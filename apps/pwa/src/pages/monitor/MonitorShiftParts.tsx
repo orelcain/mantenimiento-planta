@@ -6,7 +6,7 @@
  * bundle público no debe arrastrar los helpers del Grader, que se llevan echarts.
  */
 
-import { useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import type { PublicMonitorLive } from '@/services/shoplogix/publicShiftMonitor.service'
 import {
@@ -815,6 +815,24 @@ export function VelocidadDeLinea({ series, breaks, recentPerMinute, avgPerMinute
   medianCpm?: number | null
   cerrado: boolean
 }) {
+  /*
+   * Zoom horizontal con paneo, el mismo mecanismo del comparador: al cambiar
+   * la escala se conserva lo que se estaba mirando, y si el FINAL de la curva
+   * (el presente, lo que uno vino a ver en un turno vivo) queda fuera del área
+   * visible, se recentra ahí. Los hooks van ANTES del early return.
+   */
+  const [zoom, setZoom] = useState(1)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const focoRef = useRef<number | null>(null)
+  useLayoutEffect(() => {
+    const el = scrollRef.current
+    if (!el || focoRef.current == null) return
+    const visible = el.clientWidth
+    const x = focoRef.current * el.scrollWidth - visible / 2
+    el.scrollLeft = Math.max(0, Math.min(x, el.scrollWidth - visible))
+    focoRef.current = null
+  }, [zoom])
+
   const raw = (series ?? []).map((p) => (p.pieces || 0) / 5)
   if (raw.length < 3) return null
 
@@ -835,9 +853,26 @@ export function VelocidadDeLinea({ series, breaks, recentPerMinute, avgPerMinute
   const linea = (vals: number[]) =>
     vals.map((v, i) => `${x(i).toFixed(2)},${y(v).toFixed(2)}`).join(' ')
 
-  /* Marcas cada hora de turno, como en el comparador. */
-  const marcas: number[] = []
-  for (let m = 60; m < totalMin; m += 60) marcas.push(m)
+  /*
+   * Marcas en HORAS REALES del reloj (08:00, 09:00…), no "h+1" (pedido de
+   * Orel): esta curva es la línea de tiempo del PROPIO turno — el eje relativo
+   * solo hace falta en el comparador, donde se alinean días que arrancan a
+   * horas distintas. `t` viene en la convención wall-clock-as-UTC del doc: la
+   * hora de planta ES la del ISO. Se densifican con el zoom.
+   */
+  const t0 = Date.parse(series![0]!.t)
+  const stepMin = zoom >= 4 ? 30 : zoom >= 2 ? 60 : 120
+  const marcas: Array<{ pct: number; label: string }> = []
+  if (Number.isFinite(t0)) {
+    const stepMs = stepMin * 60_000
+    const finMs = t0 + (raw.length - 1) * 5 * 60_000
+    for (let h = Math.ceil(t0 / stepMs) * stepMs; h <= finMs; h += stepMs) {
+      const pct = (((h - t0) / 60_000 / 5) / (raw.length - 1)) * 100
+      // Pegada al borde, media etiqueta queda fuera y "07:40" se lee ":40".
+      if (pct < 2 || pct > 98) continue
+      marcas.push({ pct, label: new Date(h).toISOString().slice(11, 16) })
+    }
+  }
 
   return (
     <Bloque
@@ -862,7 +897,8 @@ export function VelocidadDeLinea({ series, breaks, recentPerMinute, avgPerMinute
             </span>
           ))}
         </div>
-        <div className="relative min-w-0 flex-1">
+        <div ref={scrollRef} className="min-w-0 flex-1 overflow-x-auto">
+          <div className="relative" style={{ width: `${zoom * 100}%`, minWidth: '100%' }} data-zoom={zoom}>
           <svg
             viewBox={`0 0 ${W} ${H}`}
             className="h-32 w-full"
@@ -882,9 +918,9 @@ export function VelocidadDeLinea({ series, breaks, recentPerMinute, avgPerMinute
                 className="text-border" vectorEffect="non-scaling-stroke" />
             ))}
             {marcas.map((m) => (
-              <line key={m} x1={xMin(m)} x2={xMin(m)} y1={0} y2={H} stroke="currentColor"
-                strokeWidth="0.25" strokeDasharray="1.5 2" className="text-border"
-                vectorEffect="non-scaling-stroke" />
+              <line key={m.pct} x1={(m.pct / 100) * W} x2={(m.pct / 100) * W} y1={0} y2={H}
+                stroke="currentColor" strokeWidth="0.25" strokeDasharray="1.5 2"
+                className="text-border" vectorEffect="non-scaling-stroke" />
             ))}
 
             {/* Las referencias primero: las curvas van encima. */}
@@ -905,15 +941,17 @@ export function VelocidadDeLinea({ series, breaks, recentPerMinute, avgPerMinute
               strokeWidth="2.4" vectorEffect="non-scaling-stroke" />
           </svg>
           {/* Eje de horas en HTML: un <text> dentro de un SVG con
-              preserveAspectRatio="none" se deforma. */}
+              preserveAspectRatio="none" se deforma. Va DENTRO del área
+              escalada para viajar con el paneo. */}
           <div className="relative h-4">
             {marcas.map((m) => (
-              <span key={m}
+              <span key={m.pct}
                 className="absolute top-0 -translate-x-1/2 whitespace-nowrap text-[9px] tabular-nums text-muted-foreground"
-                style={{ left: `${(xMin(m) / W) * 100}%` }}>
-                h+{m / 60}
+                style={{ left: `${m.pct}%` }}>
+                {m.label}
               </span>
             ))}
+          </div>
           </div>
         </div>
       </div>
@@ -939,6 +977,29 @@ export function VelocidadDeLinea({ series, breaks, recentPerMinute, avgPerMinute
             lo normal <span className="tabular-nums">{fmtDec(medianCpm)}</span>
           </span>
         )}
+        {zoom > 1 && <span>deslizá el gráfico &#8594;</span>}
+        <span className="ml-auto flex items-center gap-1">
+          {[1, 2, 4].map((z) => (
+            <button key={z} type="button"
+              onClick={() => {
+                const el = scrollRef.current
+                // Desde 1× el foco es el FINAL (el presente); desde más
+                // adentro se conserva lo que se estaba mirando.
+                focoRef.current = zoom === 1 || !el
+                  ? 1
+                  : (el.scrollLeft + el.clientWidth / 2) / el.scrollWidth
+                setZoom(z)
+              }}
+              aria-pressed={zoom === z}
+              className={`rounded-full border px-1.5 py-0.5 tabular-nums ${
+                zoom === z
+                  ? 'border-sky-500/50 bg-sky-500/20 text-sky-800 dark:text-sky-200'
+                  : 'border-border hover:bg-muted'
+              }`}>
+              {z}×
+            </button>
+          ))}
+        </span>
       </div>
     </Bloque>
   )
