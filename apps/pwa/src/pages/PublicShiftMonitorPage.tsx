@@ -568,10 +568,14 @@ function RitmoNecesario({ pace, cierre, muestras, fuente, plantSlug, shiftName, 
   }
 
   const fuera = pace.verdict === 'fuera-de-alcance'
+  /* El escalón del medio (pedido de Orel, 13-ago): "Se alcanza pidiendo 24
+     pz/min" en una línea que viene a 10 es verdad solo en teoría — el techo es
+     lo mejor que la línea hizo alguna vez, no la tendencia de hoy. */
+  const exigente = pace.verdict === 'exigente'
   return (
     <div
       className={`mt-2 rounded-xl border px-3 py-2 ${
-        fuera
+        fuera || exigente
           ? 'border-amber-400/30 bg-amber-400/10'
           : 'border-sky-400/25 bg-sky-400/10'
       }`}
@@ -589,9 +593,21 @@ function RitmoNecesario({ pace, cierre, muestras, fuente, plantSlug, shiftName, 
       {/* El VEREDICTO primero y en grande. Antes todo esto era un párrafo denso
           donde "¿llego o no?" —la única pregunta que importa— había que
           deducirla leyendo cuatro cifras seguidas. */}
-      <p className={`mt-1 text-[15px] font-semibold ${fuera ? 'text-amber-800 dark:text-amber-300' : 'text-sky-800 dark:text-sky-300'}`}>
-        {fuera ? 'No se alcanza con el tiempo que queda' : 'Se alcanza'}
+      <p className={`mt-1 text-[15px] font-semibold ${fuera || exigente ? 'text-amber-800 dark:text-amber-300' : 'text-sky-800 dark:text-sky-300'}`}>
+        {fuera
+          ? 'No se alcanza con el tiempo que queda'
+          : exigente
+          ? 'Se alcanza, pero solo apurando'
+          : 'Se alcanza al ritmo que traés'}
       </p>
+      {/* Sin adornos históricos: con techo desconocido no se puede afirmar
+          que la línea "lo logró alguna vez" — los dos números ya lo dicen. */}
+      {exigente && (
+        <p className="mt-0.5 text-[12px] text-muted-foreground">
+          Pide <span className="tabular-nums text-foreground/90">{fmtDec(pace.requiredPerMinute)} pz/min</span>{' '}
+          y el turno viene a <span className="tabular-nums text-foreground/90">{fmtDec(pace.currentPerHour / 60)}</span>.
+        </p>
+      )}
       <p className="mt-0.5 text-[12px] text-muted-foreground">
         Al ritmo de ahora el turno cierra en{' '}
         <span className="tabular-nums text-foreground/90">{fmtInt(pace.projectedPieces)} pz</span>
@@ -699,7 +715,13 @@ function RitmoNecesario({ pace, cierre, muestras, fuente, plantSlug, shiftName, 
               <span className="text-muted-foreground/80">
                 ({fmtInt(pace.withExtraHour.requiredPerHour)} pz/h)
               </span>
-              {' '}— <span className="text-emerald-800 dark:text-emerald-300">la meta entra</span>.
+              {' '}—{' '}
+              {/* La diferencia entre "cabe en el techo histórico" y "es el
+                  ritmo que la línea YA trae" es la que decide si la hora
+                  extra resuelve o solo acerca. */}
+              <span className="text-emerald-800 dark:text-emerald-300">
+                {pace.withExtraHour.realistic ? 'el ritmo que ya traés' : 'la meta entra'}
+              </span>.
             </>
           ) : (
             <>
@@ -956,6 +978,9 @@ export function PublicShiftMonitorPage() {
       scheduledEnd: live.plannedEnd,
       nowWallMs,
       currentPerHour: live.piecesPerHour,
+      // Para el escalón "exigente": el requerido se juzga contra el MAYOR
+      // entre el promedio y la última media hora (ver monitorPace).
+      recentPerHour: live.recentPiecesPerMinute * 60,
       /*
        * El techo sale del MEJOR turno real, no de `expectedPieces/horas`. Ese
        * cálculo mezclaba lo que el sensor espera con una ventana que puede ser
