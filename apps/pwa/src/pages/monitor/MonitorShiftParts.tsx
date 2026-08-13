@@ -10,13 +10,15 @@ import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import type { PublicMonitorLive } from '@/services/shoplogix/publicShiftMonitor.service'
 import {
-  findGapWindows, resumenComparacion, type CompareResult, type PacePoint,
+  findGapWindows, resumenComparacion, type CompareResult, type PacePoint, type PlannedBreak,
 } from '@/services/shoplogix/monitorCompare'
 import { MonitorCompareChart } from './MonitorCompareChart'
 import { COLORES } from './monitorColors'
 
 const nf = new Intl.NumberFormat('es-CL')
 const fmtInt = (n: number) => nf.format(Math.round(n || 0))
+const nf1 = new Intl.NumberFormat('es-CL', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+const fmtDec = (n: number) => nf1.format(n || 0)
 
 /**
  * Sección plegable del monitor.
@@ -780,6 +782,164 @@ export function BitacoraOperador({ comments, onCausa }: {
           </li>
         ))}
       </ul>
+    </Bloque>
+  )
+}
+
+/**
+ * Velocidad de la línea (pz/min) a lo largo del turno — "¿venimos acelerando o
+ * frenando?" (pedido de Orel, 13-ago). El KPI "Últimos 30 min" da la velocidad
+ * de AHORA; esta curva da la historia: la rampa del arranque, los baches y el
+ * crucero.
+ *
+ * PRECISIÓN: Shoplogix entrega tramos de 5 minutos y el sync corre cada ~5 min
+ * — ese es el piso del dato. La curva cruda de 5 min queda siempre visible
+ * (tenue); la protagonista es la MEDIA MÓVIL DE 15 MIN (3 tramos): con 5 min a
+ * secas una micro-detención parece un desplome de velocidad, con 30 min el
+ * cambio de ritmo tarda media hora en notarse. 15 es el compromiso que pidió
+ * Orel ("mientras más preciso mejor").
+ *
+ * Las dos referencias punteadas la vuelven accionable: "necesitás" (el ritmo
+ * para la cuota, el mismo de la tarjeta de la meta, se mueve durante el turno)
+ * y "lo normal" (la mediana de los últimos turnos). Si la media cruza abajo de
+ * "necesitás", el atraso se ve venir ANTES de que la brecha lo cuente.
+ */
+export function VelocidadDeLinea({ series, breaks, recentPerMinute, avgPerMinute, requiredPerMinute, medianCpm, cerrado }: {
+  series?: PublicMonitorLive['series']
+  /** Paradas de convenio (hechos + pronóstico), para que el valle de la
+      colación no parezca falla. Mismas bandas grises que el comparador. */
+  breaks?: PlannedBreak[]
+  recentPerMinute?: number | null
+  avgPerMinute?: number | null
+  requiredPerMinute?: number | null
+  medianCpm?: number | null
+  cerrado: boolean
+}) {
+  const raw = (series ?? []).map((p) => (p.pieces || 0) / 5)
+  if (raw.length < 3) return null
+
+  const VENTANA = 3 // 3 tramos de 5 min = 15 minutos
+  const media = raw.map((_, i) => {
+    const w = raw.slice(Math.max(0, i - VENTANA + 1), i + 1)
+    return w.reduce((a, x) => a + x, 0) / w.length
+  })
+
+  const totalMin = raw.length * 5
+  const maxY = Math.max(...raw, requiredPerMinute ?? 0, medianCpm ?? 0, 1) * 1.08
+
+  const W = 100
+  const H = 100
+  const x = (i: number) => (i / (raw.length - 1)) * W
+  const xMin = (m: number) => Math.min(W, (m / totalMin) * W)
+  const y = (v: number) => H - (v / maxY) * H
+  const linea = (vals: number[]) =>
+    vals.map((v, i) => `${x(i).toFixed(2)},${y(v).toFixed(2)}`).join(' ')
+
+  /* Marcas cada hora de turno, como en el comparador. */
+  const marcas: number[] = []
+  for (let m = 60; m < totalMin; m += 60) marcas.push(m)
+
+  return (
+    <Bloque
+      id="velocidad"
+      titulo="Velocidad de la línea"
+      extra={
+        <span className="tabular-nums font-semibold text-sky-700 dark:text-sky-300">
+          {fmtDec(cerrado ? (avgPerMinute ?? 0) : (recentPerMinute ?? 0))} pz/min
+          <span className="ml-1 font-normal text-muted-foreground">
+            {cerrado ? 'promedio' : 'ahora'}
+          </span>
+        </span>
+      }
+    >
+      <div className="mt-2 flex gap-1">
+        <div className="relative h-32 w-7 shrink-0">
+          {[maxY, maxY / 2].map((v) => (
+            <span key={v}
+              className="absolute right-0 -translate-y-1/2 text-[9px] tabular-nums text-muted-foreground"
+              style={{ top: `${(y(v) / H) * 100}%` }}>
+              {fmtDec(v)}
+            </span>
+          ))}
+        </div>
+        <div className="relative min-w-0 flex-1">
+          <svg
+            viewBox={`0 0 ${W} ${H}`}
+            className="h-32 w-full"
+            preserveAspectRatio="none"
+            role="img"
+            aria-label="Velocidad de la línea en piezas por minuto, tramo a tramo del turno"
+          >
+            {(breaks ?? []).filter((b) => b.fromMin < totalMin).map((b) => (
+              <rect key={`${b.fromMin}-${b.toMin}`} x={xMin(b.fromMin)} y={0}
+                width={Math.max(0.3, xMin(b.toMin) - xMin(b.fromMin))} height={H}
+                className="fill-muted-foreground/15" />
+            ))}
+
+            {[0.25, 0.5, 0.75].map((f) => (
+              <line key={f} x1={0} x2={W} y1={H * f} y2={H * f}
+                stroke="currentColor" strokeWidth="0.25" strokeDasharray="1.5 1.5"
+                className="text-border" vectorEffect="non-scaling-stroke" />
+            ))}
+            {marcas.map((m) => (
+              <line key={m} x1={xMin(m)} x2={xMin(m)} y1={0} y2={H} stroke="currentColor"
+                strokeWidth="0.25" strokeDasharray="1.5 2" className="text-border"
+                vectorEffect="non-scaling-stroke" />
+            ))}
+
+            {/* Las referencias primero: las curvas van encima. */}
+            {requiredPerMinute != null && requiredPerMinute > 0 && requiredPerMinute < maxY && (
+              <line x1={0} x2={W} y1={y(requiredPerMinute)} y2={y(requiredPerMinute)}
+                stroke="#f59e0b" strokeWidth="1" strokeDasharray="4 3" opacity="0.85"
+                vectorEffect="non-scaling-stroke" />
+            )}
+            {medianCpm != null && medianCpm > 0 && (
+              <line x1={0} x2={W} y1={y(medianCpm)} y2={y(medianCpm)}
+                stroke="currentColor" strokeWidth="1" strokeDasharray="2 3"
+                className="text-muted-foreground/70" vectorEffect="non-scaling-stroke" />
+            )}
+
+            <polyline points={linea(raw)} fill="none" stroke={COLORES[0]}
+              strokeWidth="1" opacity="0.25" vectorEffect="non-scaling-stroke" />
+            <polyline points={linea(media)} fill="none" stroke={COLORES[0]}
+              strokeWidth="2.4" vectorEffect="non-scaling-stroke" />
+          </svg>
+          {/* Eje de horas en HTML: un <text> dentro de un SVG con
+              preserveAspectRatio="none" se deforma. */}
+          <div className="relative h-4">
+            {marcas.map((m) => (
+              <span key={m}
+                className="absolute top-0 -translate-x-1/2 whitespace-nowrap text-[9px] tabular-nums text-muted-foreground"
+                style={{ left: `${(xMin(m) / W) * 100}%` }}>
+                h+{m / 60}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
+        <span className="flex items-center gap-1.5">
+          <i className="h-1.5 w-4 rounded-full" style={{ background: COLORES[0] }} />
+          media 15 min
+        </span>
+        <span className="flex items-center gap-1.5">
+          <i className="h-1.5 w-4 rounded-full opacity-30" style={{ background: COLORES[0] }} />
+          tramos de 5 min (el dato crudo de Shoplogix)
+        </span>
+        {requiredPerMinute != null && requiredPerMinute > 0 && (
+          <span className="flex items-center gap-1.5">
+            <i className="h-0.5 w-4 rounded-full bg-amber-500" />
+            necesitás <span className="tabular-nums">{fmtDec(requiredPerMinute)}</span>
+          </span>
+        )}
+        {medianCpm != null && medianCpm > 0 && (
+          <span className="flex items-center gap-1.5">
+            <i className="h-0.5 w-4 rounded-full bg-muted-foreground/70" />
+            lo normal <span className="tabular-nums">{fmtDec(medianCpm)}</span>
+          </span>
+        )}
+      </div>
     </Bloque>
   )
 }
