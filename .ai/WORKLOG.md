@@ -13,6 +13,19 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-13 - claude - Boton para abrir el monitor en vivo sin pasar por compartir (#511)
+
+- Hecho: generar link/QR es para COMPARTIR; para mirar el monitor uno mismo faltaba un boton de
+  un click. `handleAbrirMonitor` reusa el token de linea via `createPublicShiftMonitor`
+  (invariante: no crea token nuevo, solo extiende vigencia) y abre `/monitor/{token}` en pestana
+  nueva; la pestana se abre ANTES del await para que el bloqueador de popups no la mate.
+- Archivos: `pages/AnalisisGrader/AnalisisGraderTurnoPage.tsx`.
+- Verificación: tsc y eslint limpios (1 warning preexistente ajeno). Pendiente de verificación
+  humana: el click con sesion de supervisor (no probado en navegador, sin login).
+- Estado: HECHO. Merge squash a main `14564470`.
+
+---
+
 ## 2026-08-13 - claude - Fix: la brecha se calcula contra la MISMA referencia que el grafico (#509)
 
 - Hecho: el v3 (#505) dejo el grafico comparando contra la referencia del chip pero la lista
