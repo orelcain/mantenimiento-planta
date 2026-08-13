@@ -182,10 +182,19 @@ export function computePaceToTarget(input: PaceInput): PaceToTarget | null {
    */
   const ritmoReal = Math.max(currentPerHour, input.recentPerHour ?? 0)
   const MARGEN = 1.05
+  /*
+   * Tope del "apurando" (Orel, 13-ago, segunda vuelta): "se alcanza pero con
+   * 36 pz/min" en una línea que viene a 10 sigue siendo irreal — nadie apura
+   * 3,6×. Por encima de +30% del ritmo real el veredicto es NO SE ALCANZA,
+   * haya techo o no. Calibrado con los casos vistos hoy: pedir 12,6 viniendo
+   * a 9,8 (+29%) es un apuro plausible; pedir 26,8 no.
+   */
+  const TOPE_APURO = 1.3
   const realista = ritmoReal > 0 && requiredPerHour <= ritmoReal * MARGEN
 
   const verdict: PaceVerdict =
-    maxPerHour != null && requiredPerHour > maxPerHour
+    (maxPerHour != null && requiredPerHour > maxPerHour) ||
+    (ritmoReal > 0 && requiredPerHour > ritmoReal * TOPE_APURO)
       ? 'fuera-de-alcance'
       : ritmoReal > 0 && !realista
       ? 'exigente'
@@ -202,7 +211,11 @@ export function computePaceToTarget(input: PaceInput): PaceToTarget | null {
   const withExtraHour = verdict === 'alcanzable' ? null : {
     requiredPerHour: requiredWithExtra,
     requiredPerMinute: requiredWithExtra / 60,
-    feasible: maxPerHour == null || requiredWithExtra <= maxPerHour,
+    // "Factible" respeta los DOS topes: el techo histórico y el tope de apuro
+    // sobre el ritmo real — si con la hora extra sigue pidiendo 2×, no basta.
+    feasible:
+      (maxPerHour == null || requiredWithExtra <= maxPerHour) &&
+      (ritmoReal <= 0 || requiredWithExtra <= ritmoReal * TOPE_APURO),
     realistic: ritmoReal > 0 && requiredWithExtra <= ritmoReal * MARGEN,
     remainingMin: extraMin,
   }

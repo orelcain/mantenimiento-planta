@@ -601,8 +601,9 @@ function RitmoNecesario({ pace, cierre, muestras, fuente, plantSlug, shiftName, 
           : 'Se alcanza al ritmo que traés'}
       </p>
       {/* Sin adornos históricos: con techo desconocido no se puede afirmar
-          que la línea "lo logró alguna vez" — los dos números ya lo dicen. */}
-      {exigente && (
+          que la línea "lo logró alguna vez" — los dos números ya lo dicen.
+          También en "no se alcanza": el porqué en una línea. */}
+      {(exigente || fuera) && (
         <p className="mt-0.5 text-[12px] text-muted-foreground">
           Pide <span className="tabular-nums text-foreground/90">{fmtDec(pace.requiredPerMinute)} pz/min</span>{' '}
           y el turno viene a <span className="tabular-nums text-foreground/90">{fmtDec(pace.currentPerHour / 60)}</span>.
@@ -729,7 +730,7 @@ function RitmoNecesario({ pace, cierre, muestras, fuente, plantSlug, shiftName, 
               <b className="tabular-nums">
                 {fmtDec(pace.withExtraHour.requiredPerMinute)} pz/min ({fmtInt(pace.withExtraHour.requiredPerHour)} pz/h)
               </b>, que
-              sigue por encima del techo de la línea. Con una hora no basta.
+              sigue lejos de lo que la línea viene dando. Con una hora no basta.
             </>
           )}
         </div>
