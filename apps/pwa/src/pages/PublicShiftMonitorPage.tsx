@@ -991,14 +991,17 @@ export function PublicShiftMonitorPage() {
     return buildDayComparison({
       todaySeries: live?.series,
       todayDateKey: data?.dateKey ?? '',
-      previous: (data?.history ?? []).map((h) => ({ dateKey: h.dateKey, series: h.live?.series })),
+      todayShiftId: data?.shiftId ?? null,
+      previous: (data?.history ?? []).map((h) => ({
+        dateKey: h.dateKey, shiftId: h.shiftId, series: h.live?.series,
+      })),
       // Los 6 que trae el doc: cuáles se dibujan lo elige quien mira.
       maxDays: 6,
       targetPieces: meta,
       usefulMin: opt?.usefulMin ?? null,
       breaks: mergeBreaks(hoyBreaks, anteriores, minutoActual),
     })
-  }, [live, data?.dateKey, data?.history, data?.targetPieces])
+  }, [live, data?.dateKey, data?.shiftId, data?.history, data?.targetPieces])
 
   if (status === 'loading') {
     return (
@@ -1237,7 +1240,16 @@ export function PublicShiftMonitorPage() {
             value={fmtDec(live.uptimePct, 0)}
             unit="%"
             icon={<Clock className="h-3 w-3" />}
-            hint={fmtDurationSec(live.uptimeSec)}
+            /*
+             * Minutos de LÍNEA, no la suma del uptime de cada máquina: en Yal,
+             * con tres Baader, esa suma daba "13 h 31 min" dentro de un turno
+             * de 4 h 51 — un número imposible en la pantalla.
+             */
+            hint={
+              live.timeBreakdown
+                ? fmtDurationSec(live.timeBreakdown.producingMin * 60)
+                : fmtDurationSec(live.uptimeSec)
+            }
           />
         </div>
 

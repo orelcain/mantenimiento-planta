@@ -112,11 +112,18 @@ export interface PublicMonitorLive {
    */
   timeBreakdown?: {
     windowMin: number
+    /** Minutos de LÍNEA: los tres suman la ventana, con una máquina o con tres. */
     producingMin: number
     plannedMin: number
     recoverableMin: number
-    planned: Array<{ reason: string; min: number; count: number }>
-    recoverable: Array<{ reason: string; min: number; count: number }>
+    /**
+     * `min` son los minutos que la causa estuvo activa en alguna máquina;
+     * `lineMin`, los que además frenaron la línea entera. Con varias máquinas
+     * los dos se separan mucho y esa diferencia es el dato: en Chonchi KNURO se
+     * llevó 98 min de UNA Baader y solo 4 detuvieron la línea.
+     */
+    planned: Array<{ reason: string; min: number; count: number; lineMin?: number }>
+    recoverable: Array<{ reason: string; min: number; count: number; lineMin?: number }>
   } | null
   /** Razones de detención, referenciadas por índice desde `stopEvents`. */
   stopReasons?: string[]

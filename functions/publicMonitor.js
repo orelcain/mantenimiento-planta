@@ -896,16 +896,131 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
    * Desglose planificado / recuperable, con las causas VISIBLES en los dos
    * grupos. Agrupar el planificado en un solo número invita a sospechar que se
    * esconde algo: si la colación se lleva 56 min, que se lea "colación 56 min".
+   *
+   * ⚠⚠ Se mide sobre la LÍNEA DE TIEMPO del turno, minuto a minuto, y no
+   * sumando las duraciones de cada máquina. Yal tiene TRES Baader: sumadas, sus
+   * paradas daban 811 + 193 + 21 min contra una ventana de 291 — la barra
+   * marcaba 352% y la colación aparecía como "179 min · 6×" cuando fueron 60
+   * minutos, dos veces. En Filete, con una sola máquina, la suma coincidía con
+   * la ventana y el error no se veía.
+   *
+   * Cada minuto se clasifica UNA vez y con esta prioridad: si alguna máquina
+   * produjo, la línea estaba produciendo; después el convenio; después lo
+   * recuperable. Así el total nunca pasa de la ventana.
    */
+  const minVentana = Math.max(0, Math.round(windowHours * 60))
+  const t0Ventana = effectiveStart ? effectiveStart.getTime() : null
+
+  /*
+   * La rejilla va de 10 en 10 segundos, no de minuto en minuto: una micro
+   * detención de 40 s pintaba un minuto entero, y con 37 de ellas en un turno
+   * de Filete el error se acumula en decenas de minutos. Un turno de 12 h son
+   * 4.320 celdas — nada.
+   */
+  const PASO_SEG = 10
+  const celdas = Math.max(0, minVentana * (60 / PASO_SEG))
+  const aMin = (n) => Math.round((n * PASO_SEG) / 60)
+
+  /** Marca [desde, hasta) en una rejilla, redondeando al paso más cercano. */
+  const marcar = (rejilla, desdeMs, hastaMs, valor) => {
+    const a = Math.max(0, Math.round((desdeMs - t0Ventana) / (PASO_SEG * 1000)))
+    const b = Math.min(celdas, Math.round((hastaMs - t0Ventana) / (PASO_SEG * 1000)))
+    for (let i = a; i < b; i++) rejilla[i] = valor
+  }
+
+  /*
+   * La línea de tiempo se arma en DOS pasos, y el orden importa.
+   *
+   * 1. Cada máquina resuelve su propia línea: primero sus `uptime`, y encima
+   *    sus paradas. Las paradas pisan el uptime a propósito — los states de una
+   *    misma máquina llegan duplicados entre el doc del turno y el de la cola
+   *    `Unscheduled`, y un uptime solapado tapaba la parada. Así, con UNA sola
+   *    máquina, las 37 micro detenciones de Filete daban "0 min frenaron la
+   *    línea", que es justo lo contrario de la verdad.
+   * 2. La línea produce en un minuto si ALGUNA máquina lo estaba produciendo.
+   *    Recién ahí, sobre los minutos que quedaron sin producción, se reparte el
+   *    convenio y lo recuperable.
+   */
+  const linea = new Uint8Array(celdas)  // 1 produce, 2 convenio, 3 recuperable
+  if (t0Ventana != null) {
+    for (const m of machines) {
+      const gm = new Uint8Array(celdas)
+      for (const st of m.states || []) {
+        const d = toDate(st.startAt)
+        const sec = st.durationSec || 0
+        if (!d || sec <= 0) continue
+        if (st.type === 'uptime') marcar(gm, d.getTime(), d.getTime() + sec * 1000, 1)
+      }
+      for (const st of m.states || []) {
+        const d = toDate(st.startAt)
+        const sec = st.durationSec || 0
+        if (!d || sec <= 0 || st.type === 'uptime') continue
+        marcar(gm, d.getTime(), d.getTime() + sec * 1000, 4)  // parada de ESTA máquina
+      }
+      for (let i = 0; i < celdas; i++) if (gm[i] === 1) linea[i] = 1
+    }
+  }
+
+  /** Minutos de la ventana cubiertos por cada causa, ya sin solapes. */
+  const porCausa = new Map()
+  if (t0Ventana != null) {
+    for (const e of stopEvents) {
+      const reason = stopReasons[e.r]
+      let g = porCausa.get(reason)
+      if (!g) { g = new Uint8Array(celdas); porCausa.set(reason, g) }
+      const a = new Date(e.f).getTime()
+      marcar(g, a, a + e.s * 1000, 1)
+    }
+    // Convenio antes que recuperable: una colación no se "recupera".
+    for (const [reason, g] of porCausa) {
+      const valor = esParoPlanificado(reason) ? 2 : 3
+      for (let i = 0; i < celdas; i++) if (g[i] && linea[i] === 0) linea[i] = valor
+    }
+  }
+
+  /**
+   * Minutos y tramos contiguos de una causa. "2x" son dos paradas reales, no
+   * dos máquinas parando por lo mismo.
+   *
+   * `lineMin` son los minutos en que ADEMÁS la línea entera estuvo detenida.
+   * Con varias máquinas los dos números se separan mucho y esa diferencia es el
+   * dato: KNURO se llevó 107 min de UNA Baader de Chonchi mientras las otras
+   * dos seguían, así que la línea no perdió esos minutos. Sin distinguirlo, la
+   * barra dice "recuperable 7 min" y el detalle "107 min", y parece un error.
+   */
+  const resumir = (g) => {
+    let celdasCausa = 0, tramos = 0, previo = 0, celdasLinea = 0
+    for (let i = 0; i < g.length; i++) {
+      if (g[i]) {
+        celdasCausa++
+        if (linea[i] !== 1) celdasLinea++
+        if (!previo) tramos++
+      }
+      previo = g[i]
+    }
+    return { min: aMin(celdasCausa), count: tramos, lineMin: aMin(celdasLinea) }
+  }
+
   const planificados = []
   const recuperables = []
-  for (const st of [...stopAcc.values()].sort((a, b) => b.sec - a.sec)) {
-    const fila = { reason: st.reason, min: Math.round(st.sec / 60), count: st.count }
-    if (fila.min <= 0 && st.count === 0) continue
-    ;(esParoPlanificado(st.reason) ? planificados : recuperables).push(fila)
+  for (const [reason, g] of [...porCausa.entries()].sort()) {
+    const r = resumir(g)
+    if (r.min <= 0) continue
+    ;(esParoPlanificado(reason) ? planificados : recuperables)
+      .push({ reason, min: r.min, count: r.count, lineMin: r.lineMin })
   }
-  const plannedMin = planificados.reduce((a, x) => a + x.min, 0)
-  const recoverableMin = recuperables.reduce((a, x) => a + x.min, 0)
+  planificados.sort((a, b) => b.min - a.min)
+  recuperables.sort((a, b) => b.min - a.min)
+
+  let cProd = 0, cPlan = 0, cRec = 0
+  for (let i = 0; i < linea.length; i++) {
+    if (linea[i] === 1) cProd++
+    else if (linea[i] === 2) cPlan++
+    else if (linea[i] === 3) cRec++
+  }
+  const producingMin = aMin(cProd)
+  const plannedMin = aMin(cPlan)
+  const recoverableMin = aMin(cRec)
 
   // ── Serie temporal (suma de todas las máquinas por bucket de 5 min) ──────
   const byBucket = new Map()
@@ -1109,13 +1224,12 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
     series,
     topStops,
     /*
-     * A dónde se fue el tiempo del turno. `producingMin` sale del uptime real;
-     * el resto se reparte entre paradas de convenio y paradas recuperables, con
-     * el detalle de cada una — que es lo que permite discutir el número.
+     * A dónde se fue el tiempo del turno, medido sobre la línea de tiempo: los
+     * tres números y el resto suman la ventana, con varias máquinas o con una.
      */
     timeBreakdown: {
-      windowMin: Math.round(windowHours * 60),
-      producingMin: Math.round(uptimeSec / 60),
+      windowMin: minVentana,
+      producingMin,
       plannedMin,
       recoverableMin,
       planned: planificados,
