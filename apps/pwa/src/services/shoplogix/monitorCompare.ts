@@ -323,20 +323,25 @@ export interface GapWindow {
 }
 
 /**
- * Dónde se abrió la brecha: el tramo continuo en que hoy perdió más terreno.
+ * Dónde se abrió la brecha: los tramos continuos en que hoy perdió terreno.
  *
  * Es la pregunta de Orel — *"¿qué pasó que nos atrasó?"*. Ver la curva de hoy por
  * debajo de la de ayer dice QUE se perdió, no DÓNDE: la brecha casi nunca se
- * abre parejo, se abre en un tramo y después se arrastra planchada el resto del
- * turno. Con el tramo en la mano se puede cruzar contra las detenciones y
- * ponerle nombre.
+ * abre pareja, se abre a golpes. Y muchas veces son VARIOS golpes — quedarse
+ * con el peor tramo cuenta la mitad de la historia cuando el atraso se
+ * repartió en dos o tres paradas distintas.
  *
- * Se busca la racha continua de tramos con más pérdida acumulada (Kadane sobre
- * los negativos) y no el peor tramo suelto: una parada de 40 minutos son ocho
- * tramos malos seguidos, y quedarse con uno la haría ver ocho veces más chica.
+ * Cada ventana es una racha de tramos consecutivos con pérdida (una parada de
+ * 40 minutos son ocho tramos malos seguidos: se cuentan como UNA). Se devuelven
+ * de mayor a menor pérdida, hasta 3, y solo las que explican una parte real del
+ * atraso — listar un bache de 8 piezas al lado de uno de 300 es ruido.
  */
-export function findGapWindow(hoy: PacePoint[], ref: PacePoint[]): GapWindow | null {
-  if (hoy.length === 0 || ref.length === 0) return null
+export function findGapWindows(
+  hoy: PacePoint[],
+  ref: PacePoint[],
+  maxVentanas = 3,
+): GapWindow[] {
+  if (hoy.length === 0 || ref.length === 0) return []
 
   /** Piezas de CADA tramo (no acumuladas), por minuto de turno. */
   const porTramo = (curve: PacePoint[]) => {
@@ -351,40 +356,55 @@ export function findGapWindow(hoy: PacePoint[], ref: PacePoint[]): GapWindow | n
   const a = porTramo(hoy)
   const b = porTramo(ref)
 
-  let mejorIni: number | null = null
-  let mejorFin = 0
-  let mejor = 0
+  /** Rachas maximales de tramos con pérdida. */
+  const rachas: Array<{ fromMin: number; toMin: number; lost: number }> = []
   let ini: number | null = null
-  let corriendo = 0
-
+  let fin = 0
+  let acum = 0
+  const cerrar = () => {
+    if (ini != null && acum < 0) rachas.push({ fromMin: ini - BUCKET_MIN, toMin: fin, lost: -acum })
+    ini = null
+    acum = 0
+  }
   for (const min of [...a.keys()].sort((x, y) => x - y)) {
     // Un tramo que el día de referencia no alcanzó no se puede comparar: contar
     // su ausencia como pérdida inventaría una brecha que no existe.
-    if (!b.has(min)) continue
+    if (!b.has(min)) { cerrar(); continue }
     const delta = (a.get(min) ?? 0) - (b.get(min) ?? 0)
     if (delta < 0) {
-      if (ini == null) { ini = min; corriendo = 0 }
-      corriendo += delta
-      if (corriendo < mejor) { mejor = corriendo; mejorIni = ini; mejorFin = min }
+      if (ini == null) ini = min
+      acum += delta
+      fin = min
     } else {
-      ini = null
-      corriendo = 0
+      cerrar()
     }
   }
+  cerrar()
+  if (rachas.length === 0) return []
 
-  if (mejorIni == null || mejor >= 0) return null
+  /*
+   * El share se mide contra el total PERDIDO (la suma de todas las rachas), no
+   * contra la brecha neta. La neta descuenta los tramos en que hoy fue mejor, y
+   * con ella los porcentajes explotan: en Yal salió "100% + 96% + 53%" porque
+   * cada pérdida bruta superaba a la diferencia final. Contra lo perdido, los
+   * tramos mostrados siempre suman ≤ 100.
+   */
+  const totalPerdido = rachas.reduce((a, r) => a + r.lost, 0)
 
-  // La diferencia total, para saber cuánto del atraso explica este tramo.
-  const totalHoy = hoy[hoy.length - 1]!.pieces
-  const totalRef = piecesAt(ref, hoy[hoy.length - 1]!.minutes)
-  const brechaTotal = totalRef == null ? 0 : totalRef - totalHoy
+  const ordenadas = rachas.sort((x, y) => y.lost - x.lost)
+  const filtradas = ordenadas.filter((r) => r.lost >= totalPerdido * 0.1)
 
-  return {
-    fromMin: mejorIni - BUCKET_MIN,
-    toMin: mejorFin,
-    lostPieces: Math.round(-mejor),
-    share: brechaTotal > 0 ? Math.min(1, -mejor / brechaTotal) : 0,
-  }
+  return filtradas.slice(0, maxVentanas).map((r) => ({
+    fromMin: r.fromMin,
+    toMin: r.toMin,
+    lostPieces: Math.round(r.lost),
+    share: totalPerdido > 0 ? r.lost / totalPerdido : 0,
+  }))
+}
+
+/** La peor racha sola. Conservada por los llamadores que muestran una. */
+export function findGapWindow(hoy: PacePoint[], ref: PacePoint[]): GapWindow | null {
+  return findGapWindows(hoy, ref, 1)[0] ?? null
 }
 
 /**
