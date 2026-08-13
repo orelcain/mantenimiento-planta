@@ -13,6 +13,20 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-13 - claude - "Datos hasta las HH:MM" junto a las piezas del turno vivo (#519)
+
+- Hecho: el monitor es un espejo que copia Shoplogix cada ~5 min; sin el corte, la
+  diferencia de un ciclo de sync (63 pz, ~6 min a 10,9 pz/min) parecia descuadre de
+  conteo. Se muestra el FIN del ultimo tramo con dato (t + 5 min), no lastSyncAt. Solo
+  con turno vivo.
+- Archivos: apps/pwa/src/pages/PublicShiftMonitorPage.tsx
+- Verificación: preview :5175 contra turno VIVO de Filete (390px, "3.488 piezas · datos
+  hasta las 14:25"); tsc y eslint limpios.
+- Estado: HECHO. Merge squash a main `7501ddae`.
+- Sigue: nada pendiente de este cambio.
+
+---
+
 ## 2026-08-13 - claude - Curva de velocidad: horas reales, zoom y paneo (#517)
 
 - Hecho: eje de la curva pasa de "h+1" a horas reales del reloj (08:00, 09:00...); zoom
