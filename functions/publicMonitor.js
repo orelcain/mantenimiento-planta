@@ -1203,7 +1203,11 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
      * planta: los buckets de 5 min corren un bucket detrás y la diferencia se
      * leía como descuadre. null en turnos sin rollup (históricos, pre-deploy).
      */
-    shoplogixLive: parent.officialLive && Number.isFinite(parent.officialLive.totalCycles)
+    /* > 0, no solo "es número": los turnos que ya pasaron su cierre quedaron
+       con un 0 congelado del bug del 13-08 (el rollup devolvía la plantilla
+       del día siguiente y se guardaba su cero). Exponerlo haría que cualquier
+       consumidor lea "Shoplogix marcaba 0" con la línea en 4.707 piezas. */
+    shoplogixLive: parent.officialLive && parent.officialLive.totalCycles > 0
       ? {
           totalCycles: parent.officialLive.totalCycles,
           at: iso(toDate(parent.officialLive.at)),
