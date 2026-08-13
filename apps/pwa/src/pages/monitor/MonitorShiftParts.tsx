@@ -329,7 +329,11 @@ export function ComparadorDias({ cmp, live, onCausa }: {
           : <span className="tabular-nums">{hh} h {String(mm).padStart(2, '0')} de turno</span>
       }
     >
-          <Veredicto cmp={cmp} cerrado={live?.shiftClosed ?? false} />
+          <Veredicto
+            cmp={cmp}
+            cerrado={live?.shiftClosed ?? false}
+            producingMin={live?.timeBreakdown?.producingMin ?? null}
+          />
 
           <div className="mt-3">
             <MonitorCompareChart cmp={cmp} visibles={visibles} />
@@ -602,15 +606,25 @@ function BrechaDelDia({ cmp, live, onCausa }: {
  * compara sola ("ayer a esta hora"), y el MEJOR es la que dice si el turno
  * bueno era alcanzable. La cuota es la tercera y no se negocia.
  */
-function Veredicto({ cmp, cerrado }: { cmp: CompareResult; cerrado: boolean }) {
+function Veredicto({ cmp, cerrado, producingMin }: {
+  cmp: CompareResult
+  cerrado: boolean
+  /** Minutos que la L\u00cdNEA produjo de verdad (timeBreakdown), para decir cu\u00e1nto
+      de la altura del turno fue producci\u00f3n real y cu\u00e1nto parada. */
+  producingMin?: number | null
+}) {
   const r = resumenComparacion(cmp)
   if (r.actual == null) return null
 
   const tono = (n: number) =>
     n >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'
   const conSigno = (n: number) => `${n >= 0 ? '+' : '\u2212'}${fmtInt(Math.abs(n))}`
-  const altura = r.minutos != null
-    ? `${Math.floor(r.minutos / 60)} h ${String(r.minutos % 60).padStart(2, '0')}`
+  const fmtHm = (min: number) => `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, '0')}`
+  const altura = r.minutos != null ? fmtHm(r.minutos) : null
+  // Solo si aporta: con la l\u00ednea produciendo el turno completo, repetir la
+  // misma cifra dos veces no dice nada.
+  const real = producingMin != null && r.minutos != null && producingMin < r.minutos
+    ? fmtHm(producingMin)
     : null
 
   return (
@@ -626,6 +640,12 @@ function Veredicto({ cmp, cerrado }: { cmp: CompareResult; cerrado: boolean }) {
         {altura && (
           <span className="font-normal text-muted-foreground">
             {cerrado ? ` en ${altura} de turno` : ` a ${altura} de turno`}
+            {/* Pedido de Orel (13-ago): decir cuánto de esa altura fue
+                producción de verdad — el resto son paradas, y es la brecha
+                que Mantención puede mostrar y atacar. */}
+            {real && (cerrado
+              ? `, de las que ${real} fueron de producción real`
+              : `, con ${real} de producción real`)}
           </span>
         )}
         .
