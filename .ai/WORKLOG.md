@@ -13,6 +13,19 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-12 - claude - Sin "Ahora mismo" con turno cerrado y produccion real en el veredicto (#503)
+
+- Hecho: con el turno cerrado, el bloque "Ahora mismo — Linea detenida" pintaba alarmante una
+  noche normal (esperable tras el cierre); ahora solo aparece con el turno en curso. Ademas el
+  veredicto del comparador dice cuanto de la altura del turno fue produccion real, ej. "Se
+  lograron 4.486 pz en 8 h 20 de turno, de las que 5 h 40 fueron de produccion real" (solo cuando
+  produccion < altura del turno).
+- Archivos: `PublicShiftMonitorPage.tsx`, `pages/monitor/MonitorShiftParts.tsx`.
+- Verificación: tsc y eslint limpios; preview contra Filete cerrado y turno vivo de Yal.
+- Estado: HECHO. Merge squash a main `2764cd5e`.
+
+---
+
 ## 2026-08-12 - claude - La cabecera del turno vivo mostraba el ultimo sync, no el cierre previsto (#501)
 
 - Hecho: en el monitor publico, con el turno en curso la cabecera mostraba el ultimo intervalo
