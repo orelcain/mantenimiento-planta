@@ -13,6 +13,20 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-12 - claude - La cabecera del turno vivo mostraba el ultimo sync, no el cierre previsto (#501)
+
+- Hecho: en el monitor publico, con el turno en curso la cabecera mostraba el ultimo intervalo
+  sincronizado como hora de termino ("15:00-21:52" con la linea aun produciendo); ahora muestra
+  el cierre previsto ("15:00 -> 23:57") con marca "est." (sin marca si esta fijado a mano). Turno
+  cerrado sigue mostrando el rango real. De paso, "A donde se va el tiempo" pasa a decir "de
+  operacion" en vez de "de turno" para no repetir la palabra que usa el comparador de tiempo corrido.
+- Archivos: `PublicShiftMonitorPage.tsx`, `pages/monitor/MonitorShiftParts.tsx`.
+- Verificación: tsc y eslint limpios; preview contra turno vivo de Yal y Filete cerrado, 390px,
+  ambos temas.
+- Estado: HECHO.
+
+---
+
 ## 2026-08-12 - claude - El header de movil montaba los botones sobre el titulo (#478)
 
 Orel, con captura: *"mira se ven todos montados los botones ojo con el orden en el modo movil"*.
