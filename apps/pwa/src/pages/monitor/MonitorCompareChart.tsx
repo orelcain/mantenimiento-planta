@@ -18,7 +18,7 @@
  */
 
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
-import type { CompareResult, PacePoint } from '@/services/shoplogix/monitorCompare'
+import { diffCurve, type CompareResult, type PacePoint } from '@/services/shoplogix/monitorCompare'
 import { COLORES, COLOR_META } from './monitorColors'
 
 const nf = new Intl.NumberFormat('es-CL')
@@ -35,6 +35,20 @@ export function MonitorCompareChart({ cmp, visibles }: {
   /** dateKeys que se dibujan. Hoy siempre entra. */
   visibles: Set<string>
 }) {
+  /*
+   * Dos modos. El de DIFERENCIA es el que viene primero porque responde la
+   * pregunta sin que haya que interpretar nada: la línea de cero es "empatados",
+   * arriba vas mejor, abajo vas peor, y donde BAJA es donde perdiste terreno.
+   * Con el acumulado hay que comparar alturas de dos curvas paralelas, y con
+   * seis días encima eso ya no se lee.
+   */
+  const [modo, setModo] = useState<"dif" | "acum">("dif")
+  /*
+   * La cuota se puede apagar. Su diferencia es mucho más grande que la de los
+   * días entre sí (en Yal, −5.820 contra ±300), así que manda la escala y
+   * aplasta contra el cero justamente la comparación que uno vino a mirar.
+   */
+  const [verCuota, setVerCuota] = useState(true)
   const [alto, setAlto] = useState(false)
   /*
    * Zoom horizontal con paneo. Un turno de 8 h en 320 px deja cada tramo de 5
@@ -76,21 +90,53 @@ export function MonitorCompareChart({ cmp, visibles }: {
     [cmp.days, visibles],
   )
 
-  const { maxMin, maxPz } = useMemo(() => {
+  /**
+   * En modo diferencia, una curva por cada día visible (y por la cuota): cuánto
+   * le lleva HOY de ventaja a cada uno, tramo a tramo.
+   */
+  const difs = useMemo(() => {
+    const hoy = cmp.days.find((d) => d.esHoy)
+    if (!hoy) return []
+    const out = dibujados
+      .filter((d) => !d.esHoy)
+      .map((d) => ({
+        clave: d.dateKey + d.label,
+        label: d.label,
+        color: COLORES[cmp.days.indexOf(d) % COLORES.length]!,
+        curve: diffCurve(hoy.curve, d.curve),
+      }))
+    if (cmp.optimal && verCuota) {
+      out.push({
+        clave: "cuota", label: "cuota", color: COLOR_META,
+        curve: diffCurve(hoy.curve, cmp.optimal),
+      })
+    }
+    return out.filter((x) => x.curve.length > 0)
+  }, [cmp, dibujados, verCuota])
+
+  const { maxMin, maxPz, minPz } = useMemo(() => {
     const mm = Math.max(cmp.maxMinutes, cmp.optimal?.[cmp.optimal.length - 1]?.minutes ?? 0, 60)
-    const mp = Math.max(
-      ...dibujados.map((d) => d.totalPieces),
-      cmp.optimal?.[cmp.optimal.length - 1]?.pieces ?? 0,
-      1,
-    )
-    return { maxMin: mm, maxPz: mp }
-  }, [cmp, dibujados])
+    if (modo === "acum") {
+      const mp = Math.max(
+        ...dibujados.map((d) => d.totalPieces),
+        cmp.optimal?.[cmp.optimal.length - 1]?.pieces ?? 0,
+        1,
+      )
+      return { maxMin: mm, maxPz: mp, minPz: 0 }
+    }
+    // El cero tiene que quedar visible SIEMPRE: es la referencia del modo.
+    const vals = difs.flatMap((d) => d.curve.map((p) => p.pieces))
+    const arriba = Math.max(0, ...vals)
+    const abajo = Math.min(0, ...vals)
+    const margen = Math.max(1, (arriba - abajo) * 0.08)
+    return { maxMin: mm, maxPz: arriba + margen, minPz: abajo - margen }
+  }, [cmp, dibujados, difs, modo])
 
   if (cmp.days.length === 0 || cmp.currentMinute == null) return null
 
   /** Fracción 0-1 del ancho/alto: sirve para el SVG y para las etiquetas HTML. */
   const fx = (m: number) => m / maxMin
-  const fy = (p: number) => 1 - p / maxPz
+  const fy = (p: number) => 1 - (p - minPz) / Math.max(1, maxPz - minPz)
 
   const x = (m: number) => fx(m) * W
   const y = (p: number) => fy(p) * H
@@ -120,13 +166,15 @@ export function MonitorCompareChart({ cmp, visibles }: {
           * está mirando un tramo de cerca.
           */}
         <div className={`relative w-7 shrink-0 ${alto ? ALTO_GRANDE : ALTO_CHICO} transition-[height] duration-200`}>
-          {[maxPz, maxPz / 2].map((v) => (
+          {(modo === "acum" ? [maxPz, maxPz / 2] : [maxPz, 0, minPz]).map((v) => (
             <span
               key={v}
-              className="absolute right-0 -translate-y-1/2 text-[9px] tabular-nums text-muted-foreground"
+              className={`absolute right-0 -translate-y-1/2 text-[9px] tabular-nums ${
+                modo === "dif" && v === 0 ? "text-foreground/70" : "text-muted-foreground"
+              }`}
               style={{ top: `${fy(v) * 100}%` }}
             >
-              {fmtInt(v)}
+              {modo === "dif" && v > 0 ? `+${fmtInt(v)}` : fmtInt(v)}
             </span>
           ))}
         </div>
@@ -163,10 +211,17 @@ export function MonitorCompareChart({ cmp, visibles }: {
               ))}
 
               {lineas.map((f) => (
-                <line key={f} x1={0} x2={W} y1={y(maxPz * f)} y2={y(maxPz * f)}
+                <line key={f} x1={0} x2={W} y1={y(minPz + (maxPz - minPz) * f)}
+                  y2={y(minPz + (maxPz - minPz) * f)}
                   stroke="currentColor" strokeWidth="0.25" strokeDasharray="1.5 1.5"
                   className="text-border" vectorEffect="non-scaling-stroke" />
               ))}
+
+              {/* El cero: la línea contra la que se lee todo el modo diferencia. */}
+              {modo === "dif" && (
+                <line x1={0} x2={W} y1={y(0)} y2={y(0)} stroke="currentColor"
+                  strokeWidth="1" className="text-foreground/45" vectorEffect="non-scaling-stroke" />
+              )}
 
               {marcas.map((m) => (
                 <line key={m} x1={x(m)} x2={x(m)} y1={0} y2={H} stroke="currentColor"
@@ -174,21 +229,31 @@ export function MonitorCompareChart({ cmp, visibles }: {
                   vectorEffect="non-scaling-stroke" />
               ))}
 
-              {/* la cuota, punteada: la referencia contra la que se mide todo */}
-              {cmp.optimal && (
-                <path d={path(cmp.optimal)} fill="none" stroke={COLOR_META} strokeWidth="1.5"
-                  strokeDasharray="5 4" opacity="0.9" vectorEffect="non-scaling-stroke" />
+              {modo === "acum" ? (
+                <>
+                  {/* la cuota, punteada: la referencia contra la que se mide todo */}
+                  {cmp.optimal && (
+                    <path d={path(cmp.optimal)} fill="none" stroke={COLOR_META} strokeWidth="1.5"
+                      strokeDasharray="5 4" opacity="0.9" vectorEffect="non-scaling-stroke" />
+                  )}
+                  {/* días anteriores primero: hoy va encima y más grueso */}
+                  {[...dibujados].reverse().map((d) => {
+                    const i = cmp.days.indexOf(d)
+                    return (
+                      <path key={d.dateKey} d={path(d.curve)} fill="none"
+                        stroke={COLORES[i % COLORES.length]} strokeWidth={d.esHoy ? 2.4 : 1.4}
+                        opacity={d.esHoy ? 1 : 0.8} vectorEffect="non-scaling-stroke" />
+                    )
+                  })}
+                </>
+              ) : (
+                difs.map((d) => (
+                  <path key={d.clave} d={path(d.curve)} fill="none" stroke={d.color}
+                    strokeWidth={d.clave === "cuota" ? 1.6 : 2}
+                    strokeDasharray={d.clave === "cuota" ? "5 4" : undefined}
+                    vectorEffect="non-scaling-stroke" />
+                ))
               )}
-
-              {/* días anteriores primero: hoy va encima y más grueso */}
-              {[...dibujados].reverse().map((d) => {
-                const i = cmp.days.indexOf(d)
-                return (
-                  <path key={d.dateKey} d={path(d.curve)} fill="none"
-                    stroke={COLORES[i % COLORES.length]} strokeWidth={d.esHoy ? 2.4 : 1.4}
-                    opacity={d.esHoy ? 1 : 0.8} vectorEffect="non-scaling-stroke" />
-                )
-              })}
 
             </svg>
 
@@ -197,7 +262,7 @@ export function MonitorCompareChart({ cmp, visibles }: {
               * se estira horizontalmente con el zoom y un círculo adentro sale
               * ovalado — a 4x medía 28 x 3 px, una raya.
               */}
-            {hoy?.atCurrentMinute != null && (
+            {modo === "acum" && hoy?.atCurrentMinute != null && (
               <span
                 className="pointer-events-none absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-card"
                 style={{
@@ -227,11 +292,30 @@ export function MonitorCompareChart({ cmp, visibles }: {
       </div>
 
       <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
-        {cmp.optimal && (
-          <span className="flex items-center gap-1.5">
-            <i className="h-1.5 w-4 rounded-full" style={{ background: COLOR_META }} />
-            Para la cuota
-          </span>
+        {modo === "dif" ? (
+          <>
+            <span>línea arriba del cero = hoy va mejor</span>
+            {cmp.optimal && (
+              <button
+                type="button"
+                onClick={() => setVerCuota((v) => !v)}
+                aria-pressed={verCuota}
+                className={`flex items-center gap-1.5 rounded-full border px-2 py-0.5 ${
+                  verCuota ? 'border-amber-500/50' : 'border-border opacity-60'
+                }`}
+              >
+                <i className="h-1.5 w-4 rounded-full" style={{ background: COLOR_META }} />
+                cuota
+              </button>
+            )}
+          </>
+        ) : (
+          cmp.optimal && (
+            <span className="flex items-center gap-1.5">
+              <i className="h-1.5 w-4 rounded-full" style={{ background: COLOR_META }} />
+              Para la cuota
+            </span>
+          )
         )}
         {cmp.breaks.length > 0 && (
           <span className="flex items-center gap-1.5">
@@ -241,6 +325,13 @@ export function MonitorCompareChart({ cmp, visibles }: {
         )}
         {zoom > 1 && <span>deslizá el gráfico &#8594;</span>}
         <span className="ml-auto flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setModo((v) => (v === "dif" ? "acum" : "dif"))}
+            className="rounded-full border border-border px-2 py-0.5 hover:bg-muted"
+          >
+            {modo === "dif" ? "ver acumulado" : "ver diferencia"}
+          </button>
           {[1, 2, 4].map((z) => (
             <button
               key={z}

@@ -12,7 +12,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   cumulativeFromStart, piecesAt, buildDayComparison, optimalPace, findGapWindow,
-  plannedBreaks, mergeBreaks,
+  plannedBreaks, mergeBreaks, diffCurve, resumenComparacion,
 } from '../monitorCompare'
 import type { MonitorSeriesPoint } from '../monitorHourly'
 
@@ -377,5 +377,75 @@ describe('etiquetas de los días comparados', () => {
       maxDays: 6,
     })
     expect(r.days[1]!.label).toBe('hoy T1')
+  })
+})
+
+
+describe('diffCurve', () => {
+  const hoy = cumulativeFromStart(serie('2026-08-12T07:45:00Z', Array(12).fill(50)))   // 60 min
+  const ayer = cumulativeFromStart(serie('2026-08-11T08:00:00Z', Array(12).fill(40)))
+
+  it('dice cuántas piezas de ventaja llevás en cada tramo', () => {
+    const d = diffCurve(hoy, ayer)
+    expect(d[0]).toEqual({ minutes: 5, pieces: 10 })
+    expect(d[d.length - 1]).toEqual({ minutes: 60, pieces: 120 })
+  })
+
+  it('la diferencia BAJA en el tramo donde se pierde terreno', () => {
+    // Hoy se para 15 min a mitad de camino: ahí la línea tiene que caer.
+    const arr = Array(12).fill(50); arr[6] = 0; arr[7] = 0; arr[8] = 0
+    const conParada = cumulativeFromStart(serie('2026-08-12T07:45:00Z', arr))
+    const d = diffCurve(conParada, ayer)
+    const en30 = d.find((p) => p.minutes === 30)!.pieces
+    const en45 = d.find((p) => p.minutes === 45)!.pieces
+    expect(en45).toBeLessThan(en30)
+  })
+
+  it('NO se estira más allá de donde llegó la referencia', () => {
+    // Sin esto la línea seguiría plana e inventaría una ventaja que nadie sacó.
+    const corto = cumulativeFromStart(serie('2026-08-11T08:00:00Z', Array(4).fill(40)))
+    const d = diffCurve(hoy, corto)
+    expect(d[d.length - 1]!.minutes).toBe(20)
+  })
+
+  it('sin curvas no dibuja nada', () => {
+    expect(diffCurve([], ayer)).toEqual([])
+    expect(diffCurve(hoy, [])).toEqual([])
+  })
+})
+
+describe('resumenComparacion', () => {
+  const hoyS = serie('2026-08-12T07:45:00Z', Array(24).fill(50))    // 1.200 pz a 120 min
+  const flojo = serie('2026-08-11T08:00:00Z', Array(24).fill(30))   // 720
+  const bueno = serie('2026-08-10T08:00:00Z', Array(24).fill(45))   // 1.080
+
+  const armar = (previous: Array<{ dateKey: string; series: MonitorSeriesPoint[] }>, meta = 0) =>
+    resumenComparacion(buildDayComparison({
+      todaySeries: hoyS, todayDateKey: '2026-08-12', previous,
+      ...(meta ? { targetPieces: meta, usefulMin: 372 } : {}),
+    }))
+
+  it('separa el día más RECIENTE del MEJOR: no siempre son el mismo', () => {
+    const r = armar([
+      { dateKey: '2026-08-11', series: flojo },
+      { dateKey: '2026-08-10', series: bueno },
+    ])
+    expect(r.reciente).toEqual({ label: 'mar 11', dif: 480, mismoDia: false })
+    expect(r.mejor).toEqual({ label: 'lun 10', dif: 120 })
+  })
+
+  it('contra la cuota, un número negativo es ir atrasado', () => {
+    // A los 120 min la cuota pide 1.613 y hoy lleva 1.200.
+    expect(armar([], 5_000).cuota).toBeLessThan(0)
+  })
+
+  it('sin días anteriores ni meta no inventa una conclusión', () => {
+    expect(armar([])).toEqual({ reciente: null, mejor: null, cuota: null })
+  })
+
+  it('ignora los días que no llegaron a esta altura de turno', () => {
+    const corto = serie('2026-08-11T08:00:00Z', Array(6).fill(50))
+    const r = armar([{ dateKey: '2026-08-11', series: corto }, { dateKey: '2026-08-10', series: bueno }])
+    expect(r.reciente?.label).toBe('lun 10')
   })
 })

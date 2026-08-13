@@ -9,7 +9,9 @@
 import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import type { PublicMonitorLive } from '@/services/shoplogix/publicShiftMonitor.service'
-import { findGapWindow, type CompareResult } from '@/services/shoplogix/monitorCompare'
+import {
+  findGapWindow, resumenComparacion, type CompareResult,
+} from '@/services/shoplogix/monitorCompare'
 import { MonitorCompareChart } from './MonitorCompareChart'
 import { COLORES } from './monitorColors'
 
@@ -283,6 +285,8 @@ export function ComparadorDias({ cmp, live, onCausa }: {
    * puede venir vacío.
    */
   const [elegidos, setElegidos] = useState<Set<string> | null>(null)
+  /** La tabla día por día arranca plegada: primero la conclusión. */
+  const [detalle, setDetalle] = useState(false)
   const visibles = elegidos
     ?? new Set(cmp.days.filter((d) => !d.esHoy).slice(0, 2).map((d) => d.dateKey))
   const alternar = (dateKey: string) =>
@@ -310,10 +314,21 @@ export function ComparadorDias({ cmp, live, onCausa }: {
         </span>
       }
     >
-          <div className="mt-2">
+          <Veredicto cmp={cmp} />
+
+          <div className="mt-3">
             <MonitorCompareChart cmp={cmp} visibles={visibles} />
           </div>
 
+          <button
+            type="button"
+            onClick={() => setDetalle((v) => !v)}
+            className="mt-2 text-[11px] text-sky-700 underline underline-offset-2 dark:text-sky-300"
+          >
+            {detalle ? 'ocultar los días' : `ver los ${cmp.days.length} días uno por uno`}
+          </button>
+
+          {detalle && (
           <ul className="mt-2 space-y-1">
             {cmp.days.map((d, i) => {
               const dif =
@@ -403,11 +418,13 @@ export function ComparadorDias({ cmp, live, onCausa }: {
               </li>
             )}
           </ul>
+          )}
 
           <BrechaDelDia cmp={cmp} live={live} onCausa={onCausa} />
 
           <p className="mt-2 text-[11px] text-muted-foreground/70">
-            Tocá un día para mostrarlo u ocultarlo en el gráfico. Todos se leen a la misma
+            {detalle && 'Tocá un día para mostrarlo u ocultarlo en el gráfico. '}
+            Todos se leen a la misma
             altura de turno, contada desde el arranque: los turnos no
             empiezan a la misma hora, así que comparar por reloj mide mal justamente el
             primer tramo.
@@ -541,6 +558,83 @@ function BrechaDelDia({ cmp, live, onCausa }: {
       {comentario && (
         <p className="mt-0.5 italic text-muted-foreground">{comentario}</p>
       )}
+    </div>
+  )
+}
+
+/**
+ * La conclusión del comparador, arriba y en palabras.
+ *
+ * Lo que fallaba: el bloque abría con seis filas de números y dejaba la
+ * conclusión a cargo de quien mira, que tiene que restar de cabeza parado en
+ * planta. Acá la primera línea ya dice si vas mejor o peor, y contra qué; los
+ * días quedan abajo, plegados, para el que quiera hurgar.
+ *
+ * Dos varas distintas a propósito: el día MÁS RECIENTE es con el que la gente
+ * compara sola ("ayer a esta hora"), y el MEJOR es la que dice si el turno
+ * bueno era alcanzable. La cuota es la tercera y no se negocia.
+ */
+function Veredicto({ cmp }: { cmp: CompareResult }) {
+  const r = resumenComparacion(cmp)
+  if (!r.reciente && !r.mejor && r.cuota == null) return null
+
+  const tono = (n: number) =>
+    n >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'
+  const conSigno = (n: number) => `${n >= 0 ? '+' : '\u2212'}${fmtInt(Math.abs(n))}`
+
+  return (
+    <div className="mt-2">
+      <p className="text-[15px] font-semibold leading-snug text-foreground">
+        {r.reciente && (
+          <>
+            Vas{' '}
+            <span className={tono(r.reciente.dif)}>
+              {fmtInt(Math.abs(r.reciente.dif))} pz {r.reciente.dif >= 0 ? 'arriba' : 'abajo'}
+            </span>{' '}
+            {r.reciente.mismoDia ? 'del turno anterior' : `de ${r.reciente.label}`}
+          </>
+        )}
+        {r.reciente && r.cuota != null && ', '}
+        {r.cuota != null && (
+          <>
+            {r.reciente ? 'y ' : 'Vas '}
+            <span className={tono(r.cuota)}>
+              {fmtInt(Math.abs(r.cuota))} {r.cuota >= 0 ? 'arriba' : 'abajo'}
+            </span>{' '}
+            de la cuota
+          </>
+        )}
+        .
+      </p>
+
+      <dl className="mt-2 grid grid-cols-2 gap-2">
+        {r.mejor && (
+          <div className="rounded-xl border border-border bg-muted/60 px-2.5 py-1.5">
+            <dt className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              Mejor día a esta altura
+            </dt>
+            <dd className={`mt-0.5 text-lg font-bold tabular-nums ${tono(r.mejor.dif)}`}>
+              {conSigno(r.mejor.dif)}
+              <span className="ml-1 text-[11px] font-normal text-muted-foreground">
+                vs {r.mejor.label}
+              </span>
+            </dd>
+          </div>
+        )}
+        {r.cuota != null && (
+          <div className="rounded-xl border border-border bg-muted/60 px-2.5 py-1.5">
+            <dt className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              Para la cuota
+            </dt>
+            <dd className={`mt-0.5 text-lg font-bold tabular-nums ${tono(r.cuota)}`}>
+              {conSigno(r.cuota)}
+              <span className="ml-1 text-[11px] font-normal text-muted-foreground">
+                a esta altura
+              </span>
+            </dd>
+          </div>
+        )}
+      </dl>
     </div>
   )
 }
