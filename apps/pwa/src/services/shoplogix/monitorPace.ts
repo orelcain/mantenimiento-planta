@@ -35,6 +35,15 @@ export type PaceVerdict =
   | 'fuera-de-alcance'
   /** Ya se llegó a la cuota. */
   | 'cumplida'
+  /**
+   * Pasado el cierre y la línea sigue produciendo: HORA EXTRA.
+   *
+   * Antes acá la tarjeta desaparecía entera (sin minutos por delante no hay
+   * ritmo que recomendar) — justo cuando la hora extra suele hacerse PARA
+   * alcanzar la cuota. Ya no hay "ritmo necesario" que pedir, pero sí lo que
+   * importa: cuánto falta y cuánto tardaría al ritmo de ahora.
+   */
+  | 'hora-extra'
 
 export interface PaceToTarget {
   verdict: PaceVerdict
@@ -61,6 +70,9 @@ export interface PaceToTarget {
   maxPerHour: number | null
   /** Porcentaje de la meta ya producido. */
   progressPct: number
+  /** Minutos que tardaría en cubrir lo que falta al ritmo de ahora. Solo en
+      'hora-extra': es la única guía honesta cuando ya no hay ventana. */
+  extraMinutesNeeded?: number | null
   /**
    * Qué pasaría con UNA HORA EXTRA.
    *
@@ -167,8 +179,32 @@ export function computePaceToTarget(input: PaceInput): PaceToTarget | null {
     }
   }
 
-  // Sin tiempo por delante no hay ritmo que sirva: dividir daría infinito.
-  if (remainingMin <= 0) return null
+  /*
+   * Sin tiempo por delante no hay ritmo que pedir (dividir daría infinito),
+   * pero SÍ hay algo que decir mientras la línea siga andando: es hora extra.
+   * Antes la tarjeta desaparecía justo cuando se estira el turno para llegar a
+   * la cuota, y quien miraba se quedaba sin saber cuánto faltaba.
+   */
+  if (remainingMin <= 0) {
+    if (shiftClosed || currentPerHour <= 0) return null
+    return {
+      verdict: 'hora-extra',
+      targetPieces: meta,
+      targetSource,
+      remainingPieces,
+      remainingMin: 0,
+      // No hay ritmo "necesario": el turno ya se pasó de su horario.
+      requiredPerHour: 0,
+      requiredPerMinute: 0,
+      currentPerHour,
+      gapPerHour: 0,
+      projectedPieces: producedPieces,
+      maxPerHour,
+      progressPct: Math.min(100, (producedPieces / meta) * 100),
+      extraMinutesNeeded: Math.round(remainingPieces / (currentPerHour / 60)),
+      withExtraHour: null,
+    }
+  }
 
   const requiredPerHour = (remainingPieces / remainingMin) * 60
   const projectedPieces = producedPieces + remainingMin * (currentPerHour / 60)

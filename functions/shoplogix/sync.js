@@ -1084,6 +1084,20 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
           start: officialRollup.officialStart,
           end:   officialRollup.officialEnd,
         }
+        /*
+         * El contador VIVO solo cuando la ventana del rollup es la de ESTE
+         * turno. ⚠ Pasado el cierre, Shoplogix devuelve la plantilla del turno
+         * del DÍA SIGUIENTE con el MISMO nombre y 0 ciclos: como el gate de
+         * arriba compara solo etiquetas, el 0 pisaba el último valor bueno
+         * justo durante la hora extra (visto el 13-08 en Filete, 15:34).
+         * `isOfficialScheduleSane` ya mata los saltos de día — reusarlo acá es
+         * lo que hace que el contador conserve el último dato real.
+         */
+        parentDoc.officialLive = {
+          totalCycles: officialRollup.liveTotalCycles ?? null,
+          byMachineId: Object.fromEntries(officialRollup.liveCyclesByMachineId ?? []),
+          at: syncedAt,
+        }
       } else {
         logger.warn(
           `[syncDay][${plantSlug}] officialSchedule del rollup descartado por incoherente ` +
@@ -1094,13 +1108,6 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
       parentDoc.officialTargetsByMachineId = Object.fromEntries(officialRollup.targetsByMachineId)
       parentDoc.currentJob = officialRollup.currentJob
       parentDoc.officialSyncedAt = syncedAt
-      // El contador vivo del whiteboard, con su hora (UTC real, como
-      // lastSyncAt). Viaja en el MISMO write del padre: cero escrituras extra.
-      parentDoc.officialLive = {
-        totalCycles: officialRollup.liveTotalCycles ?? null,
-        byMachineId: Object.fromEntries(officialRollup.liveCyclesByMachineId ?? []),
-        at: syncedAt,
-      }
     }
 
     await db.doc(`shoplogix/${plantSlug}/shifts/${parentShiftDateKey}_${group.shiftId}`).set(parentDoc, { merge: true })

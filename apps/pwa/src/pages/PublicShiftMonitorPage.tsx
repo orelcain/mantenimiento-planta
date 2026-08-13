@@ -567,6 +567,33 @@ function RitmoNecesario({ pace, cierre, muestras, fuente, plantSlug, shiftName, 
     )
   }
 
+  /*
+   * Hora extra: el turno pasó su horario y la línea sigue. Ya no hay "ritmo
+   * necesario" que pedir —no queda ventana— pero sí lo que importa: cuánto
+   * falta y cuánto tardaría a este ritmo. Antes la tarjeta desaparecía entera.
+   */
+  if (pace.verdict === 'hora-extra') {
+    return (
+      <div className="mt-2 rounded-xl border border-sky-400/25 bg-sky-400/10 px-3 py-2">
+        <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+          <Target className="h-3.5 w-3.5" />
+          Hora extra · pasado el horario del turno
+        </div>
+        <p className="mt-1 text-[15px] font-semibold text-sky-800 dark:text-sky-300">
+          Faltan <span className="tabular-nums">{fmtInt(pace.remainingPieces)} pz</span> para{' '}
+          {pace.targetSource === 'cuota' ? 'la meta' : 'lo esperado'}
+        </p>
+        <p className="mt-0.5 text-[12px] text-muted-foreground">
+          Al ritmo de ahora ({fmtDec(pace.currentPerHour / 60)} pz/min) son unos{' '}
+          <span className="tabular-nums text-foreground/90">
+            {fmtDurationSec((pace.extraMinutesNeeded ?? 0) * 60)}
+          </span>{' '}
+          más.
+        </p>
+      </div>
+    )
+  }
+
   const fuera = pace.verdict === 'fuera-de-alcance'
   /* El escalón del medio (pedido de Orel, 13-ago): "Se alcanza pidiendo 24
      pz/min" en una línea que viene a 10 es verdad solo en teoría — el techo es
@@ -1376,7 +1403,7 @@ export function PublicShiftMonitorPage() {
           breaks={comparacion.breaks}
           recentPerMinute={live.recentPiecesPerMinute}
           avgPerMinute={live.piecesPerMinute}
-          requiredPerMinute={pace && pace.verdict !== 'cumplida' ? pace.requiredPerMinute : null}
+          requiredPerMinute={pace && pace.requiredPerMinute > 0 ? pace.requiredPerMinute : null}
           medianCpm={live.paceMedianCpm}
           cerrado={live.shiftClosed}
         />
