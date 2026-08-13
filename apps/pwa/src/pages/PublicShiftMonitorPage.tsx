@@ -1310,17 +1310,9 @@ export function PublicShiftMonitorPage() {
           </section>
         )}
 
-        <Sparkbars
-          series={live.series}
-          stopReasons={live.stopReasons}
-          stopEvents={live.stopEvents}
-          comments={live.comments}
-          causaSel={causaSel}
-          onCausa={setCausaSel}
-        />
-
-        {/* La velocidad como historia, no solo el "ahora" del KPI. Tramos de
-            5 min de Shoplogix (el piso del dato) + media móvil de 15 min. */}
+        {/* La velocidad como historia, no solo el "ahora" del KPI — ARRIBA del
+            gráfico de tramos (pedido de Orel): primero la tendencia, después
+            el detalle fino. Tramos de 5 min de Shoplogix + media móvil 15 min. */}
         <VelocidadDeLinea
           series={live.series}
           breaks={comparacion.breaks}
@@ -1329,6 +1321,15 @@ export function PublicShiftMonitorPage() {
           requiredPerMinute={pace && pace.verdict !== 'cumplida' ? pace.requiredPerMinute : null}
           medianCpm={live.paceMedianCpm}
           cerrado={live.shiftClosed}
+        />
+
+        <Sparkbars
+          series={live.series}
+          stopReasons={live.stopReasons}
+          stopEvents={live.stopEvents}
+          comments={live.comments}
+          causaSel={causaSel}
+          onCausa={setCausaSel}
         />
 
         <TiempoDelTurno tb={live.timeBreakdown} causaSel={causaSel} onCausa={setCausaSel} />
