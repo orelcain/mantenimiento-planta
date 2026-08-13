@@ -13,6 +13,22 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-13 - claude - No exponer el contador vivo del monitor cuando quedó en cero (#531)
+
+- Hecho: los turnos que ya pasaron su cierre quedaron con `officialLive.totalCycles: 0`
+  del bug corregido en #529 (el rollup devolvía la plantilla del día siguiente y se
+  guardaba su cero antes del guard). El guard nuevo evita que se vuelva a pisar, pero
+  el payload seguía publicando ese 0 congelado. Ahora `shoplogixLive` se expone solo
+  con `totalCycles > 0`; si no, `null`.
+- Archivos: functions/publicMonitor.js
+- Verificación: `buildMonitorLive` contra el turno real de Filete de hoy: `live` pasa de
+  `{totalCycles: 0}` a `null`, resto intacto (4.707 total, 4.202 dentro, 505 fuera).
+  Solo backend, sin UI que verificar. Deploy de Firebase Functions y PWA en success.
+- Estado: HECHO
+- Sigue: nada pendiente.
+
+---
+
 ## 2026-08-13 - claude - La hora extra se ve desde el primer minuto, y sigue guiando (#529)
 
 - Hecho: "fuera del horario" se decidia por el DOC de origen del tramo, no por su hora real,
