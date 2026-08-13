@@ -199,9 +199,29 @@ describe('computePaceToTarget', () => {
     expect(base({ targetPieces: 0, expectedPieces: 0 })).toBeNull()
   })
 
-  it('no divide por cero cuando ya no queda tiempo', () => {
-    expect(base({ nowWallMs: CIERRE })).toBeNull()
-    expect(base({ nowWallMs: CIERRE + 60_000 })).toBeNull()
+  it('no divide por cero cuando ya no queda tiempo NI la línea produce', () => {
+    expect(base({ nowWallMs: CIERRE, currentPerHour: 0 })).toBeNull()
+    expect(base({ nowWallMs: CIERRE + 60_000, shiftClosed: true })).toBeNull()
+  })
+
+  it('HORA EXTRA: pasado el cierre con la línea andando, sigue diciendo cuánto falta', () => {
+    /*
+     * Antes acá devolvía null y la tarjeta desaparecía entera — justo cuando la
+     * hora extra se hace PARA alcanzar la cuota (Orel, 13-ago).
+     */
+    const p = base({ nowWallMs: CIERRE + 20 * 60_000 })!
+    expect(p.verdict).toBe('hora-extra')
+    expect(p.remainingPieces).toBe(20_000 - 5_453)
+    expect(p.remainingMin).toBe(0)
+    // No hay ritmo que pedir: ya no queda ventana que repartir.
+    expect(p.requiredPerHour).toBe(0)
+    // 14.547 pz a 1.449 pz/h = 24,15 h = 1.449 min
+    expect(p.extraMinutesNeeded).toBe(Math.round(14_547 / (1_449 / 60)))
+    expect(p.withExtraHour).toBeNull()
+  })
+
+  it('pero con el turno CERRADO no recomienda nada aunque falten piezas', () => {
+    expect(base({ nowWallMs: CIERRE + 20 * 60_000, shiftClosed: true })).toBeNull()
   })
 
   it('pero SÍ informa la cuota cumplida aunque el turno ya haya terminado su horario', () => {

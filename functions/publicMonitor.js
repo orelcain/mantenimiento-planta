@@ -716,16 +716,48 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
     extras = new Map()
   }
 
-  const shiftPieces = machines.reduce((a, m) => a + (m.totalCycles || 0), 0)
-  let outsidePieces = 0
   for (const m of machines) {
     const extra = extras.get(m.id)
     if (!extra) continue
     m.intervals = [...(m.intervals || []), ...extra.intervals]
     m.states = [...(m.states || []), ...extra.states]
     m.totalCycles = (m.totalCycles || 0) + extra.pieces
-    outsidePieces += extra.pieces
   }
+
+  /*
+   * Qué es "fuera del horario" se decide por la HORA REAL del tramo, no por el
+   * doc del que vino.
+   *
+   * ⚠ Visto el 13-08 en Filete con la línea en hora extra: los tramos 15:30 y
+   * 15:35 (49 pz, pasado el cierre de 15:30) estaban en el doc del turno Y
+   * duplicados en `Unscheduled`. El dedupe —correcto, evita contarlos dos
+   * veces— los dejaba del lado "dentro del turno", así que el chip "+N fuera
+   * del horario" no aparecía hasta que Shoplogix dejaba de escribirlos en el
+   * doc del turno (ayer, recién a las 15:40). La hora extra se contaba pero no
+   * se veía, y eso se lee como que la app dejó de contarla.
+   *
+   * Se conserva el criterio viejo como UNIÓN: lo rescatado del bucket
+   * `Unscheduled` sigue siendo "fuera" aunque la ventana del turno venga
+   * derivada del último intervalo (Yal) y no permita clasificar por tiempo.
+   */
+  const fueraDeVentana = (ms) => {
+    if (ventanaTurno.end && ms >= ventanaTurno.end.getTime()) return true
+    if (ventanaTurno.start && ms < ventanaTurno.start.getTime()) return true
+    return false
+  }
+  const outsideIntervals = []
+  for (const m of machines) {
+    const rescatados = new Set(
+      (extras.get(m.id)?.intervals || []).map(iv => toDate(iv.startAt)?.getTime()).filter(Boolean),
+    )
+    for (const iv of m.intervals || []) {
+      if ((iv.cycles || 0) <= 0) continue
+      const s = toDate(iv.startAt)
+      if (!s) continue
+      if (rescatados.has(s.getTime()) || fueraDeVentana(s.getTime())) outsideIntervals.push(iv)
+    }
+  }
+  const outsidePieces = outsideIntervals.reduce((a, iv) => a + (iv.cycles || 0), 0)
 
   // ── Ventana de producción ────────────────────────────────────────────────
   // Misma regla que `buildLineSnapshot` de la PWA: la cadencia se divide por la
@@ -769,6 +801,9 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
 
   // ── Agregados de línea ───────────────────────────────────────────────────
   const totalPieces = machines.reduce((a, m) => a + (m.totalCycles || 0), 0)
+  /* Lo de adentro se DERIVA del total: así los dos números siempre suman, sin
+     importar por qué doc llegó cada tramo. */
+  const shiftPieces = Math.max(0, totalPieces - outsidePieces)
   const expectedPieces = machines.reduce((a, m) => a + (m.expectedTotalCycles || 0), 0)
 
   const piecesPerHour = windowHours > 0 ? totalPieces / windowHours : 0
@@ -799,9 +834,7 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
   // vez que hay más de 15 min sin piezas). Es lo que la pantalla nombra como
   // "antes/después del horario" — sin los rangos, el número suelto no se puede
   // contrastar con lo que la gente vio en la línea.
-  const outsideRanges = agruparTramos(
-    machines.flatMap(m => extras.get(m.id)?.intervals || []),
-  ).map(t => ({
+  const outsideRanges = agruparTramos(outsideIntervals).map(t => ({
     from: new Date(t.start).toISOString(),
     to: new Date(t.end).toISOString(),
     pieces: t.pieces,
