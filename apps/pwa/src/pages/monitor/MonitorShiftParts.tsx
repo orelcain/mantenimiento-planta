@@ -10,7 +10,7 @@ import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import type { PublicMonitorLive } from '@/services/shoplogix/publicShiftMonitor.service'
 import {
-  findGapWindows, resumenComparacion, type CompareResult,
+  findGapWindows, resumenComparacion, type CompareResult, type PacePoint,
 } from '@/services/shoplogix/monitorCompare'
 import { MonitorCompareChart } from './MonitorCompareChart'
 import { COLORES } from './monitorColors'
@@ -280,8 +280,25 @@ export function ComparadorDias({ cmp, live, onCausa }: {
 }) {
   /** La tabla día por día arranca plegada: primero la conclusión. */
   const [detalle, setDetalle] = useState(false)
+  /*
+   * La referencia elegida ('cuota' o dateKey+label de un día) vive ACÁ y no en
+   * el gráfico: la brecha de abajo se calcula contra la MISMA referencia. El
+   * estado arranca en null (el default se resuelve después del early return,
+   * cuando `cmp.days` ya no puede venir vacío).
+   */
+  const [refSel, setRefSel] = useState<string | null>(null)
 
   if (cmp.days.length === 0 || cmp.currentMinute == null) return null
+
+  const anterioresSel = cmp.days.filter((d) => !d.esHoy)
+  const claveSel = refSel
+    ?? (cmp.optimal ? 'cuota' : anterioresSel[0] ? anterioresSel[0].dateKey + anterioresSel[0].label : null)
+  const diaSel = anterioresSel.find((d) => d.dateKey + d.label === claveSel) ?? null
+  const contraSel = claveSel === 'cuota' && cmp.optimal
+    ? { curva: cmp.optimal, nombre: 'la cuota' }
+    : diaSel
+    ? { curva: diaSel.curve, nombre: diaSel.label }
+    : null
 
   const hoy = cmp.days.find((d) => d.esHoy)
   const ref = hoy?.atCurrentMinute ?? null
@@ -316,7 +333,12 @@ export function ComparadorDias({ cmp, live, onCausa }: {
           />
 
           <div className="mt-3">
-            <MonitorCompareChart cmp={cmp} cerrado={live?.shiftClosed ?? false} />
+            <MonitorCompareChart
+              cmp={cmp}
+              cerrado={live?.shiftClosed ?? false}
+              claveSel={claveSel}
+              onSel={setRefSel}
+            />
           </div>
 
           <button
@@ -395,7 +417,7 @@ export function ComparadorDias({ cmp, live, onCausa }: {
           </ul>
           )}
 
-          <BrechaDelDia cmp={cmp} live={live} onCausa={onCausa} />
+          <BrechaDelDia cmp={cmp} live={live} onCausa={onCausa} contra={contraSel} />
 
           <p className="mt-2 text-[11px] text-muted-foreground/70">
             {detalle && 'Tocá un día para mostrarlo u ocultarlo en el gráfico. '}
@@ -418,28 +440,19 @@ export function ComparadorDias({ cmp, live, onCausa }: {
  * detenciones y contra lo que el operador escribió, y recién ahí se puede
  * responder "¿qué pasó que nos atrasó?".
  *
- * La referencia es el mejor de los días anteriores a esta misma altura. Si hoy
- * va arriba de todos, se compara contra la curva de la cuota — que igual hay
- * que alcanzar.
+ * La referencia es LA MISMA que el chip del comparador (v3): con el gráfico
+ * comparando contra la cuota y esta lista contra "lun 10" eran dos verdades a
+ * 20 px de distancia. Si contra la referencia elegida hoy no perdió terreno,
+ * el bloque simplemente no aparece.
  */
-function BrechaDelDia({ cmp, live, onCausa }: {
+function BrechaDelDia({ cmp, live, onCausa, contra }: {
   cmp: CompareResult
   live?: PublicMonitorLive
   onCausa?: (c: string | null) => void
+  contra: { curva: PacePoint[]; nombre: string } | null
 }) {
   const hoy = cmp.days.find((d) => d.esHoy)
-  if (!hoy || cmp.currentMinute == null) return null
-
-  const anteriores = cmp.days.filter((d) => !d.esHoy && d.atCurrentMinute != null)
-  const mejor = anteriores.sort((a, b) => (b.atCurrentMinute ?? 0) - (a.atCurrentMinute ?? 0))[0]
-
-  const contra =
-    mejor && (mejor.atCurrentMinute ?? 0) > (hoy.atCurrentMinute ?? 0)
-      ? { curva: mejor.curve, nombre: mejor.label }
-      : cmp.optimal
-      ? { curva: cmp.optimal, nombre: 'la cuota' }
-      : null
-  if (!contra) return null
+  if (!hoy || cmp.currentMinute == null || !contra) return null
 
   // Hasta 3 tramos; el filtro del 10% del atraso ya viene hecho del servicio.
   const ventanas = findGapWindows(hoy.curve, contra.curva, 3)
