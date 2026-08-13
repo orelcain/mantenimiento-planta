@@ -46,17 +46,28 @@ export function MonitorCompareChart({ cmp, visibles }: {
   const scrollRef = useRef<HTMLDivElement>(null)
   /** Fracción del turno a dejar centrada después de cambiar el zoom. */
   const focoRef = useRef<number | null>(null)
+  /** Dónde cae el minuto actual en el eje, para no perderlo de vista. */
+  const ahoraRef = useRef(0)
 
   /*
    * Ampliar dejaba la vista clavada al principio del turno: uno tocaba "4x" y
    * lo que quería mirar —dónde va la línea AHORA— quedaba fuera de pantalla,
-   * así que el zoom parecía no hacer nada. Al ampliar desde 1x la vista salta
-   * al minuto actual; entre zooms se conserva lo que ya se estaba mirando.
+   * así que el zoom parecía no hacer nada.
+   *
+   * Se conserva lo que se estaba mirando, PERO si a la nueva escala el minuto
+   * actual queda fuera del área visible se recentra en él. Sin esa segunda
+   * parte, ampliar en cadena 1x → 2x → 4x terminaba dejando el punto afuera:
+   * el salto de 1x no alcanza a centrarlo (el scroll se topa con el final del
+   * eje) y el de 4x hereda ese centro, ya corrido.
    */
   useLayoutEffect(() => {
     const el = scrollRef.current
     if (!el || focoRef.current == null) return
-    el.scrollLeft = Math.max(0, focoRef.current * el.scrollWidth - el.clientWidth / 2)
+    const visible = el.clientWidth
+    let x = focoRef.current * el.scrollWidth - visible / 2
+    const xAhora = ahoraRef.current * el.scrollWidth
+    if (xAhora < x || xAhora > x + visible) x = xAhora - visible / 2
+    el.scrollLeft = Math.max(0, Math.min(x, el.scrollWidth - visible))
     focoRef.current = null
   }, [zoom])
 
@@ -83,6 +94,7 @@ export function MonitorCompareChart({ cmp, visibles }: {
 
   const x = (m: number) => fx(m) * W
   const y = (p: number) => fy(p) * H
+  ahoraRef.current = fx(cmp.currentMinute)
   const hoy = cmp.days.find((d) => d.esHoy)
 
   const path = (curve: PacePoint[]) =>
