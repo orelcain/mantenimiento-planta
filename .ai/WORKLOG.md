@@ -13,6 +13,28 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-13 - claude - La hora extra se ve desde el primer minuto, y sigue guiando (#529)
+
+- Hecho: "fuera del horario" se decidia por el DOC de origen del tramo, no por su hora real,
+  y con la linea pasada de las 15:30 los tramos quedaban del lado "dentro del turno" hasta
+  que Shoplogix cortaba (chip aparecia tarde, sin doble conteo real). Ahora la hora real
+  manda, en union con el rescate de Unscheduled. `officialLive` ahora se escribe dentro del
+  guard `isOfficialScheduleSane` (ya no se pisa con 0 cuando Shoplogix devuelve la plantilla
+  del dia siguiente). Verdict nuevo 'hora-extra' en la tarjeta de ritmo: sin ventana que
+  medir pero con cuanto falta y cuanto tardaria al ritmo actual.
+- Archivos: functions/publicMonitor.js, functions/shoplogix/sync.js,
+  apps/pwa/src/services/shoplogix/monitorPace.ts (+tests),
+  apps/pwa/src/pages/PublicShiftMonitorPage.tsx
+- Verificación: vitest shoplogix 246/246, tsc y eslint limpios; backend probado contra datos
+  reales de Filete (turno de hoy con hora extra: 0 → 136 pz fuera, 15:30-15:44; turno de ayer
+  con el mismo total 4.486, sin doble conteo); tarjeta de hora extra verificada en preview
+  contra el turno vivo.
+- Estado: HECHO. Merge squash a main `b0c2c748` (#529). Deploy hosting y Functions ambos
+  success.
+- Sigue: verificación humana en producción durante una hora extra real.
+
+---
+
 ## 2026-08-13 - claude - Monitor muestra el contador VIVO de la pantalla de planta (#526)
 
 - Hecho: el rollup que el sync ya consulta cada ciclo (mismo endpoint que el whiteboard en
