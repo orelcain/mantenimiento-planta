@@ -1177,9 +1177,23 @@ export function PublicShiftMonitorPage() {
             <Activity className="h-3 w-3" />
             {esActual ? 'Piezas procesadas en la jornada' : 'Piezas de ese turno'}
           </div>
-          <div className="mt-1 flex items-baseline gap-2">
+          <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-1">
             <span className="text-5xl font-bold tabular-nums leading-none">{fmtInt(live.totalPieces)}</span>
             <span className="text-sm text-muted-foreground/70">piezas</span>
+            {/* Hasta qué minuto cuenta el número (pedido de Orel, 13-ago): el
+                contador de la pantalla de Shoplogix es vivo y este es un espejo
+                que copia cada ~5 min — sin decir el corte, la diferencia de un
+                ciclo de sync (63 pz ese día) parecía un descuadre de conteo.
+                El corte honesto es el FIN del último tramo con dato (t + 5),
+                no `lastSyncAt` (el sync puede correr sin traer tramo nuevo).
+                Solo con el turno VIVO: cerrado, el total ya es final. */}
+            {!live.shiftClosed && live.series && live.series.length > 0 && (
+              <span className="text-[12px] tabular-nums text-muted-foreground/70">
+                datos hasta las{' '}
+                {new Date(Date.parse(live.series[live.series.length - 1]!.t) + 5 * 60_000)
+                  .toISOString().slice(11, 16)}
+              </span>
+            )}
           </div>
 
           {/* Desglose cuando la línea produjo fuera del horario del turno.
