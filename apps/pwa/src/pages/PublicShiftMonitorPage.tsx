@@ -26,7 +26,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { Activity, AlertCircle, ChevronLeft, ChevronRight, Clock, Gauge, Hourglass, Moon, PauseCircle, Radio, RefreshCw, Sun, Target, Timer } from 'lucide-react'
+import { Activity, AlertCircle, ChevronLeft, ChevronRight, Clock, Gauge, Hourglass, Moon, PauseCircle, Radio, RefreshCw, Sun, Target, Timer, TrendingUp } from 'lucide-react'
 import { useTheme } from '@/hooks/useTheme'
 import {
   subscribePublicShiftMonitor,
@@ -637,6 +637,18 @@ function RitmoNecesario({ pace, cierre, muestras, fuente, plantSlug, shiftName, 
           </div>
         )}
       </dl>
+
+      {/* El récord, dicho: el monitor también es evidencia de mejora. Solo
+          cuando el ritmo de HOY supera al mejor de los turnos recientes. */}
+      {historial?.bestCpm != null && pace.currentPerHour / 60 > historial.bestCpm && (
+        <p className="mt-1.5 flex items-baseline gap-1.5 text-[12px] text-emerald-800 dark:text-emerald-300">
+          <TrendingUp className="h-3.5 w-3.5 shrink-0 self-center" />
+          <span>
+            Por encima del mejor turno reciente ({fmtDec(historial.bestCpm)} pz/min
+            {historial.muestras ? ` en los últimos ${historial.muestras}` : ''}).
+          </span>
+        </p>
+      )}
 
       {pace.maxPerHour != null && (
         <p className="mt-1.5 text-[11px] text-muted-foreground/70">
@@ -1320,14 +1332,32 @@ export function PublicShiftMonitorPage() {
             <ul className="mt-2 space-y-2">
               {live.machines.map(m => (
                 <li key={m.id} className="flex items-center gap-3 text-sm">
-                  <span
-                    className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                      m.status === 'produciendo' ? 'bg-emerald-400' : m.status === 'detenida' ? 'bg-red-400' : 'bg-muted-foreground/40'
-                    }`}
-                  />
-                  <span className="min-w-0 flex-1 truncate">
-                    {m.name}
-                    {m.model && <span className="ml-1 text-[11px] text-muted-foreground/70">{m.model}</span>}
+                  {/* El punto de estado solo con el turno VIVO: cerrado, todas
+                      paradas es lo esperable — tres puntos rojos toda la noche
+                      son la misma falsa alarma que el "Ahora mismo". */}
+                  {!live.shiftClosed && (
+                    <span
+                      className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                        m.status === 'produciendo' ? 'bg-emerald-400' : m.status === 'detenida' ? 'bg-red-400' : 'bg-muted-foreground/40'
+                      }`}
+                    />
+                  )}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate">
+                      {m.name}
+                      {m.model && <span className="ml-1 text-[11px] text-muted-foreground/70">{m.model}</span>}
+                      {!live.shiftClosed && m.status === 'produciendo' && (
+                        <span className="ml-1 text-[11px] text-muted-foreground/70">· produciendo</span>
+                      )}
+                    </span>
+                    {/* Una Baader parada de tres no se veía en ningún lado: el
+                        "Ahora mismo" de línea solo salta si paran TODAS. */}
+                    {!live.shiftClosed && m.status === 'detenida' && m.currentReason && (
+                      <span className="block truncate text-[11px] text-red-700 dark:text-red-300/90">
+                        parada · {m.currentReason}
+                        {m.currentSinceAt && ` (${fmtAgoWall(m.currentSinceAt, now)})`}
+                      </span>
+                    )}
                   </span>
                   <span className="tabular-nums text-foreground/80">{fmtInt(m.pieces)} pz</span>
                   <span className="w-20 text-right tabular-nums text-[11px] text-muted-foreground/70">
@@ -1341,11 +1371,31 @@ export function PublicShiftMonitorPage() {
 
         {/* Frescura y procedencia */}
         <footer className="space-y-1 pb-6 pt-1 text-center text-[11px] text-muted-foreground/60">
-          <p className={stale ? 'text-amber-700 dark:text-amber-400/80' : 'text-muted-foreground/70'}>
-            <RefreshCw className="mr-1 inline h-3 w-3" />
-            Datos de planta actualizados {fmtAgo(live.lastSyncAt, now)}
-            {stale && ' — la sincronización puede estar detenida'}
-          </p>
+          {/* Con el turno CERRADO no hay sync porque no hay producción: "hace
+              4 h — puede estar detenida" de noche alarmaba por lo normal. La
+              alerta ámbar queda solo para dato viejo con turno VIVO. ⚠
+              `lastSyncAt` es UTC REAL (no wall-clock): la hora se formatea con
+              el reloj local del cliente, no con fmtWallTime. */}
+          {live.shiftClosed ? (
+            <p className="text-muted-foreground/70">
+              Turno cerrado
+              {live.lastSyncAt && (
+                <>
+                  {' '}· último dato de las{' '}
+                  <span className="tabular-nums">
+                    {new Date(live.lastSyncAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false })}
+                  </span>
+                </>
+              )}
+              . Se actualiza solo cuando arranque el próximo turno.
+            </p>
+          ) : (
+            <p className={stale ? 'text-amber-700 dark:text-amber-400/80' : 'text-muted-foreground/70'}>
+              <RefreshCw className="mr-1 inline h-3 w-3" />
+              Datos de planta actualizados {fmtAgo(live.lastSyncAt, now)}
+              {stale && ' — la sincronización puede estar detenida'}
+            </p>
+          )}
           <p>
             Se actualiza solo · solo lectura · compartido por {data.createdBy}
           </p>
