@@ -13,6 +13,22 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-13 - claude - "Donde se gana en esta línea": velocidad o tiempo andando (#538)
+
+- Hecho: bloque nuevo en el monitor que dice, por línea, cuál de los dos factores del total
+  (tiempo andando x velocidad) manda: en Filete varía más la velocidad, en Yal el tiempo
+  andando. Usa DISPERSIÓN sobre los últimos 6 turnos, no correlación (con 6 turnos un
+  coeficiente es ruido); micro-detenciones se parean con piezas solo si en esa muestra la
+  relación va en el sentido correcto, si no se muestra solo el rango.
+- Archivos: monitorDiagnostico.ts, MonitorDiagnostico.tsx, PublicShiftMonitorPage.tsx, +tests
+  (16 nuevos).
+- Verificación: vitest 286/286, tsc y eslint limpios. Verificado en pantalla contra el monitor
+  real de Filete. Deploy en success.
+- Estado: HECHO
+- Sigue: nada pendiente conocido.
+
+---
+
 ## 2026-08-13 - claude - El gráfico prolonga la curva en un cono de proyección (#536)
 
 - Hecho: dibujo del pronóstico del #534 sobre `MonitorCompareChart`: banda que nace en la punta
