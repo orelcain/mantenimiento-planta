@@ -13,6 +13,49 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-14 - claude - Menos ruido en el monitor: 4 preguntas, un gráfico, y el Pareto de paradas
+
+- Orel: "siento que aún tenemos mucho ruido para ser un monitor que necesita entregar información
+  rápido... por qué la velocidad, se detuvo por algo, por qué, e ir analizando turno a turno si se
+  repiten los patrones de detenciones para encontrar causa raíz". Mockup con el inventario real de
+  la pantalla (11 bloques, 2.766 px ≈ 4 pantallas de celular) mostrando que **tres bloques
+  contestaban "¿llegamos?"**, **cuatro "¿va rápido?"** —dos de ellos dibujando la MISMA serie de 5
+  min— y que **"¿se repite?" no existía**.
+- **Pareto de paradas (`monitorPareto.ts` + `MonitorPareto.tsx`)**. Sale del historial que ya viaja
+  en el doc: cero lecturas extra. Dos decisiones que lo hacen útil:
+  · **Dos ejes.** Ordenado solo por minutos, `ACUMULACION` entra cuarta con 45 min y ocurrió en 2
+    de 7 turnos: un incidente disfrazado de causa crónica. Cada fila lleva en cuántos turnos
+    aparece, y las que no llegan a la mitad de la muestra se dibujan en gris.
+  · **Agrupado por equipo.** Shoplogix etiqueta `Equipo/Parte`; las tres causas de la Baader
+    (cuchillería dorsal, rascador, pernos/resortes) sueltas no pasan de 47 min y ninguna llama la
+    atención, juntas son el 22% y el 2º lugar del Pareto. Regla genérica (lo que va antes de la
+    primera barra), sin mapa que mantener, sirve igual en Yal.
+  Corte estándar del 80% acumulado. Con 7 turnos de Filete: Micro Detencion 2 h 14 (35%, 7/7, 304
+  paradas), Baader 200 1 h 26 (22%, 4/7), ATASCAMIENTO 58 min (15%, 6/7), ACUMULACION 45 min (12%,
+  2/7) → **4 causas = 84%**.
+- **El comentario del operador, pegado a su causa** (`notasPorCausa`). "FALLA OPERACIONAL 14 min" y
+  «Ajuste erroneo de operador nuevo» estaban en bloques distintos separados por dos pantallas.
+- **UN solo gráfico de la serie de 5 min.** "Velocidad de la línea" y "Piezas por tramo" dibujaban
+  lo mismo (uno en pz/min, otro en piezas). Se fusionaron en el de tramos —el que sabe ubicar las
+  detenciones y tiene zoom 8×— con la media móvil de 15 min encima y las referencias de ritmo
+  convertidas a piezas/tramo. **`VelocidadDeLinea` borrado (247 líneas).**
+  ⚠ Las referencias solo se dibujan si CABEN (≤1,3× el máximo): con la meta pidiendo 53 pz/min y el
+  mejor tramo en 14,6, la línea estiraba la escala al cuádruple y aplastaba el turno contra el
+  piso. Fuera de escala, el número se dice en la leyenda.
+- **Comparador de días y Hora por hora quedan plegados por defecto.** No se borra nada: la
+  respuesta corta viaja en el `extra` del bloque cerrado y `Bloque` recuerda la elección.
+- **Resultado medido: 2.766 px → 1.726 px, −38%** (de ~4 pantallas de celular a ~2,5).
+- Archivos: monitorPareto.ts (+test con los 6 turnos reales como fixture), MonitorPareto.tsx,
+  MonitorShiftParts.tsx, PublicShiftMonitorPage.tsx.
+- Verificación: tsc limpio, 1.355 tests. En vivo con el turno de Filete, claro y oscuro: Pareto con
+  sus 4 filas y el corte del 84%, comentarios bajo FALLA OPERACIONAL y AGUA, gráfico único con la
+  media de 15 min y "necesitás 53,0 pz/min (fuera del gráfico)".
+- Estado: EN REVISIÓN (PR nuevo, encima de #551)
+- Sigue: (a) la tarjeta "Ahora" del mockup —una sola respuesta a "¿llegamos?"— todavía son dos
+  tarjetas (meta y cierre estimado); (b) con el turno por terminar el requerido se dispara ("60,2
+  pz/min · 4,6× el mejor turno"): por encima de ~2× el techo conviene decirlo en palabras en vez
+  de un número.
+
 ## 2026-08-14 - claude - El ritmo se mide ANDANDO: una sola base para toda la tarjeta
 
 - Orel, viendo la tarjeta con el descuento de convenio ya puesto: "pero igual le pones 39 pz/min...

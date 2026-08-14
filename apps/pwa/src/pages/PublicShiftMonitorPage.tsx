@@ -47,7 +47,7 @@ import { buildDiagnostico } from '@/services/shoplogix/monitorDiagnostico'
 import { buildPareto } from '@/services/shoplogix/monitorPareto'
 import { DiagnosticoDeLinea } from './monitor/MonitorDiagnostico'
 import { ParetoDeParadas } from './monitor/MonitorPareto'
-import { TiempoDelTurno, ComparadorDias, Bloque, BitacoraOperador, VelocidadDeLinea, PronosticoCierre, notasPorCausa } from './monitor/MonitorShiftParts'
+import { TiempoDelTurno, ComparadorDias, Bloque, BitacoraOperador, PronosticoCierre, notasPorCausa } from './monitor/MonitorShiftParts'
 import { useIsAdmin } from '@/store'
 
 // ── Formateadores (locales a propósito: esta página no debe arrastrar el
@@ -156,7 +156,14 @@ function Kpi({
  */
 function Sparkbars({
   series, stopReasons, stopEvents, comments, causaSel, onCausa, breaks,
+  recentPerMinute, requiredPerMinute, medianCpm,
 }: {
+  /** Ritmo de la última media hora, para la cabecera. */
+  recentPerMinute?: number | null
+  /** Ritmo que la meta exige ahora mismo, si hay meta. */
+  requiredPerMinute?: number | null
+  /** Mediana de los turnos anteriores, en pz/min de reloj. */
+  medianCpm?: number | null
   series: PublicMonitorLive['series']
   stopReasons?: string[]
   stopEvents?: PublicMonitorLive['stopEvents']
@@ -205,6 +212,43 @@ function Sparkbars({
    */
   const stepX = W / series.length
   const bw = Math.max(0.3, stepX * 0.7)
+
+  /*
+   * La MEDIA MÓVIL DE 15 MIN sobre las barras. Es lo que antes vivía en un
+   * segundo gráfico —"Velocidad de la línea"— que dibujaba exactamente esta
+   * misma serie de 5 min, uno en piezas y el otro en pz/min. Dos tarjetas para
+   * el mismo dato: la tendencia va encima de su propio detalle.
+   *
+   * ⚠ Se corta la cola de tramos en CERO del final: cuando la línea deja de
+   * producir, la serie sigue trayendo tramos vacíos y la media los promedia,
+   * así que la curva termina cayendo al suelo y el turno parece desplomarse
+   * cuando en realidad terminó. Los ceros del MEDIO se conservan: esos sí son
+   * información (la colación, una falla).
+   */
+  const VENTANA = 3   // 3 tramos de 5 min
+  let fin = series.length
+  while (fin > 0 && (series[fin - 1]!.pieces || 0) === 0) fin--
+  const media = series.slice(0, fin).map((_, i, arr) => {
+    const w = arr.slice(Math.max(0, i - VENTANA + 1), i + 1)
+    return w.reduce((a, p) => a + (p.pieces || 0), 0) / w.length
+  })
+  const yDe = (piezas: number) => H - (piezas / max) * H * 0.98
+  const lineaMedia = media.map((v, i) => `${i * stepX + bw / 2},${yDe(v)}`).join(' ')
+
+  /*
+   * Las referencias del ritmo, en piezas por tramo (pz/min × 5) para poder
+   * dibujarlas sobre las mismas barras. Solo si CABEN: con la meta pidiendo
+   * 23 pz/min y el mejor tramo en 15, la línea de "necesitás" estiraba la
+   * escala al doble y aplastaba el turno entero contra el piso. Cuando no
+   * cabe, el número se dice en la leyenda en vez de deformar el gráfico.
+   */
+  const TOPE_REF = 1.3
+  const refs = [
+    { v: (requiredPerMinute ?? 0) * 5, label: 'necesitás', cpm: requiredPerMinute ?? 0, clase: 'stroke-amber-600 dark:stroke-amber-400' },
+    { v: (medianCpm ?? 0) * 5, label: 'promedio de turno', cpm: medianCpm ?? 0, clase: 'stroke-muted-foreground/60' },
+  ].filter((r) => r.v > 0)
+  const refsDibujables = refs.filter((r) => r.v <= max * TOPE_REF)
+  const refsFuera = refs.filter((r) => r.v > max * TOPE_REF)
 
   // ⚠ La serie NO es continua: solo trae los tramos que el sensor registró, y
   // durante una parada larga puede faltar más de uno. Por eso la posición de un
@@ -339,7 +383,16 @@ function Sparkbars({
   return (
     <div id="grafico-turno" className="scroll-mt-4 rounded-2xl border border-border bg-card px-4 py-3">
       <div className="flex items-center justify-between text-[11px] uppercase tracking-wide text-muted-foreground">
-        <span>Piezas por tramo de 5 min</span>
+        <span>
+          Velocidad de la línea
+          <span className="normal-case tracking-normal text-muted-foreground/70"> · tramos de 5 min</span>
+        </span>
+        {!causaSel && recentPerMinute != null && recentPerMinute > 0 && (
+          <span className="normal-case tracking-normal">
+            <b className="tabular-nums text-sky-700 dark:text-sky-300">{fmtDec(recentPerMinute)} pz/min</b>
+            <span className="ml-1 text-muted-foreground/70">ahora</span>
+          </span>
+        )}
         {causaSel && (
           <button
             onClick={() => onCausa(null)}
@@ -377,6 +430,12 @@ function Sparkbars({
         <line x1={0} y1={H - H * 0.98} x2={W} y2={H - H * 0.98}
               className="stroke-amber-600 dark:stroke-amber-400" strokeWidth={0.2} strokeDasharray="1.2 1" />
 
+        {/* Las referencias de ritmo que CABEN en la escala (ver `refs`). */}
+        {refsDibujables.map((r) => (
+          <line key={r.label} x1={0} x2={W} y1={yDe(r.v)} y2={yDe(r.v)}
+                className={r.clase} strokeWidth={0.18} strokeDasharray="0.8 0.8" />
+        ))}
+
         {series.map((p, i) => {
           const h = (p.pieces / max) * H * 0.98
           return (
@@ -393,6 +452,16 @@ function Sparkbars({
             </rect>
           )
         })}
+
+        {/* La tendencia, encima de su propio detalle: con 5 min a secas una
+            micro-detención parece un desplome, con 30 el cambio de ritmo tarda
+            media hora en notarse. 15 es el compromiso que pidió Orel. */}
+        {media.length >= 3 && (
+          <polyline points={lineaMedia} fill="none"
+                    className="stroke-sky-800 dark:stroke-sky-200"
+                    strokeWidth={0.45} strokeLinejoin="round"
+                    vectorEffect="non-scaling-stroke" />
+        )}
 
         {/* El tramo bajo el cursor, marcado sobre las barras. */}
         {foco != null && (
@@ -478,9 +547,30 @@ function Sparkbars({
 
       <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground/70">
         <span className="inline-flex items-center gap-1">
-          <span className="inline-block h-2 w-3 border-t-2 border-dashed border-amber-600 dark:border-amber-400" />
-          mejor ritmo del turno: <span className="tabular-nums text-muted-foreground">{fmtInt(max)}</span> pz
+          <span className="inline-block h-0.5 w-3 bg-sky-800 dark:bg-sky-200" />
+          media de 15 min
         </span>
+        <span className="inline-flex items-center gap-1">
+          <span className="inline-block h-2 w-3 border-t-2 border-dashed border-amber-600 dark:border-amber-400" />
+          mejor tramo: <span className="tabular-nums text-muted-foreground">{fmtInt(max)}</span> pz
+          <span className="tabular-nums">({fmtDec(max / 5)} pz/min)</span>
+        </span>
+        {refsDibujables.map((r) => (
+          <span key={r.label} className="inline-flex items-center gap-1">
+            <span className={`inline-block h-2 w-3 border-t border-dashed ${
+              r.label === 'necesitás' ? 'border-amber-600 dark:border-amber-400' : 'border-muted-foreground/60'
+            }`} />
+            {r.label} <span className="tabular-nums">{fmtDec(r.cpm)}</span>
+          </span>
+        ))}
+        {/* Fuera de escala: el número se dice, pero no se dibuja — estirar el
+            eje hasta él aplastaba el turno entero contra el piso. */}
+        {refsFuera.map((r) => (
+          <span key={r.label} className="inline-flex items-center gap-1">
+            {r.label} <span className="tabular-nums">{fmtDec(r.cpm)}</span> pz/min
+            <span className="text-muted-foreground/50">(fuera del gráfico)</span>
+          </span>
+        ))}
         {convenio.length > 0 && (
           <span className="inline-flex items-center gap-1">
             <span className="inline-block h-2.5 w-2.5 rounded-sm bg-muted-foreground/15" />
@@ -923,6 +1013,10 @@ function PorHora({ series }: { series: PublicMonitorLive['series'] }) {
     <Bloque
       id="porhora"
       titulo="Hora por hora"
+      /* Detalle: se abre cuando alguien lo busca. Con todos los bloques
+         abiertos la pantalla medía cuatro pantallas de celular para contestar
+         tres preguntas. */
+      defaultAbierto={false}
       extra={<span className="normal-case">desde el arranque</span>}
     >
       <ul className="mt-2 space-y-1.5">
@@ -1833,19 +1927,12 @@ export function PublicShiftMonitorPage() {
           cone={pronostico && pronostico.mapePct <= MAX_MAPE_PCT ? pronostico.cone : null}
         />
 
-        {/* La velocidad como historia, no solo el "ahora" del KPI — ARRIBA del
-            gráfico de tramos (pedido de Orel): primero la tendencia, después
-            el detalle fino. Tramos de 5 min de Shoplogix + media móvil 15 min. */}
-        <VelocidadDeLinea
-          series={live.series}
-          breaks={comparacion.breaks}
-          recentPerMinute={live.recentPiecesPerMinute}
-          avgPerMinute={live.piecesPerMinute}
-          requiredPerMinute={pace && pace.requiredPerMinute > 0 ? pace.requiredPerMinute : null}
-          medianCpm={live.paceMedianCpm}
-          cerrado={live.shiftClosed}
-        />
-
+        {/* ⚠ UN solo gráfico de la serie de 5 min.
+            Había dos tarjetas —"Velocidad de la línea" y "Piezas por tramo"—
+            dibujando exactamente la misma serie, una en pz/min y otra en
+            piezas. La tendencia (media de 15 min) y las referencias de ritmo se
+            mudaron acá, encima de su propio detalle, que además es el gráfico
+            que sabe ubicar las detenciones y el que tiene el zoom a 8×. */}
         <Sparkbars
           series={live.series}
           stopReasons={live.stopReasons}
@@ -1854,6 +1941,9 @@ export function PublicShiftMonitorPage() {
           causaSel={causaSel}
           onCausa={setCausaSel}
           breaks={comparacion.breaks}
+          recentPerMinute={live.recentPiecesPerMinute}
+          requiredPerMinute={pace && pace.requiredPerMinute > 0 ? pace.requiredPerMinute : null}
+          medianCpm={live.paceMedianCpm}
         />
 
         <TiempoDelTurno

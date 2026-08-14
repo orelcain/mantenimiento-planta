@@ -6,11 +6,11 @@
  * bundle público no debe arrastrar los helpers del Grader, que se llevan echarts.
  */
 
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import type { PublicMonitorLive } from '@/services/shoplogix/publicShiftMonitor.service'
 import {
-  findGapWindows, resumenComparacion, type CompareResult, type PacePoint, type PlannedBreak,
+  findGapWindows, resumenComparacion, type CompareResult, type PacePoint,
 } from '@/services/shoplogix/monitorCompare'
 import { MAX_MAPE_PCT, type ConePoint, type ForecastResult } from '@/services/shoplogix/monitorForecast'
 import { MonitorCompareChart } from './MonitorCompareChart'
@@ -73,20 +73,6 @@ export function Bloque({ id, titulo, extra, defaultAbierto = true, children }: {
       {abierto && children}
     </section>
   )
-}
-
-/**
- * Paso "lindo" para una escala: el múltiplo de 1, 2, 2,5, 5 o 10 (por década)
- * que deja entre 3 y 5 marcas. Es la regla de siempre en gráficos; sin ella el
- * eje termina mostrando números como 17,5 y 8,7, que no se leen.
- */
-function pasoRedondo(max: number): number {
-  const objetivo = max / 4
-  const mag = Math.pow(10, Math.floor(Math.log10(Math.max(objetivo, 0.01))))
-  for (const m of [1, 2, 2.5, 5]) {
-    if (mag * m >= objetivo) return mag * m
-  }
-  return mag * 10
 }
 
 function fmtDurMin(min: number): string {
@@ -416,6 +402,10 @@ export function ComparadorDias({ cmp, live, onCausa, cone }: {
     <Bloque
       id="comparador"
       titulo="Comparado con otros días"
+      /* Plegado por defecto: la respuesta corta —cuánto vamos contra la cuota—
+         viaja en `extra` y se sigue viendo con el bloque cerrado. Quien quiere
+         las curvas lo abre, y `Bloque` recuerda la elección. */
+      defaultAbierto={false}
       /* Plegado, la altura del turno no dice nada; la diferencia contra la
          cuota sí, y es la razón por la que uno abriría el bloque. */
       extra={
@@ -1060,253 +1050,6 @@ export function PronosticoCierre({ f, meta, horizonte }: {
         <span className="tabular-nums">{f.samples}</span>. Llevás{' '}
         <span className="tabular-nums text-foreground/80">{fmtInt(f.current)}</span>.
       </p>
-    </Bloque>
-  )
-}
-
-/**
- * Velocidad de la línea (pz/min) a lo largo del turno — "¿venimos acelerando o
- * frenando?" (pedido de Orel, 13-ago). El KPI "Últimos 30 min" da la velocidad
- * de AHORA; esta curva da la historia: la rampa del arranque, los baches y el
- * crucero.
- *
- * PRECISIÓN: Shoplogix entrega tramos de 5 minutos y el sync corre cada ~5 min
- * — ese es el piso del dato. La curva cruda de 5 min queda siempre visible
- * (tenue); la protagonista es la MEDIA MÓVIL DE 15 MIN (3 tramos): con 5 min a
- * secas una micro-detención parece un desplome de velocidad, con 30 min el
- * cambio de ritmo tarda media hora en notarse. 15 es el compromiso que pidió
- * Orel ("mientras más preciso mejor").
- *
- * Las dos referencias punteadas la vuelven accionable: "necesitás" (el ritmo
- * para la cuota, el mismo de la tarjeta de la meta, se mueve durante el turno)
- * y "lo normal" (la mediana de los últimos turnos). Si la media cruza abajo de
- * "necesitás", el atraso se ve venir ANTES de que la brecha lo cuente.
- */
-export function VelocidadDeLinea({ series, breaks, recentPerMinute, avgPerMinute, requiredPerMinute, medianCpm, cerrado }: {
-  series?: PublicMonitorLive['series']
-  /** Paradas de convenio (hechos + pronóstico), para que el valle de la
-      colación no parezca falla. Mismas bandas grises que el comparador. */
-  breaks?: PlannedBreak[]
-  recentPerMinute?: number | null
-  avgPerMinute?: number | null
-  requiredPerMinute?: number | null
-  medianCpm?: number | null
-  cerrado: boolean
-}) {
-  /*
-   * Zoom horizontal con paneo, el mismo mecanismo del comparador: al cambiar
-   * la escala se conserva lo que se estaba mirando, y si el FINAL de la curva
-   * (el presente, lo que uno vino a ver en un turno vivo) queda fuera del área
-   * visible, se recentra ahí. Los hooks van ANTES del early return.
-   */
-  const [zoom, setZoom] = useState(1)
-  const scrollRef = useRef<HTMLDivElement>(null)
-  const focoRef = useRef<number | null>(null)
-  useLayoutEffect(() => {
-    const el = scrollRef.current
-    if (!el || focoRef.current == null) return
-    const visible = el.clientWidth
-    const x = focoRef.current * el.scrollWidth - visible / 2
-    el.scrollLeft = Math.max(0, Math.min(x, el.scrollWidth - visible))
-    focoRef.current = null
-  }, [zoom])
-
-  /*
-   * ⚠ Se corta la cola de tramos en CERO del final. Cuando la línea deja de
-   * producir, la serie sigue trayendo tramos vacíos —hoy en Filete eran el
-   * 8,5% del ancho— y la media móvil los promedia: la curva termina cayendo al
-   * suelo y el turno parece desplomarse cuando en realidad terminó. Los ceros
-   * del MEDIO se conservan: esos sí son información (la colación, una falla).
-   */
-  const todos = (series ?? []).map((p) => (p.pieces || 0) / 5)
-  let fin = todos.length
-  while (fin > 0 && todos[fin - 1] === 0) fin--
-  const raw = todos.slice(0, fin)
-  if (raw.length < 3) return null
-
-  const VENTANA = 3 // 3 tramos de 5 min = 15 minutos
-  const media = raw.map((_, i) => {
-    const w = raw.slice(Math.max(0, i - VENTANA + 1), i + 1)
-    return w.reduce((a, x) => a + x, 0) / w.length
-  })
-
-  const totalMin = raw.length * 5
-
-  /*
-   * Escala con marcas REDONDAS. Antes el eje mostraba el máximo y su mitad —
-   * "17,5" y "8,7" en el turno del 13-08—, dos números que nadie usa para leer
-   * un ritmo: la altura de la curva no se traducía a nada. Con múltiplos de 5
-   * (o de 1, 2, 10… según el rango) la lectura es directa y la línea de "lo
-   * normal" cae en un lugar interpretable.
-   */
-  const techo = Math.max(...raw, requiredPerMinute ?? 0, medianCpm ?? 0, 1)
-  const pasoY = pasoRedondo(techo)
-  const maxY = Math.ceil(techo / pasoY) * pasoY
-  const marcasY: number[] = []
-  for (let v = maxY; v > 0; v -= pasoY) marcasY.push(v)
-
-  const W = 100
-  const H = 100
-  const x = (i: number) => (i / (raw.length - 1)) * W
-  const xMin = (m: number) => Math.min(W, (m / totalMin) * W)
-  const y = (v: number) => H - (v / maxY) * H
-  const linea = (vals: number[]) =>
-    vals.map((v, i) => `${x(i).toFixed(2)},${y(v).toFixed(2)}`).join(' ')
-
-  /*
-   * Marcas en HORAS REALES del reloj (08:00, 09:00…), no "h+1" (pedido de
-   * Orel): esta curva es la línea de tiempo del PROPIO turno — el eje relativo
-   * solo hace falta en el comparador, donde se alinean días que arrancan a
-   * horas distintas. `t` viene en la convención wall-clock-as-UTC del doc: la
-   * hora de planta ES la del ISO. Se densifican con el zoom.
-   */
-  const t0 = Date.parse(series![0]!.t)
-  const stepMin = zoom >= 4 ? 30 : zoom >= 2 ? 60 : 120
-  const marcas: Array<{ pct: number; label: string }> = []
-  if (Number.isFinite(t0)) {
-    const stepMs = stepMin * 60_000
-    const finMs = t0 + (raw.length - 1) * 5 * 60_000
-    for (let h = Math.ceil(t0 / stepMs) * stepMs; h <= finMs; h += stepMs) {
-      const pct = (((h - t0) / 60_000 / 5) / (raw.length - 1)) * 100
-      // Pegada al borde, media etiqueta queda fuera y "07:40" se lee ":40".
-      if (pct < 2 || pct > 98) continue
-      marcas.push({ pct, label: new Date(h).toISOString().slice(11, 16) })
-    }
-  }
-
-  return (
-    <Bloque
-      id="velocidad"
-      titulo="Velocidad de la línea"
-      extra={
-        <span className="tabular-nums font-semibold text-sky-700 dark:text-sky-300">
-          {fmtDec(cerrado ? (avgPerMinute ?? 0) : (recentPerMinute ?? 0))} pz/min
-          <span className="ml-1 font-normal text-muted-foreground">
-            {cerrado ? 'promedio' : 'ahora'}
-          </span>
-        </span>
-      }
-    >
-      <div className="mt-2 flex gap-1">
-        <div className="relative h-32 w-7 shrink-0">
-          {marcasY.map((v) => (
-            <span key={v}
-              className="absolute right-0 -translate-y-1/2 text-[9px] tabular-nums text-muted-foreground"
-              style={{ top: `${(y(v) / H) * 100}%` }}>
-              {v % 1 === 0 ? v : fmtDec(v)}
-            </span>
-          ))}
-        </div>
-        <div ref={scrollRef} className="min-w-0 flex-1 overflow-x-auto">
-          <div className="relative" style={{ width: `${zoom * 100}%`, minWidth: '100%' }} data-zoom={zoom}>
-          <svg
-            viewBox={`0 0 ${W} ${H}`}
-            className="h-32 w-full"
-            preserveAspectRatio="none"
-            role="img"
-            aria-label="Velocidad de la línea en piezas por minuto, tramo a tramo del turno"
-          >
-            {(breaks ?? []).filter((b) => b.fromMin < totalMin).map((b) => (
-              <rect key={`${b.fromMin}-${b.toMin}`} x={xMin(b.fromMin)} y={0}
-                width={Math.max(0.3, xMin(b.toMin) - xMin(b.fromMin))} height={H}
-                className="fill-muted-foreground/15" />
-            ))}
-
-            {/* Las guías caen en las MISMAS marcas del eje: si no, la línea de
-                referencia y el número que la nombra no coinciden. */}
-            {marcasY.map((v) => (
-              <line key={v} x1={0} x2={W} y1={y(v)} y2={y(v)}
-                stroke="currentColor" strokeWidth="0.25" strokeDasharray="1.5 1.5"
-                className="text-border" vectorEffect="non-scaling-stroke" />
-            ))}
-            {marcas.map((m) => (
-              <line key={m.pct} x1={(m.pct / 100) * W} x2={(m.pct / 100) * W} y1={0} y2={H}
-                stroke="currentColor" strokeWidth="0.25" strokeDasharray="1.5 2"
-                className="text-border" vectorEffect="non-scaling-stroke" />
-            ))}
-
-            {/* Las referencias primero: las curvas van encima. */}
-            {requiredPerMinute != null && requiredPerMinute > 0 && requiredPerMinute < maxY && (
-              <line x1={0} x2={W} y1={y(requiredPerMinute)} y2={y(requiredPerMinute)}
-                style={{ stroke: COLOR_CUOTA }} strokeWidth="1" strokeDasharray="4 3" opacity="0.85"
-                vectorEffect="non-scaling-stroke" />
-            )}
-            {medianCpm != null && medianCpm > 0 && (
-              <line x1={0} x2={W} y1={y(medianCpm)} y2={y(medianCpm)}
-                stroke="currentColor" strokeWidth="1" strokeDasharray="2 3"
-                className="text-muted-foreground/70" vectorEffect="non-scaling-stroke" />
-            )}
-
-            <polyline points={linea(raw)} fill="none" style={{ stroke: COLOR_HOY }}
-              strokeWidth="1" opacity="0.25" vectorEffect="non-scaling-stroke" />
-            <polyline points={linea(media)} fill="none" style={{ stroke: COLOR_HOY }}
-              strokeWidth="2.4" vectorEffect="non-scaling-stroke" />
-          </svg>
-          {/* Eje de horas en HTML: un <text> dentro de un SVG con
-              preserveAspectRatio="none" se deforma. Va DENTRO del área
-              escalada para viajar con el paneo. */}
-          <div className="relative h-4">
-            {marcas.map((m) => (
-              <span key={m.pct}
-                className="absolute top-0 -translate-x-1/2 whitespace-nowrap text-[9px] tabular-nums text-muted-foreground"
-                style={{ left: `${m.pct}%` }}>
-                {m.label}
-              </span>
-            ))}
-          </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
-        <span className="flex items-center gap-1.5">
-          <i className="h-1.5 w-4 rounded-full" style={{ background: COLOR_HOY }} />
-          media 15 min
-        </span>
-        <span className="flex items-center gap-1.5">
-          <i className="h-1.5 w-4 rounded-full opacity-30" style={{ background: COLOR_HOY }} />
-          tramos de 5 min (el dato crudo de Shoplogix)
-        </span>
-        {requiredPerMinute != null && requiredPerMinute > 0 && (
-          <span className="flex items-center gap-1.5">
-            <i className="h-0.5 w-4 rounded-full" style={{ background: COLOR_CUOTA }} />
-            necesitás <span className="tabular-nums">{fmtDec(requiredPerMinute)}</span>
-          </span>
-        )}
-        {medianCpm != null && medianCpm > 0 && (
-          <span className="flex items-center gap-1.5">
-            <i className="h-0.5 w-4 rounded-full bg-muted-foreground/70" />
-            {/* "Promedio de turno", no "lo normal": esta mediana es de RELOJ
-                (incluye las paradas) y la tarjeta de la meta habla del ritmo
-                ANDANDO. Dos números distintos con la misma etiqueta se leen
-                como un error. */}
-            promedio de turno <span className="tabular-nums">{fmtDec(medianCpm)}</span>
-          </span>
-        )}
-        {zoom > 1 && <span>deslizá el gráfico &#8594;</span>}
-        <span className="ml-auto flex items-center gap-1">
-          {[1, 2, 4].map((z) => (
-            <button key={z} type="button"
-              onClick={() => {
-                const el = scrollRef.current
-                // Desde 1× el foco es el FINAL (el presente); desde más
-                // adentro se conserva lo que se estaba mirando.
-                focoRef.current = zoom === 1 || !el
-                  ? 1
-                  : (el.scrollLeft + el.clientWidth / 2) / el.scrollWidth
-                setZoom(z)
-              }}
-              aria-pressed={zoom === z}
-              className={`rounded-full border px-1.5 py-0.5 tabular-nums ${
-                zoom === z
-                  ? 'border-sky-500/50 bg-sky-500/20 text-sky-800 dark:text-sky-200'
-                  : 'border-border hover:bg-muted'
-              }`}>
-              {z}×
-            </button>
-          ))}
-        </span>
-      </div>
     </Bloque>
   )
 }
