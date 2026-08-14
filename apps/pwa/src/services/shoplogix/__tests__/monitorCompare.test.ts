@@ -445,11 +445,29 @@ describe('resumenComparacion', () => {
     expect(c.meta).toBe(5_000)
   })
 
+  it('el rango dice entre cuánto y cuánto se movieron los días anteriores', () => {
+    /*
+     * Reemplazó a la tarjeta "Para la cuota", que repetía el mismo número que
+     * la cabecera y la frase del bloque. Esto contesta otra pregunta: si el
+     * turno cae dentro de lo normal o afuera.
+     */
+    const r = armar([
+      { dateKey: '2026-08-11', series: flojo },
+      { dateKey: '2026-08-10', series: bueno },
+    ])
+    expect(r.rango).toEqual({ min: 720, max: 1_080, dias: 2 })
+  })
+
+  it('⚠ con UN solo día anterior no hay rango: sería ese día dos veces', () => {
+    expect(armar([{ dateKey: '2026-08-11', series: flojo }]).rango).toBeNull()
+  })
+
   it('sin días anteriores ni meta no inventa una conclusión', () => {
     const r = armar([])
     expect(r.reciente).toBeNull()
     expect(r.mejor).toBeNull()
     expect(r.cuota).toBeNull()
+    expect(r.rango).toBeNull()
     // Las piezas de hoy sí: son el "llevamos X" del titular.
     expect(r.actual).toBe(1_200)
   })

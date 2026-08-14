@@ -1183,6 +1183,26 @@ export function PublicShiftMonitorPage() {
     return buildDiagnostico({ history: historial, microHoy: micro(live ?? undefined) })
   }, [live, data?.history, data?.forecastHistory, data?.shiftId])
 
+  /**
+   * La hora de reloj de la próxima parada de convenio que todavía no empezó.
+   *
+   * Sirve para el turno temprano, cuando "Planificado 0 min" ocupaba un chip
+   * para no decir nada y se leía como si faltara un dato. El horario ya lo
+   * conoce la pantalla —lo usa para aplanar la curva de la cuota—, así que en
+   * vez de un cero mudo se anticipa cuándo entra la colación. Se calcula acá y
+   * no en el bloque porque `fromMin` es relativo al arranque del turno: pasar
+   * la conversión a hora de reloj adentro obligaría a que el componente
+   * conociera la convención wall-clock-as-UTC.
+   */
+  const proximaParada = useMemo(() => {
+    if (!live?.scheduledStart || comparacion.currentMinute == null) return null
+    const prox = comparacion.breaks
+      .filter((b) => b.fromMin > comparacion.currentMinute!)
+      .sort((a, b) => a.fromMin - b.fromMin)[0]
+    if (!prox) return null
+    return fmtWallTime(new Date(Date.parse(live.scheduledStart) + prox.fromMin * 60_000).toISOString())
+  }, [live?.scheduledStart, comparacion.breaks, comparacion.currentMinute])
+
   if (status === 'loading') {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -1513,6 +1533,19 @@ export function PublicShiftMonitorPage() {
           meta={data.targetPieces ?? live.quotaPieces ?? live.expectedPieces ?? null}
         />
 
+        {/* El comparador SUBE hasta acá, pegado al pronóstico: los dos
+            contestan la misma pregunta —si el turno llega— y estaban separados
+            por tres bloques de detalle. Arriba el desenlace, abajo el porqué
+            (velocidad, tramos, tiempo, hora por hora). */}
+        <ComparadorDias
+          cmp={comparacion}
+          live={live}
+          onCausa={setCausaSel}
+          /* Solo cuando el pronóstico es creíble: un cono con 20% de error es
+             una mancha que promete lo que no puede. */
+          cone={pronostico && pronostico.mapePct <= MAX_MAPE_PCT ? pronostico.cone : null}
+        />
+
         {/* La velocidad como historia, no solo el "ahora" del KPI — ARRIBA del
             gráfico de tramos (pedido de Orel): primero la tendencia, después
             el detalle fino. Tramos de 5 min de Shoplogix + media móvil 15 min. */}
@@ -1535,15 +1568,11 @@ export function PublicShiftMonitorPage() {
           onCausa={setCausaSel}
         />
 
-        <TiempoDelTurno tb={live.timeBreakdown} causaSel={causaSel} onCausa={setCausaSel} />
-
-        <ComparadorDias
-          cmp={comparacion}
-          live={live}
+        <TiempoDelTurno
+          tb={live.timeBreakdown}
+          causaSel={causaSel}
           onCausa={setCausaSel}
-          /* Solo cuando el pronóstico es creíble: un cono con 20% de error es
-             una mancha que promete lo que no puede. */
-          cone={pronostico && pronostico.mapePct <= MAX_MAPE_PCT ? pronostico.cone : null}
+          proximaParada={proximaParada}
         />
 
         <PorHora series={live.series} />
