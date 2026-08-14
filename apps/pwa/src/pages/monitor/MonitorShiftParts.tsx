@@ -75,6 +75,20 @@ export function Bloque({ id, titulo, extra, defaultAbierto = true, children }: {
   )
 }
 
+/**
+ * Paso "lindo" para una escala: el múltiplo de 1, 2, 2,5, 5 o 10 (por década)
+ * que deja entre 3 y 5 marcas. Es la regla de siempre en gráficos; sin ella el
+ * eje termina mostrando números como 17,5 y 8,7, que no se leen.
+ */
+function pasoRedondo(max: number): number {
+  const objetivo = max / 4
+  const mag = Math.pow(10, Math.floor(Math.log10(Math.max(objetivo, 0.01))))
+  for (const m of [1, 2, 2.5, 5]) {
+    if (mag * m >= objetivo) return mag * m
+  }
+  return mag * 10
+}
+
 function fmtDurMin(min: number): string {
   if (!Number.isFinite(min) || min <= 0) return '—'
   const h = Math.floor(min / 60)
@@ -931,7 +945,17 @@ export function VelocidadDeLinea({ series, breaks, recentPerMinute, avgPerMinute
     focoRef.current = null
   }, [zoom])
 
-  const raw = (series ?? []).map((p) => (p.pieces || 0) / 5)
+  /*
+   * ⚠ Se corta la cola de tramos en CERO del final. Cuando la línea deja de
+   * producir, la serie sigue trayendo tramos vacíos —hoy en Filete eran el
+   * 8,5% del ancho— y la media móvil los promedia: la curva termina cayendo al
+   * suelo y el turno parece desplomarse cuando en realidad terminó. Los ceros
+   * del MEDIO se conservan: esos sí son información (la colación, una falla).
+   */
+  const todos = (series ?? []).map((p) => (p.pieces || 0) / 5)
+  let fin = todos.length
+  while (fin > 0 && todos[fin - 1] === 0) fin--
+  const raw = todos.slice(0, fin)
   if (raw.length < 3) return null
 
   const VENTANA = 3 // 3 tramos de 5 min = 15 minutos
@@ -941,7 +965,19 @@ export function VelocidadDeLinea({ series, breaks, recentPerMinute, avgPerMinute
   })
 
   const totalMin = raw.length * 5
-  const maxY = Math.max(...raw, requiredPerMinute ?? 0, medianCpm ?? 0, 1) * 1.08
+
+  /*
+   * Escala con marcas REDONDAS. Antes el eje mostraba el máximo y su mitad —
+   * "17,5" y "8,7" en el turno del 13-08—, dos números que nadie usa para leer
+   * un ritmo: la altura de la curva no se traducía a nada. Con múltiplos de 5
+   * (o de 1, 2, 10… según el rango) la lectura es directa y la línea de "lo
+   * normal" cae en un lugar interpretable.
+   */
+  const techo = Math.max(...raw, requiredPerMinute ?? 0, medianCpm ?? 0, 1)
+  const pasoY = pasoRedondo(techo)
+  const maxY = Math.ceil(techo / pasoY) * pasoY
+  const marcasY: number[] = []
+  for (let v = maxY; v > 0; v -= pasoY) marcasY.push(v)
 
   const W = 100
   const H = 100
@@ -987,11 +1023,11 @@ export function VelocidadDeLinea({ series, breaks, recentPerMinute, avgPerMinute
     >
       <div className="mt-2 flex gap-1">
         <div className="relative h-32 w-7 shrink-0">
-          {[maxY, maxY / 2].map((v) => (
+          {marcasY.map((v) => (
             <span key={v}
               className="absolute right-0 -translate-y-1/2 text-[9px] tabular-nums text-muted-foreground"
               style={{ top: `${(y(v) / H) * 100}%` }}>
-              {fmtDec(v)}
+              {v % 1 === 0 ? v : fmtDec(v)}
             </span>
           ))}
         </div>
@@ -1010,8 +1046,10 @@ export function VelocidadDeLinea({ series, breaks, recentPerMinute, avgPerMinute
                 className="fill-muted-foreground/15" />
             ))}
 
-            {[0.25, 0.5, 0.75].map((f) => (
-              <line key={f} x1={0} x2={W} y1={H * f} y2={H * f}
+            {/* Las guías caen en las MISMAS marcas del eje: si no, la línea de
+                referencia y el número que la nombra no coinciden. */}
+            {marcasY.map((v) => (
+              <line key={v} x1={0} x2={W} y1={y(v)} y2={y(v)}
                 stroke="currentColor" strokeWidth="0.25" strokeDasharray="1.5 1.5"
                 className="text-border" vectorEffect="non-scaling-stroke" />
             ))}
