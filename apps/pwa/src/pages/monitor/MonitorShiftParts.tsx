@@ -110,12 +110,14 @@ function fmtDurMin(min: number): string {
  * "planificado 78 min" a secas invita a sospechar que se esconde algo. Si la
  * colación se llevó 57 minutos, que se lea "COLACION 57 min · 4×".
  */
-export function TiempoDelTurno({ tb, causaSel, onCausa, proximaParada }: {
+export function TiempoDelTurno({ tb, causaSel, onCausa, proximaParada, notas }: {
   tb: PublicMonitorLive['timeBreakdown']
   causaSel?: string | null
   onCausa?: (c: string | null) => void
   /** Hora de reloj de la próxima parada de convenio, ya formateada. */
   proximaParada?: string | null
+  /** Comentarios del operador agrupados por causa (ver `notasPorCausa`). */
+  notas?: Map<string, Array<{ desde: string; texto: string }>>
 }) {
   const [abierto, setAbierto] = useState(false)
   if (!tb || tb.windowMin <= 0) return null
@@ -221,7 +223,7 @@ export function TiempoDelTurno({ tb, causaSel, onCausa, proximaParada }: {
                 <li className="text-muted-foreground/60">sin paradas de convenio</li>
               )}
               {tb.planned.map((x) => (
-                <FilaCausa key={x.reason} x={x} sel={causaSel ?? null} onCausa={onCausa} />
+                <FilaCausa key={x.reason} x={x} sel={causaSel ?? null} onCausa={onCausa} notas={notas?.get(x.reason)} />
               ))}
             </ul>
           </div>
@@ -232,7 +234,7 @@ export function TiempoDelTurno({ tb, causaSel, onCausa, proximaParada }: {
                 <li className="text-muted-foreground/60">nada por recuperar</li>
               )}
               {tb.recoverable.map((x) => (
-                <FilaCausa key={x.reason} x={x} sel={causaSel ?? null} onCausa={onCausa} />
+                <FilaCausa key={x.reason} x={x} sel={causaSel ?? null} onCausa={onCausa} notas={notas?.get(x.reason)} />
               ))}
             </ul>
           </div>
@@ -255,10 +257,19 @@ export function TiempoDelTurno({ tb, causaSel, onCausa, proximaParada }: {
  * tramos — y la vista sube sola, porque en el celular el gráfico queda fuera de
  * pantalla y no se vería que algo cambió.
  */
-function FilaCausa({ x, sel, onCausa }: {
+function FilaCausa({ x, sel, onCausa, notas }: {
   x: { reason: string; min: number; count: number; lineMin?: number }
   sel: string | null
   onCausa?: (c: string | null) => void
+  /**
+   * Lo que el operador escribió sobre ESTA causa.
+   *
+   * Antes vivían tres bloques más abajo, en la bitácora: la pantalla decía
+   * "FALLA OPERACIONAL 14 min" acá y "Ajuste erroneo de operador nuevo" a dos
+   * pantallas de distancia. La causa y su explicación son la misma respuesta a
+   * "¿por qué paró?", así que van juntas.
+   */
+  notas?: Array<{ desde: string; texto: string }>
 }) {
   const activa = sel === x.reason
   /*
@@ -283,7 +294,24 @@ function FilaCausa({ x, sel, onCausa }: {
     </>
   )
 
-  if (!onCausa) return <li className="flex justify-between gap-2">{contenido}</li>
+  const notasDeLaCausa = (notas ?? []).length > 0 && (
+    <ul className="mt-0.5 space-y-0.5 border-l-2 border-sky-500/30 pl-2">
+      {notas!.map((n, i) => (
+        <li key={`${n.desde}-${i}`} className="text-[10.5px] leading-snug text-muted-foreground">
+          <span className="tabular-nums">{n.desde}</span> · «{n.texto}»
+        </li>
+      ))}
+    </ul>
+  )
+
+  if (!onCausa) {
+    return (
+      <li>
+        <div className="flex justify-between gap-2">{contenido}</div>
+        {notasDeLaCausa}
+      </li>
+    )
+  }
 
   return (
     <li>
@@ -303,8 +331,39 @@ function FilaCausa({ x, sel, onCausa }: {
       >
         {contenido}
       </button>
+      {notasDeLaCausa}
     </li>
   )
+}
+
+/**
+ * Los comentarios del operador, agrupados por la causa que anotan.
+ *
+ * Mismo criterio que la bitácora: sin texto no aporta, y un comentario que
+ * cubre el turno entero (07:45→15:30) no describe una parada. Acá además se
+ * cortan a dos por causa: son para explicar, no para leerlos todos — la
+ * bitácora completa sigue existiendo abajo.
+ */
+export function notasPorCausa(
+  comments: PublicMonitorLive['comments'],
+  fmtHora: (iso: string) => string,
+): Map<string, Array<{ desde: string; texto: string }>> {
+  const MAX_DUR_MS = 2 * 60 * 60_000
+  const out = new Map<string, Array<{ desde: string; texto: string }>>()
+  for (const c of comments ?? []) {
+    const texto = (c.t ?? '').trim()
+    if (!texto || !c.r || !c.f) continue
+    const a = Date.parse(c.f)
+    if (Number.isNaN(a)) continue
+    const b = c.h ? Date.parse(c.h) : a
+    if (!Number.isNaN(b) && b - a > MAX_DUR_MS) continue
+    const lista = out.get(c.r) ?? []
+    if (lista.some((n) => n.texto === texto)) continue   // el mismo viene duplicado
+    if (lista.length >= 2) continue
+    lista.push({ desde: fmtHora(c.f), texto })
+    out.set(c.r, lista)
+  }
+  return out
 }
 
 /**

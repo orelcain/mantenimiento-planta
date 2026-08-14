@@ -47,7 +47,7 @@ import { buildDiagnostico } from '@/services/shoplogix/monitorDiagnostico'
 import { buildPareto } from '@/services/shoplogix/monitorPareto'
 import { DiagnosticoDeLinea } from './monitor/MonitorDiagnostico'
 import { ParetoDeParadas } from './monitor/MonitorPareto'
-import { TiempoDelTurno, ComparadorDias, Bloque, BitacoraOperador, VelocidadDeLinea, PronosticoCierre } from './monitor/MonitorShiftParts'
+import { TiempoDelTurno, ComparadorDias, Bloque, BitacoraOperador, VelocidadDeLinea, PronosticoCierre, notasPorCausa } from './monitor/MonitorShiftParts'
 import { useIsAdmin } from '@/store'
 
 // ── Formateadores (locales a propósito: esta página no debe arrastrar el
@@ -1164,6 +1164,16 @@ export function PublicShiftMonitorPage() {
   }, [live, data?.history])
 
   /**
+   * Lo que el operador escribió, agrupado por la causa que anota, para poder
+   * mostrarlo PEGADO a esa causa en el desglose del tiempo. La bitácora
+   * completa sigue abajo: esto son las dos primeras notas de cada causa.
+   */
+  const notasDeOperador = useMemo(
+    () => notasPorCausa(live?.comments, fmtWallTime),
+    [live?.comments],
+  )
+
+  /**
    * El Pareto de las paradas de los últimos turnos.
    *
    * Sale del `history` que ya viaja en el doc (mismo turno, hasta 6 anteriores)
@@ -1851,6 +1861,7 @@ export function PublicShiftMonitorPage() {
           causaSel={causaSel}
           onCausa={setCausaSel}
           proximaParada={proximaParada}
+          notas={notasDeOperador}
         />
 
         {/* Pegado al desglose de HOY va el de SIEMPRE: la misma pregunta —qué
