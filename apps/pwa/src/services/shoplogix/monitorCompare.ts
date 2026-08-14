@@ -144,7 +144,13 @@ export function mergeBreaks(
   anteriores: PlannedBreak[],
   currentMinute: number,
 ): PlannedBreak[] {
-  const futuras = anteriores.filter((b) => b.fromMin > currentMinute)
+  /*
+   * ⚠ Se pronostica por el FINAL, no por el arranque. Con `fromMin >
+   * currentMinute` una colación que en los días anteriores iba de la hora 5 a
+   * la 6 dejaba de contar apenas el turno pasaba la hora 5 — justo cuando está
+   * ocurriendo y todavía falta la mitad.
+   */
+  const futuras = anteriores.filter((b) => b.toMin > currentMinute)
   const todas = [...hoy, ...futuras].sort((a, b) => a.fromMin - b.fromMin)
   const out: PlannedBreak[] = []
   for (const b of todas) {
@@ -153,6 +159,61 @@ export function mergeBreaks(
     else out.push({ ...b })
   }
   return out
+}
+
+/**
+ * Estira la parada de convenio que está OCURRIENDO hasta lo que suele durar.
+ *
+ * ⚠⚠ Una parada en curso llega con la duración que lleva, no con la que va a
+ * tener: a las 13:41 del 14-08 la colación de Filete había arrancado a las
+ * 13:37 y el dato decía "4 min". Con eso, el tiempo que queda de turno se
+ * cuenta como si la línea fuera a producir los 50 minutos que todavía va a
+ * estar parada, y el ritmo necesario sale barato justo en el peor momento.
+ *
+ * Lo que sí se sabe es cuánto dura esa misma parada en los turnos anteriores
+ * —en esta línea la colación cae siempre a la misma altura y dura parecido—,
+ * así que se usa su mediana. Nunca se acorta lo ya ocurrido: solo se extiende.
+ */
+export function extendOngoingBreaks(
+  hoy: PlannedBreak[],
+  anteriores: PlannedBreak[],
+  currentMinute: number,
+): PlannedBreak[] {
+  return hoy.map((b) => {
+    // Sigue abierta si su final toca el presente. El margen es el ciclo de
+    // sync (~5 min): una parada cerrada hace media hora no se toca.
+    if (b.toMin < currentMinute - 10) return b
+    const duraciones = anteriores
+      .filter((a) => a.reason === b.reason)
+      .map((a) => a.toMin - a.fromMin)
+      .sort((x, y) => x - y)
+    if (duraciones.length === 0) return b
+    const tipica = duraciones[Math.floor(duraciones.length / 2)]!
+    return { ...b, toMin: Math.max(b.toMin, b.fromMin + tipica) }
+  })
+}
+
+/**
+ * Minutos de parada de convenio que caen entre dos alturas del turno.
+ *
+ * Es lo que hay que DESCONTAR del tiempo que queda antes de pedir un ritmo:
+ * repartir las piezas que faltan sobre tiempo de reloj pide menos de lo que
+ * hace falta, porque adentro de ese reloj está la colación (Orel, 14-08:
+ * "veo que no estamos considerando la colación en los cálculos").
+ *
+ * Se solapa, no se suma entera: una parada que ya empezó aporta solo el pedazo
+ * que falta, y la que se pasa del cierre no cuenta por el rato que queda fuera
+ * de la ventana.
+ */
+export function breakMinutesBetween(
+  breaks: PlannedBreak[],
+  desdeMin: number,
+  hastaMin: number,
+): number {
+  return breaks.reduce(
+    (a, b) => a + Math.max(0, Math.min(b.toMin, hastaMin) - Math.max(b.fromMin, desdeMin)),
+    0,
+  )
 }
 
 export interface CompareResult {

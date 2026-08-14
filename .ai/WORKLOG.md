@@ -13,6 +13,46 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-14 - claude - La colación entra en el ritmo necesario (pregunta de Orel en vivo)
+
+- Pregunta de Orel mirando el turno: "veo que no estamos considerando la colación en los
+  cálculos, ¿o sí?". No se estaba. La cuota se aplana en las paradas de convenio desde #493 y
+  el pronóstico las hereda del historial, pero el RITMO NECESARIO se repartía sobre tiempo de
+  reloj: a las 12:50 pedía 13,1 pz/min para 2.089 pz en 2 h 40, con ~55 min de colación
+  adentro de esa ventana.
+- Hecho: `computePaceToTarget` recibe `pendingBreakMin` y calcula sobre `workMin` = reloj menos
+  convenio por delante — el ritmo necesario, la proyección al cierre y la hora extra (que ahora
+  agrega una hora de LÍNEA ANDANDO, no de reloj). Piso de 5 min para no dividir por ~0. La
+  tarjeta lo dice: "Queda 1 h 43 · 53 min produciendo" + "Descontando 50 min de paradas de
+  convenio que faltan".
+- ⚠⚠ Dos cosas que hacían que la colación EN CURSO no contara, y que solo se ven con un turno
+  vivo (las dos aparecieron mirando la pantalla a las 13:41 y 13:44):
+  1. `mergeBreaks` pronosticaba las de días anteriores por `fromMin > currentMinute`: la
+     colación dejaba de contar apenas el turno pasaba su hora de arranque, o sea justo cuando
+     está ocurriendo. Ahora por `toMin > currentMinute`.
+  2. Una parada EN CURSO no está en `stopEvents` —Shoplogix publica intervalos cerrados— y la
+     que sí está llega con los minutos que LLEVA, no con los que va a durar. Se arma desde
+     `currentReason`/`currentSinceAt` (causa de convenio si lo es hoy o lo fue antes) y
+     `extendOngoingBreaks` la estira a la mediana de esa misma parada en los turnos anteriores.
+     Sin esto el descuento era de 6 min con 50 por delante.
+- Además: `breaksTurno` es ahora UNA sola fuente para las cuatro cosas que dependen de las
+  paradas (curva de cuota, fondo de los gráficos, ritmo necesario, aviso de la próxima).
+  `breakMinutesBetween` y `extendOngoingBreaks` viven en `monitorCompare` para poder probarlas.
+- Archivos: monitorPace.ts, monitorCompare.ts, PublicShiftMonitorPage.tsx, +tests en
+  monitorPace.test.ts y monitorCompare.test.ts.
+- Verificación: tsc limpio, 1.342 tests. En vivo con la colación ocurriendo (13:46, Filete):
+  "Queda 1 h 43 min · 53 min produciendo", "Necesitás 39,4 pz/min", cierre al horario 3.430 pz
+  (69%) — antes decía 19,3 pz/min repartiendo sobre el reloj. Banda de convenio del gráfico de
+  tramos correcta (x=84,9% ancho 13,7% = 13:35 al último tramo).
+- Estado: EN REVISIÓN (PR #551)
+- Sigue: turno NOCHE de Filete la otra semana. El monitor de línea ya sigue al turno vigente
+  (Yal es el caso probado), pero para "Turno Noche" nuevo: `inferShiftEndFromHistory` exige 2
+  turnos con producción, así que las 2 primeras noches el cierre sale de la config — si no hay
+  config cargada, `pace` devuelve null y la tarjeta "Para llegar a la meta" no aparece.
+  Conviene fijar el horario del turno noche ANTES del primero. Pronóstico y diagnóstico piden
+  4 turnos del mismo nombre (MIN_SAMPLES), y la colación de la noche no se pronostica hasta
+  tener 1-2 noches de historial.
+
 ## 2026-08-14 - claude - Un solo cierre con su horizonte, fondo de convenio y aviso de colación
 
 - Hecho: (1) La pantalla daba DOS cierres que se contradecían. A las 12:50, en el turno vivo de

@@ -64,6 +64,13 @@ export interface PaceToTarget {
    * el ritmo actual alcanza.
    */
   gapPerHour: number
+  /**
+   * Minutos de parada de convenio que faltan dentro de la ventana. 0 cuando la
+   * colación ya pasó — ahí `workMin` y `remainingMin` coinciden.
+   */
+  pendingBreakMin: number
+  /** Minutos de PRODUCCIÓN que quedan: el reloj menos `pendingBreakMin`. */
+  workMin: number
   /** Proyección al cierre si sigue al ritmo actual. */
   projectedPieces: number
   /** Techo físico de la línea en pz/h, si se pudo calcular. */
@@ -121,6 +128,22 @@ export interface PaceInput {
   maxPerHour?: number | null
   /** Un turno cerrado no tiene ritmo que recomendar. */
   shiftClosed?: boolean
+  /**
+   * Minutos de PARADA DE CONVENIO que todavía faltan de acá al cierre.
+   *
+   * ⚠⚠ Sin esto el ritmo necesario se reparte sobre tiempo de reloj y pide
+   * menos de lo que hace falta. El 14-08 a las 12:50 en Filete faltaban 2.089
+   * pz y 2 h 40, y la pantalla pedía 13,1 pz/min — pero dentro de esas 2 h 40
+   * entraba la colación, ~55 min con la línea parada por convenio. Sobre los
+   * 105 minutos en que la línea de verdad produce, lo que hace falta es 19,9.
+   * La cuota ya se aplana en esas paradas desde #493; el ritmo necesario, no.
+   *
+   * De la misma fuente que todo lo demás (`timeBreakdown.planned` vía
+   * `plannedBreaks`), incluyendo el PRONÓSTICO de las que faltan: la colación
+   * de dentro de una hora todavía no es un hecho, pero contar con que no va a
+   * ocurrir es peor pronóstico que suponerla.
+   */
+  pendingBreakMin?: number | null
 }
 
 /**
@@ -147,6 +170,18 @@ export function computePaceToTarget(input: PaceInput): PaceToTarget | null {
   const remainingPieces = Math.max(0, meta - producedPieces)
 
   /*
+   * El tiempo que la línea va a estar realmente produciendo de acá al cierre:
+   * el reloj menos las paradas de convenio que faltan. Se dejan siempre 5
+   * minutos de piso — con la colación cubriendo casi toda la ventana, dividir
+   * por lo que queda daría un ritmo que no significa nada.
+   */
+  const convenioPorDelante = Math.max(
+    0,
+    Math.min(input.pendingBreakMin ?? 0, Math.max(0, remainingMin - 5)),
+  )
+  const workMin = Math.max(1, remainingMin - convenioPorDelante)
+
+  /*
    * ⚠ Un techo por DEBAJO del ritmo ya demostrado no es un techo.
    *
    * `maxPerHour` sale de repartir lo que el sensor espera del turno sobre las
@@ -168,6 +203,8 @@ export function computePaceToTarget(input: PaceInput): PaceToTarget | null {
       targetSource,
       remainingPieces: 0,
       remainingMin: Math.max(0, remainingMin),
+      pendingBreakMin: convenioPorDelante,
+      workMin: Math.max(0, remainingMin - convenioPorDelante),
       requiredPerHour: 0,
       requiredPerMinute: 0,
       currentPerHour,
@@ -193,6 +230,8 @@ export function computePaceToTarget(input: PaceInput): PaceToTarget | null {
       targetSource,
       remainingPieces,
       remainingMin: 0,
+      pendingBreakMin: 0,
+      workMin: 0,
       // No hay ritmo "necesario": el turno ya se pasó de su horario.
       requiredPerHour: 0,
       requiredPerMinute: 0,
@@ -206,8 +245,14 @@ export function computePaceToTarget(input: PaceInput): PaceToTarget | null {
     }
   }
 
-  const requiredPerHour = (remainingPieces / remainingMin) * 60
-  const projectedPieces = producedPieces + remainingMin * (currentPerHour / 60)
+  /*
+   * Los dos números sobre el tiempo PRODUCTIVO, no sobre el reloj: pedirle a
+   * la línea que haga las piezas que faltan durante su colación no es una
+   * meta, es un error de cuenta. Y la proyección, al revés: contar la colación
+   * como si produjera infla el cierre.
+   */
+  const requiredPerHour = (remainingPieces / workMin) * 60
+  const projectedPieces = producedPieces + workMin * (currentPerHour / 60)
 
   /*
    * Contra qué se juzga lo "realista": el MAYOR entre el promedio del turno y
@@ -242,7 +287,9 @@ export function computePaceToTarget(input: PaceInput): PaceToTarget | null {
    * trae, esa es una decisión que alguien puede tomar ahora. Con verdict
    * alcanzable sigue sin ofrecerse — proponer alargar cuando alcanza es ruido.
    */
-  const extraMin = remainingMin + 60
+  // La hora extra se agrega al tiempo PRODUCTIVO: es una hora de línea andando
+  // al final del turno, no una hora de reloj con otra colación adentro.
+  const extraMin = workMin + 60
   const requiredWithExtra = (remainingPieces / extraMin) * 60
   const withExtraHour = verdict === 'alcanzable' ? null : {
     requiredPerHour: requiredWithExtra,
@@ -262,6 +309,8 @@ export function computePaceToTarget(input: PaceInput): PaceToTarget | null {
     targetSource,
     remainingPieces,
     remainingMin,
+    pendingBreakMin: convenioPorDelante,
+    workMin,
     requiredPerHour,
     requiredPerMinute: requiredPerHour / 60,
     currentPerHour,

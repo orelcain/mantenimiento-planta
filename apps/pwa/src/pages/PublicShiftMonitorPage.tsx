@@ -39,6 +39,7 @@ import { computePaceToTarget, lineMaxPerHour, type PaceToTarget } from '@/servic
 import { pinShiftEnd, unpinShiftEnd } from '@/services/shoplogix/pinShiftEnd'
 import {
   buildDayComparison, optimalPace, plannedBreaks, mergeBreaks, cumulativeFromStart,
+  breakMinutesBetween, extendOngoingBreaks,
   type PlannedBreak,
 } from '@/services/shoplogix/monitorCompare'
 import { buildForecast, MAX_MAPE_PCT } from '@/services/shoplogix/monitorForecast'
@@ -743,7 +744,16 @@ function RitmoNecesario({ pace, cierre, muestras, fuente, plantSlug, shiftName, 
         </div>
         <div className="flex items-baseline gap-2">
           <dt className="w-20 shrink-0 text-muted-foreground">Queda</dt>
-          <dd className="tabular-nums">{fmtDurationSec(pace.remainingMin * 60)}</dd>
+          <dd className="tabular-nums">
+            {fmtDurationSec(pace.remainingMin * 60)}
+            {/* La colación, dicha acá mismo: sin esto el ritmo necesario se lee
+                como si esos minutos fueran de producción. */}
+            {pace.pendingBreakMin > 0 && (
+              <span className="ml-1.5 font-normal text-muted-foreground/80">
+                · {fmtDurationSec(pace.workMin * 60)} produciendo
+              </span>
+            )}
+          </dd>
         </div>
         <div className="flex items-baseline gap-2">
           <dt className="w-20 shrink-0 text-muted-foreground">Necesitás</dt>
@@ -754,6 +764,14 @@ function RitmoNecesario({ pace, cierre, muestras, fuente, plantSlug, shiftName, 
             </span>
           </dd>
         </div>
+        {pace.pendingBreakMin > 0 && (
+          <p className="pl-[5.5rem] text-[11px] leading-snug text-muted-foreground/80">
+            Descontando{' '}
+            <span className="tabular-nums">{fmtDurationSec(pace.pendingBreakMin * 60)}</span> de
+            paradas de convenio que faltan: el ritmo se pide sobre el tiempo en que la línea
+            produce, no sobre el reloj.
+          </p>
+        )}
         <div className="flex items-baseline gap-2">
           <dt className="w-20 shrink-0 text-muted-foreground">Vas a</dt>
           <dd className="tabular-nums">
@@ -1081,6 +1099,61 @@ export function PublicShiftMonitorPage() {
     return Math.min(100, (live.totalPieces / data.targetPieces) * 100)
   }, [live, data?.targetPieces])
 
+  /**
+   * Las paradas de convenio del turno: las de hoy como hechos y las de los
+   * días anteriores como pronóstico para lo que falta.
+   *
+   * UNA sola fuente para las cuatro cosas que dependen de ellas —la curva de
+   * la cuota, el fondo gris de los gráficos, el ritmo necesario y el aviso de
+   * la próxima parada—. Dos agregaciones paralelas del mismo dato siempre
+   * terminan diciendo cosas distintas.
+   */
+  const breaksTurno = useMemo(() => {
+    const deConvenio = (l: PublicMonitorLive | null | undefined) =>
+      plannedBreaks({
+        series: l?.series,
+        stopEvents: l?.stopEvents,
+        stopReasons: l?.stopReasons,
+        // Qué causa es de convenio lo resolvió el backend: duplicar la lista
+        // acá garantiza que un día las dos versiones difieran.
+        plannedReasons: (l?.timeBreakdown?.planned ?? []).map((x) => x.reason),
+      })
+    const minutoActual = live?.series?.length ? live.series.length * 5 : 0
+    const anteriores = (data?.history ?? []).flatMap((h) => deConvenio(h.live))
+
+    /*
+     * ⚠⚠ La parada EN CURSO no está en `stopEvents`.
+     *
+     * Visto a las 13:44 del 14-08: la cabecera decía "Línea detenida — COLACION
+     * (desde 13:37)" y `stopEvents` no la traía — Shoplogix publica los
+     * intervalos cerrados. Sin esto, la colación que está ocurriendo aporta
+     * cero al descuento justo mientras ocurre, que es cuando más importa.
+     * Sale de `currentReason`/`currentSinceAt`, y es de convenio si esa causa
+     * lo es hoy o lo fue en los turnos anteriores.
+     */
+    const t0raw = live?.series?.[0]?.t
+    const causasDeConvenio = new Set([
+      ...(live?.timeBreakdown?.planned ?? []).map((x) => x.reason),
+      ...anteriores.map((b) => b.reason),
+    ])
+    const enCurso: PlannedBreak[] = []
+    if (live?.currentReason && live.currentSinceAt && t0raw && causasDeConvenio.has(live.currentReason)) {
+      const desdeMin = Math.round((Date.parse(live.currentSinceAt) - Date.parse(t0raw)) / 60_000)
+      if (Number.isFinite(desdeMin)) {
+        enCurso.push({
+          fromMin: desdeMin,
+          toMin: Math.max(desdeMin, minutoActual),
+          reason: live.currentReason,
+        })
+      }
+    }
+
+    // La que está ocurriendo llega con los minutos que lleva, no con los que va
+    // a durar: se estira a lo que dura en los turnos anteriores.
+    const hoy = extendOngoingBreaks([...deConvenio(live), ...enCurso], anteriores, minutoActual)
+    return mergeBreaks(hoy, anteriores, minutoActual)
+  }, [live, data?.history])
+
   /*
    * Ritmo necesario para llegar a la meta. Se recalcula con el mismo reloj que
    * el resto de la página (`now`, que tictaquea solo), así que la recomendación
@@ -1093,6 +1166,18 @@ export function PublicShiftMonitorPage() {
   const pace = useMemo(() => {
     if (!live) return null
     const nowWallMs = now - new Date(now).getTimezoneOffset() * 60_000
+    /*
+     * Lo que falta de COLACIÓN dentro de la ventana. Sin esto el ritmo
+     * necesario se reparte sobre tiempo de reloj: el 14-08 a las 12:50 pedía
+     * 13,1 pz/min repartiendo 2.089 pz en 2 h 40, con ~55 min de colación
+     * adentro. Sobre los minutos en que la línea produce son casi 20.
+     * Minutos contados desde el primer tramo con dato, la base de `breaks`.
+     */
+    const t0 = live.series?.[0]?.t ? Date.parse(live.series[0]!.t) : NaN
+    const desdeMin = live.series?.length ? live.series.length * 5 : 0
+    const hastaMin = !Number.isNaN(t0) && live.plannedEnd
+      ? (Date.parse(live.plannedEnd) - t0) / 60_000
+      : desdeMin
     return computePaceToTarget({
       // La cuota del link primero; si no, la de la config del turno.
       targetPieces: data?.targetPieces ?? live.quotaPieces,
@@ -1116,8 +1201,9 @@ export function PublicShiftMonitorPage() {
         ? live.paceBestCpm * 60
         : lineMaxPerHour(live.expectedPieces, live.scheduledStart, live.plannedEnd),
       shiftClosed: live.shiftClosed,
+      pendingBreakMin: Number.isNaN(t0) ? 0 : breakMinutesBetween(breaksTurno, desdeMin, hastaMin),
     })
-  }, [live, data?.targetPieces, now])
+  }, [live, data?.targetPieces, now, breaksTurno])
 
   /*
    * Comparador con los turnos anteriores, a la misma altura de turno.
@@ -1140,18 +1226,8 @@ export function PublicShiftMonitorPage() {
     const meta = data?.targetPieces ?? live?.quotaPieces ?? live?.expectedPieces ?? null
     const tb = live?.timeBreakdown
 
-    const deConvenio = (l: PublicMonitorLive | null | undefined) =>
-      plannedBreaks({
-        series: l?.series,
-        stopEvents: l?.stopEvents,
-        stopReasons: l?.stopReasons,
-        plannedReasons: (l?.timeBreakdown?.planned ?? []).map((x) => x.reason),
-      })
-
-    const hoyBreaks = deConvenio(live)
-    const anteriores = (data?.history ?? []).flatMap((h) => deConvenio(h.live))
-    const minutoActual = live?.series?.length ? live.series.length * 5 : 0
-    const breaks = mergeBreaks(hoyBreaks, anteriores, minutoActual)
+    // Las mismas del ritmo necesario y del fondo de los gráficos: `breaksTurno`.
+    const breaks = breaksTurno
 
     /*
      * ⚠⚠ La curva de la cuota se reparte sobre el turno COMPLETO, no sobre lo
@@ -1194,7 +1270,7 @@ export function PublicShiftMonitorPage() {
       usefulMin: opt?.usefulMin ?? null,
       breaks,
     })
-  }, [live, data?.dateKey, data?.shiftId, data?.history, data?.targetPieces])
+  }, [live, data?.dateKey, data?.shiftId, data?.history, data?.targetPieces, breaksTurno])
 
   /*
    * Pronóstico del cierre. Se alimenta del `history` que YA viaja en el doc:
