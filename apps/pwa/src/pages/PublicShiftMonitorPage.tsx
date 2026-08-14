@@ -391,6 +391,16 @@ function Sparkbars({
     return w.reduce((a, p) => a + (p.pieces || 0), 0) / w.length
   })
   const lineaMedia = media.map((v, i) => `${i * stepX + bw / 2},${yDePiezas(v)}`).join(' ')
+  /*
+   * La serie CRUDA de 5 min, la que manda Shoplogix. Con las barras a la vista
+   * ya está dibujada —son el mismo dato—, pero en "solo línea" desaparecería y
+   * el gráfico pasaría a mostrar únicamente un promedio. Así que en ese modo
+   * vuelve como línea tenue: la media encima, el dato crudo detrás.
+   */
+  const lineaCruda = series
+    .slice(0, fin)
+    .map((p, i) => `${i * stepX + bw / 2},${yDePiezas(p.pieces || 0)}`)
+    .join(' ')
 
   /*
    * Las referencias del ritmo, ya en la escala del eje. Solo se dibujan si
@@ -654,7 +664,16 @@ function Sparkbars({
               y={y}
               width={bw}
               height={Math.max(0, H - y)}
-              rx={0.4}
+              /*
+               * ⚠ Sin `rx` y con `crispEdges`. El SVG se estira con el zoom
+               * (`preserveAspectRatio="none"`), así que una esquina redondeada
+               * de 0,4 unidades se deforma en una elipse —ancha en x, plana en
+               * y— y los bordes suavizados caen entre píxeles: las barras se
+               * ven "pixeladas" y de anchos distintos al acercarse. Con las
+               * esquinas rectas y el suavizado apagado quedan nítidas en
+               * cualquier zoom.
+               */
+              shapeRendering="crispEdges"
               className={p.pieces > 0
                 ? 'fill-sky-500/40 dark:fill-sky-400/30'
                 : 'fill-muted-foreground/15'}
@@ -669,6 +688,13 @@ function Sparkbars({
             media hora en notarse. 15 es el compromiso que pidió Orel.
             Las barras quedaron al 35%: antes competían con la curva —mismo
             tono, línea de 1 px— y la tendencia se perdía entre ellas. */}
+        {ver === 'linea' && fin >= 3 && (
+          <polyline points={lineaCruda} fill="none"
+                    className="stroke-sky-500/40 dark:stroke-sky-400/30"
+                    strokeWidth={1} strokeLinejoin="round"
+                    vectorEffect="non-scaling-stroke" />
+        )}
+
         {ver !== 'barras' && media.length >= 3 && (
           <polyline points={lineaMedia} fill="none"
                     className="stroke-sky-700 dark:stroke-sky-200"
@@ -780,12 +806,14 @@ function Sparkbars({
             media de 15 min
           </span>
         )}
-        {ver !== 'linea' && (
-          <span className="inline-flex items-center gap-1">
+        <span className="inline-flex items-center gap-1">
+          {ver === 'linea' ? (
+            <span className="inline-block h-0.5 w-3.5 bg-sky-500/40 dark:bg-sky-400/30" />
+          ) : (
             <span className="inline-block h-2.5 w-2.5 rounded-sm bg-sky-500/40 dark:bg-sky-400/30" />
-            tramo de 5 min
-          </span>
-        )}
+          )}
+          tramos de 5 min <span className="text-muted-foreground/60">(el dato crudo)</span>
+        </span>
         {/* El techo de la máquina, no el mejor tramo: es lo que hace que el
             hueco de arriba signifique algo. */}
         {setCpm != null && setCpm > 0 && setCpm <= escala && (
