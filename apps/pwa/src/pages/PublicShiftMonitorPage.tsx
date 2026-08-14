@@ -1087,18 +1087,31 @@ export function PublicShiftMonitorPage() {
    */
   const pronostico = useMemo(() => {
     const metaFc = data?.targetPieces ?? live?.quotaPieces ?? live?.expectedPieces ?? null
-    const mismoTurno = (data?.history ?? []).filter((h) => h.shiftId === data?.shiftId)
+    /*
+     * `forecastHistory` trae hasta 10 turnos del MISMO nombre; el filtro sobre
+     * `history` queda de respaldo para los docs anteriores a ese campo (y para
+     * las líneas de un solo turno por día, donde alcanzaba).
+     */
+    const resumidos = (data?.forecastHistory ?? []).map((h) => ({
+      curve: h.curve.map(([minutes, pieces]) => ({ minutes, pieces })),
+      totalPieces: h.total,
+    }))
+    const historial = resumidos.length > 0
+      ? resumidos
+      : (data?.history ?? [])
+          .filter((h) => h.shiftId === data?.shiftId)
+          .map((h) => ({
+            curve: cumulativeFromStart(h.live?.series),
+            totalPieces: h.live?.totalPieces ?? 0,
+          }))
     return buildForecast({
       todayCurve: cumulativeFromStart(live?.series),
       currentMinute: comparacion.currentMinute,
-      history: mismoTurno.map((h) => ({
-        curve: cumulativeFromStart(h.live?.series),
-        totalPieces: h.live?.totalPieces ?? 0,
-      })),
+      history: historial,
       targetPieces: metaFc,
       shiftClosed: live?.shiftClosed,
     })
-  }, [live, data?.history, data?.shiftId, data?.targetPieces, comparacion.currentMinute])
+  }, [live, data?.history, data?.forecastHistory, data?.shiftId, data?.targetPieces, comparacion.currentMinute])
 
   /*
    * Dónde se gana en esta línea. Mismo historial que el pronóstico —turnos del
@@ -1108,16 +1121,22 @@ export function PublicShiftMonitorPage() {
   const diagnostico = useMemo(() => {
     const micro = (l?: PublicMonitorLive) =>
       (l?.topStops ?? []).find((s) => /micro/i.test(s.reason))?.count ?? null
-    const mismoTurno = (data?.history ?? []).filter((h) => h.shiftId === data?.shiftId)
-    return buildDiagnostico({
-      history: mismoTurno.map((h) => ({
-        totalPieces: h.live?.totalPieces ?? 0,
-        producingMin: h.live?.timeBreakdown?.producingMin ?? 0,
-        microCount: micro(h.live),
-      })),
-      microHoy: micro(live ?? undefined),
-    })
-  }, [live, data?.history, data?.shiftId])
+    const resumidos = (data?.forecastHistory ?? []).map((h) => ({
+      totalPieces: h.total,
+      producingMin: h.producingMin,
+      microCount: h.micro,
+    }))
+    const historial = resumidos.length > 0
+      ? resumidos
+      : (data?.history ?? [])
+          .filter((h) => h.shiftId === data?.shiftId)
+          .map((h) => ({
+            totalPieces: h.live?.totalPieces ?? 0,
+            producingMin: h.live?.timeBreakdown?.producingMin ?? 0,
+            microCount: micro(h.live),
+          }))
+    return buildDiagnostico({ history: historial, microHoy: micro(live ?? undefined) })
+  }, [live, data?.history, data?.forecastHistory, data?.shiftId])
 
   if (status === 'loading') {
     return (

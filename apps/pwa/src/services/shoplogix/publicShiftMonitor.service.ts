@@ -37,6 +37,23 @@ export interface PublicMonitorMachine {
   currentSinceAt: string | null
 }
 
+/**
+ * Resumen liviano de un turno anterior DEL MISMO NOMBRE, para pronosticar.
+ *
+ * `history` trae los seis turnos cronológicos y en las líneas con varios turnos
+ * por día quedaban solo dos comparables — mezclar el de día con el de noche no
+ * es una opción. `curve` viene como pares [minuto de turno, piezas acumuladas]
+ * cada 15 min: proyectar no necesita el detalle de cinco.
+ */
+export interface ForecastHistoryShift {
+  shiftDocId: string
+  dateKey: string
+  curve: Array<[number, number]>
+  total: number
+  producingMin: number
+  micro: number | null
+}
+
 export interface PublicMonitorLive {
   updatedAt: string
   lastSyncAt: string | null
@@ -174,6 +191,8 @@ export interface PublicShiftMonitorDoc {
    * formato que `live`. Ausente en docs creados antes de esta función.
    */
   history?: Array<{ shiftDocId: string; dateKey: string; shiftId: string; live: PublicMonitorLive }>
+  /** Turnos del MISMO nombre, resumidos, para el pronóstico del cierre. */
+  forecastHistory?: ForecastHistoryShift[]
 }
 
 /** Duraciones que acepta el backend (horas). 720 = 30 días. */
