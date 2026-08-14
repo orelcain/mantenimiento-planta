@@ -24,7 +24,7 @@
  * ⚠ Horas de TURNO en wall-clock de planta (getUTC*); `lastSyncAt` es UTC real.
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { Activity, AlertCircle, ChevronLeft, ChevronRight, Clock, Gauge, Hourglass, Moon, PauseCircle, Radio, RefreshCw, Sun, Target, Timer, TrendingUp } from 'lucide-react'
 import { useTheme } from '@/hooks/useTheme'
@@ -162,7 +162,7 @@ function Kpi({
  */
 function Sparkbars({
   series, stopReasons, stopEvents, comments, causaSel, onCausa, breaks,
-  recentPerMinute, requiredPerMinute, medianCpm,
+  recentPerMinute, requiredPerMinute, medianCpm, setCpm,
 }: {
   /** Ritmo de la última media hora, para la cabecera. */
   recentPerMinute?: number | null
@@ -170,6 +170,13 @@ function Sparkbars({
   requiredPerMinute?: number | null
   /** Mediana de los turnos anteriores, en pz/min de reloj. */
   medianCpm?: number | null
+  /**
+   * Velocidad a la que corre la máquina, en pz/min. La escala llega hasta ella
+   * a propósito: con la curva orbitando en 10 y el techo dibujado en 18, el
+   * espacio vacío entre las dos ES el llenado de silletas que falta. Sin esa
+   * referencia el gráfico se autoescala y todo turno parece igual de lleno.
+   */
+  setCpm?: number | null
   series: PublicMonitorLive['series']
   stopReasons?: string[]
   stopEvents?: PublicMonitorLive['stopEvents']
@@ -198,11 +205,157 @@ function Sparkbars({
   const [zoom, setZoom] = useState(1)
   /** Tramo bajo el cursor (o tocado en el celular). null = ninguno. */
   const [foco, setFoco] = useState<number | null>(null)
+  /**
+   * Qué series se dibujan. "Solo línea" para leer la forma del turno, "solo
+   * barras" para cazar el tramo puntual. Se recuerda, como los bloques
+   * plegados: quien prefiere una vista no tiene que volver a elegirla en cada
+   * refresco (el monitor se refresca solo cada 30 s).
+   */
+  const [ver, setVer] = useState<'ambas' | 'barras' | 'linea'>(() => {
+    try {
+      const v = localStorage.getItem('monitor-grafico-ver')
+      return v === 'barras' || v === 'linea' ? v : 'ambas'
+    } catch {
+      return 'ambas'
+    }
+  })
+  const elegirVer = (v: 'ambas' | 'barras' | 'linea') => {
+    setVer(v)
+    try { localStorage.setItem('monitor-grafico-ver', v) } catch { /* modo privado */ }
+  }
+
+  /*
+   * ── Zoom por gesto ─────────────────────────────────────────────────────
+   *
+   * El zoom se hace ensanchando el contenido dentro de un contenedor con
+   * scroll, así que el PANEO es el scroll nativo: en el celular arrastra y
+   * frena con inercia sin una línea de código, y en el escritorio se arrastra
+   * con el mouse (abajo).
+   *
+   * ⚠⚠ Los listeners van NATIVOS y `passive: false`. React registra `wheel` y
+   * `touchmove` como pasivos, y ahí `preventDefault()` no hace nada: la rueda
+   * seguiría desplazando la página y el pellizco haría zoom del navegador
+   * entero por encima del gráfico.
+   *
+   * ⚠ Y hay que cortar la propagación del touch: la página entera escucha
+   * swipe para cambiar de turno, y un pellizco mueve los dedos más de 60 px —
+   * acercarse al detalle terminaría abriendo el turno anterior.
+   */
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const anclaRef = useRef<{ x: number; ratio: number } | null>(null)
+  const zoomRef = useRef(1)
+  zoomRef.current = zoom
+
+  /** Aplica un zoom nuevo dejando quieto el punto que se está mirando. */
+  const zoomA = (nuevo: number, clientX?: number) => {
+    const z = Math.min(12, Math.max(1, nuevo))
+    const el = scrollRef.current
+    if (el && el.scrollWidth > 0) {
+      const r = el.getBoundingClientRect()
+      const x = clientX == null ? r.width / 2 : Math.max(0, Math.min(r.width, clientX - r.left))
+      anclaRef.current = { x, ratio: (el.scrollLeft + x) / el.scrollWidth }
+    }
+    setZoom(z)
+  }
+
+  // El reposicionado va DESPUÉS del layout: el ancho del contenido recién
+  // cambió y `scrollLeft` se calcula contra el nuevo `scrollWidth`.
+  useLayoutEffect(() => {
+    const el = scrollRef.current
+    const a = anclaRef.current
+    if (!el || !a) return
+    anclaRef.current = null
+    el.scrollLeft = Math.max(0, a.ratio * el.scrollWidth - a.x)
+  }, [zoom])
+
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    let d0 = 0
+    let z0 = 1
+
+    const onWheel = (ev: WheelEvent) => {
+      // Sin modificador la rueda sigue desplazando la página: secuestrar el
+      // scroll de un bloque de 170 px hace que la pantalla se sienta rota. El
+      // pellizco del trackpad llega justamente como ctrl+wheel.
+      if (!ev.ctrlKey && !ev.metaKey) return
+      ev.preventDefault()
+      zoomA(zoomRef.current * (ev.deltaY < 0 ? 1.25 : 0.8), ev.clientX)
+    }
+    const dist = (t: TouchList) =>
+      Math.hypot(t[0]!.clientX - t[1]!.clientX, t[0]!.clientY - t[1]!.clientY)
+
+    const onTouchStart = (ev: TouchEvent) => {
+      // Con el gráfico acercado, arrastrar con UN dedo es panear: tampoco eso
+      // puede llegar al swipe que cambia de turno.
+      if (zoomRef.current > 1.02) ev.stopPropagation()
+      if (ev.touches.length !== 2) return
+      ev.stopPropagation()
+      d0 = dist(ev.touches)
+      z0 = zoomRef.current
+    }
+    const onTouchMove = (ev: TouchEvent) => {
+      if (ev.touches.length !== 2 || d0 <= 0) return
+      ev.preventDefault()
+      ev.stopPropagation()
+      const centro = (ev.touches[0]!.clientX + ev.touches[1]!.clientX) / 2
+      zoomA(z0 * (dist(ev.touches) / d0), centro)
+    }
+    const onTouchEnd = (ev: TouchEvent) => {
+      if (d0 > 0 || zoomRef.current > 1.02) ev.stopPropagation()
+      if (ev.touches.length < 2) d0 = 0
+    }
+
+    el.addEventListener('wheel', onWheel, { passive: false })
+    el.addEventListener('touchstart', onTouchStart, { passive: false })
+    el.addEventListener('touchmove', onTouchMove, { passive: false })
+    el.addEventListener('touchend', onTouchEnd)
+    return () => {
+      el.removeEventListener('wheel', onWheel)
+      el.removeEventListener('touchstart', onTouchStart)
+      el.removeEventListener('touchmove', onTouchMove)
+      el.removeEventListener('touchend', onTouchEnd)
+    }
+    // `zoomA` se recrea en cada render pero solo lee refs: no hace falta
+    // re-suscribir los listeners por eso.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  /** Arrastre con el mouse para panear (el touch ya panea solo). */
+  const arrastre = useRef<{ x: number; left: number } | null>(null)
   if (!series || series.length === 0) return null
 
   const max = Math.max(...series.map(p => p.pieces), 1)
   const W = 100
-  const H = 28
+  const H = 100
+
+  /*
+   * ── La escala vertical, en pz/min ───────────────────────────────────────
+   *
+   * Antes el gráfico se autoescalaba al máximo del turno y no tenía eje: la
+   * altura de una barra no se traducía a ningún número y había que tocarla
+   * para saber cuánto fue. Peor: cada turno se dibujaba contra su propio
+   * máximo, así que todos parecían igual de llenos.
+   *
+   * Ahora la escala llega hasta la velocidad de la MÁQUINA (redondeada a un
+   * múltiplo de 5) y el espacio vacío entre la curva y ese techo es, dibujado,
+   * el llenado de silletas que falta. Una sola unidad para barras y línea:
+   * pz/min. Las barras son las piezas del tramo divididas por 5, así que
+   * comparten escala — dos ejes para el mismo dato es la receta clásica para
+   * leer mal un gráfico.
+   */
+  const maxCpm = max / 5
+  const tope = Math.max(maxCpm, setCpm ?? 0)
+  const pasoY = tope > 12 ? 5 : tope > 6 ? 2 : 1
+  const escala = Math.ceil(tope / pasoY) * pasoY
+  const marcasY: number[] = []
+  for (let v = 0; v <= escala + 0.001; v += pasoY) marcasY.push(v)
+  /** Altura en el viewBox de un valor en pz/min. */
+  const yDeCpm = (cpm: number) => H - (cpm / escala) * H
+  /** Lo mismo para un tramo, que viene en piezas. */
+  const yDePiezas = (piezas: number) => yDeCpm(piezas / 5)
+  /** Alto real del área de dibujo. En px: el root corre al 85% y los rem encogen. */
+  const ALTO = 170
   /*
    * ⚠⚠ El paso sale del ancho DISPONIBLE, no de un mínimo por barra.
    *
@@ -238,23 +391,21 @@ function Sparkbars({
     const w = arr.slice(Math.max(0, i - VENTANA + 1), i + 1)
     return w.reduce((a, p) => a + (p.pieces || 0), 0) / w.length
   })
-  const yDe = (piezas: number) => H - (piezas / max) * H * 0.98
-  const lineaMedia = media.map((v, i) => `${i * stepX + bw / 2},${yDe(v)}`).join(' ')
+  const lineaMedia = media.map((v, i) => `${i * stepX + bw / 2},${yDePiezas(v)}`).join(' ')
 
   /*
-   * Las referencias del ritmo, en piezas por tramo (pz/min × 5) para poder
-   * dibujarlas sobre las mismas barras. Solo si CABEN: con la meta pidiendo
-   * 23 pz/min y el mejor tramo en 15, la línea de "necesitás" estiraba la
-   * escala al doble y aplastaba el turno entero contra el piso. Cuando no
-   * cabe, el número se dice en la leyenda en vez de deformar el gráfico.
+   * Las referencias del ritmo, ya en la escala del eje. Solo se dibujan si
+   * CABEN: con la meta pidiendo 53 pz/min y el mejor tramo en 14,6, la línea
+   * de "necesitás" estiraba el eje al cuádruple y aplastaba el turno entero
+   * contra el piso. Cuando no cabe, el número se dice en la leyenda en vez de
+   * deformar el gráfico.
    */
-  const TOPE_REF = 1.3
   const refs = [
-    { v: (requiredPerMinute ?? 0) * 5, label: 'necesitás', cpm: requiredPerMinute ?? 0, clase: 'stroke-amber-600 dark:stroke-amber-400' },
-    { v: (medianCpm ?? 0) * 5, label: 'promedio de turno', cpm: medianCpm ?? 0, clase: 'stroke-muted-foreground/60' },
-  ].filter((r) => r.v > 0)
-  const refsDibujables = refs.filter((r) => r.v <= max * TOPE_REF)
-  const refsFuera = refs.filter((r) => r.v > max * TOPE_REF)
+    { cpm: requiredPerMinute ?? 0, label: 'necesitás', clase: 'stroke-amber-600 dark:stroke-amber-400' },
+    { cpm: medianCpm ?? 0, label: 'promedio de turno', clase: 'stroke-muted-foreground/60' },
+  ].filter((r) => r.cpm > 0)
+  const refsDibujables = refs.filter((r) => r.cpm <= escala)
+  const refsFuera = refs.filter((r) => r.cpm > escala)
 
   // ⚠ La serie NO es continua: solo trae los tramos que el sensor registró, y
   // durante una parada larga puede faltar más de uno. Por eso la posición de un
@@ -409,15 +560,55 @@ function Sparkbars({
         )}
       </div>
 
-      <div className="mt-2 overflow-x-auto">
+      <div className="mt-1 text-[9px] uppercase tracking-wide text-muted-foreground/70">pz/min</div>
+
+      {/* ⚠ El eje Y va FUERA del contenedor con scroll y el X adentro: al
+          revés, las horas se quedan quietas mientras el gráfico se desplaza y
+          el eje pasa a mentir (ya ocurrió en este mismo gráfico), y los
+          números del eje vertical se irían de pantalla al panear. */}
+      <div className="relative mt-1">
+        <div
+          className="pointer-events-none absolute left-0 top-0 z-10 w-7"
+          style={{ height: ALTO }}
+          aria-hidden
+        >
+          {marcasY.map((v) => (
+            <span
+              key={v}
+              className="absolute right-1 -translate-y-1/2 text-[9px] tabular-nums text-muted-foreground/70"
+              style={{ top: `${(1 - v / escala) * 100}%` }}
+            >
+              {fmtInt(v)}
+            </span>
+          ))}
+        </div>
+
+      <div
+        ref={scrollRef}
+        className={`ml-7 overflow-x-auto ${zoom > 1.02 ? 'cursor-grab active:cursor-grabbing' : ''}`}
+        style={{ touchAction: zoom > 1.02 ? 'pan-x' : 'auto' }}
+        onDoubleClick={() => setZoom(1)}
+        onPointerDown={(ev) => {
+          if (ev.pointerType !== 'mouse' || zoom <= 1.02) return
+          arrastre.current = { x: ev.clientX, left: ev.currentTarget.scrollLeft }
+        }}
+        onPointerMove={(ev) => {
+          const a = arrastre.current
+          if (!a) return
+          ev.currentTarget.scrollLeft = a.left - (ev.clientX - a.x)
+        }}
+        onPointerUp={() => { arrastre.current = null }}
+        onPointerLeave={() => { arrastre.current = null }}
+      >
       <div style={{ width: `${zoom * 100}%`, minWidth: '100%' }}>
-      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="h-20 w-full"
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="w-full"
+           style={{ height: ALTO }}
            role="img"
            data-zoom={zoom}
            onMouseMove={(ev) => setFoco(tramoEn(ev.clientX, ev.currentTarget))}
            onMouseLeave={() => setFoco(null)}
            onClick={(ev) => setFoco(tramoEn(ev.clientX, ev.currentTarget))}
-           aria-label="Piezas por tramo de cinco minutos">
+           aria-label="Velocidad de la línea por tramos de cinco minutos">
         {/* El convenio primero: es el fondo del fondo. La causa elegida se
             dibuja encima, y las barras encima de las dos. */}
         {convenio.map(b => (
@@ -430,42 +621,59 @@ function Sparkbars({
                 className="fill-rose-500/25 stroke-rose-500/60" strokeWidth={0.15} />
         ))}
 
-        {/* Ritmo de referencia: el mejor tramo que la máquina demostró en este
-            turno. Se eligió sobre el target del sensor (100 pz/tramo) porque
-            ese nunca se alcanza y dejaba todo el turno "bajo objetivo". */}
-        <line x1={0} y1={H - H * 0.98} x2={W} y2={H - H * 0.98}
-              className="stroke-amber-600 dark:stroke-amber-400" strokeWidth={0.2} strokeDasharray="1.2 1" />
+        {/* Las guías del eje: la forma del turno se lee sin tocar nada. */}
+        {marcasY.filter((v) => v > 0 && v !== setCpm).map((v) => (
+          <line key={v} x1={0} x2={W} y1={yDeCpm(v)} y2={yDeCpm(v)}
+                className="stroke-muted-foreground/15" strokeWidth={0.2}
+                vectorEffect="non-scaling-stroke" />
+        ))}
+
+        {/* ⚠ El techo de la MÁQUINA, no el mejor tramo del turno. Antes la
+            referencia era el máximo alcanzado, que es una consecuencia y no un
+            límite: contra sí mismo todo turno se ve lleno. Con la velocidad
+            configurada, el hueco entre la curva y esta línea es el llenado de
+            silletas que falta. */}
+        {setCpm != null && setCpm > 0 && setCpm <= escala && (
+          <line x1={0} x2={W} y1={yDeCpm(setCpm)} y2={yDeCpm(setCpm)}
+                className="stroke-amber-600 dark:stroke-amber-400" strokeWidth={0.9}
+                strokeDasharray="4 3" vectorEffect="non-scaling-stroke" />
+        )}
 
         {/* Las referencias de ritmo que CABEN en la escala (ver `refs`). */}
         {refsDibujables.map((r) => (
-          <line key={r.label} x1={0} x2={W} y1={yDe(r.v)} y2={yDe(r.v)}
-                className={r.clase} strokeWidth={0.18} strokeDasharray="0.8 0.8" />
+          <line key={r.label} x1={0} x2={W} y1={yDeCpm(r.cpm)} y2={yDeCpm(r.cpm)}
+                className={r.clase} strokeWidth={0.6} strokeDasharray="2 2"
+                vectorEffect="non-scaling-stroke" />
         ))}
 
-        {series.map((p, i) => {
-          const h = (p.pieces / max) * H * 0.98
+        {ver !== 'linea' && series.map((p, i) => {
+          const y = yDePiezas(p.pieces)
           return (
             <rect
               key={p.t}
               x={i * stepX}
-              y={H - h}
+              y={y}
               width={bw}
-              height={h}
+              height={Math.max(0, H - y)}
               rx={0.4}
-              className={p.pieces > 0 ? 'fill-sky-500 dark:fill-sky-400/80' : 'fill-muted-foreground/20'}
+              className={p.pieces > 0
+                ? 'fill-sky-500/40 dark:fill-sky-400/30'
+                : 'fill-muted-foreground/15'}
             >
-              <title>{`${fmtWallTime(p.t)} · ${fmtInt(p.pieces)} pz`}</title>
+              <title>{`${fmtWallTime(p.t)} · ${fmtInt(p.pieces)} pz · ${fmtDec(p.pieces / 5)} pz/min`}</title>
             </rect>
           )
         })}
 
         {/* La tendencia, encima de su propio detalle: con 5 min a secas una
             micro-detención parece un desplome, con 30 el cambio de ritmo tarda
-            media hora en notarse. 15 es el compromiso que pidió Orel. */}
-        {media.length >= 3 && (
+            media hora en notarse. 15 es el compromiso que pidió Orel.
+            Las barras quedaron al 35%: antes competían con la curva —mismo
+            tono, línea de 1 px— y la tendencia se perdía entre ellas. */}
+        {ver !== 'barras' && media.length >= 3 && (
           <polyline points={lineaMedia} fill="none"
-                    className="stroke-sky-800 dark:stroke-sky-200"
-                    strokeWidth={0.45} strokeLinejoin="round"
+                    className="stroke-sky-700 dark:stroke-sky-200"
+                    strokeWidth={2.2} strokeLinejoin="round" strokeLinecap="round"
                     vectorEffect="non-scaling-stroke" />
         )}
 
@@ -499,6 +707,7 @@ function Sparkbars({
       </div>
       </div>
       </div>
+      </div>
 
       {/* Detalle del tramo. Alto fijo para que el bloque no salte al entrar y
           salir el cursor. */}
@@ -528,39 +737,64 @@ function Sparkbars({
         )}
       </div>
 
-      {/* En un turno completo (~100 tramos) a 375 px cada barra mide 1,6 px.
-          Con 8× pasa a ~13 px: recién ahí es un blanco que se puede tocar para
-          ver la hora y las piezas del tramo. */}
-      <div className="mt-1 flex items-center gap-1.5 text-[11px] text-muted-foreground/70">
-        <span className="normal-case">detalle</span>
-        {[1, 2, 4, 8].map((z) => (
+      {/* Qué se dibuja, y cómo se acerca. Los botones 1×/2×/4×/8× se fueron:
+          el gesto es pellizcar o rodar la rueda, y arrastrar para moverse. Lo
+          que NO puede faltar es la salida — un zoom sin "ver todo" visible es
+          peor que ninguno, porque quien se pierde no sabe volver. */}
+      <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground/70">
+        {([['ambas', 'ambas'], ['barras', 'solo barras'], ['linea', 'solo línea']] as const).map(
+          ([v, texto]) => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => elegirVer(v)}
+              aria-pressed={ver === v}
+              className={`rounded-full border px-2 py-0.5 ${
+                ver === v
+                  ? 'border-sky-500/50 bg-sky-500/20 text-sky-800 dark:text-sky-200'
+                  : 'border-border hover:bg-muted'
+              }`}
+            >
+              {texto}
+            </button>
+          ),
+        )}
+        {zoom > 1.02 ? (
           <button
-            key={z}
             type="button"
-            onClick={() => setZoom(z)}
-            aria-pressed={zoom === z}
-            className={`rounded-full border px-2 py-0.5 tabular-nums ${
-              zoom === z
-                ? 'border-sky-500/50 bg-sky-500/20 text-sky-800 dark:text-sky-200'
-                : 'border-border hover:bg-muted'
-            }`}
+            onClick={() => setZoom(1)}
+            className="rounded-full border border-border px-2 py-0.5 hover:bg-muted"
           >
-            {z}×
+            ver todo · {fmtDec(zoom)}×
           </button>
-        ))}
-        {zoom > 1 && <span className="normal-case">deslizá el gráfico &#8594;</span>}
+        ) : (
+          <span className="ml-auto text-[10px] text-muted-foreground/60">
+            pellizcá o rodá para acercar
+          </span>
+        )}
       </div>
 
       <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground/70">
-        <span className="inline-flex items-center gap-1">
-          <span className="inline-block h-0.5 w-3 bg-sky-800 dark:bg-sky-200" />
-          media de 15 min
-        </span>
-        <span className="inline-flex items-center gap-1">
-          <span className="inline-block h-2 w-3 border-t-2 border-dashed border-amber-600 dark:border-amber-400" />
-          mejor tramo: <span className="tabular-nums text-muted-foreground">{fmtInt(max)}</span> pz
-          <span className="tabular-nums">({fmtDec(max / 5)} pz/min)</span>
-        </span>
+        {ver !== 'barras' && (
+          <span className="inline-flex items-center gap-1">
+            <span className="inline-block h-[3px] w-3.5 rounded-sm bg-sky-700 dark:bg-sky-200" />
+            media de 15 min
+          </span>
+        )}
+        {ver !== 'linea' && (
+          <span className="inline-flex items-center gap-1">
+            <span className="inline-block h-2.5 w-2.5 rounded-sm bg-sky-500/40 dark:bg-sky-400/30" />
+            tramo de 5 min
+          </span>
+        )}
+        {/* El techo de la máquina, no el mejor tramo: es lo que hace que el
+            hueco de arriba signifique algo. */}
+        {setCpm != null && setCpm > 0 && setCpm <= escala && (
+          <span className="inline-flex items-center gap-1">
+            <span className="inline-block h-2 w-3 border-t-2 border-dashed border-amber-600 dark:border-amber-400" />
+            <span className="tabular-nums">{fmtCpm(setCpm)}</span> lo que da la máquina
+          </span>
+        )}
         {refsDibujables.map((r) => (
           <span key={r.label} className="inline-flex items-center gap-1">
             <span className={`inline-block h-2 w-3 border-t border-dashed ${
@@ -2176,6 +2410,7 @@ export function PublicShiftMonitorPage() {
           recentPerMinute={live.recentPiecesPerMinute}
           requiredPerMinute={pace && pace.requiredPerMinute > 0 ? pace.requiredPerMinute : null}
           medianCpm={live.paceMedianCpm}
+          setCpm={llenadoSilletas?.spec.setCpm ?? null}
         />
 
         <TiempoDelTurno
