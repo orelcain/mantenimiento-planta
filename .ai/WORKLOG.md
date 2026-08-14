@@ -13,6 +13,28 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-14 - claude - HOTFIX: monitor dejó de refrescarse — Firestore rechaza arrays anidados (#542)
+
+- Hecho: el #540 mandaba la curva de `forecastHistory` como pares `[m, p]`; Firestore no
+  admite arrays dentro de arrays y el write del patch fallaba ENTERO ("Property array
+  contains an invalid nested entity"). El doc público quedó congelado ~40 min (ni
+  `forecastHistory` ni `live` se actualizaban). Fix: la curva ahora son objetos `{m, p}`.
+- Lección: el #540 se había probado COMPUTANDO el resumen contra datos reales, nunca
+  ESCRIBIÉNDOLO. Un cálculo correcto que Firestore rechaza al guardar es indistinguible de
+  uno roto — la verificación tiene que incluir el write real, no solo el cómputo.
+- Archivos: functions/publicMonitor.js, apps/pwa/src/services/shoplogix/publicShiftMonitor.service.ts,
+  apps/pwa/src/pages/PublicShiftMonitorPage.tsx
+- Verificación: tsc/eslint/vitest 286/286 limpios; write real a Firestore (9 turnos de
+  Filete) antes de mergear. Post-deploy: logs de Cloud Functions confirman que
+  `onShoplogixShiftWrittenPublicMonitor` pasó de error en cada invocación a "refrescados"
+  sin error tras el rollout; `live.updatedAt` de Filete y Yal avanzó y `forecastHistory`
+  quedó poblado con curvas `{m,p}`.
+- Estado: HECHO
+- Sigue: nada pendiente de este fix. Nota: este archivo pasó ~160 KB — conviene compactar
+  (cortar narración PR-por-PR vieja, conservar gotchas).
+
+---
+
 ## 2026-08-13 - claude - Historial del MISMO turno para pronosticar el cierre (#540)
 
 - Hecho: el doc del monitor público ahora publica también `forecastHistory` — hasta 10
