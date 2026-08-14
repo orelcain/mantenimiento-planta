@@ -1064,9 +1064,6 @@ export function PublicShiftMonitorPage() {
      */
     const meta = data?.targetPieces ?? live?.quotaPieces ?? live?.expectedPieces ?? null
     const tb = live?.timeBreakdown
-    const opt = meta && tb
-      ? optimalPace({ targetPieces: meta, windowMin: tb.windowMin, plannedMin: tb.plannedMin })
-      : null
 
     const deConvenio = (l: PublicMonitorLive | null | undefined) =>
       plannedBreaks({
@@ -1079,6 +1076,35 @@ export function PublicShiftMonitorPage() {
     const hoyBreaks = deConvenio(live)
     const anteriores = (data?.history ?? []).flatMap((h) => deConvenio(h.live))
     const minutoActual = live?.series?.length ? live.series.length * 5 : 0
+    const breaks = mergeBreaks(hoyBreaks, anteriores, minutoActual)
+
+    /*
+     * ⚠⚠ La curva de la cuota se reparte sobre el turno COMPLETO, no sobre lo
+     * transcurrido.
+     *
+     * Visto en vivo el 14-08 a las 11:25: `timeBreakdown.windowMin` son los
+     * minutos de operación HASTA AHORA (215), no la duración del turno (465).
+     * Repartir 5.000 piezas sobre 215 min pedía 23 pz/min en una línea que da
+     * 10: la línea ámbar trepaba hasta la cuota en la hora 4 y después seguía
+     * plana, el área roja se comía el gráfico y "dónde se abrió la brecha"
+     * marcaba el turno entero. Un solo error explicaba los tres síntomas.
+     *
+     * Con el turno cerrado no se notaba, porque ahí lo transcurrido ES la
+     * duración: el bug solo aparecía con el turno en curso.
+     */
+    const ventanaTurnoMin = live?.scheduledStart && live?.plannedEnd
+      ? Math.round((Date.parse(live.plannedEnd) - Date.parse(live.scheduledStart)) / 60_000)
+      : tb?.windowMin ?? 0
+    /* Y el tiempo de convenio también es el PREVISTO: `plannedMin` todavía es 0
+       a media mañana porque la colación no ocurrió, pero va a ocurrir. */
+    const convenioPrevistoMin = breaks.reduce((a, b) => a + Math.max(0, b.toMin - b.fromMin), 0)
+    const opt = meta && ventanaTurnoMin > 0
+      ? optimalPace({
+          targetPieces: meta,
+          windowMin: ventanaTurnoMin,
+          plannedMin: Math.max(convenioPrevistoMin, tb?.plannedMin ?? 0),
+        })
+      : null
 
     return buildDayComparison({
       todaySeries: live?.series,
@@ -1091,7 +1117,7 @@ export function PublicShiftMonitorPage() {
       maxDays: 6,
       targetPieces: meta,
       usefulMin: opt?.usefulMin ?? null,
-      breaks: mergeBreaks(hoyBreaks, anteriores, minutoActual),
+      breaks,
     })
   }, [live, data?.dateKey, data?.shiftId, data?.history, data?.targetPieces])
 
