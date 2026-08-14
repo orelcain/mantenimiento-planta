@@ -10,8 +10,8 @@ describe('specDeMaquina', () => {
   it('conoce la Baader 200 y sus silletas', () => {
     const s = specDeMaquina('Baader 200')!
     expect(s.cantidad).toBe(5)
-    expect(s.setCpm).toBe(18)
-    expect(s.maxCpm).toBe(22)
+    expect(s.setCpm).toBe(18)   // ficha técnica: 18 pz/min a 47 Hz
+    expect(s.maxCpm).toBe(21)   // máximo documentado en la ficha del manual HMI
   })
 
   it('no le inventa mecanismo a una máquina que no conoce', () => {
@@ -47,7 +47,7 @@ describe('llenadoDeSilletas', () => {
     /*
      * El caso que motivó todo: 15:25, faltan 1.120 pz y quedan 5 min. Eso pide
      * 224 pz/min — la pantalla lo mostraba como si fuera una meta. Ni con las
-     * silletas llenas y la máquina en su máximo funcional (22) entra.
+     * silletas llenas y la máquina en su máximo documentado (21) entra.
      */
     const l = llenadoDeSilletas({
       model: 'Baader 200', cpmAndando: 11.6, remainingPieces: 1120, workMin: 5,
@@ -58,7 +58,7 @@ describe('llenadoDeSilletas', () => {
 
   it('lo imposible se mide contra el MÁXIMO, no contra el set point', () => {
     // 1.100 pz en 60 min = 18,3 pz/min: pasa el set point (18) pero cabe en el
-    // máximo funcional (22). Subir la velocidad es una decisión posible.
+    // máximo documentado (21). Subir la velocidad es una decisión posible.
     const l = llenadoDeSilletas({
       model: 'Baader 200', cpmAndando: 11.6, remainingPieces: 1100, workMin: 60,
     })!

@@ -789,7 +789,7 @@ function RitmoNecesario({
         {llenado && (
           <p className="mt-1 text-[12px] text-muted-foreground">
             Con la máquina a{' '}
-            <span className="tabular-nums text-foreground/90">{fmtCpm(llenado.spec.setCpm)} pz/min</span>,
+            <span className="tabular-nums text-foreground/90">{fmtCpm(llenado.spec.setCpm)} pz/min</span>{llenado.spec.setHz ? <span className="tabular-nums text-muted-foreground/70"> ({llenado.spec.setHz} Hz)</span> : null},
             van{' '}
             <b className="tabular-nums text-foreground/90">
               {comoDeCada100(llenado.actual)} de cada 100
@@ -919,7 +919,7 @@ function RitmoNecesario({
       {llenado && (
         <p className="mt-1.5 rounded-lg bg-muted/50 px-2.5 py-1.5 text-[12px] text-muted-foreground">
           Con la máquina a{' '}
-          <span className="tabular-nums text-foreground/90">{fmtCpm(llenado.spec.setCpm)} pz/min</span>,
+          <span className="tabular-nums text-foreground/90">{fmtCpm(llenado.spec.setCpm)} pz/min</span>{llenado.spec.setHz ? <span className="tabular-nums text-muted-foreground/70"> ({llenado.spec.setHz} Hz)</span> : null},
           venís llenando{' '}
           <b className="tabular-nums text-foreground/90">
             {comoDeCada100(llenado.actual)} de cada 100
