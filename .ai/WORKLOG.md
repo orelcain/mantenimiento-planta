@@ -11,6 +11,50 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 - Sigue: ...
 ```
 
+
+## 2026-08-14 - claude - El gráfico de velocidad: alto, ejes, series a elección y zoom por gesto
+
+- Pedido de Orel mirando la pantalla: *"que se vea mejor, quizás más grande, que se noten mejor las
+  líneas de velocidad frente a las barras, poder seleccionar ver una u otra, zoom in/zoom out y
+  paneo en vez de botones 1×/2×/4×/8×, y que los dos ejes muestren información"*. Mockup con los 96
+  tramos reales del turno: https://claude.ai/code/artifact/115ffa5f-c34e-4ddf-a00f-0899e80cf153
+- **Eje Y, que no existía.** La altura de una barra no se traducía a ningún número: había que
+  tocarla. Peor: el gráfico se autoescalaba al máximo del turno, así que **cada turno se dibujaba
+  contra sí mismo y todos parecían igual de llenos**. Ahora la escala llega hasta la velocidad de la
+  MÁQUINA (18 pz/min de la Baader 200, redondeado a múltiplo de 5) y **el hueco entre la curva y esa
+  línea es, dibujado, el llenado de silletas que falta**. Una sola unidad para barras y línea:
+  pz/min (las barras son las piezas del tramo ÷ 5). Dos ejes para el mismo dato es la receta clásica
+  para leer mal un gráfico.
+- **Alto de 80 → 170 px** (en px explícitos: el root corre al 85% y los rem encogen).
+- **Peso invertido**: barras al 35% de opacidad, línea de la media de 15 min al doble de grosor y
+  con su propio tono. Antes competían —mismo azul, línea de 1 px— y la tendencia se perdía.
+- **Chips `ambas / solo barras / solo línea`**, con la elección recordada en localStorage: el
+  monitor se refresca solo cada 30 s y sin memoria habría que reelegir cada vez.
+- **Zoom por gesto** en lugar de los botones: pellizco de dos dedos, ctrl/⌘+rueda (que es como llega
+  el pellizco del trackpad), arrastre con el mouse para panear —en el celular ya paneaba solo, es el
+  scroll nativo— y doble clic para volver. Queda el botón **"ver todo · N×"**: un zoom sin salida
+  visible es peor que ninguno.
+- ⚠⚠ Los listeners de `wheel` y `touchmove` van **nativos con `passive: false`**. React los registra
+  como pasivos y ahí `preventDefault()` no hace nada: la rueda seguiría desplazando la página y el
+  pellizco haría zoom del navegador entero por encima del gráfico.
+- ⚠⚠ **El pellizco tenía que cortar la propagación del touch**: la página entera escucha swipe para
+  cambiar de turno con un umbral de 60 px, y un pellizco mueve los dedos mucho más que eso —
+  acercarse al detalle habría abierto el turno anterior. Lo mismo con el arrastre de un dedo cuando
+  el gráfico está acercado.
+- ⚠ Sin modificador la rueda NO hace zoom: secuestrar el scroll de un bloque de 170 px hace que la
+  pantalla se sienta rota al bajar por la página.
+- El zoom conserva el punto que se está mirando: se guarda la razón del contenido bajo el puntero y
+  se reposiciona el scroll en `useLayoutEffect`, después de que el ancho cambió.
+- Archivos: PublicShiftMonitorPage.tsx (Sparkbars).
+- Verificación: tsc limpio, 1.369 tests. En el navegador, claro y oscuro, con el turno de Filete:
+  eje 0-20 con la línea de 18 dibujada, alto 170 px medido, ctrl+rueda llevando de 333 a 416 px de
+  contenido con el scroll anclado en el punto del cursor (63 px, el valor exacto que predice la
+  fórmula), los tres chips cambiando las series (97 rects / 1 polyline → 1 / 1 → 97 / 0) y la
+  elección persistida.
+- Estado: EN REVISIÓN (PR nuevo)
+- Sigue: el pellizco de dos dedos no se pudo probar sin un dispositivo táctil — mirarlo en el
+  celular. Y con el turno cerrado no se ve la referencia "necesitás" en el gráfico.
+
 ---
 
 ## 2026-08-14 - claude - Velocidad × llenado de silletas: el límite no es la máquina
