@@ -13,6 +13,21 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-13 - claude - Historial del MISMO turno para pronosticar el cierre (#540)
+
+- Hecho: el doc del monitor público ahora publica también `forecastHistory` — hasta 10
+  turnos DEL MISMO nombre (no los 6 cronológicos de `history`), resumidos a 5 KB. El
+  pronóstico y el diagnóstico lo usan con fallback a `history` para docs viejos.
+- Archivos: functions/publicMonitor.js, apps/pwa/src/services/shoplogix/publicShiftMonitor.service.ts,
+  apps/pwa/src/pages/PublicShiftMonitorPage.tsx
+- Verificación: tsc/eslint/vitest 286/286 limpios; probado contra Firestore real con Filete
+  (9 turnos útiles, descarta un turno basura del 1-ago de 180 pz en 16 min, 5 KB). CI y
+  ambos deploys (hosting + functions) en success.
+- Estado: HECHO
+- Sigue: verificación humana del pronóstico/diagnóstico con forecastHistory en pantalla.
+
+---
+
 ## 2026-08-13 - claude - "Donde se gana en esta línea": velocidad o tiempo andando (#538)
 
 - Hecho: bloque nuevo en el monitor que dice, por línea, cuál de los dos factores del total
