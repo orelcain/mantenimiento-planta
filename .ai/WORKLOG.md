@@ -13,6 +13,38 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-14 - claude - El ritmo se mide ANDANDO: una sola base para toda la tarjeta
+
+- Orel, viendo la tarjeta con el descuento de convenio ya puesto: "pero igual le pones 39 pz/min...
+  me imagino que se está contando el tiempo de colación como detención en tiempo perdido; la
+  colación es tiempo en el que no se puede producir pero es normal no producir". Tenía razón, y
+  el problema era MÍO: al pasar el requerido a tiempo productivo dejé el resto en tiempo de reloj.
+  La pantalla decía "Necesitás 39,4 y vas a 9,7" cuando la línea, andando, iba a 11,7 — y hasta
+  anunciaba un récord falso ("por encima del mejor turno reciente, 9,7") comparando andando contra
+  reloj. `monitorPace.js` documentaba esa invariante y la rompí sin verla.
+- ⚠⚠ REGLA: **un ritmo requerido sobre tiempo productivo SOLO se puede comparar contra ritmos
+  productivos.** Medido en los 10 turnos de Filete: andando la mediana es 11,0 pz/min y el mejor
+  turno 13,2; de reloj, 8,1 y 9,7. La diferencia entre las dos medidas ES el tiempo parado.
+- Hecho: `ritmoAndando` (piezas ÷ minutos de uptime) sale de `forecastHistory` —`total` y
+  `producingMin` ya viajan— y de `live.uptimeSec` para hoy. Alimenta `currentPerHour`,
+  `maxPerHour` (techo) y las referencias "lo normal / mejor turno". `recentPerHour` va en null: el
+  de los últimos 30 min es de reloj y durante una colación cae a cero. Las filas dicen "andando", y
+  cuando el requerido pasa el techo se agrega "· 1,8× el mejor turno" en vez de un número desnudo.
+- Y el KPI **"Tiempo produciendo" ya no mete la colación en el denominador**: va sobre el tiempo
+  DISPONIBLE (ventana − planificado). Hoy 68% → 84% con los mismos 4 h 08. Castigar a la línea por
+  una parada de convenio era exactamente lo que Orel señalaba.
+- La leyenda del gráfico de velocidad pasó de "lo normal" a "promedio de turno": esa mediana es de
+  reloj y con la tarjeta hablando de andando, dos números distintos con la misma etiqueta se leen
+  como un error.
+- Efecto de lectura, que es lo que importa: la pantalla ya no dice "la línea va lenta" (9,7 vs 8,1)
+  sino **la línea anda a 11,8, por encima de la mediana de 11,0; lo que falta es tiempo**. Eso es
+  el argumento de Mantención, no el de producción.
+- Archivos: PublicShiftMonitorPage.tsx, MonitorShiftParts.tsx.
+- Verificación: tsc limpio, 1.342 tests. En vivo (14:10, Filete, claro y oscuro): "Pide 23,4 pz/min
+  y la línea, andando, va a 11,8", "Necesitás 23,4 andando · 1,8× el mejor turno", techo 13,2,
+  "Andando, lo normal 11,0 · mejor turno 13,2", "Tiempo produciendo 84% · sin contar convenio".
+- Estado: EN REVISIÓN (PR #551)
+
 ## 2026-08-14 - claude - La colación entra en el ritmo necesario (pregunta de Orel en vivo)
 
 - Pregunta de Orel mirando el turno: "veo que no estamos considerando la colación en los

@@ -714,7 +714,8 @@ function RitmoNecesario({ pace, cierre, muestras, fuente, plantSlug, shiftName, 
       {(exigente || fuera) && (
         <p className="mt-0.5 text-[12px] text-muted-foreground">
           Pide <span className="tabular-nums text-foreground/90">{fmtDec(pace.requiredPerMinute)} pz/min</span>{' '}
-          y el turno viene a <span className="tabular-nums text-foreground/90">{fmtDec(pace.currentPerHour / 60)}</span>.
+          y la línea, andando, va a{' '}
+          <span className="tabular-nums text-foreground/90">{fmtDec(pace.currentPerHour / 60)}</span>.
         </p>
       )}
       {/* ⚠⚠ La HORA, siempre. Esta proyección va hasta el horario del turno y
@@ -759,9 +760,15 @@ function RitmoNecesario({ pace, cierre, muestras, fuente, plantSlug, shiftName, 
           <dt className="w-20 shrink-0 text-muted-foreground">Necesitás</dt>
           <dd className={`tabular-nums font-semibold ${fuera ? 'text-amber-800 dark:text-amber-300' : 'text-sky-800 dark:text-sky-300'}`}>
             {fmtDec(pace.requiredPerMinute)} pz/min
-            <span className="ml-1 font-normal text-muted-foreground/80">
-              = {fmtInt(pace.requiredPerHour)} pz/h
-            </span>
+            <span className="ml-1 font-normal text-muted-foreground/80">andando</span>
+            {/* Un requerido por encima del techo no es una meta: es una cifra
+                que hace perder la confianza en la pantalla. Se dice cuántas
+                veces es lo que la línea da, que es lo que se puede juzgar. */}
+            {fuera && pace.maxPerHour != null && pace.requiredPerHour > pace.maxPerHour && (
+              <span className="ml-1 font-normal text-muted-foreground/80">
+                · {fmtDec(pace.requiredPerHour / pace.maxPerHour)}× el mejor turno
+              </span>
+            )}
           </dd>
         </div>
         {pace.pendingBreakMin > 0 && (
@@ -776,7 +783,7 @@ function RitmoNecesario({ pace, cierre, muestras, fuente, plantSlug, shiftName, 
           <dt className="w-20 shrink-0 text-muted-foreground">Vas a</dt>
           <dd className="tabular-nums">
             {fmtDec(pace.currentPerHour / 60)} pz/min
-            <span className="ml-1 text-muted-foreground/80">= {fmtInt(pace.currentPerHour)} pz/h</span>
+            <span className="ml-1 text-muted-foreground/80">andando</span>
           </dd>
         </div>
         {/* El TECHO explicado: no es un número abstracto, es lo mejor que esta
@@ -799,7 +806,7 @@ function RitmoNecesario({ pace, cierre, muestras, fuente, plantSlug, shiftName, 
         <p className="mt-1.5 flex items-baseline gap-1.5 text-[12px] text-emerald-800 dark:text-emerald-300">
           <TrendingUp className="h-3.5 w-3.5 shrink-0 self-center" />
           <span>
-            Por encima del mejor turno reciente ({fmtDec(historial.bestCpm)} pz/min
+            Andando, por encima del mejor turno reciente ({fmtDec(historial.bestCpm)} pz/min
             {historial.muestras ? ` en los últimos ${historial.muestras}` : ''}).
           </span>
         </p>
@@ -807,7 +814,7 @@ function RitmoNecesario({ pace, cierre, muestras, fuente, plantSlug, shiftName, 
 
       {pace.maxPerHour != null && (
         <p className="mt-1.5 text-[11px] text-muted-foreground/70">
-          El <b>techo</b> es el mejor ritmo que la línea alcanzó
+          El <b>techo</b> es el mejor ritmo ANDANDO que la línea alcanzó
           {historial?.muestras ? ` en los últimos ${historial.muestras} turnos` : ' en turnos anteriores'} —
           lo que ya demostró que puede, no lo que dice el objetivo.
         </p>
@@ -818,7 +825,7 @@ function RitmoNecesario({ pace, cierre, muestras, fuente, plantSlug, shiftName, 
           pasado nunca de 12,7 — medido en Filete sobre 9 turnos. */}
       {historial?.medianCpm != null && (
         <p className="mt-1 text-[11px] text-muted-foreground/70">
-          Lo normal en esta línea:{' '}
+          Andando, lo normal en esta línea:{' '}
           <span className="tabular-nums text-foreground/80">
             {fmtDec(historial.medianCpm)} pz/min ({fmtInt(historial.medianCpm * 60)} pz/h)
           </span>
@@ -1154,6 +1161,35 @@ export function PublicShiftMonitorPage() {
     return mergeBreaks(hoy, anteriores, minutoActual)
   }, [live, data?.history])
 
+  /**
+   * El ritmo de la línea ANDANDO: piezas por minuto de uptime.
+   *
+   * ⚠⚠ Es la base que hace comparable todo lo demás. Desde que el ritmo
+   * necesario descuenta las paradas de convenio, pedirlo sobre tiempo
+   * productivo y contrastarlo contra un ritmo de RELOJ mezcla dos medidas: la
+   * pantalla decía "necesitás 39,4 y vas a 9,7" cuando la línea, andando, iba
+   * a 11,7. Lo vio Orel al toque: "igual le pones 39 pz/min".
+   *
+   * Medido en los 10 turnos de Filete (14-08): andando la mediana es 11,0 y el
+   * mejor turno 13,2, contra 8,1 y 9,7 de reloj. La diferencia entre las dos
+   * medidas ES el tiempo parado — que es justo lo que Mantención mueve.
+   */
+  const ritmoAndando = useMemo(() => {
+    const previos = (data?.forecastHistory ?? [])
+      .filter((h) => h.producingMin > 0 && h.total > 0)
+      .map((h) => h.total / h.producingMin)
+      .sort((a, b) => a - b)
+    const uptimeMin = (live?.uptimeSec ?? 0) / 60
+    const hoy = uptimeMin > 0 && live?.totalPieces ? live.totalPieces / uptimeMin : null
+    if (previos.length === 0) return { hoy, mediana: null, mejor: null, muestras: 0 }
+    return {
+      hoy,
+      mediana: previos[Math.floor(previos.length / 2)]!,
+      mejor: previos[previos.length - 1]!,
+      muestras: previos.length,
+    }
+  }, [live?.uptimeSec, live?.totalPieces, data?.forecastHistory])
+
   /*
    * Ritmo necesario para llegar a la meta. Se recalcula con el mismo reloj que
    * el resto de la página (`now`, que tictaquea solo), así que la recomendación
@@ -1187,23 +1223,30 @@ export function PublicShiftMonitorPage() {
       // el tiempo restante en ~0 durante todo el turno.
       scheduledEnd: live.plannedEnd,
       nowWallMs,
-      currentPerHour: live.piecesPerHour,
-      // Para el escalón "exigente": el requerido se juzga contra el MAYOR
-      // entre el promedio y la última media hora (ver monitorPace).
-      recentPerHour: live.recentPiecesPerMinute * 60,
+      /*
+       * ⚠ Ritmo ANDANDO, no de reloj: el requerido se pide sobre el tiempo en
+       * que la línea va a producir, así que compararlo contra un ritmo que
+       * incluye las paradas mide dos cosas distintas.
+       */
+      currentPerHour: (ritmoAndando.hoy ?? live.piecesPerMinute) * 60,
+      // Sin ritmo reciente: el de los últimos 30 min es de reloj y durante una
+      // colación cae a cero. Mezclarlo acá volvería a cruzar las dos medidas.
+      recentPerHour: null,
       /*
        * El techo sale del MEJOR turno real, no de `expectedPieces/horas`. Ese
        * cálculo mezclaba lo que el sensor espera con una ventana que puede ser
        * de otro turno, y daba números que la línea ya había superado. Lo que la
        * línea demostró que puede es un techo que se puede defender.
        */
-      maxPerHour: live.paceBestCpm != null
+      maxPerHour: ritmoAndando.mejor != null
+        ? ritmoAndando.mejor * 60
+        : live.paceBestCpm != null
         ? live.paceBestCpm * 60
         : lineMaxPerHour(live.expectedPieces, live.scheduledStart, live.plannedEnd),
       shiftClosed: live.shiftClosed,
       pendingBreakMin: Number.isNaN(t0) ? 0 : breakMinutesBetween(breaksTurno, desdeMin, hastaMin),
     })
-  }, [live, data?.targetPieces, now, breaksTurno])
+  }, [live, data?.targetPieces, now, breaksTurno, ritmoAndando])
 
   /*
    * Comparador con los turnos anteriores, a la misma altura de turno.
@@ -1636,7 +1679,14 @@ export function PublicShiftMonitorPage() {
             plantSlug={data.plantSlug}
             shiftName={live.shiftName}
             startAt={live.scheduledStart}
-            historial={live.paceMedianCpm != null ? {
+            /* Referencias en la MISMA base que el requerido: andando. Con las
+               de reloj la tarjeta comparaba 11,8 andando contra un "mejor
+               turno" de 9,7 de reloj y anunciaba un récord que no existía. */
+            historial={ritmoAndando.mediana != null ? {
+              medianCpm: ritmoAndando.mediana,
+              bestCpm: ritmoAndando.mejor,
+              muestras: ritmoAndando.muestras,
+            } : live.paceMedianCpm != null ? {
               medianCpm: live.paceMedianCpm,
               bestCpm: live.paceBestCpm ?? null,
               muestras: live.paceSamples ?? null,
@@ -1682,7 +1732,20 @@ export function PublicShiftMonitorPage() {
           />
           <Kpi
             label="Tiempo produciendo"
-            value={fmtDec(live.uptimePct, 0)}
+            /*
+             * ⚠ Sobre el tiempo DISPONIBLE, no sobre el turno entero: la
+             * colación no es tiempo en el que se podría haber producido, así
+             * que meterla en el denominador castiga a la línea por una parada
+             * de convenio (Orel, 14-08). Hoy la diferencia eran 13 puntos:
+             * 68% del turno contra 81% de lo que la línea tenía disponible.
+             */
+            value={fmtDec(
+              live.timeBreakdown && live.timeBreakdown.windowMin > live.timeBreakdown.plannedMin
+                ? (live.timeBreakdown.producingMin /
+                    (live.timeBreakdown.windowMin - live.timeBreakdown.plannedMin)) * 100
+                : live.uptimePct,
+              0,
+            )}
             unit="%"
             icon={<Clock className="h-3 w-3" />}
             /*
@@ -1692,7 +1755,9 @@ export function PublicShiftMonitorPage() {
              */
             hint={
               live.timeBreakdown
-                ? fmtDurationSec(live.timeBreakdown.producingMin * 60)
+                ? `${fmtDurationSec(live.timeBreakdown.producingMin * 60)}${
+                    live.timeBreakdown.plannedMin > 0 ? ' · sin contar convenio' : ''
+                  }`
                 : fmtDurationSec(live.uptimeSec)
             }
           />

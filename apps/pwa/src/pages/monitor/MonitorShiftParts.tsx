@@ -1217,7 +1217,11 @@ export function VelocidadDeLinea({ series, breaks, recentPerMinute, avgPerMinute
         {medianCpm != null && medianCpm > 0 && (
           <span className="flex items-center gap-1.5">
             <i className="h-0.5 w-4 rounded-full bg-muted-foreground/70" />
-            lo normal <span className="tabular-nums">{fmtDec(medianCpm)}</span>
+            {/* "Promedio de turno", no "lo normal": esta mediana es de RELOJ
+                (incluye las paradas) y la tarjeta de la meta habla del ritmo
+                ANDANDO. Dos números distintos con la misma etiqueta se leen
+                como un error. */}
+            promedio de turno <span className="tabular-nums">{fmtDec(medianCpm)}</span>
           </span>
         )}
         {zoom > 1 && <span>deslizá el gráfico &#8594;</span>}
