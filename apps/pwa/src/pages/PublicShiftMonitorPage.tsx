@@ -316,9 +316,8 @@ function Sparkbars({
       el.removeEventListener('touchmove', onTouchMove)
       el.removeEventListener('touchend', onTouchEnd)
     }
-    // `zoomA` se recrea en cada render pero solo lee refs: no hace falta
-    // re-suscribir los listeners por eso.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // `zoomA` se recrea en cada render pero solo lee refs, así que los
+    // listeners se suscriben UNA vez y no hace falta re-registrarlos.
   }, [])
 
   /** Arrastre con el mouse para panear (el touch ya panea solo). */
@@ -1957,7 +1956,7 @@ export function PublicShiftMonitorPage() {
       estimate: pronostico.mapePct <= MAX_MAPE_PCT ? pronostico.estimate : null,
       mapePct: pronostico.mapePct <= MAX_MAPE_PCT ? pronostico.mapePct : null,
     }
-  }, [pronostico, live?.series, live?.plannedEnd, pace])
+  }, [pronostico, live, pace])
 
   /**
    * Velocidad de la máquina y llenado de silletas.
@@ -1979,7 +1978,7 @@ export function PublicShiftMonitorPage() {
         ? Math.max(...live.series.map((p) => p.pieces || 0)) / 5
         : null,
     }),
-    [live?.machines, ritmoAndando.hoy, live?.timeBreakdown, pace],
+    [live?.machines, live?.series, live?.timeBreakdown, ritmoAndando.hoy, pace],
   )
 
   /**
