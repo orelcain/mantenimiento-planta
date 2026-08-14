@@ -45,6 +45,7 @@ import {
 import { buildForecast, MAX_MAPE_PCT } from '@/services/shoplogix/monitorForecast'
 import { buildDiagnostico } from '@/services/shoplogix/monitorDiagnostico'
 import { buildPareto } from '@/services/shoplogix/monitorPareto'
+import { llenadoDeSilletas, comoDeCada100, type LlenadoSilletas } from '@/services/shoplogix/monitorMaquina'
 import { DiagnosticoDeLinea } from './monitor/MonitorDiagnostico'
 import { ParetoDeParadas } from './monitor/MonitorPareto'
 import { TiempoDelTurno, ComparadorDias, Bloque, BitacoraOperador, PronosticoCierre, notasPorCausa } from './monitor/MonitorShiftParts'
@@ -71,6 +72,11 @@ const nf = new Intl.NumberFormat('es-CL')
 const fmtInt = (n: number) => nf.format(Math.round(n || 0))
 const fmtDec = (n: number, d = 1) =>
   (n || 0).toLocaleString('es-CL', { minimumFractionDigits: d, maximumFractionDigits: d })
+
+/** Velocidades de máquina: enteras se leen mejor sin el ",0". */
+function fmtCpm(n: number): string {
+  return Number.isInteger(n) ? fmtInt(n) : fmtDec(n)
+}
 
 function fmtDurationSec(sec: number): string {
   if (!Number.isFinite(sec) || sec <= 0) return '—'
@@ -719,6 +725,7 @@ function CierreDelTurno({ cierre, muestras, fuente, plantSlug, shiftName, startA
 
 function RitmoNecesario({
   pace, cierre, muestras, fuente, plantSlug, shiftName, startAt, historial, horizonte, vsAyer,
+  llenado,
 }: {
   pace: PaceToTarget | null
   historial: { medianCpm: number | null; bestCpm: number | null; muestras: number | null } | null
@@ -730,6 +737,8 @@ function RitmoNecesario({
   horizonte?: { hasta: string; estimate: number | null; mapePct: number | null } | null
   /** El día anterior a la MISMA altura de turno, y la diferencia con hoy. */
   vsAyer?: { label: string; pieces: number; diff: number } | null
+  /** Velocidad de la máquina y llenado de silletas, si el modelo se conoce. */
+  llenado?: LlenadoSilletas | null
   cierre: string | null | undefined
   muestras: number | null | undefined
   fuente: PublicMonitorLive['plannedEndSource']
@@ -769,12 +778,25 @@ function RitmoNecesario({
           {pace.targetSource === 'cuota' ? 'la meta' : 'lo esperado'}
         </p>
         <p className="mt-0.5 text-[12px] text-muted-foreground">
-          Al ritmo de ahora ({fmtDec(pace.currentPerHour / 60)} pz/min) son unos{' '}
+          Al ritmo de ahora ({fmtDec(pace.currentPerHour / 60)} pz/min andando) son unos{' '}
           <span className="tabular-nums text-foreground/90">
             {fmtDurationSec((pace.extraMinutesNeeded ?? 0) * 60)}
           </span>{' '}
           más.
         </p>
+        {/* También en hora extra: es cuando más se pregunta "¿por qué no va más
+            rápido?", y la respuesta sigue siendo el llenado, no la velocidad. */}
+        {llenado && (
+          <p className="mt-1 text-[12px] text-muted-foreground">
+            Con la máquina a{' '}
+            <span className="tabular-nums text-foreground/90">{fmtCpm(llenado.spec.setCpm)} pz/min</span>,
+            van{' '}
+            <b className="tabular-nums text-foreground/90">
+              {comoDeCada100(llenado.actual)} de cada 100
+            </b>{' '}
+            silletas con pieza.
+          </p>
+        )}
       </div>
     )
   }
@@ -822,8 +844,21 @@ function RitmoNecesario({
           186,7 pz/min y la línea, andando, va a 11,6". Es cierto y es inútil —
           nadie lee eso como una meta, se lee como que la pantalla se rompió. A
           partir de 2× el mejor turno se dice lo que de verdad pasa: que ya no
-          da el tiempo. El número exacto sigue en el detalle, que es auditable. */}
-      {(exigente || fuera) && (
+          da el tiempo. El número exacto sigue en el detalle, que es auditable.
+
+          Con el máximo funcional de la máquina se puede ser más preciso todavía:
+          no es que "no alcanza", es que **no existe** — no entra ni con las
+          silletas llenas y la máquina en su tope. */}
+      {(exigente || fuera) && llenado?.imposible ? (
+        <p className="mt-0.5 text-[12px] text-muted-foreground">
+          No entra ni con las{' '}
+          <span className="tabular-nums text-foreground/90">{llenado.spec.cantidad} silletas</span>{' '}
+          llenas: faltan{' '}
+          <span className="tabular-nums text-foreground/90">{fmtInt(pace.remainingPieces)} pz</span>
+          {' '}y el máximo de la máquina son{' '}
+          <span className="tabular-nums text-foreground/90">{fmtCpm(llenado.spec.maxCpm)} pz/min</span>.
+        </p>
+      ) : (exigente || fuera) && (
         pace.maxPerHour != null && pace.requiredPerHour > pace.maxPerHour * 2 ? (
           <p className="mt-0.5 text-[12px] text-muted-foreground">
             Ya no da el tiempo: faltan{' '}
@@ -871,6 +906,42 @@ function RitmoNecesario({
           <span className="tabular-nums text-foreground/90">{horizonte.hasta}</span>),{' '}
           <span className="tabular-nums text-foreground/90">{fmtInt(horizonte.estimate)} pz</span>
           {horizonte.mapePct != null && <> ±{fmtDec(horizonte.mapePct)}%</>}.
+        </p>
+      )}
+
+      {/* ⚠⚠ El límite NO es la velocidad de la máquina.
+          La Baader 200 pasa silletas a una velocidad fija y el operador pone
+          una pieza en cada una — o no: cansancio, un salmón que sacar, o la
+          línea atochada aguas abajo. Ritmo real = velocidad × llenado, y esas
+          dos mitades tienen dueños distintos. Sin esta línea, "la línea anda a
+          11,6" se lee como que la máquina rinde poco, cuando en 614 tramos de
+          los últimos 7 turnos NINGUNO llegó al 90% de llenado. */}
+      {llenado && (
+        <p className="mt-1.5 rounded-lg bg-muted/50 px-2.5 py-1.5 text-[12px] text-muted-foreground">
+          Con la máquina a{' '}
+          <span className="tabular-nums text-foreground/90">{fmtCpm(llenado.spec.setCpm)} pz/min</span>,
+          venís llenando{' '}
+          <b className="tabular-nums text-foreground/90">
+            {comoDeCada100(llenado.actual)} de cada 100
+          </b>{' '}
+          silletas
+          {llenado.necesaria != null && !llenado.imposible && (
+            <>
+              {' '}· para la meta harían falta{' '}
+              <b className={`tabular-nums ${
+                llenado.necesaria > llenado.actual
+                  ? 'text-amber-800 dark:text-amber-300'
+                  : 'text-emerald-800 dark:text-emerald-300'
+              }`}>
+                {comoDeCada100(llenado.necesaria)}
+              </b>
+            </>
+          )}
+          .
+          <span className="mt-0.5 block text-[11px] text-muted-foreground/70">
+            No es velocidad de máquina: es cuántas silletas van con pieza
+            (abastecimiento o atochamiento aguas abajo).
+          </span>
         </p>
       )}
 
@@ -1636,6 +1707,24 @@ export function PublicShiftMonitorPage() {
   }, [pronostico, live?.series, live?.plannedEnd, pace])
 
   /**
+   * Velocidad de la máquina y llenado de silletas.
+   *
+   * Solo para los modelos cuyo mecanismo conocemos (hoy, la Baader 200 de
+   * Filete). El ritmo va ANDANDO: sobre el reloj se mezclarían las paradas con
+   * el llenado, que es justo la confusión que este bloque viene a deshacer.
+   */
+  const llenadoSilletas = useMemo(
+    () => llenadoDeSilletas({
+      model: live?.machines?.[0]?.model,
+      cpmAndando: ritmoAndando.hoy,
+      producingMin: live?.timeBreakdown?.producingMin,
+      remainingPieces: pace?.remainingPieces,
+      workMin: pace?.workMin,
+    }),
+    [live?.machines, ritmoAndando.hoy, live?.timeBreakdown, pace],
+  )
+
+  /**
    * El día anterior más reciente a la MISMA altura de turno.
    *
    * Vivía solo dentro del comparador; ahora que ese bloque arranca plegado, la
@@ -1921,6 +2010,7 @@ export function PublicShiftMonitorPage() {
                turno" de 9,7 de reloj y anunciaba un récord que no existía. */
             horizonte={horizontePronostico}
             vsAyer={vsAyer}
+            llenado={llenadoSilletas}
             historial={ritmoAndando.mediana != null ? {
               medianCpm: ritmoAndando.mediana,
               bestCpm: ritmoAndando.mejor,

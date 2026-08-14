@@ -13,6 +13,40 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-14 - claude - Velocidad × llenado de silletas: el límite no es la máquina
+
+- Orel explicó el mecanismo de la **Baader 200 de Filete**: 5 silletas que pasan a velocidad fija
+  (máximo funcional 22 pz/min, se opera por debajo, p.ej. 18), y el operador pone una pieza por
+  silleta — o no: cansancio, un salmón que sacar, atochamiento aguas abajo (decorado, pimponeo).
+  Su punto, textual: *"no sirve poner velocidades irreales sobre eso ya que no se logrará"* y
+  *"no es un problema de máquina sino de abastecimiento o de atascamiento, pero no de velocidad"*.
+  ⚠ **Las silletas son de la Baader 200. Las Baader 142 son otras máquinas** — la config va por
+  MODELO y las 142 no tienen entrada, así que el bloque no aparece para ellas.
+- **Los datos confirman el modelo.** 614 tramos de 5 min con producción en los últimos 7 turnos de
+  Filete: máximo observado **16,6 pz/min** (92% de 18), p99 15,6, p95 14,0, mediana 10,2.
+  **NINGÚN tramo llegó al 90% de llenado**; solo el 3% pasó el 80%. Andando, el ritmo es 11,6 hoy y
+  11,0 de mediana → **se llenan 61-64 de cada 100 silletas**. De los 18 pz/min que la máquina
+  ofrece, ~6,5 se pierden en silletas vacías MIENTRAS la máquina anda.
+- `monitorMaquina.ts`: spec por modelo (silletas, setCpm, maxCpm) + `llenadoDeSilletas`. La
+  pantalla dice: *"Con la máquina a 18 pz/min, venís llenando 64 de cada 100 silletas · para la
+  meta harían falta 69"* y abajo, chico: *"No es velocidad de máquina: es cuántas silletas van con
+  pieza"*. Cuando lo que falta no entra ni con todo lleno: *"No entra ni con las 5 silletas llenas:
+  faltan N pz y el máximo de la máquina son 22 pz/min"* — antes decía "Pide 224 pz/min".
+- ⚠ `imposible` se mide contra el **máximo funcional** (22), no contra el set point (18): subir la
+  velocidad es una decisión posible; llenar más del 100% de las silletas, no.
+- ⚠⚠ **El set point NO viaja en los datos** (Shoplogix manda piezas y estados, no velocidad
+  configurada). Vive en `SPECS` hasta que haya config por línea, y por eso **la pantalla siempre lo
+  dice**: si el 18 está mal, el número está a la vista para que alguien en planta lo desmienta. Un
+  supuesto escondido sería mucho peor.
+- Archivos: monitorMaquina.ts (+10 tests), PublicShiftMonitorPage.tsx.
+- Verificación: tsc limpio, 1.365 tests. En vivo, rama de HORA EXTRA: *"Con la máquina a 18 pz/min,
+  van 64 de cada 100 silletas con pieza"*. ⚠ La línea con el llenado NECESARIO ("harían falta 69")
+  no se pudo ver en pantalla: el turno ya había pasado su horario cuando quedó lista. Queda cubierta
+  por test y hay que mirarla mañana con el turno en su ventana normal.
+- Estado: EN REVISIÓN (PR #552)
+- Sigue: confirmar con Orel si 18/22 son fijos para la Baader 200 de Filete o cambian por producto
+  o calibre; si cambian, mover `SPECS` a config por línea.
+
 ## 2026-08-14 - claude - Tarjeta "Ahora" unificada: una sola respuesta a "¿llegamos?"
 
 - Cierra el último punto del mockup de arquitectura. La respuesta a "¿vamos a llegar?" estaba
