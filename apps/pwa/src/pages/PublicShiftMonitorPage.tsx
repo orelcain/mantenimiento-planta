@@ -44,7 +44,9 @@ import {
 } from '@/services/shoplogix/monitorCompare'
 import { buildForecast, MAX_MAPE_PCT } from '@/services/shoplogix/monitorForecast'
 import { buildDiagnostico } from '@/services/shoplogix/monitorDiagnostico'
+import { buildPareto } from '@/services/shoplogix/monitorPareto'
 import { DiagnosticoDeLinea } from './monitor/MonitorDiagnostico'
+import { ParetoDeParadas } from './monitor/MonitorPareto'
 import { TiempoDelTurno, ComparadorDias, Bloque, BitacoraOperador, VelocidadDeLinea, PronosticoCierre } from './monitor/MonitorShiftParts'
 import { useIsAdmin } from '@/store'
 
@@ -1162,6 +1164,21 @@ export function PublicShiftMonitorPage() {
   }, [live, data?.history])
 
   /**
+   * El Pareto de las paradas de los últimos turnos.
+   *
+   * Sale del `history` que ya viaja en el doc (mismo turno, hasta 6 anteriores)
+   * más el turno que se está mirando: cero lecturas extra. Solo el tiempo
+   * RECUPERABLE — el convenio no es una pérdida que alguien pueda atacar.
+   */
+  const pareto = useMemo(() => {
+    const turnos = [
+      live?.timeBreakdown?.recoverable ?? null,
+      ...(data?.history ?? []).map((h) => h.live?.timeBreakdown?.recoverable ?? null),
+    ]
+    return buildPareto(turnos)
+  }, [live?.timeBreakdown, data?.history])
+
+  /**
    * El ritmo de la línea ANDANDO: piezas por minuto de uptime.
    *
    * ⚠⚠ Es la base que hace comparable todo lo demás. Desde que el ritmo
@@ -1835,6 +1852,11 @@ export function PublicShiftMonitorPage() {
           onCausa={setCausaSel}
           proximaParada={proximaParada}
         />
+
+        {/* Pegado al desglose de HOY va el de SIEMPRE: la misma pregunta —qué
+            para la línea— pero mirando los turnos anteriores. Es el paso de
+            "hoy pasó esto" a "esto vuelve todos los turnos". */}
+        <ParetoDeParadas pareto={pareto} />
 
         <PorHora series={live.series} />
 
