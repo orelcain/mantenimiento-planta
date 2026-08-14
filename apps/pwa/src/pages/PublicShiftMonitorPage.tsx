@@ -41,6 +41,8 @@ import {
   buildDayComparison, optimalPace, plannedBreaks, mergeBreaks, cumulativeFromStart,
 } from '@/services/shoplogix/monitorCompare'
 import { buildForecast, MAX_MAPE_PCT } from '@/services/shoplogix/monitorForecast'
+import { buildDiagnostico } from '@/services/shoplogix/monitorDiagnostico'
+import { DiagnosticoDeLinea } from './monitor/MonitorDiagnostico'
 import { TiempoDelTurno, ComparadorDias, Bloque, BitacoraOperador, VelocidadDeLinea, PronosticoCierre } from './monitor/MonitorShiftParts'
 import { useIsAdmin } from '@/store'
 
@@ -1098,6 +1100,25 @@ export function PublicShiftMonitorPage() {
     })
   }, [live, data?.history, data?.shiftId, data?.targetPieces, comparacion.currentMinute])
 
+  /*
+   * Dónde se gana en esta línea. Mismo historial que el pronóstico —turnos del
+   * mismo nombre, que son los comparables— y las micro-detenciones salen de
+   * `topStops`, que ya viaja en cada turno.
+   */
+  const diagnostico = useMemo(() => {
+    const micro = (l?: PublicMonitorLive) =>
+      (l?.topStops ?? []).find((s) => /micro/i.test(s.reason))?.count ?? null
+    const mismoTurno = (data?.history ?? []).filter((h) => h.shiftId === data?.shiftId)
+    return buildDiagnostico({
+      history: mismoTurno.map((h) => ({
+        totalPieces: h.live?.totalPieces ?? 0,
+        producingMin: h.live?.timeBreakdown?.producingMin ?? 0,
+        microCount: micro(h.live),
+      })),
+      microHoy: micro(live ?? undefined),
+    })
+  }, [live, data?.history, data?.shiftId])
+
   if (status === 'loading') {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -1466,6 +1487,10 @@ export function PublicShiftMonitorPage() {
         {/* La bitácora del piso: lo que el operador escribió, todo y en orden.
             Hasta ahora solo se leía lo que coincidía con un tramo de brecha. */}
         <BitacoraOperador comments={live.comments} onCausa={setCausaSel} />
+
+        {/* Dónde conviene poner el esfuerzo en ESTA línea. Va al final: es
+            contexto de varios turnos, no el estado del que está corriendo. */}
+        <DiagnosticoDeLinea d={diagnostico} />
 
         {/* Desglose por máquina — solo aporta cuando la línea tiene más de una */}
         {live.machines.length > 1 && (
