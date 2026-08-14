@@ -602,7 +602,7 @@ function BrechaDelDia({ cmp, live, onCausa, contra }: {
 
       <ul className="mt-1 space-y-1.5">
         {ventanas.map((g) => {
-          const { causa, comentario } = explicar(g)
+          const { causa } = explicar(g)
           const desdeTxt = reloj(g.fromMin)
           const hastaTxt = reloj(g.toMin)
           return (
@@ -648,11 +648,13 @@ function BrechaDelDia({ cmp, live, onCausa, contra }: {
                   </>
                 )}
               </p>
-              {/* Lo que escribió el operador: el único texto en castellano del
-                  turno, y suele explicar el bache mejor que la etiqueta. */}
-              {comentario && (
-                <p className="mt-0.5 italic text-muted-foreground">{comentario}</p>
-              )}
+              {/* ⚠ El comentario del operador NO se repite acá.
+                  Desde que va pegado a su causa en "A dónde se va el tiempo" y
+                  completo en la bitácora, imprimirlo también en la brecha lo
+                  mostraba TRES veces en la misma pantalla — «Falla
+                  abastecimiento agua dulce» aparecía arriba, al medio y abajo.
+                  Acá alcanza con la causa, que además marca el gráfico al
+                  tocarla; el texto vive donde explica la causa. */}
             </li>
           )
         })}
