@@ -24,7 +24,7 @@
  * ⚠ Horas de TURNO en wall-clock de planta (getUTC*); `lastSyncAt` es UTC real.
  */
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { Activity, AlertCircle, ChevronLeft, ChevronRight, Clock, Gauge, Hourglass, Moon, PauseCircle, Radio, RefreshCw, Sun, Target, Timer, TrendingUp } from 'lucide-react'
 import { useTheme } from '@/hooks/useTheme'
@@ -48,6 +48,7 @@ import { buildPareto } from '@/services/shoplogix/monitorPareto'
 import { llenadoDeSilletas, comoDeCada100, type LlenadoSilletas } from '@/services/shoplogix/monitorMaquina'
 import { DiagnosticoDeLinea } from './monitor/MonitorDiagnostico'
 import { ParetoDeParadas } from './monitor/MonitorPareto'
+import { useZoomGesto, type Ventana } from './monitor/useZoomGesto'
 import { TiempoDelTurno, ComparadorDias, Bloque, BitacoraOperador, PronosticoCierre, notasPorCausa } from './monitor/MonitorShiftParts'
 import { useIsAdmin } from '@/store'
 
@@ -162,8 +163,11 @@ function Kpi({
  */
 function Sparkbars({
   series, stopReasons, stopEvents, comments, causaSel, onCausa, breaks,
-  recentPerMinute, requiredPerMinute, medianCpm, setCpm,
+  recentPerMinute, requiredPerMinute, medianCpm, setCpm, ventana, onVentana,
 }: {
+  /** Ventana visible compartida con el comparador (minutos de turno). */
+  ventana?: Ventana | null
+  onVentana?: (v: Ventana | null) => void
   /** Ritmo de la última media hora, para la cabecera. */
   recentPerMinute?: number | null
   /** Ritmo que la meta exige ahora mismo, si hay meta. */
@@ -196,13 +200,6 @@ function Sparkbars({
    */
   breaks?: PlannedBreak[]
 }) {
-  /*
-   * Zoom horizontal. A 375 px, 106 tramos dan barras de 3 px: se ve la forma
-   * del turno pero no se puede leer un tramo concreto, que es justo lo que hace
-   * falta cuando uno ya sabe que a la hora 6 pasó algo. Ampliando el ancho del
-   * SVG dentro de un contenedor con scroll, cada barra crece y se puede tocar.
-   */
-  const [zoom, setZoom] = useState(1)
   /** Tramo bajo el cursor (o tocado en el celular). null = ninguno. */
   const [foco, setFoco] = useState<number | null>(null)
   /**
@@ -225,103 +222,16 @@ function Sparkbars({
   }
 
   /*
-   * ── Zoom por gesto ─────────────────────────────────────────────────────
-   *
-   * El zoom se hace ensanchando el contenido dentro de un contenedor con
-   * scroll, así que el PANEO es el scroll nativo: en el celular arrastra y
-   * frena con inercia sin una línea de código, y en el escritorio se arrastra
-   * con el mouse (abajo).
-   *
-   * ⚠⚠ Los listeners van NATIVOS y `passive: false`. React registra `wheel` y
-   * `touchmove` como pasivos, y ahí `preventDefault()` no hace nada: la rueda
-   * seguiría desplazando la página y el pellizco haría zoom del navegador
-   * entero por encima del gráfico.
-   *
-   * ⚠ Y hay que cortar la propagación del touch: la página entera escucha
-   * swipe para cambiar de turno, y un pellizco mueve los dedos más de 60 px —
-   * acercarse al detalle terminaría abriendo el turno anterior.
+   * Zoom por gesto y ventana compartida con el comparador: los dos gráficos
+   * miran el mismo turno por el mismo eje, así que acercarse en uno mueve al
+   * otro al mismo tramo. El mecanismo vive en `useZoomGesto`.
    */
-  const scrollRef = useRef<HTMLDivElement>(null)
-  const anclaRef = useRef<{ x: number; ratio: number } | null>(null)
-  const zoomRef = useRef(1)
-  zoomRef.current = zoom
-
-  /** Aplica un zoom nuevo dejando quieto el punto que se está mirando. */
-  const zoomA = (nuevo: number, clientX?: number) => {
-    const z = Math.min(12, Math.max(1, nuevo))
-    const el = scrollRef.current
-    if (el && el.scrollWidth > 0) {
-      const r = el.getBoundingClientRect()
-      const x = clientX == null ? r.width / 2 : Math.max(0, Math.min(r.width, clientX - r.left))
-      anclaRef.current = { x, ratio: (el.scrollLeft + x) / el.scrollWidth }
-    }
-    setZoom(z)
-  }
-
-  // El reposicionado va DESPUÉS del layout: el ancho del contenido recién
-  // cambió y `scrollLeft` se calcula contra el nuevo `scrollWidth`.
-  useLayoutEffect(() => {
-    const el = scrollRef.current
-    const a = anclaRef.current
-    if (!el || !a) return
-    anclaRef.current = null
-    el.scrollLeft = Math.max(0, a.ratio * el.scrollWidth - a.x)
-  }, [zoom])
-
-  useEffect(() => {
-    const el = scrollRef.current
-    if (!el) return
-    let d0 = 0
-    let z0 = 1
-
-    const onWheel = (ev: WheelEvent) => {
-      // Sin modificador la rueda sigue desplazando la página: secuestrar el
-      // scroll de un bloque de 170 px hace que la pantalla se sienta rota. El
-      // pellizco del trackpad llega justamente como ctrl+wheel.
-      if (!ev.ctrlKey && !ev.metaKey) return
-      ev.preventDefault()
-      zoomA(zoomRef.current * (ev.deltaY < 0 ? 1.25 : 0.8), ev.clientX)
-    }
-    const dist = (t: TouchList) =>
-      Math.hypot(t[0]!.clientX - t[1]!.clientX, t[0]!.clientY - t[1]!.clientY)
-
-    const onTouchStart = (ev: TouchEvent) => {
-      // Con el gráfico acercado, arrastrar con UN dedo es panear: tampoco eso
-      // puede llegar al swipe que cambia de turno.
-      if (zoomRef.current > 1.02) ev.stopPropagation()
-      if (ev.touches.length !== 2) return
-      ev.stopPropagation()
-      d0 = dist(ev.touches)
-      z0 = zoomRef.current
-    }
-    const onTouchMove = (ev: TouchEvent) => {
-      if (ev.touches.length !== 2 || d0 <= 0) return
-      ev.preventDefault()
-      ev.stopPropagation()
-      const centro = (ev.touches[0]!.clientX + ev.touches[1]!.clientX) / 2
-      zoomA(z0 * (dist(ev.touches) / d0), centro)
-    }
-    const onTouchEnd = (ev: TouchEvent) => {
-      if (d0 > 0 || zoomRef.current > 1.02) ev.stopPropagation()
-      if (ev.touches.length < 2) d0 = 0
-    }
-
-    el.addEventListener('wheel', onWheel, { passive: false })
-    el.addEventListener('touchstart', onTouchStart, { passive: false })
-    el.addEventListener('touchmove', onTouchMove, { passive: false })
-    el.addEventListener('touchend', onTouchEnd)
-    return () => {
-      el.removeEventListener('wheel', onWheel)
-      el.removeEventListener('touchstart', onTouchStart)
-      el.removeEventListener('touchmove', onTouchMove)
-      el.removeEventListener('touchend', onTouchEnd)
-    }
-    // `zoomA` se recrea en cada render pero solo lee refs, así que los
-    // listeners se suscriben UNA vez y no hace falta re-registrarlos.
-  }, [])
-
-  /** Arrastre con el mouse para panear (el touch ya panea solo). */
-  const arrastre = useRef<{ x: number; left: number } | null>(null)
+  const g = useZoomGesto({
+    dominioMin: (series?.length ?? 0) * 5,
+    ventana,
+    onVentana,
+  })
+  const zoom = g.zoom
   if (!series || series.length === 0) return null
 
   const max = Math.max(...series.map(p => p.pieces), 1)
@@ -593,21 +503,9 @@ function Sparkbars({
         </div>
 
       <div
-        ref={scrollRef}
-        className={`ml-7 overflow-x-auto ${zoom > 1.02 ? 'cursor-grab active:cursor-grabbing' : ''}`}
-        style={{ touchAction: zoom > 1.02 ? 'pan-x' : 'auto' }}
-        onDoubleClick={() => setZoom(1)}
-        onPointerDown={(ev) => {
-          if (ev.pointerType !== 'mouse' || zoom <= 1.02) return
-          arrastre.current = { x: ev.clientX, left: ev.currentTarget.scrollLeft }
-        }}
-        onPointerMove={(ev) => {
-          const a = arrastre.current
-          if (!a) return
-          ev.currentTarget.scrollLeft = a.left - (ev.clientX - a.x)
-        }}
-        onPointerUp={() => { arrastre.current = null }}
-        onPointerLeave={() => { arrastre.current = null }}
+        {...g.props}
+        className={`ml-7 overflow-x-auto ${g.acercado ? 'cursor-grab active:cursor-grabbing' : ''}`}
+        style={{ touchAction: g.acercado ? 'pan-x' : 'auto' }}
       >
       <div style={{ width: `${zoom * 100}%`, minWidth: '100%' }}>
       <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="w-full"
@@ -784,10 +682,10 @@ function Sparkbars({
             </button>
           ),
         )}
-        {zoom > 1.02 ? (
+        {g.acercado ? (
           <button
             type="button"
-            onClick={() => setZoom(1)}
+            onClick={g.verTodo}
             className="rounded-full border border-border px-2 py-0.5 hover:bg-muted"
           >
             ver todo · {fmtDec(zoom)}×
@@ -1574,6 +1472,13 @@ export function PublicShiftMonitorPage() {
   const turnoParam = searchParams.get('turno')
   /** Causa de detención resaltada sobre el gráfico. */
   const [causaSel, setCausaSel] = useState<string | null>(null)
+  /**
+   * El tramo de turno que se está mirando, en minutos desde el primer tramo
+   * con dato. Vive acá porque lo COMPARTEN los dos gráficos: acercarse en la
+   * velocidad mueve al comparador al mismo tramo, que es lo que permite cruzar
+   * "acá se cayó el ritmo" con "acá se abrió la brecha". null = todo el turno.
+   */
+  const [ventanaGrafica, setVentanaGrafica] = useState<Ventana | null>(null)
 
   // Turnos navegables, del actual hacia atrás. El backend publica el historial
   // ya compuesto; acá solo se elige cuál se pinta.
@@ -2412,6 +2317,8 @@ export function PublicShiftMonitorPage() {
             por tres bloques de detalle. Arriba el desenlace, abajo el porqué
             (velocidad, tramos, tiempo, hora por hora). */}
         <ComparadorDias
+          ventana={ventanaGrafica}
+          onVentana={setVentanaGrafica}
           cmp={comparacion}
           live={live}
           onCausa={setCausaSel}
@@ -2434,6 +2341,8 @@ export function PublicShiftMonitorPage() {
           causaSel={causaSel}
           onCausa={setCausaSel}
           breaks={comparacion.breaks}
+          ventana={ventanaGrafica}
+          onVentana={setVentanaGrafica}
           recentPerMinute={live.recentPiecesPerMinute}
           requiredPerMinute={pace && pace.requiredPerMinute > 0 ? pace.requiredPerMinute : null}
           medianCpm={live.paceMedianCpm}

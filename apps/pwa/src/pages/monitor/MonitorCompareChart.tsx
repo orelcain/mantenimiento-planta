@@ -22,10 +22,11 @@
  * "none"`) y un `<text>` o un `<circle>` adentro se deforman con él.
  */
 
-import { useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { piecesAt, type CompareResult, type PacePoint } from '@/services/shoplogix/monitorCompare'
 import type { ConePoint } from '@/services/shoplogix/monitorForecast'
 import { COLOR_HOY, COLOR_CUOTA, COLOR_REF, FILL_ARRIBA, FILL_ABAJO } from './monitorColors'
+import { useZoomGesto, type Ventana } from './useZoomGesto'
 
 const nf = new Intl.NumberFormat('es-CL')
 const fmtInt = (n: number) => nf.format(Math.round(n || 0))
@@ -95,7 +96,7 @@ function tramosDeBrecha(hoy: PacePoint[], ref: PacePoint[]): Array<{
   return out.filter((s) => s.hoy.length >= 2)
 }
 
-export function MonitorCompareChart({ cmp, cerrado, claveSel, onSel, cone }: {
+export function MonitorCompareChart({ cmp, cerrado, claveSel, onSel, cone, ventana, onVentana }: {
   cmp: CompareResult
   cerrado: boolean
   /*
@@ -113,30 +114,11 @@ export function MonitorCompareChart({ cmp, cerrado, claveSel, onSel, cone }: {
    */
   claveSel: string | null
   onSel: (clave: string) => void
+  /** Ventana visible compartida con el gráfico de velocidad (minutos de turno). */
+  ventana?: Ventana | null
+  onVentana?: (v: Ventana | null) => void
 }) {
   const [alto, setAlto] = useState(false)
-  const [zoom, setZoom] = useState(1)
-  const scrollRef = useRef<HTMLDivElement>(null)
-  /** Fracción del turno a dejar centrada después de cambiar el zoom. */
-  const focoRef = useRef<number | null>(null)
-  /** Dónde cae el minuto actual en el eje, para no perderlo de vista. */
-  const ahoraRef = useRef(0)
-
-  /*
-   * Conserva lo que se estaba mirando al cambiar el zoom, PERO si el minuto
-   * actual queda fuera del área visible se recentra en él (ampliar en cadena
-   * 1x → 2x → 4x heredaba un centro corrido y dejaba el "ahora" afuera).
-   */
-  useLayoutEffect(() => {
-    const el = scrollRef.current
-    if (!el || focoRef.current == null) return
-    const visible = el.clientWidth
-    let x = focoRef.current * el.scrollWidth - visible / 2
-    const xAhora = ahoraRef.current * el.scrollWidth
-    if (xAhora < x || xAhora > x + visible) x = xAhora - visible / 2
-    el.scrollLeft = Math.max(0, Math.min(x, el.scrollWidth - visible))
-    focoRef.current = null
-  }, [zoom])
 
   const hoy = cmp.days.find((d) => d.esHoy)
   const anteriores = useMemo(() => cmp.days.filter((d) => !d.esHoy), [cmp.days])
@@ -178,6 +160,17 @@ export function MonitorCompareChart({ cmp, cerrado, claveSel, onSel, cone }: {
     return { maxMin: mm, maxPz: mp }
   }, [cmp, hoy, refCurve, cone])
 
+  /*
+   * Zoom por gesto, con la ventana COMPARTIDA con el gráfico de velocidad: los
+   * dos miran el mismo turno por el mismo eje, así que acercarse en uno lleva
+   * al otro al mismo tramo. Reemplaza a los botones 1×/2×/4× y a su recentrado
+   * a mano en el "ahora" — con gesto, el punto que se mira queda quieto solo.
+   * ⚠ Va DESPUÉS de `maxMin` (lo necesita) y ANTES del early return: los hooks
+   * no pueden quedar detrás de un `return`.
+   */
+  const g = useZoomGesto({ dominioMin: maxMin, ventana, onVentana })
+  const zoom = g.zoom
+
   if (!hoy || cmp.currentMinute == null) return null
 
   /*
@@ -208,7 +201,6 @@ export function MonitorCompareChart({ cmp, cerrado, claveSel, onSel, cone }: {
 
   const x = (m: number) => fx(m) * W
   const y = (p: number) => fy(p) * H
-  ahoraRef.current = fx(cmp.currentMinute)
 
   const path = (curve: PacePoint[]) =>
     curve.length === 0
@@ -285,7 +277,11 @@ export function MonitorCompareChart({ cmp, cerrado, claveSel, onSel, cone }: {
           ))}
         </div>
 
-        <div ref={scrollRef} className="min-w-0 flex-1 overflow-x-auto">
+        <div
+          {...g.props}
+          className={`min-w-0 flex-1 overflow-x-auto ${g.acercado ? 'cursor-grab active:cursor-grabbing' : ''}`}
+          style={{ touchAction: g.acercado ? 'pan-x' : 'auto' }}
+        >
           <div className="relative" style={{ width: `${zoom * 100}%`, minWidth: '100%' }} data-zoom={zoom}>
             <div className={`relative ${alto ? ALTO_GRANDE : ALTO_CHICO} transition-[height] duration-200`}>
             <svg
@@ -416,26 +412,15 @@ export function MonitorCompareChart({ cmp, cerrado, claveSel, onSel, cone }: {
           <i className="h-2.5 w-2.5 rounded-sm" style={{ background: FILL_ARRIBA }} />
           vas arriba
         </span>
-        {zoom > 1 && <span>deslizá el gráfico &#8594;</span>}
         <span className="ml-auto flex items-center gap-1">
-          {[1, 2, 4].map((z) => (
-            <button key={z} type="button"
-              onClick={() => {
-                const el = scrollRef.current
-                focoRef.current = zoom === 1 || !el
-                  ? fx(cmp.currentMinute!)
-                  : (el.scrollLeft + el.clientWidth / 2) / el.scrollWidth
-                setZoom(z)
-              }}
-              aria-pressed={zoom === z}
-              className={`rounded-full border px-1.5 py-0.5 tabular-nums ${
-                zoom === z
-                  ? 'border-sky-500/50 bg-sky-500/20 text-sky-800 dark:text-sky-200'
-                  : 'border-border hover:bg-muted'
-              }`}>
-              {z}×
+          {g.acercado ? (
+            <button type="button" onClick={g.verTodo}
+              className="rounded-full border border-border px-2 py-0.5 hover:bg-muted">
+              ver todo · {zoom.toFixed(1).replace('.', ',')}×
             </button>
-          ))}
+          ) : (
+            <span className="text-[10px] text-muted-foreground/60">pellizcá o rodá para acercar</span>
+          )}
           <button type="button" onClick={() => setAlto((v) => !v)}
             className="rounded-full border border-border px-2 py-0.5 hover:bg-muted">
             {alto ? 'achicar' : 'agrandar'}

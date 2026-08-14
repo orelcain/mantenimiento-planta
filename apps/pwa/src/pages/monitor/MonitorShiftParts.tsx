@@ -14,6 +14,7 @@ import {
 } from '@/services/shoplogix/monitorCompare'
 import { MAX_MAPE_PCT, type ConePoint, type ForecastResult } from '@/services/shoplogix/monitorForecast'
 import { MonitorCompareChart } from './MonitorCompareChart'
+import type { Ventana } from './useZoomGesto'
 
 const nf = new Intl.NumberFormat('es-CL')
 const fmtInt = (n: number) => nf.format(Math.round(n || 0))
@@ -362,12 +363,15 @@ export function notasPorCausa(
  * además como cuenta Shoplogix (confirmado por Orel, 12-08): la hora 1 va del
  * arranque a +60 min, no hasta el próximo cambio de hora.
  */
-export function ComparadorDias({ cmp, live, onCausa, cone }: {
+export function ComparadorDias({ cmp, live, onCausa, cone, ventana, onVentana }: {
   cmp: CompareResult
   live?: PublicMonitorLive
   onCausa?: (c: string | null) => void
   /** Proyección al cierre, para dibujarla sobre la curva de hoy. */
   cone?: ConePoint[] | null
+  /** Ventana visible compartida con el gráfico de velocidad. */
+  ventana?: Ventana | null
+  onVentana?: (v: Ventana | null) => void
 }) {
   /*
    * La referencia elegida ('cuota' o dateKey+label de un día) vive ACÁ y no en
@@ -421,6 +425,8 @@ export function ComparadorDias({ cmp, live, onCausa, cone }: {
 
           <div className="mt-3">
             <MonitorCompareChart
+              ventana={ventana}
+              onVentana={onVentana}
               cmp={cmp}
               cerrado={live?.shiftClosed ?? false}
               claveSel={claveSel}
