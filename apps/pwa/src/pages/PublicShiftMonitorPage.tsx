@@ -2380,7 +2380,11 @@ export function PublicShiftMonitorPage() {
               cmp={comparacion}
               live={live}
               onCausa={setCausaSel}
-              contra={referenciaDe(comparacion, refSel).contra}
+              /* SIEMPRE contra la cuota: el bloque explica por qué no se llegó
+                 a la META, y seguir al chip del comparador haría que "cuándo se
+                 abrió" midiera contra "jue 13" mientras la resta de arriba
+                 habla de la cuota — dos referencias en el mismo bloque. */
+              contra={referenciaDe(comparacion, 'cuota').contra}
             />
           }
         />

@@ -213,10 +213,11 @@ export function TiempoDelTurno({
               {100 - pctParadas > 22 && `${Math.round(100 - pctParadas)}% ritmo`}
             </span>
           </div>
+          {/* Sin "habría cerrado 700 pz más arriba": era el MISMO 700 de la
+              frase de arriba, reescrito. Queda solo el supuesto del cálculo. */}
           <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground/80">
             Estimado al ritmo que la línea traía:{' '}
-            <span className="tabular-nums">{fmtDec(cpm)} pz/min</span> andando. Sin esas paradas
-            habría cerrado <span className="tabular-nums">{fmtInt(perdidas)}</span> pz más arriba.
+            <span className="tabular-nums">{fmtDec(cpm)} pz/min</span> andando.
           </p>
         </div>
       )}
@@ -225,9 +226,12 @@ export function TiempoDelTurno({
       <div className={hayBrecha ? 'mt-3 border-t border-border pt-2.5' : 'mt-2'}>
         <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
           Qué paró la línea
-          <span className="normal-case tracking-normal">
-            {' '}· {fmtDurMin(tb.recoverableMin)} recuperables
-          </span>
+          {/* Los minutos solo si la resta de arriba no los dijo ya. */}
+          {!hayBrecha && (
+            <span className="normal-case tracking-normal">
+              {' '}· {fmtDurMin(tb.recoverableMin)} recuperables
+            </span>
+          )}
         </p>
         <ul className="mt-1 space-y-0.5 text-[11.5px]">
           {tb.recoverable.length === 0 && (
@@ -624,7 +628,7 @@ export function BrechaDelDia({ cmp, live, onCausa, contra }: {
   return (
     <div className="mt-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-2.5 py-2 text-[12px]">
       <p className="text-[10px] uppercase tracking-wide text-amber-800 dark:text-amber-300">
-        Dónde se abrió la brecha con {contra.nombre}
+        Cuándo se abrió la brecha
       </p>
 
       <ul className="mt-1 space-y-1.5">
@@ -642,17 +646,13 @@ export function BrechaDelDia({ cmp, live, onCausa, contra }: {
                     min {g.fromMin}–{g.toMin} de turno
                   </span>
                 )}
-                {' · '}
-                <span className="tabular-nums text-red-700 dark:text-red-400">
-                  −{fmtInt(g.lostPieces)} pz
-                </span>
-                {/* El % solo cuando hay varios tramos: "100% de lo perdido"
-                    en un tramo único no agrega nada. */}
-                {ventanas.length > 1 && (
-                  <span className="text-muted-foreground">
-                    {' '}({Math.round(g.share * 100)}% de lo perdido)
-                  </span>
-                )}
+                {/* ⚠ Sin pz ni % desde que la lista de causas trae su costo en
+                    piezas: acá decía "AGUA −249" y arriba "AGUA 148", dos
+                    números para la misma causa en el mismo bloque — se leía
+                    como un error de cuenta (lo cazó Orel al toque). Son medidas
+                    distintas (la parada en sí contra el rato de reloj vs la
+                    referencia), y la que queda es la de la lista. Este bloque
+                    aporta el CUÁNDO, y el toque marca el gráfico. */}
                 {causa && (
                   <>
                     {' · '}
