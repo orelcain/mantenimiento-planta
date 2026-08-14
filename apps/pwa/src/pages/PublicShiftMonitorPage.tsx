@@ -49,7 +49,7 @@ import { llenadoDeSilletas, comoDeCada100, type LlenadoSilletas } from '@/servic
 import { DiagnosticoDeLinea } from './monitor/MonitorDiagnostico'
 import { ParetoDeParadas } from './monitor/MonitorPareto'
 import { useZoomGesto, type Ventana } from './monitor/useZoomGesto'
-import { TiempoDelTurno, ComparadorDias, Bloque, BitacoraOperador, PronosticoCierre, notasPorCausa } from './monitor/MonitorShiftParts'
+import { TiempoDelTurno, ComparadorDias, Bloque, BitacoraOperador, PronosticoCierre, notasPorCausa, BrechaDelDia, referenciaDe } from './monitor/MonitorShiftParts'
 import { useIsAdmin } from '@/store'
 
 // ── Formateadores (locales a propósito: esta página no debe arrastrar el
@@ -1479,6 +1479,13 @@ export function PublicShiftMonitorPage() {
    * "acá se cayó el ritmo" con "acá se abrió la brecha". null = todo el turno.
    */
   const [ventanaGrafica, setVentanaGrafica] = useState<Ventana | null>(null)
+  /**
+   * Contra qué se compara (la cuota o un día). Vive acá porque lo usan DOS
+   * bloques: el comparador para sus curvas y "por qué no llegamos" para el
+   * «cuándo se abrió». Con una copia en cada uno, el gráfico podía estar
+   * comparando contra la cuota y la brecha contra "lun 10".
+   */
+  const [refSel, setRefSel] = useState<string | null>(null)
 
   // Turnos navegables, del actual hacia atrás. El backend publica el historial
   // ya compuesto; acá solo se elige cuál se pinta.
@@ -2319,9 +2326,10 @@ export function PublicShiftMonitorPage() {
         <ComparadorDias
           ventana={ventanaGrafica}
           onVentana={setVentanaGrafica}
+          refSel={refSel}
+          onRefSel={setRefSel}
           cmp={comparacion}
           live={live}
-          onCausa={setCausaSel}
           /* Solo cuando el pronóstico es creíble: un cono con 20% de error es
              una mancha que promete lo que no puede. */
           cone={pronostico && pronostico.mapePct <= MAX_MAPE_PCT ? pronostico.cone : null}
@@ -2355,6 +2363,26 @@ export function PublicShiftMonitorPage() {
           onCausa={setCausaSel}
           proximaParada={proximaParada}
           notas={notasDeOperador}
+          /* La resta: minutos parados -> piezas, al ritmo del turno. */
+          brecha={(() => {
+            const meta = data.targetPieces ?? live.quotaPieces ?? live.expectedPieces ?? null
+            return meta != null ? Math.max(0, meta - live.totalPieces) : null
+          })()}
+          cpmAndando={
+            live.timeBreakdown && live.timeBreakdown.producingMin > 0
+              ? live.totalPieces / live.timeBreakdown.producingMin
+              : null
+          }
+          /* El «cuándo se abrió» se muda acá desde el comparador: es el momento
+             de las MISMAS causas que la lista de arriba. */
+          brechaSlot={
+            <BrechaDelDia
+              cmp={comparacion}
+              live={live}
+              onCausa={setCausaSel}
+              contra={referenciaDe(comparacion, refSel).contra}
+            />
+          }
         />
 
         {/* Pegado al desglose de HOY va el de SIEMPRE: la misma pregunta —qué

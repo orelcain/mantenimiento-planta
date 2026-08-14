@@ -32,13 +32,20 @@ const ANTES_DE_LA_COLACION: PublicMonitorLive['timeBreakdown'] = {
   recoverable: [{ reason: 'Detencion', min: 27, count: 9, lineMin: 27 }],
 }
 
-const texto = (tb: PublicMonitorLive['timeBreakdown'], proximaParada?: string | null) =>
-  render(<TiempoDelTurno tb={tb} proximaParada={proximaParada} />).container.textContent ?? ''
+const texto = (
+  tb: PublicMonitorLive['timeBreakdown'],
+  proximaParada?: string | null,
+  brecha?: number | null,
+  cpmAndando?: number | null,
+) =>
+  render(
+    <TiempoDelTurno tb={tb} proximaParada={proximaParada} brecha={brecha} cpmAndando={cpmAndando} />,
+  ).container.textContent ?? ''
 
 describe('TiempoDelTurno · aviso de la próxima parada de convenio', () => {
   it('⚠ avisa cuándo entra la colación AUNQUE ya hubo paradas planificadas', () => {
     const t = texto(ANTES_DE_LA_COLACION, '12:55')
-    expect(t).toMatch(/próxima parada de convenio entra a las/i)
+    expect(t).toMatch(/próxima entra a las/i)
     expect(t).toContain('12:55')
   })
 
@@ -54,9 +61,32 @@ describe('TiempoDelTurno · aviso de la próxima parada de convenio', () => {
     expect(t).not.toMatch(/Todavía sin paradas/i)
   })
 
-  it('el chip "Planificado" aparece con minutos y desaparece en cero', () => {
-    expect(texto(ANTES_DE_LA_COLACION, null)).toMatch(/Planificado\s*7 min/)
-    expect(texto({ ...ANTES_DE_LA_COLACION, plannedMin: 0, planned: [] }, null))
-      .not.toMatch(/Planificado/)
+  it('el convenio se muestra aparte y con sus minutos', () => {
+    // Desde que el bloque explica la brecha, el convenio va en su propia línea
+    // —"no se recupera"— y el reparto del tiempo pasó a detalle plegado.
+    expect(texto(ANTES_DE_LA_COLACION, null)).toMatch(/Convenio.*no se recupera/)
+    expect(texto(ANTES_DE_LA_COLACION, null)).toMatch(/7 min/)
+  })
+
+  it('⚠ el convenio NO se convierte a piezas', () => {
+    // Contarlo daría "se perdieron 1.550 pz" y es falso: en la colación no se
+    // puede producir. Solo las causas recuperables llevan su costo en piezas.
+    const t = texto(ANTES_DE_LA_COLACION, null, 1081, 13.5)
+    expect(t).toMatch(/Detencion.*365 pz/)      // 27 min x 13,5
+    expect(t).not.toMatch(/COLACION.*pz/)
+  })
+
+  it('hace la resta: cuánto de la brecha son paradas evitables', () => {
+    const t = texto(ANTES_DE_LA_COLACION, null, 1081, 13.5)
+    // 36 min recuperables x 13,5 = 486 pz de las 1.081 que faltaron.
+    expect(t).toMatch(/486/)
+    expect(t).toMatch(/595/)                    // el resto, por ritmo
+    expect(t).toMatch(/Por qué no llegamos/i)
+  })
+
+  it('sin brecha no promete explicar por qué no llegamos', () => {
+    const t = texto(ANTES_DE_LA_COLACION, null, 0, 13.5)
+    expect(t).toMatch(/A dónde se va el tiempo/i)
+    expect(t).not.toMatch(/Por qué no llegamos/i)
   })
 })

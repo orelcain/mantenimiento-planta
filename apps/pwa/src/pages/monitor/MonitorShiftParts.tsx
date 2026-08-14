@@ -75,6 +75,27 @@ export function Bloque({ id, titulo, extra, defaultAbierto = true, children }: {
   )
 }
 
+/**
+ * La referencia contra la que se compara: la cuota o un día anterior.
+ *
+ * Vive fuera de los componentes porque la usan DOS bloques —el comparador para
+ * sus curvas y "por qué no llegamos" para el «cuándo se abrió»—, y si cada uno
+ * resolviera la suya el gráfico podría estar comparando contra la cuota y la
+ * brecha contra "lun 10": dos verdades a 20 px de distancia.
+ */
+export function referenciaDe(cmp: CompareResult, clave: string | null) {
+  const anteriores = cmp.days.filter((d) => !d.esHoy)
+  const efectiva = clave
+    ?? (cmp.optimal ? 'cuota' : anteriores[0] ? anteriores[0].dateKey + anteriores[0].label : null)
+  const dia = anteriores.find((d) => d.dateKey + d.label === efectiva) ?? null
+  const contra = efectiva === 'cuota' && cmp.optimal
+    ? { curva: cmp.optimal, nombre: 'la cuota' }
+    : dia
+    ? { curva: dia.curve, nombre: dia.label }
+    : null
+  return { clave: efectiva, contra }
+}
+
 function fmtDurMin(min: number): string {
   if (!Number.isFinite(min) || min <= 0) return '—'
   const h = Math.floor(min / 60)
@@ -84,19 +105,34 @@ function fmtDurMin(min: number): string {
 }
 
 /**
- * A dónde se fue el tiempo del turno.
+ * Por qué no llegamos: la brecha explicada, y a dónde se fue el tiempo.
  *
- * La separación planificado / recuperable es el hallazgo que motivó esto: en el
- * turno del 12-08 de Filete los 86 min de detenciones grandes parecían el
- * problema, y 78 eran colación, reunión de inicio, ejercicio compensatorio y
- * detención programada. Sin distinguirlos se le pide a la línea que recupere un
- * tiempo que por convenio no se recupera.
+ * ── La resta que faltaba ────────────────────────────────────────────────────
  *
- * ⚠ Las causas van CON SU DETALLE en los dos grupos, a pedido de Orel: un
- * "planificado 78 min" a secas invita a sospechar que se esconde algo. Si la
- * colación se llevó 57 minutos, que se lea "COLACION 57 min · 4×".
+ * Este bloque y el comparador ya se rozaban sin tocarse: el comparador decía
+ * "faltaron 1.081 pz" y este "52 min recuperables", en unidades distintas y sin
+ * que nadie hiciera la cuenta. Al ritmo que la línea traía —13,5 pz/min andando
+ * el 14-08— esos 52 minutos son ~700 piezas: el 65% de la brecha. Las otras 381
+ * no son parada, es que ni andando alcanzaba.
+ *
+ * ⚠ Es una ESTIMACIÓN al ritmo del turno, y la pantalla lo dice con esas
+ * palabras. No se usa el techo de la máquina (18 pz/min daría 936): eso es lo
+ * que PODRÍA haber producido, no lo que habría producido.
+ *
+ * ⚠⚠ Las paradas de CONVENIO no entran en la cuenta. Contarlas daría "se
+ * perdieron 1.550 pz" y es falso: en la colación no se puede producir, y la
+ * cuota ya se reparte descontándola.
+ *
+ * ── La separación planificado / recuperable ────────────────────────────────
+ *
+ * Es el hallazgo que motivó el bloque: en el turno del 12-08 los 86 min de
+ * detenciones grandes parecían el problema, y 78 eran colación, reunión de
+ * inicio, ejercicio compensatorio y detención programada. Sin distinguirlos se
+ * le pide a la línea que recupere un tiempo que por convenio no se recupera.
  */
-export function TiempoDelTurno({ tb, causaSel, onCausa, proximaParada, notas }: {
+export function TiempoDelTurno({
+  tb, causaSel, onCausa, proximaParada, notas, brecha, cpmAndando, brechaSlot,
+}: {
   tb: PublicMonitorLive['timeBreakdown']
   causaSel?: string | null
   onCausa?: (c: string | null) => void
@@ -104,7 +140,15 @@ export function TiempoDelTurno({ tb, causaSel, onCausa, proximaParada, notas }: 
   proximaParada?: string | null
   /** Comentarios del operador agrupados por causa (ver `notasPorCausa`). */
   notas?: Map<string, Array<{ desde: string; texto: string }>>
+  /** Piezas que faltan (o faltaron) para la meta. null si no hay meta. */
+  brecha?: number | null
+  /** Ritmo de la línea ANDANDO, para traducir minutos parados a piezas. */
+  cpmAndando?: number | null
+  /** «Cuándo se abrió»: viene del padre, que resuelve contra qué se compara. */
+  brechaSlot?: React.ReactNode
 }) {
+  /* El reparto del tiempo pasa a DETALLE: la barra de 72/16/13% es el "cómo",
+     y arriba va el "cuánto costó", que es lo que se viene a mirar. */
   const [abierto, setAbierto] = useState(false)
   if (!tb || tb.windowMin <= 0) return null
 
@@ -114,119 +158,185 @@ export function TiempoDelTurno({ tb, causaSel, onCausa, proximaParada, notas }: 
   // explicar, pero tampoco se puede hacer desaparecer de la barra.
   const otros = Math.max(0, tb.windowMin - tb.producingMin - tb.plannedMin - tb.recoverableMin)
 
+  /*
+   * La resta. `perdidas` se topea a la brecha: si la línea anduvo por encima
+   * del ritmo necesario, las paradas explican TODA la diferencia y un "700 de
+   * 400" sería un número imposible en pantalla.
+   */
+  const cpm = cpmAndando && cpmAndando > 0 ? cpmAndando : null
+  const crudas = cpm ? tb.recoverableMin * cpm : null
+  const hayBrecha = brecha != null && brecha > 0
+  const perdidas = crudas == null ? null : hayBrecha ? Math.min(crudas, brecha) : crudas
+  const porRitmo = hayBrecha && perdidas != null ? Math.max(0, brecha - perdidas) : null
+  const pctParadas = hayBrecha && perdidas != null ? (perdidas / brecha) * 100 : null
+  /** Piezas que costó una causa, al mismo ritmo. */
+  const piezasDe = (min: number) => (cpm ? Math.round(min * cpm) : null)
+
   return (
     <Bloque
       id="tiempo"
-      titulo="A dónde se va el tiempo"
-      // "de operación", no "de turno": esta ventana es el tiempo RASTREADO
-      // (sin huecos de sensor), y el comparador usa "de turno" para el tiempo
-      // corrido desde el arranque — la misma palabra para dos medidas parecía
-      // un error de suma (6 h 3 vs 7 h 0 en la misma pantalla).
-      extra={<span className="tabular-nums">{fmtDurMin(tb.windowMin)} de operación</span>}
+      // El título depende de si hay algo que explicar: con la meta cumplida,
+      // "Por qué no llegamos" sería un titular falso.
+      titulo={hayBrecha ? 'Por qué no llegamos' : 'A dónde se va el tiempo'}
+      extra={hayBrecha
+        ? (
+          <span className="tabular-nums font-semibold text-red-700 dark:text-red-400">
+            −{fmtInt(brecha)} pz
+          </span>
+        )
+        // "de operación", no "de turno": esta ventana es el tiempo RASTREADO
+        // (sin huecos de sensor), y el comparador usa "de turno" para el tiempo
+        // corrido desde el arranque — la misma palabra para dos medidas parecía
+        // un error de suma (6 h 3 vs 7 h 0 en la misma pantalla).
+        : <span className="tabular-nums">{fmtDurMin(tb.windowMin)} de operación</span>}
     >
-      <div className="mt-2 flex h-6 overflow-hidden rounded-lg text-[10px] font-semibold text-white">
-        <span
-          className="flex items-center justify-center bg-emerald-600 dark:bg-emerald-500"
-          style={{ width: `${pct(tb.producingMin)}%` }}
-          title={`Produciendo ${tb.producingMin} min`}
-        >
-          {pct(tb.producingMin) > 14 && `${Math.round(pct(tb.producingMin))}%`}
-        </span>
-        {/* En cero no se renderiza: un segmento de ancho 0 no se ve, pero su
-            `title` seguía diciendo "Planificado 0 min" en el árbol de
-            accesibilidad — un lector de pantalla anunciaba justo el dato que
-            se sacó de la leyenda por no aportar. */}
-        {tb.plannedMin > 0 && (
-          <span
-            className="flex items-center justify-center bg-slate-500"
-            style={{ width: `${pct(tb.plannedMin)}%` }}
-            title={`Planificado ${tb.plannedMin} min`}
-          >
-            {pct(tb.plannedMin) > 14 && `${Math.round(pct(tb.plannedMin))}%`}
-          </span>
-        )}
-        <span
-          className="flex items-center justify-center bg-red-600 dark:bg-red-500"
-          style={{ width: `${pct(tb.recoverableMin)}%` }}
-          title={`Recuperable ${tb.recoverableMin} min`}
-        >
-          {pct(tb.recoverableMin) > 14 && `${Math.round(pct(tb.recoverableMin))}%`}
-        </span>
-        {otros > 0 && <span className="bg-muted-foreground/30" style={{ width: `${pct(otros)}%` }} />}
-      </div>
-
-      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
-        <span className="flex items-center gap-1.5">
-          <i className="h-2.5 w-2.5 rounded-sm bg-emerald-600 dark:bg-emerald-500" />
-          Produciendo <span className="tabular-nums text-foreground/80">{tb.producingMin} min</span>
-        </span>
-        {/* Un chip en cero ocupa lugar para no decir nada, y peor: se lee como
-            si el dato faltara. Cuando todavía no hubo paradas de convenio, la
-            línea de abajo dice cuándo entra la próxima. */}
-        {tb.plannedMin > 0 && (
-          <span className="flex items-center gap-1.5">
-            <i className="h-2.5 w-2.5 rounded-sm bg-slate-500" />
-            Planificado <span className="tabular-nums text-foreground/80">{tb.plannedMin} min</span>
-          </span>
-        )}
-        <span className="flex items-center gap-1.5">
-          <i className="h-2.5 w-2.5 rounded-sm bg-red-600 dark:bg-red-500" />
-          Recuperable <span className="tabular-nums text-foreground/80">{tb.recoverableMin} min</span>
-        </span>
-      </div>
-
-      {/* ⚠ El aviso NO se apaga con la primera parada planificada.
-          Visto el 14-08 a las 12:50 en Filete: `plannedMin` era 7 —2 min de
-          reunión de inicio y 5 de ejercicio compensatorio— así que el aviso ya
-          se había ido, y la colación, la parada de ~55 min que de verdad mueve
-          la cuota, todavía no había ocurrido. La pregunta no es si hubo alguna
-          parada de convenio, es si falta la próxima. */}
-      {proximaParada && (
-        <p className="mt-1.5 text-[11px] text-muted-foreground">
-          {tb.plannedMin === 0
-            ? 'Todavía sin paradas de convenio: la próxima entra a las '
-            : 'La próxima parada de convenio entra a las '}
-          <span className="tabular-nums">{proximaParada}</span>.
-        </p>
+      {/* ── 1 · La resta ────────────────────────────────────────────────── */}
+      {hayBrecha && perdidas != null && porRitmo != null && pctParadas != null && cpm != null && (
+        <div className="mt-2">
+          <p className="text-[13.5px] leading-snug text-foreground">
+            De las <span className="tabular-nums font-semibold">{fmtInt(brecha)} pz</span> que
+            faltaron,{' '}
+            <span className="tabular-nums font-semibold text-red-700 dark:text-red-400">
+              {fmtInt(perdidas)}
+            </span>{' '}
+            son <b>{fmtDurMin(tb.recoverableMin)} de paradas evitables</b> y{' '}
+            <span className="tabular-nums font-semibold">{fmtInt(porRitmo)}</span>, ritmo por debajo
+            del necesario.
+          </p>
+          <div className="mt-2 flex h-5 overflow-hidden rounded-lg text-[10px] font-semibold text-white">
+            <span className="flex items-center justify-center bg-red-600 dark:bg-red-500"
+              style={{ width: `${pctParadas}%` }}>
+              {pctParadas > 22 && `${Math.round(pctParadas)}% paradas`}
+            </span>
+            <span className="flex items-center justify-center bg-slate-500"
+              style={{ width: `${100 - pctParadas}%` }}>
+              {100 - pctParadas > 22 && `${Math.round(100 - pctParadas)}% ritmo`}
+            </span>
+          </div>
+          <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground/80">
+            Estimado al ritmo que la línea traía:{' '}
+            <span className="tabular-nums">{fmtDec(cpm)} pz/min</span> andando. Sin esas paradas
+            habría cerrado <span className="tabular-nums">{fmtInt(perdidas)}</span> pz más arriba.
+          </p>
+        </div>
       )}
 
+      {/* ── 2 · Qué paró la línea ──────────────────────────────────────── */}
+      <div className={hayBrecha ? 'mt-3 border-t border-border pt-2.5' : 'mt-2'}>
+        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+          Qué paró la línea
+          <span className="normal-case tracking-normal">
+            {' '}· {fmtDurMin(tb.recoverableMin)} recuperables
+          </span>
+        </p>
+        <ul className="mt-1 space-y-0.5 text-[11.5px]">
+          {tb.recoverable.length === 0 && (
+            <li className="text-muted-foreground/60">nada por recuperar</li>
+          )}
+          {tb.recoverable.map((x) => (
+            <FilaCausa key={x.reason} x={x} sel={causaSel ?? null} onCausa={onCausa}
+              notas={notas?.get(x.reason)} piezas={piezasDe(x.min)} />
+          ))}
+        </ul>
+      </div>
+
+      {/* ── 3 · El convenio, aparte y sin convertir a piezas ───────────── */}
+      {(tb.plannedMin > 0 || proximaParada) && (
+        <div className="mt-2 flex flex-wrap items-baseline justify-between gap-x-3 border-t border-border pt-2 text-[11px] text-muted-foreground">
+          <span>Convenio <span className="text-muted-foreground/70">· no se recupera</span></span>
+          <span className="tabular-nums">{fmtDurMin(tb.plannedMin)}</span>
+          {/* ⚠ El aviso NO se apaga con la primera parada planificada: 7 min de
+              reunión de inicio lo mataban con la colación todavía por delante. */}
+          {proximaParada && (
+            <span className="basis-full text-[10.5px] text-muted-foreground/70">
+              {tb.plannedMin === 0
+                ? 'Todavía sin paradas de convenio: la próxima entra a las '
+                : 'La próxima entra a las '}
+              <span className="tabular-nums">{proximaParada}</span>.
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* ── 4 · Cuándo se abrió ────────────────────────────────────────── */}
+      {brechaSlot}
+
+      {/* ── 5 · El reparto del tiempo, plegado ─────────────────────────── */}
       <button
         type="button"
         onClick={() => setAbierto((v) => !v)}
         className="mt-2 text-[11px] text-sky-700 underline underline-offset-2 dark:text-sky-300"
+        aria-expanded={abierto}
       >
-        {abierto ? 'ocultar el detalle' : 'ver de qué son'}
+        {abierto ? 'ocultar el reparto del tiempo' : 'ver el reparto del tiempo'}
       </button>
 
       {abierto && (
-        <div className="mt-2 grid gap-3 sm:grid-cols-2">
-          <div>
-            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-              Planificado · no se recupera
-            </p>
-            <ul className="mt-1 space-y-0.5 text-[11px]">
-              {tb.planned.length === 0 && (
-                <li className="text-muted-foreground/60">sin paradas de convenio</li>
-              )}
-              {tb.planned.map((x) => (
-                <FilaCausa key={x.reason} x={x} sel={causaSel ?? null} onCausa={onCausa} notas={notas?.get(x.reason)} />
-              ))}
-            </ul>
+        <div className="mt-2">
+          <div className="flex h-6 overflow-hidden rounded-lg text-[10px] font-semibold text-white">
+            <span
+              className="flex items-center justify-center bg-emerald-600 dark:bg-emerald-500"
+              style={{ width: `${pct(tb.producingMin)}%` }}
+              title={`Produciendo ${tb.producingMin} min`}
+            >
+              {pct(tb.producingMin) > 14 && `${Math.round(pct(tb.producingMin))}%`}
+            </span>
+            {/* En cero no se renderiza: un segmento de ancho 0 no se ve, pero su
+                `title` seguía diciendo "Planificado 0 min" en el árbol de
+                accesibilidad. */}
+            {tb.plannedMin > 0 && (
+              <span
+                className="flex items-center justify-center bg-slate-500"
+                style={{ width: `${pct(tb.plannedMin)}%` }}
+                title={`Planificado ${tb.plannedMin} min`}
+              >
+                {pct(tb.plannedMin) > 14 && `${Math.round(pct(tb.plannedMin))}%`}
+              </span>
+            )}
+            <span
+              className="flex items-center justify-center bg-red-600 dark:bg-red-500"
+              style={{ width: `${pct(tb.recoverableMin)}%` }}
+              title={`Recuperable ${tb.recoverableMin} min`}
+            >
+              {pct(tb.recoverableMin) > 14 && `${Math.round(pct(tb.recoverableMin))}%`}
+            </span>
+            {otros > 0 && <span className="bg-muted-foreground/30" style={{ width: `${pct(otros)}%` }} />}
           </div>
-          <div>
-            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Recuperable</p>
-            <ul className="mt-1 space-y-0.5 text-[11px]">
-              {tb.recoverable.length === 0 && (
-                <li className="text-muted-foreground/60">nada por recuperar</li>
-              )}
-              {tb.recoverable.map((x) => (
-                <FilaCausa key={x.reason} x={x} sel={causaSel ?? null} onCausa={onCausa} notas={notas?.get(x.reason)} />
-              ))}
-            </ul>
+
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <i className="h-2.5 w-2.5 rounded-sm bg-emerald-600 dark:bg-emerald-500" />
+              Produciendo <span className="tabular-nums text-foreground/80">{tb.producingMin} min</span>
+            </span>
+            {tb.plannedMin > 0 && (
+              <span className="flex items-center gap-1.5">
+                <i className="h-2.5 w-2.5 rounded-sm bg-slate-500" />
+                Planificado <span className="tabular-nums text-foreground/80">{tb.plannedMin} min</span>
+              </span>
+            )}
+            <span className="flex items-center gap-1.5">
+              <i className="h-2.5 w-2.5 rounded-sm bg-red-600 dark:bg-red-500" />
+              Recuperable <span className="tabular-nums text-foreground/80">{tb.recoverableMin} min</span>
+            </span>
           </div>
-          <p className="text-[10px] text-muted-foreground/70 sm:col-span-2">
-            Los minutos son los que la causa estuvo activa en alguna máquina; la barra
-            de arriba mide la LÍNEA, que solo se detiene cuando paran todas.
+
+          {tb.planned.length > 0 && (
+            <div className="mt-2">
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                Planificado · no se recupera
+              </p>
+              <ul className="mt-1 space-y-0.5 text-[11px]">
+                {tb.planned.map((x) => (
+                  <FilaCausa key={x.reason} x={x} sel={causaSel ?? null} onCausa={onCausa}
+                    notas={notas?.get(x.reason)} />
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <p className="mt-2 text-[10px] leading-snug text-muted-foreground/70">
+            Los minutos son los que la causa estuvo activa en alguna máquina; la barra mide la
+            LÍNEA, que solo se detiene cuando paran todas.
             {onCausa && ' Tocá una causa para ver en qué momento del turno ocurrió.'}
           </p>
         </div>
@@ -243,10 +353,17 @@ export function TiempoDelTurno({ tb, causaSel, onCausa, proximaParada, notas }: 
  * tramos — y la vista sube sola, porque en el celular el gráfico queda fuera de
  * pantalla y no se vería que algo cambió.
  */
-function FilaCausa({ x, sel, onCausa, notas }: {
+function FilaCausa({ x, sel, onCausa, notas, piezas }: {
   x: { reason: string; min: number; count: number; lineMin?: number }
   sel: string | null
   onCausa?: (c: string | null) => void
+  /**
+   * Lo que costo la causa, en piezas. Es lo que convierte el bloque en
+   * evidencia: "FALLA OPERACIONAL 14 min" no se discute igual que
+   * "FALLA OPERACIONAL 189 pz". Ausente en las de convenio: ese tiempo no se
+   * podia producir, y convertirlo seria inventar una perdida.
+   */
+  piezas?: number | null
   /**
    * Lo que el operador escribió sobre ESTA causa.
    *
@@ -274,8 +391,13 @@ function FilaCausa({ x, sel, onCausa, notas }: {
           </span>
         )}
       </span>
-      <span className="shrink-0 tabular-nums text-muted-foreground">
-        {x.min} min · {x.count}×
+      <span className="shrink-0 tabular-nums">
+        {piezas != null && (
+          <span className="font-semibold text-red-700 dark:text-red-400">{fmtInt(piezas)} pz</span>
+        )}
+        <span className="text-muted-foreground">
+          {piezas != null ? ' · ' : ''}{x.min} min · {x.count}×
+        </span>
       </span>
     </>
   )
@@ -363,35 +485,22 @@ export function notasPorCausa(
  * además como cuenta Shoplogix (confirmado por Orel, 12-08): la hora 1 va del
  * arranque a +60 min, no hasta el próximo cambio de hora.
  */
-export function ComparadorDias({ cmp, live, onCausa, cone, ventana, onVentana }: {
+export function ComparadorDias({ cmp, live, cone, ventana, onVentana, refSel, onRefSel }: {
   cmp: CompareResult
   live?: PublicMonitorLive
-  onCausa?: (c: string | null) => void
   /** Proyección al cierre, para dibujarla sobre la curva de hoy. */
   cone?: ConePoint[] | null
   /** Ventana visible compartida con el gráfico de velocidad. */
   ventana?: Ventana | null
   onVentana?: (v: Ventana | null) => void
+  /** Contra qué se compara. Vive en el padre: el bloque "por qué no llegamos"
+      usa la MISMA referencia para su «cuándo se abrió». */
+  refSel?: string | null
+  onRefSel: (clave: string) => void
 }) {
-  /*
-   * La referencia elegida ('cuota' o dateKey+label de un día) vive ACÁ y no en
-   * el gráfico: la brecha de abajo se calcula contra la MISMA referencia. El
-   * estado arranca en null (el default se resuelve después del early return,
-   * cuando `cmp.days` ya no puede venir vacío).
-   */
-  const [refSel, setRefSel] = useState<string | null>(null)
-
   if (cmp.days.length === 0 || cmp.currentMinute == null) return null
 
-  const anterioresSel = cmp.days.filter((d) => !d.esHoy)
-  const claveSel = refSel
-    ?? (cmp.optimal ? 'cuota' : anterioresSel[0] ? anterioresSel[0].dateKey + anterioresSel[0].label : null)
-  const diaSel = anterioresSel.find((d) => d.dateKey + d.label === claveSel) ?? null
-  const contraSel = claveSel === 'cuota' && cmp.optimal
-    ? { curva: cmp.optimal, nombre: 'la cuota' }
-    : diaSel
-    ? { curva: diaSel.curve, nombre: diaSel.label }
-    : null
+  const { clave: claveSel } = referenciaDe(cmp, refSel ?? null)
 
   const hh = Math.floor(cmp.currentMinute / 60)
   const mm = cmp.currentMinute % 60
@@ -430,13 +539,11 @@ export function ComparadorDias({ cmp, live, onCausa, cone, ventana, onVentana }:
               cmp={cmp}
               cerrado={live?.shiftClosed ?? false}
               claveSel={claveSel}
-              onSel={setRefSel}
+              onSel={onRefSel}
               cone={cone}
             />
           </div>
 
-
-          <BrechaDelDia cmp={cmp} live={live} onCausa={onCausa} contra={contraSel} />
 
           {/* UNA sola nota. Antes eran tres diciendo variantes de lo mismo:
               una debajo de las tarjetas, otra acá y la de la brecha. */}
@@ -463,7 +570,7 @@ export function ComparadorDias({ cmp, live, onCausa, cone, ventana, onVentana }:
  * 20 px de distancia. Si contra la referencia elegida hoy no perdió terreno,
  * el bloque simplemente no aparece.
  */
-function BrechaDelDia({ cmp, live, onCausa, contra }: {
+export function BrechaDelDia({ cmp, live, onCausa, contra }: {
   cmp: CompareResult
   live?: PublicMonitorLive
   onCausa?: (c: string | null) => void
