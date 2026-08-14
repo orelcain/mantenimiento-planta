@@ -13,6 +13,108 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-14 - claude - Velocidad × llenado de silletas: el límite no es la máquina
+
+- Orel explicó el mecanismo de la **Baader 200 de Filete**: 5 silletas que pasan a velocidad fija
+  (máximo funcional 22 pz/min, se opera por debajo, p.ej. 18), y el operador pone una pieza por
+  silleta — o no: cansancio, un salmón que sacar, atochamiento aguas abajo (decorado, pimponeo).
+  Su punto, textual: *"no sirve poner velocidades irreales sobre eso ya que no se logrará"* y
+  *"no es un problema de máquina sino de abastecimiento o de atascamiento, pero no de velocidad"*.
+  ⚠ **Las silletas son de la Baader 200. Las Baader 142 son otras máquinas** — la config va por
+  MODELO y las 142 no tienen entrada, así que el bloque no aparece para ellas.
+- **Los datos confirman el modelo.** 614 tramos de 5 min con producción en los últimos 7 turnos de
+  Filete: máximo observado **16,6 pz/min** (92% de 18), p99 15,6, p95 14,0, mediana 10,2.
+  **NINGÚN tramo llegó al 90% de llenado**; solo el 3% pasó el 80%. Andando, el ritmo es 11,6 hoy y
+  11,0 de mediana → **se llenan 61-64 de cada 100 silletas**. De los 18 pz/min que la máquina
+  ofrece, ~6,5 se pierden en silletas vacías MIENTRAS la máquina anda.
+- `monitorMaquina.ts`: spec por modelo (silletas, setCpm, maxCpm) + `llenadoDeSilletas`. La
+  pantalla dice: *"Con la máquina a 18 pz/min, venís llenando 64 de cada 100 silletas · para la
+  meta harían falta 69"* y abajo, chico: *"No es velocidad de máquina: es cuántas silletas van con
+  pieza"*. Cuando lo que falta no entra ni con todo lleno: *"No entra ni con las 5 silletas llenas:
+  faltan N pz y el máximo de la máquina son 22 pz/min"* — antes decía "Pide 224 pz/min".
+- ⚠ `imposible` se mide contra el **máximo funcional** (22), no contra el set point (18): subir la
+  velocidad es una decisión posible; llenar más del 100% de las silletas, no.
+- ⚠⚠ **El set point NO viaja en los datos** (Shoplogix manda piezas y estados, no velocidad
+  configurada). Vive en `SPECS` hasta que haya config por línea, y por eso **la pantalla siempre lo
+  dice**: si el 18 está mal, el número está a la vista para que alguien en planta lo desmienta. Un
+  supuesto escondido sería mucho peor.
+- Archivos: monitorMaquina.ts (+10 tests), PublicShiftMonitorPage.tsx.
+- Verificación: tsc limpio, 1.365 tests. En vivo, rama de HORA EXTRA: *"Con la máquina a 18 pz/min,
+  van 64 de cada 100 silletas con pieza"*. ⚠ La línea con el llenado NECESARIO ("harían falta 69")
+  no se pudo ver en pantalla: el turno ya había pasado su horario cuando quedó lista. Queda cubierta
+  por test y hay que mirarla mañana con el turno en su ventana normal.
+- Estado: EN REVISIÓN (PR #552)
+- Sigue: confirmar con Orel si 18/22 son fijos para la Baader 200 de Filete o cambian por producto
+  o calibre; si cambian, mover `SPECS` a config por línea.
+
+## 2026-08-14 - claude - Tarjeta "Ahora" unificada: una sola respuesta a "¿llegamos?"
+
+- Cierra el último punto del mockup de arquitectura. La respuesta a "¿vamos a llegar?" estaba
+  repartida en tres tarjetas: la meta (veredicto + proyección al horario), el pronóstico (cierre
+  estimado, tres bloques abajo) y el comparador (contra ayer, otro bloque más). Ahora la tarjeta de
+  arriba lo dice completo en cuatro líneas: veredicto, cierre al horario, cierre si el turno se
+  estira, y el día anterior a la misma altura con su diferencia.
+- El resto —ritmo requerido, techo, "lo normal", hora extra y de dónde sale la hora de cierre—
+  pasa a un **"ver qué hace falta"**; cerrado deja una línea con lo único que se mira de reojo
+  ("Faltan 1.120 pz · quedan 5 min"). Eran doce líneas siempre abiertas arriba de todo.
+- `PronosticoCierre` queda plegado: su titular ya está en la tarjeta y con el bloque cerrado el
+  número se sigue viendo en la cabecera. Adentro queda lo auditable (banda, método, cuántos turnos
+  llegaron desde esta altura).
+- ⚠ **Un requerido MUY por encima del techo no se dice como número.** Visto a las 15:25 con 6 min
+  de turno: *"Pide 186,7 pz/min y la línea, andando, va a 11,6"*. Es cierto y es inútil — se lee
+  como que la pantalla se rompió. Desde 2× el mejor turno: *"Ya no da el tiempo: faltan 1.120 pz y
+  quedan 5 min"*. El número exacto sigue en el detalle.
+- ⚠ Al plegar `PronosticoCierre` los 11 tests de su bloque empezaron a fallar por leer un cuerpo
+  que ya no se renderiza. Se abren por el BOTÓN (`aria-expanded="false"`), como lo haría alguien en
+  planta, en vez de tocar el `localStorage` que usa `Bloque`.
+- Archivos: PublicShiftMonitorPage.tsx, MonitorShiftParts.tsx, PronosticoCierre.test.tsx.
+- Verificación: tsc limpio, 1.355 tests. En vivo, claro y oscuro, con el turno de Filete a punto de
+  cerrar. La pantalla quedó en **1.420 px** contra los 2.766 px del inicio del día: **−49%**.
+- Estado: EN REVISIÓN (PR #552)
+
+## 2026-08-14 - claude - Menos ruido en el monitor: 4 preguntas, un gráfico, y el Pareto de paradas
+
+- Orel: "siento que aún tenemos mucho ruido para ser un monitor que necesita entregar información
+  rápido... por qué la velocidad, se detuvo por algo, por qué, e ir analizando turno a turno si se
+  repiten los patrones de detenciones para encontrar causa raíz". Mockup con el inventario real de
+  la pantalla (11 bloques, 2.766 px ≈ 4 pantallas de celular) mostrando que **tres bloques
+  contestaban "¿llegamos?"**, **cuatro "¿va rápido?"** —dos de ellos dibujando la MISMA serie de 5
+  min— y que **"¿se repite?" no existía**.
+- **Pareto de paradas (`monitorPareto.ts` + `MonitorPareto.tsx`)**. Sale del historial que ya viaja
+  en el doc: cero lecturas extra. Dos decisiones que lo hacen útil:
+  · **Dos ejes.** Ordenado solo por minutos, `ACUMULACION` entra cuarta con 45 min y ocurrió en 2
+    de 7 turnos: un incidente disfrazado de causa crónica. Cada fila lleva en cuántos turnos
+    aparece, y las que no llegan a la mitad de la muestra se dibujan en gris.
+  · **Agrupado por equipo.** Shoplogix etiqueta `Equipo/Parte`; las tres causas de la Baader
+    (cuchillería dorsal, rascador, pernos/resortes) sueltas no pasan de 47 min y ninguna llama la
+    atención, juntas son el 22% y el 2º lugar del Pareto. Regla genérica (lo que va antes de la
+    primera barra), sin mapa que mantener, sirve igual en Yal.
+  Corte estándar del 80% acumulado. Con 7 turnos de Filete: Micro Detencion 2 h 14 (35%, 7/7, 304
+  paradas), Baader 200 1 h 26 (22%, 4/7), ATASCAMIENTO 58 min (15%, 6/7), ACUMULACION 45 min (12%,
+  2/7) → **4 causas = 84%**.
+- **El comentario del operador, pegado a su causa** (`notasPorCausa`). "FALLA OPERACIONAL 14 min" y
+  «Ajuste erroneo de operador nuevo» estaban en bloques distintos separados por dos pantallas.
+- **UN solo gráfico de la serie de 5 min.** "Velocidad de la línea" y "Piezas por tramo" dibujaban
+  lo mismo (uno en pz/min, otro en piezas). Se fusionaron en el de tramos —el que sabe ubicar las
+  detenciones y tiene zoom 8×— con la media móvil de 15 min encima y las referencias de ritmo
+  convertidas a piezas/tramo. **`VelocidadDeLinea` borrado (247 líneas).**
+  ⚠ Las referencias solo se dibujan si CABEN (≤1,3× el máximo): con la meta pidiendo 53 pz/min y el
+  mejor tramo en 14,6, la línea estiraba la escala al cuádruple y aplastaba el turno contra el
+  piso. Fuera de escala, el número se dice en la leyenda.
+- **Comparador de días y Hora por hora quedan plegados por defecto.** No se borra nada: la
+  respuesta corta viaja en el `extra` del bloque cerrado y `Bloque` recuerda la elección.
+- **Resultado medido: 2.766 px → 1.726 px, −38%** (de ~4 pantallas de celular a ~2,5).
+- Archivos: monitorPareto.ts (+test con los 6 turnos reales como fixture), MonitorPareto.tsx,
+  MonitorShiftParts.tsx, PublicShiftMonitorPage.tsx.
+- Verificación: tsc limpio, 1.355 tests. En vivo con el turno de Filete, claro y oscuro: Pareto con
+  sus 4 filas y el corte del 84%, comentarios bajo FALLA OPERACIONAL y AGUA, gráfico único con la
+  media de 15 min y "necesitás 53,0 pz/min (fuera del gráfico)".
+- Estado: EN REVISIÓN (PR nuevo, encima de #551)
+- Sigue: (a) la tarjeta "Ahora" del mockup —una sola respuesta a "¿llegamos?"— todavía son dos
+  tarjetas (meta y cierre estimado); (b) con el turno por terminar el requerido se dispara ("60,2
+  pz/min · 4,6× el mejor turno"): por encima de ~2× el techo conviene decirlo en palabras en vez
+  de un número.
+
 ## 2026-08-14 - claude - El ritmo se mide ANDANDO: una sola base para toda la tarjeta
 
 - Orel, viendo la tarjeta con el descuento de convenio ya puesto: "pero igual le pones 39 pz/min...
