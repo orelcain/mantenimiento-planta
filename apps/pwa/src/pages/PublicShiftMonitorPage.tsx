@@ -39,6 +39,7 @@ import { computePaceToTarget, lineMaxPerHour, type PaceToTarget } from '@/servic
 import { pinShiftEnd, unpinShiftEnd } from '@/services/shoplogix/pinShiftEnd'
 import {
   buildDayComparison, optimalPace, plannedBreaks, mergeBreaks, cumulativeFromStart,
+  type PlannedBreak,
 } from '@/services/shoplogix/monitorCompare'
 import { buildForecast, MAX_MAPE_PCT } from '@/services/shoplogix/monitorForecast'
 import { buildDiagnostico } from '@/services/shoplogix/monitorDiagnostico'
@@ -151,7 +152,7 @@ function Kpi({
  * hora fue la caída y por qué. SVG puro, sin librerías de gráficos.
  */
 function Sparkbars({
-  series, stopReasons, stopEvents, comments, causaSel, onCausa,
+  series, stopReasons, stopEvents, comments, causaSel, onCausa, breaks,
 }: {
   series: PublicMonitorLive['series']
   stopReasons?: string[]
@@ -159,6 +160,18 @@ function Sparkbars({
   comments?: PublicMonitorLive['comments']
   causaSel: string | null
   onCausa: (c: string | null) => void
+  /**
+   * Paradas de convenio, de fondo: las mismas bandas grises del comparador y
+   * de la curva de velocidad, y de la MISMA fuente (`comparacion.breaks`).
+   *
+   * ⚠⚠ El intento anterior las dibujaba desde `stopEvents` y salían 23 bandas
+   * de ancho mínimo en vez de una. La razón: `stopEvents` trae TODAS las
+   * detenciones —56 el 13-08, 28 el 14-08, casi todas micro-detenciones de 15
+   * a 90 segundos— y su campo `r` es un ÍNDICE a `stopReasons`, no el nombre
+   * de la causa. Filtrando por las causas de `timeBreakdown.planned`, que es
+   * lo que hace `plannedBreaks()`, quedan 3 el 13-08 y 2 el 14-08.
+   */
+  breaks?: PlannedBreak[]
 }) {
   /*
    * Zoom horizontal. A 375 px, 106 tramos dan barras de 3 px: se ve la forma
@@ -213,6 +226,36 @@ function Sparkbars({
    * se busca por ÍNDICE en la serie, no por aritmética de tiempo — la serie no
    * es continua y ese atajo corre las bandas a la derecha.
    */
+  /*
+   * Fondo de convenio: solo las paradas que explican un hueco VISIBLE. El piso
+   * de 15 min (3 tramos) es lo que separa la colación —43 min el 13-08, ocho
+   * barras en cero seguidas— de la reunión de inicio de 5 min, que pinta un
+   * puntito gris y ensucia en vez de explicar. Con ese piso, el 13-08 queda
+   * UNA banda: la colación.
+   *
+   * `comparacion.breaks` incluye el PRONÓSTICO de las paradas que todavía no
+   * ocurrieron (para aplanar la curva de la cuota). Acá no van: este gráfico
+   * solo llega hasta el último tramo con dato, y una banda futura terminaría
+   * clavada contra el borde derecho, sobre producción real.
+   */
+  const convenio = (breaks ?? [])
+    .filter((b) => b.toMin - b.fromMin >= 15)
+    .map((b) => {
+      const desde = tiempos[0]! + b.fromMin * 60_000
+      const hasta = tiempos[0]! + b.toMin * 60_000
+      return { b, desde, hasta }
+    })
+    .filter(({ desde }) => desde < tiempos[tiempos.length - 1]!)
+    .map(({ b, desde, hasta }) => {
+      const i0 = indiceDe(desde)
+      const i1 = indiceDe(hasta)
+      return {
+        x: i0 * stepX,
+        ancho: Math.max(stepX, (i1 - i0) * stepX),
+        key: `${b.fromMin}-${b.toMin}`,
+      }
+    })
+
   // Bandas de la causa elegida. Se dibujan primero para quedar DETRÁS de las
   // barras: la producción es el dato, la detención es el contexto.
   const bandas = causaSel && stopEvents && stopReasons
@@ -313,6 +356,13 @@ function Sparkbars({
            onMouseLeave={() => setFoco(null)}
            onClick={(ev) => setFoco(tramoEn(ev.clientX, ev.currentTarget))}
            aria-label="Piezas por tramo de cinco minutos">
+        {/* El convenio primero: es el fondo del fondo. La causa elegida se
+            dibuja encima, y las barras encima de las dos. */}
+        {convenio.map(b => (
+          <rect key={b.key} x={b.x} y={0} width={b.ancho} height={H}
+                className="fill-muted-foreground/15" />
+        ))}
+
         {bandas.map(b => (
           <rect key={b.key} x={b.x} y={0} width={b.ancho} height={H}
                 className="fill-rose-500/25 stroke-rose-500/60" strokeWidth={0.15} />
@@ -428,6 +478,12 @@ function Sparkbars({
           <span className="inline-block h-2 w-3 border-t-2 border-dashed border-amber-600 dark:border-amber-400" />
           mejor ritmo del turno: <span className="tabular-nums text-muted-foreground">{fmtInt(max)}</span> pz
         </span>
+        {convenio.length > 0 && (
+          <span className="inline-flex items-center gap-1">
+            <span className="inline-block h-2.5 w-2.5 rounded-sm bg-muted-foreground/15" />
+            parada de convenio
+          </span>
+        )}
         {causaSel && (
           <span className="inline-flex items-center gap-1">
             <span className="inline-block h-2.5 w-2.5 rounded-sm bg-rose-500/25 ring-1 ring-rose-500/60" />
@@ -644,7 +700,9 @@ function RitmoNecesario({ pace, cierre, muestras, fuente, plantSlug, shiftName, 
           deducirla leyendo cuatro cifras seguidas. */}
       <p className={`mt-1 text-[15px] font-semibold ${fuera || exigente ? 'text-amber-800 dark:text-amber-300' : 'text-sky-800 dark:text-sky-300'}`}>
         {fuera
-          ? 'No se alcanza con el tiempo que queda'
+          // "Dentro del horario", no "con el tiempo que queda": el turno se
+          // estira casi todos los días y el bloque de abajo cuenta con eso.
+          ? 'Dentro del horario no alcanza'
           : exigente
           ? 'Se alcanza, pero solo apurando'
           : 'Se alcanza al ritmo que traés'}
@@ -658,8 +716,21 @@ function RitmoNecesario({ pace, cierre, muestras, fuente, plantSlug, shiftName, 
           y el turno viene a <span className="tabular-nums text-foreground/90">{fmtDec(pace.currentPerHour / 60)}</span>.
         </p>
       )}
+      {/* ⚠⚠ La HORA, siempre. Esta proyección va hasta el horario del turno y
+          el bloque "Cierre estimado" va hasta lo que duraron los turnos
+          anteriores: el 14-08 a las 12:50 uno decía 4.501 pz y el otro 5.011,
+          a lados opuestos de la meta, sin que nada explicara la diferencia.
+          Son dos horizontes, no dos cuentas. */}
       <p className="mt-0.5 text-[12px] text-muted-foreground">
-        Al ritmo de ahora el turno cierra en{' '}
+        {cierre ? (
+          <>
+            Al ritmo de ahora, hasta las{' '}
+            <span className="tabular-nums text-foreground/90">{fmtWallTime(cierre)}</span> el turno
+            cierra en{' '}
+          </>
+        ) : (
+          <>Al ritmo de ahora el turno cierra en{' '}</>
+        )}
         <span className="tabular-nums text-foreground/90">{fmtInt(pace.projectedPieces)} pz</span>
         {' '}({fmtDec((pace.projectedPieces / pace.targetPieces) * 100, 0)}% de la meta).
       </p>
@@ -770,7 +841,11 @@ function RitmoNecesario({ pace, cierre, muestras, fuente, plantSlug, shiftName, 
                   ritmo que la línea YA trae" es la que decide si la hora
                   extra resuelve o solo acerca. */}
               <span className="text-emerald-800 dark:text-emerald-300">
-                {pace.withExtraHour.realistic ? 'el ritmo que ya traés' : 'la meta entra'}
+                {/* "La meta entra" a secas volvía a chocar con el bloque del
+                    pronóstico, que a la misma hora decía "no entra": este
+                    número cabe en el techo pero está por encima del ritmo que
+                    la línea trae, así que se dice condicional. */}
+                {pace.withExtraHour.realistic ? 'el ritmo que ya traés' : 'alcanzaría, pero apurando'}
               </span>.
             </>
           ) : (
@@ -1184,6 +1259,45 @@ export function PublicShiftMonitorPage() {
   }, [live, data?.history, data?.forecastHistory, data?.shiftId])
 
   /**
+   * Hasta cuándo mide el pronóstico, y cuánto sería si el turno cortara en su
+   * horario.
+   *
+   * ⚠⚠ Los dos cierres de la pantalla no discrepaban por la cuenta sino por el
+   * horizonte: `pace` proyecta a `plannedEnd` y el pronóstico a la mediana de
+   * lo que DURARON los turnos anteriores (`horizonMin`). En Filete son 460 min
+   * contra 525 — la hora extra que la línea hace casi todos los días. Acá se
+   * traducen los dos a hora de reloj para que cada número diga hasta cuándo
+   * vale, en vez de dejar que se contradigan a tres tarjetas de distancia.
+   *
+   * El minuto 0 es el PRIMER TRAMO CON DATO, no `scheduledStart`: es la misma
+   * base con que `monitorCompare` indexa las curvas.
+   */
+  const horizontePronostico = useMemo(() => {
+    const t0raw = live?.series?.[0]?.t
+    if (!pronostico || !t0raw) return null
+    const t0 = Date.parse(t0raw)
+    if (Number.isNaN(t0)) return null
+    const finMs = t0 + pronostico.horizonMin * 60_000
+    const horarioMs = live?.plannedEnd ? Date.parse(live.plannedEnd) : NaN
+    /*
+     * La segunda línea solo cuando el horario corta ANTES y por un margen que
+     * se note: con los dos horizontes casi pegados serían dos cifras iguales
+     * ocupando dos renglones, que es la clase de ruido que este cambio vino a
+     * sacar.
+     */
+    const horario =
+      pace && pace.verdict !== 'hora-extra' && !Number.isNaN(horarioMs) &&
+      horarioMs < finMs - 15 * 60_000
+        ? { hasta: fmtWallTime(live!.plannedEnd!), piezas: Math.round(pace.projectedPieces) }
+        : null
+    return {
+      hasta: fmtWallTime(new Date(finMs).toISOString()),
+      dura: fmtDurationSec(pronostico.horizonMin * 60),
+      horario,
+    }
+  }, [pronostico, live?.series, live?.plannedEnd, pace])
+
+  /**
    * La hora de reloj de la próxima parada de convenio que todavía no empezó.
    *
    * Sirve para el turno temprano, cuando "Planificado 0 min" ocupaba un chip
@@ -1195,13 +1309,17 @@ export function PublicShiftMonitorPage() {
    * conociera la convención wall-clock-as-UTC.
    */
   const proximaParada = useMemo(() => {
-    if (!live?.scheduledStart || comparacion.currentMinute == null) return null
+    // ⚠ La base es el PRIMER TRAMO CON DATO, que es contra lo que
+    // `plannedBreaks` cuenta sus minutos. Con `scheduledStart` la hora salía
+    // corrida (hoy 07:45 contra 07:40: cinco minutos tarde).
+    const base = live?.series?.[0]?.t ?? live?.scheduledStart
+    if (!base || comparacion.currentMinute == null) return null
     const prox = comparacion.breaks
       .filter((b) => b.fromMin > comparacion.currentMinute!)
       .sort((a, b) => a.fromMin - b.fromMin)[0]
     if (!prox) return null
-    return fmtWallTime(new Date(Date.parse(live.scheduledStart) + prox.fromMin * 60_000).toISOString())
-  }, [live?.scheduledStart, comparacion.breaks, comparacion.currentMinute])
+    return fmtWallTime(new Date(Date.parse(base) + prox.fromMin * 60_000).toISOString())
+  }, [live?.series, live?.scheduledStart, comparacion.breaks, comparacion.currentMinute])
 
   if (status === 'loading') {
     return (
@@ -1531,6 +1649,7 @@ export function PublicShiftMonitorPage() {
         <PronosticoCierre
           f={pronostico}
           meta={data.targetPieces ?? live.quotaPieces ?? live.expectedPieces ?? null}
+          horizonte={horizontePronostico}
         />
 
         {/* El comparador SUBE hasta acá, pegado al pronóstico: los dos
@@ -1566,6 +1685,7 @@ export function PublicShiftMonitorPage() {
           comments={live.comments}
           causaSel={causaSel}
           onCausa={setCausaSel}
+          breaks={comparacion.breaks}
         />
 
         <TiempoDelTurno

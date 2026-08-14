@@ -187,9 +187,17 @@ export function TiempoDelTurno({ tb, causaSel, onCausa, proximaParada }: {
         </span>
       </div>
 
-      {tb.plannedMin === 0 && proximaParada && (
+      {/* ⚠ El aviso NO se apaga con la primera parada planificada.
+          Visto el 14-08 a las 12:50 en Filete: `plannedMin` era 7 —2 min de
+          reunión de inicio y 5 de ejercicio compensatorio— así que el aviso ya
+          se había ido, y la colación, la parada de ~55 min que de verdad mueve
+          la cuota, todavía no había ocurrido. La pregunta no es si hubo alguna
+          parada de convenio, es si falta la próxima. */}
+      {proximaParada && (
         <p className="mt-1.5 text-[11px] text-muted-foreground">
-          Todavía sin paradas de convenio: la próxima entra a las{' '}
+          {tb.plannedMin === 0
+            ? 'Todavía sin paradas de convenio: la próxima entra a las '
+            : 'La próxima parada de convenio entra a las '}
           <span className="tabular-nums">{proximaParada}</span>.
         </p>
       )}
@@ -850,9 +858,28 @@ export function BitacoraOperador({ comments, onCausa }: {
  * Ver `monitorForecast.ts` para por qué el método se elige por backtest y no
  * a mano (el mejor predictor se invierte entre Filete y Yal).
  */
-export function PronosticoCierre({ f, meta }: {
+export function PronosticoCierre({ f, meta, horizonte }: {
   f: ForecastResult | null
   meta: number | null
+  /**
+   * Hasta cuándo mide cada cierre.
+   *
+   * ⚠⚠ Sin esto la pantalla daba DOS cierres y ninguno decía hasta qué hora.
+   * Visto en vivo el 14-08 a las 12:50 en Filete: "No se alcanza… cierra en
+   * 4.501 pz (90%)" en la tarjeta de la meta y "5.011 pz — la meta entra" acá,
+   * a tres tarjetas de distancia. Los dos correctos: uno proyecta al horario
+   * (15:30) y el otro a lo que duraron los turnos anteriores (8 h 45). El
+   * arreglo NO es elegir uno —la hora extra es una decisión que alguien toma—
+   * sino escribir el horizonte al lado de cada número.
+   */
+  horizonte?: {
+    /** Hora de reloj a la que llega el pronóstico. */
+    hasta: string
+    /** Cuánto dura ese turno típico, ya formateado ("8 h 45 min"). */
+    dura: string
+    /** El cierre del horario, cuando corta antes que el pronóstico. */
+    horario: { hasta: string; piezas: number } | null
+  } | null
 }) {
   if (!f) return null
 
@@ -924,6 +951,31 @@ export function PronosticoCierre({ f, meta }: {
         <span>{fmtInt(f.high)}</span>
       </div>
 
+      {/* El horizonte, escrito. Va pegado al número grande y ANTES del
+          veredicto de la meta: sin él, "5.011 entra" contradice al "4.501 no
+          alcanza" de la tarjeta de arriba sin que se pueda ver por qué. */}
+      {horizonte && (
+        <p className="mt-2 text-[12px] text-muted-foreground">
+          Supone un turno como los últimos{' '}
+          <span className="tabular-nums">{f.samples}</span> — {horizonte.dura}, hasta las{' '}
+          <span className="tabular-nums text-foreground/90">{horizonte.hasta}</span>.
+        </p>
+      )}
+      {horizonte?.horario && (
+        <p className="mt-0.5 text-[12px] text-muted-foreground">
+          Si corta a las{' '}
+          <span className="tabular-nums text-foreground/90">{horizonte.horario.hasta}</span> del
+          horario serían{' '}
+          <span className="tabular-nums text-foreground/90">
+            {fmtInt(horizonte.horario.piezas)} pz
+          </span>
+          {meta != null && meta > 0 && (
+            <> ({Math.round((horizonte.horario.piezas / meta) * 100)}% de la meta)</>
+          )}
+          .
+        </p>
+      )}
+
       {meta != null && f.hitsTarget != null && (
         <p className={`mt-2 text-[13px] font-semibold ${
           grado === 'entra'
@@ -931,7 +983,12 @@ export function PronosticoCierre({ f, meta }: {
             : 'text-amber-800 dark:text-amber-300'
         }`}>
           {grado === 'entra'
-            ? `La meta de ${fmtInt(meta)} entra: ${f.hitsTarget} de ${f.samples} turnos la superaron desde acá.`
+            ? horizonte?.horario
+              // Con el horizonte a la vista, "entra" a secas volvería a chocar
+              // con el "no alcanza" de la tarjeta de la meta: entra CON esa
+              // duración, que es justamente lo que hay que decidir.
+              ? `La meta de ${fmtInt(meta)} entra con esa duración: ${f.hitsTarget} de ${f.samples} turnos la superaron desde acá.`
+              : `La meta de ${fmtInt(meta)} entra: ${f.hitsTarget} de ${f.samples} turnos la superaron desde acá.`
             : grado === 'dificil'
             ? `La meta de ${fmtInt(meta)} es difícil: solo ${f.hitsTarget} de ${f.samples} turnos la superó desde acá.`
             : `La meta de ${fmtInt(meta)} no entra: ninguno de los ${f.samples} turnos anteriores llegó desde esta altura.`}

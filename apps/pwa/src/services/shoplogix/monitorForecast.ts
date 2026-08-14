@@ -59,6 +59,19 @@ export interface ForecastResult {
   /** Piezas que el turno ya lleva. */
   current: number
   /**
+   * Hasta qué minuto de turno llega el pronóstico: la mediana de lo que
+   * DURARON los turnos comparables.
+   *
+   * ⚠⚠ No es el horario del turno, y esa diferencia es la que hacía que la
+   * pantalla diera dos cierres distintos. El 14-08 a las 12:50 Filete mostraba
+   * "cierra en 4.501 pz (90% de la meta)" —proyectado al horario, 15:30— junto
+   * a "5.011 pz, la meta entra" —proyectado a la duración típica, 8 h 45—.
+   * Los dos correctos; la diferencia es la hora extra que esta línea hace casi
+   * todos los días (505 pz el 13-08 después de las 15:30). Se expone para que
+   * la UI pueda DECIR hasta cuándo mide cada número en vez de dar dos.
+   */
+  horizonMin: number
+  /**
    * El mismo pronóstico, dibujable: de acá al cierre, dónde habría terminado
    * hoy si se comportara como cada turno anterior. Empieza en el punto actual
    * (el cono nace de la curva, no flota) y termina en el estimado.
@@ -263,6 +276,7 @@ export function buildForecast(args: {
     samples: hist.length,
     hitsTarget: meta != null ? finales.filter((v) => v >= meta).length : null,
     current,
+    horizonMin: finCono,
     cone,
   }
 }

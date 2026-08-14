@@ -13,6 +13,39 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-14 - claude - Un solo cierre con su horizonte, fondo de convenio y aviso de colación
+
+- Hecho: (1) La pantalla daba DOS cierres que se contradecían. A las 12:50, en el turno vivo de
+  Filete: la tarjeta de la meta decía "No se alcanza… cierra en 4.501 pz (90%)" y el pronóstico
+  "5.011 pz — la meta entra". No era un error de cuenta: son dos horizontes y ninguno lo decía.
+  `pace` proyecta a `plannedEnd` (15:30, 460 min) y el pronóstico a la mediana de lo que
+  DURARON los turnos anteriores (8 h 45). La diferencia es la hora extra que esta línea hace
+  casi todos los días: el 13-08 produjo 505 pz después de las 15:30, el 12-08 311 y el 11-08
+  413. Ahora cada número lleva su hora escrita y el bloque del pronóstico agrega "Si corta a
+  las 15:30 del horario serían N pz". `ForecastResult` expone `horizonMin`. (2) Fondo gris de
+  las paradas de convenio en "Piezas por tramo": el pendiente del 13-08. (3) El aviso de la
+  próxima parada de convenio ya no se apaga con la primera parada planificada.
+- Por qué salían 23 bandas (lo que quedó sin explicar el 13-08): `stopEvents` trae TODAS las
+  detenciones (56 el 13-08, 28 el 14-08) y su campo `r` es un ÍNDICE a `stopReasons`, no el
+  nombre. La fuente correcta es `comparacion.breaks` (`plannedBreaks()` filtra por las causas
+  de `timeBreakdown.planned`), la misma que ya usan el comparador y la curva de velocidad: 3
+  eventos el 13-08 y 2 el 14-08. Con el piso de 15 min queda UNA banda, la colación. Se dibuja
+  solo el pasado: `breaks` incluye el pronóstico de las que faltan y una banda futura quedaría
+  clavada contra el borde derecho, sobre producción real.
+- También: el aviso de la próxima parada se contaba desde `scheduledStart` y `plannedBreaks`
+  cuenta desde el PRIMER TRAMO CON DATO — salía 5 min tarde. Y "Con 1 hora extra… la meta
+  entra" pasó a "alcanzaría, pero apurando": chocaba con el "no entra" del pronóstico a la
+  misma hora.
+- Archivos: monitorForecast.ts, MonitorShiftParts.tsx, PublicShiftMonitorPage.tsx,
+  __tests__/PronosticoCierre.test.tsx, __tests__/TiempoDelTurno.test.tsx (nuevo).
+- Verificación: tsc limpio; 1.327 tests (97 archivos). Navegador a 390 px, claro y oscuro:
+  turno VIVO de Filete —los dos bloques dicen 4.105 pz hasta las 15:30 y 4.386 al cierre
+  típico— y turno del 13-08 —UNA banda gris en x=52,5% ancho 6,8% = 12:50-13:30, la colación,
+  alineada con la del gráfico de velocidad—.
+- Estado: EN REVISIÓN (PR abierto)
+- Sigue: el aviso con `plannedMin > 0` quedó cubierto por test pero no visto en pantalla (a las
+  13:20 ya no había próxima parada por delante); mirarlo en un turno temprano.
+
 ## 2026-08-14 - claude - Tres roles de color en vez de siete, y el desenlace junto (PR pendiente de merge)
 
 - Hecho: `monitorColors.ts` era 7 hex crudos de Tailwind; 6 muertos y los 2 usados (hoy/cuota)
