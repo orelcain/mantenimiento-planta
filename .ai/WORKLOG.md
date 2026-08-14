@@ -13,6 +13,111 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-14 - claude - El ritmo se mide ANDANDO: una sola base para toda la tarjeta
+
+- Orel, viendo la tarjeta con el descuento de convenio ya puesto: "pero igual le pones 39 pz/min...
+  me imagino que se está contando el tiempo de colación como detención en tiempo perdido; la
+  colación es tiempo en el que no se puede producir pero es normal no producir". Tenía razón, y
+  el problema era MÍO: al pasar el requerido a tiempo productivo dejé el resto en tiempo de reloj.
+  La pantalla decía "Necesitás 39,4 y vas a 9,7" cuando la línea, andando, iba a 11,7 — y hasta
+  anunciaba un récord falso ("por encima del mejor turno reciente, 9,7") comparando andando contra
+  reloj. `monitorPace.js` documentaba esa invariante y la rompí sin verla.
+- ⚠⚠ REGLA: **un ritmo requerido sobre tiempo productivo SOLO se puede comparar contra ritmos
+  productivos.** Medido en los 10 turnos de Filete: andando la mediana es 11,0 pz/min y el mejor
+  turno 13,2; de reloj, 8,1 y 9,7. La diferencia entre las dos medidas ES el tiempo parado.
+- Hecho: `ritmoAndando` (piezas ÷ minutos de uptime) sale de `forecastHistory` —`total` y
+  `producingMin` ya viajan— y de `live.uptimeSec` para hoy. Alimenta `currentPerHour`,
+  `maxPerHour` (techo) y las referencias "lo normal / mejor turno". `recentPerHour` va en null: el
+  de los últimos 30 min es de reloj y durante una colación cae a cero. Las filas dicen "andando", y
+  cuando el requerido pasa el techo se agrega "· 1,8× el mejor turno" en vez de un número desnudo.
+- Y el KPI **"Tiempo produciendo" ya no mete la colación en el denominador**: va sobre el tiempo
+  DISPONIBLE (ventana − planificado). Hoy 68% → 84% con los mismos 4 h 08. Castigar a la línea por
+  una parada de convenio era exactamente lo que Orel señalaba.
+- La leyenda del gráfico de velocidad pasó de "lo normal" a "promedio de turno": esa mediana es de
+  reloj y con la tarjeta hablando de andando, dos números distintos con la misma etiqueta se leen
+  como un error.
+- Efecto de lectura, que es lo que importa: la pantalla ya no dice "la línea va lenta" (9,7 vs 8,1)
+  sino **la línea anda a 11,8, por encima de la mediana de 11,0; lo que falta es tiempo**. Eso es
+  el argumento de Mantención, no el de producción.
+- Archivos: PublicShiftMonitorPage.tsx, MonitorShiftParts.tsx.
+- Verificación: tsc limpio, 1.342 tests. En vivo (14:10, Filete, claro y oscuro): "Pide 23,4 pz/min
+  y la línea, andando, va a 11,8", "Necesitás 23,4 andando · 1,8× el mejor turno", techo 13,2,
+  "Andando, lo normal 11,0 · mejor turno 13,2", "Tiempo produciendo 84% · sin contar convenio".
+- Estado: EN REVISIÓN (PR #551)
+
+## 2026-08-14 - claude - La colación entra en el ritmo necesario (pregunta de Orel en vivo)
+
+- Pregunta de Orel mirando el turno: "veo que no estamos considerando la colación en los
+  cálculos, ¿o sí?". No se estaba. La cuota se aplana en las paradas de convenio desde #493 y
+  el pronóstico las hereda del historial, pero el RITMO NECESARIO se repartía sobre tiempo de
+  reloj: a las 12:50 pedía 13,1 pz/min para 2.089 pz en 2 h 40, con ~55 min de colación
+  adentro de esa ventana.
+- Hecho: `computePaceToTarget` recibe `pendingBreakMin` y calcula sobre `workMin` = reloj menos
+  convenio por delante — el ritmo necesario, la proyección al cierre y la hora extra (que ahora
+  agrega una hora de LÍNEA ANDANDO, no de reloj). Piso de 5 min para no dividir por ~0. La
+  tarjeta lo dice: "Queda 1 h 43 · 53 min produciendo" + "Descontando 50 min de paradas de
+  convenio que faltan".
+- ⚠⚠ Dos cosas que hacían que la colación EN CURSO no contara, y que solo se ven con un turno
+  vivo (las dos aparecieron mirando la pantalla a las 13:41 y 13:44):
+  1. `mergeBreaks` pronosticaba las de días anteriores por `fromMin > currentMinute`: la
+     colación dejaba de contar apenas el turno pasaba su hora de arranque, o sea justo cuando
+     está ocurriendo. Ahora por `toMin > currentMinute`.
+  2. Una parada EN CURSO no está en `stopEvents` —Shoplogix publica intervalos cerrados— y la
+     que sí está llega con los minutos que LLEVA, no con los que va a durar. Se arma desde
+     `currentReason`/`currentSinceAt` (causa de convenio si lo es hoy o lo fue antes) y
+     `extendOngoingBreaks` la estira a la mediana de esa misma parada en los turnos anteriores.
+     Sin esto el descuento era de 6 min con 50 por delante.
+- Además: `breaksTurno` es ahora UNA sola fuente para las cuatro cosas que dependen de las
+  paradas (curva de cuota, fondo de los gráficos, ritmo necesario, aviso de la próxima).
+  `breakMinutesBetween` y `extendOngoingBreaks` viven en `monitorCompare` para poder probarlas.
+- Archivos: monitorPace.ts, monitorCompare.ts, PublicShiftMonitorPage.tsx, +tests en
+  monitorPace.test.ts y monitorCompare.test.ts.
+- Verificación: tsc limpio, 1.342 tests. En vivo con la colación ocurriendo (13:46, Filete):
+  "Queda 1 h 43 min · 53 min produciendo", "Necesitás 39,4 pz/min", cierre al horario 3.430 pz
+  (69%) — antes decía 19,3 pz/min repartiendo sobre el reloj. Banda de convenio del gráfico de
+  tramos correcta (x=84,9% ancho 13,7% = 13:35 al último tramo).
+- Estado: EN REVISIÓN (PR #551)
+- Sigue: turno NOCHE de Filete la otra semana. El monitor de línea ya sigue al turno vigente
+  (Yal es el caso probado), pero para "Turno Noche" nuevo: `inferShiftEndFromHistory` exige 2
+  turnos con producción, así que las 2 primeras noches el cierre sale de la config — si no hay
+  config cargada, `pace` devuelve null y la tarjeta "Para llegar a la meta" no aparece.
+  Conviene fijar el horario del turno noche ANTES del primero. Pronóstico y diagnóstico piden
+  4 turnos del mismo nombre (MIN_SAMPLES), y la colación de la noche no se pronostica hasta
+  tener 1-2 noches de historial.
+
+## 2026-08-14 - claude - Un solo cierre con su horizonte, fondo de convenio y aviso de colación
+
+- Hecho: (1) La pantalla daba DOS cierres que se contradecían. A las 12:50, en el turno vivo de
+  Filete: la tarjeta de la meta decía "No se alcanza… cierra en 4.501 pz (90%)" y el pronóstico
+  "5.011 pz — la meta entra". No era un error de cuenta: son dos horizontes y ninguno lo decía.
+  `pace` proyecta a `plannedEnd` (15:30, 460 min) y el pronóstico a la mediana de lo que
+  DURARON los turnos anteriores (8 h 45). La diferencia es la hora extra que esta línea hace
+  casi todos los días: el 13-08 produjo 505 pz después de las 15:30, el 12-08 311 y el 11-08
+  413. Ahora cada número lleva su hora escrita y el bloque del pronóstico agrega "Si corta a
+  las 15:30 del horario serían N pz". `ForecastResult` expone `horizonMin`. (2) Fondo gris de
+  las paradas de convenio en "Piezas por tramo": el pendiente del 13-08. (3) El aviso de la
+  próxima parada de convenio ya no se apaga con la primera parada planificada.
+- Por qué salían 23 bandas (lo que quedó sin explicar el 13-08): `stopEvents` trae TODAS las
+  detenciones (56 el 13-08, 28 el 14-08) y su campo `r` es un ÍNDICE a `stopReasons`, no el
+  nombre. La fuente correcta es `comparacion.breaks` (`plannedBreaks()` filtra por las causas
+  de `timeBreakdown.planned`), la misma que ya usan el comparador y la curva de velocidad: 3
+  eventos el 13-08 y 2 el 14-08. Con el piso de 15 min queda UNA banda, la colación. Se dibuja
+  solo el pasado: `breaks` incluye el pronóstico de las que faltan y una banda futura quedaría
+  clavada contra el borde derecho, sobre producción real.
+- También: el aviso de la próxima parada se contaba desde `scheduledStart` y `plannedBreaks`
+  cuenta desde el PRIMER TRAMO CON DATO — salía 5 min tarde. Y "Con 1 hora extra… la meta
+  entra" pasó a "alcanzaría, pero apurando": chocaba con el "no entra" del pronóstico a la
+  misma hora.
+- Archivos: monitorForecast.ts, MonitorShiftParts.tsx, PublicShiftMonitorPage.tsx,
+  __tests__/PronosticoCierre.test.tsx, __tests__/TiempoDelTurno.test.tsx (nuevo).
+- Verificación: tsc limpio; 1.327 tests (97 archivos). Navegador a 390 px, claro y oscuro:
+  turno VIVO de Filete —los dos bloques dicen 4.105 pz hasta las 15:30 y 4.386 al cierre
+  típico— y turno del 13-08 —UNA banda gris en x=52,5% ancho 6,8% = 12:50-13:30, la colación,
+  alineada con la del gráfico de velocidad—.
+- Estado: EN REVISIÓN (PR abierto)
+- Sigue: el aviso con `plannedMin > 0` quedó cubierto por test pero no visto en pantalla (a las
+  13:20 ya no había próxima parada por delante); mirarlo en un turno temprano.
+
 ## 2026-08-14 - claude - Tres roles de color en vez de siete, y el desenlace junto (PR pendiente de merge)
 
 - Hecho: `monitorColors.ts` era 7 hex crudos de Tailwind; 6 muertos y los 2 usados (hoy/cuota)

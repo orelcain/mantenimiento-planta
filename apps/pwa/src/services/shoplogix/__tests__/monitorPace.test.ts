@@ -242,6 +242,62 @@ describe('computePaceToTarget', () => {
     expect(base({ scheduledEnd: null })).toBeNull()
     expect(base({ scheduledEnd: 'no-es-fecha' })).toBeNull()
   })
+
+  /*
+   * ⚠⚠ La colación. Pregunta de Orel el 14-08 mirando el turno en vivo: "veo
+   * que no estamos considerando la colación en los cálculos, ¿o sí?". No se
+   * estaba: el ritmo se repartía sobre tiempo de reloj, con la línea parada
+   * por convenio adentro de esa ventana.
+   */
+  describe('descuenta las paradas de convenio que faltan', () => {
+    /** Filete el 14-08 a las 12:50: faltan 2.089 pz y 2 h 40 hasta las 15:30. */
+    const filete = (pendingBreakMin: number | null) =>
+      computePaceToTarget({
+        targetPieces: 5_000,
+        producedPieces: 2_911,
+        scheduledEnd: '2026-08-14T15:30:00.000Z',
+        nowWallMs: Date.parse('2026-08-14T12:50:00.000Z'),
+        currentPerHour: 592,
+        maxPerHour: 582,
+        pendingBreakMin,
+      })!
+
+    it('el ritmo necesario se pide sobre el tiempo que la línea PRODUCE', () => {
+      const conColacion = filete(55)
+      // 2 h 40 de reloj menos 55 min de colación = 105 min produciendo.
+      expect(conColacion.remainingMin).toBe(160)
+      expect(conColacion.workMin).toBe(105)
+      expect(conColacion.pendingBreakMin).toBe(55)
+      expect(conColacion.requiredPerMinute).toBeCloseTo(2_089 / 105, 2)   // 19,9
+      // Sin descontarla pedía 13,1: seis pz/min menos de lo que hace falta.
+      expect(filete(0).requiredPerMinute).toBeCloseTo(2_089 / 160, 2)
+    })
+
+    it('y la proyección al cierre NO cuenta la colación como producción', () => {
+      expect(filete(55).projectedPieces).toBe(Math.round(2_911 + 105 * (592 / 60)))
+      expect(filete(0).projectedPieces).toBe(Math.round(2_911 + 160 * (592 / 60)))
+    })
+
+    it('la hora extra agrega una hora de LÍNEA ANDANDO, no de reloj', () => {
+      const p = filete(55)
+      expect(p.withExtraHour!.remainingMin).toBe(105 + 60)
+      expect(p.withExtraHour!.requiredPerMinute).toBeCloseTo(2_089 / 165, 2)
+    })
+
+    it('con la colación ya pasada, nada cambia', () => {
+      const p = filete(0)
+      expect(p.workMin).toBe(p.remainingMin)
+      expect(p.pendingBreakMin).toBe(0)
+    })
+
+    it('⚠ nunca deja la ventana en cero: siempre quedan 5 min de piso', () => {
+      // Una parada más larga que lo que queda de turno haría dividir por ~0 y
+      // el ritmo saldría infinito.
+      const p = filete(600)
+      expect(p.workMin).toBe(5)
+      expect(Number.isFinite(p.requiredPerMinute)).toBe(true)
+    })
+  })
 })
 
 describe('lineMaxPerHour', () => {

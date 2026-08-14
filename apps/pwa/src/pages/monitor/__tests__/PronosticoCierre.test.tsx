@@ -17,15 +17,17 @@ afterEach(cleanup)
 /** Caso real: Filete a las 5 h del 13-ago (el turno cerró en 4.294). */
 const FILETE: ForecastResult = {
   estimate: 4257, low: 3973, high: 4650, mapePct: 4, method: 'proporcional',
-  samples: 9, hitsTarget: 0, current: 2945,
+  samples: 9, hitsTarget: 0, current: 2945, horizonMin: 470,
   cone: [
     { minutes: 300, low: 2945, mid: 2945, high: 2945 },
     { minutes: 470, low: 3973, mid: 4257, high: 4650 },
   ],
 }
 
-const texto = (f: ForecastResult | null, meta: number | null) =>
-  render(<PronosticoCierre f={f} meta={meta} />).container.textContent ?? ''
+type Horizonte = React.ComponentProps<typeof PronosticoCierre>['horizonte']
+
+const texto = (f: ForecastResult | null, meta: number | null, horizonte?: Horizonte) =>
+  render(<PronosticoCierre f={f} meta={meta} horizonte={horizonte} />).container.textContent ?? ''
 
 describe('PronosticoCierre', () => {
   it('muestra el cierre estimado y NUNCA sin su error al lado', () => {
@@ -77,6 +79,51 @@ describe('PronosticoCierre', () => {
     const t = texto({ ...FILETE, mapePct: 22 }, 5000)
     expect(t).toMatch(/todavía no/i)
     expect(t).not.toContain('4.257')
+  })
+
+  /*
+   * El hallazgo del 14-08 a las 12:50 en Filete: la tarjeta de la meta decía
+   * "cierra en 4.501 pz (90% de la meta)" y este bloque "5.011 — la meta
+   * entra". Ninguno de los dos decía hasta qué hora medía, y la diferencia era
+   * entera la hora extra que la línea hace casi todos los días.
+   */
+  describe('los dos horizontes', () => {
+    const HORIZONTE = {
+      hasta: '16:20', dura: '8 h 45 min',
+      horario: { hasta: '15:30', piezas: 4501 },
+    }
+
+    it('escribe hasta qué hora llega el pronóstico y cuánto dura ese turno', () => {
+      const t = texto(FILETE, 5000, HORIZONTE)
+      expect(t).toContain('16:20')
+      expect(t).toContain('8 h 45 min')
+      expect(t).toMatch(/últimos\s+9/)
+    })
+
+    it('y cuánto sería si el turno cortara en su horario, con su % de meta', () => {
+      const t = texto(FILETE, 5000, HORIZONTE)
+      expect(t).toContain('15:30')
+      expect(t).toContain('4.501')
+      expect(t).toContain('90% de la meta')
+    })
+
+    it('con horario más temprano, "entra" dice CON QUÉ duración entra', () => {
+      const t = texto({ ...FILETE, hitsTarget: 7 }, 5000, HORIZONTE)
+      expect(t).toMatch(/entra con esa duración: 7 de 9 turnos/)
+    })
+
+    it('sin segundo horizonte no inventa una línea de más', () => {
+      const t = texto({ ...FILETE, hitsTarget: 7 }, 5000, { ...HORIZONTE, horario: null })
+      expect(t).toContain('16:20')
+      expect(t).not.toContain('horario serían')
+      expect(t).toMatch(/entra: 7 de 9 turnos/)
+    })
+
+    it('sin horizonte el bloque queda como estaba', () => {
+      const t = texto(FILETE, 5000)
+      expect(t).not.toContain('Supone un turno')
+      expect(t).toContain('4.257')
+    })
   })
 
   it('sin pronóstico no renderiza nada', () => {

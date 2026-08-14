@@ -39,6 +39,8 @@ import { computePaceToTarget, lineMaxPerHour, type PaceToTarget } from '@/servic
 import { pinShiftEnd, unpinShiftEnd } from '@/services/shoplogix/pinShiftEnd'
 import {
   buildDayComparison, optimalPace, plannedBreaks, mergeBreaks, cumulativeFromStart,
+  breakMinutesBetween, extendOngoingBreaks,
+  type PlannedBreak,
 } from '@/services/shoplogix/monitorCompare'
 import { buildForecast, MAX_MAPE_PCT } from '@/services/shoplogix/monitorForecast'
 import { buildDiagnostico } from '@/services/shoplogix/monitorDiagnostico'
@@ -151,7 +153,7 @@ function Kpi({
  * hora fue la caída y por qué. SVG puro, sin librerías de gráficos.
  */
 function Sparkbars({
-  series, stopReasons, stopEvents, comments, causaSel, onCausa,
+  series, stopReasons, stopEvents, comments, causaSel, onCausa, breaks,
 }: {
   series: PublicMonitorLive['series']
   stopReasons?: string[]
@@ -159,6 +161,18 @@ function Sparkbars({
   comments?: PublicMonitorLive['comments']
   causaSel: string | null
   onCausa: (c: string | null) => void
+  /**
+   * Paradas de convenio, de fondo: las mismas bandas grises del comparador y
+   * de la curva de velocidad, y de la MISMA fuente (`comparacion.breaks`).
+   *
+   * ⚠⚠ El intento anterior las dibujaba desde `stopEvents` y salían 23 bandas
+   * de ancho mínimo en vez de una. La razón: `stopEvents` trae TODAS las
+   * detenciones —56 el 13-08, 28 el 14-08, casi todas micro-detenciones de 15
+   * a 90 segundos— y su campo `r` es un ÍNDICE a `stopReasons`, no el nombre
+   * de la causa. Filtrando por las causas de `timeBreakdown.planned`, que es
+   * lo que hace `plannedBreaks()`, quedan 3 el 13-08 y 2 el 14-08.
+   */
+  breaks?: PlannedBreak[]
 }) {
   /*
    * Zoom horizontal. A 375 px, 106 tramos dan barras de 3 px: se ve la forma
@@ -213,6 +227,36 @@ function Sparkbars({
    * se busca por ÍNDICE en la serie, no por aritmética de tiempo — la serie no
    * es continua y ese atajo corre las bandas a la derecha.
    */
+  /*
+   * Fondo de convenio: solo las paradas que explican un hueco VISIBLE. El piso
+   * de 15 min (3 tramos) es lo que separa la colación —43 min el 13-08, ocho
+   * barras en cero seguidas— de la reunión de inicio de 5 min, que pinta un
+   * puntito gris y ensucia en vez de explicar. Con ese piso, el 13-08 queda
+   * UNA banda: la colación.
+   *
+   * `comparacion.breaks` incluye el PRONÓSTICO de las paradas que todavía no
+   * ocurrieron (para aplanar la curva de la cuota). Acá no van: este gráfico
+   * solo llega hasta el último tramo con dato, y una banda futura terminaría
+   * clavada contra el borde derecho, sobre producción real.
+   */
+  const convenio = (breaks ?? [])
+    .filter((b) => b.toMin - b.fromMin >= 15)
+    .map((b) => {
+      const desde = tiempos[0]! + b.fromMin * 60_000
+      const hasta = tiempos[0]! + b.toMin * 60_000
+      return { b, desde, hasta }
+    })
+    .filter(({ desde }) => desde < tiempos[tiempos.length - 1]!)
+    .map(({ b, desde, hasta }) => {
+      const i0 = indiceDe(desde)
+      const i1 = indiceDe(hasta)
+      return {
+        x: i0 * stepX,
+        ancho: Math.max(stepX, (i1 - i0) * stepX),
+        key: `${b.fromMin}-${b.toMin}`,
+      }
+    })
+
   // Bandas de la causa elegida. Se dibujan primero para quedar DETRÁS de las
   // barras: la producción es el dato, la detención es el contexto.
   const bandas = causaSel && stopEvents && stopReasons
@@ -313,6 +357,13 @@ function Sparkbars({
            onMouseLeave={() => setFoco(null)}
            onClick={(ev) => setFoco(tramoEn(ev.clientX, ev.currentTarget))}
            aria-label="Piezas por tramo de cinco minutos">
+        {/* El convenio primero: es el fondo del fondo. La causa elegida se
+            dibuja encima, y las barras encima de las dos. */}
+        {convenio.map(b => (
+          <rect key={b.key} x={b.x} y={0} width={b.ancho} height={H}
+                className="fill-muted-foreground/15" />
+        ))}
+
         {bandas.map(b => (
           <rect key={b.key} x={b.x} y={0} width={b.ancho} height={H}
                 className="fill-rose-500/25 stroke-rose-500/60" strokeWidth={0.15} />
@@ -428,6 +479,12 @@ function Sparkbars({
           <span className="inline-block h-2 w-3 border-t-2 border-dashed border-amber-600 dark:border-amber-400" />
           mejor ritmo del turno: <span className="tabular-nums text-muted-foreground">{fmtInt(max)}</span> pz
         </span>
+        {convenio.length > 0 && (
+          <span className="inline-flex items-center gap-1">
+            <span className="inline-block h-2.5 w-2.5 rounded-sm bg-muted-foreground/15" />
+            parada de convenio
+          </span>
+        )}
         {causaSel && (
           <span className="inline-flex items-center gap-1">
             <span className="inline-block h-2.5 w-2.5 rounded-sm bg-rose-500/25 ring-1 ring-rose-500/60" />
@@ -644,7 +701,9 @@ function RitmoNecesario({ pace, cierre, muestras, fuente, plantSlug, shiftName, 
           deducirla leyendo cuatro cifras seguidas. */}
       <p className={`mt-1 text-[15px] font-semibold ${fuera || exigente ? 'text-amber-800 dark:text-amber-300' : 'text-sky-800 dark:text-sky-300'}`}>
         {fuera
-          ? 'No se alcanza con el tiempo que queda'
+          // "Dentro del horario", no "con el tiempo que queda": el turno se
+          // estira casi todos los días y el bloque de abajo cuenta con eso.
+          ? 'Dentro del horario no alcanza'
           : exigente
           ? 'Se alcanza, pero solo apurando'
           : 'Se alcanza al ritmo que traés'}
@@ -655,11 +714,25 @@ function RitmoNecesario({ pace, cierre, muestras, fuente, plantSlug, shiftName, 
       {(exigente || fuera) && (
         <p className="mt-0.5 text-[12px] text-muted-foreground">
           Pide <span className="tabular-nums text-foreground/90">{fmtDec(pace.requiredPerMinute)} pz/min</span>{' '}
-          y el turno viene a <span className="tabular-nums text-foreground/90">{fmtDec(pace.currentPerHour / 60)}</span>.
+          y la línea, andando, va a{' '}
+          <span className="tabular-nums text-foreground/90">{fmtDec(pace.currentPerHour / 60)}</span>.
         </p>
       )}
+      {/* ⚠⚠ La HORA, siempre. Esta proyección va hasta el horario del turno y
+          el bloque "Cierre estimado" va hasta lo que duraron los turnos
+          anteriores: el 14-08 a las 12:50 uno decía 4.501 pz y el otro 5.011,
+          a lados opuestos de la meta, sin que nada explicara la diferencia.
+          Son dos horizontes, no dos cuentas. */}
       <p className="mt-0.5 text-[12px] text-muted-foreground">
-        Al ritmo de ahora el turno cierra en{' '}
+        {cierre ? (
+          <>
+            Al ritmo de ahora, hasta las{' '}
+            <span className="tabular-nums text-foreground/90">{fmtWallTime(cierre)}</span> el turno
+            cierra en{' '}
+          </>
+        ) : (
+          <>Al ritmo de ahora el turno cierra en{' '}</>
+        )}
         <span className="tabular-nums text-foreground/90">{fmtInt(pace.projectedPieces)} pz</span>
         {' '}({fmtDec((pace.projectedPieces / pace.targetPieces) * 100, 0)}% de la meta).
       </p>
@@ -672,22 +745,45 @@ function RitmoNecesario({ pace, cierre, muestras, fuente, plantSlug, shiftName, 
         </div>
         <div className="flex items-baseline gap-2">
           <dt className="w-20 shrink-0 text-muted-foreground">Queda</dt>
-          <dd className="tabular-nums">{fmtDurationSec(pace.remainingMin * 60)}</dd>
+          <dd className="tabular-nums">
+            {fmtDurationSec(pace.remainingMin * 60)}
+            {/* La colación, dicha acá mismo: sin esto el ritmo necesario se lee
+                como si esos minutos fueran de producción. */}
+            {pace.pendingBreakMin > 0 && (
+              <span className="ml-1.5 font-normal text-muted-foreground/80">
+                · {fmtDurationSec(pace.workMin * 60)} produciendo
+              </span>
+            )}
+          </dd>
         </div>
         <div className="flex items-baseline gap-2">
           <dt className="w-20 shrink-0 text-muted-foreground">Necesitás</dt>
           <dd className={`tabular-nums font-semibold ${fuera ? 'text-amber-800 dark:text-amber-300' : 'text-sky-800 dark:text-sky-300'}`}>
             {fmtDec(pace.requiredPerMinute)} pz/min
-            <span className="ml-1 font-normal text-muted-foreground/80">
-              = {fmtInt(pace.requiredPerHour)} pz/h
-            </span>
+            <span className="ml-1 font-normal text-muted-foreground/80">andando</span>
+            {/* Un requerido por encima del techo no es una meta: es una cifra
+                que hace perder la confianza en la pantalla. Se dice cuántas
+                veces es lo que la línea da, que es lo que se puede juzgar. */}
+            {fuera && pace.maxPerHour != null && pace.requiredPerHour > pace.maxPerHour && (
+              <span className="ml-1 font-normal text-muted-foreground/80">
+                · {fmtDec(pace.requiredPerHour / pace.maxPerHour)}× el mejor turno
+              </span>
+            )}
           </dd>
         </div>
+        {pace.pendingBreakMin > 0 && (
+          <p className="pl-[5.5rem] text-[11px] leading-snug text-muted-foreground/80">
+            Descontando{' '}
+            <span className="tabular-nums">{fmtDurationSec(pace.pendingBreakMin * 60)}</span> de
+            paradas de convenio que faltan: el ritmo se pide sobre el tiempo en que la línea
+            produce, no sobre el reloj.
+          </p>
+        )}
         <div className="flex items-baseline gap-2">
           <dt className="w-20 shrink-0 text-muted-foreground">Vas a</dt>
           <dd className="tabular-nums">
             {fmtDec(pace.currentPerHour / 60)} pz/min
-            <span className="ml-1 text-muted-foreground/80">= {fmtInt(pace.currentPerHour)} pz/h</span>
+            <span className="ml-1 text-muted-foreground/80">andando</span>
           </dd>
         </div>
         {/* El TECHO explicado: no es un número abstracto, es lo mejor que esta
@@ -710,7 +806,7 @@ function RitmoNecesario({ pace, cierre, muestras, fuente, plantSlug, shiftName, 
         <p className="mt-1.5 flex items-baseline gap-1.5 text-[12px] text-emerald-800 dark:text-emerald-300">
           <TrendingUp className="h-3.5 w-3.5 shrink-0 self-center" />
           <span>
-            Por encima del mejor turno reciente ({fmtDec(historial.bestCpm)} pz/min
+            Andando, por encima del mejor turno reciente ({fmtDec(historial.bestCpm)} pz/min
             {historial.muestras ? ` en los últimos ${historial.muestras}` : ''}).
           </span>
         </p>
@@ -718,7 +814,7 @@ function RitmoNecesario({ pace, cierre, muestras, fuente, plantSlug, shiftName, 
 
       {pace.maxPerHour != null && (
         <p className="mt-1.5 text-[11px] text-muted-foreground/70">
-          El <b>techo</b> es el mejor ritmo que la línea alcanzó
+          El <b>techo</b> es el mejor ritmo ANDANDO que la línea alcanzó
           {historial?.muestras ? ` en los últimos ${historial.muestras} turnos` : ' en turnos anteriores'} —
           lo que ya demostró que puede, no lo que dice el objetivo.
         </p>
@@ -729,7 +825,7 @@ function RitmoNecesario({ pace, cierre, muestras, fuente, plantSlug, shiftName, 
           pasado nunca de 12,7 — medido en Filete sobre 9 turnos. */}
       {historial?.medianCpm != null && (
         <p className="mt-1 text-[11px] text-muted-foreground/70">
-          Lo normal en esta línea:{' '}
+          Andando, lo normal en esta línea:{' '}
           <span className="tabular-nums text-foreground/80">
             {fmtDec(historial.medianCpm)} pz/min ({fmtInt(historial.medianCpm * 60)} pz/h)
           </span>
@@ -770,7 +866,11 @@ function RitmoNecesario({ pace, cierre, muestras, fuente, plantSlug, shiftName, 
                   ritmo que la línea YA trae" es la que decide si la hora
                   extra resuelve o solo acerca. */}
               <span className="text-emerald-800 dark:text-emerald-300">
-                {pace.withExtraHour.realistic ? 'el ritmo que ya traés' : 'la meta entra'}
+                {/* "La meta entra" a secas volvía a chocar con el bloque del
+                    pronóstico, que a la misma hora decía "no entra": este
+                    número cabe en el techo pero está por encima del ritmo que
+                    la línea trae, así que se dice condicional. */}
+                {pace.withExtraHour.realistic ? 'el ritmo que ya traés' : 'alcanzaría, pero apurando'}
               </span>.
             </>
           ) : (
@@ -1006,6 +1106,90 @@ export function PublicShiftMonitorPage() {
     return Math.min(100, (live.totalPieces / data.targetPieces) * 100)
   }, [live, data?.targetPieces])
 
+  /**
+   * Las paradas de convenio del turno: las de hoy como hechos y las de los
+   * días anteriores como pronóstico para lo que falta.
+   *
+   * UNA sola fuente para las cuatro cosas que dependen de ellas —la curva de
+   * la cuota, el fondo gris de los gráficos, el ritmo necesario y el aviso de
+   * la próxima parada—. Dos agregaciones paralelas del mismo dato siempre
+   * terminan diciendo cosas distintas.
+   */
+  const breaksTurno = useMemo(() => {
+    const deConvenio = (l: PublicMonitorLive | null | undefined) =>
+      plannedBreaks({
+        series: l?.series,
+        stopEvents: l?.stopEvents,
+        stopReasons: l?.stopReasons,
+        // Qué causa es de convenio lo resolvió el backend: duplicar la lista
+        // acá garantiza que un día las dos versiones difieran.
+        plannedReasons: (l?.timeBreakdown?.planned ?? []).map((x) => x.reason),
+      })
+    const minutoActual = live?.series?.length ? live.series.length * 5 : 0
+    const anteriores = (data?.history ?? []).flatMap((h) => deConvenio(h.live))
+
+    /*
+     * ⚠⚠ La parada EN CURSO no está en `stopEvents`.
+     *
+     * Visto a las 13:44 del 14-08: la cabecera decía "Línea detenida — COLACION
+     * (desde 13:37)" y `stopEvents` no la traía — Shoplogix publica los
+     * intervalos cerrados. Sin esto, la colación que está ocurriendo aporta
+     * cero al descuento justo mientras ocurre, que es cuando más importa.
+     * Sale de `currentReason`/`currentSinceAt`, y es de convenio si esa causa
+     * lo es hoy o lo fue en los turnos anteriores.
+     */
+    const t0raw = live?.series?.[0]?.t
+    const causasDeConvenio = new Set([
+      ...(live?.timeBreakdown?.planned ?? []).map((x) => x.reason),
+      ...anteriores.map((b) => b.reason),
+    ])
+    const enCurso: PlannedBreak[] = []
+    if (live?.currentReason && live.currentSinceAt && t0raw && causasDeConvenio.has(live.currentReason)) {
+      const desdeMin = Math.round((Date.parse(live.currentSinceAt) - Date.parse(t0raw)) / 60_000)
+      if (Number.isFinite(desdeMin)) {
+        enCurso.push({
+          fromMin: desdeMin,
+          toMin: Math.max(desdeMin, minutoActual),
+          reason: live.currentReason,
+        })
+      }
+    }
+
+    // La que está ocurriendo llega con los minutos que lleva, no con los que va
+    // a durar: se estira a lo que dura en los turnos anteriores.
+    const hoy = extendOngoingBreaks([...deConvenio(live), ...enCurso], anteriores, minutoActual)
+    return mergeBreaks(hoy, anteriores, minutoActual)
+  }, [live, data?.history])
+
+  /**
+   * El ritmo de la línea ANDANDO: piezas por minuto de uptime.
+   *
+   * ⚠⚠ Es la base que hace comparable todo lo demás. Desde que el ritmo
+   * necesario descuenta las paradas de convenio, pedirlo sobre tiempo
+   * productivo y contrastarlo contra un ritmo de RELOJ mezcla dos medidas: la
+   * pantalla decía "necesitás 39,4 y vas a 9,7" cuando la línea, andando, iba
+   * a 11,7. Lo vio Orel al toque: "igual le pones 39 pz/min".
+   *
+   * Medido en los 10 turnos de Filete (14-08): andando la mediana es 11,0 y el
+   * mejor turno 13,2, contra 8,1 y 9,7 de reloj. La diferencia entre las dos
+   * medidas ES el tiempo parado — que es justo lo que Mantención mueve.
+   */
+  const ritmoAndando = useMemo(() => {
+    const previos = (data?.forecastHistory ?? [])
+      .filter((h) => h.producingMin > 0 && h.total > 0)
+      .map((h) => h.total / h.producingMin)
+      .sort((a, b) => a - b)
+    const uptimeMin = (live?.uptimeSec ?? 0) / 60
+    const hoy = uptimeMin > 0 && live?.totalPieces ? live.totalPieces / uptimeMin : null
+    if (previos.length === 0) return { hoy, mediana: null, mejor: null, muestras: 0 }
+    return {
+      hoy,
+      mediana: previos[Math.floor(previos.length / 2)]!,
+      mejor: previos[previos.length - 1]!,
+      muestras: previos.length,
+    }
+  }, [live?.uptimeSec, live?.totalPieces, data?.forecastHistory])
+
   /*
    * Ritmo necesario para llegar a la meta. Se recalcula con el mismo reloj que
    * el resto de la página (`now`, que tictaquea solo), así que la recomendación
@@ -1018,6 +1202,18 @@ export function PublicShiftMonitorPage() {
   const pace = useMemo(() => {
     if (!live) return null
     const nowWallMs = now - new Date(now).getTimezoneOffset() * 60_000
+    /*
+     * Lo que falta de COLACIÓN dentro de la ventana. Sin esto el ritmo
+     * necesario se reparte sobre tiempo de reloj: el 14-08 a las 12:50 pedía
+     * 13,1 pz/min repartiendo 2.089 pz en 2 h 40, con ~55 min de colación
+     * adentro. Sobre los minutos en que la línea produce son casi 20.
+     * Minutos contados desde el primer tramo con dato, la base de `breaks`.
+     */
+    const t0 = live.series?.[0]?.t ? Date.parse(live.series[0]!.t) : NaN
+    const desdeMin = live.series?.length ? live.series.length * 5 : 0
+    const hastaMin = !Number.isNaN(t0) && live.plannedEnd
+      ? (Date.parse(live.plannedEnd) - t0) / 60_000
+      : desdeMin
     return computePaceToTarget({
       // La cuota del link primero; si no, la de la config del turno.
       targetPieces: data?.targetPieces ?? live.quotaPieces,
@@ -1027,22 +1223,30 @@ export function PublicShiftMonitorPage() {
       // el tiempo restante en ~0 durante todo el turno.
       scheduledEnd: live.plannedEnd,
       nowWallMs,
-      currentPerHour: live.piecesPerHour,
-      // Para el escalón "exigente": el requerido se juzga contra el MAYOR
-      // entre el promedio y la última media hora (ver monitorPace).
-      recentPerHour: live.recentPiecesPerMinute * 60,
+      /*
+       * ⚠ Ritmo ANDANDO, no de reloj: el requerido se pide sobre el tiempo en
+       * que la línea va a producir, así que compararlo contra un ritmo que
+       * incluye las paradas mide dos cosas distintas.
+       */
+      currentPerHour: (ritmoAndando.hoy ?? live.piecesPerMinute) * 60,
+      // Sin ritmo reciente: el de los últimos 30 min es de reloj y durante una
+      // colación cae a cero. Mezclarlo acá volvería a cruzar las dos medidas.
+      recentPerHour: null,
       /*
        * El techo sale del MEJOR turno real, no de `expectedPieces/horas`. Ese
        * cálculo mezclaba lo que el sensor espera con una ventana que puede ser
        * de otro turno, y daba números que la línea ya había superado. Lo que la
        * línea demostró que puede es un techo que se puede defender.
        */
-      maxPerHour: live.paceBestCpm != null
+      maxPerHour: ritmoAndando.mejor != null
+        ? ritmoAndando.mejor * 60
+        : live.paceBestCpm != null
         ? live.paceBestCpm * 60
         : lineMaxPerHour(live.expectedPieces, live.scheduledStart, live.plannedEnd),
       shiftClosed: live.shiftClosed,
+      pendingBreakMin: Number.isNaN(t0) ? 0 : breakMinutesBetween(breaksTurno, desdeMin, hastaMin),
     })
-  }, [live, data?.targetPieces, now])
+  }, [live, data?.targetPieces, now, breaksTurno, ritmoAndando])
 
   /*
    * Comparador con los turnos anteriores, a la misma altura de turno.
@@ -1065,18 +1269,8 @@ export function PublicShiftMonitorPage() {
     const meta = data?.targetPieces ?? live?.quotaPieces ?? live?.expectedPieces ?? null
     const tb = live?.timeBreakdown
 
-    const deConvenio = (l: PublicMonitorLive | null | undefined) =>
-      plannedBreaks({
-        series: l?.series,
-        stopEvents: l?.stopEvents,
-        stopReasons: l?.stopReasons,
-        plannedReasons: (l?.timeBreakdown?.planned ?? []).map((x) => x.reason),
-      })
-
-    const hoyBreaks = deConvenio(live)
-    const anteriores = (data?.history ?? []).flatMap((h) => deConvenio(h.live))
-    const minutoActual = live?.series?.length ? live.series.length * 5 : 0
-    const breaks = mergeBreaks(hoyBreaks, anteriores, minutoActual)
+    // Las mismas del ritmo necesario y del fondo de los gráficos: `breaksTurno`.
+    const breaks = breaksTurno
 
     /*
      * ⚠⚠ La curva de la cuota se reparte sobre el turno COMPLETO, no sobre lo
@@ -1119,7 +1313,7 @@ export function PublicShiftMonitorPage() {
       usefulMin: opt?.usefulMin ?? null,
       breaks,
     })
-  }, [live, data?.dateKey, data?.shiftId, data?.history, data?.targetPieces])
+  }, [live, data?.dateKey, data?.shiftId, data?.history, data?.targetPieces, breaksTurno])
 
   /*
    * Pronóstico del cierre. Se alimenta del `history` que YA viaja en el doc:
@@ -1184,6 +1378,45 @@ export function PublicShiftMonitorPage() {
   }, [live, data?.history, data?.forecastHistory, data?.shiftId])
 
   /**
+   * Hasta cuándo mide el pronóstico, y cuánto sería si el turno cortara en su
+   * horario.
+   *
+   * ⚠⚠ Los dos cierres de la pantalla no discrepaban por la cuenta sino por el
+   * horizonte: `pace` proyecta a `plannedEnd` y el pronóstico a la mediana de
+   * lo que DURARON los turnos anteriores (`horizonMin`). En Filete son 460 min
+   * contra 525 — la hora extra que la línea hace casi todos los días. Acá se
+   * traducen los dos a hora de reloj para que cada número diga hasta cuándo
+   * vale, en vez de dejar que se contradigan a tres tarjetas de distancia.
+   *
+   * El minuto 0 es el PRIMER TRAMO CON DATO, no `scheduledStart`: es la misma
+   * base con que `monitorCompare` indexa las curvas.
+   */
+  const horizontePronostico = useMemo(() => {
+    const t0raw = live?.series?.[0]?.t
+    if (!pronostico || !t0raw) return null
+    const t0 = Date.parse(t0raw)
+    if (Number.isNaN(t0)) return null
+    const finMs = t0 + pronostico.horizonMin * 60_000
+    const horarioMs = live?.plannedEnd ? Date.parse(live.plannedEnd) : NaN
+    /*
+     * La segunda línea solo cuando el horario corta ANTES y por un margen que
+     * se note: con los dos horizontes casi pegados serían dos cifras iguales
+     * ocupando dos renglones, que es la clase de ruido que este cambio vino a
+     * sacar.
+     */
+    const horario =
+      pace && pace.verdict !== 'hora-extra' && !Number.isNaN(horarioMs) &&
+      horarioMs < finMs - 15 * 60_000
+        ? { hasta: fmtWallTime(live!.plannedEnd!), piezas: Math.round(pace.projectedPieces) }
+        : null
+    return {
+      hasta: fmtWallTime(new Date(finMs).toISOString()),
+      dura: fmtDurationSec(pronostico.horizonMin * 60),
+      horario,
+    }
+  }, [pronostico, live?.series, live?.plannedEnd, pace])
+
+  /**
    * La hora de reloj de la próxima parada de convenio que todavía no empezó.
    *
    * Sirve para el turno temprano, cuando "Planificado 0 min" ocupaba un chip
@@ -1195,13 +1428,17 @@ export function PublicShiftMonitorPage() {
    * conociera la convención wall-clock-as-UTC.
    */
   const proximaParada = useMemo(() => {
-    if (!live?.scheduledStart || comparacion.currentMinute == null) return null
+    // ⚠ La base es el PRIMER TRAMO CON DATO, que es contra lo que
+    // `plannedBreaks` cuenta sus minutos. Con `scheduledStart` la hora salía
+    // corrida (hoy 07:45 contra 07:40: cinco minutos tarde).
+    const base = live?.series?.[0]?.t ?? live?.scheduledStart
+    if (!base || comparacion.currentMinute == null) return null
     const prox = comparacion.breaks
       .filter((b) => b.fromMin > comparacion.currentMinute!)
       .sort((a, b) => a.fromMin - b.fromMin)[0]
     if (!prox) return null
-    return fmtWallTime(new Date(Date.parse(live.scheduledStart) + prox.fromMin * 60_000).toISOString())
-  }, [live?.scheduledStart, comparacion.breaks, comparacion.currentMinute])
+    return fmtWallTime(new Date(Date.parse(base) + prox.fromMin * 60_000).toISOString())
+  }, [live?.series, live?.scheduledStart, comparacion.breaks, comparacion.currentMinute])
 
   if (status === 'loading') {
     return (
@@ -1442,7 +1679,14 @@ export function PublicShiftMonitorPage() {
             plantSlug={data.plantSlug}
             shiftName={live.shiftName}
             startAt={live.scheduledStart}
-            historial={live.paceMedianCpm != null ? {
+            /* Referencias en la MISMA base que el requerido: andando. Con las
+               de reloj la tarjeta comparaba 11,8 andando contra un "mejor
+               turno" de 9,7 de reloj y anunciaba un récord que no existía. */
+            historial={ritmoAndando.mediana != null ? {
+              medianCpm: ritmoAndando.mediana,
+              bestCpm: ritmoAndando.mejor,
+              muestras: ritmoAndando.muestras,
+            } : live.paceMedianCpm != null ? {
               medianCpm: live.paceMedianCpm,
               bestCpm: live.paceBestCpm ?? null,
               muestras: live.paceSamples ?? null,
@@ -1488,7 +1732,20 @@ export function PublicShiftMonitorPage() {
           />
           <Kpi
             label="Tiempo produciendo"
-            value={fmtDec(live.uptimePct, 0)}
+            /*
+             * ⚠ Sobre el tiempo DISPONIBLE, no sobre el turno entero: la
+             * colación no es tiempo en el que se podría haber producido, así
+             * que meterla en el denominador castiga a la línea por una parada
+             * de convenio (Orel, 14-08). Hoy la diferencia eran 13 puntos:
+             * 68% del turno contra 81% de lo que la línea tenía disponible.
+             */
+            value={fmtDec(
+              live.timeBreakdown && live.timeBreakdown.windowMin > live.timeBreakdown.plannedMin
+                ? (live.timeBreakdown.producingMin /
+                    (live.timeBreakdown.windowMin - live.timeBreakdown.plannedMin)) * 100
+                : live.uptimePct,
+              0,
+            )}
             unit="%"
             icon={<Clock className="h-3 w-3" />}
             /*
@@ -1498,7 +1755,9 @@ export function PublicShiftMonitorPage() {
              */
             hint={
               live.timeBreakdown
-                ? fmtDurationSec(live.timeBreakdown.producingMin * 60)
+                ? `${fmtDurationSec(live.timeBreakdown.producingMin * 60)}${
+                    live.timeBreakdown.plannedMin > 0 ? ' · sin contar convenio' : ''
+                  }`
                 : fmtDurationSec(live.uptimeSec)
             }
           />
@@ -1531,6 +1790,7 @@ export function PublicShiftMonitorPage() {
         <PronosticoCierre
           f={pronostico}
           meta={data.targetPieces ?? live.quotaPieces ?? live.expectedPieces ?? null}
+          horizonte={horizontePronostico}
         />
 
         {/* El comparador SUBE hasta acá, pegado al pronóstico: los dos
@@ -1566,6 +1826,7 @@ export function PublicShiftMonitorPage() {
           comments={live.comments}
           causaSel={causaSel}
           onCausa={setCausaSel}
+          breaks={comparacion.breaks}
         />
 
         <TiempoDelTurno

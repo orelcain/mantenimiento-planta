@@ -13,6 +13,7 @@ import { describe, it, expect } from 'vitest'
 import {
   cumulativeFromStart, piecesAt, buildDayComparison, optimalPace, findGapWindow,
   plannedBreaks, mergeBreaks, diffCurve, resumenComparacion, findGapWindows,
+  breakMinutesBetween, extendOngoingBreaks,
 } from '../monitorCompare'
 import type { MonitorSeriesPoint } from '../monitorHourly'
 
@@ -521,5 +522,110 @@ describe('findGapWindows — varios tramos', () => {
     for (let i = 30; i < 36; i++) arr[i] = 0
     const hoy = cumulativeFromStart(serie('2026-08-12T07:45:00Z', arr))
     expect(findGapWindow(hoy, ayer)!.lostPieces).toBe(300)
+  })
+})
+
+/**
+ * Cuánto convenio falta de acá al cierre — lo que hay que descontar antes de
+ * pedir un ritmo.
+ *
+ * Datos REALES de Filete leídos con `public-monitor-probe.js`. El 13-08 el
+ * turno tuvo 56 stopEvents y solo TRES eran de convenio; el 14-08, 28 y dos.
+ * Ese es el filtro que hay que respetar: `stopEvents.r` es un índice a
+ * `stopReasons`, no el nombre de la causa, y dibujar/sumar todos daba las 23
+ * bandas de ancho mínimo del intento anterior.
+ */
+describe('breakMinutesBetween — la colación que todavía falta', () => {
+  /** Serie de 5 min arrancando 07:40, como la real. */
+  const serie = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({
+      t: new Date(Date.parse('2026-08-13T07:40:00.000Z') + i * 5 * 60_000).toISOString(),
+      pieces: 40,
+    }))
+
+  /** Turno del 13-08: colación de 43 min a las 12:50, más ruido recuperable. */
+  const ayer = plannedBreaks({
+    series: serie(118),
+    stopReasons: ['REUNION INICIO TURNO', 'Micro Detencion', 'EJERCICIO  COMPENSATORIO', 'COLACION', 'Detencion'],
+    stopEvents: [
+      { r: 0, f: '2026-08-13T07:45:00.000Z', s: 300 },
+      { r: 1, f: '2026-08-13T08:20:00.000Z', s: 15 },
+      { r: 2, f: '2026-08-13T09:33:00.000Z', s: 180 },
+      { r: 4, f: '2026-08-13T11:10:00.000Z', s: 90 },
+      { r: 3, f: '2026-08-13T12:50:00.000Z', s: 43 * 60 },
+    ],
+    plannedReasons: ['COLACION', 'EJERCICIO  COMPENSATORIO', 'REUNION INICIO TURNO'],
+  })
+
+  it('de 5 detenciones toma las 3 de convenio, no las 5', () => {
+    expect(ayer).toHaveLength(3)
+    expect(ayer.map((b) => b.reason)).toContain('COLACION')
+    expect(ayer.map((b) => b.reason)).not.toContain('Micro Detencion')
+  })
+
+  it('a la altura en que Orel lo miró, faltaban los 43 min de la colación', () => {
+    // Turno en curso al minuto 305 (12:45): la colación de los días anteriores
+    // vale como pronóstico, y el cierre programado cae en el minuto 470.
+    const merged = mergeBreaks([], ayer, 305)
+    expect(breakMinutesBetween(merged, 305, 470)).toBe(43)
+  })
+
+  it('una parada ya empezada aporta solo el pedazo que falta', () => {
+    expect(breakMinutesBetween([{ fromMin: 310, toMin: 353, reason: 'COLACION' }], 330, 470)).toBe(23)
+  })
+
+  it('y lo que se pasa del cierre no se cuenta', () => {
+    expect(breakMinutesBetween([{ fromMin: 440, toMin: 500, reason: 'COLACION' }], 305, 470)).toBe(30)
+  })
+
+  it('con la colación ya pasada no queda nada que descontar', () => {
+    expect(breakMinutesBetween(ayer, 400, 470)).toBe(0)
+  })
+})
+
+/**
+ * La parada que está OCURRIENDO.
+ *
+ * Caso real, 14-08 13:41: la colación de Filete había arrancado a las 13:37 y
+ * el payload decía 4 minutos, porque una parada en curso solo reporta lo que
+ * lleva. Con esos 4 minutos, el ritmo necesario se repartía sobre 1 h 48 como
+ * si la línea fuera a producir los ~50 min que todavía iba a estar parada.
+ */
+describe('extendOngoingBreaks', () => {
+  const ayer = [
+    { fromMin: 310, toMin: 353, reason: 'COLACION' },   // 43 min
+    { fromMin: 312, toMin: 367, reason: 'COLACION' },   // 55 min
+    { fromMin: 308, toMin: 358, reason: 'COLACION' },   // 50 min
+  ]
+
+  it('estira la colación en curso a lo que dura en los turnos anteriores', () => {
+    const hoy = [{ fromMin: 357, toMin: 361, reason: 'COLACION' }]
+    // Mediana de 43/50/55 = 50 min.
+    expect(extendOngoingBreaks(hoy, ayer, 360)).toEqual([
+      { fromMin: 357, toMin: 407, reason: 'COLACION' },
+    ])
+  })
+
+  it('no toca una parada que ya cerró hace rato', () => {
+    const hoy = [{ fromMin: 300, toMin: 320, reason: 'COLACION' }]
+    expect(extendOngoingBreaks(hoy, ayer, 400)).toEqual(hoy)
+  })
+
+  it('nunca acorta lo que ya ocurrió, aunque haya durado más que la mediana', () => {
+    const hoy = [{ fromMin: 357, toMin: 430, reason: 'COLACION' }]
+    expect(extendOngoingBreaks(hoy, ayer, 428)[0]!.toMin).toBe(430)
+  })
+
+  it('sin historial de esa causa la deja como está', () => {
+    const hoy = [{ fromMin: 357, toMin: 361, reason: 'REUNION INICIO TURNO' }]
+    expect(extendOngoingBreaks(hoy, ayer, 360)).toEqual(hoy)
+  })
+
+  it('y con eso el descuento pasa de 1 minuto a los 47 que faltan de verdad', () => {
+    const hoy = [{ fromMin: 357, toMin: 361, reason: 'COLACION' }]
+    const crudo = mergeBreaks(hoy, ayer, 360)
+    const estirado = mergeBreaks(extendOngoingBreaks(hoy, ayer, 360), ayer, 360)
+    expect(breakMinutesBetween(crudo, 360, 470)).toBeLessThan(10)
+    expect(breakMinutesBetween(estirado, 360, 470)).toBe(47)
   })
 })
