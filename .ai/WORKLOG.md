@@ -13,6 +13,25 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-14 - claude - La curva de la cuota se reparte sobre el turno completo (#548)
+
+- Hecho: visto en vivo con el turno de Filete en curso a las 11:25, `timeBreakdown.windowMin`
+  son los minutos de operación HASTA AHORA (215), no la duración del turno (465). Repartir
+  5.000 piezas sobre 215 min hacía que la línea de la cuota trepara hasta la meta en la hora 4
+  y siguiera plana, el área roja se comiera el gráfico y "dónde se abrió la brecha" marcara el
+  turno entero en un solo tramo. Ahora la ventana sale de scheduledStart→plannedEnd y el
+  convenio descontado es el PREVISTO (breaks, no `plannedMin` que a media mañana es 0). Con
+  el turno cerrado no se veía: transcurrido = duración ahí.
+- Archivos: apps/pwa/src/pages/PublicShiftMonitorPage.tsx
+- Verificación: tsc/eslint limpios, vitest 288/288, verificado en vivo contra el turno de
+  Filete en curso (preview :5175): la diferencia contra cuota pasó de −2.995 a −929, y la
+  brecha de un tramo de 3,5 h a dos tramos concretos de 40-65 min. Deploy a GitHub Pages en
+  success.
+- Estado: HECHO
+- Sigue: nada. Nota: este archivo pasó los ~165 KB — sigue pendiente compactar.
+
+---
+
 ## 2026-08-14 - claude - "1 de 10 turnos" no es que la meta entre — tres grados (#546)
 
 - Hecho: visto en vivo con el turno de Filete a media mañana, el pronóstico decía "La meta
