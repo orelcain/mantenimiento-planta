@@ -42,13 +42,16 @@ export interface PublicMonitorMachine {
  *
  * `history` trae los seis turnos cronológicos y en las líneas con varios turnos
  * por día quedaban solo dos comparables — mezclar el de día con el de noche no
- * es una opción. `curve` viene como pares [minuto de turno, piezas acumuladas]
- * cada 15 min: proyectar no necesita el detalle de cinco.
+ * es una opción.
+ *
+ * ⚠ `curve` son objetos `{m: minuto de turno, p: piezas acumuladas}` cada 15
+ * min y no pares `[m, p]`: Firestore rechaza los arrays anidados y el write del
+ * doc falla entero.
  */
 export interface ForecastHistoryShift {
   shiftDocId: string
   dateKey: string
-  curve: Array<[number, number]>
+  curve: Array<{ m: number; p: number }>
   total: number
   producingMin: number
   micro: number | null
