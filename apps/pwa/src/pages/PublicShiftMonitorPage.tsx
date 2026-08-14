@@ -174,8 +174,21 @@ function Sparkbars({
   const max = Math.max(...series.map(p => p.pieces), 1)
   const W = 100
   const H = 28
-  const gap = 0.6
-  const bw = Math.max(0.5, W / series.length - gap)
+  /*
+   * ⚠⚠ El paso sale del ancho DISPONIBLE, no de un mínimo por barra.
+   *
+   * Antes: `bw = max(0.5, W/n - gap)` con `gap = 0.6`, y cada barra en
+   * `i * stepX`. Con un turno largo —118 tramos el 13-08— el paso queda
+   * en 1,1 y el contenido llega hasta x=129 dentro de un viewBox de 100: **las
+   * últimas 15 barras se dibujaban FUERA del área visible**. Más de una hora
+   * de producción que nadie veía, justo la cola donde vive la hora extra.
+   *
+   * Ahora el paso es `W / n` siempre y la barra ocupa el 70% de su paso: el
+   * turno entra completo cualquiera sea su largo, y para mirar de cerca está
+   * el zoom.
+   */
+  const stepX = W / series.length
+  const bw = Math.max(0.3, stepX * 0.7)
 
   // ⚠ La serie NO es continua: solo trae los tramos que el sensor registró, y
   // durante una parada larga puede faltar más de uno. Por eso la posición de un
@@ -194,6 +207,12 @@ function Sparkbars({
     return 0
   }
 
+  /*
+   * Fondo de convenio. Solo las que explican un hueco VISIBLE: una parada de
+   * 5 min pinta un puntito gris que ensucia en vez de explicar. Y la posición
+   * se busca por ÍNDICE en la serie, no por aritmética de tiempo — la serie no
+   * es continua y ese atajo corre las bandas a la derecha.
+   */
   // Bandas de la causa elegida. Se dibujan primero para quedar DETRÁS de las
   // barras: la producción es el dato, la detención es el contexto.
   const bandas = causaSel && stopEvents && stopReasons
@@ -204,9 +223,9 @@ function Sparkbars({
           const hasta = desde + e.s * 1000
           const i0 = indiceDe(desde)
           const i1 = indiceDe(hasta)
-          const x = i0 * (bw + gap)
+          const x = i0 * stepX
           // Al menos un tramo de ancho: un paro de 40 s tiene que verse.
-          const ancho = Math.max((i1 - i0 + (e.s >= paso ? 1 : 0)) * (bw + gap), bw * 0.6)
+          const ancho = Math.max((i1 - i0 + (e.s >= paso ? 1 : 0)) * stepX, bw * 0.6)
           // La key lleva el índice: dos paros pueden arrancar en el MISMO
           // instante con distinta duración, y con `e.f` sola React los tomaba
           // por el mismo elemento.
@@ -310,7 +329,7 @@ function Sparkbars({
           return (
             <rect
               key={p.t}
-              x={i * (bw + gap)}
+              x={i * stepX}
               y={H - h}
               width={bw}
               height={h}
@@ -324,7 +343,7 @@ function Sparkbars({
 
         {/* El tramo bajo el cursor, marcado sobre las barras. */}
         {foco != null && (
-          <rect x={foco * (bw + gap)} y={0} width={bw} height={H} className="fill-foreground/30" />
+          <rect x={foco * stepX} y={0} width={bw} height={H} className="fill-foreground/30" />
         )}
       </svg>
 
