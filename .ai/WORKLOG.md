@@ -13,6 +13,29 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-13 - claude - Pronóstico del cierre auto-calibrado, con su error medido (#534)
+
+- Hecho: motor `monitorForecast.ts` que predice el cierre del turno desde el minuto 240 usando
+  el history que ya viaja en el doc (cero lecturas extra). El método (proporcional/aditivo/ritmo)
+  no se elige a mano: se mide por backtesting leave-one-out contra los turnos comparables
+  (mismo nombre, cerrados) y se queda con el de menor error; ese error viaja con el pronóstico.
+  Backtesting sobre 34 turnos reales: Filete acierta mejor con proporcional (5,2% vs 11,3% del
+  ritmo actual), Yal con aditivo (8,8%, proporcional erra 12-24%) — la causa es física (Filete:
+  total explicado por velocidad; Yal: por tiempo andando + paradas). Por encima de 15% de error
+  el bloque se calla.
+- Archivos: apps/pwa/src/services/shoplogix/monitorForecast.ts (+test),
+  apps/pwa/src/pages/monitor/MonitorShiftParts.tsx, apps/pwa/src/pages/PublicShiftMonitorPage.tsx
+  (+test de render).
+- Verificación: vitest 263/263 (17 nuevos, con datos reales de Shoplogix como fixture: estima
+  4.257 contra un cierre real de 4.294). tsc y eslint limpios. Deploy en success.
+- Estado: HECHO
+- Sigue: pendiente ver el bloque en pantalla con un turno vivo (requiere >=4 turnos comparables
+  del mismo nombre; Yal solo trae 2 "Turno 2" — se verá mañana en Filete). Siguiente paso
+  previsto: publicar historial del mismo turno desde el backend para que Yal también alcance
+  muestra. Nota: WORKLOG.md pasó los ~150 KB — conviene compactarlo.
+
+---
+
 ## 2026-08-13 - claude - No exponer el contador vivo del monitor cuando quedó en cero (#531)
 
 - Hecho: los turnos que ya pasaron su cierre quedaron con `officialLive.totalCycles: 0`
