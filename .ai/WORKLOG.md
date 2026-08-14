@@ -13,6 +13,31 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-14 - claude - Tarjeta "Ahora" unificada: una sola respuesta a "¿llegamos?"
+
+- Cierra el último punto del mockup de arquitectura. La respuesta a "¿vamos a llegar?" estaba
+  repartida en tres tarjetas: la meta (veredicto + proyección al horario), el pronóstico (cierre
+  estimado, tres bloques abajo) y el comparador (contra ayer, otro bloque más). Ahora la tarjeta de
+  arriba lo dice completo en cuatro líneas: veredicto, cierre al horario, cierre si el turno se
+  estira, y el día anterior a la misma altura con su diferencia.
+- El resto —ritmo requerido, techo, "lo normal", hora extra y de dónde sale la hora de cierre—
+  pasa a un **"ver qué hace falta"**; cerrado deja una línea con lo único que se mira de reojo
+  ("Faltan 1.120 pz · quedan 5 min"). Eran doce líneas siempre abiertas arriba de todo.
+- `PronosticoCierre` queda plegado: su titular ya está en la tarjeta y con el bloque cerrado el
+  número se sigue viendo en la cabecera. Adentro queda lo auditable (banda, método, cuántos turnos
+  llegaron desde esta altura).
+- ⚠ **Un requerido MUY por encima del techo no se dice como número.** Visto a las 15:25 con 6 min
+  de turno: *"Pide 186,7 pz/min y la línea, andando, va a 11,6"*. Es cierto y es inútil — se lee
+  como que la pantalla se rompió. Desde 2× el mejor turno: *"Ya no da el tiempo: faltan 1.120 pz y
+  quedan 5 min"*. El número exacto sigue en el detalle.
+- ⚠ Al plegar `PronosticoCierre` los 11 tests de su bloque empezaron a fallar por leer un cuerpo
+  que ya no se renderiza. Se abren por el BOTÓN (`aria-expanded="false"`), como lo haría alguien en
+  planta, en vez de tocar el `localStorage` que usa `Bloque`.
+- Archivos: PublicShiftMonitorPage.tsx, MonitorShiftParts.tsx, PronosticoCierre.test.tsx.
+- Verificación: tsc limpio, 1.355 tests. En vivo, claro y oscuro, con el turno de Filete a punto de
+  cerrar. La pantalla quedó en **1.420 px** contra los 2.766 px del inicio del día: **−49%**.
+- Estado: EN REVISIÓN (PR #552)
+
 ## 2026-08-14 - claude - Menos ruido en el monitor: 4 preguntas, un gráfico, y el Pareto de paradas
 
 - Orel: "siento que aún tenemos mucho ruido para ser un monitor que necesita entregar información

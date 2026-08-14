@@ -8,7 +8,7 @@
  * Sin `jest-dom` en este repo: se asierta sobre el texto renderizado.
  */
 import { describe, it, expect, afterEach } from 'vitest'
-import { render, cleanup } from '@testing-library/react'
+import { render, cleanup, fireEvent } from '@testing-library/react'
 import { PronosticoCierre } from '../MonitorShiftParts'
 import type { ForecastResult } from '@/services/shoplogix/monitorForecast'
 
@@ -26,8 +26,18 @@ const FILETE: ForecastResult = {
 
 type Horizonte = React.ComponentProps<typeof PronosticoCierre>['horizonte']
 
-const texto = (f: ForecastResult | null, meta: number | null, horizonte?: Horizonte) =>
-  render(<PronosticoCierre f={f} meta={meta} horizonte={horizonte} />).container.textContent ?? ''
+/**
+ * El bloque arranca PLEGADO desde que su titular subió a la tarjeta de arriba,
+ * así que hay que abrirlo para leer el detalle. Se abre por el botón, como lo
+ * haría alguien en planta, en vez de tocar el `localStorage` que `Bloque` usa
+ * para recordar la elección.
+ */
+const texto = (f: ForecastResult | null, meta: number | null, horizonte?: Horizonte) => {
+  const { container } = render(<PronosticoCierre f={f} meta={meta} horizonte={horizonte} />)
+  const abrir = container.querySelector('button[aria-expanded="false"]')
+  if (abrir) fireEvent.click(abrir)
+  return container.textContent ?? ''
+}
 
 describe('PronosticoCierre', () => {
   it('muestra el cierre estimado y NUNCA sin su error al lado', () => {

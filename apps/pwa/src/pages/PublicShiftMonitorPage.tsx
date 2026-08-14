@@ -717,9 +717,19 @@ function CierreDelTurno({ cierre, muestras, fuente, plantSlug, shiftName, startA
   )
 }
 
-function RitmoNecesario({ pace, cierre, muestras, fuente, plantSlug, shiftName, startAt, historial }: {
+function RitmoNecesario({
+  pace, cierre, muestras, fuente, plantSlug, shiftName, startAt, historial, horizonte, vsAyer,
+}: {
   pace: PaceToTarget | null
   historial: { medianCpm: number | null; bestCpm: number | null; muestras: number | null } | null
+  /**
+   * El otro horizonte: hasta dónde llega el pronóstico y con qué cierre. Sin
+   * esto, la respuesta a "¿llegamos?" quedaba partida entre esta tarjeta (que
+   * mide hasta el horario) y el bloque del pronóstico, tres tarjetas abajo.
+   */
+  horizonte?: { hasta: string; estimate: number | null; mapePct: number | null } | null
+  /** El día anterior a la MISMA altura de turno, y la diferencia con hoy. */
+  vsAyer?: { label: string; pieces: number; diff: number } | null
   cierre: string | null | undefined
   muestras: number | null | undefined
   fuente: PublicMonitorLive['plannedEndSource']
@@ -727,6 +737,10 @@ function RitmoNecesario({ pace, cierre, muestras, fuente, plantSlug, shiftName, 
   shiftName: string | null | undefined
   startAt: string | null | undefined
 }) {
+  /* El detalle arranca cerrado: la tarjeta contesta "¿llegamos?" en tres
+     líneas y el resto —ritmo requerido, techo, hora extra— se abre a pedido.
+     El hook va ANTES de cualquier return. */
+  const [verDetalle, setVerDetalle] = useState(false)
   if (!pace) return null
 
   if (pace.verdict === 'cumplida') {
@@ -803,18 +817,37 @@ function RitmoNecesario({ pace, cierre, muestras, fuente, plantSlug, shiftName, 
       {/* Sin adornos históricos: con techo desconocido no se puede afirmar
           que la línea "lo logró alguna vez" — los dos números ya lo dicen.
           También en "no se alcanza": el porqué en una línea. */}
+      {/* ⚠ Un requerido MUY por encima del techo no se dice como número.
+          Visto el 14-08 a las 15:25, con 6 minutos de turno por delante: "Pide
+          186,7 pz/min y la línea, andando, va a 11,6". Es cierto y es inútil —
+          nadie lee eso como una meta, se lee como que la pantalla se rompió. A
+          partir de 2× el mejor turno se dice lo que de verdad pasa: que ya no
+          da el tiempo. El número exacto sigue en el detalle, que es auditable. */}
       {(exigente || fuera) && (
-        <p className="mt-0.5 text-[12px] text-muted-foreground">
-          Pide <span className="tabular-nums text-foreground/90">{fmtDec(pace.requiredPerMinute)} pz/min</span>{' '}
-          y la línea, andando, va a{' '}
-          <span className="tabular-nums text-foreground/90">{fmtDec(pace.currentPerHour / 60)}</span>.
-        </p>
+        pace.maxPerHour != null && pace.requiredPerHour > pace.maxPerHour * 2 ? (
+          <p className="mt-0.5 text-[12px] text-muted-foreground">
+            Ya no da el tiempo: faltan{' '}
+            <span className="tabular-nums text-foreground/90">{fmtInt(pace.remainingPieces)} pz</span>
+            {' '}y quedan{' '}
+            <span className="tabular-nums text-foreground/90">
+              {fmtDurationSec(pace.workMin * 60)}
+            </span>
+            {pace.pendingBreakMin > 0 ? ' de producción.' : '.'}
+          </p>
+        ) : (
+          <p className="mt-0.5 text-[12px] text-muted-foreground">
+            Pide <span className="tabular-nums text-foreground/90">{fmtDec(pace.requiredPerMinute)} pz/min</span>{' '}
+            y la línea, andando, va a{' '}
+            <span className="tabular-nums text-foreground/90">{fmtDec(pace.currentPerHour / 60)}</span>.
+          </p>
+        )
       )}
       {/* ⚠⚠ La HORA, siempre. Esta proyección va hasta el horario del turno y
-          el bloque "Cierre estimado" va hasta lo que duraron los turnos
-          anteriores: el 14-08 a las 12:50 uno decía 4.501 pz y el otro 5.011,
-          a lados opuestos de la meta, sin que nada explicara la diferencia.
-          Son dos horizontes, no dos cuentas. */}
+          el pronóstico va hasta lo que duraron los turnos anteriores: el 14-08
+          a las 12:50 uno decía 4.501 pz y el otro 5.011, a lados opuestos de
+          la meta, sin que nada explicara la diferencia. Son dos horizontes, no
+          dos cuentas — y desde que la tarjeta los dice a los dos, el "¿vamos a
+          llegar?" se contesta acá arriba sin abrir nada. */}
       <p className="mt-0.5 text-[12px] text-muted-foreground">
         {cierre ? (
           <>
@@ -829,8 +862,64 @@ function RitmoNecesario({ pace, cierre, muestras, fuente, plantSlug, shiftName, 
         {' '}({fmtDec((pace.projectedPieces / pace.targetPieces) * 100, 0)}% de la meta).
       </p>
 
+      {/* El otro horizonte, el que suele ocurrir: los turnos de esta línea se
+          estiran. El número grande del pronóstico vive tres bloques más abajo;
+          acá va su titular, que es la otra mitad de la respuesta. */}
+      {horizonte?.hasta && horizonte.estimate != null && (
+        <p className="mt-0.5 text-[12px] text-muted-foreground">
+          Si se estira como los últimos turnos (≈
+          <span className="tabular-nums text-foreground/90">{horizonte.hasta}</span>),{' '}
+          <span className="tabular-nums text-foreground/90">{fmtInt(horizonte.estimate)} pz</span>
+          {horizonte.mapePct != null && <> ±{fmtDec(horizonte.mapePct)}%</>}.
+        </p>
+      )}
+
+      {/* La referencia que uno busca enseguida: contra el día anterior, a la
+          MISMA altura de turno. Estaba solo dentro del comparador, que ahora
+          arranca plegado. */}
+      {vsAyer && (
+        <p className="mt-0.5 text-[12px] text-muted-foreground">
+          {vsAyer.label} a esta altura llevaba{' '}
+          <span className="tabular-nums text-foreground/90">{fmtInt(vsAyer.pieces)} pz</span>
+          {' '}
+          <span className={
+            vsAyer.diff >= 0
+              ? 'text-emerald-800 dark:text-emerald-300'
+              : 'text-amber-800 dark:text-amber-300'
+          }>
+            ({vsAyer.diff >= 0 ? '+' : '−'}{fmtInt(Math.abs(vsAyer.diff))})
+          </span>.
+        </p>
+      )}
+
+      {/* El detalle, a un toque: qué ritmo hace falta, el techo, lo normal y la
+          hora extra. Antes eran doce líneas siempre abiertas arriba de todo, y
+          la pregunta que la gente hace —¿llegamos?— quedaba enterrada entre
+          ellas. */}
+      <button
+        type="button"
+        onClick={() => setVerDetalle((v) => !v)}
+        className="mt-2 text-[11px] text-sky-700 underline underline-offset-2 dark:text-sky-300"
+        aria-expanded={verDetalle}
+      >
+        {verDetalle ? 'ocultar qué hace falta' : 'ver qué hace falta'}
+      </button>
+
+      {!verDetalle && (
+        <p className="mt-1 text-[11px] text-muted-foreground/70">
+          Faltan <span className="tabular-nums">{fmtInt(pace.remainingPieces)} pz</span> ·{' '}
+          quedan <span className="tabular-nums">{fmtDurationSec(pace.remainingMin * 60)}</span>
+          {pace.pendingBreakMin > 0 && (
+            <>
+              {' '}(<span className="tabular-nums">{fmtDurationSec(pace.workMin * 60)}</span>{' '}
+              produciendo)
+            </>
+          )}
+        </p>
+      )}
+
       {/* Los números en filas, no en prosa: se comparan de un vistazo. */}
-      <dl className="mt-2 space-y-0.5 text-[12px]">
+      <dl className={`mt-2 space-y-0.5 text-[12px] ${verDetalle ? '' : 'hidden'}`}>
         <div className="flex items-baseline gap-2">
           <dt className="w-20 shrink-0 text-muted-foreground">Faltan</dt>
           <dd className="tabular-nums">{fmtInt(pace.remainingPieces)} pz</dd>
@@ -892,6 +981,10 @@ function RitmoNecesario({ pace, cierre, muestras, fuente, plantSlug, shiftName, 
         )}
       </dl>
 
+      {/* Todo lo de abajo es el DETALLE de "qué hace falta": ritmo requerido,
+          techo, referencias históricas, hora extra y de dónde sale la hora de
+          cierre. Se abre a pedido — antes eran doce líneas siempre abiertas.*/}
+      <div className={verDetalle ? '' : 'hidden'}>
       {/* El récord, dicho: el monitor también es evidencia de mejora. Solo
           cuando el ritmo de HOY supera al mejor de los turnos recientes. */}
       {historial?.bestCpm != null && pace.currentPerHour / 60 > historial.bestCpm && (
@@ -984,6 +1077,7 @@ function RitmoNecesario({ pace, cierre, muestras, fuente, plantSlug, shiftName, 
         shiftName={shiftName}
         startAt={startAt}
       />
+      </div>
       {/* El aviso de "no se alcanza" ya no va acá: era una tercera repetición
           del mismo hecho, después del veredicto de arriba y de la fila "Techo".
           Y convivía mal con el "hay que subir 320 pz/h" — decir a la vez cuánto
@@ -1534,8 +1628,30 @@ export function PublicShiftMonitorPage() {
       hasta: fmtWallTime(new Date(finMs).toISOString()),
       dura: fmtDurationSec(pronostico.horizonMin * 60),
       horario,
+      // El titular del pronóstico, para poder decirlo también arriba: la
+      // respuesta a "¿llegamos?" no puede estar partida en dos tarjetas.
+      estimate: pronostico.mapePct <= MAX_MAPE_PCT ? pronostico.estimate : null,
+      mapePct: pronostico.mapePct <= MAX_MAPE_PCT ? pronostico.mapePct : null,
     }
   }, [pronostico, live?.series, live?.plannedEnd, pace])
+
+  /**
+   * El día anterior más reciente a la MISMA altura de turno.
+   *
+   * Vivía solo dentro del comparador; ahora que ese bloque arranca plegado, la
+   * referencia que uno busca primero —"¿vamos mejor o peor que ayer?"— sube a
+   * la tarjeta de arriba.
+   */
+  const vsAyer = useMemo(() => {
+    const hoy = comparacion.days.find((d) => d.esHoy)
+    const previo = comparacion.days.find((d) => !d.esHoy && d.atCurrentMinute != null)
+    if (!hoy?.atCurrentMinute || !previo?.atCurrentMinute) return null
+    return {
+      label: previo.label,
+      pieces: previo.atCurrentMinute,
+      diff: hoy.atCurrentMinute - previo.atCurrentMinute,
+    }
+  }, [comparacion.days])
 
   /**
    * La hora de reloj de la próxima parada de convenio que todavía no empezó.
@@ -1803,6 +1919,8 @@ export function PublicShiftMonitorPage() {
             /* Referencias en la MISMA base que el requerido: andando. Con las
                de reloj la tarjeta comparaba 11,8 andando contra un "mejor
                turno" de 9,7 de reloj y anunciaba un récord que no existía. */
+            horizonte={horizontePronostico}
+            vsAyer={vsAyer}
             historial={ritmoAndando.mediana != null ? {
               medianCpm: ritmoAndando.mediana,
               bestCpm: ritmoAndando.mejor,

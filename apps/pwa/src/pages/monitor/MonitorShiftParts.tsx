@@ -972,6 +972,11 @@ export function PronosticoCierre({ f, meta, horizonte }: {
     <Bloque
       id="pronostico"
       titulo="Cierre estimado"
+      /* Plegado: su titular —cuánto cierra y hasta qué hora mide— ya lo dice la
+         tarjeta de arriba. Acá queda el detalle auditable: la banda de los
+         turnos anteriores, el método elegido y cuántos llegaron desde esta
+         altura. El número sigue a la vista con el bloque cerrado. */
+      defaultAbierto={false}
       extra={<span className="tabular-nums font-semibold text-sky-700 dark:text-sky-300">
         {fmtInt(f.estimate)} pz
       </span>}
