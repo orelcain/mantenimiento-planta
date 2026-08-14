@@ -211,7 +211,13 @@ export function MonitorCompareChart({ cmp, cerrado, claveSel, onSel, cone }: {
 
   return (
     <div>
-      {/* Contra quién: UNA referencia a la vez. Cambiarla es re-preguntar. */}
+      {/* Contra quién: UNA referencia a la vez. Cambiarla es re-preguntar.
+          El rótulo importa: sin él son siete chips sueltos y hay que deducir
+          qué hacen. Y es el ÚNICO selector — la tabla "ver los N días uno por
+          uno" hacía lo mismo con otra interfaz. */}
+      <div className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+        Comparar contra
+      </div>
       <div className="mb-1.5 flex flex-wrap items-center gap-1.5 text-[11px]">
         {cmp.optimal && (
           <button type="button" onClick={() => onSel('cuota')} aria-pressed={claveSel === 'cuota'}

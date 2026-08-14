@@ -14,7 +14,6 @@ import {
 } from '@/services/shoplogix/monitorCompare'
 import { MAX_MAPE_PCT, type ConePoint, type ForecastResult } from '@/services/shoplogix/monitorForecast'
 import { MonitorCompareChart } from './MonitorCompareChart'
-import { COLOR_HOY, COLOR_CUOTA, COLOR_REF } from './monitorColors'
 
 const nf = new Intl.NumberFormat('es-CL')
 const fmtInt = (n: number) => nf.format(Math.round(n || 0))
@@ -370,8 +369,6 @@ export function ComparadorDias({ cmp, live, onCausa, cone }: {
   /** Proyección al cierre, para dibujarla sobre la curva de hoy. */
   cone?: ConePoint[] | null
 }) {
-  /** La tabla día por día arranca plegada: primero la conclusión. */
-  const [detalle, setDetalle] = useState(false)
   /*
    * La referencia elegida ('cuota' o dateKey+label de un día) vive ACÁ y no en
    * el gráfico: la brecha de abajo se calcula contra la MISMA referencia. El
@@ -392,8 +389,6 @@ export function ComparadorDias({ cmp, live, onCausa, cone }: {
     ? { curva: diaSel.curve, nombre: diaSel.label }
     : null
 
-  const hoy = cmp.days.find((d) => d.esHoy)
-  const ref = hoy?.atCurrentMinute ?? null
   const hh = Math.floor(cmp.currentMinute / 60)
   const mm = cmp.currentMinute % 60
   const resumen = resumenComparacion(cmp)
@@ -422,11 +417,7 @@ export function ComparadorDias({ cmp, live, onCausa, cone }: {
           : <span className="tabular-nums">{hh} h {String(mm).padStart(2, '0')} de turno</span>
       }
     >
-          <Veredicto
-            cmp={cmp}
-            cerrado={live?.shiftClosed ?? false}
-            producingMin={live?.timeBreakdown?.producingMin ?? null}
-          />
+          <Veredicto cmp={cmp} cerrado={live?.shiftClosed ?? false} />
 
           <div className="mt-3">
             <MonitorCompareChart
@@ -438,91 +429,14 @@ export function ComparadorDias({ cmp, live, onCausa, cone }: {
             />
           </div>
 
-          <button
-            type="button"
-            onClick={() => setDetalle((v) => !v)}
-            className="mt-2 text-[11px] text-sky-700 underline underline-offset-2 dark:text-sky-300"
-          >
-            {detalle ? 'ocultar los días' : `ver los ${cmp.days.length} días uno por uno`}
-          </button>
-
-          {detalle && (
-          <ul className="mt-2 space-y-1">
-            {/* Solo informativa: el "contra qui\u00e9n" del gr\u00e1fico se elige en sus
-                chips, y duplicar esa selecci\u00f3n ac\u00e1 creaba dos verdades. */}
-            {cmp.days.map((d) => {
-              const dif =
-                !d.esHoy && ref != null && d.atCurrentMinute != null ? ref - d.atCurrentMinute : null
-              return (
-                <li key={d.dateKey + d.label} className="flex items-center gap-2 px-1 text-[12px]">
-                  <span
-                    className="h-2 w-2 shrink-0 rounded-full"
-                    style={{ background: d.esHoy ? COLOR_HOY : COLOR_REF }}
-                  />
-                  <span className={`w-14 shrink-0 truncate ${d.esHoy ? 'font-semibold' : 'text-foreground/80'}`}>
-                    {d.label}
-                  </span>
-                  <span className="flex-1 text-right tabular-nums">
-                    {d.atCurrentMinute != null ? fmtInt(d.atCurrentMinute) : '\u2014'}
-                  </span>
-                  {/* La diferencia contra hoy. Sin esto hay que restar de cabeza. */}
-                  <span
-                    className={`w-12 shrink-0 text-right tabular-nums text-[11px] ${
-                      dif == null
-                        ? 'text-transparent'
-                        : dif >= 0
-                        ? 'text-emerald-700 dark:text-emerald-400'
-                        : 'text-red-700 dark:text-red-400'
-                    }`}
-                  >
-                    {dif == null ? '\u2014' : `${dif >= 0 ? '+' : ''}${fmtInt(dif)}`}
-                  </span>
-                  {/* El total al cierre de ese día. En HOY no va: el turno puede
-                      estar en curso y "cerró 4.486" sería falso. */}
-                  <span className="w-[4.2rem] shrink-0 whitespace-nowrap text-right text-[10px] tabular-nums text-muted-foreground/60">
-                    {d.esHoy ? '' : `cerró ${fmtInt(d.totalPieces)}`}
-                  </span>
-                </li>
-              )
-            })}
-
-            {cmp.optimalAtCurrentMinute != null && cmp.optimalAtCurrentMinute > 0 && (
-              <li className="flex items-center gap-2 border-t border-border pt-1.5 text-[12px]">
-                <span className="h-2 w-2 shrink-0 rounded-full border border-dashed"
-                  style={{ borderColor: COLOR_CUOTA }} />
-                <span className="w-14 shrink-0 truncate text-amber-700 dark:text-amber-300">
-                  Cuota
-                </span>
-                <span className="flex-1 text-right tabular-nums text-amber-700 dark:text-amber-300">
-                  {fmtInt(cmp.optimalAtCurrentMinute)}
-                </span>
-                <span
-                  className={`w-12 shrink-0 text-right tabular-nums text-[11px] ${
-                    ref != null && ref - cmp.optimalAtCurrentMinute >= 0
-                      ? 'text-emerald-700 dark:text-emerald-400'
-                      : 'text-red-700 dark:text-red-400'
-                  }`}
-                >
-                  {ref != null
-                    ? `${ref - cmp.optimalAtCurrentMinute >= 0 ? '+' : ''}${fmtInt(
-                        ref - cmp.optimalAtCurrentMinute,
-                      )}`
-                    : '—'}
-                </span>
-                <span className="w-[4.2rem] shrink-0" />
-              </li>
-            )}
-          </ul>
-          )}
 
           <BrechaDelDia cmp={cmp} live={live} onCausa={onCausa} contra={contraSel} />
 
-          <p className="mt-2 text-[11px] text-muted-foreground/70">
-            {detalle && 'Tocá un día para mostrarlo u ocultarlo en el gráfico. '}
-            Todos se leen a la misma
-            altura de turno, contada desde el arranque: los turnos no
-            empiezan a la misma hora, así que comparar por reloj mide mal justamente el
-            primer tramo.
+          {/* UNA sola nota. Antes eran tres diciendo variantes de lo mismo:
+              una debajo de las tarjetas, otra acá y la de la brecha. */}
+          <p className="mt-2 text-[11px] leading-snug text-muted-foreground/70">
+            Todo se lee a la misma altura de turno, no por hora de reloj: los turnos no arrancan
+            a la misma hora, y esta diferencia cambia a medida que el turno avanza.
           </p>
     </Bloque>
   )
@@ -675,26 +589,15 @@ function BrechaDelDia({ cmp, live, onCausa, contra }: {
  * compara sola ("ayer a esta hora"), y el MEJOR es la que dice si el turno
  * bueno era alcanzable. La cuota es la tercera y no se negocia.
  */
-function Veredicto({ cmp, cerrado, producingMin }: {
+function Veredicto({ cmp, cerrado }: {
   cmp: CompareResult
   cerrado: boolean
-  /** Minutos que la L\u00cdNEA produjo de verdad (timeBreakdown), para decir cu\u00e1nto
-      de la altura del turno fue producci\u00f3n real y cu\u00e1nto parada. */
-  producingMin?: number | null
 }) {
   const r = resumenComparacion(cmp)
   if (r.actual == null) return null
 
   const tono = (n: number) =>
     n >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'
-  const conSigno = (n: number) => `${n >= 0 ? '+' : '\u2212'}${fmtInt(Math.abs(n))}`
-  const fmtHm = (min: number) => `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, '0')}`
-  const altura = r.minutos != null ? fmtHm(r.minutos) : null
-  // Solo si aporta: con la l\u00ednea produciendo el turno completo, repetir la
-  // misma cifra dos veces no dice nada.
-  const real = producingMin != null && r.minutos != null && producingMin < r.minutos
-    ? fmtHm(producingMin)
-    : null
 
   return (
     <div className="mt-2">
@@ -703,109 +606,69 @@ function Veredicto({ cmp, cerrado, producingMin }: {
         * apagada suena a que alguien sigue contando, y el que abre el link a la
         * noche está leyendo un resultado, no un avance.
         */}
-      <p className="text-[15px] font-semibold leading-snug text-foreground">
-        {cerrado ? 'Se lograron ' : 'Llevamos '}
-        <span className="tabular-nums">{fmtInt(r.actual)} pz</span>
-        {altura && (
-          <span className="font-normal text-muted-foreground">
-            {cerrado ? ` en ${altura} de turno` : ` a ${altura} de turno`}
-            {/* Pedido de Orel (13-ago): decir cuánto de esa altura fue
-                producción de verdad — el resto son paradas, y es la brecha
-                que Mantención puede mostrar y atacar. */}
-            {real && (cerrado
-              ? `, de las que ${real} fueron de producción real`
-              : `, con ${real} de producción real`)}
-          </span>
-        )}
-        .
-      </p>
-
       {/*
-        * Cada comparación con el número del otro al lado. "Vas 1.083 arriba de
-        * mar 11" no dice nada si no se sabe que mar 11 llevaba 3.403 a esta
-        * misma altura — y ese valor es el que se mueve durante el turno.
+        * ⚠ UNA sola frase con las piezas y las dos diferencias.
+        *
+        * Antes esto eran dos párrafos y dos tarjetas diciendo lo mismo cuatro
+        * veces: las piezas, las dos diferencias, "mejor día" y "rango de los N
+        * días" —que ya salían de las mismas cifras—. La altura del turno y el
+        * "de las que X fueron producción real" se fueron: ese dato vive, con
+        * más contexto, en "A dónde se va el tiempo".
+        *
+        * Lo que NO se toca: el número del OTRO va al lado de cada diferencia
+        * (pedido de Orel, 12-08). "375 abajo de jue 13" no dice nada sin saber
+        * que jue 13 llevaba 4.294 a esta misma altura.
         */}
-      <p className="mt-1 text-[13.5px] leading-snug text-foreground/90">
+      <p className="text-[14.5px] leading-snug text-foreground">
+        <span className="text-[19px] font-bold tabular-nums">{fmtInt(r.actual)}</span>
+        <span className="text-muted-foreground"> pz</span>
         {r.reciente && (
           <>
-            {cerrado ? 'Fueron' : 'Vamos'}{' '}
+            {' · '}
             <span className={`font-semibold tabular-nums ${tono(r.reciente.dif)}`}>
-              {fmtInt(Math.abs(r.reciente.dif))} pz {r.reciente.dif >= 0 ? 'arriba' : 'abajo'}
+              {fmtInt(Math.abs(r.reciente.dif))} {r.reciente.dif >= 0 ? 'arriba' : 'abajo'}
             </span>{' '}
-            {r.reciente.mismoDia ? 'del turno anterior' : `de ${r.reciente.label}`}, que a
-            {cerrado ? ' la misma altura' : ' esta altura'} llevaba{' '}
-            <span className="tabular-nums">{fmtInt(r.reciente.valor)}</span>
+            {r.reciente.mismoDia ? 'del turno anterior' : `de ${r.reciente.label}`}
+            <span className="tabular-nums text-muted-foreground"> ({fmtInt(r.reciente.valor)})</span>
           </>
         )}
-        {r.reciente && r.cuota && ', y '}
+        {r.reciente && r.cuota && ' y'}
         {r.cuota && (
           <>
-            {!r.reciente && (cerrado ? 'Fueron ' : 'Vamos ')}
+            {!r.reciente && ' · '}
+            {' '}
             <span className={`font-semibold tabular-nums ${tono(r.cuota.dif)}`}>
-              {fmtInt(Math.abs(r.cuota.dif))} pz {r.cuota.dif >= 0 ? 'arriba' : 'abajo'}
+              {fmtInt(Math.abs(r.cuota.dif))} {r.cuota.dif >= 0 ? 'arriba' : 'abajo'}
             </span>{' '}
             de la cuota
-            {r.cuota.meta ? <> de <span className="tabular-nums">{fmtInt(r.cuota.meta)}</span></> : null}
-            {/* Al final del turno la cuota ya pide el total: repetirlo sobra.
-                Se compara REDONDEADO — la meta puede venir con decimales de
-                Shoplogix y "de 17.908, que pide 17.908" es la misma cifra. */}
+            {/* Lo que la cuota pide A ESTA ALTURA, no la meta del turno: la meta
+                ya está arriba, y el número que explica la diferencia es este.
+                Se compara REDONDEADO porque puede venir con decimales. */}
             {Math.round(r.cuota.meta ?? 0) !== Math.round(r.cuota.valor) && (
-              <>
-                , que a {cerrado ? 'esa altura pedía' : 'esta altura pide'}{' '}
-                <span className="tabular-nums">{fmtInt(r.cuota.valor)}</span>
-              </>
+              <span className="tabular-nums text-muted-foreground"> ({fmtInt(r.cuota.valor)})</span>
             )}
           </>
         )}
         .
       </p>
 
-      <dl className="mt-2 grid grid-cols-2 gap-2">
-        {r.mejor && (
-          <div className="rounded-xl border border-border bg-muted/60 px-2.5 py-1.5">
-            <dt className="text-[10px] uppercase tracking-wide text-muted-foreground">
-              Mejor día a esta altura
-            </dt>
-            <dd className={`mt-0.5 text-lg font-bold tabular-nums ${tono(r.mejor.dif)}`}>
-              {conSigno(r.mejor.dif)}
-              <span className="ml-1 text-[11px] font-normal text-muted-foreground">
-                vs {r.mejor.label} ({fmtInt(r.mejor.valor)})
-              </span>
-            </dd>
-          </div>
-        )}
-        {/*
-          * Acá vivía "Para la cuota −918 · pide 3.166", que era el MISMO dato
-          * tres veces en el mismo bloque: la cabecera plegada ya muestra
-          * "−918 vs cuota" y la frase de arriba dice "918 pz abajo de la cuota
-          * de 5.000, que a esta altura pide 3.166" — con más contexto que la
-          * tarjeta. El lugar se lo gana algo que no está en ninguna otra
-          * parte: entre cuánto y cuánto se movieron los días anteriores a esta
-          * altura, que contesta "¿es un mal día o el día de siempre?".
-          */}
-        {r.rango && (
-          <div className="rounded-xl border border-border bg-muted/60 px-2.5 py-1.5">
-            <dt className="text-[10px] uppercase tracking-wide text-muted-foreground">
-              Los {r.rango.dias} días a esta altura
-            </dt>
-            <dd className="mt-0.5 text-base font-bold tabular-nums">
-              {fmtInt(r.rango.min)}–{fmtInt(r.rango.max)}
-              {r.actual != null && (
-                <span className="ml-1 text-[11px] font-normal text-muted-foreground">
-                  {cerrado ? 'fue' : 'hoy'} {fmtInt(r.actual)}
-                </span>
-              )}
-            </dd>
-          </div>
-        )}
-      </dl>
+      {/*
+        * El rango de los días anteriores, en una línea en vez de dos tarjetas.
+        * Contesta "¿es un mal día o el día de siempre?", que es lo único que
+        * las tarjetas aportaban y no estaba ya en la frase de arriba.
+        */}
+      {r.rango && (
+        <p className="mt-1 text-[12px] leading-snug text-muted-foreground">
+          {cerrado ? 'A esa altura' : 'A esta altura'} los{' '}
+          <span className="tabular-nums">{r.rango.dias}</span> días anteriores fueron de{' '}
+          <span className="tabular-nums text-foreground/80">{fmtInt(r.rango.min)}</span> a{' '}
+          <span className="tabular-nums text-foreground/80">{fmtInt(r.rango.max)}</span>
+          {r.mejor && <> · el mejor, {r.mejor.label}</>}.
+        </p>
+      )}
 
-      {/* Que quede dicho que el número se mueve: no es el total del otro día. */}
-      <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground/80">
-        {cerrado
-          ? 'Comparado a la misma altura de turno: un día que duró más pudo cerrar con otro total.'
-          : 'Esta diferencia cambia durante el turno: se compara contra lo que cada día llevaba a esta MISMA altura, no contra el total con que cerró.'}
-      </p>
+      {/* La aclaración de "misma altura de turno" vive UNA sola vez, al pie del
+          bloque: acá era la segunda de tres diciendo lo mismo. */}
     </div>
   )
 }
