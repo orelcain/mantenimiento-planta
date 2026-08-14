@@ -46,9 +46,25 @@ describe('PronosticoCierre', () => {
     expect(t).toMatch(/ninguno de los 9/)
   })
 
-  it('y que SÍ entra cuando algún turno lo logró desde esta altura', () => {
+  it('y que SÍ entra cuando lo logró un tercio de los turnos o más', () => {
     const t = texto({ ...FILETE, hitsTarget: 7 }, 3800)
-    expect(t).toMatch(/7 de 9 turnos/)
+    expect(t).toMatch(/entra: 7 de 9 turnos/)
+  })
+
+  it('⚠ con UNO de diez no dice "entra": dice que es difícil', () => {
+    /*
+     * Visto en vivo el 14-08: con 1 de 10 la pantalla decía "la meta entra"
+     * mientras la tarjeta del ritmo decía "no se alcanza" — juntas se leían
+     * como una contradicción. Un caso entre diez es que se pudo una vez.
+     */
+    const t = texto({ ...FILETE, hitsTarget: 1, samples: 10 }, 5000)
+    expect(t).toMatch(/es difícil: solo 1 de 10 turnos la superó/)
+    expect(t).not.toMatch(/entra/)
+  })
+
+  it('el borde del tercio cuenta como "entra"', () => {
+    expect(texto({ ...FILETE, hitsTarget: 3, samples: 9 }, 4000)).toMatch(/entra: 3 de 9/)
+    expect(texto({ ...FILETE, hitsTarget: 2, samples: 9 }, 4000)).toMatch(/difícil: solo 2 de 9/)
   })
 
   it('nombra el método y sobre cuántos turnos se midió — es auditable', () => {
