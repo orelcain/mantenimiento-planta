@@ -15,12 +15,14 @@ import type { PacePoint } from '../monitorCompare'
  * llevaba a la altura que se predice y con cuánto cerró.
  */
 function turno(a300: number, total: number, durMin = 470): HistoryShift {
-  const curve: PacePoint[] = [
-    { minutes: 60, pieces: Math.round(a300 * 0.22) },
-    { minutes: 180, pieces: Math.round(a300 * 0.58) },
-    { minutes: 300, pieces: a300 },
-    { minutes: durMin, pieces: total },
-  ]
+  const curve: PacePoint[] = []
+  for (let m = 30; m <= 300; m += 30) {
+    curve.push({ minutes: m, pieces: Math.round(a300 * (m / 300)) })
+  }
+  for (let m = 330; m < durMin; m += 30) {
+    curve.push({ minutes: m, pieces: Math.round(a300 + (total - a300) * ((m - 300) / (durMin - 300))) })
+  }
+  curve.push({ minutes: durMin, pieces: total })
   return { curve, totalPieces: total }
 }
 
@@ -91,6 +93,41 @@ describe('buildForecast · elección del método', () => {
   it('sin cuota no inventa un veredicto', () => {
     const f = buildForecast({ todayCurve: HOY_FILETE.curve, currentMinute: 300, history: FILETE })!
     expect(f.hitsTarget).toBeNull()
+  })
+})
+
+describe('buildForecast · el cono que se dibuja', () => {
+  const f = () => buildForecast({
+    todayCurve: HOY_FILETE.curve, currentMinute: 300, history: FILETE, targetPieces: 5000,
+  })!
+
+  it('nace exactamente en el punto actual — la banda sale de la curva, no flota', () => {
+    const c = f().cone
+    expect(c[0]!.minutes).toBe(300)
+    expect(c[0]!.low).toBe(2945)
+    expect(c[0]!.mid).toBe(2945)
+    expect(c[0]!.high).toBe(2945)
+  })
+
+  it('se abre hacia el cierre y nunca retrocede', () => {
+    const c = f().cone
+    expect(c.length).toBeGreaterThan(4)
+    for (let i = 1; i < c.length; i++) {
+      expect(c[i]!.mid).toBeGreaterThanOrEqual(c[i - 1]!.mid)
+      expect(c[i]!.high).toBeGreaterThanOrEqual(c[i]!.low)
+    }
+    // El ancho crece: a mitad de camino la banda es más angosta que al final.
+    const medio = c[Math.floor(c.length / 2)]!
+    const fin = c[c.length - 1]!
+    expect(fin.high - fin.low).toBeGreaterThan(medio.high - medio.low)
+  })
+
+  it('termina donde dice el número grande — una sola verdad en pantalla', () => {
+    const r = f()
+    const fin = r.cone[r.cone.length - 1]!
+    expect(Math.abs(fin.mid - r.estimate) / r.estimate).toBeLessThan(0.03)
+    expect(fin.low).toBeGreaterThanOrEqual(r.low - 1)
+    expect(fin.high).toBeLessThanOrEqual(r.high + 1)
   })
 })
 

@@ -40,7 +40,7 @@ import { pinShiftEnd, unpinShiftEnd } from '@/services/shoplogix/pinShiftEnd'
 import {
   buildDayComparison, optimalPace, plannedBreaks, mergeBreaks, cumulativeFromStart,
 } from '@/services/shoplogix/monitorCompare'
-import { buildForecast } from '@/services/shoplogix/monitorForecast'
+import { buildForecast, MAX_MAPE_PCT } from '@/services/shoplogix/monitorForecast'
 import { TiempoDelTurno, ComparadorDias, Bloque, BitacoraOperador, VelocidadDeLinea, PronosticoCierre } from './monitor/MonitorShiftParts'
 import { useIsAdmin } from '@/store'
 
@@ -1452,7 +1452,14 @@ export function PublicShiftMonitorPage() {
 
         <TiempoDelTurno tb={live.timeBreakdown} causaSel={causaSel} onCausa={setCausaSel} />
 
-        <ComparadorDias cmp={comparacion} live={live} onCausa={setCausaSel} />
+        <ComparadorDias
+          cmp={comparacion}
+          live={live}
+          onCausa={setCausaSel}
+          /* Solo cuando el pronóstico es creíble: un cono con 20% de error es
+             una mancha que promete lo que no puede. */
+          cone={pronostico && pronostico.mapePct <= MAX_MAPE_PCT ? pronostico.cone : null}
+        />
 
         <PorHora series={live.series} />
 

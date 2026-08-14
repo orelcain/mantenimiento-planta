@@ -31,6 +31,14 @@ import { piecesAt, type PacePoint } from './monitorCompare'
 
 export type ForecastMethod = 'proporcional' | 'aditivo' | 'ritmo'
 
+/** Un punto del cono: dónde estaría hoy a esa altura, según los anteriores. */
+export interface ConePoint {
+  minutes: number
+  low: number
+  mid: number
+  high: number
+}
+
 export interface ForecastResult {
   /** Piezas estimadas al cierre. */
   estimate: number
@@ -50,6 +58,12 @@ export interface ForecastResult {
   hitsTarget: number | null
   /** Piezas que el turno ya lleva. */
   current: number
+  /**
+   * El mismo pronóstico, dibujable: de acá al cierre, dónde habría terminado
+   * hoy si se comportara como cada turno anterior. Empieza en el punto actual
+   * (el cono nace de la curva, no flota) y termina en el estimado.
+   */
+  cone: ConePoint[]
 }
 
 /** Turno anterior comparable: su curva completa y su total al cierre. */
@@ -123,6 +137,29 @@ function comparables(history: HistoryShift[], min: number): HistoryShift[] {
   })
 }
 
+/**
+ * Dónde estaría HOY a la altura `m` si se comportara como el turno `t`.
+ *
+ * Es la pieza que comparten el número y el dibujo: el estimado final es esta
+ * misma proyección evaluada al cierre. Si divergieran, el cono terminaría en
+ * un punto distinto del número grande — el clásico "dos verdades en pantalla".
+ */
+function proyectar(
+  t: HistoryShift, m: number, current: number, min: number, method: ForecastMethod,
+): number | null {
+  const parcial = piecesAt(t.curve, min) ?? 0
+  // Más allá del final de ese turno vale su total: no se extrapola a ciegas.
+  const enM = m >= duracion(t) ? t.totalPieces : (piecesAt(t.curve, m) ?? t.totalPieces)
+  if (method === 'proporcional') {
+    return parcial > 0 ? current * (enM / parcial) : null
+  }
+  if (method === 'aditivo') {
+    return current + Math.max(0, enM - parcial)
+  }
+  if (min <= 0) return null
+  return current + (current / min) * Math.max(0, Math.min(m, duracion(t)) - min)
+}
+
 /** Error medio (MAPE) de un método, prediciendo cada turno con los demás. */
 function errorDe(metodo: ForecastMethod, hist: HistoryShift[], min: number): number | null {
   const errores: number[] = []
@@ -181,29 +218,51 @@ export function buildForecast(args: {
    * habría terminado hoy si se comportara como cada uno de ellos. Así se
    * angosta sola a medida que avanza el turno, sin ningún parámetro.
    */
+  const metodo = mejor.method
   const finales = hist
-    .map((t) => {
-      const parcial = piecesAt(t.curve, currentMinute) ?? 0
-      if (mejor!.method === 'proporcional') {
-        return parcial > 0 ? current * (t.totalPieces / parcial) : null
-      }
-      if (mejor!.method === 'aditivo') return current + Math.max(0, t.totalPieces - parcial)
-      const dur = duracion(t)
-      return current + (current / currentMinute) * Math.max(0, dur - currentMinute)
-    })
+    .map((t) => proyectar(t, duracion(t), current, currentMinute, metodo))
     .filter((v): v is number => v != null && Number.isFinite(v))
     .sort((a, b) => a - b)
 
   const meta = args.targetPieces && args.targetPieces > 0 ? args.targetPieces : null
+
+  /*
+   * El cono: el mismo pronóstico hecho dibujo. Cada 15 minutos de acá al
+   * cierre típico, dónde caería hoy según cada turno anterior. Nace en el
+   * punto actual —los tres métodos dan exactamente `current` en `currentMinute`—
+   * así que la banda sale de la curva y no flota por encima.
+   */
+  const finCono = Math.round(mediana(hist.map(duracion)))
+  const alturas: number[] = []
+  for (let m = currentMinute; m < finCono; m += 15) alturas.push(m)
+  // El cierre SIEMPRE entra, caiga o no en el paso de 15: sin él el cono se
+  // corta antes de tiempo y su punta no coincide con el número grande.
+  if (finCono > currentMinute) alturas.push(finCono)
+
+  const cone: ConePoint[] = []
+  for (const m of alturas) {
+    const vs = hist
+      .map((t) => proyectar(t, m, current, currentMinute, metodo))
+      .filter((v): v is number => v != null && Number.isFinite(v))
+      .sort((a, b) => a - b)
+    if (vs.length === 0) continue
+    cone.push({
+      minutes: m,
+      low: Math.round(vs[0]!),
+      mid: Math.round(mediana(vs)),
+      high: Math.round(vs[vs.length - 1]!),
+    })
+  }
 
   return {
     estimate: Math.round(estimate),
     low: Math.round(finales[0] ?? estimate),
     high: Math.round(finales[finales.length - 1] ?? estimate),
     mapePct: Math.round(mejor.mape * 10) / 10,
-    method: mejor.method,
+    method: metodo,
     samples: hist.length,
     hitsTarget: meta != null ? finales.filter((v) => v >= meta).length : null,
     current,
+    cone,
   }
 }

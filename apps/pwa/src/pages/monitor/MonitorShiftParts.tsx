@@ -12,7 +12,7 @@ import type { PublicMonitorLive } from '@/services/shoplogix/publicShiftMonitor.
 import {
   findGapWindows, resumenComparacion, type CompareResult, type PacePoint, type PlannedBreak,
 } from '@/services/shoplogix/monitorCompare'
-import { MAX_MAPE_PCT, type ForecastResult } from '@/services/shoplogix/monitorForecast'
+import { MAX_MAPE_PCT, type ConePoint, type ForecastResult } from '@/services/shoplogix/monitorForecast'
 import { MonitorCompareChart } from './MonitorCompareChart'
 import { COLORES } from './monitorColors'
 
@@ -276,10 +276,12 @@ function FilaCausa({ x, sel, onCausa }: {
  * además como cuenta Shoplogix (confirmado por Orel, 12-08): la hora 1 va del
  * arranque a +60 min, no hasta el próximo cambio de hora.
  */
-export function ComparadorDias({ cmp, live, onCausa }: {
+export function ComparadorDias({ cmp, live, onCausa, cone }: {
   cmp: CompareResult
   live?: PublicMonitorLive
   onCausa?: (c: string | null) => void
+  /** Proyección al cierre, para dibujarla sobre la curva de hoy. */
+  cone?: ConePoint[] | null
 }) {
   /** La tabla día por día arranca plegada: primero la conclusión. */
   const [detalle, setDetalle] = useState(false)
@@ -341,6 +343,7 @@ export function ComparadorDias({ cmp, live, onCausa }: {
               cerrado={live?.shiftClosed ?? false}
               claveSel={claveSel}
               onSel={setRefSel}
+              cone={cone}
             />
           </div>
 
