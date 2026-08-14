@@ -24,6 +24,7 @@
 
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { piecesAt, type CompareResult, type PacePoint } from '@/services/shoplogix/monitorCompare'
+import type { ConePoint } from '@/services/shoplogix/monitorForecast'
 import { COLORES, COLOR_META } from './monitorColors'
 
 const nf = new Intl.NumberFormat('es-CL')
@@ -94,9 +95,16 @@ function tramosDeBrecha(hoy: PacePoint[], ref: PacePoint[]): Array<{
   return out.filter((s) => s.hoy.length >= 2)
 }
 
-export function MonitorCompareChart({ cmp, cerrado, claveSel, onSel }: {
+export function MonitorCompareChart({ cmp, cerrado, claveSel, onSel, cone }: {
   cmp: CompareResult
   cerrado: boolean
+  /*
+   * Adónde llegaría el turno según los anteriores, de acá al cierre. Se dibuja
+   * como una banda que nace en la punta de la curva de hoy: si la línea de la
+   * cuota queda por encima de todo el cono, que no entra se ve sin leer un
+   * número. Ausente con el turno cerrado o sin muestra suficiente.
+   */
+  cone?: ConePoint[] | null
   /*
    * Qué referencia se compara: 'cuota' o el dateKey+label de un día anterior.
    * El estado vive en el PADRE porque el bloque de la brecha usa la MISMA
@@ -153,14 +161,22 @@ export function MonitorCompareChart({ cmp, cerrado, claveSel, onSel }: {
   )
 
   const { maxMin, maxPz } = useMemo(() => {
-    const mm = Math.max(cmp.maxMinutes, cmp.optimal?.[cmp.optimal.length - 1]?.minutes ?? 0, 60)
+    const finCono = cone?.[cone.length - 1]
+    // El eje tiene que dar para el cono entero, o su parte alta queda cortada.
+    const mm = Math.max(
+      cmp.maxMinutes,
+      cmp.optimal?.[cmp.optimal.length - 1]?.minutes ?? 0,
+      finCono?.minutes ?? 0,
+      60,
+    )
     const mp = Math.max(
       hoy?.totalPieces ?? 0,
       refCurve?.[refCurve.length - 1]?.pieces ?? 0,
+      finCono?.high ?? 0,
       1,
     )
     return { maxMin: mm, maxPz: mp }
-  }, [cmp, hoy, refCurve])
+  }, [cmp, hoy, refCurve, cone])
 
   if (!hoy || cmp.currentMinute == null) return null
 
@@ -261,6 +277,23 @@ export function MonitorCompareChart({ cmp, cerrado, claveSel, onSel }: {
                   vectorEffect="non-scaling-stroke" />
               ))}
 
+              {/* El cono de proyección, detrás de todo: es contexto, no dato
+                  medido. Va antes que la brecha para no taparla. */}
+              {cone && cone.length >= 2 && (
+                <>
+                  <path
+                    d={`${cone.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(p.minutes).toFixed(2)},${y(p.high).toFixed(2)}`).join(' ')} ${[...cone].reverse().map((p) => `L${x(p.minutes).toFixed(2)},${y(p.low).toFixed(2)}`).join(' ')} Z`}
+                    fill={COLORES[0]}
+                    opacity="0.16"
+                  />
+                  <path
+                    d={cone.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(p.minutes).toFixed(2)},${y(p.mid).toFixed(2)}`).join(' ')}
+                    fill="none" stroke={COLORES[0]} strokeWidth="1.4" strokeDasharray="4 3"
+                    opacity="0.8" vectorEffect="non-scaling-stroke"
+                  />
+                </>
+              )}
+
               {/* La brecha pintada: rojo = hoy abajo, verde = hoy arriba. Es lo
                   primero que se lee, por eso va antes que las curvas. */}
               {brecha.map((s, i) => (
@@ -320,6 +353,12 @@ export function MonitorCompareChart({ cmp, cerrado, claveSel, onSel }: {
           <span className="flex items-center gap-1.5">
             <i className="h-1.5 w-4 rounded-full" style={{ background: refColor }} />
             {claveSel === 'cuota' ? 'cuota (se aplana en las paradas de convenio)' : diaSel?.label}
+          </span>
+        )}
+        {cone && cone.length >= 2 && (
+          <span className="flex items-center gap-1.5">
+            <i className="h-2.5 w-2.5 rounded-sm" style={{ background: COLORES[0], opacity: 0.3 }} />
+            dónde terminaron los turnos anteriores
           </span>
         )}
         <span className="flex items-center gap-1.5">

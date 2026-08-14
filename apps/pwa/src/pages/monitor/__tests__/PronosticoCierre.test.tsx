@@ -18,6 +18,10 @@ afterEach(cleanup)
 const FILETE: ForecastResult = {
   estimate: 4257, low: 3973, high: 4650, mapePct: 4, method: 'proporcional',
   samples: 9, hitsTarget: 0, current: 2945,
+  cone: [
+    { minutes: 300, low: 2945, mid: 2945, high: 2945 },
+    { minutes: 470, low: 3973, mid: 4257, high: 4650 },
+  ],
 }
 
 const texto = (f: ForecastResult | null, meta: number | null) =>
