@@ -13,6 +13,23 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-14 - claude - "1 de 10 turnos" no es que la meta entre — tres grados (#546)
+
+- Hecho: visto en vivo con el turno de Filete a media mañana, el pronóstico decía "La meta
+  de 5.000 entra: 1 de 10 turnos la superaron desde acá" mientras la tarjeta del ritmo, dos
+  bloques arriba, decía "No se alcanza con el tiempo que queda" — ambas correctas pero
+  leídas juntas como contradicción. El umbral era `hitsTarget > 0`; ahora hay tres grados:
+  ninguno → "no entra", menos de un tercio → "es difícil: solo N de M lo superó", un tercio
+  o más → "entra".
+- Archivos: apps/pwa/src/pages/monitor/MonitorShiftParts.tsx, .../__tests__/PronosticoCierre.test.tsx
+- Verificación: tsc limpio, vitest 20/20 en src/pages/monitor, verificado en vivo en preview
+  (:5175) contra el turno de Filete en curso. Deploy a GitHub Pages en success.
+- Estado: HECHO
+- Sigue: nada. Nota: este archivo pasó 163 KB — sigue pendiente compactar (cortar narración
+  PR-por-PR vieja, conservar gotchas).
+
+---
+
 ## 2026-08-14 - claude - Gráfico de tramos ocultaba dos horas de turno, y la curva mentía (#544)
 
 - Hecho: 2 fixes medidos sobre el turno del 13-08 en Filete. (1) "Piezas por tramo de 5 min"
