@@ -109,6 +109,16 @@ export interface LlenadoSilletas {
   imposible: boolean
   /** Piezas que la máquina habría dado en ese mismo tiempo con todo lleno. */
   potencial: number | null
+  /**
+   * El mejor tramo del turno superó el set point configurado — o sea que la
+   * máquina NO está corriendo a esa velocidad.
+   *
+   * Es la defensa contra el riesgo real de este bloque: una config que nadie
+   * vuelve a mirar y sigue diciendo 18 cuando hace meses corre en 15. Los
+   * propios datos la desmienten, así que el aviso sale solo. `null` cuando no
+   * hay con qué comprobarlo.
+   */
+  contradiceSetPoint: number | null
 }
 
 /**
@@ -127,6 +137,8 @@ export function llenadoDeSilletas(args: {
   remainingPieces?: number | null
   /** Minutos de producción que quedan (ya sin las paradas de convenio). */
   workMin?: number | null
+  /** El mejor tramo de 5 min del turno, en pz/min: sirve para comprobar el set point. */
+  maxTramoCpm?: number | null
 }): LlenadoSilletas | null {
   const spec = specDeMaquina(args.model)
   if (!spec || !args.cpmAndando || args.cpmAndando <= 0) return null
@@ -146,6 +158,15 @@ export function llenadoDeSilletas(args: {
     potencial: args.producingMin && args.producingMin > 0
       ? Math.round(args.producingMin * spec.setCpm)
       : null,
+    /*
+     * Un 5% de margen: un tramo a 18,4 con el set point en 18 es redondeo del
+     * bucket de 5 minutos, no prueba de nada. Por encima de eso la máquina
+     * está corriendo más rápido que lo configurado y hay que decirlo.
+     */
+    contradiceSetPoint:
+      args.maxTramoCpm != null && args.maxTramoCpm > spec.setCpm * 1.05
+        ? args.maxTramoCpm
+        : null,
   }
 }
 

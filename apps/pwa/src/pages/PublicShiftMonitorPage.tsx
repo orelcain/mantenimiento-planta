@@ -795,6 +795,13 @@ function RitmoNecesario({
               {comoDeCada100(llenado.actual)} de cada 100
             </b>{' '}
             silletas con pieza.
+            {llenado.contradiceSetPoint != null && (
+              <span className="mt-0.5 block text-[11px] text-amber-800 dark:text-amber-300">
+                ⚠ Hubo tramos a{' '}
+                <span className="tabular-nums">{fmtDec(llenado.contradiceSetPoint)} pz/min</span>:
+                la máquina no está corriendo a {fmtCpm(llenado.spec.setCpm)}.
+              </span>
+            )}
           </p>
         )}
       </div>
@@ -942,6 +949,18 @@ function RitmoNecesario({
             No es velocidad de máquina: es cuántas silletas van con pieza
             (abastecimiento o atochamiento aguas abajo).
           </span>
+          {/* Los datos desmintiendo la config: si algún tramo pasó la velocidad
+              configurada, la máquina no está en esa velocidad y el llenado de
+              arriba está mal calculado. Sale solo, sin que nadie se acuerde de
+              revisar el set point. */}
+          {llenado.contradiceSetPoint != null && (
+            <span className="mt-1 block text-[11px] text-amber-800 dark:text-amber-300">
+              ⚠ Hubo tramos a{' '}
+              <span className="tabular-nums">{fmtDec(llenado.contradiceSetPoint)} pz/min</span>: la
+              máquina no está corriendo a {fmtCpm(llenado.spec.setCpm)}. Hay que corregir la
+              velocidad configurada.
+            </span>
+          )}
         </p>
       )}
 
@@ -1720,6 +1739,11 @@ export function PublicShiftMonitorPage() {
       producingMin: live?.timeBreakdown?.producingMin,
       remainingPieces: pace?.remainingPieces,
       workMin: pace?.workMin,
+      // El mejor tramo del turno, para que los datos puedan desmentir el set
+      // point configurado en vez de que alguien tenga que acordarse de revisarlo.
+      maxTramoCpm: live?.series?.length
+        ? Math.max(...live.series.map((p) => p.pieces || 0)) / 5
+        : null,
     }),
     [live?.machines, ritmoAndando.hoy, live?.timeBreakdown, pace],
   )

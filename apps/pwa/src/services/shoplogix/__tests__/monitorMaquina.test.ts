@@ -72,6 +72,41 @@ describe('llenadoDeSilletas', () => {
     expect(l.potencial).toBe(5184)
   })
 
+  /*
+   * La defensa contra una config que envejece: si la máquina corre a otra
+   * velocidad, los propios datos lo desmienten y el aviso sale solo. Nadie
+   * tiene que acordarse de revisar el set point.
+   */
+  describe('comprobación del set point contra los datos', () => {
+    it('avisa cuando un tramo supera la velocidad configurada', () => {
+      const l = llenadoDeSilletas({
+        model: 'Baader 200', cpmAndando: 14, maxTramoCpm: 19.6,
+      })!
+      expect(l.contradiceSetPoint).toBe(19.6)
+    })
+
+    it('no se queja por el redondeo del bucket de 5 min', () => {
+      // 18,4 con el set point en 18 son 92 piezas en un tramo: redondeo, no
+      // prueba de que la máquina corra más rápido.
+      const l = llenadoDeSilletas({
+        model: 'Baader 200', cpmAndando: 14, maxTramoCpm: 18.4,
+      })!
+      expect(l.contradiceSetPoint).toBeNull()
+    })
+
+    it('con el turno real de Filete no se queja: 16,6 está por debajo de 18', () => {
+      const l = llenadoDeSilletas({
+        model: 'Baader 200', cpmAndando: 11.6, maxTramoCpm: 16.6,
+      })!
+      expect(l.contradiceSetPoint).toBeNull()
+    })
+
+    it('sin el dato del mejor tramo no afirma nada', () => {
+      expect(llenadoDeSilletas({ model: 'Baader 200', cpmAndando: 11.6 })!.contradiceSetPoint)
+        .toBeNull()
+    })
+  })
+
   it('sin meta no inventa un llenado necesario', () => {
     const l = llenadoDeSilletas({ model: 'Baader 200', cpmAndando: 11.6 })!
     expect(l.necesaria).toBeNull()
