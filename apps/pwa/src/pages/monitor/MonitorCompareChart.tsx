@@ -25,7 +25,7 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { piecesAt, type CompareResult, type PacePoint } from '@/services/shoplogix/monitorCompare'
 import type { ConePoint } from '@/services/shoplogix/monitorForecast'
-import { COLORES, COLOR_META } from './monitorColors'
+import { COLOR_HOY, COLOR_CUOTA, COLOR_REF, FILL_ARRIBA, FILL_ABAJO } from './monitorColors'
 
 const nf = new Intl.NumberFormat('es-CL')
 const fmtInt = (n: number) => nf.format(Math.round(n || 0))
@@ -35,9 +35,6 @@ const W = 100
 const H = 100
 const ALTO_CHICO = 'h-32'
 const ALTO_GRANDE = 'h-56'
-
-/** La referencia gris neutra para "un día anterior": la principal es hoy. */
-const COLOR_DIA_REF = '#64748b'
 
 /**
  * Tramos continuos de ventaja/desventaja entre hoy y la referencia, con el
@@ -153,7 +150,7 @@ export function MonitorCompareChart({ cmp, cerrado, claveSel, onSel, cone }: {
 
   const diaSel = anteriores.find((d) => d.dateKey + d.label === claveSel) ?? null
   const refCurve: PacePoint[] | null = claveSel === 'cuota' ? cmp.optimal : diaSel?.curve ?? null
-  const refColor = claveSel === 'cuota' ? COLOR_META : COLOR_DIA_REF
+  const refColor = claveSel === 'cuota' ? COLOR_CUOTA : COLOR_REF
 
   const brecha = useMemo(
     () => (hoy && refCurve ? tramosDeBrecha(hoy.curve, refCurve) : []),
@@ -283,12 +280,12 @@ export function MonitorCompareChart({ cmp, cerrado, claveSel, onSel, cone }: {
                 <>
                   <path
                     d={`${cone.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(p.minutes).toFixed(2)},${y(p.high).toFixed(2)}`).join(' ')} ${[...cone].reverse().map((p) => `L${x(p.minutes).toFixed(2)},${y(p.low).toFixed(2)}`).join(' ')} Z`}
-                    fill={COLORES[0]}
+                    style={{ fill: COLOR_HOY }}
                     opacity="0.16"
                   />
                   <path
                     d={cone.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(p.minutes).toFixed(2)},${y(p.mid).toFixed(2)}`).join(' ')}
-                    fill="none" stroke={COLORES[0]} strokeWidth="1.4" strokeDasharray="4 3"
+                    fill="none" style={{ stroke: COLOR_HOY }} strokeWidth="1.4" strokeDasharray="4 3"
                     opacity="0.8" vectorEffect="non-scaling-stroke"
                   />
                 </>
@@ -298,19 +295,19 @@ export function MonitorCompareChart({ cmp, cerrado, claveSel, onSel, cone }: {
                   primero que se lee, por eso va antes que las curvas. */}
               {brecha.map((s, i) => (
                 <path key={i} d={areaBrecha(s)}
-                  fill={s.arriba ? 'rgb(5 150 105 / 0.16)' : 'rgb(239 68 68 / 0.16)'} />
+                  style={{ fill: s.arriba ? FILL_ARRIBA : FILL_ABAJO }} />
               ))}
 
               {/* La referencia: punteada si es la cuota (una meta, no un hecho). */}
               {refCurve && (
-                <path d={path(refCurve)} fill="none" stroke={refColor}
+                <path d={path(refCurve)} fill="none" style={{ stroke: refColor }}
                   strokeWidth={claveSel === 'cuota' ? 1.6 : 1.8}
                   strokeDasharray={claveSel === 'cuota' ? '5 4' : undefined}
                   opacity="0.95" vectorEffect="non-scaling-stroke" />
               )}
 
               {/* Hoy, encima y más gruesa: es la protagonista. */}
-              <path d={path(hoy.curve)} fill="none" stroke={COLORES[0]} strokeWidth="2.4"
+              <path d={path(hoy.curve)} fill="none" style={{ stroke: COLOR_HOY }} strokeWidth="2.4"
                 vectorEffect="non-scaling-stroke" />
             </svg>
 
@@ -323,7 +320,7 @@ export function MonitorCompareChart({ cmp, cerrado, claveSel, onSel, cone }: {
                 style={{
                   left: `${fx(cmp.currentMinute) * 100}%`,
                   top: `${fy(hoy.atCurrentMinute) * 100}%`,
-                  background: COLORES[0],
+                  background: COLOR_HOY,
                 }}
               />
             )}
@@ -346,7 +343,7 @@ export function MonitorCompareChart({ cmp, cerrado, claveSel, onSel, cone }: {
 
       <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
         <span className="flex items-center gap-1.5">
-          <i className="h-1.5 w-4 rounded-full" style={{ background: COLORES[0] }} />
+          <i className="h-1.5 w-4 rounded-full" style={{ background: COLOR_HOY }} />
           hoy
         </span>
         {refCurve && (
@@ -357,16 +354,16 @@ export function MonitorCompareChart({ cmp, cerrado, claveSel, onSel, cone }: {
         )}
         {cone && cone.length >= 2 && (
           <span className="flex items-center gap-1.5">
-            <i className="h-2.5 w-2.5 rounded-sm" style={{ background: COLORES[0], opacity: 0.3 }} />
+            <i className="h-2.5 w-2.5 rounded-sm" style={{ background: COLOR_HOY, opacity: 0.3 }} />
             dónde terminaron los turnos anteriores
           </span>
         )}
         <span className="flex items-center gap-1.5">
-          <i className="h-2.5 w-2.5 rounded-sm" style={{ background: 'rgb(239 68 68 / 0.3)' }} />
+          <i className="h-2.5 w-2.5 rounded-sm" style={{ background: FILL_ABAJO }} />
           vas abajo
         </span>
         <span className="flex items-center gap-1.5">
-          <i className="h-2.5 w-2.5 rounded-sm" style={{ background: 'rgb(5 150 105 / 0.3)' }} />
+          <i className="h-2.5 w-2.5 rounded-sm" style={{ background: FILL_ARRIBA }} />
           vas arriba
         </span>
         {zoom > 1 && <span>deslizá el gráfico &#8594;</span>}

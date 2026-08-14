@@ -84,6 +84,23 @@
   --lc-crit: #dc2626;
   --lc-star: #b7791f;
 
+  /* Monitor público de turno — TRES roles, no una paleta de identidades.
+     Las curvas de los gráficos se dibujaban con hex crudos de Tailwind
+     (#38bdf8 hoy, #f59e0b cuota) que nunca pasaron por el −50% de croma de
+     julio: brillaban en oscuro y en CLARO daban 1,9:1 sobre --card, muy por
+     debajo del 3:1 que pide WCAG para un trazo (o sea: al sol no estaban).
+     Derivados por OKLCH del hue de marca #2E75B6, con la luminosidad ajustada
+     por tema. El contraste de cada uno es deliberado y arma la jerarquía:
+     hoy 6:1 pesa el doble que la referencia 3,2:1, así que la curva propia se
+     lee primero aunque las tres se crucen. */
+  --mon-hoy: #3e5c7b;
+  --mon-cuota: #8b6434;
+  --mon-ref: #7e8692;
+  /* Relleno de la brecha: mismo patrón `-soft` que el resto del archivo,
+     sobre los semánticos −50% (no el rojo/verde puros que había). */
+  --mon-arriba-soft: rgba(103, 149, 118, 0.22);
+  --mon-abajo-soft: rgba(176, 112, 109, 0.22);
+
   /* Rampa secuencial de la matriz de turnos — 4 pasos del hue de marca
      (#2E75B6). Codifica MAGNITUD (ciclos / piezas / uptime), nunca estado:
      el estado va aparte, en forma (esquina + punto), para que se lea aunque
@@ -228,6 +245,14 @@
   --lc-warn: #cf9636;
   --lc-crit: #d95757;
   --lc-star: #d9ab4e;
+
+  /* Monitor público — mismos tres roles, aclarados para el card oscuro
+     (#16242f). Ver el comentario largo en :root. */
+  --mon-hoy: #82a3c4;
+  --mon-cuota: #ac8352;
+  --mon-ref: #69717d;
+  --mon-arriba-soft: rgba(108, 154, 138, 0.22);
+  --mon-abajo-soft: rgba(178, 128, 127, 0.22);
 
   /* Rampa de la matriz en oscuro: NO es el claro invertido — se re-derivó y
      re-validó contra el card oscuro (#16242f). El anclaje se da vuelta porque

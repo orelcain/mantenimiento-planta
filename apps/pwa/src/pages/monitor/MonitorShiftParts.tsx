@@ -14,7 +14,7 @@ import {
 } from '@/services/shoplogix/monitorCompare'
 import { MAX_MAPE_PCT, type ConePoint, type ForecastResult } from '@/services/shoplogix/monitorForecast'
 import { MonitorCompareChart } from './MonitorCompareChart'
-import { COLORES } from './monitorColors'
+import { COLOR_HOY, COLOR_CUOTA, COLOR_REF } from './monitorColors'
 
 const nf = new Intl.NumberFormat('es-CL')
 const fmtInt = (n: number) => nf.format(Math.round(n || 0))
@@ -110,10 +110,12 @@ function fmtDurMin(min: number): string {
  * "planificado 78 min" a secas invita a sospechar que se esconde algo. Si la
  * colación se llevó 57 minutos, que se lea "COLACION 57 min · 4×".
  */
-export function TiempoDelTurno({ tb, causaSel, onCausa }: {
+export function TiempoDelTurno({ tb, causaSel, onCausa, proximaParada }: {
   tb: PublicMonitorLive['timeBreakdown']
   causaSel?: string | null
   onCausa?: (c: string | null) => void
+  /** Hora de reloj de la próxima parada de convenio, ya formateada. */
+  proximaParada?: string | null
 }) {
   const [abierto, setAbierto] = useState(false)
   if (!tb || tb.windowMin <= 0) return null
@@ -142,13 +144,19 @@ export function TiempoDelTurno({ tb, causaSel, onCausa }: {
         >
           {pct(tb.producingMin) > 14 && `${Math.round(pct(tb.producingMin))}%`}
         </span>
-        <span
-          className="flex items-center justify-center bg-slate-500"
-          style={{ width: `${pct(tb.plannedMin)}%` }}
-          title={`Planificado ${tb.plannedMin} min`}
-        >
-          {pct(tb.plannedMin) > 14 && `${Math.round(pct(tb.plannedMin))}%`}
-        </span>
+        {/* En cero no se renderiza: un segmento de ancho 0 no se ve, pero su
+            `title` seguía diciendo "Planificado 0 min" en el árbol de
+            accesibilidad — un lector de pantalla anunciaba justo el dato que
+            se sacó de la leyenda por no aportar. */}
+        {tb.plannedMin > 0 && (
+          <span
+            className="flex items-center justify-center bg-slate-500"
+            style={{ width: `${pct(tb.plannedMin)}%` }}
+            title={`Planificado ${tb.plannedMin} min`}
+          >
+            {pct(tb.plannedMin) > 14 && `${Math.round(pct(tb.plannedMin))}%`}
+          </span>
+        )}
         <span
           className="flex items-center justify-center bg-red-600 dark:bg-red-500"
           style={{ width: `${pct(tb.recoverableMin)}%` }}
@@ -164,15 +172,27 @@ export function TiempoDelTurno({ tb, causaSel, onCausa }: {
           <i className="h-2.5 w-2.5 rounded-sm bg-emerald-600 dark:bg-emerald-500" />
           Produciendo <span className="tabular-nums text-foreground/80">{tb.producingMin} min</span>
         </span>
-        <span className="flex items-center gap-1.5">
-          <i className="h-2.5 w-2.5 rounded-sm bg-slate-500" />
-          Planificado <span className="tabular-nums text-foreground/80">{tb.plannedMin} min</span>
-        </span>
+        {/* Un chip en cero ocupa lugar para no decir nada, y peor: se lee como
+            si el dato faltara. Cuando todavía no hubo paradas de convenio, la
+            línea de abajo dice cuándo entra la próxima. */}
+        {tb.plannedMin > 0 && (
+          <span className="flex items-center gap-1.5">
+            <i className="h-2.5 w-2.5 rounded-sm bg-slate-500" />
+            Planificado <span className="tabular-nums text-foreground/80">{tb.plannedMin} min</span>
+          </span>
+        )}
         <span className="flex items-center gap-1.5">
           <i className="h-2.5 w-2.5 rounded-sm bg-red-600 dark:bg-red-500" />
           Recuperable <span className="tabular-nums text-foreground/80">{tb.recoverableMin} min</span>
         </span>
       </div>
+
+      {tb.plannedMin === 0 && proximaParada && (
+        <p className="mt-1.5 text-[11px] text-muted-foreground">
+          Todavía sin paradas de convenio: la próxima entra a las{' '}
+          <span className="tabular-nums">{proximaParada}</span>.
+        </p>
+      )}
 
       <button
         type="button"
@@ -380,7 +400,7 @@ export function ComparadorDias({ cmp, live, onCausa, cone }: {
                 <li key={d.dateKey + d.label} className="flex items-center gap-2 px-1 text-[12px]">
                   <span
                     className="h-2 w-2 shrink-0 rounded-full"
-                    style={{ background: d.esHoy ? COLORES[0] : '#64748b' }}
+                    style={{ background: d.esHoy ? COLOR_HOY : COLOR_REF }}
                   />
                   <span className={`w-14 shrink-0 truncate ${d.esHoy ? 'font-semibold' : 'text-foreground/80'}`}>
                     {d.label}
@@ -411,7 +431,8 @@ export function ComparadorDias({ cmp, live, onCausa, cone }: {
 
             {cmp.optimalAtCurrentMinute != null && cmp.optimalAtCurrentMinute > 0 && (
               <li className="flex items-center gap-2 border-t border-border pt-1.5 text-[12px]">
-                <span className="h-2 w-2 shrink-0 rounded-full border border-dashed border-amber-500" />
+                <span className="h-2 w-2 shrink-0 rounded-full border border-dashed"
+                  style={{ borderColor: COLOR_CUOTA }} />
                 <span className="w-14 shrink-0 truncate text-amber-700 dark:text-amber-300">
                   Cuota
                 </span>
@@ -694,16 +715,27 @@ function Veredicto({ cmp, cerrado, producingMin }: {
             </dd>
           </div>
         )}
-        {r.cuota && (
+        {/*
+          * Acá vivía "Para la cuota −918 · pide 3.166", que era el MISMO dato
+          * tres veces en el mismo bloque: la cabecera plegada ya muestra
+          * "−918 vs cuota" y la frase de arriba dice "918 pz abajo de la cuota
+          * de 5.000, que a esta altura pide 3.166" — con más contexto que la
+          * tarjeta. El lugar se lo gana algo que no está en ninguna otra
+          * parte: entre cuánto y cuánto se movieron los días anteriores a esta
+          * altura, que contesta "¿es un mal día o el día de siempre?".
+          */}
+        {r.rango && (
           <div className="rounded-xl border border-border bg-muted/60 px-2.5 py-1.5">
             <dt className="text-[10px] uppercase tracking-wide text-muted-foreground">
-              Para la cuota
+              Los {r.rango.dias} días a esta altura
             </dt>
-            <dd className={`mt-0.5 text-lg font-bold tabular-nums ${tono(r.cuota.dif)}`}>
-              {conSigno(r.cuota.dif)}
-              <span className="ml-1 text-[11px] font-normal text-muted-foreground">
-                {cerrado ? 'pedía' : 'pide'} {fmtInt(r.cuota.valor)}
-              </span>
+            <dd className="mt-0.5 text-base font-bold tabular-nums">
+              {fmtInt(r.rango.min)}–{fmtInt(r.rango.max)}
+              {r.actual != null && (
+                <span className="ml-1 text-[11px] font-normal text-muted-foreground">
+                  {cerrado ? 'fue' : 'hoy'} {fmtInt(r.actual)}
+                </span>
+              )}
             </dd>
           </div>
         )}
@@ -1080,7 +1112,7 @@ export function VelocidadDeLinea({ series, breaks, recentPerMinute, avgPerMinute
             {/* Las referencias primero: las curvas van encima. */}
             {requiredPerMinute != null && requiredPerMinute > 0 && requiredPerMinute < maxY && (
               <line x1={0} x2={W} y1={y(requiredPerMinute)} y2={y(requiredPerMinute)}
-                stroke="#f59e0b" strokeWidth="1" strokeDasharray="4 3" opacity="0.85"
+                style={{ stroke: COLOR_CUOTA }} strokeWidth="1" strokeDasharray="4 3" opacity="0.85"
                 vectorEffect="non-scaling-stroke" />
             )}
             {medianCpm != null && medianCpm > 0 && (
@@ -1089,9 +1121,9 @@ export function VelocidadDeLinea({ series, breaks, recentPerMinute, avgPerMinute
                 className="text-muted-foreground/70" vectorEffect="non-scaling-stroke" />
             )}
 
-            <polyline points={linea(raw)} fill="none" stroke={COLORES[0]}
+            <polyline points={linea(raw)} fill="none" style={{ stroke: COLOR_HOY }}
               strokeWidth="1" opacity="0.25" vectorEffect="non-scaling-stroke" />
-            <polyline points={linea(media)} fill="none" stroke={COLORES[0]}
+            <polyline points={linea(media)} fill="none" style={{ stroke: COLOR_HOY }}
               strokeWidth="2.4" vectorEffect="non-scaling-stroke" />
           </svg>
           {/* Eje de horas en HTML: un <text> dentro de un SVG con
@@ -1112,16 +1144,16 @@ export function VelocidadDeLinea({ series, breaks, recentPerMinute, avgPerMinute
 
       <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
         <span className="flex items-center gap-1.5">
-          <i className="h-1.5 w-4 rounded-full" style={{ background: COLORES[0] }} />
+          <i className="h-1.5 w-4 rounded-full" style={{ background: COLOR_HOY }} />
           media 15 min
         </span>
         <span className="flex items-center gap-1.5">
-          <i className="h-1.5 w-4 rounded-full opacity-30" style={{ background: COLORES[0] }} />
+          <i className="h-1.5 w-4 rounded-full opacity-30" style={{ background: COLOR_HOY }} />
           tramos de 5 min (el dato crudo de Shoplogix)
         </span>
         {requiredPerMinute != null && requiredPerMinute > 0 && (
           <span className="flex items-center gap-1.5">
-            <i className="h-0.5 w-4 rounded-full bg-amber-500" />
+            <i className="h-0.5 w-4 rounded-full" style={{ background: COLOR_CUOTA }} />
             necesitás <span className="tabular-nums">{fmtDec(requiredPerMinute)}</span>
           </span>
         )}

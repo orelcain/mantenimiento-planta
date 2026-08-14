@@ -471,6 +471,15 @@ export interface ResumenComparacion {
   mejor: { label: string; dif: number; valor: number } | null
   /** Contra lo que la cuota pide a esta altura, y la cuota completa del turno. */
   cuota: { dif: number; valor: number; meta: number | null } | null
+  /**
+   * De cuánto a cuánto llevaban los días anteriores a esta MISMA altura.
+   *
+   * Contesta algo que ninguna otra cifra del bloque contesta: si el turno cae
+   * dentro de lo normal o afuera. "−918 vs la cuota" dice cuánto falta; el
+   * rango dice si eso es un mal día o el día de siempre. Solo con dos días o
+   * más — con uno, el "rango" sería ese día repetido dos veces.
+   */
+  rango: { min: number; max: number; dias: number } | null
 }
 
 /**
@@ -515,6 +524,13 @@ export function resumenComparacion(cmp: CompareResult): ResumenComparacion {
           dif: actual - cmp.optimalAtCurrentMinute,
           valor: cmp.optimalAtCurrentMinute,
           meta: cmp.targetPieces ?? null,
+        }
+      : null,
+    rango: anteriores.length >= 2
+      ? {
+          min: Math.min(...anteriores.map((d) => d.atCurrentMinute!)),
+          max: Math.max(...anteriores.map((d) => d.atCurrentMinute!)),
+          dias: anteriores.length,
         }
       : null,
   }

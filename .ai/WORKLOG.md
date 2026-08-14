@@ -13,6 +13,25 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-14 - claude - Tres roles de color en vez de siete, y el desenlace junto (PR pendiente de merge)
+
+- Hecho: `monitorColors.ts` era 7 hex crudos de Tailwind; 6 muertos y los 2 usados (hoy/cuota)
+  daban 1,9:1 sobre `--card` en claro (WCAG pide 3:1 para un trazo). Reemplazado por 3 roles
+  con nombre (hoy/cuota/referencia) por OKLCH del hue de marca, variables `--mon-*` por tema.
+  Además: tarjeta de cuota muestra rango de días comparables en vez de repetir el mismo
+  número 3 veces; chip "Planificado 0 min" se oculta; "Comparado con otros días" sube junto
+  a "Cierre estimado".
+- Archivos: index.css, monitorColors.ts, MonitorCompareChart.tsx, MonitorShiftParts.tsx,
+  PublicShiftMonitorPage.tsx, monitorCompare.ts (+test).
+- Gotchas: (a) los colores van por `style={{ stroke }}`, no por atributo `stroke=` — los
+  atributos de presentación SVG no resuelven `var()`; (b) los hex de gráficos NO pasan por
+  `tailwind.config.js`, hay que medirles el contraste a mano en LOS DOS temas.
+- Verificación: tsc limpio, 290 tests, navegador a 390px en claro/oscuro sobre turno vivo.
+- Estado: EN REVISIÓN (PR abierto, merge lo decide Orel)
+- Sigue: nada de código. Nota: este archivo pasó ~166 KB, sigue pendiente compactar.
+
+---
+
 ## 2026-08-14 - claude - La curva de la cuota se reparte sobre el turno completo (#548)
 
 - Hecho: visto en vivo con el turno de Filete en curso a las 11:25, `timeBreakdown.windowMin`
