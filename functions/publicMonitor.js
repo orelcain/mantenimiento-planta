@@ -1374,6 +1374,13 @@ function resumirParaForecast(live) {
   const t0 = Date.parse(serie[0].t)
   if (Number.isNaN(t0)) return null
 
+  /*
+   * ⚠⚠ Objetos {m, p} y NO pares [m, p]: **Firestore rechaza los arrays
+   * anidados** ("Property array contains an invalid nested entity") y el write
+   * del patch falla ENTERO — no solo este campo. Costó tener el monitor
+   * congelado 25 minutos en producción el 13-08: el cálculo se había probado
+   * leyendo, nunca escribiendo.
+   */
   const curve = []
   let acum = 0
   let proximo = 0
@@ -1381,14 +1388,14 @@ function resumirParaForecast(live) {
     acum += p.pieces || 0
     const min = Math.round((Date.parse(p.t) - t0) / 60_000) + 5
     if (min >= proximo) {
-      curve.push([min, acum])
+      curve.push({ m: min, p: acum })
       proximo = min + FORECAST_STEP_MIN
     }
   }
   // El cierre siempre entra: es el punto que ancla toda la proyección.
   const ultimo = curve[curve.length - 1]
   const finMin = Math.round((Date.parse(serie[serie.length - 1].t) - t0) / 60_000) + 5
-  if (!ultimo || ultimo[0] !== finMin) curve.push([finMin, acum])
+  if (!ultimo || ultimo.m !== finMin) curve.push({ m: finMin, p: acum })
   if (curve.length < 3) return null
 
   /*

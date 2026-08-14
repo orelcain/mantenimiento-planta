@@ -1093,7 +1093,7 @@ export function PublicShiftMonitorPage() {
      * las líneas de un solo turno por día, donde alcanzaba).
      */
     const resumidos = (data?.forecastHistory ?? []).map((h) => ({
-      curve: h.curve.map(([minutes, pieces]) => ({ minutes, pieces })),
+      curve: (h.curve ?? []).map((p) => ({ minutes: p.m, pieces: p.p })),
       totalPieces: h.total,
     }))
     const historial = resumidos.length > 0
