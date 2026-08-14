@@ -9,9 +9,7 @@
 import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import type { PublicMonitorLive } from '@/services/shoplogix/publicShiftMonitor.service'
-import {
-  findGapWindows, resumenComparacion, type CompareResult, type PacePoint,
-} from '@/services/shoplogix/monitorCompare'
+import { resumenComparacion, type CompareResult } from '@/services/shoplogix/monitorCompare'
 import { MAX_MAPE_PCT, type ConePoint, type ForecastResult } from '@/services/shoplogix/monitorForecast'
 import { MonitorCompareChart } from './MonitorCompareChart'
 import type { Ventana } from './useZoomGesto'
@@ -131,7 +129,7 @@ function fmtDurMin(min: number): string {
  * le pide a la línea que recupere un tiempo que por convenio no se recupera.
  */
 export function TiempoDelTurno({
-  tb, causaSel, onCausa, proximaParada, notas, brecha, cpmAndando, brechaSlot,
+  tb, causaSel, onCausa, proximaParada, notas, brecha, cpmAndando,
 }: {
   tb: PublicMonitorLive['timeBreakdown']
   causaSel?: string | null
@@ -144,8 +142,6 @@ export function TiempoDelTurno({
   brecha?: number | null
   /** Ritmo de la línea ANDANDO, para traducir minutos parados a piezas. */
   cpmAndando?: number | null
-  /** «Cuándo se abrió»: viene del padre, que resuelve contra qué se compara. */
-  brechaSlot?: React.ReactNode
 }) {
   /* El reparto del tiempo pasa a DETALLE: la barra de 72/16/13% es el "cómo",
      y arriba va el "cuánto costó", que es lo que se viene a mirar. */
@@ -242,6 +238,15 @@ export function TiempoDelTurno({
               notas={notas?.get(x.reason)} piezas={piezasDe(x.min)} />
           ))}
         </ul>
+        {/* El "cuándo" de cada causa lo da el gráfico, no una caja aparte: acá
+            vivía "dónde se abrió la brecha", que sin sus cifras solo repetía
+            estos mismos nombres con una hora al lado — y encima solo los tres
+            peores. Tocar la causa marca TODAS sus paradas en la serie. */}
+        {onCausa && tb.recoverable.length > 0 && (
+          <p className="mt-1.5 text-[10.5px] text-muted-foreground/70">
+            Tocá una causa para ver en qué momento del turno ocurrió.
+          </p>
+        )}
       </div>
 
       {/* ── 3 · El convenio, aparte y sin convertir a piezas ───────────── */}
@@ -261,9 +266,6 @@ export function TiempoDelTurno({
           )}
         </div>
       )}
-
-      {/* ── 4 · Cuándo se abrió ────────────────────────────────────────── */}
-      {brechaSlot}
 
       {/* ── 5 · El reparto del tiempo, plegado ─────────────────────────── */}
       <button
@@ -341,7 +343,6 @@ export function TiempoDelTurno({
           <p className="mt-2 text-[10px] leading-snug text-muted-foreground/70">
             Los minutos son los que la causa estuvo activa en alguna máquina; la barra mide la
             LÍNEA, que solo se detiene cuando paran todas.
-            {onCausa && ' Tocá una causa para ver en qué momento del turno ocurrió.'}
           </p>
         </div>
       )}
@@ -559,136 +560,6 @@ export function ComparadorDias({ cmp, live, cone, ventana, onVentana, refSel, on
   )
 }
 
-/**
- * Dónde se abrió la brecha — el bloque que convierte la comparación en una
- * pregunta contestable.
- *
- * Ver la curva de hoy por debajo de la de ayer dice QUE se perdió, no DÓNDE. Y
- * muchas veces el atraso se repartió en dos o tres golpes distintos: mostrar
- * solo el peor cuenta la mitad de la historia. Cada tramo se cruza contra las
- * detenciones y contra lo que el operador escribió, y recién ahí se puede
- * responder "¿qué pasó que nos atrasó?".
- *
- * La referencia es LA MISMA que el chip del comparador (v3): con el gráfico
- * comparando contra la cuota y esta lista contra "lun 10" eran dos verdades a
- * 20 px de distancia. Si contra la referencia elegida hoy no perdió terreno,
- * el bloque simplemente no aparece.
- */
-export function BrechaDelDia({ cmp, live, onCausa, contra }: {
-  cmp: CompareResult
-  live?: PublicMonitorLive
-  onCausa?: (c: string | null) => void
-  contra: { curva: PacePoint[]; nombre: string } | null
-}) {
-  const hoy = cmp.days.find((d) => d.esHoy)
-  if (!hoy || cmp.currentMinute == null || !contra) return null
-
-  // Hasta 3 tramos; el filtro del 10% del atraso ya viene hecho del servicio.
-  const ventanas = findGapWindows(hoy.curve, contra.curva, 3)
-  if (ventanas.length === 0) return null
-
-  /*
-   * Minutos de turno → hora de reloj. El arranque es el primer tramo con dato,
-   * el mismo origen con el que se armó la curva; tomar `scheduledStart` correría
-   * la ventana los minutos que la línea tardó en dar la primera pieza.
-   */
-  const t0 = live?.series?.[0]?.t ? Date.parse(live.series[0]!.t) : null
-  const reloj = (min: number) =>
-    t0 == null
-      ? null
-      : new Date(t0 + min * 60_000).toISOString().slice(11, 16)
-
-  /** La causa que más tiempo se llevó dentro de la ventana, y el comentario. */
-  const explicar = (g: { fromMin: number; toMin: number }) => {
-    if (t0 == null || !live?.stopEvents || !live.stopReasons) {
-      return { causa: null as string | null, comentario: null as string | null }
-    }
-    const desde = t0 + g.fromMin * 60_000
-    const hasta = t0 + g.toMin * 60_000
-    const acc = new Map<string, number>()
-    for (const e of live.stopEvents) {
-      const a = Date.parse(e.f)
-      const b = a + e.s * 1000
-      const solape = Math.min(b, hasta) - Math.max(a, desde)
-      if (solape > 0) {
-        const rr = live.stopReasons[e.r]
-        if (rr) acc.set(rr, (acc.get(rr) ?? 0) + solape)
-      }
-    }
-    const causa = [...acc.entries()].sort((x, y) => y[1] - x[1])[0]?.[0] ?? null
-    const c = (live.comments ?? []).find((x) => {
-      if (!x.f) return false
-      const a = Date.parse(x.f)
-      const b = x.h ? Date.parse(x.h) : a
-      return a < hasta && b > desde && b - a <= 2 * 60 * 60_000
-    })
-    return { causa, comentario: c?.t ?? null }
-  }
-
-  return (
-    <div className="mt-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-2.5 py-2 text-[12px]">
-      <p className="text-[10px] uppercase tracking-wide text-amber-800 dark:text-amber-300">
-        Cuándo se abrió la brecha
-      </p>
-
-      <ul className="mt-1 space-y-1.5">
-        {ventanas.map((g) => {
-          const { causa } = explicar(g)
-          const desdeTxt = reloj(g.fromMin)
-          const hastaTxt = reloj(g.toMin)
-          return (
-            <li key={g.fromMin}>
-              <p className="text-foreground">
-                {desdeTxt && hastaTxt ? (
-                  <span className="tabular-nums font-semibold">{desdeTxt}–{hastaTxt}</span>
-                ) : (
-                  <span className="tabular-nums font-semibold">
-                    min {g.fromMin}–{g.toMin} de turno
-                  </span>
-                )}
-                {/* ⚠ Sin pz ni % desde que la lista de causas trae su costo en
-                    piezas: acá decía "AGUA −249" y arriba "AGUA 148", dos
-                    números para la misma causa en el mismo bloque — se leía
-                    como un error de cuenta (lo cazó Orel al toque). Son medidas
-                    distintas (la parada en sí contra el rato de reloj vs la
-                    referencia), y la que queda es la de la lista. Este bloque
-                    aporta el CUÁNDO, y el toque marca el gráfico. */}
-                {causa && (
-                  <>
-                    {' · '}
-                    {onCausa ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          onCausa(causa)
-                          document
-                            .getElementById('grafico-turno')
-                            ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-                        }}
-                        className="text-rose-700 underline underline-offset-2 dark:text-rose-300"
-                      >
-                        {causa}
-                      </button>
-                    ) : (
-                      <span className="text-rose-700 dark:text-rose-300">{causa}</span>
-                    )}
-                  </>
-                )}
-              </p>
-              {/* ⚠ El comentario del operador NO se repite acá.
-                  Desde que va pegado a su causa en "A dónde se va el tiempo" y
-                  completo en la bitácora, imprimirlo también en la brecha lo
-                  mostraba TRES veces en la misma pantalla — «Falla
-                  abastecimiento agua dulce» aparecía arriba, al medio y abajo.
-                  Acá alcanza con la causa, que además marca el gráfico al
-                  tocarla; el texto vive donde explica la causa. */}
-            </li>
-          )
-        })}
-      </ul>
-    </div>
-  )
-}
 
 /**
  * La conclusión del comparador, arriba y en palabras.

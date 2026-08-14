@@ -49,7 +49,7 @@ import { llenadoDeSilletas, comoDeCada100, type LlenadoSilletas } from '@/servic
 import { DiagnosticoDeLinea } from './monitor/MonitorDiagnostico'
 import { ParetoDeParadas } from './monitor/MonitorPareto'
 import { useZoomGesto, type Ventana } from './monitor/useZoomGesto'
-import { TiempoDelTurno, ComparadorDias, Bloque, BitacoraOperador, PronosticoCierre, notasPorCausa, BrechaDelDia, referenciaDe } from './monitor/MonitorShiftParts'
+import { TiempoDelTurno, ComparadorDias, Bloque, BitacoraOperador, PronosticoCierre, notasPorCausa } from './monitor/MonitorShiftParts'
 import { useIsAdmin } from '@/store'
 
 // ── Formateadores (locales a propósito: esta página no debe arrastrar el
@@ -2372,20 +2372,6 @@ export function PublicShiftMonitorPage() {
             live.timeBreakdown && live.timeBreakdown.producingMin > 0
               ? live.totalPieces / live.timeBreakdown.producingMin
               : null
-          }
-          /* El «cuándo se abrió» se muda acá desde el comparador: es el momento
-             de las MISMAS causas que la lista de arriba. */
-          brechaSlot={
-            <BrechaDelDia
-              cmp={comparacion}
-              live={live}
-              onCausa={setCausaSel}
-              /* SIEMPRE contra la cuota: el bloque explica por qué no se llegó
-                 a la META, y seguir al chip del comparador haría que "cuándo se
-                 abrió" midiera contra "jue 13" mientras la resta de arriba
-                 habla de la cuota — dos referencias en el mismo bloque. */
-              contra={referenciaDe(comparacion, 'cuota').contra}
-            />
           }
         />
 
