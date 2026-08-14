@@ -13,6 +13,24 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-14 - claude - Gráfico de tramos ocultaba dos horas de turno, y la curva mentía (#544)
+
+- Hecho: 2 fixes medidos sobre el turno del 13-08 en Filete. (1) "Piezas por tramo de 5 min"
+  tenía un piso de ancho de barra (`max(0.5, W/n - gap)`) que con 118 tramos dejaba las
+  últimas 15 barras fuera del viewBox (borde en x=129 vs 100) — casi dos horas de producción
+  invisibles. Ahora el paso es `W / n`, barra al 70%. (2) La curva de velocidad cortaba la
+  cola de ceros del final (turno terminado ≠ turno cayéndose) y la escala pasa a marcas
+  redondas cada 5 en vez de máximo/mitad ilegibles.
+- Archivos: apps/pwa/src/pages/monitor/MonitorShiftParts.tsx, apps/pwa/src/pages/PublicShiftMonitorPage.tsx
+- Verificación: 96 → 118 barras visibles, escala 20/15/10/5, verificado en pantalla contra
+  el monitor real de Filete con el dev server reiniciado (preview :5175). tsc, eslint y
+  vitest 286/286 limpios. Deploy a GitHub Pages en success (run 31764396081).
+- Estado: HECHO
+- Sigue: nada pendiente de este fix. Este archivo pasó ~160 KB — sigue pendiente compactar
+  (cortar narración PR-por-PR vieja, conservar gotchas).
+
+---
+
 ## 2026-08-14 - claude - HOTFIX: monitor dejó de refrescarse — Firestore rechaza arrays anidados (#542)
 
 - Hecho: el #540 mandaba la curva de `forecastHistory` como pares `[m, p]`; Firestore no
