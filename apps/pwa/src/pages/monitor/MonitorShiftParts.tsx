@@ -841,7 +841,21 @@ export function PronosticoCierre({ f, meta }: {
     )
   }
 
-  const alcanza = meta != null && f.hitsTarget != null && f.hitsTarget > 0
+  /*
+   * Tres grados, no dos.
+   *
+   * ⚠ Visto en vivo el 14-08 con el turno de Filete a media mañana: con 1 de
+   * 10 turnos por encima de la meta la pantalla decía "la meta entra" mientras
+   * la tarjeta del ritmo, dos bloques más arriba, decía "no se alcanza". Ambas
+   * eran correctas y juntas se leían como una contradicción. Un caso entre
+   * diez no es "entra": es que se pudo una vez.
+   */
+  const proporcion = meta != null && f.hitsTarget != null && f.samples > 0
+    ? f.hitsTarget / f.samples
+    : null
+  const grado: 'entra' | 'dificil' | 'no' =
+    proporcion == null || proporcion === 0 ? 'no' : proporcion >= 1 / 3 ? 'entra' : 'dificil'
+
   const nombreMetodo = f.method === 'proporcional'
     ? 'proporcional'
     : f.method === 'aditivo' ? 'aditivo' : 'ritmo del turno'
@@ -880,10 +894,14 @@ export function PronosticoCierre({ f, meta }: {
 
       {meta != null && f.hitsTarget != null && (
         <p className={`mt-2 text-[13px] font-semibold ${
-          alcanza ? 'text-emerald-800 dark:text-emerald-300' : 'text-amber-800 dark:text-amber-300'
+          grado === 'entra'
+            ? 'text-emerald-800 dark:text-emerald-300'
+            : 'text-amber-800 dark:text-amber-300'
         }`}>
-          {alcanza
+          {grado === 'entra'
             ? `La meta de ${fmtInt(meta)} entra: ${f.hitsTarget} de ${f.samples} turnos la superaron desde acá.`
+            : grado === 'dificil'
+            ? `La meta de ${fmtInt(meta)} es difícil: solo ${f.hitsTarget} de ${f.samples} turnos la superó desde acá.`
             : `La meta de ${fmtInt(meta)} no entra: ninguno de los ${f.samples} turnos anteriores llegó desde esta altura.`}
         </p>
       )}
