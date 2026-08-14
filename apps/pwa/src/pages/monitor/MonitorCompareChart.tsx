@@ -29,6 +29,9 @@ import { COLOR_HOY, COLOR_CUOTA, COLOR_REF, FILL_ARRIBA, FILL_ABAJO } from './mo
 
 const nf = new Intl.NumberFormat('es-CL')
 const fmtInt = (n: number) => nf.format(Math.round(n || 0))
+/** Miles del eje: "5k" o "2,5k" — sin decimal cuando es entero. */
+const fmtDec1 = (n: number) =>
+  Number.isInteger(n) ? String(n) : n.toLocaleString('es-CL', { maximumFractionDigits: 1 })
 
 /** Coordenadas internas del SVG. */
 const W = 100
@@ -177,9 +180,31 @@ export function MonitorCompareChart({ cmp, cerrado, claveSel, onSel, cone }: {
 
   if (!hoy || cmp.currentMinute == null) return null
 
+  /*
+   * ── La escala vertical, en marcas REDONDAS ──────────────────────────────
+   *
+   * Antes el eje mostraba el máximo y su mitad —"5.011" y "2.506" el 14-08— y
+   * las guías caían en el 25/50/75% de ese máximo: números que nadie usa para
+   * leer un acumulado, y que cambian de turno en turno. Ahora la escala se
+   * redondea hacia arriba a un múltiplo "lindo" y las guías caen en esas mismas
+   * marcas, igual que en el gráfico de velocidad. Así dos turnos distintos se
+   * leen contra la misma regla.
+   */
+  const escalaY = (() => {
+    // Cinco intervalos, no cuatro: con la cuota en 5.000 el paso de 4 daba
+    // 2.000 y el eje terminaba en 6k —tres marcas y un 17% de alto vacío—;
+    // con 5 el paso es 1.000 y el tope cae justo en la cuota.
+    const objetivo = maxPz / 5
+    const mag = Math.pow(10, Math.floor(Math.log10(Math.max(objetivo, 1))))
+    const paso = [1, 2, 2.5, 5, 10].map((m) => mag * m).find((p) => p >= objetivo) ?? mag * 10
+    return { paso, tope: Math.ceil(maxPz / paso) * paso }
+  })()
+  const marcasY: number[] = []
+  for (let v = 0; v <= escalaY.tope + 0.001; v += escalaY.paso) marcasY.push(v)
+
   /** Fracción 0-1 del ancho/alto: sirve para el SVG y para las etiquetas HTML. */
   const fx = (m: number) => m / maxMin
-  const fy = (p: number) => 1 - p / maxPz
+  const fy = (p: number) => 1 - p / escalaY.tope
 
   const x = (m: number) => fx(m) * W
   const y = (p: number) => fy(p) * H
@@ -237,15 +262,25 @@ export function MonitorCompareChart({ cmp, cerrado, claveSel, onSel, cone }: {
         })}
       </div>
 
+      {/* Qué mide el eje. El gráfico dibuja ACUMULADO y a más de uno le pasó
+          leerlo como piezas por hora: sin la unidad, dos curvas que suben no
+          dicen de qué. */}
+      <div className="mb-0.5 text-[9px] uppercase tracking-wide text-muted-foreground/70">
+        piezas acumuladas
+      </div>
+
       <div className="flex gap-1">
         {/* La escala vertical queda FUERA del área con scroll: adentro se iría
             con el paneo justo cuando uno mira un tramo de cerca. */}
         <div className={`relative w-7 shrink-0 ${alto ? ALTO_GRANDE : ALTO_CHICO} transition-[height] duration-200`}>
-          {[maxPz, maxPz / 2].map((v) => (
+          {/* Miles abreviados: "5k" entra en 28 px, "5.000" no — y el eje se
+              lee de reojo, no se suma de memoria. El valor exacto está en la
+              línea de arriba del bloque y en el tooltip. */}
+          {marcasY.map((v) => (
             <span key={v}
               className="absolute right-0 -translate-y-1/2 text-[9px] tabular-nums text-muted-foreground"
               style={{ top: `${fy(v) * 100}%` }}>
-              {fmtInt(v)}
+              {v === 0 ? '0' : v >= 1000 ? `${fmtDec1(v / 1000)}k` : fmtInt(v)}
             </span>
           ))}
         </div>
@@ -268,8 +303,10 @@ export function MonitorCompareChart({ cmp, cerrado, claveSel, onSel, cone }: {
                   className="fill-muted-foreground/15" />
               ))}
 
-              {[0.25, 0.5, 0.75].map((f) => (
-                <line key={f} x1={0} x2={W} y1={H * f} y2={H * f}
+              {/* Las guías caen en las MISMAS marcas del eje: si no, la línea
+                  de referencia y el número que la nombra no coinciden. */}
+              {marcasY.filter((v) => v > 0 && v < escalaY.tope).map((v) => (
+                <line key={v} x1={0} x2={W} y1={y(v)} y2={y(v)}
                   stroke="currentColor" strokeWidth="0.25" strokeDasharray="1.5 1.5"
                   className="text-border" vectorEffect="non-scaling-stroke" />
               ))}
@@ -335,6 +372,13 @@ export function MonitorCompareChart({ cmp, cerrado, claveSel, onSel, cone }: {
             {/* Eje de horas: HTML, dentro del área escalada para viajar con el
                 paneo sin deformarse como un <text> del SVG. */}
             <div className="relative h-4">
+              {/* El origen, dicho. Sin él "h+2" es la primera marca y el eje
+                  parece empezar ahí; y es lo que recuerda que se cuenta desde
+                  el arranque del turno y no por reloj. Anclado al borde: si se
+                  centrara, media palabra quedaría fuera. */}
+              <span className="absolute left-0 top-0 whitespace-nowrap text-[9px] text-muted-foreground">
+                arranque
+              </span>
               {marcas.map((m) => (
                 <span key={m}
                   className="absolute top-0 -translate-x-1/2 whitespace-nowrap text-[9px] tabular-nums text-muted-foreground"
