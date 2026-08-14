@@ -1352,6 +1352,106 @@ async function buildMonitorHistory(db, plantSlug, currentShiftDocId, prevHistory
   return out
 }
 
+/** Turnos del MISMO nombre que se publican para pronosticar el cierre. */
+const FORECAST_MAX = 10
+/** Un punto cada 15 min alcanza para proyectar y deja el resumen liviano. */
+const FORECAST_STEP_MIN = 15
+/** Debajo de esto no fue un turno: fue una prueba o un arranque abortado. */
+const FORECAST_MIN_PIECES = 500
+const FORECAST_MIN_PROD_MIN = 60
+
+/**
+ * Resumen liviano de un turno para el pronóstico: su curva acumulada indexada
+ * en minutos desde el arranque, más los tres datos que usa el diagnóstico.
+ *
+ * No viaja la serie completa (~100 puntos por turno): con diez turnos eso
+ * engordaría el doc público sin aportar — proyectar no necesita el detalle de
+ * cinco minutos.
+ */
+function resumirParaForecast(live) {
+  const serie = (live?.series || []).filter(p => p && p.t)
+  if (serie.length < 3) return null
+  const t0 = Date.parse(serie[0].t)
+  if (Number.isNaN(t0)) return null
+
+  const curve = []
+  let acum = 0
+  let proximo = 0
+  for (const p of serie) {
+    acum += p.pieces || 0
+    const min = Math.round((Date.parse(p.t) - t0) / 60_000) + 5
+    if (min >= proximo) {
+      curve.push([min, acum])
+      proximo = min + FORECAST_STEP_MIN
+    }
+  }
+  // El cierre siempre entra: es el punto que ancla toda la proyección.
+  const ultimo = curve[curve.length - 1]
+  const finMin = Math.round((Date.parse(serie[serie.length - 1].t) - t0) / 60_000) + 5
+  if (!ultimo || ultimo[0] !== finMin) curve.push([finMin, acum])
+  if (curve.length < 3) return null
+
+  /*
+   * ⚠ Fuera los turnos que apenas arrancaron. Visto al probarlo en Filete: el
+   * 1-ago figura con 180 piezas en 16 minutos —una prueba, no un turno— y como
+   * referencia envenena las dos cosas que alimenta: su ratio distorsiona la
+   * proyección y su velocidad (11 pz/min en 16 min) el diagnóstico.
+   */
+  const total = live.totalPieces ?? acum
+  const producingMin = live.timeBreakdown?.producingMin ?? 0
+  if (total < FORECAST_MIN_PIECES || producingMin < FORECAST_MIN_PROD_MIN) return null
+
+  const micro = (live.topStops || []).find(s => /micro/i.test(s.reason || ''))
+  return { curve, total, producingMin, micro: micro?.count ?? null }
+}
+
+/**
+ * Turnos anteriores DEL MISMO NOMBRE, para pronosticar el cierre.
+ *
+ * ⚠ Por qué no alcanza con `history`: ese trae los seis turnos cronológicos
+ * anteriores, y en Yal conviven tres turnos por día — quedaban solo dos
+ * comparables y el pronóstico no aparecía nunca. Mezclar el turno de día con
+ * el de noche no es una opción: tienen otra dotación y otra duración.
+ *
+ * Mismo truco de costo que `buildMonitorHistory`: un turno cerrado no cambia,
+ * así que se reusa lo ya publicado y solo se compone lo que falta. Además se
+ * aprovechan los `live` que el historial acaba de construir.
+ */
+async function buildForecastHistory(db, plantSlug, currentShiftDocId, shiftId, prev = [], history = []) {
+  if (!shiftId) return []
+  const nowWall = shoplogixPolling.toChileWall(new Date())
+  const desde = shiftDateKey(nowWall, -30)
+
+  const refs = await db.collection(`shoplogix/${plantSlug}/shifts`).listDocuments()
+  const candidatos = refs.filter(r =>
+    r.id !== currentShiftDocId &&
+    r.id.slice(0, 10) >= desde &&
+    r.id.slice(11) === shiftId,
+  )
+  if (candidatos.length === 0) return []
+
+  const previos = new Map((prev || []).map(h => [h.shiftDocId, h]))
+  const yaConstruidos = new Map((history || []).map(h => [h.shiftDocId, h.live]))
+  const ids = candidatos.map(r => r.id).sort().reverse().slice(0, FORECAST_MAX)
+
+  const out = []
+  for (let i = 0; i < ids.length; i++) {
+    const id = ids[i]
+    // i === 0 es el turno anterior: el re-sync móvil todavía puede moverlo.
+    const cacheado = previos.get(id)
+    if (cacheado && i > 0) { out.push(cacheado); continue }
+    try {
+      const live = yaConstruidos.get(id) || await buildMonitorLive(db, plantSlug, id)
+      const resumen = live && resumirParaForecast(live)
+      if (resumen) out.push({ shiftDocId: id, dateKey: id.slice(0, 10), ...resumen })
+      else if (cacheado) out.push(cacheado)
+    } catch {
+      if (cacheado) out.push(cacheado)
+    }
+  }
+  return out
+}
+
 /**
  * Refresca un monitor. En modo `line` además re-resuelve qué turno está
  * vigente, así que devuelve también los campos de identidad del turno para que
@@ -1369,7 +1469,14 @@ async function buildMonitorPatch(db, monitor, currentShiftDocIdByPlant = new Map
     const live = await buildMonitorLive(db, plantSlug, monitor.shiftDocId)
     if (!live) return null
     const history = await buildMonitorHistory(db, plantSlug, monitor.shiftDocId, monitor.history)
-    return { live, history }
+    return {
+      live,
+      history,
+      forecastHistory: await buildForecastHistory(
+        db, plantSlug, monitor.shiftDocId, String(monitor.shiftDocId).slice(11),
+        monitor.forecastHistory, history,
+      ),
+    }
   }
 
   // Modo línea: el turno vigente se resuelve una vez por planta y se reusa
@@ -1384,9 +1491,15 @@ async function buildMonitorPatch(db, monitor, currentShiftDocIdByPlant = new Map
   const live = await buildMonitorLive(db, plantSlug, shiftDocId)
   if (!live) return null
 
+  const history = await buildMonitorHistory(db, plantSlug, shiftDocId, monitor.history)
   return {
     live,
-    history: await buildMonitorHistory(db, plantSlug, shiftDocId, monitor.history),
+    history,
+    /* Turnos del mismo nombre: es lo que hace posible pronosticar en las
+       líneas con varios turnos por día. */
+    forecastHistory: await buildForecastHistory(
+      db, plantSlug, shiftDocId, shiftDocId.slice(11), monitor.forecastHistory, history,
+    ),
     shiftDocId,
     dateKey: shiftDocId.slice(0, 10),
     shiftId: shiftDocId.slice(11),
@@ -1522,6 +1635,7 @@ module.exports = {
   COLLECTION,
   buildMonitorLive,
   buildMonitorHistory,
+  buildForecastHistory,
   buildMonitorPatch,
   resolveCurrentShiftDocId,
   ensureLineMonitor,
