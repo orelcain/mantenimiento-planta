@@ -13,6 +13,21 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-13 - claude - El gráfico prolonga la curva en un cono de proyección (#536)
+
+- Hecho: dibujo del pronóstico del #534 sobre `MonitorCompareChart`: banda que nace en la punta
+  de la curva de hoy y llega hasta el cierre, con mediana punteada; si la cuota queda por encima
+  de todo el cono se ve sin leer un número. Número y dibujo salen de la MISMA función `proyectar`
+  (evitado el "dos verdades en pantalla"); el cierre entra siempre en el cono aunque no caiga en
+  el paso de 15 min.
+- Archivos: monitorForecast.ts (tipo `ConePoint` + `cone`), MonitorCompareChart.tsx,
+  MonitorShiftParts.tsx, PublicShiftMonitorPage.tsx, +tests (7 nuevos, 4 de render).
+- Verificación: vitest 270/270, tsc y eslint limpios. Deploy en success.
+- Estado: HECHO
+- Sigue: ver en pantalla con turno vivo con muestra (mañana en Filete, mismo pendiente que #534).
+
+---
+
 ## 2026-08-13 - claude - Pronóstico del cierre auto-calibrado, con su error medido (#534)
 
 - Hecho: motor `monitorForecast.ts` que predice el cierre del turno desde el minuto 240 usando
