@@ -12,6 +12,7 @@ import type { PublicMonitorLive } from '@/services/shoplogix/publicShiftMonitor.
 import {
   findGapWindows, resumenComparacion, type CompareResult, type PacePoint, type PlannedBreak,
 } from '@/services/shoplogix/monitorCompare'
+import { MAX_MAPE_PCT, type ForecastResult } from '@/services/shoplogix/monitorForecast'
 import { MonitorCompareChart } from './MonitorCompareChart'
 import { COLORES } from './monitorColors'
 
@@ -782,6 +783,100 @@ export function BitacoraOperador({ comments, onCausa }: {
           </li>
         ))}
       </ul>
+    </Bloque>
+  )
+}
+
+/**
+ * Cierre estimado del turno, con su incertidumbre y su método.
+ *
+ * El número grande NUNCA va solo. Lo acompañan la banda (dónde terminaron los
+ * turnos anteriores proyectados desde esta misma altura) y el error medido del
+ * método en ESTA línea: un pronóstico desnudo se lee como promesa.
+ *
+ * El veredicto de la cuota es un CONTEO auditable —"ninguno de los 6 turnos
+ * llegó desde acá"— y no una probabilidad: con esa muestra, un "72%" fingiría
+ * una precisión que no existe.
+ *
+ * Ver `monitorForecast.ts` para por qué el método se elige por backtest y no
+ * a mano (el mejor predictor se invierte entre Filete y Yal).
+ */
+export function PronosticoCierre({ f, meta }: {
+  f: ForecastResult | null
+  meta: number | null
+}) {
+  if (!f) return null
+
+  /*
+   * Por encima del umbral el bloque se calla. Un número con 20% de error a la
+   * hora 1 quema la credibilidad del bloque para todo el resto del turno.
+   */
+  if (f.mapePct > MAX_MAPE_PCT) {
+    return (
+      <Bloque id="pronostico" titulo="Cierre estimado" defaultAbierto={false}
+        extra={<span>todavía no</span>}>
+        <p className="mt-2 text-[12px] text-muted-foreground">
+          A esta altura el pronóstico erra{' '}
+          <span className="tabular-nums text-foreground/80">{fmtDec(f.mapePct)}%</span> en esta
+          línea — más adelante en el turno empieza a servir.
+        </p>
+      </Bloque>
+    )
+  }
+
+  const alcanza = meta != null && f.hitsTarget != null && f.hitsTarget > 0
+  const nombreMetodo = f.method === 'proporcional'
+    ? 'proporcional'
+    : f.method === 'aditivo' ? 'aditivo' : 'ritmo del turno'
+
+  return (
+    <Bloque
+      id="pronostico"
+      titulo="Cierre estimado"
+      extra={<span className="tabular-nums font-semibold text-sky-700 dark:text-sky-300">
+        {fmtInt(f.estimate)} pz
+      </span>}
+    >
+      <div className="mt-1 flex flex-wrap items-baseline gap-x-2">
+        <span className="text-[30px] font-bold leading-none tabular-nums">{fmtInt(f.estimate)}</span>
+        <span className="text-[13px] font-semibold text-muted-foreground">
+          pz ±{fmtDec(f.mapePct)}%
+        </span>
+      </div>
+
+      {/* La banda, dibujada: dónde terminó cada turno anterior proyectado desde
+          esta altura. Se angosta sola a medida que avanza el turno. */}
+      <div className="mt-2 flex items-center gap-2 text-[10px] tabular-nums text-muted-foreground">
+        <span>{fmtInt(f.low)}</span>
+        <span className="relative h-1.5 flex-1 rounded-full bg-muted">
+          <span
+            className="absolute h-1.5 rounded-full bg-sky-500/60"
+            style={{ left: '0%', right: '0%' }}
+          />
+          {meta != null && meta >= f.low && meta <= f.high && (
+            <span className="absolute -top-1 h-3.5 w-0.5 bg-amber-500"
+              style={{ left: `${((meta - f.low) / Math.max(1, f.high - f.low)) * 100}%` }} />
+          )}
+        </span>
+        <span>{fmtInt(f.high)}</span>
+      </div>
+
+      {meta != null && f.hitsTarget != null && (
+        <p className={`mt-2 text-[13px] font-semibold ${
+          alcanza ? 'text-emerald-800 dark:text-emerald-300' : 'text-amber-800 dark:text-amber-300'
+        }`}>
+          {alcanza
+            ? `La meta de ${fmtInt(meta)} entra: ${f.hitsTarget} de ${f.samples} turnos la superaron desde acá.`
+            : `La meta de ${fmtInt(meta)} no entra: ninguno de los ${f.samples} turnos anteriores llegó desde esta altura.`}
+        </p>
+      )}
+
+      <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground/80">
+        Método <span className="text-foreground/80">{nombreMetodo}</span> — el que menos se
+        equivocó en esta línea, medido turno por turno sobre los últimos{' '}
+        <span className="tabular-nums">{f.samples}</span>. Llevás{' '}
+        <span className="tabular-nums text-foreground/80">{fmtInt(f.current)}</span>.
+      </p>
     </Bloque>
   )
 }

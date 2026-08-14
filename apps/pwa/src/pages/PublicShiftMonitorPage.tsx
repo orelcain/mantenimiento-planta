@@ -38,9 +38,10 @@ import { buildHourlyRows, peakPieces } from '@/services/shoplogix/monitorHourly'
 import { computePaceToTarget, lineMaxPerHour, type PaceToTarget } from '@/services/shoplogix/monitorPace'
 import { pinShiftEnd, unpinShiftEnd } from '@/services/shoplogix/pinShiftEnd'
 import {
-  buildDayComparison, optimalPace, plannedBreaks, mergeBreaks,
+  buildDayComparison, optimalPace, plannedBreaks, mergeBreaks, cumulativeFromStart,
 } from '@/services/shoplogix/monitorCompare'
-import { TiempoDelTurno, ComparadorDias, Bloque, BitacoraOperador, VelocidadDeLinea } from './monitor/MonitorShiftParts'
+import { buildForecast } from '@/services/shoplogix/monitorForecast'
+import { TiempoDelTurno, ComparadorDias, Bloque, BitacoraOperador, VelocidadDeLinea, PronosticoCierre } from './monitor/MonitorShiftParts'
 import { useIsAdmin } from '@/store'
 
 // ── Formateadores (locales a propósito: esta página no debe arrastrar el
@@ -1073,6 +1074,30 @@ export function PublicShiftMonitorPage() {
     })
   }, [live, data?.dateKey, data?.shiftId, data?.history, data?.targetPieces])
 
+  /*
+   * Pronóstico del cierre. Se alimenta del `history` que YA viaja en el doc:
+   * cero lecturas extra.
+   *
+   * ⚠ Solo turnos del MISMO nombre. En Yal conviven tres turnos por día con
+   * dotación y duración distintas; mezclarlos como si fueran comparables es
+   * exactamente el error que el motor no puede detectar por su cuenta. Si con
+   * ese filtro no queda muestra suficiente, el bloque no aparece.
+   */
+  const pronostico = useMemo(() => {
+    const metaFc = data?.targetPieces ?? live?.quotaPieces ?? live?.expectedPieces ?? null
+    const mismoTurno = (data?.history ?? []).filter((h) => h.shiftId === data?.shiftId)
+    return buildForecast({
+      todayCurve: cumulativeFromStart(live?.series),
+      currentMinute: comparacion.currentMinute,
+      history: mismoTurno.map((h) => ({
+        curve: cumulativeFromStart(h.live?.series),
+        totalPieces: h.live?.totalPieces ?? 0,
+      })),
+      targetPieces: metaFc,
+      shiftClosed: live?.shiftClosed,
+    })
+  }, [live, data?.history, data?.shiftId, data?.targetPieces, comparacion.currentMinute])
+
   if (status === 'loading') {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -1394,6 +1419,14 @@ export function PublicShiftMonitorPage() {
             </p>
           </section>
         )}
+
+        {/* Adónde va a cerrar el turno, según lo que hicieron los anteriores
+            desde esta misma altura. Antes de la velocidad: primero el
+            desenlace, después el detalle de cómo se está llegando. */}
+        <PronosticoCierre
+          f={pronostico}
+          meta={data.targetPieces ?? live.quotaPieces ?? live.expectedPieces ?? null}
+        />
 
         {/* La velocidad como historia, no solo el "ahora" del KPI — ARRIBA del
             gráfico de tramos (pedido de Orel): primero la tendencia, después
