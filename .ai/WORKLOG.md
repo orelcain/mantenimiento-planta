@@ -1,3 +1,24 @@
+## 2026-08-15 · Deuda de gráficos saldada + guardia de CI
+
+Los 9 fixes del inventario contra las guías de visualización (destilado en
+ANTARFOOD/_GUIAS/_DESTILADO_VISUALIZACION.md), implementados por el
+implementador-patrón y revisados en el diff: ejes de barras a cero, calibres
+en orden físico (comparador compartido `utils/calibres.ts` + 4 tests — el bug
+estaba DUPLICADO en Pivote y en el timeline del Grader), compuertas con dos
+ejes rotulados, eje de ProductionBarsEC con números, leyenda del timeline sin
+series técnicas (`_target`/`_shadow`), tooltip del pie con %, y el recorte
+p95 declarado en pantalla. El fix 6 (GraderPeriodView) no se tocó: ya cumplía
+con leyenda HTML propia.
+
+**Guardia nueva: `scripts/audit-graficos.mjs` en CI** (deploy.yml, tras el
+lint). Línea base POR ARCHIVO con la justificación de cada excepción al lado;
+falla solo con deuda nueva. En su primera corrida ya cazó 8 `.sort()` pelados
+que el grep manual no vio — 2 eran el bug de calibres duplicado; los otros 6
+eran legítimos (claves de fecha, listas nominales) y quedaron en la base.
+
+Pendiente visual (no bloqueante): leyenda nueva del GraderTimelineChart en
+pantallas angostas, y los dos ejes de compuertas en ambos temas.
+
 ## 2026-08-15 · Monitor público · la capa de contexto (guías de visualización)
 
 **Qué cambió.** Aplicación de las guías de Kevin Cáceres (destiladas en
