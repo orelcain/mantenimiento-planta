@@ -15,6 +15,7 @@
  *   crosshair, dark theme polish.
  */
 import { useMemo, useState, useCallback, useRef, useEffect } from 'react'
+import { compararCalibres } from '@/utils/calibres'
 import ReactECharts from 'echarts-for-react'
 import type ReactEChartsCore from 'echarts-for-react'
 import type { EChartsOption } from 'echarts'
@@ -250,7 +251,7 @@ function computeChartSeriesFromRecords(records: FirestorePieceRecord[]): ChartSe
       maxWeight: wts.length > 0 ? Math.round(maxW) : 0,
       p0Count: errs.length,
       totalPieces: sorted.reduce((s, r) => s + r.pieces, 0),
-      uniqueCalibres: Array.from(calibreSet).sort(),
+      uniqueCalibres: Array.from(calibreSet).sort(compararCalibres),
       uniqueErrors: Array.from(errorSet).sort(),
       uniqueGates: sortedGates,
     },
@@ -402,7 +403,7 @@ function computeChartSeriesFromAggregates(aggregates: TimelineBucket[]): ChartSe
       maxWeight: Math.round(maxW),
       p0Count: totalP0,
       totalPieces,
-      uniqueCalibres: Array.from(calibreSet).sort(),
+      uniqueCalibres: Array.from(calibreSet).sort(compararCalibres),
       uniqueErrors: Array.from(errorSet).sort(),
       uniqueGates: sortedGates,
     },
@@ -513,7 +514,7 @@ export function GraderTimelineChart({ records, aggregates, shiftId, dateKey }: P
     // ── Grid principal (peso + P0%) ──
     grids.push({
       left: 55, right: 60, top: 30,
-      bottom: useDualGrid ? '40%' : 70,
+      bottom: useDualGrid ? '40%' : 86,
     })
     xAxes.push({
       type: 'time',
@@ -711,7 +712,7 @@ export function GraderTimelineChart({ records, aggregates, shiftId, dateKey }: P
       const lowerColor = layers.gates ? '#8b5cf6' : '#10b981'
       grids.push({
         left: 55, right: 60,
-        top: '66%', bottom: 45,
+        top: '66%', bottom: 61,
       })
       xAxes.push({
         type: 'time', gridIndex: 1,
@@ -822,7 +823,7 @@ export function GraderTimelineChart({ records, aggregates, shiftId, dateKey }: P
           type: 'slider',
           xAxisIndex: useDualGrid ? [0, 1] : [0],
           start: zoomRange.start, end: zoomRange.end,
-          height: 18, bottom: 6,
+          height: 18, bottom: 22,
           borderColor: 'rgba(148,163,184,0.1)',
           fillerColor: 'rgba(59,130,246,0.1)',
           handleStyle: { color: '#3b82f6', borderColor: '#3b82f6' },
@@ -838,7 +839,14 @@ export function GraderTimelineChart({ records, aggregates, shiftId, dateKey }: P
         },
         { type: 'inside', xAxisIndex: useDualGrid ? [0, 1] : [0] },
       ],
-      legend: { show: false },
+      // Leyenda solo con las series visibles reales: excluimos las series técnicas
+      // (prefijo "_", como "_shadow"/"_target") que no representan un dato en sí.
+      legend: {
+        show: true,
+        data: series.filter((s) => !String(s.name).startsWith('_')).map((s) => s.name),
+        bottom: 0,
+        textStyle: { fontSize: 10, color: '#94a3b8' },
+      },
       animation: false,
     }
   }, [layers, weightSeries, weightMovingAvg, p0PctSeries, p0CumulativeSeries, errorSeries, productionSeries, gateTimeSeries, gaps, useDualGrid, zoomRange])

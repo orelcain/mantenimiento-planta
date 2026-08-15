@@ -570,7 +570,9 @@ export function TelemetryChart({ data, type, height = 300 }: TelemetryChartProps
               }
             },
             y: {
-              beginAtZero: false
+              // Barras con eje truncado exageran; era la deuda #2 del inventario.
+              beginAtZero: true,
+              title: { display: true, text: '°C / %' }
             }
           }
         }

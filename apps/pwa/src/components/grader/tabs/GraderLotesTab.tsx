@@ -132,7 +132,8 @@ export function GraderLotesTab({
                     },
                   },
                 },
-                scales: { y: { beginAtZero: false, title: { display: true, text: 'Peso (g)' } } },
+                // En barras la longitud ES el dato: truncar el eje exagera las diferencias entre lotes.
+                scales: { y: { beginAtZero: true, title: { display: true, text: 'Peso (g)' } } },
               }}
             />
           </div>

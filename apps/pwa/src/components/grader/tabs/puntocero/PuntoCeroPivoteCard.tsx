@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { compararCalibres } from '@/utils/calibres'
 import { Card, CardContent, CardHeader, CardTitle, Badge, InfoTooltip } from '@/components/ui'
 import { Table2 } from 'lucide-react'
 import { Bar } from 'react-chartjs-2'
@@ -31,7 +32,8 @@ export function PuntoCeroPivoteCard({ analytics }: Props) {
 
   const uniqueErrors = Array.from(new Set(allRows.map((r) => r.error)))
   const filteredTotal = filteredRows.reduce((sum, r) => sum + r.pieces, 0)
-  const allCalibres = Array.from(new Set(filteredRows.map((r) => r.calibre))).sort()
+  // Orden físico del calibre, no alfabético ("2-4 lb" antes que "10-12 lb").
+  const allCalibres = Array.from(new Set(filteredRows.map((r) => r.calibre))).sort(compararCalibres)
 
   const pivotBarDatasets = uniqueErrors.map((errorLabel) => {
     const data = allCalibres.map((cal) =>

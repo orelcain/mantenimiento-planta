@@ -49,6 +49,12 @@ jobs:
         working-directory: apps/pwa
         run: pnpm exec eslint . --max-warnings 30
 
+      # Guardia de las guías de visualización: falla solo con deuda NUEVA
+      # (ejes truncados en barras, leyendas apagadas con multi-serie, sort
+      # lexicográfico en ejes). Línea base y reglas: scripts/audit-graficos.mjs.
+      - name: Audit gráficos
+        run: node scripts/audit-graficos.mjs --ci
+
       - name: Build PWA
         working-directory: apps/pwa
         env:

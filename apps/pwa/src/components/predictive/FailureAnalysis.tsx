@@ -233,15 +233,26 @@ export function FailureAnalysis() {
                 </CardHeader>
                 <CardContent className="flex justify-center items-center">
                     <div className="h-[250px] w-[250px] relative">
-                         <Pie 
+                         <Pie
                             data={statusData}
-                            options={{ 
+                            options={{
                                 responsive: true,
                                 maintainAspectRatio: false,
-                                plugins: { 
-                                    legend: { position: 'bottom' } 
+                                plugins: {
+                                    legend: { position: 'bottom' },
+                                    tooltip: {
+                                        callbacks: {
+                                            // El tooltip por defecto solo mostraba el conteo: agregamos el % sobre el total.
+                                            label: (ctx) => {
+                                                const total = (ctx.dataset.data as number[]).reduce((sum, v) => sum + v, 0)
+                                                const value = ctx.raw as number
+                                                const pct = total > 0 ? ((value / total) * 100).toFixed(0) : '0'
+                                                return `${ctx.label}: ${value} (${pct}%)`
+                                            }
+                                        }
+                                    }
                                 }
-                            }} 
+                            }}
                          />
                     </div>
                 </CardContent>
