@@ -149,6 +149,8 @@ export interface PublicMonitorLive {
    * un "planificado: 78 min" sin desglose invita a sospechar que se esconde algo.
    */
   timeBreakdown?: {
+    /** Versión de la rejilla (2 = lapso real, fix #562). Ausente en docs viejos. */
+    tbv?: number | null
     windowMin: number
     /** Minutos de LÍNEA: los tres suman la ventana, con una máquina o con tres. */
     producingMin: number

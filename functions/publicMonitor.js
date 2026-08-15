@@ -1318,6 +1318,14 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
      * tres números y el resto suman la ventana, con varias máquinas o con una.
      */
     timeBreakdown: {
+      /*
+       * Versión de la rejilla. v2 = dimensionada por el lapso real (fix del
+       * recorte de cola, #562). Viaja EN el desglose porque las dos cachés
+       * (history y forecastHistory) reusan lives ya publicados: sin la marca
+       * acá, un live viejo se re-sellaba como nuevo y los récords mezclaban
+       * turnos medidos con dos varas.
+       */
+      tbv: 2,
       windowMin: minVentana,
       producingMin,
       plannedMin,
@@ -1382,7 +1390,9 @@ async function buildMonitorHistory(db, plantSlug, currentShiftDocId, prevHistory
     const { id } = turnos[i]
     const cacheado = previos.get(id)
     // i === 0 es el turno inmediatamente anterior: puede seguir moviéndose.
-    if (cacheado?.live && i > 0) { out.push(cacheado); continue }
+    // Y solo se reusa un live medido con la rejilla vigente: uno viejo dejaría
+    // «Anterior» mostrando el desglose recortado para siempre.
+    if (cacheado?.live && i > 0 && cacheado.live.timeBreakdown?.tbv === 2) { out.push(cacheado); continue }
     try {
       const live = await buildMonitorLive(db, plantSlug, id)
       if (live) out.push({ shiftDocId: id, dateKey: id.slice(0, 10), shiftId: id.slice(11), live })
@@ -1462,10 +1472,9 @@ function resumirParaForecast(live) {
     windowMin: tb.windowMin ?? null,
     plannedMin: tb.plannedMin ?? null,
     recoverableMin: tb.recoverableMin ?? null,
-    // Versión del desglose: v2 = rejilla por lapso real (fix del recorte de
-    // cola). Sirve para invalidar la caché — mezclar turnos medidos con las
-    // dos varas haría récords y bandas incomparables.
-    tbv: 2,
+    // La versión viene del PROPIO desglose: sellarla con una constante acá
+    // re-etiquetaría como nuevos números medidos con la vara vieja.
+    tbv: tb.tbv ?? null,
   }
 }
 
@@ -1495,7 +1504,11 @@ async function buildForecastHistory(db, plantSlug, currentShiftDocId, shiftId, p
   if (candidatos.length === 0) return []
 
   const previos = new Map((prev || []).map(h => [h.shiftDocId, h]))
-  const yaConstruidos = new Map((history || []).map(h => [h.shiftDocId, h.live]))
+  // Solo lives de la rejilla vigente: uno viejo acá se resumiría y quedaría
+  // sellado como nuevo con números de la vara vieja — cache poisoning silencioso.
+  const yaConstruidos = new Map((history || [])
+    .filter(h => h.live?.timeBreakdown?.tbv === 2)
+    .map(h => [h.shiftDocId, h.live]))
   const ids = candidatos.map(r => r.id).sort().reverse().slice(0, FORECAST_MAX)
 
   const out = []
