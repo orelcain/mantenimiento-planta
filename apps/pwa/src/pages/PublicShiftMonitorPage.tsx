@@ -2797,8 +2797,8 @@ export function PublicShiftMonitorPage() {
             cierre es lo esperable, no una alerta — junto al aviso de sync
             detenida pintaba alarmante una noche normal. */}
         {live.status === 'detenida' && esActual && !live.shiftClosed && (
-          <section className="rounded-2xl border border-red-500/40 bg-red-500/15 px-4 py-3 dark:border-red-400/25">
-            <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-red-700 dark:text-red-300/80">
+          <section className="rounded-2xl border border-border bg-muted px-4 py-3">
+            <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-red-600 dark:text-red-400">
               <PauseCircle className="h-3 w-3" />
               Ahora mismo
             </div>
@@ -3046,7 +3046,7 @@ export function PublicShiftMonitorPage() {
                     {/* Una Baader parada de tres no se veía en ningún lado: el
                         "Ahora mismo" de línea solo salta si paran TODAS. */}
                     {!live.shiftClosed && m.status === 'detenida' && m.currentReason && (
-                      <span className="block truncate text-[11px] text-red-700 dark:text-red-300/90">
+                      <span className="block truncate text-[11px] text-red-600 dark:text-red-400">
                         parada · {m.currentReason}
                         {m.currentSinceAt && ` (${fmtAgoWall(m.currentSinceAt, now)})`}
                       </span>
@@ -3083,7 +3083,7 @@ export function PublicShiftMonitorPage() {
               . Se actualiza solo cuando arranque el próximo turno.
             </p>
           ) : (
-            <p className={stale ? 'text-amber-700 dark:text-amber-400/80' : 'text-muted-foreground/70'}>
+            <p className={stale ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground/70'}>
               <RefreshCw className="mr-1 inline h-3 w-3" />
               Datos de planta actualizados {fmtAgo(live.lastSyncAt, now)}
               {stale && ' — la sincronización puede estar detenida'}
