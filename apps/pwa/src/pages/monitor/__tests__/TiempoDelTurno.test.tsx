@@ -15,6 +15,7 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { render, cleanup } from '@testing-library/react'
 import { TiempoDelTurno } from '../MonitorShiftParts'
+import { agruparEventos } from '@/services/shoplogix/monitorEventos'
 import type { PublicMonitorLive } from '@/services/shoplogix/publicShiftMonitor.service'
 
 afterEach(cleanup)
@@ -32,13 +33,32 @@ const ANTES_DE_LA_COLACION: PublicMonitorLive['timeBreakdown'] = {
   recoverable: [{ reason: 'Detencion', min: 27, count: 9, lineMin: 27 }],
 }
 
-const texto = (tb: PublicMonitorLive['timeBreakdown'], proximaParada?: string | null) =>
-  render(<TiempoDelTurno tb={tb} proximaParada={proximaParada} />).container.textContent ?? ''
+const texto = (
+  tb: PublicMonitorLive['timeBreakdown'],
+  proximaParada?: string | null,
+  brecha?: number | null,
+  cpmAndando?: number | null,
+  costo?: Parameters<typeof TiempoDelTurno>[0]['costo'],
+  notasTurno?: string[],
+) =>
+  render(
+    <TiempoDelTurno
+      tb={tb}
+      proximaParada={proximaParada}
+      brecha={brecha}
+      cpmAndando={cpmAndando}
+      costo={costo}
+      // Los grupos se arman con el mismo servicio que en producción: así el
+      // test cubre el camino real y no una versión de laboratorio.
+      grupos={agruparEventos({ tb, costo, cpmGlobal: cpmAndando })}
+      notasTurno={notasTurno}
+    />,
+  ).container.textContent ?? ''
 
 describe('TiempoDelTurno · aviso de la próxima parada de convenio', () => {
   it('⚠ avisa cuándo entra la colación AUNQUE ya hubo paradas planificadas', () => {
     const t = texto(ANTES_DE_LA_COLACION, '12:55')
-    expect(t).toMatch(/próxima parada de convenio entra a las/i)
+    expect(t).toMatch(/próxima entra a las/i)
     expect(t).toContain('12:55')
   })
 
@@ -54,9 +74,90 @@ describe('TiempoDelTurno · aviso de la próxima parada de convenio', () => {
     expect(t).not.toMatch(/Todavía sin paradas/i)
   })
 
-  it('el chip "Planificado" aparece con minutos y desaparece en cero', () => {
-    expect(texto(ANTES_DE_LA_COLACION, null)).toMatch(/Planificado\s*7 min/)
-    expect(texto({ ...ANTES_DE_LA_COLACION, plannedMin: 0, planned: [] }, null))
-      .not.toMatch(/Planificado/)
+  it('el convenio se muestra aparte y con sus minutos', () => {
+    // El convenio es su propio grupo —"Programado · no se recupera"— con sus
+    // causas adentro, y sin piezas.
+    expect(texto(ANTES_DE_LA_COLACION, null)).toMatch(/Programado.*no se recupera/)
+    expect(texto(ANTES_DE_LA_COLACION, null)).toMatch(/REUNION INICIO TURNO/)
+  })
+
+  it('⚠ el convenio NO se convierte a piezas', () => {
+    // Contarlo daría "se perdieron 1.550 pz" y es falso: en la colación no se
+    // puede producir. Solo las causas recuperables llevan su costo en piezas.
+    const t = texto(ANTES_DE_LA_COLACION, null, 1081, 13.5)
+    expect(t).toMatch(/Detencion.*365 pz/)      // 27 min x 13,5
+    expect(t).not.toMatch(/COLACION.*pz/)
+  })
+
+  it('hace la resta: cuánto de la brecha son paradas evitables', () => {
+    const t = texto(ANTES_DE_LA_COLACION, null, 1081, 13.5)
+    // 36 min recuperables x 13,5 = 486 pz de las 1.081 que faltaron.
+    expect(t).toMatch(/486/)
+    expect(t).toMatch(/595/)                    // el resto, por ritmo
+    expect(t).toMatch(/Por qué no llegamos/i)
+  })
+
+  /*
+   * ⚠⚠ Lo de abajo es lo que impide sobreestimar. Valorizar cada parada al
+   * promedio del turno le imputa a Mantención piezas que no se iban a producir:
+   * el 14-08 el promedio daba 719 pz y el ritmo real de cada momento, 662.
+   */
+  it('⚠ usa el costo por evento, no los minutos por el promedio', () => {
+    const t = texto(ANTES_DE_LA_COLACION, null, 1081, 13, {
+      // 27 min que al promedio darían 351 pz, pero la línea venía a 9 pz/min.
+      porCausa: [{ reason: 'Detencion', min: 27, piezas: 243, eventos: 9, cpm: 9 }],
+      totalPiezas: 243,
+      totalMin: 27,
+      sinLocal: 0,
+      eventos: 9,
+    })
+    expect(t).toMatch(/Detencion.*243 pz/)
+    expect(t).not.toMatch(/351/)
+    // 243 + los 9 min que todavía no tienen causa (la parada EN CURSO) x 13.
+    expect(t).toMatch(/360/)
+  })
+
+  it('deja escrito el supuesto: al ritmo de antes, no al promedio', () => {
+    const costo = {
+      porCausa: [
+        { reason: 'Detencion', min: 20, piezas: 180, eventos: 5, cpm: 9 },
+        { reason: 'AGUA', min: 7, piezas: 84, eventos: 1, cpm: 12 },
+      ],
+      totalPiezas: 264, totalMin: 27, sinLocal: 0, eventos: 6,
+    }
+    const t = texto(ANTES_DE_LA_COLACION, null, 1081, 13.5, costo)
+    expect(t).toMatch(/ritmo que la línea traía justo antes/i)
+    expect(t).toMatch(/9,0 a 12,0 pz\/min/)      // el rango realmente usado
+    expect(t).toMatch(/no al promedio del turno/i)
+  })
+
+  it('⚠ separa lo que es de Mantención de lo que no', () => {
+    // Ninguna de estas causas es falla de máquina: el bloque tiene que poder
+    // decirlo, o los 486 pz se leen como si Mantención hubiera fallado.
+    const t = texto(ANTES_DE_LA_COLACION, null, 1081, 13.5)
+    expect(t).toMatch(/Ninguna parada por falla de máquina/i)
+    expect(t).toMatch(/Sin imputar/i)          // "Detencion" no está en el árbol
+  })
+
+  it('una falla de máquina apaga la frase y aparece como Mantención', () => {
+    const t = texto(
+      { ...ANTES_DE_LA_COLACION, recoverable: [{ reason: 'Baader 200/CUCHILLERIA DORSAL', min: 36, count: 2, lineMin: 36 }] },
+      null, 1081, 13.5,
+    )
+    expect(t).toMatch(/Mantención/)
+    expect(t).not.toMatch(/Ninguna parada por falla de máquina/i)
+  })
+
+  it('⚠ lo anotado para todo el turno ya no se pierde', () => {
+    const t = texto(ANTES_DE_LA_COLACION, null, 1081, 13.5, undefined,
+      ['«Se abren guías de bronce baader 200» — Baader 200/PERNOS/RESORTES'])
+    expect(t).toMatch(/Anotado para todo el turno/i)
+    expect(t).toMatch(/guías de bronce/)
+  })
+
+  it('sin brecha no promete explicar por qué no llegamos', () => {
+    const t = texto(ANTES_DE_LA_COLACION, null, 0, 13.5)
+    expect(t).toMatch(/A dónde se va el tiempo/i)
+    expect(t).not.toMatch(/Por qué no llegamos/i)
   })
 })

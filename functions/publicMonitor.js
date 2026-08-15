@@ -1409,7 +1409,19 @@ function resumirParaForecast(live) {
   if (total < FORECAST_MIN_PIECES || producingMin < FORECAST_MIN_PROD_MIN) return null
 
   const micro = (live.topStops || []).find(s => /micro/i.test(s.reason || ''))
-  return { curve, total, producingMin, micro: micro?.count ?? null }
+  /*
+   * El desglose del tiempo viaja entero: sin ventana/convenio/paradas del turno
+   * anterior no se puede explicar POR QUE hoy cerro distinto (el 14-08 hizo 788
+   * pz menos que el 13 siendo mas rapido: la diferencia era 80 min de ventana
+   * y 17 de convenio, y eso solo se ve con estos tres numeros).
+   */
+  const tb = live.timeBreakdown || {}
+  return {
+    curve, total, producingMin, micro: micro?.count ?? null,
+    windowMin: tb.windowMin ?? null,
+    plannedMin: tb.plannedMin ?? null,
+    recoverableMin: tb.recoverableMin ?? null,
+  }
 }
 
 /**
@@ -1445,8 +1457,10 @@ async function buildForecastHistory(db, plantSlug, currentShiftDocId, shiftId, p
   for (let i = 0; i < ids.length; i++) {
     const id = ids[i]
     // i === 0 es el turno anterior: el re-sync móvil todavía puede moverlo.
+    // Un cacheado SIN el desglose del tiempo es de antes de que se publicara:
+    // se reconstruye una vez (10 lecturas por linea, por unica vez) y queda.
     const cacheado = previos.get(id)
-    if (cacheado && i > 0) { out.push(cacheado); continue }
+    if (cacheado && i > 0 && cacheado.windowMin != null) { out.push(cacheado); continue }
     try {
       const live = yaConstruidos.get(id) || await buildMonitorLive(db, plantSlug, id)
       const resumen = live && resumirParaForecast(live)

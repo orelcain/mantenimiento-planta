@@ -24,7 +24,7 @@
  * ⚠ Horas de TURNO en wall-clock de planta (getUTC*); `lastSyncAt` es UTC real.
  */
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { Activity, AlertCircle, ChevronLeft, ChevronRight, Clock, Gauge, Hourglass, Moon, PauseCircle, Radio, RefreshCw, Sun, Target, Timer, TrendingUp } from 'lucide-react'
 import { useTheme } from '@/hooks/useTheme'
@@ -43,12 +43,16 @@ import {
   type PlannedBreak,
 } from '@/services/shoplogix/monitorCompare'
 import { buildForecast, MAX_MAPE_PCT } from '@/services/shoplogix/monitorForecast'
-import { buildDiagnostico } from '@/services/shoplogix/monitorDiagnostico'
 import { buildPareto } from '@/services/shoplogix/monitorPareto'
+import { agruparEventos } from '@/services/shoplogix/monitorEventos'
+import { costoDeParadas } from '@/services/shoplogix/monitorPerdidas'
+import { recordsDeLinea, vsAyer as compararVsAyer, type TurnoResumen } from '@/services/shoplogix/monitorVsAyer'
 import { llenadoDeSilletas, comoDeCada100, type LlenadoSilletas } from '@/services/shoplogix/monitorMaquina'
-import { DiagnosticoDeLinea } from './monitor/MonitorDiagnostico'
 import { ParetoDeParadas } from './monitor/MonitorPareto'
-import { TiempoDelTurno, ComparadorDias, Bloque, BitacoraOperador, PronosticoCierre, notasPorCausa } from './monitor/MonitorShiftParts'
+import { useZoomGesto, type Ventana } from './monitor/useZoomGesto'
+import { TiempoDelTurno, ComparadorDias, Bloque, PronosticoCierre } from './monitor/MonitorShiftParts'
+import { notasPorCausa, notasDelTurno } from './monitor/notasOperador'
+import { VsAyerBloque } from './monitor/MonitorVsAyer'
 import { useIsAdmin } from '@/store'
 
 // ── Formateadores (locales a propósito: esta página no debe arrastrar el
@@ -125,13 +129,15 @@ function fmtAgoWall(isoStr: string | null | undefined, nowMs: number): string {
 // ── Piezas de UI ────────────────────────────────────────────────────────────
 
 function Kpi({
-  label, value, unit, icon, hint, tone = 'default',
+  label, value, unit, icon, hint, sub, tone = 'default',
 }: {
   label: string
   value: string
   unit?: string
   icon: React.ReactNode
   hint?: string
+  /** Segunda medida, con su denominador escrito (ej. el ritmo de reloj). */
+  sub?: string
   tone?: 'default' | 'accent'
 }) {
   return (
@@ -146,6 +152,9 @@ function Kpi({
         {unit && <span className="text-[12px] text-muted-foreground/70">{unit}</span>}
       </div>
       {hint && <div className="mt-0.5 text-[11px] text-muted-foreground/70">{hint}</div>}
+      {sub && (
+        <div className="mt-0.5 text-[11px] tabular-nums text-muted-foreground">{sub}</div>
+      )}
     </div>
   )
 }
@@ -162,8 +171,11 @@ function Kpi({
  */
 function Sparkbars({
   series, stopReasons, stopEvents, comments, causaSel, onCausa, breaks,
-  recentPerMinute, requiredPerMinute, medianCpm, setCpm,
+  recentPerMinute, requiredPerMinute, medianCpm, setCpm, ventana, onVentana,
 }: {
+  /** Ventana visible compartida con el comparador (minutos de turno). */
+  ventana?: Ventana | null
+  onVentana?: (v: Ventana | null) => void
   /** Ritmo de la última media hora, para la cabecera. */
   recentPerMinute?: number | null
   /** Ritmo que la meta exige ahora mismo, si hay meta. */
@@ -196,13 +208,6 @@ function Sparkbars({
    */
   breaks?: PlannedBreak[]
 }) {
-  /*
-   * Zoom horizontal. A 375 px, 106 tramos dan barras de 3 px: se ve la forma
-   * del turno pero no se puede leer un tramo concreto, que es justo lo que hace
-   * falta cuando uno ya sabe que a la hora 6 pasó algo. Ampliando el ancho del
-   * SVG dentro de un contenedor con scroll, cada barra crece y se puede tocar.
-   */
-  const [zoom, setZoom] = useState(1)
   /** Tramo bajo el cursor (o tocado en el celular). null = ninguno. */
   const [foco, setFoco] = useState<number | null>(null)
   /**
@@ -225,103 +230,16 @@ function Sparkbars({
   }
 
   /*
-   * ── Zoom por gesto ─────────────────────────────────────────────────────
-   *
-   * El zoom se hace ensanchando el contenido dentro de un contenedor con
-   * scroll, así que el PANEO es el scroll nativo: en el celular arrastra y
-   * frena con inercia sin una línea de código, y en el escritorio se arrastra
-   * con el mouse (abajo).
-   *
-   * ⚠⚠ Los listeners van NATIVOS y `passive: false`. React registra `wheel` y
-   * `touchmove` como pasivos, y ahí `preventDefault()` no hace nada: la rueda
-   * seguiría desplazando la página y el pellizco haría zoom del navegador
-   * entero por encima del gráfico.
-   *
-   * ⚠ Y hay que cortar la propagación del touch: la página entera escucha
-   * swipe para cambiar de turno, y un pellizco mueve los dedos más de 60 px —
-   * acercarse al detalle terminaría abriendo el turno anterior.
+   * Zoom por gesto y ventana compartida con el comparador: los dos gráficos
+   * miran el mismo turno por el mismo eje, así que acercarse en uno mueve al
+   * otro al mismo tramo. El mecanismo vive en `useZoomGesto`.
    */
-  const scrollRef = useRef<HTMLDivElement>(null)
-  const anclaRef = useRef<{ x: number; ratio: number } | null>(null)
-  const zoomRef = useRef(1)
-  zoomRef.current = zoom
-
-  /** Aplica un zoom nuevo dejando quieto el punto que se está mirando. */
-  const zoomA = (nuevo: number, clientX?: number) => {
-    const z = Math.min(12, Math.max(1, nuevo))
-    const el = scrollRef.current
-    if (el && el.scrollWidth > 0) {
-      const r = el.getBoundingClientRect()
-      const x = clientX == null ? r.width / 2 : Math.max(0, Math.min(r.width, clientX - r.left))
-      anclaRef.current = { x, ratio: (el.scrollLeft + x) / el.scrollWidth }
-    }
-    setZoom(z)
-  }
-
-  // El reposicionado va DESPUÉS del layout: el ancho del contenido recién
-  // cambió y `scrollLeft` se calcula contra el nuevo `scrollWidth`.
-  useLayoutEffect(() => {
-    const el = scrollRef.current
-    const a = anclaRef.current
-    if (!el || !a) return
-    anclaRef.current = null
-    el.scrollLeft = Math.max(0, a.ratio * el.scrollWidth - a.x)
-  }, [zoom])
-
-  useEffect(() => {
-    const el = scrollRef.current
-    if (!el) return
-    let d0 = 0
-    let z0 = 1
-
-    const onWheel = (ev: WheelEvent) => {
-      // Sin modificador la rueda sigue desplazando la página: secuestrar el
-      // scroll de un bloque de 170 px hace que la pantalla se sienta rota. El
-      // pellizco del trackpad llega justamente como ctrl+wheel.
-      if (!ev.ctrlKey && !ev.metaKey) return
-      ev.preventDefault()
-      zoomA(zoomRef.current * (ev.deltaY < 0 ? 1.25 : 0.8), ev.clientX)
-    }
-    const dist = (t: TouchList) =>
-      Math.hypot(t[0]!.clientX - t[1]!.clientX, t[0]!.clientY - t[1]!.clientY)
-
-    const onTouchStart = (ev: TouchEvent) => {
-      // Con el gráfico acercado, arrastrar con UN dedo es panear: tampoco eso
-      // puede llegar al swipe que cambia de turno.
-      if (zoomRef.current > 1.02) ev.stopPropagation()
-      if (ev.touches.length !== 2) return
-      ev.stopPropagation()
-      d0 = dist(ev.touches)
-      z0 = zoomRef.current
-    }
-    const onTouchMove = (ev: TouchEvent) => {
-      if (ev.touches.length !== 2 || d0 <= 0) return
-      ev.preventDefault()
-      ev.stopPropagation()
-      const centro = (ev.touches[0]!.clientX + ev.touches[1]!.clientX) / 2
-      zoomA(z0 * (dist(ev.touches) / d0), centro)
-    }
-    const onTouchEnd = (ev: TouchEvent) => {
-      if (d0 > 0 || zoomRef.current > 1.02) ev.stopPropagation()
-      if (ev.touches.length < 2) d0 = 0
-    }
-
-    el.addEventListener('wheel', onWheel, { passive: false })
-    el.addEventListener('touchstart', onTouchStart, { passive: false })
-    el.addEventListener('touchmove', onTouchMove, { passive: false })
-    el.addEventListener('touchend', onTouchEnd)
-    return () => {
-      el.removeEventListener('wheel', onWheel)
-      el.removeEventListener('touchstart', onTouchStart)
-      el.removeEventListener('touchmove', onTouchMove)
-      el.removeEventListener('touchend', onTouchEnd)
-    }
-    // `zoomA` se recrea en cada render pero solo lee refs, así que los
-    // listeners se suscriben UNA vez y no hace falta re-registrarlos.
-  }, [])
-
-  /** Arrastre con el mouse para panear (el touch ya panea solo). */
-  const arrastre = useRef<{ x: number; left: number } | null>(null)
+  const g = useZoomGesto({
+    dominioMin: (series?.length ?? 0) * 5,
+    ventana,
+    onVentana,
+  })
+  const zoom = g.zoom
   if (!series || series.length === 0) return null
 
   const max = Math.max(...series.map(p => p.pieces), 1)
@@ -593,21 +511,9 @@ function Sparkbars({
         </div>
 
       <div
-        ref={scrollRef}
-        className={`ml-7 overflow-x-auto ${zoom > 1.02 ? 'cursor-grab active:cursor-grabbing' : ''}`}
-        style={{ touchAction: zoom > 1.02 ? 'pan-x' : 'auto' }}
-        onDoubleClick={() => setZoom(1)}
-        onPointerDown={(ev) => {
-          if (ev.pointerType !== 'mouse' || zoom <= 1.02) return
-          arrastre.current = { x: ev.clientX, left: ev.currentTarget.scrollLeft }
-        }}
-        onPointerMove={(ev) => {
-          const a = arrastre.current
-          if (!a) return
-          ev.currentTarget.scrollLeft = a.left - (ev.clientX - a.x)
-        }}
-        onPointerUp={() => { arrastre.current = null }}
-        onPointerLeave={() => { arrastre.current = null }}
+        {...g.props}
+        className={`ml-7 overflow-x-auto ${g.acercado ? 'cursor-grab active:cursor-grabbing' : ''}`}
+        style={{ touchAction: g.acercado ? 'pan-x' : 'auto' }}
       >
       <div style={{ width: `${zoom * 100}%`, minWidth: '100%' }}>
       <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="w-full"
@@ -784,10 +690,10 @@ function Sparkbars({
             </button>
           ),
         )}
-        {zoom > 1.02 ? (
+        {g.acercado ? (
           <button
             type="button"
-            onClick={() => setZoom(1)}
+            onClick={g.verTodo}
             className="rounded-full border border-border px-2 py-0.5 hover:bg-muted"
           >
             ver todo · {fmtDec(zoom)}×
@@ -1574,6 +1480,20 @@ export function PublicShiftMonitorPage() {
   const turnoParam = searchParams.get('turno')
   /** Causa de detención resaltada sobre el gráfico. */
   const [causaSel, setCausaSel] = useState<string | null>(null)
+  /**
+   * El tramo de turno que se está mirando, en minutos desde el primer tramo
+   * con dato. Vive acá porque lo COMPARTEN los dos gráficos: acercarse en la
+   * velocidad mueve al comparador al mismo tramo, que es lo que permite cruzar
+   * "acá se cayó el ritmo" con "acá se abrió la brecha". null = todo el turno.
+   */
+  const [ventanaGrafica, setVentanaGrafica] = useState<Ventana | null>(null)
+  /**
+   * Contra qué se compara (la cuota o un día). Vive acá porque lo usan DOS
+   * bloques: el comparador para sus curvas y "por qué no llegamos" para el
+   * «cuándo se abrió». Con una copia en cada uno, el gráfico podía estar
+   * comparando contra la cuota y la brecha contra "lun 10".
+   */
+  const [refSel, setRefSel] = useState<string | null>(null)
 
   // Turnos navegables, del actual hacia atrás. El backend publica el historial
   // ya compuesto; acá solo se elige cuál se pinta.
@@ -1712,6 +1632,10 @@ export function PublicShiftMonitorPage() {
     [live?.comments],
   )
 
+  /* Los que Shoplogix marca para el turno entero: no cuelgan de ninguna parada
+     y hasta ahora se descartaban en silencio. */
+  const notasDeTurnoCompleto = useMemo(() => notasDelTurno(live?.comments), [live?.comments])
+
   /**
    * El Pareto de las paradas de los últimos turnos.
    *
@@ -1740,6 +1664,122 @@ export function PublicShiftMonitorPage() {
    * mejor turno 13,2, contra 8,1 y 9,7 de reloj. La diferencia entre las dos
    * medidas ES el tiempo parado — que es justo lo que Mantención mueve.
    */
+  /**
+   * Cuánto costó cada parada, en piezas.
+   *
+   * ⚠ Cada evento se valoriza al ritmo que la línea traía JUSTO ANTES, no al
+   * promedio del turno. Lo vio Orel el 14-08: antes del corte de agua la línea
+   * venía a 12,1 pz/min con tramos de 8,5, no a los 13,5 del promedio. Con el
+   * promedio las paradas de ese turno suman 719 pz; medidas así, 662. Esas 57
+   * piezas de diferencia se le imputaban a Mantención sin que hubieran existido.
+   */
+  const costoParadas = useMemo(
+    () =>
+      costoDeParadas({
+        series: live?.series,
+        stopEvents: live?.stopEvents,
+        stopReasons: live?.stopReasons,
+        // Solo lo recuperable: el convenio no se convierte a piezas.
+        recuperables: (live?.timeBreakdown?.recoverable ?? []).map((x) => x.reason),
+        cpmGlobal:
+          live?.timeBreakdown && live.timeBreakdown.producingMin > 0
+            ? live.totalPieces / live.timeBreakdown.producingMin
+            : 0,
+      }),
+    [live],
+  )
+
+  /**
+   * Los eventos del turno agrupados por dueño de la pérdida, con el árbol
+   * OFICIAL de imputación como juez (ver `monitorEventos`).
+   */
+  const gruposEventos = useMemo(
+    () =>
+      agruparEventos({
+        tb: live?.timeBreakdown,
+        stopEvents: live?.stopEvents,
+        stopReasons: live?.stopReasons,
+        costo: costoParadas,
+        cpmGlobal:
+          live?.timeBreakdown && live.timeBreakdown.producingMin > 0
+            ? live.totalPieces / live.timeBreakdown.producingMin
+            : null,
+      }),
+    [live, costoParadas],
+  )
+
+  /*
+   * Por qué el turno cerró distinto que ayer, y los récords de la línea.
+   *
+   * Los resúmenes salen de DOS fuentes que se complementan: `forecastHistory`
+   * (hasta 10 turnos del mismo nombre, RECONSTRUIDOS con el código vigente) y
+   * `history` (solo 6 turnos, con el `live` completo pero CACHEADO tal como se
+   * calculó en su momento).
+   *
+   * ⚠ Manda `forecastHistory` cuando trae el desglose. Verificado el 14-08: el
+   * `history` cacheado decía 397 min produciendo para el 07-08 y reconstruirlo
+   * fresco da 351 — son números de ANTES de los fixes de atribución de paradas,
+   * y un «récord de 84% andando» calculado con otras reglas no es un récord,
+   * es una vara torcida. `history` queda solo de relleno para los dateKeys que
+   * el backend todavía no repobló.
+   */
+  const resumenesAnteriores = useMemo(() => {
+    const por = new Map<string, TurnoResumen>()
+    for (const h of data?.forecastHistory ?? []) {
+      if (h.windowMin == null) continue // entrada vieja, sin desglose: no sirve acá
+      por.set(h.dateKey, {
+        dateKey: h.dateKey,
+        total: h.total,
+        producingMin: h.producingMin,
+        windowMin: h.windowMin,
+        plannedMin: h.plannedMin,
+        recoverableMin: h.recoverableMin,
+      })
+    }
+    for (const h of data?.history ?? []) {
+      if (por.has(h.dateKey)) continue
+      if (h.shiftId !== data?.shiftId) continue // el nocturno no compara con el de día
+      const tb = h.live?.timeBreakdown
+      if (!tb) continue
+      por.set(h.dateKey, {
+        dateKey: h.dateKey,
+        total: h.live.totalPieces ?? 0,
+        producingMin: tb.producingMin ?? 0,
+        windowMin: tb.windowMin,
+        plannedMin: tb.plannedMin,
+        recoverableMin: tb.recoverableMin,
+      })
+    }
+    return [...por.values()]
+  }, [data?.history, data?.forecastHistory, data?.shiftId])
+
+  /*
+   * ⚠ Solo con el turno CERRADO: a mitad de turno el término «duración»
+   * compararía una ventana a medio crecer contra una completa, y todos los
+   * números darían en contra sin que nadie hubiera hecho nada mal. En vivo esa
+   * pregunta la contesta el comparador.
+   */
+  const resumenHoy = useMemo((): TurnoResumen | null => {
+    if (!live?.shiftClosed || !live.timeBreakdown || !data?.dateKey) return null
+    return {
+      dateKey: data.dateKey,
+      total: live.totalPieces,
+      producingMin: live.timeBreakdown.producingMin,
+      windowMin: live.timeBreakdown.windowMin,
+      plannedMin: live.timeBreakdown.plannedMin,
+      recoverableMin: live.timeBreakdown.recoverableMin,
+    }
+  }, [live, data?.dateKey])
+
+  const comparadoConAyer = useMemo(
+    () => (resumenHoy ? compararVsAyer(resumenHoy, resumenesAnteriores) : null),
+    [resumenHoy, resumenesAnteriores],
+  )
+  const recordsLinea = useMemo(
+    () => (resumenHoy ? recordsDeLinea(resumenHoy, resumenesAnteriores) : null),
+    [resumenHoy, resumenesAnteriores],
+  )
+
   const ritmoAndando = useMemo(() => {
     const previos = (data?.forecastHistory ?? [])
       .filter((h) => h.producingMin > 0 && h.total > 0)
@@ -1917,31 +1957,6 @@ export function PublicShiftMonitorPage() {
       shiftClosed: live?.shiftClosed,
     })
   }, [live, data?.history, data?.forecastHistory, data?.shiftId, data?.targetPieces, comparacion.currentMinute])
-
-  /*
-   * Dónde se gana en esta línea. Mismo historial que el pronóstico —turnos del
-   * mismo nombre, que son los comparables— y las micro-detenciones salen de
-   * `topStops`, que ya viaja en cada turno.
-   */
-  const diagnostico = useMemo(() => {
-    const micro = (l?: PublicMonitorLive) =>
-      (l?.topStops ?? []).find((s) => /micro/i.test(s.reason))?.count ?? null
-    const resumidos = (data?.forecastHistory ?? []).map((h) => ({
-      totalPieces: h.total,
-      producingMin: h.producingMin,
-      microCount: h.micro,
-    }))
-    const historial = resumidos.length > 0
-      ? resumidos
-      : (data?.history ?? [])
-          .filter((h) => h.shiftId === data?.shiftId)
-          .map((h) => ({
-            totalPieces: h.live?.totalPieces ?? 0,
-            producingMin: h.live?.timeBreakdown?.producingMin ?? 0,
-            microCount: micro(h.live),
-          }))
-    return buildDiagnostico({ history: historial, microHoy: micro(live ?? undefined) })
-  }, [live, data?.history, data?.forecastHistory, data?.shiftId])
 
   /**
    * Hasta cuándo mide el pronóstico, y cuánto sería si el turno cortara en su
@@ -2321,12 +2336,30 @@ export function PublicShiftMonitorPage() {
 
         {/* Cadencia */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {/* El número que manda es el ANDANDO: mide a la línea y se compara
+              entre turnos. El de reloj (piezas ÷ ventana) mezcla velocidad con
+              disponibilidad —9,7 vs 9,7 el día que la línea fue la más rápida
+              de los últimos 8 turnos— y queda como segunda línea, con su
+              denominador escrito. */}
           <Kpi
-            label="Piezas / min"
-            value={fmtDec(live.piecesPerMinute)}
+            label="Ritmo andando"
+            value={
+              live.timeBreakdown && live.timeBreakdown.producingMin > 0
+                ? fmtDec(live.totalPieces / live.timeBreakdown.producingMin)
+                : fmtDec(live.piecesPerMinute)
+            }
             unit="pz/min"
             icon={<Gauge className="h-3 w-3" />}
-            hint="promedio del turno"
+            hint={
+              live.timeBreakdown && live.timeBreakdown.producingMin > 0
+                ? 'cuando la línea produce'
+                : 'promedio del turno'
+            }
+            sub={
+              live.timeBreakdown && live.timeBreakdown.producingMin > 0
+                ? `Con paradas y colación: ${fmtDec(live.piecesPerMinute)} de reloj`
+                : undefined
+            }
             tone="accent"
           />
           <Kpi
@@ -2412,9 +2445,12 @@ export function PublicShiftMonitorPage() {
             por tres bloques de detalle. Arriba el desenlace, abajo el porqué
             (velocidad, tramos, tiempo, hora por hora). */}
         <ComparadorDias
+          ventana={ventanaGrafica}
+          onVentana={setVentanaGrafica}
+          refSel={refSel}
+          onRefSel={setRefSel}
           cmp={comparacion}
           live={live}
-          onCausa={setCausaSel}
           /* Solo cuando el pronóstico es creíble: un cono con 20% de error es
              una mancha que promete lo que no puede. */
           cone={pronostico && pronostico.mapePct <= MAX_MAPE_PCT ? pronostico.cone : null}
@@ -2434,6 +2470,8 @@ export function PublicShiftMonitorPage() {
           causaSel={causaSel}
           onCausa={setCausaSel}
           breaks={comparacion.breaks}
+          ventana={ventanaGrafica}
+          onVentana={setVentanaGrafica}
           recentPerMinute={live.recentPiecesPerMinute}
           requiredPerMinute={pace && pace.requiredPerMinute > 0 ? pace.requiredPerMinute : null}
           medianCpm={live.paceMedianCpm}
@@ -2446,22 +2484,32 @@ export function PublicShiftMonitorPage() {
           onCausa={setCausaSel}
           proximaParada={proximaParada}
           notas={notasDeOperador}
+          /* La resta: minutos parados -> piezas, al ritmo del turno. */
+          brecha={(() => {
+            const meta = data.targetPieces ?? live.quotaPieces ?? live.expectedPieces ?? null
+            return meta != null ? Math.max(0, meta - live.totalPieces) : null
+          })()}
+          cpmAndando={
+            live.timeBreakdown && live.timeBreakdown.producingMin > 0
+              ? live.totalPieces / live.timeBreakdown.producingMin
+              : null
+          }
+          costo={costoParadas}
+          grupos={gruposEventos}
+          notasTurno={notasDeTurnoCompleto}
         />
 
         {/* Pegado al desglose de HOY va el de SIEMPRE: la misma pregunta —qué
             para la línea— pero mirando los turnos anteriores. Es el paso de
             "hoy pasó esto" a "esto vuelve todos los turnos". */}
+        {/* Cerró el turno: qué cambió contra ayer y cómo quedó contra los
+            récords. El orden es a propósito — primero qué pasó (arriba),
+            después por qué fue distinto, después qué se repite siempre. */}
+        <VsAyerBloque r={comparadoConAyer} records={recordsLinea} />
+
         <ParetoDeParadas pareto={pareto} />
 
         <PorHora series={live.series} />
-
-        {/* La bitácora del piso: lo que el operador escribió, todo y en orden.
-            Hasta ahora solo se leía lo que coincidía con un tramo de brecha. */}
-        <BitacoraOperador comments={live.comments} onCausa={setCausaSel} />
-
-        {/* Dónde conviene poner el esfuerzo en ESTA línea. Va al final: es
-            contexto de varios turnos, no el estado del que está corriendo. */}
-        <DiagnosticoDeLinea d={diagnostico} />
 
         {/* Desglose por máquina — solo aporta cuando la línea tiene más de una */}
         {live.machines.length > 1 && (

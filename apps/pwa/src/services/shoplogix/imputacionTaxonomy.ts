@@ -20,6 +20,12 @@
  * igual — eléctrica y mecánica caen ambas en el bucket `mantencion` — pero para
  * el Pareto "eléctrica vs mecánica" que pide el curso, no.
  *
+ * ── Extensiones ─────────────────────────────────────────────────────────────
+ * El curso cubre la Baader 142 de Yal. Filete tiene una Baader 200 con otros
+ * componentes, así que al final del array hay hojas marcadas `extension`. NO
+ * son del curso y no se cuentan como tales: `TOTAL_HOJAS_CURSO` sigue diciendo
+ * 46 y el árbol dibujable no las muestra.
+ *
  * ── Reglas de matching ──────────────────────────────────────────────────────
  * El reason se normaliza (mayúsculas, sin acentos, separadores y espacios
  * colapsados) y se busca EXACTO primero, substring después. El orden importa:
@@ -62,7 +68,14 @@ export interface ImputacionLeaf {
   /** Dueño de la pérdida en la cascada del turno. */
   bucket: Exclude<LossBucket, 'produccion'>
   /** Equipo al que el curso amarra la hoja, cuando lo especifica. */
-  equipo?: 'baader142' | 'auxiliar'
+  equipo?: 'baader142' | 'baader200' | 'auxiliar'
+  /**
+   * Hoja que NO está en el curso: la agregamos nosotros para una máquina que la
+   * V12 no cubre. No cuenta en `TOTAL_HOJAS_CURSO` ni se dibuja en el árbol —
+   * presentar como oficial algo que no lo es sería exactamente el error que la
+   * app ya evita en otros lados.
+   */
+  extension?: 'filete-baader200'
   /** Formas normalizadas con las que puede llegar el reason desde Shoplogix. */
   match: string[]
 }
@@ -142,6 +155,32 @@ export const IMPUTACION_LEAVES: ImputacionLeaf[] = [
   { label: 'Ejercicio compensatorio - Paro', categorias: ['programado'], bucket: 'planificado', match: ['EJERCICIO COMPENSATORIO - PARO', 'EJERCICIO COMPENSATORIO'] },
   { label: 'Reunión inicio turno',           categorias: ['programado'], bucket: 'planificado', match: ['REUNION INICIO TURNO', 'REUNION DE INICIO DE TURNO'] },
   { label: 'Cumplimiento cuota',             categorias: ['programado'], bucket: 'externo', match: ['CUMPLIMIENTO CUOTA'] },
+
+  /*
+   * ── EXTENSIÓN · Filete / Baader 200 ─────────────────────────────────────
+   *
+   * El curso V12 se escribió para la Baader 142 de Yal: sus hojas mecánicas
+   * nombran los componentes de ESA máquina. Filete tiene una Baader 200, que
+   * manda otros nombres, y por eso 154 min de fallas mecánicas de los últimos
+   * 12 turnos caían en "sin imputar" — justo los minutos que Mantención
+   * necesita poder mostrar como suyos, y medir para ver si bajan.
+   *
+   * Verificado contra Firestore (shoplogix/filete/shifts, 12 turnos al 14-08):
+   * CUCHILLERIA DORSAL 80 min · RASCADOR 47 · PUNZON 13 · Equipo Auxiliar/GEA 14.
+   *
+   * ⚠ Van marcadas `extension` a propósito: no son del curso. Decisión de Orel
+   * el 14-08. Si algún día la V13 las incorpora, se les saca la marca.
+   */
+  { label: 'Cuchillería dorsal',   categorias: ['mecanica'], bucket: 'mantencion', equipo: 'baader200', extension: 'filete-baader200', match: ['CUCHILLERIA DORSAL'] },
+  { label: 'Cuchillería rascador', categorias: ['mecanica'], bucket: 'mantencion', equipo: 'baader200', extension: 'filete-baader200', match: ['CUCHILLERIA RASCADOR'] },
+  { label: 'Cuchillería punzón',   categorias: ['mecanica'], bucket: 'mantencion', equipo: 'baader200', extension: 'filete-baader200', match: ['CUCHILLERIA PUNZON'] },
+  // Cualquier otra cuchillería de la 200 que aparezca: mejor "cuchillería sin
+  // detalle" que "sin imputar". Va DESPUÉS de las tres anteriores porque el
+  // match por substring respeta el orden del array.
+  { label: 'Cuchillería',          categorias: ['mecanica'], bucket: 'mantencion', equipo: 'baader200', extension: 'filete-baader200', match: ['CUCHILLERIA'] },
+  // GEA: la descamadora auxiliar de Filete. No es ninguna de las auxiliares del
+  // curso (Ciclón, Knuro, Balanzas, Bombas, Cintas, Estación de Calidad, Grader).
+  { label: 'GEA',                  categorias: ['electrica', 'mecanica'], bucket: 'mantencion', equipo: 'auxiliar', extension: 'filete-baader200', match: ['EQUIPO AUXILIAR / GEA', 'GEA'] },
 ]
 
 /**
@@ -200,7 +239,9 @@ export function leavesByCategoria(): Array<{ categoria: ImputacionCategoria; lab
   return (Object.keys(CATEGORIA_META) as ImputacionCategoria[]).map((categoria) => ({
     categoria,
     label: CATEGORIA_META[categoria].oficial,
-    hojas: IMPUTACION_LEAVES.filter((l) => l.categorias.includes(categoria)),
+    // Sin las extensiones: esta vista dice "el árbol del curso" y tiene que
+    // seguir siendo cierto.
+    hojas: IMPUTACION_LEAVES.filter((l) => !l.extension && l.categorias.includes(categoria)),
   }))
 }
 
@@ -209,5 +250,7 @@ export function leavesByCategoria(): Array<{ categoria: ImputacionCategoria; lab
  * en mecánica, así que el árbol dibujado tiene 46 nodos aunque acá haya 40
  * entradas (una por causal distinguible en el dato).
  */
-export const TOTAL_HOJAS_CURSO = IMPUTACION_LEAVES.reduce((n, l) => n + l.categorias.length, 0)
-export const TOTAL_CAUSALES = IMPUTACION_LEAVES.length
+export const TOTAL_HOJAS_CURSO = IMPUTACION_LEAVES
+  .filter((l) => !l.extension)
+  .reduce((n, l) => n + l.categorias.length, 0)
+export const TOTAL_CAUSALES = IMPUTACION_LEAVES.filter((l) => !l.extension).length

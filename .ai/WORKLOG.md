@@ -1,3 +1,176 @@
+## 2026-08-14 · Monitor público · ritmo con denominador + «Qué cambió contra ayer» + récords
+
+**Qué cambió.** Tres piezas: (1) la tarjeta de ritmo ahora manda el ANDANDO
+(13,5 = piezas ÷ min produciendo) con el de reloj como segunda línea y su
+denominador escrito; (2) bloque nuevo «Qué cambió contra ayer»: la diferencia
+de piezas contra el último turno del mismo nombre, repartida entre duración /
+convenio / paradas / velocidad, con la suma cuadrando y el residuo visible;
+(3) «Contra lo mejor que ya hicimos»: récords POR COMPONENTE (ritmo, paradas,
+% andando) — no «el mejor turno», que por piezas era solo el más largo.
+
+**El hallazgo que lo motivó (Orel):** la pantalla decía 9,7 «promedio del
+turno» arriba y 13,5 abajo. Los dos eran ciertos (405 min de reloj vs 291
+andando) pero el de reloj daba 9,7 IGUAL el 13 y el 14 — el día que la línea
+fue la más rápida de los últimos 8 turnos e hizo 788 pz menos solo por tiempo.
+La descomposición: −1.001 duración, −213 convenio, +88 paradas, +276 ritmo,
++63 residuo = −788 ✓.
+
+**Archivos.** `services/shoplogix/monitorVsAyer.ts` (nuevo, 11 tests),
+`pages/monitor/MonitorVsAyer.tsx` (nuevo), `functions/publicMonitor.js`
+(forecastHistory ahora publica windowMin/plannedMin/recoverableMin),
+`publicShiftMonitor.service.ts`, `PublicShiftMonitorPage.tsx` (Kpi + memos).
+
+**Decisiones y trampas:**
+
+- ⚠⚠ **El `history` cacheado del espejo trae números de la metodología VIEJA**:
+  para el 07-08 dice 397 min produciendo y reconstruirlo fresco da 351 (84% vs
+  75% andando). Un récord calculado con otras reglas es una vara torcida. Por
+  eso manda `forecastHistory` (que el fix de functions reconstruye una vez con
+  el código vigente) y `history` queda de relleno hasta que el backend repueble.
+  **Hasta ese deploy el bloque muestra el récord viejo de 84%** — se corrige
+  solo con el merge (functions se despliega automático) + el próximo sync.
+- **El bloque solo aparece con el turno CERRADO**: a mitad de turno el término
+  «duración» compararía una ventana a medio crecer y todo daría en contra. En
+  vivo esa pregunta la contesta el comparador.
+- **Récords solo de lo que el turno controla** (ritmo, paradas, % andando); la
+  brecha se traduce a piezas solo en paradas — convertir también el % andando
+  contaría dos veces lo mismo. Mínimo 3 turnos válidos o no hay récords.
+- **Turnos rotos no comparan**: 12 de 23 en Firestore vienen sin piezas o sin
+  desglose. `vsAyer` los salta y busca el anterior válido; si no hay, no hay
+  bloque. Con residuo > 35% el bloque dice «datos incompletos» y no reparte.
+- Identidad de la descomposición: Δpz = r₀·Δandando + Δr·andando₁, con
+  Δandando = Δventana − Δconvenio − Δparadas − Δotros (otros → residuo).
+- El término de ritmo dio 276 y no 282: el redondeo de 12,52 a 12,5 en la
+  estimación de cabeza. Los tests fijan los valores EXACTOS del turno real.
+
+**Verificado:** 1.401 tests, tsc limpio, eslint 28/30, bloque y tarjeta leídos
+en el navegador con el turno real del 14-08 en claro y oscuro.
+
+## 2026-08-14 · Monitor público · un solo apartado, con los tipos del CURSO
+
+**Qué cambió.** «Por qué no llegamos» pasó a «Qué pasó en el turno»: un solo
+apartado con los eventos agrupados por **dueño de la pérdida** —Mantención,
+Externo, Sin imputar, Programado— cada causa con su categoría oficial y con sus
+paradas adentro, a un toque.
+
+**De dónde salen los tipos.** Del árbol OFICIAL (`imputacionTaxonomy.ts`, la
+«Capacitación de Imputación de Fallas V12»), no de nuestro criterio. Orel lo
+preguntó —«¿los tipos los estás tomando del curso?»— y la respuesta era NO: yo
+había inventado «flujo de línea». Cruzadas las 21 causas reales de Filete contra
+el árbol: **14 matchean, 7 no**.
+
+**Por qué importa la separación.** «Evitable» ≠ «de Mantención». El 14-08 los
+662 pz evitables fueron 410 externos (operación, agua, MMPP) y 252 sin imputar,
+y **cero de máquina** — y el bloque ahora lo dice con esas palabras. Sin eso, la
+cifra se lee como si Mantención hubiera fallado.
+
+**Extensión del árbol (decisión de Orel).** El curso se escribió para la Baader
+142 de Yal; Filete tiene una 200 y sus cuchillerías caían en «sin imputar»: 140
+min de fallas mecánicas invisibles en 12 turnos. Se agregaron 5 hojas marcadas
+`extension: 'filete-baader200'` (CUCHILLERIA DORSAL / RASCADOR / PUNZON, una
+genérica de cuchillería, y GEA). **No cuentan como del curso**: `TOTAL_HOJAS_CURSO`
+sigue diciendo 46 y el árbol dibujable no las muestra.
+
+**Archivos.** `services/shoplogix/monitorEventos.ts` (nuevo, +9 tests),
+`imputacionTaxonomy.ts` (+6 tests), `pages/monitor/notasOperador.ts` (nuevo,
++5 tests), `MonitorShiftParts.tsx`, `PublicShiftMonitorPage.tsx`.
+
+**Decisiones y trampas:**
+
+- ⚠ **Dos números para lo mismo, otra vez.** La fila decía «23×» (de
+  `timeBreakdown`) y el detalle contaba 28 eventos (de `stopEvents`). El resumen
+  ahora se calcula con el `count` de la fila; la lista de abajo son ejemplos.
+  **Queda pendiente entender por qué difieren** — 5 eventos de diferencia en el
+  mismo turno.
+- **Tocar una causa ya NO salta al gráfico**: saltaba y dejaba fuera de pantalla
+  el detalle recién abierto. Se marca igual en la serie, y el salto es un botón
+  explícito («ver en el gráfico») dentro del detalle.
+- **Las microparadas no se listan**: 23 filas de 12 s tapan las cuatro paradas
+  que costaron piezas. Se resumen («23 paradas de 26 s en promedio») + las 3 más
+  largas. Es la cronología de la opción B sin su ruido.
+- **Se rescataron los comentarios de turno completo** (`notasDelTurno`): los que
+  Shoplogix marca 07:45→15:30 no cuelgan de ninguna parada y se descartaban en
+  silencio. El 07-08 uno era «Se abren guías de bronce baader 200» — una falla
+  mecánica que no leía nadie.
+- **`notasPorCausa` y `notasDelTurno` se mudaron a `notasOperador.ts`**: son
+  datos, no componentes, y el archivo de componentes ya llevaba 3 warnings de
+  `react-refresh`. El repo bajó de 30 (el límite exacto de CI) a 28.
+- ⚠ **Lo que sigue sin poderse hacer**: el Pareto eléctrica vs mecánica del
+  curso. Shoplogix aplana el árbol y «MOTORES» vive en las dos categorías.
+
+**Verificado:** 1.390 tests, tsc limpio, eslint 28/30, y los dos turnos reales
+en el navegador a 390 px en claro y oscuro — el 14-08 (sin fallas de máquina) y
+el 07-08 (Mantención 11 min / 115 pz por PERNOS/RESORTES, con su nota de turno
+completo recuperada).
+
+## 2026-08-14 · Monitor público · fuera dos bloques (bitácora y diagnóstico)
+
+Orel los sacó mirando la pantalla: **«Comentarios del operador»** repetía lo que
+ya sale en las filas de causa, y **«Dónde se gana en esta línea»** «no aporta
+datos certeros». Borrados junto con su código muerto: `MonitorDiagnostico.tsx`,
+`services/shoplogix/monitorDiagnostico.ts` y sus tests, el componente
+`BitacoraOperador` y el memo `diagnostico` de la página.
+
+⚠ **Lo que se pierde, medido antes de borrar** (8 turnos de Filete): 4
+anotaciones vivían SOLO en la bitácora — las de causas que no tienen fila
+(«Bajada de Información», DETENCION PROGRAMADA, 12-08), las de más de 2 h de
+duración («retraso ingreso personal», 07-08), una mecánica sin fila propia («Se
+abren guías de bronce baader 200», 07-08) y las que pasan el tope de 2 notas por
+causa que aplica `notasPorCausa` (13-08 y 14-08). Si algún día falta contexto
+del piso, el tope de 2 y el filtro de causas son los dos lugares donde mirar.
+
+## 2026-08-14 · Monitor público · cada parada al ritmo que la línea traía
+
+**Qué cambió.** Las piezas que costó cada detención ya no se calculan con el
+promedio del turno, sino con el ritmo que la línea traía JUSTO ANTES de esa
+parada (mediana de los tramos limpios de los 30 min previos).
+
+**Por qué.** Lo vio Orel mirando el turno de Filete del 14-08: el bloque decía
+13,5 pz/min, pero antes del corte de agua la línea venía a 12,1, con tramos de
+8,5 y 10,9. Valorizar todo al promedio SOBREESTIMA lo que se le imputa a
+Mantención — "se perdieron X piezas por esa detención" es exactamente la frase
+que después se usa para echar culpas, y tiene que aguantar que la revisen.
+
+**Cuánto cambia (turno real 14-08, verificado con `buildMonitorLive`):**
+
+| causa | min | al promedio | al ritmo real |
+|---|---|---|---|
+| FALLA OPERACIONAL | 14 | 189 | 183 |
+| Micro Detencion | 10 | 148 | 135 |
+| AGUA | 11 | 146 | 131 |
+| ACUMULACION | 9 | 125 | 117 |
+| ATASCAMIENTO | 8 | 111 | 96 |
+| **total** | **52** | **719** | **662** (−8%) |
+
+El reparto de la brecha pasó de 65/35 a 61/39.
+
+**Archivos.** `services/shoplogix/monitorPerdidas.ts` (nuevo, + 9 tests),
+`pages/monitor/MonitorShiftParts.tsx`, `pages/PublicShiftMonitorPage.tsx`.
+
+**Decisiones y trampas:**
+
+- **Ventana de 30 min hacia atrás, con mediana.** Un solo tramo de 5 min es
+  ruido (el previo al agua marcaba 8,5); la ventana da 12,1. Solo hacia atrás:
+  lo de después ya está contaminado por el arranque post-parada.
+- **El ritmo de un tramo se mide sobre su tiempo ANDANDO**, no sobre los 5 min:
+  un tramo con 2 min parado produce menos sin ser más lento.
+- ⚠ **Los tramos con parada NO entran en la referencia**, y **los que están en
+  cero sin parada registrada tampoco** (rampa del arranque). Un test lo pilló:
+  el tramo 0 metía un ritmo de 0 y una parada habría costado 0 piezas —
+  subestimar es el error opuesto y también miente.
+- ⚠ **El titular se suma de las mismas filas de abajo.** Calcularlo aparte
+  (recoverableMin x promedio) daba un número que no cuadraba con su detalle.
+  Excepción: los minutos recuperables que todavía no tienen fila —la parada EN
+  CURSO— van al promedio, o el titular se queda corto justo con la línea parada.
+- Las filas se ordenan por lo que COSTARON, no por minutos: la más larga ya no
+  es siempre la más cara (Micro Detencion, 10 min, cuesta más que AGUA, 11).
+- 4 de los 40 eventos (los del arranque) no tienen 30 min hacia atrás y usan el
+  promedio; `sinLocal` lo reporta.
+
+**Verificado:** 1.383 tests, tsc limpio, eslint 29/30 warnings (ninguna nueva),
+y el bloque leído en el navegador con el turno real del 14-08 a 390 px en tema
+claro y oscuro.
+
 # WORKLOG — bitácora de agentes (append-only)
 
 Una entrada por bloque de trabajo. La más reciente arriba. Formato:
