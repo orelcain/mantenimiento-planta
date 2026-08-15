@@ -153,3 +153,29 @@ describe('buildPareto · bordes', () => {
     expect(p.vitalCount).toBe(4)   // 4 de 5 = 80%
   })
 })
+
+describe('dueño de la recurrencia', () => {
+  it('⚠ cada fila dice de quién es, según el árbol oficial', () => {
+    const p = buildPareto([[
+      { reason: 'Baader 200/CUCHILLERIA DORSAL', min: 75, count: 5 },
+      { reason: 'ATASCAMIENTO', min: 58, count: 20 },
+      { reason: 'Micro Detencion', min: 113, count: 260 },
+    ]])
+    const por = Object.fromEntries(p.rows.map((r) => [r.label, r.dueno]))
+    expect(por['Baader 200']).toBe('mantencion')
+    expect(por['ATASCAMIENTO']).toBe('externo')       // MMPP en el curso
+    expect(por['Micro Detencion']).toBe('sin-imputar')
+  })
+
+  it('el reparto por dueño suma lo mismo que las filas', () => {
+    const p = buildPareto([[
+      { reason: 'Baader 200/CUCHILLERIA DORSAL', min: 75, count: 5 },
+      { reason: 'ATASCAMIENTO', min: 58, count: 20 },
+      { reason: 'Micro Detencion', min: 113, count: 260 },
+    ]])
+    expect(p.porDueno.mantencion).toBe(75)
+    expect(p.porDueno.externo).toBe(58)
+    expect(p.porDueno['sin-imputar']).toBe(113)
+    expect(p.porDueno.mantencion + p.porDueno.externo + p.porDueno['sin-imputar']).toBe(p.totalMin)
+  })
+})

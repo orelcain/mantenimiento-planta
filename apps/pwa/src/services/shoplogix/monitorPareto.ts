@@ -27,12 +27,17 @@
  * pondría primeras y taparían justamente lo que sí se puede mejorar.
  */
 
+import { matchImputacion } from './imputacionTaxonomy'
+
 /** Una causa tal como viaja en el `timeBreakdown` de un turno. */
 export interface CausaTurno {
   reason: string
   min: number
   count: number
 }
+
+/** De quién es la recurrencia. Mismo lenguaje que «Qué pasó en el turno». */
+export type DuenoPareto = 'mantencion' | 'externo' | 'sin-imputar'
 
 export interface ParetoRow {
   /** Etiqueta que se muestra: el equipo si agrupa, o la causa tal cual. */
@@ -46,12 +51,24 @@ export interface ParetoRow {
   sharePct: number
   /** Porcentaje acumulado hasta esta fila, inclusive. */
   cumPct: number
+  /**
+   * Dueño según el árbol OFICIAL de imputación. La fila agrupada por equipo se
+   * decide por la parte con más minutos — en la práctica todas las partes de
+   * un mismo equipo caen en el mismo dueño.
+   */
+  dueno: DuenoPareto
   /** Las causas que se agruparon, cuando son más de una. */
   parts: CausaTurno[]
 }
 
 export interface ParetoResult {
   rows: ParetoRow[]
+  /**
+   * Minutos de la recurrencia por dueño. Es el dato de gestión que las filas
+   * solas no dicen: en Filete (7 turnos al 15-08) lo más grande era lo SIN
+   * IMPUTAR — 170 de 349 min, el 49% — y no se puede atacar lo que nadie anota.
+   */
+  porDueno: Record<DuenoPareto, number>
   /** Minutos recuperables sumados de toda la muestra. */
   totalMin: number
   /** Turnos considerados. */
@@ -107,13 +124,23 @@ export function buildPareto(turnos: Array<CausaTurno[] | null | undefined>): Par
 
   const totalMin = [...acc.values()].reduce((a, f) => a + f.minutes, 0)
   const shifts = turnos.filter(Boolean).length
-  if (totalMin <= 0) return { rows: [], totalMin: 0, shifts, vitalCount: 0, vitalPct: 0 }
+  if (totalMin <= 0) {
+    return {
+      rows: [], totalMin: 0, shifts, vitalCount: 0, vitalPct: 0,
+      porDueno: { mantencion: 0, externo: 0, 'sin-imputar': 0 },
+    }
+  }
 
   let cum = 0
   const rows: ParetoRow[] = [...acc.entries()]
     .sort((a, b) => b[1].minutes - a[1].minutes)
     .map(([label, f]) => {
       cum += f.minutes
+      const dominante = [...f.parts.values()].sort((a, b) => b.min - a.min)[0]!
+      const m = matchImputacion(dominante.reason)
+      const dueno: DuenoPareto = m.bucket === 'mantencion'
+        ? 'mantencion'
+        : m.bucket === 'externo' ? 'externo' : 'sin-imputar'
       return {
         label,
         minutes: f.minutes,
@@ -121,9 +148,13 @@ export function buildPareto(turnos: Array<CausaTurno[] | null | undefined>): Par
         count: f.count,
         sharePct: (f.minutes / totalMin) * 100,
         cumPct: (cum / totalMin) * 100,
+        dueno,
         parts: [...f.parts.values()].sort((a, b) => b.min - a.min),
       }
     })
+
+  const porDueno: Record<DuenoPareto, number> = { mantencion: 0, externo: 0, 'sin-imputar': 0 }
+  for (const r of rows) porDueno[r.dueno] += r.minutes
 
   /*
    * El corte del 80%: la primera fila que lo alcanza entra. Con muestras
@@ -139,5 +170,6 @@ export function buildPareto(turnos: Array<CausaTurno[] | null | undefined>): Par
     shifts,
     vitalCount,
     vitalPct: vitalCount > 0 ? rows[vitalCount - 1]!.cumPct : 0,
+    porDueno,
   }
 }
