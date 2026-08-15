@@ -222,7 +222,7 @@ export function MonitorCompareChart({ cmp, cerrado, claveSel, onSel, cone, venta
   const chip = (activo: boolean) =>
     `flex items-center gap-1.5 rounded-full border px-2 py-0.5 ${
       activo
-        ? 'border-amber-500/50 bg-amber-500/10 font-semibold text-amber-800 dark:text-amber-200'
+        ? 'border-transparent bg-primary/[0.13] font-semibold text-brand-ink'
         : 'border-border text-muted-foreground hover:bg-muted'
     }`
 
