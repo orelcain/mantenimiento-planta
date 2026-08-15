@@ -89,15 +89,42 @@ function paradasPorCausa(
   stopEvents: Array<{ r: number; f: string; s: number }>,
   stopReasons: string[],
 ): Map<string, ParadaSuelta[]> {
-  const m = new Map<string, ParadaSuelta[]>()
+  /*
+   * ⚠ EPISODIOS, no eventos crudos. El sensor parte una misma parada en varios
+   * states (el 14-08, dos "Micro Detencion" a las 14:44 con 8 s de diferencia)
+   * y la fila de la causa cuenta TRAMOS sobre una grilla de 10 s — así que la
+   * fila decía «23×» y este detalle listaba 28, dos números para lo mismo a
+   * 20 px de distancia. Acá se funde con la misma vara del backend: hueco de
+   * hasta una celda (10 s) = la misma parada, y la duración es el LARGO del
+   * episodio (con sus microhuecos adentro), que es lo que mide la grilla.
+   */
+  const GRILLA_SEG = 10
+  const porCausa = new Map<string, Array<{ ini: number; fin: number }>>()
   for (const e of stopEvents) {
     const causa = stopReasons[e.r]
-    if (!causa || !(e.s > 0) || !e.f) continue
-    const lista = m.get(causa) ?? []
-    lista.push({ hora: horaDe(e.f), min: e.s / 60 })
-    m.set(causa, lista)
+    const ini = Date.parse(e.f)
+    if (!causa || !(e.s > 0) || Number.isNaN(ini)) continue
+    const lista = porCausa.get(causa) ?? []
+    lista.push({ ini, fin: ini + e.s * 1000 })
+    porCausa.set(causa, lista)
   }
-  for (const lista of m.values()) lista.sort((a, b) => b.min - a.min)
+
+  const m = new Map<string, ParadaSuelta[]>()
+  for (const [causa, eventos] of porCausa) {
+    eventos.sort((a, b) => a.ini - b.ini)
+    const episodios: Array<{ ini: number; fin: number }> = []
+    for (const e of eventos) {
+      const ultimo = episodios[episodios.length - 1]
+      if (ultimo && e.ini - ultimo.fin <= GRILLA_SEG * 1000) {
+        ultimo.fin = Math.max(ultimo.fin, e.fin)
+      } else {
+        episodios.push({ ...e })
+      }
+    }
+    m.set(causa, episodios
+      .map((ep) => ({ hora: horaDe(new Date(ep.ini).toISOString()), min: (ep.fin - ep.ini) / 60_000 }))
+      .sort((a, b) => b.min - a.min))
+  }
   return m
 }
 

@@ -240,11 +240,11 @@ export function TiempoDelTurno({
             −{fmtInt(brecha)} pz
           </span>
         )
-        // "de operación", no "de turno": esta ventana es el tiempo RASTREADO
-        // (sin huecos de sensor), y el comparador usa "de turno" para el tiempo
-        // corrido desde el arranque — la misma palabra para dos medidas parecía
-        // un error de suma (6 h 3 vs 7 h 0 en la misma pantalla).
-        : <span className="tabular-nums">{fmtDurMin(tb.windowMin)} de operación</span>}
+        // Desde el fix de la rejilla (tbv 2), windowMin es el lapso REAL de
+        // punta a punta — la MISMA medida que el "de turno" del comparador, así
+        // que ahora comparten palabra a propósito. (Antes eran medidas
+        // distintas y la palabra compartida parecía un error de suma.)
+        : <span className="tabular-nums">{fmtDurMin(tb.windowMin)} de turno</span>}
     >
       {/* ── 1 · La resta ────────────────────────────────────────────────── */}
       {hayBrecha && perdidas != null && porRitmo != null && pctParadas != null && cpm != null && (

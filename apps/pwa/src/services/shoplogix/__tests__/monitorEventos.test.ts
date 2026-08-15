@@ -113,6 +113,25 @@ describe('agruparEventos', () => {
     expect(g[0]!.causas[0]!.paradas.map((p) => p.min)).toEqual([8, 2, 1])
   })
 
+  it('⚠ dos eventos pegados son UNA parada: la misma vara que la fila', () => {
+    // El caso real del 14-08: dos Micro a las 14:44 con 8 s entre medio. La
+    // fila cuenta tramos de grilla (23×) y el detalle listaba eventos (28) —
+    // dos números para lo mismo. Fundidos, el episodio mide su largo total.
+    const g = agruparEventos({
+      tb: { ...TB_14_08, recoverable: [{ reason: 'Micro Detencion', min: 1, count: 1, lineMin: 1 }] },
+      stopReasons: ['Micro Detencion'],
+      stopEvents: [
+        { r: 0, f: '2026-08-14T14:44:00.000Z', s: 12 },
+        { r: 0, f: '2026-08-14T14:44:20.000Z', s: 12 },   // hueco de 8 s: se funde
+        { r: 0, f: '2026-08-14T14:46:00.000Z', s: 12 },   // hueco de 88 s: aparte
+      ],
+    })
+    const paradas = g.find((x) => x.dueno === 'sin-imputar')!.causas[0]!.paradas
+    expect(paradas).toHaveLength(2)
+    // El episodio fundido mide de 14:44:00 a 14:44:32 — 32 s, no 24.
+    expect(Math.round(paradas[0]!.min * 60)).toBe(32)
+  })
+
   it('⚠ la hora sale del ISO tal cual: es hora de planta, no UTC local', () => {
     const g = agruparEventos({
       tb: { ...TB_14_08, recoverable: [{ reason: 'AGUA', min: 11, count: 1, lineMin: 11 }] },

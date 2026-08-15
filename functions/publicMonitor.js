@@ -957,7 +957,24 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
    * produjo, la línea estaba produciendo; después el convenio; después lo
    * recuperable. Así el total nunca pasa de la ventana.
    */
-  const minVentana = Math.max(0, Math.round(windowHours * 60))
+  /*
+   * ⚠⚠ El TAMAÑO de la rejilla es el LAPSO REAL (effectiveStart→effectiveEnd),
+   * no los minutos de operación. `windowHours` descuenta los huecos >30 min
+   * (decisión correcta para la cadencia pz/h), pero la rejilla se indexa por
+   * hora real: dimensionarla con los minutos descontados la cortaba ANTES del
+   * final del turno, exactamente tantos minutos como hueco hubo.
+   *
+   * Visto en Filete el 14-08 (colación de 43 min > 30): rejilla hasta las
+   * 14:35 con el turno corriendo hasta las 15:25 — los últimos 50 min
+   * desaparecían del desglose entero. La fila decía "Micro 23×" con 28 paros
+   * reales, una Detencion de 6 min a las 15:24 no salía en NINGUNA fila, y el
+   * ritmo andando daba 13,5 con ~11,8 reales (las piezas de la cola contaban,
+   * sus minutos produciendo no).
+   */
+  const spanMin = effectiveStart && effectiveEnd && effectiveEnd > effectiveStart
+    ? Math.round((effectiveEnd.getTime() - effectiveStart.getTime()) / 60_000)
+    : Math.max(0, Math.round(windowHours * 60))
+  const minVentana = spanMin
   const t0Ventana = effectiveStart ? effectiveStart.getTime() : null
 
   /*
@@ -1445,6 +1462,10 @@ function resumirParaForecast(live) {
     windowMin: tb.windowMin ?? null,
     plannedMin: tb.plannedMin ?? null,
     recoverableMin: tb.recoverableMin ?? null,
+    // Versión del desglose: v2 = rejilla por lapso real (fix del recorte de
+    // cola). Sirve para invalidar la caché — mezclar turnos medidos con las
+    // dos varas haría récords y bandas incomparables.
+    tbv: 2,
   }
 }
 
@@ -1481,10 +1502,10 @@ async function buildForecastHistory(db, plantSlug, currentShiftDocId, shiftId, p
   for (let i = 0; i < ids.length; i++) {
     const id = ids[i]
     // i === 0 es el turno anterior: el re-sync móvil todavía puede moverlo.
-    // Un cacheado SIN el desglose del tiempo es de antes de que se publicara:
-    // se reconstruye una vez (10 lecturas por linea, por unica vez) y queda.
+    // Un cacheado sin el desglose (o con el de la rejilla RECORTADA, tbv<2)
+    // es de un código anterior: se reconstruye una vez y queda.
     const cacheado = previos.get(id)
-    if (cacheado && i > 0 && cacheado.windowMin != null) { out.push(cacheado); continue }
+    if (cacheado && i > 0 && cacheado.windowMin != null && cacheado.tbv === 2) { out.push(cacheado); continue }
     try {
       const live = yaConstruidos.get(id) || await buildMonitorLive(db, plantSlug, id)
       const resumen = live && resumirParaForecast(live)
