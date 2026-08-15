@@ -12,6 +12,7 @@ import {
   IMPUTACION_LEAVES,
   TOTAL_HOJAS_CURSO,
   categoriaLabel,
+  leavesByCategoria,
   matchImputacion,
   normalizeReason,
 } from '../imputacionTaxonomy'
@@ -26,12 +27,16 @@ describe('normalizeReason', () => {
 })
 
 describe('el árbol cubre el curso completo', () => {
+  // Las hojas de extensión (Baader 200 de Filete) no son del curso: se filtran
+  // acá para que estas cuentas sigan hablando SOLO de la V12.
+  const DEL_CURSO = IMPUTACION_LEAVES.filter((l) => !l.extension)
+
   it('tiene las 46 hojas del curso en 40 causales distinguibles', () => {
     expect(TOTAL_HOJAS_CURSO).toBe(46)
-    expect(IMPUTACION_LEAVES).toHaveLength(40)
+    expect(DEL_CURSO).toHaveLength(40)
   })
   it('exactamente 6 causales son ambiguas entre eléctrica y mecánica', () => {
-    const ambiguas = IMPUTACION_LEAVES.filter((l) => l.categorias.length > 1).map((l) => l.label)
+    const ambiguas = DEL_CURSO.filter((l) => l.categorias.length > 1).map((l) => l.label)
     expect(ambiguas.sort()).toEqual(
       ['Balanzas', 'Bombas', 'Cintas', 'Estación de Calidad', 'Grader', 'Motores'].sort(),
     )
@@ -95,5 +100,49 @@ describe('trampas de matching', () => {
     const m = matchImputacion('CAUSAL QUE NADIE VIO')
     expect(m.leaf).toBeNull()
     expect(m.bucket).toBeNull()
+  })
+})
+
+/*
+ * El curso se escribio para la Baader 142 de Yal. Filete tiene una 200, y sus
+ * cuchillerias caian en "sin imputar": 140 min de fallas mecanicas que no se
+ * podian mostrar como de Mantencion. Los nombres salieron de Firestore
+ * (shoplogix/filete/shifts, 12 turnos al 14-08), no de la imaginacion.
+ */
+describe('extension Filete / Baader 200', () => {
+  it('las tres cuchillerias son falla mecanica de Mantencion', () => {
+    for (const r of ['Baader 200/CUCHILLERIA DORSAL', 'Baader 200/CUCHILLERIA RASCADOR',
+                     'Baader 200/CUCHILLERIA PUNZON']) {
+      const m = matchImputacion(r)
+      expect(m.bucket).toBe('mantencion')
+      expect(m.leaf?.categorias).toEqual(['mecanica'])
+      expect(m.leaf?.equipo).toBe('baader200')
+    }
+  })
+
+  it('una cuchilleria que no conocemos cae en la generica, no en sin imputar', () => {
+    expect(matchImputacion('Baader 200/CUCHILLERIA LATERAL').leaf?.label).toBe('Cuchillería')
+  })
+
+  it('la especifica gana a la generica: el orden del array importa', () => {
+    expect(matchImputacion('Baader 200/CUCHILLERIA DORSAL').leaf?.label).toBe('Cuchillería dorsal')
+  })
+
+  it('no se roba la hoja del curso: CUCHILLOS / GUILLOTINAS sigue siendo del 142', () => {
+    const m = matchImputacion('CUCHILLOS / GUILLOTINAS')
+    expect(m.leaf?.label).toBe('Cuchillos / Guillotinas')
+    expect(m.leaf?.equipo).toBe('baader142')
+    expect(m.leaf?.extension).toBeUndefined()
+  })
+
+  it('GEA es la auxiliar de Filete, ambigua como las demas auxiliares', () => {
+    const m = matchImputacion('Equipo Auxiliar/GEA')
+    expect(m.bucket).toBe('mantencion')
+    expect(m.ambigua).toBe(true)
+  })
+
+  it('las hojas del curso siguen siendo 46: la extension NO cuenta', () => {
+    expect(TOTAL_HOJAS_CURSO).toBe(46)
+    expect(leavesByCategoria().flatMap((c) => c.hojas).some((h) => h.extension)).toBe(false)
   })
 })

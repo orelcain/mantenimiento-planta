@@ -44,11 +44,13 @@ import {
 } from '@/services/shoplogix/monitorCompare'
 import { buildForecast, MAX_MAPE_PCT } from '@/services/shoplogix/monitorForecast'
 import { buildPareto } from '@/services/shoplogix/monitorPareto'
+import { agruparEventos } from '@/services/shoplogix/monitorEventos'
 import { costoDeParadas } from '@/services/shoplogix/monitorPerdidas'
 import { llenadoDeSilletas, comoDeCada100, type LlenadoSilletas } from '@/services/shoplogix/monitorMaquina'
 import { ParetoDeParadas } from './monitor/MonitorPareto'
 import { useZoomGesto, type Ventana } from './monitor/useZoomGesto'
-import { TiempoDelTurno, ComparadorDias, Bloque, PronosticoCierre, notasPorCausa } from './monitor/MonitorShiftParts'
+import { TiempoDelTurno, ComparadorDias, Bloque, PronosticoCierre } from './monitor/MonitorShiftParts'
+import { notasPorCausa, notasDelTurno } from './monitor/notasOperador'
 import { useIsAdmin } from '@/store'
 
 // ── Formateadores (locales a propósito: esta página no debe arrastrar el
@@ -1623,6 +1625,10 @@ export function PublicShiftMonitorPage() {
     [live?.comments],
   )
 
+  /* Los que Shoplogix marca para el turno entero: no cuelgan de ninguna parada
+     y hasta ahora se descartaban en silencio. */
+  const notasDeTurnoCompleto = useMemo(() => notasDelTurno(live?.comments), [live?.comments])
+
   /**
    * El Pareto de las paradas de los últimos turnos.
    *
@@ -1674,6 +1680,25 @@ export function PublicShiftMonitorPage() {
             : 0,
       }),
     [live],
+  )
+
+  /**
+   * Los eventos del turno agrupados por dueño de la pérdida, con el árbol
+   * OFICIAL de imputación como juez (ver `monitorEventos`).
+   */
+  const gruposEventos = useMemo(
+    () =>
+      agruparEventos({
+        tb: live?.timeBreakdown,
+        stopEvents: live?.stopEvents,
+        stopReasons: live?.stopReasons,
+        costo: costoParadas,
+        cpmGlobal:
+          live?.timeBreakdown && live.timeBreakdown.producingMin > 0
+            ? live.totalPieces / live.timeBreakdown.producingMin
+            : null,
+      }),
+    [live, costoParadas],
   )
 
   const ritmoAndando = useMemo(() => {
@@ -2373,6 +2398,8 @@ export function PublicShiftMonitorPage() {
               : null
           }
           costo={costoParadas}
+          grupos={gruposEventos}
+          notasTurno={notasDeTurnoCompleto}
         />
 
         {/* Pegado al desglose de HOY va el de SIEMPRE: la misma pregunta —qué

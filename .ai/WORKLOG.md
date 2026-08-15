@@ -1,3 +1,60 @@
+## 2026-08-14 · Monitor público · un solo apartado, con los tipos del CURSO
+
+**Qué cambió.** «Por qué no llegamos» pasó a «Qué pasó en el turno»: un solo
+apartado con los eventos agrupados por **dueño de la pérdida** —Mantención,
+Externo, Sin imputar, Programado— cada causa con su categoría oficial y con sus
+paradas adentro, a un toque.
+
+**De dónde salen los tipos.** Del árbol OFICIAL (`imputacionTaxonomy.ts`, la
+«Capacitación de Imputación de Fallas V12»), no de nuestro criterio. Orel lo
+preguntó —«¿los tipos los estás tomando del curso?»— y la respuesta era NO: yo
+había inventado «flujo de línea». Cruzadas las 21 causas reales de Filete contra
+el árbol: **14 matchean, 7 no**.
+
+**Por qué importa la separación.** «Evitable» ≠ «de Mantención». El 14-08 los
+662 pz evitables fueron 410 externos (operación, agua, MMPP) y 252 sin imputar,
+y **cero de máquina** — y el bloque ahora lo dice con esas palabras. Sin eso, la
+cifra se lee como si Mantención hubiera fallado.
+
+**Extensión del árbol (decisión de Orel).** El curso se escribió para la Baader
+142 de Yal; Filete tiene una 200 y sus cuchillerías caían en «sin imputar»: 140
+min de fallas mecánicas invisibles en 12 turnos. Se agregaron 5 hojas marcadas
+`extension: 'filete-baader200'` (CUCHILLERIA DORSAL / RASCADOR / PUNZON, una
+genérica de cuchillería, y GEA). **No cuentan como del curso**: `TOTAL_HOJAS_CURSO`
+sigue diciendo 46 y el árbol dibujable no las muestra.
+
+**Archivos.** `services/shoplogix/monitorEventos.ts` (nuevo, +9 tests),
+`imputacionTaxonomy.ts` (+6 tests), `pages/monitor/notasOperador.ts` (nuevo,
++5 tests), `MonitorShiftParts.tsx`, `PublicShiftMonitorPage.tsx`.
+
+**Decisiones y trampas:**
+
+- ⚠ **Dos números para lo mismo, otra vez.** La fila decía «23×» (de
+  `timeBreakdown`) y el detalle contaba 28 eventos (de `stopEvents`). El resumen
+  ahora se calcula con el `count` de la fila; la lista de abajo son ejemplos.
+  **Queda pendiente entender por qué difieren** — 5 eventos de diferencia en el
+  mismo turno.
+- **Tocar una causa ya NO salta al gráfico**: saltaba y dejaba fuera de pantalla
+  el detalle recién abierto. Se marca igual en la serie, y el salto es un botón
+  explícito («ver en el gráfico») dentro del detalle.
+- **Las microparadas no se listan**: 23 filas de 12 s tapan las cuatro paradas
+  que costaron piezas. Se resumen («23 paradas de 26 s en promedio») + las 3 más
+  largas. Es la cronología de la opción B sin su ruido.
+- **Se rescataron los comentarios de turno completo** (`notasDelTurno`): los que
+  Shoplogix marca 07:45→15:30 no cuelgan de ninguna parada y se descartaban en
+  silencio. El 07-08 uno era «Se abren guías de bronce baader 200» — una falla
+  mecánica que no leía nadie.
+- **`notasPorCausa` y `notasDelTurno` se mudaron a `notasOperador.ts`**: son
+  datos, no componentes, y el archivo de componentes ya llevaba 3 warnings de
+  `react-refresh`. El repo bajó de 30 (el límite exacto de CI) a 28.
+- ⚠ **Lo que sigue sin poderse hacer**: el Pareto eléctrica vs mecánica del
+  curso. Shoplogix aplana el árbol y «MOTORES» vive en las dos categorías.
+
+**Verificado:** 1.390 tests, tsc limpio, eslint 28/30, y los dos turnos reales
+en el navegador a 390 px en claro y oscuro — el 14-08 (sin fallas de máquina) y
+el 07-08 (Mantención 11 min / 115 pz por PERNOS/RESORTES, con su nota de turno
+completo recuperada).
+
 ## 2026-08-14 · Monitor público · fuera dos bloques (bitácora y diagnóstico)
 
 Orel los sacó mirando la pantalla: **«Comentarios del operador»** repetía lo que

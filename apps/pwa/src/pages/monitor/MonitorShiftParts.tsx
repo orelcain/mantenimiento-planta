@@ -10,6 +10,7 @@ import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import type { PublicMonitorLive } from '@/services/shoplogix/publicShiftMonitor.service'
 import type { CostoDeParadas } from '@/services/shoplogix/monitorPerdidas'
+import { DUENO_META, type CausaDelTurno, type GrupoDelTurno } from '@/services/shoplogix/monitorEventos'
 import { resumenComparacion, type CompareResult } from '@/services/shoplogix/monitorCompare'
 import { MAX_MAPE_PCT, type ConePoint, type ForecastResult } from '@/services/shoplogix/monitorForecast'
 import { MonitorCompareChart } from './MonitorCompareChart'
@@ -130,7 +131,7 @@ function fmtDurMin(min: number): string {
  * le pide a la línea que recupere un tiempo que por convenio no se recupera.
  */
 export function TiempoDelTurno({
-  tb, causaSel, onCausa, proximaParada, notas, brecha, cpmAndando, costo,
+  tb, causaSel, onCausa, proximaParada, notas, brecha, cpmAndando, costo, grupos, notasTurno,
 }: {
   tb: PublicMonitorLive['timeBreakdown']
   causaSel?: string | null
@@ -149,6 +150,20 @@ export function TiempoDelTurno({
    * queda solo como respaldo para las causas que no vengan calculadas.
    */
   costo?: CostoDeParadas | null
+  /**
+   * Los eventos del turno agrupados por dueno de la perdida (ver
+   * `monitorEventos`). Es lo que se muestra; `tb.recoverable` queda solo para
+   * los totales y para el reparto del tiempo plegado.
+   */
+  grupos?: GrupoDelTurno[]
+  /**
+   * Comentarios que Shoplogix marca para el turno COMPLETO (07:45-15:30).
+   *
+   * No cuelgan de ninguna parada, asi que hasta ahora se descartaban en
+   * silencio: el 07-08 el operador anoto "Se abren guias de bronce baader 200"
+   * -una falla mecanica- y no la vio nadie.
+   */
+  notasTurno?: string[]
 }) {
   /* El reparto del tiempo pasa a DETALLE: la barra de 72/16/13% es el "cómo",
      y arriba va el "cuánto costó", que es lo que se viene a mirar. */
@@ -178,8 +193,6 @@ export function TiempoDelTurno({
    */
   const sinRedondear = (reason: string, min: number) =>
     porCausa.get(reason)?.piezas ?? (cpm ? min * cpm : 0)
-  const piezasDe = (reason: string, min: number) =>
-    cpm ? Math.round(sinRedondear(reason, min)) : null
   /*
    * El total se SUMA de las mismas filas de abajo. Calcularlo aparte
    * (recoverableMin x promedio) daba un titular que no cuadraba con su propio
@@ -203,6 +216,17 @@ export function TiempoDelTurno({
   // distinto. Con una sola causa no hay rango que mostrar.
   const ritmos = (costo?.porCausa ?? []).map((c) => c.cpm)
   const rango = ritmos.length > 1 ? { min: Math.min(...ritmos), max: Math.max(...ritmos) } : null
+
+  const gruposVisibles = (grupos ?? []).filter((g) => g.causas.length > 0)
+  /*
+   * "Ninguna falla de máquina" solo se puede afirmar si hubo paradas que
+   * clasificar y ninguna cayó en Mantención. Con el turno entero sin paradas
+   * la frase sería cierta pero vacía, y con el grupo presente sería falsa.
+   */
+  const sinFallaDeMaquina =
+    gruposVisibles.some((g) => g.dueno !== 'programado') &&
+    !gruposVisibles.some((g) => g.dueno === 'mantencion')
+  const ultimoImputable = [...gruposVisibles].reverse().find((g) => g.dueno !== 'programado')?.dueno
 
   return (
     <Bloque
@@ -273,10 +297,10 @@ export function TiempoDelTurno({
         </div>
       )}
 
-      {/* ── 2 · Qué paró la línea ──────────────────────────────────────── */}
+      {/* ── 2 · Qué pasó, agrupado por de quién es ─────────────────────── */}
       <div className={hayBrecha ? 'mt-3 border-t border-border pt-2.5' : 'mt-2'}>
         <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-          Qué paró la línea
+          Qué pasó en el turno
           {/* Los minutos solo si la resta de arriba no los dijo ya. */}
           {!hayBrecha && (
             <span className="normal-case tracking-normal">
@@ -284,48 +308,62 @@ export function TiempoDelTurno({
             </span>
           )}
         </p>
-        <ul className="mt-1 space-y-0.5 text-[11.5px]">
-          {tb.recoverable.length === 0 && (
-            <li className="text-muted-foreground/60">nada por recuperar</li>
-          )}
-          {/* Ordenadas por lo que COSTARON, no por minutos: desde que cada
-              parada se valoriza a su propio ritmo, la más larga ya no es
-              siempre la más cara, y la pieza es el número que manda la fila. */}
-          {[...tb.recoverable]
-            .sort((a, b) => sinRedondear(b.reason, b.min) - sinRedondear(a.reason, a.min))
-            .map((x) => (
-              <FilaCausa key={x.reason} x={x} sel={causaSel ?? null} onCausa={onCausa}
-                notas={notas?.get(x.reason)} piezas={piezasDe(x.reason, x.min)} />
-            ))}
-        </ul>
-        {/* El "cuándo" de cada causa lo da el gráfico, no una caja aparte: acá
-            vivía "dónde se abrió la brecha", que sin sus cifras solo repetía
-            estos mismos nombres con una hora al lado — y encima solo los tres
-            peores. Tocar la causa marca TODAS sus paradas en la serie. */}
-        {onCausa && tb.recoverable.length > 0 && (
+
+        {gruposVisibles.length === 0 && (
+          <p className="mt-1 text-[11.5px] text-muted-foreground/60">nada por recuperar</p>
+        )}
+
+        {gruposVisibles.map((g) => (
+          <div key={g.dueno}>
+            <GrupoDeEventos
+              g={g}
+              sel={causaSel ?? null}
+              onCausa={onCausa}
+              notas={notas}
+              proximaParada={g.dueno === 'programado' ? proximaParada : null}
+              plannedMin={tb.plannedMin}
+            />
+            {/* ⚠ La frase que Mantención necesita poder decir. Va pegada al
+                último grupo que se le puede imputar a alguien, no al final:
+                después del convenio queda a tres dedos de distancia de los
+                minutos que explica y se lee como un pie de página. */}
+            {sinFallaDeMaquina && g.dueno === ultimoImputable && (
+              <p className="mt-2 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
+                ✓ Ninguna parada por falla de máquina en este turno.
+              </p>
+            )}
+          </div>
+        ))}
+
+        {/* El aviso de la próxima parada de convenio no puede depender de que
+            YA haya habido una: el 14-08 los primeros 7 min planificados eran
+            reunión de inicio y ejercicio, con la colación todavía por delante. */}
+        {proximaParada && tb.plannedMin === 0 && (
           <p className="mt-1.5 text-[10.5px] text-muted-foreground/70">
-            Tocá una causa para ver en qué momento del turno ocurrió.
+            Todavía sin paradas de convenio: la próxima entra a las{' '}
+            <span className="tabular-nums">{proximaParada}</span>.
+          </p>
+        )}
+
+        {notasTurno && notasTurno.length > 0 && (
+          <div className="mt-2 border-t border-border pt-2">
+            <p className="text-[10px] uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+              Anotado para todo el turno
+            </p>
+            <ul className="mt-1 space-y-0.5 border-l-2 border-emerald-500/40 pl-2">
+              {notasTurno.map((t) => (
+                <li key={t} className="text-[10.5px] leading-snug text-muted-foreground">{t}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {onCausa && gruposVisibles.length > 0 && (
+          <p className="mt-1.5 text-[10.5px] text-muted-foreground/70">
+            Tocá una causa para ver sus paradas una por una.
           </p>
         )}
       </div>
-
-      {/* ── 3 · El convenio, aparte y sin convertir a piezas ───────────── */}
-      {(tb.plannedMin > 0 || proximaParada) && (
-        <div className="mt-2 flex flex-wrap items-baseline justify-between gap-x-3 border-t border-border pt-2 text-[11px] text-muted-foreground">
-          <span>Convenio <span className="text-muted-foreground/70">· no se recupera</span></span>
-          <span className="tabular-nums">{fmtDurMin(tb.plannedMin)}</span>
-          {/* ⚠ El aviso NO se apaga con la primera parada planificada: 7 min de
-              reunión de inicio lo mataban con la colación todavía por delante. */}
-          {proximaParada && (
-            <span className="basis-full text-[10.5px] text-muted-foreground/70">
-              {tb.plannedMin === 0
-                ? 'Todavía sin paradas de convenio: la próxima entra a las '
-                : 'La próxima entra a las '}
-              <span className="tabular-nums">{proximaParada}</span>.
-            </span>
-          )}
-        </div>
-      )}
 
       {/* ── 5 · El reparto del tiempo, plegado ─────────────────────────── */}
       <button
@@ -386,20 +424,6 @@ export function TiempoDelTurno({
             </span>
           </div>
 
-          {tb.planned.length > 0 && (
-            <div className="mt-2">
-              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                Planificado · no se recupera
-              </p>
-              <ul className="mt-1 space-y-0.5 text-[11px]">
-                {tb.planned.map((x) => (
-                  <FilaCausa key={x.reason} x={x} sel={causaSel ?? null} onCausa={onCausa}
-                    notas={notas?.get(x.reason)} />
-                ))}
-              </ul>
-            </div>
-          )}
-
           <p className="mt-2 text-[10px] leading-snug text-muted-foreground/70">
             Los minutos son los que la causa estuvo activa en alguna máquina; la barra mide la
             LÍNEA, que solo se detiene cuando paran todas.
@@ -411,100 +435,188 @@ export function TiempoDelTurno({
 }
 
 /**
- * Una causa del desglose. Clickeable cuando hay gráfico que marcar.
+ * Un grupo de eventos: de quién es la pérdida, cuánto costó y sus causas.
  *
- * Saber que la colación se llevó 57 min no dice nada por sí solo; lo que explica
- * el turno es CUÁNDO se los llevó. Al tocarla, el gráfico de arriba pinta esos
- * tramos — y la vista sube sola, porque en el celular el gráfico queda fuera de
- * pantalla y no se vería que algo cambió.
+ * El primer nivel NO es "evitable / no evitable" sino de quién es, porque
+ * evitable no significa de Mantención. El 14-08 los 662 pz evitables no tenían
+ * ni un minuto de falla de máquina —eran operación, abastecimiento y paradas
+ * que nadie imputó— y sin la separación la cifra se lee como si alguien de
+ * Mantención hubiera fallado.
  */
-function FilaCausa({ x, sel, onCausa, notas, piezas }: {
-  x: { reason: string; min: number; count: number; lineMin?: number }
+function GrupoDeEventos({ g, sel, onCausa, notas, proximaParada, plannedMin }: {
+  g: GrupoDelTurno
+  sel: string | null
+  onCausa?: (c: string | null) => void
+  notas?: Map<string, Array<{ desde: string; texto: string }>>
+  /** Solo en el grupo de convenio: cuándo entra la próxima. */
+  proximaParada?: string | null
+  plannedMin: number
+}) {
+  const color =
+    g.dueno === 'mantencion' ? 'text-amber-700 dark:text-amber-400'
+      : g.dueno === 'externo' ? 'text-sky-700 dark:text-sky-300'
+        : g.dueno === 'sin-imputar' ? 'text-muted-foreground'
+          : 'text-slate-600 dark:text-slate-300'
+  const meta = DUENO_META[g.dueno]
+
+  return (
+    <div className="mt-2">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className={`text-[10.5px] font-bold uppercase tracking-wide ${color}`}>
+          {meta.label} <span className="font-normal normal-case tracking-normal opacity-70">· {meta.detalle}</span>
+        </span>
+        <span className="shrink-0 text-[10.5px] tabular-nums text-muted-foreground">
+          {fmtDurMin(g.min)}
+          {g.piezas != null && (
+            <>
+              {' · '}
+              <b className="text-red-700 dark:text-red-400">{fmtInt(g.piezas)} pz</b>
+            </>
+          )}
+        </span>
+      </div>
+      <ul className="mt-0.5 space-y-0.5 pl-2 text-[11.5px]">
+        {g.causas.map((c) => (
+          <FilaEvento key={c.reason} c={c} sel={sel} onCausa={onCausa} notas={notas?.get(c.reason)} />
+        ))}
+      </ul>
+      {/* ⚠ El aviso NO se apaga con la primera parada planificada: 7 min de
+          reunión de inicio lo mataban con la colación todavía por delante. */}
+      {proximaParada && plannedMin > 0 && (
+        <p className="mt-1 pl-2 text-[10.5px] text-muted-foreground/70">
+          La próxima entra a las <span className="tabular-nums">{proximaParada}</span>.
+        </p>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Una causa, con sus paradas adentro.
+ *
+ * El detalle va PLEGADO y no en una lista aparte: el turno del 14-08 tuvo 46
+ * eventos y 23 eran microparadas de 12 segundos — la cronología completa entierra
+ * las cuatro paradas que de verdad costaron piezas. Acá cada causa se abre sola.
+ *
+ * ⚠ Tocarla ya no salta al gráfico: si saltara, el detalle que se acaba de abrir
+ * quedaría fuera de pantalla. La causa se marca igual en la serie, y el salto es
+ * un toque más, explícito.
+ */
+function FilaEvento({ c, sel, onCausa, notas }: {
+  c: CausaDelTurno
   sel: string | null
   onCausa?: (c: string | null) => void
   /**
-   * Lo que costo la causa, en piezas. Es lo que convierte el bloque en
-   * evidencia: "FALLA OPERACIONAL 14 min" no se discute igual que
-   * "FALLA OPERACIONAL 189 pz". Ausente en las de convenio: ese tiempo no se
-   * podia producir, y convertirlo seria inventar una perdida.
-   */
-  piezas?: number | null
-  /**
-   * Lo que el operador escribió sobre ESTA causa.
-   *
-   * Antes vivían tres bloques más abajo, en la bitácora: la pantalla decía
-   * "FALLA OPERACIONAL 14 min" acá y "Ajuste erroneo de operador nuevo" a dos
-   * pantallas de distancia. La causa y su explicación son la misma respuesta a
-   * "¿por qué paró?", así que van juntas.
+   * Lo que el operador escribió sobre ESTA causa. La causa y su explicación son
+   * la misma respuesta a "¿por qué paró?", así que van juntas.
    */
   notas?: Array<{ desde: string; texto: string }>
 }) {
-  const activa = sel === x.reason
+  const [abierta, setAbierta] = useState(false)
+  const activa = sel === c.reason
   /*
-   * Cuando la parada fue de UNA máquina y las otras siguieron, la línea no
-   * perdió ese tiempo. Sin decirlo, la barra marca "recuperable 9 min" y acá
-   * abajo se lee "KNURO 98 min", y parece que uno de los dos miente.
+   * Con muchas paradas, listarlas todas es la lista de 46 filas que estamos
+   * evitando: se resume y se muestran las más largas, que son las que pesan.
    */
-  const frenoMenos = x.lineMin != null && x.lineMin < x.min
-  const contenido = (
-    <>
-      <span className="min-w-0 truncate">
-        {x.reason}
-        {frenoMenos && (
-          <span className="ml-1.5 text-[10px] text-muted-foreground/70">
-            {x.lineMin === 0 ? 'la línea siguió' : `frenó ${x.lineMin} min`}
-          </span>
-        )}
+  const MUCHAS = 6
+  const muchas = c.paradas.length > MUCHAS
+  const visibles = muchas ? c.paradas.slice(0, 3) : c.paradas
+  /*
+   * ⚠ El resumen se calcula con el `count` de la FILA, no con la cantidad de
+   * eventos que trae `paradas`: los dos números no coinciden —el 14-08 la fila
+   * decía 23 microparadas y `stopEvents` traía 28— y verlos a 20 px de
+   * distancia se lee como un error de cuenta. La lista de abajo son ejemplos
+   * reales; el conteo manda el que usa todo el resto del bloque.
+   */
+  const cuantas = c.count || c.paradas.length
+  const prom = cuantas > 0 ? (c.min / cuantas) * 60 : 0
+
+  const cifras = (
+    <span className="shrink-0 tabular-nums">
+      {c.piezas != null && (
+        <span className="font-semibold text-red-700 dark:text-red-400">{fmtInt(c.piezas)} pz</span>
+      )}
+      <span className="text-muted-foreground">
+        {c.piezas != null ? ' · ' : ''}{Math.round(c.min)} min{c.count > 0 ? ` · ${c.count}×` : ''}
       </span>
-      <span className="shrink-0 tabular-nums">
-        {piezas != null && (
-          <span className="font-semibold text-red-700 dark:text-red-400">{fmtInt(piezas)} pz</span>
-        )}
-        <span className="text-muted-foreground">
-          {piezas != null ? ' · ' : ''}{x.min} min · {x.count}×
-        </span>
-      </span>
-    </>
+    </span>
   )
 
-  const notasDeLaCausa = (notas ?? []).length > 0 && (
-    <ul className="mt-0.5 space-y-0.5 border-l-2 border-sky-500/30 pl-2">
-      {notas!.map((n, i) => (
-        <li key={`${n.desde}-${i}`} className="text-[10.5px] leading-snug text-muted-foreground">
-          <span className="tabular-nums">{n.desde}</span> · «{n.texto}»
-        </li>
-      ))}
-    </ul>
+  const nombre = (
+    <span className="min-w-0 truncate">
+      {c.reason}
+      {c.paradas.length > 0 && <span className="ml-1 text-[9px] text-muted-foreground/70">{abierta ? '▾' : '▸'}</span>}
+    </span>
   )
-
-  if (!onCausa) {
-    return (
-      <li>
-        <div className="flex justify-between gap-2">{contenido}</div>
-        {notasDeLaCausa}
-      </li>
-    )
-  }
 
   return (
     <li>
-      <button
-        type="button"
-        onClick={() => {
-          onCausa(activa ? null : x.reason)
-          if (!activa) {
-            document
-              .getElementById('grafico-turno')
-              ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-          }
-        }}
-        className={`flex w-full justify-between gap-2 rounded px-1 py-0.5 text-left ${
-          activa ? 'bg-sky-500/20 text-sky-800 dark:text-sky-200' : 'text-foreground hover:bg-muted'
-        }`}
-      >
-        {contenido}
-      </button>
-      {notasDeLaCausa}
+      {onCausa && c.paradas.length > 0 ? (
+        <button
+          type="button"
+          onClick={() => {
+            setAbierta((v) => !v)
+            onCausa(abierta ? null : c.reason)
+          }}
+          className={`flex w-full justify-between gap-2 rounded px-1 py-0.5 text-left ${
+            activa ? 'bg-sky-500/20 text-sky-800 dark:text-sky-200' : 'text-foreground hover:bg-muted'
+          }`}
+          aria-expanded={abierta}
+        >
+          {nombre}
+          {cifras}
+        </button>
+      ) : (
+        <div className="flex justify-between gap-2 px-1">{nombre}{cifras}</div>
+      )}
+
+      {/* La categoría del curso, para que la etiqueta no sea nuestra: si el
+          árbol dice que ATASCAMIENTO es MMPP, nadie discute la fila. */}
+      {c.categoria && (
+        <p className="px-1 text-[9.5px] uppercase tracking-wide text-muted-foreground/70">
+          {c.categoria}
+          {c.extension && <span className="ml-1 normal-case tracking-normal">· fuera del curso</span>}
+        </p>
+      )}
+
+      {abierta && c.paradas.length > 0 && (
+        <div className="my-1 ml-2 border-l border-border pl-2">
+          {muchas && (
+            <p className="text-[10px] italic text-muted-foreground/70">
+              {cuantas} paradas de {Math.round(prom)} s en promedio.
+            </p>
+          )}
+          <ul className="space-y-px">
+            {visibles.map((p, i) => (
+              <li key={`${p.hora}-${i}`} className="flex gap-3 text-[10.5px] tabular-nums text-muted-foreground">
+                <span className="text-muted-foreground/70">{p.hora}</span>
+                <span>{fmtDec(p.min)} min</span>
+              </li>
+            ))}
+          </ul>
+          {muchas && <p className="text-[10px] italic text-muted-foreground/70">las 3 más largas</p>}
+          <button
+            type="button"
+            onClick={() => {
+              onCausa?.(c.reason)
+              document.getElementById('grafico-turno')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            }}
+            className="mt-0.5 text-[10px] text-sky-700 underline underline-offset-2 dark:text-sky-300"
+          >
+            ver en el gráfico
+          </button>
+        </div>
+      )}
+
+      {(notas ?? []).length > 0 && (
+        <ul className="mt-0.5 space-y-0.5 border-l-2 border-sky-500/30 pl-2">
+          {notas!.map((n, i) => (
+            <li key={`${n.desde}-${i}`} className="text-[10.5px] leading-snug text-muted-foreground">
+              <span className="tabular-nums">{n.desde}</span> · «{n.texto}»
+            </li>
+          ))}
+        </ul>
+      )}
     </li>
   )
 }
@@ -517,27 +629,6 @@ function FilaCausa({ x, sel, onCausa, notas, piezas }: {
  * cortan a dos por causa: son para explicar, no para leerlos todos — la
  * bitácora completa sigue existiendo abajo.
  */
-export function notasPorCausa(
-  comments: PublicMonitorLive['comments'],
-  fmtHora: (iso: string) => string,
-): Map<string, Array<{ desde: string; texto: string }>> {
-  const MAX_DUR_MS = 2 * 60 * 60_000
-  const out = new Map<string, Array<{ desde: string; texto: string }>>()
-  for (const c of comments ?? []) {
-    const texto = (c.t ?? '').trim()
-    if (!texto || !c.r || !c.f) continue
-    const a = Date.parse(c.f)
-    if (Number.isNaN(a)) continue
-    const b = c.h ? Date.parse(c.h) : a
-    if (!Number.isNaN(b) && b - a > MAX_DUR_MS) continue
-    const lista = out.get(c.r) ?? []
-    if (lista.some((n) => n.texto === texto)) continue   // el mismo viene duplicado
-    if (lista.length >= 2) continue
-    lista.push({ desde: fmtHora(c.f), texto })
-    out.set(c.r, lista)
-  }
-  return out
-}
 
 /**
  * Comparador de días, a la MISMA ALTURA DE TURNO.

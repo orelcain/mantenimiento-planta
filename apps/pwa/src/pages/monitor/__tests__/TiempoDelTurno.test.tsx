@@ -15,6 +15,7 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { render, cleanup } from '@testing-library/react'
 import { TiempoDelTurno } from '../MonitorShiftParts'
+import { agruparEventos } from '@/services/shoplogix/monitorEventos'
 import type { PublicMonitorLive } from '@/services/shoplogix/publicShiftMonitor.service'
 
 afterEach(cleanup)
@@ -38,6 +39,7 @@ const texto = (
   brecha?: number | null,
   cpmAndando?: number | null,
   costo?: Parameters<typeof TiempoDelTurno>[0]['costo'],
+  notasTurno?: string[],
 ) =>
   render(
     <TiempoDelTurno
@@ -46,6 +48,10 @@ const texto = (
       brecha={brecha}
       cpmAndando={cpmAndando}
       costo={costo}
+      // Los grupos se arman con el mismo servicio que en producción: así el
+      // test cubre el camino real y no una versión de laboratorio.
+      grupos={agruparEventos({ tb, costo, cpmGlobal: cpmAndando })}
+      notasTurno={notasTurno}
     />,
   ).container.textContent ?? ''
 
@@ -69,10 +75,10 @@ describe('TiempoDelTurno · aviso de la próxima parada de convenio', () => {
   })
 
   it('el convenio se muestra aparte y con sus minutos', () => {
-    // Desde que el bloque explica la brecha, el convenio va en su propia línea
-    // —"no se recupera"— y el reparto del tiempo pasó a detalle plegado.
-    expect(texto(ANTES_DE_LA_COLACION, null)).toMatch(/Convenio.*no se recupera/)
-    expect(texto(ANTES_DE_LA_COLACION, null)).toMatch(/7 min/)
+    // El convenio es su propio grupo —"Programado · no se recupera"— con sus
+    // causas adentro, y sin piezas.
+    expect(texto(ANTES_DE_LA_COLACION, null)).toMatch(/Programado.*no se recupera/)
+    expect(texto(ANTES_DE_LA_COLACION, null)).toMatch(/REUNION INICIO TURNO/)
   })
 
   it('⚠ el convenio NO se convierte a piezas', () => {
@@ -123,6 +129,30 @@ describe('TiempoDelTurno · aviso de la próxima parada de convenio', () => {
     expect(t).toMatch(/ritmo que la línea traía justo antes/i)
     expect(t).toMatch(/9,0 a 12,0 pz\/min/)      // el rango realmente usado
     expect(t).toMatch(/no al promedio del turno/i)
+  })
+
+  it('⚠ separa lo que es de Mantención de lo que no', () => {
+    // Ninguna de estas causas es falla de máquina: el bloque tiene que poder
+    // decirlo, o los 486 pz se leen como si Mantención hubiera fallado.
+    const t = texto(ANTES_DE_LA_COLACION, null, 1081, 13.5)
+    expect(t).toMatch(/Ninguna parada por falla de máquina/i)
+    expect(t).toMatch(/Sin imputar/i)          // "Detencion" no está en el árbol
+  })
+
+  it('una falla de máquina apaga la frase y aparece como Mantención', () => {
+    const t = texto(
+      { ...ANTES_DE_LA_COLACION, recoverable: [{ reason: 'Baader 200/CUCHILLERIA DORSAL', min: 36, count: 2, lineMin: 36 }] },
+      null, 1081, 13.5,
+    )
+    expect(t).toMatch(/Mantención/)
+    expect(t).not.toMatch(/Ninguna parada por falla de máquina/i)
+  })
+
+  it('⚠ lo anotado para todo el turno ya no se pierde', () => {
+    const t = texto(ANTES_DE_LA_COLACION, null, 1081, 13.5, undefined,
+      ['«Se abren guías de bronce baader 200» — Baader 200/PERNOS/RESORTES'])
+    expect(t).toMatch(/Anotado para todo el turno/i)
+    expect(t).toMatch(/guías de bronce/)
   })
 
   it('sin brecha no promete explicar por qué no llegamos', () => {
