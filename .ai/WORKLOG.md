@@ -1,3 +1,55 @@
+## 2026-08-14 · Monitor público · cada parada al ritmo que la línea traía
+
+**Qué cambió.** Las piezas que costó cada detención ya no se calculan con el
+promedio del turno, sino con el ritmo que la línea traía JUSTO ANTES de esa
+parada (mediana de los tramos limpios de los 30 min previos).
+
+**Por qué.** Lo vio Orel mirando el turno de Filete del 14-08: el bloque decía
+13,5 pz/min, pero antes del corte de agua la línea venía a 12,1, con tramos de
+8,5 y 10,9. Valorizar todo al promedio SOBREESTIMA lo que se le imputa a
+Mantención — "se perdieron X piezas por esa detención" es exactamente la frase
+que después se usa para echar culpas, y tiene que aguantar que la revisen.
+
+**Cuánto cambia (turno real 14-08, verificado con `buildMonitorLive`):**
+
+| causa | min | al promedio | al ritmo real |
+|---|---|---|---|
+| FALLA OPERACIONAL | 14 | 189 | 183 |
+| Micro Detencion | 10 | 148 | 135 |
+| AGUA | 11 | 146 | 131 |
+| ACUMULACION | 9 | 125 | 117 |
+| ATASCAMIENTO | 8 | 111 | 96 |
+| **total** | **52** | **719** | **662** (−8%) |
+
+El reparto de la brecha pasó de 65/35 a 61/39.
+
+**Archivos.** `services/shoplogix/monitorPerdidas.ts` (nuevo, + 9 tests),
+`pages/monitor/MonitorShiftParts.tsx`, `pages/PublicShiftMonitorPage.tsx`.
+
+**Decisiones y trampas:**
+
+- **Ventana de 30 min hacia atrás, con mediana.** Un solo tramo de 5 min es
+  ruido (el previo al agua marcaba 8,5); la ventana da 12,1. Solo hacia atrás:
+  lo de después ya está contaminado por el arranque post-parada.
+- **El ritmo de un tramo se mide sobre su tiempo ANDANDO**, no sobre los 5 min:
+  un tramo con 2 min parado produce menos sin ser más lento.
+- ⚠ **Los tramos con parada NO entran en la referencia**, y **los que están en
+  cero sin parada registrada tampoco** (rampa del arranque). Un test lo pilló:
+  el tramo 0 metía un ritmo de 0 y una parada habría costado 0 piezas —
+  subestimar es el error opuesto y también miente.
+- ⚠ **El titular se suma de las mismas filas de abajo.** Calcularlo aparte
+  (recoverableMin x promedio) daba un número que no cuadraba con su detalle.
+  Excepción: los minutos recuperables que todavía no tienen fila —la parada EN
+  CURSO— van al promedio, o el titular se queda corto justo con la línea parada.
+- Las filas se ordenan por lo que COSTARON, no por minutos: la más larga ya no
+  es siempre la más cara (Micro Detencion, 10 min, cuesta más que AGUA, 11).
+- 4 de los 40 eventos (los del arranque) no tienen 30 min hacia atrás y usan el
+  promedio; `sinLocal` lo reporta.
+
+**Verificado:** 1.383 tests, tsc limpio, eslint 29/30 warnings (ninguna nueva),
+y el bloque leído en el navegador con el turno real del 14-08 a 390 px en tema
+claro y oscuro.
+
 # WORKLOG — bitácora de agentes (append-only)
 
 Una entrada por bloque de trabajo. La más reciente arriba. Formato:

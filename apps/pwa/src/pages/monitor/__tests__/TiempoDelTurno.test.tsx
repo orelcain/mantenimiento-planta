@@ -37,9 +37,16 @@ const texto = (
   proximaParada?: string | null,
   brecha?: number | null,
   cpmAndando?: number | null,
+  costo?: Parameters<typeof TiempoDelTurno>[0]['costo'],
 ) =>
   render(
-    <TiempoDelTurno tb={tb} proximaParada={proximaParada} brecha={brecha} cpmAndando={cpmAndando} />,
+    <TiempoDelTurno
+      tb={tb}
+      proximaParada={proximaParada}
+      brecha={brecha}
+      cpmAndando={cpmAndando}
+      costo={costo}
+    />,
   ).container.textContent ?? ''
 
 describe('TiempoDelTurno · aviso de la próxima parada de convenio', () => {
@@ -82,6 +89,40 @@ describe('TiempoDelTurno · aviso de la próxima parada de convenio', () => {
     expect(t).toMatch(/486/)
     expect(t).toMatch(/595/)                    // el resto, por ritmo
     expect(t).toMatch(/Por qué no llegamos/i)
+  })
+
+  /*
+   * ⚠⚠ Lo de abajo es lo que impide sobreestimar. Valorizar cada parada al
+   * promedio del turno le imputa a Mantención piezas que no se iban a producir:
+   * el 14-08 el promedio daba 719 pz y el ritmo real de cada momento, 662.
+   */
+  it('⚠ usa el costo por evento, no los minutos por el promedio', () => {
+    const t = texto(ANTES_DE_LA_COLACION, null, 1081, 13, {
+      // 27 min que al promedio darían 351 pz, pero la línea venía a 9 pz/min.
+      porCausa: [{ reason: 'Detencion', min: 27, piezas: 243, eventos: 9, cpm: 9 }],
+      totalPiezas: 243,
+      totalMin: 27,
+      sinLocal: 0,
+      eventos: 9,
+    })
+    expect(t).toMatch(/Detencion.*243 pz/)
+    expect(t).not.toMatch(/351/)
+    // 243 + los 9 min que todavía no tienen causa (la parada EN CURSO) x 13.
+    expect(t).toMatch(/360/)
+  })
+
+  it('deja escrito el supuesto: al ritmo de antes, no al promedio', () => {
+    const costo = {
+      porCausa: [
+        { reason: 'Detencion', min: 20, piezas: 180, eventos: 5, cpm: 9 },
+        { reason: 'AGUA', min: 7, piezas: 84, eventos: 1, cpm: 12 },
+      ],
+      totalPiezas: 264, totalMin: 27, sinLocal: 0, eventos: 6,
+    }
+    const t = texto(ANTES_DE_LA_COLACION, null, 1081, 13.5, costo)
+    expect(t).toMatch(/ritmo que la línea traía justo antes/i)
+    expect(t).toMatch(/9,0 a 12,0 pz\/min/)      // el rango realmente usado
+    expect(t).toMatch(/no al promedio del turno/i)
   })
 
   it('sin brecha no promete explicar por qué no llegamos', () => {

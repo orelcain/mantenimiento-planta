@@ -9,6 +9,7 @@
 import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import type { PublicMonitorLive } from '@/services/shoplogix/publicShiftMonitor.service'
+import type { CostoDeParadas } from '@/services/shoplogix/monitorPerdidas'
 import { resumenComparacion, type CompareResult } from '@/services/shoplogix/monitorCompare'
 import { MAX_MAPE_PCT, type ConePoint, type ForecastResult } from '@/services/shoplogix/monitorForecast'
 import { MonitorCompareChart } from './MonitorCompareChart'
@@ -129,7 +130,7 @@ function fmtDurMin(min: number): string {
  * le pide a la línea que recupere un tiempo que por convenio no se recupera.
  */
 export function TiempoDelTurno({
-  tb, causaSel, onCausa, proximaParada, notas, brecha, cpmAndando,
+  tb, causaSel, onCausa, proximaParada, notas, brecha, cpmAndando, costo,
 }: {
   tb: PublicMonitorLive['timeBreakdown']
   causaSel?: string | null
@@ -140,8 +141,14 @@ export function TiempoDelTurno({
   notas?: Map<string, Array<{ desde: string; texto: string }>>
   /** Piezas que faltan (o faltaron) para la meta. null si no hay meta. */
   brecha?: number | null
-  /** Ritmo de la línea ANDANDO, para traducir minutos parados a piezas. */
+  /** Ritmo promedio de la línea ANDANDO. Respaldo cuando no hay `costo`. */
   cpmAndando?: number | null
+  /**
+   * Lo que costó cada parada, valorizada al ritmo que la línea traía en ese
+   * momento (ver `monitorPerdidas.ts`). Es lo que se muestra; `cpmAndando`
+   * queda solo como respaldo para las causas que no vengan calculadas.
+   */
+  costo?: CostoDeParadas | null
 }) {
   /* El reparto del tiempo pasa a DETALLE: la barra de 72/16/13% es el "cómo",
      y arriba va el "cuánto costó", que es lo que se viene a mirar. */
@@ -160,13 +167,42 @@ export function TiempoDelTurno({
    * 400" sería un número imposible en pantalla.
    */
   const cpm = cpmAndando && cpmAndando > 0 ? cpmAndando : null
-  const crudas = cpm ? tb.recoverableMin * cpm : null
+  const porCausa = new Map((costo?.porCausa ?? []).map((c) => [c.reason, c]))
+  /**
+   * Piezas que costó una causa.
+   *
+   * ⚠ Al ritmo que la línea traía CUANDO paró, no al promedio del turno: el
+   * promedio sobreestima —el 14-08, 719 pz contra 662 reales, un 8% de más— y
+   * esa cifra se le imputa a Mantención. El respaldo al promedio solo entra
+   * para causas que no vengan calculadas.
+   */
+  const sinRedondear = (reason: string, min: number) =>
+    porCausa.get(reason)?.piezas ?? (cpm ? min * cpm : 0)
+  const piezasDe = (reason: string, min: number) =>
+    cpm ? Math.round(sinRedondear(reason, min)) : null
+  /*
+   * El total se SUMA de las mismas filas de abajo. Calcularlo aparte
+   * (recoverableMin x promedio) daba un titular que no cuadraba con su propio
+   * detalle, y lo que no cuadra se discute en vez de arreglarse.
+   *
+   * ⚠ Pero los minutos recuperables NO siempre están todos en la lista: en
+   * vivo, la parada EN CURSO ya suma en `recoverableMin` y todavía no tiene
+   * fila. Ese resto va al promedio del turno —no se sabe de qué causa es— y
+   * sin él el titular se quedaría corto justo cuando la línea está parada.
+   */
+  const restoMin = Math.max(0, tb.recoverableMin - tb.recoverable.reduce((a, x) => a + x.min, 0))
+  const crudas =
+    cpm == null
+      ? null
+      : tb.recoverable.reduce((a, x) => a + sinRedondear(x.reason, x.min), 0) + restoMin * cpm
   const hayBrecha = brecha != null && brecha > 0
   const perdidas = crudas == null ? null : hayBrecha ? Math.min(crudas, brecha) : crudas
   const porRitmo = hayBrecha && perdidas != null ? Math.max(0, brecha - perdidas) : null
   const pctParadas = hayBrecha && perdidas != null ? (perdidas / brecha) * 100 : null
-  /** Piezas que costó una causa, al mismo ritmo. */
-  const piezasDe = (min: number) => (cpm ? Math.round(min * cpm) : null)
+  // El rango de ritmos usados: es la evidencia de que cada parada se valorizó
+  // distinto. Con una sola causa no hay rango que mostrar.
+  const ritmos = (costo?.porCausa ?? []).map((c) => c.cpm)
+  const rango = ritmos.length > 1 ? { min: Math.min(...ritmos), max: Math.max(...ritmos) } : null
 
   return (
     <Bloque
@@ -211,9 +247,28 @@ export function TiempoDelTurno({
           </div>
           {/* Sin "habría cerrado 700 pz más arriba": era el MISMO 700 de la
               frase de arriba, reescrito. Queda solo el supuesto del cálculo. */}
+          {/* ⚠ El supuesto va escrito: es la parte discutible del número, y
+              quien lo discuta va a preguntar exactamente esto. */}
           <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground/80">
-            Estimado al ritmo que la línea traía:{' '}
-            <span className="tabular-nums">{fmtDec(cpm)} pz/min</span> andando.
+            {costo
+              ? (
+                <>
+                  Cada parada valorizada al ritmo que la línea traía justo antes
+                  {rango && (
+                    <>
+                      {' '}(<span className="tabular-nums">{fmtDec(rango.min)}</span> a{' '}
+                      <span className="tabular-nums">{fmtDec(rango.max)} pz/min</span>)
+                    </>
+                  )}
+                  , no al promedio del turno (<span className="tabular-nums">{fmtDec(cpm)}</span>).
+                </>
+              )
+              : (
+                <>
+                  Estimado al ritmo que la línea traía:{' '}
+                  <span className="tabular-nums">{fmtDec(cpm)} pz/min</span> andando.
+                </>
+              )}
           </p>
         </div>
       )}
@@ -233,10 +288,15 @@ export function TiempoDelTurno({
           {tb.recoverable.length === 0 && (
             <li className="text-muted-foreground/60">nada por recuperar</li>
           )}
-          {tb.recoverable.map((x) => (
-            <FilaCausa key={x.reason} x={x} sel={causaSel ?? null} onCausa={onCausa}
-              notas={notas?.get(x.reason)} piezas={piezasDe(x.min)} />
-          ))}
+          {/* Ordenadas por lo que COSTARON, no por minutos: desde que cada
+              parada se valoriza a su propio ritmo, la más larga ya no es
+              siempre la más cara, y la pieza es el número que manda la fila. */}
+          {[...tb.recoverable]
+            .sort((a, b) => sinRedondear(b.reason, b.min) - sinRedondear(a.reason, a.min))
+            .map((x) => (
+              <FilaCausa key={x.reason} x={x} sel={causaSel ?? null} onCausa={onCausa}
+                notas={notas?.get(x.reason)} piezas={piezasDe(x.reason, x.min)} />
+            ))}
         </ul>
         {/* El "cuándo" de cada causa lo da el gráfico, no una caja aparte: acá
             vivía "dónde se abrió la brecha", que sin sus cifras solo repetía

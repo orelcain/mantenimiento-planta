@@ -45,6 +45,7 @@ import {
 import { buildForecast, MAX_MAPE_PCT } from '@/services/shoplogix/monitorForecast'
 import { buildDiagnostico } from '@/services/shoplogix/monitorDiagnostico'
 import { buildPareto } from '@/services/shoplogix/monitorPareto'
+import { costoDeParadas } from '@/services/shoplogix/monitorPerdidas'
 import { llenadoDeSilletas, comoDeCada100, type LlenadoSilletas } from '@/services/shoplogix/monitorMaquina'
 import { DiagnosticoDeLinea } from './monitor/MonitorDiagnostico'
 import { ParetoDeParadas } from './monitor/MonitorPareto'
@@ -1652,6 +1653,31 @@ export function PublicShiftMonitorPage() {
    * mejor turno 13,2, contra 8,1 y 9,7 de reloj. La diferencia entre las dos
    * medidas ES el tiempo parado — que es justo lo que Mantención mueve.
    */
+  /**
+   * Cuánto costó cada parada, en piezas.
+   *
+   * ⚠ Cada evento se valoriza al ritmo que la línea traía JUSTO ANTES, no al
+   * promedio del turno. Lo vio Orel el 14-08: antes del corte de agua la línea
+   * venía a 12,1 pz/min con tramos de 8,5, no a los 13,5 del promedio. Con el
+   * promedio las paradas de ese turno suman 719 pz; medidas así, 662. Esas 57
+   * piezas de diferencia se le imputaban a Mantención sin que hubieran existido.
+   */
+  const costoParadas = useMemo(
+    () =>
+      costoDeParadas({
+        series: live?.series,
+        stopEvents: live?.stopEvents,
+        stopReasons: live?.stopReasons,
+        // Solo lo recuperable: el convenio no se convierte a piezas.
+        recuperables: (live?.timeBreakdown?.recoverable ?? []).map((x) => x.reason),
+        cpmGlobal:
+          live?.timeBreakdown && live.timeBreakdown.producingMin > 0
+            ? live.totalPieces / live.timeBreakdown.producingMin
+            : 0,
+      }),
+    [live],
+  )
+
   const ritmoAndando = useMemo(() => {
     const previos = (data?.forecastHistory ?? [])
       .filter((h) => h.producingMin > 0 && h.total > 0)
@@ -2373,6 +2399,7 @@ export function PublicShiftMonitorPage() {
               ? live.totalPieces / live.timeBreakdown.producingMin
               : null
           }
+          costo={costoParadas}
         />
 
         {/* Pegado al desglose de HOY va el de SIEMPRE: la misma pregunta —qué
