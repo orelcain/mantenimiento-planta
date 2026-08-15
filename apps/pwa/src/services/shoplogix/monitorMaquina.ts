@@ -139,8 +139,17 @@ export function llenadoDeSilletas(args: {
   workMin?: number | null
   /** El mejor tramo de 5 min del turno, en pz/min: sirve para comprobar el set point. */
   maxTramoCpm?: number | null
+  /**
+   * Set point EDITADO por un supervisor (viaja en el payload del monitor). Pisa
+   * al del código: el hardcodeado es el arranque, el editado es el vigente. El
+   * máximo funcional NO se pisa — sale del manual, no se mide.
+   */
+  setCpmOverride?: number | null
 }): LlenadoSilletas | null {
-  const spec = specDeMaquina(args.model)
+  const base = specDeMaquina(args.model)
+  const spec = base && args.setCpmOverride && args.setCpmOverride > 0
+    ? { ...base, setCpm: args.setCpmOverride, setHz: undefined }
+    : base
   if (!spec || !args.cpmAndando || args.cpmAndando <= 0) return null
 
   const actual = args.cpmAndando / spec.setCpm

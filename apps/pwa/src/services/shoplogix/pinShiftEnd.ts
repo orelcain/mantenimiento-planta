@@ -110,3 +110,45 @@ export async function unpinShiftEnd(params: {
   )
   await setDoc(ref, { shiftSchedule: siguiente, updatedAt: serverTimestamp() }, { merge: true })
 }
+
+/**
+ * Guarda el set point operacional de la línea, con su fuente.
+ *
+ * Orel lo midió cronómetro en mano (silletas por minuto en la alimentación) y
+ * vivía hardcodeado en el código: parecía dato del PLC. Acá queda CON fecha,
+ * método y quién — «la fuente es parte del dato»— y el backend lo publica en
+ * el payload del monitor. El máximo funcional NO se edita: sale del manual.
+ *
+ * El historial se acumula: cada cambio queda, así «¿desde cuándo corre a X?»
+ * tiene respuesta sin ir a buscar en git.
+ */
+export async function setMonitorSetPoint(params: {
+  plantSlug: PlantSlug | string
+  cpm: number
+  metodo: string
+  por: string | null
+}): Promise<void> {
+  const docId = CONFIG_DOC_ID[params.plantSlug]
+  if (!docId) throw new Error(`Línea sin config: ${params.plantSlug}`)
+  if (!(params.cpm > 0) || params.cpm > 60) throw new Error('Set point fuera de rango')
+
+  const ref = doc(db, COLLECTION, docId)
+  const snap = await getDoc(ref)
+  const previo = snap.data()?.monitorSetPoint ?? null
+  const hoy = new Date()
+  const dateKey = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`
+  const nuevo = {
+    cpm: params.cpm,
+    medidoEl: dateKey,
+    metodo: params.metodo.trim() || null,
+    por: params.por,
+  }
+  const historial = Array.isArray(snap.data()?.monitorSetPointHistorial)
+    ? snap.data()!.monitorSetPointHistorial
+    : []
+  await setDoc(ref, {
+    monitorSetPoint: nuevo,
+    monitorSetPointHistorial: [...historial, ...(previo ? [previo] : [])].slice(-20),
+    updatedAt: serverTimestamp(),
+  }, { merge: true })
+}

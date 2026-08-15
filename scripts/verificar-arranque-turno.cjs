@@ -84,6 +84,44 @@ const FRESCURA_MAX_MIN = 25
 const RUIDO_CICLOS = 50
 
 const hallazgos = []
+
+// ── nombres de turno vistos por planta (estado local, se puebla solo) ──────
+const VISTOS_PATH = path.join(__dirname, '.turnos-vistos.json')
+function cargarVistos() {
+  try { return JSON.parse(fs.readFileSync(VISTOS_PATH, 'utf8')) } catch { return {} }
+}
+const turnosVistos = cargarVistos()
+const normNombre = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
+
+/*
+ * 6. NOMBRE NUEVO — un turno con un nombre nunca visto en esta planta.
+ *
+ * Nacio para el turno noche de Filete (semana del 17-08): Orel pidio NO asumir
+ * que Shoplogix lo llamara "Turno Noche" sino comprobarlo cuando exista. El
+ * aviso trae el nombre EXACTO, para revisar que el monitor y la config lo
+ * matcheen (todo se compara por nombre). Tambien ataja el caso "lo renombraron
+ * y el monitor quedo comparando contra un turno que ya no existe".
+ * La primera corrida puebla el archivo en silencio: avisar "nuevo" por los
+ * nombres de siempre seria gritar lobo el dia uno.
+ */
+function revisarNombresNuevos(plant, shiftDocIds) {
+  const vistos = new Set((turnosVistos[plant] ?? []).map(normNombre))
+  const primeraVez = vistos.size === 0
+  let hayNuevos = false
+  for (const id of shiftDocIds) {
+    const nombre = id.slice(11)
+    if (!nombre || /unscheduled/i.test(nombre)) continue
+    if (vistos.has(normNombre(nombre))) continue
+    vistos.add(normNombre(nombre))
+    turnosVistos[plant] = [...(turnosVistos[plant] ?? []), nombre]
+    hayNuevos = true
+    if (primeraVez) say(`  [ok] nombre de turno registrado: "${nombre}"`)
+    else problema(`${plant}: turno con nombre NUEVO "${nombre}" — el monitor ya lo sigue; revisar que config y comparaciones lo matcheen (todo compara por nombre)`)
+  }
+  if (hayNuevos) {
+    try { fs.writeFileSync(VISTOS_PATH, JSON.stringify(turnosVistos, null, 2)) } catch { /* no fatal */ }
+  }
+}
 const lineas = []
 const say = (s = '') => { lineas.push(s); console.log(s) }
 const problema = (s) => { hallazgos.push(s); say(`  [!!] ${s}`) }
@@ -226,6 +264,8 @@ async function main() {
       problema(`${plant}: no hay NINGUN turno de ${dateKey} en Firestore`)
       continue
     }
+
+    revisarNombresNuevos(plant, snap.docs.map(d => d.id))
 
     let resumen = {}
     try {

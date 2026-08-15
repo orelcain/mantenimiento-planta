@@ -90,6 +90,11 @@ export interface PublicMonitorLive {
    * nuevo y todavía no tiene historia.
    */
   plannedEndSource?: 'fijado' | 'historial' | 'config' | null
+  /**
+   * Set point operacional de la máquina, editado por un supervisor en la PWA.
+   * `medidoEl`/`metodo`/`por` viajan porque la fuente es parte del dato.
+   */
+  setPoint?: { cpm: number; medidoEl: string | null; metodo: string | null; por: string | null } | null
   /** Nombre del turno según Shoplogix — con él se fija el cierre de ESTE turno. */
   shiftName?: string | null
   /** Turnos anteriores usados, cuando se aprendió del historial. */

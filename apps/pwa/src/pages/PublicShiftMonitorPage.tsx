@@ -36,7 +36,7 @@ import {
 } from '@/services/shoplogix/publicShiftMonitor.service'
 import { buildHourlyRows, peakPieces } from '@/services/shoplogix/monitorHourly'
 import { computePaceToTarget, lineMaxPerHour, type PaceToTarget } from '@/services/shoplogix/monitorPace'
-import { pinShiftEnd, unpinShiftEnd } from '@/services/shoplogix/pinShiftEnd'
+import { pinShiftEnd, unpinShiftEnd, setMonitorSetPoint } from '@/services/shoplogix/pinShiftEnd'
 import {
   buildDayComparison, optimalPace, plannedBreaks, mergeBreaks, cumulativeFromStart,
   breakMinutesBetween, extendOngoingBreaks,
@@ -47,13 +47,14 @@ import { buildPareto } from '@/services/shoplogix/monitorPareto'
 import { agruparEventos } from '@/services/shoplogix/monitorEventos'
 import { costoDeParadas } from '@/services/shoplogix/monitorPerdidas'
 import { bandaNormal, recordsDeLinea, vsAyer as compararVsAyer, type TurnoResumen } from '@/services/shoplogix/monitorVsAyer'
-import { llenadoDeSilletas, comoDeCada100, type LlenadoSilletas } from '@/services/shoplogix/monitorMaquina'
+import { llenadoDeSilletas, specDeMaquina, comoDeCada100, type LlenadoSilletas } from '@/services/shoplogix/monitorMaquina'
 import { ParetoDeParadas } from './monitor/MonitorPareto'
 import { useZoomGesto, type Ventana } from './monitor/useZoomGesto'
 import { TiempoDelTurno, ComparadorDias, Bloque, PronosticoCierre } from './monitor/MonitorShiftParts'
 import { notasPorCausa, notasDelTurno } from './monitor/notasOperador'
 import { VsAyerBloque } from './monitor/MonitorVsAyer'
 import { useIsAdmin } from '@/store'
+import { useAuthStore } from '@/store/authStore'
 
 // ── Formateadores (locales a propósito: esta página no debe arrastrar el
 //    módulo de helpers del Grader, que se lleva echarts al bundle) ───────────
@@ -225,6 +226,73 @@ function Chispa({ serie, hoy, banda }: {
   )
 }
 
+/**
+ * Editor inline del set point, calcado del «Cambiar» del cierre: visible solo
+ * con sesión de supervisor. Pide el MÉTODO además del número — un set point
+ * sin cómo se midió es el hardcodeo de vuelta, con otra ropa.
+ */
+function EditorSetPoint({ actual, onGuardar }: {
+  actual: number | null
+  onGuardar: (cpm: number, metodo: string) => Promise<void>
+}) {
+  const [abierto, setAbierto] = useState(false)
+  const [valor, setValor] = useState('')
+  const [metodo, setMetodo] = useState('cronómetro en mano · silletas/min en la alimentación')
+  const [error, setError] = useState<string | null>(null)
+  const [guardando, setGuardando] = useState(false)
+
+  if (!abierto) {
+    return (
+      <button
+        type="button"
+        onClick={() => { setValor(actual != null ? String(actual) : ''); setAbierto(true); setError(null) }}
+        className="rounded-full border border-border px-2 py-0.5 text-[10px] hover:bg-muted"
+      >
+        Cambiar
+      </button>
+    )
+  }
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1.5">
+      <input
+        type="text"
+        inputMode="decimal"
+        value={valor}
+        onChange={(e) => setValor(e.target.value)}
+        className="w-14 rounded border border-border bg-background px-1.5 py-0.5 text-[11px] tabular-nums"
+        aria-label="Set point en piezas por minuto"
+      />
+      <input
+        type="text"
+        value={metodo}
+        onChange={(e) => setMetodo(e.target.value)}
+        className="w-52 rounded border border-border bg-background px-1.5 py-0.5 text-[10px]"
+        aria-label="Cómo se midió"
+        placeholder="cómo se midió"
+      />
+      <button
+        type="button"
+        disabled={guardando}
+        onClick={async () => {
+          const cpm = Number(valor.replace(',', '.'))
+          if (!(cpm > 0) || cpm > 60) { setError('entre 1 y 60'); return }
+          setGuardando(true)
+          try { await onGuardar(cpm, metodo); setAbierto(false) }
+          catch { setError('no se pudo guardar') }
+          finally { setGuardando(false) }
+        }}
+        className="rounded-full bg-sky-600 px-2 py-0.5 text-[10px] font-semibold text-white disabled:opacity-50"
+      >
+        Guardar
+      </button>
+      <button type="button" onClick={() => setAbierto(false)} className="text-[10px] text-muted-foreground underline">
+        cancelar
+      </button>
+      {error && <span className="text-[10px] text-red-600 dark:text-red-400">{error}</span>}
+    </span>
+  )
+}
+
 /** Barras de 5 min. SVG puro — sin librerías de gráficos en el bundle público. */
 /**
  * Barras de 5 min con eje de horas, ritmo de referencia y las detenciones
@@ -237,7 +305,7 @@ function Chispa({ serie, hoy, banda }: {
  */
 function Sparkbars({
   series, stopReasons, stopEvents, comments, causaSel, onCausa, breaks,
-  recentPerMinute, requiredPerMinute, medianCpm, setCpm, ventana, onVentana,
+  recentPerMinute, requiredPerMinute, medianCpm, setCpm, fuenteSetPoint, onGuardarSetPoint, ventana, onVentana,
 }: {
   /** Ventana visible compartida con el comparador (minutos de turno). */
   ventana?: Ventana | null
@@ -255,6 +323,10 @@ function Sparkbars({
    * referencia el gráfico se autoescala y todo turno parece igual de lleno.
    */
   setCpm?: number | null
+  /** De dónde salió el set point (fecha y método): la fuente es parte del dato. */
+  fuenteSetPoint?: string | null
+  /** Presente solo para supervisores logueados: habilita el editor inline. */
+  onGuardarSetPoint?: (cpm: number, metodo: string) => Promise<void>
   series: PublicMonitorLive['series']
   stopReasons?: string[]
   stopEvents?: PublicMonitorLive['stopEvents']
@@ -792,6 +864,17 @@ function Sparkbars({
           <span className="inline-flex items-center gap-1">
             <span className="inline-block h-2 w-3 border-t-2 border-dashed border-amber-600 dark:border-amber-400" />
             <span className="tabular-nums">{fmtCpm(setCpm)}</span> lo que da la máquina
+            {/* Editado por un supervisor: 18 medidos con cronómetro no es un
+                dato del PLC, y presentarlo sin fuente lo hacía parecer uno. */}
+            {fuenteSetPoint && (
+              <span
+                className="cursor-help border-b border-dotted border-muted-foreground/50 text-muted-foreground/80"
+                title={fuenteSetPoint}
+              >
+                ⓘ
+              </span>
+            )}
+            {onGuardarSetPoint && <EditorSetPoint actual={setCpm} onGuardar={onGuardarSetPoint} />}
           </span>
         )}
         {refsDibujables.map((r) => (
@@ -983,7 +1066,24 @@ function RitmoNecesario({
      líneas y el resto —ritmo requerido, techo, hora extra— se abre a pedido.
      El hook va ANTES de cualquier return. */
   const [verDetalle, setVerDetalle] = useState(false)
-  if (!pace) return null
+  /*
+   * ⚠ Sin horario NO se desaparece en silencio. La primera noche de un turno
+   * nuevo (Filete, semana del 17-08) no hay historia ni entrada de config:
+   * `pace` es null y esta tarjeta era un hueco mudo justo la noche de máxima
+   * audiencia. La regla de las guías: un hueco sin explicación es peor que un
+   * número sin contexto. Shoplogix manda los horarios — acá solo se espera.
+   */
+  if (!pace) {
+    if (cierre != null) return null // hay horario pero no meta: nada que decir
+    return (
+      <div className="mt-3 rounded-xl border border-dashed border-border px-3 py-2.5 text-[11.5px] leading-snug text-muted-foreground">
+        <span className="font-semibold text-amber-700 dark:text-amber-400">◔ Para llegar a la meta</span>{' '}
+        — sin horario conocido para este turno todavía
+        {shiftName ? <> («{shiftName}» es nuevo)</> : null}: se activa solo cuando Shoplogix
+        cierre 2 turnos con este nombre. Mientras tanto, la lectura es el ritmo andando.
+      </div>
+    )
+  }
 
   if (pace.verdict === 'cumplida') {
     return (
@@ -1601,6 +1701,12 @@ export function PublicShiftMonitorPage() {
   const live = vista?.live ?? null
   const esActual = idx === 0
 
+  /* Supervisor logueado mirando el monitor: puede editar el set point inline
+     (mismo patrón que el «Cambiar» del cierre). Las reglas de Firestore son la
+     defensa real; esto solo decide si se muestra el botón. */
+  const esAdminMonitor = useIsAdmin()
+  const usuarioActual = useAuthStore((st) => st.user)
+
   const verIndice = (n: number) => {
     const destino = Math.min(vistas.length - 1, Math.max(0, n))
     // Volver al vigente es dejar de navegar: desde ahí la pantalla vuelve a
@@ -2100,6 +2206,9 @@ export function PublicShiftMonitorPage() {
    * Filete). El ritmo va ANDANDO: sobre el reloj se mezclarían las paradas con
    * el llenado, que es justo la confusión que este bloque viene a deshacer.
    */
+  /** El set point que manda: el editado por un supervisor, si existe. */
+  const setCpmVigente = live?.setPoint?.cpm ?? specDeMaquina(live?.machines?.[0]?.model)?.setCpm ?? null
+
   const llenadoSilletas = useMemo(
     () => llenadoDeSilletas({
       model: live?.machines?.[0]?.model,
@@ -2112,8 +2221,9 @@ export function PublicShiftMonitorPage() {
       maxTramoCpm: live?.series?.length
         ? Math.max(...live.series.map((p) => p.pieces || 0)) / 5
         : null,
+      setCpmOverride: live?.setPoint?.cpm ?? null,
     }),
-    [live?.machines, live?.series, live?.timeBreakdown, ritmoAndando.hoy, pace],
+    [live?.machines, live?.series, live?.timeBreakdown, live?.setPoint, ritmoAndando.hoy, pace],
   )
 
   /**
@@ -2486,7 +2596,11 @@ export function PublicShiftMonitorPage() {
                 : andando < banda.ritmo.min
                   ? { texto: `▼ abajo de su rango normal (${fmtDec(banda.ritmo.min)}–${fmtDec(banda.ritmo.max)})`, tono: 'mal' as const }
                   : { texto: `en su rango normal (${fmtDec(banda.ritmo.min)}–${fmtDec(banda.ritmo.max)})`, tono: 'normal' as const }
-              : null
+              // Turno nuevo sin banda: la única referencia demostrable es el
+              // set point de máquina — y se dice cuándo llega el rango normal.
+              : andando != null && resumenesAnteriores.length === 0
+                ? { texto: `sin rango normal todavía (aparece al 5º turno) · set point ${fmtDec(setCpmVigente ?? 18)}`, tono: 'normal' as const }
+                : null
             return (
               <Kpi
                 label="Ritmo andando"
@@ -2638,7 +2752,23 @@ export function PublicShiftMonitorPage() {
           recentPerMinute={live.recentPiecesPerMinute}
           requiredPerMinute={pace && pace.requiredPerMinute > 0 ? pace.requiredPerMinute : null}
           medianCpm={live.paceMedianCpm}
-          setCpm={llenadoSilletas?.spec.setCpm ?? null}
+          setCpm={setCpmVigente}
+          fuenteSetPoint={live.setPoint
+            ? `Set point ${fmtDec(live.setPoint.cpm)} pz/min` +
+              (live.setPoint.medidoEl ? ` · medido el ${live.setPoint.medidoEl}` : '') +
+              (live.setPoint.metodo ? ` (${live.setPoint.metodo})` : '') +
+              ' — no es dato del PLC.'
+            : null}
+          onGuardarSetPoint={esAdminMonitor && esActual && data.plantSlug
+            ? async (cpm, metodo) => {
+              await setMonitorSetPoint({
+                plantSlug: data.plantSlug!,
+                cpm,
+                metodo,
+                por: usuarioActual?.email ?? null,
+              })
+            }
+            : undefined}
         />
 
         <TiempoDelTurno
@@ -2669,6 +2799,20 @@ export function PublicShiftMonitorPage() {
             récords. El orden es a propósito — primero qué pasó (arriba),
             después por qué fue distinto, después qué se repite siempre. */}
         <VsAyerBloque r={comparadoConAyer} records={recordsLinea} />
+
+        {/* ⚠ Turno sin historia (la primera noche del turno noche): medio
+            monitor no puede existir y eso es CORRECTO — pero se dice, con el
+            plan de cuándo aparece cada cosa, en vez de dejar huecos mudos. */}
+        {resumenesAnteriores.length === 0 && live.totalPieces > 0 && (
+          <div className="rounded-xl border border-dashed border-border px-3 py-2.5 text-[11.5px] leading-snug text-muted-foreground">
+            <span className="font-semibold text-amber-700 dark:text-amber-400">
+              ◔ Turno sin historia todavía
+            </span>{' '}
+            — «{live.shiftName ?? data.shiftId}» compara solo contra turnos del mismo nombre,
+            nunca contra el de día. Van a ir apareciendo solos: el comparativo con ayer
+            (2º turno), el pronóstico de cierre (4º), y el rango normal con los récords (5º).
+          </div>
+        )}
 
         <ParetoDeParadas pareto={pareto} />
 
