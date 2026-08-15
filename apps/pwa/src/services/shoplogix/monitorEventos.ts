@@ -40,9 +40,17 @@ export const DUENO_META: Record<DuenoPerdida, { label: string; detalle: string }
 
 /** Una parada suelta, para el detalle de la causa. */
 export interface ParadaSuelta {
-  /** Hora de planta, ya formateada (HH:MM). */
+  /** Hora de planta a la que EMPEZÓ, ya formateada (HH:MM). */
   hora: string
+  /** Hora a la que TERMINÓ. «De 08:57 a 09:02» ubica; «08:57» sola, no. */
+  hasta: string
   min: number
+  /**
+   * Su tramo en el eje del gráfico (minutos desde el primer dato), para poder
+   * saltar a ESTA parada y no a todas las de su causa. null sin `t0`.
+   */
+  desdeMin: number | null
+  hastaMin: number | null
 }
 
 export interface CausaDelTurno {
@@ -88,6 +96,8 @@ function horaDe(iso: string): string {
 function paradasPorCausa(
   stopEvents: Array<{ r: number; f: string; s: number }>,
   stopReasons: string[],
+  /** Primer tramo con dato: el minuto 0 del eje que comparten los gráficos. */
+  t0Ms: number | null,
 ): Map<string, ParadaSuelta[]> {
   /*
    * ⚠ EPISODIOS, no eventos crudos. El sensor parte una misma parada en varios
@@ -122,7 +132,13 @@ function paradasPorCausa(
       }
     }
     m.set(causa, episodios
-      .map((ep) => ({ hora: horaDe(new Date(ep.ini).toISOString()), min: (ep.fin - ep.ini) / 60_000 }))
+      .map((ep) => ({
+        hora: horaDe(new Date(ep.ini).toISOString()),
+        hasta: horaDe(new Date(ep.fin).toISOString()),
+        min: (ep.fin - ep.ini) / 60_000,
+        desdeMin: t0Ms == null ? null : (ep.ini - t0Ms) / 60_000,
+        hastaMin: t0Ms == null ? null : (ep.fin - t0Ms) / 60_000,
+      }))
       .sort((a, b) => b.min - a.min))
   }
   return m
@@ -153,10 +169,15 @@ export function agruparEventos(args: {
   costo?: CostoDeParadas | null
   /** Promedio andando, de respaldo para las causas que el costo no cubra. */
   cpmGlobal?: number | null
+  /** ISO del primer tramo con dato: ubica cada parada en el eje del gráfico. */
+  t0?: string | null
 }): GrupoDelTurno[] {
   const { tb } = args
   if (!tb) return []
-  const paradas = paradasPorCausa(args.stopEvents ?? [], args.stopReasons ?? [])
+  const t0Ms = args.t0 ? Date.parse(args.t0) : NaN
+  const paradas = paradasPorCausa(
+    args.stopEvents ?? [], args.stopReasons ?? [], Number.isNaN(t0Ms) ? null : t0Ms,
+  )
   const costo = new Map((args.costo?.porCausa ?? []).map((c) => [c.reason, c.piezas]))
   const cpm = args.cpmGlobal && args.cpmGlobal > 0 ? args.cpmGlobal : null
 
