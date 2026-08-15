@@ -41,6 +41,7 @@ import {
   buildDayComparison, optimalPace, plannedBreaks, mergeBreaks, cumulativeFromStart,
   breakMinutesBetween, extendOngoingBreaks,
   type PlannedBreak,
+  prediccionConvenio,
 } from '@/services/shoplogix/monitorCompare'
 import { buildForecast, MAX_MAPE_PCT } from '@/services/shoplogix/monitorForecast'
 import { buildPareto } from '@/services/shoplogix/monitorPareto'
@@ -1814,7 +1815,13 @@ export function PublicShiftMonitorPage() {
         plannedReasons: (l?.timeBreakdown?.planned ?? []).map((x) => x.reason),
       })
     const minutoActual = live?.series?.length ? live.series.length * 5 : 0
-    const anteriores = (data?.history ?? []).flatMap((h) => deConvenio(h.live))
+    /*
+     * ⚠ Por TURNO y no aplanado: la predicción necesita saber en cuántos
+     * turnos aparece cada causa. Aplanado, la detención programada de UN día
+     * se pronosticaba como diaria y el ejercicio generaba paradas fantasma.
+     */
+    const porTurno = (data?.history ?? []).map((h) => deConvenio(h.live))
+    const anteriores = prediccionConvenio(porTurno)
 
     /*
      * ⚠⚠ La parada EN CURSO no está en `stopEvents`.
@@ -2332,7 +2339,16 @@ export function PublicShiftMonitorPage() {
       .filter((b) => b.fromMin > comparacion.currentMinute!)
       .sort((a, b) => a.fromMin - b.fromMin)[0]
     if (!prox) return null
-    return fmtWallTime(new Date(Date.parse(base) + prox.fromMin * 60_000).toISOString())
+    /*
+     * CON NOMBRE: «la próxima entra a las 12:50» obligaba a adivinar cuál. La
+     * pregunta real de Control de Producción es «¿cuándo es la colación?», y
+     * la respuesta tiene que decir colación. La hora lleva ~ porque es la
+     * mediana de los turnos anteriores, no un horario pactado.
+     */
+    return {
+      hora: fmtWallTime(new Date(Date.parse(base) + prox.fromMin * 60_000).toISOString()),
+      reason: prox.reason,
+    }
   }, [live?.series, live?.scheduledStart, comparacion.breaks, comparacion.currentMinute])
 
   if (status === 'loading') {

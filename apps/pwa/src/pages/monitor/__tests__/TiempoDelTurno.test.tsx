@@ -35,7 +35,7 @@ const ANTES_DE_LA_COLACION: PublicMonitorLive['timeBreakdown'] = {
 
 const texto = (
   tb: PublicMonitorLive['timeBreakdown'],
-  proximaParada?: string | null,
+  proximaParada?: { hora: string; reason: string } | null,
   brecha?: number | null,
   cpmAndando?: number | null,
   costo?: Parameters<typeof TiempoDelTurno>[0]['costo'],
@@ -57,15 +57,16 @@ const texto = (
 
 describe('TiempoDelTurno · aviso de la próxima parada de convenio', () => {
   it('⚠ avisa cuándo entra la colación AUNQUE ya hubo paradas planificadas', () => {
-    const t = texto(ANTES_DE_LA_COLACION, '12:55')
-    expect(t).toMatch(/próxima entra a las/i)
-    expect(t).toContain('12:55')
+    // Y la nombra: «la próxima entra a las 12:55» obligaba a adivinar cuál.
+    const t = texto(ANTES_DE_LA_COLACION, { hora: '12:55', reason: 'COLACION' })
+    expect(t).toMatch(/La colación entra a las/i)
+    expect(t).toContain('~12:55')
   })
 
   it('con el turno todavía sin ninguna parada de convenio, lo dice así', () => {
-    const t = texto({ ...ANTES_DE_LA_COLACION, plannedMin: 0, planned: [] }, '12:55')
+    const t = texto({ ...ANTES_DE_LA_COLACION, plannedMin: 0, planned: [] }, { hora: '12:55', reason: 'COLACION' })
     expect(t).toMatch(/Todavía sin paradas de convenio/i)
-    expect(t).toContain('12:55')
+    expect(t).toContain('~12:55')
   })
 
   it('sin próxima parada conocida no inventa una línea', () => {

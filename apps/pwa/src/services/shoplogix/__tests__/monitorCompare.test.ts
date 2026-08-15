@@ -13,7 +13,7 @@ import { describe, it, expect } from 'vitest'
 import {
   cumulativeFromStart, piecesAt, buildDayComparison, optimalPace, findGapWindow,
   plannedBreaks, mergeBreaks, diffCurve, resumenComparacion, findGapWindows,
-  breakMinutesBetween, extendOngoingBreaks,
+  breakMinutesBetween, extendOngoingBreaks, prediccionConvenio,
 } from '../monitorCompare'
 import type { MonitorSeriesPoint } from '../monitorHourly'
 
@@ -627,5 +627,57 @@ describe('extendOngoingBreaks', () => {
     const estirado = mergeBreaks(extendOngoingBreaks(hoy, ayer, 360), ayer, 360)
     expect(breakMinutesBetween(crudo, 360, 470)).toBeLessThan(10)
     expect(breakMinutesBetween(estirado, 360, 470)).toBe(47)
+  })
+})
+
+describe('prediccionConvenio', () => {
+  /*
+   * El caso REAL que motivó la función (simulación a minuto 150 con los 5
+   * turnos del espejo, 15-08): volcando los breaks de todos los días crudos,
+   * la próxima parada anunciada era un ejercicio fantasma y la DETENCION
+   * PROGRAMADA de UN día quedaba pronosticada como diaria — mientras la
+   * colación, la única que importa, no se anunciaba nunca.
+   */
+  const TURNOS = [
+    [{ reason: 'REUNION INICIO TURNO', fromMin: 5, toMin: 10 },
+     { reason: 'EJERCICIO  COMPENSATORIO', fromMin: 114, toMin: 117 },
+     { reason: 'COLACION', fromMin: 310, toMin: 353 }],
+    [{ reason: 'REUNION INICIO TURNO', fromMin: 5, toMin: 9 },
+     { reason: 'DETENCION PROGRAMADA', fromMin: 143, toMin: 160 },
+     { reason: 'COLACION', fromMin: 242, toMin: 244 },
+     { reason: 'COLACION', fromMin: 311, toMin: 366 }],
+    [{ reason: 'REUNION INICIO TURNO', fromMin: 5, toMin: 21 },
+     { reason: 'EJERCICIO  COMPENSATORIO', fromMin: 62, toMin: 65 },
+     { reason: 'COLACION', fromMin: 282, toMin: 346 }],
+    [{ reason: 'EJERCICIO  COMPENSATORIO', fromMin: 92, toMin: 97 },
+     { reason: 'COLACION', fromMin: 313, toMin: 366 }],
+    [{ reason: 'REUNION INICIO TURNO', fromMin: 5, toMin: 10 },
+     { reason: 'EJERCICIO  COMPENSATORIO', fromMin: 155, toMin: 160 },
+     { reason: 'COLACION', fromMin: 301, toMin: 353 }],
+  ]
+
+  it('⚠⚠ lo de UN solo día no se pronostica como diario', () => {
+    const p = prediccionConvenio(TURNOS)
+    expect(p.some((b) => b.reason === 'DETENCION PROGRAMADA')).toBe(false)
+  })
+
+  it('la colación se predice con la mediana, robusta al día raro', () => {
+    const p = prediccionConvenio(TURNOS)
+    const col = p.find((b) => b.reason === 'COLACION')!
+    // Mediana de inicios por turno: 242(raro),282,301,310,313 → 301.
+    // El outlier del día partido no la arrastra.
+    expect(col.fromMin).toBe(301)
+    expect(col.toMin).toBeGreaterThan(340)
+  })
+
+  it('lo recurrente con horario variable igual entra, con su mediana', () => {
+    const p = prediccionConvenio(TURNOS)
+    const ej = p.find((b) => b.reason === 'EJERCICIO  COMPENSATORIO')!
+    expect(ej.fromMin).toBe(114)   // mediana de 62/92/114/155 (par: se toma el alto)
+  })
+
+  it('sin turnos anteriores no se inventa convenio', () => {
+    expect(prediccionConvenio([])).toEqual([])
+    expect(prediccionConvenio([[], []])).toEqual([])
   })
 })
