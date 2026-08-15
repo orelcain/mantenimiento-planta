@@ -1,3 +1,34 @@
+## 2026-08-15 · Monitor listo para el turno noche (set point con fuente + estados honestos + watchdog)
+
+Regla de Orel: **Shoplogix manda** — cero horarios hardcodeados (se descartó
+cargar la entrada del turno noche en la config), y el nombre del turno no se
+asume: el verificador diario ganó el chequeo de NOMBRE NUEVO (avisa por
+Telegram con el nombre exacto; `scripts/.turnos-vistos.json` se puebla solo y
+está gitignoreado — estado por máquina, no del repo).
+
+**Set point con fuente.** `graderModuleConfigs.monitorSetPoint` →
+`loadPlannedShift` → payload `live.setPoint` → leyenda del gráfico con ⓘ
+(fecha+método) y editor inline para supervisores (patrón del «Cambiar» del
+cierre; `setMonitorSetPoint` en `pinShiftEnd.ts` guarda historial de cambios).
+⚠ El set point se resuelve ANTES de buscar la entrada de horario en la config:
+la primera noche —sin entrada— no pierde también la referencia de máquina.
+Sembrado el valor real: 18 pz/min, cronómetro en mano, 15-08, Orel. El máximo
+funcional (21) no se edita: sale del manual. `llenadoDeSilletas` acepta
+`setCpmOverride` y NO hereda el Hz viejo.
+
+**Primera noche honesta.** Sin historia del mismo nombre el monitor se
+degrada BIEN (no inventa referencias) pero se degradaba MUDO. Ahora: «Para
+llegar a la meta» sin horario explica y dice cuándo se activa (2 turnos);
+aviso agrupado con el plan (ayer 2º · pronóstico 4º · banda/récords 5º); la
+tarjeta de ritmo sin banda ofrece el set point como única referencia
+demostrable. Los avisos usan señales que el payload YA trae.
+
+**Verificado:** 1.411 tests, tsc limpio, eslint 28/30, audit-graficos 0, y el
+monitor en navegador con el turno real (vivo del 15 + cerrado del 14 vía
+«Anterior») sin regresiones. Los estados de primera noche quedan cubiertos
+por condiciones simples verificadas en código — se verán en vivo la primera
+noche real.
+
 ## 2026-08-15 · Deuda de gráficos saldada + guardia de CI
 
 Los 9 fixes del inventario contra las guías de visualización (destilado en
