@@ -46,7 +46,7 @@ import { buildForecast, MAX_MAPE_PCT } from '@/services/shoplogix/monitorForecas
 import { buildPareto } from '@/services/shoplogix/monitorPareto'
 import { agruparEventos } from '@/services/shoplogix/monitorEventos'
 import { costoDeParadas } from '@/services/shoplogix/monitorPerdidas'
-import { bandaNormal, recordsDeLinea, vsAyer as compararVsAyer, type TurnoResumen } from '@/services/shoplogix/monitorVsAyer'
+import { bandaNormal, nombreDeDia, rachaDeRitmos, recordsDeLinea, vsAyer as compararVsAyer, type TurnoResumen } from '@/services/shoplogix/monitorVsAyer'
 import { llenadoDeSilletas, specDeMaquina, comoDeCada100, type LlenadoSilletas } from '@/services/shoplogix/monitorMaquina'
 import { ParetoDeParadas } from './monitor/MonitorPareto'
 import { useZoomGesto, type Ventana } from './monitor/useZoomGesto'
@@ -158,17 +158,15 @@ function Kpi({
       <div className="flex items-center gap-1.5 text-caption font-semibold uppercase tracking-wide text-muted-foreground">
         {icon}{label}
       </div>
-      <div className="mt-1 flex items-center justify-between gap-2">
-        <div className="flex items-baseline gap-1">
-          <span className={`text-title1 tabular-nums ${tone === 'accent' ? 'text-sky-700 dark:text-sky-300' : 'text-foreground'}`}>
-            {value}
-          </span>
-          {unit && <span className="text-footnote text-muted-foreground/70">{unit}</span>}
-        </div>
-        {/* El spark vuelve al lado del valor: la tarjeta del ritmo ahora es
-            ancha (col-span-2) y ya no desborda como cuando medía 160 px. */}
-        {spark}
+      <div className="mt-1 flex items-baseline gap-1">
+        <span className={`text-title1 tabular-nums ${tone === 'accent' ? 'text-sky-700 dark:text-sky-300' : 'text-foreground'}`}>
+          {value}
+        </span>
+        {unit && <span className="text-footnote text-muted-foreground/70">{unit}</span>}
       </div>
+      {/* A todo el ancho, bajo el número: con días y bordes rotulados el spark
+          dejó de ser miniatura y necesita la fila completa. */}
+      {spark}
       {hint && <div className="mt-0.5 text-caption text-muted-foreground/70">{hint}</div>}
       {lectura && (
         <div
@@ -190,46 +188,89 @@ function Kpi({
   )
 }
 
+/** «x13» — el día de un turno en dos-tres caracteres, para el pie del spark. */
+function diaCorto(dateKey: string): string {
+  const d = new Date(`${dateKey}T12:00:00Z`)
+  if (Number.isNaN(d.getTime())) return ''
+  return 'dlmxjvs'[d.getUTCDay()]! + d.getUTCDate()
+}
+
 /**
- * Sparkline con banda de rango normal: los últimos turnos como forma, no como
- * lectura fina (sin ejes ni marcas — el valor exacto vive en el número grande
- * de al lado). La banda gris es el mín-máx de los turnos válidos anteriores,
- * fijado a priori; el punto es hoy.
+ * La semana de la línea, con identidad: banda de rango normal con sus BORDES
+ * rotulados, un día bajo cada punto (y tooltip con el valor), y HOY con anillo
+ * de acento. Antes era una miniatura muda de 86 px: escondía la noticia de la
+ * semana (la línea venía acelerando y aflojó) y el rango había que leerlo en
+ * el texto.
+ *
+ * ⚠ El SVG va estirado (`preserveAspectRatio="none"`): adentro SOLO geometría
+ * con trazo no escalable — texto, puntos y redondeos van en HTML encima, que
+ * es la lección que ya nos costó una vez en el gráfico grande.
  */
-function Chispa({ serie, hoy, banda }: {
-  serie: number[]
+function Chispa({ turnos, hoy, banda }: {
+  turnos: Array<{ dateKey: string; ritmo: number }>
   hoy: number
   banda: { min: number; max: number }
 }) {
-  const W = 86
-  const H = 34
-  const todos = [...serie, hoy, banda.min, banda.max]
+  const todos = [...turnos.map((t) => t.ritmo), hoy, banda.min, banda.max]
   const lo = Math.min(...todos)
   const hi = Math.max(...todos)
   const span = hi - lo || 1
-  // 10% de aire arriba y abajo para que ni la banda ni el punto toquen el borde.
-  const y = (v: number) => H - 3.4 - ((v - lo) / span) * (H - 6.8)
-  const puntos = [...serie, hoy]
-  const x = (i: number) => 4 + (i / Math.max(1, puntos.length - 1)) * (W - 8)
+  // En % del alto, con 12% de aire arriba y abajo.
+  const yPct = (v: number) => 88 - ((v - lo) / span) * 76
+  const puntos = [...turnos.map((t) => t.ritmo), hoy]
+  const xPct = (i: number) => (i / Math.max(1, puntos.length - 1)) * 100
   return (
-    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} aria-hidden className="shrink-0">
-      <rect
-        x="0"
-        y={y(banda.max)}
-        width={W}
-        height={Math.max(2, y(banda.min) - y(banda.max))}
-        rx="2"
-        className="fill-muted-foreground/20"
-      />
-      <polyline
-        points={puntos.map((v, i) => `${x(i)},${y(v)}`).join(' ')}
-        fill="none"
-        strokeWidth="1.6"
-        strokeLinejoin="round"
-        className="stroke-muted-foreground/70"
-      />
-      <circle cx={x(puntos.length - 1)} cy={y(hoy)} r="3" className="fill-sky-600 dark:fill-sky-300" />
-    </svg>
+    <div className="mt-1.5" aria-hidden>
+      <div className="flex items-stretch gap-1.5">
+        <div className="relative h-16 min-w-0 flex-1">
+          <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-full w-full">
+            <rect
+              x="0"
+              y={yPct(banda.max)}
+              width="100"
+              height={Math.max(3, yPct(banda.min) - yPct(banda.max))}
+              className="fill-muted-foreground/15"
+            />
+            <polyline
+              points={puntos.map((v, i) => `${xPct(i)},${yPct(v)}`).join(' ')}
+              fill="none"
+              strokeWidth="1.8"
+              strokeLinejoin="round"
+              vectorEffect="non-scaling-stroke"
+              className="stroke-muted-foreground/70"
+            />
+          </svg>
+          {/* Los puntos en HTML: un círculo dentro del SVG estirado sale elipse. */}
+          {puntos.map((v, i) => (
+            <span
+              key={i}
+              title={`${i < turnos.length ? nombreDeDia(turnos[i]!.dateKey) : 'hoy'} · ${fmtDec(v)} pz/min`}
+              className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full ${
+                i === puntos.length - 1
+                  ? 'h-2.5 w-2.5 bg-primary ring-2 ring-primary/35'
+                  : 'h-1.5 w-1.5 bg-muted-foreground/70'
+              }`}
+              style={{ left: `${xPct(i)}%`, top: `${yPct(v)}%` }}
+            />
+          ))}
+        </div>
+        {/* Los bordes de la banda, rotulados: el rango se LEE, no se adivina. */}
+        <div className="relative w-7 shrink-0 text-caption tabular-nums text-muted-foreground/70">
+          <span className="absolute -translate-y-1/2" style={{ top: `${yPct(banda.max)}%` }}>
+            {fmtDec(banda.max)}
+          </span>
+          <span className="absolute -translate-y-1/2" style={{ top: `${yPct(banda.min)}%` }}>
+            {fmtDec(banda.min)}
+          </span>
+        </div>
+      </div>
+      <div className="mr-8 flex justify-between text-caption tabular-nums text-muted-foreground/70">
+        {turnos.map((t) => (
+          <span key={t.dateKey}>{diaCorto(t.dateKey)}</span>
+        ))}
+        <span className="font-semibold text-brand-ink">hoy</span>
+      </div>
+    </div>
   )
 }
 
@@ -2627,12 +2668,23 @@ export function PublicShiftMonitorPage() {
             const andando = live.timeBreakdown && live.timeBreakdown.producingMin > 0
               ? live.totalPieces / live.timeBreakdown.producingMin
               : null
+            /*
+             * La lectura suma la RACHA: el spark dibuja la historia pero nadie
+             * la lee sola. Los bordes de la banda ya están rotulados en el
+             * gráfico, así que acá no se repiten (cada dato en UN lugar).
+             */
+            const racha = andando != null && banda
+              ? rachaDeRitmos([...banda.turnos.map((t) => t.ritmo), andando])
+              : null
+            const fraseRacha = racha && andando != null
+              ? ` — viene ${racha.dir > 0 ? 'subiendo' : 'aflojando'} ${racha.n} turnos (${fmtDec(racha.desde)} → ${fmtDec(andando)})`
+              : ''
             const lectura = andando != null && banda
               ? andando > banda.ritmo.max
-                ? { texto: `▲ arriba de su rango normal (${fmtDec(banda.ritmo.min)}–${fmtDec(banda.ritmo.max)})`, tono: 'bien' as const }
+                ? { texto: `▲ arriba de su rango normal${fraseRacha}`, tono: 'bien' as const }
                 : andando < banda.ritmo.min
-                  ? { texto: `▼ abajo de su rango normal (${fmtDec(banda.ritmo.min)}–${fmtDec(banda.ritmo.max)})`, tono: 'mal' as const }
-                  : { texto: `en su rango normal (${fmtDec(banda.ritmo.min)}–${fmtDec(banda.ritmo.max)})`, tono: 'normal' as const }
+                  ? { texto: `▼ abajo de su rango normal${fraseRacha}`, tono: 'mal' as const }
+                  : { texto: `en su rango normal${fraseRacha}`, tono: 'normal' as const }
               // Turno nuevo sin banda: la única referencia demostrable es el
               // set point de máquina — y se dice cuándo llega el rango normal.
               : andando != null && resumenesAnteriores.length === 0
@@ -2647,7 +2699,7 @@ export function PublicShiftMonitorPage() {
                   icon={<Gauge className="h-3 w-3" />}
                   hint={andando != null ? 'cuando la línea produce' : 'promedio del turno'}
                   spark={andando != null && banda
-                    ? <Chispa serie={banda.serieRitmos} hoy={andando} banda={banda.ritmo} />
+                    ? <Chispa turnos={banda.turnos} hoy={andando} banda={banda.ritmo} />
                     : undefined}
                   lectura={lectura}
                   sub={andando != null && relojCpm != null

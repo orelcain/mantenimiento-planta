@@ -7,7 +7,7 @@
  * descomposición tiene que saber contar.
  */
 import { describe, it, expect } from 'vitest'
-import { vsAyer, recordsDeLinea, bandaNormal, nombreDeDia, type TurnoResumen } from '../monitorVsAyer'
+import { vsAyer, recordsDeLinea, bandaNormal, rachaDeRitmos, nombreDeDia, type TurnoResumen } from '../monitorVsAyer'
 
 /** Filete, reales: 06→14 de agosto. */
 const T = {
@@ -126,13 +126,40 @@ describe('bandaNormal', () => {
     expect(b.ritmo.max).toBeCloseTo(13.2, 1)
   })
 
-  it('la serie viene en orden cronológico, para el sparkline', () => {
+  it('la serie viene en orden cronológico y con identidad (día por punto)', () => {
     const b = bandaNormal(T.d14, previos)!
-    expect(b.serieRitmos[0]).toBeCloseTo(3754 / 331, 1)   // el 06, primero
-    expect(b.serieRitmos[b.serieRitmos.length - 1]!).toBeCloseTo(12.5, 1) // el 13, último
+    expect(b.turnos[0]!.dateKey).toBe('2026-08-06')
+    expect(b.turnos[0]!.ritmo).toBeCloseTo(3754 / 331, 1)
+    expect(b.turnos[b.turnos.length - 1]!.dateKey).toBe('2026-08-13')
   })
 
   it('⚠ con menos de 5 turnos válidos no hay banda: no se inventa un «normal»', () => {
     expect(bandaNormal(T.d14, [T.d06, T.d12, T.d13])).toBeNull()
+  })
+})
+
+describe('rachaDeRitmos', () => {
+  // La semana real de Filete (v2): NO fue una suba limpia — bache el vie 8.
+  const SEMANA = [9.63, 9.11, 10.01, 11.02, 10.28, 12.44, 12.83, 13.19, 12.52, 11.59]
+
+  it('⚠ la frase honesta del 14-08: aflojando 2, no «subió toda la semana»', () => {
+    const r = rachaDeRitmos(SEMANA)!
+    expect(r.dir).toBe(-1)
+    expect(r.n).toBe(2)
+    expect(r.desde).toBeCloseTo(13.19, 2)
+  })
+
+  it('una suba sostenida se cuenta como tal', () => {
+    const r = rachaDeRitmos([9, 9.5, 10.2, 11.4, 12.8])!
+    expect(r.dir).toBe(1)
+    expect(r.n).toBe(4)
+  })
+
+  it('pasos de ruido (<0,15) no fabrican racha', () => {
+    expect(rachaDeRitmos([11.0, 11.05, 11.1, 11.05])).toBeNull()
+  })
+
+  it('con un solo paso no hay racha que contar', () => {
+    expect(rachaDeRitmos([12, 11, 12.5])).toBeNull()
   })
 })
