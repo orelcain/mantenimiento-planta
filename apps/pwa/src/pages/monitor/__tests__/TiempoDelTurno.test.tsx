@@ -163,7 +163,7 @@ describe('TiempoDelTurno · aviso de la próxima parada de convenio', () => {
         grupos={agruparEventos({ tb: ANTES_DE_LA_COLACION, costo, cpmGlobal: 13.5 })}
       />,
     )
-    fireEvent.click(r.getByRole('button', { name: /^Paradas/ }))
+    // «Paradas» arranca ABIERTA: el supuesto se ve sin tocar nada.
     const t = r.container.textContent ?? ''
     expect(t).toMatch(/ritmo que la línea traía justo antes/i)
     expect(t).toMatch(/9,0 a 12,0 pz\/min/)      // el rango realmente usado
@@ -250,12 +250,49 @@ describe('TiempoDelTurno · acordeón por parte (una barra, cada parte se abre)'
       />,
     )
 
-  it('cerrado por defecto: ni minutos ni supuesto a la vista (y sin segunda barra)', () => {
+  it('por defecto: «Paradas» abierta con la imputación a la vista; minutos no', () => {
     const t = montar().container.textContent ?? ''
+    // El argumento de imputación se ve SIN tocar nada (regla: no esconderlo).
+    expect(t).toMatch(/Sin imputar/i)
+    expect(t).toMatch(/Ninguna parada por falla de máquina/i)
+    // Los minutos esperan bajo «Hechas»; el pliegue viejo no aparece.
     expect(t).not.toMatch(/Produciendo/)
-    expect(t).not.toMatch(/ritmo que la línea traía justo antes/i)
-    // El pliegue viejo de minutos no debe aparecer cuando la resta está.
     expect(t).not.toMatch(/ver el reparto del tiempo/i)
+  })
+
+  it('la colación pronosticada sigue visible con «Programado» cerrada', () => {
+    // La regresión que esto caza: a media mañana CON brecha, plannedMin ya no
+    // es 0 (reunión de inicio) y la fila «Programado» arranca cerrada — el
+    // aviso de cuándo entra la colación no puede esconderse detrás de un tap.
+    const r = render(
+      <TiempoDelTurno
+        tb={ANTES_DE_LA_COLACION}
+        cerrado={false}
+        meta={5000}
+        hechas={2230}
+        cuotaAhora={2600}
+        horaAhora="11:00"
+        cpmAndando={10}
+        proximaParada={{ hora: '12:55', reason: 'COLACION' }}
+        grupos={agruparEventos({ tb: ANTES_DE_LA_COLACION, cpmGlobal: 10 })}
+      />,
+    )
+    const t = r.container.textContent ?? ''
+    expect(t).toMatch(/La colación entra a las/i)
+    expect(t).toContain('~12:55')
+  })
+
+  it('lo programado va APARTE de las paradas imputables (regla de Orel)', () => {
+    const r = montar()
+    const t0 = r.container.textContent ?? ''
+    // Con «Paradas» abierta, el convenio NO está adentro…
+    expect(t0).not.toMatch(/REUNION INICIO TURNO/)
+    expect(t0).toMatch(/Programado · no se recupera.*7 min/)
+    // …vive en su propia fila, en minutos.
+    fireEvent.click(r.getByRole('button', { name: /^Programado/ }))
+    const t = r.container.textContent ?? ''
+    expect(t).toMatch(/REUNION INICIO TURNO/)
+    expect(t).toMatch(/EJERCICIO  COMPENSATORIO/)
   })
 
   it('los minutos del turno viven bajo «Hechas» — la segunda barra murió', () => {
