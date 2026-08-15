@@ -96,6 +96,12 @@ export function referenciaDe(cmp: CompareResult, clave: string | null) {
   return { clave: efectiva, contra }
 }
 
+/** «La colación» a partir de «COLACION»: el aviso habla, no grita. */
+function nombreDeConvenio(reason: string): string {
+  const bajo = reason.toLowerCase().replace(/\s+/g, ' ').trim()
+  return 'La ' + (bajo === 'colacion' ? 'colación' : bajo)
+}
+
 function fmtDurMin(min: number): string {
   if (!Number.isFinite(min) || min <= 0) return '—'
   const h = Math.floor(min / 60)
@@ -136,8 +142,9 @@ export function TiempoDelTurno({
   tb: PublicMonitorLive['timeBreakdown']
   causaSel?: string | null
   onCausa?: (c: string | null) => void
-  /** Hora de reloj de la próxima parada de convenio, ya formateada. */
-  proximaParada?: string | null
+  /** La próxima parada de convenio pronosticada: hora de reloj Y su nombre —
+      «la próxima entra a las 12:50» obligaba a adivinar cuál. */
+  proximaParada?: { hora: string; reason: string } | null
   /** Comentarios del operador agrupados por causa (ver `notasPorCausa`). */
   notas?: Map<string, Array<{ desde: string; texto: string }>>
   /** Piezas que faltan (o faltaron) para la meta. null si no hay meta. */
@@ -340,8 +347,9 @@ export function TiempoDelTurno({
             reunión de inicio y ejercicio, con la colación todavía por delante. */}
         {proximaParada && tb.plannedMin === 0 && (
           <p className="mt-1.5 text-[10.5px] text-muted-foreground/70">
-            Todavía sin paradas de convenio: la próxima entra a las{' '}
-            <span className="tabular-nums">{proximaParada}</span>.
+            Todavía sin paradas de convenio: {nombreDeConvenio(proximaParada.reason)} entra a las{' '}
+            {/* ~ porque es la mediana de los turnos anteriores, no un pacto. */}
+            <span className="tabular-nums">~{proximaParada.hora}</span>.
           </p>
         )}
 
@@ -448,8 +456,8 @@ function GrupoDeEventos({ g, sel, onCausa, notas, proximaParada, plannedMin }: {
   sel: string | null
   onCausa?: (c: string | null) => void
   notas?: Map<string, Array<{ desde: string; texto: string }>>
-  /** Solo en el grupo de convenio: cuándo entra la próxima. */
-  proximaParada?: string | null
+  /** Solo en el grupo de convenio: cuándo entra la próxima, y cuál. */
+  proximaParada?: { hora: string; reason: string } | null
   plannedMin: number
 }) {
   const color =
@@ -484,7 +492,10 @@ function GrupoDeEventos({ g, sel, onCausa, notas, proximaParada, plannedMin }: {
           reunión de inicio lo mataban con la colación todavía por delante. */}
       {proximaParada && plannedMin > 0 && (
         <p className="mt-1 pl-2 text-[10.5px] text-muted-foreground/70">
-          La próxima entra a las <span className="tabular-nums">{proximaParada}</span>.
+          {/* Con NOMBRE y en mayúscula inicial: la pregunta real es «¿cuándo es
+              la colación?» y la respuesta tiene que decir colación. */}
+          {nombreDeConvenio(proximaParada.reason)} entra a las{' '}
+          <span className="tabular-nums">~{proximaParada.hora}</span>.
         </p>
       )}
     </div>

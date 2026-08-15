@@ -139,6 +139,60 @@ export function plannedBreaks(args: {
  * exige un ritmo que nadie va a sostener justo cuando la línea está parada por
  * convenio.
  */
+/**
+ * Qué convenio VA a haber hoy, aprendido de los turnos anteriores.
+ *
+ * ── Por qué no basta con volcar los breaks de todos los días ────────────────
+ *
+ * Se hacía así y el resultado eran predicciones basura: la «DETENCION
+ * PROGRAMADA» del 12-08 (bajada de información, UN solo día) quedaba
+ * pronosticada como si ocurriera siempre, y el ejercicio compensatorio —que
+ * cada día cae a una hora distinta— generaba CINCO paradas fantasma. Cada una
+ * aplanaba la curva de cuota y le mentía al ritmo necesario. Y lo peor: la
+ * próxima parada anunciada a media mañana era un ejercicio de 5 min, y la
+ * COLACIÓN —la única que Control de Producción necesita para planificar—
+ * no se anunciaba nunca.
+ *
+ * ── La regla ────────────────────────────────────────────────────────────────
+ *
+ * Solo se predice lo RECURRENTE: una causa entra si aparece en al menos la
+ * mitad de los turnos anteriores (la vara del Pareto para «es patrón»). Su
+ * horario es la MEDIANA del inicio y la MEDIANA de la duración por turno —
+ * un día raro no mueve el pronóstico. Dentro de cada turno la causa se toma
+ * como su rango completo (la colación llega partida por el sensor).
+ */
+export function prediccionConvenio(porTurno: PlannedBreak[][]): PlannedBreak[] {
+  const conDatos = porTurno.filter((t) => t.length > 0)
+  if (conDatos.length === 0) return []
+  const mediana = (v: number[]) => [...v].sort((a, b) => a - b)[Math.floor(v.length / 2)]!
+
+  /** reason → un rango por turno en que apareció. */
+  const porCausa = new Map<string, Array<{ fromMin: number; durMin: number }>>()
+  for (const turno of conDatos) {
+    const enEste = new Map<string, { from: number; to: number }>()
+    for (const b of turno) {
+      const g = enEste.get(b.reason)
+      if (g) { g.from = Math.min(g.from, b.fromMin); g.to = Math.max(g.to, b.toMin) }
+      else enEste.set(b.reason, { from: b.fromMin, to: b.toMin })
+    }
+    for (const [reason, g] of enEste) {
+      const lista = porCausa.get(reason) ?? []
+      lista.push({ fromMin: g.from, durMin: g.to - g.from })
+      porCausa.set(reason, lista)
+    }
+  }
+
+  const minTurnos = Math.ceil(conDatos.length / 2)
+  const out: PlannedBreak[] = []
+  for (const [reason, veces] of porCausa) {
+    if (veces.length < minTurnos) continue
+    const fromMin = mediana(veces.map((v) => v.fromMin))
+    const durMin = mediana(veces.map((v) => v.durMin))
+    out.push({ reason, fromMin, toMin: fromMin + Math.max(1, durMin) })
+  }
+  return out.sort((a, b) => a.fromMin - b.fromMin)
+}
+
 export function mergeBreaks(
   hoy: PlannedBreak[],
   anteriores: PlannedBreak[],
