@@ -309,7 +309,7 @@ describe('TiempoDelTurno · acordeón por parte (una barra, cada parte se abre)'
     const t0 = r.container.textContent ?? ''
     // Con «Paradas» abierta, el convenio NO está adentro…
     expect(t0).not.toMatch(/REUNION INICIO TURNO/)
-    expect(t0).toMatch(/Programado · no se recupera.*7 min/)
+    expect(t0).toMatch(/Programado.*7 min.*% turno/)
     // …vive en su propia fila, en minutos.
     fireEvent.click(r.getByRole('button', { name: /^Programado/ }))
     const t = r.container.textContent ?? ''
@@ -326,12 +326,19 @@ describe('TiempoDelTurno · acordeón por parte (una barra, cada parte se abre)'
     expect(t).toMatch(/la LÍNEA, que solo se detiene/i)
   })
 
-  it('«Ritmo» explica la única cifra que antes no se explicaba', () => {
+  it('«Ritmo» dice QUÉ es la cifra, la cuenta, y qué NO sabe', () => {
     const r = montar()
     fireEvent.click(r.getByRole('button', { name: /^Ritmo/ }))
     const t = r.container.textContent ?? ''
-    expect(t).toMatch(/Andando, la línea promedió/i)
+    // 1 · qué es: el resto de la resta, no una medición aparte.
+    expect(t).toMatch(/queda de la brecha después de descontar las paradas/i)
+    // 2 · la cuenta, con las dos varas.
     expect(t).toMatch(/13,5 pz\/min/)
+    expect(t).toMatch(/para la meta necesitaba/i)
+    // 3 · ⚠ lo que el dato NO dice: sin esto se lee «el operador bajó la
+    //     velocidad», y las causas probables no son esa.
+    expect(t).toMatch(/Por qué anduvo más lento, esto no lo dice/i)
+    expect(t).toMatch(/aguas arriba/i)
   })
 
   it('una parte a la vez: abrir «Ritmo» cierra «Hechas»', () => {
@@ -339,7 +346,69 @@ describe('TiempoDelTurno · acordeón por parte (una barra, cada parte se abre)'
     fireEvent.click(r.getByRole('button', { name: /^Hechas/ }))
     fireEvent.click(r.getByRole('button', { name: /^Ritmo/ }))
     const t = r.container.textContent ?? ''
-    expect(t).toMatch(/Andando, la línea promedió/i)
+    expect(t).toMatch(/queda de la brecha después de descontar las paradas/i)
     expect(t).not.toMatch(/la LÍNEA, que solo se detiene/i)
+  })
+})
+
+describe('TiempoDelTurno · cada parada se ubica y se salta sola', () => {
+  /* Dos episodios reales de la misma causa, con t0 = 07:40 (primer tramo). */
+  const T0 = '2026-08-14T07:40:00.000Z'
+  const TB: PublicMonitorLive['timeBreakdown'] = {
+    ...ANTES_DE_LA_COLACION,
+    recoverable: [{ reason: 'FALLA OPERACIONAL', min: 8, count: 2, lineMin: 8 }],
+  }
+  const EVENTOS = [
+    { r: 0, f: '2026-08-14T08:57:00.000Z', s: 330 },   // 08:57 -> 09:02 (5,5 min)
+    { r: 0, f: '2026-08-14T10:10:00.000Z', s: 150 },   // 10:10 -> 10:12 (2,5 min)
+  ]
+
+  const montar = (onVentana?: (v: { desdeMin: number; hastaMin: number } | null) => void) =>
+    render(
+      <TiempoDelTurno
+        tb={TB}
+        cerrado
+        meta={5000}
+        hechas={3919}
+        cpmAndando={13.5}
+        onCausa={() => {}}
+        onVentana={onVentana}
+        grupos={agruparEventos({
+          tb: TB, stopEvents: EVENTOS, stopReasons: ['FALLA OPERACIONAL'], cpmGlobal: 13.5, t0: T0,
+        })}
+      />,
+    )
+
+  it('la parada dice DE cuándo A cuándo, no solo su hora de inicio', () => {
+    const r = montar(() => {})
+    fireEvent.click(r.getByRole('button', { name: /FALLA OPERACIONAL/ }))
+    const t = r.container.textContent ?? ''
+    expect(t).toMatch(/08:57.*09:02/)
+    expect(t).toMatch(/10:10.*10:12/)
+  })
+
+  it('tocar UNA parada acerca el gráfico a ESE tramo, con aire a los lados', () => {
+    const ventanas: Array<{ desdeMin: number; hastaMin: number } | null> = []
+    const r = montar((v) => ventanas.push(v))
+    fireEvent.click(r.getByRole('button', { name: /FALLA OPERACIONAL/ }))
+    // La de las 08:57 es la más larga: primera de la lista.
+    fireEvent.click(r.getAllByTitle('Ver esta parada en el gráfico')[0]!)
+    expect(ventanas).toHaveLength(1)
+    // 08:57 son 77 min desde t0 (07:40); termina a los 82,5. Con aire de 4,4.
+    expect(ventanas[0]!.desdeMin).toBeCloseTo(72.6, 1)
+    expect(ventanas[0]!.hastaMin).toBeCloseTo(86.9, 1)
+  })
+
+  it('ya no hay «ver en el gráfico» al pie: cada parada salta sola', () => {
+    const r = montar(() => {})
+    fireEvent.click(r.getByRole('button', { name: /FALLA OPERACIONAL/ }))
+    expect(r.container.textContent ?? '').not.toMatch(/ver en el gráfico/i)
+  })
+
+  it('sin manera de mover el gráfico, la parada se muestra pero no finge un salto', () => {
+    const r = montar(undefined)
+    fireEvent.click(r.getByRole('button', { name: /FALLA OPERACIONAL/ }))
+    expect(r.container.textContent ?? '').toMatch(/08:57.*09:02/)
+    expect(r.queryAllByTitle('Ver esta parada en el gráfico')).toHaveLength(0)
   })
 })

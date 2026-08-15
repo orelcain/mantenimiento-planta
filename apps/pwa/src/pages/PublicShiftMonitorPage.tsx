@@ -1938,6 +1938,10 @@ export function PublicShiftMonitorPage() {
           live?.timeBreakdown && live.timeBreakdown.producingMin > 0
             ? live.totalPieces / live.timeBreakdown.producingMin
             : null,
+        /* El minuto 0 del eje que comparten los gráficos: el PRIMER TRAMO CON
+           DATO, la misma base de `monitorCompare`. Con él, cada parada sabe
+           dónde cae en el gráfico y se puede saltar a ella sola. */
+        t0: live?.series?.[0]?.t ?? null,
       }),
     [live, costoParadas],
   )
@@ -2869,6 +2873,7 @@ export function PublicShiftMonitorPage() {
               tb={live.timeBreakdown}
               causaSel={causaSel}
               onCausa={setCausaSel}
+              onVentana={setVentanaGrafica}
               proximaParada={proximaParada}
               notas={notasDeOperador}
               /* La resta: minutos parados -> piezas, al ritmo del turno.
@@ -2981,6 +2986,7 @@ export function PublicShiftMonitorPage() {
               tb={live.timeBreakdown}
               causaSel={causaSel}
               onCausa={setCausaSel}
+              onVentana={setVentanaGrafica}
               proximaParada={proximaParada}
               notas={notasDeOperador}
               /* La resta: minutos parados -> piezas, al ritmo del turno.

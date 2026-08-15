@@ -138,12 +138,17 @@ function fmtDurMin(min: number): string {
  * le pide a la línea que recupere un tiempo que por convenio no se recupera.
  */
 export function TiempoDelTurno({
-  tb, causaSel, onCausa, proximaParada, notas, cerrado, meta, hechas, cuotaAhora, horaAhora,
-  cpmAndando, costo, grupos, notasTurno,
+  tb, causaSel, onCausa, onVentana, proximaParada, notas, cerrado, meta, hechas, cuotaAhora,
+  horaAhora, cpmAndando, costo, grupos, notasTurno,
 }: {
   tb: PublicMonitorLive['timeBreakdown']
   causaSel?: string | null
   onCausa?: (c: string | null) => void
+  /**
+   * Acercar el gráfico a un tramo. Es lo que permite saltar a UNA parada y no
+   * a todas las de su causa: tocar «de 08:57 a 09:02» lleva el gráfico ahí.
+   */
+  onVentana?: (v: Ventana | null) => void
   /** La próxima parada de convenio pronosticada: hora de reloj Y su nombre —
       «la próxima entra a las 12:50» obligaba a adivinar cuál. */
   proximaParada?: { hora: string; reason: string } | null
@@ -267,6 +272,9 @@ export function TiempoDelTurno({
   const porRitmo = (hayBrecha || superada) && perdidas != null ? Math.max(0, (brecha ?? 0) - perdidas) : null
   /** Lo que la cuota todavía no pide: va HUECO en la barra, no es pérdida. */
   const porJugar = cuotaOk != null && metaOk != null ? Math.max(0, metaOk - cuotaOk) : 0
+  /** El peso de cada parte sobre la meta: el «% del 100%» que pidió Orel. */
+  const pctMeta = (v: number) =>
+    metaOk != null && metaOk > 0 ? `${Math.round((v / metaOk) * 100)}%` : null
   /* Con la vara superada en vivo, lo hecho puede pasar la cuota: el hueco se
      mide contra lo HECHO para que la barra no dibuje de más. */
   const porJugarBarra = superada && !cerrado && metaOk != null && hechas != null
@@ -363,13 +371,18 @@ export function TiempoDelTurno({
           {/* Las filas SON la leyenda, y cada una abre su parte (44 px §3). */}
           <div className="mt-2 overflow-hidden rounded-[10px] bg-muted">
             {([
-              { p: 'hechas' as const, nombre: 'Hechas', valor: `${fmtInt(hechas)} pz`, tick: 'bg-muted-foreground/[0.5]' },
-              { p: 'paradas' as const, nombre: 'Paradas', valor: `${fmtInt(perdidas)} pz`, tick: 'bg-red-600 dark:bg-red-500' },
-              { p: 'ritmo' as const, nombre: 'Ritmo', valor: `${fmtInt(porRitmo)} pz`, tick: 'bg-amber-600 dark:bg-amber-500' },
-              ...(porJugarBarra > 0 ? [{ p: 'jugar' as const, nombre: 'Por jugar', valor: `${fmtInt(porJugarBarra)} pz`, tick: 'border border-dashed border-muted-foreground/[0.5] bg-transparent' }] : []),
-              /* Sin segmento en la barra: el convenio no pierde piezas (la cuota
-                 ya lo descuenta) — por eso su valor va en MINUTOS. */
-              ...(grupoProgramado ? [{ p: 'programado' as const, nombre: 'Programado · no se recupera', valor: fmtDurMin(grupoProgramado.min), tick: 'bg-muted-foreground' }] : []),
+              { p: 'hechas' as const, nombre: 'Hechas', valor: `${fmtInt(hechas)} pz`, pct: pctMeta(hechas), tick: 'bg-muted-foreground/[0.5]' },
+              { p: 'paradas' as const, nombre: 'Paradas', valor: `${fmtInt(perdidas)} pz`, pct: pctMeta(perdidas), tick: 'bg-red-600 dark:bg-red-500' },
+              { p: 'ritmo' as const, nombre: 'Ritmo', valor: `${fmtInt(porRitmo)} pz`, pct: pctMeta(porRitmo), tick: 'bg-amber-600 dark:bg-amber-500' },
+              ...(porJugarBarra > 0 ? [{ p: 'jugar' as const, nombre: 'Por jugar', valor: `${fmtInt(porJugarBarra)} pz`, pct: pctMeta(porJugarBarra), tick: 'border border-dashed border-muted-foreground/[0.5] bg-transparent' }] : []),
+              /*
+               * El convenio NO tiene segmento en la barra: la barra cuenta
+               * PIEZAS contra la meta y en la colación no se producen — la
+               * cuota ya se reparte descontándola. Convertirlo daría «se
+               * perdieron 794 pz en la colación», que es falso. Su peso se dice
+               * igual, con el denominador nombrado: % DEL TURNO, no de la meta.
+               */
+              ...(grupoProgramado ? [{ p: 'programado' as const, nombre: 'Programado', valor: fmtDurMin(grupoProgramado.min), pct: tb.windowMin > 0 ? `${Math.round((grupoProgramado.min / tb.windowMin) * 100)}% turno` : null, tick: 'bg-muted-foreground' }] : []),
             ]).map((f, i) => (
               <div key={f.p} className={i > 0 ? 'border-t border-border/60' : ''}>
                 <button
@@ -379,8 +392,13 @@ export function TiempoDelTurno({
                   className={`flex min-h-[44px] w-full items-center gap-2.5 px-3 text-left text-[13px] text-foreground ${parte === f.p ? 'bg-primary/[0.08]' : ''}`}
                 >
                   <i className={`h-5 w-1 shrink-0 rounded-full ${f.tick}`} />
-                  <span className="flex-1">{f.nombre}</span>
+                  <span className="flex-1 truncate">{f.nombre}</span>
                   <span className="tabular-nums font-semibold">{f.valor}</span>
+                  {f.pct && (
+                    <span className="w-20 shrink-0 whitespace-nowrap text-right tabular-nums text-[11px] font-normal text-muted-foreground">
+                      {f.pct}
+                    </span>
+                  )}
                   <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform ${parte === f.p ? '' : '-rotate-90'}`} />
                 </button>
                 {parte === f.p && (
@@ -420,6 +438,7 @@ export function TiempoDelTurno({
                               g={g}
                               sel={causaSel ?? null}
                               onCausa={onCausa}
+                              onVentana={onVentana}
                               notas={notas}
                               proximaParada={null}
                               plannedMin={tb.plannedMin}
@@ -462,20 +481,42 @@ export function TiempoDelTurno({
                       </>
                     )}
                     {f.p === 'ritmo' && (
-                      <p className="text-muted-foreground">
-                        Andando, la línea promedió{' '}
-                        <span className="tabular-nums font-semibold text-foreground">{fmtDec(cpm)} pz/min</span>
+                      <>
+                        {/* Qué es la cifra: el RESTO de la resta, no una medición
+                            aparte. Sin esto se lee como si alguien hubiera medido
+                            «piezas perdidas por velocidad», que no existe. */}
+                        <p className="text-muted-foreground">
+                          Es lo que queda de la brecha <b>después</b> de descontar las paradas:{' '}
+                          <span className="tabular-nums font-semibold text-foreground">{fmtInt(porRitmo)} pz</span>{' '}
+                          que no se hicieron <b>con la línea andando</b>.
+                        </p>
                         {tb.producingMin > 0 && (
-                          <>
-                            {' '}y la vara pedía{' '}
+                          <p className="mt-1.5 text-muted-foreground">
+                            La cuenta: mientras produjo, la línea promedió{' '}
+                            <span className="tabular-nums font-semibold text-foreground">{fmtDec(cpm)} pz/min</span>{' '}
+                            y para la meta necesitaba{' '}
                             <span className="tabular-nums font-semibold text-foreground">
                               {fmtDec(cpm + porRitmo / tb.producingMin)}
                             </span>
-                            : la diferencia, sostenida {fmtDurMin(tb.producingMin)} de producción, son
-                            estas <span className="tabular-nums font-semibold text-foreground">{fmtInt(porRitmo)} pz</span>
-                          </>
-                        )}.
-                      </p>
+                            . Esa diferencia de{' '}
+                            <span className="tabular-nums">{fmtDec(porRitmo / tb.producingMin)} pz/min</span>,
+                            sostenida {fmtDurMin(tb.producingMin)}, son las{' '}
+                            <span className="tabular-nums">{fmtInt(porRitmo)} pz</span>.
+                          </p>
+                        )}
+                        {/*
+                          * ⚠ Lo que el dato NO dice. Sin este párrafo, «ritmo» se
+                          * lee como «el operador bajó la velocidad» — y las causas
+                          * más probables (menos materia prima llegando, calibre
+                          * más chico, microparadas bajo el umbral) no son eso.
+                          */}
+                        <p className="mt-1.5 text-muted-foreground/80">
+                          <b>Por qué anduvo más lento, esto no lo dice.</b> Las causas habituales son
+                          menos producto llegando desde aguas arriba, calibre distinto al del set
+                          point, o microparadas más cortas que el umbral con que Shoplogix las
+                          registra. Confirmarlo es pregunta de terreno, no del dato.
+                        </p>
+                      </>
                     )}
                     {f.p === 'jugar' && (
                       <p className="text-muted-foreground">
@@ -485,14 +526,28 @@ export function TiempoDelTurno({
                       </p>
                     )}
                     {f.p === 'programado' && grupoProgramado && (
-                      <GrupoDeEventos
-                        g={grupoProgramado}
-                        sel={causaSel ?? null}
-                        onCausa={onCausa}
-                        notas={notas}
-                        proximaParada={proximaParada}
-                        plannedMin={tb.plannedMin}
-                      />
+                      <>
+                        {/* La pregunta que salta al verlo fuera de la barra, contestada
+                            en la pantalla y no en una conversación: */}
+                        <p className="mb-1 text-muted-foreground/80">
+                          No entra en la barra porque la barra cuenta <b>piezas contra la meta</b> y
+                          en el convenio no se produce: la meta ya se reparte descontándolo. Por eso
+                          su peso se mide en tiempo — {tb.windowMin > 0 && (
+                            <span className="tabular-nums">
+                              {Math.round((grupoProgramado.min / tb.windowMin) * 100)}%
+                            </span>
+                          )} del turno.
+                        </p>
+                        <GrupoDeEventos
+                          g={grupoProgramado}
+                          sel={causaSel ?? null}
+                          onCausa={onCausa}
+                          onVentana={onVentana}
+                          notas={notas}
+                          proximaParada={proximaParada}
+                          plannedMin={tb.plannedMin}
+                        />
+                      </>
                     )}
                   </div>
                 )}
@@ -576,6 +631,7 @@ export function TiempoDelTurno({
                 g={g}
                 sel={causaSel ?? null}
                 onCausa={onCausa}
+                onVentana={onVentana}
                 notas={notas}
                 proximaParada={g.dueno === 'programado' ? proximaParada : null}
                 plannedMin={tb.plannedMin}
@@ -716,10 +772,11 @@ export function TiempoDelTurno({
  * que nadie imputó— y sin la separación la cifra se lee como si alguien de
  * Mantención hubiera fallado.
  */
-function GrupoDeEventos({ g, sel, onCausa, notas, proximaParada, plannedMin }: {
+function GrupoDeEventos({ g, sel, onCausa, onVentana, notas, proximaParada, plannedMin }: {
   g: GrupoDelTurno
   sel: string | null
   onCausa?: (c: string | null) => void
+  onVentana?: (v: Ventana | null) => void
   notas?: Map<string, Array<{ desde: string; texto: string }>>
   /** Solo en el grupo de convenio: cuándo entra la próxima, y cuál. */
   proximaParada?: { hora: string; reason: string } | null
@@ -748,7 +805,8 @@ function GrupoDeEventos({ g, sel, onCausa, notas, proximaParada, plannedMin }: {
       </div>
       <ul className="mt-0.5 space-y-0.5 pl-2 text-[11.5px]">
         {g.causas.map((c) => (
-          <FilaEvento key={c.reason} c={c} sel={sel} onCausa={onCausa} notas={notas?.get(c.reason)} />
+          <FilaEvento key={c.reason} c={c} sel={sel} onCausa={onCausa} onVentana={onVentana}
+            notas={notas?.get(c.reason)} />
         ))}
       </ul>
       {/* ⚠ El aviso NO se apaga con la primera parada planificada: 7 min de
@@ -776,10 +834,11 @@ function GrupoDeEventos({ g, sel, onCausa, notas, proximaParada, plannedMin }: {
  * quedaría fuera de pantalla. La causa se marca igual en la serie, y el salto es
  * un toque más, explícito.
  */
-function FilaEvento({ c, sel, onCausa, notas }: {
+function FilaEvento({ c, sel, onCausa, onVentana, notas }: {
   c: CausaDelTurno
   sel: string | null
   onCausa?: (c: string | null) => void
+  onVentana?: (v: Ventana | null) => void
   /**
    * Lo que el operador escribió sobre ESTA causa. La causa y su explicación son
    * la misma respuesta a "¿por qué paró?", así que van juntas.
@@ -860,25 +919,55 @@ function FilaEvento({ c, sel, onCausa, notas }: {
               {cuantas} paradas de {Math.round(prom)} s en promedio.
             </p>
           )}
+          {/*
+            Cada parada es su propio botón: tocarla acerca el gráfico a ESE
+            tramo (con un respiro a los lados para verla en contexto). Antes
+            había un «ver en el gráfico» al pie que mostraba TODAS las de la
+            causa; eso ya lo hace tocar la causa madre, y una parada de 5 min
+            perdida entre 40 microparadas era imposible de ubicar.
+          */}
           <ul className="space-y-px">
-            {visibles.map((p, i) => (
-              <li key={`${p.hora}-${i}`} className="flex gap-3 text-[11px] tabular-nums text-muted-foreground">
-                <span className="text-muted-foreground/70">{p.hora}</span>
-                <span>{fmtDec(p.min)} min</span>
-              </li>
-            ))}
+            {visibles.map((p, i) => {
+              const saltable = onVentana != null && p.desdeMin != null && p.hastaMin != null
+              const contenido = (
+                <>
+                  <span className="tabular-nums text-muted-foreground/70">
+                    {p.hora}<span className="px-0.5">→</span>{p.hasta}
+                  </span>
+                  <span className="tabular-nums">{fmtDec(p.min)} min</span>
+                </>
+              )
+              return (
+                <li key={`${p.hora}-${i}`}>
+                  {saltable ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onCausa?.(c.reason)
+                        /* Un respiro proporcional a la parada (mín. 3 min): pegada
+                           al borde no se entiende qué venía antes ni después. */
+                        const aire = Math.max(3, p.min * 0.8)
+                        onVentana?.({
+                          desdeMin: Math.max(0, p.desdeMin! - aire),
+                          hastaMin: p.hastaMin! + aire,
+                        })
+                        document.getElementById('grafico-turno')
+                          ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                      }}
+                      className="flex w-full items-center gap-3 rounded-ctl px-1 py-1 text-left text-[11px] text-muted-foreground hover:bg-muted"
+                      title="Ver esta parada en el gráfico"
+                    >
+                      {contenido}
+                      <span className="ml-auto text-brand-ink">ver ›</span>
+                    </button>
+                  ) : (
+                    <div className="flex gap-3 px-1 py-1 text-[11px] text-muted-foreground">{contenido}</div>
+                  )}
+                </li>
+              )
+            })}
           </ul>
           {muchas && <p className="text-[11px] italic text-muted-foreground/70">las 3 más largas</p>}
-          <button
-            type="button"
-            onClick={() => {
-              onCausa?.(c.reason)
-              document.getElementById('grafico-turno')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-            }}
-            className="mt-0.5 text-[11px] text-brand-ink underline underline-offset-2"
-          >
-            ver en el gráfico
-          </button>
         </div>
       )}
 
