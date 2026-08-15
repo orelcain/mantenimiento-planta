@@ -43,14 +43,12 @@ import {
   type PlannedBreak,
 } from '@/services/shoplogix/monitorCompare'
 import { buildForecast, MAX_MAPE_PCT } from '@/services/shoplogix/monitorForecast'
-import { buildDiagnostico } from '@/services/shoplogix/monitorDiagnostico'
 import { buildPareto } from '@/services/shoplogix/monitorPareto'
 import { costoDeParadas } from '@/services/shoplogix/monitorPerdidas'
 import { llenadoDeSilletas, comoDeCada100, type LlenadoSilletas } from '@/services/shoplogix/monitorMaquina'
-import { DiagnosticoDeLinea } from './monitor/MonitorDiagnostico'
 import { ParetoDeParadas } from './monitor/MonitorPareto'
 import { useZoomGesto, type Ventana } from './monitor/useZoomGesto'
-import { TiempoDelTurno, ComparadorDias, Bloque, BitacoraOperador, PronosticoCierre, notasPorCausa } from './monitor/MonitorShiftParts'
+import { TiempoDelTurno, ComparadorDias, Bloque, PronosticoCierre, notasPorCausa } from './monitor/MonitorShiftParts'
 import { useIsAdmin } from '@/store'
 
 // ── Formateadores (locales a propósito: esta página no debe arrastrar el
@@ -1856,31 +1854,6 @@ export function PublicShiftMonitorPage() {
     })
   }, [live, data?.history, data?.forecastHistory, data?.shiftId, data?.targetPieces, comparacion.currentMinute])
 
-  /*
-   * Dónde se gana en esta línea. Mismo historial que el pronóstico —turnos del
-   * mismo nombre, que son los comparables— y las micro-detenciones salen de
-   * `topStops`, que ya viaja en cada turno.
-   */
-  const diagnostico = useMemo(() => {
-    const micro = (l?: PublicMonitorLive) =>
-      (l?.topStops ?? []).find((s) => /micro/i.test(s.reason))?.count ?? null
-    const resumidos = (data?.forecastHistory ?? []).map((h) => ({
-      totalPieces: h.total,
-      producingMin: h.producingMin,
-      microCount: h.micro,
-    }))
-    const historial = resumidos.length > 0
-      ? resumidos
-      : (data?.history ?? [])
-          .filter((h) => h.shiftId === data?.shiftId)
-          .map((h) => ({
-            totalPieces: h.live?.totalPieces ?? 0,
-            producingMin: h.live?.timeBreakdown?.producingMin ?? 0,
-            microCount: micro(h.live),
-          }))
-    return buildDiagnostico({ history: historial, microHoy: micro(live ?? undefined) })
-  }, [live, data?.history, data?.forecastHistory, data?.shiftId])
-
   /**
    * Hasta cuándo mide el pronóstico, y cuánto sería si el turno cortara en su
    * horario.
@@ -2408,14 +2381,6 @@ export function PublicShiftMonitorPage() {
         <ParetoDeParadas pareto={pareto} />
 
         <PorHora series={live.series} />
-
-        {/* La bitácora del piso: lo que el operador escribió, todo y en orden.
-            Hasta ahora solo se leía lo que coincidía con un tramo de brecha. */}
-        <BitacoraOperador comments={live.comments} onCausa={setCausaSel} />
-
-        {/* Dónde conviene poner el esfuerzo en ESTA línea. Va al final: es
-            contexto de varios turnos, no el estado del que está corriendo. */}
-        <DiagnosticoDeLinea d={diagnostico} />
 
         {/* Desglose por máquina — solo aporta cuando la línea tiene más de una */}
         {live.machines.length > 1 && (

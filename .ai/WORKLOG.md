@@ -1,3 +1,19 @@
+## 2026-08-14 · Monitor público · fuera dos bloques (bitácora y diagnóstico)
+
+Orel los sacó mirando la pantalla: **«Comentarios del operador»** repetía lo que
+ya sale en las filas de causa, y **«Dónde se gana en esta línea»** «no aporta
+datos certeros». Borrados junto con su código muerto: `MonitorDiagnostico.tsx`,
+`services/shoplogix/monitorDiagnostico.ts` y sus tests, el componente
+`BitacoraOperador` y el memo `diagnostico` de la página.
+
+⚠ **Lo que se pierde, medido antes de borrar** (8 turnos de Filete): 4
+anotaciones vivían SOLO en la bitácora — las de causas que no tienen fila
+(«Bajada de Información», DETENCION PROGRAMADA, 12-08), las de más de 2 h de
+duración («retraso ingreso personal», 07-08), una mecánica sin fila propia («Se
+abren guías de bronce baader 200», 07-08) y las que pasan el tope de 2 notas por
+causa que aplica `notasPorCausa` (13-08 y 14-08). Si algún día falta contexto
+del piso, el tope de 2 y el filtro de causas son los dos lugares donde mirar.
+
 ## 2026-08-14 · Monitor público · cada parada al ritmo que la línea traía
 
 **Qué cambió.** Las piezas que costó cada detención ya no se calculan con el
