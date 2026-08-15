@@ -151,7 +151,7 @@ describe('TiempoDelTurno · aviso de la próxima parada de convenio', () => {
       ],
       totalPiezas: 264, totalMin: 27, sinLocal: 0, eventos: 6,
     }
-    // El supuesto vive en el detalle plegado (mockup A v2): hay que abrirlo.
+    // El supuesto vive bajo la fila «Paradas» del acordeón (mockup v3).
     const r = render(
       <TiempoDelTurno
         tb={ANTES_DE_LA_COLACION}
@@ -163,7 +163,7 @@ describe('TiempoDelTurno · aviso de la próxima parada de convenio', () => {
         grupos={agruparEventos({ tb: ANTES_DE_LA_COLACION, costo, cpmGlobal: 13.5 })}
       />,
     )
-    fireEvent.click(r.getByText(/cómo se calculó/i))
+    fireEvent.click(r.getByRole('button', { name: /^Paradas/ }))
     const t = r.container.textContent ?? ''
     expect(t).toMatch(/ritmo que la línea traía justo antes/i)
     expect(t).toMatch(/9,0 a 12,0 pz\/min/)      // el rango realmente usado
@@ -234,5 +234,53 @@ describe('TiempoDelTurno · en vivo la vara es la cuota de la hora, no la meta',
     const t = textoVivo({ meta: 5000, hechas: 2230, cuotaAhora: 2600, cpmAndando: null })
     expect(t).toMatch(/vamos atrás/i)
     expect(t).toMatch(/no se puede repartir/i)
+  })
+})
+
+describe('TiempoDelTurno · acordeón por parte (una barra, cada parte se abre)', () => {
+  const montar = () =>
+    render(
+      <TiempoDelTurno
+        tb={ANTES_DE_LA_COLACION}
+        cerrado
+        meta={5000}
+        hechas={3919}
+        cpmAndando={13.5}
+        grupos={agruparEventos({ tb: ANTES_DE_LA_COLACION, cpmGlobal: 13.5 })}
+      />,
+    )
+
+  it('cerrado por defecto: ni minutos ni supuesto a la vista (y sin segunda barra)', () => {
+    const t = montar().container.textContent ?? ''
+    expect(t).not.toMatch(/Produciendo/)
+    expect(t).not.toMatch(/ritmo que la línea traía justo antes/i)
+    // El pliegue viejo de minutos no debe aparecer cuando la resta está.
+    expect(t).not.toMatch(/ver el reparto del tiempo/i)
+  })
+
+  it('los minutos del turno viven bajo «Hechas» — la segunda barra murió', () => {
+    const r = montar()
+    fireEvent.click(r.getByRole('button', { name: /^Hechas/ }))
+    const t = r.container.textContent ?? ''
+    expect(t).toMatch(/Produciendo.*4 h 4 min/)   // 244 min
+    expect(t).toMatch(/Detenida, recuperable.*36 min/)
+    expect(t).toMatch(/la LÍNEA, que solo se detiene/i)
+  })
+
+  it('«Ritmo» explica la única cifra que antes no se explicaba', () => {
+    const r = montar()
+    fireEvent.click(r.getByRole('button', { name: /^Ritmo/ }))
+    const t = r.container.textContent ?? ''
+    expect(t).toMatch(/Andando, la línea promedió/i)
+    expect(t).toMatch(/13,5 pz\/min/)
+  })
+
+  it('una parte a la vez: abrir «Ritmo» cierra «Hechas»', () => {
+    const r = montar()
+    fireEvent.click(r.getByRole('button', { name: /^Hechas/ }))
+    fireEvent.click(r.getByRole('button', { name: /^Ritmo/ }))
+    const t = r.container.textContent ?? ''
+    expect(t).toMatch(/Andando, la línea promedió/i)
+    expect(t).not.toMatch(/la LÍNEA, que solo se detiene/i)
   })
 })

@@ -186,9 +186,15 @@ export function TiempoDelTurno({
    */
   notasTurno?: string[]
 }) {
-  /* El reparto del tiempo pasa a DETALLE: la barra de 72/16/13% es el "cómo",
-     y arriba va el "cuánto costó", que es lo que se viene a mirar. */
-  const [abierto, setAbierto] = useState(false)
+  /*
+   * Acordeón por parte (mockup v3): cada parte de la barra abre SU detalle,
+   * uno a la vez. Los minutos del turno viven como texto bajo «Hechas» — la
+   * segunda barra murió acá. El control canónico es la FILA de 44 px, no el
+   * segmento: un segmento puede medir 3 px en un turno bueno.
+   */
+  const [parte, setParte] = useState<'hechas' | 'paradas' | 'ritmo' | 'jugar' | null>(null)
+  const alternarParte = (p: 'hechas' | 'paradas' | 'ritmo' | 'jugar') =>
+    setParte((v) => (v === p ? null : p))
   if (!tb || tb.windowMin <= 0) return null
 
   const pct = (m: number) => Math.max(0, (m / tb.windowMin) * 100)
@@ -252,6 +258,10 @@ export function TiempoDelTurno({
   const ritmos = (costo?.porCausa ?? []).map((c) => c.cpm)
   const rango = ritmos.length > 1 ? { min: Math.min(...ritmos), max: Math.max(...ritmos) } : null
 
+  /** La resta (y su acordeón) solo con todas sus piezas sobre la mesa. */
+  const restaVisible =
+    hayBrecha && perdidas != null && porRitmo != null && metaOk != null && hechas != null && cpm != null
+
   const gruposVisibles = (grupos ?? []).filter((g) => g.causas.length > 0)
   /*
    * "Ninguna falla de máquina" solo se puede afirmar si hubo paradas que
@@ -285,7 +295,7 @@ export function TiempoDelTurno({
         : <span className="tabular-nums">{fmtDurMin(tb.windowMin)} de turno</span>}
     >
       {/* ── 1 · La resta ────────────────────────────────────────────────── */}
-      {hayBrecha && perdidas != null && porRitmo != null && metaOk != null && hechas != null && cpm != null && (
+      {restaVisible && perdidas != null && porRitmo != null && metaOk != null && hechas != null && cpm != null && (
         <div className="mt-2">
           {/*
            * La barra madre: su largo total ES la meta, todo en piezas. Lo hecho
@@ -294,47 +304,134 @@ export function TiempoDelTurno({
            * entre lo pintado y el hueco es la cuota de esta hora. Los valores
            * SIEMPRE afuera: el ancho de un segmento no decide su legibilidad.
            */}
-          <div
-            className="flex h-6 gap-[2px]"
-            role="img"
-            aria-label={`De la meta de ${fmtInt(metaOk)} piezas: ${fmtInt(hechas)} hechas, ${fmtInt(perdidas)} perdidas en paradas, ${fmtInt(porRitmo)} por ritmo${porJugar > 0 ? `, ${fmtInt(porJugar)} aún por jugar` : ''}`}
-          >
-            <i className="rounded-[4px] bg-muted-foreground/[0.35]" style={{ flex: '1 1 0%' }} />
-            {perdidas > 0 && (
-              <i className="rounded-[4px] bg-red-600 dark:bg-red-500"
-                style={{ width: `${(perdidas / metaOk) * 100}%`, minWidth: 3 }} />
-            )}
-            {porRitmo > 0 && (
-              <i className="rounded-[4px] bg-amber-600 dark:bg-amber-500"
-                style={{ width: `${(porRitmo / metaOk) * 100}%`, minWidth: 3 }} />
-            )}
-            {porJugar > 0 && (
-              <i className="rounded-[4px] border border-dashed border-muted-foreground/[0.4]"
-                style={{ width: `${(porJugar / metaOk) * 100}%`, minWidth: 3 }} />
-            )}
+          <p className="text-right text-[11px] uppercase tracking-wide text-muted-foreground/70">
+            meta <span className="tabular-nums">{fmtInt(metaOk)} pz</span>
+          </p>
+          {/* Los segmentos son ATAJOS al mismo detalle que su fila (abajo);
+              con una parte abierta los demás se atenúan para ver cuál se mira. */}
+          <div className="mt-1 flex h-6 gap-[2px]">
+            {([
+              { p: 'hechas' as const, v: hechas, cls: 'bg-muted-foreground/[0.35]', flex: true, rotulo: 'hechas' },
+              { p: 'paradas' as const, v: perdidas, cls: 'bg-red-600 dark:bg-red-500', rotulo: 'perdidas en paradas' },
+              { p: 'ritmo' as const, v: porRitmo, cls: 'bg-amber-600 dark:bg-amber-500', rotulo: 'por ritmo' },
+              { p: 'jugar' as const, v: porJugar, cls: 'border border-dashed border-muted-foreground/[0.4]', rotulo: 'aún por jugar' },
+            ]).filter((s) => s.flex || s.v > 0).map((s) => (
+              <button
+                key={s.p}
+                type="button"
+                onClick={() => alternarParte(s.p)}
+                aria-expanded={parte === s.p}
+                aria-label={`${fmtInt(s.v)} piezas ${s.rotulo} — ver detalle`}
+                className={`rounded-[4px] transition-opacity ${s.cls} ${parte != null && parte !== s.p ? 'opacity-30' : ''}`}
+                style={s.flex ? { flex: '1 1 0%' } : { width: `${(s.v / metaOk) * 100}%`, minWidth: 3 }}
+              />
+            ))}
           </div>
-          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
-            <span className="flex items-center gap-1.5">
-              <i className="h-2.5 w-2.5 rounded-[4px] bg-muted-foreground/[0.35]" />
-              Hechas <span className="tabular-nums font-semibold text-foreground/80">{fmtInt(hechas)}</span>
-            </span>
-            <span className="flex items-center gap-1.5">
-              <i className="h-2.5 w-2.5 rounded-[4px] bg-red-600 dark:bg-red-500" />
-              Paradas <span className="tabular-nums font-semibold text-foreground/80">{fmtInt(perdidas)}</span>
-            </span>
-            <span className="flex items-center gap-1.5">
-              <i className="h-2.5 w-2.5 rounded-[4px] bg-amber-600 dark:bg-amber-500" />
-              Ritmo <span className="tabular-nums font-semibold text-foreground/80">{fmtInt(porRitmo)}</span>
-            </span>
-            {porJugar > 0 && (
-              <span className="flex items-center gap-1.5">
-                <i className="h-2.5 w-2.5 rounded-[4px] border border-dashed border-muted-foreground/[0.4]" />
-                Por jugar <span className="tabular-nums text-foreground/80">{fmtInt(porJugar)}</span>
-              </span>
-            )}
-            <span className="text-muted-foreground/70">
-              meta <span className="tabular-nums">{fmtInt(metaOk)}</span>
-            </span>
+          {/* Las filas SON la leyenda, y cada una abre su parte (44 px §3). */}
+          <div className="mt-2 overflow-hidden rounded-[10px] bg-muted">
+            {([
+              { p: 'hechas' as const, nombre: 'Hechas', v: hechas, tick: 'bg-muted-foreground/[0.5]' },
+              { p: 'paradas' as const, nombre: 'Paradas', v: perdidas, tick: 'bg-red-600 dark:bg-red-500' },
+              { p: 'ritmo' as const, nombre: 'Ritmo', v: porRitmo, tick: 'bg-amber-600 dark:bg-amber-500' },
+              ...(porJugar > 0 ? [{ p: 'jugar' as const, nombre: 'Por jugar', v: porJugar, tick: 'border border-dashed border-muted-foreground/[0.5] bg-transparent' }] : []),
+            ]).map((f, i) => (
+              <div key={f.p} className={i > 0 ? 'border-t border-border/60' : ''}>
+                <button
+                  type="button"
+                  onClick={() => alternarParte(f.p)}
+                  aria-expanded={parte === f.p}
+                  className={`flex min-h-[44px] w-full items-center gap-2.5 px-3 text-left text-[13px] text-foreground ${parte === f.p ? 'bg-primary/[0.08]' : ''}`}
+                >
+                  <i className={`h-5 w-1 shrink-0 rounded-full ${f.tick}`} />
+                  <span className="flex-1">{f.nombre}</span>
+                  <span className="tabular-nums font-semibold">{fmtInt(f.v)} <span className="font-normal text-muted-foreground">pz</span></span>
+                  <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform ${parte === f.p ? '' : '-rotate-90'}`} />
+                </button>
+                {parte === f.p && (
+                  <div className="bg-primary/[0.08] px-3 pb-3 pl-[26px] text-[12.5px] leading-snug">
+                    {f.p === 'hechas' && (
+                      <>
+                        {([
+                          { n: 'Produciendo', m: tb.producingMin },
+                          { n: 'Convenio (colación y afines)', m: tb.plannedMin },
+                          { n: 'Detenida, recuperable', m: tb.recoverableMin },
+                          ...(otros > 0 ? [{ n: 'Huecos de sincronización', m: otros }] : []),
+                        ]).filter((x) => x.m > 0).map((x) => (
+                          <p key={x.n} className="flex justify-between gap-2 py-0.5">
+                            <span className="text-muted-foreground">{x.n}</span>
+                            <span className="tabular-nums font-semibold text-foreground">
+                              {fmtDurMin(x.m)} <span className="font-normal text-muted-foreground">· {Math.round(pct(x.m))}%</span>
+                            </span>
+                          </p>
+                        ))}
+                        <p className="mt-1.5 text-muted-foreground/80">
+                          Los minutos miden la LÍNEA, que solo se detiene cuando paran todas las máquinas.
+                        </p>
+                      </>
+                    )}
+                    {f.p === 'paradas' && (
+                      <>
+                        {gruposVisibles.filter((g) => g.dueno !== 'programado').map((g) => (
+                          <p key={g.dueno} className="flex justify-between gap-2 py-0.5">
+                            <span className="text-muted-foreground">{DUENO_META[g.dueno].label}</span>
+                            <span className="tabular-nums font-semibold text-foreground">
+                              {g.piezas != null ? `${fmtInt(g.piezas)} pz` : '—'}{' '}
+                              <span className="font-normal text-muted-foreground">· {fmtDurMin(g.min)}</span>
+                            </span>
+                          </p>
+                        ))}
+                        {/* ⚠ El supuesto va escrito: es la parte discutible del
+                            número, y quien lo discuta pregunta exactamente esto. */}
+                        <p className="mt-1.5 text-muted-foreground/80">
+                          {costo
+                            ? (
+                              <>
+                                Cada parada valorizada al ritmo que la línea traía justo antes
+                                {rango && (
+                                  <>
+                                    {' '}(<span className="tabular-nums">{fmtDec(rango.min)}</span> a{' '}
+                                    <span className="tabular-nums">{fmtDec(rango.max)} pz/min</span>)
+                                  </>
+                                )}
+                                , no al promedio del turno (<span className="tabular-nums">{fmtDec(cpm)}</span>).
+                              </>
+                            )
+                            : (
+                              <>
+                                Estimado al ritmo que la línea traía:{' '}
+                                <span className="tabular-nums">{fmtDec(cpm)} pz/min</span> andando.
+                              </>
+                            )}
+                        </p>
+                      </>
+                    )}
+                    {f.p === 'ritmo' && (
+                      <p className="text-muted-foreground">
+                        Andando, la línea promedió{' '}
+                        <span className="tabular-nums font-semibold text-foreground">{fmtDec(cpm)} pz/min</span>
+                        {tb.producingMin > 0 && (
+                          <>
+                            {' '}y la vara pedía{' '}
+                            <span className="tabular-nums font-semibold text-foreground">
+                              {fmtDec(cpm + porRitmo / tb.producingMin)}
+                            </span>
+                            : la diferencia, sostenida {fmtDurMin(tb.producingMin)} de producción, son
+                            estas <span className="tabular-nums font-semibold text-foreground">{fmtInt(porRitmo)} pz</span>
+                          </>
+                        )}.
+                      </p>
+                    )}
+                    {f.p === 'jugar' && (
+                      <p className="text-muted-foreground">
+                        Piezas que la cuota todavía no pide a esta altura: no son pérdida, son el
+                        resto del turno. El pronóstico de cierre vive en su propia tarjeta, más
+                        abajo.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
           {cerrado
             ? (
@@ -439,47 +536,24 @@ export function TiempoDelTurno({
         )}
       </div>
 
-      {/* ── 5 · El reparto del tiempo, plegado ─────────────────────────── */}
+      {/* ── 5 · El reparto del tiempo, plegado ───────────────────────────
+          SOLO cuando el acordeón no está: con la resta visible, los minutos
+          ya viven bajo la fila «Hechas» y esto sería la segunda barra de
+          vuelta. Sin brecha (meta cumplida, sin meta, sin cpm) sigue siendo
+          la única puerta a los minutos. */}
+      {!restaVisible && (
+        <>
       <button
         type="button"
-        onClick={() => setAbierto((v) => !v)}
+        onClick={() => alternarParte('hechas')}
         className="mt-2 text-[11px] text-brand-ink underline underline-offset-2"
-        aria-expanded={abierto}
+        aria-expanded={parte === 'hechas'}
       >
-        {abierto
-          ? 'ocultar el detalle'
-          : hayBrecha && perdidas != null
-            ? 'cómo se calculó y el reparto del tiempo'
-            : 'ver el reparto del tiempo'}
+        {parte === 'hechas' ? 'ocultar el reparto del tiempo' : 'ver el reparto del tiempo'}
       </button>
 
-      {abierto && (
+      {parte === 'hechas' && (
         <div className="mt-2">
-          {/* ⚠ El supuesto va escrito: es la parte discutible del número, y
-              quien lo discuta va a preguntar exactamente esto. */}
-          {hayBrecha && perdidas != null && cpm != null && (
-            <p className="mb-2 text-[11px] leading-snug text-muted-foreground/80">
-              {costo
-                ? (
-                  <>
-                    Cada parada valorizada al ritmo que la línea traía justo antes
-                    {rango && (
-                      <>
-                        {' '}(<span className="tabular-nums">{fmtDec(rango.min)}</span> a{' '}
-                        <span className="tabular-nums">{fmtDec(rango.max)} pz/min</span>)
-                      </>
-                    )}
-                    , no al promedio del turno (<span className="tabular-nums">{fmtDec(cpm)}</span>).
-                  </>
-                )
-                : (
-                  <>
-                    Estimado al ritmo que la línea traía:{' '}
-                    <span className="tabular-nums">{fmtDec(cpm)} pz/min</span> andando.
-                  </>
-                )}
-            </p>
-          )}
           <div className="flex h-6 overflow-hidden rounded-lg text-[11px] font-semibold text-white">
             <span
               className="flex items-center justify-center bg-emerald-600 dark:bg-emerald-500"
@@ -532,6 +606,8 @@ export function TiempoDelTurno({
             LÍNEA, que solo se detiene cuando paran todas.
           </p>
         </div>
+      )}
+        </>
       )}
     </Bloque>
   )
