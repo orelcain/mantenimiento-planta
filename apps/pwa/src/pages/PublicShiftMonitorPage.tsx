@@ -2612,8 +2612,10 @@ export function PublicShiftMonitorPage() {
                   ? <Chispa serie={banda.serieRitmos} hoy={andando} banda={banda.ritmo} />
                   : undefined}
                 lectura={lectura}
+                // "9,7 de reloj" sin unidad no se leía como un ritmo: Orel
+                // preguntó si íbamos a "poner también" el que ya estaba acá.
                 sub={andando != null
-                  ? `Con paradas y colación: ${fmtDec(live.piecesPerMinute)} de reloj`
+                  ? `Con paradas y colación: ${fmtDec(live.piecesPerMinute)} pz/min de reloj`
                   : undefined}
                 tone="accent"
               />
