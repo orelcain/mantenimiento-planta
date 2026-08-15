@@ -1,3 +1,51 @@
+## 2026-08-14 · Monitor público · ritmo con denominador + «Qué cambió contra ayer» + récords
+
+**Qué cambió.** Tres piezas: (1) la tarjeta de ritmo ahora manda el ANDANDO
+(13,5 = piezas ÷ min produciendo) con el de reloj como segunda línea y su
+denominador escrito; (2) bloque nuevo «Qué cambió contra ayer»: la diferencia
+de piezas contra el último turno del mismo nombre, repartida entre duración /
+convenio / paradas / velocidad, con la suma cuadrando y el residuo visible;
+(3) «Contra lo mejor que ya hicimos»: récords POR COMPONENTE (ritmo, paradas,
+% andando) — no «el mejor turno», que por piezas era solo el más largo.
+
+**El hallazgo que lo motivó (Orel):** la pantalla decía 9,7 «promedio del
+turno» arriba y 13,5 abajo. Los dos eran ciertos (405 min de reloj vs 291
+andando) pero el de reloj daba 9,7 IGUAL el 13 y el 14 — el día que la línea
+fue la más rápida de los últimos 8 turnos e hizo 788 pz menos solo por tiempo.
+La descomposición: −1.001 duración, −213 convenio, +88 paradas, +276 ritmo,
++63 residuo = −788 ✓.
+
+**Archivos.** `services/shoplogix/monitorVsAyer.ts` (nuevo, 11 tests),
+`pages/monitor/MonitorVsAyer.tsx` (nuevo), `functions/publicMonitor.js`
+(forecastHistory ahora publica windowMin/plannedMin/recoverableMin),
+`publicShiftMonitor.service.ts`, `PublicShiftMonitorPage.tsx` (Kpi + memos).
+
+**Decisiones y trampas:**
+
+- ⚠⚠ **El `history` cacheado del espejo trae números de la metodología VIEJA**:
+  para el 07-08 dice 397 min produciendo y reconstruirlo fresco da 351 (84% vs
+  75% andando). Un récord calculado con otras reglas es una vara torcida. Por
+  eso manda `forecastHistory` (que el fix de functions reconstruye una vez con
+  el código vigente) y `history` queda de relleno hasta que el backend repueble.
+  **Hasta ese deploy el bloque muestra el récord viejo de 84%** — se corrige
+  solo con el merge (functions se despliega automático) + el próximo sync.
+- **El bloque solo aparece con el turno CERRADO**: a mitad de turno el término
+  «duración» compararía una ventana a medio crecer y todo daría en contra. En
+  vivo esa pregunta la contesta el comparador.
+- **Récords solo de lo que el turno controla** (ritmo, paradas, % andando); la
+  brecha se traduce a piezas solo en paradas — convertir también el % andando
+  contaría dos veces lo mismo. Mínimo 3 turnos válidos o no hay récords.
+- **Turnos rotos no comparan**: 12 de 23 en Firestore vienen sin piezas o sin
+  desglose. `vsAyer` los salta y busca el anterior válido; si no hay, no hay
+  bloque. Con residuo > 35% el bloque dice «datos incompletos» y no reparte.
+- Identidad de la descomposición: Δpz = r₀·Δandando + Δr·andando₁, con
+  Δandando = Δventana − Δconvenio − Δparadas − Δotros (otros → residuo).
+- El término de ritmo dio 276 y no 282: el redondeo de 12,52 a 12,5 en la
+  estimación de cabeza. Los tests fijan los valores EXACTOS del turno real.
+
+**Verificado:** 1.401 tests, tsc limpio, eslint 28/30, bloque y tarjeta leídos
+en el navegador con el turno real del 14-08 en claro y oscuro.
+
 ## 2026-08-14 · Monitor público · un solo apartado, con los tipos del CURSO
 
 **Qué cambió.** «Por qué no llegamos» pasó a «Qué pasó en el turno»: un solo

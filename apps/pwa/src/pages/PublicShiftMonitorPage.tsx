@@ -46,11 +46,13 @@ import { buildForecast, MAX_MAPE_PCT } from '@/services/shoplogix/monitorForecas
 import { buildPareto } from '@/services/shoplogix/monitorPareto'
 import { agruparEventos } from '@/services/shoplogix/monitorEventos'
 import { costoDeParadas } from '@/services/shoplogix/monitorPerdidas'
+import { recordsDeLinea, vsAyer as compararVsAyer, type TurnoResumen } from '@/services/shoplogix/monitorVsAyer'
 import { llenadoDeSilletas, comoDeCada100, type LlenadoSilletas } from '@/services/shoplogix/monitorMaquina'
 import { ParetoDeParadas } from './monitor/MonitorPareto'
 import { useZoomGesto, type Ventana } from './monitor/useZoomGesto'
 import { TiempoDelTurno, ComparadorDias, Bloque, PronosticoCierre } from './monitor/MonitorShiftParts'
 import { notasPorCausa, notasDelTurno } from './monitor/notasOperador'
+import { VsAyerBloque } from './monitor/MonitorVsAyer'
 import { useIsAdmin } from '@/store'
 
 // ── Formateadores (locales a propósito: esta página no debe arrastrar el
@@ -127,13 +129,15 @@ function fmtAgoWall(isoStr: string | null | undefined, nowMs: number): string {
 // ── Piezas de UI ────────────────────────────────────────────────────────────
 
 function Kpi({
-  label, value, unit, icon, hint, tone = 'default',
+  label, value, unit, icon, hint, sub, tone = 'default',
 }: {
   label: string
   value: string
   unit?: string
   icon: React.ReactNode
   hint?: string
+  /** Segunda medida, con su denominador escrito (ej. el ritmo de reloj). */
+  sub?: string
   tone?: 'default' | 'accent'
 }) {
   return (
@@ -148,6 +152,9 @@ function Kpi({
         {unit && <span className="text-[12px] text-muted-foreground/70">{unit}</span>}
       </div>
       {hint && <div className="mt-0.5 text-[11px] text-muted-foreground/70">{hint}</div>}
+      {sub && (
+        <div className="mt-0.5 text-[11px] tabular-nums text-muted-foreground">{sub}</div>
+      )}
     </div>
   )
 }
@@ -1701,6 +1708,78 @@ export function PublicShiftMonitorPage() {
     [live, costoParadas],
   )
 
+  /*
+   * Por qué el turno cerró distinto que ayer, y los récords de la línea.
+   *
+   * Los resúmenes salen de DOS fuentes que se complementan: `forecastHistory`
+   * (hasta 10 turnos del mismo nombre, RECONSTRUIDOS con el código vigente) y
+   * `history` (solo 6 turnos, con el `live` completo pero CACHEADO tal como se
+   * calculó en su momento).
+   *
+   * ⚠ Manda `forecastHistory` cuando trae el desglose. Verificado el 14-08: el
+   * `history` cacheado decía 397 min produciendo para el 07-08 y reconstruirlo
+   * fresco da 351 — son números de ANTES de los fixes de atribución de paradas,
+   * y un «récord de 84% andando» calculado con otras reglas no es un récord,
+   * es una vara torcida. `history` queda solo de relleno para los dateKeys que
+   * el backend todavía no repobló.
+   */
+  const resumenesAnteriores = useMemo(() => {
+    const por = new Map<string, TurnoResumen>()
+    for (const h of data?.forecastHistory ?? []) {
+      if (h.windowMin == null) continue // entrada vieja, sin desglose: no sirve acá
+      por.set(h.dateKey, {
+        dateKey: h.dateKey,
+        total: h.total,
+        producingMin: h.producingMin,
+        windowMin: h.windowMin,
+        plannedMin: h.plannedMin,
+        recoverableMin: h.recoverableMin,
+      })
+    }
+    for (const h of data?.history ?? []) {
+      if (por.has(h.dateKey)) continue
+      if (h.shiftId !== data?.shiftId) continue // el nocturno no compara con el de día
+      const tb = h.live?.timeBreakdown
+      if (!tb) continue
+      por.set(h.dateKey, {
+        dateKey: h.dateKey,
+        total: h.live.totalPieces ?? 0,
+        producingMin: tb.producingMin ?? 0,
+        windowMin: tb.windowMin,
+        plannedMin: tb.plannedMin,
+        recoverableMin: tb.recoverableMin,
+      })
+    }
+    return [...por.values()]
+  }, [data?.history, data?.forecastHistory, data?.shiftId])
+
+  /*
+   * ⚠ Solo con el turno CERRADO: a mitad de turno el término «duración»
+   * compararía una ventana a medio crecer contra una completa, y todos los
+   * números darían en contra sin que nadie hubiera hecho nada mal. En vivo esa
+   * pregunta la contesta el comparador.
+   */
+  const resumenHoy = useMemo((): TurnoResumen | null => {
+    if (!live?.shiftClosed || !live.timeBreakdown || !data?.dateKey) return null
+    return {
+      dateKey: data.dateKey,
+      total: live.totalPieces,
+      producingMin: live.timeBreakdown.producingMin,
+      windowMin: live.timeBreakdown.windowMin,
+      plannedMin: live.timeBreakdown.plannedMin,
+      recoverableMin: live.timeBreakdown.recoverableMin,
+    }
+  }, [live, data?.dateKey])
+
+  const comparadoConAyer = useMemo(
+    () => (resumenHoy ? compararVsAyer(resumenHoy, resumenesAnteriores) : null),
+    [resumenHoy, resumenesAnteriores],
+  )
+  const recordsLinea = useMemo(
+    () => (resumenHoy ? recordsDeLinea(resumenHoy, resumenesAnteriores) : null),
+    [resumenHoy, resumenesAnteriores],
+  )
+
   const ritmoAndando = useMemo(() => {
     const previos = (data?.forecastHistory ?? [])
       .filter((h) => h.producingMin > 0 && h.total > 0)
@@ -2257,12 +2336,30 @@ export function PublicShiftMonitorPage() {
 
         {/* Cadencia */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {/* El número que manda es el ANDANDO: mide a la línea y se compara
+              entre turnos. El de reloj (piezas ÷ ventana) mezcla velocidad con
+              disponibilidad —9,7 vs 9,7 el día que la línea fue la más rápida
+              de los últimos 8 turnos— y queda como segunda línea, con su
+              denominador escrito. */}
           <Kpi
-            label="Piezas / min"
-            value={fmtDec(live.piecesPerMinute)}
+            label="Ritmo andando"
+            value={
+              live.timeBreakdown && live.timeBreakdown.producingMin > 0
+                ? fmtDec(live.totalPieces / live.timeBreakdown.producingMin)
+                : fmtDec(live.piecesPerMinute)
+            }
             unit="pz/min"
             icon={<Gauge className="h-3 w-3" />}
-            hint="promedio del turno"
+            hint={
+              live.timeBreakdown && live.timeBreakdown.producingMin > 0
+                ? 'cuando la línea produce'
+                : 'promedio del turno'
+            }
+            sub={
+              live.timeBreakdown && live.timeBreakdown.producingMin > 0
+                ? `Con paradas y colación: ${fmtDec(live.piecesPerMinute)} de reloj`
+                : undefined
+            }
             tone="accent"
           />
           <Kpi
@@ -2405,6 +2502,11 @@ export function PublicShiftMonitorPage() {
         {/* Pegado al desglose de HOY va el de SIEMPRE: la misma pregunta —qué
             para la línea— pero mirando los turnos anteriores. Es el paso de
             "hoy pasó esto" a "esto vuelve todos los turnos". */}
+        {/* Cerró el turno: qué cambió contra ayer y cómo quedó contra los
+            récords. El orden es a propósito — primero qué pasó (arriba),
+            después por qué fue distinto, después qué se repite siempre. */}
+        <VsAyerBloque r={comparadoConAyer} records={recordsLinea} />
+
         <ParetoDeParadas pareto={pareto} />
 
         <PorHora series={live.series} />

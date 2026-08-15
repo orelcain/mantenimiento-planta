@@ -55,6 +55,15 @@ export interface ForecastHistoryShift {
   total: number
   producingMin: number
   micro: number | null
+  /**
+   * Desglose del tiempo del turno, para explicar por qué hoy cerró distinto
+   * («Qué cambió contra ayer») y para los récords por componente.
+   * Ausentes en entradas cacheadas antes de publicarse — el backend las
+   * reconstruye una vez y quedan.
+   */
+  windowMin?: number | null
+  plannedMin?: number | null
+  recoverableMin?: number | null
 }
 
 export interface PublicMonitorLive {
