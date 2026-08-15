@@ -26,7 +26,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { Activity, AlertCircle, ChevronLeft, ChevronRight, Clock, Gauge, Hourglass, Moon, PauseCircle, Radio, RefreshCw, Sun, Target, Timer, TrendingUp } from 'lucide-react'
+import { Activity, AlertCircle, ChevronLeft, ChevronRight, Clock, Gauge, Hourglass, Moon, PauseCircle, Radio, RefreshCw, Sun, Target, TrendingUp } from 'lucide-react'
 import { useTheme } from '@/hooks/useTheme'
 import {
   subscribePublicShiftMonitor,
@@ -150,22 +150,28 @@ function Kpi({
 }) {
   return (
     <div className="rounded-2xl border border-border bg-card px-4 py-3">
-      <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+      {/* Roles de la piel (§2 del HIG): caption para el encabezado de grupo
+          (es EL rol sancionado en mayúsculas), title1 para el dato — «nunca
+          inventar tamaño»: el stat 30/700 no está en la escala del config y el
+          rol existente más cercano es title1. */}
+      <div className="flex items-center gap-1.5 text-caption font-semibold uppercase tracking-wide text-muted-foreground">
         {icon}{label}
       </div>
-      <div className="mt-1 flex items-baseline gap-1">
-        <span className={`text-2xl font-bold tabular-nums ${tone === 'accent' ? 'text-sky-700 dark:text-sky-300' : 'text-foreground'}`}>
-          {value}
-        </span>
-        {unit && <span className="text-[12px] text-muted-foreground/70">{unit}</span>}
+      <div className="mt-1 flex items-center justify-between gap-2">
+        <div className="flex items-baseline gap-1">
+          <span className={`text-title1 tabular-nums ${tone === 'accent' ? 'text-sky-700 dark:text-sky-300' : 'text-foreground'}`}>
+            {value}
+          </span>
+          {unit && <span className="text-footnote text-muted-foreground/70">{unit}</span>}
+        </div>
+        {/* El spark vuelve al lado del valor: la tarjeta del ritmo ahora es
+            ancha (col-span-2) y ya no desborda como cuando medía 160 px. */}
+        {spark}
       </div>
-      {/* En su propia fila: al lado del valor desbordaba la tarjeta en el
-          celular (las KPI van de a dos por fila, ~160 px cada una). */}
-      {spark && <div className="mt-1">{spark}</div>}
-      {hint && <div className="mt-0.5 text-[11px] text-muted-foreground/70">{hint}</div>}
+      {hint && <div className="mt-0.5 text-caption text-muted-foreground/70">{hint}</div>}
       {lectura && (
         <div
-          className={`mt-0.5 text-[11px] leading-snug ${
+          className={`mt-0.5 text-caption leading-snug ${
             lectura.tono === 'bien'
               ? 'font-semibold text-emerald-700 dark:text-emerald-400'
               : lectura.tono === 'mal'
@@ -177,7 +183,7 @@ function Kpi({
         </div>
       )}
       {sub && (
-        <div className="mt-0.5 text-[11px] tabular-nums text-muted-foreground">{sub}</div>
+        <div className="mt-0.5 text-caption tabular-nums text-muted-foreground">{sub}</div>
       )}
     </div>
   )
@@ -2554,7 +2560,7 @@ export function PublicShiftMonitorPage() {
           {/* Fuera del bloque de la meta: la recomendación también aplica
               cuando el link se creó sin cuota, midiendo contra lo que el sensor
               espera del turno — que es la mayoría de los links repartidos. */}
-          <RitmoNecesario
+          {!live.shiftClosed && <RitmoNecesario
             pace={pace}
             cierre={live.plannedEnd}
             muestras={live.plannedEndSamples}
@@ -2577,7 +2583,7 @@ export function PublicShiftMonitorPage() {
               bestCpm: live.paceBestCpm ?? null,
               muestras: live.paceSamples ?? null,
             } : null}
-          />
+          />}
 
           <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
             <span>
@@ -2628,35 +2634,28 @@ export function PublicShiftMonitorPage() {
                 ? { texto: `sin rango normal todavía (aparece al 5º turno) · set point ${fmtDec(setCpmVigente ?? 18)}`, tono: 'normal' as const }
                 : null
             return (
-              <Kpi
-                label="Ritmo andando"
-                value={fmtDec(andando ?? live.piecesPerMinute)}
-                unit="pz/min"
-                icon={<Gauge className="h-3 w-3" />}
-                hint={andando != null ? 'cuando la línea produce' : 'promedio del turno'}
-                spark={andando != null && banda
-                  ? <Chispa serie={banda.serieRitmos} hoy={andando} banda={banda.ritmo} />
-                  : undefined}
-                lectura={lectura}
-                // "9,7 de reloj" sin unidad no se leía como un ritmo: Orel
-                // preguntó si íbamos a "poner también" el que ya estaba acá.
-                sub={andando != null && relojCpm != null
-                  ? `Con paradas y colación: ${fmtDec(relojCpm)} pz/min de reloj`
-                  : undefined}
-                tone="accent"
-              />
+              <div className="col-span-2">
+                <Kpi
+                  label="Ritmo andando"
+                  value={fmtDec(andando ?? live.piecesPerMinute)}
+                  unit="pz/min"
+                  icon={<Gauge className="h-3 w-3" />}
+                  hint={andando != null ? 'cuando la línea produce' : 'promedio del turno'}
+                  spark={andando != null && banda
+                    ? <Chispa serie={banda.serieRitmos} hoy={andando} banda={banda.ritmo} />
+                    : undefined}
+                  lectura={lectura}
+                  sub={andando != null && relojCpm != null
+                    ? `De reloj, con paradas y colación: ${fmtDec(relojCpm)} pz/min · ${fmtInt(relojCpm * 60)} pz/h`
+                    : undefined}
+                  tone="accent"
+                />
+              </div>
             )
           })()}
-          {/* La MISMA vara que el reloj de al lado (lapso real): con la vieja,
-              581 pz/h convivía con 8,6 pz/min de reloj y no multiplicaban. */}
-          <Kpi
-            label="Piezas / hora"
-            value={fmtInt(relojCpm != null ? relojCpm * 60 : live.piecesPerHour)}
-            unit="pz/h"
-            icon={<Timer className="h-3 w-3" />}
-            hint="ciclos por hora, de reloj"
-            tone="accent"
-          />
+          {/* Sin tarjeta de pz/h: desde el reloj unificado era el pz/min × 60
+              con otra ropa — el mismo dato en dos lugares termina divergiendo.
+              El pz/h vive en la sub-línea del ritmo. */}
           {/* La tarjeta más mirada en vivo era la única sin referencia. El
               contraste es contra el ritmo del PROPIO turno: «frenando» aparece
               acá antes de que el total del turno lo delate. Umbrales anchos
@@ -2741,98 +2740,192 @@ export function PublicShiftMonitorPage() {
           </section>
         )}
 
-        {/* Adónde va a cerrar el turno, según lo que hicieron los anteriores
-            desde esta misma altura. Antes de la velocidad: primero el
-            desenlace, después el detalle de cómo se está llegando. */}
-        <PronosticoCierre
-          f={pronostico}
-          meta={data.targetPieces ?? live.quotaPieces ?? live.expectedPieces ?? null}
-          horizonte={horizontePronostico}
-        />
+        {/*
+          El ORDEN cuenta la historia del estado (test del §0 del HIG: lo más
+          importante AHORA va primero). En VIVO la pregunta es «¿cómo vamos y
+          llegamos?»: pronóstico → comparador → velocidad → detalle. CERRADO es
+          una autopsia: qué pasó → qué cambió contra ayer → la velocidad como
+          evidencia → la comparación. El pronóstico y el ritmo necesario no se
+          renderizan en cerrado: pronosticar un turno terminado no es un dato,
+          es ruido.
+        */}
+        {live.shiftClosed ? (
+          <>
+            <TiempoDelTurno
+              tb={live.timeBreakdown}
+              causaSel={causaSel}
+              onCausa={setCausaSel}
+              proximaParada={proximaParada}
+              notas={notasDeOperador}
+              /* La resta: minutos parados -> piezas, al ritmo del turno. */
+              brecha={(() => {
+                const meta = data.targetPieces ?? live.quotaPieces ?? live.expectedPieces ?? null
+                return meta != null ? Math.max(0, meta - live.totalPieces) : null
+              })()}
+              cpmAndando={
+                live.timeBreakdown && live.timeBreakdown.producingMin > 0
+                  ? live.totalPieces / live.timeBreakdown.producingMin
+                  : null
+              }
+              costo={costoParadas}
+              grupos={gruposEventos}
+              notasTurno={notasDeTurnoCompleto}
+            />
+            {/* Pegado al desglose de HOY va el de SIEMPRE: la misma pregunta —qué
+                para la línea— pero mirando los turnos anteriores. Es el paso de
+                "hoy pasó esto" a "esto vuelve todos los turnos". */}
+            {/* Cerró el turno: qué cambió contra ayer y cómo quedó contra los
+                récords. El orden es a propósito — primero qué pasó (arriba),
+                después por qué fue distinto, después qué se repite siempre. */}
+            <VsAyerBloque r={comparadoConAyer} records={recordsLinea} />
+            {/* ⚠ UN solo gráfico de la serie de 5 min.
+                Había dos tarjetas —"Velocidad de la línea" y "Piezas por tramo"—
+                dibujando exactamente la misma serie, una en pz/min y otra en
+                piezas. La tendencia (media de 15 min) y las referencias de ritmo se
+                mudaron acá, encima de su propio detalle, que además es el gráfico
+                que sabe ubicar las detenciones y el que tiene el zoom a 8×. */}
+            <Sparkbars
+              series={live.series}
+              stopReasons={live.stopReasons}
+              stopEvents={live.stopEvents}
+              comments={live.comments}
+              causaSel={causaSel}
+              onCausa={setCausaSel}
+              breaks={comparacion.breaks}
+              ventana={ventanaGrafica}
+              onVentana={setVentanaGrafica}
+              recentPerMinute={live.recentPiecesPerMinute}
+              requiredPerMinute={pace && pace.requiredPerMinute > 0 ? pace.requiredPerMinute : null}
+              medianCpm={live.paceMedianCpm}
+              setCpm={setCpmVigente}
+              fuenteSetPoint={live.setPoint
+                ? `Set point ${fmtDec(live.setPoint.cpm)} pz/min` +
+                  (live.setPoint.medidoEl ? ` · medido el ${live.setPoint.medidoEl}` : '') +
+                  (live.setPoint.metodo ? ` (${live.setPoint.metodo})` : '') +
+                  ' — no es dato del PLC.'
+                : null}
+              cerrado={live.shiftClosed}
+              onGuardarSetPoint={esAdminMonitor && esActual && data.plantSlug
+                ? async (cpm, metodo) => {
+                  await setMonitorSetPoint({
+                    plantSlug: data.plantSlug!,
+                    cpm,
+                    metodo,
+                    por: usuarioActual?.email ?? null,
+                  })
+                }
+                : undefined}
+            />
+            {/* El comparador SUBE hasta acá, pegado al pronóstico: los dos
+                contestan la misma pregunta —si el turno llega— y estaban separados
+                por tres bloques de detalle. Arriba el desenlace, abajo el porqué
+                (velocidad, tramos, tiempo, hora por hora). */}
+            <ComparadorDias
+              ventana={ventanaGrafica}
+              onVentana={setVentanaGrafica}
+              refSel={refSel}
+              onRefSel={setRefSel}
+              cmp={comparacion}
+              live={live}
+              /* Solo cuando el pronóstico es creíble: un cono con 20% de error es
+                 una mancha que promete lo que no puede. */
+              cone={pronostico && pronostico.mapePct <= MAX_MAPE_PCT ? pronostico.cone : null}
+            />
 
-        {/* El comparador SUBE hasta acá, pegado al pronóstico: los dos
-            contestan la misma pregunta —si el turno llega— y estaban separados
-            por tres bloques de detalle. Arriba el desenlace, abajo el porqué
-            (velocidad, tramos, tiempo, hora por hora). */}
-        <ComparadorDias
-          ventana={ventanaGrafica}
-          onVentana={setVentanaGrafica}
-          refSel={refSel}
-          onRefSel={setRefSel}
-          cmp={comparacion}
-          live={live}
-          /* Solo cuando el pronóstico es creíble: un cono con 20% de error es
-             una mancha que promete lo que no puede. */
-          cone={pronostico && pronostico.mapePct <= MAX_MAPE_PCT ? pronostico.cone : null}
-        />
+          </>
+        ) : (
+          <>
+            {/* Adónde va a cerrar el turno, según lo que hicieron los anteriores
+                desde esta misma altura. Antes de la velocidad: primero el
+                desenlace, después el detalle de cómo se está llegando. */}
+            <PronosticoCierre
+              f={pronostico}
+              meta={data.targetPieces ?? live.quotaPieces ?? live.expectedPieces ?? null}
+              horizonte={horizontePronostico}
+            />
+            {/* El comparador SUBE hasta acá, pegado al pronóstico: los dos
+                contestan la misma pregunta —si el turno llega— y estaban separados
+                por tres bloques de detalle. Arriba el desenlace, abajo el porqué
+                (velocidad, tramos, tiempo, hora por hora). */}
+            <ComparadorDias
+              ventana={ventanaGrafica}
+              onVentana={setVentanaGrafica}
+              refSel={refSel}
+              onRefSel={setRefSel}
+              cmp={comparacion}
+              live={live}
+              /* Solo cuando el pronóstico es creíble: un cono con 20% de error es
+                 una mancha que promete lo que no puede. */
+              cone={pronostico && pronostico.mapePct <= MAX_MAPE_PCT ? pronostico.cone : null}
+            />
+            {/* ⚠ UN solo gráfico de la serie de 5 min.
+                Había dos tarjetas —"Velocidad de la línea" y "Piezas por tramo"—
+                dibujando exactamente la misma serie, una en pz/min y otra en
+                piezas. La tendencia (media de 15 min) y las referencias de ritmo se
+                mudaron acá, encima de su propio detalle, que además es el gráfico
+                que sabe ubicar las detenciones y el que tiene el zoom a 8×. */}
+            <Sparkbars
+              series={live.series}
+              stopReasons={live.stopReasons}
+              stopEvents={live.stopEvents}
+              comments={live.comments}
+              causaSel={causaSel}
+              onCausa={setCausaSel}
+              breaks={comparacion.breaks}
+              ventana={ventanaGrafica}
+              onVentana={setVentanaGrafica}
+              recentPerMinute={live.recentPiecesPerMinute}
+              requiredPerMinute={pace && pace.requiredPerMinute > 0 ? pace.requiredPerMinute : null}
+              medianCpm={live.paceMedianCpm}
+              setCpm={setCpmVigente}
+              fuenteSetPoint={live.setPoint
+                ? `Set point ${fmtDec(live.setPoint.cpm)} pz/min` +
+                  (live.setPoint.medidoEl ? ` · medido el ${live.setPoint.medidoEl}` : '') +
+                  (live.setPoint.metodo ? ` (${live.setPoint.metodo})` : '') +
+                  ' — no es dato del PLC.'
+                : null}
+              cerrado={live.shiftClosed}
+              onGuardarSetPoint={esAdminMonitor && esActual && data.plantSlug
+                ? async (cpm, metodo) => {
+                  await setMonitorSetPoint({
+                    plantSlug: data.plantSlug!,
+                    cpm,
+                    metodo,
+                    por: usuarioActual?.email ?? null,
+                  })
+                }
+                : undefined}
+            />
+            <TiempoDelTurno
+              tb={live.timeBreakdown}
+              causaSel={causaSel}
+              onCausa={setCausaSel}
+              proximaParada={proximaParada}
+              notas={notasDeOperador}
+              /* La resta: minutos parados -> piezas, al ritmo del turno. */
+              brecha={(() => {
+                const meta = data.targetPieces ?? live.quotaPieces ?? live.expectedPieces ?? null
+                return meta != null ? Math.max(0, meta - live.totalPieces) : null
+              })()}
+              cpmAndando={
+                live.timeBreakdown && live.timeBreakdown.producingMin > 0
+                  ? live.totalPieces / live.timeBreakdown.producingMin
+                  : null
+              }
+              costo={costoParadas}
+              grupos={gruposEventos}
+              notasTurno={notasDeTurnoCompleto}
+            />
+            {/* Pegado al desglose de HOY va el de SIEMPRE: la misma pregunta —qué
+                para la línea— pero mirando los turnos anteriores. Es el paso de
+                "hoy pasó esto" a "esto vuelve todos los turnos". */}
+            {/* Cerró el turno: qué cambió contra ayer y cómo quedó contra los
+                récords. El orden es a propósito — primero qué pasó (arriba),
+                después por qué fue distinto, después qué se repite siempre. */}
+            <VsAyerBloque r={comparadoConAyer} records={recordsLinea} />
 
-        {/* ⚠ UN solo gráfico de la serie de 5 min.
-            Había dos tarjetas —"Velocidad de la línea" y "Piezas por tramo"—
-            dibujando exactamente la misma serie, una en pz/min y otra en
-            piezas. La tendencia (media de 15 min) y las referencias de ritmo se
-            mudaron acá, encima de su propio detalle, que además es el gráfico
-            que sabe ubicar las detenciones y el que tiene el zoom a 8×. */}
-        <Sparkbars
-          series={live.series}
-          stopReasons={live.stopReasons}
-          stopEvents={live.stopEvents}
-          comments={live.comments}
-          causaSel={causaSel}
-          onCausa={setCausaSel}
-          breaks={comparacion.breaks}
-          ventana={ventanaGrafica}
-          onVentana={setVentanaGrafica}
-          recentPerMinute={live.recentPiecesPerMinute}
-          requiredPerMinute={pace && pace.requiredPerMinute > 0 ? pace.requiredPerMinute : null}
-          medianCpm={live.paceMedianCpm}
-          setCpm={setCpmVigente}
-          fuenteSetPoint={live.setPoint
-            ? `Set point ${fmtDec(live.setPoint.cpm)} pz/min` +
-              (live.setPoint.medidoEl ? ` · medido el ${live.setPoint.medidoEl}` : '') +
-              (live.setPoint.metodo ? ` (${live.setPoint.metodo})` : '') +
-              ' — no es dato del PLC.'
-            : null}
-          cerrado={live.shiftClosed}
-          onGuardarSetPoint={esAdminMonitor && esActual && data.plantSlug
-            ? async (cpm, metodo) => {
-              await setMonitorSetPoint({
-                plantSlug: data.plantSlug!,
-                cpm,
-                metodo,
-                por: usuarioActual?.email ?? null,
-              })
-            }
-            : undefined}
-        />
-
-        <TiempoDelTurno
-          tb={live.timeBreakdown}
-          causaSel={causaSel}
-          onCausa={setCausaSel}
-          proximaParada={proximaParada}
-          notas={notasDeOperador}
-          /* La resta: minutos parados -> piezas, al ritmo del turno. */
-          brecha={(() => {
-            const meta = data.targetPieces ?? live.quotaPieces ?? live.expectedPieces ?? null
-            return meta != null ? Math.max(0, meta - live.totalPieces) : null
-          })()}
-          cpmAndando={
-            live.timeBreakdown && live.timeBreakdown.producingMin > 0
-              ? live.totalPieces / live.timeBreakdown.producingMin
-              : null
-          }
-          costo={costoParadas}
-          grupos={gruposEventos}
-          notasTurno={notasDeTurnoCompleto}
-        />
-
-        {/* Pegado al desglose de HOY va el de SIEMPRE: la misma pregunta —qué
-            para la línea— pero mirando los turnos anteriores. Es el paso de
-            "hoy pasó esto" a "esto vuelve todos los turnos". */}
-        {/* Cerró el turno: qué cambió contra ayer y cómo quedó contra los
-            récords. El orden es a propósito — primero qué pasó (arriba),
-            después por qué fue distinto, después qué se repite siempre. */}
-        <VsAyerBloque r={comparadoConAyer} records={recordsLinea} />
+          </>
+        )}
 
         {/* ⚠ Turno sin historia (la primera noche del turno noche): medio
             monitor no puede existir y eso es CORRECTO — pero se dice, con el
