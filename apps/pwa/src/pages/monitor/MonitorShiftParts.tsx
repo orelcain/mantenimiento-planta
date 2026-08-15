@@ -192,8 +192,13 @@ export function TiempoDelTurno({
    * segunda barra murió acá. El control canónico es la FILA de 44 px, no el
    * segmento: un segmento puede medir 3 px en un turno bueno.
    */
-  const [parte, setParte] = useState<'hechas' | 'paradas' | 'ritmo' | 'jugar' | null>(null)
-  const alternarParte = (p: 'hechas' | 'paradas' | 'ritmo' | 'jugar') =>
+  /*
+   * «Paradas» arranca ABIERTA: adentro vive la lista de causas por dueño — el
+   * argumento de imputación de Mantención — y detrás de un tap, por defecto,
+   * no lo vería nadie. Quien mira otra parte la pliega, y un tap la devuelve.
+   */
+  const [parte, setParte] = useState<'hechas' | 'paradas' | 'ritmo' | 'jugar' | 'programado' | null>('paradas')
+  const alternarParte = (p: 'hechas' | 'paradas' | 'ritmo' | 'jugar' | 'programado') =>
     setParte((v) => (v === p ? null : p))
   if (!tb || tb.windowMin <= 0) return null
 
@@ -263,6 +268,10 @@ export function TiempoDelTurno({
     hayBrecha && perdidas != null && porRitmo != null && metaOk != null && hechas != null && cpm != null
 
   const gruposVisibles = (grupos ?? []).filter((g) => g.causas.length > 0)
+  /* Regla de Orel: lo PROGRAMADO va aparte — no es detención imputable ni se
+     recupera. Las imputables viven dentro de «Paradas»; el convenio, en su fila. */
+  const gruposImputables = gruposVisibles.filter((g) => g.dueno !== 'programado')
+  const grupoProgramado = gruposVisibles.find((g) => g.dueno === 'programado') ?? null
   /*
    * "Ninguna falla de máquina" solo se puede afirmar si hubo paradas que
    * clasificar y ninguna cayó en Mantención. Con el turno entero sin paradas
@@ -330,10 +339,13 @@ export function TiempoDelTurno({
           {/* Las filas SON la leyenda, y cada una abre su parte (44 px §3). */}
           <div className="mt-2 overflow-hidden rounded-[10px] bg-muted">
             {([
-              { p: 'hechas' as const, nombre: 'Hechas', v: hechas, tick: 'bg-muted-foreground/[0.5]' },
-              { p: 'paradas' as const, nombre: 'Paradas', v: perdidas, tick: 'bg-red-600 dark:bg-red-500' },
-              { p: 'ritmo' as const, nombre: 'Ritmo', v: porRitmo, tick: 'bg-amber-600 dark:bg-amber-500' },
-              ...(porJugar > 0 ? [{ p: 'jugar' as const, nombre: 'Por jugar', v: porJugar, tick: 'border border-dashed border-muted-foreground/[0.5] bg-transparent' }] : []),
+              { p: 'hechas' as const, nombre: 'Hechas', valor: `${fmtInt(hechas)} pz`, tick: 'bg-muted-foreground/[0.5]' },
+              { p: 'paradas' as const, nombre: 'Paradas', valor: `${fmtInt(perdidas)} pz`, tick: 'bg-red-600 dark:bg-red-500' },
+              { p: 'ritmo' as const, nombre: 'Ritmo', valor: `${fmtInt(porRitmo)} pz`, tick: 'bg-amber-600 dark:bg-amber-500' },
+              ...(porJugar > 0 ? [{ p: 'jugar' as const, nombre: 'Por jugar', valor: `${fmtInt(porJugar)} pz`, tick: 'border border-dashed border-muted-foreground/[0.5] bg-transparent' }] : []),
+              /* Sin segmento en la barra: el convenio no pierde piezas (la cuota
+                 ya lo descuenta) — por eso su valor va en MINUTOS. */
+              ...(grupoProgramado ? [{ p: 'programado' as const, nombre: 'Programado · no se recupera', valor: fmtDurMin(grupoProgramado.min), tick: 'bg-muted-foreground' }] : []),
             ]).map((f, i) => (
               <div key={f.p} className={i > 0 ? 'border-t border-border/60' : ''}>
                 <button
@@ -344,7 +356,7 @@ export function TiempoDelTurno({
                 >
                   <i className={`h-5 w-1 shrink-0 rounded-full ${f.tick}`} />
                   <span className="flex-1">{f.nombre}</span>
-                  <span className="tabular-nums font-semibold">{fmtInt(f.v)} <span className="font-normal text-muted-foreground">pz</span></span>
+                  <span className="tabular-nums font-semibold">{f.valor}</span>
                   <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform ${parte === f.p ? '' : '-rotate-90'}`} />
                 </button>
                 {parte === f.p && (
@@ -371,15 +383,35 @@ export function TiempoDelTurno({
                     )}
                     {f.p === 'paradas' && (
                       <>
-                        {gruposVisibles.filter((g) => g.dueno !== 'programado').map((g) => (
-                          <p key={g.dueno} className="flex justify-between gap-2 py-0.5">
-                            <span className="text-muted-foreground">{DUENO_META[g.dueno].label}</span>
-                            <span className="tabular-nums font-semibold text-foreground">
-                              {g.piezas != null ? `${fmtInt(g.piezas)} pz` : '—'}{' '}
-                              <span className="font-normal text-muted-foreground">· {fmtDurMin(g.min)}</span>
-                            </span>
-                          </p>
+                        {/* La lista de causas por DUEÑO completa vive acá adentro
+                            (pedido de Orel: «las demás dentro de las de arriba») —
+                            y la fila arranca abierta para que el argumento de
+                            imputación siga siendo lo primero que se ve. */}
+                        {gruposImputables.length === 0 && (
+                          <p className="py-0.5 text-muted-foreground/70">nada por recuperar</p>
+                        )}
+                        {gruposImputables.map((g) => (
+                          <div key={g.dueno}>
+                            <GrupoDeEventos
+                              g={g}
+                              sel={causaSel ?? null}
+                              onCausa={onCausa}
+                              notas={notas}
+                              proximaParada={null}
+                              plannedMin={tb.plannedMin}
+                            />
+                            {sinFallaDeMaquina && g.dueno === ultimoImputable && (
+                              <p className="mt-2 text-[11px] font-semibold text-ink-ok">
+                                ✓ Ninguna parada por falla de máquina en este turno.
+                              </p>
+                            )}
+                          </div>
                         ))}
+                        {onCausa && gruposImputables.length > 0 && (
+                          <p className="mt-1.5 text-[11px] text-muted-foreground/70">
+                            Tocá una causa para ver sus paradas una por una.
+                          </p>
+                        )}
                         {/* ⚠ El supuesto va escrito: es la parte discutible del
                             número, y quien lo discuta pregunta exactamente esto. */}
                         <p className="mt-1.5 text-muted-foreground/80">
@@ -428,6 +460,16 @@ export function TiempoDelTurno({
                         abajo.
                       </p>
                     )}
+                    {f.p === 'programado' && grupoProgramado && (
+                      <GrupoDeEventos
+                        g={grupoProgramado}
+                        sel={causaSel ?? null}
+                        onCausa={onCausa}
+                        notas={notas}
+                        proximaParada={proximaParada}
+                        plannedMin={tb.plannedMin}
+                      />
+                    )}
                   </div>
                 )}
               </div>
@@ -466,75 +508,82 @@ export function TiempoDelTurno({
         </p>
       )}
 
-      {/* ── 2 · Qué pasó, agrupado por de quién es ─────────────────────── */}
-      {/* Aire en vez de línea (§38): el espacio separa igual y con menos tinta. */}
-      <div className={hayBrecha ? 'mt-4' : 'mt-2'}>
-        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-          Qué pasó en el turno
-          {/* Los minutos solo si la resta de arriba no los dijo ya. */}
-          {!hayBrecha && (
+      {/* ── 2 · Qué pasó, agrupado por de quién es ───────────────────────
+          SOLO sin acordeón: con la resta visible, las causas imputables viven
+          dentro de «Paradas» (abierta por defecto) y el convenio dentro de
+          «Programado» — repetirlas acá era la duplicación que acusó Orel. */}
+      {!restaVisible && (
+        <div className="mt-2">
+          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+            Qué pasó en el turno
             <span className="normal-case tracking-normal">
               {' '}· {fmtDurMin(tb.recoverableMin)} recuperables
             </span>
+          </p>
+
+          {gruposVisibles.length === 0 && (
+            <p className="mt-1 text-[11.5px] text-muted-foreground/60">nada por recuperar</p>
           )}
-        </p>
 
-        {gruposVisibles.length === 0 && (
-          <p className="mt-1 text-[11.5px] text-muted-foreground/60">nada por recuperar</p>
-        )}
+          {gruposVisibles.map((g) => (
+            <div key={g.dueno}>
+              <GrupoDeEventos
+                g={g}
+                sel={causaSel ?? null}
+                onCausa={onCausa}
+                notas={notas}
+                proximaParada={g.dueno === 'programado' ? proximaParada : null}
+                plannedMin={tb.plannedMin}
+              />
+              {/* ⚠ La frase que Mantención necesita poder decir. Va pegada al
+                  último grupo que se le puede imputar a alguien, no al final:
+                  después del convenio queda a tres dedos de distancia de los
+                  minutos que explica y se lee como un pie de página. */}
+              {sinFallaDeMaquina && g.dueno === ultimoImputable && (
+                <p className="mt-2 text-[11px] font-semibold text-ink-ok">
+                  ✓ Ninguna parada por falla de máquina en este turno.
+                </p>
+              )}
+            </div>
+          ))}
 
-        {gruposVisibles.map((g) => (
-          <div key={g.dueno}>
-            <GrupoDeEventos
-              g={g}
-              sel={causaSel ?? null}
-              onCausa={onCausa}
-              notas={notas}
-              proximaParada={g.dueno === 'programado' ? proximaParada : null}
-              plannedMin={tb.plannedMin}
-            />
-            {/* ⚠ La frase que Mantención necesita poder decir. Va pegada al
-                último grupo que se le puede imputar a alguien, no al final:
-                después del convenio queda a tres dedos de distancia de los
-                minutos que explica y se lee como un pie de página. */}
-            {sinFallaDeMaquina && g.dueno === ultimoImputable && (
-              <p className="mt-2 text-[11px] font-semibold text-ink-ok">
-                ✓ Ninguna parada por falla de máquina en este turno.
-              </p>
-            )}
-          </div>
-        ))}
-
-        {/* El aviso de la próxima parada de convenio no puede depender de que
-            YA haya habido una: el 14-08 los primeros 7 min planificados eran
-            reunión de inicio y ejercicio, con la colación todavía por delante. */}
-        {proximaParada && tb.plannedMin === 0 && (
-          <p className="mt-1.5 text-[11px] text-muted-foreground/70">
-            Todavía sin paradas de convenio: {nombreDeConvenio(proximaParada.reason)} entra a las{' '}
-            {/* ~ porque es la mediana de los turnos anteriores, no un pacto. */}
-            <span className="tabular-nums">~{proximaParada.hora}</span>.
-          </p>
-        )}
-
-        {notasTurno && notasTurno.length > 0 && (
-          <div className="mt-4">
-            <p className="text-[11px] uppercase tracking-wide text-ink-ok">
-              Anotado para todo el turno
+          {onCausa && gruposVisibles.length > 0 && (
+            <p className="mt-1.5 text-[11px] text-muted-foreground/70">
+              Tocá una causa para ver sus paradas una por una.
             </p>
-            <ul className="mt-1 space-y-0.5 border-l-2 border-ink-ok pl-2">
-              {notasTurno.map((t) => (
-                <li key={t} className="text-[11px] leading-snug text-muted-foreground">{t}</li>
-              ))}
-            </ul>
-          </div>
-        )}
+          )}
+        </div>
+      )}
 
-        {onCausa && gruposVisibles.length > 0 && (
-          <p className="mt-1.5 text-[11px] text-muted-foreground/70">
-            Tocá una causa para ver sus paradas una por una.
+      {/* El aviso de la próxima parada de convenio no puede depender de que
+          YA haya habido una (14-08: los primeros 7 min eran reunión y
+          ejercicio, con la colación por delante) NI de que la fila
+          «Programado» esté abierta — con ella cerrada, este renglón es el
+          único que lo dice; con ella abierta lo dice el grupo y esto se
+          calla para no repetirlo. */}
+      {proximaParada && (tb.plannedMin === 0 || (restaVisible && parte !== 'programado')) && (
+        <p className="mt-1.5 text-[11px] text-muted-foreground/70">
+          {tb.plannedMin === 0 ? 'Todavía sin paradas de convenio: ' : ''}
+          {nombreDeConvenio(proximaParada.reason)} entra a las{' '}
+          {/* ~ porque es la mediana de los turnos anteriores, no un pacto. */}
+          <span className="tabular-nums">~{proximaParada.hora}</span>.
+        </p>
+      )}
+
+      {/* Siempre visible: acá aparecen fallas mecánicas anotadas a mano
+          («guías de bronce») y eso no puede depender de ningún tap. */}
+      {notasTurno && notasTurno.length > 0 && (
+        <div className="mt-4">
+          <p className="text-[11px] uppercase tracking-wide text-ink-ok">
+            Anotado para todo el turno
           </p>
-        )}
-      </div>
+          <ul className="mt-1 space-y-0.5 border-l-2 border-ink-ok pl-2">
+            {notasTurno.map((t) => (
+              <li key={t} className="text-[11px] leading-snug text-muted-foreground">{t}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* ── 5 · El reparto del tiempo, plegado ───────────────────────────
           SOLO cuando el acordeón no está: con la resta visible, los minutos
