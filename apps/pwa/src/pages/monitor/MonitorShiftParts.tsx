@@ -138,7 +138,8 @@ function fmtDurMin(min: number): string {
  * le pide a la línea que recupere un tiempo que por convenio no se recupera.
  */
 export function TiempoDelTurno({
-  tb, causaSel, onCausa, proximaParada, notas, brecha, cpmAndando, costo, grupos, notasTurno,
+  tb, causaSel, onCausa, proximaParada, notas, cerrado, meta, hechas, cuotaAhora, horaAhora,
+  cpmAndando, costo, grupos, notasTurno,
 }: {
   tb: PublicMonitorLive['timeBreakdown']
   causaSel?: string | null
@@ -148,8 +149,20 @@ export function TiempoDelTurno({
   proximaParada?: { hora: string; reason: string } | null
   /** Comentarios del operador agrupados por causa (ver `notasPorCausa`). */
   notas?: Map<string, Array<{ desde: string; texto: string }>>
-  /** Piezas que faltan (o faltaron) para la meta. null si no hay meta. */
-  brecha?: number | null
+  /** true con el turno cerrado: la resta se hace contra la meta COMPLETA. */
+  cerrado?: boolean
+  /** La meta del turno completo. null si no hay meta. */
+  meta?: number | null
+  /** Piezas hechas hasta ahora (o al cierre). */
+  hechas?: number | null
+  /**
+   * La cuota a esta ALTURA del turno: la curva del comparador, que se aplana
+   * durante la colación. Solo importa en vivo — restar contra la meta completa
+   * pintaría como «ritmo perdido» lo que simplemente no se jugó todavía.
+   */
+  cuotaAhora?: number | null
+  /** Hora de reloj para nombrar la cuota («las 2.600 que tocaban a las 11:00»). */
+  horaAhora?: string | null
   /** Ritmo promedio de la línea ANDANDO. Respaldo cuando no hay `costo`. */
   cpmAndando?: number | null
   /**
@@ -216,10 +229,24 @@ export function TiempoDelTurno({
     cpm == null
       ? null
       : tb.recoverable.reduce((a, x) => a + sinRedondear(x.reason, x.min), 0) + restoMin * cpm
+  /*
+   * La vara de la resta. Cerrado: la meta completa. En vivo: la cuota A ESTA
+   * ALTURA (la misma curva del comparador, aplanada en colación) — contra la
+   * meta completa, `porRitmo` absorbería todo lo que aún no se juega: a las
+   * 11:00 con 2.230 pz hechas la brecha contra la meta es ~2.770 y casi nada
+   * de eso es pérdida. Sin curva de cuota, en vivo NO hay resta honesta.
+   */
+  const metaOk = meta != null && meta > 0 ? meta : null
+  const cuotaOk = !cerrado && metaOk != null && cuotaAhora != null && cuotaAhora > 0
+    ? Math.min(Math.round(cuotaAhora), metaOk)
+    : null
+  const referencia = cerrado ? metaOk : cuotaOk
+  const brecha = referencia != null && hechas != null ? Math.max(0, referencia - hechas) : null
   const hayBrecha = brecha != null && brecha > 0
   const perdidas = crudas == null ? null : hayBrecha ? Math.min(crudas, brecha) : crudas
   const porRitmo = hayBrecha && perdidas != null ? Math.max(0, brecha - perdidas) : null
-  const pctParadas = hayBrecha && perdidas != null ? (perdidas / brecha) * 100 : null
+  /** Lo que la cuota todavía no pide: va HUECO en la barra, no es pérdida. */
+  const porJugar = cuotaOk != null && metaOk != null ? Math.max(0, metaOk - cuotaOk) : 0
   // El rango de ritmos usados: es la evidencia de que cada parada se valorizó
   // distinto. Con una sola causa no hay rango que mostrar.
   const ritmos = (costo?.porCausa ?? []).map((c) => c.cpm)
@@ -241,11 +268,14 @@ export function TiempoDelTurno({
       id="tiempo"
       // El título depende de si hay algo que explicar: con la meta cumplida,
       // "Por qué no llegamos" sería un titular falso.
-      titulo={hayBrecha ? 'Por qué no llegamos' : 'A dónde se va el tiempo'}
+      titulo={hayBrecha ? (cerrado ? 'Por qué no llegamos' : 'Por qué vamos atrás') : 'A dónde se va el tiempo'}
       extra={hayBrecha
         ? (
           <span className="tabular-nums font-semibold text-red-700 dark:text-red-400">
             −{fmtInt(brecha)} pz
+            {/* En vivo la cifra es contra la cuota de AHORA, y tiene que decirlo:
+                sin el sufijo se lee como si faltara eso para la meta completa. */}
+            {!cerrado && <span className="font-normal text-muted-foreground"> a esta hora</span>}
           </span>
         )
         // Desde el fix de la rejilla (tbv 2), windowMin es el lapso REAL de
@@ -255,60 +285,94 @@ export function TiempoDelTurno({
         : <span className="tabular-nums">{fmtDurMin(tb.windowMin)} de turno</span>}
     >
       {/* ── 1 · La resta ────────────────────────────────────────────────── */}
-      {hayBrecha && perdidas != null && porRitmo != null && pctParadas != null && cpm != null && (
+      {hayBrecha && perdidas != null && porRitmo != null && metaOk != null && hechas != null && cpm != null && (
         <div className="mt-2">
-          <p className="text-[13.5px] leading-snug text-foreground">
-            De las <span className="tabular-nums font-semibold">{fmtInt(brecha)} pz</span> que
-            faltaron,{' '}
-            <span className="tabular-nums font-semibold text-red-700 dark:text-red-400">
-              {fmtInt(perdidas)}
-            </span>{' '}
-            son <b>{fmtDurMin(tb.recoverableMin)} de paradas evitables</b> y{' '}
-            <span className="tabular-nums font-semibold">{fmtInt(porRitmo)}</span>, ritmo por debajo
-            del necesario.
-          </p>
-          <div className="mt-2 flex h-5 overflow-hidden rounded-lg text-[10px] font-semibold text-white">
-            <span className="flex items-center justify-center bg-red-600 dark:bg-red-500"
-              style={{ width: `${pctParadas}%` }}>
-              {pctParadas > 22 && `${Math.round(pctParadas)}% paradas`}
+          {/*
+           * La barra madre: su largo total ES la meta, todo en piezas. Lo hecho
+           * en neutro apagado (no es la noticia bajo este título), la pérdida
+           * en color, y en vivo lo que la cuota aún no pide va HUECO — el borde
+           * entre lo pintado y el hueco es la cuota de esta hora. Los valores
+           * SIEMPRE afuera: el ancho de un segmento no decide su legibilidad.
+           */}
+          <div
+            className="flex h-6 gap-[2px]"
+            role="img"
+            aria-label={`De la meta de ${fmtInt(metaOk)} piezas: ${fmtInt(hechas)} hechas, ${fmtInt(perdidas)} perdidas en paradas, ${fmtInt(porRitmo)} por ritmo${porJugar > 0 ? `, ${fmtInt(porJugar)} aún por jugar` : ''}`}
+          >
+            <i className="rounded-[4px] bg-muted-foreground/[0.35]" style={{ flex: '1 1 0%' }} />
+            {perdidas > 0 && (
+              <i className="rounded-[4px] bg-red-600 dark:bg-red-500"
+                style={{ width: `${(perdidas / metaOk) * 100}%`, minWidth: 3 }} />
+            )}
+            {porRitmo > 0 && (
+              <i className="rounded-[4px] bg-amber-600 dark:bg-amber-500"
+                style={{ width: `${(porRitmo / metaOk) * 100}%`, minWidth: 3 }} />
+            )}
+            {porJugar > 0 && (
+              <i className="rounded-[4px] border border-dashed border-muted-foreground/[0.4]"
+                style={{ width: `${(porJugar / metaOk) * 100}%`, minWidth: 3 }} />
+            )}
+          </div>
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <i className="h-2.5 w-2.5 rounded-[4px] bg-muted-foreground/[0.35]" />
+              Hechas <span className="tabular-nums font-semibold text-foreground/80">{fmtInt(hechas)}</span>
             </span>
-            <span className="flex items-center justify-center bg-slate-500"
-              style={{ width: `${100 - pctParadas}%` }}>
-              {100 - pctParadas > 22 && `${Math.round(100 - pctParadas)}% ritmo`}
+            <span className="flex items-center gap-1.5">
+              <i className="h-2.5 w-2.5 rounded-[4px] bg-red-600 dark:bg-red-500" />
+              Paradas <span className="tabular-nums font-semibold text-foreground/80">{fmtInt(perdidas)}</span>
+            </span>
+            <span className="flex items-center gap-1.5">
+              <i className="h-2.5 w-2.5 rounded-[4px] bg-amber-600 dark:bg-amber-500" />
+              Ritmo <span className="tabular-nums font-semibold text-foreground/80">{fmtInt(porRitmo)}</span>
+            </span>
+            {porJugar > 0 && (
+              <span className="flex items-center gap-1.5">
+                <i className="h-2.5 w-2.5 rounded-[4px] border border-dashed border-muted-foreground/[0.4]" />
+                Por jugar <span className="tabular-nums text-foreground/80">{fmtInt(porJugar)}</span>
+              </span>
+            )}
+            <span className="text-muted-foreground/70">
+              meta <span className="tabular-nums">{fmtInt(metaOk)}</span>
             </span>
           </div>
-          {/* Sin "habría cerrado 700 pz más arriba": era el MISMO 700 de la
-              frase de arriba, reescrito. Queda solo el supuesto del cálculo. */}
-          {/* ⚠ El supuesto va escrito: es la parte discutible del número, y
-              quien lo discuta va a preguntar exactamente esto. */}
-          <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground/80">
-            {costo
-              ? (
-                <>
-                  Cada parada valorizada al ritmo que la línea traía justo antes
-                  {rango && (
-                    <>
-                      {' '}(<span className="tabular-nums">{fmtDec(rango.min)}</span> a{' '}
-                      <span className="tabular-nums">{fmtDec(rango.max)} pz/min</span>)
-                    </>
-                  )}
-                  , no al promedio del turno (<span className="tabular-nums">{fmtDec(cpm)}</span>).
-                </>
-              )
-              : (
-                <>
-                  Estimado al ritmo que la línea traía:{' '}
-                  <span className="tabular-nums">{fmtDec(cpm)} pz/min</span> andando.
-                </>
-              )}
-          </p>
+          {cerrado
+            ? (
+              <p className="mt-2 text-[13.5px] leading-snug text-foreground">
+                De las <span className="tabular-nums font-semibold">{fmtInt(brecha!)} pz</span> que
+                faltaron,{' '}
+                <span className="tabular-nums font-semibold text-red-700 dark:text-red-400">
+                  {fmtInt(perdidas)}
+                </span>{' '}
+                son <b>{fmtDurMin(tb.recoverableMin)} de paradas evitables</b> y{' '}
+                <span className="tabular-nums font-semibold">{fmtInt(porRitmo)}</span>, ritmo por
+                debajo del necesario.
+              </p>
+            )
+            : (
+              <p className="mt-2 text-[13.5px] leading-snug text-foreground">
+                Van <span className="tabular-nums font-semibold">{fmtInt(hechas)}</span> de las{' '}
+                <span className="tabular-nums font-semibold">{fmtInt(cuotaOk ?? 0)}</span> que
+                tocaban {horaAhora ? <>a las <span className="tabular-nums">{horaAhora}</span></> : 'a esta altura'}.
+                Las paradas evitables llevan <b>{fmtDurMin(tb.recoverableMin)}</b>.
+              </p>
+            )}
         </div>
+      )}
+      {/* Sin ritmo de referencia la resta no se puede repartir — pero decirlo
+          es mejor que desaparecer mudo, que es lo que hacía antes. */}
+      {hayBrecha && perdidas == null && (
+        <p className="mt-2 text-[12px] leading-snug text-muted-foreground">
+          {cerrado
+            ? 'Sin un ritmo de referencia no se puede repartir la brecha entre paradas y ritmo.'
+            : 'La línea todavía no produce: sin un ritmo de referencia no se puede repartir lo que falta entre paradas y ritmo.'}
+        </p>
       )}
 
       {/* ── 2 · Qué pasó, agrupado por de quién es ─────────────────────── */}
       {/* Aire en vez de línea (§38): el espacio separa igual y con menos tinta. */}
       <div className={hayBrecha ? 'mt-4' : 'mt-2'}>
-        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
           Qué pasó en el turno
           {/* Los minutos solo si la resta de arriba no los dijo ya. */}
           {!hayBrecha && (
@@ -337,7 +401,7 @@ export function TiempoDelTurno({
                 después del convenio queda a tres dedos de distancia de los
                 minutos que explica y se lee como un pie de página. */}
             {sinFallaDeMaquina && g.dueno === ultimoImputable && (
-              <p className="mt-2 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
+              <p className="mt-2 text-[11px] font-semibold text-ink-ok">
                 ✓ Ninguna parada por falla de máquina en este turno.
               </p>
             )}
@@ -348,7 +412,7 @@ export function TiempoDelTurno({
             YA haya habido una: el 14-08 los primeros 7 min planificados eran
             reunión de inicio y ejercicio, con la colación todavía por delante. */}
         {proximaParada && tb.plannedMin === 0 && (
-          <p className="mt-1.5 text-[10.5px] text-muted-foreground/70">
+          <p className="mt-1.5 text-[11px] text-muted-foreground/70">
             Todavía sin paradas de convenio: {nombreDeConvenio(proximaParada.reason)} entra a las{' '}
             {/* ~ porque es la mediana de los turnos anteriores, no un pacto. */}
             <span className="tabular-nums">~{proximaParada.hora}</span>.
@@ -357,19 +421,19 @@ export function TiempoDelTurno({
 
         {notasTurno && notasTurno.length > 0 && (
           <div className="mt-4">
-            <p className="text-[10px] uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+            <p className="text-[11px] uppercase tracking-wide text-ink-ok">
               Anotado para todo el turno
             </p>
-            <ul className="mt-1 space-y-0.5 border-l-2 border-emerald-600 pl-2">
+            <ul className="mt-1 space-y-0.5 border-l-2 border-ink-ok pl-2">
               {notasTurno.map((t) => (
-                <li key={t} className="text-[10.5px] leading-snug text-muted-foreground">{t}</li>
+                <li key={t} className="text-[11px] leading-snug text-muted-foreground">{t}</li>
               ))}
             </ul>
           </div>
         )}
 
         {onCausa && gruposVisibles.length > 0 && (
-          <p className="mt-1.5 text-[10.5px] text-muted-foreground/70">
+          <p className="mt-1.5 text-[11px] text-muted-foreground/70">
             Tocá una causa para ver sus paradas una por una.
           </p>
         )}
@@ -379,15 +443,44 @@ export function TiempoDelTurno({
       <button
         type="button"
         onClick={() => setAbierto((v) => !v)}
-        className="mt-2 text-[11px] text-sky-700 underline underline-offset-2 dark:text-sky-300"
+        className="mt-2 text-[11px] text-brand-ink underline underline-offset-2"
         aria-expanded={abierto}
       >
-        {abierto ? 'ocultar el reparto del tiempo' : 'ver el reparto del tiempo'}
+        {abierto
+          ? 'ocultar el detalle'
+          : hayBrecha && perdidas != null
+            ? 'cómo se calculó y el reparto del tiempo'
+            : 'ver el reparto del tiempo'}
       </button>
 
       {abierto && (
         <div className="mt-2">
-          <div className="flex h-6 overflow-hidden rounded-lg text-[10px] font-semibold text-white">
+          {/* ⚠ El supuesto va escrito: es la parte discutible del número, y
+              quien lo discuta va a preguntar exactamente esto. */}
+          {hayBrecha && perdidas != null && cpm != null && (
+            <p className="mb-2 text-[11px] leading-snug text-muted-foreground/80">
+              {costo
+                ? (
+                  <>
+                    Cada parada valorizada al ritmo que la línea traía justo antes
+                    {rango && (
+                      <>
+                        {' '}(<span className="tabular-nums">{fmtDec(rango.min)}</span> a{' '}
+                        <span className="tabular-nums">{fmtDec(rango.max)} pz/min</span>)
+                      </>
+                    )}
+                    , no al promedio del turno (<span className="tabular-nums">{fmtDec(cpm)}</span>).
+                  </>
+                )
+                : (
+                  <>
+                    Estimado al ritmo que la línea traía:{' '}
+                    <span className="tabular-nums">{fmtDec(cpm)} pz/min</span> andando.
+                  </>
+                )}
+            </p>
+          )}
+          <div className="flex h-6 overflow-hidden rounded-lg text-[11px] font-semibold text-white">
             <span
               className="flex items-center justify-center bg-emerald-600 dark:bg-emerald-500"
               style={{ width: `${pct(tb.producingMin)}%` }}
@@ -429,12 +522,12 @@ export function TiempoDelTurno({
               </span>
             )}
             <span className="flex items-center gap-1.5">
-              <i className="h-2.5 w-2.5 rounded-sm bg-red-600 dark:bg-red-500" />
+              <i className="h-2.5 w-2.5 rounded-[4px] bg-red-600 dark:bg-red-500" />
               Recuperable <span className="tabular-nums text-foreground/80">{tb.recoverableMin} min</span>
             </span>
           </div>
 
-          <p className="mt-2 text-[10px] leading-snug text-muted-foreground/70">
+          <p className="mt-2 text-[11px] leading-snug text-muted-foreground/70">
             Los minutos son los que la causa estuvo activa en alguna máquina; la barra mide la
             LÍNEA, que solo se detiene cuando paran todas.
           </p>
@@ -470,10 +563,10 @@ function GrupoDeEventos({ g, sel, onCausa, notas, proximaParada, plannedMin }: {
   return (
     <div className="mt-2">
       <div className="flex items-baseline justify-between gap-2">
-        <span className={`text-[10.5px] font-bold uppercase tracking-wide ${color}`}>
+        <span className={`text-[11px] font-bold uppercase tracking-wide ${color}`}>
           {meta.label} <span className="font-normal normal-case tracking-normal opacity-70">· {meta.detalle}</span>
         </span>
-        <span className="shrink-0 text-[10.5px] tabular-nums text-muted-foreground">
+        <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
           {fmtDurMin(g.min)}
           {g.piezas != null && (
             <>
@@ -491,7 +584,7 @@ function GrupoDeEventos({ g, sel, onCausa, notas, proximaParada, plannedMin }: {
       {/* ⚠ El aviso NO se apaga con la primera parada planificada: 7 min de
           reunión de inicio lo mataban con la colación todavía por delante. */}
       {proximaParada && plannedMin > 0 && (
-        <p className="mt-1 pl-2 text-[10.5px] text-muted-foreground/70">
+        <p className="mt-1 pl-2 text-[11px] text-muted-foreground/70">
           {/* Con NOMBRE y en mayúscula inicial: la pregunta real es «¿cuándo es
               la colación?» y la respuesta tiene que decir colación. */}
           {nombreDeConvenio(proximaParada.reason)} entra a las{' '}
@@ -593,26 +686,26 @@ function FilaEvento({ c, sel, onCausa, notas }: {
       {abierta && c.paradas.length > 0 && (
         <div className="my-1 ml-2 border-l border-border pl-2">
           {muchas && (
-            <p className="text-[10px] italic text-muted-foreground/70">
+            <p className="text-[11px] italic text-muted-foreground/70">
               {cuantas} paradas de {Math.round(prom)} s en promedio.
             </p>
           )}
           <ul className="space-y-px">
             {visibles.map((p, i) => (
-              <li key={`${p.hora}-${i}`} className="flex gap-3 text-[10.5px] tabular-nums text-muted-foreground">
+              <li key={`${p.hora}-${i}`} className="flex gap-3 text-[11px] tabular-nums text-muted-foreground">
                 <span className="text-muted-foreground/70">{p.hora}</span>
                 <span>{fmtDec(p.min)} min</span>
               </li>
             ))}
           </ul>
-          {muchas && <p className="text-[10px] italic text-muted-foreground/70">las 3 más largas</p>}
+          {muchas && <p className="text-[11px] italic text-muted-foreground/70">las 3 más largas</p>}
           <button
             type="button"
             onClick={() => {
               onCausa?.(c.reason)
               document.getElementById('grafico-turno')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
             }}
-            className="mt-0.5 text-[10px] text-sky-700 underline underline-offset-2 dark:text-sky-300"
+            className="mt-0.5 text-[11px] text-brand-ink underline underline-offset-2"
           >
             ver en el gráfico
           </button>
@@ -622,7 +715,7 @@ function FilaEvento({ c, sel, onCausa, notas }: {
       {(notas ?? []).length > 0 && (
         <ul className="mt-0.5 space-y-0.5 border-l-2 border-sky-600 pl-2">
           {notas!.map((n, i) => (
-            <li key={`${n.desde}-${i}`} className="text-[10.5px] leading-snug text-muted-foreground">
+            <li key={`${n.desde}-${i}`} className="text-[11px] leading-snug text-muted-foreground">
               <span className="tabular-nums">{n.desde}</span> · «{n.texto}»
             </li>
           ))}
@@ -688,7 +781,7 @@ export function ComparadorDias({ cmp, live, cone, ventana, onVentana, refSel, on
           ? (
             <span className={`tabular-nums font-semibold ${
               resumen.cuota.dif >= 0
-                ? 'text-emerald-700 dark:text-emerald-400'
+                ? 'text-ink-ok'
                 : 'text-red-700 dark:text-red-400'
             }`}>
               {resumen.cuota.dif >= 0 ? '+' : '−'}{fmtInt(Math.abs(resumen.cuota.dif))} vs cuota
@@ -743,7 +836,7 @@ function Veredicto({ cmp, cerrado }: {
   if (r.actual == null) return null
 
   const tono = (n: number) =>
-    n >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'
+    n >= 0 ? 'text-ink-ok' : 'text-red-700 dark:text-red-400'
 
   return (
     <div className="mt-2">
@@ -916,7 +1009,7 @@ export function PronosticoCierre({ f, meta, horizonte }: {
 
       {/* La banda, dibujada: dónde terminó cada turno anterior proyectado desde
           esta altura. Se angosta sola a medida que avanza el turno. */}
-      <div className="mt-2 flex items-center gap-2 text-[10px] tabular-nums text-muted-foreground">
+      <div className="mt-2 flex items-center gap-2 text-[11px] tabular-nums text-muted-foreground">
         <span>{fmtInt(f.low)}</span>
         <span className="relative h-1.5 flex-1 rounded-full bg-muted">
           <span

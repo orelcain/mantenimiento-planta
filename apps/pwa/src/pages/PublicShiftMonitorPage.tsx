@@ -2830,11 +2830,15 @@ export function PublicShiftMonitorPage() {
               onCausa={setCausaSel}
               proximaParada={proximaParada}
               notas={notasDeOperador}
-              /* La resta: minutos parados -> piezas, al ritmo del turno. */
-              brecha={(() => {
-                const meta = data.targetPieces ?? live.quotaPieces ?? live.expectedPieces ?? null
-                return meta != null ? Math.max(0, meta - live.totalPieces) : null
-              })()}
+              /* La resta: minutos parados -> piezas, al ritmo del turno.
+                 En vivo la vara es la cuota a ESTA altura (la curva del
+                 comparador, aplanada en colacion) - contra la meta completa,
+                 el "ritmo" absorberia lo que aun no se juega. */
+              cerrado={live.shiftClosed}
+              meta={data.targetPieces ?? live.quotaPieces ?? live.expectedPieces ?? null}
+              hechas={live.totalPieces}
+              cuotaAhora={comparacion.optimalAtCurrentMinute}
+              horaAhora={`${String(new Date(now).getHours()).padStart(2, '0')}:${String(new Date(now).getMinutes()).padStart(2, '0')}`}
               cpmAndando={
                 live.timeBreakdown && live.timeBreakdown.producingMin > 0
                   ? live.totalPieces / live.timeBreakdown.producingMin
@@ -2975,11 +2979,15 @@ export function PublicShiftMonitorPage() {
               onCausa={setCausaSel}
               proximaParada={proximaParada}
               notas={notasDeOperador}
-              /* La resta: minutos parados -> piezas, al ritmo del turno. */
-              brecha={(() => {
-                const meta = data.targetPieces ?? live.quotaPieces ?? live.expectedPieces ?? null
-                return meta != null ? Math.max(0, meta - live.totalPieces) : null
-              })()}
+              /* La resta: minutos parados -> piezas, al ritmo del turno.
+                 En vivo la vara es la cuota a ESTA altura (la curva del
+                 comparador, aplanada en colacion) - contra la meta completa,
+                 el "ritmo" absorberia lo que aun no se juega. */
+              cerrado={live.shiftClosed}
+              meta={data.targetPieces ?? live.quotaPieces ?? live.expectedPieces ?? null}
+              hechas={live.totalPieces}
+              cuotaAhora={comparacion.optimalAtCurrentMinute}
+              horaAhora={`${String(new Date(now).getHours()).padStart(2, '0')}:${String(new Date(now).getMinutes()).padStart(2, '0')}`}
               cpmAndando={
                 live.timeBreakdown && live.timeBreakdown.producingMin > 0
                   ? live.totalPieces / live.timeBreakdown.producingMin

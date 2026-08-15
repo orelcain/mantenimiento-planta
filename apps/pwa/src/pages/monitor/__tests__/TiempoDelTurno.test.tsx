@@ -13,7 +13,7 @@
  * Sin `jest-dom` en este repo: se asierta sobre el texto renderizado.
  */
 import { describe, it, expect, afterEach } from 'vitest'
-import { render, cleanup } from '@testing-library/react'
+import { render, cleanup, fireEvent } from '@testing-library/react'
 import { TiempoDelTurno } from '../MonitorShiftParts'
 import { agruparEventos } from '@/services/shoplogix/monitorEventos'
 import type { PublicMonitorLive } from '@/services/shoplogix/publicShiftMonitor.service'
@@ -42,16 +42,41 @@ const texto = (
   notasTurno?: string[],
 ) =>
   render(
+    // El caso histórico de estos tests es la AUTOPSIA: turno cerrado, la vara
+    // es la meta completa. `brecha` se traduce a meta/hechas para conservar
+    // los números que los tests ya verifican.
     <TiempoDelTurno
       tb={tb}
       proximaParada={proximaParada}
-      brecha={brecha}
+      cerrado
+      meta={brecha != null ? 3919 + brecha : null}
+      hechas={3919}
       cpmAndando={cpmAndando}
       costo={costo}
       // Los grupos se arman con el mismo servicio que en producción: así el
       // test cubre el camino real y no una versión de laboratorio.
       grupos={agruparEventos({ tb, costo, cpmGlobal: cpmAndando })}
       notasTurno={notasTurno}
+    />,
+  ).container.textContent ?? ''
+
+/** El mismo render pero EN VIVO: la vara es la cuota a esta altura. */
+const textoVivo = (args: {
+  meta: number
+  hechas: number
+  cuotaAhora: number | null
+  cpmAndando?: number | null
+}) =>
+  render(
+    <TiempoDelTurno
+      tb={ANTES_DE_LA_COLACION}
+      cerrado={false}
+      meta={args.meta}
+      hechas={args.hechas}
+      cuotaAhora={args.cuotaAhora}
+      horaAhora="11:00"
+      cpmAndando={args.cpmAndando}
+      grupos={agruparEventos({ tb: ANTES_DE_LA_COLACION, cpmGlobal: args.cpmAndando })}
     />,
   ).container.textContent ?? ''
 
@@ -126,7 +151,20 @@ describe('TiempoDelTurno · aviso de la próxima parada de convenio', () => {
       ],
       totalPiezas: 264, totalMin: 27, sinLocal: 0, eventos: 6,
     }
-    const t = texto(ANTES_DE_LA_COLACION, null, 1081, 13.5, costo)
+    // El supuesto vive en el detalle plegado (mockup A v2): hay que abrirlo.
+    const r = render(
+      <TiempoDelTurno
+        tb={ANTES_DE_LA_COLACION}
+        cerrado
+        meta={5000}
+        hechas={3919}
+        cpmAndando={13.5}
+        costo={costo}
+        grupos={agruparEventos({ tb: ANTES_DE_LA_COLACION, costo, cpmGlobal: 13.5 })}
+      />,
+    )
+    fireEvent.click(r.getByText(/cómo se calculó/i))
+    const t = r.container.textContent ?? ''
     expect(t).toMatch(/ritmo que la línea traía justo antes/i)
     expect(t).toMatch(/9,0 a 12,0 pz\/min/)      // el rango realmente usado
     expect(t).toMatch(/no al promedio del turno/i)
@@ -160,5 +198,41 @@ describe('TiempoDelTurno · aviso de la próxima parada de convenio', () => {
     const t = texto(ANTES_DE_LA_COLACION, null, 0, 13.5)
     expect(t).toMatch(/A dónde se va el tiempo/i)
     expect(t).not.toMatch(/Por qué no llegamos/i)
+  })
+})
+
+describe('TiempoDelTurno · en vivo la vara es la cuota de la hora, no la meta', () => {
+  /*
+   * ⚠⚠ El bug que esta semántica corrige: a las 11:00 con 2.230 pz hechas y
+   * meta 5.000, la resta contra la meta completa daba brecha 2.770 y casi todo
+   * caía en «ritmo por debajo del necesario» — piezas que simplemente aún no
+   * se jugaban. Contra la cuota de la hora (2.600) la brecha real es 370.
+   */
+  it('no pinta como ritmo perdido lo que aún no se juega', () => {
+    const t = textoVivo({ meta: 5000, hechas: 2230, cuotaAhora: 2600, cpmAndando: 10 })
+    expect(t).toMatch(/Por qué vamos atrás/i)
+    expect(t).toMatch(/370/)                    // la brecha contra la cuota de ahora
+    expect(t).toMatch(/a esta hora/i)
+    expect(t).toMatch(/Por jugar\s*2\.400/)     // meta − cuota: hueco, no pérdida
+    expect(t).not.toMatch(/2\.770/)             // la brecha mentirosa contra la meta
+    expect(t).toMatch(/tocaban a las 11:00/)
+  })
+
+  it('al día con la cuota, no fabrica un «vamos atrás»', () => {
+    const t = textoVivo({ meta: 5000, hechas: 2650, cuotaAhora: 2600, cpmAndando: 10 })
+    expect(t).toMatch(/A dónde se va el tiempo/i)
+    expect(t).not.toMatch(/vamos atrás/i)
+  })
+
+  it('en vivo SIN curva de cuota no hay resta honesta que hacer', () => {
+    const t = textoVivo({ meta: 5000, hechas: 2230, cuotaAhora: null, cpmAndando: 10 })
+    expect(t).toMatch(/A dónde se va el tiempo/i)
+    expect(t).not.toMatch(/vamos atrás/i)
+  })
+
+  it('sin ritmo de referencia lo dice, en vez de desaparecer mudo', () => {
+    const t = textoVivo({ meta: 5000, hechas: 2230, cuotaAhora: 2600, cpmAndando: null })
+    expect(t).toMatch(/vamos atrás/i)
+    expect(t).toMatch(/no se puede repartir/i)
   })
 })
