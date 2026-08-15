@@ -11,6 +11,7 @@ import { ChevronDown } from 'lucide-react'
 import type { PublicMonitorLive } from '@/services/shoplogix/publicShiftMonitor.service'
 import type { CostoDeParadas } from '@/services/shoplogix/monitorPerdidas'
 import { DUENO_META, type CausaDelTurno, type GrupoDelTurno } from '@/services/shoplogix/monitorEventos'
+import { DUENO_UI } from './duenoUi'
 import { resumenComparacion, type CompareResult } from '@/services/shoplogix/monitorCompare'
 import { MAX_MAPE_PCT, type ConePoint, type ForecastResult } from '@/services/shoplogix/monitorForecast'
 import { MonitorCompareChart } from './MonitorCompareChart'
@@ -57,7 +58,7 @@ export function Bloque({ id, titulo, extra, defaultAbierto = true, children }: {
   }
 
   return (
-    <section className="rounded-2xl border border-border bg-card px-4 py-3">
+    <section className="rounded-2xl border border-border bg-card p-4">
       <button
         type="button"
         onClick={toggle}
@@ -305,7 +306,8 @@ export function TiempoDelTurno({
       )}
 
       {/* ── 2 · Qué pasó, agrupado por de quién es ─────────────────────── */}
-      <div className={hayBrecha ? 'mt-3 border-t border-border pt-2.5' : 'mt-2'}>
+      {/* Aire en vez de línea (§38): el espacio separa igual y con menos tinta. */}
+      <div className={hayBrecha ? 'mt-4' : 'mt-2'}>
         <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
           Qué pasó en el turno
           {/* Los minutos solo si la resta de arriba no los dijo ya. */}
@@ -354,7 +356,7 @@ export function TiempoDelTurno({
         )}
 
         {notasTurno && notasTurno.length > 0 && (
-          <div className="mt-2 border-t border-border pt-2">
+          <div className="mt-4">
             <p className="text-[10px] uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
               Anotado para todo el turno
             </p>
@@ -460,11 +462,9 @@ function GrupoDeEventos({ g, sel, onCausa, notas, proximaParada, plannedMin }: {
   proximaParada?: { hora: string; reason: string } | null
   plannedMin: number
 }) {
-  const color =
-    g.dueno === 'mantencion' ? 'text-amber-700 dark:text-amber-400'
-      : g.dueno === 'externo' ? 'text-sky-700 dark:text-sky-300'
-        : g.dueno === 'sin-imputar' ? 'text-muted-foreground'
-          : 'text-slate-600 dark:text-slate-300'
+  // La paleta del dueño vive en UN lugar (duenoUi): este bloque y el Pareto
+  // hablan el mismo color o el lenguaje se rompe.
+  const color = DUENO_UI[g.dueno].clase
   const meta = DUENO_META[g.dueno]
 
   return (
