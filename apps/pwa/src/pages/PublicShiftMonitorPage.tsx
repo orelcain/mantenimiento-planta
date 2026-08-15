@@ -305,7 +305,7 @@ function EditorSetPoint({ actual, onGuardar }: {
  */
 function Sparkbars({
   series, stopReasons, stopEvents, comments, causaSel, onCausa, breaks,
-  recentPerMinute, requiredPerMinute, medianCpm, setCpm, fuenteSetPoint, onGuardarSetPoint, ventana, onVentana,
+  recentPerMinute, requiredPerMinute, medianCpm, setCpm, fuenteSetPoint, onGuardarSetPoint, cerrado, ventana, onVentana,
 }: {
   /** Ventana visible compartida con el comparador (minutos de turno). */
   ventana?: Ventana | null
@@ -327,6 +327,8 @@ function Sparkbars({
   fuenteSetPoint?: string | null
   /** Presente solo para supervisores logueados: habilita el editor inline. */
   onGuardarSetPoint?: (cpm: number, metodo: string) => Promise<void>
+  /** Turno cerrado: el chip del último tramo dice "al cierre", no "ahora". */
+  cerrado?: boolean
   series: PublicMonitorLive['series']
   stopReasons?: string[]
   stopEvents?: PublicMonitorLive['stopEvents']
@@ -612,7 +614,8 @@ function Sparkbars({
         {!causaSel && recentPerMinute != null && recentPerMinute > 0 && (
           <span className="normal-case tracking-normal">
             <b className="tabular-nums text-sky-700 dark:text-sky-300">{fmtDec(recentPerMinute)} pz/min</b>
-            <span className="ml-1 text-muted-foreground/70">ahora</span>
+            {/* En un turno cerrado, "ahora" hablaba en presente de ayer. */}
+            <span className="ml-1 text-muted-foreground/70">{cerrado ? 'al cierre' : 'ahora'}</span>
           </span>
         )}
         {causaSel && (
@@ -2206,6 +2209,18 @@ export function PublicShiftMonitorPage() {
    * Filete). El ritmo va ANDANDO: sobre el reloj se mezclarían las paradas con
    * el llenado, que es justo la confusión que este bloque viene a deshacer.
    */
+  /*
+   * El ritmo "de reloj" HONESTO: piezas ÷ lapso real de punta a punta
+   * (tb.windowMin, la vara del fix #562). `live.piecesPerMinute` divide por los
+   * minutos de OPERACIÓN (huecos >30 min descontados) — decirle "con paradas y
+   * colación" a ese número era falso justo en la colación larga, y además el
+   * ritmo requerido del pace ya usa la base de lapso real: eran dos "reloj"
+   * distintos en la misma pantalla.
+   */
+  const relojCpm = live?.timeBreakdown && live.timeBreakdown.windowMin > 0
+    ? live.totalPieces / live.timeBreakdown.windowMin
+    : live?.piecesPerMinute ?? null
+
   /** El set point que manda: el editado por un supervisor, si existe. */
   const setCpmVigente = live?.setPoint?.cpm ?? specDeMaquina(live?.machines?.[0]?.model)?.setCpm ?? null
 
@@ -2572,7 +2587,18 @@ export function PublicShiftMonitorPage() {
               <span className="tabular-nums text-foreground/80">{fmtWallTime(live.effectiveEnd)}</span>
             </span>
             <span className="text-muted-foreground/50">·</span>
-            <span className="tabular-nums">{fmtDec(live.windowHours)} h de operación</span>
+            {/* PRODUCIENDO, el mismo número de la tarjeta del %: acá vivía una
+                tercera medida de tiempo ("6,8 h de operación", huecos >30 min
+                descontados) entre el lapso del turno y el produciendo — tres
+                números parecidos con dos etiquetas parecidas es la receta del
+                "esto no suma" que ya nos mordió una vez. */}
+            {live.timeBreakdown && live.timeBreakdown.producingMin > 0 ? (
+              <span className="tabular-nums">
+                {fmtDurationSec(live.timeBreakdown.producingMin * 60)} produciendo
+              </span>
+            ) : (
+              <span className="tabular-nums">{fmtDec(live.windowHours)} h de operación</span>
+            )}
           </div>
         </section>
 
@@ -2614,19 +2640,21 @@ export function PublicShiftMonitorPage() {
                 lectura={lectura}
                 // "9,7 de reloj" sin unidad no se leía como un ritmo: Orel
                 // preguntó si íbamos a "poner también" el que ya estaba acá.
-                sub={andando != null
-                  ? `Con paradas y colación: ${fmtDec(live.piecesPerMinute)} pz/min de reloj`
+                sub={andando != null && relojCpm != null
+                  ? `Con paradas y colación: ${fmtDec(relojCpm)} pz/min de reloj`
                   : undefined}
                 tone="accent"
               />
             )
           })()}
+          {/* La MISMA vara que el reloj de al lado (lapso real): con la vieja,
+              581 pz/h convivía con 8,6 pz/min de reloj y no multiplicaban. */}
           <Kpi
             label="Piezas / hora"
-            value={fmtInt(live.piecesPerHour)}
+            value={fmtInt(relojCpm != null ? relojCpm * 60 : live.piecesPerHour)}
             unit="pz/h"
             icon={<Timer className="h-3 w-3" />}
-            hint="ciclos por hora"
+            hint="ciclos por hora, de reloj"
             tone="accent"
           />
           {/* La tarjeta más mirada en vivo era la única sin referencia. El
@@ -2638,11 +2666,14 @@ export function PublicShiftMonitorPage() {
               ? live.totalPieces / live.timeBreakdown.producingMin
               : null
             const reciente = live.recentPiecesPerMinute
+            // En cerrado la tarjeta describe el TRAMO FINAL, no una alerta viva:
+            // el ▼ de la cola de un turno terminado no le pide nada a nadie.
+            const tramo = live.shiftClosed ? 'el tramo final quedó' : ''
             const lectura = andando != null && andando > 0 && reciente != null && (live.recentMinutes || 0) >= 15
               ? reciente >= andando * 1.1
-                ? { texto: `▲ por encima del ritmo del turno (${fmtDec(andando)})`, tono: 'bien' as const }
+                ? { texto: `▲ ${tramo || ''} por encima del ritmo del turno (${fmtDec(andando)})`.replace('  ', ' '), tono: 'bien' as const }
                 : reciente <= andando * 0.75
-                  ? { texto: `▼ por debajo del ritmo del turno (${fmtDec(andando)})`, tono: 'mal' as const }
+                  ? { texto: `▼ ${tramo || ''} por debajo del ritmo del turno (${fmtDec(andando)})`.replace('  ', ' '), tono: live.shiftClosed ? 'normal' as const : 'mal' as const }
                   : { texto: `al ritmo del turno (${fmtDec(andando)})`, tono: 'normal' as const }
               : null
             return (
@@ -2761,6 +2792,7 @@ export function PublicShiftMonitorPage() {
               (live.setPoint.metodo ? ` (${live.setPoint.metodo})` : '') +
               ' — no es dato del PLC.'
             : null}
+          cerrado={live.shiftClosed}
           onGuardarSetPoint={esAdminMonitor && esActual && data.plantSlug
             ? async (cpm, metodo) => {
               await setMonitorSetPoint({
