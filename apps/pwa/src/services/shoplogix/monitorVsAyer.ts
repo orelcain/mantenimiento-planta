@@ -198,8 +198,9 @@ export interface BandaNormal {
   ritmo: { min: number; max: number }
   /** Rango normal de piezas al cierre. */
   cierres: { min: number; max: number }
-  /** Los ritmos en orden cronológico, para el sparkline. */
-  serieRitmos: number[]
+  /** Los turnos en orden cronológico, con su día: cada punto del sparkline
+      tiene identidad («x13 · 12,5»), no es solo forma. */
+  turnos: Array<{ dateKey: string; ritmo: number }>
   muestras: number
 }
 
@@ -223,7 +224,36 @@ export function bandaNormal(hoy: TurnoResumen, previos: TurnoResumen[]): BandaNo
   return {
     ritmo: { min: Math.min(...ritmos), max: Math.max(...ritmos) },
     cierres: { min: Math.min(...cierres), max: Math.max(...cierres) },
-    serieRitmos: ritmos,
+    turnos: base.map((t) => ({ dateKey: t.dateKey, ritmo: t.total / t.producingMin })),
     muestras: base.length,
   }
+}
+
+/**
+ * La racha con que llega el turno de hoy: pasos consecutivos en la MISMA
+ * dirección contando hacia atrás desde hoy. «Viene subiendo 3 turnos» es la
+ * historia que el sparkline dibuja pero nadie lee sola.
+ *
+ * ⚠ Sale del dato, no se adorna: pasos de menos de 0,15 pz/min no cortan ni
+ * suman racha (ruido de redondeo), y con menos de 2 pasos no hay racha que
+ * contar. La semana real de Filete (04→14 ago) NO fue una suba limpia — tuvo
+ * un bache el vie 8 — así que la frase honesta del 14 era «viene aflojando
+ * 2 turnos (13,2 → 11,6)», no «subió toda la semana».
+ */
+export function rachaDeRitmos(valores: number[]): { dir: 1 | -1; n: number; desde: number } | null {
+  const RUIDO = 0.15
+  if (valores.length < 3) return null
+  let dir: 1 | -1 | 0 = 0
+  let n = 0
+  for (let i = valores.length - 1; i > 0; i--) {
+    const paso = valores[i]! - valores[i - 1]!
+    if (Math.abs(paso) < RUIDO) break
+    const d: 1 | -1 = paso > 0 ? 1 : -1
+    if (dir === 0) dir = d
+    else if (d !== dir) break
+    n++
+    if (n >= valores.length - 1) break
+  }
+  if (dir === 0 || n < 2) return null
+  return { dir, n, desde: valores[valores.length - 1 - n]! }
 }
