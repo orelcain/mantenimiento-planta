@@ -192,3 +192,38 @@ export function nombreDeDia(dateKey: string): string {
   const dias = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb']
   return `${dias[d.getUTCDay()]} ${d.getUTCDate()}`
 }
+
+export interface BandaNormal {
+  /** Rango normal del ritmo andando (pz/min), de los turnos válidos anteriores. */
+  ritmo: { min: number; max: number }
+  /** Rango normal de piezas al cierre. */
+  cierres: { min: number; max: number }
+  /** Los ritmos en orden cronológico, para el sparkline. */
+  serieRitmos: number[]
+  muestras: number
+}
+
+/**
+ * El rango de variación normal de la línea, para leer el turno de hoy de un
+ * vistazo: dentro de la banda = martes cualquiera; fuera = noticia.
+ *
+ * ⚠ Se fija A PRIORI: solo turnos ANTERIORES válidos, nunca el de hoy — una
+ * banda que se recalcula con el dato del día siempre termina justificando el
+ * número que salió (guía numero-contexto). Y con menos de 5 turnos no hay
+ * banda: mejor una tarjeta sin contexto que un «rango normal» de 3 datos.
+ */
+export function bandaNormal(hoy: TurnoResumen, previos: TurnoResumen[]): BandaNormal | null {
+  const base = previos
+    .filter(valido)
+    .filter((p) => p.dateKey < hoy.dateKey)
+    .sort((a, b) => a.dateKey.localeCompare(b.dateKey))
+  if (base.length < 5) return null
+  const ritmos = base.map((t) => t.total / t.producingMin)
+  const cierres = base.map((t) => t.total)
+  return {
+    ritmo: { min: Math.min(...ritmos), max: Math.max(...ritmos) },
+    cierres: { min: Math.min(...cierres), max: Math.max(...cierres) },
+    serieRitmos: ritmos,
+    muestras: base.length,
+  }
+}

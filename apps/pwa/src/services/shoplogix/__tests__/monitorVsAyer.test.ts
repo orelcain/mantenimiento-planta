@@ -7,7 +7,7 @@
  * descomposición tiene que saber contar.
  */
 import { describe, it, expect } from 'vitest'
-import { vsAyer, recordsDeLinea, nombreDeDia, type TurnoResumen } from '../monitorVsAyer'
+import { vsAyer, recordsDeLinea, bandaNormal, nombreDeDia, type TurnoResumen } from '../monitorVsAyer'
 
 /** Filete, reales: 06→14 de agosto. */
 const T = {
@@ -99,5 +99,40 @@ describe('nombreDeDia', () => {
   it('cita el turno como se habla en planta', () => {
     expect(nombreDeDia('2026-08-13')).toBe('jue 13')
     expect(nombreDeDia('2026-08-14')).toBe('vie 14')
+  })
+})
+
+describe('bandaNormal', () => {
+  // Los 7 turnos válidos anteriores al 14-08 (reales, resumidos).
+  const previos: TurnoResumen[] = [
+    T.d06, T.d12, T.d13,
+    { dateKey: '2026-08-07', total: 4364, producingMin: 351, windowMin: 470, plannedMin: 57, recoverableMin: 53 },
+    { dateKey: '2026-08-08', total: 3454, producingMin: 297, windowMin: 410, plannedMin: 73, recoverableMin: 40 },
+    { dateKey: '2026-08-10', total: 4915, producingMin: 395, windowMin: 515, plannedMin: 57, recoverableMin: 55 },
+    { dateKey: '2026-08-11', total: 3618, producingMin: 282, windowMin: 425, plannedMin: 65, recoverableMin: 78 },
+  ]
+
+  it('la banda real de Filete: ritmo 11,3-13,2 y cierres 3.454-4.915', () => {
+    const b = bandaNormal(T.d14, previos)!
+    expect(b.ritmo.min).toBeCloseTo(11.3, 1)
+    expect(b.ritmo.max).toBeCloseTo(13.2, 1)
+    expect(b.cierres).toEqual({ min: 3454, max: 4915 })
+    expect(b.muestras).toBe(7)
+  })
+
+  it('⚠ el turno de HOY no entra en su propia banda: se fija a priori', () => {
+    // Si entrara, el récord de hoy (13,5) estiraría la banda hasta taparse solo.
+    const b = bandaNormal(T.d14, [...previos, T.d14])!
+    expect(b.ritmo.max).toBeCloseTo(13.2, 1)
+  })
+
+  it('la serie viene en orden cronológico, para el sparkline', () => {
+    const b = bandaNormal(T.d14, previos)!
+    expect(b.serieRitmos[0]).toBeCloseTo(3754 / 331, 1)   // el 06, primero
+    expect(b.serieRitmos[b.serieRitmos.length - 1]!).toBeCloseTo(12.5, 1) // el 13, último
+  })
+
+  it('⚠ con menos de 5 turnos válidos no hay banda: no se inventa un «normal»', () => {
+    expect(bandaNormal(T.d14, [T.d06, T.d12, T.d13])).toBeNull()
   })
 })
