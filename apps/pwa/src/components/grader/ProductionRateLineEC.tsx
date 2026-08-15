@@ -455,6 +455,16 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd, showGap
     return Math.ceil(Math.max(ceiling, 1))
   }, [series, expectedRate])
 
+  // Recortar sin decirlo es elegir la ventana sin explicitarla: contamos cuántos
+  // puntos quedan por encima del techo (percentil 95 × 1.25) para mostrarlo.
+  const clippedCount = useMemo(() => {
+    let count = 0
+    for (const s of series) {
+      for (const v of s.data) { if (v != null && v > maxRate) count++ }
+    }
+    return count
+  }, [series, maxRate])
+
   const option = useMemo(() => {
     // Ancho de barra en px: el tramo real (5 o 15 min) proyectado al eje, con un
     // mínimo de 2 px para que un tramo aislado siga siendo visible.
@@ -711,8 +721,21 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd, showGap
         ...gapSeries,
         ...(avgS ? [avgS] : []),
       ],
+      // Aviso del recorte: la escala NO cambia (decisión deliberada), pero si hay
+      // picos fuera del techo eso queda dicho, no oculto.
+      graphic: clippedCount > 0 ? [{
+        type: 'text' as const,
+        right: 4,
+        top: legendHeight + 2,
+        style: {
+          text: `${clippedCount} pico${clippedCount === 1 ? '' : 's'} por encima de la escala`,
+          fontSize: 10,
+          fill: ink.axis,
+        },
+        z: 10,
+      }] : undefined,
     }
-  }, [series, avgSeries, targetSeries, stoppedWithTarget, timeAxis, rangeStart, rangeEnd, maxRate, expectedRate, timelineSync, showAvg, highlightRanges, showGap, wrapWidth, legendLabelsForHeight, ink])
+  }, [series, avgSeries, targetSeries, stoppedWithTarget, timeAxis, rangeStart, rangeEnd, maxRate, clippedCount, expectedRate, timelineSync, showAvg, highlightRanges, showGap, wrapWidth, legendLabelsForHeight, ink])
 
   if (timeAxis.length < 2) return null
 

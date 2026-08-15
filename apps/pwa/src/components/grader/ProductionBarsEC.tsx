@@ -195,7 +195,13 @@ export function ProductionBarsEC({ intervals, threshold, windowStart, windowEnd 
       max: maxValue,
       axisLine: { show: false },
       axisTick: { show: false },
-      axisLabel: { show: false },
+      // Sin escala la altura de la barra no se traduce a ningún número salvo por tooltip.
+      axisLabel: {
+        show: true,
+        color: '#64748b',
+        fontSize: 9,
+        formatter: (value: number) => (value >= 1000 ? `${(value / 1000).toFixed(1)}k` : String(value)),
+      },
       splitLine: { show: false },
     },
     tooltip: {

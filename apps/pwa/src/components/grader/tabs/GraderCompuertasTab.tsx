@@ -138,11 +138,13 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                         label: 'Demanda (%)',
                         data: analytics.gateBalance.map((g) => g.demandPct),
                         backgroundColor: 'rgba(59,130,246,0.7)',
+                        yAxisID: 'y',
                       },
                       {
                         label: 'Gates Asignados',
                         data: analytics.gateBalance.map((g) => g.gatesAssigned),
                         backgroundColor: 'rgba(16,185,129,0.7)',
+                        yAxisID: 'y1',
                       },
                       {
                         label: 'Gates Ideal',
@@ -150,13 +152,30 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                         backgroundColor: 'rgba(168,85,247,0.4)',
                         borderColor: 'rgba(168,85,247,0.8)',
                         borderWidth: 1,
+                        yAxisID: 'y1',
                       },
                     ],
                   }}
                   options={{
                     responsive: true,
                     plugins: { legend: { position: 'bottom' } },
-                    scales: { y: { beginAtZero: true } },
+                    // Porcentajes y conteos en un mismo eje sin rotular era ilegible: separamos en dos ejes.
+                    scales: {
+                      y: {
+                        type: 'linear',
+                        position: 'left',
+                        beginAtZero: true,
+                        max: 100,
+                        title: { display: true, text: '%' },
+                      },
+                      y1: {
+                        type: 'linear',
+                        position: 'right',
+                        beginAtZero: true,
+                        title: { display: true, text: 'gates' },
+                        grid: { drawOnChartArea: false },
+                      },
+                    },
                   }}
                 />
               </div>
