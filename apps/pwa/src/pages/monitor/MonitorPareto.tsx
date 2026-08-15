@@ -62,7 +62,7 @@ export function ParetoDeParadas({ pareto }: { pareto: ParetoResult | null }) {
 
       {/* El corte, dicho en palabras: es la frase que alguien puede repetir en
           una reunión sin tener que leer el gráfico. */}
-      <p className="mt-3 rounded-lg bg-emerald-500/10 px-2.5 py-2 text-[12px] font-medium text-emerald-800 dark:text-emerald-300">
+      <p className="mt-3 rounded-lg bg-muted px-2.5 py-2 text-[12px] font-medium text-emerald-800 dark:text-emerald-300">
         {vitales.length === 1
           ? `Una sola causa explica el ${Math.round(pareto.vitalPct)}% del tiempo parado.`
           : `${vitales.length} causas explican el ${Math.round(pareto.vitalPct)}% del tiempo parado.`}

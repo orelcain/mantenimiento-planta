@@ -350,7 +350,7 @@ export function TiempoDelTurno({
             <p className="text-[10px] uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
               Anotado para todo el turno
             </p>
-            <ul className="mt-1 space-y-0.5 border-l-2 border-emerald-500/40 pl-2">
+            <ul className="mt-1 space-y-0.5 border-l-2 border-emerald-600 pl-2">
               {notasTurno.map((t) => (
                 <li key={t} className="text-[10.5px] leading-snug text-muted-foreground">{t}</li>
               ))}
@@ -559,7 +559,7 @@ function FilaEvento({ c, sel, onCausa, notas }: {
             onCausa(abierta ? null : c.reason)
           }}
           className={`flex w-full justify-between gap-2 rounded px-1 py-0.5 text-left ${
-            activa ? 'bg-sky-500/20 text-sky-800 dark:text-sky-200' : 'text-foreground hover:bg-muted'
+            activa ? 'bg-primary/[0.13] font-semibold text-brand-ink' : 'text-foreground hover:bg-muted'
           }`}
           aria-expanded={abierta}
         >
@@ -609,7 +609,7 @@ function FilaEvento({ c, sel, onCausa, notas }: {
       )}
 
       {(notas ?? []).length > 0 && (
-        <ul className="mt-0.5 space-y-0.5 border-l-2 border-sky-500/30 pl-2">
+        <ul className="mt-0.5 space-y-0.5 border-l-2 border-sky-600 pl-2">
           {notas!.map((n, i) => (
             <li key={`${n.desde}-${i}`} className="text-[10.5px] leading-snug text-muted-foreground">
               <span className="tabular-nums">{n.desde}</span> · «{n.texto}»

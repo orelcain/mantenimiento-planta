@@ -53,6 +53,7 @@ import { useZoomGesto, type Ventana } from './monitor/useZoomGesto'
 import { TiempoDelTurno, ComparadorDias, Bloque, PronosticoCierre } from './monitor/MonitorShiftParts'
 import { notasPorCausa, notasDelTurno } from './monitor/notasOperador'
 import { VsAyerBloque } from './monitor/MonitorVsAyer'
+import { Pill } from '@/components/piel'
 import { useIsAdmin } from '@/store'
 import { useAuthStore } from '@/store/authStore'
 
@@ -627,9 +628,9 @@ function Sparkbars({
         {causaSel && (
           <button
             onClick={() => onCausa(null)}
-            className="rounded-full border border-rose-500/40 bg-rose-500/15 px-2 py-0.5 text-[11px] normal-case text-rose-800 dark:text-rose-300"
+            className="rounded-full"
           >
-            {causaSel} ✕
+            <Pill tone="critical" className="normal-case">{causaSel} ✕</Pill>
           </button>
         )}
       </div>
@@ -829,7 +830,7 @@ function Sparkbars({
               aria-pressed={ver === v}
               className={`rounded-full border px-2 py-0.5 ${
                 ver === v
-                  ? 'border-sky-500/50 bg-sky-500/20 text-sky-800 dark:text-sky-200'
+                  ? 'border-transparent bg-primary/[0.13] font-semibold text-brand-ink'
                   : 'border-border hover:bg-muted'
               }`}
             >
@@ -1110,7 +1111,7 @@ function RitmoNecesario({
    */
   if (pace.verdict === 'hora-extra') {
     return (
-      <div className="mt-2 rounded-xl border border-sky-400/25 bg-sky-400/10 px-3 py-2">
+      <div className="mt-2 rounded-xl border border-border bg-muted px-3 py-2">
         <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
           <Target className="h-3.5 w-3.5" />
           Hora extra · pasado el horario del turno
@@ -1159,8 +1160,8 @@ function RitmoNecesario({
     <div
       className={`mt-2 rounded-xl border px-3 py-2 ${
         fuera || exigente
-          ? 'border-amber-400/30 bg-amber-400/10'
-          : 'border-sky-400/25 bg-sky-400/10'
+          ? 'border-border bg-muted'
+          : 'border-border bg-muted'
       }`}
     >
       <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
@@ -1464,8 +1465,8 @@ function RitmoNecesario({
         <div
           className={`mt-2 rounded-xl border px-2.5 py-2 text-[12px] ${
             pace.withExtraHour.feasible
-              ? 'border-emerald-500/30 bg-emerald-500/10'
-              : 'border-border bg-muted/40'
+              ? 'border-border bg-muted'
+              : 'border-border bg-muted'
           }`}
         >
           <span className="font-medium">Con 1 hora extra: </span>
@@ -1594,17 +1595,21 @@ function PorHora({ series }: { series: PublicMonitorLive['series'] }) {
 }
 
 function StatusPill({ live }: { live: PublicMonitorLive }) {
+  // El primitivo Pill de la piel: tonos MEDIDOS (texto 600 sobre 500 al 15%)
+  // y el punto integrado — era exactamente lo que este componente imitaba a mano.
   const map = {
-    produciendo: { label: 'Produciendo', dot: 'bg-emerald-400', text: 'text-emerald-800 dark:text-emerald-300', ring: 'border-emerald-400/30 bg-emerald-400/20' },
-    detenida:    { label: 'Detenida',    dot: 'bg-red-400',     text: 'text-red-800 dark:text-red-300',     ring: 'border-red-400/30 bg-red-400/20' },
-    'sin-datos': { label: 'Sin datos',   dot: 'bg-muted-foreground/50',    text: 'text-muted-foreground',    ring: 'border-border bg-muted' },
+    produciendo: { label: 'Produciendo', tone: 'ok' as const },
+    detenida:    { label: 'Detenida',    tone: 'critical' as const },
+    'sin-datos': { label: 'Sin datos',   tone: 'neutral' as const },
   } as const
-  const s = map[live.status]
+
+  const x = map[live.status] ?? map['sin-datos']
+  // `pulse` solo con el turno VIVO produciendo: el punto que respira es la
+  // señal de "en vivo" (§7); en un turno cerrado sería un parpadeo mentiroso.
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] font-semibold ${s.ring} ${s.text}`}>
-      <span className={`h-1.5 w-1.5 rounded-full ${s.dot} ${live.status === 'produciendo' ? 'animate-pulse' : ''}`} />
-      {s.label}
-    </span>
+    <Pill tone={x.tone} dot={live.status === 'produciendo' && !live.shiftClosed ? 'pulse' : true}>
+      {x.label}
+    </Pill>
   )
 }
 
@@ -2316,7 +2321,7 @@ export function PublicShiftMonitorPage() {
   if (!live) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-background px-6 text-center">
-        <Hourglass className="h-11 w-11 text-sky-600 dark:text-sky-400/70" />
+        <Hourglass className="h-11 w-11 text-primary" />
         <p className="text-lg font-semibold text-foreground">Esperando el próximo turno</p>
         <p className="max-w-xs text-sm text-muted-foreground">
           {data.machineKindLong || data.lineLabel || 'La línea'} no tiene un turno en curso. Esta
@@ -2417,7 +2422,7 @@ export function PublicShiftMonitorPage() {
             {idx > 1 && (
               <button
                 onClick={() => verIndice(0)}
-                className="rounded-full border border-sky-400/25 bg-sky-400/20 px-2 py-0.5 text-[11px] text-sky-700 dark:text-sky-200 transition-colors hover:bg-sky-400/20"
+                className="rounded-full bg-primary/[0.13] px-2 py-0.5 text-[11px] font-semibold text-brand-ink transition-opacity hover:opacity-80"
               >
                 Ir al actual
               </button>
@@ -2441,7 +2446,7 @@ export function PublicShiftMonitorPage() {
         onTouchEnd={onTouchEnd}
       >
         {/* Piezas acumuladas — el número que vienen a ver */}
-        <section className="rounded-2xl border border-sky-400/20 bg-gradient-to-b from-sky-500/15 to-transparent px-4 py-4">
+        <section className="rounded-2xl border border-border bg-gradient-to-b from-primary/[0.08] to-transparent px-4 py-4">
           <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
             <Activity className="h-3 w-3" />
             {esActual ? 'Piezas procesadas en la jornada' : 'Piezas de ese turno'}
@@ -2491,9 +2496,9 @@ export function PublicShiftMonitorPage() {
             <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-muted-foreground">
               <span className="tabular-nums">{fmtInt(live.shiftPieces ?? 0)} dentro del turno</span>
               <span className="text-muted-foreground/60">+</span>
-              <span className="rounded-full border border-amber-400/25 bg-amber-400/20 px-2 py-0.5 tabular-nums text-amber-800 dark:text-amber-200">
+              <Pill tone="warning" className="tabular-nums normal-case">
                 {fmtInt(outside)} fuera del horario
-              </span>
+              </Pill>
               {(live.outsideRanges ?? []).map(r => (
                 <span key={r.from} className="text-[11px] tabular-nums text-muted-foreground/70">
                   ({r.kind === 'antes' ? 'antes: ' : ''}{fmtWallTime(r.from)}–{fmtWallTime(r.to)})
