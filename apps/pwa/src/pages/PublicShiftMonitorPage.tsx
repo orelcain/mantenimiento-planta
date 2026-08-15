@@ -2824,37 +2824,6 @@ export function PublicShiftMonitorPage() {
         */}
         {live.shiftClosed ? (
           <>
-            <TiempoDelTurno
-              tb={live.timeBreakdown}
-              causaSel={causaSel}
-              onCausa={setCausaSel}
-              proximaParada={proximaParada}
-              notas={notasDeOperador}
-              /* La resta: minutos parados -> piezas, al ritmo del turno.
-                 En vivo la vara es la cuota a ESTA altura (la curva del
-                 comparador, aplanada en colacion) - contra la meta completa,
-                 el "ritmo" absorberia lo que aun no se juega. */
-              cerrado={live.shiftClosed}
-              meta={data.targetPieces ?? live.quotaPieces ?? live.expectedPieces ?? null}
-              hechas={live.totalPieces}
-              cuotaAhora={comparacion.optimalAtCurrentMinute}
-              horaAhora={`${String(new Date(now).getHours()).padStart(2, '0')}:${String(new Date(now).getMinutes()).padStart(2, '0')}`}
-              cpmAndando={
-                live.timeBreakdown && live.timeBreakdown.producingMin > 0
-                  ? live.totalPieces / live.timeBreakdown.producingMin
-                  : null
-              }
-              costo={costoParadas}
-              grupos={gruposEventos}
-              notasTurno={notasDeTurnoCompleto}
-            />
-            {/* Pegado al desglose de HOY va el de SIEMPRE: la misma pregunta —qué
-                para la línea— pero mirando los turnos anteriores. Es el paso de
-                "hoy pasó esto" a "esto vuelve todos los turnos". */}
-            {/* Cerró el turno: qué cambió contra ayer y cómo quedó contra los
-                récords. El orden es a propósito — primero qué pasó (arriba),
-                después por qué fue distinto, después qué se repite siempre. */}
-            <VsAyerBloque r={comparadoConAyer} records={recordsLinea} />
             {/* ⚠ UN solo gráfico de la serie de 5 min.
                 Había dos tarjetas —"Velocidad de la línea" y "Piezas por tramo"—
                 dibujando exactamente la misma serie, una en pz/min y otra en
@@ -2893,6 +2862,41 @@ export function PublicShiftMonitorPage() {
                 }
                 : undefined}
             />
+            {/* El gráfico va ARRIBA del bloque de la meta (pedido de Orel):
+                tocar una imputación salta al gráfico, y el salto tiene que ser
+                hacia algo que ya pasaste, no hacia abajo. */}
+            <TiempoDelTurno
+              tb={live.timeBreakdown}
+              causaSel={causaSel}
+              onCausa={setCausaSel}
+              proximaParada={proximaParada}
+              notas={notasDeOperador}
+              /* La resta: minutos parados -> piezas, al ritmo del turno.
+                 En vivo la vara es la cuota a ESTA altura (la curva del
+                 comparador, aplanada en colacion) - contra la meta completa,
+                 el "ritmo" absorberia lo que aun no se juega. */
+              cerrado={live.shiftClosed}
+              meta={data.targetPieces ?? live.quotaPieces ?? live.expectedPieces ?? null}
+              hechas={live.totalPieces}
+              cuotaAhora={comparacion.optimalAtCurrentMinute}
+              horaAhora={`${String(new Date(now).getHours()).padStart(2, '0')}:${String(new Date(now).getMinutes()).padStart(2, '0')}`}
+              cpmAndando={
+                live.timeBreakdown && live.timeBreakdown.producingMin > 0
+                  ? live.totalPieces / live.timeBreakdown.producingMin
+                  : null
+              }
+              costo={costoParadas}
+              grupos={gruposEventos}
+              notasTurno={notasDeTurnoCompleto}
+            />
+            {/* Pegado al desglose de HOY va el de SIEMPRE: la misma pregunta —qué
+                para la línea— pero mirando los turnos anteriores. Es el paso de
+                "hoy pasó esto" a "esto vuelve todos los turnos". */}
+            {/* Cerró el turno: qué cambió contra ayer y cómo quedó contra los
+                récords. El orden es a propósito — primero qué pasó (arriba),
+                después por qué fue distinto, después qué se repite siempre. */}
+            <VsAyerBloque r={comparadoConAyer} records={recordsLinea} />
+            
             {/* El comparador SUBE hasta acá, pegado al pronóstico: los dos
                 contestan la misma pregunta —si el turno llega— y estaban separados
                 por tres bloques de detalle. Arriba el desenlace, abajo el porqué

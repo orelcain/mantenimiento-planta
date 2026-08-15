@@ -120,7 +120,7 @@ describe('TiempoDelTurno · aviso de la próxima parada de convenio', () => {
     // 36 min recuperables x 13,5 = 486 pz de las 1.081 que faltaron.
     expect(t).toMatch(/486/)
     expect(t).toMatch(/595/)                    // el resto, por ritmo
-    expect(t).toMatch(/Por qué no llegamos/i)
+    expect(t).toMatch(/Camino a la meta/i)
   })
 
   /*
@@ -194,10 +194,31 @@ describe('TiempoDelTurno · aviso de la próxima parada de convenio', () => {
     expect(t).toMatch(/guías de bronce/)
   })
 
-  it('sin brecha no promete explicar por qué no llegamos', () => {
+  it('meta cumplida: celebra, y las paradas igual muestran su costo', () => {
+    // brecha 0 = se llegó justo. El bloque no puede decir «por qué no llegamos»
+    // un día que SÍ se llegó (regla de Orel) — y el costo de las paradas se
+    // convierte en el argumento: sin ellas, el cierre quedaba más arriba.
     const t = texto(ANTES_DE_LA_COLACION, null, 0, 13.5)
-    expect(t).toMatch(/A dónde se va el tiempo/i)
-    expect(t).not.toMatch(/Por qué no llegamos/i)
+    expect(t).toMatch(/Camino a la meta/i)
+    expect(t).toMatch(/Meta cumplida/i)
+    expect(t).toMatch(/Las paradas igual costaron/i)
+    expect(t).not.toMatch(/que faltaron/i)
+  })
+
+  it('meta superada: dice cuánto arriba quedó', () => {
+    const r = render(
+      <TiempoDelTurno
+        tb={ANTES_DE_LA_COLACION}
+        cerrado
+        meta={5000}
+        hechas={5200}
+        cpmAndando={13.5}
+        grupos={agruparEventos({ tb: ANTES_DE_LA_COLACION, cpmGlobal: 13.5 })}
+      />,
+    )
+    const t = r.container.textContent ?? ''
+    expect(t).toMatch(/\+200/)
+    expect(t).toMatch(/Meta cumplida/i)
   })
 })
 
@@ -210,7 +231,7 @@ describe('TiempoDelTurno · en vivo la vara es la cuota de la hora, no la meta',
    */
   it('no pinta como ritmo perdido lo que aún no se juega', () => {
     const t = textoVivo({ meta: 5000, hechas: 2230, cuotaAhora: 2600, cpmAndando: 10 })
-    expect(t).toMatch(/Por qué vamos atrás/i)
+    expect(t).toMatch(/Camino a la meta/i)
     expect(t).toMatch(/370/)                    // la brecha contra la cuota de ahora
     expect(t).toMatch(/a esta hora/i)
     expect(t).toMatch(/Por jugar\s*2\.400/)     // meta − cuota: hueco, no pérdida
@@ -218,10 +239,11 @@ describe('TiempoDelTurno · en vivo la vara es la cuota de la hora, no la meta',
     expect(t).toMatch(/tocaban a las 11:00/)
   })
 
-  it('al día con la cuota, no fabrica un «vamos atrás»', () => {
+  it('al día con la cuota: positivo, no un «vamos atrás»', () => {
     const t = textoVivo({ meta: 5000, hechas: 2650, cuotaAhora: 2600, cpmAndando: 10 })
-    expect(t).toMatch(/A dónde se va el tiempo/i)
-    expect(t).not.toMatch(/vamos atrás/i)
+    expect(t).toMatch(/Camino a la meta/i)
+    expect(t).toMatch(/Al día con la cuota/i)
+    expect(t).not.toMatch(/que faltaron/i)
   })
 
   it('en vivo SIN curva de cuota no hay resta honesta que hacer', () => {
@@ -232,7 +254,7 @@ describe('TiempoDelTurno · en vivo la vara es la cuota de la hora, no la meta',
 
   it('sin ritmo de referencia lo dice, en vez de desaparecer mudo', () => {
     const t = textoVivo({ meta: 5000, hechas: 2230, cuotaAhora: 2600, cpmAndando: null })
-    expect(t).toMatch(/vamos atrás/i)
+    expect(t).toMatch(/Camino a la meta/i)
     expect(t).toMatch(/no se puede repartir/i)
   })
 })

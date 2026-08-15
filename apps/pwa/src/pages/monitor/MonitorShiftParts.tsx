@@ -254,10 +254,24 @@ export function TiempoDelTurno({
   const referencia = cerrado ? metaOk : cuotaOk
   const brecha = referencia != null && hechas != null ? Math.max(0, referencia - hechas) : null
   const hayBrecha = brecha != null && brecha > 0
+  /*
+   * Meta cumplida (regla de Orel: «seamos positivos — ¿qué pasa si se llega?»).
+   * El bloque no puede llamarse «por qué no llegamos» un día que SÍ se llegó:
+   * con la vara alcanzada se celebra, y las paradas igual muestran su costo —
+   * «llegamos, y sin las paradas llegábamos más arriba» es el mejor argumento
+   * de Mantención que existe.
+   */
+  const superada = referencia != null && hechas != null && referencia > 0 && brecha === 0
+  const excedente = superada ? Math.max(0, Math.round(hechas! - referencia!)) : 0
   const perdidas = crudas == null ? null : hayBrecha ? Math.min(crudas, brecha) : crudas
-  const porRitmo = hayBrecha && perdidas != null ? Math.max(0, brecha - perdidas) : null
+  const porRitmo = (hayBrecha || superada) && perdidas != null ? Math.max(0, (brecha ?? 0) - perdidas) : null
   /** Lo que la cuota todavía no pide: va HUECO en la barra, no es pérdida. */
   const porJugar = cuotaOk != null && metaOk != null ? Math.max(0, metaOk - cuotaOk) : 0
+  /* Con la vara superada en vivo, lo hecho puede pasar la cuota: el hueco se
+     mide contra lo HECHO para que la barra no dibuje de más. */
+  const porJugarBarra = superada && !cerrado && metaOk != null && hechas != null
+    ? Math.max(0, metaOk - hechas)
+    : porJugar
   // El rango de ritmos usados: es la evidencia de que cada parada se valorizó
   // distinto. Con una sola causa no hay rango que mostrar.
   const ritmos = (costo?.porCausa ?? []).map((c) => c.cpm)
@@ -265,7 +279,7 @@ export function TiempoDelTurno({
 
   /** La resta (y su acordeón) solo con todas sus piezas sobre la mesa. */
   const restaVisible =
-    hayBrecha && perdidas != null && porRitmo != null && metaOk != null && hechas != null && cpm != null
+    (hayBrecha || superada) && perdidas != null && porRitmo != null && metaOk != null && hechas != null && cpm != null
 
   const gruposVisibles = (grupos ?? []).filter((g) => g.causas.length > 0)
   /* Regla de Orel: lo PROGRAMADO va aparte — no es detención imputable ni se
@@ -287,13 +301,23 @@ export function TiempoDelTurno({
       id="tiempo"
       // El título depende de si hay algo que explicar: con la meta cumplida,
       // "Por qué no llegamos" sería un titular falso.
-      titulo={hayBrecha ? (cerrado ? 'Por qué no llegamos' : 'Por qué vamos atrás') : 'A dónde se va el tiempo'}
+      /* «Camino a la meta» funciona perdiendo, ganando y en vivo — el nombre
+         viejo («Por qué no llegamos») asumía la derrota, y el día que se
+         llegue no puede quedarse ese titular (regla de Orel). */
+      titulo={hayBrecha || superada ? 'Camino a la meta' : 'A dónde se va el tiempo'}
       extra={hayBrecha
         ? (
           <span className="tabular-nums font-semibold text-red-700 dark:text-red-400">
             −{fmtInt(brecha)} pz
             {/* En vivo la cifra es contra la cuota de AHORA, y tiene que decirlo:
                 sin el sufijo se lee como si faltara eso para la meta completa. */}
+            {!cerrado && <span className="font-normal text-muted-foreground"> a esta hora</span>}
+          </span>
+        )
+        : superada
+        ? (
+          <span className="tabular-nums font-semibold text-ink-ok">
+            {excedente > 0 ? `✓ +${fmtInt(excedente)} pz` : '✓ en la meta'}
             {!cerrado && <span className="font-normal text-muted-foreground"> a esta hora</span>}
           </span>
         )
@@ -321,9 +345,9 @@ export function TiempoDelTurno({
           <div className="mt-1 flex h-6 gap-[2px]">
             {([
               { p: 'hechas' as const, v: hechas, cls: 'bg-muted-foreground/[0.35]', flex: true, rotulo: 'hechas' },
-              { p: 'paradas' as const, v: perdidas, cls: 'bg-red-600 dark:bg-red-500', rotulo: 'perdidas en paradas' },
-              { p: 'ritmo' as const, v: porRitmo, cls: 'bg-amber-600 dark:bg-amber-500', rotulo: 'por ritmo' },
-              { p: 'jugar' as const, v: porJugar, cls: 'border border-dashed border-muted-foreground/[0.4]', rotulo: 'aún por jugar' },
+              { p: 'paradas' as const, v: hayBrecha ? perdidas : 0, cls: 'bg-red-600 dark:bg-red-500', rotulo: 'perdidas en paradas' },
+              { p: 'ritmo' as const, v: hayBrecha ? porRitmo : 0, cls: 'bg-amber-600 dark:bg-amber-500', rotulo: 'por ritmo' },
+              { p: 'jugar' as const, v: porJugarBarra, cls: 'border border-dashed border-muted-foreground/[0.4]', rotulo: 'aún por jugar' },
             ]).filter((s) => s.flex || s.v > 0).map((s) => (
               <button
                 key={s.p}
@@ -342,7 +366,7 @@ export function TiempoDelTurno({
               { p: 'hechas' as const, nombre: 'Hechas', valor: `${fmtInt(hechas)} pz`, tick: 'bg-muted-foreground/[0.5]' },
               { p: 'paradas' as const, nombre: 'Paradas', valor: `${fmtInt(perdidas)} pz`, tick: 'bg-red-600 dark:bg-red-500' },
               { p: 'ritmo' as const, nombre: 'Ritmo', valor: `${fmtInt(porRitmo)} pz`, tick: 'bg-amber-600 dark:bg-amber-500' },
-              ...(porJugar > 0 ? [{ p: 'jugar' as const, nombre: 'Por jugar', valor: `${fmtInt(porJugar)} pz`, tick: 'border border-dashed border-muted-foreground/[0.5] bg-transparent' }] : []),
+              ...(porJugarBarra > 0 ? [{ p: 'jugar' as const, nombre: 'Por jugar', valor: `${fmtInt(porJugarBarra)} pz`, tick: 'border border-dashed border-muted-foreground/[0.5] bg-transparent' }] : []),
               /* Sin segmento en la barra: el convenio no pierde piezas (la cuota
                  ya lo descuenta) — por eso su valor va en MINUTOS. */
               ...(grupoProgramado ? [{ p: 'programado' as const, nombre: 'Programado · no se recupera', valor: fmtDurMin(grupoProgramado.min), tick: 'bg-muted-foreground' }] : []),
@@ -475,7 +499,28 @@ export function TiempoDelTurno({
               </div>
             ))}
           </div>
-          {cerrado
+          {superada
+            ? (
+              /* «Llegamos, y sin las paradas llegábamos más arriba»: la meta
+                 cumplida no apaga el costo de las paradas — lo convierte en el
+                 argumento de cuánto más se puede. */
+              <p className="mt-2 text-[13.5px] leading-snug text-foreground">
+                <span className="font-semibold text-ink-ok">
+                  {cerrado ? 'Meta cumplida' : 'Al día con la cuota'}
+                </span>
+                : <span className="tabular-nums font-semibold">{fmtInt(hechas)}</span> de{' '}
+                <span className="tabular-nums">{fmtInt(referencia ?? 0)} pz</span>
+                {excedente > 0 && <> (+{fmtInt(excedente)})</>}.
+                {perdidas != null && perdidas > 0 && (
+                  <>
+                    {' '}Las paradas igual costaron ~
+                    <span className="tabular-nums font-semibold">{fmtInt(perdidas)} pz</span> — sin
+                    ellas {cerrado ? 'el cierre quedaba' : 'iríamos'} más arriba.
+                  </>
+                )}
+              </p>
+            )
+            : cerrado
             ? (
               <p className="mt-2 text-[13.5px] leading-snug text-foreground">
                 De las <span className="tabular-nums font-semibold">{fmtInt(brecha!)} pz</span> que
