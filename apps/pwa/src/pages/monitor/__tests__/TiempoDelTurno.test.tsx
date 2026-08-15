@@ -292,7 +292,7 @@ describe('TiempoDelTurno · acordeón por parte (una barra, cada parte se abre)'
     fireEvent.click(r.getByRole('button', { name: /^Programado/ }))
     const t = r.container.textContent ?? ''
     expect(t).toMatch(/REUNION INICIO TURNO/)
-    expect(t).toMatch(/EJERCICIO  COMPENSATORIO/)
+    expect(t).toMatch(/EJERCICIO {2}COMPENSATORIO/)
   })
 
   it('los minutos del turno viven bajo «Hechas» — la segunda barra murió', () => {
