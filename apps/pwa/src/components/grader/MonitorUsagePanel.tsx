@@ -16,6 +16,7 @@ import {
   type MonitorUsageStats,
 } from '@/services/shoplogix/publicShiftMonitor.service'
 import { cn } from '@/lib/utils'
+import { Pill } from '@/components/piel'
 
 function fmtDuracion(sec: number): string {
   if (!Number.isFinite(sec) || sec <= 0) return '—'
@@ -150,9 +151,9 @@ function FilaAparato({
             </span>
           )}
           {esNuevo(firstSeen, linkDesde) && (
-            <span className="shrink-0 rounded-full border border-sky-500/30 bg-sky-500/15 px-1.5 text-[10px] text-sky-700 dark:text-sky-300">
+            <Pill tone="info" className="shrink-0 px-1.5 py-0.5 text-[10px]">
               nuevo
-            </span>
+            </Pill>
           )}
           {secs > 0 && (
             <span className="tabular-nums text-muted-foreground/70 shrink-0">· {fmtDuracion(secs)}</span>
@@ -232,10 +233,9 @@ export function MonitorUsagePanel({ stats, token }: { stats: MonitorUsageStats |
         <Dato icon={<Users className="w-3.5 h-3.5" />} valor={String(totalAparatos)} label={totalAparatos === 1 ? 'aparato' : 'aparatos'} />
         <Dato icon={<Monitor className="w-3.5 h-3.5" />} valor={fmtDuracion(stats.secondsViewed ?? 0)} label="mirando" />
         {ahora > 0 && (
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          <Pill tone="ok" dot="pulse" className="px-2 py-0.5 text-[11px]">
             {ahora === 1 ? 'Alguien mirando ahora' : `${ahora} mirando ahora`}
-          </span>
+          </Pill>
         )}
       </div>
 
@@ -295,7 +295,7 @@ export function MonitorUsagePanel({ stats, token }: { stats: MonitorUsageStats |
               <div
                 key={d.dia}
                 title={`${d.dia}: ${d.opens} aperturas`}
-                className="flex-1 rounded-sm bg-sky-500/70 min-h-[2px]"
+                className="flex-1 rounded-sm bg-primary/[0.7] min-h-[2px]"
                 style={{ height: `${Math.max(6, (d.opens / maxDia) * 100)}%` }}
               />
             ))}

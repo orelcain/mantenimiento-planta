@@ -920,7 +920,7 @@ export function PronosticoCierre({ f, meta, horizonte }: {
         <span>{fmtInt(f.low)}</span>
         <span className="relative h-1.5 flex-1 rounded-full bg-muted">
           <span
-            className="absolute h-1.5 rounded-full bg-sky-500/60"
+            className="absolute h-1.5 rounded-full bg-primary/[0.6]"
             style={{ left: '0%', right: '0%' }}
           />
           {meta != null && meta >= f.low && meta <= f.high && (

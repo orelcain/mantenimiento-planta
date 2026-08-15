@@ -1464,7 +1464,7 @@ export function SensorsMonitorPage() {
                 <p className="text-xs text-muted-foreground mb-1">Online</p>
                 <p className="text-2xl font-bold text-emerald-500">{metrics.online}</p>
               </div>
-              <Activity className="h-8 w-8 text-emerald-500/20" />
+              <Activity className="h-8 w-8 text-emerald-500/[0.2]" />
             </div>
           </CardContent>
         </Card>
@@ -1475,7 +1475,7 @@ export function SensorsMonitorPage() {
                 <p className="text-xs text-muted-foreground mb-1">Warning</p>
                 <p className="text-2xl font-bold text-amber-500">{metrics.warning}</p>
               </div>
-              <AlertTriangle className="h-8 w-8 text-amber-500/20" />
+              <AlertTriangle className="h-8 w-8 text-amber-500/[0.2]" />
             </div>
           </CardContent>
         </Card>
@@ -1486,7 +1486,7 @@ export function SensorsMonitorPage() {
                 <p className="text-xs text-muted-foreground mb-1">Crítico</p>
                 <p className="text-2xl font-bold text-red-500">{metrics.critical}</p>
               </div>
-              <AlertTriangle className="h-8 w-8 text-red-500/20" />
+              <AlertTriangle className="h-8 w-8 text-red-500/[0.2]" />
             </div>
           </CardContent>
         </Card>
