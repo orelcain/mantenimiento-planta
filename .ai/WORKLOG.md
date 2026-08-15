@@ -1,3 +1,30 @@
+## 2026-08-15 · La rejilla del desglose recortaba la cola del turno (fix #562)
+
+Perseguir un descuadre chico —la fila decía «Micro 23×» y `stopEvents` traía
+28— destapó un bug grande: la rejilla del `timeBreakdown` se dimensionaba con
+los minutos de OPERACIÓN (huecos >30 min descontados, correcto para la
+cadencia) pero se indexa por hora REAL. Con la colación de 43 min del 14-08,
+la rejilla terminaba a las 14:35 y el turno corrió hasta las 15:25: los
+últimos 50 minutos no existían para el desglose.
+
+Lo que estaba mal por esto: el ritmo andando del 14-08 decía 13,5 (real ~11,6
+— las piezas de la cola contaban y sus minutos produciendo no; el «récord» de
+ese día era un artefacto); una Detencion de 6 min a las 15:24 no salía en
+ninguna fila; y **el 13-08 tenía una falla de máquina invisible en la cola**
+(CUCHILLERIA DORSAL 15 min·3×) — el «✓ ninguna parada por falla de máquina»
+pudo haber sido falso otros días.
+
+Fix: rejilla por lapso real (`effectiveStart→effectiveEnd`); `windowMin` pasa
+a ser ese lapso — la MISMA medida que el «de turno» del comparador, ahora
+comparten palabra a propósito. `windowHours`/cadencia pz-h no cambian.
+`resumirParaForecast` publica `tbv: 2` y la caché de `forecastHistory`
+invalida lo medido con la vara vieja: mezclar las dos haría récords y bandas
+incomparables. El detalle de causas además funde eventos pegados (≤10 s, la
+celda de la rejilla) en EPISODIOS, con test del caso real de las 14:44.
+
+Verificado reconstruyendo el 13 y el 14 de agosto con el código nuevo;
+1.412 tests, tsc limpio, eslint 28/30, audit-graficos 0.
+
 ## 2026-08-15 · Monitor listo para el turno noche (set point con fuente + estados honestos + watchdog)
 
 Regla de Orel: **Shoplogix manda** — cero horarios hardcodeados (se descartó
