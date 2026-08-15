@@ -1,3 +1,47 @@
+## 2026-08-15 · Monitor público · la capa de contexto (guías de visualización)
+
+**Qué cambió.** Aplicación de las guías de Kevin Cáceres (destiladas en
+`ANTARFOOD/_GUIAS/_DESTILADO_VISUALIZACION.md`) al monitor: cada tarjeta grande
+contesta sola «¿esto está bien?». Tres piezas, todas de la guía numero-contexto:
+
+1. **Ritmo andando con sparkline + banda normal**: miniatura de los últimos
+   turnos con el rango normal de fondo (mín-máx de los turnos VÁLIDOS
+   anteriores) y la lectura escrita («▲ arriba de su rango normal (10,3–13,2)»).
+2. **«Últimos 30 min» con referencia**: contra el ritmo del propio turno, con
+   umbrales anchos (▲ ≥110%, ▼ ≤75%) para que el ruido de un tramo no titile.
+3. **La meta como bullet**: banda de cierres habituales detrás de la barra. Con
+   los datos reales destapó el hallazgo del día: la meta (5.000) está POR ENCIMA
+   de todo lo que la línea cerró en su historia (3.168–4.915) — el 78% no es
+   «el turno falló», es «la meta no la alcanzó nadie todavía».
+
+**Archivos.** `monitorVsAyer.ts` (+`bandaNormal`, 4 tests),
+`PublicShiftMonitorPage.tsx` (Kpi con `spark`/`lectura`, `Chispa`, bullet).
+
+**Decisiones y trampas:**
+
+- ⚠⚠ **BUG cazado en la verificación: el turno visto se colaba en su propia
+  banda.** Los memos usaban `data.dateKey` (turno VIGENTE) pero `live` es el
+  turno que se MIRA — al navegar con «Anterior» al 14-08 desde el 15, el filtro
+  `< hoy` dejaba pasar al propio 14 y la banda decía «en su rango normal
+  (10,3–13,5)»: el techo era él mismo y el récord desaparecía. Es la violación
+  exacta del «fijado a priori» de la guía. Fix: `vista.dateKey`.
+  **Regla general: en el monitor, todo lo que dependa de "hoy" usa `vista`, no
+  `data`** — data es el doc, vista es lo que está en pantalla.
+- **La banda se fija a priori** (solo turnos anteriores, nunca el de hoy — hay
+  test que lo clava) y **con <5 turnos válidos no hay banda**: al arrancar el
+  turno noche, esas tarjetas quedan sin contexto hasta juntar historia.
+- El sparkline va en su PROPIA fila: al lado del valor desbordaba la tarjeta a
+  390 px (las KPI van de a dos, ~160 px cada una; el mockup era de 250).
+- Banda `fill-muted` era invisible sobre la tarjeta oscura → `fill-muted-foreground/20`.
+- **El deploy automático de functions del PR #555 ya repobló `forecastHistory`**:
+  los récords pasaron de 7 a 10 turnos y el «84% (vie 7)» torcido de la caché
+  vieja quedó en 82% (sáb 8) recalculado fresco. La fusión history/forecastHistory
+  funcionó como estaba prevista.
+
+**Verificado:** 1.405 tests, tsc limpio, eslint 28/30, y el monitor leído en el
+navegador con el turno real del 14-08 (navegado con «Anterior» desde el vivo del
+15) a 390 px en claro y oscuro.
+
 ## 2026-08-14 · Monitor público · ritmo con denominador + «Qué cambió contra ayer» + récords
 
 **Qué cambió.** Tres piezas: (1) la tarjeta de ritmo ahora manda el ANDANDO

@@ -46,7 +46,7 @@ import { buildForecast, MAX_MAPE_PCT } from '@/services/shoplogix/monitorForecas
 import { buildPareto } from '@/services/shoplogix/monitorPareto'
 import { agruparEventos } from '@/services/shoplogix/monitorEventos'
 import { costoDeParadas } from '@/services/shoplogix/monitorPerdidas'
-import { recordsDeLinea, vsAyer as compararVsAyer, type TurnoResumen } from '@/services/shoplogix/monitorVsAyer'
+import { bandaNormal, recordsDeLinea, vsAyer as compararVsAyer, type TurnoResumen } from '@/services/shoplogix/monitorVsAyer'
 import { llenadoDeSilletas, comoDeCada100, type LlenadoSilletas } from '@/services/shoplogix/monitorMaquina'
 import { ParetoDeParadas } from './monitor/MonitorPareto'
 import { useZoomGesto, type Ventana } from './monitor/useZoomGesto'
@@ -129,7 +129,7 @@ function fmtAgoWall(isoStr: string | null | undefined, nowMs: number): string {
 // ── Piezas de UI ────────────────────────────────────────────────────────────
 
 function Kpi({
-  label, value, unit, icon, hint, sub, tone = 'default',
+  label, value, unit, icon, hint, sub, spark, lectura, tone = 'default',
 }: {
   label: string
   value: string
@@ -138,6 +138,13 @@ function Kpi({
   hint?: string
   /** Segunda medida, con su denominador escrito (ej. el ritmo de reloj). */
   sub?: string
+  /** Miniatura de los últimos turnos con la banda normal (ver `Chispa`). */
+  spark?: React.ReactNode
+  /**
+   * El veredicto del número contra su contexto — la guía lo resume: la tarjeta
+   * tiene que contestar sola «¿esto está bien?». `null` = sin contexto todavía.
+   */
+  lectura?: { texto: string; tono: 'bien' | 'mal' | 'normal' } | null
   tone?: 'default' | 'accent'
 }) {
   return (
@@ -151,11 +158,70 @@ function Kpi({
         </span>
         {unit && <span className="text-[12px] text-muted-foreground/70">{unit}</span>}
       </div>
+      {/* En su propia fila: al lado del valor desbordaba la tarjeta en el
+          celular (las KPI van de a dos por fila, ~160 px cada una). */}
+      {spark && <div className="mt-1">{spark}</div>}
       {hint && <div className="mt-0.5 text-[11px] text-muted-foreground/70">{hint}</div>}
+      {lectura && (
+        <div
+          className={`mt-0.5 text-[11px] leading-snug ${
+            lectura.tono === 'bien'
+              ? 'font-semibold text-emerald-700 dark:text-emerald-400'
+              : lectura.tono === 'mal'
+                ? 'font-semibold text-red-700 dark:text-red-400'
+                : 'text-muted-foreground'
+          }`}
+        >
+          {lectura.texto}
+        </div>
+      )}
       {sub && (
         <div className="mt-0.5 text-[11px] tabular-nums text-muted-foreground">{sub}</div>
       )}
     </div>
+  )
+}
+
+/**
+ * Sparkline con banda de rango normal: los últimos turnos como forma, no como
+ * lectura fina (sin ejes ni marcas — el valor exacto vive en el número grande
+ * de al lado). La banda gris es el mín-máx de los turnos válidos anteriores,
+ * fijado a priori; el punto es hoy.
+ */
+function Chispa({ serie, hoy, banda }: {
+  serie: number[]
+  hoy: number
+  banda: { min: number; max: number }
+}) {
+  const W = 86
+  const H = 34
+  const todos = [...serie, hoy, banda.min, banda.max]
+  const lo = Math.min(...todos)
+  const hi = Math.max(...todos)
+  const span = hi - lo || 1
+  // 10% de aire arriba y abajo para que ni la banda ni el punto toquen el borde.
+  const y = (v: number) => H - 3.4 - ((v - lo) / span) * (H - 6.8)
+  const puntos = [...serie, hoy]
+  const x = (i: number) => 4 + (i / Math.max(1, puntos.length - 1)) * (W - 8)
+  return (
+    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} aria-hidden className="shrink-0">
+      <rect
+        x="0"
+        y={y(banda.max)}
+        width={W}
+        height={Math.max(2, y(banda.min) - y(banda.max))}
+        rx="2"
+        className="fill-muted-foreground/20"
+      />
+      <polyline
+        points={puntos.map((v, i) => `${x(i)},${y(v)}`).join(' ')}
+        fill="none"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+        className="stroke-muted-foreground/70"
+      />
+      <circle cx={x(puntos.length - 1)} cy={y(hoy)} r="3" className="fill-sky-600 dark:fill-sky-300" />
+    </svg>
   )
 }
 
@@ -1759,17 +1825,43 @@ export function PublicShiftMonitorPage() {
    * números darían en contra sin que nadie hubiera hecho nada mal. En vivo esa
    * pregunta la contesta el comparador.
    */
+  /*
+   * ⚠ `vista.dateKey`, NUNCA `data.dateKey`: `live` es el turno que se está
+   * MIRANDO (con «Anterior» puede ser el de ayer) y `data.dateKey` el VIGENTE.
+   * Con el vigente, el turno visto pasaba el filtro `< hoy` y entraba en su
+   * propia banda/récords: el 14-08 visto desde el 15 decía «en su rango normal
+   * (10,3–13,5)» — el techo era él mismo, y el récord desaparecía. Es la
+   * violación exacta del «fijado a priori» de la guía.
+   */
   const resumenHoy = useMemo((): TurnoResumen | null => {
-    if (!live?.shiftClosed || !live.timeBreakdown || !data?.dateKey) return null
+    if (!live?.shiftClosed || !live.timeBreakdown || !vista?.dateKey) return null
     return {
-      dateKey: data.dateKey,
+      dateKey: vista.dateKey,
       total: live.totalPieces,
       producingMin: live.timeBreakdown.producingMin,
       windowMin: live.timeBreakdown.windowMin,
       plannedMin: live.timeBreakdown.plannedMin,
       recoverableMin: live.timeBreakdown.recoverableMin,
     }
-  }, [live, data?.dateKey])
+  }, [live, vista?.dateKey])
+
+  /*
+   * El rango normal se calcula también EN VIVO (no solo con el turno cerrado):
+   * la banda es de los turnos anteriores y no cambia con el minuto a minuto.
+   */
+  const banda = useMemo(() => {
+    const hoy: TurnoResumen | null = live?.timeBreakdown && vista?.dateKey
+      ? {
+        dateKey: vista.dateKey,
+        total: live.totalPieces,
+        producingMin: live.timeBreakdown.producingMin,
+        windowMin: live.timeBreakdown.windowMin,
+        plannedMin: live.timeBreakdown.plannedMin,
+        recoverableMin: live.timeBreakdown.recoverableMin,
+      }
+      : null
+    return hoy ? bandaNormal(hoy, resumenesAnteriores) : null
+  }, [live, vista?.dateKey, resumenesAnteriores])
 
   const comparadoConAyer = useMemo(
     () => (resumenHoy ? compararVsAyer(resumenHoy, resumenesAnteriores) : null),
@@ -2285,12 +2377,52 @@ export function PublicShiftMonitorPage() {
                 <span>Meta del turno: {fmtInt(data.targetPieces)} pz</span>
                 <span className="tabular-nums">{fmtDec(progressPct, 0)}%</span>
               </div>
-              <div className="mt-1 h-2 overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full rounded-full bg-sky-500 dark:bg-sky-400 transition-[width] duration-700"
-                  style={{ width: `${progressPct}%` }}
-                />
-              </div>
+              {/*
+               * Bullet, no barra de progreso: la banda gris de fondo es lo que
+               * esta línea CIERRA normalmente. Separa dos conversaciones que el
+               * % mezcla: «el turno fue malo» vs «la meta está por encima de lo
+               * que la línea cerró en toda su historia» — en Filete la meta
+               * (5.000) supera el mejor cierre real (4.915).
+               */}
+              {(() => {
+                const meta = data.targetPieces!
+                const techo = Math.max(meta, live.totalPieces, banda?.cierres.max ?? 0) * 1.04
+                const pctDe = (v: number) => Math.min(100, (v / techo) * 100)
+                return (
+                  <div className="relative mt-1 h-3.5 overflow-hidden rounded-md bg-muted">
+                    {banda && (
+                      <span
+                        className="absolute inset-y-0 bg-slate-400/40 dark:bg-slate-500/40"
+                        style={{
+                          left: `${pctDe(banda.cierres.min)}%`,
+                          width: `${pctDe(banda.cierres.max) - pctDe(banda.cierres.min)}%`,
+                        }}
+                        title={`Cierres habituales: ${fmtInt(banda.cierres.min)}–${fmtInt(banda.cierres.max)} pz (${banda.muestras} turnos)`}
+                      />
+                    )}
+                    <span
+                      className="absolute inset-y-1 left-0 rounded-r-sm bg-sky-500 dark:bg-sky-400 transition-[width] duration-700"
+                      style={{ width: `${pctDe(live.totalPieces)}%` }}
+                    />
+                    <span
+                      className="absolute inset-y-0 w-[2.5px] bg-foreground"
+                      style={{ left: `${pctDe(meta)}%` }}
+                      title={`Meta: ${fmtInt(meta)} pz`}
+                    />
+                  </div>
+                )
+              })()}
+              {banda && (
+                <p className="mt-1 text-[10.5px] leading-snug text-muted-foreground/80">
+                  La banda gris es lo que esta línea cierra normalmente{' '}
+                  (<span className="tabular-nums">{fmtInt(banda.cierres.min)}–{fmtInt(banda.cierres.max)}</span>
+                  , últimos {banda.muestras} turnos)
+                  {data.targetPieces! > (banda.cierres.max ?? 0) && (
+                    <> — la meta está por encima de todo ese rango</>
+                  )}
+                  .
+                </p>
+              )}
             </div>
           )}
 
@@ -2341,27 +2473,38 @@ export function PublicShiftMonitorPage() {
               disponibilidad —9,7 vs 9,7 el día que la línea fue la más rápida
               de los últimos 8 turnos— y queda como segunda línea, con su
               denominador escrito. */}
-          <Kpi
-            label="Ritmo andando"
-            value={
-              live.timeBreakdown && live.timeBreakdown.producingMin > 0
-                ? fmtDec(live.totalPieces / live.timeBreakdown.producingMin)
-                : fmtDec(live.piecesPerMinute)
-            }
-            unit="pz/min"
-            icon={<Gauge className="h-3 w-3" />}
-            hint={
-              live.timeBreakdown && live.timeBreakdown.producingMin > 0
-                ? 'cuando la línea produce'
-                : 'promedio del turno'
-            }
-            sub={
-              live.timeBreakdown && live.timeBreakdown.producingMin > 0
-                ? `Con paradas y colación: ${fmtDec(live.piecesPerMinute)} de reloj`
-                : undefined
-            }
-            tone="accent"
-          />
+          {/* Con banda normal y sparkline la tarjeta contesta sola «¿esto
+              está bien?»: dentro de la banda = martes cualquiera; fuera =
+              noticia. La banda es de los turnos ANTERIORES, fijada a priori. */}
+          {(() => {
+            const andando = live.timeBreakdown && live.timeBreakdown.producingMin > 0
+              ? live.totalPieces / live.timeBreakdown.producingMin
+              : null
+            const lectura = andando != null && banda
+              ? andando > banda.ritmo.max
+                ? { texto: `▲ arriba de su rango normal (${fmtDec(banda.ritmo.min)}–${fmtDec(banda.ritmo.max)})`, tono: 'bien' as const }
+                : andando < banda.ritmo.min
+                  ? { texto: `▼ abajo de su rango normal (${fmtDec(banda.ritmo.min)}–${fmtDec(banda.ritmo.max)})`, tono: 'mal' as const }
+                  : { texto: `en su rango normal (${fmtDec(banda.ritmo.min)}–${fmtDec(banda.ritmo.max)})`, tono: 'normal' as const }
+              : null
+            return (
+              <Kpi
+                label="Ritmo andando"
+                value={fmtDec(andando ?? live.piecesPerMinute)}
+                unit="pz/min"
+                icon={<Gauge className="h-3 w-3" />}
+                hint={andando != null ? 'cuando la línea produce' : 'promedio del turno'}
+                spark={andando != null && banda
+                  ? <Chispa serie={banda.serieRitmos} hoy={andando} banda={banda.ritmo} />
+                  : undefined}
+                lectura={lectura}
+                sub={andando != null
+                  ? `Con paradas y colación: ${fmtDec(live.piecesPerMinute)} de reloj`
+                  : undefined}
+                tone="accent"
+              />
+            )
+          })()}
           <Kpi
             label="Piezas / hora"
             value={fmtInt(live.piecesPerHour)}
@@ -2370,13 +2513,33 @@ export function PublicShiftMonitorPage() {
             hint="ciclos por hora"
             tone="accent"
           />
-          <Kpi
-            label={`Últimos ${live.recentMinutes || 0} min`}
-            value={fmtDec(live.recentPiecesPerMinute)}
-            unit="pz/min"
-            icon={<Radio className="h-3 w-3" />}
-            hint={`${fmtInt(live.recentPieces)} pz en el tramo`}
-          />
+          {/* La tarjeta más mirada en vivo era la única sin referencia. El
+              contraste es contra el ritmo del PROPIO turno: «frenando» aparece
+              acá antes de que el total del turno lo delate. Umbrales anchos
+              (±25%/−10%) para que el ruido de un tramo no titile. */}
+          {(() => {
+            const andando = live.timeBreakdown && live.timeBreakdown.producingMin > 0
+              ? live.totalPieces / live.timeBreakdown.producingMin
+              : null
+            const reciente = live.recentPiecesPerMinute
+            const lectura = andando != null && andando > 0 && reciente != null && (live.recentMinutes || 0) >= 15
+              ? reciente >= andando * 1.1
+                ? { texto: `▲ por encima del ritmo del turno (${fmtDec(andando)})`, tono: 'bien' as const }
+                : reciente <= andando * 0.75
+                  ? { texto: `▼ por debajo del ritmo del turno (${fmtDec(andando)})`, tono: 'mal' as const }
+                  : { texto: `al ritmo del turno (${fmtDec(andando)})`, tono: 'normal' as const }
+              : null
+            return (
+              <Kpi
+                label={`Últimos ${live.recentMinutes || 0} min`}
+                value={fmtDec(live.recentPiecesPerMinute)}
+                unit="pz/min"
+                icon={<Radio className="h-3 w-3" />}
+                hint={`${fmtInt(live.recentPieces)} pz en el tramo`}
+                lectura={lectura}
+              />
+            )
+          })()}
           <Kpi
             label="Tiempo produciendo"
             /*
