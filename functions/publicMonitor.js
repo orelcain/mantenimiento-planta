@@ -616,7 +616,7 @@ function normShiftName(s) {
 }
 
 async function loadPlannedShift(db, plantSlug, shiftId, scheduledStart) {
-  const vacio = { plannedEnd: null, quotaPieces: null }
+  const vacio = { plannedEnd: null, quotaPieces: null, setPoint: null }
   if (!shiftId || !scheduledStart) return vacio
   /*
    * Cada `plantSlug` del monitor es UNA línea, así que el id de config se
@@ -628,8 +628,23 @@ async function loadPlannedShift(db, plantSlug, shiftId, scheduledStart) {
   try {
     const snap = await db.doc(`graderModuleConfigs/${docId}`).get()
     if (!snap.exists) return vacio
+    /*
+     * El set point es de la LÍNEA, no del turno: se resuelve ANTES de buscar la
+     * entrada de horario, para que la primera noche de un turno nuevo —sin
+     * entrada todavía— no pierda también la referencia de máquina. Lo edita un
+     * supervisor en la PWA; acá solo se valida que sea un número usable.
+     */
+    const spRaw = snap.data()?.monitorSetPoint
+    const setPoint = spRaw && Number(spRaw.cpm) > 0
+      ? {
+        cpm: Number(spRaw.cpm),
+        medidoEl: typeof spRaw.medidoEl === 'string' ? spRaw.medidoEl : null,
+        metodo: typeof spRaw.metodo === 'string' ? spRaw.metodo : null,
+        por: typeof spRaw.por === 'string' ? spRaw.por : null,
+      }
+      : null
     const schedule = snap.data()?.shiftSchedule
-    if (!Array.isArray(schedule)) return vacio
+    if (!Array.isArray(schedule)) return { ...vacio, setPoint }
     /*
      * Comparación TOLERANTE de nombre de turno. Filete llama al suyo
      * "Turno Dia" y la config guarda "Turno día": comparando literal, Filete
@@ -639,7 +654,7 @@ async function loadPlannedShift(db, plantSlug, shiftId, scheduledStart) {
     // ̀-ͯ = los diacríticos que separa NFD. Escapado y no literal:
     // un archivo con otro encoding convertiría el rango en basura silenciosa.
     const entry = schedule.find(s => normShiftName(s?.shiftId) === normShiftName(shiftId))
-    if (!entry) return vacio
+    if (!entry) return { ...vacio, setPoint }
 
     const endH = Number(entry.endHour)
     const endM = Number(entry.endMinute ?? 0)
@@ -662,6 +677,7 @@ async function loadPlannedShift(db, plantSlug, shiftId, scheduledStart) {
     const enPiezas = entry.quota?.unit === 'pieces'
     return {
       plannedEnd: end,
+      setPoint,
       quotaPieces: enPiezas && Number.isFinite(quota) && quota > 0 ? quota : null,
       /*
        * `endPinned` lo marca quien fija el cierre A PROPÓSITO desde el monitor.
@@ -1168,6 +1184,7 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
   const shiftIdActual = parent.shiftId ?? machines[0]?.shiftId
   const cfg = await loadPlannedShift(db, plantSlug, shiftIdActual, scheduledStart)
   const planned = { quotaPieces: cfg.quotaPieces }
+  const setPoint = cfg.setPoint ?? null
 
   let plannedEnd = null
   let plannedEndSource = null
@@ -1225,6 +1242,13 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
     plannedEnd: iso(plannedEnd),
     /** 'fijado' | 'historial' | 'config' | null — para poder decirlo en pantalla. */
     plannedEndSource,
+    /**
+     * Set point operacional de la máquina, editado por un supervisor en la PWA
+     * (graderModuleConfigs.monitorSetPoint). Con fecha y método porque la
+     * fuente es parte del dato: 18 pz/min medidos con cronómetro no es lo mismo
+     * que un dato del PLC, y la pantalla lo dice.
+     */
+    setPoint,
     /** Turnos anteriores usados cuando se infirió del historial. */
     plannedEndSamples,
     /*

@@ -105,3 +105,4 @@ scripts/normalizacion/*-report.json
 # Artefacto del bundle para scripts Node (ver scripts/build-grader-core.js)
 scripts/_grader-core.cjs
 scripts/planos/_staging/
+scripts/.turnos-vistos.json

@@ -119,3 +119,17 @@ describe('llenadoDeSilletas', () => {
     expect(llenadoDeSilletas({ model: 'Baader 200', cpmAndando: null })).toBeNull()
   })
 })
+
+describe('setCpmOverride', () => {
+  it('el set point editado pisa al del código, sin tocar el máximo del manual', () => {
+    const l = llenadoDeSilletas({ model: 'Baader 200', cpmAndando: 10, setCpmOverride: 16 })!
+    expect(l.spec.setCpm).toBe(16)
+    expect(l.spec.setHz).toBeUndefined()  // el Hz era del set point viejo: no se hereda
+    expect(l.spec.maxCpm).toBe(21)        // el techo sale del manual, no se edita
+  })
+
+  it('sin override, el spec del código sigue mandando', () => {
+    expect(llenadoDeSilletas({ model: 'Baader 200', cpmAndando: 10 })!.spec.setCpm).toBe(18)
+    expect(llenadoDeSilletas({ model: 'Baader 200', cpmAndando: 10, setCpmOverride: 0 })!.spec.setCpm).toBe(18)
+  })
+})
