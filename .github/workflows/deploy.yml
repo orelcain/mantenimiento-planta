@@ -55,6 +55,16 @@ jobs:
       - name: Audit gráficos
         run: node scripts/audit-graficos.mjs --ci
 
+      # Guardarraíl de la NUEVA PIEL (mismo patrón de ratchet): falla solo si la
+      # deuda CRECE — emojis-ícono, colores Tailwind crudos, radios fuera de la
+      # escala o chips translúcidos nuevos. Hasta ahora corría solo a mano, y
+      # por eso se coló un PR con la línea base desincronizada sin que nadie se
+      # enterara. `--verbose` lista las ocurrencias nuevas en el log, para no
+      # tener que reproducirlo en local para saber qué se rompió.
+      # Normas: ARIA_MANTENIMIENTO_PLANTA/docs/NUEVA_PIEL_APPLE_HIG.md
+      - name: Audit piel
+        run: node scripts/audit-piel.mjs --verbose
+
       - name: Build PWA
         working-directory: apps/pwa
         env:
