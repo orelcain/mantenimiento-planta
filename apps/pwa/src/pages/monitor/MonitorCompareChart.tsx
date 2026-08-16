@@ -30,6 +30,23 @@ import { useZoomGesto, type Ventana } from './useZoomGesto'
 
 const nf = new Intl.NumberFormat('es-CL')
 const fmtInt = (n: number) => nf.format(Math.round(n || 0))
+/**
+ * El minuto de turno, en hora de reloj.
+ *
+ * ⚠ El eje sigue midiendo MINUTOS DESDE EL ARRANQUE —es la única base que hace
+ * comparables dos días— pero la etiqueta ya no dice «h+6», que no le sirve a
+ * nadie parado en planta. Se rotula con el reloj del turno VISTO; los otros
+ * días quedan alineados por hora de turno, no de reloj. En Filete los 7 turnos
+ * medidos arrancaron todos a las 07:40 exactas, así que la diferencia es cero;
+ * cuando no lo sea, la nota bajo el eje lo dice.
+ */
+function horaDesde(t0: string | null | undefined, min: number): string | null {
+  if (!t0) return null
+  const ms = Date.parse(t0)
+  if (Number.isNaN(ms)) return null
+  return new Date(ms + min * 60_000).toISOString().slice(11, 16)
+}
+
 /** Miles del eje: "5k" o "2,5k" — sin decimal cuando es entero. */
 const fmtDec1 = (n: number) =>
   Number.isInteger(n) ? String(n) : n.toLocaleString('es-CL', { maximumFractionDigits: 1 })
@@ -96,9 +113,14 @@ function tramosDeBrecha(hoy: PacePoint[], ref: PacePoint[]): Array<{
   return out.filter((s) => s.hoy.length >= 2)
 }
 
-export function MonitorCompareChart({ cmp, cerrado, claveSel, onSel, cone, ventana, onVentana }: {
+export function MonitorCompareChart({ cmp, cerrado, claveSel, onSel, cone, ventana, onVentana, t0 }: {
   cmp: CompareResult
   cerrado: boolean
+  /**
+   * ISO del primer tramo con dato del turno VISTO: convierte los minutos del
+   * eje en hora de reloj. Sin él, el eje vuelve a «h+N».
+   */
+  t0?: string | null
   /*
    * Adónde llegaría el turno según los anteriores, de acá al cierre. Se dibuja
    * como una banda que nace en la punta de la curva de hoy: si la línea de la
@@ -214,7 +236,7 @@ export function MonitorCompareChart({ cmp, cerrado, claveSel, onSel, cone, venta
       .map((p) => `L${x(p.minutes).toFixed(2)},${y(p.pieces).toFixed(2)}`)
       .join(' ')} Z`
 
-  /* Marcas cada hora de TURNO: h+1, h+2… Es el eje que se puede comparar. */
+  /* Marcas cada hora de TURNO, rotuladas con el reloj del turno visto. */
   const marcas: number[] = []
   const cadaHora = zoom >= 2 ? 60 : 120
   for (let m = cadaHora; m <= maxMin; m += cadaHora) marcas.push(m)
@@ -379,7 +401,7 @@ export function MonitorCompareChart({ cmp, cerrado, claveSel, onSel, cone, venta
                 <span key={m}
                   className="absolute top-0 -translate-x-1/2 whitespace-nowrap text-[9px] tabular-nums text-muted-foreground"
                   style={{ left: `${fx(m) * 100}%` }}>
-                  h+{m / 60}
+                  {horaDesde(t0, m) ?? `h+${m / 60}`}
                 </span>
               ))}
             </div>
