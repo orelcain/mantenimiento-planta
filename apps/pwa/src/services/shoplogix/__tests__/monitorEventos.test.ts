@@ -138,7 +138,8 @@ describe('agruparEventos', () => {
       stopReasons: ['AGUA'],
       stopEvents: [{ r: 0, f: '2026-08-14T12:43:00.000Z', s: 660 }],
     })
-    expect(g[0]!.causas[0]!.paradas[0]!.hora).toBe('12:43')
+    // Con SEGUNDOS: sin ellos, «08:11→08:12 · 1,5 min» se contradecía solo.
+    expect(g[0]!.causas[0]!.paradas[0]!.hora).toBe('12:43:00')
   })
 
   it('sin desglose de tiempo no inventa grupos', () => {

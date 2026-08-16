@@ -16,6 +16,7 @@ import { resumenComparacion, type CompareResult } from '@/services/shoplogix/mon
 import { MAX_MAPE_PCT, type ConePoint, type ForecastResult } from '@/services/shoplogix/monitorForecast'
 import { MonitorCompareChart } from './MonitorCompareChart'
 import type { Ventana } from './useZoomGesto'
+import type { NotaDeOperador } from './notasOperador'
 
 const nf = new Intl.NumberFormat('es-CL')
 const fmtInt = (n: number) => nf.format(Math.round(n || 0))
@@ -138,8 +139,8 @@ function fmtDurMin(min: number): string {
  * le pide a la línea que recupere un tiempo que por convenio no se recupera.
  */
 export function TiempoDelTurno({
-  tb, causaSel, onCausa, onVentana, proximaParada, notas, cerrado, meta, hechas, cuotaAhora,
-  horaAhora, cpmAndando, costo, grupos, notasTurno,
+  tb, causaSel, onCausa, onVentana, onTramo, proximaParada, notas, cerrado, meta, hechas,
+  cuotaAhora, horaAhora, cpmAndando, costo, grupos, notasTurno,
 }: {
   tb: PublicMonitorLive['timeBreakdown']
   causaSel?: string | null
@@ -149,11 +150,16 @@ export function TiempoDelTurno({
    * a todas las de su causa: tocar «de 08:57 a 09:02» lleva el gráfico ahí.
    */
   onVentana?: (v: Ventana | null) => void
+  /**
+   * Marcar UNA parada en el gráfico. Sin esto, tocar una microdetención
+   * pintaba las 40 de su causa y no se podía saber cuál era ni medirla.
+   */
+  onTramo?: (v: Ventana | null) => void
   /** La próxima parada de convenio pronosticada: hora de reloj Y su nombre —
       «la próxima entra a las 12:50» obligaba a adivinar cuál. */
   proximaParada?: { hora: string; reason: string } | null
   /** Comentarios del operador agrupados por causa (ver `notasPorCausa`). */
-  notas?: Map<string, Array<{ desde: string; texto: string }>>
+  notas?: Map<string, NotaDeOperador[]>
   /** true con el turno cerrado: la resta se hace contra la meta COMPLETA. */
   cerrado?: boolean
   /** La meta del turno completo. null si no hay meta. */
@@ -439,6 +445,7 @@ export function TiempoDelTurno({
                               sel={causaSel ?? null}
                               onCausa={onCausa}
                               onVentana={onVentana}
+                              onTramo={onTramo}
                               notas={notas}
                               proximaParada={null}
                               plannedMin={tb.plannedMin}
@@ -543,6 +550,7 @@ export function TiempoDelTurno({
                           sel={causaSel ?? null}
                           onCausa={onCausa}
                           onVentana={onVentana}
+                          onTramo={onTramo}
                           notas={notas}
                           proximaParada={proximaParada}
                           plannedMin={tb.plannedMin}
@@ -632,6 +640,7 @@ export function TiempoDelTurno({
                 sel={causaSel ?? null}
                 onCausa={onCausa}
                 onVentana={onVentana}
+                onTramo={onTramo}
                 notas={notas}
                 proximaParada={g.dueno === 'programado' ? proximaParada : null}
                 plannedMin={tb.plannedMin}
@@ -772,12 +781,13 @@ export function TiempoDelTurno({
  * que nadie imputó— y sin la separación la cifra se lee como si alguien de
  * Mantención hubiera fallado.
  */
-function GrupoDeEventos({ g, sel, onCausa, onVentana, notas, proximaParada, plannedMin }: {
+function GrupoDeEventos({ g, sel, onCausa, onVentana, onTramo, notas, proximaParada, plannedMin }: {
   g: GrupoDelTurno
   sel: string | null
   onCausa?: (c: string | null) => void
   onVentana?: (v: Ventana | null) => void
-  notas?: Map<string, Array<{ desde: string; texto: string }>>
+  onTramo?: (v: Ventana | null) => void
+  notas?: Map<string, NotaDeOperador[]>
   /** Solo en el grupo de convenio: cuándo entra la próxima, y cuál. */
   proximaParada?: { hora: string; reason: string } | null
   plannedMin: number
@@ -806,7 +816,7 @@ function GrupoDeEventos({ g, sel, onCausa, onVentana, notas, proximaParada, plan
       <ul className="mt-0.5 space-y-0.5 pl-2 text-[11.5px]">
         {g.causas.map((c) => (
           <FilaEvento key={c.reason} c={c} sel={sel} onCausa={onCausa} onVentana={onVentana}
-            notas={notas?.get(c.reason)} />
+            onTramo={onTramo} notas={notas?.get(c.reason)} />
         ))}
       </ul>
       {/* ⚠ El aviso NO se apaga con la primera parada planificada: 7 min de
@@ -834,16 +844,17 @@ function GrupoDeEventos({ g, sel, onCausa, onVentana, notas, proximaParada, plan
  * quedaría fuera de pantalla. La causa se marca igual en la serie, y el salto es
  * un toque más, explícito.
  */
-function FilaEvento({ c, sel, onCausa, onVentana, notas }: {
+function FilaEvento({ c, sel, onCausa, onVentana, onTramo, notas }: {
   c: CausaDelTurno
   sel: string | null
   onCausa?: (c: string | null) => void
   onVentana?: (v: Ventana | null) => void
+  onTramo?: (v: Ventana | null) => void
   /**
    * Lo que el operador escribió sobre ESTA causa. La causa y su explicación son
    * la misma respuesta a "¿por qué paró?", así que van juntas.
    */
-  notas?: Array<{ desde: string; texto: string }>
+  notas?: NotaDeOperador[]
 }) {
   const [abierta, setAbierta] = useState(false)
   const activa = sel === c.reason
@@ -851,9 +862,16 @@ function FilaEvento({ c, sel, onCausa, onVentana, notas }: {
    * Con muchas paradas, listarlas todas es la lista de 46 filas que estamos
    * evitando: se resume y se muestran las más largas, que son las que pesan.
    */
+  /*
+   * TODAS las paradas, no una muestra (pedido de Orel): cortar en 3 dejaba
+   * fuera 37 de las 40 microdetenciones y con ellas cualquier posibilidad de
+   * ubicar la que a uno le interesa. Siguen ordenadas de más larga a más
+   * corta; con muchas, la lista scrollea dentro de su propia caja para no
+   * empujar el resto del bloque fuera de pantalla.
+   */
   const MUCHAS = 6
   const muchas = c.paradas.length > MUCHAS
-  const visibles = muchas ? c.paradas.slice(0, 3) : c.paradas
+  const visibles = c.paradas
   /*
    * ⚠ El resumen se calcula con el `count` de la FILA, no con la cantidad de
    * eventos que trae `paradas`: los dos números no coinciden —el 14-08 la fila
@@ -863,6 +881,25 @@ function FilaEvento({ c, sel, onCausa, onVentana, notas }: {
    */
   const cuantas = c.count || c.paradas.length
   const prom = cuantas > 0 ? (c.min / cuantas) * 60 : 0
+
+  /*
+   * El comentario del operador va PEGADO a la parada que explica, no en una
+   * lista aparte que repetía la hora (pedido de Orel: «ligado al evento
+   * imputado, no duplicado»). Se emparejan por tramo, con dos minutos de
+   * tolerancia: el operador escribe cuando ya paró, no en el instante exacto.
+   *
+   * Las que no calzan con ninguna parada visible NO se tiran: quedan en la
+   * lista de abajo. Perder lo que escribió el piso ya nos costó una vez.
+   */
+  const TOLERANCIA_MIN = 2
+  const notaDe = (p: { desdeMin: number | null; hastaMin: number | null }) =>
+    (notas ?? []).filter((n) =>
+      n.desdeMin != null && p.desdeMin != null && p.hastaMin != null &&
+      n.desdeMin >= p.desdeMin - TOLERANCIA_MIN && n.desdeMin <= p.hastaMin + TOLERANCIA_MIN)
+  const emparejadas = new Set(
+    (c.paradas ?? []).flatMap((p) => notaDe(p)).map((n) => n.texto),
+  )
+  const sueltas = (notas ?? []).filter((n) => !emparejadas.has(n.texto))
 
   const cifras = (
     <span className="shrink-0 tabular-nums">
@@ -926,7 +963,7 @@ function FilaEvento({ c, sel, onCausa, onVentana, notas }: {
             causa; eso ya lo hace tocar la causa madre, y una parada de 5 min
             perdida entre 40 microparadas era imposible de ubicar.
           */}
-          <ul className="space-y-px">
+          <ul className={`space-y-px ${muchas ? 'max-h-56 overflow-y-auto pr-1' : ''}`}>
             {visibles.map((p, i) => {
               const saltable = onVentana != null && p.desdeMin != null && p.hastaMin != null
               const contenido = (
@@ -937,6 +974,7 @@ function FilaEvento({ c, sel, onCausa, onVentana, notas }: {
                   <span className="tabular-nums">{fmtDec(p.min)} min</span>
                 </>
               )
+              const suyas = notaDe(p)
               return (
                 <li key={`${p.hora}-${i}`}>
                   {saltable ? (
@@ -944,6 +982,8 @@ function FilaEvento({ c, sel, onCausa, onVentana, notas }: {
                       type="button"
                       onClick={() => {
                         onCausa?.(c.reason)
+                        /* La banda marcada es ESTA parada, no las 40 de su causa. */
+                        onTramo?.({ desdeMin: p.desdeMin!, hastaMin: p.hastaMin! })
                         /* Un respiro proporcional a la parada (mín. 3 min): pegada
                            al borde no se entiende qué venía antes ni después. */
                         const aire = Math.max(3, p.min * 0.8)
@@ -963,19 +1003,35 @@ function FilaEvento({ c, sel, onCausa, onVentana, notas }: {
                   ) : (
                     <div className="flex gap-3 px-1 py-1 text-[11px] text-muted-foreground">{contenido}</div>
                   )}
+                  {/* Lo que el operador escribió DE ESTA parada: sin repetir la
+                      hora, que ya la dice la línea de arriba. */}
+                  {suyas.map((n) => (
+                    <p key={n.texto} className="ml-1 border-l-2 border-primary pl-2 text-[11px] leading-snug text-muted-foreground">
+                      «{n.texto}»
+                    </p>
+                  ))}
                 </li>
               )
             })}
           </ul>
-          {muchas && <p className="text-[11px] italic text-muted-foreground/70">las 3 más largas</p>}
+          {muchas && (
+            <p className="text-[11px] italic text-muted-foreground/70">
+              las {c.paradas.length}, de la más larga a la más corta
+            </p>
+          )}
         </div>
       )}
 
-      {(notas ?? []).length > 0 && (
-        <ul className="mt-0.5 space-y-0.5 border-l-2 border-sky-600 pl-2">
-          {notas!.map((n, i) => (
+      {/* Con la causa ABIERTA, las notas ya viven dentro de su parada: acá
+          quedan solo las que no calzaron con ninguna. Con la causa cerrada se
+          muestran todas — son la señal de que el piso explicó algo. */}
+      {(abierta ? sueltas : (notas ?? [])).length > 0 && (
+        <ul className="mt-0.5 space-y-0.5 border-l-2 border-primary pl-2">
+          {(abierta ? sueltas : (notas ?? [])).map((n, i) => (
             <li key={`${n.desde}-${i}`} className="text-[11px] leading-snug text-muted-foreground">
-              <span className="tabular-nums">{n.desde}</span> · «{n.texto}»
+              <span className="tabular-nums">
+                {n.desde}{n.hasta && n.hasta !== n.desde && <>→{n.hasta}</>}
+              </span> · «{n.texto}»
             </li>
           ))}
         </ul>

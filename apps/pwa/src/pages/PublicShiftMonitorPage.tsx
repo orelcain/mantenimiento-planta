@@ -353,7 +353,7 @@ function EditorSetPoint({ actual, onGuardar }: {
  * hora fue la caída y por qué. SVG puro, sin librerías de gráficos.
  */
 function Sparkbars({
-  series, stopReasons, stopEvents, comments, causaSel, onCausa, breaks,
+  series, stopReasons, stopEvents, comments, causaSel, onCausa, tramoSel, breaks,
   recentPerMinute, requiredPerMinute, medianCpm, setCpm, fuenteSetPoint, onGuardarSetPoint, cerrado, ventana, onVentana,
 }: {
   /** Ventana visible compartida con el comparador (minutos de turno). */
@@ -384,6 +384,12 @@ function Sparkbars({
   comments?: PublicMonitorLive['comments']
   causaSel: string | null
   onCausa: (c: string | null) => void
+  /**
+   * UNA parada concreta, en minutos de turno. Cuando está, la banda marcada es
+   * SOLO esa: con «Micro Detencion» seleccionada se pintaban las 40 y era
+   * imposible saber cuál se tocó ni medir su largo.
+   */
+  tramoSel?: Ventana | null
   /**
    * Paradas de convenio, de fondo: las mismas bandas grises del comparador y
    * de la curva de velocidad, y de la MISMA fuente (`comparacion.breaks`).
@@ -578,7 +584,19 @@ function Sparkbars({
 
   // Bandas de la causa elegida. Se dibujan primero para quedar DETRÁS de las
   // barras: la producción es el dato, la detención es el contexto.
-  const bandas = causaSel && stopEvents && stopReasons
+  const bandas = tramoSel
+    ? (() => {
+        const desde = tiempos[0]! + tramoSel.desdeMin * 60_000
+        const hasta = tiempos[0]! + tramoSel.hastaMin * 60_000
+        const i0 = indiceDe(desde)
+        const i1 = indiceDe(hasta)
+        return [{
+          x: i0 * stepX,
+          ancho: Math.max((i1 - i0) * stepX, bw * 0.6),
+          key: `tramo-${tramoSel.desdeMin}-${tramoSel.hastaMin}`,
+        }]
+      })()
+    : causaSel && stopEvents && stopReasons
     ? stopEvents
         .filter(e => stopReasons[e.r] === causaSel)
         .map((e, i) => {
@@ -1702,6 +1720,9 @@ export function PublicShiftMonitorPage() {
   const turnoParam = searchParams.get('turno')
   /** Causa de detención resaltada sobre el gráfico. */
   const [causaSel, setCausaSel] = useState<string | null>(null)
+  /* La parada concreta que se está mirando: marca UNA banda, no las 40 de su
+     causa. Se limpia al soltar la causa o al elegir otra. */
+  const [tramoSel, setTramoSel] = useState<Ventana | null>(null)
   /**
    * El tramo de turno que se está mirando, en minutos desde el primer tramo
    * con dato. Vive acá porque lo COMPARTEN los dos gráficos: acercarse en la
@@ -1862,8 +1883,9 @@ export function PublicShiftMonitorPage() {
    * completa sigue abajo: esto son las dos primeras notas de cada causa.
    */
   const notasDeOperador = useMemo(
-    () => notasPorCausa(live?.comments, fmtWallTime),
-    [live?.comments],
+    () => notasPorCausa(live?.comments, fmtWallTime, live?.series?.[0]?.t ?? null),
+    // El t0 entra en la cuenta: sin él las notas no sabrían dónde caen.
+    [live?.comments, live?.series],
   )
 
   /* Los que Shoplogix marca para el turno entero: no cuelgan de ninguna parada
@@ -2840,7 +2862,8 @@ export function PublicShiftMonitorPage() {
               stopEvents={live.stopEvents}
               comments={live.comments}
               causaSel={causaSel}
-              onCausa={setCausaSel}
+              onCausa={(c) => { setCausaSel(c); setTramoSel(null) }}
+              tramoSel={tramoSel}
               breaks={comparacion.breaks}
               ventana={ventanaGrafica}
               onVentana={setVentanaGrafica}
@@ -2872,8 +2895,9 @@ export function PublicShiftMonitorPage() {
             <TiempoDelTurno
               tb={live.timeBreakdown}
               causaSel={causaSel}
-              onCausa={setCausaSel}
+              onCausa={(c) => { setCausaSel(c); setTramoSel(null) }}
               onVentana={setVentanaGrafica}
+              onTramo={setTramoSel}
               proximaParada={proximaParada}
               notas={notasDeOperador}
               /* La resta: minutos parados -> piezas, al ritmo del turno.
@@ -2952,7 +2976,8 @@ export function PublicShiftMonitorPage() {
               stopEvents={live.stopEvents}
               comments={live.comments}
               causaSel={causaSel}
-              onCausa={setCausaSel}
+              onCausa={(c) => { setCausaSel(c); setTramoSel(null) }}
+              tramoSel={tramoSel}
               breaks={comparacion.breaks}
               ventana={ventanaGrafica}
               onVentana={setVentanaGrafica}
@@ -2981,8 +3006,9 @@ export function PublicShiftMonitorPage() {
             <TiempoDelTurno
               tb={live.timeBreakdown}
               causaSel={causaSel}
-              onCausa={setCausaSel}
+              onCausa={(c) => { setCausaSel(c); setTramoSel(null) }}
               onVentana={setVentanaGrafica}
+              onTramo={setTramoSel}
               proximaParada={proximaParada}
               notas={notasDeOperador}
               /* La resta: minutos parados -> piezas, al ritmo del turno.
