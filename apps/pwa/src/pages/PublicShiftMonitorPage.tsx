@@ -2018,13 +2018,25 @@ export function PublicShiftMonitorPage() {
   /* Qué turno se mira: el propio, o todos juntos para comparar día vs noche. */
   const [turnoPareto, setTurnoPareto] = useState<string | 'todos' | null>(null)
 
+  /* El ranking y su barra: SOLO turnos con detalle de causas, o el total de
+     arriba no cuadraría con la suma de las filas de abajo. */
   const turnosDelPareto = useMemo(
+    () => turnosParaVentana(turnosConocidos, {
+      ventana: ventanaPareto,
+      turno: turnoPareto ?? vista?.shiftId ?? null,
+      conCausas: true,
+    }),
+    [turnosConocidos, ventanaPareto, turnoPareto, vista?.shiftId],
+  )
+  /* La tendencia mira más turnos: solo necesita minutos, no causas. */
+  const turnosDeTendencia = useMemo(
     () => turnosParaVentana(turnosConocidos, {
       ventana: ventanaPareto,
       turno: turnoPareto ?? vista?.shiftId ?? null,
     }),
     [turnosConocidos, ventanaPareto, turnoPareto, vista?.shiftId],
   )
+  const paretoTendencia = useMemo(() => contextoPareto(turnosDeTendencia), [turnosDeTendencia])
 
   const pareto = useMemo(
     () => buildPareto(turnosDelPareto.map((t) => t.causas ?? null)),
@@ -3220,7 +3232,7 @@ export function PublicShiftMonitorPage() {
         )}
 
         <ParetoDeParadas
-          pareto={pareto} ctx={paretoCtx} tendencia={paretoCtx}
+          pareto={pareto} ctx={paretoCtx} tendencia={paretoTendencia}
           porTurno={paretoPorTurno}
           ventana={ventanaPareto} onVentana={setVentanaPareto}
           turno={turnoPareto ?? vista?.shiftId ?? null} onTurno={setTurnoPareto}
