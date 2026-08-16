@@ -59,13 +59,24 @@ export function VsAyerBloque({ r, records }: {
 
   /*
    * Los términos se muestran de MAYOR a menor efecto: el orden fijo del
-   * servicio es para auditar; acá manda qué explicó el día. El residuo va
-   * siempre último — es el «no sabemos», no una causa.
+   * servicio es para auditar; acá manda qué explicó el día.
+   *
+   * ⚠ El RESIDUO no es un término de la lista: es el «no sabemos». Medido en
+   * los 5 turnos comparables de Filete pesa entre 11 y 82 pz (1-11% de la
+   * diferencia) mientras las causas reales mueven cientos — con fila propia
+   * se leía como una causa más, y encima con nombre de manual. Va al PIE, en
+   * castellano llano. Borrarlo no era opción: sin él las cuatro causas no
+   * suman la cifra del título y el descuadre se discute en vez de arreglarse.
    */
   const terminos = r
-    ? [...r.terminos].sort((a, b) =>
-      (a.clave === 'residuo' ? -1 : Math.abs(a.piezas)) < (b.clave === 'residuo' ? -1 : Math.abs(b.piezas)) ? 1 : -1)
+    ? [...r.terminos]
+      .filter((t) => t.clave !== 'residuo')
+      .sort((a, b) => (Math.abs(a.piezas) < Math.abs(b.piezas) ? 1 : -1))
     : []
+  const residuo = r?.terminos.find((t) => t.clave === 'residuo') ?? null
+  const residuoPct = r && residuo
+    ? Math.round((Math.abs(residuo.piezas) / Math.max(Math.abs(r.diff), 1)) * 100)
+    : 0
 
   const gano = r != null && r.diff >= 0
   const masRapido = r != null && r.ritmoHoy > r.ritmoAyer
@@ -87,7 +98,6 @@ export function VsAyerBloque({ r, records }: {
       t: t.hoy > t.ayer ? 'Línea más rápida' : 'Línea más lenta',
       d: `${fmtDec(t.hoy)} contra ${fmtDec(t.ayer)} pz/min andando`,
     }),
-    residuo: () => ({ t: 'Huecos de sensor y redondeo', d: '' }),
   }
 
   return (
@@ -130,7 +140,7 @@ export function VsAyerBloque({ r, records }: {
             {terminos.map((t) => {
               const tx = textos[t.clave]?.(t)
               if (!tx || Math.round(t.piezas) === 0) return null
-              const signo = t.clave === 'residuo' ? '·' : t.piezas > 0 ? '+' : '−'
+              const signo = t.piezas > 0 ? '+' : '−'
               return <Termino key={t.clave} signo={signo} titulo={tx.t} detalle={tx.d} piezas={t.piezas} />
             })}
             <div className="flex items-baseline justify-between border-t-2 border-border pt-1.5 text-[12px] font-bold">
@@ -141,9 +151,17 @@ export function VsAyerBloque({ r, records }: {
             </div>
           </div>
 
-          <p className="mt-1.5 text-[10px] leading-snug text-muted-foreground/70">
+          <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground/70">
             Contra el último turno del mismo nombre con datos completos. Piezas estimadas al ritmo
             andando de cada día.
+            {residuo && Math.round(Math.abs(residuo.piezas)) > 0 && (
+              <>
+                {' '}Quedan{' '}
+                <span className="tabular-nums">{fmtInt(Math.abs(residuo.piezas))} pz</span> sin
+                atribuir ({residuoPct}%): minutos que el sensor no alcanzó a clasificar, más
+                redondeo.
+              </>
+            )}
           </p>
         </>
       )}
