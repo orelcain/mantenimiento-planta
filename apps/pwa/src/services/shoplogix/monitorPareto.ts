@@ -253,16 +253,25 @@ function cuartil(orden: number[], q: number): number {
  * apagada tiene 0 min recuperables y dibujaría una mejora que no ocurrió.
  */
 export function contextoPareto(turnos: TurnoCtx[]): ContextoPareto {
-  const unicos = muestraUnica(turnos).filter((t) => (t.windowMin ?? 0) > 0)
+  /*
+   * ⚠⚠ Los turnos SIN PRODUCCIÓN quedan fuera de TODA la cuenta, no solo de la
+   * serie: un sábado con la línea apagada aporta 7 h 45 min al denominador y
+   * cero al numerador, así que baja el indicador sin que nadie haya arreglado
+   * una parada. Mirando el turno de hoy el bloque decía «7 turnos · 10,3%» y
+   * mirando el de ayer «6 turnos · 11,9%» — con los mismos 6 turnos de trabajo
+   * adentro. El mismo vicio que el convenio en el denominador: mejorar por no
+   * producir. Siguen contándose aparte (`sinProduccion`) para que el día no
+   * desaparezca de la pantalla.
+   */
+  const conVentana = muestraUnica(turnos).filter((t) => (t.windowMin ?? 0) > 0)
+  const unicos = conVentana.filter((t) => (t.producingMin ?? 0) > 0)
   const suma = (f: (t: TurnoCtx) => number) => unicos.reduce((a, t) => a + f(t), 0)
   const ventanaMin = suma((t) => t.windowMin ?? 0)
   const produciendoMin = suma((t) => t.producingMin ?? 0)
   const convenioMin = suma((t) => t.plannedMin ?? 0)
   const recuperableMin = suma((t) => t.recoverableMin ?? 0)
 
-  const conProduccion = [...unicos]
-    .filter((t) => (t.producingMin ?? 0) > 0)
-    .sort((a, b) => a.dateKey.localeCompare(b.dateKey))
+  const conProduccion = [...unicos].sort((a, b) => a.dateKey.localeCompare(b.dateKey))
   const serie: PuntoTendencia[] = conProduccion.map((t) => ({
     dateKey: t.dateKey,
     pct: ((t.recoverableMin ?? 0) / (t.windowMin || 1)) * 100,
@@ -308,7 +317,7 @@ export function contextoPareto(turnos: TurnoCtx[]): ContextoPareto {
     huecosMin: Math.max(0, ventanaMin - produciendoMin - convenioMin - recuperableMin),
     pct: ventanaMin > 0 ? (recuperableMin / ventanaMin) * 100 : 0,
     serie,
-    sinProduccion: unicos.filter((t) => !((t.producingMin ?? 0) > 0)).map((t) => t.dateKey),
+    sinProduccion: conVentana.filter((t) => !((t.producingMin ?? 0) > 0)).map((t) => t.dateKey),
     banda,
     veredicto,
     vara,

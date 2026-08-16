@@ -203,18 +203,35 @@ describe('contextoPareto · el marco temporal del Pareto', () => {
   it('⚠ el turno que se está mirando no se cuenta dos veces', () => {
     const conDuplicado = [TURNOS[5]!, ...TURNOS]     // el 14-08, como en la página
     const c = contextoPareto(conDuplicado)
-    expect(c.turnos).toBe(7)
+    expect(c.turnos).toBe(6)                         // 7 menos el sábado sin producción
     expect(c.recuperableMin).toBe(351)               // no 406
   })
 
   it('el 100% es el tiempo TOTAL, con el convenio a la vista', () => {
     const c = contextoPareto(TURNOS)
-    expect(c.ventanaMin).toBe(3415)
+    expect(c.ventanaMin).toBe(2950)                  // 3.415 menos los 465 del sábado
     expect(c.convenioMin).toBe(374)                  // el convenio se muestra, no se descuenta
     expect(c.recuperableMin).toBe(351)
-    expect(c.pct).toBeCloseTo(10.3, 1)
-    // Con el tiempo útil como base daría 11,6%: más alto y sin ver la colación.
-    expect(c.pct).toBeLessThan((351 / (3415 - 374)) * 100)
+    expect(c.pct).toBeCloseTo(11.9, 1)
+    // Con el tiempo útil como base daría más: 351/(2950-374).
+    expect(c.pct).toBeLessThan((351 / (2950 - 374)) * 100)
+  })
+
+  /*
+   * ⚠⚠ El turno con la línea APAGADA no puede diluir el indicador: aporta
+   * ventana al denominador y cero al numerador, así que el % «mejora» sin que
+   * nadie haya arreglado una parada. Mirando el turno de hoy el bloque decía
+   * «7 turnos · 10,3%» y mirando el de ayer «6 turnos · 11,9%», con los mismos
+   * seis turnos de trabajo adentro.
+   */
+  it('⚠ un turno sin producción no baja el indicador por no trabajar', () => {
+    const soloConTrabajo = TURNOS.filter((t) => (t.producingMin ?? 0) > 0)
+    const conElSabado = contextoPareto(TURNOS)
+    const sinElSabado = contextoPareto(soloConTrabajo)
+    expect(conElSabado.pct).toBeCloseTo(sinElSabado.pct, 5)
+    expect(conElSabado.ventanaMin).toBe(sinElSabado.ventanaMin)
+    // Pero el día no desaparece: queda contado aparte.
+    expect(conElSabado.sinProduccion).toEqual(['2026-08-15'])
   })
 
   it('⚠ el turno sin producción no dibuja una mejora que no ocurrió', () => {
