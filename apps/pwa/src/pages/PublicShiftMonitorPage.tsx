@@ -546,6 +546,22 @@ function Sparkbars({
     return 0
   }
 
+  /**
+   * Posición horizontal EXACTA de un instante, con su fracción dentro del
+   * tramo.
+   *
+   * ⚠ Antes se dibujaba por índice de tramo y con un ancho mínimo de 0,6
+   * barras: una microparada de 15 s pintaba media barra de 5 min y parecía
+   * durar veinte veces más de lo que duró. La posición sigue buscándose por
+   * ÍNDICE (la serie no es continua), pero adentro del tramo se interpola.
+   */
+  const xDe = (ms: number) => {
+    const i = indiceDe(ms)
+    const frac = Math.min(1, Math.max(0, (ms - tiempos[i]!) / paso))
+    return (i + frac) * stepX
+  }
+
+
   /*
    * Fondo de convenio. Solo las que explican un hueco VISIBLE: una parada de
    * 5 min pinta un puntito gris que ensucia en vez de explicar. Y la posición
@@ -584,33 +600,32 @@ function Sparkbars({
 
   // Bandas de la causa elegida. Se dibujan primero para quedar DETRÁS de las
   // barras: la producción es el dato, la detención es el contexto.
+  /*
+   * Ancho mínimo de una banda: lo justo para que un paro corto se VEA, sin
+   * fingir que duró más. Antes el piso era 0,6 barras (≈3 min de los 5 del
+   * tramo) y una microparada de 15 s se dibujaba como si fuera eterna.
+   */
+  const ANCHO_MIN = Math.min(0.25, bw * 0.25)
+  const bandaDe = (desde: number, hasta: number, key: string) => {
+    const x = xDe(desde)
+    return { x, ancho: Math.max(xDe(hasta) - x, ANCHO_MIN), key }
+  }
+
   const bandas = tramoSel
-    ? (() => {
-        const desde = tiempos[0]! + tramoSel.desdeMin * 60_000
-        const hasta = tiempos[0]! + tramoSel.hastaMin * 60_000
-        const i0 = indiceDe(desde)
-        const i1 = indiceDe(hasta)
-        return [{
-          x: i0 * stepX,
-          ancho: Math.max((i1 - i0) * stepX, bw * 0.6),
-          key: `tramo-${tramoSel.desdeMin}-${tramoSel.hastaMin}`,
-        }]
-      })()
+    ? [bandaDe(
+        tiempos[0]! + tramoSel.desdeMin * 60_000,
+        tiempos[0]! + tramoSel.hastaMin * 60_000,
+        `tramo-${tramoSel.desdeMin}-${tramoSel.hastaMin}`,
+      )]
     : causaSel && stopEvents && stopReasons
     ? stopEvents
         .filter(e => stopReasons[e.r] === causaSel)
+        // La key lleva el índice: dos paros pueden arrancar en el MISMO
+        // instante con distinta duración, y con `e.f` sola React los tomaba
+        // por el mismo elemento.
         .map((e, i) => {
           const desde = new Date(e.f).getTime()
-          const hasta = desde + e.s * 1000
-          const i0 = indiceDe(desde)
-          const i1 = indiceDe(hasta)
-          const x = i0 * stepX
-          // Al menos un tramo de ancho: un paro de 40 s tiene que verse.
-          const ancho = Math.max((i1 - i0 + (e.s >= paso ? 1 : 0)) * stepX, bw * 0.6)
-          // La key lleva el índice: dos paros pueden arrancar en el MISMO
-          // instante con distinta duración, y con `e.f` sola React los tomaba
-          // por el mismo elemento.
-          return { x, ancho, key: `${e.f}-${e.s}-${i}` }
+          return bandaDe(desde, desde + e.s * 1000, `${e.f}-${e.s}-${i}`)
         })
     : []
 
@@ -631,11 +646,37 @@ function Sparkbars({
     if (!stopEvents || !stopReasons) return null
     const desde = tiempos[i]!
     const hasta = desde + paso
-    const e = stopEvents.find((x) => {
+    /*
+     * ⚠⚠ Antes: `.find()` — el PRIMER evento que rozara el tramo, con su
+     * duración completa. En el tramo 08:25-08:30 del 12-08 había tres paradas
+     * (15 s + 15 s + los primeros 24 s de una de 75 s) y el chip decía «Micro
+     * Detencion 15 s»: ni la parada más larga, ni el total, ni lo que cabía en
+     * el tramo. Ahora se suma lo que CADA parada pasó DENTRO del tramo, que es
+     * lo único que ese tramo puede afirmar.
+     */
+    let sec = 0
+    let cuantas = 0
+    const porCausa = new Map<string, number>()
+    for (const x of stopEvents) {
       const a = new Date(x.f).getTime()
-      return a < hasta && a + x.s * 1000 > desde
-    })
-    return e ? { causa: stopReasons[e.r]!, sec: e.s } : null
+      const b = a + x.s * 1000
+      const solape = Math.min(b, hasta) - Math.max(a, desde)
+      if (solape <= 0) continue
+      const causa = stopReasons[x.r]
+      if (!causa) continue
+      sec += solape / 1000
+      cuantas += 1
+      porCausa.set(causa, (porCausa.get(causa) ?? 0) + solape / 1000)
+    }
+    if (cuantas === 0) return null
+    const [causa] = [...porCausa.entries()].sort((a, b) => b[1] - a[1])[0]!
+    return {
+      causa,
+      sec: Math.round(sec),
+      cuantas,
+      /** Más de una causa en el mismo tramo: el chip no puede nombrar una sola. */
+      variasCausas: porCausa.size > 1,
+    }
   }
 
   /** Lo que el operador escribió sobre lo que pasó en ese tramo. */
@@ -859,8 +900,12 @@ function Sparkbars({
               {' '}({fmtDec(detalle.pz / 5, 1)} pz/min)
             </span>
             {detalle.paro && (
+              /* Lo que ese tramo estuvo parado, sumando las paradas que caen
+                 DENTRO de él — no la duración de una sola. */
               <span className="text-rose-700 dark:text-rose-300">
-                {' '}- {detalle.paro.causa} {fmtDurationSec(detalle.paro.sec)}
+                {' '}- {detalle.paro.variasCausas ? 'detenida' : detalle.paro.causa}{' '}
+                {fmtDurationSec(detalle.paro.sec)}
+                {detalle.paro.cuantas > 1 && ` en ${detalle.paro.cuantas} paradas`}
               </span>
             )}
             {/* El comentario del operador es el unico texto en castellano del
