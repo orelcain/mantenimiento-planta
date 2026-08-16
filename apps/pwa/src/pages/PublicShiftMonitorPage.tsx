@@ -561,6 +561,18 @@ function Sparkbars({
     return (i + frac) * stepX
   }
 
+  /*
+   * Ancho mínimo de una banda: lo justo para que un paro corto se VEA, sin
+   * fingir que duró más. Antes el piso era 0,6 barras (≈3 min de los 5 del
+   * tramo) y una microparada de 15 s se dibujaba como si fuera eterna.
+   */
+  const ANCHO_MIN = Math.min(0.25, bw * 0.25)
+  const bandaDe = (desde: number, hasta: number, key: string) => {
+    const x = xDe(desde)
+    return { x, ancho: Math.max(xDe(hasta) - x, ANCHO_MIN), key }
+  }
+
+
 
   /*
    * Fondo de convenio. Solo las que explican un hueco VISIBLE: una parada de
@@ -581,36 +593,25 @@ function Sparkbars({
    * clavada contra el borde derecho, sobre producción real.
    */
   const convenio = (breaks ?? [])
-    .filter((b) => b.toMin - b.fromMin >= 15)
+    /*
+     * El piso baja de 15 a 3 min: el motivo del umbral alto era que la banda
+     * se dibujaba por índice con un mínimo de UN TRAMO, así que una reunión de
+     * 5 min pintaba lo mismo que la colación de 43 y ensuciaba sin explicar.
+     * Con el ancho real, 5 min miden 5 min — y esconder una parada de convenio
+     * porque es corta era esconder tiempo que sí ocurrió.
+     */
+    .filter((b) => b.toMin - b.fromMin >= 3)
     .map((b) => {
       const desde = tiempos[0]! + b.fromMin * 60_000
       const hasta = tiempos[0]! + b.toMin * 60_000
       return { b, desde, hasta }
     })
     .filter(({ desde }) => desde < tiempos[tiempos.length - 1]!)
-    .map(({ b, desde, hasta }) => {
-      const i0 = indiceDe(desde)
-      const i1 = indiceDe(hasta)
-      return {
-        x: i0 * stepX,
-        ancho: Math.max(stepX, (i1 - i0) * stepX),
-        key: `${b.fromMin}-${b.toMin}`,
-      }
-    })
+    // Mismo trazo que las paradas: posición y ancho por TIEMPO, no por índice.
+    .map(({ b, desde, hasta }) => bandaDe(desde, hasta, `${b.fromMin}-${b.toMin}`))
 
   // Bandas de la causa elegida. Se dibujan primero para quedar DETRÁS de las
   // barras: la producción es el dato, la detención es el contexto.
-  /*
-   * Ancho mínimo de una banda: lo justo para que un paro corto se VEA, sin
-   * fingir que duró más. Antes el piso era 0,6 barras (≈3 min de los 5 del
-   * tramo) y una microparada de 15 s se dibujaba como si fuera eterna.
-   */
-  const ANCHO_MIN = Math.min(0.25, bw * 0.25)
-  const bandaDe = (desde: number, hasta: number, key: string) => {
-    const x = xDe(desde)
-    return { x, ancho: Math.max(xDe(hasta) - x, ANCHO_MIN), key }
-  }
-
   const bandas = tramoSel
     ? [bandaDe(
         tiempos[0]! + tramoSel.desdeMin * 60_000,

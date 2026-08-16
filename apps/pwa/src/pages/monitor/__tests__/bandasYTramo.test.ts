@@ -91,3 +91,37 @@ describe('la banda mide lo que duró la parada', () => {
     expect(xDe(a + 75_000)).toBeGreaterThan(1)
   })
 })
+
+describe('el convenio se dibuja con la misma vara que las paradas', () => {
+  const stepX = 1
+  const xDe = (ms: number) => {
+    const i = Math.floor((ms - T_TRAMO) / PASO)
+    const frac = (ms - (T_TRAMO + i * PASO)) / PASO
+    return (i + frac) * stepX
+  }
+
+  /*
+   * ⚠ El convenio se dibujaba por ÍNDICE de tramo con un piso de UN TRAMO
+   * entero: una reunión de 5 min ocupaba lo mismo que una de 15, y por eso
+   * había un umbral que directamente escondía todo lo menor a 15 min. Con el
+   * ancho real, 5 min miden 5 min y el umbral pudo bajar a 3.
+   */
+  it('la colación mide sus minutos, no tramos redondeados', () => {
+    const a = T_TRAMO
+    const ancho = xDe(a + 43 * 60_000) - xDe(a)   // 43 min de colación
+    expect(ancho).toBeCloseTo(8.6, 1)             // 43 / 5 = 8,6 tramos
+  })
+
+  it('una parada de convenio de 5 min ocupa UN tramo, no más', () => {
+    const a = T_TRAMO + 2 * PASO
+    const ancho = xDe(a + 5 * 60_000) - xDe(a)
+    expect(ancho).toBeCloseTo(1, 2)
+  })
+
+  it('y una de 6 min no se redondea a dos tramos', () => {
+    const a = T_TRAMO
+    const ancho = xDe(a + 6 * 60_000) - xDe(a)
+    expect(ancho).toBeCloseTo(1.2, 2)
+    expect(ancho).toBeLessThan(2)
+  })
+})
