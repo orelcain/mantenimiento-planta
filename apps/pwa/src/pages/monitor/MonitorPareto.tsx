@@ -13,7 +13,7 @@
 import { useState } from 'react'
 import { DUENO_UI } from './duenoUi'
 import { Bloque } from './MonitorShiftParts'
-import type { ContextoPareto, ParetoResult } from '@/services/shoplogix/monitorPareto'
+import type { ContextoPareto, ParetoResult, PuntoTendencia } from '@/services/shoplogix/monitorPareto'
 import { nombreDeDia } from '@/services/shoplogix/monitorVsAyer'
 
 const nf = new Intl.NumberFormat('es-CL')
@@ -31,10 +31,12 @@ function fmtMin(min: number): string {
   return r > 0 ? `${h} h ${r} min` : `${h} h`
 }
 
-export function ParetoDeParadas({ pareto, ctx }: {
+export function ParetoDeParadas({ pareto, ctx, tendencia }: {
   pareto: ParetoResult | null
-  /** El marco temporal: cuánto tiempo se está midiendo y cómo viene turno a turno. */
+  /** El marco temporal de los MISMOS turnos del ranking. */
   ctx?: ContextoPareto | null
+  /** La serie, que mira más atrás: 10 turnos en vez de los 6 con detalle. */
+  tendencia?: ContextoPareto | null
 }) {
   const [abierta, setAbierta] = useState<string | null>(null)
   // Con uno o dos turnos no hay patrón que mostrar, solo el turno de hoy otra
@@ -45,17 +47,27 @@ export function ParetoDeParadas({ pareto, ctx }: {
   const vitales = pareto.rows.slice(0, Math.max(1, pareto.vitalCount))
   const resto = pareto.rows.slice(vitales.length)
   const cronicas = vitales.filter((r) => r.shifts >= Math.ceil(pareto.shifts / 2))
+  /* La serie mira más atrás que el ranking (10 turnos contra 6): si no llega,
+     se cae al contexto de la propia muestra. */
+  const serie = tendencia ?? ctx ?? null
   /* Escala del gráfico: el peor turno con aire, para que la barra más alta no
      toque el techo y se pueda leer su número encima. */
   const maxPct = Math.max(
-    5, ...(ctx?.serie ?? []).map((p) => p.pct), ctx?.banda?.alto ?? 0,
-  ) * 1.25
+    5, ...(serie?.serie ?? []).map((p) => p.pct), serie?.banda?.alto ?? 0,
+  ) * 1.3
 
   return (
     <Bloque
       id="pareto"
       titulo="Qué se repite"
-      extra={<span className="tabular-nums">{pareto.shifts} turnos · {fmtMin(pareto.totalMin)}</span>}
+      /* ⚠ El extra decía «6 turnos · 5 h 48 min» y adentro se leía «49 h 10
+         min en total»: dos horas distintas a diez centímetros, sin decir que
+         una es la parte y la otra el todo. Acá va el indicador. */
+      extra={
+        <span className="tabular-nums">
+          {pareto.shifts} turnos{ctx && ctx.ventanaMin > 0 && ` · ${fmtDec1(ctx.pct)}%`}
+        </span>
+      }
       defaultAbierto={false}
     >
       <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
@@ -76,8 +88,10 @@ export function ParetoDeParadas({ pareto, ctx }: {
               {fmtDec1(ctx.pct)}%
             </span>
             <span className="text-right text-[11px] leading-tight text-muted-foreground">
-              del tiempo de estos {ctx.turnos} turnos<br />
-              <span className="tabular-nums">{fmtMin(ctx.ventanaMin)}</span> en total
+              <span className="tabular-nums font-semibold text-foreground/80">{fmtMin(ctx.recuperableMin)}</span>
+              {' '}recuperables<br />
+              de <span className="tabular-nums">{fmtMin(ctx.ventanaMin)}</span> en{' '}
+              {ctx.turnos} turnos completos
             </span>
           </div>
           <div className="mt-2 flex h-3.5 gap-[2px]" role="img"
@@ -178,83 +192,82 @@ export function ParetoDeParadas({ pareto, ctx }: {
       </p>
 
       {/* ── ¿Mejora o empeora? ────────────────────────────────────────────
-          Barras por turno (pedido de Orel: se leen mejor que la línea) con la
-          franja de lo habitual detrás.
-          * ⚠ El veredicto NO se infiere de la forma: los últimos 3 turnos
-          * tienen que quedar TODOS bajo el mejor de los anteriores. Con seis
-          * puntos ruidosos, cualquier regla más blanda declara una mejora que
-          * la produjo un solo turno malo. */}
-      {ctx && ctx.serie.length >= 3 && (
+        * Barras por turno (Orel: se leen mejor que la línea), angostas y con
+        * su % encima — anchas y sin cifra no se podían comparar.
+        * ⚠ El veredicto NO se infiere de la forma: los últimos 3 turnos tienen
+        * que quedar TODOS bajo el mejor de los anteriores. Con datos ruidosos,
+        * cualquier regla más blanda declara una mejora que la produjo un solo
+        * turno malo.
+        */}
+      {serie && serie.serie.length >= 3 && (
         <div className="mt-4">
           <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
             Cómo viene turno a turno
-            <span className="normal-case tracking-normal"> · % del turno recuperable</span>
+            <span className="normal-case tracking-normal">
+              {' '}· % recuperable de cada turno · últimos {serie.serie.length}
+            </span>
           </p>
 
-          <div className="relative mt-2 h-24">
-            {/* La franja de lo habitual: sin ella, seis barras invitan a leer
-                una bajada en cualquier zigzag. */}
-            {ctx.banda && (
-              <div
-                className="absolute inset-x-0 rounded-[3px] bg-muted"
-                style={{
-                  bottom: `${(ctx.banda.bajo / maxPct) * 100}%`,
-                  height: `${((ctx.banda.alto - ctx.banda.bajo) / maxPct) * 100}%`,
-                }}
-              />
+          <div className="relative mt-3 h-[104px]">
+            {/* La mediana, para tener contra qué comparar cada barra. */}
+            {serie.banda && (
+              <div className="absolute inset-x-0 border-t border-dashed border-muted-foreground/[0.5]"
+                style={{ bottom: `${(serie.banda.mediana / maxPct) * 100}%` }}>
+                <span className="absolute right-0 -top-4 text-[11px] tabular-nums text-muted-foreground">
+                  mediana {fmtDec1(serie.banda.mediana)}%
+                </span>
+              </div>
             )}
-            <div className="absolute inset-0 flex items-end gap-[3px]">
-              {ctx.serie.map((p) => {
-                const fuera = ctx.banda && (p.pct > ctx.banda.alto || p.pct < ctx.banda.bajo)
-                return (
-                  <div key={p.dateKey} className="flex min-w-0 flex-1 flex-col items-center gap-1">
-                    <span className="text-[11px] tabular-nums text-muted-foreground">
-                      {Math.round(p.pct)}
-                    </span>
+            <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-[3px]">
+              {[
+                ...serie.serie.map((p): { p: PuntoTendencia; hueco: boolean } => ({ p, hueco: false })),
+                ...serie.sinProduccion.map((d): { p: PuntoTendencia; hueco: boolean } => (
+                  { p: { dateKey: d, pct: 0, recuperableMin: 0, windowMin: 0 }, hueco: true })),
+              ]
+                .map(({ p, hueco }) => (
+                  <div key={p.dateKey} className="flex min-w-0 flex-1 flex-col items-center">
+                    {!hueco && (
+                      <span className="text-[11px] tabular-nums text-muted-foreground">
+                        {Math.round(p.pct)}%
+                      </span>
+                    )}
                     <div
-                      className={`w-full rounded-t-[3px] ${fuera ? 'bg-ink-warn' : 'bg-muted-foreground/[0.45]'}`}
-                      style={{ height: `${Math.max(2, (p.pct / maxPct) * 72)}px` }}
-                      title={`${nombreDeDia(p.dateKey)}: ${fmtMin(p.recuperableMin)} de ${fmtMin(p.windowMin)}`}
+                      className={hueco
+                        ? 'w-full max-w-[26px] rounded-t-[3px] border border-dashed border-muted-foreground/[0.4]'
+                        : `w-full max-w-[26px] rounded-t-[3px] ${p.pct > (serie.banda?.mediana ?? 0) ? 'bg-ink-warn' : 'bg-muted-foreground/[0.45]'}`}
+                      style={{ height: hueco ? '8px' : `${Math.max(3, (p.pct / maxPct) * 80)}px` }}
+                      title={hueco
+                        ? `${nombreDeDia(p.dateKey)}: la línea no produjo`
+                        : `${nombreDeDia(p.dateKey)}: ${fmtMin(p.recuperableMin)} de ${fmtMin(p.windowMin)}`}
                     />
                   </div>
-                )
-              })}
-              {/* Los turnos sin producción existen, pero no tienen % que valga:
-                  con 0 min recuperables dibujarían una mejora que no ocurrió. */}
-              {ctx.sinProduccion.map((d) => (
-                <div key={d} className="flex min-w-0 flex-1 flex-col items-center gap-1">
-                  <span className="text-[11px] text-muted-foreground/60">–</span>
-                  <div className="w-full rounded-t-[3px] border border-dashed border-muted-foreground/[0.4]"
-                    style={{ height: '10px' }} title={`${nombreDeDia(d)}: la línea no produjo`} />
-                </div>
-              ))}
+                ))}
             </div>
           </div>
 
-          <div className="mt-1 flex gap-[3px] text-[11px] text-muted-foreground/70">
-            {ctx.serie.map((p) => (
-              <span key={p.dateKey} className="min-w-0 flex-1 truncate text-center">{nombreDeDia(p.dateKey)}</span>
-            ))}
-            {ctx.sinProduccion.map((d) => (
-              <span key={d} className="min-w-0 flex-1 truncate text-center opacity-60">{nombreDeDia(d)}</span>
+          <div className="mt-1 flex justify-between gap-[3px] text-[11px] text-muted-foreground/70">
+            {[...serie.serie.map((p) => p.dateKey), ...serie.sinProduccion].map((d: string) => (
+              <span key={d} className="min-w-0 flex-1 truncate text-center tabular-nums">
+                {d.slice(8)}
+              </span>
             ))}
           </div>
 
           <p className="mt-2 text-[12px] leading-snug">
-            <b className={ctx.veredicto === 'mejora' ? 'text-ink-ok'
-              : ctx.veredicto === 'empeora' ? 'text-ink-crit' : 'text-foreground'}>
-              {ctx.veredicto === 'mejora' ? 'Viene mejorando'
-                : ctx.veredicto === 'empeora' ? 'Viene empeorando'
+            <b className={serie.veredicto === 'mejora' ? 'text-ink-ok'
+              : serie.veredicto === 'empeora' ? 'text-ink-crit' : 'text-foreground'}>
+              {serie.veredicto === 'mejora' ? 'Viene mejorando'
+                : serie.veredicto === 'empeora' ? 'Viene empeorando'
                 : 'Sin cambio visible'}
             </b>
-            {ctx.banda && (
+            {serie.banda && (
               <span className="text-muted-foreground">
                 {' '}· lo habitual va de{' '}
-                <span className="tabular-nums">{fmtDec1(ctx.banda.bajo)}%</span> a{' '}
-                <span className="tabular-nums">{fmtDec1(ctx.banda.alto)}%</span>
-                {ctx.veredicto === 'sin-cambio' && ctx.vara != null && (
+                <span className="tabular-nums">{fmtDec1(serie.banda.bajo)}%</span> a{' '}
+                <span className="tabular-nums">{fmtDec1(serie.banda.alto)}%</span>
+                {serie.veredicto === 'sin-cambio' && serie.vara != null && (
                   <> — para decir que mejoró harían falta 3 turnos seguidos bajo{' '}
-                    <span className="tabular-nums">{fmtDec1(ctx.vara)}%</span></>
+                    <span className="tabular-nums">{fmtDec1(serie.vara)}%</span></>
                 )}
               </span>
             )}
