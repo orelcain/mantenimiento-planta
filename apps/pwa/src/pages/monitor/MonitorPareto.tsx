@@ -43,6 +43,8 @@ export function ParetoDeParadas({ pareto, ctx, tendencia }: {
   // vez. Tres es el mínimo para que "en 2 de 3" signifique algo.
   if (!pareto || pareto.shifts < 3 || pareto.rows.length === 0) return null
 
+  /* Los turnos que de verdad se están midiendo: los que produjeron. */
+  const turnosMedidos = ctx?.turnos ?? pareto.shifts
   const max = pareto.rows[0]!.minutes
   const vitales = pareto.rows.slice(0, Math.max(1, pareto.vitalCount))
   const resto = pareto.rows.slice(vitales.length)
@@ -63,15 +65,18 @@ export function ParetoDeParadas({ pareto, ctx, tendencia }: {
       /* ⚠ El extra decía «6 turnos · 5 h 48 min» y adentro se leía «49 h 10
          min en total»: dos horas distintas a diez centímetros, sin decir que
          una es la parte y la otra el todo. Acá va el indicador. */
+      /* ⚠ El conteo lo manda el CONTEXTO, no el ranking: `pareto.shifts` cuenta
+         las entradas de la muestra —incluido un sábado con la línea apagada y
+         cero causas— y decía «7 turnos» al lado de una barra que medía 6. */
       extra={
         <span className="tabular-nums">
-          {pareto.shifts} turnos{ctx && ctx.ventanaMin > 0 && ` · ${fmtDec1(ctx.pct)}%`}
+          {turnosMedidos} turnos{ctx && ctx.ventanaMin > 0 && ` · ${fmtDec1(ctx.pct)}%`}
         </span>
       }
       defaultAbierto={false}
     >
       <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
-        Tiempo <b>recuperable</b> de los últimos <span className="tabular-nums">{pareto.shifts}</span>{' '}
+        Tiempo <b>recuperable</b> de los últimos <span className="tabular-nums">{turnosMedidos}</span>{' '}
         turnos de esta línea, por causa. Las paradas de convenio no entran: no son pérdidas que
         alguien pueda atacar.
       </p>
@@ -128,7 +133,7 @@ export function ParetoDeParadas({ pareto, ctx, tendencia }: {
       <ul className="mt-4 space-y-2.5">
         {vitales.map((r) => (
           <FilaPareto
-            key={r.label} r={r} max={max} turnos={pareto.shifts}
+            key={r.label} r={r} max={max} turnos={turnosMedidos}
             abierta={abierta === r.label}
             onToggle={() => setAbierta((v) => (v === r.label ? null : r.label))}
           />
@@ -146,7 +151,7 @@ export function ParetoDeParadas({ pareto, ctx, tendencia }: {
           <ul className="mt-2 space-y-2.5">
             {resto.map((r) => (
               <FilaPareto
-                key={r.label} r={r} max={max} turnos={pareto.shifts}
+                key={r.label} r={r} max={max} turnos={turnosMedidos}
                 abierta={abierta === r.label}
                 onToggle={() => setAbierta((v) => (v === r.label ? null : r.label))}
               />
