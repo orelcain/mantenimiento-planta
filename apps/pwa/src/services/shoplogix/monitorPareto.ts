@@ -173,3 +173,144 @@ export function buildPareto(turnos: Array<CausaTurno[] | null | undefined>): Par
     porDueno,
   }
 }
+
+/** Un turno de la muestra, con lo que hace falta para ubicar su recuperable. */
+export interface TurnoCtx {
+  dateKey: string
+  shiftId?: string | null
+  windowMin?: number | null
+  producingMin?: number | null
+  plannedMin?: number | null
+  recoverableMin?: number | null
+  causas?: CausaTurno[] | null
+}
+
+export interface PuntoTendencia {
+  dateKey: string
+  /** % del tiempo del turno que fue recuperable. */
+  pct: number
+  recuperableMin: number
+  windowMin: number
+}
+
+export interface ContextoPareto {
+  /** Turnos DISTINTOS de la muestra (ya deduplicados). */
+  turnos: number
+  ventanaMin: number
+  produciendoMin: number
+  convenioMin: number
+  recuperableMin: number
+  /** Lo que no cae en ninguna categoría: huecos de sincronización. */
+  huecosMin: number
+  /** % recuperable sobre el tiempo TOTAL medido, convenio incluido. */
+  pct: number
+  /** Un punto por turno CON PRODUCCIÓN, del más viejo al más nuevo. */
+  serie: PuntoTendencia[]
+  /** Turnos sin un minuto produciendo: no entran en la serie, pero existieron. */
+  sinProduccion: string[]
+  /** Banda de lo habitual (cuartiles de la serie). null con menos de 4 puntos. */
+  banda: { bajo: number; alto: number; mediana: number } | null
+  /**
+   * El veredicto, con una regla dura para que no se vuelva optimista solo:
+   * los últimos 3 turnos TODOS por debajo del mejor de los anteriores.
+   */
+  veredicto: 'mejora' | 'empeora' | 'sin-cambio' | 'sin-datos'
+  /** El % que hay que bajar 3 turnos seguidos para poder decir que mejoró. */
+  vara: number | null
+}
+
+/** Deduplica por turno: el que se está mirando suele venir también en el historial. */
+export function muestraUnica(turnos: TurnoCtx[]): TurnoCtx[] {
+  const vistos = new Set<string>()
+  const out: TurnoCtx[] = []
+  for (const t of turnos) {
+    if (!t?.dateKey) continue
+    const clave = `${t.dateKey}|${t.shiftId ?? ''}`
+    if (vistos.has(clave)) continue
+    vistos.add(clave)
+    out.push(t)
+  }
+  return out
+}
+
+function cuartil(orden: number[], q: number): number {
+  const i = (orden.length - 1) * q
+  const lo = Math.floor(i)
+  const hi = Math.ceil(i)
+  return lo === hi ? orden[lo]! : orden[lo]! + (orden[hi]! - orden[lo]!) * (i - lo)
+}
+
+/**
+ * El marco temporal del Pareto: cuánto tiempo se está midiendo y qué parte de
+ * ese tiempo es recuperable, turno a turno.
+ *
+ * ⚠ El 100% es el tiempo TOTAL de los turnos, convenio incluido (decisión de
+ * Orel): así el convenio se VE en la barra en vez de esconderse en el
+ * denominador. Con el tiempo útil como base el número sale más alto (11,6% en
+ * vez de 10,3%) y, sobre todo, nadie puede ver que la colación creció.
+ *
+ * ⚠⚠ Los turnos SIN producción no entran en la serie: un sábado con la línea
+ * apagada tiene 0 min recuperables y dibujaría una mejora que no ocurrió.
+ */
+export function contextoPareto(turnos: TurnoCtx[]): ContextoPareto {
+  const unicos = muestraUnica(turnos).filter((t) => (t.windowMin ?? 0) > 0)
+  const suma = (f: (t: TurnoCtx) => number) => unicos.reduce((a, t) => a + f(t), 0)
+  const ventanaMin = suma((t) => t.windowMin ?? 0)
+  const produciendoMin = suma((t) => t.producingMin ?? 0)
+  const convenioMin = suma((t) => t.plannedMin ?? 0)
+  const recuperableMin = suma((t) => t.recoverableMin ?? 0)
+
+  const conProduccion = [...unicos]
+    .filter((t) => (t.producingMin ?? 0) > 0)
+    .sort((a, b) => a.dateKey.localeCompare(b.dateKey))
+  const serie: PuntoTendencia[] = conProduccion.map((t) => ({
+    dateKey: t.dateKey,
+    pct: ((t.recoverableMin ?? 0) / (t.windowMin || 1)) * 100,
+    recuperableMin: t.recoverableMin ?? 0,
+    windowMin: t.windowMin ?? 0,
+  }))
+
+  const orden = serie.map((p) => p.pct).sort((a, b) => a - b)
+  const banda = orden.length >= 4
+    ? { bajo: cuartil(orden, 0.25), alto: cuartil(orden, 0.75), mediana: cuartil(orden, 0.5) }
+    : null
+
+  /*
+   * El veredicto: los últimos 3 turnos TODOS por debajo del MEJOR de los
+   * anteriores (o todos por encima del peor, para «empeora»).
+   *
+   * ⚠ La vara se calcula con los turnos previos, NO con la serie entera: una
+   * banda que incluye a los turnos que se están juzgando se mueve con ellos y
+   * nunca los declara fuera. Y la regla es dura a propósito — con seis turnos
+   * ruidosos (11,1 · 10,7 · 17,8 · 7,5 · 12,1 · 12,1) cualquier cosa más
+   * blanda declara una mejora que la produjo un solo turno malo.
+   */
+  const RACHA = 3
+  let veredicto: ContextoPareto['veredicto'] = serie.length === 0 ? 'sin-datos' : 'sin-cambio'
+  /** El listón que hay que bajar 3 turnos seguidos para poder decir «mejoró». */
+  let vara: number | null = null
+  if (serie.length >= RACHA + 2) {
+    const previos = serie.slice(0, -RACHA).map((p) => p.pct)
+    const ultimos = serie.slice(-RACHA).map((p) => p.pct)
+    const mejorPrevio = Math.min(...previos)
+    const peorPrevio = Math.max(...previos)
+    vara = mejorPrevio
+    if (ultimos.every((v) => v < mejorPrevio)) veredicto = 'mejora'
+    else if (ultimos.every((v) => v > peorPrevio)) veredicto = 'empeora'
+  }
+
+  return {
+    turnos: unicos.length,
+    ventanaMin,
+    produciendoMin,
+    convenioMin,
+    recuperableMin,
+    huecosMin: Math.max(0, ventanaMin - produciendoMin - convenioMin - recuperableMin),
+    pct: ventanaMin > 0 ? (recuperableMin / ventanaMin) * 100 : 0,
+    serie,
+    sinProduccion: unicos.filter((t) => !((t.producingMin ?? 0) > 0)).map((t) => t.dateKey),
+    banda,
+    veredicto,
+    vara,
+  }
+}
