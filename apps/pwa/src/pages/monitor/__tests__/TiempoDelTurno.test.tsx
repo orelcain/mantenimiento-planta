@@ -16,6 +16,7 @@ import { describe, it, expect, afterEach } from 'vitest'
 import { render, cleanup, fireEvent } from '@testing-library/react'
 import { TiempoDelTurno } from '../MonitorShiftParts'
 import { agruparEventos } from '@/services/shoplogix/monitorEventos'
+import { notasPorCausa } from '../notasOperador'
 import type { PublicMonitorLive } from '@/services/shoplogix/publicShiftMonitor.service'
 
 afterEach(cleanup)
@@ -410,5 +411,161 @@ describe('TiempoDelTurno · cada parada se ubica y se salta sola', () => {
     fireEvent.click(r.getByRole('button', { name: /FALLA OPERACIONAL/ }))
     expect(r.container.textContent ?? '').toMatch(/08:57.*09:02/)
     expect(r.queryAllByTitle('Ver esta parada en el gráfico')).toHaveLength(0)
+  })
+})
+
+describe('TiempoDelTurno · el comentario del operador vive DENTRO de su parada', () => {
+  /*
+   * ⚠ Lo que se protege acá (pedido de Orel): el comentario colgaba en una
+   * lista aparte repitiendo la hora («09:17 · atrapamiento cuchillos») al lado
+   * de la parada que ya decía «09:17→09:27». Dos líneas para el mismo evento.
+   * Ahora el texto va pegado a SU parada, sin repetir la hora, y las notas que
+   * no calzan con ninguna no se tiran: quedan abajo, con su tramo.
+   */
+  const T0 = '2026-08-13T07:40:00.000Z'
+  const TB: PublicMonitorLive['timeBreakdown'] = {
+    ...ANTES_DE_LA_COLACION,
+    recoverable: [{ reason: 'Baader 200/CUCHILLERIA DORSAL', min: 15, count: 2, lineMin: 15 }],
+  }
+  const EVENTOS = [
+    { r: 0, f: '2026-08-13T09:17:00.000Z', s: 618 },   // 09:17 -> 09:27
+    { r: 0, f: '2026-08-13T09:12:00.000Z', s: 168 },   // 09:12 -> 09:14
+  ]
+  const COMENTARIOS = [
+    { r: 'Baader 200/CUCHILLERIA DORSAL', f: '2026-08-13T09:17:00.000Z', h: '2026-08-13T09:27:00.000Z', t: 'atrapamiento cuchillos' },
+    // Este no cae en ninguna parada de la lista: no puede perderse.
+    { r: 'Baader 200/CUCHILLERIA DORSAL', f: '2026-08-13T14:40:00.000Z', h: '2026-08-13T14:45:00.000Z', t: 'se revisa el eje' },
+  ]
+
+  const montar = () => {
+    const notas = notasPorCausa(COMENTARIOS, (iso) => iso.slice(11, 16), T0)
+    return render(
+      <TiempoDelTurno
+        tb={TB}
+        cerrado
+        meta={5000}
+        hechas={3919}
+        cpmAndando={13.5}
+        onCausa={() => {}}
+        onVentana={() => {}}
+        notas={notas}
+        grupos={agruparEventos({
+          tb: TB, stopEvents: EVENTOS, stopReasons: ['Baader 200/CUCHILLERIA DORSAL'],
+          cpmGlobal: 13.5, t0: T0,
+        })}
+      />,
+    )
+  }
+
+  it('el texto va bajo su parada y la hora NO se repite', () => {
+    const r = montar()
+    fireEvent.click(r.getByRole('button', { name: /CUCHILLERIA DORSAL/ }))
+    const t = r.container.textContent ?? ''
+    expect(t).toMatch(/09:17:00→09:27:18/)   // rango exacto: la duración cuadra
+    expect(t).toMatch(/atrapamiento cuchillos/)
+    // La hora aparece UNA vez (en la parada), no otra vez para el comentario.
+    expect((t.match(/09:17/g) ?? []).length).toBe(1)
+  })
+
+  it('el comentario que no calza con ninguna parada NO se pierde', () => {
+    const r = montar()
+    fireEvent.click(r.getByRole('button', { name: /CUCHILLERIA DORSAL/ }))
+    const t = r.container.textContent ?? ''
+    expect(t).toMatch(/se revisa el eje/)
+    expect(t).toMatch(/14:40→14:45/)   // con su tramo, para poder ubicarlo
+  })
+
+  it('con la causa cerrada se siguen viendo: son la señal de que el piso explicó algo', () => {
+    const t = montar().container.textContent ?? ''
+    expect(t).toMatch(/atrapamiento cuchillos/)
+    expect(t).toMatch(/se revisa el eje/)
+  })
+})
+
+describe('TiempoDelTurno · la parada tocada se marca SOLA en el gráfico', () => {
+  /*
+   * ⚠ El problema que cierra (Orel, mirando «Micro Detencion 40×»): tocar una
+   * parada seleccionaba su CAUSA, y el gráfico pintaba las 40 bandas — «no se
+   * puede medir bien cuál es y su tiempo». Ahora además viaja el TRAMO, que es
+   * la banda única que el gráfico marca.
+   */
+  const T0 = '2026-08-13T07:40:00.000Z'
+  const TB: PublicMonitorLive['timeBreakdown'] = {
+    ...ANTES_DE_LA_COLACION,
+    recoverable: [{ reason: 'Micro Detencion', min: 16, count: 3, lineMin: 16 }],
+  }
+  const EVENTOS = [
+    { r: 0, f: '2026-08-13T08:11:20.000Z', s: 90 },   // 1,5 min
+    { r: 0, f: '2026-08-13T08:03:10.000Z', s: 60 },
+    { r: 0, f: '2026-08-13T11:59:00.000Z', s: 60 },
+  ]
+
+  it('manda el tramo exacto de ESA parada, no solo la causa', () => {
+    const tramos: Array<{ desdeMin: number; hastaMin: number } | null> = []
+    const causas: Array<string | null> = []
+    const r = render(
+      <TiempoDelTurno
+        tb={TB}
+        cerrado
+        meta={5000}
+        hechas={3919}
+        cpmAndando={13.5}
+        onCausa={(c) => causas.push(c)}
+        onVentana={() => {}}
+        onTramo={(t) => tramos.push(t)}
+        grupos={agruparEventos({
+          tb: TB, stopEvents: EVENTOS, stopReasons: ['Micro Detencion'], cpmGlobal: 13.5, t0: T0,
+        })}
+      />,
+    )
+    fireEvent.click(r.getByRole('button', { name: /Micro Detencion/ }))
+    fireEvent.click(r.getAllByTitle('Ver esta parada en el gráfico')[0]!)
+    expect(causas).toContain('Micro Detencion')
+    expect(tramos).toHaveLength(1)
+    // 08:11:20 son 31,33 min desde t0 (07:40); dura 1,5.
+    expect(tramos[0]!.desdeMin).toBeCloseTo(31.3, 1)
+    expect(tramos[0]!.hastaMin).toBeCloseTo(32.8, 1)
+  })
+
+  it('se listan TODAS las paradas, no una muestra de 3', () => {
+    const r = render(
+      <TiempoDelTurno
+        tb={TB}
+        cerrado
+        meta={5000}
+        hechas={3919}
+        cpmAndando={13.5}
+        onCausa={() => {}}
+        onVentana={() => {}}
+        grupos={agruparEventos({
+          tb: TB, stopEvents: EVENTOS, stopReasons: ['Micro Detencion'], cpmGlobal: 13.5, t0: T0,
+        })}
+      />,
+    )
+    fireEvent.click(r.getByRole('button', { name: /Micro Detencion/ }))
+    expect(r.getAllByTitle('Ver esta parada en el gráfico')).toHaveLength(3)
+    expect(r.container.textContent ?? '').not.toMatch(/las 3 más largas/)
+  })
+
+  it('el rango CUADRA con la duración: los segundos van escritos', () => {
+    const r = render(
+      <TiempoDelTurno
+        tb={TB}
+        cerrado
+        meta={5000}
+        hechas={3919}
+        cpmAndando={13.5}
+        onCausa={() => {}}
+        onVentana={() => {}}
+        grupos={agruparEventos({
+          tb: TB, stopEvents: EVENTOS, stopReasons: ['Micro Detencion'], cpmGlobal: 13.5, t0: T0,
+        })}
+      />,
+    )
+    fireEvent.click(r.getByRole('button', { name: /Micro Detencion/ }))
+    const t = r.container.textContent ?? ''
+    // «08:11→08:12 · 1,5 min» era el reloj contradiciendo a la duración.
+    expect(t).toMatch(/08:11:20→08:12:50/)
+    expect(t).toMatch(/1,5 min/)
   })
 })

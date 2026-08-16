@@ -82,8 +82,16 @@ const ORDEN: DuenoPerdida[] = ['mantencion', 'externo', 'sin-imputar', 'programa
  * `f` viene en la convención wall-clock-as-UTC del doc: la hora de planta ES la
  * del ISO. Formatear con el reloj local la correría 3 o 4 horas.
  */
-function horaDe(iso: string): string {
-  return iso.slice(11, 16)
+/**
+ * Hora CON SEGUNDOS, para el detalle de una parada.
+ *
+ * ⚠ Sin segundos el detalle se contradecía solo: una microparada de 08:11:20 a
+ * 08:12:50 se mostraba como «08:11→08:12 · 1,5 min» — el reloj decía un minuto
+ * y la duración uno y medio. Con paradas cuya MEDIA es de 24 s, el minuto no
+ * es una unidad que sirva.
+ */
+function horaSegDe(iso: string): string {
+  return iso.slice(11, 19)
 }
 
 /**
@@ -133,8 +141,8 @@ function paradasPorCausa(
     }
     m.set(causa, episodios
       .map((ep) => ({
-        hora: horaDe(new Date(ep.ini).toISOString()),
-        hasta: horaDe(new Date(ep.fin).toISOString()),
+        hora: horaSegDe(new Date(ep.ini).toISOString()),
+        hasta: horaSegDe(new Date(ep.fin).toISOString()),
         min: (ep.fin - ep.ini) / 60_000,
         desdeMin: t0Ms == null ? null : (ep.ini - t0Ms) / 60_000,
         hastaMin: t0Ms == null ? null : (ep.fin - t0Ms) / 60_000,
