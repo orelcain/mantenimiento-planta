@@ -799,3 +799,84 @@ test('ensureLineMonitor refresca las etiquetas sin cambiar el token', async () =
   assert.equal(db._store['tok'].targetPieces, 5000)
   assert.equal(db._store['tok'].expiresAt, vence, 'con vigencia de sobra no se toca')
 })
+
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * buildShiftStats — la estadística LIVIANA que habilita elegir la ventana
+ * («últimos 5/10/30») y comparar el turno de día contra el de noche.
+ * ────────────────────────────────────────────────────────────────────────── */
+const { buildShiftStats } = require('../publicMonitor')
+
+/** Una máquina con ciclos repartidos, como la usa el test del historial. */
+const maquinaStats = (c, startMs) => ({
+  machineid: 'b200', machineName: 'Linea 1', machineType: 'baader_200',
+  totalCycles: c, shiftRuntime: 0.8,
+  shiftRuntimeBreakdown: { uptimeSec: 3600, downtimeSec: 600, breakSec: 0 },
+  intervals: intervals(startMs, 6, c / 6), states: [],
+})
+
+test('shiftStats trae los DOS turnos, no solo el del monitor', async () => {
+  const w = nowWall()
+  const d1 = dk(new Date(w.getTime() - 86_400_000))
+  const actual = `${dk(w)}_Turno Dia`
+  const noche = `${d1}_Turno Noche`
+  const dia = `${d1}_Turno Dia`
+  const hDe = (d, h) => new Date(Date.UTC(Number(d.slice(0, 4)), Number(d.slice(5, 7)) - 1, Number(d.slice(8, 10)), h))
+
+  const db = fakeShiftsDb({
+    [actual]: { shiftId: 'Turno Dia', scheduledStart: hoy(8), scheduledEnd: hoy(16), machines: [{ totalCycles: 3000 }] },
+    [dia]:    { shiftId: 'Turno Dia', scheduledStart: hDe(d1, 8), scheduledEnd: hDe(d1, 16), machines: [{ totalCycles: 2000 }] },
+    [noche]:  { shiftId: 'Turno Noche', scheduledStart: hDe(d1, 20), scheduledEnd: hDe(d1, 23), machines: [{ totalCycles: 900 }] },
+  }, {
+    [dia]:   [maquinaStats(2000, hDe(d1, 8).getTime())],
+    [noche]: [maquinaStats(900, hDe(d1, 20).getTime())],
+  })
+
+  const out = await buildShiftStats(db, 'filete', actual, [], [], [])
+  const nombres = out.map(o => o.shiftId).sort()
+  // ⚠ El forecastHistory filtra por MISMO nombre; este arreglo NO: sin los dos
+  // turnos adentro no hay «día vs noche» que comparar.
+  assert.ok(nombres.includes('Turno Noche'), 'el nocturno tiene que estar')
+  assert.ok(nombres.includes('Turno Dia'), 'y el diurno también')
+  assert.ok(!out.some(o => o.shiftDocId === actual), 'el turno vigente no se guarda: ya viaja en `live`')
+})
+
+test('⚠ shiftStats NO carga la curva: es lo que lo hace liviano', async () => {
+  const w = nowWall()
+  const d1 = dk(new Date(w.getTime() - 86_400_000))
+  const actual = `${dk(w)}_Turno Dia`
+  const ayer = `${d1}_Turno Dia`
+  const hDe = (d, h) => new Date(Date.UTC(Number(d.slice(0, 4)), Number(d.slice(5, 7)) - 1, Number(d.slice(8, 10)), h))
+  const db = fakeShiftsDb({
+    [actual]: { shiftId: 'Turno Dia', scheduledStart: hoy(8), scheduledEnd: hoy(16), machines: [{ totalCycles: 3000 }] },
+    [ayer]:   { shiftId: 'Turno Dia', scheduledStart: hDe(d1, 8), scheduledEnd: hDe(d1, 16), machines: [{ totalCycles: 2000 }] },
+  }, { [ayer]: [maquinaStats(2000, hDe(d1, 8).getTime())] })
+
+  const out = await buildShiftStats(db, 'filete', actual, [], [], [])
+  assert.ok(out.length > 0, 'sin entradas el test no probaría nada')
+  for (const o of out) {
+    assert.equal(o.curve, undefined, 'la curva vive en forecastHistory, no acá')
+    assert.ok('recoverable' in o, 'las causas SÍ, que es lo que el Pareto necesita')
+  }
+})
+
+test('shiftStats reusa lo cacheado y no reconstruye turnos viejos', async () => {
+  const w = nowWall()
+  const d1 = dk(new Date(w.getTime() - 86_400_000))
+  const d2 = dk(new Date(w.getTime() - 2 * 86_400_000))
+  const actual = `${dk(w)}_Turno Dia`
+  const ayer = `${d1}_Turno Dia`
+  const anteayer = `${d2}_Turno Dia`
+  const hDe = (d, h) => new Date(Date.UTC(Number(d.slice(0, 4)), Number(d.slice(5, 7)) - 1, Number(d.slice(8, 10)), h))
+  const db = fakeShiftsDb({
+    [actual]:   { shiftId: 'Turno Dia', scheduledStart: hoy(8), scheduledEnd: hoy(16), machines: [{ totalCycles: 3000 }] },
+    [ayer]:     { shiftId: 'Turno Dia', scheduledStart: hDe(d1, 8), scheduledEnd: hDe(d1, 16), machines: [{ totalCycles: 2000 }] },
+    [anteayer]: { shiftId: 'Turno Dia', scheduledStart: hDe(d2, 8), scheduledEnd: hDe(d2, 16), machines: [{ totalCycles: 1000 }] },
+  })
+
+  // Valor imposible: si se reusa sale tal cual; si se recompone, saldría 1000.
+  const prev = [{ shiftDocId: anteayer, dateKey: d2, shiftId: 'Turno Dia', total: 777777, windowMin: 480, tbv: 2 }]
+  const out = await buildShiftStats(db, 'filete', actual, prev, [], [])
+  const viejo = out.find(o => o.shiftDocId === anteayer)
+  assert.equal(viejo?.total, 777777, 'un turno cerrado no cambia: se reusa')
+})

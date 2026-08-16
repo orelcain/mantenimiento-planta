@@ -1478,6 +1478,98 @@ function resumirParaForecast(live) {
   }
 }
 
+
+/**
+ * Cuántos turnos guarda el arreglo liviano de estadísticas. 40 son ~20 días
+ * con dos turnos: alcanza para ventanas de «últimos 30» sin acercarse al
+ * límite de 1 MB del documento (medido el 16-08: el doc entero pesaba 74 KB y
+ * cada entrada de estas ronda los 0,4 KB, así que 40 suman ~16 KB).
+ */
+const STATS_MAX = 40
+/**
+ * Cuántas entradas NUEVAS se construyen por corrida.
+ *
+ * ⚠ `buildMonitorLive` lee los ciclos del turno: construir 40 de una es un
+ * pico de lecturas y de tiempo en una función que corre cada pocos minutos.
+ * El arreglo se va llenando solo, unas pocas por vez, y mientras tanto la app
+ * usa las que ya hay — que es exactamente cómo se comporta hoy el historial.
+ */
+const STATS_NUEVOS_POR_CORRIDA = 5
+
+/**
+ * Estadística LIVIANA de los últimos turnos, de TODOS los nombres.
+ *
+ * Por qué existe además de `forecastHistory`:
+ *  - `forecastHistory` guarda la CURVA (lo pesado) y solo del MISMO turno,
+ *    porque su trabajo es pronosticar el cierre.
+ *  - Esto guarda lo que necesitan el Pareto, la banda y la tendencia —minutos
+ *    y causas—, sin curva y con día y noche juntos, para poder comparar un
+ *    turno contra otro y elegir la ventana («últimos 5/10/30»).
+ *
+ * Sin esto, «lo que se repite» solo podía mirar los 6 turnos de `history`, que
+ * cargan la serie completa de cada uno y por eso son pocos.
+ */
+async function buildShiftStats(db, plantSlug, currentShiftDocId, prev = [], history = [], forecast = []) {
+  const nowWall = shoplogixPolling.toChileWall(new Date())
+  const desde = shiftDateKey(nowWall, -45)
+
+  const refs = await db.collection(`shoplogix/${plantSlug}/shifts`).listDocuments()
+  const ids = refs
+    .map(r => r.id)
+    .filter(id => id.slice(0, 10) >= desde && id !== currentShiftDocId)
+    .sort()
+    .reverse()
+    .slice(0, STATS_MAX)
+
+  const previos = new Map((prev || []).map(h => [h.shiftDocId, h]))
+  // Lives que este mismo refresco ya construyó: se aprovechan gratis.
+  const yaConstruidos = new Map([
+    ...(history || []).filter(h => h.live?.timeBreakdown?.tbv === 2).map(h => [h.shiftDocId, h.live]),
+  ])
+  const conCurva = new Set((forecast || []).map(f => f.shiftDocId))
+
+  const out = []
+  let nuevos = 0
+  for (let i = 0; i < ids.length; i++) {
+    const id = ids[i]
+    const cacheado = previos.get(id)
+    // i === 0 es el turno anterior: el re-sync móvil todavía puede moverlo.
+    if (cacheado && i > 0 && cacheado.tbv === 2) { out.push(cacheado); continue }
+    const live = yaConstruidos.get(id)
+    if (!live && nuevos >= STATS_NUEVOS_POR_CORRIDA) {
+      if (cacheado) out.push(cacheado)
+      continue
+    }
+    try {
+      const l = live || await buildMonitorLive(db, plantSlug, id)
+      if (!live) nuevos++
+      const tb = l?.timeBreakdown
+      if (!tb || !(tb.windowMin > 0)) { if (cacheado) out.push(cacheado); continue }
+      out.push({
+        shiftDocId: id,
+        dateKey: id.slice(0, 10),
+        shiftId: id.slice(11),
+        total: l.totalPieces ?? 0,
+        producingMin: tb.producingMin ?? 0,
+        windowMin: tb.windowMin ?? null,
+        plannedMin: tb.plannedMin ?? null,
+        recoverableMin: tb.recoverableMin ?? null,
+        /* Las causas, que es lo que `forecastHistory` no trae: sin ellas el
+           Pareto no puede mirar más allá de los 6 turnos de `history`.
+           Solo reason/min/count — ni paradas sueltas ni comentarios. */
+        recoverable: (tb.recoverable || []).map(c => ({
+          reason: c.reason, min: c.min, count: c.count ?? 0,
+        })),
+        tieneCurva: conCurva.has(id) || undefined,
+        tbv: tb.tbv ?? null,
+      })
+    } catch {
+      if (cacheado) out.push(cacheado)
+    }
+  }
+  return out
+}
+
 /**
  * Turnos anteriores DEL MISMO NOMBRE, para pronosticar el cierre.
  *
@@ -1548,12 +1640,18 @@ async function buildMonitorPatch(db, monitor, currentShiftDocIdByPlant = new Map
     const live = await buildMonitorLive(db, plantSlug, monitor.shiftDocId)
     if (!live) return null
     const history = await buildMonitorHistory(db, plantSlug, monitor.shiftDocId, monitor.history)
+    const fh = await buildForecastHistory(
+      db, plantSlug, monitor.shiftDocId, String(monitor.shiftDocId).slice(11),
+      monitor.forecastHistory, history,
+    )
     return {
       live,
       history,
-      forecastHistory: await buildForecastHistory(
-        db, plantSlug, monitor.shiftDocId, String(monitor.shiftDocId).slice(11),
-        monitor.forecastHistory, history,
+      forecastHistory: fh,
+      /* Liviano y con TODOS los turnos: habilita elegir la ventana y comparar
+         un turno contra el otro. Ver `buildShiftStats`. */
+      shiftStats: await buildShiftStats(
+        db, plantSlug, monitor.shiftDocId, monitor.shiftStats, history, fh,
       ),
     }
   }
@@ -1571,14 +1669,18 @@ async function buildMonitorPatch(db, monitor, currentShiftDocIdByPlant = new Map
   if (!live) return null
 
   const history = await buildMonitorHistory(db, plantSlug, shiftDocId, monitor.history)
+  const fhLinea = await buildForecastHistory(
+    db, plantSlug, shiftDocId, shiftDocId.slice(11), monitor.forecastHistory, history,
+  )
   return {
     live,
     history,
     /* Turnos del mismo nombre: es lo que hace posible pronosticar en las
        líneas con varios turnos por día. */
-    forecastHistory: await buildForecastHistory(
-      db, plantSlug, shiftDocId, shiftDocId.slice(11), monitor.forecastHistory, history,
-    ),
+    forecastHistory: fhLinea,
+    /* Liviano y con TODOS los turnos: habilita elegir la ventana y comparar
+       un turno contra el otro. Ver `buildShiftStats`. */
+    shiftStats: await buildShiftStats(db, plantSlug, shiftDocId, monitor.shiftStats, history, fhLinea),
     shiftDocId,
     dateKey: shiftDocId.slice(0, 10),
     shiftId: shiftDocId.slice(11),
@@ -1715,6 +1817,7 @@ module.exports = {
   buildMonitorLive,
   buildMonitorHistory,
   buildForecastHistory,
+  buildShiftStats,
   buildMonitorPatch,
   resolveCurrentShiftDocId,
   ensureLineMonitor,
