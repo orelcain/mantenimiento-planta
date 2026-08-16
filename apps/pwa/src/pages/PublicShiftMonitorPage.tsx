@@ -45,6 +45,7 @@ import {
 } from '@/services/shoplogix/monitorCompare'
 import { buildForecast, MAX_MAPE_PCT } from '@/services/shoplogix/monitorForecast'
 import { buildPareto, contextoPareto, muestraUnica } from '@/services/shoplogix/monitorPareto'
+import { parseShiftDocId } from '@/services/shoplogix/shoplogixShift.service'
 import { agruparEventos } from '@/services/shoplogix/monitorEventos'
 import { costoDeParadas } from '@/services/shoplogix/monitorPerdidas'
 import { bandaNormal, nombreDeDia, rachaDeRitmos, recordsDeLinea, vsAyer as compararVsAyer, type TurnoResumen } from '@/services/shoplogix/monitorVsAyer'
@@ -1980,7 +1981,32 @@ export function PublicShiftMonitorPage() {
     () => buildPareto(muestraPareto.map((t) => t.causas ?? null)),
     [muestraPareto],
   )
+  /*
+   * La BARRA de contexto mide los mismos turnos que el ranking que tiene
+   * debajo: si mirara más, el «% de estos N turnos» no sería el de las causas
+   * listadas.
+   */
   const paretoCtx = useMemo(() => contextoPareto(muestraPareto), [muestraPareto])
+
+  /*
+   * La TENDENCIA, en cambio, mira más atrás y lo dice: `history` trae 6 turnos
+   * (los únicos con detalle de causas) pero `forecastHistory` trae 10 con los
+   * minutos del turno, que es todo lo que la serie necesita. Con 10 puntos el
+   * veredicto se apoya en 7 turnos previos en vez de 3 — la diferencia entre
+   * poder afirmar una mejora y solo intuirla.
+   */
+  const paretoTendencia = useMemo(() => contextoPareto(muestraUnica([
+    ...muestraPareto,
+    ...(data?.forecastHistory ?? []).map((f) => ({
+      dateKey: f.dateKey,
+      shiftId: parseShiftDocId(f.shiftDocId)?.shiftId ?? null,
+      windowMin: f.windowMin ?? null,
+      producingMin: f.producingMin ?? null,
+      plannedMin: f.plannedMin ?? null,
+      recoverableMin: f.recoverableMin ?? null,
+      causas: null,
+    })),
+  ])), [muestraPareto, data?.forecastHistory])
 
   /**
    * El ritmo de la línea ANDANDO: piezas por minuto de uptime.
@@ -3129,7 +3155,7 @@ export function PublicShiftMonitorPage() {
           </div>
         )}
 
-        <ParetoDeParadas pareto={pareto} ctx={paretoCtx} />
+        <ParetoDeParadas pareto={pareto} ctx={paretoCtx} tendencia={paretoTendencia} />
 
         <PorHora series={live.series} />
 
