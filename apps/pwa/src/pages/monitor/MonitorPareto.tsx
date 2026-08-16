@@ -199,7 +199,7 @@ export function ParetoDeParadas({
                 corrido, y el «resto» sonaba a sobra en vez de a cola larga. */}
             <div className={i > 0 ? 'border-t border-border/50' : ''}>
               <FilaPareto
-                r={r} max={max} turnos={turnosMedidos}
+                r={r} max={max} turnos={turnosMedidos} ventanaMin={ctx?.ventanaMin}
                 abierta={abierta === r.label}
                 onToggle={() => setAbierta((v) => (v === r.label ? null : r.label))}
               />
@@ -373,10 +373,12 @@ export function ParetoDeParadas({
   )
 }
 
-function FilaPareto({ r, max, turnos, abierta, onToggle }: {
+function FilaPareto({ r, max, turnos, ventanaMin, abierta, onToggle }: {
   r: ParetoResult['rows'][number]
   max: number
   turnos: number
+  /** Minutos totales de la muestra: el 100% del bloque entero. */
+  ventanaMin?: number
   abierta: boolean
   onToggle: () => void
 }) {
@@ -406,9 +408,20 @@ function FilaPareto({ r, max, turnos, abierta, onToggle }: {
       >
         <span className="flex items-baseline justify-between gap-2">
           <span className="min-w-0 truncate text-[13px] text-foreground">{r.label}</span>
+          {/*
+            * ⚠ El % es del TIEMPO DE LOS TURNOS, el mismo 100% que el número
+            * grande de arriba — así la columna SUMA ese número (pedido de
+            * Orel). Antes era el % de lo recuperable y sumaba 100%: dos
+            * denominadores a diez centímetros, y el «32%» no se entendía de
+            * qué era. Con un decimal, porque las causas chicas dan 0,2%.
+            */}
           <span className="shrink-0 text-[13px] tabular-nums font-semibold text-foreground">
             {fmtMin(r.minutes)}
-            <span className="ml-1.5 font-normal text-muted-foreground">{Math.round(r.sharePct)}%</span>
+            {ventanaMin != null && ventanaMin > 0 && (
+              <span className="ml-1.5 font-normal text-muted-foreground">
+                {fmtDec1((r.minutes / ventanaMin) * 100)}%
+              </span>
+            )}
           </span>
         </span>
         <span className="mt-1.5 block h-1 overflow-hidden rounded-full bg-muted-foreground/[0.15]">

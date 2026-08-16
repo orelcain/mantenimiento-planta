@@ -345,10 +345,18 @@ export type Ventana = (typeof VENTANAS)[number]
  */
 export function turnosParaVentana(
   turnos: TurnoCtx[],
-  opts: { ventana?: Ventana; turno?: string | null | 'todos' } = {},
+  opts: { ventana?: Ventana; turno?: string | null | 'todos'; conCausas?: boolean } = {},
 ): TurnoCtx[] {
-  const { ventana = 10, turno = null } = opts
+  const { ventana = 10, turno = null, conCausas = false } = opts
   let out = muestraUnica(turnos).filter((t) => (t.windowMin ?? 0) > 0)
+  /*
+   * ⚠⚠ `conCausas` para el RANKING y su barra: un turno que aporta minutos
+   * pero no trae el detalle infla el total sin poder explicarlo. Con 10 turnos
+   * en la barra y causas de solo 6, el bloque decía «10 h 59 min recuperables»
+   * arriba y las causas sumaban 5 h 48 min — 311 minutos sin dueño ni fila.
+   * La tendencia SÍ los usa: solo necesita minutos, no causas.
+   */
+  if (conCausas) out = out.filter((t) => (t.causas?.length ?? 0) > 0)
   if (turno && turno !== 'todos') out = out.filter((t) => !t.shiftId || t.shiftId === turno)
   /* Del más nuevo al más viejo para recortar, y de vuelta al orden natural:
      la serie se lee de izquierda (viejo) a derecha (nuevo). */
