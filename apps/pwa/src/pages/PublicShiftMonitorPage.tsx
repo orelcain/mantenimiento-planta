@@ -2028,21 +2028,25 @@ export function PublicShiftMonitorPage() {
     }),
     [turnosConocidos, ventanaPareto, turnoPareto, vista?.shiftId],
   )
-  /* La tendencia mira más turnos: solo necesita minutos, no causas. */
-  const turnosDeTendencia = useMemo(
-    () => turnosParaVentana(turnosConocidos, {
-      ventana: ventanaPareto,
-      turno: turnoPareto ?? vista?.shiftId ?? null,
-    }),
-    [turnosConocidos, ventanaPareto, turnoPareto, vista?.shiftId],
-  )
-  const paretoTendencia = useMemo(() => contextoPareto(turnosDeTendencia), [turnosDeTendencia])
-
   const pareto = useMemo(
     () => buildPareto(turnosDelPareto.map((t) => t.causas ?? null)),
     [turnosDelPareto],
   )
   const paretoCtx = useMemo(() => contextoPareto(turnosDelPareto), [turnosDelPareto])
+  /*
+   * ⚠⚠ La tendencia mira LOS MISMOS turnos que el ranking, no más.
+   *
+   * Tenía sentido técnico que mirara más (solo necesita minutos, no causas),
+   * pero en pantalla quedaba «6 de 10 turnos» arriba y diez barras abajo, y
+   * Orel insistió dos veces: un bloque que muestra dos conteos hace dudar del
+   * dato entero, por bien explicado que esté. Vale más un bloque que cuadra
+   * con seis turnos que uno que enseña diez y hay que justificar.
+   *
+   * No se pierde nada permanente: en cuanto `shiftStats` (#590) traiga el
+   * detalle de todos, el mismo selector muestra 10, 15 o 30 sin explicaciones.
+   */
+  const paretoTendencia = paretoCtx
+
   /* Un contexto por turno: es la comparación «Día vs Noche». Con un solo turno
      corriendo devuelve uno y la UI no ofrece nada. */
   const paretoPorTurno = useMemo(
