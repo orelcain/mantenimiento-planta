@@ -944,3 +944,27 @@ test('shiftStats es un documento Firestore VALIDO: sin undefined en ningun campo
   }
   out.forEach((o, i) => sinUndefined(o, `shiftStats[${i}]`))
 })
+
+
+test('shiftStats descarta Unscheduled: no es un turno, es el cajon de fuera de horario', async () => {
+  // Se colo en la primera corrida real (16-08): el Unscheduled del 13-08 tenia
+  // 520 pz y pasaba el piso de piezas. Habria aparecido como "turno" propio en
+  // el selector Dia/Noche.
+  const w = nowWall()
+  const d1 = dk(new Date(w.getTime() - 86_400_000))
+  const actual = `${dk(w)}_Turno Dia`
+  const bueno = `${d1}_Turno Dia`
+  const cajon = `${d1}_Unscheduled`
+  const hDe = (d, h) => new Date(Date.UTC(Number(d.slice(0, 4)), Number(d.slice(5, 7)) - 1, Number(d.slice(8, 10)), h))
+  const db = fakeShiftsDb({
+    [actual]: { shiftId: 'Turno Dia', scheduledStart: hoy(8), scheduledEnd: hoy(16), machines: [{ totalCycles: 3000 }] },
+    [bueno]:  { shiftId: 'Turno Dia', scheduledStart: hDe(d1, 8), scheduledEnd: hDe(d1, 16), machines: [{ totalCycles: 2000 }] },
+    [cajon]:  { shiftId: 'Unscheduled', scheduledStart: hDe(d1, 16), scheduledEnd: hDe(d1, 20), machines: [{ totalCycles: 600 }] },
+  }, {
+    [bueno]: [maquinaStats(2000, hDe(d1, 8).getTime())],
+    [cajon]: [maquinaStats(600, hDe(d1, 16).getTime())],
+  })
+  const out = await buildShiftStats(db, 'filete', actual, [], [], [])
+  assert.ok(out.some(o => o.shiftDocId === bueno), 'el turno real entra')
+  assert.ok(!out.some(o => o.shiftId === 'Unscheduled'), 'el cajon NO entra, ni con 600 pz')
+})

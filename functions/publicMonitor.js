@@ -1516,7 +1516,13 @@ async function buildShiftStats(db, plantSlug, currentShiftDocId, prev = [], hist
   const refs = await db.collection(`shoplogix/${plantSlug}/shifts`).listDocuments()
   const ids = refs
     .map(r => r.id)
-    .filter(id => id.slice(0, 10) >= desde && id !== currentShiftDocId)
+    /*
+     * ⚠ Sin «Unscheduled»: es el cajón de lo que cae fuera de horario, no un
+     * turno — el historial ya lo descarta por la misma razón. Se coló en la
+     * primera corrida real (16-08) porque el de 520 pz pasaba el piso de
+     * piezas, y habría aparecido como «turno» propio en el selector Día/Noche.
+     */
+    .filter(id => id.slice(0, 10) >= desde && id !== currentShiftDocId && id.slice(11) !== 'Unscheduled')
     .sort()
     .reverse()
     .slice(0, STATS_MAX)
