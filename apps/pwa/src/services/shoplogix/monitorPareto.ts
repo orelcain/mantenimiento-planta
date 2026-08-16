@@ -210,6 +210,8 @@ export interface ContextoPareto {
   sinProduccion: string[]
   /** Banda de lo habitual (cuartiles de la serie). null con menos de 4 puntos. */
   banda: { bajo: number; alto: number; mediana: number } | null
+  /** El promedio simple. Solo para explicar por qué NO se usa como referencia. */
+  promedio: number | null
   /**
    * El veredicto, con una regla dura para que no se vuelva optimista solo:
    * los últimos 3 turnos TODOS por debajo del mejor de los anteriores.
@@ -280,6 +282,7 @@ export function contextoPareto(turnos: TurnoCtx[]): ContextoPareto {
   }))
 
   const orden = serie.map((p) => p.pct).sort((a, b) => a - b)
+  const promedio = orden.length > 0 ? orden.reduce((a, v) => a + v, 0) / orden.length : null
   const banda = orden.length >= 4
     ? { bajo: cuartil(orden, 0.25), alto: cuartil(orden, 0.75), mediana: cuartil(orden, 0.5) }
     : null
@@ -319,6 +322,7 @@ export function contextoPareto(turnos: TurnoCtx[]): ContextoPareto {
     serie,
     sinProduccion: conVentana.filter((t) => !((t.producingMin ?? 0) > 0)).map((t) => t.dateKey),
     banda,
+    promedio,
     veredicto,
     vara,
   }

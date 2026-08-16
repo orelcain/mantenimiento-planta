@@ -39,6 +39,7 @@ export function ParetoDeParadas({ pareto, ctx, tendencia }: {
   tendencia?: ContextoPareto | null
 }) {
   const [abierta, setAbierta] = useState<string | null>(null)
+  const [porQueMediana, setPorQueMediana] = useState(false)
   // Con uno o dos turnos no hay patrón que mostrar, solo el turno de hoy otra
   // vez. Tres es el mínimo para que "en 2 de 3" signifique algo.
   if (!pareto || pareto.shifts < 3 || pareto.rows.length === 0) return null
@@ -140,24 +141,49 @@ export function ParetoDeParadas({ pareto, ctx, tendencia }: {
         ))}
       </ul>
 
-      {/* El resto de las causas va PEGADO a la lista, no después de la
-          conclusión: partía el bloque en dos mitades y las cuatro chicas
-          aparecían debajo del cierre, donde el ojo ya daba por terminado. */}
+      {/*
+        * El Pareto COMPLETO, sin esconder la cola (pedido de Orel: «queremos
+        * ver todo, más ordenado»). Lo que cambia no es qué se muestra sino
+        * CUÁNTO espacio ocupa cada cosa: las que explican el 80% van con su
+        * barra y su detalle; las de la cola, en una línea cada una. Nueve
+        * filas completas son 27 líneas en un teléfono — así son 17, y ninguna
+        * causa desaparece.
+        */}
       {resto.length > 0 && (
-        <details className="mt-2">
-          <summary className="cursor-pointer text-[11px] text-brand-ink underline underline-offset-2">
-            ver las otras {resto.length}
-          </summary>
-          <ul className="mt-2 space-y-2.5">
+        <>
+          <p className="mt-3 flex items-center gap-2 text-[11px] text-muted-foreground/70">
+            <span className="h-px flex-1 bg-border" />
+            el resto, {fmtMin(resto.reduce((a, r) => a + r.minutes, 0))} entre {resto.length}
+            <span className="h-px flex-1 bg-border" />
+          </p>
+          <ul className="mt-1.5 space-y-1">
             {resto.map((r) => (
-              <FilaPareto
-                key={r.label} r={r} max={max} turnos={turnosMedidos}
-                abierta={abierta === r.label}
-                onToggle={() => setAbierta((v) => (v === r.label ? null : r.label))}
-              />
+              <li key={r.label}>
+                <button
+                  type="button"
+                  onClick={() => setAbierta((v) => (v === r.label ? null : r.label))}
+                  className="flex min-h-[32px] w-full items-baseline gap-2 rounded-ctl px-1 text-left text-[12px] hover:bg-muted"
+                >
+                  <span className={`shrink-0 text-[11px] font-semibold ${DUENO_UI[r.dueno].clase}`}>
+                    {DUENO_UI[r.dueno].corto}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-foreground/80">{r.label}</span>
+                  <span className="shrink-0 tabular-nums text-muted-foreground">
+                    <span className="font-semibold text-foreground/80">{fmtMin(r.minutes)}</span>
+                    {' '}{Math.round(r.sharePct)}%
+                  </span>
+                </button>
+                {abierta === r.label && (
+                  <p className="px-1 pb-1 text-[11px] text-muted-foreground">
+                    en <b className="text-foreground/80">{r.shifts} de {turnosMedidos}</b> turnos
+                    {r.count > 0 && <> · {fmtInt(r.count)} {r.count === 1 ? 'parada' : 'paradas'}</>}
+                    {' '}· acumulado {Math.round(r.cumPct)}%
+                  </p>
+                )}
+              </li>
             ))}
           </ul>
-        </details>
+        </>
       )}
 
       {/* El corte, dicho en palabras: es la frase que alguien puede repetir en
@@ -210,18 +236,64 @@ export function ParetoDeParadas({ pareto, ctx, tendencia }: {
             Cómo viene turno a turno
             <span className="normal-case tracking-normal">
               {' '}· % recuperable de cada turno · últimos {serie.serie.length}
+              {serie.banda && (
+                <>
+                  {' · '}
+                  <button
+                    type="button"
+                    onClick={() => setPorQueMediana((v) => !v)}
+                    className="underline decoration-dotted underline-offset-2 text-brand-ink"
+                    aria-expanded={porQueMediana}
+                  >
+                    mediana <span className="tabular-nums">{fmtDec1(serie.banda.mediana)}%</span> ⓘ
+                  </button>
+                </>
+              )}
             </span>
           </p>
 
+          {/* Por qué la mediana y no el promedio: la pregunta que se hace
+              cualquiera que mire el número, contestada con SUS datos. */}
+          {porQueMediana && serie.banda && (
+            <div className="mt-2 rounded-[10px] bg-muted p-2.5 text-[12px] leading-snug text-muted-foreground">
+              <p>
+                <b className="text-foreground">Mediana</b>: el valor del medio. La mitad de los
+                turnos estuvo por debajo de{' '}
+                <span className="tabular-nums">{fmtDec1(serie.banda.mediana)}%</span> y la otra
+                mitad por encima.
+              </p>
+              {serie.promedio != null && (
+                <p className="mt-1.5">
+                  <b className="text-foreground">Promedio</b>: sumar todo y dividir. Da{' '}
+                  <span className="tabular-nums">{fmtDec1(serie.promedio)}%</span>
+                  {Math.abs(serie.promedio - serie.banda.mediana) >= 0.3 && (
+                    <>
+                      , más alto que la mediana porque{' '}
+                      <b className="text-foreground">un solo turno malo lo arrastra</b>: el peor de
+                      estos {serie.serie.length} llegó a{' '}
+                      <span className="tabular-nums">
+                        {fmtDec1(Math.max(...serie.serie.map((p) => p.pct)))}%
+                      </span>
+                      {' '}y sube el promedio de todos
+                    </>
+                  )}
+                  .
+                </p>
+              )}
+              <p className="mt-1.5">
+                Por eso la referencia es la mediana: describe el turno <b>típico</b>, no se mueve
+                por un día suelto, y así una mejora de verdad se nota en vez de quedar tapada.
+              </p>
+            </div>
+          )}
+
           <div className="relative mt-3 h-[104px]">
-            {/* La mediana, para tener contra qué comparar cada barra. */}
+            {/* La mediana, para tener contra qué comparar cada barra. Su cifra
+                va en el encabezado: flotando sobre la línea pisaba el % de la
+                barra que quedara debajo. */}
             {serie.banda && (
               <div className="absolute inset-x-0 border-t border-dashed border-muted-foreground/[0.5]"
-                style={{ bottom: `${(serie.banda.mediana / maxPct) * 100}%` }}>
-                <span className="absolute right-0 -top-4 text-[11px] tabular-nums text-muted-foreground">
-                  mediana {fmtDec1(serie.banda.mediana)}%
-                </span>
-              </div>
+                style={{ bottom: `${(serie.banda.mediana / maxPct) * 100}%` }} />
             )}
             <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-[3px]">
               {[
