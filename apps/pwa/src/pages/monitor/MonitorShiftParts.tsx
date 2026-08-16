@@ -1109,6 +1109,9 @@ export function ComparadorDias({ cmp, live, cone, ventana, onVentana, refSel, on
 
           <div className="mt-3">
             <MonitorCompareChart
+              /* El arranque del turno visto: convierte el eje de «h+6» a la
+                 hora de reloj, la misma que muestra el gráfico de velocidad. */
+              t0={live?.series?.[0]?.t ?? null}
               ventana={ventana}
               onVentana={onVentana}
               cmp={cmp}
@@ -1122,9 +1125,15 @@ export function ComparadorDias({ cmp, live, cone, ventana, onVentana, refSel, on
 
           {/* UNA sola nota. Antes eran tres diciendo variantes de lo mismo:
               una debajo de las tarjetas, otra acá y la de la brecha. */}
+          {/* ⚠ Esta nota decía «no por hora de reloj» y quedó contradiciendo al
+              eje, que ahora SÍ muestra horas. Además su premisa era falsa acá:
+              los 7 turnos medidos de Filete arrancaron todos a las 07:40. Lo
+              que sigue siendo cierto —y lo único que hay que advertir— es
+              contra qué se alinean los OTROS días. */}
           <p className="mt-2 text-[11px] leading-snug text-muted-foreground/70">
-            Todo se lee a la misma altura de turno, no por hora de reloj: los turnos no arrancan
-            a la misma hora, y esta diferencia cambia a medida que el turno avanza.
+            Las horas son las de este turno. Los otros días se alinean por altura de turno
+            —minutos desde su propio arranque—, así que si alguno empezó a otra hora, igual se
+            compara a la misma altura.
           </p>
     </Bloque>
   )
