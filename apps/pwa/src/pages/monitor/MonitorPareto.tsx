@@ -48,7 +48,6 @@ export function ParetoDeParadas({ pareto, ctx, tendencia }: {
   const turnosMedidos = ctx?.turnos ?? pareto.shifts
   const max = pareto.rows[0]!.minutes
   const vitales = pareto.rows.slice(0, Math.max(1, pareto.vitalCount))
-  const resto = pareto.rows.slice(vitales.length)
   const cronicas = vitales.filter((r) => r.shifts >= Math.ceil(pareto.shifts / 2))
   /* La serie mira más atrás que el ranking (10 turnos contra 6): si no llega,
      se cae al contexto de la propia muestra. */
@@ -131,66 +130,30 @@ export function ParetoDeParadas({ pareto, ctx, tendencia }: {
         </div>
       )}
 
-      <ul className="mt-4 space-y-2.5">
-        {vitales.map((r) => (
-          <FilaPareto
-            key={r.label} r={r} max={max} turnos={turnosMedidos}
-            abierta={abierta === r.label}
-            onToggle={() => setAbierta((v) => (v === r.label ? null : r.label))}
-          />
+      {/*
+        * UNA lista agrupada con TODAS las causas (§5.2): superficie propia,
+        * separadores hairline y nada escondido. Antes eran dos listas con
+        * formatos distintos —las «vitales» con barra y la cola en texto— y la
+        * conclusión partiéndolas al medio. El corte del 80% sigue estando,
+        * pero como una MARCA entre filas, no como un tajo.
+        */}
+      <ul className="mt-4 overflow-hidden rounded-[14px] bg-muted/50">
+        {pareto.rows.map((r, i) => (
+          <div key={r.label}>
+            {/* Sin marca del corte 80/20: la lista ya está ordenada y cada fila
+                dice su % — el separador partía en dos algo que se lee de
+                corrido, y el «resto» sonaba a sobra en vez de a cola larga. */}
+            <div className={i > 0 ? 'border-t border-border/50' : ''}>
+              <FilaPareto
+                r={r} max={max} turnos={turnosMedidos}
+                abierta={abierta === r.label}
+                onToggle={() => setAbierta((v) => (v === r.label ? null : r.label))}
+              />
+            </div>
+          </div>
         ))}
       </ul>
 
-      {/*
-        * El Pareto COMPLETO, sin esconder la cola (pedido de Orel: «queremos
-        * ver todo, más ordenado»). Lo que cambia no es qué se muestra sino
-        * CUÁNTO espacio ocupa cada cosa: las que explican el 80% van con su
-        * barra y su detalle; las de la cola, en una línea cada una. Nueve
-        * filas completas son 27 líneas en un teléfono — así son 17, y ninguna
-        * causa desaparece.
-        */}
-      {resto.length > 0 && (
-        <>
-          <p className="mt-3 flex items-center gap-2 text-[11px] text-muted-foreground/70">
-            <span className="h-px flex-1 bg-border" />
-            el resto, {fmtMin(resto.reduce((a, r) => a + r.minutes, 0))} entre {resto.length}
-            <span className="h-px flex-1 bg-border" />
-          </p>
-          <ul className="mt-1.5 space-y-1">
-            {resto.map((r) => (
-              <li key={r.label}>
-                <button
-                  type="button"
-                  onClick={() => setAbierta((v) => (v === r.label ? null : r.label))}
-                  className="flex min-h-[32px] w-full items-baseline gap-2 rounded-ctl px-1 text-left text-[12px] hover:bg-muted"
-                >
-                  <span className={`shrink-0 text-[11px] font-semibold ${DUENO_UI[r.dueno].clase}`}>
-                    {DUENO_UI[r.dueno].corto}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate text-foreground/80">{r.label}</span>
-                  <span className="shrink-0 tabular-nums text-muted-foreground">
-                    <span className="font-semibold text-foreground/80">{fmtMin(r.minutes)}</span>
-                    {' '}{Math.round(r.sharePct)}%
-                  </span>
-                </button>
-                {abierta === r.label && (
-                  <p className="px-1 pb-1 text-[11px] text-muted-foreground">
-                    en <b className="text-foreground/80">{r.shifts} de {turnosMedidos}</b> turnos
-                    {r.count > 0 && <> · {fmtInt(r.count)} {r.count === 1 ? 'parada' : 'paradas'}</>}
-                    {' '}· acumulado {Math.round(r.cumPct)}%
-                  </p>
-                )}
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-
-      {/* El corte, dicho en palabras: es la frase que alguien puede repetir en
-          una reunión sin tener que leer el gráfico. */}
-      {/* La frase de gestión que las filas no dicen: quién carga con lo que
-          se repite. El 15-08 el 49% no tenía dueño — no se puede atacar lo
-          que nadie anota, y ESO es el hallazgo. */}
       {(pareto.porDueno.mantencion > 0 || pareto.porDueno.externo > 0 || pareto.porDueno['sin-imputar'] > 0) && (
         <p className="mt-4 text-[12px] leading-relaxed text-muted-foreground">
           De lo que se repite:{' '}
@@ -365,59 +328,63 @@ function FilaPareto({ r, max, turnos, abierta, onToggle }: {
 }) {
   const agrupa = r.parts.length > 1
   /*
-   * Una causa que aparece en menos de la mitad de los turnos se dibuja en gris:
-   * pesa en minutos pero no es un patrón, y la diferencia tiene que verse sin
-   * leer la cifra.
+   * Una causa que aparece en menos de la mitad de los turnos NO es un patrón:
+   * pesa en minutos pero pasó suelta. Antes eso se decía apagando la barra a
+   * gris; ahora la barra lleva el color del DUEÑO —que es más información— y
+   * lo crónico se dice donde corresponde: en el texto, «en 6 de 6 turnos».
    */
   const cronica = r.shifts >= Math.ceil(turnos / 2)
+  const ui = DUENO_UI[r.dueno]
 
   return (
     <li>
-      <div className="flex items-baseline justify-between gap-2 text-[12.5px]">
-        <span className="min-w-0 truncate">
-          {r.label}
+      {/*
+        * TODAS las causas llevan barra, también las chicas (pedido de Orel):
+        * sin ella hay que leer «5 min · 1%» para saber que no pesa, y la
+        * comparación entre filas se pierde. La barra es fina y del color del
+        * dueño, así una fila dice cuánto Y de quién sin leer una palabra.
+        */}
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={abierta}
+        className="w-full px-3 py-2 text-left"
+      >
+        <span className="flex items-baseline justify-between gap-2">
+          <span className="min-w-0 truncate text-[13px] text-foreground">{r.label}</span>
+          <span className="shrink-0 text-[13px] tabular-nums font-semibold text-foreground">
+            {fmtMin(r.minutes)}
+            <span className="ml-1.5 font-normal text-muted-foreground">{Math.round(r.sharePct)}%</span>
+          </span>
+        </span>
+        <span className="mt-1.5 block h-1 overflow-hidden rounded-full bg-muted-foreground/[0.15]">
+          <span
+            className={`block h-full rounded-full ${ui.barra} ${cronica ? '' : 'opacity-60'}`}
+            style={{ width: `${Math.max(2, (r.minutes / max) * 100)}%` }}
+          />
+        </span>
+        <span className="mt-1 flex flex-wrap items-baseline gap-x-2 text-[11px]">
+          {/* El dueño según el árbol oficial: cierra el círculo con «Qué pasó
+              en el turno» — lo que se repite también dice de quién es. */}
+          <span className={`font-semibold ${ui.clase}`}>{ui.corto}</span>
+          <span className="tabular-nums text-muted-foreground">
+            en <b className={cronica ? 'text-foreground/80' : ''}>{r.shifts} de {turnos}</b> turnos
+          </span>
+          {r.count > 0 && (
+            <span className="tabular-nums text-muted-foreground">
+              {fmtInt(r.count)} {r.count === 1 ? 'parada' : 'paradas'}
+            </span>
+          )}
           {agrupa && (
-            <button
-              type="button"
-              onClick={onToggle}
-              className="ml-1.5 text-[11px] text-sky-700 underline underline-offset-2 dark:text-sky-300"
-            >
-              {r.parts.length} causas
-            </button>
+            <span className="ml-auto shrink-0 text-brand-ink">
+              {abierta ? 'ocultar' : `${r.parts.length} causas`}
+            </span>
           )}
         </span>
-        <span className="shrink-0 tabular-nums font-semibold">
-          {fmtMin(r.minutes)}
-          <span className="ml-1 font-normal text-muted-foreground">{Math.round(r.sharePct)}%</span>
-        </span>
-      </div>
-
-      <div className="mt-1 h-2 overflow-hidden rounded bg-muted">
-        <div
-          className={`h-full rounded ${cronica ? 'bg-sky-500 dark:bg-sky-400' : 'bg-muted-foreground/50'}`}
-          style={{ width: `${(r.minutes / max) * 100}%` }}
-        />
-      </div>
-
-      <div className="mt-0.5 flex flex-wrap gap-x-3 text-[10.5px] text-muted-foreground">
-        {/* El dueño según el árbol oficial: cierra el círculo con «Qué pasó en
-            el turno» — lo que se repite también dice de quién es. */}
-        <span className={`font-semibold ${DUENO_UI[r.dueno].clase}`}>
-          {DUENO_UI[r.dueno].corto}
-        </span>
-        <span className="tabular-nums">
-          en <b className={cronica ? 'text-foreground/80' : ''}>{r.shifts} de {turnos}</b> turnos
-        </span>
-        {r.count > 0 && (
-          <span className="tabular-nums">
-            {fmtInt(r.count)} {r.count === 1 ? 'parada' : 'paradas'}
-          </span>
-        )}
-        <span className="tabular-nums">acumulado {Math.round(r.cumPct)}%</span>
-      </div>
+      </button>
 
       {abierta && agrupa && (
-        <ul className="mt-1 space-y-0.5 border-l border-border pl-2.5 text-[11px] text-muted-foreground">
+        <ul className="space-y-0.5 px-3 pb-2 pl-6 text-[11px] text-muted-foreground">
           {r.parts.map((p) => (
             <li key={p.reason} className="flex justify-between gap-2">
               <span className="min-w-0 truncate">{p.reason}</span>

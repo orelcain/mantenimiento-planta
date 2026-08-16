@@ -380,6 +380,13 @@ export function buildDayComparison(args: {
     esHoy: true,
   }]
 
+  /*
+   * ⚠ Acá NO se filtra ni se reordena por turno: Yal corre tres turnos por
+   * jornada y los compara ENTRE SÍ a propósito (hay test que fija el orden
+   * «lun 10 T1/T2/T3»). La curva de otro turno es una opción legítima y las
+   * etiquetas ya los distinguen. Lo que sí se elige por turno es la REFERENCIA
+   * por defecto — eso vive en `resumenComparacion`.
+   */
   for (const prev of (args.previous ?? []).slice(0, args.maxDays ?? 2)) {
     const curve = cumulativeFromStart(prev.series)
     if (curve.length === 0) continue
@@ -607,7 +614,18 @@ export interface ResumenComparacion {
 export function resumenComparacion(cmp: CompareResult): ResumenComparacion {
   const hoy = cmp.days.find((d) => d.esHoy)
   const actual = hoy?.atCurrentMinute ?? null
-  const anteriores = cmp.days.filter((d) => !d.esHoy && d.atCurrentMinute != null)
+  /*
+   * ⚠⚠ El «anterior» con el que se compara en palabras («vas 375 abajo de jue
+   * 13») busca primero un turno del MISMO nombre: con día y noche corriendo,
+   * el más reciente puede ser el otro turno, y un diurno contra un nocturno no
+   * es una comparación, es una confusión. Si no hay ninguno del mismo nombre,
+   * vale el más reciente: una comparación imperfecta enseña más que ninguna.
+   */
+  const todosAnteriores = cmp.days.filter((d) => !d.esHoy && d.atCurrentMinute != null)
+  const mismoTurno = hoy?.shiftId
+    ? todosAnteriores.filter((d) => d.shiftId === hoy.shiftId)
+    : []
+  const anteriores = mismoTurno.length > 0 ? mismoTurno : todosAnteriores
 
   const mejorDia = anteriores.reduce<DayCurve | null>(
     (mej, d) => (mej == null || (d.atCurrentMinute ?? 0) > (mej.atCurrentMinute ?? 0) ? d : mej),

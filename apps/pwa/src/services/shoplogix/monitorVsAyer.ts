@@ -34,6 +34,12 @@
 /** Resumen mínimo de un turno para comparar. */
 export interface TurnoResumen {
   dateKey: string
+  /**
+   * Nombre del turno («Turno Dia», «Turno Noche»…). Sin él no hay comparación
+   * honesta en cuanto la línea corre más de un turno: un nocturno de 6 h no se
+   * mide contra un diurno de 8 h.
+   */
+  shiftId?: string | null
   total: number
   producingMin: number
   windowMin?: number | null
@@ -62,6 +68,18 @@ export interface VsAyerResult {
 /** Fracción de la diferencia que el residuo puede comerse sin invalidar todo. */
 const MAX_RESIDUO = 0.35
 
+/**
+ * Turnos comparables entre sí: los del MISMO nombre.
+ *
+ * ⚠ Un nocturno no se compara contra un diurno — distinta duración, distinta
+ * dotación, distinta alimentación aguas arriba. Sin `shiftId` (entradas viejas
+ * del historial) se acepta igual: una comparación imperfecta enseña más que
+ * ninguna, y el caso desaparece solo a medida que el historial se renueva.
+ */
+function mismoTurnoQue(hoy: TurnoResumen) {
+  return (p: TurnoResumen) => !hoy.shiftId || !p.shiftId || p.shiftId === hoy.shiftId
+}
+
 function valido(t: TurnoResumen): t is Required<TurnoResumen> & TurnoResumen {
   return (
     t.total > 0 && t.producingMin >= 60 &&
@@ -79,9 +97,21 @@ function valido(t: TurnoResumen): t is Required<TurnoResumen> & TurnoResumen {
  */
 export function vsAyer(hoy: TurnoResumen, previos: TurnoResumen[]): VsAyerResult | null {
   if (!valido(hoy)) return null
+  /*
+   * ⚠⚠ MISMO TURNO, no solo día anterior. La pantalla ya decía «contra el
+   * último turno del mismo nombre» y el código solo filtraba por fecha: con un
+   * solo turno en la línea daba igual, pero en cuanto arranca el nocturno
+   * compararía un turno de noche contra uno de día y llamaría «ayer» a algo
+   * que dura distinto, produce distinto y tiene otra dotación. El texto decía
+   * la verdad que el código todavía no cumplía.
+   *
+   * Sin `shiftId` (turnos viejos del historial) se compara como antes: es
+   * preferible una comparación que a otra que no existe.
+   */
   const ayer = [...previos]
     .filter(valido)
     .filter((p) => p.dateKey < hoy.dateKey)
+    .filter(mismoTurnoQue(hoy))
     .sort((a, b) => b.dateKey.localeCompare(a.dateKey))[0]
   if (!ayer) return null
 
@@ -141,7 +171,8 @@ export interface RecordsResult {
  */
 export function recordsDeLinea(hoy: TurnoResumen, previos: TurnoResumen[]): RecordsResult | null {
   if (!valido(hoy)) return null
-  const base = previos.filter(valido).filter((p) => p.dateKey < hoy.dateKey)
+  /* Récords del MISMO turno: el mejor diurno no es meta para el nocturno. */
+  const base = previos.filter(valido).filter((p) => p.dateKey < hoy.dateKey).filter(mismoTurnoQue(hoy))
   if (base.length < 3) return null
 
   const ritmoDe = (t: TurnoResumen) => t.total / t.producingMin
@@ -214,9 +245,12 @@ export interface BandaNormal {
  * banda: mejor una tarjeta sin contexto que un «rango normal» de 3 datos.
  */
 export function bandaNormal(hoy: TurnoResumen, previos: TurnoResumen[]): BandaNormal | null {
+  /* «Lo normal» es lo normal DE ESE TURNO: mezclar día y noche ensancha la
+     banda hasta que cualquier cosa cae adentro y deja de avisar. */
   const base = previos
     .filter(valido)
     .filter((p) => p.dateKey < hoy.dateKey)
+    .filter(mismoTurnoQue(hoy))
     .sort((a, b) => a.dateKey.localeCompare(b.dateKey))
   if (base.length < 5) return null
   const ritmos = base.map((t) => t.total / t.producingMin)

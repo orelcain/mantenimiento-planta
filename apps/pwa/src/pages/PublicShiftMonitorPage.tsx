@@ -1959,7 +1959,7 @@ export function PublicShiftMonitorPage() {
   const muestraPareto = useMemo(() => muestraUnica([
     {
       dateKey: vista?.dateKey ?? data?.dateKey ?? '',
-      shiftId: data?.shiftId ?? null,
+      shiftId: vista?.shiftId ?? data?.shiftId ?? null,
       windowMin: live?.timeBreakdown?.windowMin ?? null,
       producingMin: live?.timeBreakdown?.producingMin ?? null,
       plannedMin: live?.timeBreakdown?.plannedMin ?? null,
@@ -1975,7 +1975,10 @@ export function PublicShiftMonitorPage() {
       recoverableMin: h.live?.timeBreakdown?.recoverableMin ?? null,
       causas: h.live?.timeBreakdown?.recoverable ?? null,
     })),
-  ]), [live?.timeBreakdown, data?.history, data?.dateKey, data?.shiftId, vista?.dateKey])
+    /* ⚠ Solo turnos del MISMO nombre: «lo que se repite» en el nocturno no es
+       lo que se repite en el diurno, y sumarlos esconde a los dos. */
+  ].filter((t) => !vista?.shiftId || !t.shiftId || t.shiftId === vista.shiftId)),
+  [live?.timeBreakdown, data?.history, data?.dateKey, data?.shiftId, vista?.dateKey, vista?.shiftId])
 
   const pareto = useMemo(
     () => buildPareto(muestraPareto.map((t) => t.causas ?? null)),
@@ -2085,11 +2088,28 @@ export function PublicShiftMonitorPage() {
    * el backend todavía no repobló.
    */
   const resumenesAnteriores = useMemo(() => {
+    /*
+     * ⚠⚠ La clave lleva el NOMBRE del turno, no solo la fecha. Con día y noche
+     * corriendo, dos turnos del mismo día son dos entradas distintas: con la
+     * fecha sola, el que llegara segundo pisaba al primero y desaparecía.
+     *
+     * Y el filtro por turno mira el turno VISTO (`vista`), no el vigente: es
+     * el mismo gotcha de siempre en esta página — mirando el nocturno de ayer
+     * desde el diurno de hoy, comparaba contra los diurnos.
+     */
     const por = new Map<string, TurnoResumen>()
+    const turnoVisto = vista?.shiftId ?? null
+    const mismo = (id: string | null) => !turnoVisto || !id || id === turnoVisto
+    const clave = (dateKey: string, shiftId: string | null) => `${dateKey}|${shiftId ?? ''}`
+
     for (const h of data?.forecastHistory ?? []) {
       if (h.windowMin == null) continue // entrada vieja, sin desglose: no sirve acá
-      por.set(h.dateKey, {
+      /* `forecastHistory` no trae `shiftId` suelto: viene dentro del docId. */
+      const shiftId = parseShiftDocId(h.shiftDocId)?.shiftId ?? null
+      if (!mismo(shiftId)) continue
+      por.set(clave(h.dateKey, shiftId), {
         dateKey: h.dateKey,
+        shiftId,
         total: h.total,
         producingMin: h.producingMin,
         windowMin: h.windowMin,
@@ -2098,12 +2118,14 @@ export function PublicShiftMonitorPage() {
       })
     }
     for (const h of data?.history ?? []) {
-      if (por.has(h.dateKey)) continue
-      if (h.shiftId !== data?.shiftId) continue // el nocturno no compara con el de día
+      const shiftId = h.shiftId ?? null
+      if (por.has(clave(h.dateKey, shiftId))) continue
+      if (!mismo(shiftId)) continue          // el nocturno no compara con el de día
       const tb = h.live?.timeBreakdown
       if (!tb) continue
-      por.set(h.dateKey, {
+      por.set(clave(h.dateKey, shiftId), {
         dateKey: h.dateKey,
+        shiftId,
         total: h.live.totalPieces ?? 0,
         producingMin: tb.producingMin ?? 0,
         windowMin: tb.windowMin,
@@ -2112,7 +2134,7 @@ export function PublicShiftMonitorPage() {
       })
     }
     return [...por.values()]
-  }, [data?.history, data?.forecastHistory, data?.shiftId])
+  }, [data?.history, data?.forecastHistory, vista?.shiftId])
 
   /*
    * ⚠ Solo con el turno CERRADO: a mitad de turno el término «duración»
@@ -2132,13 +2154,14 @@ export function PublicShiftMonitorPage() {
     if (!live?.shiftClosed || !live.timeBreakdown || !vista?.dateKey) return null
     return {
       dateKey: vista.dateKey,
+      shiftId: vista.shiftId ?? null,
       total: live.totalPieces,
       producingMin: live.timeBreakdown.producingMin,
       windowMin: live.timeBreakdown.windowMin,
       plannedMin: live.timeBreakdown.plannedMin,
       recoverableMin: live.timeBreakdown.recoverableMin,
     }
-  }, [live, vista?.dateKey])
+  }, [live, vista?.dateKey, vista?.shiftId])
 
   /*
    * El rango normal se calcula también EN VIVO (no solo con el turno cerrado):
@@ -2148,6 +2171,7 @@ export function PublicShiftMonitorPage() {
     const hoy: TurnoResumen | null = live?.timeBreakdown && vista?.dateKey
       ? {
         dateKey: vista.dateKey,
+        shiftId: vista.shiftId ?? null,
         total: live.totalPieces,
         producingMin: live.timeBreakdown.producingMin,
         windowMin: live.timeBreakdown.windowMin,
@@ -2156,7 +2180,7 @@ export function PublicShiftMonitorPage() {
       }
       : null
     return hoy ? bandaNormal(hoy, resumenesAnteriores) : null
-  }, [live, vista?.dateKey, resumenesAnteriores])
+  }, [live, vista?.dateKey, vista?.shiftId, resumenesAnteriores])
 
   const comparadoConAyer = useMemo(
     () => (resumenHoy ? compararVsAyer(resumenHoy, resumenesAnteriores) : null),
