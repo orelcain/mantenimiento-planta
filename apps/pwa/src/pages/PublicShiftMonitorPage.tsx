@@ -44,7 +44,7 @@ import {
   prediccionConvenio,
 } from '@/services/shoplogix/monitorCompare'
 import { buildForecast, MAX_MAPE_PCT } from '@/services/shoplogix/monitorForecast'
-import { buildPareto } from '@/services/shoplogix/monitorPareto'
+import { buildPareto, contextoPareto, muestraUnica } from '@/services/shoplogix/monitorPareto'
 import { agruparEventos } from '@/services/shoplogix/monitorEventos'
 import { costoDeParadas } from '@/services/shoplogix/monitorPerdidas'
 import { bandaNormal, nombreDeDia, rachaDeRitmos, recordsDeLinea, vsAyer as compararVsAyer, type TurnoResumen } from '@/services/shoplogix/monitorVsAyer'
@@ -1945,13 +1945,42 @@ export function PublicShiftMonitorPage() {
    * más el turno que se está mirando: cero lecturas extra. Solo el tiempo
    * RECUPERABLE — el convenio no es una pérdida que alguien pueda atacar.
    */
-  const pareto = useMemo(() => {
-    const turnos = [
-      live?.timeBreakdown?.recoverable ?? null,
-      ...(data?.history ?? []).map((h) => h.live?.timeBreakdown?.recoverable ?? null),
-    ]
-    return buildPareto(turnos)
-  }, [live?.timeBreakdown, data?.history])
+  /*
+   * La muestra del Pareto, UNA sola vez para el ranking y para su contexto: si
+   * cada uno armara la suya podrían hablar de conjuntos distintos, que es
+   * justo lo que pasaba.
+   *
+   * ⚠⚠ BUG que esto corrige: se sumaba el turno VISTO más el historial
+   * completo, y el historial YA lo incluye. Mirando el 14-08 el bloque decía
+   * «7 turnos · 6 h 42 min» cuando eran 6 turnos y 5 h 48 min: el turno en
+   * pantalla contaba dos veces (verificado contra Firestore el 15-08).
+   */
+  const muestraPareto = useMemo(() => muestraUnica([
+    {
+      dateKey: vista?.dateKey ?? data?.dateKey ?? '',
+      shiftId: data?.shiftId ?? null,
+      windowMin: live?.timeBreakdown?.windowMin ?? null,
+      producingMin: live?.timeBreakdown?.producingMin ?? null,
+      plannedMin: live?.timeBreakdown?.plannedMin ?? null,
+      recoverableMin: live?.timeBreakdown?.recoverableMin ?? null,
+      causas: live?.timeBreakdown?.recoverable ?? null,
+    },
+    ...(data?.history ?? []).map((h) => ({
+      dateKey: h.dateKey,
+      shiftId: h.shiftId ?? null,
+      windowMin: h.live?.timeBreakdown?.windowMin ?? null,
+      producingMin: h.live?.timeBreakdown?.producingMin ?? null,
+      plannedMin: h.live?.timeBreakdown?.plannedMin ?? null,
+      recoverableMin: h.live?.timeBreakdown?.recoverableMin ?? null,
+      causas: h.live?.timeBreakdown?.recoverable ?? null,
+    })),
+  ]), [live?.timeBreakdown, data?.history, data?.dateKey, data?.shiftId, vista?.dateKey])
+
+  const pareto = useMemo(
+    () => buildPareto(muestraPareto.map((t) => t.causas ?? null)),
+    [muestraPareto],
+  )
+  const paretoCtx = useMemo(() => contextoPareto(muestraPareto), [muestraPareto])
 
   /**
    * El ritmo de la línea ANDANDO: piezas por minuto de uptime.
@@ -3100,7 +3129,7 @@ export function PublicShiftMonitorPage() {
           </div>
         )}
 
-        <ParetoDeParadas pareto={pareto} />
+        <ParetoDeParadas pareto={pareto} ctx={paretoCtx} />
 
         <PorHora series={live.series} />
 

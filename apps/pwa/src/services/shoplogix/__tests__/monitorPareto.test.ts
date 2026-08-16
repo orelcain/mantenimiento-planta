@@ -4,7 +4,7 @@
  * en pantalla, no un ejemplo inventado.
  */
 import { describe, it, expect } from 'vitest'
-import { buildPareto, equipoDe } from '../monitorPareto'
+import { buildPareto, contextoPareto, equipoDe, type TurnoCtx } from '../monitorPareto'
 
 /** `timeBreakdown.recoverable` de cada uno de los 6 turnos anteriores. */
 const TURNOS = [
@@ -177,5 +177,72 @@ describe('dueño de la recurrencia', () => {
     expect(p.porDueno.externo).toBe(58)
     expect(p.porDueno['sin-imputar']).toBe(113)
     expect(p.porDueno.mantencion + p.porDueno.externo + p.porDueno['sin-imputar']).toBe(p.totalMin)
+  })
+})
+
+describe('contextoPareto · el marco temporal del Pareto', () => {
+  /*
+   * Los 7 turnos REALES de Filete al 15-08 (verificados contra Firestore).
+   * El sábado 15 tiene la línea apagada: 465 min de ventana y 0 produciendo.
+   */
+  const TURNOS: TurnoCtx[] = [
+    { dateKey: '2026-08-08', windowMin: 460, producingMin: 340, plannedMin: 62, recoverableMin: 51 },
+    { dateKey: '2026-08-10', windowMin: 515, producingMin: 395, plannedMin: 57, recoverableMin: 55 },
+    { dateKey: '2026-08-11', windowMin: 505, producingMin: 343, plannedMin: 65, recoverableMin: 90 },
+    { dateKey: '2026-08-12', windowMin: 495, producingMin: 375, plannedMin: 77, recoverableMin: 37 },
+    { dateKey: '2026-08-13', windowMin: 520, producingMin: 403, plannedMin: 50, recoverableMin: 63 },
+    { dateKey: '2026-08-14', windowMin: 455, producingMin: 338, plannedMin: 63, recoverableMin: 55 },
+    { dateKey: '2026-08-15', windowMin: 465, producingMin: 0, plannedMin: 0, recoverableMin: 0 },
+  ]
+
+  /*
+   * ⚠⚠ EL BUG que esto congela: la página sumaba el turno VISTO más el
+   * historial completo, y el historial ya lo incluye. Mirando el 14-08 el
+   * bloque decía «7 turnos · 6 h 42 min» cuando eran 6 turnos y 5 h 48 min.
+   */
+  it('⚠ el turno que se está mirando no se cuenta dos veces', () => {
+    const conDuplicado = [TURNOS[5]!, ...TURNOS]     // el 14-08, como en la página
+    const c = contextoPareto(conDuplicado)
+    expect(c.turnos).toBe(7)
+    expect(c.recuperableMin).toBe(351)               // no 406
+  })
+
+  it('el 100% es el tiempo TOTAL, con el convenio a la vista', () => {
+    const c = contextoPareto(TURNOS)
+    expect(c.ventanaMin).toBe(3415)
+    expect(c.convenioMin).toBe(374)                  // el convenio se muestra, no se descuenta
+    expect(c.recuperableMin).toBe(351)
+    expect(c.pct).toBeCloseTo(10.3, 1)
+    // Con el tiempo útil como base daría 11,6%: más alto y sin ver la colación.
+    expect(c.pct).toBeLessThan((351 / (3415 - 374)) * 100)
+  })
+
+  it('⚠ el turno sin producción no dibuja una mejora que no ocurrió', () => {
+    const c = contextoPareto(TURNOS)
+    expect(c.serie).toHaveLength(6)                  // el sábado queda fuera
+    expect(c.serie.some((p) => p.dateKey === '2026-08-15')).toBe(false)
+    expect(c.sinProduccion).toEqual(['2026-08-15'])  // pero no desaparece
+  })
+
+  it('la serie va del más viejo al más nuevo, con el % de cada turno', () => {
+    const c = contextoPareto(TURNOS)
+    expect(c.serie.map((p) => p.dateKey)[0]).toBe('2026-08-08')
+    expect(c.serie.map((p) => Math.round(p.pct))).toEqual([11, 11, 18, 7, 12, 12])
+  })
+
+  it('⚠⚠ con datos ruidosos NO declara una mejora: hace falta una racha', () => {
+    // 11,1 · 10,7 · 17,8 · 7,5 · 12,1 · 12,1 no tiene tendencia, y el bloque
+    // tiene que decirlo en vez de dibujar una flecha sobre el ruido.
+    expect(contextoPareto(TURNOS).veredicto).toBe('sin-cambio')
+  })
+
+  it('con tres turnos seguidos bajo lo habitual, sí lo dice', () => {
+    const mejorando: TurnoCtx[] = [
+      ...TURNOS.slice(0, 3),
+      { dateKey: '2026-08-16', windowMin: 480, producingMin: 400, plannedMin: 60, recoverableMin: 10 },
+      { dateKey: '2026-08-17', windowMin: 480, producingMin: 400, plannedMin: 60, recoverableMin: 9 },
+      { dateKey: '2026-08-18', windowMin: 480, producingMin: 400, plannedMin: 60, recoverableMin: 8 },
+    ]
+    expect(contextoPareto(mejorando).veredicto).toBe('mejora')
   })
 })

@@ -13,12 +13,16 @@
 import { useState } from 'react'
 import { DUENO_UI } from './duenoUi'
 import { Bloque } from './MonitorShiftParts'
-import type { ParetoResult } from '@/services/shoplogix/monitorPareto'
+import type { ContextoPareto, ParetoResult } from '@/services/shoplogix/monitorPareto'
+import { nombreDeDia } from '@/services/shoplogix/monitorVsAyer'
 
 const nf = new Intl.NumberFormat('es-CL')
 const fmtInt = (n: number) => nf.format(Math.round(n || 0))
 
 /** "2 h 6 min" a partir de minutos, para totales que pasan la hora. */
+const nf1 = new Intl.NumberFormat('es-CL', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+const fmtDec1 = (n: number) => nf1.format(n || 0)
+
 function fmtMin(min: number): string {
   const m = Math.round(min)
   if (m < 60) return `${m} min`
@@ -27,7 +31,11 @@ function fmtMin(min: number): string {
   return r > 0 ? `${h} h ${r} min` : `${h} h`
 }
 
-export function ParetoDeParadas({ pareto }: { pareto: ParetoResult | null }) {
+export function ParetoDeParadas({ pareto, ctx }: {
+  pareto: ParetoResult | null
+  /** El marco temporal: cuánto tiempo se está midiendo y cómo viene turno a turno. */
+  ctx?: ContextoPareto | null
+}) {
   const [abierta, setAbierta] = useState<string | null>(null)
   // Con uno o dos turnos no hay patrón que mostrar, solo el turno de hoy otra
   // vez. Tres es el mínimo para que "en 2 de 3" signifique algo.
@@ -37,6 +45,11 @@ export function ParetoDeParadas({ pareto }: { pareto: ParetoResult | null }) {
   const vitales = pareto.rows.slice(0, Math.max(1, pareto.vitalCount))
   const resto = pareto.rows.slice(vitales.length)
   const cronicas = vitales.filter((r) => r.shifts >= Math.ceil(pareto.shifts / 2))
+  /* Escala del gráfico: el peor turno con aire, para que la barra más alta no
+     toque el techo y se pueda leer su número encima. */
+  const maxPct = Math.max(
+    5, ...(ctx?.serie ?? []).map((p) => p.pct), ctx?.banda?.alto ?? 0,
+  ) * 1.25
 
   return (
     <Bloque
@@ -51,7 +64,54 @@ export function ParetoDeParadas({ pareto }: { pareto: ParetoResult | null }) {
         alguien pueda atacar.
       </p>
 
-      <ul className="mt-3 space-y-2.5">
+      {/* ── El marco: cuánto tiempo se está midiendo ──────────────────────
+          Sin esto, «5 h 48 min» no dice nada: no se sabe si es mucho o poco.
+          El 100% es el tiempo TOTAL de los turnos, con el convenio A LA VISTA
+          (decisión de Orel) — escondido en el denominador, nadie notaría que
+          la colación creció. */}
+      {ctx && ctx.ventanaMin > 0 && (
+        <div className="mt-3">
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="text-[28px] font-bold leading-none tabular-nums text-foreground">
+              {fmtDec1(ctx.pct)}%
+            </span>
+            <span className="text-right text-[11px] leading-tight text-muted-foreground">
+              del tiempo de estos {ctx.turnos} turnos<br />
+              <span className="tabular-nums">{fmtMin(ctx.ventanaMin)}</span> en total
+            </span>
+          </div>
+          <div className="mt-2 flex h-3.5 gap-[2px]" role="img"
+            aria-label={`De ${fmtMin(ctx.ventanaMin)} medidos: ${fmtMin(ctx.produciendoMin)} produciendo, ${fmtMin(ctx.convenioMin)} de convenio, ${fmtMin(ctx.recuperableMin)} recuperables`}>
+            <i className="rounded-[4px] bg-muted-foreground/[0.35]" style={{ flex: '1 1 0%' }} />
+            {ctx.convenioMin > 0 && (
+              <i className="rounded-[4px] bg-muted-foreground/[0.6]"
+                style={{ width: `${(ctx.convenioMin / ctx.ventanaMin) * 100}%`, minWidth: 3 }} />
+            )}
+            {ctx.recuperableMin > 0 && (
+              <i className="rounded-[4px] bg-ink-warn"
+                style={{ width: `${(ctx.recuperableMin / ctx.ventanaMin) * 100}%`, minWidth: 3 }} />
+            )}
+          </div>
+          <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <i className="h-2.5 w-2.5 rounded-[3px] bg-muted-foreground/[0.35]" />
+              Produciendo <span className="tabular-nums text-foreground/80">{fmtMin(ctx.produciendoMin)}</span>
+            </span>
+            {ctx.convenioMin > 0 && (
+              <span className="flex items-center gap-1.5">
+                <i className="h-2.5 w-2.5 rounded-[3px] bg-muted-foreground/[0.6]" />
+                Convenio <span className="tabular-nums text-foreground/80">{fmtMin(ctx.convenioMin)}</span>
+              </span>
+            )}
+            <span className="flex items-center gap-1.5">
+              <i className="h-2.5 w-2.5 rounded-[3px] bg-ink-warn" />
+              Recuperable <span className="tabular-nums font-semibold text-foreground/80">{fmtMin(ctx.recuperableMin)}</span>
+            </span>
+          </div>
+        </div>
+      )}
+
+      <ul className="mt-4 space-y-2.5">
         {vitales.map((r) => (
           <FilaPareto
             key={r.label} r={r} max={max} turnos={pareto.shifts}
@@ -60,6 +120,26 @@ export function ParetoDeParadas({ pareto }: { pareto: ParetoResult | null }) {
           />
         ))}
       </ul>
+
+      {/* El resto de las causas va PEGADO a la lista, no después de la
+          conclusión: partía el bloque en dos mitades y las cuatro chicas
+          aparecían debajo del cierre, donde el ojo ya daba por terminado. */}
+      {resto.length > 0 && (
+        <details className="mt-2">
+          <summary className="cursor-pointer text-[11px] text-brand-ink underline underline-offset-2">
+            ver las otras {resto.length}
+          </summary>
+          <ul className="mt-2 space-y-2.5">
+            {resto.map((r) => (
+              <FilaPareto
+                key={r.label} r={r} max={max} turnos={pareto.shifts}
+                abierta={abierta === r.label}
+                onToggle={() => setAbierta((v) => (v === r.label ? null : r.label))}
+              />
+            ))}
+          </ul>
+        </details>
+      )}
 
       {/* El corte, dicho en palabras: es la frase que alguien puede repetir en
           una reunión sin tener que leer el gráfico. */}
@@ -97,22 +177,91 @@ export function ParetoDeParadas({ pareto }: { pareto: ParetoResult | null }) {
         )}
       </p>
 
-      {resto.length > 0 && (
-        <details className="mt-2">
-          <summary className="cursor-pointer text-[11px] text-sky-700 underline underline-offset-2 dark:text-sky-300">
-            ver las otras {resto.length}
-          </summary>
-          <ul className="mt-2 space-y-2.5">
-            {resto.map((r) => (
-              <FilaPareto
-                key={r.label} r={r} max={max} turnos={pareto.shifts}
-                abierta={abierta === r.label}
-                onToggle={() => setAbierta((v) => (v === r.label ? null : r.label))}
+      {/* ── ¿Mejora o empeora? ────────────────────────────────────────────
+          Barras por turno (pedido de Orel: se leen mejor que la línea) con la
+          franja de lo habitual detrás.
+          * ⚠ El veredicto NO se infiere de la forma: los últimos 3 turnos
+          * tienen que quedar TODOS bajo el mejor de los anteriores. Con seis
+          * puntos ruidosos, cualquier regla más blanda declara una mejora que
+          * la produjo un solo turno malo. */}
+      {ctx && ctx.serie.length >= 3 && (
+        <div className="mt-4">
+          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+            Cómo viene turno a turno
+            <span className="normal-case tracking-normal"> · % del turno recuperable</span>
+          </p>
+
+          <div className="relative mt-2 h-24">
+            {/* La franja de lo habitual: sin ella, seis barras invitan a leer
+                una bajada en cualquier zigzag. */}
+            {ctx.banda && (
+              <div
+                className="absolute inset-x-0 rounded-[3px] bg-muted"
+                style={{
+                  bottom: `${(ctx.banda.bajo / maxPct) * 100}%`,
+                  height: `${((ctx.banda.alto - ctx.banda.bajo) / maxPct) * 100}%`,
+                }}
               />
+            )}
+            <div className="absolute inset-0 flex items-end gap-[3px]">
+              {ctx.serie.map((p) => {
+                const fuera = ctx.banda && (p.pct > ctx.banda.alto || p.pct < ctx.banda.bajo)
+                return (
+                  <div key={p.dateKey} className="flex min-w-0 flex-1 flex-col items-center gap-1">
+                    <span className="text-[11px] tabular-nums text-muted-foreground">
+                      {Math.round(p.pct)}
+                    </span>
+                    <div
+                      className={`w-full rounded-t-[3px] ${fuera ? 'bg-ink-warn' : 'bg-muted-foreground/[0.45]'}`}
+                      style={{ height: `${Math.max(2, (p.pct / maxPct) * 72)}px` }}
+                      title={`${nombreDeDia(p.dateKey)}: ${fmtMin(p.recuperableMin)} de ${fmtMin(p.windowMin)}`}
+                    />
+                  </div>
+                )
+              })}
+              {/* Los turnos sin producción existen, pero no tienen % que valga:
+                  con 0 min recuperables dibujarían una mejora que no ocurrió. */}
+              {ctx.sinProduccion.map((d) => (
+                <div key={d} className="flex min-w-0 flex-1 flex-col items-center gap-1">
+                  <span className="text-[11px] text-muted-foreground/60">–</span>
+                  <div className="w-full rounded-t-[3px] border border-dashed border-muted-foreground/[0.4]"
+                    style={{ height: '10px' }} title={`${nombreDeDia(d)}: la línea no produjo`} />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-1 flex gap-[3px] text-[11px] text-muted-foreground/70">
+            {ctx.serie.map((p) => (
+              <span key={p.dateKey} className="min-w-0 flex-1 truncate text-center">{nombreDeDia(p.dateKey)}</span>
             ))}
-          </ul>
-        </details>
+            {ctx.sinProduccion.map((d) => (
+              <span key={d} className="min-w-0 flex-1 truncate text-center opacity-60">{nombreDeDia(d)}</span>
+            ))}
+          </div>
+
+          <p className="mt-2 text-[12px] leading-snug">
+            <b className={ctx.veredicto === 'mejora' ? 'text-ink-ok'
+              : ctx.veredicto === 'empeora' ? 'text-ink-crit' : 'text-foreground'}>
+              {ctx.veredicto === 'mejora' ? 'Viene mejorando'
+                : ctx.veredicto === 'empeora' ? 'Viene empeorando'
+                : 'Sin cambio visible'}
+            </b>
+            {ctx.banda && (
+              <span className="text-muted-foreground">
+                {' '}· lo habitual va de{' '}
+                <span className="tabular-nums">{fmtDec1(ctx.banda.bajo)}%</span> a{' '}
+                <span className="tabular-nums">{fmtDec1(ctx.banda.alto)}%</span>
+                {ctx.veredicto === 'sin-cambio' && ctx.vara != null && (
+                  <> — para decir que mejoró harían falta 3 turnos seguidos bajo{' '}
+                    <span className="tabular-nums">{fmtDec1(ctx.vara)}%</span></>
+                )}
+              </span>
+            )}
+          </p>
+        </div>
       )}
+
     </Bloque>
   )
 }
