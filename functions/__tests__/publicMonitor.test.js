@@ -811,8 +811,9 @@ const { buildShiftStats } = require('../publicMonitor')
 const maquinaStats = (c, startMs) => ({
   machineid: 'b200', machineName: 'Linea 1', machineType: 'baader_200',
   totalCycles: c, shiftRuntime: 0.8,
-  shiftRuntimeBreakdown: { uptimeSec: 3600, downtimeSec: 600, breakSec: 0 },
-  intervals: intervals(startMs, 6, c / 6), states: [],
+  shiftRuntimeBreakdown: { uptimeSec: 3600 * 3, downtimeSec: 600, breakSec: 0 },
+  // 30 tramos de 5 min = 150 min produciendo: bien por encima del mínimo.
+  intervals: intervals(startMs, 30, c / 30), states: [],
 })
 
 test('shiftStats trae los DOS turnos, no solo el del monitor', async () => {
@@ -826,10 +827,10 @@ test('shiftStats trae los DOS turnos, no solo el del monitor', async () => {
   const db = fakeShiftsDb({
     [actual]: { shiftId: 'Turno Dia', scheduledStart: hoy(8), scheduledEnd: hoy(16), machines: [{ totalCycles: 3000 }] },
     [dia]:    { shiftId: 'Turno Dia', scheduledStart: hDe(d1, 8), scheduledEnd: hDe(d1, 16), machines: [{ totalCycles: 2000 }] },
-    [noche]:  { shiftId: 'Turno Noche', scheduledStart: hDe(d1, 20), scheduledEnd: hDe(d1, 23), machines: [{ totalCycles: 900 }] },
+    [noche]:  { shiftId: 'Turno Noche', scheduledStart: hDe(d1, 20), scheduledEnd: hDe(d1, 23), machines: [{ totalCycles: 1500 }] },
   }, {
     [dia]:   [maquinaStats(2000, hDe(d1, 8).getTime())],
-    [noche]: [maquinaStats(900, hDe(d1, 20).getTime())],
+    [noche]: [maquinaStats(1500, hDe(d1, 20).getTime())],
   })
 
   const out = await buildShiftStats(db, 'filete', actual, [], [], [])
@@ -879,4 +880,67 @@ test('shiftStats reusa lo cacheado y no reconstruye turnos viejos', async () => 
   const out = await buildShiftStats(db, 'filete', actual, prev, [], [])
   const viejo = out.find(o => o.shiftDocId === anteayer)
   assert.equal(viejo?.total, 777777, 'un turno cerrado no cambia: se reusa')
+})
+
+
+test('shiftStats descarta las PRUEBAS, igual que el pronostico', async () => {
+  /*
+   * En Filete el 1-ago figura con 180 piezas en 16 minutos y el 28-jul con 42:
+   * son pruebas, no turnos. Coladas en la muestra envenenan las tres piezas
+   * que alimenta — un turno de 16 min con 5 de parada da 31% de recuperable y
+   * arrastra la mediana, la banda y el ranking.
+   */
+  const w = nowWall()
+  const d1 = dk(new Date(w.getTime() - 86_400_000))
+  const d2 = dk(new Date(w.getTime() - 2 * 86_400_000))
+  const actual = `${dk(w)}_Turno Dia`
+  const bueno = `${d1}_Turno Dia`
+  const prueba = `${d2}_Turno Dia`
+  const hDe = (d, h) => new Date(Date.UTC(Number(d.slice(0, 4)), Number(d.slice(5, 7)) - 1, Number(d.slice(8, 10)), h))
+
+  const db = fakeShiftsDb({
+    [actual]: { shiftId: 'Turno Dia', scheduledStart: hoy(8), scheduledEnd: hoy(16), machines: [{ totalCycles: 3000 }] },
+    [bueno]:  { shiftId: 'Turno Dia', scheduledStart: hDe(d1, 8), scheduledEnd: hDe(d1, 16), machines: [{ totalCycles: 2000 }] },
+    [prueba]: { shiftId: 'Turno Dia', scheduledStart: hDe(d2, 8), scheduledEnd: hDe(d2, 16), machines: [{ totalCycles: 180 }] },
+  }, {
+    [bueno]:  [maquinaStats(2000, hDe(d1, 8).getTime())],
+    // 180 piezas en 3 tramos: la prueba del 1-ago, tal cual.
+    [prueba]: [{
+      machineid: 'b200', machineName: 'Linea 1', machineType: 'baader_200',
+      totalCycles: 180, shiftRuntime: 0.8,
+      shiftRuntimeBreakdown: { uptimeSec: 960, downtimeSec: 60, breakSec: 0 },
+      intervals: intervals(hDe(d2, 8).getTime(), 3, 60), states: [],
+    }],
+  })
+
+  const out = await buildShiftStats(db, 'filete', actual, [], [], [])
+  assert.ok(out.some(o => o.shiftDocId === bueno), 'el turno de verdad entra')
+  assert.ok(!out.some(o => o.shiftDocId === prueba), 'la prueba de 180 pz NO entra')
+})
+
+
+test('shiftStats es un documento Firestore VALIDO: sin undefined en ningun campo', async () => {
+  /*
+   * El bug que congelo el espejo 40 min el 16-08: `tieneCurva: undefined`.
+   * Firestore rechaza undefined y el write del patch falla ENTERO — cada
+   * refresco de cada monitor murio en silencio. Este test recorre el resumen
+   * como lo recorre Firestore: ningun valor puede ser undefined.
+   */
+  const w = nowWall()
+  const d1 = dk(new Date(w.getTime() - 86_400_000))
+  const actual = `${dk(w)}_Turno Dia`
+  const ayer = `${d1}_Turno Dia`
+  const hDe = (d, h) => new Date(Date.UTC(Number(d.slice(0, 4)), Number(d.slice(5, 7)) - 1, Number(d.slice(8, 10)), h))
+  const db = fakeShiftsDb({
+    [actual]: { shiftId: 'Turno Dia', scheduledStart: hoy(8), scheduledEnd: hoy(16), machines: [{ totalCycles: 3000 }] },
+    [ayer]:   { shiftId: 'Turno Dia', scheduledStart: hDe(d1, 8), scheduledEnd: hDe(d1, 16), machines: [{ totalCycles: 2000 }] },
+  }, { [ayer]: [maquinaStats(2000, hDe(d1, 8).getTime())] })
+
+  const out = await buildShiftStats(db, 'filete', actual, [], [], [])
+  assert.ok(out.length > 0)
+  const sinUndefined = (v, ruta) => {
+    assert.notEqual(v, undefined, `undefined en ${ruta}: Firestore rechaza el write ENTERO`)
+    if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) sinUndefined(x, `${ruta}.${k}`)
+  }
+  out.forEach((o, i) => sinUndefined(o, `shiftStats[${i}]`))
 })

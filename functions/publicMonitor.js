@@ -1545,11 +1545,25 @@ async function buildShiftStats(db, plantSlug, currentShiftDocId, prev = [], hist
       if (!live) nuevos++
       const tb = l?.timeBreakdown
       if (!tb || !(tb.windowMin > 0)) { if (cacheado) out.push(cacheado); continue }
+      /*
+       * ⚠ El MISMO piso de piezas que el pronóstico, y por la misma razón: en
+       * Filete el 1-ago figura con 180 piezas y el 28-jul con 42 — son
+       * pruebas, no turnos. Coladas en la muestra envenenan las tres piezas
+       * que alimenta: un "turno" de 16 min con 5 de parada da 31% de tiempo
+       * recuperable y arrastra la mediana, la banda y el ranking.
+       * Solo el piso de PIEZAS (no el de minutos): es el criterio robusto y
+       * las dos pruebas reales caen por él.
+       */
+      const total = l.totalPieces ?? 0
+      if (total < FORECAST_MIN_PIECES) {
+        if (cacheado) out.push(cacheado)
+        continue
+      }
       out.push({
         shiftDocId: id,
         dateKey: id.slice(0, 10),
         shiftId: id.slice(11),
-        total: l.totalPieces ?? 0,
+        total,
         producingMin: tb.producingMin ?? 0,
         windowMin: tb.windowMin ?? null,
         plannedMin: tb.plannedMin ?? null,
@@ -1560,7 +1574,16 @@ async function buildShiftStats(db, plantSlug, currentShiftDocId, prev = [], hist
         recoverable: (tb.recoverable || []).map(c => ({
           reason: c.reason, min: c.min, count: c.count ?? 0,
         })),
-        tieneCurva: conCurva.has(id) || undefined,
+        /*
+         * ⚠⚠ NUNCA `undefined` en un doc de Firestore: lo rechaza y el write
+         * del patch falla ENTERO — no solo este campo. Pasó el 16-08: cada
+         * refresco de CADA monitor murió con «Cannot use undefined as a
+         * Firestore value (shiftStats.0.tieneCurva)» y el espejo quedó
+         * congelado 40 minutos. El mismo gotcha del 13-08 con los arrays
+         * anidados, y la misma causa: probado leyendo (tests), nunca
+         * escribiendo. El campo solo existe cuando es true.
+         */
+        ...(conCurva.has(id) ? { tieneCurva: true } : {}),
         tbv: tb.tbv ?? null,
       })
     } catch {
