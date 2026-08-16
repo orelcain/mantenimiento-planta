@@ -63,8 +63,6 @@ export function ParetoDeParadas({
 
   /* Los turnos que de verdad se están midiendo: los que produjeron. */
   const turnosMedidos = ctx?.turnos ?? pareto.shifts
-  /* Los que la TENDENCIA puede dibujar: solo necesitan minutos, no causas. */
-  const turnosConSerie = tendencia?.turnos ?? turnosMedidos
   const max = pareto.rows[0]!.minutes
   const vitales = pareto.rows.slice(0, Math.max(1, pareto.vitalCount))
   const cronicas = vitales.filter((r) => r.shifts >= Math.ceil(pareto.shifts / 2))
@@ -88,15 +86,13 @@ export function ParetoDeParadas({
          las entradas de la muestra —incluido un sábado con la línea apagada y
          cero causas— y decía «7 turnos» al lado de una barra que medía 6. */
       /*
-       * ⚠ Dos conteos distintos en la misma pantalla confunden y hacen dudar
-       * del dato entero (lo cazó Orel: «selecciono 10 y arriba dice 6»). El
-       * ranking mira los turnos CON detalle de causas y la tendencia todos los
-       * que tengan minutos — así que cuando difieren, se dicen los dos.
+       * ⚠ UN solo conteo. Todo el bloque —barra, ranking y tendencia— mira los
+       * mismos turnos: dos números distintos en la misma pantalla hacían dudar
+       * del dato entero, por bien explicados que estuvieran.
        */
       extra={
         <span className="tabular-nums">
-          {turnosConSerie > turnosMedidos ? `${turnosMedidos} de ${turnosConSerie}` : turnosMedidos} turnos
-          {ctx && ctx.ventanaMin > 0 && ` · ${fmtDec1(ctx.pct)}%`}
+          {turnosMedidos} turnos{ctx && ctx.ventanaMin > 0 && ` · ${fmtDec1(ctx.pct)}%`}
         </span>
       }
       defaultAbierto={false}
@@ -107,14 +103,12 @@ export function ParetoDeParadas({
         alguien pueda atacar.
       </p>
 
-      {/* Por qué el ranking mira menos turnos que la tendencia. Se cae solo en
-          cuanto el espejo traiga el detalle de todos. */}
-      {turnosConSerie > turnosMedidos && (
+      {/* Si el selector pide más turnos de los que hay con detalle, se dice —
+          es la diferencia entre «no hay más» y «los estamos escondiendo». */}
+      {ventana != null && turnosMedidos < ventana && (
         <p className="mt-1 text-[11px] leading-snug text-muted-foreground/70">
-          El detalle por causa está en{' '}
-          <span className="tabular-nums">{turnosMedidos}</span> de esos{' '}
-          <span className="tabular-nums">{turnosConSerie}</span>; los demás cuentan en la
-          tendencia de abajo, que solo necesita los minutos.
+          Hay <span className="tabular-nums">{turnosMedidos}</span> turnos con detalle de causas;
+          los demás todavía no lo traen.
         </p>
       )}
 
