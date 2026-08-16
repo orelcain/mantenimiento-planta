@@ -13,7 +13,7 @@
 import { useState } from 'react'
 import { DUENO_UI } from './duenoUi'
 import { Bloque } from './MonitorShiftParts'
-import type { ContextoPareto, ParetoResult, PuntoTendencia } from '@/services/shoplogix/monitorPareto'
+import { VENTANAS, type ContextoPareto, type ParetoResult, type PuntoTendencia, type Ventana as VentanaPareto } from '@/services/shoplogix/monitorPareto'
 import { nombreDeDia } from '@/services/shoplogix/monitorVsAyer'
 
 const nf = new Intl.NumberFormat('es-CL')
@@ -23,6 +23,13 @@ const fmtInt = (n: number) => nf.format(Math.round(n || 0))
 const nf1 = new Intl.NumberFormat('es-CL', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 const fmtDec1 = (n: number) => nf1.format(n || 0)
 
+/** «Turno Dia» → «Día». El prefijo se repite en todos y no aporta. */
+function nombreCortoTurno(id: string): string {
+  const t = id.replace(/^turno\s+/i, '').trim()
+  if (/^dia$/i.test(t)) return 'Día'
+  return t.charAt(0).toUpperCase() + t.slice(1)
+}
+
 function fmtMin(min: number): string {
   const m = Math.round(min)
   if (m < 60) return `${m} min`
@@ -31,12 +38,22 @@ function fmtMin(min: number): string {
   return r > 0 ? `${h} h ${r} min` : `${h} h`
 }
 
-export function ParetoDeParadas({ pareto, ctx, tendencia }: {
+export function ParetoDeParadas({
+  pareto, ctx, tendencia, porTurno, ventana, onVentana, turno, onTurno,
+}: {
   pareto: ParetoResult | null
   /** El marco temporal de los MISMOS turnos del ranking. */
   ctx?: ContextoPareto | null
-  /** La serie, que mira más atrás: 10 turnos en vez de los 6 con detalle. */
+  /** La serie de la tendencia (hoy, los mismos turnos que el ranking). */
   tendencia?: ContextoPareto | null
+  /** Un contexto por nombre de turno: la comparación «Día vs Noche». */
+  porTurno?: Array<{ turno: string; ctx: ContextoPareto }>
+  /** Cuántos turnos se miran. null = todos los que haya. */
+  ventana?: VentanaPareto
+  onVentana?: (v: VentanaPareto) => void
+  /** Qué turno se mira, o 'todos' para verlos juntos. */
+  turno?: string | 'todos' | null
+  onTurno?: (t: string | 'todos' | null) => void
 }) {
   const [abierta, setAbierta] = useState<string | null>(null)
   const [porQueMediana, setPorQueMediana] = useState(false)
@@ -86,6 +103,43 @@ export function ParetoDeParadas({ pareto, ctx, tendencia }: {
           El 100% es el tiempo TOTAL de los turnos, con el convenio A LA VISTA
           (decisión de Orel) — escondido en el denominador, nadie notaría que
           la colación creció. */}
+      {/* Cuántos turnos y cuál: los dos controles que Orel pidió. Solo
+          aparecen cuando hay de dónde elegir — con un turno corriendo y pocos
+          datos, un selector con una sola opción es ruido. */}
+      {(onVentana || (onTurno && (porTurno?.length ?? 0) > 1)) && (
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          {onVentana && VENTANAS.map((v) => (
+            <button
+              key={String(v)}
+              type="button"
+              onClick={() => onVentana(v)}
+              className={`min-h-[32px] rounded-full px-2.5 text-[12px] tabular-nums ${
+                ventana === v ? 'bg-primary/[0.13] font-semibold text-brand-ink' : 'bg-muted text-muted-foreground'
+              }`}
+            >
+              {v == null ? 'todos' : v}
+            </button>
+          ))}
+          {onTurno && (porTurno?.length ?? 0) > 1 && (
+            <>
+              <span className="mx-0.5 h-4 w-px bg-border" />
+              {[...(porTurno ?? []).map((x) => x.turno), 'todos'].map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => onTurno(t as string | 'todos')}
+                  className={`min-h-[32px] rounded-full px-2.5 text-[12px] ${
+                    turno === t ? 'bg-primary/[0.13] font-semibold text-brand-ink' : 'bg-muted text-muted-foreground'
+                  }`}
+                >
+                  {t === 'todos' ? 'los dos' : nombreCortoTurno(t)}
+                </button>
+              ))}
+            </>
+          )}
+        </div>
+      )}
+
       {ctx && ctx.ventanaMin > 0 && (
         <div className="mt-3">
           <div className="flex items-baseline justify-between gap-2">

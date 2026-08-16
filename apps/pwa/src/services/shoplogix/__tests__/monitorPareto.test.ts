@@ -4,7 +4,7 @@
  * en pantalla, no un ejemplo inventado.
  */
 import { describe, it, expect } from 'vitest'
-import { buildPareto, contextoPareto, equipoDe, type TurnoCtx } from '../monitorPareto'
+import { buildPareto, contextoPareto, contextoPorTurno, equipoDe, turnosParaVentana, type TurnoCtx } from '../monitorPareto'
 
 /** `timeBreakdown.recoverable` de cada uno de los 6 turnos anteriores. */
 const TURNOS = [
@@ -261,5 +261,49 @@ describe('contextoPareto · el marco temporal del Pareto', () => {
       { dateKey: '2026-08-18', windowMin: 480, producingMin: 400, plannedMin: 60, recoverableMin: 8 },
     ]
     expect(contextoPareto(mejorando).veredicto).toBe('mejora')
+  })
+})
+
+
+describe('ventana elegible y comparación entre turnos', () => {
+  /* Día y noche del mismo período, como quedará Filete desde el 17-08. */
+  const MIXTO: TurnoCtx[] = [
+    { dateKey: '2026-08-10', shiftId: 'Turno Dia', windowMin: 480, producingMin: 380, plannedMin: 60, recoverableMin: 40 },
+    { dateKey: '2026-08-10', shiftId: 'Turno Noche', windowMin: 360, producingMin: 300, plannedMin: 30, recoverableMin: 30 },
+    { dateKey: '2026-08-11', shiftId: 'Turno Dia', windowMin: 480, producingMin: 370, plannedMin: 60, recoverableMin: 50 },
+    { dateKey: '2026-08-11', shiftId: 'Turno Noche', windowMin: 360, producingMin: 290, plannedMin: 30, recoverableMin: 40 },
+    { dateKey: '2026-08-12', shiftId: 'Turno Dia', windowMin: 480, producingMin: 390, plannedMin: 60, recoverableMin: 30 },
+    { dateKey: '2026-08-12', shiftId: 'Turno Noche', windowMin: 360, producingMin: 280, plannedMin: 30, recoverableMin: 50 },
+  ]
+
+  it('⚠ dos turnos del MISMO día son dos entradas, no una', () => {
+    // Con la fecha como clave, el que llegaba segundo pisaba al primero.
+    expect(turnosParaVentana(MIXTO, { turno: 'todos' })).toHaveLength(6)
+  })
+
+  it('la ventana recorta por los MÁS RECIENTES y devuelve en orden natural', () => {
+    const r = turnosParaVentana(MIXTO, { ventana: 5, turno: 'Turno Dia' })
+    expect(r.map((t) => t.dateKey)).toEqual(['2026-08-10', '2026-08-11', '2026-08-12'])
+  })
+
+  it('sin ventana se miran todos los turnos que haya', () => {
+    expect(turnosParaVentana(MIXTO, { ventana: null, turno: 'Turno Dia' })).toHaveLength(3)
+  })
+
+  it('⚠⚠ el nocturno se mide con SU propia vara, no con la del diurno', () => {
+    const porTurno = contextoPorTurno(MIXTO)
+    const dia = porTurno.find((x) => x.turno === 'Turno Dia')!
+    const noche = porTurno.find((x) => x.turno === 'Turno Noche')!
+    // El diurno mide 24 h de ventana y el nocturno 18: mezclarlos daba un
+    // porcentaje que no era el de ninguno de los dos.
+    expect(dia.ctx.ventanaMin).toBe(1440)
+    expect(noche.ctx.ventanaMin).toBe(1080)
+    // Y el nocturno sale PEOR, que es justo lo que hay que poder ver:
+    expect(noche.ctx.pct).toBeGreaterThan(dia.ctx.pct)
+  })
+
+  it('con un solo turno corriendo no hay comparación que ofrecer', () => {
+    const soloDia = MIXTO.filter((t) => t.shiftId === 'Turno Dia')
+    expect(contextoPorTurno(soloDia)).toHaveLength(1)
   })
 })
