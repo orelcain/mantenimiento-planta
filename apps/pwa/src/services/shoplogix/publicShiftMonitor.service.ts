@@ -212,6 +212,34 @@ export interface PublicShiftMonitorDoc {
   history?: Array<{ shiftDocId: string; dateKey: string; shiftId: string; live: PublicMonitorLive }>
   /** Turnos del MISMO nombre, resumidos, para el pronóstico del cierre. */
   forecastHistory?: ForecastHistoryShift[]
+  /**
+   * Estadística LIVIANA de los últimos ~40 turnos, de TODOS los nombres.
+   *
+   * Sin curva (eso vive en `forecastHistory`) pero CON las causas, que es lo
+   * que permite mirar «los últimos 30» en vez de los 6 de `history` — ese
+   * carga la serie completa de cada turno y por eso son pocos. Y con día y
+   * noche juntos, para poder comparar un turno contra el otro.
+   *
+   * ⚠ Ausente en docs que el backend todavía no repobló: el arreglo se llena
+   * de a pocos turnos por corrida. Todo lo que lo use tiene que funcionar sin
+   * él, cayendo a `history`/`forecastHistory`.
+   */
+  shiftStats?: ShiftStat[]
+}
+
+/** Un turno resumido, sin curva. Ver `buildShiftStats` en las functions. */
+export interface ShiftStat {
+  shiftDocId: string
+  dateKey: string
+  shiftId: string
+  total: number
+  producingMin: number
+  windowMin?: number | null
+  plannedMin?: number | null
+  recoverableMin?: number | null
+  /** Causas recuperables del turno: `reason`, minutos y cantidad de paradas. */
+  recoverable?: Array<{ reason: string; min: number; count: number }>
+  tbv?: number | null
 }
 
 /** Duraciones que acepta el backend (horas). 720 = 30 días. */

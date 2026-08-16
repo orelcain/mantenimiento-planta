@@ -327,3 +327,47 @@ export function contextoPareto(turnos: TurnoCtx[]): ContextoPareto {
     vara,
   }
 }
+
+/** Las ventanas que se pueden elegir. `null` = todos los turnos que haya. */
+export const VENTANAS = [5, 10, 15, 30, null] as const
+export type Ventana = (typeof VENTANAS)[number]
+
+/**
+ * Los turnos a mirar, ya recortados a la ventana y al turno elegido.
+ *
+ * ⚠ Una sola función para las tres piezas del bloque (barra, ranking y
+ * tendencia): si cada una recortara por su cuenta, el «% de estos N turnos»
+ * podría no ser el de las causas listadas — que es exactamente el descuadre
+ * que hubo que arreglar cuando el turno visto se contaba dos veces.
+ *
+ * `turno` filtra por nombre: null = el que se esté mirando, 'todos' = sin
+ * filtrar (para comparar día contra noche).
+ */
+export function turnosParaVentana(
+  turnos: TurnoCtx[],
+  opts: { ventana?: Ventana; turno?: string | null | 'todos' } = {},
+): TurnoCtx[] {
+  const { ventana = 10, turno = null } = opts
+  let out = muestraUnica(turnos).filter((t) => (t.windowMin ?? 0) > 0)
+  if (turno && turno !== 'todos') out = out.filter((t) => !t.shiftId || t.shiftId === turno)
+  /* Del más nuevo al más viejo para recortar, y de vuelta al orden natural:
+     la serie se lee de izquierda (viejo) a derecha (nuevo). */
+  out = [...out].sort((a, b) => b.dateKey.localeCompare(a.dateKey))
+  if (ventana != null) out = out.slice(0, ventana)
+  return out.reverse()
+}
+
+/**
+ * El mismo contexto, calculado por turno: lo que hace comparable el Turno Día
+ * contra el Turno Noche.
+ *
+ * Devuelve una entrada por nombre de turno, de más a menos tiempo medido — con
+ * un solo turno corriendo devuelve uno y la UI no muestra comparación.
+ */
+export function contextoPorTurno(turnos: TurnoCtx[], ventana: Ventana = 10): Array<{ turno: string; ctx: ContextoPareto }> {
+  const nombres = [...new Set(muestraUnica(turnos).map((t) => t.shiftId).filter((x): x is string => !!x))]
+  return nombres
+    .map((turno) => ({ turno, ctx: contextoPareto(turnosParaVentana(turnos, { ventana, turno })) }))
+    .filter((x) => x.ctx.turnos > 0)
+    .sort((a, b) => b.ctx.ventanaMin - a.ctx.ventanaMin)
+}

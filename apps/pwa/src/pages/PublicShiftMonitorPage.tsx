@@ -44,7 +44,10 @@ import {
   prediccionConvenio,
 } from '@/services/shoplogix/monitorCompare'
 import { buildForecast, MAX_MAPE_PCT } from '@/services/shoplogix/monitorForecast'
-import { buildPareto, contextoPareto, muestraUnica } from '@/services/shoplogix/monitorPareto'
+import {
+  buildPareto, contextoPareto, contextoPorTurno, muestraUnica, turnosParaVentana,
+  type Ventana as VentanaPareto,
+} from '@/services/shoplogix/monitorPareto'
 import { parseShiftDocId } from '@/services/shoplogix/shoplogixShift.service'
 import { agruparEventos } from '@/services/shoplogix/monitorEventos'
 import { costoDeParadas } from '@/services/shoplogix/monitorPerdidas'
@@ -1956,7 +1959,16 @@ export function PublicShiftMonitorPage() {
    * «7 turnos · 6 h 42 min» cuando eran 6 turnos y 5 h 48 min: el turno en
    * pantalla contaba dos veces (verificado contra Firestore el 15-08).
    */
-  const muestraPareto = useMemo(() => muestraUnica([
+  /*
+   * TODOS los turnos que el espejo conozca, de la fuente más rica primero.
+   *
+   * `shiftStats` (40 turnos, con causas, día y noche) es lo que habilita elegir
+   * la ventana y comparar un turno contra el otro. Cae a `history` (6, con
+   * causas) y `forecastHistory` (10, sin causas) mientras el backend no lo
+   * haya repoblado: el arreglo se llena de a pocos turnos por corrida, así que
+   * durante un rato el monitor va a tener las tres fuentes conviviendo.
+   */
+  const turnosConocidos = useMemo(() => muestraUnica([
     {
       dateKey: vista?.dateKey ?? data?.dateKey ?? '',
       shiftId: vista?.shiftId ?? data?.shiftId ?? null,
@@ -1966,6 +1978,15 @@ export function PublicShiftMonitorPage() {
       recoverableMin: live?.timeBreakdown?.recoverableMin ?? null,
       causas: live?.timeBreakdown?.recoverable ?? null,
     },
+    ...(data?.shiftStats ?? []).map((t) => ({
+      dateKey: t.dateKey,
+      shiftId: t.shiftId ?? null,
+      windowMin: t.windowMin ?? null,
+      producingMin: t.producingMin ?? null,
+      plannedMin: t.plannedMin ?? null,
+      recoverableMin: t.recoverableMin ?? null,
+      causas: t.recoverable ?? null,
+    })),
     ...(data?.history ?? []).map((h) => ({
       dateKey: h.dateKey,
       shiftId: h.shiftId ?? null,
@@ -1975,31 +1996,6 @@ export function PublicShiftMonitorPage() {
       recoverableMin: h.live?.timeBreakdown?.recoverableMin ?? null,
       causas: h.live?.timeBreakdown?.recoverable ?? null,
     })),
-    /* ⚠ Solo turnos del MISMO nombre: «lo que se repite» en el nocturno no es
-       lo que se repite en el diurno, y sumarlos esconde a los dos. */
-  ].filter((t) => !vista?.shiftId || !t.shiftId || t.shiftId === vista.shiftId)),
-  [live?.timeBreakdown, data?.history, data?.dateKey, data?.shiftId, vista?.dateKey, vista?.shiftId])
-
-  const pareto = useMemo(
-    () => buildPareto(muestraPareto.map((t) => t.causas ?? null)),
-    [muestraPareto],
-  )
-  /*
-   * La BARRA de contexto mide los mismos turnos que el ranking que tiene
-   * debajo: si mirara más, el «% de estos N turnos» no sería el de las causas
-   * listadas.
-   */
-  const paretoCtx = useMemo(() => contextoPareto(muestraPareto), [muestraPareto])
-
-  /*
-   * La TENDENCIA, en cambio, mira más atrás y lo dice: `history` trae 6 turnos
-   * (los únicos con detalle de causas) pero `forecastHistory` trae 10 con los
-   * minutos del turno, que es todo lo que la serie necesita. Con 10 puntos el
-   * veredicto se apoya en 7 turnos previos en vez de 3 — la diferencia entre
-   * poder afirmar una mejora y solo intuirla.
-   */
-  const paretoTendencia = useMemo(() => contextoPareto(muestraUnica([
-    ...muestraPareto,
     ...(data?.forecastHistory ?? []).map((f) => ({
       dateKey: f.dateKey,
       shiftId: parseShiftDocId(f.shiftDocId)?.shiftId ?? null,
@@ -2009,7 +2005,39 @@ export function PublicShiftMonitorPage() {
       recoverableMin: f.recoverableMin ?? null,
       causas: null,
     })),
-  ])), [muestraPareto, data?.forecastHistory])
+  ]), [live?.timeBreakdown, data?.shiftStats, data?.history, data?.forecastHistory,
+       data?.dateKey, data?.shiftId, vista?.dateKey, vista?.shiftId])
+
+  /*
+   * La ventana elegida vive acá arriba porque las TRES piezas del bloque
+   * (barra, ranking y tendencia) tienen que mirar los mismos turnos: si cada
+   * una recortara por su cuenta, el «% de estos N turnos» podría no ser el de
+   * las causas listadas.
+   */
+  const [ventanaPareto, setVentanaPareto] = useState<VentanaPareto>(10)
+  /* Qué turno se mira: el propio, o todos juntos para comparar día vs noche. */
+  const [turnoPareto, setTurnoPareto] = useState<string | 'todos' | null>(null)
+
+  const turnosDelPareto = useMemo(
+    () => turnosParaVentana(turnosConocidos, {
+      ventana: ventanaPareto,
+      turno: turnoPareto ?? vista?.shiftId ?? null,
+    }),
+    [turnosConocidos, ventanaPareto, turnoPareto, vista?.shiftId],
+  )
+
+  const pareto = useMemo(
+    () => buildPareto(turnosDelPareto.map((t) => t.causas ?? null)),
+    [turnosDelPareto],
+  )
+  const paretoCtx = useMemo(() => contextoPareto(turnosDelPareto), [turnosDelPareto])
+  /* Un contexto por turno: es la comparación «Día vs Noche». Con un solo turno
+     corriendo devuelve uno y la UI no ofrece nada. */
+  const paretoPorTurno = useMemo(
+    () => contextoPorTurno(turnosConocidos, ventanaPareto),
+    [turnosConocidos, ventanaPareto],
+  )
+
 
   /**
    * El ritmo de la línea ANDANDO: piezas por minuto de uptime.
@@ -3191,7 +3219,12 @@ export function PublicShiftMonitorPage() {
           </div>
         )}
 
-        <ParetoDeParadas pareto={pareto} ctx={paretoCtx} tendencia={paretoTendencia} />
+        <ParetoDeParadas
+          pareto={pareto} ctx={paretoCtx} tendencia={paretoCtx}
+          porTurno={paretoPorTurno}
+          ventana={ventanaPareto} onVentana={setVentanaPareto}
+          turno={turnoPareto ?? vista?.shiftId ?? null} onTurno={setTurnoPareto}
+        />
 
         <PorHora series={live.series} />
 
