@@ -2295,18 +2295,30 @@ export function PublicShiftMonitorPage() {
 
     return buildDayComparison({
       todaySeries: live?.series,
-      todayDateKey: data?.dateKey ?? '',
-      todayShiftId: data?.shiftId ?? null,
-      previous: (data?.history ?? []).map((h) => ({
-        dateKey: h.dateKey, shiftId: h.shiftId, series: h.live?.series,
-      })),
+      /*
+       * ⚠⚠ El turno VISTO, no el vigente. `todaySeries` ya venía de `vista`
+       * pero el dateKey salía de `data`: mirando el 14-08 la curva era la del
+       * 14 y su etiqueta decía 15, así que el propio 14 seguía en `previous` y
+       * el veredicto se comparaba CONSIGO MISMO — «0 arriba de vie 14 (3.919)»
+       * estando parado en el vie 14. Es el gotcha de siempre en esta página:
+       * lo que dependa de «hoy» se toma de `vista`, nunca de `data`.
+       */
+      todayDateKey: vista?.dateKey ?? '',
+      todayShiftId: vista?.shiftId ?? null,
+      previous: (data?.history ?? [])
+        .filter((h) => !(h.dateKey === vista?.dateKey && h.shiftId === vista?.shiftId))
+        .map((h) => ({
+          dateKey: h.dateKey, shiftId: h.shiftId, series: h.live?.series,
+        })),
       // Los 6 que trae el doc: cuáles se dibujan lo elige quien mira.
       maxDays: 6,
       targetPieces: meta,
       usefulMin: opt?.usefulMin ?? null,
       breaks,
     })
-  }, [live, data?.dateKey, data?.shiftId, data?.history, data?.targetPieces, breaksTurno])
+    // El turno VISTO entra en las dependencias: al navegar a otro turno la
+    // comparación tiene que rearmarse contra los días previos a ESE.
+  }, [live, vista?.dateKey, vista?.shiftId, data?.history, data?.targetPieces, breaksTurno])
 
   /*
    * Pronóstico del cierre. Se alimenta del `history` que YA viaja en el doc:

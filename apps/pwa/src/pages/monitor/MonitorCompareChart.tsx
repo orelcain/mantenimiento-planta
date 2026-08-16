@@ -390,12 +390,12 @@ export function MonitorCompareChart({ cmp, cerrado, claveSel, onSel, cone, venta
             {/* Eje de horas: HTML, dentro del área escalada para viajar con el
                 paneo sin deformarse como un <text> del SVG. */}
             <div className="relative h-4">
-              {/* El origen, dicho. Sin él "h+2" es la primera marca y el eje
-                  parece empezar ahí; y es lo que recuerda que se cuenta desde
-                  el arranque del turno y no por reloj. Anclado al borde: si se
-                  centrara, media palabra quedaría fuera. */}
-              <span className="absolute left-0 top-0 whitespace-nowrap text-[9px] text-muted-foreground">
-                arranque
+              {/* El origen. Con el eje ya rotulado en hora de reloj, la palabra
+                  «arranque» sobraba: la hora dice lo mismo y además CUÁL es.
+                  Sin `t0` vuelve a la palabra, que sigue siendo lo único
+                  cierto. Anclado al borde: centrada, media quedaría fuera. */}
+              <span className="absolute left-0 top-0 whitespace-nowrap text-[9px] tabular-nums text-muted-foreground">
+                {horaDesde(t0, 0) ?? 'arranque'}
               </span>
               {marcas.map((m) => (
                 <span key={m}
