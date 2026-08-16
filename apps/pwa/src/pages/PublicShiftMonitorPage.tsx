@@ -2894,18 +2894,10 @@ export function PublicShiftMonitorPage() {
               grupos={gruposEventos}
               notasTurno={notasDeTurnoCompleto}
             />
-            {/* Pegado al desglose de HOY va el de SIEMPRE: la misma pregunta —qué
-                para la línea— pero mirando los turnos anteriores. Es el paso de
-                "hoy pasó esto" a "esto vuelve todos los turnos". */}
-            {/* Cerró el turno: qué cambió contra ayer y cómo quedó contra los
-                récords. El orden es a propósito — primero qué pasó (arriba),
-                después por qué fue distinto, después qué se repite siempre. */}
-            <VsAyerBloque r={comparadoConAyer} records={recordsLinea} />
-            
-            {/* El comparador SUBE hasta acá, pegado al pronóstico: los dos
-                contestan la misma pregunta —si el turno llega— y estaban separados
-                por tres bloques de detalle. Arriba el desenlace, abajo el porqué
-                (velocidad, tramos, tiempo, hora por hora). */}
+            {/* La curva contra los otros días va ANTES del «vs ayer» (pedido de
+                Orel): las dos miran atrás, pero esta enseña el turno completo de
+                un vistazo y la de ayer es el detalle numérico de UNA de esas
+                curvas. Primero el panorama, después la cuenta. */}
             <ComparadorDias
               ventana={ventanaGrafica}
               onVentana={setVentanaGrafica}
@@ -2917,6 +2909,10 @@ export function PublicShiftMonitorPage() {
                  una mancha que promete lo que no puede. */
               cone={pronostico && pronostico.mapePct <= MAX_MAPE_PCT ? pronostico.cone : null}
             />
+            {/* Cerró el turno: qué cambió contra ayer y cómo quedó contra los
+                récords. Es el paso de "hoy pasó esto" a "esto vuelve todos los
+                turnos". */}
+            <VsAyerBloque r={comparadoConAyer} records={recordsLinea} />
 
           </>
         ) : (
