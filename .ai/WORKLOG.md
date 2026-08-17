@@ -1,3 +1,18 @@
+## 2026-08-17 · Monitor: ejes legibles, sin doble estado en turno cerrado, ritmo con periodo claro (PR #622)
+
+Los ejes de los dos gráficos y del detalle de paradas estaban a 9 px, bajo el
+piso de 11 de la Constitución (§9/§64): subidos los 7 usos, verificado sin
+solapes entre etiquetas del eje X. Con el turno cerrado la cabecera mostraba
+la píldora de estado en vivo junto a «Turno cerrado» (dos estados a la vez, y
+a 375 px empujaba la fecha a una tercera línea); la píldora ahora solo
+aparece con el turno en curso. El «ritmo andando» (`totalPieces /
+producingMin`, promedio acumulado de todo el turno) decía «cuando la línea
+produce», que se lee como velocidad actual y contradecía al gráfico de abajo
+(caso real: número 12,37→12,33→12,16 mientras el gráfico iba de 0 a 17
+pz/min); ahora dice «promedio del turno, cuando produce». 1499 tests verdes,
+tsc limpio, `audit-piel.mjs` sin crecer la deuda. Merge commit `ad53ad3c` en
+main (squash), deploy en verificación en GitHub Pages.
+
 ## 2026-08-17 · Monitor: 44 px de área táctil y el chip activo legible (PR #620)
 
 Auditoría del monitor público con Filete en vivo a 375 px: 19 de 19 controles
