@@ -1,3 +1,33 @@
+## 2026-08-17 · Monitor: el turno arranca donde arranca la producción, cierre estimado por duración (PR #616)
+
+Filete cambia el horario del turno noche de un día para otro (hoy 00:00→08:00,
+mañana 21:00→05:00) y Shoplogix aún no lo tiene definido (`Unscheduled`), así
+que un cierre aprendido «por hora» no sirve. Dos cambios: (1) el arranque del
+turno ya no es el primer pico de piezas — si tras el primer tramo con
+producción hay un hueco >60 min, el inicio es el bloque siguiente (evita que
+piezas sueltas de prueba de máquina, ej. 3 pz a las 21:45, corran el inicio
+real de 00:20 y hundan «tiempo produciendo»; las piezas siguen contando en el
+total). (2) nuevo `inferShiftEndFromDuration()` en el backend: sin cierre
+fijado/aprendido/configurado, suma la duración mediana de los turnos de la
+línea (11 turnos, 449-461 min, mediana 452) al arranque productivo — al final
+de la cascada, después de cualquier horario real. También corrige
+«Producción real desde…», que usaba `effectiveStart` del backend y no
+coincidía con la cabecera.
+
+Verificado con turno real: cabecera pasó de `21:45–02:51` a `00:20–02:51`,
+«hora por hora» quedó en 3 filas todas con producción. 1499 tests verdes en
+cliente (105 archivos, 4 casos nuevos), 2 tests nuevos en backend
+(`inferShiftEndFromDuration`); tsc/eslint limpios. `functions/publicMonitor.test.js`
+(node --test) da 35/37, los 2 fallos son preexistentes en main. Merge commit
+`5b952ed` en main, deploy confirmado en GitHub Pages (`buildSha: 5b952ed`) y
+`Deploy Firebase Functions` en success.
+
+⚠️ Pendiente: definir el turno nocturno de Filete en Shoplogix — mientras no
+exista sigue entrando como `Unscheduled`, fuera del Pareto y del historial.
+
+⚠️ Este archivo pasó los ~150 KB recomendados (ahora ~216 KB) — compactar
+entradas antiguas en la próxima sesión de mantenimiento.
+
 ## 2026-08-17 · Monitor: la cabecera anuncia el arranque real del turno (PR #614)
 
 Último cabo suelto del #612: el resto de la pantalla ya contaba desde la
