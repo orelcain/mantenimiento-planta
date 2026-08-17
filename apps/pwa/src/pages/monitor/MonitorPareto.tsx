@@ -61,6 +61,25 @@ export function ParetoDeParadas({
   // vez. Tres es el mínimo para que "en 2 de 3" signifique algo.
   if (!pareto || pareto.shifts < 3 || pareto.rows.length === 0) return null
 
+  /*
+   * Los % de los dueños, con el MISMO denominador que las filas y repartidos
+   * para que SUMEN el % del titular al decimal: redondeando cada uno por su
+   * lado, 6,5 + 2,8 + 4,6 daba 13,9 contra un titular de 13,8 — y una frase
+   * que existe para cuadrar no puede descuadrar por redondeo. Método del
+   * mayor resto, en décimas.
+   */
+  const pctDuenos = (() => {
+    if (!ctx || ctx.ventanaMin <= 0) return null
+    const claves = ['sin-imputar', 'externo', 'mantencion'] as const
+    const exactos = claves.map((k) => (pareto.porDueno[k] / ctx.ventanaMin) * 1000)
+    const pisos = exactos.map(Math.floor)
+    let falta = Math.round((pareto.totalMin / ctx.ventanaMin) * 1000) - pisos.reduce((a, b) => a + b, 0)
+    const orden = exactos.map((v, i) => ({ i, resto: v - pisos[i]! })).sort((a, b) => b.resto - a.resto)
+    for (const { i } of orden) { if (falta <= 0) break; pisos[i]!++; falta-- }
+    return Object.fromEntries(claves.map((k, i) => [k, pisos[i]! / 10])) as Record<typeof claves[number], number>
+  })()
+  const pctDelTotal = (k: 'sin-imputar' | 'externo' | 'mantencion') =>
+    pctDuenos ? ` (${fmtDec1(pctDuenos[k])}%)` : ''
   /* Los turnos que de verdad se están midiendo: los que produjeron. */
   const turnosMedidos = ctx?.turnos ?? pareto.shifts
   const max = pareto.rows[0]!.minutes
@@ -222,15 +241,27 @@ export function ParetoDeParadas({
         ))}
       </ul>
 
+      {/*
+        * ⚠ El MISMO denominador que las filas (% del tiempo total): esta frase
+        * decía «47%» —que era % de lo recuperable— a diez centímetros de filas
+        * que dicen «5,1%» del tiempo total. Dos denominadores sin avisar, el
+        * vicio que Orel ya cazó tres veces en este bloque. Ahora los tres %
+        * SUMAN el % del titular, y los minutos suman sus horas.
+        */}
       {(pareto.porDueno.mantencion > 0 || pareto.porDueno.externo > 0 || pareto.porDueno['sin-imputar'] > 0) && (
         <p className="mt-4 text-[12px] leading-relaxed text-muted-foreground">
           De lo que se repite:{' '}
-          <b className="tabular-nums text-muted-foreground">{fmtMin(pareto.porDueno['sin-imputar'])} sin imputar
-            {pareto.totalMin > 0 && ` (${Math.round((pareto.porDueno['sin-imputar'] / pareto.totalMin) * 100)}%)`}</b>
+          <b className="tabular-nums text-muted-foreground">
+            {fmtMin(pareto.porDueno['sin-imputar'])} sin imputar{pctDelTotal('sin-imputar')}
+          </b>
           {' · '}
-          <b className={`tabular-nums ${DUENO_UI.externo.clase}`}>{fmtMin(pareto.porDueno.externo)} externos</b>
+          <b className={`tabular-nums ${DUENO_UI.externo.clase}`}>
+            {fmtMin(pareto.porDueno.externo)} externos{pctDelTotal('externo')}
+          </b>
           {' · '}
-          <b className={`tabular-nums ${DUENO_UI.mantencion.clase}`}>{fmtMin(pareto.porDueno.mantencion)} de equipos</b>.
+          <b className={`tabular-nums ${DUENO_UI.mantencion.clase}`}>
+            {fmtMin(pareto.porDueno.mantencion)} de equipos{pctDelTotal('mantencion')}
+          </b>.
           {pareto.porDueno['sin-imputar'] >= pareto.porDueno.mantencion &&
             pareto.porDueno['sin-imputar'] >= pareto.porDueno.externo && (
             <> Lo más grande no tiene dueño — no se puede atacar lo que nadie anota.</>
@@ -238,10 +269,12 @@ export function ParetoDeParadas({
         </p>
       )}
 
+      {/* En MINUTOS y no en un «80%» cuyo denominador no era el de las filas:
+          así se verifica sumando las primeras filas de arriba. */}
       <p className="mt-3 rounded-lg bg-muted px-2.5 py-2 text-[12px] font-medium text-emerald-800 dark:text-emerald-300">
         {vitales.length === 1
-          ? `Una sola causa explica el ${Math.round(pareto.vitalPct)}% del tiempo parado.`
-          : `${vitales.length} causas explican el ${Math.round(pareto.vitalPct)}% del tiempo parado.`}
+          ? `Una sola causa suma ${fmtMin(vitales[0]!.minutes)} de las ${fmtMin(pareto.totalMin)} que se repiten.`
+          : `Las ${vitales.length} primeras causas suman ${fmtMin(vitales.reduce((a, r) => a + r.minutes, 0))} de las ${fmtMin(pareto.totalMin)} que se repiten.`}
         {cronicas.length > 0 && cronicas.length < vitales.length && (
           <>
             {' '}

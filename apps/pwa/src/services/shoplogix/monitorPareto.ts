@@ -271,13 +271,24 @@ export function contextoPareto(turnos: TurnoCtx[]): ContextoPareto {
   const ventanaMin = suma((t) => t.windowMin ?? 0)
   const produciendoMin = suma((t) => t.producingMin ?? 0)
   const convenioMin = suma((t) => t.plannedMin ?? 0)
-  const recuperableMin = suma((t) => t.recoverableMin ?? 0)
+  /*
+   * ⚠ Cuando el turno trae el detalle de causas, lo recuperable es LA SUMA DE
+   * ESAS CAUSAS, no el total redondeado del backend: el titular del bloque
+   * tiene que ser exactamente la suma de sus filas, o los 3 minutos de
+   * diferencia (redondeo por causa) reaparecen en cada frase que compare las
+   * dos cifras — ya pasó con «12 h 40» arriba y dueños que sumaban 12 h 37.
+   */
+  const recuperableDe = (t: TurnoCtx) =>
+    (t.causas?.length ?? 0) > 0
+      ? t.causas!.reduce((a, c) => a + (c.min ?? 0), 0)
+      : t.recoverableMin ?? 0
+  const recuperableMin = suma(recuperableDe)
 
   const conProduccion = [...unicos].sort((a, b) => a.dateKey.localeCompare(b.dateKey))
   const serie: PuntoTendencia[] = conProduccion.map((t) => ({
     dateKey: t.dateKey,
-    pct: ((t.recoverableMin ?? 0) / (t.windowMin || 1)) * 100,
-    recuperableMin: t.recoverableMin ?? 0,
+    pct: (recuperableDe(t) / (t.windowMin || 1)) * 100,
+    recuperableMin: recuperableDe(t),
     windowMin: t.windowMin ?? 0,
   }))
 
