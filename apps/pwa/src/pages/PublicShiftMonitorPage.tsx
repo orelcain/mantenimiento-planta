@@ -1883,6 +1883,8 @@ export function PublicShiftMonitorPage() {
   )
   /** La serie que ven los gráficos: desde la primera pieza, como el resto. */
   const serieDelTurno = useMemo(() => desdePrimeraPieza(live?.series), [live?.series])
+  /** El arranque que se anuncia: la primera pieza, con el declarado de respaldo. */
+  const inicioReal = serieDelTurno[0]?.t ?? live?.scheduledStart
 
   const esActual = idx === 0
 
@@ -2707,9 +2709,17 @@ export function PublicShiftMonitorPage() {
               * —la misma fuente que el "Cierre estimado" de abajo—; el rango
               * real recién vale cuando el turno cerró.
               */}
+            {/*
+              * El INICIO es la primera pieza, no `scheduledStart`: el resto del
+              * monitor ya cuenta desde ahí (gráficos, hora por hora, comparador)
+              * y la cabecera anunciaba «06:00» mientras los gráficos partían a
+              * las 21:45 — dos horarios para el mismo turno en la misma
+              * pantalla. Si no hay ni una pieza todavía, se muestra el
+              * declarado: es lo único que se sabe.
+              */}
             {!live.shiftClosed && live.plannedEnd ? (
               <span className="tabular-nums">
-                {fmtWallTime(live.scheduledStart)}&nbsp;&#8594;&nbsp;{fmtWallTime(live.plannedEnd)}
+                {fmtWallTime(inicioReal)}&nbsp;&#8594;&nbsp;{fmtWallTime(live.plannedEnd)}
                 {live.plannedEndSource !== 'fijado' && (
                   <span className="ml-1 rounded bg-muted px-1 py-px text-[10px] uppercase tracking-wide text-muted-foreground">
                     est.
@@ -2718,7 +2728,7 @@ export function PublicShiftMonitorPage() {
               </span>
             ) : (
               <span className="tabular-nums">
-                {fmtWallTime(live.scheduledStart)}–{fmtWallTime(live.scheduledEnd)}
+                {fmtWallTime(inicioReal)}–{fmtWallTime(live.scheduledEnd)}
               </span>
             )}
           </div>
@@ -3081,15 +3091,16 @@ export function PublicShiftMonitorPage() {
           </section>
         )}
 
-{/*
-          Recortar el eje sin decirlo haría creer que el turno entero fue
-          así de corto. Se dice qué se está mirando y se ofrece la salida.
+        {/*
+          Ahora que la cabecera muestra el arranque REAL, el horario declarado
+          no se ve en ninguna otra parte: este aviso es el que lo conserva. Sin
+          él, el turno de 06:00 desaparecería de la pantalla sin dejar rastro y
+          nadie podría notar el desfase.
         */}
         {recorteActividad && serieDelTurno.length > 0 && (
           <p className="text-[11px] leading-snug text-muted-foreground">
-            Los gráficos y las horas cuentan desde{' '}
-            <b className="text-foreground/80">{fmtWallTime(serieDelTurno[0]!.t)}</b>, la primera
-            pieza del turno. El turno declarado empieza antes:{' '}
+            Todo se cuenta desde la primera pieza. El turno estaba declarado desde las{' '}
+            <b className="text-foreground/80">{fmtWallTime(live.scheduledStart)}</b>:{' '}
             {fmtDurationSec(recorteActividad.recortadoMin * 60)} sin actividad que no se dibujan.
           </p>
         )}
