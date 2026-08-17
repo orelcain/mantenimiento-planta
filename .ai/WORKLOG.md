@@ -1,3 +1,17 @@
+## 2026-08-17 · Monitor: la cabecera anuncia el arranque real del turno (PR #614)
+
+Último cabo suelto del #612: el resto de la pantalla ya contaba desde la
+primera pieza pero la cabecera seguía mostrando el horario declarado
+(`06:00–02:17` vs `21:45–02:23` en el resto). Cabecera ahora usa
+`serieDelTurno[0].t` (respaldo: declarado si aún no hay piezas), en ambos
+estados (vivo/cerrado). El declarado no se pierde: el aviso de abajo lo
+nombra junto al tiempo sin actividad no dibujado. 1495 tests verdes,
+tsc/eslint limpios. Merge commit `d09d71f` en main, deploy confirmado en
+GitHub Pages (`buildSha: d09d71f`).
+
+⚠️ Este archivo sigue sobre los ~150 KB recomendados (ahora ~214 KB) —
+compactar entradas antiguas en la próxima sesión de mantenimiento.
+
 ## 2026-08-17 · Monitor: el turno empieza en la primera pieza, no en el primer tramo sincronizado (PR #612)
 
 Reemplaza el auto-zoom del PR #610 (lo causaba desalineado): `monitorHourly.ts`
