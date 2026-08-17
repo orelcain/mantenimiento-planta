@@ -23,6 +23,21 @@ const fmtInt = (n: number) => nf.format(Math.round(n || 0))
 const nf1 = new Intl.NumberFormat('es-CL', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 const fmtDec1 = (n: number) => nf1.format(n || 0)
 
+/*
+ * Redondeo de las piezas estimadas (regla del mockup): FILAS a la decena,
+ * HÉROE a la centena — una estimación con unidades exactas parece medición, y
+ * no lo es. El ≈ acompaña SIEMPRE a una cifra de piezas.
+ */
+const fmtPzDecena = (n: number) => nf.format(Math.round(n / 10) * 10)
+const fmtPzCentena = (n: number) => nf.format(Math.round(n / 100) * 100)
+/** «≈ 2 turnos de producción», a medio turno — nunca «2,04». */
+const fmtTurnosEq = (pz: number, pzPorTurno: number) => {
+  if (!(pzPorTurno > 0)) return null
+  const t = Math.round((pz / pzPorTurno) * 2) / 2
+  if (t < 0.5) return null
+  return t === 1 ? '1 turno' : `${nf1.format(t).replace(',0', '')} turnos`
+}
+
 /** «Turno Dia» → «Día». El prefijo se repite en todos y no aporta. */
 function nombreCortoTurno(id: string): string {
   const t = id.replace(/^turno\s+/i, '').trim()
@@ -57,32 +72,15 @@ export function ParetoDeParadas({
 }) {
   const [abierta, setAbierta] = useState<string | null>(null)
   const [porQueMediana, setPorQueMediana] = useState(false)
+  const [comoAbierto, setComoAbierto] = useState(false)
   // Con uno o dos turnos no hay patrón que mostrar, solo el turno de hoy otra
   // vez. Tres es el mínimo para que "en 2 de 3" signifique algo.
   if (!pareto || pareto.shifts < 3 || pareto.rows.length === 0) return null
 
-  /*
-   * Los % de los dueños, con el MISMO denominador que las filas y repartidos
-   * para que SUMEN el % del titular al decimal: redondeando cada uno por su
-   * lado, 6,5 + 2,8 + 4,6 daba 13,9 contra un titular de 13,8 — y una frase
-   * que existe para cuadrar no puede descuadrar por redondeo. Método del
-   * mayor resto, en décimas.
-   */
-  const pctDuenos = (() => {
-    if (!ctx || ctx.ventanaMin <= 0) return null
-    const claves = ['sin-imputar', 'externo', 'mantencion'] as const
-    const exactos = claves.map((k) => (pareto.porDueno[k] / ctx.ventanaMin) * 1000)
-    const pisos = exactos.map(Math.floor)
-    let falta = Math.round((pareto.totalMin / ctx.ventanaMin) * 1000) - pisos.reduce((a, b) => a + b, 0)
-    const orden = exactos.map((v, i) => ({ i, resto: v - pisos[i]! })).sort((a, b) => b.resto - a.resto)
-    for (const { i } of orden) { if (falta <= 0) break; pisos[i]!++; falta-- }
-    return Object.fromEntries(claves.map((k, i) => [k, pisos[i]! / 10])) as Record<typeof claves[number], number>
-  })()
-  const pctDelTotal = (k: 'sin-imputar' | 'externo' | 'mantencion') =>
-    pctDuenos ? ` (${fmtDec1(pctDuenos[k])}%)` : ''
   /* Los turnos que de verdad se están midiendo: los que produjeron. */
   const turnosMedidos = ctx?.turnos ?? pareto.shifts
-  const max = pareto.rows[0]!.minutes
+  /* La barra mide lo que la cifra dice: piezas (minutos solo si no hay cpm). */
+  const max = Math.max(pareto.rows[0]!.piezas, pareto.rows[0]!.minutes)
   const vitales = pareto.rows.slice(0, Math.max(1, pareto.vitalCount))
   const cronicas = vitales.filter((r) => r.shifts >= Math.ceil(pareto.shifts / 2))
   /* La serie mira más atrás que el ranking (10 turnos contra 6): si no llega,
@@ -109,9 +107,11 @@ export function ParetoDeParadas({
        * mismos turnos: dos números distintos en la misma pantalla hacían dudar
        * del dato entero, por bien explicados que estuvieran.
        */
+      /* La cabecera del bloque CERRADO es el píxel de mayor alcance (más gente
+         lo ve plegado que abierto): lleva el número de gestión, en piezas. */
       extra={
         <span className="tabular-nums">
-          {turnosMedidos} turnos{ctx && ctx.ventanaMin > 0 && ` · ${fmtDec1(ctx.pct)}%`}
+          {turnosMedidos} turnos{pareto.totalPiezas > 0 && ` · ≈${fmtPzCentena(pareto.totalPiezas)} pz`}
         </span>
       }
       defaultAbierto={false}
@@ -175,13 +175,29 @@ export function ParetoDeParadas({
 
       {ctx && ctx.ventanaMin > 0 && (
         <div className="mt-3">
+          {/*
+            * Las PIEZAS mandan (mockup «piezas mandan»): el héroe traía el
+            * mismo % que ya está en la cabecera a 60 px — duplicado puro. La
+            * cifra de gestión va acá; el % baja junto a los minutos que lo
+            * explican y sigue mandando en la tendencia, donde una tasa
+            * corresponde.
+            */}
           <div className="flex items-baseline justify-between gap-2">
-            <span className="text-[28px] font-bold leading-none tabular-nums text-foreground">
-              {fmtDec1(ctx.pct)}%
+            <span className="tabular-nums text-foreground">
+              <span className="text-[28px] font-bold leading-none">≈{fmtPzCentena(pareto.totalPiezas)}</span>
+              <span className="text-[15px] font-semibold text-muted-foreground"> pz</span>
+              {(() => {
+                const eq = fmtTurnosEq(pareto.totalPiezas, ctx.piezasPorTurno)
+                return eq ? (
+                  <span className="block text-[12px] font-normal text-muted-foreground">
+                    ≈ {eq} completos de producción
+                  </span>
+                ) : null
+              })()}
             </span>
             <span className="text-right text-[11px] leading-tight text-muted-foreground">
               <span className="tabular-nums font-semibold text-foreground/80">{fmtMin(ctx.recuperableMin)}</span>
-              {' '}recuperables<br />
+              {' '}recuperables · <span className="tabular-nums">{fmtDec1(ctx.pct)}%</span><br />
               de <span className="tabular-nums">{fmtMin(ctx.ventanaMin)}</span> en{' '}
               {ctx.turnos} turnos completos
             </span>
@@ -214,6 +230,31 @@ export function ParetoDeParadas({
               Recuperable <span className="tabular-nums font-semibold text-foreground/80">{fmtMin(ctx.recuperableMin)}</span>
             </span>
           </div>
+          {/* El supuesto, SIEMPRE visible (quien proyecta esta pantalla en una
+              reunión no abre desplegables): una línea, sin repetirse por fila. */}
+          {/* Mismo gesto que «mediana ⓘ»: el supuesto siempre visible, el cómo
+              tocable — con el rango REAL de la muestra, no un número inventado. */}
+          <button
+            type="button"
+            onClick={() => setComoAbierto((v) => !v)}
+            className="mt-1.5 block text-left text-[11px] leading-snug text-muted-foreground/70"
+          >
+            Piezas ≈ estimadas al ritmo que cada turno traía andando, no al promedio de la
+            muestra.{' '}
+            <span className="underline decoration-dotted underline-offset-2">cómo se calcula</span>
+          </button>
+          {comoAbierto && (
+            <p className="mt-1.5 rounded-ctl bg-muted px-2.5 py-2 text-[11px] leading-relaxed text-muted-foreground">
+              Cada parada se multiplica por las piezas por minuto que su propio turno hizo
+              mientras la línea andaba
+              {ctx?.cpmRango && (
+                <> — en estos {ctx.turnos} turnos ese ritmo fue de {fmtDec1(ctx.cpmRango.min)} a{' '}
+                {fmtDec1(ctx.cpmRango.max)} pz/min</>
+              )}
+              . Por eso 20 min en un turno lento cuestan menos piezas que 17 en uno rápido, y
+              el orden del ranking puede diferir del de minutos.
+            </p>
+          )}
         </div>
       )}
 
@@ -232,7 +273,7 @@ export function ParetoDeParadas({
                 corrido, y el «resto» sonaba a sobra en vez de a cola larga. */}
             <div className={i > 0 ? 'border-t border-border/50' : ''}>
               <FilaPareto
-                r={r} max={max} turnos={turnosMedidos} ventanaMin={ctx?.ventanaMin}
+                r={r} max={max} turnos={turnosMedidos}
                 abierta={abierta === r.label}
                 onToggle={() => setAbierta((v) => (v === r.label ? null : r.label))}
               />
@@ -248,33 +289,42 @@ export function ParetoDeParadas({
         * vicio que Orel ya cazó tres veces en este bloque. Ahora los tres %
         * SUMAN el % del titular, y los minutos suman sus horas.
         */}
+      {/*
+        * En PIEZAS (pedido de Orel sobre el mockup): es la frase que más
+        * directamente cuantifica cuánto de lo recuperable es de Mantención.
+        * Decena y ≈, como toda cifra valorizada; suma el héroe por
+        * construcción (mismo total, mismo redondeo por dueño).
+        */}
       {(pareto.porDueno.mantencion > 0 || pareto.porDueno.externo > 0 || pareto.porDueno['sin-imputar'] > 0) && (
         <p className="mt-4 text-[12px] leading-relaxed text-muted-foreground">
           De lo que se repite:{' '}
           <b className="tabular-nums text-muted-foreground">
-            {fmtMin(pareto.porDueno['sin-imputar'])} sin imputar{pctDelTotal('sin-imputar')}
+            ≈{fmtPzDecena(pareto.porDuenoPiezas['sin-imputar'])} pz sin imputar
           </b>
           {' · '}
           <b className={`tabular-nums ${DUENO_UI.externo.clase}`}>
-            {fmtMin(pareto.porDueno.externo)} externos{pctDelTotal('externo')}
+            ≈{fmtPzDecena(pareto.porDuenoPiezas.externo)} externas
           </b>
           {' · '}
           <b className={`tabular-nums ${DUENO_UI.mantencion.clase}`}>
-            {fmtMin(pareto.porDueno.mantencion)} de equipos{pctDelTotal('mantencion')}
+            ≈{fmtPzDecena(pareto.porDuenoPiezas.mantencion)} de equipos
           </b>.
-          {pareto.porDueno['sin-imputar'] >= pareto.porDueno.mantencion &&
-            pareto.porDueno['sin-imputar'] >= pareto.porDueno.externo && (
+          {pareto.porDuenoPiezas['sin-imputar'] >= pareto.porDuenoPiezas.mantencion &&
+            pareto.porDuenoPiezas['sin-imputar'] >= pareto.porDuenoPiezas.externo && (
             <> Lo más grande no tiene dueño — no se puede atacar lo que nadie anota.</>
           )}
         </p>
       )}
 
-      {/* En MINUTOS y no en un «80%» cuyo denominador no era el de las filas:
-          así se verifica sumando las primeras filas de arriba. */}
+      {/* El cierre habla en piezas, verificable sumando las filas de arriba, y
+          lleva la SEGUNDA (y última) equivalencia en turnos — nunca por fila. */}
       <p className="mt-3 rounded-lg bg-muted px-2.5 py-2 text-[12px] font-medium text-emerald-800 dark:text-emerald-300">
-        {vitales.length === 1
-          ? `Una sola causa suma ${fmtMin(vitales[0]!.minutes)} de las ${fmtMin(pareto.totalMin)} que se repiten.`
-          : `Las ${vitales.length} primeras causas suman ${fmtMin(vitales.reduce((a, r) => a + r.minutes, 0))} de las ${fmtMin(pareto.totalMin)} que se repiten.`}
+        {(() => {
+          const pzVitales = vitales.reduce((a, r) => a + r.piezas, 0)
+          const eq = ctx ? fmtTurnosEq(pzVitales, ctx.piezasPorTurno) : null
+          const quien = vitales.length === 1 ? 'Una sola causa suma' : `Las ${vitales.length} primeras causas suman`
+          return `${quien} ≈${fmtPzDecena(pzVitales)} pz de las ≈${fmtPzCentena(pareto.totalPiezas)} que se repiten${eq ? ` — ${eq} de producción` : ''}.`
+        })()}
         {cronicas.length > 0 && cronicas.length < vitales.length && (
           <>
             {' '}
@@ -363,7 +413,7 @@ export function ParetoDeParadas({
               {[
                 ...serie.serie.map((p): { p: PuntoTendencia; hueco: boolean } => ({ p, hueco: false })),
                 ...serie.sinProduccion.map((d): { p: PuntoTendencia; hueco: boolean } => (
-                  { p: { dateKey: d, pct: 0, recuperableMin: 0, windowMin: 0 }, hueco: true })),
+                  { p: { dateKey: d, pct: 0, recuperableMin: 0, windowMin: 0, piezas: 0 }, hueco: true })),
               ]
                 .map(({ p, hueco }) => (
                   <div key={p.dateKey} className="flex min-w-0 flex-1 flex-col items-center">
@@ -379,7 +429,7 @@ export function ParetoDeParadas({
                       style={{ height: hueco ? '8px' : `${Math.max(3, (p.pct / maxPct) * 80)}px` }}
                       title={hueco
                         ? `${nombreDeDia(p.dateKey)}: la línea no produjo`
-                        : `${nombreDeDia(p.dateKey)}: ${fmtMin(p.recuperableMin)} de ${fmtMin(p.windowMin)}`}
+                        : `${nombreDeDia(p.dateKey)}: ${fmtMin(p.recuperableMin)} de ${fmtMin(p.windowMin)}${p.piezas > 0 ? ` · ≈${fmtPzDecena(p.piezas)} pz` : ''}`}
                     />
                   </div>
                 ))}
@@ -420,12 +470,10 @@ export function ParetoDeParadas({
   )
 }
 
-function FilaPareto({ r, max, turnos, ventanaMin, abierta, onToggle }: {
+function FilaPareto({ r, max, turnos, abierta, onToggle }: {
   r: ParetoResult['rows'][number]
   max: number
   turnos: number
-  /** Minutos totales de la muestra: el 100% del bloque entero. */
-  ventanaMin?: number
   abierta: boolean
   onToggle: () => void
 }) {
@@ -456,25 +504,22 @@ function FilaPareto({ r, max, turnos, ventanaMin, abierta, onToggle }: {
         <span className="flex items-baseline justify-between gap-2">
           <span className="min-w-0 truncate text-[13px] text-foreground">{r.label}</span>
           {/*
-            * ⚠ El % es del TIEMPO DE LOS TURNOS, el mismo 100% que el número
-            * grande de arriba — así la columna SUMA ese número (pedido de
-            * Orel). Antes era el % de lo recuperable y sumaba 100%: dos
-            * denominadores a diez centímetros, y el «32%» no se entendía de
-            * qué era. Con un decimal, porque las causas chicas dan 0,2%.
+            * Las PIEZAS mandan y los minutos acompañan en el slot que tenía el
+            * % (mockup: dos números, no tres). El % de fila sale: junto a una
+            * cifra de piezas recrearía el problema de dos denominadores que
+            * este bloque ya arregló.
             */}
           <span className="shrink-0 text-[13px] tabular-nums font-semibold text-foreground">
-            {fmtMin(r.minutes)}
-            {ventanaMin != null && ventanaMin > 0 && (
-              <span className="ml-1.5 font-normal text-muted-foreground">
-                {fmtDec1((r.minutes / ventanaMin) * 100)}%
-              </span>
+            {r.piezas > 0 ? <>≈{fmtPzDecena(r.piezas)} pz</> : fmtMin(r.minutes)}
+            {r.piezas > 0 && (
+              <span className="ml-1.5 font-normal text-muted-foreground">{fmtMin(r.minutes)}</span>
             )}
           </span>
         </span>
         <span className="mt-1.5 block h-1 overflow-hidden rounded-full bg-muted-foreground/[0.15]">
           <span
             className={`block h-full rounded-full ${ui.barra} ${cronica ? '' : 'opacity-60'}`}
-            style={{ width: `${Math.max(2, (r.minutes / max) * 100)}%` }}
+            style={{ width: `${Math.max(2, ((r.piezas > 0 ? r.piezas : r.minutes) / max) * 100)}%` }}
           />
         </span>
         <span className="mt-1 flex flex-wrap items-baseline gap-x-2 text-[11px]">
@@ -502,7 +547,9 @@ function FilaPareto({ r, max, turnos, ventanaMin, abierta, onToggle }: {
           {r.parts.map((p) => (
             <li key={p.reason} className="flex justify-between gap-2">
               <span className="min-w-0 truncate">{p.reason}</span>
-              <span className="shrink-0 tabular-nums">{fmtMin(p.min)} · {p.count}×</span>
+              <span className="shrink-0 tabular-nums">
+                {p.piezas > 0 ? <>≈{fmtPzDecena(p.piezas)} pz · </> : ''}{fmtMin(p.min)} · {p.count}×
+              </span>
             </li>
           ))}
         </ul>

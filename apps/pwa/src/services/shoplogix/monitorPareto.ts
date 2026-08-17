@@ -43,6 +43,13 @@ export interface ParetoRow {
   /** Etiqueta que se muestra: el equipo si agrupa, o la causa tal cual. */
   label: string
   minutes: number
+  /**
+   * ≈ piezas que costó, valorizadas al ritmo andando DEL TURNO en que ocurrió
+   * cada parada (total/producingMin de ese turno), no al promedio de la
+   * muestra: 20 min en un turno lento cuestan menos piezas que 17 en uno
+   * rápido, y esa diferencia reordena el ranking — es información, no ruido.
+   */
+  piezas: number
   /** En cuántos turnos de la muestra aparece. */
   shifts: number
   /** Paradas totales sumadas. */
@@ -58,7 +65,14 @@ export interface ParetoRow {
    */
   dueno: DuenoPareto
   /** Las causas que se agruparon, cuando son más de una. */
-  parts: CausaTurno[]
+  parts: Array<CausaTurno & { piezas: number }>
+}
+
+/** Lo que buildPareto necesita de cada turno para valorizar sus causas. */
+export interface TurnoParaPareto {
+  causas?: CausaTurno[] | null
+  total?: number | null
+  producingMin?: number | null
 }
 
 export interface ParetoResult {
@@ -69,8 +83,12 @@ export interface ParetoResult {
    * IMPUTAR — 170 de 349 min, el 49% — y no se puede atacar lo que nadie anota.
    */
   porDueno: Record<DuenoPareto, number>
+  /** Lo mismo, en ≈ piezas — la frase de dueños habla en piezas. */
+  porDuenoPiezas: Record<DuenoPareto, number>
   /** Minutos recuperables sumados de toda la muestra. */
   totalMin: number
+  /** ≈ piezas de toda la muestra, valorizadas turno a turno. */
+  totalPiezas: number
   /** Turnos considerados. */
   shifts: number
   /**
@@ -96,46 +114,59 @@ export function equipoDe(reason: string): string | null {
  * Cada turno aporta su lista de causas ya agregada por el backend; acá solo se
  * suman, se agrupan por equipo y se ordenan.
  */
-export function buildPareto(turnos: Array<CausaTurno[] | null | undefined>): ParetoResult {
-  const acc = new Map<string, { minutes: number; count: number; shifts: Set<number>; parts: Map<string, CausaTurno> }>()
+export function buildPareto(turnos: Array<TurnoParaPareto | null | undefined>): ParetoResult {
+  const acc = new Map<string, { minutes: number; piezas: number; count: number; shifts: Set<number>; parts: Map<string, CausaTurno & { piezas: number }> }>()
 
-  turnos.forEach((causas, idx) => {
-    if (!causas) return
+  turnos.forEach((t, idx) => {
+    const causas = t?.causas
+    if (!causas || causas.length === 0) return
+    /* El ritmo andando de ESTE turno: la vara con que se valorizan SUS causas. */
+    const cpm = t.total != null && (t.producingMin ?? 0) > 0 ? t.total / t.producingMin! : 0
     for (const c of causas) {
       if (!c?.reason || !(c.min > 0)) continue
+      const pz = c.min * cpm
       const label = equipoDe(c.reason) ?? c.reason
       let fila = acc.get(label)
       if (!fila) {
-        fila = { minutes: 0, count: 0, shifts: new Set(), parts: new Map() }
+        fila = { minutes: 0, piezas: 0, count: 0, shifts: new Set(), parts: new Map() }
         acc.set(label, fila)
       }
       fila.minutes += c.min
+      fila.piezas += pz
       fila.count += c.count ?? 0
       fila.shifts.add(idx)
       const parte = fila.parts.get(c.reason)
       if (parte) {
         parte.min += c.min
+        parte.piezas += pz
         parte.count += c.count ?? 0
       } else {
-        fila.parts.set(c.reason, { reason: c.reason, min: c.min, count: c.count ?? 0 })
+        fila.parts.set(c.reason, { reason: c.reason, min: c.min, count: c.count ?? 0, piezas: pz })
       }
     }
   })
 
   const totalMin = [...acc.values()].reduce((a, f) => a + f.minutes, 0)
-  const shifts = turnos.filter(Boolean).length
+  const totalPiezas = [...acc.values()].reduce((a, f) => a + f.piezas, 0)
+  const shifts = turnos.filter((t) => (t?.causas?.length ?? 0) > 0).length
   if (totalMin <= 0) {
     return {
-      rows: [], totalMin: 0, shifts, vitalCount: 0, vitalPct: 0,
+      rows: [], totalMin: 0, totalPiezas: 0, shifts, vitalCount: 0, vitalPct: 0,
       porDueno: { mantencion: 0, externo: 0, 'sin-imputar': 0 },
+      porDuenoPiezas: { mantencion: 0, externo: 0, 'sin-imputar': 0 },
     }
   }
 
+  /*
+   * ⚠ El orden y el corte 80/20 van por PIEZAS, no por minutos (decisión del
+   * mockup): las piezas son el número que manda en pantalla, y un ranking
+   * ordenado por otra columna que la que se lee es una trampa silenciosa.
+   */
   let cum = 0
   const rows: ParetoRow[] = [...acc.entries()]
-    .sort((a, b) => b[1].minutes - a[1].minutes)
+    .sort((a, b) => b[1].piezas - a[1].piezas)
     .map(([label, f]) => {
-      cum += f.minutes
+      cum += f.piezas
       const dominante = [...f.parts.values()].sort((a, b) => b.min - a.min)[0]!
       const m = matchImputacion(dominante.reason)
       const dueno: DuenoPareto = m.bucket === 'mantencion'
@@ -144,33 +175,31 @@ export function buildPareto(turnos: Array<CausaTurno[] | null | undefined>): Par
       return {
         label,
         minutes: f.minutes,
+        piezas: f.piezas,
         shifts: f.shifts.size,
         count: f.count,
-        sharePct: (f.minutes / totalMin) * 100,
-        cumPct: (cum / totalMin) * 100,
+        sharePct: totalPiezas > 0 ? (f.piezas / totalPiezas) * 100 : 0,
+        cumPct: totalPiezas > 0 ? (cum / totalPiezas) * 100 : 0,
         dueno,
-        parts: [...f.parts.values()].sort((a, b) => b.min - a.min),
+        parts: [...f.parts.values()].sort((a, b) => b.piezas - a.piezas),
       }
     })
 
-  const porDueno: Record<DuenoPareto, number> = { mantencion: 0, externo: 0, 'sin-imputar': 0 }
-  for (const r of rows) porDueno[r.dueno] += r.minutes
+  const porDueno = { mantencion: 0, externo: 0, 'sin-imputar': 0 } as Record<DuenoPareto, number>
+  const porDuenoPiezas = { mantencion: 0, externo: 0, 'sin-imputar': 0 } as Record<DuenoPareto, number>
+  for (const r of rows) { porDueno[r.dueno] += r.minutes; porDuenoPiezas[r.dueno] += r.piezas }
 
-  /*
-   * El corte del 80%: la primera fila que lo alcanza entra. Con muestras
-   * chicas puede caer en la fila 1 (una causa que se llevó todo) o no llegar
-   * nunca si están todas parejas — ahí no hay "pocas vitales" que mostrar y el
-   * bloque lo dice en vez de inventar un corte.
-   */
   const i = rows.findIndex((r) => r.cumPct >= 80)
   const vitalCount = i >= 0 ? i + 1 : 0
   return {
     rows,
     totalMin,
+    totalPiezas,
     shifts,
     vitalCount,
     vitalPct: vitalCount > 0 ? rows[vitalCount - 1]!.cumPct : 0,
     porDueno,
+    porDuenoPiezas,
   }
 }
 
@@ -178,6 +207,8 @@ export function buildPareto(turnos: Array<CausaTurno[] | null | undefined>): Par
 export interface TurnoCtx {
   dateKey: string
   shiftId?: string | null
+  /** Piezas del turno: el numerador del cpm con que se valorizan sus causas. */
+  total?: number | null
   windowMin?: number | null
   producingMin?: number | null
   plannedMin?: number | null
@@ -191,6 +222,8 @@ export interface PuntoTendencia {
   pct: number
   recuperableMin: number
   windowMin: number
+  /** ≈ piezas de ese recuperable, al cpm andando del propio turno. */
+  piezas: number
 }
 
 export interface ContextoPareto {
@@ -204,6 +237,10 @@ export interface ContextoPareto {
   huecosMin: number
   /** % recuperable sobre el tiempo TOTAL medido, convenio incluido. */
   pct: number
+  /** Piezas promedio por turno de la muestra: la vara de «≈ N turnos». */
+  piezasPorTurno: number
+  /** Rango real de cpm andando en la muestra: el «cómo se calcula» lo muestra. */
+  cpmRango: { min: number; max: number } | null
   /** Un punto por turno CON PRODUCCIÓN, del más viejo al más nuevo. */
   serie: PuntoTendencia[]
   /** Turnos sin un minuto produciendo: no entran en la serie, pero existieron. */
@@ -284,13 +321,22 @@ export function contextoPareto(turnos: TurnoCtx[]): ContextoPareto {
       : t.recoverableMin ?? 0
   const recuperableMin = suma(recuperableDe)
 
+  /* El cpm andando de un turno: el mismo con que buildPareto valoriza sus
+   * causas — si difirieran, las pz del hover de la tendencia no cuadrarían
+   * con las filas del ranking. */
+  const cpmDe = (t: TurnoCtx) =>
+    t.total != null && (t.producingMin ?? 0) > 0 ? t.total / t.producingMin! : 0
+
   const conProduccion = [...unicos].sort((a, b) => a.dateKey.localeCompare(b.dateKey))
   const serie: PuntoTendencia[] = conProduccion.map((t) => ({
     dateKey: t.dateKey,
     pct: (recuperableDe(t) / (t.windowMin || 1)) * 100,
     recuperableMin: recuperableDe(t),
     windowMin: t.windowMin ?? 0,
+    piezas: recuperableDe(t) * cpmDe(t),
   }))
+
+  const cpms = unicos.map(cpmDe).filter((v) => v > 0)
 
   const orden = serie.map((p) => p.pct).sort((a, b) => a - b)
   const promedio = orden.length > 0 ? orden.reduce((a, v) => a + v, 0) / orden.length : null
@@ -330,6 +376,8 @@ export function contextoPareto(turnos: TurnoCtx[]): ContextoPareto {
     recuperableMin,
     huecosMin: Math.max(0, ventanaMin - produciendoMin - convenioMin - recuperableMin),
     pct: ventanaMin > 0 ? (recuperableMin / ventanaMin) * 100 : 0,
+    piezasPorTurno: unicos.length > 0 ? suma((t) => t.total ?? 0) / unicos.length : 0,
+    cpmRango: cpms.length > 0 ? { min: Math.min(...cpms), max: Math.max(...cpms) } : null,
     serie,
     sinProduccion: conVentana.filter((t) => !((t.producingMin ?? 0) > 0)).map((t) => t.dateKey),
     banda,

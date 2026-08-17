@@ -1972,6 +1972,7 @@ export function PublicShiftMonitorPage() {
     {
       dateKey: vista?.dateKey ?? data?.dateKey ?? '',
       shiftId: vista?.shiftId ?? data?.shiftId ?? null,
+      total: live?.totalPieces ?? null,
       windowMin: live?.timeBreakdown?.windowMin ?? null,
       producingMin: live?.timeBreakdown?.producingMin ?? null,
       plannedMin: live?.timeBreakdown?.plannedMin ?? null,
@@ -1981,6 +1982,7 @@ export function PublicShiftMonitorPage() {
     ...(data?.shiftStats ?? []).map((t) => ({
       dateKey: t.dateKey,
       shiftId: t.shiftId ?? null,
+      total: t.total ?? null,
       windowMin: t.windowMin ?? null,
       producingMin: t.producingMin ?? null,
       plannedMin: t.plannedMin ?? null,
@@ -1990,6 +1992,7 @@ export function PublicShiftMonitorPage() {
     ...(data?.history ?? []).map((h) => ({
       dateKey: h.dateKey,
       shiftId: h.shiftId ?? null,
+      total: h.live?.totalPieces ?? null,
       windowMin: h.live?.timeBreakdown?.windowMin ?? null,
       producingMin: h.live?.timeBreakdown?.producingMin ?? null,
       plannedMin: h.live?.timeBreakdown?.plannedMin ?? null,
@@ -1999,13 +2002,14 @@ export function PublicShiftMonitorPage() {
     ...(data?.forecastHistory ?? []).map((f) => ({
       dateKey: f.dateKey,
       shiftId: parseShiftDocId(f.shiftDocId)?.shiftId ?? null,
+      total: f.total ?? null,
       windowMin: f.windowMin ?? null,
       producingMin: f.producingMin ?? null,
       plannedMin: f.plannedMin ?? null,
       recoverableMin: f.recoverableMin ?? null,
       causas: null,
     })),
-  ]), [live?.timeBreakdown, data?.shiftStats, data?.history, data?.forecastHistory,
+  ]), [live?.timeBreakdown, live?.totalPieces, data?.shiftStats, data?.history, data?.forecastHistory,
        data?.dateKey, data?.shiftId, vista?.dateKey, vista?.shiftId])
 
   /*
@@ -2028,10 +2032,9 @@ export function PublicShiftMonitorPage() {
     }),
     [turnosConocidos, ventanaPareto, turnoPareto, vista?.shiftId],
   )
-  const pareto = useMemo(
-    () => buildPareto(turnosDelPareto.map((t) => t.causas ?? null)),
-    [turnosDelPareto],
-  )
+  /* El turno ENTERO, no solo sus causas: buildPareto valoriza cada causa con
+     el cpm andando del turno en que ocurrió. */
+  const pareto = useMemo(() => buildPareto(turnosDelPareto), [turnosDelPareto])
   const paretoCtx = useMemo(() => contextoPareto(turnosDelPareto), [turnosDelPareto])
   /*
    * ⚠⚠ La tendencia mira LOS MISMOS turnos que el ranking, no más.
