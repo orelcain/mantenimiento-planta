@@ -207,6 +207,19 @@ describe('contextoPareto · el marco temporal del Pareto', () => {
     expect(c.recuperableMin).toBe(351)               // no 406
   })
 
+
+  it('⚠ el titular es la SUMA EXACTA de las causas, no el total redondeado', () => {
+    // El backend redondea cada causa a minuto: recoverableMin decía 55 y las
+    // causas sumaban 54, y esos 3 minutos reaparecían en cada frase que
+    // comparara las dos cifras («12 h 40» arriba, dueños sumando 12 h 37).
+    const c = contextoPareto([
+      { dateKey: '2026-08-14', shiftId: 'Turno Dia', windowMin: 455, producingMin: 338, plannedMin: 63,
+        recoverableMin: 55, causas: [{ reason: 'Micro Detencion', min: 30, count: 10 },
+                                     { reason: 'AGUA', min: 24, count: 1 }] },
+    ])
+    expect(c.recuperableMin).toBe(54)   // 30 + 24, no el 55 del backend
+  })
+
   it('el 100% es el tiempo TOTAL, con el convenio a la vista', () => {
     const c = contextoPareto(TURNOS)
     expect(c.ventanaMin).toBe(2950)                  // 3.415 menos los 465 del sábado
