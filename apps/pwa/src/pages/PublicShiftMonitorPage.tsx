@@ -36,7 +36,7 @@ import {
 } from '@/services/shoplogix/publicShiftMonitor.service'
 import { buildHourlyRows, peakPieces } from '@/services/shoplogix/monitorHourly'
 import { computePaceToTarget, lineMaxPerHour, type PaceToTarget } from '@/services/shoplogix/monitorPace'
-import { ventanaDeActividad, desdePrimeraPieza } from '@/services/shoplogix/monitorActividad'
+import { ventanaDeActividad, desdePrimeraPieza, piezasAntesDelArranque } from '@/services/shoplogix/monitorActividad'
 import { pinShiftEnd, unpinShiftEnd, setMonitorSetPoint } from '@/services/shoplogix/pinShiftEnd'
 import {
   buildDayComparison, optimalPace, plannedBreaks, mergeBreaks, cumulativeFromStart,
@@ -1093,8 +1093,17 @@ function CierreDelTurno({ cierre, muestras, fuente, plantSlug, shiftName, startA
       <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
         <span>
           Cierre estimado <span className="tabular-nums">{fmtWallTime(cierre)}</span>
+          {/*
+            * `duracion` se dice distinto a propósito: no es «a qué hora
+            * cerraron» sino «cuánto duraron». Es el caso de un turno sin
+            * definir en Shoplogix, donde la hora cambia día a día y lo único
+            * estable es la duración — quien lee tiene que saber de dónde sale
+            * el número para poder desconfiar de él con criterio.
+            */}
           {fuente === 'fijado'
             ? ', fijado a mano'
+            : fuente === 'duracion'
+            ? `, estimado sumando lo que duran los turnos de esta línea (${muestras ?? 0} turnos)`
             : muestras
             ? `, según los últimos ${muestras} turnos`
             : ', según el horario configurado'}.
@@ -1881,6 +1890,8 @@ export function PublicShiftMonitorPage() {
     () => ventanaDeActividad(live?.series),
     [live?.series],
   )
+  /** Piezas de la prueba de máquina que quedaron antes del arranque real. */
+  const pzAntesDelArranque = useMemo(() => piezasAntesDelArranque(live?.series), [live?.series])
   /** La serie que ven los gráficos: desde la primera pieza, como el resto. */
   const serieDelTurno = useMemo(() => desdePrimeraPieza(live?.series), [live?.series])
   /** El arranque que se anuncia: la primera pieza, con el declarado de respaldo. */
@@ -2927,8 +2938,11 @@ export function PublicShiftMonitorPage() {
 
           <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
             <span>
+              {/* El MISMO arranque que la cabecera: `effectiveStart` viene del
+                  backend y toma el primer ciclo, aunque sea un pico suelto —
+                  decía 21:45 mientras la cabecera decía 00:20. */}
               Producción real desde{' '}
-              <span className="tabular-nums text-foreground/80">{fmtWallTime(live.effectiveStart)}</span>
+              <span className="tabular-nums text-foreground/80">{fmtWallTime(inicioReal)}</span>
               {' '}hasta{' '}
               <span className="tabular-nums text-foreground/80">{fmtWallTime(live.effectiveEnd)}</span>
             </span>
@@ -3099,9 +3113,12 @@ export function PublicShiftMonitorPage() {
         */}
         {recorteActividad && serieDelTurno.length > 0 && (
           <p className="text-[11px] leading-snug text-muted-foreground">
-            Todo se cuenta desde la primera pieza. El turno estaba declarado desde las{' '}
-            <b className="text-foreground/80">{fmtWallTime(live.scheduledStart)}</b>:{' '}
-            {fmtDurationSec(recorteActividad.recortadoMin * 60)} sin actividad que no se dibujan.
+            Todo se cuenta desde que arrancó la producción. El turno estaba declarado desde
+            las <b className="text-foreground/80">{fmtWallTime(live.scheduledStart)}</b>.
+            {pzAntesDelArranque > 0 && (
+              <> Antes del arranque hubo <b className="text-foreground/80">{fmtInt(pzAntesDelArranque)} pz</b>
+              {' '}sueltas —una prueba de máquina— que siguen contando en el total pero no marcan el inicio.</>
+            )}
           </p>
         )}
 

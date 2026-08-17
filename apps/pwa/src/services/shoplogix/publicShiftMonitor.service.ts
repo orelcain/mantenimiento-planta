@@ -89,7 +89,7 @@ export interface PublicMonitorLive {
    * los turnos anteriores con el mismo nombre. `config` solo cuando el turno es
    * nuevo y todavía no tiene historia.
    */
-  plannedEndSource?: 'fijado' | 'historial' | 'config' | null
+  plannedEndSource?: 'fijado' | 'historial' | 'config' | 'duracion' | null
   /**
    * Set point operacional de la máquina, editado por un supervisor en la PWA.
    * `medidoEl`/`metodo`/`por` viajan porque la fuente es parte del dato.

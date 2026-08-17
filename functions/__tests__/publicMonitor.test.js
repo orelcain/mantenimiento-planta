@@ -20,7 +20,7 @@
 const { test } = require('node:test')
 const assert = require('node:assert')
 
-const { buildMonitorLive, currentStateOf, statusOf } = require('../publicMonitor')
+const { buildMonitorLive, currentStateOf, statusOf, inferShiftEndFromDuration } = require('../publicMonitor')
 
 /** Ahora en wall-clock de planta, que es el reloj de los datos de turno. */
 function nowWall() {
@@ -967,4 +967,58 @@ test('shiftStats descarta Unscheduled: no es un turno, es el cajon de fuera de h
   const out = await buildShiftStats(db, 'filete', actual, [], [], [])
   assert.ok(out.some(o => o.shiftDocId === bueno), 'el turno real entra')
   assert.ok(!out.some(o => o.shiftId === 'Unscheduled'), 'el cajon NO entra, ni con 600 pz')
+})
+
+/*
+ * El cierre estimado por DURACIÓN. Es el único que sirve cuando el turno no
+ * está definido en Shoplogix: su HORA de cierre cambia día a día (Filete
+ * 17-08 cerraba 08:00, el 18-08 a las 05:00) pero su DURACIÓN no.
+ */
+test('inferShiftEndFromDuration: suma la duración mediana al arranque real', async () => {
+  const turno = (id, iniIso, finIso, piezas) => ({
+    id,
+    exists: true,
+    data: () => ({
+      effectiveStart: new Date(iniIso),
+      effectiveEnd: new Date(finIso),
+      machines: [{ totalCycles: piezas }],
+    }),
+  })
+  // 5 turnos de ~452 min, los mismos números reales de Filete.
+  const docs = [
+    turno('2026-08-10_Turno Dia', '2026-08-10T07:55:00Z', '2026-08-10T15:30:00Z', 4410),
+    turno('2026-08-11_Turno Dia', '2026-08-11T08:00:00Z', '2026-08-11T15:30:00Z', 3275),
+    turno('2026-08-12_Turno Dia', '2026-08-12T07:48:00Z', '2026-08-12T15:30:00Z', 4278),
+    turno('2026-08-13_Turno Dia', '2026-08-13T07:50:00Z', '2026-08-13T15:29:00Z', 4294),
+    turno('2026-08-14_Turno Dia', '2026-08-14T07:52:00Z', '2026-08-14T15:24:00Z', 3919),
+  ]
+  const db = {
+    collection: () => ({ listDocuments: async () => docs.map((d) => ({ id: d.id })) }),
+    getAll: async (...refs) => refs.map((r) => docs.find((d) => d.id === r.id)),
+  }
+
+  const r = await inferShiftEndFromDuration(db, 'filete', new Date('2026-08-17T00:20:00Z'), '2026-08-16_Unscheduled')
+  assert.ok(r, 'debería estimar un cierre')
+  assert.equal(r.duracionMin, 455)                       // mediana de 455/450/462/459/452
+  // Arranque 00:20 + 7 h 35 → 07:55, la planta dice "hasta las 08:00 aprox".
+  assert.equal(r.end.toISOString().slice(11, 16), '07:55')
+  assert.equal(r.muestras, 5)
+})
+
+test('inferShiftEndFromDuration: sin muestras suficientes NO inventa un cierre', async () => {
+  const docs = [{
+    id: '2026-08-10_Turno Dia',
+    exists: true,
+    data: () => ({
+      effectiveStart: new Date('2026-08-10T07:55:00Z'),
+      effectiveEnd: new Date('2026-08-10T15:30:00Z'),
+      machines: [{ totalCycles: 4410 }],
+    }),
+  }]
+  const db = {
+    collection: () => ({ listDocuments: async () => docs.map((d) => ({ id: d.id })) }),
+    getAll: async (...refs) => refs.map((r) => docs.find((d) => d.id === r.id)),
+  }
+  const r = await inferShiftEndFromDuration(db, 'filete', new Date('2026-08-17T00:20:00Z'), 'x')
+  assert.equal(r, null)
 })

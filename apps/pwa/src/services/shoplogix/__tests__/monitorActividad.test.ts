@@ -5,7 +5,7 @@
  * en Shoplogix → ventana de 06:00 a ahora (16 h) para 1 h de producción.
  */
 import { describe, it, expect } from 'vitest'
-import { ventanaDeActividad, horaDelMinuto, desdePrimeraPieza, type PuntoSerie } from '../monitorActividad'
+import { ventanaDeActividad, horaDelMinuto, desdePrimeraPieza, piezasAntesDelArranque, type PuntoSerie } from '../monitorActividad'
 
 /** Serie de `n` tramos vacíos; `pone` marca piezas en índices concretos. */
 const serie = (n: number, pone: Record<number, number> = {}): PuntoSerie[] =>
@@ -120,5 +120,39 @@ describe('desdePrimeraPieza', () => {
     expect(desdePrimeraPieza([])).toEqual([])
     expect(desdePrimeraPieza(null)).toEqual([])
     expect(desdePrimeraPieza(undefined)).toEqual([])
+  })
+})
+
+/*
+ * ⚠⚠ EL CASO REAL: Filete, madrugada del 17-08-2026. La línea pasó 3 piezas a
+ * las 21:45 y arrancó en serio a las 00:20. Tomar el pico como origen metía
+ * 2 h 35 min de nada en el turno y hundía el «tiempo produciendo» al 43 %.
+ */
+describe('desdePrimeraPieza · un pico suelto no es el arranque', () => {
+  it('salta el pico aislado y arranca en la racha productiva', () => {
+    // tramo 0: 3 pz (la prueba) · nada hasta el tramo 31 (2 h 35 min después)
+    const s = serie(60, { 0: 3, 31: 60, 32: 55, 33: 70 })
+    const r = desdePrimeraPieza(s)
+    expect(r).toHaveLength(29)          // 60 − 31
+    expect(r[0]!.pieces).toBe(60)
+  })
+
+  it('las piezas de la prueba no se pierden: se pueden contar aparte', () => {
+    const s = serie(60, { 0: 3, 31: 60 })
+    expect(piezasAntesDelArranque(s)).toBe(3)
+  })
+
+  it('un hueco corto NO parte el turno: es una detención normal', () => {
+    // 25 min sin piezas en medio de la producción: eso es un paro, no un pico.
+    const s = serie(20, { 0: 40, 1: 50, 7: 45, 8: 60 })
+    expect(desdePrimeraPieza(s)).toHaveLength(20)
+    expect(piezasAntesDelArranque(s)).toBe(0)
+  })
+
+  it('varios picos seguidos: arranca después del último hueco largo', () => {
+    const s = serie(80, { 0: 5, 20: 4, 60: 70, 61: 65 })
+    const r = desdePrimeraPieza(s)
+    expect(r).toHaveLength(20)          // 80 − 60
+    expect(piezasAntesDelArranque(s)).toBe(9)
   })
 })

@@ -108,11 +108,49 @@ export function horaDelMinuto(
  */
 export function desdePrimeraPieza<T extends PuntoSerie>(
   series: readonly T[] | null | undefined,
+  { huecoMaxMin = 60 }: { huecoMaxMin?: number } = {},
 ): T[] {
   if (!series || series.length === 0) return []
-  const i = series.findIndex((p) => (p.pieces ?? 0) > 0)
+  const i = arranqueProductivo(series, huecoMaxMin)
   /* Sin una sola pieza se devuelve la serie tal cual: un turno que no produjo
      nada sigue siendo un turno, y su gráfico plano es la información. */
   if (i <= 0) return [...series]
   return series.slice(i)
+}
+
+/**
+ * Índice donde arranca la producción DE VERDAD.
+ *
+ * ⚠ No basta con «la primera pieza». La madrugada del 17-08 la línea de Filete
+ * pasó **3 piezas a las 21:45** y recién arrancó en serio a las 00:20: tomar
+ * ese pico aislado como origen metía 2 h 35 min de nada en el turno, hundía el
+ * «tiempo produciendo» del 100 % al 43 % y corría el cierre estimado casi tres
+ * horas. Un pico suelto es una prueba de máquina o un ajuste, no el arranque.
+ *
+ * La regla: si tras el primer tramo con piezas viene un hueco de más de
+ * `huecoMaxMin` sin nada, el arranque es el bloque siguiente. Las piezas de la
+ * prueba NO se pierden — el total del turno las sigue contando, solo dejan de
+ * definir el origen del eje.
+ */
+function arranqueProductivo(series: readonly PuntoSerie[], huecoMaxMin: number): number {
+  const conPiezas: number[] = []
+  series.forEach((p, i) => { if ((p.pieces ?? 0) > 0) conPiezas.push(i) })
+  if (conPiezas.length === 0) return -1
+
+  let inicio = conPiezas[0]!
+  for (let k = 1; k < conPiezas.length; k++) {
+    const huecoMin = (conPiezas[k]! - conPiezas[k - 1]! - 1) * PASO_MIN
+    if (huecoMin > huecoMaxMin) inicio = conPiezas[k]!   // lo de antes fue un pico suelto
+    else break                                            // ya empezó la racha buena
+  }
+  return inicio
+}
+
+/** Piezas que quedaron antes del arranque productivo (la prueba de máquina). */
+export function piezasAntesDelArranque(series: readonly PuntoSerie[] | null | undefined,
+  { huecoMaxMin = 60 }: { huecoMaxMin?: number } = {}): number {
+  if (!series || series.length === 0) return 0
+  const i = arranqueProductivo(series, huecoMaxMin)
+  if (i <= 0) return 0
+  return series.slice(0, i).reduce((a, p) => a + (p.pieces ?? 0), 0)
 }
