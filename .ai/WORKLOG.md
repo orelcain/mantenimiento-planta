@@ -1,3 +1,16 @@
+## 2026-08-16 · Fix: la tendencia del Pareto pierde el color (PR #602)
+
+`bg-ink-warn` tenía dos sentidos en el mismo bloque: en las filas del
+ranking «pérdida de Mantención» (`DUENO_UI`), en la tira «Cómo viene
+turno a turno» «peor que la mediana». Las 10 barras quedan en un solo
+gris neutro (`bg-muted-foreground/[0.45]`); la mediana punteada sube de
+`/[0.5]` a `/[0.75]` como única señal de comparación. El ámbar queda
+con un solo significado en todo el bloque.
+
+Verificado: 438 tests verdes, tsc/eslint limpios, audit-piel OK; 375 px
+en ambos temas. Merge commit `77f72b8c` en main, deploy confirmado en
+GitHub Pages (`buildSha: 77f72b8`).
+
 ## 2026-08-16 · Tendencia del Pareto muestra % y ≈pz de cada turno (PR #600)
 
 La tira «Cómo viene turno a turno» era lo único del bloque de Pareto que
