@@ -1,3 +1,26 @@
+## 2026-08-17 · Monitor: el turno empieza en la primera pieza, no en el primer tramo sincronizado (PR #612)
+
+Reemplaza el auto-zoom del PR #610 (lo causaba desalineado): `monitorHourly.ts`
+y `monitorCompare.ts` decían en comentarios «arranca en la primera pieza» pero
+tomaban el primer tramo sincronizado. Con Filete `Unscheduled` (ventana desde
+06:00) la serie arrancaba 09:45 y la primera pieza 21:45 → «hora por hora»
+mostraba 12 filas en cero y el comparador quedaba corrido 12 h (ningún día de
+referencia «llegaba a la altura» del turno). Nuevo `desdePrimeraPieza()` en
+`monitorActividad.ts` (recorta solo por delante, conserva la cola vacía),
+usado en `buildHourlyRows`, `cumulativeFromStart`, los 6 usos de
+`live.series[0].t` en `PublicShiftMonitorPage.tsx` y el rótulo de
+`MonitorShiftParts.tsx`. También corrige el bloque «¿se llega a la meta?»:
+mensaje distinto para turno `Unscheduled` (nunca cierra 2 turnos con ese
+nombre) y el botón «Fijar cierre» ya no queda inalcanzable en ese estado.
+
+Verificado con turno real de Filete de madrugada: hora por hora de 16 filas
+(12 en cero) a 5; comparador ahora compara («6 días anteriores de 2.074 a
+2.668»); 1495 tests verdes (105 archivos); tsc/eslint limpios. Merge commit
+`d2711130` en main, deploy confirmado en GitHub Pages (`buildSha: d271113`).
+
+⚠️ Este archivo sigue sobre los ~150 KB recomendados (ahora ~213 KB) —
+compactar entradas antiguas en la próxima sesión de mantenimiento.
+
 ## 2026-08-17 · Monitor: los gráficos parten donde la línea arrancó, no donde dice el turno (PR #610)
 
 Filete de noche llega sin turno definido (`Unscheduled`), y la ventana
