@@ -407,9 +407,11 @@ export function ParetoDeParadas({
           <div className="relative mt-3 h-[120px]">
             {/* La mediana, para tener contra qué comparar cada barra. Su cifra
                 va en el encabezado: flotando sobre la línea pisaba el % de la
-                barra que quedara debajo. */}
+                barra que quedara debajo.
+                Se dibuja más marcada desde que las barras son todas grises: es
+                la ÚNICA señal de quién está sobre lo habitual. */}
             {serie.banda && (
-              <div className="absolute inset-x-0 border-t border-dashed border-muted-foreground/[0.5]"
+              <div className="absolute inset-x-0 border-t border-dashed border-muted-foreground/[0.75]"
                 style={{ bottom: `${(serie.banda.mediana / maxPct) * 100}%` }} />
             )}
             <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-[3px]">
@@ -434,10 +436,18 @@ export function ParetoDeParadas({
                         )}
                       </>
                     )}
+                    {/*
+                      * Barras SIN color a propósito: en las filas de arriba el
+                      * ámbar significa «es de Mantención» (DUENO_UI), y aquí
+                      * significaba «peor que la mediana» — el mismo token con
+                      * dos sentidos a diez centímetros. Quién está sobre la
+                      * mediana ya lo dice la punteada, así que el ámbar queda
+                      * con un solo significado en todo el bloque.
+                      */}
                     <div
                       className={hueco
                         ? 'w-full max-w-[26px] rounded-t-[3px] border border-dashed border-muted-foreground/[0.4]'
-                        : `w-full max-w-[26px] rounded-t-[3px] ${p.pct > (serie.banda?.mediana ?? 0) ? 'bg-ink-warn' : 'bg-muted-foreground/[0.45]'}`}
+                        : 'w-full max-w-[26px] rounded-t-[3px] bg-muted-foreground/[0.45]'}
                       style={{ height: hueco ? '8px' : `${Math.max(3, (p.pct / maxPct) * 80)}px` }}
                       title={hueco
                         ? `${nombreDeDia(p.dateKey)}: la línea no produjo`
