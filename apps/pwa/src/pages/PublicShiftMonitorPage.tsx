@@ -2365,8 +2365,31 @@ export function PublicShiftMonitorPage() {
         recoverableMin: tb.recoverableMin,
       })
     }
+    /*
+     * ⚠⚠ Y por último `shiftStats`, que es el ÚNICO que trae TODOS los nombres
+     * de turno (40 turnos livianos). `forecastHistory` se publica solo para el
+     * turno VIGENTE, así que al mirar el otro —el diurno mientras corre la
+     * noche, o al revés— la muestra se quedaba corta y la banda de «rango
+     * normal» desaparecía justo cuando Filete pasó a tener dos turnos. Va al
+     * final porque las otras dos fuentes traen más detalle por turno.
+     */
+    for (const t of data?.shiftStats ?? []) {
+      const shiftId = t.shiftId ?? null
+      if (por.has(clave(t.dateKey, shiftId))) continue
+      if (!mismo(shiftId)) continue
+      if (t.windowMin == null || t.producingMin == null) continue
+      por.set(clave(t.dateKey, shiftId), {
+        dateKey: t.dateKey,
+        shiftId,
+        total: t.total ?? 0,
+        producingMin: t.producingMin,
+        windowMin: t.windowMin,
+        plannedMin: t.plannedMin ?? 0,
+        recoverableMin: t.recoverableMin ?? 0,
+      })
+    }
     return [...por.values()]
-  }, [data?.history, data?.forecastHistory, vista?.shiftId])
+  }, [data?.history, data?.forecastHistory, data?.shiftStats, vista?.shiftId])
 
   /*
    * ⚠ Solo con el turno CERRADO: a mitad de turno el término «duración»
@@ -2424,7 +2447,14 @@ export function PublicShiftMonitorPage() {
   )
 
   const ritmoAndando = useMemo(() => {
-    const previos = (data?.forecastHistory ?? [])
+    /*
+     * ⚠ Del MISMO turno: este ritmo alimenta el techo («lo que esta línea
+     * demostró que puede»). Con día y noche corriendo, mezclarlos le pondría
+     * al diurno un techo hecho con nocturnos, que trabajan otra dotación y
+     * otra materia prima. `resumenesAnteriores` ya viene filtrado por el turno
+     * VISTO y trae las tres fuentes, incluido `shiftStats`.
+     */
+    const previos = resumenesAnteriores
       .filter((h) => h.producingMin > 0 && h.total > 0)
       .map((h) => h.total / h.producingMin)
       .sort((a, b) => a - b)
@@ -2437,7 +2467,7 @@ export function PublicShiftMonitorPage() {
       mejor: previos[previos.length - 1]!,
       muestras: previos.length,
     }
-  }, [live?.uptimeSec, live?.totalPieces, data?.forecastHistory])
+  }, [live?.uptimeSec, live?.totalPieces, resumenesAnteriores])
 
   /*
    * Ritmo necesario para llegar a la meta. Se recalcula con el mismo reloj que
@@ -2575,8 +2605,26 @@ export function PublicShiftMonitorPage() {
        */
       todayDateKey: vista?.dateKey ?? '',
       todayShiftId: vista?.shiftId ?? null,
-      previous: (data?.history ?? [])
-        .filter((h) => !(h.dateKey === vista?.dateKey && h.shiftId === vista?.shiftId))
+      /*
+       * ⚠⚠ MISMO TURNO CONTRA MISMO TURNO. Desde que Filete tiene día y noche,
+       * comparar el diurno contra un nocturno mezcla dos procesos distintos
+       * (otra dotación, otra materia prima, otro horario) y el gráfico no lo
+       * avisaba: la etiqueta solo distingue el turno si dos filas comparten
+       * dateKey, y el nocturno cae en otro día.
+       *
+       * El filtro va acá y NO en `buildDayComparison`: Yal corre tres turnos
+       * por jornada y los compara ENTRE SÍ a propósito (hay test que lo fija).
+       * Si no quedan turnos del mismo nombre —una línea recién partida— se cae
+       * a todos, que es mejor que un gráfico vacío.
+       */
+      previous: (() => {
+        const otros = (data?.history ?? [])
+          .filter((h) => !(h.dateKey === vista?.dateKey && h.shiftId === vista?.shiftId))
+        const mismos = vista?.shiftId
+          ? otros.filter((h) => !h.shiftId || h.shiftId === vista.shiftId)
+          : otros
+        return (mismos.length > 0 ? mismos : otros)
+      })()
         .map((h) => ({
           dateKey: h.dateKey, shiftId: h.shiftId, series: h.live?.series,
         })),
@@ -2613,7 +2661,8 @@ export function PublicShiftMonitorPage() {
     const historial = resumidos.length > 0
       ? resumidos
       : (data?.history ?? [])
-          .filter((h) => h.shiftId === data?.shiftId)
+          /* `vista`, no `data`: el turno que se está MIRANDO, no el vigente. */
+      .filter((h) => h.shiftId === vista?.shiftId)
           .map((h) => ({
             curve: cumulativeFromStart(h.live?.series),
             totalPieces: h.live?.totalPieces ?? 0,
@@ -2625,7 +2674,7 @@ export function PublicShiftMonitorPage() {
       targetPieces: metaFc,
       shiftClosed: live?.shiftClosed,
     })
-  }, [live, data?.history, data?.forecastHistory, data?.shiftId, data?.targetPieces, comparacion.currentMinute])
+  }, [live, data?.history, data?.forecastHistory, data?.targetPieces, comparacion.currentMinute, vista?.shiftId])
 
   /**
    * Hasta cuándo mide el pronóstico, y cuánto sería si el turno cortara en su

@@ -418,10 +418,18 @@ export function buildDayComparison(args: {
    */
   const porFecha = new Map<string, number>()
   for (const d of days) porFecha.set(d.dateKey, (porFecha.get(d.dateKey) ?? 0) + 1)
+  /*
+   * ⚠ También cuando hay MÁS DE UN NOMBRE de turno en la muestra, aunque cada
+   * uno caiga en una fecha distinta. En Filete el nocturno arranca pasada la
+   * medianoche, así que tiene su propio dateKey: contando solo fechas
+   * repetidas, «jue 14» podía ser un diurno y «vie 15» un nocturno y nada en
+   * pantalla lo decía. Comparar dos procesos distintos sin avisarlo es peor
+   * que no compararlos.
+   */
+  const nombres = new Set(days.map((d) => d.shiftId).filter(Boolean))
+  const variosTurnos = nombres.size > 1
   for (const d of days) {
-    // Se cuenta por FECHA y no por etiqueta: el turno anterior de hoy compite
-    // con la fila "Hoy", que se llama distinto pero es el mismo día.
-    if ((porFecha.get(d.dateKey) ?? 0) < 2) continue
+    if (!variosTurnos && (porFecha.get(d.dateKey) ?? 0) < 2) continue
     const t = etiquetaTurno(d.shiftId)
     if (t) d.label = `${d.label} ${t}`
   }

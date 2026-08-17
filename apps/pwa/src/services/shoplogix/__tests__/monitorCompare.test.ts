@@ -358,6 +358,25 @@ describe('etiquetas de los días comparados', () => {
     expect(r.days.slice(1).map((d) => d.label)).toEqual(['lun 10 T1', 'lun 10 T2', 'lun 10 T3'])
   })
 
+  /*
+   * ⚠⚠ EL CASO FILETE (17-08-2026): el nocturno arranca pasada la medianoche,
+   * así que cae en OTRO dateKey. Contando solo fechas repetidas, «dom 16» podía
+   * ser un diurno y «lun 17» un nocturno, y nada en pantalla lo decía.
+   */
+  it('distingue el turno aunque cada uno caiga en una fecha distinta', () => {
+    const r = buildDayComparison({
+      todaySeries: hoy, todayDateKey: '2026-08-17', todayShiftId: 'Turno Dia',
+      previous: [
+        { dateKey: '2026-08-17', shiftId: 'Turno Noche L', series: otro },
+        { dateKey: '2026-08-14', shiftId: 'Turno Dia', series: otro },
+      ],
+      maxDays: 6,
+    })
+    const labels = r.days.slice(1).map((d) => d.label)
+    expect(labels.some((l) => l.includes('noche l'))).toBe(true)
+    expect(labels.some((l) => l.includes('dia'))).toBe(true)
+  })
+
   it('con un turno por día la etiqueta queda corta — no se agrega nada', () => {
     const r = buildDayComparison({
       todaySeries: hoy, todayDateKey: '2026-08-12',
