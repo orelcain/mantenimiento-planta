@@ -36,6 +36,7 @@ import {
 } from '@/services/shoplogix/publicShiftMonitor.service'
 import { buildHourlyRows, peakPieces } from '@/services/shoplogix/monitorHourly'
 import { computePaceToTarget, lineMaxPerHour, type PaceToTarget } from '@/services/shoplogix/monitorPace'
+import { ventanaDeActividad, horaDelMinuto } from '@/services/shoplogix/monitorActividad'
 import { pinShiftEnd, unpinShiftEnd, setMonitorSetPoint } from '@/services/shoplogix/pinShiftEnd'
 import {
   buildDayComparison, optimalPace, plannedBreaks, mergeBreaks, cumulativeFromStart,
@@ -1826,6 +1827,40 @@ export function PublicShiftMonitorPage() {
 
   const vista = vistas[idx] ?? null
   const live = vista?.live ?? null
+
+  /*
+   * ── El eje arranca donde la línea arrancó ──────────────────────────────
+   *
+   * La ventana del turno la declara Shoplogix y cuando el turno no está
+   * definido (Filete de noche llega como `Unscheduled`) va de las 06:00 a
+   * ahora: 16 h de eje para 1 h de producción, con la actividad aplastada
+   * contra el borde. Al abrir se propone la ventana de actividad — la misma
+   * que mueve el pellizco, así que alejarse la deshace y no hay estado nuevo
+   * que mantener.
+   *
+   * `autoAplicada` guarda QUÉ turno se ajustó solo: sin eso, cada refresco
+   * de datos volvería a encuadrar y el gráfico se resistiría a que lo muevan.
+   */
+  const [autoAplicada, setAutoAplicada] = useState<string | null>(null)
+  const recorteActividad = useMemo(
+    () => ventanaDeActividad(live?.series),
+    [live?.series],
+  )
+  const claveTurno = `${vista?.dateKey ?? ''}|${vista?.shiftId ?? ''}`
+  useEffect(() => {
+    if (!recorteActividad || autoAplicada === claveTurno) return
+    setAutoAplicada(claveTurno)
+    setVentanaGrafica({ desdeMin: recorteActividad.desdeMin, hastaMin: recorteActividad.hastaMin })
+  }, [recorteActividad, claveTurno, autoAplicada])
+  /*
+   * El aviso acompaña a CUALQUIER ventana aplicada, no solo al encuadre exacto
+   * que propusimos: `useZoomGesto` recorta la ventana ajena a su propio dominio
+   * y la republica con otros minutos, así que comparar por igualdad dejaba el
+   * aviso invisible justo cuando el eje sí estaba recortado. Solo desaparece
+   * cuando se mira el turno entero (ventana en null).
+   */
+  const conRecorteAuto = Boolean(recorteActividad && ventanaGrafica)
+
   const esActual = idx === 0
 
   /* Supervisor logueado mirando el monitor: puede editar el set point inline
@@ -3021,6 +3056,30 @@ export function PublicShiftMonitorPage() {
               )}
             </p>
           </section>
+        )}
+
+{/*
+          Recortar el eje sin decirlo haría creer que el turno entero fue
+          así de corto. Se dice qué se está mirando y se ofrece la salida.
+        */}
+        {conRecorteAuto && recorteActividad && (
+          <p className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] leading-snug text-muted-foreground">
+            <span>
+              Los gráficos parten en{' '}
+              <b className="text-foreground/80">
+                {horaDelMinuto(live.series, recorteActividad.desdeMin, fmtWallTime) ?? '—'}
+              </b>
+              , cuando la línea registró la primera pieza. El turno declarado empieza antes
+              ({fmtDurationSec(recorteActividad.recortadoMin * 60)} sin actividad).
+            </span>
+            <button
+              type="button"
+              onClick={() => setVentanaGrafica(null)}
+              className="min-h-[44px] shrink-0 text-brand-ink underline decoration-dotted underline-offset-2"
+            >
+              ver el turno completo
+            </button>
+          </p>
         )}
 
         {/*
