@@ -1,3 +1,25 @@
+## 2026-08-17 · Monitor: una sola regla de ritmo en vez de seis cifras sueltas (PR #624)
+
+Convivían 6 cifras de ritmo (acumulado del turno, de reloj, pz/h, últimos
+30 min, «N pz/min ahora» dentro del gráfico, media de 15) sin jerarquía, y a
+veces discrepaban entre sí (tarjeta 4,6 vs gráfico 2,1 en el mismo instante).
+El bug era de parentesco: la media móvil se calculaba dentro del componente
+del gráfico. Fix: nuevo `monitorRitmo.ts` como única fuente de la media
+móvil; una sola tarjeta con el ritmo de ahora como protagonista, mostrado
+como regla (relleno = ritmo, marca = promedio del turno, borde = techo de la
+máquina) en vez de aritmética mental; estado también en palabra («va
+lento»/«a ritmo»/«casi parada»), no solo color. Salieron de pantalla: tarjeta
+«Últimos N min», delta «▼ por debajo del ritmo del turno» (ahora es la
+distancia visual en la regla), el «N pz/min ahora» duplicado del gráfico, y
+el pz/h de reloj (sigue en hora-por-hora y exportaciones). Verificado con
+turno real: de 6 cifras a 1; 1511 tests verdes (12 nuevos), tsc/eslint
+limpios, `audit-piel.mjs` sin crecer deuda. Revisado a 375 px en ambos temas.
+Merge commit `73ed94d0` en main (squash), deploy confirmado en GitHub Pages
+(`buildSha: 73ed94d`).
+
+⚠️ Este archivo pasó los ~150 KB de referencia (216 KB) — conviene
+compactar entradas viejas en la próxima sesión de mantenimiento.
+
 ## 2026-08-17 · Monitor: ejes legibles, sin doble estado en turno cerrado, ritmo con periodo claro (PR #622)
 
 Los ejes de los dos gráficos y del detalle de paradas estaban a 9 px, bajo el
