@@ -610,6 +610,65 @@ async function inferShiftEndFromHistory(db, plantSlug, shiftId, scheduledStart, 
   }
 }
 
+/**
+ * Cierre estimado a partir de la DURACIÓN típica de la línea, no de la hora.
+ *
+ * ⚠ Por qué hace falta: `inferShiftEndFromHistory` aprende la HORA de cierre de
+ * los turnos con el mismo nombre, y eso no sirve para un tramo `Unscheduled`
+ * —que además descarta a propósito—. En Filete el turno noche no está definido
+ * en Shoplogix y su horario CAMBIA de un día para otro (17-08: 00:00→08:00;
+ * 18-08: 21:00→05:00; el de día 09:00→17:00). La hora de cierre es distinta
+ * cada vez; lo que se mantiene es cuánto DURA: los 11 turnos productivos de la
+ * línea miden entre 449 y 461 min, con mediana 452 (7 h 32).
+ *
+ * Sumada al arranque real, esa mediana da 07:52 / 04:32 / 16:32 para los tres
+ * casos de arriba — dentro de media hora de lo que dice la planta, y sin que
+ * nadie tenga que configurar nada a diario.
+ *
+ * Devuelve null si no hay al menos MIN_MUESTRAS_DURACION turnos con producción
+ * real: con menos, una duración rara fijaría la referencia entera.
+ */
+const MIN_MUESTRAS_DURACION = 4
+
+async function inferShiftEndFromDuration(db, plantSlug, scheduledStart, currentShiftDocId) {
+  if (!scheduledStart) return null
+  try {
+    const refs = await db.collection(`shoplogix/${plantSlug}/shifts`).listDocuments()
+    /* Acá SÍ entran todos los nombres: se mide cuánto dura un turno de esta
+       línea, no cuándo cierra uno que se llame igual. */
+    const otros = refs.filter((r) => r.id !== currentShiftDocId && !/unscheduled/i.test(r.id))
+    if (otros.length === 0) return null
+    otros.sort((a, b) => b.id.localeCompare(a.id))
+    const snaps = await db.getAll(...otros.slice(0, HISTORIAL_TURNOS * 2))
+
+    const duraciones = []
+    for (const snap of snaps) {
+      if (!snap.exists) continue
+      const d = snap.data() || {}
+      const piezas = (d.machines || []).reduce((a, m) => a + (m.totalCycles || 0), 0)
+      if (piezas < MIN_PIEZAS_HISTORIAL) continue
+      const ini = toDate(d.effectiveStart) ?? toDate(d.scheduledStart)
+      const fin = toDate(d.effectiveEnd) ?? toDate(d.scheduledEnd)
+      if (!ini || !fin) continue
+      const min = Math.round((fin.getTime() - ini.getTime()) / 60000)
+      if (min > 60 && min < 16 * 60) duraciones.push(min)
+    }
+    if (duraciones.length < MIN_MUESTRAS_DURACION) return null
+
+    duraciones.sort((a, b) => a - b)
+    const m = Math.floor(duraciones.length / 2)
+    const mediana = duraciones.length % 2 === 0
+      ? Math.round((duraciones[m - 1] + duraciones[m]) / 2)
+      : duraciones[m]
+
+    const ini = toDate(scheduledStart)
+    if (!ini) return null
+    return { end: new Date(ini.getTime() + mediana * 60000), muestras: duraciones.length, duracionMin: mediana }
+  } catch {
+    return null
+  }
+}
+
 /** "Turno Dia" y "Turno día" son el mismo turno: se comparan sin tildes. */
 function normShiftName(s) {
   return String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
@@ -1122,6 +1181,26 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
 
   const series = seriesAll.slice(-SERIES_MAX_POINTS)
 
+  /*
+   * El arranque PRODUCTIVO: el primer bucket con piezas, saltando picos
+   * sueltos. La madrugada del 17-08 la línea pasó 3 piezas a las 21:45 y
+   * arrancó de verdad a las 00:20; tomar el pico como arranque corría el
+   * cierre estimado casi tres horas. Misma regla que el cliente
+   * (`monitorActividad.desdePrimeraPieza`), y el mismo umbral.
+   */
+  const HUECO_ARRANQUE_MIN = 60
+  const arranqueProductivo = (() => {
+    const conPz = seriesAll.filter((p) => (p.pieces || 0) > 0)
+    if (conPz.length === 0) return null
+    let elegido = conPz[0]
+    for (let i = 1; i < conPz.length; i++) {
+      const huecoMin = (Date.parse(conPz[i].t) - Date.parse(conPz[i - 1].t)) / 60000 - INTERVAL_MIN
+      if (huecoMin > HUECO_ARRANQUE_MIN) elegido = conPz[i]
+      else break
+    }
+    return toDate(elegido.t)
+  })()
+
   // Cadencia reciente: últimos 30 min de intervalos sincronizados. Cero es un
   // dato válido y buscado (la línea está parada AHORA), no un hueco.
   const recentSlice = seriesAll.slice(-RECENT_INTERVALS)
@@ -1225,6 +1304,24 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
     } else if (cfg.plannedEnd) {
       plannedEnd = cfg.plannedEnd
       plannedEndSource = 'config'
+    } else {
+      /*
+       * Último recurso, y el único que sirve cuando el turno NO está definido
+       * en Shoplogix: estimar por DURACIÓN típica de la línea. Va al final a
+       * propósito — un horario real, aprendido o configurado, siempre le gana
+       * a una duración promediada.
+       */
+      /* Se cuenta desde que la línea ARRANCÓ, no desde el horario declarado:
+         para un `Unscheduled` ese horario es el borde de la ventana (06:00) y
+         sumarle la duración daría un cierre a media tarde. */
+      const porDuracion = await inferShiftEndFromDuration(
+        db, plantSlug, arranqueProductivo ?? scheduledStart, shiftDocId,
+      )
+      if (porDuracion) {
+        plannedEnd = porDuracion.end
+        plannedEndSource = 'duracion'
+        plannedEndSamples = porDuracion.muestras
+      }
     }
   }
 
@@ -1847,6 +1944,7 @@ module.exports = {
   buildMonitorHistory,
   buildForecastHistory,
   buildShiftStats,
+  inferShiftEndFromDuration,
   buildMonitorPatch,
   resolveCurrentShiftDocId,
   ensureLineMonitor,
