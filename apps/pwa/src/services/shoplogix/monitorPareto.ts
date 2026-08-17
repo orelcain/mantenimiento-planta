@@ -246,7 +246,7 @@ export interface ContextoPareto {
   /** Turnos sin un minuto produciendo: no entran en la serie, pero existieron. */
   sinProduccion: string[]
   /** Banda de lo habitual (cuartiles de la serie). null con menos de 4 puntos. */
-  banda: { bajo: number; alto: number; mediana: number } | null
+  banda: { bajo: number; alto: number; mediana: number; medianaPiezas: number } | null
   /** El promedio simple. Solo para explicar por qué NO se usa como referencia. */
   promedio: number | null
   /**
@@ -340,8 +340,20 @@ export function contextoPareto(turnos: TurnoCtx[]): ContextoPareto {
 
   const orden = serie.map((p) => p.pct).sort((a, b) => a - b)
   const promedio = orden.length > 0 ? orden.reduce((a, v) => a + v, 0) / orden.length : null
+  /*
+   * ⚠ La mediana de piezas se calcula sobre SU PROPIA serie ordenada, no
+   * aplicándole el % mediano al turno promedio: el turno del % mediano y el de
+   * las piezas medianas no tienen por qué ser el mismo (un turno lento pierde
+   * menos piezas con el mismo %).
+   */
+  const ordenPz = serie.map((p) => p.piezas).sort((a, b) => a - b)
   const banda = orden.length >= 4
-    ? { bajo: cuartil(orden, 0.25), alto: cuartil(orden, 0.75), mediana: cuartil(orden, 0.5) }
+    ? {
+        bajo: cuartil(orden, 0.25),
+        alto: cuartil(orden, 0.75),
+        mediana: cuartil(orden, 0.5),
+        medianaPiezas: cuartil(ordenPz, 0.5),
+      }
     : null
 
   /*

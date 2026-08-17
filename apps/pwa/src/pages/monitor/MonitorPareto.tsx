@@ -33,6 +33,29 @@ const fmtPzCentena = (n: number) => nf.format(Math.round(n / 100) * 100)
 /* Piezas para columnas de ~30 px: sobre mil pasa a «1,2k» o no cabe. */
 const fmtPzCorto = (n: number) =>
   n >= 1000 ? `${(n / 1000).toFixed(1).replace('.', ',')}k` : nf.format(Math.round(n / 10) * 10)
+/*
+ * Reparte 100,0% entre las filas por MAYOR RESTO. Redondear cada share por su
+ * cuenta deja la columna en 99,9 o 100,1 y quien suma las filas —que es
+ * exactamente lo que hace un supervisor— encuentra la falla. Ya pasó con los
+ * dueños y con el titular del bloque.
+ */
+function repartir100(valores: number[]): number[] {
+  const total = valores.reduce((a, v) => a + v, 0)
+  if (!(total > 0)) return valores.map(() => 0)
+  const exactos = valores.map((v) => (v / total) * 1000)
+  const pisos = exactos.map((e) => Math.floor(e))
+  let sobran = 1000 - pisos.reduce((a, v) => a + v, 0)
+  const orden = exactos
+    .map((e, i) => ({ i, resto: e - Math.floor(e) }))
+    .sort((a, b) => b.resto - a.resto)
+  for (const { i } of orden) {
+    if (sobran <= 0) break
+    pisos[i]! += 1
+    sobran -= 1
+  }
+  return pisos.map((p) => p / 10)
+}
+
 /** «≈ 2 turnos de producción», a medio turno — nunca «2,04». */
 const fmtTurnosEq = (pz: number, pzPorTurno: number) => {
   if (!(pzPorTurno > 0)) return null
@@ -84,6 +107,9 @@ export function ParetoDeParadas({
   const turnosMedidos = ctx?.turnos ?? pareto.shifts
   /* La barra mide lo que la cifra dice: piezas (minutos solo si no hay cpm). */
   const max = Math.max(pareto.rows[0]!.piezas, pareto.rows[0]!.minutes)
+  /* Los % de las filas, repartidos de una sola vez sobre TODAS: si se
+     repartieran solo entre las visibles, el total cambiaría al desplegar. */
+  const pctFilas = repartir100(pareto.rows.map((r) => r.piezas))
   const vitales = pareto.rows.slice(0, Math.max(1, pareto.vitalCount))
   const cronicas = vitales.filter((r) => r.shifts >= Math.ceil(pareto.shifts / 2))
   /* La serie mira más atrás que el ranking (10 turnos contra 6): si no llega,
@@ -276,7 +302,7 @@ export function ParetoDeParadas({
                 corrido, y el «resto» sonaba a sobra en vez de a cola larga. */}
             <div className={i > 0 ? 'border-t border-border/50' : ''}>
               <FilaPareto
-                r={r} max={max} turnos={turnosMedidos}
+                r={r} max={max} turnos={turnosMedidos} pct={pctFilas[i] ?? r.sharePct}
                 abierta={abierta === r.label}
                 onToggle={() => setAbierta((v) => (v === r.label ? null : r.label))}
               />
@@ -362,7 +388,11 @@ export function ParetoDeParadas({
                     className="underline decoration-dotted underline-offset-2 text-brand-ink"
                     aria-expanded={porQueMediana}
                   >
-                    mediana <span className="tabular-nums">{fmtDec1(serie.banda.mediana)}%</span> ⓘ
+                    mediana{' '}
+                    <span className="tabular-nums">
+                      {fmtDec1(serie.banda.mediana)}%
+                      {serie.banda.medianaPiezas > 0 && ` · ≈${fmtPzDecena(serie.banda.medianaPiezas)} pz`}
+                    </span> ⓘ
                   </button>
                 </>
               )}
@@ -405,15 +435,9 @@ export function ParetoDeParadas({
           )}
 
           <div className="relative mt-3 h-[120px]">
-            {/* La mediana, para tener contra qué comparar cada barra. Su cifra
-                va en el encabezado: flotando sobre la línea pisaba el % de la
-                barra que quedara debajo.
-                Se dibuja más marcada desde que las barras son todas grises: es
-                la ÚNICA señal de quién está sobre lo habitual. */}
-            {serie.banda && (
-              <div className="absolute inset-x-0 border-t border-dashed border-muted-foreground/[0.75]"
-                style={{ bottom: `${(serie.banda.mediana / maxPct) * 100}%` }} />
-            )}
+            {/* Sin línea de mediana: cruzaba justo a la altura de los números
+                de las barras bajas y ensuciaba más de lo que informaba (Orel,
+                16-08). Su valor va en el encabezado, en % y en piezas. */}
             <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-[3px]">
               {[
                 ...serie.serie.map((p): { p: PuntoTendencia; hueco: boolean } => ({ p, hueco: false })),
@@ -492,10 +516,12 @@ export function ParetoDeParadas({
   )
 }
 
-function FilaPareto({ r, max, turnos, abierta, onToggle }: {
+function FilaPareto({ r, max, turnos, pct, abierta, onToggle }: {
   r: ParetoResult['rows'][number]
   max: number
   turnos: number
+  /** Su % del total de piezas, ya repartido para que la columna sume 100,0. */
+  pct: number
   abierta: boolean
   onToggle: () => void
 }) {
@@ -526,15 +552,18 @@ function FilaPareto({ r, max, turnos, abierta, onToggle }: {
         <span className="flex items-baseline justify-between gap-2">
           <span className="min-w-0 truncate text-[13px] text-foreground">{r.label}</span>
           {/*
-            * Las PIEZAS mandan y los minutos acompañan en el slot que tenía el
-            * % (mockup: dos números, no tres). El % de fila sale: junto a una
-            * cifra de piezas recrearía el problema de dos denominadores que
-            * este bloque ya arregló.
+            * Los DOS números que pidió Orel: piezas y su % — y el % es del
+            * TOTAL DE PIEZAS del bloque (`sharePct`), el mismo ≈7.000 del
+            * héroe, así que la columna suma 100% y se verifica sumando filas.
+            * Un solo denominador: los minutos bajan a la línea de abajo antes
+            * que convivir con un segundo porcentaje.
             */}
           <span className="shrink-0 text-[13px] tabular-nums font-semibold text-foreground">
             {r.piezas > 0 ? <>≈{fmtPzDecena(r.piezas)} pz</> : fmtMin(r.minutes)}
             {r.piezas > 0 && (
-              <span className="ml-1.5 font-normal text-muted-foreground">{fmtMin(r.minutes)}</span>
+              <span className="ml-1.5 font-normal text-muted-foreground">
+                {fmtDec1(pct)}%
+              </span>
             )}
           </span>
         </span>
@@ -555,6 +584,11 @@ function FilaPareto({ r, max, turnos, abierta, onToggle }: {
             <span className="tabular-nums text-muted-foreground">
               {fmtInt(r.count)} {r.count === 1 ? 'parada' : 'paradas'}
             </span>
+          )}
+          {/* Los minutos siguen a la vista, un escalón más abajo: son el dato
+              que el mecánico usa en terreno, aunque la gestión hable en pz. */}
+          {r.piezas > 0 && (
+            <span className="tabular-nums text-muted-foreground">{fmtMin(r.minutes)}</span>
           )}
           {agrupa && (
             <span className="ml-auto shrink-0 text-brand-ink">
