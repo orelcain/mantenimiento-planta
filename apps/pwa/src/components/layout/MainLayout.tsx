@@ -42,7 +42,7 @@ import { signOut } from '@/services/auth'
 import { cn } from '@/lib/utils'
 import { HelpButton, HelpModal, WelcomeModal } from '@/components/help'
 import { APP_VERSION } from '@/constants/version'
-import { formatBuildLabel, formatBuildDateShort, formatUpdatedLabel } from '@/constants/buildInfo'
+import { formatBuildLabel, formatBuildDateShort, formatUpdatedLabel, formatDesfase, formatHora } from '@/constants/buildInfo'
 import { useAppVersion } from '@/hooks/useAppVersion'
 import { useToast } from '@/hooks/useToast'
 import { initUploadQueue } from '@/services/offlineUploadQueue'
@@ -190,7 +190,16 @@ export function MainLayout() {
   const uploadItems = useUploadQueueStore((state) => state.items)
   const { toast } = useToast()
   const prevPendingRef = useRef(pendingWrites)
-  const { hasUpdate, newVersion, reload } = useAppVersion()
+  const { hasUpdate, newBuildTime, reload } = useAppVersion()
+  /* El desfase se cuenta solo mientras el banner está a la vista: si no, diría
+     «llevas 3 min» durante horas y sería otro número que miente. */
+  const [ahora, setAhora] = useState(() => Date.now())
+  useEffect(() => {
+    if (!hasUpdate) return
+    setAhora(Date.now())
+    const id = window.setInterval(() => setAhora(Date.now()), 60_000)
+    return () => window.clearInterval(id)
+  }, [hasUpdate])
   const { setZones, setEquipment, setIncidents } = useAppStore()
   const isGanttRoute = location.pathname.startsWith('/gantt')
   const isClimaRoute = location.pathname.startsWith('/clima-puerto')
@@ -1110,12 +1119,24 @@ export function MainLayout() {
           <div className="mx-4 mt-4 lg:mx-6 bg-primary/[0.15] border border-primary/[0.25] text-ink-info px-4 py-3 rounded-card flex items-center justify-between">
             <div className="flex items-center gap-3">
               <RefreshCw className="h-5 w-5" />
+              {/*
+                * Sin número de versión (pedido de Orel, 16-08): «4.2.0» no le
+                * dice nada a quien está en planta, y el semver se sube a mano
+                * —ya se quedó 13 días atrás con 39 mejoras desplegadas—, así
+                * que además puede mentir. Lo que sí responde su pregunta real
+                * es la HORA de lo nuevo y cuánto lleva sin ello. Misma
+                * decisión que ya tomó el sello de build.
+                */}
               <div>
                 <span className="font-medium block">
-                  Nueva versión disponible: {newVersion}
+                  {newBuildTime
+                    ? `Hay una versión nueva de las ${formatHora(newBuildTime)}`
+                    : 'Hay una versión nueva'}
                 </span>
                 <span className="text-sm opacity-80">
-                  Recarga la página para obtener la última versión
+                  {newBuildTime
+                    ? `Llevas ${formatDesfase(ahora - newBuildTime)} con la anterior. Recarga para ponerte al día.`
+                    : 'Recarga para ponerte al día.'}
                 </span>
               </div>
             </div>
@@ -1123,7 +1144,11 @@ export function MainLayout() {
               onClick={reload} 
               variant="default" 
               size="sm" 
-              className="gap-2 ml-4 transition-all hover:scale-105 active:scale-95 shadow-md hover:shadow-lg"
+              /* 44 px en PÍXELES, no `h-11`: el root de esta app está al 85%
+                 (index.css), así que 2.75rem se queda en 37 px y el piso táctil
+                 es absoluto. Mismo patrón que MonitorShiftParts y el editor de
+                 sidebar. El botón medía 31 px. */
+              className="gap-2 ml-4 min-h-[44px] transition-all hover:scale-105 active:scale-95 shadow-md hover:shadow-lg"
             >
               <RefreshCw className="h-4 w-4 animate-spin-slow" />
               Recargar

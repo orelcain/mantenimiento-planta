@@ -14,6 +14,7 @@ import { useAuthStore, useAppStore } from '@/store'
 import { useWipOverrides } from '@/hooks/useWipOverrides'
 import type { UserRole } from '@/types'
 import { LEARNING_MACHINES } from '@/data/learningMachines'
+import { PLANT_LINES, PLANTS } from '@/config/plantLines'
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
@@ -29,7 +30,35 @@ interface Tile {
   cta?:     boolean
   /** WIP estático — se mezcla con overrides de Firestore */
   wip?:     boolean
+  /**
+   * Accesos subordinados, siempre visibles (no acordeón): el padre sigue
+   * siendo destino y llegar a una línea cuesta UN toque, que es lo que se
+   * pidió. Se dibujan con `ListCell variant="child"`.
+   */
+  children?: Tile[]
 }
+
+/*
+ * Las líneas con Shoplogix, tal como las declara `plantLines.ts`: si mañana se
+ * instrumenta Empaque, aparece sola. Escribirlas a mano acá sería una segunda
+ * fuente de verdad que se desincroniza en silencio.
+ * El texto va PLANTA · PROCESO porque los labels del config mezclan los dos
+ * ejes («P. Principal», «Filete») y en una lista de tres no se distinguen.
+ */
+const LINEAS_ANALISIS: Tile[] = PLANT_LINES
+  .filter((l) => l.shoplogixEnabled)
+  /* Agrupadas por planta: leer «Principal, Yal, Principal» obliga a volver
+     atrás. Con las dos de la principal juntas la lista se lee 2 + 1. */
+  .slice()
+  .sort((a, b) => PLANTS.findIndex((p) => p.id === a.plant) - PLANTS.findIndex((p) => p.id === b.plant))
+  .map((l) => ({
+    id: `analisis-${l.id}`,
+    label: `${PLANTS.find((p) => p.id === l.plant)?.label.replace(/^Planta /, '') ?? l.label} · ${l.areaLabel}`,
+    sublabel: '',
+    icon: BarChart3,
+    href: `/analisis-grader?linea=${l.id}`,
+    color: 'blue' as TileColor,
+  }))
 
 interface TileGroup {
   label: string
@@ -107,7 +136,7 @@ const GROUPS: Record<UserRole, TileGroup[]> = {
       label: 'Seguimiento',
       tiles: [
         { id: 'incidents', label: 'Incidencias',   sublabel: 'Revisar & validar',  icon: AlertTriangle, href: '/incidents',       color: 'red'    },
-        { id: 'grader',    label: 'Grader',        sublabel: 'Rendimiento',         icon: BarChart3,     href: '/analisis-grader', color: 'blue'   },
+        { id: 'grader',    label: 'Análisis de Turno', sublabel: 'Rendimiento',      icon: BarChart3,     href: '/analisis-grader', color: 'blue', children: LINEAS_ANALISIS },
         { id: 'inspecc',   label: 'Inspecciones',  sublabel: 'Rondas',             icon: Route,         href: '/inspections',     color: 'amber',  wip: true },
         { id: 'prevntv',   label: 'Preventivo',    sublabel: 'Plan mantención',    icon: CalendarClock, href: '/preventive',      color: 'amber',  wip: true },
         { id: 'sensores',  label: 'Sensores',      sublabel: 'Monitor real',       icon: Activity,      href: '/sensors/monitor', color: 'green',  wip: true },
@@ -147,7 +176,7 @@ const GROUPS: Record<UserRole, TileGroup[]> = {
     {
       label: 'Análisis & monitoreo',
       tiles: [
-        { id: 'grader',   label: 'Grader',        sublabel: 'Análisis de piezas', icon: BarChart3, href: '/analisis-grader', color: 'blue'    },
+        { id: 'grader',   label: 'Análisis de Turno', sublabel: '',                icon: BarChart3, href: '/analisis-grader', color: 'blue', children: LINEAS_ANALISIS },
         { id: 'sensores', label: 'Sensores',       sublabel: 'Tiempo real',        icon: Activity,  href: '/sensors/monitor', color: 'green',  wip: true },
         { id: 'mapa',     label: 'Mapa Planta',   sublabel: 'Zonas',              icon: Map,       href: '/map',             color: 'emerald' },
         { id: 'clima',    label: 'Clima Puerto',  sublabel: 'Condiciones',        icon: CloudSun,  href: '/clima-puerto',    color: 'slate'   },
@@ -414,11 +443,11 @@ export function MobileHomeGrid() {
                 contenido, nunca para navegar.
               */
               <ListGroup>
-                {chipTiles.map((tile) => {
+                {chipTiles.flatMap((tile) => {
                   const c = COLOR[tile.color]
                   const Icon = tile.icon
                   const wip = isWip(tile.id, tile.wip)
-                  return (
+                  return [
                     <ListCell
                       key={tile.id}
                       leading={
@@ -429,8 +458,19 @@ export function MobileHomeGrid() {
                       title={tile.label}
                       trailing={wip ? <Pill tone="warning">En desarrollo</Pill> : undefined}
                       onClick={() => navigate(tile.href)}
-                    />
-                  )
+                    />,
+                    /* Los hijos van en la MISMA tarjeta que el padre: una card
+                       aparte los volvería un grupo hermano y se perdería de
+                       quién dependen (§7). */
+                    ...(tile.children ?? []).map((hijo) => (
+                      <ListCell
+                        key={hijo.id}
+                        variant="child"
+                        title={hijo.label}
+                        onClick={() => navigate(hijo.href)}
+                      />
+                    )),
+                  ]
                 })}
               </ListGroup>
             )}

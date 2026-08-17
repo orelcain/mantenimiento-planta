@@ -55,6 +55,9 @@ export function shouldNotifyUpdate(
 export function useAppVersion() {
   const [hasUpdate, setHasUpdate] = useState(false)
   const [newVersion, setNewVersion] = useState<string | null>(null)
+  /* Cuándo se publicó lo nuevo: el banner habla de HORAS, no de semver — el
+     número de versión no le dice nada a quien está en planta. */
+  const [newBuildTime, setNewBuildTime] = useState<number | null>(null)
 
   useEffect(() => {
     const checkVersion = async () => {
@@ -103,11 +106,16 @@ export function useAppVersion() {
               reason,
             })
             setNewVersion(serverVersion)
+            const ts = typeof data.buildTimestamp === 'number'
+              ? data.buildTimestamp
+              : Date.parse(data.buildDate ?? '')
+            setNewBuildTime(Number.isNaN(ts) ? null : ts)
             setHasUpdate(true)
           } else {
             // Mismo build y mismo (o menor) semver → sin banner
             setHasUpdate(false)
             setNewVersion(null)
+            setNewBuildTime(null)
           }
         }
       } catch (_error) {
@@ -216,6 +224,7 @@ export function useAppVersion() {
   return {
     hasUpdate,
     newVersion,
+    newBuildTime,
     currentVersion: APP_VERSION,
     reload,
   }
