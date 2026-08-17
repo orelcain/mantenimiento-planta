@@ -229,6 +229,32 @@ describe('contextoPareto · el marco temporal del Pareto', () => {
     expect(c.recuperableMin).toBe(54)   // 30 + 24, no el 55 del backend
   })
 
+  /*
+   * La mediana de piezas NO es «aplicarle el % mediano al turno promedio»:
+   * sale de su propia serie ordenada. Con cpm distintos por turno, el turno
+   * del % mediano y el de las piezas medianas pueden ser otros.
+   */
+  it('la mediana de piezas sale de su propia serie, no del % mediano', () => {
+    const turno = (dateKey: string, rec: number, total: number) => ({
+      dateKey, windowMin: 500, producingMin: 400, plannedMin: 60,
+      recoverableMin: rec, total,
+      causas: [{ reason: 'Micro Detencion', min: rec, count: 1 }],
+    })
+    // Mismos minutos recuperables en dos turnos, pero uno andaba al doble de
+    // ritmo: 20 min valen 100 pz en el lento y 200 en el rápido.
+    const c = contextoPareto([
+      turno('2026-08-11', 20, 2000),   // cpm 5  → 100 pz
+      turno('2026-08-12', 40, 2000),   // cpm 5  → 200 pz
+      turno('2026-08-13', 20, 4000),   // cpm 10 → 200 pz
+      turno('2026-08-14', 60, 4000),   // cpm 10 → 600 pz
+    ])
+    expect(c.serie.map((p) => Math.round(p.piezas))).toEqual([100, 200, 200, 600])
+    expect(c.banda?.medianaPiezas).toBe(200)
+    // El % mediano es 4% (de 4/8/4/12): quien lo aplicara al turno promedio
+    // sacaría otra cifra, y sería una invención.
+    expect(c.banda?.mediana).toBeCloseTo(6, 0)
+  })
+
   it('el 100% es el tiempo TOTAL, con el convenio a la vista', () => {
     const c = contextoPareto(TURNOS)
     expect(c.ventanaMin).toBe(2950)                  // 3.415 menos los 465 del sábado
