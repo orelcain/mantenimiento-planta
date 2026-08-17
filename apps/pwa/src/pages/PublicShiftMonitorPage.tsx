@@ -2421,9 +2421,23 @@ export function PublicShiftMonitorPage() {
      * Con el turno cerrado no se notaba, porque ahí lo transcurrido ES la
      * duración: el bug solo aparecía con el turno en curso.
      */
-    const ventanaTurnoMin = live?.scheduledStart && live?.plannedEnd
-      ? Math.round((Date.parse(live.plannedEnd) - Date.parse(live.scheduledStart)) / 60_000)
-      : tb?.windowMin ?? 0
+    /*
+     * ⚠⚠ Desde el ARRANQUE REAL, no desde `scheduledStart`. En un turno sin
+     * definir la ventana declarada empieza en el borde de las 06:00 del día
+     * ANTERIOR: con el cierre estimado del día siguiente, la resta daba casi
+     * 26 h de turno y la cuota se repartía tan fina que cualquier ritmo parecía
+     * ir sobrado.
+     *
+     * ⚠ Y el fallback a `windowMin` —lo TRANSCURRIDO— es el que producía la
+     * cuota fantasma: a las 02:45, con 2 h 21 de producción, repartía las 5.000
+     * sobre lo transcurrido y anunciaba «van 1.829 de las 5.000 que tocaban a
+     * esta hora», imputándole al turno una deuda de 3.100 piezas por un tiempo
+     * que todavía no pasó. Sin cierre conocido NO hay cuota que repartir: mejor
+     * no dibujar la curva que dibujar una que miente.
+     */
+    const ventanaTurnoMin = inicioReal && live?.plannedEnd
+      ? Math.round((Date.parse(live.plannedEnd) - Date.parse(inicioReal)) / 60_000)
+      : 0
     /* Y el tiempo de convenio también es el PREVISTO: `plannedMin` todavía es 0
        a media mañana porque la colación no ocurrió, pero va a ocurrir. */
     const convenioPrevistoMin = breaks.reduce((a, b) => a + Math.max(0, b.toMin - b.fromMin), 0)
