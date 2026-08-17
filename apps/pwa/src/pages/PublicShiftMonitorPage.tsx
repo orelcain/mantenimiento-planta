@@ -26,7 +26,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { Activity, AlertCircle, ChevronLeft, ChevronRight, Clock, Gauge, Hourglass, Moon, PauseCircle, Radio, RefreshCw, Sun, Target, TrendingUp } from 'lucide-react'
+import { Activity, AlertCircle, ChevronLeft, ChevronRight, Clock, Gauge, Hourglass, Moon, PauseCircle, RefreshCw, Sun, Target, TrendingUp } from 'lucide-react'
 import { useTheme } from '@/hooks/useTheme'
 import {
   subscribePublicShiftMonitor,
@@ -37,6 +37,7 @@ import {
 import { buildHourlyRows, peakPieces } from '@/services/shoplogix/monitorHourly'
 import { computePaceToTarget, lineMaxPerHour, type PaceToTarget } from '@/services/shoplogix/monitorPace'
 import { ventanaDeActividad, desdePrimeraPieza, piezasAntesDelArranque } from '@/services/shoplogix/monitorActividad'
+import { mediaMovil, ritmoAhoraCpm, estadoRitmo, fraccionDeRegla } from '@/services/shoplogix/monitorRitmo'
 import { pinShiftEnd, unpinShiftEnd, setMonitorSetPoint } from '@/services/shoplogix/pinShiftEnd'
 import {
   buildDayComparison, optimalPace, plannedBreaks, mergeBreaks, cumulativeFromStart,
@@ -359,13 +360,12 @@ function EditorSetPoint({ actual, onGuardar }: {
  */
 function Sparkbars({
   series, stopReasons, stopEvents, comments, causaSel, onCausa, tramoSel, breaks,
-  recentPerMinute, requiredPerMinute, medianCpm, setCpm, fuenteSetPoint, onGuardarSetPoint, cerrado, ventana, onVentana,
+  requiredPerMinute, medianCpm, setCpm, fuenteSetPoint, onGuardarSetPoint, ventana, onVentana,
 }: {
   /** Ventana visible compartida con el comparador (minutos de turno). */
   ventana?: Ventana | null
   onVentana?: (v: Ventana | null) => void
   /** Ritmo de la última media hora, para la cabecera. */
-  recentPerMinute?: number | null
   /** Ritmo que la meta exige ahora mismo, si hay meta. */
   requiredPerMinute?: number | null
   /** Mediana de los turnos anteriores, en pz/min de reloj. */
@@ -381,8 +381,6 @@ function Sparkbars({
   fuenteSetPoint?: string | null
   /** Presente solo para supervisores logueados: habilita el editor inline. */
   onGuardarSetPoint?: (cpm: number, metodo: string) => Promise<void>
-  /** Turno cerrado: el chip del último tramo dice "al cierre", no "ahora". */
-  cerrado?: boolean
   series: PublicMonitorLive['series']
   stopReasons?: string[]
   stopEvents?: PublicMonitorLive['stopEvents']
@@ -501,13 +499,13 @@ function Sparkbars({
    * cuando en realidad terminó. Los ceros del MEDIO se conservan: esos sí son
    * información (la colación, una falla).
    */
-  const VENTANA = 3   // 3 tramos de 5 min
-  let fin = series.length
-  while (fin > 0 && (series[fin - 1]!.pieces || 0) === 0) fin--
-  const media = series.slice(0, fin).map((_, i, arr) => {
-    const w = arr.slice(Math.max(0, i - VENTANA + 1), i + 1)
-    return w.reduce((a, p) => a + (p.pieces || 0), 0) / w.length
-  })
+  /* ⚠ La media vive en `monitorRitmo`, no acá: el número protagonista de la
+     tarjeta de arriba es el ÚLTIMO PUNTO de esta misma curva, y con dos
+     cálculos separados podían divergir sin que nadie lo notara. */
+  const media = mediaMovil(series)
+  /* Dónde termina la parte con datos: `mediaMovil` ya corta la cola de ceros,
+     así que su largo ES ese corte. La línea cruda usa el mismo. */
+  const fin = media.length
   const lineaMedia = media.map((v, i) => `${i * stepX + bw / 2},${yDePiezas(v)}`).join(' ')
   /*
    * La serie CRUDA de 5 min, la que manda Shoplogix. Con las barras a la vista
@@ -725,13 +723,11 @@ function Sparkbars({
           Velocidad de la línea
           <span className="normal-case tracking-normal text-muted-foreground/70"> · tramos de 5 min</span>
         </span>
-        {!causaSel && recentPerMinute != null && recentPerMinute > 0 && (
-          <span className="normal-case tracking-normal">
-            <b className="tabular-nums text-sky-700 dark:text-sky-300">{fmtDec(recentPerMinute)} pz/min</b>
-            {/* En un turno cerrado, "ahora" hablaba en presente de ayer. */}
-            <span className="ml-1 text-muted-foreground/70">{cerrado ? 'al cierre' : 'ahora'}</span>
-          </span>
-        )}
+        {/* OJO — Acá había un «N pz/min ahora» que salía de `recentPerMinute` —otra
+            ventana móvil— mientras la regla de arriba muestra el último punto de
+            ESTA curva: se veían 4,6 arriba y 2,1 acá, dos verdades para el mismo
+            instante. Es exactamente el problema que este rediseño vino a cerrar,
+            así que el número vive en UN solo lugar y el gráfico solo lo dibuja. */}
         {causaSel && (
           <button
             onClick={() => onCausa(null)}
@@ -1751,6 +1747,124 @@ function PorHora({ series }: { series: PublicMonitorLive['series'] }) {
   )
 }
 
+/**
+ * La regla de ritmo: UN número protagonista y una escala que lo explica.
+ *
+ * ── Por qué reemplaza a tres tarjetas ──────────────────────────────────────
+ *
+ * Convivían seis cifras de ritmo (acumulado del turno, de reloj, pz/h, últimos
+ * 30 min, «12,5 ahora» dentro del gráfico, media de 15) sin jerarquía, y la más
+ * grande era la que menos se movía: Orel vio el gráfico desplomarse mientras el
+ * número no se inmutaba. Acá el protagonista es el ritmo de AHORA —el último
+ * punto de la curva de abajo, literalmente el mismo dato— y las otras dos
+ * referencias dejan de ser cifras sueltas para volverse posiciones de una
+ * escala: dónde está el promedio del turno, y dónde el techo de la máquina.
+ *
+ * La lectura no exige aritmética mental: la distancia entre el relleno y el
+ * final de la regla ES lo que falta. No hay que saber que 18 es el techo ni
+ * restar 12,5 de 18.
+ */
+function ReglaDeRitmo({ ahora, turno, setCpm, onEditarSetPoint, cerrado, contexto, chispa }: {
+  /** Ritmo de ahora, en pz/min: el último punto de la media de 15 min. */
+  ahora: number | null
+  /** Promedio del turno cuando la línea produce: la marca de la regla. */
+  turno: number | null
+  /** Velocidad de la máquina: el final de la regla. */
+  setCpm: number | null | undefined
+  onEditarSetPoint?: () => void
+  cerrado?: boolean
+  /** Cómo viene el turno contra los anteriores: el dato que traía la tarjeta
+      vieja y que sin esto se perdería. Texto, no una cifra más. */
+  contexto?: string | null
+  /** El sparkline de los turnos previos, si hay historia. */
+  chispa?: React.ReactNode
+}) {
+  const estado = estadoRitmo(ahora, setCpm)
+  const fr = fraccionDeRegla(ahora, setCpm)
+  const frTurno = fraccionDeRegla(turno, setCpm)
+  /* El estado SIEMPRE se dice con palabra además de color: en planta hay
+     pantallas quemadas por el sol y gente que no distingue rojo de verde. */
+  const palabra = cerrado
+    ? 'al cierre'
+    : estado === 'ok' ? 'a ritmo' : estado === 'lento' ? 'va lento' : 'casi parada'
+  const colorRelleno = estado === 'ok'
+    ? 'bg-ink-ok' : estado === 'lento' ? 'bg-ink-warn' : 'bg-ink-crit'
+  const colorPunto = estado === 'ok'
+    ? 'text-ink-ok' : estado === 'lento' ? 'text-ink-warn' : 'text-ink-crit'
+
+  return (
+    <section className="rounded-card border border-border bg-card p-4">
+      <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+        <Gauge className="h-3 w-3" />
+        Ritmo de la línea
+      </div>
+
+      {/* El número no lleva acento: el acento se reserva para lo interactivo y
+          el estado ya lo cuenta la barra (§1.4). */}
+      <div className="mt-1 flex flex-wrap items-baseline gap-x-2">
+        <span className="text-[42px] font-semibold leading-none tabular-nums text-foreground">
+          {ahora != null ? fmtDec(ahora) : '—'}
+        </span>
+        <span className="text-[15px] text-muted-foreground">pz/min</span>
+        {ahora != null && (
+          <span className={`ml-auto inline-flex items-center gap-1 text-[12px] font-medium ${colorPunto}`}>
+            <span className="inline-block size-1.5 rounded-full bg-current" />
+            {palabra}
+          </span>
+        )}
+      </div>
+
+      {/* ── La regla ──────────────────────────────────────────────────────
+          0 → set point. El relleno es AHORA, la marca es el promedio del
+          turno y el final es lo que da la máquina. */}
+      <div className="mt-3">
+        <div className="relative h-2.5 overflow-hidden rounded-full bg-muted">
+          <span
+            className={`absolute inset-y-0 left-0 rounded-full ${colorRelleno} transition-[width] duration-300 motion-reduce:transition-none`}
+            style={{ width: `${Math.max(fr * 100, ahora != null && ahora > 0 ? 2 : 0)}%` }}
+          />
+          {turno != null && turno > 0 && setCpm != null && setCpm > 0 && (
+            <span
+              className="absolute inset-y-0 w-0.5 bg-foreground/45"
+              style={{ left: `${frTurno * 100}%` }}
+              title={`Promedio del turno: ${fmtDec(turno)} pz/min`}
+            />
+          )}
+        </div>
+        <div className="mt-1 flex items-baseline justify-between text-[11px] text-muted-foreground">
+          <span className="tabular-nums">
+            {turno != null ? <>promedio del turno <b className="font-semibold text-foreground/80">{fmtDec(turno)}</b></> : 'promedio del turno —'}
+          </span>
+          {/* La etiqueta del techo ES el control: a 375 px no cabe un lápiz
+              extra sin pisarla. */}
+          {setCpm != null && setCpm > 0 && (
+            onEditarSetPoint ? (
+              <button
+                type="button"
+                onClick={onEditarSetPoint}
+                className="tap-44 tabular-nums underline decoration-dotted underline-offset-2"
+              >
+                {fmtDec(setCpm)} máquina
+              </button>
+            ) : (
+              <span className="tabular-nums">{fmtDec(setCpm)} máquina</span>
+            )
+          )}
+        </div>
+      </div>
+
+      {(contexto || chispa) && (
+        <div className="mt-2.5 flex items-center gap-2 border-t border-border/50 pt-2.5">
+          {chispa}
+          {contexto && (
+            <span className="text-[11px] leading-snug text-muted-foreground">{contexto}</span>
+          )}
+        </div>
+      )}
+    </section>
+  )
+}
+
 function StatusPill({ live }: { live: PublicMonitorLive }) {
   // El primitivo Pill de la piel: tonos MEDIDOS (texto 600 sobre 500 al 15%)
   // y el punto integrado — era exactamente lo que este componente imitaba a mano.
@@ -2571,10 +2685,9 @@ export function PublicShiftMonitorPage() {
    * ritmo requerido del pace ya usa la base de lapso real: eran dos "reloj"
    * distintos en la misma pantalla.
    */
-  const relojCpm = live?.timeBreakdown && live.timeBreakdown.windowMin > 0
-    ? live.totalPieces / live.timeBreakdown.windowMin
-    : live?.piecesPerMinute ?? null
-
+  /* El «de reloj · pz/h» salió de la pantalla con la regla de ritmo: era la
+     misma producción en otra unidad, y dos unidades obligan a convertir de
+     cabeza. El pz/h sigue en las exportaciones y en el análisis del turno. */
   /** El set point que manda: el editado por un supervisor, si existe. */
   const setCpmVigente = live?.setPoint?.cpm ?? specDeMaquina(live?.machines?.[0]?.model)?.setCpm ?? null
 
@@ -2980,100 +3093,55 @@ export function PublicShiftMonitorPage() {
         </section>
 
         {/* Cadencia */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {(() => {
+          const turnoCpm = live.timeBreakdown && live.timeBreakdown.producingMin > 0
+            ? live.totalPieces / live.timeBreakdown.producingMin
+            : null
+          /* El contexto histórico que traía la tarjeta vieja: rango normal de
+             los turnos anteriores y racha. Se conserva como TEXTO —una cifra
+             más habría recreado el problema que este bloque vino a arreglar. */
+          const racha = turnoCpm != null && banda
+            ? rachaDeRitmos([...banda.turnos.map((t) => t.ritmo), turnoCpm])
+            : null
+          const fraseRacha = racha && turnoCpm != null
+            ? ` — viene ${racha.dir > 0 ? 'subiendo' : 'aflojando'} ${racha.n} turnos`
+            : ''
+          const contexto = turnoCpm != null && banda
+            ? turnoCpm > banda.ritmo.max ? `El turno va arriba de su rango normal${fraseRacha}`
+              : turnoCpm < banda.ritmo.min ? `El turno va abajo de su rango normal${fraseRacha}`
+              : `El turno va en su rango normal${fraseRacha}`
+            : turnoCpm != null && resumenesAnteriores.length === 0
+              ? 'Sin rango normal todavía: aparece al 5º turno'
+              : null
+          return (
+            <ReglaDeRitmo
+              ahora={ritmoAhoraCpm(serieDelTurno)}
+              turno={turnoCpm}
+              setCpm={setCpmVigente}
+              cerrado={live.shiftClosed}
+              contexto={contexto}
+              chispa={turnoCpm != null && banda
+                ? <Chispa turnos={banda.turnos} hoy={turnoCpm} banda={banda.ritmo} />
+                : undefined}
+            />
+          )
+        })()}
+        {/* Una sola tarjeta desde que el ritmo se unificó arriba: en una grilla
+            de dos columnas quedaba a media pantalla, con el hueco al lado. */}
+        <div className="grid grid-cols-1 gap-3">
           {/* El número que manda es el ANDANDO: mide a la línea y se compara
               entre turnos. El de reloj (piezas ÷ ventana) mezcla velocidad con
               disponibilidad —9,7 vs 9,7 el día que la línea fue la más rápida
               de los últimos 8 turnos— y queda como segunda línea, con su
               denominador escrito. */}
-          {/* Con banda normal y sparkline la tarjeta contesta sola «¿esto
-              está bien?»: dentro de la banda = martes cualquiera; fuera =
-              noticia. La banda es de los turnos ANTERIORES, fijada a priori. */}
-          {(() => {
-            const andando = live.timeBreakdown && live.timeBreakdown.producingMin > 0
-              ? live.totalPieces / live.timeBreakdown.producingMin
-              : null
-            /*
-             * La lectura suma la RACHA: el spark dibuja la historia pero nadie
-             * la lee sola. Los bordes de la banda ya están rotulados en el
-             * gráfico, así que acá no se repiten (cada dato en UN lugar).
-             */
-            const racha = andando != null && banda
-              ? rachaDeRitmos([...banda.turnos.map((t) => t.ritmo), andando])
-              : null
-            const fraseRacha = racha && andando != null
-              ? ` — viene ${racha.dir > 0 ? 'subiendo' : 'aflojando'} ${racha.n} turnos (${fmtDec(racha.desde)} → ${fmtDec(andando)})`
-              : ''
-            const lectura = andando != null && banda
-              ? andando > banda.ritmo.max
-                ? { texto: `▲ arriba de su rango normal${fraseRacha}`, tono: 'bien' as const }
-                : andando < banda.ritmo.min
-                  ? { texto: `▼ abajo de su rango normal${fraseRacha}`, tono: 'mal' as const }
-                  : { texto: `en su rango normal${fraseRacha}`, tono: 'normal' as const }
-              // Turno nuevo sin banda: la única referencia demostrable es el
-              // set point de máquina — y se dice cuándo llega el rango normal.
-              : andando != null && resumenesAnteriores.length === 0
-                ? { texto: `sin rango normal todavía (aparece al 5º turno) · set point ${fmtDec(setCpmVigente ?? 18)}`, tono: 'normal' as const }
-                : null
-            return (
-              <div className="col-span-2">
-                <Kpi
-                  label="Ritmo andando"
-                  value={fmtDec(andando ?? live.piecesPerMinute)}
-                  unit="pz/min"
-                  icon={<Gauge className="h-3 w-3" />}
-                  /* ⚠ Es el acumulado de TODO el turno, no el ritmo de ahora:
-                     con el turno avanzado casi no se mueve aunque el gráfico se
-                     desplome (medido: 12,37 → 12,16 mientras los tramos iban de
-                     0 a 17). Sin decirlo, se lee como «va a esta velocidad» y
-                     contradice al gráfico de abajo. El ritmo de ahora es la
-                     tarjeta de al lado. */
-                  hint={andando != null ? 'promedio del turno, cuando produce' : 'promedio del turno'}
-                  spark={andando != null && banda
-                    ? <Chispa turnos={banda.turnos} hoy={andando} banda={banda.ritmo} />
-                    : undefined}
-                  lectura={lectura}
-                  sub={andando != null && relojCpm != null
-                    ? `De reloj, con paradas y colación: ${fmtDec(relojCpm)} pz/min · ${fmtInt(relojCpm * 60)} pz/h`
-                    : undefined}
-                  tone="accent"
-                />
-              </div>
-            )
-          })()}
-          {/* Sin tarjeta de pz/h: desde el reloj unificado era el pz/min × 60
-              con otra ropa — el mismo dato en dos lugares termina divergiendo.
-              El pz/h vive en la sub-línea del ritmo. */}
-          {/* La tarjeta más mirada en vivo era la única sin referencia. El
-              contraste es contra el ritmo del PROPIO turno: «frenando» aparece
-              acá antes de que el total del turno lo delate. Umbrales anchos
-              (±25%/−10%) para que el ruido de un tramo no titile. */}
-          {(() => {
-            const andando = live.timeBreakdown && live.timeBreakdown.producingMin > 0
-              ? live.totalPieces / live.timeBreakdown.producingMin
-              : null
-            const reciente = live.recentPiecesPerMinute
-            // En cerrado la tarjeta describe el TRAMO FINAL, no una alerta viva:
-            // el ▼ de la cola de un turno terminado no le pide nada a nadie.
-            const tramo = live.shiftClosed ? 'el tramo final quedó' : ''
-            const lectura = andando != null && andando > 0 && reciente != null && (live.recentMinutes || 0) >= 15
-              ? reciente >= andando * 1.1
-                ? { texto: `▲ ${tramo || ''} por encima del ritmo del turno (${fmtDec(andando)})`.replace('  ', ' '), tono: 'bien' as const }
-                : reciente <= andando * 0.75
-                  ? { texto: `▼ ${tramo || ''} por debajo del ritmo del turno (${fmtDec(andando)})`.replace('  ', ' '), tono: live.shiftClosed ? 'normal' as const : 'mal' as const }
-                  : { texto: `al ritmo del turno (${fmtDec(andando)})`, tono: 'normal' as const }
-              : null
-            return (
-              <Kpi
-                label={`Últimos ${live.recentMinutes || 0} min`}
-                value={fmtDec(live.recentPiecesPerMinute)}
-                unit="pz/min"
-                icon={<Radio className="h-3 w-3" />}
-                hint={`${fmtInt(live.recentPieces)} pz en el tramo`}
-                lectura={lectura}
-              />
-            )
-          })()}
+          {/* OJO — Acá vivían DOS tarjetas: «Ritmo andando» y «Últimos N min», y
+              entre ambas repartían cuatro cifras de ritmo más las del gráfico.
+              La grande era el acumulado del turno, que pasada la primera hora
+              casi no se mueve: Orel vio caer el gráfico con el número quieto.
+              Ahora son una sola regla, con el ritmo de AHORA de protagonista y
+              las otras dos como posiciones de la escala. El detalle histórico
+              (rango normal, racha de turnos) vive en «Comparado con otros
+              días», que es el bloque que existe para eso. */}
           <Kpi
             label="Tiempo produciendo"
             /*
@@ -3173,7 +3241,6 @@ export function PublicShiftMonitorPage() {
               breaks={comparacion.breaks}
               ventana={ventanaGrafica}
               onVentana={setVentanaGrafica}
-              recentPerMinute={live.recentPiecesPerMinute}
               requiredPerMinute={pace && pace.requiredPerMinute > 0 ? pace.requiredPerMinute : null}
               medianCpm={live.paceMedianCpm}
               setCpm={setCpmVigente}
@@ -3183,7 +3250,6 @@ export function PublicShiftMonitorPage() {
                   (live.setPoint.metodo ? ` (${live.setPoint.metodo})` : '') +
                   ' — no es dato del PLC.'
                 : null}
-              cerrado={live.shiftClosed}
               onGuardarSetPoint={esAdminMonitor && esActual && data.plantSlug
                 ? async (cpm, metodo) => {
                   await setMonitorSetPoint({
@@ -3287,7 +3353,6 @@ export function PublicShiftMonitorPage() {
               breaks={comparacion.breaks}
               ventana={ventanaGrafica}
               onVentana={setVentanaGrafica}
-              recentPerMinute={live.recentPiecesPerMinute}
               requiredPerMinute={pace && pace.requiredPerMinute > 0 ? pace.requiredPerMinute : null}
               medianCpm={live.paceMedianCpm}
               setCpm={setCpmVigente}
@@ -3297,7 +3362,6 @@ export function PublicShiftMonitorPage() {
                   (live.setPoint.metodo ? ` (${live.setPoint.metodo})` : '') +
                   ' — no es dato del PLC.'
                 : null}
-              cerrado={live.shiftClosed}
               onGuardarSetPoint={esAdminMonitor && esActual && data.plantSlug
                 ? async (cpm, metodo) => {
                   await setMonitorSetPoint({
