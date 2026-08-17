@@ -1,3 +1,19 @@
+## 2026-08-17 · Monitor: 44 px de área táctil y el chip activo legible (PR #620)
+
+Auditoría del monitor público con Filete en vivo a 375 px: 19 de 19 controles
+bajo 44 px (cabeceras plegables 17 px, chips de comparación 21, «agrandar»/
+«Cambiar» 20, flechas Anterior/Siguiente 30, botón de tema 26×26), y el chip
+SELECCIONADO era el texto menos legible de la pantalla (2,81:1 oscuro / 3,81:1
+claro vs 8,1:1 de los no seleccionados) por `text-brand-ink` sobre
+`bg-primary/[0.13]`, mismo azul en texto y fondo. Fix: nueva utilidad `.tap-44`
+en `index.css` (`::after` transparente 44×44 fuera de layout, no engorda el
+control) aplicada a los 20 controles; `text-brand-ink` → `text-foreground` en
+los 7 lugares con el patrón del chip activo. Verificado: 0 controles bajo
+44 px, contraste 2,81→10,64 (oscuro) y 3,81→13,64 (claro), sin robo de clic
+entre chips (`elementFromPoint`), sin scroll horizontal a 375 px. 1499 tests
+verdes, tsc/eslint limpios. Merge commit `5575b838` en main, deploy confirmado
+en GitHub Pages (`buildSha: 5575b83`).
+
 ## 2026-08-17 · Monitor: sin hora de cierre no se inventa una cuota (PR #618)
 
 Auditoría visual con Filete en vivo: a las 02:45 (turno produciendo hacía
