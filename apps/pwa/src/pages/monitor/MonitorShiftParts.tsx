@@ -64,7 +64,9 @@ export function Bloque({ id, titulo, extra, defaultAbierto = true, children }: {
       <button
         type="button"
         onClick={toggle}
-        className="flex w-full items-center justify-between gap-2 text-left"
+        /* La cabecera de un bloque plegable medía 17 px de alto: es el control
+           que más se toca de la pantalla y el que menos superficie daba. */
+        className="tap-44 flex w-full items-center justify-between gap-2 text-left"
         aria-expanded={abierto}
       >
         <span className="text-[11px] uppercase tracking-wide text-muted-foreground">{titulo}</span>
@@ -930,7 +932,7 @@ function FilaEvento({ c, sel, onCausa, onVentana, onTramo, notas }: {
             onCausa(abierta ? null : c.reason)
           }}
           className={`flex w-full justify-between gap-2 rounded px-1 py-0.5 text-left ${
-            activa ? 'bg-primary/[0.13] font-semibold text-brand-ink' : 'text-foreground hover:bg-muted'
+            activa ? 'bg-primary/[0.13] font-semibold text-foreground' : 'text-foreground hover:bg-muted'
           }`}
           aria-expanded={abierta}
         >

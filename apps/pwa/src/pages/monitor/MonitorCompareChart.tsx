@@ -242,9 +242,9 @@ export function MonitorCompareChart({ cmp, cerrado, claveSel, onSel, cone, venta
   for (let m = cadaHora; m <= maxMin; m += cadaHora) marcas.push(m)
 
   const chip = (activo: boolean) =>
-    `flex items-center gap-1.5 rounded-full border px-2 py-0.5 ${
+    `tap-44 flex items-center gap-1.5 rounded-full border px-2 py-0.5 ${
       activo
-        ? 'border-transparent bg-primary/[0.13] font-semibold text-brand-ink'
+        ? 'border-transparent bg-primary/[0.13] font-semibold text-foreground'
         : 'border-border text-muted-foreground hover:bg-muted'
     }`
 
@@ -437,14 +437,14 @@ export function MonitorCompareChart({ cmp, cerrado, claveSel, onSel, cone, venta
         <span className="ml-auto flex items-center gap-1">
           {g.acercado ? (
             <button type="button" onClick={g.verTodo}
-              className="rounded-full border border-border px-2 py-0.5 hover:bg-muted">
+              className="tap-44 rounded-full border border-border px-2 py-0.5 hover:bg-muted">
               ver todo · {zoom.toFixed(1).replace('.', ',')}×
             </button>
           ) : (
             <span className="text-[10px] text-muted-foreground/60">pellizcá o rodá para acercar</span>
           )}
           <button type="button" onClick={() => setAlto((v) => !v)}
-            className="rounded-full border border-border px-2 py-0.5 hover:bg-muted">
+            className="tap-44 rounded-full border border-border px-2 py-0.5 hover:bg-muted">
             {alto ? 'achicar' : 'agrandar'}
           </button>
         </span>

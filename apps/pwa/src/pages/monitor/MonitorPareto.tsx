@@ -175,8 +175,8 @@ export function ParetoDeParadas({
               key={String(v)}
               type="button"
               onClick={() => onVentana(v)}
-              className={`min-h-[32px] rounded-full px-2.5 text-[12px] tabular-nums ${
-                ventana === v ? 'bg-primary/[0.13] font-semibold text-brand-ink' : 'bg-muted text-muted-foreground'
+              className={`tap-44 min-h-[32px] rounded-full px-2.5 text-[12px] tabular-nums ${
+                ventana === v ? 'bg-primary/[0.13] font-semibold text-foreground' : 'bg-muted text-muted-foreground'
               }`}
             >
               {v == null ? 'todos' : v}
@@ -191,7 +191,7 @@ export function ParetoDeParadas({
                   type="button"
                   onClick={() => onTurno(t as string | 'todos')}
                   className={`min-h-[32px] rounded-full px-2.5 text-[12px] ${
-                    turno === t ? 'bg-primary/[0.13] font-semibold text-brand-ink' : 'bg-muted text-muted-foreground'
+                    turno === t ? 'bg-primary/[0.13] font-semibold text-foreground' : 'bg-muted text-muted-foreground'
                   }`}
                 >
                   {t === 'todos' ? 'los dos' : nombreCortoTurno(t)}

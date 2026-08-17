@@ -300,7 +300,7 @@ function EditorSetPoint({ actual, onGuardar }: {
       <button
         type="button"
         onClick={() => { setValor(actual != null ? String(actual) : ''); setAbierto(true); setError(null) }}
-        className="rounded-full border border-border px-2 py-0.5 text-[10px] hover:bg-muted"
+        className="tap-44 rounded-full border border-border px-2 py-0.5 text-[10px] hover:bg-muted"
       >
         Cambiar
       </button>
@@ -939,9 +939,9 @@ function Sparkbars({
               type="button"
               onClick={() => elegirVer(v)}
               aria-pressed={ver === v}
-              className={`rounded-full border px-2 py-0.5 ${
+              className={`tap-44 rounded-full border px-2 py-0.5 ${
                 ver === v
-                  ? 'border-transparent bg-primary/[0.13] font-semibold text-brand-ink'
+                  ? 'border-transparent bg-primary/[0.13] font-semibold text-foreground'
                   : 'border-border hover:bg-muted'
               }`}
             >
@@ -953,7 +953,7 @@ function Sparkbars({
           <button
             type="button"
             onClick={g.verTodo}
-            className="rounded-full border border-border px-2 py-0.5 hover:bg-muted"
+            className="tap-44 rounded-full border border-border px-2 py-0.5 hover:bg-muted"
           >
             ver todo · {fmtDec(zoom)}×
           </button>
@@ -1112,7 +1112,7 @@ function CierreDelTurno({ cierre, muestras, fuente, plantSlug, shiftName, startA
           <button
             type="button"
             onClick={() => { setValor(fmtWallTime(cierre)); setEditando(true); setError(null) }}
-            className="rounded-full border border-border px-2 py-0.5 text-[10px] hover:bg-muted"
+            className="tap-44 rounded-full border border-border px-2 py-0.5 text-[10px] hover:bg-muted"
           >
             Cambiar
           </button>
@@ -1489,7 +1489,7 @@ function RitmoNecesario({
       <button
         type="button"
         onClick={() => setVerDetalle((v) => !v)}
-        className="mt-2 text-[11px] text-sky-700 underline underline-offset-2 dark:text-sky-300"
+        className="tap-44 mt-2 text-[11px] text-sky-700 underline underline-offset-2 dark:text-sky-300"
         aria-expanded={verDetalle}
       >
         {verDetalle ? 'ocultar qué hace falta' : 'ver qué hace falta'}
@@ -2474,7 +2474,7 @@ export function PublicShiftMonitorPage() {
     })
     // El turno VISTO entra en las dependencias: al navegar a otro turno la
     // comparación tiene que rearmarse contra los días previos a ESE.
-  }, [live, vista?.dateKey, vista?.shiftId, data?.history, data?.targetPieces, breaksTurno])
+  }, [live, inicioReal, vista?.dateKey, vista?.shiftId, data?.history, data?.targetPieces, breaksTurno])
 
   /*
    * Pronóstico del cierre. Se alimenta del `history` que YA viaja en el doc:
@@ -2709,7 +2709,7 @@ export function PublicShiftMonitorPage() {
             )}
           <button
             onClick={toggleTheme}
-            className="ml-auto shrink-0 rounded-full border border-border bg-card p-1.5 text-muted-foreground transition-colors hover:text-foreground"
+            className="tap-44 ml-auto shrink-0 rounded-full border border-border bg-card p-1.5 text-muted-foreground transition-colors hover:text-foreground"
             title={isDark ? 'Cambiar a vista clara' : 'Cambiar a vista oscura'}
             aria-label={isDark ? 'Cambiar a vista clara' : 'Cambiar a vista oscura'}
           >
@@ -2767,7 +2767,7 @@ export function PublicShiftMonitorPage() {
           <button
             onClick={() => irA(1)}
             disabled={idx >= vistas.length - 1}
-            className="flex items-center gap-1 rounded-full border border-border bg-muted px-3 py-1.5 text-[12px] text-foreground/80 transition-colors enabled:hover:bg-muted disabled:opacity-30"
+            className="tap-44 flex items-center gap-1 rounded-full border border-border bg-muted px-3 py-1.5 text-[12px] text-foreground/80 transition-colors enabled:hover:bg-muted disabled:opacity-30"
           >
             <ChevronLeft className="h-3.5 w-3.5" />
             Anterior
@@ -2782,7 +2782,7 @@ export function PublicShiftMonitorPage() {
             {idx > 1 && (
               <button
                 onClick={() => verIndice(0)}
-                className="rounded-full bg-primary/[0.13] px-2 py-0.5 text-[11px] font-semibold text-brand-ink transition-opacity hover:opacity-80"
+                className="tap-44 rounded-full bg-primary/[0.13] px-2 py-0.5 text-[11px] font-semibold text-foreground transition-opacity hover:opacity-80"
               >
                 Ir al actual
               </button>
@@ -2792,7 +2792,7 @@ export function PublicShiftMonitorPage() {
           <button
             onClick={() => irA(-1)}
             disabled={esActual}
-            className="flex items-center gap-1 rounded-full border border-border bg-muted px-3 py-1.5 text-[12px] text-foreground/80 transition-colors enabled:hover:bg-muted disabled:opacity-30"
+            className="tap-44 flex items-center gap-1 rounded-full border border-border bg-muted px-3 py-1.5 text-[12px] text-foreground/80 transition-colors enabled:hover:bg-muted disabled:opacity-30"
           >
             Siguiente
             <ChevronRight className="h-3.5 w-3.5" />
