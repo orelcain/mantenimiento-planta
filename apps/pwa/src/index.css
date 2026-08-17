@@ -642,6 +642,30 @@
 }
 
 @layer utilities {
+  /*
+   * `tap-44` — área táctil de 44x44 sin tocar el tamaño visual (§3 de la
+   * Constitución). Para controles chicos por diseño: chips de filtro, cabeceras
+   * plegables, flechas de navegación.
+   *
+   * ⚠ Medido en el monitor público: sus 19 controles estaban entre 17 y 30 px.
+   * Agrandarlos de verdad habría hecho ilegible la densidad de la pantalla, así
+   * que crece el área y no el dibujo.
+   *
+   * ⚠ Usa ::after: si el elemento ya tiene ::after propio, esta clase lo pisa.
+   * `ListCell` usa ::before para su separador, así que no chocan.
+   */
+  .tap-44 { position: relative; }
+  .tap-44::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 100%;
+    height: 100%;
+    min-width: 44px;
+    min-height: 44px;
+  }
   /* Animaciones */
   .animate-fade-in {
     animation: fadeIn 0.3s ease-in-out;
