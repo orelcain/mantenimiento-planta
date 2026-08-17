@@ -1,3 +1,20 @@
+## 2026-08-16 · Fuera la mediana punteada del Pareto; filas con piezas y % (PR #604)
+
+Orel: la línea punteada de la tira «Cómo viene turno a turno» ensuciaba
+el gráfico más de lo que informaba. Se quita la punteada; su valor pasa
+al encabezado en las dos unidades («mediana 11,9% · ≈640 pz», con
+`banda.medianaPiezas` calculado sobre su propia serie ordenada, no
+aplicando el % mediano al turno promedio). Las filas del ranking ahora
+muestran piezas y % (`≈2.460 pz 35,4%`, un solo denominador que suma
+100% vía `repartir100()` por mayor resto sobre todas las filas). Los
+minutos bajan a la línea de metadatos.
+
+Verificado: 438 tests verdes (32 en el archivo), tsc/eslint limpios,
+audit-piel OK; suma de % de filas = 100,0 exacto en las 4 ventanas (5,
+10, 15, todos) medido en navegador con datos reales; 375 px. Merge
+commit `617c5922` en main, deploy confirmado en GitHub Pages
+(`buildSha: 617c592`).
+
 ## 2026-08-16 · Fix: la tendencia del Pareto pierde el color (PR #602)
 
 `bg-ink-warn` tenía dos sentidos en el mismo bloque: en las filas del
