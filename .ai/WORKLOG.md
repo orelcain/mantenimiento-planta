@@ -1,3 +1,19 @@
+## 2026-08-16 · Pareto "Qué se repite" valorizado en piezas (PR #598)
+
+El bloque de causas repetidas del monitor público de Filete pasa de hablar
+en minutos a hablar en PIEZAS (opción 2 del mockup aprobado por Orel):
+`buildPareto` valoriza cada causa al cpm andando de SU PROPIO turno
+(`total/producingMin`), no al promedio de la muestra — reordena ranking y
+corte 80/20 por piezas reales. Héroe en centena + equivalencia en turnos,
+filas en decena con barra proporcional a piezas, frase de dueños y caja de
+cierre también en piezas, panel "cómo se calcula" con el rango real de cpm
+de la muestra (9,1–12,4 pz/min en los 11 turnos actuales).
+
+Verificado: 438 tests verdes, tsc/eslint limpios, audit-piel OK, y en
+navegador contra el monitor real de Filete (:5189, 11 turnos) — héroe
+≈7.800 pz ≈ 2 turnos, dueños suman exacto el héroe, ambos temas a 375 px.
+Merge commit `52b9459a` en main.
+
 ## 2026-08-15 · La rejilla del desglose recortaba la cola del turno (fix #562)
 
 Perseguir un descuadre chico —la fila decía «Micro 23×» y `stopEvents` traía
