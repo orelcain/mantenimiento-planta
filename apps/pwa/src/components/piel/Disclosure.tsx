@@ -71,12 +71,15 @@ export function Disclosure({
         aria-controls={id}
         className={cn(
           // §16: 44px de área táctil. La cabecera ENTERA abre y cierra.
+          // `min-h-[44px]` literal en la variante `section`: el root global va
+          // al 87.5% (85% en móvil, ver index.css), así que `min-h-11` (2.75rem)
+          // rinde ~37-38px y no los 44 que este comentario promete.
           'flex w-full items-center gap-2 text-left',
           'transition-colors duration-150 motion-reduce:transition-none',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary',
           inline
             ? 'min-h-9 text-footnote text-muted-foreground hover:text-foreground'
-            : 'min-h-11 gap-3 px-4 py-3 hover:bg-accent',
+            : 'min-h-[44px] gap-3 px-4 py-3 hover:bg-accent',
         )}
       >
         <ChevronDown

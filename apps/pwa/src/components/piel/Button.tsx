@@ -35,8 +35,11 @@ const buttonVariants = cva(
       },
       size: {
         // Alturas ≥44px salvo `sm`, que es para barras densas de escritorio.
+        // `md` usa el píxel literal (no `h-11`): el root global va al 87.5%
+        // (85% en móvil, ver index.css), así que h-11 (2.75rem) rinde ~37-38px
+        // y no los 44 que este comentario promete.
         sm: 'h-9 px-4 text-[0.8rem]',
-        md: 'h-11 px-5 text-sm',
+        md: 'h-[44px] px-5 text-sm',
         lg: 'h-[3.25rem] px-6 text-[0.95rem] rounded-panel',
         block: 'h-[3.25rem] w-full px-6 text-[0.95rem] rounded-panel',
       },

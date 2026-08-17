@@ -53,7 +53,10 @@ export function TabBar({ items, activeId, onSelect, center, className }: TabBarP
                 onClick={() => onSelect(item.id)}
                 aria-current={active ? 'page' : undefined}
                 className={cn(
-                  'flex min-h-11 flex-1 flex-col items-center justify-end gap-0.5 rounded-ctl py-1',
+                  // `min-h-[44px]` literal: el root global va al 87.5% (85% en
+                  // móvil, ver index.css), así que `min-h-11` (2.75rem) rinde
+                  // ~37-38px y no los 44 del piso táctil de la Constitución §3.
+                  'flex min-h-[44px] flex-1 flex-col items-center justify-end gap-0.5 rounded-ctl py-1',
                   'transition-colors duration-150 motion-reduce:transition-none',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
                   active ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
