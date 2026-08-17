@@ -1,3 +1,20 @@
+## 2026-08-17 · Monitor: sin hora de cierre no se inventa una cuota (PR #618)
+
+Auditoría visual con Filete en vivo: a las 02:45 (turno produciendo hacía
+2h21) la pantalla decía «Van 1.829 de las 5.000 que tocaban a las 02:45» y
+titulaba «−3.171 vs cuota», imputando deuda por tiempo que aún no había
+pasado. Dos causas: `ventanaTurnoMin` caía a `windowMin` (minutos
+transcurridos, no duración del turno) cuando faltaba `plannedEnd`; y el
+cierre estimado del PR #616 se restaba contra `scheduledStart`, que en un
+turno sin definir cae 24h atrás, estirando la ventana a ~26h y diluyendo la
+cuota casi a cero. Fix: la ventana se mide desde el arranque real de
+producción hasta el cierre estimado (455 min, no 26h), y sin cierre conocido
+no se dibuja cuota (`0` en vez de fallback engañoso), igual regla que ya usa
+«para llegar a la meta». Verificado con turno real: titular pasó de
+«−3.171 vs cuota» a «2.022 pz · 494 arriba de vie 14». 1499 tests verdes,
+tsc/eslint limpios. Merge commit `3740eb21` en main, deploy confirmado en
+GitHub Pages (`buildSha: 3740eb2`).
+
 ## 2026-08-17 · Monitor: el turno arranca donde arranca la producción, cierre estimado por duración (PR #616)
 
 Filete cambia el horario del turno noche de un día para otro (hoy 00:00→08:00,
