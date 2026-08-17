@@ -68,8 +68,17 @@ describe('equipoDe', () => {
   })
 })
 
+/*
+ * cpm UNIFORME (10 pz/min) en los tests históricos: con la misma vara en todos
+ * los turnos, las piezas son proporcionales a los minutos y el orden y los %
+ * heredados siguen valiendo tal cual. El cpm DIFERENCIAL —que reordena— tiene
+ * su describe propio más abajo.
+ */
+const conCpm = (causas: Array<{ reason: string; min: number; count: number }> | null | undefined) =>
+  causas ? { causas, total: 3000, producingMin: 300 } : causas
+
 describe('buildPareto · 6 turnos reales de Filete', () => {
-  const p = buildPareto(TURNOS)
+  const p = buildPareto(TURNOS.map(conCpm))
 
   it('suma los 336 min recuperables de la muestra', () => {
     expect(p.totalMin).toBe(336)
@@ -133,34 +142,34 @@ describe('buildPareto · bordes', () => {
   })
 
   it('descarta causas de duración cero en vez de listarlas con 0%', () => {
-    const p = buildPareto([[{ reason: 'X', min: 0, count: 3 }, { reason: 'Y', min: 5, count: 1 }]])
+    const p = buildPareto([conCpm([{ reason: 'X', min: 0, count: 3 }, { reason: 'Y', min: 5, count: 1 }])])
     expect(p.rows).toHaveLength(1)
     expect(p.rows[0]!.label).toBe('Y')
   })
 
   it('una sola causa se lleva el 100% y el corte es de una fila', () => {
-    const p = buildPareto([[{ reason: 'X', min: 10, count: 1 }]])
+    const p = buildPareto([conCpm([{ reason: 'X', min: 10, count: 1 }])])
     expect(p.vitalCount).toBe(1)
     expect(p.vitalPct).toBe(100)
   })
 
   it('con todas parejas y ninguna llegando al 80%, igual corta donde lo cruza', () => {
-    const p = buildPareto([[
+    const p = buildPareto([conCpm([
       { reason: 'A', min: 10, count: 1 }, { reason: 'B', min: 10, count: 1 },
       { reason: 'C', min: 10, count: 1 }, { reason: 'D', min: 10, count: 1 },
       { reason: 'E', min: 10, count: 1 },
-    ]])
+    ])])
     expect(p.vitalCount).toBe(4)   // 4 de 5 = 80%
   })
 })
 
 describe('dueño de la recurrencia', () => {
   it('⚠ cada fila dice de quién es, según el árbol oficial', () => {
-    const p = buildPareto([[
+    const p = buildPareto([conCpm([
       { reason: 'Baader 200/CUCHILLERIA DORSAL', min: 75, count: 5 },
       { reason: 'ATASCAMIENTO', min: 58, count: 20 },
       { reason: 'Micro Detencion', min: 113, count: 260 },
-    ]])
+    ])])
     const por = Object.fromEntries(p.rows.map((r) => [r.label, r.dueno]))
     expect(por['Baader 200']).toBe('mantencion')
     expect(por['ATASCAMIENTO']).toBe('externo')       // MMPP en el curso
@@ -168,11 +177,11 @@ describe('dueño de la recurrencia', () => {
   })
 
   it('el reparto por dueño suma lo mismo que las filas', () => {
-    const p = buildPareto([[
+    const p = buildPareto([conCpm([
       { reason: 'Baader 200/CUCHILLERIA DORSAL', min: 75, count: 5 },
       { reason: 'ATASCAMIENTO', min: 58, count: 20 },
       { reason: 'Micro Detencion', min: 113, count: 260 },
-    ]])
+    ])])
     expect(p.porDueno.mantencion).toBe(75)
     expect(p.porDueno.externo).toBe(58)
     expect(p.porDueno['sin-imputar']).toBe(113)
@@ -318,5 +327,46 @@ describe('ventana elegible y comparación entre turnos', () => {
   it('con un solo turno corriendo no hay comparación que ofrecer', () => {
     const soloDia = MIXTO.filter((t) => t.shiftId === 'Turno Dia')
     expect(contextoPorTurno(soloDia)).toHaveLength(1)
+  })
+})
+
+
+describe('buildPareto · la valorización usa el cpm de CADA turno', () => {
+  it('⚠ los mismos minutos en un turno lento cuestan menos piezas — y eso reordena', () => {
+    /*
+     * El caso real que el mockup mostró: MOTORES (20 min) cae bajo CAMBIO LOTE
+     * (17 min) porque sus paradas fueron en turnos lentos. Acá: A tiene MÁS
+     * minutos que B, pero paró en el turno de 8 pz/min; B paró en el de 14.
+     */
+    const p = buildPareto([
+      { causas: [{ reason: 'A', min: 20, count: 1 }], total: 2400, producingMin: 300 },  // 8 pz/min
+      { causas: [{ reason: 'B', min: 17, count: 1 }], total: 4200, producingMin: 300 },  // 14 pz/min
+    ])
+    expect(p.rows[0]!.label).toBe('B')                   // 238 pz > 160 pz
+    expect(Math.round(p.rows[0]!.piezas)).toBe(238)
+    expect(Math.round(p.rows[1]!.piezas)).toBe(160)
+    // …aunque por minutos A sigue siendo mayor: la diferencia ES la información.
+    expect(p.rows[1]!.minutes).toBeGreaterThan(p.rows[0]!.minutes)
+  })
+
+  it('un turno sin cpm (sin producción registrada) aporta minutos pero 0 piezas', () => {
+    const p = buildPareto([
+      { causas: [{ reason: 'A', min: 10, count: 1 }], total: 0, producingMin: 0 },
+    ])
+    expect(p.rows[0]!.minutes).toBe(10)
+    expect(p.rows[0]!.piezas).toBe(0)
+  })
+
+  it('el reparto por dueño en piezas suma el total valorizado', () => {
+    const p = buildPareto([
+      { causas: [
+        { reason: 'Baader 200/CUCHILLERIA DORSAL', min: 10, count: 1 },
+        { reason: 'ATASCAMIENTO', min: 10, count: 1 },
+        { reason: 'Micro Detencion', min: 10, count: 1 },
+      ], total: 3000, producingMin: 300 },
+    ])
+    const d = p.porDuenoPiezas
+    expect(d.mantencion + d.externo + d['sin-imputar']).toBeCloseTo(p.totalPiezas, 6)
+    expect(d.mantencion).toBeCloseTo(100, 6)
   })
 })
