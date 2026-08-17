@@ -22,6 +22,8 @@
  */
 
 /** Un tramo de la serie del monitor: `t` ISO wall-clock, `pieces` del tramo. */
+import { desdePrimeraPieza } from './monitorActividad'
+
 export interface MonitorSeriesPoint {
   t: string
   pieces: number
@@ -54,9 +56,14 @@ const BUCKET_MIN = 5
 /**
  * Agrupa la serie en horas CORRIDAS desde el primer tramo con dato.
  *
- * El arranque es la primera pieza y no `scheduledStart`: el horario programado
- * puede estar 20 minutos antes de que salga la primera, y esos minutos vacíos
- * correrían todas las filas.
+ * El arranque es la primera PIEZA y no `scheduledStart` ni el primer tramo
+ * sincronizado: el horario programado puede estar 20 minutos antes de que salga
+ * la primera, y esos minutos vacíos correrían todas las filas.
+ *
+ * ⚠ Esto lo prometía el comentario y no lo hacía el código: se tomaba el primer
+ * tramo con dato. Con un turno sin definir en Shoplogix (Filete de noche: serie
+ * desde 09:45, primera pieza 21:45) salían doce filas h1..h12 con 0 pz antes de
+ * la primera con producción.
  *
  * ⚠ Wall-clock: los ISO del monitor llevan Z pero son hora de planta, así que
  * el reloj se lee con `getUTC*`. Con `getHours()` los tramos se correrían al
@@ -66,7 +73,7 @@ const BUCKET_MIN = 5
 export function buildHourlyRows(series: MonitorSeriesPoint[] | null | undefined): HourlyRow[] {
   if (!series || series.length === 0) return []
 
-  const puntos = series
+  const puntos = desdePrimeraPieza(series)
     .map((p) => ({ ms: Date.parse(p.t), pieces: p.pieces || 0 }))
     .filter((p) => !Number.isNaN(p.ms))
     .sort((a, b) => a.ms - b.ms)

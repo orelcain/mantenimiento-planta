@@ -5,7 +5,7 @@
  * en Shoplogix → ventana de 06:00 a ahora (16 h) para 1 h de producción.
  */
 import { describe, it, expect } from 'vitest'
-import { ventanaDeActividad, horaDelMinuto, type PuntoSerie } from '../monitorActividad'
+import { ventanaDeActividad, horaDelMinuto, desdePrimeraPieza, type PuntoSerie } from '../monitorActividad'
 
 /** Serie de `n` tramos vacíos; `pone` marca piezas en índices concretos. */
 const serie = (n: number, pone: Record<number, number> = {}): PuntoSerie[] =>
@@ -90,5 +90,35 @@ describe('horaDelMinuto', () => {
 
   it('sin serie devuelve null', () => {
     expect(horaDelMinuto([], 10, fmt)).toBeNull()
+  })
+})
+
+describe('desdePrimeraPieza', () => {
+  it('corta los tramos vacíos del principio', () => {
+    const s = serie(10, { 4: 20, 5: 30 })
+    const r = desdePrimeraPieza(s)
+    expect(r).toHaveLength(6)
+    expect(r[0]!.pieces).toBe(20)
+  })
+
+  it('conserva la COLA vacía: el backend la agrega para que se vea el último paro', () => {
+    const s = serie(10, { 2: 15 })
+    expect(desdePrimeraPieza(s)).toHaveLength(8)
+  })
+
+  it('un turno sin una sola pieza se devuelve entero, no vacío', () => {
+    // Un turno que no produjo sigue siendo un turno y su gráfico plano informa.
+    expect(desdePrimeraPieza(serie(6))).toHaveLength(6)
+  })
+
+  it('si ya arranca con piezas no cambia nada', () => {
+    const s = serie(4, { 0: 10 })
+    expect(desdePrimeraPieza(s)).toHaveLength(4)
+  })
+
+  it('serie vacía o ausente devuelve lista vacía, no revienta', () => {
+    expect(desdePrimeraPieza([])).toEqual([])
+    expect(desdePrimeraPieza(null)).toEqual([])
+    expect(desdePrimeraPieza(undefined)).toEqual([])
   })
 })

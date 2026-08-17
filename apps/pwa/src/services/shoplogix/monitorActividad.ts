@@ -89,3 +89,30 @@ export function horaDelMinuto(
   const t = series[i]?.t
   return t ? fmt(t) : null
 }
+
+/**
+ * La serie desde la PRIMERA PIEZA: el turno empieza cuando la línea produjo,
+ * no cuando Shoplogix empezó a sincronizar tramos vacíos.
+ *
+ * ⚠ Esto no es cosmético, es el ORIGEN del eje de todo el monitor. «Hora por
+ * hora» y el comparador miden minutos desde el primer punto de la serie, y sus
+ * propios comentarios decían «el arranque es la primera pieza» — pero el código
+ * tomaba el primer tramo sincronizado, con piezas o sin ellas. Con un turno sin
+ * definir (Filete de noche: la serie arranca 09:45 y la primera pieza llega
+ * 21:45) eso daba 12 horas de h1..h12 en cero y desplazaba la curva de hoy 12 h
+ * respecto de los días de referencia, que sí arrancaban con producción: el
+ * comparador quedaba con la mitad del ancho vacío.
+ *
+ * Se recorta SOLO por delante. La cola de tramos vacíos se conserva: el
+ * backend la agrega a propósito para que el último paro se vea.
+ */
+export function desdePrimeraPieza<T extends PuntoSerie>(
+  series: readonly T[] | null | undefined,
+): T[] {
+  if (!series || series.length === 0) return []
+  const i = series.findIndex((p) => (p.pieces ?? 0) > 0)
+  /* Sin una sola pieza se devuelve la serie tal cual: un turno que no produjo
+     nada sigue siendo un turno, y su gráfico plano es la información. */
+  if (i <= 0) return [...series]
+  return series.slice(i)
+}

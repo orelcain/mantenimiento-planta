@@ -36,7 +36,7 @@ import {
 } from '@/services/shoplogix/publicShiftMonitor.service'
 import { buildHourlyRows, peakPieces } from '@/services/shoplogix/monitorHourly'
 import { computePaceToTarget, lineMaxPerHour, type PaceToTarget } from '@/services/shoplogix/monitorPace'
-import { ventanaDeActividad, horaDelMinuto } from '@/services/shoplogix/monitorActividad'
+import { ventanaDeActividad, desdePrimeraPieza } from '@/services/shoplogix/monitorActividad'
 import { pinShiftEnd, unpinShiftEnd, setMonitorSetPoint } from '@/services/shoplogix/pinShiftEnd'
 import {
   buildDayComparison, optimalPace, plannedBreaks, mergeBreaks, cumulativeFromStart,
@@ -1196,13 +1196,50 @@ function RitmoNecesario({
    */
   if (!pace) {
     if (cierre != null) return null // hay horario pero no meta: nada que decir
+    /*
+     * ⚠⚠ DOS causas distintas y una de ellas no se resuelve sola:
+     *
+     * - Turno con nombre nuevo → el backend aprende su cierre con 2 turnos
+     *   cerrados. Esperar sirve.
+     * - Turno SIN DEFINIR en Shoplogix (`Unscheduled`) → el inferidor descarta
+     *   los Unscheduled a propósito (`publicMonitor.js`, filtro
+     *   `!/unscheduled/i`), así que ese cierre NO se va a aprender nunca.
+     *   Decirle a la gente que espere sería mandarla a esperar para siempre.
+     *
+     * Y en los dos casos hay que dejar a mano el botón de fijar el cierre: la
+     * versión anterior retornaba ANTES de `CierreDelTurno`, así que justo
+     * cuando faltaba el horario no había forma de ponerlo.
+     */
+    const sinDefinir = /unscheduled/i.test(shiftName ?? '')
     return (
-      <div className="mt-3 rounded-xl border border-dashed border-border px-3 py-2.5 text-[11.5px] leading-snug text-muted-foreground">
-        <span className="font-semibold text-amber-700 dark:text-amber-400">◔ Para llegar a la meta</span>{' '}
-        — sin horario conocido para este turno todavía
-        {shiftName ? <> («{shiftName}» es nuevo)</> : null}: se activa solo cuando Shoplogix
-        cierre 2 turnos con este nombre. Mientras tanto, la lectura es el ritmo andando.
-      </div>
+      <>
+        <div className="mt-3 rounded-xl border border-dashed border-border px-3 py-2.5 text-[11.5px] leading-snug text-muted-foreground">
+          <span className="font-semibold text-amber-700 dark:text-amber-400">◔ Para llegar a la meta</span>{' '}
+          {sinDefinir ? (
+            <>
+              — este tramo no tiene turno definido en Shoplogix, así que no se sabe a qué hora
+              cierra y no se puede calcular el ritmo que falta. Se arregla definiendo el turno
+              en Shoplogix, o fijando acá abajo la hora de cierre. Mientras tanto, la lectura es
+              el ritmo andando.
+            </>
+          ) : (
+            <>
+              — sin horario conocido para este turno todavía
+              {shiftName ? <> («{shiftName}» es nuevo)</> : null}: se aprende solo cuando
+              Shoplogix cierre 2 turnos con este nombre. También se puede fijar acá abajo.
+              Mientras tanto, la lectura es el ritmo andando.
+            </>
+          )}
+        </div>
+        <CierreDelTurno
+          cierre={cierre}
+          muestras={muestras}
+          fuente={fuente}
+          plantSlug={plantSlug}
+          shiftName={shiftName}
+          startAt={startAt}
+        />
+      </>
     )
   }
 
@@ -1831,35 +1868,21 @@ export function PublicShiftMonitorPage() {
   /*
    * ── El eje arranca donde la línea arrancó ──────────────────────────────
    *
-   * La ventana del turno la declara Shoplogix y cuando el turno no está
-   * definido (Filete de noche llega como `Unscheduled`) va de las 06:00 a
-   * ahora: 16 h de eje para 1 h de producción, con la actividad aplastada
-   * contra el borde. Al abrir se propone la ventana de actividad — la misma
-   * que mueve el pellizco, así que alejarse la deshace y no hay estado nuevo
-   * que mantener.
+   * El recorte ya NO se hace con la ventana de zoom: se hace en el ORIGEN de la
+   * serie (`desdePrimeraPieza`, dentro de `monitorHourly` y `monitorCompare`),
+   * que es de donde salía el problema. Forzar una ventana además desalineaba el
+   * comparador: los días de referencia arrancaban en su minuto 0 y hoy en el
+   * 725, así que sus curvas quedaban fuera del encuadre.
    *
-   * `autoAplicada` guarda QUÉ turno se ajustó solo: sin eso, cada refresco
-   * de datos volvería a encuadrar y el gráfico se resistiría a que lo muevan.
+   * Lo que queda acá es solo el AVISO: cuánto tiempo declarado se está dejando
+   * afuera, para que nadie crea que el turno entero fue así de corto.
    */
-  const [autoAplicada, setAutoAplicada] = useState<string | null>(null)
   const recorteActividad = useMemo(
     () => ventanaDeActividad(live?.series),
     [live?.series],
   )
-  const claveTurno = `${vista?.dateKey ?? ''}|${vista?.shiftId ?? ''}`
-  useEffect(() => {
-    if (!recorteActividad || autoAplicada === claveTurno) return
-    setAutoAplicada(claveTurno)
-    setVentanaGrafica({ desdeMin: recorteActividad.desdeMin, hastaMin: recorteActividad.hastaMin })
-  }, [recorteActividad, claveTurno, autoAplicada])
-  /*
-   * El aviso acompaña a CUALQUIER ventana aplicada, no solo al encuadre exacto
-   * que propusimos: `useZoomGesto` recorta la ventana ajena a su propio dominio
-   * y la republica con otros minutos, así que comparar por igualdad dejaba el
-   * aviso invisible justo cuando el eje sí estaba recortado. Solo desaparece
-   * cuando se mira el turno entero (ventana en null).
-   */
-  const conRecorteAuto = Boolean(recorteActividad && ventanaGrafica)
+  /** La serie que ven los gráficos: desde la primera pieza, como el resto. */
+  const serieDelTurno = useMemo(() => desdePrimeraPieza(live?.series), [live?.series])
 
   const esActual = idx === 0
 
@@ -1939,7 +1962,7 @@ export function PublicShiftMonitorPage() {
      * Sale de `currentReason`/`currentSinceAt`, y es de convenio si esa causa
      * lo es hoy o lo fue en los turnos anteriores.
      */
-    const t0raw = live?.series?.[0]?.t
+    const t0raw = serieDelTurno[0]?.t
     const causasDeConvenio = new Set([
       ...(live?.timeBreakdown?.planned ?? []).map((x) => x.reason),
       ...anteriores.map((b) => b.reason),
@@ -1960,7 +1983,7 @@ export function PublicShiftMonitorPage() {
     // a durar: se estira a lo que dura en los turnos anteriores.
     const hoy = extendOngoingBreaks([...deConvenio(live), ...enCurso], anteriores, minutoActual)
     return mergeBreaks(hoy, anteriores, minutoActual)
-  }, [live, data?.history])
+  }, [live, data?.history, serieDelTurno])
 
   /**
    * Lo que el operador escribió, agrupado por la causa que anota, para poder
@@ -1968,9 +1991,9 @@ export function PublicShiftMonitorPage() {
    * completa sigue abajo: esto son las dos primeras notas de cada causa.
    */
   const notasDeOperador = useMemo(
-    () => notasPorCausa(live?.comments, fmtWallTime, live?.series?.[0]?.t ?? null),
+    () => notasPorCausa(live?.comments, fmtWallTime, serieDelTurno[0]?.t ?? null),
     // El t0 entra en la cuenta: sin él las notas no sabrían dónde caen.
-    [live?.comments, live?.series],
+    [live?.comments, serieDelTurno],
   )
 
   /* Los que Shoplogix marca para el turno entero: no cuelgan de ninguna parada
@@ -2146,12 +2169,12 @@ export function PublicShiftMonitorPage() {
           live?.timeBreakdown && live.timeBreakdown.producingMin > 0
             ? live.totalPieces / live.timeBreakdown.producingMin
             : null,
-        /* El minuto 0 del eje que comparten los gráficos: el PRIMER TRAMO CON
-           DATO, la misma base de `monitorCompare`. Con él, cada parada sabe
+        /* El minuto 0 del eje que comparten los gráficos: la PRIMERA PIEZA,
+           la misma base de `monitorCompare`. Con él, cada parada sabe
            dónde cae en el gráfico y se puede saltar a ella sola. */
-        t0: live?.series?.[0]?.t ?? null,
+        t0: serieDelTurno[0]?.t ?? null,
       }),
-    [live, costoParadas],
+    [live, costoParadas, serieDelTurno],
   )
 
   /*
@@ -2306,9 +2329,9 @@ export function PublicShiftMonitorPage() {
      * necesario se reparte sobre tiempo de reloj: el 14-08 a las 12:50 pedía
      * 13,1 pz/min repartiendo 2.089 pz en 2 h 40, con ~55 min de colación
      * adentro. Sobre los minutos en que la línea produce son casi 20.
-     * Minutos contados desde el primer tramo con dato, la base de `breaks`.
+     * Minutos contados desde la primera pieza, la base de `breaks`.
      */
-    const t0 = live.series?.[0]?.t ? Date.parse(live.series[0]!.t) : NaN
+    const t0 = serieDelTurno[0]?.t ? Date.parse(serieDelTurno[0]!.t) : NaN
     const desdeMin = live.series?.length ? live.series.length * 5 : 0
     const hastaMin = !Number.isNaN(t0) && live.plannedEnd
       ? (Date.parse(live.plannedEnd) - t0) / 60_000
@@ -2345,7 +2368,7 @@ export function PublicShiftMonitorPage() {
       shiftClosed: live.shiftClosed,
       pendingBreakMin: Number.isNaN(t0) ? 0 : breakMinutesBetween(breaksTurno, desdeMin, hastaMin),
     })
-  }, [live, data?.targetPieces, now, breaksTurno, ritmoAndando])
+  }, [live, data?.targetPieces, now, breaksTurno, ritmoAndando, serieDelTurno])
 
   /*
    * Comparador con los turnos anteriores, a la misma altura de turno.
@@ -2474,11 +2497,11 @@ export function PublicShiftMonitorPage() {
    * traducen los dos a hora de reloj para que cada número diga hasta cuándo
    * vale, en vez de dejar que se contradigan a tres tarjetas de distancia.
    *
-   * El minuto 0 es el PRIMER TRAMO CON DATO, no `scheduledStart`: es la misma
-   * base con que `monitorCompare` indexa las curvas.
+   * El minuto 0 es la PRIMERA PIEZA, no `scheduledStart` ni el primer tramo
+   * sincronizado: es la misma base con que `monitorCompare` indexa las curvas.
    */
   const horizontePronostico = useMemo(() => {
-    const t0raw = live?.series?.[0]?.t
+    const t0raw = serieDelTurno[0]?.t
     if (!pronostico || !t0raw) return null
     const t0 = Date.parse(t0raw)
     if (Number.isNaN(t0)) return null
@@ -2504,7 +2527,7 @@ export function PublicShiftMonitorPage() {
       estimate: pronostico.mapePct <= MAX_MAPE_PCT ? pronostico.estimate : null,
       mapePct: pronostico.mapePct <= MAX_MAPE_PCT ? pronostico.mapePct : null,
     }
-  }, [pronostico, live, pace])
+  }, [pronostico, live, pace, serieDelTurno])
 
   /**
    * Velocidad de la máquina y llenado de silletas.
@@ -2575,10 +2598,10 @@ export function PublicShiftMonitorPage() {
    * conociera la convención wall-clock-as-UTC.
    */
   const proximaParada = useMemo(() => {
-    // ⚠ La base es el PRIMER TRAMO CON DATO, que es contra lo que
+    // ⚠ La base es la PRIMERA PIEZA, que es contra lo que
     // `plannedBreaks` cuenta sus minutos. Con `scheduledStart` la hora salía
     // corrida (hoy 07:45 contra 07:40: cinco minutos tarde).
-    const base = live?.series?.[0]?.t ?? live?.scheduledStart
+    const base = serieDelTurno[0]?.t ?? live?.scheduledStart
     if (!base || comparacion.currentMinute == null) return null
     const prox = comparacion.breaks
       .filter((b) => b.fromMin > comparacion.currentMinute!)
@@ -2594,7 +2617,7 @@ export function PublicShiftMonitorPage() {
       hora: fmtWallTime(new Date(Date.parse(base) + prox.fromMin * 60_000).toISOString()),
       reason: prox.reason,
     }
-  }, [live?.series, live?.scheduledStart, comparacion.breaks, comparacion.currentMinute])
+  }, [serieDelTurno, live?.scheduledStart, comparacion.breaks, comparacion.currentMinute])
 
   if (status === 'loading') {
     return (
@@ -3062,23 +3085,12 @@ export function PublicShiftMonitorPage() {
           Recortar el eje sin decirlo haría creer que el turno entero fue
           así de corto. Se dice qué se está mirando y se ofrece la salida.
         */}
-        {conRecorteAuto && recorteActividad && (
-          <p className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] leading-snug text-muted-foreground">
-            <span>
-              Los gráficos parten en{' '}
-              <b className="text-foreground/80">
-                {horaDelMinuto(live.series, recorteActividad.desdeMin, fmtWallTime) ?? '—'}
-              </b>
-              , cuando la línea registró la primera pieza. El turno declarado empieza antes
-              ({fmtDurationSec(recorteActividad.recortadoMin * 60)} sin actividad).
-            </span>
-            <button
-              type="button"
-              onClick={() => setVentanaGrafica(null)}
-              className="min-h-[44px] shrink-0 text-brand-ink underline decoration-dotted underline-offset-2"
-            >
-              ver el turno completo
-            </button>
+        {recorteActividad && serieDelTurno.length > 0 && (
+          <p className="text-[11px] leading-snug text-muted-foreground">
+            Los gráficos y las horas cuentan desde{' '}
+            <b className="text-foreground/80">{fmtWallTime(serieDelTurno[0]!.t)}</b>, la primera
+            pieza del turno. El turno declarado empieza antes:{' '}
+            {fmtDurationSec(recorteActividad.recortadoMin * 60)} sin actividad que no se dibujan.
           </p>
         )}
 
@@ -3100,7 +3112,7 @@ export function PublicShiftMonitorPage() {
                 mudaron acá, encima de su propio detalle, que además es el gráfico
                 que sabe ubicar las detenciones y el que tiene el zoom a 8×. */}
             <Sparkbars
-              series={live.series}
+              series={serieDelTurno}
               stopReasons={live.stopReasons}
               stopEvents={live.stopEvents}
               comments={live.comments}
@@ -3214,7 +3226,7 @@ export function PublicShiftMonitorPage() {
                 mudaron acá, encima de su propio detalle, que además es el gráfico
                 que sabe ubicar las detenciones y el que tiene el zoom a 8×. */}
             <Sparkbars
-              series={live.series}
+              series={serieDelTurno}
               stopReasons={live.stopReasons}
               stopEvents={live.stopEvents}
               comments={live.comments}
@@ -3304,7 +3316,7 @@ export function PublicShiftMonitorPage() {
           turno={turnoPareto ?? vista?.shiftId ?? null} onTurno={setTurnoPareto}
         />
 
-        <PorHora series={live.series} />
+        <PorHora series={serieDelTurno} />
 
         {/* Desglose por máquina — solo aporta cuando la línea tiene más de una */}
         {live.machines.length > 1 && (

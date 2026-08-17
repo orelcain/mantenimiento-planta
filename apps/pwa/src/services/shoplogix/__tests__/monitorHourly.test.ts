@@ -105,3 +105,38 @@ describe('peakPieces', () => {
     expect(peakPieces([])).toBe(0)
   })
 })
+
+/*
+ * ⚠⚠ El caso Filete del 17-08-2026: turno sin definir en Shoplogix. La serie
+ * arranca a las 09:45 (Shoplogix sincroniza tramos vacíos desde el borde de la
+ * ventana) y la primera pieza llega a las 21:45. Antes salían doce filas h1..h12
+ * con 0 pz antes de la primera con producción.
+ */
+describe('buildHourlyRows · el turno empieza en la primera pieza', () => {
+  const punto = (h: number, m: number, pieces: number) => ({
+    t: `2026-08-16T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00.000Z`,
+    pieces,
+  })
+
+  it('no cuenta las horas vacías previas a la primera pieza', () => {
+    const series = [
+      // 12 tramos vacíos: 09:45 → 10:40
+      ...Array.from({ length: 12 }, (_, i) => punto(9 + Math.floor((45 + i * 5) / 60), (45 + i * 5) % 60, 0)),
+      punto(21, 45, 40),
+      punto(21, 50, 50),
+    ]
+    const rows = buildHourlyRows(series)
+    // Una sola hora: la que arranca con la primera pieza.
+    expect(rows).toHaveLength(1)
+    expect(rows[0]!.index).toBe(1)
+    expect(rows[0]!.pieces).toBe(90)
+    expect(rows[0]!.from).toContain('21:45')
+  })
+
+  it('un turno que produce desde el primer tramo no cambia', () => {
+    const rows = buildHourlyRows([punto(7, 45, 30), punto(7, 50, 30)])
+    expect(rows).toHaveLength(1)
+    expect(rows[0]!.pieces).toBe(60)
+    expect(rows[0]!.from).toContain('07:45')
+  })
+})
