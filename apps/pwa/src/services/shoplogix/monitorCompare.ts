@@ -20,6 +20,7 @@
  * (el de hoy en `live`, los anteriores en `history`). No hace falta guardar nada.
  */
 
+import { desdePrimeraPieza } from './monitorActividad'
 import type { MonitorSeriesPoint } from './monitorHourly'
 
 /** Tramo de la serie de Shoplogix. */
@@ -34,13 +35,21 @@ export interface PacePoint {
 /**
  * Curva acumulada indexada en minutos desde el arranque.
  *
- * El arranque es el primer tramo CON DATO de la serie y no `scheduledStart`: el
- * horario programado puede estar 20 minutos antes de la primera pieza, y esos
- * minutos vacíos correrían la curva entera hacia la derecha.
+ * El arranque es la PRIMERA PIEZA, no `scheduledStart` ni el primer tramo
+ * sincronizado: el horario programado puede estar 20 minutos antes de la
+ * primera pieza, y esos minutos vacíos correrían la curva entera hacia la
+ * derecha.
+ *
+ * ⚠ Antes tomaba el primer tramo con DATO —con piezas o sin ellas— y eso
+ * rompía la comparación cuando el turno no está definido en Shoplogix: en
+ * Filete de noche la serie arranca 09:45 y la primera pieza llega 21:45, así
+ * que la curva de hoy quedaba corrida 12 h contra días de referencia que sí
+ * arrancaban produciendo, y la mitad del gráfico quedaba vacía. Comparar «a la
+ * misma altura de turno» exige que los dos midan desde lo mismo.
  */
 export function cumulativeFromStart(series: MonitorSeriesPoint[] | null | undefined): PacePoint[] {
   if (!series || series.length === 0) return []
-  const puntos = series
+  const puntos = desdePrimeraPieza(series)
     .map((p) => ({ ms: Date.parse(p.t), pieces: p.pieces || 0 }))
     .filter((p) => !Number.isNaN(p.ms))
     .sort((a, b) => a.ms - b.ms)

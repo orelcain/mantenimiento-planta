@@ -6,6 +6,7 @@
  * bundle público no debe arrastrar los helpers del Grader, que se llevan echarts.
  */
 
+import { desdePrimeraPieza } from '@/services/shoplogix/monitorActividad'
 import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import type { PublicMonitorLive } from '@/services/shoplogix/publicShiftMonitor.service'
@@ -1111,7 +1112,10 @@ export function ComparadorDias({ cmp, live, cone, ventana, onVentana, refSel, on
             <MonitorCompareChart
               /* El arranque del turno visto: convierte el eje de «h+6» a la
                  hora de reloj, la misma que muestra el gráfico de velocidad. */
-              t0={live?.series?.[0]?.t ?? null}
+              /* La primera PIEZA, igual que el resto del monitor: rotular
+                 desde el primer tramo sincronizado ponía el eje 12 h antes del
+                 arranque real cuando el turno no está definido en Shoplogix. */
+              t0={desdePrimeraPieza(live?.series)[0]?.t ?? null}
               ventana={ventana}
               onVentana={onVentana}
               cmp={cmp}
