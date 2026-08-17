@@ -918,7 +918,7 @@ function FilaEvento({ c, sel, onCausa, onVentana, onTramo, notas }: {
   const nombre = (
     <span className="min-w-0 truncate">
       {c.reason}
-      {c.paradas.length > 0 && <span className="ml-1 text-[9px] text-muted-foreground/70">{abierta ? '▾' : '▸'}</span>}
+      {c.paradas.length > 0 && <span className="ml-1 text-[11px] text-muted-foreground/70">{abierta ? '▾' : '▸'}</span>}
     </span>
   )
 
