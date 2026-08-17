@@ -1,3 +1,22 @@
+## 2026-08-17 · Monitor: comparar mismo turno con mismo turno, ahora que Filete tiene día y noche (PR #626)
+
+Shoplogix normalizó los turnos de Filete: de «Turno Dia» único pasó a «Turno
+Dia» + «Turno Noche L» (00:20→08:00, 4.398 pz). Con eso, tres partes del
+monitor mezclaban diurno y nocturno sin avisarlo: el gráfico comparador
+tomaba los 6 turnos anteriores por fecha sin mirar el nombre (filtro en la
+página, no en `buildDayComparison`, porque Yal compara sus 3 turnos del
+mismo día a propósito); la etiqueta solo distinguía turno cuando compartían
+`dateKey` (el nocturno tiene su propio día y no se notaba); el techo de
+ritmo salía de `forecastHistory` sin filtrar (que además el backend publica
+solo para el turno vigente); y la banda de «rango normal» sumaba
+`shiftStats` como tercera fuente porque es la única que trae todos los
+nombres (si no, el turno no vigente se quedaba con <5 muestras y la banda
+desaparecía). Verificado con datos reales: el comparador del diurno lista
+solo diurnos (vie 14 a lun 10), el nocturno del 17 ya no se cuela. 1512
+tests verdes (1 nuevo, caso Filete), tsc/eslint limpios, `audit-piel.mjs`
+sin crecer deuda. Merge commit `bfccc182` en main (squash), deploy
+confirmado en GitHub Pages (`buildSha: bfccc18`).
+
 ## 2026-08-17 · Monitor: una sola regla de ritmo en vez de seis cifras sueltas (PR #624)
 
 Convivían 6 cifras de ritmo (acumulado del turno, de reloj, pz/h, últimos
