@@ -1,3 +1,22 @@
+## 2026-08-17 · Monitor: los gráficos parten donde la línea arrancó, no donde dice el turno (PR #610)
+
+Filete de noche llega sin turno definido (`Unscheduled`), y la ventana
+por defecto va de 06:00 a ahora: de madrugada eso daba 16 h de eje
+para 1 h de producción. Nuevo `monitorActividad.ts` con
+`ventanaDeActividad()`: encuentra el primer/último tramo con piezas y
+lo propone como encuadre inicial de ambos gráficos (reusa la ventana
+de `useZoomGesto`, sin estado nuevo); aviso en pantalla de qué se
+recortó y por qué, solo si el recorte supera 45 min. No comprime
+huecos interiores ni esconde picos aislados.
+
+Verificado con el turno real de Filete en vivo (eje `09:20–01:20` →
+`21:35–01:30`); 1488 tests verdes (105 archivos, 10 nuevos del
+helper); tsc/eslint limpios. Merge commit `61cbbf3c` en main, deploy
+confirmado en GitHub Pages (`buildSha: 61cbbf3`).
+
+⚠️ Este archivo sigue sobre los ~150 KB recomendados (ahora ~212 KB) —
+compactar entradas antiguas en la próxima sesión de mantenimiento.
+
 ## 2026-08-17 · Fix: los targets táctiles de piel/ miden 44 px de verdad, no 37 (PR #608)
 
 `min-h-11`/`h-11` no rendía 44 px: `index.css` baja el root al 87,5%
