@@ -1,3 +1,22 @@
+## 2026-08-16 · Accesos por línea en Análisis de Turno + banner sin versión (PR #606)
+
+«Grader» pasa a «Análisis de Turno» en home móvil (admin y supervisor),
+alineado con el sidebar; la tarjeta gana 3 accesos directos por línea
+(`Principal · Eviscerado`, `Principal · Filete`, `Yal · Eviscerado`)
+derivados de `PLANT_LINES.filter(shoplogixEnabled)`, con `ListCell
+variant="child"`. El banner de actualización deja de mostrar el semver
+(«4.2.0») y muestra hora de la nueva versión + tiempo desactualizado
+(`formatDesfase`/`formatHora` en `buildInfo.ts`); botón «Recargar» pasa
+de 31 px a 44 px de alto.
+
+Verificado: 1478 tests verdes (104 archivos, 11 nuevos), tsc/eslint
+limpios, audit-piel OK; 375 px con sesión real de admin. Merge commit
+`2b496dda` en main, deploy confirmado en GitHub Pages
+(`buildSha: 2b496dd`).
+
+⚠️ Este archivo pasó los ~150 KB recomendados (209 KB) — conviene
+compactar entradas antiguas en la próxima sesión de mantenimiento.
+
 ## 2026-08-16 · Fuera la mediana punteada del Pareto; filas con piezas y % (PR #604)
 
 Orel: la línea punteada de la tira «Cómo viene turno a turno» ensuciaba
