@@ -279,7 +279,7 @@ export function MonitorCompareChart({ cmp, cerrado, claveSel, onSel, cone, venta
       {/* Qué mide el eje. El gráfico dibuja ACUMULADO y a más de uno le pasó
           leerlo como piezas por hora: sin la unidad, dos curvas que suben no
           dicen de qué. */}
-      <div className="mb-0.5 text-[9px] uppercase tracking-wide text-muted-foreground/70">
+      <div className="mb-0.5 text-[11px] uppercase tracking-wide text-muted-foreground/70">
         piezas acumuladas
       </div>
 
@@ -292,7 +292,7 @@ export function MonitorCompareChart({ cmp, cerrado, claveSel, onSel, cone, venta
               línea de arriba del bloque y en el tooltip. */}
           {marcasY.map((v) => (
             <span key={v}
-              className="absolute right-0 -translate-y-1/2 text-[9px] tabular-nums text-muted-foreground"
+              className="absolute right-0 -translate-y-1/2 text-[11px] tabular-nums text-muted-foreground"
               style={{ top: `${fy(v) * 100}%` }}>
               {v === 0 ? '0' : v >= 1000 ? `${fmtDec1(v / 1000)}k` : fmtInt(v)}
             </span>
@@ -394,12 +394,12 @@ export function MonitorCompareChart({ cmp, cerrado, claveSel, onSel, cone, venta
                   «arranque» sobraba: la hora dice lo mismo y además CUÁL es.
                   Sin `t0` vuelve a la palabra, que sigue siendo lo único
                   cierto. Anclado al borde: centrada, media quedaría fuera. */}
-              <span className="absolute left-0 top-0 whitespace-nowrap text-[9px] tabular-nums text-muted-foreground">
+              <span className="absolute left-0 top-0 whitespace-nowrap text-[11px] tabular-nums text-muted-foreground">
                 {horaDesde(t0, 0) ?? 'arranque'}
               </span>
               {marcas.map((m) => (
                 <span key={m}
-                  className="absolute top-0 -translate-x-1/2 whitespace-nowrap text-[9px] tabular-nums text-muted-foreground"
+                  className="absolute top-0 -translate-x-1/2 whitespace-nowrap text-[11px] tabular-nums text-muted-foreground"
                   style={{ left: `${fx(m) * 100}%` }}>
                   {horaDesde(t0, m) ?? `h+${m / 60}`}
                 </span>

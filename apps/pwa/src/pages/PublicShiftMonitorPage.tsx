@@ -742,7 +742,7 @@ function Sparkbars({
         )}
       </div>
 
-      <div className="mt-1 text-[9px] uppercase tracking-wide text-muted-foreground/70">pz/min</div>
+      <div className="mt-1 text-[11px] uppercase tracking-wide text-muted-foreground/70">pz/min</div>
 
       {/* ⚠ El eje Y va FUERA del contenedor con scroll y el X adentro: al
           revés, las horas se quedan quietas mientras el gráfico se desplaza y
@@ -757,7 +757,7 @@ function Sparkbars({
           {marcasY.map((v) => (
             <span
               key={v}
-              className="absolute right-1 -translate-y-1/2 text-[9px] tabular-nums text-muted-foreground/70"
+              className="absolute right-1 -translate-y-1/2 text-[11px] tabular-nums text-muted-foreground/70"
               style={{ top: `${(1 - v / escala) * 100}%` }}
             >
               {fmtInt(v)}
@@ -2701,7 +2701,10 @@ export function PublicShiftMonitorPage() {
         <div className="mx-auto max-w-3xl px-4 py-3">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <h1 className="text-base font-semibold leading-tight">{lineTitle}</h1>
-            <StatusPill live={live} />
+            {/* Con el turno CERRADO no se anuncia el estado en vivo: «Detenida»
+                junto a «Turno cerrado» son dos estados a la vez, y a 375 px
+                empujaban la fecha a una tercera línea. */}
+            {!live.shiftClosed && <StatusPill live={live} />}
             {live.shiftClosed && (
               <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
                 Turno cerrado
@@ -3019,7 +3022,13 @@ export function PublicShiftMonitorPage() {
                   value={fmtDec(andando ?? live.piecesPerMinute)}
                   unit="pz/min"
                   icon={<Gauge className="h-3 w-3" />}
-                  hint={andando != null ? 'cuando la línea produce' : 'promedio del turno'}
+                  /* ⚠ Es el acumulado de TODO el turno, no el ritmo de ahora:
+                     con el turno avanzado casi no se mueve aunque el gráfico se
+                     desplome (medido: 12,37 → 12,16 mientras los tramos iban de
+                     0 a 17). Sin decirlo, se lee como «va a esta velocidad» y
+                     contradice al gráfico de abajo. El ritmo de ahora es la
+                     tarjeta de al lado. */
+                  hint={andando != null ? 'promedio del turno, cuando produce' : 'promedio del turno'}
                   spark={andando != null && banda
                     ? <Chispa turnos={banda.turnos} hoy={andando} banda={banda.ritmo} />
                     : undefined}
