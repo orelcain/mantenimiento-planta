@@ -1,3 +1,18 @@
+## 2026-08-16 · Tendencia del Pareto muestra % y ≈pz de cada turno (PR #600)
+
+La tira «Cómo viene turno a turno» era lo único del bloque de Pareto que
+seguía hablando solo en minutos/%. Ahora cada barra muestra su % arriba y
+sus ≈pz debajo (`fmtPzCorto` abrevia sobre mil a `1,1k`), con el cpm andando
+del turno que usa el ranking. El `≈` se declara una sola vez en el
+encabezado en vez de repetirse por columna (desbordaba a 375 px); la tira
+sube de 104 a 120 px de alto.
+
+Verificado: 438 tests verdes, tsc/eslint limpios, audit-piel OK; medido en
+navegador a 375 px con los turnos reales (0 columnas desbordadas, antes 1)
+en ambos temas. Merge commit `684a5d5e` en main, deploy confirmado en
+GitHub Pages (`orelcain.github.io/mantenimiento-planta/version.json`
+→ `buildSha: 684a5d5`).
+
 ## 2026-08-16 · Pareto "Qué se repite" valorizado en piezas (PR #598)
 
 El bloque de causas repetidas del monitor público de Filete pasa de hablar
