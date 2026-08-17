@@ -1,3 +1,24 @@
+## 2026-08-17 · Fix: los targets táctiles de piel/ miden 44 px de verdad, no 37 (PR #608)
+
+`min-h-11`/`h-11` no rendía 44 px: `index.css` baja el root al 87,5%
+(85% en móvil), o sea 1 rem ≈ 13,6 px, así que `2.75rem` daba 37 px.
+Salió a la luz arreglando el botón «Recargar» del banner (PR #606).
+Se pasan a píxeles literales cuatro primitivos de `components/piel/`:
+`GroupedList.tsx` (`ListCell`, 23 apariciones en 6 archivos — el de
+mayor alcance), `Button.tsx` (tamaño `md`, el default), `Disclosure.tsx`
+(variante `section`) y `TabBar.tsx`, cada uno con comentario para que
+no se revierta a `min-h-11`. Sin tocar: `Button` `sm`, `Disclosure`
+`inline` (documentados como exentos o zona gris), ni nada fuera de
+`components/piel/`.
+
+Verificado: 1478 tests verdes (104 archivos, línea base), tsc/eslint
+limpios, audit-piel sin crecer deuda; medido en navegador a 375 px
+(celdas 44 px, tabs 44,2 px, antes 37). Merge commit `9f90208b` en
+main, deploy confirmado en GitHub Pages (`buildSha: 9f90208`).
+
+⚠️ Este archivo sigue sobre los ~150 KB recomendados (~210 KB) —
+compactar entradas antiguas en la próxima sesión de mantenimiento.
+
 ## 2026-08-16 · Accesos por línea en Análisis de Turno + banner sin versión (PR #606)
 
 «Grader» pasa a «Análisis de Turno» en home móvil (admin y supervisor),
