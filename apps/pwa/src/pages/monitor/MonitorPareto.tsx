@@ -30,6 +30,9 @@ const fmtDec1 = (n: number) => nf1.format(n || 0)
  */
 const fmtPzDecena = (n: number) => nf.format(Math.round(n / 10) * 10)
 const fmtPzCentena = (n: number) => nf.format(Math.round(n / 100) * 100)
+/* Piezas para columnas de ~30 px: sobre mil pasa a «1,2k» o no cabe. */
+const fmtPzCorto = (n: number) =>
+  n >= 1000 ? `${(n / 1000).toFixed(1).replace('.', ',')}k` : nf.format(Math.round(n / 10) * 10)
 /** «≈ 2 turnos de producción», a medio turno — nunca «2,04». */
 const fmtTurnosEq = (pz: number, pzPorTurno: number) => {
   if (!(pzPorTurno > 0)) return null
@@ -349,7 +352,7 @@ export function ParetoDeParadas({
           <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
             Cómo viene turno a turno
             <span className="normal-case tracking-normal">
-              {' '}· % recuperable de cada turno · últimos {serie.serie.length}
+              {' '}· % y ≈pz recuperables de cada turno · últimos {serie.serie.length}
               {serie.banda && (
                 <>
                   {' · '}
@@ -401,7 +404,7 @@ export function ParetoDeParadas({
             </div>
           )}
 
-          <div className="relative mt-3 h-[104px]">
+          <div className="relative mt-3 h-[120px]">
             {/* La mediana, para tener contra qué comparar cada barra. Su cifra
                 va en el encabezado: flotando sobre la línea pisaba el % de la
                 barra que quedara debajo. */}
@@ -418,9 +421,18 @@ export function ParetoDeParadas({
                 .map(({ p, hueco }) => (
                   <div key={p.dateKey} className="flex min-w-0 flex-1 flex-col items-center">
                     {!hueco && (
-                      <span className="text-[11px] tabular-nums text-muted-foreground">
-                        {Math.round(p.pct)}%
-                      </span>
+                      <>
+                        <span className="text-[11px] tabular-nums text-muted-foreground">
+                          {Math.round(p.pct)}%
+                        </span>
+                        {/* Las piezas del mismo turno bajo su %: el bloque entero
+                            habla en piezas, esta tira era lo único que no. */}
+                        {p.piezas > 0 && (
+                          <span className="text-[11px] tabular-nums text-muted-foreground/70">
+                            {fmtPzCorto(p.piezas)}
+                          </span>
+                        )}
+                      </>
                     )}
                     <div
                       className={hueco
