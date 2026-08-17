@@ -88,8 +88,12 @@ export function ListCell({
   return (
     <div
       // El separador es un ::before insetado; `first:` lo oculta en la 1ª celda.
+      // `min-h-[44px]` en vez de `min-h-11`: el root global va al 87.5% (85% en
+      // móvil, ver index.css), así que min-h-11 (2.75rem) rinde ~37px y no 44 —
+      // el piso táctil absoluto de la Constitución §3. No "corregir" a la clase
+      // de escala o la celda vuelve a quedar bajo el mínimo táctil.
       className={cn(
-        'relative flex min-h-11 items-center gap-3 px-4 py-2.5',
+        'relative flex min-h-[44px] items-center gap-3 px-4 py-2.5',
         'before:absolute before:right-0 before:top-0 before:h-px before:bg-border before:content-[""]',
         leading || esHijo ? 'before:left-[3.25rem]' : 'before:left-4',
         'first:before:hidden',
