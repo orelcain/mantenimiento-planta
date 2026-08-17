@@ -67,3 +67,30 @@ export function formatUpdatedLabel(now: Date = new Date()): string {
   if (dias === 1) return `Actualizada ayer ${hh}:${mi}`
   return `Actualizada el ${formatBuildDateShort()}`
 }
+
+/**
+ * «2 h 15 min», «45 min», «3 días» — cuánto se lleva con la versión vieja.
+ *
+ * Pura y exportada para testearla: es el número que el banner le pone delante
+ * a la gente, y decir «hace 1 día» cuando fueron 20 minutos quema la confianza
+ * en el aviso entero.
+ */
+export function formatDesfase(ms: number): string {
+  const min = Math.max(0, Math.round(ms / 60_000))
+  if (min < 1) return 'recién'
+  if (min < 60) return `${min} min`
+  const h = Math.floor(min / 60)
+  const rm = min % 60
+  if (h < 24) return rm > 0 ? `${h} h ${rm} min` : `${h} h`
+  const d = Math.floor(h / 24)
+  const rh = h % 24
+  if (d === 1) return rh > 0 ? `1 día ${rh} h` : '1 día'
+  return `${d} días`
+}
+
+/** «14:25» en hora local, para decir a qué hora salió lo nuevo. */
+export function formatHora(ts: number): string {
+  const d = new Date(ts)
+  if (Number.isNaN(d.getTime())) return ''
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}

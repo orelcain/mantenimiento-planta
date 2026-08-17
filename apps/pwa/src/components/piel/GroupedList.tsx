@@ -60,6 +60,12 @@ export interface ListCellProps extends Omit<React.HTMLAttributes<HTMLDivElement>
   trailing?: React.ReactNode
   /** Muestra el chevron de navegación. Se activa solo si hay onClick. */
   chevron?: boolean
+  /**
+   * `child` = celda subordinada a la de arriba (p. ej. una línea dentro de
+   * «Análisis de Turno»). La jerarquía se dice con un carril y peso de texto,
+   * NO con una card dentro de otra ni con una línea nueva (§7 y §38).
+   */
+  variant?: 'default' | 'child'
   onClick?: React.MouseEventHandler<HTMLDivElement>
 }
 
@@ -71,19 +77,21 @@ export function ListCell({
   valueSub,
   trailing,
   chevron,
+  variant = 'default',
   onClick,
   className,
   ...props
 }: ListCellProps) {
   const interactive = Boolean(onClick)
   const showChevron = chevron ?? interactive
+  const esHijo = variant === 'child'
   return (
     <div
       // El separador es un ::before insetado; `first:` lo oculta en la 1ª celda.
       className={cn(
         'relative flex min-h-11 items-center gap-3 px-4 py-2.5',
         'before:absolute before:right-0 before:top-0 before:h-px before:bg-border before:content-[""]',
-        leading ? 'before:left-[3.25rem]' : 'before:left-4',
+        leading || esHijo ? 'before:left-[3.25rem]' : 'before:left-4',
         'first:before:hidden',
         interactive &&
           'cursor-pointer transition-colors duration-150 hover:bg-accent active:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary motion-reduce:transition-none',
@@ -104,6 +112,13 @@ export function ListCell({
       }
       {...props}
     >
+      {esHijo && (
+        /* Carril del ancho del ícono del padre: alinea al hijo bajo su título
+           y deja el punto donde el ojo ya está mirando. */
+        <div className="flex w-7 shrink-0 justify-center" aria-hidden>
+          <span className="size-[5px] rounded-full bg-muted-foreground/[0.45]" />
+        </div>
+      )}
       {leading && <div className="shrink-0">{leading}</div>}
       {/*
         En pantalla angosta el título puede ocupar DOS líneas y el valor baja a
@@ -113,7 +128,8 @@ export function ListCell({
         además que en móvil la arquitectura cambie, no que solo se encoja.
       */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="line-clamp-2 text-body font-semibold leading-tight sm:truncate">{title}</div>
+        <div className={cn('line-clamp-2 text-body leading-tight sm:truncate',
+          esHijo ? 'font-normal' : 'font-semibold')}>{title}</div>
         {subtitle && (
           <div className="line-clamp-1 text-footnote leading-tight text-muted-foreground">{subtitle}</div>
         )}
