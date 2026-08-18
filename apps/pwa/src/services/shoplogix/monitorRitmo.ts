@@ -58,6 +58,32 @@ export function ritmoAhoraCpm(series: readonly TramoSerie[] | null | undefined):
   return media[media.length - 1]! / PASO_MIN
 }
 
+/**
+ * El ritmo de ahora ANDANDO: solo los minutos en que la línea produjo.
+ *
+ * ⚠⚠ Por qué existe: la regla compara contra el SET POINT de la máquina, que
+ * es una velocidad andando (18 pz/min es lo que da cuando corre, no un promedio
+ * con paradas). Si el relleno de la barra fuera de reloj y el techo andando,
+ * la barra subestimaría siempre y la comparación no significaría nada. Peor: la
+ * marca del promedio del turno TAMBIÉN es andando, así que en la misma barra
+ * convivían dos denominadores — el error que este bloque vino a terminar.
+ *
+ * Los minutos andando se cuentan por tramo: un tramo con piezas cuenta sus 5
+ * minutos, uno vacío no cuenta ninguno. Es una aproximación —dentro de un tramo
+ * puede haber habido un paro corto— pero es la misma con la que se dibuja la
+ * curva, así que número y gráfico siguen contando lo mismo.
+ */
+export function ritmoAhoraAndando(series: readonly TramoSerie[] | null | undefined): number | null {
+  if (!series || series.length === 0) return null
+  const conDatos = mediaMovil(series).length      // corta la cola de ceros igual que la curva
+  if (conDatos === 0) return null
+  const ventana = series.slice(Math.max(0, conDatos - VENTANA_TRAMOS), conDatos)
+  const piezas = ventana.reduce((a, p) => a + (p.pieces ?? 0), 0)
+  const tramosAndando = ventana.filter((p) => (p.pieces ?? 0) > 0).length
+  if (tramosAndando === 0) return 0               // la línea estuvo parada toda la ventana
+  return piezas / (tramosAndando * PASO_MIN)
+}
+
 /** Cómo se lee un ritmo contra el techo de la máquina. */
 export type EstadoRitmo = 'ok' | 'lento' | 'parada'
 

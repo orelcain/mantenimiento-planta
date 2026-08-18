@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import {
-  mediaMovil, ritmoAhoraCpm, estadoRitmo, fraccionDeRegla, PASO_MIN,
+  mediaMovil, ritmoAhoraCpm, ritmoAhoraAndando, estadoRitmo, fraccionDeRegla, PASO_MIN,
   type TramoSerie,
 } from '../monitorRitmo'
 
@@ -86,5 +86,40 @@ describe('fraccionDeRegla', () => {
 
   it('sin techo la regla se llena: no hay escala contra la cual mentir', () => {
     expect(fraccionDeRegla(12, null)).toBe(1)
+  })
+})
+
+/*
+ * ⚠⚠ LA BASE IMPORTA (Orel, 17-08: «¿este ritmo es en producción o de reloj?»).
+ * La regla compara contra el set point de la MÁQUINA, que es una velocidad
+ * andando. Si el relleno fuera de reloj y el techo andando, la barra
+ * subestimaría siempre — y la marca del promedio del turno, que también es
+ * andando, quedaría en otra base que el relleno: dos denominadores en la misma
+ * barra.
+ */
+describe('ritmoAhoraAndando · la misma base que el techo y que la marca', () => {
+  it('descuenta los tramos parados de la ventana', () => {
+    // 3 tramos: 60 pz, 0 (paro), 60 pz → 120 pz en 10 min ANDANDO = 12 pz/min.
+    const s = serie([60, 0, 60])
+    expect(ritmoAhoraAndando(s)).toBeCloseTo(12, 5)
+    // De reloj sería 120/15 = 8: el mismo turno, dos lecturas distintas.
+    expect(ritmoAhoraCpm(s)).toBeCloseTo(8, 5)
+  })
+
+  it('sin paros, ambas bases coinciden', () => {
+    const s = serie([50, 50, 50])
+    expect(ritmoAhoraAndando(s)).toBeCloseTo(10, 5)
+    expect(ritmoAhoraCpm(s)).toBeCloseTo(10, 5)
+  })
+
+  it('la línea parada toda la ventana da 0, no null', () => {
+    // Los ceros del final se cortan como en la curva; si TODO es cero no hay
+    // ventana que medir y devuelve null (no hay ritmo, no es «va a cero»).
+    expect(ritmoAhoraAndando(serie([0, 0, 0]))).toBeNull()
+  })
+
+  it('serie vacía o ausente no rompe', () => {
+    expect(ritmoAhoraAndando([])).toBeNull()
+    expect(ritmoAhoraAndando(null)).toBeNull()
   })
 })
