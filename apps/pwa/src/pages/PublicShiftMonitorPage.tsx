@@ -37,7 +37,7 @@ import {
 import { buildHourlyRows, peakPieces } from '@/services/shoplogix/monitorHourly'
 import { computePaceToTarget, lineMaxPerHour, type PaceToTarget } from '@/services/shoplogix/monitorPace'
 import { ventanaDeActividad, desdePrimeraPieza, piezasAntesDelArranque } from '@/services/shoplogix/monitorActividad'
-import { mediaMovil, ritmoAhoraCpm, ritmoAhoraAndando, estadoRitmo, fraccionDeRegla } from '@/services/shoplogix/monitorRitmo'
+import { mediaMovil, ritmoAhoraCpm, ritmoAhoraAndando, estadoRitmo, fraccionDeRegla, pedidoAndando } from '@/services/shoplogix/monitorRitmo'
 import { pinShiftEnd, unpinShiftEnd, setMonitorSetPoint } from '@/services/shoplogix/pinShiftEnd'
 import {
   buildDayComparison, optimalPace, plannedBreaks, mergeBreaks, cumulativeFromStart,
@@ -1780,7 +1780,7 @@ function PorHora({ series }: { series: PublicMonitorLive['series'] }) {
  * final de la regla ES lo que falta. No hay que saber que 18 es el techo ni
  * restar 12,5 de 18.
  */
-function ReglaDeRitmo({ ahora, ahoraReloj, turno, setCpm, onEditarSetPoint, cerrado, contexto, chispa }: {
+function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, onEditarSetPoint, cerrado, contexto, chispa }: {
   /**
    * Ritmo de ahora ANDANDO, en pz/min: los últimos 15 min descontando los
    * tramos parados. Va en esta base y no en la de reloj porque es contra lo
@@ -1791,6 +1791,13 @@ function ReglaDeRitmo({ ahora, ahoraReloj, turno, setCpm, onEditarSetPoint, cerr
   ahora: number | null
   /** El mismo tramo pero DE RELOJ (con las paradas adentro). */
   ahoraReloj?: number | null
+  /**
+   * El ritmo ANDANDO que hay que sostener para llegar a la meta. Es la marca
+   * de la regla: dinámico, sube si el turno se atrasa. null cuando no se sabe
+   * a qué hora cierra —sin cierre no hay objetivo que calcular—, y ahí la
+   * marca vuelve a ser el promedio del turno.
+   */
+  pedido?: number | null
   /** Promedio del turno cuando la línea produce: la marca de la regla. */
   turno: number | null
   /** Velocidad de la máquina: el final de la regla. */
@@ -1803,14 +1810,26 @@ function ReglaDeRitmo({ ahora, ahoraReloj, turno, setCpm, onEditarSetPoint, cerr
   /** El sparkline de los turnos previos, si hay historia. */
   chispa?: React.ReactNode
 }) {
-  const estado = estadoRitmo(ahora, setCpm)
+  /*
+   * ⚠ El estado se juzga contra el OBJETIVO cuando se conoce, no contra la
+   * máquina: «va lento» comparando con el set point decía que la línea no está
+   * a tope, que casi siempre es cierto y no ayuda a decidir. Lo que importa es
+   * si el ritmo alcanza para la cuota (pedido de Orel, 17-08). Sin objetivo
+   * —turno sin hora de cierre— se cae al set point, que es la única vara que
+   * queda.
+   */
+  const vara = pedido && pedido > 0 ? pedido : setCpm
+  const estado = estadoRitmo(ahora, vara)
   const fr = fraccionDeRegla(ahora, setCpm)
   const frTurno = fraccionDeRegla(turno, setCpm)
+  const frPedido = fraccionDeRegla(pedido ?? null, setCpm)
   /* El estado SIEMPRE se dice con palabra además de color: en planta hay
      pantallas quemadas por el sol y gente que no distingue rojo de verde. */
   const palabra = cerrado
     ? 'al cierre'
-    : estado === 'ok' ? 'a ritmo' : estado === 'lento' ? 'va lento' : 'casi parada'
+    : pedido && pedido > 0
+      ? estado === 'ok' ? 'alcanza la meta' : estado === 'lento' ? 'falta ritmo' : 'muy por debajo'
+      : estado === 'ok' ? 'a ritmo' : estado === 'lento' ? 'va lento' : 'casi parada'
   const colorRelleno = estado === 'ok'
     ? 'bg-ink-ok' : estado === 'lento' ? 'bg-ink-warn' : 'bg-ink-crit'
   const colorPunto = estado === 'ok'
@@ -1847,7 +1866,18 @@ function ReglaDeRitmo({ ahora, ahoraReloj, turno, setCpm, onEditarSetPoint, cerr
             className={`absolute inset-y-0 left-0 rounded-full ${colorRelleno} transition-[width] duration-300 motion-reduce:transition-none`}
             style={{ width: `${Math.max(fr * 100, ahora != null && ahora > 0 ? 2 : 0)}%` }}
           />
-          {turno != null && turno > 0 && setCpm != null && setCpm > 0 && (
+          {/* La marca es el OBJETIVO: dónde tendría que estar el relleno para
+              llegar a la cuota. Que el relleno la pase o no la alcance ES la
+              respuesta, sin leer un número. */}
+          {pedido != null && pedido > 0 && setCpm != null && setCpm > 0 && (
+            <span
+              className="absolute inset-y-0 w-0.5 bg-foreground"
+              style={{ left: `${frPedido * 100}%` }}
+              title={`Para la meta hay que ir a ${fmtDec(pedido)} pz/min andando`}
+            />
+          )}
+          {/* Sin objetivo conocido, la referencia posible es el promedio del turno. */}
+          {(pedido == null || pedido <= 0) && turno != null && turno > 0 && setCpm != null && setCpm > 0 && (
             <span
               className="absolute inset-y-0 w-0.5 bg-foreground/45"
               style={{ left: `${frTurno * 100}%` }}
@@ -1857,7 +1887,11 @@ function ReglaDeRitmo({ ahora, ahoraReloj, turno, setCpm, onEditarSetPoint, cerr
         </div>
         <div className="mt-1 flex items-baseline justify-between text-[11px] text-muted-foreground">
           <span className="tabular-nums">
-            {turno != null ? <>promedio del turno <b className="font-semibold text-foreground/80">{fmtDec(turno)}</b></> : 'promedio del turno —'}
+            {pedido != null && pedido > 0
+              ? <>para la meta <b className="font-semibold text-foreground">{fmtDec(pedido)}</b></>
+              : turno != null
+                ? <>promedio del turno <b className="font-semibold text-foreground/80">{fmtDec(turno)}</b></>
+                : 'promedio del turno —'}
           </span>
           {/* La etiqueta del techo ES el control: a 375 px no cabe un lápiz
               extra sin pisarla. */}
@@ -3214,6 +3248,16 @@ export function PublicShiftMonitorPage() {
             <ReglaDeRitmo
               ahora={ritmoAhoraAndando(serieDelTurno)}
               ahoraReloj={ritmoAhoraCpm(serieDelTurno)}
+              /* El objetivo, en la MISMA base que el ritmo: el requerido de
+                 `pace` es sobre el reloj útil que queda, y se convierte a
+                 «andando» con el uptime real del turno. */
+              pedido={pedidoAndando(
+                pace?.requiredPerMinute,
+                live.timeBreakdown?.producingMin,
+                live.timeBreakdown
+                  ? Math.max(1, live.timeBreakdown.windowMin - (live.timeBreakdown.plannedMin ?? 0))
+                  : null,
+              )}
               turno={turnoCpm}
               setCpm={setCpmVigente}
               cerrado={live.shiftClosed}
