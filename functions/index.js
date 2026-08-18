@@ -205,6 +205,43 @@ async function editTelegramMessage(chatId, messageId, text, buttons) {
 }
 
 /**
+ * Enviar un ARCHIVO a Telegram (multipart, no JSON).
+ *
+ * `callTelegramApi` manda JSON y sirve para todo lo demás, pero sendDocument
+ * necesita multipart/form-data con el binario adentro. FormData y Blob son
+ * nativos desde Node 18, así que no hace falta dependencia.
+ *
+ * Límite de Telegram: 50 MB por archivo. Los informes de turno pesan ~50 KB.
+ *
+ * @param {string} chatId
+ * @param {Buffer} buffer
+ * @param {string} filename
+ * @param {string} [caption] HTML
+ * @param {object} [opts] {topicId}
+ */
+async function sendTelegramDocument(chatId, buffer, filename, caption, opts = {}) {
+  const token = process.env.TELEGRAM_BOT_TOKEN
+  if (!token) return null
+  try {
+    const form = new FormData()
+    form.append('chat_id', String(chatId || process.env.TELEGRAM_CHAT_ID))
+    form.append('document', new Blob([buffer], { type: 'application/pdf' }), filename)
+    if (caption) {
+      form.append('caption', caption)
+      form.append('parse_mode', 'HTML')
+    }
+    if (opts.topicId) form.append('message_thread_id', String(opts.topicId))
+    const response = await fetch(`${TELEGRAM_API_BASE}/bot${token}/sendDocument`, { method: 'POST', body: form })
+    const result = await response.json()
+    if (!result.ok) logger.error('Telegram sendDocument error', result)
+    return result
+  } catch (error) {
+    logger.error('Telegram sendDocument fetch error', error)
+    return null
+  }
+}
+
+/**
  * Enviar una foto con caption y botones opcionales.
  */
 async function sendTelegramPhoto(chatId, photoUrl, caption, buttons, opts = {}) {
@@ -7167,6 +7204,7 @@ const SHOPLOGIX_PLANT_LINE_ID = {
 // Firestore). Vive en su propio módulo para poder testear la resolución.
 const notifConfigMod = require('./shoplogix/notifConfig')
 const shoplogixMachinesMod = require('./shoplogix/machines')
+const shoplogixInformeMod = require('./shoplogix/enviarInforme')
 const SHOPLOGIX_NOTIF_DEFAULTS = notifConfigMod.DEFAULTS
 
 /** Base pública de la PWA (GitHub Pages). Los links de Telegram son absolutos. */
@@ -7858,6 +7896,31 @@ exports.checkShiftEndBriefs = onSchedule(
             }, { merge: true })
 
             logger.info('[checkShiftEndBriefs] brief enviado', { plant, doc: docSnap.id, total })
+
+            // ── Informe post-turno en PDF ────────────────────────────────
+            // Va DESPUÉS del brief y en su propio try/catch: el brief lleva
+            // meses funcionando y es lo crítico. Si el informe falla —jsPDF,
+            // Telegram, un turno con datos raros— tiene que caerse solo el
+            // informe y quedar en el log, sin tocar lo que ya salió.
+            // Apagado por defecto; se prende por planta en la config.
+            try {
+              const r = await shoplogixInformeMod.enviarInformeDeTurno({
+                db,
+                plant,
+                shiftDocId: docSnap.id,
+                config,
+                enviarDocumento: (chatId, buffer, filename, caption) =>
+                  sendTelegramDocument(chatId, buffer, filename, caption),
+                logger,
+              })
+              if (r.enviado) {
+                logger.info('[checkShiftEndBriefs] informe PDF enviado', { plant, doc: docSnap.id, bytes: r.bytes })
+              } else if (r.motivo !== 'apagado') {
+                logger.info('[checkShiftEndBriefs] informe PDF no enviado', { plant, doc: docSnap.id, motivo: r.motivo })
+              }
+            } catch (e) {
+              logger.error('[checkShiftEndBriefs] informe PDF falló', { plant, doc: docSnap.id, err: e.message })
+            }
           } catch (e) {
             logger.error('[checkShiftEndBriefs] error componiendo/enviando', { plant, doc: docSnap.id, err: e.message })
           }
