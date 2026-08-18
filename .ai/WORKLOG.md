@@ -6,6 +6,26 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-08-18 · Monitor: la marca de la regla es la velocidad que exige la meta, y el pulso lee el contador vivo cada minuto (PR #635)
+
+Dos cambios. (1) La marca de la regla de ritmo deja de ser el set point y
+pasa a ser el ritmo requerido para cumplir la meta del turno, convertido a
+base «andando» con el uptime real (14,2 pz/min de reloj con 82 % de uptime
+= 17,4 andando); con menos de 15 min producidos no se extrapola. Verificado
+con turno real: relleno 40 % vs marca 96,5 %, estado pasó de «va lento» a
+«muy por debajo». (2) Nuevo scheduler `shoplogixPulseWakeup` (cada 1 min)
+que lee el acumulado instantáneo de Shoplogix (mismo endpoint del
+whiteboard) sin tocar los buckets de 5 min ni el sync completo; con dos
+lecturas seguidas publica el ritmo instantáneo. No reemplaza al sync (los
+buckets siguen siendo la fuente de curva/paradas/historial); descarta
+acumulados que bajan entre lecturas (cambio de turno) y solo escribe en
+monitores vigentes no expirados. Falta la UI del pulso (cronómetro +
+refrescar) para el próximo PR. 1522 tests verdes (7 nuevos del pulso en
+backend), tsc/eslint limpios, `audit-piel.mjs` sin crecer deuda. Merge
+commit `d1c55dfe` en main (squash), deploy confirmado en GitHub Pages
+(`buildSha: d1c55df`) y deploy de Cloud Functions en success (creó
+`shoplogixPulseWakeup(us-central1)` sin error).
+
 ## 2026-08-18 · Monitor: el ritmo dice en qué base está, y las tres cifras de la regla usan la misma (PR #633)
 
 Orel, mirando la tarjeta con la línea andando: «¿este ritmo es de producción
