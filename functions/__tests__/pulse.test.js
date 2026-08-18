@@ -6,7 +6,7 @@
  */
 const test = require('node:test')
 const assert = require('node:assert')
-const { componerPulso, MAX_LECTURAS } = require('../shoplogix/pulse')
+const { componerPulso, ritmoDeVentana, MAX_LECTURAS } = require('../shoplogix/pulse')
 
 const lec = (min, n) => ({ at: new Date(Date.UTC(2026, 7, 18, 3, min)).toISOString(), totalCycles: n })
 
@@ -17,23 +17,24 @@ test('pulse: la primera lectura no tiene con qué calcular ritmo', () => {
   assert.equal(p.lecturas.length, 1)
 })
 
-test('pulse: el ritmo sale de la diferencia entre dos lecturas', () => {
+test('pulse: el ritmo sale de la ventana, no de las dos últimas', () => {
   let p = componerPulso(null, lec(0, 100))
-  p = componerPulso(p, lec(1, 112))          // 12 piezas en 1 minuto
+  p = componerPulso(p, lec(2, 124))          // 24 piezas en 2 minutos
   assert.equal(p.cpm, 12)
-  assert.equal(p.totalCycles, 112)
+  assert.equal(p.totalCycles, 124)
 })
 
 test('pulse: la línea parada da ritmo 0, no null', () => {
-  // Cero es información: la línea está detenida AHORA.
-  let p = componerPulso(null, lec(0, 500))
-  p = componerPulso(p, lec(2, 500))
+  // Cero es información: la línea está detenida AHORA. Pero se necesita una
+  // ventana de verdad para afirmarlo, no dos lecturas pegadas.
+  let p = null
+  for (let i = 0; i <= 4; i++) p = componerPulso(p, lec(i, 500))
   assert.equal(p.cpm, 0)
 })
 
 test('⚠ pulse: dos lecturas muy juntas NO publican ritmo', () => {
-  // Con menos de 30 s el redondeo del tiempo hace saltar el número entre 0 y
-  // valores enormes; mejor no decir nada que decir cualquier cosa.
+  // Bajo el minuto y medio, el refresco de Shoplogix (cada 2 min) hace saltar
+  // el número entre 0 y valores enormes; mejor no decir nada.
   let p = componerPulso(null, lec(0, 100))
   const casi = { at: new Date(Date.UTC(2026, 7, 18, 3, 0, 10)).toISOString(), totalCycles: 103 }
   p = componerPulso(p, casi)
@@ -42,7 +43,7 @@ test('⚠ pulse: dos lecturas muy juntas NO publican ritmo', () => {
 
 test('⚠ pulse: un acumulado que BAJA es cambio de turno, no ritmo negativo', () => {
   let p = componerPulso(null, lec(0, 4000))
-  p = componerPulso(p, lec(1, 30))           // arrancó el turno siguiente
+  p = componerPulso(p, lec(2, 30))           // arrancó el turno siguiente
   assert.equal(p.cpm, null)
   assert.equal(p.totalCycles, 30)            // el acumulado sí se actualiza
 })
@@ -96,4 +97,23 @@ test('pulse: leerPulso no revienta si Shoplogix falla — devuelve null', async 
     logger: { warn() {} },
   })
   assert.equal(r, null)
+})
+
+/*
+ * ⚠⚠ EL CASO MEDIDO EN PRODUCCIÓN (18-08, turno noche de Filete): aunque
+ * preguntemos cada minuto, el contador de Shoplogix se refresca cada DOS. Las
+ * lecturas reales fueron 1453 → 1476 → 1476 → 1495 → 1495.
+ */
+test('⚠ pulse: el refresco de 2 min de Shoplogix NO hace parpadear el ritmo', () => {
+  const reales = [1453, 1476, 1476, 1495, 1495]
+  let p = null
+  reales.forEach((n, i) => { p = componerPulso(p, lec(i, n)) })
+  // Entre las dos últimas la diferencia es 0; sobre la ventana de 4 min son
+  // 42 piezas → 10,5 pz/min, que es el ritmo de verdad.
+  assert.equal(p.cpm, 10.5)
+})
+
+test('ritmoDeVentana: sin dos lecturas no inventa un número', () => {
+  assert.equal(ritmoDeVentana([]), null)
+  assert.equal(ritmoDeVentana([{ at: new Date().toISOString(), totalCycles: 10 }]), null)
 })
