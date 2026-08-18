@@ -268,8 +268,12 @@ function construirTextos({ resumen, recuperaciones, cotejo, principal, meta, dif
   const pendientes = []
   const pausaMayor = (resumen.pausas || [])[0]
   if (pausaMayor && pausaMayor.todasSec > resumen.detencion.todasSec) {
-    pendientes.push(`${etiquetaCausa(pausaMayor)} detuvo la linea ${durTexto(pausaMayor.todasSec)}, mas que toda la detencion no programada `
-      + `(${durTexto(resumen.detencion.todasSec)}). Es una decision de Produccion y Mantencion juntas, no un pendiente de un departamento.`)
+    // Redactado con cuidado: esto sale automatico todos los dias y habla de una
+    // pausa que es de Produccion. Se informa como dato de donde esta el tiempo,
+    // no como reproche — el objetivo es que la conversacion exista, no ganarla.
+    pendientes.push(`Para tener presente: ${etiquetaCausa(pausaMayor)} concentro ${durTexto(pausaMayor.todasSec)} de linea detenida, `
+      + `el bloque mas grande del turno. Es tiempo planificado y no una falla; se anota solo porque si alguna vez se busca capacidad, `
+      + 'ahi hay mas que en las detenciones.')
   }
   if (principal && principal.eventos >= 5) {
     pendientes.push(`${etiquetaCausa(principal)} cayo ${principal.eventos} veces en el turno. Un patron asi rara vez es azar: revisar en terreno.`)

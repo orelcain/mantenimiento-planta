@@ -140,7 +140,10 @@ test('la pausa programada se compara con la detención, sin culpar a nadie', () 
   const t = construirTextos({ resumen: r, recuperaciones: [], cotejo: cotejoMejor, principal: r.causas[0], meta })
   const p = t.pendientes.find((x) => /Colación/.test(x))
   assert.ok(p, 'debe mencionar la pausa mayor')
-  assert.match(p, /Produccion y Mantencion juntas/i)
+  // El dato se informa, pero sin tono de reproche: esto sale solo todos los
+  // dias y habla de una pausa que es de Produccion.
+  assert.match(p, /tiempo planificado y no una falla/i)
+  assert.ok(!/mas que toda la detencion|no un pendiente de un departamento/i.test(p), 'no debe sonar a reproche')
 })
 
 test('pide el sufijo de categoría cuando el dato no distingue', () => {
