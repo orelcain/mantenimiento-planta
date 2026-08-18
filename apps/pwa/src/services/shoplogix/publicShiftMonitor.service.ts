@@ -338,6 +338,40 @@ export function subscribePublicShiftMonitor(
 const HEARTBEAT_SEC = 120
 
 const PING_URL = 'https://us-central1-mantenimiento-planta-771a3.cloudfunctions.net/publicMonitorPing'
+const REFRESCAR_URL = 'https://us-central1-mantenimiento-planta-771a3.cloudfunctions.net/publicMonitorRefrescar'
+
+/**
+ * Pide a Shoplogix el contador vivo AHORA, sin esperar al pulso automático.
+ *
+ * ⚠ Adelanta «cuántas van» y el ritmo — es el mismo request liviano del pulso.
+ * NO fuerza el sync completo del día (la curva, las paradas y el historial
+ * siguen su ciclo de 5 min): eso son ~7 requests por planta y decenas de
+ * segundos, demasiado para un botón que cualquiera con el link puede tocar.
+ *
+ * El servidor tiene throttle propio: si el pulso ya es fresco devuelve el que
+ * hay con `yaFresco: true`, y eso NO es un error — es el dato más nuevo que
+ * existe. El contador de Shoplogix se refresca cada ~2 min, así que pedirlo
+ * más seguido devolvería el mismo número.
+ *
+ * No lanza: un botón de refrescar que rompe la pantalla es peor que uno que no
+ * hace nada. Devuelve `null` si falló y quien llama decide qué mostrar.
+ */
+export async function refrescarPulso(token: string): Promise<
+  { pulse: PulsoMonitor | null; yaFresco: boolean; esperaSeg?: number } | null
+> {
+  try {
+    const r = await fetch(REFRESCAR_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    })
+    if (!r.ok) return null
+    const d = await r.json()
+    return { pulse: d.pulse ?? null, yaFresco: Boolean(d.yaFresco), esperaSeg: d.esperaSeg }
+  } catch {
+    return null
+  }
+}
 const VIEWER_KEY = 'monitorViewerId'
 
 /**
