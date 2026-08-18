@@ -1,3 +1,21 @@
+## 2026-08-17 · Monitor: el nombre del turno dejó de significar lo mismo — la comparación la elige la persona (PR #628)
+
+Revierte el criterio del PR #626 de ayer mismo: filtrar el comparador por
+nombre de turno resultó exactamente al revés de lo que sirve, porque Filete
+movió su turno grande de «Turno Dia» a «Turno Noche L» (00:20–07:51, 4.398
+pz) y dejó un «Turno Dia» residual de 4 h y 604 pz el 17-ago. Filtrando por
+nombre, al turno chico se le ponía la vara del grande y al grande no le
+quedaba nada con qué compararse. Fix: se ofrecen todos los turnos como
+chips (etiquetados «vie 14 dia», «hoy noche l», mismo nombre primero) y la
+persona elige contra cuál comparar; la frase del rango declara su muestra
+(«los 5 turnos iguales anteriores fueron de…») y avisa cuando son de otro
+horario. Se conserva el filtro por nombre en banda/récords/vsAyer/Pareto,
+donde la comparación sigue siendo automática. Verificado con datos reales
+(desde el turno de día ahora se puede comparar contra el nocturno). 1514
+tests verdes (2 nuevos, caso Filete), tsc/eslint limpios, `audit-piel.mjs`
+sin crecer deuda. Merge commit `f033e738` en main (squash), deploy
+confirmado en GitHub Pages (`buildSha: f033e73`).
+
 ## 2026-08-17 · Monitor: comparar mismo turno con mismo turno, ahora que Filete tiene día y noche (PR #626)
 
 Shoplogix normalizó los turnos de Filete: de «Turno Dia» único pasó a «Turno
