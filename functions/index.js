@@ -205,43 +205,6 @@ async function editTelegramMessage(chatId, messageId, text, buttons) {
 }
 
 /**
- * Enviar un ARCHIVO a Telegram (multipart, no JSON).
- *
- * `callTelegramApi` manda JSON y sirve para todo lo demás, pero sendDocument
- * necesita multipart/form-data con el binario adentro. FormData y Blob son
- * nativos desde Node 18, así que no hace falta dependencia.
- *
- * Límite de Telegram: 50 MB por archivo. Los informes de turno pesan ~50 KB.
- *
- * @param {string} chatId
- * @param {Buffer} buffer
- * @param {string} filename
- * @param {string} [caption] HTML
- * @param {object} [opts] {topicId}
- */
-async function sendTelegramDocument(chatId, buffer, filename, caption, opts = {}) {
-  const token = process.env.TELEGRAM_BOT_TOKEN
-  if (!token) return null
-  try {
-    const form = new FormData()
-    form.append('chat_id', String(chatId || process.env.TELEGRAM_CHAT_ID))
-    form.append('document', new Blob([buffer], { type: 'application/pdf' }), filename)
-    if (caption) {
-      form.append('caption', caption)
-      form.append('parse_mode', 'HTML')
-    }
-    if (opts.topicId) form.append('message_thread_id', String(opts.topicId))
-    const response = await fetch(`${TELEGRAM_API_BASE}/bot${token}/sendDocument`, { method: 'POST', body: form })
-    const result = await response.json()
-    if (!result.ok) logger.error('Telegram sendDocument error', result)
-    return result
-  } catch (error) {
-    logger.error('Telegram sendDocument fetch error', error)
-    return null
-  }
-}
-
-/**
  * Enviar una foto con caption y botones opcionales.
  */
 async function sendTelegramPhoto(chatId, photoUrl, caption, buttons, opts = {}) {
@@ -7205,6 +7168,7 @@ const SHOPLOGIX_PLANT_LINE_ID = {
 const notifConfigMod = require('./shoplogix/notifConfig')
 const shoplogixMachinesMod = require('./shoplogix/machines')
 const shoplogixInformeMod = require('./shoplogix/enviarInforme')
+const { sendTelegramDocument } = require('./shoplogix/telegramDoc')
 const SHOPLOGIX_NOTIF_DEFAULTS = notifConfigMod.DEFAULTS
 
 /** Base pública de la PWA (GitHub Pages). Los links de Telegram son absolutos. */
