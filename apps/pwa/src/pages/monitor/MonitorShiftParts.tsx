@@ -1229,10 +1229,20 @@ function Veredicto({ cmp, cerrado }: {
       {r.rango && (
         <p className="mt-1 text-[12px] leading-snug text-muted-foreground">
           {cerrado ? 'A esa altura' : 'A esta altura'} los{' '}
-          <span className="tabular-nums">{r.rango.dias}</span> días anteriores fueron de{' '}
+          <span className="tabular-nums">{r.rango.dias}</span>{' '}
+          {r.muestra.mismoTurno ? 'turnos iguales anteriores' : 'turnos anteriores'} fueron de{' '}
           <span className="tabular-nums text-foreground/80">{fmtInt(r.rango.min)}</span> a{' '}
           <span className="tabular-nums text-foreground/80">{fmtInt(r.rango.max)}</span>
           {r.mejor && <> · el mejor, {r.mejor.label}</>}.
+          {/* OJO — Si la muestra mezcla horarios hay que decirlo: un turno de noche
+              contra turnos de día no es «lo normal de este turno». Pasó en Filete
+              al mover la producción de día a noche — el nombre siguió igual y la
+              comparación cambió de significado sin avisar. */}
+          {!r.muestra.mismoTurno && (
+            <span className="text-muted-foreground/80">
+              {' '}Son de otro horario: no hay suficientes de este turno todavía.
+            </span>
+          )}
         </p>
       )}
 

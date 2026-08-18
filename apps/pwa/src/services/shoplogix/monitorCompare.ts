@@ -611,6 +611,15 @@ export interface ResumenComparacion {
   /** Contra lo que la cuota pide a esta altura, y la cuota completa del turno. */
   cuota: { dif: number; valor: number; meta: number | null } | null
   /**
+   * Sobre QUÉ turnos se calcularon `mejor` y `rango`.
+   *
+   * ⚠ Importa decirlo: si la muestra incluye turnos de otro horario, el rango
+   * no es «lo normal de este turno» sino un promedio de dos operaciones
+   * distintas. En Filete pasó al mover el turno de producción de día a noche —
+   * el nombre dejó de significar lo mismo y la comparación silenciosa mentía.
+   */
+  muestra: { turnos: number; mismoTurno: boolean }
+  /**
    * De cuánto a cuánto llevaban los días anteriores a esta MISMA altura.
    *
    * Contesta algo que ninguna otra cifra del bloque contesta: si el turno cae
@@ -643,6 +652,7 @@ export function resumenComparacion(cmp: CompareResult): ResumenComparacion {
     ? todosAnteriores.filter((d) => d.shiftId === hoy.shiftId)
     : []
   const anteriores = mismoTurno.length > 0 ? mismoTurno : todosAnteriores
+  const muestra = { turnos: anteriores.length, mismoTurno: mismoTurno.length > 0 }
 
   const mejorDia = anteriores.reduce<DayCurve | null>(
     (mej, d) => (mej == null || (d.atCurrentMinute ?? 0) > (mej.atCurrentMinute ?? 0) ? d : mej),
@@ -652,6 +662,7 @@ export function resumenComparacion(cmp: CompareResult): ResumenComparacion {
   return {
     actual,
     minutos: cmp.currentMinute,
+    muestra,
     reciente: actual != null && anteriores[0]
       ? {
           label: anteriores[0].label,

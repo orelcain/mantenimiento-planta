@@ -2606,29 +2606,28 @@ export function PublicShiftMonitorPage() {
       todayDateKey: vista?.dateKey ?? '',
       todayShiftId: vista?.shiftId ?? null,
       /*
-       * ⚠⚠ MISMO TURNO CONTRA MISMO TURNO. Desde que Filete tiene día y noche,
-       * comparar el diurno contra un nocturno mezcla dos procesos distintos
-       * (otra dotación, otra materia prima, otro horario) y el gráfico no lo
-       * avisaba: la etiqueta solo distingue el turno si dos filas comparten
-       * dateKey, y el nocturno cae en otro día.
+       * ⚠⚠ NO se filtra por nombre de turno, y esto se decidió MIRANDO LOS
+       * DATOS (Orel, 17-08). Filete movió su turno de producción: hasta el 14
+       * el grande era «Turno Dia» (07:50–15:30, 2.400–4.400 pz) y el 17 pasó a
+       * ser «Turno Noche L» (00:20–07:51, 4.398 pz) — el MISMO turno corrido de
+       * hora. El «Turno Dia» del 17 es otra cosa: 4 h y 604 pz.
        *
-       * El filtro va acá y NO en `buildDayComparison`: Yal corre tres turnos
-       * por jornada y los compara ENTRE SÍ a propósito (hay test que lo fija).
-       * Si no quedan turnos del mismo nombre —una línea recién partida— se cae
-       * a todos, que es mejor que un gráfico vacío.
+       * O sea que el nombre dejó de significar lo mismo, y filtrar por él hacía
+       * exactamente lo contrario de lo que sirve: le ponía al turno chico la
+       * vara del grande, y dejaba al grande sin nada con qué compararse.
+       *
+       * Se ofrecen TODOS los turnos, cada uno etiquetado con el suyo, y ordenados
+       * con los del mismo nombre primero. Quién compara contra quién lo elige la
+       * persona con los chips: el nombre es una sugerencia, no una regla.
        */
       previous: (() => {
         const otros = (data?.history ?? [])
           .filter((h) => !(h.dateKey === vista?.dateKey && h.shiftId === vista?.shiftId))
-        const mismos = vista?.shiftId
-          ? otros.filter((h) => !h.shiftId || h.shiftId === vista.shiftId)
-          : otros
-        return (mismos.length > 0 ? mismos : otros)
-      })()
-        .map((h) => ({
-          dateKey: h.dateKey, shiftId: h.shiftId, series: h.live?.series,
-        })),
-      // Los 6 que trae el doc: cuáles se dibujan lo elige quien mira.
+        if (!vista?.shiftId) return otros
+        const mismo = otros.filter((h) => h.shiftId === vista.shiftId)
+        const resto = otros.filter((h) => h.shiftId !== vista.shiftId)
+        return [...mismo, ...resto]
+      })().map((h) => ({ dateKey: h.dateKey, shiftId: h.shiftId, series: h.live?.series })),
       maxDays: 6,
       targetPieces: meta,
       usefulMin: opt?.usefulMin ?? null,
