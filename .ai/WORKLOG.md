@@ -6,6 +6,27 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-08-18 · Feat: botón «actualizar ahora» + cronómetro de la próxima lectura del pulso (PR #641)
+
+Pedido de Orel para no depender solo del ciclo automático: se agregó el
+endpoint HTTP `publicMonitorRefrescar` (lee el contador vivo, 1 request
+~1 s — no dispara el sync completo del día) y en el monitor público el
+bloque del pulso ahora muestra cuántas piezas marca Shoplogix, a qué hora
+las leyó, cuánto falta para la próxima lectura útil (2 min, no 1) y el
+botón. Throttle de 20 s es del servidor (no del navegador); si el pulso
+ya es fresco responde 200 con `yaFresco: true`. Se eliminó la duplicación
+del sync que repetía el mismo dato viejo cada 5 min. Merge commit
+`82325f92` en main (squash, PR #641). Deploy de Cloud Functions en
+success — log confirma `functions[publicMonitorRefrescar(us-central1)]
+Successful create operation` y `Deploy complete!` sin errores. Deploy PWA
+en success, `version.json` sirve `buildSha: 82325f9` (coincide con el
+merge commit). 1522 tests verdes antes del merge.
+**Pendiente de verificación humana:** el endpoint y el bloque con
+acumulado > 0 en producción con un turno vivo (el turno de la noche había
+cerrado a las 05:00 mientras se construía esto).
+
+⚠️ Este archivo pasa los 172 KB — compactar en la próxima sesión que lo toque.
+
 ## 2026-08-18 · Fix: el ritmo del pulso se mide sobre la ventana, no entre lecturas consecutivas (PR #639)
 
 Las primeras lecturas reales en producción destaparon que el contador de
