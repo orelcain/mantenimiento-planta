@@ -6,6 +6,27 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-08-18 · Monitor: el ritmo dice en qué base está, y las tres cifras de la regla usan la misma (PR #633)
+
+Orel, mirando la tarjeta con la línea andando: «¿este ritmo es de producción
+o de reloj? pongamos cuál es para no confundir». La barra comparaba tres
+cifras con dos denominadores: el número grande (piezas de los últimos 15 min
+÷ 15 min) era **de reloj**, pero la marca del turno (`totalPieces /
+producingMin`) y el techo (set point) eran **andando** — el relleno
+subestimaba siempre porque el techo estaba en otra base, y la marca del
+turno quedaba a la derecha del relleno por construcción, no porque la línea
+fuera más lenta. Fix: el número grande pasa a ser el ritmo andando de los
+últimos 15 min (descuenta tramos parados, contados por tramo igual que la
+curva) y lleva su base escrita («pz/min andando»); el de reloj no se
+esconde, aparece como línea aparte cuando difiere. Test que fija la
+diferencia: con un paro en medio de la ventana, la misma serie da 12
+andando contra 8 de reloj. Con el turno noche produciendo en vivo la
+tarjeta pasó de «7,5 pz/min» a «9,6 pz/min andando», marca del turno 12,0 y
+techo 18 — todo en la misma escala. 1518 tests verdes en 106 archivos,
+tsc/eslint limpios, `audit-piel.mjs` sin crecer deuda. Merge commit
+`acc75170` en main (squash), deploy confirmado en GitHub Pages (`buildSha:
+acc7517`).
+
 ## 2026-08-17 · Monitor: el nombre del turno dejó de significar lo mismo — la comparación la elige la persona (PR #628)
 
 Revierte el criterio del PR #626 de ayer mismo: filtrar el comparador por
