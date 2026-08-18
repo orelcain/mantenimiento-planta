@@ -24,6 +24,22 @@
  * igual: un turno ideal que no ocurrió. Lo que sí se puede afirmar —cuánto cayó
  * el ritmo y cuánto demoró en volver— sale de `ritmoDelTurno` y `recuperacion`.
  *
+ * ── Limitación conocida: el denominador ─────────────────────────────────────
+ * `equivalenteLineaSec` divide por TODAS las máquinas del turno. Si una queda
+ * fuera de servicio la noche entera (mantención mayor, repuesto que no llegó),
+ * la línea corrió con 2 y el equivalente igual divide por 3: subestima el
+ * impacto de cada falla en un tercio.
+ *
+ * No se corrige acá a propósito. Para saber que una máquina "no estaba" hay que
+ * distinguir tres cosas que desde `states` se ven casi iguales: fuera de
+ * servicio, disponible pero sin producto, y detenida por la falla que estamos
+ * midiendo. Elegir mal cambia el denominador y por lo tanto la cifra que se
+ * lleva a la reunión — es peor equivocarse en silencio que dividir de más.
+ *
+ * Mitigación mientras tanto: `porMaquina` viene siempre en cada fila. Una
+ * máquina con 0 eventos y 0 ciclos en todo el turno es la señal de que hay que
+ * mirar el caso a mano. Decisión de Orel el 2026-08-18: documentarlo y seguir.
+ *
  * ── Escalas de tiempo ───────────────────────────────────────────────────────
  * Todo acá es aritmética de DURACIONES, así que es inmune al enredo de
  * wall-clock-as-UTC que arrastra el resto del pipeline (ver el comentario largo
