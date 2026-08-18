@@ -159,7 +159,16 @@ function impactoPorCausa({ machines, windowStart, windowEnd, incluir = esDetenci
 
       let e = porCausa.get(clave)
       if (!e) {
-        e = { porMaquina: new Map(), eventos: 0, reasonCrudo: reason }
+        e = {
+          porMaquina: new Map(),
+          eventos: 0,
+          // El reason TAL CUAL llegó, aunque venga vacío: el clasificador
+          // necesita distinguir "nadie imputó" de "imputó algo raro", y si acá
+          // se guardara el texto de relleno "(sin causa imputada)" lo leería
+          // como una causal desconocida.
+          reasonCrudo: s.reason || '',
+          esMicro: s.name === 'Micro Detencion',
+        }
         porCausa.set(clave, e)
       }
       if (!e.porMaquina.has(nombre)) e.porMaquina.set(nombre, [])
@@ -188,6 +197,10 @@ function impactoPorCausa({ machines, windowStart, windowEnd, incluir = esDetenci
     const sumaSec = porMaquina.reduce((a, x) => a + x.sec, 0)
     filas.push({
       causa,
+      // Las micro detenciones no llevan causal por diseño, no por descuido:
+      // marcarlas para que el informe no las acuse de "sin imputar" ni de
+      // "causal desconocida".
+      esMicro: e.esMicro,
       eventos: e.eventos,
       sumaSec,                                                        // lo que muestra Shoplogix
       unionSec: perfil.unionSec,                                      // ≥1 máquina detenida
@@ -195,7 +208,7 @@ function impactoPorCausa({ machines, windowStart, windowEnd, incluir = esDetenci
       equivalenteLineaSec: nMaquinas > 0 ? Math.round(sumaSec / nMaquinas) : 0,
       porNivelSec: perfil.porNivelSec,
       porMaquina,
-      imputacion: clasificar ? clasificar(e.reasonCrudo) : null,
+      imputacion: clasificar ? clasificar(e.reasonCrudo, { esMicro: e.esMicro }) : null,
     })
   }
 

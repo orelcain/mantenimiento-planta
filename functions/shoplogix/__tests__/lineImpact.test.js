@@ -288,3 +288,23 @@ test('sin bloques limpios no se inventa un ritmo normal', () => {
   assert.strictEqual(r.ritmoNormal, null)
   assert.deepStrictEqual(tramosDeRitmo({ bloques: r.bloques, ritmoNormal: null, pasoMin: 5 }), [])
 })
+
+test('el clasificador recibe el reason CRUDO, no el texto de relleno', () => {
+  // Si se le pasara "(sin causa imputada)", el clasificador lo leería como una
+  // causal desconocida y el informe diría "fuera del árbol" en vez de
+  // "nadie imputó" — que son dos problemas distintos y se arreglan distinto.
+  const vistos = []
+  impactoPorCausa({
+    machines: [maq('Ev 1', [st(0, 10, ''), st(20, 30, 'BOMBAS')])],
+    clasificar: (r, o) => { vistos.push([r, o.esMicro]); return null },
+  })
+  assert.deepStrictEqual(vistos.sort(), [['', false], ['BOMBAS', false]])
+})
+
+test('marca las filas de micro detención', () => {
+  const filas = impactoPorCausa({
+    machines: [maq('Ev 1', [st(0, 10, '', { name: 'Micro Detencion' }), st(20, 30, 'BOMBAS')])],
+  })
+  assert.strictEqual(filas.find((f) => f.causa === '(micro detenciones)').esMicro, true)
+  assert.strictEqual(filas.find((f) => f.causa === 'BOMBAS').esMicro, false)
+})
