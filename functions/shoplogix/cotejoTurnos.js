@@ -268,7 +268,37 @@ async function cotejarTurnos({ db, plant, shiftDocId, dias = 21, n = 7, minPieza
     .filter((d) => !/_Unscheduled$/.test(d.id))
     .map(aFila)
 
-  const comparables = seleccionarComparables(candidatos, referencia, { n, minPiezas })
+  let comparables = seleccionarComparables(candidatos, referencia, { n, minPiezas })
+
+  // Si la ventana de busqueda no alcanzo para juntar los 3 turnos que exige un
+  // veredicto, se estira UNA vez y se vuelve a buscar. No es un caso raro:
+  // "Turno 1 Lunes" de Chonchi existe solo los lunes, asi que en 21 dias hay 2
+  // anteriores y el informe se quedaba sin lamina de cotejo por calendario, no
+  // por falta de datos.
+  //
+  // Se estira el PLAZO, nunca la tolerancia de la ventana horaria: aflojar esa
+  // mezclaria turnos distintos, que es justo lo que el emparejamiento por
+  // ventana vino a evitar.
+  if (comparables.length < 3 && dias < 60) {
+    const desdeAmplio = new Date(referencia.inicioMs - dias * 2 * 86_400_000).toISOString().slice(0, 10)
+    const snapAmplio = await col
+      .where('__name__', '>=', `${desdeAmplio}_`)
+      .where('__name__', '<=', `${shiftDocId}`)
+      .get()
+    const masCandidatos = snapAmplio.docs.filter((d) => !/_Unscheduled$/.test(d.id)).map(aFila)
+    comparables = seleccionarComparables(masCandidatos, referencia, { n, minPiezas })
+  }
+
+  // NO agregar aqui un relleno que lea `machines` de los candidatos sin
+  // produccion en el doc padre. Se probo y es codigo muerto: un turno sin
+  // `endBriefSnapshot` es, casi siempre, un turno que NO produjo — el aviso de
+  // cierre justamente se salta los turnos bajo el minimo, asi que la ausencia
+  // del dato y la ausencia de produccion son la misma cosa.
+  //
+  // Medido el 2026-08-18 en Chonchi: de los turnos sin snapshot, los "Turno 1
+  // Lunes" de julio dieron 0 ciclos reales, y los "Turno 2" dieron 0, 0, 0, 1 y
+  // 17. Rellenarlos costaba 3 lecturas por turno para recuperar nada.
+
   return { referencia, comparables, ...armarCotejo(referencia, comparables) }
 }
 
