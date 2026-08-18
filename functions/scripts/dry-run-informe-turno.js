@@ -74,6 +74,11 @@ function revisar({ datos, pdf, plant, docId }) {
   if (datos.cotejo.veredicto === 'sin-comparables') {
     problemas.push(`sin veredicto comparativo (${datos.cotejo.comparados} comparables)`)
   }
+  for (const e of (datos.reparto && datos.reparto.eventos) || []) {
+    if (e.minReenganche > (datos.reparto.maxReengancheMin || 20)) {
+      problemas.push(`reenganche de ${e.minReenganche} min: pasa el tope y deberia caer en degradado`)
+    }
+  }
   if (datos.tramos.length > 12) problemas.push(`${datos.tramos.length} tramos: la tabla no cabe`)
   if (datos.eventosPorMaquina.length > 6) problemas.push(`${datos.eventosPorMaquina.length} pistas en la cronologia`)
   if (!datos.resumen.ritmoNormal && datos.bloques.length > 20) {
@@ -158,9 +163,12 @@ async function turnosCerrados(plant, n) {
         const rev = revisar({ datos, pdf, plant, docId })
         revisiones.push(rev)
         const marca = rev.problemas.length ? 'REVISAR' : 'ok     '
+        const rp = datos.reparto || { totalPz: 0 }
+        const pc = (v) => (rp.totalPz ? `${String(Math.round((v / rp.totalPz) * 100)).padStart(3)}%` : '  --')
         console.log(`  ${docId.padEnd(28)} ${marca} ${String(ciclos).padStart(6)} pz  `
-          + `${String(datos.cotejo.veredicto).padEnd(18)} ritmo ${datos.resumen.ritmoNormal ? datos.resumen.ritmoNormal.toFixed(1) : '--'}  `
-          + `${datos.resumen.causas.length} causas  ${datos.tramos.length} tramos  ${Math.round(pdf.length / 1024)} KB`)
+          + `${String(datos.cotejo.veredicto).padEnd(18)} ritmo ${String(datos.resumen.ritmoNormal ? datos.resumen.ritmoNormal.toFixed(1) : '--').padStart(5)}  `
+          + `parada ${pc(rp.paradoPz)} reeng ${pc(rp.reenganchePz)} degrad ${pc(rp.degradadoPz)}  `
+          + `${datos.tramos.length} tramos ${Math.round(pdf.length / 1024)} KB`)
         rev.problemas.forEach((p) => console.log(`      - ${p}`))
       } catch (e) {
         revisiones.push({ plant, docId, problemas: [`EXCEPCION: ${e.message}`] })

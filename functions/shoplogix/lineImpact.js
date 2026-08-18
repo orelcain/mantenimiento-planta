@@ -391,8 +391,111 @@ function tramosDeRitmo({ bloques, ritmoNormal, pasoMin, umbral = 0.9, minMinutos
   })
 }
 
+/**
+ * Reparte las piezas que faltaron para el ritmo normal segun EN QUE ESTABA la
+ * linea cuando faltaron. Es la medida de contencion.
+ *
+ * Las fallas van a ocurrir siempre; lo que se puede mejorar es cuanto de la
+ * perdida ocurre con la linea parada —inevitable— y cuanto despues, mientras
+ * vuelve a tomar ritmo. Por eso se separan tres cosas que se arreglan distinto:
+ *
+ *   parado      La linea no produce (bajo `umbralParo` del ritmo normal).
+ *   reenganche  Desde que vuelve a producir hasta alcanzar el ritmo. ESTE es el
+ *               que se acorta conteniendo bien.
+ *   degradado   Anda bajo el ritmo SIN paro grande. No es contencion: son micro
+ *               detenciones o abastecimiento, y se ataca con otra palanca.
+ *
+ * ── Por que el reenganche va acotado ────────────────────────────────────────
+ * Sin tope, cualquier tramo lento posterior a una caida se cuenta como
+ * "arranque lento". Medido contra el turno real del 2026-08-18 en Chonchi, una
+ * version sin tope atribuia 2.766 piezas a un arranque de 90 minutos — y al
+ * mirar los eventos, la linea habia estado PRODUCIENDO todo ese rato, llena de
+ * micro detenciones y acumulacion de rechazo. Eso no es un reenganche lento y
+ * cargarselo a Mantencion seria apuntar al culpable equivocado.
+ *
+ * Por eso el reenganche se corta a los `maxReengancheMin` (20 por defecto,
+ * calibrado con Orel contra la realidad de las Baader) y se interrumpe si la
+ * linea vuelve a caer o entra una pausa. Lo que queda afuera cae en `degradado`,
+ * que es lo que de verdad es.
+ *
+ * Las pausas programadas se contabilizan aparte: no son perdida por falla.
+ */
+function repartoDePerdida({
+  machines, bloques, ritmoNormal, pasoMin,
+  maxReengancheMin = 20, umbralParo = 0.5, umbralRitmo = 0.9,
+}) {
+  const vacio = { paradoPz: 0, reenganchePz: 0, degradadoPz: 0, pausadoPz: 0, totalPz: 0, eventos: [] }
+  if (!ritmoNormal || !bloques || !bloques.length) return vacio
+
+  const pausas = fusionar(
+    (machines || []).flatMap((m) => (m.states || [])
+      .filter((s) => s.type === 'break')
+      .map((s) => [aMs(s.startAt), aMs(s.endAt)])
+      .filter(([a, b]) => a != null && b != null)),
+  )
+  const pasoMs = pasoMin * 60_000
+  const esPausa = (ini) => pausas.some(([a, b]) => a < ini + pasoMs && b > ini)
+  const potencial = pasoMin * ritmoNormal
+  const falta = (b) => Math.max(potencial - b.ciclos, 0)
+
+  let paradoPz = 0
+  let reenganchePz = 0
+  let degradadoPz = 0
+  let pausadoPz = 0
+  const eventos = []
+
+  let i = 0
+  while (i < bloques.length) {
+    const b = bloques[i]
+    if (esPausa(b.inicioMs)) { pausadoPz += falta(b); i++; continue }
+
+    if (b.piezasPorMin < ritmoNormal * umbralParo) {
+      const ini = i
+      let pzParo = 0
+      while (i < bloques.length
+             && bloques[i].piezasPorMin < ritmoNormal * umbralParo
+             && !esPausa(bloques[i].inicioMs)) {
+        pzParo += falta(bloques[i]); i++
+      }
+      let j = i
+      let pzRe = 0
+      while (j < bloques.length
+             && bloques[j].piezasPorMin < ritmoNormal * umbralRitmo
+             && bloques[j].piezasPorMin >= ritmoNormal * umbralParo
+             && !esPausa(bloques[j].inicioMs)
+             && (j - i) * pasoMin < maxReengancheMin) {
+        pzRe += falta(bloques[j]); j++
+      }
+      paradoPz += pzParo
+      reenganchePz += pzRe
+      eventos.push({
+        inicioMs: bloques[ini].inicioMs,
+        minParo: (i - ini) * pasoMin,
+        minReenganche: (j - i) * pasoMin,
+        pzParo: Math.round(pzParo),
+        pzReenganche: Math.round(pzRe),
+      })
+      i = j
+    } else if (b.piezasPorMin < ritmoNormal * umbralRitmo) {
+      degradadoPz += falta(b); i++
+    } else i++
+  }
+
+  const redondear = (n) => Math.round(n)
+  return {
+    paradoPz: redondear(paradoPz),
+    reenganchePz: redondear(reenganchePz),
+    degradadoPz: redondear(degradadoPz),
+    pausadoPz: redondear(pausadoPz),
+    totalPz: redondear(paradoPz + reenganchePz + degradadoPz),
+    eventos,
+    maxReengancheMin,
+  }
+}
+
 module.exports = {
   aMs,
+  repartoDePerdida,
   recortar,
   fusionar,
   perfilDeSolapamiento,
