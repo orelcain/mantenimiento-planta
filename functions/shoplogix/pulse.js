@@ -63,27 +63,50 @@ async function leerPulso({ query, plantSlug, at = new Date(), toShoplogixTime, l
 /**
  * Arma el pulso nuevo a partir del anterior y la lectura recién hecha.
  *
- * ⚠ El ritmo se calcula contra la lectura anterior con piezas DISTINTAS: si la
- * línea está parada, dos lecturas seguidas dan el mismo acumulado y dividir da
- * 0 — que es correcto — pero si se compara contra una lectura idéntica de hace
- * segundos el resultado salta entre 0 y valores enormes por el redondeo del
- * tiempo. Se exige al menos 30 s entre lecturas para publicar un ritmo.
+ * ⚠⚠ EL RITMO NO SE CALCULA ENTRE LECTURAS CONSECUTIVAS.
+ *
+ * Medido en producción con el turno del 18-08: aunque preguntemos cada minuto,
+ * el contador de Shoplogix se refresca cada DOS. Las lecturas reales fueron
+ * 1453 → 1476 → 1476 → 1495 → 1495: el ritmo entre consecutivas alterna 23, 0,
+ * 19, 0 — y ese 0 no es que la línea pare, es que el número todavía no cambió.
+ * Un indicador que parpadea entre «va rápido» y «parada» cada minuto no se
+ * puede mirar.
+ *
+ * Por eso el ritmo se mide sobre la VENTANA de las últimas lecturas: piezas
+ * ganadas entre la más vieja y la más nueva, divididas por los minutos que las
+ * separan. Con 5 lecturas eso son ~4 minutos, suficiente para absorber el
+ * refresco de 2 min y seguir siendo «casi instantáneo» comparado con los
+ * buckets de 5.
  */
 function componerPulso(previo, lectura) {
   if (!lectura) return previo ?? null
   const lecturas = [...(previo?.lecturas ?? []), lectura].slice(-MAX_LECTURAS)
 
-  let cpm = null
-  const anterior = lecturas.length >= 2 ? lecturas[lecturas.length - 2] : null
-  if (anterior) {
-    const min = (Date.parse(lectura.at) - Date.parse(anterior.at)) / 60000
-    const dif = lectura.totalCycles - anterior.totalCycles
-    /* Un acumulado que BAJA significa que Shoplogix cambió de turno entre
-       lecturas: no es un ritmo negativo, es otro turno. Se descarta. */
-    if (min >= 0.5 && dif >= 0) cpm = dif / min
-  }
-
+  const cpm = ritmoDeVentana(lecturas)
   return { at: lectura.at, totalCycles: lectura.totalCycles, cpm, lecturas }
 }
 
-module.exports = { leerPulso, componerPulso, MAX_LECTURAS }
+/** Lecturas que entran en el ritmo: ~4 min, más que el refresco de Shoplogix. */
+const VENTANA_RITMO = 5
+/** Mínimo de minutos entre extremos para publicar un ritmo. */
+const MIN_MINUTOS = 1.5
+
+/**
+ * Piezas por minuto entre la lectura más vieja y la más nueva de la ventana.
+ *
+ * Devuelve null cuando no hay con qué: menos de dos lecturas, muy juntas en el
+ * tiempo, o un acumulado que BAJA — eso último es cambio de turno, no un ritmo
+ * negativo.
+ */
+function ritmoDeVentana(lecturas) {
+  if (!Array.isArray(lecturas) || lecturas.length < 2) return null
+  const ventana = lecturas.slice(-VENTANA_RITMO)
+  const primera = ventana[0]
+  const ultima = ventana[ventana.length - 1]
+  const min = (Date.parse(ultima.at) - Date.parse(primera.at)) / 60000
+  const dif = ultima.totalCycles - primera.totalCycles
+  if (!(min >= MIN_MINUTOS) || dif < 0) return null
+  return dif / min
+}
+
+module.exports = { leerPulso, componerPulso, ritmoDeVentana, MAX_LECTURAS, VENTANA_RITMO }
