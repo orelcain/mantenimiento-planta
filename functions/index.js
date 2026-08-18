@@ -6312,7 +6312,9 @@ exports.shoplogixPulseWakeup = onSchedule(
     secrets: ['SHOPLOGIX_COOKIE'],
   },
   async () => {
-    const db = admin.firestore()
+    /* `db` es el singleton del módulo (getFirestore(), línea 16). Usar
+       `admin.firestore()` acá reventaba con «admin is not defined»: este
+       archivo importa `firebase-admin/firestore` por piezas, no el default. */
     const monitores = await db.collection('publicShiftMonitors')
       .where('mode', '==', 'line')
       .get()

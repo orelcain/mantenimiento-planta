@@ -57,3 +57,43 @@ test('pulse: sin lectura nueva conserva el pulso anterior', () => {
   const p = componerPulso(null, lec(0, 100))
   assert.deepEqual(componerPulso(p, null), p)
 })
+
+/*
+ * ⚠⚠ EL ERROR QUE ESTE TEST HABRÍA ATRAPADO: la primera versión de
+ * `shoplogixPulseWakeup` hacía `admin.firestore()`, pero `index.js` importa
+ * `firebase-admin/firestore` por piezas y NO tiene un `admin` en scope. La
+ * función se desplegó "con éxito" y falló en cada corrida con «admin is not
+ * defined» — invisible hasta mirar los logs, porque un scheduler que revienta
+ * no rompe nada más.
+ *
+ * Acá se comprueba que todo lo que la función necesita EXISTE y es del tipo
+ * esperado. No reemplaza a mirar los logs tras un deploy, pero corta la clase
+ * de error más tonta antes de que llegue a producción.
+ */
+test('pulse: las piezas que usa la función programada existen', () => {
+  const { toShoplogixTime } = require('../shoplogix/time')
+  const { queryShoplogix, queryShoplogixBearer } = require('../shoplogix/client')
+  const { PLANT_AREA_ID } = require('../shoplogix/machines')
+  const { leerPulso } = require('../shoplogix/pulse')
+
+  assert.equal(typeof toShoplogixTime, 'function')
+  assert.equal(typeof queryShoplogix, 'function')
+  assert.equal(typeof queryShoplogixBearer, 'function')
+  assert.equal(typeof leerPulso, 'function')
+  // Las tres plantas tienen área: sin ella `leerPulso` devuelve null en silencio.
+  for (const slug of ['chonchi', 'yal', 'filete']) {
+    assert.ok(PLANT_AREA_ID[slug], `falta el areaId de ${slug}`)
+  }
+})
+
+test('pulse: leerPulso no revienta si Shoplogix falla — devuelve null', async () => {
+  const { leerPulso } = require('../shoplogix/pulse')
+  const { toShoplogixTime } = require('../shoplogix/time')
+  const r = await leerPulso({
+    query: async () => { throw new Error('502 del proxy') },
+    plantSlug: 'filete',
+    toShoplogixTime,
+    logger: { warn() {} },
+  })
+  assert.equal(r, null)
+})
