@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import {
-  mediaMovil, ritmoAhoraCpm, ritmoAhoraAndando, estadoRitmo, fraccionDeRegla, PASO_MIN,
+  mediaMovil, ritmoAhoraCpm, ritmoAhoraAndando, estadoRitmo, fraccionDeRegla, pedidoAndando, PASO_MIN,
   type TramoSerie,
 } from '../monitorRitmo'
 
@@ -121,5 +121,34 @@ describe('ritmoAhoraAndando · la misma base que el techo y que la marca', () =>
   it('serie vacía o ausente no rompe', () => {
     expect(ritmoAhoraAndando([])).toBeNull()
     expect(ritmoAhoraAndando(null)).toBeNull()
+  })
+})
+
+/*
+ * La marca de la regla pasa a ser el OBJETIVO (pedido de Orel, 17-08): «esa
+ * marca podría ser el indicativo dinámico de la velocidad que espera la línea
+ * para cumplir la cuota». Para que sea comparable con el relleno —y realista—
+ * hay que convertirla a la base andando con el uptime real del turno.
+ */
+describe('pedidoAndando · el objetivo en la misma base que el ritmo', () => {
+  it('convierte el requerido de reloj a ritmo andando con el uptime real', () => {
+    // Pide 14 de reloj y la línea produce el 80 % del tiempo → 17,5 andando.
+    expect(pedidoAndando(14, 80, 100)).toBeCloseTo(17.5, 5)
+  })
+
+  it('con la línea corriendo sin parar, ambas bases coinciden', () => {
+    expect(pedidoAndando(14, 100, 100)).toBeCloseTo(14, 5)
+  })
+
+  it('⚠ con poco turno corrido NO extrapola: el uptime todavía es ruido', () => {
+    // 10 min producidos de 40 disponibles daría 4× — un arranque tardío no
+    // significa que la línea vaya a parar el 75 % del turno.
+    expect(pedidoAndando(14, 10, 40)).toBeCloseTo(14, 5)
+  })
+
+  it('sin meta o sin datos devuelve null o el valor tal cual', () => {
+    expect(pedidoAndando(null, 80, 100)).toBeNull()
+    expect(pedidoAndando(0, 80, 100)).toBeNull()
+    expect(pedidoAndando(14, null, null)).toBeCloseTo(14, 5)
   })
 })
