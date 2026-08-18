@@ -37,7 +37,7 @@ import {
 import { buildHourlyRows, peakPieces } from '@/services/shoplogix/monitorHourly'
 import { computePaceToTarget, lineMaxPerHour, type PaceToTarget } from '@/services/shoplogix/monitorPace'
 import { ventanaDeActividad, desdePrimeraPieza, piezasAntesDelArranque } from '@/services/shoplogix/monitorActividad'
-import { mediaMovil, ritmoAhoraCpm, estadoRitmo, fraccionDeRegla } from '@/services/shoplogix/monitorRitmo'
+import { mediaMovil, ritmoAhoraCpm, ritmoAhoraAndando, estadoRitmo, fraccionDeRegla } from '@/services/shoplogix/monitorRitmo'
 import { pinShiftEnd, unpinShiftEnd, setMonitorSetPoint } from '@/services/shoplogix/pinShiftEnd'
 import {
   buildDayComparison, optimalPace, plannedBreaks, mergeBreaks, cumulativeFromStart,
@@ -1780,9 +1780,17 @@ function PorHora({ series }: { series: PublicMonitorLive['series'] }) {
  * final de la regla ES lo que falta. No hay que saber que 18 es el techo ni
  * restar 12,5 de 18.
  */
-function ReglaDeRitmo({ ahora, turno, setCpm, onEditarSetPoint, cerrado, contexto, chispa }: {
-  /** Ritmo de ahora, en pz/min: el último punto de la media de 15 min. */
+function ReglaDeRitmo({ ahora, ahoraReloj, turno, setCpm, onEditarSetPoint, cerrado, contexto, chispa }: {
+  /**
+   * Ritmo de ahora ANDANDO, en pz/min: los últimos 15 min descontando los
+   * tramos parados. Va en esta base y no en la de reloj porque es contra lo
+   * que se compara —el set point de la máquina y el promedio del turno— y
+   * mezclar denominadores en una misma barra fue justo el error que este
+   * bloque vino a terminar.
+   */
   ahora: number | null
+  /** El mismo tramo pero DE RELOJ (con las paradas adentro). */
+  ahoraReloj?: number | null
   /** Promedio del turno cuando la línea produce: la marca de la regla. */
   turno: number | null
   /** Velocidad de la máquina: el final de la regla. */
@@ -1821,7 +1829,7 @@ function ReglaDeRitmo({ ahora, turno, setCpm, onEditarSetPoint, cerrado, context
         <span className="text-[42px] font-semibold leading-none tabular-nums text-foreground">
           {ahora != null ? fmtDec(ahora) : '—'}
         </span>
-        <span className="text-[15px] text-muted-foreground">pz/min</span>
+        <span className="text-[15px] text-muted-foreground">pz/min andando</span>
         {ahora != null && (
           <span className={`ml-auto inline-flex items-center gap-1 text-[12px] font-medium ${colorPunto}`}>
             <span className="inline-block size-1.5 rounded-full bg-current" />
@@ -1868,6 +1876,17 @@ function ReglaDeRitmo({ ahora, turno, setCpm, onEditarSetPoint, cerrado, context
           )}
         </div>
       </div>
+
+      {/* Las dos bases, dichas. El de reloj no se esconde: es el que dice
+          cuánto SALE de verdad, y su distancia con el andando es el costo de
+          las paradas. Pero el grande es el andando porque es el comparable. */}
+      {ahora != null && ahoraReloj != null && ahoraReloj > 0 && Math.abs(ahora - ahoraReloj) > 0.05 && (
+        <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
+          Son los últimos 15 min <b className="text-foreground/80">cuando la línea corre</b>.
+          Contando también los minutos parados de ese tramo:{' '}
+          <b className="tabular-nums text-foreground/80">{fmtDec(ahoraReloj)}</b> pz/min de reloj.
+        </p>
+      )}
 
       {(contexto || chispa) && (
         <div className="mt-2.5 flex items-center gap-2 border-t border-border/50 pt-2.5">
@@ -3193,7 +3212,8 @@ export function PublicShiftMonitorPage() {
               : null
           return (
             <ReglaDeRitmo
-              ahora={ritmoAhoraCpm(serieDelTurno)}
+              ahora={ritmoAhoraAndando(serieDelTurno)}
+              ahoraReloj={ritmoAhoraCpm(serieDelTurno)}
               turno={turnoCpm}
               setCpm={setCpmVigente}
               cerrado={live.shiftClosed}
