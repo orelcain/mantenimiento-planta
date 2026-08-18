@@ -81,6 +81,22 @@ function fmtDateLong(dateKey: string): string {
   return d.toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' })
 }
 
+/**
+ * «mar 18» — el día en corto, para turnos que cruzan la medianoche.
+ *
+ * ⚠ Shoplogix fecha el turno por su día de INICIO: el nocturno que arranca
+ * 21:30 del lunes 17 y cierra 05:15 del martes 18 se llama «17 Aug». En planta
+ * ese mismo turno es «el turno noche del 18». No se pelea con la fuente —el
+ * dateKey sigue siendo el de Shoplogix, que es lo que empareja los documentos—
+ * pero la cabecera muestra los DOS días para que nadie tenga que adivinar de
+ * cuál se está hablando.
+ */
+function fmtDiaCorto(d: Date): string {
+  /* timeZone UTC porque los ISO del monitor son wall-clock: el instante YA es
+     hora de planta. Sin esto, un celular en otro huso muestra otro día. */
+  return d.toLocaleDateString('es-CL', { weekday: 'short', day: 'numeric', timeZone: 'UTC' })
+}
+
 const nf = new Intl.NumberFormat('es-CL')
 const fmtInt = (n: number) => nf.format(Math.round(n || 0))
 const fmtDec = (n: number, d = 1) =>
@@ -2888,7 +2904,21 @@ export function PublicShiftMonitorPage() {
             <span className="text-muted-foreground/50">·</span>
             {/* first-letter, no `capitalize`: ese capitaliza CADA palabra y
                 dejaba "Lunes, 10 De Agosto". */}
-            <span className="first-letter:uppercase">{fmtDateLong(vista?.dateKey || data.dateKey)}</span>
+            <span className="first-letter:uppercase">
+              {fmtDateLong(vista?.dateKey || data.dateKey)}
+              {(() => {
+                /* El fin del turno: el previsto si está en curso, el real si cerró. */
+                const finIso = live.shiftClosed ? live.scheduledEnd : (live.plannedEnd ?? live.scheduledEnd)
+                if (!finIso || !inicioReal) return null
+                const ini = new Date(inicioReal)
+                const fin = new Date(finIso)
+                if (Number.isNaN(ini.getTime()) || Number.isNaN(fin.getTime())) return null
+                /* Wall-clock: los ISO del monitor llevan Z pero son hora de
+                   planta, así que el día se lee con getUTCDate. */
+                if (ini.getUTCDate() === fin.getUTCDate()) return null
+                return <span className="text-muted-foreground/70"> → {fmtDiaCorto(fin)}</span>
+              })()}
+            </span>
             <span className="text-muted-foreground/50">·</span>
             {/*
               * Con el turno VIVO el fin de la ventana es el ÚLTIMO INTERVALO
