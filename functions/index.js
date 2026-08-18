@@ -6280,6 +6280,80 @@ exports.shoplogixSyncHttp = onRequest(
  * Además del día actual, re-sincroniza días RECIENTES en cadencias bajas
  * (auto-corrección de etiquetado retroactivo — ver extraDateKeys abajo).
  */
+/**
+ * ── EL PULSO: contador vivo cada minuto ────────────────────────────────────
+ *
+ * Los buckets de producción vienen de a 5 minutos y no existen hasta que
+ * cierran: por eso el monitor arrastraba entre 1,5 y 8 min de atraso (medido
+ * en el turno del 17-08). Pero el sensor manda continuo, y Shoplogix expone el
+ * acumulado del instante en el mismo endpoint que alimenta el whiteboard de
+ * planta.
+ *
+ * Esta función lee ese contador cada minuto — UN request liviano por planta —
+ * y con dos lecturas seguidas publica el RITMO INSTANTÁNEO, que es lo que no
+ * se podía ver con buckets de 5 min (pedido de Orel, 17-08: «ver la velocidad
+ * de ritmo en línea de proceso casi instantáneamente»).
+ *
+ * ⚠ NO reemplaza al sync: los buckets siguen siendo la fuente de la curva, de
+ * las paradas y del historial. Esto solo adelanta «cuántas van» y «a qué ritmo
+ * va ahora».
+ *
+ * ⚠ Solo escribe en monitores VIGENTES y no expirados, y solo si la planta
+ * tiene un turno en curso: fuera de turno no hay nada que pulsar y sería
+ * quemar requests.
+ */
+exports.shoplogixPulseWakeup = onSchedule(
+  {
+    schedule: 'every 1 minutes',
+    timeZone: 'America/Santiago',
+    timeoutSeconds: 60,
+    memory: '256MiB',
+    retryCount: 0,          // si falla, en un minuto hay otro: reintentar sería duplicar
+    secrets: ['SHOPLOGIX_COOKIE'],
+  },
+  async () => {
+    const db = admin.firestore()
+    const monitores = await db.collection('publicShiftMonitors')
+      .where('mode', '==', 'line')
+      .get()
+    const vivos = monitores.docs.filter((d) => {
+      const v = d.data()
+      const exp = v.expiresAt?.toDate ? v.expiresAt.toDate() : new Date(v.expiresAt ?? 0)
+      return exp > new Date() && typeof v.plantSlug === 'string'
+    })
+    if (vivos.length === 0) return
+
+    const auth = await resolveShoplogixAuth(logger)
+    if (auth.mode === 'none') return
+    /* El mismo patrón que `syncDay`: Bearer si hay token, cookie si no. */
+    const { queryShoplogix, queryShoplogixBearer } = require('./shoplogix/client')
+    const query = auth.accessToken
+      ? (opts) => queryShoplogixBearer({ accessToken: auth.accessToken, ...opts })
+      : (opts) => queryShoplogix({ cookie: auth.cookie, ...opts })
+
+    const { leerPulso, componerPulso } = require('./shoplogix/pulse')
+    const { toShoplogixTime } = require('./shoplogix/time')
+
+    /* Una lectura por PLANTA aunque haya varios monitores de la misma línea. */
+    const porPlanta = new Map()
+    for (const d of vivos) {
+      const slug = d.data().plantSlug
+      if (!porPlanta.has(slug)) porPlanta.set(slug, [])
+      porPlanta.get(slug).push(d)
+    }
+
+    await Promise.all([...porPlanta.entries()].map(async ([plantSlug, docs]) => {
+      const lectura = await leerPulso({ query, plantSlug, toShoplogixTime, logger })
+      if (!lectura) return
+      await Promise.all(docs.map(async (d) => {
+        const pulso = componerPulso(d.data().pulse ?? null, lectura)
+        await d.ref.update({ pulse: pulso })
+      }))
+      logger.info(`[pulse][${plantSlug}] ${lectura.totalCycles} pz`)
+    }))
+  },
+)
+
 exports.shoplogixSyncWakeup = onSchedule(
   {
     schedule: 'every 5 minutes',

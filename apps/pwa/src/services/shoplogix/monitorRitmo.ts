@@ -112,3 +112,41 @@ export function fraccionDeRegla(cpm: number | null, setCpm: number | null | unde
   if (!setCpm || setCpm <= 0) return 1
   return Math.max(0, Math.min(1, cpm / setCpm))
 }
+
+/**
+ * El ritmo ANDANDO que hay que sostener para llegar a la meta.
+ *
+ * ── Por qué hay que convertirlo ────────────────────────────────────────────
+ *
+ * `computePaceToTarget` calcula el requerido sobre el tiempo de RELOJ que
+ * queda (descontando las colaciones previstas): «pide 14 pz/min». Pero la
+ * línea no produce todos esos minutos — para y arranca. Si el turno viene
+ * produciendo el 80 % del tiempo disponible, sostener 14 de reloj exige ir a
+ * 17,5 **cuando corre**.
+ *
+ * Sin esa conversión, la marca del objetivo y el relleno del ritmo actual
+ * estarían en bases distintas y compararlos no significaría nada — el mismo
+ * error que la barra ya tuvo una vez.
+ *
+ * ⚠ Se usa el uptime REAL del turno en curso, no un supuesto: es lo que hace
+ * que el número sea realista. Un turno que viene parando la mitad del tiempo
+ * necesita el doble de velocidad, y eso es exactamente lo que hay que mostrar.
+ *
+ * @param requeridoReloj  pz/min sobre el tiempo de reloj útil que queda.
+ * @param producingMin    minutos que la línea produjo en el turno.
+ * @param disponibleMin   minutos disponibles hasta ahora (ventana − convenio).
+ */
+export function pedidoAndando(
+  requeridoReloj: number | null | undefined,
+  producingMin: number | null | undefined,
+  disponibleMin: number | null | undefined,
+): number | null {
+  if (!requeridoReloj || requeridoReloj <= 0) return null
+  if (!producingMin || !disponibleMin || disponibleMin <= 0) return requeridoReloj
+  const frac = producingMin / disponibleMin
+  /* Con muy poco turno corrido la fracción es ruido (un arranque tardío da
+     20 % y dispararía el pedido a 5×). Bajo 15 min producidos se muestra el
+     requerido de reloj tal cual, que ya es una referencia honesta. */
+  if (producingMin < 15 || frac <= 0.05) return requeridoReloj
+  return requeridoReloj / Math.min(1, frac)
+}

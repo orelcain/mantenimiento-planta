@@ -187,6 +187,24 @@ export interface PublicMonitorLive {
  */
 export type MonitorMode = 'shift' | 'line'
 
+/**
+ * El PULSO: el contador vivo de Shoplogix, leído cada minuto.
+ *
+ * Los buckets de producción son de 5 min y no existen hasta que cierran; este
+ * contador es el del instante y es el mismo número que muestra la pantalla de
+ * planta. Con dos lecturas seguidas sale el ritmo instantáneo (`cpm`).
+ */
+export interface PulsoMonitor {
+  /** ISO de la última lectura. */
+  at: string
+  /** Acumulado del turno en ese instante. */
+  totalCycles: number
+  /** Piezas por minuto entre las dos últimas lecturas. null si no se puede. */
+  cpm: number | null
+  /** Las últimas lecturas, para dibujar el pulso reciente. */
+  lecturas?: Array<{ at: string; totalCycles: number }>
+}
+
 export interface PublicShiftMonitorDoc {
   token: string
   mode?: MonitorMode
@@ -204,6 +222,11 @@ export interface PublicShiftMonitorDoc {
   expiresAt: string
   ttlHours: number
   live: PublicMonitorLive | null
+  /**
+   * Contador vivo de Shoplogix, refrescado cada minuto (ver `PulsoMonitor`).
+   * Ausente en monitores creados antes de esta función o fuera de turno.
+   */
+  pulse?: PulsoMonitor | null
   /**
    * Turnos anteriores de la línea, del más reciente al más viejo, para poder
    * deslizar hacia atrás sin sesión. Los compone el backend con el mismo
