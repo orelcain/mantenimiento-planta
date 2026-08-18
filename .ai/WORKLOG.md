@@ -6,6 +6,23 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-08-18 · Fix: `shoplogixPulseWakeup` reventaba en cada corrida por `admin.firestore()` sin definir (PR #637)
+
+El scheduler del pulso (PR #635) desplegó con éxito pero fallaba una vez por
+minuto con `Error: admin is not defined`: `functions/index.js` importa
+`firebase-admin/firestore` por piezas (`getFirestore`, `FieldValue`,
+`FieldPath`) y no tiene `admin` en scope, y la función nueva llamaba
+`admin.firestore()`. Síntoma único: el campo `pulse` nunca aparecía en el
+monitor. Lección: «deploy con éxito» no significa que la función corra —
+hay que mirar los logs de la primera ejecución. Se agregaron 2 tests que
+verifican que las piezas de scope existen y que `leerPulso` devuelve
+`null` sin reventar si Shoplogix falla (9 tests del pulso en verde).
+Merge commit `e9ede075` en main (squash). Deploy de Cloud Functions en
+success. Verificado en logs (`functions:log --only shoplogixPulseWakeup`):
+`[pulse][filete] N pz` en cada corrida, sin ningún `admin is not defined`.
+Nota aparte, no corregida acá: hay un error de auth ROPC en backoff para
+`yal` en los mismos logs (ya conocido, fuera de alcance de este fix).
+
 ## 2026-08-18 · Monitor: la marca de la regla es la velocidad que exige la meta, y el pulso lee el contador vivo cada minuto (PR #635)
 
 Dos cambios. (1) La marca de la regla de ritmo deja de ser el set point y
