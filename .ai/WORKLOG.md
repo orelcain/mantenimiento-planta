@@ -6,6 +6,23 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-08-18 · Fix: el ritmo del pulso se mide sobre la ventana, no entre lecturas consecutivas (PR #639)
+
+Las primeras lecturas reales en producción destaparon que el contador de
+Shoplogix se refresca cada 2 minutos aunque se pregunte cada 1: el ritmo
+calculado entre lecturas consecutivas alternaba 23, 0, 19, 0 pz/min — el
+0 no era la línea parada, era el número sin cambiar todavía. Se cambió el
+cálculo a ventana de las últimas 5 lecturas (piezas ganadas entre la más
+vieja y la más nueva / minutos entre ellas); con esa misma serie da 10,5
+pz/min real. 11 tests en verde, incluido uno con la serie exacta de
+producción para que no se vuelva a romper. Merge commit `f69ca42c` en
+main (squash, PR #639). Deploy de Cloud Functions en success. Verificado
+en logs (`functions:log --only shoplogixPulseWakeup`): `[pulse][filete]
+N pz` corriendo cada minuto sin error nuevo; el único error en logs sigue
+siendo el ROPC de `yal` en backoff (conocido, ajeno a este cambio).
+
+⚠️ Este archivo pasó los 170 KB — corresponde compactar de nuevo pronto.
+
 ## 2026-08-18 · Fix: `shoplogixPulseWakeup` reventaba en cada corrida por `admin.firestore()` sin definir (PR #637)
 
 El scheduler del pulso (PR #635) desplegó con éxito pero fallaba una vez por
