@@ -700,3 +700,42 @@ describe('prediccionConvenio', () => {
     expect(prediccionConvenio([[], []])).toEqual([])
   })
 })
+
+/*
+ * ⚠⚠ EL CASO FILETE (17-08-2026): la línea movió su turno de producción. Hasta
+ * el 14 el grande era «Turno Dia» (07:50–15:30, ~4.000 pz) y el 17 pasó a ser
+ * «Turno Noche L» (00:20–07:51, 4.398 pz): el MISMO turno corrido de hora. El
+ * nombre dejó de significar lo mismo, así que la comparación tiene que DECIR
+ * sobre qué turnos se calculó en vez de dar un promedio mudo.
+ */
+describe('resumenComparacion · declara de qué turnos habla', () => {
+  const serieDe = (n: number) => serie('2026-08-17T00:20:00Z', Array(12).fill(n))
+
+  it('avisa cuando la muestra es de OTRO horario', () => {
+    const cmp = buildDayComparison({
+      todaySeries: serieDe(60), todayDateKey: '2026-08-17', todayShiftId: 'Turno Noche L',
+      previous: [
+        { dateKey: '2026-08-14', shiftId: 'Turno Dia', series: serieDe(50) },
+        { dateKey: '2026-08-13', shiftId: 'Turno Dia', series: serieDe(45) },
+      ],
+      maxDays: 6,
+    })
+    const r = resumenComparacion(cmp)
+    expect(r.muestra.mismoTurno).toBe(false)   // no hay nocturnos con qué comparar
+    expect(r.muestra.turnos).toBe(2)
+  })
+
+  it('cuando SÍ hay del mismo turno, no avisa nada', () => {
+    const cmp = buildDayComparison({
+      todaySeries: serieDe(60), todayDateKey: '2026-08-18', todayShiftId: 'Turno Noche L',
+      previous: [
+        { dateKey: '2026-08-17', shiftId: 'Turno Noche L', series: serieDe(55) },
+        { dateKey: '2026-08-14', shiftId: 'Turno Dia', series: serieDe(50) },
+      ],
+      maxDays: 6,
+    })
+    const r = resumenComparacion(cmp)
+    expect(r.muestra.mismoTurno).toBe(true)
+    expect(r.muestra.turnos).toBe(1)           // solo el nocturno, el diurno queda fuera
+  })
+})
