@@ -8600,6 +8600,80 @@ const publicMonitorStatsMod = require('./publicMonitorStats')
  * contra un formato fijo. Un abusador con el link solo puede inflar sus propios
  * contadores de uso — no puede leer nada ni tocar los datos del turno.
  */
+/**
+ * ── REFRESCAR AHORA: el botón del monitor ──────────────────────────────────
+ *
+ * Lee el contador vivo de Shoplogix en el momento, sin esperar al pulso
+ * automático (pedido de Orel, 18-08: «por si demora mucho en hacerlo
+ * automáticamente»).
+ *
+ * ⚠ Es UN request a Shoplogix, el mismo que hace el pulso — no dispara el sync
+ * completo del día, que son ~7 requests por planta y tarda decenas de segundos.
+ * Lo que adelanta es «cuántas van» y el ritmo; la curva, las paradas y el
+ * historial siguen su ciclo de 5 min.
+ *
+ * ⚠⚠ El monitor es PÚBLICO: cualquiera con el link puede tocar el botón. Por eso
+ * hay throttle POR MONITOR en el servidor —no en el navegador, que se salta con
+ * F12—: si la última lectura tiene menos de `REFRESCO_MIN_SEG`, se devuelve la
+ * que ya está en vez de volver a preguntarle a Shoplogix. Así el peor caso de
+ * alguien martillando el botón es el mismo tráfico que el pulso automático.
+ *
+ * ⚠ Y el contador de Shoplogix se refresca cada ~2 min: pedirlo más seguido
+ * devuelve el mismo número. El throttle está alineado con eso.
+ */
+const REFRESCO_MIN_SEG = 20
+
+exports.publicMonitorRefrescar = onRequest(
+  { region: 'us-central1', cors: ALLOWED_ORIGINS, maxInstances: 10, memory: '256MiB', timeoutSeconds: 25, secrets: ['SHOPLOGIX_COOKIE'] },
+  async (req, res) => {
+    if (req.method !== 'POST') { res.status(405).json({ error: 'METHOD_NOT_ALLOWED' }); return }
+    const token = String((req.body || {}).token || '').trim()
+    if (!/^[a-f0-9-]{20,64}$/.test(token)) { res.status(400).json({ error: 'BAD_REQUEST' }); return }
+
+    try {
+      const ref = db.collection(publicMonitorMod.COLLECTION).doc(token)
+      const snap = await ref.get()
+      const monitor = snap.exists ? snap.data() : null
+      if (!monitor || String(monitor.expiresAt || '') <= new Date().toISOString()) {
+        res.status(404).json({ error: 'NOT_FOUND' }); return
+      }
+      const plantSlug = monitor.plantSlug
+      if (!plantSlug) { res.status(409).json({ error: 'SIN_PLANTA' }); return }
+
+      /* Throttle: si el pulso es fresco, se devuelve tal cual. No es un error
+         —el usuario ve el dato más nuevo que existe— así que responde 200. */
+      const pulsoActual = monitor.pulse ?? null
+      const edadSeg = pulsoActual?.at
+        ? (Date.now() - Date.parse(pulsoActual.at)) / 1000
+        : Number.POSITIVE_INFINITY
+      if (edadSeg < REFRESCO_MIN_SEG) {
+        res.json({ ok: true, yaFresco: true, pulse: pulsoActual, esperaSeg: Math.ceil(REFRESCO_MIN_SEG - edadSeg) })
+        return
+      }
+
+      const auth = await resolveShoplogixAuth(logger)
+      if (auth.mode === 'none') { res.status(503).json({ error: 'SIN_AUTH' }); return }
+      const { queryShoplogix, queryShoplogixBearer } = require('./shoplogix/client')
+      const query = auth.accessToken
+        ? (opts) => queryShoplogixBearer({ accessToken: auth.accessToken, ...opts })
+        : (opts) => queryShoplogix({ cookie: auth.cookie, ...opts })
+
+      const { leerPulso, componerPulso } = require('./shoplogix/pulse')
+      const { toShoplogixTime } = require('./shoplogix/time')
+      const lectura = await leerPulso({ query, plantSlug, toShoplogixTime, logger })
+      if (!lectura) { res.status(502).json({ error: 'SHOPLOGIX_NO_RESPONDE' }); return }
+
+      const pulso = componerPulso(pulsoActual, lectura)
+      await ref.update({ pulse: pulso })
+      logger.info(`[refrescar][${plantSlug}] ${lectura.totalCycles} pz (a pedido)`)
+      res.json({ ok: true, yaFresco: false, pulse: pulso })
+    } catch (err) {
+      logger.error('[publicMonitorRefrescar]', err)
+      res.status(500).json({ error: 'ERROR' })
+    }
+  },
+)
+
 exports.publicMonitorPing = onRequest(
   { region: 'us-central1', cors: ALLOWED_ORIGINS, maxInstances: 10, memory: '256MiB', timeoutSeconds: 15 },
   async (req, res) => {
