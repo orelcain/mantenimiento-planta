@@ -25,6 +25,9 @@ const { construirDatosInforme } = require('./informeTurno')
 const { generarInformeTurno } = require('./turnoDefensaPdf')
 const { clasificarParaInforme } = require('./imputacion')
 
+/** Reintentos antes de rendirse con un turno. */
+const MAX_INTENTOS = 3
+
 const AREA_LABEL = {
   chonchi: 'Eviscerados Chonchi',
   yal: 'Eviscerados Yal',
@@ -90,6 +93,13 @@ async function enviarInformeDeTurno({ db, plant, shiftDocId, config, enviarDocum
   const padre = (await ref.get()).data() || {}
   if (padre.informePdfSentAt) return { enviado: false, motivo: 'ya-enviado' }
 
+  // Tope de reintentos. Sin el, un error permanente (chat borrado, token
+  // rotado) hace que cada corrida del cron —o sea cada 5 min— vuelva a armar el
+  // PDF y a fallar, para siempre. Con el tope, el turno queda con el error
+  // anotado y se puede ver que paso.
+  const intentos = padre.informePdfIntentos || 0
+  if (intentos >= MAX_INTENTOS) return { enviado: false, motivo: 'demasiados-intentos', intentos }
+
   const snap = await ref.collection('machines').get()
   if (snap.empty) return { enviado: false, motivo: 'sin-maquinas' }
 
@@ -129,7 +139,18 @@ async function enviarInformeDeTurno({ db, plant, shiftDocId, config, enviarDocum
   const datos = construirDatosInforme({ machines, windowStart, windowEnd, cotejo, meta })
   const pdf = generarInformeTurno(datos)
 
-  await enviarDocumento(chatId, pdf, nombreArchivo(plant, shiftDocId), caption({ meta, datos }))
+  // `enviarDocumento` DEBE lanzar si el envio no se concreto. Telegram responde
+  // {ok:false} sin lanzar, y si eso se toma por bueno el turno queda marcado
+  // como enviado sin que nadie lo haya recibido.
+  try {
+    await enviarDocumento(chatId, pdf, nombreArchivo(plant, shiftDocId), caption({ meta, datos }))
+  } catch (e) {
+    await ref.set({
+      informePdfIntentos: intentos + 1,
+      informePdfError: { mensaje: String(e.message).slice(0, 300), at: new Date() },
+    }, { merge: true })
+    throw e
+  }
 
   // El resumen se cachea para que los cotejos futuros no tengan que volver a
   // bajar esta subcolección. Se guarda sin `causas`/`pausas`: el detalle pesa y
@@ -144,4 +165,4 @@ async function enviarInformeDeTurno({ db, plant, shiftDocId, config, enviarDocum
   return { enviado: true, bytes: pdf.length }
 }
 
-module.exports = { enviarInformeDeTurno, nombreArchivo, caption, AREA_LABEL }
+module.exports = { enviarInformeDeTurno, nombreArchivo, caption, AREA_LABEL, MAX_INTENTOS }
