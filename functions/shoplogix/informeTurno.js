@@ -250,6 +250,19 @@ function construirTextos({ resumen, recuperaciones, reparto, cotejo, principal, 
     }
   }
 
+  // El titulo de la lamina 4 sigue a lo que paso. Un tercio de los turnos no
+  // tiene NINGUNA caida: dejarles el titulo de "tramo por tramo" con la tabla
+  // de caidas vacia hace que el informe se vea roto justo cuando no hubo
+  // fallas, que es cuando mas conviene que se lea bien.
+  let tituloLamina4 = 'El ritmo real del turno, tramo por tramo'
+  if (rp.totalPz === 0) {
+    tituloLamina4 = 'El turno corrio a su ritmo de punta a punta'
+  } else if (!rp.eventos.length) {
+    tituloLamina4 = 'El turno no tuvo detenciones: lo que falto fue ritmo'
+  } else if (rp.degradadoPz > rp.paradoPz + rp.reenganchePz) {
+    tituloLamina4 = 'Hubo caidas, pero lo que mas costo fue el ritmo'
+  }
+
   let notaLamina4 = 'Lo que importa no es cuanto duro la falla, sino cuanto tardo la linea en volver a su ritmo y si lo sostuvo hasta el cierre. '
   if (recuperaciones.length && recuperaciones.every((r) => r.minutos != null)) {
     notaLamina4 += `Aca, tras el ultimo evento de cada causa: ${recuperaciones.map(recuperacionEnPalabras).join('; ')}. `
@@ -339,6 +352,7 @@ function construirTextos({ resumen, recuperaciones, reparto, cotejo, principal, 
     notaLamina1,
     notaLamina2,
     notaLamina3,
+    tituloLamina4,
     notaLamina4,
     notaReparto,
     notaLamina5,

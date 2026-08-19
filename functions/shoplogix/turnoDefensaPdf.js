@@ -345,7 +345,7 @@ function lamina3Cronologia(doc, d) {
 function lamina4Ritmo(doc, d) {
   const y = crearLamina(doc, {
     indice: 4, total: TOTAL_LAMINAS, pestania: 'Donde afecto y como se contuvo',
-    titulo: 'El ritmo real del turno, tramo por tramo',
+    titulo: d.textos.tituloLamina4 || 'El ritmo real del turno, tramo por tramo',
     subtitulo: d.resumen.ritmoNormal
       ? `Ritmo normal de la linea: ${d.resumen.ritmoNormal.toFixed(1)} piezas por minuto (mediana de los bloques limpios de esta misma noche)`
       : 'Sin bloques limpios: no se puede fijar un ritmo normal',
@@ -401,7 +401,9 @@ function lamina4Ritmo(doc, d) {
   const rp = d.reparto || { totalPz: 0, eventos: [] }
   if (rp.totalPz > 0) {
     doc.setFontSize(8).setFont('helvetica', 'bold').setTextColor(...C.tinta)
-    doc.text(wa('Donde falto la produccion: las piezas que faltaron para el ritmo normal, segun en que estaba la linea'), M, cy + 2)
+    doc.text(wa(rp.eventos.length
+      ? 'Donde falto la produccion: las piezas que faltaron para el ritmo normal, segun en que estaba la linea'
+      : 'El turno no registro caidas de linea. Las piezas que faltaron para el ritmo normal se perdieron andando:'), M, cy + 2)
     const by = cy + 6
     const bh = 10
     const segs = [
