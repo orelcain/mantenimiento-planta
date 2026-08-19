@@ -109,6 +109,10 @@ const IMPUTACION_LEAVES = [
   { label: 'Cuchillería punzón',   categorias: ['mecanica'], bucket: 'mantencion', equipo: 'baader200', extension: 'filete-baader200', match: ['CUCHILLERIA PUNZON'] },
   { label: 'Cuchillería',          categorias: ['mecanica'], bucket: 'mantencion', equipo: 'baader200', extension: 'filete-baader200', match: ['CUCHILLERIA'] },
   { label: 'GEA',                  categorias: ['electrica', 'mecanica'], bucket: 'mantencion', equipo: 'auxiliar', extension: 'filete-baader200', match: ['EQUIPO AUXILIAR / GEA', 'GEA'] },
+  // Filete anota `ACUMULACION` a secas; Chonchi usa `ACUMULACION RECHAZO`. Hoja
+  // propia y no alias: desde el reason plano no se puede afirmar que la de
+  // Filete sea de rechazo. Mismo bucket, asi que la cascada no cambia.
+  { label: 'Acumulación',          categorias: ['mmpp'], bucket: 'externo', equipo: 'baader200', extension: 'filete-baader200', match: ['ACUMULACION'] },
 ]
 
 /**
