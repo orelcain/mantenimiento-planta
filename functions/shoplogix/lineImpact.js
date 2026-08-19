@@ -498,9 +498,70 @@ function repartoDePerdida({
   }
 }
 
+/**
+ * Ocupación de la cadena: qué fracción de la capacidad que PASÓ se llenó.
+ *
+ * ── Qué mide y por qué no es "velocidad" ────────────────────────────────────
+ * En Filete la Baader 200 la alimenta un operador: la cadena gira siempre a su
+ * velocidad nominal (18 pz/min, 5 silletas) y el sensor cuenta cada vez que se
+ * posiciona un pescado. Si el operador se salta silletas, el sensor cuenta
+ * menos — pero la maquina nunca bajo el ritmo.
+ *
+ * Shoplogix compara lo contado contra la capacidad nominal y llama a la
+ * diferencia "perdida de velocidad" (verificado: su `expectedTotalCycles` de un
+ * turno de Filete equivale exactamente a 18 pz/min). Ese nombre manda a buscar
+ * el problema en la maquina, cuando lo que hubo fueron silletas vacias.
+ *
+ * Este calculo dice lo mismo con el nombre correcto: de cada 10 silletas que
+ * pasaron, cuantas iban llenas.
+ *
+ * ── Evidencia de que el modelo es el correcto ───────────────────────────────
+ * Seis turnos de Filete (ago-2026): el bucket mas rapido de toda la muestra
+ * marco 17,0 pz/min y NINGUNO paso de 18. Si el sensor midiera otra cosa o la
+ * maquina pudiera correr mas, habria valores por encima del nominal. No los hay.
+ *
+ * ⚠ El nominal es de la MAQUINA, no una meta de produccion: es la capacidad
+ * fisica que pasa por el sensor. Cambiarlo por un objetivo comercial convierte
+ * esto en otra cosa.
+ *
+ * ⚠ Solo se cuenta el tiempo en que la cadena estaba EN MARCHA (uptime). Una
+ * maquina detenida no deja pasar silletas vacias: eso ya lo mide el paro.
+ */
+function ocupacionDeCadena({ machines, ritmoNominal, windowStart, windowEnd }) {
+  if (!(ritmoNominal > 0) || !machines || !machines.length) return null
+  const desde = aMs(windowStart)
+  const hasta = aMs(windowEnd)
+
+  let minutosEnMarcha = 0
+  for (const m of machines) {
+    for (const st of m.states || []) {
+      if (st.type !== 'uptime') continue
+      const a = aMs(st.startAt)
+      const b = aMs(st.endAt)
+      if (a == null || b == null) continue
+      const iv = recortar(a, b, desde, hasta)
+      if (iv) minutosEnMarcha += (iv[1] - iv[0]) / 60_000
+    }
+  }
+  if (!(minutosEnMarcha > 0)) return null
+
+  const llenas = machines.reduce((a, m) => a + (m.totalCycles || 0), 0)
+  const pasaron = Math.round(ritmoNominal * minutosEnMarcha)
+  const vacias = Math.max(pasaron - llenas, 0)
+  return {
+    ritmoNominal,
+    minutosEnMarcha: Math.round(minutosEnMarcha),
+    pasaron,
+    llenas,
+    vacias,
+    ocupacion: pasaron > 0 ? llenas / pasaron : null,
+  }
+}
+
 module.exports = {
   aMs,
   repartoDePerdida,
+  ocupacionDeCadena,
   recortar,
   fusionar,
   perfilDeSolapamiento,

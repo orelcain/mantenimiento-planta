@@ -18,7 +18,7 @@
  *    categorias sale como "Electrica o Mecanica", no elige una.
  */
 
-const { impactoPorCausa, ritmoDelTurno, tramosDeRitmo, recuperacion, repartoDePerdida } = require('./lineImpact')
+const { impactoPorCausa, ritmoDelTurno, tramosDeRitmo, recuperacion, repartoDePerdida, ocupacionDeCadena } = require('./lineImpact')
 const { clasificarParaInforme } = require('./imputacion')
 const { resumirTurno, armarCotejo } = require('./cotejoTurnos')
 
@@ -125,6 +125,25 @@ function construirDatosInforme({ machines, windowStart, windowEnd, cotejo, meta 
     })
     .filter(Boolean)
 
+  /* Ritmo NOMINAL de la maquina: la capacidad fisica que pasa por el sensor,
+     no una meta de produccion.
+       filete  — Baader 200 alimentada por un operador: cadena de 5 silletas a
+                 18 pz/min (dato de Orel, confirmado contra 6 turnos: ningun
+                 bucket supero 18 y el maximo fue 17,0).
+       chonchi/yal — Baader 142, 17 pz/min POR MAQUINA segun la tasa esperada
+                 que informa Shoplogix. ⚠ Ahi el mecanismo NO es un operador
+                 llenando silletas, asi que la cifra se informa sin atribuirle
+                 causa: decir "silletas vacias" en el eviscerado seria inventar. */
+  //
+  // ⚠ El nominal es POR MAQUINA y `minutosEnMarcha` viene en minutos-maquina
+  // (suma de las 3). Multiplicar aca por el numero de maquinas fue el primer
+  // intento y daba 23% de ocupacion en Chonchi: capacidad de linea por tiempo
+  // de maquina, o sea el mismo doble conteo del rollup pero al reves. Con el
+  // nominal por maquina da 68%, coherente con su ritmo real.
+  const RITMO_NOMINAL = { filete: 18, chonchi: 17, yal: 17 }
+  const nominal = RITMO_NOMINAL[meta.planta] || 0
+  const ocupacion = ocupacionDeCadena({ machines, ritmoNominal: nominal, windowStart, windowEnd })
+
   // Donde ocurrio la perdida: parado / reenganchando / andando degradado.
   const reparto = repartoDePerdida({
     machines, bloques: ritmo.bloques, ritmoNormal: ritmo.ritmoNormal, pasoMin: ritmo.pasoMin,
@@ -159,8 +178,9 @@ function construirDatosInforme({ machines, windowStart, windowEnd, cotejo, meta 
     eventosPorMaquina,
     recuperaciones,
     reparto,
+    ocupacion,
     cotejo: cot || { comparados: 0, filas: [], veredicto: 'sin-comparables' },
-    textos: construirTextos({ resumen, tramos, recuperaciones, reparto, cotejo: cot, principal, meta, difFuentes }),
+    textos: construirTextos({ resumen, tramos, recuperaciones, reparto, ocupacion, cotejo: cot, principal, meta, difFuentes }),
   }
 }
 
@@ -168,7 +188,7 @@ function construirDatosInforme({ machines, windowStart, windowEnd, cotejo, meta 
  * Los textos del informe. Todo lo que se afirma sale de acá, para que se pueda
  * leer de una sola vez qué es capaz de decir el informe y qué no.
  */
-function construirTextos({ resumen, recuperaciones, reparto, cotejo, principal, meta, difFuentes = 0 }) {
+function construirTextos({ resumen, recuperaciones, reparto, ocupacion, cotejo, principal, meta, difFuentes = 0 }) {
   const c = cotejo || { comparados: 0, veredicto: 'sin-comparables' }
   const hayFalla = principal && principal.equivalenteLineaSec > 0
   const etiqueta = principal ? etiquetaCausa(principal) : null
@@ -279,6 +299,30 @@ function construirTextos({ resumen, recuperaciones, reparto, cotejo, principal, 
     tituloLamina4 = 'Hubo caidas, pero lo que mas costo fue el ritmo'
   }
 
+  // ── Ocupacion de la cadena ────────────────────────────────────────────────
+  let notaOcupacion = ''
+  if (ocupacion && ocupacion.ocupacion != null) {
+    const pctOcu = Math.round(ocupacion.ocupacion * 100)
+    if (meta.planta === 'filete') {
+      notaOcupacion = `Con la cadena en marcha pasaron ${num(ocupacion.pasaron)} silletas y se llenaron `
+        + `${num(ocupacion.llenas)}: ${pctOcu}%. Las otras ${num(ocupacion.vacias)} pasaron vacias. `
+        + 'Shoplogix llama a esa diferencia "perdida de velocidad", pero la cadena nunca bajo el ritmo: '
+        + 'gira siempre a 18 pz/min y el sensor cuenta cada pescado que se posiciona. '
+        + `O sea de cada 10 silletas se llenaron ${(pctOcu / 10).toFixed(1)}.`
+      if (resumen.causas.some((cc) => cc.esMicro)) {
+        notaOcupacion += ' Las micro detenciones son la otra cara de lo mismo: son los huecos entre pescado '
+          + 'y pescado, no fallas de maquina.'
+      }
+    } else {
+      // En el eviscerado el mecanismo no es un operador llenando silletas: se
+      // informa la brecha sin atribuirle causa.
+      notaOcupacion = `La linea uso ${pctOcu}% de su capacidad mientras estuvo en marcha `
+        + `(${num(ocupacion.llenas)} de ${num(ocupacion.pasaron)} posibles a ${ocupacion.ritmoNominal} pz/min). `
+        + 'Shoplogix informa esa brecha como "perdida de velocidad". Que la causa sea alimentacion, '
+        + 'calibre o la maquina misma es lo que hay que establecer en terreno: el dato no lo dice.'
+    }
+  }
+
   let notaLamina4 = 'Lo que importa no es cuanto duro la falla, sino cuanto tardo la linea en volver a su ritmo y si lo sostuvo hasta el cierre. '
   if (recuperaciones.length && recuperaciones.every((r) => r.minutos != null)) {
     notaLamina4 += `Aca, tras el ultimo evento de cada causa: ${recuperaciones.map(recuperacionEnPalabras).join('; ')}. `
@@ -379,6 +423,7 @@ function construirTextos({ resumen, recuperaciones, reparto, cotejo, principal, 
     tituloLamina4,
     notaLamina4,
     notaReparto,
+    notaOcupacion,
     notaLamina5,
     parrafoReunion: partes.join(' '),
     pendientes,
