@@ -75,7 +75,7 @@ function revisar({ datos, pdf, plant, docId }) {
     problemas.push(`sin veredicto comparativo (${datos.cotejo.comparados} comparables)`)
   }
   for (const e of (datos.reparto && datos.reparto.eventos) || []) {
-    if (e.minReenganche > (datos.reparto.maxReengancheMin || 20)) {
+    if (e.minReenganche > (datos.reparto.maxReengancheMin || 30)) {
       problemas.push(`reenganche de ${e.minReenganche} min: pasa el tope y deberia caer en degradado`)
     }
   }

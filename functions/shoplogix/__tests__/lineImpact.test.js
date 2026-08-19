@@ -374,3 +374,14 @@ test('sin ritmo normal no se reparte nada', () => {
   assert.strictEqual(r.totalPz, 0)
   assert.deepStrictEqual(r.eventos, [])
 })
+
+test('el tope por defecto son 30 min (calibrado con la Baader, no con la teoria)', () => {
+  // Partió en 20 y Orel lo subió a 30 el 2026-08-18: en el turno del 17-08 una
+  // caída tocaba el tope exacto, señal de que se estaba mandando reenganche
+  // real al saco de "degradado". Si alguien cambia el default, que se entere.
+  const b = bloquesDe([180, 0, 140, 140, 140, 140, 140, 140, 180])
+  const r = repartoDePerdida({ machines: [], bloques: b, ritmoNormal: 36, pasoMin: 5 })
+  assert.strictEqual(r.maxReengancheMin, 30)
+  assert.strictEqual(r.eventos[0].minReenganche, 30)
+  assert.strictEqual(r.degradadoPz, 0)   // los 6 bloques lentos caben en el tope
+})

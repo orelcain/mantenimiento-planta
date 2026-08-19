@@ -413,16 +413,21 @@ function tramosDeRitmo({ bloques, ritmoNormal, pasoMin, umbral = 0.9, minMinutos
  * micro detenciones y acumulacion de rechazo. Eso no es un reenganche lento y
  * cargarselo a Mantencion seria apuntar al culpable equivocado.
  *
- * Por eso el reenganche se corta a los `maxReengancheMin` (20 por defecto,
- * calibrado con Orel contra la realidad de las Baader) y se interrumpe si la
+ * Por eso el reenganche se corta a los `maxReengancheMin` y se interrumpe si la
  * linea vuelve a caer o entra una pausa. Lo que queda afuera cae en `degradado`,
  * que es lo que de verdad es.
+ *
+ * El tope se calibra con la realidad de la maquina, no con la teoria: partio en
+ * 20 min y Orel lo subio a 30 el 2026-08-18, despues de ver que en el turno del
+ * 17-08 una de las tres caidas tocaba el tope exacto — señal de que la Baader
+ * tarda mas que eso en tomar ritmo y que el corte estaba mandando reenganche
+ * real al saco de `degradado`.
  *
  * Las pausas programadas se contabilizan aparte: no son perdida por falla.
  */
 function repartoDePerdida({
   machines, bloques, ritmoNormal, pasoMin,
-  maxReengancheMin = 20, umbralParo = 0.5, umbralRitmo = 0.9,
+  maxReengancheMin = 30, umbralParo = 0.5, umbralRitmo = 0.9,
 }) {
   const vacio = { paradoPz: 0, reenganchePz: 0, degradadoPz: 0, pausadoPz: 0, totalPz: 0, eventos: [] }
   if (!ritmoNormal || !bloques || !bloques.length) return vacio
