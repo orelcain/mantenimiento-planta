@@ -1,0 +1,56 @@
+/**
+ * Tests de `pulse` (node:test nativo — correr con `node --test`).
+ *
+ * El pulso es el ritmo casi instantáneo. Lo que se protege acá es que no
+ * parpadee entre "va rápido" y "parada" por el refresco de 2 min de Shoplogix,
+ * y que la radiografía del caso en cero no engorde el doc del monitor.
+ */
+
+const test = require('node:test')
+const assert = require('node:assert')
+const { componerPulso, ritmoDeVentana, radiografia } = require('../pulse')
+
+const lect = (min, total) => ({ at: new Date(Date.UTC(2026, 7, 19, 5, min)).toISOString(), totalCycles: total })
+
+test('el ritmo se mide sobre la ventana, no entre lecturas consecutivas', () => {
+  // Caso REAL del 18-08: el contador de Shoplogix se refresca cada 2 min, así
+  // que entre consecutivas alterna 23, 0, 19, 0 — y ese 0 no es que la línea
+  // pare. Sobre la ventana sale un número que se puede mirar.
+  const lecturas = [lect(0, 1453), lect(1, 1476), lect(2, 1476), lect(3, 1495), lect(4, 1495)]
+  const cpm = ritmoDeVentana(lecturas)
+  assert.strictEqual(cpm, (1495 - 1453) / 4)
+  assert.ok(cpm > 0, 'no debe dar 0 aunque la última pareja no haya cambiado')
+})
+
+test('un acumulado que baja no es un ritmo negativo: es cambio de turno', () => {
+  assert.strictEqual(ritmoDeVentana([lect(0, 5000), lect(4, 12)]), null)
+})
+
+test('con una sola lectura no se inventa un ritmo', () => {
+  assert.strictEqual(ritmoDeVentana([lect(0, 100)]), null)
+})
+
+test('el diagnóstico NO se guarda en el doc del monitor', () => {
+  // El doc del monitor se escribe cada minuto y lo lee la PWA: la radiografía
+  // viaja a su propio doc, no acá.
+  const p = componerPulso(null, { ...lect(0, 0), diag: { filas: 1, muestra: [] } })
+  assert.strictEqual(p.diag, undefined)
+  assert.deepStrictEqual(Object.keys(p.lecturas[0]).sort(), ['at', 'totalCycles'])
+})
+
+test('la radiografía describe la forma sin copiar la respuesta entera', () => {
+  const data = {
+    machines: [
+      { machineid: 'Total', name: 'Total', shift: 'Turno 1', target: 20, states: [{ type: 'Uptime', cycles: 0, name: 'Produciendo' }] },
+      { machineid: 'abc', name: 'Ev 1', states: [{ type: 'Downtime', cycles: 0 }] },
+    ],
+    jobs: [], otraCosa: 1,
+  }
+  const r = radiografia(data)
+  assert.strictEqual(r.filas, 2)
+  assert.strictEqual(r.muestra[0].machineid, 'Total')
+  assert.deepStrictEqual(r.muestra[0].estados[0], { type: 'Uptime', cycles: 0, name: 'Produciendo' })
+  assert.ok(r.clavesRaiz.includes('machines'))
+  // No arrastra la respuesta completa.
+  assert.strictEqual(JSON.stringify(r).length < 900, true)
+})

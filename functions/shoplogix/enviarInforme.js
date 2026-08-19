@@ -77,7 +77,7 @@ function caption({ meta, datos }) {
  * @param {object}   [p.logger]
  * @returns {Promise<{enviado:boolean, motivo?:string, bytes?:number}>}
  */
-async function enviarInformeDeTurno({ db, plant, shiftDocId, config, enviarDocumento, logger = console }) {
+async function enviarInformeDeTurno({ db, plant, shiftDocId, config, enviarDocumento, logger = console, forzar = false }) {
   const cfg = (config && config.shiftEnd && config.shiftEnd.informePdf) || {}
   if (!cfg.enabled) return { enviado: false, motivo: 'apagado' }
 
@@ -91,14 +91,16 @@ async function enviarInformeDeTurno({ db, plant, shiftDocId, config, enviarDocum
 
   const ref = db.collection('shoplogix').doc(plant).collection('shifts').doc(shiftDocId)
   const padre = (await ref.get()).data() || {}
-  if (padre.informePdfSentAt) return { enviado: false, motivo: 'ya-enviado' }
+  // `forzar` lo usa el boton manual del monitor: reenviar un turno que ya salio
+  // es una decision consciente de quien aprieta, no un reintento automatico.
+  if (!forzar && padre.informePdfSentAt) return { enviado: false, motivo: 'ya-enviado' }
 
   // Tope de reintentos. Sin el, un error permanente (chat borrado, token
   // rotado) hace que cada corrida del cron —o sea cada 5 min— vuelva a armar el
   // PDF y a fallar, para siempre. Con el tope, el turno queda con el error
   // anotado y se puede ver que paso.
   const intentos = padre.informePdfIntentos || 0
-  if (intentos >= MAX_INTENTOS) return { enviado: false, motivo: 'demasiados-intentos', intentos }
+  if (!forzar && intentos >= MAX_INTENTOS) return { enviado: false, motivo: 'demasiados-intentos', intentos }
 
   const snap = await ref.collection('machines').get()
   if (snap.empty) return { enviado: false, motivo: 'sin-maquinas' }

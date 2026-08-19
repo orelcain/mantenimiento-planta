@@ -64,6 +64,8 @@ import { VsAyerBloque } from './monitor/MonitorVsAyer'
 import { Pill } from '@/components/piel'
 import { useIsAdmin } from '@/store'
 import { useAuthStore } from '@/store/authStore'
+import { ReAuthConfirmDialog } from '@/components/admin/ReAuthConfirmDialog'
+import { getFunctions, httpsCallable } from 'firebase/functions'
 
 // ── Formateadores (locales a propósito: esta página no debe arrastrar el
 //    módulo de helpers del Grader, que se lleva echarts al bundle) ───────────
@@ -2178,6 +2180,33 @@ export function PublicShiftMonitorPage() {
      (mismo patrón que el «Cambiar» del cierre). Las reglas de Firestore son la
      defensa real; esto solo decide si se muestra el botón. */
   const esAdminMonitor = useIsAdmin()
+  /* Envío manual del informe de fin de turno.
+     El botón solo se MUESTRA a un admin y solo tras confirmar la contraseña;
+     quien decide de verdad es la Cloud Function, que revalida el rol contra
+     `users`. Un monitor abierto en un tablet de planta no tiene sesión, así que
+     no ve el botón. */
+  const [pidiendoClave, setPidiendoClave] = useState(false)
+  const [enviandoInforme, setEnviandoInforme] = useState(false)
+  const [avisoInforme, setAvisoInforme] = useState<string | null>(null)
+
+  const enviarInforme = async () => {
+    // `data` puede ser null mientras carga; el botón solo existe cuando ya hay
+    // turno en pantalla, pero el tipo no lo sabe.
+    if (!data) return
+    setEnviandoInforme(true)
+    setAvisoInforme(null)
+    try {
+      const fn = httpsCallable<{ plant: string; shiftDocId: string }, { enviado: boolean; motivo?: string }>(
+        getFunctions(undefined, 'us-central1'), 'enviarInformeTurnoManual',
+      )
+      const { data: r } = await fn({ plant: data.plantSlug, shiftDocId: data.shiftDocId })
+      setAvisoInforme(r.enviado ? 'Informe enviado a Telegram.' : `No se envió: ${r.motivo}`)
+    } catch (e) {
+      setAvisoInforme(e instanceof Error ? e.message : 'No se pudo enviar el informe.')
+    } finally {
+      setEnviandoInforme(false)
+    }
+  }
   const usuarioActual = useAuthStore((st) => st.user)
 
   const verIndice = (n: number) => {
@@ -3735,6 +3764,22 @@ export function PublicShiftMonitorPage() {
           <p>
             Se actualiza solo · solo lectura · compartido por {data.createdBy}
           </p>
+          {esAdminMonitor && (
+            <div className="flex flex-col items-center gap-1 pt-1">
+              <button
+                type="button"
+                onClick={() => setPidiendoClave(true)}
+                disabled={enviandoInforme}
+                className="rounded border border-border px-3 py-1.5 text-xs font-medium text-foreground
+                           hover:bg-muted disabled:opacity-50"
+              >
+                {enviandoInforme ? 'Enviando…' : 'Enviar informe de este turno'}
+              </button>
+              {avisoInforme && (
+                <span className="text-xs text-muted-foreground">{avisoInforme}</span>
+              )}
+            </div>
+          )}
           {data.mode === 'line' && (
             <p className="text-muted-foreground/70">
               Este link no caduca con el turno: al arrancar el siguiente, cambia solo.
@@ -3752,6 +3797,16 @@ export function PublicShiftMonitorPage() {
           </p>
         </footer>
       </main>
+
+      {/* La contraseña se pide en el navegador y no viaja a ninguna parte: solo
+          prueba que quien aprieta es el dueño de la sesión. Que además sea
+          admin lo revalida la Cloud Function contra `users`. */}
+      <ReAuthConfirmDialog
+        open={pidiendoClave}
+        onOpenChange={setPidiendoClave}
+        reason="Confirma tu contraseña para enviar el informe de este turno por Telegram."
+        onConfirmed={enviarInforme}
+      />
     </div>
   )
 }
