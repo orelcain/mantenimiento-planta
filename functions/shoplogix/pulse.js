@@ -53,10 +53,48 @@ async function leerPulso({ query, plantSlug, at = new Date(), toShoplogixTime, l
       ? uptime(total)
       : filas.reduce((a, m) => a + uptime(m), 0)
     if (!(totalCycles >= 0)) return null
-    return { at: new Date().toISOString(), totalCycles }
+    return { at: new Date().toISOString(), totalCycles, diag: totalCycles === 0 ? radiografia(data) : null }
   } catch (err) {
     logger.warn(`[pulse][${plantSlug}] no disponible (no bloquea): ${err.message}`)
     return null
+  }
+}
+
+/**
+ * Radiografía de la respuesta cuando el contador sale en CERO.
+ *
+ * ── Por qué existe ──────────────────────────────────────────────────────────
+ * Medido el 2026-08-19: el pulso devuelve 0 para Chonchi y Filete y funciona en
+ * Yal, con las tres plantas produciendo. El mismo corte afecta al contador vivo
+ * del sync (`shoplogixLive`), que usa esta misma llamada y quedó congelado
+ * horas en esas dos plantas sin que nadie lo notara. Los buckets de 5 min
+ * siguen llegando porque vienen de otra consulta.
+ *
+ * Para saber QUÉ devuelve el whiteboard en esas áreas hace falta ver la
+ * respuesta real, y no se puede desde fuera de la nube: la credencial local
+ * está en backoff. Esto la guarda en Firestore —no en los logs— para poder
+ * leerla con el SDK admin.
+ *
+ * ⚠ NO guarda la respuesta completa: solo su FORMA (cuántas filas, qué ids, qué
+ * tipos de estado, qué campos traen). Alcanza para el diagnóstico y evita
+ * meter un blob grande en un doc que se escribe cada minuto.
+ *
+ * Se puede sacar en cuanto el caso esté resuelto.
+ */
+function radiografia(data) {
+  const filas = data?.machines || []
+  return {
+    clavesRaiz: Object.keys(data || {}).slice(0, 12),
+    filas: filas.length,
+    muestra: filas.slice(0, 4).map((f) => ({
+      machineid: String(f.machineid ?? '(sin id)').slice(0, 40),
+      nombre: f.name ?? f.machinename ?? null,
+      turno: f.shift ?? null,
+      claves: Object.keys(f).filter((k) => k !== 'states').slice(0, 14),
+      estados: (f.states || []).slice(0, 8).map((e) => ({
+        type: e.type ?? null, cycles: e.cycles ?? null, name: e.name ?? null,
+      })),
+    })),
   }
 }
 
@@ -83,7 +121,10 @@ function componerPulso(previo, lectura) {
   const lecturas = [...(previo?.lecturas ?? []), lectura].slice(-MAX_LECTURAS)
 
   const cpm = ritmoDeVentana(lecturas)
-  return { at: lectura.at, totalCycles: lectura.totalCycles, cpm, lecturas }
+  // El `diag` no entra al pulso: viaja aparte, a su propio doc. Acá solo va lo
+  // que la pantalla necesita.
+  const limpias = lecturas.map(({ at, totalCycles }) => ({ at, totalCycles }))
+  return { at: lectura.at, totalCycles: lectura.totalCycles, cpm, lecturas: limpias }
 }
 
 /** Lecturas que entran en el ritmo: ~4 min, más que el refresco de Shoplogix. */
@@ -109,4 +150,4 @@ function ritmoDeVentana(lecturas) {
   return dif / min
 }
 
-module.exports = { leerPulso, componerPulso, ritmoDeVentana, MAX_LECTURAS, VENTANA_RITMO }
+module.exports = { leerPulso, componerPulso, ritmoDeVentana, radiografia, MAX_LECTURAS, VENTANA_RITMO }
