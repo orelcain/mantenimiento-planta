@@ -85,12 +85,24 @@ function radiografia(data) {
   const filas = data?.machines || []
   return {
     clavesRaiz: Object.keys(data || {}).slice(0, 12),
+    // Escalares del nivel raiz: `currentSpeed` y `expectedRate` pueden ser el
+    // ritmo que buscamos sin pasar por las filas.
+    raizValores: Object.fromEntries(Object.entries(data || {})
+      .filter(([, v]) => typeof v === 'number' || typeof v === 'string').slice(0, 10)),
     filas: filas.length,
     muestra: filas.slice(0, 4).map((f) => ({
       machineid: String(f.machineid ?? '(sin id)').slice(0, 40),
       nombre: f.name ?? f.machinename ?? null,
       turno: f.shift ?? null,
-      claves: Object.keys(f).filter((k) => k !== 'states').slice(0, 14),
+      // Segunda pasada (2026-08-19): la primera radiografia mostro que `states`
+      // llega VACIO en Chonchi y Filete —por eso el contador daba 0— pero que
+      // los demas campos si vienen. Ahora se guardan sus VALORES para poder
+      // decidir cual es el acumulado del turno, en vez de adivinar por el
+      // nombre. `fgUnits` y `target` son los candidatos; `actualRuntime` es
+      // tiempo, no piezas.
+      valores: Object.fromEntries(Object.entries(f)
+        .filter(([k, v]) => k !== 'states' && (typeof v === 'number' || typeof v === 'string'))
+        .slice(0, 16)),
       estados: (f.states || []).slice(0, 8).map((e) => ({
         type: e.type ?? null, cycles: e.cycles ?? null, name: e.name ?? null,
       })),
