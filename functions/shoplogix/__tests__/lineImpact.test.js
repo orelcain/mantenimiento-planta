@@ -308,3 +308,69 @@ test('marca las filas de micro detención', () => {
   assert.strictEqual(filas.find((f) => f.causa === '(micro detenciones)').esMicro, true)
   assert.strictEqual(filas.find((f) => f.causa === 'BOMBAS').esMicro, false)
 })
+
+// ── repartoDePerdida ────────────────────────────────────────────────────────
+
+const { repartoDePerdida } = require('../lineImpact')
+
+/** Bloques de 5 min a partir de una lista de ciclos. */
+const bloquesDe = (ciclos) => ciclos.map((c, i) => ({
+  inicioMs: m(i * 5), ciclos: c, piezasPorMin: c / 5, limpio: true,
+}))
+
+test('separa lo perdido parado de lo perdido reenganchando', () => {
+  //            en ritmo | parada  | reenganche  | en ritmo
+  const b = bloquesDe([180, 180, 0, 0, 90, 140, 180, 180])
+  const r = repartoDePerdida({ machines: [], bloques: b, ritmoNormal: 36, pasoMin: 5 })
+  assert.strictEqual(r.paradoPz, 360)          // 2 bloques a 0, potencial 180 c/u
+  assert.strictEqual(r.reenganchePz, 130)      // (180-90) + (180-140)
+  assert.strictEqual(r.degradadoPz, 0)
+  assert.strictEqual(r.eventos.length, 1)
+  assert.strictEqual(r.eventos[0].minParo, 10)
+  assert.strictEqual(r.eventos[0].minReenganche, 10)
+})
+
+test('el reenganche se corta a los 20 min y el resto es ritmo degradado', () => {
+  // Esta es la guarda que evita el error del 2026-08-18: sin tope, los 30 min
+  // lentos de después se contaban como "arranque lento" y se le cargaban a la
+  // contención de la falla.
+  const b = bloquesDe([180, 0, 140, 140, 140, 140, 140, 140, 180])
+  const r = repartoDePerdida({ machines: [], bloques: b, ritmoNormal: 36, pasoMin: 5, maxReengancheMin: 20 })
+  assert.strictEqual(r.eventos[0].minReenganche, 20)
+  assert.strictEqual(r.reenganchePz, 160)      // 4 bloques x 40
+  assert.strictEqual(r.degradadoPz, 80)        // los 2 bloques que sobran
+})
+
+test('un tramo lento SIN paro previo es ritmo degradado, no reenganche', () => {
+  const b = bloquesDe([180, 150, 150, 150, 180])
+  const r = repartoDePerdida({ machines: [], bloques: b, ritmoNormal: 36, pasoMin: 5 })
+  assert.strictEqual(r.reenganchePz, 0)
+  assert.strictEqual(r.paradoPz, 0)
+  assert.strictEqual(r.degradadoPz, 90)
+  assert.deepStrictEqual(r.eventos, [])
+})
+
+test('la colación no cuenta como pérdida por falla', () => {
+  const b = bloquesDe([180, 0, 0, 180])
+  const machines = [{
+    machineName: 'Ev 1',
+    states: [{ startAt: new Date(m(5)), endAt: new Date(m(15)), type: 'break', name: 'Detencion', reason: 'COLACION' }],
+  }]
+  const r = repartoDePerdida({ machines, bloques: b, ritmoNormal: 36, pasoMin: 5 })
+  assert.strictEqual(r.paradoPz, 0)
+  assert.strictEqual(r.pausadoPz, 360)
+  assert.strictEqual(r.totalPz, 0)
+})
+
+test('una segunda caída durante el reenganche abre su propio evento', () => {
+  const b = bloquesDe([180, 0, 120, 0, 120, 180])
+  const r = repartoDePerdida({ machines: [], bloques: b, ritmoNormal: 36, pasoMin: 5 })
+  assert.strictEqual(r.eventos.length, 2)
+  assert.strictEqual(r.paradoPz, 360)
+})
+
+test('sin ritmo normal no se reparte nada', () => {
+  const r = repartoDePerdida({ machines: [], bloques: bloquesDe([100, 0]), ritmoNormal: null, pasoMin: 5 })
+  assert.strictEqual(r.totalPz, 0)
+  assert.deepStrictEqual(r.eventos, [])
+})

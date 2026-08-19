@@ -18,7 +18,7 @@
  *    categorias sale como "Electrica o Mecanica", no elige una.
  */
 
-const { impactoPorCausa, ritmoDelTurno, tramosDeRitmo, recuperacion } = require('./lineImpact')
+const { impactoPorCausa, ritmoDelTurno, tramosDeRitmo, recuperacion, repartoDePerdida } = require('./lineImpact')
 const { clasificarParaInforme } = require('./imputacion')
 const { resumirTurno, armarCotejo } = require('./cotejoTurnos')
 
@@ -125,6 +125,11 @@ function construirDatosInforme({ machines, windowStart, windowEnd, cotejo, meta 
     })
     .filter(Boolean)
 
+  // Donde ocurrio la perdida: parado / reenganchando / andando degradado.
+  const reparto = repartoDePerdida({
+    machines, bloques: ritmo.bloques, ritmoNormal: ritmo.ritmoNormal, pasoMin: ritmo.pasoMin,
+  })
+
   // Una sola cifra de produccion en todo el informe.
   //
   // El cotejo saca la produccion de `endBriefSnapshot.total` (lo que el brief
@@ -153,8 +158,9 @@ function construirDatosInforme({ machines, windowStart, windowEnd, cotejo, meta 
     tramos,
     eventosPorMaquina,
     recuperaciones,
+    reparto,
     cotejo: cot || { comparados: 0, filas: [], veredicto: 'sin-comparables' },
-    textos: construirTextos({ resumen, tramos, recuperaciones, cotejo: cot, principal, meta, difFuentes }),
+    textos: construirTextos({ resumen, tramos, recuperaciones, reparto, cotejo: cot, principal, meta, difFuentes }),
   }
 }
 
@@ -162,7 +168,7 @@ function construirDatosInforme({ machines, windowStart, windowEnd, cotejo, meta 
  * Los textos del informe. Todo lo que se afirma sale de acá, para que se pueda
  * leer de una sola vez qué es capaz de decir el informe y qué no.
  */
-function construirTextos({ resumen, recuperaciones, cotejo, principal, meta, difFuentes = 0 }) {
+function construirTextos({ resumen, recuperaciones, reparto, cotejo, principal, meta, difFuentes = 0 }) {
   const c = cotejo || { comparados: 0, veredicto: 'sin-comparables' }
   const hayFalla = principal && principal.equivalenteLineaSec > 0
   const etiqueta = principal ? etiquetaCausa(principal) : null
@@ -220,6 +226,42 @@ function construirTextos({ resumen, recuperaciones, cotejo, principal, meta, dif
   const notaLamina3 = 'Permite responder a que hora fue sin abrir Shoplogix, y muestra si las maquinas cayeron juntas '
     + '(un problema de linea) o escalonadas (fallas independientes). Cuando las tres caen a la misma hora, casi siempre es '
     + 'una sola causa aguas arriba o aguas abajo, no tres fallas.'
+
+  // ── Reparto de la perdida ─────────────────────────────────────────────────
+  // Es lo que responde a "las fallas van a ocurrir siempre; lo que importa es
+  // contener". El porcentaje de reenganche es el unico de los tres que mide
+  // contencion: los otros dos se atacan con otras palancas.
+  const rp = reparto || { totalPz: 0, eventos: [] }
+  const pct = (n) => (rp.totalPz ? Math.round((n / rp.totalPz) * 100) : 0)
+  let notaReparto = ''
+  if (rp.totalPz > 0) {
+    const peor = rp.eventos.reduce((a, e) => (e.minReenganche > (a ? a.minReenganche : -1) ? e : a), null)
+    notaReparto = `De las piezas que faltaron para el ritmo normal, ${pct(rp.paradoPz)}% falto con la linea `
+      + `parada, ${pct(rp.reenganchePz)}% mientras volvia a tomar ritmo y ${pct(rp.degradadoPz)}% andando `
+      + 'por debajo de su ritmo sin paro grande. '
+    if (rp.paradoPz + rp.reenganchePz > 0) {
+      notaReparto += `El reenganche es el unico de los tres que mide contencion: es lo que se acorta `
+        + `respondiendo mas rapido. Acá fue ${pct(rp.reenganchePz)}%`
+        + (peor && peor.minReenganche ? `, y el peor tomo ${peor.minReenganche} min. ` : '. ')
+    }
+    if (rp.degradadoPz > rp.paradoPz + rp.reenganchePz) {
+      notaReparto += 'Ojo con el tramo degradado: es mas grande que todo lo perdido por las caidas, y no se '
+        + 'arregla conteniendo mejor una averia — son micro detenciones o abastecimiento, otra palanca.'
+    }
+  }
+
+  // El titulo de la lamina 4 sigue a lo que paso. Un tercio de los turnos no
+  // tiene NINGUNA caida: dejarles el titulo de "tramo por tramo" con la tabla
+  // de caidas vacia hace que el informe se vea roto justo cuando no hubo
+  // fallas, que es cuando mas conviene que se lea bien.
+  let tituloLamina4 = 'El ritmo real del turno, tramo por tramo'
+  if (rp.totalPz === 0) {
+    tituloLamina4 = 'El turno corrio a su ritmo de punta a punta'
+  } else if (!rp.eventos.length) {
+    tituloLamina4 = 'El turno no tuvo detenciones: lo que falto fue ritmo'
+  } else if (rp.degradadoPz > rp.paradoPz + rp.reenganchePz) {
+    tituloLamina4 = 'Hubo caidas, pero lo que mas costo fue el ritmo'
+  }
 
   let notaLamina4 = 'Lo que importa no es cuanto duro la falla, sino cuanto tardo la linea en volver a su ritmo y si lo sostuvo hasta el cierre. '
   if (recuperaciones.length && recuperaciones.every((r) => r.minutos != null)) {
@@ -310,7 +352,9 @@ function construirTextos({ resumen, recuperaciones, cotejo, principal, meta, dif
     notaLamina1,
     notaLamina2,
     notaLamina3,
+    tituloLamina4,
     notaLamina4,
+    notaReparto,
     notaLamina5,
     parrafoReunion: partes.join(' '),
     pendientes,

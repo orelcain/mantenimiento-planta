@@ -345,7 +345,7 @@ function lamina3Cronologia(doc, d) {
 function lamina4Ritmo(doc, d) {
   const y = crearLamina(doc, {
     indice: 4, total: TOTAL_LAMINAS, pestania: 'Donde afecto y como se contuvo',
-    titulo: 'El ritmo real del turno, tramo por tramo',
+    titulo: d.textos.tituloLamina4 || 'El ritmo real del turno, tramo por tramo',
     subtitulo: d.resumen.ritmoNormal
       ? `Ritmo normal de la linea: ${d.resumen.ritmoNormal.toFixed(1)} piezas por minuto (mediana de los bloques limpios de esta misma noche)`
       : 'Sin bloques limpios: no se puede fijar un ritmo normal',
@@ -397,6 +397,50 @@ function lamina4Ritmo(doc, d) {
   }))
   cy = tabla(doc, M, cy, cols, filas)
 
+  // ── Reparto de la perdida: parada / reenganche / degradado ───────────────
+  const rp = d.reparto || { totalPz: 0, eventos: [] }
+  if (rp.totalPz > 0) {
+    doc.setFontSize(8).setFont('helvetica', 'bold').setTextColor(...C.tinta)
+    doc.text(wa(rp.eventos.length
+      ? 'Donde falto la produccion: las piezas que faltaron para el ritmo normal, segun en que estaba la linea'
+      : 'El turno no registro caidas de linea. Las piezas que faltaron para el ritmo normal se perdieron andando:'), M, cy + 2)
+    const by = cy + 6
+    const bh = 10
+    const segs = [
+      { l: 'PARADA - inevitable cuando hay falla', v: rp.paradoPz, c: C.crit },
+      { l: 'REENGANCHE - lo que se acorta conteniendo', v: rp.reenganchePz, c: C.atencion },
+      { l: 'RITMO DEGRADADO - otra palanca', v: rp.degradadoPz, c: C.tinta3 },
+    ].filter((x) => x.v > 0)
+    let bx = M
+    for (const sgm of segs) {
+      const sw = (sgm.v / rp.totalPz) * ancho
+      doc.setFillColor(...sgm.c)
+      doc.rect(bx, by, Math.max(sw - 0.6, 0.6), bh, 'F')
+      if (sw > 42) {
+        doc.setFontSize(6.5).setFont('helvetica', 'bold').setTextColor(...C.tinta3)
+        doc.text(wa(sgm.l), bx + 1, by + bh + 4)
+        doc.setFontSize(9).setTextColor(...C.tinta)
+        doc.text(wa(`${Math.round((sgm.v / rp.totalPz) * 100)}%  ${num(sgm.v)} pz`), bx + 1, by + bh + 9)
+      }
+      bx += sw
+    }
+    cy = by + bh + 14
+
+    if (rp.eventos.length) {
+      cy = tabla(doc, M, cy, [
+        { t: 'Caida', ancho: 26 },
+        { t: 'Parada', ancho: 26, alinear: 'der' },
+        { t: 'Piezas parada', ancho: 34, alinear: 'der' },
+        { t: 'Reenganche', ancho: 32, alinear: 'der' },
+        { t: 'Piezas reenganche', ancho: 40, alinear: 'der' },
+      ], rp.eventos.map((e) => ({
+        celdas: [hhmm(e.inicioMs), `${e.minParo} min`, num(e.pzParo),
+          `${e.minReenganche} min`, num(e.pzReenganche)],
+        colores: [null, null, null, e.minReenganche >= rp.maxReengancheMin ? [...C.atencion] : [...C.ok], null],
+      })))
+    }
+  }
+
   if (d.recuperaciones.length) {
     const cajaAncho = (ancho - 3 * (d.recuperaciones.length - 1)) / Math.max(d.recuperaciones.length, 1)
     d.recuperaciones.forEach((r, i) => {
@@ -408,6 +452,9 @@ function lamina4Ritmo(doc, d) {
       })
     })
     cy += 27
+  }
+  if (d.textos.notaReparto) {
+    cy = nota(doc, M, cy, ancho, d.textos.notaReparto, { color: C.acento, titulo: 'Como leer el reparto' })
   }
   nota(doc, M, cy, ancho, d.textos.notaLamina4, { color: C.acento, titulo: 'Lo que estos numeros si prueban' })
 }

@@ -187,3 +187,41 @@ test('etiquetaCausa usa la hoja del árbol cuando existe', () => {
   assert.strictEqual(etiquetaCausa(causa('Planta De Riles', { fuera: true })), 'Planta De Riles')
   assert.strictEqual(etiquetaCausa(causa('(micro detenciones)', { micro: true })), 'micro detenciones')
 })
+
+// ── Título de la lámina 4 ───────────────────────────────────────────────────
+
+const repartoDe = (parado, reenganche, degradado, eventos = []) => ({
+  paradoPz: parado, reenganchePz: reenganche, degradadoPz: degradado,
+  pausadoPz: 0, totalPz: parado + reenganche + degradado, eventos, maxReengancheMin: 20,
+})
+const textosCon = (reparto) => construirTextos({
+  resumen: resumenBase(), recuperaciones: [], reparto, cotejo: cotejoMejor,
+  principal: resumenBase().causas[0], meta,
+})
+
+test('sin caídas, el título no habla de tramos ni deja la lámina coja', () => {
+  // Un tercio de los turnos no tiene ninguna caída. Con el título de "tramo por
+  // tramo" y la tabla de caídas vacía, el informe se ve roto justo cuando no
+  // hubo fallas — que es cuando más conviene que se lea bien.
+  const t = textosCon(repartoDe(0, 0, 819))
+  assert.match(t.tituloLamina4, /no tuvo detenciones/i)
+})
+
+test('turno perfecto: el título lo dice', () => {
+  assert.match(textosCon(repartoDe(0, 0, 0)).tituloLamina4, /de punta a punta/i)
+})
+
+test('con caídas pero dominado por el ritmo, el título lo refleja', () => {
+  const t = textosCon(repartoDe(300, 50, 900, [{ inicioMs: 0, minParo: 10, minReenganche: 5, pzParo: 300, pzReenganche: 50 }]))
+  assert.match(t.tituloLamina4, /lo que mas costo fue el ritmo/i)
+})
+
+test('caso típico: título estándar', () => {
+  const t = textosCon(repartoDe(2158, 286, 819, [{ inicioMs: 0, minParo: 35, minReenganche: 5, pzParo: 1076, pzReenganche: 43 }]))
+  assert.match(t.tituloLamina4, /tramo por tramo/i)
+})
+
+test('la nota del reparto avisa cuando el degradado manda', () => {
+  const t = textosCon(repartoDe(300, 50, 900, [{ inicioMs: 0, minParo: 10, minReenganche: 5, pzParo: 300, pzReenganche: 50 }]))
+  assert.match(t.notaReparto, /otra palanca/i)
+})
