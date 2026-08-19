@@ -210,7 +210,23 @@ function construirTextos({ resumen, recuperaciones, reparto, cotejo, principal, 
         : 'No hubo detenciones no programadas relevantes: la diferencia hay que buscarla en las horas efectivas de corrida o en el abastecimiento.')
   } else {
     veredictoTitulo = `Turno cerrado con ${num(resumen.ciclos)} ciclos.`
-    veredictoDetalle = 'No hay suficientes turnos equivalentes anteriores para emitir un veredicto comparativo. '
+    // Decir por que faltan comparables, no solo que faltan: distingue un
+    // problema de calendario (este turno se corre pocas veces) de uno de datos.
+    const d = c.diagnostico
+    let porque = ''
+    if (d) {
+      if (d.mismaVentana === 0) {
+        porque = `En los ultimos ${d.diasMirados} dias no hubo ningun turno con el mismo horario y duracion: `
+          + 'este turno no se repite seguido, o le cambiaron la hora de inicio.'
+      } else if (d.sinProduccion) {
+        porque = `En los ultimos ${d.diasMirados} dias hubo ${d.mismaVentana} turnos con el mismo horario, `
+          + `pero ${d.sinProduccion === 1 ? 'uno de ellos no produjo' : `${d.sinProduccion} de ellos no produjeron`}: `
+          + `quedan ${c.comparados} para comparar y hacen falta 3.`
+      } else {
+        porque = `Solo ${c.comparados} turnos equivalentes anteriores en los ultimos ${d.diasMirados} dias.`
+      }
+    }
+    veredictoDetalle = `No hay suficientes turnos equivalentes anteriores para emitir un veredicto comparativo. ${porque} `
       + 'El informe muestra lo que paso en el turno, sin compararlo.'
   }
 
@@ -341,6 +357,14 @@ function construirTextos({ resumen, recuperaciones, reparto, cotejo, principal, 
     pendientes.push(`La suma de las maquinas da ${num(resumen.ciclos)} ciclos y el aviso de cierre reporto `
       + `${num(resumen.ciclos - difFuentes)}: ${num(Math.abs(difFuentes))} de diferencia. El informe usa la suma de las maquinas. `
       + 'Vale cerrar de donde sale la diferencia.')
+  }
+  // Shoplogix no alimenta rechazo para estas maquinas: 204 turnos revisados de
+  // las tres plantas, cero scrap SIEMPRE. El "Calidad 100%" de su waterfall no
+  // es una medicion, es la ausencia del dato — y alguien lo puede citar como
+  // logro. Se advierte una vez, y solo si de verdad no vino nada.
+  if (resumen.scrapTotal === 0) {
+    pendientes.push('La pata de Calidad del OEE sale 100% porque Shoplogix no informa rechazo para estas maquinas, '
+      + 'no porque se haya medido y dado cero. Mientras siga asi, ese 100% no es un resultado.')
   }
   if (!pendientes.length) pendientes.push('Sin observaciones: el turno no dejo pendientes de imputacion ni patrones que revisar.')
 
