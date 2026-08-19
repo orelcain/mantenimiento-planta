@@ -64,6 +64,7 @@ import { VsAyerBloque } from './monitor/MonitorVsAyer'
 import { Pill } from '@/components/piel'
 import { useIsAdmin } from '@/store'
 import { useAuthStore } from '@/store/authStore'
+import { Button } from '@/components/ui/button'
 import { ReAuthConfirmDialog } from '@/components/admin/ReAuthConfirmDialog'
 import { getFunctions, httpsCallable } from 'firebase/functions'
 
@@ -3766,15 +3767,17 @@ export function PublicShiftMonitorPage() {
           </p>
           {esAdminMonitor && (
             <div className="flex flex-col items-center gap-1 pt-1">
-              <button
+              {/* Componente de la app, no estilos crudos: el guardarrail de la
+                  piel prohibe radios fuera de la escala unica. */}
+              <Button
                 type="button"
+                variant="outline"
+                size="sm"
                 onClick={() => setPidiendoClave(true)}
                 disabled={enviandoInforme}
-                className="rounded border border-border px-3 py-1.5 text-xs font-medium text-foreground
-                           hover:bg-muted disabled:opacity-50"
               >
                 {enviandoInforme ? 'Enviando…' : 'Enviar informe de este turno'}
-              </button>
+              </Button>
               {avisoInforme && (
                 <span className="text-xs text-muted-foreground">{avisoInforme}</span>
               )}
