@@ -7873,8 +7873,18 @@ exports.checkShiftEndBriefs = onSchedule(
                 plant,
                 shiftDocId: docSnap.id,
                 config,
-                enviarDocumento: (chatId, buffer, filename, caption) =>
-                  sendTelegramDocument(chatId, buffer, filename, caption),
+                // Telegram no lanza al fallar: devuelve {ok:false}. Si no se
+                // revisa, `enviarInformeDeTurno` estampa `informePdfSentAt`
+                // igual y el turno queda marcado como enviado sin que nadie lo
+                // haya recibido — y nunca se reintenta. Paso el 2026-08-19 con
+                // el primer informe automatico.
+                enviarDocumento: async (chatId, buffer, filename, caption) => {
+                  const res = await sendTelegramDocument(chatId, buffer, filename, caption)
+                  if (!res || !res.ok) {
+                    throw new Error(`Telegram rechazo el documento: ${res ? res.description : 'sin respuesta (¿falta el token?)'}`)
+                  }
+                  return res
+                },
                 logger,
               })
               if (r.enviado) {

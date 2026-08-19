@@ -168,3 +168,39 @@ test('caption arma bien un turno sin detenciones', () => {
   assert.match(c, /Línea detenida: 0 min/)
   assert.ok(!/Atribuible a Mantención/.test(c), 'sin tiempo de Mantencion no se muestra la linea')
 })
+
+test('un envío fallido NO se marca como enviado', () => {
+  // El defecto del 2026-08-19: Telegram responde {ok:false} sin lanzar, el
+  // envoltorio no lo miraba y el turno quedaba con `informePdfSentAt` puesto
+  // sin que nadie hubiera recibido nada. Y como quedaba marcado, no se
+  // reintentaba nunca.
+  const db = fakeDb({ machines: [maquina('Ev 1', 2160), maquina('Ev 2', 2160)] })
+  return enviarInformeDeTurno({
+    db, plant: 'chonchi', shiftDocId: '2026-08-17_Turno 1', config: cfgPrendida,
+    enviarDocumento: async () => { throw new Error('Telegram rechazo el documento: chat not found') },
+    logger: silencioso,
+  }).then(
+    () => assert.fail('debe propagar el error'),
+    (e) => {
+      assert.match(e.message, /chat not found/)
+      const escrito = Object.assign({}, ...db.escrituras)
+      assert.strictEqual(escrito.informePdfSentAt, undefined, 'no debe marcarse como enviado')
+      assert.strictEqual(escrito.informePdfIntentos, 1)
+      assert.match(escrito.informePdfError.mensaje, /chat not found/)
+    },
+  )
+})
+
+test('se rinde después de 3 intentos en vez de reintentar para siempre', async () => {
+  // Sin tope, un error permanente hace que el cron arme el PDF cada 5 min y
+  // falle, indefinidamente.
+  let llamado = false
+  const r = await enviarInformeDeTurno({
+    db: fakeDb({ padre: { informePdfIntentos: 3 }, machines: [maquina('Ev 1', 2160)] }),
+    plant: 'chonchi', shiftDocId: '2026-08-17_Turno 1', config: cfgPrendida,
+    enviarDocumento: async () => { llamado = true },
+    logger: silencioso,
+  })
+  assert.strictEqual(r.motivo, 'demasiados-intentos')
+  assert.strictEqual(llamado, false)
+})
