@@ -3,7 +3,17 @@
  * Que sea determinístico es lo que hace que re-anotar CORRIJA en vez de crear
  * un duplicado, y que un paro anotado se reconozca al recargar la vista.
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
+
+/**
+ * `@/services/paros` arrastra `@/services/firebase`, que llama a `getAuth()` al
+ * importarse y revienta con `auth/invalid-api-key` cuando no hay `.env.local`
+ * — o sea siempre en CI. El archivo entero fallaba a la hora de importarlo y
+ * sus 4 tests no corrian: el test estaba "en verde" solo porque nadie corria
+ * vitest. Mismo mock que ya usan frozenDateKey y graderDailySummary.
+ */
+vi.mock('@/services/firebase', () => ({ db: {}, auth: {}, storage: {}, rtdb: {} }))
+
 import { sensorStopKey } from '@/services/paros'
 
 const base = {
