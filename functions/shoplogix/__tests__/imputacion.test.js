@@ -212,3 +212,26 @@ test('un paro grande sin causal SÍ cuenta como sin imputar', () => {
   assert.strictEqual(c.sinCausa, true)
   assert.strictEqual(c.categoriaLabel, 'Sin causa imputada')
 })
+
+test('la acumulación de Filete se clasifica sin decir que es de rechazo', () => {
+  // Filete anota "ACUMULACION" a secas (164 min / 38 eventos en 29 turnos);
+  // Chonchi usa "ACUMULACION RECHAZO". Antes caía en "fuera del árbol", que es
+  // justo la pata de MMPP de Filete.
+  const f = matchImputacion('ACUMULACION')
+  assert.strictEqual(f.leaf.label, 'Acumulación')
+  assert.strictEqual(f.bucket, 'externo')
+  assert.strictEqual(f.fueraDelArbol, false)
+  // No se le pone la etiqueta mas especifica: el dato plano no dice que sea de rechazo.
+  assert.notStrictEqual(f.leaf.label, 'Acumulación rechazo')
+
+  // Y la causal de Chonchi sigue resolviendo a la suya, no a la nueva.
+  assert.strictEqual(matchImputacion('ACUMULACION RECHAZO').leaf.label, 'Acumulación rechazo')
+  assert.strictEqual(matchImputacion('ACUMULACION DE RECHAZO').leaf.label, 'Acumulación rechazo')
+})
+
+test('la hoja nueva no infla el conteo del curso', () => {
+  // Va marcada como extension: el curso V12 no la tiene y el arbol dibujable
+  // tiene que seguir diciendo la verdad.
+  const hoja = IMPUTACION_LEAVES.find((l) => l.label === 'Acumulación')
+  assert.strictEqual(hoja.extension, 'filete-baader200')
+})

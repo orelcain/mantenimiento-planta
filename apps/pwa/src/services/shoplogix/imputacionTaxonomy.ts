@@ -181,6 +181,17 @@ export const IMPUTACION_LEAVES: ImputacionLeaf[] = [
   // GEA: la descamadora auxiliar de Filete. No es ninguna de las auxiliares del
   // curso (Ciclón, Knuro, Balanzas, Bombas, Cintas, Estación de Calidad, Grader).
   { label: 'GEA',                  categorias: ['electrica', 'mecanica'], bucket: 'mantencion', equipo: 'auxiliar', extension: 'filete-baader200', match: ['EQUIPO AUXILIAR / GEA', 'GEA'] },
+  /*
+   * Filete anota `ACUMULACION` a secas (164 min / 38 eventos en 29 turnos de
+   * jul-ago 2026); Chonchi usa `ACUMULACION RECHAZO` y Yal no usa ninguna.
+   * Caia en "sin clasificar" — justo la pata de MMPP de Filete.
+   *
+   * Va como hoja propia y no como alias de "Acumulacion rechazo": desde el
+   * reason plano no se puede afirmar que la acumulacion de Filete sea de
+   * rechazo. Mismo bucket (`externo`), asi que la cascada no cambia; lo que se
+   * evita es ponerle a un dato una etiqueta mas especifica de la que tiene.
+   */
+  { label: 'Acumulación',          categorias: ['mmpp'], bucket: 'externo', equipo: 'baader200', extension: 'filete-baader200', match: ['ACUMULACION'] },
 ]
 
 /**
