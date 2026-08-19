@@ -241,7 +241,12 @@ function lamina2Falla(doc, d) {
     { t: 'Equiv. linea', ancho: 28, alinear: 'der' },
     { t: 'Eventos', ancho: 20, alinear: 'der' },
   ]
-  const filas = d.resumen.causas.map((c) => ({
+  // Las micro detenciones van al pie, no en la tabla: son cientos de eventos de
+  // segundos que inflan la tabla y compiten visualmente con la falla que
+  // importa. Se resumen en una linea, que es lo que aportan.
+  const micro = d.resumen.causas.find((c) => c.esMicro)
+  const causasReales = d.resumen.causas.filter((c) => !c.esMicro)
+  const filas = causasReales.map((c) => ({
     celdas: [
       c.imputacion && c.imputacion.hoja ? c.imputacion.hoja : c.causa,
       c.imputacion ? c.imputacion.categoriaLabel : '--',
@@ -251,12 +256,20 @@ function lamina2Falla(doc, d) {
   }))
   filas.push({
     celdas: [
-      'TOTAL detencion no programada', '',
+      'TOTAL (con micro detenciones)', '',
       dur(d.resumen.detencion.sumaSec), dur(d.resumen.detencion.unionSec),
       dur(d.resumen.detencion.todasSec), dur(d.resumen.detencion.equivalenteLineaSec), '',
     ],
   })
   let cy = tabla(doc, M, y, cols, filas, { resaltar: 0 })
+
+  if (micro) {
+    doc.setFontSize(7.5).setFont('helvetica', 'normal').setTextColor(...C.tinta3)
+    doc.text(wa(`Aparte: ${micro.eventos} micro detenciones, ${dur(micro.sumaSec)} sumados `
+      + `(${dur(micro.equivalenteLineaSec)} de linea). Son paros de segundos que el sistema no pide imputar; `
+      + 'se cuentan pero no compiten con las causas de arriba.'), M, cy - 1)
+    cy += 5
+  }
 
   // Barra del reparto por nivel de solapamiento de la causa principal.
   const p = d.resumen.causas[0]
@@ -474,6 +487,8 @@ function lamina5Cotejo(doc, d) {
 
   const gh = 60
   const maxC = Math.max(...d.cotejo.filas.map((f) => f.ciclos || 0), 1)
+  const conDet = d.cotejo.filas.filter((f) => typeof f.detencionLineaSec === 'number')
+  const maxDet = Math.max(...conDet.map((f) => f.detencionLineaSec), 0)
   const bw = ancho / d.cotejo.filas.length
   d.cotejo.filas.forEach((f, i) => {
     const h = ((f.ciclos || 0) / maxC) * gh
@@ -483,6 +498,15 @@ function lamina5Cotejo(doc, d) {
     doc.text(wa(num(f.ciclos)), M + i * bw + bw * 0.5, y + gh - h - 2, { align: 'center' })
     doc.setTextColor(...(f.esReferencia ? C.tinta : C.tinta3))
     doc.text(wa(f.id.slice(5, 10)), M + i * bw + bw * 0.5, y + gh + 5, { align: 'center' })
+
+    // Detencion de linea de ese turno, cuando esta cacheada. Va como barra
+    // fina encima de la de produccion: la pregunta que responde es "este turno
+    // tuvo mas falla de lo normal", y para eso hay que ver las dos juntas.
+    if (typeof f.detencionLineaSec === 'number' && maxDet > 0) {
+      const hd = (f.detencionLineaSec / maxDet) * (gh * 0.35)
+      doc.setFillColor(...C.crit)
+      doc.rect(M + i * bw + bw * 0.15 + bw * 0.7 + 1, y + gh - hd, bw * 0.16, hd, 'F')
+    }
   })
   if (d.cotejo.medianaPrevios) {
     const my = y + gh - (d.cotejo.medianaPrevios / maxC) * gh
@@ -494,7 +518,13 @@ function lamina5Cotejo(doc, d) {
   }
   doc.setDrawColor(...C.linea).line(M, y + gh, W - M, y + gh)
 
-  nota(doc, M, y + gh + 12, ancho, d.textos.notaLamina5, { color: C.acento, titulo: 'Que dice esta comparacion' })
+  doc.setFontSize(7).setFont('helvetica', 'normal').setTextColor(...C.tinta3)
+  doc.text(wa(conDet.length > 1
+    ? `Barra ancha: ciclos producidos. Barra fina roja: detencion de linea (${conDet.length} de ${d.cotejo.filas.length} turnos la tienen calculada).`
+    : 'Barra ancha: ciclos producidos. La detencion de los turnos previos aparecera a medida que se vayan cerrando con el informe activo.'),
+  M, y + gh + 10)
+
+  nota(doc, M, y + gh + 14, ancho, d.textos.notaLamina5, { color: C.acento, titulo: 'Que dice esta comparacion' })
 }
 
 function lamina6Cierre(doc, d) {

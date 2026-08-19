@@ -135,6 +135,10 @@ function resumirTurno({ machines, windowStart, windowEnd, clasificar, pasoMin = 
   return {
     maquinas: machines.length,
     ciclos,
+    // Suma del rechazo informado. Hoy llega SIEMPRE en 0 (204 turnos revisados
+    // en las 3 plantas): Shoplogix no lo alimenta para estas maquinas. Se
+    // guarda igual, para que el dia que empiece a llegar se note solo.
+    scrapTotal: machines.reduce((a, m) => a + (m.scrapTotal || 0), 0),
     inicioMs: aMs(windowStart),
     finMs: aMs(windowEnd),
     ritmoNormal: ritmo.ritmoNormal,
@@ -299,7 +303,20 @@ async function cotejarTurnos({ db, plant, shiftDocId, dias = 21, n = 7, minPieza
   // Lunes" de julio dieron 0 ciclos reales, y los "Turno 2" dieron 0, 0, 0, 1 y
   // 17. Rellenarlos costaba 3 lecturas por turno para recuperar nada.
 
-  return { referencia, comparables, ...armarCotejo(referencia, comparables) }
+  // Por que quedaron pocos. "No hay suficientes turnos equivalentes" no le
+  // sirve a nadie; "solo 2 lunes anteriores con produccion en la temporada" si,
+  // porque dice si es un problema de calendario o de datos.
+  const mismaVentana = candidatos.filter((c) => c.id !== referencia.id
+    && c.inicioMs != null && c.inicioMs < referencia.inicioMs
+    && esComparable(referencia, c))
+  const diagnostico = {
+    turnosMirados: candidatos.length,
+    mismaVentana: mismaVentana.length,
+    sinProduccion: mismaVentana.filter((c) => (c.ciclos ?? 0) < minPiezas).length,
+    diasMirados: dias,
+  }
+
+  return { referencia, comparables, diagnostico, ...armarCotejo(referencia, comparables) }
 }
 
 module.exports = {

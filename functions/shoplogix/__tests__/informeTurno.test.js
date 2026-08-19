@@ -225,3 +225,58 @@ test('la nota del reparto avisa cuando el degradado manda', () => {
   const t = textosCon(repartoDe(300, 50, 900, [{ inicioMs: 0, minParo: 10, minReenganche: 5, pzParo: 300, pzReenganche: 50 }]))
   assert.match(t.notaReparto, /otra palanca/i)
 })
+
+// ── Mejoras de láminas (v2) ─────────────────────────────────────────────────
+
+test('sin comparables, el informe dice POR QUÉ y no solo que faltan', () => {
+  // "No hay suficientes" no le sirve a nadie. Distinguir calendario de datos sí:
+  // el "Turno 1 Lunes" existe solo los lunes; el turno de día de Chonchi cambia
+  // de hora de inicio. Son dos problemas distintos.
+  const r = resumenBase()
+  const base = { comparados: 2, veredicto: 'sin-comparables' }
+
+  const calendario = construirTextos({
+    resumen: r, recuperaciones: [], principal: r.causas[0], meta,
+    cotejo: { ...base, diagnostico: { mismaVentana: 0, sinProduccion: 0, diasMirados: 21, turnosMirados: 40 } },
+  })
+  assert.match(calendario.veredictoDetalle, /no se repite seguido|cambiaron la hora/i)
+
+  const datos = construirTextos({
+    resumen: r, recuperaciones: [], principal: r.causas[0], meta,
+    cotejo: { ...base, diagnostico: { mismaVentana: 6, sinProduccion: 4, diasMirados: 21, turnosMirados: 40 } },
+  })
+  assert.match(datos.veredictoDetalle, /4 de ellos no produjeron/i)
+})
+
+test('advierte que la Calidad 100% es ausencia de dato, no medición', () => {
+  // 204 turnos revisados en las 3 plantas: cero rechazo SIEMPRE. Alguien podría
+  // citar ese 100% como logro.
+  const t = construirTextos({
+    resumen: resumenBase({ scrapTotal: 0 }), recuperaciones: [], cotejo: cotejoMejor,
+    principal: resumenBase().causas[0], meta,
+  })
+  const p = t.pendientes.find((x) => /Calidad/.test(x))
+  assert.ok(p, 'debe advertir sobre la Calidad')
+  assert.match(p, /no es un resultado/i)
+})
+
+test('si algún día llega rechazo de verdad, la advertencia desaparece', () => {
+  const t = construirTextos({
+    resumen: resumenBase({ scrapTotal: 42 }), recuperaciones: [], cotejo: cotejoMejor,
+    principal: resumenBase().causas[0], meta,
+  })
+  assert.ok(!t.pendientes.some((x) => /Calidad/.test(x)))
+})
+
+test('la explicación concuerda en singular y en plural', () => {
+  const r = resumenBase()
+  const con = (sinProduccion) => construirTextos({
+    resumen: r, recuperaciones: [], principal: r.causas[0], meta,
+    cotejo: {
+      comparados: 2, veredicto: 'sin-comparables',
+      diagnostico: { mismaVentana: 3, sinProduccion, diasMirados: 21, turnosMirados: 40 },
+    },
+  }).veredictoDetalle
+  assert.match(con(1), /uno de ellos no produjo/)
+  assert.match(con(4), /4 de ellos no produjeron/)
+})
