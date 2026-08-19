@@ -49,6 +49,20 @@ jobs:
         working-directory: apps/pwa
         run: pnpm exec eslint . --max-warnings 30
 
+      # Los tests unitarios de la PWA. Faltaban en CI, y por eso 11 archivos de
+      # test llevaban tiempo muriendo AL IMPORTAR (firebase.ts llama a getAuth()
+      # y sin apiKey revienta): vitest los contaba como fallidos y sus 97 tests
+      # no corrian nunca, sin que nadie se enterara. Se arreglo con
+      # apps/pwa/.env.test, que da valores falsos solo en modo test.
+      - name: Tests PWA
+        working-directory: apps/pwa
+        run: pnpm exec vitest run --reporter=dot
+
+      # Los tests de las Cloud Functions (node:test nativo, sin dependencias).
+      - name: Tests functions
+        working-directory: functions
+        run: node --test shoplogix/__tests__/*.test.js
+
       # Guardia de las guías de visualización: falla solo con deuda NUEVA
       # (ejes truncados en barras, leyendas apagadas con multi-serie, sort
       # lexicográfico en ejes). Línea base y reglas: scripts/audit-graficos.mjs.
