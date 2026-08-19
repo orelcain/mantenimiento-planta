@@ -385,3 +385,61 @@ test('el tope por defecto son 30 min (calibrado con la Baader, no con la teoria)
   assert.strictEqual(r.eventos[0].minReenganche, 30)
   assert.strictEqual(r.degradadoPz, 0)   // los 6 bloques lentos caben en el tope
 })
+
+// ── ocupacionDeCadena ───────────────────────────────────────────────────────
+
+const { ocupacionDeCadena } = require('../lineImpact')
+
+const conUptime = (nombre, ciclos, minutos) => ({
+  machineName: nombre,
+  totalCycles: ciclos,
+  states: [{ type: 'uptime', name: 'Produciendo', reason: '', startAt: new Date(m(0)), endAt: new Date(m(minutos)) }],
+  intervals: [],
+})
+
+test('la ocupación cuenta silletas llenas sobre las que pasaron', () => {
+  // 60 min de cadena a 18 pz/min = 1.080 silletas; se llenaron 648 → 60%.
+  const r = ocupacionDeCadena({ machines: [conUptime('Baader 200', 648, 60)], ritmoNominal: 18 })
+  assert.strictEqual(r.pasaron, 1080)
+  assert.strictEqual(r.vacias, 432)
+  assert.strictEqual(Math.round(r.ocupacion * 100), 60)
+})
+
+test('solo cuenta el tiempo con la cadena EN MARCHA', () => {
+  // Una máquina detenida no deja pasar silletas vacías: eso ya lo mide el paro.
+  const maq = conUptime('Baader 200', 648, 60)
+  maq.states.push({ type: 'downtime', name: 'Detencion', reason: 'X', startAt: new Date(m(60)), endAt: new Date(m(120)) })
+  const r = ocupacionDeCadena({ machines: [maq], ritmoNominal: 18 })
+  assert.strictEqual(r.minutosEnMarcha, 60, 'los 60 min detenida no entran')
+  assert.strictEqual(r.pasaron, 1080)
+})
+
+test('recorta la marcha a la ventana del turno', () => {
+  const r = ocupacionDeCadena({
+    machines: [conUptime('Baader 200', 648, 120)], ritmoNominal: 18,
+    windowStart: m(0), windowEnd: m(60),
+  })
+  assert.strictEqual(r.minutosEnMarcha, 60)
+})
+
+test('nunca informa más silletas llenas que las que pasaron', () => {
+  // Defensivo: si el nominal quedara mal configurado, no se publica un negativo.
+  const r = ocupacionDeCadena({ machines: [conUptime('Baader 200', 5000, 60)], ritmoNominal: 18 })
+  assert.strictEqual(r.vacias, 0)
+})
+
+test('sin nominal o sin marcha no se inventa una ocupación', () => {
+  assert.strictEqual(ocupacionDeCadena({ machines: [conUptime('X', 100, 60)], ritmoNominal: 0 }), null)
+  assert.strictEqual(ocupacionDeCadena({ machines: [{ machineName: 'X', totalCycles: 100, states: [] }], ritmoNominal: 18 }), null)
+})
+
+test('con varias máquinas, nominal POR MÁQUINA sobre minutos-máquina', () => {
+  // El primer intento multiplicaba la capacidad de LÍNEA por el tiempo de
+  // MÁQUINA y daba 23% de ocupación en Chonchi: el doble conteo del rollup,
+  // pero al revés.
+  const tres = [conUptime('Ev 1', 400, 60), conUptime('Ev 2', 400, 60), conUptime('Ev 3', 400, 60)]
+  const r = ocupacionDeCadena({ machines: tres, ritmoNominal: 17 })
+  assert.strictEqual(r.minutosEnMarcha, 180)      // minutos-máquina
+  assert.strictEqual(r.pasaron, 3060)             // 17 × 180, no 51 × 180
+  assert.strictEqual(Math.round(r.ocupacion * 100), 39)
+})

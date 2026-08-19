@@ -466,6 +466,37 @@ function lamina4Ritmo(doc, d) {
     })
     cy += 27
   }
+  // Ocupacion de la cadena: la traduccion de la "perdida de velocidad".
+  const oc = d.reparto && d.ocupacion ? d.ocupacion : d.ocupacion
+  if (oc && oc.ocupacion != null) {
+    const pct = Math.round(oc.ocupacion * 100)
+    const cajaAncho = (ancho - 6) / 3
+    kpi(doc, M, cy, cajaAncho, {
+      rotulo: d.meta.planta === 'filete' ? 'Silletas llenas' : 'Capacidad usada',
+      valor: `${pct}%`,
+      sub: `${num(oc.llenas)} de ${num(oc.pasaron)} a ${oc.ritmoNominal} pz/min`,
+      color: pct >= 80 ? C.ok : pct >= 55 ? C.tinta : C.atencion,
+    })
+    kpi(doc, M + cajaAncho + 3, cy, cajaAncho, {
+      rotulo: d.meta.planta === 'filete' ? 'Silletas vacias' : 'Capacidad sin usar',
+      valor: num(oc.vacias),
+      sub: 'lo que Shoplogix llama perdida de velocidad',
+      color: C.atencion,
+    })
+    kpi(doc, M + (cajaAncho + 3) * 2, cy, cajaAncho, {
+      rotulo: 'Cadena en marcha',
+      valor: durTexto(oc.minutosEnMarcha * 60),
+      sub: 'solo este tiempo deja pasar capacidad',
+    })
+    cy += 27
+    if (d.textos.notaOcupacion) {
+      cy = nota(doc, M, cy, ancho, d.textos.notaOcupacion, {
+        color: C.acento,
+        titulo: d.meta.planta === 'filete' ? 'La "perdida de velocidad", traducida' : 'Sobre la "perdida de velocidad"',
+      })
+    }
+  }
+
   if (d.textos.notaReparto) {
     cy = nota(doc, M, cy, ancho, d.textos.notaReparto, { color: C.acento, titulo: 'Como leer el reparto' })
   }
