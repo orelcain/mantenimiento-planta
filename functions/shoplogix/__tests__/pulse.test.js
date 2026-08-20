@@ -51,8 +51,14 @@ test('la radiografía describe la forma sin copiar la respuesta entera', () => {
   assert.strictEqual(r.muestra[0].machineid, 'Total')
   assert.deepStrictEqual(r.muestra[0].estados[0], { type: 'Uptime', cycles: 0, name: 'Produciendo' })
   assert.ok(r.clavesRaiz.includes('machines'))
-  // No arrastra la respuesta completa.
-  assert.strictEqual(JSON.stringify(r).length < 900, true)
+  // Guarda los VALORES de los campos escalares: son los candidatos a ser el
+  // acumulado del turno cuando `states` viene vacío.
+  assert.strictEqual(r.muestra[0].valores.target, 20)
+  assert.strictEqual(r.muestra[0].valores.shift, 'Turno 1')
+  assert.strictEqual(r.raizValores.otraCosa, 1)
+  // No arrastra la respuesta completa ni los objetos anidados.
+  assert.strictEqual(r.muestra[0].valores.states, undefined)
+  assert.strictEqual(JSON.stringify(r).length < 1200, true)
 })
 
 // ── Hora de planta ──────────────────────────────────────────────────────────
