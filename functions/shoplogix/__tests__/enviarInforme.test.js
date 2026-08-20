@@ -204,3 +204,21 @@ test('se rinde después de 3 intentos en vez de reintentar para siempre', async 
   assert.strictEqual(r.motivo, 'demasiados-intentos')
   assert.strictEqual(llamado, false)
 })
+
+test('un turno EN CURSO se manda, pero no deja marca ni cachea', async () => {
+  // El botón sirve a mitad de turno, pero el turno sigue vivo: sus números van
+  // a cambiar. Si se cacheara, el cotejo de mañana compararía contra una foto
+  // a medias — y si dejara marca, el informe real del cierre no saldría.
+  const db = fakeDb({ machines: [maquina('Ev 1', 2160), maquina('Ev 2', 2160)] })
+  let cap = null
+  const r = await enviarInformeDeTurno({
+    db, plant: 'chonchi', shiftDocId: '2026-08-17_Turno 1', config: cfgPrendida,
+    enCurso: true, forzar: true,
+    enviarDocumento: async (_c, _b, _f, c) => { cap = c },
+    logger: silencioso,
+  })
+  assert.strictEqual(r.enviado, true)
+  assert.strictEqual(r.parcial, true)
+  assert.deepStrictEqual(db.escrituras, [], 'no escribe nada en el turno')
+  assert.match(cap, /TURNO EN CURSO/)
+})

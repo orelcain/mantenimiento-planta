@@ -102,7 +102,7 @@ function aMs(t) {
  * @param {object} p.cotejo    salida de cotejarTurnos (o null)
  * @param {object} p.meta      { areaLabel, turnoLabel, fechaLabel, planta }
  */
-function construirDatosInforme({ machines, windowStart, windowEnd, cotejo, meta }) {
+function construirDatosInforme({ machines, windowStart, windowEnd, cotejo, meta, enCurso = false }) {
   const resumen = resumirTurno({ machines, windowStart, windowEnd, clasificar: clasificarParaInforme })
   const ritmo = ritmoDelTurno({ machines, windowStart, windowEnd })
   const tramos = tramosDeRitmo({ bloques: ritmo.bloques, ritmoNormal: ritmo.ritmoNormal, pasoMin: ritmo.pasoMin })
@@ -180,7 +180,8 @@ function construirDatosInforme({ machines, windowStart, windowEnd, cotejo, meta 
     reparto,
     ocupacion,
     cotejo: cot || { comparados: 0, filas: [], veredicto: 'sin-comparables' },
-    textos: construirTextos({ resumen, tramos, recuperaciones, reparto, ocupacion, cotejo: cot, principal, meta, difFuentes }),
+    enCurso,
+    textos: construirTextos({ resumen, tramos, recuperaciones, reparto, ocupacion, cotejo: cot, principal, meta, difFuentes, enCurso }),
   }
 }
 
@@ -188,7 +189,7 @@ function construirDatosInforme({ machines, windowStart, windowEnd, cotejo, meta 
  * Los textos del informe. Todo lo que se afirma sale de acá, para que se pueda
  * leer de una sola vez qué es capaz de decir el informe y qué no.
  */
-function construirTextos({ resumen, recuperaciones, reparto, ocupacion, cotejo, principal, meta, difFuentes = 0 }) {
+function construirTextos({ resumen, recuperaciones, reparto, ocupacion, cotejo, principal, meta, difFuentes = 0, enCurso = false }) {
   const c = cotejo || { comparados: 0, veredicto: 'sin-comparables' }
   const hayFalla = principal && principal.equivalenteLineaSec > 0
   const etiqueta = principal ? etiquetaCausa(principal) : null
@@ -411,6 +412,20 @@ function construirTextos({ resumen, recuperaciones, reparto, ocupacion, cotejo, 
       + 'no porque se haya medido y dado cero. Mientras siga asi, ese 100% no es un resultado.')
   }
   if (!pendientes.length) pendientes.push('Sin observaciones: el turno no dejo pendientes de imputacion ni patrones que revisar.')
+
+  /* Un turno EN CURSO no "cerro" nada: hablar en pasado de algo que todavia
+     esta pasando invita a leer una foto parcial como si fuera el resultado. Se
+     reescribe el tiempo verbal y se avisa desde la primera linea. */
+  if (enCurso) {
+    const hasta = resumen.finMs ? hhmm(resumen.finMs) : null
+    veredictoTitulo = 'Turno EN CURSO — foto parcial'
+    veredictoDetalle = `Van ${num(resumen.ciclos)} ciclos${hasta ? ` con datos hasta las ${hasta}` : ''}. `
+      + 'Este informe se pidio a mitad del turno: los numeros son de lo que va corrido y pueden cambiar '
+      + 'bastante antes del cierre. El cotejo con otros turnos compara un turno incompleto contra turnos '
+      + 'completos, asi que ahi la comparacion NO vale.'
+    veredictoBueno = false
+    produccionSub = 'ciclos hasta ahora'
+  }
 
   return {
     veredictoTitulo,

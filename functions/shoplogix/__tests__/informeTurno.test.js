@@ -280,3 +280,18 @@ test('la explicación concuerda en singular y en plural', () => {
   assert.match(con(1), /uno de ellos no produjo/)
   assert.match(con(4), /4 de ellos no produjeron/)
 })
+
+test('un turno EN CURSO no habla en pasado ni presume del cotejo', () => {
+  // Decir "el turno cerró con X" cuando todavía está corriendo invita a leer
+  // una foto parcial como si fuera el resultado.
+  const r = resumenBase()
+  const t = construirTextos({
+    resumen: r, recuperaciones: [], cotejo: cotejoMejor, principal: r.causas[0], meta, enCurso: true,
+  })
+  assert.match(t.veredictoTitulo, /EN CURSO/i)
+  assert.ok(!/cerro|cerró/i.test(t.veredictoDetalle), 'no debe hablar en pasado')
+  assert.match(t.veredictoDetalle, /pueden cambiar/i)
+  // Y avisa que la comparación con turnos completos no vale.
+  assert.match(t.veredictoDetalle, /NO vale/i)
+  assert.strictEqual(t.veredictoBueno, false)
+})
