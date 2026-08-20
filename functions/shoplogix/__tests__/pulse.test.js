@@ -88,3 +88,41 @@ test('el desfase se recalcula por fecha: verano e invierno no son iguales', () =
   assert.ok(verano === 3 || verano === 4)
   assert.notStrictEqual(invierno, verano)
 })
+
+// ── Tope de plausibilidad ───────────────────────────────────────────────────
+
+test('un salto imposible del contador reinicia la ventana, no se promedia', () => {
+  // Caso REAL del deploy del 2026-08-19: la ventana quedó a caballo entre las
+  // lecturas de antes del arreglo de la hora (0, porque preguntábamos por un
+  // turno que no había empezado) y las de después (12.169). El salto publicó
+  // 3.101 pz/min en el documento que lee la pantalla.
+  let p = componerPulso(null, lect(0, 0))
+  p = componerPulso(p, lect(1, 0))
+  p = componerPulso(p, lect(2, 12169))
+
+  assert.strictEqual(p.lecturas.length, 1, 'la ventana arranca de nuevo desde el salto')
+  assert.strictEqual(p.lecturas[0].totalCycles, 12169)
+  assert.strictEqual(p.cpm, null, 'con una sola lectura no hay ritmo que publicar')
+})
+
+test('después del salto, el ritmo se reconstruye normal', () => {
+  let p = componerPulso(null, lect(0, 0))
+  p = componerPulso(p, lect(2, 12169))
+  p = componerPulso(p, lect(4, 12252))
+  p = componerPulso(p, lect(6, 12345))
+  assert.strictEqual(p.cpm, (12345 - 12169) / 4)
+  assert.ok(p.cpm < 120)
+})
+
+test('la producción normal no se ve afectada por el tope', () => {
+  // Yal produciendo: ~35 pz/min, muy por debajo del absurdo.
+  let p = componerPulso(null, lect(0, 12169))
+  p = componerPulso(p, lect(2, 12252))
+  p = componerPulso(p, lect(4, 12345))
+  assert.strictEqual(p.lecturas.length, 3, 'no se reinicia la ventana')
+  assert.strictEqual(p.cpm, 44)
+})
+
+test('ritmoDeVentana no publica un absurdo aunque la ventana lo contenga', () => {
+  assert.strictEqual(ritmoDeVentana([lect(0, 0), lect(4, 12169)]), null)
+})
