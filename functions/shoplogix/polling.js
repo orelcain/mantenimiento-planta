@@ -46,6 +46,28 @@ const SHIFT_DURATION_MIN = 12 * 60
  * wall) quedaba sin re-sincronizar — pérdida silenciosa de la cola de turnos
  * nocturnos que terminan pasadas las 07:00.
  */
+/**
+ * El instante actual expresado como HORA DE PLANTA, para mandárselo a Shoplogix.
+ *
+ * ⚠ Shoplogix interpreta el `start` que recibe como hora de planta, no como
+ * UTC. Mandarle `new Date()` es preguntarle por un momento 4 horas en el
+ * futuro. Verificado el 2026-08-19: a las 19:58 UTC la consulta devolvia la
+ * ficha del turno de la noche (21:30→05:15) con TODO en cero — existe, tiene
+ * horario, no tiene produccion, porque todavia no empezaba.
+ *
+ * Eso tuvo dos victimas silenciosas: el pulso (cpm siempre 0) y el contador
+ * vivo del sync (`shoplogixLive`), que quedaban congelados apenas el desfase
+ * dejaba de caer dentro de un turno real. Yal parecia sano de casualidad: su
+ * Turno 3 va de 00:00 a 07:45, asi que con 4 horas de corrimiento seguia
+ * aterrizando adentro.
+ *
+ * El resultado se formatea con `toShoplogixTime`, que usa getters UTC — por eso
+ * hay que restar el offset y NO sumarlo.
+ */
+function ahoraEnPlanta(now = new Date()) {
+  return new Date(now.getTime() - chileUtcOffsetHours(now) * 3600_000)
+}
+
 function chileUtcOffsetHours(now = new Date()) {
   const dtf = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/Santiago',
@@ -154,6 +176,7 @@ async function pauseBetweenMachines() {
 }
 
 module.exports = {
+  ahoraEnPlanta,
   SHIFT_SCHEDULE,
   LUNCH_WINDOWS,
   SHIFT_DURATION_MIN,

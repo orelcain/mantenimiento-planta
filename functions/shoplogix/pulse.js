@@ -25,6 +25,7 @@
  * sigue saliendo de los buckets.
  */
 const { PLANT_AREA_ID } = require('./machines')
+const { ahoraEnPlanta } = require('./polling')
 
 /** Cuántas lecturas se conservan: 10 min de historia a un pulso por minuto. */
 const MAX_LECTURAS = 10
@@ -33,7 +34,7 @@ const MAX_LECTURAS = 10
  * Lee el contador vivo de una planta.
  * @returns {Promise<{at: string, totalCycles: number} | null>}
  */
-async function leerPulso({ query, plantSlug, at = new Date(), toShoplogixTime, logger = console }) {
+async function leerPulso({ query, plantSlug, at = ahoraEnPlanta(), toShoplogixTime, logger = console }) {
   const areaId = PLANT_AREA_ID[plantSlug]
   if (!areaId) return null
   try {

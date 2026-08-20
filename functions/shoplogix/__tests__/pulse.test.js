@@ -54,3 +54,31 @@ test('la radiografía describe la forma sin copiar la respuesta entera', () => {
   // No arrastra la respuesta completa.
   assert.strictEqual(JSON.stringify(r).length < 900, true)
 })
+
+// ── Hora de planta ──────────────────────────────────────────────────────────
+
+const { ahoraEnPlanta, chileUtcOffsetHours } = require('../polling')
+const { toShoplogixTime } = require('../time')
+
+test('a Shoplogix se le manda la hora de PLANTA, no UTC', () => {
+  // El defecto del 2026-08-19: se mandaba `new Date()` y Shoplogix lo leía como
+  // hora local, o sea preguntábamos 4 h en el futuro. A las 19:58 UTC devolvía
+  // la ficha del turno de la noche (21:30→05:15) con todo en cero.
+  const utc = new Date('2026-08-19T19:58:47.000Z')
+  const off = chileUtcOffsetHours(utc)
+  const enPlanta = ahoraEnPlanta(utc)
+
+  assert.strictEqual((utc.getTime() - enPlanta.getTime()) / 3_600_000, off)
+  // Formateado con getters UTC da la hora del reloj de planta.
+  assert.strictEqual(toShoplogixTime(enPlanta).slice(9, 13), String(19 - off).padStart(2, '0') + '58')
+  // Y ya no cae dentro de un turno que aún no empezó.
+  assert.ok(enPlanta < utc, 'Chile va detrás de UTC')
+})
+
+test('el desfase se recalcula por fecha: verano e invierno no son iguales', () => {
+  const invierno = chileUtcOffsetHours(new Date('2026-08-19T12:00:00Z'))
+  const verano = chileUtcOffsetHours(new Date('2026-01-15T12:00:00Z'))
+  assert.ok(invierno === 4 || invierno === 3)
+  assert.ok(verano === 3 || verano === 4)
+  assert.notStrictEqual(invierno, verano)
+})
