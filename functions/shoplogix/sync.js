@@ -23,7 +23,7 @@ const { PLANT_MACHINES, PLANT_AREA_ID } = require('./machines')
 const { queryShoplogix, queryShoplogixBearer } = require('./client')
 const { normalizeShift } = require('./normalizer')
 const { toShoplogixTime, parseShoplogixTime } = require('./time')
-const { pauseBetweenMachines, currentShift, toChileWall, chileUtcOffsetHours } = require('./polling')
+const { pauseBetweenMachines, currentShift, toChileWall, chileUtcOffsetHours, ahoraEnPlanta } = require('./polling')
 const { canonicalShiftName } = require('./canonicalShift')
 
 /** Plantas activas — usada en wakeup scheduler. */
@@ -768,7 +768,11 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
   // Al ser "ahora", describe el turno vigente — se adjunta al grupo cuyo
   // shiftId coincide con la etiqueta que reporta el rollup.
   const officialRollup = (dateKey === currentDateKey())
-    ? await fetchOfficialRollup({ query, plantSlug, at: syncedAt, logger })
+    // Hora de PLANTA, no UTC: Shoplogix lee el `start` como hora local. Mandarle
+    // `syncedAt` crudo preguntaba 4 h en el futuro y devolvia la ficha del turno
+    // siguiente en cero — por eso `shoplogixLive` se congelaba al cruzar el
+    // borde de cada turno.
+    ? await fetchOfficialRollup({ query, plantSlug, at: ahoraEnPlanta(syncedAt), logger })
     : null
 
   if (shiftGroups.length === 0) {
