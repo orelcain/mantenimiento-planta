@@ -7942,8 +7942,16 @@ exports.enviarInformeTurnoManual = onCall({ region: 'us-central1' }, async (requ
   const config = await getShoplogixNotifConfig(plant)
   if (!config.shiftEnd?.informePdf?.chatId) {
     throw new HttpsError('failed-precondition',
-      `${plant} no tiene un chat de Telegram configurado para el informe.`)
+      `${plant} no tiene un chat de Telegram configurado para el informe. `
+      + 'Se configura en notificationConfig, campo shiftEnd.informePdf.chatId.')
   }
+
+  /* ¿El turno sigue corriendo? El brief de cierre es la señal más confiable:
+     lo estampa el mismo cron que sabe cuándo un turno termino de verdad
+     (espera incluso a que la linea deje de producir). Si no está, el turno
+     sigue vivo y el informe sale marcado como foto parcial. */
+  const turnoDoc = await db.collection('shoplogix').doc(plant).collection('shifts').doc(shiftDocId).get()
+  const enCurso = !turnoDoc.data()?.endBriefSentAt
 
   try {
     const r = await shoplogixInformeMod.enviarInformeDeTurno({
@@ -7954,6 +7962,7 @@ exports.enviarInformeTurnoManual = onCall({ region: 'us-central1' }, async (requ
       // eso está el botón.
       config: { ...config, shiftEnd: { ...config.shiftEnd, informePdf: { ...config.shiftEnd.informePdf, enabled: true } } },
       forzar: true,
+      enCurso,
       enviarDocumento: async (chatId, buffer, filename, caption) => {
         const res = await sendTelegramDocument(chatId, buffer, filename, caption)
         if (!res || !res.ok) {
@@ -7963,7 +7972,7 @@ exports.enviarInformeTurnoManual = onCall({ region: 'us-central1' }, async (requ
       },
       logger,
     })
-    logger.info('[enviarInformeTurnoManual]', { uid, plant, shiftDocId, ...r })
+    logger.info('[enviarInformeTurnoManual]', { uid, plant, shiftDocId, enCurso, ...r })
     return r
   } catch (e) {
     logger.error('[enviarInformeTurnoManual] falló', { uid, plant, shiftDocId, err: e.message })

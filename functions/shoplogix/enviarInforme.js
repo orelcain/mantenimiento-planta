@@ -51,6 +51,7 @@ function caption({ meta, datos }) {
   l.push(`<b>${meta.areaLabel} · ${meta.turnoLabel}</b>`)
   l.push(meta.fechaLabel)
   l.push('')
+  if (datos.enCurso) l.push('⏳ <b>TURNO EN CURSO</b> — foto parcial')
   l.push(datos.textos.veredictoTitulo)
   l.push('')
   l.push(`Producción: <b>${r.ciclos.toLocaleString('es-CL')}</b> ciclos`)
@@ -77,7 +78,7 @@ function caption({ meta, datos }) {
  * @param {object}   [p.logger]
  * @returns {Promise<{enviado:boolean, motivo?:string, bytes?:number}>}
  */
-async function enviarInformeDeTurno({ db, plant, shiftDocId, config, enviarDocumento, logger = console, forzar = false }) {
+async function enviarInformeDeTurno({ db, plant, shiftDocId, config, enviarDocumento, logger = console, forzar = false, enCurso = false }) {
   const cfg = (config && config.shiftEnd && config.shiftEnd.informePdf) || {}
   if (!cfg.enabled) return { enviado: false, motivo: 'apagado' }
 
@@ -138,7 +139,7 @@ async function enviarInformeDeTurno({ db, plant, shiftDocId, config, enviarDocum
     fechaLabel: shiftDocId.slice(0, 10),
   }
 
-  const datos = construirDatosInforme({ machines, windowStart, windowEnd, cotejo, meta })
+  const datos = construirDatosInforme({ machines, windowStart, windowEnd, cotejo, meta, enCurso })
   const pdf = generarInformeTurno(datos)
 
   // `enviarDocumento` DEBE lanzar si el envio no se concreto. Telegram responde
@@ -153,6 +154,11 @@ async function enviarInformeDeTurno({ db, plant, shiftDocId, config, enviarDocum
     }, { merge: true })
     throw e
   }
+
+  // Un informe de turno EN CURSO no deja marca ni cachea: el turno sigue vivo,
+  // sus numeros van a cambiar, y guardarlos haria que el cotejo de manana
+  // comparara contra una foto a medias.
+  if (enCurso) return { enviado: true, bytes: pdf.length, parcial: true }
 
   // El resumen se cachea para que los cotejos futuros no tengan que volver a
   // bajar esta subcolección. Se guarda sin `causas`/`pausas`: el detalle pesa y
