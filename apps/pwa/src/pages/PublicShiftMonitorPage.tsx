@@ -1784,7 +1784,7 @@ function PorHora({ series }: { series: PublicMonitorLive['series'] }) {
  * final de la regla ES lo que falta. No hay que saber que 18 es el techo ni
  * restar 12,5 de 18.
  */
-function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, onEditarSetPoint, cerrado, contexto, chispa }: {
+function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, onEditarSetPoint, cerrado, contexto, chispa, corteMs, pulso }: {
   /**
    * Ritmo de ahora ANDANDO, en pz/min: los últimos 15 min descontando los
    * tramos parados. Va en esta base y no en la de reloj porque es contra lo
@@ -1813,6 +1813,10 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, onEditarSetPoi
   contexto?: string | null
   /** El sparkline de los turnos previos, si hay historia. */
   chispa?: React.ReactNode
+  /** Fin del último tramo cerrado: hasta cuándo describe el número grande. */
+  corteMs?: number | null
+  /** Ritmo casi instantáneo (~4 min) que ya calcula el backend. */
+  pulso?: { cpm?: number | null; at?: string | null } | null
 }) {
   /*
    * ⚠ El estado se juzga contra el OBJETIVO cuando se conoce, no contra la
@@ -1914,6 +1918,38 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, onEditarSetPoi
           )}
         </div>
       </div>
+
+      {/* La hora de corte. El número grande describe los últimos 15 min, pero
+          un tramo no existe hasta que cierra: sin decir hasta cuándo, quien lo
+          mira no sabe si la línea bajó o si todavía no llega el dato. */}
+      {ahora != null && corteMs != null && (
+        <p className="mt-1 text-[11px] text-muted-foreground">
+          Últimos 15 min · hasta las{' '}
+          <span className="tabular-nums">
+            {new Date(corteMs).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false })}
+          </span>
+        </p>
+      )}
+
+      {/* El pulso, en otra jerarquía a propósito: responde otra pregunta («¿está
+          andando AHORA?») y con el mismo peso visual competiría con el número
+          de decidir. Solo aparece si el backend publicó un ritmo — cuando el
+          contador salta o no llega, `cpm` viene null y acá no se muestra nada
+          en vez de mentir con un cero. */}
+      {pulso?.cpm != null && (
+        <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-border px-3 py-1">
+          <span className="inline-block size-1.5 rounded-full bg-emerald-500" />
+          <span className="text-[13px] font-semibold tabular-nums text-foreground">{fmtDec(pulso.cpm)}</span>
+          <span className="text-[11px] text-muted-foreground">
+            ahora mismo
+            {pulso.at && (
+              <> · <span className="tabular-nums">
+                {new Date(pulso.at).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false })}
+              </span></>
+            )}
+          </span>
+        </div>
+      )}
 
       {/* Las dos bases, dichas. El de reloj no se esconde: es el que dice
           cuánto SALE de verdad, y su distancia con el andando es el costo de
@@ -3363,6 +3399,12 @@ export function PublicShiftMonitorPage() {
             <ReglaDeRitmo
               ahora={ritmoAhoraAndando(serieDelTurno)}
               ahoraReloj={ritmoAhoraCpm(serieDelTurno)}
+              /* Fin del último tramo: la serie viene en hora de planta, igual
+                 que el resto de la pantalla. */
+              corteMs={serieDelTurno.length
+                ? Date.parse(serieDelTurno[serieDelTurno.length - 1]!.t) + 5 * 60_000
+                : null}
+              pulso={data.pulse ?? null}
               /* El objetivo, en la MISMA base que el ritmo: el requerido de
                  `pace` es sobre el reloj útil que queda, y se convierte a
                  «andando» con el uptime real del turno. */
