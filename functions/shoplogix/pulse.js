@@ -131,7 +131,20 @@ function radiografia(data) {
  */
 function componerPulso(previo, lectura) {
   if (!lectura) return previo ?? null
-  const lecturas = [...(previo?.lecturas ?? []), lectura].slice(-MAX_LECTURAS)
+
+  /* Discontinuidad: si el salto respecto de la última lectura implica un ritmo
+     imposible, el contador no "produjo" eso — se reinició o cambió de turno.
+     Se arranca la ventana de nuevo desde esta lectura en vez de promediar a
+     través del salto, que es lo que publicó 3.101 pz/min. */
+  const previas = previo?.lecturas ?? []
+  const ultima = previas[previas.length - 1]
+  const saltoImposible = ultima && (() => {
+    const min = (Date.parse(lectura.at) - Date.parse(ultima.at)) / 60000
+    if (!(min > 0)) return false
+    return (lectura.totalCycles - ultima.totalCycles) / min > MAX_CPM_PLAUSIBLE
+  })()
+
+  const lecturas = (saltoImposible ? [lectura] : [...previas, lectura]).slice(-MAX_LECTURAS)
 
   const cpm = ritmoDeVentana(lecturas)
   // El `diag` no entra al pulso: viaja aparte, a su propio doc. Acá solo va lo
@@ -139,6 +152,26 @@ function componerPulso(previo, lectura) {
   const limpias = lecturas.map(({ at, totalCycles }) => ({ at, totalCycles }))
   return { at: lectura.at, totalCycles: lectura.totalCycles, cpm, lecturas: limpias }
 }
+
+/**
+ * Techo de plausibilidad, en piezas por minuto de LÍNEA.
+ *
+ * No es una meta ni la capacidad real: es un absurdo. La línea más rápida es
+ * Yal con 3 evisceradoras a 17 pz/min nominales, o sea ~51. Cualquier cosa
+ * sobre 120 no es producción: es el contador que se reinició, un backfill o un
+ * cambio de turno.
+ *
+ * Hizo falta el 2026-08-19: al desplegar el arreglo de la hora, la ventana de
+ * lecturas quedó a caballo entre las de antes (0, porque preguntábamos por un
+ * turno que no había empezado) y las de después (12.169). El salto de 0 a
+ * 12.169 en cuatro minutos publicó **3.101 pz/min** en el pulso. Se corrigió
+ * solo cuando la ventana se llenó de lecturas nuevas, pero alcanzó a estar en
+ * el documento que lee la pantalla.
+ *
+ * El código ya se protegía de que el acumulado BAJARA (cambio de turno). Que
+ * SALTE es la misma discontinuidad al revés y no estaba cubierta.
+ */
+const MAX_CPM_PLAUSIBLE = 120
 
 /** Lecturas que entran en el ritmo: ~4 min, más que el refresco de Shoplogix. */
 const VENTANA_RITMO = 5
@@ -160,7 +193,12 @@ function ritmoDeVentana(lecturas) {
   const min = (Date.parse(ultima.at) - Date.parse(primera.at)) / 60000
   const dif = ultima.totalCycles - primera.totalCycles
   if (!(min >= MIN_MINUTOS) || dif < 0) return null
-  return dif / min
+  const cpm = dif / min
+  // Cinturón además del tirante: si aun así sale un absurdo, no se publica.
+  return cpm > MAX_CPM_PLAUSIBLE ? null : cpm
 }
 
-module.exports = { leerPulso, componerPulso, ritmoDeVentana, radiografia, MAX_LECTURAS, VENTANA_RITMO }
+module.exports = {
+  leerPulso, componerPulso, ritmoDeVentana, radiografia,
+  MAX_LECTURAS, VENTANA_RITMO, MAX_CPM_PLAUSIBLE,
+}
