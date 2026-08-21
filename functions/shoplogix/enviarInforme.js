@@ -13,6 +13,18 @@
  *   configurar el destino, es peor que no mandarlo.
  * - No hay maquinas o el turno no produjo.
  *
+ * ── Rastro de lo enviado ────────────────────────────────────────────────────
+ * Cada envío deja su `message_id` de Telegram en `informePdfEnvios`. Sin eso no
+ * se puede responder la pregunta más básica cuando alguien dice "no me llegó":
+ * el 2026-08-20 un envío del botón salió con `enviado: true` y 45 KB en el log
+ * de la Cloud Function, y no hubo forma de confirmar si el mensaje existía en
+ * el hilo o si Telegram lo había deduplicado contra uno idéntico anterior.
+ *
+ * El rastro se guarda TAMBIÉN para los envíos parciales (turno en curso), que
+ * son justo los que no dejaban nada. Va en un campo aparte a propósito: no es
+ * la marca de idempotencia, así que anotarlo no impide que salga el informe del
+ * cierre.
+ *
  * ── Idempotencia ────────────────────────────────────────────────────────────
  * Se estampa `informePdfSentAt` en el doc del turno. `checkShiftEndBriefs` ya
  * es idempotente por `endBriefSentAt`, pero el informe se manda DESPUES: si el
@@ -145,8 +157,9 @@ async function enviarInformeDeTurno({ db, plant, shiftDocId, config, enviarDocum
   // `enviarDocumento` DEBE lanzar si el envio no se concreto. Telegram responde
   // {ok:false} sin lanzar, y si eso se toma por bueno el turno queda marcado
   // como enviado sin que nadie lo haya recibido.
+  let respuesta = null
   try {
-    await enviarDocumento(chatId, pdf, nombreArchivo(plant, shiftDocId), caption({ meta, datos }))
+    respuesta = await enviarDocumento(chatId, pdf, nombreArchivo(plant, shiftDocId), caption({ meta, datos }))
   } catch (e) {
     await ref.set({
       informePdfIntentos: intentos + 1,
@@ -155,10 +168,33 @@ async function enviarInformeDeTurno({ db, plant, shiftDocId, config, enviarDocum
     throw e
   }
 
-  // Un informe de turno EN CURSO no deja marca ni cachea: el turno sigue vivo,
+  /* El id que devuelve Telegram. Puede faltar —un `enviarDocumento` de prueba,
+     o una respuesta con otra forma— y en ese caso se anota el envio igual con
+     `messageId: null`: saber que se envio y no tener el id es distinto de no
+     tener rastro. */
+  const messageId = (respuesta && respuesta.result && respuesta.result.message_id) || null
+  const envio = {
+    at: new Date(),
+    messageId,
+    chatId: String(chatId),
+    bytes: pdf.length,
+    parcial: !!enCurso,
+  }
+  /* Ultimos 10. Sin tope, el boton de reenviar puede engordar el doc padre —que
+     se lee en cada cotejo— sin que nadie lo note.
+     ⚠ Es read-modify-write sobre `padre`, que se leyo al principio: dos envios
+     simultaneos del mismo turno podrian pisarse una entrada. Se acepta: no hay
+     nada que decidir sobre este campo, es historial. */
+  const envios = [...(padre.informePdfEnvios || []), envio].slice(-10)
+
+  // Un informe de turno EN CURSO no deja MARCA ni cachea: el turno sigue vivo,
   // sus numeros van a cambiar, y guardarlos haria que el cotejo de manana
-  // comparara contra una foto a medias.
-  if (enCurso) return { enviado: true, bytes: pdf.length, parcial: true }
+  // comparara contra una foto a medias. El rastro del envio si se guarda: no es
+  // la marca de idempotencia y es justo lo que faltaba para poder confirmarlo.
+  if (enCurso) {
+    await ref.set({ informePdfEnvios: envios }, { merge: true })
+    return { enviado: true, bytes: pdf.length, parcial: true, messageId }
+  }
 
   // El resumen se cachea para que los cotejos futuros no tengan que volver a
   // bajar esta subcolección. Se guarda sin `causas`/`pausas`: el detalle pesa y
@@ -166,11 +202,14 @@ async function enviarInformeDeTurno({ db, plant, shiftDocId, config, enviarDocum
   const resumen = resumirTurno({ machines, windowStart, windowEnd, clasificar: clasificarParaInforme })
   const { causas, pausas, ...compacto } = resumen
   await ref.set({
-    informePdfSentAt: new Date(),
+    informePdfSentAt: envio.at,
+    // El id del ultimo envio, suelto, para poder buscarlo sin recorrer el array.
+    informePdfMessageId: messageId,
+    informePdfEnvios: envios,
     resumenLinea: compacto,
   }, { merge: true })
 
-  return { enviado: true, bytes: pdf.length }
+  return { enviado: true, bytes: pdf.length, messageId }
 }
 
 module.exports = { enviarInformeDeTurno, nombreArchivo, caption, AREA_LABEL, MAX_INTENTOS }

@@ -7899,7 +7899,12 @@ exports.checkShiftEndBriefs = onSchedule(
                 logger,
               })
               if (r.enviado) {
-                logger.info('[checkShiftEndBriefs] informe PDF enviado', { plant, doc: docSnap.id, bytes: r.bytes })
+                // `messageId` va al log a proposito: es lo que permite ir al
+                // hilo y confirmar que el mensaje existe cuando alguien dice
+                // que no le llego.
+                logger.info('[checkShiftEndBriefs] informe PDF enviado', {
+                  plant, doc: docSnap.id, bytes: r.bytes, messageId: r.messageId ?? null,
+                })
               } else if (r.motivo !== 'apagado') {
                 logger.info('[checkShiftEndBriefs] informe PDF no enviado', { plant, doc: docSnap.id, motivo: r.motivo })
               }
