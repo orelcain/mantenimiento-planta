@@ -74,6 +74,13 @@ function durTexto(sec) {
 
 const num = (n) => (typeof n === 'number' ? n.toLocaleString('es-CL') : '--')
 
+/**
+ * "1 maquina" / "3 maquinas". Parece cosmetico y no lo es: el informe de Filete
+ * decia "1 maquinas" en la cabecera y "LAS 1 - linea muerta" en el grafico, y
+ * cualquiera que lo lea deja de creerle al resto de las cifras.
+ */
+const maquinasTexto = (n) => (n === 1 ? '1 maquina' : `${n} maquinas`)
+
 // ── Paleta ───────────────────────────────────────────────────────────────────
 // Misma familia que el mockup: azul petróleo de acento, semánticos aparte.
 const C = {
@@ -323,7 +330,7 @@ function lamina1Veredicto(L, d) {
   crearLamina(L, {
     pestania: 'Veredicto',
     titulo: `${d.meta.areaLabel} - ${d.meta.turnoLabel}`,
-    subtitulo: `${d.meta.fechaLabel} - ${hhmm(d.resumen.inicioMs)} a ${hhmm(d.resumen.finMs)} - ${d.resumen.maquinas} maquinas`,
+    subtitulo: `${d.meta.fechaLabel} - ${hhmm(d.resumen.inicioMs)} a ${hhmm(d.resumen.finMs)} - ${maquinasTexto(d.resumen.maquinas)}`,
   })
 
   nota(L, d.textos.veredictoDetalle, {
@@ -344,7 +351,7 @@ function lamina1Veredicto(L, d) {
     },
     {
       rotulo: 'Linea detenida', valor: durTexto(d.resumen.detencion.todasSec),
-      sub: 'todas las maquinas a la vez', color: C.atencion,
+      sub: d.resumen.maquinas === 1 ? 'sin producir' : 'todas las maquinas a la vez', color: C.atencion,
     },
     {
       rotulo: 'Atribuible a Mantencion',
@@ -360,40 +367,77 @@ function lamina1Veredicto(L, d) {
 }
 
 function lamina2Falla(L, d) {
+  /*
+   * ⚠ Esta lamina existe para corregir el doble conteo del rollup de Shoplogix,
+   * que suma las maquinas del area. Con UNA sola maquina no hay nada que
+   * corregir: suma, union, todas y equivalente son el MISMO numero, y la lamina
+   * quedaba explicando un doble conteo inexistente mientras mostraba cuatro
+   * columnas identicas — 1:17:50 cuatro veces en el informe de Filete del 20-08.
+   * Eso no es un detalle de formato: una lamina que argumenta algo que su propia
+   * tabla desmiente le quita autoridad a todo el resto del informe.
+   *
+   * Con una maquina la lamina cambia de trabajo: deja de corregir y pasa a
+   * detallar las detenciones, que es lo que si tiene para decir.
+   */
+  const unaSolaMaquina = d.resumen.maquinas === 1
+
   crearLamina(L, {
-    pestania: 'La falla, medida bien',
-    titulo: 'Horas-maquina no son horas de linea',
-    subtitulo: `El resumen de area de Shoplogix suma las ${d.resumen.maquinas} maquinas`,
+    pestania: unaSolaMaquina ? 'Las detenciones' : 'La falla, medida bien',
+    titulo: unaSolaMaquina ? 'En que se fue el tiempo detenido' : 'Horas-maquina no son horas de linea',
+    subtitulo: unaSolaMaquina
+      ? 'La linea es una sola maquina: cada minuto detenido es un minuto sin producir'
+      : `El resumen de area de Shoplogix suma las ${d.resumen.maquinas} maquinas`,
   })
 
-  const cols = [
-    { t: 'Causa', ancho: 62 },
-    { t: 'Categoria', ancho: 38 },
-    { t: 'Suma del area', ancho: 30, alinear: 'der' },
-    { t: 'Al menos 1', ancho: 26, alinear: 'der' },
-    { t: 'Todas', ancho: 24, alinear: 'der' },
-    { t: 'Equiv. linea', ancho: 28, alinear: 'der' },
-    { t: 'Eventos', ancho: 20, alinear: 'der' },
-  ]
+  const cols = unaSolaMaquina
+    ? [
+      { t: 'Causa', ancho: 84 },
+      { t: 'Categoria', ancho: 52 },
+      { t: 'Linea detenida', ancho: 34, alinear: 'der' },
+      { t: 'Eventos', ancho: 24, alinear: 'der' },
+      { t: 'Promedio', ancho: 28, alinear: 'der' },
+    ]
+    : [
+      { t: 'Causa', ancho: 62 },
+      { t: 'Categoria', ancho: 38 },
+      { t: 'Suma del area', ancho: 30, alinear: 'der' },
+      { t: 'Al menos 1', ancho: 26, alinear: 'der' },
+      { t: 'Todas', ancho: 24, alinear: 'der' },
+      { t: 'Equiv. linea', ancho: 28, alinear: 'der' },
+      { t: 'Eventos', ancho: 20, alinear: 'der' },
+    ]
   // Las micro detenciones van al pie, no en la tabla: son cientos de eventos de
   // segundos que inflan la tabla y compiten visualmente con la falla que
   // importa. Se resumen en una linea, que es lo que aportan.
   const micro = d.resumen.causas.find((c) => c.esMicro)
   const causasReales = d.resumen.causas.filter((c) => !c.esMicro)
-  const filas = causasReales.map((c) => ({
-    celdas: [
-      c.imputacion && c.imputacion.hoja ? c.imputacion.hoja : c.causa,
-      c.imputacion ? c.imputacion.categoriaLabel : '--',
-      dur(c.sumaSec), dur(c.unionSec), dur(c.todasSec), dur(c.equivalenteLineaSec), String(c.eventos),
-    ],
-    colores: [null, null, [...C.tinta3], null, null, null, null],
-  }))
+  const filas = causasReales.map((c) => {
+    const nombre = c.imputacion && c.imputacion.hoja ? c.imputacion.hoja : c.causa
+    const categoria = c.imputacion ? c.imputacion.categoriaLabel : '--'
+    /* El promedio por evento reemplaza a las columnas que sobran: separa una
+       averia larga de muchas paradas cortas, que suman igual y se atacan
+       distinto. Es lo unico que la tabla de una maquina no decia. */
+    if (unaSolaMaquina) {
+      return {
+        celdas: [nombre, categoria, dur(c.equivalenteLineaSec), String(c.eventos),
+          c.eventos ? dur(Math.round(c.equivalenteLineaSec / c.eventos)) : '--'],
+        colores: [null, [...C.tinta3], null, null, null],
+      }
+    }
+    return {
+      celdas: [nombre, categoria,
+        dur(c.sumaSec), dur(c.unionSec), dur(c.todasSec), dur(c.equivalenteLineaSec), String(c.eventos)],
+      colores: [null, null, [...C.tinta3], null, null, null, null],
+    }
+  })
   filas.push({
-    celdas: [
-      'TOTAL (con micro detenciones)', '',
-      dur(d.resumen.detencion.sumaSec), dur(d.resumen.detencion.unionSec),
-      dur(d.resumen.detencion.todasSec), dur(d.resumen.detencion.equivalenteLineaSec), '',
-    ],
+    celdas: unaSolaMaquina
+      ? ['TOTAL (con micro detenciones)', '', dur(d.resumen.detencion.equivalenteLineaSec), '', '']
+      : [
+        'TOTAL (con micro detenciones)', '',
+        dur(d.resumen.detencion.sumaSec), dur(d.resumen.detencion.unionSec),
+        dur(d.resumen.detencion.todasSec), dur(d.resumen.detencion.equivalenteLineaSec), '',
+      ],
   })
   tabla(L, cols, filas, { resaltar: 0 })
 
@@ -405,7 +449,10 @@ function lamina2Falla(L, d) {
 
   // Barra del reparto por nivel de solapamiento de la causa principal.
   const p = d.resumen.causas[0]
-  if (p && p.unionSec > 0) {
+  // Con UNA maquina no hay solapamiento que repartir: la barra seria un
+  // rectangulo lleno etiquetado "LAS 1 - linea muerta", que no explica nada y
+  // ademas esta mal escrito.
+  if (p && p.unionSec > 0 && d.resumen.maquinas > 1) {
     const y = sitio(L, 30)
     L.y = y
     rotulo(L, `Reparto de los ${durTexto(p.unionSec)} en que hubo alguna maquina detenida por ${p.imputacion && p.imputacion.hoja ? p.imputacion.hoja : p.causa}`)

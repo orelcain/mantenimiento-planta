@@ -199,6 +199,22 @@ function construirTextos({ resumen, recuperaciones, reparto, ocupacion, cotejo, 
   const hayFalla = principal && principal.equivalenteLineaSec > 0
   const etiqueta = principal ? etiquetaCausa(principal) : null
 
+  /*
+   * ⚠ El informe nacio para lineas de VARIAS maquinas y su argumento central es
+   * que el rollup de Shoplogix las suma. En Filete hay UNA sola Baader 200, y
+   * ahi ese argumento no aplica: suma, union, todas y equivalente son el MISMO
+   * numero. Sin esta bandera el informe decia "1 maquinas", hablaba de "cuando
+   * las tres caen a la misma hora" sobre una sola pista, y explicaba un doble
+   * conteo inexistente mientras mostraba cuatro columnas identicas.
+   *
+   * Con una maquina el informe no tiene menos que decir, tiene que decir OTRA
+   * cosa: el detalle de las detenciones, no la correccion del doble conteo.
+   */
+  const unaSolaMaquina = resumen.maquinas === 1
+  /* "Linea completa" solo significa algo cuando hay varias maquinas que podrian
+     estar caidas en parte. */
+  const deLinea = unaSolaMaquina ? 'de linea detenida' : 'de linea completa'
+
   // ── Veredicto ─────────────────────────────────────────────────────────────
   let veredictoTitulo
   let veredictoDetalle
@@ -214,7 +230,7 @@ function construirTextos({ resumen, recuperaciones, reparto, ocupacion, cotejo, 
     veredictoDetalle = hayFalla
       ? `El turno cerro con ${num(resumen.ciclos)} ciclos, la produccion mas alta de los ultimos ${c.comparados} turnos equivalentes, `
         + `pese a ${durTexto(principal.sumaSec)} de ${etiqueta} en el resumen de area de Shoplogix `
-        + `(equivalentes a ${durTexto(principal.equivalenteLineaSec)} de linea completa).`
+        + `(equivalentes a ${durTexto(principal.equivalenteLineaSec)} ${deLinea}).`
       : `El turno cerro con ${num(resumen.ciclos)} ciclos, la produccion mas alta de los ultimos ${c.comparados} turnos equivalentes.`
   } else if (c.veredicto === 'sobre-la-mediana') {
     veredictoBueno = true
@@ -251,7 +267,7 @@ function construirTextos({ resumen, recuperaciones, reparto, ocupacion, cotejo, 
     veredictoDetalle = `${num(resumen.ciclos)} ciclos, ${num(Math.abs(c.difVsMediana))} por debajo de la mediana `
       + `de los ultimos ${c.comparados} turnos equivalentes. `
       + (hayFalla
-        ? `La detencion no programada suma ${durTexto(resumen.detencion.equivalenteLineaSec)} de linea completa: `
+        ? `La detencion no programada suma ${durTexto(resumen.detencion.equivalenteLineaSec)} ${deLinea}: `
           + `revisar si alcanza para explicar la diferencia o si el turno corrio menos horas.`
         : 'No hubo detenciones no programadas relevantes: la diferencia hay que buscarla en las horas efectivas de corrida o en el abastecimiento.')
   } else {
@@ -277,17 +293,39 @@ function construirTextos({ resumen, recuperaciones, reparto, ocupacion, cotejo, 
   }
 
   // ── Notas por lamina ──────────────────────────────────────────────────────
-  const notaLamina1 = 'La reunion suele empezar por la cifra grande del resumen de area, que suma las maquinas y por eso '
-    + 'exagera el impacto. Esta lamina entrega el veredicto antes que el detalle; el detalle queda atras para sostenerlo si alguien lo pide.'
+  //
+  // ⚠ El informe nacio para lineas de VARIAS maquinas y su argumento central es
+  // que el rollup de Shoplogix las suma. En Filete hay UNA sola Baader 200, y
+  // ahi ese argumento no aplica: suma, union, todas y equivalente son el MISMO
+  // numero, y la lamina 2 quedaba explicando un doble conteo que no existe
+  // mientras mostraba cuatro columnas identicas. Peor: la lamina 3 hablaba de
+  // "cuando las tres caen a la misma hora" sobre una sola pista.
+  //
+  // Con una maquina el informe no tiene menos que decir, tiene que decir OTRA
+  // cosa: el detalle de las detenciones, no la correccion del doble conteo.
+  const notaLamina1 = unaSolaMaquina
+    ? 'La reunion suele empezar por la duracion de las detenciones, que no dice cuantas piezas costaron. '
+      + 'Esta lamina entrega el veredicto antes que el detalle; el detalle queda atras para sostenerlo si alguien lo pide.'
+    : 'La reunion suele empezar por la cifra grande del resumen de area, que suma las maquinas y por eso '
+      + 'exagera el impacto. Esta lamina entrega el veredicto antes que el detalle; el detalle queda atras para sostenerlo si alguien lo pide.'
 
-  const notaLamina2 = `El resumen de area suma las ${resumen.maquinas} maquinas: una falla aparece con la duracion sumada, `
-    + 'no con el tiempo que la linea estuvo afectada. "Todas" es el unico tiempo en que la linea estuvo realmente parada; '
-    + '"Equiv. linea" es la perdida de capacidad, y es la columna que se traduce a produccion. '
-    + 'Una causa que el arbol de imputacion no puede separar sale como "Electrica o Mecanica": el dato de Shoplogix no distingue cual fue.'
+  const notaLamina2 = unaSolaMaquina
+    ? 'La linea es una sola maquina, asi que el tiempo detenido es directo: no hay varias maquinas que sumar ni '
+      + 'solapamiento que repartir, y cada minuto de esta tabla es un minuto en que la linea no produjo. '
+      + 'La columna que se traduce a piezas es la duracion. '
+      + 'Una causa que el arbol de imputacion no puede separar sale como "Electrica o Mecanica": el dato de Shoplogix no distingue cual fue.'
+    : `El resumen de area suma las ${resumen.maquinas} maquinas: una falla aparece con la duracion sumada, `
+      + 'no con el tiempo que la linea estuvo afectada. "Todas" es el unico tiempo en que la linea estuvo realmente parada; '
+      + '"Equiv. linea" es la perdida de capacidad, y es la columna que se traduce a produccion. '
+      + 'Una causa que el arbol de imputacion no puede separar sale como "Electrica o Mecanica": el dato de Shoplogix no distingue cual fue.'
 
-  const notaLamina3 = 'Permite responder a que hora fue sin abrir Shoplogix, y muestra si las maquinas cayeron juntas '
-    + '(un problema de linea) o escalonadas (fallas independientes). Cuando las tres caen a la misma hora, casi siempre es '
-    + 'una sola causa aguas arriba o aguas abajo, no tres fallas.'
+  const notaLamina3 = unaSolaMaquina
+    ? 'Permite responder a que hora fue sin abrir Shoplogix, y ver como se repartieron las paradas en el turno: '
+      + 'muchas paradas cortas y seguidas son un problema de flujo, y una sola parada larga es una averia. '
+      + 'No es lo mismo aunque sumen los mismos minutos.'
+    : 'Permite responder a que hora fue sin abrir Shoplogix, y muestra si las maquinas cayeron juntas '
+      + '(un problema de linea) o escalonadas (fallas independientes). Cuando varias caen a la misma hora, casi siempre es '
+      + 'una sola causa aguas arriba o aguas abajo, no varias fallas.'
 
   // ── Reparto de la perdida ─────────────────────────────────────────────────
   // Es lo que responde a "las fallas van a ocurrir siempre; lo que importa es
@@ -368,9 +406,15 @@ function construirTextos({ resumen, recuperaciones, reparto, ocupacion, cotejo, 
   // ── Parrafo para leer en la reunion ───────────────────────────────────────
   const partes = []
   if (hayFalla) {
-    partes.push(`El turno registro ${durTexto(principal.sumaSec)} de ${etiqueta} en el resumen de area de Shoplogix, `
-      + `equivalentes a ${durTexto(principal.equivalenteLineaSec)} de linea completa y `
-      + `${durTexto(principal.todasSec)} con todas las maquinas detenidas a la vez.`)
+    /* Con UNA maquina los tres numeros son el mismo: leerlos en voz alta como si
+       fueran tres medidas distintas hace que la primera pregunta de la reunion
+       sea por que se repite la cifra, y ahi se perdio el punto. */
+    partes.push(unaSolaMaquina
+      ? `El turno registro ${durTexto(principal.equivalenteLineaSec)} de linea detenida por ${etiqueta}, `
+        + `en ${principal.eventos} ${principal.eventos === 1 ? 'evento' : 'eventos'}.`
+      : `El turno registro ${durTexto(principal.sumaSec)} de ${etiqueta} en el resumen de area de Shoplogix, `
+        + `equivalentes a ${durTexto(principal.equivalenteLineaSec)} de linea completa y `
+        + `${durTexto(principal.todasSec)} con todas las maquinas detenidas a la vez.`)
   } else {
     partes.push('El turno no registro detenciones no programadas relevantes.')
   }
@@ -426,8 +470,10 @@ function construirTextos({ resumen, recuperaciones, reparto, ocupacion, cotejo, 
     // Se declara aunque sea chico: dos fuentes que no cuadran en un turno
     // pueden no cuadrar en grande en otro, y el informe pierde autoridad si el
     // que lo lee descubre la diferencia antes que nosotros.
-    pendientes.push(`La suma de las maquinas da ${num(resumen.ciclos)} ciclos y el aviso de cierre reporto `
-      + `${num(resumen.ciclos - difFuentes)}: ${num(Math.abs(difFuentes))} de diferencia. El informe usa la suma de las maquinas. `
+    pendientes.push(`${unaSolaMaquina ? 'El contador de la maquina da' : 'La suma de las maquinas da'} `
+      + `${num(resumen.ciclos)} ciclos y el aviso de cierre reporto `
+      + `${num(resumen.ciclos - difFuentes)}: ${num(Math.abs(difFuentes))} de diferencia. `
+      + `El informe usa ${unaSolaMaquina ? 'el contador de la maquina' : 'la suma de las maquinas'}. `
       + 'Vale cerrar de donde sale la diferencia.')
   }
   // Shoplogix no alimenta rechazo para estas maquinas: 204 turnos revisados de

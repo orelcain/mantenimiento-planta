@@ -205,3 +205,40 @@ test('un turno corto no gasta hojas de mas', () => {
   const total = Number(registro.find((e) => /^\d+ \/ \d+$/.test(e.texto)).texto.split(' / ')[1])
   assert.ok(total <= 8, `un turno corto no deberia ocupar ${total} hojas`)
 })
+
+// ── El PDF de UNA sola maquina ──────────────────────────────────────────────
+//
+// Los dos defectos vivian en el dibujo, no en los textos: la cabecera decia
+// "1 maquinas" y la barra de solapamiento etiquetaba "LAS 1 - linea muerta".
+// Se barre el registro de escrituras, que es lo unico que ve lo dibujado.
+
+test('el PDF de una sola maquina no dice "1 maquinas" ni "LAS 1"', () => {
+  const d = datos({ planta: 'filete' })       // maquinas: 1
+  const todo = escrituras(d).map((e) => e.texto).join(' | ')
+  assert.ok(!/1 maquinas/i.test(todo), 'la cabecera dice "1 maquinas"')
+  assert.ok(!/LAS 1\b/i.test(todo), 'el grafico dice "LAS 1 - linea muerta"')
+  assert.ok(!/todas las maquinas a la vez/i.test(todo), 'el KPI habla de todas las maquinas')
+  assert.ok(/1 maquina\b/.test(todo), 'deberia decir "1 maquina" en singular')
+})
+
+test('con una maquina la lamina 2 no muestra cuatro columnas iguales', () => {
+  const d = datos({ planta: 'filete' })
+  const todo = escrituras(d).map((e) => e.texto).join(' | ')
+  // Las columnas del doble conteo no tienen nada que corregir con una maquina.
+  assert.ok(!/SUMA DEL AREA/i.test(todo), 'sigue mostrando la columna de suma del area')
+  assert.ok(!/AL MENOS 1/i.test(todo))
+  assert.ok(!/EQUIV\. LINEA/i.test(todo))
+  // Y en su lugar aporta algo que antes no decia.
+  assert.ok(/LINEA DETENIDA/i.test(todo), 'falta la columna de linea detenida')
+  assert.ok(/PROMEDIO/i.test(todo), 'falta el promedio por evento')
+  assert.ok(/En que se fue el tiempo detenido/i.test(todo), 'la lamina 2 conserva el titulo viejo')
+})
+
+test('con varias maquinas la lamina 2 conserva la correccion del rollup', () => {
+  const d = datos({ planta: 'chonchi' })      // maquinas: 3
+  const todo = escrituras(d).map((e) => e.texto).join(' | ')
+  assert.ok(/SUMA DEL AREA/i.test(todo))
+  assert.ok(/EQUIV\. LINEA/i.test(todo))
+  assert.ok(/Horas-maquina no son horas de linea/i.test(todo))
+  assert.ok(/3 maquinas/.test(todo))
+})
