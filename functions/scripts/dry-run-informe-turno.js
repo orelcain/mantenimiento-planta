@@ -87,8 +87,12 @@ function revisar({ datos, pdf, plant, docId }) {
   // El PDF mismo.
   const cabecera = pdf.slice(0, 5).toString()
   if (cabecera !== '%PDF-') problemas.push('el archivo no es un PDF')
+  // Las 6 láminas pueden ocupar más hojas: una tabla larga se continúa en vez
+  // de perder el final (ver `turnoDefensaPdf`). Lo que sí es sospechoso es un
+  // informe que se dispara: ahí algo está cortando de más.
   const paginas = (pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) || []).length
-  if (paginas !== 6) problemas.push(`${paginas} paginas en vez de 6`)
+  if (paginas < 6) problemas.push(`${paginas} paginas: falta alguna lamina`)
+  if (paginas > 10) problemas.push(`${paginas} paginas: la maqueta esta cortando de mas`)
   if (pdf.length > 400_000) problemas.push(`PDF muy pesado (${Math.round(pdf.length / 1024)} KB)`)
   const cap = caption({ meta: datos.meta, datos })
   if (cap.length > 1024) problemas.push(`caption de ${cap.length} car.: Telegram corta en 1024`)

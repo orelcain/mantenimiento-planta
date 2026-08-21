@@ -88,19 +88,38 @@ const C = {
   atencion: [181, 71, 8],
 }
 
-// ── Primitivas de lámina ─────────────────────────────────────────────────────
+// ── Maquetación con flujo ────────────────────────────────────────────────────
+//
+// ⚠ jsPDF DESCARTA en silencio lo que se dibuja bajo el borde inferior de la
+// hoja: no lo recorta ni avisa, simplemente no queda en el PDF. Verificado el
+// 2026-08-20 con un texto en y=260 mm sobre una hoja de 210 mm.
+//
+// Por eso la maqueta no puede ir sumando `y` a ojo, que es lo que hacía. En los
+// 8 informes que se revisaron ese día la lámina 4 se pasaba del borde SIEMPRE, y
+// con ella se perdían los KPI de ocupación de la cadena, la nota de cómo leer el
+// reparto y la nota que declara lo que el informe NO afirma. El PDF salía bien
+// formado y el bloque no estaba: nada lo delataba salvo mirar la hoja.
+//
+// Regla nueva: todo bloque pide espacio ANTES de dibujarse. Si no cabe, la
+// lámina sigue en una página de continuación. Antes una página de más que un
+// dato de menos — este informe se defiende en una reunión.
 
 const W = 297 // A4 apaisado
 const H = 210
 const M = 16 // margen
+const Y_FIN = H - 12 // última línea útil del cuerpo
 
-function crearLamina(doc, { indice, total, titulo, subtitulo, pestania }) {
-  if (indice > 1) doc.addPage()
+/** Estado de maquetación: la hoja en curso y hasta dónde se llenó. */
+function abrirLienzo(doc) {
+  return { doc, y: 0, paginas: 0, pestania: '', titulo: '' }
+}
+
+/** Cabecera de hoja. El número de página se estampa al final, en `numerar`. */
+function encabezado(doc, { pestania, titulo, subtitulo }) {
   doc.setFillColor(...C.acento)
   doc.rect(0, 0, W, 7, 'F')
   doc.setFontSize(7.5).setTextColor(255, 255, 255).setFont('helvetica', 'bold')
   doc.text(wa(pestania.toUpperCase()), M, 4.8)
-  doc.text(wa(`${indice} / ${total}`), W - M, 4.8, { align: 'right' })
 
   doc.setTextColor(...C.tinta).setFontSize(19).setFont('helvetica', 'bold')
   doc.text(wa(titulo), M, 20)
@@ -113,9 +132,55 @@ function crearLamina(doc, { indice, total, titulo, subtitulo, pestania }) {
   return 38 // y de arranque del cuerpo
 }
 
-/** Caja de cifra grande. */
+/** Abre una lámina nueva. */
+function crearLamina(L, { pestania, titulo, subtitulo }) {
+  if (L.paginas > 0) L.doc.addPage()
+  L.paginas += 1
+  L.pestania = pestania
+  L.titulo = titulo
+  L.y = encabezado(L.doc, { pestania, titulo, subtitulo })
+  return L.y
+}
+
+/**
+ * Sigue la MISMA lámina en otra hoja. Se marca "(cont.)" para que nadie crea
+ * que perdió una lámina o que hay dos versiones del mismo dato.
+ */
+function continuar(L) {
+  const { doc } = L
+  doc.addPage()
+  L.paginas += 1
+  // Cabecera compacta: repetir el título a 19 pt cuesta 38 mm de hoja y hacía
+  // que una nota de 24 mm se quedara sola en una página entera. Basta con decir
+  // de qué lámina viene.
+  doc.setFillColor(...C.acento)
+  doc.rect(0, 0, W, 7, 'F')
+  doc.setFontSize(7.5).setTextColor(255, 255, 255).setFont('helvetica', 'bold')
+  doc.text(wa(`${L.pestania} (cont.)`.toUpperCase()), M, 4.8)
+  doc.setTextColor(...C.tinta3).setFontSize(9).setFont('helvetica', 'normal')
+  doc.text(wa(`${L.titulo} - continuación`), M, 15)
+  doc.setDrawColor(...C.linea).setLineWidth(0.3)
+  doc.line(M, 18, W - M, 18)
+  L.y = 24
+  return L.y
+}
+
+/** Reserva `alto` mm. Devuelve la `y` donde se puede dibujar de verdad. */
+function sitio(L, alto) {
+  if (L.y + alto > Y_FIN) continuar(L)
+  return L.y
+}
+
+/** Cuánto queda hasta el borde útil. */
+const resto = (L) => Y_FIN - L.y
+
+// ── Primitivas de lámina ─────────────────────────────────────────────────────
+
+/** Caja de cifra grande. Alto fijo: 24 mm. */
+const ALTO_KPI = 24
+
 function kpi(doc, x, y, ancho, { rotulo, valor, sub, color = C.tinta }) {
-  doc.setDrawColor(...C.linea).setLineWidth(0.3).rect(x, y, ancho, 24)
+  doc.setDrawColor(...C.linea).setLineWidth(0.3).rect(x, y, ancho, ALTO_KPI)
   doc.setFontSize(7).setFont('helvetica', 'bold').setTextColor(...C.tinta3)
   doc.text(wa(rotulo.toUpperCase()), x + 4, y + 6)
   doc.setFontSize(17).setFont('helvetica', 'bold').setTextColor(...color)
@@ -126,10 +191,32 @@ function kpi(doc, x, y, ancho, { rotulo, valor, sub, color = C.tinta }) {
   }
 }
 
-/** Bloque de texto con fondo, para las notas y el veredicto. */
-function nota(doc, x, y, ancho, texto, { color = C.linea, tamano = 8.5, titulo } = {}) {
+/** Fila de cajas repartidas a lo ancho, pidiendo espacio antes. */
+function filaKpis(L, cajas, { ancho = W - M * 2 } = {}) {
+  if (!cajas.length) return L.y
+  const y = sitio(L, ALTO_KPI)
+  const cw = (ancho - 3 * (cajas.length - 1)) / cajas.length
+  cajas.forEach((c, i) => kpi(L.doc, M + i * (cw + 3), y, cw, c))
+  L.y = y + ALTO_KPI + 3
+  return L.y
+}
+
+/** Alto que va a ocupar una nota, sin dibujarla. */
+function altoNota(doc, ancho, texto, { tamano = 8.5, titulo } = {}) {
   const lineas = doc.setFontSize(tamano).setFont('helvetica', 'normal').splitTextToSize(wa(texto), ancho - 10)
-  const alto = lineas.length * (tamano * 0.42) + (titulo ? 6 : 0) + 7
+  return { lineas, alto: lineas.length * (tamano * 0.42) + (titulo ? 6 : 0) + 7 }
+}
+
+/**
+ * Bloque de texto con fondo, para las notas y el veredicto.
+ *
+ * Si no cabe entera se pasa a la hoja siguiente completa, en vez de partirse:
+ * media nota explicativa confunde más que la nota en la página de al lado.
+ */
+function nota(L, texto, { color = C.linea, tamano = 8.5, titulo, ancho = W - M * 2, x = M } = {}) {
+  const { doc } = L
+  const { lineas, alto } = altoNota(doc, ancho, texto, { tamano, titulo })
+  const y = sitio(L, alto)
   doc.setFillColor(...C.fondo).rect(x, y, ancho, alto, 'F')
   doc.setFillColor(...color).rect(x, y, 1.2, alto, 'F')
   let ty = y + 5.5
@@ -140,12 +227,13 @@ function nota(doc, x, y, ancho, texto, { color = C.linea, tamano = 8.5, titulo }
   }
   doc.setFontSize(tamano).setFont('helvetica', 'normal').setTextColor(...C.tinta2)
   doc.text(lineas, x + 5, ty)
-  return y + alto + 5
+  L.y = y + alto + 5
+  return L.y
 }
 
-/** Tabla simple. `cols` = [{ t, ancho, alinear }]. */
-function tabla(doc, x, y, cols, filas, { resaltar = -1 } = {}) {
-  const alto = 7
+const ALTO_FILA = 7
+
+function cabeceraTabla(doc, x, y, cols) {
   doc.setFontSize(7).setFont('helvetica', 'bold').setTextColor(...C.tinta3)
   let cx = x
   for (const c of cols) {
@@ -156,81 +244,127 @@ function tabla(doc, x, y, cols, filas, { resaltar = -1 } = {}) {
   }
   const ancho = cols.reduce((a, c) => a + c.ancho, 0)
   doc.setDrawColor(...C.linea).setLineWidth(0.3).line(x, y + 2, x + ancho, y + 2)
+  return y + 2
+}
 
-  let fy = y + 2
-  filas.forEach((f, i) => {
-    if (i === resaltar) {
-      doc.setFillColor(224, 238, 241).rect(x, fy, ancho, alto, 'F')
-    }
-    cx = x
-    doc.setFontSize(8).setTextColor(...C.tinta)
-    cols.forEach((c, j) => {
-      doc.setFont('helvetica', i === resaltar ? 'bold' : 'normal')
-      if (f.colores && f.colores[j]) doc.setTextColor(...f.colores[j])
-      else doc.setTextColor(...C.tinta)
-      doc.text(wa(f.celdas[j]), c.alinear === 'der' ? cx + c.ancho - 2 : cx + 2, fy + 5, {
-        align: c.alinear === 'der' ? 'right' : 'left',
+/**
+ * Tabla que fluye. `cols` = [{ t, ancho, alinear }].
+ *
+ * Cuando no caben todas las filas sigue en la hoja siguiente y REPITE la
+ * cabecera: una tabla decapitada en la segunda hoja es ilegible en una reunión.
+ * Ninguna fila se descarta — la tabla de caídas del turno del 20-08 en Filete
+ * tenía 14 y solo entraban 5.
+ */
+function tabla(L, cols, filas, { resaltar = -1, x = M } = {}) {
+  const { doc } = L
+  const ancho = cols.reduce((a, c) => a + c.ancho, 0)
+  let i = 0
+  let vueltas = 0
+  do {
+    // Cinturón: `sitio` siempre deja la hoja en y=24 y ahí caben filas, así que
+    // el bucle avanza sí o sí. El tope es por si alguien cambia esa invariante:
+    // una Cloud Function colgada a las 5 de la mañana no deja informe ni error.
+    vueltas += 1
+    if (vueltas > filas.length + 10) break
+    // Cabecera + al menos dos filas, si no la continuación no aporta nada.
+    const y = sitio(L, 2 + ALTO_FILA * Math.min(2, filas.length - i))
+    let fy = cabeceraTabla(doc, x, y, cols)
+    while (i < filas.length && fy + ALTO_FILA <= Y_FIN) {
+      const f = filas[i]
+      if (i === resaltar) doc.setFillColor(224, 238, 241).rect(x, fy, ancho, ALTO_FILA, 'F')
+      let cx = x
+      doc.setFontSize(8).setTextColor(...C.tinta)
+      cols.forEach((c, j) => {
+        doc.setFont('helvetica', i === resaltar ? 'bold' : 'normal')
+        if (f.colores && f.colores[j]) doc.setTextColor(...f.colores[j])
+        else doc.setTextColor(...C.tinta)
+        doc.text(wa(f.celdas[j]), c.alinear === 'der' ? cx + c.ancho - 2 : cx + 2, fy + 5, {
+          align: c.alinear === 'der' ? 'right' : 'left',
+        })
+        cx += c.ancho
       })
-      cx += c.ancho
-    })
-    fy += alto
-    doc.setDrawColor(...C.linea).line(x, fy, x + ancho, fy)
-  })
-  return fy + 5
+      fy += ALTO_FILA
+      doc.setDrawColor(...C.linea).line(x, fy, x + ancho, fy)
+      i += 1
+    }
+    L.y = fy + 5
+  } while (i < filas.length)
+  return L.y
+}
+
+/** Línea suelta de texto chico, pidiendo espacio. */
+function pie(L, texto, { tamano = 7.5, color = C.tinta3, ancho = W - M * 2 } = {}) {
+  const { doc } = L
+  const lineas = doc.setFontSize(tamano).setFont('helvetica', 'normal').splitTextToSize(wa(texto), ancho)
+  const alto = lineas.length * (tamano * 0.42) + 3
+  const y = sitio(L, alto)
+  doc.setTextColor(...color)
+  doc.text(lineas, M, y + 3)
+  L.y = y + alto + 3
+  return L.y
+}
+
+/** Rótulo en negrita sobre un gráfico. */
+function rotulo(L, texto, { alto = 6 } = {}) {
+  const y = sitio(L, alto)
+  L.doc.setFontSize(8).setFont('helvetica', 'bold').setTextColor(...C.tinta)
+  L.doc.text(wa(texto), M, y + 4)
+  L.y = y + alto
+  return L.y
 }
 
 // ── Láminas ──────────────────────────────────────────────────────────────────
 
+// Seis láminas de narrativa. Las HOJAS pueden ser más: una lámina con muchas
+// filas se continúa en vez de perder el final.
 const TOTAL_LAMINAS = 6
 
-function lamina1Veredicto(doc, d) {
-  const y = crearLamina(doc, {
-    indice: 1, total: TOTAL_LAMINAS, pestania: 'Veredicto',
+function lamina1Veredicto(L, d) {
+  crearLamina(L, {
+    pestania: 'Veredicto',
     titulo: `${d.meta.areaLabel} - ${d.meta.turnoLabel}`,
     subtitulo: `${d.meta.fechaLabel} - ${hhmm(d.resumen.inicioMs)} a ${hhmm(d.resumen.finMs)} - ${d.resumen.maquinas} maquinas`,
   })
 
-  const ancho = W - M * 2
-  let cy = nota(doc, M, y, ancho, d.textos.veredictoDetalle, {
+  nota(L, d.textos.veredictoDetalle, {
     color: d.textos.veredictoBueno ? C.ok : C.atencion,
     tamano: 10,
     titulo: d.textos.veredictoTitulo,
   })
 
-  const cajaAncho = (ancho - 9) / 4
-  const principal = d.resumen.causas[0]
-  kpi(doc, M, cy + 3, cajaAncho, {
-    rotulo: 'Produccion', valor: num(d.resumen.ciclos), sub: d.textos.produccionSub,
-    color: d.textos.veredictoBueno ? C.ok : C.tinta,
-  })
-  kpi(doc, M + cajaAncho + 3, cy + 3, cajaAncho, {
-    rotulo: 'Ritmo normal de la linea',
-    valor: d.resumen.ritmoNormal ? `${d.resumen.ritmoNormal.toFixed(1)}` : '--',
-    sub: 'piezas por minuto sin problemas',
-  })
-  kpi(doc, M + (cajaAncho + 3) * 2, cy + 3, cajaAncho, {
-    rotulo: 'Linea detenida', valor: durTexto(d.resumen.detencion.todasSec),
-    sub: 'todas las maquinas a la vez', color: C.atencion,
-  })
-  kpi(doc, M + (cajaAncho + 3) * 3, cy + 3, cajaAncho, {
-    rotulo: 'Atribuible a Mantencion',
-    valor: durTexto(d.resumen.mantencionEquivSec),
-    sub: `de ${durTexto(d.resumen.detencion.equivalenteLineaSec)} perdidos`,
-  })
+  filaKpis(L, [
+    {
+      rotulo: 'Produccion', valor: num(d.resumen.ciclos), sub: d.textos.produccionSub,
+      color: d.textos.veredictoBueno ? C.ok : C.tinta,
+    },
+    {
+      rotulo: 'Ritmo normal de la linea',
+      valor: d.resumen.ritmoNormal ? `${d.resumen.ritmoNormal.toFixed(1)}` : '--',
+      sub: 'piezas por minuto sin problemas',
+    },
+    {
+      rotulo: 'Linea detenida', valor: durTexto(d.resumen.detencion.todasSec),
+      sub: 'todas las maquinas a la vez', color: C.atencion,
+    },
+    {
+      rotulo: 'Atribuible a Mantencion',
+      valor: durTexto(d.resumen.mantencionEquivSec),
+      sub: `de ${durTexto(d.resumen.detencion.equivalenteLineaSec)} perdidos`,
+    },
+  ])
 
-  cy += 32
-  if (principal) {
-    nota(doc, M, cy, ancho, d.textos.notaLamina1, { color: C.acento, titulo: 'Por que esta lamina va primero' })
+  L.y += 3
+  if (d.resumen.causas[0]) {
+    nota(L, d.textos.notaLamina1, { color: C.acento, titulo: 'Por que esta lamina va primero' })
   }
 }
 
-function lamina2Falla(doc, d) {
-  const y = crearLamina(doc, {
-    indice: 2, total: TOTAL_LAMINAS, pestania: 'La falla, medida bien',
+function lamina2Falla(L, d) {
+  crearLamina(L, {
+    pestania: 'La falla, medida bien',
     titulo: 'Horas-maquina no son horas de linea',
     subtitulo: `El resumen de area de Shoplogix suma las ${d.resumen.maquinas} maquinas`,
   })
-  const ancho = W - M * 2
 
   const cols = [
     { t: 'Causa', ancho: 62 },
@@ -261,64 +395,63 @@ function lamina2Falla(doc, d) {
       dur(d.resumen.detencion.todasSec), dur(d.resumen.detencion.equivalenteLineaSec), '',
     ],
   })
-  let cy = tabla(doc, M, y, cols, filas, { resaltar: 0 })
+  tabla(L, cols, filas, { resaltar: 0 })
 
   if (micro) {
-    doc.setFontSize(7.5).setFont('helvetica', 'normal').setTextColor(...C.tinta3)
-    doc.text(wa(`Aparte: ${micro.eventos} micro detenciones, ${dur(micro.sumaSec)} sumados `
+    pie(L, `Aparte: ${micro.eventos} micro detenciones, ${dur(micro.sumaSec)} sumados `
       + `(${dur(micro.equivalenteLineaSec)} de linea). Son paros de segundos que el sistema no pide imputar; `
-      + 'se cuentan pero no compiten con las causas de arriba.'), M, cy - 1)
-    cy += 5
+      + 'se cuentan pero no compiten con las causas de arriba.')
   }
 
   // Barra del reparto por nivel de solapamiento de la causa principal.
   const p = d.resumen.causas[0]
   if (p && p.unionSec > 0) {
-    doc.setFontSize(8).setFont('helvetica', 'bold').setTextColor(...C.tinta)
-    doc.text(wa(`Reparto de los ${durTexto(p.unionSec)} en que hubo alguna maquina detenida por ${p.imputacion && p.imputacion.hoja ? p.imputacion.hoja : p.causa}`), M, cy + 4)
-    const bx = M
-    const by = cy + 8
-    const bw = ancho
+    const y = sitio(L, 30)
+    L.y = y
+    rotulo(L, `Reparto de los ${durTexto(p.unionSec)} en que hubo alguna maquina detenida por ${p.imputacion && p.imputacion.hoja ? p.imputacion.hoja : p.causa}`)
+    const { doc } = L
+    const ancho = W - M * 2
+    const by = L.y + 2
     let acc = 0
     for (let k = 1; k < p.porNivelSec.length; k++) {
       const sec = p.porNivelSec[k]
       if (!sec) continue
-      const w = (sec / p.unionSec) * bw
+      const w = (sec / p.unionSec) * ancho
       const alpha = k / (p.porNivelSec.length - 1)
       doc.setFillColor(
         Math.round(255 - (255 - C.crit[0]) * alpha),
         Math.round(255 - (255 - C.crit[1]) * alpha),
         Math.round(255 - (255 - C.crit[2]) * alpha),
       )
-      doc.rect(bx + acc, by, Math.max(w - 0.6, 0.6), 11, 'F')
+      doc.rect(M + acc, by, Math.max(w - 0.6, 0.6), 11, 'F')
       doc.setFontSize(7).setFont('helvetica', 'bold').setTextColor(...C.tinta)
       const etiqueta = k === p.porNivelSec.length - 1 ? `LAS ${k} - linea muerta` : `${k} detenida${k > 1 ? 's' : ''}`
       if (w > 24) {
-        doc.text(wa(etiqueta), bx + acc + 2, by + 15)
+        doc.text(wa(etiqueta), M + acc + 2, by + 15)
         doc.setFont('helvetica', 'normal').setTextColor(...C.tinta2)
-        doc.text(wa(dur(sec)), bx + acc + 2, by + 19)
+        doc.text(wa(dur(sec)), M + acc + 2, by + 19)
       }
       acc += w
     }
-    cy = by + 24
+    L.y = by + 24
   }
 
-  nota(doc, M, cy, ancho, d.textos.notaLamina2, { color: C.acento, titulo: 'Como leer esta tabla' })
+  nota(L, d.textos.notaLamina2, { color: C.acento, titulo: 'Como leer esta tabla' })
 }
 
-function lamina3Cronologia(doc, d) {
+function lamina3Cronologia(L, d) {
   const p = d.resumen.causas[0]
-  const y = crearLamina(doc, {
-    indice: 3, total: TOTAL_LAMINAS, pestania: 'Cronologia',
+  crearLamina(L, {
+    pestania: 'Cronologia',
     titulo: p ? `Donde ocurrio: ${p.imputacion && p.imputacion.hoja ? p.imputacion.hoja : p.causa}` : 'Sin detenciones que ubicar',
     subtitulo: p ? `${p.eventos} eventos en el turno` : '',
   })
-  const ancho = W - M * 2
   if (!p) {
-    nota(doc, M, y, ancho, 'El turno no registro detenciones no programadas.', { color: C.ok })
+    nota(L, 'El turno no registro detenciones no programadas.', { color: C.ok })
     return
   }
 
+  const { doc } = L
   const t0 = d.resumen.inicioMs
   const t1 = d.resumen.finMs
   const span = t1 - t0
@@ -326,7 +459,9 @@ function lamina3Cronologia(doc, d) {
   const anchoPista = W - M - izq
   const altoPista = 11
   const gap = 6
-  let py = y + 6
+  const n = d.eventosPorMaquina.length
+  const altoBloque = n * (altoPista + gap) + 12
+  let py = sitio(L, altoBloque) + 6
 
   const sx = (ms) => izq + ((ms - t0) / span) * anchoPista
 
@@ -334,9 +469,9 @@ function lamina3Cronologia(doc, d) {
   const primera = Math.ceil(t0 / 3_600_000) * 3_600_000
   for (let t = primera; t <= t1; t += 3_600_000) {
     doc.setDrawColor(...C.linea).setLineWidth(0.2)
-    doc.line(sx(t), py - 3, sx(t), py + d.eventosPorMaquina.length * (altoPista + gap))
+    doc.line(sx(t), py - 3, sx(t), py + n * (altoPista + gap))
     doc.setFontSize(6.5).setTextColor(...C.tinta3).setFont('helvetica', 'normal')
-    doc.text(wa(hhmm(t)), sx(t), py + d.eventosPorMaquina.length * (altoPista + gap) + 4, { align: 'center' })
+    doc.text(wa(hhmm(t)), sx(t), py + n * (altoPista + gap) + 4, { align: 'center' })
   }
 
   for (const m of d.eventosPorMaquina) {
@@ -351,23 +486,34 @@ function lamina3Cronologia(doc, d) {
     doc.text(wa(dur(m.sec)), W - M + 0, py + 7.5, { align: 'right' })
     py += altoPista + gap
   }
+  L.y = py + 8
 
-  nota(doc, M, py + 8, ancho, d.textos.notaLamina3, { color: C.acento, titulo: 'Para que sirve en la reunion' })
+  nota(L, d.textos.notaLamina3, { color: C.acento, titulo: 'Para que sirve en la reunion' })
 }
 
-function lamina4Ritmo(doc, d) {
-  const y = crearLamina(doc, {
-    indice: 4, total: TOTAL_LAMINAS, pestania: 'Donde afecto y como se contuvo',
+/**
+ * La lámina que se salía de la hoja.
+ *
+ * Apila gráfico, tabla de tramos, barra del reparto, tabla de caídas, KPI de
+ * recuperación, KPI de ocupación y tres notas. Con 9 tramos y 14 caídas eso son
+ * dos hojas largas, y antes se dibujaba todo en una sumando `y` a ojo: lo que
+ * pasaba del borde desaparecía. El orden es de más a menos defendible, así que
+ * si algo queda en la segunda hoja, que sea el detalle y no el veredicto.
+ */
+function lamina4Ritmo(L, d) {
+  crearLamina(L, {
+    pestania: 'Donde afecto y como se contuvo',
     titulo: d.textos.tituloLamina4 || 'El ritmo real del turno, tramo por tramo',
     subtitulo: d.resumen.ritmoNormal
-      ? `Ritmo normal de la linea: ${d.resumen.ritmoNormal.toFixed(1)} piezas por minuto (mediana de los bloques limpios de esta misma noche)`
+      ? `Ritmo normal de la linea: ${d.resumen.ritmoNormal.toFixed(1)} piezas por minuto (mediana de los bloques limpios de este mismo turno)`
       : 'Sin bloques limpios: no se puede fijar un ritmo normal',
   })
+  const { doc } = L
   const ancho = W - M * 2
 
   // Gráfico de barras del ritmo por bloque
-  const gy = y
   const gh = 46
+  const gy = sitio(L, gh + 8)
   const maxR = Math.max(d.resumen.ritmoNormal ? d.resumen.ritmoNormal * 1.25 : 1, ...d.bloques.map((b) => b.piezasPorMin), 1)
   const bw = ancho / Math.max(d.bloques.length, 1)
   d.bloques.forEach((b, i) => {
@@ -388,17 +534,16 @@ function lamina4Ritmo(doc, d) {
   doc.setFontSize(6.5).setTextColor(...C.tinta3).setFont('helvetica', 'normal')
   doc.text(wa(hhmm(d.resumen.inicioMs)), M, gy + gh + 4)
   doc.text(wa(hhmm(d.resumen.finMs)), W - M, gy + gh + 4, { align: 'right' })
+  L.y = gy + gh + 10
 
-  let cy = gy + gh + 10
-  const cols = [
+  tabla(L, [
     { t: 'Tramo', ancho: 42 },
     { t: 'Ventana', ancho: 34 },
     { t: 'Minutos', ancho: 24, alinear: 'der' },
     { t: 'Piezas', ancho: 26, alinear: 'der' },
     { t: 'Piezas/min', ancho: 28, alinear: 'der' },
     { t: '% del ritmo normal', ancho: 40, alinear: 'der' },
-  ]
-  const filas = d.tramos.map((t) => ({
+  ], d.tramos.map((t) => ({
     celdas: [
       t.enRitmo ? 'En ritmo' : 'Caida',
       `${hhmm(t.inicioMs)} a ${hhmm(t.finMs)}`,
@@ -407,17 +552,18 @@ function lamina4Ritmo(doc, d) {
     ],
     colores: [t.enRitmo ? [...C.ok] : [...C.crit], null, null, null, null,
       t.enRitmo ? [...C.ok] : [...C.crit]],
-  }))
-  cy = tabla(doc, M, cy, cols, filas)
+  })))
 
   // ── Reparto de la perdida: parada / reenganche / degradado ───────────────
   const rp = d.reparto || { totalPz: 0, eventos: [] }
   if (rp.totalPz > 0) {
-    doc.setFontSize(8).setFont('helvetica', 'bold').setTextColor(...C.tinta)
-    doc.text(wa(rp.eventos.length
+    // La barra y sus etiquetas son un solo bloque: partirlas deja los
+    // porcentajes huérfanos en la hoja siguiente.
+    L.y = sitio(L, 30)
+    rotulo(L, rp.eventos.length
       ? 'Donde falto la produccion: las piezas que faltaron para el ritmo normal, segun en que estaba la linea'
-      : 'El turno no registro caidas de linea. Las piezas que faltaron para el ritmo normal se perdieron andando:'), M, cy + 2)
-    const by = cy + 6
+      : 'El turno no registro caidas de linea. Las piezas que faltaron para el ritmo normal se perdieron andando:')
+    const by = L.y
     const bh = 10
     const segs = [
       { l: 'PARADA - inevitable cuando hay falla', v: rp.paradoPz, c: C.crit },
@@ -437,10 +583,10 @@ function lamina4Ritmo(doc, d) {
       }
       bx += sw
     }
-    cy = by + bh + 14
+    L.y = by + bh + 14
 
     if (rp.eventos.length) {
-      cy = tabla(doc, M, cy, [
+      tabla(L, [
         { t: 'Caida', ancho: 26 },
         { t: 'Parada', ancho: 26, alinear: 'der' },
         { t: 'Piezas parada', ancho: 34, alinear: 'der' },
@@ -454,43 +600,38 @@ function lamina4Ritmo(doc, d) {
     }
   }
 
-  if (d.recuperaciones.length) {
-    const cajaAncho = (ancho - 3 * (d.recuperaciones.length - 1)) / Math.max(d.recuperaciones.length, 1)
-    d.recuperaciones.forEach((r, i) => {
-      kpi(doc, M + i * (cajaAncho + 3), cy, cajaAncho, {
-        rotulo: `Recuperacion - ${r.causa}`,
-        valor: r.minutos == null ? 'no volvio' : `${r.minutos} min`,
-        sub: r.minutos == null ? 'la linea no recupero el ritmo' : `ultimo evento ${hhmm(r.desdeMs)}, ritmo a las ${hhmm(r.volvioMs)}`,
-        color: r.minutos == null ? C.crit : C.ok,
-      })
-    })
-    cy += 27
-  }
+  filaKpis(L, d.recuperaciones.map((r) => ({
+    rotulo: `Recuperacion - ${r.causa}`,
+    valor: r.minutos == null ? 'no volvio' : `${r.minutos} min`,
+    sub: r.minutos == null ? 'la linea no recupero el ritmo' : `ultimo evento ${hhmm(r.desdeMs)}, ritmo a las ${hhmm(r.volvioMs)}`,
+    color: r.minutos == null ? C.crit : C.ok,
+  })))
+
   // Ocupacion de la cadena: la traduccion de la "perdida de velocidad".
-  const oc = d.reparto && d.ocupacion ? d.ocupacion : d.ocupacion
+  const oc = d.ocupacion
   if (oc && oc.ocupacion != null) {
     const pct = Math.round(oc.ocupacion * 100)
-    const cajaAncho = (ancho - 6) / 3
-    kpi(doc, M, cy, cajaAncho, {
-      rotulo: d.meta.planta === 'filete' ? 'Silletas llenas' : 'Capacidad usada',
-      valor: `${pct}%`,
-      sub: `${num(oc.llenas)} de ${num(oc.pasaron)} a ${oc.ritmoNominal} pz/min`,
-      color: pct >= 80 ? C.ok : pct >= 55 ? C.tinta : C.atencion,
-    })
-    kpi(doc, M + cajaAncho + 3, cy, cajaAncho, {
-      rotulo: d.meta.planta === 'filete' ? 'Silletas vacias' : 'Capacidad sin usar',
-      valor: num(oc.vacias),
-      sub: 'lo que Shoplogix llama perdida de velocidad',
-      color: C.atencion,
-    })
-    kpi(doc, M + (cajaAncho + 3) * 2, cy, cajaAncho, {
-      rotulo: 'Cadena en marcha',
-      valor: durTexto(oc.minutosEnMarcha * 60),
-      sub: 'solo este tiempo deja pasar capacidad',
-    })
-    cy += 27
+    filaKpis(L, [
+      {
+        rotulo: d.meta.planta === 'filete' ? 'Silletas llenas' : 'Capacidad usada',
+        valor: `${pct}%`,
+        sub: `${num(oc.llenas)} de ${num(oc.pasaron)} a ${oc.ritmoNominal} pz/min`,
+        color: pct >= 80 ? C.ok : pct >= 55 ? C.tinta : C.atencion,
+      },
+      {
+        rotulo: d.meta.planta === 'filete' ? 'Silletas vacias' : 'Capacidad sin usar',
+        valor: num(oc.vacias),
+        sub: 'lo que Shoplogix llama perdida de velocidad',
+        color: C.atencion,
+      },
+      {
+        rotulo: 'Cadena en marcha',
+        valor: durTexto(oc.minutosEnMarcha * 60),
+        sub: 'solo este tiempo deja pasar capacidad',
+      },
+    ])
     if (d.textos.notaOcupacion) {
-      cy = nota(doc, M, cy, ancho, d.textos.notaOcupacion, {
+      nota(L, d.textos.notaOcupacion, {
         color: C.acento,
         titulo: d.meta.planta === 'filete' ? 'La "perdida de velocidad", traducida' : 'Sobre la "perdida de velocidad"',
       })
@@ -498,25 +639,27 @@ function lamina4Ritmo(doc, d) {
   }
 
   if (d.textos.notaReparto) {
-    cy = nota(doc, M, cy, ancho, d.textos.notaReparto, { color: C.acento, titulo: 'Como leer el reparto' })
+    nota(L, d.textos.notaReparto, { color: C.acento, titulo: 'Como leer el reparto' })
   }
-  nota(doc, M, cy, ancho, d.textos.notaLamina4, { color: C.acento, titulo: 'Lo que estos numeros si prueban' })
+  nota(L, d.textos.notaLamina4, { color: C.acento, titulo: 'Lo que estos numeros si prueban' })
 }
 
-function lamina5Cotejo(doc, d) {
-  const y = crearLamina(doc, {
-    indice: 5, total: TOTAL_LAMINAS, pestania: 'Cotejo',
+function lamina5Cotejo(L, d) {
+  crearLamina(L, {
+    pestania: 'Cotejo',
     titulo: `Contra los ${d.cotejo.comparados} turnos equivalentes anteriores`,
     subtitulo: 'Turnos del mismo horario y duracion, con produccion real',
   })
+  const { doc } = L
   const ancho = W - M * 2
 
   if (!d.cotejo.comparados) {
-    nota(doc, M, y, ancho, 'No hay suficientes turnos equivalentes anteriores para cotejar. El informe no emite veredicto comparativo.', { color: C.atencion })
+    nota(L, 'No hay suficientes turnos equivalentes anteriores para cotejar. El informe no emite veredicto comparativo.', { color: C.atencion })
     return
   }
 
   const gh = 60
+  const y = sitio(L, gh + 12)
   const maxC = Math.max(...d.cotejo.filas.map((f) => f.ciclos || 0), 1)
   const conDet = d.cotejo.filas.filter((f) => typeof f.detencionLineaSec === 'number')
   const maxDet = Math.max(...conDet.map((f) => f.detencionLineaSec), 0)
@@ -548,37 +691,75 @@ function lamina5Cotejo(doc, d) {
     doc.text(wa(`mediana ${num(d.cotejo.medianaPrevios)}`), W - M, my - 1.5, { align: 'right' })
   }
   doc.setDrawColor(...C.linea).line(M, y + gh, W - M, y + gh)
+  L.y = y + gh + 8
 
-  doc.setFontSize(7).setFont('helvetica', 'normal').setTextColor(...C.tinta3)
-  doc.text(wa(conDet.length > 1
+  pie(L, conDet.length > 1
     ? `Barra ancha: ciclos producidos. Barra fina roja: detencion de linea (${conDet.length} de ${d.cotejo.filas.length} turnos la tienen calculada).`
-    : 'Barra ancha: ciclos producidos. La detencion de los turnos previos aparecera a medida que se vayan cerrando con el informe activo.'),
-  M, y + gh + 10)
+    : 'Barra ancha: ciclos producidos. La detencion de los turnos previos aparecera a medida que se vayan cerrando con el informe activo.',
+  { tamano: 7 })
 
-  nota(doc, M, y + gh + 14, ancho, d.textos.notaLamina5, { color: C.acento, titulo: 'Que dice esta comparacion' })
+  nota(L, d.textos.notaLamina5, { color: C.acento, titulo: 'Que dice esta comparacion' })
 }
 
-function lamina6Cierre(doc, d) {
-  const y = crearLamina(doc, {
-    indice: 6, total: TOTAL_LAMINAS, pestania: 'Cierre',
+function lamina6Cierre(L, d) {
+  crearLamina(L, {
+    pestania: 'Cierre',
     titulo: 'Lo que se dice en la reunion',
     subtitulo: 'Texto listo para leer, y lo que queda comprometido',
   })
+  const { doc } = L
   const ancho = W - M * 2
-  let cy = nota(doc, M, y, ancho, d.textos.parrafoReunion, { color: C.acento, tamano: 10 })
+  nota(L, d.textos.parrafoReunion, { color: C.acento, tamano: 10 })
 
+  const yTit = sitio(L, 12)
   doc.setFontSize(7).setFont('helvetica', 'bold').setTextColor(...C.tinta3)
-  doc.text(wa('LO QUE QUEDA ABIERTO'), M, cy + 4)
-  cy += 8
-  doc.setFontSize(8.5).setFont('helvetica', 'normal').setTextColor(...C.tinta2)
+  doc.text(wa('LO QUE QUEDA ABIERTO'), M, yTit + 4)
+  L.y = yTit + 8
+
   for (const p of d.textos.pendientes) {
+    doc.setFontSize(8.5).setFont('helvetica', 'normal')
     const lineas = doc.splitTextToSize(wa(`- ${p}`), ancho - 4)
-    doc.text(lineas, M + 2, cy)
-    cy += lineas.length * 4 + 2
+    const alto = lineas.length * 4 + 2
+    const y = sitio(L, alto)
+    doc.setTextColor(...C.tinta2)
+    doc.text(lineas, M + 2, y)
+    L.y = y + alto
   }
 
+  // El pie va en la ULTIMA hoja, que con pendientes largos puede no ser esta.
   doc.setFontSize(7).setTextColor(...C.tinta3).setFont('helvetica', 'normal')
   doc.text(wa(d.textos.pieDeFuente), M, H - 10)
+}
+
+/**
+ * Estampa "hoja / total" cuando ya se sabe el total. No se puede hacer al
+ * dibujar la cabecera: el número de hojas depende de cuántos tramos y caídas
+ * tuvo el turno.
+ */
+function numerar(doc) {
+  const total = doc.getNumberOfPages()
+  for (let p = 1; p <= total; p++) {
+    doc.setPage(p)
+    doc.setFontSize(7.5).setTextColor(255, 255, 255).setFont('helvetica', 'bold')
+    doc.text(wa(`${p} / ${total}`), W - M, 4.8, { align: 'right' })
+  }
+}
+
+/** Anota cada `doc.text` para poder auditar la maqueta desde un test. */
+function instrumentar(doc, registro) {
+  const original = doc.text.bind(doc)
+  doc.text = (txt, x, y, opciones) => {
+    const lineas = Array.isArray(txt) ? txt : [txt]
+    registro.push({
+      texto: lineas.join(' '),
+      x,
+      y,
+      yFin: y + (lineas.length - 1) * doc.getLineHeight(),
+      pagina: doc.getCurrentPageInfo().pageNumber,
+    })
+    return original(txt, x, y, opciones)
+  }
+  return doc
 }
 
 // ── Entrada ──────────────────────────────────────────────────────────────────
@@ -591,9 +772,13 @@ function lamina6Cierre(doc, d) {
  * que se guardaron, sin depender de que Shoplogix siga respondiendo lo mismo.
  *
  * @param {object} d  ver `construirDatosInforme` en informeTurno.js
+ * @param {object} [opciones]
+ * @param {Array}  [opciones.registro]  si viene, se llena con todo lo escrito
+ *        ({ texto, x, y, yFin, pagina }). Es la única forma de verificar en un
+ *        test que nada quedó bajo el borde, porque jsPDF lo descarta sin avisar.
  * @returns {Buffer}
  */
-function generarInformeTurno(d) {
+function generarInformeTurno(d, { registro } = {}) {
   // Carga diferida: jsPDF pesa y no todas las invocaciones de la function
   // generan un PDF.
   // eslint-disable-next-line global-require
@@ -603,15 +788,18 @@ function generarInformeTurno(d) {
     title: `Informe de turno - ${d.meta.areaLabel} - ${d.meta.fechaLabel}`,
     creator: 'PWA Mantencion',
   })
+  if (registro) instrumentar(doc, registro)
 
-  lamina1Veredicto(doc, d)
-  lamina2Falla(doc, d)
-  lamina3Cronologia(doc, d)
-  lamina4Ritmo(doc, d)
-  lamina5Cotejo(doc, d)
-  lamina6Cierre(doc, d)
+  const L = abrirLienzo(doc)
+  lamina1Veredicto(L, d)
+  lamina2Falla(L, d)
+  lamina3Cronologia(L, d)
+  lamina4Ritmo(L, d)
+  lamina5Cotejo(L, d)
+  lamina6Cierre(L, d)
+  numerar(doc)
 
   return Buffer.from(doc.output('arraybuffer'))
 }
 
-module.exports = { generarInformeTurno, wa, dur, durTexto, hhmm, TOTAL_LAMINAS }
+module.exports = { generarInformeTurno, wa, dur, durTexto, hhmm, TOTAL_LAMINAS, Y_FIN, H }
