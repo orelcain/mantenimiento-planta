@@ -38,6 +38,7 @@ import { buildHourlyRows, peakPieces } from '@/services/shoplogix/monitorHourly'
 import { computePaceToTarget, lineMaxPerHour, type PaceToTarget } from '@/services/shoplogix/monitorPace'
 import { ventanaDeActividad, desdePrimeraPieza, piezasAntesDelArranque } from '@/services/shoplogix/monitorActividad'
 import { refrescarPulso, type PulsoMonitor } from '@/services/shoplogix/publicShiftMonitor.service'
+import { elegirContador } from './monitor/contadorCrudo'
 import { mediaMovil, ritmoAhoraCpm, ritmoAhoraAndando, estadoRitmo, fraccionDeRegla, pedidoAndando } from '@/services/shoplogix/monitorRitmo'
 import { pinShiftEnd, unpinShiftEnd, setMonitorSetPoint } from '@/services/shoplogix/pinShiftEnd'
 import {
@@ -1975,29 +1976,33 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, onEditarSetPoi
 }
 
 /**
- * El PULSO en pantalla: lo último que Shoplogix sabe, con su hora y un botón
- * para pedirlo ahora.
+ * El control del PULSO: cuándo se leyó por última vez el contador de Shoplogix
+ * y un botón para pedirlo ahora.
  *
- * ── Por qué tiene cronómetro ───────────────────────────────────────────────
+ * ── Ya no muestra el número ────────────────────────────────────────────────
+ * Lo mostraba, y el 2026-08-20 se vio el resultado: «Shoplogix marca 805 pz a
+ * las 22:56» justo debajo de un «805 · datos hasta las 23:00». El mismo número
+ * con dos horas distintas, porque venían de dos fuentes con distinto atraso.
+ * Ahora el número grande YA ES el crudo de Shoplogix (ver `contadorCrudo`), así
+ * que acá solo queda el control.
  *
- * Un número sin hora en una pantalla que se refresca sola invita a creer que
- * es de este segundo. Acá se dice de cuándo es y cuánto falta para el
- * siguiente, así que quien mira sabe si vale la pena esperar o tocar el botón.
- *
- * ⚠ El cronómetro cuenta hasta la próxima lectura ÚTIL, no hasta el próximo
- * minuto: medido en producción, el contador de Shoplogix se refresca cada ~2
- * min, así que preguntando cada minuto la mitad de las veces vuelve el mismo
- * número. Prometer «en 1 min» y que no cambie nada es peor que no prometer.
+ * ── Y ya no promete cuándo llega el próximo ────────────────────────────────
+ * Tenía un cronómetro que suponía un ciclo fijo de 2 min desde la última
+ * lectura. En la misma pantalla se leía «próxima lectura en 1:39» al lado de
+ * «hay dato nuevo en 9s», que es lo que respondió el servidor al tocar el
+ * botón. El servidor sabe; la cuenta local adivinaba. Se queda la del servidor,
+ * que aparece cuando de verdad hay una respuesta.
  */
-function PulsoVivo({ pulse, token, cerrado }: {
+function PulsoVivo({ pulse, token, cerrado, onPulso }: {
   pulse: PulsoMonitor | null | undefined
   token: string
   cerrado?: boolean
+  /** El pulso fresco sube a la página: el número grande sale de ahí. */
+  onPulso: (p: PulsoMonitor) => void
 }) {
   const [ahora, setAhora] = useState(() => Date.now())
   const [pidiendo, setPidiendo] = useState(false)
   const [aviso, setAviso] = useState<string | null>(null)
-  const [local, setLocal] = useState<PulsoMonitor | null>(null)
 
   /* El reloj corre solo mientras el turno está vivo: en uno cerrado el pulso
      no cambia y un cronómetro contando sería ruido. */
@@ -2007,59 +2012,42 @@ function PulsoVivo({ pulse, token, cerrado }: {
     return () => window.clearInterval(id)
   }, [cerrado])
 
-  const p = local ?? pulse ?? null
   /*
    * ⚠ Con el acumulado en 0 no se muestra nada. Visto al cerrar el turno de la
    * noche: el rollup de Shoplogix deja de contar el turno que terminó y
-   * devuelve 0, y «Shoplogix marca 0 pz» al lado de un turno con 4.076 parece
-   * un error de la app cuando es el fin del turno.
+   * devuelve 0, y un control de refresco al lado de un turno ya cerrado no
+   * tiene nada que refrescar.
    */
-  if (!p?.at || !(p.totalCycles > 0)) return null
+  if (cerrado || !pulse?.at || !(pulse.totalCycles > 0)) return null
 
-  const edadSeg = Math.max(0, Math.round((ahora - Date.parse(p.at)) / 1000))
-  /* Shoplogix refresca cada ~2 min: la próxima lectura útil es esa. */
-  const CICLO_SEG = 120
-  const faltaSeg = Math.max(0, CICLO_SEG - edadSeg)
-  const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+  const edadSeg = Math.max(0, Math.round((ahora - Date.parse(pulse.at)) / 1000))
+  const hace = edadSeg < 60
+    ? 'recién'
+    : `hace ${Math.floor(edadSeg / 60)} min`
 
   const pedir = async () => {
     setPidiendo(true); setAviso(null)
     const r = await refrescarPulso(token)
     setPidiendo(false)
     if (!r) { setAviso('No se pudo consultar ahora. Se reintenta solo.'); return }
-    if (r.pulse) { setLocal(r.pulse); setAhora(Date.now()) }
+    if (r.pulse) { onPulso(r.pulse); setAhora(Date.now()) }
     /* `yaFresco` NO es un error: es el dato más nuevo que existe. */
     if (r.yaFresco) setAviso(`Ya es lo último que hay${r.esperaSeg ? ` — hay dato nuevo en ${r.esperaSeg}s` : ''}.`)
   }
 
   return (
     <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
-      <span className="tabular-nums">
-        Shoplogix marca <b className="text-foreground/80">{fmtInt(p.totalCycles)}</b> pz
-        {/* OJO — `at` del pulso es UTC REAL (lo estampa el servidor), no
-            wall-clock como el resto de los ISO del monitor: se formatea en la
-            zona de la planta o mostraría cuatro horas de más. */}
-        {' '}a las <b className="text-foreground/80">
-          {new Date(p.at).toLocaleTimeString('es-CL', {
-            timeZone: 'America/Santiago', hour: '2-digit', minute: '2-digit',
-          })}
-        </b>
+      <span className="tabular-nums text-muted-foreground/70">
+        Leído de Shoplogix {hace}
       </span>
-      {!cerrado && (
-        <span className="tabular-nums text-muted-foreground/70">
-          {faltaSeg > 0 ? <>próxima lectura en {mmss(faltaSeg)}</> : 'esperando lectura…'}
-        </span>
-      )}
-      {!cerrado && (
-        <button
-          type="button"
-          onClick={pedir}
-          disabled={pidiendo}
-          className="tap-44 rounded-full border border-border px-2 py-0.5 text-brand-ink disabled:opacity-50"
-        >
-          {pidiendo ? 'consultando…' : 'actualizar ahora'}
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={pedir}
+        disabled={pidiendo}
+        className="tap-44 rounded-full border border-border px-2 py-0.5 text-brand-ink disabled:opacity-50"
+      >
+        {pidiendo ? 'consultando…' : 'actualizar ahora'}
+      </button>
       {aviso && <span className="w-full text-muted-foreground/70">{aviso}</span>}
     </div>
   )
@@ -3076,7 +3064,11 @@ export function PublicShiftMonitorPage() {
   // el subtítulo quedaba "Filete · Filete".
   const areaTitle = [...new Set([data.lineLabel, data.areaLabel].filter(Boolean))].join(' · ')
 
-  const outside = live.outsidePieces ?? 0
+  /* El número grande: el contador crudo de Shoplogix, el mismo que muestra la
+     pantalla de planta, con caída al derivado de los buckets cuando el vivo no
+     está o quedó atrás. Ver `contadorCrudo` para por qué no es un `??`. */
+  const contador = elegirContador({ pulse: data.pulse, live, shiftClosed: live.shiftClosed })
+  const outside = contador.fuente === 'pulso' ? contador.fueraDelHorario : (live.outsidePieces ?? 0)
 
   const stale = live.lastSyncAt
     ? (now - new Date(live.lastSyncAt).getTime()) / 1000 > 15 * 60
@@ -3217,29 +3209,31 @@ export function PublicShiftMonitorPage() {
             {esActual ? 'Piezas procesadas en la jornada' : 'Piezas de ese turno'}
           </div>
           <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-            <span className="text-5xl font-bold tabular-nums leading-none">{fmtInt(live.totalPieces)}</span>
+            <span className="text-5xl font-bold tabular-nums leading-none">{fmtInt(contador.valor)}</span>
             <span className="text-sm text-muted-foreground/70">piezas</span>
-            {/* Hasta qué minuto cuenta el número (pedido de Orel, 13-ago): el
-                contador de la pantalla de Shoplogix es vivo y este es un espejo
-                que copia cada ~5 min — sin decir el corte, la diferencia de un
-                ciclo de sync (63 pz ese día) parecía un descuadre de conteo.
-                El corte honesto es el FIN del último tramo con dato (t + 5),
-                no `lastSyncAt` (el sync puede correr sin traer tramo nuevo).
-                Solo con el turno VIVO: cerrado, el total ya es final. */}
-            {!live.shiftClosed && live.series && live.series.length > 0 && (
+            {/* UNA sola hora de corte en toda la pantalla (pedido de Orel,
+                13-ago y 20-ago). Antes acá decía «datos hasta las 23:00» por los
+                buckets y el pie decía «Shoplogix marca ... a las 22:56» por el
+                contador vivo: el mismo número con dos horas, que es la clase de
+                contradicción que este monitor viene cerrando. Ahora el grande ES
+                el crudo de Shoplogix y esta es SU hora. Solo con el turno VIVO:
+                cerrado, el total ya es final. */}
+            {!live.shiftClosed && contador.corteWallMs != null && (
               <span className="text-[12px] tabular-nums text-muted-foreground/70">
-                datos hasta las{' '}
-                {new Date(Date.parse(live.series[live.series.length - 1]!.t) + 5 * 60_000)
-                  .toISOString().slice(11, 16)}
-                {/* OJO — Acá vivía «Shoplogix marcaba N a las HH:MM», capturado por el
-                    sync cada 5 min. Lo reemplaza `PulsoVivo`, que trae el mismo
-                    contador pero leído cada minuto y con el botón para pedirlo
-                    ahora: dos veces el mismo número, uno más viejo que el otro,
-                    es la clase de contradicción que este monitor viene
-                    cerrando. */}
+                {contador.fuente === 'pulso' ? 'Shoplogix, ' : 'datos hasta las '}
+                {new Date(contador.corteWallMs).toISOString().slice(11, 16)}
               </span>
             )}
           </div>
+
+          {/* Cuando el contador vivo no responde, el número es el derivado de
+              los buckets y llega hasta 8 min tarde. Decirlo es la diferencia
+              entre un dato viejo y un dato viejo que se hace pasar por vivo. */}
+          {contador.motivoFallback && (
+            <p className="mt-1 text-[11px] text-muted-foreground/70">
+              {contador.motivoFallback}: se muestra el acumulado de los tramos de 5 min.
+            </p>
+          )}
 
           {/* Desglose cuando la línea produjo fuera del horario del turno.
               Shoplogix cierra el turno a una hora fija y manda lo que venga
@@ -3247,7 +3241,7 @@ export function PublicShiftMonitorPage() {
               que la gente contó en la línea, y ahí se pierde la confianza. */}
           {outside > 0 && (
             <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-muted-foreground">
-              <span className="tabular-nums">{fmtInt(live.shiftPieces ?? 0)} dentro del turno</span>
+              <span className="tabular-nums">{fmtInt(contador.valor)} dentro del turno</span>
               <span className="text-muted-foreground/60">+</span>
               <Pill tone="warning" className="tabular-nums normal-case">
                 {fmtInt(outside)} fuera del horario
@@ -3395,7 +3389,12 @@ export function PublicShiftMonitorPage() {
             {/* El pulso va JUNTO a la regla: son la misma pregunta —«¿cómo va
                 ahora?»— y el número de Shoplogix es el que cierra el círculo
                 con la pantalla de planta. */}
-            <PulsoVivo pulse={data.pulse} token={token ?? ''} cerrado={live.shiftClosed} />
+            <PulsoVivo
+              pulse={data.pulse}
+              token={token ?? ''}
+              cerrado={live.shiftClosed}
+              onPulso={p => setData(d => (d ? { ...d, pulse: p } : d))}
+            />
             <ReglaDeRitmo
               ahora={ritmoAhoraAndando(serieDelTurno)}
               ahoraReloj={ritmoAhoraCpm(serieDelTurno)}
