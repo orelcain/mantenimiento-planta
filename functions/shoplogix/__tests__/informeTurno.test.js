@@ -295,3 +295,54 @@ test('un turno EN CURSO no habla en pasado ni presume del cotejo', () => {
   assert.match(t.veredictoDetalle, /NO vale/i)
   assert.strictEqual(t.veredictoBueno, false)
 })
+
+// ── El veredicto "en lo habitual" ───────────────────────────────────────────
+
+const cotejoHabitual = {
+  comparados: 7, veredicto: 'en-lo-habitual', difVsMediana: -225,
+  medianaPrevios: 10952, margenHabitual: 481,
+  banda: { desde: 10471, hasta: 11433 },
+}
+
+test('un turno dentro de la banda no se informa como malo NI como logro', () => {
+  const t = construirTextos({
+    resumen: resumenBase({ ciclos: 10727 }), recuperaciones: [], cotejo: cotejoHabitual,
+    principal: resumenBase().causas[0], meta,
+  })
+  assert.match(t.veredictoTitulo, /en lo habitual/i)
+  // Ni reproche...
+  assert.ok(!/bajo lo habitual|revisar si|menos horas/i.test(t.veredictoTitulo + t.veredictoDetalle),
+    'no debe acusar por una diferencia que no se distingue del ruido')
+  // ...ni celebración: un turno normal no es un logro.
+  assert.strictEqual(t.veredictoBueno, false)
+  assert.ok(!/excelente|muy bueno|logro/i.test(t.veredictoTitulo))
+})
+
+test('explica de donde sale la banda, para poder discutirla', () => {
+  const t = construirTextos({
+    resumen: resumenBase({ ciclos: 10727 }), recuperaciones: [], cotejo: cotejoHabitual,
+    principal: resumenBase().causas[0], meta,
+  })
+  // La mediana, cuánto varían esos turnos y la diferencia de hoy: los tres.
+  assert.match(t.veredictoDetalle, /10\.952/)
+  assert.match(t.veredictoDetalle, /481/)
+  assert.match(t.veredictoDetalle, /225/)
+})
+
+test('el parrafo de la reunion tambien dice "en lo habitual"', () => {
+  const t = construirTextos({
+    resumen: resumenBase({ ciclos: 10727 }), recuperaciones: [], cotejo: cotejoHabitual,
+    principal: resumenBase().causas[0], meta,
+  })
+  assert.match(t.parrafoReunion, /dentro de lo habitual/i)
+})
+
+test('la banda NO reintroduce la estimacion contrafactual', () => {
+  // El mismo barrido de la regla que no se negocia, ahora sobre el veredicto nuevo.
+  const prohibido = /habriamos|habríamos|se habrian|se habrían|piezas mas|piezas más|dejamos de producir/i
+  const t = construirTextos({
+    resumen: resumenBase({ ciclos: 10727 }), recuperaciones: [], cotejo: cotejoHabitual,
+    principal: resumenBase().causas[0], meta,
+  })
+  assert.ok(!prohibido.test([t.veredictoTitulo, t.veredictoDetalle, t.parrafoReunion, ...t.pendientes].join(' ')))
+})

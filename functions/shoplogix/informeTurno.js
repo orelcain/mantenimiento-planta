@@ -11,9 +11,14 @@
  *    imaginarios, deja de ser evidencia y pasa a ser excusa.
  * 2. Lo que si se afirma es lo que paso: cuanto cayo el ritmo, cuanto demoro en
  *    volver, y como quedo el turno al lado de los turnos equivalentes.
- * 3. Un turno malo se informa como malo. Si el volumen quedo bajo la mediana,
+ * 3. Un turno malo se informa como malo. Si el volumen quedo bajo lo habitual,
  *    el texto lo dice; buscarle un angulo favorable a un mal turno quema la
  *    credibilidad de todos los informes buenos.
+ *    ⚠ "Bajo lo habitual" NO es "bajo la mediana". Contra la mediana, la mitad
+ *    de los turnos sale mala por construccion, y el informe pasa a acusar por
+ *    diferencias de 2% — que es lo que hacia hasta el 21-08. Hay una banda
+ *    muerta del ancho de lo que estos mismos turnos varian (ver `armarCotejo`):
+ *    adentro el turno se informa como normal, sin reproche y sin celebrarlo.
  * 4. Lo que el dato no permite distinguir se declara. Una causa que vive en dos
  *    categorias sale como "Electrica o Mecanica", no elige una.
  */
@@ -218,6 +223,26 @@ function construirTextos({ resumen, recuperaciones, reparto, ocupacion, cotejo, 
     veredictoDetalle = `${num(resumen.ciclos)} ciclos, ${num(Math.abs(c.difVsMediana))} por encima de la mediana `
       + `de los ultimos ${c.comparados} turnos equivalentes`
       + (hayFalla ? `, con ${durTexto(principal.equivalenteLineaSec)} de linea perdidos por ${etiqueta}.` : '.')
+  } else if (c.veredicto === 'en-lo-habitual') {
+    /*
+     * Ni bueno ni malo: indistinguible del ruido. Antes este turno salía como
+     * «cerró bajo lo habitual» por 225 piezas sobre 10.727 y pedía revisar si
+     * había corrido menos horas — un reproche construido sobre un 2%.
+     *
+     * `veredictoBueno` queda en false a propósito: esto NO es un logro y pintarlo
+     * de verde sería el mismo error al revés. Es un turno normal.
+     */
+    produccionSub = `dentro de lo habitual de los ultimos ${c.comparados} turnos`
+    veredictoTitulo = 'El turno cerro en lo habitual.'
+    veredictoDetalle = `${num(resumen.ciclos)} ciclos. La mediana de los ultimos ${c.comparados} turnos equivalentes `
+      + `es ${num(c.medianaPrevios)} y esos turnos varian ${num(c.margenHabitual)} piezas para arriba o para abajo, `
+      + `asi que la diferencia de hoy (${num(Math.abs(c.difVsMediana))}) no se distingue de esa variacion normal.`
+      /* Dato pelado, sin «y aun asi»: que hubo falla y el volumen igual quedo
+         normal es un hecho, pero redactarlo como merito es buscarle el angulo,
+         que es justo lo que la regla 3 no permite. */
+      + (hayFalla
+        ? ` En el turno se perdieron ${durTexto(principal.equivalenteLineaSec)} de linea por ${etiqueta}.`
+        : '')
   } else if (c.veredicto === 'bajo-la-mediana') {
     produccionSub = `bajo la mediana de los ultimos ${c.comparados} turnos`
     veredictoTitulo = 'El turno cerro bajo lo habitual.'
@@ -359,6 +384,8 @@ function construirTextos({ resumen, recuperaciones, reparto, ocupacion, cotejo, 
     partes.push(`Cerro con ${num(resumen.ciclos)} ciclos, la mayor produccion de los ultimos ${c.comparados} turnos equivalentes.`)
   } else if (c.veredicto === 'bajo-la-mediana') {
     partes.push(`Cerro con ${num(resumen.ciclos)} ciclos, bajo la mediana de los ultimos ${c.comparados} turnos equivalentes.`)
+  } else if (c.veredicto === 'en-lo-habitual') {
+    partes.push(`Cerro con ${num(resumen.ciclos)} ciclos, dentro de lo habitual de los ultimos ${c.comparados} turnos equivalentes.`)
   } else if (c.comparados) {
     partes.push(`Cerro con ${num(resumen.ciclos)} ciclos, sobre la mediana de los ultimos ${c.comparados} turnos equivalentes.`)
   }

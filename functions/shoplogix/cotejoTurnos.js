@@ -76,6 +76,16 @@ function esComparable(ref, cand, { toleranciaHoras = 1.5, toleranciaDuracion = 2
 }
 
 /**
+ * Mediana por rango: con N par toma el de arriba. Es la regla que ya usaba este
+ * módulo, y se conserva a propósito — cambiarla movería veredictos que no
+ * tienen nada que ver con la banda.
+ */
+function mediana(nums) {
+  const orden = [...nums].sort((a, b) => a - b)
+  return orden.length ? orden[Math.floor(orden.length / 2)] : 0
+}
+
+/**
  * Elige los turnos con los que cotejar: comparables, anteriores al de
  * referencia, con producción real, del más reciente al más antiguo.
  *
@@ -106,9 +116,8 @@ function seleccionarComparables(
     .filter((c) => (c.ciclos ?? 0) >= minPiezas)
     .filter((c) => esComparable(referencia, c, opts))
 
-  const ciclos = base.map((c) => c.ciclos).sort((a, b) => a - b)
-  const mediana = ciclos.length ? ciclos[Math.floor(ciclos.length / 2)] : 0
-  const piso = mediana * fraccionMinima
+  const medianaCandidatos = mediana(base.map((c) => c.ciclos))
+  const piso = medianaCandidatos * fraccionMinima
 
   return base
     .filter((c) => c.ciclos >= piso)
@@ -197,14 +206,44 @@ function armarCotejo(referencia, comparables) {
 
   const previos = comparables.map((c) => c.ciclos).filter((n) => typeof n === 'number')
   const mejorPrevio = previos.length ? Math.max(...previos) : null
-  const medianaPrevios = previos.length
-    ? [...previos].sort((a, b) => a - b)[Math.floor(previos.length / 2)]
+  const medianaPrevios = previos.length ? mediana(previos) : null
+
+  /*
+   * ── La banda muerta ───────────────────────────────────────────────────────
+   *
+   * Sin ella el veredicto era binario contra la mediana, y eso llama malo a la
+   * mitad de los turnos POR CONSTRUCCIÓN: la mitad siempre queda debajo. Caso
+   * real (Chonchi, 20-08): 10.727 ciclos contra una mediana de 10.952 — 225
+   * piezas, un 2,1% — y el informe abría con «el turno cerró bajo lo habitual»
+   * y pedía revisar si el turno corrió menos horas. Eso es ruido con tono de
+   * reproche, y desgasta justo la credibilidad que la regla quería proteger.
+   *
+   * El margen NO es un porcentaje inventado: es cuánto varían estos mismos
+   * turnos, medido con la desviación mediana absoluta (MAD). Se eligió sobre
+   * los cuartiles porque aguanta los extremos, que acá son la regla y no la
+   * excepción: en esos 7 turnos de Chonchi conviven un 7.730 y un 14.186, y con
+   * el cuartil bajo (10.827) el turno del 20-08 seguía saliendo malo por 100
+   * piezas. Con la MAD la banda es ±481 y el turno queda donde corresponde:
+   * dentro de lo que esta línea hace habitualmente.
+   *
+   * ⚠ La regla de Orel sigue en pie: un turno malo se informa como malo. La
+   * banda solo cubre lo que no se distingue del ruido — el turno flojo del
+   * 13-08 (8.159 contra 12.170) queda fuera por lejos.
+   */
+  const margen = previos.length
+    // Piso del 2%: con una muestra muy pareja la MAD puede dar casi 0, y ahí
+    // una pieza de diferencia volvería a disparar el veredicto.
+    ? Math.max(mediana(previos.map((n) => Math.abs(n - medianaPrevios))), medianaPrevios * 0.02)
+    : null
+  const banda = margen != null
+    ? { desde: Math.round(medianaPrevios - margen), hasta: Math.round(medianaPrevios + margen) }
     : null
 
   let veredicto = 'sin-comparables'
   if (previos.length >= 3 && typeof referencia.ciclos === 'number') {
     if (referencia.ciclos >= mejorPrevio) veredicto = 'mejor-del-periodo'
-    else if (referencia.ciclos >= medianaPrevios) veredicto = 'sobre-la-mediana'
+    else if (referencia.ciclos > banda.hasta) veredicto = 'sobre-la-mediana'
+    else if (referencia.ciclos >= banda.desde) veredicto = 'en-lo-habitual'
     else veredicto = 'bajo-la-mediana'
   }
 
@@ -213,6 +252,9 @@ function armarCotejo(referencia, comparables) {
     comparados: previos.length,
     mejorPrevio,
     medianaPrevios,
+    /** Dentro de esta banda el turno no se distingue de lo habitual. */
+    banda,
+    margenHabitual: margen != null ? Math.round(margen) : null,
     veredicto,
     // Cuánto se aparta de lo habitual, en piezas. Sirve para redactar la frase.
     difVsMediana: medianaPrevios != null && typeof referencia.ciclos === 'number'

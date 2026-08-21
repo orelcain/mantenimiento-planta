@@ -238,3 +238,87 @@ test('el piso es relativo, no un número fijo por planta', () => {
   const sel = seleccionarComparables(candYal, refYal)
   assert.ok(sel.some((t) => t.id === '2026-08-09_Turno 2'), '10.343 es un turno flojo pero real en Yal')
 })
+
+// ── La banda muerta ─────────────────────────────────────────────────────────
+//
+// Sin banda, el veredicto contra la mediana llama malo a la mitad de los turnos
+// por construcción. Estos tests fijan dónde está el corte.
+
+test('un turno a 2% de la mediana NO se informa como malo', () => {
+  // El caso real que originó el cambio: Chonchi, 20-08. 225 piezas bajo la
+  // mediana sobre 10.727 — y el informe abría acusando.
+  const ref = turno('2026-08-20_Turno 2', '2026-08-20', 10727)
+  const prev = [
+    turno('2026-08-08_Turno 2', '2026-08-08', 14186),
+    turno('2026-08-11_Turno 2', '2026-08-11', 12224),
+    turno('2026-08-12_Turno 2', '2026-08-12', 11433),
+    turno('2026-08-13_Turno 2', '2026-08-13', 10952),
+    turno('2026-08-14_Turno 2', '2026-08-14', 10789),
+    turno('2026-08-18_Turno 2', '2026-08-18', 10864),
+    turno('2026-08-19_Turno 2', '2026-08-19', 7730),
+  ]
+  const c = armarCotejo(ref, prev)
+  assert.strictEqual(c.veredicto, 'en-lo-habitual')
+  assert.strictEqual(c.medianaPrevios, 10952)
+  // La banda sale de cuánto varían estos turnos, no de un porcentaje inventado.
+  assert.strictEqual(c.margenHabitual, 481)
+  assert.ok(ref.ciclos >= c.banda.desde && ref.ciclos <= c.banda.hasta)
+})
+
+test('el cuartil bajo NO habría alcanzado: por eso la banda es la MAD', () => {
+  // Con los mismos 7 turnos, el cuartil bajo cae en 10.827 y el turno del 20-08
+  // seguía saliendo malo por 100 piezas. Los extremos (7.730 y 14.186) son la
+  // regla en esta línea, y la MAD los aguanta.
+  const previos = [14186, 12224, 11433, 10952, 10789, 10864, 7730].sort((a, b) => a - b)
+  const i = (previos.length - 1) * 0.25
+  const cuartilBajo = previos[Math.floor(i)] + (previos[Math.ceil(i)] - previos[Math.floor(i)]) * (i - Math.floor(i))
+  assert.ok(10727 < cuartilBajo, 'el cuartil habria dejado el turno afuera')
+})
+
+test('un turno realmente flojo sigue saliendo flojo', () => {
+  // La regla de Orel no se toca: la banda cubre el ruido, no un mal turno.
+  const ref = turno('2026-08-13_Turno 1', '2026-08-13', 8159)
+  const prev = [
+    turno('2026-08-11_Turno 1', '2026-08-11', 12341),
+    turno('2026-08-10_Turno 1', '2026-08-10', 12170),
+    turno('2026-08-07_Turno 1', '2026-08-07', 9652),
+  ]
+  assert.strictEqual(armarCotejo(ref, prev).veredicto, 'bajo-la-mediana')
+})
+
+test('un turno claramente por encima sigue saliendo por encima', () => {
+  const ref = turno('2026-08-20_Turno 2', '2026-08-20', 12800)
+  const prev = [
+    turno('2026-08-11_Turno 2', '2026-08-11', 14186),
+    turno('2026-08-12_Turno 2', '2026-08-12', 10952),
+    turno('2026-08-13_Turno 2', '2026-08-13', 10864),
+    turno('2026-08-14_Turno 2', '2026-08-14', 10789),
+  ]
+  assert.strictEqual(armarCotejo(ref, prev).veredicto, 'sobre-la-mediana')
+})
+
+test('con una muestra muy pareja la banda tiene piso del 2%', () => {
+  // Cuatro turnos casi idénticos dan MAD ~0: sin piso, una pieza de diferencia
+  // volvería a disparar el veredicto.
+  const ref = turno('2026-08-20_Turno 2', '2026-08-20', 9990)
+  const prev = [
+    turno('2026-08-11_Turno 2', '2026-08-11', 10000),
+    turno('2026-08-12_Turno 2', '2026-08-12', 10000),
+    turno('2026-08-13_Turno 2', '2026-08-13', 10001),
+    turno('2026-08-14_Turno 2', '2026-08-14', 9999),
+  ]
+  const c = armarCotejo(ref, prev)
+  assert.strictEqual(c.margenHabitual, 200) // 2% de 10.000
+  assert.strictEqual(c.veredicto, 'en-lo-habitual')
+})
+
+test('el mejor del periodo gana a la banda', () => {
+  // Aunque caiga dentro de la banda, si es el mejor de todos se dice.
+  const ref = turno('2026-08-20_Turno 2', '2026-08-20', 10100)
+  const prev = [
+    turno('2026-08-11_Turno 2', '2026-08-11', 10000),
+    turno('2026-08-12_Turno 2', '2026-08-12', 10000),
+    turno('2026-08-13_Turno 2', '2026-08-13', 9900),
+  ]
+  assert.strictEqual(armarCotejo(ref, prev).veredicto, 'mejor-del-periodo')
+})
