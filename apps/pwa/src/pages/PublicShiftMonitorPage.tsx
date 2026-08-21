@@ -39,6 +39,8 @@ import { computePaceToTarget, lineMaxPerHour, type PaceToTarget } from '@/servic
 import { ventanaDeActividad, desdePrimeraPieza, piezasAntesDelArranque } from '@/services/shoplogix/monitorActividad'
 import { refrescarPulso, type PulsoMonitor } from '@/services/shoplogix/publicShiftMonitor.service'
 import { elegirContador } from './monitor/contadorCrudo'
+import { construirCascada } from './monitor/cascadaTurno'
+import { CascadaTurnoCard } from './monitor/CascadaTurnoCard'
 import { mediaMovil, ritmoAhoraCpm, ritmoAhoraAndando, estadoRitmo, fraccionDeRegla, pedidoAndando } from '@/services/shoplogix/monitorRitmo'
 import { pinShiftEnd, unpinShiftEnd, setMonitorSetPoint } from '@/services/shoplogix/pinShiftEnd'
 import {
@@ -3070,6 +3072,11 @@ export function PublicShiftMonitorPage() {
   const contador = elegirContador({ pulse: data.pulse, live, shiftClosed: live.shiftClosed })
   const outside = contador.fuente === 'pulso' ? contador.fueraDelHorario : (live.outsidePieces ?? 0)
 
+  /* La cascada del turno. Se mide contra los TRAMOS CERRADOS, no contra el
+     contador vivo: los minutos de `timeBreakdown` salen de esa misma rejilla y
+     mezclarlos haría que la suma no cierre. Declara su propio corte. */
+  const cascada = construirCascada({ live, ritmoMaquina: setCpmVigente })
+
   const stale = live.lastSyncAt
     ? (now - new Date(live.lastSyncAt).getTime()) / 1000 > 15 * 60
     : true
@@ -3395,6 +3402,15 @@ export function PublicShiftMonitorPage() {
               cerrado={live.shiftClosed}
               onPulso={p => setData(d => (d ? { ...d, pulse: p } : d))}
             />
+            {/* «Dónde se fueron las piezas»: el análisis táctico del turno. Va
+                acá, entre el número crudo y la regla de ritmo, porque responde
+                la pregunta que sigue a «cuántas van».
+                El pronóstico del cierre NO se duplica acá: ya vive en
+                `PronosticoCierre`, con su banda, su método y el conteo de
+                cuántos turnos llegaron. Repetirlo sería recrear el bug de los
+                «dos cierres a tres tarjetas de distancia» que ese bloque
+                documenta. */}
+            {cascada && !live.shiftClosed && <CascadaTurnoCard cascada={cascada} />}
             <ReglaDeRitmo
               ahora={ritmoAhoraAndando(serieDelTurno)}
               ahoraReloj={ritmoAhoraCpm(serieDelTurno)}
