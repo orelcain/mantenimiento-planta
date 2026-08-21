@@ -346,3 +346,90 @@ test('la banda NO reintroduce la estimacion contrafactual', () => {
   })
   assert.ok(!prohibido.test([t.veredictoTitulo, t.veredictoDetalle, t.parrafoReunion, ...t.pendientes].join(' ')))
 })
+
+// ── El informe de UNA sola maquina (Filete) ─────────────────────────────────
+//
+// El informe nacio para lineas de varias maquinas y su argumento central es que
+// el rollup de Shoplogix las suma. En Filete hay UNA Baader 200, y ahi ese
+// argumento no aplica: el informe decia "1 maquinas", hablaba de "cuando las
+// tres caen a la misma hora" sobre una sola pista, y explicaba un doble conteo
+// inexistente. Estos tests barren las superficies que se leen en la reunion.
+
+const resumenUnaMaquina = (over = {}) => resumenBase({
+  maquinas: 1,
+  ciclos: 2308,
+  causas: [causa('(sin causa imputada)', {
+    suma: 4670, union: 4670, todas: 4670, equiv: 4670, eventos: 14, sinCausa: true,
+  })],
+  ...over,
+})
+
+const superficies = (t) => [
+  t.veredictoTitulo, t.veredictoDetalle, t.parrafoReunion,
+  t.notaLamina1, t.notaLamina2, t.notaLamina3, t.notaLamina4, t.notaLamina5,
+  t.notaReparto, t.notaOcupacion, ...t.pendientes,
+].filter(Boolean).join(' ')
+
+test('con UNA maquina ningun texto habla de varias', () => {
+  const t = construirTextos({
+    resumen: resumenUnaMaquina(), recuperaciones: [], cotejo: cotejoBajo,
+    principal: resumenUnaMaquina().causas[0],
+    meta: { ...meta, planta: 'filete', areaLabel: 'Filete' },
+  })
+  const texto = superficies(t)
+  assert.ok(!/\b1 maquinas\b/i.test(texto), 'dice "1 maquinas"')
+  assert.ok(!/las tres|tres maquinas|tres fallas/i.test(texto), 'habla de tres maquinas')
+  assert.ok(!/todas las maquinas/i.test(texto), 'habla de "todas las maquinas" con una sola')
+  assert.ok(!/suma las 1 |resumen de area suma/i.test(texto), 'explica un doble conteo que no existe')
+})
+
+test('con UNA maquina la lamina 2 dice lo que si tiene para decir', () => {
+  const t = construirTextos({
+    resumen: resumenUnaMaquina(), recuperaciones: [], cotejo: cotejoBajo,
+    principal: resumenUnaMaquina().causas[0],
+    meta: { ...meta, planta: 'filete', areaLabel: 'Filete' },
+  })
+  assert.match(t.notaLamina2, /una sola maquina/i)
+  assert.match(t.notaLamina2, /cada minuto/i)
+  // Y sigue diciendo lo que el dato no permite distinguir.
+  assert.match(t.notaLamina2, /Electrica o Mecanica/i)
+})
+
+test('con UNA maquina el parrafo no repite tres veces el mismo numero', () => {
+  const t = construirTextos({
+    resumen: resumenUnaMaquina(), recuperaciones: [], cotejo: cotejoBajo,
+    principal: resumenUnaMaquina().causas[0],
+    meta: { ...meta, planta: 'filete', areaLabel: 'Filete' },
+  })
+  // 4.670 s = 1 h 18 min. Con una maquina suma, equivalente y "todas" son el
+  // mismo valor: leerlo tres veces invita a preguntar por que se repite.
+  const veces = (t.parrafoReunion.match(/1 h 18 min/g) || []).length
+  assert.strictEqual(veces, 1, `el parrafo repite la duracion ${veces} veces`)
+  assert.match(t.parrafoReunion, /14 eventos/)
+})
+
+test('con VARIAS maquinas el argumento del doble conteo sigue intacto', () => {
+  // El contrapeso: la correccion del rollup es el corazon del informe en
+  // Chonchi y Yal, y no se puede perder por arreglar Filete.
+  const t = construirTextos({
+    resumen: resumenBase(), recuperaciones: [], cotejo: cotejoBajo,
+    principal: resumenBase().causas[0], meta,
+  })
+  assert.match(t.notaLamina2, /suma las 3 maquinas/i)
+  assert.match(t.notaLamina2, /Equiv\. linea|Todas/i)
+  assert.match(t.notaLamina3, /cayeron juntas/i)
+})
+
+test('con UNA maquina no queda lenguaje de varias en ningun rincon', () => {
+  // Barrido final: incluye los pendientes, que es donde quedo escondido
+  // "la suma de las maquinas" despues de arreglar las laminas.
+  const t = construirTextos({
+    resumen: resumenUnaMaquina(), recuperaciones: [], cotejo: cotejoBajo,
+    principal: resumenUnaMaquina().causas[0], difFuentes: 47,
+    meta: { ...meta, planta: 'filete', areaLabel: 'Filete' },
+  })
+  const texto = superficies(t)
+  assert.ok(!/de linea completa/i.test(texto), 'dice "de linea completa" con una sola maquina')
+  assert.ok(!/suma de las maquinas/i.test(texto), 'dice "la suma de las maquinas"')
+  assert.match(texto, /contador de la maquina/i)
+})
