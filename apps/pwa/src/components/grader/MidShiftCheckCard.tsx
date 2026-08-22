@@ -67,7 +67,7 @@ export function MidShiftCheckCard({
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between gap-2 flex-wrap">
           <CardTitle className="text-base flex items-center gap-2">
-            <Radio className="w-4 h-4 text-primary animate-pulse" />
+            <Radio className="w-4 h-4 text-primary motion-safe:animate-pulse" />
             Corte de control · con lo que va del turno
             <InfoTooltip
               text={'Mira el reparto de calibres del Excel ya cargado —aunque cubra solo un tramo— y lo compara con las gates asignadas, igual que el análisis de cierre.\n\nLa estimación de piezas que faltan es ritmo medido × tiempo que queda: sirve para dimensionar, no es una promesa.'}
@@ -211,7 +211,7 @@ export function MidShiftCheckCard({
                 ].join('\n')
                 navigate(`/incidents?nueva=1&titulo=${encodeURIComponent(`Repartir el ${saturated[0]!.label} en los gates (corte de control)`)}&desc=${encodeURIComponent(desc)}`)
               }}
-              className="inline-flex min-h-[44px] items-center rounded-ctl bg-primary/[0.12] px-4 text-xs font-medium text-primary"
+              className="inline-flex min-h-[44px] items-center rounded-ctl bg-primary/[0.12] px-4 text-xs font-medium text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             >
               Registrar incidencia con esto
             </button>
@@ -229,7 +229,7 @@ export function MidShiftCheckCard({
                 })
               }}
               className={cn(
-                'inline-flex min-h-[44px] items-center gap-1.5 rounded-ctl px-4 text-xs font-medium',
+                'inline-flex min-h-[44px] items-center gap-1.5 rounded-ctl px-4 text-xs font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
                 copiado ? 'bg-success/[0.12] text-ink-ok' : 'bg-muted text-muted-foreground',
               )}
               aria-live="polite"
