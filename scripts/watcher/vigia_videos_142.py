@@ -162,6 +162,32 @@ def vigia_tick(log) -> None:
                 _guardar_estado(est)
                 log(f"  [vigia] {unidad} preparado: {meta.get('nPantallas')} pantallas "
                     f"en {destino.name}/")
+
+                # Transcripcion automatica: si pasa la verificacion aritmetica,
+                # el JSON queda en _INBOX y el resto de la cadena (watcher ->
+                # Firestore -> aviso al tema) corre sola. Sin DM en el exito:
+                # el tema recibe el resultado, que es el aviso que importa.
+                try:
+                    from transcriptor_gemini_142 import transcribir, Incoherente
+                    r = transcribir(destino)
+                    log(f"  [vigia] {unidad} transcrito: {len(r['leidos'])} contadores"
+                        + (f", faltan {len(r['faltantes'])}" if r['faltantes'] else "")
+                        + " -> _INBOX")
+                    continue
+                except Incoherente as e:
+                    log(f"  [vigia] {unidad} INCOHERENTE: {e}")
+                    avisar_dm(
+                        f"🔎 <b>Protocolo {unidad}: la lectura no cuadra</b>\n"
+                        f"{video.name}\n<code>{e}</code>\n\n"
+                        f"No la ingesto sola. Revisa el paquete "
+                        f"<code>_PENDIENTE/{fecha}_{unidad}/</code> o graba otro barrido.",
+                        log,
+                    )
+                    continue
+                except Exception as e:
+                    log(f"  [vigia] fallo transcribiendo {unidad}: {type(e).__name__}: {e}")
+
+                # el transcriptor fallo (red, cuota, etc.): avisar que quedo pendiente
                 avisar_dm(
                     f"📼 <b>Video del protocolo {unidad} preparado</b>\n"
                     f"{meta.get('nPantallas')} pantallas únicas · {video.name}\n"
