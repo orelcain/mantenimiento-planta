@@ -22,7 +22,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
-  AlertTriangle, ArrowLeft, ChevronDown, ChevronRight, CircleGauge, LineChart as LineChartIcon, Loader2, RotateCcw,
+  AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, CircleGauge, LineChart as LineChartIcon, Loader2, RotateCcw,
   Save, Video,
 } from 'lucide-react'
 import { Line } from 'react-chartjs-2'
@@ -422,7 +422,7 @@ export function Perilla5Page() {
               role="tab"
               aria-selected={vista === 'herramienta'}
               onClick={() => setVista('herramienta')}
-              className="inline-flex items-center gap-1.5 rounded-ctl border px-3 py-1.5 text-sm font-medium"
+              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-ctl border px-3.5 text-sm font-medium"
               style={
                 vista === 'herramienta'
                   ? { background: LC.aqua, borderColor: LC.aqua, color: '#fff' }
@@ -436,7 +436,7 @@ export function Perilla5Page() {
               role="tab"
               aria-selected={vista === 'protocolo'}
               onClick={() => setVista('protocolo')}
-              className="inline-flex items-center gap-1.5 rounded-ctl border px-3 py-1.5 text-sm font-medium"
+              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-ctl border px-3.5 text-sm font-medium"
               style={
                 vista === 'protocolo'
                   ? { background: LC.aqua, borderColor: LC.aqua, color: '#fff' }
@@ -484,7 +484,18 @@ export function Perilla5Page() {
 
 function VistaProtocolo() {
   const { isAuthenticated, user } = useAuthStore()
-  const { isDark } = useTheme()
+  // useTheme es estado LOCAL por instancia: el toggle de la toolbar cambia SU
+  // copia y esta vista nunca se entera (el gráfico quedaba con los colores del
+  // tema anterior hasta un remount). Se observa la clase del documento, que es
+  // la fuente de verdad que todos comparten.
+  const [isDark, setIsDark] = useState(() =>
+    document.documentElement.classList.contains('dark'))
+  useEffect(() => {
+    const obs = new MutationObserver(() =>
+      setIsDark(document.documentElement.classList.contains('dark')))
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+    return () => obs.disconnect()
+  }, [])
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
 
@@ -513,8 +524,37 @@ function VistaProtocolo() {
   const [cargando, setCargando] = useState(true)
   const [metrica, setMetrica] = useState<Metrica>('correcciones')
   const [borrador, setBorrador] = useState<BorradorVideo | null>(null)
+  /** Cambia de máquina y deja la URL compartible (?maquina=n2). */
+  const cambiarMaquina = (id: MaquinaBaader) => {
+    setMaquina(id)
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      next.set('maquina', id.replace('baader-', ''))
+      return next
+    }, { replace: true })
+  }
+
+  /** Veredicto de la última lectura válida de CADA máquina, para el selector. */
+  const [veredictos, setVeredictos] = useState<Partial<Record<MaquinaBaader, { label: string; color: string }>>>({})
+  useEffect(() => {
+    let vivo = true
+    void Promise.all(MAQUINAS.map(async (m) => {
+      const rows = await lecturasDeMaquina(m.id, 'chonchi', 6)
+      const ult = rows.find((l) => muestraValida(l))
+      return [m.id, ult ? veredictoDe(ult) : null] as const
+    })).then((pares) => {
+      if (!vivo) return
+      const out: Partial<Record<MaquinaBaader, { label: string; color: string }>> = {}
+      for (const [id, v] of pares) if (v) out[id] = { label: v.label, color: v.color }
+      setVeredictos(out)
+    })
+    return () => { vivo = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [guardadoOk])   // se refresca al guardar una lectura nueva
+
   // Registrar es semanal y el explicativo es de una sola vez: ambos plegados.
   const [mostrarForm, setMostrarForm] = useState(false)
+  const [lecturaAbierta, setLecturaAbierta] = useState<string | null>(null)
   const [mostrarInfo, setMostrarInfo] = useState(false)
 
   const cargar = useCallback(async () => {
@@ -628,6 +668,11 @@ function VistaProtocolo() {
       })
       setGuardadoOk(true)
       await cargar()
+      // feedback inmediato y cierre del ciclo: el form se pliega, los campos
+      // quedan limpios para la proxima, y la confirmacion vive junto a la celda
+      setMostrarForm(false)
+      setForm({ ...FORM_VACIO })
+      setNotas('')
     } catch {
       setError('No se pudo guardar. Revisá la conexión o tus permisos.')
     } finally {
@@ -809,6 +854,14 @@ function VistaProtocolo() {
     navigate(`/incidents?nueva=1&titulo=${encodeURIComponent(titulo)}&desc=${encodeURIComponent(desc)}`)
   }
 
+  const ultimoIdxValido = useMemo(() => {
+    for (let i = serie.length - 1; i >= 0; i--) {
+      const l = serie[i]
+      if (l && muestraValida(l)) return i
+    }
+    return -1
+  }, [serie])
+
   const chartData = useMemo(
     () => ({
       labels: serie.map((l) => fechaCorta(l.fecha)),
@@ -820,16 +873,24 @@ function VistaProtocolo() {
         data: serie.map((l) => (muestraValida(l) ? tasa1000(l[s.k], l.fish) : null)),
         borderColor: s.color,
         backgroundColor: s.color,
-        pointRadius: 4,
+        // el ÚLTIMO punto válido va enfatizado: es el estado actual, el que
+        // decide (dataviz: emphasized endpoint)
+        pointRadius: serie.map((l, i) =>
+          i === ultimoIdxValido && muestraValida(l) ? 4.5 : 2.5),
+        pointHoverRadius: 6,
+        pointBorderWidth: 1.5,
+        pointBorderColor: isDark ? '#16242f' : '#ffffff',
         spanGaps: false,
-        tension: 0.2,
-        borderWidth: s.grosor ?? 2,
+        tension: 0.25,
+        borderWidth: s.grosor ?? 1.75,
         borderDash: s.trazo ?? [],
+        // los chips mandan: serie apagada = dataset oculto (y el eje recalcula)
+        hidden: apagadas.has(s.k as string),
         // clave del contador para que el tooltip encuentre su ficha en SABER
         clave: s.k as string,
       })),
     }),
-    [serie, seriesActivas],
+    [serie, seriesActivas, apagadas, isDark, ultimoIdxValido],
   )
 
   /**
@@ -901,12 +962,29 @@ function VistaProtocolo() {
     () => ({
       responsive: true,
       maintainAspectRatio: false,
+      // La animación explica continuidad, no impresiona — y bajo
+      // prefers-reduced-motion no existe (norma dura §7).
+      animation: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        ? (false as const)
+        : { duration: 400, easing: 'easeOutCubic' as const },
       // nearest (no index): el tooltip didáctico es de UN contador; con 7 series
       // el modo index apila las fichas de todas y no se puede leer ninguna
       interaction: { mode: 'nearest' as const, intersect: false },
       plugins: {
         legend: { display: false },   // los chips son la leyenda
         tooltip: {
+          // El negro por defecto de Chart.js era una isla fuera del tema: va con
+          // los mismos colores resueltos que ya usa el eje.
+          backgroundColor: isDark ? '#1b2530' : '#ffffff',
+          titleColor: isDark ? '#eef3f7' : '#0d141a',
+          bodyColor: isDark ? '#a9b8c4' : '#43535f',
+          borderColor: isDark ? 'rgba(138,160,180,0.25)' : 'rgba(74,85,94,0.25)',
+          borderWidth: 1,
+          padding: 10,
+          cornerRadius: 10,
+          titleFont: { size: 12, weight: 600 as const },
+          bodyFont: { size: 11 },
+          displayColors: false,
           callbacks: {
             label: (item: TooltipItem<'line'>) => {
               const clave = (item.dataset as { clave?: string }).clave ?? ''
@@ -939,33 +1017,55 @@ function VistaProtocolo() {
         },
       },
     }),
-    [ejeColor, gridColor, metrica],
+    [ejeColor, gridColor, metrica, isDark],
   )
 
   return (
     <div className="mt-4 space-y-4">
-      {/* Selector de máquina */}
+      {/* Selector de máquina: cada una lleva el punto de su veredicto — las tres
+          plantas de un vistazo sin cambiar de máquina. Color + posición, y el
+          detalle con texto al entrar (nunca solo color). */}
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-xs tracking-wide" style={{ color: LC.inkLo }}>
           Máquina
         </span>
-        {MAQUINAS.map((m) => (
-          <button
-            key={m.id}
-            type="button"
-            onClick={() => setMaquina(m.id)}
-            title={m.hint}
-            className="rounded-full border px-3 py-1 text-sm"
-            style={
-              maquina === m.id
-                ? { background: LC.aqua, borderColor: LC.aqua, color: '#fff' }
-                : { background: LC.surface, borderColor: LC.border, color: LC.inkMid }
-            }
-          >
-            {m.label}
-          </button>
-        ))}
+        {MAQUINAS.map((m) => {
+          const v = veredictos[m.id]
+          return (
+            <button
+              key={m.id}
+              type="button"
+              aria-pressed={maquina === m.id}
+              onClick={() => cambiarMaquina(m.id)}
+              title={v ? `${m.label}: ${v.label}` : m.hint}
+              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full border px-3.5 text-sm"
+              style={
+                maquina === m.id
+                  ? { background: LC.aqua, borderColor: LC.aqua, color: '#fff' }
+                  : { background: LC.surface, borderColor: LC.border, color: LC.inkMid }
+              }
+            >
+              {v ? (
+                <span
+                  aria-hidden
+                  className="h-2 w-2 rounded-full"
+                  style={{ background: maquina === m.id ? '#fff' : v.color }}
+                />
+              ) : null}
+              {m.label}
+            </button>
+          )
+        })}
       </div>
+
+      {/* Todo verde también es información: sin esta línea, "no hay tarjeta"
+          y "no hay datos" se ven igual. */}
+      {!queRevisar && ultimaValida ? (
+        <p className="flex items-center gap-1.5 text-footnote" style={{ color: LC.ok }}>
+          <CheckCircle2 aria-hidden className="h-4 w-4 shrink-0" />
+          Al día · última lectura {fechaCorta(ultimaValida.fecha)} · todo bajo umbral de intervención
+        </p>
+      ) : null}
 
         {/* Qué revisar ahora — solo cuando la última lectura cruzó «intervenir».
             Orden por urgencia: la acción va antes que el gráfico. */}
@@ -1170,30 +1270,71 @@ function VistaProtocolo() {
             {lecturas.map((l) => {
               const v = veredictoDe(l)
               const esVideo = Boolean((l as unknown as { origen?: { video?: string } }).origen?.video)
+              const abierta = lecturaAbierta === l.id
               return (
-                <div
-                  key={l.id}
-                  className="flex items-center gap-3 border-t py-2.5 first:border-t-0"
-                  style={{ borderColor: LC.border }}
-                >
-                  <span className="w-16 shrink-0 font-mono text-footnote tabular-nums">
-                    {fechaCorta(l.fecha)}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate text-footnote" style={{ color: LC.inkMid }}>
-                    {l.fish} pz · {esVideo ? 'video' : 'manual'}
-                  </span>
-                  <span
-                    className="shrink-0 rounded-full px-2.5 py-0.5 text-caption font-semibold"
-                    style={{ background: v.soft, color: v.color }}
+                <div key={l.id} className="border-t first:border-t-0" style={{ borderColor: LC.border }}>
+                  {/* la fila completa es tocable (≥44px): progressive disclosure */}
+                  <button
+                    type="button"
+                    aria-expanded={abierta}
+                    onClick={() => setLecturaAbierta(abierta ? null : (l.id ?? null))}
+                    className="flex min-h-[44px] w-full items-center gap-3 text-left"
                   >
-                    {v.label}
-                  </span>
+                    <span className="w-16 shrink-0 font-mono text-footnote tabular-nums">
+                      {fechaCorta(l.fecha)}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-footnote" style={{ color: LC.inkMid }}>
+                      {l.fish} pz · {esVideo ? 'video' : 'manual'}
+                    </span>
+                    <span
+                      className="shrink-0 rounded-full px-2.5 py-0.5 text-caption font-semibold"
+                      style={{ background: v.soft, color: v.color }}
+                    >
+                      {v.label}
+                    </span>
+                    {abierta
+                      ? <ChevronDown aria-hidden className="h-3.5 w-3.5 shrink-0" style={{ color: LC.inkGhost }} />
+                      : <ChevronRight aria-hidden className="h-3.5 w-3.5 shrink-0" style={{ color: LC.inkGhost }} />}
+                  </button>
+                  {abierta ? (
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 pb-3 pl-2 sm:grid-cols-3">
+                      {[...SERIES, ...SERIES_PARADAS].map((s) => {
+                        const m = METRICA_DE[s.k as string] ?? 'correcciones'
+                        const r = tasa1000(l[s.k], l.fish)
+                        const n = nivelTasa(r, m)
+                        const valida = muestraValida(l)
+                        return (
+                          <div key={s.k} className="flex items-baseline justify-between gap-2 text-caption">
+                            <span style={{ color: LC.inkMid }}>{s.label}</span>
+                            {valida ? (
+                              <span className="font-mono font-semibold tabular-nums" style={{ color: n.color }}>
+                                {r}
+                              </span>
+                            ) : (
+                              <span style={{ color: LC.inkLo }}>—</span>
+                            )}
+                          </div>
+                        )
+                      })}
+                      <p className="col-span-2 mt-1 text-caption sm:col-span-3" style={{ color: LC.inkGhost }}>
+                        Tasas por 1.000 pescados · el color es el semáforo de cada contador
+                      </p>
+                    </div>
+                  ) : null}
                 </div>
               )
             })}
           </div>
         )}
       </div>
+
+      {/* Confirmación visible aunque el form se pliegue al guardar */}
+      {guardadoOk && !mostrarForm ? (
+        <p className="flex items-center gap-1.5 text-footnote" style={{ color: LC.ok }}>
+          <CheckCircle2 aria-hidden className="h-4 w-4 shrink-0" />
+          Lectura guardada — ya está en la tendencia y en el historial.
+        </p>
+      ) : null}
 
       {/* Registrar es semanal, y casi siempre lo llena el video: va plegado.
           Lo diario (lector + tendencia) manda arriba. */}
