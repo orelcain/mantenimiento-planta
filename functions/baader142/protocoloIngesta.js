@@ -19,6 +19,15 @@ const { MAQUINAS, UMBRALES, HERRAMIENTAS, tasa1000, nivelDeTasa } = require('./p
 const URL_PROTOCOLO =
   'https://orelcain.github.io/mantenimiento-planta/aprendizaje/perilla-5?vista=protocolo'
 
+/**
+ * Link que cae en la MAQUINA del aviso. Sin esto la pagina abre en N1 por
+ * defecto y el operador de la N2 tiene que darse cuenta y cambiar.
+ */
+function urlProtocolo(maquina) {
+  const sufijo = typeof maquina === 'string' ? maquina.replace('baader-', '') : ''
+  return sufijo ? `${URL_PROTOCOLO}&maquina=${sufijo}` : URL_PROTOCOLO
+}
+
 /** Los 17 contadores, con el rótulo que muestra el display. */
 const ROTULOS = {
   tclip: 'TAIL CLIP', tclipc: 'T-CLIP-C', anusi: 'ANUS-I', anuso: 'ANUS-O',
@@ -66,7 +75,7 @@ function componerRechazo(ing) {
   }
 
   l.push('')
-  l.push(`🔗 <a href="${URL_PROTOCOLO}">Abrir el protocolo</a>`)
+  l.push(`🔗 <a href="${urlProtocolo(ing.maquina)}">Abrir el protocolo</a>`)
   return l.join('\n')
 }
 
@@ -102,7 +111,7 @@ function componerCargada(ing) {
     l.push('El panel no calcula /1000Fi todavía: la lectura queda guardada pero')
     l.push('no se compara ni dispara semáforo.')
     l.push('')
-    l.push(`🔗 <a href="${URL_PROTOCOLO}">Ver la tendencia</a>`)
+    l.push(`🔗 <a href="${urlProtocolo(ing.maquina)}">Ver la tendencia</a>`)
     return l.join('\n')
   }
 
@@ -135,7 +144,7 @@ function componerCargada(ing) {
   }
 
   l.push('')
-  l.push(`🔗 <a href="${URL_PROTOCOLO}">Ver la tendencia</a>`)
+  l.push(`🔗 <a href="${urlProtocolo(ing.maquina)}">Ver la tendencia</a>`)
   return l.join('\n')
 }
 

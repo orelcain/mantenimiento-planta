@@ -31,6 +31,12 @@ interface IncidentFormProps {
   onSuccess: () => void
   preselectedZoneId?: string
   incident?: Incident // Para modo edición
+  /**
+   * Texto inicial para creación asistida (p. ej. la pauta del protocolo BAADER
+   * 142 llega con título y pasos ya escritos). Solo aplica al crear; en edición
+   * manda `incident`.
+   */
+  prefill?: { titulo?: string; descripcion?: string }
 }
 
 const PRIORITY_OPTIONS = [
@@ -45,7 +51,7 @@ const COMMON_SYMPTOMS = [
   'Fuga de agua', 'Humo', 'Olor extraño', 'No enciende', 'Se detiene solo'
 ]
 
-export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }: IncidentFormProps) {
+export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident, prefill }: IncidentFormProps) {
   const user = useAuthStore((state) => state.user)
   const { zones } = useAppStore()
   const { toast } = useToast()
@@ -88,8 +94,8 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
   const isEditMode = !!incident
 
   const [formData, setFormData] = useState({
-    titulo: incident?.titulo || '',
-    descripcion: incident?.descripcion || '',
+    titulo: incident?.titulo || prefill?.titulo || '',
+    descripcion: incident?.descripcion || prefill?.descripcion || '',
     zoneId: incident?.zoneId || preselectedZoneId || '',
     hierarchyNodeId: incident?.hierarchyNodeId as string | undefined,
     prioridad: (incident?.prioridad || 'media') as IncidentPriority,

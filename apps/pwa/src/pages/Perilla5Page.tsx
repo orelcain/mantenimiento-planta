@@ -20,7 +20,7 @@
  * (claro/oscuro) para que no sea una isla clara dentro de la app en oscuro.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   AlertTriangle, ArrowLeft, CircleGauge, LineChart as LineChartIcon, Loader2, RotateCcw,
   Save, Video,
@@ -113,6 +113,37 @@ const SERIES_PARADAS: { k: keyof ContadoresProtocolo; label: string; color: stri
 ]
 
 export type Metrica = 'correcciones' | 'paradas'
+
+/**
+ * Pauta de revisión por herramienta — extracto operativo del RUNBOOK E8xx (§2-§3)
+ * y del manual 1420000804. La tarjeta «Qué revisar ahora» la muestra inline para
+ * que el diagnóstico no obligue a saltar a otro documento; el detalle completo
+ * sigue viviendo en la pestaña Herramienta.
+ */
+const PAUTAS: Record<string, { inductivo: string; pasos: string[] }> = {
+  e821c: { inductivo: 'B1', pasos: [
+    'Revisar inductivo B1 (posición cero del centraje), su cable y la distancia al tope — con la máquina parada.',
+    'Verificar la correa del SM1 y buscar atasco en el recorrido del centrador.',
+  ]},
+  e822c: { inductivo: 'B2', pasos: [
+    'Revisar inductivo B2 (posición cero de la cuchilla hendedora), su cable y la distancia al tope — con la máquina parada.',
+    'Verificar la correa del SM2 y que la cuchilla no esté trabada ni mellada.',
+  ]},
+  e823c: { inductivo: 'B3', pasos: [
+    'Revisar inductivo B3 (posición cero del aspirador), su cable y la distancia al tope — con la máquina parada.',
+    'Verificar la correa del SM3 y que el tubo de aspiración no esté obstruido.',
+  ]},
+  e824c: { inductivo: 'B4', pasos: [
+    'Revisar inductivo B4 (posición cero del excavador A), su cable y la distancia al tope — con la máquina parada.',
+    'Verificar la correa del SM4 y buscar atasco mecánico en el recorrido del excavador.',
+  ]},
+  e825c: { inductivo: 'B5', pasos: [
+    'Revisar inductivo B5 (posición cero del excavador B), su cable y la distancia al tope — con la máquina parada.',
+    'Verificar la correa del SM5 y buscar atasco mecánico en el recorrido del excavador.',
+  ]},
+}
+const PASO_FINAL =
+  'Si tras la marcha de referencia (I → I) reincide, el problema es mecánico, no de control.'
 
 /**
  * Umbrales provisorios (hasta tener 4 semanas de registro real).
@@ -367,8 +398,15 @@ export function Perilla5Page() {
 function VistaProtocolo() {
   const { isAuthenticated, user } = useAuthStore()
   const { isDark } = useTheme()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
 
-  const [maquina, setMaquina] = useState<MaquinaBaader>('baader-n1')
+  // El aviso de Telegram trae ?maquina=n2: el operador cae directo en SU maquina
+  // en vez de aterrizar en N1 y tener que darse cuenta. Acepta n2 o baader-n2.
+  const [maquina, setMaquina] = useState<MaquinaBaader>(() => {
+    const q = (searchParams.get('maquina') ?? '').toLowerCase().replace('baader-', '')
+    return q === 'n2' ? 'baader-n2' : q === 'n3' ? 'baader-n3' : 'baader-n1'
+  })
   // Fecha LOCAL (no toISOString/UTC): la lectura semanal se hace al fin del turno
   // de la tarde, justo la ventana en que la fecha UTC ya saltó al día siguiente.
   const [fecha, setFecha] = useState(() => {
@@ -479,6 +517,17 @@ function VistaProtocolo() {
       setError('La fecha debe ser válida (AAAA-MM-DD).')
       return
     }
+    // Un campo VACÍO no es un cero: guardarlo como 0 contamina la serie (un cero
+    // inventado es indistinguible de uno real). Ya pasó con la lectura del 21-08.
+    // Si el valor real es cero, hay que escribir 0 — eso es una afirmación.
+    const vacios = CONTADORES_KEYS.filter((k) => form[k].trim() === '')
+    if (vacios.length > 0) {
+      setError(
+        `Faltan ${vacios.length} contadores: ${vacios.join(', ')}. `
+        + 'Si el valor real es cero, escribí 0; si no lo tenés, buscalo en el panel antes de guardar.',
+      )
+      return
+    }
     setGuardando(true)
     try {
       const contadores = Object.fromEntries(
@@ -509,6 +558,49 @@ function VistaProtocolo() {
 
   const seriesActivas = metrica === 'paradas' ? SERIES_PARADAS : SERIES
   const hayInsuficientes = serie.some((l) => !muestraValida(l))
+
+  /**
+   * Qué revisar ahora: la herramienta dominante de la ÚLTIMA lectura válida,
+   * solo si cruzó «intervenir». Con todo verde no hay tarjeta — una alerta que
+   * aparece siempre se deja de leer.
+   */
+  const queRevisar = useMemo(() => {
+    const ultima = [...serie].reverse().find((l) => muestraValida(l))
+    if (!ultima) return null
+    const tasas = SERIES.map((s) => ({ s, r: tasa1000(ultima[s.k], ultima.fish) }))
+    const dom = tasas.reduce((a, b) => (b.r > a.r ? b : a))
+    if (dom.r < UMBRALES.correcciones.intervenir) return null
+    // la lectura válida anterior, para decir «subió de X a Y» con datos
+    const previa = [...serie].reverse().find((l) => muestraValida(l) && l !== ultima)
+    return {
+      lectura: ultima,
+      serie: dom.s,
+      tasa: dom.r,
+      nivel: nivelTasa(dom.r),
+      tasaPrevia: previa ? tasa1000(previa[dom.s.k], previa.fish) : null,
+      pauta: PAUTAS[dom.s.k as string] ?? null,
+    }
+  }, [serie])
+
+  /**
+   * Cierre del lazo: la incidencia sale precargada con máquina, código y pauta.
+   * El marcador [protocolo142 …] en la descripción es lo que después permite
+   * cruzar intervención ↔ lectura y mostrar que la tasa bajó.
+   */
+  const registrarIncidencia = () => {
+    if (!queRevisar) return
+    const q = queRevisar
+    const titulo = `${q.serie.label}: ${q.tasa}/1000 correcciones (protocolo ${MAQUINAS.find((m) => m.id === maquina)?.label ?? maquina})`
+    const desc = [
+      `[protocolo142 ${maquina} · ${q.serie.k} ${q.tasa}/1000 · lectura ${q.lectura.fecha}]`,
+      q.tasaPrevia !== null ? `Venía de ${q.tasaPrevia}/1000 en la lectura anterior.` : '',
+      '',
+      'Pauta (runbook E8xx):',
+      ...(q.pauta?.pasos ?? []).map((s, i) => `${i + 1}. ${s}`),
+      `${(q.pauta?.pasos.length ?? 0) + 1}. ${PASO_FINAL}`,
+    ].filter(Boolean).join('\n')
+    navigate(`/incidents?nueva=1&titulo=${encodeURIComponent(titulo)}&desc=${encodeURIComponent(desc)}`)
+  }
 
   const chartData = useMemo(
     () => ({
@@ -727,6 +819,87 @@ function VistaProtocolo() {
             </p>
           )}
         </div>
+
+        {/* Qué revisar ahora — solo cuando la última lectura cruzó «intervenir».
+            Orden por urgencia: la acción va antes que el gráfico. */}
+        {queRevisar ? (
+          <div
+            className="rounded-card border p-4 lg:col-span-2"
+            style={{ background: LC.surface, borderColor: queRevisar.nivel.color }}
+            role="region"
+            aria-label="Qué revisar ahora"
+          >
+            <div className="flex flex-wrap items-center gap-3">
+              <span
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-ctl"
+                style={{ background: LC.dangerSoft, color: queRevisar.nivel.color }}
+              >
+                <AlertTriangle className="h-5 w-5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <h2 className="text-base font-semibold leading-tight">
+                  {queRevisar.serie.label} — qué revisar ahora
+                </h2>
+                <p className="text-caption" style={{ color: LC.inkMid }}>
+                  Lectura del {queRevisar.lectura.fecha} · {queRevisar.lectura.fish} pescados
+                </p>
+              </div>
+              <span
+                className="rounded-ctl px-2.5 py-1 text-footnote font-semibold tabular-nums"
+                style={{ background: LC.dangerSoft, color: queRevisar.nivel.color }}
+              >
+                {queRevisar.tasa}/1000 · {queRevisar.nivel.label}
+              </span>
+            </div>
+
+            <ol className="mt-3 space-y-2 text-footnote" style={{ color: LC.ink }}>
+              <li className="flex gap-2">
+                <span className="font-mono text-caption" style={{ color: LC.inkLo }}>1</span>
+                <span>
+                  El control corrigió esta herramienta <strong>{queRevisar.tasa} veces por cada
+                  1.000 pescados</strong> sin detener la máquina
+                  {queRevisar.tasaPrevia !== null
+                    ? ` — venía de ${queRevisar.tasaPrevia}/1000 en la lectura anterior.`
+                    : '.'}
+                </span>
+              </li>
+              {(queRevisar.pauta?.pasos ?? []).map((paso, i) => (
+                <li key={paso} className="flex gap-2">
+                  <span className="font-mono text-caption" style={{ color: LC.inkLo }}>{i + 2}</span>
+                  <span>{paso}</span>
+                </li>
+              ))}
+              <li className="flex gap-2">
+                <span className="font-mono text-caption" style={{ color: LC.inkLo }}>
+                  {(queRevisar.pauta?.pasos.length ?? 0) + 2}
+                </span>
+                <span>{PASO_FINAL}</span>
+              </li>
+            </ol>
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={registrarIncidencia}
+                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-ctl px-4 text-footnote font-semibold"
+                style={{ background: LC.aqua, color: '#fff' }}
+              >
+                Registrar incidencia con esto
+              </button>
+              <button
+                type="button"
+                onClick={() => setSearchParams({ vista: 'herramienta' })}
+                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-ctl px-4 text-footnote font-medium"
+                style={{ background: LC.aquaSoft, color: LC.aqua }}
+              >
+                Diagnóstico completo
+              </button>
+            </div>
+            <p className="mt-2 text-caption" style={{ color: LC.inkLo }}>
+              La incidencia sale precargada con la máquina, el código y estos pasos como pauta.
+            </p>
+          </div>
+        ) : null}
 
         {/* Tendencia */}
         <div className="rounded-card border p-4" style={{ background: LC.surface, borderColor: LC.border }}>
