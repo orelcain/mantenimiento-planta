@@ -128,10 +128,15 @@ const SERIES_PARADAS: typeof SERIES = [
 ]
 
 /** Nombre corto para el chip: el largo vive en el tooltip del gráfico. */
+/* Nombres COMPLETOS: las abreviaturas («Abraz.», «Cuch. I») se leían como
+   texto entrecortado — feedback directo de Orel. Sin la cantidad en el chip
+   hay espacio para la palabra entera; la fila envuelve y no pasa nada. */
 const CORTO: Record<string, string> = {
-  stopc: '-C total', tclipc: 'Abraz.', e821c: 'SM1', e822c: 'SM2',
-  e823c: 'SM3', e824c: 'SM4', e825c: 'SM5',
-  stops: 'Paradas', tclip: 'Abraz.', anusi: 'Cuch. I', anuso: 'Cuch. O',
+  stopc: 'Total correcciones', tclipc: 'Abrazaderas', e821c: 'Centraje SM1',
+  e822c: 'Cuchilla SM2', e823c: 'Aspirador SM3', e824c: 'Excavador A SM4',
+  e825c: 'Excavador B SM5',
+  stops: 'Total paradas', tclip: 'Abrazaderas', anusi: 'Cuchilla punta I',
+  anuso: 'Cuchilla punta O',
 }
 
 /** URL absoluta de esta vista con la máquina puesta — se pega en Telegram. */
