@@ -22,7 +22,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
-  AlertTriangle, Share2, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, CircleGauge, Copy,
+  AlertTriangle,
+  PencilLine, Share2, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, CircleGauge, Copy,
   TrendingDown, TrendingUp, LineChart as LineChartIcon, Loader2, RotateCcw,
   Save, Video,
 } from 'lucide-react'
@@ -1275,8 +1276,20 @@ function VistaProtocolo() {
           ctx.lineTo(chartArea.right, py)
           ctx.stroke()
           ctx.setLineDash([])
-          /* P68: placa detrás del texto — la etiqueta cruzaba las líneas de
-             datos y no se leía. */
+        }
+        ctx.restore()
+      },
+      /* P68 (v2): las ETIQUETAS van después de los datasets — en beforeDraw
+         los puntos las tapaban. Las líneas siguen detrás, como corresponde. */
+      afterDatasetsDraw(chart) {
+        const { ctx, chartArea, scales } = chart
+        const y = scales.y as { getPixelForValue: (v: number) => number; max: number } | undefined
+        if (!chartArea || !y) return
+        ctx.save()
+        for (const l of lineas) {
+          if (l.v > y.max) continue
+          const py = y.getPixelForValue(l.v)
+          if (py < chartArea.top + 6 || py > chartArea.bottom - 2) continue
           ctx.font = '700 9px system-ui'
           ctx.textAlign = 'right'
           const ancho = ctx.measureText(l.label).width
@@ -1378,7 +1391,7 @@ function VistaProtocolo() {
   )
 
   return (
-    <div className="p5-protocolo mt-4 space-y-4">
+    <div className="p5-protocolo mx-auto mt-4 max-w-2xl space-y-4">
       {/* Selector de máquina: cada una lleva el punto de su veredicto — las tres
           plantas de un vistazo sin cambiar de máquina. Color + posición, y el
           detalle con texto al entrar (nunca solo color). */}
@@ -1470,7 +1483,7 @@ function VistaProtocolo() {
                     {queRevisar.tasa <= queRevisar.tasaPrevia ? '▾' : '▴'}
                     {Math.abs(queRevisar.tasa - queRevisar.tasaPrevia)} vs anterior
                     {huboReinicio.has(queRevisar.lectura.fecha) ? (
-                      <span style={{ color: LC.inkMid }}> (con reinicio del protocolo entre medio)</span>
+                      <span style={{ color: LC.inkMid }}> (hubo reinicio entre medio)</span>
                     ) : null}
                   </strong>
                 ) : null}
@@ -1964,15 +1977,21 @@ function VistaProtocolo() {
                     type="button"
                     aria-expanded={abierta}
                     onClick={() => setLecturaAbierta(abierta ? null : (l.id ?? null))}
-                    className="flex min-h-[44px] w-full items-center gap-3 text-left"
+                    className="flex min-h-[44px] w-full items-center gap-2 text-left"
                   >
-                    <span className="w-16 shrink-0 font-mono text-footnote tabular-nums">
+                    <span className="w-14 shrink-0 font-mono text-footnote tabular-nums">
                       {fechaCorta(l.fecha)}
                     </span>
-                    <span className="min-w-0 flex-1 truncate text-footnote" style={{ color: LC.inkMid }}>
-                      {l.fish} pz · {esVideo ? 'video' : 'manual'}
+                    <span
+                      className="flex min-w-0 flex-1 items-center gap-1 whitespace-nowrap text-footnote tabular-nums"
+                      style={{ color: LC.inkMid }}
+                    >
+                      {l.fish} pz
+                      {esVideo
+                        ? <Video aria-label="lectura por video" className="h-3.5 w-3.5 shrink-0" />
+                        : <PencilLine aria-label="lectura manual" className="h-3.5 w-3.5 shrink-0" />}
                       {huboReinicio.has(l.fecha) ? (
-                        <span style={{ color: LC.prep }}> · reinicio</span>
+                        <span className="shrink-0" style={{ color: LC.prep }} title="protocolo reiniciado antes de esta lectura">⟳</span>
                       ) : null}
                     </span>
                     <span
