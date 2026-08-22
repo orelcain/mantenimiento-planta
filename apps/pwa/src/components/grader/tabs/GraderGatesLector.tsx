@@ -177,7 +177,7 @@ export function GraderGatesLector({ analytics, gates, timingSignals, etiquetaPer
         <button
           type="button"
           onClick={registrarIncidencia}
-          className="inline-flex min-h-[44px] items-center rounded-ctl bg-primary px-4 text-sm font-semibold text-primary-foreground"
+          className="inline-flex min-h-[44px] items-center rounded-ctl bg-primary px-4 text-sm font-semibold text-primary-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         >
           Registrar incidencia con esto
         </button>
@@ -185,7 +185,7 @@ export function GraderGatesLector({ analytics, gates, timingSignals, etiquetaPer
           type="button"
           onClick={() => void copiarResumen()}
           className={cn(
-            'inline-flex min-h-[44px] items-center gap-1.5 rounded-ctl px-4 text-sm font-medium',
+            'inline-flex min-h-[44px] items-center gap-1.5 rounded-ctl px-4 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
             copiado ? 'bg-ink-ok/10 text-ink-ok' : 'bg-primary/10 text-primary',
           )}
           aria-live="polite"

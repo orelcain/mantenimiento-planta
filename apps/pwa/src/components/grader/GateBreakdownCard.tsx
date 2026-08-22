@@ -626,7 +626,7 @@ export function GateBreakdownCard({
                             ].join('\n')
                             navigate(`/incidents?nueva=1&titulo=${encodeURIComponent(`Gates del Grader: dejar pauta para el próximo turno`)}&desc=${encodeURIComponent(desc)}`)
                           }}
-                          className="inline-flex min-h-[44px] items-center rounded-ctl bg-primary/[0.12] px-4 text-xs font-medium text-primary"
+                          className="inline-flex min-h-[44px] items-center rounded-ctl bg-primary/[0.12] px-4 text-xs font-medium text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                         >
                           Registrar incidencia con esto
                         </button>
@@ -645,7 +645,7 @@ export function GateBreakdownCard({
                             })
                           }}
                           className={cn(
-                            'inline-flex min-h-[44px] items-center gap-1.5 rounded-ctl px-4 text-xs font-medium',
+                            'inline-flex min-h-[44px] items-center gap-1.5 rounded-ctl px-4 text-xs font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
                             copiado ? 'bg-success/[0.12] text-ink-ok' : 'bg-muted text-muted-foreground',
                           )}
                           aria-live="polite"

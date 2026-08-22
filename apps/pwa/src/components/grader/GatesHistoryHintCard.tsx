@@ -112,13 +112,33 @@ export function GatesHistoryHintCard({
   useEffect(() => {
     if (!dateKey) return
     let cancelled = false
+    /*
+     * Caché de SESIÓN: el historial termina el día ANTERIOR al turno, así que
+     * para un (turno, línea) dados no cambia mientras la pestaña viva. Sin
+     * esto, pasear por 10 turnos del mes son 10 lecturas de 45 días de
+     * resúmenes a Firestore para calcular lo mismo.
+     */
+    const cacheKey = `gatesHist:${plantLineId}:${dateKey}`
+    try {
+      const hit = sessionStorage.getItem(cacheKey)
+      if (hit) {
+        setHistory(JSON.parse(hit) as CalibreHistory)
+        setLoading(false)
+        return
+      }
+    } catch { /* sessionStorage no disponible */ }
     setLoading(true)
     /*
      * Se pide hasta el día ANTERIOR al turno: incluir el propio turno haría que
      * la tarjeta se comparara consigo misma y siempre diera "equilibrado".
      */
     listDailySummariesByRange(shiftDaysBack(dateKey, LOOKBACK_DAYS), shiftDaysBack(dateKey, 1), plantLineId)
-      .then((rows) => { if (!cancelled) setHistory(aggregateCalibreHistory(rows, DEFAULT_HISTORY_SHIFTS)) })
+      .then((rows) => {
+        if (cancelled) return
+        const agg = aggregateCalibreHistory(rows, DEFAULT_HISTORY_SHIFTS)
+        setHistory(agg)
+        try { sessionStorage.setItem(cacheKey, JSON.stringify(agg)) } catch { /* llena o no disponible */ }
+      })
       .catch((e) => {
         logger.error('[GatesHistoryHintCard] no se pudo leer el historial', e instanceof Error ? e : new Error(String(e)))
         if (!cancelled) setHistory(null)
@@ -154,18 +174,18 @@ export function GatesHistoryHintCard({
     return (
       <Card aria-busy="true" aria-label="Cargando contraste con turnos anteriores">
         <CardHeader className="pb-2">
-          <div className="h-5 w-64 max-w-full animate-pulse rounded-ctl bg-muted" />
-          <div className="mt-1 h-3.5 w-44 animate-pulse rounded-ctl bg-muted" />
+          <div className="h-5 w-64 max-w-full motion-safe:animate-pulse rounded-ctl bg-muted" />
+          <div className="mt-1 h-3.5 w-44 motion-safe:animate-pulse rounded-ctl bg-muted" />
         </CardHeader>
         <CardContent className="space-y-2.5">
           {[0, 1, 2].map((i) => (
             <div key={i} className="grid grid-cols-[7rem_1fr_5.5rem] items-center gap-2.5">
-              <div className="h-3.5 w-16 animate-pulse rounded-ctl bg-muted" />
+              <div className="h-3.5 w-16 motion-safe:animate-pulse rounded-ctl bg-muted" />
               <div className="space-y-1">
-                <div className="h-2 animate-pulse rounded-full bg-muted" />
-                <div className="h-2 w-2/3 animate-pulse rounded-full bg-muted" />
+                <div className="h-2 motion-safe:animate-pulse rounded-full bg-muted" />
+                <div className="h-2 w-2/3 motion-safe:animate-pulse rounded-full bg-muted" />
               </div>
-              <div className="h-3.5 w-12 animate-pulse justify-self-end rounded-ctl bg-muted" />
+              <div className="h-3.5 w-12 motion-safe:animate-pulse justify-self-end rounded-ctl bg-muted" />
             </div>
           ))}
         </CardContent>
@@ -357,7 +377,7 @@ export function GatesHistoryHintCard({
                 ].join('\n')
                 navigate(`/incidents?nueva=1&titulo=${encodeURIComponent(`Repartir el ${saturados[0]!.label} en los gates del Grader`)}&desc=${encodeURIComponent(desc)}`)
               }}
-              className="inline-flex min-h-[44px] items-center rounded-ctl bg-primary/[0.12] px-4 text-xs font-medium text-primary"
+              className="inline-flex min-h-[44px] items-center rounded-ctl bg-primary/[0.12] px-4 text-xs font-medium text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             >
               Registrar incidencia con esto
             </button>
@@ -375,7 +395,7 @@ export function GatesHistoryHintCard({
                 })
               }}
               className={cn(
-                'inline-flex min-h-[44px] items-center gap-1.5 rounded-ctl px-4 text-xs font-medium',
+                'inline-flex min-h-[44px] items-center gap-1.5 rounded-ctl px-4 text-xs font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
                 copiado ? 'bg-success/[0.12] text-ink-ok' : 'bg-muted text-muted-foreground',
               )}
               aria-live="polite"
