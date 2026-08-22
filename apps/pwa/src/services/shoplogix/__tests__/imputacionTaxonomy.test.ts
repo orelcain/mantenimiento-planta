@@ -141,6 +141,25 @@ describe('extension Filete / Baader 200', () => {
     expect(m.ambigua).toBe(true)
   })
 
+  it('la acumulacion de Filete se clasifica sin decir que es de rechazo', () => {
+    // Filete anota "ACUMULACION" a secas (164 min / 38 eventos en 29 turnos de
+    // jul-ago 2026); Chonchi usa "ACUMULACION RECHAZO" y Yal no usa ninguna.
+    // Antes caia en "sin clasificar", que es justo la pata de MMPP de Filete.
+    const f = matchImputacion('ACUMULACION')
+    expect(f.leaf?.label).toBe('Acumulación')
+    expect(f.bucket).toBe('externo')
+    expect(f.leaf?.extension).toBe('filete-baader200')
+    // No se le pone la etiqueta mas especifica: el dato plano no dice que sea
+    // de rechazo, solo que hubo acumulacion.
+    expect(f.leaf?.label).not.toBe('Acumulación rechazo')
+  })
+
+  it('no se roba la causal de Chonchi: ACUMULACION RECHAZO sigue siendo del curso', () => {
+    const m = matchImputacion('ACUMULACION RECHAZO')
+    expect(m.leaf?.label).toBe('Acumulación rechazo')
+    expect(m.leaf?.extension).toBeUndefined()
+  })
+
   it('las hojas del curso siguen siendo 46: la extension NO cuenta', () => {
     expect(TOTAL_HOJAS_CURSO).toBe(46)
     expect(leavesByCategoria().flatMap((c) => c.hojas).some((h) => h.extension)).toBe(false)

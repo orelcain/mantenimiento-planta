@@ -59,9 +59,12 @@ describe('agruparEventos', () => {
   it('reparte según el árbol del curso, no según nuestro criterio', () => {
     const g = agruparEventos({ tb: TB_14_08, costo: COSTO })
     const externo = g.find((x) => x.dueno === 'externo')!
-    // FALLA OPERACIONAL (Operacionales), AGUA (Abastecimiento), ATASCAMIENTO (MMPP)
-    expect(externo.causas.map((c) => c.reason)).toEqual(['FALLA OPERACIONAL', 'AGUA', 'ATASCAMIENTO'])
-    expect(externo.piezas).toBe(410)
+    // FALLA OPERACIONAL (Operacionales), AGUA (Abastecimiento), ACUMULACION y
+    // ATASCAMIENTO (MMPP). ACUMULACION entro al arbol el 2026-08-18: Filete la
+    // anota a secas y antes caia en "sin imputar" pese a que el supervisor SI
+    // la habia imputado.
+    expect(externo.causas.map((c) => c.reason)).toEqual(['FALLA OPERACIONAL', 'AGUA', 'ACUMULACION', 'ATASCAMIENTO'])
+    expect(externo.piezas).toBe(527)
     expect(externo.causas[0]!.categoria).toBe('Operacional')
     expect(externo.causas[1]!.categoria).toBe('Abastecimiento')
     expect(externo.causas[2]!.categoria).toBe('MMPP')
@@ -70,8 +73,10 @@ describe('agruparEventos', () => {
   it('⚠ lo que nadie imputó se muestra como tal, no repartido', () => {
     const g = agruparEventos({ tb: TB_14_08, costo: COSTO })
     const sin = g.find((x) => x.dueno === 'sin-imputar')!
-    expect(sin.causas.map((c) => c.reason)).toEqual(['Micro Detencion', 'ACUMULACION'])
-    expect(sin.piezas).toBe(252)
+    // Solo queda Micro Detencion: llega sin causal por diseno del sistema, no
+    // porque nadie la anotara. ACUMULACION salio de aca al entrar al arbol.
+    expect(sin.causas.map((c) => c.reason)).toEqual(['Micro Detencion'])
+    expect(sin.piezas).toBe(135)
     expect(sin.causas[0]!.categoria).toBeNull()
   })
 
@@ -98,9 +103,12 @@ describe('agruparEventos', () => {
 
   it('las causas se ordenan por lo que costaron, no por minutos', () => {
     const g = agruparEventos({ tb: TB_14_08, costo: COSTO })
-    const sin = g.find((x) => x.dueno === 'sin-imputar')!
-    // Micro (10 min, 135 pz) por delante de ACUMULACION (9 min, 117 pz)
-    expect(sin.causas[0]!.piezas).toBeGreaterThan(sin.causas[1]!.piezas!)
+    const externo = g.find((x) => x.dueno === 'externo')!
+    // AGUA (11 min, 131 pz) por delante de ACUMULACION (9 min, 117 pz), y esta
+    // por delante de ATASCAMIENTO (8 min, 96 pz): manda el costo, no el reloj.
+    for (let i = 1; i < externo.causas.length; i++) {
+      expect(externo.causas[i - 1]!.piezas!).toBeGreaterThan(externo.causas[i]!.piezas!)
+    }
   })
 
   it('el detalle de cada causa viene de la más larga a la más corta', () => {

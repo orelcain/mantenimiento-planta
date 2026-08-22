@@ -45,6 +45,7 @@ export const LC = {
   ok:        'var(--lc-ok)',
   okSoft:    'var(--lc-ok-soft)',
   warn:      'var(--lc-warn)',
+  warnSoft:  'var(--lc-warn-soft)',
   crit:      'var(--lc-crit)',
   // Favorito
   star:      'var(--lc-star)',

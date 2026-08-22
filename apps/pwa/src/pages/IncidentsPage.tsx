@@ -54,6 +54,16 @@ export function IncidentsPage() {
    * a abrir el formulario.
    */
   const [showForm, setShowForm] = useState(() => searchParams.get('nueva') === '1')
+  /**
+   * Creación asistida: ?nueva=1&titulo=…&desc=… llega con el formulario ya
+   * escrito (p. ej. la pauta del protocolo BAADER 142). Se captura una vez al
+   * montar — si el usuario borra el texto, no se le vuelve a imponer.
+   */
+  const [prefill] = useState(() => {
+    const titulo = searchParams.get('titulo') ?? undefined
+    const descripcion = searchParams.get('desc') ?? undefined
+    return titulo || descripcion ? { titulo, descripcion } : undefined
+  })
   const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') ?? '')
   const [debouncedSearch, setDebouncedSearch] = useState(() => searchParams.get('q') ?? '')
   const [activeFilter, setActiveFilter] = useState<string | null>(() => searchParams.get('filter'))
@@ -405,6 +415,7 @@ export function IncidentsPage() {
         <IncidentForm
           onClose={() => setShowForm(false)}
           onSuccess={() => setShowForm(false)}
+          prefill={prefill}
         />
       )}
 

@@ -540,6 +540,13 @@ service cloud.firestore {
     // muestra el desgaste que el kit corrige en silencio, para intervenir antes
     // de la parada. Igual que variadoresCambios: evidencia historica, solo se
     // crea y se lee, no se edita ni se borra desde la app.
+    // Registro de ingesta por video — lo escribe SOLO el watcher local (Admin SDK).
+    // Se lee para auditar que llego cada video; nadie lo edita desde la app.
+    match /baader142ProtocoloIngesta/{ingestaId} {
+      allow read: if isActiveUser();
+      allow write: if false;
+    }
+
     match /baader142Protocolo/{lecturaId} {
       allow read: if isActiveUser();
 

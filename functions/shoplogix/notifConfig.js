@@ -25,7 +25,15 @@ const DEFAULTS = Object.freeze({
    * `minPieces` = piezas mínimas para considerar que hubo turno productivo;
    * bajo eso no se molesta a nadie (bucket de ruido o lote de prueba).
    */
-  shiftEnd:      { enabled: true, delayMinutes: 10, minPieces: 50 },
+  /**
+   * Informe post-turno en PDF (6 láminas) al cerrar el turno.
+   *
+   * Apagado por defecto y SIN destino por defecto, a propósito: el informe
+   * contiene lecturas sobre el turno que no todos los canales deben recibir
+   * automáticamente. Se prende planta por planta y con el chat escrito
+   * explícitamente — nunca cae al chat general por descarte.
+   */
+  shiftEnd:      { enabled: true, delayMinutes: 10, minPieces: 50, informePdf: { enabled: false, chatId: null } },
   firstPiece:    { enabled: true },
   pieceInterval: { enabled: false, every: 1000 },
   // stoppageMinMinutes: umbral para alertar detenciones (≥N min). Bajo eso es

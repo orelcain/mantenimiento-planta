@@ -25,6 +25,7 @@
  * sigue saliendo de los buckets.
  */
 const { PLANT_AREA_ID } = require('./machines')
+const { ahoraEnPlanta } = require('./polling')
 
 /** Cuántas lecturas se conservan: 10 min de historia a un pulso por minuto. */
 const MAX_LECTURAS = 10
@@ -33,7 +34,7 @@ const MAX_LECTURAS = 10
  * Lee el contador vivo de una planta.
  * @returns {Promise<{at: string, totalCycles: number} | null>}
  */
-async function leerPulso({ query, plantSlug, at = new Date(), toShoplogixTime, logger = console }) {
+async function leerPulso({ query, plantSlug, at = ahoraEnPlanta(), toShoplogixTime, logger = console }) {
   const areaId = PLANT_AREA_ID[plantSlug]
   if (!areaId) return null
   try {
@@ -53,10 +54,60 @@ async function leerPulso({ query, plantSlug, at = new Date(), toShoplogixTime, l
       ? uptime(total)
       : filas.reduce((a, m) => a + uptime(m), 0)
     if (!(totalCycles >= 0)) return null
-    return { at: new Date().toISOString(), totalCycles }
+    return { at: new Date().toISOString(), totalCycles, diag: totalCycles === 0 ? radiografia(data) : null }
   } catch (err) {
     logger.warn(`[pulse][${plantSlug}] no disponible (no bloquea): ${err.message}`)
     return null
+  }
+}
+
+/**
+ * Radiografía de la respuesta cuando el contador sale en CERO.
+ *
+ * ── Por qué existe ──────────────────────────────────────────────────────────
+ * Medido el 2026-08-19: el pulso devuelve 0 para Chonchi y Filete y funciona en
+ * Yal, con las tres plantas produciendo. El mismo corte afecta al contador vivo
+ * del sync (`shoplogixLive`), que usa esta misma llamada y quedó congelado
+ * horas en esas dos plantas sin que nadie lo notara. Los buckets de 5 min
+ * siguen llegando porque vienen de otra consulta.
+ *
+ * Para saber QUÉ devuelve el whiteboard en esas áreas hace falta ver la
+ * respuesta real, y no se puede desde fuera de la nube: la credencial local
+ * está en backoff. Esto la guarda en Firestore —no en los logs— para poder
+ * leerla con el SDK admin.
+ *
+ * ⚠ NO guarda la respuesta completa: solo su FORMA (cuántas filas, qué ids, qué
+ * tipos de estado, qué campos traen). Alcanza para el diagnóstico y evita
+ * meter un blob grande en un doc que se escribe cada minuto.
+ *
+ * Se puede sacar en cuanto el caso esté resuelto.
+ */
+function radiografia(data) {
+  const filas = data?.machines || []
+  return {
+    clavesRaiz: Object.keys(data || {}).slice(0, 12),
+    // Escalares del nivel raiz: `currentSpeed` y `expectedRate` pueden ser el
+    // ritmo que buscamos sin pasar por las filas.
+    raizValores: Object.fromEntries(Object.entries(data || {})
+      .filter(([, v]) => typeof v === 'number' || typeof v === 'string').slice(0, 10)),
+    filas: filas.length,
+    muestra: filas.slice(0, 4).map((f) => ({
+      machineid: String(f.machineid ?? '(sin id)').slice(0, 40),
+      nombre: f.name ?? f.machinename ?? null,
+      turno: f.shift ?? null,
+      // Segunda pasada (2026-08-19): la primera radiografia mostro que `states`
+      // llega VACIO en Chonchi y Filete —por eso el contador daba 0— pero que
+      // los demas campos si vienen. Ahora se guardan sus VALORES para poder
+      // decidir cual es el acumulado del turno, en vez de adivinar por el
+      // nombre. `fgUnits` y `target` son los candidatos; `actualRuntime` es
+      // tiempo, no piezas.
+      valores: Object.fromEntries(Object.entries(f)
+        .filter(([k, v]) => k !== 'states' && (typeof v === 'number' || typeof v === 'string'))
+        .slice(0, 16)),
+      estados: (f.states || []).slice(0, 8).map((e) => ({
+        type: e.type ?? null, cycles: e.cycles ?? null, name: e.name ?? null,
+      })),
+    })),
   }
 }
 
@@ -80,11 +131,47 @@ async function leerPulso({ query, plantSlug, at = new Date(), toShoplogixTime, l
  */
 function componerPulso(previo, lectura) {
   if (!lectura) return previo ?? null
-  const lecturas = [...(previo?.lecturas ?? []), lectura].slice(-MAX_LECTURAS)
+
+  /* Discontinuidad: si el salto respecto de la última lectura implica un ritmo
+     imposible, el contador no "produjo" eso — se reinició o cambió de turno.
+     Se arranca la ventana de nuevo desde esta lectura en vez de promediar a
+     través del salto, que es lo que publicó 3.101 pz/min. */
+  const previas = previo?.lecturas ?? []
+  const ultima = previas[previas.length - 1]
+  const saltoImposible = ultima && (() => {
+    const min = (Date.parse(lectura.at) - Date.parse(ultima.at)) / 60000
+    if (!(min > 0)) return false
+    return (lectura.totalCycles - ultima.totalCycles) / min > MAX_CPM_PLAUSIBLE
+  })()
+
+  const lecturas = (saltoImposible ? [lectura] : [...previas, lectura]).slice(-MAX_LECTURAS)
 
   const cpm = ritmoDeVentana(lecturas)
-  return { at: lectura.at, totalCycles: lectura.totalCycles, cpm, lecturas }
+  // El `diag` no entra al pulso: viaja aparte, a su propio doc. Acá solo va lo
+  // que la pantalla necesita.
+  const limpias = lecturas.map(({ at, totalCycles }) => ({ at, totalCycles }))
+  return { at: lectura.at, totalCycles: lectura.totalCycles, cpm, lecturas: limpias }
 }
+
+/**
+ * Techo de plausibilidad, en piezas por minuto de LÍNEA.
+ *
+ * No es una meta ni la capacidad real: es un absurdo. La línea más rápida es
+ * Yal con 3 evisceradoras a 17 pz/min nominales, o sea ~51. Cualquier cosa
+ * sobre 120 no es producción: es el contador que se reinició, un backfill o un
+ * cambio de turno.
+ *
+ * Hizo falta el 2026-08-19: al desplegar el arreglo de la hora, la ventana de
+ * lecturas quedó a caballo entre las de antes (0, porque preguntábamos por un
+ * turno que no había empezado) y las de después (12.169). El salto de 0 a
+ * 12.169 en cuatro minutos publicó **3.101 pz/min** en el pulso. Se corrigió
+ * solo cuando la ventana se llenó de lecturas nuevas, pero alcanzó a estar en
+ * el documento que lee la pantalla.
+ *
+ * El código ya se protegía de que el acumulado BAJARA (cambio de turno). Que
+ * SALTE es la misma discontinuidad al revés y no estaba cubierta.
+ */
+const MAX_CPM_PLAUSIBLE = 120
 
 /** Lecturas que entran en el ritmo: ~4 min, más que el refresco de Shoplogix. */
 const VENTANA_RITMO = 5
@@ -106,7 +193,12 @@ function ritmoDeVentana(lecturas) {
   const min = (Date.parse(ultima.at) - Date.parse(primera.at)) / 60000
   const dif = ultima.totalCycles - primera.totalCycles
   if (!(min >= MIN_MINUTOS) || dif < 0) return null
-  return dif / min
+  const cpm = dif / min
+  // Cinturón además del tirante: si aun así sale un absurdo, no se publica.
+  return cpm > MAX_CPM_PLAUSIBLE ? null : cpm
 }
 
-module.exports = { leerPulso, componerPulso, ritmoDeVentana, MAX_LECTURAS, VENTANA_RITMO }
+module.exports = {
+  leerPulso, componerPulso, ritmoDeVentana, radiografia,
+  MAX_LECTURAS, VENTANA_RITMO, MAX_CPM_PLAUSIBLE,
+}

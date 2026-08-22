@@ -6347,6 +6347,17 @@ exports.shoplogixPulseWakeup = onSchedule(
     await Promise.all([...porPlanta.entries()].map(async ([plantSlug, docs]) => {
       const lectura = await leerPulso({ query, plantSlug, toShoplogixTime, logger })
       if (!lectura) return
+
+      /* Diagnostico del pulso en cero (2026-08-19, temporal).
+         Chonchi y Filete devuelven 0 con la linea produciendo; Yal funciona. Se
+         guarda la FORMA de la respuesta en Firestore —no en los logs— para
+         poder mirarla con el SDK admin. Un doc por planta, siempre pisado, asi
+         que no crece. Sacar cuando el caso este cerrado. */
+      if (lectura.diag) {
+        await db.doc(`diagnosticos/pulso_${plantSlug}`).set({
+          at: new Date(), plantSlug, totalCycles: lectura.totalCycles, ...lectura.diag,
+        }).catch((e) => logger.warn('[pulse][diag] no se pudo guardar', { plantSlug, err: e.message }))
+      }
       await Promise.all(docs.map(async (d) => {
         const pulso = componerPulso(d.data().pulse ?? null, lectura)
         await d.ref.update({ pulse: pulso })
@@ -7167,6 +7178,8 @@ const SHOPLOGIX_PLANT_LINE_ID = {
 // Firestore). Vive en su propio módulo para poder testear la resolución.
 const notifConfigMod = require('./shoplogix/notifConfig')
 const shoplogixMachinesMod = require('./shoplogix/machines')
+const shoplogixInformeMod = require('./shoplogix/enviarInforme')
+const { sendTelegramDocument } = require('./shoplogix/telegramDoc')
 const SHOPLOGIX_NOTIF_DEFAULTS = notifConfigMod.DEFAULTS
 
 /** Base pública de la PWA (GitHub Pages). Los links de Telegram son absolutos. */
@@ -7858,6 +7871,46 @@ exports.checkShiftEndBriefs = onSchedule(
             }, { merge: true })
 
             logger.info('[checkShiftEndBriefs] brief enviado', { plant, doc: docSnap.id, total })
+
+            // ── Informe post-turno en PDF ────────────────────────────────
+            // Va DESPUÉS del brief y en su propio try/catch: el brief lleva
+            // meses funcionando y es lo crítico. Si el informe falla —jsPDF,
+            // Telegram, un turno con datos raros— tiene que caerse solo el
+            // informe y quedar en el log, sin tocar lo que ya salió.
+            // Apagado por defecto; se prende por planta en la config.
+            try {
+              const r = await shoplogixInformeMod.enviarInformeDeTurno({
+                db,
+                plant,
+                shiftDocId: docSnap.id,
+                config,
+                // Telegram no lanza al fallar: devuelve {ok:false}. Si no se
+                // revisa, `enviarInformeDeTurno` estampa `informePdfSentAt`
+                // igual y el turno queda marcado como enviado sin que nadie lo
+                // haya recibido — y nunca se reintenta. Paso el 2026-08-19 con
+                // el primer informe automatico.
+                enviarDocumento: async (chatId, buffer, filename, caption) => {
+                  const res = await sendTelegramDocument(chatId, buffer, filename, caption)
+                  if (!res || !res.ok) {
+                    throw new Error(`Telegram rechazo el documento: ${res ? res.description : 'sin respuesta (¿falta el token?)'}`)
+                  }
+                  return res
+                },
+                logger,
+              })
+              if (r.enviado) {
+                // `messageId` va al log a proposito: es lo que permite ir al
+                // hilo y confirmar que el mensaje existe cuando alguien dice
+                // que no le llego.
+                logger.info('[checkShiftEndBriefs] informe PDF enviado', {
+                  plant, doc: docSnap.id, bytes: r.bytes, messageId: r.messageId ?? null,
+                })
+              } else if (r.motivo !== 'apagado') {
+                logger.info('[checkShiftEndBriefs] informe PDF no enviado', { plant, doc: docSnap.id, motivo: r.motivo })
+              }
+            } catch (e) {
+              logger.error('[checkShiftEndBriefs] informe PDF falló', { plant, doc: docSnap.id, err: e.message })
+            }
           } catch (e) {
             logger.error('[checkShiftEndBriefs] error componiendo/enviando', { plant, doc: docSnap.id, err: e.message })
           }
@@ -7866,6 +7919,71 @@ exports.checkShiftEndBriefs = onSchedule(
     }
   },
 )
+
+// ── enviarInformeTurnoManual ─────────────────────────────────────────────────
+// Botón "Enviar informe" del monitor. Lo dispara un admin desde la pantalla del
+// turno, después de confirmar su contraseña en el navegador.
+//
+// La reautenticación del front prueba que quien aprieta es el dueño de la
+// sesión, pero NO prueba que sea admin: eso se verifica acá contra el rol
+// guardado en `users`. El front decide si MUESTRA el botón; el servidor decide
+// si la acción ocurre.
+//
+// Permite reenviar un turno que ya salió (`forzar`): apretar el botón es una
+// decisión consciente, distinta del reintento automático del cron.
+exports.enviarInformeTurnoManual = onCall({ region: 'us-central1' }, async (request) => {
+  const uid = request.auth?.uid
+  if (!uid) throw new HttpsError('unauthenticated', 'Hay que iniciar sesión.')
+
+  const perfil = await db.collection('users').doc(uid).get()
+  if (perfil.data()?.rol !== 'admin') {
+    throw new HttpsError('permission-denied', 'Solo un administrador puede enviar el informe.')
+  }
+
+  const plant = String(request.data?.plant || '').trim()
+  const shiftDocId = String(request.data?.shiftDocId || '').trim()
+  if (!plant || !shiftDocId) throw new HttpsError('invalid-argument', 'Faltan la planta o el turno.')
+
+  const config = await getShoplogixNotifConfig(plant)
+  if (!config.shiftEnd?.informePdf?.chatId) {
+    throw new HttpsError('failed-precondition',
+      `${plant} no tiene un chat de Telegram configurado para el informe. `
+      + 'Se configura en notificationConfig, campo shiftEnd.informePdf.chatId.')
+  }
+
+  /* ¿El turno sigue corriendo? El brief de cierre es la señal más confiable:
+     lo estampa el mismo cron que sabe cuándo un turno termino de verdad
+     (espera incluso a que la linea deje de producir). Si no está, el turno
+     sigue vivo y el informe sale marcado como foto parcial. */
+  const turnoDoc = await db.collection('shoplogix').doc(plant).collection('shifts').doc(shiftDocId).get()
+  const enCurso = !turnoDoc.data()?.endBriefSentAt
+
+  try {
+    const r = await shoplogixInformeMod.enviarInformeDeTurno({
+      db,
+      plant,
+      shiftDocId,
+      // El botón manda aunque la planta tenga el envío automático apagado: para
+      // eso está el botón.
+      config: { ...config, shiftEnd: { ...config.shiftEnd, informePdf: { ...config.shiftEnd.informePdf, enabled: true } } },
+      forzar: true,
+      enCurso,
+      enviarDocumento: async (chatId, buffer, filename, caption) => {
+        const res = await sendTelegramDocument(chatId, buffer, filename, caption)
+        if (!res || !res.ok) {
+          throw new Error(`Telegram rechazó el documento: ${res ? res.description : 'sin respuesta'}`)
+        }
+        return res
+      },
+      logger,
+    })
+    logger.info('[enviarInformeTurnoManual]', { uid, plant, shiftDocId, enCurso, ...r })
+    return r
+  } catch (e) {
+    logger.error('[enviarInformeTurnoManual] falló', { uid, plant, shiftDocId, err: e.message })
+    throw new HttpsError('internal', e.message)
+  }
+})
 
 // ── checkShiftReconciliation ─────────────────────────────────────────────────
 // Cron cada 30 minutos. Verifica que el brief de FIN de turno ya enviado (ver
@@ -8238,6 +8356,49 @@ exports.onStockConteoCreated = onDocumentCreated('stockAuditLog/{logId}', async 
 const protocoloAlertas = require('./baader142/protocoloAlertas')
 
 const PROTOCOLO_COL = 'baader142Protocolo'
+const protocoloIngesta = require('./baader142/protocoloIngesta')
+const INGESTA_COL = 'baader142ProtocoloIngesta'
+
+/**
+ * Tema de Telegram donde el operador sube el video de esa máquina.
+ * El grupo es "Manuales e informacion mantencion" (foro), distinto del grupo del bot.
+ */
+function getTopicProtocolo(maquina) {
+  const map = {
+    'baader-n1': process.env.TELEGRAM_TOPIC_PROTOCOLO_N1,
+    'baader-n2': process.env.TELEGRAM_TOPIC_PROTOCOLO_N2,
+    'baader-n3': process.env.TELEGRAM_TOPIC_PROTOCOLO_N3,
+  }
+  const id = map[maquina]
+  return id ? Number(id) : undefined
+}
+
+/**
+ * Resultado de una ingesta por video → UN mensaje, en el tema de esa máquina.
+ *
+ * Va SOLO al tema (no al DM ni al general): el detalle de tendencia ya lo manda
+ * onProtocoloBaader142Created. Duplicar el aviso en dos canales es la forma más
+ * rápida de que se dejen de leer los dos.
+ */
+exports.onProtocoloIngestaCreated = onDocumentCreated(
+  { document: `${INGESTA_COL}/{ingestaId}`, region: 'us-central1' },
+  async (event) => {
+    const ing = event.data?.data()
+    const msg = protocoloIngesta.componerIngesta(ing)
+    if (!msg) {
+      logger.info('protocolo ingesta: doc no accionable, se omite')
+      return
+    }
+    const chatId = process.env.TELEGRAM_CHAT_MANUALES
+    const topicId = getTopicProtocolo(ing.maquina)
+    if (!chatId || !topicId) {
+      logger.warn(`protocolo ingesta: sin chat/tema para ${ing.maquina} — mensaje omitido`)
+      return
+    }
+    await sendTelegramMessage(msg, chatId, { topicId })
+    logger.info(`protocolo ingesta: aviso ${ing.resultado} de ${ing.maquina} al tema ${topicId}`)
+  }
+)
 
 /** Fecha de Santiago en YYYY-MM-DD (las lecturas se guardan con la fecha local). */
 function fechaChile(offsetDias = 0) {

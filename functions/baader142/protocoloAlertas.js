@@ -30,6 +30,29 @@ const HERRAMIENTAS = [
  */
 const UMBRALES = { vigilar: 5, intervenir: 30, critico: 100 }
 
+/**
+ * Contadores de SISTEMA (no motores). El 22-08 la N2 estaba critica en
+ * abrazaderas (T-CLIP-C 268/1000) y correcciones totales (341/1000) con los 5
+ * motores en verde — y no salio NINGUNA alerta. Las paradas se juzgan con una
+ * escala ~3x mas dura: detienen la linea (ver Perilla5Page/UMBRALES).
+ */
+const UMBRALES_PARADAS = { vigilar: 3, intervenir: 10, critico: 30 }
+const SISTEMA = [
+  { k: 'stopc', nombre: 'Correcciones totales', escala: UMBRALES, hint: 'mirar que contador especifico domina' },
+  { k: 'tclipc', nombre: 'Abrazaderas (correcciones)', escala: UMBRALES, hint: 'tension y desgaste de las abrazaderas de cola' },
+  { k: 'stops', nombre: 'Paradas totales', escala: UMBRALES_PARADAS, hint: 'mirar que parada especifica domina' },
+  { k: 'tclip', nombre: 'Abrazaderas (paradas)', escala: UMBRALES_PARADAS, hint: 'el pescado no fue recogido ni con la segunda abrazadera' },
+  { k: 'anusi', nombre: 'Cuchilla de punta (palpador pared)', escala: UMBRALES_PARADAS, hint: 'cuchilla de punta y palpador lado pared' },
+  { k: 'anuso', nombre: 'Cuchilla de punta (palpador entrada)', escala: UMBRALES_PARADAS, hint: 'cuchilla de punta y palpador lado entrada' },
+]
+
+function nivelDeTasaEscala(r, u) {
+  if (r >= u.critico) return 'critico'
+  if (r >= u.intervenir) return 'intervenir'
+  if (r >= u.vigilar) return 'vigilar'
+  return 'normal'
+}
+
 /** Nombre de cada máquina en el orden de planta. */
 const MAQUINAS = {
   'baader-n1': 'Baader 142 N1 (antigua)',
@@ -109,6 +132,29 @@ function evaluarLectura(actual, previas = []) {
     }
   }
 
+  // Contadores de sistema: umbral y tendencia (sin regla de falla-dura, que es
+  // especifica de los motores con inductivo).
+  for (const s of SISTEMA) {
+    const r = tasa1000(actual[s.k], fish)
+    const rPrev1 = prev1 ? tasa1000(prev1[s.k], prev1.fish) : null
+    const rPrev2 = prev2 ? tasa1000(prev2[s.k], prev2.fish) : null
+    const niv = nivelDeTasaEscala(r, s.escala)
+    const sube2 =
+      rPrev1 !== null && rPrev2 !== null && r > rPrev1 && rPrev1 > rPrev2 && r >= s.escala.vigilar
+    if (niv === 'critico' || niv === 'intervenir') {
+      alertas.push({
+        tipo: 'sistema', herramienta: s.nombre, sm: '', ind: '', hint: s.hint,
+        tasa: r, tasaPrevia: rPrev1, nivel: niv, subiendo: sube2,
+        igual: rPrev1 !== null && r === rPrev1,
+      })
+    } else if (sube2) {
+      alertas.push({
+        tipo: 'sistema', herramienta: s.nombre, sm: '', ind: '', hint: s.hint,
+        tasa: r, tasaPrevia: rPrev1, tasaPrevia2: rPrev2, nivel: 'vigilar',
+      })
+    }
+  }
+
   // La que más correcciones concentra manda el orden: es por donde hay que empezar.
   const orden = { critico: 0, intervenir: 1, vigilar: 2 }
   alertas.sort((a, b) => (orden[a.nivel] - orden[b.nivel]) || (b.tasa - a.tasa))
@@ -140,6 +186,10 @@ function componerAlerta(ev) {
       const cab = a.nivel === 'critico' ? '🔴 CRÍTICO' : '🟠 Intervenir'
       l.push(`${cab} · <b>${a.herramienta} ${a.sm}</b>: <b>${a.tasa}</b> correcciones /1000`)
       l.push(`   ${textoMovimiento(a)}`)
+    } else if (a.tipo === 'sistema') {
+      const cab = a.nivel === 'critico' ? '🔴 CRÍTICO' : a.nivel === 'intervenir' ? '🟠 Intervenir' : '🟡 Vigilar'
+      l.push(`${cab} · <b>${a.herramienta}</b>: <b>${a.tasa}</b> /1000`)
+      l.push(`   ${a.hint}.`)
     } else {
       l.push(`🟡 <b>${a.herramienta} ${a.sm}</b>: subió dos lecturas seguidas`)
       l.push(`   ${a.tasaPrevia2} → ${a.tasaPrevia} → <b>${a.tasa}</b> /1000. Todavía es barato mirarlo.`)
@@ -196,6 +246,8 @@ function fmtNum(n) {
 
 module.exports = {
   HERRAMIENTAS,
+  SISTEMA,
+  UMBRALES_PARADAS,
   UMBRALES,
   MAQUINAS,
   URL_PROTOCOLO,
