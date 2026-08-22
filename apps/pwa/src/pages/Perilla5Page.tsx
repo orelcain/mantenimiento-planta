@@ -130,6 +130,11 @@ const CORTO: Record<string, string> = {
   stops: 'Paradas', tclip: 'Abraz.', anusi: 'Cuch. I', anuso: 'Cuch. O',
 }
 
+/** URL absoluta de esta vista con la máquina puesta — se pega en Telegram. */
+function urlProtocoloMaquina(maquina: string): string {
+  return `${window.location.origin}${import.meta.env.BASE_URL}aprendizaje/perilla-5?vista=protocolo&maquina=${encodeURIComponent(maquina)}`
+}
+
 export type Metrica = 'correcciones' | 'paradas'
 
 /**
@@ -820,23 +825,27 @@ function VistaProtocolo() {
     return items
   }, [seriesActivas, ultimaValida, penultimaValida, apagadas, comparar, maquina, guardarPrefs, verdesAbiertos])
 
-  /** Veredicto de una lectura: el peor de los 11 contadores contra SU escala. */
+  /** Veredicto de una lectura: el peor de los 11 contadores contra SU escala.
+   *  Devuelve además QUIÉN lo causó — «crítico» a secas obligaba a expandir
+   *  la fila para saber si era el mismo contador de siempre u otro nuevo. */
   const veredictoDe = (l: LecturaProtocolo) => {
-    if (!muestraValida(l)) return { label: 'muestra insuf.', color: LC.warn, soft: LC.warnSoft }
-    let peor: { label: string; color: string; exceso: number } = { label: 'normal', color: LC.ok, exceso: 0 }
+    if (!muestraValida(l)) return { label: 'muestra insuf.', color: LC.warn, soft: LC.warnSoft, dominante: null as string | null }
+    let peor: { label: string; color: string; exceso: number; dominante: string | null } =
+      { label: 'normal', color: LC.ok, exceso: 0, dominante: null }
     for (const s of [...SERIES, ...SERIES_PARADAS]) {
       const m = METRICA_DE[s.k as string] ?? 'correcciones'
       const r = tasa1000(l[s.k], l.fish)
       const ex = r / UMBRALES[m].intervenir
       if (ex > peor.exceso) {
         const n = nivelTasa(r, m)
-        peor = { label: n.label, color: n.color, exceso: ex }
+        peor = { label: n.label, color: n.color, exceso: ex,
+                 dominante: ex >= 1 ? `${CORTO[s.k as string] ?? s.label} ${r}` : null }
       }
     }
     const soft = peor.label === 'crítico' ? LC.dangerSoft
       : peor.label === 'intervenir' ? LC.warnSoft
       : peor.label === 'vigilar' ? LC.prepSoft : LC.okSoft
-    return { label: peor.label, color: peor.color, soft }
+    return { label: peor.label, color: peor.color, soft, dominante: peor.dominante }
   }
 
   /**
@@ -919,6 +928,8 @@ function VistaProtocolo() {
       'Pauta:',
       ...pasos.map((s, i) => `${i + 1}. ${s}`),
       ...(q.esMotor ? [`${pasos.length + 1}. ${PASO_FINAL}`] : []),
+      '',
+      urlProtocoloMaquina(maquina),
     ].filter(Boolean).join('\n')
     navigate(`/incidents?nueva=1&titulo=${encodeURIComponent(titulo)}&desc=${encodeURIComponent(desc)}`)
   }
@@ -936,6 +947,7 @@ function VistaProtocolo() {
       ...comparacion.map((c) => `${c.maquina} está en ${c.tasa}/1000.`),
       'Pauta:',
       ...(q.saber?.pasos ?? []).map((s, i) => `${i + 1}. ${s}`),
+      urlProtocoloMaquina(maquina),
     ]
     const texto = lineas.join('\n')
     try {
@@ -953,6 +965,27 @@ function VistaProtocolo() {
     setCopiado(true)
     window.setTimeout(() => setCopiado(false), 2500)
   }
+
+  /**
+   * P39: reinicio del protocolo entre lecturas. Los contadores del panel son
+   * ACUMULATIVOS desde el último reset; si el crudo baja de una lectura a la
+   * siguiente, alguien puso el protocolo en cero entre medio (pasó en la N2:
+   * la tasa «mejoró» de 1026 a 341 con reset de por medio). La tasa /1000
+   * sigue siendo comparable, pero el que lee tiene derecho a saberlo.
+   */
+  const huboReinicio = useMemo(() => {
+    const marcas = new Set<string>()
+    let previa: LecturaProtocolo | null = null
+    for (const l of serie) {
+      if (previa) {
+        const bajaCrudo = ([...SERIES, ...SERIES_PARADAS] as const)
+          .some((s) => l[s.k] < previa![s.k])
+        if (l.fish < previa.fish || bajaCrudo) marcas.add(l.fecha)
+      }
+      previa = l
+    }
+    return marcas
+  }, [serie])
 
   const ultimoIdxValido = useMemo(() => {
     for (let i = serie.length - 1; i >= 0; i--) {
@@ -1266,6 +1299,9 @@ function VistaProtocolo() {
                   <strong style={{ color: queRevisar.tasa <= queRevisar.tasaPrevia ? LC.ok : LC.crit }}>
                     {queRevisar.tasa <= queRevisar.tasaPrevia ? '▾' : '▴'}
                     {Math.abs(queRevisar.tasa - queRevisar.tasaPrevia)} vs anterior
+                    {huboReinicio.has(queRevisar.lectura.fecha) ? (
+                      <span style={{ color: LC.inkMid }}> (con reinicio del protocolo entre medio)</span>
+                    ) : null}
                   </strong>
                 ) : null}
                 {comparacion.map((c, i) => (
@@ -1555,12 +1591,16 @@ function VistaProtocolo() {
                     </span>
                     <span className="min-w-0 flex-1 truncate text-footnote" style={{ color: LC.inkMid }}>
                       {l.fish} pz · {esVideo ? 'video' : 'manual'}
+                      {huboReinicio.has(l.fecha) ? (
+                        <span style={{ color: LC.prep }}> · reinicio</span>
+                      ) : null}
                     </span>
                     <span
-                      className="shrink-0 rounded-full px-2.5 py-0.5 text-caption font-semibold"
+                      className="shrink-0 rounded-full px-2.5 py-0.5 text-caption font-semibold tabular-nums"
                       style={{ background: v.soft, color: v.color }}
                     >
                       {v.label}
+                      {v.dominante ? ` · ${v.dominante}` : ''}
                     </span>
                     {abierta
                       ? <ChevronDown aria-hidden className="h-3.5 w-3.5 shrink-0" style={{ color: LC.inkGhost }} />
