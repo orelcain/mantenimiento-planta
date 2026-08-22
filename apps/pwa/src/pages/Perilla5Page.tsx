@@ -26,7 +26,7 @@ import {
   TrendingDown, TrendingUp, LineChart as LineChartIcon, Loader2, RotateCcw,
   Save, Video,
 } from 'lucide-react'
-import { Line } from 'react-chartjs-2'
+import { Line, getElementAtEvent } from 'react-chartjs-2'
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -580,6 +580,13 @@ function VistaProtocolo() {
   const [comparar, setComparar] = useState(false)
   /** P41: incidencias nacidas del lector (marcador [protocolo142 …]). */
   const [incidencias, setIncidencias] = useState<IncidenciaProtocolo[]>([])
+  /** P47: punto del gráfico elegido con click/tap → detalle con la pauta. */
+  const [detallePunto, setDetallePunto] = useState<{ clave: string; fecha: string; tasa: number } | null>(null)
+  const chartRef = useRef<never>(null)
+  const detalleRef = useRef<HTMLDivElement | null>(null)
+  // cambiar de máquina o métrica invalida el punto elegido
+  useEffect(() => { setDetallePunto(null) }, [maquina, metrica])
+
   // P33: lo verde plegado en un chip; se expande solo si alguien lo pide.
   const [verdesAbiertos, setVerdesAbiertos] = useState(false)
 
@@ -1092,7 +1099,9 @@ function VistaProtocolo() {
       backgroundColor: s.color,
       // el ÚLTIMO punto válido va enfatizado: es el estado actual, el que
       // decide (dataviz: emphasized endpoint)
-      pointRadius: fechasEje.map((_, i) => (i === idxUltimo ? 4.5 : 2.5)),
+      pointRadius: fechasEje.map((f, i) =>
+        (detallePunto && detallePunto.clave === String(s.k) && detallePunto.fecha === f ? 6
+        : i === idxUltimo ? 4.5 : 2.5)),
       pointHoverRadius: 6,
       pointBorderWidth: 1.5,
       pointBorderColor: isDark ? '#16242f' : '#ffffff',
@@ -1125,7 +1134,7 @@ function VistaProtocolo() {
 
     return { labels: fechasEje.map(fechaCorta), datasets: [...propios, ...fantasmas] }
   }, [serie, seriesActivas, apagadas, isDark, ultimoIdxValido, comparar, serieUnica,
-      filasPorMaquina, maquina, ultimaValida, ejeColor, fechasEje])
+      filasPorMaquina, maquina, ultimaValida, ejeColor, fechasEje, detallePunto])
 
   /**
    * Bandas de umbral pintadas DETRÁS de la serie, con etiqueta al borde.
@@ -1208,19 +1217,6 @@ function VistaProtocolo() {
     return plugin
   }, [metrica, isDark, marcasGrafico])
 
-  /** Corta un texto en líneas de tooltip (~46 caracteres): Chart.js no envuelve. */
-  const envolver = (texto: string, ancho = 46): string[] => {
-    const palabras = texto.split(' ')
-    const lineas: string[] = []
-    let linea = ''
-    for (const p of palabras) {
-      if ((linea + ' ' + p).trim().length > ancho) { lineas.push(linea.trim()); linea = p }
-      else linea = linea + ' ' + p
-    }
-    if (linea.trim()) lineas.push(linea.trim())
-    return lineas
-  }
-
   const chartOptions = useMemo(
     () => ({
       responsive: true,
@@ -1232,7 +1228,9 @@ function VistaProtocolo() {
         : { duration: 400, easing: 'easeOutCubic' as const },
       // nearest (no index): el tooltip didáctico es de UN contador; con 7 series
       // el modo index apila las fichas de todas y no se puede leer ninguna
-      interaction: { mode: 'nearest' as const, intersect: false },
+      // P46: intersect true — el tooltip solo aparece TOCANDO un punto,
+      // no fantasmeando por todo el plano.
+      interaction: { mode: 'nearest' as const, intersect: true },
       plugins: {
         legend: { display: false },   // los chips son la leyenda
         tooltip: {
@@ -1255,23 +1253,15 @@ function VistaProtocolo() {
               const r = item.parsed.y ?? 0
               return `${item.dataset.label}: ${r}/1000 · ${nivelTasa(r, m).label}`
             },
-            // La ficha del contador: qué cuenta + la pauta. El tooltip ES la clase.
+            /* P46: el tooltip era la clase completa (ficha + pauta) y tapaba
+               el gráfico entero — feedback directo de Orel. Ahora: el dato, las
+               marcas del día y una invitación. La clase vive en el CLICK. */
             afterBody: (items: TooltipItem<'line'>[]) => {
-              const clave = (items[0]?.dataset as { clave?: string })?.clave ?? ''
               const idx = items[0]?.dataIndex ?? -1
               const marcas: string[] = []
-              if (marcasGrafico.reins.includes(idx)) marcas.push('⟳ protocolo reiniciado antes de esta lectura')
-              if (marcasGrafico.ints.includes(idx)) marcas.push('| ese día se registró una intervención')
-              const s = SABER[clave]
-              if (!s) return marcas.length > 0 ? ['', ...marcas] : []
-              return [
-                ...(marcas.length > 0 ? ['', ...marcas] : []),
-                '',
-                ...envolver(s.que),
-                '',
-                'Pauta:',
-                ...s.pasos.flatMap((p, i) => envolver(`${i + 1}. ${p}`)),
-              ]
+              if (marcasGrafico.reins.includes(idx)) marcas.push('⟳ protocolo reiniciado antes')
+              if (marcasGrafico.ints.includes(idx)) marcas.push('| intervención registrada ese día')
+              return [...marcas, 'Tocá el punto para ver la pauta']
             },
           },
         },
@@ -1541,15 +1531,22 @@ function VistaProtocolo() {
                   className="min-h-[44px] rounded-ctl px-3 text-footnote font-medium"
                   style={
                     metrica === m
-                      ? { background: LC.surface, color: LC.aqua }
+                      ? { background: LC.surface, color: LC.aqua, boxShadow: `inset 0 0 0 1.5px ${LC.borderHi}`, fontWeight: 600 }
                       : { color: LC.inkMid }
                   }
                 >
-                  {m === 'paradas' ? 'Paradas' : 'Correcciones -C'}
+                  {m === 'paradas' ? 'Paradas' : 'Correcciones'}
                 </button>
               ))}
             </div>
           </div>
+          {/* P48: qué significa la métrica elegida, en una línea — el «-C» del
+              panel no se explica solo. */}
+          <p className="mt-1 text-caption" style={{ color: LC.inkLo }}>
+            {metrica === 'paradas'
+              ? 'Fallas donde la máquina SE DETUVO.'
+              : 'Fallas que el control corrigió sin detener la máquina (los contadores -C del panel).'}
+          </p>
           {/* Chips de serie con su valor: leyenda tocable. Smart default: solo
               lo que tiene algo que decir; los motores sanos, plegados en uno. */}
           <div className="mt-2 flex flex-wrap gap-1.5">
@@ -1664,9 +1661,88 @@ function VistaProtocolo() {
             </div>
           ) : (
             <div className="relative mt-3 h-64 w-full min-w-0">
-              <Line data={chartData} options={chartOptions} plugins={[umbralPlugin]} role="img" aria-label={resumenGrafico} />
+              <Line
+                ref={chartRef}
+                data={chartData}
+                options={chartOptions}
+                plugins={[umbralPlugin]}
+                role="img"
+                aria-label={resumenGrafico}
+                onClick={(evt) => {
+                  const chart = chartRef.current
+                  if (!chart) return
+                  const [el] = getElementAtEvent(chart, evt)
+                  if (!el) { setDetallePunto(null); return }
+                  const ds = (chartData.datasets[el.datasetIndex] ?? {}) as { clave?: string; data?: (number | null)[] }
+                  const clave = ds.clave
+                  const fecha = fechasEje[el.index]
+                  const tasa = ds.data?.[el.index]
+                  if (!clave || !fecha || tasa === null || tasa === undefined) return
+                  setDetallePunto({ clave, fecha, tasa })
+                  window.setTimeout(() => detalleRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 80)
+                }}
+              />
             </div>
           )}
+
+          {/* P47: la clase que antes tapaba el gráfico, ahora a pedido: el
+              punto tocado abre su ficha con la pauta y el cierre del lazo. */}
+          {detallePunto ? (() => {
+            const sDef = [...SERIES, ...SERIES_PARADAS].find((s) => String(s.k) === detallePunto.clave)
+            const saber = SABER[detallePunto.clave]
+            const m = METRICA_DE[detallePunto.clave] ?? 'correcciones'
+            const nivel = nivelTasa(detallePunto.tasa, m)
+            return (
+              <div
+                ref={detalleRef}
+                className="mt-3 rounded-ctl border p-3"
+                style={{ background: LC.bgPanel, borderColor: LC.border }}
+                role="region"
+                aria-label={`Detalle de ${sDef?.label ?? detallePunto.clave} el ${detallePunto.fecha}`}
+              >
+                <div className="flex items-center gap-2">
+                  {sDef ? (
+                    <span aria-hidden className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: sDef.color }} />
+                  ) : null}
+                  <span className="min-w-0 flex-1 truncate text-footnote font-semibold">
+                    {sDef?.label ?? detallePunto.clave} · {fechaCorta(detallePunto.fecha)}
+                  </span>
+                  <span
+                    className="shrink-0 rounded-full px-2 py-0.5 text-caption font-semibold tabular-nums"
+                    style={{ color: nivel.color, background: LC.surface }}
+                  >
+                    {detallePunto.tasa}/1000 · {nivel.label}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setDetallePunto(null)}
+                    aria-label="Cerrar detalle"
+                    className="grid h-9 w-9 shrink-0 place-items-center rounded-ctl"
+                    style={{ color: LC.inkMid }}
+                  >
+                    ✕
+                  </button>
+                </div>
+                {saber ? (
+                  <>
+                    <p className="mt-1.5 text-footnote" style={{ color: LC.inkMid }}>{saber.que}</p>
+                    <ol className="mt-2 space-y-1 text-footnote">
+                      {saber.pasos.map((paso, i) => (
+                        <li key={paso} className="flex gap-2">
+                          <span className="font-mono text-caption" style={{ color: LC.inkLo }}>{i + 1}</span>
+                          <span>{paso}</span>
+                        </li>
+                      ))}
+                    </ol>
+                  </>
+                ) : (
+                  <p className="mt-1.5 text-footnote" style={{ color: LC.inkMid }}>
+                    Este contador no tiene ficha de pauta todavía.
+                  </p>
+                )}
+              </div>
+            )
+          })() : null}
         </div>
 
       {/* Historial compacto: fecha · pescados · origen · veredicto. El detalle
