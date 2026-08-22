@@ -41,7 +41,13 @@ const MODOS: { value: TelegramSyncModo; label: string; hint: string }[] = [
 
 function fmt(ts: Timestamp | null): string {
   if (!ts) return '—'
-  return ts.toDate().toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' })
+  const d = ts.toDate()
+  const local = d.toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' })
+  // La UTC al lado: Firestore guarda en UTC y este proyecto ya se confundió más
+  // de una vez comparando wall-clock contra UTC. Con las dos a la vista no hay
+  // ambigüedad ("¿por qué dice 9:12 si son las 5:12?" — Orel, 22-08-2026, 5 AM).
+  const utc = d.toLocaleTimeString('es-CL', { timeStyle: 'short', timeZone: 'UTC' })
+  return `${local} (${utc} UTC)`
 }
 
 /** El agente corre cada 15 min: >25 min sin heartbeat = PC apagado/agente caído. */
