@@ -133,3 +133,82 @@ export async function lecturasDeMaquina(
     return []
   }
 }
+
+/** Pescados mínimos para que el panel calcule /1000Fi (manual 1420000804). */
+export const MUESTRA_MINIMA_FISH = 1000
+
+/**
+ * ¿Las tasas /1000 de esta lectura significan algo?
+ *
+ * El manual lo repite en las once pantallas con tasa: "la primera indicación se
+ * visualiza después de 1000 pescados elaborados". Con menos, el panel todavía no
+ * calcula nada y cualquier tasa que se dibuje es ruido — graficarla sin marca es
+ * afirmar algo que no se sabe.
+ */
+export function muestraValida(l: Pick<ContadoresProtocolo, 'fish'>): boolean {
+  return (Number(l.fish) || 0) >= MUESTRA_MINIMA_FISH
+}
+
+export const INGESTA_COLLECTION = 'baader142ProtocoloIngesta'
+
+/** Lectura transcrita de un video, para precargar el formulario. */
+export interface BorradorVideo {
+  fecha: string
+  maquina: MaquinaBaader
+  /** Solo los contadores que se pudieron leer; el resto NO viene (nunca en cero). */
+  contadores: Partial<Record<keyof ContadoresProtocolo, number>>
+  /** Claves que el barrido no alcanzó a mostrar. */
+  faltantes: (keyof ContadoresProtocolo)[]
+  video?: string
+}
+
+/**
+ * Último video transcrito de una máquina que todavía no entró como lectura.
+ *
+ * Lo escribe el watcher local (scripts/watcher) cuando la ingesta se rechaza por
+ * barrido incompleto: en vez de perder los 13 contadores que sí se leyeron, quedan
+ * acá para que el formulario los precargue y la persona solo complete los que faltan.
+ *
+ * Falla en silencio como lecturasDeMaquina: sin esto el formulario sigue sirviendo
+ * a mano, que es como funcionó siempre.
+ */
+export async function borradorDeVideo(
+  maquina: MaquinaBaader,
+  plantId = 'chonchi',
+): Promise<BorradorVideo | null> {
+  try {
+    const q = query(
+      collection(db, INGESTA_COLLECTION),
+      where('plantId', '==', plantId),
+      where('maquina', '==', maquina),
+      where('resultado', '==', 'rechazado'),
+      orderBy('createdAt', 'desc'),
+      limit(1),
+    )
+    const snap = await getDocs(q)
+    const d = snap.docs[0]?.data() as
+      | { fecha?: string; contadores?: Record<string, number | null>; faltantes?: string[]; origen?: { video?: string } }
+      | undefined
+    if (!d?.fecha || !d.contadores) return null
+
+    const contadores: Partial<Record<keyof ContadoresProtocolo, number>> = {}
+    for (const k of CONTADORES_KEYS) {
+      const v = d.contadores[k]
+      // null / undefined = no se leyó. Se omite: un cero inventado es
+      // indistinguible de un cero real y contamina la serie para siempre.
+      if (typeof v === 'number' && Number.isFinite(v)) contadores[k] = v
+    }
+    return {
+      fecha: d.fecha,
+      maquina,
+      contadores,
+      faltantes: (d.faltantes ?? []).filter(
+        (k): k is keyof ContadoresProtocolo =>
+          (CONTADORES_KEYS as readonly string[]).includes(k),
+      ),
+      video: d.origen?.video,
+    }
+  } catch {
+    return null
+  }
+}
