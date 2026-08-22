@@ -54,7 +54,7 @@ const analytics = (overrides: Partial<GraderAnalyticsResult>): GraderAnalyticsRe
       gateNumber: g.gateNumber, pieces: 100, weightKg: 400, avgWeightGrams: 4000,
       stdDevWeightGrams: 200, cv: 0.05, utilizationPct: 8.3,
       assignedCalibre: g.assignedCalibre, assignedQuality: g.assignedQuality,
-      mismatchPct: 2, calibreBreakdown: {},
+      mismatchPct: g.gateNumber === 7 ? 22 : 2, calibreBreakdown: {},
     })),
     ...overrides,
   } as unknown as GraderAnalyticsResult)
@@ -99,6 +99,9 @@ describe('GraderGatesLector', () => {
     // grilla glanceable: los 12 gates presentes, el inactivo marcado
     expect(texto).toContain('G12')
     expect(texto).toContain('inactivo')
+    // mismatch alto visible en el tile; el hint de timing como leyenda (touch)
+    expect(texto).toContain('22% no calza')
+    expect(texto).toContain('flipper con 0,41 s y necesita 0,52 s')
   })
 
   it('timing crítico sin desbalance: titular de timing y pauta con el hint', () => {

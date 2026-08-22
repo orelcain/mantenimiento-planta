@@ -16,10 +16,12 @@
  */
 
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle, Badge, InfoTooltip } from '@/components/ui'
-import { History, ArrowRight, TrendingUp } from 'lucide-react'
+import { History, ArrowRight, TrendingUp, CheckCircle2, Copy } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { logger } from '@/lib/logger'
+import { copiarTexto } from '@/lib/clipboard'
 import { listDailySummariesByRange } from '@/services/grader/graderDailySummary.service'
 import { listGatesTemplates } from '@/services/grader/graderSession.service'
 import {
@@ -75,6 +77,8 @@ const STATUS_STYLE: Record<CalibreFit['status'], { bar: string; text: string; la
 export function GatesHistoryHintCard({
   gates, dateKey, plantLineId, shiftDocId, configSnapshots, onSaved,
 }: Props) {
+  const navigate = useNavigate()
+  const [copiado, setCopiado] = useState(false)
   const [history, setHistory] = useState<CalibreHistory | null>(null)
   const [loading, setLoading] = useState(true)
   const [template, setTemplate] = useState<{ name: string; gates: GateAssignment[] } | null>(null)
@@ -178,6 +182,25 @@ export function GatesHistoryHintCard({
       </CardHeader>
 
       <CardContent className="space-y-3">
+        {/* El patrón lector del protocolo 142: cuando hay un calibre apretado,
+            lo primero que se lee es la decisión en lenguaje de planta — no una
+            tabla que el lector tiene que interpretar. Con todo equilibrado no
+            hay titular: una alerta que aparece siempre se deja de leer. */}
+        {saturados.length > 0 && (
+          <p className="text-sm font-semibold leading-snug">
+            Repartir el {saturados[0]!.label}:{' '}
+            {saturados[0]!.gates.length === 0
+              ? 'no tiene ninguna gate y suele ser'
+              : `${saturados[0]!.gates.length} gate${saturados[0]!.gates.length > 1 ? 's' : ''} para`}{' '}
+            el <span className="tabular-nums">{saturados[0]!.productionPct.toFixed(0)}%</span> de lo que suele venir
+            {saturados.length > 1 && (
+              <span className="font-normal text-muted-foreground">
+                {' '}· {saturados.length - 1} calibre{saturados.length > 2 ? 's' : ''} más apretado{saturados.length > 2 ? 's' : ''}
+              </span>
+            )}
+          </p>
+        )}
+
         {/* Producción histórica vs gates asignadas, calibre por calibre. Las dos
             barras juntas son el argumento: cuando la de arriba es mucho más
             larga que la de abajo, ese calibre está apretado. */}
@@ -279,6 +302,54 @@ export function GatesHistoryHintCard({
                 />
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Cierre del lazo, como en el protocolo 142: la sugerencia se convierte
+            en una incidencia trazable o en un resumen pegable en Telegram. Solo
+            cuando hay algo apretado — con la config equilibrada no hay lazo que
+            cerrar. */}
+        {saturados.length > 0 && (
+          <div className="flex flex-wrap gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => {
+                const desc = [
+                  `[grader-gates · ${dateKey}]`,
+                  ...saturados.map((f) =>
+                    `${f.label}: ${f.productionPct.toFixed(1)}% de la producción con ${f.gates.length === 0 ? 'ninguna gate' : `${f.gates.length} gate${f.gates.length > 1 ? 's' : ''} (${f.gates.map((g) => `G${g}`).join(', ')})`} — ${fmtRatio(f.ratio)}`),
+                  '',
+                  'Pauta:',
+                  ...moves.map((m, i) =>
+                    `${i + 1}. Mover 1 gate de ${m.fromLabel} → ${m.toLabel} (candidatas ${m.fromGates.map((g) => `G${g}`).join(', ')}; pasa de ${fmtRatio(m.beforeRatio)} a ${fmtRatio(m.afterRatio)})`),
+                ].join('\n')
+                navigate(`/incidents?nueva=1&titulo=${encodeURIComponent(`Repartir el ${saturados[0]!.label} en los gates del Grader`)}&desc=${encodeURIComponent(desc)}`)
+              }}
+              className="inline-flex min-h-[44px] items-center rounded-ctl bg-primary/[0.12] px-4 text-xs font-medium text-primary"
+            >
+              Registrar incidencia con esto
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                void copiarTexto([
+                  `Gates del Grader — ${dateKey}`,
+                  ...saturados.map((f) => `${f.label} apretado: ${f.productionPct.toFixed(1)}% de la producción, ${f.gates.length} gate${f.gates.length === 1 ? '' : 's'} (${fmtRatio(f.ratio)})`),
+                  ...moves.map((m, i) => `${i + 1}. Mover 1 gate de ${m.fromLabel} → ${m.toLabel} — candidatas ${m.fromGates.map((g) => `G${g}`).join(', ')}`),
+                ].join('\n')).then(() => {
+                  setCopiado(true)
+                  window.setTimeout(() => setCopiado(false), 2500)
+                })
+              }}
+              className={cn(
+                'inline-flex min-h-[44px] items-center gap-1.5 rounded-ctl px-4 text-xs font-medium',
+                copiado ? 'bg-success/[0.12] text-ink-ok' : 'bg-muted text-muted-foreground',
+              )}
+              aria-live="polite"
+            >
+              {copiado ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+              {copiado ? 'Copiado' : 'Copiar resumen'}
+            </button>
           </div>
         )}
 
