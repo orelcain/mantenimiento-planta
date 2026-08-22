@@ -561,7 +561,6 @@ function VistaProtocolo() {
       setFilasPorMaquina(fs)
     })
     return () => { vivo = false }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [guardadoOk])   // se refresca al guardar una lectura nueva
 
   /** Superponer la serie visible en las OTRAS máquinas (solo con UNA encendida). */
@@ -573,16 +572,16 @@ function VistaProtocolo() {
    * máquina porque N2 con abrazaderas críticas y N3 sana se miran distinto.
    */
   const PREFS_KEY = 'perilla5-protocolo-prefs'
-  const leerPrefs = (): Record<string, { metrica?: Metrica; apagadas?: string[] }> => {
+  const leerPrefs = useCallback((): Record<string, { metrica?: Metrica; apagadas?: string[] }> => {
     try { return JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}') } catch { return {} }
-  }
-  const guardarPrefs = (id: string, patch: { metrica?: Metrica; apagadas?: string[] }) => {
+  }, [])
+  const guardarPrefs = useCallback((id: string, patch: { metrica?: Metrica; apagadas?: string[] }) => {
     try {
       const todo = leerPrefs()
       todo[id] = { ...todo[id], ...patch }
       localStorage.setItem(PREFS_KEY, JSON.stringify(todo))
     } catch { /* almacenamiento lleno o bloqueado: la vista funciona igual */ }
-  }
+  }, [leerPrefs])
 
   // Registrar es semanal y el explicativo es de una sola vez: ambos plegados.
   const [mostrarForm, setMostrarForm] = useState(false)
@@ -807,7 +806,7 @@ function VistaProtocolo() {
       })
     }
     return items
-  }, [seriesActivas, ultimaValida, penultimaValida, apagadas, comparar])
+  }, [seriesActivas, ultimaValida, penultimaValida, apagadas, comparar, maquina, guardarPrefs])
 
   /** Veredicto de una lectura: el peor de los 11 contadores contra SU escala. */
   const veredictoDe = (l: LecturaProtocolo) => {
@@ -1160,7 +1159,7 @@ function VistaProtocolo() {
         },
       },
     }),
-    [ejeColor, gridColor, metrica, isDark],
+    [ejeColor, gridColor, isDark],
   )
 
   return (
