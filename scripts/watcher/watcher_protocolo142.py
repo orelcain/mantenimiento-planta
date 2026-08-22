@@ -176,12 +176,15 @@ def registrar_ingesta(cliente, datos: dict, resultado: str, **extra) -> None:
             k: datos.get(k) for k in CONTADORES if isinstance(datos.get(k), int)
         }
     doc.update(extra)
+    log(f"  registrar_ingesta: escribiendo {datos.get('registroId')}__{resultado}")
     try:
         cliente.collection(INGESTA).document(
             f"{datos.get('registroId') or 'sin-id'}__{resultado}").set(doc)
     except Exception as e:
         # Nunca voltear la ingesta por no poder avisar.
         log(f"  [aviso] no se pudo registrar la ingesta: {type(e).__name__}: {e}")
+    else:
+        log("  registrar_ingesta: OK")
 
 def doc_id(datos: dict) -> str:
     return f"{datos['plantId']}__{datos['maquina']}__{datos['fecha']}"
