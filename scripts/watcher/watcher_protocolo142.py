@@ -155,6 +155,7 @@ def registrar_ingesta(cliente, datos: dict, resultado: str, **extra) -> None:
     from google.cloud import firestore
     doc = {
         "resultado": resultado,
+        "plantId": datos.get("plantId", "chonchi"),
         "maquina": datos.get("maquina"),
         "fecha": datos.get("fecha"),
         "registroId": datos.get("registroId"),
@@ -167,6 +168,13 @@ def registrar_ingesta(cliente, datos: dict, resultado: str, **extra) -> None:
         # los -C alimentan el semaforo del mensaje
         for k in ("e821c", "e822c", "e823c", "e824c", "e825c"):
             doc[k] = datos.get(k)
+    else:
+        # Los contadores que SI se leyeron: sin esto se perderian y habria que
+        # tipear los 17 a mano. El formulario de la PWA los precarga desde aca
+        # (borradorDeVideo). Los que faltan van ausentes, nunca en cero.
+        doc["contadores"] = {
+            k: datos.get(k) for k in CONTADORES if isinstance(datos.get(k), int)
+        }
     doc.update(extra)
     try:
         cliente.collection(INGESTA).document(

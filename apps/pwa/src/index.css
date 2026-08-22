@@ -80,7 +80,8 @@
   --lc-nuevo-soft: rgba(23, 122, 91, 0.10);
   --lc-ok: #0e8060;
   --lc-ok-soft: rgba(14, 128, 96, 0.10);
-  --lc-warn: #a16207;
+  --lc-warn: #875105;
+  --lc-warn-soft: rgba(161, 98, 7, 0.10);
   --lc-crit: #dc2626;
   --lc-star: #b7791f;
 
@@ -243,6 +244,7 @@
   --lc-ok: #2aa07e;
   --lc-ok-soft: rgba(42, 160, 126, 0.14);
   --lc-warn: #cf9636;
+  --lc-warn-soft: rgba(207, 150, 54, 0.14);
   --lc-crit: #d95757;
   --lc-star: #d9ab4e;
 
