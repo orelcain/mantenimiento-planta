@@ -850,7 +850,18 @@ function VistaProtocolo() {
     /* P56 (aprobado por Orel): TODAS las series de la métrica, siempre — el
        plegado «+N en verde» escondía el menú de lo elegible. Los motores van
        con su código del panel (SM1…SM5) y el valor lleva su semáforo. */
-    for (const s of seriesActivas) {
+    /* P67: lo alterado primero — el orden del panel (SM1…SM5) es para la
+       Herramienta; acá la pregunta es «¿qué está mal?», y eso va a la
+       izquierda. Empate: orden del panel, estable. */
+    const ordenadas = [...seriesActivas].sort((a, b) => {
+      const ex = (s2: typeof a) => {
+        const r2 = ultimaValida ? tasa1000(ultimaValida[s2.k], ultimaValida.fish) : 0
+        const m2 = METRICA_DE[s2.k as string] ?? 'correcciones'
+        return r2 / UMBRALES[m2].intervenir
+      }
+      return ex(b) - ex(a)
+    })
+    for (const s of ordenadas) {
       const k = s.k as string
       const r = ultimaValida ? tasa1000(ultimaValida[s.k], ultimaValida.fish) : null
       const m = METRICA_DE[k] ?? 'correcciones'
@@ -1250,11 +1261,17 @@ function VistaProtocolo() {
           ctx.lineTo(chartArea.right, py)
           ctx.stroke()
           ctx.setLineDash([])
-          ctx.globalAlpha = 0.9
-          ctx.fillStyle = l.ink
+          /* P68: placa detrás del texto — la etiqueta cruzaba las líneas de
+             datos y no se leía. */
           ctx.font = '700 9px system-ui'
           ctx.textAlign = 'right'
-          ctx.fillText(l.label, chartArea.right - 2, py - 3)
+          const ancho = ctx.measureText(l.label).width
+          ctx.globalAlpha = 0.85
+          ctx.fillStyle = isDark ? '#16242f' : '#ffffff'
+          ctx.fillRect(chartArea.right - ancho - 6, py - 12, ancho + 5, 11)
+          ctx.globalAlpha = 0.95
+          ctx.fillStyle = l.ink
+          ctx.fillText(l.label, chartArea.right - 3, py - 3)
         }
         ctx.restore()
       },
@@ -1331,6 +1348,12 @@ function VistaProtocolo() {
       scales: {
         x: { ticks: { color: ejeColor, font: { size: 11 } }, grid: { color: gridColor } },
         y: {
+          title: {
+            display: true,
+            text: 'por 1.000 pescados',
+            color: ejeColor,
+            font: { size: 10 },
+          },
           beginAtZero: true,
           ticks: { color: ejeColor, font: { size: 10 }, maxTicksLimit: 5 },
           grid: { color: gridColor },
@@ -1605,7 +1628,7 @@ function VistaProtocolo() {
                   className="min-h-[44px] rounded-ctl px-3 text-footnote font-medium"
                   style={
                     metrica === m
-                      ? { background: LC.surface, color: LC.aqua, boxShadow: `inset 0 0 0 1.5px ${LC.borderHi}`, fontWeight: 600 }
+                      ? { background: LC.surface, color: LC.aqua, boxShadow: `inset 0 0 0 1.5px ${LC.aqua}`, fontWeight: 600 }
                       : { color: LC.inkMid }
                   }
                 >
@@ -1664,8 +1687,8 @@ function VistaProtocolo() {
                 title={c.nombreLargo}
                 className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full px-3.5 text-footnote font-semibold"
                 style={c.on
-                  ? { background: LC.surface, boxShadow: `inset 0 0 0 1.5px ${LC.aqua}`, color: LC.ink }
-                  : { background: LC.bgPanel, color: LC.inkMid }}
+                  ? { background: LC.aquaSoft, boxShadow: `inset 0 0 0 1.5px ${LC.aqua}`, color: LC.ink }
+                  : { background: 'transparent', boxShadow: `inset 0 0 0 1px ${LC.border}`, color: LC.inkMid }}
               >
                 {c.color ? (
                   <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: c.on ? c.color : LC.inkGhost, opacity: c.on ? 1 : 0.5 }} />
