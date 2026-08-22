@@ -14,6 +14,7 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, CheckCircle2, Copy } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { copiarTexto } from '@/lib/clipboard'
 import type { GateTimingSignal } from '@/services/grader/graderGateTiming'
 import type { GateAssignment, GraderAnalyticsResult } from '@/services/grader/types'
 
@@ -24,6 +25,12 @@ interface Props {
   /** Etiqueta del período para el marcador de la incidencia (p. ej. "T2 22-08"). */
   etiquetaPeriodo?: string
 }
+
+/**
+ * Desde qué % de piezas mal caídas un gate lo dice en su tile. Bajo esto es
+ * ruido de balanza; sobre esto ya se pierde calibre en la caja.
+ */
+const MISMATCH_AVISO_PCT = 15
 
 export function GraderGatesLector({ analytics, gates, timingSignals, etiquetaPeriodo }: Props) {
   const navigate = useNavigate()
@@ -47,13 +54,15 @@ export function GraderGatesLector({ analytics, gates, timingSignals, etiquetaPer
       ? `Repartir el ${dominante.calibre}: ${dominante.gatesAssigned} gate${dominante.gatesAssigned === 1 ? '' : 's'} no dan abasto`
       : `Timing crítico en ${timingCrit.length} gate${timingCrit.length === 1 ? '' : 's'}`
 
-    const pasos: string[] = swaps.length > 0
+    const pasos: Array<{ texto: string; evidencia: string[] }> = swaps.length > 0
       ? [
-          ...swaps.map((s) =>
-            `Gate ${s.gateNumber}: ${s.currentCalibre} → ${s.suggestedCalibre} — ${s.reason}`),
-          'Verificar en el HMI que el cambio quedó y mirar el balance a los 30 min.',
+          ...swaps.map((s) => ({
+            texto: `Gate ${s.gateNumber}: ${s.currentCalibre} → ${s.suggestedCalibre} — ${s.reason}`,
+            evidencia: s.evidence ?? [],
+          })),
+          { texto: 'Verificar en el HMI que el cambio quedó y mirar el balance a los 30 min.', evidencia: [] },
         ]
-      : timingCrit.map((s) => `Gate ${s.gateNumber}: ${s.hint}`)
+      : timingCrit.map((s) => ({ texto: `Gate ${s.gateNumber}: ${s.hint}`, evidencia: [] }))
 
     return { dominante, timingCrit, titulo, pasos }
   }, [analytics.gateBalance, analytics.gateSwapSuggestions, timingSignals])
@@ -69,7 +78,7 @@ export function GraderGatesLector({ analytics, gates, timingSignals, etiquetaPer
     ...(dominante ? [dominante.message] : []),
     ...timingCrit.map((s) => `Gate ${s.gateNumber} crítico de timing: ${s.hint}`),
     'Pauta:',
-    ...pasos.map((p, i) => `${i + 1}. ${p}`),
+    ...pasos.map((p, i) => `${i + 1}. ${p.texto}`),
   ].join('\n')
 
   const registrarIncidencia = () => {
@@ -79,24 +88,13 @@ export function GraderGatesLector({ analytics, gates, timingSignals, etiquetaPer
       ...timingCrit.map((s) => `Gate ${s.gateNumber} crítico de timing: ${s.hint}`),
       '',
       'Pauta:',
-      ...pasos.map((p, i) => `${i + 1}. ${p}`),
+      ...pasos.map((p, i) => `${i + 1}. ${p.texto}`),
     ].join('\n')
     navigate(`/incidents?nueva=1&titulo=${encodeURIComponent(`${titulo} (gates Grader)`)}&desc=${encodeURIComponent(desc)}`)
   }
 
   const copiarResumen = async () => {
-    const texto = resumenTexto()
-    try {
-      await navigator.clipboard.writeText(texto)
-    } catch {
-      const ta = document.createElement('textarea')
-      ta.value = texto
-      ta.style.position = 'fixed'
-      ta.style.opacity = '0'
-      document.body.appendChild(ta)
-      ta.select()
-      try { document.execCommand('copy') } finally { ta.remove() }
-    }
+    await copiarTexto(resumenTexto())
     setCopiado(true)
     window.setTimeout(() => setCopiado(false), 2500)
   }
@@ -151,9 +149,25 @@ export function GraderGatesLector({ analytics, gates, timingSignals, etiquetaPer
       {pasos.length > 0 ? (
         <ol className="mt-3 space-y-1.5 text-sm">
           {pasos.map((p, i) => (
-            <li key={p} className="flex gap-2">
+            <li key={p.texto} className="flex gap-2">
               <span className="font-mono text-xs text-muted-foreground">{i + 1}</span>
-              <span>{p}</span>
+              <span className="min-w-0">
+                {p.texto}
+                {/* La evidencia del cálculo, plegada: quien confía actúa con el
+                    paso; quien duda abre el «por qué» sin salir de la tarjeta. */}
+                {p.evidencia.length > 0 ? (
+                  <details className="mt-0.5">
+                    <summary className="inline-flex min-h-[28px] cursor-pointer items-center text-xs text-primary">
+                      ¿por qué?
+                    </summary>
+                    <ul className="mt-1 space-y-0.5 border-l-2 border-muted pl-2.5 text-xs text-muted-foreground">
+                      {p.evidencia.map((e) => (
+                        <li key={e}>{e}</li>
+                      ))}
+                    </ul>
+                  </details>
+                ) : null}
+              </span>
             </li>
           ))}
         </ol>
@@ -174,6 +188,7 @@ export function GraderGatesLector({ analytics, gates, timingSignals, etiquetaPer
             'inline-flex min-h-[44px] items-center gap-1.5 rounded-ctl px-4 text-sm font-medium',
             copiado ? 'bg-ink-ok/10 text-ink-ok' : 'bg-primary/10 text-primary',
           )}
+          aria-live="polite"
         >
           {copiado ? <CheckCircle2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
           {copiado ? 'Copiado' : 'Copiar resumen'}
@@ -185,6 +200,7 @@ export function GraderGatesLector({ analytics, gates, timingSignals, etiquetaPer
         {gates.map((g) => {
           const stats = analytics.gateAdvancedStats.find((s) => s.gateNumber === g.gateNumber)
           const sig = timingSignals.find((s) => s.gateNumber === g.gateNumber)
+          const mismatch = g.active && stats && stats.mismatchPct >= MISMATCH_AVISO_PCT
           return (
             <div
               key={g.gateNumber}
@@ -212,10 +228,41 @@ export function GraderGatesLector({ analytics, gates, timingSignals, etiquetaPer
               <div className="truncate text-[11px] text-muted-foreground">
                 {g.active ? g.assignedCalibre : 'inactivo'}
               </div>
+              {/* Piezas que cayeron acá sin ser del calibre asignado: el dato
+                  ya venía en gateAdvancedStats y no se veía en ninguna parte.
+                  Un gate puede estar «verde» de timing y aun así clasificar mal. */}
+              {mismatch ? (
+                <div className="text-[11px] font-medium text-ink-warn">
+                  {Math.round(stats.mismatchPct)}% no calza
+                </div>
+              ) : null}
             </div>
           )
         })}
       </div>
+
+      {/* Pasada 19: los hints de timing vivían solo en title= (hover) —
+          invisibles en tablet o con guantes. Los gates con problema los
+          muestran como leyenda, que además le da al semáforo su porqué. */}
+      {timingSignals.some((s) => s.status !== 'ok' && s.hint) ? (
+        <ul className="mt-2 space-y-0.5 text-xs text-muted-foreground">
+          {timingSignals
+            .filter((s) => s.status !== 'ok' && s.hint)
+            .map((s) => (
+              <li key={s.gateNumber} className="flex gap-1.5">
+                <span
+                  className={cn(
+                    'font-mono font-bold tabular-nums',
+                    s.status === 'critical' ? 'text-ink-crit' : 'text-ink-warn',
+                  )}
+                >
+                  G{s.gateNumber}
+                </span>
+                <span>{s.hint}</span>
+              </li>
+            ))}
+        </ul>
+      ) : null}
     </div>
   )
 }
