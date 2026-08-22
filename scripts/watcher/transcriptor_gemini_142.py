@@ -119,24 +119,50 @@ def _llamar_gemini(imagenes: list[Path]) -> dict:
     return json.loads(texto)
 
 
-def _consolidar(bruto: dict) -> tuple[dict, list[dict]]:
-    """De la lista de pantallas leidas a los 17 contadores + pares verificables."""
-    valores: dict[str, int | None] = {k: None for k in CONTADORES}
-    pares: list[dict] = []   # (clave, sum, por1000Fi) para la aritmetica
+def _consolidar(bruto: dict) -> list[dict]:
+    """Lecturas crudas por contador (una pantalla puede aparecer varias veces)."""
+    crudas: list[dict] = []
     for l in bruto.get("lecturas", []):
-        rot = str(l.get("rotulo", "")).upper().replace("∑", "").strip()
-        rot = re.sub(r"[:\s]+$", "", rot)
+        rot = str(l.get("rotulo", "")).upper().replace("∑", "").replace("Σ", "").strip()
+        rot = re.sub(r"[:\s]+$", "", rot).lstrip()
         clave = ROTULO_A_CLAVE.get(rot)
         if clave is None:
             continue
         s = l.get("sum")
         if isinstance(s, int) and s >= 0:
-            # la misma pantalla puede aparecer en varios frames: la ULTIMA gana
-            # (mismo criterio que el dedupe del preparador)
-            valores[clave] = s
             r = l.get("por1000Fi")
-            if isinstance(r, (int, float)) and r >= 0:
-                pares.append({"clave": clave, "sum": s, "tasa": float(r)})
+            crudas.append({"clave": clave, "sum": s,
+                           "tasa": float(r) if isinstance(r, (int, float)) and r >= 0 else None})
+    return crudas
+
+
+def _elegir(crudas: list[dict], fish: int | None) -> tuple[dict, list[dict]]:
+    """De N lecturas por contador a UNA: la que cuadra aritmeticamente.
+
+    El LCD refresca la linea /1000Fi con lag: un frame de transicion puede traer
+    la suma nueva con la tasa VIEJA (nos paso: T-CLIP-C 811 con tasa 3 en vez de
+    268). Si un rotulo aparece varias veces, gana el par cuya tasa calza con
+    sum/fish*1000; entre coherentes, el ultimo.
+    """
+    valores: dict[str, int | None] = {k: None for k in CONTADORES}
+    pares: list[dict] = []
+    por_clave: dict[str, list[dict]] = {}
+    for c in crudas:
+        por_clave.setdefault(c["clave"], []).append(c)
+    for clave, lecturas in por_clave.items():
+        elegido = None
+        if fish and fish >= 1000:
+            coherentes = [l for l in lecturas
+                          if l["tasa"] is not None
+                          and abs(round(l["sum"] * 1000 / fish) - l["tasa"]) <= TOLERANCIA]
+            if coherentes:
+                elegido = coherentes[-1]
+        if elegido is None:
+            con_tasa = [l for l in lecturas if l["tasa"] is not None]
+            elegido = (con_tasa or lecturas)[-1]
+        valores[clave] = elegido["sum"]
+        if elegido["tasa"] is not None:
+            pares.append({"clave": clave, "sum": elegido["sum"], "tasa": elegido["tasa"]})
     return valores, pares
 
 
@@ -172,7 +198,9 @@ def transcribir(paquete: Path) -> dict:
         raise RuntimeError(f"paquete sin hojas de contacto: {paquete}")
 
     bruto = _llamar_gemini(hojas)
-    valores, pares = _consolidar(bruto)
+    crudas = _consolidar(bruto)
+    fish_leidos = [c["sum"] for c in crudas if c["clave"] == "fish"]
+    valores, pares = _elegir(crudas, max(fish_leidos) if fish_leidos else None)
     _verificar(valores, pares)
 
     faltantes = [k for k, v in valores.items() if v is None]
