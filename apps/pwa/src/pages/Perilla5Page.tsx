@@ -66,7 +66,9 @@ import {
   type NotaFigura,
 } from '@/services/baader142/perilla5Notas'
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend)
+import zoomPlugin from 'chartjs-plugin-zoom'
+
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend, zoomPlugin)
 
 type Vista = 'herramienta' | 'protocolo'
 
@@ -126,8 +128,8 @@ const SERIES_PARADAS: typeof SERIES = [
 
 /** Nombre corto para el chip: el largo vive en el tooltip del gráfico. */
 const CORTO: Record<string, string> = {
-  stopc: '-C total', tclipc: 'Abraz.', e821c: 'Centraje', e822c: 'Cuchilla',
-  e823c: 'Aspirador', e824c: 'Exc. A', e825c: 'Exc. B',
+  stopc: '-C total', tclipc: 'Abraz.', e821c: 'SM1', e822c: 'SM2',
+  e823c: 'SM3', e824c: 'SM4', e825c: 'SM5',
   stops: 'Paradas', tclip: 'Abraz.', anusi: 'Cuch. I', anuso: 'Cuch. O',
 }
 
@@ -580,6 +582,9 @@ function VistaProtocolo() {
   const [comparar, setComparar] = useState(false)
   /** P41: incidencias nacidas del lector (marcador [protocolo142 …]). */
   const [incidencias, setIncidencias] = useState<IncidenciaProtocolo[]>([])
+  /** P52: true cuando el usuario hizo zoom — enciende el «restablecer». */
+  const [conZoom, setConZoom] = useState(false)
+
   /** P47: punto del gráfico elegido con click/tap → detalle con la pauta. */
   const [detallePunto, setDetallePunto] = useState<{ clave: string; fecha: string; tasa: number } | null>(null)
   const chartRef = useRef<never>(null)
@@ -587,8 +592,6 @@ function VistaProtocolo() {
   // cambiar de máquina o métrica invalida el punto elegido
   useEffect(() => { setDetallePunto(null) }, [maquina, metrica])
 
-  // P33: lo verde plegado en un chip; se expande solo si alguien lo pide.
-  const [verdesAbiertos, setVerdesAbiertos] = useState(false)
 
   useEffect(() => {
     let cancelado = false
@@ -790,7 +793,7 @@ function VistaProtocolo() {
 
   /** Chips-leyenda: cada serie con su valor actual; los motores sanos, plegados en uno. */
   const chips = useMemo(() => {
-    type Chip = { id: string; label: string; color?: string; on: boolean; toggle: () => void; delta?: 'sube' | 'baja' }
+    type Chip = { id: string; label: string; valor?: number | null; valorColor?: string; nombreLargo?: string; color?: string; on: boolean; toggle: () => void; delta?: 'sube' | 'baja' }
     const alternar = (ks: string[], encender: boolean) =>
       setApagadas((prev) => {
         const n = new Set(prev)
@@ -799,35 +802,26 @@ function VistaProtocolo() {
         return n
       })
     const items: Chip[] = []
-    // P33: TODO lo verde (motores o no) se pliega en un chip; la fila queda
-    // para lo que tiene algo que decir. Expandir es reversible y no persiste.
-    const verdes: typeof seriesActivas = []
+    /* P56 (aprobado por Orel): TODAS las series de la métrica, siempre — el
+       plegado «+N en verde» escondía el menú de lo elegible. Los motores van
+       con su código del panel (SM1…SM5) y el valor lleva su semáforo. */
     for (const s of seriesActivas) {
       const k = s.k as string
       const r = ultimaValida ? tasa1000(ultimaValida[s.k], ultimaValida.fish) : null
       const m = METRICA_DE[k] ?? 'correcciones'
-      const sano = r !== null && nivelTasa(r, m).label === 'normal'
-      if (sano && !verdesAbiertos) { verdes.push(s); continue }
       const rPrev = penultimaValida ? tasa1000(penultimaValida[s.k], penultimaValida.fish) : null
       items.push({
         id: k,
-        label: r !== null ? `${CORTO[k] ?? s.label} ${r}` : (CORTO[k] ?? s.label),
+        label: CORTO[k] ?? s.label,
+        valor: r,
+        valorColor: r !== null ? nivelTasa(r, m).color : undefined,
+        nombreLargo: s.label,
         color: s.color,
         on: !apagadas.has(k),
         toggle: () => alternar([k], apagadas.has(k)),
         // direccion vs la lectura anterior: subir es malo en estas series
         delta: r !== null && rPrev !== null && r !== rPrev ? (r > rPrev ? 'sube' : 'baja') : undefined,
       })
-    }
-    if (verdes.length > 0) {
-      items.push({
-        id: 'verdes',
-        label: `+${verdes.length} en verde`,
-        on: false,
-        toggle: () => setVerdesAbiertos(true),
-      })
-    } else if (verdesAbiertos) {
-      items.push({ id: 'plegar', label: 'plegar verdes', on: false, toggle: () => setVerdesAbiertos(false) })
     }
     // Con UNA serie encendida se puede comparar contra las otras máquinas:
     // la brecha que el lector dice en texto, vista.
@@ -841,7 +835,7 @@ function VistaProtocolo() {
       })
     }
     return items
-  }, [seriesActivas, ultimaValida, penultimaValida, apagadas, comparar, maquina, guardarPrefs, verdesAbiertos])
+  }, [seriesActivas, ultimaValida, penultimaValida, apagadas, comparar, maquina, guardarPrefs])
 
   /** Veredicto de una lectura: el peor de los 11 contadores contra SU escala.
    *  Devuelve además QUIÉN lo causó — «crítico» a secas obligaba a expandir
@@ -1103,6 +1097,8 @@ function VistaProtocolo() {
         (detallePunto && detallePunto.clave === String(s.k) && detallePunto.fecha === f ? 6
         : i === idxUltimo ? 4.5 : 2.5)),
       pointHoverRadius: 6,
+      // P53: tolerancia de dedo — el tap cuenta hasta 14px alrededor del punto
+      pointHitRadius: 14,
       pointBorderWidth: 1.5,
       pointBorderColor: isDark ? '#16242f' : '#ffffff',
       spanGaps: false,
@@ -1124,6 +1120,7 @@ function VistaProtocolo() {
           backgroundColor: ejeColor,
           pointRadius: 2,
           pointHoverRadius: 5,
+          pointHitRadius: 14,
           spanGaps: false,
           tension: 0.25,
           borderWidth: 1.25,
@@ -1232,6 +1229,23 @@ function VistaProtocolo() {
       // no fantasmeando por todo el plano.
       interaction: { mode: 'nearest' as const, intersect: true },
       plugins: {
+        /* P51: pinch en celular, rueda en computador, arrastre con ctrl para
+           panear — el mismo idioma que TelemetryChart. Solo eje x: acercarse a
+           una fecha separa los puntos apretados sin descalibrar el semáforo. */
+        zoom: {
+          pan: { enabled: true, mode: 'x' as const, modifierKey: 'ctrl' as const },
+          zoom: {
+            wheel: { enabled: true, speed: 0.1 },
+            pinch: { enabled: true },
+            mode: 'x' as const,
+            onZoomComplete: ({ chart }: { chart: { isZoomedOrPanned?: () => boolean } }) => {
+              setConZoom(chart.isZoomedOrPanned?.() ?? false)
+            },
+          },
+          // minRange 1: nunca menos de DOS fechas a la vista — colapsar a una
+          // sola categoría deja los puntos sin posición (NaN) y no hay qué tocar
+          limits: { x: { min: 'original' as const, max: 'original' as const, minRange: 1 } },
+        },
         legend: { display: false },   // los chips son la leyenda
         tooltip: {
           // El negro por defecto de Chart.js era una isla fuera del tema: va con
@@ -1547,24 +1561,61 @@ function VistaProtocolo() {
               ? 'Fallas donde la máquina SE DETUVO.'
               : 'Fallas que el control corrigió sin detener la máquina (los contadores -C del panel).'}
           </p>
-          {/* Chips de serie con su valor: leyenda tocable. Smart default: solo
-              lo que tiene algo que decir; los motores sanos, plegados en uno. */}
-          <div className="mt-2 flex flex-wrap gap-1.5">
+          {/* P58: qué es esta fila y cuántas están en el gráfico. */}
+          <p className="mt-2 flex flex-wrap items-center gap-x-2 text-caption" style={{ color: LC.inkLo }}>
+            <span>
+              Series · <strong style={{ color: LC.inkMid }}>
+                {seriesActivas.filter((s) => !apagadas.has(s.k as string)).length} de {seriesActivas.length}
+              </strong> en el gráfico · tocá para mostrar u ocultar
+            </span>
+            {apagadas.size > 0 && seriesActivas.some((s) => {
+              const r = ultimaValida ? tasa1000(ultimaValida[s.k], ultimaValida.fish) : null
+              const m = METRICA_DE[s.k as string] ?? 'correcciones'
+              const alterada = r !== null && nivelTasa(r, m).label !== 'normal'
+              return alterada === apagadas.has(s.k as string) // alterada oculta o sana visible
+            }) ? (
+              <button
+                type="button"
+                onClick={() => {
+                  const off = seriesActivas
+                    .filter((s) => {
+                      const r = ultimaValida ? tasa1000(ultimaValida[s.k], ultimaValida.fish) : null
+                      const m = METRICA_DE[s.k as string] ?? 'correcciones'
+                      return r === null || nivelTasa(r, m).label === 'normal'
+                    })
+                    .map((s) => s.k as string)
+                  setApagadas(new Set(off))
+                  guardarPrefs(maquina, { apagadas: off })
+                }}
+                className="inline-flex min-h-[28px] items-center font-medium"
+                style={{ color: LC.aqua }}
+              >
+                restablecer
+              </button>
+            ) : null}
+          </p>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
             {chips.map((c) => (
               <button
                 key={c.id}
                 type="button"
                 aria-pressed={c.on}
                 onClick={c.toggle}
-                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full px-3.5 text-caption font-semibold"
+                title={c.nombreLargo}
+                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full px-3.5 text-footnote font-semibold"
                 style={c.on
-                  ? { background: LC.surface, boxShadow: `inset 0 0 0 1.5px ${LC.borderHi}`, color: LC.ink }
+                  ? { background: LC.surface, boxShadow: `inset 0 0 0 1.5px ${LC.aqua}`, color: LC.ink }
                   : { background: LC.bgPanel, color: LC.inkMid }}
               >
                 {c.color ? (
-                  <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: c.on ? c.color : LC.inkGhost }} />
+                  <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: c.on ? c.color : LC.inkGhost, opacity: c.on ? 1 : 0.5 }} />
                 ) : null}
                 {c.label}
+                {c.valor !== null && c.valor !== undefined ? (
+                  <span className="font-mono tabular-nums" style={{ color: c.on ? c.valorColor : undefined }}>
+                    {c.valor}
+                  </span>
+                ) : null}
                 {c.delta === 'sube' ? (
                   <TrendingUp aria-label="subiendo" className="h-3 w-3" style={{ color: LC.crit }} />
                 ) : c.delta === 'baja' ? (
@@ -1661,6 +1712,19 @@ function VistaProtocolo() {
             </div>
           ) : (
             <div className="relative mt-3 h-64 w-full min-w-0">
+              {conZoom ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    (chartRef.current as { resetZoom?: () => void } | null)?.resetZoom?.()
+                    setConZoom(false)
+                  }}
+                  className="absolute right-1 top-0 z-10 inline-flex min-h-[36px] items-center rounded-ctl px-3 text-caption font-medium"
+                  style={{ background: LC.aquaSoft, color: LC.aqua }}
+                >
+                  Restablecer zoom
+                </button>
+              ) : null}
               <Line
                 ref={chartRef}
                 data={chartData}
@@ -1668,6 +1732,11 @@ function VistaProtocolo() {
                 plugins={[umbralPlugin]}
                 role="img"
                 aria-label={resumenGrafico}
+                onDoubleClick={() => {
+                  const chart = chartRef.current as { resetZoom?: () => void } | null
+                  chart?.resetZoom?.()
+                  setConZoom(false)
+                }}
                 onClick={(evt) => {
                   const chart = chartRef.current
                   if (!chart) return
