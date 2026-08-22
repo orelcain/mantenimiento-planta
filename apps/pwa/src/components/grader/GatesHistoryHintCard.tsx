@@ -22,6 +22,7 @@ import { History, ArrowRight, TrendingUp, CheckCircle2, Copy } from 'lucide-reac
 import { cn } from '@/lib/utils'
 import { logger } from '@/lib/logger'
 import { copiarTexto } from '@/lib/clipboard'
+import { urlTurnoGates } from '@/lib/urlTurno'
 import { listDailySummariesByRange } from '@/services/grader/graderDailySummary.service'
 import { listGatesTemplates } from '@/services/grader/graderSession.service'
 import {
@@ -143,8 +144,37 @@ export function GatesHistoryHintCard({
     [fits, history],
   )
 
+  /*
+   * Mientras carga: la silueta de la tarjeta, no un hueco. Devolver null
+   * durante el fetch hacía saltar el layout un segundo después, justo cuando
+   * el ojo ya estaba leyendo la tarjeta siguiente. Solo durante `loading`:
+   * si el veredicto es que no hay nada honesto que decir, ahí sí desaparece.
+   */
+  if (loading) {
+    return (
+      <Card aria-busy="true" aria-label="Cargando contraste con turnos anteriores">
+        <CardHeader className="pb-2">
+          <div className="h-5 w-64 max-w-full animate-pulse rounded-ctl bg-muted" />
+          <div className="mt-1 h-3.5 w-44 animate-pulse rounded-ctl bg-muted" />
+        </CardHeader>
+        <CardContent className="space-y-2.5">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="grid grid-cols-[7rem_1fr_5.5rem] items-center gap-2.5">
+              <div className="h-3.5 w-16 animate-pulse rounded-ctl bg-muted" />
+              <div className="space-y-1">
+                <div className="h-2 animate-pulse rounded-full bg-muted" />
+                <div className="h-2 w-2/3 animate-pulse rounded-full bg-muted" />
+              </div>
+              <div className="h-3.5 w-12 animate-pulse justify-self-end rounded-ctl bg-muted" />
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    )
+  }
+
   // Sin config o sin historial suficiente no hay nada honesto que decir.
-  if (loading || !history || activeCount === 0 || fits.length === 0) return null
+  if (!history || activeCount === 0 || fits.length === 0) return null
 
   const saturados = fits.filter((f) => f.status === 'saturado')
   const maxPct = Math.max(...fits.map((f) => Math.max(f.productionPct, f.gatesPct)), 1)
@@ -322,6 +352,8 @@ export function GatesHistoryHintCard({
                   'Pauta:',
                   ...moves.map((m, i) =>
                     `${i + 1}. Mover 1 gate de ${m.fromLabel} → ${m.toLabel} (candidatas ${m.fromGates.map((g) => `G${g}`).join(', ')}; pasa de ${fmtRatio(m.beforeRatio)} a ${fmtRatio(m.afterRatio)})`),
+                  '',
+                  urlTurnoGates(shiftDocId),
                 ].join('\n')
                 navigate(`/incidents?nueva=1&titulo=${encodeURIComponent(`Repartir el ${saturados[0]!.label} en los gates del Grader`)}&desc=${encodeURIComponent(desc)}`)
               }}
@@ -336,6 +368,7 @@ export function GatesHistoryHintCard({
                   `Gates del Grader — ${dateKey}`,
                   ...saturados.map((f) => `${f.label} apretado: ${f.productionPct.toFixed(1)}% de la producción, ${f.gates.length} gate${f.gates.length === 1 ? '' : 's'} (${fmtRatio(f.ratio)})`),
                   ...moves.map((m, i) => `${i + 1}. Mover 1 gate de ${m.fromLabel} → ${m.toLabel} — candidatas ${m.fromGates.map((g) => `G${g}`).join(', ')}`),
+                  urlTurnoGates(shiftDocId),
                 ].join('\n')).then(() => {
                   setCopiado(true)
                   window.setTimeout(() => setCopiado(false), 2500)

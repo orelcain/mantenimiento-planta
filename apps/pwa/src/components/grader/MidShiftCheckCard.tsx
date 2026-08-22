@@ -14,9 +14,12 @@
  * desbordan el Excel no lo dice.
  */
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button, InfoTooltip } from '@/components/ui'
-import { Radio, ArrowRight, Upload, TrendingUp } from 'lucide-react'
+import { Radio, ArrowRight, Upload, TrendingUp, CheckCircle2, Copy } from 'lucide-react'
+import { copiarTexto } from '@/lib/clipboard'
+import { urlTurnoGates } from '@/lib/urlTurno'
 import { cn } from '@/lib/utils'
 import { buildMidShiftCheck, excelGapMinutes } from '@/services/grader/graderMidShiftCheck'
 import { nowAsWallClockUTC } from '@/services/grader/graderShiftStatus'
@@ -44,6 +47,8 @@ interface Props {
 export function MidShiftCheckCard({
   summary, gates, remainingMin, shiftDocId, plantLineId, configSnapshots, onSaved, onLoadExcel,
 }: Props) {
+  const navigate = useNavigate()
+  const [copiado, setCopiado] = useState(false)
   const check = useMemo(
     () => buildMidShiftCheck({ summary, gates, remainingMin }),
     [summary, gates, remainingMin],
@@ -103,6 +108,14 @@ export function MidShiftCheckCard({
 
         {!todoBien && (
           <>
+            {/* El patrón lector: la decisión primero, en lenguaje de planta. */}
+            <p className="text-sm font-semibold leading-snug">
+              Repartir el {saturated[0]!.label}:{' '}
+              {saturated[0]!.gates.length === 0
+                ? 'sin gate y lleva'
+                : `${saturated[0]!.gates.length} gate${saturated[0]!.gates.length > 1 ? 's' : ''} para`}{' '}
+              el <span className="tabular-nums">{saturated[0]!.productionPct.toFixed(0)}%</span> de lo que va del turno
+            </p>
             <p className="text-sm">
               {saturated.map((f, i) => (
                 <span key={f.key}>
@@ -174,6 +187,57 @@ export function MidShiftCheckCard({
               </p>
             )}
           </>
+        )}
+
+        {/* Cierre del lazo, igual que la tarjeta del historial: la lectura del
+            corte se vuelve incidencia trazable o resumen pegable en el grupo
+            del turno — con el link para caer de vuelta acá. */}
+        {!todoBien && (
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                const desc = [
+                  `[grader-gates · corte ${shiftDocId}]`,
+                  ...saturated.map((f) =>
+                    `${f.label}: ${f.productionPct.toFixed(1)}% de lo que va con ${f.gates.length === 0 ? 'ninguna gate' : `${f.gates.length} gate${f.gates.length > 1 ? 's' : ''}`}`),
+                  ...(estPiecesOnSaturated != null ? [`≈${estPiecesOnSaturated.toLocaleString('es-CL')} piezas de ese calibre aún por pasar`] : []),
+                  '',
+                  'Pauta:',
+                  ...moves.map((m, i) =>
+                    `${i + 1}. Mover 1 gate de ${m.fromLabel} → ${m.toLabel} (candidatas ${m.fromGates.map((g) => `G${g}`).join(', ')})`),
+                  '',
+                  urlTurnoGates(shiftDocId),
+                ].join('\n')
+                navigate(`/incidents?nueva=1&titulo=${encodeURIComponent(`Repartir el ${saturated[0]!.label} en los gates (corte de control)`)}&desc=${encodeURIComponent(desc)}`)
+              }}
+              className="inline-flex min-h-[44px] items-center rounded-ctl bg-primary/[0.12] px-4 text-xs font-medium text-primary"
+            >
+              Registrar incidencia con esto
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                void copiarTexto([
+                  `Corte de control — ${shiftDocId} (quedan ${fmtDurationMin(check.remainingMin)})`,
+                  ...saturated.map((f) => `${f.label} apretado: ${f.productionPct.toFixed(1)}% de lo que va, ${f.gates.length} gate${f.gates.length === 1 ? '' : 's'}`),
+                  ...moves.map((m, i) => `${i + 1}. Mover 1 gate de ${m.fromLabel} → ${m.toLabel} — candidatas ${m.fromGates.map((g) => `G${g}`).join(', ')}`),
+                  urlTurnoGates(shiftDocId),
+                ].join('\n')).then(() => {
+                  setCopiado(true)
+                  window.setTimeout(() => setCopiado(false), 2500)
+                })
+              }}
+              className={cn(
+                'inline-flex min-h-[44px] items-center gap-1.5 rounded-ctl px-4 text-xs font-medium',
+                copiado ? 'bg-success/[0.12] text-ink-ok' : 'bg-muted text-muted-foreground',
+              )}
+              aria-live="polite"
+            >
+              {copiado ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+              {copiado ? 'Copiado' : 'Copiar resumen'}
+            </button>
+          </div>
         )}
 
         {/* El cambio queda con hora: lo que pase después se clasifica con la
