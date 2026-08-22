@@ -345,14 +345,29 @@ def main() -> None:
         time.sleep(2)
         for f in json_estables(vistos):
             procesar_archivo(cliente, f)
+        try:
+            from vigia_videos_142 import vigia_tick
+            vigia_tick(log)
+        except Exception:
+            log("fallo el vigia:\n" + traceback.format_exc())
         return
 
+    ciclo = 0
     while True:
         try:
             for f in json_estables(vistos):
                 procesar_archivo(cliente, f)
         except Exception:
             log("fallo el ciclo:\n" + traceback.format_exc())
+        # Vigia de videos: cada 5 ciclos (~5 min). El sync trae videos a lo mas
+        # cada 4 h; 5 min de latencia es invisible y no carga la CPU.
+        ciclo += 1
+        if ciclo % 5 == 0:
+            try:
+                from vigia_videos_142 import vigia_tick
+                vigia_tick(log)
+            except Exception:
+                log("fallo el vigia:\n" + traceback.format_exc())
         time.sleep(INTERVALO)
 
 
