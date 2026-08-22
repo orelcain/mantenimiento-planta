@@ -144,6 +144,14 @@ function urlProtocoloMaquina(maquina: string): string {
   return `${window.location.origin}${import.meta.env.BASE_URL}aprendizaje/perilla-5?vista=protocolo&maquina=${encodeURIComponent(maquina)}`
 }
 
+/** Código de panel para espacios chicos (pill del veredicto): códigos
+ *  industriales reales, no palabras mutiladas. El nombre completo va en CORTO. */
+const CODIGO: Record<string, string> = {
+  stopc: 'STOP-C', tclipc: 'T-CLIP-C', e821c: 'SM1', e822c: 'SM2',
+  e823c: 'SM3', e824c: 'SM4', e825c: 'SM5',
+  stops: 'STOPS', tclip: 'T-CLIP', anusi: 'ANUS-I', anuso: 'ANUS-O',
+}
+
 export type Metrica = 'correcciones' | 'paradas'
 
 /**
@@ -925,7 +933,7 @@ function VistaProtocolo() {
       if (ex > peor.exceso) {
         const n = nivelTasa(r, m)
         peor = { label: n.label, color: n.color, exceso: ex,
-                 dominante: ex >= 1 ? `${CORTO[s.k as string] ?? s.label} ${r}` : null }
+                 dominante: ex >= 1 ? `${CODIGO[s.k as string] ?? s.label} ${r}` : null }
       }
     }
     const soft = peor.label === 'crítico' ? LC.dangerSoft
@@ -2000,8 +2008,9 @@ function VistaProtocolo() {
                       ) : null}
                     </span>
                     <span
-                      className="shrink-0 rounded-full px-2.5 py-0.5 text-caption font-semibold tabular-nums"
+                      className="min-w-0 max-w-[55%] truncate rounded-full px-2.5 py-0.5 text-caption font-semibold tabular-nums"
                       style={{ background: v.soft, color: v.color }}
+                      title={v.dominante ? `${v.label} · ${v.dominante}` : v.label}
                     >
                       {v.label}
                       {v.dominante ? ` · ${v.dominante}` : ''}
