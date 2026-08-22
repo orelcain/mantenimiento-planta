@@ -837,8 +837,21 @@ function VistaProtocolo() {
   }, [serie])
 
   /** Chips-leyenda: cada serie con su valor actual; los motores sanos, plegados en uno. */
+  /**
+   * P72: series con datos en ALGUNA lectura válida del historial. Las que
+   * nunca marcaron nada no aparecen ni en chips ni en el gráfico — puro
+   * ruido. OJO: se mira TODO el historial, no la última lectura: el SM4
+   * hoy está en 0 viniendo de 370, y esa bajada es justo la historia que
+   * hay que poder ver.
+   */
+  const seriesConDatos = useMemo(
+    () => seriesActivas.filter((s) =>
+      serie.some((l) => muestraValida(l) && tasa1000(l[s.k], l.fish) > 0)),
+    [seriesActivas, serie],
+  )
+
   const chips = useMemo(() => {
-    type Chip = { id: string; label: string; valor?: number | null; valorColor?: string; nombreLargo?: string; color?: string; on: boolean; toggle: () => void; delta?: 'sube' | 'baja' }
+    type Chip = { id: string; label: string; nombreLargo?: string; color?: string; on: boolean; toggle: () => void; delta?: 'sube' | 'baja' }
     const alternar = (ks: string[], encender: boolean) =>
       setApagadas((prev) => {
         const n = new Set(prev)
@@ -853,7 +866,7 @@ function VistaProtocolo() {
     /* P67: lo alterado primero — el orden del panel (SM1…SM5) es para la
        Herramienta; acá la pregunta es «¿qué está mal?», y eso va a la
        izquierda. Empate: orden del panel, estable. */
-    const ordenadas = [...seriesActivas].sort((a, b) => {
+    const ordenadas = [...seriesConDatos].sort((a, b) => {
       const ex = (s2: typeof a) => {
         const r2 = ultimaValida ? tasa1000(ultimaValida[s2.k], ultimaValida.fish) : 0
         const m2 = METRICA_DE[s2.k as string] ?? 'correcciones'
@@ -864,14 +877,13 @@ function VistaProtocolo() {
     for (const s of ordenadas) {
       const k = s.k as string
       const r = ultimaValida ? tasa1000(ultimaValida[s.k], ultimaValida.fish) : null
-      const m = METRICA_DE[k] ?? 'correcciones'
       const rPrev = penultimaValida ? tasa1000(penultimaValida[s.k], penultimaValida.fish) : null
       items.push({
         id: k,
+        // P71: SOLO el nombre — la cantidad apretaba el texto y se leía
+        // entrecortado; el valor vive en el gráfico, el tooltip y el title.
         label: CORTO[k] ?? s.label,
-        valor: r,
-        valorColor: r !== null ? nivelTasa(r, m).color : undefined,
-        nombreLargo: s.label,
+        nombreLargo: r !== null ? `${s.label} · ${r}/1000` : s.label,
         color: s.color,
         on: !apagadas.has(k),
         toggle: () => alternar([k], apagadas.has(k)),
@@ -881,7 +893,7 @@ function VistaProtocolo() {
     }
     // Con UNA serie encendida se puede comparar contra las otras máquinas:
     // la brecha que el lector dice en texto, vista.
-    const encendidas = seriesActivas.filter((s) => !apagadas.has(s.k as string))
+    const encendidas = seriesConDatos.filter((s) => !apagadas.has(s.k as string))
     if (encendidas.length === 1) {
       items.push({
         id: 'comparar',
@@ -891,7 +903,7 @@ function VistaProtocolo() {
       })
     }
     return items
-  }, [seriesActivas, ultimaValida, penultimaValida, apagadas, comparar, maquina, guardarPrefs])
+  }, [seriesConDatos, ultimaValida, penultimaValida, apagadas, comparar, maquina, guardarPrefs])
 
   /** Veredicto de una lectura: el peor de los 11 contadores contra SU escala.
    *  Devuelve además QUIÉN lo causó — «crítico» a secas obligaba a expandir
@@ -1164,8 +1176,10 @@ function VistaProtocolo() {
       tension: 0.25,
       borderWidth: s.grosor ?? 1.75,
       borderDash: s.trazo ?? [],
-      // los chips mandan: serie apagada = dataset oculto (y el eje recalcula)
-      hidden: apagadas.has(s.k as string),
+      // los chips mandan: serie apagada = dataset oculto (y el eje recalcula);
+      // sin datos en todo el historial ni siquiera hay chip → oculto siempre
+      hidden: apagadas.has(s.k as string)
+        || !serie.some((l) => muestraValida(l) && tasa1000(l[s.k], l.fish) > 0),
       // clave del contador para que el tooltip encuentre su ficha en SABER
       clave: s.k as string,
     }))
@@ -1648,10 +1662,10 @@ function VistaProtocolo() {
           <p className="mt-2 flex flex-wrap items-center gap-x-2 text-caption" style={{ color: LC.inkLo }}>
             <span>
               Series · <strong style={{ color: LC.inkMid }}>
-                {seriesActivas.filter((s) => !apagadas.has(s.k as string)).length} de {seriesActivas.length}
+                {seriesConDatos.filter((s) => !apagadas.has(s.k as string)).length} de {seriesConDatos.length}
               </strong> en el gráfico · tocá para mostrar u ocultar
             </span>
-            {apagadas.size > 0 && seriesActivas.some((s) => {
+            {apagadas.size > 0 && seriesConDatos.some((s) => {
               const r = ultimaValida ? tasa1000(ultimaValida[s.k], ultimaValida.fish) : null
               const m = METRICA_DE[s.k as string] ?? 'correcciones'
               const alterada = r !== null && nivelTasa(r, m).label !== 'normal'
@@ -1660,7 +1674,7 @@ function VistaProtocolo() {
               <button
                 type="button"
                 onClick={() => {
-                  const off = seriesActivas
+                  const off = seriesConDatos
                     .filter((s) => {
                       const r = ultimaValida ? tasa1000(ultimaValida[s.k], ultimaValida.fish) : null
                       const m = METRICA_DE[s.k as string] ?? 'correcciones'
@@ -1685,7 +1699,7 @@ function VistaProtocolo() {
                 aria-pressed={c.on}
                 onClick={c.toggle}
                 title={c.nombreLargo}
-                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full px-3.5 text-footnote font-semibold"
+                className="inline-flex min-h-[44px] items-center gap-2 whitespace-nowrap rounded-full px-4 text-footnote font-semibold"
                 style={c.on
                   ? { background: LC.aquaSoft, boxShadow: `inset 0 0 0 1.5px ${LC.aqua}`, color: LC.ink }
                   : { background: 'transparent', boxShadow: `inset 0 0 0 1px ${LC.border}`, color: LC.inkMid }}
@@ -1694,11 +1708,6 @@ function VistaProtocolo() {
                   <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: c.on ? c.color : LC.inkGhost, opacity: c.on ? 1 : 0.5 }} />
                 ) : null}
                 {c.label}
-                {c.valor !== null && c.valor !== undefined ? (
-                  <span className="font-mono tabular-nums" style={{ color: c.on ? c.valorColor : undefined }}>
-                    {c.valor}
-                  </span>
-                ) : null}
                 {c.delta === 'sube' ? (
                   <TrendingUp aria-label="subiendo" className="h-3 w-3" style={{ color: LC.crit }} />
                 ) : c.delta === 'baja' ? (
