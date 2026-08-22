@@ -22,7 +22,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
-  AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, CircleGauge, Copy, LineChart as LineChartIcon, Loader2, RotateCcw,
+  AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, CircleGauge, Copy,
+  TrendingDown, TrendingUp, LineChart as LineChartIcon, Loader2, RotateCcw,
   Save, Video,
 } from 'lucide-react'
 import { Line } from 'react-chartjs-2'
@@ -523,6 +524,10 @@ function VistaProtocolo() {
   const [lecturas, setLecturas] = useState<LecturaProtocolo[]>([])
   const [cargando, setCargando] = useState(true)
   const [metrica, setMetrica] = useState<Metrica>('correcciones')
+  const cambiarMetrica = (m: Metrica) => {
+    setMetrica(m)
+    guardarPrefs(maquina, { metrica: m })
+  }
   const [borrador, setBorrador] = useState<BorradorVideo | null>(null)
   /** Cambia de máquina y deja la URL compartible (?maquina=n2). */
   const cambiarMaquina = (id: MaquinaBaader) => {
@@ -561,6 +566,23 @@ function VistaProtocolo() {
 
   /** Superponer la serie visible en las OTRAS máquinas (solo con UNA encendida). */
   const [comparar, setComparar] = useState(false)
+
+  /**
+   * Preferencias por máquina (métrica y series apagadas) en localStorage:
+   * volver a la vista y encontrarla como la dejaste. La clave incluye la
+   * máquina porque N2 con abrazaderas críticas y N3 sana se miran distinto.
+   */
+  const PREFS_KEY = 'perilla5-protocolo-prefs'
+  const leerPrefs = (): Record<string, { metrica?: Metrica; apagadas?: string[] }> => {
+    try { return JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}') } catch { return {} }
+  }
+  const guardarPrefs = (id: string, patch: { metrica?: Metrica; apagadas?: string[] }) => {
+    try {
+      const todo = leerPrefs()
+      todo[id] = { ...todo[id], ...patch }
+      localStorage.setItem(PREFS_KEY, JSON.stringify(todo))
+    } catch { /* almacenamiento lleno o bloqueado: la vista funciona igual */ }
+  }
 
   // Registrar es semanal y el explicativo es de una sola vez: ambos plegados.
   const [mostrarForm, setMostrarForm] = useState(false)
@@ -712,6 +734,10 @@ function VistaProtocolo() {
   // más el total. La N2 de hoy abre con 3 líneas, no 7 — menos es más (§63).
   useEffect(() => {
     setComparar(false)
+    const pref = leerPrefs()[maquina]
+    // metrica guardada de esta maquina (solo al entrar a la maquina)
+    if (pref?.metrica && pref.metrica !== metrica) setMetrica(pref.metrica)
+    if (pref?.apagadas) { setApagadas(new Set(pref.apagadas)); return }
     if (!ultimaValida) { setApagadas(new Set()); return }
     const off = new Set<string>()
     for (const s of seriesActivas) {
@@ -722,15 +748,23 @@ function VistaProtocolo() {
       if (!esTotal && nivelTasa(r, m).label === 'normal') off.add(k)
     }
     setApagadas(off)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [maquina, metrica, ultimaValida, seriesActivas])
+
+  /** La lectura válida ANTERIOR a la última: el denominador de los deltas. */
+  const penultimaValida = useMemo(() => {
+    const validas = serie.filter((l) => muestraValida(l))
+    return validas.length >= 2 ? (validas[validas.length - 2] ?? null) : null
+  }, [serie])
 
   /** Chips-leyenda: cada serie con su valor actual; los motores sanos, plegados en uno. */
   const chips = useMemo(() => {
-    type Chip = { id: string; label: string; color?: string; on: boolean; toggle: () => void }
+    type Chip = { id: string; label: string; color?: string; on: boolean; toggle: () => void; delta?: 'sube' | 'baja' }
     const alternar = (ks: string[], encender: boolean) =>
       setApagadas((prev) => {
         const n = new Set(prev)
         for (const k of ks) { if (encender) n.delete(k); else n.add(k) }
+        guardarPrefs(maquina, { apagadas: [...n] })
         return n
       })
     const items: Chip[] = []
@@ -741,12 +775,15 @@ function VistaProtocolo() {
       const m = METRICA_DE[k] ?? 'correcciones'
       const sano = r !== null && nivelTasa(r, m).label === 'normal'
       if (k.startsWith('e82') && sano) { motoresSanos.push(k); continue }
+      const rPrev = penultimaValida ? tasa1000(penultimaValida[s.k], penultimaValida.fish) : null
       items.push({
         id: k,
         label: r !== null ? `${s.label} ${r}` : s.label,
         color: s.color,
         on: !apagadas.has(k),
         toggle: () => alternar([k], apagadas.has(k)),
+        // direccion vs la lectura anterior: subir es malo en estas series
+        delta: r !== null && rPrev !== null && r !== rPrev ? (r > rPrev ? 'sube' : 'baja') : undefined,
       })
     }
     if (motoresSanos.length > 0) {
@@ -770,7 +807,7 @@ function VistaProtocolo() {
       })
     }
     return items
-  }, [seriesActivas, ultimaValida, apagadas, comparar])
+  }, [seriesActivas, ultimaValida, penultimaValida, apagadas, comparar])
 
   /** Veredicto de una lectura: el peor de los 11 contadores contra SU escala. */
   const veredictoDe = (l: LecturaProtocolo) => {
@@ -837,21 +874,20 @@ function VistaProtocolo() {
    * las otras dos, con su última lectura válida. "La N3, con la misma pesca,
    * está en 31" enseña más que cualquier umbral.
    */
-  const [comparacion, setComparacion] = useState<{ maquina: string; tasa: number }[]>([])
-  useEffect(() => {
-    let vivo = true
-    if (!queRevisar) { setComparacion([]); return }
-    const otras = MAQUINAS.filter((m) => m.id !== maquina)
-    void Promise.all(otras.map(async (m) => {
-      const rows = await lecturasDeMaquina(m.id, 'chonchi', 6)
-      const ult = rows.find((l) => muestraValida(l))
-      return ult
-        ? { maquina: m.label.replace('Baader 142 ', '').replace(' (antigua)', ''),
-            tasa: tasa1000(ult[queRevisar.serie.k], ult.fish) }
-        : null
-    })).then((r) => { if (vivo) setComparacion(r.filter((x): x is NonNullable<typeof x> => x !== null)) })
-    return () => { vivo = false }
-  }, [maquina, queRevisar])
+  // Derivada de filasPorMaquina — el fetch de veredictos ya trajo estas filas;
+  // pedirlas de nuevo eran 2 reads de Firestore duplicados por cambio de máquina.
+  const comparacion = useMemo(() => {
+    if (!queRevisar) return []
+    return MAQUINAS.filter((m) => m.id !== maquina)
+      .map((m) => {
+        const ult = (filasPorMaquina[m.id] ?? []).find((l) => muestraValida(l))
+        return ult
+          ? { maquina: m.label.replace('Baader 142 ', '').replace(' (antigua)', ''),
+              tasa: tasa1000(ult[queRevisar.serie.k], ult.fish) }
+          : null
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null)
+  }, [maquina, queRevisar, filasPorMaquina])
 
   /**
    * Cierre del lazo: la incidencia sale precargada con máquina, código y pauta.
@@ -920,6 +956,16 @@ function VistaProtocolo() {
     const on = seriesActivas.filter((s) => !apagadas.has(s.k as string))
     return on.length === 1 ? (on[0] ?? null) : null
   }, [seriesActivas, apagadas])
+
+  /** El gráfico en una frase, para lectores de pantalla (nunca solo imagen). */
+  const resumenGrafico = useMemo(() => {
+    if (!ultimaValida) return 'Sin lecturas para esta máquina.'
+    const partes = seriesActivas
+      .filter((s) => !apagadas.has(s.k as string))
+      .map((s) => `${s.label} en ${tasa1000(ultimaValida[s.k], ultimaValida.fish)} por mil`)
+    const etiqueta = MAQUINAS.find((m) => m.id === maquina)?.label ?? maquina
+    return `Tendencia de ${metrica} de ${etiqueta}. Última lectura ${fechaCorta(ultimaValida.fecha)}: ${partes.join(', ')}.`
+  }, [ultimaValida, seriesActivas, apagadas, maquina, metrica])
 
   const chartData = useMemo(() => {
     const activo = comparar && serieUnica !== null
@@ -1204,9 +1250,19 @@ function VistaProtocolo() {
                   {queRevisar.metrica === 'paradas' ? 'Una parada' : 'Una corrección'} cada{' '}
                   {Math.max(1, Math.round(1000 / Math.max(queRevisar.tasa, 1)))} pescados.
                 </strong>
-                {queRevisar.tasaPrevia !== null
-                  ? ` Venía de ${queRevisar.tasaPrevia}/1000 en la lectura anterior.`
-                  : ''}
+                {queRevisar.tasaPrevia !== null ? (
+                  <>
+                    {' '}Venía de {queRevisar.tasaPrevia}/1000:{' '}
+                    <strong
+                      className="tabular-nums"
+                      style={{ color: queRevisar.tasa <= queRevisar.tasaPrevia ? LC.ok : LC.crit }}
+                    >
+                      {queRevisar.tasa <= queRevisar.tasaPrevia ? '▾' : '▴'}
+                      {Math.abs(queRevisar.tasa - queRevisar.tasaPrevia)}
+                    </strong>
+                    {queRevisar.tasa <= queRevisar.tasaPrevia ? ' — mejorando.' : ' — empeorando.'}
+                  </>
+                ) : null}
               </p>
               {comparacion.length > 0 ? (
                 <p style={{ color: LC.inkMid }}>
@@ -1305,7 +1361,7 @@ function VistaProtocolo() {
                   type="button"
                   role="tab"
                   aria-selected={metrica === m}
-                  onClick={() => setMetrica(m)}
+                  onClick={() => cambiarMetrica(m)}
                   className="min-h-[44px] rounded-ctl px-3 text-footnote font-medium"
                   style={
                     metrica === m
@@ -1336,6 +1392,11 @@ function VistaProtocolo() {
                   <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: c.on ? c.color : LC.inkGhost }} />
                 ) : null}
                 {c.label}
+                {c.delta === 'sube' ? (
+                  <TrendingUp aria-label="subiendo" className="h-3 w-3" style={{ color: LC.crit }} />
+                ) : c.delta === 'baja' ? (
+                  <TrendingDown aria-label="bajando" className="h-3 w-3" style={{ color: LC.ok }} />
+                ) : null}
               </button>
             ))}
           </div>
@@ -1401,7 +1462,7 @@ function VistaProtocolo() {
             </div>
           ) : (
             <div className="relative mt-3 h-64 w-full min-w-0">
-              <Line data={chartData} options={chartOptions} plugins={[umbralPlugin]} />
+              <Line data={chartData} options={chartOptions} plugins={[umbralPlugin]} role="img" aria-label={resumenGrafico} />
             </div>
           )}
         </div>
