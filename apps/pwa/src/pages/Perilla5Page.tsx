@@ -22,7 +22,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
-  AlertTriangle, ArrowLeft, CircleGauge, LineChart as LineChartIcon, Loader2, RotateCcw,
+  AlertTriangle, ArrowLeft, ChevronDown, ChevronRight, CircleGauge, LineChart as LineChartIcon, Loader2, RotateCcw,
   Save, Video,
 } from 'lucide-react'
 import { Line } from 'react-chartjs-2'
@@ -42,7 +42,6 @@ import { useTheme } from '@/hooks/useTheme'
 import { LC } from '@/data/learningTheme'
 import {
   CONTADORES_KEYS,
-  LECTURA_BASE_2026_08_08,
   MUESTRA_MINIMA_FISH,
   muestraValida,
   borradorDeVideo,
@@ -153,6 +152,13 @@ const PAUTAS: Record<string, { inductivo: string; pasos: string[] }> = {
     'Verificar la correa del SM5 y buscar atasco mecánico en el recorrido del excavador.',
   ]},
 }
+const MESES_CORTOS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+/** '2026-08-22' -> '22 ago' — el eje y el historial respiran con fechas cortas. */
+function fechaCorta(f: string): string {
+  const [, m, d] = f.split('-')
+  return `${Number(d)} ${MESES_CORTOS[Number(m) - 1] ?? m}`
+}
+
 const PASO_FINAL =
   'Si tras la marcha de referencia (I → I) reincide, el problema es mecánico, no de control.'
 
@@ -163,14 +169,16 @@ const PASO_FINAL =
  * aprende qué significa el número sin salir a buscar el runbook. Fuentes:
  * manual 1420000804 (esquema de programas) y runbook E8xx.
  */
-const SABER: Record<string, { que: string; pasos: string[] }> = {
+const SABER: Record<string, { titulo?: string; que: string; pasos: string[] }> = {
   stopc: {
+    titulo: 'Mirar el desglose de correcciones',
     que: 'Fallas de cualquier herramienta que el control corrigió sin detener la máquina — el total de la degradación silenciosa. Invisible en piso: solo este contador la ve.',
     pasos: [
       'Mirar qué contador específico domina (abrazaderas, cuchilla de punta o un motor): el total solo dice cuánto, no dónde.',
     ],
   },
   tclipc: {
+    titulo: 'Revisar las abrazaderas de cola',
     que: 'Fallas de las abrazaderas de cola corregidas por el control sin parar — el pescado no fue tomado por la primera abrazadera y lo recogió la segunda.',
     pasos: [
       'Revisar tensión y desgaste de las abrazaderas de cola — con la máquina parada.',
@@ -179,6 +187,7 @@ const SABER: Record<string, { que: string; pasos: string[] }> = {
     ],
   },
   tclip: {
+    titulo: 'Revisar las abrazaderas de cola',
     que: 'Fallas de abrazaderas que SÍ detuvieron la máquina: el pescado no fue recogido ni con la segunda abrazadera.',
     pasos: [
       'Revisar tensión y desgaste de ambas abrazaderas de cola.',
@@ -186,12 +195,14 @@ const SABER: Record<string, { que: string; pasos: string[] }> = {
     ],
   },
   stops: {
+    titulo: 'Mirar el desglose de paradas',
     que: 'Todas las fallas que hicieron que el ordenador detuviera la máquina. Cada una cuesta producción directa (~20 s de marcha de referencia + arranque).',
     pasos: [
       'Mirar qué contador de parada específico domina (abrazaderas o cuchilla de punta).',
     ],
   },
   anusi: {
+    titulo: 'Revisar la cuchilla de punta',
     que: 'Fallas de la cuchilla de punta detectadas por el palpador interior (lado pared) que detuvieron la máquina.',
     pasos: [
       'Revisar la cuchilla de punta (filo, montaje) y el palpador del lado pared.',
@@ -199,17 +210,18 @@ const SABER: Record<string, { que: string; pasos: string[] }> = {
     ],
   },
   anuso: {
+    titulo: 'Revisar la cuchilla de punta',
     que: 'Fallas de la cuchilla de punta detectadas por el palpador exterior (lado entrada) que detuvieron la máquina.',
     pasos: [
       'Revisar la cuchilla de punta (filo, montaje) y el palpador del lado entrada.',
       'Verificar el ajuste del palpador: distancia y limpieza.',
     ],
   },
-  e821c: { que: 'Correcciones silenciosas del motor del centraje (SM1): perdió su posición cero y el control lo recuperó sin parar.', pasos: PAUTAS.e821c!.pasos },
-  e822c: { que: 'Correcciones silenciosas del motor de la cuchilla hendedora (SM2).', pasos: PAUTAS.e822c!.pasos },
-  e823c: { que: 'Correcciones silenciosas del motor del aspirador (SM3).', pasos: PAUTAS.e823c!.pasos },
-  e824c: { que: 'Correcciones silenciosas del motor del excavador A (SM4).', pasos: PAUTAS.e824c!.pasos },
-  e825c: { que: 'Correcciones silenciosas del motor del excavador B (SM5). Fue el caso fundacional: 1 de cada 3 pescados sin que nadie lo viera.', pasos: PAUTAS.e825c!.pasos },
+  e821c: { titulo: 'Revisar el centraje (SM1)', que: 'Correcciones silenciosas del motor del centraje (SM1): perdió su posición cero y el control lo recuperó sin parar.', pasos: PAUTAS.e821c!.pasos },
+  e822c: { titulo: 'Revisar la cuchilla hendedora (SM2)', que: 'Correcciones silenciosas del motor de la cuchilla hendedora (SM2).', pasos: PAUTAS.e822c!.pasos },
+  e823c: { titulo: 'Revisar el aspirador (SM3)', que: 'Correcciones silenciosas del motor del aspirador (SM3).', pasos: PAUTAS.e823c!.pasos },
+  e824c: { titulo: 'Revisar el excavador A (SM4)', que: 'Correcciones silenciosas del motor del excavador A (SM4).', pasos: PAUTAS.e824c!.pasos },
+  e825c: { titulo: 'Revisar el excavador B (SM5)', que: 'Correcciones silenciosas del motor del excavador B (SM5). Fue el caso fundacional: 1 de cada 3 pescados sin que nadie lo viera.', pasos: PAUTAS.e825c!.pasos },
 }
 
 /** Con qué escala de umbral se juzga cada contador. */
@@ -501,6 +513,9 @@ function VistaProtocolo() {
   const [cargando, setCargando] = useState(true)
   const [metrica, setMetrica] = useState<Metrica>('correcciones')
   const [borrador, setBorrador] = useState<BorradorVideo | null>(null)
+  // Registrar es semanal y el explicativo es de una sola vez: ambos plegados.
+  const [mostrarForm, setMostrarForm] = useState(false)
+  const [mostrarInfo, setMostrarInfo] = useState(false)
 
   const cargar = useCallback(async () => {
     setCargando(true)
@@ -539,17 +554,6 @@ function VistaProtocolo() {
     return Number.isFinite(v) && v >= 0 ? v : 0
   }
   const fish = num('fish')
-
-  const precargarBase = () => {
-    setMaquina('baader-n1')
-    setFecha('2026-08-08')
-    setForm(
-      Object.fromEntries(
-        CONTADORES_KEYS.map((k) => [k, String(LECTURA_BASE_2026_08_08[k])]),
-      ) as Record<keyof ContadoresProtocolo, string>,
-    )
-    setNotas('Lectura base de terreno 08-08-2026, Baader 142 N1 antigua (1299 pescados). E825-C=452: el excavador B perdía pasos en 1 de cada 3 pescados.')
-  }
 
   /**
    * Precarga los contadores que el watcher pudo leer del video.
@@ -642,6 +646,84 @@ function VistaProtocolo() {
   const seriesActivas = metrica === 'paradas' ? SERIES_PARADAS : SERIES
   const hayInsuficientes = serie.some((l) => !muestraValida(l))
 
+  const ultimaValida = useMemo(
+    () => [...serie].reverse().find((l) => muestraValida(l)) ?? null,
+    [serie],
+  )
+
+  /** Series apagadas del gráfico (por clave). */
+  const [apagadas, setApagadas] = useState<Set<string>>(new Set())
+  // Smart default: encendido solo lo que tiene algo que decir (nivel ≥ vigilar)
+  // más el total. La N2 de hoy abre con 3 líneas, no 7 — menos es más (§63).
+  useEffect(() => {
+    if (!ultimaValida) { setApagadas(new Set()); return }
+    const off = new Set<string>()
+    for (const s of seriesActivas) {
+      const k = s.k as string
+      const esTotal = k === 'stopc' || k === 'stops'
+      const r = tasa1000(ultimaValida[s.k], ultimaValida.fish)
+      const m = METRICA_DE[k] ?? 'correcciones'
+      if (!esTotal && nivelTasa(r, m).label === 'normal') off.add(k)
+    }
+    setApagadas(off)
+  }, [maquina, metrica, ultimaValida, seriesActivas])
+
+  /** Chips-leyenda: cada serie con su valor actual; los motores sanos, plegados en uno. */
+  const chips = useMemo(() => {
+    type Chip = { id: string; label: string; color?: string; on: boolean; toggle: () => void }
+    const alternar = (ks: string[], encender: boolean) =>
+      setApagadas((prev) => {
+        const n = new Set(prev)
+        for (const k of ks) { if (encender) n.delete(k); else n.add(k) }
+        return n
+      })
+    const items: Chip[] = []
+    const motoresSanos: string[] = []
+    for (const s of seriesActivas) {
+      const k = s.k as string
+      const r = ultimaValida ? tasa1000(ultimaValida[s.k], ultimaValida.fish) : null
+      const m = METRICA_DE[k] ?? 'correcciones'
+      const sano = r !== null && nivelTasa(r, m).label === 'normal'
+      if (k.startsWith('e82') && sano) { motoresSanos.push(k); continue }
+      items.push({
+        id: k,
+        label: r !== null ? `${s.label} ${r}` : s.label,
+        color: s.color,
+        on: !apagadas.has(k),
+        toggle: () => alternar([k], apagadas.has(k)),
+      })
+    }
+    if (motoresSanos.length > 0) {
+      const on = motoresSanos.some((k) => !apagadas.has(k))
+      items.push({
+        id: 'motores',
+        label: `Motores (${motoresSanos.length} en verde)`,
+        on,
+        toggle: () => alternar(motoresSanos, !on),
+      })
+    }
+    return items
+  }, [seriesActivas, ultimaValida, apagadas])
+
+  /** Veredicto de una lectura: el peor de los 11 contadores contra SU escala. */
+  const veredictoDe = (l: LecturaProtocolo) => {
+    if (!muestraValida(l)) return { label: 'muestra insuf.', color: LC.warn, soft: LC.warnSoft }
+    let peor: { label: string; color: string; exceso: number } = { label: 'normal', color: LC.ok, exceso: 0 }
+    for (const s of [...SERIES, ...SERIES_PARADAS]) {
+      const m = METRICA_DE[s.k as string] ?? 'correcciones'
+      const r = tasa1000(l[s.k], l.fish)
+      const ex = r / UMBRALES[m].intervenir
+      if (ex > peor.exceso) {
+        const n = nivelTasa(r, m)
+        peor = { label: n.label, color: n.color, exceso: ex }
+      }
+    }
+    const soft = peor.label === 'crítico' ? LC.dangerSoft
+      : peor.label === 'intervenir' ? LC.warnSoft
+      : peor.label === 'vigilar' ? LC.prepSoft : LC.okSoft
+    return { label: peor.label, color: peor.color, soft }
+  }
+
   /**
    * Qué revisar ahora: la herramienta dominante de la ÚLTIMA lectura válida,
    * solo si cruzó «intervenir». Con todo verde no hay tarjeta — una alerta que
@@ -729,7 +811,7 @@ function VistaProtocolo() {
 
   const chartData = useMemo(
     () => ({
-      labels: serie.map((l) => l.fecha),
+      labels: serie.map((l) => fechaCorta(l.fecha)),
       datasets: seriesActivas.map((s) => ({
         label: s.label,
         // null (no 0) en las muestras insuficientes: con spanGaps:false la línea se
@@ -755,42 +837,46 @@ function VistaProtocolo() {
    * El umbral deja de ser un texto al pie: el que mira aprende qué es "alto"
    * porque el punto cae en una zona de color.
    */
-  const bandasPlugin = useMemo(() => {
+  /**
+   * Líneas de umbral punteadas con etiqueta al borde. Las bandas de fondo del
+   * primer intento quedaron pesadas ("muy bruto" — Orel): una línea por umbral
+   * enseña lo mismo con una fracción de la tinta.
+   */
+  const umbralPlugin = useMemo(() => {
     const u = UMBRALES[metrica]
-    const bandas = isDark
-      ? [
-          { desde: u.critico, hasta: Infinity, fill: 'rgba(255,69,58,0.10)', ink: '#F0716A', label: `crítico ≥${u.critico}` },
-          { desde: u.intervenir, hasta: u.critico, fill: 'rgba(255,140,10,0.09)', ink: '#EE8A55', label: `intervenir ≥${u.intervenir}` },
-          { desde: u.vigilar, hasta: u.intervenir, fill: 'rgba(255,159,10,0.06)', ink: '#E0AC4E', label: `vigilar ≥${u.vigilar}` },
-          { desde: 0, hasta: u.vigilar, fill: 'rgba(48,209,88,0.05)', ink: '#5DC9A2', label: 'normal' },
-        ]
-      : [
-          { desde: u.critico, hasta: Infinity, fill: 'rgba(255,59,48,0.07)', ink: '#A8201A', label: `crítico ≥${u.critico}` },
-          { desde: u.intervenir, hasta: u.critico, fill: 'rgba(255,105,0,0.08)', ink: '#B4501C', label: `intervenir ≥${u.intervenir}` },
-          { desde: u.vigilar, hasta: u.intervenir, fill: 'rgba(255,149,0,0.07)', ink: '#875105', label: `vigilar ≥${u.vigilar}` },
-          { desde: 0, hasta: u.vigilar, fill: 'rgba(52,199,89,0.07)', ink: '#127054', label: 'normal' },
-        ]
+    const tinta = isDark
+      ? { critico: '#F0716A', intervenir: '#EE8A55', vigilar: '#E0AC4E' }
+      : { critico: '#A8201A', intervenir: '#B4501C', vigilar: '#875105' }
+    const lineas = [
+      { v: u.critico, ink: tinta.critico, label: `crítico ${u.critico}` },
+      { v: u.intervenir, ink: tinta.intervenir, label: `intervenir ${u.intervenir}` },
+      { v: u.vigilar, ink: tinta.vigilar, label: `vigilar ${u.vigilar}` },
+    ]
     const plugin: Plugin<'line'> = {
-      id: 'bandasUmbral',
+      id: 'lineasUmbral',
       beforeDraw(chart) {
         const { ctx, chartArea, scales } = chart
-        const y = scales.y as { getPixelForValue: (v: number) => number } | undefined
-        if (!y) return
-        if (!chartArea) return
+        const y = scales.y as { getPixelForValue: (v: number) => number; max: number } | undefined
+        if (!chartArea || !y) return
         ctx.save()
-        for (const b of bandas) {
-          const yTop = b.hasta === Infinity ? chartArea.top
-            : Math.max(chartArea.top, y.getPixelForValue(b.hasta))
-          const yBot = Math.min(chartArea.bottom, y.getPixelForValue(b.desde))
-          if (yBot <= yTop) continue
-          ctx.fillStyle = b.fill
-          ctx.fillRect(chartArea.left, yTop, chartArea.right - chartArea.left, yBot - yTop)
-          if (yBot - yTop > 14) {
-            ctx.fillStyle = b.ink
-            ctx.font = '700 9px system-ui'
-            ctx.textAlign = 'right'
-            ctx.fillText(b.label, chartArea.right - 4, Math.min(yTop + 11, yBot - 4))
-          }
+        for (const l of lineas) {
+          if (l.v > y.max) continue          // fuera de escala: no dibujar en el borde
+          const py = y.getPixelForValue(l.v)
+          if (py < chartArea.top + 6 || py > chartArea.bottom - 2) continue
+          ctx.strokeStyle = l.ink
+          ctx.globalAlpha = 0.55
+          ctx.setLineDash([5, 4])
+          ctx.lineWidth = 1
+          ctx.beginPath()
+          ctx.moveTo(chartArea.left, py)
+          ctx.lineTo(chartArea.right, py)
+          ctx.stroke()
+          ctx.setLineDash([])
+          ctx.globalAlpha = 0.9
+          ctx.fillStyle = l.ink
+          ctx.font = '700 9px system-ui'
+          ctx.textAlign = 'right'
+          ctx.fillText(l.label, chartArea.right - 2, py - 3)
         }
         ctx.restore()
       },
@@ -819,7 +905,7 @@ function VistaProtocolo() {
       // el modo index apila las fichas de todas y no se puede leer ninguna
       interaction: { mode: 'nearest' as const, intersect: false },
       plugins: {
-        legend: { labels: { color: ejeColor, boxWidth: 12, font: { size: 11 } } },
+        legend: { display: false },   // los chips son la leyenda
         tooltip: {
           callbacks: {
             label: (item: TooltipItem<'line'>) => {
@@ -848,13 +934,7 @@ function VistaProtocolo() {
         x: { ticks: { color: ejeColor, font: { size: 11 } }, grid: { color: gridColor } },
         y: {
           beginAtZero: true,
-          title: {
-            display: true,
-            text: metrica === 'paradas' ? 'paradas por 1000 pescados' : 'correcciones -C por 1000 pescados',
-            color: ejeColor,
-            font: { size: 11 },
-          },
-          ticks: { color: ejeColor, font: { size: 11 } },
+          ticks: { color: ejeColor, font: { size: 10 }, maxTicksLimit: 5 },
           grid: { color: gridColor },
         },
       },
@@ -864,24 +944,6 @@ function VistaProtocolo() {
 
   return (
     <div className="mt-4 space-y-4">
-      {/* Qué es y por qué se registra */}
-      <div
-        className="rounded-card border p-4 text-sm leading-relaxed"
-        style={{ background: LC.surface, borderColor: LC.border, color: LC.inkMid }}
-      >
-        <p>
-          Con Upgrade Kit, el control corrige en silencio los pasos perdidos de cada motor y los
-          anota en los contadores <span className="font-mono">∑E82x-C</span> (perilla 5 → posición 1,
-          se navega con la perilla 4). Registrar la lectura <strong style={{ color: LC.ink }}>semanal
-          (viernes, fin de turno)</strong> y <strong style={{ color: LC.ink }}>siempre antes de
-          resetear</strong> deja visible el desgaste antes de que pare la máquina.
-        </p>
-        <p className="mt-2" style={{ color: LC.ink }}>
-          Regla de planta: <strong>no resetear el protocolo sin registrar primero los valores</strong>.
-          Para el conteo del turno usar <span className="font-mono">∑ FI-TODAY</span>, no el reset.
-        </p>
-      </div>
-
       {/* Selector de máquina */}
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-xs tracking-wide" style={{ color: LC.inkLo }}>
@@ -905,21 +967,268 @@ function VistaProtocolo() {
         ))}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        {/* Formulario */}
+        {/* Qué revisar ahora — solo cuando la última lectura cruzó «intervenir».
+            Orden por urgencia: la acción va antes que el gráfico. */}
+        {queRevisar ? (
+          <div
+            className="min-w-0 rounded-card border p-4"
+            style={{ background: LC.surface, borderColor: queRevisar.nivel.color }}
+            role="region"
+            aria-label="Qué revisar ahora"
+          >
+            <div className="flex flex-wrap items-center gap-3">
+              <span
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-ctl"
+                style={{ background: LC.dangerSoft, color: queRevisar.nivel.color }}
+              >
+                <AlertTriangle className="h-5 w-5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <h2 className="text-base font-semibold leading-tight">
+                  {queRevisar.saber?.titulo ?? queRevisar.serie.label}
+                </h2>
+                <p className="text-caption" style={{ color: LC.inkMid }}>
+                  Lectura del {queRevisar.lectura.fecha} · {queRevisar.lectura.fish} pescados
+                </p>
+              </div>
+              <span
+                className="rounded-ctl px-2.5 py-1 text-footnote font-semibold tabular-nums"
+                style={{ background: LC.dangerSoft, color: queRevisar.nivel.color }}
+              >
+                {queRevisar.tasa}/1000 · {queRevisar.nivel.label}
+              </span>
+            </div>
+
+            {/* El lector: qué dice el gráfico hoy, en lenguaje de planta */}
+            <div className="mt-3 space-y-1.5 text-footnote" style={{ color: LC.ink }}>
+              <p>
+                {queRevisar.saber?.que ?? ''}{' '}
+                <strong className="tabular-nums">
+                  {queRevisar.metrica === 'paradas' ? 'Una parada' : 'Una corrección'} cada{' '}
+                  {Math.max(1, Math.round(1000 / Math.max(queRevisar.tasa, 1)))} pescados.
+                </strong>
+                {queRevisar.tasaPrevia !== null
+                  ? ` Venía de ${queRevisar.tasaPrevia}/1000 en la lectura anterior.`
+                  : ''}
+              </p>
+              {comparacion.length > 0 ? (
+                <p style={{ color: LC.inkMid }}>
+                  En el mismo contador,{' '}
+                  {comparacion.map((c, i) => (
+                    <span key={c.maquina}>
+                      {i > 0 ? ' y ' : ''}
+                      <strong style={{ color: LC.ink }}>{c.maquina}</strong> está en{' '}
+                      <strong
+                        className="tabular-nums"
+                        style={{ color: nivelTasa(c.tasa, queRevisar.metrica).color }}
+                      >
+                        {c.tasa}/1000
+                      </strong>
+                    </span>
+                  ))}
+                  .
+                </p>
+              ) : null}
+              {!queRevisar.esMotor && queRevisar.motoresSanos ? (
+                <p style={{ color: LC.inkMid }}>
+                  Los 5 motores paso a paso están sanos: el problema es{' '}
+                  <strong style={{ color: LC.ink }}>mecánico</strong>, no de control.
+                </p>
+              ) : null}
+            </div>
+
+            <ol className="mt-3 space-y-2 text-footnote" style={{ color: LC.ink }}>
+              {(queRevisar.saber?.pasos ?? []).map((paso, i) => (
+                <li key={paso} className="flex gap-2">
+                  <span className="font-mono text-caption" style={{ color: LC.inkLo }}>{i + 1}</span>
+                  <span>{paso}</span>
+                </li>
+              ))}
+              {queRevisar.esMotor ? (
+                <li className="flex gap-2">
+                  <span className="font-mono text-caption" style={{ color: LC.inkLo }}>
+                    {(queRevisar.saber?.pasos.length ?? 0) + 1}
+                  </span>
+                  <span>{PASO_FINAL}</span>
+                </li>
+              ) : null}
+            </ol>
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={registrarIncidencia}
+                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-ctl px-4 text-footnote font-semibold"
+                style={{ background: LC.aqua, color: '#fff' }}
+              >
+                Registrar incidencia con esto
+              </button>
+              <button
+                type="button"
+                onClick={() => setSearchParams({ vista: 'herramienta' })}
+                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-ctl px-4 text-footnote font-medium"
+                style={{ background: LC.aquaSoft, color: LC.aqua }}
+              >
+                Diagnóstico completo
+              </button>
+            </div>
+            <p className="mt-2 text-caption" style={{ color: LC.inkLo }}>
+              La incidencia sale precargada con la máquina, el código y estos pasos como pauta.
+            </p>
+          </div>
+        ) : null}
+
+
+        {/* Tendencia */}
+        <div className="min-w-0 rounded-card border p-4" style={{ background: LC.surface, borderColor: LC.border }}>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-base font-semibold">
+              Tendencia
+            </h2>
+            <div
+              className="inline-flex gap-1 rounded-ctl p-0.5"
+              role="tablist"
+              aria-label="Métrica"
+              style={{ background: LC.bgPanel }}
+            >
+              {(['correcciones', 'paradas'] as Metrica[]).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  role="tab"
+                  aria-selected={metrica === m}
+                  onClick={() => setMetrica(m)}
+                  className="min-h-[44px] rounded-ctl px-3 text-footnote font-medium"
+                  style={
+                    metrica === m
+                      ? { background: LC.surface, color: LC.aqua }
+                      : { color: LC.inkMid }
+                  }
+                >
+                  {m === 'paradas' ? 'Paradas' : 'Correcciones -C'}
+                </button>
+              ))}
+            </div>
+          </div>
+          {/* Chips de serie con su valor: leyenda tocable. Smart default: solo
+              lo que tiene algo que decir; los motores sanos, plegados en uno. */}
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {chips.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                aria-pressed={c.on}
+                onClick={c.toggle}
+                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full px-3.5 text-caption font-semibold"
+                style={c.on
+                  ? { background: LC.surface, boxShadow: `inset 0 0 0 1.5px ${LC.borderHi}`, color: LC.ink }
+                  : { background: LC.bgPanel, color: LC.inkMid }}
+              >
+                {c.color ? (
+                  <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: c.on ? c.color : LC.inkGhost }} />
+                ) : null}
+                {c.label}
+              </button>
+            ))}
+          </div>
+          {hayInsuficientes ? (
+            <p
+              className="mt-2 flex items-start gap-1.5 text-xs"
+              style={{ color: LC.warn }}
+            >
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>
+                La línea se corta en las lecturas con menos de {MUESTRA_MINIMA_FISH} pescados: el
+                panel todavía no calcula /1000Fi y esas tasas no son comparables.
+              </span>
+            </p>
+          ) : null}
+          {cargando ? (
+            <div className="flex h-64 items-center justify-center">
+              <Loader2 className="h-5 w-5 animate-spin" style={{ color: LC.inkLo }} />
+            </div>
+          ) : serie.length === 0 ? (
+            <p className="mt-6 text-sm" style={{ color: LC.inkLo }}>
+              Sin lecturas guardadas para esta máquina todavía. Guardá la primera con el
+              formulario — podés partir precargando la lectura base del 08-08.
+            </p>
+          ) : (
+            <div className="relative mt-3 h-64 w-full min-w-0">
+              <Line data={chartData} options={chartOptions} plugins={[umbralPlugin]} />
+            </div>
+          )}
+        </div>
+
+      {/* Historial compacto: fecha · pescados · origen · veredicto. El detalle
+          numérico vive en el gráfico y su tooltip, no en una tabla de 8 columnas. */}
+      <div className="min-w-0 rounded-card border p-4" style={{ background: LC.surface, borderColor: LC.border }}>
+        <h2 className="text-base font-semibold">Lecturas</h2>
+        {cargando ? null : lecturas.length === 0 ? (
+          <p className="mt-2 text-footnote" style={{ color: LC.inkLo }}>Ninguna todavía.</p>
+        ) : (
+          <div className="mt-1">
+            {lecturas.map((l) => {
+              const v = veredictoDe(l)
+              const esVideo = Boolean((l as unknown as { origen?: { video?: string } }).origen?.video)
+              return (
+                <div
+                  key={l.id}
+                  className="flex items-center gap-3 border-t py-2.5 first:border-t-0"
+                  style={{ borderColor: LC.border }}
+                >
+                  <span className="w-16 shrink-0 font-mono text-footnote tabular-nums">
+                    {fechaCorta(l.fecha)}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-footnote" style={{ color: LC.inkMid }}>
+                    {l.fish} pz · {esVideo ? 'video' : 'manual'}
+                  </span>
+                  <span
+                    className="shrink-0 rounded-full px-2.5 py-0.5 text-caption font-semibold"
+                    style={{ background: v.soft, color: v.color }}
+                  >
+                    {v.label}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Registrar es semanal, y casi siempre lo llena el video: va plegado.
+          Lo diario (lector + tendencia) manda arriba. */}
+      <button
+        type="button"
+        aria-expanded={mostrarForm}
+        onClick={() => setMostrarForm((v) => !v)}
+        className="flex w-full items-center gap-3 rounded-card border p-4 text-left"
+        style={{ background: LC.surface, borderColor: LC.border }}
+      >
+        <span
+          className="grid h-8 w-8 shrink-0 place-items-center rounded-ctl"
+          style={{ background: LC.aquaSoft, color: LC.aqua }}
+        >
+          <Save className="h-4 w-4" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold" style={{ color: LC.ink }}>
+            Registrar lectura
+          </span>
+          <span className="block text-caption" style={{ color: LC.inkMid }}>
+            {borrador
+              ? `Hay un video transcrito del ${borrador.fecha} esperando`
+              : 'Los 17 contadores del panel, a mano'}
+          </span>
+        </span>
+        {mostrarForm
+          ? <ChevronDown aria-hidden className="h-4 w-4 shrink-0" style={{ color: LC.inkLo }} />
+          : <ChevronRight aria-hidden className="h-4 w-4 shrink-0" style={{ color: LC.inkLo }} />}
+      </button>
+      {mostrarForm ? (
         <div className="min-w-0 rounded-card border p-4" style={{ background: LC.surface, borderColor: LC.border }}>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-base font-semibold">Nueva lectura</h2>
             <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={precargarBase}
-                className="rounded-ctl border px-2 py-1 text-xs"
-                style={{ borderColor: LC.border, color: LC.inkMid }}
-                title="Rellena el formulario con la lectura de terreno del 08-08-2026 (Baader antigua)"
-              >
-                Precargar base 08-08
-              </button>
               <button
                 type="button"
                 onClick={limpiar}
@@ -1029,277 +1338,45 @@ function VistaProtocolo() {
           )}
         </div>
 
-        {/* Qué revisar ahora — solo cuando la última lectura cruzó «intervenir».
-            Orden por urgencia: la acción va antes que el gráfico. */}
-        {queRevisar ? (
-          <div
-            className="min-w-0 rounded-card border p-4 lg:col-span-2"
-            style={{ background: LC.surface, borderColor: queRevisar.nivel.color }}
-            role="region"
-            aria-label="Qué revisar ahora"
-          >
-            <div className="flex flex-wrap items-center gap-3">
-              <span
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-ctl"
-                style={{ background: LC.dangerSoft, color: queRevisar.nivel.color }}
-              >
-                <AlertTriangle className="h-5 w-5" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <h2 className="text-base font-semibold leading-tight">
-                  {queRevisar.serie.label} — qué revisar ahora
-                </h2>
-                <p className="text-caption" style={{ color: LC.inkMid }}>
-                  Lectura del {queRevisar.lectura.fecha} · {queRevisar.lectura.fish} pescados
-                </p>
-              </div>
-              <span
-                className="rounded-ctl px-2.5 py-1 text-footnote font-semibold tabular-nums"
-                style={{ background: LC.dangerSoft, color: queRevisar.nivel.color }}
-              >
-                {queRevisar.tasa}/1000 · {queRevisar.nivel.label}
-              </span>
-            </div>
+      ) : null}
 
-            {/* El lector: qué dice el gráfico hoy, en lenguaje de planta */}
-            <div className="mt-3 space-y-1.5 text-footnote" style={{ color: LC.ink }}>
-              <p>
-                {queRevisar.saber?.que ?? ''}{' '}
-                <strong className="tabular-nums">
-                  {queRevisar.metrica === 'paradas' ? 'Una parada' : 'Una corrección'} cada{' '}
-                  {Math.max(1, Math.round(1000 / Math.max(queRevisar.tasa, 1)))} pescados.
-                </strong>
-                {queRevisar.tasaPrevia !== null
-                  ? ` Venía de ${queRevisar.tasaPrevia}/1000 en la lectura anterior.`
-                  : ''}
-              </p>
-              {comparacion.length > 0 ? (
-                <p style={{ color: LC.inkMid }}>
-                  En el mismo contador,{' '}
-                  {comparacion.map((c, i) => (
-                    <span key={c.maquina}>
-                      {i > 0 ? ' y ' : ''}
-                      <strong style={{ color: LC.ink }}>{c.maquina}</strong> está en{' '}
-                      <strong
-                        className="tabular-nums"
-                        style={{ color: nivelTasa(c.tasa, queRevisar.metrica).color }}
-                      >
-                        {c.tasa}/1000
-                      </strong>
-                    </span>
-                  ))}
-                  .
-                </p>
-              ) : null}
-              {!queRevisar.esMotor && queRevisar.motoresSanos ? (
-                <p style={{ color: LC.inkMid }}>
-                  Los 5 motores paso a paso están sanos: el problema es{' '}
-                  <strong style={{ color: LC.ink }}>mecánico</strong>, no de control.
-                </p>
-              ) : null}
-            </div>
-
-            <ol className="mt-3 space-y-2 text-footnote" style={{ color: LC.ink }}>
-              {(queRevisar.saber?.pasos ?? []).map((paso, i) => (
-                <li key={paso} className="flex gap-2">
-                  <span className="font-mono text-caption" style={{ color: LC.inkLo }}>{i + 1}</span>
-                  <span>{paso}</span>
-                </li>
-              ))}
-              {queRevisar.esMotor ? (
-                <li className="flex gap-2">
-                  <span className="font-mono text-caption" style={{ color: LC.inkLo }}>
-                    {(queRevisar.saber?.pasos.length ?? 0) + 1}
-                  </span>
-                  <span>{PASO_FINAL}</span>
-                </li>
-              ) : null}
-            </ol>
-
-            <div className="mt-3 flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={registrarIncidencia}
-                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-ctl px-4 text-footnote font-semibold"
-                style={{ background: LC.aqua, color: '#fff' }}
-              >
-                Registrar incidencia con esto
-              </button>
-              <button
-                type="button"
-                onClick={() => setSearchParams({ vista: 'herramienta' })}
-                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-ctl px-4 text-footnote font-medium"
-                style={{ background: LC.aquaSoft, color: LC.aqua }}
-              >
-                Diagnóstico completo
-              </button>
-            </div>
-            <p className="mt-2 text-caption" style={{ color: LC.inkLo }}>
-              La incidencia sale precargada con la máquina, el código y estos pasos como pauta.
-            </p>
-          </div>
-        ) : null}
-
-        {/* Tendencia */}
-        <div className="min-w-0 rounded-card border p-4" style={{ background: LC.surface, borderColor: LC.border }}>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-base font-semibold">
-              {metrica === 'paradas' ? 'Tendencia de paradas' : 'Tendencia de correcciones -C'}
-            </h2>
-            <div
-              className="inline-flex gap-1 rounded-ctl p-0.5"
-              role="tablist"
-              aria-label="Métrica"
-              style={{ background: LC.bgPanel }}
-            >
-              {(['correcciones', 'paradas'] as Metrica[]).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  role="tab"
-                  aria-selected={metrica === m}
-                  onClick={() => setMetrica(m)}
-                  className="min-h-[44px] rounded-ctl px-3 text-footnote font-medium"
-                  style={
-                    metrica === m
-                      ? { background: LC.surface, color: LC.aqua }
-                      : { color: LC.inkMid }
-                  }
-                >
-                  {m === 'paradas' ? 'Paradas' : 'Correcciones -C'}
-                </button>
-              ))}
-            </div>
-          </div>
-          <p className="mt-1 text-xs" style={{ color: LC.inkMid }}>
-            {metrica === 'paradas' ? (
-              <>
-                Paradas por 1000 pescados. Estas SÍ detienen la línea, así que la escala es más
-                exigente: {UMBRALES.paradas.vigilar} vigilar · {UMBRALES.paradas.intervenir}{' '}
-                intervenir · {UMBRALES.paradas.critico} crítico — una parada cada 333, cada 100 y
-                cada 33 pescados.
-              </>
-            ) : (
-              <>
-                Tasa /1000 pescados por herramienta. La serie que sube semana a semana marca el
-                subconjunto a intervenir. Umbrales provisorios: {UMBRALES.correcciones.vigilar}{' '}
-                vigilar · {UMBRALES.correcciones.intervenir} intervenir ·{' '}
-                {UMBRALES.correcciones.critico} crítico
-              </>
-            )}
-            <span style={{ color: LC.inkLo }}> (criterio interno de Mantención ANTARFOOD hasta
-            juntar 4 semanas de registro real)</span>.
-          </p>
-          {hayInsuficientes ? (
-            <p
-              className="mt-2 flex items-start gap-1.5 text-xs"
-              style={{ color: LC.warn }}
-            >
-              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              <span>
-                La línea se corta en las lecturas con menos de {MUESTRA_MINIMA_FISH} pescados: el
-                panel todavía no calcula /1000Fi y esas tasas no son comparables.
-              </span>
-            </p>
-          ) : null}
-          {cargando ? (
-            <div className="flex h-64 items-center justify-center">
-              <Loader2 className="h-5 w-5 animate-spin" style={{ color: LC.inkLo }} />
-            </div>
-          ) : serie.length === 0 ? (
-            <p className="mt-6 text-sm" style={{ color: LC.inkLo }}>
-              Sin lecturas guardadas para esta máquina todavía. Guardá la primera con el
-              formulario — podés partir precargando la lectura base del 08-08.
-            </p>
-          ) : (
-            <div className="relative mt-3 h-64 w-full min-w-0">
-              <Line data={chartData} options={chartOptions} plugins={[bandasPlugin]} />
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Historial */}
-      <div className="rounded-card border p-4" style={{ background: LC.surface, borderColor: LC.border }}>
-        <h2 className="text-base font-semibold">Lecturas registradas</h2>
-        {cargando ? null : lecturas.length === 0 ? (
-          <p className="mt-2 text-sm" style={{ color: LC.inkLo }}>Ninguna todavía.</p>
-        ) : (
-          <div className="mt-2 overflow-x-auto">
-            <table className="w-full min-w-[640px] text-sm">
-              <thead>
-                <tr style={{ color: LC.inkLo }}>
-                  <th className="py-1.5 pr-3 text-left font-medium">Fecha</th>
-                  <th className="py-1.5 pr-3 text-right font-medium">∑ FISH</th>
-                  <th className="py-1.5 pr-3 text-right font-medium">STOP-C</th>
-                  {SERIES.map((s) => (
-                    <th key={s.k} className="py-1.5 pr-3 text-right font-medium" title={s.label}>
-                      {s.label.split(' ').pop()}
-                    </th>
-                  ))}
-                  <th className="py-1.5 text-left font-medium">Dominante</th>
-                </tr>
-              </thead>
-              <tbody>
-                {lecturas.map((l) => {
-                  const valida = muestraValida(l)
-                  const tasas = SERIES.map((s) => ({ s, r: tasa1000(l[s.k], l.fish) }))
-                  const dom = tasas.reduce((a, b) => (b.r > a.r ? b : a))
-                  const nivel = nivelTasa(dom.r)
-                  return (
-                    <tr key={l.id} style={{ borderTop: `1px solid ${LC.border}` }}>
-                      <td className="py-1.5 pr-3 font-mono text-xs">
-                        {l.fecha}
-                        {valida ? null : (
-                          <span
-                            className="ml-1.5 rounded-ctl px-1.5 py-0.5 text-caption font-medium"
-                            style={{ background: LC.warnSoft, color: LC.warn }}
-                          >
-                            muestra insuf.
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-1.5 pr-3 text-right font-mono text-xs tabular-nums">
-                        {l.fish}
-                      </td>
-                      {/* Con muestra insuficiente se muestra "—", no el número en gris:
-                          un valor atenuado igual se lee y se compara; una raya no. */}
-                      <td className="py-1.5 pr-3 text-right font-mono text-xs tabular-nums">
-                        {valida ? tasa1000(l.stopc, l.fish) : <span style={{ color: LC.inkLo }}>—</span>}
-                      </td>
-                      {tasas.map(({ s, r }) => (
-                        <td
-                          key={s.k}
-                          className="py-1.5 pr-3 text-right font-mono text-xs tabular-nums"
-                        >
-                          {valida ? r : <span style={{ color: LC.inkLo }}>—</span>}
-                        </td>
-                      ))}
-                      <td className="py-1.5 text-xs">
-                        {!valida ? (
-                          <span style={{ color: LC.warn }}>
-                            Sin tasas: menos de {MUESTRA_MINIMA_FISH} pescados
-                          </span>
-                        ) : dom.r > 0 ? (
-                          <span style={{ color: nivel.color }}>
-                            {dom.s.label} · {dom.r}/1000 ({nivel.label})
-                          </span>
-                        ) : (
-                          <span style={{ color: LC.inkLo }}>sin correcciones</span>
-                        )}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-        <p className="mt-3 text-xs" style={{ color: LC.inkGhost }}>
-          Fuente técnica: manual 1420000804 §22.4 (Upgrade Kit) y runbook E8xx de planta.
-          Las lecturas son evidencia histórica: se crean y se leen, no se editan.
+      <button
+        type="button"
+        aria-expanded={mostrarInfo}
+        onClick={() => setMostrarInfo((v) => !v)}
+        className="mx-auto flex min-h-[44px] items-center gap-1 text-footnote"
+        style={{ color: LC.inkMid }}
+      >
+        ¿Cómo funciona el protocolo?
+        {mostrarInfo
+          ? <ChevronDown aria-hidden className="h-3.5 w-3.5" />
+          : <ChevronRight aria-hidden className="h-3.5 w-3.5" />}
+      </button>
+      {mostrarInfo ? (
+      <div
+        className="rounded-card border p-4 text-sm leading-relaxed"
+        style={{ background: LC.surface, borderColor: LC.border, color: LC.inkMid }}
+      >
+        <p>
+          Con Upgrade Kit, el control corrige en silencio los pasos perdidos de cada motor y los
+          anota en los contadores <span className="font-mono">∑E82x-C</span> (perilla 5 → posición 1,
+          se navega con la perilla 4). Registrar la lectura <strong style={{ color: LC.ink }}>semanal
+          (viernes, fin de turno)</strong> y <strong style={{ color: LC.ink }}>siempre antes de
+          resetear</strong> deja visible el desgaste antes de que pare la máquina.
+        </p>
+        <p className="mt-2" style={{ color: LC.ink }}>
+          Regla de planta: <strong>no resetear el protocolo sin registrar primero los valores</strong>.
+          Para el conteo del turno usar <span className="font-mono">∑ FI-TODAY</span>, no el reset.
+        </p>
+        <p className="mt-2 text-caption" style={{ color: LC.inkGhost }}>
+          Umbrales por 1000 pescados — correcciones: 5 vigilar · 30 intervenir · 100 crítico;
+          paradas: 3 · 10 · 30 (criterio interno de Mantención ANTARFOOD, provisorio hasta
+          juntar 4 semanas de registro). Fuente técnica: manual 1420000804 §22.4 (Upgrade Kit)
+          y runbook E8xx. Las lecturas son evidencia histórica: se crean y se leen, no se editan.
         </p>
       </div>
+
+      ) : null}
     </div>
   )
 }

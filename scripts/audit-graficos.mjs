@@ -52,6 +52,9 @@ const REGLAS = [
     base: {
       // Una serie o leyenda HTML propia al lado (verificado 2026-08-15):
       'components/grader/GraderPeriodView.tsx': 3, // 355 leyenda HTML propia; 860/899 una serie
+      // Chips-leyenda interactivos (punto de color + nombre + valor actual, tocables
+      // para encender/apagar): reemplazan la leyenda nativa con MAS informacion (#675).
+      'pages/Perilla5Page.tsx': 1,
       'components/grader/GraderTurnoDetailView.tsx': 2,
       'components/grader/tabs/GraderCompuertasTab.tsx': 1,
       'components/grader/tabs/GraderLotesTab.tsx': 2,
