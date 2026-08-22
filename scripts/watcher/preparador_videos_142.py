@@ -62,7 +62,10 @@ def extraer_frames(video: Path, destino: Path) -> list[Path]:
     destino.mkdir(parents=True, exist_ok=True)
     cmd = ["ffmpeg", "-y", "-v", "error", "-i", str(video),
            "-vf", f"fps={FPS}", str(destino / "f_%04d.png")]
-    subprocess.run(cmd, check=True)
+    # CREATE_NO_WINDOW: bajo pythonw (la tarea programada) cada ffmpeg abriria
+    # una consola que parpadea en el escritorio.
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    subprocess.run(cmd, check=True, creationflags=flags)
     return sorted(destino.glob("f_*.png"))
 
 
