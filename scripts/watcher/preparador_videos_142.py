@@ -34,7 +34,7 @@ PROTOCOLO = (ONEDRIVE / "ANTARFOOD" / "⚙️ EQUIPOS PLANTA" /
              "⚙️ BAADER 142" / "_PROTOCOLO")
 PENDIENTE = PROTOCOLO / "_PENDIENTE"
 
-FPS = 2                 # 2 fps: a 1 fps se pierden pantallas de ~3 s
+FPS = 3                 # 3 fps: con giro rapido de perilla, 2 fps perdia pantallas
 ANCHO_SALIDA = 1400     # ancho al que se amplia el display recortado
 HAMMING_DUP = 6         # distancia dHash bajo la cual dos pantallas son la misma
 FILAS_HOJA = 8          # pantallas por hoja de contacto
@@ -205,13 +205,18 @@ def procesar(video: Path, unidad: str, fecha: str) -> Path:
         log(f"  display detectado en {len(candidatos)} / {len(frames)} "
             f"(sin display: {sin_display})")
 
-    # dedupe conservando, por grupo, el frame mas nitido
+    # Dedupe SOLO contra el grupo inmediatamente anterior (colapsar quietud).
+    # Comparar contra TODOS los grupos fusionaba pantallas distintas pero
+    # parecidas: "E825-C: 0" se parece a "E821-C: 0" y desaparecia — le paso
+    # al barrido completo de Orel del 22-08. La perilla avanza en un sentido:
+    # si el frame no es igual AL ANTERIOR, es pantalla nueva, aunque se parezca
+    # a una de hace 20 segundos.
     grupos: list[list[tuple[int, np.ndarray, float]]] = []
     for cand in candidatos:
-        for g in grupos:
-            if hamming(cand[0], g[0][0]) <= HAMMING_DUP:
-                g.append(cand)
-                break
+        # ancla = PRIMER frame del grupo: comparar con el ultimo encadena a
+        # traves del blur de transicion y fusiona dos pantallas distintas
+        if grupos and hamming(cand[0], grupos[-1][0][0]) <= HAMMING_DUP:
+            grupos[-1].append(cand)
         else:
             grupos.append([cand])
 
