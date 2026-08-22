@@ -8356,6 +8356,49 @@ exports.onStockConteoCreated = onDocumentCreated('stockAuditLog/{logId}', async 
 const protocoloAlertas = require('./baader142/protocoloAlertas')
 
 const PROTOCOLO_COL = 'baader142Protocolo'
+const protocoloIngesta = require('./baader142/protocoloIngesta')
+const INGESTA_COL = 'baader142ProtocoloIngesta'
+
+/**
+ * Tema de Telegram donde el operador sube el video de esa máquina.
+ * El grupo es "Manuales e informacion mantencion" (foro), distinto del grupo del bot.
+ */
+function getTopicProtocolo(maquina) {
+  const map = {
+    'baader-n1': process.env.TELEGRAM_TOPIC_PROTOCOLO_N1,
+    'baader-n2': process.env.TELEGRAM_TOPIC_PROTOCOLO_N2,
+    'baader-n3': process.env.TELEGRAM_TOPIC_PROTOCOLO_N3,
+  }
+  const id = map[maquina]
+  return id ? Number(id) : undefined
+}
+
+/**
+ * Resultado de una ingesta por video → UN mensaje, en el tema de esa máquina.
+ *
+ * Va SOLO al tema (no al DM ni al general): el detalle de tendencia ya lo manda
+ * onProtocoloBaader142Created. Duplicar el aviso en dos canales es la forma más
+ * rápida de que se dejen de leer los dos.
+ */
+exports.onProtocoloIngestaCreated = onDocumentCreated(
+  { document: `${INGESTA_COL}/{ingestaId}`, region: 'us-central1' },
+  async (event) => {
+    const ing = event.data?.data()
+    const msg = protocoloIngesta.componerIngesta(ing)
+    if (!msg) {
+      logger.info('protocolo ingesta: doc no accionable, se omite')
+      return
+    }
+    const chatId = process.env.TELEGRAM_CHAT_MANUALES
+    const topicId = getTopicProtocolo(ing.maquina)
+    if (!chatId || !topicId) {
+      logger.warn(`protocolo ingesta: sin chat/tema para ${ing.maquina} — mensaje omitido`)
+      return
+    }
+    await sendTelegramMessage(msg, chatId, { topicId })
+    logger.info(`protocolo ingesta: aviso ${ing.resultado} de ${ing.maquina} al tema ${topicId}`)
+  }
+)
 
 /** Fecha de Santiago en YYYY-MM-DD (las lecturas se guardan con la fecha local). */
 function fechaChile(offsetDias = 0) {
