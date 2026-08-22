@@ -145,13 +145,15 @@ def vigia_tick(log) -> None:
                 continue
 
             m = RE_FECHA.search(clave)
-            if not m:
-                log(f"  [vigia] {tema}: {video.name} sin fecha en el nombre; lo salto")
-                hechos.add(clave)
-                procesados[tema] = sorted(hechos)
-                _guardar_estado(est)
-                continue
-            fecha = m.group(1)
+            if m:
+                fecha = m.group(1)
+            else:
+                # Los videos de iPhone se llaman IMG_NNNN.MOV — sin fecha en el
+                # nombre (nos paso el 22-08 con IMG_3088/3090). Fallback: la
+                # fecha de descarga del archivo, que es la del dia de carga.
+                fecha = datetime.fromtimestamp(st.st_mtime).strftime("%Y-%m-%d")
+                log(f"  [vigia] {tema}: {video.name} sin fecha en el nombre; "
+                    f"uso la de descarga ({fecha})")
 
             log(f"  [vigia] {tema}: video nuevo {video.name} -> preparador")
             try:
