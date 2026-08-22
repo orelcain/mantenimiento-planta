@@ -123,6 +123,13 @@ const SERIES_PARADAS: typeof SERIES = [
   { k: 'anuso', label: 'Cuchilla punta O', color: '#0f9d8f' },
 ]
 
+/** Nombre corto para el chip: el largo vive en el tooltip del gráfico. */
+const CORTO: Record<string, string> = {
+  stopc: '-C total', tclipc: 'Abraz.', e821c: 'Centraje', e822c: 'Cuchilla',
+  e823c: 'Aspirador', e824c: 'Exc. A', e825c: 'Exc. B',
+  stops: 'Paradas', tclip: 'Abraz.', anusi: 'Cuch. I', anuso: 'Cuch. O',
+}
+
 export type Metrica = 'correcciones' | 'paradas'
 
 /**
@@ -565,6 +572,8 @@ function VistaProtocolo() {
 
   /** Superponer la serie visible en las OTRAS máquinas (solo con UNA encendida). */
   const [comparar, setComparar] = useState(false)
+  // P33: lo verde plegado en un chip; se expande solo si alguien lo pide.
+  const [verdesAbiertos, setVerdesAbiertos] = useState(false)
 
   /**
    * Preferencias por máquina (métrica y series apagadas) en localStorage:
@@ -767,17 +776,19 @@ function VistaProtocolo() {
         return n
       })
     const items: Chip[] = []
-    const motoresSanos: string[] = []
+    // P33: TODO lo verde (motores o no) se pliega en un chip; la fila queda
+    // para lo que tiene algo que decir. Expandir es reversible y no persiste.
+    const verdes: typeof seriesActivas = []
     for (const s of seriesActivas) {
       const k = s.k as string
       const r = ultimaValida ? tasa1000(ultimaValida[s.k], ultimaValida.fish) : null
       const m = METRICA_DE[k] ?? 'correcciones'
       const sano = r !== null && nivelTasa(r, m).label === 'normal'
-      if (k.startsWith('e82') && sano) { motoresSanos.push(k); continue }
+      if (sano && !verdesAbiertos) { verdes.push(s); continue }
       const rPrev = penultimaValida ? tasa1000(penultimaValida[s.k], penultimaValida.fish) : null
       items.push({
         id: k,
-        label: r !== null ? `${s.label} ${r}` : s.label,
+        label: r !== null ? `${CORTO[k] ?? s.label} ${r}` : (CORTO[k] ?? s.label),
         color: s.color,
         on: !apagadas.has(k),
         toggle: () => alternar([k], apagadas.has(k)),
@@ -785,14 +796,15 @@ function VistaProtocolo() {
         delta: r !== null && rPrev !== null && r !== rPrev ? (r > rPrev ? 'sube' : 'baja') : undefined,
       })
     }
-    if (motoresSanos.length > 0) {
-      const on = motoresSanos.some((k) => !apagadas.has(k))
+    if (verdes.length > 0) {
       items.push({
-        id: 'motores',
-        label: `Motores (${motoresSanos.length} en verde)`,
-        on,
-        toggle: () => alternar(motoresSanos, !on),
+        id: 'verdes',
+        label: `+${verdes.length} en verde`,
+        on: false,
+        toggle: () => setVerdesAbiertos(true),
       })
+    } else if (verdesAbiertos) {
+      items.push({ id: 'plegar', label: 'plegar verdes', on: false, toggle: () => setVerdesAbiertos(false) })
     }
     // Con UNA serie encendida se puede comparar contra las otras máquinas:
     // la brecha que el lector dice en texto, vista.
@@ -806,7 +818,7 @@ function VistaProtocolo() {
       })
     }
     return items
-  }, [seriesActivas, ultimaValida, penultimaValida, apagadas, comparar, maquina, guardarPrefs])
+  }, [seriesActivas, ultimaValida, penultimaValida, apagadas, comparar, maquina, guardarPrefs, verdesAbiertos])
 
   /** Veredicto de una lectura: el peor de los 11 contadores contra SU escala. */
   const veredictoDe = (l: LecturaProtocolo) => {
@@ -1225,12 +1237,16 @@ function VistaProtocolo() {
               >
                 <AlertTriangle className="h-5 w-5" />
               </span>
-              <div className="min-w-0 flex-1">
-                <h2 className="text-base font-semibold leading-tight">
-                  {queRevisar.saber?.titulo ?? queRevisar.serie.label}
+              <div className="min-w-[12rem] flex-1">
+                {/* P31: el titular es el DATO en lenguaje de planta; el nombre
+                    del contador y la lectura bajan al subtítulo. */}
+                <h2 className="text-base font-semibold leading-tight tabular-nums">
+                  {queRevisar.metrica === 'paradas' ? 'Una parada' : 'Una corrección'} cada{' '}
+                  {Math.max(1, Math.round(1000 / Math.max(queRevisar.tasa, 1)))} pescados
                 </h2>
                 <p className="text-caption" style={{ color: LC.inkMid }}>
-                  Lectura del {queRevisar.lectura.fecha} · {queRevisar.lectura.fish} pescados
+                  {queRevisar.serie.label} · lectura del {queRevisar.lectura.fecha} ·{' '}
+                  {queRevisar.lectura.fish} pescados
                 </p>
               </div>
               <span
@@ -1241,53 +1257,67 @@ function VistaProtocolo() {
               </span>
             </div>
 
-            {/* El lector: qué dice el gráfico hoy, en lenguaje de planta */}
-            <div className="mt-3 space-y-1.5 text-footnote" style={{ color: LC.ink }}>
-              <p>
-                {queRevisar.saber?.que ?? ''}{' '}
-                <strong className="tabular-nums">
-                  {queRevisar.metrica === 'paradas' ? 'Una parada' : 'Una corrección'} cada{' '}
-                  {Math.max(1, Math.round(1000 / Math.max(queRevisar.tasa, 1)))} pescados.
-                </strong>
-                {queRevisar.tasaPrevia !== null ? (
-                  <>
-                    {' '}Venía de {queRevisar.tasaPrevia}/1000:{' '}
-                    <strong
-                      className="tabular-nums"
-                      style={{ color: queRevisar.tasa <= queRevisar.tasaPrevia ? LC.ok : LC.crit }}
-                    >
-                      {queRevisar.tasa <= queRevisar.tasaPrevia ? '▾' : '▴'}
-                      {Math.abs(queRevisar.tasa - queRevisar.tasaPrevia)}
-                    </strong>
-                    {queRevisar.tasa <= queRevisar.tasaPrevia ? ' — mejorando.' : ' — empeorando.'}
-                  </>
+            {/* P31: lo glanceable en UNA línea (delta + otras máquinas); la
+                definición docente y las frases largas, plegadas en un details.
+                Nada se pierde — se gana el paso 1 arriba del pliegue. */}
+            {(queRevisar.tasaPrevia !== null || comparacion.length > 0) ? (
+              <p className="mt-2 text-caption tabular-nums" style={{ color: LC.inkMid }}>
+                {queRevisar.tasaPrevia !== null && queRevisar.tasa !== queRevisar.tasaPrevia ? (
+                  <strong style={{ color: queRevisar.tasa <= queRevisar.tasaPrevia ? LC.ok : LC.crit }}>
+                    {queRevisar.tasa <= queRevisar.tasaPrevia ? '▾' : '▴'}
+                    {Math.abs(queRevisar.tasa - queRevisar.tasaPrevia)} vs anterior
+                  </strong>
                 ) : null}
+                {comparacion.map((c, i) => (
+                  <span key={c.maquina}>
+                    {queRevisar.tasaPrevia !== null && queRevisar.tasa !== queRevisar.tasaPrevia
+                      ? ' · '
+                      : i > 0 ? ' · ' : ''}
+                    {c.maquina}{' '}
+                    <strong style={{ color: nivelTasa(c.tasa, queRevisar.metrica).color }}>{c.tasa}</strong>
+                  </span>
+                ))}
               </p>
-              {comparacion.length > 0 ? (
-                <p style={{ color: LC.inkMid }}>
-                  En el mismo contador,{' '}
-                  {comparacion.map((c, i) => (
-                    <span key={c.maquina}>
-                      {i > 0 ? ' y ' : ''}
-                      <strong style={{ color: LC.ink }}>{c.maquina}</strong> está en{' '}
-                      <strong
-                        className="tabular-nums"
-                        style={{ color: nivelTasa(c.tasa, queRevisar.metrica).color }}
-                      >
-                        {c.tasa}/1000
-                      </strong>
-                    </span>
-                  ))}
-                  .
-                </p>
-              ) : null}
-              {!queRevisar.esMotor && queRevisar.motoresSanos ? (
-                <p style={{ color: LC.inkMid }}>
-                  Los 5 motores paso a paso están sanos: el problema es{' '}
-                  <strong style={{ color: LC.ink }}>mecánico</strong>, no de control.
-                </p>
-              ) : null}
-            </div>
+            ) : null}
+            <details className="mt-1.5">
+              <summary
+                className="inline-flex min-h-[28px] cursor-pointer items-center text-caption font-medium"
+                style={{ color: LC.aqua }}
+              >
+                ¿qué mide este contador?
+              </summary>
+              <div
+                className="mt-1 space-y-1.5 border-l-2 pl-2.5 text-footnote"
+                style={{ borderColor: LC.border, color: LC.inkMid }}
+              >
+                <p>{queRevisar.saber?.que ?? ''}</p>
+                {queRevisar.tasaPrevia !== null ? (
+                  <p>
+                    Venía de {queRevisar.tasaPrevia}/1000
+                    {queRevisar.tasa <= queRevisar.tasaPrevia ? ' — mejorando.' : ' — empeorando.'}
+                  </p>
+                ) : null}
+                {comparacion.length > 0 ? (
+                  <p>
+                    En el mismo contador,{' '}
+                    {comparacion.map((c, i) => (
+                      <span key={c.maquina}>
+                        {i > 0 ? ' y ' : ''}
+                        <strong style={{ color: LC.ink }}>{c.maquina}</strong> está en{' '}
+                        <strong className="tabular-nums">{c.tasa}/1000</strong>
+                      </span>
+                    ))}
+                    .
+                  </p>
+                ) : null}
+                {!queRevisar.esMotor && queRevisar.motoresSanos ? (
+                  <p>
+                    Los 5 motores paso a paso están sanos: el problema es{' '}
+                    <strong style={{ color: LC.ink }}>mecánico</strong>, no de control.
+                  </p>
+                ) : null}
+              </div>
+            </details>
 
             <ol className="mt-3 space-y-2 text-footnote" style={{ color: LC.ink }}>
               {(queRevisar.saber?.pasos ?? []).map((paso, i) => (
@@ -1306,38 +1336,38 @@ function VistaProtocolo() {
               ) : null}
             </ol>
 
-            <div className="mt-3 flex flex-wrap gap-2">
+            {/* P34: UN primario ancho; el resto compacto. El caption se fue —
+                que la incidencia sale precargada se descubre al tocarla. */}
+            <div className="mt-3 flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={registrarIncidencia}
-                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-ctl px-4 text-footnote font-semibold"
+                className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-ctl px-4 text-footnote font-semibold"
                 style={{ background: LC.aqua, color: '#fff' }}
               >
-                Registrar incidencia con esto
+                Registrar incidencia
               </button>
               <button
                 type="button"
                 onClick={() => setSearchParams({ vista: 'herramienta' })}
-                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-ctl px-4 text-footnote font-medium"
+                className="inline-flex min-h-[44px] items-center rounded-ctl px-3 text-caption font-medium"
                 style={{ background: LC.aquaSoft, color: LC.aqua }}
               >
-                Diagnóstico completo
+                Diagnóstico
               </button>
               <button
                 type="button"
                 onClick={() => void copiarResumen()}
-                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-ctl px-4 text-footnote font-medium"
+                aria-label={copiado ? 'Resumen copiado' : 'Copiar resumen'}
+                aria-live="polite"
+                className="grid min-h-[44px] min-w-[44px] place-items-center rounded-ctl"
                 style={copiado
                   ? { background: LC.okSoft, color: LC.ok }
                   : { background: LC.aquaSoft, color: LC.aqua }}
               >
                 {copiado ? <CheckCircle2 aria-hidden className="h-4 w-4" /> : <Copy aria-hidden className="h-4 w-4" />}
-                {copiado ? 'Copiado' : 'Copiar resumen'}
               </button>
             </div>
-            <p className="mt-2 text-caption" style={{ color: LC.inkLo }}>
-              La incidencia sale precargada con la máquina, el código y estos pasos como pauta.
-            </p>
           </div>
         ) : null}
 
@@ -1457,6 +1487,32 @@ function VistaProtocolo() {
                 >
                   ¿Cómo funciona?
                 </button>
+              </div>
+            </div>
+          ) : serie.filter((l) => muestraValida(l)).length < 2 ? (
+            /* P32: con una sola lectura válida no hay curva que dibujar — el
+               canvas mostraba puntos flotando en 400px. Estado honesto: la
+               foto de hoy; el gráfico aparece solo cuando puede enseñar. */
+            <div className="mt-3 rounded-ctl p-3 text-footnote" style={{ background: LC.bgPanel }}>
+              <p>
+                <strong>Primera lectura registrada.</strong>{' '}
+                <span style={{ color: LC.inkMid }}>La curva aparece con la segunda — por ahora, la foto:</span>
+              </p>
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-mono text-footnote font-bold tabular-nums">
+                {ultimaValida
+                  ? seriesActivas
+                      .map((s) => ({ s, r: tasa1000(ultimaValida[s.k], ultimaValida.fish) }))
+                      .sort((a, b) => b.r - a.r)
+                      .slice(0, 3)
+                      .map(({ s, r }) => (
+                        <span
+                          key={s.k as string}
+                          style={{ color: nivelTasa(r, METRICA_DE[s.k as string] ?? 'correcciones').color }}
+                        >
+                          {CORTO[s.k as string] ?? s.label} {r}
+                        </span>
+                      ))
+                  : null}
               </div>
             </div>
           ) : (
