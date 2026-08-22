@@ -607,7 +607,7 @@ function VistaProtocolo() {
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Formulario */}
         <div className="rounded-card border p-4" style={{ background: LC.surface, borderColor: LC.border }}>
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-base font-semibold">Nueva lectura</h2>
             <div className="flex gap-2">
               <button
@@ -747,7 +747,7 @@ function VistaProtocolo() {
                   role="tab"
                   aria-selected={metrica === m}
                   onClick={() => setMetrica(m)}
-                  className="rounded-ctl px-2.5 py-1 text-xs font-medium capitalize"
+                  className="min-h-[44px] rounded-ctl px-3 text-footnote font-medium"
                   style={
                     metrica === m
                       ? { background: LC.surface, color: LC.aqua }
