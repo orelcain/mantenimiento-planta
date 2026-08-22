@@ -22,7 +22,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
-  AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, CircleGauge, Copy,
+  AlertTriangle, Share2, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, CircleGauge, Copy,
   TrendingDown, TrendingUp, LineChart as LineChartIcon, Loader2, RotateCcw,
   Save, Video,
 } from 'lucide-react'
@@ -582,6 +582,51 @@ function VistaProtocolo() {
   const [comparar, setComparar] = useState(false)
   /** P41: incidencias nacidas del lector (marcador [protocolo142 …]). */
   const [incidencias, setIncidencias] = useState<IncidenciaProtocolo[]>([])
+  /**
+   * P61: el gráfico como PNG con fondo del tema y título — para pegarlo en el
+   * grupo de Telegram como evidencia visual, no solo texto. En celular abre la
+   * hoja de compartir del sistema; sin soporte, descarga.
+   */
+  const compartirImagen = async () => {
+    const chart = chartRef.current as { canvas?: HTMLCanvasElement } | null
+    const src = chart?.canvas
+    if (!src) return
+    const escala = window.devicePixelRatio || 1
+    const margen = 16 * escala
+    const alturaTitulo = 34 * escala
+    const out = document.createElement('canvas')
+    out.width = src.width + margen * 2
+    out.height = src.height + alturaTitulo + margen * 2
+    const ctx = out.getContext('2d')
+    if (!ctx) return
+    const estilos = getComputedStyle(document.documentElement)
+    const fondo = estilos.getPropertyValue('--lc-surface').trim() || '#ffffff'
+    const tinta = estilos.getPropertyValue('--lc-ink').trim() || '#111'
+    ctx.fillStyle = fondo
+    ctx.fillRect(0, 0, out.width, out.height)
+    ctx.fillStyle = tinta
+    ctx.font = `600 ${13 * escala}px system-ui, sans-serif`
+    const etiqueta = MAQUINAS.find((m) => m.id === maquina)?.label ?? maquina
+    ctx.fillText(
+      `Protocolo ${etiqueta} · ${metrica === 'paradas' ? 'paradas' : 'correcciones'} /1000 · ${new Date().toISOString().slice(0, 10)}`,
+      margen, margen + 14 * escala,
+    )
+    ctx.drawImage(src, margen, alturaTitulo + margen)
+    const blob: Blob | null = await new Promise((res) => out.toBlob(res, 'image/png'))
+    if (!blob) return
+    const nombre = `tendencia-${maquina}-${new Date().toISOString().slice(0, 10)}.png`
+    const archivo = new File([blob], nombre, { type: 'image/png' })
+    if (navigator.canShare?.({ files: [archivo] })) {
+      try { await navigator.share({ files: [archivo], title: nombre }); return } catch { /* cancelado */ }
+    }
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = nombre
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   /** P52: true cuando el usuario hizo zoom — enciende el «restablecer». */
   const [conZoom, setConZoom] = useState(false)
 
@@ -944,6 +989,9 @@ function VistaProtocolo() {
    */
   const registrarIncidencia = () => {
     if (!queRevisar) return
+    // P63: la incidencia nueva invalida la caché del lazo — al volver, el
+    // lector debe verla como «abierta», no servir la foto vieja de la sesión.
+    try { sessionStorage.removeItem(`p5incid:${maquina}`) } catch { /* sin storage */ }
     const q = queRevisar
     const unidadRuido = q.metrica === 'paradas' ? 'paradas' : 'correcciones'
     const titulo = `${q.serie.label}: ${q.tasa}/1000 ${unidadRuido} (protocolo ${MAQUINAS.find((m) => m.id === maquina)?.label ?? maquina})`
@@ -1526,8 +1574,20 @@ function VistaProtocolo() {
         {/* Tendencia */}
         <div className="min-w-0 rounded-card border p-4" style={{ background: LC.surface, borderColor: LC.border }}>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-base font-semibold">
+            <h2 className="flex items-center gap-2 text-base font-semibold">
               Tendencia
+              {serie.filter((l) => muestraValida(l)).length >= 2 ? (
+                <button
+                  type="button"
+                  onClick={() => void compartirImagen()}
+                  aria-label="Compartir imagen del gráfico"
+                  title="Compartir imagen del gráfico"
+                  className="grid h-9 w-9 place-items-center rounded-ctl"
+                  style={{ background: LC.aquaSoft, color: LC.aqua }}
+                >
+                  <Share2 aria-hidden className="h-4 w-4" />
+                </button>
+              ) : null}
             </h2>
             <div
               className="inline-flex gap-1 rounded-ctl p-0.5"
@@ -1773,7 +1833,7 @@ function VistaProtocolo() {
                   {sDef ? (
                     <span aria-hidden className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: sDef.color }} />
                   ) : null}
-                  <span className="min-w-0 flex-1 truncate text-footnote font-semibold">
+                  <span className="min-w-0 flex-1 text-footnote font-semibold leading-tight">
                     {sDef?.label ?? detallePunto.clave} · {fechaCorta(detallePunto.fecha)}
                   </span>
                   <span
@@ -1809,6 +1869,38 @@ function VistaProtocolo() {
                     Este contador no tiene ficha de pauta todavía.
                   </p>
                 )}
+                {/* P62: el lazo desde CUALQUIER punto, no solo el dominante —
+                    mismo marcador, así el lector lo reconoce después. */}
+                <div className="mt-2.5 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      try { sessionStorage.removeItem(`p5incid:${maquina}`) } catch { /* sin storage */ }
+                      const titulo = `${sDef?.label ?? detallePunto.clave}: ${detallePunto.tasa}/1000 (protocolo ${MAQUINAS.find((mq) => mq.id === maquina)?.label ?? maquina})`
+                      const desc = [
+                        `[protocolo142 ${maquina} · ${detallePunto.clave} ${detallePunto.tasa}/1000 · lectura ${detallePunto.fecha}]`,
+                        '',
+                        'Pauta:',
+                        ...(saber?.pasos ?? []).map((s2, i) => `${i + 1}. ${s2}`),
+                        '',
+                        urlProtocoloMaquina(maquina),
+                      ].join('\n')
+                      navigate(`/incidents?nueva=1&titulo=${encodeURIComponent(titulo)}&desc=${encodeURIComponent(desc)}`)
+                    }}
+                    className="inline-flex min-h-[44px] items-center rounded-ctl px-3 text-caption font-medium"
+                    style={{ background: LC.aquaSoft, color: LC.aqua }}
+                  >
+                    Registrar incidencia
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSearchParams({ vista: 'herramienta' })}
+                    className="inline-flex min-h-[44px] items-center rounded-ctl px-3 text-caption font-medium"
+                    style={{ background: LC.aquaSoft, color: LC.aqua }}
+                  >
+                    Ver en la Herramienta
+                  </button>
+                </div>
               </div>
             )
           })() : null}
