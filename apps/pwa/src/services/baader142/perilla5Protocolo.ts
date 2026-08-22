@@ -212,3 +212,79 @@ export async function borradorDeVideo(
     return null
   }
 }
+
+// ── Lazo lectura → intervención → mejora ────────────────────────────────────
+
+/**
+ * Incidencia nacida del lector del protocolo, reconocida por su marcador
+ * `[protocolo142 <maquina> · <contador> <tasa>/1000 · lectura <fecha>]`.
+ * El marcador vive en la descripción desde que el lector precarga la
+ * incidencia — es el hilo que permite mostrar «se intervino y la tasa bajó».
+ */
+export interface IncidenciaProtocolo {
+  id: string
+  titulo: string
+  status: string
+  /** yyyy-mm-dd del createdAt de la incidencia. */
+  creada: string
+  /** Contador del marcador (p. ej. `stopc`). */
+  contador: string
+  /** Tasa /1000 al momento de registrarla. */
+  tasa: number
+  /** Fecha de la lectura que la originó. */
+  lectura: string
+}
+
+const RE_MARCADOR = /\[protocolo142 (\S+) · (\S+) (\d+)\/1000 · lectura ([\d-]+)\]/
+
+/** Parsea el marcador de una descripción; null si no es del protocolo. */
+export function parsearMarcadorProtocolo(
+  descripcion: string,
+): { maquina: string; contador: string; tasa: number; lectura: string } | null {
+  const m = RE_MARCADOR.exec(descripcion)
+  if (!m) return null
+  return { maquina: m[1]!, contador: m[2]!, tasa: Number(m[3]), lectura: m[4]! }
+}
+
+/**
+ * Incidencias del protocolo de UNA máquina, más recientes primero.
+ *
+ * Firestore no busca substrings, así que se traen las últimas incidencias y
+ * se filtra por el marcador en el cliente. Cacheado por sesión: este dato
+ * cambia cuando alguien registra/resuelve una incidencia, no a cada render.
+ */
+export async function incidenciasProtocolo(
+  maquina: MaquinaBaader,
+  opts?: { max?: number },
+): Promise<IncidenciaProtocolo[]> {
+  const cacheKey = `p5incid:${maquina}`
+  try {
+    const hit = sessionStorage.getItem(cacheKey)
+    if (hit) return JSON.parse(hit) as IncidenciaProtocolo[]
+  } catch { /* sin sessionStorage */ }
+
+  const q = query(
+    collection(db, 'incidents'),
+    orderBy('createdAt', 'desc'),
+    limit(opts?.max ?? 150),
+  )
+  const snap = await getDocs(q)
+  const filas: IncidenciaProtocolo[] = []
+  for (const d of snap.docs) {
+    const data = d.data() as { titulo?: string; descripcion?: string; status?: string; createdAt?: { toDate?: () => Date } }
+    const marca = parsearMarcadorProtocolo(data.descripcion ?? '')
+    if (!marca || marca.maquina !== maquina) continue
+    const creada = data.createdAt?.toDate?.()
+    filas.push({
+      id: d.id,
+      titulo: data.titulo ?? '',
+      status: data.status ?? 'pendiente',
+      creada: creada ? creada.toISOString().slice(0, 10) : marca.lectura,
+      contador: marca.contador,
+      tasa: marca.tasa,
+      lectura: marca.lectura,
+    })
+  }
+  try { sessionStorage.setItem(cacheKey, JSON.stringify(filas)) } catch { /* llena */ }
+  return filas
+}

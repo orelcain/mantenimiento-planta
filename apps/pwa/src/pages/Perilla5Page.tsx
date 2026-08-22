@@ -54,6 +54,7 @@ import {
   type ContadoresProtocolo,
   type LecturaProtocolo,
   type MaquinaBaader,
+  incidenciasProtocolo, type IncidenciaProtocolo,
 } from '@/services/baader142/perilla5Protocolo'
 import {
   borrarNota,
@@ -577,8 +578,18 @@ function VistaProtocolo() {
 
   /** Superponer la serie visible en las OTRAS máquinas (solo con UNA encendida). */
   const [comparar, setComparar] = useState(false)
+  /** P41: incidencias nacidas del lector (marcador [protocolo142 …]). */
+  const [incidencias, setIncidencias] = useState<IncidenciaProtocolo[]>([])
   // P33: lo verde plegado en un chip; se expande solo si alguien lo pide.
   const [verdesAbiertos, setVerdesAbiertos] = useState(false)
+
+  useEffect(() => {
+    let cancelado = false
+    incidenciasProtocolo(maquina)
+      .then((filas) => { if (!cancelado) setIncidencias(filas) })
+      .catch(() => { if (!cancelado) setIncidencias([]) })
+    return () => { cancelado = true }
+  }, [maquina])
 
   /**
    * Preferencias por máquina (métrica y series apagadas) en localStorage:
@@ -890,6 +901,22 @@ function VistaProtocolo() {
   }, [serie])
 
   /**
+   * P42: el lazo del contador dominante. Una ABIERTA frena el duplicado; una
+   * RESUELTA con la tasa más baja que cuando se registró es la frase que
+   * cierra el círculo: se intervino y el número bajó.
+   */
+  const lazo = useMemo(() => {
+    if (!queRevisar) return null
+    const delContador = incidencias.filter((i) => i.contador === String(queRevisar.serie.k))
+    const abierta = delContador.find((i) => ['pendiente', 'confirmada', 'en_proceso'].includes(i.status)) ?? null
+    const resuelta = delContador.find((i) =>
+      ['resuelta', 'cerrada'].includes(i.status)
+      && i.lectura < queRevisar.lectura.fecha
+      && i.tasa > queRevisar.tasa) ?? null
+    return { abierta, resuelta }
+  }, [incidencias, queRevisar])
+
+  /**
    * Comparación entre máquinas para el lector: el mismo contador dominante en
    * las otras dos, con su última lectura válida. "La N3, con la misma pesca,
    * está en 31" enseña más que cualquier umbral.
@@ -1008,19 +1035,39 @@ function VistaProtocolo() {
       .filter((s) => !apagadas.has(s.k as string))
       .map((s) => `${s.label} en ${tasa1000(ultimaValida[s.k], ultimaValida.fish)} por mil`)
     const etiqueta = MAQUINAS.find((m) => m.id === maquina)?.label ?? maquina
-    return `Tendencia de ${metrica} de ${etiqueta}. Última lectura ${fechaCorta(ultimaValida.fecha)}: ${partes.join(', ')}.`
-  }, [ultimaValida, seriesActivas, apagadas, maquina, metrica])
+    const extras = [
+      huboReinicio.size > 0 ? `${huboReinicio.size} lectura${huboReinicio.size > 1 ? 's' : ''} con reinicio del protocolo` : '',
+      incidencias.length > 0 ? `${incidencias.length} intervención${incidencias.length > 1 ? 'es' : ''} registrada${incidencias.length > 1 ? 's' : ''}` : '',
+    ].filter(Boolean).join('; ')
+    return `Tendencia de ${metrica} de ${etiqueta}. Última lectura ${fechaCorta(ultimaValida.fecha)}: ${partes.join(', ')}.${extras ? ` ${extras}.` : ''}`
+  }, [ultimaValida, seriesActivas, apagadas, maquina, metrica, huboReinicio, incidencias])
 
-  const chartData = useMemo(() => {
+  // Comparando, el eje es la UNIÓN de fechas de todas las máquinas: alinear
+  // por posición mentiría cuando una máquina saltó una semana.
+  const fechasEje = useMemo(() => {
     const activo = comparar && serieUnica !== null
-    // Comparando, el eje es la UNIÓN de fechas de todas las máquinas: alinear
-    // por posición mentiría cuando una máquina saltó una semana.
-    const fechasEje = activo
+    return activo
       ? [...new Set([
           ...serie.map((l) => l.fecha),
           ...MAQUINAS.flatMap((m) => (m.id === maquina ? [] : (filasPorMaquina[m.id] ?? []).map((l) => l.fecha))),
         ])].sort()
       : serie.map((l) => l.fecha)
+  }, [comparar, serieUnica, serie, maquina, filasPorMaquina])
+
+  /** P43: índices del eje con intervención registrada / reinicio del protocolo.
+   *  Va por CLOSURE al plugin y al tooltip: react-chartjs-2 solo sincroniza
+   *  labels y datasets — una clave extra en data muere en el primer update. */
+  const marcasGrafico = useMemo(() => ({
+    ints: fechasEje
+      .map((f, i) => (incidencias.some((inc) => inc.creada === f || inc.lectura === f) ? i : -1))
+      .filter((i) => i >= 0),
+    reins: fechasEje
+      .map((f, i) => (huboReinicio.has(f) ? i : -1))
+      .filter((i) => i >= 0),
+  }), [fechasEje, incidencias, huboReinicio])
+
+  const chartData = useMemo(() => {
+    const activo = comparar && serieUnica !== null
 
     const porFecha = (rows: LecturaProtocolo[]) => {
       const idx = new Map(rows.map((l) => [l.fecha, l]))
@@ -1078,7 +1125,7 @@ function VistaProtocolo() {
 
     return { labels: fechasEje.map(fechaCorta), datasets: [...propios, ...fantasmas] }
   }, [serie, seriesActivas, apagadas, isDark, ultimoIdxValido, comparar, serieUnica,
-      filasPorMaquina, maquina, ultimaValida, ejeColor])
+      filasPorMaquina, maquina, ultimaValida, ejeColor, fechasEje])
 
   /**
    * Bandas de umbral pintadas DETRÁS de la serie, con etiqueta al borde.
@@ -1107,6 +1154,35 @@ function VistaProtocolo() {
         const y = scales.y as { getPixelForValue: (v: number) => number; max: number } | undefined
         if (!chartArea || !y) return
         ctx.save()
+        /* P43: intervenciones como línea vertical aqua tenue (acá se actuó) y
+           reinicios como marca ⟳ en el borde superior. Los índices vienen en
+           el data del chart para no cerrar sobre estado stale. */
+        const x = scales.x as { getPixelForValue: (v: number) => number } | undefined
+        if (x) {
+          for (const i of marcasGrafico.ints) {
+            const px = x.getPixelForValue(i)
+            ctx.strokeStyle = isDark ? '#5aa6e8' : '#2E75B6'
+            ctx.globalAlpha = 0.35
+            ctx.setLineDash([2, 3])
+            ctx.lineWidth = 1.5
+            ctx.beginPath()
+            ctx.moveTo(px, chartArea.top)
+            ctx.lineTo(px, chartArea.bottom)
+            ctx.stroke()
+            ctx.setLineDash([])
+          }
+        }
+        if (x) {
+          for (const i of marcasGrafico.reins) {
+            const px = x.getPixelForValue(i)
+            ctx.globalAlpha = 0.9
+            ctx.fillStyle = isDark ? '#E0AC4E' : '#875105'
+            ctx.font = '10px ui-monospace, monospace'
+            ctx.textAlign = 'center'
+            ctx.fillText('⟳', px, chartArea.top + 9)
+          }
+        }
+        ctx.globalAlpha = 1
         for (const l of lineas) {
           if (l.v > y.max) continue          // fuera de escala: no dibujar en el borde
           const py = y.getPixelForValue(l.v)
@@ -1130,7 +1206,7 @@ function VistaProtocolo() {
       },
     }
     return plugin
-  }, [metrica, isDark])
+  }, [metrica, isDark, marcasGrafico])
 
   /** Corta un texto en líneas de tooltip (~46 caracteres): Chart.js no envuelve. */
   const envolver = (texto: string, ancho = 46): string[] => {
@@ -1182,9 +1258,14 @@ function VistaProtocolo() {
             // La ficha del contador: qué cuenta + la pauta. El tooltip ES la clase.
             afterBody: (items: TooltipItem<'line'>[]) => {
               const clave = (items[0]?.dataset as { clave?: string })?.clave ?? ''
+              const idx = items[0]?.dataIndex ?? -1
+              const marcas: string[] = []
+              if (marcasGrafico.reins.includes(idx)) marcas.push('⟳ protocolo reiniciado antes de esta lectura')
+              if (marcasGrafico.ints.includes(idx)) marcas.push('| ese día se registró una intervención')
               const s = SABER[clave]
-              if (!s) return []
+              if (!s) return marcas.length > 0 ? ['', ...marcas] : []
               return [
+                ...(marcas.length > 0 ? ['', ...marcas] : []),
                 '',
                 ...envolver(s.que),
                 '',
@@ -1204,7 +1285,7 @@ function VistaProtocolo() {
         },
       },
     }),
-    [ejeColor, gridColor, isDark],
+    [ejeColor, gridColor, isDark, marcasGrafico],
   )
 
   return (
@@ -1371,6 +1452,36 @@ function VistaProtocolo() {
                 </li>
               ) : null}
             </ol>
+
+            {/* P42: el lazo a la vista. Abierta → no duplicar; resuelta con la
+                tasa abajo → la evidencia de que la intervención funcionó. */}
+            {lazo?.abierta ? (
+              <button
+                type="button"
+                onClick={() => navigate('/incidents')}
+                className="mt-2 flex min-h-[44px] w-full items-center gap-2 rounded-ctl px-3 text-left text-caption"
+                style={{ background: LC.prepSoft, color: LC.prep }}
+              >
+                <AlertTriangle aria-hidden className="h-3.5 w-3.5 shrink-0" />
+                <span className="min-w-0">
+                  Ya hay una incidencia abierta por este contador
+                  {' '}({fechaCorta(lazo.abierta.creada)}, {lazo.abierta.status.replace('_', ' ')}) — revisala antes de registrar otra.
+                </span>
+              </button>
+            ) : null}
+            {!lazo?.abierta && lazo?.resuelta ? (
+              <p
+                className="mt-2 flex items-start gap-2 rounded-ctl px-3 py-2 text-caption"
+                style={{ background: LC.okSoft, color: LC.ok }}
+              >
+                <CheckCircle2 aria-hidden className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <span>
+                  La intervención del {fechaCorta(lazo.resuelta.creada)} funcionó: este contador
+                  venía de <strong className="tabular-nums">{lazo.resuelta.tasa}/1000</strong> y hoy
+                  está en <strong className="tabular-nums">{queRevisar.tasa}/1000</strong>.
+                </span>
+              </p>
+            ) : null}
 
             {/* P34: UN primario ancho; el resto compacto. El caption se fue —
                 que la incidencia sale precargada se descubre al tocarla. */}
