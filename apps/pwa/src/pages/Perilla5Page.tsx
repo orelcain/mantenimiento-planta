@@ -22,7 +22,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
-  AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, CircleGauge, LineChart as LineChartIcon, Loader2, RotateCcw,
+  AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, CircleGauge, Copy, LineChart as LineChartIcon, Loader2, RotateCcw,
   Save, Video,
 } from 'lucide-react'
 import { Line } from 'react-chartjs-2'
@@ -534,23 +534,33 @@ function VistaProtocolo() {
     }, { replace: true })
   }
 
-  /** Veredicto de la última lectura válida de CADA máquina, para el selector. */
+  /** Veredicto de la última lectura válida de CADA máquina, para el selector,
+   *  y sus filas (el mismo viaje alimenta la comparación del gráfico). */
   const [veredictos, setVeredictos] = useState<Partial<Record<MaquinaBaader, { label: string; color: string }>>>({})
+  const [filasPorMaquina, setFilasPorMaquina] = useState<Partial<Record<MaquinaBaader, LecturaProtocolo[]>>>({})
   useEffect(() => {
     let vivo = true
     void Promise.all(MAQUINAS.map(async (m) => {
       const rows = await lecturasDeMaquina(m.id, 'chonchi', 6)
       const ult = rows.find((l) => muestraValida(l))
-      return [m.id, ult ? veredictoDe(ult) : null] as const
-    })).then((pares) => {
+      return [m.id, rows, ult ? veredictoDe(ult) : null] as const
+    })).then((tuplas) => {
       if (!vivo) return
-      const out: Partial<Record<MaquinaBaader, { label: string; color: string }>> = {}
-      for (const [id, v] of pares) if (v) out[id] = { label: v.label, color: v.color }
-      setVeredictos(out)
+      const vs: Partial<Record<MaquinaBaader, { label: string; color: string }>> = {}
+      const fs: Partial<Record<MaquinaBaader, LecturaProtocolo[]>> = {}
+      for (const [id, rows, v] of tuplas) {
+        fs[id] = rows
+        if (v) vs[id] = { label: v.label, color: v.color }
+      }
+      setVeredictos(vs)
+      setFilasPorMaquina(fs)
     })
     return () => { vivo = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [guardadoOk])   // se refresca al guardar una lectura nueva
+
+  /** Superponer la serie visible en las OTRAS máquinas (solo con UNA encendida). */
+  const [comparar, setComparar] = useState(false)
 
   // Registrar es semanal y el explicativo es de una sola vez: ambos plegados.
   const [mostrarForm, setMostrarForm] = useState(false)
@@ -701,6 +711,7 @@ function VistaProtocolo() {
   // Smart default: encendido solo lo que tiene algo que decir (nivel ≥ vigilar)
   // más el total. La N2 de hoy abre con 3 líneas, no 7 — menos es más (§63).
   useEffect(() => {
+    setComparar(false)
     if (!ultimaValida) { setApagadas(new Set()); return }
     const off = new Set<string>()
     for (const s of seriesActivas) {
@@ -747,8 +758,19 @@ function VistaProtocolo() {
         toggle: () => alternar(motoresSanos, !on),
       })
     }
+    // Con UNA serie encendida se puede comparar contra las otras máquinas:
+    // la brecha que el lector dice en texto, vista.
+    const encendidas = seriesActivas.filter((s) => !apagadas.has(s.k as string))
+    if (encendidas.length === 1) {
+      items.push({
+        id: 'comparar',
+        label: 'Otras máquinas',
+        on: comparar,
+        toggle: () => setComparar((v) => !v),
+      })
+    }
     return items
-  }, [seriesActivas, ultimaValida, apagadas])
+  }, [seriesActivas, ultimaValida, apagadas, comparar])
 
   /** Veredicto de una lectura: el peor de los 11 contadores contra SU escala. */
   const veredictoDe = (l: LecturaProtocolo) => {
@@ -854,6 +876,37 @@ function VistaProtocolo() {
     navigate(`/incidents?nueva=1&titulo=${encodeURIComponent(titulo)}&desc=${encodeURIComponent(desc)}`)
   }
 
+  /** Resumen del lector en texto plano, listo para pegar al grupo del turno. */
+  const [copiado, setCopiado] = useState(false)
+  const copiarResumen = async () => {
+    if (!queRevisar) return
+    const q = queRevisar
+    const etiqueta = MAQUINAS.find((m) => m.id === maquina)?.label ?? maquina
+    const lineas = [
+      `Protocolo ${etiqueta} — lectura ${q.lectura.fecha} (${q.lectura.fish} pescados)`,
+      `${q.saber?.titulo ?? q.serie.label}: ${q.tasa}/1000 (${q.nivel.label})`,
+      ...(q.tasaPrevia !== null ? [`Venía de ${q.tasaPrevia}/1000.`] : []),
+      ...comparacion.map((c) => `${c.maquina} está en ${c.tasa}/1000.`),
+      'Pauta:',
+      ...(q.saber?.pasos ?? []).map((s, i) => `${i + 1}. ${s}`),
+    ]
+    const texto = lineas.join('\n')
+    try {
+      await navigator.clipboard.writeText(texto)
+    } catch {
+      // WebViews y permisos raros: fallback clásico con textarea temporal
+      const ta = document.createElement('textarea')
+      ta.value = texto
+      ta.style.position = 'fixed'
+      ta.style.opacity = '0'
+      document.body.appendChild(ta)
+      ta.select()
+      try { document.execCommand('copy') } finally { ta.remove() }
+    }
+    setCopiado(true)
+    window.setTimeout(() => setCopiado(false), 2500)
+  }
+
   const ultimoIdxValido = useMemo(() => {
     for (let i = serie.length - 1; i >= 0; i--) {
       const l = serie[i]
@@ -862,36 +915,80 @@ function VistaProtocolo() {
     return -1
   }, [serie])
 
-  const chartData = useMemo(
-    () => ({
-      labels: serie.map((l) => fechaCorta(l.fecha)),
-      datasets: seriesActivas.map((s) => ({
-        label: s.label,
-        // null (no 0) en las muestras insuficientes: con spanGaps:false la línea se
-        // CORTA ahí. Unirla diría "de 31 subió a 88", y eso no se sabe — el panel
-        // todavía no calculaba la tasa.
-        data: serie.map((l) => (muestraValida(l) ? tasa1000(l[s.k], l.fish) : null)),
-        borderColor: s.color,
-        backgroundColor: s.color,
-        // el ÚLTIMO punto válido va enfatizado: es el estado actual, el que
-        // decide (dataviz: emphasized endpoint)
-        pointRadius: serie.map((l, i) =>
-          i === ultimoIdxValido && muestraValida(l) ? 4.5 : 2.5),
-        pointHoverRadius: 6,
-        pointBorderWidth: 1.5,
-        pointBorderColor: isDark ? '#16242f' : '#ffffff',
-        spanGaps: false,
-        tension: 0.25,
-        borderWidth: s.grosor ?? 1.75,
-        borderDash: s.trazo ?? [],
-        // los chips mandan: serie apagada = dataset oculto (y el eje recalcula)
-        hidden: apagadas.has(s.k as string),
-        // clave del contador para que el tooltip encuentre su ficha en SABER
-        clave: s.k as string,
-      })),
-    }),
-    [serie, seriesActivas, apagadas, isDark, ultimoIdxValido],
-  )
+  /** La única serie encendida (o null): condición para poder comparar máquinas. */
+  const serieUnica = useMemo(() => {
+    const on = seriesActivas.filter((s) => !apagadas.has(s.k as string))
+    return on.length === 1 ? (on[0] ?? null) : null
+  }, [seriesActivas, apagadas])
+
+  const chartData = useMemo(() => {
+    const activo = comparar && serieUnica !== null
+    // Comparando, el eje es la UNIÓN de fechas de todas las máquinas: alinear
+    // por posición mentiría cuando una máquina saltó una semana.
+    const fechasEje = activo
+      ? [...new Set([
+          ...serie.map((l) => l.fecha),
+          ...MAQUINAS.flatMap((m) => (m.id === maquina ? [] : (filasPorMaquina[m.id] ?? []).map((l) => l.fecha))),
+        ])].sort()
+      : serie.map((l) => l.fecha)
+
+    const porFecha = (rows: LecturaProtocolo[]) => {
+      const idx = new Map(rows.map((l) => [l.fecha, l]))
+      return (k: keyof ContadoresProtocolo) =>
+        fechasEje.map((f) => {
+          const l = idx.get(f)
+          return l && muestraValida(l) ? tasa1000(l[k], l.fish) : null
+        })
+    }
+    const propio = porFecha(serie)
+    const idxUltimo = activo
+      ? fechasEje.lastIndexOf(ultimaValida?.fecha ?? '')
+      : ultimoIdxValido
+
+    const propios = seriesActivas.map((s) => ({
+      label: s.label,
+      // null (no 0) en las muestras insuficientes: con spanGaps:false la línea se
+      // CORTA ahí. Unirla diría "de 31 subió a 88", y eso no se sabe — el panel
+      // todavía no calculaba la tasa.
+      data: propio(s.k),
+      borderColor: s.color,
+      backgroundColor: s.color,
+      // el ÚLTIMO punto válido va enfatizado: es el estado actual, el que
+      // decide (dataviz: emphasized endpoint)
+      pointRadius: fechasEje.map((_, i) => (i === idxUltimo ? 4.5 : 2.5)),
+      pointHoverRadius: 6,
+      pointBorderWidth: 1.5,
+      pointBorderColor: isDark ? '#16242f' : '#ffffff',
+      spanGaps: false,
+      tension: 0.25,
+      borderWidth: s.grosor ?? 1.75,
+      borderDash: s.trazo ?? [],
+      // los chips mandan: serie apagada = dataset oculto (y el eje recalcula)
+      hidden: apagadas.has(s.k as string),
+      // clave del contador para que el tooltip encuentre su ficha en SABER
+      clave: s.k as string,
+    }))
+
+    // Las otras máquinas, en gris punteado: contexto, no protagonistas.
+    const fantasmas = activo && serieUnica
+      ? MAQUINAS.filter((m) => m.id !== maquina).map((m) => ({
+          label: m.label.replace('Baader 142 ', '').replace(' (antigua)', ''),
+          data: porFecha(filasPorMaquina[m.id] ?? [])(serieUnica.k),
+          borderColor: ejeColor,
+          backgroundColor: ejeColor,
+          pointRadius: 2,
+          pointHoverRadius: 5,
+          spanGaps: false,
+          tension: 0.25,
+          borderWidth: 1.25,
+          borderDash: [3, 3],
+          clave: serieUnica.k as string,
+        }))
+      : []
+
+    return { labels: fechasEje.map(fechaCorta), datasets: [...propios, ...fantasmas] }
+  }, [serie, seriesActivas, apagadas, isDark, ultimoIdxValido, comparar, serieUnica,
+      filasPorMaquina, maquina, ultimaValida, ejeColor])
 
   /**
    * Bandas de umbral pintadas DETRÁS de la serie, con etiqueta al borde.
@@ -1021,7 +1118,7 @@ function VistaProtocolo() {
   )
 
   return (
-    <div className="mt-4 space-y-4">
+    <div className="p5-protocolo mt-4 space-y-4">
       {/* Selector de máquina: cada una lleva el punto de su veredicto — las tres
           plantas de un vistazo sin cambiar de máquina. Color + posición, y el
           detalle con texto al entrar (nunca solo color). */}
@@ -1171,6 +1268,17 @@ function VistaProtocolo() {
               >
                 Diagnóstico completo
               </button>
+              <button
+                type="button"
+                onClick={() => void copiarResumen()}
+                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-ctl px-4 text-footnote font-medium"
+                style={copiado
+                  ? { background: LC.okSoft, color: LC.ok }
+                  : { background: LC.aquaSoft, color: LC.aqua }}
+              >
+                {copiado ? <CheckCircle2 aria-hidden className="h-4 w-4" /> : <Copy aria-hidden className="h-4 w-4" />}
+                {copiado ? 'Copiado' : 'Copiar resumen'}
+              </button>
             </div>
             <p className="mt-2 text-caption" style={{ color: LC.inkLo }}>
               La incidencia sale precargada con la máquina, el código y estos pasos como pauta.
@@ -1244,14 +1352,53 @@ function VistaProtocolo() {
             </p>
           ) : null}
           {cargando ? (
-            <div className="flex h-64 items-center justify-center">
-              <Loader2 className="h-5 w-5 animate-spin" style={{ color: LC.inkLo }} />
+            /* Skeleton, no spinner (constitución): la forma de lo que viene,
+               en gris de panel, con el pulso apagado bajo reduced-motion */
+            <div className="mt-3 h-64 w-full" aria-hidden>
+              <div className="flex h-full flex-col justify-between">
+                <div className="flex gap-1.5">
+                  {[88, 76, 64].map((w) => (
+                    <div key={w} className="h-8 animate-pulse rounded-full motion-reduce:animate-none"
+                         style={{ width: w, background: LC.bgPanel }} />
+                  ))}
+                </div>
+                <div className="h-40 animate-pulse rounded-ctl motion-reduce:animate-none"
+                     style={{ background: LC.bgPanel }} />
+                <div className="h-3 w-1/3 animate-pulse rounded-full motion-reduce:animate-none"
+                     style={{ background: LC.bgPanel }} />
+              </div>
             </div>
           ) : serie.length === 0 ? (
-            <p className="mt-6 text-sm" style={{ color: LC.inkLo }}>
-              Sin lecturas guardadas para esta máquina todavía. Guardá la primera con el
-              formulario — podés partir precargando la lectura base del 08-08.
-            </p>
+            /* Empty state con acción (constitución): qué es, qué hacer, a un toque */
+            <div className="mt-4 flex flex-col items-start gap-3 py-4">
+              <span className="grid h-10 w-10 place-items-center rounded-ctl"
+                    style={{ background: LC.aquaSoft, color: LC.aqua }}>
+                <Video aria-hidden className="h-5 w-5" />
+              </span>
+              <p className="max-w-md text-footnote" style={{ color: LC.inkMid }}>
+                Esta máquina aún no tiene lecturas. La forma fácil: grabar el barrido de las
+                13 pantallas y subirlo al tema de Telegram — el resto es automático. También
+                se puede tipear a mano.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setMostrarForm(true)}
+                  className="inline-flex min-h-[44px] items-center rounded-ctl px-4 text-footnote font-semibold"
+                  style={{ background: LC.aqua, color: '#fff' }}
+                >
+                  Registrar lectura
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMostrarInfo(true)}
+                  className="inline-flex min-h-[44px] items-center rounded-ctl px-4 text-footnote font-medium"
+                  style={{ background: LC.aquaSoft, color: LC.aqua }}
+                >
+                  ¿Cómo funciona?
+                </button>
+              </div>
+            </div>
           ) : (
             <div className="relative mt-3 h-64 w-full min-w-0">
               <Line data={chartData} options={chartOptions} plugins={[umbralPlugin]} />
@@ -1263,7 +1410,14 @@ function VistaProtocolo() {
           numérico vive en el gráfico y su tooltip, no en una tabla de 8 columnas. */}
       <div className="min-w-0 rounded-card border p-4" style={{ background: LC.surface, borderColor: LC.border }}>
         <h2 className="text-base font-semibold">Lecturas</h2>
-        {cargando ? null : lecturas.length === 0 ? (
+        {cargando ? (
+          <div className="mt-2 space-y-2" aria-hidden>
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="h-10 animate-pulse rounded-ctl motion-reduce:animate-none"
+                   style={{ background: LC.bgPanel }} />
+            ))}
+          </div>
+        ) : lecturas.length === 0 ? (
           <p className="mt-2 text-footnote" style={{ color: LC.inkLo }}>Ninguna todavía.</p>
         ) : (
           <div className="mt-1">

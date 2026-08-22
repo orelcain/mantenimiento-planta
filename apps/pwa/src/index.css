@@ -942,3 +942,10 @@
     background: #cbd5e1;
   }
 }
+
+/* Perilla 5 · Protocolo — foco visible en todo interactivo (constitución §accesibilidad).
+   Scoped a la vista para no sorprender al resto de la app; candidato a globalizarse. */
+.p5-protocolo :where(button, input, textarea, [role='tab']):focus-visible {
+  outline: 2px solid var(--lc-aqua);
+  outline-offset: 2px;
+}
