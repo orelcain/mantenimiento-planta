@@ -34,6 +34,7 @@ import {
   LineElement,
   Tooltip,
   Legend,
+  type Plugin,
   type TooltipItem,
 } from 'chart.js'
 import { useAuthStore } from '@/store'
@@ -89,13 +90,23 @@ const CAMPOS: { k: keyof ContadoresProtocolo; label: string; conTasa?: boolean }
   { k: 'e825c', label: '∑ E825-C', conTasa: true },
 ]
 
-/** Series de la tendencia: las 5 tasas -C /1000 (indicador adelantado de desgaste). */
-const SERIES: { k: keyof ContadoresProtocolo; label: string; color: string }[] = [
+/**
+ * Series de la tendencia de CORRECCIONES.
+ *
+ * Además de los 5 motores lleva STOP-C (el total) y T-CLIP-C (abrazaderas):
+ * el 22-08 la N2 estaba crítica en ambos (341 y 268/1000) con los 5 motores en
+ * verde, y el gráfico decía "todo bien". Las series de sistema van más gruesas
+ * y con trazo distinto para que no se confundan con una herramienta.
+ */
+const SERIES: { k: keyof ContadoresProtocolo; label: string; color: string;
+                grosor?: number; trazo?: number[] }[] = [
+  { k: 'stopc', label: 'Total correcciones', color: '#c8102e', grosor: 3 },
+  { k: 'tclipc', label: 'Abrazaderas', color: '#b45309', grosor: 2.5, trazo: [6, 3] },
   { k: 'e821c', label: 'Centraje SM1', color: '#2E75B6' },
   { k: 'e822c', label: 'Cuchilla SM2', color: '#7d7f9e' },
   { k: 'e823c', label: 'Aspirador SM3', color: '#0f9d8f' },
   { k: 'e824c', label: 'Excavador A SM4', color: '#d97706' },
-  { k: 'e825c', label: 'Excavador B SM5', color: '#c8102e' },
+  { k: 'e825c', label: 'Excavador B SM5', color: '#8b5cf6' },
 ]
 
 /**
@@ -105,9 +116,9 @@ const SERIES: { k: keyof ContadoresProtocolo; label: string; color: string }[] =
  * y paradas a 128/1000: en un eje común las paradas quedan aplastadas contra el piso
  * y se leen como sanas, que es exactamente lo contrario de lo que pasa.
  */
-const SERIES_PARADAS: { k: keyof ContadoresProtocolo; label: string; color: string }[] = [
-  { k: 'stops', label: 'Total de paradas', color: '#c8102e' },
-  { k: 'tclip', label: 'Abrazaderas', color: '#d97706' },
+const SERIES_PARADAS: typeof SERIES = [
+  { k: 'stops', label: 'Total de paradas', color: '#c8102e', grosor: 3 },
+  { k: 'tclip', label: 'Abrazaderas', color: '#b45309', trazo: [6, 3] },
   { k: 'anusi', label: 'Cuchilla punta I', color: '#2E75B6' },
   { k: 'anuso', label: 'Cuchilla punta O', color: '#0f9d8f' },
 ]
@@ -144,6 +155,70 @@ const PAUTAS: Record<string, { inductivo: string; pasos: string[] }> = {
 }
 const PASO_FINAL =
   'Si tras la marcha de referencia (I → I) reincide, el problema es mecánico, no de control.'
+
+/**
+ * Lo que cada contador CUENTA, en lenguaje de planta, y su pauta.
+ *
+ * Es el contenido del tooltip didáctico y del lector del gráfico: el que mira
+ * aprende qué significa el número sin salir a buscar el runbook. Fuentes:
+ * manual 1420000804 (esquema de programas) y runbook E8xx.
+ */
+const SABER: Record<string, { que: string; pasos: string[] }> = {
+  stopc: {
+    que: 'Fallas de cualquier herramienta que el control corrigió sin detener la máquina — el total de la degradación silenciosa. Invisible en piso: solo este contador la ve.',
+    pasos: [
+      'Mirar qué contador específico domina (abrazaderas, cuchilla de punta o un motor): el total solo dice cuánto, no dónde.',
+    ],
+  },
+  tclipc: {
+    que: 'Fallas de las abrazaderas de cola corregidas por el control sin parar — el pescado no fue tomado por la primera abrazadera y lo recogió la segunda.',
+    pasos: [
+      'Revisar tensión y desgaste de las abrazaderas de cola — con la máquina parada.',
+      'Verificar que la segunda abrazadera recoja el pescado que la primera no tomó.',
+      'Si reincide tras la marcha de referencia, revisar los palpadores de entrada.',
+    ],
+  },
+  tclip: {
+    que: 'Fallas de abrazaderas que SÍ detuvieron la máquina: el pescado no fue recogido ni con la segunda abrazadera.',
+    pasos: [
+      'Revisar tensión y desgaste de ambas abrazaderas de cola.',
+      'Verificar la introducción del pescado (posición y tamaño fuera de rango).',
+    ],
+  },
+  stops: {
+    que: 'Todas las fallas que hicieron que el ordenador detuviera la máquina. Cada una cuesta producción directa (~20 s de marcha de referencia + arranque).',
+    pasos: [
+      'Mirar qué contador de parada específico domina (abrazaderas o cuchilla de punta).',
+    ],
+  },
+  anusi: {
+    que: 'Fallas de la cuchilla de punta detectadas por el palpador interior (lado pared) que detuvieron la máquina.',
+    pasos: [
+      'Revisar la cuchilla de punta (filo, montaje) y el palpador del lado pared.',
+      'Verificar el ajuste del palpador: distancia y limpieza.',
+    ],
+  },
+  anuso: {
+    que: 'Fallas de la cuchilla de punta detectadas por el palpador exterior (lado entrada) que detuvieron la máquina.',
+    pasos: [
+      'Revisar la cuchilla de punta (filo, montaje) y el palpador del lado entrada.',
+      'Verificar el ajuste del palpador: distancia y limpieza.',
+    ],
+  },
+  e821c: { que: 'Correcciones silenciosas del motor del centraje (SM1): perdió su posición cero y el control lo recuperó sin parar.', pasos: PAUTAS.e821c!.pasos },
+  e822c: { que: 'Correcciones silenciosas del motor de la cuchilla hendedora (SM2).', pasos: PAUTAS.e822c!.pasos },
+  e823c: { que: 'Correcciones silenciosas del motor del aspirador (SM3).', pasos: PAUTAS.e823c!.pasos },
+  e824c: { que: 'Correcciones silenciosas del motor del excavador A (SM4).', pasos: PAUTAS.e824c!.pasos },
+  e825c: { que: 'Correcciones silenciosas del motor del excavador B (SM5). Fue el caso fundacional: 1 de cada 3 pescados sin que nadie lo viera.', pasos: PAUTAS.e825c!.pasos },
+}
+
+/** Con qué escala de umbral se juzga cada contador. */
+const METRICA_DE: Record<string, Metrica> = {
+  stopc: 'correcciones', tclipc: 'correcciones', e821c: 'correcciones',
+  e822c: 'correcciones', e823c: 'correcciones', e824c: 'correcciones',
+  e825c: 'correcciones',
+  stops: 'paradas', tclip: 'paradas', anusi: 'paradas', anuso: 'paradas',
+}
 
 /**
  * Umbrales provisorios (hasta tener 4 semanas de registro real).
@@ -416,6 +491,9 @@ function VistaProtocolo() {
   const [form, setForm] = useState<Record<keyof ContadoresProtocolo, string>>({ ...FORM_VACIO })
   const [notas, setNotas] = useState('')
   const [guardando, setGuardando] = useState(false)
+  // Guard SÍNCRONO contra el doble-tap: el estado de React no alcanza a
+  // re-renderizar entre dos taps rápidos y el 22-08 entraron lecturas duplicadas.
+  const guardandoRef = useRef(false)
   const [error, setError] = useState<string | null>(null)
   const [guardadoOk, setGuardadoOk] = useState(false)
 
@@ -502,7 +580,9 @@ function VistaProtocolo() {
   }
 
   const guardar = async () => {
-    if (guardando) return
+    if (guardando || guardandoRef.current) return
+    guardandoRef.current = true
+    try {
     setError(null)
     setGuardadoOk(false)
     if (!isAuthenticated || !user?.id) {
@@ -549,6 +629,9 @@ function VistaProtocolo() {
     } finally {
       setGuardando(false)
     }
+    } finally {
+      guardandoRef.current = false
+    }
   }
 
   /* --- tendencia: lecturas ascendentes por fecha --- */
@@ -567,20 +650,59 @@ function VistaProtocolo() {
   const queRevisar = useMemo(() => {
     const ultima = [...serie].reverse().find((l) => muestraValida(l))
     if (!ultima) return null
-    const tasas = SERIES.map((s) => ({ s, r: tasa1000(ultima[s.k], ultima.fish) }))
-    const dom = tasas.reduce((a, b) => (b.r > a.r ? b : a))
-    if (dom.r < UMBRALES.correcciones.intervenir) return null
-    // la lectura válida anterior, para decir «subió de X a Y» con datos
+    // Los 11 contadores, cada uno contra SU escala (correcciones o paradas).
+    // El 22-08 el dominante real de la N2 era STOP-C/T-CLIP-C con los motores
+    // en verde: mirar solo motores decía "todo bien" con la máquina crítica.
+    const todos = [...SERIES, ...SERIES_PARADAS].map((s) => {
+      const m = METRICA_DE[s.k as string] ?? 'correcciones'
+      const r = tasa1000(ultima[s.k], ultima.fish)
+      const u = UMBRALES[m]
+      return { s, r, m, exceso: r / u.intervenir }
+    })
+    // dominante = el que MÁS excede su propio umbral (370 correcciones no es
+    // comparable con 23 paradas salvo normalizando por la escala)
+    const dom = todos.reduce((a, b) => (b.exceso > a.exceso ? b : a))
+    if (dom.exceso < 1) return null
     const previa = [...serie].reverse().find((l) => muestraValida(l) && l !== ultima)
+    const saber = SABER[dom.s.k as string] ?? null
+    // ¿los 5 motores están sanos? decide la frase "mecánico vs paso a paso"
+    const motoresMax = Math.max(
+      ...(['e821c', 'e822c', 'e823c', 'e824c', 'e825c'] as const)
+        .map((k) => tasa1000(ultima[k], ultima.fish)),
+    )
     return {
       lectura: ultima,
       serie: dom.s,
+      metrica: dom.m,
       tasa: dom.r,
-      nivel: nivelTasa(dom.r),
+      nivel: nivelTasa(dom.r, dom.m),
       tasaPrevia: previa ? tasa1000(previa[dom.s.k], previa.fish) : null,
-      pauta: PAUTAS[dom.s.k as string] ?? null,
+      saber,
+      motoresSanos: motoresMax < UMBRALES.correcciones.vigilar,
+      esMotor: String(dom.s.k).startsWith('e82'),
     }
   }, [serie])
+
+  /**
+   * Comparación entre máquinas para el lector: el mismo contador dominante en
+   * las otras dos, con su última lectura válida. "La N3, con la misma pesca,
+   * está en 31" enseña más que cualquier umbral.
+   */
+  const [comparacion, setComparacion] = useState<{ maquina: string; tasa: number }[]>([])
+  useEffect(() => {
+    let vivo = true
+    if (!queRevisar) { setComparacion([]); return }
+    const otras = MAQUINAS.filter((m) => m.id !== maquina)
+    void Promise.all(otras.map(async (m) => {
+      const rows = await lecturasDeMaquina(m.id, 'chonchi', 6)
+      const ult = rows.find((l) => muestraValida(l))
+      return ult
+        ? { maquina: m.label.replace('Baader 142 ', '').replace(' (antigua)', ''),
+            tasa: tasa1000(ult[queRevisar.serie.k], ult.fish) }
+        : null
+    })).then((r) => { if (vivo) setComparacion(r.filter((x): x is NonNullable<typeof x> => x !== null)) })
+    return () => { vivo = false }
+  }, [maquina, queRevisar])
 
   /**
    * Cierre del lazo: la incidencia sale precargada con máquina, código y pauta.
@@ -590,14 +712,17 @@ function VistaProtocolo() {
   const registrarIncidencia = () => {
     if (!queRevisar) return
     const q = queRevisar
-    const titulo = `${q.serie.label}: ${q.tasa}/1000 correcciones (protocolo ${MAQUINAS.find((m) => m.id === maquina)?.label ?? maquina})`
+    const unidadRuido = q.metrica === 'paradas' ? 'paradas' : 'correcciones'
+    const titulo = `${q.serie.label}: ${q.tasa}/1000 ${unidadRuido} (protocolo ${MAQUINAS.find((m) => m.id === maquina)?.label ?? maquina})`
+    const pasos = q.saber?.pasos ?? []
     const desc = [
       `[protocolo142 ${maquina} · ${q.serie.k} ${q.tasa}/1000 · lectura ${q.lectura.fecha}]`,
       q.tasaPrevia !== null ? `Venía de ${q.tasaPrevia}/1000 en la lectura anterior.` : '',
+      ...comparacion.map((c) => `${c.maquina} está en ${c.tasa}/1000 en el mismo contador.`),
       '',
-      'Pauta (runbook E8xx):',
-      ...(q.pauta?.pasos ?? []).map((s, i) => `${i + 1}. ${s}`),
-      `${(q.pauta?.pasos.length ?? 0) + 1}. ${PASO_FINAL}`,
+      'Pauta:',
+      ...pasos.map((s, i) => `${i + 1}. ${s}`),
+      ...(q.esMotor ? [`${pasos.length + 1}. ${PASO_FINAL}`] : []),
     ].filter(Boolean).join('\n')
     navigate(`/incidents?nueva=1&titulo=${encodeURIComponent(titulo)}&desc=${encodeURIComponent(desc)}`)
   }
@@ -616,22 +741,106 @@ function VistaProtocolo() {
         pointRadius: 4,
         spanGaps: false,
         tension: 0.2,
+        borderWidth: s.grosor ?? 2,
+        borderDash: s.trazo ?? [],
+        // clave del contador para que el tooltip encuentre su ficha en SABER
+        clave: s.k as string,
       })),
     }),
     [serie, seriesActivas],
   )
 
+  /**
+   * Bandas de umbral pintadas DETRÁS de la serie, con etiqueta al borde.
+   * El umbral deja de ser un texto al pie: el que mira aprende qué es "alto"
+   * porque el punto cae en una zona de color.
+   */
+  const bandasPlugin = useMemo(() => {
+    const u = UMBRALES[metrica]
+    const bandas = isDark
+      ? [
+          { desde: u.critico, hasta: Infinity, fill: 'rgba(255,69,58,0.10)', ink: '#F0716A', label: `crítico ≥${u.critico}` },
+          { desde: u.intervenir, hasta: u.critico, fill: 'rgba(255,140,10,0.09)', ink: '#EE8A55', label: `intervenir ≥${u.intervenir}` },
+          { desde: u.vigilar, hasta: u.intervenir, fill: 'rgba(255,159,10,0.06)', ink: '#E0AC4E', label: `vigilar ≥${u.vigilar}` },
+          { desde: 0, hasta: u.vigilar, fill: 'rgba(48,209,88,0.05)', ink: '#5DC9A2', label: 'normal' },
+        ]
+      : [
+          { desde: u.critico, hasta: Infinity, fill: 'rgba(255,59,48,0.07)', ink: '#A8201A', label: `crítico ≥${u.critico}` },
+          { desde: u.intervenir, hasta: u.critico, fill: 'rgba(255,105,0,0.08)', ink: '#B4501C', label: `intervenir ≥${u.intervenir}` },
+          { desde: u.vigilar, hasta: u.intervenir, fill: 'rgba(255,149,0,0.07)', ink: '#875105', label: `vigilar ≥${u.vigilar}` },
+          { desde: 0, hasta: u.vigilar, fill: 'rgba(52,199,89,0.07)', ink: '#127054', label: 'normal' },
+        ]
+    const plugin: Plugin<'line'> = {
+      id: 'bandasUmbral',
+      beforeDraw(chart) {
+        const { ctx, chartArea, scales } = chart
+        const y = scales.y as { getPixelForValue: (v: number) => number } | undefined
+        if (!y) return
+        if (!chartArea) return
+        ctx.save()
+        for (const b of bandas) {
+          const yTop = b.hasta === Infinity ? chartArea.top
+            : Math.max(chartArea.top, y.getPixelForValue(b.hasta))
+          const yBot = Math.min(chartArea.bottom, y.getPixelForValue(b.desde))
+          if (yBot <= yTop) continue
+          ctx.fillStyle = b.fill
+          ctx.fillRect(chartArea.left, yTop, chartArea.right - chartArea.left, yBot - yTop)
+          if (yBot - yTop > 14) {
+            ctx.fillStyle = b.ink
+            ctx.font = '700 9px system-ui'
+            ctx.textAlign = 'right'
+            ctx.fillText(b.label, chartArea.right - 4, Math.min(yTop + 11, yBot - 4))
+          }
+        }
+        ctx.restore()
+      },
+    }
+    return plugin
+  }, [metrica, isDark])
+
+  /** Corta un texto en líneas de tooltip (~46 caracteres): Chart.js no envuelve. */
+  const envolver = (texto: string, ancho = 46): string[] => {
+    const palabras = texto.split(' ')
+    const lineas: string[] = []
+    let linea = ''
+    for (const p of palabras) {
+      if ((linea + ' ' + p).trim().length > ancho) { lineas.push(linea.trim()); linea = p }
+      else linea = linea + ' ' + p
+    }
+    if (linea.trim()) lineas.push(linea.trim())
+    return lineas
+  }
+
   const chartOptions = useMemo(
     () => ({
       responsive: true,
       maintainAspectRatio: false,
-      interaction: { mode: 'index' as const, intersect: false },
+      // nearest (no index): el tooltip didáctico es de UN contador; con 7 series
+      // el modo index apila las fichas de todas y no se puede leer ninguna
+      interaction: { mode: 'nearest' as const, intersect: false },
       plugins: {
         legend: { labels: { color: ejeColor, boxWidth: 12, font: { size: 11 } } },
         tooltip: {
           callbacks: {
-            label: (item: TooltipItem<'line'>) =>
-              `${item.dataset.label}: ${item.parsed.y ?? 0} /1000 pescados`,
+            label: (item: TooltipItem<'line'>) => {
+              const clave = (item.dataset as { clave?: string }).clave ?? ''
+              const m = METRICA_DE[clave] ?? 'correcciones'
+              const r = item.parsed.y ?? 0
+              return `${item.dataset.label}: ${r}/1000 · ${nivelTasa(r, m).label}`
+            },
+            // La ficha del contador: qué cuenta + la pauta. El tooltip ES la clase.
+            afterBody: (items: TooltipItem<'line'>[]) => {
+              const clave = (items[0]?.dataset as { clave?: string })?.clave ?? ''
+              const s = SABER[clave]
+              if (!s) return []
+              return [
+                '',
+                ...envolver(s.que),
+                '',
+                'Pauta:',
+                ...s.pasos.flatMap((p, i) => envolver(`${i + 1}. ${p}`)),
+              ]
+            },
           },
         },
       },
@@ -698,7 +907,7 @@ function VistaProtocolo() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Formulario */}
-        <div className="rounded-card border p-4" style={{ background: LC.surface, borderColor: LC.border }}>
+        <div className="min-w-0 rounded-card border p-4" style={{ background: LC.surface, borderColor: LC.border }}>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-base font-semibold">Nueva lectura</h2>
             <div className="flex gap-2">
@@ -824,7 +1033,7 @@ function VistaProtocolo() {
             Orden por urgencia: la acción va antes que el gráfico. */}
         {queRevisar ? (
           <div
-            className="rounded-card border p-4 lg:col-span-2"
+            className="min-w-0 rounded-card border p-4 lg:col-span-2"
             style={{ background: LC.surface, borderColor: queRevisar.nivel.color }}
             role="region"
             aria-label="Qué revisar ahora"
@@ -852,29 +1061,59 @@ function VistaProtocolo() {
               </span>
             </div>
 
+            {/* El lector: qué dice el gráfico hoy, en lenguaje de planta */}
+            <div className="mt-3 space-y-1.5 text-footnote" style={{ color: LC.ink }}>
+              <p>
+                {queRevisar.saber?.que ?? ''}{' '}
+                <strong className="tabular-nums">
+                  {queRevisar.metrica === 'paradas' ? 'Una parada' : 'Una corrección'} cada{' '}
+                  {Math.max(1, Math.round(1000 / Math.max(queRevisar.tasa, 1)))} pescados.
+                </strong>
+                {queRevisar.tasaPrevia !== null
+                  ? ` Venía de ${queRevisar.tasaPrevia}/1000 en la lectura anterior.`
+                  : ''}
+              </p>
+              {comparacion.length > 0 ? (
+                <p style={{ color: LC.inkMid }}>
+                  En el mismo contador,{' '}
+                  {comparacion.map((c, i) => (
+                    <span key={c.maquina}>
+                      {i > 0 ? ' y ' : ''}
+                      <strong style={{ color: LC.ink }}>{c.maquina}</strong> está en{' '}
+                      <strong
+                        className="tabular-nums"
+                        style={{ color: nivelTasa(c.tasa, queRevisar.metrica).color }}
+                      >
+                        {c.tasa}/1000
+                      </strong>
+                    </span>
+                  ))}
+                  .
+                </p>
+              ) : null}
+              {!queRevisar.esMotor && queRevisar.motoresSanos ? (
+                <p style={{ color: LC.inkMid }}>
+                  Los 5 motores paso a paso están sanos: el problema es{' '}
+                  <strong style={{ color: LC.ink }}>mecánico</strong>, no de control.
+                </p>
+              ) : null}
+            </div>
+
             <ol className="mt-3 space-y-2 text-footnote" style={{ color: LC.ink }}>
-              <li className="flex gap-2">
-                <span className="font-mono text-caption" style={{ color: LC.inkLo }}>1</span>
-                <span>
-                  El control corrigió esta herramienta <strong>{queRevisar.tasa} veces por cada
-                  1.000 pescados</strong> sin detener la máquina
-                  {queRevisar.tasaPrevia !== null
-                    ? ` — venía de ${queRevisar.tasaPrevia}/1000 en la lectura anterior.`
-                    : '.'}
-                </span>
-              </li>
-              {(queRevisar.pauta?.pasos ?? []).map((paso, i) => (
+              {(queRevisar.saber?.pasos ?? []).map((paso, i) => (
                 <li key={paso} className="flex gap-2">
-                  <span className="font-mono text-caption" style={{ color: LC.inkLo }}>{i + 2}</span>
+                  <span className="font-mono text-caption" style={{ color: LC.inkLo }}>{i + 1}</span>
                   <span>{paso}</span>
                 </li>
               ))}
-              <li className="flex gap-2">
-                <span className="font-mono text-caption" style={{ color: LC.inkLo }}>
-                  {(queRevisar.pauta?.pasos.length ?? 0) + 2}
-                </span>
-                <span>{PASO_FINAL}</span>
-              </li>
+              {queRevisar.esMotor ? (
+                <li className="flex gap-2">
+                  <span className="font-mono text-caption" style={{ color: LC.inkLo }}>
+                    {(queRevisar.saber?.pasos.length ?? 0) + 1}
+                  </span>
+                  <span>{PASO_FINAL}</span>
+                </li>
+              ) : null}
             </ol>
 
             <div className="mt-3 flex flex-wrap gap-2">
@@ -902,7 +1141,7 @@ function VistaProtocolo() {
         ) : null}
 
         {/* Tendencia */}
-        <div className="rounded-card border p-4" style={{ background: LC.surface, borderColor: LC.border }}>
+        <div className="min-w-0 rounded-card border p-4" style={{ background: LC.surface, borderColor: LC.border }}>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-base font-semibold">
               {metrica === 'paradas' ? 'Tendencia de paradas' : 'Tendencia de correcciones -C'}
@@ -973,8 +1212,8 @@ function VistaProtocolo() {
               formulario — podés partir precargando la lectura base del 08-08.
             </p>
           ) : (
-            <div className="mt-3 h-64">
-              <Line data={chartData} options={chartOptions} />
+            <div className="relative mt-3 h-64 w-full min-w-0">
+              <Line data={chartData} options={chartOptions} plugins={[bandasPlugin]} />
             </div>
           )}
         </div>
