@@ -3,16 +3,32 @@ import { assetPlano } from '@/data/planos'
 
 const CACHE_PLANOS = 'planos-offline-v1'
 
-/** Red primero; si no hay señal, lo guardado con "Disponible sin señal". */
-async function fetchConCache(url: string, init?: RequestInit): Promise<Response> {
-  try {
-    const r = await fetch(url, init)
-    if (r.ok) return r
-    throw new Error(String(r.status))
-  } catch (e) {
-    const c = await caches.open(CACHE_PLANOS).then((c) => c.match(url)).catch(() => undefined)
-    if (c) return c
-    throw e
+/**
+ * Red primero; si no hay señal, lo guardado con "Disponible sin señal".
+ *
+ * Con REINTENTO: el índice del despiece pesa ~134 KB comprimidos y la señal
+ * de planta parpadea — un solo fallo dejaba la pantalla en "No se pudo
+ * cargar" sin salida. Dos reintentos cortos cubren el bache típico antes de
+ * caer a la caché offline.
+ */
+async function fetchConCache(url: string, init?: RequestInit, reintentos = 2): Promise<Response> {
+  for (let intento = 0; ; intento++) {
+    try {
+      const r = await fetch(url, init)
+      if (r.ok) return r
+      // 4xx no se reintenta: el archivo no está, esperar no lo trae.
+      if (r.status >= 400 && r.status < 500) throw new Error(String(r.status))
+      throw new Error(`HTTP ${r.status}`)
+    } catch (e) {
+      const esCliente = e instanceof Error && /^4\d\d$/.test(e.message)
+      if (!esCliente && intento < reintentos) {
+        await new Promise((r) => setTimeout(r, 600 * (intento + 1)))
+        continue
+      }
+      const c = await caches.open(CACHE_PLANOS).then((c) => c.match(url)).catch(() => undefined)
+      if (c) return c
+      throw e
+    }
   }
 }
 
@@ -134,6 +150,11 @@ export function usePlano(slug: string | undefined, inicial?: number) {
   const [cargando, setCargando] = useState(false)
   const cache = useRef(new Map<number, PlanoHoja>())
 
+  // Permite reintentar a mano cuando la red de planta se cayó del todo: sin
+  // esto el único camino era recargar la página (y perder la hoja abierta).
+  const [intentoIndice, setIntentoIndice] = useState(0)
+  const reintentar = useCallback(() => setIntentoIndice((n) => n + 1), [])
+
   useEffect(() => {
     cache.current.clear()
     setIndice(null)
@@ -158,7 +179,7 @@ export function usePlano(slug: string | undefined, inicial?: number) {
     return () => {
       vivo = false
     }
-  }, [slug])
+  }, [slug, intentoIndice])
 
   const traer = useCallback(
     async (blatt: number): Promise<PlanoHoja | null> => {
@@ -214,5 +235,5 @@ export function usePlano(slug: string | undefined, inicial?: number) {
     if (destino != null) void abrir(destino)
   }, [indice, hoja, abrir, inicial])
 
-  return { indice, hoja, abrir, cargando, error }
+  return { indice, hoja, abrir, cargando, error, reintentar }
 }
