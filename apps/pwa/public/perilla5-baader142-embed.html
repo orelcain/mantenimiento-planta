@@ -2929,7 +2929,8 @@ if(EMBEBIDO){ try{ parent.postMessage({__p5:true,type:'hello'},'*'); }catch(e){}
   .s142-k .marca.act{color:#e8f36a}
   .s142-lab{text-align:center;font-family:ui-monospace,Consolas,monospace;font-size:9px;
     color:#9fb2c4;margin-top:5px}
-  .s142-lcd{margin-top:14px;background:#cdd94e;border-radius:6px;border:4px solid #23282e;
+  .s142-lcd{display:block;width:100%;box-sizing:border-box;cursor:pointer;text-align:left;
+    font:inherit;margin-top:14px;background:#cdd94e;border-radius:6px;border:4px solid #23282e;
     padding:7px 12px;font-family:ui-monospace,Consolas,monospace;font-weight:800;color:#31380c;
     font-size:14px;letter-spacing:1.6px;line-height:1.5;
     box-shadow:inset 0 3px 8px rgba(0,0,0,.35)}
@@ -2938,6 +2939,8 @@ if(EMBEBIDO){ try{ parent.postMessage({__p5:true,type:'hello'},'*'); }catch(e){}
   .s142-bot span{width:30px;height:30px;border-radius:99px;border:5px solid #c9ccd1;
     box-shadow:0 3px 7px rgba(0,0,0,.45),inset 0 2px 3px rgba(255,255,255,.3)}
   .s142-hint{font-size:10.5px;color:#9fb2c4;text-align:center;margin-top:9px}
+  .s142-desc{font-size:11.5px;color:#dfe7ee;text-align:center;margin-top:8px;min-height:16px;padding:0 8px}
+  .s142-lcd:active{transform:translateY(1px)}
   .s142-extra{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
   .s142-extra button{font:600 12px system-ui;border:1px solid #c9d4de;background:#fff;
     color:#1d3557;border-radius:999px;padding:7px 12px;min-height:34px;cursor:pointer}
@@ -3002,6 +3005,29 @@ if(EMBEBIDO){ try{ parent.postMessage({__p5:true,type:'hello'},'*'); }catch(e){}
     {l1:'SCRAPER B SM5',  l2:'Σ E825:',     v1:'',  v2:'0'},
     {l1:'Σ E825-C:',      l2:'/1000Fi:',    v1:'0', v2:'0'}
   ];
+  // que significa lo que estas viendo — aparece bajo el display
+  var P4_DESC = [
+    'Piezas procesadas: total acumulado y las de hoy.',
+    'Paradas totales de la maquina, por cualquier causa.',
+    'Correcciones sin detener la maquina — la degradacion silenciosa. El contador estrella.',
+    'Paradas causadas por las abrazaderas (tail clip).',
+    'Correcciones de abrazaderas sin detener — si sube, revisar abrazaderas.',
+    'Cuchilla de punta, lado ENTRADA: paradas.',
+    'Cuchilla de punta, lado SALIDA: paradas.',
+    'Motor del centraje (SM1): veces que se detuvo.',
+    'Correcciones del centraje SM1 sin detener.',
+    'Motor de la cuchilla (SM2): veces que se detuvo.',
+    'Correcciones de la cuchilla SM2 sin detener.',
+    'Motor del aspirador (SM3): veces que se detuvo.',
+    'Correcciones del aspirador SM3 sin detener.',
+    'Motor del excavador A (SM4): veces que se detuvo.',
+    'Correcciones del excavador A SM4 sin detener.',
+    'Motor del excavador B (SM5): veces que se detuvo.',
+    'Correcciones del excavador B SM5 sin detener.'
+  ];
+  // termino a buscar en el contenido al tocar la pantalla en cada paso
+  var P4_LINK = ['FISH','STOPS','STOP-C','TAIL CLIP','T-CLIP-C','ANUS-I','ANUS-O',
+    'E821','E821-C','E822','E822-C','E823','E823-C','E824','E824-C','E825','E825-C'];
   var p4idx = 2; // parte en STOP-C, el contador estrella
 
   function detent(t){ return nav.querySelector('.detent[data-t="'+t+'"]'); }
@@ -3023,14 +3049,15 @@ if(EMBEBIDO){ try{ parent.postMessage({__p5:true,type:'hello'},'*'); }catch(e){}
       '<div><div class="s142-k media" id="s142k4" role="button" tabindex="0" aria-label="Perilla 4: siguiente contador del protocolo" title="Perilla 4 · recorre los contadores (en posición 1)"><div class="pozo"></div><div class="lado"></div><div class="cara"></div><div class="giro" id="s142g4"><div class="msombra"></div><div class="mlado"></div><div class="mtapa"></div><div class="ranura"></div><div class="punta"></div></div></div><div class="s142-lab">4 · /min</div></div>' +
       '<div><div class="s142-k grande" id="s142k5"><div class="pozo"></div><div class="lado"></div><div class="cara"></div><div class="giro" id="s142g5"><div class="msombra"></div><div class="mlado"></div><div class="mtapa"></div><div class="ranura"></div><div class="punta"></div></div></div><div class="s142-lab">5 · service · reset</div></div>' +
     '</div>' +
-    '<div class="s142-lcd"><div class="l"><span id="s142l1">BA142-PROTOCOL</span><span id="s142v1"></span></div>' +
-    '<div class="l"><span id="s142l2">through switch 4</span><span id="s142v2"></span></div></div>' +
+    '<button type="button" class="s142-lcd" id="s142lcd" aria-label="Ver el detalle de lo que muestra el display"><div class="l"><span id="s142l1">BA142-PROTOCOL</span><span id="s142v1"></span></div>' +
+    '<div class="l"><span id="s142l2">through switch 4</span><span id="s142v2"></span></div></button>' +
+    '<div class="s142-desc" id="s142desc"></div>' +
     '<div class="s142-bot" aria-hidden="true">' +
       '<span style="background:radial-gradient(circle at 35% 28%,#3a3a3a,#050505 65%)"></span>' +
       '<span style="background:radial-gradient(circle at 35% 28%,#ff7a5c,#c0170b 65%)"></span>' +
       '<span style="background:radial-gradient(circle at 35% 28%,#5ee98a,#0a8f3c 65%)"></span>' +
     '</div>' +
-    '<div class="s142-hint">tocá una marca del anillo · la perilla 4 recorre los contadores en posición 1</div>';
+    '<div class="s142-hint">girá la 5 (marcas) y la 4 (contadores) · tocá la PANTALLA para ir al detalle</div>';
   nav.parentNode.insertBefore(panel, nav);
 
   // marcas del anillo (posicionadas en % del knob grande)
@@ -3042,7 +3069,9 @@ if(EMBEBIDO){ try{ parent.postMessage({__p5:true,type:'hello'},'*'); }catch(e){}
     el.textContent = m.rot;
     el.style.cssText = 'position:absolute;left:'+m.x+'%;top:'+m.y+'%;transform:translate(-50%,-50%);background:none;border:0;';
     el.setAttribute('aria-label', 'Posición '+m.rot+': '+titulo(m.t));
-    el.addEventListener('click', function(){ irA(m.t, true); });
+    // girar NO arrastra la vista hacia abajo: cambia posicion y LCD; ir al
+    // contenido es decision aparte (tocar la pantalla). Feedback de Orel.
+    el.addEventListener('click', function(){ irA(m.t, false); });
     k5.appendChild(el);
   });
   // las clases de pescado del lado derecho: están en el anillo real pero su
@@ -3061,16 +3090,20 @@ if(EMBEBIDO){ try{ parent.postMessage({__p5:true,type:'hello'},'*'); }catch(e){}
   var g5 = panel.querySelector('#s142g5');
   var l1 = panel.querySelector('#s142l1'), l2 = panel.querySelector('#s142l2');
   var k4 = panel.querySelector('#s142k4'), g4 = panel.querySelector('#s142g4');
-  var g4rot = 0;
 
   var v1 = panel.querySelector('#s142v1'), v2 = panel.querySelector('#s142v2');
+  var desc = panel.querySelector('#s142desc');
   function lcd(t){
     if (t === 'p1') {
       var s = P4_PASOS[p4idx];
       l1.textContent = s.l1; l2.textContent = s.l2;
       v1.textContent = s.v1; v2.textContent = s.v2;
+      desc.textContent = P4_DESC[p4idx];
+      // la perilla 4 en SU posicion: un deten por pantalla, vuelta completa = ciclo
+      g4.style.transform = 'rotate(' + Math.round(p4idx * (360 / P4_PASOS.length)) + 'deg)';
     } else {
       v1.textContent = ''; v2.textContent = '';
+      desc.textContent = 'Toca la pantalla para ir al contenido de esta posicion.';
       l1.textContent = LCD1[t] || (titulo(t).toUpperCase().slice(0,16));
       l2.textContent = titulo(t).slice(0, 22);
     }
@@ -3099,9 +3132,31 @@ if(EMBEBIDO){ try{ parent.postMessage({__p5:true,type:'hello'},'*'); }catch(e){}
   }
   k4.addEventListener('click', function(){
     p4idx = (p4idx + 1) % P4_PASOS.length;
-    g4rot += 30;
-    g4.style.transform = 'rotate(' + g4rot + 'deg)';
     lcd(activa());
+  });
+  panel.querySelector('#s142lcd').addEventListener('click', function(){
+    var t = activa();
+    var sec = document.getElementById(t);
+    if (!sec) return;
+    if (t === 'p1') {
+      var q = P4_LINK[p4idx].toLowerCase();
+      document.querySelectorAll('mark.s142-hl').forEach(function(m){
+        m.replaceWith(document.createTextNode(m.textContent));
+      });
+      var tw = document.createTreeWalker(sec, NodeFilter.SHOW_TEXT);
+      var nodo, mejor = null;
+      while ((nodo = tw.nextNode())) {
+        var j = nodo.textContent.toLowerCase().indexOf(q);
+        if (j >= 0) { mejor = {n: nodo, j: j}; break; }
+      }
+      if (mejor) {
+        var r = document.createRange();
+        r.setStart(mejor.n, mejor.j); r.setEnd(mejor.n, mejor.j + q.length);
+        var mk = document.createElement('mark'); mk.className = 's142-hl';
+        try { r.surroundContents(mk); mk.scrollIntoView({behavior:'smooth', block:'center'}); return; } catch(e){}
+      }
+    }
+    sec.scrollIntoView({behavior:'smooth', block:'start'});
   });
   k4.addEventListener('keydown', function(e){
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); k4.click(); }
