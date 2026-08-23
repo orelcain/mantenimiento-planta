@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
-import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Copy, Download, Link as LinkIcon, Loader2, Printer, QrCode, Search, X, Zap } from 'lucide-react'
+import { Camera, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Copy, Download, Link as LinkIcon, Loader2, Printer, QrCode, Search, X, Zap } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { PLANOS, assetPlano, planoPorSlug } from '@/data/planos'
 import {
@@ -1642,6 +1642,7 @@ function PiezaTerreno({ tag, pieza, vinculosTerreno }: {
   const [opcion, setOpcion] = useState<VinculoTerreno['estado'] | null>(null)
   const [codigoLeido, setCodigoLeido] = useState('')
   const [nota, setNota] = useState('')
+  const [foto, setFoto] = useState<File | null>(null)
   const [guardando, setGuardando] = useState(false)
   const [errorLocal, setErrorLocal] = useState<string | null>(null)
 
@@ -1658,13 +1659,18 @@ function PiezaTerreno({ tag, pieza, vinculosTerreno }: {
     setGuardando(true)
     setErrorLocal(null)
     try {
+      // La foto va primero: si falla la subida, no se guarda un vínculo que
+      // dice tener evidencia y no la tiene.
+      const urlFoto = foto ? await vinculosTerreno.subirFoto(foto) : undefined
       await vinculosTerreno.confirmar({
         aparato: tag,
         estado: opcion,
         codigo: opcion === 'confirmado' ? pieza.nr : opcion === 'corregido' ? codigoLeido.trim() : undefined,
         nota: nota.trim() || undefined,
+        foto: urlFoto,
       })
       setAbierto(false)
+      setFoto(null)
     } catch (e) {
       setErrorLocal(e instanceof Error ? e.message : 'No se pudo guardar.')
     } finally {
@@ -1681,7 +1687,10 @@ function PiezaTerreno({ tag, pieza, vinculosTerreno }: {
         </p>
       ) : (
         <>
-          <div className="flex items-baseline justify-between gap-2">
+          {/* El badge va DEBAJO, no al lado: compitiendo por el ancho del
+              panel partía nombres como "Sensores de proximidad inductivo" en
+              cuatro líneas de una palabra. El nombre manda. */}
+          <div className="flex flex-col items-start gap-1">
             <span className="text-footnote font-semibold leading-snug">{pieza.es}</span>
             {v?.estado === 'confirmado' ? (
               <span className="shrink-0 rounded-ctl px-2 py-0.5 text-caption"
@@ -1740,6 +1749,7 @@ function PiezaTerreno({ tag, pieza, vinculosTerreno }: {
           opcion={opcion} onOpcion={setOpcion}
           codigo={codigoLeido} onCodigo={setCodigoLeido}
           nota={nota} onNota={setNota}
+          fotoNombre={foto?.name ?? null} onFoto={setFoto}
           guardando={guardando} error={errorLocal ?? vinculosTerreno.error}
           onGuardar={() => void guardar()} onCancelar={() => setAbierto(false)}
         />
@@ -1758,7 +1768,8 @@ function PiezaTerreno({ tag, pieza, vinculosTerreno }: {
 
 /** El formulario en línea (no modal: el panel ya es hoja inferior en móvil). */
 function FormularioTerreno({
-  opcion, onOpcion, codigo, onCodigo, nota, onNota, guardando, error, onGuardar, onCancelar,
+  opcion, onOpcion, codigo, onCodigo, nota, onNota, fotoNombre, onFoto,
+  guardando, error, onGuardar, onCancelar,
 }: {
   opcion: VinculoTerreno['estado'] | null
   onOpcion: (o: VinculoTerreno['estado']) => void
@@ -1766,6 +1777,8 @@ function FormularioTerreno({
   onCodigo: (v: string) => void
   nota: string
   onNota: (v: string) => void
+  fotoNombre: string | null
+  onFoto: (f: File | null) => void
   guardando: boolean
   error: string | null
   onGuardar: () => void
@@ -1798,6 +1811,16 @@ function FormularioTerreno({
                 onChange={(e) => onNota(e.target.value)}
                 className="rounded-ctl border px-3 py-2 text-footnote"
                 style={{ borderColor: 'var(--lc-border)', background: 'var(--lc-surface)', color: 'var(--lc-ink)' }} />
+      {/* La foto de la etiqueta es lo que vuelve irrefutable el vínculo: el
+          que venga después no tiene que creer, ve la placa. `capture` abre
+          la cámara directo en el teléfono. */}
+      <label className="flex min-h-[44px] cursor-pointer items-center justify-center gap-2 rounded-ctl border px-3 text-footnote font-medium"
+             style={{ borderColor: 'var(--lc-border)', color: fotoNombre ? 'var(--lc-nuevo)' : 'var(--lc-ink-mid)' }}>
+        <Camera size={15} />
+        {fotoNombre ? 'Foto lista ✓' : 'Foto de la etiqueta (opcional)'}
+        <input type="file" accept="image/*" capture="environment" className="hidden"
+               onChange={(e) => onFoto(e.target.files?.[0] ?? null)} />
+      </label>
       {error && (
         <p className="m-0 rounded-ctl p-2 text-footnote" style={{ background: 'var(--lc-danger-soft)', color: 'var(--lc-danger)' }}>
           {error}
