@@ -14,7 +14,7 @@ import { usePartesPlano } from '@/hooks/usePartesPlano'
 import { usePlanoVinculos, type VinculoTerreno } from '@/hooks/usePlanoVinculos'
 import { PlanoLienzo, type Foco } from '@/components/planos/PlanoLienzo'
 import { NotasAparato } from '@/components/planos/NotasAparato'
-import { compactarTramos } from '@/utils/designaciones'
+import { compactarTramos, compararTags } from '@/utils/designaciones'
 import { auth } from '@/services/firebase'
 
 /** minusculas y sin acentos: "posicion" debe encontrar "POSICIÓN ZERO". */
@@ -1112,6 +1112,12 @@ function Panel({
                 confirmados en terreno
               </p>
             )}
+            {/* La ruta de trabajo, viva: los que tienen pieza propuesta y
+                todavía nadie verificó. Tocar uno lleva directo a su ficha
+                para confirmarlo ahí mismo — el checklist de papel deja de
+                ser necesario. */}
+            <PendientesTerreno partes={partes} vinculos={vinculosTerreno.vinculos}
+                               onAbrir={onAbrirAparato} />
           </>
         )}
         {recientes.length > 0 && (
@@ -1848,6 +1854,49 @@ function FormularioTerreno({
  * despiece: no promete la pieza, solo dice en qué caja de distribución
  * buscarla — 134 aparatos pasan de "nada" a esto.
  */
+/**
+ * Los aparatos con pieza propuesta que todavía nadie verificó en la máquina.
+ * Es la ruta de trabajo del próximo recorrido: se toca uno, se abre su ficha
+ * y se confirma ahí mismo. Muestra hasta 8 para no volverse un muro.
+ */
+function PendientesTerreno({ partes, vinculos, onAbrir }: {
+  partes: ReturnType<typeof usePartesPlano>
+  vinculos: Map<string, VinculoTerreno>
+  onAbrir: (tag: string) => void
+}) {
+  const pendientes = Object.keys(partes?.aparatos ?? {})
+    .filter((t) => !vinculos.has(t))
+    .sort(compararTags)
+  if (!pendientes.length) {
+    return partes?.aparatos && Object.keys(partes.aparatos).length > 0 ? (
+      <p className="m-0 mt-1 text-footnote" style={{ color: 'var(--lc-nuevo)' }}>
+        Todas las piezas propuestas están verificadas en terreno.
+      </p>
+    ) : null
+  }
+  return (
+    <>
+      <p className="m-0 mt-2 text-footnote" style={{ color: 'var(--lc-ink-mid)' }}>
+        Falta verificar en la máquina ({pendientes.length}):
+      </p>
+      <div className="mt-1 flex flex-wrap gap-1.5">
+        {pendientes.slice(0, 8).map((t) => (
+          <button key={t} type="button" onClick={() => onAbrir(t)}
+                  className="rounded-ctl border px-2 py-1 font-mono text-footnote"
+                  style={{ borderColor: 'var(--lc-prep)', color: 'var(--lc-prep)' }}>
+            {t}
+          </button>
+        ))}
+        {pendientes.length > 8 && (
+          <span className="self-center text-caption" style={{ color: 'var(--lc-ink-ghost)' }}>
+            +{pendientes.length - 8} más
+          </span>
+        )}
+      </div>
+    </>
+  )
+}
+
 function ZonaSugerida({ tag, partes, slug }: {
   tag: string
   partes: NonNullable<ReturnType<typeof usePartesPlano>>
