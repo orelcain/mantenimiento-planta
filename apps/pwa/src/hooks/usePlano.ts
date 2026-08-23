@@ -100,7 +100,10 @@ export type PlanoIndice = {
   hojas: PlanoHojaMeta[]
   /** aparato -> todas sus apariciones, cada una con su caja exacta */
   indice: Record<string, PlanoAparicion[]>
-  /** todos los rotulos traducidos del plano, para el buscador */
+  /** Todos los rótulos traducidos del plano, para el buscador.
+   *  ⚠ En los planos grandes (despiece) viaja APARTE en `busqueda.json` y
+   *  llega vacío acá: son el 50% del peso y solo hacen falta al buscar, no
+   *  al abrir. `usePlano` lo carga bajo demanda y lo fusiona. */
   busqueda: PlanoBusquedaItem[]
   /** borne -> su columna en el Klemmenplan, para el buscador */
   bornesIdx: Record<string, { h: number; tb: Caja }>
@@ -150,6 +153,24 @@ export function usePlano(slug: string | undefined, inicial?: number) {
   const [cargando, setCargando] = useState(false)
   const cache = useRef(new Map<number, PlanoHoja>())
 
+  // El buscador vive aparte en los planos grandes: se trae al primer tecleo.
+  const busquedaPedida = useRef(false)
+  const cargarBusqueda = useCallback(() => {
+    if (busquedaPedida.current || !slug) return
+    busquedaPedida.current = true
+    fetchConCache(assetPlano(slug, 'busqueda.json'))
+      .then((r) => r.json())
+      .then((d: { busqueda?: PlanoBusquedaItem[]; descs?: Record<string, string> }) => {
+        setIndice((prev) => (prev
+          ? { ...prev, busqueda: d.busqueda ?? prev.busqueda, descs: d.descs ?? prev.descs }
+          : prev))
+      })
+      .catch(() => {
+        // sin buscador el visor sigue sirviendo: se permite reintentar
+        busquedaPedida.current = false
+      })
+  }, [slug])
+
   // Permite reintentar a mano cuando la red de planta se cayó del todo: sin
   // esto el único camino era recargar la página (y perder la hoja abierta).
   const [intentoIndice, setIntentoIndice] = useState(0)
@@ -157,6 +178,7 @@ export function usePlano(slug: string | undefined, inicial?: number) {
 
   useEffect(() => {
     cache.current.clear()
+    busquedaPedida.current = false
     setIndice(null)
     setHoja(null)
     setError(null)
@@ -171,7 +193,19 @@ export function usePlano(slug: string | undefined, inicial?: number) {
         return r.json()
       })
       .then((d: PlanoIndice) => {
-        if (vivo) setIndice(d)
+        // Defaults ANTES de publicar el índice: los planos grandes emiten
+        // `busqueda` aparte y el consumidor la itera sin preguntar —
+        // exactamente el patrón que ya salvó al lienzo con las capas de hoja.
+        if (vivo) {
+          setIndice({
+            ...d,
+            busqueda: d.busqueda ?? [],
+            indice: d.indice ?? {},
+            hojas: d.hojas ?? [],
+            bornesIdx: d.bornesIdx ?? {},
+            glosario: d.glosario ?? {},
+          })
+        }
       })
       .catch(() => {
         if (vivo) setError('No se pudo cargar el índice del plano.')
@@ -235,5 +269,5 @@ export function usePlano(slug: string | undefined, inicial?: number) {
     if (destino != null) void abrir(destino)
   }, [indice, hoja, abrir, inicial])
 
-  return { indice, hoja, abrir, cargando, error, reintentar }
+  return { indice, hoja, abrir, cargando, error, reintentar, cargarBusqueda }
 }

@@ -19,11 +19,17 @@ const PUB = join(__dirname, '..', '..', '..', 'public')
 // el staging está presente — así el guard protege lo que el repo publica
 // sin romper el build por un archivo que a propósito no versionamos.
 const RUTA_INDICE = join(PUB, 'planos', 'baader-142-despiece', 'indice.json')
+// `busqueda` y `descs` viajan APARTE (son el 62% del peso y solo hacen falta
+// al buscar): el guard tiene que mirar los dos archivos, igual que la app.
+const RUTA_BUSQUEDA = join(PUB, 'planos', 'baader-142-despiece', 'busqueda.json')
 const hayIndice = existsSync(RUTA_INDICE)
 const soloLocal = hayIndice ? describe : describe.skip
 
 const indice = (hayIndice
-  ? JSON.parse(readFileSync(RUTA_INDICE, 'utf8'))
+  ? {
+      ...JSON.parse(readFileSync(RUTA_INDICE, 'utf8')),
+      ...(existsSync(RUTA_BUSQUEDA) ? JSON.parse(readFileSync(RUTA_BUSQUEDA, 'utf8')) : {}),
+    }
   : { hojas: [], indice: {}, busqueda: [] }) as {
   hojas: { blatt: number; fig?: string; tituloEs: string }[]
   destacados?: { hoja: number; etiqueta: string; detalle: string }[]

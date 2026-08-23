@@ -945,8 +945,17 @@ def indice_app():
         "destacados": destacados,
         "sinonimos": sinonimos,
     }
+    # PARTIR EL INDICE: `busqueda` (50% del peso) y `descs` (12%) solo hacen
+    # falta al BUSCAR, no al abrir el plano. Separarlos baja el arranque de
+    # ~134 KB a ~50 KB comprimidos — en planta la senal parpadea y el fetch
+    # del indice era el punto donde se caia la carga.
+    busqueda_aparte = {"busqueda": idx.pop("busqueda"), "descs": idx.pop("descs", {})}
+    with io.open(os.path.join(STAGING, "busqueda.json"), "w", encoding="utf-8") as fh:
+        json.dump(busqueda_aparte, fh, ensure_ascii=False)
     with io.open(os.path.join(STAGING, "indice.json"), "w", encoding="utf-8") as fh:
         json.dump(idx, fh, ensure_ascii=False)
+    kb = lambda o: len(json.dumps(o, ensure_ascii=False).encode("utf-8")) / 1024
+    print(f"   indice {kb(idx):.0f} KB + busqueda {kb(busqueda_aparte):.0f} KB (antes: {kb(idx)+kb(busqueda_aparte):.0f} KB juntos)")
     restantes = os.listdir(os.path.join(STAGING, "assets")) if os.path.isdir(os.path.join(STAGING, "assets")) else []
     if not restantes:
         try:

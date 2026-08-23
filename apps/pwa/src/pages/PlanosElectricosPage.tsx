@@ -67,7 +67,20 @@ function Catalogo() {
     void Promise.all(PLANOS.map(async (p) => {
       try {
         const r = await fetch(assetPlano(p.slug, 'indice.json'))
-        return [p.slug, await r.json()] as const
+        const idx = (await r.json()) as PlanoIndice
+        // Los planos grandes emiten `busqueda` aparte para abrir rápido: acá
+        // sí se necesita, así que se trae y se fusiona (el buscador global es
+        // justamente lo que la usa).
+        if (!idx.busqueda?.length) {
+          try {
+            const rb = await fetch(assetPlano(p.slug, 'busqueda.json'))
+            if (rb.ok) {
+              const b = (await rb.json()) as { busqueda?: PlanoIndice['busqueda'] }
+              if (b.busqueda) idx.busqueda = b.busqueda
+            }
+          } catch { /* sin buscador de ese plano, el resto sigue */ }
+        }
+        return [p.slug, idx] as const
       } catch { return null }
     })).then((rs) => {
       setIndices(new Map(rs.filter((x): x is [string, PlanoIndice] => !!x)))
@@ -225,7 +238,7 @@ function Visor({ slug }: { slug: string }) {
     const g = Number(localStorage.getItem(`plano-hoja:${slug}`))
     return Number.isInteger(g) && g > 0 ? g : undefined
   })
-  const { indice, hoja, abrir, cargando, error, reintentar } = usePlano(slug, inicial)
+  const { indice, hoja, abrir, cargando, error, reintentar, cargarBusqueda } = usePlano(slug, inicial)
   // ?fig=70-8 — en el catálogo de piezas la referencia que la gente se pasa
   // por chat es la FIGURA impresa, no el número de hoja del visor. Se
   // resuelve cuando llega el índice (que es quien conoce el mapa fig→hoja).
@@ -632,7 +645,8 @@ function Visor({ slug }: { slug: string }) {
 
         <div className="order-last basis-full md:order-none md:basis-auto relative min-w-[180px] flex-1 md:max-w-sm">
           <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--lc-ink-ghost)' }} />
-          <input ref={buscaRef} value={busca} onChange={(e) => setBusca(e.target.value)} type="search"
+          <input ref={buscaRef} value={busca}
+                 onChange={(e) => { setBusca(e.target.value); if (e.target.value.trim()) cargarBusqueda() }} type="search"
                  placeholder={esVisor ? 'Buscar hoja por título: sellado, vacío, freno…'
                               : esDespiece ? 'Buscar pieza: cuchilla, resorte, código…'
                               : 'Buscar K7, Q1, B12, Messer, cuchillo…'}
