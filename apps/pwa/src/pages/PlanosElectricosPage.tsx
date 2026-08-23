@@ -917,7 +917,7 @@ function Panel({
         <FichaPieza
           fila={filaSel} filas={filas} meta={meta} tagsHoja={tagsHoja} selTag={sel.tag}
           notas={notas} onSeleccionarFila={onSeleccionarFila} onIrFigura={onIrFigura}
-          anclaId={anclaDeAparato(sel.tag)} slug={slug}
+          anclaId={anclaDeAparato(sel.tag)} slug={slug} sapPorCodigo={indice.sapPorCodigo}
         />
       )
     }
@@ -1091,7 +1091,7 @@ function compararTags(a: string, b: string): number {
  * sin volver al lienzo — la degradación pensada para las que no tienen
  * ancla OCR (se eligen desde la tabla en vez de tocarlas en el dibujo).
  */
-function FichaPieza({ fila, filas, meta, tagsHoja, selTag, notas, onSeleccionarFila, onIrFigura, anclaId, slug }: {
+function FichaPieza({ fila, filas, meta, tagsHoja, selTag, notas, onSeleccionarFila, onIrFigura, anclaId, slug, sapPorCodigo }: {
   fila: FilaDespiece
   filas: FilaDespiece[]
   meta: PlanoHojaMeta
@@ -1102,6 +1102,8 @@ function FichaPieza({ fila, filas, meta, tagsHoja, selTag, notas, onSeleccionarF
   onIrFigura: (fig: string) => void
   anclaId: string
   slug: string
+  /** código de fabricante -> SAP, del índice del despiece (planos viejos no lo traen). */
+  sapPorCodigo?: Record<string, { s: string; n: string; u: string }>
 }) {
   const [copiado, setCopiado] = useState(false)
   // Una vez por sesion por posicion (registrarUso ya dedupe): mide cuantas
@@ -1112,6 +1114,7 @@ function FichaPieza({ fila, filas, meta, tagsHoja, selTag, notas, onSeleccionarF
 
   const posN = normalizarPos(fila.pos)
   const enPlanoElectrico = /^[A-Z]\d+$/.test(posN)
+  const sap = fila.nr ? sapPorCodigo?.[fila.nr] : undefined
   // Sin curaduria manual detras de esta tabla (sale directo del catalogo
   // escaneado): nunca se marca "confirmado" desde aca.
   const badge = !fila.nr
@@ -1165,7 +1168,7 @@ function FichaPieza({ fila, filas, meta, tagsHoja, selTag, notas, onSeleccionarF
             Ver en plano eléctrico → {posN}
           </Link>
         )}
-        {fila.nr && (
+        {fila.nr && !sap && (
           <Link to={`/repuestos?q=${encodeURIComponent(fila.nr)}`}
                 className="text-caption underline-offset-2 hover:underline"
                 style={{ color: 'var(--lc-aqua-bright)' }}>
@@ -1173,6 +1176,22 @@ function FichaPieza({ fila, filas, meta, tagsHoja, selTag, notas, onSeleccionarF
           </Link>
         )}
       </div>
+
+      {sap && (
+        <>
+          {/* El dato estatico del indice se ve SIEMPRE (el visor corre anonimo
+              via QR y la coleccion repuestos exige sesion): SAP + nombre +
+              ubicacion de bodega. FichasSap suma el stock vivo con sesion. */}
+          <p className="m-0 mb-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-caption"
+             style={{ color: 'var(--lc-ink-mid)' }}>
+            <span className="rounded-ctl px-2 py-0.5 font-mono"
+                  style={{ background: 'var(--lc-surface-hi)' }}>SAP {sap.s}</span>
+            {sap.n && <span>{sap.n}</span>}
+            {sap.u && <span>· bodega {sap.u}</span>}
+          </p>
+          <FichasSap saps={[sap.s]} />
+        </>
+      )}
 
       <Titulo>Posiciones de esta figura</Titulo>
       <div className="max-h-[38vh] overflow-y-auto rounded-ctl border" style={{ borderColor: 'var(--lc-border)' }}>
@@ -1275,6 +1294,12 @@ function PiezaFisica({ sel, partes, slug }: {
         <p className="m-0 mt-0.5 text-caption" style={{ color: 'var(--lc-ink-lo)' }}>{pieza.de}</p>
       )}
       <p className="m-0 mt-1.5 font-mono text-[15px] font-semibold" style={{ color: 'var(--lc-aqua-bright)' }}>{pieza.nr}</p>
+      {pieza.sap && (
+        <span className="mt-1 inline-flex w-fit items-center gap-1 rounded-ctl px-2 py-0.5 text-caption"
+              style={{ background: 'var(--lc-surface-hi)', color: 'var(--lc-ink-mid)' }}>
+          SAP {pieza.sap}{pieza.sapUbicacion ? ` · ${pieza.sapUbicacion}` : ''}
+        </span>
+      )}
       {aviso && (
         <p className="m-0 mt-2 rounded-ctl border-l-2 py-1 pl-2 text-footnote leading-relaxed"
            style={{ borderColor: 'var(--lc-prep)', background: 'var(--lc-prep-soft)', color: 'var(--lc-ink-mid)' }}>
@@ -1296,10 +1321,17 @@ function PiezaFisica({ sel, partes, slug }: {
  * en las notas del aparato, resueltos contra el maestro de repuestos y el
  * stock de bodega. Veo la falla en el plano -> se que pedir y cuantos hay.
  */
-function FichasSap({ notas }: { notas: ReturnType<typeof usePlanoNotas>['notas'] }) {
+function FichasSap({ notas, saps: sapsDirectos }: {
+  notas?: ReturnType<typeof usePlanoNotas>['notas']
+  /** SAPs a mostrar directo, sin pasar por notas (p.ej. el cruce del catálogo del despiece). */
+  saps?: string[]
+}) {
   const saps = useMemo(
-    () => [...new Set(notas.map((n) => n.codigoSAP).filter((s): s is string => !!s))],
-    [notas],
+    () => [...new Set([
+      ...(sapsDirectos ?? []),
+      ...(notas ?? []).map((n) => n.codigoSAP).filter((s): s is string => !!s),
+    ])],
+    [notas, sapsDirectos],
   )
   const info = usePlanoSap(saps)
   const fichas = saps.map((s) => info[s]).filter((f): f is NonNullable<typeof f> => !!f)
