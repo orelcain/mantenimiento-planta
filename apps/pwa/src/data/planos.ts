@@ -156,6 +156,23 @@ export const PLANOS: PlanoCatalogo[] = [
       'a su ficha aca, o busca el codigo y ve en que figura va.',
   },
   {
+    slug: 'baader-200-despiece',
+    maquina: 'BAADER 200 · PLANO DE PARTES',
+    numero: 'Catálogo de piezas BAADER 200',
+    revision: '—',
+    aplicaA: 'BAADER 200 (fileteadora)',
+    hojas: 201,
+    faltantes: [],
+    modo: 'despiece',
+    enStorage: true,
+    vAssets: 2,
+    idioma: 'es',
+    descripcion:
+      'El catalogo de piezas de la fileteadora: 201 figuras explotadas con 4.069 posiciones ' +
+      'y su codigo de repuesto. Mismo visor que el de la 142; las posiciones se eligen desde ' +
+      'la tabla de cada figura.',
+  },
+  {
     slug: 'baader-200-508',
     maquina: 'BAADER 200 · plano de planta',
     numero: 'AquaChile 508',

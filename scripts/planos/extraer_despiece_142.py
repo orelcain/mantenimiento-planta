@@ -23,19 +23,45 @@ import fitz
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
 RAIZ = os.path.dirname(os.path.abspath(__file__))
-STAGING = os.path.join(RAIZ, "_staging", "baader-142-despiece")
-TRABAJO = STAGING + "-trabajo"
+# El pipeline sirve para CUALQUIER catalogo BAADER con el mismo formato
+# (dibujo vectorial + tabla cuatrilingue alternados). Se elige con la variable
+# DESPIECE (por defecto la 142); la 200 usa el mismo codigo sin tocar nada.
+CATALOGOS = {
+    "142": {
+        "slug": "baader-142-despiece",
+        "pdf": ("⚙️ BAADER 142", "INFO ALOJADA EN TELEGRAM BAADER 142", "DOCUMENTOS",
+                "835_142-Piezas de Recambio Baader vieja-2006-10.pdf"),
+        "maquina": "BAADER 142",
+        "plano": "Catálogo de piezas 142.00.00.821",
+        "rev": "Ed. 10/2006",
+        "cat2014": "baader-142.json",
+        "planosElectricos": ("baader-142-888", "baader-142-860"),
+    },
+    "200": {
+        "slug": "baader-200-despiece",
+        "pdf": ("⚙️ BAADER 200", "INFO ALOJADA EN TELEGRAM BAADER 200", "DOCUMENTOS", "549_BAADER 200 n°parte y materiales.pdf"),
+        "maquina": "BAADER 200",
+        "plano": "Catálogo de piezas BAADER 200",
+        "rev": "—",
+        "cat2014": "baader-200.json",
+        "planosElectricos": ("baader-200-862",),
+    },
+}
+# .strip(): `set VAR=200 && cmd` de cmd.exe deja el espacio pegado al valor
+DESPIECE_ID = os.environ.get("DESPIECE", "142").strip()
+CFG_DESPIECE = CATALOGOS[DESPIECE_ID]
+# El numero de maquina encabeza cada pagina del catalogo ("142", "200"): es
+# la marca por la que se ubican los titulos de cada figura.
 PDF_835 = os.path.join(
     os.environ.get("ONEDRIVE", os.path.expanduser("~/OneDrive")),
-    "ANTARFOOD", "⚙️ EQUIPOS PLANTA", "⚙️ BAADER 142",
-    "INFO ALOJADA EN TELEGRAM BAADER 142", "DOCUMENTOS",
-    "835_142-Piezas de Recambio Baader vieja-2006-10.pdf",
+    "ANTARFOOD", "⚙️ EQUIPOS PLANTA", *CFG_DESPIECE["pdf"],
 )
+STAGING = os.path.join(RAIZ, "_staging", CFG_DESPIECE["slug"])
+TRABAJO = STAGING + "-trabajo"
 
 RE_CONJUNTO = re.compile(r"\b(\d{10})\b")
 RE_SECCION = re.compile(r"\b(\d+(?:-\d+)+)\b")
 RE_POS_FILA = re.compile(r"^\s*(\d+(?:-\d+)?)\s+\S")
-
 
 def clasificar(doc):
     """Devuelve lista de dicts por pagina: tipo dibujo/tabla + metadatos."""
@@ -67,7 +93,6 @@ def clasificar(doc):
         paginas.append(info)
     return paginas
 
-
 def asignar_dibujos(paginas):
     """Cada dibujo hereda el conjunto de la TABLA que lo sigue (patron del 835).
 
@@ -86,7 +111,6 @@ def asignar_dibujos(paginas):
         p["tabla_ant"] = ant["pag"] if ant else None
         p["conj_ant"] = (ant.get("cabecera") or {}).get("conjunto") if ant else None
     return paginas
-
 
 def inventario():
     doc = fitz.open(PDF_835)
@@ -109,7 +133,6 @@ def inventario():
         print(f"  dib pag {p['pag']:3d} paths={p['paths']:5d} -> tabla sig {p['tabla_sig']} ({p['conj_sig']}) / ant {p['tabla_ant']} ({p['conj_ant']})")
     return paginas
 
-
 RE_CONJ_PUNTOS = re.compile(r"\b(\d{3}\.\d{2}\.\d{2}\.\d{3})\b")
 RE_SECCION_SOLA = re.compile(r"^\d+(?:-\d+)+$|^00$")
 RE_FILA_DE = re.compile(
@@ -117,7 +140,6 @@ RE_FILA_DE = re.compile(
 )
 RE_FR = re.compile(r"[éèêàçûôî]|\bpour\b|\bavec\b|Détecteur|Plaque|D['’]|\bde manoeuvre\b")
 RE_ES = re.compile(r"ción|ñ|á|í|ó|ú|\bpor\b|\bpara\b|\bde\b.*\b(mando|recambio|proximidad)\b|Placa|Sensores|entrada|salida|paso|inductivo|Tornillo|Anillo|Interruptor|Caja")
-
 
 def _agrupar_trads(lineas_trad):
     """Separa las lineas EN/FR/ES (orden fijo del catalogo) por idioma."""
@@ -148,7 +170,6 @@ def _agrupar_trads(lineas_trad):
 RE_LEYENDA = re.compile(r"^(\d+)-\.\.\.\s*=\s*(\d{3}\.\d{2}\.\d{2}\.\d{3})")
 RE_CODIGO_FIN = re.compile(r"(Fig\.\s*[\d-]+|\b\d{6,10})\s*$")
 
-
 def _cabecera_tabla(lineas):
     """conjunto, seccion y titulos [de, fr, en, es] de una pagina de tabla."""
     conjunto = seccion = None
@@ -161,7 +182,7 @@ def _cabecera_tabla(lineas):
     for j, l in enumerate(lineas[:40]):
         if seccion is None and RE_SECCION_SOLA.match(l):
             seccion = l
-        if l == "142" and not titulos:
+        if l == DESPIECE_ID and not titulos:
             cand = []
             for k in range(j + 1, min(j + 7, len(lineas))):
                 if lineas[k].startswith("Pos.") or RE_SECCION_SOLA.match(lineas[k]):
@@ -170,7 +191,6 @@ def _cabecera_tabla(lineas):
             if len(cand) >= 3:
                 titulos = cand[:4]
     return conjunto, seccion, titulos
-
 
 def _parsear_filas(lineas):
     """Filas cuatrilingues: linea DE con pos+codigo, luego EN/FR/ES."""
@@ -219,7 +239,6 @@ def _parsear_filas(lineas):
         filas.append(fila)
         i = j
     return filas, leyenda
-
 
 def tablas():
     doc = fitz.open(PDF_835)
@@ -327,17 +346,14 @@ def tablas():
                     difieren += 1
     print(f"validacion vs 2014 por (conjunto,pos): {coinciden} codigos iguales, {difieren} distintos")
 
-
 def _optimizar_svg(svg):
     svg = re.sub(r"^<\?xml[^>]*\?>\s*", "", svg)
     svg = re.sub(r"(\d+\.\d{2})\d+", r"\1", svg)
     svg = re.sub(r">\s+<", "><", svg)
     return re.sub(r"<svg ", '<svg class="plano-svg" ', svg, count=1)
 
-
 def _figuras():
     return json.load(io.open(os.path.join(TRABAJO, "figuras.json"), encoding="utf-8"))
-
 
 def svg():
     """Exporta el dibujo de cada figura a hoja-NNN.svg (numeradas 1..N en orden)."""
@@ -353,12 +369,10 @@ def svg():
             print(f"  svg {n}/{len(figs)}")
     print(f"OK {len(figs)} SVG en {dest}")
 
-
 def _normalizar_pos(t):
     t = t.strip().replace(" ", "").replace(",", "-").replace(".", "-")
     t = re.sub(r"[^A-Za-z0-9-]", "", t).upper()
     return t
-
 
 def ocr():
     """OCRea los numeros de posicion sobre cada dibujo y los valida contra las
@@ -406,7 +420,6 @@ def ocr():
     with io.open(os.path.join(TRABAJO, "ocr.json"), "w", encoding="utf-8") as fh:
         json.dump(salida, fh, ensure_ascii=False, indent=1)
     print(f"OK ocr.json · posiciones ancladas {tot_ok}/{tot_esp} ({100*tot_ok/max(tot_esp,1):.1f}%)")
-
 
 def ocr2():
     """Segunda pasada: re-OCR a zoom 7 SOLO de las figuras con <70% de anclaje,
@@ -459,7 +472,6 @@ def ocr2():
     tot_ok = tot_esp - sum(len(a["sinAncla"]) for a in datos.values())
     print(f"OK ocr2 · figuras mejoradas: {mejoradas} · ancladas {tot_ok}/{tot_esp} ({100*tot_ok/max(tot_esp,1):.1f}%)")
 
-
 LOOKALIKES = str.maketrans({"O": "0", "o": "0", "l": "1", "I": "1", "|": "1"})
 
 # El catalogo esta en castellano de TRADUCCION ALEMANA ("cojinete", "atarjea",
@@ -485,7 +497,6 @@ SINONIMOS = {
     "motor": "motor", "reductor": "engranaje", "pinon": "rueda dentada",
     "chumacera": "cojinete", "pasador": "perno", "tuerca": "tuerca",
 }
-
 
 def ocrt(desde=1, hasta=None):
     """OCR POR TESELAS: el detector de rapidocr reescala la pagina entera a
@@ -549,7 +560,6 @@ def ocrt(desde=1, hasta=None):
         json.dump(salida, fh, ensure_ascii=False, indent=1)
     print(f"OK ocrt [{desde}-{hasta}] · ancladas {tot_ok}/{tot_esp} ({100*tot_ok/max(tot_esp,1):.1f}%)")
 
-
 def ocrmerge():
     import glob as _glob
     total = {}
@@ -560,7 +570,6 @@ def ocrmerge():
     esp = sum(len(a["esperadas"]) for a in total.values())
     ok = esp - sum(len(a["sinAncla"]) for a in total.values())
     print(f"OK merge {len(total)} figuras · ancladas {ok}/{esp} ({100*ok/max(esp,1):.1f}%)")
-
 
 def ocrr(desde=1, hasta=None):
     """Pasada ROTADA para figuras apaisadas: muchas figuras estan giradas 90
@@ -659,7 +668,6 @@ def ocrr(desde=1, hasta=None):
     tot_ok = tot_esp - sum(len(x["sinAncla"]) for x in datos.values())
     print(f"OK ocrr [{desde}-{hasta}] -> {destino} · figuras mejoradas {mejoradas} (+{nuevas_tot} anclas)")
 
-
 def ocrrmerge():
     import glob as _glob
     base = json.load(io.open(os.path.join(TRABAJO, "ocr.json"), encoding="utf-8"))
@@ -674,7 +682,6 @@ def ocrrmerge():
     esp = sum(len(a["esperadas"]) for a in base.values())
     ok = esp - sum(len(a["sinAncla"]) for a in base.values())
     print(f"OK ocrrmerge ({len(partes)} partes) · ancladas {ok}/{esp} ({100*ok/max(esp,1):.1f}%)")
-
 
 def _expandir_grupo(texto_crudo, esperadas):
     """'16-18' -> [16,17,18] · '2, 3' / '31, 40' -> lista. Solo miembros que
@@ -694,7 +701,6 @@ def _expandir_grupo(texto_crudo, esperadas):
     miembros = [x for x in out if x in esperadas]
     # un rotulo agrupado tiene 2+ miembros validos; uno solo ya lo cazo ocrt
     return miembros if len(miembros) >= 2 else []
-
 
 def ocrg(desde=1, hasta=None):
     """Pasada de GRUPOS: el catalogo rotula posiciones agrupadas ('2, 3',
@@ -778,7 +784,6 @@ def ocrg(desde=1, hasta=None):
         json.dump(contenido, fh, ensure_ascii=False, indent=1)
     print(f"OK ocrg [{desde}-{hasta}] -> {destino} · figuras mejoradas {mejoradas} (+{nuevas_tot})")
 
-
 def ocrgmerge():
     import glob as _glob
     base = json.load(io.open(os.path.join(TRABAJO, "ocr.json"), encoding="utf-8"))
@@ -793,11 +798,9 @@ def ocrgmerge():
     ok = esp - sum(len(a["sinAncla"]) for a in base.values())
     print(f"OK ocrgmerge ({len(partes)} partes) · ancladas {ok}/{esp} ({100*ok/max(esp,1):.1f}%)")
 
-
 def _nn(n):
     """Mismo nombre de archivo que usePlano: String(blatt).padStart(2,'0')."""
     return str(n).zfill(2)
-
 
 def indice_app():
     """Arma los assets finales para la PWA en _staging/baader-142-despiece/.
@@ -836,7 +839,7 @@ def indice_app():
     # por (conjunto, posicion) — el mismo par que ya valido 1.189 codigos
     # identicos entre ambos. Sin esto el tecnico pide 1 y la maquina lleva 4.
     ruta14 = os.path.abspath(os.path.join(RAIZ, "..", "..", "apps", "pwa", "public",
-                                          "data", "codigos-fabricante", "baader-142.json"))
+                                          "data", "codigos-fabricante", CFG_DESPIECE["cat2014"]))
     cant_por_cp = {}
     if os.path.exists(ruta14):
         for pz in json.load(io.open(ruta14, encoding="utf-8"))["piezas"]:
@@ -946,9 +949,9 @@ def indice_app():
         if m:
             sap_por_codigo[cod] = m
     idx = {
-        "plano": "Catálogo de piezas 142.00.00.821",
-        "rev": "Ed. 10/2006",
-        "maquina": "BAADER 142",
+        "plano": CFG_DESPIECE["plano"],
+        "rev": CFG_DESPIECE["rev"],
+        "maquina": CFG_DESPIECE["maquina"],
         "hojasTotales": len(figs),
         "faltante": [],
         "hojas": hojas_meta,
@@ -985,9 +988,9 @@ def indice_app():
     mapa = {cod: [aps[0]["h"], hojas_meta[aps[0]["h"] - 1]["fig"]]
             for cod, aps in indice_cod.items() if aps}
     ruta_mapa = os.path.abspath(os.path.join(
-        RAIZ, "..", "..", "apps", "pwa", "public", "data", "despiece-142-figuras.json"))
+        RAIZ, "..", "..", "apps", "pwa", "public", "data", f"despiece-{DESPIECE_ID}-figuras.json"))
     with io.open(ruta_mapa, "w", encoding="utf-8") as fh:
-        json.dump({"plano": "baader-142-despiece", "codigos": mapa}, fh, ensure_ascii=False)
+        json.dump({"plano": CFG_DESPIECE["slug"], "codigos": mapa}, fh, ensure_ascii=False)
     print(f"OK mapa codigo->figura ({len(mapa)}) -> public/data/despiece-142-figuras.json")
 
     print(f"OK indice.json + {len(figs)} hojas en {STAGING}")
@@ -996,7 +999,6 @@ def indice_app():
     print(f"   sinonimos de planta validados: {len(sinonimos)} -> {sorted(sinonimos)[:10]}")
     esp = sum(1 for n in compartidas.values() if n <= UMBRAL_COMUN)
     print(f"   piezas compartidas: {len(compartidas)} ({esp} especificas, {len(compartidas)-esp} ferreteria comun)")
-
 
 if __name__ == "__main__":
     fase = sys.argv[1] if len(sys.argv) > 1 else "inventario"
