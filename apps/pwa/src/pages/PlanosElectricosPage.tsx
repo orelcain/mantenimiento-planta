@@ -77,8 +77,16 @@ function Catalogo() {
 
   const v = sinAcentos(q.trim())
   const hits: { slug: string; maquina: string; clave: string; detalle: string; href: string }[] = []
+  // Quien escribe "K7" busca el esquema; quien escribe "cuchilla" busca la
+  // PIEZA. Con el orden fijo del catálogo, una búsqueda por nombre llenaba
+  // los primeros lugares con hojas de circuitos y el catálogo de piezas
+  // quedaba fuera de la primera pantalla.
+  const pareceDesignacion = /^[a-z]{1,2}\d/i.test(q.trim())
+  const planosOrdenados = pareceDesignacion
+    ? PLANOS
+    : [...PLANOS].sort((a, b) => Number(b.modo === 'despiece') - Number(a.modo === 'despiece'))
   if (v.length >= 2 && indices) {
-    for (const p of PLANOS) {
+    for (const p of planosOrdenados) {
       const idx = indices.get(p.slug)
       if (!idx) continue
       let porPlano = 0
@@ -94,8 +102,13 @@ function Catalogo() {
       for (const item of idx.busqueda ?? []) {
         if (porPlano >= 3 || hits.length >= 24) break
         if (sinAcentos(item.es).includes(v)) {
+          // En el catálogo de piezas la referencia útil es la FIGURA, no el
+          // número interno de hoja: es lo que el técnico busca en el papel.
+          const fig = p.modo === 'despiece'
+            ? idx.hojas.find((h) => h.blatt === item.h)?.fig
+            : undefined
           hits.push({ slug: p.slug, maquina: p.maquina, clave: item.es.slice(0, 34),
-                      detalle: `hoja ${item.h}`,
+                      detalle: fig ? `Fig. ${fig}` : `hoja ${item.h}`,
                       href: `/aprendizaje/planos/${p.slug}?hoja=${item.h}` })
           porPlano++
         }
@@ -213,6 +226,18 @@ function Visor({ slug }: { slug: string }) {
     return Number.isInteger(g) && g > 0 ? g : undefined
   })
   const { indice, hoja, abrir, cargando, error } = usePlano(slug, inicial)
+  // ?fig=70-8 — en el catálogo de piezas la referencia que la gente se pasa
+  // por chat es la FIGURA impresa, no el número de hoja del visor. Se
+  // resuelve cuando llega el índice (que es quien conoce el mapa fig→hoja).
+  const figPedida = new URLSearchParams(busquedaRuta).get('fig')
+  const figAbierta = useRef(false)
+  useEffect(() => {
+    if (figAbierta.current || !indice || !figPedida) return
+    const destino = indice.hojas.find((h) => h.fig === figPedida)
+    if (!destino) return
+    figAbierta.current = true
+    void abrir(destino.blatt)
+  }, [indice, figPedida, abrir])
   const notas = usePlanoNotas(slug)
   // Puente electrico -> pieza: solo trae datos en los planos que ya tienen
   // curaduria (888/860); en el resto (incluido el propio despiece) queda null.
@@ -628,7 +653,17 @@ function Visor({ slug }: { slug: string }) {
         </button>
         <BotonOffline slug={slug} indice={indice} />
         <button type="button" title="Copiar link de esta vista"
-                onClick={() => { void navigator.clipboard?.writeText(window.location.href) }}
+                onClick={() => {
+                  // En el despiece se comparte por FIGURA: el link queda
+                  // legible ("...?fig=70-8") y sobrevive a que el extractor
+                  // renumere las hojas al sumar material al catálogo.
+                  const u = new URL(window.location.href)
+                  if (esDespiece && meta?.fig) {
+                    u.searchParams.delete('hoja')
+                    u.searchParams.set('fig', meta.fig)
+                  }
+                  void navigator.clipboard?.writeText(u.toString())
+                }}
                 className="rounded-ctl p-1.5" style={{ color: 'var(--lc-ink-mid)' }}>
           <LinkIcon size={15} />
         </button>
