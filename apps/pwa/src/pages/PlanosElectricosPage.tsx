@@ -1,16 +1,33 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Download, Link as LinkIcon, Loader2, Printer, QrCode, Search, X, Zap } from 'lucide-react'
+import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Copy, Download, Link as LinkIcon, Loader2, Printer, QrCode, Search, X, Zap } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { PLANOS, assetPlano, planoPorSlug } from '@/data/planos'
-import { usePlano, guardarPlanoOffline, type Caja, type PlanoBorneLibre, type PlanoIndice, type PlanoRotulo } from '@/hooks/usePlano'
+import {
+  usePlano, guardarPlanoOffline,
+  type Caja, type FilaDespiece, type PlanoAparato, type PlanoBorneLibre,
+  type PlanoHojaMeta, type PlanoIndice, type PlanoRotulo,
+} from '@/hooks/usePlano'
 import { usePlanoNotas } from '@/hooks/usePlanoNotas'
 import { usePlanoSap } from '@/hooks/usePlanoSap'
+import { usePartesPlano } from '@/hooks/usePartesPlano'
 import { PlanoLienzo, type Foco } from '@/components/planos/PlanoLienzo'
 import { NotasAparato } from '@/components/planos/NotasAparato'
 
 /** minusculas y sin acentos: "posicion" debe encontrar "POSICIÓN ZERO". */
 const sinAcentos = (t: string) => t.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '')
+
+/** Misma normalización que `_normalizar_pos` en extraer_despiece_142.py: así
+ *  una posición tocada en el lienzo (ya normalizada por el extractor) calza
+ *  con la misma fila de la tabla, venga como venga escrita en el catálogo. */
+const normalizarPos = (t: string) =>
+  t.trim().replace(/ /g, '').replace(/,/g, '-').replace(/\./g, '-').replace(/[^A-Za-z0-9-]/g, '').toUpperCase()
+
+/** Etiqueta de un grupo del índice lateral / select de hojas. Los planos
+ *  eléctricos usan 2 claves fijas; el despiece manda su propia etiqueta de
+ *  capítulo ya armada ("70 · Equipo eléctrico") — se muestra tal cual. */
+const etiquetaSeccion = (sec: string) =>
+  sec === 'circuitos' ? 'Esquema de circuitos' : sec === 'bornes' ? 'Plano de bornes' : sec
 
 type Seleccion =
   | { tipo: 'aparato'; tag: string }
@@ -112,29 +129,49 @@ function Catalogo() {
         )}
       </header>
 
-      {PLANOS.map((p) => (
-        <Link key={p.slug} to={`/aprendizaje/planos/${p.slug}`}
-              className="flex flex-col gap-2 rounded-card border p-4 no-underline transition-opacity hover:opacity-90"
-              style={{ background: 'var(--lc-surface)', borderColor: 'var(--lc-border)', color: 'inherit' }}>
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <span className="text-[15px] font-semibold">{p.maquina}</span>
-            <span className="font-mono text-caption" style={{ color: 'var(--lc-aqua-bright)' }}>
-              {p.numero} · {p.revision}
-            </span>
-          </div>
-          <p className="m-0 text-footnote leading-relaxed" style={{ color: 'var(--lc-ink-mid)' }}>
-            {p.descripcion}
-          </p>
-          <div className="flex flex-wrap gap-3 font-mono text-caption" style={{ color: 'var(--lc-ink-lo)' }}>
-            <span>{p.hojas} hojas</span>
-            <span>{p.aplicaA}</span>
-            {!!p.faltantes.length && (
-              <span style={{ color: 'var(--lc-prep)' }}>
-                falta la hoja {p.faltantes.join(', ')} en el PDF original
-              </span>
-            )}
-          </div>
-        </Link>
+      {([
+        ['Esquemas eléctricos y neumáticos', PLANOS.filter((p) => p.modo !== 'despiece')],
+        ['Planos de partes', PLANOS.filter((p) => p.modo === 'despiece')],
+      ] as const).map(([titulo, grupo]) => grupo.length > 0 && (
+        <section key={titulo} className="flex flex-col gap-3">
+          <h2 className="m-0 flex items-baseline gap-2 text-caption font-semibold tracking-wider"
+              style={{ color: 'var(--lc-ink-ghost)' }}>
+            {titulo}
+            <span className="font-mono normal-case tracking-normal">{grupo.length}</span>
+          </h2>
+          {grupo.map((p) => (
+            <Link key={p.slug} to={`/aprendizaje/planos/${p.slug}`}
+                  className="flex flex-col gap-2 rounded-card border p-4 no-underline transition-opacity hover:opacity-90"
+                  style={{ background: 'var(--lc-surface)', borderColor: 'var(--lc-border)', color: 'inherit' }}>
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <span className="flex items-baseline gap-2 text-[15px] font-semibold">
+                  {p.maquina}
+                  {p.modo === 'despiece' && (
+                    <span className="rounded-ctl px-1.5 py-0.5 text-caption font-medium"
+                          style={{ background: 'var(--lc-surface-hi)', color: 'var(--lc-ink-mid)' }}>
+                      Plano de partes
+                    </span>
+                  )}
+                </span>
+                <span className="font-mono text-caption" style={{ color: 'var(--lc-aqua-bright)' }}>
+                  {p.numero} · {p.revision}
+                </span>
+              </div>
+              <p className="m-0 text-footnote leading-relaxed" style={{ color: 'var(--lc-ink-mid)' }}>
+                {p.descripcion}
+              </p>
+              <div className="flex flex-wrap gap-3 font-mono text-caption" style={{ color: 'var(--lc-ink-lo)' }}>
+                <span>{p.hojas} hojas</span>
+                <span>{p.aplicaA}</span>
+                {!!p.faltantes.length && (
+                  <span style={{ color: 'var(--lc-prep)' }}>
+                    falta la hoja {p.faltantes.join(', ')} en el PDF original
+                  </span>
+                )}
+              </div>
+            </Link>
+          ))}
+        </section>
       ))}
     </div>
   )
@@ -147,6 +184,9 @@ function Visor({ slug }: { slug: string }) {
   // Modo visor (GEA): sin texto extraible -> sin zonas ni buscador ni DE/ES;
   // lo que SI hay es navegacion completa y notas con fotos POR HOJA.
   const esVisor = cat?.modo === 'visor'
+  // Despiece (catalogo de piezas): a diferencia del modo visor SI tiene
+  // buscador y notas; lo que no tiene es toggle DE/ES (ya viene en espanol).
+  const esDespiece = cat?.modo === 'despiece'
   // Plano ya en espanol (neumaticos GEA): el toggle DE/ES no aplica.
   const sinIdiomas = esVisor || cat?.idioma === 'es'
   // Hoja inicial: la de la URL (?hoja=9, para compartir un punto del plano por
@@ -159,6 +199,9 @@ function Visor({ slug }: { slug: string }) {
   })
   const { indice, hoja, abrir, cargando, error } = usePlano(slug, inicial)
   const notas = usePlanoNotas(slug)
+  // Puente electrico -> pieza: solo trae datos en los planos que ya tienen
+  // curaduria (888/860); en el resto (incluido el propio despiece) queda null.
+  const partes = usePartesPlano(slug)
   const [sel, setSel] = useState<Seleccion>(null)
   const [foco, setFoco] = useState<Foco>(null)
   // ES por defecto: el equipo lee castellano; el aleman queda a un toque para
@@ -217,6 +260,13 @@ function Visor({ slug }: { slug: string }) {
     [indice, hoja],
   )
 
+  // Grupos del select/nav lateral: 2 fijos en los planos electricos
+  // ('circuitos'/'bornes'), N en el despiece (una etiqueta por capitulo).
+  const secciones = useMemo(
+    () => (indice ? [...new Set(indice.hojas.map((h) => h.seccion))] : []),
+    [indice],
+  )
+
   const irA = useCallback(
     async (blatt: number, col?: number, caja?: Caja) => {
       setFoco(caja ? { tipo: 'caja', b: caja } : col != null ? { tipo: 'columna', c: col } : null)
@@ -266,15 +316,27 @@ function Visor({ slug }: { slug: string }) {
   useEffect(() => {
     if (apAbierto.current || !indice || !hoja) return
     apAbierto.current = true
-    const ap = new URLSearchParams(window.location.search).get('ap')?.toUpperCase()
-    if (!ap || !indice.indice[ap]) return
-    // si la URL tambien trae ?hoja=, mandan la hoja pedida: se busca la
-    // aparicion del aparato AHI; si no hay, recien se va a la primera
-    const puntos = indice.indice[ap]
-    const enHojaPedida = puntos.find((pt) => pt.h === hoja.blatt)
-    const destino = enHojaPedida ?? puntos[0]
-    seleccionar({ tipo: 'aparato', tag: ap })
-    if (destino) void irA(destino.h, undefined, destino.b)
+    const ap = new URLSearchParams(window.location.search).get('ap')
+    if (!ap) return
+    const apN = normalizarPos(ap)
+    if (indice.indice[apN]) {
+      // si la URL tambien trae ?hoja=, mandan la hoja pedida: se busca la
+      // aparicion del aparato AHI; si no hay, recien se va a la primera
+      const puntos = indice.indice[apN]
+      const enHojaPedida = puntos.find((pt) => pt.h === hoja.blatt)
+      const destino = enHojaPedida ?? puntos[0]
+      seleccionar({ tipo: 'aparato', tag: apN })
+      if (destino) void irA(destino.h, undefined, destino.b)
+      return
+    }
+    // El indice global del despiece esta indexado por codigo de repuesto, no
+    // por posicion: para ?hoja=N&ap=B14 la posicion se busca entre los tags
+    // de la hoja N ya abierta (validada por usePlano contra ?hoja=).
+    const tagEnHoja = hoja.datos.tags.find((t) => t.t === apN)
+    if (tagEnHoja) {
+      seleccionar({ tipo: 'aparato', tag: apN })
+      setFoco({ tipo: 'caja', b: tagEnHoja.b })
+    }
   }, [indice, hoja, irA, seleccionar])
 
   const imprimirHoja = useCallback(() => {
@@ -303,6 +365,24 @@ function Visor({ slug }: { slug: string }) {
     void irA(destino.h, undefined, destino.b)
   }, [indice, hoja, seleccionar, irA])
 
+  // Elegir una fila de la tabla del despiece (degradación cuando la posición
+  // no tiene ancla OCR): si igual está dibujada en el lienzo se resalta su
+  // caja, si no, solo se abre la ficha.
+  const seleccionarFilaDespiece = useCallback((f: FilaDespiece) => {
+    const posN = normalizarPos(f.pos)
+    const tagDibujado = hoja?.datos.tags.find((t) => t.t === posN)
+    seleccionar({ tipo: 'aparato', tag: posN })
+    setFoco(tagDibujado ? { tipo: 'caja', b: tagDibujado.b } : null)
+  }, [hoja, seleccionar])
+
+  // Salta a otra figura del despiece (referencia "ver Fig. 70-9" de una fila).
+  const irAFigura = useCallback((fig: string) => {
+    const destino = indice?.hojas.find((h) => h.fig === fig)
+    if (!destino) return
+    seleccionar(null)
+    void irA(destino.blatt)
+  }, [indice, seleccionar, irA])
+
   const volver = useCallback(() => {
     setHistorial((h) => {
       const previa = h[h.length - 1]
@@ -326,7 +406,14 @@ function Visor({ slug }: { slug: string }) {
     window.history.replaceState(null, '', u)
   }, [hoja, slug, sel])
 
-  const notasDe = useCallback((tag: string) => notas.notasDe('aparato', tag).length, [notas])
+  // En el despiece el mismo codigo de posicion (B1, S00...) se repite en
+  // figuras distintas: anclar la nota a "fig·pos" evita que una nota de la
+  // figura 70-8 aparezca colgada en una figura sin relacion.
+  const anclaDeAparato = useCallback(
+    (tag: string) => (esDespiece && meta?.fig ? `${meta.fig}·${tag}` : tag),
+    [esDespiece, meta],
+  )
+  const notasDe = useCallback((tag: string) => notas.notasDe('aparato', anclaDeAparato(tag)).length, [notas, anclaDeAparato])
 
   // Telemetria minima para la META GRANDE: cuantas consultas recibe cada plano
   // y cada aparato. Fire-and-forget, una vez por sesion, solo con sesion.
@@ -457,8 +544,8 @@ function Visor({ slug }: { slug: string }) {
                   aria-label="Ir a hoja"
                   className="cursor-pointer appearance-none rounded-ctl border-0 bg-transparent py-1 pr-0.5 font-mono text-footnote tabular-nums outline-none"
                   style={{ color: 'var(--lc-ink)' }}>
-            {(['circuitos', 'bornes'] as const).map((sec) => (
-              <optgroup key={sec} label={sec === 'circuitos' ? 'Esquema de circuitos' : 'Plano de bornes'}>
+            {secciones.map((sec) => (
+              <optgroup key={sec} label={etiquetaSeccion(sec)}>
                 {indice.hojas.filter((h) => h.seccion === sec).map((h) => (
                   <option key={h.blatt} value={h.blatt}>{h.blatt}</option>
                 ))}
@@ -498,14 +585,14 @@ function Visor({ slug }: { slug: string }) {
         {/* índice de hojas */}
         <nav ref={navRef} className="hidden w-56 shrink-0 overflow-y-auto border-r px-2 pb-2 md:block"
              style={{ background: 'var(--lc-surface)', borderColor: 'var(--lc-border)' }}>
-          {(['circuitos', 'bornes'] as const).map((sec) => {
+          {secciones.map((sec) => {
             const grupo = indice.hojas.filter((h) => h.seccion === sec)
             if (!grupo.length) return null
             return (
               <section key={sec}>
                 <h2 className="sticky top-0 z-10 m-0 flex items-baseline justify-between border-b px-2 pb-1.5 pt-3 text-caption font-semibold tracking-wider"
                     style={{ background: 'var(--lc-surface)', color: 'var(--lc-ink-ghost)', borderColor: 'var(--lc-border)' }}>
-                  {sec === 'circuitos' ? 'Esquema de circuitos' : 'Plano de bornes'}
+                  {etiquetaSeccion(sec)}
                   <span className="font-mono normal-case tracking-normal">{grupo.length}</span>
                 </h2>
                 <div className="pt-1.5">
@@ -669,7 +756,11 @@ function Visor({ slug }: { slug: string }) {
             : <Panel sel={sel} indice={indice} hojaActual={hoja.blatt} notas={notas} onIr={irA}
                      recientes={recientes} onAbrirAparato={abrirAparato}
                      resaltar={resaltar} onResaltar={() => setResaltar((v) => !v)}
-                     enEstaHoja={sel?.tipo === 'aparato' ? hoja.datos.tags.filter((t) => t.t === sel.tag).length : 0} />}
+                     enEstaHoja={sel?.tipo === 'aparato' ? hoja.datos.tags.filter((t) => t.t === sel.tag).length : 0}
+                     esDespiece={esDespiece} meta={meta} filas={hoja.datos.filas ?? []}
+                     tagsHoja={hoja.datos.tags} onSeleccionarFila={seleccionarFilaDespiece}
+                     onIrFigura={irAFigura} anclaDeAparato={anclaDeAparato}
+                     partes={partes} slug={slug} />}
           </>}
         </aside>
       </div>
@@ -679,7 +770,10 @@ function Visor({ slug }: { slug: string }) {
 
 /* ────────────────────────────── panel ────────────────────────────── */
 
-function Panel({ sel, indice, hojaActual, notas, onIr, recientes, onAbrirAparato, resaltar, onResaltar, enEstaHoja }: {
+function Panel({
+  sel, indice, hojaActual, notas, onIr, recientes, onAbrirAparato, resaltar, onResaltar, enEstaHoja,
+  esDespiece, meta, filas, tagsHoja, onSeleccionarFila, onIrFigura, anclaDeAparato, partes, slug,
+}: {
   sel: Seleccion
   indice: NonNullable<ReturnType<typeof usePlano>['indice']>
   hojaActual: number
@@ -690,6 +784,17 @@ function Panel({ sel, indice, hojaActual, notas, onIr, recientes, onAbrirAparato
   resaltar: boolean
   onResaltar: () => void
   enEstaHoja: number
+  esDespiece: boolean
+  meta: PlanoHojaMeta | null
+  /** Tabla completa de la figura actual (solo despiece). */
+  filas: FilaDespiece[]
+  /** Posiciones con ancla OCR de la hoja actual (solo despiece). */
+  tagsHoja: PlanoAparato[]
+  onSeleccionarFila: (f: FilaDespiece) => void
+  onIrFigura: (fig: string) => void
+  anclaDeAparato: (tag: string) => string
+  partes: ReturnType<typeof usePartesPlano>
+  slug: string
 }) {
   if (!sel) {
     return (
@@ -785,6 +890,24 @@ function Panel({ sel, indice, hojaActual, notas, onIr, recientes, onAbrirAparato
     )
   }
 
+  // Despiece: la posición tocada (o elegida desde la tabla) es una pieza del
+  // catálogo, no un aparato del esquema eléctrico — ficha completamente
+  // distinta (opción "Pila" del mockup). Si la posición no está en la tabla
+  // de esta figura (no debería pasar: los tags salen de esas mismas filas),
+  // se sigue de largo a la ficha genérica de más abajo.
+  if (esDespiece && meta) {
+    const filaSel = filas.find((f) => normalizarPos(f.pos) === normalizarPos(sel.tag))
+    if (filaSel) {
+      return (
+        <FichaPieza
+          fila={filaSel} filas={filas} meta={meta} tagsHoja={tagsHoja} selTag={sel.tag}
+          notas={notas} onSeleccionarFila={onSeleccionarFila} onIrFigura={onIrFigura}
+          anclaId={anclaDeAparato(sel.tag)} slug={slug}
+        />
+      )
+    }
+  }
+
   const puntos = indice.indice[sel.tag] ?? []
   const esSenal = /^(0\/)?\d{1,3}V\d{0,2}$/.test(sel.tag)
   const esRegla = /^X\d{1,2}$/.test(sel.tag)
@@ -826,7 +949,9 @@ function Panel({ sel, indice, hojaActual, notas, onIr, recientes, onAbrirAparato
         ))}
       </div>
 
-      <FichasSap notas={notas.notasDe('aparato', sel.tag)} />
+      <PiezaFisica sel={sel} partes={partes} slug={slug} />
+
+      <FichasSap notas={notas.notasDe('aparato', anclaDeAparato(sel.tag))} />
 
       <Titulo>Notas y fotos</Titulo>
       {notas.error && (
@@ -834,8 +959,8 @@ function Panel({ sel, indice, hojaActual, notas, onIr, recientes, onAbrirAparato
       )}
       <NotasAparato
         anclaId={sel.tag}
-        notas={notas.notasDe('aparato', sel.tag)}
-        onCrear={(n) => notas.crear({ ancla: 'aparato', anclaId: sel.tag, ...n })}
+        notas={notas.notasDe('aparato', anclaDeAparato(sel.tag))}
+        onCrear={(n) => notas.crear({ ancla: 'aparato', anclaId: anclaDeAparato(sel.tag), ...n })}
         onBorrar={notas.borrar}
         onEditar={notas.editar}
       />
@@ -934,6 +1059,223 @@ function Resultados({ items, onIr }: {
   )
 }
 
+/** Orden "natural" de una designación (B1, B2 … B12, no alfabético B1,B10,B11,B12,B2…). */
+function compararTags(a: string, b: string): number {
+  const pa = a.match(/^([A-Za-z]*)(\d*)$/)
+  const pb = b.match(/^([A-Za-z]*)(\d*)$/)
+  const la = pa?.[1] ?? a
+  const lb = pb?.[1] ?? b
+  if (la !== lb) return la.localeCompare(lb)
+  return Number(pa?.[2] || 0) - Number(pb?.[2] || 0)
+}
+
+/**
+ * Ficha de una pieza del despiece (opción "Pila" del mockup, sin pestañas):
+ * el nombre en español manda, el código de repuesto es lo primero copiable,
+ * y la tabla completa de la figura queda debajo para saltar a otra posición
+ * sin volver al lienzo — la degradación pensada para las que no tienen
+ * ancla OCR (se eligen desde la tabla en vez de tocarlas en el dibujo).
+ */
+function FichaPieza({ fila, filas, meta, tagsHoja, selTag, notas, onSeleccionarFila, onIrFigura, anclaId, slug }: {
+  fila: FilaDespiece
+  filas: FilaDespiece[]
+  meta: PlanoHojaMeta
+  tagsHoja: PlanoAparato[]
+  selTag: string
+  notas: ReturnType<typeof usePlanoNotas>
+  onSeleccionarFila: (f: FilaDespiece) => void
+  onIrFigura: (fig: string) => void
+  anclaId: string
+  slug: string
+}) {
+  const [copiado, setCopiado] = useState(false)
+  // Una vez por sesion por posicion (registrarUso ya dedupe): mide cuantas
+  // fichas de pieza se abren de verdad, no solo cuantas posiciones se tocan.
+  useEffect(() => {
+    void registrarUso(slug, 'pieza', fila.pos)
+  }, [slug, fila.pos])
+
+  const posN = normalizarPos(fila.pos)
+  const enPlanoElectrico = /^[A-Z]\d+$/.test(posN)
+  // Sin curaduria manual detras de esta tabla (sale directo del catalogo
+  // escaneado): nunca se marca "confirmado" desde aca.
+  const badge = !fila.nr
+    ? { txt: 'sin registro', bg: 'var(--lc-surface-hi)', fg: 'var(--lc-ink-mid)' }
+    : { txt: 'propuesto', bg: 'var(--lc-prep-soft)', fg: 'var(--lc-prep)' }
+
+  return (
+    <>
+      <div className="mb-2 flex items-baseline justify-between gap-2">
+        <Titulo>Pieza</Titulo>
+        <span className="rounded-ctl px-1.5 py-0.5 text-caption font-medium" style={{ background: badge.bg, color: badge.fg }}>
+          {badge.txt}
+        </span>
+      </div>
+      <p className="m-0 text-[17px] font-semibold leading-snug">{fila.es || fila.de || fila.pos}</p>
+      {fila.de && fila.es && (
+        <p className="m-0 mt-0.5 text-footnote" style={{ color: 'var(--lc-ink-mid)' }}>{fila.de}</p>
+      )}
+
+      {fila.nr && (
+        <div className="mt-2 flex items-center gap-2">
+          <span className="font-mono text-[17px] font-semibold" style={{ color: 'var(--lc-aqua-bright)' }}>{fila.nr}</span>
+          <button type="button" title="Copiar código"
+                  onClick={() => {
+                    void navigator.clipboard?.writeText(fila.nr!)
+                    setCopiado(true)
+                    setTimeout(() => setCopiado(false), 1500)
+                  }}
+                  className="rounded-ctl p-1" style={{ color: copiado ? 'var(--lc-nuevo)' : 'var(--lc-ink-mid)' }}>
+            {copiado ? <Check size={14} /> : <Copy size={14} />}
+          </button>
+        </div>
+      )}
+
+      <p className="m-0 mt-2 text-footnote" style={{ color: 'var(--lc-ink-mid)' }}>
+        Figura {meta.fig} · {meta.tituloEs}
+      </p>
+
+      <div className="mt-2 flex flex-col gap-2">
+        {fila.fig && (
+          <button type="button" onClick={() => onIrFigura(fila.fig!)}
+                  className="flex min-h-[44px] items-center justify-center rounded-ctl border px-3 text-center text-footnote font-medium"
+                  style={{ borderColor: 'var(--lc-aqua)', background: 'var(--lc-aqua-soft)', color: 'var(--lc-aqua-bright)' }}>
+            Ver figura {fila.fig}
+          </button>
+        )}
+        {enPlanoElectrico && (
+          <Link to={`/aprendizaje/planos/baader-142-888?ap=${encodeURIComponent(posN)}`}
+                className="flex min-h-[44px] items-center justify-center rounded-ctl border px-3 text-center text-footnote font-medium no-underline"
+                style={{ borderColor: 'var(--lc-aqua)', background: 'var(--lc-aqua-soft)', color: 'var(--lc-aqua-bright)' }}>
+            Ver en plano eléctrico → {posN}
+          </Link>
+        )}
+        {fila.nr && (
+          <Link to={`/repuestos?q=${encodeURIComponent(fila.nr)}`}
+                className="text-caption underline-offset-2 hover:underline"
+                style={{ color: 'var(--lc-aqua-bright)' }}>
+            Buscar {fila.nr} en repuestos
+          </Link>
+        )}
+      </div>
+
+      <Titulo>Posiciones de esta figura</Titulo>
+      <div className="max-h-[38vh] overflow-y-auto rounded-ctl border" style={{ borderColor: 'var(--lc-border)' }}>
+        {filas.map((f) => {
+          const fPosN = normalizarPos(f.pos)
+          const activa = fPosN === posN
+          const anclada = tagsHoja.some((t) => t.t === fPosN)
+          return (
+            <button key={f.pos} type="button" onClick={() => onSeleccionarFila(f)}
+                    className="flex w-full items-baseline justify-between gap-2 border-b px-2 py-1.5 text-left last:border-b-0"
+                    style={{
+                      borderColor: 'var(--lc-border)',
+                      background: activa ? 'var(--lc-aqua-soft)' : undefined,
+                      opacity: anclada || activa ? 1 : 0.55,
+                    }}>
+              <span className="shrink-0 font-mono text-footnote font-semibold"
+                    style={{ color: activa ? 'var(--lc-aqua-bright)' : 'var(--lc-ink-mid)' }}>
+                {f.pos}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-caption" style={{ color: 'var(--lc-ink-mid)' }}>
+                {f.es || f.de || '—'}
+              </span>
+              {f.nr && (
+                <span className="shrink-0 font-mono text-caption" style={{ color: 'var(--lc-ink-lo)' }}>{f.nr}</span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      <FichasSap notas={notas.notasDe('aparato', anclaId)} />
+
+      <Titulo>Notas y fotos</Titulo>
+      {notas.error && (
+        <p className="m-0 mb-2 text-footnote" style={{ color: 'var(--lc-danger)' }}>{notas.error}</p>
+      )}
+      <NotasAparato
+        anclaId={selTag}
+        notas={notas.notasDe('aparato', anclaId)}
+        onCrear={(n) => notas.crear({ ancla: 'aparato', anclaId, ...n })}
+        onBorrar={notas.borrar}
+        onEditar={notas.editar}
+      />
+    </>
+  )
+}
+
+/**
+ * Puente eléctrico → pieza física: solo aparece en los planos que ya tienen
+ * curaduría (`partes.json`) y solo si ESTE aparato tiene una pieza vinculada.
+ * Vive aparte del cruce SAP (`FichasSap`, debajo): son fuentes distintas —
+ * esta sale del catálogo de fábrica, esa de lo que la gente anotó a mano.
+ */
+function PiezaFisica({ sel, partes, slug }: {
+  sel: { tipo: 'aparato'; tag: string }
+  partes: ReturnType<typeof usePartesPlano>
+  slug: string
+}) {
+  const pieza = partes?.aparatos[sel.tag]?.[0]
+  if (!pieza || !partes) return null
+
+  // Otras designaciones de la MISMA figura con un código distinto: el aviso
+  // de "es otro modelo" sale de los datos, no de un texto fijo.
+  const otras = Object.entries(partes.aparatos)
+    .flatMap(([tag, entradas]) => entradas.map((e) => ({ tag, ...e })))
+    .filter((e) => e.fig === pieza.fig && e.nr !== pieza.nr && e.tag !== sel.tag)
+  const tagsOtras = [...new Set(otras.map((o) => o.tag))].sort(compararTags)
+  const nrOtras = otras[0]?.nr
+  // Compactar respetando HUECOS: B10 usa el mismo modelo que B14, así que
+  // "B1–B12" mentiría — debe salir "B1–B9, B11, B12". El guion solo se usa
+  // para corridas de 3 o más; dos seguidos van con coma.
+  const corridas: string[][] = []
+  for (const tag of tagsOtras) {
+    const m = /^([A-Z]+)(\d+)$/.exec(tag)
+    const previa = corridas[corridas.length - 1]
+    const ult = previa ? /^([A-Z]+)(\d+)$/.exec(previa[previa.length - 1] ?? '') : null
+    if (m && previa && ult && ult[1] === m[1] && Number(ult[2]) === Number(m[2]) - 1) {
+      previa.push(tag)
+    } else {
+      corridas.push([tag])
+    }
+  }
+  const tramos = corridas.flatMap((c) =>
+    c.length >= 3 ? [`${c[0]}–${c[c.length - 1]}`] : c,
+  )
+  const aviso = tramos.length > 0 && nrOtras
+    ? `Ojo: ${tramos.join(', ')} llevan el ${nrOtras}. Este ${sel.tag} es otro modelo.`
+    : null
+
+  return (
+    <div className="mb-3 rounded-card border p-3" style={{ background: 'var(--lc-bg-panel)', borderColor: 'var(--lc-border)' }}>
+      <Titulo>Pieza física</Titulo>
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-footnote font-semibold leading-snug">{pieza.es}</span>
+        <span className="shrink-0 rounded-ctl px-2 py-0.5 text-caption" style={{ background: 'var(--lc-surface-hi)', color: 'var(--lc-ink-mid)' }}>
+          {pieza.confianza === 'catalogo' ? 'según catálogo BAADER 2006' : 'propuesto'}
+        </span>
+      </div>
+      {pieza.de && (
+        <p className="m-0 mt-0.5 text-caption" style={{ color: 'var(--lc-ink-lo)' }}>{pieza.de}</p>
+      )}
+      <p className="m-0 mt-1.5 font-mono text-[15px] font-semibold" style={{ color: 'var(--lc-aqua-bright)' }}>{pieza.nr}</p>
+      {aviso && (
+        <p className="m-0 mt-2 rounded-ctl border-l-2 py-1 pl-2 text-footnote leading-relaxed"
+           style={{ borderColor: 'var(--lc-prep)', background: 'var(--lc-prep-soft)', color: 'var(--lc-ink-mid)' }}>
+          {aviso}
+        </p>
+      )}
+      <Link to={`/aprendizaje/planos/${partes.despiece}?hoja=${pieza.hoja}&ap=${encodeURIComponent(pieza.pos)}`}
+            onClick={() => void registrarUso(slug, 'salto-a-despiece', sel.tag)}
+            className="mt-2 flex min-h-[44px] items-center justify-center rounded-ctl border px-3 text-center text-footnote font-medium no-underline"
+            style={{ borderColor: 'var(--lc-aqua)', background: 'var(--lc-aqua-soft)', color: 'var(--lc-aqua-bright)' }}>
+        Ver en el despiece
+      </Link>
+    </div>
+  )
+}
+
 /**
  * El cruce que cierra el circulo del modulo: los codigos SAP que la gente dejo
  * en las notas del aparato, resueltos contra el maestro de repuestos y el
@@ -1004,7 +1346,7 @@ function FichasSap({ notas }: { notas: ReturnType<typeof usePlanoNotas>['notas']
 
 /** Registra una consulta (plano o aparato) para los KPIs de uso del modulo.
  *  Silencioso: sin sesion o sin red simplemente no registra. */
-async function registrarUso(slug: string, tipo: 'apertura' | 'aparato', tag?: string) {
+async function registrarUso(slug: string, tipo: 'apertura' | 'aparato' | 'pieza' | 'salto-a-despiece', tag?: string) {
   try {
     const { auth: a, db: base } = await import('@/services/firebase')
     if (!a.currentUser) return

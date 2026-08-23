@@ -29,8 +29,10 @@ export type PlanoCatalogo = {
   faltantes: number[]
   descripcion: string
   /** 'visor': el PDF trae el texto en contornos (sin palabras extraibles) —
-   *  hojas navegables y notas por hoja, pero sin zonas clicables ni indice. */
-  modo?: 'visor'
+   *  hojas navegables y notas por hoja, pero sin zonas clicables ni indice.
+   *  'despiece': catalogo de piezas (figuras numeradas, no hojas de circuito):
+   *  buscador y notas si, pero sin toggle DE/ES. */
+  modo?: 'visor' | 'despiece'
   /** Presente = los assets se sirven desde Firebase Storage, no del bundle. */
   enStorage?: boolean
   /** Version de los assets en Storage: subirla rompe la cache del CDN de
@@ -135,6 +137,23 @@ export const PLANOS: PlanoCatalogo[] = [
     descripcion:
       'Diagrama neumatico oficial en espanol, con texto real: el buscador encuentra ' +
       'valvulas, cilindros y bombas por nombre.',
+  },
+  {
+    slug: 'baader-142-despiece',
+    maquina: 'BAADER 142 · PLANO DE PARTES',
+    numero: '142.00.00.821',
+    revision: 'Ed. 10/2006',
+    aplicaA: 'Ambas generaciones (figuras del catalogo 2006; posiciones identicas al catalogo 2014)',
+    hojas: 254,
+    faltantes: [],
+    modo: 'despiece',
+    enStorage: true,
+    vAssets: 1,
+    idioma: 'es',
+    descripcion:
+      'El catalogo de piezas de fabrica: cada figura lista las posiciones con su nombre y su ' +
+      'codigo de repuesto. Cruzado con los planos electricos 888/860: toca un aparato y salta ' +
+      'a su ficha aca, o busca el codigo y ve en que figura va.',
   },
   {
     slug: 'baader-200-508',
