@@ -225,7 +225,7 @@ function Visor({ slug }: { slug: string }) {
     const g = Number(localStorage.getItem(`plano-hoja:${slug}`))
     return Number.isInteger(g) && g > 0 ? g : undefined
   })
-  const { indice, hoja, abrir, cargando, error } = usePlano(slug, inicial)
+  const { indice, hoja, abrir, cargando, error, reintentar } = usePlano(slug, inicial)
   // ?fig=70-8 — en el catálogo de piezas la referencia que la gente se pasa
   // por chat es la FIGURA impresa, no el número de hoja del visor. Se
   // resuelve cuando llega el índice (que es quien conoce el mapa fig→hoja).
@@ -324,11 +324,19 @@ function Visor({ slug }: { slug: string }) {
     setMinimizada(false)
     setResaltar(false)
     if (nuevo?.tipo === 'aparato') {
-      setRecientes((r) => {
-        const v = [nuevo.tag, ...r.filter((x) => x !== nuevo.tag)].slice(0, 6)
-        localStorage.setItem(`plano-recientes:${slug}`, JSON.stringify(v))
-        return v
-      })
+      // En el despiece se guarda el CÓDIGO, no la posición: un chip que dice
+      // "24" no significa nada (esa posición existe en decenas de figuras),
+      // y el código además reabre la ficha correcta desde cualquier hoja.
+      const clave = esDespiece
+        ? (hoja?.datos.filas?.find((f) => normalizarPos(f.pos) === nuevo.tag)?.nr ?? null)
+        : nuevo.tag
+      if (clave) {
+        setRecientes((r) => {
+          const v = [clave, ...r.filter((x) => x !== clave)].slice(0, 6)
+          localStorage.setItem(`plano-recientes:${slug}`, JSON.stringify(v))
+          return v
+        })
+      }
     }
     setSel((previo) => {
       if (previo && nuevo && previo !== nuevo && hoja) {
@@ -336,7 +344,7 @@ function Visor({ slug }: { slug: string }) {
       }
       return nuevo
     })
-  }, [hoja, slug])
+  }, [hoja, slug, esDespiece])
 
   const volverSel = useCallback(() => {
     setPilaSel((p) => {
@@ -440,15 +448,30 @@ function Visor({ slug }: { slug: string }) {
     setTimeout(() => w.print(), 400)
   }, [hoja, indice, esDespiece, meta])
 
+  // En el despiece las claves del índice son CÓDIGOS de repuesto, no
+  // posiciones: al abrir uno hay que seleccionar la FILA que lo lleva (su
+  // ficha con nombre, cantidad y SAP), y eso solo se puede una vez cargada la
+  // hoja destino — por eso queda pendiente hasta que llegue.
+  const piezaPendiente = useRef<string | null>(null)
+  useEffect(() => {
+    const cod = piezaPendiente.current
+    if (!cod || !hoja || !esDespiece) return
+    const fila = hoja.datos.filas?.find((f) => f.nr && normalizarPos(f.nr) === normalizarPos(cod))
+    if (!fila) return
+    piezaPendiente.current = null
+    seleccionar({ tipo: 'aparato', tag: normalizarPos(fila.pos) })
+  }, [hoja, esDespiece, seleccionar])
+
   const abrirAparato = useCallback((tag: string) => {
     const puntos = indice?.indice[tag]
     if (!puntos?.length) return
     const enEsta = puntos.find((pt) => pt.h === hoja?.blatt)
     const destino = enEsta ?? puntos[0]!
-    seleccionar({ tipo: 'aparato', tag })
+    if (esDespiece) piezaPendiente.current = tag
+    else seleccionar({ tipo: 'aparato', tag })
     setBusca('')
     void irA(destino.h, undefined, destino.b)
-  }, [indice, hoja, seleccionar, irA])
+  }, [indice, hoja, seleccionar, irA, esDespiece])
 
   // Elegir una fila de la tabla del despiece (degradación cuando la posición
   // no tiene ancla OCR): si igual está dibujada en el lienzo se resalta su
@@ -555,7 +578,7 @@ function Visor({ slug }: { slug: string }) {
   }, [indice, hoja, irA, volver])
 
   if (error) {
-    return <Aviso texto={error} />
+    return <Aviso texto={error} onReintentar={reintentar} />
   }
   if (!indice || !hoja || !meta) {
     return <Aviso texto="Cargando el plano…" />
@@ -1050,7 +1073,11 @@ function Panel({
               Recientes
             </h2>
             <div className="flex flex-wrap gap-1.5">
-              {recientes.map((t) => (
+              {/* Solo los que el índice sabe abrir: en el despiece quedaron
+                  guardadas posiciones sueltas ("24") de antes de guardar el
+                  código, y un chip que no lleva a ninguna parte es peor que
+                  no estar. Se filtran al mostrar; el uso los reemplaza solo. */}
+              {recientes.filter((t) => indice.indice[t]).map((t) => (
                 <button key={t} type="button" onClick={() => onAbrirAparato(t)}
                         className="rounded-ctl border px-2 py-1 font-mono text-footnote"
                         style={{ borderColor: 'var(--lc-border)', color: 'var(--lc-aqua-bright)' }}>
@@ -1760,11 +1787,20 @@ function Titulo({ children }: { children: React.ReactNode }) {
   )
 }
 
-function Aviso({ texto }: { texto: string }) {
+function Aviso({ texto, onReintentar }: { texto: string; onReintentar?: () => void }) {
   return (
-    <div className="flex h-[100dvh] items-center justify-center gap-2 text-footnote"
+    <div className="flex h-[100dvh] flex-col items-center justify-center gap-3 px-6 text-center text-footnote"
          style={{ background: 'var(--lc-bg)', color: 'var(--lc-ink-mid)' }}>
-      <Zap size={15} /> {texto}
+      <span className="flex items-center gap-2"><Zap size={15} /> {texto}</span>
+      {/* En planta la señal se corta a mitad de la descarga: sin este botón
+          el único camino era recargar la página y perder la hoja abierta. */}
+      {onReintentar && (
+        <button type="button" onClick={onReintentar}
+                className="flex min-h-[44px] items-center rounded-ctl border px-4 font-medium"
+                style={{ borderColor: 'var(--lc-aqua)', background: 'var(--lc-aqua-soft)', color: 'var(--lc-aqua-bright)' }}>
+          Reintentar
+        </button>
+      )}
     </div>
   )
 }
