@@ -13,6 +13,7 @@ import { usePlanoSap } from '@/hooks/usePlanoSap'
 import { usePartesPlano } from '@/hooks/usePartesPlano'
 import { PlanoLienzo, type Foco } from '@/components/planos/PlanoLienzo'
 import { NotasAparato } from '@/components/planos/NotasAparato'
+import { compactarTramos } from '@/utils/designaciones'
 
 /** minusculas y sin acentos: "posicion" debe encontrar "POSICIÓN ZERO". */
 const sinAcentos = (t: string) => t.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '')
@@ -1074,15 +1075,6 @@ function Resultados({ items, onIr }: {
   )
 }
 
-/** Orden "natural" de una designación (B1, B2 … B12, no alfabético B1,B10,B11,B12,B2…). */
-function compararTags(a: string, b: string): number {
-  const pa = a.match(/^([A-Za-z]*)(\d*)$/)
-  const pb = b.match(/^([A-Za-z]*)(\d*)$/)
-  const la = pa?.[1] ?? a
-  const lb = pb?.[1] ?? b
-  if (la !== lb) return la.localeCompare(lb)
-  return Number(pa?.[2] || 0) - Number(pb?.[2] || 0)
-}
 
 /**
  * Ficha de una pieza del despiece (opción "Pila" del mockup, sin pestañas):
@@ -1258,25 +1250,10 @@ function PiezaFisica({ sel, partes, slug }: {
   const otras = Object.entries(partes.aparatos)
     .flatMap(([tag, entradas]) => entradas.map((e) => ({ tag, ...e })))
     .filter((e) => e.fig === pieza.fig && e.nr !== pieza.nr && e.tag !== sel.tag)
-  const tagsOtras = [...new Set(otras.map((o) => o.tag))].sort(compararTags)
   const nrOtras = otras[0]?.nr
-  // Compactar respetando HUECOS: B10 usa el mismo modelo que B14, así que
-  // "B1–B12" mentiría — debe salir "B1–B9, B11, B12". El guion solo se usa
-  // para corridas de 3 o más; dos seguidos van con coma.
-  const corridas: string[][] = []
-  for (const tag of tagsOtras) {
-    const m = /^([A-Z]+)(\d+)$/.exec(tag)
-    const previa = corridas[corridas.length - 1]
-    const ult = previa ? /^([A-Z]+)(\d+)$/.exec(previa[previa.length - 1] ?? '') : null
-    if (m && previa && ult && ult[1] === m[1] && Number(ult[2]) === Number(m[2]) - 1) {
-      previa.push(tag)
-    } else {
-      corridas.push([tag])
-    }
-  }
-  const tramos = corridas.flatMap((c) =>
-    c.length >= 3 ? [`${c[0]}–${c[c.length - 1]}`] : c,
-  )
+  // Compactar respetando HUECOS (compactarTramos, con tests): "B1–B12"
+  // escondería que B10 usa el mismo modelo que B14.
+  const tramos = compactarTramos([...new Set(otras.map((o) => o.tag))])
   const aviso = tramos.length > 0 && nrOtras
     ? `Ojo: ${tramos.join(', ')} llevan el ${nrOtras}. Este ${sel.tag} es otro modelo.`
     : null

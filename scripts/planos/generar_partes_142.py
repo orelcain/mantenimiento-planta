@@ -61,6 +61,17 @@ def main():
             # si ya existe (misma designacion en 2 figuras), conservar ambas
             aparatos.setdefault(pos, []).append(entrada)
 
+    # solo designaciones que EXISTEN en al menos un plano electrico (el S00
+    # del catalogo no aparece en ninguno y ensuciaba la auditoria)
+    en_planos = set()
+    for slug in ("baader-142-888", "baader-142-860"):
+        idx = json.load(io.open(os.path.join(PWA_PLANOS, slug, "indice.json"), encoding="utf-8"))
+        en_planos.update(k for k in idx["indice"] if RE_DESIGNACION.match(k))
+    descartadas = sorted(set(aparatos) - en_planos)
+    if descartadas:
+        print(f"descartadas (no existen en los planos): {descartadas}")
+    aparatos = {k: v for k, v in aparatos.items() if k in en_planos}
+
     # curaduria manual encima
     ruta_cur = os.path.join(RAIZ, "partes_curadas_142.json")
     if os.path.exists(ruta_cur):

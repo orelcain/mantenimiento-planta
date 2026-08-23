@@ -652,6 +652,103 @@ def ocrrmerge():
     print(f"OK ocrrmerge ({len(partes)} partes) · ancladas {ok}/{esp} ({100*ok/max(esp,1):.1f}%)")
 
 
+def _expandir_grupo(texto_crudo, esperadas):
+    """'16-18' -> [16,17,18] · '2, 3' / '31, 40' -> lista. Solo miembros que
+    esten en las posiciones esperadas de la figura (validacion de tablas)."""
+    t = texto_crudo.strip()
+    out = []
+    for parte in re.split(r"[,;]\s*", t):
+        parte = parte.strip()
+        m = re.fullmatch(r"(\d{1,3})\s*[-–]\s*(\d{1,3})", parte)
+        if m:
+            a, b = int(m.group(1)), int(m.group(2))
+            if 0 < b - a <= 8:
+                out.extend(str(x) for x in range(a, b + 1))
+            continue
+        if re.fullmatch(r"\d{1,3}", parte):
+            out.append(parte)
+    miembros = [x for x in out if x in esperadas]
+    # un rotulo agrupado tiene 2+ miembros validos; uno solo ya lo cazo ocrt
+    return miembros if len(miembros) >= 2 else []
+
+
+def ocrg():
+    """Pasada de GRUPOS: el catalogo rotula posiciones agrupadas ('2, 3',
+    '16-18', '31, 40') y el matcher individual no las veia. Re-OCRea SOLO las
+    figuras con posiciones sin ancla, en la orientacion que ya funciono para
+    esa figura, y expande listas/rangos. Fusiona sobre ocr.json."""
+    from rapidocr_onnxruntime import RapidOCR
+    import numpy as np
+    import cv2
+
+    doc = fitz.open(PDF_835)
+    figs = _figuras()["figuras"]
+    datos = json.load(io.open(os.path.join(TRABAJO, "ocr.json"), encoding="utf-8"))
+    motor = RapidOCR()
+    ZOOM, TESELA_PX, SOLAPE_PX = 4, 1000, 160
+    mejoradas = nuevas_tot = 0
+    for n, f in enumerate(figs, 1):
+        a = datos.get(str(n))
+        if not a or not a["sinAncla"]:
+            continue
+        esperadas = set(a["esperadas"])
+        vistas = {p["t"] for p in a["poss"]}
+        # orientaciones: 0 siempre; las rotadas solo si esa figura ya dio
+        # anclas rotadas (o si no tiene ninguna ancla aun)
+        rots = {0}
+        rots.update(p.get("r", 0) for p in a["poss"])
+        if not a["poss"]:
+            rots.update((90, 270))
+        nuevas = 0
+        for rot in sorted(rots):
+            mat = fitz.Matrix(ZOOM, ZOOM).prerotate(rot)
+            pix = doc[f["dibujos"][0] - 1].get_pixmap(matrix=mat)
+            inv = fitz.Matrix(mat)
+            inv.invert()
+            img = cv2.imdecode(np.frombuffer(pix.tobytes("png"), np.uint8), cv2.IMREAD_COLOR)
+            Hp, Wp = img.shape[:2]
+            y0 = 0
+            while y0 < Hp:
+                x0 = 0
+                while x0 < Wp:
+                    tile = img[y0:min(y0 + TESELA_PX, Hp), x0:min(x0 + TESELA_PX, Wp)]
+                    if tile.shape[0] < 120 or tile.shape[1] < 120:
+                        x0 += TESELA_PX - SOLAPE_PX
+                        continue
+                    res, _ = motor(tile)
+                    for l in res or []:
+                        miembros = _expandir_grupo(l[1], esperadas)
+                        pendientes = [mm for mm in miembros if mm not in vistas]
+                        if not pendientes:
+                            continue
+                        xs = [p[0] + x0 for p in l[0]]
+                        ys = [p[1] + y0 for p in l[0]]
+                        esq = [fitz.Point(x + pix.x, y + pix.y) * inv
+                               for x, y in ((min(xs), min(ys)), (max(xs), max(ys)))]
+                        px0, py0 = min(p.x for p in esq), min(p.y for p in esq)
+                        px1, py1 = max(p.x for p in esq), max(p.y for p in esq)
+                        if not (0 <= px0 <= doc[f["dibujos"][0] - 1].rect.width):
+                            continue
+                        b = [round(px0, 1), round(py0, 1), round(px1 - px0, 1), round(py1 - py0, 1)]
+                        for mm in pendientes:
+                            a["poss"].append({"t": mm, "b": b, "g": 1})
+                            vistas.add(mm)
+                            nuevas += 1
+                    x0 += TESELA_PX - SOLAPE_PX
+                y0 += TESELA_PX - SOLAPE_PX
+        a["sinAncla"] = sorted(esperadas - vistas)
+        if nuevas:
+            mejoradas += 1
+            nuevas_tot += nuevas
+        if n % 10 == 0:
+            print(f"  ocrg {n}/{len(figs)}…", flush=True)
+    with io.open(os.path.join(TRABAJO, "ocr.json"), "w", encoding="utf-8") as fh:
+        json.dump(datos, fh, ensure_ascii=False, indent=1)
+    esp = sum(len(x["esperadas"]) for x in datos.values())
+    ok = esp - sum(len(x["sinAncla"]) for x in datos.values())
+    print(f"OK ocrg · figuras mejoradas {mejoradas} (+{nuevas_tot}) · total {ok}/{esp} ({100*ok/max(esp,1):.1f}%)")
+
+
 def _nn(n):
     """Mismo nombre de archivo que usePlano: String(blatt).padStart(2,'0')."""
     return str(n).zfill(2)
@@ -786,6 +883,8 @@ if __name__ == "__main__":
         ocrmerge()
     elif fase == "ocrrmerge":
         ocrrmerge()
+    elif fase == "ocrg":
+        ocrg()
     elif fase == "ocrr":
         ocrr(int(sys.argv[2]) if len(sys.argv) > 2 else 1,
              int(sys.argv[3]) if len(sys.argv) > 3 else None)
