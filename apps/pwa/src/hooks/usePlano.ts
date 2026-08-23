@@ -39,15 +39,18 @@ export async function guardarPlanoOffline(
   onAvance: (hechas: number, total: number) => void,
 ): Promise<void> {
   const cache = await caches.open(CACHE_PLANOS)
-  const urls = [assetPlano(slug, 'indice.json')]
+  // `busqueda.json` va SIEMPRE: sin él, el plano guardado "para usar sin
+  // señal" abre pero no se puede buscar — justo lo que más se necesita en una
+  // zona sin cobertura. Los planos que no lo emiten devuelven 404 y se saltan.
+  const urls = [assetPlano(slug, 'indice.json'), assetPlano(slug, 'busqueda.json')]
   hojas.forEach((b) => {
     const nn = String(b).padStart(2, '0')
     urls.push(assetPlano(slug, `hoja-${nn}.svg`), assetPlano(slug, `hoja-${nn}.json`))
   })
   let hechas = 0
   for (const url of urls) {
-    const r = await fetch(url)
-    if (r.ok) await cache.put(url, r)
+    const r = await fetch(url).catch(() => null)
+    if (r?.ok) await cache.put(url, r)
     hechas++
     onAvance(hechas, urls.length)
   }
