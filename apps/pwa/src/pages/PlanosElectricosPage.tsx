@@ -24,6 +24,10 @@ const sinAcentos = (t: string) => t.toLowerCase().normalize('NFD').replace(/\p{D
 const normalizarPos = (t: string) =>
   t.trim().replace(/ /g, '').replace(/,/g, '-').replace(/\./g, '-').replace(/[^A-Za-z0-9-]/g, '').toUpperCase()
 
+/** Escapa para inyectar texto en el HTML de la ventana de impresión (nombres
+ *  de piezas pueden traer "&"/"<" sueltos del OCR del catálogo). */
+const escHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
 /** Etiqueta de un grupo del índice lateral / select de hojas. Los planos
  *  eléctricos usan 2 claves fijas; el despiece manda su propia etiqueta de
  *  capítulo ya armada ("70 · Equipo eléctrico") — se muestra tal cual. */
@@ -330,6 +334,20 @@ function Visor({ slug }: { slug: string }) {
     const ap = new URLSearchParams(busquedaRuta).get('ap')
     if (!ap) return
     const apN = normalizarPos(ap)
+    // En el despiece un ?ap= puede ser un CÓDIGO de repuesto (así llega el
+    // link desde Repuestos): la ficha útil es la de la PIEZA —con su nombre,
+    // cantidad, SAP y la tabla de la figura—, no la ficha genérica de aparato.
+    if (esDespiece) {
+      const filaCodigo = hoja.datos.filas?.find(
+        (f) => f.nr && normalizarPos(f.nr) === apN,
+      )
+      if (filaCodigo) {
+        seleccionar({ tipo: 'aparato', tag: normalizarPos(filaCodigo.pos) })
+        const tagCaja = hoja.datos.tags.find((t) => normalizarPos(t.t) === normalizarPos(filaCodigo.pos))
+        if (tagCaja) setFoco({ tipo: 'caja', b: tagCaja.b })
+        return
+      }
+    }
     if (indice.indice[apN]) {
       // si la URL tambien trae ?hoja=, mandan la hoja pedida: se busca la
       // aparicion del aparato AHI; si no hay, recien se va a la primera
@@ -348,23 +366,54 @@ function Visor({ slug }: { slug: string }) {
       seleccionar({ tipo: 'aparato', tag: apN })
       setFoco({ tipo: 'caja', b: tagEnHoja.b })
     }
-  }, [indice, hoja, irA, seleccionar, busquedaRuta])
+  }, [indice, hoja, irA, seleccionar, busquedaRuta, esDespiece])
 
   const imprimirHoja = useCallback(() => {
     if (!hoja || !indice) return
     const w = window.open('', '_blank')
     if (!w) return
+    const filas = esDespiece ? (hoja.datos.filas ?? []) : []
+    const tieneTabla = filas.length > 0
+    // En el despiece el numero de figura/hoja no dice nada en terreno: la
+    // tabla de piezas es lo que hace util el papel impreso (sin ella, un SVG
+    // con solo posiciones numeradas es ilegible fuera de la app).
+    const titulo = tieneTabla && meta
+      ? `${indice.maquina} · Figura ${meta.fig} · ${limpiarTitulo(meta.tituloEs)}`
+      : `${indice.maquina} · ${indice.plano} · Hoja ${hoja.blatt} / ${indice.hojasTotales}`
+    const fila = (f: FilaDespiece) => {
+      const sap = f.nr ? indice.sapPorCodigo?.[f.nr] : undefined
+      return `<tr><td>${escHtml(f.pos)}</td><td>${escHtml(f.es || f.de || '—')}</td>`
+        + `<td>${escHtml(f.nr ?? '—')}</td>`
+        + `<td>${sap ? escHtml(`SAP ${sap.s}${sap.u ? ' · ' + sap.u : ''}`) : '—'}</td></tr>`
+    }
+    // 2 columnas de tabla (dos <table> lado a lado, no CSS multicol sobre
+    // <table>: eso fragmenta distinto entre navegadores) para que la lista
+    // completa de posiciones quepa en A4 sin achicar el texto al mínimo.
+    const mitad = Math.ceil(filas.length / 2)
+    const tablaCols = (rows: FilaDespiece[]) =>
+      `<table><thead><tr><th>Pos</th><th>Nombre</th><th>Código</th><th>SAP / bodega</th></tr></thead>`
+      + `<tbody>${rows.map(fila).join('')}</tbody></table>`
+    const tablaHtml = tieneTabla
+      ? `<div class="tabla2col">${tablaCols(filas.slice(0, mitad))}${tablaCols(filas.slice(mitad))}</div>`
+      : ''
     w.document.write(
-      `<title>${indice.maquina} - ${indice.plano} - Hoja ${hoja.blatt}</title>`
-      + '<style>@page{size:A3 landscape;margin:8mm} body{margin:0} svg{width:100%;height:auto}'
-      + 'header{font:600 12px system-ui;padding:4px 0}</style>'
-      + `<header>${indice.maquina} · ${indice.plano} · Hoja ${hoja.blatt} / ${indice.hojasTotales}</header>`
-      + hoja.datos.svg,
+      '<meta charset="utf-8">'
+      + `<title>${escHtml(titulo)}</title>`
+      + `<style>@page{size:${tieneTabla ? 'A4 portrait' : 'A3 landscape'};margin:8mm} body{margin:0;font:12px system-ui}`
+      + 'svg{width:100%;height:auto} header{font:600 12px system-ui;padding:4px 0}'
+      + 'table{width:100%;border-collapse:collapse;font-size:9.5px}'
+      + 'th,td{border:1px solid #999;padding:2px 4px;text-align:left}'
+      + 'tr{break-inside:avoid}'
+      + '.tabla2col{display:flex;gap:10px;margin-top:8px}'
+      + '.tabla2col table{flex:1;width:50%}</style>'
+      + `<header>${titulo}</header>`
+      + hoja.datos.svg
+      + tablaHtml,
     )
     w.document.close()
     w.focus()
     setTimeout(() => w.print(), 400)
-  }, [hoja, indice])
+  }, [hoja, indice, esDespiece, meta])
 
   const abrirAparato = useCallback((tag: string) => {
     const puntos = indice?.indice[tag]
@@ -448,11 +497,20 @@ function Visor({ slug }: { slug: string }) {
     if (!indice) return m
     notas.notas.forEach((n) => {
       if (n.ancla !== 'aparato') return
-      const hojasDel = new Set((indice.indice[n.anclaId] ?? []).map((pt) => pt.h))
+      // En el despiece el ancla es "fig·pos" (ej. "70-8·B1") y las claves de
+      // indice.indice son códigos de fabricante: NUNCA calzan. La hoja se
+      // deriva directo de la figura antes del "·".
+      const hojasDel = esDespiece
+        ? (() => {
+            const fig = n.anclaId.split('·')[0]
+            const b = indice.hojas.find((h) => h.fig === fig)?.blatt
+            return b != null ? new Set([b]) : new Set<number>()
+          })()
+        : new Set((indice.indice[n.anclaId] ?? []).map((pt) => pt.h))
       hojasDel.forEach((h) => m.set(h, (m.get(h) ?? 0) + 1))
     })
     return m
-  }, [notas.notas, indice])
+  }, [notas.notas, indice, esDespiece])
 
   // Teclado: ← → pasan hoja, "/" enfoca el buscador, Backspace deshace el salto.
   useEffect(() => {
@@ -481,12 +539,23 @@ function Visor({ slug }: { slug: string }) {
   const i = indice.hojas.findIndex((h) => h.blatt === hoja.blatt)
   const anterior = indice.hojas[i - 1]
   const siguiente = indice.hojas[i + 1]
-  const resultados = buscar(busca, indice, hoja.blatt)
+  const { items: resultados, total: totalResultados } = buscar(busca, indice, hoja.blatt, esDespiece)
   const vNota = busca.trim().toLowerCase()
   if (vNota) {
     notas.notas.forEach((n) => {
       if (n.ancla !== 'aparato') return
       if (!n.texto.toLowerCase().includes(vNota) && !n.anclaId.toLowerCase().includes(vNota)) return
+      // En el despiece indice.indice esta por codigo de fabricante, no por
+      // "fig·pos": la hoja de la nota se deriva de la figura del ancla.
+      if (esDespiece) {
+        const [fig, pos] = n.anclaId.split('·')
+        const destino = indice.hojas.find((h) => h.fig === fig)
+        if (destino && resultados.length < 60) {
+          resultados.push({ clave: pos ?? n.anclaId, detalle: `nota en fig. ${fig}: ${n.texto.slice(0, 26)}…`,
+                            blatt: destino.blatt, aparato: pos ?? n.anclaId })
+        }
+        return
+      }
       const primera = indice.indice[n.anclaId]?.[0]
       if (primera && resultados.length < 60) {
         resultados.push({ clave: n.anclaId, detalle: `nota: ${n.texto.slice(0, 26)}…`,
@@ -516,10 +585,28 @@ function Visor({ slug }: { slug: string }) {
         <div className="order-last basis-full md:order-none md:basis-auto relative min-w-[180px] flex-1 md:max-w-sm">
           <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--lc-ink-ghost)' }} />
           <input ref={buscaRef} value={busca} onChange={(e) => setBusca(e.target.value)} type="search"
-                 placeholder={esVisor ? 'Buscar hoja por título: sellado, vacío, freno…' : 'Buscar K7, Q1, B12, Messer, cuchillo…'}
+                 placeholder={esVisor ? 'Buscar hoja por título: sellado, vacío, freno…'
+                              : esDespiece ? 'Buscar pieza: cuchilla, resorte, código…'
+                              : 'Buscar K7, Q1, B12, Messer, cuchillo…'}
                  className="w-full rounded-card border bg-transparent py-1.5 pl-8 pr-2 font-mono text-footnote outline-none"
                  style={{ color: 'var(--lc-ink)', borderColor: 'var(--lc-border)' }} />
         </div>
+
+        {/* Destacados: acceso rapido de uso diario (piezas de desgaste). En
+            escritorio va arriba del indice lateral; en movil no hay indice,
+            asi que se muestra acá, en el riel de busqueda. */}
+        {esDespiece && !!indice.destacados?.length && (
+          <div className="order-last flex basis-full gap-2 overflow-x-auto md:hidden">
+            {indice.destacados.map((d, i) => (
+              <button key={i} type="button" onClick={() => void irA(d.hoja)}
+                      className="flex shrink-0 flex-col items-start rounded-card border px-2.5 py-1.5 text-left"
+                      style={{ borderColor: 'var(--lc-aqua)', background: 'var(--lc-aqua-soft)' }}>
+                <span className="text-footnote font-semibold" style={{ color: 'var(--lc-aqua-bright)' }}>{d.etiqueta}</span>
+                <span className="text-caption" style={{ color: 'var(--lc-ink-mid)' }}>{d.detalle}</span>
+              </button>
+            ))}
+          </div>
+        )}
 
         <div className={`${sinIdiomas ? 'hidden' : 'flex'} overflow-hidden rounded-card border`} style={{ borderColor: 'var(--lc-border)' }}>
           {([['DE', false], ['ES', true]] as const).map(([txt, v]) => (
@@ -536,7 +623,7 @@ function Visor({ slug }: { slug: string }) {
         </div>
 
         <button type="button" title="Imprimir esta hoja" onClick={imprimirHoja}
-                className="hidden rounded-ctl p-1.5 md:block" style={{ color: 'var(--lc-ink-mid)' }}>
+                className="rounded-ctl p-1.5" style={{ color: 'var(--lc-ink-mid)' }}>
           <Printer size={15} />
         </button>
         <BotonOffline slug={slug} indice={indice} />
@@ -601,6 +688,18 @@ function Visor({ slug }: { slug: string }) {
         {/* índice de hojas */}
         <nav ref={navRef} className="hidden w-56 shrink-0 overflow-y-auto border-r px-2 pb-2 md:block"
              style={{ background: 'var(--lc-surface)', borderColor: 'var(--lc-border)' }}>
+          {esDespiece && !!indice.destacados?.length && (
+            <div className="flex flex-col gap-1.5 pb-2 pt-2">
+              {indice.destacados.map((d, i) => (
+                <button key={i} type="button" onClick={() => void irA(d.hoja)}
+                        className="flex flex-col items-start gap-0.5 rounded-ctl border px-2 py-1.5 text-left"
+                        style={{ borderColor: 'var(--lc-aqua)', background: 'var(--lc-aqua-soft)' }}>
+                  <span className="text-caption font-semibold" style={{ color: 'var(--lc-aqua-bright)' }}>{d.etiqueta}</span>
+                  <span className="text-[10.5px]" style={{ color: 'var(--lc-ink-mid)' }}>{d.detalle}</span>
+                </button>
+              ))}
+            </div>
+          )}
           {secciones.map((sec) => {
             const grupo = indice.hojas.filter((h) => h.seccion === sec)
             if (!grupo.length) return null
@@ -736,7 +835,7 @@ function Visor({ slug }: { slug: string }) {
             </button>
           )}
           {esVisor && busca.trim()
-            ? <Resultados items={resultados}
+            ? <Resultados items={resultados} total={totalResultados}
                 onIr={(b, c, caja, aparato) => {
                   if (aparato) seleccionar({ tipo: 'aparato', tag: aparato })
                   setBusca('')
@@ -761,7 +860,7 @@ function Visor({ slug }: { slug: string }) {
                 />
               </>
             : busca.trim()
-            ? <Resultados items={resultados}
+            ? <Resultados items={resultados} total={totalResultados}
                 onIr={(b, c, caja, aparato) => {
                   if (aparato) seleccionar({ tipo: 'aparato', tag: aparato })
                   // Elegir un resultado cierra la busqueda: si no, el panel se
@@ -776,7 +875,7 @@ function Visor({ slug }: { slug: string }) {
                      esDespiece={esDespiece} meta={meta} filas={hoja.datos.filas ?? []}
                      tagsHoja={hoja.datos.tags} onSeleccionarFila={seleccionarFilaDespiece}
                      onIrFigura={irAFigura} anclaDeAparato={anclaDeAparato}
-                     partes={partes} slug={slug} />}
+                     partes={partes} slug={slug} sapPorCodigo={indice.sapPorCodigo} />}
           </>}
         </aside>
       </div>
@@ -789,6 +888,7 @@ function Visor({ slug }: { slug: string }) {
 function Panel({
   sel, indice, hojaActual, notas, onIr, recientes, onAbrirAparato, resaltar, onResaltar, enEstaHoja,
   esDespiece, meta, filas, tagsHoja, onSeleccionarFila, onIrFigura, anclaDeAparato, partes, slug,
+  sapPorCodigo,
 }: {
   sel: Seleccion
   indice: NonNullable<ReturnType<typeof usePlano>['indice']>
@@ -811,7 +911,68 @@ function Panel({
   anclaDeAparato: (tag: string) => string
   partes: ReturnType<typeof usePartesPlano>
   slug: string
+  /** código → SAP/bodega, para la lista copiable de la figura. */
+  sapPorCodigo?: Record<string, { s: string; n: string; u: string }>
 }) {
+  const [copiadoLista, setCopiadoLista] = useState(false)
+  // En el despiece, llegar a una figura y NO ver sus piezas obliga a adivinar
+  // qué número tocar (y la mitad de las figuras tiene posiciones sin ancla).
+  // Sin selección, el panel ES la lista de piezas de esta figura.
+  if (!sel && esDespiece && filas.length > 0) {
+    return (
+      <>
+        <Titulo>Piezas de esta figura</Titulo>
+        {meta && (
+          <p className="m-0 mb-2 text-footnote" style={{ color: 'var(--lc-ink-mid)' }}>
+            Figura {meta.fig} · {meta.tituloEs} — {filas.length} piezas. Toca una para ver su
+            código, cuántas lleva y dónde está en bodega.
+            {/* Pedir a bodega es copiar la lista a mano desde el teléfono:
+                un toque la deja lista para pegar en el chat del turno. */}
+            <button type="button"
+                    onClick={() => {
+                      const lineas = filas.map((f) => {
+                        const sap = f.nr ? sapPorCodigo?.[f.nr] : undefined
+                        return [
+                          `${f.pos}. ${f.es || f.de || ''}`.trim(),
+                          f.nr ?? '',
+                          f.q != null ? `x${f.q}` : '',
+                          sap ? `SAP ${sap.s}${sap.u ? ` (${sap.u})` : ''}` : '',
+                        ].filter(Boolean).join(' · ')
+                      })
+                      const texto = [
+                        `BAADER 142 · Figura ${meta.fig} · ${meta.tituloEs}`,
+                        ...lineas,
+                      ].join('\n')
+                      void navigator.clipboard?.writeText(texto)
+                      setCopiadoLista(true)
+                      setTimeout(() => setCopiadoLista(false), 2000)
+                    }}
+                    className="ml-1 underline underline-offset-2"
+                    style={{ color: 'var(--lc-aqua-bright)' }}>
+              {copiadoLista ? '¡Lista copiada!' : 'Copiar la lista'}
+            </button>
+          </p>
+        )}
+        <div className="rounded-ctl border" style={{ borderColor: 'var(--lc-border)' }}>
+          {filas.map((f) => (
+            <button key={`${f.pos}-${f.nr ?? ''}`} type="button" onClick={() => onSeleccionarFila(f)}
+                    className="flex w-full items-baseline justify-between gap-2 border-b px-2 py-2 text-left last:border-b-0"
+                    style={{ borderColor: 'var(--lc-border)', minHeight: 44 }}>
+              <span className="w-9 shrink-0 font-mono text-caption tabular-nums"
+                    style={{ color: 'var(--lc-aqua-bright)' }}>{f.pos}</span>
+              <span className="min-w-0 flex-1 text-footnote leading-snug"
+                    style={{ color: 'var(--lc-ink)' }}>{f.es || f.de}</span>
+              {f.nr && (
+                <span className="shrink-0 font-mono text-caption tabular-nums"
+                      style={{ color: 'var(--lc-ink-mid)' }}>{f.nr}</span>
+              )}
+            </button>
+          ))}
+        </div>
+      </>
+    )
+  }
+
   if (!sel) {
     return (
       <>
@@ -827,6 +988,26 @@ function Panel({
           <br />
           <b style={{ color: 'var(--lc-prep)' }}>Ámbar</b> — rótulo en otro idioma con su traducción.
         </p>
+        {/* Cuánto del plano ya está conectado al catálogo de piezas. Es el
+            número que demuestra el avance del puente y sube solo: con cada
+            vínculo confirmado en terreno pasa de «zona» a «pieza exacta». */}
+        {partes?.cobertura && (
+          <>
+            <Titulo>Puente al catálogo de piezas</Titulo>
+            <p className="m-0 text-footnote leading-relaxed" style={{ color: 'var(--lc-ink-mid)' }}>
+              <b style={{ color: 'var(--lc-ink)' }}>
+                {partes.cobertura.exacta + partes.cobertura.zona} de {partes.cobertura.total}
+              </b>{' '}
+              aparatos de este plano ya llevan al despiece:{' '}
+              <b>{partes.cobertura.exacta}</b> con la pieza exacta
+              {partes.cobertura.conSap > 0 && ` (${partes.cobertura.conSap} con su código SAP)`} y{' '}
+              <b>{partes.cobertura.zona}</b> con el gabinete donde están montados.
+              {partes.cobertura.sinDato > 0 && (
+                <> Quedan <b>{partes.cobertura.sinDato}</b> por identificar.</>
+              )}
+            </p>
+          </>
+        )}
         {recientes.length > 0 && (
           <>
             <h2 className="m-0 mb-2 mt-4 text-caption font-semibold tracking-wider"
@@ -919,6 +1100,7 @@ function Panel({
           fila={filaSel} filas={filas} meta={meta} tagsHoja={tagsHoja} selTag={sel.tag}
           notas={notas} onSeleccionarFila={onSeleccionarFila} onIrFigura={onIrFigura}
           anclaId={anclaDeAparato(sel.tag)} slug={slug} sapPorCodigo={indice.sapPorCodigo}
+          usosPorCodigo={indice.usosPorCodigo} umbralComun={indice.umbralComun}
         />
       )
     }
@@ -996,16 +1178,31 @@ type Resultado = {
 /** lowercase + sin acentos: "vacio" encuentra "Vacío" y "kuhlwasser" a "Kühlwasser". */
 const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '')
 
+/** Detalle de un resultado de figura en el despiece: la figura + su título
+ *  dice algo en terreno; "hoja N" es un numero de pagina interno crudo. */
+const figuraDetalle = (indice: PlanoIndice, blatt: number): string => {
+  const h = indice.hojas.find((hh) => hh.blatt === blatt)
+  return h ? `Fig. ${h.fig} · ${limpiarTitulo(h.tituloEs)}` : `hoja ${blatt}`
+}
+
 function buscar(
   q: string,
   indice: NonNullable<ReturnType<typeof usePlano>['indice']>,
   _hojaActual: number,
-): Resultado[] {
+  esDespiece: boolean,
+): { items: Resultado[]; total: number } {
   const v = norm(q.trim())
-  if (!v) return []
+  if (!v) return { items: [], total: 0 }
   const out: Resultado[] = []
+  // Vocabulario de planta: el catálogo está en castellano de traducción
+  // alemana ("cojinete", "atarjea", "arandela") y el técnico escribe la
+  // palabra que usa a diario ("descanso", "canaleta", "golilla"). El mapa
+  // viene del índice, ya validado contra el vocabulario real del catálogo.
+  const alias = indice.sinonimos?.[v.toLowerCase()]
+  const vAlias = alias ? norm(alias) : null
 
-  // Aparatos: por designacion (K7, Q1, X5...). Aterrizan en su caja exacta.
+  // Aparatos: por designacion (K7, Q1, X5...) o codigo de fabricante en el
+  // despiece. Aterrizan en su caja exacta.
   Object.entries(indice.indice).forEach(([tag, puntos]) => {
     const primero = puntos[0]
     if (primero && norm(tag).startsWith(v)) {
@@ -1018,7 +1215,6 @@ function buscar(
 
   // Hojas por su titulo ("SELLADO" -> las hojas de la estacion de sellado).
   indice.hojas.forEach((h) => {
-    if (out.length >= 60) return
     if (sinAcentos(h.tituloEs).includes(v) || sinAcentos(h.titulo).includes(v)) {
       out.push({ clave: `Hoja ${h.blatt}`, detalle: h.tituloEs.slice(0, 34), blatt: h.blatt })
     }
@@ -1034,26 +1230,38 @@ function buscar(
     })
   } else if (/^\d{1,3}$/.test(v)) {
     Object.entries(indice.bornesIdx).forEach(([k, dst]) => {
-      if (k.endsWith(`:${v}`) && out.length < 40) {
+      if (k.endsWith(`:${v}`)) {
         out.push({ clave: k, detalle: `borne · hoja ${dst.h}`, blatt: dst.h, caja: dst.tb })
       }
     })
   }
 
-  // Rotulos: en el idioma que sea. Cada resultado lleva su hoja y su caja.
+  // Rotulos / piezas: en el idioma que sea. Cada resultado lleva su hoja y
+  // su caja. En el despiece "hoja N" no dice nada — se muestra la figura.
   for (const r of indice.busqueda) {
-    if (norm(r.de).includes(v) || norm(r.es).includes(v)) {
-      out.push({ clave: r.es, detalle: `${r.de} · hoja ${r.h}`, blatt: r.h, caja: r.b })
+    const es = norm(r.es)
+    const de = norm(r.de)
+    const calza = de.includes(v) || es.includes(v)
+      || (vAlias != null && (es.includes(vAlias) || de.includes(vAlias)))
+    if (calza) {
+      const detalle = esDespiece ? figuraDetalle(indice, r.h) : `${r.de} · hoja ${r.h}`
+      out.push({ clave: r.es, detalle, blatt: r.h, caja: r.b })
     }
-    if (out.length >= 60) break
   }
-  return out.slice(0, 60)
+
+  // El total real (antes de truncar) para poder decir "60 de N" en vez de
+  // fingir que 60 es todo lo que había.
+  return { items: out.slice(0, 60), total: out.length }
 }
 
-function Resultados({ items, onIr }: {
+function Resultados({ items, total, onIr }: {
   items: Resultado[]
+  /** Total de coincidencias antes de truncar a 60; si es mayor a items.length
+   *  se avisa en vez de dejar creer que eso es todo lo que había. */
+  total?: number
   onIr: (b: number, c?: number, caja?: Caja, aparato?: string) => void
 }) {
+  const truncado = total != null && total > items.length
   return (
     <>
       <Titulo>{items.length} resultado{items.length !== 1 ? 's' : ''}</Titulo>
@@ -1071,6 +1279,11 @@ function Resultados({ items, onIr }: {
           <span className="text-caption" style={{ color: 'var(--lc-ink-mid)' }}>{r.detalle}</span>
         </button>
       ))}
+      {truncado && (
+        <p className="m-0 mt-1 text-caption" style={{ color: 'var(--lc-ink-ghost)' }}>
+          {items.length} de {total} — afina la búsqueda.
+        </p>
+      )}
     </>
   )
 }
@@ -1083,7 +1296,10 @@ function Resultados({ items, onIr }: {
  * sin volver al lienzo — la degradación pensada para las que no tienen
  * ancla OCR (se eligen desde la tabla en vez de tocarlas en el dibujo).
  */
-function FichaPieza({ fila, filas, meta, tagsHoja, selTag, notas, onSeleccionarFila, onIrFigura, anclaId, slug, sapPorCodigo }: {
+function FichaPieza({
+  fila, filas, meta, tagsHoja, selTag, notas, onSeleccionarFila, onIrFigura, anclaId, slug,
+  sapPorCodigo, usosPorCodigo, umbralComun,
+}: {
   fila: FilaDespiece
   filas: FilaDespiece[]
   meta: PlanoHojaMeta
@@ -1096,6 +1312,10 @@ function FichaPieza({ fila, filas, meta, tagsHoja, selTag, notas, onSeleccionarF
   slug: string
   /** código de fabricante -> SAP, del índice del despiece (planos viejos no lo traen). */
   sapPorCodigo?: Record<string, { s: string; n: string; u: string }>
+  /** código de fabricante -> en cuántas figuras distintas se usa (solo códigos con >1 uso). */
+  usosPorCodigo?: Record<string, number>
+  /** desde cuántos usos una pieza pasa de "específica" a "ferretería común". */
+  umbralComun?: number
 }) {
   const [copiado, setCopiado] = useState(false)
   // Una vez por sesion por posicion (registrarUso ya dedupe): mide cuantas
@@ -1125,6 +1345,14 @@ function FichaPieza({ fila, filas, meta, tagsHoja, selTag, notas, onSeleccionarF
       {fila.de && fila.es && (
         <p className="m-0 mt-0.5 text-footnote" style={{ color: 'var(--lc-ink-mid)' }}>{fila.de}</p>
       )}
+      {/* Cuántas van en la máquina: pedir 1 cuando lleva 32 es un viaje
+          perdido a bodega. Solo se muestra si el catálogo lo dice (x1 no). */}
+      {fila.q != null && (
+        <p className="m-0 mt-1 inline-block rounded-ctl px-2 py-0.5 text-caption font-semibold"
+           style={{ background: 'var(--lc-prep-soft)', color: 'var(--lc-ink-mid)' }}>
+          Lleva {fila.q} unidades
+        </p>
+      )}
 
       {fila.nr && (
         <div className="mt-2 flex items-center gap-2">
@@ -1139,6 +1367,14 @@ function FichaPieza({ fila, filas, meta, tagsHoja, selTag, notas, onSeleccionarF
             {copiado ? <Check size={14} /> : <Copy size={14} />}
           </button>
         </div>
+      )}
+
+      {fila.nr && usosPorCodigo?.[fila.nr] != null && (
+        <p className="m-0 mt-1 text-caption" style={{ color: 'var(--lc-ink-mid)' }}>
+          {umbralComun != null && usosPorCodigo[fila.nr]! > umbralComun
+            ? `Pieza común: se usa en toda la máquina (${usosPorCodigo[fila.nr]} figuras)`
+            : `Esta misma pieza va en otras ${usosPorCodigo[fila.nr]! - 1} figuras`}
+        </p>
       )}
 
       <p className="m-0 mt-2 text-footnote" style={{ color: 'var(--lc-ink-mid)' }}>
@@ -1243,7 +1479,8 @@ function PiezaFisica({ sel, partes, slug }: {
   slug: string
 }) {
   const pieza = partes?.aparatos[sel.tag]?.[0]
-  if (!pieza || !partes) return null
+  if (!partes) return null
+  if (!pieza) return <ZonaSugerida tag={sel.tag} partes={partes} slug={slug} />
 
   // Otras designaciones de la MISMA figura con un código distinto: el aviso
   // de "es otro modelo" sale de los datos, no de un texto fijo.
@@ -1289,6 +1526,44 @@ function PiezaFisica({ sel, partes, slug }: {
             style={{ borderColor: 'var(--lc-aqua)', background: 'var(--lc-aqua-soft)', color: 'var(--lc-aqua-bright)' }}>
         Ver en el despiece
       </Link>
+    </div>
+  )
+}
+
+/**
+ * Cuando el aparato NO tiene una pieza exacta vinculada por designación pero
+ * su letra IEC 81346 (K, Q, F, S, Y, M, SM, B...) sí tiene familia en el
+ * despiece: no promete la pieza, solo dice en qué caja de distribución
+ * buscarla — 134 aparatos pasan de "nada" a esto.
+ */
+function ZonaSugerida({ tag, partes, slug }: {
+  tag: string
+  partes: NonNullable<ReturnType<typeof usePartesPlano>>
+  slug: string
+}) {
+  const letra = tag.match(/^[A-Z]+/)?.[0]
+  const familia = letra ? partes.familias?.[letra] : undefined
+  if (!familia?.figuras.length) return null
+  return (
+    <div className="mb-3 rounded-card border p-3" style={{ background: 'var(--lc-bg-panel)', borderColor: 'var(--lc-border)' }}>
+      <Titulo>Dónde buscarlo en el despiece</Titulo>
+      <p className="m-0 text-footnote leading-relaxed" style={{ color: 'var(--lc-ink-mid)' }}>
+        {tag} es de {familia.etiqueta}. En el catálogo de piezas vive en:
+      </p>
+      <div className="mt-2 flex flex-col gap-1.5">
+        {familia.figuras.slice(0, 3).map((f) => (
+          <Link key={f.fig} to={`/aprendizaje/planos/${partes.despiece}?hoja=${f.hoja}`}
+                onClick={(e) => { e.stopPropagation(); void registrarUso(slug, 'salto-a-despiece', tag) }}
+                className="flex min-h-[44px] items-center justify-center rounded-ctl border px-3 text-center text-footnote font-medium no-underline"
+                style={{ borderColor: 'var(--lc-aqua)', background: 'var(--lc-aqua-soft)', color: 'var(--lc-aqua-bright)' }}>
+            Fig {f.fig} · {f.titulo}
+          </Link>
+        ))}
+      </div>
+      <p className="m-0 mt-2 text-caption leading-relaxed" style={{ color: 'var(--lc-ink-lo)' }}>
+        El catálogo no rotula la designación eléctrica: esto es el gabinete/conjunto
+        donde está montado, no la pieza exacta.
+      </p>
     </div>
   )
 }

@@ -19,7 +19,8 @@
  * codigoProveedor / codigoSap cuando el catálogo los trae.
  */
 import { useEffect, useMemo, useState } from 'react'
-import { BookMarked, BookOpen, Check, CircleCheck, CirclePlus, Copy, Loader2, PackagePlus, ScanSearch, Search } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { BookMarked, BookOpen, Check, CircleCheck, CirclePlus, Copy, Loader2, PackagePlus, ScanSearch, Search, Shapes } from 'lucide-react'
 import { collection, getDocs } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import { Input } from '@/components/ui'
@@ -27,6 +28,33 @@ import { ShareInteractiveButton } from '@/components/visor3d/ShareInteractiveBut
 import { APP_VERSION } from '@/constants'
 import { useRepuestosExistentes, normCodigo } from '@/hooks/repuestos/useRepuestosExistentes'
 import { logger } from '@/lib/logger'
+
+/**
+ * Mapa código de fabricante → figura del despiece navegable (BAADER 142).
+ * Es el camino INVERSO del puente: el visor de planos ya lleva de una pieza a
+ * `/repuestos?q=`, pero desde acá no se podía ver el DIBUJO. Se carga aparte
+ * (~39 KB) en vez de leer el índice completo del despiece (~770 KB).
+ */
+const MAPA_FIGURAS_URL = `${import.meta.env.BASE_URL}data/despiece-142-figuras.json`
+
+function useFigurasDespiece() {
+  const [mapa, setMapa] = useState<Record<string, [number, string]> | null>(null)
+  useEffect(() => {
+    let vivo = true
+    fetch(MAPA_FIGURAS_URL)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { codigos?: Record<string, [number, string]> } | null) => {
+        if (vivo && d?.codigos) setMapa(d.codigos)
+      })
+      .catch(() => {
+        /* sin mapa el botón simplemente no aparece */
+      })
+    return () => {
+      vivo = false
+    }
+  }, [])
+  return mapa
+}
 
 /** Datos para prellenar la creación de un repuesto desde una pieza de catálogo. */
 export interface CrearDesdeCatalogo {
@@ -204,6 +232,7 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
   // ¿cuáles de los códigos en pantalla ya existen como repuesto en el maestro?
   // (requiere sesión: en modo invitado no se consulta)
   const { existentes } = useRepuestosExistentes(publico ? [] : resultados.map((p) => p.codigo))
+  const figurasDespiece = useFigurasDespiece()
 
   const copiar = (codigo: string) => {
     navigator.clipboard?.writeText(codigo).then(() => {
@@ -322,6 +351,22 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
             </div>
             {/* Acciones: abrir el PDF del manual en la página exacta + sembrar el maestro */}
             <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-border/50 pt-2">
+              {/* Camino inverso del puente: si esta pieza tiene dibujo en el
+                  despiece navegable, se va derecho a su figura explotada. */}
+              {(() => {
+                const enDespiece = figurasDespiece?.[p.codigo]
+                if (!enDespiece) return null
+                const [hojaFig, nombreFig] = enDespiece
+                return (
+                  <Link
+                    to={`/aprendizaje/planos/baader-142-despiece?hoja=${hojaFig}&ap=${encodeURIComponent(p.codigo)}`}
+                    className="inline-flex items-center gap-1 rounded-ctl border border-primary/40 bg-primary/[0.08] px-2 py-1 text-caption font-medium text-ink-info transition hover:bg-primary/[0.15]"
+                    title={`Ver el dibujo explotado (figura ${nombreFig})`}
+                  >
+                    <Shapes className="h-3.5 w-3.5" /> Ver dibujo · fig. {nombreFig}
+                  </Link>
+                )
+              })()}
               {p.manualId && manualUrls[p.manualId] && (
                 <a
                   href={`${manualUrls[p.manualId]}#page=${p.pagina}`}

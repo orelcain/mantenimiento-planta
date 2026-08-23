@@ -462,6 +462,30 @@ def ocr2():
 
 LOOKALIKES = str.maketrans({"O": "0", "o": "0", "l": "1", "I": "1", "|": "1"})
 
+# El catalogo esta en castellano de TRADUCCION ALEMANA ("cojinete", "atarjea",
+# "muelle"); en planta se dice otra cosa ("rodamiento", "canaleta", "resorte",
+# y "golilla" por arandela). Sin esto el buscador devuelve 0 justo cuando el
+# tecnico escribe la palabra que usa a diario. Cada alias se VALIDA contra el
+# vocabulario real del catalogo: si el termino destino no existe, no se emite.
+SINONIMOS = {
+    "golilla": "arandela", "huincha": "cinta", "perno": "tornillo",
+    "rodamiento": "cojinete", "balero": "cojinete", "descanso": "cojinete",
+    "buje": "casquillo", "bocina": "casquillo",
+    "canaleta": "atarjea", "canal": "atarjea",
+    "resorte": "muelle", "manilla": "palanca", "manija": "palanca",
+    "sello": "junta", "reten": "obturador", "oring": "anillo",
+    "llave": "interruptor", "switch": "interruptor",
+    "correa": "correa", "cadena": "cadena", "polea": "disco",
+    "prensa": "abrazadera", "grampa": "abrazadera", "abrazadera": "abrazadera",
+    "cuchillo": "cuchilla", "hoja": "hoja", "rasqueta": "rascador",
+    "manguera": "manguera", "codo": "angulo", "niple": "boquilla",
+    "grasa": "lubrificante", "aceite": "lubrificante",
+    "electrovalvula": "valvula", "solenoide": "valvula",
+    "sensor": "proximidad", "fotocelula": "proximidad",
+    "motor": "motor", "reductor": "engranaje", "pinon": "rueda dentada",
+    "chumacera": "cojinete", "pasador": "perno", "tuerca": "tuerca",
+}
+
 
 def ocrt(desde=1, hasta=None):
     """OCR POR TESELAS: el detector de rapidocr reescala la pagina entera a
@@ -672,7 +696,7 @@ def _expandir_grupo(texto_crudo, esperadas):
     return miembros if len(miembros) >= 2 else []
 
 
-def ocrg():
+def ocrg(desde=1, hasta=None):
     """Pasada de GRUPOS: el catalogo rotula posiciones agrupadas ('2, 3',
     '16-18', '31, 40') y el matcher individual no las veia. Re-OCRea SOLO las
     figuras con posiciones sin ancla, en la orientacion que ya funciono para
@@ -686,8 +710,11 @@ def ocrg():
     datos = json.load(io.open(os.path.join(TRABAJO, "ocr.json"), encoding="utf-8"))
     motor = RapidOCR()
     ZOOM, TESELA_PX, SOLAPE_PX = 4, 1000, 160
+    hasta = hasta or len(figs)
     mejoradas = nuevas_tot = 0
     for n, f in enumerate(figs, 1):
+        if n < desde or n > hasta:
+            continue
         a = datos.get(str(n))
         if not a or not a["sinAncla"]:
             continue
@@ -741,12 +768,30 @@ def ocrg():
             mejoradas += 1
             nuevas_tot += nuevas
         if n % 10 == 0:
-            print(f"  ocrg {n}/{len(figs)}…", flush=True)
+            print(f"  ocrg {n}/{hasta}…", flush=True)
+    if desde == 1 and hasta == len(figs):
+        destino, contenido = "ocr.json", datos
+    else:
+        destino = f"ocr-grp-{desde}-{hasta}.json"
+        contenido = {k: v for k, v in datos.items() if desde <= int(k) <= hasta}
+    with io.open(os.path.join(TRABAJO, destino), "w", encoding="utf-8") as fh:
+        json.dump(contenido, fh, ensure_ascii=False, indent=1)
+    print(f"OK ocrg [{desde}-{hasta}] -> {destino} · figuras mejoradas {mejoradas} (+{nuevas_tot})")
+
+
+def ocrgmerge():
+    import glob as _glob
+    base = json.load(io.open(os.path.join(TRABAJO, "ocr.json"), encoding="utf-8"))
+    partes = sorted(_glob.glob(os.path.join(TRABAJO, "ocr-grp-*.json")))
+    for ruta in partes:
+        for k, v in json.load(io.open(ruta, encoding="utf-8")).items():
+            if len(v.get("poss", [])) >= len(base.get(k, {}).get("poss", [])):
+                base[k] = v
     with io.open(os.path.join(TRABAJO, "ocr.json"), "w", encoding="utf-8") as fh:
-        json.dump(datos, fh, ensure_ascii=False, indent=1)
-    esp = sum(len(x["esperadas"]) for x in datos.values())
-    ok = esp - sum(len(x["sinAncla"]) for x in datos.values())
-    print(f"OK ocrg · figuras mejoradas {mejoradas} (+{nuevas_tot}) · total {ok}/{esp} ({100*ok/max(esp,1):.1f}%)")
+        json.dump(base, fh, ensure_ascii=False, indent=1)
+    esp = sum(len(a["esperadas"]) for a in base.values())
+    ok = esp - sum(len(a["sinAncla"]) for a in base.values())
+    print(f"OK ocrgmerge ({len(partes)} partes) · ancladas {ok}/{esp} ({100*ok/max(esp,1):.1f}%)")
 
 
 def _nn(n):
@@ -787,6 +832,18 @@ def indice_app():
             tit = f["titulos"][3] if len(f["titulos"]) > 3 else (f["titulos"][0] if f["titulos"] else "Varios")
             etiquetas[c] = f"{c} · {tit}" if c != "0" else "Portada"
 
+    # CANTIDAD por pieza: el catalogo 2006 no la trae, el 2014 si. Se hereda
+    # por (conjunto, posicion) — el mismo par que ya valido 1.189 codigos
+    # identicos entre ambos. Sin esto el tecnico pide 1 y la maquina lleva 4.
+    ruta14 = os.path.abspath(os.path.join(RAIZ, "..", "..", "apps", "pwa", "public",
+                                          "data", "codigos-fabricante", "baader-142.json"))
+    cant_por_cp = {}
+    if os.path.exists(ruta14):
+        for pz in json.load(io.open(ruta14, encoding="utf-8"))["piezas"]:
+            cj = (pz.get("conjunto") or "").split(" ")[0]
+            if cj and pz.get("posicion") and pz.get("cantidad"):
+                cant_por_cp[(cj, str(pz["posicion"]))] = pz["cantidad"]
+
     hojas_meta, indice_cod, busqueda, descs = [], {}, [], {}
     for n, f in enumerate(figs, 1):
         pg = doc[f["dibujos"][0] - 1]
@@ -826,11 +883,44 @@ def indice_app():
             shutil.move(origen, destino)
         # las posiciones OCR van como capa `tags`: PlanoLienzo ya dibuja esa
         # capa y su click (onAparato) — cero cambios de lienzo para el despiece
-        datos_hoja = {"tags": poss, "filas": f["filas"]}
+        filas_out = []
+        for x in f["filas"]:
+            fila = dict(x)
+            q = cant_por_cp.get((f.get("conjunto") or "", x["pos"]))
+            if q and str(q).strip() not in ("", "1"):
+                fila["q"] = q          # x1 no se muestra: es el caso normal
+            filas_out.append(fila)
+        datos_hoja = {"tags": poss, "filas": filas_out}
         if f.get("leyenda"):
             datos_hoja["leyenda"] = f["leyenda"]
         with io.open(os.path.join(STAGING, f"hoja-{_nn(n)}.json"), "w", encoding="utf-8") as fh:
             json.dump(datos_hoja, fh, ensure_ascii=False)
+
+    # "tambien en N figuras": util cuando la pieza es ESPECIFICA (2-12 usos:
+    # "ojo, la misma cuchilla va en el excavador B"); por encima de eso es
+    # ferreteria comun (una arandela va en 287 figuras) y decir el numero solo
+    # estorba -> se marca como comun y la UI lo dice con palabras.
+    UMBRAL_COMUN = 12
+    usos = {cod: len(aps) for cod, aps in indice_cod.items()}
+    compartidas = {cod: n for cod, n in usos.items() if n > 1}
+
+    # Accesos directos: la figura de PIEZAS DE DESGASTE (fig 00) es la que el
+    # tecnico busca a diario (cuchillas, hojas, rascador) y queda enterrada
+    # entre 43 capitulos. Se detecta por su titulo, no por numero fijo.
+    destacados = []
+    for h in hojas_meta:
+        if re.search(r"desgaste|verschleiss|wearing", (h["tituloEs"] or "") + (h["titulo"] or ""), re.I):
+            destacados.append({"hoja": h["blatt"], "etiqueta": "Piezas de desgaste",
+                               "detalle": f"{h['n']['d']} piezas que se cambian seguido"})
+            break
+
+    # sinonimos VALIDADOS: solo los que apuntan a una palabra que de verdad
+    # aparece en este catalogo (si no, seria una promesa vacia en el buscador)
+    vocab = set()
+    for b in busqueda:
+        vocab.update(re.findall(r"[a-záéíóúñ]{3,}", (b.get("es") or "").lower()))
+    sinonimos = {a: d for a, d in SINONIMOS.items()
+                 if a not in vocab and all(w in vocab for w in d.split())}
 
     sap_por_codigo = {}
     for cod in indice_cod:
@@ -850,6 +940,10 @@ def indice_app():
         "descs": descs,
         "glosario": {},
         "sapPorCodigo": sap_por_codigo,
+        "usosPorCodigo": compartidas,
+        "umbralComun": UMBRAL_COMUN,
+        "destacados": destacados,
+        "sinonimos": sinonimos,
     }
     with io.open(os.path.join(STAGING, "indice.json"), "w", encoding="utf-8") as fh:
         json.dump(idx, fh, ensure_ascii=False)
@@ -859,9 +953,22 @@ def indice_app():
             os.rmdir(os.path.join(STAGING, "assets"))
         except OSError:
             pass
+    # Mapa liviano codigo->figura para el modulo REPUESTOS (el indice completo
+    # pesa 770 KB y ahi solo se necesita "donde esta el dibujo de esta pieza").
+    mapa = {cod: [aps[0]["h"], hojas_meta[aps[0]["h"] - 1]["fig"]]
+            for cod, aps in indice_cod.items() if aps}
+    ruta_mapa = os.path.abspath(os.path.join(
+        RAIZ, "..", "..", "apps", "pwa", "public", "data", "despiece-142-figuras.json"))
+    with io.open(ruta_mapa, "w", encoding="utf-8") as fh:
+        json.dump({"plano": "baader-142-despiece", "codigos": mapa}, fh, ensure_ascii=False)
+    print(f"OK mapa codigo->figura ({len(mapa)}) -> public/data/despiece-142-figuras.json")
+
     print(f"OK indice.json + {len(figs)} hojas en {STAGING}")
     print(f"   codigos indexados: {len(indice_cod)} · items de busqueda: {len(busqueda)} · capitulos: {len(etiquetas)}")
     print(f"   codigos con SAP (match exacto): {len(sap_por_codigo)}")
+    print(f"   sinonimos de planta validados: {len(sinonimos)} -> {sorted(sinonimos)[:10]}")
+    esp = sum(1 for n in compartidas.values() if n <= UMBRAL_COMUN)
+    print(f"   piezas compartidas: {len(compartidas)} ({esp} especificas, {len(compartidas)-esp} ferreteria comun)")
 
 
 if __name__ == "__main__":
@@ -884,7 +991,10 @@ if __name__ == "__main__":
     elif fase == "ocrrmerge":
         ocrrmerge()
     elif fase == "ocrg":
-        ocrg()
+        ocrg(int(sys.argv[2]) if len(sys.argv) > 2 else 1,
+             int(sys.argv[3]) if len(sys.argv) > 3 else None)
+    elif fase == "ocrgmerge":
+        ocrgmerge()
     elif fase == "ocrr":
         ocrr(int(sys.argv[2]) if len(sys.argv) > 2 else 1,
              int(sys.argv[3]) if len(sys.argv) > 3 else None)
