@@ -2980,10 +2980,28 @@ if(EMBEBIDO){ try{ parent.postMessage({__p5:true,type:'hello'},'*'); }catch(e){}
   ];
   var LCD1 = {p0:'CLEANING', p1:'BA142-PROTOCOL', p2:'TEST 12', p3:'TEST 13',
     p4:'POS 4', p5:'POS 5', p6:'POS 6', p7:'POS 7', p8:'POS 8'};
-  // el recorrido REAL de la perilla 4 en posición 1 (los rótulos del display)
-  var P4_PASOS = ['Σ FISH','Σ STOPS','Σ STOP-C','Σ TAIL CLIP',
-    'Σ T-CLIP-C','Σ ANUS-I','Σ ANUS-O',
-    'Σ E821-C','Σ E822-C','Σ E823-C','Σ E824-C','Σ E825-C'];
+  // las 17 pantallas REALES del display en posición 1, leídas cuadro a cuadro
+  // del barrido de la N3 (457_IMG_3090.MOV): dos formatos — contadores con su
+  // /1000Fi, y pantallas de motor con nombre de herramienta + código SM.
+  var P4_PASOS = [
+    {l1:'Σ FISH:',        l2:'Σ FI-TODAY:', v1:'0', v2:'0'},
+    {l1:'Σ STOPS:',       l2:'/1000Fi:',    v1:'0', v2:'0'},
+    {l1:'Σ STOP-C:',      l2:'/1000Fi:',    v1:'0', v2:'0'},
+    {l1:'Σ TAIL CLIP:',   l2:'/1000Fi:',    v1:'0', v2:'0'},
+    {l1:'Σ T-CLIP-C:',    l2:'/1000Fi:',    v1:'0', v2:'0'},
+    {l1:'Σ ANUS-I:',      l2:'/1000Fi:',    v1:'0', v2:'0'},
+    {l1:'Σ ANUS-O:',      l2:'/1000Fi:',    v1:'0', v2:'0'},
+    {l1:'CENTERING SM1',  l2:'Σ E821:',     v1:'',  v2:'0'},
+    {l1:'Σ E821-C:',      l2:'/1000Fi:',    v1:'0', v2:'0'},
+    {l1:'SLIT KNIFE SM2', l2:'Σ E822:',     v1:'',  v2:'0'},
+    {l1:'Σ E822-C:',      l2:'/1000Fi:',    v1:'0', v2:'0'},
+    {l1:'SUCTION DEV. SM3',l2:'Σ E823:',    v1:'',  v2:'0'},
+    {l1:'Σ E823-C:',      l2:'/1000Fi:',    v1:'0', v2:'0'},
+    {l1:'SCRAPER A SM4',  l2:'Σ E824:',     v1:'',  v2:'0'},
+    {l1:'Σ E824-C:',      l2:'/1000Fi:',    v1:'0', v2:'0'},
+    {l1:'SCRAPER B SM5',  l2:'Σ E825:',     v1:'',  v2:'0'},
+    {l1:'Σ E825-C:',      l2:'/1000Fi:',    v1:'0', v2:'0'}
+  ];
   var p4idx = 2; // parte en STOP-C, el contador estrella
 
   function detent(t){ return nav.querySelector('.detent[data-t="'+t+'"]'); }
@@ -3045,11 +3063,14 @@ if(EMBEBIDO){ try{ parent.postMessage({__p5:true,type:'hello'},'*'); }catch(e){}
   var k4 = panel.querySelector('#s142k4'), g4 = panel.querySelector('#s142g4');
   var g4rot = 0;
 
+  var v1 = panel.querySelector('#s142v1'), v2 = panel.querySelector('#s142v2');
   function lcd(t){
     if (t === 'p1') {
-      l1.textContent = P4_PASOS[p4idx] + ':';
-      l2.textContent = '/1000Fi:';
+      var s = P4_PASOS[p4idx];
+      l1.textContent = s.l1; l2.textContent = s.l2;
+      v1.textContent = s.v1; v2.textContent = s.v2;
     } else {
+      v1.textContent = ''; v2.textContent = '';
       l1.textContent = LCD1[t] || (titulo(t).toUpperCase().slice(0,16));
       l2.textContent = titulo(t).slice(0, 22);
     }
