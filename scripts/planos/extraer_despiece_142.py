@@ -666,6 +666,14 @@ def indice_app():
 
     trabajo = TRABAJO
     figs = json.load(io.open(os.path.join(trabajo, "figuras.json"), encoding="utf-8"))["figuras"]
+    # cruce SAP: maestro exportado por cruzar_sap_142.mjs (match EXACTO por
+    # codigoFabricante, solo SAP numericos — certeza primero)
+    ruta_maestro = os.path.join(trabajo, "maestro-142.json")
+    sap_por_fab = {}
+    if os.path.exists(ruta_maestro):
+        for m in json.load(io.open(ruta_maestro, encoding="utf-8")):
+            if m["fab"] and m["sap"].isdigit():
+                sap_por_fab.setdefault(m["fab"], {"s": m["sap"], "n": m["nombre"][:60], "u": m["ubicacion"]})
     ruta_ocr = os.path.join(trabajo, "ocr.json")
     anclas = json.load(io.open(ruta_ocr, encoding="utf-8")) if os.path.exists(ruta_ocr) else {}
     doc = fitz.open(PDF_835)
@@ -727,6 +735,11 @@ def indice_app():
         with io.open(os.path.join(STAGING, f"hoja-{_nn(n)}.json"), "w", encoding="utf-8") as fh:
             json.dump(datos_hoja, fh, ensure_ascii=False)
 
+    sap_por_codigo = {}
+    for cod in indice_cod:
+        m = sap_por_fab.get(re.sub(r"[^A-Z0-9]", "", cod.upper()))
+        if m:
+            sap_por_codigo[cod] = m
     idx = {
         "plano": "Catálogo de piezas 142.00.00.821",
         "rev": "Ed. 10/2006",
@@ -739,6 +752,7 @@ def indice_app():
         "bornesIdx": {},
         "descs": descs,
         "glosario": {},
+        "sapPorCodigo": sap_por_codigo,
     }
     with io.open(os.path.join(STAGING, "indice.json"), "w", encoding="utf-8") as fh:
         json.dump(idx, fh, ensure_ascii=False)
@@ -750,6 +764,7 @@ def indice_app():
             pass
     print(f"OK indice.json + {len(figs)} hojas en {STAGING}")
     print(f"   codigos indexados: {len(indice_cod)} · items de busqueda: {len(busqueda)} · capitulos: {len(etiquetas)}")
+    print(f"   codigos con SAP (match exacto): {len(sap_por_codigo)}")
 
 
 if __name__ == "__main__":

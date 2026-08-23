@@ -31,6 +31,12 @@ RE_DESIGNACION = re.compile(r"^[A-Z]\d+$")
 
 def main():
     figs = json.load(io.open(os.path.join(TRABAJO, "figuras.json"), encoding="utf-8"))["figuras"]
+    ruta_maestro = os.path.join(TRABAJO, "maestro-142.json")
+    sap_por_fab = {}
+    if os.path.exists(ruta_maestro):
+        for m in json.load(io.open(ruta_maestro, encoding="utf-8")):
+            if m["fab"] and m["sap"].isdigit():
+                sap_por_fab.setdefault(m["fab"], m)
 
     aparatos = {}
     for n, f in enumerate(figs, 1):
@@ -47,6 +53,11 @@ def main():
                 "pos": pos,
                 "confianza": "catalogo",
             }
+            m = sap_por_fab.get(re.sub(r"[^A-Z0-9]", "", x["nr"].upper()))
+            if m:
+                entrada["sap"] = m["sap"]
+                entrada["sapNombre"] = m["nombre"][:60]
+                entrada["sapUbicacion"] = m["ubicacion"]
             # si ya existe (misma designacion en 2 figuras), conservar ambas
             aparatos.setdefault(pos, []).append(entrada)
 

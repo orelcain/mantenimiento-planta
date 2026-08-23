@@ -89,6 +89,9 @@ export type PlanoIndice = {
   /** descripcion tecnica natural de cada aparato, generada del propio plano */
   descs?: Record<string, string>
   glosario: Record<string, string>
+  /** Solo despiece: código de fabricante -> SAP, para cruzar con /repuestos.
+   *  Planos viejos no lo traen (undefined). */
+  sapPorCodigo?: Record<string, { s: string; n: string; u: string }>
 }
 
 export type PlanoHoja = {

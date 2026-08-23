@@ -13,6 +13,11 @@ export type ParteFisica = {
   /** 'catalogo' = el cruce sale del catálogo BAADER 2006, sin verificar en
    *  terreno. Cualquier otro valor se trata como propuesto, nunca confirmado. */
   confianza: string
+  /** Cruce SAP, si el código de fabricante tiene match en el maestro de
+   *  repuestos. Solo un subconjunto de aparatos lo trae. */
+  sap?: string
+  sapNombre?: string
+  sapUbicacion?: string
 }
 
 export type PartesPlano = {
