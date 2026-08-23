@@ -55,7 +55,9 @@ export type PlanoBorneLibre = { b: Caja; t: string; op: { k: string; h: number; 
 /** Un rótulo en otro idioma con su traducción. `dup` = repetición a tapar. */
 export type PlanoRotulo = { b: Caja; de: string; es: string; r: number; dup?: number }
 /** Una fila de la tabla de un despiece: posición del catálogo + su código. */
-export type FilaDespiece = { pos: string; de?: string; en?: string; fr?: string; es?: string; nr?: string; fig?: string }
+/** `q` = cuántas unidades lleva la máquina (heredado del catálogo 2014; el x1
+ *  no se emite porque es el caso normal y solo haría ruido). */
+export type FilaDespiece = { pos: string; de?: string; en?: string; fr?: string; es?: string; nr?: string; fig?: string; q?: number | string }
 
 export type PlanoHojaMeta = {
   blatt: number
@@ -92,6 +94,16 @@ export type PlanoIndice = {
   /** Solo despiece: código de fabricante -> SAP, para cruzar con /repuestos.
    *  Planos viejos no lo traen (undefined). */
   sapPorCodigo?: Record<string, { s: string; n: string; u: string }>
+  /** Solo despiece: código de fabricante -> cuántas figuras distintas usan esa
+   *  misma pieza. Solo trae los códigos con más de 1 uso. */
+  usosPorCodigo?: Record<string, number>
+  /** Vocabulario de planta → palabra del catálogo ("descanso" → "cojinete"). */
+  sinonimos?: Record<string, string>
+  /** Solo despiece: desde cuántos usos una pieza pasa de "específica" a
+   *  "ferretería común" (se marca con palabras, no con el número). */
+  umbralComun?: number
+  /** Solo despiece: accesos rápidos de uso diario (piezas de desgaste...). */
+  destacados?: { hoja: number; etiqueta: string; detalle: string }[]
 }
 
 export type PlanoHoja = {

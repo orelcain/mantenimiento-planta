@@ -20,10 +20,20 @@ export type ParteFisica = {
   sapUbicacion?: string
 }
 
+/** Una familia de aparatos por letra IEC 81346 (K, Q, F, S, Y, M, SM, B...):
+ *  las figuras del despiece donde vive esa familia, para cuando NO hay una
+ *  pieza exacta vinculada por designación (ej. K7 sin fila propia). */
+export type ParteFamilia = {
+  etiqueta: string
+  figuras: { fig: string; hoja: number; titulo: string; n: number }[]
+}
+
 export type PartesPlano = {
   /** slug del plano de despiece al que salta el botón "Ver en el despiece". */
   despiece: string
   aparatos: Record<string, ParteFisica[]>
+  /** Letra -> zona sugerida en el despiece. Solo 888/860 por ahora. */
+  familias?: Record<string, ParteFamilia>
 }
 
 /**

@@ -56,11 +56,16 @@ export function usePlanoNotas(planoSlug: string | undefined) {
         setCargando(false)
       },
       (e) => {
-        // El caso típico acá es permission-denied porque las reglas todavía no
-        // están desplegadas (el CI solo publica a Pages). Se dice, no se calla.
+        // Sin sesión (el visor se abre por QR desde el tablero) las reglas
+        // niegan la lectura y eso es lo ESPERADO: no es un error que mostrar
+        // en rojo, el panel ya invita a iniciar sesión. Se avisa solo cuando
+        // hay sesión — ahí sí significa reglas sin desplegar o un problema
+        // real. El caso original que motivó el mensaje (reglas no publicadas)
+        // sigue cubierto.
+        const anonimo = !auth.currentUser
         setError(
           e.code === 'permission-denied'
-            ? 'No tienes permiso para ver las notas, o las reglas de Firestore aún no están desplegadas.'
+            ? (anonimo ? null : 'No tienes permiso para ver las notas, o las reglas de Firestore aún no están desplegadas.')
             : 'No se pudieron cargar las notas.',
         )
         setCargando(false)
