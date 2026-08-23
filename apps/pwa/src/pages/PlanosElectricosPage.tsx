@@ -1010,6 +1010,8 @@ function Panel({
   slug: string
   /** código → SAP/bodega, para la lista copiable de la figura. */
   sapPorCodigo?: Record<string, { s: string; n: string; u: string }>
+  /** códigos que el catálogo marca como piezas de desgaste */
+  desgaste?: string[]
   vinculosTerreno: ReturnType<typeof usePlanoVinculos>
 }) {
   const [copiadoLista, setCopiadoLista] = useState(false)
@@ -1217,6 +1219,7 @@ function Panel({
           notas={notas} onSeleccionarFila={onSeleccionarFila} onIrFigura={onIrFigura}
           anclaId={anclaDeAparato(sel.tag)} slug={slug} sapPorCodigo={indice.sapPorCodigo}
           usosPorCodigo={indice.usosPorCodigo} umbralComun={indice.umbralComun}
+                      desgaste={indice.desgaste}
         />
       )
     }
@@ -1414,7 +1417,7 @@ function Resultados({ items, total, onIr }: {
  */
 function FichaPieza({
   fila, filas, meta, tagsHoja, selTag, notas, onSeleccionarFila, onIrFigura, anclaId, slug,
-  sapPorCodigo, usosPorCodigo, umbralComun,
+  sapPorCodigo, usosPorCodigo, umbralComun, desgaste,
 }: {
   fila: FilaDespiece
   filas: FilaDespiece[]
@@ -1432,6 +1435,8 @@ function FichaPieza({
   usosPorCodigo?: Record<string, number>
   /** desde cuántos usos una pieza pasa de "específica" a "ferretería común". */
   umbralComun?: number
+  /** códigos que el catálogo lista como piezas de desgaste (consumibles). */
+  desgaste?: string[]
 }) {
   const [copiado, setCopiado] = useState(false)
   // Una vez por sesion por posicion (registrarUso ya dedupe): mide cuantas
@@ -1463,6 +1468,14 @@ function FichaPieza({
       )}
       {/* Cuántas van en la máquina: pedir 1 cuando lleva 32 es un viaje
           perdido a bodega. Solo se muestra si el catálogo lo dice (x1 no). */}
+      {/* Consumible: el técnico lo ve dentro de SU conjunto (un cojinete en
+          la fig 13-1) sin tener que saber que también está en la figura 00. */}
+      {fila.nr && desgaste?.includes(fila.nr) && (
+        <p className="m-0 mt-1 inline-block rounded-ctl px-2 py-0.5 text-caption font-semibold"
+           style={{ background: 'var(--lc-nuevo-soft)', color: 'var(--lc-nuevo)' }}>
+          Pieza de desgaste — se cambia seguido
+        </p>
+      )}
       {fila.q != null && (
         <p className="m-0 mt-1 inline-block rounded-ctl px-2 py-0.5 text-caption font-semibold"
            style={{ background: 'var(--lc-prep-soft)', color: 'var(--lc-ink-mid)' }}>

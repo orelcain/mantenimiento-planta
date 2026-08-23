@@ -943,6 +943,17 @@ def indice_app():
     sinonimos = {a: d for a, d in SINONIMOS.items()
                  if a not in vocab and all(w in vocab for w in d.split())}
 
+    # PIEZAS DE DESGASTE, transversal: el catalogo las junta en la figura 00,
+    # pero el tecnico las encuentra dentro de SU conjunto (un cojinete en la
+    # 13-1). Marcar el codigo en cualquier ficha donde aparezca evita pedir un
+    # repuesto sin saber que es consumible y que conviene tener de stock.
+    desgaste = []
+    for h in hojas_meta:
+        if re.search(r"desgaste|verschleiss|wearing", (h["tituloEs"] or "") + (h["titulo"] or ""), re.I):
+            hoja_d = json.load(io.open(os.path.join(STAGING, f"hoja-{_nn(h['blatt'])}.json"), encoding="utf-8"))
+            desgaste = sorted({f["nr"] for f in hoja_d.get("filas", []) if f.get("nr")})
+            break
+
     sap_por_codigo = {}
     for cod in indice_cod:
         m = sap_por_fab.get(re.sub(r"[^A-Z0-9]", "", cod.upper()))
@@ -965,6 +976,7 @@ def indice_app():
         "umbralComun": UMBRAL_COMUN,
         "destacados": destacados,
         "sinonimos": sinonimos,
+        "desgaste": desgaste,
     }
     # PARTIR EL INDICE: `busqueda` (50% del peso) y `descs` (12%) solo hacen
     # falta al BUSCAR, no al abrir el plano. Separarlos baja el arranque de
@@ -996,6 +1008,7 @@ def indice_app():
     print(f"OK indice.json + {len(figs)} hojas en {STAGING}")
     print(f"   codigos indexados: {len(indice_cod)} · items de busqueda: {len(busqueda)} · capitulos: {len(etiquetas)}")
     print(f"   codigos con SAP (match exacto): {len(sap_por_codigo)}")
+    print(f"   piezas de desgaste marcadas: {len(desgaste)}")
     print(f"   sinonimos de planta validados: {len(sinonimos)} -> {sorted(sinonimos)[:10]}")
     esp = sum(1 for n in compartidas.values() if n <= UMBRAL_COMUN)
     print(f"   piezas compartidas: {len(compartidas)} ({esp} especificas, {len(compartidas)-esp} ferreteria comun)")

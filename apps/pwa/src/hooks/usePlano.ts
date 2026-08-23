@@ -126,6 +126,9 @@ export type PlanoIndice = {
   umbralComun?: number
   /** Solo despiece: accesos rápidos de uso diario (piezas de desgaste...). */
   destacados?: { hoja: number; etiqueta: string; detalle: string }[]
+  /** Solo despiece: códigos que el catálogo lista como piezas de desgaste.
+   *  Se marcan en CUALQUIER figura donde aparezcan, no solo en la suya. */
+  desgaste?: string[]
 }
 
 export type PlanoHoja = {
