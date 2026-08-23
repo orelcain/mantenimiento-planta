@@ -2891,7 +2891,10 @@ if(EMBEBIDO){ try{ parent.postMessage({__p5:true,type:'hello'},'*'); }catch(e){}
 <style id="sim142-css">
   nav.dial{display:none !important} /* el panel la reemplaza; sigue siendo el motor */
   .s142{background:linear-gradient(180deg,#3672b8,#2a5c99);border-radius:14px;
-    padding:14px 12px 12px;margin:0 0 14px;color:#dfe7ee;user-select:none}
+    padding:14px 12px 12px;margin:0 auto 14px;color:#dfe7ee;user-select:none;
+    max-width:480px}
+  .s142-buscar{max-width:480px;margin-left:auto;margin-right:auto}
+  .s142-extra{max-width:480px;margin-left:auto;margin-right:auto}
   .s142-cab{display:flex;justify-content:space-between;align-items:center;
     font-family:ui-monospace,Consolas,monospace;font-size:10px;color:#cfe0f2}
   .s142-cab b{font-style:italic;font-size:14px;color:#fff;letter-spacing:.02em}
@@ -2934,7 +2937,7 @@ if(EMBEBIDO){ try{ parent.postMessage({__p5:true,type:'hello'},'*'); }catch(e){}
     padding:7px 12px;font-family:ui-monospace,Consolas,monospace;font-weight:800;color:#31380c;
     font-size:14px;letter-spacing:1.6px;line-height:1.5;
     box-shadow:inset 0 3px 8px rgba(0,0,0,.35)}
-  .s142-lcd .l{display:flex;justify-content:space-between;white-space:nowrap;overflow:hidden}
+  .s142-lcd .l{display:block;white-space:pre;overflow:hidden}
   .s142-bot{display:flex;gap:16px;justify-content:center;margin-top:11px}
   .s142-bot span{width:30px;height:30px;border-radius:99px;border:5px solid #c9ccd1;
     box-shadow:0 3px 7px rgba(0,0,0,.45),inset 0 2px 3px rgba(255,255,255,.3)}
@@ -2981,42 +2984,45 @@ if(EMBEBIDO){ try{ parent.postMessage({__p5:true,type:'hello'},'*'); }catch(e){}
     {t:'p7', rot:'7',     ang:171,  x:46, y:103},
     {t:'p8', rot:'8',     ang:144,  x:68, y:97}
   ];
-  // el display REAL de cada posicion — sacado del lcd-frame de cada seccion
-  // del contenido validado en terreno (linea 1 / linea 2 exactas)
+  // el display REAL de cada posicion, CARACTER POR CARACTER como el contenido
+  // validado (espaciado incluido) — se renderiza con white-space:pre
   var LCD_POS = {
-    p0:{l1:'Cleaning',        l2:'Position'},
-    p1:{l1:'BA142-PROTOCOL',  l2:'through switch 4'},
-    p2:{l1:'Test 12',         l2:'12 F/min     62 %', v1:'0001299'},
-    p3:{l1:'Test 13',         l2:' 8 F/min     40 %', v1:'0001299'},
-    p4:{l1:'Height [mm]',     l2:'', v2:'51'},
-    p5:{l1:'Service for',     l2:'Stepmotors & Kit'},
-    p6:{l1:'Stop for justage',l2:'1 F/min'},
-    p7:{l1:'middle fish',     l2:'princess cut'},
-    p8:{l1:'RESET Protocol &',l2:'Fishcounter'}
+    p0:['Cleaning',           'Position'],
+    p1:['BA142-PROTOCOL',     'through switch 4'],
+    p2:['Test 12    0001299', ' 12 F/min     62 %'],
+    p3:['Test 13    0001299', '  8 F/min     40 %'],
+    p4:['Height [mm]',        '             51'],
+    p5:['Service for',        'Stepmotors & Kit'],
+    p6:['Stop for justage',   '1 F/min'],
+    p7:['middle fish',        'princess cut'],
+    p8:['RESET Protocol &',   'Fishcounter']
   };
-  // las 17 pantallas REALES del display en posición 1, leídas cuadro a cuadro
-  // del barrido de la N3 (457_IMG_3090.MOV): dos formatos — contadores con su
-  // /1000Fi, y pantallas de motor con nombre de herramienta + código SM.
+  // fila del display: rotulo a la izquierda, valor a la DERECHA, 18 columnas
+  function fila(rot, val){
+    var n = 18 - rot.length - String(val).length;
+    return rot + Array(Math.max(n, 1) + 1).join(' ') + val;
+  }
+  // el barrido de la perilla 4 en posicion 1 (17 pantallas del video), con el
+  // MISMO formato de columnas del display real; valores en 0 (pedido de Orel)
   var P4_PASOS = [
-    {l1:'Σ FISH:',        l2:'Σ FI-TODAY:', v1:'0', v2:'0'},
-    {l1:'Σ STOPS:',       l2:'/1000Fi:',    v1:'0', v2:'0'},
-    {l1:'Σ STOP-C:',      l2:'/1000Fi:',    v1:'0', v2:'0'},
-    {l1:'Σ TAIL CLIP:',   l2:'/1000Fi:',    v1:'0', v2:'0'},
-    {l1:'Σ T-CLIP-C:',    l2:'/1000Fi:',    v1:'0', v2:'0'},
-    {l1:'Σ ANUS-I:',      l2:'/1000Fi:',    v1:'0', v2:'0'},
-    {l1:'Σ ANUS-O:',      l2:'/1000Fi:',    v1:'0', v2:'0'},
-    {l1:'CENTERING SM1',  l2:'Σ E821:',     v1:'',  v2:'0'},
-    {l1:'Σ E821-C:',      l2:'/1000Fi:',    v1:'0', v2:'0'},
-    {l1:'SLIT KNIFE SM2', l2:'Σ E822:',     v1:'',  v2:'0'},
-    {l1:'Σ E822-C:',      l2:'/1000Fi:',    v1:'0', v2:'0'},
-    {l1:'SUCTION DEV. SM3',l2:'Σ E823:',    v1:'',  v2:'0'},
-    {l1:'Σ E823-C:',      l2:'/1000Fi:',    v1:'0', v2:'0'},
-    {l1:'SCRAPER A SM4',  l2:'Σ E824:',     v1:'',  v2:'0'},
-    {l1:'Σ E824-C:',      l2:'/1000Fi:',    v1:'0', v2:'0'},
-    {l1:'SCRAPER B SM5',  l2:'Σ E825:',     v1:'',  v2:'0'},
-    {l1:'Σ E825-C:',      l2:'/1000Fi:',    v1:'0', v2:'0'}
+    [fila('Σ FISH:','0'),      fila('Σ FI-TODAY:','0')],
+    [fila('Σ STOPS:','0'),     fila('/1000Fi:','0')],
+    [fila('Σ STOP-C:','0'),    fila('/1000Fi:','0')],
+    [fila('Σ TAIL CLIP:','0'), fila('/1000Fi:','0')],
+    [fila('Σ T-CLIP-C:','0'),  fila('/1000Fi:','0')],
+    [fila('Σ ANUS-I:','0'),    fila('/1000Fi:','0')],
+    [fila('Σ ANUS-O:','0'),    fila('/1000Fi:','0')],
+    ['CENTERING SM1',          fila('Σ E821:','0')],
+    [fila('Σ E821-C:','0'),    fila('/1000Fi:','0')],
+    ['SLIT KNIFE SM2',         fila('Σ E822:','0')],
+    [fila('Σ E822-C:','0'),    fila('/1000Fi:','0')],
+    ['SUCTION DEV. SM3',       fila('Σ E823:','0')],
+    [fila('Σ E823-C:','0'),    fila('/1000Fi:','0')],
+    ['SCRAPER A SM4',          fila('Σ E824:','0')],
+    [fila('Σ E824-C:','0'),    fila('/1000Fi:','0')],
+    ['SCRAPER B SM5',          fila('Σ E825:','0')],
+    [fila('Σ E825-C:','0'),    fila('/1000Fi:','0')]
   ];
-  // que significa lo que estas viendo — aparece bajo el display
   var P4_DESC = [
     'Piezas procesadas: total acumulado y las de hoy.',
     'Paradas totales de la maquina, por cualquier causa.',
@@ -3036,7 +3042,6 @@ if(EMBEBIDO){ try{ parent.postMessage({__p5:true,type:'hello'},'*'); }catch(e){}
     'Motor del excavador B (SM5): veces que se detuvo.',
     'Correcciones del excavador B SM5 sin detener.'
   ];
-  // termino a buscar en el contenido al tocar la pantalla en cada paso
   var P4_LINK = ['FISH','STOPS','STOP-C','TAIL CLIP','T-CLIP-C','ANUS-I','ANUS-O',
     'E821','E821-C','E822','E822-C','E823','E823-C','E824','E824-C','E825','E825-C'];
   var p4idx = 2; // parte en STOP-C, el contador estrella
@@ -3117,22 +3122,17 @@ if(EMBEBIDO){ try{ parent.postMessage({__p5:true,type:'hello'},'*'); }catch(e){}
   var v1 = panel.querySelector('#s142v1'), v2 = panel.querySelector('#s142v2');
   var desc = panel.querySelector('#s142desc');
   function lcd(t){
+    v1.textContent = ''; v2.textContent = '';
     if (t === 'p1') {
       var s = P4_PASOS[p4idx];
-      l1.textContent = s.l1; l2.textContent = s.l2;
-      v1.textContent = s.v1; v2.textContent = s.v2;
+      l1.textContent = s[0]; l2.textContent = s[1];
       desc.textContent = P4_DESC[p4idx];
-      // la perilla 4 en SU posicion: un deten por pantalla, vuelta completa = ciclo
       g4.style.transform = 'rotate(' + Math.round(p4idx * (360 / P4_PASOS.length)) + 'deg)';
     } else if (LCD_POS[t]) {
-      var d0 = LCD_POS[t];
-      l1.textContent = d0.l1; l2.textContent = d0.l2;
-      v1.textContent = d0.v1 || ''; v2.textContent = d0.v2 || '';
+      l1.textContent = LCD_POS[t][0]; l2.textContent = LCD_POS[t][1];
       desc.textContent = 'Toca la pantalla para ir al contenido de esta posicion.';
     } else {
-      v1.textContent = ''; v2.textContent = '';
-      l1.textContent = titulo(t).slice(0, 18);
-      l2.textContent = '';
+      l1.textContent = titulo(t).slice(0, 18); l2.textContent = '';
       desc.textContent = 'Toca la pantalla para ir al contenido.';
     }
   }
