@@ -193,9 +193,23 @@ export function planoPorSlug(slug: string | undefined) {
 
 /** Ruta pública de un asset del plano (índice, hoja SVG o sus zonas). */
 export function assetPlano(slug: string, archivo: string) {
+  return assetPlanoAlternativas(slug, archivo)[0]!
+}
+
+/**
+ * Las rutas donde puede estar un asset, EN ORDEN de preferencia.
+ *
+ * Firebase Storage solo autoriza el origin de producción: desde `localhost`
+ * toda lectura muere por CORS. Antes había que alternar `enStorage` a mano
+ * para desarrollar y volver a ponerlo — con el riesgo real de commitear el
+ * flag equivocado y tumbar producción. Ahora, en desarrollo se intenta
+ * primero la copia local (`public/planos/`) y Storage queda de respaldo; el
+ * fetch prueba las alternativas en orden y usa la primera que responde.
+ */
+export function assetPlanoAlternativas(slug: string, archivo: string): string[] {
   const p = PLANOS.find((x) => x.slug === slug)
-  if (p?.enStorage) {
-    return `${STORAGE_BASE}${encodeURIComponent(`planos/${slug}/${archivo}`)}?alt=media&v=${p.vAssets ?? 1}`
-  }
-  return `${import.meta.env.BASE_URL}planos/${slug}/${archivo}`
+  const local = `${import.meta.env.BASE_URL}planos/${slug}/${archivo}`
+  const storage = `${STORAGE_BASE}${encodeURIComponent(`planos/${slug}/${archivo}`)}?alt=media&v=${p?.vAssets ?? 1}`
+  if (!p?.enStorage) return [local]
+  return import.meta.env.DEV ? [local, storage] : [storage]
 }

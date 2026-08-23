@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { assetPlano } from '@/data/planos'
+import { assetPlano, assetPlanoAlternativas } from '@/data/planos'
 
 const CACHE_PLANOS = 'planos-offline-v1'
 
@@ -11,6 +11,24 @@ const CACHE_PLANOS = 'planos-offline-v1'
  * cargar" sin salida. Dos reintentos cortos cubren el bache típico antes de
  * caer a la caché offline.
  */
+/**
+ * Prueba las rutas posibles del asset (en desarrollo: copia local y, si no
+ * está, Storage) y devuelve la primera que responde. Así el preview funciona
+ * sin tener que alternar flags a mano.
+ */
+async function fetchAsset(slug: string, archivo: string, init?: RequestInit): Promise<Response> {
+  const urls = assetPlanoAlternativas(slug, archivo)
+  let ultimo: unknown = new Error('sin rutas')
+  for (const url of urls) {
+    try {
+      return await fetchConCache(url, init, urls.length > 1 ? 0 : 2)
+    } catch (e) {
+      ultimo = e
+    }
+  }
+  throw ultimo
+}
+
 async function fetchConCache(url: string, init?: RequestInit, reintentos = 2): Promise<Response> {
   for (let intento = 0; ; intento++) {
     try {
@@ -164,7 +182,7 @@ export function usePlano(slug: string | undefined, inicial?: number) {
   const cargarBusqueda = useCallback(() => {
     if (busquedaPedida.current || !slug) return
     busquedaPedida.current = true
-    fetchConCache(assetPlano(slug, 'busqueda.json'))
+    fetchAsset(slug, 'busqueda.json')
       .then((r) => r.json())
       .then((d: { busqueda?: PlanoBusquedaItem[]; descs?: Record<string, string> }) => {
         setIndice((prev) => (prev
@@ -193,7 +211,7 @@ export function usePlano(slug: string | undefined, inicial?: number) {
     // El indice CAMBIA (titulos OCR, capas nuevas) y los planos en Storage se
     // subieron primero con cache de 24 h: revalidar siempre (ETag barato).
     // Las hojas SVG son inmutables y siguen con la cache normal.
-    fetchConCache(assetPlano(slug, 'indice.json'), { cache: 'no-cache' })
+    fetchAsset(slug, 'indice.json', { cache: 'no-cache' })
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
         return r.json()
@@ -228,8 +246,8 @@ export function usePlano(slug: string | undefined, inicial?: number) {
       if (yaEsta) return yaEsta
       const nn = String(blatt).padStart(2, '0')
       const [svg, zonas] = await Promise.all([
-        fetchConCache(assetPlano(slug, `hoja-${nn}.svg`)).then((r) => r.text()),
-        fetchConCache(assetPlano(slug, `hoja-${nn}.json`)).then((r) => r.json()),
+        fetchAsset(slug, `hoja-${nn}.svg`).then((r) => r.text()),
+        fetchAsset(slug, `hoja-${nn}.json`).then((r) => r.json()),
       ])
       // Defaults ANTES del spread: un hoja-NN.json viejo en la caché HTTP del
       // navegador (de un deploy anterior, sin `bornes` o `libres`) reventaba
