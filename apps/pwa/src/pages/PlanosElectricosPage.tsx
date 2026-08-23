@@ -875,7 +875,7 @@ function Visor({ slug }: { slug: string }) {
                      esDespiece={esDespiece} meta={meta} filas={hoja.datos.filas ?? []}
                      tagsHoja={hoja.datos.tags} onSeleccionarFila={seleccionarFilaDespiece}
                      onIrFigura={irAFigura} anclaDeAparato={anclaDeAparato}
-                     partes={partes} slug={slug} />}
+                     partes={partes} slug={slug} sapPorCodigo={indice.sapPorCodigo} />}
           </>}
         </aside>
       </div>
@@ -888,6 +888,7 @@ function Visor({ slug }: { slug: string }) {
 function Panel({
   sel, indice, hojaActual, notas, onIr, recientes, onAbrirAparato, resaltar, onResaltar, enEstaHoja,
   esDespiece, meta, filas, tagsHoja, onSeleccionarFila, onIrFigura, anclaDeAparato, partes, slug,
+  sapPorCodigo,
 }: {
   sel: Seleccion
   indice: NonNullable<ReturnType<typeof usePlano>['indice']>
@@ -910,7 +911,10 @@ function Panel({
   anclaDeAparato: (tag: string) => string
   partes: ReturnType<typeof usePartesPlano>
   slug: string
+  /** código → SAP/bodega, para la lista copiable de la figura. */
+  sapPorCodigo?: Record<string, { s: string; n: string; u: string }>
 }) {
+  const [copiadoLista, setCopiadoLista] = useState(false)
   // En el despiece, llegar a una figura y NO ver sus piezas obliga a adivinar
   // qué número tocar (y la mitad de las figuras tiene posiciones sin ancla).
   // Sin selección, el panel ES la lista de piezas de esta figura.
@@ -922,6 +926,31 @@ function Panel({
           <p className="m-0 mb-2 text-footnote" style={{ color: 'var(--lc-ink-mid)' }}>
             Figura {meta.fig} · {meta.tituloEs} — {filas.length} piezas. Toca una para ver su
             código, cuántas lleva y dónde está en bodega.
+            {/* Pedir a bodega es copiar la lista a mano desde el teléfono:
+                un toque la deja lista para pegar en el chat del turno. */}
+            <button type="button"
+                    onClick={() => {
+                      const lineas = filas.map((f) => {
+                        const sap = f.nr ? sapPorCodigo?.[f.nr] : undefined
+                        return [
+                          `${f.pos}. ${f.es || f.de || ''}`.trim(),
+                          f.nr ?? '',
+                          f.q != null ? `x${f.q}` : '',
+                          sap ? `SAP ${sap.s}${sap.u ? ` (${sap.u})` : ''}` : '',
+                        ].filter(Boolean).join(' · ')
+                      })
+                      const texto = [
+                        `BAADER 142 · Figura ${meta.fig} · ${meta.tituloEs}`,
+                        ...lineas,
+                      ].join('\n')
+                      void navigator.clipboard?.writeText(texto)
+                      setCopiadoLista(true)
+                      setTimeout(() => setCopiadoLista(false), 2000)
+                    }}
+                    className="ml-1 underline underline-offset-2"
+                    style={{ color: 'var(--lc-aqua-bright)' }}>
+              {copiadoLista ? '¡Lista copiada!' : 'Copiar la lista'}
+            </button>
           </p>
         )}
         <div className="rounded-ctl border" style={{ borderColor: 'var(--lc-border)' }}>
@@ -959,6 +988,26 @@ function Panel({
           <br />
           <b style={{ color: 'var(--lc-prep)' }}>Ámbar</b> — rótulo en otro idioma con su traducción.
         </p>
+        {/* Cuánto del plano ya está conectado al catálogo de piezas. Es el
+            número que demuestra el avance del puente y sube solo: con cada
+            vínculo confirmado en terreno pasa de «zona» a «pieza exacta». */}
+        {partes?.cobertura && (
+          <>
+            <Titulo>Puente al catálogo de piezas</Titulo>
+            <p className="m-0 text-footnote leading-relaxed" style={{ color: 'var(--lc-ink-mid)' }}>
+              <b style={{ color: 'var(--lc-ink)' }}>
+                {partes.cobertura.exacta + partes.cobertura.zona} de {partes.cobertura.total}
+              </b>{' '}
+              aparatos de este plano ya llevan al despiece:{' '}
+              <b>{partes.cobertura.exacta}</b> con la pieza exacta
+              {partes.cobertura.conSap > 0 && ` (${partes.cobertura.conSap} con su código SAP)`} y{' '}
+              <b>{partes.cobertura.zona}</b> con el gabinete donde están montados.
+              {partes.cobertura.sinDato > 0 && (
+                <> Quedan <b>{partes.cobertura.sinDato}</b> por identificar.</>
+              )}
+            </p>
+          </>
+        )}
         {recientes.length > 0 && (
           <>
             <h2 className="m-0 mb-2 mt-4 text-caption font-semibold tracking-wider"

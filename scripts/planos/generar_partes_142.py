@@ -122,7 +122,6 @@ def main():
         print(f"curaduria aplicada: {len(curadas)} designaciones")
 
     familias = construir_familias(figs)
-    salida = {"despiece": DESPIECE_SLUG, "aparatos": aparatos, "familias": familias}
     for slug in ("baader-142-888", "baader-142-860"):
         destino = os.path.join(PWA_PLANOS, slug, "partes.json")
         # cobertura contra los aparatos reales de ese plano
@@ -131,6 +130,22 @@ def main():
         mapeados = {k for k in aparatos if k in del_plano}
         con_zona = {k for k in del_plano
                     if k not in mapeados and re.match(r"^[A-Z]", k) and familias.get(re.match(r"^[A-Z]+", k).group())}
+        # La cobertura viaja EN el dataset: es el número que demuestra el
+        # avance del puente (y sube solo cuando la curaduría de terreno
+        # confirma vínculos). Se calcula acá y no en runtime porque exigiría
+        # cargar índice + partes de cada plano solo para pintar un chip.
+        confirmados = sum(1 for t in mapeados
+                          for e in aparatos[t] if e.get("confianza") == "confirmado")
+        cobertura = {
+            "total": len(del_plano),
+            "exacta": len(mapeados),
+            "zona": len(con_zona),
+            "sinDato": len(del_plano) - len(mapeados) - len(con_zona),
+            "confirmados": confirmados,
+            "conSap": sum(1 for t in mapeados for e in aparatos[t][:1] if e.get("sap")),
+        }
+        salida = {"despiece": DESPIECE_SLUG, "aparatos": aparatos,
+                  "familias": familias, "cobertura": cobertura}
         with io.open(destino, "w", encoding="utf-8") as fh:
             json.dump(salida, fh, ensure_ascii=False)
         cob = 100 * (len(mapeados) + len(con_zona)) / max(len(del_plano), 1)

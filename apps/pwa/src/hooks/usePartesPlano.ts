@@ -34,6 +34,15 @@ export type PartesPlano = {
   aparatos: Record<string, ParteFisica[]>
   /** Letra -> zona sugerida en el despiece. Solo 888/860 por ahora. */
   familias?: Record<string, ParteFamilia>
+  /** Cuánto del plano está conectado al catálogo de piezas (KPI del puente). */
+  cobertura?: {
+    total: number
+    exacta: number
+    zona: number
+    sinDato: number
+    confirmados: number
+    conSap: number
+  }
 }
 
 /**
