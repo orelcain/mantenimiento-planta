@@ -2904,7 +2904,7 @@ if(EMBEBIDO){ try{ parent.postMessage({__p5:true,type:'hello'},'*'); }catch(e){}
   .s142-k .cara{position:absolute;inset:12%;border-radius:999px;
     background:radial-gradient(circle at 34% 28%,#ded8cb,#b3ac9d 52%,#847d6f 88%);
     box-shadow:inset 0 3px 4px rgba(255,255,255,.6),inset 0 -5px 8px rgba(0,0,0,.42),0 7px 12px rgba(0,0,0,.5)}
-  .s142-k .giro{position:absolute;inset:12%;border-radius:999px;transition:transform .28s ease}
+  .s142-k .giro{position:absolute;inset:12%;border-radius:999px;transition:transform .38s cubic-bezier(.3,1.35,.55,1)}
   .s142-k .msombra{position:absolute;left:50%;top:50%;width:34%;height:82%;
     transform:translate(-50%,-50%);border-radius:8px;background:rgba(0,0,0,.30);filter:blur(4px)}
   .s142-k .mlado{position:absolute;left:50%;top:50%;width:28%;height:78%;
@@ -2981,8 +2981,19 @@ if(EMBEBIDO){ try{ parent.postMessage({__p5:true,type:'hello'},'*'); }catch(e){}
     {t:'p7', rot:'7',     ang:171,  x:46, y:103},
     {t:'p8', rot:'8',     ang:144,  x:68, y:97}
   ];
-  var LCD1 = {p0:'CLEANING', p1:'BA142-PROTOCOL', p2:'TEST 12', p3:'TEST 13',
-    p4:'POS 4', p5:'POS 5', p6:'POS 6', p7:'POS 7', p8:'POS 8'};
+  // el display REAL de cada posicion — sacado del lcd-frame de cada seccion
+  // del contenido validado en terreno (linea 1 / linea 2 exactas)
+  var LCD_POS = {
+    p0:{l1:'Cleaning',        l2:'Position'},
+    p1:{l1:'BA142-PROTOCOL',  l2:'through switch 4'},
+    p2:{l1:'Test 12',         l2:'12 F/min     62 %', v1:'0001299'},
+    p3:{l1:'Test 13',         l2:' 8 F/min     40 %', v1:'0001299'},
+    p4:{l1:'Height [mm]',     l2:'', v2:'51'},
+    p5:{l1:'Service for',     l2:'Stepmotors & Kit'},
+    p6:{l1:'Stop for justage',l2:'1 F/min'},
+    p7:{l1:'middle fish',     l2:'princess cut'},
+    p8:{l1:'RESET Protocol &',l2:'Fishcounter'}
+  };
   // las 17 pantallas REALES del display en posición 1, leídas cuadro a cuadro
   // del barrido de la N3 (457_IMG_3090.MOV): dos formatos — contadores con su
   // /1000Fi, y pantallas de motor con nombre de herramienta + código SM.
@@ -3076,13 +3087,25 @@ if(EMBEBIDO){ try{ parent.postMessage({__p5:true,type:'hello'},'*'); }catch(e){}
   });
   // las clases de pescado del lado derecho: están en el anillo real pero su
   // contenido vive en la sección pf — marcas informativas que llevan allá
-  [['salmon',78,2],['B',95,20],['C',104,42],['trout',102,64],['E',92,84],['F',76,97]].forEach(function(c){
+  // el lado de PRODUCCION del anillo: elegir una clase gira la perilla a su
+  // marca, el display anuncia la clase y el contenido muestra la seccion de
+  // clases — le faltaba movimiento (feedback de Orel)
+  [['salmon',78,2,27],['B',95,20,54],['C',104,42,81],['trout',102,64,108],['E',92,84,135],['F',76,97,162]].forEach(function(c){
     var el = document.createElement('button');
     el.type='button'; el.className='marca'; el.textContent=c[0];
     el.style.cssText='position:absolute;left:'+c[1]+'%;top:'+c[2]+'%;transform:translate(-50%,-50%);background:none;border:0;font-style:italic;font-size:9px;';
-    el.setAttribute('aria-label','Clase '+c[0]+' (ver clases de pescado)');
+    el.setAttribute('aria-label','Clase '+c[0]+' (produccion)');
     el.addEventListener('click', function(){
-      var b = detent('pf'); if (b) { b.click(); sincronizar('pf'); }
+      var b = detent('pf');
+      if (b) b.click();
+      g5.style.transform = 'rotate(' + c[3] + 'deg)';
+      k5.querySelectorAll('.marca').forEach(function(x){ x.classList.remove('act'); });
+      el.classList.add('act');
+      k4.style.opacity = '.45';
+      l1.textContent = 'class: ' + c[0];
+      l2.textContent = 'production';
+      v1.textContent = ''; v2.textContent = '';
+      desc.textContent = 'Clase de produccion ' + c[0] + ' — toca la pantalla para ver las clases.';
     });
     k5.appendChild(el);
   });
@@ -3101,11 +3124,16 @@ if(EMBEBIDO){ try{ parent.postMessage({__p5:true,type:'hello'},'*'); }catch(e){}
       desc.textContent = P4_DESC[p4idx];
       // la perilla 4 en SU posicion: un deten por pantalla, vuelta completa = ciclo
       g4.style.transform = 'rotate(' + Math.round(p4idx * (360 / P4_PASOS.length)) + 'deg)';
+    } else if (LCD_POS[t]) {
+      var d0 = LCD_POS[t];
+      l1.textContent = d0.l1; l2.textContent = d0.l2;
+      v1.textContent = d0.v1 || ''; v2.textContent = d0.v2 || '';
+      desc.textContent = 'Toca la pantalla para ir al contenido de esta posicion.';
     } else {
       v1.textContent = ''; v2.textContent = '';
-      desc.textContent = 'Toca la pantalla para ir al contenido de esta posicion.';
-      l1.textContent = LCD1[t] || (titulo(t).toUpperCase().slice(0,16));
-      l2.textContent = titulo(t).slice(0, 22);
+      l1.textContent = titulo(t).slice(0, 18);
+      l2.textContent = '';
+      desc.textContent = 'Toca la pantalla para ir al contenido.';
     }
   }
   function sincronizar(t){
