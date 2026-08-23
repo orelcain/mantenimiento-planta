@@ -61,32 +61,44 @@ function Catalogo() {
   const [q, setQ] = useState('')
   const [indices, setIndices] = useState<Map<string, PlanoIndice> | null>(null)
   const [cargandoIdx, setCargandoIdx] = useState(false)
+  // Se dispara UNA vez: si dependiera de `indices`, cada índice que llega
+  // cambiaría la dep, correría el cleanup y cancelaría los que faltan.
+  const cargaPedida = useRef(false)
   useEffect(() => {
-    if (q.trim().length < 2 || indices || cargandoIdx) return
+    if (q.trim().length < 2 || cargaPedida.current) return
+    cargaPedida.current = true
     setCargandoIdx(true)
-    void Promise.all(PLANOS.map(async (p) => {
-      try {
-        const r = await fetch(assetPlano(p.slug, 'indice.json'))
-        const idx = (await r.json()) as PlanoIndice
-        // Los planos grandes emiten `busqueda` aparte para abrir rápido: acá
-        // sí se necesita, así que se trae y se fusiona (el buscador global es
-        // justamente lo que la usa).
-        if (!idx.busqueda?.length) {
-          try {
-            const rb = await fetch(assetPlano(p.slug, 'busqueda.json'))
-            if (rb.ok) {
+    // PROGRESIVO, no todo-o-nada: buscar en los 9 planos son ~170 KB y antes
+    // el primer resultado esperaba a que llegara el último (en la red de
+    // planta, una eternidad). Ahora cada índice que llega ya busca, así el
+    // buscador responde con lo que tiene y se va completando solo.
+    let vivo = true
+    let pendientes = PLANOS.length
+    const sumar = (slug: string, idx: PlanoIndice) => {
+      if (!vivo) return
+      setIndices((prev) => new Map(prev ?? []).set(slug, idx))
+    }
+    PLANOS.forEach((p) => {
+      void (async () => {
+        try {
+          const r = await fetch(assetPlano(p.slug, 'indice.json'))
+          const idx = (await r.json()) as PlanoIndice
+          sumar(p.slug, idx)   // el índice ya sirve: los aparatos se buscan por código
+          // `busqueda` viaja aparte en los planos grandes y pesa: se trae
+          // después para no retrasar el primer resultado.
+          if (!idx.busqueda?.length) {
+            const rb = await fetch(assetPlano(p.slug, 'busqueda.json')).catch(() => null)
+            if (rb?.ok) {
               const b = (await rb.json()) as { busqueda?: PlanoIndice['busqueda'] }
-              if (b.busqueda) idx.busqueda = b.busqueda
+              if (b.busqueda) sumar(p.slug, { ...idx, busqueda: b.busqueda })
             }
-          } catch { /* sin buscador de ese plano, el resto sigue */ }
-        }
-        return [p.slug, idx] as const
-      } catch { return null }
-    })).then((rs) => {
-      setIndices(new Map(rs.filter((x): x is [string, PlanoIndice] => !!x)))
-      setCargandoIdx(false)
+          }
+        } catch { /* ese plano no entra al buscador; los demás sí */ }
+        if (--pendientes === 0 && vivo) setCargandoIdx(false)
+      })()
     })
-  }, [q, indices, cargandoIdx])
+    return () => { vivo = false }
+  }, [q])
 
   const v = sinAcentos(q.trim())
   const hits: { slug: string; maquina: string; clave: string; detalle: string; href: string }[] = []
