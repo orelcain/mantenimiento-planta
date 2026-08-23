@@ -538,6 +538,120 @@ def ocrmerge():
     print(f"OK merge {len(total)} figuras · ancladas {ok}/{esp} ({100*ok/max(esp,1):.1f}%)")
 
 
+def ocrr(desde=1, hasta=None):
+    """Pasada ROTADA para figuras apaisadas: muchas figuras estan giradas 90
+    dentro de la pagina vertical (los numeros quedan de lado y el OCR normal
+    no los ve — la fig 67-1-2 daba 0/11 por esto). Se OCRea la pagina rotada
+    +90 y +270 en teselas y las cajas se mapean de vuelta con la matriz
+    inversa. Solo figuras con cobertura < 80%. Fusiona sobre ocr.json."""
+    from rapidocr_onnxruntime import RapidOCR
+    import numpy as np
+    import cv2
+
+    doc = fitz.open(PDF_835)
+    figs = _figuras()["figuras"]
+    datos = json.load(io.open(os.path.join(TRABAJO, "ocr.json"), encoding="utf-8"))
+    motor = RapidOCR()
+    ZOOM, TESELA_PX, SOLAPE_PX = 4, 1000, 160
+    hasta = hasta or len(figs)
+    mejoradas = nuevas_tot = 0
+    for n, f in enumerate(figs, 1):
+        if n < desde or n > hasta:
+            continue
+        a = datos.get(str(n))
+        if not a or not a["esperadas"]:
+            continue
+        cobertura = 1 - len(a["sinAncla"]) / len(a["esperadas"])
+        if cobertura >= 0.8:
+            continue
+        esperadas = set(a["esperadas"])
+        variantes = {}
+        for e in esperadas:
+            variantes[e] = e
+            m = re.match(r"^\d+-(\d+.*)$", e)
+            if m and f.get("leyenda"):
+                variantes.setdefault(m.group(1), e)
+        pg = doc[f["dibujos"][0] - 1]
+        vistas = {p["t"] for p in a["poss"]}
+        nuevas = 0
+        for rot in (90, 270):
+            mat = fitz.Matrix(ZOOM, ZOOM).prerotate(rot)
+            pix = pg.get_pixmap(matrix=mat)
+            inv = fitz.Matrix(mat)
+            inv.invert()
+            img = cv2.imdecode(np.frombuffer(pix.tobytes("png"), np.uint8), cv2.IMREAD_COLOR)
+            Hp, Wp = img.shape[:2]
+            y0 = 0
+            while y0 < Hp:
+                x0 = 0
+                while x0 < Wp:
+                    tile = img[y0:min(y0 + TESELA_PX, Hp), x0:min(x0 + TESELA_PX, Wp)]
+                    # sliver del borde (p.ej. 8 px de alto): el detector lo
+                    # reescala a ~86.000 px y revienta la memoria (725 MB por
+                    # tesela). El solape de 160 ya cubre ese borde.
+                    if tile.shape[0] < 120 or tile.shape[1] < 120:
+                        x0 += TESELA_PX - SOLAPE_PX
+                        continue
+                    res, _ = motor(tile)
+                    for l in res or []:
+                        txt = _normalizar_pos(l[1])
+                        destino = variantes.get(txt) or variantes.get(txt.translate(LOOKALIKES))
+                        if not destino or destino in vistas:
+                            continue
+                        xs = [p[0] + x0 for p in l[0]]
+                        ys = [p[1] + y0 for p in l[0]]
+                        # a coords de pagina: deshacer offset del pixmap y la matriz
+                        esquinas = [fitz.Point(x + pix.x, y + pix.y) * inv
+                                    for x, y in ((min(xs), min(ys)), (max(xs), max(ys)))]
+                        px0 = min(p.x for p in esquinas)
+                        py0 = min(p.y for p in esquinas)
+                        px1 = max(p.x for p in esquinas)
+                        py1 = max(p.y for p in esquinas)
+                        if not (0 <= px0 <= pg.rect.width and 0 <= py0 <= pg.rect.height):
+                            continue
+                        a["poss"].append({"t": destino, "b": [round(px0, 1), round(py0, 1),
+                                                             round(px1 - px0, 1), round(py1 - py0, 1)],
+                                          "r": rot})
+                        vistas.add(destino)
+                        nuevas += 1
+                    x0 += TESELA_PX - SOLAPE_PX
+                y0 += TESELA_PX - SOLAPE_PX
+        a["sinAncla"] = sorted(esperadas - vistas)
+        if nuevas:
+            mejoradas += 1
+            nuevas_tot += nuevas
+        if n % 10 == 0:
+            print(f"  ocrr {n}/{hasta}…", flush=True)
+    # cada proceso escribe SOLO su rango: 4 en paralelo sobre ocr.json entero
+    # se pisaban entre si (last-writer-wins). ocrrmerge los aplica encima.
+    if desde == 1 and hasta == len(figs):
+        destino, contenido = "ocr.json", datos
+    else:
+        destino = f"ocr-rot-{desde}-{hasta}.json"
+        contenido = {k: v for k, v in datos.items() if desde <= int(k) <= hasta}
+    with io.open(os.path.join(TRABAJO, destino), "w", encoding="utf-8") as fh:
+        json.dump(contenido, fh, ensure_ascii=False, indent=1)
+    tot_esp = sum(len(x["esperadas"]) for x in datos.values())
+    tot_ok = tot_esp - sum(len(x["sinAncla"]) for x in datos.values())
+    print(f"OK ocrr [{desde}-{hasta}] -> {destino} · figuras mejoradas {mejoradas} (+{nuevas_tot} anclas)")
+
+
+def ocrrmerge():
+    import glob as _glob
+    base = json.load(io.open(os.path.join(TRABAJO, "ocr.json"), encoding="utf-8"))
+    partes = sorted(_glob.glob(os.path.join(TRABAJO, "ocr-rot-*.json")))
+    for ruta in partes:
+        for k, v in json.load(io.open(ruta, encoding="utf-8")).items():
+            # quedarse con la version con MAS anclas (la rotada solo suma)
+            if len(v.get("poss", [])) >= len(base.get(k, {}).get("poss", [])):
+                base[k] = v
+    with io.open(os.path.join(TRABAJO, "ocr.json"), "w", encoding="utf-8") as fh:
+        json.dump(base, fh, ensure_ascii=False, indent=1)
+    esp = sum(len(a["esperadas"]) for a in base.values())
+    ok = esp - sum(len(a["sinAncla"]) for a in base.values())
+    print(f"OK ocrrmerge ({len(partes)} partes) · ancladas {ok}/{esp} ({100*ok/max(esp,1):.1f}%)")
+
+
 def _nn(n):
     """Mismo nombre de archivo que usePlano: String(blatt).padStart(2,'0')."""
     return str(n).zfill(2)
@@ -655,6 +769,11 @@ if __name__ == "__main__":
              int(sys.argv[3]) if len(sys.argv) > 3 else None)
     elif fase == "ocrmerge":
         ocrmerge()
+    elif fase == "ocrrmerge":
+        ocrrmerge()
+    elif fase == "ocrr":
+        ocrr(int(sys.argv[2]) if len(sys.argv) > 2 else 1,
+             int(sys.argv[3]) if len(sys.argv) > 3 else None)
     elif fase == "indice":
         indice_app()
     else:

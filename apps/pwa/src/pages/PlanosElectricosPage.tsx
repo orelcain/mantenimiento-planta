@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Copy, Download, Link as LinkIcon, Loader2, Printer, QrCode, Search, X, Zap } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { PLANOS, assetPlano, planoPorSlug } from '@/data/planos'
@@ -39,7 +39,12 @@ type Seleccion =
 
 export function PlanosElectricosPage() {
   const { slug } = useParams<{ slug: string }>()
-  return slug ? <Visor slug={slug} /> : <Catalogo />
+  // key: al navegar de un plano a OTRO (boton "Ver en el despiece") la ruta es
+  // la misma (/planos/:slug) y react-router REUSA la instancia — sin el key,
+  // el visor nuevo heredaba la hoja, la seleccion y el deep-link ya consumido
+  // del plano anterior (solo en el layout anonimo; con sesion MainLayout ya
+  // remonta por pathname y el bug quedaba escondido).
+  return slug ? <Visor key={slug} slug={slug} /> : <Catalogo />
 }
 
 /* ────────────────────────────── catálogo ────────────────────────────── */
@@ -191,8 +196,13 @@ function Visor({ slug }: { slug: string }) {
   const sinIdiomas = esVisor || cat?.idioma === 'es'
   // Hoja inicial: la de la URL (?hoja=9, para compartir un punto del plano por
   // chat) o la última visitada en este equipo; usePlano valida contra el índice.
+  // ⚠ Los parametros se leen del ROUTER, no de window.location: al navegar
+  // entre planos (boton "Ver en el despiece") window.location puede ir un
+  // tick atras del render y este visor arrancaba con la hoja del plano
+  // ANTERIOR (carrera intermitente que devolvia al usuario a donde estaba).
+  const busquedaRuta = useLocation().search
   const [inicial] = useState<number | undefined>(() => {
-    const q = Number(new URLSearchParams(window.location.search).get('hoja'))
+    const q = Number(new URLSearchParams(busquedaRuta).get('hoja'))
     if (Number.isInteger(q) && q > 0) return q
     const g = Number(localStorage.getItem(`plano-hoja:${slug}`))
     return Number.isInteger(g) && g > 0 ? g : undefined
@@ -316,7 +326,7 @@ function Visor({ slug }: { slug: string }) {
   useEffect(() => {
     if (apAbierto.current || !indice || !hoja) return
     apAbierto.current = true
-    const ap = new URLSearchParams(window.location.search).get('ap')
+    const ap = new URLSearchParams(busquedaRuta).get('ap')
     if (!ap) return
     const apN = normalizarPos(ap)
     if (indice.indice[apN]) {
@@ -337,7 +347,7 @@ function Visor({ slug }: { slug: string }) {
       seleccionar({ tipo: 'aparato', tag: apN })
       setFoco({ tipo: 'caja', b: tagEnHoja.b })
     }
-  }, [indice, hoja, irA, seleccionar])
+  }, [indice, hoja, irA, seleccionar, busquedaRuta])
 
   const imprimirHoja = useCallback(() => {
     if (!hoja || !indice) return
@@ -400,6 +410,11 @@ function Visor({ slug }: { slug: string }) {
     if (!hoja) return
     localStorage.setItem(`plano-hoja:${slug}`, String(hoja.blatt))
     const u = new URL(window.location.href)
+    // Si la URL ya es de OTRO plano (click en "Ver en el despiece" recién
+    // navegó), estampar acá pisaba el ?hoja= del destino con la hoja de ESTE
+    // visor — la carrera devolvía al usuario a donde estaba. Solo se escribe
+    // la URL propia.
+    if (!u.pathname.endsWith(`/planos/${slug}`)) return
     u.searchParams.set('hoja', String(hoja.blatt))
     if (sel?.tipo === 'aparato') u.searchParams.set('ap', sel.tag)
     else u.searchParams.delete('ap')
@@ -1267,7 +1282,7 @@ function PiezaFisica({ sel, partes, slug }: {
         </p>
       )}
       <Link to={`/aprendizaje/planos/${partes.despiece}?hoja=${pieza.hoja}&ap=${encodeURIComponent(pieza.pos)}`}
-            onClick={() => void registrarUso(slug, 'salto-a-despiece', sel.tag)}
+            onClick={(e) => { e.stopPropagation(); void registrarUso(slug, 'salto-a-despiece', sel.tag) }}
             className="mt-2 flex min-h-[44px] items-center justify-center rounded-ctl border px-3 text-center text-footnote font-medium no-underline"
             style={{ borderColor: 'var(--lc-aqua)', background: 'var(--lc-aqua-soft)', color: 'var(--lc-aqua-bright)' }}>
         Ver en el despiece
