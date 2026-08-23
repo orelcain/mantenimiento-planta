@@ -844,6 +844,14 @@ def indice_app():
             if cj and pz.get("posicion") and pz.get("cantidad"):
                 cant_por_cp[(cj, str(pz["posicion"]))] = pz["cantidad"]
 
+    ruta_manuales = os.path.join(RAIZ, "anclas_manuales_142.json")
+    anclas_manuales = (json.load(io.open(ruta_manuales, encoding="utf-8"))
+                       if os.path.exists(ruta_manuales) else {})
+    if anclas_manuales:
+        reales = {k: {kk: vv for kk, vv in v.items() if not kk.startswith("_")}
+                  for k, v in anclas_manuales.items() if isinstance(v, dict)}
+        print(f"   anclas manuales: {sum(len(v) for v in reales.values())} en {len([k for k, v in reales.items() if v])} figuras")
+
     hojas_meta, indice_cod, busqueda, descs = [], {}, [], {}
     for n, f in enumerate(figs, 1):
         pg = doc[f["dibujos"][0] - 1]
@@ -881,6 +889,16 @@ def indice_app():
         destino = os.path.join(STAGING, f"hoja-{_nn(n)}.svg")
         if os.path.exists(origen):
             shutil.move(origen, destino)
+        # ANCLAS MANUALES: lo que el OCR no saca (numero tapado por una linea
+        # del dibujo, o figura sin ninguna) se puede fijar a mano en
+        # anclas_manuales_142.json — {"<hoja>": {"<pos>": [x, y, w, h]}}.
+        # Pisan al OCR: una coordenada puesta por una persona siempre gana.
+        for pos_m, caja_m in (anclas_manuales.get(str(n)) or {}).items():
+            if pos_m.startswith("_"):
+                continue
+            poss = [p for p in poss if p["t"] != _normalizar_pos(pos_m)]
+            poss.append({"t": _normalizar_pos(pos_m), "b": caja_m, "m": 1})
+
         # las posiciones OCR van como capa `tags`: PlanoLienzo ya dibuja esa
         # capa y su click (onAparato) — cero cambios de lienzo para el despiece
         filas_out = []

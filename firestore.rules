@@ -682,6 +682,36 @@ service cloud.firestore {
         && (resource.data.creadoPor == request.auth.uid || isAdmin());
     }
 
+    // CONFIRMACION EN TERRENO del puente aparato electrico -> pieza fisica.
+    // El catalogo del fabricante PROPONE (badge "segun catalogo"); solo quien
+    // fue a la maquina y leyo el rotulo puede confirmar o corregir. Con esto
+    // el vinculo pasa a "confirmado" y la cobertura del puente sube con
+    // evidencia real, no con una suposicion de papel.
+    // docId = "<planoSlug>__<designacion>" (uno por aparato: la ultima palabra
+    // de terreno manda, y el historial de quien/cuando queda en el doc).
+    match /planoVinculos/{vinculoId} {
+      allow read: if isActiveUser();
+
+      allow create, update: if isActiveUser()
+        && isValidDocSize()
+        && request.resource.data.plantId is string
+        && isNonEmptyString(request.resource.data.planoSlug, 1, 60)
+        && isNonEmptyString(request.resource.data.aparato, 1, 20)
+        && request.resource.data.estado in ['confirmado', 'corregido', 'no_aplica']
+        // el codigo leido en terreno (o el propuesto, al confirmarlo tal cual)
+        && (!('codigo' in request.resource.data)
+            || isNonEmptyString(request.resource.data.codigo, 1, 30))
+        && (!('nota' in request.resource.data)
+            || isNonEmptyString(request.resource.data.nota, 1, 500))
+        && (!('foto' in request.resource.data)
+            || request.resource.data.foto is string)
+        && request.resource.data.confirmadoPor == request.auth.uid;
+
+      // Nadie borra evidencia de terreno: si estaba mal, se corrige con un
+      // update (que deja el estado 'corregido' y la nota del por que).
+      allow delete: if isAdmin();
+    }
+
     match /incidents/{incidentId} {
       allow read: if isActiveUser();
       

@@ -11,9 +11,11 @@ import {
 import { usePlanoNotas } from '@/hooks/usePlanoNotas'
 import { usePlanoSap } from '@/hooks/usePlanoSap'
 import { usePartesPlano } from '@/hooks/usePartesPlano'
+import { usePlanoVinculos, type VinculoTerreno } from '@/hooks/usePlanoVinculos'
 import { PlanoLienzo, type Foco } from '@/components/planos/PlanoLienzo'
 import { NotasAparato } from '@/components/planos/NotasAparato'
 import { compactarTramos } from '@/utils/designaciones'
+import { auth } from '@/services/firebase'
 
 /** minusculas y sin acentos: "posicion" debe encontrar "POSICIÓN ZERO". */
 const sinAcentos = (t: string) => t.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '')
@@ -27,6 +29,13 @@ const normalizarPos = (t: string) =>
 /** Escapa para inyectar texto en el HTML de la ventana de impresión (nombres
  *  de piezas pueden traer "&"/"<" sueltos del OCR del catálogo). */
 const escHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+/** dd-MM: la fecha corta que va junto a quién confirmó en terreno. */
+const formatearFechaCorta = (t?: VinculoTerreno['actualizado']) => {
+  if (!t) return ''
+  const d = t.toDate()
+  return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
 
 /** Etiqueta de un grupo del índice lateral / select de hojas. Los planos
  *  eléctricos usan 2 claves fijas; el despiece manda su propia etiqueta de
@@ -267,6 +276,9 @@ function Visor({ slug }: { slug: string }) {
   // Puente electrico -> pieza: solo trae datos en los planos que ya tienen
   // curaduria (888/860); en el resto (incluido el propio despiece) queda null.
   const partes = usePartesPlano(slug)
+  // Confirmacion EN TERRENO de ese puente: quien esta frente a la maquina
+  // dice si el catalogo acerto, se equivoco o el aparato ni existe ahi.
+  const vinculosTerreno = usePlanoVinculos(slug)
   const [sel, setSel] = useState<Seleccion>(null)
   const [foco, setFoco] = useState<Foco>(null)
   // ES por defecto: el equipo lee castellano; el aleman queda a un toque para
@@ -959,7 +971,8 @@ function Visor({ slug }: { slug: string }) {
                      esDespiece={esDespiece} meta={meta} filas={hoja.datos.filas ?? []}
                      tagsHoja={hoja.datos.tags} onSeleccionarFila={seleccionarFilaDespiece}
                      onIrFigura={irAFigura} anclaDeAparato={anclaDeAparato}
-                     partes={partes} slug={slug} sapPorCodigo={indice.sapPorCodigo} />}
+                     partes={partes} slug={slug} sapPorCodigo={indice.sapPorCodigo}
+                     vinculosTerreno={vinculosTerreno} />}
           </>}
         </aside>
       </div>
@@ -972,7 +985,7 @@ function Visor({ slug }: { slug: string }) {
 function Panel({
   sel, indice, hojaActual, notas, onIr, recientes, onAbrirAparato, resaltar, onResaltar, enEstaHoja,
   esDespiece, meta, filas, tagsHoja, onSeleccionarFila, onIrFigura, anclaDeAparato, partes, slug,
-  sapPorCodigo,
+  sapPorCodigo, vinculosTerreno,
 }: {
   sel: Seleccion
   indice: NonNullable<ReturnType<typeof usePlano>['indice']>
@@ -997,6 +1010,7 @@ function Panel({
   slug: string
   /** código → SAP/bodega, para la lista copiable de la figura. */
   sapPorCodigo?: Record<string, { s: string; n: string; u: string }>
+  vinculosTerreno: ReturnType<typeof usePlanoVinculos>
 }) {
   const [copiadoLista, setCopiadoLista] = useState(false)
   // En el despiece, llegar a una figura y NO ver sus piezas obliga a adivinar
@@ -1090,6 +1104,14 @@ function Panel({
                 <> Quedan <b>{partes.cobertura.sinDato}</b> por identificar.</>
               )}
             </p>
+            {/* El número que demuestra el avance REAL, no el propuesto por
+                catálogo: solo sube cuando alguien lo verifica en la máquina. */}
+            {vinculosTerreno.resumen.confirmados + vinculosTerreno.resumen.corregidos > 0 && (
+              <p className="m-0 mt-1 text-footnote" style={{ color: 'var(--lc-nuevo)' }}>
+                <b>{vinculosTerreno.resumen.confirmados + vinculosTerreno.resumen.corregidos}</b>{' '}
+                confirmados en terreno
+              </p>
+            )}
           </>
         )}
         {recientes.length > 0 && (
@@ -1235,7 +1257,7 @@ function Panel({
         ))}
       </div>
 
-      <PiezaFisica sel={sel} partes={partes} slug={slug} />
+      <PiezaFisica sel={sel} partes={partes} slug={slug} vinculosTerreno={vinculosTerreno} />
 
       <FichasSap notas={notas.notasDe('aparato', anclaDeAparato(sel.tag))} />
 
@@ -1561,10 +1583,11 @@ function FichaPieza({
  * Vive aparte del cruce SAP (`FichasSap`, debajo): son fuentes distintas —
  * esta sale del catálogo de fábrica, esa de lo que la gente anotó a mano.
  */
-function PiezaFisica({ sel, partes, slug }: {
+function PiezaFisica({ sel, partes, slug, vinculosTerreno }: {
   sel: { tipo: 'aparato'; tag: string }
   partes: ReturnType<typeof usePartesPlano>
   slug: string
+  vinculosTerreno: ReturnType<typeof usePlanoVinculos>
 }) {
   const pieza = partes?.aparatos[sel.tag]?.[0]
   if (!partes) return null
@@ -1586,22 +1609,7 @@ function PiezaFisica({ sel, partes, slug }: {
   return (
     <div className="mb-3 rounded-card border p-3" style={{ background: 'var(--lc-bg-panel)', borderColor: 'var(--lc-border)' }}>
       <Titulo>Pieza física</Titulo>
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="text-footnote font-semibold leading-snug">{pieza.es}</span>
-        <span className="shrink-0 rounded-ctl px-2 py-0.5 text-caption" style={{ background: 'var(--lc-surface-hi)', color: 'var(--lc-ink-mid)' }}>
-          {pieza.confianza === 'catalogo' ? 'según catálogo BAADER 2006' : 'propuesto'}
-        </span>
-      </div>
-      {pieza.de && (
-        <p className="m-0 mt-0.5 text-caption" style={{ color: 'var(--lc-ink-lo)' }}>{pieza.de}</p>
-      )}
-      <p className="m-0 mt-1.5 font-mono text-[15px] font-semibold" style={{ color: 'var(--lc-aqua-bright)' }}>{pieza.nr}</p>
-      {pieza.sap && (
-        <span className="mt-1 inline-flex w-fit items-center gap-1 rounded-ctl px-2 py-0.5 text-caption"
-              style={{ background: 'var(--lc-surface-hi)', color: 'var(--lc-ink-mid)' }}>
-          SAP {pieza.sap}{pieza.sapUbicacion ? ` · ${pieza.sapUbicacion}` : ''}
-        </span>
-      )}
+      <PiezaTerreno tag={sel.tag} pieza={pieza} vinculosTerreno={vinculosTerreno} />
       {aviso && (
         <p className="m-0 mt-2 rounded-ctl border-l-2 py-1 pl-2 text-footnote leading-relaxed"
            style={{ borderColor: 'var(--lc-prep)', background: 'var(--lc-prep-soft)', color: 'var(--lc-ink-mid)' }}>
@@ -1614,6 +1622,199 @@ function PiezaFisica({ sel, partes, slug }: {
             style={{ borderColor: 'var(--lc-aqua)', background: 'var(--lc-aqua-soft)', color: 'var(--lc-aqua-bright)' }}>
         Ver en el despiece
       </Link>
+    </div>
+  )
+}
+
+/**
+ * Estado + acciones de la confirmación EN TERRENO de este aparato. El
+ * catálogo solo propone (badge gris "según catálogo"); la palabra de quien
+ * está frente a la máquina es la que convierte esa propuesta en certeza —
+ * o la corrige, o dice que ese aparato ni existe ahí.
+ */
+function PiezaTerreno({ tag, pieza, vinculosTerreno }: {
+  tag: string
+  pieza: { es: string; de?: string; nr: string; sap?: string; sapUbicacion?: string; confianza: string }
+  vinculosTerreno: ReturnType<typeof usePlanoVinculos>
+}) {
+  const v = vinculosTerreno.vinculos.get(tag)
+  const [abierto, setAbierto] = useState(false)
+  const [opcion, setOpcion] = useState<VinculoTerreno['estado'] | null>(null)
+  const [codigoLeido, setCodigoLeido] = useState('')
+  const [nota, setNota] = useState('')
+  const [guardando, setGuardando] = useState(false)
+  const [errorLocal, setErrorLocal] = useState<string | null>(null)
+
+  const abrirFormulario = () => {
+    setOpcion(null)
+    setCodigoLeido('')
+    setNota('')
+    setErrorLocal(null)
+    setAbierto(true)
+  }
+
+  const guardar = async () => {
+    if (!opcion || (opcion === 'corregido' && !codigoLeido.trim())) return
+    setGuardando(true)
+    setErrorLocal(null)
+    try {
+      await vinculosTerreno.confirmar({
+        aparato: tag,
+        estado: opcion,
+        codigo: opcion === 'confirmado' ? pieza.nr : opcion === 'corregido' ? codigoLeido.trim() : undefined,
+        nota: nota.trim() || undefined,
+      })
+      setAbierto(false)
+    } catch (e) {
+      setErrorLocal(e instanceof Error ? e.message : 'No se pudo guardar.')
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  return (
+    <>
+      {v?.estado === 'no_aplica' ? (
+        <p className="m-0 rounded-ctl p-2 text-footnote leading-relaxed"
+           style={{ background: 'var(--lc-surface-hi)', color: 'var(--lc-ink-mid)' }}>
+          Este aparato no existe en esta máquina (verificado en terreno).
+        </p>
+      ) : (
+        <>
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="text-footnote font-semibold leading-snug">{pieza.es}</span>
+            {v?.estado === 'confirmado' ? (
+              <span className="shrink-0 rounded-ctl px-2 py-0.5 text-caption"
+                    style={{ background: 'var(--lc-nuevo-soft)', color: 'var(--lc-nuevo)' }}>
+                Confirmado en terreno
+              </span>
+            ) : v?.estado === 'corregido' ? (
+              <span className="shrink-0 rounded-ctl px-2 py-0.5 text-caption"
+                    style={{ background: 'var(--lc-prep-soft)', color: 'var(--lc-prep)' }}>
+                Corregido en terreno
+              </span>
+            ) : (
+              <span className="shrink-0 rounded-ctl px-2 py-0.5 text-caption"
+                    style={{ background: 'var(--lc-surface-hi)', color: 'var(--lc-ink-mid)' }}>
+                {pieza.confianza === 'catalogo' ? 'según catálogo BAADER 2006' : 'propuesto'}
+              </span>
+            )}
+          </div>
+          {pieza.de && (
+            <p className="m-0 mt-0.5 text-caption" style={{ color: 'var(--lc-ink-lo)' }}>{pieza.de}</p>
+          )}
+          {v?.estado === 'corregido' ? (
+            <>
+              <p className="m-0 mt-1.5 font-mono text-[15px] font-semibold" style={{ color: 'var(--lc-aqua-bright)' }}>
+                {v.codigo}
+              </p>
+              <p className="m-0 mt-0.5 text-caption" style={{ color: 'var(--lc-ink-ghost)' }}>
+                el catálogo decía <span className="font-mono line-through">{pieza.nr}</span>
+              </p>
+            </>
+          ) : (
+            <p className="m-0 mt-1.5 font-mono text-[15px] font-semibold" style={{ color: 'var(--lc-aqua-bright)' }}>
+              {pieza.nr}
+            </p>
+          )}
+          {pieza.sap && (
+            <span className="mt-1 inline-flex w-fit items-center gap-1 rounded-ctl px-2 py-0.5 text-caption"
+                  style={{ background: 'var(--lc-surface-hi)', color: 'var(--lc-ink-mid)' }}>
+              SAP {pieza.sap}{pieza.sapUbicacion ? ` · ${pieza.sapUbicacion}` : ''}
+            </span>
+          )}
+        </>
+      )}
+      {v && (
+        <p className="m-0 mt-1 text-caption" style={{ color: 'var(--lc-ink-lo)' }}>
+          Por {v.confirmadoPorNombre || 'alguien'} · {formatearFechaCorta(v.actualizado)}
+        </p>
+      )}
+
+      {!auth.currentUser ? (
+        <p className="m-0 mt-2 text-caption" style={{ color: 'var(--lc-ink-ghost)' }}>
+          Inicia sesión para confirmar en terreno
+        </p>
+      ) : abierto ? (
+        <FormularioTerreno
+          opcion={opcion} onOpcion={setOpcion}
+          codigo={codigoLeido} onCodigo={setCodigoLeido}
+          nota={nota} onNota={setNota}
+          guardando={guardando} error={errorLocal ?? vinculosTerreno.error}
+          onGuardar={() => void guardar()} onCancelar={() => setAbierto(false)}
+        />
+      ) : (
+        <button type="button" onClick={abrirFormulario}
+                className="mt-2 flex min-h-[44px] w-full items-center justify-center rounded-ctl border px-3 text-center text-footnote font-medium"
+                style={v
+                  ? { borderColor: 'var(--lc-border)', color: 'var(--lc-ink-mid)' }
+                  : { borderColor: 'var(--lc-aqua)', background: 'var(--lc-aqua-soft)', color: 'var(--lc-aqua-bright)' }}>
+          {v ? 'Corregir' : 'Confirmar en terreno'}
+        </button>
+      )}
+    </>
+  )
+}
+
+/** El formulario en línea (no modal: el panel ya es hoja inferior en móvil). */
+function FormularioTerreno({
+  opcion, onOpcion, codigo, onCodigo, nota, onNota, guardando, error, onGuardar, onCancelar,
+}: {
+  opcion: VinculoTerreno['estado'] | null
+  onOpcion: (o: VinculoTerreno['estado']) => void
+  codigo: string
+  onCodigo: (v: string) => void
+  nota: string
+  onNota: (v: string) => void
+  guardando: boolean
+  error: string | null
+  onGuardar: () => void
+  onCancelar: () => void
+}) {
+  const opciones: { valor: VinculoTerreno['estado']; etiqueta: string }[] = [
+    { valor: 'confirmado', etiqueta: 'Sí, es esta pieza' },
+    { valor: 'corregido', etiqueta: 'Es otra pieza' },
+    { valor: 'no_aplica', etiqueta: 'No existe en esta máquina' },
+  ]
+  const puedeGuardar = !!opcion && (opcion !== 'corregido' || codigo.trim().length > 0) && !guardando
+  return (
+    <div className="mt-2 flex flex-col gap-1.5 rounded-ctl border p-2" style={{ borderColor: 'var(--lc-border)' }}>
+      {opciones.map((o) => (
+        <button key={o.valor} type="button" onClick={() => onOpcion(o.valor)} aria-pressed={opcion === o.valor}
+                className="flex min-h-[44px] items-center rounded-ctl border px-3 text-left text-footnote font-medium"
+                style={opcion === o.valor
+                  ? { borderColor: 'var(--lc-aqua)', background: 'var(--lc-aqua-soft)', color: 'var(--lc-aqua-bright)' }
+                  : { borderColor: 'var(--lc-border)', color: 'var(--lc-ink-mid)' }}>
+          {o.etiqueta}
+        </button>
+      ))}
+      {opcion === 'corregido' && (
+        <input type="text" inputMode="numeric" placeholder="código de la etiqueta" value={codigo}
+               onChange={(e) => onCodigo(e.target.value)}
+               className="min-h-[44px] rounded-ctl border px-3 text-footnote"
+               style={{ borderColor: 'var(--lc-border)', background: 'var(--lc-surface)', color: 'var(--lc-ink)' }} />
+      )}
+      <textarea rows={2} maxLength={500} placeholder="Nota (opcional)" value={nota}
+                onChange={(e) => onNota(e.target.value)}
+                className="rounded-ctl border px-3 py-2 text-footnote"
+                style={{ borderColor: 'var(--lc-border)', background: 'var(--lc-surface)', color: 'var(--lc-ink)' }} />
+      {error && (
+        <p className="m-0 rounded-ctl p-2 text-footnote" style={{ background: 'var(--lc-danger-soft)', color: 'var(--lc-danger)' }}>
+          {error}
+        </p>
+      )}
+      <div className="flex gap-1.5">
+        <button type="button" onClick={onCancelar}
+                className="flex min-h-[44px] flex-1 items-center justify-center rounded-ctl border px-3 text-footnote font-medium"
+                style={{ borderColor: 'var(--lc-border)', color: 'var(--lc-ink-mid)' }}>
+          Cancelar
+        </button>
+        <button type="button" onClick={onGuardar} disabled={!puedeGuardar}
+                className="flex min-h-[44px] flex-1 items-center justify-center rounded-ctl border px-3 text-footnote font-medium disabled:opacity-50"
+                style={{ borderColor: 'var(--lc-aqua)', background: 'var(--lc-aqua)', color: '#fff' }}>
+          {guardando ? 'Guardando…' : 'Guardar'}
+        </button>
+      </div>
     </div>
   )
 }
