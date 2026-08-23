@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { collection, doc, onSnapshot, query, serverTimestamp, setDoc, where } from 'firebase/firestore'
 import type { Timestamp } from 'firebase/firestore'
-import { db, auth } from '@/services/firebase'
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage'
+import { db, auth, storage } from '@/services/firebase'
+import { processImageForUpload, IMAGE_PRESETS } from '@/utils/images/processImage'
+import { generateId } from '@/lib/utils'
 import { logger } from '@/lib/logger'
 
 const COL = 'planoVinculos'
@@ -62,6 +65,28 @@ export function usePlanoVinculos(planoSlug: string | undefined) {
     return off
   }, [planoSlug])
 
+  /**
+   * Sube la foto de la etiqueta y devuelve su URL. La evidencia visual es lo
+   * que vuelve irrefutable un vínculo: "acá está la placa que leí". Se
+   * comprime en el teléfono antes de subir — una foto de cámara son ~4 MB y
+   * en planta la señal no da para eso.
+   */
+  const subirFoto = useCallback(
+    async (archivo: File): Promise<string> => {
+      if (!auth.currentUser || !planoSlug) throw new Error('Hay que iniciar sesión.')
+      let aSubir: File = archivo
+      try {
+        aSubir = (await processImageForUpload(archivo, IMAGE_PRESETS.photo)).file
+      } catch {
+        // si el navegador no puede procesarla, va la original (5 MB tope de la regla)
+      }
+      const r = storageRef(storage, `planosElectricos/${planoSlug}/terreno/${generateId()}`)
+      await uploadBytes(r, aSubir, { contentType: aSubir.type })
+      return getDownloadURL(r)
+    },
+    [planoSlug],
+  )
+
   const confirmar = useCallback(
     async (datos: {
       aparato: string
@@ -99,5 +124,5 @@ export function usePlanoVinculos(planoSlug: string | undefined) {
     return { confirmados, corregidos, total: vinculos.size }
   }, [vinculos])
 
-  return { vinculos, confirmar, resumen, error }
+  return { vinculos, confirmar, subirFoto, resumen, error }
 }
