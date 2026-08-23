@@ -148,7 +148,7 @@ export const PLANOS: PlanoCatalogo[] = [
     faltantes: [],
     modo: 'despiece',
     enStorage: true,
-    vAssets: 1,
+    vAssets: 2,
     idioma: 'es',
     descripcion:
       'El catalogo de piezas de fabrica: cada figura lista las posiciones con su nombre y su ' +
