@@ -1,0 +1,6 @@
+{
+  "_comentario": "Anclas puestas a mano donde el OCR no llega (numero tapado por una linea del dibujo, contraste bajo, figura sin ninguna). Formato: {hoja: {posicion: [x, y, ancho, alto]}} en coordenadas de la hoja (pt). Pisan al OCR: una coordenada puesta por una persona siempre gana. Verificar mirando el dibujo, no de memoria.",
+  "201": {
+    "98": [297.0, 341.0, 10.0, 8.5]
+  }
+}

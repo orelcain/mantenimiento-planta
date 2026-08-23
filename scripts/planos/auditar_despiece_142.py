@@ -93,6 +93,56 @@ def main():
         mapeados = sensores & set(p["aparatos"])
         print(f"{slug}: sensores B/S mapeados {len(mapeados)}/{len(sensores)}")
 
+    # 2c. INDICE PARTIDO: busqueda.json debe existir y ser coherente
+    ruta_busq = os.path.join(APP, "busqueda.json")
+    if os.path.exists(ruta_busq):
+        bus = json.load(io.open(ruta_busq, encoding="utf-8"))
+        if "busqueda" in idx and idx["busqueda"]:
+            errores.append("indice.json TODAVIA trae `busqueda`: se duplica el peso que se separo")
+        hojas_busq = {b["h"] for b in bus.get("busqueda", [])}
+        fuera = hojas_busq - set(hojas)
+        if fuera:
+            errores.append(f"busqueda.json apunta a hojas inexistentes: {sorted(fuera)[:5]}")
+        print(f"indice partido: busqueda {len(bus.get('busqueda', []))} items · descs {len(bus.get('descs', {}))}")
+    else:
+        avisos.append("no hay busqueda.json: el indice va entero (mas pesado al abrir)")
+
+    # 2d. DATOS DERIVADOS que consume la UI
+    dest = idx.get("destacados") or []
+    for d in dest:
+        if d["hoja"] not in hojas:
+            errores.append(f"destacado '{d['etiqueta']}' apunta a la hoja {d['hoja']}, que no existe")
+    if not dest:
+        avisos.append("sin destacados: se pierde el acceso directo a piezas de desgaste")
+
+    vocab = set()
+    for b in (json.load(io.open(ruta_busq, encoding="utf-8")).get("busqueda", [])
+              if os.path.exists(ruta_busq) else idx.get("busqueda", [])):
+        vocab.update(re.findall(r"[a-záéíóúñ]{3,}", (b.get("es") or "").lower()))
+    for alias, destino in (idx.get("sinonimos") or {}).items():
+        if any(w not in vocab for w in destino.split()):
+            errores.append(f"sinonimo {alias}->{destino}: el destino no existe en el catalogo")
+
+    sap = idx.get("sapPorCodigo") or {}
+    fuera_sap = [c for c in sap if c not in idx["indice"]]
+    if fuera_sap:
+        errores.append(f"sapPorCodigo con codigos que no estan en el indice: {fuera_sap[:5]}")
+    print(f"derivados: destacados {len(dest)} · sinonimos {len(idx.get('sinonimos') or {})} · SAP {len(sap)}")
+
+    # 2e. FAMILIAS del puente (zona sugerida)
+    for slug in ("baader-142-888", "baader-142-860"):
+        rp = os.path.join(PWA, slug, "partes.json")
+        if not os.path.exists(rp):
+            continue
+        pj = json.load(io.open(rp, encoding="utf-8"))
+        for fam, datos in (pj.get("familias") or {}).items():
+            for f in datos["figuras"]:
+                if f["hoja"] not in hojas:
+                    errores.append(f"{slug} familia {fam}: hoja {f['hoja']} no existe")
+        cob = pj.get("cobertura")
+        if cob and cob["exacta"] + cob["zona"] + cob["sinDato"] != cob["total"]:
+            errores.append(f"{slug}: la cobertura no suma ({cob})")
+
     # 3. cobertura de anclas
     anclados = sum(len(d.get("tags", [])) for d in datos_hoja.values())
     print(f"hojas: {len(hojas)} · filas con pos: {tot_filas} · posiciones ancladas (tags): {anclados}")
