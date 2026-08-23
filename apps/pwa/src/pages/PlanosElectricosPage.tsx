@@ -11,6 +11,7 @@ import {
 import { usePlanoNotas } from '@/hooks/usePlanoNotas'
 import { usePlanoSap } from '@/hooks/usePlanoSap'
 import { usePartesPlano } from '@/hooks/usePartesPlano'
+import { useCodigosParte, useCargaSiEsNumero, PARECE_NUMERO_PARTE } from '@/hooks/useCodigosParte'
 import { usePlanoVinculos, type VinculoTerreno } from '@/hooks/usePlanoVinculos'
 import { PlanoLienzo, type Foco } from '@/components/planos/PlanoLienzo'
 import { NotasAparato } from '@/components/planos/NotasAparato'
@@ -70,6 +71,11 @@ function Catalogo() {
   const [q, setQ] = useState('')
   const [indices, setIndices] = useState<Map<string, PlanoIndice> | null>(null)
   const [cargandoIdx, setCargandoIdx] = useState(false)
+  // Números de parte de TODA la planta (incluidas las máquinas sin despiece
+  // navegable): se carga solo si la consulta parece un código.
+  const codigos = useCodigosParte()
+  useCargaSiEsNumero(q, codigos.cargar)
+  const partesEncontradas = PARECE_NUMERO_PARTE.test(q) ? codigos.buscar(q) : []
   // Se dispara UNA vez: si dependiera de `indices`, cada índice que llega
   // cambiaría la dep, correría el cleanup y cancelaría los que faltan.
   const cargaPedida = useRef(false)
@@ -166,6 +172,37 @@ function Catalogo() {
                  className="w-full rounded-card border bg-transparent py-2 pl-8 pr-2 font-mono text-footnote outline-none"
                  style={{ color: 'var(--lc-ink)', borderColor: 'var(--lc-border)' }} />
         </div>
+        {/* NÚMEROS DE PARTE de toda la planta: incluye las máquinas sin
+            despiece navegable (GEA, enzunchadora, Marel), que antes no se
+            podían buscar desde acá. Va primero porque quien escribe un código
+            grabado en una pieza busca exactamente esto. */}
+        {partesEncontradas.length > 0 && (
+          <div className="mt-3 flex flex-col gap-0.5">
+            <h2 className="m-0 mb-1 flex items-baseline gap-2 text-caption font-semibold tracking-wider"
+                style={{ color: 'var(--lc-ink-ghost)' }}>
+              Números de parte
+              <span className="font-mono normal-case tracking-normal">{partesEncontradas.length}</span>
+            </h2>
+            {partesEncontradas.map((pt) => {
+              const destino = pt.plano
+                ? `/aprendizaje/planos/${pt.plano}?hoja=${pt.hoja}&ap=${encodeURIComponent(pt.codigo)}`
+                : `/repuestos?q=${encodeURIComponent(pt.codigo)}`
+              return (
+                <Link key={pt.codigo} to={destino}
+                      className="flex min-h-[44px] items-center justify-between gap-3 rounded-ctl px-2 py-1.5 no-underline hover:opacity-80"
+                      style={{ background: 'var(--lc-surface)', color: 'inherit' }}>
+                  <span className="min-w-0 flex-1">
+                    <span className="font-mono text-footnote" style={{ color: 'var(--lc-aqua-bright)' }}>{pt.codigo}</span>
+                    {pt.nombre && <span className="ml-2 text-footnote">{pt.nombre}</span>}
+                  </span>
+                  <span className="shrink-0 text-caption" style={{ color: 'var(--lc-ink-mid)' }}>
+                    {pt.maquina}{pt.figura ? ` · fig. ${pt.figura}` : ' · en Repuestos'}
+                  </span>
+                </Link>
+              )
+            })}
+          </div>
+        )}
         {v.length >= 2 && (
           <div className="mt-2 flex flex-col gap-0.5">
             {cargandoIdx && (
