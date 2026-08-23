@@ -54,12 +54,20 @@ export type PlanoBorne = { b: Caja; t: string; h: number; tb: Caja }
 export type PlanoBorneLibre = { b: Caja; t: string; op: { k: string; h: number; tb: Caja }[] }
 /** Un rótulo en otro idioma con su traducción. `dup` = repetición a tapar. */
 export type PlanoRotulo = { b: Caja; de: string; es: string; r: number; dup?: number }
+/** Una fila de la tabla de un despiece: posición del catálogo + su código. */
+export type FilaDespiece = { pos: string; de?: string; en?: string; fr?: string; es?: string; nr?: string; fig?: string }
 
 export type PlanoHojaMeta = {
   blatt: number
   vb: [number, number]
   cols: Record<string, number>
-  seccion: 'circuitos' | 'bornes'
+  /** 'circuitos' | 'bornes' en los planos eléctricos; en el despiece es la
+   *  etiqueta de capítulo ya armada ("70 · Equipo eléctrico"). */
+  seccion: string
+  /** Solo despiece: id de la figura del catálogo ("70-8"). */
+  fig?: string
+  /** Solo despiece: grupo/conjunto al que pertenece la figura, si aplica. */
+  conjunto?: string | null
   titulo: string
   tituloEs: string
   n: { x: number; t: number; d: number }
@@ -83,7 +91,18 @@ export type PlanoIndice = {
   glosario: Record<string, string>
 }
 
-export type PlanoHoja = { svg: string; xrefs: PlanoSalto[]; tags: PlanoAparato[]; terms: PlanoRotulo[]; bornes: PlanoBorne[]; libres: PlanoBorneLibre[] }
+export type PlanoHoja = {
+  svg: string
+  xrefs: PlanoSalto[]
+  tags: PlanoAparato[]
+  terms: PlanoRotulo[]
+  bornes: PlanoBorne[]
+  libres: PlanoBorneLibre[]
+  /** Solo despiece: la tabla completa de la figura (con y sin ancla OCR). */
+  filas?: FilaDespiece[]
+  /** Solo despiece: glosario de abreviaturas de la figura, si trae. */
+  leyenda?: Record<string, string>
+}
 
 /**
  * Carga el índice de un plano y sus hojas bajo demanda.
@@ -140,7 +159,7 @@ export function usePlano(slug: string | undefined, inicial?: number) {
       // navegador (de un deploy anterior, sin `bornes` o `libres`) reventaba
       // el lienzo en `.map`. Con esto, un JSON incompleto degrada a "esa capa
       // no aparece" en vez de a pantalla en blanco.
-      const datos: PlanoHoja = { svg, xrefs: [], tags: [], terms: [], bornes: [], libres: [], ...zonas }
+      const datos: PlanoHoja = { svg, xrefs: [], tags: [], terms: [], bornes: [], libres: [], filas: [], leyenda: {}, ...zonas }
       cache.current.set(blatt, datos)
       return datos
     },

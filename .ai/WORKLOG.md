@@ -6,6 +6,22 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-08-23 · Feat: plano de partes BAADER 142 (254 figuras) + puente eléctrico→pieza (PR #699)
+
+Noveno plano del Centro de Aprendizaje: catálogo de piezas de fábrica
+1420000821 ed. 2006 (254 figuras, 3.664 filas) navegable en modo
+`despiece` (assets en Firebase Storage, `planos/baader-142-despiece/`),
+con ficha de pieza y puente bidireccional B14↔pieza física en los planos
+eléctricos 888/860 (`partes.json` nuevo + bloque "Pieza física" +
+telemetría `planoUsos`). Verificado: tsc/eslint limpios, 8/8 checks de
+navegador, auditoría de datos OK (254 hojas, 2.527 posiciones ancladas,
+14 sensores B mapeados en 888 y 860, assets HTTP 200 en Storage).
+**Pendiente:** el OCR fino por teselas sigue corriendo — al terminar se
+re-suben los JSON de hojas con más anclas y se bumpea `vAssets`
+(micro-PR data-only, sin código).
+
+⚠️ Este archivo pasa los 173 KB — compactar en la próxima sesión que lo toque.
+
 ## 2026-08-18 · Feat: botón «actualizar ahora» + cronómetro de la próxima lectura del pulso (PR #641)
 
 Pedido de Orel para no depender solo del ciclo automático: se agregó el
