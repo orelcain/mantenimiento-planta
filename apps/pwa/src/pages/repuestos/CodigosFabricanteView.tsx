@@ -25,7 +25,7 @@ import { collection, getDocs } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import { Input } from '@/components/ui'
 import { ShareInteractiveButton } from '@/components/visor3d/ShareInteractiveButton'
-import { APP_VERSION } from '@/constants'
+import { CATALOGOS, cargarCatalogos, type PiezaCatalogo } from './catalogosFabricante'
 import { useRepuestosExistentes, normCodigo } from '@/hooks/repuestos/useRepuestosExistentes'
 import { logger } from '@/lib/logger'
 
@@ -88,84 +88,6 @@ export interface CrearDesdeCatalogo {
   equipoNombre: string
 }
 
-interface PiezaCatalogo {
-  codigo: string
-  descripcion: string
-  descripcionEn: string
-  especificacion: string
-  cantidad: string
-  posicion: string
-  conjunto: string
-  pagina: number
-  fuente: string
-  /** Campos estampados al cargar desde el header del catálogo: */
-  maquina?: string
-  equipoNodeIds?: string[]
-  equipoCodigos?: string[]
-  equipoNombre?: string
-  /** Id del manual en la colección `manuales` (si el PDF está subido a la app). */
-  manualId?: string
-  /** Código del distribuidor local (envuelve al código de fabricante) y su empresa. */
-  codigoProveedor?: string
-  proveedor?: string
-  /** Código SAP ya creado para esta pieza (cruzado desde el maestro del proveedor). */
-  codigoSap?: string
-}
-
-interface CatalogoFabricante {
-  maquina: string
-  sap?: string
-  equipoNodeIds?: string[]
-  equipoCodigos?: string[]
-  equipoNombre?: string
-  manualPorFuente?: Record<string, string>
-  piezas: PiezaCatalogo[]
-}
-
-/** Catálogos publicados (public/data/codigos-fabricante/). */
-const CATALOGOS = [
-  { id: 'gea', url: '/data/codigos-fabricante/gea-termoformadora.json', maquina: 'TERMOFORMADORA GEA' },
-  { id: 'baader-142', url: '/data/codigos-fabricante/baader-142.json', maquina: 'BAADER 142' },
-  { id: 'baader-200', url: '/data/codigos-fabricante/baader-200.json', maquina: 'BAADER 200' },
-  { id: 'marel-eviscerado', url: '/data/codigos-fabricante/marel-eviscerado.json', maquina: 'MAREL EVISCERADO' },
-  { id: 'marel-filete', url: '/data/codigos-fabricante/marel-filete.json', maquina: 'MAREL FILETE' },
-  { id: 'enzunchadora-tp6000', url: '/data/codigos-fabricante/enzunchadora-tp6000.json', maquina: 'ENZUNCHADORA TP-6000' },
-]
-
-// Cache de módulo: el JSON (~2 MB) se baja una sola vez por sesión.
-let _cache: PiezaCatalogo[] | null = null
-let _cachePromise: Promise<PiezaCatalogo[]> | null = null
-
-async function cargarCatalogos(): Promise<PiezaCatalogo[]> {
-  if (_cache) return _cache
-  if (!_cachePromise) {
-    _cachePromise = Promise.all(
-      CATALOGOS.map(async (c) => {
-        const base = import.meta.env.BASE_URL.replace(/\/$/, '')
-        // ?v=<versión> evita que el navegador sirva un JSON viejo cacheado
-        // (GitHub Pages manda Cache-Control max-age=600): al subir la versión,
-        // la URL cambia y se baja el catálogo fresco tras cada deploy.
-        const res = await fetch(`${base}${c.url}?v=${APP_VERSION}`)
-        if (!res.ok) throw new Error(`catálogo ${c.id}: HTTP ${res.status}`)
-        const data = (await res.json()) as CatalogoFabricante
-        const manualPorFuente = data.manualPorFuente || {}
-        return (data.piezas || []).map((p) => ({
-          ...p,
-          maquina: data.maquina,
-          equipoNodeIds: data.equipoNodeIds || [],
-          equipoCodigos: data.equipoCodigos || [],
-          equipoNombre: data.equipoNombre || '',
-          manualId: manualPorFuente[p.fuente],
-        }))
-      }),
-    ).then((listas) => {
-      _cache = listas.flat()
-      return _cache
-    }).catch((e) => { _cachePromise = null; throw e })
-  }
-  return _cachePromise
-}
-
 const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase()
 
 interface CodigosFabricanteViewProps {
@@ -194,7 +116,15 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
 
   useEffect(() => {
     let alive = true
-    cargarCatalogos()
+    // Progresivo: se pinta lo que va llegando en vez de esperar a los 6.
+    cargarCatalogos((parcial, faltan) => {
+      if (!alive) return
+      setPiezas(parcial)
+      // Decir CUÁLES faltan, no un "algo falló" genérico: si el técnico busca
+      // una pieza de la GEA tiene que saber que ese catálogo no cargó, en vez
+      // de creer que su código no existe.
+      setError(faltan.length ? `No cargó el catálogo de ${faltan.join(', ')}. El resto sí se puede buscar.` : null)
+    })
       .then((p) => { if (alive) setPiezas(p) })
       .catch((e) => {
         if (alive) setError('No se pudo cargar el catálogo de códigos.')
