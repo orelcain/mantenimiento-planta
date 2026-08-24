@@ -369,6 +369,26 @@ def svg():
             print(f"  svg {n}/{len(figs)}")
     print(f"OK {len(figs)} SVG en {dest}")
 
+def _guardar_ocr(salida, desde, hasta, total_figs, parcial=False):
+    """Escribe el resultado del OCR.
+
+    Los parciales van a un `.parcial` que `ocrt` lee al arrancar para
+    RETOMAR: un proceso de OCR corre horas y si lo matan (memoria, reinicio,
+    cierre de sesion) se perdia TODO — ya paso con la 200. Guardar cada 10
+    figuras cuesta milisegundos.
+    """
+    completo = desde == 1 and hasta == total_figs
+    nombre = "ocr.json" if completo else f"ocr-parte-{desde}-{hasta}.json"
+    if parcial:
+        nombre += ".parcial"
+    with io.open(os.path.join(TRABAJO, nombre), "w", encoding="utf-8") as fh:
+        json.dump(salida, fh, ensure_ascii=False, indent=1)
+    if not parcial:
+        prev = os.path.join(TRABAJO, nombre + ".parcial")
+        if os.path.exists(prev):
+            os.remove(prev)
+
+
 def _normalizar_pos(t):
     t = t.strip().replace(" ", "").replace(",", "-").replace(".", "-")
     t = re.sub(r"[^A-Za-z0-9-]", "", t).upper()
@@ -511,10 +531,23 @@ def ocrt(desde=1, hasta=None):
     motor = RapidOCR()
     ZOOM, TESELA, SOLAPE = 4, 250, 40
     hasta = hasta or len(figs)
-    salida = {}
+    # RETOMAR: si hay un parcial de una corrida anterior, las figuras que ya
+    # tienen resultado no se vuelven a procesar (cada una cuesta ~1 min).
+    ruta_parcial = os.path.join(
+        TRABAJO,
+        ("ocr.json" if (desde == 1 and hasta == len(figs)) else f"ocr-parte-{desde}-{hasta}.json") + ".parcial",
+    )
+    salida = json.load(io.open(ruta_parcial, encoding="utf-8")) if os.path.exists(ruta_parcial) else {}
+    if salida:
+        print(f"retomando: {len(salida)} figuras ya procesadas", flush=True)
     tot_esp = tot_ok = 0
     for n, f in enumerate(figs, 1):
         if n < desde or n > hasta:
+            continue
+        if str(n) in salida:      # ya venía del parcial
+            a = salida[str(n)]
+            tot_esp += len(a["esperadas"])
+            tot_ok += len(a["esperadas"]) - len(a["sinAncla"])
             continue
         pg = doc[f["dibujos"][0] - 1]
         esperadas = {_normalizar_pos(x["pos"]) for x in f["filas"]}
@@ -555,9 +588,7 @@ def ocrt(desde=1, hasta=None):
         tot_ok += len(esperadas) - len(sin)
         if n % 10 == 0:
             print(f"  ocrt {n}/{len(figs)} · ancladas {tot_ok}/{tot_esp} ({100*tot_ok/max(tot_esp,1):.0f}%)", flush=True)
-    nombre = "ocr.json" if (desde == 1 and hasta == len(figs)) else f"ocr-parte-{desde}-{hasta}.json"
-    with io.open(os.path.join(TRABAJO, nombre), "w", encoding="utf-8") as fh:
-        json.dump(salida, fh, ensure_ascii=False, indent=1)
+    _guardar_ocr(salida, desde, hasta, len(figs))
     print(f"OK ocrt [{desde}-{hasta}] · ancladas {tot_ok}/{tot_esp} ({100*tot_ok/max(tot_esp,1):.1f}%)")
 
 def ocrmerge():

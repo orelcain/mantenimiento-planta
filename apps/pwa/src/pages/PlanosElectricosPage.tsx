@@ -764,10 +764,20 @@ function Visor({ slug }: { slug: string }) {
       {/* riel superior */}
       <header className="sticky top-0 z-40 flex flex-wrap items-center gap-3 border-b px-3 py-2"
               style={{ background: 'var(--lc-surface)', borderColor: 'var(--lc-border)' }}>
-        <Link to="/aprendizaje/planos" className="flex flex-col leading-tight no-underline" style={{ color: 'inherit' }}>
-          <span className="text-footnote font-semibold">{cat?.maquina ?? indice.maquina}</span>
-          <span className="font-mono text-caption" style={{ color: 'var(--lc-ink-mid)' }}>
-            {indice.plano} · {indice.rev}
+        {/* La vuelta al catálogo estaba SOLO en el título, sin nada que lo
+            indicara: nadie adivina que tocando "BAADER 142" se sale del plano
+            (lo reportó Orel usándolo). La flecha lo dice, y entra en el mismo
+            área tocable de 44 px. */}
+        <Link to="/aprendizaje/planos"
+              title="Volver a todos los planos"
+              className="-ml-1 flex min-h-[44px] items-center gap-1.5 rounded-ctl pl-1 pr-2 no-underline"
+              style={{ color: 'inherit' }}>
+          <ChevronLeft size={18} style={{ color: 'var(--lc-aqua-bright)' }} />
+          <span className="flex flex-col leading-tight">
+            <span className="text-footnote font-semibold">{cat?.maquina ?? indice.maquina}</span>
+            <span className="font-mono text-caption" style={{ color: 'var(--lc-ink-mid)' }}>
+              {indice.plano} · {indice.rev}
+            </span>
           </span>
         </Link>
 
