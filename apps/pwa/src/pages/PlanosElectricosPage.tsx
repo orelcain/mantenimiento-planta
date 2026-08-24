@@ -1994,10 +1994,10 @@ function FormularioTerreno({
           {o.etiqueta}
         </button>
       ))}
+      {/* maxLength=30 es el tope que exige la regla de Firestore. Sin el,
+          pegar de mas rebota con "Missing or insufficient permissions", que
+          en terreno no le dice nada a nadie. */}
       {opcion === 'corregido' && (
-        {/* 30 = el tope que exige la regla de Firestore. Sin esto, pegar de
-            mas rebota con "Missing or insufficient permissions", que en
-            terreno no le dice nada a nadie. */}
         <input type="text" inputMode="numeric" maxLength={30} placeholder="código de la etiqueta" value={codigo}
                onChange={(e) => onCodigo(e.target.value)}
                className="min-h-[44px] rounded-ctl border px-3 text-footnote"
