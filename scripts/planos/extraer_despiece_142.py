@@ -902,6 +902,15 @@ def indice_app():
 
     hojas_meta, indice_cod, busqueda, descs = [], {}, [], {}
     for n, f in enumerate(figs, 1):
+        # RESCATE de la figura 00 «Piezas de desgaste»: no tiene codigo de
+        # conjunto (no es un conjunto, es una lista) y el parser general la
+        # dejaba en 0 filas — la figura que el tecnico mas busca, vacia.
+        # extraer_desgaste_<ID>.py la saca aparte; aca se inyecta.
+        # VA ACA, antes de hojas_meta: inyectarla mas abajo poblaba la hoja
+        # pero dejaba el CONTADOR del indice en 0, y el acceso directo decia
+        # "0 piezas que se cambian seguido" con las 9 piezas ya adentro.
+        if not f["filas"] and desgaste_extra and f.get("seccion") in ("00", "0"):
+            f = dict(f, filas=desgaste_extra)
         pg = doc[f["dibujos"][0] - 1]
         vb = [round(pg.rect.width, 2), round(pg.rect.height, 2)]
         a = anclas.get(str(n), {"poss": [], "sinAncla": []})
@@ -949,12 +958,6 @@ def indice_app():
 
         # las posiciones OCR van como capa `tags`: PlanoLienzo ya dibuja esa
         # capa y su click (onAparato) — cero cambios de lienzo para el despiece
-        # RESCATE de la figura 00 «Piezas de desgaste»: no tiene codigo de
-        # conjunto (no es un conjunto, es una lista) y el parser general la
-        # dejaba en 0 filas — la figura que el tecnico mas busca, vacia.
-        # extraer_desgaste_<ID>.py la saca aparte; aca se inyecta.
-        if not f["filas"] and desgaste_extra and f.get("seccion") in ("00", "0"):
-            f = dict(f, filas=desgaste_extra)
         filas_out = []
         for x in f["filas"]:
             fila = dict(x)
@@ -1069,7 +1072,14 @@ def indice_app():
             pass
     # Mapa liviano codigo->figura para el modulo REPUESTOS (el indice completo
     # pesa 770 KB y ahi solo se necesita "donde esta el dibujo de esta pieza").
-    mapa = {cod: [aps[0]["h"], hojas_meta[aps[0]["h"] - 1]["fig"]]
+    # La figura 00 es la LISTA de piezas de desgaste, no un dibujo: si un codigo
+    # sale ahi y tambien en su figura real, el boton "Ver dibujo" tiene que
+    # llevar a la que TIENE dibujo. Al rescatar esa lista, las 9 piezas pasaron
+    # a apuntar a la 00 solo porque va primero.
+    def _mejor(aps):
+        reales = [a for a in aps if hojas_meta[a["h"] - 1]["fig"] not in ("00", "0")]
+        return (reales or aps)[0]
+    mapa = {cod: [_mejor(aps)["h"], hojas_meta[_mejor(aps)["h"] - 1]["fig"]]
             for cod, aps in indice_cod.items() if aps}
     ruta_mapa = os.path.abspath(os.path.join(
         RAIZ, "..", "..", "apps", "pwa", "public", "data", f"despiece-{DESPIECE_ID}-figuras.json"))
