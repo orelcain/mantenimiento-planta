@@ -27,6 +27,7 @@ import { Input } from '@/components/ui'
 import { ShareInteractiveButton } from '@/components/visor3d/ShareInteractiveButton'
 import { CATALOGOS, cargarCatalogos, type PiezaCatalogo } from './catalogosFabricante'
 import { agruparPorCodigo } from './agruparPiezas'
+import { sinonimoDe } from '@/utils/sinonimosPlanta'
 import { useRepuestosExistentes, normCodigo } from '@/hooks/repuestos/useRepuestosExistentes'
 import { logger } from '@/lib/logger'
 
@@ -170,6 +171,13 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
     const alnumQ = q.replace(/[^A-Z0-9]/g, '')
     const esNumerico = soloDigitos.length >= 4
     const terms = q.split(/\s+/).filter((t) => t.length >= 2)
+    // El término del fabricante para cada palabra escrita, si lo hay: el
+    // catálogo dice "arandela" y en planta se dice "golilla".
+    const termsAlias: Record<string, string> = {}
+    for (const t of terms) {
+      const a = sinonimoDe(t)
+      if (a) termsAlias[t] = norm(a)
+    }
     const scored: { p: PiezaCatalogo; score: number }[] = []
     for (const p of piezas) {
       let score = 0
@@ -183,7 +191,9 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
         else if (p.codigo.includes(soloDigitos) || (alnumProv && alnumProv.includes(alnumQ))) score = 30
       } else if (terms.length) {
         const blob = norm(`${p.descripcion} ${p.descripcionEn} ${p.conjunto} ${p.especificacion}`)
-        const hits = terms.filter((t) => blob.includes(t)).length
+        // Cada palabra vale por sí misma o por su término de fabricante:
+        // "golilla" daba Sin resultados con 135 arandelas en el catálogo.
+        const hits = terms.filter((t) => blob.includes(t) || (termsAlias[t] !== undefined && blob.includes(termsAlias[t]!))).length
         if (hits === terms.length) score = 20 + hits
       }
       if (score > 0) scored.push({ p, score })
