@@ -444,6 +444,12 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident, 
     }
   }
 
+  /** Lo que impide enviar, en palabras. Mismo criterio que el `disabled`. */
+  const faltan = [
+    !isEditMode && !formData.hierarchyNodeId && !formData.zoneId ? 'la ubicación' : null,
+    !formData.titulo ? 'el título' : null,
+  ].filter(Boolean) as string[]
+
   return (
     <Dialog open onOpenChange={onClose}>
       <DialogContent className="max-w-lg max-h-[95vh] overflow-y-auto p-4 sm:p-6">
@@ -956,6 +962,16 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident, 
               <div className="p-3 rounded-card bg-destructive/10 text-destructive text-sm">
                 {validationErrors.general}
               </div>
+            )}
+            {/* El botón se deshabilita hasta tener ubicación y título, y hasta
+                ahora no decía cuál de las dos faltaba: en el teléfono, con el
+                selector de ubicación más arriba en el formulario, el técnico
+                llena lo que ve, toca "Reportar" y no pasa nada. Se dice qué
+                falta, en el mismo lugar donde está el botón muerto. */}
+            {faltan.length > 0 && (
+              <p className="text-xs text-ink-warn">
+                Falta {faltan.join(' y ')} para poder reportar.
+              </p>
             )}
             <div className="flex flex-col-reverse sm:flex-row gap-2">
               <Button 
