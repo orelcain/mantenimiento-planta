@@ -264,19 +264,28 @@ export function usePlano(slug: string | undefined, inicial?: number) {
     [slug],
   )
 
+  // Ultima hoja PEDIDA. Sin esto gana la que resuelve ultima, no la que el
+  // usuario pidio ultima: un deep-link ?fig= perdia contra la hoja recordada
+  // en localStorage (dos abrir() en vuelo) y aterrizaba en la hoja
+  // equivocada — reproducido en produccion. Pasa igual al tocar dos hojas
+  // seguidas si la primera es mas pesada.
+  const pedida = useRef<number | null>(null)
+
   const abrir = useCallback(
     async (blatt: number) => {
       if (!indice) return
       if (!indice.hojas.some((h) => h.blatt === blatt)) return
+      pedida.current = blatt
       setCargando(true)
       try {
         const datos = await traer(blatt)
+        if (pedida.current !== blatt) return // llego tarde: ya piden otra
         if (datos) setHoja({ blatt, datos })
         setError(null)
       } catch {
-        setError(`No se pudo cargar la hoja ${blatt}.`)
+        if (pedida.current === blatt) setError(`No se pudo cargar la hoja ${blatt}.`)
       } finally {
-        setCargando(false)
+        if (pedida.current === blatt) setCargando(false)
       }
       // Prefetch de las vecinas, sin bloquear ni romper si fallan.
       const i = indice.hojas.findIndex((h) => h.blatt === blatt)
