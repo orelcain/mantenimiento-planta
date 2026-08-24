@@ -1227,6 +1227,32 @@ async function fetchCalendarioMantencionSummary(): Promise<string> {
 
     const effectiveDaily = Math.max(0, (hoursConfig.workHours || 8) - (hoursConfig.breakHours || 0.5))
 
+    /*
+     * Hasta dónde llega la planilla.
+     *
+     * El 24-08 la planilla terminaba el 08/06 y a "¿quién está de turno hoy?"
+     * ARIA contestó "tú estás en el Turno Tarde (14:00 a 22:00)" — inventado,
+     * y encima con un horario que ni siquiera coincidía con la configuración
+     * del mismo contexto (Tarde 16:00-00:00). El contexto decía "Sin datos
+     * para esta semana", pero perdido en medio del bloque. Cuando la planilla
+     * no cubre HOY se dice con todas las letras y se instruye qué contestar.
+     */
+    const fechasCargadas = parsedCols
+      .map((c: any) => c.dateObj as Date | null)
+      .filter((d: Date | null): d is Date => !!d)
+      .sort((x: Date, y: Date) => x.getTime() - y.getTime())
+    const fmtDia = (d: Date) => d.toLocaleDateString('es-CL')
+    const cubreHoy = weekCols.length > 0
+    const avisoCobertura = cubreHoy
+      ? ''
+      : [
+          `\n⚠️ LA PLANILLA NO CUBRE HOY (${todayStr}).`,
+          fechasCargadas.length > 0
+            ? `Solo hay turnos cargados del ${fmtDia(fechasCargadas[0]!)} al ${fmtDia(fechasCargadas[fechasCargadas.length - 1]!)}.`
+            : 'No hay ningún día cargado.',
+          `NO afirmes quién está de turno hoy ni inventes horarios: di hasta qué fecha llega la planilla y que hay que extenderla en /calendario-mantencion.`,
+        ].join('\n')
+
     const result = [
       `CALENDARIO MANTENCIÓN — Datos actuales:`,
       `Plantilla: ${filename}`,
@@ -1239,10 +1265,19 @@ async function fetchCalendarioMantencionSummary(): Promise<string> {
       ``,
       `Semana actual (${currentWeek}): ${weekCols.length} días`,
       `Fecha de hoy: ${todayStr}`,
+      avisoCobertura,
       weekSummary.length > 0 ? `Turnos esta semana:\n${weekSummary.join('\n')}` : 'Sin datos para esta semana.',
       techsOnVacation.length > 0 ? `\nTécnicos en vacaciones esta semana: ${techsOnVacation.join(', ')}` : '',
       `\nMes actual (${currentMonth}): ${monthCols.length} días`,
-      `\nTurnos configurados: Día ${shiftConfig.diaInicio || '08:00'}-${shiftConfig.diaFin || '16:00'} | Tarde ${shiftConfig.tardeInicio || '16:00'}-${shiftConfig.tardeFin || '00:00'} | Noche ${shiftConfig.nocheInicio || '00:00'}-${shiftConfig.nocheFin || '08:00'}`,
+      /* Los horarios van con "estos y no otros" porque el modelo los rellenaba
+         de memoria: dijo "Turno Tarde (14:00 a 22:00)" teniendo el 16:00-00:00
+         configurado tres líneas más arriba, en este mismo contexto. */
+      `\nTurnos configurados (usa EXACTAMENTE estos horarios, no existen otros): Día ${shiftConfig.diaInicio || '08:00'}-${shiftConfig.diaFin || '16:00'} | Tarde ${shiftConfig.tardeInicio || '16:00'}-${shiftConfig.tardeFin || '00:00'} | Noche ${shiftConfig.nocheInicio || '00:00'}-${shiftConfig.nocheFin || '08:00'}`,
+      /* El turno de una persona SOLO existe en esta planilla. La cuenta del
+         usuario no guarda turno, y sin este dato el modelo lo rellenaba solo:
+         "tú estás registrado en el Turno Tarde (14:00 a 22:00)" — inventado, y
+         encima con un horario distinto al configurado acá arriba. */
+      `\nOJO: el sistema NO guarda el turno de cada usuario. El turno de una persona SOLO se sabe si aparece en esta planilla y para una fecha cargada. Nunca deduzcas el turno de alguien de su sesión, su rol ni su nombre.`,
       `\nPágina: /calendario-mantencion`,
     ].join('\n')
 
