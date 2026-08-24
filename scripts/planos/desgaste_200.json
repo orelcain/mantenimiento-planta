@@ -1,0 +1,59 @@
+{
+ "fig": "00",
+ "filas": [
+  {
+   "pos": "1",
+   "nr": "2001101002",
+   "de": "2. Flossenrichter Flossenblech, rechts",
+   "es": "Alineador para aletas 2 · derecha"
+  },
+  {
+   "pos": "2",
+   "nr": "2001101001",
+   "de": "2. Flossenrichter Flossenblech, links",
+   "es": "Alineador para aletas 2 · izquierda"
+  },
+  {
+   "pos": "3",
+   "nr": "518477",
+   "de": "1. Flossenrichter Flossenblech, rechts",
+   "es": "Alineador para aletas 1 · derecha"
+  },
+  {
+   "pos": "4",
+   "nr": "518487",
+   "de": "1. Flossenrichter Flossenblech, links",
+   "es": "Alineador para aletas 1 · izquierda"
+  },
+  {
+   "pos": "5",
+   "nr": "94011760",
+   "de": "Kreismesser (Bauch-/Rückenmesser)",
+   "es": "Cuchilla circular (cuchilla ventral/dorsal)"
+  },
+  {
+   "pos": "6",
+   "nr": "94011918",
+   "de": "Messeraufnahme - Linksgewinde -",
+   "es": "Portada de cuchilla - Rosca a la izquierda -"
+  },
+  {
+   "pos": "7",
+   "nr": "94011910",
+   "de": "Messeraufnahme - Rechtsgewinde -",
+   "es": "Portada de cuchilla - Rosca a la derecha -"
+  },
+  {
+   "pos": "8",
+   "nr": "2001400009",
+   "de": "Messer, rechts (Trennstichel)",
+   "es": "Cuchilla, derecha (cortador de separacion)"
+  },
+  {
+   "pos": "9",
+   "nr": "2001400010",
+   "de": "Messer, links (Trennstichel)",
+   "es": "Cuchilla, izquierda (cortador de separacion)"
+  }
+ ]
+}

@@ -857,6 +857,10 @@ def indice_app():
         for m in json.load(io.open(ruta_maestro, encoding="utf-8")):
             if m["fab"] and m["sap"].isdigit():
                 sap_por_fab.setdefault(m["fab"], {"s": m["sap"], "n": m["nombre"][:60], "u": m["ubicacion"]})
+    # Piezas de desgaste rescatadas aparte (ver extraer_desgaste_<ID>.py)
+    ruta_desg = os.path.join(RAIZ, f"desgaste_{DESPIECE_ID}.json")
+    desgaste_extra = (json.load(io.open(ruta_desg, encoding="utf-8")).get("filas") or []
+                      if os.path.exists(ruta_desg) else [])
     ruta_ocr = os.path.join(trabajo, "ocr.json")
     anclas = json.load(io.open(ruta_ocr, encoding="utf-8")) if os.path.exists(ruta_ocr) else {}
     doc = fitz.open(PDF_835)
@@ -945,6 +949,12 @@ def indice_app():
 
         # las posiciones OCR van como capa `tags`: PlanoLienzo ya dibuja esa
         # capa y su click (onAparato) — cero cambios de lienzo para el despiece
+        # RESCATE de la figura 00 «Piezas de desgaste»: no tiene codigo de
+        # conjunto (no es un conjunto, es una lista) y el parser general la
+        # dejaba en 0 filas — la figura que el tecnico mas busca, vacia.
+        # extraer_desgaste_<ID>.py la saca aparte; aca se inyecta.
+        if not f["filas"] and desgaste_extra and f.get("seccion") in ("00", "0"):
+            f = dict(f, filas=desgaste_extra)
         filas_out = []
         for x in f["filas"]:
             fila = dict(x)
