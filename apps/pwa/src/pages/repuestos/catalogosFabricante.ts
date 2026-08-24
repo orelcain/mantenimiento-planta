@@ -58,6 +58,16 @@ let _cache: PiezaCatalogo[] | null = null
 let _cachePromise: Promise<PiezaCatalogo[]> | null = null
 
 /**
+ * Vacía la caché de módulo. SOLO para tests: sin esto el resultado de un test
+ * queda cacheado y el siguiente no vuelve a pedir nada, así que la suite pasa
+ * o falla según el orden en que se escribieron los casos.
+ */
+export function _resetCacheCatalogos(): void {
+  _cache = null
+  _cachePromise = null
+}
+
+/**
  * Carga los catálogos TOLERANDO que alguno falle.
  *
  * Antes era un `Promise.all`: con la señal de planta, que se cayera UN
