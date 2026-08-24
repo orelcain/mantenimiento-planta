@@ -89,6 +89,9 @@ export interface CrearDesdeCatalogo {
   equipoNombre: string
 }
 
+/** Tope de tarjetas en pantalla. Con el aviso de abajo, ya no esconde nada. */
+const TOPE = 100
+
 const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase()
 
 interface CodigosFabricanteViewProps {
@@ -147,10 +150,10 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
     return () => { alive = false }
   }, [publico])
 
-  const resultados = useMemo(() => {
-    if (!piezas) return []
+  const resultadosMemo = useMemo(() => {
+    if (!piezas) return { lista: [], total: 0 }
     const q = norm(query.trim())
-    if (q.length < 3) return []
+    if (q.length < 3) return { lista: [], total: 0 }
     // Si la consulta trae una secuencia numérica larga se busca como código,
     // tolerando prefijos ("GEA 3000544810" viene grabado así en la pieza).
     // También se compara sin separadores ("T6-1-20250" ↔ "T6120250") para que
@@ -182,12 +185,16 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
     // Agrupar ANTES del tope: `31800105` tenía 159 filas y el corte en 100 se
     // las comía todas con la misma pieza, escondiendo el resto de resultados.
     // Ahora el tope cuenta PIEZAS distintas, que es lo que el técnico mira.
-    return agruparPorCodigo(scored.map((s) => s.p)).slice(0, 100)
+    const todas = agruparPorCodigo(scored.map((s) => s.p))
+    // El total viaja aparte para poder DECIR que se cortó: un listado de 100
+    // sin aviso se lee como "esto es todo lo que hay".
+    return { lista: todas.slice(0, TOPE), total: todas.length }
   }, [piezas, query])
+  const { lista, total } = resultadosMemo
 
   // ¿cuáles de los códigos en pantalla ya existen como repuesto en el maestro?
   // (requiere sesión: en modo invitado no se consulta)
-  const { existentes } = useRepuestosExistentes(publico ? [] : resultados.map((g) => g.rep.codigo))
+  const { existentes } = useRepuestosExistentes(publico ? [] : lista.map((g) => g.rep.codigo))
   const figurasDespiece = useFigurasDespiece()
 
   const copiar = (codigo: string) => {
@@ -233,7 +240,7 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
       {!error && !piezas && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Cargando catálogo…</div>
       )}
-      {piezas && query.trim().length >= 3 && resultados.length === 0 && (
+      {piezas && query.trim().length >= 3 && total === 0 && (
         <p className="text-sm text-muted-foreground">Sin resultados en los catálogos ({piezas.length.toLocaleString('es-CL')} filas indexadas).</p>
       )}
       {piezas && query.trim().length < 3 && (
@@ -241,9 +248,19 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
           {piezas.length.toLocaleString('es-CL')} filas de despiece indexadas · catálogos: {CATALOGOS.map((c) => c.maquina).join(', ')}.
         </p>
       )}
+      {/* Cuántas piezas hay de verdad. Un listado cortado en 100 sin avisar se
+          lee como "esto es todo": el técnico que no ve la suya cree que no
+          está en el catálogo, cuando lo que falta es afinar la búsqueda. */}
+      {total > 0 && (
+        <p className="text-footnote text-muted-foreground">
+          {total > TOPE
+            ? `${TOPE} de ${total.toLocaleString('es-CL')} piezas — afiná la búsqueda para ver el resto.`
+            : `${total} pieza${total === 1 ? '' : 's'}.`}
+        </p>
+      )}
 
       <div className="space-y-2">
-        {resultados.map((g, i) => {
+        {lista.map((g, i) => {
           const p = g.rep
           // undefined = aún no verificado · null = no existe · objeto = ya creado
           const existe = existentes.get(normCodigo(p.codigo))
