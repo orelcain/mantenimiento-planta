@@ -75,6 +75,8 @@ function shift(
     hasGrader: !!opts.grader,
     lowActivity: false,
     unscheduled: false,
+    corregido: false,
+    notaCorreccion: null,
   }
 }
 

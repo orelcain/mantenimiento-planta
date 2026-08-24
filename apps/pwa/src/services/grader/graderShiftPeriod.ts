@@ -128,6 +128,17 @@ export interface PeriodShift {
 
   hasSlx: boolean
   hasGrader: boolean
+  /**
+   * Shoplogix cambió los números de este turno DESPUÉS de que ya se había
+   * reportado el brief de fin de turno (`checkShiftReconciliation`). Pasó en
+   * 39 de 790 turnos, y no siempre en chico: Yal 21-07 pasó de 9.494 a 20.113
+   * piezas. El backend lo detecta y avisa por Telegram, pero en la app el
+   * turno corregido se veía idéntico a los demás — quien lo mira hoy no tenía
+   * cómo saber que el número que se reportó ese día no es el que está viendo.
+   */
+  corregido: boolean
+  /** El antes y después, tal como lo escribió el backend. Null si no hubo. */
+  notaCorreccion: string | null
   /** Tiene ciclos, pero por debajo de la operación normal (mantención, test…). */
   lowActivity: boolean
   /** Producción que Shoplogix registró sin turno configurado. Se muestra fiel. */
@@ -376,6 +387,8 @@ function makeShift(
     p0Pct,
     hasSlx: p !== null,
     hasGrader: g !== null,
+    corregido: p?.correctionDetected === true,
+    notaCorreccion: p?.reconciliationNote ?? null,
     lowActivity: isLowActivityCycleCount(cycles),
     unscheduled: isUnscheduledShift(shiftId),
   }
@@ -484,6 +497,9 @@ export function mergeSameNameShifts(shifts: readonly PeriodShift[]): PeriodShift
         : null,
       hasSlx: list.some(s => s.hasSlx),
       hasGrader: list.some(s => s.hasGrader),
+      // Si CUALQUIERA de las jornadas unidas fue corregida, el turno lo está.
+      corregido: list.some(s => s.corregido),
+      notaCorreccion: list.map(s => s.notaCorreccion).filter(Boolean).join(' · ') || null,
       lowActivity: list.every(s => s.lowActivity),
       mergedFrom: ordered,
     })
