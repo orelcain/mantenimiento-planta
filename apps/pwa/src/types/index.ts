@@ -95,6 +95,17 @@ export interface Equipment {
   position?: { x: number; y: number }
   qrCode?: string
   criticidad: 'alta' | 'media' | 'baja'
+  /**
+   * ISO de cuándo ALGUIEN evaluó la criticidad.
+   *
+   * Los 553 equipos entraron por la importación SAP con `criticidad: 'media'`
+   * —el valor por defecto del formulario— y nadie la cambió nunca. Sin esta
+   * marca, el Centro Técnico Documental mostraba "B · Media · Inspección base
+   * ~365 días" como si fuera una evaluación NFPA 70B §2.4, y el KPI
+   * "Criticidad A: 0" se leía como "no hay equipos críticos" en vez de
+   * "nadie los ha clasificado". Ausente = sin evaluar.
+   */
+  criticidadEvaluadaEl?: string
   estado: 'operativo' | 'en_mantenimiento' | 'fuera_servicio'
   fechaInstalacion?: Date
   photoURL?: string // @deprecated - usar photos[]
