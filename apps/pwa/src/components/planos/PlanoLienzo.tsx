@@ -285,7 +285,7 @@ export function PlanoLienzo({
           ['fit', 'Ajustar hoja', ajustar],
         ].map(([txt, titulo, fn]) => (
           <button key={txt as string} type="button" title={titulo as string} onClick={fn as () => void}
-                  className="border-b px-3 py-2 font-mono text-sm last:border-b-0 hover:opacity-80"
+                  className="flex min-h-[44px] min-w-[44px] items-center justify-center border-b font-mono text-sm last:border-b-0 hover:opacity-80"
                   style={{ color: 'var(--lc-ink-mid)', borderColor: 'var(--lc-border)' }}>
             {txt as string}
           </button>

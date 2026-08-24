@@ -831,7 +831,7 @@ function Visor({ slug }: { slug: string }) {
                  placeholder={esVisor ? 'Buscar hoja por título: sellado, vacío, freno…'
                               : esDespiece ? 'Buscar pieza: cuchilla, resorte, código…'
                               : 'Buscar K7, Q1, B12, Messer, cuchillo…'}
-                 className="w-full rounded-card border bg-transparent py-1.5 pl-8 pr-2 font-mono text-footnote outline-none"
+                 className="min-h-[44px] w-full rounded-card border bg-transparent py-1.5 pl-8 pr-2 font-mono text-footnote outline-none"
                  style={{ color: 'var(--lc-ink)', borderColor: 'var(--lc-border)' }} />
         </div>
 
@@ -856,7 +856,7 @@ function Visor({ slug }: { slug: string }) {
             <button key={txt} type="button"
                     onClick={() => { setMostrarEs(v); localStorage.setItem('plano-idioma', v ? 'es' : 'de') }}
                     aria-pressed={mostrarEs === v}
-                    className="px-3 py-1.5 text-footnote font-semibold"
+                    className="flex min-h-[44px] items-center px-3 text-footnote font-semibold"
                     style={mostrarEs === v
                       ? { background: 'var(--lc-prep-soft)', color: 'var(--lc-prep)' }
                       : { color: 'var(--lc-ink-mid)' }}>
@@ -866,7 +866,7 @@ function Visor({ slug }: { slug: string }) {
         </div>
 
         <button type="button" title="Imprimir esta hoja" onClick={imprimirHoja}
-                className="rounded-ctl p-1.5" style={{ color: 'var(--lc-ink-mid)' }}>
+                className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-ctl" style={{ color: 'var(--lc-ink-mid)' }}>
           <Printer size={15} />
         </button>
         <BotonOffline slug={slug} indice={indice} />
@@ -882,23 +882,23 @@ function Visor({ slug }: { slug: string }) {
                   }
                   void navigator.clipboard?.writeText(u.toString())
                 }}
-                className="rounded-ctl p-1.5" style={{ color: 'var(--lc-ink-mid)' }}>
+                className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-ctl" style={{ color: 'var(--lc-ink-mid)' }}>
           <LinkIcon size={15} />
         </button>
         <button type="button" title="QR de este punto del plano" onClick={() => setMostrarQR(true)}
-                className="rounded-ctl p-1.5" style={{ color: 'var(--lc-ink-mid)' }}>
+                className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-ctl" style={{ color: 'var(--lc-ink-mid)' }}>
           <QrCode size={15} />
         </button>
         <div className="flex items-center gap-1 font-mono text-footnote">
           <button type="button" disabled={!anterior} onClick={() => anterior && void irA(anterior.blatt)}
-                  className="rounded-ctl p-1 disabled:opacity-30" title="Hoja anterior">
+                  className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-ctl disabled:opacity-30" title="Hoja anterior">
             <ChevronLeft size={16} />
           </button>
           {/* Select nativo: en el teléfono el índice lateral no existe y sin
               esto la única forma de moverse era de a una hoja con las flechas. */}
           <select value={hoja.blatt} onChange={(e) => void irA(Number(e.target.value))}
                   aria-label="Ir a hoja"
-                  className="max-w-[7.5rem] cursor-pointer appearance-none truncate rounded-ctl border-0 bg-transparent py-1 pr-0.5 font-mono text-footnote tabular-nums outline-none sm:max-w-[18rem]"
+                  className="min-h-[44px] max-w-[7.5rem] cursor-pointer appearance-none truncate rounded-ctl border-0 bg-transparent pr-0.5 font-mono text-footnote tabular-nums outline-none sm:max-w-[18rem]"
                   style={{ color: 'var(--lc-ink)' }}>
             {secciones.map((sec) => (
               <optgroup key={sec} label={etiquetaSeccion(sec)}>
@@ -923,7 +923,7 @@ function Visor({ slug }: { slug: string }) {
           <span className="tabular-nums" style={{ color: 'var(--lc-ink-mid)' }}>/ {indice.hojasTotales}</span>
           <button type="button" disabled={!siguiente}
                   onClick={() => siguiente && void irA(siguiente.blatt)}
-                  className="rounded-ctl p-1 disabled:opacity-30" title="Hoja siguiente">
+                  className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-ctl disabled:opacity-30" title="Hoja siguiente">
             <ChevronRight size={16} />
           </button>
         </div>
@@ -1437,7 +1437,7 @@ function Panel({
       <div className="mb-4 mt-2 flex flex-wrap gap-1.5">
         {puntos.map((p) => (
           <button key={`${p.h}.${p.c}`} type="button" onClick={() => onIr(p.h, undefined, p.b)}
-                  className="rounded-ctl border px-2 py-1 font-mono text-footnote tabular-nums"
+                  className="flex min-h-[44px] items-center rounded-ctl border px-3 font-mono text-footnote tabular-nums"
                   style={p.h === hojaActual
                     ? { borderColor: 'var(--lc-aqua)', color: 'var(--lc-aqua-bright)', background: 'var(--lc-aqua-soft)' }
                     : { borderColor: 'var(--lc-border)', color: 'var(--lc-ink-mid)' }}>
@@ -2317,7 +2317,7 @@ function BotonOffline({ slug, indice }: { slug: string; indice: PlanoIndice | nu
     <button type="button"
             title={estado === 'si' ? 'Guardado para usar sin señal' : 'Guardar para usar sin señal'}
             onClick={() => { if (estado === 'no') void bajar() }}
-            className="flex items-center gap-1 rounded-ctl p-1.5 font-mono text-caption"
+            className="flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 rounded-ctl px-2 font-mono text-caption"
             style={{ color: estado === 'si' ? 'var(--lc-nuevo)' : 'var(--lc-ink-mid)' }}>
       {estado === 'bajando' ? <><Loader2 size={14} className="animate-spin" />{avance}%</>
         : estado === 'si' ? <><Check size={14} /><Download size={12} /></>
