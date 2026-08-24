@@ -23,9 +23,13 @@ import sys
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
 RAIZ = os.path.dirname(os.path.abspath(__file__))
-TRABAJO = os.path.join(RAIZ, "_staging", "baader-142-despiece-trabajo")
+# Mismo interruptor DESPIECE que el extractor y el auditor.
+DESPIECE_ID = os.environ.get("DESPIECE", "142").strip()
+# Planos electricos que apuntan a ESTE despiece.
+ELECTRICOS = {"142": ("baader-142-888", "baader-142-860"), "200": ("baader-200-862",)}[DESPIECE_ID]
+TRABAJO = os.path.join(RAIZ, "_staging", f"baader-{DESPIECE_ID}-despiece-trabajo")
 PWA_PLANOS = os.path.abspath(os.path.join(RAIZ, "..", "..", "apps", "pwa", "public", "planos"))
-DESPIECE_SLUG = "baader-142-despiece"
+DESPIECE_SLUG = f"baader-{DESPIECE_ID}-despiece"
 RE_DESIGNACION = re.compile(r"^[A-Z]\d+$")
 
 
@@ -36,13 +40,34 @@ RE_DESIGNACION = re.compile(r"^[A-Z]\d+$")
 FAMILIAS = {
     "K": (r"sch(ü|ue)tz|contactor|rel(é|e)\b|relais", "contactores y relés"),
     "Q": (r"motorschutz|guardamotor|leistungsschalter|interruptor autom", "guardamotores"),
-    "F": (r"sicherung|fusible|schutzschalter", "fusibles y protecciones"),
+    # OJO con `sicherung`: en aleman tecnico «Sicherung» sola es el fusible,
+    # pero los compuestos son piezas MECANICAS — Sicherungsring (anillo de
+    # retencion/seeger), Sicherungsblech (chapa de seguridad),
+    # Sicherungsscheibe (arandela). Sin la exclusion el patron traia mas ruido
+    # que senal: 18 falsas contra 11 reales en la 142, y 22 contra 1 en la 200,
+    # y mandaba al que busca su F3 a una figura de chapas.
+    "F": (r"sicherung(?!s(blech|ring|scheibe|mutter|splint))|fusible|schutzschalter|allstrom-automat",
+          "fusibles y protecciones"),
     "S": (r"taster|pulsador|stufenschalter|bedieneinheit|puesto de mando", "mandos y pulsadores"),
     "Y": (r"magnetventil|electrov|v(á|a)lvula|ventil\b", "electroválvulas"),
     "M": (r"\bmotor\b", "motores"),
     "SM": (r"schrittmotor|paso a paso|sm-platte", "motores paso a paso"),
     "B": (r"ann(ä|ae)herungsschalter|proximidad|sensor|initiator", "sensores"),
 }
+
+
+# «Sensor inductivo (para motor paso a paso SM1)» es un SENSOR, no un motor:
+# lo que va entre parentesis tras "para/por/für" nombra a OTRO componente. Sin
+# esta limpieza, la fig 70-8 (sensores) figuraba como el lugar donde viven los
+# motores paso a paso, y el que buscaba su SM1 aterrizaba en la caja equivocada.
+# ⚠ El «für» del catalogo viene con el umlaut ROTO (f�r): hay que verlo con
+# repr(), no con print, o parece que el patron no matchea nada.
+PAREN_REFERENCIA = re.compile(r"\(\s*(f.?r|para|por|zu)[^)]*\)?", re.I)
+
+
+def _texto_propio(fila):
+    """El texto de la fila SIN las referencias a otros componentes."""
+    return PAREN_REFERENCIA.sub(" ", " ".join(str(fila.get(k) or "") for k in ("de", "es")))
 
 
 def construir_familias(figs):
@@ -56,10 +81,7 @@ def construir_familias(figs):
         cands = []
         for n, f in enumerate(figs, 1):
             titulo_all = " ".join(f["titulos"])
-            filas_tipo = sum(
-                1 for x in f["filas"]
-                if rx.search(" ".join(str(x.get(k) or "") for k in ("de", "es")))
-            )
+            filas_tipo = sum(1 for x in f["filas"] if rx.search(_texto_propio(x)))
             if rx.search(titulo_all) or filas_tipo >= 3:
                 tit = f["titulos"][3] if len(f["titulos"]) > 3 else (f["titulos"][0] if f["titulos"] else "")
                 cands.append({"fig": f["seccion"], "hoja": n, "titulo": tit[:44], "n": filas_tipo})
@@ -72,7 +94,7 @@ def construir_familias(figs):
 
 def main():
     figs = json.load(io.open(os.path.join(TRABAJO, "figuras.json"), encoding="utf-8"))["figuras"]
-    ruta_maestro = os.path.join(TRABAJO, "maestro-142.json")
+    ruta_maestro = os.path.join(TRABAJO, f"maestro-{DESPIECE_ID}.json")
     sap_por_fab = {}
     if os.path.exists(ruta_maestro):
         for m in json.load(io.open(ruta_maestro, encoding="utf-8")):
@@ -105,7 +127,7 @@ def main():
     # solo designaciones que EXISTEN en al menos un plano electrico (el S00
     # del catalogo no aparece en ninguno y ensuciaba la auditoria)
     en_planos = set()
-    for slug in ("baader-142-888", "baader-142-860"):
+    for slug in ELECTRICOS:
         idx = json.load(io.open(os.path.join(PWA_PLANOS, slug, "indice.json"), encoding="utf-8"))
         en_planos.update(k for k in idx["indice"] if RE_DESIGNACION.match(k))
     descartadas = sorted(set(aparatos) - en_planos)
@@ -114,7 +136,7 @@ def main():
     aparatos = {k: v for k, v in aparatos.items() if k in en_planos}
 
     # curaduria manual encima
-    ruta_cur = os.path.join(RAIZ, "partes_curadas_142.json")
+    ruta_cur = os.path.join(RAIZ, f"partes_curadas_{DESPIECE_ID}.json")
     if os.path.exists(ruta_cur):
         curadas = json.load(io.open(ruta_cur, encoding="utf-8"))
         for tag, entradas in curadas.items():
@@ -122,7 +144,7 @@ def main():
         print(f"curaduria aplicada: {len(curadas)} designaciones")
 
     familias = construir_familias(figs)
-    for slug in ("baader-142-888", "baader-142-860"):
+    for slug in ELECTRICOS:
         destino = os.path.join(PWA_PLANOS, slug, "partes.json")
         # cobertura contra los aparatos reales de ese plano
         idx = json.load(io.open(os.path.join(PWA_PLANOS, slug, "indice.json"), encoding="utf-8"))
