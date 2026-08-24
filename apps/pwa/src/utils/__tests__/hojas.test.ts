@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { etiquetaHoja } from '../hojas'
+import { coincideTitulo, etiquetaHoja } from '../hojas'
 
 /**
  * El selector "Ir a hoja" listaba numeros pelados (1..254): en un despiece
@@ -34,5 +34,34 @@ describe('etiquetaHoja', () => {
 
   it('degrada a solo el numero si no hay titulo', () => {
     expect(etiquetaHoja({ blatt: 5 }, true)).toBe('5')
+  })
+})
+
+/**
+ * Los títulos de los planos GEA salen de OCR del cajetín y traen palabras
+ * pegadas. Verificado en producción antes del fix: "ocupacion cable" devolvía
+ * 0 resultados y "ocupacioncable" devolvía 3.
+ */
+describe('coincideTitulo', () => {
+  const TIT = 'H0.14 · OCUPACIONCABLE DE UNION25G075'
+
+  it('encuentra el título aunque el OCR haya pegado las palabras', () => {
+    expect(coincideTitulo(TIT, 'OCUPACION CABLE')).toBe(true)
+  })
+
+  it('sigue encontrando la coincidencia literal', () => {
+    expect(coincideTitulo(TIT, 'OCUPACIONCABLE')).toBe(true)
+    expect(coincideTitulo(TIT, 'UNION25G075')).toBe(true)
+  })
+
+  it('NO convierte consultas cortas en coincidencias de cualquier cosa', () => {
+    // "de la" -> "dela" no puede empezar a calzar con títulos al azar.
+    expect(coincideTitulo('CUADRO DE LAMPARAS', 'DE LA')).toBe(true)   // literal, sí
+    expect(coincideTitulo('MODELADO', 'DE LA')).toBe(false)            // pegado, no
+  })
+
+  it('no calza con texto vacío', () => {
+    expect(coincideTitulo('', 'CABLE')).toBe(false)
+    expect(coincideTitulo(TIT, '')).toBe(false)
   })
 })
