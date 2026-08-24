@@ -613,7 +613,12 @@ export function App() {
             } />
             {/* Hub admin — el único punto de entrada visible. Todas las sub-rutas
                 están envueltas en RequireReAuth para pedir credenciales aún con
-                sesión activa, evitando cambios accidentales. */}
+                sesión activa, evitando cambios accidentales.
+                OJO: el hub está detrás del gate, pero las sub-rutas se alcanzan
+                ESCRIBIENDO LA URL: si una se queda sin envolver, el gate no
+                sirve para ella. Cuatro estaban así (dev-modules, default-route,
+                sync-telegram, powerbi-export) mientras este comentario decía
+                que estaban todas. Al agregar una ruta admin, envolverla. */}
             <Route path="admin" element={
               <AdminRoute>
                 <RequireReAuth reason="para acceder al panel de administración">
@@ -680,30 +685,38 @@ export function App() {
             } />
             <Route path="admin/dev-modules" element={
               <AdminRoute>
-                <Suspense fallback={<LoadingScreen />}>
-                  <DevModulesPage />
-                </Suspense>
+                <RequireReAuth reason="antes de cambiar qué módulos se ven en la app">
+                  <Suspense fallback={<LoadingScreen />}>
+                    <DevModulesPage />
+                  </Suspense>
+                </RequireReAuth>
               </AdminRoute>
             } />
             <Route path="admin/default-route" element={
               <AdminRoute>
-                <Suspense fallback={<LoadingScreen />}>
-                  <DefaultRoutePage />
-                </Suspense>
+                <RequireReAuth reason="antes de cambiar la pantalla de inicio de todos">
+                  <Suspense fallback={<LoadingScreen />}>
+                    <DefaultRoutePage />
+                  </Suspense>
+                </RequireReAuth>
               </AdminRoute>
             } />
             <Route path="admin/sync-telegram" element={
               <AdminRoute>
-                <Suspense fallback={<LoadingScreen />}>
-                  <TelegramSyncPage />
-                </Suspense>
+                <RequireReAuth reason="antes de tocar la sincronización de Telegram">
+                  <Suspense fallback={<LoadingScreen />}>
+                    <TelegramSyncPage />
+                  </Suspense>
+                </RequireReAuth>
               </AdminRoute>
             } />
             <Route path="admin/powerbi-export" element={
               <AdminRoute>
-                <Suspense fallback={<LoadingScreen />}>
-                  <PowerBIExportPage />
-                </Suspense>
+                <RequireReAuth reason="antes de exportar datos a Power BI">
+                  <Suspense fallback={<LoadingScreen />}>
+                    <PowerBIExportPage />
+                  </Suspense>
+                </RequireReAuth>
               </AdminRoute>
             } />
             <Route path="admin/machine-capacity" element={
