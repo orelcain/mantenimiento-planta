@@ -41,6 +41,18 @@ const formatearFechaCorta = (t?: VinculoTerreno['actualizado']) => {
 /** Etiqueta de un grupo del índice lateral / select de hojas. Los planos
  *  eléctricos usan 2 claves fijas; el despiece manda su propia etiqueta de
  *  capítulo ya armada ("70 · Equipo eléctrico") — se muestra tal cual. */
+// El numero de hoja del visor no le dice NADA a nadie: en un despiece de 254
+// figuras lo que la gente cita es la figura impresa ("70-8") y lo que reconoce
+// es el titulo del conjunto. El indice ya traia ambos y el selector los tiraba.
+function etiquetaHoja(
+  h: { blatt: number; fig?: string | null; titulo?: string | null; tituloEs?: string | null },
+  es: boolean,
+): string {
+  const nombre = (es ? h.tituloEs || h.titulo : h.titulo || h.tituloEs) || ''
+  const ref = h.fig && h.fig !== '—' ? h.fig : String(h.blatt)
+  return nombre ? `${ref} · ${nombre}` : ref
+}
+
 const etiquetaSeccion = (sec: string) =>
   sec === 'circuitos' ? 'Esquema de circuitos' : sec === 'bornes' ? 'Plano de bornes' : sec
 
@@ -860,7 +872,7 @@ function Visor({ slug }: { slug: string }) {
             {secciones.map((sec) => (
               <optgroup key={sec} label={etiquetaSeccion(sec)}>
                 {indice.hojas.filter((h) => h.seccion === sec).map((h) => (
-                  <option key={h.blatt} value={h.blatt}>{h.blatt}</option>
+                  <option key={h.blatt} value={h.blatt}>{etiquetaHoja(h, mostrarEs)}</option>
                 ))}
               </optgroup>
             ))}
