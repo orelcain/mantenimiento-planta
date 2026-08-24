@@ -1930,8 +1930,12 @@ function PiezaTerreno({ tag, pieza, vinculosTerreno }: {
       )}
 
       {!auth.currentUser ? (
+        /* Sin sesion no se LEEN los vinculos (la regla los protege), asi que
+           el badge dice "segun catalogo" aunque alguien ya lo haya confirmado
+           frente a la maquina. El texto tiene que decir que hay algo que no se
+           esta viendo, no solo invitar a confirmar. */
         <p className="m-0 mt-2 text-caption" style={{ color: 'var(--lc-ink-ghost)' }}>
-          Inicia sesión para confirmar en terreno
+          Inicia sesión para ver y hacer confirmaciones en terreno
         </p>
       ) : abierto ? (
         <FormularioTerreno
