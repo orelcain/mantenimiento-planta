@@ -192,6 +192,25 @@ export function PredictivePage() {
   const lastReading = displayReadings[displayReadings.length - 1]
   const lastReadingTs = normalizeTs(lastReading?.timestamp)
 
+  /**
+   * ¿El sensor está reportando AHORA?
+   *
+   * El flag `online` del nodo RTDB se queda pegado en `true` cuando el ESP32
+   * deja de reportar: el 24-08 esta ficha decía "online: sí" y "Online" para
+   * un sensor cuyo último reporte era del 04/04 —cuatro meses antes— y tres
+   * líneas más abajo, en Indicadores, "Sensor sin reporte reciente". La página
+   * de Sensores ya lo mostraba bien ("Sin datos recientes").
+   *
+   * Se usa el MISMO criterio que el predictor: `lastSeen` dentro de
+   * `thresholds.offlineMs`. En modo prueba manda lo simulado.
+   */
+  const enLinea = useMemo(() => {
+    if (testMode) return displaySummary?.online === true
+    const visto = displaySummary?.lastSeen ?? linkedDevice?.lastSeen
+    if (!visto) return false
+    return Date.now() - normalizeTs(visto)! <= thresholds.offlineMs
+  }, [testMode, displaySummary, linkedDevice, thresholds.offlineMs])
+
   const canCreateIncident = Boolean(user?.id && selectedEquipment && lastReading && !testMode)
 
   async function copyToClipboard(text: string) {
@@ -1061,6 +1080,16 @@ export function PredictivePage() {
                   ID: <span className="text-foreground">{selectedEquipment.id}</span>
                 </div>
 
+                {/* Las cifras de abajo se leen como el estado de AHORA. Si la
+                    última lectura es vieja, hay que decirlo antes de que alguien
+                    tome el riesgo por bueno o cree una incidencia con ella. */}
+                {!testMode && !enLinea && lastReadingTs && (
+                  <div className="rounded-ctl border border-ink-warn/40 px-2.5 py-1.5 text-xs text-ink-warn">
+                    Lecturas del {new Date(lastReadingTs).toLocaleString('es-CL')} — el sensor no reporta desde entonces.
+                    Lo que sigue describe ese momento, no el actual.
+                  </div>
+                )}
+
                 <div className="grid gap-2 sm:grid-cols-2">
                   <div className="p-3 rounded-ctl border">
                     <div className="text-xs text-muted-foreground">Temperatura</div>
@@ -1081,7 +1110,7 @@ export function PredictivePage() {
                         : '—'}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      online: {displaySummary?.online ? 'sí' : 'no'}
+                      online: {enLinea ? 'sí' : 'no'}
                     </div>
                   </div>
                 </div>
@@ -1091,8 +1120,8 @@ export function PredictivePage() {
                   {linkedDevice ? (
                     <div className="mt-1 space-y-1 text-sm">
                       <div className="flex items-center gap-2">
-                        <Badge variant={linkedDevice.online ? 'default' : 'secondary'}>
-                          {linkedDevice.online ? 'Online' : 'Offline'}
+                        <Badge variant={enLinea ? 'default' : 'secondary'}>
+                          {enLinea ? 'Online' : 'Sin reporte reciente'}
                         </Badge>
                         <span className="text-muted-foreground">ID:</span>
                         <span className="font-mono text-xs">{linkedDevice.deviceId}</span>

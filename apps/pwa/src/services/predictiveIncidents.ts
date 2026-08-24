@@ -68,8 +68,16 @@ export async function ensurePredictiveIncident(params: {
 
   const priority = riskToPriority(params.prediction.nivelRiesgo)
 
+  /* La FECHA de la lectura va en la incidencia: el riesgo se puede calcular
+     sobre un sensor que dejó de reportar hace meses (el 04-04 en el caso real
+     de la bomba de aducción), y quien la lea después tiene que poder ver de
+     cuándo era el dato que la originó. */
+  const readingTs = params.lastReading?.timestamp
+    ? new Date(params.lastReading.timestamp < 1e12 ? params.lastReading.timestamp * 1000 : params.lastReading.timestamp)
+    : null
   const readingText = params.lastReading
     ? `Última lectura: ${params.lastReading.temperature.toFixed(1)}°C, ${params.lastReading.humidity.toFixed(1)}% (fuente: ${params.lastReading.source ?? '—'})`
+      + (readingTs ? ` · tomada el ${readingTs.toLocaleString('es-CL')}` : '')
     : 'Sin lectura reciente disponible.'
 
   const titulo = `Riesgo ${params.prediction.nivelRiesgo} detectado (IoT)`
