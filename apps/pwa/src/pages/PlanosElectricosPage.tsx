@@ -1853,7 +1853,15 @@ function PiezaTerreno({ tag, pieza, vinculosTerreno }: {
       setAbierto(false)
       setFoto(null)
     } catch (e) {
-      setErrorLocal(e instanceof Error ? e.message : 'No se pudo guardar.')
+      // Firestore contesta "Missing or insufficient permissions" tanto si se
+      // cayo la sesion como si el dato no pasa la regla. Frente a la maquina
+      // ese texto no ayuda: se traduce a algo que se pueda hacer.
+      const msg = e instanceof Error ? e.message : ''
+      setErrorLocal(
+        /permission|insufficient/i.test(msg)
+          ? 'No se pudo guardar: revisa que tu sesión siga abierta y que el código no sea muy largo.'
+          : msg || 'No se pudo guardar.',
+      )
     } finally {
       setGuardando(false)
     }
@@ -1922,8 +1930,12 @@ function PiezaTerreno({ tag, pieza, vinculosTerreno }: {
       )}
 
       {!auth.currentUser ? (
+        /* Sin sesion no se LEEN los vinculos (la regla los protege), asi que
+           el badge dice "segun catalogo" aunque alguien ya lo haya confirmado
+           frente a la maquina. El texto tiene que decir que hay algo que no se
+           esta viendo, no solo invitar a confirmar. */
         <p className="m-0 mt-2 text-caption" style={{ color: 'var(--lc-ink-ghost)' }}>
-          Inicia sesión para confirmar en terreno
+          Inicia sesión para ver y hacer confirmaciones en terreno
         </p>
       ) : abierto ? (
         <FormularioTerreno
@@ -1982,8 +1994,11 @@ function FormularioTerreno({
           {o.etiqueta}
         </button>
       ))}
+      {/* maxLength=30 es el tope que exige la regla de Firestore. Sin el,
+          pegar de mas rebota con "Missing or insufficient permissions", que
+          en terreno no le dice nada a nadie. */}
       {opcion === 'corregido' && (
-        <input type="text" inputMode="numeric" placeholder="código de la etiqueta" value={codigo}
+        <input type="text" inputMode="numeric" maxLength={30} placeholder="código de la etiqueta" value={codigo}
                onChange={(e) => onCodigo(e.target.value)}
                className="min-h-[44px] rounded-ctl border px-3 text-footnote"
                style={{ borderColor: 'var(--lc-border)', background: 'var(--lc-surface)', color: 'var(--lc-ink)' }} />
