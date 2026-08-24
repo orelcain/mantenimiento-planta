@@ -40,6 +40,7 @@ import { ventanaDeActividad, desdePrimeraPieza, piezasAntesDelArranque } from '@
 import { refrescarPulso, type PulsoMonitor } from '@/services/shoplogix/publicShiftMonitor.service'
 import { elegirContador } from './monitor/contadorCrudo'
 import { construirCascada } from './monitor/cascadaTurno'
+import { horaPlanta } from './monitor/horaPlanta'
 import { CascadaTurnoCard } from './monitor/CascadaTurnoCard'
 import { mediaMovil, ritmoAhoraCpm, ritmoAhoraAndando, estadoRitmo, fraccionDeRegla, pedidoAndando } from '@/services/shoplogix/monitorRitmo'
 import { pinShiftEnd, unpinShiftEnd, setMonitorSetPoint } from '@/services/shoplogix/pinShiftEnd'
@@ -1924,13 +1925,15 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, onEditarSetPoi
 
       {/* La hora de corte. El número grande describe los últimos 15 min, pero
           un tramo no existe hasta que cierra: sin decir hasta cuándo, quien lo
-          mira no sabe si la línea bajó o si todavía no llega el dato. */}
+          mira no sabe si la línea bajó o si todavía no llega el dato.
+
+          OJO: `corteMs` sale de la serie, que viene en HORA DE PLANTA sellada
+          como UTC. Formatearla con el reloj del que mira le restaba las 4 h
+          del huso: a las 06:51 la línea decía "hasta las 02:50". Va con
+          `horaPlanta`, igual que el resto de las horas de la serie. */}
       {ahora != null && corteMs != null && (
         <p className="mt-1 text-[11px] text-muted-foreground">
-          Últimos 15 min · hasta las{' '}
-          <span className="tabular-nums">
-            {new Date(corteMs).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false })}
-          </span>
+          Últimos 15 min · hasta las <span className="tabular-nums">{horaPlanta(corteMs)}</span>
         </p>
       )}
 
