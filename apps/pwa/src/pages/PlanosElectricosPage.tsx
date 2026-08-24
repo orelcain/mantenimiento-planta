@@ -902,9 +902,21 @@ function Visor({ slug }: { slug: string }) {
                   style={{ color: 'var(--lc-ink)' }}>
             {secciones.map((sec) => (
               <optgroup key={sec} label={etiquetaSeccion(sec)}>
-                {indice.hojas.filter((h) => h.seccion === sec).map((h) => (
-                  <option key={h.blatt} value={h.blatt}>{etiquetaHoja(h, mostrarEs)}</option>
-                ))}
+                {indice.hojas.filter((h) => h.seccion === sec).flatMap((h) => [
+                  /* El PDF del fabricante no trae todas las hojas (el 888 no
+                     tiene la 43). Sin decirlo, el selector salta de 42 a 44
+                     contra un total de 45 y parece que la app perdió una hoja
+                     — o que el técnico se la salteó. El índice ya traía el
+                     dato en `faltante` y nadie lo usaba. */
+                  ...(indice.faltante ?? [])
+                    .filter((n) => n === h.blatt - 1)
+                    .map((n) => (
+                      <option key={`falta-${n}`} value={h.blatt} disabled>
+                        {n} · no viene en el plano
+                      </option>
+                    )),
+                  <option key={h.blatt} value={h.blatt}>{etiquetaHoja(h, mostrarEs)}</option>,
+                ])}
               </optgroup>
             ))}
           </select>
