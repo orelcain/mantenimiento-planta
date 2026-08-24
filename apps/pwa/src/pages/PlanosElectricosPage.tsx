@@ -16,6 +16,7 @@ import { usePlanoVinculos, type VinculoTerreno } from '@/hooks/usePlanoVinculos'
 import { PlanoLienzo, type Foco } from '@/components/planos/PlanoLienzo'
 import { NotasAparato } from '@/components/planos/NotasAparato'
 import { compactarTramos, compararTags } from '@/utils/designaciones'
+import { etiquetaHoja } from '@/utils/hojas'
 import { auth } from '@/services/firebase'
 
 /** minusculas y sin acentos: "posicion" debe encontrar "POSICIÓN ZERO". */
@@ -44,15 +45,6 @@ const formatearFechaCorta = (t?: VinculoTerreno['actualizado']) => {
 // El numero de hoja del visor no le dice NADA a nadie: en un despiece de 254
 // figuras lo que la gente cita es la figura impresa ("70-8") y lo que reconoce
 // es el titulo del conjunto. El indice ya traia ambos y el selector los tiraba.
-function etiquetaHoja(
-  h: { blatt: number; fig?: string | null; titulo?: string | null; tituloEs?: string | null },
-  es: boolean,
-): string {
-  const nombre = (es ? h.tituloEs || h.titulo : h.titulo || h.tituloEs) || ''
-  const ref = h.fig && h.fig !== '—' ? h.fig : String(h.blatt)
-  return nombre ? `${ref} · ${nombre}` : ref
-}
-
 const etiquetaSeccion = (sec: string) =>
   sec === 'circuitos' ? 'Esquema de circuitos' : sec === 'bornes' ? 'Plano de bornes' : sec
 
