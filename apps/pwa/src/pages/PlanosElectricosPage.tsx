@@ -1139,14 +1139,20 @@ function Panel({
   // En el despiece, llegar a una figura y NO ver sus piezas obliga a adivinar
   // qué número tocar (y la mitad de las figuras tiene posiciones sin ancla).
   // Sin selección, el panel ES la lista de piezas de esta figura.
+  // ¿Este despiece tiene ubicaciones de bodega? (la 142 sí: 320 códigos
+  // cruzados con el maestro; la 200 todavía no).
+  const hayBodega = !!sapPorCodigo && Object.keys(sapPorCodigo).length > 0
   if (!sel && esDespiece && filas.length > 0) {
     return (
       <>
         <Titulo>Piezas de esta figura</Titulo>
         {meta && (
           <p className="m-0 mb-2 text-footnote" style={{ color: 'var(--lc-ink-mid)' }}>
+            {/* La bodega solo se promete si ESE despiece tiene el cruce SAP
+                hecho: la fileteadora tiene 0 códigos cruzados y el texto le
+                ofrecía una ubicación que nunca iba a aparecer. */}
             Figura {meta.fig} · {meta.tituloEs} — {filas.length} piezas. Toca una para ver su
-            código, cuántas lleva y dónde está en bodega.
+            código, cuántas lleva{hayBodega ? ' y dónde está en bodega' : ''}.
             {/* Pedir a bodega es copiar la lista a mano desde el teléfono:
                 un toque la deja lista para pegar en el chat del turno. */}
             <button type="button"
