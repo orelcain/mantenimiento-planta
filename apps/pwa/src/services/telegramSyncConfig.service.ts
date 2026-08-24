@@ -30,6 +30,26 @@ export interface TelegramSyncConfig {
   mensajeError: string | null
   /** Heartbeat: última vez que el agente del PC consultó este doc. */
   agenteVistoAt: Timestamp | null
+  /**
+   * Temas de Telegram que llegaron SIN mapeo y quedaron en `POR CLASIFICAR`.
+   *
+   * El agente ya los detectaba y los dejaba anotados en un JSON del PC
+   * (`_temas_sin_mapeo.json`), que hay que acordarse de abrir: los tres temas
+   * del protocolo de la Baader 142 estuvieron ahí 3 días —con el video que
+   * sube el turno todos los días— sin que nadie los viera. Ahora el aviso
+   * viaja al panel.
+   */
+  temasSinMapeo: TelegramSyncTemaSinMapeo[]
+}
+
+export interface TelegramSyncTemaSinMapeo {
+  grupo: string
+  tema: string
+  /** Cuántos mensajes de ese tema ya cayeron en POR CLASIFICAR. */
+  items: number
+  destino: string
+  /** ISO de cuándo se vio por última vez. */
+  visto: string | null
 }
 
 const PLANT_ID = 'chonchi'
@@ -48,6 +68,7 @@ export const TELEGRAM_SYNC_DEFAULTS: TelegramSyncConfig = {
   itemsNuevos: null,
   mensajeError: null,
   agenteVistoAt: null,
+  temasSinMapeo: [],
 }
 
 export async function loadTelegramSyncConfig(): Promise<TelegramSyncConfig> {
