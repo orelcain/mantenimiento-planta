@@ -741,6 +741,25 @@ function Visor({ slug }: { slug: string }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [indice, hoja, irA, volver])
 
+  // Qué busca la gente y NO encuentra: es el dato que le falta a la telemetría
+  // (hoy sabemos qué abren y qué aparatos tocan, pero no qué escribió el que se
+  // fue con las manos vacías). Va ANTES de los early return de abajo: un hook
+  // después de un `return` condicional rompe el orden de hooks de React.
+  // Una sola búsqueda por render: se calcula acá (antes de los early return) y
+  // la usan tanto la lista de resultados como la telemetría de abajo.
+  const busqueda = useMemo(
+    () => (indice && hoja ? buscar(busca, indice, hoja.blatt, esDespiece) : { items: [], total: 0 }),
+    [busca, indice, hoja, esDespiece],
+  )
+  const sinNada = Boolean(indice && hoja && !busqueda.items.length && !partesEncontradas.length)
+  useEffect(() => {
+    const q = busca.trim()
+    if (q.length < 3 || !sinNada) return
+    // 2,5 s: registrar mientras teclea guardaría cada prefijo, no la consulta.
+    const t = setTimeout(() => void registrarUso(slug, 'sin-resultado', q.slice(0, 40)), 2500)
+    return () => clearTimeout(t)
+  }, [busca, sinNada, slug])
+
   if (error) {
     return <Aviso texto={error} onReintentar={reintentar} />
   }
@@ -751,7 +770,8 @@ function Visor({ slug }: { slug: string }) {
   const i = indice.hojas.findIndex((h) => h.blatt === hoja.blatt)
   const anterior = indice.hojas[i - 1]
   const siguiente = indice.hojas[i + 1]
-  const { items: resultados, total: totalResultados } = buscar(busca, indice, hoja.blatt, esDespiece)
+  const { items: resultados, total: totalResultados } = busqueda
+
   const vNota = busca.trim().toLowerCase()
   if (vNota) {
     notas.notas.forEach((n) => {
@@ -2224,7 +2244,11 @@ function FichasSap({ notas, saps: sapsDirectos }: {
 
 /** Registra una consulta (plano o aparato) para los KPIs de uso del modulo.
  *  Silencioso: sin sesion o sin red simplemente no registra. */
-async function registrarUso(slug: string, tipo: 'apertura' | 'aparato' | 'pieza' | 'salto-a-despiece', tag?: string) {
+async function registrarUso(
+  slug: string,
+  tipo: 'apertura' | 'aparato' | 'pieza' | 'salto-a-despiece' | 'sin-resultado',
+  tag?: string,
+) {
   try {
     const { auth: a, db: base } = await import('@/services/firebase')
     if (!a.currentUser) return
