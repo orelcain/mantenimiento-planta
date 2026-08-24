@@ -435,6 +435,17 @@ export function CalendarioMantencionPage() {
   const calendarSectionRef = useRef<HTMLDivElement | null>(null)
   const isHydratingRemoteRef = useRef(false)
   const hasLoadedCalendarRef = useRef(false)
+  /**
+   * Lo último que quedó guardado (serializado), para no volver a escribirlo.
+   *
+   * El efecto de autosave depende de la IDENTIDAD de `dayCols`/`techRows`, no
+   * de su contenido: al terminar de hidratar desde Firestore esas referencias
+   * cambian y disparaban un `setDoc` completo del estado. Resultado: ABRIR la
+   * planilla la "guardaba" —con `reason: 'state-change'` y el uid de quien
+   * miraba— aunque nadie hubiera tocado nada. Se comprobó el 24-08: entrar a
+   * la página dejó `updatedAt` un minuto después, sin ninguna edición.
+   */
+  const lastSyncedPayloadRef = useRef<string | null>(null)
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const syncSeqRef = useRef(0)
   const shiftStyleSamplesRef = useRef<ShiftStyleSamples>({})
@@ -863,13 +874,9 @@ export function CalendarioMantencionPage() {
     }
   }
 
-  const syncCalendarToFirebase = useCallback(async (reason: string): Promise<void> => {
-    const mySeq = ++syncSeqRef.current
-    try {
-      setSyncState('saving')
-      setSyncErrorText('')
-      const currentUser = getCurrentUser()
-      const localPayload: PersistedCalendarState = {
+  /** El estado tal como se guarda. Se usa para escribir y para comparar. */
+  const buildLocalPayload = useCallback((): PersistedCalendarState => {
+    return {
         version: 1,
         originalFilename,
         dayCols: dayCols.map((d) => ({
@@ -888,10 +895,26 @@ export function CalendarioMantencionPage() {
           name: t.name,
           shifts: Object.fromEntries(Object.entries(t.shifts).map(([k, v]) => [String(k), v])),
         })),
-        hoursConfig,
-        shiftConfig,
-      }
+      hoursConfig,
+      shiftConfig,
+    }
+  }, [dayCols, hoursConfig, originalFilename, shiftConfig, techRows])
+
+  const syncCalendarToFirebase = useCallback(async (reason: string): Promise<void> => {
+    const mySeq = ++syncSeqRef.current
+    try {
+      setSyncState('saving')
+      setSyncErrorText('')
+      const currentUser = getCurrentUser()
+      const localPayload = buildLocalPayload()
       safeStorageSet(CALENDAR_LOCAL_CACHE_KEY, localPayload)
+
+      // Nada cambió de verdad: no se escribe (ni se ensucia el "quién editó").
+      const serializado = JSON.stringify(localPayload)
+      if (lastSyncedPayloadRef.current === serializado) {
+        if (syncSeqRef.current === mySeq) setSyncState('idle')
+        return
+      }
 
       const payload = {
         ...localPayload,
@@ -901,6 +924,7 @@ export function CalendarioMantencionPage() {
         updatedBy: currentUser?.uid ?? 'anon',
       }
       await trackedSetDoc(doc(db, CALENDAR_FIRESTORE_PATH[0], CALENDAR_FIRESTORE_PATH[1]), payload, { merge: true })
+      lastSyncedPayloadRef.current = serializado
       if (syncSeqRef.current !== mySeq) return
       setLastSyncAt(new Date())
       setSyncState('synced')
@@ -910,16 +934,23 @@ export function CalendarioMantencionPage() {
       setSyncErrorText(error instanceof Error ? error.message : 'Error desconocido')
       setStatus('Cambios guardados en este navegador, pero sin permisos para sincronizar en Firebase.')
     }
-  }, [dayCols, hoursConfig, originalFilename, shiftConfig, techRows])
+  }, [buildLocalPayload])
 
   useEffect(() => {
     if (!hasLoadedCalendarRef.current || isHydratingRemoteRef.current) return
+    /* Primer disparo después de hidratar: no es una edición, es el cambio de
+       identidad de `dayCols`. Se toma como línea base y no se escribe. */
+    if (lastSyncedPayloadRef.current === null) {
+      lastSyncedPayloadRef.current = JSON.stringify(buildLocalPayload())
+      setSyncState('idle')
+      return
+    }
     if (syncTimerRef.current) clearTimeout(syncTimerRef.current)
     setSyncState('saving')
     syncTimerRef.current = setTimeout(() => {
       void syncCalendarToFirebase('state-change')
     }, 200)
-  }, [dayCols, syncCalendarToFirebase])
+  }, [dayCols, syncCalendarToFirebase, buildLocalPayload])
 
   const syncIndicator = useMemo(() => {
     if (syncState === 'saving') return { label: 'Guardando…', className: 'bg-amber-500/[0.15] text-ink-warn border-amber-500/[0.25]' }
@@ -1841,6 +1872,21 @@ export function CalendarioMantencionPage() {
   const todayWeekKey = useMemo(() => isoWeekKey(new Date(todayTick)), [todayTick])
   const isCurrentWeek = selectedWeek === todayWeekKey
 
+  /**
+   * La planilla no llega a hoy.
+   *
+   * Cuando la semana actual no está cargada, el calendario cae en la PRIMERA
+   * semana del archivo y la muestra sin decir nada: el 24-08 abría en la
+   * semana del 01/03 —seis meses atrás— con pinta de ser la de hoy. El botón
+   * "Ir a hoy" solo aparece si esa semana existe, así que en este caso no
+   * había ninguna señal.
+   */
+  const finDePlanilla = useMemo(() => {
+    if (weekKeys.length === 0 || weekKeys.includes(todayWeekKey)) return null
+    const ultima = dayCols.map((d) => d.dateObj).filter((d): d is Date => !!d).sort((x, y) => x.getTime() - y.getTime()).pop()
+    return ultima ? formatDate(ultima) : null
+  }, [weekKeys, todayWeekKey, dayCols])
+
   const mobileWeekLabel = useMemo(() => {
     const parts = selectedWeek.split('-W')
     return parts.length === 2 ? `Sem ${parts[1]} · ${parts[0]}` : (selectedWeek || 'Semana actual')
@@ -1878,9 +1924,11 @@ export function CalendarioMantencionPage() {
                 <span className="text-caption font-semibold text-foreground">{mobileWeekLabel}</span>
                 {isCurrentWeek
                   ? <span className="ml-1 text-caption text-ink-warn">● hoy</span>
-                  : weekKeys.includes(todayWeekKey) && (
+                  : weekKeys.includes(todayWeekKey) ? (
                     <button onClick={() => setSelectedWeek(todayWeekKey)}
                       className="ml-1.5 inline-flex h-5 items-center gap-1 px-1.5 text-caption font-medium text-ink-warn border border-amber-500/[0.25] rounded-ctl bg-amber-500/[0.15] active:bg-amber-500/[0.15] select-none"><CornerUpLeft className="h-3 w-3" />Ir a hoy</button>
+                  ) : finDePlanilla && (
+                    <span className="ml-1.5 text-caption text-ink-warn">· la planilla llega al {finDePlanilla}</span>
                   )
                 }
               </div>
@@ -1920,6 +1968,11 @@ export function CalendarioMantencionPage() {
                 {!isCurrentWeek && weekKeys.includes(todayWeekKey) && (
                   <button onClick={() => setSelectedWeek(todayWeekKey)}
                     className="shrink-0 inline-flex h-6 items-center gap-1 px-1.5 rounded-ctl border border-amber-500/[0.25] bg-amber-500/[0.15] text-caption font-medium text-ink-warn active:bg-amber-500/[0.15] select-none"><CornerUpLeft className="h-3 w-3" />Hoy</button>
+                )}
+                {finDePlanilla && (
+                  <span className="shrink-0 text-caption text-ink-warn leading-tight">
+                    la planilla llega al {finDePlanilla}
+                  </span>
                 )}
                 <span title={syncIndicator.label} className={`w-2 h-2 rounded-full shrink-0 ${syncState === 'saving' ? 'bg-amber-400' : syncState === 'synced' ? 'bg-emerald-400' : syncState === 'error' ? 'bg-red-400' : 'bg-muted-foreground'}`} />
                 <button onClick={() => nextWeekKey && setSelectedWeek(nextWeekKey)} disabled={!nextWeekKey}
