@@ -597,7 +597,10 @@ service cloud.firestore {
         // 'pieza' y 'salto-a-despiece' son del puente electrico->pieza fisica:
         // sin ellos en la whitelist Firestore rechazaba la escritura y, como
         // registrarUso() traga el error, el KPI del puente se perdia MUDO.
-        && request.resource.data.tipo in ['apertura', 'aparato', 'pieza', 'salto-a-despiece']
+        // 'sin-resultado' guarda QUE se busco sin encontrar nada: es el dato
+        // que dice que le falta al catalogo. Mismo cuidado que arriba — si el
+        // tipo no esta en la whitelist, la escritura se pierde en silencio.
+        && request.resource.data.tipo in ['apertura', 'aparato', 'pieza', 'salto-a-despiece', 'sin-resultado']
         && (!('tag' in request.resource.data)
             || isNonEmptyString(request.resource.data.tag, 1, 40))
         && request.resource.data.uid == request.auth.uid

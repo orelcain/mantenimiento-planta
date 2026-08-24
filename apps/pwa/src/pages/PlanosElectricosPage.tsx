@@ -752,6 +752,17 @@ function Visor({ slug }: { slug: string }) {
   const anterior = indice.hojas[i - 1]
   const siguiente = indice.hojas[i + 1]
   const { items: resultados, total: totalResultados } = buscar(busca, indice, hoja.blatt, esDespiece)
+
+  // Qué busca la gente y NO encuentra. Es el dato que le falta a la telemetría:
+  // hoy sabemos qué abren y qué aparatos tocan, pero no qué escribieron cuando
+  // se fueron con las manos vacías — que es justo lo que dice qué le falta al
+  // catálogo. Se espera a que dejen de escribir para no registrar cada tecla.
+  useEffect(() => {
+    const q = busca.trim()
+    if (q.length < 3 || resultados.length || partesEncontradas.length) return
+    const t = setTimeout(() => void registrarUso(slug, 'sin-resultado', q.slice(0, 40)), 2500)
+    return () => clearTimeout(t)
+  }, [busca, resultados.length, partesEncontradas.length, slug])
   const vNota = busca.trim().toLowerCase()
   if (vNota) {
     notas.notas.forEach((n) => {
@@ -2224,7 +2235,11 @@ function FichasSap({ notas, saps: sapsDirectos }: {
 
 /** Registra una consulta (plano o aparato) para los KPIs de uso del modulo.
  *  Silencioso: sin sesion o sin red simplemente no registra. */
-async function registrarUso(slug: string, tipo: 'apertura' | 'aparato' | 'pieza' | 'salto-a-despiece', tag?: string) {
+async function registrarUso(
+  slug: string,
+  tipo: 'apertura' | 'aparato' | 'pieza' | 'salto-a-despiece' | 'sin-resultado',
+  tag?: string,
+) {
   try {
     const { auth: a, db: base } = await import('@/services/firebase')
     if (!a.currentUser) return
