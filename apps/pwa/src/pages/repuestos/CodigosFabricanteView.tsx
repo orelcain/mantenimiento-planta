@@ -26,8 +26,8 @@ import { db } from '@/services/firebase'
 import { Input } from '@/components/ui'
 import { ShareInteractiveButton } from '@/components/visor3d/ShareInteractiveButton'
 import { CATALOGOS, cargarCatalogos, type PiezaCatalogo } from './catalogosFabricante'
-import { agruparPorCodigo } from './agruparPiezas'
-import { buscarPiezas } from './buscarCatalogo'
+import { agruparPorCodigo, conRecuentoTotal, indexarGrupos } from './agruparPiezas'
+import { buscarPiezas, norm } from './buscarCatalogo'
 import { useRepuestosExistentes, normCodigo } from '@/hooks/repuestos/useRepuestosExistentes'
 import { logger } from '@/lib/logger'
 
@@ -89,6 +89,10 @@ export interface CrearDesdeCatalogo {
   equipoCodigos: string[]
   equipoNombre: string
 }
+
+/** ¿Los dos textos dicen lo mismo? (sin acentos, espacios ni mayúsculas). */
+const mismoTexto = (a: string, b: string) =>
+  norm(a).replace(/\s+/g, ' ').trim() === norm(b).replace(/\s+/g, ' ').trim()
 
 /** Tope de tarjetas en pantalla. Con el aviso de abajo, ya no esconde nada. */
 const TOPE = 100
@@ -156,6 +160,10 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
     return () => { alive = false }
   }, [publico, intento])
 
+  // Índice del catálogo completo por (código, máquina): se calcula una vez y
+  // sirve para contar en cuántos lugares va una pieza, sin importar la consulta.
+  const indiceTodo = useMemo(() => (piezas ? indexarGrupos(piezas) : null), [piezas])
+
   const resultadosMemo = useMemo(() => {
     if (!piezas) return { lista: [], total: 0 }
     // La búsqueda vive en `buscarCatalogo.ts` (pura y testeada): acepta el
@@ -165,11 +173,13 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
     // Agrupar ANTES del tope: `31800105` tenía 159 filas y el corte en 100 se
     // las comía todas con la misma pieza, escondiendo el resto de resultados.
     // Ahora el tope cuenta PIEZAS distintas, que es lo que el técnico mira.
-    const todas = agruparPorCodigo(encontradas)
+    // Con el recuento del catálogo completo: "va en N lugares de la máquina"
+    // no puede depender de lo que se haya escrito en el buscador.
+    const todas = conRecuentoTotal(agruparPorCodigo(encontradas), indiceTodo)
     // El total viaja aparte para poder DECIR que se cortó: un listado de 100
     // sin aviso se lee como "esto es todo lo que hay".
     return { lista: todas.slice(0, TOPE), total: todas.length }
-  }, [piezas, query])
+  }, [piezas, query, indiceTodo])
   const { lista, total } = resultadosMemo
 
   // ¿cuáles de los códigos en pantalla ya existen como repuesto en el maestro?
@@ -279,8 +289,17 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
               )}
             </div>
             <div className="mt-1 text-footnote font-medium text-foreground">
-              {p.descripcion}
-              {p.descripcionEn && <span className="ml-1.5 text-footnote font-normal text-muted-foreground">({p.descripcionEn})</span>}
+              {p.descripcion?.trim()
+                ? p.descripcion
+                : /* 47 piezas de la BAADER 200 no traen nombre en el manual: la
+                     tarjeta salía muda y parecía la app rota, no el catálogo. */
+                  <span className="font-normal italic text-muted-foreground">El manual no le pone nombre</span>}
+              {/* El original entre paréntesis solo si DICE algo distinto: 1.071
+                  de 7.387 piezas (la TP-6000 y la MAREL EVISCERADO vienen solo
+                  en inglés) mostraban el mismo texto dos veces seguidas. */}
+              {p.descripcionEn && !mismoTexto(p.descripcion, p.descripcionEn) && (
+                <span className="ml-1.5 text-footnote font-normal text-muted-foreground">({p.descripcionEn})</span>
+              )}
             </div>
             {p.especificacion && <div className="font-mono text-footnote text-muted-foreground">{p.especificacion}</div>}
             {/* Códigos equivalentes: distribuidor local (envuelve al de fabricante) y SAP */}
