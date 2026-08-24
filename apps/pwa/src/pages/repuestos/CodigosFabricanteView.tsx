@@ -26,6 +26,7 @@ import { db } from '@/services/firebase'
 import { Input } from '@/components/ui'
 import { ShareInteractiveButton } from '@/components/visor3d/ShareInteractiveButton'
 import { CATALOGOS, cargarCatalogos, type PiezaCatalogo } from './catalogosFabricante'
+import { agruparPorCodigo } from './agruparPiezas'
 import { useRepuestosExistentes, normCodigo } from '@/hooks/repuestos/useRepuestosExistentes'
 import { logger } from '@/lib/logger'
 
@@ -178,12 +179,15 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
       if (score > 0) scored.push({ p, score })
     }
     scored.sort((a, b) => b.score - a.score || a.p.pagina - b.p.pagina)
-    return scored.slice(0, 100).map((s) => s.p)
+    // Agrupar ANTES del tope: `31800105` tenía 159 filas y el corte en 100 se
+    // las comía todas con la misma pieza, escondiendo el resto de resultados.
+    // Ahora el tope cuenta PIEZAS distintas, que es lo que el técnico mira.
+    return agruparPorCodigo(scored.map((s) => s.p)).slice(0, 100)
   }, [piezas, query])
 
   // ¿cuáles de los códigos en pantalla ya existen como repuesto en el maestro?
   // (requiere sesión: en modo invitado no se consulta)
-  const { existentes } = useRepuestosExistentes(publico ? [] : resultados.map((p) => p.codigo))
+  const { existentes } = useRepuestosExistentes(publico ? [] : resultados.map((g) => g.rep.codigo))
   const figurasDespiece = useFigurasDespiece()
 
   const copiar = (codigo: string) => {
@@ -239,11 +243,12 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
       )}
 
       <div className="space-y-2">
-        {resultados.map((p, i) => {
+        {resultados.map((g, i) => {
+          const p = g.rep
           // undefined = aún no verificado · null = no existe · objeto = ya creado
           const existe = existentes.get(normCodigo(p.codigo))
           return (
-          <div key={`${p.codigo}-${p.fuente}-${p.pagina}-${i}`} className="rounded-card border border-border bg-card p-3">
+          <div key={`${p.codigo}-${p.maquina}-${i}`} className="rounded-card border border-border bg-card p-3">
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-mono text-sm font-bold text-foreground">{p.codigo}</span>
               {p.maquina && <span className="rounded-ctl bg-primary/10 px-1.5 py-0.5 text-caption font-medium text-primary">{p.maquina}</span>}
@@ -297,8 +302,23 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
               </div>
             )}
             <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-caption text-muted-foreground">
-              <span className="inline-flex items-center gap-1"><BookMarked className="h-3 w-3" /> {p.conjunto || 'conjunto s/n'}</span>
-              <span>pág. {p.pagina}{p.posicion ? ` · pos. ${p.posicion}` : ''}</span>
+              {g.esComun ? (
+                /* Ferretería: va en tantos lugares que la figura no identifica
+                   nada. Decirlo es más útil que listar 159 ubicaciones. */
+                <span className="inline-flex items-center gap-1">
+                  <BookMarked className="h-3 w-3" /> Pieza común · va en {g.apariciones.length} lugares de la máquina
+                </span>
+              ) : (
+                <>
+                  <span className="inline-flex items-center gap-1"><BookMarked className="h-3 w-3" /> {p.conjunto || 'conjunto s/n'}</span>
+                  <span>pág. {p.pagina}{p.posicion ? ` · pos. ${p.posicion}` : ''}</span>
+                  {g.apariciones.length > 1 && (
+                    <span title={g.apariciones.map((a) => `${a.conjunto || 's/n'} · pág. ${a.pagina}`).join(' | ')}>
+                      y en {g.apariciones.length - 1} lugar{g.apariciones.length > 2 ? 'es' : ''} más
+                    </span>
+                  )}
+                </>
+              )}
               <span className="min-w-0 truncate" title={p.fuente}>{p.fuente}</span>
             </div>
             {/* Acciones: abrir el PDF del manual en la página exacta + sembrar el maestro */}
