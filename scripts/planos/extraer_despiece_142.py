@@ -848,7 +848,10 @@ def indice_app():
     figs = json.load(io.open(os.path.join(trabajo, "figuras.json"), encoding="utf-8"))["figuras"]
     # cruce SAP: maestro exportado por cruzar_sap_142.mjs (match EXACTO por
     # codigoFabricante, solo SAP numericos — certeza primero)
-    ruta_maestro = os.path.join(trabajo, "maestro-142.json")
+    # Por DESPIECE, como todo lo demas: con el nombre fijo, la 200 buscaba el
+    # maestro de la 142, no lo encontraba, y el indice salia con SAP 0 sin
+    # decir por que.
+    ruta_maestro = os.path.join(trabajo, f"maestro-{DESPIECE_ID}.json")
     sap_por_fab = {}
     if os.path.exists(ruta_maestro):
         for m in json.load(io.open(ruta_maestro, encoding="utf-8")):

@@ -43,7 +43,11 @@ const bucket = admin.storage().bucket()
 
 const archivos = readdirSync(staging)
   .filter((f) => f.endsWith('.svg') || f.endsWith('.json'))
-  .filter((f) => !soloIndice || f === 'indice.json')
+  // El modo rapido sube el indice Y su `busqueda.json`: los dos se generan
+  // juntos y se leen juntos, pero antes solo viajaba el primero. Trampa
+  // gemela de la de las anclas (que viven en los hoja-NN.json y este modo
+  // TAMPOCO lleva — si tocaste el OCR, sube todo).
+  .filter((f) => !soloIndice || f === 'indice.json' || f === 'busqueda.json')
 console.log(`${archivos.length} archivos de ${staging}`)
 
 let subidos = 0, bytes = 0
