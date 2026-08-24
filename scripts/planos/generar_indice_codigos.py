@@ -16,6 +16,7 @@ Salida: apps/pwa/public/data/codigos-indice.json
 """
 import io
 import json
+import re
 import os
 import glob
 
@@ -34,15 +35,39 @@ for slug in ("baader-142-despiece", "baader-200-despiece"):
         if aps and cod not in despieces:
             despieces[cod] = (slug, aps[0]["h"], figs.get(aps[0]["h"], ""))
 
+RE_CONJUNTO_NUM = re.compile(r"^\d{6,}")
+
 salida = {}
 for f in sorted(glob.glob(os.path.join(PUB, "data", "codigos-fabricante", "*.json"))):
     d = json.load(io.open(f, encoding="utf-8"))
     maquina = d.get("maquina") or os.path.basename(f)
     for p in d.get("piezas", []):
         cod = str(p.get("codigo") or "").strip()
-        if not cod or cod in salida:
+        if not cod:
             continue
-        e = {"m": maquina, "n": (p.get("descripcion") or "")[:52]}
+        desc = (p.get("descripcion") or "")[:52]
+        # Un codigo puede venir DOS veces: en la lista «Piezas de desgaste»
+        # (indice al principio del catalogo) y en su figura real. En la lista,
+        # BAADER dejo varias descripciones EN FRANCES —«Redresseur des
+        # nageoires», «(couteau de ventre/dos)»— y como aparece primero, era
+        # la que ganaba: el buscador por numero de parte devolvia frances
+        # justo en las piezas que mas se buscan (cuchillas, alineadores).
+        # Se prefiere la entrada que viene de una FIGURA (su conjunto empieza
+        # con el codigo numerico del conjunto), que si esta en castellano.
+        # "Viene de una figura" = tiene POSICION (toda fila de tabla la tiene)
+        # o su conjunto empieza con el codigo numerico. La lista de desgaste no
+        # cumple ninguna de las dos: es un indice, no una tabla de piezas.
+        de_figura = (bool(str(p.get("posicion") or "").strip())
+                     or bool(RE_CONJUNTO_NUM.match((p.get("conjunto") or "").strip())))
+        if cod in salida:
+            if not de_figura or salida[cod].get("_fig"):
+                continue      # ya hay una de figura, o esta no lo es
+            salida[cod]["n"] = desc      # reemplaza la de la lista de desgaste
+            salida[cod]["_fig"] = True
+            continue
+        e = {"m": maquina, "n": desc}
+        if de_figura:
+            e["_fig"] = True
         d_ = despieces.get(cod)
         if d_:
             e["s"], e["h"], e["f"] = d_
