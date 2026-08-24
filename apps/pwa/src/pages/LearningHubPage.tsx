@@ -38,6 +38,7 @@ import {
 import { getFavorites, toggleFavorite, getRecents, pushRecent } from '@/utils/learningHubPrefs'
 import { getQuizBest, QUIZ_PASS_PCT } from '@/utils/learningProgress'
 import { LC as C } from '@/data/learningTheme'
+import { normHub, textoBuscable, coincide } from '@/data/learningHubSearch'
 import { MetaText, StatusTag } from '@/components/learning/primitives'
 
 // ── Paleta DARK + AquaChile: ver import { LC as C } arriba (compartida con admin) ──
@@ -49,7 +50,7 @@ const prefersReduced = () =>
   window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true
 
 /** lowercase + sin acentos, para búsqueda tolerante */
-const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '')
+const norm = normHub
 
 interface SpecialModule {
   id: string; title: string; subtitle: string; description: string
@@ -195,8 +196,22 @@ export function LearningHubPage() {
   // ── Búsqueda ──
   const q = norm(query.trim())
   const searching = q.length >= 2
-  const machineHits = searching ? allMachines.filter(m => norm(m.name).includes(q)) : []
-  const simHits = searching ? visibleSims.filter(s => norm(s.title).includes(q) || norm(s.subtitle).includes(q)) : []
+  /*
+   * Se busca TODO lo que la tarjeta muestra, no solo su nombre.
+   *
+   * El técnico llega con la placa de la máquina en la mano y escribe lo que
+   * lee ahí: `A600`, `M3210`, `MS4`, `TP-6000`, `GR8251`. Todos esos modelos
+   * están escritos en la bajada de su propia ficha, y el buscador —que solo
+   * miraba `name`— contestaba "Sin resultados". Lo mismo con los simuladores:
+   * la tarjeta del HMI Grader dice "Clasificador automático por peso" y
+   * buscar "clasificador" no encontraba nada.
+   */
+  const machineHits = searching
+    ? allMachines.filter(m => coincide(textoBuscable(m.name, m.description, m.area), q))
+    : []
+  const simHits = searching
+    ? visibleSims.filter(s => coincide(textoBuscable(s.title, s.subtitle, s.description, s.stats), q))
+    : []
   const symptomHits = searching
     ? symptoms.filter(h => norm(h.title).includes(q) || norm(h.symptom).includes(q)).slice(0, 8)
     : []
@@ -547,7 +562,7 @@ function MachineCard({
   const badges = course
     ? [
         { short: 'Lecciones', icon: FileText, count: meta?.manual ?? 0, tooltip: 'Teoria del curso, por unidades' },
-        { short: 'Practica', icon: ListChecks, count: meta?.procedures ?? 0, tooltip: 'Procedimientos paso a paso' },
+        { short: 'Práctica', icon: ListChecks, count: meta?.procedures ?? 0, tooltip: 'Procedimientos paso a paso' },
         { short: 'Casos', icon: Workflow, count: (meta?.flows ?? 0) + (meta?.diagnosis ?? 0), tooltip: 'Que hacer en cada situacion' },
         { short: 'Examen', icon: GraduationCap, count: meta?.quiz ?? 0, tooltip: 'Autoevaluacion tipo prueba' },
       ].map(b => ({ ...b, enabled: b.count > 0 }))

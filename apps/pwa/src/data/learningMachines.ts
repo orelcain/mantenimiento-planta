@@ -43,7 +43,7 @@ export interface LearningMachine {
 }
 
 /** Area del catalogo cuyos temas son CURSOS (no maquinas): set de pestanas y UI distintos. */
-export const CAPACITACION_AREA = 'Capacitacion / Normativa'
+export const CAPACITACION_AREA = 'Capacitación / Normativa'
 
 /** True si el tema es un curso (vive en el area de capacitacion). */
 export function isCourseMachine(machine: Pick<LearningMachine, 'area'>): boolean {
@@ -62,7 +62,7 @@ export const LEARNING_MACHINES: LearningMachine[] = [
     slug: 'marel-hg',
     name: 'Marel HG',
     area: 'Planta Principal',
-    description: 'Linea de procesamiento primario Marel; operacion y control desde el software del Clasificador A600 (controlador M3210): pantallas, programas, productos, lotes, informes y alarmas.',
+    description: 'Línea de procesamiento primario Marel; operación y control desde el software del Clasificador A600 (controlador M3210): pantallas, programas, productos, lotes, informes y alarmas.',
     icon: Fish,
     color: '#5a7d9e',
     sections: { manual: true, procedures: true, flows: true, diagnosis: true },
@@ -71,7 +71,7 @@ export const LEARNING_MACHINES: LearningMachine[] = [
     slug: 'baader-142',
     name: 'Evisceradora Baader 142 N3',
     area: 'Planta Principal',
-    description: 'Evisceradora Baader 142 — manual completo del fabricante: seguridad, funcionamiento, ajustes, limpieza, mantenimiento y catalogo de fallas y codigos de error (A3C).',
+    description: 'Evisceradora Baader 142 — manual completo del fabricante: seguridad, funcionamiento, ajustes, limpieza, mantenimiento y catálogo de fallas y códigos de error (A3C).',
     icon: Scissors,
     color: '#a5745f',
     hmiRoute: '/aprendizaje/hmi-knuro',
@@ -82,7 +82,7 @@ export const LEARNING_MACHINES: LearningMachine[] = [
     slug: 'grader',
     name: 'Grader',
     area: 'Planta Principal',
-    description: 'Clasificador automatico por peso y tamaño. Manual Marelec MS4/12, SOPs y runbooks Z2 (contrastacion, calibracion, mantencion, limpieza, troubleshooting).',
+    description: 'Clasificador automático por peso y tamaño. Manual Marelec MS4/12, SOPs y runbooks Z2 (contrastación, calibración, mantención, limpieza, troubleshooting).',
     icon: Scale,
     color: '#6e9080',
     hmiRoute: '/aprendizaje/hmi-grader',
@@ -93,7 +93,7 @@ export const LEARNING_MACHINES: LearningMachine[] = [
     slug: 'baader-200',
     name: 'Baader 200',
     area: 'Planta Principal',
-    description: 'Fileteadora Baader 200 — manual tecnico completo con ajustes, medidas y calibracion.',
+    description: 'Fileteadora Baader 200 — manual técnico completo con ajustes, medidas y calibración.',
     icon: BookOpen,
     color: '#6b8299',
     hmiRoute: '/aprendizaje/hmi-knuro',
@@ -104,7 +104,7 @@ export const LEARNING_MACHINES: LearningMachine[] = [
     slug: 'marel-filete',
     name: 'Marel Filete',
     area: 'Planta Principal',
-    description: 'Pesador dinamico Marel M-Weigher WTR (GR8251) con indicador M6410: alimentacion, plataforma de pesaje (celda de carga + modulo MWS2) y salida al proceso siguiente. NO clasifica ni arma lotes: eso ocurre aguas abajo. Seguridad, limpieza y mantenimiento.',
+    description: 'Pesador dinámico Marel M-Weigher WTR (GR8251) con indicador M6410: alimentación, plataforma de pesaje (celda de carga + módulo MWS2) y salida al proceso siguiente. NO clasifica ni arma lotes: eso ocurre aguas abajo. Seguridad, limpieza y mantenimiento.',
     icon: Fish,
     color: '#86769c',
     sections: { manual: true, procedures: true, flows: true, diagnosis: true },
@@ -113,7 +113,7 @@ export const LEARNING_MACHINES: LearningMachine[] = [
     slug: 'termoformadora-gea',
     name: 'Termoformadora GEA',
     area: 'Planta Principal',
-    description: 'Termoformadora de empaque al vacio para productos finales.',
+    description: 'Termoformadora GEA PowerPak PLUS: empaque al vacío de productos finales.',
     icon: Package,
     color: '#5f8f88',
     sections: { manual: false, procedures: false, flows: false, diagnosis: false },
@@ -122,7 +122,7 @@ export const LEARNING_MACHINES: LearningMachine[] = [
     slug: 'fishken',
     name: 'Fishken',
     area: 'Planta Principal',
-    description: 'Envasadora / pesadora combinatoria Fishken E-Pack S28: 28 compuertas, celdas de carga y software E-Pack (proceso, servicio, calibracion) + FishKen Web (reportes).',
+    description: 'Envasadora / pesadora combinatoria Fishken E-Pack S28: 28 compuertas, celdas de carga y software E-Pack (proceso, servicio, calibración) + FishKen Web (reportes).',
     icon: Fish,
     color: '#ab8f5e',
     sections: { manual: true, procedures: true, flows: true, diagnosis: true },
@@ -131,7 +131,7 @@ export const LEARNING_MACHINES: LearningMachine[] = [
     slug: 'detector-metales',
     name: 'Detector de Metales',
     area: 'Planta Principal',
-    description: 'Detector de metales en linea de empaque.',
+    description: 'Detector de metales Vistus (Sartorius Mechatronics) en línea de empaque: inspecciona el producto y separa las piezas contaminadas.',
     icon: Zap,
     color: '#a06b64',
     sections: { manual: true, procedures: true, flows: true, diagnosis: true },
@@ -147,7 +147,7 @@ export const LEARNING_MACHINES: LearningMachine[] = [
   },
   {
     slug: 'seguridad-electrica',
-    name: 'Seguridad Electrica (NFPA 70E)',
+    name: 'Seguridad Eléctrica (NFPA 70E)',
     area: CAPACITACION_AREA,
     programa: 'Programa Electricidad - Mantenimiento Industrial',
     modulo: 1,
@@ -159,7 +159,7 @@ export const LEARNING_MACHINES: LearningMachine[] = [
   },
   {
     slug: 'rescate-svb',
-    name: 'Rescate Electrico y SVB',
+    name: 'Rescate Eléctrico y SVB',
     area: CAPACITACION_AREA,
     programa: 'Programa Electricidad - Mantenimiento Industrial',
     modulo: 2,
@@ -171,7 +171,7 @@ export const LEARNING_MACHINES: LearningMachine[] = [
   },
   {
     slug: 'nfpa-70b',
-    name: 'NFPA 70B - Mantenimiento Electrico',
+    name: 'NFPA 70B — Mantenimiento Eléctrico',
     area: CAPACITACION_AREA,
     programa: 'Programa Electricidad - Mantenimiento Industrial',
     modulo: 3,
@@ -183,7 +183,7 @@ export const LEARNING_MACHINES: LearningMachine[] = [
   },
   {
     slug: 'codigo-electrico-nec',
-    name: 'Codigo Electrico Nacional (NFPA 70/NEC)',
+    name: 'Código Eléctrico Nacional (NFPA 70/NEC)',
     area: CAPACITACION_AREA,
     programa: 'Programa Electricidad - Mantenimiento Industrial',
     modulo: 4,
@@ -195,7 +195,7 @@ export const LEARNING_MACHINES: LearningMachine[] = [
   },
   {
     slug: 'imputacion-fallas',
-    name: 'Imputacion de Fallas',
+    name: 'Imputación de Fallas',
     area: CAPACITACION_AREA,
     programa: 'Capacitacion interna - Operacion y Mantencion',
     nivel: 1,
