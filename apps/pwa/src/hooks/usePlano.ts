@@ -183,19 +183,27 @@ export function usePlano(slug: string | undefined, inicial?: number) {
 
   // El buscador vive aparte en los planos grandes: se trae al primer tecleo.
   const busquedaPedida = useRef(false)
+  // El buscador de los planos grandes viaja aparte y se trae al escribir. Sin
+  // exponer que ESTA CARGANDO, la primera consulta de la sesion contesta "sin
+  // coincidencias" mientras baja el archivo, y quien no ve su pieza concluye
+  // que no esta en el plano.
+  const [buscadorListo, setBuscadorListo] = useState(true)
   const cargarBusqueda = useCallback(() => {
     if (busquedaPedida.current || !slug) return
     busquedaPedida.current = true
+    setBuscadorListo(false)
     fetchAsset(slug, 'busqueda.json')
       .then((r) => r.json())
       .then((d: { busqueda?: PlanoBusquedaItem[]; descs?: Record<string, string> }) => {
         setIndice((prev) => (prev
           ? { ...prev, busqueda: d.busqueda ?? prev.busqueda, descs: d.descs ?? prev.descs }
           : prev))
+        setBuscadorListo(true)
       })
       .catch(() => {
         // sin buscador el visor sigue sirviendo: se permite reintentar
         busquedaPedida.current = false
+        setBuscadorListo(true)
       })
   }, [slug])
 
@@ -207,6 +215,7 @@ export function usePlano(slug: string | undefined, inicial?: number) {
   useEffect(() => {
     cache.current.clear()
     busquedaPedida.current = false
+    setBuscadorListo(true)
     setIndice(null)
     setHoja(null)
     setError(null)
@@ -306,5 +315,5 @@ export function usePlano(slug: string | undefined, inicial?: number) {
     if (destino != null) void abrir(destino)
   }, [indice, hoja, abrir, inicial])
 
-  return { indice, hoja, abrir, cargando, error, reintentar, cargarBusqueda }
+  return { indice, hoja, abrir, cargando, error, reintentar, cargarBusqueda, buscadorListo }
 }
