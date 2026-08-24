@@ -9,6 +9,7 @@ import {
   getMaintenanceLog,
   updateMaintenanceLogEntry,
 } from '@/services/maintenanceLog'
+import { criticidadEvaluada } from '@/lib/ctd'
 import { usePermissions } from '@/hooks/usePermissions'
 import { useAppStore } from '@/store'
 import { logger } from '@/lib/logger'
@@ -491,9 +492,18 @@ export function FichaTecnicaNFPA70B({
             Criticidad · RCM
           </SectionTitle>
           <div className="flex items-center gap-3 flex-wrap">
-            <Badge variant="outline" className={`${crit.cls} text-sm`}>
+            <Badge
+              variant="outline"
+              className={`${criticidadEvaluada(equipment) ? crit.cls : 'border-border text-muted-foreground'} text-sm`}
+              title={criticidadEvaluada(equipment)
+                ? undefined
+                : 'Es el valor con que se importó el equipo, no una evaluación. Se fija editando el equipo.'}
+            >
               Criticidad {crit.nivel} · {crit.label}
             </Badge>
+            {!criticidadEvaluada(equipment) && (
+              <span className="text-xs text-ink-warn">Sin evaluar — viene de la importación</span>
+            )}
             {editing ? (
               <div className="flex items-center gap-1.5">
                 <span className="text-xs text-muted-foreground mr-1">Condición:</span>
@@ -551,7 +561,14 @@ export function FichaTecnicaNFPA70B({
               <span className="text-xs text-muted-foreground">
                 Próxima inspección sugerida:{' '}
                 <span className="font-medium text-foreground">{sugeridaFecha.toLocaleDateString()}</span> — criticidad{' '}
-                {crit.nivel} × condición {ficha.condicion ?? '—'} → {sugeridaDias} d desde {refFecha.toLocaleDateString()}
+                {crit.nivel}
+                {/* El intervalo sale de la criticidad: si nadie la evaluó, la fecha
+                    sugerida se apoya en el valor con que se importó el equipo, y eso
+                    hay que decirlo antes de que alguien la guarde como plan. */}
+                {!criticidadEvaluada(equipment) && (
+                  <span className="text-ink-warn"> (sin evaluar)</span>
+                )}{' '}
+                × condición {ficha.condicion ?? '—'} → {sugeridaDias} d desde {refFecha.toLocaleDateString()}
               </span>
               <Button size="sm" variant="outline" onClick={aplicarSugerida} disabled={saving}>
                 Usar sugerida

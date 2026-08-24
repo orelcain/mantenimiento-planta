@@ -9,6 +9,7 @@ import {
   bucketDe,
   completitud,
   contarOtPorEquipo,
+  criticidadEvaluada,
   diasVencida,
   lineaDe,
   proximaMs,
@@ -90,6 +91,7 @@ export function useCtdEquipos(favorites: Set<string>) {
 
   const kpis = useMemo(() => {
     let critA = 0
+    let sinEvaluar = 0
     let cond3 = 0
     let vencidas = 0
     let incompletas = 0
@@ -98,6 +100,7 @@ export function useCtdEquipos(favorites: Set<string>) {
     let otVencidas = 0
     for (const e of equipos) {
       if (e.criticidad === 'alta') critA++
+      if (!criticidadEvaluada(e)) sinEvaluar++
       if (e.fichaTecnica?.condicion === 3) cond3++
       if (diasVencida(e.fichaTecnica?.proximaInspeccion) !== null) vencidas++
       if (completitud(e) < 100) incompletas++
@@ -106,7 +109,7 @@ export function useCtdEquipos(favorites: Set<string>) {
       if (ot && ot.abiertas > 0) otAbiertas++
       if (ot && ot.vencidas > 0) otVencidas++
     }
-    return { total: equipos.length, critA, cond3, vencidas, incompletas, favs, otAbiertas, otVencidas }
+    return { total: equipos.length, critA, sinEvaluar, cond3, vencidas, incompletas, favs, otAbiertas, otVencidas }
   }, [equipos, favorites, otByEquipo])
 
   const secciones = useMemo(() => {
@@ -160,6 +163,8 @@ export function useCtdEquipos(favorites: Set<string>) {
       switch (filtro) {
         case 'A':
           return e.criticidad === 'alta'
+        case 'sinEvaluar':
+          return !criticidadEvaluada(e)
         case 'cond3':
           return e.fichaTecnica?.condicion === 3
         case 'vencida':
@@ -244,7 +249,12 @@ export function useCtdEquipos(favorites: Set<string>) {
   // disponible en el hook por si se reactiva en los críticos.
   const kpiFiltros: { key: Filtro; label: string; n: number; cls?: string }[] = [
     { key: 'todos', label: 'Equipos', n: kpis.total },
-    { key: 'A', label: 'Criticidad A', n: kpis.critA, cls: 'text-red-600' },
+    /* "Criticidad A: 0" se lee como "no hay equipos críticos". Mientras nadie
+       haya evaluado ninguno, lo que corresponde mostrar es cuántos faltan por
+       evaluar: hoy son los 553, todos con el 'media' de la importación. */
+    kpis.sinEvaluar === kpis.total && kpis.total > 0
+      ? { key: 'sinEvaluar' as const, label: 'Criticidad sin evaluar', n: kpis.sinEvaluar, cls: 'text-amber-600' }
+      : { key: 'A' as const, label: 'Criticidad A', n: kpis.critA, cls: 'text-red-600' },
     { key: 'incompleta', label: 'Ficha incompleta', n: kpis.incompletas, cls: 'text-amber-600' },
     { key: 'favoritos', label: '★ Favoritos', n: kpis.favs, cls: 'text-yellow-600' },
   ]
