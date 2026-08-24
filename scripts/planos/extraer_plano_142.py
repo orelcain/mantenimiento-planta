@@ -395,6 +395,25 @@ def main():
     resumen(DEST, hojas, indice, sin_traducir, lineas_saltadas)
 
 
+def recortar_titulo(t, n=48):
+    """Recorta un titulo de hoja SIN cortar a mitad de palabra.
+
+    El corte duro `t[:48]` producia cosas como «SM3 Aspirador · SM2 Cuchilla
+    ranuradora · SM1 Ce» — visto en produccion en la ficha de B14. Se corta en
+    el ultimo separador util y se marca con elipsis para que se lea como
+    "hay mas", no como un dato incompleto.
+    """
+    t = (t or "").strip()
+    if len(t) <= n:
+        return t
+    corte = t[:n]
+    for sep in (" · ", " "):
+        i = corte.rfind(sep)
+        if i > n * 0.5:
+            return corte[:i].rstrip(" ·") + "…"
+    return corte.rstrip() + "…"
+
+
 def construir_descripciones(indice, hojas, bornes_por_hoja, terms_por_hoja):
     """Descripcion en lenguaje tecnico natural de cada aparato, generada SOLO
     con datos del propio plano (nada inventado): que es (por la letra IEC de
@@ -418,7 +437,7 @@ def construir_descripciones(indice, hojas, bornes_por_hoja, terms_por_hoja):
             vistos.add(pt["h"])
             t = titulos.get(pt["h"], "")
             if t and t != "Continuacion del esquema":
-                lugares.append(f"«{t[:48]}» (hoja {pt['h']})")
+                lugares.append(f"«{recortar_titulo(t)}» (hoja {pt['h']})")
             else:
                 lugares.append(f"hoja {pt['h']}")
         if lugares:
