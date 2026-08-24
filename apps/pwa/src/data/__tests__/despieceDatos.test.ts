@@ -6,7 +6,7 @@
  * Todos se regeneran con scripts/planos/*.py; si un cambio del extractor
  * rompe la forma, esto lo detiene antes del deploy.
  */
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
@@ -157,5 +157,22 @@ describe('mapa código→figura (camino inverso desde Repuestos)', () => {
     for (const [cod, [hoja]] of Object.entries(mapa.codigos).slice(0, 100)) {
       expect(indice.indice[cod]?.some((a) => a.h === hoja), `${cod} no coincide con el índice`).toBe(true)
     }
+  })
+})
+
+/**
+ * El mapa inverso de la fileteadora se generaba desde hacía tiempo (1.510
+ * códigos) y la vista de Repuestos cargaba SOLO el de la evisceradora: el
+ * botón "Ver dibujo" no aparecía nunca para la 200 aunque el dato estaba ahí.
+ * Este guard obliga a que cada archivo generado tenga quien lo consuma.
+ */
+describe('mapas inversos codigo -> figura', () => {
+  const VISTA = join(__dirname, '..', '..', 'pages', 'repuestos', 'CodigosFabricanteView.tsx')
+
+  it('todos los archivos despiece-*-figuras.json estan declarados en la vista', () => {
+    const fuente = readFileSync(VISTA, 'utf8')
+    const generados = readdirSync(join(PUB, 'data')).filter((f) => /^despiece-\d+-figuras\.json$/.test(f))
+    expect(generados.length).toBeGreaterThan(1)
+    for (const archivo of generados) expect(fuente).toContain(archivo)
   })
 })
