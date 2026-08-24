@@ -24,3 +24,23 @@ export function etiquetaHoja(h: HojaEtiquetable, es: boolean): string {
   const ref = h.fig && h.fig !== '—' ? h.fig : String(h.blatt)
   return nombre ? `${ref} · ${nombre}` : ref
 }
+
+/**
+ * ¿El título de una hoja coincide con lo que se buscó?
+ *
+ * Compara también SIN ESPACIOS: los títulos de los planos GEA salen de OCR del
+ * cajetín y traen palabras pegadas («OCUPACIONCABLE DE UNION25G075»). Buscar
+ * "ocupacion cable" —lo que escribe cualquiera— daba 0 resultados mientras
+ * "ocupacioncable" daba 3.
+ *
+ * Ambos textos llegan ya normalizados (sin acentos, en mayúsculas).
+ */
+export function coincideTitulo(titulo: string, consulta: string): boolean {
+  if (!titulo || !consulta) return false
+  if (titulo.includes(consulta)) return true
+  const pegada = consulta.replace(/\s+/g, '')
+  // 5+ caracteres: sin ese piso, "de la" → "dela" coincidiría con cualquier
+  // cosa que contenga esas letras seguidas.
+  if (pegada.length < 5 || pegada === consulta) return false
+  return titulo.replace(/\s+/g, '').includes(pegada)
+}

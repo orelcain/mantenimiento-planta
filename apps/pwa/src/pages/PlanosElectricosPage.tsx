@@ -16,7 +16,7 @@ import { usePlanoVinculos, type VinculoTerreno } from '@/hooks/usePlanoVinculos'
 import { PlanoLienzo, type Foco } from '@/components/planos/PlanoLienzo'
 import { NotasAparato } from '@/components/planos/NotasAparato'
 import { compactarTramos, compararTags } from '@/utils/designaciones'
-import { etiquetaHoja } from '@/utils/hojas'
+import { coincideTitulo, etiquetaHoja } from '@/utils/hojas'
 import { auth } from '@/services/firebase'
 
 /** minusculas y sin acentos: "posicion" debe encontrar "POSICIÓN ZERO". */
@@ -1513,8 +1513,14 @@ function buscar(
   })
 
   // Hojas por su titulo ("SELLADO" -> las hojas de la estacion de sellado).
+  //
+  // Tambien SIN ESPACIOS: los titulos de los planos GEA salen de OCR del
+  // cajetin y traen palabras pegadas («OCUPACIONCABLE DE UNION25G075»).
+  // Buscar "ocupacion cable" —lo que escribe cualquiera— daba 0 resultados
+  // mientras "ocupacioncable" daba 3. Se exige 5+ caracteres para no convertir
+  // consultas cortas en coincidencias de cualquier cosa.
   indice.hojas.forEach((h) => {
-    if (sinAcentos(h.tituloEs).includes(v) || sinAcentos(h.titulo).includes(v)) {
+    if (coincideTitulo(sinAcentos(h.tituloEs), v) || coincideTitulo(sinAcentos(h.titulo), v)) {
       out.push({ clave: `Hoja ${h.blatt}`, detalle: h.tituloEs.slice(0, 34), blatt: h.blatt })
     }
   })
