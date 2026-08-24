@@ -604,7 +604,16 @@ export function TiempoDelTurno({
                 Van <span className="tabular-nums font-semibold">{fmtInt(hechas)}</span> de las{' '}
                 <span className="tabular-nums font-semibold">{fmtInt(cuotaOk ?? 0)}</span> que
                 tocaban {horaAhora ? <>a las <span className="tabular-nums">{horaAhora}</span></> : 'a esta altura'}.
-                Las paradas evitables llevan <b>{fmtDurMin(tb.recoverableMin)}</b>.
+                {' '}
+                {/* `recoverableMin` son los minutos con la LÍNEA ENTERA detenida, y
+                    arriba cada causa muestra los minutos en que estuvo activa en
+                    ALGUNA máquina (86 min de "Detención" contra 67 de línea, el
+                    24-08 en Chonchi). Sin decir cuál es cuál, los dos números se
+                    leen como si uno estuviera mal. */}
+                Las paradas evitables llevan <b>{fmtDurMin(tb.recoverableMin)}</b>
+                {(tb.recoverable ?? []).some((x) => (x.lineMin ?? x.min) < x.min)
+                  ? ' con la línea entera detenida.'
+                  : '.'}
               </p>
             )}
         </div>

@@ -125,3 +125,49 @@ describe('costoDeParadas', () => {
     expect(costoDeParadas({ ...base, series: serie([50]), stopEvents: [], cpmGlobal: 0 })).toBeNull()
   })
 })
+
+/**
+ * Líneas con VARIAS máquinas. Cada evento de `stopEvents` es la parada de una
+ * sola máquina, pero el ritmo local sale de `series`, que son las piezas de la
+ * LÍNEA entera. Sin dividir, la parada se cobraba una vez por máquina.
+ *
+ * El caso real: Chonchi eviscerado, turno del 24-08-2026 con 3 Baader 142.
+ * Los eventos de "Detencion" sumaban 239 min de máquina y salían valorizados
+ * en 10.871 pz — más que las 7.036 que el propio monitor mostraba como brecha
+ * total, y con la línea completa detenida solo 67 min.
+ */
+describe('costoDeParadas · líneas con varias máquinas', () => {
+  const REASONS = ['Detencion']
+  // 10 tramos de 5 min a 150 pz = 30 pz/min de línea.
+  const series10 = serie(Array.from({ length: 10 }, () => 150))
+  const args = (maquinas?: number) => ({
+    series: series10,
+    // Las 3 máquinas paran 10 min a la vez, en el minuto 40.
+    stopEvents: [ev(0, 40, 10), ev(0, 40, 10), ev(0, 40, 10)],
+    stopReasons: REASONS,
+    recuperables: ['Detencion'],
+    cpmGlobal: 30,
+    maquinas,
+  })
+
+  it('no cobra la misma parada una vez por máquina', () => {
+    const c = costoDeParadas(args(3))!
+    // 10 min de línea a 30 pz/min = 300 pz, no 900.
+    expect(Math.round(c.totalPiezas)).toBe(300)
+  })
+
+  it('con una sola máquina no cambia nada (Filete)', () => {
+    const c = costoDeParadas({ ...args(1), stopEvents: [ev(0, 40, 10)] })!
+    expect(Math.round(c.totalPiezas)).toBe(300)
+  })
+
+  it('sin el dato de máquinas se comporta como antes (divisor 1)', () => {
+    const c = costoDeParadas(args(undefined))!
+    expect(Math.round(c.totalPiezas)).toBe(900)
+  })
+
+  it('informa el ritmo de LÍNEA, que es el que se muestra al explicar la cifra', () => {
+    const c = costoDeParadas(args(3))!
+    expect(Math.round(c.porCausa[0]!.cpm)).toBe(30)
+  })
+})
