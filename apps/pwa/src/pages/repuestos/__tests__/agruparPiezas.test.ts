@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { agruparPorCodigo, mejorDescripcion, UMBRAL_COMUN } from '../agruparPiezas'
+import { agruparPorCodigo, conRecuentoTotal, indexarGrupos, mejorDescripcion, UMBRAL_COMUN } from '../agruparPiezas'
 import type { PiezaCatalogo } from '../catalogosFabricante'
 
 /**
@@ -80,5 +80,29 @@ describe('mejorDescripcion', () => {
     const a = pieza({ descripcion: 'Arandela', pagina: 1 })
     const b = pieza({ descripcion: 'Arandela', pagina: 2 })
     expect(mejorDescripcion([a, b]).pagina).toBe(1)
+  })
+})
+
+describe('conRecuentoTotal', () => {
+  // La misma arandela decía "va en 129 lugares" buscando "golilla" y "159"
+  // buscando su código: el recuento salía de las filas que traía la búsqueda.
+  const catalogo = Array.from({ length: 159 }, (_, i) => pieza({ pagina: 17 + i }))
+  const filtradas = catalogo.slice(0, 129)
+
+  it('cuenta sobre el catálogo completo, no sobre lo filtrado', () => {
+    const g = conRecuentoTotal(agruparPorCodigo(filtradas), indexarGrupos(catalogo))
+    expect(g[0]?.apariciones).toHaveLength(159)
+  })
+
+  it('sin el índice, no rompe (queda el recuento de la búsqueda)', () => {
+    const g = conRecuentoTotal(agruparPorCodigo(filtradas), null)
+    expect(g[0]?.apariciones).toHaveLength(129)
+  })
+
+  it('no mezcla máquinas: el mismo código en la otra máquina se cuenta aparte', () => {
+    const otra = Array.from({ length: 50 }, () => pieza({ maquina: 'BAADER 142' }))
+    const idx = indexarGrupos([...catalogo, ...otra])
+    const g = conRecuentoTotal(agruparPorCodigo([pieza({ maquina: 'BAADER 142' })]), idx)
+    expect(g[0]?.apariciones).toHaveLength(50)
   })
 })
