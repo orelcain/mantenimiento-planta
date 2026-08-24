@@ -379,7 +379,7 @@ function Visor({ slug }: { slug: string }) {
     const g = Number(localStorage.getItem(`plano-hoja:${slug}`))
     return Number.isInteger(g) && g > 0 ? g : undefined
   })
-  const { indice, hoja, abrir, cargando, error, reintentar, cargarBusqueda } = usePlano(slug, inicial)
+  const { indice, hoja, abrir, cargando, error, reintentar, cargarBusqueda, buscadorListo } = usePlano(slug, inicial)
   // ?fig=70-8 — en el catálogo de piezas la referencia que la gente se pasa
   // por chat es la FIGURA impresa, no el número de hoja del visor. Se
   // resuelve cuando llega el índice (que es quien conoce el mapa fig→hoja).
@@ -1100,7 +1100,7 @@ function Visor({ slug }: { slug: string }) {
             </button>
           )}
           {esVisor && busca.trim()
-            ? <Resultados items={resultados} total={totalResultados} partes={partesEncontradas}
+            ? <Resultados items={resultados} total={totalResultados} partes={partesEncontradas} cargando={!buscadorListo}
                 onIr={(b, c, caja, aparato) => {
                   if (aparato) seleccionar({ tipo: 'aparato', tag: aparato })
                   setBusca('')
@@ -1125,7 +1125,7 @@ function Visor({ slug }: { slug: string }) {
                 />
               </>
             : busca.trim()
-            ? <Resultados items={resultados} total={totalResultados} partes={partesEncontradas}
+            ? <Resultados items={resultados} total={totalResultados} partes={partesEncontradas} cargando={!buscadorListo}
                 onIr={(b, c, caja, aparato) => {
                   if (aparato) seleccionar({ tipo: 'aparato', tag: aparato })
                   // Elegir un resultado cierra la busqueda: si no, el panel se
@@ -1559,7 +1559,7 @@ function buscar(
   return { items: out.slice(0, 60), total: out.length }
 }
 
-function Resultados({ items, total, onIr, partes = [] }: {
+function Resultados({ items, total, onIr, partes = [], cargando = false }: {
   items: Resultado[]
   /** Total de coincidencias antes de truncar a 60; si es mayor a items.length
    *  se avisa en vez de dejar creer que eso es todo lo que había. */
@@ -1567,13 +1567,20 @@ function Resultados({ items, total, onIr, partes = [] }: {
   onIr: (b: number, c?: number, caja?: Caja, aparato?: string) => void
   /** Coincidencias por número de parte, de TODA la planta (no solo este plano). */
   partes?: ParteEncontrada[]
+  /** El buscador de este plano viaja aparte y aún está bajando. */
+  cargando?: boolean
 }) {
   const truncado = total != null && total > items.length
   return (
     <>
       <ResultadosNumeroParte partes={partes} />
       <Titulo>{items.length} resultado{items.length !== 1 ? 's' : ''}{partes.length ? ' en este plano' : ''}</Titulo>
-      {!items.length && !partes.length && (
+      {cargando && !items.length && (
+        <p className="m-0 text-footnote" style={{ color: 'var(--lc-ink-ghost)' }}>
+          Bajando el buscador de este plano…
+        </p>
+      )}
+      {!cargando && !items.length && !partes.length && (
         <p className="m-0 text-footnote" style={{ color: 'var(--lc-ink-ghost)' }}>
           Sin coincidencias. Prueba con una designación (K7, Q1) o una palabra
           del plano en alemán o castellano.
