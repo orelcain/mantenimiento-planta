@@ -2497,6 +2497,9 @@ export function PublicShiftMonitorPage() {
           live?.timeBreakdown && live.timeBreakdown.producingMin > 0
             ? live.totalPieces / live.timeBreakdown.producingMin
             : 0,
+        /* Cada evento es la parada de UNA máquina y el ritmo sale de la LÍNEA:
+           sin esto, en Chonchi (3 Baader) cada parada se cobraba tres veces. */
+        maquinas: live?.machinesTotal,
       }),
     [live],
   )
