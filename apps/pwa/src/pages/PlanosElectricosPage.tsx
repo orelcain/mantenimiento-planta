@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
-import { Camera, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Copy, Download, Link as LinkIcon, Loader2, Printer, QrCode, Search, X, Zap } from 'lucide-react'
+import { AlertTriangle, Camera, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Component, Copy, Download, Link as LinkIcon, Loader2, LayoutPanelTop, Printer, QrCode, Search, Wind, X, Zap } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
-import { PLANOS, assetPlano, planoPorSlug } from '@/data/planos'
+import { EQUIPOS, PLANOS, assetPlano, planoPorSlug, planosPorEquipo, type PlanoCatalogo, type TipoPlano } from '@/data/planos'
 import {
   usePlano, guardarPlanoOffline,
   type Caja, type FilaDespiece, type PlanoAparato, type PlanoBorneLibre,
@@ -156,13 +156,17 @@ function Catalogo() {
     }
   }
 
+  // Mientras hay una consulta activa, el catálogo por máquina se pliega: los
+  // resultados se quedan con la pantalla en vez de competir con 14 filas.
+  const buscando = q.trim().length > 0
+
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-5 p-5" style={{ color: 'var(--lc-ink)' }}>
       <header>
-        <h1 className="m-0 text-xl font-semibold">Planos eléctricos</h1>
+        <h1 className="m-0 text-title3">Planos</h1>
         <p className="m-0 mt-1 text-footnote" style={{ color: 'var(--lc-ink-mid)' }}>
-          El plano del fabricante, navegable: los saltos entre hojas se siguen tocando,
-          cada aparato dice dónde más aparece, y los rótulos se leen en castellano.
+          Los planos del fabricante, navegables: los saltos entre hojas se siguen tocando
+          y los rótulos se leen en castellano. {PLANOS.length} documentos de {EQUIPOS.length} máquinas.
         </p>
         <div className="relative mt-3">
           <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2"
@@ -223,51 +227,114 @@ function Catalogo() {
         )}
       </header>
 
-      {([
-        ['Esquemas eléctricos y neumáticos', PLANOS.filter((p) => p.modo !== 'despiece')],
-        ['Planos de partes', PLANOS.filter((p) => p.modo === 'despiece')],
-      ] as const).map(([titulo, grupo]) => grupo.length > 0 && (
-        <section key={titulo} className="flex flex-col gap-3">
-          <h2 className="m-0 flex items-baseline gap-2 text-caption font-semibold tracking-wider"
-              style={{ color: 'var(--lc-ink-ghost)' }}>
-            {titulo}
-            <span className="font-mono normal-case tracking-normal">{grupo.length}</span>
-          </h2>
-          {grupo.map((p) => (
-            <Link key={p.slug} to={`/aprendizaje/planos/${p.slug}`}
-                  className="flex flex-col gap-2 rounded-card border p-4 no-underline transition-opacity hover:opacity-90"
-                  style={{ background: 'var(--lc-surface)', borderColor: 'var(--lc-border)', color: 'inherit' }}>
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <span className="flex items-baseline gap-2 text-[15px] font-semibold">
-                  {p.maquina}
-                  {p.modo === 'despiece' && (
-                    <span className="rounded-ctl px-1.5 py-0.5 text-caption font-medium"
-                          style={{ background: 'var(--lc-surface-hi)', color: 'var(--lc-ink-mid)' }}>
-                      Plano de partes
-                    </span>
-                  )}
+      {!buscando && (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {planosPorEquipo().map(({ equipo, planos }) => (
+            <section key={equipo.id} className="flex min-w-0 flex-col gap-0">
+              <div className="flex items-baseline gap-2 px-0.5 pb-2">
+                <span className="font-mono text-caption uppercase tracking-[.13em]"
+                      style={{ color: 'var(--lc-ink-ghost)' }}>
+                  {equipo.funcion}
                 </span>
-                <span className="font-mono text-caption" style={{ color: 'var(--lc-aqua-bright)' }}>
-                  {p.numero} · {p.revision}
+                <span className="ml-auto font-mono text-caption" style={{ color: 'var(--lc-ink-ghost)' }}>
+                  {planos.length} plano{planos.length !== 1 ? 's' : ''}
                 </span>
               </div>
-              <p className="m-0 text-footnote leading-relaxed" style={{ color: 'var(--lc-ink-mid)' }}>
-                {p.descripcion}
-              </p>
-              <div className="flex flex-wrap gap-3 font-mono text-caption" style={{ color: 'var(--lc-ink-lo)' }}>
-                <span>{p.hojas} hojas</span>
-                <span>{p.aplicaA}</span>
-                {!!p.faltantes.length && (
-                  <span style={{ color: 'var(--lc-prep)' }}>
-                    falta la hoja {p.faltantes.join(', ')} en el PDF original
+              <h2 className="m-0 -mt-3 mb-2 text-headline">
+                {equipo.nombre}
+                {equipo.serie && (
+                  <span className="ml-2 font-mono text-body font-semibold tabular-nums">
+                    <span style={{ color: 'var(--lc-ink-ghost)' }}>{equipo.serie.slice(0, 3)}</span>
+                    {equipo.serie.slice(3)}
                   </span>
                 )}
+              </h2>
+              <div className="overflow-hidden rounded-card border" style={{ background: 'var(--lc-surface)', borderColor: 'var(--lc-border)' }}>
+                {planos.map((p, i) => (
+                  <div key={p.slug}>
+                    {i > 0 && <div className="border-t" style={{ borderColor: 'var(--lc-border)' }} />}
+                    <FilaPlano p={p} />
+                    {p.verificacion?.estado === 'por_confirmar' && (
+                      <p className="m-0 flex items-start gap-2 px-3 pb-2.5 pt-2 text-caption leading-snug"
+                         style={{ background: 'var(--lc-prep-soft)', color: 'var(--lc-prep)' }}>
+                        <AlertTriangle size={14} className="mt-px shrink-0" />
+                        <span>Sin confirmar. Antes de usarlo, {p.verificacion.nota}.</span>
+                      </p>
+                    )}
+                    {p.verificacion?.estado === 'confirmado' && (
+                      <p className="m-0 -mt-1.5 flex items-start gap-2 py-1.5 pb-2 pl-14 pr-3 text-caption leading-snug"
+                         style={{ color: 'var(--lc-ink-lo)' }}>
+                        <CheckCircle2 size={14} className="mt-px shrink-0" style={{ color: 'var(--lc-ok)' }} />
+                        <span>Confirmado: {p.verificacion.nota}</span>
+                      </p>
+                    )}
+                  </div>
+                ))}
               </div>
-            </Link>
+            </section>
           ))}
-        </section>
-      ))}
+        </div>
+      )}
     </div>
+  )
+}
+
+const TIPO_LABEL: Record<TipoPlano, string> = {
+  electrico: 'Eléctrico',
+  neumatico: 'Neumático',
+  partes: 'Plano de partes',
+  planta: 'Plano de planta',
+}
+
+const TIPO_ICONO: Record<TipoPlano, typeof Zap> = {
+  electrico: Zap,
+  neumatico: Wind,
+  partes: Component,
+  planta: LayoutPanelTop,
+}
+
+/** Ficha de tipo: 2 matices (eléctrico=aqua, neumático=verde) + 2 formas
+ *  (partes=ficha llena, planta=ficha de contorno). El ámbar queda reservado
+ *  para la advertencia de verificación. */
+function FichaTipo({ tipo }: { tipo: TipoPlano }) {
+  const Icono = TIPO_ICONO[tipo]
+  const estilo =
+    tipo === 'electrico' ? { background: 'var(--lc-aqua-soft)', color: 'var(--lc-aqua-bright)' }
+    : tipo === 'neumatico' ? { background: 'var(--lc-ok-soft)', color: 'var(--lc-ok)' }
+    : tipo === 'partes' ? { background: 'var(--lc-ink-lo)', color: 'var(--lc-surface)' }
+    : { background: 'transparent', color: 'var(--lc-ink-mid)', border: '1.5px solid var(--lc-border-hi)' }
+  return (
+    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-ctl" style={estilo}>
+      <Icono size={17} strokeWidth={1.9} />
+    </span>
+  )
+}
+
+/** Una fila del catálogo: ficha de tipo + título (con variante) + línea mono
+ *  con número, hojas/figuras y detalle. Alto mínimo de 56 px para el guante. */
+function FilaPlano({ p }: { p: PlanoCatalogo }) {
+  return (
+    <Link to={`/aprendizaje/planos/${p.slug}`}
+          className="flex min-h-[56px] items-center gap-3 px-3 py-2.5 no-underline hover:opacity-90"
+          style={{ color: 'inherit' }}>
+      <FichaTipo tipo={p.tipo} />
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="text-body font-semibold">
+          {TIPO_LABEL[p.tipo]}
+          {p.variante && <span className="font-normal" style={{ color: 'var(--lc-ink-mid)' }}> · {p.variante}</span>}
+        </span>
+        <span className="truncate font-mono text-caption tabular-nums" style={{ color: 'var(--lc-ink-lo)' }}>
+          {/* El número se omite cuando no aporta: en los GEA repite el serial
+              que ya está en la cabecera del grupo, y en el despiece de la 200
+              es una frase larga que empujaba la línea a truncarse. */}
+          {p.numero && p.numero !== '—' && !p.numero.includes(' ') && (
+            <><span className="font-medium" style={{ color: 'var(--lc-ink-mid)' }}>{p.numero}</span>{' · '}</>
+          )}
+          {p.hojas} {p.unidad ?? 'hojas'}{p.detalle ? ` · ${p.detalle}` : ''}
+        </span>
+      </span>
+      <ChevronRight size={16} className="shrink-0" style={{ color: 'var(--lc-ink-ghost)' }} />
+    </Link>
   )
 }
 
