@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Spinner } from '@/components/ui'
 import { AlertCircle, Clock, PauseCircle, Activity, ExternalLink } from 'lucide-react'
-import { loadPublicToken } from '@/services/grader/graderPublicToken.service'
+import { loadPublicToken, esAccesoDenegado } from '@/services/grader/graderPublicToken.service'
 import { ShiftTimelineView } from '@/components/grader/ShiftTimelineView'
 import { computeShiftTimeWindow } from '@/services/grader/graderShiftStatus'
 import { DEFAULT_SHIFT_SCHEDULE } from '@/services/grader/graderShiftSchedule'
@@ -41,7 +41,7 @@ export function GraderPublicTokenPage() {
       if (new Date(doc.expiresAt) < new Date()) { setStatus('expired'); return }
       setData(doc)
       setStatus('ok')
-    }).catch(() => setStatus('notfound'))
+    }).catch((e) => setStatus(esAccesoDenegado(e) ? 'expired' : 'notfound'))
   }, [token])
 
   // ── Loading ──────────────────────────────────────────────────────────────
@@ -59,11 +59,14 @@ export function GraderPublicTokenPage() {
       <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center gap-4 text-white/70 px-6 text-center">
         <AlertCircle className="w-12 h-12 text-red-400" />
         <p className="text-lg font-semibold text-white">
-          {status === 'expired' ? 'Este link ha expirado' : 'Turno no encontrado'}
+          {status === 'expired' ? 'Este link ya no sirve' : 'Turno no encontrado'}
         </p>
         <p className="text-sm max-w-xs">
           {status === 'expired'
-            ? 'Los links de turno son válidos por 24 horas. Pide al supervisor que genere uno nuevo.'
+            /* Las reglas devuelven lo mismo para vencido, revocado y mal
+               copiado, así que no se afirma cuál de los tres: se dice el caso
+               más común (las 24 h) y qué hacer. */
+            ? 'Los links de turno duran 24 horas: este pudo vencer, lo revocaron o está mal copiado. Pedile al supervisor que genere uno nuevo desde el turno.'
             : 'El link no es válido o fue eliminado.'}
         </p>
         <button

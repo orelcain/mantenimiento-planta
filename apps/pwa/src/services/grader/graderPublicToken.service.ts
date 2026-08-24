@@ -68,6 +68,20 @@ export async function createPublicToken(
   return token
 }
 
+/**
+ * ¿El error de lectura es "las reglas no te dejan"?
+ *
+ * Desde que la expiración se chequea EN LAS REGLAS (antes solo en el cliente),
+ * un token vencido ya no llega como documento vencido: llega como
+ * `permission-denied`. Sin distinguirlo, la vista pública mostraba "El link no
+ * es válido o fue eliminado" a alguien cuyo link simplemente cumplió sus 24 h
+ * — y esa persona no tiene forma de saber que solo hay que pedir otro.
+ */
+export function esAccesoDenegado(e: unknown): boolean {
+  const code = (e as { code?: unknown } | null)?.code
+  return typeof code === 'string' && code.includes('permission-denied')
+}
+
 export async function loadPublicToken(token: string): Promise<GraderPublicTokenDoc | null> {
   const snap = await getDoc(doc(db, COLLECTION, token))
   if (!snap.exists()) return null
