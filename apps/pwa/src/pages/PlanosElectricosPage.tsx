@@ -11,7 +11,7 @@ import {
 import { usePlanoNotas } from '@/hooks/usePlanoNotas'
 import { usePlanoSap } from '@/hooks/usePlanoSap'
 import { usePartesPlano } from '@/hooks/usePartesPlano'
-import { useCodigosParte, useCargaSiEsNumero, PARECE_NUMERO_PARTE } from '@/hooks/useCodigosParte'
+import { useCodigosParte, useCargaSiEsNumero, PARECE_NUMERO_PARTE, type ParteEncontrada } from '@/hooks/useCodigosParte'
 import { usePlanoVinculos, type VinculoTerreno } from '@/hooks/usePlanoVinculos'
 import { PlanoLienzo, type Foco } from '@/components/planos/PlanoLienzo'
 import { NotasAparato } from '@/components/planos/NotasAparato'
@@ -67,6 +67,44 @@ export function PlanosElectricosPage() {
 }
 
 /* ────────────────────────────── catálogo ────────────────────────────── */
+
+/**
+ * Resultados de la búsqueda por NÚMERO DE PARTE (el código grabado en la
+ * pieza). Se usa en el catálogo y DENTRO del visor: el técnico que tiene la
+ * pieza en la mano suele estar ya mirando un plano, y ahí el buscador solo
+ * conocía designaciones y rótulos de esa hoja — escribir el código daba
+ * "sin coincidencias" aunque la pieza estuviera en el despiece de al lado.
+ */
+function ResultadosNumeroParte({ partes }: { partes: ParteEncontrada[] }) {
+  if (!partes.length) return null
+  return (
+    <div className="mt-3 flex flex-col gap-0.5">
+      <h2 className="m-0 mb-1 flex items-baseline gap-2 text-caption font-semibold tracking-wider"
+          style={{ color: 'var(--lc-ink-ghost)' }}>
+        Números de parte
+        <span className="font-mono normal-case tracking-normal">{partes.length}</span>
+      </h2>
+      {partes.map((pt) => {
+        const destino = pt.plano
+          ? `/aprendizaje/planos/${pt.plano}?hoja=${pt.hoja}&ap=${encodeURIComponent(pt.codigo)}`
+          : `/repuestos?q=${encodeURIComponent(pt.codigo)}`
+        return (
+          <Link key={pt.codigo} to={destino}
+                className="flex min-h-[44px] items-center justify-between gap-3 rounded-ctl px-2 py-1.5 no-underline hover:opacity-80"
+                style={{ background: 'var(--lc-surface)', color: 'inherit' }}>
+            <span className="min-w-0 flex-1">
+              <span className="font-mono text-footnote" style={{ color: 'var(--lc-aqua-bright)' }}>{pt.codigo}</span>
+              {pt.nombre && <span className="ml-2 text-footnote">{pt.nombre}</span>}
+            </span>
+            <span className="shrink-0 text-caption" style={{ color: 'var(--lc-ink-mid)' }}>
+              {pt.maquina}{pt.figura ? ` · fig. ${pt.figura}` : ' · en Repuestos'}
+            </span>
+          </Link>
+        )
+      })}
+    </div>
+  )
+}
 
 function Catalogo() {
   // Buscador GLOBAL: un aparato o palabra buscado en LOS 8 PLANOS a la vez
@@ -184,33 +222,7 @@ function Catalogo() {
             despiece navegable (GEA, enzunchadora, Marel), que antes no se
             podían buscar desde acá. Va primero porque quien escribe un código
             grabado en una pieza busca exactamente esto. */}
-        {partesEncontradas.length > 0 && (
-          <div className="mt-3 flex flex-col gap-0.5">
-            <h2 className="m-0 mb-1 flex items-baseline gap-2 text-caption font-semibold tracking-wider"
-                style={{ color: 'var(--lc-ink-ghost)' }}>
-              Números de parte
-              <span className="font-mono normal-case tracking-normal">{partesEncontradas.length}</span>
-            </h2>
-            {partesEncontradas.map((pt) => {
-              const destino = pt.plano
-                ? `/aprendizaje/planos/${pt.plano}?hoja=${pt.hoja}&ap=${encodeURIComponent(pt.codigo)}`
-                : `/repuestos?q=${encodeURIComponent(pt.codigo)}`
-              return (
-                <Link key={pt.codigo} to={destino}
-                      className="flex min-h-[44px] items-center justify-between gap-3 rounded-ctl px-2 py-1.5 no-underline hover:opacity-80"
-                      style={{ background: 'var(--lc-surface)', color: 'inherit' }}>
-                  <span className="min-w-0 flex-1">
-                    <span className="font-mono text-footnote" style={{ color: 'var(--lc-aqua-bright)' }}>{pt.codigo}</span>
-                    {pt.nombre && <span className="ml-2 text-footnote">{pt.nombre}</span>}
-                  </span>
-                  <span className="shrink-0 text-caption" style={{ color: 'var(--lc-ink-mid)' }}>
-                    {pt.maquina}{pt.figura ? ` · fig. ${pt.figura}` : ' · en Repuestos'}
-                  </span>
-                </Link>
-              )
-            })}
-          </div>
-        )}
+        <ResultadosNumeroParte partes={partesEncontradas} />
         {v.length >= 2 && (
           <div className="mt-2 flex flex-col gap-0.5">
             {cargandoIdx && (
@@ -395,6 +407,13 @@ function Visor({ slug }: { slug: string }) {
     () => (localStorage.getItem('plano-idioma') ?? 'es') === 'es',
   )
   const [busca, setBusca] = useState('')
+  // Números de parte DENTRO del visor: el técnico que tiene la pieza en la
+  // mano ya está mirando un plano, y acá el buscador solo conocía las
+  // designaciones y rótulos de estas hojas — escribir el código grabado daba
+  // "sin coincidencias" aunque la pieza estuviera en el despiece de al lado.
+  const codigosParte = useCodigosParte()
+  useCargaSiEsNumero(busca, codigosParte.cargar)
+  const partesEncontradas = PARECE_NUMERO_PARTE.test(busca) ? codigosParte.buscar(busca) : []
   const [ayuda, setAyuda] = useState(false)
   // "Resaltar todos": ilumina cada aparicion del aparato/senal seleccionado
   // en la hoja actual, para seguir un cable con la vista.
@@ -1049,7 +1068,7 @@ function Visor({ slug }: { slug: string }) {
             </button>
           )}
           {esVisor && busca.trim()
-            ? <Resultados items={resultados} total={totalResultados}
+            ? <Resultados items={resultados} total={totalResultados} partes={partesEncontradas}
                 onIr={(b, c, caja, aparato) => {
                   if (aparato) seleccionar({ tipo: 'aparato', tag: aparato })
                   setBusca('')
@@ -1074,7 +1093,7 @@ function Visor({ slug }: { slug: string }) {
                 />
               </>
             : busca.trim()
-            ? <Resultados items={resultados} total={totalResultados}
+            ? <Resultados items={resultados} total={totalResultados} partes={partesEncontradas}
                 onIr={(b, c, caja, aparato) => {
                   if (aparato) seleccionar({ tipo: 'aparato', tag: aparato })
                   // Elegir un resultado cierra la busqueda: si no, el panel se
@@ -1502,18 +1521,21 @@ function buscar(
   return { items: out.slice(0, 60), total: out.length }
 }
 
-function Resultados({ items, total, onIr }: {
+function Resultados({ items, total, onIr, partes = [] }: {
   items: Resultado[]
   /** Total de coincidencias antes de truncar a 60; si es mayor a items.length
    *  se avisa en vez de dejar creer que eso es todo lo que había. */
   total?: number
   onIr: (b: number, c?: number, caja?: Caja, aparato?: string) => void
+  /** Coincidencias por número de parte, de TODA la planta (no solo este plano). */
+  partes?: ParteEncontrada[]
 }) {
   const truncado = total != null && total > items.length
   return (
     <>
-      <Titulo>{items.length} resultado{items.length !== 1 ? 's' : ''}</Titulo>
-      {!items.length && (
+      <ResultadosNumeroParte partes={partes} />
+      <Titulo>{items.length} resultado{items.length !== 1 ? 's' : ''}{partes.length ? ' en este plano' : ''}</Titulo>
+      {!items.length && !partes.length && (
         <p className="m-0 text-footnote" style={{ color: 'var(--lc-ink-ghost)' }}>
           Sin coincidencias. Prueba con una designación (K7, Q1) o una palabra
           del plano en alemán o castellano.
