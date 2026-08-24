@@ -867,7 +867,7 @@ function Visor({ slug }: { slug: string }) {
               esto la única forma de moverse era de a una hoja con las flechas. */}
           <select value={hoja.blatt} onChange={(e) => void irA(Number(e.target.value))}
                   aria-label="Ir a hoja"
-                  className="cursor-pointer appearance-none rounded-ctl border-0 bg-transparent py-1 pr-0.5 font-mono text-footnote tabular-nums outline-none"
+                  className="max-w-[7.5rem] cursor-pointer appearance-none truncate rounded-ctl border-0 bg-transparent py-1 pr-0.5 font-mono text-footnote tabular-nums outline-none sm:max-w-[18rem]"
                   style={{ color: 'var(--lc-ink)' }}>
             {secciones.map((sec) => (
               <optgroup key={sec} label={etiquetaSeccion(sec)}>
