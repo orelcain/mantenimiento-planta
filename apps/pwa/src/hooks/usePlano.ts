@@ -144,6 +144,10 @@ export type PlanoIndice = {
   umbralComun?: number
   /** Solo despiece: accesos rápidos de uso diario (piezas de desgaste...). */
   destacados?: { hoja: number; etiqueta: string; detalle: string }[]
+  /** Solo despiece: código -> {hoja: [posiciones]} cuando el MISMO código
+   *  ocupa varias posiciones de una misma figura (el sensor 42303077 es a la
+   *  vez B10, B14 y B15). */
+  hermanasPorCodigo?: Record<string, Record<string, string[]>>
   /** Solo despiece: códigos que el catálogo lista como piezas de desgaste.
    *  Se marcan en CUALQUIER figura donde aparezcan, no solo en la suya. */
   desgaste?: string[]

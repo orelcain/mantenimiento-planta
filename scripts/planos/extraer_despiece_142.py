@@ -953,8 +953,28 @@ def indice_app():
     # ferreteria comun (una arandela va en 287 figuras) y decir el numero solo
     # estorba -> se marca como comun y la UI lo dice con palabras.
     UMBRAL_COMUN = 12
-    usos = {cod: len(aps) for cod, aps in indice_cod.items()}
+    # ⚠ FIGURAS DISTINTAS, no apariciones: el sensor 42303077 sale 3 veces en
+    # la MISMA figura (es el de B10, B14 y B15) y la ficha decia "va en otras 2
+    # figuras", que es falso. Lo util es en cuantos CONJUNTOS distintos va.
+    usos = {cod: len({a["h"] for a in aps}) for cod, aps in indice_cod.items()}
     compartidas = {cod: n for cod, n in usos.items() if n > 1}
+    # y las posiciones hermanas dentro de la misma figura: "el mismo codigo es
+    # tambien B10 y B15 aca" — dato que el tecnico usa para no confundirse.
+    hermanas = {}
+    for cod, aps in indice_cod.items():
+        por_hoja = {}
+        for a in aps:
+            por_hoja.setdefault(a["h"], 0)
+            por_hoja[a["h"]] += 1
+        if any(v > 1 for v in por_hoja.values()):
+            hermanas[cod] = {
+                str(h): sorted(
+                    {f["pos"] for f in json.load(io.open(
+                        os.path.join(STAGING, f"hoja-{_nn(h)}.json"), encoding="utf-8"))["filas"]
+                     if f.get("nr") == cod}
+                )
+                for h, c in por_hoja.items() if c > 1
+            }
 
     # Accesos directos: la figura de PIEZAS DE DESGASTE (fig 00) es la que el
     # tecnico busca a diario (cuchillas, hojas, rascador) y queda enterrada
@@ -1004,6 +1024,7 @@ def indice_app():
         "glosario": {},
         "sapPorCodigo": sap_por_codigo,
         "usosPorCodigo": compartidas,
+        "hermanasPorCodigo": hermanas,
         "umbralComun": UMBRAL_COMUN,
         "destacados": destacados,
         "sinonimos": sinonimos,
