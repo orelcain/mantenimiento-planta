@@ -1084,7 +1084,8 @@ function Visor({ slug }: { slug: string }) {
                      enEstaHoja={sel?.tipo === 'aparato' ? hoja.datos.tags.filter((t) => t.t === sel.tag).length : 0}
                      esDespiece={esDespiece} meta={meta} filas={hoja.datos.filas ?? []}
                      tagsHoja={hoja.datos.tags} onSeleccionarFila={seleccionarFilaDespiece}
-                     onIrFigura={irAFigura} anclaDeAparato={anclaDeAparato}
+                     onIrFigura={irAFigura} onVerEnDibujo={(caja) => setFoco({ tipo: 'caja', b: caja })}
+                     anclaDeAparato={anclaDeAparato}
                      partes={partes} slug={slug} sapPorCodigo={indice.sapPorCodigo}
                      vinculosTerreno={vinculosTerreno} />}
           </>}
@@ -1098,7 +1099,7 @@ function Visor({ slug }: { slug: string }) {
 
 function Panel({
   sel, indice, hojaActual, notas, onIr, recientes, onAbrirAparato, resaltar, onResaltar, enEstaHoja,
-  esDespiece, meta, filas, tagsHoja, onSeleccionarFila, onIrFigura, anclaDeAparato, partes, slug,
+  esDespiece, meta, filas, tagsHoja, onSeleccionarFila, onIrFigura, onVerEnDibujo, anclaDeAparato, partes, slug,
   sapPorCodigo, vinculosTerreno,
 }: {
   sel: Seleccion
@@ -1119,6 +1120,8 @@ function Panel({
   tagsHoja: PlanoAparato[]
   onSeleccionarFila: (f: FilaDespiece) => void
   onIrFigura: (fig: string) => void
+  /** centra el lienzo en la caja de una posición (solo despiece). */
+  onVerEnDibujo: (caja: Caja) => void
   anclaDeAparato: (tag: string) => string
   partes: ReturnType<typeof usePartesPlano>
   slug: string
@@ -1333,7 +1336,9 @@ function Panel({
           notas={notas} onSeleccionarFila={onSeleccionarFila} onIrFigura={onIrFigura}
           anclaId={anclaDeAparato(sel.tag)} slug={slug} sapPorCodigo={indice.sapPorCodigo}
           usosPorCodigo={indice.usosPorCodigo} umbralComun={indice.umbralComun}
-                      desgaste={indice.desgaste}
+          desgaste={indice.desgaste}
+          hermanas={filaSel.nr ? indice.hermanasPorCodigo?.[filaSel.nr]?.[String(hojaActual)] : undefined}
+          onVerEnDibujo={onVerEnDibujo}
         />
       )
     }
@@ -1531,7 +1536,7 @@ function Resultados({ items, total, onIr }: {
  */
 function FichaPieza({
   fila, filas, meta, tagsHoja, selTag, notas, onSeleccionarFila, onIrFigura, anclaId, slug,
-  sapPorCodigo, usosPorCodigo, umbralComun, desgaste,
+  sapPorCodigo, usosPorCodigo, umbralComun, desgaste, hermanas, onVerEnDibujo,
 }: {
   fila: FilaDespiece
   filas: FilaDespiece[]
@@ -1551,8 +1556,14 @@ function FichaPieza({
   umbralComun?: number
   /** códigos que el catálogo lista como piezas de desgaste (consumibles). */
   desgaste?: string[]
+  /** otras posiciones de ESTA figura que llevan el mismo código. */
+  hermanas?: string[]
+  /** centra el dibujo en la marca de una posición. */
+  onVerEnDibujo: (caja: Caja) => void
 }) {
   const [copiado, setCopiado] = useState(false)
+  // la caja de ESTA posición sobre el dibujo, si el OCR la ancló
+  const anclaEnDibujo = tagsHoja.find((t) => normalizarPos(t.t) === selTag)?.b
   // Una vez por sesion por posicion (registrarUso ya dedupe): mide cuantas
   // fichas de pieza se abren de verdad, no solo cuantas posiciones se tocan.
   useEffect(() => {
@@ -1618,6 +1629,39 @@ function FichaPieza({
             ? `Pieza común: se usa en toda la máquina (${usosPorCodigo[fila.nr]} figuras)`
             : `Esta misma pieza va en otras ${usosPorCodigo[fila.nr]! - 1} figuras`}
         </p>
+      )}
+
+      {/* El MISMO código en varias posiciones de ESTA figura: el sensor
+          42303077 es a la vez B10, B14 y B15. Saberlo evita pedir tres
+          repuestos distintos creyendo que son piezas diferentes. */}
+      {hermanas && hermanas.length > 1 && (
+        <p className="m-0 mt-1 flex flex-wrap items-baseline gap-1 text-caption"
+           style={{ color: 'var(--lc-ink-mid)' }}>
+          <span>El mismo código es también</span>
+          {hermanas.filter((h) => normalizarPos(h) !== selTag).map((h) => (
+            <button key={h} type="button"
+                    onClick={() => {
+                      const f = filas.find((x) => normalizarPos(x.pos) === normalizarPos(h))
+                      if (f) onSeleccionarFila(f)
+                    }}
+                    className="rounded-ctl border px-1.5 font-mono"
+                    style={{ borderColor: 'var(--lc-border)', color: 'var(--lc-aqua-bright)' }}>
+              {h}
+            </button>
+          ))}
+          <span>en esta figura.</span>
+        </p>
+      )}
+
+      {/* La figura del catálogo ubica cada posición SOBRE el dibujo de la
+          máquina; el botón lleva la vista a esa marca. Sin él, el técnico ve
+          la ficha y no se entera de que el dibujo de atrás dice dónde va. */}
+      {anclaEnDibujo && (
+        <button type="button" onClick={() => onVerEnDibujo(anclaEnDibujo)}
+                className="mt-2 flex min-h-[44px] w-full items-center justify-center rounded-ctl border px-3 text-footnote font-medium"
+                style={{ borderColor: 'var(--lc-aqua)', background: 'var(--lc-aqua-soft)', color: 'var(--lc-aqua-bright)' }}>
+          Ver dónde va en el dibujo
+        </button>
       )}
 
       <p className="m-0 mt-2 text-footnote" style={{ color: 'var(--lc-ink-mid)' }}>
