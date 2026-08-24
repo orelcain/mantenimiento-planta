@@ -29,7 +29,7 @@ describe('agruparPorCodigo', () => {
     const filas = Array.from({ length: 159 }, (_, i) => pieza({ pagina: 17 + i }))
     const g = agruparPorCodigo(filas)
     expect(g).toHaveLength(1)
-    expect(g[0].apariciones).toHaveLength(159)
+    expect(g[0]?.apariciones).toHaveLength(159)
   })
 
   it('NO funde el mismo código de dos máquinas distintas', () => {
@@ -43,8 +43,8 @@ describe('agruparPorCodigo', () => {
   it('marca como común la ferretería que va en toda la máquina', () => {
     const muchas = Array.from({ length: UMBRAL_COMUN + 1 }, (_, i) => pieza({ pagina: i }))
     const pocas = Array.from({ length: 3 }, (_, i) => pieza({ pagina: i }))
-    expect(agruparPorCodigo(muchas)[0].esComun).toBe(true)
-    expect(agruparPorCodigo(pocas)[0].esComun).toBe(false)
+    expect(agruparPorCodigo(muchas)[0]?.esComun).toBe(true)
+    expect(agruparPorCodigo(pocas)[0]?.esComun).toBe(false)
   })
 
   it('conserva el orden de llegada (el score de la búsqueda manda)', () => {
