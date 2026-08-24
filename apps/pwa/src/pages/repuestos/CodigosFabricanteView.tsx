@@ -118,6 +118,12 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
   // Mapa manualId → URL del PDF (colección `manuales`), para el enlace "Ver manual".
   const [manualUrls, setManualUrls] = useState<Record<string, string>>({})
 
+  // Reintento a mano: un catálogo puede fallar por un parpadeo de la señal y
+  // quedaba fuera TODA la sesión — la vista pide los catálogos una sola vez al
+  // montar. El aviso decía la verdad pero no ofrecía salida.
+  const [intento, setIntento] = useState(0)
+  const [faltantes, setFaltantes] = useState<string[]>([])
+
   useEffect(() => {
     let alive = true
     // Progresivo: se pinta lo que va llegando en vez de esperar a los 6.
@@ -127,6 +133,7 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
       // Decir CUÁLES faltan, no un "algo falló" genérico: si el técnico busca
       // una pieza de la GEA tiene que saber que ese catálogo no cargó, en vez
       // de creer que su código no existe.
+      setFaltantes(faltan)
       setError(faltan.length ? `No cargó el catálogo de ${faltan.join(', ')}. El resto sí se puede buscar.` : null)
     })
       .then((p) => { if (alive) setPiezas(p) })
@@ -148,7 +155,7 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
         .catch((e) => logger.warn('No se pudieron cargar URLs de manuales', { error: e instanceof Error ? e.message : String(e) }))
     }
     return () => { alive = false }
-  }, [publico])
+  }, [publico, intento])
 
   const resultadosMemo = useMemo(() => {
     if (!piezas) return { lista: [], total: 0 }
@@ -236,7 +243,17 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
         />
       </div>
 
-      {error && <p className="text-sm text-red-500">{error}</p>}
+      {error && (
+        <p className="flex flex-wrap items-center gap-2 text-sm text-red-500">
+          {error}
+          {faltantes.length > 0 && (
+            <button type="button" onClick={() => setIntento((n) => n + 1)}
+                    className="min-h-[44px] rounded-ctl border border-current px-3 text-footnote font-medium">
+              Reintentar
+            </button>
+          )}
+        </p>
+      )}
       {!error && !piezas && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Cargando catálogo…</div>
       )}
