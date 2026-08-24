@@ -27,7 +27,7 @@ import { Input } from '@/components/ui'
 import { ShareInteractiveButton } from '@/components/visor3d/ShareInteractiveButton'
 import { CATALOGOS, cargarCatalogos, type PiezaCatalogo } from './catalogosFabricante'
 import { agruparPorCodigo } from './agruparPiezas'
-import { sinonimoDe } from '@/utils/sinonimosPlanta'
+import { buscarPiezas } from './buscarCatalogo'
 import { useRepuestosExistentes, normCodigo } from '@/hooks/repuestos/useRepuestosExistentes'
 import { logger } from '@/lib/logger'
 
@@ -92,8 +92,6 @@ export interface CrearDesdeCatalogo {
 
 /** Tope de tarjetas en pantalla. Con el aviso de abajo, ya no esconde nada. */
 const TOPE = 100
-
-const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase()
 
 interface CodigosFabricanteViewProps {
   /** Salta a la pestaña Áreas con este código pre-buscado ("¿Existe en repuestos?"). */
@@ -160,49 +158,14 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
 
   const resultadosMemo = useMemo(() => {
     if (!piezas) return { lista: [], total: 0 }
-    const q = norm(query.trim())
-    if (q.length < 3) return { lista: [], total: 0 }
-    // Si la consulta trae una secuencia numérica larga se busca como código,
-    // tolerando prefijos ("GEA 3000544810" viene grabado así en la pieza).
-    // También se compara sin separadores ("T6-1-20250" ↔ "T6120250") para que
-    // el código del distribuidor (29123T612025022, que envuelve al del
-    // fabricante) y el código con/sin guiones encuentren la misma pieza.
-    const soloDigitos = q.replace(/[^0-9]/g, '')
-    const alnumQ = q.replace(/[^A-Z0-9]/g, '')
-    const esNumerico = soloDigitos.length >= 4
-    const terms = q.split(/\s+/).filter((t) => t.length >= 2)
-    // El término del fabricante para cada palabra escrita, si lo hay: el
-    // catálogo dice "arandela" y en planta se dice "golilla".
-    const termsAlias: Record<string, string> = {}
-    for (const t of terms) {
-      const a = sinonimoDe(t)
-      if (a) termsAlias[t] = norm(a)
-    }
-    const scored: { p: PiezaCatalogo; score: number }[] = []
-    for (const p of piezas) {
-      let score = 0
-      if (esNumerico) {
-        const alnumCod = norm(p.codigo).replace(/[^A-Z0-9]/g, '')
-        const alnumProv = p.codigoProveedor ? norm(p.codigoProveedor).replace(/[^A-Z0-9]/g, '') : ''
-        if (p.codigo === soloDigitos || alnumCod === alnumQ) score = 100
-        else if (alnumProv === alnumQ || p.codigoSap === soloDigitos) score = 90
-        else if (p.codigo.startsWith(soloDigitos) || alnumCod.startsWith(alnumQ)) score = 60
-        else if (alnumCod.length >= 5 && alnumQ.includes(alnumCod)) score = 40
-        else if (p.codigo.includes(soloDigitos) || (alnumProv && alnumProv.includes(alnumQ))) score = 30
-      } else if (terms.length) {
-        const blob = norm(`${p.descripcion} ${p.descripcionEn} ${p.conjunto} ${p.especificacion}`)
-        // Cada palabra vale por sí misma o por su término de fabricante:
-        // "golilla" daba Sin resultados con 135 arandelas en el catálogo.
-        const hits = terms.filter((t) => blob.includes(t) || (termsAlias[t] !== undefined && blob.includes(termsAlias[t]!))).length
-        if (hits === terms.length) score = 20 + hits
-      }
-      if (score > 0) scored.push({ p, score })
-    }
-    scored.sort((a, b) => b.score - a.score || a.p.pagina - b.p.pagina)
+    // La búsqueda vive en `buscarCatalogo.ts` (pura y testeada): acepta el
+    // plural ("arandelas"), el vocabulario de planta ("golillas") y los códigos
+    // cortos de la enzunchadora ("SW06"), que no entran por el camino numérico.
+    const encontradas = buscarPiezas(piezas, query)
     // Agrupar ANTES del tope: `31800105` tenía 159 filas y el corte en 100 se
     // las comía todas con la misma pieza, escondiendo el resto de resultados.
     // Ahora el tope cuenta PIEZAS distintas, que es lo que el técnico mira.
-    const todas = agruparPorCodigo(scored.map((s) => s.p))
+    const todas = agruparPorCodigo(encontradas)
     // El total viaja aparte para poder DECIR que se cortó: un listado de 100
     // sin aviso se lee como "esto es todo lo que hay".
     return { lista: todas.slice(0, TOPE), total: todas.length }
