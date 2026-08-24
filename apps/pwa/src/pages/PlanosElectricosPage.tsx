@@ -1853,7 +1853,15 @@ function PiezaTerreno({ tag, pieza, vinculosTerreno }: {
       setAbierto(false)
       setFoto(null)
     } catch (e) {
-      setErrorLocal(e instanceof Error ? e.message : 'No se pudo guardar.')
+      // Firestore contesta "Missing or insufficient permissions" tanto si se
+      // cayo la sesion como si el dato no pasa la regla. Frente a la maquina
+      // ese texto no ayuda: se traduce a algo que se pueda hacer.
+      const msg = e instanceof Error ? e.message : ''
+      setErrorLocal(
+        /permission|insufficient/i.test(msg)
+          ? 'No se pudo guardar: revisa que tu sesión siga abierta y que el código no sea muy largo.'
+          : msg || 'No se pudo guardar.',
+      )
     } finally {
       setGuardando(false)
     }
@@ -1983,7 +1991,10 @@ function FormularioTerreno({
         </button>
       ))}
       {opcion === 'corregido' && (
-        <input type="text" inputMode="numeric" placeholder="código de la etiqueta" value={codigo}
+        {/* 30 = el tope que exige la regla de Firestore. Sin esto, pegar de
+            mas rebota con "Missing or insufficient permissions", que en
+            terreno no le dice nada a nadie. */}
+        <input type="text" inputMode="numeric" maxLength={30} placeholder="código de la etiqueta" value={codigo}
                onChange={(e) => onCodigo(e.target.value)}
                className="min-h-[44px] rounded-ctl border px-3 text-footnote"
                style={{ borderColor: 'var(--lc-border)', background: 'var(--lc-surface)', color: 'var(--lc-ink)' }} />
