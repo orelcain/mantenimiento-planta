@@ -1927,7 +1927,7 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, onEditarSetPoi
           un tramo no existe hasta que cierra: sin decir hasta cuándo, quien lo
           mira no sabe si la línea bajó o si todavía no llega el dato.
 
-          ⚠ `corteMs` sale de la serie, que viene en HORA DE PLANTA sellada
+          OJO: `corteMs` sale de la serie, que viene en HORA DE PLANTA sellada
           como UTC. Formatearla con el reloj del que mira le restaba las 4 h
           del huso: a las 06:51 la línea decía "hasta las 02:50". Va con
           `horaPlanta`, igual que el resto de las horas de la serie. */}
