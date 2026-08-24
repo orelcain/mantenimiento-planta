@@ -30,25 +30,47 @@ import { useRepuestosExistentes, normCodigo } from '@/hooks/repuestos/useRepuest
 import { logger } from '@/lib/logger'
 
 /**
- * Mapa código de fabricante → figura del despiece navegable (BAADER 142).
+ * Mapa código de fabricante → figura del despiece navegable.
  * Es el camino INVERSO del puente: el visor de planos ya lleva de una pieza a
  * `/repuestos?q=`, pero desde acá no se podía ver el DIBUJO. Se carga aparte
- * (~39 KB) en vez de leer el índice completo del despiece (~770 KB).
+ * (~39 KB por máquina) en vez de leer los índices completos (~770 KB c/u).
+ *
+ * Son DOS máquinas: el archivo de la fileteadora ya se generaba (1.510
+ * códigos) y nadie lo cargaba — el botón "Ver dibujo" solo aparecía para la
+ * evisceradora aunque el dato de la otra estuviera ahí.
  */
-const MAPA_FIGURAS_URL = `${import.meta.env.BASE_URL}data/despiece-142-figuras.json`
+const DESPIECES = [
+  { slug: 'baader-142-despiece', archivo: 'despiece-142-figuras.json', maquina: 'BAADER 142' },
+  { slug: 'baader-200-despiece', archivo: 'despiece-200-figuras.json', maquina: 'BAADER 200' },
+]
+
+/** Dónde vive un código dentro de un despiece. */
+type EnDespiece = { hoja: number; fig: string; slug: string; maquina: string }
 
 function useFigurasDespiece() {
-  const [mapa, setMapa] = useState<Record<string, [number, string]> | null>(null)
+  const [mapa, setMapa] = useState<Record<string, EnDespiece[]> | null>(null)
   useEffect(() => {
     let vivo = true
-    fetch(MAPA_FIGURAS_URL)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d: { codigos?: Record<string, [number, string]> } | null) => {
-        if (vivo && d?.codigos) setMapa(d.codigos)
-      })
-      .catch(() => {
-        /* sin mapa el botón simplemente no aparece */
-      })
+    Promise.all(
+      DESPIECES.map(({ slug, archivo, maquina }) =>
+        fetch(`${import.meta.env.BASE_URL}data/${archivo}`)
+          .then((r) => (r.ok ? r.json() : null))
+          .then((d: { codigos?: Record<string, [number, string]> } | null) =>
+            Object.entries(d?.codigos ?? {}).map(
+              ([cod, [hoja, fig]]) => [cod, { hoja, fig, slug, maquina }] as const,
+            ))
+          .catch(() => []),
+      ),
+    ).then((partes) => {
+      if (!vivo) return
+      // Un código puede estar en LAS DOS máquinas (220 lo están: tornillos,
+      // arandelas). Se guardan todas sus ubicaciones y se muestra un botón por
+      // máquina — quedarse con una sola mandaría al de la fileteadora al
+      // dibujo de la evisceradora.
+      const acc: Record<string, EnDespiece[]> = {}
+      for (const [cod, donde] of partes.flat()) (acc[cod] ??= []).push(donde)
+      setMapa(acc)
+    })
     return () => {
       vivo = false
     }
@@ -355,17 +377,21 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
                   despiece navegable, se va derecho a su figura explotada. */}
               {(() => {
                 const enDespiece = figurasDespiece?.[p.codigo]
-                if (!enDespiece) return null
-                const [hojaFig, nombreFig] = enDespiece
-                return (
+                if (!enDespiece?.length) return null
+                // Con una sola máquina el botón no la nombra (sería ruido);
+                // con dos hay que decir cuál es cuál.
+                const varias = enDespiece.length > 1
+                return enDespiece.map((d) => (
                   <Link
-                    to={`/aprendizaje/planos/baader-142-despiece?hoja=${hojaFig}&ap=${encodeURIComponent(p.codigo)}`}
+                    key={d.slug}
+                    to={`/aprendizaje/planos/${d.slug}?hoja=${d.hoja}&ap=${encodeURIComponent(p.codigo)}`}
                     className="inline-flex items-center gap-1 rounded-ctl border border-primary/40 bg-primary/[0.08] px-2 py-1 text-caption font-medium text-ink-info transition hover:bg-primary/[0.15]"
-                    title={`Ver el dibujo explotado (figura ${nombreFig})`}
+                    title={`Ver el dibujo explotado en la ${d.maquina} (figura ${d.fig})`}
                   >
-                    <Shapes className="h-3.5 w-3.5" /> Ver dibujo · fig. {nombreFig}
+                    <Shapes className="h-3.5 w-3.5" />
+                    {varias ? `${d.maquina} · fig. ${d.fig}` : `Ver dibujo · fig. ${d.fig}`}
                   </Link>
-                )
+                ))
               })()}
               {p.manualId && manualUrls[p.manualId] && (
                 <a
