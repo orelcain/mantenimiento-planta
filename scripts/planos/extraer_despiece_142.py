@@ -587,7 +587,11 @@ def ocrt(desde=1, hasta=None):
         tot_esp += len(esperadas)
         tot_ok += len(esperadas) - len(sin)
         if n % 10 == 0:
-            print(f"  ocrt {n}/{len(figs)} · ancladas {tot_ok}/{tot_esp} ({100*tot_ok/max(tot_esp,1):.0f}%)", flush=True)
+            print(f"  ocrt {n}/{hasta} · ancladas {tot_ok}/{tot_esp} ({100*tot_ok/max(tot_esp,1):.0f}%)", flush=True)
+            # CHECKPOINT: esta corrida dura horas y ya paso una vez que la
+            # mataron y se perdio TODO. Guardar cuesta milisegundos; al
+            # arrancar de nuevo, el bloque de arriba retoma desde aca.
+            _guardar_ocr(salida, desde, hasta, len(figs), parcial=True)
     _guardar_ocr(salida, desde, hasta, len(figs))
     print(f"OK ocrt [{desde}-{hasta}] · ancladas {tot_ok}/{tot_esp} ({100*tot_ok/max(tot_esp,1):.1f}%)")
 
