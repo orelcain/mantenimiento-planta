@@ -882,7 +882,10 @@ def indice_app():
             if cj and pz.get("posicion") and pz.get("cantidad"):
                 cant_por_cp[(cj, str(pz["posicion"]))] = pz["cantidad"]
 
-    ruta_manuales = os.path.join(RAIZ, "anclas_manuales_142.json")
+    # Por DESPIECE: el nombre estaba fijo y las anclas de la 142 se aplicaban
+    # tambien a la 200 — la auditoria encontro un tag «98» clicable sobre una
+    # posicion que en esa maquina NO existe.
+    ruta_manuales = os.path.join(RAIZ, f"anclas_manuales_{DESPIECE_ID}.json")
     anclas_manuales = (json.load(io.open(ruta_manuales, encoding="utf-8"))
                        if os.path.exists(ruta_manuales) else {})
     if anclas_manuales:
@@ -929,7 +932,7 @@ def indice_app():
             shutil.move(origen, destino)
         # ANCLAS MANUALES: lo que el OCR no saca (numero tapado por una linea
         # del dibujo, o figura sin ninguna) se puede fijar a mano en
-        # anclas_manuales_142.json — {"<hoja>": {"<pos>": [x, y, w, h]}}.
+        # anclas_manuales_<ID>.json — {"<hoja>": {"<pos>": [x, y, w, h]}}.
         # Pisan al OCR: una coordenada puesta por una persona siempre gana.
         for pos_m, caja_m in (anclas_manuales.get(str(n)) or {}).items():
             if pos_m.startswith("_"):

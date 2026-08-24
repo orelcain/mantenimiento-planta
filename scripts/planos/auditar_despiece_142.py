@@ -22,7 +22,15 @@ import sys
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
 RAIZ = os.path.dirname(os.path.abspath(__file__))
-APP = os.path.join(RAIZ, "_staging", "baader-142-despiece")
+# Mismo interruptor que el extractor. Sin esto, `DESPIECE=200 python auditar...`
+# corria contento y auditaba la 142: el comando "pasa" y verifica otra cosa.
+# El .strip() es porque `set VAR=200 &&` de cmd.exe deja un espacio pegado.
+DESPIECE_ID = os.environ.get("DESPIECE", "142").strip()
+DESPIECE_SLUG = f"baader-{DESPIECE_ID}-despiece"
+# Planos electricos con puente hacia ESTE despiece (la 200 aun no tiene: su
+# catalogo no rotula las posiciones con designaciones IEC).
+ELECTRICOS = {"142": ("baader-142-888", "baader-142-860")}.get(DESPIECE_ID, ())
+APP = os.path.join(RAIZ, "_staging", DESPIECE_SLUG)
 PWA = os.path.abspath(os.path.join(RAIZ, "..", "..", "apps", "pwa", "public", "planos"))
 
 errores, avisos = [], []
@@ -68,7 +76,7 @@ def main():
                 errores.append(f"indice[{cod}]: la hoja {a['h']} no tiene fila con ese codigo")
 
     # 1. partes.json de los planos electricos
-    for slug in ("baader-142-888", "baader-142-860"):
+    for slug in ELECTRICOS:
         ruta = os.path.join(PWA, slug, "partes.json")
         if not os.path.exists(ruta):
             errores.append(f"{slug}: falta partes.json")
@@ -130,7 +138,7 @@ def main():
     print(f"derivados: destacados {len(dest)} · sinonimos {len(idx.get('sinonimos') or {})} · SAP {len(sap)}")
 
     # 2e. FAMILIAS del puente (zona sugerida)
-    for slug in ("baader-142-888", "baader-142-860"):
+    for slug in ELECTRICOS:
         rp = os.path.join(PWA, slug, "partes.json")
         if not os.path.exists(rp):
             continue

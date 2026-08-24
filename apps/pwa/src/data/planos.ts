@@ -244,7 +244,7 @@ export const PLANOS: PlanoCatalogo[] = [
     faltantes: [],
     modo: 'despiece',
     enStorage: true,
-    vAssets: 2,
+    vAssets: 3,
     idioma: 'es',
     descripcion:
       'El catalogo de piezas de la fileteadora: 201 figuras explotadas con 4.069 posiciones ' +
