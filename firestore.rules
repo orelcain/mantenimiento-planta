@@ -1226,6 +1226,19 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ARIA – Lagunas: preguntas que no supo responder.
+    // Las escribía solo el bot (Admin SDK, sin reglas). Ahora también el chat
+    // de la PWA, para que la lista de lo que hay que enseñarle esté completa.
+    match /ariaGaps/{docId} {
+      allow read: if isNotAnonymous();
+      allow create: if isNotAnonymous()
+        && request.resource.data.pregunta is string
+        && request.resource.data.pregunta.size() > 0
+        && request.resource.data.pregunta.size() <= 300
+        && isValidDocSize();
+      allow update, delete: if isAdmin();
+    }
+
     // ARIA – User corrections
     match /ariaCorrections/{docId} {
       allow read: if isNotAnonymous();

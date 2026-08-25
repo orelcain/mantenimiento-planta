@@ -1275,6 +1275,7 @@ export function ChatBot() {
     { cmd: '/sensores', desc: 'Datos de sensores', expand: '¿Cuál es el estado de los sensores IoT?' },
     { cmd: '/falla', desc: 'Reportar falla', expand: 'Quiero reportar una falla: ' },
     { cmd: '/gantt', desc: 'Planificación Gantt', expand: '¿Cómo va la planificación del Gantt?' },
+    { cmd: '/lagunas', desc: 'Qué no supe responder', expand: '/lagunas' },
     { cmd: '/ayuda', desc: 'Qué puedo hacer', expand: '¿Qué puedes hacer?' },
     { cmd: '/mis', desc: 'Mis plantillas guardadas', expand: '__TEMPLATES__' },
   ]
