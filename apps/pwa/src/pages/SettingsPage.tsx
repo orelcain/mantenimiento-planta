@@ -49,6 +49,7 @@ import { fixPCBOtoPCHO } from '@/scripts/fixPCBOtoPCHO'
 import { 
   collection, 
   getDocs, 
+  getDoc,
   doc, 
   updateDoc, 
   deleteDoc,
@@ -58,6 +59,7 @@ import {
   where,
 } from 'firebase/firestore'
 import { db } from '@/services/firebase'
+import { leerAjustesGenerales, AJUSTES_GENERALES_POR_DEFECTO, type AjustesGenerales } from './settings/ajustesGenerales'
 import type { User, InviteCode, UserRole } from '@/types'
 import { cn } from '@/lib/utils'
 import { initializeHierarchySystem, isHierarchyInitialized } from '../services/hierarchyInit'
@@ -141,20 +143,32 @@ export function SettingsPage() {
 // Configuración General
 function GeneralSettings() {
   const { toggleTheme, isDark } = useTheme()
-  const [requireValidation, setRequireValidation] = useState(true)
-  const [autoAssign, setAutoAssign] = useState(false)
+  const [ajustes, setAjustes] = useState<AjustesGenerales>(AJUSTES_GENERALES_POR_DEFECTO)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const requireValidation = ajustes.requireValidation
+  const autoAssign = ajustes.autoAssign
+  const setRequireValidation = (v: boolean) => setAjustes((p) => ({ ...p, requireValidation: v }))
+  const setAutoAssign = (v: boolean) => setAjustes((p) => ({ ...p, autoAssign: v }))
+
+  // Antes la pantalla no leia lo guardado: al volver a entrar mostraba los
+  // valores por defecto, no los tuyos.
+  useEffect(() => {
+    let cancelado = false
+    getDoc(doc(db, 'settings', 'general'))
+      .then((snap) => { if (!cancelado && snap.exists()) setAjustes(leerAjustesGenerales(snap.data())) })
+      .catch((error) => logger.error('Error leyendo configuración general', error instanceof Error ? error : new Error(String(error))))
+    return () => { cancelado = true }
+  }, [])
 
   const handleSave = async () => {
     setSaving(true)
     try {
       await setDoc(doc(db, 'settings', 'general'), {
-        requireValidation,
-        autoAssign,
+        ...ajustes,
         updatedAt: serverTimestamp(),
       }, { merge: true })
-      logger.info('General settings saved', { requireValidation, autoAssign })
+      logger.info('General settings saved', { ...ajustes })
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
     } catch (error) {
@@ -237,24 +251,31 @@ function GeneralSettings() {
           <CardTitle>Prioridades</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Estos cuatro campos eran `defaultValue` sueltos: el boton Guardar
+              ni los leia. Se escribia 45, decia "Guardado" y no guardaba nada. */}
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Tiempo respuesta crítica (min)</Label>
-              <Input type="number" defaultValue={15} className="mt-1" />
-            </div>
-            <div>
-              <Label>Tiempo respuesta alta (min)</Label>
-              <Input type="number" defaultValue={30} className="mt-1" />
-            </div>
-            <div>
-              <Label>Tiempo respuesta media (min)</Label>
-              <Input type="number" defaultValue={60} className="mt-1" />
-            </div>
-            <div>
-              <Label>Tiempo respuesta baja (min)</Label>
-              <Input type="number" defaultValue={120} className="mt-1" />
-            </div>
+            {([
+              ['tiempoCriticaMin', 'Tiempo respuesta crítica (min)'],
+              ['tiempoAltaMin', 'Tiempo respuesta alta (min)'],
+              ['tiempoMediaMin', 'Tiempo respuesta media (min)'],
+              ['tiempoBajaMin', 'Tiempo respuesta baja (min)'],
+            ] as const).map(([campo, etiqueta]) => (
+              <div key={campo}>
+                <Label>{etiqueta}</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={ajustes[campo]}
+                  onChange={(e) => setAjustes((p) => ({ ...p, [campo]: Number(e.target.value) }))}
+                  className="mt-1"
+                />
+              </div>
+            ))}
           </div>
+          <p className="text-xs text-muted-foreground">
+            Por ahora estos ajustes quedan guardados pero todavía no cambian el
+            flujo de incidencias: ninguna pantalla los usa aún.
+          </p>
         </CardContent>
       </Card>
 
