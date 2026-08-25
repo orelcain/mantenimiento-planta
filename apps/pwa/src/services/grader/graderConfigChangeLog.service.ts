@@ -148,6 +148,11 @@ export function diffPhysicalConfig<T extends Record<string, unknown>>(
     const pv = prev[field]
     const nv = next[field]
     if (pv === nv) continue
+    // Un lado sin valor NO es un cambio de alguien: es la config todavía sin
+    // cargar, o un objeto parcial. Registrarlo llenó el historial de líneas
+    // "0.5 → —" (2.538 de 3.953, y 35 de las últimas 50), que además empujan
+    // fuera de la lista a los cambios de verdad.
+    if (pv === undefined || nv === undefined) continue
     // Objeto/array: comparar por JSON (shallow safety)
     if (typeof pv === 'object' || typeof nv === 'object') {
       if (JSON.stringify(pv) !== JSON.stringify(nv)) {
@@ -163,21 +168,21 @@ export function diffPhysicalConfig<T extends Record<string, unknown>>(
     for (const nb of next.belts) {
       const pb = prev.belts.find((b: any) => b.beltId === nb.beltId)
       if (!pb) continue
-      if (pb.speedMps !== nb.speedMps) {
+      if (pb.speedMps !== nb.speedMps && pb.speedMps !== undefined && nb.speedMps !== undefined) {
         diffs.push({
           field: `belts.${nb.beltId}.speedMps`,
           prevValue: pb.speedMps,
           nextValue: nb.speedMps,
         })
       }
-      if (pb.lengthMeters !== nb.lengthMeters) {
+      if (pb.lengthMeters !== nb.lengthMeters && pb.lengthMeters !== undefined && nb.lengthMeters !== undefined) {
         diffs.push({
           field: `belts.${nb.beltId}.lengthMeters`,
           prevValue: pb.lengthMeters,
           nextValue: nb.lengthMeters,
         })
       }
-      if (pb.calibrationStatus !== nb.calibrationStatus) {
+      if (pb.calibrationStatus !== nb.calibrationStatus && pb.calibrationStatus !== undefined && nb.calibrationStatus !== undefined) {
         diffs.push({
           field: `belts.${nb.beltId}.calibrationStatus`,
           prevValue: pb.calibrationStatus,
@@ -192,7 +197,7 @@ export function diffPhysicalConfig<T extends Record<string, unknown>>(
     for (const np of next.flipperPositions) {
       const pp = prev.flipperPositions.find((p: any) => p.gateNumber === np.gateNumber)
       if (!pp) continue
-      if (pp.distanceFromSensorMeters !== np.distanceFromSensorMeters) {
+      if (pp.distanceFromSensorMeters !== np.distanceFromSensorMeters && pp.distanceFromSensorMeters !== undefined && np.distanceFromSensorMeters !== undefined) {
         diffs.push({
           field: `flipperPositions.gate${np.gateNumber}.distanceFromSensorMeters`,
           prevValue: pp.distanceFromSensorMeters,
