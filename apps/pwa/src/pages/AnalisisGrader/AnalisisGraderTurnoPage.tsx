@@ -1766,6 +1766,7 @@ export function AnalisisGraderTurnoPage() {
       shiftDocId={shiftDocId}
       configSnapshots={configSnapshots}
       onSaved={reloadConfigSnapshots}
+      turnoEnVivo={shiftWindow?.status === 'live'}
     />
   ) : null
 
