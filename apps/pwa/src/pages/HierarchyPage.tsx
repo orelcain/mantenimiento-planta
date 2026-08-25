@@ -64,6 +64,7 @@ import {
 import { getEquipments } from '@/services/equipment'
 import { logger } from '@/lib/logger'
 import { cn } from '@/lib/utils'
+import { contarEquiposPorSubarbol, etiquetaEquipos } from './hierarchy/contarEquipos'
 
 interface NodeFormData {
   nombre: string
@@ -664,6 +665,12 @@ export function HierarchyPage() {
     )
   }
 
+  // Total de equipos por subárbol: lo que permite leer el árbol contraído.
+  const equiposEnSubarbol = useMemo(
+    () => contarEquiposPorSubarbol(viewTree, equipmentByNode),
+    [viewTree, equipmentByNode],
+  )
+
   const renderTree = (nodes: HierarchyNodeWithChildren[], depth = 0) => {
     let isFirstRendered = isFirstMatch // Track si es el primer match renderizado
 
@@ -777,6 +784,16 @@ export function HierarchyPage() {
                     Hijos: {childCount}
                   </Badge>
                 )}
+                {/* Cada equipo cuelga de su propia hoja: el badge de al lado
+                    decía "1" en las 552 etiquetas del árbol. Con el árbol
+                    contraído no había forma de saber cuántos equipos hay en un
+                    área sin abrir 191 nodos. */}
+                {childCount > 0 && (equiposEnSubarbol.get(node.id) ?? 0) > 0 && (
+                  <Badge variant="secondary" className="text-xs flex items-center gap-1">
+                    <Package className="h-3 w-3" />
+                    {etiquetaEquipos(equiposEnSubarbol.get(node.id)!)}
+                  </Badge>
+                )}
                 {!node.activo && (
                   <Badge variant="secondary" className="text-xs">
                     Inactivo
@@ -882,7 +899,7 @@ export function HierarchyPage() {
                   <ChevronRight className="h-3 w-3" />
                 )}
                 <Package className="h-3 w-3" />
-                <span>{equipmentByNode.get(node.id)!.length} equipos</span>
+                <span>{etiquetaEquipos(equipmentByNode.get(node.id)!.length)}</span>
               </button>
 
               {expandedEquipmentNodes.has(node.id) && (
