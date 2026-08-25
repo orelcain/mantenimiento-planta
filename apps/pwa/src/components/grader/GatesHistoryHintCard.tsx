@@ -55,6 +55,17 @@ interface Props {
   dateKey: string
   plantLineId: PlantLineId
   shiftDocId: string
+  /**
+   * ¿El turno está EN VIVO?
+   *
+   * El consejo ("mové una gate del 2-4 al 8-10") es para lo que viene. En un
+   * turno cerrado el botón igual guardaba el cambio... con la hora del CLIC
+   * (`at: new Date()`), o sea un cambio de configuración fechado días después
+   * de que el turno terminó, y el timeline lo usa para clasificar "las piezas
+   * posteriores". En un turno cerrado no hay piezas posteriores: solo ensucia
+   * el historial. Cerrado ⇒ se muestra el análisis, no el botón.
+   */
+  turnoEnVivo?: boolean
   configSnapshots?: GateConfigSnapshot[]
   onSaved?: () => void
 }
@@ -76,7 +87,7 @@ const STATUS_STYLE: Record<CalibreFit['status'], { bar: string; text: string; la
 }
 
 export function GatesHistoryHintCard({
-  gates, dateKey, plantLineId, shiftDocId, configSnapshots, onSaved,
+  gates, dateKey, plantLineId, shiftDocId, configSnapshots, onSaved, turnoEnVivo = false,
 }: Props) {
   const navigate = useNavigate()
   const [copiado, setCopiado] = useState(false)
@@ -339,17 +350,23 @@ export function GatesHistoryHintCard({
                     {m.afterStatus === 'saturado' && <span className="text-ink-warn"> (sigue apretado)</span>}
                   </div>
                 </div>
-                <GateChangeTrigger
-                  shiftDocId={shiftDocId}
-                  configSnapshots={configSnapshots}
-                  plantLineId={plantLineId}
-                  variant="compact"
-                  initialGate={m.fromGates[0]}
-                  initialCalibre={m.toLabel}
-                  initialReason={`Historial ${history.fromDateKey}→${history.toDateKey}: ${m.toLabel} es el ${fits.find((f) => f.key === m.toKey)?.productionPct.toFixed(1)}% de la producción`}
-                  triggerLabel="Cambiar →"
-                  onSaved={onSaved}
-                />
+                {turnoEnVivo ? (
+                  <GateChangeTrigger
+                    shiftDocId={shiftDocId}
+                    configSnapshots={configSnapshots}
+                    plantLineId={plantLineId}
+                    variant="compact"
+                    initialGate={m.fromGates[0]}
+                    initialCalibre={m.toLabel}
+                    initialReason={`Historial ${history.fromDateKey}→${history.toDateKey}: ${m.toLabel} es el ${fits.find((f) => f.key === m.toKey)?.productionPct.toFixed(1)}% de la producción`}
+                    triggerLabel="Cambiar →"
+                    onSaved={onSaved}
+                  />
+                ) : (
+                  <span className="shrink-0 text-caption text-muted-foreground">
+                    para el próximo turno
+                  </span>
+                )}
               </div>
             ))}
           </div>
