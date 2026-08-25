@@ -869,11 +869,28 @@ async function fetchPreventiveSummary(): Promise<string> {
     // de avisos de la misma pantalla sí la nombraba.
     const ahora = new Date()
     let vencidas = 0
-    activas.slice(0, 10).forEach((t: any) => {
+    const aMostrar = activas.slice(0, 10)
+
+    // El nombre del equipo, no su id: ARIA respondía "vencida ... en equipo
+    // nIjUKAay3odasttyZ0yj", que no le dice nada a nadie. Son pocas tareas, así
+    // que se resuelven de a una.
+    const nombreDeEquipo = new Map<string, string>()
+    await Promise.all(
+      [...new Set(aMostrar.map((t: any) => t.equipmentId).filter(Boolean))].map(async (id: any) => {
+        try {
+          const eq = await getDoc(doc(db, 'equipment', String(id)))
+          const nombre = eq.exists() ? (eq.data().nombre as string) : ''
+          if (nombre) nombreDeEquipo.set(String(id), nombre)
+        } catch { /* si no se puede leer, queda el id */ }
+      }),
+    )
+
+    aMostrar.forEach((t: any) => {
       const fecha = t.proximaEjecucion?.toDate?.() || t.proximaEjecucion
       const estado = estadoDePreventiva(fecha instanceof Date ? fecha : null, ahora)
       if (estado.vencida) vencidas++
-      proximas.push(`- ${t.nombre || 'Sin nombre'} [${t.tipo || 'general'}] → ${estado.texto} (cada ${t.frecuenciaDias || '?'} días)${t.equipmentId ? ` | equipo: ${t.equipmentId}` : ''}`)
+      const equipo = t.equipmentId ? (nombreDeEquipo.get(String(t.equipmentId)) || String(t.equipmentId)) : ''
+      proximas.push(`- ${t.nombre || 'Sin nombre'} [${t.tipo || 'general'}] → ${estado.texto} (cada ${t.frecuenciaDias || '?'} días)${equipo ? ` | equipo: ${equipo}` : ''}`)
     })
 
     const result = [
