@@ -3294,17 +3294,27 @@
       const driversEl = document.getElementById('closureDrivers');
 
       decisionEl.classList.remove('ok', 'warn', 'danger');
-      if (outlook.closeLikely || outlook.nowStatus === 'CERRADO') {
+      // La recomendación decía "ahora" aunque viniera del pronóstico de 24 h:
+      // con el puerto ABIERTO y 1 km/h de viento se leía "Recomendado ahora:
+      // preparar cierre y limitar salidas", contradiciendo al veredicto grande
+      // que estaba tres líneas más arriba. Ahora cada caso dice de qué habla.
+      if (outlook.nowStatus === 'CERRADO') {
         decisionEl.classList.add('danger');
-        decisionEl.textContent = 'Recomendado ahora: preparar cierre y limitar salidas';
-      } else if (outlook.restrictLikely || outlook.nowStatus === 'RESTRINGIDO') {
+        decisionEl.textContent = 'Ahora: puerto cerrado — sin salidas';
+      } else if (outlook.closeLikely) {
+        decisionEl.classList.add('danger');
+        decisionEl.textContent = 'Próximas 24 h: preparar cierre y limitar salidas';
+      } else if (outlook.nowStatus === 'RESTRINGIDO') {
         decisionEl.classList.add('warn');
-        decisionEl.textContent = 'Recomendado ahora: operar con restricción y carta';
+        decisionEl.textContent = 'Ahora: operar con restricción y carta';
+      } else if (outlook.restrictLikely) {
+        decisionEl.classList.add('warn');
+        decisionEl.textContent = 'Próximas 24 h: operar con restricción y carta';
       } else {
         decisionEl.classList.add('ok');
-        decisionEl.textContent = 'Recomendado ahora: operar normal con monitoreo';
+        decisionEl.textContent = 'Ahora: operar normal con monitoreo';
       }
-      decisionEl.title = 'Recomendación táctica inmediata basada en estado actual + probabilidad 24h.';
+      decisionEl.title = 'Recomendación táctica: dice "Ahora" cuando la manda el estado actual y "Próximas 24 h" cuando la manda el pronóstico.';
       decisionReviewEl.textContent = computeNextReviewSuggestion(outlook);
       decisionReviewEl.title = 'Hora sugerida para reevaluar por evolución del índice horario de riesgo.';
 
