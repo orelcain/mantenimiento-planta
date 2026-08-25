@@ -2,6 +2,7 @@
  * Servicio de Chatbot con RAG (Retrieval-Augmented Generation)
  * v4 — Memoria Firestore, turnos, resumen semanal, auto-seguimiento, alertas proactivas
  */
+import { estadoDePreventiva } from './chatbot/estadoPreventiva'
 import { collection, getDocs, getDoc, setDoc, doc, query, where, orderBy, limit, serverTimestamp } from 'firebase/firestore'
 import { db } from './firebase'
 import { callGroq, callGemini, isAIConfigured, isGeminiConfigured, RateLimitError } from './ai'
@@ -862,17 +863,26 @@ async function fetchPreventiveSummary(): Promise<string> {
       byTipo[t.tipo || 'general'] = (byTipo[t.tipo || 'general'] || 0) + 1
     })
 
-    // Próximas 10 tareas
+    // Próximas 10 tareas. La fecha sola no basta: una `proximaEjecucion` que ya
+    // pasó se leía como "programada", y el resumen del día decía "sin alertas
+    // de retraso" con una preventiva vencida hace 218 días — mientras el panel
+    // de avisos de la misma pantalla sí la nombraba.
+    const ahora = new Date()
+    let vencidas = 0
     activas.slice(0, 10).forEach((t: any) => {
       const fecha = t.proximaEjecucion?.toDate?.() || t.proximaEjecucion
-      const fechaStr = fecha instanceof Date ? fecha.toLocaleDateString('es-CL') : String(fecha || 'sin fecha')
-      proximas.push(`- ${t.nombre || 'Sin nombre'} [${t.tipo || 'general'}] → próxima: ${fechaStr} (cada ${t.frecuenciaDias || '?'} días)${t.equipmentId ? ` | equipo: ${t.equipmentId}` : ''}`)
+      const estado = estadoDePreventiva(fecha instanceof Date ? fecha : null, ahora)
+      if (estado.vencida) vencidas++
+      proximas.push(`- ${t.nombre || 'Sin nombre'} [${t.tipo || 'general'}] → ${estado.texto} (cada ${t.frecuenciaDias || '?'} días)${t.equipmentId ? ` | equipo: ${t.equipmentId}` : ''}`)
     })
 
     const result = [
       `MANTENIMIENTO PREVENTIVO (${activas.length} tareas activas):`,
+      vencidas > 0
+        ? `OJO: ${vencidas} VENCIDA(S). Nombralas en el resumen; no son "próximas".`
+        : 'Ninguna vencida.',
       `Por tipo: ${JSON.stringify(byTipo)}`,
-      `Próximas tareas:`,
+      `Tareas:`,
       ...proximas,
       activas.length > 10 ? `... y ${activas.length - 10} más` : '',
     ].join('\n')
