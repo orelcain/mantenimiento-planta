@@ -12,21 +12,14 @@
 import { useMemo } from 'react'
 import type { BodegaMergedItem } from '@/hooks/repuestos/useBodega'
 
-export type StockStatus = 'ok' | 'low' | 'out' | 'unset'
+export type { StockStatus } from '@/hooks/repuestos/estadoDeStock'
+export { stockStatusOf } from '@/hooks/repuestos/estadoDeStock'
+import { stockStatusOf as _estado, type StockStatus } from '@/hooks/repuestos/estadoDeStock'
 
 export interface AreaRepuestoRow extends BodegaMergedItem {
   stockStatus: StockStatus
 }
 
-export function stockStatusOf(item: BodegaMergedItem): StockStatus {
-  if (!item.bodegaId) return 'unset' // sin configuración de bodega
-  // Cero es "sin stock" SIEMPRE, tenga o no mínimo definido: antes exigir
-  // stockMinimo > 0 hacía que ~1.768 ítems con 0 unidades se mostraran como
-  // "Disponible" (solo 19 de 2.177 tienen mínimo) y el filtro no servía.
-  if (item.stockActual === 0) return 'out'
-  if (item.stockMinimo > 0 && item.stockActual <= item.stockMinimo) return 'low'
-  return 'ok'
-}
 
 interface Options {
   /** true = mostrar todas las áreas (sin filtrar). */
@@ -50,6 +43,6 @@ export function useAreaRepuestos(
 
     return items
       .filter(belongsToArea)
-      .map((it) => ({ ...it, stockStatus: stockStatusOf(it) }))
+      .map((it) => ({ ...it, stockStatus: _estado(it) }))
   }, [items, showingAll, selectedAreaId, machineInArea])
 }

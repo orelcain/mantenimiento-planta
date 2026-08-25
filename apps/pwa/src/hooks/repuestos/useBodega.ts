@@ -29,6 +29,7 @@ import {
 } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import { logger } from '@/lib/logger'
+import { contarPorEstado } from '@/hooks/repuestos/estadoDeStock'
 import { uploadBodegaPhoto, deleteBodegaPhoto } from '@/services/storage'
 import type { GlobalSearchResult } from '@/hooks/repuestos/useGlobalSearch'
 import type { MaterialClase } from '@/types/repuestos'
@@ -800,13 +801,17 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
   const stats = useMemo(() => {
     const conStock = items.filter(i => i.bodegaId)
     const sinConfig = items.filter(i => !i.bodegaId)
+    const conteoDeStock = contarPorEstado(conStock)
     return {
       total: items.length,
       conStock: conStock.length,
       sinConfig: sinConfig.length,
-      bajoStock: conStock.filter(i => i.stockMinimo > 0 && i.stockActual <= i.stockMinimo && i.stockActual > 0).length,
-      sinStock: conStock.filter(i => i.stockActual === 0 && i.stockMinimo > 0).length,
-      stockOk: conStock.filter(i => i.stockMinimo === 0 || i.stockActual > i.stockMinimo).length,
+      // Una sola definición para toda la app (ver `estadoDeStock.ts`): antes
+      // "sin stock" exigía tener mínimo definido y los 524 ítems restantes con
+      // cero unidades se contaban como disponibles.
+      bajoStock: conteoDeStock.low,
+      sinStock: conteoDeStock.out,
+      stockOk: conteoDeStock.ok,
       valorTotal: conStock.reduce((sum, i) => sum + (i.costoCompra ?? i.valorUnitario ?? 0) * i.stockActual, 0),
       // Por tipo
       tipoDistribution: (() => {
