@@ -18,6 +18,7 @@ import { setDoc as trackedSetDoc } from '../services/firestoreTracked'
 import { getCurrentUser } from '../services/auth'
 import { getHmiTooltipPwd } from '../services/hmiKnuro'
 import { logger } from '@/lib/logger'
+import { semanaDeApertura } from './calendario/semanaDeApertura'
 
 /**
  * Semáforo de 4 niveles para el delta de horas (sobre-asignado → muy bajo).
@@ -608,8 +609,11 @@ export function CalendarioMantencionPage() {
       setSelectedWeek(preferred)
       return
     }
-    const first = Object.keys(weeks)[0]
-    if (first) setSelectedWeek(first)
+    // Sin la semana de hoy, la MÁS CERCANA — no la primera del archivo. Con la
+    // planilla terminada en junio, abría en la semana del 01/03: seis meses
+    // atrás y catorce clicks de "›" para llegar a lo último cargado.
+    const cercana = semanaDeApertura(Object.keys(weeks), preferred)
+    if (cercana) setSelectedWeek(cercana)
   }, [weeks, selectedWeek])
 
   useEffect(() => {
