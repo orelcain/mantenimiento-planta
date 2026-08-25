@@ -7,12 +7,12 @@ import {
   deleteDoc,
   addDoc,
   serverTimestamp,
-  Timestamp,
   query,
   orderBy,
   limit,
 } from '@/services/firestoreTracked'
 import { db } from './firebase'
+import { aFechaSegura } from '@/lib/fechaFirestore'
 
 // ⚠ Este archivo es SOLO FALLBACK: la Baader 200 lee su contenido de la colección Firestore
 // `baader200-sections`. Corregir acá NO cambia lo que se ve en pantalla — hay que escribir a
@@ -103,7 +103,7 @@ export async function getB200Sections(): Promise<B200Section[]> {
       measurements: (data.measurements as B200Measurement[]) ?? [],
       notes: (data.notes as string[]) ?? [],
       images: (data.images as B200Image[]) ?? [],
-      updatedAt: (data.updatedAt as Timestamp)?.toDate() ?? new Date(),
+      updatedAt: aFechaSegura(data.updatedAt) ?? new Date(),
       updatedBy: data.updatedBy as string ?? '',
     }
   }).sort((a, b) => a.order - b.order)
@@ -169,7 +169,7 @@ export async function getB200History(limitCount = 50): Promise<B200HistoryEntry[
       action: data.action as B200HistoryEntry['action'],
       userId: data.userId as string,
       userName: data.userName as string,
-      timestamp: (data.timestamp as Timestamp)?.toDate() ?? new Date(),
+      timestamp: aFechaSegura(data.timestamp) ?? new Date(),
     }
   })
 }

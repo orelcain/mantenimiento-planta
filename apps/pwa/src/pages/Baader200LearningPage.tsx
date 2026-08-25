@@ -28,6 +28,10 @@ export function Baader200LearningPage() {
   const [sections, setSections] = useState<B200Section[]>([])
   const [, setSectionOrder] = useState<string[]>([])
   const [currentSectionId, setCurrentSectionId] = useState<string | null>(null)
+  // Si la carga falla, el iframe se queda en "Selecciona una sección del menú"
+  // sin que nadie sepa por qué: el error solo iba al logger. Pasó de verdad —
+  // 9 de las 23 secciones tenían `updatedAt` como número y el parser reventaba.
+  const [errorCarga, setErrorCarga] = useState<string | null>(null)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [historyExpanded, setHistoryExpanded] = useState(false)
   const [history, setHistory] = useState<B200HistoryEntry[]>([])
@@ -60,8 +64,10 @@ export function Baader200LearningPage() {
         order,
         readonly: false,
       }, '*')
+      setErrorCarga(null)
     } catch (err) {
       logger.error('B200: Error cargando datos', err instanceof Error ? err : new Error(String(err)))
+      setErrorCarga(err instanceof Error ? err.message : String(err))
     }
   }, [user])
 
@@ -217,6 +223,12 @@ export function Baader200LearningPage() {
 
   return (
     <div className="flex flex-col h-full w-full relative">
+      {errorCarga && (
+        <div className="px-3 py-2 text-xs text-ink-crit border-b border-border flex-shrink-0">
+          No se pudieron cargar las secciones del manual, así que el visor quedó
+          vacío. Detalle: {errorCarga}
+        </div>
+      )}
       <div className="flex items-center justify-between px-3 py-1.5 bg-card border-b border-border flex-shrink-0 gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <BookOpen className="h-4 w-4 text-primary flex-shrink-0" />
