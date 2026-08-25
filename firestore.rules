@@ -1715,6 +1715,27 @@ service cloud.firestore {
     }
 
     // ============================================
+    // HMI GRADER — Estado del simulador e historial
+    // ============================================
+    // No existían: `getGraderState()` fallaba con permission-denied para todo
+    // el mundo, incluido un admin. La pantalla no lo decía —el error solo iba
+    // al logger— así que el simulador arrancaba en sus valores por defecto y
+    // nada de lo que se tocaba quedaba guardado. Quedaron 29 errores
+    // registrados, el último el 24-08-2026.
+    match /hmi-grader-config/{configId} {
+      // Lectura pública: /aprendizaje/hmi-grader se abre sin login, igual que
+      // el HMI Knuro.
+      allow read: if true;
+      allow write: if isSupervisor() && isValidDocSize();
+    }
+
+    match /hmi-grader-history/{entryId} {
+      allow read: if isNotAnonymous();
+      allow create: if isAuthenticated() && isValidDocSize();
+      allow update, delete: if isAdmin();
+    }
+
+    // ============================================
     // BAADER 200 — Manual de Ajustes / Aprendizaje
     // ============================================
     match /baader200-sections/{sectionId} {
