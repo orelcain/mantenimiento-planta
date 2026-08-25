@@ -2,6 +2,7 @@ import { logger } from '@/lib/logger'
 import { httpsCallable } from 'firebase/functions'
 import type { Incident, Equipment, AIAnalysis, PredictiveThresholds } from '@/types'
 import type { SensorReading, SensorSummaryNode } from '@/services/sensorsRtdb'
+import { groqNoVaAContestar, conTechoParaGemini } from './ai/groqCaido'
 
 // ─── Rate Limit Error con tiempo de espera ──────────────────────────
 export class RateLimitError extends Error {
@@ -15,6 +16,8 @@ export class RateLimitError extends Error {
 
 // Modelo por defecto (usado como parámetro a Cloud Functions, no para llamadas directas)
 const MODEL = 'llama-3.3-70b-versatile'
+// OJO: Groq dejó de servir este modelo (404). Mientras no se actualice, cada
+// llamada cae en el suplente Gemini — ver `groqNoVaAContestar`.
 
 // Las API keys ya NO se usan en el cliente — todo pasa por Cloud Functions.
 
@@ -54,6 +57,18 @@ export async function callGroq(messages: Array<{ role: string; content: string }
         return { content: data.content, tokens: data.usage?.total_tokens || 0 }
       }
     } catch (err: unknown) {
+      // Groq caído: hoy devuelve 404 porque ya no sirve el modelo que se le
+      // pide. Antes eso subía tal cual y cada función que dependía de Groq
+      // quedaba sin respuesta —`extractSymptomsFromDescription` devolvía `[]`,
+      // que en pantalla se ve como "esta descripción no tiene síntomas"—.
+      // Gemini ya está configurado y respondiendo: se usa como suplente.
+      if (groqNoVaAContestar(err)) {
+        logger.warn('Groq no contestó; se responde con Gemini', {
+          motivo: err instanceof Error ? err.message : String(err),
+        })
+        return await callGemini(messages, conTechoParaGemini(opts))
+      }
+
       // Si falla (Cloud Function no deployada o error), fallback a llamada directa
       const errorMsg = err instanceof Error ? err.message : String(err)
       if (
@@ -70,8 +85,9 @@ export async function callGroq(messages: Array<{ role: string; content: string }
     }
   }
 
-  // Seguridad: NO hacer fallback directo con API key en cliente
-  throw new Error('IA no disponible: Cloud Function groqProxy no configurada. Contacta al administrador.')
+  // Sin proxy de Groq queda Gemini, que va por su propia Cloud Function.
+  logger.warn('groqProxy no disponible; se responde con Gemini')
+  return await callGemini(messages, conTechoParaGemini(opts))
 }
 
 /**
