@@ -4,6 +4,7 @@
  */
 
 import { collection, addDoc, Timestamp } from 'firebase/firestore'
+import { FrenoDeErroresRepetidos, claveDeError } from './errorLogThrottle'
 
 export type LogLevel = 'info' | 'warn' | 'error' | 'debug'
 
@@ -21,6 +22,7 @@ class Logger {
   private maxLogs = 100
   private errorQueue: Array<{ message: string; stack?: string; context?: Record<string, unknown>; timestamp: Date }> = []
   private flushTimer: ReturnType<typeof setTimeout> | null = null
+  private freno = new FrenoDeErroresRepetidos()
 
   private log(level: LogLevel, message: string, context?: Record<string, unknown>, error?: Error) {
     const entry: LogEntry = {
@@ -90,6 +92,15 @@ class Logger {
       const errorLogsRef = collection(db, 'errorLogs')
 
       for (const err of batch) {
+        // Sin este freno, una pantalla que reintenta escribe una fila por
+        // reintento: 143.623 copias de "Error fetching isometric maps" en
+        // febrero-marzo. Ver `errorLogThrottle.ts`.
+        const decision = this.freno.decidir(
+          claveDeError(err.message, err.stack),
+          err.timestamp.getTime(),
+        )
+        if (!decision.escribir) continue
+
         await addDoc(errorLogsRef, {
           message: err.message,
           stack: err.stack || null,
@@ -97,6 +108,8 @@ class Logger {
           timestamp: Timestamp.fromDate(err.timestamp),
           userAgent: navigator.userAgent,
           url: window.location.href,
+          ...(decision.repeticionesOmitidas > 0 && { repeticionesOmitidas: decision.repeticionesOmitidas }),
+          ...(decision.topeAlcanzado && { avisoTope: 'Se alcanzó el tope de errores registrados en esta sesión; el resto no se escribe.' }),
         }).catch(() => {
           // Silenciar errores de logging para evitar bucles
         })
