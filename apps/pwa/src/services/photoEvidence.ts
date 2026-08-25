@@ -26,35 +26,11 @@ import type { PhotoEvidence, PhotoItem, PhotoEvidenceStatus, PhotoComparison, Ph
 import { generateId } from '@/lib/utils'
 import { processImageForUpload, IMAGE_PRESETS } from '@/utils/images/processImage'
 import { logger } from '@/lib/logger'
+import { quitarUndefined, fechaDesdeId } from '@/lib/limpiarPayloadFirestore'
 import { enqueueEvidenceUpload } from '@/services/offlineUploadQueue'
 
 const COLLECTION = 'photoEvidence'
 
-function stripUndefined(value: unknown): unknown {
-  if (value === undefined) return undefined
-  if (value === null) return null
-
-  if (Array.isArray(value)) {
-    const mapped = value
-      .map((item) => stripUndefined(item))
-      .filter((item) => item !== undefined)
-    return mapped
-  }
-
-  if (value instanceof Date) return value
-
-  if (typeof value === 'object') {
-    const record = value as Record<string, unknown>
-    const result: Record<string, unknown> = {}
-    for (const [key, val] of Object.entries(record)) {
-      const cleaned = stripUndefined(val)
-      if (cleaned !== undefined) result[key] = cleaned
-    }
-    return result
-  }
-
-  return value
-}
 
 function toDateSafe(value: unknown): Date | undefined {
   if (!value) return undefined
@@ -168,7 +144,14 @@ export async function deleteEvidencePhoto(
 // Helper para parsear documentos de Firestore
 function parseEvidenceDoc(doc: any): PhotoEvidence {
   const data = doc.data()
-  const createdAt = toDateSafe(data.createdAt) ?? new Date()
+  // `createdAt` puede haber quedado guardado como el sentinel de
+  // serverTimestamp (un objeto que el parser no entiende). Antes de inventar
+  // "hoy", se usa el instante que trae el propio id y, si no, la fecha en que
+  // se marcó como corregida.
+  const createdAt = toDateSafe(data.createdAt)
+    ?? fechaDesdeId(String(doc.id))
+    ?? toDateSafe(data.corregidaAt)
+    ?? new Date()
   const updatedAt = toDateSafe(data.updatedAt) ?? createdAt
 
   const pairPhotos: PhotoPairPhotos[] | undefined = Array.isArray(data.pairPhotos)
@@ -292,7 +275,7 @@ export async function createPhotoEvidence(
 
   await setDoc(
     doc(db, COLLECTION, id),
-    stripUndefined({
+    quitarUndefined({
       ...evidence,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -370,7 +353,7 @@ export async function updatePhotoEvidence(
   const docRef = doc(db, COLLECTION, id)
   await updateDoc(
     docRef,
-    stripUndefined({
+    quitarUndefined({
       ...data,
       updatedAt: serverTimestamp(),
     }) as Record<string, unknown>

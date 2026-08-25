@@ -12,6 +12,7 @@ import {
 import { db } from './firebase'
 import { generateId } from '@/lib/utils'
 import type { RevisionTablero, Tablero, TipoRevision } from '@/types/tableros'
+import { quitarUndefined } from '@/lib/limpiarPayloadFirestore'
 
 /**
  * Servicio del levantamiento de tableros eléctricos (Centro Técnico Documental / NFPA 70B).
@@ -30,18 +31,6 @@ function toDate(v: unknown): Date {
 }
 
 // Firestore rechaza `undefined`; limpiamos recursivamente antes de escribir.
-function stripUndefined<T>(value: T): T {
-  if (Array.isArray(value)) return value.map((v) => stripUndefined(v)) as unknown as T
-  if (value && typeof value === 'object' && !(value instanceof Date)) {
-    const out: Record<string, unknown> = {}
-    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-      if (v === undefined) continue
-      out[k] = stripUndefined(v)
-    }
-    return out as T
-  }
-  return value
-}
 
 function docToTablero(id: string, data: Record<string, unknown>): Tablero {
   return {
@@ -111,7 +100,7 @@ export async function saveTableroForEquipment(
   const existing = await getDoc(ref)
   if (!existing.exists()) {
     const revision0 = nuevaRevision('as-found', 'Levantamiento inicial (as-found)', opts?.autor)
-    const payload = stripUndefined({
+    const payload = quitarUndefined({
       ...input,
       equipmentId,
       revisiones: [revision0],
@@ -124,7 +113,7 @@ export async function saveTableroForEquipment(
     if (opts?.revisionNota?.trim()) {
       revisiones.push(nuevaRevision('cambio', opts.revisionNota.trim(), opts?.autor))
     }
-    const payload = stripUndefined({ ...input, equipmentId, revisiones })
+    const payload = quitarUndefined({ ...input, equipmentId, revisiones })
     await updateDoc(ref, { ...payload, updatedAt: serverTimestamp() })
   }
 }
