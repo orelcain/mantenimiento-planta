@@ -1644,6 +1644,14 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Rueda de ventanas de intervención (pestaña del calendario). Mismos permisos
+    // que el calendario: lo lee cualquiera con sesión, lo edita Mantención.
+    match /rueda_ventanas_state/{docId} {
+      allow read: if isNotAnonymous();
+      allow create, update: if isTechnician();
+      allow delete: if isAdmin();
+    }
+
     match /ganttTasks/{taskId} {
       allow read: if isNotAnonymous();
       allow create: if isTechnician() && isValidGanttTask();
