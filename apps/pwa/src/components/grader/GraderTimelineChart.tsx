@@ -24,6 +24,7 @@ import { Activity, Coffee, Scale } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { FirestorePieceRecord } from '@/services/grader/graderDailySummary.service'
 import type { TimelineBucket } from '@/services/grader/types'
+import { minDe, maxDe } from '@/services/grader/minMaxSeguro'
 
 // ── Paleta ──────────────────────────────────────────────────────────────────
 
@@ -478,8 +479,8 @@ export function GraderTimelineChart({ records, aggregates, shiftId, dateKey }: P
   const visibleStats = useMemo(() => {
     if (weightSeries.length === 0) return null
     const allTs = weightSeries.map(([ts]) => ts)
-    const minTs = Math.min(...allTs)
-    const maxTs = Math.max(...allTs)
+    const minTs = minDe(allTs) ?? 0
+    const maxTs = maxDe(allTs) ?? 0
     const rangeMs = maxTs - minTs
     const visStart = minTs + (rangeMs * zoomRange.start / 100)
     const visEnd = minTs + (rangeMs * zoomRange.end / 100)

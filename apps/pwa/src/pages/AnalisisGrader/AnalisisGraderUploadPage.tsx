@@ -192,10 +192,17 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
     const fmt = (d: Date) => d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })
     const fmtDate = (d: Date) => d.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' })
 
+    // Un export de varios dias se leia como un turno de 5 horas: la linea
+    // mostraba SOLO la fecha del primer registro y dos horas de reloj, asi que
+    // un archivo de 15 dias con 277.841 piezas se anunciaba como
+    // "15-07-2025 01:19-06:05". Cuando el archivo cruza el dia, se dice.
+    const dias = Math.floor((endDate.getTime() - startDate.getTime()) / 86_400_000) + 1
     return {
       start: fmt(startDate),
       end: fmt(endDate),
       date: fmtDate(startDate),
+      endDate: fmtDate(endDate),
+      dias,
       durationMin: Math.round((endDate.getTime() - startDate.getTime()) / 60000),
       totalPieces,
     }
@@ -424,7 +431,10 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
         )}
         {turnoRange && (
           <span className="text-xs text-muted-foreground">
-            {turnoRange.date} · {turnoRange.start}–{turnoRange.end} · {fmt(turnoRange.totalPieces)} pzs
+            {turnoRange.dias > 1
+              ? `${turnoRange.date} ${turnoRange.start} → ${turnoRange.endDate} ${turnoRange.end} · ${turnoRange.dias} días`
+              : `${turnoRange.date} · ${turnoRange.start}–${turnoRange.end}`}
+            {' · '}{fmt(turnoRange.totalPieces)} pzs
           </span>
         )}
         <input
