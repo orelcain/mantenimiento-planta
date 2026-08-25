@@ -411,6 +411,21 @@ html.in-iframe, html.in-iframe body {
 }
 .menu-row:hover { background: rgba(255,255,255,0.06); }
 .menu-row.sel { background: #c7cbcf; color: #13233c; font-weight: 600; }
+/* Entradas del HMI real que todavía no están clonadas. El aviso existía —una
+   línea en el log— pero el log NO se ve mientras el menú está abierto: quien
+   practica tocaba y, desde su lado, no pasaba nada. Se marcan antes de tocar
+   y el aviso también aparece en la propia fila. */
+.menu-row.no-clonada { color: #6b7f96; }
+.menu-row.no-clonada::after {
+  content: 'sin clonar';
+  float: right;
+  font-size: 12px;
+  font-weight: normal;
+  letter-spacing: .5px;
+  opacity: .75;
+  text-transform: uppercase;
+}
+.menu-row.no-clonada.sel::after { color: #13233c; }
 
 /* Fase 3 — tabla clave/valor (Velocidad cintas, Resultados Clasificación) */
 .kv-table { flex: 1; padding: 18px 20px; overflow-y: auto; }
@@ -1146,8 +1161,10 @@ function buildScrollList(containerId, items) {
   const list = document.getElementById(containerId);
   items.forEach((item, i) => {
     const row = document.createElement('div');
-    row.className = 'menu-row' + (i === 0 ? ' sel' : '');
+    const clonada = Boolean(item.target && document.getElementById(item.target));
+    row.className = 'menu-row' + (i === 0 ? ' sel' : '') + (clonada ? '' : ' no-clonada');
     row.textContent = item.label;
+    if (!clonada) row.title = 'Esta pantalla del HMI real todavía no está clonada en el simulador';
     row.addEventListener('click', () => {
       list.querySelectorAll('.menu-row.sel').forEach(r => r.classList.remove('sel'));
       row.classList.add('sel');
