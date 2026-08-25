@@ -22,6 +22,7 @@ import {
   resolveCalibreLabel,
 } from '@/services/grader/graderDashboardHelpers'
 import type { GraderAnalyticsResult, ParsedMatrixData } from '@/services/grader/types'
+import { minDe } from '@/services/grader/minMaxSeguro'
 
 // ─── Tipos de salida ───────────────────────────────────────────────────────
 
@@ -177,7 +178,7 @@ export function useGraderPatternAnalytics({
 
     if (validTimestamps.length === 0) return []
 
-    const anchorMs = Math.min(...validTimestamps)
+    const anchorMs = minDe(validTimestamps) ?? 0
     const map = new Map<number, number>()
     for (const r of filteredPatternRecords) {
       const dt = new Date(r.ts)
@@ -212,7 +213,7 @@ export function useGraderPatternAnalytics({
 
     if (validTimestamps.length === 0) return new Map<string, PatternIntervalDetail>()
 
-    const anchorMs = Math.min(...validTimestamps)
+    const anchorMs = minDe(validTimestamps) ?? 0
     const bucketMap = new Map<string, { totalPieces: number; calibreMap: Map<string, number>; qualityMap: Map<string, number> }>()
 
     for (const r of filteredPatternRecords) {
@@ -310,7 +311,7 @@ export function useGraderPatternAnalytics({
       }
     }
 
-    const anchorMs = Math.min(...pieceRecordsInRange.map((record) => new Date(record.ts).getTime()))
+    const anchorMs = minDe(pieceRecordsInRange.map((record) => new Date(record.ts).getTime())) ?? 0
     const totalByBucket = new Map<number, number>()
     for (const record of pieceRecordsInRange) {
       const ts = new Date(record.ts).getTime()

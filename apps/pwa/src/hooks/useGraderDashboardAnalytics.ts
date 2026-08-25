@@ -10,6 +10,7 @@
  * para reducir la complejidad del componente principal (de 67 hooks → 40).
  */
 import { useMemo } from 'react'
+import { minDe, maxDe } from '@/services/grader/minMaxSeguro'
 import type {
   ParsedMatrixData,
   GraderAnalysisConfig,
@@ -227,8 +228,9 @@ export function useGraderDashboardAnalytics({
     }
     if (errorRecords.length < 8) return null
 
-    const minTs = Math.min(...errorRecords.map((r) => r.ts))
-    const maxTs = Math.max(...errorRecords.map((r) => r.ts))
+    const tsDeErrores = errorRecords.map((r) => r.ts)
+    const minTs = minDe(tsDeErrores) ?? 0
+    const maxTs = maxDe(tsDeErrores) ?? 0
     const spanMs = maxTs - minTs
     if (spanMs < 30 * 60_000) return null
 
