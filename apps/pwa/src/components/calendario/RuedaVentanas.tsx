@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Check, CloudOff, Loader2, RotateCcw, Undo2, Eraser } from 'lucide-react'
 import { ListGroup, ListCell, Pill } from '@/components/piel'
+import { FranjaVentanas } from './FranjaVentanas'
 import { getCurrentUser } from '@/services/auth'
 import { logger } from '@/lib/logger'
 import { cn } from '@/lib/utils'
@@ -10,6 +11,7 @@ import {
   DIAS_CORTOS,
   DIAS_SEMANA,
   OCUPANTES,
+  agruparTramos,
   SLOTS_POR_DIA,
   baseDia,
   bloquesIntervencion,
@@ -78,19 +80,6 @@ function sector(inicio: number, largo: number, rIn: number, rOut: number): strin
   )
 }
 
-/** Tramos contiguos con el mismo valor, para dibujar ~20 paths y no 288. */
-function agrupar(capa: string): Array<{ inicio: number; largo: number; valor: string }> {
-  const out: Array<{ inicio: number; largo: number; valor: string }> = []
-  let inicio = 0
-  for (let i = 1; i <= SLOTS_POR_DIA; i++) {
-    if (i === SLOTS_POR_DIA || capa[i] !== capa[inicio]) {
-      out.push({ inicio, largo: i - inicio, valor: capa[inicio] ?? '0' })
-      inicio = i
-    }
-  }
-  return out
-}
-
 /* Color: siempre por token del sistema, nunca hex. Las clases van literales
    porque Tailwind purga lo que no encuentra escrito (misma razón que en Tag). */
 const FILL_OCUPANTE: Record<Ocupante, string> = {
@@ -132,6 +121,9 @@ export function RuedaVentanas() {
   const [maquinaId, setMaquinaId] = useState<string>(() => estadoInicial().maquinas[0]?.id ?? '')
   const [diaIdx, setDiaIdx] = useState<number>(() => (new Date().getDay() + 6) % 7)
   const [brocha, setBrocha] = useState<Brocha>({ capa: 'mant', valor: '1' })
+  /* Editar en la rueda, mostrar en la franja: son dos trabajos distintos y cada
+     forma es buena en uno solo. Ver el comentario de FranjaVentanas. */
+  const [modo, setModo] = useState<'editar' | 'comparar'>('editar')
   const [sync, setSync] = useState<EstadoSync>('cargando')
   const [errorTexto, setErrorTexto] = useState<string | null>(null)
   const [ahora, setAhora] = useState(() => new Date())
@@ -313,15 +305,15 @@ export function RuedaVentanas() {
   }, [])
 
   /* ── Dibujo ─────────────────────────────────────────────────────────────── */
-  const gruposArea = useMemo(() => agrupar(dia.areas), [dia.areas])
-  const gruposMant = useMemo(() => agrupar(dia.mant), [dia.mant])
+  const gruposArea = useMemo(() => agruparTramos(dia.areas), [dia.areas])
+  const gruposMant = useMemo(() => agruparTramos(dia.mant), [dia.mant])
   const gruposCondicion = useMemo(() => {
     // La condición solo se dibuja donde Mantención entra: el anillo exterior
     // responde «cómo entro», no «cómo entraría si entrara».
     const capa = Array.from({ length: SLOTS_POR_DIA }, (_, i) =>
       dia.mant[i] === '1' ? dia.areas[i] : ' ',
     ).join('')
-    return agrupar(capa)
+    return agruparTramos(capa)
   }, [dia.areas, dia.mant])
 
   const esHoy = (new Date().getDay() + 6) % 7 === diaIdx
@@ -334,6 +326,25 @@ export function RuedaVentanas() {
 
   return (
     <div className="flex flex-col gap-6">
+      {/* ── Modo ───────────────────────────────────────────────────────────── */}
+      <div className="flex gap-1" role="tablist" aria-label="Modo de la vista">
+        {([['editar', 'Pintar el día'], ['comparar', 'Comparar máquinas']] as const).map(([id, label]) => (
+          <button
+            key={id}
+            role="tab"
+            aria-selected={modo === id}
+            onClick={() => setModo(id)}
+            className={cn(
+              'min-h-[44px] rounded-ctl px-3.5 text-footnote font-semibold transition-colors duration-150',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary motion-reduce:transition-none',
+              modo === id ? 'bg-card text-foreground ring-1 ring-inset ring-primary' : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       {/* ── Selectores ─────────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-end gap-4">
         <div className="flex flex-col gap-1.5">
@@ -382,7 +393,7 @@ export function RuedaVentanas() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className={cn('grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]', modo === 'comparar' && 'hidden')}>
         {/* ── Rueda ────────────────────────────────────────────────────────── */}
         <div className="flex flex-col gap-4">
           <div className="mx-auto w-full max-w-[30rem]">
@@ -707,8 +718,12 @@ export function RuedaVentanas() {
         </div>
       </div>
 
+      {modo === 'comparar' && (
+        <FranjaVentanas maquinas={state.maquinas} diaIdx={diaIdx} maquinaActivaId={maquinaId} />
+      )}
+
       {/* ── Semana ───────────────────────────────────────────────────────────── */}
-      {semana && (
+      {modo === 'editar' && semana && (
         <ListGroup title={`Semana completa · ${maquina.nombre}`}>
           <div className="flex flex-col gap-5 p-4">
             <div className="flex flex-wrap gap-x-10 gap-y-4">

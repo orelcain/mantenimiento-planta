@@ -234,6 +234,28 @@ function contarAgua(dia: DiaRueda, inicio: number, largo: number): number {
   return n
 }
 
+export interface TramoAgrupado {
+  inicio: number
+  largo: number
+  valor: string
+}
+
+/**
+ * Tramos contiguos con el mismo valor. Dibujar 288 elementos por capa es caro y
+ * además se ve peor: los bordes entre tramos iguales dejan costuras.
+ */
+export function agruparTramos(capa: string): TramoAgrupado[] {
+  const out: TramoAgrupado[] = []
+  let inicio = 0
+  for (let i = 1; i <= SLOTS_POR_DIA; i++) {
+    if (i === SLOTS_POR_DIA || capa[i] !== capa[inicio]) {
+      out.push({ inicio, largo: i - inicio, valor: capa[inicio] ?? '0' })
+      inicio = i
+    }
+  }
+  return out
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Formato
 // ─────────────────────────────────────────────────────────────────────────────
