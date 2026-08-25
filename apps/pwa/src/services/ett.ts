@@ -45,6 +45,15 @@ function tsToDate(ts: unknown): Date | undefined {
   if (typeof (ts as Timestamp).toDate === 'function') {
     return (ts as Timestamp).toDate()
   }
+  // Timestamp que quedo guardado como mapa plano (mismo caso que en el Gantt).
+  if (typeof ts === 'object') {
+    const raw = ts as { seconds?: unknown; _seconds?: unknown; nanoseconds?: unknown; _nanoseconds?: unknown }
+    const secs = typeof raw.seconds === 'number' ? raw.seconds : (typeof raw._seconds === 'number' ? raw._seconds : null)
+    if (secs !== null) {
+      const nanos = typeof raw.nanoseconds === 'number' ? raw.nanoseconds : (typeof raw._nanoseconds === 'number' ? raw._nanoseconds : 0)
+      return new Date(secs * 1000 + Math.round(nanos / 1e6))
+    }
+  }
   return undefined
 }
 
@@ -111,8 +120,116 @@ function ettToFirestore(ett: Omit<ETT, 'id'>): Record<string, unknown> {
   }
 }
 
+/**
+ * Lectura de las ETT guardadas con el esquema viejo (v2.44: `general`,
+ * `trabajo_descripcion`, `materiales`, `procedimientos`, `riesgos`).
+ *
+ * Sin esto, `ettFromFirestore` no encontraba NADA de lo que buscaba y devolvia
+ * una ficha en blanco fechada hoy: el listado mostraba 2 ETT que al abrirlas no
+ * tenian proyecto, ni solicitante, ni sector, ni una sola linea de trabajo
+ * —mientras el documento guardaba 10 materiales, 7 procedimientos, 5 riesgos y
+ * la descripcion completa del servicio—.
+ *
+ * Solo se traduce lo que el documento ya dice; los rotulos de seccion son los
+ * que el propio esquema viejo usaba como nombre de campo.
+ */
+function esEsquemaViejo(data: Record<string, unknown>): boolean {
+  return !data.cabecera && Boolean(data.general)
+}
+
+/** Un parrafo termina donde hay una linea en blanco. */
+const SEPARADOR_PARRAFO = /\n\s*\n/
+
+function bloquesDesdeEsquemaViejo(data: Record<string, unknown>): ETT['descripcion_trabajos'] {
+  const bloques: ETT['descripcion_trabajos'] = []
+  const texto = typeof data.trabajo_descripcion === 'string' ? data.trabajo_descripcion : ''
+  for (const parrafo of texto.split(SEPARADOR_PARRAFO).map((t) => t.trim()).filter(Boolean)) {
+    bloques.push({ tipo: 'parrafo', texto: parrafo })
+  }
+
+  const materiales = Array.isArray(data.materiales) ? data.materiales as Record<string, unknown>[] : []
+  if (materiales.length > 0) {
+    bloques.push({ tipo: 'subtitulo', texto: 'Materiales' })
+    bloques.push({
+      tipo: 'tabla',
+      columnas: ['Material', 'Cantidad', 'Unidad', 'Especificaciones'],
+      filas: materiales.map((m) => ({
+        celdas: [
+          String(m.nombre ?? ''),
+          String(m.cantidad ?? ''),
+          String(m.unidad ?? ''),
+          String(m.especificaciones ?? ''),
+        ],
+      })),
+    })
+  }
+
+  const procedimientos = Array.isArray(data.procedimientos) ? data.procedimientos as Record<string, unknown>[] : []
+  if (procedimientos.length > 0) {
+    bloques.push({ tipo: 'subtitulo', texto: 'Procedimientos' })
+    bloques.push({
+      tipo: 'lista',
+      estilo: 'numerada',
+      items: procedimientos.map((p) => ({
+        texto: String(p.titulo ?? ''),
+        subitems: [
+          p.descripcion ? { texto: String(p.descripcion) } : null,
+          p.tiempo_estimado ? { texto: `Tiempo estimado: ${String(p.tiempo_estimado)}` } : null,
+          p.precauciones ? { texto: `Precauciones: ${String(p.precauciones)}` } : null,
+        ].filter((x): x is { texto: string } => x !== null),
+      })),
+    })
+  }
+
+  const riesgos = Array.isArray(data.riesgos) ? data.riesgos as Record<string, unknown>[] : []
+  if (riesgos.length > 0) {
+    bloques.push({ tipo: 'subtitulo', texto: 'Riesgos' })
+    bloques.push({
+      tipo: 'tabla',
+      columnas: ['Peligro', 'Probabilidad', 'Consecuencia', 'Medidas preventivas', 'EPP'],
+      filas: riesgos.map((r) => ({
+        celdas: [
+          String(r.peligro ?? ''),
+          String(r.probabilidad ?? ''),
+          String(r.consecuencia ?? ''),
+          String(r.medidas_preventivas ?? ''),
+          String(r.equipos_seguridad ?? ''),
+        ],
+      })),
+    })
+  }
+
+  return bloques
+}
+
+function ettDesdeEsquemaViejo(id: string, data: Record<string, unknown>): ETT {
+  const general = (data.general as Record<string, unknown>) || {}
+  const titulo = String(general.titulo ?? '')
+  const codigo = String(general.codigo ?? '')
+  return {
+    id,
+    cabecera: {
+      fecha_requerimiento: tsToDate(general.fecha) || tsToDate(data.createdAt) || new Date(),
+      proyecto: codigo ? `${titulo} (${codigo})` : titulo,
+      usuario_solicitante: String(general.solicitante ?? ''),
+      sector_realizacion: String(general.area ?? ''),
+      garantia_texto: '06 (meses) Garantía Temporada Alta',
+    },
+    area_intervencion: String(general.area ?? ''),
+    descripcion_trabajos: bloquesDesdeEsquemaViejo(data),
+    responsabilidades_contratista: [],
+    imagenes: imagenesFromFirestore(data.adjuntos),
+    estado: ((data.estado as ETTEstado) || 'borrador') as ETTEstado,
+    createdBy: String(data.createdBy ?? ''),
+    createdAt: tsToDate(data.createdAt) || new Date(),
+    updatedAt: tsToDate(data.updatedAt) || new Date(),
+  }
+}
+
 /** Deserializa una ETT desde el formato Firestore al modelo de dominio. */
-function ettFromFirestore(id: string, data: Record<string, unknown>): ETT {
+export function ettFromFirestore(id: string, data: Record<string, unknown>): ETT {
+  if (esEsquemaViejo(data)) return ettDesdeEsquemaViejo(id, data)
+
   return {
     id,
     cabecera: cabeceraFromFirestore(
