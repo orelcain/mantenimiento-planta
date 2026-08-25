@@ -150,3 +150,30 @@ export function pedidoAndando(
   if (producingMin < 15 || frac <= 0.05) return requeridoReloj
   return requeridoReloj / Math.min(1, frac)
 }
+
+/**
+ * ¿El ritmo que pide la meta está fuera de lo que la línea puede dar?
+ *
+ * Con el turno casi terminado, `pedidoAndando` se dispara: en el monitor de
+ * Chonchi del 25-08, faltando 10.580 pz y 33 min de producción, pedía **320,7
+ * pz/min** — la línea hace entre 24 y 38. La regla lo mostraba igual, con la
+ * marca clavada en el extremo y el rótulo "para la meta 320,7", como si fuera
+ * un objetivo. Tres líneas más arriba la misma pantalla ya decía "Ya no da el
+ * tiempo".
+ *
+ * Un número imposible presentado como meta no informa: confunde. El bloque de
+ * llenado de la Baader 200 ya toma esta misma decisión (`imposible`), contra el
+ * máximo funcional y no contra el set point — subir la velocidad es una
+ * decisión posible; pasarse del techo, no.
+ *
+ * @param pedido  pz/min andando que exige la meta.
+ * @param techo   máximo que la línea puede sostener (set point / máx. funcional).
+ */
+export function pedidoFueraDeAlcance(
+  pedido: number | null | undefined,
+  techo: number | null | undefined,
+): boolean {
+  if (pedido == null || pedido <= 0) return false
+  if (techo == null || techo <= 0) return false
+  return pedido > techo
+}

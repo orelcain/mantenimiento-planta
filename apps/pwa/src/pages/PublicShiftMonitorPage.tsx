@@ -42,7 +42,7 @@ import { elegirContador } from './monitor/contadorCrudo'
 import { construirCascada } from './monitor/cascadaTurno'
 import { horaPlanta } from './monitor/horaPlanta'
 import { CascadaTurnoCard } from './monitor/CascadaTurnoCard'
-import { mediaMovil, ritmoAhoraCpm, ritmoAhoraAndando, estadoRitmo, fraccionDeRegla, pedidoAndando } from '@/services/shoplogix/monitorRitmo'
+import { mediaMovil, ritmoAhoraCpm, ritmoAhoraAndando, estadoRitmo, fraccionDeRegla, pedidoAndando, pedidoFueraDeAlcance } from '@/services/shoplogix/monitorRitmo'
 import { pinShiftEnd, unpinShiftEnd, setMonitorSetPoint } from '@/services/shoplogix/pinShiftEnd'
 import {
   buildDayComparison, optimalPace, plannedBreaks, mergeBreaks, cumulativeFromStart,
@@ -1788,7 +1788,7 @@ function PorHora({ series }: { series: PublicMonitorLive['series'] }) {
  * final de la regla ES lo que falta. No hay que saber que 18 es el techo ni
  * restar 12,5 de 18.
  */
-function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, onEditarSetPoint, cerrado, contexto, chispa, corteMs, pulso }: {
+function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrado, onEditarSetPoint, cerrado, contexto, chispa, corteMs, pulso }: {
   /**
    * Ritmo de ahora ANDANDO, en pz/min: los últimos 15 min descontando los
    * tramos parados. Va en esta base y no en la de reloj porque es contra lo
@@ -1810,6 +1810,13 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, onEditarSetPoi
   turno: number | null
   /** Velocidad de la máquina: el final de la regla. */
   setCpm: number | null | undefined
+  /**
+   * Lo que esta línea demostró que puede: el mejor ritmo andando de los turnos
+   * anteriores del mismo tipo. Se usa como techo cuando no hay set point —esta
+   * línea, con tres Baader, no tiene uno— para poder decir cuándo el ritmo que
+   * pide la meta ya no es alcanzable.
+   */
+  techoDemostrado?: number | null
   onEditarSetPoint?: () => void
   cerrado?: boolean
   /** Cómo viene el turno contra los anteriores: el dato que traía la tarjeta
@@ -1835,6 +1842,8 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, onEditarSetPoi
   const fr = fraccionDeRegla(ahora, setCpm)
   const frTurno = fraccionDeRegla(turno, setCpm)
   const frPedido = fraccionDeRegla(pedido ?? null, setCpm)
+  const techoDeLaLinea = setCpm != null && setCpm > 0 ? setCpm : (techoDemostrado ?? null)
+  const pedidoImposible = pedidoFueraDeAlcance(pedido, techoDeLaLinea)
   /* El estado SIEMPRE se dice con palabra además de color: en planta hay
      pantallas quemadas por el sol y gente que no distingue rojo de verde. */
   const palabra = cerrado
@@ -1883,9 +1892,11 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, onEditarSetPoi
               respuesta, sin leer un número. */}
           {pedido != null && pedido > 0 && setCpm != null && setCpm > 0 && (
             <span
-              className="absolute inset-y-0 w-0.5 bg-foreground"
+              className={`absolute inset-y-0 w-0.5 ${pedidoImposible ? 'bg-foreground/30' : 'bg-foreground'}`}
               style={{ left: `${frPedido * 100}%` }}
-              title={`Para la meta hay que ir a ${fmtDec(pedido)} pz/min andando`}
+              title={pedidoImposible
+                ? `La meta exigiría ${fmtDec(pedido)} pz/min andando, por encima del techo de la línea (${fmtDec(techoDeLaLinea ?? 0)})`
+                : `Para la meta hay que ir a ${fmtDec(pedido)} pz/min andando`}
             />
           )}
           {/* Sin objetivo conocido, la referencia posible es el promedio del turno. */}
@@ -1900,7 +1911,11 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, onEditarSetPoi
         <div className="mt-1 flex items-baseline justify-between text-[11px] text-muted-foreground">
           <span className="tabular-nums">
             {pedido != null && pedido > 0
-              ? <>para la meta <b className="font-semibold text-foreground">{fmtDec(pedido)}</b></>
+              ? (pedidoImposible
+                  /* Un numero que la linea no puede dar no es una meta: es
+                     ruido. La pantalla ya dice arriba que no da el tiempo. */
+                  ? <span title={`Haria falta ir a ${fmtDec(pedido)} pz/min andando`}>la meta ya no alcanza</span>
+                  : <>para la meta <b className="font-semibold text-foreground">{fmtDec(pedido)}</b></>)
               : turno != null
                 ? <>promedio del turno <b className="font-semibold text-foreground/80">{fmtDec(turno)}</b></>
                 : 'promedio del turno —'}
@@ -3438,6 +3453,7 @@ export function PublicShiftMonitorPage() {
               )}
               turno={turnoCpm}
               setCpm={setCpmVigente}
+              techoDemostrado={ritmoAndando.mejor}
               cerrado={live.shiftClosed}
               contexto={contexto}
               chispa={turnoCpm != null && banda
