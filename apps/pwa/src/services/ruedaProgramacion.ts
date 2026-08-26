@@ -336,6 +336,19 @@ export function veredictoDe(prog: Programacion): Veredicto {
  * mirar si quedó donde se pidió — así la comprobación usa exactamente el mismo
  * motor que después dibuja el plan, y no puede divergir de él.
  */
+/**
+ * Ajusta el destino de un arrastre a la retícula y lo deja dentro del día.
+ *
+ * El arrastre usa paso GRUESO y los botones paso fino, a propósito: con el dedo
+ * sobre una franja de 24 h, un píxel son casi cinco minutos, así que apuntar a
+ * un tramo de 5 es pelearse con el pulso. El ajuste al minuto se hace con los
+ * botones, que no dependen de la puntería.
+ */
+export function ajustarAPaso(slot: number, paso: number, largo: number): number {
+  const alineado = Math.round(slot / paso) * paso
+  return Math.min(Math.max(alineado, 0), SLOTS_POR_DIA - largo)
+}
+
 export function conAnclaje(anclajes: Anclaje[], nuevo: Anclaje): Anclaje[] {
   const resto = anclajes.filter(
     (a) => !(a.tareaId === nuevo.tareaId && a.ocurrencia === nuevo.ocurrencia),
