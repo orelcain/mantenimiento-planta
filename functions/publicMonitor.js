@@ -1587,6 +1587,14 @@ function resumirParaForecast(live) {
   const tb = live.timeBreakdown || {}
   return {
     curve, total, producingMin, micro: micro?.count ?? null,
+    /*
+     * Lo que Shoplogix esperaba de este turno YA CERRADO. Es la unica forma de
+     * tener una meta firme cuando nadie cargo una cuota: en el turno EN CURSO
+     * `expectedPieces` se completa sobre la marcha (medido la noche del 25-08:
+     * 15.821 -> 20.875 en el mismo turno), asi que como meta en vivo corre
+     * hacia arriba. Ver `objetivoDelTurno` en la PWA.
+     */
+    expected: live.expectedPieces ?? null,
     windowMin: tb.windowMin ?? null,
     plannedMin: tb.plannedMin ?? null,
     recoverableMin: tb.recoverableMin ?? null,
@@ -1756,8 +1764,16 @@ async function buildForecastHistory(db, plantSlug, currentShiftDocId, shiftId, p
     // i === 0 es el turno anterior: el re-sync móvil todavía puede moverlo.
     // Un cacheado sin el desglose (o con el de la rejilla RECORTADA, tbv<2)
     // es de un código anterior: se reconstruye una vez y queda.
+    //
+    // `expected` entra con el mismo criterio: sin el se pierde la unica meta
+    // firme cuando nadie carga cuota (ver `objetivoDelTurno` en la PWA), y sin
+    // forzar el rearmado los cacheados nunca lo tendrian — la mediana tardaria
+    // una semana en poblarse sola. Se compara contra `undefined` a proposito:
+    // un turno donde el sensor no espero nada guarda `null` y NO se rearma.
     const cacheado = previos.get(id)
-    if (cacheado && i > 0 && cacheado.windowMin != null && cacheado.tbv === 2) { out.push(cacheado); continue }
+    const completo = cacheado && cacheado.windowMin != null && cacheado.tbv === 2
+      && cacheado.expected !== undefined
+    if (completo && i > 0) { out.push(cacheado); continue }
     try {
       const live = yaConstruidos.get(id) || await buildMonitorLive(db, plantSlug, id)
       const resumen = live && resumirParaForecast(live)
