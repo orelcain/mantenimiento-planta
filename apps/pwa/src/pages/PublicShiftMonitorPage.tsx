@@ -58,6 +58,7 @@ import {
 import { parseShiftDocId } from '@/services/shoplogix/shoplogixShift.service'
 import { estadoDelLink } from '@/services/shoplogix/estadoDelLink'
 import { convenioFaltante } from '@/services/shoplogix/convenioFaltante'
+import { frescuraDelRitmo } from '@/services/shoplogix/datosAlDia'
 import { horaDeLaCuota } from '@/services/shoplogix/horaDeLaCuota'
 import { horaMasFloja, type ParadaConHora } from '@/services/shoplogix/horaMasFloja'
 import { objetivoDelTurno, type OrigenObjetivo } from '@/services/shoplogix/objetivoDelTurno'
@@ -2082,7 +2083,7 @@ function PorHora({ series, paradas }: {
  * final de la regla ES lo que falta. No hay que saber que 18 es el techo ni
  * restar 12,5 de 18.
  */
-function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrado, onEditarSetPoint, cerrado, contexto, chispa, corteMs, pulso, maquinas, parada }: {
+function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrado, onEditarSetPoint, cerrado, contexto, chispa, corteMs, ahoraWallMs, pulso, maquinas, parada }: {
   /**
    * Ritmo de ahora ANDANDO, en pz/min: los últimos 15 min descontando los
    * tramos parados. Va en esta base y no en la de reloj porque es contra lo
@@ -2133,6 +2134,8 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
   chispa?: React.ReactNode
   /** Fin del último tramo cerrado: hasta cuándo describe el número grande. */
   corteMs?: number | null
+  /** Hora de planta de ahora, para saber si el número sigue siendo del presente. */
+  ahoraWallMs?: number | null
   /** Ritmo casi instantáneo (~4 min) que ya calcula el backend. */
   pulso?: { cpm?: number | null; at?: string | null } | null
 }) {
@@ -2144,6 +2147,7 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
    * —turno sin hora de cierre— se cae al set point, que es la única vara que
    * queda.
    */
+  const frescura = frescuraDelRitmo(corteMs, ahoraWallMs)
   const vara = pedido && pedido > 0 ? pedido : setCpm
   const estado = estadoRitmo(ahora, vara)
   const fr = fraccionDeRegla(ahora, setCpm)
@@ -2184,7 +2188,13 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
           pz/min andando
           {!parada && (
             <span className="text-[12px] text-muted-foreground/80">
-              {cerrado ? ' · últimos 15 min del turno' : ' · últimos 15 min'}
+              {/* Si hace rato que no llega un tramo, el número deja de ser «de
+                  ahora»: el turno del 26-08 cerró 15:00, el último dato era de
+                  las 15:10 y a las 15:35 el bloque seguía diciendo «últimos 15
+                  min · a ritmo». Ver `frescuraDelRitmo`. */}
+              {frescura?.viejo
+                ? ` · último dato, hace ${Math.round(frescura.haceMin)} min`
+                : cerrado ? ' · últimos 15 min del turno' : ' · últimos 15 min'}
             </span>
           )}
         </span>
@@ -2192,6 +2202,13 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
           <span className="ml-auto inline-flex items-center gap-1 text-[12px] font-medium text-ink-crit">
             <span className="inline-block size-1.5 rounded-full bg-current" />
             {parada.motivo ?? 'detenida'}
+          </span>
+        ) : frescura?.viejo ? (
+          /* «a ritmo» sobre un número de hace media hora es un veredicto sobre
+             algo que ya no está pasando. Se dice de cuándo es y nada más. */
+          <span className="ml-auto inline-flex items-center gap-1 text-[12px] font-medium text-muted-foreground">
+            <span className="inline-block size-1.5 rounded-full bg-current" />
+            sin datos nuevos
           </span>
         ) : ahora != null && (
           <span className={`ml-auto inline-flex items-center gap-1 text-[12px] font-medium ${colorPunto}`}>
@@ -4020,6 +4037,7 @@ export function PublicShiftMonitorPage() {
               corteMs={serieDelTurno.length
                 ? Date.parse(serieDelTurno[serieDelTurno.length - 1]!.t) + 5 * 60_000
                 : null}
+              ahoraWallMs={ahoraWallMs}
               /* ⚠ El pulso SOLO si el contador vivo está respondiendo. Con el
                  contador caído, `totalCycles` viene 0 y `cpm` viene 0 —no
                  null—, así que el chip pintaba «0,0 · ahora mismo · 15:30» dos
