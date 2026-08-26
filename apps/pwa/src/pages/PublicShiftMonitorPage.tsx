@@ -1339,7 +1339,10 @@ function Sparkbars({
         )}
         {cierre != null && cierre.extraW > 0 && (
           <span className="inline-flex items-center gap-1">
-            <span className="inline-block h-2.5 w-2.5 rounded-sm bg-ink-warn/25" />
+            {/* Cuadrado sin radio: es la muestra de la ZONA tintada del SVG,
+                que también es cuadrada (y el ratchet de la piel no admite
+                radios nuevos fuera de escala). */}
+            <span className="inline-block h-2.5 w-2.5 bg-ink-warn/25" />
             hora extra
           </span>
         )}
@@ -4088,7 +4091,7 @@ export function PublicShiftMonitorPage() {
           {/* Sin peso, el hueco se explica —también al que abre el link sin
               sesión— y trae su acción solo para quien puede cargarlo. */}
           {!toneladas && esActual && !turnoCerrado && (
-            <div className="mt-1.5 flex items-center gap-2 rounded-xl bg-muted px-3 py-2">
+            <div className="mt-1.5 flex items-center gap-2 rounded-ctl bg-muted px-3 py-2">
               <div className="min-w-0 flex-1">
                 <div className="text-[13px] text-foreground">Sin peso promedio no hay toneladas</div>
                 <div className="text-[11px] text-muted-foreground/80">
