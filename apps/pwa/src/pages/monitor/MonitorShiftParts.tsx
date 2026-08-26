@@ -276,7 +276,10 @@ export function TiempoDelTurno({
    * MINUTOS. Valorizar con el promedio del turno sería el error opuesto: una
    * parada de 27 min a 9 pz/min cuesta 243 pz, no las 351 del promedio.
    */
-  const cpmDeCausa = (reason: string) => porCausa.get(reason)?.cpm ?? cpm ?? 0
+  /* Ritmo local de la causa (`cpm` ya trae deshecha la división por máquinas
+     que lleva `piezas`) por los minutos de LÍNEA. */
+  const piezasDe = (reason: string, minLinea: number) =>
+    minLinea * (porCausa.get(reason)?.cpm ?? cpm ?? 0)
   /*
    * Y los `lineMin` de las causas tampoco se descuentan ENTRE SÍ: dos causas
    * distintas pueden frenar la línea en el mismo minuto. En el turno del 26-08
@@ -291,7 +294,7 @@ export function TiempoDelTurno({
   const crudas =
     cpm == null
       ? null
-      : tb.recoverable.reduce((a, x) => a + minDeLinea(x) * escala * cpmDeCausa(x.reason), 0) + restoMin * cpm
+      : tb.recoverable.reduce((a, x) => a + piezasDe(x.reason, minDeLinea(x) * escala), 0) + restoMin * cpm
   /*
    * La vara de la resta. Cerrado: la meta completa. En vivo: la cuota A ESTA
    * ALTURA (la misma curva del comparador, aplanada en colación) — contra la

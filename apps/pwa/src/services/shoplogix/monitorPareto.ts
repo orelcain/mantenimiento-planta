@@ -32,7 +32,14 @@ import { matchImputacion } from './imputacionTaxonomy'
 /** Una causa tal como viaja en el `timeBreakdown` de un turno. */
 export interface CausaTurno {
   reason: string
+  /** Minutos que la causa duró en ALGUNA máquina. NO usar para valorizar. */
   min: number
+  /**
+   * Minutos que además frenaron la LÍNEA entera. Es el único que se traduce a
+   * piezas que no pasaron por el sensor: con tres Baader, `min` lo multiplica
+   * por más de cinco. Ausente en payloads viejos, donde se cae a `min`.
+   */
+  lineMin?: number | null
   count: number
 }
 
@@ -73,6 +80,11 @@ export interface TurnoParaPareto {
   causas?: CausaTurno[] | null
   total?: number | null
   producingMin?: number | null
+  /**
+   * Total de minutos de línea recuperables del turno — el que cierra su
+   * ventana. Topa la suma de `lineMin`, que no se descuentan entre sí.
+   */
+  recoverableMin?: number | null
 }
 
 export interface ParetoResult {
@@ -122,26 +134,51 @@ export function buildPareto(turnos: Array<TurnoParaPareto | null | undefined>): 
     if (!causas || causas.length === 0) return
     /* El ritmo andando de ESTE turno: la vara con que se valorizan SUS causas. */
     const cpm = t.total != null && (t.producingMin ?? 0) > 0 ? t.total / t.producingMin! : 0
+    /*
+     * OJO OJO: MINUTOS DE LÍNEA, no de máquina.
+     *
+     * `min` es lo que la causa duró en ALGUNA máquina; `lineMin`, lo que frenó
+     * la línea entera. Con tres Baader se separan brutalmente. Medido sobre los
+     * 7 turnos que publicaba el monitor el 26-08: 669 min de máquina (11,2 h)
+     * contra 122 de línea (2,0 h) — y 24.517 piezas contra 4.383, **5,6 veces**.
+     *
+     * En pantalla eso era «≈41.900 pz · ≈3,5 turnos completos de producción»
+     * donde lo defendible es del orden de medio turno. Y no es solo exagerar:
+     * las causas que más se inflan son las que paran UNA máquina muchas veces
+     * —las microdetenciones— así que el ranking mandaba a atacar la equivocada.
+     *
+     * Y como los `lineMin` tampoco se descuentan entre sí (dos causas pueden
+     * frenar la línea el mismo minuto), se escalan al `recoverableMin` del
+     * turno, que es el total de línea que cierra su ventana.
+     */
+    const sumaLinea = causas.reduce((a, c) => a + Math.max(0, c.lineMin ?? c.min ?? 0), 0)
+    const tope = t.recoverableMin ?? null
+    const escala = tope != null && tope > 0 && sumaLinea > tope ? tope / sumaLinea : 1
+    const minDe = (c: { min: number; lineMin?: number | null }) =>
+      Math.max(0, c.lineMin ?? c.min ?? 0) * escala
+
     for (const c of causas) {
       if (!c?.reason || !(c.min > 0)) continue
-      const pz = c.min * cpm
+      const min = minDe(c)
+      if (!(min > 0)) continue
+      const pz = min * cpm
       const label = equipoDe(c.reason) ?? c.reason
       let fila = acc.get(label)
       if (!fila) {
         fila = { minutes: 0, piezas: 0, count: 0, shifts: new Set(), parts: new Map() }
         acc.set(label, fila)
       }
-      fila.minutes += c.min
+      fila.minutes += min
       fila.piezas += pz
       fila.count += c.count ?? 0
       fila.shifts.add(idx)
       const parte = fila.parts.get(c.reason)
       if (parte) {
-        parte.min += c.min
+        parte.min += min
         parte.piezas += pz
         parte.count += c.count ?? 0
       } else {
-        fila.parts.set(c.reason, { reason: c.reason, min: c.min, count: c.count ?? 0, piezas: pz })
+        fila.parts.set(c.reason, { reason: c.reason, min, count: c.count ?? 0, piezas: pz })
       }
     }
   })
@@ -315,10 +352,18 @@ export function contextoPareto(turnos: TurnoCtx[]): ContextoPareto {
    * diferencia (redondeo por causa) reaparecen en cada frase que compare las
    * dos cifras — ya pasó con «12 h 40» arriba y dueños que sumaban 12 h 37.
    */
-  const recuperableDe = (t: TurnoCtx) =>
-    (t.causas?.length ?? 0) > 0
-      ? t.causas!.reduce((a, c) => a + (c.min ?? 0), 0)
-      : t.recoverableMin ?? 0
+  /*
+   * OJO: y en minutos de LÍNEA, la misma vara que el ranking. Con `min` este
+   * titular decía «22 h 27 min recuperables · 29,4%» sobre un ranking cuyas
+   * filas sumaban menos de 4 h — dos cifras del mismo bloque midiendo cosas
+   * distintas. Ver el comentario largo en `buildPareto`.
+   */
+  const recuperableDe = (t: TurnoCtx) => {
+    if ((t.causas?.length ?? 0) === 0) return t.recoverableMin ?? 0
+    const suma = t.causas!.reduce((a, c) => a + Math.max(0, c.lineMin ?? c.min ?? 0), 0)
+    const tope = t.recoverableMin ?? null
+    return tope != null && tope > 0 && suma > tope ? tope : suma
+  }
   const recuperableMin = suma(recuperableDe)
 
   /* El cpm andando de un turno: el mismo con que buildPareto valoriza sus

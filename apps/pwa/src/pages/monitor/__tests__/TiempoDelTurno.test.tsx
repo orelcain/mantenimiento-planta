@@ -193,6 +193,9 @@ describe('TiempoDelTurno · aviso de la próxima parada de convenio', () => {
     const t = texto(
       {
         ...ANTES_DE_LA_COLACION,
+        // `recoverableMin` acompaña a las causas: es el total de línea y topa la
+        // suma de sus `lineMin` (ver el escalado en `agruparEventos`).
+        recoverableMin: 39,
         recoverable: [
           { reason: 'Detencion', min: 27, count: 9, lineMin: 27 },
           { reason: 'AJUSTE OPERADOR', min: 12, count: 1, lineMin: 12 },
