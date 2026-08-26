@@ -12,8 +12,12 @@ import {
   normalizarEstado,
   confirmadas,
   sinConfirmar,
+  pintarHoras,
   pintarRango,
   pintarSlot,
+  copiarDia,
+  copiarSemanaDesde,
+  type MaquinaRueda,
   slotAHora,
   slotDeHora,
   slotsAHorasDecimal,
@@ -278,5 +282,91 @@ describe('normalizarEstado', () => {
     const a = { ...maquinaNueva('a', 'A'), revisadoEnTerreno: true }
     const state = normalizarEstado({ maquinas: [a], revisadoEnTerreno: false })
     expect(state?.maquinas[0]!.revisadoEnTerreno).toBe(true)
+  })
+})
+
+describe('pintarHoras · cómo se escribe un horario', () => {
+  const vacio = '0'.repeat(SLOTS_POR_DIA)
+  const cuenta = (c: string, v: string) => c.split('').filter((x) => x === v).length
+
+  it('«de 08:00 a 13:00» pinta 5 horas', () => {
+    const c = pintarHoras(vacio, slotDeHora(8), slotDeHora(13), 'P')
+    expect(cuenta(c, 'P')).toBe(5 * HORA)
+  })
+
+  it('«de 22:00 a 02:00» cruza la medianoche', () => {
+    const c = pintarHoras(vacio, slotDeHora(22), slotDeHora(2), 'H')
+    expect(cuenta(c, 'H')).toBe(4 * HORA)
+    expect(c[slotDeHora(23)]).toBe('H')
+    expect(c[slotDeHora(1)]).toBe('H')
+  })
+
+  it('«de 19:00 a 00:00» llega al final del día, no pinta cero', () => {
+    // 24:00 se escribe 00:00; sin distinguirlo este caso no pintaba nada.
+    const c = pintarHoras(vacio, slotDeHora(19), 0, 'H')
+    expect(cuenta(c, 'H')).toBe(5 * HORA)
+    expect(c[SLOTS_POR_DIA - 1]).toBe('H')
+  })
+
+  it('«de 00:00 a 00:00» es el día entero', () => {
+    const c = pintarHoras(vacio, 0, 0, 'P')
+    expect(cuenta(c, 'P')).toBe(SLOTS_POR_DIA)
+  })
+
+  it('conserva el largo de la capa', () => {
+    expect(pintarHoras(vacio, slotDeHora(8), slotDeHora(9), 'P')).toHaveLength(SLOTS_POR_DIA)
+  })
+})
+
+describe('copiarDia', () => {
+  function conLunes(): MaquinaRueda {
+    const m = maquinaNueva('a', 'A')
+    m.semana[0] = { areas: pintarHoras('0'.repeat(SLOTS_POR_DIA), slotDeHora(8), slotDeHora(13), 'P'), mant: '1'.repeat(SLOTS_POR_DIA) }
+    return m
+  }
+
+  it('copia las DOS capas del día, no solo la ocupación', () => {
+    const m = copiarDia(conLunes(), 0, [1, 2])
+    expect(m.semana[1]!.areas).toBe(m.semana[0]!.areas)
+    expect(m.semana[1]!.mant).toBe(m.semana[0]!.mant)
+    expect(m.semana[2]!.areas).toBe(m.semana[0]!.areas)
+  })
+
+  it('no toca los días que no son destino', () => {
+    const orig = conLunes()
+    const m = copiarDia(orig, 0, [1])
+    expect(m.semana[3]!.areas).toBe(orig.semana[3]!.areas)
+  })
+
+  it('ignora el propio origen y los índices fuera de rango', () => {
+    const orig = conLunes()
+    const m = copiarDia(orig, 0, [0, 9, -1])
+    expect(m).toBe(orig) // sin destinos válidos, devuelve la misma máquina
+  })
+
+  it('no muta la máquina de entrada', () => {
+    const orig = conLunes()
+    const antes = orig.semana[1]!.areas
+    copiarDia(orig, 0, [1])
+    expect(orig.semana[1]!.areas).toBe(antes)
+  })
+})
+
+describe('copiarSemanaDesde', () => {
+  it('trae los 7 días de la otra máquina', () => {
+    const origen = maquinaNueva('o', 'Origen', 'doble')
+    const destino = maquinaNueva('d', 'Destino', 'simple')
+    const m = copiarSemanaDesde(destino, origen)
+    expect(m.semana.map((d) => d.areas)).toEqual(origen.semana.map((d) => d.areas))
+    expect(m.id).toBe('d')
+    expect(m.nombre).toBe('Destino')
+  })
+
+  it('el horario copiado queda SIN confirmar aunque el origen lo estuviera', () => {
+    // Heredar el visto bueno sería dar por confirmado lo que nadie miró en esta
+    // máquina: mismo horario no significa misma operación.
+    const origen = { ...maquinaNueva('o', 'Origen'), revisadoEnTerreno: true }
+    const destino = { ...maquinaNueva('d', 'Destino'), revisadoEnTerreno: true }
+    expect(copiarSemanaDesde(destino, origen).revisadoEnTerreno).toBe(false)
   })
 })

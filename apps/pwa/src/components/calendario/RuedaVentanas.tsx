@@ -6,6 +6,7 @@ import { CompartirRueda } from './CompartirRueda'
 import { ResumenPlanta } from './ResumenPlanta'
 import { CargaTrabajo } from './CargaTrabajo'
 import { EditorMaquinas } from './EditorMaquinas'
+import { CargaRapida } from './CargaRapida'
 import { CONFIG_CARGA_POR_DEFECTO, tareasIniciales, type ConfigCarga, type TareaMantencion } from '@/services/ruedaCarga'
 import { getCurrentUser } from '@/services/auth'
 import { logger } from '@/lib/logger'
@@ -695,6 +696,17 @@ export function RuedaVentanas() {
               </div>
             </div>
           </ListGroup>
+
+          <CargaRapida
+            maquina={maquina}
+            maquinas={state.maquinas}
+            diaIdx={diaIdx}
+            onCambiarMaquina={(m) => {
+              tomarSnapshot()
+              snapshotTomadoRef.current = false
+              setState((p) => ({ ...p, maquinas: p.maquinas.map((x) => (x.id === m.id ? m : x)) }))
+            }}
+          />
 
           <ListGroup title="En qué condición entramos">
             {resumen.intervencion === 0 ? (
