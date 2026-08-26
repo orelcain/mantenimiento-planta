@@ -80,6 +80,8 @@ const DIR_REPORTES = process.env.VERIFICAR_TURNO_REPORTES
 const TOLERANCIA_ARRANQUE_MIN = 5
 /** Cuanto puede llevar sin sincronizar un turno EN CURSO antes de sospechar. */
 const FRESCURA_MAX_MIN = 25
+/** Espera antes de releer el padre y la subcoleccion. Ver el chequeo 4. */
+const REINTENTO_COHERENCIA_MS = 20_000
 /** Bajo esto, un Unscheduled es ruido y no se reporta (igual que la app). */
 const RUIDO_CICLOS = 50
 
@@ -342,12 +344,34 @@ async function main() {
       }
 
       // 4. COHERENCIA — el padre tiene que decir lo mismo que la subcoleccion.
-      const subs = await doc.ref.collection('machines').get()
-      const ciclosSub = subs.docs.reduce((a, m) => a + (m.data().totalCycles || 0), 0)
-      if (ciclos !== ciclosSub) {
-        problema(`${plant} ${shiftId}: doc padre ${ciclos} ciclos vs subcoleccion ${ciclosSub}`)
+      //
+      // OJO: el sync escribe la subcoleccion y el doc padre en momentos
+      // distintos, asi que si el chequeo cae JUSTO entre las dos escrituras ve
+      // una diferencia que se arregla sola. Paso el 26-08 a las 09:12: aviso
+      // "chonchi Turno 2: doc padre 3280 vs subcoleccion 3389" y al cerrar el
+      // turno los dos decian 13.689. Dos de 23 reportes fueron eso.
+      //
+      // Un aviso que se resuelve solo gasta la credibilidad del que si importa:
+      // esta vigilancia avisa por Telegram y la proxima vez nadie la mira. Por
+      // eso relee las dos cifras una vez antes de acusar.
+      const leerCoherencia = async () => {
+        const [padre, subs] = await Promise.all([doc.ref.get(), doc.ref.collection('machines').get()])
+        const pv = padre.data() || {}
+        return {
+          ciclosPadre: (pv.machines || []).reduce((a, m) => a + (m.totalCycles || 0), 0),
+          ciclosSub: subs.docs.reduce((a, m) => a + (m.data().totalCycles || 0), 0),
+          maquinas: subs.size,
+        }
+      }
+      let coh = await leerCoherencia()
+      if (coh.ciclosPadre !== coh.ciclosSub) {
+        await new Promise((r) => setTimeout(r, REINTENTO_COHERENCIA_MS))
+        coh = await leerCoherencia()
+      }
+      if (coh.ciclosPadre !== coh.ciclosSub) {
+        problema(`${plant} ${shiftId}: doc padre ${coh.ciclosPadre} ciclos vs subcoleccion ${coh.ciclosSub} (persiste tras releer)`)
       } else {
-        ok(`padre y subcoleccion coinciden (${subs.size} ${subs.size === 1 ? 'maquina' : 'maquinas'})`)
+        ok(`padre y subcoleccion coinciden (${coh.maquinas} ${coh.maquinas === 1 ? 'maquina' : 'maquinas'})`)
       }
 
       // 5. CALIDAD
