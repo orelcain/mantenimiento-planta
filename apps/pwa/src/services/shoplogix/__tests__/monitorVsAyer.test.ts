@@ -84,7 +84,12 @@ describe('recordsDeLinea', () => {
     const pct = r.componentes.find((c) => c.clave === 'pctAndando')!
     expect(paradas.recordDe).toBe('2026-08-12')    // 33 min
     expect(paradas.esNuevo).toBe(false)
-    expect(pct.recordDe).toBe('2026-08-13')        // 78%
+    /* El % produciendo se mide sobre el tiempo DISPONIBLE (ventana −
+       planificado), la misma base que el KPI de la página. Con la ventana
+       completa el récord era el 13 (78%); sobre el disponible es el 12:
+       340/(450−77) = 91%. */
+    expect(pct.recordDe).toBe('2026-08-12')
+    expect(pct.record).toBeCloseTo(91.2, 0)
     // La brecha de paradas en piezas, al ritmo de HOY: 19 min × 13,5.
     expect(Math.round(paradas.brechaPiezas!)).toBe(256)
   })

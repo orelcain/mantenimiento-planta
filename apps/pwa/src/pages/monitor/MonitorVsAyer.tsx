@@ -199,7 +199,9 @@ export function VsAyerBloque({ r, records, sinConvenio }: {
                   : (v: number) => `${Math.round(v)}%`
               const nombre = c.clave === 'ritmo' ? 'Ritmo andando'
                 : c.clave === 'paradas' ? 'Paradas evitables'
-                  : 'Tiempo produciendo'
+                  /* «del tiempo disponible»: misma base y mismo rótulo que el
+                     KPI de la página (ventana − planificado). */
+                  : 'Tiempo produciendo (del disponible)'
               return (
                 <li key={c.clave} className="text-[12px]">
                   <span className="flex items-baseline justify-between gap-2">
