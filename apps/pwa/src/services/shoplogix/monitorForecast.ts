@@ -115,7 +115,26 @@ const duracion = (t: HistoryShift) => (t.curve.length ? t.curve[t.curve.length -
  * Los tres predictores. Reciben lo que el turno lleva a `min` y el historial,
  * y devuelven el total estimado al cierre.
  */
-const PREDICTORES: Record<ForecastMethod, (p: number, min: number, h: HistoryShift[]) => number | null> = {
+/**
+ * El convenio del turno, en minutos: lo que ya pasó y lo que falta.
+ *
+ * ⚠⚠ Regla de Orel (26-08): «el estimado no debe considerar la colación — ese
+ * tiempo es tiempo planificado FUERA de proceso». El método `ritmo` extrapolaba
+ * sobre el reloj: contaba la colación pasada como si se hubiera producido en
+ * ella (bajando el ritmo) y la que falta como tiempo de producción (subiendo el
+ * total). El 26-08 daba 18.164 pz contra los 8.611 de la proyección lineal.
+ */
+export interface ConvenioDelTurno {
+  /** Minutos de convenio ya transcurridos dentro de `currentMinute`. */
+  transcurridoMin?: number | null
+  /** Minutos de convenio que faltan hasta el cierre. */
+  porDelanteMin?: number | null
+}
+
+export const PREDICTORES: Record<
+  ForecastMethod,
+  (p: number, min: number, h: HistoryShift[], convenio?: ConvenioDelTurno | null) => number | null
+> = {
   /* "Qué fracción del total ya llevaban los otros a esta altura." */
   proporcional: (p, min, h) => {
     const ratios = h
@@ -130,11 +149,20 @@ const PREDICTORES: Record<ForecastMethod, (p: number, min: number, h: HistoryShi
     if (deltas.length === 0) return null
     return p + mediana(deltas)
   },
-  /* El método viejo: extrapolar el ritmo de reloj hasta el cierre típico. */
-  ritmo: (p, min, h) => {
+  /*
+   * Extrapolar el ritmo hasta el cierre típico, SIN la colación: ni la que ya
+   * pasó (que no produjo y no debe bajar el ritmo) ni la que falta (que no va
+   * a producir y no debe sumar piezas).
+   */
+  ritmo: (p, min, h, convenio) => {
     const dur = mediana(h.map(duracion))
     if (min <= 0) return null
-    return p + (p / min) * Math.max(0, dur - min)
+    const yaPaso = Math.max(0, Math.min(convenio?.transcurridoMin ?? 0, min - 1))
+    const producidos = min - yaPaso
+    if (producidos <= 0) return null
+    const restanteReloj = Math.max(0, dur - min)
+    const restanteProductivo = Math.max(0, restanteReloj - Math.max(0, convenio?.porDelanteMin ?? 0))
+    return p + (p / producidos) * restanteProductivo
   },
 }
 
@@ -246,7 +274,7 @@ export function explicacionDelMetodo(
   // Decir que es ritmo de RELOJ no basta: lo que hace que este número sea el
   // más alto de la pantalla es que no descuenta las colaciones, y de madrugada
   // el convenio se lleva casi tres horas del turno.
-  return 'manteniendo el ritmo de reloj, sin descontar colaciones, hasta el cierre típico'
+  return 'manteniendo el ritmo, sin contar colaciones, hasta el cierre típico'
 }
 
 /**
@@ -262,6 +290,8 @@ export function buildForecast(args: {
   history: HistoryShift[]
   targetPieces?: number | null
   shiftClosed?: boolean
+  /** Colación y afines: no cuenta como tiempo de proceso. */
+  convenio?: ConvenioDelTurno | null
 }): ForecastResult | null {
   const { todayCurve, currentMinute, shiftClosed } = args
   if (shiftClosed) return null
@@ -283,7 +313,7 @@ export function buildForecast(args: {
   }
   if (!mejor) return null
 
-  const estimate = PREDICTORES[mejor.method](current, currentMinute, hist)
+  const estimate = PREDICTORES[mejor.method](current, currentMinute, hist, args.convenio)
   if (estimate == null || !Number.isFinite(estimate)) return null
 
   /*
