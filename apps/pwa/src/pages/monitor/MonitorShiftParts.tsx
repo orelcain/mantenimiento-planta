@@ -143,6 +143,7 @@ function fmtDurMin(min: number): string {
  */
 export function TiempoDelTurno({
   tb, causaSel, onCausa, onVentana, onTramo, proximaParada, notas, cerrado, meta, hechas,
+  piezasPulso, corteHora,
   cuotaAhora, horaAhora, cpmAndando, costo, grupos, notasTurno,
 }: {
   tb: PublicMonitorLive['timeBreakdown']
@@ -169,6 +170,10 @@ export function TiempoDelTurno({
   meta?: number | null
   /** Piezas hechas hasta ahora (o al cierre). */
   hechas?: number | null
+  /** Lo que ya leyó el pulso — más fresco que el snapshot de este desglose. */
+  piezasPulso?: number | null
+  /** Hora de planta del corte al que corresponde este desglose. */
+  corteHora?: string | null
   /**
    * La cuota a esta ALTURA del turno: la curva del comparador, que se aplana
    * durante la colación. Solo importa en vivo — restar contra la meta completa
@@ -430,6 +435,22 @@ export function TiempoDelTurno({
                         <p className="mt-1.5 text-muted-foreground/80">
                           Los minutos miden la LÍNEA, que solo se detiene cuando paran todas las máquinas.
                         </p>
+                        {/* El titular de arriba usa el pulso (lectura por minuto)
+                            y este desglose el último snapshot: el 26-08 se leía
+                            "9.041 piezas" arriba y "Hechas 8.894" acá, 147 de
+                            diferencia por 6 minutos de desfase, sin nada que lo
+                            explicara. */}
+                        {piezasPulso != null && hechas != null && piezasPulso > hechas && (
+                          <p className="mt-1 text-muted-foreground/80">
+                            Este desglose va al último corte de Shoplogix
+                            {corteHora ? <> (<span className="tabular-nums">{corteHora}</span>)</> : null}
+                            : el pulso ya leyó{' '}
+                            <span className="tabular-nums font-semibold text-foreground">
+                              {fmtInt(piezasPulso - hechas)} pz
+                            </span>{' '}
+                            más, que entran en el próximo.
+                          </p>
+                        )}
                       </>
                     )}
                     {f.p === 'paradas' && (

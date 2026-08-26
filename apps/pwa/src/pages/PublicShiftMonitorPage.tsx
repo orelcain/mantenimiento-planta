@@ -385,7 +385,7 @@ function EditorSetPoint({ actual, onGuardar }: {
  */
 function Sparkbars({
   series, stopReasons, stopEvents, comments, causaSel, onCausa, tramoSel, breaks,
-  requiredPerMinute, medianCpm, setCpm, fuenteSetPoint, onGuardarSetPoint, ventana, onVentana,
+  requiredPerMinute, medianCpm, medianSamples, setCpm, fuenteSetPoint, onGuardarSetPoint, ventana, onVentana,
 }: {
   /** Ventana visible compartida con el comparador (minutos de turno). */
   ventana?: Ventana | null
@@ -395,6 +395,8 @@ function Sparkbars({
   requiredPerMinute?: number | null
   /** Mediana de los turnos anteriores, en pz/min de reloj. */
   medianCpm?: number | null
+  /** Cuántos turnos hay detrás de esa mediana: va en el rótulo. */
+  medianSamples?: number | null
   /**
    * Velocidad a la que corre la máquina, en pz/min. La escala llega hasta ella
    * a propósito: con la curva orbitando en 10 y el techo dibujado en 18, el
@@ -552,7 +554,14 @@ function Sparkbars({
    */
   const refs = [
     { cpm: requiredPerMinute ?? 0, label: 'necesitás', clase: 'stroke-amber-600 dark:stroke-amber-400' },
-    { cpm: medianCpm ?? 0, label: 'promedio de turno', clase: 'stroke-muted-foreground/60' },
+    /* Decía "promedio de turno" y es la MEDIANA DE LOS TURNOS ANTERIORES: el
+       26-08 marcaba 26,8 mientras el turno de hoy promediaba 37,2. Quien mira
+       la línea gris creía estar viendo su propio turno. */
+    {
+      cpm: medianCpm ?? 0,
+      label: medianSamples ? `mediana de ${medianSamples} turnos` : 'mediana de turnos anteriores',
+      clase: 'stroke-muted-foreground/60',
+    },
   ].filter((r) => r.cpm > 0)
   const refsDibujables = refs.filter((r) => r.cpm <= escala)
   const refsFuera = refs.filter((r) => r.cpm > escala)
@@ -3612,6 +3621,7 @@ export function PublicShiftMonitorPage() {
               onVentana={setVentanaGrafica}
               requiredPerMinute={pace && pace.requiredPerMinute > 0 ? pace.requiredPerMinute : null}
               medianCpm={live.paceMedianCpm}
+              medianSamples={live.paceSamples}
               setCpm={setCpmVigente}
               fuenteSetPoint={live.setPoint
                 ? `Set point ${fmtDec(live.setPoint.cpm)} pz/min` +
@@ -3648,6 +3658,8 @@ export function PublicShiftMonitorPage() {
               cerrado={live.shiftClosed}
               meta={data.targetPieces ?? live.quotaPieces ?? live.expectedPieces ?? null}
               hechas={live.totalPieces}
+              piezasPulso={data.pulse?.totalCycles ?? null}
+              corteHora={horaPlanta(live.lastSyncAt ? Date.parse(live.lastSyncAt) - new Date().getTimezoneOffset() * 60_000 : null)}
               cuotaAhora={comparacion.optimalAtCurrentMinute}
               horaAhora={`${String(new Date(now).getHours()).padStart(2, '0')}:${String(new Date(now).getMinutes()).padStart(2, '0')}`}
               cpmAndando={
@@ -3724,6 +3736,7 @@ export function PublicShiftMonitorPage() {
               onVentana={setVentanaGrafica}
               requiredPerMinute={pace && pace.requiredPerMinute > 0 ? pace.requiredPerMinute : null}
               medianCpm={live.paceMedianCpm}
+              medianSamples={live.paceSamples}
               setCpm={setCpmVigente}
               fuenteSetPoint={live.setPoint
                 ? `Set point ${fmtDec(live.setPoint.cpm)} pz/min` +
@@ -3757,6 +3770,8 @@ export function PublicShiftMonitorPage() {
               cerrado={live.shiftClosed}
               meta={data.targetPieces ?? live.quotaPieces ?? live.expectedPieces ?? null}
               hechas={live.totalPieces}
+              piezasPulso={data.pulse?.totalCycles ?? null}
+              corteHora={horaPlanta(live.lastSyncAt ? Date.parse(live.lastSyncAt) - new Date().getTimezoneOffset() * 60_000 : null)}
               cuotaAhora={comparacion.optimalAtCurrentMinute}
               horaAhora={`${String(new Date(now).getHours()).padStart(2, '0')}:${String(new Date(now).getMinutes()).padStart(2, '0')}`}
               cpmAndando={
