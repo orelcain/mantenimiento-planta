@@ -58,7 +58,7 @@ import {
 import { parseShiftDocId } from '@/services/shoplogix/shoplogixShift.service'
 import { estadoDelLink } from '@/services/shoplogix/estadoDelLink'
 import { convenioFaltante } from '@/services/shoplogix/convenioFaltante'
-import { frescuraDelRitmo } from '@/services/shoplogix/datosAlDia'
+import { frescuraDelRitmo, MIN_PARA_VIEJO } from '@/services/shoplogix/datosAlDia'
 import { horaDeLaCuota } from '@/services/shoplogix/horaDeLaCuota'
 import { horaMasFloja, type ParadaConHora } from '@/services/shoplogix/horaMasFloja'
 import { objetivoDelTurno, type OrigenObjetivo } from '@/services/shoplogix/objetivoDelTurno'
@@ -1411,11 +1411,13 @@ function CierreDelTurno({ cierre, muestras, fuente, plantSlug, shiftName, startA
 
 function RitmoNecesario({
   pace, cierre, muestras, fuente, plantSlug, shiftName, startAt, historial, horizonte, vsAyer,
-  llenado, onGuardarCuota, origenObjetivo, turnosObjetivo, detenida,
+  llenado, onGuardarCuota, origenObjetivo, turnosObjetivo, detenida, sinDatosHaceMin,
 }: {
   pace: PaceToTarget | null
   /** Hace cuánto que la línea no produce, si está parada ahora mismo. */
   detenida?: string | null
+  /** Minutos sin un tramo nuevo: la cuenta de hora extra sale de datos viejos. */
+  sinDatosHaceMin?: number | null
   /** De dónde salió la vara cuando no hay cuota: ver `objetivoDelTurno`. */
   origenObjetivo?: OrigenObjetivo | null
   /** Cuántos turnos cerrados respaldan esa mediana. */
@@ -1543,6 +1545,16 @@ function RitmoNecesario({
           <p className="mt-0.5 text-[12px] text-ink-crit">
             Pero la línea no está produciendo {detenida}: esa cuenta supone que
             vuelve a arrancar.
+          </p>
+        )}
+        {/* Y el otro caso, que es el que más se da pasado el horario: no es que
+            la línea esté parada, es que no llega dato. Proyectar tres horas de
+            trabajo sobre información de hace hora y media no se sostiene. */}
+        {!detenida && sinDatosHaceMin != null && sinDatosHaceMin >= MIN_PARA_VIEJO && (
+          <p className="mt-0.5 text-[12px] text-ink-warn">
+            Ojo: no llega dato nuevo hace{' '}
+            <span className="tabular-nums">{Math.round(sinDatosHaceMin)} min</span>, así que esa
+            cuenta sale del último ritmo conocido.
           </p>
         )}
         {/* También en hora extra: es cuando más se pregunta "¿por qué no va más
@@ -2230,33 +2242,39 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
           entre ambos delata a la que se quedó atrás. */}
       {maquinas && maquinas.maquinas.length > 1 && (
         <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[12px]">
-          {/* OJO: la ventana, siempre. El número grande es de los últimos minutos y
-              estas tres son del turno ENTERO: pegadas y sin rótulo, se leía
-              «14,1 andando» arriba y «suma 35,1» abajo, que fue exactamente la
-              pregunta de Orel («esos dos ritmos, ¿por qué son distintos?»). */}
           <span className="basis-full text-[11px] text-muted-foreground/80">
-            Cada máquina, en todo el turno:
+            Cada máquina, cuando anda:
           </span>
           {maquinas.maquinas.map((m) => (
-            <span key={m.nombre} className="text-muted-foreground" title={`${m.nombre}: ${fmtInt(m.piezas)} pz`}>
+            <span
+              key={m.nombre}
+              className="text-muted-foreground"
+              title={`${m.nombre}: ${fmtInt(m.piezas)} pz`}
+            >
               {nombreCorto(m.nombre)}{' '}
               <b className={`tabular-nums ${m.detenida ? 'text-muted-foreground' : 'text-foreground/90'}`}>
                 {fmtDec(m.cpm)}
               </b>
+              {/* El uptime al lado: sin él, dos máquinas que andan igual pero
+                  rinden muy distinto se ven iguales — y es justo la diferencia
+                  entre «mirar la velocidad» y «buscar por qué se detiene». */}
+              {m.uptimePct != null && (
+                <span className="text-muted-foreground/80"> ({Math.round(m.uptimePct)}%)</span>
+              )}
             </span>
           ))}
           <span className="text-muted-foreground">
-            las {maquinas.maquinas.length} juntas <b className="tabular-nums text-foreground/90">{fmtDec(maquinas.suma)}</b>
+            promedio <b className="tabular-nums text-foreground/90">{fmtDec(maquinas.promedio)}</b>
           </span>
-          <span className="text-muted-foreground">
-            cada una <b className="tabular-nums text-foreground/90">{fmtDec(maquinas.promedio)}</b>
-          </span>
-          {/* Por qué «las 3 juntas» no da igual que el ritmo de la línea: cada
-              máquina se mide sobre SU tiempo andando y la línea sobre el suyo.
-              Sin esta línea, dos cifras parecidas y distintas a diez píxeles se
-              leen como un error de cuenta. */}
+          {/* NO se muestra la suma: las máquinas no andan en los mismos minutos,
+              así que sumar sus ritmos da un número que la línea nunca alcanza
+              (44,2 contra 34,9 en el turno del 26-08). Lo que dan las tres
+              juntas es el ritmo de la LÍNEA, que está en la regla de abajo.
+              El paréntesis es el % del turno que cada una estuvo andando. */}
           <span className="basis-full text-[11px] text-muted-foreground/80">
-            Cada máquina sobre su propio tiempo andando; el ritmo de arriba, sobre el de la línea.
+            {maquinas.parejas
+              ? 'Las tres andan a un ritmo parecido: la diferencia de piezas es cuánto paró cada una (%).'
+              : 'Entre paréntesis, el % del turno que cada una estuvo andando.'}
           </span>
         </div>
       )}
@@ -2465,7 +2483,22 @@ function PulsoVivo({ pulse, token, cerrado, onPulso }: {
   )
 }
 
-function StatusPill({ live }: { live: PublicMonitorLive }) {
+function StatusPill({ live, sinDatosHaceMin }: {
+  live: PublicMonitorLive
+  /**
+   * Minutos sin un tramo nuevo. Corroborado con Shoplogix el 26-08: a las 16:34
+   * el whiteboard devolvía las tres Evisceradoras asignadas al «Turno 1» de
+   * 21:15→05:00 —el de noche, que aún no empezaba— con CERO estados, y el
+   * último tramo con piezas era el de las 15:05. El estado «produciendo» de las
+   * máquinas venía congelado desde las 14:48-14:59.
+   *
+   * Con el estado viejo, «Produciendo» en verde y con el punto latiendo es una
+   * afirmación sobre el presente que nadie puede sostener — y si la línea SÍ
+   * está corriendo, tampoco es cierta: significa que el dato no está llegando.
+   * En los dos casos lo honesto es lo mismo.
+   */
+  sinDatosHaceMin?: number | null
+}) {
   // El primitivo Pill de la piel: tonos MEDIDOS (texto 600 sobre 500 al 15%)
   // y el punto integrado — era exactamente lo que este componente imitaba a mano.
   const map = {
@@ -2474,12 +2507,13 @@ function StatusPill({ live }: { live: PublicMonitorLive }) {
     'sin-datos': { label: 'Sin datos',   tone: 'neutral' as const },
   } as const
 
-  const x = map[live.status] ?? map['sin-datos']
+  const viejo = sinDatosHaceMin != null && sinDatosHaceMin >= MIN_PARA_VIEJO
+  const x = viejo ? map['sin-datos'] : (map[live.status] ?? map['sin-datos'])
   // `pulse` solo con el turno VIVO produciendo: el punto que respira es la
   // señal de "en vivo" (§7); en un turno cerrado sería un parpadeo mentiroso.
   return (
-    <Pill tone={x.tone} dot={live.status === 'produciendo' && !live.shiftClosed ? 'pulse' : true}>
-      {x.label}
+    <Pill tone={x.tone} dot={!viejo && live.status === 'produciendo' && !live.shiftClosed ? 'pulse' : true}>
+      {viejo ? `Sin datos hace ${Math.round(sinDatosHaceMin!)} min` : x.label}
     </Pill>
   )
 }
@@ -2987,6 +3021,14 @@ export function PublicShiftMonitorPage() {
    */
   /* La hora que nombra la cuota acumulada; se topa en el cierre y se lee en
      hora de PLANTA. El porqué, en `horaDeLaCuota`. */
+  /* Hace cuánto que no llega un tramo nuevo: lo usan el badge de estado, el
+     número grande y la cuenta de hora extra. Ver `frescuraDelRitmo`. */
+  const sinDatosHaceMin = useMemo(() => {
+    const ult = serieDelTurno[serieDelTurno.length - 1]?.t
+    if (!ult) return null
+    return frescuraDelRitmo(Date.parse(ult) + 5 * 60_000, ahoraWallMs)?.haceMin ?? null
+  }, [serieDelTurno, ahoraWallMs])
+
   const horaDeCuota = useMemo(
     () => horaDeLaCuota(live?.plannedEnd, ahoraWallMs),
     [live?.plannedEnd, ahoraWallMs],
@@ -3647,7 +3689,7 @@ export function PublicShiftMonitorPage() {
             {/* Con el turno CERRADO no se anuncia el estado en vivo: «Detenida»
                 junto a «Turno cerrado» son dos estados a la vez, y a 375 px
                 empujaban la fecha a una tercera línea. */}
-            {!turnoCerrado && <StatusPill live={live} />}
+            {!turnoCerrado && <StatusPill live={live} sinDatosHaceMin={sinDatosHaceMin} />}
             {turnoCerrado && (
               <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
                 Turno cerrado
@@ -3910,6 +3952,7 @@ export function PublicShiftMonitorPage() {
             pace={pace}
             origenObjetivo={objetivoSensor?.origen ?? null}
             turnosObjetivo={objetivoSensor?.turnos ?? null}
+            sinDatosHaceMin={sinDatosHaceMin}
             detenida={live.machinesProducing === 0 && !live.shiftClosed && live.currentSinceAt
               ? fmtAgoWall(live.currentSinceAt, now)
               : null}
@@ -4021,7 +4064,7 @@ export function PublicShiftMonitorPage() {
                  los 5 que va a durar: si no, el número de "ahora" queda siempre
                  por debajo del que muestra Shoplogix. */
               ahora={ritmoAhoraAndando(serieDelTurno, ahoraWallMs)}
-              maquinas={ritmoPorMaquina(live.machines)}
+              maquinas={ritmoPorMaquina(live.machines, (live.windowHours ?? 0) * 60)}
               /* Parada = ninguna máquina produciendo. El pulso lo confirma:
                  con la línea en colación marca 0,0 mientras el número grande
                  mostraba el ritmo de antes de parar. */
