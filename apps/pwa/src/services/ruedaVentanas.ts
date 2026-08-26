@@ -20,6 +20,12 @@
 import { doc, getDoc, serverTimestamp } from 'firebase/firestore'
 import { db } from './firebase'
 import { setDoc as trackedSetDoc } from './firestoreTracked'
+import {
+  CONFIG_CARGA_POR_DEFECTO,
+  tareasIniciales,
+  type ConfigCarga,
+  type TareaMantencion,
+} from './ruedaCarga'
 
 export const SLOTS_POR_DIA = 288
 export const MINUTOS_POR_SLOT = 5
@@ -57,6 +63,9 @@ export interface MaquinaRueda {
 
 export interface RuedaState {
   maquinas: MaquinaRueda[]
+  /** Trabajo rutinario y preventivo a encajar en las ventanas. Ver `ruedaCarga`. */
+  tareas?: TareaMantencion[]
+  configCarga?: ConfigCarga
   /** Para saber si lo que se ve ya fue corregido en terreno o sigue siendo la base. */
   revisadoEnTerreno?: boolean
   updatedAtClient?: number
@@ -342,6 +351,8 @@ const MAQUINAS_INICIALES: Array<[string, string, PerfilOperacion]> = [
 export function estadoInicial(): RuedaState {
   return {
     maquinas: MAQUINAS_INICIALES.map(([id, nombre, perfil]) => maquinaNueva(id, nombre, perfil)),
+    tareas: tareasIniciales(),
+    configCarga: { ...CONFIG_CARGA_POR_DEFECTO },
     revisadoEnTerreno: false,
   }
 }
@@ -382,8 +393,32 @@ export function normalizarEstado(data: unknown): RuedaState | null {
     }))
 
   if (!maquinas.length) return null
+
+  // Las tareas llegaron después que las máquinas: un documento guardado antes no
+  // las trae, y quedarse sin ninguna dejaría la vista de carga vacía sin
+  // explicación. Se repone la semilla, que además es editable.
+  const tareas: TareaMantencion[] = Array.isArray(raw.tareas)
+    ? raw.tareas.filter(
+        (t): t is TareaMantencion =>
+          !!t && typeof t.id === 'string' && typeof t.nombre === 'string' &&
+          typeof t.minutos === 'number' && typeof t.personas === 'number',
+      )
+    : tareasIniciales()
+
+  const cfg = raw.configCarga
   return {
     maquinas,
+    tareas,
+    configCarga: {
+      dotacion:
+        typeof cfg?.dotacion === 'number' && cfg.dotacion > 0
+          ? cfg.dotacion
+          : CONFIG_CARGA_POR_DEFECTO.dotacion,
+      reservaCorrectivasPct:
+        typeof cfg?.reservaCorrectivasPct === 'number'
+          ? cfg.reservaCorrectivasPct
+          : CONFIG_CARGA_POR_DEFECTO.reservaCorrectivasPct,
+    },
     revisadoEnTerreno: raw.revisadoEnTerreno === true,
     updatedAtClient: raw.updatedAtClient,
     updatedBy: raw.updatedBy,
@@ -401,6 +436,8 @@ export async function guardarRueda(state: RuedaState, uid: string | null): Promi
     doc(db, RUEDA_FIRESTORE_PATH[0], RUEDA_FIRESTORE_PATH[1]),
     {
       maquinas: state.maquinas,
+      tareas: state.tareas ?? [],
+      configCarga: state.configCarga ?? CONFIG_CARGA_POR_DEFECTO,
       revisadoEnTerreno: state.revisadoEnTerreno === true,
       updatedAt: serverTimestamp(),
       updatedAtClient: Date.now(),

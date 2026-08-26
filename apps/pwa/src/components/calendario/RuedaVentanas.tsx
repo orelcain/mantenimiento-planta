@@ -3,6 +3,9 @@ import { AlertTriangle, Check, CloudOff, Loader2, RotateCcw, Undo2, Eraser } fro
 import { ListGroup, ListCell, Pill } from '@/components/piel'
 import { FranjaVentanas } from './FranjaVentanas'
 import { CompartirRueda } from './CompartirRueda'
+import { ResumenPlanta } from './ResumenPlanta'
+import { CargaTrabajo } from './CargaTrabajo'
+import { CONFIG_CARGA_POR_DEFECTO, tareasIniciales, type ConfigCarga, type TareaMantencion } from '@/services/ruedaCarga'
 import { getCurrentUser } from '@/services/auth'
 import { logger } from '@/lib/logger'
 import { cn } from '@/lib/utils'
@@ -124,7 +127,7 @@ export function RuedaVentanas() {
   const [brocha, setBrocha] = useState<Brocha>({ capa: 'mant', valor: '1' })
   /* Editar en la rueda, mostrar en la franja: son dos trabajos distintos y cada
      forma es buena en uno solo. Ver el comentario de FranjaVentanas. */
-  const [modo, setModo] = useState<'editar' | 'comparar'>('editar')
+  const [modo, setModo] = useState<'editar' | 'comparar' | 'carga'>('editar')
   const [sync, setSync] = useState<EstadoSync>('cargando')
   const [errorTexto, setErrorTexto] = useState<string | null>(null)
   const [ahora, setAhora] = useState(() => new Date())
@@ -333,7 +336,11 @@ export function RuedaVentanas() {
     <div className="flex flex-col gap-6">
       {/* ── Modo ───────────────────────────────────────────────────────────── */}
       <div className="flex gap-1" role="tablist" aria-label="Modo de la vista">
-        {([['editar', 'Pintar el día'], ['comparar', 'Comparar máquinas']] as const).map(([id, label]) => (
+        {([
+          ['editar', 'Pintar el día'],
+          ['comparar', 'Dónde hay tiempo'],
+          ['carga', '¿Alcanza el tiempo?'],
+        ] as const).map(([id, label]) => (
           <button
             key={id}
             role="tab"
@@ -351,7 +358,7 @@ export function RuedaVentanas() {
       </div>
 
       {/* ── Selectores ─────────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-end gap-4">
+      <div className={cn('flex flex-wrap items-end gap-4', modo === 'carga' && 'hidden')}>
         <div className="flex flex-col gap-1.5">
           <label htmlFor="rueda-maquina" className="text-caption text-muted-foreground">
             Máquina
@@ -725,7 +732,20 @@ export function RuedaVentanas() {
       </div>
 
       {modo === 'comparar' && (
-        <FranjaVentanas maquinas={state.maquinas} diaIdx={diaIdx} maquinaActivaId={maquinaId} />
+        <>
+          <ResumenPlanta maquinas={state.maquinas} diaIdx={diaIdx} onVerMaquina={setMaquinaId} />
+          <FranjaVentanas maquinas={state.maquinas} diaIdx={diaIdx} maquinaActivaId={maquinaId} />
+        </>
+      )}
+
+      {modo === 'carga' && (
+        <CargaTrabajo
+          maquinas={state.maquinas}
+          tareas={state.tareas ?? tareasIniciales()}
+          config={state.configCarga ?? CONFIG_CARGA_POR_DEFECTO}
+          onCambiarTareas={(tareas: TareaMantencion[]) => setState((p) => ({ ...p, tareas }))}
+          onCambiarConfig={(configCarga: ConfigCarga) => setState((p) => ({ ...p, configCarga }))}
+        />
       )}
 
       {/* ── Semana ───────────────────────────────────────────────────────────── */}
@@ -776,7 +796,7 @@ export function RuedaVentanas() {
         </ListGroup>
       )}
 
-      {!state.revisadoEnTerreno && (
+      {modo !== 'carga' && !state.revisadoEnTerreno && (
         <div className="flex gap-3 rounded-card border border-border bg-card p-4">
           <AlertTriangle className="h-5 w-5 shrink-0 text-cat-4-ink" />
           <div className="flex flex-col gap-1">

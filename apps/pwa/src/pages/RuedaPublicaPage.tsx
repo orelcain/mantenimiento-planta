@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { AlertCircle, ExternalLink, Clock } from 'lucide-react'
 import { Spinner } from '@/components/ui'
 import { FranjaVentanas } from '@/components/calendario/FranjaVentanas'
+import { ResumenPlanta } from '@/components/calendario/ResumenPlanta'
 import { cn } from '@/lib/utils'
 import {
   cargarTokenPublico,
@@ -194,6 +195,8 @@ export function RuedaPublicaPage() {
             </div>
           )}
         </div>
+
+        <ResumenPlanta maquinas={data.maquinas} diaIdx={diaIdx} onVerMaquina={setMaquinaId} />
 
         <FranjaVentanas maquinas={data.maquinas} diaIdx={diaIdx} maquinaActivaId={maquinaId} />
 
