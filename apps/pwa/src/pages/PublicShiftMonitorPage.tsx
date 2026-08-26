@@ -56,6 +56,7 @@ import {
   type Ventana as VentanaPareto,
 } from '@/services/shoplogix/monitorPareto'
 import { parseShiftDocId } from '@/services/shoplogix/shoplogixShift.service'
+import { estadoDelLink } from '@/services/shoplogix/estadoDelLink'
 import { convenioFaltante } from '@/services/shoplogix/convenioFaltante'
 import { horaDeLaCuota } from '@/services/shoplogix/horaDeLaCuota'
 import { horaMasFloja, type ParadaConHora } from '@/services/shoplogix/horaMasFloja'
@@ -2461,7 +2462,7 @@ export function PublicShiftMonitorPage() {
   const { token } = useParams<{ token: string }>()
   const { isDark, toggleTheme } = useTheme()
   const [data, setData] = useState<PublicShiftMonitorDoc | null>(null)
-  const [status, setStatus] = useState<'loading' | 'ok' | 'gone'>('loading')
+  const [status, setStatus] = useState<'loading' | 'ok' | 'gone' | 'sin-conexion'>('loading')
   const [now, setNow] = useState(() => Date.now())
   /* Los `t` de la serie son wall-clock sellados como UTC; para compararlos con
      el reloj hay que llevar "ahora" a esa misma base (igual que `fmtAgoWall`). */
@@ -2487,7 +2488,10 @@ export function PublicShiftMonitorPage() {
         setData(docData)
         setStatus('ok')
       },
-      () => setStatus('gone'),
+      /* Un error del stream NO es un link muerto: con la señal caída en planta
+         se pintaba «pedí uno nuevo a Mantención» sobre un link perfecto. Ver
+         `estadoDelLink`. */
+      (err) => setStatus(estadoDelLink(err)),
     )
   }, [token])
 
@@ -3529,6 +3533,29 @@ export function PublicShiftMonitorPage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <RefreshCw className="h-6 w-6 animate-spin text-sky-600 dark:text-sky-400" />
+      </div>
+    )
+  }
+
+  /* La red se cayó pero el link sirve: se dice eso, y se ofrece reintentar.
+     Si ya había datos en pantalla no se tapa nada — se sigue mostrando lo
+     último leído, que es mejor que una pantalla vacía en medio del turno. */
+  if (status === 'sin-conexion' && !data) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-background px-6 text-center">
+        <RefreshCw className="h-10 w-10 text-muted-foreground" />
+        <p className="text-lg font-semibold text-foreground">Sin conexión con los datos</p>
+        <p className="max-w-xs text-sm text-muted-foreground">
+          El link sigue siendo válido: es la conexión la que no responde. Se reintenta solo;
+          también podés recargar.
+        </p>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="tap-44 min-h-[44px] rounded-ctl border border-border px-4 text-[13px] font-medium hover:bg-muted"
+        >
+          Reintentar
+        </button>
       </div>
     )
   }
