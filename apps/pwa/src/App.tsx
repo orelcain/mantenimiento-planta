@@ -114,6 +114,7 @@ const GanttModulePage = lazyWithReload(() => import('@/pages/gantt/GanttModulePa
 const AriaActionsPage = lazyWithReload(() => import('@/pages/AriaActionsPage').then((mod) => ({ default: mod.AriaActionsPage })))
 const ClimaPortPage = lazyWithReload(() => import('@/pages/ClimaPortPage').then((mod) => ({ default: mod.ClimaPortPage })))
 const PlanosAguasPage = lazyWithReload(() => import('@/pages/PlanosAguasPage').then((mod) => ({ default: mod.PlanosAguasPage })))
+const RuedaPublicaPage = lazyWithReload(() => import('@/pages/RuedaPublicaPage').then((mod) => ({ default: mod.RuedaPublicaPage })))
 const CalendarioMantencionPage = lazyWithReload(() => import('@/pages/CalendarioMantencionPage').then((mod) => ({ default: mod.CalendarioMantencionPage })))
 const HmiKnuroPage = lazyWithReload(() => import('@/pages/HmiKnuroPage').then((mod) => ({ default: mod.HmiKnuroPage })))
 const HmiGraderPage = lazyWithReload(() => import('@/pages/HmiGraderPage').then((mod) => ({ default: mod.HmiGraderPage })))
@@ -512,6 +513,17 @@ export function App() {
           <Route path="/baader-200/learn" element={
             <Suspense fallback={<LoadingScreen />}><Baader200LearningPublicPage /></Suspense>
           } />
+
+          {/* Plan de ventanas de intervención — público por token, sin login:
+              se comparte con Producción e Higiene, que no tienen cuenta. */}
+          <Route
+            path="/rueda/:token"
+            element={
+              <Suspense fallback={<LoadingScreen />}>
+                <RuedaPublicaPage />
+              </Suspense>
+            }
+          />
 
           {/* Public grader shift view — token-based, no auth required */}
           <Route

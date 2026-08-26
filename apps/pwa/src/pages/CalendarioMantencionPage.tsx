@@ -19,6 +19,7 @@ import { getCurrentUser } from '../services/auth'
 import { getHmiTooltipPwd } from '../services/hmiKnuro'
 import { logger } from '@/lib/logger'
 import { semanaDeApertura } from './calendario/semanaDeApertura'
+import { RuedaVentanas } from '@/components/calendario/RuedaVentanas'
 
 /**
  * Semáforo de 4 niveles para el delta de horas (sobre-asignado → muy bajo).
@@ -399,6 +400,25 @@ export function CalendarioMantencionPage() {
       return next
     }, { replace: true })
   }, [activeTab, searchParams, setSearchParams])
+
+  // Vista del módulo. Va aparte de `activeTab` a propósito: las pestañas de
+  // arriba solo existen en escritorio, y la rueda tiene que abrirse también en
+  // el teléfono, que es donde se mira en planta.
+  const [vistaModulo, setVistaModulo] = useState<'turnos' | 'rueda'>(
+    () => (searchParams.get('vista') === 'rueda' ? 'rueda' : 'turnos'),
+  )
+  useEffect(() => {
+    const actual = searchParams.get('vista')
+    const deseada = vistaModulo === 'rueda' ? 'rueda' : null
+    if (actual === deseada) return
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      if (deseada) next.set('vista', deseada)
+      else next.delete('vista')
+      return next
+    }, { replace: true })
+  }, [vistaModulo, searchParams, setSearchParams])
+
   const [newTechName, setNewTechName] = useState('')
   const [newTechRut, setNewTechRut] = useState('')
   const [newTechGroup, setNewTechGroup] = useState('A')
@@ -1914,9 +1934,36 @@ export function CalendarioMantencionPage() {
     <div className="h-full min-h-0 flex flex-col gap-2">
 
       {/* ══════════════════════════════════════════
+          Conmutador de vista del módulo
+          ══════════════════════════════════════════ */}
+      <div className="flex shrink-0 gap-1" role="tablist" aria-label="Vista del calendario">
+        {([['turnos', 'Turnos'], ['rueda', 'Ventanas de intervención']] as const).map(([id, label]) => (
+          <button
+            key={id}
+            role="tab"
+            aria-selected={vistaModulo === id}
+            onClick={() => setVistaModulo(id)}
+            className={`min-h-[44px] rounded-ctl px-3.5 text-footnote font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary motion-reduce:transition-none ${
+              vistaModulo === id
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-card text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {vistaModulo === 'rueda' && (
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <RuedaVentanas />
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════
           VISTA MÓVIL — lectura de turnos por semana
           ══════════════════════════════════════════ */}
-      {isMobile && (
+      {vistaModulo === 'turnos' && isMobile && (
         <div className="h-full min-h-0 flex flex-col gap-1">
 
           {isLandscape ? (
@@ -2384,7 +2431,7 @@ export function CalendarioMantencionPage() {
       {/* ══════════════════════════════════════════
           VISTA DESKTOP — panel de tabs + tabla
           ══════════════════════════════════════════ */}
-      {!isMobile && <section className="sticky top-0 z-20 rounded-card border bg-card p-2">
+      {vistaModulo === 'turnos' && !isMobile && <section className="sticky top-0 z-20 rounded-card border bg-card p-2">
         {/* ── Tab bar ── */}
         <div className="flex items-center gap-1 border-b border-border pb-1 mb-2">
           {TAB_ITEMS.map((tab) => (
@@ -2847,7 +2894,7 @@ export function CalendarioMantencionPage() {
         </div>
       </section>}
 
-      {!isMobile && <section className="min-h-0 flex-1 rounded-card border bg-card p-2">
+      {vistaModulo === 'turnos' && !isMobile && <section className="min-h-0 flex-1 rounded-card border bg-card p-2">
         <div className="mb-1 flex items-center justify-between gap-2">
           <div className="text-sm font-semibold">Calendario Mantención</div>
           <div className="flex items-center gap-1">
