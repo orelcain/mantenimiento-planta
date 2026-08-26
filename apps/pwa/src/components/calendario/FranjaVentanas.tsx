@@ -50,7 +50,18 @@ function ocupanteDe(v: string): Ocupante {
 }
 
 /** Una fila = un día de una máquina sobre el eje de 24 h. */
-function Fila({ dia, etiqueta, destacada }: { dia: DiaRueda; etiqueta: string; destacada?: boolean }) {
+function Fila({
+  dia,
+  etiqueta,
+  destacada,
+  sinConfirmar: pendiente,
+}: {
+  dia: DiaRueda
+  etiqueta: string
+  destacada?: boolean
+  /** Marca la fila cuyo horario todavía no se comparó con la operación real. */
+  sinConfirmar?: boolean
+}) {
   const gruposArea = useMemo(() => agruparTramos(dia.areas), [dia.areas])
   const gruposMant = useMemo(() => agruparTramos(dia.mant), [dia.mant])
   const r = useMemo(() => contarDia(dia), [dia])
@@ -62,9 +73,10 @@ function Fila({ dia, etiqueta, destacada }: { dia: DiaRueda; etiqueta: string; d
           'w-28 shrink-0 truncate text-footnote sm:w-36',
           destacada ? 'font-semibold text-foreground' : 'text-muted-foreground',
         )}
-        title={etiqueta}
+        title={pendiente ? `${etiqueta} · horario sin confirmar en terreno` : etiqueta}
       >
         {etiqueta}
+        {pendiente && <span className="ml-1 text-cat-4-ink" aria-label="sin confirmar">*</span>}
       </span>
 
       <div className="relative h-8 min-w-0 flex-1 overflow-hidden rounded-ctl bg-muted/30">
@@ -180,6 +192,10 @@ function LeyendaFranja() {
           <span className="h-2 w-4 rounded-[2px] bg-destructive" />
           Con higiene encima
         </span>
+        <span className="flex items-center gap-1.5 text-footnote text-muted-foreground">
+          <span className="text-cat-4-ink">*</span>
+          Horario sin confirmar en terreno
+        </span>
       </div>
     </div>
   )
@@ -232,7 +248,15 @@ export function FranjaVentanas({ maquinas, diaIdx, maquinaActivaId }: FranjaVent
               {maquinas.map((m) => {
                 const d = m.semana[diaIdx]
                 if (!d) return null
-                return <Fila key={m.id} dia={d} etiqueta={m.nombre} destacada={m.id === maquinaActivaId} />
+                return (
+                  <Fila
+                    key={m.id}
+                    dia={d}
+                    etiqueta={m.nombre}
+                    destacada={m.id === maquinaActivaId}
+                    sinConfirmar={m.revisadoEnTerreno !== true}
+                  />
+                )
               })}
             </div>
           </div>

@@ -60,16 +60,25 @@ export interface MaquinaRueda {
   nombre: string
   /** Siempre 7 posiciones, lunes = 0. */
   semana: DiaRueda[]
+  /**
+   * Si alguien ya comparó el horario de ESTA máquina con la operación real.
+   *
+   * Empezó siendo un único flag para todo el plan, y eso obligaba a desconfiar
+   * de las seis máquinas hasta terminar la última. En terreno se confirman de a
+   * una, así que el estado también va de a una: lo confirmado se puede usar como
+   * evidencia aunque el resto siga siendo base de ejemplo.
+   */
+  revisadoEnTerreno?: boolean
 }
 
 export interface RuedaState {
   maquinas: MaquinaRueda[]
+  /** @deprecated Migrado a `MaquinaRueda.revisadoEnTerreno`; se lee para convertir documentos viejos. */
   /** Trabajo rutinario y preventivo a encajar en las ventanas. Ver `ruedaCarga`. */
   tareas?: TareaMantencion[]
   configCarga?: ConfigCarga
   /** Ejecuciones movidas a mano en la programación. Ver `ruedaProgramacion`. */
   anclajes?: Anclaje[]
-  /** Para saber si lo que se ve ya fue corregido en terreno o sigue siendo la base. */
   revisadoEnTerreno?: boolean
   updatedAtClient?: number
   updatedBy?: string
@@ -338,6 +347,15 @@ export function baseSemana(perfil: PerfilOperacion): DiaRueda[] {
   return Array.from({ length: 7 }, (_, d) => baseDia(perfil, d))
 }
 
+/** Cuántas máquinas tienen el horario confirmado contra la operación real. */
+export function confirmadas(maquinas: MaquinaRueda[]): MaquinaRueda[] {
+  return maquinas.filter((m) => m.revisadoEnTerreno === true)
+}
+
+export function sinConfirmar(maquinas: MaquinaRueda[]): MaquinaRueda[] {
+  return maquinas.filter((m) => m.revisadoEnTerreno !== true)
+}
+
 export function maquinaNueva(id: string, nombre: string, perfil: PerfilOperacion = 'simple'): MaquinaRueda {
   return { id, nombre, semana: baseSemana(perfil) }
 }
@@ -357,7 +375,6 @@ export function estadoInicial(): RuedaState {
     tareas: tareasIniciales(),
     configCarga: { ...CONFIG_CARGA_POR_DEFECTO },
     anclajes: [],
-    revisadoEnTerreno: false,
   }
 }
 
@@ -385,6 +402,9 @@ export function normalizarEstado(data: unknown): RuedaState | null {
   const raw = data as Partial<RuedaState> | null
   if (!raw || !Array.isArray(raw.maquinas) || raw.maquinas.length === 0) return null
 
+  // Documento viejo con el flag global: si estaba confirmado, lo estaban todas.
+  const revisadoGlobal = raw.revisadoEnTerreno === true
+
   const maquinas: MaquinaRueda[] = raw.maquinas
     .filter((m): m is MaquinaRueda => !!m && typeof m.id === 'string' && typeof m.nombre === 'string')
     .map((m) => ({
@@ -394,6 +414,7 @@ export function normalizarEstado(data: unknown): RuedaState | null {
         Array.isArray(m.semana) && m.semana.length === 7 && m.semana.every(esDiaValido)
           ? m.semana.map((d) => ({ areas: d.areas, mant: d.mant }))
           : baseSemana('simple'),
+      revisadoEnTerreno: m.revisadoEnTerreno === true || revisadoGlobal,
     }))
 
   if (!maquinas.length) return null
@@ -432,7 +453,6 @@ export function normalizarEstado(data: unknown): RuedaState | null {
           ? cfg.reservaCorrectivasPct
           : CONFIG_CARGA_POR_DEFECTO.reservaCorrectivasPct,
     },
-    revisadoEnTerreno: raw.revisadoEnTerreno === true,
     updatedAtClient: raw.updatedAtClient,
     updatedBy: raw.updatedBy,
   }
@@ -452,7 +472,6 @@ export async function guardarRueda(state: RuedaState, uid: string | null): Promi
       tareas: state.tareas ?? [],
       configCarga: state.configCarga ?? CONFIG_CARGA_POR_DEFECTO,
       anclajes: state.anclajes ?? [],
-      revisadoEnTerreno: state.revisadoEnTerreno === true,
       updatedAt: serverTimestamp(),
       updatedAtClient: Date.now(),
       updatedBy: uid ?? 'anon',

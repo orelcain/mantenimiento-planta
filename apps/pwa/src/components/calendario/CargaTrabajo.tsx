@@ -10,7 +10,7 @@ import {
   type ConfigCarga,
   type TareaMantencion,
 } from '@/services/ruedaCarga'
-import type { MaquinaRueda } from '@/services/ruedaVentanas'
+import { sinConfirmar, type MaquinaRueda } from '@/services/ruedaVentanas'
 import { ProgramacionSemana } from './ProgramacionSemana'
 import {
   MOTIVO_TEXTO,
@@ -89,6 +89,7 @@ export function CargaTrabajo({
   }
 
   const activas = tareas.filter((t) => t.activa)
+  const pendientes = sinConfirmar(maquinas)
 
   /*
    * Mover se valida corriendo el mismo motor que dibuja el plan: si la
@@ -169,6 +170,18 @@ export function CargaTrabajo({
           </p>
         )}
       </section>
+
+      {pendientes.length > 0 && (
+        <p className="flex items-start gap-2 px-1 text-footnote text-muted-foreground">
+          <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-cat-4-ink" />
+          <span>
+            Este cálculo se apoya en {pendientes.length}{' '}
+            {pendientes.length === 1 ? 'horario todavía sin confirmar' : 'horarios todavía sin confirmar'}{' '}
+            en terreno ({pendientes.map((m) => m.nombre).join(', ')}). Las ventanas pueden no ser las
+            reales, y con ellas cambia lo que cabe.
+          </span>
+        </p>
+      )}
 
       <ProgramacionSemana
         prog={prog}
