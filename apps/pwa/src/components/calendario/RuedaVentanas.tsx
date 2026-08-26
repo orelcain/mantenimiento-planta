@@ -743,8 +743,10 @@ export function RuedaVentanas() {
           maquinas={state.maquinas}
           tareas={state.tareas ?? tareasIniciales()}
           config={state.configCarga ?? CONFIG_CARGA_POR_DEFECTO}
+          anclajes={state.anclajes ?? []}
           onCambiarTareas={(tareas: TareaMantencion[]) => setState((p) => ({ ...p, tareas }))}
           onCambiarConfig={(configCarga: ConfigCarga) => setState((p) => ({ ...p, configCarga }))}
+          onCambiarAnclajes={(anclajes) => setState((p) => ({ ...p, anclajes }))}
         />
       )}
 

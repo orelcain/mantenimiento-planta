@@ -35,9 +35,25 @@ export interface Asignacion {
   personas: number
   /** En qué condición queda esa ejecución (limpia, colación, en marcha). */
   condicion: Condicion
+  /** La puso una persona a mano, no el algoritmo. */
+  anclada?: boolean
 }
 
-export type MotivoNoCabe = 'sin-hueco' | 'sin-gente' | 'sin-maquina'
+/**
+ * Una ejecución movida a mano. Se guarda aparte de la programación porque la
+ * programación se recalcula entera cada vez que cambia cualquier cosa: si el
+ * movimiento viviera en el resultado, se perdería al tocar la dotación o
+ * cualquier horario.
+ */
+export interface Anclaje {
+  tareaId: string
+  /** 1-based, igual que `Asignacion.ocurrencia`. */
+  ocurrencia: number
+  dia: number
+  inicio: number
+}
+
+export type MotivoNoCabe = 'sin-hueco' | 'sin-gente' | 'sin-maquina' | 'anclaje-invalido'
 
 export interface NoAsignada {
   tareaId: string
@@ -58,6 +74,7 @@ export const MOTIVO_TEXTO: Record<MotivoNoCabe, string> = {
   'sin-hueco': 'No hay ningún hueco contiguo lo bastante largo',
   'sin-gente': 'No queda gente libre cuando la máquina lo está',
   'sin-maquina': 'La máquina de la tarea no existe en el plan',
+  'anclaje-invalido': 'La hora fijada a mano dejó de servir',
 }
 
 /** Condiciones en las que se puede trabajar según si la tarea exige detención. */
@@ -103,6 +120,7 @@ export function programarSemana(
   maquinas: MaquinaRueda[],
   tareas: TareaMantencion[],
   config: ConfigCarga,
+  anclajes: Anclaje[] = [],
 ): Programacion {
   const estado = estadoVacio()
   const asignaciones: Asignacion[] = []
@@ -164,9 +182,45 @@ export function programarSemana(
     }
   }
 
+  const largoDe = (t: TareaMantencion) => Math.max(1, Math.ceil(t.minutos / MINUTOS_POR_SLOT))
+  const maquinaDe = (t: TareaMantencion) => (t.maquinaId ? porId.get(t.maquinaId) ?? null : null)
+
+  /*
+   * Los movimientos a mano se colocan PRIMERO y en bloque: si se resolvieran
+   * junto con el resto, una tarea automática podría ocupar el hueco que una
+   * persona ya había elegido, y el plan cambiaría solo bajo los pies de quien
+   * lo acomodó.
+   */
+  const ancladasOk = new Set<string>()
+  const clave = (tareaId: string, ocurrencia: number) => `${tareaId}#${ocurrencia}`
+
+  for (const a of anclajes) {
+    const t = activas.find((x) => x.id === a.tareaId)
+    if (!t || a.ocurrencia < 1 || a.ocurrencia > t.vecesPorSemana) continue
+    const maquina = maquinaDe(t)
+    if (t.maquinaId && !maquina) continue
+    const largo = largoDe(t)
+    const cond = cabeAqui(t, a.dia, a.inicio, largo, maquina)
+    if (!cond) continue // se resolverá automáticamente y se avisará
+    marcar(t, a.dia, a.inicio, largo, t.maquinaId)
+    asignaciones.push({
+      tareaId: t.id,
+      nombre: t.nombre,
+      ocurrencia: a.ocurrencia,
+      dia: a.dia,
+      inicio: a.inicio,
+      largo,
+      maquinaId: t.maquinaId,
+      personas: t.personas,
+      condicion: cond,
+      anclada: true,
+    })
+    ancladasOk.add(clave(t.id, a.ocurrencia))
+  }
+
   for (const t of activas) {
-    const largo = Math.max(1, Math.ceil(t.minutos / MINUTOS_POR_SLOT))
-    const maquina = t.maquinaId ? porId.get(t.maquinaId) ?? null : null
+    const largo = largoDe(t)
+    const maquina = maquinaDe(t)
 
     if (t.maquinaId && !maquina) {
       for (let k = 0; k < t.vecesPorSemana; k++) {
@@ -176,6 +230,7 @@ export function programarSemana(
     }
 
     for (let k = 0; k < t.vecesPorSemana; k++) {
+      if (ancladasOk.has(clave(t.id, k + 1))) continue // ya la puso una persona
       // Repartir por la semana en vez de apilar todo el lunes: la ocurrencia k
       // empieza a buscar en el día que le tocaría si estuvieran repartidas, y
       // desde ahí recorre en círculo.
@@ -273,6 +328,61 @@ export function veredictoDe(prog: Programacion): Veredicto {
     [...cuenta.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
 
   return { cabe: pedidas > 0 && ubicadas === pedidas, ubicadas, pedidas, motivoPrincipal }
+}
+
+/**
+ * Deja la ejecución en la hora pedida, reemplazando el anclaje anterior si lo
+ * había. No valida: la validación es intentar programar con el anclaje puesto y
+ * mirar si quedó donde se pidió — así la comprobación usa exactamente el mismo
+ * motor que después dibuja el plan, y no puede divergir de él.
+ */
+export function conAnclaje(anclajes: Anclaje[], nuevo: Anclaje): Anclaje[] {
+  const resto = anclajes.filter(
+    (a) => !(a.tareaId === nuevo.tareaId && a.ocurrencia === nuevo.ocurrencia),
+  )
+  return [...resto, nuevo]
+}
+
+export function sinAnclaje(anclajes: Anclaje[], tareaId: string, ocurrencia: number): Anclaje[] {
+  return anclajes.filter((a) => !(a.tareaId === tareaId && a.ocurrencia === ocurrencia))
+}
+
+export interface ResultadoMovimiento {
+  ok: boolean
+  anclajes: Anclaje[]
+  programacion: Programacion
+  /** Por qué no se pudo, cuando `ok` es falso. */
+  motivo: MotivoNoCabe | null
+}
+
+/** Intenta mover una ejecución. Si no cabe ahí, devuelve el plan intacto. */
+export function moverOcurrencia(
+  maquinas: MaquinaRueda[],
+  tareas: TareaMantencion[],
+  config: ConfigCarga,
+  anclajes: Anclaje[],
+  destino: Anclaje,
+): ResultadoMovimiento {
+  const propuesta = conAnclaje(anclajes, destino)
+  const programacion = programarSemana(maquinas, tareas, config, propuesta)
+  const quedo = programacion.asignaciones.find(
+    (a) =>
+      a.tareaId === destino.tareaId &&
+      a.ocurrencia === destino.ocurrencia &&
+      a.dia === destino.dia &&
+      a.inicio === destino.inicio,
+  )
+  if (quedo) return { ok: true, anclajes: propuesta, programacion, motivo: null }
+
+  const fallo = programacion.noAsignadas.find(
+    (n) => n.tareaId === destino.tareaId && n.ocurrencia === destino.ocurrencia,
+  )
+  return {
+    ok: false,
+    anclajes,
+    programacion: programarSemana(maquinas, tareas, config, anclajes),
+    motivo: fallo?.motivo ?? 'sin-hueco',
+  }
 }
 
 /** Asignaciones de un día, para dibujar la fila de ese día. */

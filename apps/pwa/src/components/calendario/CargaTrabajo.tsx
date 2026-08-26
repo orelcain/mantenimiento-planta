@@ -12,7 +12,14 @@ import {
 } from '@/services/ruedaCarga'
 import type { MaquinaRueda } from '@/services/ruedaVentanas'
 import { ProgramacionSemana } from './ProgramacionSemana'
-import { MOTIVO_TEXTO, programarSemana, veredictoDe } from '@/services/ruedaProgramacion'
+import {
+  MOTIVO_TEXTO,
+  moverOcurrencia,
+  programarSemana,
+  sinAnclaje,
+  veredictoDe,
+  type Anclaje,
+} from '@/services/ruedaProgramacion'
 
 /**
  * «¿Alcanza el tiempo?» — capacidad contra carga.
@@ -31,22 +38,29 @@ export interface CargaTrabajoProps {
   maquinas: MaquinaRueda[]
   tareas: TareaMantencion[]
   config: ConfigCarga
+  anclajes: Anclaje[]
   onCambiarTareas: (t: TareaMantencion[]) => void
   onCambiarConfig: (c: ConfigCarga) => void
+  onCambiarAnclajes: (a: Anclaje[]) => void
 }
 
 export function CargaTrabajo({
   maquinas,
   tareas,
   config,
+  anclajes,
   onCambiarTareas,
   onCambiarConfig,
+  onCambiarAnclajes,
 }: CargaTrabajoProps) {
   const [nuevoNombre, setNuevoNombre] = useState('')
   const b = useMemo(() => balance(maquinas, tareas, config), [maquinas, tareas, config])
   // Una sola programación para toda la vista: la calcula el padre y la baja,
   // para que el veredicto y el detalle no puedan contarse historias distintas.
-  const prog = useMemo(() => programarSemana(maquinas, tareas, config), [maquinas, tareas, config])
+  const prog = useMemo(
+    () => programarSemana(maquinas, tareas, config, anclajes),
+    [maquinas, tareas, config, anclajes],
+  )
   const v = useMemo(() => veredictoDe(prog), [prog])
 
   const nombrePorId = useMemo(() => new Map(maquinas.map((m) => [m.id, m.nombre])), [maquinas])
@@ -75,6 +89,17 @@ export function CargaTrabajo({
   }
 
   const activas = tareas.filter((t) => t.activa)
+
+  /*
+   * Mover se valida corriendo el mismo motor que dibuja el plan: si la
+   * ejecución no queda exactamente donde se pidió, el movimiento se descarta
+   * entero. Así nunca se guarda un anclaje que la vista no pueda honrar.
+   */
+  const mover = (destino: Anclaje) => {
+    const r = moverOcurrencia(maquinas, tareas, config, anclajes, destino)
+    if (r.ok) onCambiarAnclajes(r.anclajes)
+    return { ok: r.ok, motivo: r.motivo }
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -145,7 +170,14 @@ export function CargaTrabajo({
         )}
       </section>
 
-      <ProgramacionSemana prog={prog} maquinas={maquinas} />
+      <ProgramacionSemana
+        prog={prog}
+        maquinas={maquinas}
+        anclajes={anclajes}
+        onMover={mover}
+        onSoltarAnclaje={(tareaId, ocurrencia) => onCambiarAnclajes(sinAnclaje(anclajes, tareaId, ocurrencia))}
+        onRestablecer={() => onCambiarAnclajes([])}
+      />
 
       {/* ── Palancas ─────────────────────────────────────────────────────── */}
       <ListGroup title="Con qué contamos" footer="Sube o baja la dotación para ver cuánto cambia lo que cabe.">

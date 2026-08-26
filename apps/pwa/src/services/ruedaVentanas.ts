@@ -26,6 +26,7 @@ import {
   type ConfigCarga,
   type TareaMantencion,
 } from './ruedaCarga'
+import type { Anclaje } from './ruedaProgramacion'
 
 export const SLOTS_POR_DIA = 288
 export const MINUTOS_POR_SLOT = 5
@@ -66,6 +67,8 @@ export interface RuedaState {
   /** Trabajo rutinario y preventivo a encajar en las ventanas. Ver `ruedaCarga`. */
   tareas?: TareaMantencion[]
   configCarga?: ConfigCarga
+  /** Ejecuciones movidas a mano en la programación. Ver `ruedaProgramacion`. */
+  anclajes?: Anclaje[]
   /** Para saber si lo que se ve ya fue corregido en terreno o sigue siendo la base. */
   revisadoEnTerreno?: boolean
   updatedAtClient?: number
@@ -353,6 +356,7 @@ export function estadoInicial(): RuedaState {
     maquinas: MAQUINAS_INICIALES.map(([id, nombre, perfil]) => maquinaNueva(id, nombre, perfil)),
     tareas: tareasIniciales(),
     configCarga: { ...CONFIG_CARGA_POR_DEFECTO },
+    anclajes: [],
     revisadoEnTerreno: false,
   }
 }
@@ -405,10 +409,19 @@ export function normalizarEstado(data: unknown): RuedaState | null {
       )
     : tareasIniciales()
 
+  const anclajes: Anclaje[] = Array.isArray(raw.anclajes)
+    ? raw.anclajes.filter(
+        (a): a is Anclaje =>
+          !!a && typeof a.tareaId === 'string' && typeof a.ocurrencia === 'number' &&
+          typeof a.dia === 'number' && typeof a.inicio === 'number',
+      )
+    : []
+
   const cfg = raw.configCarga
   return {
     maquinas,
     tareas,
+    anclajes,
     configCarga: {
       dotacion:
         typeof cfg?.dotacion === 'number' && cfg.dotacion > 0
@@ -438,6 +451,7 @@ export async function guardarRueda(state: RuedaState, uid: string | null): Promi
       maquinas: state.maquinas,
       tareas: state.tareas ?? [],
       configCarga: state.configCarga ?? CONFIG_CARGA_POR_DEFECTO,
+      anclajes: state.anclajes ?? [],
       revisadoEnTerreno: state.revisadoEnTerreno === true,
       updatedAt: serverTimestamp(),
       updatedAtClient: Date.now(),

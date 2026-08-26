@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest'
-import { programarSemana, asignacionesDe, veredictoDe } from '../ruedaProgramacion'
+import {
+  programarSemana,
+  asignacionesDe,
+  veredictoDe,
+  moverOcurrencia,
+  conAnclaje,
+  sinAnclaje,
+  type Anclaje,
+} from '../ruedaProgramacion'
 import { balance, tareasIniciales } from '../ruedaCarga'
 import { estadoInicial } from '../ruedaVentanas'
 import type { ConfigCarga, TareaMantencion } from '../ruedaCarga'
@@ -264,5 +272,127 @@ describe('veredictoDe · el plan no puede prometer lo que no ubica', () => {
     const v = veredictoDe(programarSemana([maquina('a')], [], cfg()))
     expect(v.cabe).toBe(false)
     expect(v.pedidas).toBe(0)
+  })
+})
+
+describe('anclajes · mover una ejecución a mano', () => {
+  const libre = [maquina('a')]
+  const t1 = tarea({ id: 't1', nombre: 'T', maquinaId: 'a', minutos: 60 })
+
+  it('respeta la hora fijada a mano', () => {
+    const anclaje: Anclaje = { tareaId: 't1', ocurrencia: 1, dia: 3, inicio: slotDeHora(14) }
+    const p = programarSemana(libre, [t1], cfg(), [anclaje])
+    const a = p.asignaciones[0]!
+    expect(a.dia).toBe(3)
+    expect(slotAHora(a.inicio)).toBe('14:00')
+    expect(a.anclada).toBe(true)
+  })
+
+  it('el anclaje gana el hueco frente a las tareas automáticas', () => {
+    // Un solo hueco de 1 h en la semana y dos tareas que lo quieren; la anclada
+    // debe quedarse con él aunque la otra sea "más difícil".
+    const m = [maquina('a', [[0, 24, 'P']])]
+    m[0]!.semana[0]!.areas = pintarRango(m[0]!.semana[0]!.areas, slotDeHora(10), slotDeHora(11), '0')
+    const chica = tarea({ id: 'chica', nombre: 'Chica', maquinaId: 'a', minutos: 60 })
+    const grande = tarea({ id: 'grande', nombre: 'Grande', maquinaId: 'a', minutos: 60, personas: 2 })
+    const p = programarSemana(m, [chica, grande], cfg(4), [
+      { tareaId: 'chica', ocurrencia: 1, dia: 0, inicio: slotDeHora(10) },
+    ])
+    expect(p.asignaciones.map((a) => a.tareaId)).toEqual(['chica'])
+    expect(p.noAsignadas[0]!.tareaId).toBe('grande')
+  })
+
+  it('un anclaje imposible no rompe el plan: cae al automático', () => {
+    // Anclado sobre higiene, donde nunca se programa.
+    const m = [maquina('a', [[0, 4, 'H']])]
+    const p = programarSemana(m, [t1], cfg(), [
+      { tareaId: 't1', ocurrencia: 1, dia: 0, inicio: slotDeHora(1) },
+    ])
+    expect(p.asignaciones).toHaveLength(1)
+    expect(p.asignaciones[0]!.anclada).toBeFalsy()
+  })
+
+  it('ignora anclajes de tareas apagadas o de ocurrencias que ya no existen', () => {
+    const p = programarSemana(libre, [tarea({ id: 't1', maquinaId: 'a', vecesPorSemana: 1 })], cfg(), [
+      { tareaId: 't1', ocurrencia: 9, dia: 0, inicio: 0 },
+      { tareaId: 'fantasma', ocurrencia: 1, dia: 0, inicio: 0 },
+    ])
+    expect(p.asignaciones).toHaveLength(1)
+    expect(p.asignaciones[0]!.anclada).toBeFalsy()
+  })
+})
+
+describe('moverOcurrencia', () => {
+  const libre = [maquina('a')]
+  const t1 = tarea({ id: 't1', nombre: 'T', maquinaId: 'a', minutos: 60 })
+
+  it('mueve cuando el destino sirve', () => {
+    const r = moverOcurrencia(libre, [t1], cfg(), [], {
+      tareaId: 't1', ocurrencia: 1, dia: 2, inicio: slotDeHora(9),
+    })
+    expect(r.ok).toBe(true)
+    expect(r.anclajes).toHaveLength(1)
+    const a = r.programacion.asignaciones[0]!
+    expect(a.dia).toBe(2)
+    expect(slotAHora(a.inicio)).toBe('09:00')
+  })
+
+  it('rechaza el movimiento sobre higiene y deja el plan intacto', () => {
+    const m = [maquina('a', [[0, 4, 'H']])]
+    const antes = programarSemana(m, [t1], cfg(), [])
+    const r = moverOcurrencia(m, [t1], cfg(), [], {
+      tareaId: 't1', ocurrencia: 1, dia: 0, inicio: slotDeHora(2),
+    })
+    expect(r.ok).toBe(false)
+    expect(r.anclajes).toHaveLength(0)
+    expect(r.programacion.asignaciones[0]!.inicio).toBe(antes.asignaciones[0]!.inicio)
+  })
+
+  it('rechaza si el destino se sale del día', () => {
+    const r = moverOcurrencia(libre, [t1], cfg(), [], {
+      tareaId: 't1', ocurrencia: 1, dia: 0, inicio: SLOTS_POR_DIA - 3,
+    })
+    expect(r.ok).toBe(false)
+  })
+
+  it('rechaza si el destino pisa otra tarea de la misma máquina', () => {
+    const otra = tarea({ id: 't2', nombre: 'Otra', maquinaId: 'a', minutos: 60 })
+    const anclajes: Anclaje[] = [{ tareaId: 't2', ocurrencia: 1, dia: 0, inicio: slotDeHora(10) }]
+    const r = moverOcurrencia(libre, [t1, otra], cfg(4), anclajes, {
+      tareaId: 't1', ocurrencia: 1, dia: 0, inicio: slotDeHora(10, 30),
+    })
+    expect(r.ok).toBe(false)
+  })
+
+  it('mover dos veces la misma ejecución deja un solo anclaje', () => {
+    const uno = moverOcurrencia(libre, [t1], cfg(), [], {
+      tareaId: 't1', ocurrencia: 1, dia: 1, inicio: slotDeHora(8),
+    })
+    const dos = moverOcurrencia(libre, [t1], cfg(), uno.anclajes, {
+      tareaId: 't1', ocurrencia: 1, dia: 4, inicio: slotDeHora(15),
+    })
+    expect(dos.ok).toBe(true)
+    expect(dos.anclajes).toHaveLength(1)
+    expect(dos.anclajes[0]!.dia).toBe(4)
+  })
+})
+
+describe('conAnclaje / sinAnclaje', () => {
+  it('reemplaza el anclaje de la misma ejecución en vez de duplicarlo', () => {
+    const a: Anclaje[] = [{ tareaId: 't', ocurrencia: 1, dia: 0, inicio: 0 }]
+    const b = conAnclaje(a, { tareaId: 't', ocurrencia: 1, dia: 3, inicio: 60 })
+    expect(b).toHaveLength(1)
+    expect(b[0]!.dia).toBe(3)
+  })
+
+  it('conserva los anclajes de otras ejecuciones', () => {
+    const a: Anclaje[] = [{ tareaId: 't', ocurrencia: 1, dia: 0, inicio: 0 }]
+    const b = conAnclaje(a, { tareaId: 't', ocurrencia: 2, dia: 3, inicio: 60 })
+    expect(b).toHaveLength(2)
+  })
+
+  it('sinAnclaje devuelve la ejecución al automático', () => {
+    const a: Anclaje[] = [{ tareaId: 't', ocurrencia: 1, dia: 0, inicio: 0 }]
+    expect(sinAnclaje(a, 't', 1)).toHaveLength(0)
   })
 })
