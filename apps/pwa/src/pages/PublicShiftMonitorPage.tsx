@@ -56,6 +56,7 @@ import {
   type Ventana as VentanaPareto,
 } from '@/services/shoplogix/monitorPareto'
 import { parseShiftDocId } from '@/services/shoplogix/shoplogixShift.service'
+import { objetivoDelTurno, type OrigenObjetivo } from '@/services/shoplogix/objetivoDelTurno'
 import { agruparEventos } from '@/services/shoplogix/monitorEventos'
 import { costoDeParadas } from '@/services/shoplogix/monitorPerdidas'
 import { bandaNormal, nombreDeDia, rachaDeRitmos, recordsDeLinea, vsAyer as compararVsAyer, type TurnoResumen } from '@/services/shoplogix/monitorVsAyer'
@@ -1405,9 +1406,13 @@ function CierreDelTurno({ cierre, muestras, fuente, plantSlug, shiftName, startA
 
 function RitmoNecesario({
   pace, cierre, muestras, fuente, plantSlug, shiftName, startAt, historial, horizonte, vsAyer,
-  llenado, onGuardarCuota,
+  llenado, onGuardarCuota, origenObjetivo, turnosObjetivo,
 }: {
   pace: PaceToTarget | null
+  /** De dónde salió la vara cuando no hay cuota: ver `objetivoDelTurno`. */
+  origenObjetivo?: OrigenObjetivo | null
+  /** Cuántos turnos cerrados respaldan esa mediana. */
+  turnosObjetivo?: number | null
   /** Fijar la cuota del turno desde acá. Solo llega con sesión de admin. */
   onGuardarCuota?: (piezas: number | null) => Promise<void>
   historial: { medianCpm: number | null; bestCpm: number | null; muestras: number | null } | null
@@ -1564,7 +1569,15 @@ function RitmoNecesario({
         Para llegar a {pace.targetSource === 'cuota' ? 'la meta' : 'lo esperado'}
         <span className="normal-case tracking-normal text-muted-foreground/70">
           ({fmtInt(pace.targetPieces)} pz
-          {pace.targetSource === 'objetivo-sensor' && ' · objetivo Shoplogix'})
+          {/* De dónde sale la vara. Con el objetivo del sensor se dice sobre
+              cuántos turnos se calculó: es una mediana de turnos cerrados, no
+              el acumulado del turno en curso (que sube mientras el turno pasa
+              — ver `objetivoDelTurno`). Sin historia se avisa que todavía se
+              está completando, para que nadie lo lea como meta firme. */}
+          {pace.targetSource === 'objetivo-sensor' && (
+            origenObjetivo === 'historia'
+              ? ` · Shoplogix, típico de ${turnosObjetivo} turnos`
+              : ' · Shoplogix, aún completándose')})
         </span>
         {onGuardarCuota && (
           <EditorCuota
@@ -2810,6 +2823,18 @@ export function PublicShiftMonitorPage() {
    * Los eventos del turno agrupados por dueño de la pérdida, con el árbol
    * OFICIAL de imputación como juez (ver `monitorEventos`).
    */
+  /*
+   * El objetivo del turno cuando nadie cargo una cuota. NO se usa
+   * `live.expectedPieces` crudo: se completa durante el turno y como meta en
+   * vivo corre hacia arriba (15.821 -> 20.875 en la misma noche). El porque y
+   * la medicion, en `objetivoDelTurno`.
+   */
+  const objetivoSensor = useMemo(
+    () => objetivoDelTurno(live?.expectedPieces, data?.forecastHistory ?? []),
+    [live?.expectedPieces, data?.forecastHistory],
+  )
+  const metaSensor = objetivoSensor?.piezas ?? null
+
   const gruposEventos = useMemo(
     () =>
       agruparEventos({
@@ -3030,7 +3055,7 @@ export function PublicShiftMonitorPage() {
     return computePaceToTarget({
       // La cuota del link primero; si no, la de la config del turno.
       targetPieces: data?.targetPieces ?? live.quotaPieces,
-      expectedPieces: live.expectedPieces,
+      expectedPieces: metaSensor,
       producedPieces: live.totalPieces,
       // `plannedEnd`, no `scheduledEnd`: aquél corre detrás del reloj y dejaría
       // el tiempo restante en ~0 durante todo el turno.
@@ -3055,11 +3080,11 @@ export function PublicShiftMonitorPage() {
         ? ritmoAndando.mejor * 60
         : live.paceBestCpm != null
         ? live.paceBestCpm * 60
-        : lineMaxPerHour(live.expectedPieces, live.scheduledStart, live.plannedEnd),
+        : lineMaxPerHour(metaSensor, live.scheduledStart, live.plannedEnd),
       shiftClosed: live.shiftClosed,
       pendingBreakMin: Number.isNaN(t0) ? 0 : breakMinutesBetween(breaksTurno, desdeMin, hastaMin),
     })
-  }, [live, data?.targetPieces, now, breaksTurno, ritmoAndando, serieDelTurno])
+  }, [live, data?.targetPieces, now, breaksTurno, ritmoAndando, serieDelTurno, metaSensor])
 
   /*
    * Comparador con los turnos anteriores, a la misma altura de turno.
@@ -3079,7 +3104,7 @@ export function PublicShiftMonitorPage() {
      * la pantalla ya mide arriba: si no, en Yal el comparador se quedaba sin
      * referencia y no había con qué contrastar el avance.
      */
-    const meta = data?.targetPieces ?? live?.quotaPieces ?? live?.expectedPieces ?? null
+    const meta = data?.targetPieces ?? live?.quotaPieces ?? metaSensor
     const tb = live?.timeBreakdown
 
     // Las mismas del ritmo necesario y del fondo de los gráficos: `breaksTurno`.
@@ -3169,7 +3194,7 @@ export function PublicShiftMonitorPage() {
     })
     // El turno VISTO entra en las dependencias: al navegar a otro turno la
     // comparación tiene que rearmarse contra los días previos a ESE.
-  }, [live, inicioReal, vista?.dateKey, vista?.shiftId, data?.history, data?.targetPieces, breaksTurno])
+  }, [live, inicioReal, vista?.dateKey, vista?.shiftId, data?.history, data?.targetPieces, breaksTurno, metaSensor])
 
   /*
    * Pronóstico del cierre. Se alimenta del `history` que YA viaja en el doc:
@@ -3181,7 +3206,7 @@ export function PublicShiftMonitorPage() {
    * ese filtro no queda muestra suficiente, el bloque no aparece.
    */
   const pronostico = useMemo(() => {
-    const metaFc = data?.targetPieces ?? live?.quotaPieces ?? live?.expectedPieces ?? null
+    const metaFc = data?.targetPieces ?? live?.quotaPieces ?? metaSensor
     /*
      * `forecastHistory` trae hasta 10 turnos del MISMO nombre; el filtro sobre
      * `history` queda de respaldo para los docs anteriores a ese campo (y para
@@ -3213,7 +3238,7 @@ export function PublicShiftMonitorPage() {
         porDelanteMin: pace?.pendingBreakMin ?? 0,
       },
     })
-  }, [live, data?.history, data?.forecastHistory, data?.targetPieces, comparacion.currentMinute, vista?.shiftId, pace?.pendingBreakMin])
+  }, [live, data?.history, data?.forecastHistory, data?.targetPieces, comparacion.currentMinute, vista?.shiftId, pace?.pendingBreakMin, metaSensor])
 
   /**
    * Hasta cuándo mide el pronóstico, y cuánto sería si el turno cortara en su
@@ -3699,6 +3724,8 @@ export function PublicShiftMonitorPage() {
               espera del turno — que es la mayoría de los links repartidos. */}
           {!live.shiftClosed && <RitmoNecesario
             pace={pace}
+            origenObjetivo={objetivoSensor?.origen ?? null}
+            turnosObjetivo={objetivoSensor?.turnos ?? null}
             /* La cuota se edita desde el monitor porque cambia turno a turno.
                Solo con sesión de admin y en el turno en curso: quien abre el
                link sigue viendo una pantalla de solo lectura. */
@@ -3998,7 +4025,7 @@ export function PublicShiftMonitorPage() {
                  comparador, aplanada en colacion) - contra la meta completa,
                  el "ritmo" absorberia lo que aun no se juega. */
               cerrado={live.shiftClosed}
-              meta={data.targetPieces ?? live.quotaPieces ?? live.expectedPieces ?? null}
+              meta={data.targetPieces ?? live.quotaPieces ?? metaSensor}
               hechas={live.totalPieces}
               piezasPulso={data.pulse?.totalCycles ?? null}
               corteHora={horaPlanta(live.lastSyncAt ? Date.parse(live.lastSyncAt) - new Date().getTimezoneOffset() * 60_000 : null)}
@@ -4041,7 +4068,7 @@ export function PublicShiftMonitorPage() {
                 desenlace, después el detalle de cómo se está llegando. */}
             <PronosticoCierre
               f={pronostico}
-              meta={data.targetPieces ?? live.quotaPieces ?? live.expectedPieces ?? null}
+              meta={data.targetPieces ?? live.quotaPieces ?? metaSensor}
               horizonte={horizontePronostico}
             />
             {/* El comparador SUBE hasta acá, pegado al pronóstico: los dos
@@ -4110,7 +4137,7 @@ export function PublicShiftMonitorPage() {
                  comparador, aplanada en colacion) - contra la meta completa,
                  el "ritmo" absorberia lo que aun no se juega. */
               cerrado={live.shiftClosed}
-              meta={data.targetPieces ?? live.quotaPieces ?? live.expectedPieces ?? null}
+              meta={data.targetPieces ?? live.quotaPieces ?? metaSensor}
               hechas={live.totalPieces}
               piezasPulso={data.pulse?.totalCycles ?? null}
               corteHora={horaPlanta(live.lastSyncAt ? Date.parse(live.lastSyncAt) - new Date().getTimezoneOffset() * 60_000 : null)}

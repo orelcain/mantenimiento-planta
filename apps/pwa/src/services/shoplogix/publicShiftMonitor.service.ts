@@ -56,6 +56,13 @@ export interface ForecastHistoryShift {
   producingMin: number
   micro: number | null
   /**
+   * Lo que Shoplogix esperaba de este turno YA CERRADO (suma de
+   * `expectedTotalCycles`). Es la meta firme cuando nadie cargó cuota: en el
+   * turno EN CURSO el mismo campo se completa sobre la marcha. Ver
+   * `objetivoDelTurno`. Ausente en entradas cacheadas de antes.
+   */
+  expected?: number | null
+  /**
    * Desglose del tiempo del turno, para explicar por qué hoy cerró distinto
    * («Qué cambió contra ayer») y para los récords por componente.
    * Ausentes en entradas cacheadas antes de publicarse — el backend las

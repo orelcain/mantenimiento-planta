@@ -11,7 +11,7 @@ import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import type { PublicMonitorLive } from '@/services/shoplogix/publicShiftMonitor.service'
 import type { CostoDeParadas } from '@/services/shoplogix/monitorPerdidas'
-import { DUENO_META, type CausaDelTurno, type GrupoDelTurno } from '@/services/shoplogix/monitorEventos'
+import { DUENO_META, veredictoFallaDeMaquina, type CausaDelTurno, type GrupoDelTurno } from '@/services/shoplogix/monitorEventos'
 import { DUENO_UI } from './duenoUi'
 import { resumenComparacion, type CompareResult } from '@/services/shoplogix/monitorCompare'
 import { MAX_MAPE_PCT, type ConePoint, type ForecastResult } from '@/services/shoplogix/monitorForecast'
@@ -309,13 +309,11 @@ export function TiempoDelTurno({
   const gruposImputables = gruposVisibles.filter((g) => g.dueno !== 'programado')
   const grupoProgramado = gruposVisibles.find((g) => g.dueno === 'programado') ?? null
   /*
-   * "Ninguna falla de máquina" solo se puede afirmar si hubo paradas que
-   * clasificar y ninguna cayó en Mantención. Con el turno entero sin paradas
-   * la frase sería cierta pero vacía, y con el grupo presente sería falsa.
+   * "Ninguna falla de máquina" solo se puede afirmar sobre las paradas que
+   * TIENEN causa anotada — `sin-imputar` no es evidencia de nada. La regla y
+   * el porqué viven en `veredictoFallaDeMaquina`.
    */
-  const sinFallaDeMaquina =
-    gruposVisibles.some((g) => g.dueno !== 'programado') &&
-    !gruposVisibles.some((g) => g.dueno === 'mantencion')
+  const veredicto = veredictoFallaDeMaquina(gruposVisibles)
   const ultimoImputable = [...gruposVisibles].reverse().find((g) => g.dueno !== 'programado')?.dueno
 
   return (
@@ -474,9 +472,9 @@ export function TiempoDelTurno({
                               proximaParada={null}
                               plannedMin={tb.plannedMin}
                             />
-                            {sinFallaDeMaquina && g.dueno === ultimoImputable && (
+                            {veredicto && g.dueno === ultimoImputable && (
                               <p className="mt-2 text-[11px] font-semibold text-ink-ok">
-                                ✓ Ninguna parada por falla de máquina en este turno.
+                                {veredicto.texto}
                               </p>
                             )}
                           </div>
@@ -682,9 +680,9 @@ export function TiempoDelTurno({
                   último grupo que se le puede imputar a alguien, no al final:
                   después del convenio queda a tres dedos de distancia de los
                   minutos que explica y se lee como un pie de página. */}
-              {sinFallaDeMaquina && g.dueno === ultimoImputable && (
+              {veredicto && g.dueno === ultimoImputable && (
                 <p className="mt-2 text-[11px] font-semibold text-ink-ok">
-                  ✓ Ninguna parada por falla de máquina en este turno.
+                  {veredicto.texto}
                 </p>
               )}
             </div>

@@ -241,3 +241,54 @@ export function agruparEventos(args: {
 export function minutosDeMantencion(grupos: GrupoDelTurno[]): number {
   return grupos.find((g) => g.dueno === 'mantencion')?.min ?? 0
 }
+
+/**
+ * ¿Se puede afirmar que ninguna parada fue por falla de máquina?
+ *
+ * POR QUÉ EXISTE
+ * --------------
+ * El monitor lo afirmaba con un ✓ verde cada vez que no había grupo
+ * `mantencion` — y `sin-imputar` contaba como "grupo que clasificar". O sea:
+ * con el turno ENTERO sin imputar, la pantalla decía
+ *
+ *     ✓ Ninguna parada por falla de máquina en este turno.
+ *
+ * justo debajo de «SIN IMPUTAR · nadie anotó la causa · 2 h 40 min». Visto en
+ * el monitor de Eviscerado el 26-08 a las 04:00. En Chonchi la imputación viene
+ * en 0% la mayor parte del tiempo, así que el ✓ salía casi siempre sin
+ * evidencia detrás.
+ *
+ * Convertir "no sé" en "no fue Mantención" es justo lo que este archivo
+ * prohíbe más arriba, y en el sentido que le conviene a Mantención: el día que
+ * Producción note que el ✓ sale igual sin imputar nada, se cae la credibilidad
+ * del resto de la pantalla.
+ *
+ * La regla: se afirma solo sobre lo que TIENE causa anotada. Sin nada imputado
+ * no se dice nada; con parte sin imputar, la frase lo dice y no habla "del
+ * turno".
+ */
+export function veredictoFallaDeMaquina(
+  grupos: GrupoDelTurno[],
+): { texto: string; sinImputarMin: number } | null {
+  const imputados = grupos.filter((g) => g.dueno === 'mantencion' || g.dueno === 'externo')
+  // Sin nada imputado no hay nada que afirmar; con Mantención adentro, tampoco.
+  if (imputados.length === 0) return null
+  if (imputados.some((g) => g.dueno === 'mantencion')) return null
+
+  const sinImputarMin = grupos.find((g) => g.dueno === 'sin-imputar')?.min ?? 0
+  if (sinImputarMin <= 0) {
+    return { texto: '✓ Ninguna parada por falla de máquina en este turno.', sinImputarMin: 0 }
+  }
+  return {
+    texto: `✓ Ninguna parada con causa anotada fue falla de máquina · quedan ${fmtDur(sinImputarMin)} sin imputar.`,
+    sinImputarMin,
+  }
+}
+
+/** "111" → "1 h 51 min". Mismo formato que usa el bloque de tiempo. */
+function fmtDur(min: number): string {
+  const h = Math.floor(min / 60)
+  const m = Math.round(min % 60)
+  if (h === 0) return `${m} min`
+  return m > 0 ? `${h} h ${m} min` : `${h} h`
+}
