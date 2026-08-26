@@ -32,7 +32,8 @@ export interface RuedaPublicTokenDoc {
   token: string
   titulo: string
   maquinas: MaquinaRueda[]
-  revisadoEnTerreno: boolean
+  /** @deprecated El estado de revisión vive en cada máquina desde 2026-08-26. */
+  revisadoEnTerreno?: boolean
   createdBy: string
   createdAt: string
   expiresAt: string
@@ -45,7 +46,8 @@ export function fechaExpiracion(dias = DIAS_VIGENCIA): Date {
 export async function crearTokenPublico(data: {
   titulo: string
   maquinas: MaquinaRueda[]
-  revisadoEnTerreno: boolean
+  /** @deprecated El estado de revisión vive en cada máquina desde 2026-08-26. */
+  revisadoEnTerreno?: boolean
   createdBy: string
   /** Reutiliza un token existente para refrescar su snapshot en vez de crear otro. */
   token?: string
@@ -56,7 +58,6 @@ export async function crearTokenPublico(data: {
     token,
     titulo: data.titulo,
     maquinas: data.maquinas,
-    revisadoEnTerreno: data.revisadoEnTerreno,
     createdBy: data.createdBy,
     createdAt: ahora.toISOString(),
     expiresAt: fechaExpiracion().toISOString(),

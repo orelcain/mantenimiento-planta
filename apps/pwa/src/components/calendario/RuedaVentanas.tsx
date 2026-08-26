@@ -26,6 +26,7 @@ import {
   diaVacio,
   estadoInicial,
   guardarRueda,
+  sinConfirmar,
   pintarSlot,
   slotAHora,
   slotsAHorasDecimal,
@@ -300,6 +301,15 @@ export function RuedaVentanas() {
     }
   }, [pintarEn])
 
+  const marcarRevisada = useCallback((maquinaId: string, valor: boolean) => {
+    setState((prev) => ({
+      ...prev,
+      maquinas: prev.maquinas.map((m) =>
+        m.id === maquinaId ? { ...m, revisadoEnTerreno: valor } : m,
+      ),
+    }))
+  }, [])
+
   const deshacer = useCallback(() => {
     const ultimo = historialRef.current.pop()
     setPuedeDeshacer(historialRef.current.length > 0)
@@ -378,6 +388,19 @@ export function RuedaVentanas() {
         ))}
       </div>
 
+      {sinConfirmar(state.maquinas).length > 0 && (
+        <p className="flex flex-wrap items-center gap-x-1.5 px-1 text-footnote text-muted-foreground">
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-cat-4-ink" />
+          <span>
+            {state.maquinas.length - sinConfirmar(state.maquinas).length} de {state.maquinas.length}{' '}
+            máquinas con el horario confirmado en terreno.
+          </span>
+          <span className="text-caption">
+            Sin confirmar: {sinConfirmar(state.maquinas).map((m) => m.nombre).join(', ')}
+          </span>
+        </p>
+      )}
+
       {/* ── Selectores ─────────────────────────────────────────────────────── */}
       <div className={cn('flex flex-wrap items-end gap-4', modo === 'carga' && 'hidden')}>
         <div className="flex flex-col gap-1.5">
@@ -436,7 +459,7 @@ export function RuedaVentanas() {
 
         <div className="ml-auto flex items-center gap-3 pb-1">
           <EstadoGuardado estado={sync} detalle={errorTexto} />
-          <CompartirRueda maquinas={state.maquinas} revisadoEnTerreno={state.revisadoEnTerreno === true} />
+          <CompartirRueda maquinas={state.maquinas} />
         </div>
       </div>
 
@@ -842,22 +865,37 @@ export function RuedaVentanas() {
         </ListGroup>
       )}
 
-      {modo !== 'carga' && !state.revisadoEnTerreno && (
+      {modo === 'editar' && maquina.revisadoEnTerreno !== true && (
         <div className="flex gap-3 rounded-card border border-border bg-card p-4">
           <AlertTriangle className="h-5 w-5 shrink-0 text-cat-4-ink" />
           <div className="flex flex-col gap-1">
-            <p className="text-headline text-foreground">Los horarios son una base de ejemplo</p>
+            <p className="text-headline text-foreground">
+              El horario de {maquina.nombre} es una base de ejemplo
+            </p>
             <p className="text-footnote text-muted-foreground">
-              Proceso, colación e higiene vienen de un patrón razonable para poder empezar a trabajar, no del horario
-              real de la planta. Corrígelos máquina por máquina antes de usar estas horas como evidencia.
+              Proceso, colación e higiene vienen de un patrón razonable para poder empezar, no de la
+              operación real. Confírmalo en terreno antes de usar estas horas como evidencia.
             </p>
             <button
-              onClick={() => setState((p) => ({ ...p, revisadoEnTerreno: true }))}
+              onClick={() => marcarRevisada(maquina.id, true)}
               className="mt-1 self-start text-footnote font-semibold text-primary"
             >
-              Ya los revisé en terreno
+              Confirmé el horario de {maquina.nombre}
             </button>
           </div>
+        </div>
+      )}
+
+      {modo === 'editar' && maquina.revisadoEnTerreno === true && (
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1 text-footnote text-muted-foreground">
+          <Check className="h-3.5 w-3.5 shrink-0 text-cat-2-ink" />
+          <span>Horario de {maquina.nombre} confirmado en terreno.</span>
+          <button
+            onClick={() => marcarRevisada(maquina.id, false)}
+            className="font-medium text-primary"
+          >
+            Marcar como sin confirmar
+          </button>
         </div>
       )}
     </div>

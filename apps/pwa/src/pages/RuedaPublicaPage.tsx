@@ -13,6 +13,7 @@ import {
 import {
   DIAS_CORTOS,
   contarSemana,
+  sinConfirmar,
   slotsAHorasDecimal,
 } from '@/services/ruedaVentanas'
 
@@ -105,6 +106,7 @@ export function RuedaPublicaPage() {
   }
 
   const creado = new Date(data.createdAt)
+  const pendientes = sinConfirmar(data.maquinas)
 
   return (
     <div className="min-h-screen bg-background">
@@ -124,11 +126,19 @@ export function RuedaPublicaPage() {
           </p>
         </header>
 
-        {!data.revisadoEnTerreno && (
+        {/* Se nombran las máquinas pendientes en vez de descalificar el plan entero:
+            lo ya confirmado sirve como evidencia aunque el resto siga en borrador. */}
+        {pendientes.length > 0 && (
           <p className="rounded-card border-l-[3px] border-l-cat-4-ink bg-card p-4 text-footnote text-muted-foreground">
-            <span className="font-semibold text-foreground">Horarios sin confirmar en terreno.</span>{' '}
-            Este plan todavía usa una base de referencia; las horas pueden no coincidir con la
-            operación real.
+            <span className="font-semibold text-foreground">
+              {pendientes.length === data.maquinas.length
+                ? 'Ningún horario está confirmado en terreno todavía.'
+                : `${pendientes.length} de ${data.maquinas.length} horarios sin confirmar en terreno:`}
+            </span>{' '}
+            {pendientes.length < data.maquinas.length && (
+              <span className="text-foreground">{pendientes.map((m) => m.nombre).join(', ')}. </span>
+            )}
+            Esas horas vienen de una base de referencia y pueden no coincidir con la operación real.
           </p>
         )}
 

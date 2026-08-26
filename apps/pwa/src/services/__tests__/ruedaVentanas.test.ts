@@ -10,6 +10,8 @@ import {
   estadoInicial,
   maquinaNueva,
   normalizarEstado,
+  confirmadas,
+  sinConfirmar,
   pintarRango,
   pintarSlot,
   slotAHora,
@@ -249,9 +251,32 @@ describe('normalizarEstado', () => {
     expect(state?.maquinas[0]!.semana[0]!.areas).toHaveLength(SLOTS_POR_DIA)
   })
 
-  it('revisadoEnTerreno solo es verdadero si viene explícito', () => {
-    const base = maquinaNueva('a', 'A')
-    expect(normalizarEstado({ maquinas: [base] })?.revisadoEnTerreno).toBe(false)
-    expect(normalizarEstado({ maquinas: [base], revisadoEnTerreno: true })?.revisadoEnTerreno).toBe(true)
+  it('una máquina nueva arranca sin confirmar', () => {
+    const state = normalizarEstado({ maquinas: [maquinaNueva('a', 'A')] })
+    expect(state?.maquinas[0]!.revisadoEnTerreno).toBe(false)
+  })
+
+  it('migra el flag global viejo: si el plan estaba confirmado, lo estaban todas', () => {
+    // Documentos guardados antes del 26-08 llevaban un único `revisadoEnTerreno`
+    // para todo el plan. Perderlo obligaría a reconfirmar máquina por máquina.
+    const state = normalizarEstado({
+      maquinas: [maquinaNueva('a', 'A'), maquinaNueva('b', 'B')],
+      revisadoEnTerreno: true,
+    })
+    expect(confirmadas(state!.maquinas)).toHaveLength(2)
+  })
+
+  it('sin flag global, cada máquina conserva el suyo', () => {
+    const a = { ...maquinaNueva('a', 'A'), revisadoEnTerreno: true }
+    const b = maquinaNueva('b', 'B')
+    const state = normalizarEstado({ maquinas: [a, b] })
+    expect(confirmadas(state!.maquinas).map((m) => m.id)).toEqual(['a'])
+    expect(sinConfirmar(state!.maquinas).map((m) => m.id)).toEqual(['b'])
+  })
+
+  it('el flag global no puede DESconfirmar una máquina ya confirmada', () => {
+    const a = { ...maquinaNueva('a', 'A'), revisadoEnTerreno: true }
+    const state = normalizarEstado({ maquinas: [a], revisadoEnTerreno: false })
+    expect(state?.maquinas[0]!.revisadoEnTerreno).toBe(true)
   })
 })

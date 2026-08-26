@@ -18,10 +18,9 @@ import type { MaquinaRueda } from '@/services/ruedaVentanas'
  */
 export interface CompartirRuedaProps {
   maquinas: MaquinaRueda[]
-  revisadoEnTerreno: boolean
 }
 
-export function CompartirRueda({ maquinas, revisadoEnTerreno }: CompartirRuedaProps) {
+export function CompartirRueda({ maquinas }: CompartirRuedaProps) {
   const [abierto, setAbierto] = useState(false)
   const [doc, setDoc] = useState<RuedaPublicTokenDoc | null>(null)
   const [generando, setGenerando] = useState(false)
@@ -38,7 +37,6 @@ export function CompartirRueda({ maquinas, revisadoEnTerreno }: CompartirRuedaPr
         const creado = await crearTokenPublico({
           titulo: 'Ventanas de intervención',
           maquinas,
-          revisadoEnTerreno,
           createdBy: getCurrentUser()?.uid ?? 'anon',
           token: tokenExistente,
         })
@@ -50,7 +48,7 @@ export function CompartirRueda({ maquinas, revisadoEnTerreno }: CompartirRuedaPr
         setGenerando(false)
       }
     },
-    [maquinas, revisadoEnTerreno],
+    [maquinas],
   )
 
   const abrir = useCallback(() => {
