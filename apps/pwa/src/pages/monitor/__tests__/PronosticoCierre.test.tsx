@@ -17,7 +17,7 @@ afterEach(cleanup)
 /** Caso real: Filete a las 5 h del 13-ago (el turno cerró en 4.294). */
 const FILETE: ForecastResult = {
   estimate: 4257, low: 3973, high: 4650, mapePct: 4, method: 'proporcional',
-  samples: 9, hitsTarget: 0, current: 2945, horizonMin: 470,
+  samples: 9, hitsTarget: 0, current: 2945, horizonMin: 470, fraccionTipica: 0.69, explicacion: 'a esta altura llevaban el 69% de su total',
   cone: [
     { minutes: 300, low: 2945, mid: 2945, high: 2945 },
     { minutes: 470, low: 3973, mid: 4257, high: 4650 },
