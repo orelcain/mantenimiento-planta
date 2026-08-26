@@ -159,6 +159,31 @@ function statusOf(state) {
   return state.type === 'uptime' ? 'produciendo' : 'detenida'
 }
 
+/*
+ * El margen NO es cosmético: en Filete el `scheduledEnd` se deriva del ÚLTIMO
+ * intervalo sincronizado, o sea que va corriendo detrás del reloj y siempre
+ * queda unos minutos en el pasado. Sin margen, un turno en plena producción se
+ * anunciaba como "cerrado" (10-ago: fin derivado 14:36, línea produciendo 14:40).
+ */
+const CLOSE_MARGIN_MS = 30 * 60 * 1000
+
+/**
+ * ¿El turno se puede sellar como cerrado?
+ *
+ * Pasado el horario (+margen), se sella si ninguna máquina produce O si el
+ * último dato de producción es más viejo que el margen. La segunda pata evita
+ * el turno zombie: el state vigente no se reescribe cuando Shoplogix deja de
+ * mandar datos, así que un turno cuyo final fue uptime quedaba "produciendo"
+ * para siempre — el 26-08 en Chonchi la pantalla seguía pronosticando hora
+ * extra 2 h 30 min después del último pescado.
+ */
+function esTurnoSellado({ nowWallMs, scheduledEndMs, hayProduciendo, ultimaProdMs, margenMs = CLOSE_MARGIN_MS }) {
+  if (scheduledEndMs == null) return false
+  if (nowWallMs <= scheduledEndMs + margenMs) return false
+  if (!hayProduciendo) return true
+  return ultimaProdMs == null || nowWallMs - ultimaProdMs > margenMs
+}
+
 /** dateKey (wall-clock de planta) desplazado `n` días. */
 function shiftDateKey(nowWall, n) {
   const d = new Date(nowWall.getTime() + n * 86_400_000)
@@ -465,7 +490,36 @@ async function loadOutsideShiftProduction(db, plantSlug, shiftDocId, ventanaTurn
       const tramos = cadenas
         .filter(c => esColaDeEsteTurno(c, ventanaTurno, otrasVentanas))
         .flatMap(c => c.tramos)
-      if (tramos.length === 0) return
+
+      /*
+       * El state VIGENTE del día se publica APARTE de los rescatados, incluso
+       * cuando no hay cola que rescatar (el dedupe por `yaContados` puede dejar
+       * `tramos` vacío porque el doc del turno ya trae esos mismos minutos).
+       * Cuando el turno termina, Shoplogix escribe la detención del cierre solo
+       * en este bucket: sin esto la máquina quedaba congelada en su último
+       * uptime — "produciendo" horas después del último pescado (26-08 Chonchi).
+       * No entra a `states` (esos suman al % produciendo); solo dice el AHORA.
+       */
+      const vigente = [...(m.states || [])]
+        .filter(st => {
+          const s = toDate(st.startAt)
+          return s && !otrasVentanas.some(v => distanciaA(s.getTime(), v) === 0)
+        })
+        .sort((a, b) => (toDate(a.startAt)?.getTime() ?? 0) - (toDate(b.startAt)?.getTime() ?? 0))
+        .pop() ?? null
+      const conVigente = (prev) => {
+        if (vigente) {
+          const nuevoMs = toDate(vigente.startAt)?.getTime() ?? 0
+          const prevMs = prev.stateVigente ? (toDate(prev.stateVigente.startAt)?.getTime() ?? 0) : -1
+          if (nuevoMs > prevMs) prev.stateVigente = vigente
+        }
+        return prev
+      }
+
+      if (tramos.length === 0) {
+        extras.set(doc.id, conVigente(extras.get(doc.id) || { intervals: [], states: [], pieces: 0, stateVigente: null }))
+        return
+      }
 
       const intervals = tramos.flatMap(t => t.intervals)
 
@@ -483,7 +537,7 @@ async function loadOutsideShiftProduction(db, plantSlug, shiftDocId, ventanaTurn
         return tramos.some(t => e.getTime() > t.start && s.getTime() < t.end)
       })
 
-      const prev = extras.get(doc.id) || { intervals: [], states: [], pieces: 0 }
+      const prev = conVigente(extras.get(doc.id) || { intervals: [], states: [], pieces: 0, stateVigente: null })
       prev.intervals.push(...intervals)
       prev.states.push(...states)
       prev.pieces += intervals.reduce((a, iv) => a + (iv.cycles || 0), 0)
@@ -1229,14 +1283,26 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
 
   // ── Por máquina ──────────────────────────────────────────────────────────
   const machinesOut = machines.map(m => {
-    const st = currentStateOf(m.states)
-    const pieces = m.totalCycles || 0
-    const mHours = windowHours > 0 ? windowHours : 0
     // Mismo criterio que el % de línea (uptime sobre tiempo rastreado), para que
     // los dos números se puedan comparar. `shiftRuntime` no sirve acá: es del
     // turno y no conoce la cola de después del cierre.
     const b = m.shiftRuntimeBreakdown || {}
     const extraStates = extras.get(m.id)?.states || []
+    // El estado ACTUAL: el del turno, salvo que el bucket `Unscheduled` tenga
+    // uno más nuevo (`stateVigente`) y el turno no traiga un `isCurrent` real.
+    // Al cerrar el turno, la detención del cierre vive solo en ese bucket, y
+    // mirando únicamente los states del turno la máquina quedaba congelada en
+    // su último uptime — "produciendo" horas después del último pescado.
+    let st = currentStateOf(m.states)
+    const vigente = extras.get(m.id)?.stateVigente
+    if (
+      vigente && st?.isCurrent !== true &&
+      (!st || (toDate(vigente.startAt)?.getTime() ?? 0) > (toDate(st.startAt)?.getTime() ?? 0))
+    ) {
+      st = vigente
+    }
+    const pieces = m.totalCycles || 0
+    const mHours = windowHours > 0 ? windowHours : 0
     const secDe = (tipo) => (
       (tipo === 'uptime' ? b.uptimeSec : tipo === 'downtime' ? b.downtimeSec : b.breakSec) || 0
     ) + extraStates.filter(s => s.type === tipo).reduce((a, s) => a + (s.durationSec || 0), 0)
@@ -1264,21 +1330,26 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
   // ¿Turno cerrado? Se compara wall-clock contra wall-clock (ver nota de
   // convención arriba). El proceso de Cloud Functions corre en UTC, así que el
   // "ahora" de planta se deriva con el mismo helper que usa el sync —
-  // `new Date()` a secas iría 3-4 h adelantado.
-  //
-  // El margen de 30 min NO es cosmético: en Filete el `scheduledEnd` se deriva
-  // del ÚLTIMO intervalo sincronizado, o sea que va corriendo detrás del reloj
-  // y siempre queda unos minutos en el pasado. Sin margen, un turno en plena
-  // producción se anunciaba como "cerrado" (verificado con el turno del
-  // 10-ago: fin derivado 14:36 con la línea produciendo a las 14:40). Además
-  // se exige que ninguna máquina esté corriendo: mientras haya producción, el
-  // turno no está cerrado, diga lo que diga el horario.
+  // `new Date()` a secas iría 3-4 h adelantado. La decisión vive en
+  // `esTurnoSellado` (ver su nota: margen de Filete + turno zombie).
   const nowWall = shoplogixPolling.toChileWall(new Date())
-  const CLOSE_MARGIN_MS = 30 * 60 * 1000
   const stopped = machinesOut.filter(m => m.status === 'detenida')
-  const shiftClosed = scheduledEnd
-    ? nowWall.getTime() > scheduledEnd.getTime() + CLOSE_MARGIN_MS && producing.length === 0
-    : false
+  // Último dato de PRODUCCIÓN conocido (turno + cola rescatada), wall-clock.
+  let ultimaProdMs = hasProduction ? lastMs : null
+  for (const ex of extras.values()) {
+    for (const iv of ex.intervals || []) {
+      if ((iv.cycles || 0) <= 0) continue
+      const e = toDate(iv.endAt)
+      if (e && (ultimaProdMs == null || e.getTime() > ultimaProdMs)) ultimaProdMs = e.getTime()
+    }
+  }
+  const shiftClosed = esTurnoSellado({
+    nowWallMs: nowWall.getTime(),
+    scheduledEndMs: scheduledEnd ? scheduledEnd.getTime() : null,
+    hayProduciendo: producing.length > 0,
+    ultimaProdMs,
+    margenMs: CLOSE_MARGIN_MS,
+  })
 
   /*
    * Cierre del turno, en tres niveles y en este orden:
@@ -1977,6 +2048,8 @@ async function sumarColaAMaquinas(db, plantSlug, shiftDocId, parent, machines) {
 
 module.exports = {
   COLLECTION,
+  esTurnoSellado,
+  CLOSE_MARGIN_MS,
   buildMonitorLive,
   buildMonitorHistory,
   buildForecastHistory,

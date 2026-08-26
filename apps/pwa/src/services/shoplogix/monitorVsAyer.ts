@@ -176,7 +176,12 @@ export function recordsDeLinea(hoy: TurnoResumen, previos: TurnoResumen[]): Reco
   if (base.length < 3) return null
 
   const ritmoDe = (t: TurnoResumen) => t.total / t.producingMin
-  const pctDe = (t: TurnoResumen) => (t.producingMin / t.windowMin!) * 100
+  /* Sobre el tiempo DISPONIBLE (ventana − planificado), la MISMA base que el
+     KPI «Tiempo produciendo» de la página: con denominadores distintos la
+     tarjeta decía 95% y este bloque 83% para el mismo turno. En resúmenes
+     viejos sin `plannedMin` cae a la ventana completa, que es lo que había. */
+  const pctDe = (t: TurnoResumen) =>
+    (t.producingMin / Math.max(1, t.windowMin! - (t.plannedMin ?? 0))) * 100
 
   const mejorRitmo = [...base].sort((a, b) => ritmoDe(b) - ritmoDe(a))[0]!
   const mejorParadas = [...base].sort((a, b) => a.recoverableMin! - b.recoverableMin!)[0]!
