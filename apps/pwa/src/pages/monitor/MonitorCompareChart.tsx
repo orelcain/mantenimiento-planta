@@ -279,7 +279,7 @@ export function MonitorCompareChart({ cmp, cerrado, claveSel, onSel, cone, venta
       {/* Qué mide el eje. El gráfico dibuja ACUMULADO y a más de uno le pasó
           leerlo como piezas por hora: sin la unidad, dos curvas que suben no
           dicen de qué. */}
-      <div className="mb-0.5 text-[11px] uppercase tracking-wide text-muted-foreground/70">
+      <div className="mb-0.5 text-[11px] uppercase tracking-wide text-muted-foreground/80">
         piezas acumuladas
       </div>
 
@@ -441,7 +441,7 @@ export function MonitorCompareChart({ cmp, cerrado, claveSel, onSel, cone, venta
               ver todo · {zoom.toFixed(1).replace('.', ',')}×
             </button>
           ) : (
-            <span className="text-[10px] text-muted-foreground/60">pellizcá o rodá para acercar</span>
+            <span className="text-[10px] text-muted-foreground/80">pellizcá o rodá para acercar</span>
           )}
           <button type="button" onClick={() => setAlto((v) => !v)}
             className="tap-44 rounded-full border border-border px-2 py-0.5 hover:bg-muted">

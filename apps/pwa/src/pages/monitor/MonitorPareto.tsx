@@ -154,7 +154,7 @@ export function ParetoDeParadas({
       {/* Si el selector pide más turnos de los que hay con detalle, se dice —
           es la diferencia entre «no hay más» y «los estamos escondiendo». */}
       {ventana != null && turnosMedidos < ventana && (
-        <p className="mt-1 text-[11px] leading-snug text-muted-foreground/70">
+        <p className="mt-1 text-[11px] leading-snug text-muted-foreground/80">
           Hay <span className="tabular-nums">{turnosMedidos}</span> turnos con detalle de causas;
           los demás todavía no lo traen.
         </p>
@@ -266,7 +266,7 @@ export function ParetoDeParadas({
           <button
             type="button"
             onClick={() => setComoAbierto((v) => !v)}
-            className="mt-1.5 block text-left text-[11px] leading-snug text-muted-foreground/70"
+            className="mt-1.5 block text-left text-[11px] leading-snug text-muted-foreground/80"
           >
             Piezas ≈ estimadas al ritmo que cada turno traía andando, no al promedio de la
             muestra.{' '}
@@ -454,7 +454,7 @@ export function ParetoDeParadas({
                         {/* Las piezas del mismo turno bajo su %: el bloque entero
                             habla en piezas, esta tira era lo único que no. */}
                         {p.piezas > 0 && (
-                          <span className="text-[11px] tabular-nums text-muted-foreground/70">
+                          <span className="text-[11px] tabular-nums text-muted-foreground/80">
                             {fmtPzCorto(p.piezas)}
                           </span>
                         )}
@@ -482,7 +482,7 @@ export function ParetoDeParadas({
             </div>
           </div>
 
-          <div className="mt-1 flex justify-between gap-[3px] text-[11px] text-muted-foreground/70">
+          <div className="mt-1 flex justify-between gap-[3px] text-[11px] text-muted-foreground/80">
             {[...serie.serie.map((p) => p.dateKey), ...serie.sinProduccion].map((d: string) => (
               <span key={d} className="min-w-0 flex-1 truncate text-center tabular-nums">
                 {d.slice(8)}
