@@ -53,7 +53,13 @@ export interface Anclaje {
   inicio: number
 }
 
-export type MotivoNoCabe = 'sin-hueco' | 'sin-gente' | 'sin-maquina' | 'anclaje-invalido'
+export type MotivoNoCabe =
+  | 'sin-hueco'
+  | 'sin-gente'
+  | 'sin-maquina'
+  | 'higiene-encima'
+  | 'maquina-corriendo'
+  | 'anclaje-invalido'
 
 export interface NoAsignada {
   tareaId: string
@@ -74,6 +80,8 @@ export const MOTIVO_TEXTO: Record<MotivoNoCabe, string> = {
   'sin-hueco': 'No hay ningún hueco contiguo lo bastante largo',
   'sin-gente': 'No queda gente libre cuando la máquina lo está',
   'sin-maquina': 'La máquina de la tarea no existe en el plan',
+  'higiene-encima': 'A esa hora higiene está lavando esa máquina',
+  'maquina-corriendo': 'A esa hora la máquina está produciendo, y la tarea la necesita detenida',
   'anclaje-invalido': 'La hora fijada a mano dejó de servir',
 }
 
@@ -84,6 +92,8 @@ function condicionesValidas(requiereDetencion: boolean): Condicion[] {
 }
 
 interface Estado {
+  /** Minutos-hombre ya comprometidos en cada día, para poder repartir. */
+  cargaPorDia: number[]
   /** `personas[dia][slot]` = gente ya comprometida en ese instante. */
   personas: Uint8Array[]
   /** `maquina[dia][maquinaId][slot]` = 1 si ya hay una tarea nuestra ahí. */
@@ -92,6 +102,7 @@ interface Estado {
 
 function estadoVacio(): Estado {
   return {
+    cargaPorDia: new Array(7).fill(0),
     personas: Array.from({ length: 7 }, () => new Uint8Array(SLOTS_POR_DIA)),
     maquina: Array.from({ length: 7 }, () => new Map<string, Uint8Array>()),
   }
@@ -180,6 +191,7 @@ export function programarSemana(
       personasDia[slot] = (personasDia[slot] ?? 0) + t.personas
       if (ocupada) ocupada[slot] = 1
     }
+    estado.cargaPorDia[dia] = (estado.cargaPorDia[dia] ?? 0) + largo * MINUTOS_POR_SLOT * t.personas
   }
 
   const largoDe = (t: TareaMantencion) => Math.max(1, Math.ceil(t.minutos / MINUTOS_POR_SLOT))
@@ -235,11 +247,30 @@ export function programarSemana(
       // empieza a buscar en el día que le tocaría si estuvieran repartidas, y
       // desde ahí recorre en círculo.
       const diaPreferido = Math.floor((k * 7) / Math.max(t.vecesPorSemana, 1))
+
+      /*
+       * Los días se prueban de MENOS a MÁS cargado, no en fila desde el
+       * preferido. Recorriéndolos en orden, el primer día con hueco se llevaba
+       * todo: en el recorrido con un horario real, el lunes acumulaba 5 de 9
+       * ejecuciones y martes, sábado y domingo quedaban vacíos. Un plan así no
+       * lo firma nadie, aunque sea válido.
+       *
+       * El día preferido sigue pesando: se usa la cercanía a él para desempatar
+       * entre días igual de cargados, y así las repeticiones no se amontonan.
+       */
+      const distancia = (d: number) => Math.min((d - diaPreferido + 7) % 7, (diaPreferido - d + 7) % 7)
+      const orden = Array.from({ length: 7 }, (_, d) => d).sort(
+        (a, b) =>
+          (estado.cargaPorDia[a] ?? 0) - (estado.cargaPorDia[b] ?? 0) ||
+          distancia(a) - distancia(b) ||
+          a - b,
+      )
+
       let ubicada = false
       let huboHuecoSinGente = false
 
-      for (let d = 0; d < 7 && !ubicada; d++) {
-        const dia = (diaPreferido + d) % 7
+      for (const dia of orden) {
+        if (ubicada) break
         for (let inicio = 0; inicio + largo <= SLOTS_POR_DIA; inicio++) {
           const cond = cabeAqui(t, dia, inicio, largo, maquina)
           if (cond) {
@@ -386,6 +417,31 @@ export function moverOcurrencia(
       a.inicio === destino.inicio,
   )
   if (quedo) return { ok: true, anclajes: propuesta, programacion, motivo: null }
+
+  /*
+   * «No hay hueco» es cierto pero inútil cuando la causa es que higiene está
+   * lavando justo ahí: quien arrastra necesita saber CON QUIÉN choca, porque de
+   * eso depende si mueve la tarea o habla con higiene.
+   */
+  const tarea = tareas.find((t) => t.id === destino.tareaId)
+  const maquina = tarea?.maquinaId ? maquinas.find((m) => m.id === tarea.maquinaId) : null
+  if (tarea && maquina) {
+    const largo = Math.max(1, Math.ceil(tarea.minutos / MINUTOS_POR_SLOT))
+    const dia = maquina.semana[destino.dia]
+    for (let k = 0; k < largo && dia; k++) {
+      const slot = destino.inicio + k
+      if (slot >= SLOTS_POR_DIA) break
+      const cond = condicionDe(dia.areas[slot] ?? '0')
+      if (cond === 'agua' || (cond === 'marcha' && tarea.requiereDetencion)) {
+        return {
+          ok: false,
+          anclajes,
+          programacion: programarSemana(maquinas, tareas, config, anclajes),
+          motivo: cond === 'agua' ? 'higiene-encima' : 'maquina-corriendo',
+        }
+      }
+    }
+  }
 
   const fallo = programacion.noAsignadas.find(
     (n) => n.tareaId === destino.tareaId && n.ocurrencia === destino.ocurrencia,
