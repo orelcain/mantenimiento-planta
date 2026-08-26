@@ -2457,3 +2457,27 @@ Estos seguían abiertos cuando se compactó el historial (2026-07-30):
   quedó restringida.
 - Opcional: botones Confirmar/Cancelar dedicados para repuestos en el chat ARIA de la PWA (hoy es
   solo texto plano) + soporte de fotos.
+
+## 2026-08-26 · Ventanas de intervención (PR #789, en producción)
+
+Módulo nuevo en `/calendario-mantencion` → pestaña «Ventanas de intervención». Responde
+tres preguntas encadenadas: dónde puede entrar Mantención, dónde choca, y si alcanza el
+tiempo. Desplegado y verificado en producción (`buildSha 285e0bf`) abriendo la ruta pública.
+
+- **Dos capas por tramo de 5 min** (quién ocupa el equipo / dónde entra Mantención). Con una
+  sola capa, «intervenir mientras higiene lava» se guarda como simple bloqueo y se pierde el
+  dato que hay que mostrar: las horas con agua encima.
+- **Ocupante `X` (higiene en colación)**: en esta planta higiene entra durante la colación de
+  producción. Es el único hueco sin línea corriendo, así que higiene y mantención se lo
+  disputan — el choque es estructural, no accidental.
+- **Rueda para pintar, franja para mostrar**: un arco se juzga por ángulo y seis máquinas
+  serían seis relojes sueltos.
+- **`ruedaCarga`**: capacidad vs carga en horas-hombre. Capacidad de un tramo =
+  `min(máquinas disponibles, dotación)`, NO el producto.
+- **`ruedaProgramacion`**: encaja cada ejecución en día y hora, arrastrables. ⚠ El veredicto
+  sale del ENCAJE, no de la suma: con dotación 1 los totales decían «cabe» (13,7 h contra
+  107 h) y solo se ubicaban 5 de 10 ejecuciones.
+- Link público `/rueda/:token` (snapshot, 30 días, expiración validada en reglas).
+- 113 tests. Reglas `rueda_ventanas_state` y `ruedaVentanasPublicTokens` desplegadas.
+
+⚠ Los horarios cargados son una BASE DE EJEMPLO, no el horario real de planta.
