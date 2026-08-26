@@ -2114,6 +2114,9 @@ export function PublicShiftMonitorPage() {
   const [data, setData] = useState<PublicShiftMonitorDoc | null>(null)
   const [status, setStatus] = useState<'loading' | 'ok' | 'gone'>('loading')
   const [now, setNow] = useState(() => Date.now())
+  /* Los `t` de la serie son wall-clock sellados como UTC; para compararlos con
+     el reloj hay que llevar "ahora" a esa misma base (igual que `fmtAgoWall`). */
+  const ahoraWallMs = useMemo(() => now - new Date(now).getTimezoneOffset() * 60_000, [now])
 
   // Reloj propio: la frescura ("hace X min") tiene que envejecer a la vista
   // aunque el doc no cambie — si no, un sync caído se ve igual que uno al día.
@@ -3449,8 +3452,11 @@ export function PublicShiftMonitorPage() {
                 documenta. */}
             {cascada && !live.shiftClosed && <CascadaTurnoCard cascada={cascada} />}
             <ReglaDeRitmo
-              ahora={ritmoAhoraAndando(serieDelTurno)}
-              ahoraReloj={ritmoAhoraCpm(serieDelTurno)}
+              /* El tramo en curso se cuenta por los minutos que LLEVA, no por
+                 los 5 que va a durar: si no, el número de "ahora" queda siempre
+                 por debajo del que muestra Shoplogix. */
+              ahora={ritmoAhoraAndando(serieDelTurno, ahoraWallMs)}
+              ahoraReloj={ritmoAhoraCpm(serieDelTurno, ahoraWallMs)}
               /* Fin del último tramo: la serie viene en hora de planta, igual
                  que el resto de la pantalla. */
               corteMs={serieDelTurno.length
