@@ -4,6 +4,7 @@ import { ListGroup, Pill } from '@/components/piel'
 import { cn } from '@/lib/utils'
 import {
   MOTIVO_TEXTO,
+  ajustarAPaso,
   asignacionesDe,
   veredictoDe,
   type Anclaje,
@@ -38,8 +39,14 @@ import {
  * se ve. Si no cabe, el bloque vuelve a su sitio y se dice por qué.
  */
 
-/** Paso del ajuste fino por teclado: 15 min es lo que se corrige en la práctica. */
-const PASO_FINO = 3
+/**
+ * Dos pasos distintos y no uno: el arrastre es un gesto impreciso —con el dedo,
+ * un píxel de la franja son casi cinco minutos— así que salta de 15 en 15. El
+ * ajuste al tramo exacto se hace con los botones y las flechas, que no dependen
+ * de la puntería.
+ */
+const PASO_ARRASTRE = 3 // 15 min
+const PASO_FINO = 1 // 5 min
 
 const COLOR_CONDICION: Record<Condicion, string> = {
   limpia: 'bg-cat-2-tint',
@@ -101,8 +108,7 @@ export function ProgramacionSemana({
       const r = el.getBoundingClientRect()
       if (!r.width) return null
       const tramo = Math.round(((x - r.left) / r.width) * SLOTS_POR_DIA) - a.offset
-      const inicio = Math.min(Math.max(tramo, 0), SLOTS_POR_DIA - a.largo)
-      return { dia, inicio }
+      return { dia, inicio: ajustarAPaso(tramo, PASO_ARRASTRE, a.largo) }
     },
     [],
   )
@@ -404,14 +410,14 @@ function DetalleDia({
                 <button
                   className={btn}
                   onClick={() => onMover(a, -PASO_FINO)}
-                  aria-label={`Adelantar ${a.nombre} 15 minutos`}
+                  aria-label={`Adelantar ${a.nombre} ${MINUTOS_POR_SLOT} minutos`}
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </button>
                 <button
                   className={btn}
                   onClick={() => onMover(a, PASO_FINO)}
-                  aria-label={`Atrasar ${a.nombre} 15 minutos`}
+                  aria-label={`Atrasar ${a.nombre} ${MINUTOS_POR_SLOT} minutos`}
                 >
                   <ChevronRight className="h-4 w-4" />
                 </button>
@@ -463,7 +469,8 @@ function Leyenda() {
         Movida a mano
       </span>
       <span className="text-caption text-muted-foreground">
-        Nunca se programa sobre higiene · el paso es de {MINUTOS_POR_SLOT} min
+        Arrastrar salta de 15 en 15 min · las flechas y los botones mueven de{' '}
+        {MINUTOS_POR_SLOT} en {MINUTOS_POR_SLOT} · nunca se programa sobre higiene
       </span>
     </div>
   )

@@ -4,6 +4,7 @@ import {
   asignacionesDe,
   veredictoDe,
   moverOcurrencia,
+  ajustarAPaso,
   conAnclaje,
   sinAnclaje,
   type Anclaje,
@@ -394,5 +395,34 @@ describe('conAnclaje / sinAnclaje', () => {
   it('sinAnclaje devuelve la ejecución al automático', () => {
     const a: Anclaje[] = [{ tareaId: 't', ocurrencia: 1, dia: 0, inicio: 0 }]
     expect(sinAnclaje(a, 't', 1)).toHaveLength(0)
+  })
+})
+
+describe('ajustarAPaso · el arrastre salta de 15 en 15', () => {
+  const PASO = 3 // 15 min
+
+  it('alinea al múltiplo más cercano', () => {
+    expect(ajustarAPaso(slotDeHora(10, 5), PASO, 12)).toBe(slotDeHora(10))
+    expect(ajustarAPaso(slotDeHora(10, 10), PASO, 12)).toBe(slotDeHora(10, 15))
+    expect(ajustarAPaso(slotDeHora(10, 20), PASO, 12)).toBe(slotDeHora(10, 15))
+    expect(ajustarAPaso(slotDeHora(10, 25), PASO, 12)).toBe(slotDeHora(10, 30))
+  })
+
+  it('lo que ya está en la retícula no se mueve', () => {
+    expect(ajustarAPaso(slotDeHora(14, 45), PASO, 12)).toBe(slotDeHora(14, 45))
+  })
+
+  it('no deja la tarea colgando fuera del día', () => {
+    const largo = 12 // 1 h
+    expect(ajustarAPaso(SLOTS_POR_DIA - 2, PASO, largo)).toBe(SLOTS_POR_DIA - largo)
+    expect(ajustarAPaso(-5, PASO, largo)).toBe(0)
+  })
+
+  it('con paso fino de 1, cualquier tramo es alcanzable', () => {
+    expect(ajustarAPaso(slotDeHora(10, 5), 1, 12)).toBe(slotDeHora(10, 5))
+  })
+
+  it('una tarea tan larga como el día solo cabe empezando a las 00:00', () => {
+    expect(ajustarAPaso(50, PASO, SLOTS_POR_DIA)).toBe(0)
   })
 })
