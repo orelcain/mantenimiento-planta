@@ -1200,7 +1200,7 @@ function RitmoNecesario({
    * esto, la respuesta a "¿llegamos?" quedaba partida entre esta tarjeta (que
    * mide hasta el horario) y el bloque del pronóstico, tres tarjetas abajo.
    */
-  horizonte?: { hasta: string; estimate: number | null; mapePct: number | null } | null
+  horizonte?: { hasta: string; estimate: number | null; mapePct: number | null; explicacion?: string | null } | null
   /** El día anterior a la MISMA altura de turno, y la diferencia con hoy. */
   vsAyer?: { label: string; pieces: number; diff: number } | null
   /** Velocidad de la máquina y llenado de silletas, si el modelo se conoce. */
@@ -1429,10 +1429,24 @@ function RitmoNecesario({
           acá va su titular, que es la otra mitad de la respuesta. */}
       {horizonte?.hasta && horizonte.estimate != null && (
         <p className="mt-0.5 text-[12px] text-muted-foreground">
-          Si se estira como los últimos turnos (≈
-          <span className="tabular-nums text-foreground/90">{horizonte.hasta}</span>),{' '}
+          {/* El rótulo le echaba la culpa al horario —"si se estira como los
+              últimos turnos (≈05:25)"— y no cuadraba: el 26-08 a las 00:34 esa
+              línea decía 18.212 pz justo debajo de "hasta las 05:00, 8.496 pz".
+              Veinticinco minutos no explican 9.716 piezas. La diferencia es que
+              los turnos anteriores, a esta altura, llevaban menos de la mitad
+              de lo que terminaron haciendo — y eso hay que decirlo, porque es
+              lo que uno tiene que creer o no para creerle al número. */}
+          {horizonte.explicacion ? (
+            <>Si el turno rinde como los últimos ({horizonte.explicacion}),{' '}</>
+          ) : (
+            <>
+              Si se estira como los últimos turnos (≈
+              <span className="tabular-nums text-foreground/90">{horizonte.hasta}</span>),{' '}
+            </>
+          )}
           <span className="tabular-nums text-foreground/90">{fmtInt(horizonte.estimate)} pz</span>
-          {horizonte.mapePct != null && <> ±{fmtDec(horizonte.mapePct)}%</>}.
+          {horizonte.mapePct != null && <> ±{fmtDec(horizonte.mapePct)}%</>}
+          {horizonte.explicacion && <> · cierre ≈{horizonte.hasta}</>}.
         </p>
       )}
 
@@ -2953,6 +2967,8 @@ export function PublicShiftMonitorPage() {
       // respuesta a "¿llegamos?" no puede estar partida en dos tarjetas.
       estimate: pronostico.mapePct <= MAX_MAPE_PCT ? pronostico.estimate : null,
       mapePct: pronostico.mapePct <= MAX_MAPE_PCT ? pronostico.mapePct : null,
+      // Lo que explica el número cuando gana el método proporcional.
+      explicacion: pronostico.explicacion,
     }
   }, [pronostico, live, pace, serieDelTurno])
 
