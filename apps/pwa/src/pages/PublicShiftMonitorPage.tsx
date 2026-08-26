@@ -56,6 +56,7 @@ import {
   type Ventana as VentanaPareto,
 } from '@/services/shoplogix/monitorPareto'
 import { parseShiftDocId } from '@/services/shoplogix/shoplogixShift.service'
+import { convenioFaltante } from '@/services/shoplogix/convenioFaltante'
 import { horaDeLaCuota } from '@/services/shoplogix/horaDeLaCuota'
 import { horaMasFloja, type ParadaConHora } from '@/services/shoplogix/horaMasFloja'
 import { objetivoDelTurno, type OrigenObjetivo } from '@/services/shoplogix/objetivoDelTurno'
@@ -2959,6 +2960,16 @@ export function PublicShiftMonitorPage() {
     [live?.plannedEnd, ahoraWallMs],
   )
 
+  /*
+   * ¿Este turno se quedó sin convenio registrado? Medido en el turno del
+   * 25-08: 0 min contra los ~57 que traen 6 de los 8 turnos iguales. El porqué
+   * importa, en `convenioFaltante`.
+   */
+  const sinConvenio = useMemo(
+    () => convenioFaltante(live?.timeBreakdown?.plannedMin, data?.forecastHistory ?? []),
+    [live?.timeBreakdown?.plannedMin, data?.forecastHistory],
+  )
+
   const paradasDelTurno = useMemo<ParadaConHora[]>(
     () => (gruposEventos ?? []).flatMap((g) =>
       g.causas.flatMap((c) => c.paradas.map((p) => ({
@@ -4174,7 +4185,7 @@ export function PublicShiftMonitorPage() {
             {/* Cerró el turno: qué cambió contra ayer y cómo quedó contra los
                 récords. Es el paso de "hoy pasó esto" a "esto vuelve todos los
                 turnos". */}
-            <VsAyerBloque r={comparadoConAyer} records={recordsLinea} />
+            <VsAyerBloque r={comparadoConAyer} records={recordsLinea} sinConvenio={sinConvenio} />
 
           </>
         ) : (
@@ -4274,7 +4285,7 @@ export function PublicShiftMonitorPage() {
             {/* Cerró el turno: qué cambió contra ayer y cómo quedó contra los
                 récords. El orden es a propósito — primero qué pasó (arriba),
                 después por qué fue distinto, después qué se repite siempre. */}
-            <VsAyerBloque r={comparadoConAyer} records={recordsLinea} />
+            <VsAyerBloque r={comparadoConAyer} records={recordsLinea} sinConvenio={sinConvenio} />
 
           </>
         )}
