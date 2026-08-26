@@ -170,12 +170,24 @@ export function ParetoDeParadas({
           datos, un selector con una sola opción es ruido. */}
       {(onVentana || (onTurno && (porTurno?.length ?? 0) > 1)) && (
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          {/* Sin este rótulo la fila se leía «5 10 15 30 todos | 2 1 1 Lunes
+              los dos»: nueve controles y ninguna pista de qué eligen. El
+              segundo grupo se explica solo por el nombre del turno. */}
+          {onVentana && (
+            <span className="text-[11px] text-muted-foreground/80">últimos</span>
+          )}
           {onVentana && VENTANAS.map((v) => (
             <button
               key={String(v)}
               type="button"
               onClick={() => onVentana(v)}
-              className={`tap-44 min-h-[32px] rounded-full px-2.5 text-[12px] tabular-nums ${
+              aria-pressed={ventana === v}
+              aria-label={v == null ? 'todos los turnos que haya' : `últimos ${v} turnos`}
+              /* Ancho REAL de 44, no solo el área de `tap-44`: los chips de un dígito
+                 medían 22-23 px y el ::after del vecino les robaba parte de su
+                 propio dibujo — tocar el borde del «2» activaba el «1». Medido
+                 con `elementFromPoint` recorriendo el ancho dibujado. */
+              className={`tap-44 min-h-[32px] min-w-[44px] rounded-full px-2.5 text-[12px] tabular-nums ${
                 ventana === v ? 'bg-primary/[0.13] font-semibold text-foreground' : 'bg-muted text-muted-foreground'
               }`}
             >
@@ -190,7 +202,9 @@ export function ParetoDeParadas({
                   key={t}
                   type="button"
                   onClick={() => onTurno(t as string | 'todos')}
-                  className={`min-h-[32px] rounded-full px-2.5 text-[12px] ${
+                  aria-pressed={turno === t}
+                  aria-label={t === 'todos' ? 'los dos turnos juntos' : `solo ${t}`}
+                  className={`tap-44 min-h-[32px] min-w-[44px] rounded-full px-2.5 text-[12px] ${
                     turno === t ? 'bg-primary/[0.13] font-semibold text-foreground' : 'bg-muted text-muted-foreground'
                   }`}
                 >
