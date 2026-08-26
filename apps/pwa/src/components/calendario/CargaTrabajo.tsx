@@ -11,6 +11,8 @@ import {
   type TareaMantencion,
 } from '@/services/ruedaCarga'
 import type { MaquinaRueda } from '@/services/ruedaVentanas'
+import { ProgramacionSemana } from './ProgramacionSemana'
+import { MOTIVO_TEXTO, programarSemana, veredictoDe } from '@/services/ruedaProgramacion'
 
 /**
  * «¿Alcanza el tiempo?» — capacidad contra carga.
@@ -42,6 +44,10 @@ export function CargaTrabajo({
 }: CargaTrabajoProps) {
   const [nuevoNombre, setNuevoNombre] = useState('')
   const b = useMemo(() => balance(maquinas, tareas, config), [maquinas, tareas, config])
+  // Una sola programación para toda la vista: la calcula el padre y la baja,
+  // para que el veredicto y el detalle no puedan contarse historias distintas.
+  const prog = useMemo(() => programarSemana(maquinas, tareas, config), [maquinas, tareas, config])
+  const v = useMemo(() => veredictoDe(prog), [prog])
 
   const nombrePorId = useMemo(() => new Map(maquinas.map((m) => [m.id, m.nombre])), [maquinas])
 
@@ -76,49 +82,46 @@ export function CargaTrabajo({
       <section
         className={cn(
           'flex flex-col gap-4 rounded-card border-l-[3px] bg-card p-4',
-          b.alcanza ? 'border-l-cat-2-ink' : 'border-l-destructive',
+          v.cabe ? 'border-l-cat-2-ink' : 'border-l-destructive',
         )}
       >
         <div className="flex items-start gap-3">
-          {b.alcanza ? (
+          {v.cabe ? (
             <Check className="mt-0.5 h-6 w-6 shrink-0 text-cat-2-ink" />
           ) : (
             <TriangleAlert className="mt-0.5 h-6 w-6 shrink-0 text-destructive" />
           )}
           <div className="flex flex-col gap-1">
             <p className="text-title3 text-foreground">
-              {b.alcanza ? 'El trabajo cabe en la semana' : 'El trabajo no cabe en la semana'}
+              {v.cabe
+                ? 'Todo el trabajo tiene hora'
+                : `${v.pedidas - v.ubicadas} de ${v.pedidas} ejecuciones se quedan sin hora`}
             </p>
             <p className="text-body text-muted-foreground">
-              {b.alcanza ? (
+              {v.cabe ? (
                 <>
-                  Sobran{' '}
+                  Las {v.pedidas} ejecuciones de la semana caben en las ventanas, sin pisar a
+                  higiene. Quedan{' '}
                   <span className="font-mono font-semibold tabular-nums text-foreground">
-                    {minutosAHorasTexto(b.holguraTotalMin)}
+                    {minutosAHorasTexto(Math.max(b.holguraTotalMin, 0))}
                   </span>{' '}
-                  de holgura tras apartar la reserva para correctivas.
-                </>
-              ) : b.holguraConDetencionMin < 0 && b.holguraTotalMin >= 0 ? (
-                <>
-                  Alcanzan las horas en total, pero faltan{' '}
-                  <span className="font-mono font-semibold tabular-nums text-destructive">
-                    {minutosAHorasTexto(-b.holguraConDetencionMin)}
-                  </span>{' '}
-                  de <strong>máquina detenida</strong>, que es donde se hace el trabajo pesado.
+                  de holgura tras la reserva para correctivas.
                 </>
               ) : (
                 <>
-                  Faltan{' '}
-                  <span className="font-mono font-semibold tabular-nums text-destructive">
-                    {minutosAHorasTexto(-b.holguraTotalMin)}
-                  </span>
-                  . Hay que sacar tareas, sumar gente o negociar más ventana.
+                  {v.motivoPrincipal ? MOTIVO_TEXTO[v.motivoPrincipal] : 'No entran'}.{' '}
+                  {v.motivoPrincipal === 'sin-gente'
+                    ? 'Es un problema de dotación, no de horario: hay ventana, falta gente.'
+                    : 'Es un problema de horario: hay que negociar ventana o mover la tarea.'}
                 </>
               )}
             </p>
           </div>
         </div>
 
+        <p className="text-caption text-muted-foreground">
+          Las horas sueltas, como contexto: que alcancen no garantiza que quepan.
+        </p>
         <BarraCarga
           etiqueta="Total"
           cargaMin={b.cargaTotalMin}
@@ -141,6 +144,8 @@ export function CargaTrabajo({
           </p>
         )}
       </section>
+
+      <ProgramacionSemana prog={prog} maquinas={maquinas} />
 
       {/* ── Palancas ─────────────────────────────────────────────────────── */}
       <ListGroup title="Con qué contamos" footer="Sube o baja la dotación para ver cuánto cambia lo que cabe.">
