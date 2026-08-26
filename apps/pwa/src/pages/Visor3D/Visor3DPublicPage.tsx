@@ -11,7 +11,7 @@
  * - Ruta: /v/:modelId
  */
 
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import {
   Maximize,
@@ -77,7 +77,23 @@ export function Visor3DPublicPage() {
   const [error, setError] = useState<string | null>(null)
 
   // Dimensions state
-  const [dimensions, setDimensions] = useState<Dimension3D[]>([])
+  /**
+   * Las cotas que YA están guardadas (suscripción) y las que se acaban de
+   * medir desde el enlace público.
+   *
+   * Las reglas de Firestore dicen que el QR público es de SOLO LECTURA
+   * (`dimensions` pide `isActiveUser()`), pero esta pantalla ofrecía igual
+   * "+ Cota", "Pintar" y borrar: el invitado medía, tocaba, y no pasaba nada
+   * —el `createDimension` fallaba con permission-denied y nadie lo cachaba—.
+   * Ahora la medición se conserva EN PANTALLA y se dice que no queda guardada.
+   */
+  const [remoteDimensions, setRemoteDimensions] = useState<Dimension3D[]>([])
+  const [localDimensions, setLocalDimensions] = useState<Dimension3D[]>([])
+  const [soloLectura, setSoloLectura] = useState(false)
+  const dimensions = useMemo(
+    () => [...remoteDimensions, ...localDimensions],
+    [remoteDimensions, localDimensions],
+  )
   const [showDimensions, setShowDimensions] = useState(true)
   const [creatingDimension, setCreatingDimension] = useState(false)
   const [selectedUnit, setSelectedUnit] = useState<DimensionUnit>('cm')
@@ -139,7 +155,7 @@ export function Visor3DPublicPage() {
   // Suscribirse a cotas (sin auth)
   useEffect(() => {
     if (!modelId) return
-    const unsub = subscribeToDimensions(modelId, setDimensions)
+    const unsub = subscribeToDimensions(modelId, setRemoteDimensions)
     return () => unsub()
   }, [modelId])
 
@@ -156,6 +172,26 @@ export function Visor3DPublicPage() {
     const unsub = subscribeToAnnotations(modelId, setAnnotations)
     return () => unsub()
   }, [modelId])
+
+  /**
+   * Guarda la cota; si las reglas no dejan (enlace público), la deja en
+   * pantalla igual. Medir sirve aunque no se pueda dejar anotado.
+   */
+  const crearCota = useCallback(
+    async (payload: Parameters<typeof createDimension>[1]) => {
+      if (!modelId) return
+      try {
+        await createDimension(modelId, payload)
+      } catch {
+        setSoloLectura(true)
+        setLocalDimensions((prev) => [
+          ...prev,
+          { ...payload, id: `local-${prev.length + 1}`, modelId } as unknown as Dimension3D,
+        ])
+      }
+    },
+    [modelId],
+  )
 
   // Fullscreen
   const toggleFullscreen = useCallback(() => {
@@ -197,7 +233,7 @@ export function Visor3DPublicPage() {
       if (measurementType === 'distance') {
         const distance = calculateDistance(newPoints[0]!, newPoints[1]!)
         const length = convertUnit(distance, selectedUnit)
-        await createDimension(modelId, {
+        await crearCota({
           type: 'distance',
           points: newPoints,
           p1: newPoints[0]!,
@@ -215,7 +251,7 @@ export function Visor3DPublicPage() {
         }
         const radiusConverted = convertUnit(circle.radius, selectedUnit)
         const circumference = 2 * Math.PI * radiusConverted
-        await createDimension(modelId, {
+        await crearCota({
           type: 'circumference',
           points: newPoints,
           p1: newPoints[0]!,
@@ -230,7 +266,7 @@ export function Visor3DPublicPage() {
       } else if (measurementType === 'volume') {
         const result = calculateOrientedBoxVolume(newPoints[0]!, newPoints[1]!, newPoints[2]!, newPoints[3]!)
         const volConverted = convertVolumeUnit(result.volume, selectedUnit)
-        await createDimension(modelId, {
+        await crearCota({
           type: 'volume',
           points: newPoints,
           p1: newPoints[0]!,
@@ -245,7 +281,7 @@ export function Visor3DPublicPage() {
       setPendingPoints([])
       setCreatingDimension(false)
     },
-    [creatingDimension, pendingPoints, modelId, selectedUnit, measurementType]
+    [creatingDimension, pendingPoints, modelId, selectedUnit, measurementType, crearCota]
   )
 
   // Close area polygon manually
@@ -253,7 +289,7 @@ export function Visor3DPublicPage() {
     if (!modelId || pendingPoints.length < 3) return
     const area = calculatePolygonArea(pendingPoints)
     const areaConverted = convertAreaUnit(area, selectedUnit)
-    await createDimension(modelId, {
+    await crearCota({
       type: 'area',
       points: pendingPoints,
       p1: pendingPoints[0]!,
@@ -265,19 +301,20 @@ export function Visor3DPublicPage() {
     })
     setPendingPoints([])
     setCreatingDimension(false)
-  }, [modelId, pendingPoints, selectedUnit])
+  }, [modelId, pendingPoints, selectedUnit, crearCota])
 
   // Handle paint mesh
   const handleMeshPainted = useCallback(
     async (meshId: string, color: string | null) => {
       if (!modelId) return
       if (color) {
+        // El color ya se aplicó en la escena; esto es solo persistirlo.
         await setMaterialOverride(modelId, {
           meshId,
           color,
           opacity: 1,
           createdBy: PUBLIC_USER_ID,
-        })
+        }).catch(() => setSoloLectura(true))
       } else {
         const overrideId = meshId.replace(/[/#[\]]/g, '_').replace(/\./g, '_')
         await deleteMaterialOverride(modelId, overrideId).catch(() => {})
@@ -297,7 +334,12 @@ export function Visor3DPublicPage() {
   const handleDeleteDimension = useCallback(
     async (dimId: string) => {
       if (!modelId) return
-      await deleteDimension(modelId, dimId)
+      // Las medidas que no se pudieron guardar viven solo acá.
+      if (dimId.startsWith('local-')) {
+        setLocalDimensions((prev) => prev.filter((d) => d.id !== dimId))
+        return
+      }
+      await deleteDimension(modelId, dimId).catch(() => setSoloLectura(true))
     },
     [modelId]
   )
@@ -569,6 +611,16 @@ export function Visor3DPublicPage() {
             >
               {showDimensions && <DimensionsTool dimensions={dimensions} pendingPoints={pendingPoints} measurementType={measurementType} />}
             </Viewer3D>
+
+            {/* Las reglas dejan el enlace público en solo lectura. En vez de que
+                el invitado mida y no pase nada, la medida queda en pantalla y
+                acá se dice por qué no la va a encontrar después. */}
+            {soloLectura && (
+              <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20 max-w-[92%] rounded-ctl
+                              border border-ink-warn/40 bg-card/95 px-3 py-1.5 text-center text-xs text-ink-warn shadow">
+                Desde este enlace las medidas y los colores se ven solo en tu pantalla: no quedan guardados.
+              </div>
+            )}
 
             {paintMode && (
               <ColorPalette

@@ -58,6 +58,7 @@ import {
   BUCKETS,
   CRIT,
   CRIT_INFO,
+  criticidadEvaluada,
   ESTADO,
   ITEMS_PER_PAGE,
   WO_ESTADO,
@@ -1867,8 +1868,18 @@ function ExpedienteDialog({
               <div className="text-xs text-muted-foreground font-mono">{equipment.codigo}</div>
               {equipment.nombreComun && <div className="text-sm text-muted-foreground truncate">“{equipment.nombreComun}”</div>}
               <div className="mt-2 flex flex-wrap items-center gap-2">
-                <Badge variant="outline" className={`${crit.cls} text-xs`} title={CRIT_INFO[equipment.criticidad].desc}>
+                {/* Sin evaluar, la criticidad es el valor con que entró el equipo
+                    en la importación, no una clasificación NFPA 70B: se dice, en vez
+                    de mostrar una letra que se lee como si alguien la hubiera puesto. */}
+                <Badge
+                  variant="outline"
+                  className={`${criticidadEvaluada(equipment) ? crit.cls : 'border-border text-muted-foreground'} text-xs`}
+                  title={criticidadEvaluada(equipment)
+                    ? CRIT_INFO[equipment.criticidad].desc
+                    : 'Nadie la ha evaluado todavía: es el valor con que se importó el equipo. Se fija editando el equipo.'}
+                >
                   Criticidad {crit.nivel}
+                  {!criticidadEvaluada(equipment) && ' · sin evaluar'}
                 </Badge>
                 <Badge variant="outline" className={`${est.cls} text-xs`}>{est.label}</Badge>
                 {ubicacion && (

@@ -2,6 +2,7 @@
  * Servicio de Chatbot con RAG (Retrieval-Augmented Generation)
  * v4 — Memoria Firestore, turnos, resumen semanal, auto-seguimiento, alertas proactivas
  */
+import { estadoDePreventiva } from './chatbot/estadoPreventiva'
 import { collection, getDocs, getDoc, setDoc, doc, query, where, orderBy, limit, serverTimestamp } from 'firebase/firestore'
 import { db } from './firebase'
 import { callGroq, callGemini, isAIConfigured, isGeminiConfigured, RateLimitError } from './ai'
@@ -862,17 +863,43 @@ async function fetchPreventiveSummary(): Promise<string> {
       byTipo[t.tipo || 'general'] = (byTipo[t.tipo || 'general'] || 0) + 1
     })
 
-    // Próximas 10 tareas
-    activas.slice(0, 10).forEach((t: any) => {
+    // Próximas 10 tareas. La fecha sola no basta: una `proximaEjecucion` que ya
+    // pasó se leía como "programada", y el resumen del día decía "sin alertas
+    // de retraso" con una preventiva vencida hace 218 días — mientras el panel
+    // de avisos de la misma pantalla sí la nombraba.
+    const ahora = new Date()
+    let vencidas = 0
+    const aMostrar = activas.slice(0, 10)
+
+    // El nombre del equipo, no su id: ARIA respondía "vencida ... en equipo
+    // nIjUKAay3odasttyZ0yj", que no le dice nada a nadie. Son pocas tareas, así
+    // que se resuelven de a una.
+    const nombreDeEquipo = new Map<string, string>()
+    await Promise.all(
+      [...new Set(aMostrar.map((t: any) => t.equipmentId).filter(Boolean))].map(async (id: any) => {
+        try {
+          const eq = await getDoc(doc(db, 'equipment', String(id)))
+          const nombre = eq.exists() ? (eq.data().nombre as string) : ''
+          if (nombre) nombreDeEquipo.set(String(id), nombre)
+        } catch { /* si no se puede leer, queda el id */ }
+      }),
+    )
+
+    aMostrar.forEach((t: any) => {
       const fecha = t.proximaEjecucion?.toDate?.() || t.proximaEjecucion
-      const fechaStr = fecha instanceof Date ? fecha.toLocaleDateString('es-CL') : String(fecha || 'sin fecha')
-      proximas.push(`- ${t.nombre || 'Sin nombre'} [${t.tipo || 'general'}] → próxima: ${fechaStr} (cada ${t.frecuenciaDias || '?'} días)${t.equipmentId ? ` | equipo: ${t.equipmentId}` : ''}`)
+      const estado = estadoDePreventiva(fecha instanceof Date ? fecha : null, ahora)
+      if (estado.vencida) vencidas++
+      const equipo = t.equipmentId ? (nombreDeEquipo.get(String(t.equipmentId)) || String(t.equipmentId)) : ''
+      proximas.push(`- ${t.nombre || 'Sin nombre'} [${t.tipo || 'general'}] → ${estado.texto} (cada ${t.frecuenciaDias || '?'} días)${equipo ? ` | equipo: ${equipo}` : ''}`)
     })
 
     const result = [
       `MANTENIMIENTO PREVENTIVO (${activas.length} tareas activas):`,
+      vencidas > 0
+        ? `OJO: ${vencidas} VENCIDA(S). Nombralas en el resumen; no son "próximas".`
+        : 'Ninguna vencida.',
       `Por tipo: ${JSON.stringify(byTipo)}`,
-      `Próximas tareas:`,
+      `Tareas:`,
       ...proximas,
       activas.length > 10 ? `... y ${activas.length - 10} más` : '',
     ].join('\n')
@@ -1227,6 +1254,32 @@ async function fetchCalendarioMantencionSummary(): Promise<string> {
 
     const effectiveDaily = Math.max(0, (hoursConfig.workHours || 8) - (hoursConfig.breakHours || 0.5))
 
+    /*
+     * Hasta dónde llega la planilla.
+     *
+     * El 24-08 la planilla terminaba el 08/06 y a "¿quién está de turno hoy?"
+     * ARIA contestó "tú estás en el Turno Tarde (14:00 a 22:00)" — inventado,
+     * y encima con un horario que ni siquiera coincidía con la configuración
+     * del mismo contexto (Tarde 16:00-00:00). El contexto decía "Sin datos
+     * para esta semana", pero perdido en medio del bloque. Cuando la planilla
+     * no cubre HOY se dice con todas las letras y se instruye qué contestar.
+     */
+    const fechasCargadas = parsedCols
+      .map((c: any) => c.dateObj as Date | null)
+      .filter((d: Date | null): d is Date => !!d)
+      .sort((x: Date, y: Date) => x.getTime() - y.getTime())
+    const fmtDia = (d: Date) => d.toLocaleDateString('es-CL')
+    const cubreHoy = weekCols.length > 0
+    const avisoCobertura = cubreHoy
+      ? ''
+      : [
+          `\n⚠️ LA PLANILLA NO CUBRE HOY (${todayStr}).`,
+          fechasCargadas.length > 0
+            ? `Solo hay turnos cargados del ${fmtDia(fechasCargadas[0]!)} al ${fmtDia(fechasCargadas[fechasCargadas.length - 1]!)}.`
+            : 'No hay ningún día cargado.',
+          `NO afirmes quién está de turno hoy ni inventes horarios: di hasta qué fecha llega la planilla y que hay que extenderla en /calendario-mantencion.`,
+        ].join('\n')
+
     const result = [
       `CALENDARIO MANTENCIÓN — Datos actuales:`,
       `Plantilla: ${filename}`,
@@ -1239,10 +1292,19 @@ async function fetchCalendarioMantencionSummary(): Promise<string> {
       ``,
       `Semana actual (${currentWeek}): ${weekCols.length} días`,
       `Fecha de hoy: ${todayStr}`,
+      avisoCobertura,
       weekSummary.length > 0 ? `Turnos esta semana:\n${weekSummary.join('\n')}` : 'Sin datos para esta semana.',
       techsOnVacation.length > 0 ? `\nTécnicos en vacaciones esta semana: ${techsOnVacation.join(', ')}` : '',
       `\nMes actual (${currentMonth}): ${monthCols.length} días`,
-      `\nTurnos configurados: Día ${shiftConfig.diaInicio || '08:00'}-${shiftConfig.diaFin || '16:00'} | Tarde ${shiftConfig.tardeInicio || '16:00'}-${shiftConfig.tardeFin || '00:00'} | Noche ${shiftConfig.nocheInicio || '00:00'}-${shiftConfig.nocheFin || '08:00'}`,
+      /* Los horarios van con "estos y no otros" porque el modelo los rellenaba
+         de memoria: dijo "Turno Tarde (14:00 a 22:00)" teniendo el 16:00-00:00
+         configurado tres líneas más arriba, en este mismo contexto. */
+      `\nTurnos configurados (usa EXACTAMENTE estos horarios, no existen otros): Día ${shiftConfig.diaInicio || '08:00'}-${shiftConfig.diaFin || '16:00'} | Tarde ${shiftConfig.tardeInicio || '16:00'}-${shiftConfig.tardeFin || '00:00'} | Noche ${shiftConfig.nocheInicio || '00:00'}-${shiftConfig.nocheFin || '08:00'}`,
+      /* El turno de una persona SOLO existe en esta planilla. La cuenta del
+         usuario no guarda turno, y sin este dato el modelo lo rellenaba solo:
+         "tú estás registrado en el Turno Tarde (14:00 a 22:00)" — inventado, y
+         encima con un horario distinto al configurado acá arriba. */
+      `\nOJO: el sistema NO guarda el turno de cada usuario. El turno de una persona SOLO se sabe si aparece en esta planilla y para una fecha cargada. Nunca deduzcas el turno de alguien de su sesión, su rol ni su nombre.`,
       `\nPágina: /calendario-mantencion`,
     ].join('\n')
 

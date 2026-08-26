@@ -323,7 +323,7 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
 
       {/* Panel de alertas — visible en las vistas de resumen (todos/configurados) */}
       {stats.alertas.length > 0 && (stockFilter === 'todos' || stockFilter === 'configurados') && !searchQuery && (
-        <AlertPanel alertas={stats.alertas} onFilter={(f: StockFilter) => setStockFilter(f)} />
+        <AlertPanel alertas={stats.alertas} enCeroSinMinimo={stats.sinStock - stats.alertas.filter(a => a.stockActual === 0).length} onFilter={(f: StockFilter) => setStockFilter(f)} />
       )}
 
       {/* Sort bar */}
@@ -1856,7 +1856,7 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
 //  MODALES
 // ══════════════════════════════════════════════
 
-function AlertPanel({ alertas, onFilter }: { alertas: BodegaMergedItem[]; onFilter: (f: StockFilter) => void }) {
+function AlertPanel({ alertas, enCeroSinMinimo, onFilter }: { alertas: BodegaMergedItem[]; enCeroSinMinimo: number; onFilter: (f: StockFilter) => void }) {
   const [expanded, setExpanded] = useState(false)
   const sinStock = alertas.filter(a => a.stockActual === 0)
   const bajoStock = alertas.filter(a => a.stockActual > 0)
@@ -1870,6 +1870,14 @@ function AlertPanel({ alertas, onFilter }: { alertas: BodegaMergedItem[]; onFilt
           <span className="text-xs font-semibold text-ink-crit">{alertas.length} alerta{alertas.length > 1 ? 's' : ''} de stock</span>
           {sinStock.length > 0 && <span className="text-caption px-1.5 py-0.5 rounded-ctl bg-red-500/[0.15] text-ink-crit font-bold">{sinStock.length} sin stock</span>}
           {bajoStock.length > 0 && <span className="text-caption px-1.5 py-0.5 rounded-ctl bg-amber-500/[0.15] text-ink-warn font-bold">{bajoStock.length} bajo mínimo</span>}
+          {/* La alerta solo vigila los ítems con mínimo definido — son 61 de
+              2.177. Sin esta línea, "21 sin stock" convivía con la tarjeta que
+              dice 545 y no había forma de entender la diferencia. */}
+          {enCeroSinMinimo > 0 && (
+            <span className="text-caption text-muted-foreground">
+              +{enCeroSinMinimo} en cero sin mínimo definido
+            </span>
+          )}
         </div>
         <ChevronDown className={`h-4 w-4 text-ink-crit/60 transition-transform ${expanded ? 'rotate-180' : ''}`} />
       </button>

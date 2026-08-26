@@ -1,18 +1,52 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { assetPlano } from '@/data/planos'
+import { assetPlano, assetPlanoAlternativas } from '@/data/planos'
 
 const CACHE_PLANOS = 'planos-offline-v1'
 
-/** Red primero; si no hay señal, lo guardado con "Disponible sin señal". */
-async function fetchConCache(url: string, init?: RequestInit): Promise<Response> {
-  try {
-    const r = await fetch(url, init)
-    if (r.ok) return r
-    throw new Error(String(r.status))
-  } catch (e) {
-    const c = await caches.open(CACHE_PLANOS).then((c) => c.match(url)).catch(() => undefined)
-    if (c) return c
-    throw e
+/**
+ * Red primero; si no hay señal, lo guardado con "Disponible sin señal".
+ *
+ * Con REINTENTO: el índice del despiece pesa ~134 KB comprimidos y la señal
+ * de planta parpadea — un solo fallo dejaba la pantalla en "No se pudo
+ * cargar" sin salida. Dos reintentos cortos cubren el bache típico antes de
+ * caer a la caché offline.
+ */
+/**
+ * Prueba las rutas posibles del asset (en desarrollo: copia local y, si no
+ * está, Storage) y devuelve la primera que responde. Así el preview funciona
+ * sin tener que alternar flags a mano.
+ */
+async function fetchAsset(slug: string, archivo: string, init?: RequestInit): Promise<Response> {
+  const urls = assetPlanoAlternativas(slug, archivo)
+  let ultimo: unknown = new Error('sin rutas')
+  for (const url of urls) {
+    try {
+      return await fetchConCache(url, init, urls.length > 1 ? 0 : 2)
+    } catch (e) {
+      ultimo = e
+    }
+  }
+  throw ultimo
+}
+
+async function fetchConCache(url: string, init?: RequestInit, reintentos = 2): Promise<Response> {
+  for (let intento = 0; ; intento++) {
+    try {
+      const r = await fetch(url, init)
+      if (r.ok) return r
+      // 4xx no se reintenta: el archivo no está, esperar no lo trae.
+      if (r.status >= 400 && r.status < 500) throw new Error(String(r.status))
+      throw new Error(`HTTP ${r.status}`)
+    } catch (e) {
+      const esCliente = e instanceof Error && /^4\d\d$/.test(e.message)
+      if (!esCliente && intento < reintentos) {
+        await new Promise((r) => setTimeout(r, 600 * (intento + 1)))
+        continue
+      }
+      const c = await caches.open(CACHE_PLANOS).then((c) => c.match(url)).catch(() => undefined)
+      if (c) return c
+      throw e
+    }
   }
 }
 
@@ -23,15 +57,18 @@ export async function guardarPlanoOffline(
   onAvance: (hechas: number, total: number) => void,
 ): Promise<void> {
   const cache = await caches.open(CACHE_PLANOS)
-  const urls = [assetPlano(slug, 'indice.json')]
+  // `busqueda.json` va SIEMPRE: sin él, el plano guardado "para usar sin
+  // señal" abre pero no se puede buscar — justo lo que más se necesita en una
+  // zona sin cobertura. Los planos que no lo emiten devuelven 404 y se saltan.
+  const urls = [assetPlano(slug, 'indice.json'), assetPlano(slug, 'busqueda.json')]
   hojas.forEach((b) => {
     const nn = String(b).padStart(2, '0')
     urls.push(assetPlano(slug, `hoja-${nn}.svg`), assetPlano(slug, `hoja-${nn}.json`))
   })
   let hechas = 0
   for (const url of urls) {
-    const r = await fetch(url)
-    if (r.ok) await cache.put(url, r)
+    const r = await fetch(url).catch(() => null)
+    if (r?.ok) await cache.put(url, r)
     hechas++
     onAvance(hechas, urls.length)
   }
@@ -54,12 +91,22 @@ export type PlanoBorne = { b: Caja; t: string; h: number; tb: Caja }
 export type PlanoBorneLibre = { b: Caja; t: string; op: { k: string; h: number; tb: Caja }[] }
 /** Un rótulo en otro idioma con su traducción. `dup` = repetición a tapar. */
 export type PlanoRotulo = { b: Caja; de: string; es: string; r: number; dup?: number }
+/** Una fila de la tabla de un despiece: posición del catálogo + su código. */
+/** `q` = cuántas unidades lleva la máquina (heredado del catálogo 2014; el x1
+ *  no se emite porque es el caso normal y solo haría ruido). */
+export type FilaDespiece = { pos: string; de?: string; en?: string; fr?: string; es?: string; nr?: string; fig?: string; q?: number | string }
 
 export type PlanoHojaMeta = {
   blatt: number
   vb: [number, number]
   cols: Record<string, number>
-  seccion: 'circuitos' | 'bornes'
+  /** 'circuitos' | 'bornes' en los planos eléctricos; en el despiece es la
+   *  etiqueta de capítulo ya armada ("70 · Equipo eléctrico"). */
+  seccion: string
+  /** Solo despiece: id de la figura del catálogo ("70-8"). */
+  fig?: string
+  /** Solo despiece: grupo/conjunto al que pertenece la figura, si aplica. */
+  conjunto?: string | null
   titulo: string
   tituloEs: string
   n: { x: number; t: number; d: number }
@@ -74,16 +121,50 @@ export type PlanoIndice = {
   hojas: PlanoHojaMeta[]
   /** aparato -> todas sus apariciones, cada una con su caja exacta */
   indice: Record<string, PlanoAparicion[]>
-  /** todos los rotulos traducidos del plano, para el buscador */
+  /** Todos los rótulos traducidos del plano, para el buscador.
+   *  ⚠ En los planos grandes (despiece) viaja APARTE en `busqueda.json` y
+   *  llega vacío acá: son el 50% del peso y solo hacen falta al buscar, no
+   *  al abrir. `usePlano` lo carga bajo demanda y lo fusiona. */
   busqueda: PlanoBusquedaItem[]
   /** borne -> su columna en el Klemmenplan, para el buscador */
   bornesIdx: Record<string, { h: number; tb: Caja }>
   /** descripcion tecnica natural de cada aparato, generada del propio plano */
   descs?: Record<string, string>
   glosario: Record<string, string>
+  /** Solo despiece: código de fabricante -> SAP, para cruzar con /repuestos.
+   *  Planos viejos no lo traen (undefined). */
+  sapPorCodigo?: Record<string, { s: string; n: string; u: string }>
+  /** Solo despiece: código de fabricante -> cuántas figuras distintas usan esa
+   *  misma pieza. Solo trae los códigos con más de 1 uso. */
+  usosPorCodigo?: Record<string, number>
+  /** Vocabulario de planta → palabra del catálogo ("descanso" → "cojinete"). */
+  sinonimos?: Record<string, string>
+  /** Solo despiece: desde cuántos usos una pieza pasa de "específica" a
+   *  "ferretería común" (se marca con palabras, no con el número). */
+  umbralComun?: number
+  /** Solo despiece: accesos rápidos de uso diario (piezas de desgaste...). */
+  destacados?: { hoja: number; etiqueta: string; detalle: string }[]
+  /** Solo despiece: código -> {hoja: [posiciones]} cuando el MISMO código
+   *  ocupa varias posiciones de una misma figura (el sensor 42303077 es a la
+   *  vez B10, B14 y B15). */
+  hermanasPorCodigo?: Record<string, Record<string, string[]>>
+  /** Solo despiece: códigos que el catálogo lista como piezas de desgaste.
+   *  Se marcan en CUALQUIER figura donde aparezcan, no solo en la suya. */
+  desgaste?: string[]
 }
 
-export type PlanoHoja = { svg: string; xrefs: PlanoSalto[]; tags: PlanoAparato[]; terms: PlanoRotulo[]; bornes: PlanoBorne[]; libres: PlanoBorneLibre[] }
+export type PlanoHoja = {
+  svg: string
+  xrefs: PlanoSalto[]
+  tags: PlanoAparato[]
+  terms: PlanoRotulo[]
+  bornes: PlanoBorne[]
+  libres: PlanoBorneLibre[]
+  /** Solo despiece: la tabla completa de la figura (con y sin ancla OCR). */
+  filas?: FilaDespiece[]
+  /** Solo despiece: glosario de abreviaturas de la figura, si trae. */
+  leyenda?: Record<string, string>
+}
 
 /**
  * Carga el índice de un plano y sus hojas bajo demanda.
@@ -100,8 +181,41 @@ export function usePlano(slug: string | undefined, inicial?: number) {
   const [cargando, setCargando] = useState(false)
   const cache = useRef(new Map<number, PlanoHoja>())
 
+  // El buscador vive aparte en los planos grandes: se trae al primer tecleo.
+  const busquedaPedida = useRef(false)
+  // El buscador de los planos grandes viaja aparte y se trae al escribir. Sin
+  // exponer que ESTA CARGANDO, la primera consulta de la sesion contesta "sin
+  // coincidencias" mientras baja el archivo, y quien no ve su pieza concluye
+  // que no esta en el plano.
+  const [buscadorListo, setBuscadorListo] = useState(true)
+  const cargarBusqueda = useCallback(() => {
+    if (busquedaPedida.current || !slug) return
+    busquedaPedida.current = true
+    setBuscadorListo(false)
+    fetchAsset(slug, 'busqueda.json')
+      .then((r) => r.json())
+      .then((d: { busqueda?: PlanoBusquedaItem[]; descs?: Record<string, string> }) => {
+        setIndice((prev) => (prev
+          ? { ...prev, busqueda: d.busqueda ?? prev.busqueda, descs: d.descs ?? prev.descs }
+          : prev))
+        setBuscadorListo(true)
+      })
+      .catch(() => {
+        // sin buscador el visor sigue sirviendo: se permite reintentar
+        busquedaPedida.current = false
+        setBuscadorListo(true)
+      })
+  }, [slug])
+
+  // Permite reintentar a mano cuando la red de planta se cayó del todo: sin
+  // esto el único camino era recargar la página (y perder la hoja abierta).
+  const [intentoIndice, setIntentoIndice] = useState(0)
+  const reintentar = useCallback(() => setIntentoIndice((n) => n + 1), [])
+
   useEffect(() => {
     cache.current.clear()
+    busquedaPedida.current = false
+    setBuscadorListo(true)
     setIndice(null)
     setHoja(null)
     setError(null)
@@ -110,13 +224,25 @@ export function usePlano(slug: string | undefined, inicial?: number) {
     // El indice CAMBIA (titulos OCR, capas nuevas) y los planos en Storage se
     // subieron primero con cache de 24 h: revalidar siempre (ETag barato).
     // Las hojas SVG son inmutables y siguen con la cache normal.
-    fetchConCache(assetPlano(slug, 'indice.json'), { cache: 'no-cache' })
+    fetchAsset(slug, 'indice.json', { cache: 'no-cache' })
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
         return r.json()
       })
       .then((d: PlanoIndice) => {
-        if (vivo) setIndice(d)
+        // Defaults ANTES de publicar el índice: los planos grandes emiten
+        // `busqueda` aparte y el consumidor la itera sin preguntar —
+        // exactamente el patrón que ya salvó al lienzo con las capas de hoja.
+        if (vivo) {
+          setIndice({
+            ...d,
+            busqueda: d.busqueda ?? [],
+            indice: d.indice ?? {},
+            hojas: d.hojas ?? [],
+            bornesIdx: d.bornesIdx ?? {},
+            glosario: d.glosario ?? {},
+          })
+        }
       })
       .catch(() => {
         if (vivo) setError('No se pudo cargar el índice del plano.')
@@ -124,7 +250,7 @@ export function usePlano(slug: string | undefined, inicial?: number) {
     return () => {
       vivo = false
     }
-  }, [slug])
+  }, [slug, intentoIndice])
 
   const traer = useCallback(
     async (blatt: number): Promise<PlanoHoja | null> => {
@@ -133,33 +259,42 @@ export function usePlano(slug: string | undefined, inicial?: number) {
       if (yaEsta) return yaEsta
       const nn = String(blatt).padStart(2, '0')
       const [svg, zonas] = await Promise.all([
-        fetchConCache(assetPlano(slug, `hoja-${nn}.svg`)).then((r) => r.text()),
-        fetchConCache(assetPlano(slug, `hoja-${nn}.json`)).then((r) => r.json()),
+        fetchAsset(slug, `hoja-${nn}.svg`).then((r) => r.text()),
+        fetchAsset(slug, `hoja-${nn}.json`).then((r) => r.json()),
       ])
       // Defaults ANTES del spread: un hoja-NN.json viejo en la caché HTTP del
       // navegador (de un deploy anterior, sin `bornes` o `libres`) reventaba
       // el lienzo en `.map`. Con esto, un JSON incompleto degrada a "esa capa
       // no aparece" en vez de a pantalla en blanco.
-      const datos: PlanoHoja = { svg, xrefs: [], tags: [], terms: [], bornes: [], libres: [], ...zonas }
+      const datos: PlanoHoja = { svg, xrefs: [], tags: [], terms: [], bornes: [], libres: [], filas: [], leyenda: {}, ...zonas }
       cache.current.set(blatt, datos)
       return datos
     },
     [slug],
   )
 
+  // Ultima hoja PEDIDA. Sin esto gana la que resuelve ultima, no la que el
+  // usuario pidio ultima: un deep-link ?fig= perdia contra la hoja recordada
+  // en localStorage (dos abrir() en vuelo) y aterrizaba en la hoja
+  // equivocada — reproducido en produccion. Pasa igual al tocar dos hojas
+  // seguidas si la primera es mas pesada.
+  const pedida = useRef<number | null>(null)
+
   const abrir = useCallback(
     async (blatt: number) => {
       if (!indice) return
       if (!indice.hojas.some((h) => h.blatt === blatt)) return
+      pedida.current = blatt
       setCargando(true)
       try {
         const datos = await traer(blatt)
+        if (pedida.current !== blatt) return // llego tarde: ya piden otra
         if (datos) setHoja({ blatt, datos })
         setError(null)
       } catch {
-        setError(`No se pudo cargar la hoja ${blatt}.`)
+        if (pedida.current === blatt) setError(`No se pudo cargar la hoja ${blatt}.`)
       } finally {
-        setCargando(false)
+        if (pedida.current === blatt) setCargando(false)
       }
       // Prefetch de las vecinas, sin bloquear ni romper si fallan.
       const i = indice.hojas.findIndex((h) => h.blatt === blatt)
@@ -180,5 +315,5 @@ export function usePlano(slug: string | undefined, inicial?: number) {
     if (destino != null) void abrir(destino)
   }, [indice, hoja, abrir, inicial])
 
-  return { indice, hoja, abrir, cargando, error }
+  return { indice, hoja, abrir, cargando, error, reintentar, cargarBusqueda, buscadorListo }
 }

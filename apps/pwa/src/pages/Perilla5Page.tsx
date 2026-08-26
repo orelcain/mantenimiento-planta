@@ -22,10 +22,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
-  AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, CircleGauge, Copy, LineChart as LineChartIcon, Loader2, RotateCcw,
+  AlertTriangle,
+  PencilLine, Share2, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, CircleGauge, Copy,
+  TrendingDown, TrendingUp, LineChart as LineChartIcon, Loader2, RotateCcw,
   Save, Video,
 } from 'lucide-react'
-import { Line } from 'react-chartjs-2'
+import { Line, getElementAtEvent } from 'react-chartjs-2'
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -53,6 +55,7 @@ import {
   type ContadoresProtocolo,
   type LecturaProtocolo,
   type MaquinaBaader,
+  incidenciasProtocolo, type IncidenciaProtocolo,
 } from '@/services/baader142/perilla5Protocolo'
 import {
   borrarNota,
@@ -64,7 +67,9 @@ import {
   type NotaFigura,
 } from '@/services/baader142/perilla5Notas'
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend)
+import zoomPlugin from 'chartjs-plugin-zoom'
+
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend, zoomPlugin)
 
 type Vista = 'herramienta' | 'protocolo'
 
@@ -121,6 +126,31 @@ const SERIES_PARADAS: typeof SERIES = [
   { k: 'anusi', label: 'Cuchilla punta I', color: '#2E75B6' },
   { k: 'anuso', label: 'Cuchilla punta O', color: '#0f9d8f' },
 ]
+
+/** Nombre corto para el chip: el largo vive en el tooltip del gráfico. */
+/* Nombres COMPLETOS: las abreviaturas («Abraz.», «Cuch. I») se leían como
+   texto entrecortado — feedback directo de Orel. Sin la cantidad en el chip
+   hay espacio para la palabra entera; la fila envuelve y no pasa nada. */
+const CORTO: Record<string, string> = {
+  stopc: 'Total correcciones', tclipc: 'Abrazaderas', e821c: 'Centraje SM1',
+  e822c: 'Cuchilla SM2', e823c: 'Aspirador SM3', e824c: 'Excavador A SM4',
+  e825c: 'Excavador B SM5',
+  stops: 'Total paradas', tclip: 'Abrazaderas', anusi: 'Cuchilla punta I',
+  anuso: 'Cuchilla punta O',
+}
+
+/** URL absoluta de esta vista con la máquina puesta — se pega en Telegram. */
+function urlProtocoloMaquina(maquina: string): string {
+  return `${window.location.origin}${import.meta.env.BASE_URL}aprendizaje/perilla-5?vista=protocolo&maquina=${encodeURIComponent(maquina)}`
+}
+
+/** Código de panel para espacios chicos (pill del veredicto): códigos
+ *  industriales reales, no palabras mutiladas. El nombre completo va en CORTO. */
+const CODIGO: Record<string, string> = {
+  stopc: 'STOP-C', tclipc: 'T-CLIP-C', e821c: 'SM1', e822c: 'SM2',
+  e823c: 'SM3', e824c: 'SM4', e825c: 'SM5',
+  stops: 'STOPS', tclip: 'T-CLIP', anusi: 'ANUS-I', anuso: 'ANUS-O',
+}
 
 export type Metrica = 'correcciones' | 'paradas'
 
@@ -523,6 +553,10 @@ function VistaProtocolo() {
   const [lecturas, setLecturas] = useState<LecturaProtocolo[]>([])
   const [cargando, setCargando] = useState(true)
   const [metrica, setMetrica] = useState<Metrica>('correcciones')
+  const cambiarMetrica = (m: Metrica) => {
+    setMetrica(m)
+    guardarPrefs(maquina, { metrica: m })
+  }
   const [borrador, setBorrador] = useState<BorradorVideo | null>(null)
   /** Cambia de máquina y deja la URL compartible (?maquina=n2). */
   const cambiarMaquina = (id: MaquinaBaader) => {
@@ -556,11 +590,92 @@ function VistaProtocolo() {
       setFilasPorMaquina(fs)
     })
     return () => { vivo = false }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [guardadoOk])   // se refresca al guardar una lectura nueva
 
   /** Superponer la serie visible en las OTRAS máquinas (solo con UNA encendida). */
   const [comparar, setComparar] = useState(false)
+  /** P41: incidencias nacidas del lector (marcador [protocolo142 …]). */
+  const [incidencias, setIncidencias] = useState<IncidenciaProtocolo[]>([])
+  /**
+   * P61: el gráfico como PNG con fondo del tema y título — para pegarlo en el
+   * grupo de Telegram como evidencia visual, no solo texto. En celular abre la
+   * hoja de compartir del sistema; sin soporte, descarga.
+   */
+  const compartirImagen = async () => {
+    const chart = chartRef.current as { canvas?: HTMLCanvasElement } | null
+    const src = chart?.canvas
+    if (!src) return
+    const escala = window.devicePixelRatio || 1
+    const margen = 16 * escala
+    const alturaTitulo = 34 * escala
+    const out = document.createElement('canvas')
+    out.width = src.width + margen * 2
+    out.height = src.height + alturaTitulo + margen * 2
+    const ctx = out.getContext('2d')
+    if (!ctx) return
+    const estilos = getComputedStyle(document.documentElement)
+    const fondo = estilos.getPropertyValue('--lc-surface').trim() || '#ffffff'
+    const tinta = estilos.getPropertyValue('--lc-ink').trim() || '#111'
+    ctx.fillStyle = fondo
+    ctx.fillRect(0, 0, out.width, out.height)
+    ctx.fillStyle = tinta
+    ctx.font = `600 ${13 * escala}px system-ui, sans-serif`
+    const etiqueta = MAQUINAS.find((m) => m.id === maquina)?.label ?? maquina
+    ctx.fillText(
+      `Protocolo ${etiqueta} · ${metrica === 'paradas' ? 'paradas' : 'correcciones'} /1000 · ${new Date().toISOString().slice(0, 10)}`,
+      margen, margen + 14 * escala,
+    )
+    ctx.drawImage(src, margen, alturaTitulo + margen)
+    const blob: Blob | null = await new Promise((res) => out.toBlob(res, 'image/png'))
+    if (!blob) return
+    const nombre = `tendencia-${maquina}-${new Date().toISOString().slice(0, 10)}.png`
+    const archivo = new File([blob], nombre, { type: 'image/png' })
+    if (navigator.canShare?.({ files: [archivo] })) {
+      try { await navigator.share({ files: [archivo], title: nombre }); return } catch { /* cancelado */ }
+    }
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = nombre
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  /** P52: true cuando el usuario hizo zoom — enciende el «restablecer». */
+  const [conZoom, setConZoom] = useState(false)
+
+  /** P47: punto del gráfico elegido con click/tap → detalle con la pauta. */
+  const [detallePunto, setDetallePunto] = useState<{ clave: string; fecha: string; tasa: number } | null>(null)
+  const chartRef = useRef<never>(null)
+  const detalleRef = useRef<HTMLDivElement | null>(null)
+  // cambiar de máquina o métrica invalida el punto elegido
+  useEffect(() => { setDetallePunto(null) }, [maquina, metrica])
+
+
+  useEffect(() => {
+    let cancelado = false
+    incidenciasProtocolo(maquina)
+      .then((filas) => { if (!cancelado) setIncidencias(filas) })
+      .catch(() => { if (!cancelado) setIncidencias([]) })
+    return () => { cancelado = true }
+  }, [maquina])
+
+  /**
+   * Preferencias por máquina (métrica y series apagadas) en localStorage:
+   * volver a la vista y encontrarla como la dejaste. La clave incluye la
+   * máquina porque N2 con abrazaderas críticas y N3 sana se miran distinto.
+   */
+  const PREFS_KEY = 'perilla5-protocolo-prefs'
+  const leerPrefs = useCallback((): Record<string, { metrica?: Metrica; apagadas?: string[] }> => {
+    try { return JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}') } catch { return {} }
+  }, [])
+  const guardarPrefs = useCallback((id: string, patch: { metrica?: Metrica; apagadas?: string[] }) => {
+    try {
+      const todo = leerPrefs()
+      todo[id] = { ...todo[id], ...patch }
+      localStorage.setItem(PREFS_KEY, JSON.stringify(todo))
+    } catch { /* almacenamiento lleno o bloqueado: la vista funciona igual */ }
+  }, [leerPrefs])
 
   // Registrar es semanal y el explicativo es de una sola vez: ambos plegados.
   const [mostrarForm, setMostrarForm] = useState(false)
@@ -712,6 +827,10 @@ function VistaProtocolo() {
   // más el total. La N2 de hoy abre con 3 líneas, no 7 — menos es más (§63).
   useEffect(() => {
     setComparar(false)
+    const pref = leerPrefs()[maquina]
+    // metrica guardada de esta maquina (solo al entrar a la maquina)
+    if (pref?.metrica && pref.metrica !== metrica) setMetrica(pref.metrica)
+    if (pref?.apagadas) { setApagadas(new Set(pref.apagadas)); return }
     if (!ultimaValida) { setApagadas(new Set()); return }
     const off = new Set<string>()
     for (const s of seriesActivas) {
@@ -722,45 +841,73 @@ function VistaProtocolo() {
       if (!esTotal && nivelTasa(r, m).label === 'normal') off.add(k)
     }
     setApagadas(off)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [maquina, metrica, ultimaValida, seriesActivas])
 
+  /** La lectura válida ANTERIOR a la última: el denominador de los deltas. */
+  const penultimaValida = useMemo(() => {
+    const validas = serie.filter((l) => muestraValida(l))
+    return validas.length >= 2 ? (validas[validas.length - 2] ?? null) : null
+  }, [serie])
+
   /** Chips-leyenda: cada serie con su valor actual; los motores sanos, plegados en uno. */
+  /**
+   * P72: series con datos en ALGUNA lectura válida del historial. Las que
+   * nunca marcaron nada no aparecen ni en chips ni en el gráfico — puro
+   * ruido. OJO: se mira TODO el historial, no la última lectura: el SM4
+   * hoy está en 0 viniendo de 370, y esa bajada es justo la historia que
+   * hay que poder ver.
+   */
+  const seriesConDatos = useMemo(
+    () => seriesActivas.filter((s) =>
+      serie.some((l) => muestraValida(l) && tasa1000(l[s.k], l.fish) > 0)),
+    [seriesActivas, serie],
+  )
+
   const chips = useMemo(() => {
-    type Chip = { id: string; label: string; color?: string; on: boolean; toggle: () => void }
+    type Chip = { id: string; label: string; nombreLargo?: string; color?: string; on: boolean; toggle: () => void; delta?: 'sube' | 'baja' }
     const alternar = (ks: string[], encender: boolean) =>
       setApagadas((prev) => {
         const n = new Set(prev)
         for (const k of ks) { if (encender) n.delete(k); else n.add(k) }
+        guardarPrefs(maquina, { apagadas: [...n] })
         return n
       })
     const items: Chip[] = []
-    const motoresSanos: string[] = []
-    for (const s of seriesActivas) {
+    /* P56 (aprobado por Orel): TODAS las series de la métrica, siempre — el
+       plegado «+N en verde» escondía el menú de lo elegible. Los motores van
+       con su código del panel (SM1…SM5) y el valor lleva su semáforo. */
+    /* P67: lo alterado primero — el orden del panel (SM1…SM5) es para la
+       Herramienta; acá la pregunta es «¿qué está mal?», y eso va a la
+       izquierda. Empate: orden del panel, estable. */
+    const ordenadas = [...seriesConDatos].sort((a, b) => {
+      const ex = (s2: typeof a) => {
+        const r2 = ultimaValida ? tasa1000(ultimaValida[s2.k], ultimaValida.fish) : 0
+        const m2 = METRICA_DE[s2.k as string] ?? 'correcciones'
+        return r2 / UMBRALES[m2].intervenir
+      }
+      return ex(b) - ex(a)
+    })
+    for (const s of ordenadas) {
       const k = s.k as string
       const r = ultimaValida ? tasa1000(ultimaValida[s.k], ultimaValida.fish) : null
-      const m = METRICA_DE[k] ?? 'correcciones'
-      const sano = r !== null && nivelTasa(r, m).label === 'normal'
-      if (k.startsWith('e82') && sano) { motoresSanos.push(k); continue }
+      const rPrev = penultimaValida ? tasa1000(penultimaValida[s.k], penultimaValida.fish) : null
       items.push({
         id: k,
-        label: r !== null ? `${s.label} ${r}` : s.label,
+        // P71: SOLO el nombre — la cantidad apretaba el texto y se leía
+        // entrecortado; el valor vive en el gráfico, el tooltip y el title.
+        label: CORTO[k] ?? s.label,
+        nombreLargo: r !== null ? `${s.label} · ${r}/1000` : s.label,
         color: s.color,
         on: !apagadas.has(k),
         toggle: () => alternar([k], apagadas.has(k)),
-      })
-    }
-    if (motoresSanos.length > 0) {
-      const on = motoresSanos.some((k) => !apagadas.has(k))
-      items.push({
-        id: 'motores',
-        label: `Motores (${motoresSanos.length} en verde)`,
-        on,
-        toggle: () => alternar(motoresSanos, !on),
+        // direccion vs la lectura anterior: subir es malo en estas series
+        delta: r !== null && rPrev !== null && r !== rPrev ? (r > rPrev ? 'sube' : 'baja') : undefined,
       })
     }
     // Con UNA serie encendida se puede comparar contra las otras máquinas:
     // la brecha que el lector dice en texto, vista.
-    const encendidas = seriesActivas.filter((s) => !apagadas.has(s.k as string))
+    const encendidas = seriesConDatos.filter((s) => !apagadas.has(s.k as string))
     if (encendidas.length === 1) {
       items.push({
         id: 'comparar',
@@ -770,25 +917,29 @@ function VistaProtocolo() {
       })
     }
     return items
-  }, [seriesActivas, ultimaValida, apagadas, comparar])
+  }, [seriesConDatos, ultimaValida, penultimaValida, apagadas, comparar, maquina, guardarPrefs])
 
-  /** Veredicto de una lectura: el peor de los 11 contadores contra SU escala. */
+  /** Veredicto de una lectura: el peor de los 11 contadores contra SU escala.
+   *  Devuelve además QUIÉN lo causó — «crítico» a secas obligaba a expandir
+   *  la fila para saber si era el mismo contador de siempre u otro nuevo. */
   const veredictoDe = (l: LecturaProtocolo) => {
-    if (!muestraValida(l)) return { label: 'muestra insuf.', color: LC.warn, soft: LC.warnSoft }
-    let peor: { label: string; color: string; exceso: number } = { label: 'normal', color: LC.ok, exceso: 0 }
+    if (!muestraValida(l)) return { label: 'muestra insuf.', color: LC.warn, soft: LC.warnSoft, dominante: null as string | null }
+    let peor: { label: string; color: string; exceso: number; dominante: string | null } =
+      { label: 'normal', color: LC.ok, exceso: 0, dominante: null }
     for (const s of [...SERIES, ...SERIES_PARADAS]) {
       const m = METRICA_DE[s.k as string] ?? 'correcciones'
       const r = tasa1000(l[s.k], l.fish)
       const ex = r / UMBRALES[m].intervenir
       if (ex > peor.exceso) {
         const n = nivelTasa(r, m)
-        peor = { label: n.label, color: n.color, exceso: ex }
+        peor = { label: n.label, color: n.color, exceso: ex,
+                 dominante: ex >= 1 ? `${CODIGO[s.k as string] ?? s.label} ${r}` : null }
       }
     }
     const soft = peor.label === 'crítico' ? LC.dangerSoft
       : peor.label === 'intervenir' ? LC.warnSoft
       : peor.label === 'vigilar' ? LC.prepSoft : LC.okSoft
-    return { label: peor.label, color: peor.color, soft }
+    return { label: peor.label, color: peor.color, soft, dominante: peor.dominante }
   }
 
   /**
@@ -833,25 +984,40 @@ function VistaProtocolo() {
   }, [serie])
 
   /**
+   * P42: el lazo del contador dominante. Una ABIERTA frena el duplicado; una
+   * RESUELTA con la tasa más baja que cuando se registró es la frase que
+   * cierra el círculo: se intervino y el número bajó.
+   */
+  const lazo = useMemo(() => {
+    if (!queRevisar) return null
+    const delContador = incidencias.filter((i) => i.contador === String(queRevisar.serie.k))
+    const abierta = delContador.find((i) => ['pendiente', 'confirmada', 'en_proceso'].includes(i.status)) ?? null
+    const resuelta = delContador.find((i) =>
+      ['resuelta', 'cerrada'].includes(i.status)
+      && i.lectura < queRevisar.lectura.fecha
+      && i.tasa > queRevisar.tasa) ?? null
+    return { abierta, resuelta }
+  }, [incidencias, queRevisar])
+
+  /**
    * Comparación entre máquinas para el lector: el mismo contador dominante en
    * las otras dos, con su última lectura válida. "La N3, con la misma pesca,
    * está en 31" enseña más que cualquier umbral.
    */
-  const [comparacion, setComparacion] = useState<{ maquina: string; tasa: number }[]>([])
-  useEffect(() => {
-    let vivo = true
-    if (!queRevisar) { setComparacion([]); return }
-    const otras = MAQUINAS.filter((m) => m.id !== maquina)
-    void Promise.all(otras.map(async (m) => {
-      const rows = await lecturasDeMaquina(m.id, 'chonchi', 6)
-      const ult = rows.find((l) => muestraValida(l))
-      return ult
-        ? { maquina: m.label.replace('Baader 142 ', '').replace(' (antigua)', ''),
-            tasa: tasa1000(ult[queRevisar.serie.k], ult.fish) }
-        : null
-    })).then((r) => { if (vivo) setComparacion(r.filter((x): x is NonNullable<typeof x> => x !== null)) })
-    return () => { vivo = false }
-  }, [maquina, queRevisar])
+  // Derivada de filasPorMaquina — el fetch de veredictos ya trajo estas filas;
+  // pedirlas de nuevo eran 2 reads de Firestore duplicados por cambio de máquina.
+  const comparacion = useMemo(() => {
+    if (!queRevisar) return []
+    return MAQUINAS.filter((m) => m.id !== maquina)
+      .map((m) => {
+        const ult = (filasPorMaquina[m.id] ?? []).find((l) => muestraValida(l))
+        return ult
+          ? { maquina: m.label.replace('Baader 142 ', '').replace(' (antigua)', ''),
+              tasa: tasa1000(ult[queRevisar.serie.k], ult.fish) }
+          : null
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null)
+  }, [maquina, queRevisar, filasPorMaquina])
 
   /**
    * Cierre del lazo: la incidencia sale precargada con máquina, código y pauta.
@@ -860,6 +1026,9 @@ function VistaProtocolo() {
    */
   const registrarIncidencia = () => {
     if (!queRevisar) return
+    // P63: la incidencia nueva invalida la caché del lazo — al volver, el
+    // lector debe verla como «abierta», no servir la foto vieja de la sesión.
+    try { sessionStorage.removeItem(`p5incid:${maquina}`) } catch { /* sin storage */ }
     const q = queRevisar
     const unidadRuido = q.metrica === 'paradas' ? 'paradas' : 'correcciones'
     const titulo = `${q.serie.label}: ${q.tasa}/1000 ${unidadRuido} (protocolo ${MAQUINAS.find((m) => m.id === maquina)?.label ?? maquina})`
@@ -872,6 +1041,8 @@ function VistaProtocolo() {
       'Pauta:',
       ...pasos.map((s, i) => `${i + 1}. ${s}`),
       ...(q.esMotor ? [`${pasos.length + 1}. ${PASO_FINAL}`] : []),
+      '',
+      urlProtocoloMaquina(maquina),
     ].filter(Boolean).join('\n')
     navigate(`/incidents?nueva=1&titulo=${encodeURIComponent(titulo)}&desc=${encodeURIComponent(desc)}`)
   }
@@ -889,6 +1060,7 @@ function VistaProtocolo() {
       ...comparacion.map((c) => `${c.maquina} está en ${c.tasa}/1000.`),
       'Pauta:',
       ...(q.saber?.pasos ?? []).map((s, i) => `${i + 1}. ${s}`),
+      urlProtocoloMaquina(maquina),
     ]
     const texto = lineas.join('\n')
     try {
@@ -907,6 +1079,27 @@ function VistaProtocolo() {
     window.setTimeout(() => setCopiado(false), 2500)
   }
 
+  /**
+   * P39: reinicio del protocolo entre lecturas. Los contadores del panel son
+   * ACUMULATIVOS desde el último reset; si el crudo baja de una lectura a la
+   * siguiente, alguien puso el protocolo en cero entre medio (pasó en la N2:
+   * la tasa «mejoró» de 1026 a 341 con reset de por medio). La tasa /1000
+   * sigue siendo comparable, pero el que lee tiene derecho a saberlo.
+   */
+  const huboReinicio = useMemo(() => {
+    const marcas = new Set<string>()
+    let previa: LecturaProtocolo | null = null
+    for (const l of serie) {
+      if (previa) {
+        const bajaCrudo = ([...SERIES, ...SERIES_PARADAS] as const)
+          .some((s) => l[s.k] < previa![s.k])
+        if (l.fish < previa.fish || bajaCrudo) marcas.add(l.fecha)
+      }
+      previa = l
+    }
+    return marcas
+  }, [serie])
+
   const ultimoIdxValido = useMemo(() => {
     for (let i = serie.length - 1; i >= 0; i--) {
       const l = serie[i]
@@ -921,16 +1114,46 @@ function VistaProtocolo() {
     return on.length === 1 ? (on[0] ?? null) : null
   }, [seriesActivas, apagadas])
 
-  const chartData = useMemo(() => {
+  /** El gráfico en una frase, para lectores de pantalla (nunca solo imagen). */
+  const resumenGrafico = useMemo(() => {
+    if (!ultimaValida) return 'Sin lecturas para esta máquina.'
+    const partes = seriesActivas
+      .filter((s) => !apagadas.has(s.k as string))
+      .map((s) => `${s.label} en ${tasa1000(ultimaValida[s.k], ultimaValida.fish)} por mil`)
+    const etiqueta = MAQUINAS.find((m) => m.id === maquina)?.label ?? maquina
+    const extras = [
+      huboReinicio.size > 0 ? `${huboReinicio.size} lectura${huboReinicio.size > 1 ? 's' : ''} con reinicio del protocolo` : '',
+      incidencias.length > 0 ? `${incidencias.length} intervención${incidencias.length > 1 ? 'es' : ''} registrada${incidencias.length > 1 ? 's' : ''}` : '',
+    ].filter(Boolean).join('; ')
+    return `Tendencia de ${metrica} de ${etiqueta}. Última lectura ${fechaCorta(ultimaValida.fecha)}: ${partes.join(', ')}.${extras ? ` ${extras}.` : ''}`
+  }, [ultimaValida, seriesActivas, apagadas, maquina, metrica, huboReinicio, incidencias])
+
+  // Comparando, el eje es la UNIÓN de fechas de todas las máquinas: alinear
+  // por posición mentiría cuando una máquina saltó una semana.
+  const fechasEje = useMemo(() => {
     const activo = comparar && serieUnica !== null
-    // Comparando, el eje es la UNIÓN de fechas de todas las máquinas: alinear
-    // por posición mentiría cuando una máquina saltó una semana.
-    const fechasEje = activo
+    return activo
       ? [...new Set([
           ...serie.map((l) => l.fecha),
           ...MAQUINAS.flatMap((m) => (m.id === maquina ? [] : (filasPorMaquina[m.id] ?? []).map((l) => l.fecha))),
         ])].sort()
       : serie.map((l) => l.fecha)
+  }, [comparar, serieUnica, serie, maquina, filasPorMaquina])
+
+  /** P43: índices del eje con intervención registrada / reinicio del protocolo.
+   *  Va por CLOSURE al plugin y al tooltip: react-chartjs-2 solo sincroniza
+   *  labels y datasets — una clave extra en data muere en el primer update. */
+  const marcasGrafico = useMemo(() => ({
+    ints: fechasEje
+      .map((f, i) => (incidencias.some((inc) => inc.creada === f || inc.lectura === f) ? i : -1))
+      .filter((i) => i >= 0),
+    reins: fechasEje
+      .map((f, i) => (huboReinicio.has(f) ? i : -1))
+      .filter((i) => i >= 0),
+  }), [fechasEje, incidencias, huboReinicio])
+
+  const chartData = useMemo(() => {
+    const activo = comparar && serieUnica !== null
 
     const porFecha = (rows: LecturaProtocolo[]) => {
       const idx = new Map(rows.map((l) => [l.fecha, l]))
@@ -955,16 +1178,22 @@ function VistaProtocolo() {
       backgroundColor: s.color,
       // el ÚLTIMO punto válido va enfatizado: es el estado actual, el que
       // decide (dataviz: emphasized endpoint)
-      pointRadius: fechasEje.map((_, i) => (i === idxUltimo ? 4.5 : 2.5)),
+      pointRadius: fechasEje.map((f, i) =>
+        (detallePunto && detallePunto.clave === String(s.k) && detallePunto.fecha === f ? 6
+        : i === idxUltimo ? 4.5 : 2.5)),
       pointHoverRadius: 6,
+      // P53: tolerancia de dedo — el tap cuenta hasta 14px alrededor del punto
+      pointHitRadius: 14,
       pointBorderWidth: 1.5,
       pointBorderColor: isDark ? '#16242f' : '#ffffff',
       spanGaps: false,
       tension: 0.25,
       borderWidth: s.grosor ?? 1.75,
       borderDash: s.trazo ?? [],
-      // los chips mandan: serie apagada = dataset oculto (y el eje recalcula)
-      hidden: apagadas.has(s.k as string),
+      // los chips mandan: serie apagada = dataset oculto (y el eje recalcula);
+      // sin datos en todo el historial ni siquiera hay chip → oculto siempre
+      hidden: apagadas.has(s.k as string)
+        || !serie.some((l) => muestraValida(l) && tasa1000(l[s.k], l.fish) > 0),
       // clave del contador para que el tooltip encuentre su ficha en SABER
       clave: s.k as string,
     }))
@@ -978,6 +1207,7 @@ function VistaProtocolo() {
           backgroundColor: ejeColor,
           pointRadius: 2,
           pointHoverRadius: 5,
+          pointHitRadius: 14,
           spanGaps: false,
           tension: 0.25,
           borderWidth: 1.25,
@@ -988,7 +1218,7 @@ function VistaProtocolo() {
 
     return { labels: fechasEje.map(fechaCorta), datasets: [...propios, ...fantasmas] }
   }, [serie, seriesActivas, apagadas, isDark, ultimoIdxValido, comparar, serieUnica,
-      filasPorMaquina, maquina, ultimaValida, ejeColor])
+      filasPorMaquina, maquina, ultimaValida, ejeColor, fechasEje, detallePunto])
 
   /**
    * Bandas de umbral pintadas DETRÁS de la serie, con etiqueta al borde.
@@ -1017,6 +1247,35 @@ function VistaProtocolo() {
         const y = scales.y as { getPixelForValue: (v: number) => number; max: number } | undefined
         if (!chartArea || !y) return
         ctx.save()
+        /* P43: intervenciones como línea vertical aqua tenue (acá se actuó) y
+           reinicios como marca ⟳ en el borde superior. Los índices vienen en
+           el data del chart para no cerrar sobre estado stale. */
+        const x = scales.x as { getPixelForValue: (v: number) => number } | undefined
+        if (x) {
+          for (const i of marcasGrafico.ints) {
+            const px = x.getPixelForValue(i)
+            ctx.strokeStyle = isDark ? '#5aa6e8' : '#2E75B6'
+            ctx.globalAlpha = 0.35
+            ctx.setLineDash([2, 3])
+            ctx.lineWidth = 1.5
+            ctx.beginPath()
+            ctx.moveTo(px, chartArea.top)
+            ctx.lineTo(px, chartArea.bottom)
+            ctx.stroke()
+            ctx.setLineDash([])
+          }
+        }
+        if (x) {
+          for (const i of marcasGrafico.reins) {
+            const px = x.getPixelForValue(i)
+            ctx.globalAlpha = 0.9
+            ctx.fillStyle = isDark ? '#E0AC4E' : '#875105'
+            ctx.font = '10px ui-monospace, monospace'
+            ctx.textAlign = 'center'
+            ctx.fillText('⟳', px, chartArea.top + 9)
+          }
+        }
+        ctx.globalAlpha = 1
         for (const l of lineas) {
           if (l.v > y.max) continue          // fuera de escala: no dibujar en el borde
           const py = y.getPixelForValue(l.v)
@@ -1030,30 +1289,35 @@ function VistaProtocolo() {
           ctx.lineTo(chartArea.right, py)
           ctx.stroke()
           ctx.setLineDash([])
-          ctx.globalAlpha = 0.9
-          ctx.fillStyle = l.ink
+        }
+        ctx.restore()
+      },
+      /* P68 (v2): las ETIQUETAS van después de los datasets — en beforeDraw
+         los puntos las tapaban. Las líneas siguen detrás, como corresponde. */
+      afterDatasetsDraw(chart) {
+        const { ctx, chartArea, scales } = chart
+        const y = scales.y as { getPixelForValue: (v: number) => number; max: number } | undefined
+        if (!chartArea || !y) return
+        ctx.save()
+        for (const l of lineas) {
+          if (l.v > y.max) continue
+          const py = y.getPixelForValue(l.v)
+          if (py < chartArea.top + 6 || py > chartArea.bottom - 2) continue
           ctx.font = '700 9px system-ui'
           ctx.textAlign = 'right'
-          ctx.fillText(l.label, chartArea.right - 2, py - 3)
+          const ancho = ctx.measureText(l.label).width
+          ctx.globalAlpha = 0.85
+          ctx.fillStyle = isDark ? '#16242f' : '#ffffff'
+          ctx.fillRect(chartArea.right - ancho - 6, py - 12, ancho + 5, 11)
+          ctx.globalAlpha = 0.95
+          ctx.fillStyle = l.ink
+          ctx.fillText(l.label, chartArea.right - 3, py - 3)
         }
         ctx.restore()
       },
     }
     return plugin
-  }, [metrica, isDark])
-
-  /** Corta un texto en líneas de tooltip (~46 caracteres): Chart.js no envuelve. */
-  const envolver = (texto: string, ancho = 46): string[] => {
-    const palabras = texto.split(' ')
-    const lineas: string[] = []
-    let linea = ''
-    for (const p of palabras) {
-      if ((linea + ' ' + p).trim().length > ancho) { lineas.push(linea.trim()); linea = p }
-      else linea = linea + ' ' + p
-    }
-    if (linea.trim()) lineas.push(linea.trim())
-    return lineas
-  }
+  }, [metrica, isDark, marcasGrafico])
 
   const chartOptions = useMemo(
     () => ({
@@ -1066,8 +1330,27 @@ function VistaProtocolo() {
         : { duration: 400, easing: 'easeOutCubic' as const },
       // nearest (no index): el tooltip didáctico es de UN contador; con 7 series
       // el modo index apila las fichas de todas y no se puede leer ninguna
-      interaction: { mode: 'nearest' as const, intersect: false },
+      // P46: intersect true — el tooltip solo aparece TOCANDO un punto,
+      // no fantasmeando por todo el plano.
+      interaction: { mode: 'nearest' as const, intersect: true },
       plugins: {
+        /* P51: pinch en celular, rueda en computador, arrastre con ctrl para
+           panear — el mismo idioma que TelemetryChart. Solo eje x: acercarse a
+           una fecha separa los puntos apretados sin descalibrar el semáforo. */
+        zoom: {
+          pan: { enabled: true, mode: 'x' as const, modifierKey: 'ctrl' as const },
+          zoom: {
+            wheel: { enabled: true, speed: 0.1 },
+            pinch: { enabled: true },
+            mode: 'x' as const,
+            onZoomComplete: ({ chart }: { chart: { isZoomedOrPanned?: () => boolean } }) => {
+              setConZoom(chart.isZoomedOrPanned?.() ?? false)
+            },
+          },
+          // minRange 1: nunca menos de DOS fechas a la vista — colapsar a una
+          // sola categoría deja los puntos sin posición (NaN) y no hay qué tocar
+          limits: { x: { min: 'original' as const, max: 'original' as const, minRange: 1 } },
+        },
         legend: { display: false },   // los chips son la leyenda
         tooltip: {
           // El negro por defecto de Chart.js era una isla fuera del tema: va con
@@ -1089,18 +1372,15 @@ function VistaProtocolo() {
               const r = item.parsed.y ?? 0
               return `${item.dataset.label}: ${r}/1000 · ${nivelTasa(r, m).label}`
             },
-            // La ficha del contador: qué cuenta + la pauta. El tooltip ES la clase.
+            /* P46: el tooltip era la clase completa (ficha + pauta) y tapaba
+               el gráfico entero — feedback directo de Orel. Ahora: el dato, las
+               marcas del día y una invitación. La clase vive en el CLICK. */
             afterBody: (items: TooltipItem<'line'>[]) => {
-              const clave = (items[0]?.dataset as { clave?: string })?.clave ?? ''
-              const s = SABER[clave]
-              if (!s) return []
-              return [
-                '',
-                ...envolver(s.que),
-                '',
-                'Pauta:',
-                ...s.pasos.flatMap((p, i) => envolver(`${i + 1}. ${p}`)),
-              ]
+              const idx = items[0]?.dataIndex ?? -1
+              const marcas: string[] = []
+              if (marcasGrafico.reins.includes(idx)) marcas.push('⟳ protocolo reiniciado antes')
+              if (marcasGrafico.ints.includes(idx)) marcas.push('| intervención registrada ese día')
+              return [...marcas, 'Tocá el punto para ver la pauta']
             },
           },
         },
@@ -1108,17 +1388,23 @@ function VistaProtocolo() {
       scales: {
         x: { ticks: { color: ejeColor, font: { size: 11 } }, grid: { color: gridColor } },
         y: {
+          title: {
+            display: true,
+            text: 'por 1.000 pescados',
+            color: ejeColor,
+            font: { size: 10 },
+          },
           beginAtZero: true,
           ticks: { color: ejeColor, font: { size: 10 }, maxTicksLimit: 5 },
           grid: { color: gridColor },
         },
       },
     }),
-    [ejeColor, gridColor, metrica, isDark],
+    [ejeColor, gridColor, isDark, marcasGrafico],
   )
 
   return (
-    <div className="p5-protocolo mt-4 space-y-4">
+    <div className="p5-protocolo mx-auto mt-4 max-w-2xl space-y-4">
       {/* Selector de máquina: cada una lleva el punto de su veredicto — las tres
           plantas de un vistazo sin cambiar de máquina. Color + posición, y el
           detalle con texto al entrar (nunca solo color). */}
@@ -1180,12 +1466,16 @@ function VistaProtocolo() {
               >
                 <AlertTriangle className="h-5 w-5" />
               </span>
-              <div className="min-w-0 flex-1">
-                <h2 className="text-base font-semibold leading-tight">
-                  {queRevisar.saber?.titulo ?? queRevisar.serie.label}
+              <div className="min-w-[12rem] flex-1">
+                {/* P31: el titular es el DATO en lenguaje de planta; el nombre
+                    del contador y la lectura bajan al subtítulo. */}
+                <h2 className="text-base font-semibold leading-tight tabular-nums">
+                  {queRevisar.metrica === 'paradas' ? 'Una parada' : 'Una corrección'} cada{' '}
+                  {Math.max(1, Math.round(1000 / Math.max(queRevisar.tasa, 1)))} pescados
                 </h2>
                 <p className="text-caption" style={{ color: LC.inkMid }}>
-                  Lectura del {queRevisar.lectura.fecha} · {queRevisar.lectura.fish} pescados
+                  {queRevisar.serie.label} · lectura del {queRevisar.lectura.fecha} ·{' '}
+                  {queRevisar.lectura.fish} pescados
                 </p>
               </div>
               <span
@@ -1196,43 +1486,70 @@ function VistaProtocolo() {
               </span>
             </div>
 
-            {/* El lector: qué dice el gráfico hoy, en lenguaje de planta */}
-            <div className="mt-3 space-y-1.5 text-footnote" style={{ color: LC.ink }}>
-              <p>
-                {queRevisar.saber?.que ?? ''}{' '}
-                <strong className="tabular-nums">
-                  {queRevisar.metrica === 'paradas' ? 'Una parada' : 'Una corrección'} cada{' '}
-                  {Math.max(1, Math.round(1000 / Math.max(queRevisar.tasa, 1)))} pescados.
-                </strong>
-                {queRevisar.tasaPrevia !== null
-                  ? ` Venía de ${queRevisar.tasaPrevia}/1000 en la lectura anterior.`
-                  : ''}
+            {/* P31: lo glanceable en UNA línea (delta + otras máquinas); la
+                definición docente y las frases largas, plegadas en un details.
+                Nada se pierde — se gana el paso 1 arriba del pliegue. */}
+            {(queRevisar.tasaPrevia !== null || comparacion.length > 0) ? (
+              <p className="mt-2 text-caption tabular-nums" style={{ color: LC.inkMid }}>
+                {queRevisar.tasaPrevia !== null && queRevisar.tasa !== queRevisar.tasaPrevia ? (
+                  <strong style={{ color: queRevisar.tasa <= queRevisar.tasaPrevia ? LC.ok : LC.crit }}>
+                    {queRevisar.tasa <= queRevisar.tasaPrevia ? '▾' : '▴'}
+                    {Math.abs(queRevisar.tasa - queRevisar.tasaPrevia)} vs anterior
+                    {huboReinicio.has(queRevisar.lectura.fecha) ? (
+                      <span style={{ color: LC.inkMid }}> (hubo reinicio entre medio)</span>
+                    ) : null}
+                  </strong>
+                ) : null}
+                {comparacion.map((c, i) => (
+                  <span key={c.maquina}>
+                    {queRevisar.tasaPrevia !== null && queRevisar.tasa !== queRevisar.tasaPrevia
+                      ? ' · '
+                      : i > 0 ? ' · ' : ''}
+                    {c.maquina}{' '}
+                    <strong style={{ color: nivelTasa(c.tasa, queRevisar.metrica).color }}>{c.tasa}</strong>
+                  </span>
+                ))}
               </p>
-              {comparacion.length > 0 ? (
-                <p style={{ color: LC.inkMid }}>
-                  En el mismo contador,{' '}
-                  {comparacion.map((c, i) => (
-                    <span key={c.maquina}>
-                      {i > 0 ? ' y ' : ''}
-                      <strong style={{ color: LC.ink }}>{c.maquina}</strong> está en{' '}
-                      <strong
-                        className="tabular-nums"
-                        style={{ color: nivelTasa(c.tasa, queRevisar.metrica).color }}
-                      >
-                        {c.tasa}/1000
-                      </strong>
-                    </span>
-                  ))}
-                  .
-                </p>
-              ) : null}
-              {!queRevisar.esMotor && queRevisar.motoresSanos ? (
-                <p style={{ color: LC.inkMid }}>
-                  Los 5 motores paso a paso están sanos: el problema es{' '}
-                  <strong style={{ color: LC.ink }}>mecánico</strong>, no de control.
-                </p>
-              ) : null}
-            </div>
+            ) : null}
+            <details className="mt-1.5">
+              <summary
+                className="inline-flex min-h-[28px] cursor-pointer items-center text-caption font-medium"
+                style={{ color: LC.aqua }}
+              >
+                ¿qué mide este contador?
+              </summary>
+              <div
+                className="mt-1 space-y-1.5 border-l-2 pl-2.5 text-footnote"
+                style={{ borderColor: LC.border, color: LC.inkMid }}
+              >
+                <p>{queRevisar.saber?.que ?? ''}</p>
+                {queRevisar.tasaPrevia !== null ? (
+                  <p>
+                    Venía de {queRevisar.tasaPrevia}/1000
+                    {queRevisar.tasa <= queRevisar.tasaPrevia ? ' — mejorando.' : ' — empeorando.'}
+                  </p>
+                ) : null}
+                {comparacion.length > 0 ? (
+                  <p>
+                    En el mismo contador,{' '}
+                    {comparacion.map((c, i) => (
+                      <span key={c.maquina}>
+                        {i > 0 ? ' y ' : ''}
+                        <strong style={{ color: LC.ink }}>{c.maquina}</strong> está en{' '}
+                        <strong className="tabular-nums">{c.tasa}/1000</strong>
+                      </span>
+                    ))}
+                    .
+                  </p>
+                ) : null}
+                {!queRevisar.esMotor && queRevisar.motoresSanos ? (
+                  <p>
+                    Los 5 motores paso a paso están sanos: el problema es{' '}
+                    <strong style={{ color: LC.ink }}>mecánico</strong>, no de control.
+                  </p>
+                ) : null}
+              </div>
+            </details>
 
             <ol className="mt-3 space-y-2 text-footnote" style={{ color: LC.ink }}>
               {(queRevisar.saber?.pasos ?? []).map((paso, i) => (
@@ -1251,38 +1568,68 @@ function VistaProtocolo() {
               ) : null}
             </ol>
 
-            <div className="mt-3 flex flex-wrap gap-2">
+            {/* P42: el lazo a la vista. Abierta → no duplicar; resuelta con la
+                tasa abajo → la evidencia de que la intervención funcionó. */}
+            {lazo?.abierta ? (
+              <button
+                type="button"
+                onClick={() => navigate('/incidents')}
+                className="mt-2 flex min-h-[44px] w-full items-center gap-2 rounded-ctl px-3 text-left text-caption"
+                style={{ background: LC.prepSoft, color: LC.prep }}
+              >
+                <AlertTriangle aria-hidden className="h-3.5 w-3.5 shrink-0" />
+                <span className="min-w-0">
+                  Ya hay una incidencia abierta por este contador
+                  {' '}({fechaCorta(lazo.abierta.creada)}, {lazo.abierta.status.replace('_', ' ')}) — revisala antes de registrar otra.
+                </span>
+              </button>
+            ) : null}
+            {!lazo?.abierta && lazo?.resuelta ? (
+              <p
+                className="mt-2 flex items-start gap-2 rounded-ctl px-3 py-2 text-caption"
+                style={{ background: LC.okSoft, color: LC.ok }}
+              >
+                <CheckCircle2 aria-hidden className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <span>
+                  La intervención del {fechaCorta(lazo.resuelta.creada)} funcionó: este contador
+                  venía de <strong className="tabular-nums">{lazo.resuelta.tasa}/1000</strong> y hoy
+                  está en <strong className="tabular-nums">{queRevisar.tasa}/1000</strong>.
+                </span>
+              </p>
+            ) : null}
+
+            {/* P34: UN primario ancho; el resto compacto. El caption se fue —
+                que la incidencia sale precargada se descubre al tocarla. */}
+            <div className="mt-3 flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={registrarIncidencia}
-                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-ctl px-4 text-footnote font-semibold"
+                className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-ctl px-4 text-footnote font-semibold"
                 style={{ background: LC.aqua, color: '#fff' }}
               >
-                Registrar incidencia con esto
+                Registrar incidencia
               </button>
               <button
                 type="button"
                 onClick={() => setSearchParams({ vista: 'herramienta' })}
-                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-ctl px-4 text-footnote font-medium"
+                className="inline-flex min-h-[44px] items-center rounded-ctl px-3 text-caption font-medium"
                 style={{ background: LC.aquaSoft, color: LC.aqua }}
               >
-                Diagnóstico completo
+                Diagnóstico
               </button>
               <button
                 type="button"
                 onClick={() => void copiarResumen()}
-                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-ctl px-4 text-footnote font-medium"
+                aria-label={copiado ? 'Resumen copiado' : 'Copiar resumen'}
+                aria-live="polite"
+                className="grid min-h-[44px] min-w-[44px] place-items-center rounded-ctl"
                 style={copiado
                   ? { background: LC.okSoft, color: LC.ok }
                   : { background: LC.aquaSoft, color: LC.aqua }}
               >
                 {copiado ? <CheckCircle2 aria-hidden className="h-4 w-4" /> : <Copy aria-hidden className="h-4 w-4" />}
-                {copiado ? 'Copiado' : 'Copiar resumen'}
               </button>
             </div>
-            <p className="mt-2 text-caption" style={{ color: LC.inkLo }}>
-              La incidencia sale precargada con la máquina, el código y estos pasos como pauta.
-            </p>
           </div>
         ) : null}
 
@@ -1290,8 +1637,20 @@ function VistaProtocolo() {
         {/* Tendencia */}
         <div className="min-w-0 rounded-card border p-4" style={{ background: LC.surface, borderColor: LC.border }}>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-base font-semibold">
+            <h2 className="flex items-center gap-2 text-base font-semibold">
               Tendencia
+              {serie.filter((l) => muestraValida(l)).length >= 2 ? (
+                <button
+                  type="button"
+                  onClick={() => void compartirImagen()}
+                  aria-label="Compartir imagen del gráfico"
+                  title="Compartir imagen del gráfico"
+                  className="grid h-9 w-9 place-items-center rounded-ctl"
+                  style={{ background: LC.aquaSoft, color: LC.aqua }}
+                >
+                  <Share2 aria-hidden className="h-4 w-4" />
+                </button>
+              ) : null}
             </h2>
             <div
               className="inline-flex gap-1 rounded-ctl p-0.5"
@@ -1305,37 +1664,81 @@ function VistaProtocolo() {
                   type="button"
                   role="tab"
                   aria-selected={metrica === m}
-                  onClick={() => setMetrica(m)}
+                  onClick={() => cambiarMetrica(m)}
                   className="min-h-[44px] rounded-ctl px-3 text-footnote font-medium"
                   style={
                     metrica === m
-                      ? { background: LC.surface, color: LC.aqua }
+                      ? { background: LC.surface, color: LC.aqua, boxShadow: `inset 0 0 0 1.5px ${LC.aqua}`, fontWeight: 600 }
                       : { color: LC.inkMid }
                   }
                 >
-                  {m === 'paradas' ? 'Paradas' : 'Correcciones -C'}
+                  {m === 'paradas' ? 'Paradas' : 'Correcciones'}
                 </button>
               ))}
             </div>
           </div>
-          {/* Chips de serie con su valor: leyenda tocable. Smart default: solo
-              lo que tiene algo que decir; los motores sanos, plegados en uno. */}
-          <div className="mt-2 flex flex-wrap gap-1.5">
+          {/* P48: qué significa la métrica elegida, en una línea — el «-C» del
+              panel no se explica solo. */}
+          <p className="mt-1 text-caption" style={{ color: LC.inkLo }}>
+            {metrica === 'paradas'
+              ? 'Fallas donde la máquina SE DETUVO.'
+              : 'Fallas que el control corrigió sin detener la máquina (los contadores -C del panel).'}
+          </p>
+          {/* P58: qué es esta fila y cuántas están en el gráfico. */}
+          <p className="mt-2 flex flex-wrap items-center gap-x-2 text-caption" style={{ color: LC.inkLo }}>
+            <span>
+              Series · <strong style={{ color: LC.inkMid }}>
+                {seriesConDatos.filter((s) => !apagadas.has(s.k as string)).length} de {seriesConDatos.length}
+              </strong> en el gráfico · tocá para mostrar u ocultar
+            </span>
+            {apagadas.size > 0 && seriesConDatos.some((s) => {
+              const r = ultimaValida ? tasa1000(ultimaValida[s.k], ultimaValida.fish) : null
+              const m = METRICA_DE[s.k as string] ?? 'correcciones'
+              const alterada = r !== null && nivelTasa(r, m).label !== 'normal'
+              return alterada === apagadas.has(s.k as string) // alterada oculta o sana visible
+            }) ? (
+              <button
+                type="button"
+                onClick={() => {
+                  const off = seriesConDatos
+                    .filter((s) => {
+                      const r = ultimaValida ? tasa1000(ultimaValida[s.k], ultimaValida.fish) : null
+                      const m = METRICA_DE[s.k as string] ?? 'correcciones'
+                      return r === null || nivelTasa(r, m).label === 'normal'
+                    })
+                    .map((s) => s.k as string)
+                  setApagadas(new Set(off))
+                  guardarPrefs(maquina, { apagadas: off })
+                }}
+                className="inline-flex min-h-[28px] items-center font-medium"
+                style={{ color: LC.aqua }}
+              >
+                restablecer
+              </button>
+            ) : null}
+          </p>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
             {chips.map((c) => (
               <button
                 key={c.id}
                 type="button"
                 aria-pressed={c.on}
                 onClick={c.toggle}
-                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full px-3.5 text-caption font-semibold"
+                title={c.nombreLargo}
+                className="inline-flex min-h-[44px] items-center gap-2 whitespace-nowrap rounded-full px-4 text-footnote font-semibold"
                 style={c.on
-                  ? { background: LC.surface, boxShadow: `inset 0 0 0 1.5px ${LC.borderHi}`, color: LC.ink }
-                  : { background: LC.bgPanel, color: LC.inkMid }}
+                  ? { background: LC.aquaSoft, boxShadow: `inset 0 0 0 1.5px ${LC.aqua}`, color: LC.ink }
+                  : { background: 'transparent', boxShadow: `inset 0 0 0 1px ${LC.border}`, color: LC.inkMid }}
               >
                 {c.color ? (
-                  <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: c.on ? c.color : LC.inkGhost }} />
+                  <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: c.on ? c.color : LC.inkGhost, opacity: c.on ? 1 : 0.5 }} />
                 ) : null}
                 {c.label}
+                {c.delta === 'sube' ? (
+                  <TrendingUp aria-label="subiendo" className="h-3 w-3" style={{ color: LC.crit }} />
+                ) : c.delta === 'baja' ? (
+                  <TrendingDown aria-label="bajando" className="h-3 w-3" style={{ color: LC.ok }} />
+                ) : null}
               </button>
             ))}
           </div>
@@ -1399,11 +1802,166 @@ function VistaProtocolo() {
                 </button>
               </div>
             </div>
+          ) : serie.filter((l) => muestraValida(l)).length < 2 ? (
+            /* P32: con una sola lectura válida no hay curva que dibujar — el
+               canvas mostraba puntos flotando en 400px. Estado honesto: la
+               foto de hoy; el gráfico aparece solo cuando puede enseñar. */
+            <div className="mt-3 rounded-ctl p-3 text-footnote" style={{ background: LC.bgPanel }}>
+              <p>
+                <strong>Primera lectura registrada.</strong>{' '}
+                <span style={{ color: LC.inkMid }}>La curva aparece con la segunda — por ahora, la foto:</span>
+              </p>
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-mono text-footnote font-bold tabular-nums">
+                {ultimaValida
+                  ? seriesActivas
+                      .map((s) => ({ s, r: tasa1000(ultimaValida[s.k], ultimaValida.fish) }))
+                      .sort((a, b) => b.r - a.r)
+                      .slice(0, 3)
+                      .map(({ s, r }) => (
+                        <span
+                          key={s.k as string}
+                          style={{ color: nivelTasa(r, METRICA_DE[s.k as string] ?? 'correcciones').color }}
+                        >
+                          {CORTO[s.k as string] ?? s.label} {r}
+                        </span>
+                      ))
+                  : null}
+              </div>
+            </div>
           ) : (
             <div className="relative mt-3 h-64 w-full min-w-0">
-              <Line data={chartData} options={chartOptions} plugins={[umbralPlugin]} />
+              {conZoom ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    (chartRef.current as { resetZoom?: () => void } | null)?.resetZoom?.()
+                    setConZoom(false)
+                  }}
+                  className="absolute right-1 top-0 z-10 inline-flex min-h-[36px] items-center rounded-ctl px-3 text-caption font-medium"
+                  style={{ background: LC.aquaSoft, color: LC.aqua }}
+                >
+                  Restablecer zoom
+                </button>
+              ) : null}
+              <Line
+                ref={chartRef}
+                data={chartData}
+                options={chartOptions}
+                plugins={[umbralPlugin]}
+                role="img"
+                aria-label={resumenGrafico}
+                onDoubleClick={() => {
+                  const chart = chartRef.current as { resetZoom?: () => void } | null
+                  chart?.resetZoom?.()
+                  setConZoom(false)
+                }}
+                onClick={(evt) => {
+                  const chart = chartRef.current
+                  if (!chart) return
+                  const [el] = getElementAtEvent(chart, evt)
+                  if (!el) { setDetallePunto(null); return }
+                  const ds = (chartData.datasets[el.datasetIndex] ?? {}) as { clave?: string; data?: (number | null)[] }
+                  const clave = ds.clave
+                  const fecha = fechasEje[el.index]
+                  const tasa = ds.data?.[el.index]
+                  if (!clave || !fecha || tasa === null || tasa === undefined) return
+                  setDetallePunto({ clave, fecha, tasa })
+                  window.setTimeout(() => detalleRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 80)
+                }}
+              />
             </div>
           )}
+
+          {/* P47: la clase que antes tapaba el gráfico, ahora a pedido: el
+              punto tocado abre su ficha con la pauta y el cierre del lazo. */}
+          {detallePunto ? (() => {
+            const sDef = [...SERIES, ...SERIES_PARADAS].find((s) => String(s.k) === detallePunto.clave)
+            const saber = SABER[detallePunto.clave]
+            const m = METRICA_DE[detallePunto.clave] ?? 'correcciones'
+            const nivel = nivelTasa(detallePunto.tasa, m)
+            return (
+              <div
+                ref={detalleRef}
+                className="mt-3 rounded-ctl border p-3"
+                style={{ background: LC.bgPanel, borderColor: LC.border }}
+                role="region"
+                aria-label={`Detalle de ${sDef?.label ?? detallePunto.clave} el ${detallePunto.fecha}`}
+              >
+                <div className="flex items-center gap-2">
+                  {sDef ? (
+                    <span aria-hidden className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: sDef.color }} />
+                  ) : null}
+                  <span className="min-w-0 flex-1 text-footnote font-semibold leading-tight">
+                    {sDef?.label ?? detallePunto.clave} · {fechaCorta(detallePunto.fecha)}
+                  </span>
+                  <span
+                    className="shrink-0 rounded-full px-2 py-0.5 text-caption font-semibold tabular-nums"
+                    style={{ color: nivel.color, background: LC.surface }}
+                  >
+                    {detallePunto.tasa}/1000 · {nivel.label}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setDetallePunto(null)}
+                    aria-label="Cerrar detalle"
+                    className="grid h-9 w-9 shrink-0 place-items-center rounded-ctl"
+                    style={{ color: LC.inkMid }}
+                  >
+                    ✕
+                  </button>
+                </div>
+                {saber ? (
+                  <>
+                    <p className="mt-1.5 text-footnote" style={{ color: LC.inkMid }}>{saber.que}</p>
+                    <ol className="mt-2 space-y-1 text-footnote">
+                      {saber.pasos.map((paso, i) => (
+                        <li key={paso} className="flex gap-2">
+                          <span className="font-mono text-caption" style={{ color: LC.inkLo }}>{i + 1}</span>
+                          <span>{paso}</span>
+                        </li>
+                      ))}
+                    </ol>
+                  </>
+                ) : (
+                  <p className="mt-1.5 text-footnote" style={{ color: LC.inkMid }}>
+                    Este contador no tiene ficha de pauta todavía.
+                  </p>
+                )}
+                {/* P62: el lazo desde CUALQUIER punto, no solo el dominante —
+                    mismo marcador, así el lector lo reconoce después. */}
+                <div className="mt-2.5 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      try { sessionStorage.removeItem(`p5incid:${maquina}`) } catch { /* sin storage */ }
+                      const titulo = `${sDef?.label ?? detallePunto.clave}: ${detallePunto.tasa}/1000 (protocolo ${MAQUINAS.find((mq) => mq.id === maquina)?.label ?? maquina})`
+                      const desc = [
+                        `[protocolo142 ${maquina} · ${detallePunto.clave} ${detallePunto.tasa}/1000 · lectura ${detallePunto.fecha}]`,
+                        '',
+                        'Pauta:',
+                        ...(saber?.pasos ?? []).map((s2, i) => `${i + 1}. ${s2}`),
+                        '',
+                        urlProtocoloMaquina(maquina),
+                      ].join('\n')
+                      navigate(`/incidents?nueva=1&titulo=${encodeURIComponent(titulo)}&desc=${encodeURIComponent(desc)}`)
+                    }}
+                    className="inline-flex min-h-[44px] items-center rounded-ctl px-3 text-caption font-medium"
+                    style={{ background: LC.aquaSoft, color: LC.aqua }}
+                  >
+                    Registrar incidencia
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSearchParams({ vista: 'herramienta' })}
+                    className="inline-flex min-h-[44px] items-center rounded-ctl px-3 text-caption font-medium"
+                    style={{ background: LC.aquaSoft, color: LC.aqua }}
+                  >
+                    Ver en la Herramienta
+                  </button>
+                </div>
+              </div>
+            )
+          })() : null}
         </div>
 
       {/* Historial compacto: fecha · pescados · origen · veredicto. El detalle
@@ -1432,19 +1990,30 @@ function VistaProtocolo() {
                     type="button"
                     aria-expanded={abierta}
                     onClick={() => setLecturaAbierta(abierta ? null : (l.id ?? null))}
-                    className="flex min-h-[44px] w-full items-center gap-3 text-left"
+                    className="flex min-h-[44px] w-full items-center gap-2 text-left"
                   >
-                    <span className="w-16 shrink-0 font-mono text-footnote tabular-nums">
+                    <span className="w-14 shrink-0 font-mono text-footnote tabular-nums">
                       {fechaCorta(l.fecha)}
                     </span>
-                    <span className="min-w-0 flex-1 truncate text-footnote" style={{ color: LC.inkMid }}>
-                      {l.fish} pz · {esVideo ? 'video' : 'manual'}
+                    <span
+                      className="flex min-w-0 flex-1 items-center gap-1 whitespace-nowrap text-footnote tabular-nums"
+                      style={{ color: LC.inkMid }}
+                    >
+                      {l.fish} pz
+                      {esVideo
+                        ? <Video aria-label="lectura por video" className="h-3.5 w-3.5 shrink-0" />
+                        : <PencilLine aria-label="lectura manual" className="h-3.5 w-3.5 shrink-0" />}
+                      {huboReinicio.has(l.fecha) ? (
+                        <span className="shrink-0" style={{ color: LC.prep }} title="protocolo reiniciado antes de esta lectura">⟳</span>
+                      ) : null}
                     </span>
                     <span
-                      className="shrink-0 rounded-full px-2.5 py-0.5 text-caption font-semibold"
+                      className="min-w-0 max-w-[55%] truncate rounded-full px-2.5 py-0.5 text-caption font-semibold tabular-nums"
                       style={{ background: v.soft, color: v.color }}
+                      title={v.dominante ? `${v.label} · ${v.dominante}` : v.label}
                     >
                       {v.label}
+                      {v.dominante ? ` · ${v.dominante}` : ''}
                     </span>
                     {abierta
                       ? <ChevronDown aria-hidden className="h-3.5 w-3.5 shrink-0" style={{ color: LC.inkGhost }} />

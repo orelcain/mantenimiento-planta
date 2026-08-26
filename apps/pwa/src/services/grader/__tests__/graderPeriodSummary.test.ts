@@ -41,6 +41,7 @@ function shift(
     cycles, uptimePct, expectedCycles: 16840, uptimeSec: Math.round((uptimePct / 100) * 8 * 3600),
     machines, pieces: null, p0Pieces: null, p0Pct: null,
     hasSlx: true, hasGrader: false, lowActivity: false, unscheduled: false,
+    corregido: false, notaCorreccion: null,
   }
 }
 

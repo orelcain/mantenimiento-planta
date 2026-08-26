@@ -218,6 +218,42 @@ export function TelegramSyncPage() {
         </CardContent>
       </Card>
 
+      {/* Temas que llegaron sin mapeo. Va ARRIBA de todo lo demás porque es lo
+          único de esta pantalla que pide una acción: mientras el tema no tenga
+          casa, su material se acumula en POR CLASIFICAR y no aparece en la
+          ficha de ninguna máquina. Los 3 temas del protocolo de la Baader 142
+          estuvieron así 3 días, con el video que sube el turno cada día. */}
+      {config.temasSinMapeo.length > 0 && (
+        <Card className="border-ink-warn/40">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm flex items-center gap-2 text-ink-warn">
+              <CircleAlert className="w-4 h-4" />
+              {config.temasSinMapeo.length === 1
+                ? 'Un tema nuevo sin equipo asignado'
+                : `${config.temasSinMapeo.length} temas nuevos sin equipo asignado`}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <p className="text-xs text-muted-foreground">
+              Su material se está guardando en <b>POR CLASIFICAR</b> y no llega a la ficha
+              de ninguna máquina. Para darles casa hay que agregarlos al mapeo del
+              organizador en el PC de mantención.
+            </p>
+            <ul className="space-y-1">
+              {config.temasSinMapeo.map((t) => (
+                <li key={`${t.grupo}·${t.tema}`} className="flex flex-wrap items-baseline gap-x-2">
+                  <span className="font-medium text-foreground">{t.tema}</span>
+                  <span className="text-xs text-muted-foreground">{t.grupo}</span>
+                  <span className="text-xs text-ink-warn">
+                    {t.items === 1 ? '1 mensaje' : `${t.items} mensajes`}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Sincronizar ahora */}
       <Card>
         <CardHeader className="pb-3">

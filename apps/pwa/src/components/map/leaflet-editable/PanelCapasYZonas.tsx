@@ -1065,6 +1065,15 @@ export function PanelCapasYZonas() {
         <span>{elementos.length} elementos · {viewLayers.length} capas</span>
         {editMode && <span className="text-blue-400 font-semibold">EDIT</span>}
       </div>
+      {/* El store del mapa vive en localStorage ("persistido en localStorage
+          hasta migrar a Firestore"), y los DXF importados ni siquiera eso: se
+          pierden al recargar. Quien dibuja 40 zonas asume que quedan para el
+          equipo — nada en la pantalla decia lo contrario. */}
+      <div className="px-3 pb-1.5 text-[9px] leading-snug text-amber-500/80 shrink-0">
+        Lo que dibujes se guarda solo en este navegador: no lo ve nadie más y se
+        pierde si limpias los datos del sitio. Los planos DXF importados se
+        pierden al recargar.
+      </div>
     </div>
   )
 }

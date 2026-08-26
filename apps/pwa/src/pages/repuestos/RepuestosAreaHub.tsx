@@ -2058,8 +2058,22 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
 
                 {/* Paginación */}
                 <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
+                  {/* Lo que el filtro está dejando fuera, DONDE se lee el total.
+                      El aviso vivía dentro del botón "Solo con SAP", que en el
+                      teléfono queda plegado tras "Filtros": el área de PLANTA
+                      CHONCHI decía "758 repuestos" con 3.649 piezas de despiece
+                      ocultas, y el badge del árbol —a la vista— decía 4.407. */}
                   <span className="tabular-nums">
                     Mostrando {page * repPageSize + 1} a {Math.min((page + 1) * repPageSize, filteredRep.length)} de {filteredRep.length} repuestos
+                    {repSoloSap && despieceOcultos > 0 && (
+                      <button
+                        onClick={() => setRepSoloSap(false)}
+                        className="ml-1.5 underline decoration-dotted underline-offset-2 hover:text-foreground"
+                        title="Ver también las piezas de despiece sin código SAP"
+                      >
+                        · {despieceOcultos.toLocaleString('es-CL')} de despiece ocultas
+                      </button>
+                    )}
                   </span>
                   <div className="flex items-center gap-2">
                     <button

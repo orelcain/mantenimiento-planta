@@ -27,7 +27,7 @@ const GANTT_TASKS_COLLECTION = 'ganttTasks'
 const GANTT_COMMENTS_COLLECTION = 'ganttTaskComments'
 const GANTT_PROJECTS_COLLECTION = 'ganttProjects'
 
-function asDate(value: unknown): Date {
+export function asDate(value: unknown): Date {
   const now = new Date()
   if (!value) return now
 
@@ -38,6 +38,20 @@ function asDate(value: unknown): Date {
   if (typeof value === 'object' && value !== null && 'toDate' in value && typeof (value as { toDate: () => Date }).toDate === 'function') {
     const converted = (value as { toDate: () => Date }).toDate()
     return Number.isNaN(converted.getTime()) ? now : converted
+  }
+
+  // Timestamp que perdio su clase y quedo guardado como mapa plano
+  // ({seconds, nanoseconds} desde el SDK web, {_seconds, _nanoseconds} desde
+  // el admin SDK). Sin esto caia al `new Date(objeto)` de mas abajo, que da
+  // Invalid Date, y la tarea terminaba fechada HOY. Ver `stripUndefinedDeep`.
+  if (typeof value === 'object' && value !== null) {
+    const raw = value as { seconds?: unknown; _seconds?: unknown; nanoseconds?: unknown; _nanoseconds?: unknown }
+    const secs = typeof raw.seconds === 'number' ? raw.seconds : (typeof raw._seconds === 'number' ? raw._seconds : null)
+    if (secs !== null) {
+      const nanos = typeof raw.nanoseconds === 'number' ? raw.nanoseconds : (typeof raw._nanoseconds === 'number' ? raw._nanoseconds : 0)
+      const fromMap = new Date(secs * 1000 + Math.round(nanos / 1e6))
+      return Number.isNaN(fromMap.getTime()) ? now : fromMap
+    }
   }
 
   // Date-only strings (YYYY-MM-DD) parse as UTC midnight — use local constructor to avoid TZ shift
@@ -69,14 +83,30 @@ function normalizeTask(task: GanttTask): GanttTask {
   }
 }
 
-function stripUndefinedDeep<T>(value: T): T {
+/**
+ * Solo los objetos literales se recorren. Un `Timestamp`, un `FieldValue`
+ * (`serverTimestamp()`), un `Date` o cualquier otra instancia se devuelve tal
+ * cual: reconstruirla campo por campo la convierte en un objeto plano y
+ * Firestore la guarda como tal. Eso fue lo que paso con las tareas del Gantt
+ * —`startDate` quedo como `{seconds, nanoseconds}` y `createdAt` como
+ * `{_methodName: 'serverTimestamp'}`— y por eso 604 de 609 aparecian fechadas
+ * hoy. (Un `Date` es peor: no tiene campos propios enumerables, se guardaba
+ * como `{}`.)
+ */
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (Object.prototype.toString.call(value) !== '[object Object]') return false
+  const proto = Object.getPrototypeOf(value)
+  return proto === Object.prototype || proto === null
+}
+
+export function stripUndefinedDeep<T>(value: T): T {
   if (Array.isArray(value)) {
     return value
       .map((item) => stripUndefinedDeep(item))
       .filter((item) => item !== undefined) as T
   }
 
-  if (value && typeof value === 'object') {
+  if (isPlainObject(value)) {
     const result: Record<string, unknown> = {}
     Object.entries(value as Record<string, unknown>).forEach(([key, nestedValue]) => {
       if (nestedValue === undefined) return

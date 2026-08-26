@@ -27,9 +27,21 @@ export async function createIncident(
 ): Promise<Incident> {
   const id = generateId()
   const now = new Date()
-  
+
+  // Una incidencia sin texto no es una incidencia. La del 05-02 —título "´",
+  // descripción "}"— lleva seis meses "en proceso", contándose entre las
+  // abiertas del día. El schema de validación ya existía; este camino nunca lo
+  // aplicó. Se normaliza además el espacio final, que es lo que hacía que dos
+  // incidencias iguales ("Baader sucia " y "Baader sucia") no se vean iguales.
+  const titulo = normalizarTextoIncidencia(data.titulo)
+  if (!diceAlgo(titulo)) {
+    throw new Error('El título de la incidencia quedó vacío: escribe qué pasó.')
+  }
+
   const incident: Incident = {
     ...data,
+    titulo,
+    descripcion: normalizarTextoIncidencia(data.descripcion),
     id,
     createdAt: now,
     updatedAt: now,
@@ -273,6 +285,7 @@ export function subscribeToIncidents(
 
 // Helper para parsear documentos
 import type { DocumentSnapshot, QueryDocumentSnapshot } from '@/services/firestoreTracked'
+import { normalizarTextoIncidencia, diceAlgo } from './incidents/textoIncidencia'
 
 function parseIncidentDoc(doc: DocumentSnapshot | QueryDocumentSnapshot): Incident {
   const data = doc.data()

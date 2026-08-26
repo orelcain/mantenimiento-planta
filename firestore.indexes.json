@@ -409,6 +409,78 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "baader142ProtocoloIngesta",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "plantId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "maquina",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "resultado",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "baader142Protocolo",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "plantId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "maquina",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "fecha",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "machines",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "activa",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "orden",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "baader142Notas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "plantId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "ASCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": [
@@ -429,6 +501,66 @@
           "queryScope": "COLLECTION_GROUP"
         }
       ]
+    },
+    {
+      "collectionGroup": "pieceRecords",
+      "fieldPath": "pieces",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "pieceRecords",
+      "fieldPath": "weightKg",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "pieceRecords",
+      "fieldPath": "weightPerPieceGrams",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "pieceRecords",
+      "fieldPath": "quality",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "pieceRecords",
+      "fieldPath": "calibre",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "pieceRecords",
+      "fieldPath": "error",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "pieceRecords",
+      "fieldPath": "lot",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "pieceRecords",
+      "fieldPath": "dedupeKey",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "meta",
+      "fieldPath": "records",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "meta",
+      "fieldPath": "buckets",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "meta",
+      "fieldPath": "pauses",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "meta",
+      "fieldPath": "microDetentions",
+      "indexes": []
     }
   ]
 }

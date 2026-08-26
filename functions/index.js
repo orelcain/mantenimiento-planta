@@ -1159,7 +1159,7 @@ exports.geminiProxy = onCall(
       throw new Error('Se requiere autenticación para usar la IA')
     }
 
-    const { messages, model, temperature, max_tokens, systemInstruction } = request.data
+    const { messages, model, temperature, max_tokens, systemInstruction, thinkingBudget } = request.data
 
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
       throw new Error('Se requiere al menos un mensaje')
@@ -1189,13 +1189,35 @@ exports.geminiProxy = onCall(
     if (temperature !== undefined) {
       body.generationConfig = { temperature, maxOutputTokens: max_tokens || 2048 }
     }
+    // El presupuesto de salida se comparte con el pensamiento del modelo: con
+    // 400 tokens —los que pide el resumen del día— se le va en pensar y la
+    // respuesta llega cortada a media frase. Quien llama puede pedir 0 para que
+    // todo el presupuesto sea respuesta. Se acepta el 0 explícito, no solo
+    // valores positivos (geminiVisionProxy solo aceptaba > 0).
+    if (typeof thinkingBudget === 'number' && Number.isFinite(thinkingBudget) && thinkingBudget >= 0) {
+      body.generationConfig = body.generationConfig || { maxOutputTokens: max_tokens || 2048 }
+      body.generationConfig.thinkingConfig = { thinkingBudget }
+    }
+
+    const pedir = async (cuerpo) => fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Referer: GEMINI_KEY_REFERER },
+      body: JSON.stringify(cuerpo),
+    })
 
     try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Referer: GEMINI_KEY_REFERER },
-        body: JSON.stringify(body),
-      })
+      let response = await pedir(body)
+
+      // Si el modelo no entiende `thinkingConfig`, se reintenta sin él antes de
+      // dar la llamada por perdida: vale más una respuesta pensada de más que
+      // ninguna respuesta.
+      if (response.status === 400 && body.generationConfig?.thinkingConfig) {
+        const detalle = await response.text()
+        logger.warn('Gemini rechazó thinkingConfig; se reintenta sin él', { detalle: String(detalle).slice(0, 300) })
+        const sinThinking = { ...body, generationConfig: { ...body.generationConfig } }
+        delete sinThinking.generationConfig.thinkingConfig
+        response = await pedir(sinThinking)
+      }
 
       if (!response.ok) {
         const errorText = await response.text()
@@ -1204,7 +1226,16 @@ exports.geminiProxy = onCall(
       }
 
       const data = await response.json()
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+      // Con el pensamiento activado, la primera parte puede ser el razonamiento
+      // y el texto visible venir después: se buscan TODAS las partes con texto
+      // que no estén marcadas como pensamiento.
+      const partes = data.candidates?.[0]?.content?.parts || []
+      const text = partes
+        .filter((p) => typeof p.text === 'string' && p.thought !== true)
+        .map((p) => p.text)
+        .join('')
+        || partes[0]?.text
+        || ''
       return { content: text, usage: data.usageMetadata }
     } catch (error) {
       // Si ya es un HttpsError (status upstream mapeado), propagarlo tal cual

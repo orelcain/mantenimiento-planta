@@ -70,6 +70,7 @@ function shift(dateKey: string, shiftId: string, cycles: number, uptimePct: numb
     machines: [machine('Baader 1', cycles / 2, uptimePct / 100), machine('Baader 2', cycles / 2, uptimePct / 100)],
     pieces: null, p0Pieces: null, p0Pct: null,
     hasSlx: true, hasGrader: false, lowActivity: false, unscheduled: false,
+    corregido: false, notaCorreccion: null,
   }
 }
 

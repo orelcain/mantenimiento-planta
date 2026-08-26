@@ -11,9 +11,12 @@
  */
 
 import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui'
 import { cn } from '@/lib/utils'
-import { LayoutGrid, ChevronDown, ChevronUp, ArrowRight, AlertTriangle } from 'lucide-react'
+import { LayoutGrid, ChevronDown, ChevronUp, ArrowRight, AlertTriangle, CheckCircle2, Copy } from 'lucide-react'
+import { copiarTexto } from '@/lib/clipboard'
+import { urlTurnoGates } from '@/lib/urlTurno'
 import type { GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
 import {
   gateStatusFromRatio,
@@ -246,6 +249,8 @@ export function GateBreakdownCard({
   shiftDocId,
   onSaved,
 }: GateBreakdownCardProps) {
+  const navigate = useNavigate()
+  const [copiado, setCopiado] = useState(false)
   const [showAnalysis, setShowAnalysis] = useState(false)
 
   const gateConfigMap = useMemo(() => {
@@ -599,6 +604,57 @@ export function GateBreakdownCard({
                         </div>
                       )
                     })}
+
+                    {/* Cierre del lazo — la tercera pata del patrón: el
+                        historial avisa ANTES, el corte corrige DURANTE, y
+                        esta tarjeta deja constancia DESPUÉS para el próximo
+                        turno. Solo con sugerencias vivas. */}
+                    {shiftDocId && (
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const desc = [
+                              `[grader-gates · cierre ${shiftDocId}]`,
+                              diagnosis.detail,
+                              '',
+                              'Sugerencias para el próximo turno:',
+                              ...suggestions.slice(0, 3).map((s, i) =>
+                                `${i + 1}. G${s.fromGate} ${s.fromLabel} → ${s.toLabel} (esperado ${s.estimate.destBeforeRatio.toFixed(1)}× → ${s.estimate.destAfterRatio.toFixed(1)}×)`),
+                              '',
+                              urlTurnoGates(shiftDocId),
+                            ].join('\n')
+                            navigate(`/incidents?nueva=1&titulo=${encodeURIComponent(`Gates del Grader: dejar pauta para el próximo turno`)}&desc=${encodeURIComponent(desc)}`)
+                          }}
+                          className="inline-flex min-h-[44px] items-center rounded-ctl bg-primary/[0.12] px-4 text-xs font-medium text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                        >
+                          Registrar incidencia con esto
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void copiarTexto([
+                              `Gates del Grader — cierre ${shiftDocId}`,
+                              diagnosis.detail ?? diagnosis.label,
+                              ...suggestions.slice(0, 3).map((s, i) =>
+                                `${i + 1}. G${s.fromGate} ${s.fromLabel} → ${s.toLabel} — esperado ${s.estimate.destBeforeRatio.toFixed(1)}× → ${s.estimate.destAfterRatio.toFixed(1)}×`),
+                              urlTurnoGates(shiftDocId),
+                            ].join('\n')).then(() => {
+                              setCopiado(true)
+                              window.setTimeout(() => setCopiado(false), 2500)
+                            })
+                          }}
+                          className={cn(
+                            'inline-flex min-h-[44px] items-center gap-1.5 rounded-ctl px-4 text-xs font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+                            copiado ? 'bg-success/[0.12] text-ink-ok' : 'bg-muted text-muted-foreground',
+                          )}
+                          aria-live="polite"
+                        >
+                          {copiado ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                          {copiado ? 'Copiado' : 'Copiar resumen'}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

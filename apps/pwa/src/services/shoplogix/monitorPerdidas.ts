@@ -111,12 +111,25 @@ export function costoDeParadas(args: {
   cpmGlobal: number
   /** Ventana hacia atrás para el ritmo local, en minutos. */
   ventanaMin?: number
+  /**
+   * Cuántas máquinas tiene la línea.
+   *
+   * ⚠ Cada evento de `stopEvents` es la parada de UNA máquina, pero el ritmo
+   * local sale de `series`, que son las piezas de la LÍNEA. Multiplicar los
+   * minutos de una máquina por el ritmo de tres era cobrar la parada tres
+   * veces: en Chonchi (3 Baader) la "Detención" del turno del 24-08 sumaba
+   * 239 min de máquina y salía valorizada en 10.871 pz, cuando la línea
+   * completa solo estuvo detenida 67 min. Con una sola máquina —Filete— el
+   * divisor es 1 y no cambia nada.
+   */
+  maquinas?: number | null
 }): CostoDeParadas | null {
   const { series, stopEvents, stopReasons, cpmGlobal } = args
   if (!series || series.length === 0 || !stopEvents || !stopReasons) return null
   if (!(cpmGlobal > 0)) return null
   const imputables = new Set(args.recuperables)
   if (imputables.size === 0) return null
+  const maquinas = args.maquinas && args.maquinas > 0 ? args.maquinas : 1
 
   const t0 = Date.parse(series[0]!.t)
   if (Number.isNaN(t0)) return null
@@ -158,7 +171,8 @@ export function costoDeParadas(args: {
     const prev = acc.get(causa) ?? { min: 0, piezas: 0, eventos: 0 }
     acc.set(causa, {
       min: prev.min + min,
-      piezas: prev.piezas + min * cpm,
+      // El ritmo es de la LÍNEA y la parada es de UNA máquina (ver `maquinas`).
+      piezas: prev.piezas + (min * cpm) / maquinas,
       eventos: prev.eventos + 1,
     })
   }
@@ -169,7 +183,9 @@ export function costoDeParadas(args: {
       min: v.min,
       piezas: v.piezas,
       eventos: v.eventos,
-      cpm: v.min > 0 ? v.piezas / v.min : cpmGlobal,
+      // Se informa el ritmo de LÍNEA (el que se muestra al explicar la cifra),
+      // no el de una máquina: las piezas ya vienen divididas.
+      cpm: v.min > 0 ? (v.piezas * maquinas) / v.min : cpmGlobal,
     }))
     .sort((a, b) => b.piezas - a.piezas)
 

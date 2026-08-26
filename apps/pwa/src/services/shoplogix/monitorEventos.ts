@@ -106,6 +106,8 @@ function paradasPorCausa(
   stopReasons: string[],
   /** Primer tramo con dato: el minuto 0 del eje que comparten los gráficos. */
   t0Ms: number | null,
+  /** Ventana del turno: lo de afuera no es suyo. Ver el recorte más abajo. */
+  ventana?: { desdeMs: number | null; hastaMs: number | null } | null,
 ): Map<string, ParadaSuelta[]> {
   /*
    * ⚠ EPISODIOS, no eventos crudos. El sensor parte una misma parada en varios
@@ -139,7 +141,26 @@ function paradasPorCausa(
         episodios.push({ ...e })
       }
     }
-    m.set(causa, episodios
+    /*
+     * ⚠ RECORTE a la ventana del turno. Sin esto, una parada que arranca antes
+     * del primer dato entraba entera: en el turno del 25-08 (arranque 21:25) la
+     * lista de «Detencion» abría con **21:15:00→21:25:45 · 10,8 min** — diez de
+     * esos once minutos son de antes de que el turno existiera. Por eso las 10
+     * paradas listadas sumaban 99,7 min mientras la fila decía 85, y por eso
+     * las otras dos causas del mismo turno sí cuadraban: no era redondeo.
+     *
+     * Cargarle al turno tiempo que no es suyo es peor que el descuadre.
+     */
+    const desde = ventana?.desdeMs ?? null
+    const hasta = ventana?.hastaMs ?? null
+    const dentro = episodios
+      .map((ep) => ({
+        ini: desde != null ? Math.max(ep.ini, desde) : ep.ini,
+        fin: hasta != null ? Math.min(ep.fin, hasta) : ep.fin,
+      }))
+      .filter((ep) => ep.fin > ep.ini)
+
+    m.set(causa, dentro
       .map((ep) => ({
         hora: horaSegDe(new Date(ep.ini).toISOString()),
         hasta: horaSegDe(new Date(ep.fin).toISOString()),
@@ -179,14 +200,20 @@ export function agruparEventos(args: {
   cpmGlobal?: number | null
   /** ISO del primer tramo con dato: ubica cada parada en el eje del gráfico. */
   t0?: string | null
+  /**
+   * Ventana del turno en ms. Las paradas se recortan a ella: una que arranca
+   * antes del turno solo aporta lo que cae adentro.
+   */
+  ventana?: { desdeMs: number | null; hastaMs: number | null } | null
 }): GrupoDelTurno[] {
   const { tb } = args
   if (!tb) return []
   const t0Ms = args.t0 ? Date.parse(args.t0) : NaN
   const paradas = paradasPorCausa(
     args.stopEvents ?? [], args.stopReasons ?? [], Number.isNaN(t0Ms) ? null : t0Ms,
+    args.ventana,
   )
-  const costo = new Map((args.costo?.porCausa ?? []).map((c) => [c.reason, c.piezas]))
+  const costoPorCausa = new Map((args.costo?.porCausa ?? []).map((c) => [c.reason, c]))
   const cpm = args.cpmGlobal && args.cpmGlobal > 0 ? args.cpmGlobal : null
 
   const grupos = new Map<DuenoPerdida, GrupoDelTurno>()
@@ -198,12 +225,45 @@ export function agruparEventos(args: {
     grupos.set(dueno, g)
   }
 
+  /*
+   * OJO OJO: MINUTOS DE LÍNEA, como el titular del bloque y el Pareto.
+   *
+   * `min` es lo que la causa duró en ALGUNA máquina; `lineMin`, lo que frenó la
+   * línea entera. En el turno del 26-08, KNURO traía 88 y 8. Con `min` la lista
+   * decía «KNURO 1.090 pz · 88 min» y los tres dueños sumaban 2.066 pz debajo
+   * de un titular que —ya corregido— dice 469: el bloque dejaba de cuadrar
+   * consigo mismo, que es peor que el error original porque salta a la vista.
+   *
+   * Los `lineMin` tampoco se descuentan entre sí, así que se escalan al
+   * `recoverableMin` del turno: el total de línea que cierra la ventana.
+   */
+  const sumaLinea = (tb.recoverable ?? []).reduce((a, x) => a + Math.max(0, x.lineMin ?? x.min ?? 0), 0)
+  const escala = tb.recoverableMin > 0 && sumaLinea > tb.recoverableMin
+    ? tb.recoverableMin / sumaLinea
+    : 1
+
   for (const x of tb.recoverable ?? []) {
     const { dueno, categoria, extension } = duenoDe(x.reason)
-    const piezas = costo.get(x.reason) ?? (cpm ? x.min * cpm : null)
+    const minLinea = Math.max(0, x.lineMin ?? x.min ?? 0) * escala
+    /*
+     * El RITMO sigue siendo el local —el que la línea traía justo antes de esa
+     * parada—; solo se corrigen los minutos. `costo` viene calculado sobre los
+     * minutos de máquina, así que de él se toma el ritmo, no el total.
+     */
+    /*
+     * El RITMO es el local de esa causa y los MINUTOS los de línea.
+     *
+     * `c.cpm` ya viene definido en `monitorPerdidas` como
+     * `(piezas x maquinas) / min`: es el ritmo de LÍNEA efectivo, con la
+     * división por máquinas ya deshecha. Escalar `c.piezas` en vez de usar
+     * `c.cpm` aplicaría esa división DOS veces y hundía el costo a un tercio.
+     */
+    const c = costoPorCausa.get(x.reason)
+    const cpmLocal = c?.cpm ?? cpm
+    const piezas = cpmLocal ? minLinea * cpmLocal : null
     push(dueno, {
       reason: x.reason,
-      min: x.min,
+      min: minLinea,
       count: x.count ?? 0,
       piezas,
       categoria,
@@ -240,4 +300,55 @@ export function agruparEventos(args: {
  */
 export function minutosDeMantencion(grupos: GrupoDelTurno[]): number {
   return grupos.find((g) => g.dueno === 'mantencion')?.min ?? 0
+}
+
+/**
+ * ¿Se puede afirmar que ninguna parada fue por falla de máquina?
+ *
+ * POR QUÉ EXISTE
+ * --------------
+ * El monitor lo afirmaba con un ✓ verde cada vez que no había grupo
+ * `mantencion` — y `sin-imputar` contaba como "grupo que clasificar". O sea:
+ * con el turno ENTERO sin imputar, la pantalla decía
+ *
+ *     ✓ Ninguna parada por falla de máquina en este turno.
+ *
+ * justo debajo de «SIN IMPUTAR · nadie anotó la causa · 2 h 40 min». Visto en
+ * el monitor de Eviscerado el 26-08 a las 04:00. En Chonchi la imputación viene
+ * en 0% la mayor parte del tiempo, así que el ✓ salía casi siempre sin
+ * evidencia detrás.
+ *
+ * Convertir "no sé" en "no fue Mantención" es justo lo que este archivo
+ * prohíbe más arriba, y en el sentido que le conviene a Mantención: el día que
+ * Producción note que el ✓ sale igual sin imputar nada, se cae la credibilidad
+ * del resto de la pantalla.
+ *
+ * La regla: se afirma solo sobre lo que TIENE causa anotada. Sin nada imputado
+ * no se dice nada; con parte sin imputar, la frase lo dice y no habla "del
+ * turno".
+ */
+export function veredictoFallaDeMaquina(
+  grupos: GrupoDelTurno[],
+): { texto: string; sinImputarMin: number } | null {
+  const imputados = grupos.filter((g) => g.dueno === 'mantencion' || g.dueno === 'externo')
+  // Sin nada imputado no hay nada que afirmar; con Mantención adentro, tampoco.
+  if (imputados.length === 0) return null
+  if (imputados.some((g) => g.dueno === 'mantencion')) return null
+
+  const sinImputarMin = grupos.find((g) => g.dueno === 'sin-imputar')?.min ?? 0
+  if (sinImputarMin <= 0) {
+    return { texto: '✓ Ninguna parada por falla de máquina en este turno.', sinImputarMin: 0 }
+  }
+  return {
+    texto: `✓ Ninguna parada con causa anotada fue falla de máquina · quedan ${fmtDur(sinImputarMin)} sin imputar.`,
+    sinImputarMin,
+  }
+}
+
+/** "111" → "1 h 51 min". Mismo formato que usa el bloque de tiempo. */
+function fmtDur(min: number): string {
+  const h = Math.floor(min / 60)
+  const m = Math.round(min % 60)
+  if (h === 0) return `${m} min`
+  return m > 0 ? `${h} h ${m} min` : `${h} h`
 }

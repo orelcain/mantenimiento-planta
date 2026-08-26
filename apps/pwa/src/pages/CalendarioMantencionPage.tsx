@@ -18,6 +18,8 @@ import { setDoc as trackedSetDoc } from '../services/firestoreTracked'
 import { getCurrentUser } from '../services/auth'
 import { getHmiTooltipPwd } from '../services/hmiKnuro'
 import { logger } from '@/lib/logger'
+import { semanaDeApertura } from './calendario/semanaDeApertura'
+import { RuedaVentanas } from '@/components/calendario/RuedaVentanas'
 
 /**
  * Semáforo de 4 niveles para el delta de horas (sobre-asignado → muy bajo).
@@ -398,6 +400,25 @@ export function CalendarioMantencionPage() {
       return next
     }, { replace: true })
   }, [activeTab, searchParams, setSearchParams])
+
+  // Vista del módulo. Va aparte de `activeTab` a propósito: las pestañas de
+  // arriba solo existen en escritorio, y la rueda tiene que abrirse también en
+  // el teléfono, que es donde se mira en planta.
+  const [vistaModulo, setVistaModulo] = useState<'turnos' | 'rueda'>(
+    () => (searchParams.get('vista') === 'rueda' ? 'rueda' : 'turnos'),
+  )
+  useEffect(() => {
+    const actual = searchParams.get('vista')
+    const deseada = vistaModulo === 'rueda' ? 'rueda' : null
+    if (actual === deseada) return
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      if (deseada) next.set('vista', deseada)
+      else next.delete('vista')
+      return next
+    }, { replace: true })
+  }, [vistaModulo, searchParams, setSearchParams])
+
   const [newTechName, setNewTechName] = useState('')
   const [newTechRut, setNewTechRut] = useState('')
   const [newTechGroup, setNewTechGroup] = useState('A')
@@ -435,6 +456,17 @@ export function CalendarioMantencionPage() {
   const calendarSectionRef = useRef<HTMLDivElement | null>(null)
   const isHydratingRemoteRef = useRef(false)
   const hasLoadedCalendarRef = useRef(false)
+  /**
+   * Lo último que quedó guardado (serializado), para no volver a escribirlo.
+   *
+   * El efecto de autosave depende de la IDENTIDAD de `dayCols`/`techRows`, no
+   * de su contenido: al terminar de hidratar desde Firestore esas referencias
+   * cambian y disparaban un `setDoc` completo del estado. Resultado: ABRIR la
+   * planilla la "guardaba" —con `reason: 'state-change'` y el uid de quien
+   * miraba— aunque nadie hubiera tocado nada. Se comprobó el 24-08: entrar a
+   * la página dejó `updatedAt` un minuto después, sin ninguna edición.
+   */
+  const lastSyncedPayloadRef = useRef<string | null>(null)
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const syncSeqRef = useRef(0)
   const shiftStyleSamplesRef = useRef<ShiftStyleSamples>({})
@@ -597,8 +629,11 @@ export function CalendarioMantencionPage() {
       setSelectedWeek(preferred)
       return
     }
-    const first = Object.keys(weeks)[0]
-    if (first) setSelectedWeek(first)
+    // Sin la semana de hoy, la MÁS CERCANA — no la primera del archivo. Con la
+    // planilla terminada en junio, abría en la semana del 01/03: seis meses
+    // atrás y catorce clicks de "›" para llegar a lo último cargado.
+    const cercana = semanaDeApertura(Object.keys(weeks), preferred)
+    if (cercana) setSelectedWeek(cercana)
   }, [weeks, selectedWeek])
 
   useEffect(() => {
@@ -863,13 +898,9 @@ export function CalendarioMantencionPage() {
     }
   }
 
-  const syncCalendarToFirebase = useCallback(async (reason: string): Promise<void> => {
-    const mySeq = ++syncSeqRef.current
-    try {
-      setSyncState('saving')
-      setSyncErrorText('')
-      const currentUser = getCurrentUser()
-      const localPayload: PersistedCalendarState = {
+  /** El estado tal como se guarda. Se usa para escribir y para comparar. */
+  const buildLocalPayload = useCallback((): PersistedCalendarState => {
+    return {
         version: 1,
         originalFilename,
         dayCols: dayCols.map((d) => ({
@@ -888,10 +919,26 @@ export function CalendarioMantencionPage() {
           name: t.name,
           shifts: Object.fromEntries(Object.entries(t.shifts).map(([k, v]) => [String(k), v])),
         })),
-        hoursConfig,
-        shiftConfig,
-      }
+      hoursConfig,
+      shiftConfig,
+    }
+  }, [dayCols, hoursConfig, originalFilename, shiftConfig, techRows])
+
+  const syncCalendarToFirebase = useCallback(async (reason: string): Promise<void> => {
+    const mySeq = ++syncSeqRef.current
+    try {
+      setSyncState('saving')
+      setSyncErrorText('')
+      const currentUser = getCurrentUser()
+      const localPayload = buildLocalPayload()
       safeStorageSet(CALENDAR_LOCAL_CACHE_KEY, localPayload)
+
+      // Nada cambió de verdad: no se escribe (ni se ensucia el "quién editó").
+      const serializado = JSON.stringify(localPayload)
+      if (lastSyncedPayloadRef.current === serializado) {
+        if (syncSeqRef.current === mySeq) setSyncState('idle')
+        return
+      }
 
       const payload = {
         ...localPayload,
@@ -901,6 +948,7 @@ export function CalendarioMantencionPage() {
         updatedBy: currentUser?.uid ?? 'anon',
       }
       await trackedSetDoc(doc(db, CALENDAR_FIRESTORE_PATH[0], CALENDAR_FIRESTORE_PATH[1]), payload, { merge: true })
+      lastSyncedPayloadRef.current = serializado
       if (syncSeqRef.current !== mySeq) return
       setLastSyncAt(new Date())
       setSyncState('synced')
@@ -910,16 +958,23 @@ export function CalendarioMantencionPage() {
       setSyncErrorText(error instanceof Error ? error.message : 'Error desconocido')
       setStatus('Cambios guardados en este navegador, pero sin permisos para sincronizar en Firebase.')
     }
-  }, [dayCols, hoursConfig, originalFilename, shiftConfig, techRows])
+  }, [buildLocalPayload])
 
   useEffect(() => {
     if (!hasLoadedCalendarRef.current || isHydratingRemoteRef.current) return
+    /* Primer disparo después de hidratar: no es una edición, es el cambio de
+       identidad de `dayCols`. Se toma como línea base y no se escribe. */
+    if (lastSyncedPayloadRef.current === null) {
+      lastSyncedPayloadRef.current = JSON.stringify(buildLocalPayload())
+      setSyncState('idle')
+      return
+    }
     if (syncTimerRef.current) clearTimeout(syncTimerRef.current)
     setSyncState('saving')
     syncTimerRef.current = setTimeout(() => {
       void syncCalendarToFirebase('state-change')
     }, 200)
-  }, [dayCols, syncCalendarToFirebase])
+  }, [dayCols, syncCalendarToFirebase, buildLocalPayload])
 
   const syncIndicator = useMemo(() => {
     if (syncState === 'saving') return { label: 'Guardando…', className: 'bg-amber-500/[0.15] text-ink-warn border-amber-500/[0.25]' }
@@ -1841,6 +1896,21 @@ export function CalendarioMantencionPage() {
   const todayWeekKey = useMemo(() => isoWeekKey(new Date(todayTick)), [todayTick])
   const isCurrentWeek = selectedWeek === todayWeekKey
 
+  /**
+   * La planilla no llega a hoy.
+   *
+   * Cuando la semana actual no está cargada, el calendario cae en la PRIMERA
+   * semana del archivo y la muestra sin decir nada: el 24-08 abría en la
+   * semana del 01/03 —seis meses atrás— con pinta de ser la de hoy. El botón
+   * "Ir a hoy" solo aparece si esa semana existe, así que en este caso no
+   * había ninguna señal.
+   */
+  const finDePlanilla = useMemo(() => {
+    if (weekKeys.length === 0 || weekKeys.includes(todayWeekKey)) return null
+    const ultima = dayCols.map((d) => d.dateObj).filter((d): d is Date => !!d).sort((x, y) => x.getTime() - y.getTime()).pop()
+    return ultima ? formatDate(ultima) : null
+  }, [weekKeys, todayWeekKey, dayCols])
+
   const mobileWeekLabel = useMemo(() => {
     const parts = selectedWeek.split('-W')
     return parts.length === 2 ? `Sem ${parts[1]} · ${parts[0]}` : (selectedWeek || 'Semana actual')
@@ -1864,9 +1934,36 @@ export function CalendarioMantencionPage() {
     <div className="h-full min-h-0 flex flex-col gap-2">
 
       {/* ══════════════════════════════════════════
+          Conmutador de vista del módulo
+          ══════════════════════════════════════════ */}
+      <div className="flex shrink-0 gap-1" role="tablist" aria-label="Vista del calendario">
+        {([['turnos', 'Turnos'], ['rueda', 'Ventanas de intervención']] as const).map(([id, label]) => (
+          <button
+            key={id}
+            role="tab"
+            aria-selected={vistaModulo === id}
+            onClick={() => setVistaModulo(id)}
+            className={`min-h-[44px] rounded-ctl px-3.5 text-footnote font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary motion-reduce:transition-none ${
+              vistaModulo === id
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-card text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {vistaModulo === 'rueda' && (
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <RuedaVentanas />
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════
           VISTA MÓVIL — lectura de turnos por semana
           ══════════════════════════════════════════ */}
-      {isMobile && (
+      {vistaModulo === 'turnos' && isMobile && (
         <div className="h-full min-h-0 flex flex-col gap-1">
 
           {isLandscape ? (
@@ -1878,9 +1975,11 @@ export function CalendarioMantencionPage() {
                 <span className="text-caption font-semibold text-foreground">{mobileWeekLabel}</span>
                 {isCurrentWeek
                   ? <span className="ml-1 text-caption text-ink-warn">● hoy</span>
-                  : weekKeys.includes(todayWeekKey) && (
+                  : weekKeys.includes(todayWeekKey) ? (
                     <button onClick={() => setSelectedWeek(todayWeekKey)}
                       className="ml-1.5 inline-flex h-5 items-center gap-1 px-1.5 text-caption font-medium text-ink-warn border border-amber-500/[0.25] rounded-ctl bg-amber-500/[0.15] active:bg-amber-500/[0.15] select-none"><CornerUpLeft className="h-3 w-3" />Ir a hoy</button>
+                  ) : finDePlanilla && (
+                    <span className="ml-1.5 text-caption text-ink-warn">· la planilla llega al {finDePlanilla}</span>
                   )
                 }
               </div>
@@ -1920,6 +2019,11 @@ export function CalendarioMantencionPage() {
                 {!isCurrentWeek && weekKeys.includes(todayWeekKey) && (
                   <button onClick={() => setSelectedWeek(todayWeekKey)}
                     className="shrink-0 inline-flex h-6 items-center gap-1 px-1.5 rounded-ctl border border-amber-500/[0.25] bg-amber-500/[0.15] text-caption font-medium text-ink-warn active:bg-amber-500/[0.15] select-none"><CornerUpLeft className="h-3 w-3" />Hoy</button>
+                )}
+                {finDePlanilla && (
+                  <span className="shrink-0 text-caption text-ink-warn leading-tight">
+                    la planilla llega al {finDePlanilla}
+                  </span>
                 )}
                 <span title={syncIndicator.label} className={`w-2 h-2 rounded-full shrink-0 ${syncState === 'saving' ? 'bg-amber-400' : syncState === 'synced' ? 'bg-emerald-400' : syncState === 'error' ? 'bg-red-400' : 'bg-muted-foreground'}`} />
                 <button onClick={() => nextWeekKey && setSelectedWeek(nextWeekKey)} disabled={!nextWeekKey}
@@ -2327,7 +2431,7 @@ export function CalendarioMantencionPage() {
       {/* ══════════════════════════════════════════
           VISTA DESKTOP — panel de tabs + tabla
           ══════════════════════════════════════════ */}
-      {!isMobile && <section className="sticky top-0 z-20 rounded-card border bg-card p-2">
+      {vistaModulo === 'turnos' && !isMobile && <section className="sticky top-0 z-20 rounded-card border bg-card p-2">
         {/* ── Tab bar ── */}
         <div className="flex items-center gap-1 border-b border-border pb-1 mb-2">
           {TAB_ITEMS.map((tab) => (
@@ -2790,7 +2894,7 @@ export function CalendarioMantencionPage() {
         </div>
       </section>}
 
-      {!isMobile && <section className="min-h-0 flex-1 rounded-card border bg-card p-2">
+      {vistaModulo === 'turnos' && !isMobile && <section className="min-h-0 flex-1 rounded-card border bg-card p-2">
         <div className="mb-1 flex items-center justify-between gap-2">
           <div className="text-sm font-semibold">Calendario Mantención</div>
           <div className="flex items-center gap-1">

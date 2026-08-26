@@ -56,6 +56,13 @@ export interface ForecastHistoryShift {
   producingMin: number
   micro: number | null
   /**
+   * Lo que Shoplogix esperaba de este turno YA CERRADO (suma de
+   * `expectedTotalCycles`). Es la meta firme cuando nadie cargó cuota: en el
+   * turno EN CURSO el mismo campo se completa sobre la marcha. Ver
+   * `objetivoDelTurno`. Ausente en entradas cacheadas de antes.
+   */
+  expected?: number | null
+  /**
    * Desglose del tiempo del turno, para explicar por qué hoy cerró distinto
    * («Qué cambió contra ayer») y para los récords por componente.
    * Ausentes en entradas cacheadas antes de publicarse — el backend las
@@ -110,6 +117,14 @@ export interface PublicMonitorLive {
   paceSamples?: number | null
   /** Cuota del turno según la config del módulo. */
   quotaPieces?: number | null
+  /**
+   * Peso promedio del pescado, kg por pieza, cargado a mano durante el turno.
+   * Shoplogix cuenta ciclos y no manda kilos: sin este dato el monitor no puede
+   * estimar una sola tonelada, y las reales llegan después por el Grader.
+   */
+  pesoPromedioKg?: number | null
+  /** Cuando la cuota se pidió en toneladas: el pedido original. */
+  quotaOrigen?: { toneladas: number; pesoPromedioKg: number | null } | null
   effectiveStart: string | null
   effectiveEnd: string | null
   shiftClosed: boolean

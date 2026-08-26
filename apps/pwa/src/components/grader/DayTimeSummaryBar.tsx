@@ -101,9 +101,12 @@ export function DayTimeSummaryBar({ dateKey, plantSlug, enabled, className }: Pr
       <span className="text-cat-5-ink tabular-nums" title={`Tiempo total de detención/paro (suma de ${maquinasLabel}, todos los turnos)`}>
         <PauseCircle className="h-3 w-3 shrink-0" />{fmtDurationSec(totals.downtimeSec)} detenidas
       </span>
+      {/* Con solo el ícono de la taza, este número quedaba sin nombre al lado de
+          "procesando" y "detenidas" — y en el teléfono no hay hover que muestre
+          el title. Se dice la palabra, como sus dos vecinos. */}
       {totals.breakSec > 0 && (
         <span className="text-amber-400 tabular-nums" title="Pausas programadas (colación/reunión), todos los turnos">
-          <Coffee className="h-3 w-3 shrink-0" />{fmtDurationSec(totals.breakSec)}
+          <Coffee className="h-3 w-3 shrink-0" />{fmtDurationSec(totals.breakSec)} en colación
         </span>
       )}
       {/* Desglose por turno. Antes salía como "T2 0 s · T1 9 h 31 min": códigos

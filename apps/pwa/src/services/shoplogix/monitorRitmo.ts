@@ -46,16 +46,61 @@ export function mediaMovil(series: readonly TramoSerie[] | null | undefined): nu
 }
 
 /**
+ * Minutos REALES que lleva el último tramo de la serie.
+ *
+ * ⚠⚠ El tramo en curso venía contándose como si durara sus 5 minutos completos.
+ * Con la línea produciendo, el 26-08 a las 00:46 los tres tramos de la ventana
+ * eran 147, 132 y **41** piezas — el último con minuto y medio de datos — y el
+ * número protagonista daba **21,3 pz/min**, por debajo del pulso de Shoplogix
+ * (25,0) y del promedio de 30 min del backend (23,3). Un ritmo "de ahora" que
+ * siempre queda por debajo del real no sirve para decidir en planta.
+ *
+ * `ahoraWall` va en la MISMA base que los `t` de la serie: wall-clock sellado
+ * como UTC (ver `pages/monitor/horaPlanta.ts`). Sin ese dato se mantiene el
+ * comportamiento de antes.
+ */
+export function minutosDelUltimoTramo(
+  inicioIso: string | null | undefined,
+  ahoraWall: number | null | undefined,
+): number {
+  if (!inicioIso || ahoraWall == null || !Number.isFinite(ahoraWall)) return PASO_MIN
+  const inicio = Date.parse(inicioIso)
+  if (Number.isNaN(inicio)) return PASO_MIN
+  const min = (ahoraWall - inicio) / 60_000
+  if (!Number.isFinite(min) || min <= 0) return PASO_MIN
+  return Math.min(PASO_MIN, min)
+}
+
+/** Bajo este piso, el tramo en curso es ruido: dos piezas en diez segundos no son un ritmo. */
+export const MIN_TRAMO_UTIL = 1
+
+/**
  * El ritmo de AHORA en pz/min: el último punto de la media móvil.
  *
  * Es la cifra protagonista del monitor. `null` cuando la línea todavía no
  * produjo nada — y ese null es información: no hay ritmo que mostrar, no es un
  * cero que invite a leer «va lentísima».
  */
-export function ritmoAhoraCpm(series: readonly TramoSerie[] | null | undefined): number | null {
-  const media = mediaMovil(series)
-  if (media.length === 0) return null
-  return media[media.length - 1]! / PASO_MIN
+export function ritmoAhoraCpm(
+  series: readonly TramoSerie[] | null | undefined,
+  ahoraWall?: number | null,
+): number | null {
+  if (!series || series.length === 0) return null
+  const conDatos = mediaMovil(series).length
+  if (conDatos === 0) return null
+
+  const minUltimo = minutosDelUltimoTramo(series[conDatos - 1]?.t, ahoraWall)
+  // Tramo recién empezado: no aporta, y dividirlo por 5 hunde el número.
+  const hasta = minUltimo < MIN_TRAMO_UTIL ? conDatos - 1 : conDatos
+  if (hasta <= 0) return null
+
+  const ventana = series.slice(Math.max(0, hasta - VENTANA_TRAMOS), hasta)
+  const piezas = ventana.reduce((a, p) => a + (p.pieces ?? 0), 0)
+  const minutos = ventana.reduce(
+    (a, _p, i) => a + (i === ventana.length - 1 && hasta === conDatos ? minUltimo : PASO_MIN),
+    0,
+  )
+  return minutos > 0 ? piezas / minutos : null
 }
 
 /**
@@ -73,15 +118,26 @@ export function ritmoAhoraCpm(series: readonly TramoSerie[] | null | undefined):
  * puede haber habido un paro corto— pero es la misma con la que se dibuja la
  * curva, así que número y gráfico siguen contando lo mismo.
  */
-export function ritmoAhoraAndando(series: readonly TramoSerie[] | null | undefined): number | null {
+export function ritmoAhoraAndando(
+  series: readonly TramoSerie[] | null | undefined,
+  ahoraWall?: number | null,
+): number | null {
   if (!series || series.length === 0) return null
   const conDatos = mediaMovil(series).length      // corta la cola de ceros igual que la curva
   if (conDatos === 0) return null
-  const ventana = series.slice(Math.max(0, conDatos - VENTANA_TRAMOS), conDatos)
+
+  const minUltimo = minutosDelUltimoTramo(series[conDatos - 1]?.t, ahoraWall)
+  const hasta = minUltimo < MIN_TRAMO_UTIL ? conDatos - 1 : conDatos
+  if (hasta <= 0) return null
+
+  const ventana = series.slice(Math.max(0, hasta - VENTANA_TRAMOS), hasta)
   const piezas = ventana.reduce((a, p) => a + (p.pieces ?? 0), 0)
-  const tramosAndando = ventana.filter((p) => (p.pieces ?? 0) > 0).length
-  if (tramosAndando === 0) return 0               // la línea estuvo parada toda la ventana
-  return piezas / (tramosAndando * PASO_MIN)
+  const minutosAndando = ventana.reduce((a, p, i) => {
+    if ((p.pieces ?? 0) <= 0) return a
+    return a + (i === ventana.length - 1 && hasta === conDatos ? minUltimo : PASO_MIN)
+  }, 0)
+  if (minutosAndando === 0) return 0              // la línea estuvo parada toda la ventana
+  return piezas / minutosAndando
 }
 
 /** Cómo se lee un ritmo contra el techo de la máquina. */
@@ -149,4 +205,31 @@ export function pedidoAndando(
      requerido de reloj tal cual, que ya es una referencia honesta. */
   if (producingMin < 15 || frac <= 0.05) return requeridoReloj
   return requeridoReloj / Math.min(1, frac)
+}
+
+/**
+ * ¿El ritmo que pide la meta está fuera de lo que la línea puede dar?
+ *
+ * Con el turno casi terminado, `pedidoAndando` se dispara: en el monitor de
+ * Chonchi del 25-08, faltando 10.580 pz y 33 min de producción, pedía **320,7
+ * pz/min** — la línea hace entre 24 y 38. La regla lo mostraba igual, con la
+ * marca clavada en el extremo y el rótulo "para la meta 320,7", como si fuera
+ * un objetivo. Tres líneas más arriba la misma pantalla ya decía "Ya no da el
+ * tiempo".
+ *
+ * Un número imposible presentado como meta no informa: confunde. El bloque de
+ * llenado de la Baader 200 ya toma esta misma decisión (`imposible`), contra el
+ * máximo funcional y no contra el set point — subir la velocidad es una
+ * decisión posible; pasarse del techo, no.
+ *
+ * @param pedido  pz/min andando que exige la meta.
+ * @param techo   máximo que la línea puede sostener (set point / máx. funcional).
+ */
+export function pedidoFueraDeAlcance(
+  pedido: number | null | undefined,
+  techo: number | null | undefined,
+): boolean {
+  if (pedido == null || pedido <= 0) return false
+  if (techo == null || techo <= 0) return false
+  return pedido > techo
 }

@@ -233,7 +233,7 @@ export function GraderShiftPeriodMatrix({
                             setTipPos({ x: r.left + r.width / 2, y: r.top })
                           }}
                           onBlur={() => { setHoverKey(k => (k === s.key ? null : k)); setTipPos(null) }}
-                          aria-label={`${displayShiftName(shiftId)}, ${dk}, ${formatMatrixKpi(v, kpi)}${s.crossesMidnight || s.startDayOffset > 0 ? ', termina otro día' : ''}${s.mergedFrom ? `, ${s.mergedFrom.length} jornadas` : ''}`}
+                          aria-label={`${displayShiftName(shiftId)}, ${dk}, ${formatMatrixKpi(v, kpi)}${s.crossesMidnight || s.startDayOffset > 0 ? ', termina otro día' : ''}${s.mergedFrom ? `, ${s.mergedFrom.length} jornadas` : ''}${s.corregido ? ', corregido después del brief' : ''}`}
                           aria-pressed={selected}
                           className={cn(
                             'relative rounded-ctl min-h-[40px]',
@@ -262,6 +262,17 @@ export function GraderShiftPeriodMatrix({
                               aria-hidden
                               className="absolute bottom-[3px] right-[3px] w-[6px] h-[6px] rounded-full"
                               style={{ border: '1.5px solid var(--lc-warn)' }}
+                            />
+                          )}
+                          {s.corregido && (
+                            <span
+                              aria-hidden
+                              title="Shoplogix corrigió este turno después del brief"
+                              className="absolute bottom-0 left-0 w-0 h-0"
+                              style={{
+                                borderBottom: '9px solid var(--lc-warn)',
+                                borderRight: '9px solid transparent',
+                              }}
                             />
                           )}
                           {(s.crossesMidnight || s.startDayOffset > 0) && (
@@ -335,6 +346,11 @@ export function GraderShiftPeriodMatrix({
             <span className="inline-flex items-center gap-1.5">
               <span className="font-mono font-bold">⁺¹</span> ocurre al día siguiente
             </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span aria-hidden className="w-0 h-0"
+                    style={{ borderBottom: '9px solid var(--lc-warn)', borderRight: '9px solid transparent' }} />
+              corregido después del brief
+            </span>
           </div>
         )}
 
@@ -384,6 +400,15 @@ export function GraderShiftPeriodMatrix({
                 ? <><b>{hovered.pieces.toLocaleString('es-CL')}</b> pz{hovered.p0Pct != null && <> · P0 <b>{hovered.p0Pct.toFixed(1).replace('.', ',')}%</b></>}</>
                 : <span className="text-muted-foreground">sin Excel del Grader</span>}
             </div>
+            {/* Shoplogix corrigió el turno DESPUÉS del brief. Pasó en 39 de 790
+                turnos y a veces en grande (Yal 21-07: 9.494 → 20.113 pz). El
+                backend lo detecta y avisa por Telegram; acá el turno se veía
+                idéntico a cualquier otro. */}
+            {hovered.corregido && (
+              <div className="mt-1 pt-1 border-t border-border/60" style={{ color: 'var(--lc-warn)' }}>
+                {hovered.notaCorreccion ?? 'Shoplogix corrigió este turno después del brief'}
+              </div>
+            )}
           </div>
         )}
 
@@ -428,6 +453,13 @@ export function GraderShiftPeriodMatrix({
               )}
               {focused.windowSource !== 'effective' && (
                 <span className="text-muted-foreground italic">horario {focused.windowSource}</span>
+              )}
+              {/* En tablet no hay hover: si esto solo viviera en el tooltip, el
+                  turno corregido se leería como cualquier otro. */}
+              {focused.corregido && (
+                <span style={{ color: 'var(--lc-warn)' }}>
+                  {focused.notaCorreccion ?? 'Shoplogix corrigió este turno después del brief'}
+                </span>
               )}
               <span className="flex-1" />
               {onOpenShift && (

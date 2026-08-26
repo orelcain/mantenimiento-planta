@@ -51,6 +51,13 @@ export interface ForecastResult {
   /** Turnos comparables usados. */
   samples: number
   /**
+   * Qué fracción de su total llevaban esos turnos a esta altura (0-1). Solo
+   * cuando el método ganador es el proporcional.
+   */
+  fraccionTipica: number | null
+  /** En una frase, de dónde sale la estimación. */
+  explicacion: string | null
+  /**
    * De esos turnos, cuántos habrían alcanzado la meta desde esta misma altura.
    * Es el veredicto auditable: con 6 muestras, un "72% de probabilidad" finge
    * una precisión que no existe; "8 de 11" se puede revisar turno por turno.
@@ -108,7 +115,26 @@ const duracion = (t: HistoryShift) => (t.curve.length ? t.curve[t.curve.length -
  * Los tres predictores. Reciben lo que el turno lleva a `min` y el historial,
  * y devuelven el total estimado al cierre.
  */
-const PREDICTORES: Record<ForecastMethod, (p: number, min: number, h: HistoryShift[]) => number | null> = {
+/**
+ * El convenio del turno, en minutos: lo que ya pasó y lo que falta.
+ *
+ * ⚠⚠ Regla de Orel (26-08): «el estimado no debe considerar la colación — ese
+ * tiempo es tiempo planificado FUERA de proceso». El método `ritmo` extrapolaba
+ * sobre el reloj: contaba la colación pasada como si se hubiera producido en
+ * ella (bajando el ritmo) y la que falta como tiempo de producción (subiendo el
+ * total). El 26-08 daba 18.164 pz contra los 8.611 de la proyección lineal.
+ */
+export interface ConvenioDelTurno {
+  /** Minutos de convenio ya transcurridos dentro de `currentMinute`. */
+  transcurridoMin?: number | null
+  /** Minutos de convenio que faltan hasta el cierre. */
+  porDelanteMin?: number | null
+}
+
+export const PREDICTORES: Record<
+  ForecastMethod,
+  (p: number, min: number, h: HistoryShift[], convenio?: ConvenioDelTurno | null) => number | null
+> = {
   /* "Qué fracción del total ya llevaban los otros a esta altura." */
   proporcional: (p, min, h) => {
     const ratios = h
@@ -123,11 +149,20 @@ const PREDICTORES: Record<ForecastMethod, (p: number, min: number, h: HistoryShi
     if (deltas.length === 0) return null
     return p + mediana(deltas)
   },
-  /* El método viejo: extrapolar el ritmo de reloj hasta el cierre típico. */
-  ritmo: (p, min, h) => {
+  /*
+   * Extrapolar el ritmo hasta el cierre típico, SIN la colación: ni la que ya
+   * pasó (que no produjo y no debe bajar el ritmo) ni la que falta (que no va
+   * a producir y no debe sumar piezas).
+   */
+  ritmo: (p, min, h, convenio) => {
     const dur = mediana(h.map(duracion))
     if (min <= 0) return null
-    return p + (p / min) * Math.max(0, dur - min)
+    const yaPaso = Math.max(0, Math.min(convenio?.transcurridoMin ?? 0, min - 1))
+    const producidos = min - yaPaso
+    if (producidos <= 0) return null
+    const restanteReloj = Math.max(0, dur - min)
+    const restanteProductivo = Math.max(0, restanteReloj - Math.max(0, convenio?.porDelanteMin ?? 0))
+    return p + (p / producidos) * restanteProductivo
   },
 }
 
@@ -190,6 +225,59 @@ function errorDe(metodo: ForecastMethod, hist: HistoryShift[], min: number): num
 }
 
 /**
+ * Qué fracción de su total llevaban los turnos comparables a esta misma altura.
+ *
+ * Es lo que explica el pronóstico del método `proporcional` — el que suele
+ * ganar de madrugada. Sin este dato, la pantalla mostraba dos cierres muy
+ * distintos y le echaba la culpa al horario: el 26-08 a las 00:34 decía "al
+ * ritmo de ahora, hasta las 05:00, 8.496 pz" y justo debajo "si se estira como
+ * los últimos turnos (≈05:25), 18.212 pz". Veinticinco minutos no explican
+ * 9.716 piezas: la diferencia es que los turnos anteriores, a esta altura,
+ * llevaban menos de la mitad de lo que terminaron haciendo.
+ *
+ * Devuelve null si no hay con qué; se muestra solo cuando el método ganador es
+ * el proporcional, que es de donde sale.
+ */
+export function fraccionTipicaAEstaAltura(
+  history: HistoryShift[],
+  currentMinute: number,
+): number | null {
+  const ratios = history
+    .map((t) => (t.totalPieces > 0 ? (piecesAt(t.curve, currentMinute) ?? 0) / t.totalPieces : null))
+    .filter((r): r is number => r != null && r > 0.05)
+  if (ratios.length === 0) return null
+  return mediana(ratios)
+}
+
+/**
+ * De dónde sale el número, en una frase que se pueda discutir.
+ *
+ * Cada método mira otra cosa, y sin decirlo el pronóstico parece contradecir a
+ * la proyección lineal: "hasta las 05:00, 8.496 pz" arriba y "18.212 pz" abajo,
+ * con el rótulo culpando a 25 minutos de más.
+ */
+export function explicacionDelMetodo(
+  metodo: ForecastMethod,
+  history: HistoryShift[],
+  currentMinute: number,
+): string | null {
+  if (metodo === 'proporcional') {
+    const frac = fraccionTipicaAEstaAltura(history, currentMinute)
+    if (frac == null) return null
+    return `a esta altura llevaban el ${Math.round(frac * 100)}% de su total`
+  }
+  if (metodo === 'aditivo') {
+    const deltas = history.map((t) => Math.max(0, t.totalPieces - (piecesAt(t.curve, currentMinute) ?? 0)))
+    if (deltas.length === 0) return null
+    return `desde esta altura sumaron ${Math.round(mediana(deltas)).toLocaleString('es-CL')} pz más`
+  }
+  // Decir que es ritmo de RELOJ no basta: lo que hace que este número sea el
+  // más alto de la pantalla es que no descuenta las colaciones, y de madrugada
+  // el convenio se lleva casi tres horas del turno.
+  return 'manteniendo el ritmo, sin contar colaciones, hasta el cierre típico'
+}
+
+/**
  * El pronóstico del cierre, con el método que mejor funciona EN ESTA LÍNEA.
  *
  * Devuelve null cuando no hay con qué: sin historial suficiente, sin piezas
@@ -202,6 +290,8 @@ export function buildForecast(args: {
   history: HistoryShift[]
   targetPieces?: number | null
   shiftClosed?: boolean
+  /** Colación y afines: no cuenta como tiempo de proceso. */
+  convenio?: ConvenioDelTurno | null
 }): ForecastResult | null {
   const { todayCurve, currentMinute, shiftClosed } = args
   if (shiftClosed) return null
@@ -223,7 +313,7 @@ export function buildForecast(args: {
   }
   if (!mejor) return null
 
-  const estimate = PREDICTORES[mejor.method](current, currentMinute, hist)
+  const estimate = PREDICTORES[mejor.method](current, currentMinute, hist, args.convenio)
   if (estimate == null || !Number.isFinite(estimate)) return null
 
   /*
@@ -274,6 +364,8 @@ export function buildForecast(args: {
     mapePct: Math.round(mejor.mape * 10) / 10,
     method: metodo,
     samples: hist.length,
+    fraccionTipica: metodo === 'proporcional' ? fraccionTipicaAEstaAltura(hist, currentMinute) : null,
+    explicacion: explicacionDelMetodo(metodo, hist, currentMinute),
     hitsTarget: meta != null ? finales.filter((v) => v >= meta).length : null,
     current,
     horizonMin: finCono,

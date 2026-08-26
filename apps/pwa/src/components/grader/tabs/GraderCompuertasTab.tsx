@@ -13,6 +13,7 @@ import { Bar } from 'react-chartjs-2'
 import { cn } from '@/lib/utils'
 import { getTooltipProps } from '@/services/grader/graderTooltips'
 import { SwapSuggestionCard } from '@/components/grader/GraderInlinePanels'
+import { GraderGatesLector } from './GraderGatesLector'
 import {
   computeGateTimingSignals,
   computeOptimalGateAssignment,
@@ -59,6 +60,9 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
   )
   return (
     <>
+      {/* Qué mirar ahora — el patrón del protocolo 142 llevado a los gates */}
+      <GraderGatesLector analytics={analytics} gates={gates} timingSignals={timingSignals} />
+
       {/* Allocation Score KPI */}
       <div className="flex items-center gap-3 p-3 rounded-card border bg-muted">
         <div className={cn(

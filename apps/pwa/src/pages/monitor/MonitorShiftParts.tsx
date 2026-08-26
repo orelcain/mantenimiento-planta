@@ -11,7 +11,7 @@ import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import type { PublicMonitorLive } from '@/services/shoplogix/publicShiftMonitor.service'
 import type { CostoDeParadas } from '@/services/shoplogix/monitorPerdidas'
-import { DUENO_META, type CausaDelTurno, type GrupoDelTurno } from '@/services/shoplogix/monitorEventos'
+import { DUENO_META, veredictoFallaDeMaquina, type CausaDelTurno, type GrupoDelTurno } from '@/services/shoplogix/monitorEventos'
 import { DUENO_UI } from './duenoUi'
 import { resumenComparacion, type CompareResult } from '@/services/shoplogix/monitorCompare'
 import { MAX_MAPE_PCT, type ConePoint, type ForecastResult } from '@/services/shoplogix/monitorForecast'
@@ -143,6 +143,7 @@ function fmtDurMin(min: number): string {
  */
 export function TiempoDelTurno({
   tb, causaSel, onCausa, onVentana, onTramo, proximaParada, notas, cerrado, meta, hechas,
+  piezasPulso, corteHora,
   cuotaAhora, horaAhora, cpmAndando, costo, grupos, notasTurno,
 }: {
   tb: PublicMonitorLive['timeBreakdown']
@@ -169,6 +170,10 @@ export function TiempoDelTurno({
   meta?: number | null
   /** Piezas hechas hasta ahora (o al cierre). */
   hechas?: number | null
+  /** Lo que ya leyó el pulso — más fresco que el snapshot de este desglose. */
+  piezasPulso?: number | null
+  /** Hora de planta del corte al que corresponde este desglose. */
+  corteHora?: string | null
   /**
    * La cuota a esta ALTURA del turno: la curva del comparador, que se aplana
    * durante la colación. Solo importa en vivo — restar contra la meta completa
@@ -237,8 +242,6 @@ export function TiempoDelTurno({
    * esa cifra se le imputa a Mantención. El respaldo al promedio solo entra
    * para causas que no vengan calculadas.
    */
-  const sinRedondear = (reason: string, min: number) =>
-    porCausa.get(reason)?.piezas ?? (cpm ? min * cpm : 0)
   /*
    * El total se SUMA de las mismas filas de abajo. Calcularlo aparte
    * (recoverableMin x promedio) daba un titular que no cuadraba con su propio
@@ -249,11 +252,49 @@ export function TiempoDelTurno({
    * fila. Ese resto va al promedio del turno —no se sabe de qué causa es— y
    * sin él el titular se quedaría corto justo cuando la línea está parada.
    */
-  const restoMin = Math.max(0, tb.recoverableMin - tb.recoverable.reduce((a, x) => a + x.min, 0))
+  /*
+   * OJO OJO: MINUTOS DE LÍNEA, no de máquina.
+   *
+   * `min` son los minutos que la causa estuvo activa en ALGUNA máquina;
+   * `lineMin`, los que además frenaron la línea entera. Con tres Baader los dos
+   * se separan muchísimo. Turno 2 del 26-08, medido del payload:
+   *
+   *     KNURO 88/8 · Micro Detencion 39/3 · Detencion 10/3 · LOGICA 8/0 ·
+   *     ACUMULACION RECHAZO 6/5   →  suma 151 de máquina contra 12 de línea
+   *
+   * Sumando `min` la pantalla decía «Paradas 2.066 pz» cuatro renglones arriba
+   * de «las paradas evitables llevan 12 min con la línea entera detenida»:
+   * 172 pz/min en una línea que da 45. `cascadaTurno` ya usaba `lineMin` — eran
+   * dos varas para lo mismo en la misma pantalla.
+   *
+   * Solo los minutos de línea se traducen a piezas que no pasaron por el sensor.
+   */
+  const minDeLinea = (x: { min: number; lineMin?: number | null }) => Math.max(0, x.lineMin ?? x.min)
+  /*
+   * El RITMO sigue siendo el local —el que la línea traía justo antes de esa
+   * parada, que `monitorPerdidas` calcula por causa— y solo se corrigen los
+   * MINUTOS. Valorizar con el promedio del turno sería el error opuesto: una
+   * parada de 27 min a 9 pz/min cuesta 243 pz, no las 351 del promedio.
+   */
+  /* Ritmo local de la causa (`cpm` ya trae deshecha la división por máquinas
+     que lleva `piezas`) por los minutos de LÍNEA. */
+  const piezasDe = (reason: string, minLinea: number) =>
+    minLinea * (porCausa.get(reason)?.cpm ?? cpm ?? 0)
+  /*
+   * Y los `lineMin` de las causas tampoco se descuentan ENTRE SÍ: dos causas
+   * distintas pueden frenar la línea en el mismo minuto. En el turno del 26-08
+   * suman 19 mientras `recoverableMin` —el total de línea, el que cierra la
+   * ventana (475 = 392 + 61 + 12 + 10)— dice 12. Se escalan para que sumen ese
+   * total: así el titular cuadra con los minutos que la propia pantalla dice
+   * dos renglones más abajo, y la proporción entre causas se conserva.
+   */
+  const sumaLinea = tb.recoverable.reduce((a, x) => a + minDeLinea(x), 0)
+  const escala = sumaLinea > tb.recoverableMin && sumaLinea > 0 ? tb.recoverableMin / sumaLinea : 1
+  const restoMin = Math.max(0, tb.recoverableMin - sumaLinea)
   const crudas =
     cpm == null
       ? null
-      : tb.recoverable.reduce((a, x) => a + sinRedondear(x.reason, x.min), 0) + restoMin * cpm
+      : tb.recoverable.reduce((a, x) => a + piezasDe(x.reason, minDeLinea(x) * escala), 0) + restoMin * cpm
   /*
    * La vara de la resta. Cerrado: la meta completa. En vivo: la cuota A ESTA
    * ALTURA (la misma curva del comparador, aplanada en colación) — contra la
@@ -304,13 +345,11 @@ export function TiempoDelTurno({
   const gruposImputables = gruposVisibles.filter((g) => g.dueno !== 'programado')
   const grupoProgramado = gruposVisibles.find((g) => g.dueno === 'programado') ?? null
   /*
-   * "Ninguna falla de máquina" solo se puede afirmar si hubo paradas que
-   * clasificar y ninguna cayó en Mantención. Con el turno entero sin paradas
-   * la frase sería cierta pero vacía, y con el grupo presente sería falsa.
+   * "Ninguna falla de máquina" solo se puede afirmar sobre las paradas que
+   * TIENEN causa anotada — `sin-imputar` no es evidencia de nada. La regla y
+   * el porqué viven en `veredictoFallaDeMaquina`.
    */
-  const sinFallaDeMaquina =
-    gruposVisibles.some((g) => g.dueno !== 'programado') &&
-    !gruposVisibles.some((g) => g.dueno === 'mantencion')
+  const veredicto = veredictoFallaDeMaquina(gruposVisibles)
   const ultimoImputable = [...gruposVisibles].reverse().find((g) => g.dueno !== 'programado')?.dueno
 
   return (
@@ -354,7 +393,7 @@ export function TiempoDelTurno({
            * entre lo pintado y el hueco es la cuota de esta hora. Los valores
            * SIEMPRE afuera: el ancho de un segmento no decide su legibilidad.
            */}
-          <p className="text-right text-[11px] uppercase tracking-wide text-muted-foreground/70">
+          <p className="text-right text-[11px] uppercase tracking-wide text-muted-foreground/80">
             meta <span className="tabular-nums">{fmtInt(metaOk)} pz</span>
           </p>
           {/* Los segmentos son ATAJOS al mismo detalle que su fila (abajo);
@@ -391,7 +430,11 @@ export function TiempoDelTurno({
                * perdieron 794 pz en la colación», que es falso. Su peso se dice
                * igual, con el denominador nombrado: % DEL TURNO, no de la meta.
                */
-              ...(grupoProgramado ? [{ p: 'programado' as const, nombre: 'Programado', valor: fmtDurMin(grupoProgramado.min), pct: tb.windowMin > 0 ? `${Math.round((grupoProgramado.min / tb.windowMin) * 100)}% turno` : null, tick: 'bg-muted-foreground' }] : []),
+              /* `tb.plannedMin` y no `grupoProgramado.min`: el grupo suma los
+                 minutos por MÁQUINA (66+9+6 = 81) y el desglose de línea dice
+                 61. Mostrar 81 además rompía el reparto — 392 produciendo + 81
+                 + 12 se pasa de los 475 de ventana. */
+              ...(grupoProgramado ? [{ p: 'programado' as const, nombre: 'Programado', valor: fmtDurMin(tb.plannedMin), pct: tb.windowMin > 0 ? `${Math.round((tb.plannedMin / tb.windowMin) * 100)}% turno` : null, tick: 'bg-muted-foreground' }] : []),
             ]).map((f, i) => (
               <div key={f.p} className={i > 0 ? 'border-t border-border/60' : ''}>
                 <button
@@ -430,6 +473,22 @@ export function TiempoDelTurno({
                         <p className="mt-1.5 text-muted-foreground/80">
                           Los minutos miden la LÍNEA, que solo se detiene cuando paran todas las máquinas.
                         </p>
+                        {/* El titular de arriba usa el pulso (lectura por minuto)
+                            y este desglose el último snapshot: el 26-08 se leía
+                            "9.041 piezas" arriba y "Hechas 8.894" acá, 147 de
+                            diferencia por 6 minutos de desfase, sin nada que lo
+                            explicara. */}
+                        {piezasPulso != null && hechas != null && piezasPulso > hechas && (
+                          <p className="mt-1 text-muted-foreground/80">
+                            Este desglose va al último corte de Shoplogix
+                            {corteHora ? <> (<span className="tabular-nums">{corteHora}</span>)</> : null}
+                            : el pulso ya leyó{' '}
+                            <span className="tabular-nums font-semibold text-foreground">
+                              {fmtInt(piezasPulso - hechas)} pz
+                            </span>{' '}
+                            más, que entran en el próximo.
+                          </p>
+                        )}
                       </>
                     )}
                     {f.p === 'paradas' && (
@@ -439,7 +498,7 @@ export function TiempoDelTurno({
                             y la fila arranca abierta para que el argumento de
                             imputación siga siendo lo primero que se ve. */}
                         {gruposImputables.length === 0 && (
-                          <p className="py-0.5 text-muted-foreground/70">nada por recuperar</p>
+                          <p className="py-0.5 text-muted-foreground/80">nada por recuperar</p>
                         )}
                         {gruposImputables.map((g) => (
                           <div key={g.dueno}>
@@ -453,15 +512,15 @@ export function TiempoDelTurno({
                               proximaParada={null}
                               plannedMin={tb.plannedMin}
                             />
-                            {sinFallaDeMaquina && g.dueno === ultimoImputable && (
+                            {veredicto && g.dueno === ultimoImputable && (
                               <p className="mt-2 text-[11px] font-semibold text-ink-ok">
-                                ✓ Ninguna parada por falla de máquina en este turno.
+                                {veredicto.texto}
                               </p>
                             )}
                           </div>
                         ))}
                         {onCausa && gruposImputables.length > 0 && (
-                          <p className="mt-1.5 text-[11px] text-muted-foreground/70">
+                          <p className="mt-1.5 text-[11px] text-muted-foreground/80">
                             Tocá una causa para ver sus paradas una por una.
                           </p>
                         )}
@@ -544,7 +603,7 @@ export function TiempoDelTurno({
                           en el convenio no se produce: la meta ya se reparte descontándolo. Por eso
                           su peso se mide en tiempo — {tb.windowMin > 0 && (
                             <span className="tabular-nums">
-                              {Math.round((grupoProgramado.min / tb.windowMin) * 100)}%
+                              {Math.round((tb.plannedMin / tb.windowMin) * 100)}%
                             </span>
                           )} del turno.
                         </p>
@@ -604,7 +663,16 @@ export function TiempoDelTurno({
                 Van <span className="tabular-nums font-semibold">{fmtInt(hechas)}</span> de las{' '}
                 <span className="tabular-nums font-semibold">{fmtInt(cuotaOk ?? 0)}</span> que
                 tocaban {horaAhora ? <>a las <span className="tabular-nums">{horaAhora}</span></> : 'a esta altura'}.
-                Las paradas evitables llevan <b>{fmtDurMin(tb.recoverableMin)}</b>.
+                {' '}
+                {/* `recoverableMin` son los minutos con la LÍNEA ENTERA detenida, y
+                    arriba cada causa muestra los minutos en que estuvo activa en
+                    ALGUNA máquina (86 min de "Detención" contra 67 de línea, el
+                    24-08 en Chonchi). Sin decir cuál es cuál, los dos números se
+                    leen como si uno estuviera mal. */}
+                Las paradas evitables llevan <b>{fmtDurMin(tb.recoverableMin)}</b>
+                {(tb.recoverable ?? []).some((x) => (x.lineMin ?? x.min) < x.min)
+                  ? ' con la línea entera detenida.'
+                  : '.'}
               </p>
             )}
         </div>
@@ -633,7 +701,7 @@ export function TiempoDelTurno({
           </p>
 
           {gruposVisibles.length === 0 && (
-            <p className="mt-1 text-[11.5px] text-muted-foreground/60">nada por recuperar</p>
+            <p className="mt-1 text-[11.5px] text-muted-foreground/80">nada por recuperar</p>
           )}
 
           {gruposVisibles.map((g) => (
@@ -652,16 +720,16 @@ export function TiempoDelTurno({
                   último grupo que se le puede imputar a alguien, no al final:
                   después del convenio queda a tres dedos de distancia de los
                   minutos que explica y se lee como un pie de página. */}
-              {sinFallaDeMaquina && g.dueno === ultimoImputable && (
+              {veredicto && g.dueno === ultimoImputable && (
                 <p className="mt-2 text-[11px] font-semibold text-ink-ok">
-                  ✓ Ninguna parada por falla de máquina en este turno.
+                  {veredicto.texto}
                 </p>
               )}
             </div>
           ))}
 
           {onCausa && gruposVisibles.length > 0 && (
-            <p className="mt-1.5 text-[11px] text-muted-foreground/70">
+            <p className="mt-1.5 text-[11px] text-muted-foreground/80">
               Tocá una causa para ver sus paradas una por una.
             </p>
           )}
@@ -675,7 +743,7 @@ export function TiempoDelTurno({
           único que lo dice; con ella abierta lo dice el grupo y esto se
           calla para no repetirlo. */}
       {proximaParada && (tb.plannedMin === 0 || (restaVisible && parte !== 'programado')) && (
-        <p className="mt-1.5 text-[11px] text-muted-foreground/70">
+        <p className="mt-1.5 text-[11px] text-muted-foreground/80">
           {tb.plannedMin === 0 ? 'Todavía sin paradas de convenio: ' : ''}
           {nombreDeConvenio(proximaParada.reason)} entra a las{' '}
           {/* ~ porque es la mediana de los turnos anteriores, no un pacto. */}
@@ -763,7 +831,7 @@ export function TiempoDelTurno({
             </span>
           </div>
 
-          <p className="mt-2 text-[11px] leading-snug text-muted-foreground/70">
+          <p className="mt-2 text-[11px] leading-snug text-muted-foreground/80">
             Los minutos son los que la causa estuvo activa en alguna máquina; la barra mide la
             LÍNEA, que solo se detiene cuando paran todas.
           </p>
@@ -825,7 +893,7 @@ function GrupoDeEventos({ g, sel, onCausa, onVentana, onTramo, notas, proximaPar
       {/* ⚠ El aviso NO se apaga con la primera parada planificada: 7 min de
           reunión de inicio lo mataban con la colación todavía por delante. */}
       {proximaParada && plannedMin > 0 && (
-        <p className="mt-1 pl-2 text-[11px] text-muted-foreground/70">
+        <p className="mt-1 pl-2 text-[11px] text-muted-foreground/80">
           {/* Con NOMBRE y en mayúscula inicial: la pregunta real es «¿cuándo es
               la colación?» y la respuesta tiene que decir colación. */}
           {nombreDeConvenio(proximaParada.reason)} entra a las{' '}
@@ -918,7 +986,7 @@ function FilaEvento({ c, sel, onCausa, onVentana, onTramo, notas }: {
   const nombre = (
     <span className="min-w-0 truncate">
       {c.reason}
-      {c.paradas.length > 0 && <span className="ml-1 text-[11px] text-muted-foreground/70">{abierta ? '▾' : '▸'}</span>}
+      {c.paradas.length > 0 && <span className="ml-1 text-[11px] text-muted-foreground/80">{abierta ? '▾' : '▸'}</span>}
     </span>
   )
 
@@ -931,7 +999,12 @@ function FilaEvento({ c, sel, onCausa, onVentana, onTramo, notas }: {
             setAbierta((v) => !v)
             onCausa(abierta ? null : c.reason)
           }}
-          className={`flex w-full justify-between gap-2 rounded px-1 py-0.5 text-left ${
+          /* Altura REAL, no `tap-44`: estas filas van apiladas y el área
+             fantasma de 44 px de una pisaría a la vecina — tocar una abriría
+             la de al lado, que es peor que el target chico. Medido con
+             `elementFromPoint` en el monitor de prod: daban 19 px de alto
+             táctil, y son el camino para ir a ver una parada una por una. */
+          className={`flex min-h-[32px] w-full items-center justify-between gap-2 rounded px-1 py-1 text-left ${
             activa ? 'bg-primary/[0.13] font-semibold text-foreground' : 'text-foreground hover:bg-muted'
           }`}
           aria-expanded={abierta}
@@ -946,7 +1019,7 @@ function FilaEvento({ c, sel, onCausa, onVentana, onTramo, notas }: {
       {/* La categoría del curso, para que la etiqueta no sea nuestra: si el
           árbol dice que ATASCAMIENTO es MMPP, nadie discute la fila. */}
       {c.categoria && (
-        <p className="px-1 text-[9.5px] uppercase tracking-wide text-muted-foreground/70">
+        <p className="px-1 text-[9.5px] uppercase tracking-wide text-muted-foreground/80">
           {c.categoria}
           {c.extension && <span className="ml-1 normal-case tracking-normal">· fuera del curso</span>}
         </p>
@@ -955,8 +1028,15 @@ function FilaEvento({ c, sel, onCausa, onVentana, onTramo, notas }: {
       {abierta && c.paradas.length > 0 && (
         <div className="my-1 ml-2 border-l border-border pl-2">
           {muchas && (
-            <p className="text-[11px] italic text-muted-foreground/70">
-              {cuantas} paradas de {Math.round(prom)} s en promedio.
+            <p className="text-[11px] italic text-muted-foreground/80">
+              {/* Segundos SOLO cuando el promedio no llega al minuto: en las
+                  microparadas «30 s» se lee mejor que «0,5 min». Para las
+                  demás era el único número en segundos de toda la pantalla —
+                  «510 s» al lado de una lista en minutos obliga a dividir por
+                  60 de cabeza, parado en planta. */}
+              {cuantas} paradas de {prom < 60
+                ? `${Math.round(prom)} s`
+                : `${fmtDec(prom / 60)} min`} en promedio.
             </p>
           )}
           {/*
@@ -971,7 +1051,7 @@ function FilaEvento({ c, sel, onCausa, onVentana, onTramo, notas }: {
               const saltable = onVentana != null && p.desdeMin != null && p.hastaMin != null
               const contenido = (
                 <>
-                  <span className="tabular-nums text-muted-foreground/70">
+                  <span className="tabular-nums text-muted-foreground/80">
                     {p.hora}<span className="px-0.5">→</span>{p.hasta}
                   </span>
                   <span className="tabular-nums">{fmtDec(p.min)} min</span>
@@ -1018,7 +1098,7 @@ function FilaEvento({ c, sel, onCausa, onVentana, onTramo, notas }: {
             })}
           </ul>
           {muchas && (
-            <p className="text-[11px] italic text-muted-foreground/70">
+            <p className="text-[11px] italic text-muted-foreground/80">
               las {c.paradas.length}, de la más larga a la más corta
             </p>
           )}
@@ -1136,7 +1216,7 @@ export function ComparadorDias({ cmp, live, cone, ventana, onVentana, refSel, on
               los 7 turnos medidos de Filete arrancaron todos a las 07:40. Lo
               que sigue siendo cierto —y lo único que hay que advertir— es
               contra qué se alinean los OTROS días. */}
-          <p className="mt-2 text-[11px] leading-snug text-muted-foreground/70">
+          <p className="mt-2 text-[11px] leading-snug text-muted-foreground/80">
             Las horas son las de este turno. Los otros días se alinean por altura de turno
             —minutos desde su propio arranque—, así que si alguno empezó a otra hora, igual se
             compara a la misma altura.

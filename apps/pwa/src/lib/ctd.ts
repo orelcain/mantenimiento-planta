@@ -14,6 +14,15 @@ export const CRIT: Record<Equipment['criticidad'], { nivel: string; cls: string 
   baja: { nivel: 'C', cls: 'border-emerald-500 text-emerald-600' },
 }
 
+/**
+ * ¿La criticidad de este equipo la puso alguien, o es la que trajo la
+ * importación? Sin evaluar, el intervalo de inspección que sale de ella
+ * (A=180 · B=365 · C=1095 días) no se apoya en nada.
+ */
+export function criticidadEvaluada(e: Pick<Equipment, 'criticidadEvaluadaEl'>): boolean {
+  return Boolean(e.criticidadEvaluadaEl)
+}
+
 /** Explicación de la criticidad (NFPA 70B §2.4) para mostrar/aclarar en la UI. */
 export const CRIT_INFO: Record<Equipment['criticidad'], { label: string; desc: string }> = {
   alta: { label: 'A · Alta', desc: 'Su falla amenaza a personas, producto o propiedad (NFPA 70B §2.4). Inspección base ~180 días.' },
@@ -155,7 +164,7 @@ export function lineaDe(eq: Equipment): string | null {
 
 export const ITEMS_PER_PAGE = 50
 
-export type Filtro = 'todos' | 'A' | 'cond3' | 'vencida' | 'incompleta' | 'favoritos' | 'otAbiertas' | 'otVencidas'
+export type Filtro = 'todos' | 'A' | 'sinEvaluar' | 'cond3' | 'vencida' | 'incompleta' | 'favoritos' | 'otAbiertas' | 'otVencidas'
 export type EstadoFiltro = 'all' | Equipment['estado']
 export type OrdenCampo = 'criticidad' | 'proxima' | 'ficha' | 'area' | 'nombre'
 export type Vista = 'lista' | 'agenda' | 'tarjetas'

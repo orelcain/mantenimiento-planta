@@ -14,6 +14,8 @@ import { getAllProactiveAlerts, formatAlertsMessage } from '@/services/aria/proa
 import { useAppStore } from '@/store'
 import { useAuthStore } from '@/store/authStore'
 import { usePermissionsStore } from '@/store/permissionsStore'
+import { quedoCorta, registrarLaguna, listarLagunas, formatearLagunas } from '@/services/aria/lagunas'
+import { logger } from '@/lib/logger'
 
 const STORAGE_PREFIX = 'chatbot_history_'
 const MAX_PERSISTED = 50
@@ -333,6 +335,32 @@ export function useChatBot() {
     setLastActions([])
     abortRef.current = false
 
+    // Las lagunas se contestan con el dato, no con el modelo: es una lista de
+    // lo que ARIA no supo responder, y pedírsela al modelo sería justamente
+    // arriesgarse a que la invente. En Telegram ya se responde así.
+    if (/^\/lagunas\b/i.test(trimmed) || /qu[eé] no (has sabido|supiste) responder/i.test(trimmed)) {
+      try {
+        const lagunas = await listarLagunas()
+        setMessages(prev => [...prev, {
+          id: generateId(),
+          role: 'assistant',
+          content: formatearLagunas(lagunas),
+          timestamp: new Date(),
+        }])
+      } catch (err) {
+        setMessages(prev => [...prev, {
+          id: generateId(),
+          role: 'assistant',
+          content: 'No pude leer las lagunas registradas.',
+          timestamp: new Date(),
+        }])
+        logger.warn('No se pudieron listar las lagunas', { err: String(err) })
+      } finally {
+        setIsLoading(false)
+      }
+      return
+    }
+
     try {
       const history = [...messages, userMsg].filter(m => m.role !== 'system')
 
@@ -393,6 +421,17 @@ export function useChatBot() {
       }
 
       setMessages(prev => [...prev, assistantMsg])
+
+      // Si ARIA quedó corta, la pregunta se guarda para poder enseñarle después
+      // el dato que falta. En Telegram esto ya se hacía; en la PWA se perdía.
+      if (quedoCorta(result.reply, result.context)) {
+        void registrarLaguna({
+          pregunta: text,
+          respuesta: result.reply,
+          accion: result.context ?? null,
+          userId,
+        })
+      }
 
       if (!isOpenRef.current) {
         setHasUnread(true)

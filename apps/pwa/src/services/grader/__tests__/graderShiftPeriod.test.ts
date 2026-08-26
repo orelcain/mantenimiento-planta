@@ -379,3 +379,32 @@ describe('mismo turno, dos nombres el mismo día', () => {
     expect(celda.cycles).toBe(6526)
   })
 })
+
+/**
+ * Shoplogix corrige turnos DESPUÉS de que el brief de fin de turno ya salió por
+ * Telegram: 39 de 790 turnos, y no siempre en chico (Yal 21-07 pasó de 9.494 a
+ * 20.113 piezas). El backend lo detecta y lo escribe en el doc del turno, pero
+ * el modelo de la matriz lo tiraba: en pantalla el turno corregido se veía
+ * idéntico a cualquier otro.
+ */
+describe('buildPeriodShifts · turnos corregidos después del brief', () => {
+  it('lleva la marca y la nota hasta el modelo de la matriz', () => {
+    const shifts = build(
+      [parent({
+        dateKey: '2026-07-21', shiftId: 'Turno 2',
+        machines: [machine(20113, 0.78)],
+        correctionDetected: true,
+        reconciliationNote: 'Total cambió de 9.494 a 20.113 piezas (+10.619) tras el brief de fin de turno',
+      })],
+      [],
+    )
+    expect(shifts[0]?.corregido).toBe(true)
+    expect(shifts[0]?.notaCorreccion).toContain('9.494 a 20.113')
+  })
+
+  it('un turno normal no queda marcado', () => {
+    const shifts = build([parent({ dateKey: '2026-07-20', shiftId: 'Turno 2', machines: [machine(100, 0.9)] })], [])
+    expect(shifts[0]?.corregido).toBe(false)
+    expect(shifts[0]?.notaCorreccion).toBeNull()
+  })
+})

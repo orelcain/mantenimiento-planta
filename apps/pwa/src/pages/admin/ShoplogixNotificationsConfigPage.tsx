@@ -14,7 +14,10 @@ import {
   SelectValue,
   Switch,
 } from '@/components/ui'
-import { Bell, Save, Loader2, RotateCcw } from 'lucide-react'
+import { Bell, Save, Loader2, RotateCcw, AlertCircle } from 'lucide-react'
+import { collection, getCountFromServer } from 'firebase/firestore'
+import { db } from '@/services/firebase'
+import { avisoDispositivosPush } from '@/components/settings/avisoDispositivosPush'
 import { PLANT_LINES } from '@/config/plantLines'
 import type { PlantSlug } from '@/services/shoplogix/shoplogixMachines'
 import {
@@ -29,6 +32,23 @@ import { logger } from '@/lib/logger'
 
 const ACTIVE_PLANTS = PLANT_LINES.filter((l) => l.shoplogixEnabled && !l.comingSoon)
 
+/**
+ * Cuántos aparatos tienen las notificaciones push activadas de verdad. El
+ * switch prometía "push a todos los usuarios activos" sin decir que la lista
+ * de dispositivos registrados puede estar —y hoy está— vacía.
+ */
+function useDispositivosPush(): number | null {
+  const [total, setTotal] = useState<number | null>(null)
+  useEffect(() => {
+    let cancelado = false
+    getCountFromServer(collection(db, 'fcmTokens'))
+      .then((snap) => { if (!cancelado) setTotal(snap.data().count) })
+      .catch(() => { if (!cancelado) setTotal(null) })
+    return () => { cancelado = true }
+  }, [])
+  return total
+}
+
 function cloneDefaults(): ShoplogixNotifConfig {
   return structuredClone(SHOPLOGIX_NOTIF_CONFIG_DEFAULTS)
 }
@@ -41,6 +61,7 @@ interface PlantPanelProps {
 function PlantPanel({ plantSlug, plantLabel }: PlantPanelProps) {
   const { toast } = useToast()
   const [config, setConfig]   = useState<ShoplogixNotifConfig>(cloneDefaults)
+  const avisoPush = avisoDispositivosPush(useDispositivosPush())
   const [loading, setLoading] = useState(true)
   const [saving, setSaving]   = useState(false)
   const [dirty, setDirty]     = useState(false)
@@ -105,6 +126,15 @@ function PlantPanel({ plantSlug, plantLabel }: PlantPanelProps) {
               onCheckedChange={(v) => patch('channels', { push: v })}
             />
           </div>
+          {config.channels.push && (
+            <div className={[
+              'flex items-start gap-2 pl-4 text-xs',
+              avisoPush.tono === 'alerta' ? 'text-ink-warn' : 'text-muted-foreground',
+            ].join(' ')}>
+              {avisoPush.tono === 'alerta' && <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />}
+              <span>{avisoPush.texto}</span>
+            </div>
+          )}
           <div className="flex items-center justify-between">
             <div>
               <Label className="text-sm font-medium">Telegram</Label>

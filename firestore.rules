@@ -594,7 +594,13 @@ service cloud.firestore {
       allow create: if isActiveUser()
         && request.resource.data.plantId is string
         && isNonEmptyString(request.resource.data.planoSlug, 1, 60)
-        && request.resource.data.tipo in ['apertura', 'aparato']
+        // 'pieza' y 'salto-a-despiece' son del puente electrico->pieza fisica:
+        // sin ellos en la whitelist Firestore rechazaba la escritura y, como
+        // registrarUso() traga el error, el KPI del puente se perdia MUDO.
+        // 'sin-resultado' guarda QUE se busco sin encontrar nada: es el dato
+        // que dice que le falta al catalogo. Mismo cuidado que arriba — si el
+        // tipo no esta en la whitelist, la escritura se pierde en silencio.
+        && request.resource.data.tipo in ['apertura', 'aparato', 'pieza', 'salto-a-despiece', 'sin-resultado']
         && (!('tag' in request.resource.data)
             || isNonEmptyString(request.resource.data.tag, 1, 40))
         && request.resource.data.uid == request.auth.uid
@@ -677,6 +683,36 @@ service cloud.firestore {
 
       allow delete: if isActiveUser()
         && (resource.data.creadoPor == request.auth.uid || isAdmin());
+    }
+
+    // CONFIRMACION EN TERRENO del puente aparato electrico -> pieza fisica.
+    // El catalogo del fabricante PROPONE (badge "segun catalogo"); solo quien
+    // fue a la maquina y leyo el rotulo puede confirmar o corregir. Con esto
+    // el vinculo pasa a "confirmado" y la cobertura del puente sube con
+    // evidencia real, no con una suposicion de papel.
+    // docId = "<planoSlug>__<designacion>" (uno por aparato: la ultima palabra
+    // de terreno manda, y el historial de quien/cuando queda en el doc).
+    match /planoVinculos/{vinculoId} {
+      allow read: if isActiveUser();
+
+      allow create, update: if isActiveUser()
+        && isValidDocSize()
+        && request.resource.data.plantId is string
+        && isNonEmptyString(request.resource.data.planoSlug, 1, 60)
+        && isNonEmptyString(request.resource.data.aparato, 1, 20)
+        && request.resource.data.estado in ['confirmado', 'corregido', 'no_aplica']
+        // el codigo leido en terreno (o el propuesto, al confirmarlo tal cual)
+        && (!('codigo' in request.resource.data)
+            || isNonEmptyString(request.resource.data.codigo, 1, 30))
+        && (!('nota' in request.resource.data)
+            || isNonEmptyString(request.resource.data.nota, 1, 500))
+        && (!('foto' in request.resource.data)
+            || request.resource.data.foto is string)
+        && request.resource.data.confirmadoPor == request.auth.uid;
+
+      // Nadie borra evidencia de terreno: si estaba mal, se corrige con un
+      // update (que deja el estado 'corregido' y la nota del por que).
+      allow delete: if isAdmin();
     }
 
     match /incidents/{incidentId} {
@@ -1190,6 +1226,19 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ARIA – Lagunas: preguntas que no supo responder.
+    // Las escribía solo el bot (Admin SDK, sin reglas). Ahora también el chat
+    // de la PWA, para que la lista de lo que hay que enseñarle esté completa.
+    match /ariaGaps/{docId} {
+      allow read: if isNotAnonymous();
+      allow create: if isNotAnonymous()
+        && request.resource.data.pregunta is string
+        && request.resource.data.pregunta.size() > 0
+        && request.resource.data.pregunta.size() <= 300
+        && isValidDocSize();
+      allow update, delete: if isAdmin();
+    }
+
     // ARIA – User corrections
     match /ariaCorrections/{docId} {
       allow read: if isNotAnonymous();
@@ -1595,6 +1644,30 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Rueda de ventanas de intervención (pestaña del calendario). Mismos permisos
+    // que el calendario: lo lee cualquiera con sesión, lo edita Mantención.
+    match /rueda_ventanas_state/{docId} {
+      allow read: if isNotAnonymous();
+      allow create, update: if isTechnician();
+      allow delete: if isAdmin();
+    }
+
+    // Links públicos de la rueda: se comparten con Producción e Higiene, que no
+    // tienen cuenta en la app. Lectura abierta A PROPÓSITO, pero acotada por
+    // reglas a tokens NO vencidos — si la expiración se chequeara solo en el
+    // cliente, el snapshot seguiría siendo legible para siempre. expiresAt es
+    // ISO string, así que timestamp.value() lo compara contra el reloj del
+    // servidor y no contra el del visitante.
+    match /ruedaVentanasPublicTokens/{tokenId} {
+      allow read: if resource.data.expiresAt is string
+        && timestamp.value(resource.data.expiresAt) > request.time;
+      allow create, update: if isTechnician()
+        && request.resource.data.token is string
+        && request.resource.data.expiresAt is string
+        && isValidDocSize();
+      allow delete: if isTechnician();
+    }
+
     match /ganttTasks/{taskId} {
       allow read: if isNotAnonymous();
       allow create: if isTechnician() && isValidGanttTask();
@@ -1676,6 +1749,27 @@ service cloud.firestore {
     match /hmi-knuro-tooltips/{docId} {
       allow read: if true;
       allow write: if isSupervisor() && isValidDocSize();
+    }
+
+    // ============================================
+    // HMI GRADER — Estado del simulador e historial
+    // ============================================
+    // No existían: `getGraderState()` fallaba con permission-denied para todo
+    // el mundo, incluido un admin. La pantalla no lo decía —el error solo iba
+    // al logger— así que el simulador arrancaba en sus valores por defecto y
+    // nada de lo que se tocaba quedaba guardado. Quedaron 29 errores
+    // registrados, el último el 24-08-2026.
+    match /hmi-grader-config/{configId} {
+      // Lectura pública: /aprendizaje/hmi-grader se abre sin login, igual que
+      // el HMI Knuro.
+      allow read: if true;
+      allow write: if isSupervisor() && isValidDocSize();
+    }
+
+    match /hmi-grader-history/{entryId} {
+      allow read: if isNotAnonymous();
+      allow create: if isAuthenticated() && isValidDocSize();
+      allow update, delete: if isAdmin();
     }
 
     // ============================================

@@ -103,6 +103,11 @@ export function EquipmentForm({
         nombreComun: formData.nombreComun.trim() || undefined,
         syncExcluded: formData.syncExcluded,
         criticidad: formData.criticidad,
+        /* Guardar el formulario ES la evaluación de la criticidad: alguien la
+           miró y decidió. Sin esta marca no había forma de distinguir el valor
+           evaluado del 'media' con que entraron los 553 equipos de la
+           importación (ver `criticidadEvaluada` en `lib/ctd`). */
+        criticidadEvaluadaEl: new Date().toISOString(),
         estado: formData.estado,
       })
 

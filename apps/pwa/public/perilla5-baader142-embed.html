@@ -2883,5 +2883,449 @@ if(EMBEBIDO){ try{ parent.postMessage({__p5:true,type:'hello'},'*'); }catch(e){}
   }catch(e){}
 })();
 </script>
+<!-- ═══ SIM142: mejora progresiva (etapas 1-2 aprobadas por Orel) ═══
+     Un solo bloque autocontenido: panel simulador (5 perillas + LCD + botones)
+     que MANEJA la nav .dial existente por debajo, y buscador global sobre las
+     secciones. CERO edición del contenido validado en terreno: si este bloque
+     se quita, la herramienta vuelve exactamente a lo que era. -->
+<style id="sim142-css">
+  nav.dial{display:none !important} /* el panel la reemplaza; sigue siendo el motor */
+  .s142{background:linear-gradient(180deg,#3672b8,#2a5c99);border-radius:14px;
+    padding:14px 12px 12px;margin:0 auto 14px;color:#dfe7ee;user-select:none;
+    max-width:480px}
+  .s142-buscar{max-width:480px;margin-left:auto;margin-right:auto}
+  .s142-extra{max-width:480px;margin-left:auto;margin-right:auto}
+  .s142-cab{display:flex;justify-content:space-between;align-items:center;
+    font-family:ui-monospace,Consolas,monospace;font-size:10px;color:#cfe0f2}
+  .s142-cab b{font-style:italic;font-size:14px;color:#fff;letter-spacing:.02em}
+  .s142-fila{display:flex;justify-content:space-between;align-items:flex-end;gap:4px;margin-top:10px}
+  .s142-k{position:relative;flex:none}
+  .s142-k .pozo{position:absolute;inset:8%;border-radius:999px;
+    background:radial-gradient(circle,#0f2a4a 60%,#1d3c63 78%,transparent 82%);filter:blur(1px)}
+  .s142-k .lado{position:absolute;inset:12%;top:16%;border-radius:999px;
+    background:linear-gradient(180deg,#8a8375,#4d483f)}
+  .s142-k .cara{position:absolute;inset:12%;border-radius:999px;
+    background:radial-gradient(circle at 34% 28%,#ded8cb,#b3ac9d 52%,#847d6f 88%);
+    box-shadow:inset 0 3px 4px rgba(255,255,255,.6),inset 0 -5px 8px rgba(0,0,0,.42),0 7px 12px rgba(0,0,0,.5)}
+  .s142-k .giro{position:absolute;inset:12%;border-radius:999px;transition:transform .38s cubic-bezier(.3,1.35,.55,1)}
+  .s142-k .msombra{position:absolute;left:50%;top:50%;width:34%;height:82%;
+    transform:translate(-50%,-50%);border-radius:8px;background:rgba(0,0,0,.30);filter:blur(4px)}
+  .s142-k .mlado{position:absolute;left:50%;top:50%;width:28%;height:78%;
+    transform:translate(calc(-50% - 2px),calc(-50% + 2px));border-radius:6px;
+    background:linear-gradient(180deg,#6e685c,#4b463d)}
+  .s142-k .mtapa{position:absolute;left:50%;top:50%;width:28%;height:78%;
+    transform:translate(-50%,-50%);border-radius:6px;
+    background:linear-gradient(100deg,#efe9dc 20%,#c8c1b1 55%,#a29a8a);
+    box-shadow:inset 0 1px 1px rgba(255,255,255,.6)}
+  .s142-k .ranura{position:absolute;left:50%;top:50%;width:2px;height:64%;
+    transform:translate(-50%,-50%);border-radius:2px;
+    background:linear-gradient(180deg,#8d8475,#6a6255);box-shadow:0 1px 0 rgba(255,255,255,.4)}
+  .s142-k .punta{position:absolute;left:50%;top:22%;width:11%;height:11%;border-radius:99px;
+    transform:translate(-50%,-50%);
+    background:radial-gradient(circle at 38% 30%,#f2ecdf,#9a927f 60%,#6f6759);
+    box-shadow:inset 0 2px 3px rgba(0,0,0,.55),0 1px 1px rgba(255,255,255,.5)}
+  .s142-k.chica{width:46px;height:46px;opacity:.5}
+  .s142-k.media{width:54px;height:54px}
+  .s142-k.grande{width:132px;height:132px;margin:0 26px 0 10px}
+  .s142-k .marca{position:absolute;font-family:ui-monospace,Consolas,monospace;
+    font-size:10px;font-weight:700;color:#cfe0f2;cursor:pointer;padding:3px;line-height:1}
+  .s142-k .marca.act{color:#e8f36a}
+  .s142-lab{text-align:center;font-family:ui-monospace,Consolas,monospace;font-size:9px;
+    color:#9fb2c4;margin-top:5px}
+  .s142-lcd{display:block;width:100%;box-sizing:border-box;cursor:pointer;text-align:left;
+    font:inherit;margin-top:14px;background:#cdd94e;border-radius:6px;border:4px solid #23282e;
+    padding:7px 12px;font-family:ui-monospace,Consolas,monospace;font-weight:800;color:#31380c;
+    font-size:14px;letter-spacing:1.6px;line-height:1.5;
+    box-shadow:inset 0 3px 8px rgba(0,0,0,.35)}
+  .s142-lcd .l{display:block;white-space:pre;overflow:hidden}
+  .s142-bot{display:flex;gap:18px;justify-content:center;margin-top:9px}
+  .s142-bot .b{text-align:center}
+  .s142-bot .b i{display:block;font:700 10px ui-monospace,Consolas,monospace;
+    font-style:normal;color:#fff;margin-bottom:3px;letter-spacing:.5px}
+  .s142-bot span{display:inline-block;width:30px;height:30px;border-radius:99px;border:5px solid #c9ccd1;
+    box-shadow:0 3px 7px rgba(0,0,0,.45),inset 0 2px 3px rgba(255,255,255,.3)}
+  .s142-hint{font-size:10.5px;color:#9fb2c4;text-align:center;margin-top:9px}
+  .s142-desc{font-size:11.5px;color:#dfe7ee;text-align:center;margin-top:8px;min-height:16px;padding:0 8px}
+  .s142-lcd:active{transform:translateY(1px)}
+  .s142-extra{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
+  .s142-extra button{font:600 12px system-ui;border:1px solid #c9d4de;background:#fff;
+    color:#1d3557;border-radius:999px;padding:7px 12px;min-height:34px;cursor:pointer}
+  .s142-extra button.act{background:#1d3557;color:#fff;border-color:#1d3557}
+  .s142-buscar{position:relative;margin:0 0 14px}
+  .s142-buscar input{width:100%;box-sizing:border-box;font:14px system-ui;padding:11px 13px;
+    border-radius:10px;border:1px solid #c9d4de;background:#fff;color:#1d3557}
+  .s142-res{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:40;background:#fff;
+    border:1px solid #c9d4de;border-radius:10px;box-shadow:0 8px 22px rgba(0,0,0,.18);
+    max-height:300px;overflow:auto}
+  .s142-res button{display:block;width:100%;text-align:left;border:0;background:none;
+    padding:9px 13px;cursor:pointer;font:12.5px system-ui;color:#1d3557;border-top:1px solid #eef2f6}
+  .s142-res button:hover{background:#f0f5fa}
+  .s142-res .sec{font-weight:700;font-size:11px;color:#5a7a9a}
+  mark.s142-hl{background:#ffe86b;color:inherit;border-radius:3px}
+  /* H1 · etapa tipografica: los titulares gigantes en mayuscula eran el
+     «se ve todo muy colapsado, letras muy grandes» de Orel. Solo CSS. */
+  h2{font-size:clamp(19px,4.2vw,24px) !important;line-height:1.15 !important}
+  h3{font-size:15px !important;letter-spacing:.02em !important;margin:20px 0 6px !important}
+  body{font-size:14.5px !important;line-height:1.55 !important}
+  .pos-num{font-size:12px !important;padding:3px 9px !important}
+  .sub{font-size:11.5px !important}
+  @media (max-width:420px){
+    .s142-k.chica{width:38px;height:38px}
+    .s142-k.media{width:46px;height:46px}
+    .s142-k.grande{width:112px;height:112px;margin:0 22px 0 8px}
+  }
+</style>
+<script id="sim142-js">
+(function(){
+  'use strict';
+  var nav = document.querySelector('nav.dial');
+  if (!nav) return; // sin nav no hay nada que mejorar
+
+  // ── mapa: marcas de la perilla 5 (las REALES del panel) ↔ secciones ──
+  // ángulo = hacia dónde apunta la PUNTA (0° = arriba), como el anillo real
+  var MARCAS = [
+    {t:'p0', rot:'🚿',    ang:0,    x:50, y:-6},
+    {t:'p1', rot:'1',     ang:-27,  x:22, y:2},
+    {t:'p2', rot:'2',     ang:-54,  x:5,  y:20},
+    {t:'p3', rot:'3',     ang:-81,  x:-4, y:42},
+    {t:'p4', rot:'4',     ang:-108, x:-2, y:64},
+    {t:'p5', rot:'5',     ang:-135, x:8,  y:84},
+    {t:'p6', rot:'6',     ang:-162, x:24, y:97},
+    {t:'p7', rot:'7',     ang:171,  x:46, y:103},
+    {t:'p8', rot:'8',     ang:144,  x:68, y:97}
+  ];
+  // el display REAL de cada posicion, CARACTER POR CARACTER como el contenido
+  // validado (espaciado incluido) — se renderiza con white-space:pre
+  var LCD_POS = {
+    p0:['Cleaning',           'Position'],
+    p1:['BA142-PROTOCOL',     'through switch 4'],
+    p2:['Test 12    0001299', ' 12 F/min     62 %'],
+    p3:['Test 13    0001299', '  8 F/min     40 %'],
+    p4:['Height [mm]',        '             51'],
+    p5:['Service for',        'Stepmotors & Kit'],
+    p6:['Stop for justage',   '1 F/min'],
+    p7:['middle fish',        'princess cut'],
+    p8:['RESET Protocol &',   'Fishcounter']
+  };
+  // fila del display: rotulo a la izquierda, valor a la DERECHA, 18 columnas
+  function fila(rot, val){
+    var n = 18 - rot.length - String(val).length;
+    return rot + Array(Math.max(n, 1) + 1).join(' ') + val;
+  }
+  // el barrido de la perilla 4 en posicion 1 (17 pantallas del video), con el
+  // MISMO formato de columnas del display real; valores en 0 (pedido de Orel)
+  var P4_PASOS = [
+    [fila('Σ FISH:','0'),      fila('Σ FI-TODAY:','0')],
+    [fila('Σ STOPS:','0'),     fila('/1000Fi:','0')],
+    [fila('Σ STOP-C:','0'),    fila('/1000Fi:','0')],
+    [fila('Σ TAIL CLIP:','0'), fila('/1000Fi:','0')],
+    [fila('Σ T-CLIP-C:','0'),  fila('/1000Fi:','0')],
+    [fila('Σ ANUS-I:','0'),    fila('/1000Fi:','0')],
+    [fila('Σ ANUS-O:','0'),    fila('/1000Fi:','0')],
+    ['CENTERING SM1',          fila('Σ E821:','0')],
+    [fila('Σ E821-C:','0'),    fila('/1000Fi:','0')],
+    ['SLIT KNIFE SM2',         fila('Σ E822:','0')],
+    [fila('Σ E822-C:','0'),    fila('/1000Fi:','0')],
+    ['SUCTION DEV. SM3',       fila('Σ E823:','0')],
+    [fila('Σ E823-C:','0'),    fila('/1000Fi:','0')],
+    ['SCRAPER A SM4',          fila('Σ E824:','0')],
+    [fila('Σ E824-C:','0'),    fila('/1000Fi:','0')],
+    ['SCRAPER B SM5',          fila('Σ E825:','0')],
+    [fila('Σ E825-C:','0'),    fila('/1000Fi:','0')]
+  ];
+  var P4_DESC = [
+    'Piezas procesadas: total acumulado y las de hoy.',
+    'Paradas totales de la maquina, por cualquier causa.',
+    'Correcciones sin detener la maquina — la degradacion silenciosa. El contador estrella.',
+    'Paradas causadas por las abrazaderas (tail clip).',
+    'Correcciones de abrazaderas sin detener — si sube, revisar abrazaderas.',
+    'Cuchilla de punta, lado ENTRADA: paradas.',
+    'Cuchilla de punta, lado SALIDA: paradas.',
+    'Motor del centraje (SM1): veces que se detuvo.',
+    'Correcciones del centraje SM1 sin detener.',
+    'Motor de la cuchilla (SM2): veces que se detuvo.',
+    'Correcciones de la cuchilla SM2 sin detener.',
+    'Motor del aspirador (SM3): veces que se detuvo.',
+    'Correcciones del aspirador SM3 sin detener.',
+    'Motor del excavador A (SM4): veces que se detuvo.',
+    'Correcciones del excavador A SM4 sin detener.',
+    'Motor del excavador B (SM5): veces que se detuvo.',
+    'Correcciones del excavador B SM5 sin detener.'
+  ];
+  var P4_LINK = ['FISH','STOPS','STOP-C','TAIL CLIP','T-CLIP-C','ANUS-I','ANUS-O',
+    'E821','E821-C','E822','E822-C','E823','E823-C','E824','E824-C','E825','E825-C'];
+  var p4idx = 2; // parte en STOP-C, el contador estrella
+
+  function detent(t){ return nav.querySelector('.detent[data-t="'+t+'"]'); }
+  function titulo(t){
+    var s = document.getElementById(t);
+    var h = s && s.querySelector('h2');
+    return h ? h.textContent.trim() : t;
+  }
+
+  // ── el panel ──
+  var panel = document.createElement('div');
+  panel.className = 's142';
+  panel.innerHTML =
+    '<div class="s142-cab"><span>A3C</span><b>▌▌▌ BAADER® 142</b></div>' +
+    '<div class="s142-fila">' +
+      '<div><div class="s142-k chica" data-perilla="1" role="button" tabindex="0" aria-label="Perilla 1: qué ajusta"><div class="pozo"></div><div class="lado"></div><div class="cara"></div><div class="giro"><div class="msombra"></div><div class="mlado"></div><div class="mtapa"></div><div class="ranura"></div><div class="punta"></div></div></div><div class="s142-lab">1</div></div>' +
+      '<div><div class="s142-k chica" data-perilla="2" role="button" tabindex="0" aria-label="Perilla 2: qué ajusta"><div class="pozo"></div><div class="lado"></div><div class="cara"></div><div class="giro" style="transform:rotate(24deg)"><div class="msombra"></div><div class="mlado"></div><div class="mtapa"></div><div class="ranura"></div><div class="punta"></div></div></div><div class="s142-lab">2</div></div>' +
+      '<div><div class="s142-k chica" data-perilla="3" role="button" tabindex="0" aria-label="Perilla 3: qué ajusta"><div class="pozo"></div><div class="lado"></div><div class="cara"></div><div class="giro" style="transform:rotate(-30deg)"><div class="msombra"></div><div class="mlado"></div><div class="mtapa"></div><div class="ranura"></div><div class="punta"></div></div></div><div class="s142-lab">3</div></div>' +
+      '<div><div class="s142-k media" id="s142k4" role="button" tabindex="0" aria-label="Perilla 4: siguiente contador del protocolo" title="Perilla 4 · recorre los contadores (en posición 1)"><div class="pozo"></div><div class="lado"></div><div class="cara"></div><div class="giro" id="s142g4"><div class="msombra"></div><div class="mlado"></div><div class="mtapa"></div><div class="ranura"></div><div class="punta"></div></div></div><div class="s142-lab">4 · /min</div></div>' +
+      '<div><div class="s142-k grande" id="s142k5"><div class="pozo"></div><div class="lado"></div><div class="cara"></div><div class="giro" id="s142g5"><div class="msombra"></div><div class="mlado"></div><div class="mtapa"></div><div class="ranura"></div><div class="punta"></div></div></div><div class="s142-lab">5 · service · reset</div></div>' +
+    '</div>' +
+    '<button type="button" class="s142-lcd" id="s142lcd" aria-label="Ver el detalle de lo que muestra el display"><div class="l"><span id="s142l1">BA142-PROTOCOL</span><span id="s142v1"></span></div>' +
+    '<div class="l"><span id="s142l2">through switch 4</span><span id="s142v2"></span></div></button>' +
+    '<div class="s142-desc" id="s142desc"></div>' +
+    '<div class="s142-bot" aria-hidden="true">' +
+      '<div class="b"><i>&#10680; 0</i><span style="background:radial-gradient(circle at 35% 28%,#3a3a3a,#050505 65%)"></span></div>' +
+      '<div class="b"><i>0</i><span style="background:radial-gradient(circle at 35% 28%,#ff7a5c,#c0170b 65%)"></span></div>' +
+      '<div class="b"><i>I</i><span style="background:radial-gradient(circle at 35% 28%,#5ee98a,#0a8f3c 65%)"></span></div>' +
+    '</div>' +
+    '<div class="s142-hint">girá la 5 (marcas) y la 4 (contadores) · tocá la PANTALLA para ir al detalle</div>';
+  nav.parentNode.insertBefore(panel, nav);
+
+  // marcas del anillo (posicionadas en % del knob grande)
+  var k5 = panel.querySelector('#s142k5');
+  MARCAS.forEach(function(m){
+    var el = document.createElement('button');
+    el.type = 'button';
+    el.className = 's142-k-marca marca';
+    el.textContent = m.rot;
+    el.style.cssText = 'position:absolute;left:'+m.x+'%;top:'+m.y+'%;transform:translate(-50%,-50%);background:none;border:0;';
+    el.setAttribute('aria-label', 'Posición '+m.rot+': '+titulo(m.t));
+    // girar NO arrastra la vista hacia abajo: cambia posicion y LCD; ir al
+    // contenido es decision aparte (tocar la pantalla). Feedback de Orel.
+    el.addEventListener('click', function(){ irA(m.t, false); });
+    k5.appendChild(el);
+  });
+  // las clases de pescado del lado derecho: están en el anillo real pero su
+  // contenido vive en la sección pf — marcas informativas que llevan allá
+  // el lado de PRODUCCION del anillo: elegir una clase gira la perilla a su
+  // marca, el display anuncia la clase y el contenido muestra la seccion de
+  // clases — le faltaba movimiento (feedback de Orel)
+  [['salmon',78,2,27],['B',95,20,54],['C',104,42,81],['trout',102,64,108],['E',92,84,135],['F',76,97,162]].forEach(function(c){
+    var el = document.createElement('button');
+    el.type='button'; el.className='marca'; el.textContent=c[0];
+    el.style.cssText='position:absolute;left:'+c[1]+'%;top:'+c[2]+'%;transform:translate(-50%,-50%);background:none;border:0;font-style:italic;font-size:9px;';
+    el.setAttribute('aria-label','Clase '+c[0]+' (produccion)');
+    el.addEventListener('click', function(){
+      var b = detent('pf');
+      if (b) b.click();
+      g5.style.transform = 'rotate(' + c[3] + 'deg)';
+      k5.querySelectorAll('.marca').forEach(function(x){ x.classList.remove('act'); });
+      el.classList.add('act');
+      k4.style.opacity = '.45';
+      l1.textContent = 'class: ' + c[0];
+      l2.textContent = 'production';
+      v1.textContent = ''; v2.textContent = '';
+      desc.textContent = 'Clase de produccion ' + c[0] + ' — toca la pantalla para ver las clases.';
+    });
+    k5.appendChild(el);
+  });
+
+  var g5 = panel.querySelector('#s142g5');
+  var l1 = panel.querySelector('#s142l1'), l2 = panel.querySelector('#s142l2');
+  var k4 = panel.querySelector('#s142k4'), g4 = panel.querySelector('#s142g4');
+
+  var v1 = panel.querySelector('#s142v1'), v2 = panel.querySelector('#s142v2');
+  var desc = panel.querySelector('#s142desc');
+  function lcd(t){
+    v1.textContent = ''; v2.textContent = '';
+    if (t === 'p1') {
+      var s = P4_PASOS[p4idx];
+      l1.textContent = s[0]; l2.textContent = s[1];
+      desc.textContent = P4_DESC[p4idx];
+      g4.style.transform = 'rotate(' + Math.round(p4idx * (360 / P4_PASOS.length)) + 'deg)';
+    } else if (LCD_POS[t]) {
+      l1.textContent = LCD_POS[t][0]; l2.textContent = LCD_POS[t][1];
+      desc.textContent = 'Toca la pantalla para ir al contenido de esta posicion.';
+    } else {
+      l1.textContent = titulo(t).slice(0, 18); l2.textContent = '';
+      desc.textContent = 'Toca la pantalla para ir al contenido.';
+    }
+  }
+  function sincronizar(t){
+    var m = null;
+    MARCAS.forEach(function(x){ if (x.t === t) m = x; });
+    k5.querySelectorAll('.marca').forEach(function(el){ el.classList.remove('act'); });
+    if (m) {
+      g5.style.transform = 'rotate(' + m.ang + 'deg)';
+      var marcas = k5.querySelectorAll('.s142-k-marca');
+      MARCAS.forEach(function(x, i){ if (x.t === t && marcas[i]) marcas[i].classList.add('act'); });
+    }
+    k4.style.opacity = (t === 'p1') ? '1' : '.45';
+    lcd(t);
+  }
+  function irA(t, scroll){
+    var b = detent(t);
+    if (!b) return;
+    b.click();
+    sincronizar(t);
+    if (scroll) {
+      var s = document.getElementById(t);
+      if (s) s.scrollIntoView({behavior:'smooth', block:'start'});
+    }
+  }
+  k4.addEventListener('click', function(){
+    p4idx = (p4idx + 1) % P4_PASOS.length;
+    lcd(activa());
+  });
+  panel.querySelector('#s142lcd').addEventListener('click', function(){
+    var t = activa();
+    var sec = document.getElementById(t);
+    if (!sec) return;
+    if (t === 'p1') {
+      var q = P4_LINK[p4idx].toLowerCase();
+      document.querySelectorAll('mark.s142-hl').forEach(function(m){
+        m.replaceWith(document.createTextNode(m.textContent));
+      });
+      var tw = document.createTreeWalker(sec, NodeFilter.SHOW_TEXT);
+      var nodo, mejor = null;
+      while ((nodo = tw.nextNode())) {
+        var j = nodo.textContent.toLowerCase().indexOf(q);
+        if (j >= 0) { mejor = {n: nodo, j: j}; break; }
+      }
+      if (mejor) {
+        var r = document.createRange();
+        r.setStart(mejor.n, mejor.j); r.setEnd(mejor.n, mejor.j + q.length);
+        var mk = document.createElement('mark'); mk.className = 's142-hl';
+        try { r.surroundContents(mk); mk.scrollIntoView({behavior:'smooth', block:'center'}); return; } catch(e){}
+      }
+    }
+    sec.scrollIntoView({behavior:'smooth', block:'start'});
+  });
+  // H3: las perillas 1-3 no navegan, pero ENSEÑAN — el pictograma de pez del
+  // panel real muestra que parte ajusta cada una; tocarla lo cuenta abajo.
+  // Solo lo que se VE en el panel real (pictograma + escala); la funcion
+  // exacta de cada una vive en el manual — no se inventa.
+  var FICHA_123 = {
+    '1': 'Perilla 1 · ajuste fino con escala 3-6 y tope. Su pictograma marca la zona de la COLA del pez. El detalle exacto: manual BAADER 142.',
+    '2': 'Perilla 2 · ajuste fino con escala 3-6. Su pictograma marca la zona MEDIA del pez. El detalle exacto: manual BAADER 142.',
+    '3': 'Perilla 3 · ajuste fino con escala 3-6. Su pictograma marca la zona hacia la CABEZA. El detalle exacto: manual BAADER 142.'
+  };
+  panel.querySelectorAll('[data-perilla]').forEach(function(kn){
+    function contar(){
+      desc.textContent = FICHA_123[kn.getAttribute('data-perilla')];
+      kn.style.opacity = '1';
+      setTimeout(function(){ kn.style.opacity = ''; }, 1800);
+    }
+    kn.addEventListener('click', contar);
+    kn.addEventListener('keydown', function(e){
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); contar(); }
+    });
+  });
+
+  // H4: doble toque en la perilla 4 = reproducir el barrido completo solo
+  // (una pantalla por segundo); tocar de nuevo lo detiene.
+  var demoTimer = null;
+  function pararDemo(){ if (demoTimer) { clearInterval(demoTimer); demoTimer = null; } }
+  k4.addEventListener('dblclick', function(){
+    if (demoTimer) { pararDemo(); return; }
+    if (activa() !== 'p1') return;
+    demoTimer = setInterval(function(){
+      if (activa() !== 'p1') { pararDemo(); return; }
+      p4idx = (p4idx + 1) % P4_PASOS.length;
+      lcd('p1');
+      if (p4idx === 0) pararDemo(); // una vuelta completa y se detiene
+    }, 1000);
+  });
+
+  k4.addEventListener('keydown', function(e){
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); k4.click(); }
+  });
+  function activa(){
+    var b = nav.querySelector('.detent[aria-selected="true"]');
+    return b ? b.getAttribute('data-t') : 'p1';
+  }
+
+  // ── secciones fuera del anillo: chips ──
+  var extras = ['pf','pv','pm','px','pr'].filter(function(t){ return document.getElementById(t); });
+  if (extras.length) {
+    var fila = document.createElement('div');
+    fila.className = 's142-extra';
+    extras.forEach(function(t){
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = titulo(t);
+      b.addEventListener('click', function(){
+        irA(t, true);
+        fila.querySelectorAll('button').forEach(function(x){ x.classList.remove('act'); });
+        b.classList.add('act');
+      });
+      fila.appendChild(b);
+    });
+    panel.parentNode.insertBefore(fila, panel.nextSibling);
+  }
+
+  // ── buscador global (todas las secciones, visibles u ocultas) ──
+  var buscar = document.createElement('div');
+  buscar.className = 's142-buscar';
+  buscar.innerHTML = '<input type="search" id="s142q" placeholder="Buscar en la herramienta… (distancias, chapaleta, E824)" aria-label="Buscar en la herramienta">' +
+    '<div class="s142-res" id="s142res" hidden></div>';
+  panel.parentNode.insertBefore(buscar, panel);
+  var inp = buscar.querySelector('#s142q');
+  var res = buscar.querySelector('#s142res');
+  function norm(s){ return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); }
+  function limpiarMarcas(){
+    document.querySelectorAll('mark.s142-hl').forEach(function(m){
+      m.replaceWith(document.createTextNode(m.textContent));
+    });
+  }
+  inp.addEventListener('input', function(){
+    var q = norm(inp.value.trim());
+    res.innerHTML = ''; res.hidden = true;
+    if (q.length < 3) return;
+    var hits = [];
+    document.querySelectorAll('section[id]').forEach(function(sec){
+      var texto = sec.textContent, nt = norm(texto);
+      var i = nt.indexOf(q);
+      var n = 0;
+      while (i >= 0 && n < 3) {
+        hits.push({sec: sec.id, i: i,
+          snip: texto.slice(Math.max(0, i-40), i + q.length + 50).replace(/\s+/g,' ')});
+        i = nt.indexOf(q, i + q.length); n++;
+      }
+    });
+    if (!hits.length) {
+      res.innerHTML = '<button disabled>sin resultados</button>'; res.hidden = false; return;
+    }
+    hits.slice(0, 12).forEach(function(h){
+      var b = document.createElement('button');
+      b.innerHTML = '<span class="sec">' + titulo(h.sec) + '</span><br>…' +
+        h.snip.replace(/</g,'&lt;') + '…';
+      b.addEventListener('click', function(){
+        limpiarMarcas();
+        irA(h.sec, false);
+        // resaltar la PRIMERA aparición visible dentro de la sección
+        var sec = document.getElementById(h.sec);
+        var tw = document.createTreeWalker(sec, NodeFilter.SHOW_TEXT);
+        var nodo;
+        while ((nodo = tw.nextNode())) {
+          var j = norm(nodo.textContent).indexOf(q);
+          if (j >= 0) {
+            var r = document.createRange();
+            r.setStart(nodo, j); r.setEnd(nodo, j + q.length);
+            var mk = document.createElement('mark'); mk.className = 's142-hl';
+            try { r.surroundContents(mk); mk.scrollIntoView({behavior:'smooth', block:'center'}); } catch(e){}
+            break;
+          }
+        }
+        res.hidden = true;
+      });
+      res.appendChild(b);
+    });
+    res.hidden = false;
+  });
+  document.addEventListener('click', function(e){
+    if (!buscar.contains(e.target)) res.hidden = true;
+  });
+
+  // estado inicial: sincronizar con la pestaña que ya esté activa
+  sincronizar(activa());
+})();
+</script>
+
 </body>
 </html>

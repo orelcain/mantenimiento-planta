@@ -135,8 +135,17 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
       ? { value: `${slxStats.worstShift.uptimePct.toFixed(0)}%`, metric: 'uptime', date: `${slxStats.worstShift.dateKey.slice(5)} · ${shortShiftLabel(slxStats.worstShift.shiftId)}` }
       : null
 
-  const dayShifts   = stats?.dayShifts   ?? slxStats?.dayShiftsWithData   ?? 0
-  const nightShifts = stats?.nightShifts ?? slxStats?.nightShiftsWithData ?? 0
+  /*
+   * Día/Noche del Excel: se cuentan por shiftId EXACTO ('Turno día' /
+   * 'Turno noche'). Chonchi dejó de emitir esos nombres —ahora manda
+   * "Turno 1", "Turno 2", "Turno 1 Lunes"— así que el conteo daba 0 y 0, y
+   * como `??` no cae con el cero, tampoco se usaba el de Shoplogix: la tarjeta
+   * decía "5 turnos" arriba y "0 Día · 0 Noche" abajo, en la misma caja.
+   * Con el Excel en cero se usa Shoplogix, que sí sabe de qué turno se trata.
+   */
+  const excelClasificaTurnos = (stats?.dayShifts ?? 0) + (stats?.nightShifts ?? 0) > 0
+  const dayShifts   = excelClasificaTurnos ? stats!.dayShifts   : (slxStats?.dayShiftsWithData   ?? 0)
+  const nightShifts = excelClasificaTurnos ? stats!.nightShifts : (slxStats?.nightShiftsWithData ?? 0)
   const daysCount   = stats?.uniqueDays  ?? slxStats?.daysWithData        ?? 0
   const turnosCount = stats?.turnos      ?? slxStats?.turnosWithData      ?? 0
   // T1/T2/T3 counts — Yal-only. Refleja la nomenclatura real de Shoplogix.
@@ -249,8 +258,16 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
           de Shoplogix, sin inventar Día/Noche). */}
       <Card>
         <CardContent className="py-1.5 px-4">
-          <p className="text-caption text-muted-foreground tracking-wide text-center mb-1">Turnos</p>
-          {isClassificationPlant || !useNumberedShiftGrid ? (
+          {/* De dónde salen estos números: el encabezado cuenta los turnos CON
+              EXCEL cargado (5 este mes) y esta fila, cuando el Excel no
+              clasifica, cuenta los que hubo según Shoplogix (36). Sin decirlo,
+              los dos números de la misma tarjeta se leen como una contradicción. */}
+          <p className="text-caption text-muted-foreground tracking-wide text-center mb-1">
+            Turnos{!excelClasificaTurnos && slxStats ? ' · según Shoplogix' : ''}
+          </p>
+          {/* Con Día/Noche en cero, la grilla numerada es la única que dice algo,
+              aunque la planta sea clasificadora. */}
+          {(isClassificationPlant && dayShifts + nightShifts > 0) || !useNumberedShiftGrid ? (
             <div className="flex justify-around text-center">
               <div>
                 <p className="text-xl font-bold leading-none tabular-nums">{dayShifts}</p>

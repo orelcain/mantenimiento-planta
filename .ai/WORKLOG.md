@@ -6,6 +6,22 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-08-23 · Feat: plano de partes BAADER 142 (254 figuras) + puente eléctrico→pieza (PR #699)
+
+Noveno plano del Centro de Aprendizaje: catálogo de piezas de fábrica
+1420000821 ed. 2006 (254 figuras, 3.664 filas) navegable en modo
+`despiece` (assets en Firebase Storage, `planos/baader-142-despiece/`),
+con ficha de pieza y puente bidireccional B14↔pieza física en los planos
+eléctricos 888/860 (`partes.json` nuevo + bloque "Pieza física" +
+telemetría `planoUsos`). Verificado: tsc/eslint limpios, 8/8 checks de
+navegador, auditoría de datos OK (254 hojas, 2.527 posiciones ancladas,
+14 sensores B mapeados en 888 y 860, assets HTTP 200 en Storage).
+**Pendiente:** el OCR fino por teselas sigue corriendo — al terminar se
+re-suben los JSON de hojas con más anclas y se bumpea `vAssets`
+(micro-PR data-only, sin código).
+
+⚠️ Este archivo pasa los 173 KB — compactar en la próxima sesión que lo toque.
+
 ## 2026-08-18 · Feat: botón «actualizar ahora» + cronómetro de la próxima lectura del pulso (PR #641)
 
 Pedido de Orel para no depender solo del ciclo automático: se agregó el
@@ -2441,3 +2457,27 @@ Estos seguían abiertos cuando se compactó el historial (2026-07-30):
   quedó restringida.
 - Opcional: botones Confirmar/Cancelar dedicados para repuestos en el chat ARIA de la PWA (hoy es
   solo texto plano) + soporte de fotos.
+
+## 2026-08-26 · Ventanas de intervención (PR #789, en producción)
+
+Módulo nuevo en `/calendario-mantencion` → pestaña «Ventanas de intervención». Responde
+tres preguntas encadenadas: dónde puede entrar Mantención, dónde choca, y si alcanza el
+tiempo. Desplegado y verificado en producción (`buildSha 285e0bf`) abriendo la ruta pública.
+
+- **Dos capas por tramo de 5 min** (quién ocupa el equipo / dónde entra Mantención). Con una
+  sola capa, «intervenir mientras higiene lava» se guarda como simple bloqueo y se pierde el
+  dato que hay que mostrar: las horas con agua encima.
+- **Ocupante `X` (higiene en colación)**: en esta planta higiene entra durante la colación de
+  producción. Es el único hueco sin línea corriendo, así que higiene y mantención se lo
+  disputan — el choque es estructural, no accidental.
+- **Rueda para pintar, franja para mostrar**: un arco se juzga por ángulo y seis máquinas
+  serían seis relojes sueltos.
+- **`ruedaCarga`**: capacidad vs carga en horas-hombre. Capacidad de un tramo =
+  `min(máquinas disponibles, dotación)`, NO el producto.
+- **`ruedaProgramacion`**: encaja cada ejecución en día y hora, arrastrables. ⚠ El veredicto
+  sale del ENCAJE, no de la suma: con dotación 1 los totales decían «cabe» (13,7 h contra
+  107 h) y solo se ubicaban 5 de 10 ejecuciones.
+- Link público `/rueda/:token` (snapshot, 30 días, expiración validada en reglas).
+- 113 tests. Reglas `rueda_ventanas_state` y `ruedaVentanasPublicTokens` desplegadas.
+
+⚠ Los horarios cargados son una BASE DE EJEMPLO, no el horario real de planta.

@@ -171,12 +171,41 @@ describe('TiempoDelTurno · aviso de la próxima parada de convenio', () => {
     expect(t).toMatch(/no al promedio del turno/i)
   })
 
-  it('⚠ separa lo que es de Mantención de lo que no', () => {
-    // Ninguna de estas causas es falla de máquina: el bloque tiene que poder
-    // decirlo, o los 486 pz se leen como si Mantención hubiera fallado.
+  it('⚠ con TODO sin imputar NO afirma que no hubo falla de máquina', () => {
+    /*
+     * Este test decía lo contrario, y estaba mal: "Detencion" no está en el
+     * árbol, así que nadie sabe qué pasó en esos 27 minutos. La pantalla
+     * ponía igual un ✓ verde de "ninguna falla de máquina" — convertía "no
+     * sé" en "no fue Mantención", en el link que mira Producción. Visto en
+     * vivo el 26-08 a las 04:00 con 2 h 40 min sin imputar.
+     */
     const t = texto(ANTES_DE_LA_COLACION, null, 1081, 13.5)
-    expect(t).toMatch(/Ninguna parada por falla de máquina/i)
-    expect(t).toMatch(/Sin imputar/i)          // "Detencion" no está en el árbol
+    expect(t).not.toMatch(/Ninguna parada/i)
+    expect(t).toMatch(/Sin imputar/i)          // sí dice que no hay dato
+  })
+
+  it('con causas anotadas y ninguna de Mantención, SÍ lo afirma — y dice hasta dónde', () => {
+    /*
+     * El caso que sí es defendible: alguien imputó. «AJUSTE OPERADOR» está en
+     * el árbol y es de Producción, no de Mantención. Pero quedan 27 min de
+     * "Detencion" sin causa, así que la frase no puede hablar «del turno».
+     */
+    const t = texto(
+      {
+        ...ANTES_DE_LA_COLACION,
+        // `recoverableMin` acompaña a las causas: es el total de línea y topa la
+        // suma de sus `lineMin` (ver el escalado en `agruparEventos`).
+        recoverableMin: 39,
+        recoverable: [
+          { reason: 'Detencion', min: 27, count: 9, lineMin: 27 },
+          { reason: 'AJUSTE OPERADOR', min: 12, count: 1, lineMin: 12 },
+        ],
+      },
+      null, 1081, 13.5,
+    )
+    expect(t).toMatch(/Ninguna parada con causa anotada fue falla de máquina/i)
+    expect(t).toMatch(/27 min sin imputar/)
+    expect(t).not.toMatch(/en este turno/)
   })
 
   it('una falla de máquina apaga la frase y aparece como Mantención', () => {
@@ -277,7 +306,9 @@ describe('TiempoDelTurno · acordeón por parte (una barra, cada parte se abre)'
     const t = montar().container.textContent ?? ''
     // El argumento de imputación se ve SIN tocar nada (regla: no esconderlo).
     expect(t).toMatch(/Sin imputar/i)
-    expect(t).toMatch(/Ninguna parada por falla de máquina/i)
+    // Con todo sin imputar no se afirma nada sobre falla de máquina: ver el
+    // test «⚠ con TODO sin imputar…» más arriba y `veredictoFallaDeMaquina`.
+    expect(t).not.toMatch(/Ninguna parada/i)
     // Los minutos esperan bajo «Hechas»; el pliegue viejo no aparece.
     expect(t).not.toMatch(/Produciendo/)
     expect(t).not.toMatch(/ver el reparto del tiempo/i)

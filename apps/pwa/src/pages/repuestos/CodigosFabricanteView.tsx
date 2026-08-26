@@ -19,14 +19,66 @@
  * codigoProveedor / codigoSap cuando el catálogo los trae.
  */
 import { useEffect, useMemo, useState } from 'react'
-import { BookMarked, BookOpen, Check, CircleCheck, CirclePlus, Copy, Loader2, PackagePlus, ScanSearch, Search } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { BookMarked, BookOpen, Check, CircleCheck, CirclePlus, Copy, Loader2, PackagePlus, ScanSearch, Search, Shapes } from 'lucide-react'
 import { collection, getDocs } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import { Input } from '@/components/ui'
 import { ShareInteractiveButton } from '@/components/visor3d/ShareInteractiveButton'
-import { APP_VERSION } from '@/constants'
+import { CATALOGOS, cargarCatalogos, type PiezaCatalogo } from './catalogosFabricante'
+import { agruparPorCodigo, conRecuentoTotal, indexarGrupos } from './agruparPiezas'
+import { buscarPiezas, norm } from './buscarCatalogo'
 import { useRepuestosExistentes, normCodigo } from '@/hooks/repuestos/useRepuestosExistentes'
 import { logger } from '@/lib/logger'
+
+/**
+ * Mapa código de fabricante → figura del despiece navegable.
+ * Es el camino INVERSO del puente: el visor de planos ya lleva de una pieza a
+ * `/repuestos?q=`, pero desde acá no se podía ver el DIBUJO. Se carga aparte
+ * (~39 KB por máquina) en vez de leer los índices completos (~770 KB c/u).
+ *
+ * Son DOS máquinas: el archivo de la fileteadora ya se generaba (1.510
+ * códigos) y nadie lo cargaba — el botón "Ver dibujo" solo aparecía para la
+ * evisceradora aunque el dato de la otra estuviera ahí.
+ */
+const DESPIECES = [
+  { slug: 'baader-142-despiece', archivo: 'despiece-142-figuras.json', maquina: 'BAADER 142' },
+  { slug: 'baader-200-despiece', archivo: 'despiece-200-figuras.json', maquina: 'BAADER 200' },
+]
+
+/** Dónde vive un código dentro de un despiece. */
+type EnDespiece = { hoja: number; fig: string; slug: string; maquina: string }
+
+function useFigurasDespiece() {
+  const [mapa, setMapa] = useState<Record<string, EnDespiece[]> | null>(null)
+  useEffect(() => {
+    let vivo = true
+    Promise.all(
+      DESPIECES.map(({ slug, archivo, maquina }) =>
+        fetch(`${import.meta.env.BASE_URL}data/${archivo}`)
+          .then((r) => (r.ok ? r.json() : null))
+          .then((d: { codigos?: Record<string, [number, string]> } | null) =>
+            Object.entries(d?.codigos ?? {}).map(
+              ([cod, [hoja, fig]]) => [cod, { hoja, fig, slug, maquina }] as const,
+            ))
+          .catch(() => []),
+      ),
+    ).then((partes) => {
+      if (!vivo) return
+      // Un código puede estar en LAS DOS máquinas (220 lo están: tornillos,
+      // arandelas). Se guardan todas sus ubicaciones y se muestra un botón por
+      // máquina — quedarse con una sola mandaría al de la fileteadora al
+      // dibujo de la evisceradora.
+      const acc: Record<string, EnDespiece[]> = {}
+      for (const [cod, donde] of partes.flat()) (acc[cod] ??= []).push(donde)
+      setMapa(acc)
+    })
+    return () => {
+      vivo = false
+    }
+  }, [])
+  return mapa
+}
 
 /** Datos para prellenar la creación de un repuesto desde una pieza de catálogo. */
 export interface CrearDesdeCatalogo {
@@ -38,85 +90,12 @@ export interface CrearDesdeCatalogo {
   equipoNombre: string
 }
 
-interface PiezaCatalogo {
-  codigo: string
-  descripcion: string
-  descripcionEn: string
-  especificacion: string
-  cantidad: string
-  posicion: string
-  conjunto: string
-  pagina: number
-  fuente: string
-  /** Campos estampados al cargar desde el header del catálogo: */
-  maquina?: string
-  equipoNodeIds?: string[]
-  equipoCodigos?: string[]
-  equipoNombre?: string
-  /** Id del manual en la colección `manuales` (si el PDF está subido a la app). */
-  manualId?: string
-  /** Código del distribuidor local (envuelve al código de fabricante) y su empresa. */
-  codigoProveedor?: string
-  proveedor?: string
-  /** Código SAP ya creado para esta pieza (cruzado desde el maestro del proveedor). */
-  codigoSap?: string
-}
+/** ¿Los dos textos dicen lo mismo? (sin acentos, espacios ni mayúsculas). */
+const mismoTexto = (a: string, b: string) =>
+  norm(a).replace(/\s+/g, ' ').trim() === norm(b).replace(/\s+/g, ' ').trim()
 
-interface CatalogoFabricante {
-  maquina: string
-  sap?: string
-  equipoNodeIds?: string[]
-  equipoCodigos?: string[]
-  equipoNombre?: string
-  manualPorFuente?: Record<string, string>
-  piezas: PiezaCatalogo[]
-}
-
-/** Catálogos publicados (public/data/codigos-fabricante/). */
-const CATALOGOS = [
-  { id: 'gea', url: '/data/codigos-fabricante/gea-termoformadora.json', maquina: 'TERMOFORMADORA GEA' },
-  { id: 'baader-142', url: '/data/codigos-fabricante/baader-142.json', maquina: 'BAADER 142' },
-  { id: 'baader-200', url: '/data/codigos-fabricante/baader-200.json', maquina: 'BAADER 200' },
-  { id: 'marel-eviscerado', url: '/data/codigos-fabricante/marel-eviscerado.json', maquina: 'MAREL EVISCERADO' },
-  { id: 'marel-filete', url: '/data/codigos-fabricante/marel-filete.json', maquina: 'MAREL FILETE' },
-  { id: 'enzunchadora-tp6000', url: '/data/codigos-fabricante/enzunchadora-tp6000.json', maquina: 'ENZUNCHADORA TP-6000' },
-]
-
-// Cache de módulo: el JSON (~2 MB) se baja una sola vez por sesión.
-let _cache: PiezaCatalogo[] | null = null
-let _cachePromise: Promise<PiezaCatalogo[]> | null = null
-
-async function cargarCatalogos(): Promise<PiezaCatalogo[]> {
-  if (_cache) return _cache
-  if (!_cachePromise) {
-    _cachePromise = Promise.all(
-      CATALOGOS.map(async (c) => {
-        const base = import.meta.env.BASE_URL.replace(/\/$/, '')
-        // ?v=<versión> evita que el navegador sirva un JSON viejo cacheado
-        // (GitHub Pages manda Cache-Control max-age=600): al subir la versión,
-        // la URL cambia y se baja el catálogo fresco tras cada deploy.
-        const res = await fetch(`${base}${c.url}?v=${APP_VERSION}`)
-        if (!res.ok) throw new Error(`catálogo ${c.id}: HTTP ${res.status}`)
-        const data = (await res.json()) as CatalogoFabricante
-        const manualPorFuente = data.manualPorFuente || {}
-        return (data.piezas || []).map((p) => ({
-          ...p,
-          maquina: data.maquina,
-          equipoNodeIds: data.equipoNodeIds || [],
-          equipoCodigos: data.equipoCodigos || [],
-          equipoNombre: data.equipoNombre || '',
-          manualId: manualPorFuente[p.fuente],
-        }))
-      }),
-    ).then((listas) => {
-      _cache = listas.flat()
-      return _cache
-    }).catch((e) => { _cachePromise = null; throw e })
-  }
-  return _cachePromise
-}
-
-const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase()
+/** Tope de tarjetas en pantalla. Con el aviso de abajo, ya no esconde nada. */
+const TOPE = 100
 
 interface CodigosFabricanteViewProps {
   /** Salta a la pestaña Áreas con este código pre-buscado ("¿Existe en repuestos?"). */
@@ -142,9 +121,24 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
   // Mapa manualId → URL del PDF (colección `manuales`), para el enlace "Ver manual".
   const [manualUrls, setManualUrls] = useState<Record<string, string>>({})
 
+  // Reintento a mano: un catálogo puede fallar por un parpadeo de la señal y
+  // quedaba fuera TODA la sesión — la vista pide los catálogos una sola vez al
+  // montar. El aviso decía la verdad pero no ofrecía salida.
+  const [intento, setIntento] = useState(0)
+  const [faltantes, setFaltantes] = useState<string[]>([])
+
   useEffect(() => {
     let alive = true
-    cargarCatalogos()
+    // Progresivo: se pinta lo que va llegando en vez de esperar a los 6.
+    cargarCatalogos((parcial, faltan) => {
+      if (!alive) return
+      setPiezas(parcial)
+      // Decir CUÁLES faltan, no un "algo falló" genérico: si el técnico busca
+      // una pieza de la GEA tiene que saber que ese catálogo no cargó, en vez
+      // de creer que su código no existe.
+      setFaltantes(faltan)
+      setError(faltan.length ? `No cargó el catálogo de ${faltan.join(', ')}. El resto sí se puede buscar.` : null)
+    })
       .then((p) => { if (alive) setPiezas(p) })
       .catch((e) => {
         if (alive) setError('No se pudo cargar el catálogo de códigos.')
@@ -164,46 +158,34 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
         .catch((e) => logger.warn('No se pudieron cargar URLs de manuales', { error: e instanceof Error ? e.message : String(e) }))
     }
     return () => { alive = false }
-  }, [publico])
+  }, [publico, intento])
 
-  const resultados = useMemo(() => {
-    if (!piezas) return []
-    const q = norm(query.trim())
-    if (q.length < 3) return []
-    // Si la consulta trae una secuencia numérica larga se busca como código,
-    // tolerando prefijos ("GEA 3000544810" viene grabado así en la pieza).
-    // También se compara sin separadores ("T6-1-20250" ↔ "T6120250") para que
-    // el código del distribuidor (29123T612025022, que envuelve al del
-    // fabricante) y el código con/sin guiones encuentren la misma pieza.
-    const soloDigitos = q.replace(/[^0-9]/g, '')
-    const alnumQ = q.replace(/[^A-Z0-9]/g, '')
-    const esNumerico = soloDigitos.length >= 4
-    const terms = q.split(/\s+/).filter((t) => t.length >= 2)
-    const scored: { p: PiezaCatalogo; score: number }[] = []
-    for (const p of piezas) {
-      let score = 0
-      if (esNumerico) {
-        const alnumCod = norm(p.codigo).replace(/[^A-Z0-9]/g, '')
-        const alnumProv = p.codigoProveedor ? norm(p.codigoProveedor).replace(/[^A-Z0-9]/g, '') : ''
-        if (p.codigo === soloDigitos || alnumCod === alnumQ) score = 100
-        else if (alnumProv === alnumQ || p.codigoSap === soloDigitos) score = 90
-        else if (p.codigo.startsWith(soloDigitos) || alnumCod.startsWith(alnumQ)) score = 60
-        else if (alnumCod.length >= 5 && alnumQ.includes(alnumCod)) score = 40
-        else if (p.codigo.includes(soloDigitos) || (alnumProv && alnumProv.includes(alnumQ))) score = 30
-      } else if (terms.length) {
-        const blob = norm(`${p.descripcion} ${p.descripcionEn} ${p.conjunto} ${p.especificacion}`)
-        const hits = terms.filter((t) => blob.includes(t)).length
-        if (hits === terms.length) score = 20 + hits
-      }
-      if (score > 0) scored.push({ p, score })
-    }
-    scored.sort((a, b) => b.score - a.score || a.p.pagina - b.p.pagina)
-    return scored.slice(0, 100).map((s) => s.p)
-  }, [piezas, query])
+  // Índice del catálogo completo por (código, máquina): se calcula una vez y
+  // sirve para contar en cuántos lugares va una pieza, sin importar la consulta.
+  const indiceTodo = useMemo(() => (piezas ? indexarGrupos(piezas) : null), [piezas])
+
+  const resultadosMemo = useMemo(() => {
+    if (!piezas) return { lista: [], total: 0 }
+    // La búsqueda vive en `buscarCatalogo.ts` (pura y testeada): acepta el
+    // plural ("arandelas"), el vocabulario de planta ("golillas") y los códigos
+    // cortos de la enzunchadora ("SW06"), que no entran por el camino numérico.
+    const encontradas = buscarPiezas(piezas, query)
+    // Agrupar ANTES del tope: `31800105` tenía 159 filas y el corte en 100 se
+    // las comía todas con la misma pieza, escondiendo el resto de resultados.
+    // Ahora el tope cuenta PIEZAS distintas, que es lo que el técnico mira.
+    // Con el recuento del catálogo completo: "va en N lugares de la máquina"
+    // no puede depender de lo que se haya escrito en el buscador.
+    const todas = conRecuentoTotal(agruparPorCodigo(encontradas), indiceTodo)
+    // El total viaja aparte para poder DECIR que se cortó: un listado de 100
+    // sin aviso se lee como "esto es todo lo que hay".
+    return { lista: todas.slice(0, TOPE), total: todas.length }
+  }, [piezas, query, indiceTodo])
+  const { lista, total } = resultadosMemo
 
   // ¿cuáles de los códigos en pantalla ya existen como repuesto en el maestro?
   // (requiere sesión: en modo invitado no se consulta)
-  const { existentes } = useRepuestosExistentes(publico ? [] : resultados.map((p) => p.codigo))
+  const { existentes } = useRepuestosExistentes(publico ? [] : lista.map((g) => g.rep.codigo))
+  const figurasDespiece = useFigurasDespiece()
 
   const copiar = (codigo: string) => {
     navigator.clipboard?.writeText(codigo).then(() => {
@@ -244,11 +226,21 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
         />
       </div>
 
-      {error && <p className="text-sm text-red-500">{error}</p>}
+      {error && (
+        <p className="flex flex-wrap items-center gap-2 text-sm text-red-500">
+          {error}
+          {faltantes.length > 0 && (
+            <button type="button" onClick={() => setIntento((n) => n + 1)}
+                    className="min-h-[44px] rounded-ctl border border-current px-3 text-footnote font-medium">
+              Reintentar
+            </button>
+          )}
+        </p>
+      )}
       {!error && !piezas && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Cargando catálogo…</div>
       )}
-      {piezas && query.trim().length >= 3 && resultados.length === 0 && (
+      {piezas && query.trim().length >= 3 && total === 0 && (
         <p className="text-sm text-muted-foreground">Sin resultados en los catálogos ({piezas.length.toLocaleString('es-CL')} filas indexadas).</p>
       )}
       {piezas && query.trim().length < 3 && (
@@ -256,13 +248,24 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
           {piezas.length.toLocaleString('es-CL')} filas de despiece indexadas · catálogos: {CATALOGOS.map((c) => c.maquina).join(', ')}.
         </p>
       )}
+      {/* Cuántas piezas hay de verdad. Un listado cortado en 100 sin avisar se
+          lee como "esto es todo": el técnico que no ve la suya cree que no
+          está en el catálogo, cuando lo que falta es afinar la búsqueda. */}
+      {total > 0 && (
+        <p className="text-footnote text-muted-foreground">
+          {total > TOPE
+            ? `${TOPE} de ${total.toLocaleString('es-CL')} piezas — afiná la búsqueda para ver el resto.`
+            : `${total} pieza${total === 1 ? '' : 's'}.`}
+        </p>
+      )}
 
       <div className="space-y-2">
-        {resultados.map((p, i) => {
+        {lista.map((g, i) => {
+          const p = g.rep
           // undefined = aún no verificado · null = no existe · objeto = ya creado
           const existe = existentes.get(normCodigo(p.codigo))
           return (
-          <div key={`${p.codigo}-${p.fuente}-${p.pagina}-${i}`} className="rounded-card border border-border bg-card p-3">
+          <div key={`${p.codigo}-${p.maquina}-${i}`} className="rounded-card border border-border bg-card p-3">
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-mono text-sm font-bold text-foreground">{p.codigo}</span>
               {p.maquina && <span className="rounded-ctl bg-primary/10 px-1.5 py-0.5 text-caption font-medium text-primary">{p.maquina}</span>}
@@ -286,8 +289,17 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
               )}
             </div>
             <div className="mt-1 text-footnote font-medium text-foreground">
-              {p.descripcion}
-              {p.descripcionEn && <span className="ml-1.5 text-footnote font-normal text-muted-foreground">({p.descripcionEn})</span>}
+              {p.descripcion?.trim()
+                ? p.descripcion
+                : /* 47 piezas de la BAADER 200 no traen nombre en el manual: la
+                     tarjeta salía muda y parecía la app rota, no el catálogo. */
+                  <span className="font-normal italic text-muted-foreground">El manual no le pone nombre</span>}
+              {/* El original entre paréntesis solo si DICE algo distinto: 1.071
+                  de 7.387 piezas (la TP-6000 y la MAREL EVISCERADO vienen solo
+                  en inglés) mostraban el mismo texto dos veces seguidas. */}
+              {p.descripcionEn && !mismoTexto(p.descripcion, p.descripcionEn) && (
+                <span className="ml-1.5 text-footnote font-normal text-muted-foreground">({p.descripcionEn})</span>
+              )}
             </div>
             {p.especificacion && <div className="font-mono text-footnote text-muted-foreground">{p.especificacion}</div>}
             {/* Códigos equivalentes: distribuidor local (envuelve al de fabricante) y SAP */}
@@ -316,12 +328,47 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
               </div>
             )}
             <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-caption text-muted-foreground">
-              <span className="inline-flex items-center gap-1"><BookMarked className="h-3 w-3" /> {p.conjunto || 'conjunto s/n'}</span>
-              <span>pág. {p.pagina}{p.posicion ? ` · pos. ${p.posicion}` : ''}</span>
+              {g.esComun ? (
+                /* Ferretería: va en tantos lugares que la figura no identifica
+                   nada. Decirlo es más útil que listar 159 ubicaciones. */
+                <span className="inline-flex items-center gap-1">
+                  <BookMarked className="h-3 w-3" /> Pieza común · va en {g.apariciones.length} lugares de la máquina
+                </span>
+              ) : (
+                <>
+                  <span className="inline-flex items-center gap-1"><BookMarked className="h-3 w-3" /> {p.conjunto || 'conjunto s/n'}</span>
+                  <span>pág. {p.pagina}{p.posicion ? ` · pos. ${p.posicion}` : ''}</span>
+                  {g.apariciones.length > 1 && (
+                    <span title={g.apariciones.map((a) => `${a.conjunto || 's/n'} · pág. ${a.pagina}`).join(' | ')}>
+                      y en {g.apariciones.length - 1} lugar{g.apariciones.length > 2 ? 'es' : ''} más
+                    </span>
+                  )}
+                </>
+              )}
               <span className="min-w-0 truncate" title={p.fuente}>{p.fuente}</span>
             </div>
             {/* Acciones: abrir el PDF del manual en la página exacta + sembrar el maestro */}
             <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-border/50 pt-2">
+              {/* Camino inverso del puente: si esta pieza tiene dibujo en el
+                  despiece navegable, se va derecho a su figura explotada. */}
+              {(() => {
+                const enDespiece = figurasDespiece?.[p.codigo]
+                if (!enDespiece?.length) return null
+                // Con una sola máquina el botón no la nombra (sería ruido);
+                // con dos hay que decir cuál es cuál.
+                const varias = enDespiece.length > 1
+                return enDespiece.map((d) => (
+                  <Link
+                    key={d.slug}
+                    to={`/aprendizaje/planos/${d.slug}?hoja=${d.hoja}&ap=${encodeURIComponent(p.codigo)}`}
+                    className="inline-flex items-center gap-1 rounded-ctl border border-primary/40 bg-primary/[0.08] px-2 py-1 text-caption font-medium text-ink-info transition hover:bg-primary/[0.15]"
+                    title={`Ver el dibujo explotado en la ${d.maquina} (figura ${d.fig})`}
+                  >
+                    <Shapes className="h-3.5 w-3.5" />
+                    {varias ? `${d.maquina} · fig. ${d.fig}` : `Ver dibujo · fig. ${d.fig}`}
+                  </Link>
+                ))
+              })()}
               {p.manualId && manualUrls[p.manualId] && (
                 <a
                   href={`${manualUrls[p.manualId]}#page=${p.pagina}`}

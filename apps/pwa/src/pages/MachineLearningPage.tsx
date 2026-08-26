@@ -15,7 +15,7 @@ import {
 } from 'lucide-react'
 import '@/styles/learningDossier.css'
 import { useAuthStore } from '@/store'
-import { findMachineBySlug, type LearningSection } from '@/data/learningMachines'
+import { findMachineBySlug, CAPACITACION_AREA, type LearningSection } from '@/data/learningMachines'
 import { hmiPracticeUrl, glossaryPracticeUrl } from '@/services/grader/graderHmiPractice'
 import { perilla5PracticeUrl } from '@/services/baader142/perilla5Practice'
 import { GRADER_GLOSSARY } from '@/services/grader/graderGlossary'
@@ -49,7 +49,7 @@ import { posicionesDeMaquina, VARIADORES, type PosicionReceta } from '@/data/var
 import { getQuizBest } from '@/utils/learningProgress'
 
 /** Area del catalogo cuyos temas son cursos (no maquinas) -> set de pestanas distinto. */
-const COURSE_AREA = 'Capacitacion / Normativa'
+const COURSE_AREA = CAPACITACION_AREA
 
 /** Pestanas de maquina (LearningSection) + pestanas extra de curso. */
 type TabId = LearningSection | 'quickref' | 'casos' | 'quiz' | 'glossary' | 'bibliografia' | 'repuestos' | 'components' | 'variadores'
@@ -84,17 +84,17 @@ const TABS: TabDef[] = [
   },
   {
     id: 'flows',
-    label: '¿Que hago cuando...?',
+    label: '¿Qué hago cuando...?',
     shortLabel: 'Flujos',
     icon: GitBranch,
-    description: 'Flujos de accion y checklists de decision.',
+    description: 'Flujos de acción y checklists de decisión.',
   },
   {
     id: 'diagnosis',
-    label: 'Diagnostico',
+    label: 'Diagnóstico',
     shortLabel: 'Fallas',
     icon: AlertTriangle,
-    description: 'Sintoma → Causa probable → Solucion.',
+    description: 'Síntoma → Causa probable → Solución.',
   },
 ]
 
@@ -148,19 +148,19 @@ const QUIZ_TAB_MACHINE: TabDef = {
   description: 'Autoevaluación del equipo, con explicación por pregunta.',
 }
 
-/** Set de pestanas para temas de curso (area "Capacitacion / Normativa"). */
+/** Set de pestañas para temas de curso (área CAPACITACION_AREA). */
 const COURSE_TABS: TabDef[] = [
   {
     id: 'manual',
     label: 'Lecciones',
     shortLabel: 'Lecciones',
     icon: BookOpen,
-    description: 'Teoria del curso, ordenada por unidades.',
+    description: 'Teoría del curso, ordenada por unidades.',
   },
   {
     id: 'procedures',
-    label: 'Practica',
-    shortLabel: 'Practica',
+    label: 'Práctica',
+    shortLabel: 'Práctica',
     icon: ListChecks,
     description: 'Procedimientos paso a paso para aplicar lo aprendido.',
   },
@@ -169,25 +169,25 @@ const COURSE_TABS: TabDef[] = [
     label: 'Casos',
     shortLabel: 'Casos',
     icon: GitBranch,
-    description: 'Que hacer en cada situacion: flujos y señal → accion.',
+    description: 'Qué hacer en cada situación: flujos y señal → acción.',
   },
   {
     id: 'quiz',
     label: 'Examen',
     shortLabel: 'Examen',
     icon: GraduationCap,
-    description: 'Autoevaluacion tipo prueba con explicacion.',
+    description: 'Autoevaluación tipo prueba con explicación.',
   },
   {
     id: 'glossary',
     label: 'Glosario',
     shortLabel: 'Glosario',
     icon: BookMarked,
-    description: 'Siglas y terminos del curso, con enlace a la leccion donde se explican.',
+    description: 'Siglas y términos del curso, con enlace a la lección donde se explican.',
   },
   {
     id: 'bibliografia',
-    label: 'Bibliografia',
+    label: 'Bibliografía',
     shortLabel: 'Biblio.',
     icon: Library,
     description: 'Fuentes y normas en que se basa el manual del curso.',

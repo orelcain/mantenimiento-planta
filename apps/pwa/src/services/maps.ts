@@ -635,10 +635,23 @@ export async function addInspectionItem(
 }
 
 /**
- * Eliminar una inspección
+ * Eliminar una inspección y todos sus ítems.
+ *
+ * Antes borraba solo el documento de la inspección: los ítems quedaban
+ * apuntando a un padre inexistente. Hoy hay 110 de 173 así (64%), de cuatro
+ * inspecciones que ya no existen. Se borran primero los ítems: si algo falla a
+ * mitad de camino, la inspección sigue estando y se puede reintentar — al
+ * revés, cada intento fallido dejaba más huérfanos.
  */
-export async function deleteInspection(id: string): Promise<void> {
+export async function deleteInspection(id: string): Promise<{ itemsBorrados: number }> {
+  const items = await getDocs(
+    query(collection(db, INSPECTION_ITEMS_COLLECTION), where('inspectionId', '==', id)),
+  )
+  for (const item of items.docs) {
+    await deleteDoc(item.ref)
+  }
   await deleteDoc(doc(db, INSPECTIONS_COLLECTION, id))
+  return { itemsBorrados: items.size }
 }
 
 /**

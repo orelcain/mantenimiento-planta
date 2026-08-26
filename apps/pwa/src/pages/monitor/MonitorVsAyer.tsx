@@ -13,6 +13,7 @@
  */
 import type { RecordsResult, VsAyerResult } from '@/services/shoplogix/monitorVsAyer'
 import { nombreDeDia } from '@/services/shoplogix/monitorVsAyer'
+import type { ConvenioFaltante } from '@/services/shoplogix/convenioFaltante'
 import { Bloque } from './MonitorShiftParts'
 
 const nf = new Intl.NumberFormat('es-CL')
@@ -51,9 +52,15 @@ function Termino({ signo, titulo, detalle, piezas }: {
   )
 }
 
-export function VsAyerBloque({ r, records }: {
+export function VsAyerBloque({ r, records, sinConvenio }: {
   r: VsAyerResult | null
   records: RecordsResult | null
+  /**
+   * El turno no tiene convenio registrado y los turnos iguales sí lo traen.
+   * Sin esto, el renglón «Menos convenio · 0 min contra 58» se lee como una
+   * mejora de +2.497 pz que nadie hizo. Ver `convenioFaltante`.
+   */
+  sinConvenio?: ConvenioFaltante | null
 }) {
   if (!r && !records) return null
 
@@ -110,6 +117,18 @@ export function VsAyerBloque({ r, records }: {
         </span>
       )}
     >
+      {/* El aviso va ARRIBA del reparto: si se lee después, el «+2.497 pz» de
+          «Menos convenio» ya se leyó como una mejora del turno. */}
+      {sinConvenio && (
+        <p className="mt-2 rounded-ctl border border-border px-2.5 py-2 text-[11.5px] leading-snug text-ink-warn">
+          Este turno no tiene <b>convenio registrado</b>, y {sinConvenio.turnosCon} de{' '}
+          {sinConvenio.turnosMirados} turnos iguales traen{' '}
+          <span className="tabular-nums">~{sinConvenio.tipicoMin} min</span>. Lo más probable es que
+          la colación no quedara anotada como tal: si se registró con otra etiqueta, está contada
+          acá abajo como <b>parada evitable</b> — y el renglón de convenio no es una mejora.
+        </p>
+      )}
+
       {r && r.datosIncompletos && (
         <p className="mt-2 text-[11.5px] text-muted-foreground">
           Los datos de {nombreDeDia(r.ayer.dateKey)} están incompletos: la diferencia no se puede
@@ -151,7 +170,7 @@ export function VsAyerBloque({ r, records }: {
             </div>
           </div>
 
-          <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground/70">
+          <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground/80">
             Contra el último turno del mismo nombre con datos completos. Piezas estimadas al ritmo
             andando de cada día.
             {residuo && Math.round(Math.abs(residuo.piezas)) > 0 && (
@@ -202,7 +221,7 @@ export function VsAyerBloque({ r, records }: {
               )
             })}
           </ul>
-          <p className="mt-1.5 text-[10px] leading-snug text-muted-foreground/70">
+          <p className="mt-1.5 text-[10px] leading-snug text-muted-foreground/80">
             Récords de lo que el turno controla: la duración y el convenio los pone el calendario.
             El de «más piezas» no compite — era solo el turno más largo.
           </p>

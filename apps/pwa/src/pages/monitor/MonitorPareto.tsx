@@ -61,7 +61,9 @@ const fmtTurnosEq = (pz: number, pzPorTurno: number) => {
   if (!(pzPorTurno > 0)) return null
   const t = Math.round((pz / pzPorTurno) * 2) / 2
   if (t < 0.5) return null
-  return t === 1 ? '1 turno' : `${nf1.format(t).replace(',0', '')} turnos`
+  // El adjetivo va ADENTRO: al pegarle « completos» afuera, un solo turno daba
+  // «1 turno completos de producción».
+  return t === 1 ? '1 turno completo' : `${nf1.format(t).replace(',0', '')} turnos completos`
 }
 
 /** «Turno Dia» → «Día». El prefijo se repite en todos y no aporta. */
@@ -154,7 +156,7 @@ export function ParetoDeParadas({
       {/* Si el selector pide más turnos de los que hay con detalle, se dice —
           es la diferencia entre «no hay más» y «los estamos escondiendo». */}
       {ventana != null && turnosMedidos < ventana && (
-        <p className="mt-1 text-[11px] leading-snug text-muted-foreground/70">
+        <p className="mt-1 text-[11px] leading-snug text-muted-foreground/80">
           Hay <span className="tabular-nums">{turnosMedidos}</span> turnos con detalle de causas;
           los demás todavía no lo traen.
         </p>
@@ -170,12 +172,24 @@ export function ParetoDeParadas({
           datos, un selector con una sola opción es ruido. */}
       {(onVentana || (onTurno && (porTurno?.length ?? 0) > 1)) && (
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          {/* Sin este rótulo la fila se leía «5 10 15 30 todos | 2 1 1 Lunes
+              los dos»: nueve controles y ninguna pista de qué eligen. El
+              segundo grupo se explica solo por el nombre del turno. */}
+          {onVentana && (
+            <span className="text-[11px] text-muted-foreground/80">últimos</span>
+          )}
           {onVentana && VENTANAS.map((v) => (
             <button
               key={String(v)}
               type="button"
               onClick={() => onVentana(v)}
-              className={`tap-44 min-h-[32px] rounded-full px-2.5 text-[12px] tabular-nums ${
+              aria-pressed={ventana === v}
+              aria-label={v == null ? 'todos los turnos que haya' : `últimos ${v} turnos`}
+              /* Ancho REAL de 44, no solo el área de `tap-44`: los chips de un dígito
+                 medían 22-23 px y el ::after del vecino les robaba parte de su
+                 propio dibujo — tocar el borde del «2» activaba el «1». Medido
+                 con `elementFromPoint` recorriendo el ancho dibujado. */
+              className={`tap-44 min-h-[32px] min-w-[44px] rounded-full px-2.5 text-[12px] tabular-nums ${
                 ventana === v ? 'bg-primary/[0.13] font-semibold text-foreground' : 'bg-muted text-muted-foreground'
               }`}
             >
@@ -190,7 +204,9 @@ export function ParetoDeParadas({
                   key={t}
                   type="button"
                   onClick={() => onTurno(t as string | 'todos')}
-                  className={`min-h-[32px] rounded-full px-2.5 text-[12px] ${
+                  aria-pressed={turno === t}
+                  aria-label={t === 'todos' ? 'los dos turnos juntos' : `solo ${t}`}
+                  className={`tap-44 min-h-[32px] min-w-[44px] rounded-full px-2.5 text-[12px] ${
                     turno === t ? 'bg-primary/[0.13] font-semibold text-foreground' : 'bg-muted text-muted-foreground'
                   }`}
                 >
@@ -219,7 +235,7 @@ export function ParetoDeParadas({
                 const eq = fmtTurnosEq(pareto.totalPiezas, ctx.piezasPorTurno)
                 return eq ? (
                   <span className="block text-[12px] font-normal text-muted-foreground">
-                    ≈ {eq} completos de producción
+                    ≈ {eq} de producción
                   </span>
                 ) : null
               })()}
@@ -266,7 +282,7 @@ export function ParetoDeParadas({
           <button
             type="button"
             onClick={() => setComoAbierto((v) => !v)}
-            className="mt-1.5 block text-left text-[11px] leading-snug text-muted-foreground/70"
+            className="mt-1.5 block text-left text-[11px] leading-snug text-muted-foreground/80"
           >
             Piezas ≈ estimadas al ritmo que cada turno traía andando, no al promedio de la
             muestra.{' '}
@@ -454,7 +470,7 @@ export function ParetoDeParadas({
                         {/* Las piezas del mismo turno bajo su %: el bloque entero
                             habla en piezas, esta tira era lo único que no. */}
                         {p.piezas > 0 && (
-                          <span className="text-[11px] tabular-nums text-muted-foreground/70">
+                          <span className="text-[11px] tabular-nums text-muted-foreground/80">
                             {fmtPzCorto(p.piezas)}
                           </span>
                         )}
@@ -482,7 +498,7 @@ export function ParetoDeParadas({
             </div>
           </div>
 
-          <div className="mt-1 flex justify-between gap-[3px] text-[11px] text-muted-foreground/70">
+          <div className="mt-1 flex justify-between gap-[3px] text-[11px] text-muted-foreground/80">
             {[...serie.serie.map((p) => p.dateKey), ...serie.sinProduccion].map((d: string) => (
               <span key={d} className="min-w-0 flex-1 truncate text-center tabular-nums">
                 {d.slice(8)}
