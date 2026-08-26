@@ -2229,10 +2229,17 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
             </span>
           ))}
           <span className="text-muted-foreground">
-            suma <b className="tabular-nums text-foreground/90">{fmtDec(maquinas.suma)}</b>
+            las {maquinas.maquinas.length} juntas <b className="tabular-nums text-foreground/90">{fmtDec(maquinas.suma)}</b>
           </span>
           <span className="text-muted-foreground">
-            promedio <b className="tabular-nums text-foreground/90">{fmtDec(maquinas.promedio)}</b>
+            cada una <b className="tabular-nums text-foreground/90">{fmtDec(maquinas.promedio)}</b>
+          </span>
+          {/* Por qué «las 3 juntas» no da igual que el ritmo de la línea: cada
+              máquina se mide sobre SU tiempo andando y la línea sobre el suyo.
+              Sin esta línea, dos cifras parecidas y distintas a diez píxeles se
+              leen como un error de cuenta. */}
+          <span className="basis-full text-[11px] text-muted-foreground/80">
+            Cada máquina sobre su propio tiempo andando; el ritmo de arriba, sobre el de la línea.
           </span>
         </div>
       )}
@@ -2276,8 +2283,12 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
                   ? <span title={`Haria falta ir a ${fmtDec(pedido)} pz/min andando`}>la meta ya no alcanza</span>
                   : <>para la meta <b className="font-semibold text-foreground">{fmtDec(pedido)}</b></>)
               : turno != null
-                ? <>promedio del turno <b className="font-semibold text-foreground/80">{fmtDec(turno)}</b></>
-                : 'promedio del turno —'}
+                /* «línea» y no «promedio del turno»: tres centímetros más
+                   arriba hay un «promedio 10,9» que es el promedio POR MÁQUINA,
+                   y los dos rótulos parecidos con cifras distintas se leían
+                   como un error de la app. */
+                ? <>línea, todo el turno <b className="font-semibold text-foreground/80">{fmtDec(turno)}</b></>
+                : 'línea, todo el turno —'}
           </span>
           {/* La etiqueta del techo ES el control: a 375 px no cabe un lápiz
               extra sin pisarla. */}
@@ -3802,7 +3813,12 @@ export function PublicShiftMonitorPage() {
               que la gente contó en la línea, y ahí se pierde la confianza. */}
           {outside > 0 && (
             <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-muted-foreground">
-              <span className="tabular-nums">{fmtInt(contador.valor)} dentro del turno</span>
+              {/* OJO: `contador.valor` es el TOTAL y ya incluye lo de afuera: la
+                  pantalla decía «13.689 dentro del turno + 288 fuera» cuando
+                  dentro fueron 13.401. Quien sumaba no le daba, y este bloque
+                  existe justamente para que el total cuadre con lo que la gente
+                  contó en la línea. */}
+              <span className="tabular-nums">{fmtInt(Math.max(0, contador.valor - outside))} dentro del turno</span>
               <span className="text-muted-foreground/80">+</span>
               <Pill tone="warning" className="tabular-nums normal-case">
                 {fmtInt(outside)} fuera del horario
@@ -4004,7 +4020,14 @@ export function PublicShiftMonitorPage() {
               corteMs={serieDelTurno.length
                 ? Date.parse(serieDelTurno[serieDelTurno.length - 1]!.t) + 5 * 60_000
                 : null}
-              pulso={data.pulse ?? null}
+              /* ⚠ El pulso SOLO si el contador vivo está respondiendo. Con el
+                 contador caído, `totalCycles` viene 0 y `cpm` viene 0 —no
+                 null—, así que el chip pintaba «0,0 · ahora mismo · 15:30» dos
+                 renglones debajo del aviso que dice, literalmente, que el
+                 contador no está respondiendo. Un cero que es ausencia de dato
+                 presentado como medición. `elegirContador` ya hace ese juicio:
+                 si cayó al derivado, no hay pulso que mostrar. */
+              pulso={contador.fuente === 'pulso' ? (data.pulse ?? null) : null}
               /* El objetivo, en la MISMA base que el ritmo: el requerido de
                  `pace` es sobre el reloj útil que queda, y se convierte a
                  «andando» con el uptime real del turno. */

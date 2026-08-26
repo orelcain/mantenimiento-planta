@@ -242,8 +242,6 @@ export function TiempoDelTurno({
    * esa cifra se le imputa a Mantención. El respaldo al promedio solo entra
    * para causas que no vengan calculadas.
    */
-  const sinRedondear = (reason: string, min: number) =>
-    porCausa.get(reason)?.piezas ?? (cpm ? min * cpm : 0)
   /*
    * El total se SUMA de las mismas filas de abajo. Calcularlo aparte
    * (recoverableMin x promedio) daba un titular que no cuadraba con su propio
@@ -254,11 +252,46 @@ export function TiempoDelTurno({
    * fila. Ese resto va al promedio del turno —no se sabe de qué causa es— y
    * sin él el titular se quedaría corto justo cuando la línea está parada.
    */
-  const restoMin = Math.max(0, tb.recoverableMin - tb.recoverable.reduce((a, x) => a + x.min, 0))
+  /*
+   * OJO OJO: MINUTOS DE LÍNEA, no de máquina.
+   *
+   * `min` son los minutos que la causa estuvo activa en ALGUNA máquina;
+   * `lineMin`, los que además frenaron la línea entera. Con tres Baader los dos
+   * se separan muchísimo. Turno 2 del 26-08, medido del payload:
+   *
+   *     KNURO 88/8 · Micro Detencion 39/3 · Detencion 10/3 · LOGICA 8/0 ·
+   *     ACUMULACION RECHAZO 6/5   →  suma 151 de máquina contra 12 de línea
+   *
+   * Sumando `min` la pantalla decía «Paradas 2.066 pz» cuatro renglones arriba
+   * de «las paradas evitables llevan 12 min con la línea entera detenida»:
+   * 172 pz/min en una línea que da 45. `cascadaTurno` ya usaba `lineMin` — eran
+   * dos varas para lo mismo en la misma pantalla.
+   *
+   * Solo los minutos de línea se traducen a piezas que no pasaron por el sensor.
+   */
+  const minDeLinea = (x: { min: number; lineMin?: number | null }) => Math.max(0, x.lineMin ?? x.min)
+  /*
+   * El RITMO sigue siendo el local —el que la línea traía justo antes de esa
+   * parada, que `monitorPerdidas` calcula por causa— y solo se corrigen los
+   * MINUTOS. Valorizar con el promedio del turno sería el error opuesto: una
+   * parada de 27 min a 9 pz/min cuesta 243 pz, no las 351 del promedio.
+   */
+  const cpmDeCausa = (reason: string) => porCausa.get(reason)?.cpm ?? cpm ?? 0
+  /*
+   * Y los `lineMin` de las causas tampoco se descuentan ENTRE SÍ: dos causas
+   * distintas pueden frenar la línea en el mismo minuto. En el turno del 26-08
+   * suman 19 mientras `recoverableMin` —el total de línea, el que cierra la
+   * ventana (475 = 392 + 61 + 12 + 10)— dice 12. Se escalan para que sumen ese
+   * total: así el titular cuadra con los minutos que la propia pantalla dice
+   * dos renglones más abajo, y la proporción entre causas se conserva.
+   */
+  const sumaLinea = tb.recoverable.reduce((a, x) => a + minDeLinea(x), 0)
+  const escala = sumaLinea > tb.recoverableMin && sumaLinea > 0 ? tb.recoverableMin / sumaLinea : 1
+  const restoMin = Math.max(0, tb.recoverableMin - sumaLinea)
   const crudas =
     cpm == null
       ? null
-      : tb.recoverable.reduce((a, x) => a + sinRedondear(x.reason, x.min), 0) + restoMin * cpm
+      : tb.recoverable.reduce((a, x) => a + minDeLinea(x) * escala * cpmDeCausa(x.reason), 0) + restoMin * cpm
   /*
    * La vara de la resta. Cerrado: la meta completa. En vivo: la cuota A ESTA
    * ALTURA (la misma curva del comparador, aplanada en colación) — contra la
@@ -394,7 +427,11 @@ export function TiempoDelTurno({
                * perdieron 794 pz en la colación», que es falso. Su peso se dice
                * igual, con el denominador nombrado: % DEL TURNO, no de la meta.
                */
-              ...(grupoProgramado ? [{ p: 'programado' as const, nombre: 'Programado', valor: fmtDurMin(grupoProgramado.min), pct: tb.windowMin > 0 ? `${Math.round((grupoProgramado.min / tb.windowMin) * 100)}% turno` : null, tick: 'bg-muted-foreground' }] : []),
+              /* `tb.plannedMin` y no `grupoProgramado.min`: el grupo suma los
+                 minutos por MÁQUINA (66+9+6 = 81) y el desglose de línea dice
+                 61. Mostrar 81 además rompía el reparto — 392 produciendo + 81
+                 + 12 se pasa de los 475 de ventana. */
+              ...(grupoProgramado ? [{ p: 'programado' as const, nombre: 'Programado', valor: fmtDurMin(tb.plannedMin), pct: tb.windowMin > 0 ? `${Math.round((tb.plannedMin / tb.windowMin) * 100)}% turno` : null, tick: 'bg-muted-foreground' }] : []),
             ]).map((f, i) => (
               <div key={f.p} className={i > 0 ? 'border-t border-border/60' : ''}>
                 <button
@@ -563,7 +600,7 @@ export function TiempoDelTurno({
                           en el convenio no se produce: la meta ya se reparte descontándolo. Por eso
                           su peso se mide en tiempo — {tb.windowMin > 0 && (
                             <span className="tabular-nums">
-                              {Math.round((grupoProgramado.min / tb.windowMin) * 100)}%
+                              {Math.round((tb.plannedMin / tb.windowMin) * 100)}%
                             </span>
                           )} del turno.
                         </p>
