@@ -56,6 +56,7 @@ import {
   type Ventana as VentanaPareto,
 } from '@/services/shoplogix/monitorPareto'
 import { parseShiftDocId } from '@/services/shoplogix/shoplogixShift.service'
+import { horaDeLaCuota } from '@/services/shoplogix/horaDeLaCuota'
 import { horaMasFloja, type ParadaConHora } from '@/services/shoplogix/horaMasFloja'
 import { objetivoDelTurno, type OrigenObjetivo } from '@/services/shoplogix/objetivoDelTurno'
 import { agruparEventos } from '@/services/shoplogix/monitorEventos'
@@ -1407,9 +1408,11 @@ function CierreDelTurno({ cierre, muestras, fuente, plantSlug, shiftName, startA
 
 function RitmoNecesario({
   pace, cierre, muestras, fuente, plantSlug, shiftName, startAt, historial, horizonte, vsAyer,
-  llenado, onGuardarCuota, origenObjetivo, turnosObjetivo,
+  llenado, onGuardarCuota, origenObjetivo, turnosObjetivo, detenida,
 }: {
   pace: PaceToTarget | null
+  /** Hace cuánto que la línea no produce, si está parada ahora mismo. */
+  detenida?: string | null
   /** De dónde salió la vara cuando no hay cuota: ver `objetivoDelTurno`. */
   origenObjetivo?: OrigenObjetivo | null
   /** Cuántos turnos cerrados respaldan esa mediana. */
@@ -1519,13 +1522,26 @@ function RitmoNecesario({
           Faltan <span className="tabular-nums">{fmtInt(pace.remainingPieces)} pz</span> para{' '}
           {pace.targetSource === 'cuota' ? 'la meta' : 'lo esperado'}
         </p>
+        {/* OJO: es el ritmo del TURNO andando, no el de ahora. Decía «al ritmo
+            de ahora (36,3)» con la línea detenida hacía 17 minutos y el mismo
+            monitor mostrando 0,0 pz/min tres bloques abajo — dos verdades
+            contradictorias en una pantalla. */}
         <p className="mt-0.5 text-[12px] text-muted-foreground">
-          Al ritmo de ahora ({fmtDec(pace.currentPerHour / 60)} pz/min andando) son unos{' '}
+          Al ritmo del turno ({fmtDec(pace.currentPerHour / 60)} pz/min andando) son unos{' '}
           <span className="tabular-nums text-foreground/90">
             {fmtDurationSec((pace.extraMinutesNeeded ?? 0) * 60)}
           </span>{' '}
           más.
         </p>
+        {/* Y si la línea NO está andando, la cuenta de arriba es hipotética:
+            proyectar horas extra sobre una línea parada manda a esperar algo
+            que no está pasando. */}
+        {detenida && (
+          <p className="mt-0.5 text-[12px] text-ink-crit">
+            Pero la línea no está produciendo {detenida}: esa cuenta supone que
+            vuelve a arrancar.
+          </p>
+        )}
         {/* También en hora extra: es cuando más se pregunta "¿por qué no va más
             rápido?", y la respuesta sigue siendo el llenado, no la velocidad. */}
         {llenado && (
@@ -2164,7 +2180,11 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
             más abajo, sin nada que explicara la diferencia. */}
         <span className="text-[15px] text-muted-foreground">
           pz/min andando
-          {!parada && <span className="text-[12px] text-muted-foreground/70"> · últimos 15 min</span>}
+          {!parada && (
+            <span className="text-[12px] text-muted-foreground/70">
+              {cerrado ? ' · últimos 15 min del turno' : ' · últimos 15 min'}
+            </span>
+          )}
         </span>
         {parada ? (
           <span className="ml-auto inline-flex items-center gap-1 text-[12px] font-medium text-ink-crit">
@@ -2294,7 +2314,12 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
           de decidir. Solo aparece si el backend publicó un ritmo — cuando el
           contador salta o no llega, `cpm` viene null y acá no se muestra nada
           en vez de mentir con un cero. */}
-      {pulso?.cpm != null && (
+      {/* OJO: el pulso es el latido de AHORA. Mirando un turno CERRADO de ayer
+          seguía apareciendo con la hora del reloj actual: «0,0 · ahora mismo ·
+          05:15» debajo de un turno que terminó a las 16:05 del día anterior,
+          pegado a «Últimos 15 min · hasta las 16:05». Dos horas contradictorias
+          a un centímetro. En un turno cerrado no hay «ahora mismo». */}
+      {!cerrado && pulso?.cpm != null && (
         <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-border px-3 py-1">
           <span className="inline-block size-1.5 rounded-full bg-emerald-500" />
           <span className="text-[13px] font-semibold tabular-nums text-foreground">{fmtDec(pulso.cpm)}</span>
@@ -2561,6 +2586,22 @@ export function PublicShiftMonitorPage() {
   const inicioReal = serieDelTurno[0]?.t ?? live?.scheduledStart
 
   const esActual = idx === 0
+
+  /*
+   * Un turno que NO es el vigente está cerrado, se haya sellado o no.
+   *
+   * Medido en el historial publicado: de 6 turnos cacheados, `2026-08-24_Turno
+   * 1` quedó con `shiftClosed: false` y `status: 'produciendo'` — el snapshot
+   * se tomó con el turno corriendo y nunca se re-selló al cerrar. Resultado: al
+   * deslizar a ese turno de anteayer la cabecera decía **Produciendo** con el
+   * punto latiendo, aparecía el pulso vivo («0,0 · ahora mismo · 05:17» bajo un
+   * turno que terminó el lunes) y se calculaba «hora extra» contra el reloj de
+   * hoy.
+   *
+   * No se arregla esperando que el cache se rearme: si estás mirando un turno
+   * anterior, ese turno terminó. Es verdad por construcción.
+   */
+  const turnoCerrado = Boolean(live?.shiftClosed) || !esActual
 
   /* Supervisor logueado mirando el monitor: puede editar el set point inline
      (mismo patrón que el «Cambiar» del cierre). Las reglas de Firestore son la
@@ -2900,6 +2941,13 @@ export function PublicShiftMonitorPage() {
    * agrupadas por dueño para la cascada; acá se las necesita sueltas para
    * cruzarlas con la hora que se hundió (ver `horaMasFloja`).
    */
+  /* La hora que nombra la cuota acumulada; se topa en el cierre y se lee en
+     hora de PLANTA. El porqué, en `horaDeLaCuota`. */
+  const horaDeCuota = useMemo(
+    () => horaDeLaCuota(live?.plannedEnd, ahoraWallMs),
+    [live?.plannedEnd, ahoraWallMs],
+  )
+
   const paradasDelTurno = useMemo<ParadaConHora[]>(
     () => (gruposEventos ?? []).flatMap((g) =>
       g.causas.flatMap((c) => c.paradas.map((p) => ({
@@ -3522,8 +3570,8 @@ export function PublicShiftMonitorPage() {
             {/* Con el turno CERRADO no se anuncia el estado en vivo: «Detenida»
                 junto a «Turno cerrado» son dos estados a la vez, y a 375 px
                 empujaban la fecha a una tercera línea. */}
-            {!live.shiftClosed && <StatusPill live={live} />}
-            {live.shiftClosed && (
+            {!turnoCerrado && <StatusPill live={live} />}
+            {turnoCerrado && (
               <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
                 Turno cerrado
               </span>
@@ -3776,10 +3824,13 @@ export function PublicShiftMonitorPage() {
           {/* Fuera del bloque de la meta: la recomendación también aplica
               cuando el link se creó sin cuota, midiendo contra lo que el sensor
               espera del turno — que es la mayoría de los links repartidos. */}
-          {!live.shiftClosed && <RitmoNecesario
+          {!turnoCerrado && <RitmoNecesario
             pace={pace}
             origenObjetivo={objetivoSensor?.origen ?? null}
             turnosObjetivo={objetivoSensor?.turnos ?? null}
+            detenida={live.machinesProducing === 0 && !live.shiftClosed && live.currentSinceAt
+              ? fmtAgoWall(live.currentSinceAt, now)
+              : null}
             /* La cuota se edita desde el monitor porque cambia turno a turno.
                Solo con sesión de admin y en el turno en curso: quien abre el
                link sigue viendo una pantalla de solo lectura. */
@@ -3871,7 +3922,7 @@ export function PublicShiftMonitorPage() {
             <PulsoVivo
               pulse={data.pulse}
               token={token ?? ''}
-              cerrado={live.shiftClosed}
+              cerrado={turnoCerrado}
               onPulso={p => setData(d => (d ? { ...d, pulse: p } : d))}
             />
             {/* «Dónde se fueron las piezas»: el análisis táctico del turno. Va
@@ -3918,7 +3969,7 @@ export function PublicShiftMonitorPage() {
               turno={turnoCpm}
               setCpm={setCpmVigente}
               techoDemostrado={ritmoAndando.mejor}
-              cerrado={live.shiftClosed}
+              cerrado={turnoCerrado}
               contexto={contexto}
               chispa={turnoCpm != null && banda
                 ? <Chispa turnos={banda.turnos} hoy={turnoCpm} banda={banda.ritmo} />
@@ -4078,13 +4129,13 @@ export function PublicShiftMonitorPage() {
                  En vivo la vara es la cuota a ESTA altura (la curva del
                  comparador, aplanada en colacion) - contra la meta completa,
                  el "ritmo" absorberia lo que aun no se juega. */
-              cerrado={live.shiftClosed}
+              cerrado={turnoCerrado}
               meta={data.targetPieces ?? live.quotaPieces ?? metaSensor}
               hechas={live.totalPieces}
               piezasPulso={data.pulse?.totalCycles ?? null}
               corteHora={horaPlanta(live.lastSyncAt ? Date.parse(live.lastSyncAt) - new Date().getTimezoneOffset() * 60_000 : null)}
               cuotaAhora={comparacion.optimalAtCurrentMinute}
-              horaAhora={`${String(new Date(now).getHours()).padStart(2, '0')}:${String(new Date(now).getMinutes()).padStart(2, '0')}`}
+              horaAhora={horaDeCuota}
               cpmAndando={
                 live.timeBreakdown && live.timeBreakdown.producingMin > 0
                   ? live.totalPieces / live.timeBreakdown.producingMin
@@ -4190,13 +4241,13 @@ export function PublicShiftMonitorPage() {
                  En vivo la vara es la cuota a ESTA altura (la curva del
                  comparador, aplanada en colacion) - contra la meta completa,
                  el "ritmo" absorberia lo que aun no se juega. */
-              cerrado={live.shiftClosed}
+              cerrado={turnoCerrado}
               meta={data.targetPieces ?? live.quotaPieces ?? metaSensor}
               hechas={live.totalPieces}
               piezasPulso={data.pulse?.totalCycles ?? null}
               corteHora={horaPlanta(live.lastSyncAt ? Date.parse(live.lastSyncAt) - new Date().getTimezoneOffset() * 60_000 : null)}
               cuotaAhora={comparacion.optimalAtCurrentMinute}
-              horaAhora={`${String(new Date(now).getHours()).padStart(2, '0')}:${String(new Date(now).getMinutes()).padStart(2, '0')}`}
+              horaAhora={horaDeCuota}
               cpmAndando={
                 live.timeBreakdown && live.timeBreakdown.producingMin > 0
                   ? live.totalPieces / live.timeBreakdown.producingMin
