@@ -142,6 +142,20 @@ export function pintarRango(capa: string, desde: number, hasta: number, valor: s
   return out.join('')
 }
 
+/**
+ * Pinta un rango escrito como lo dice la gente: «de 22:00 a 02:00», «de 19:00 a
+ * 00:00», «de 00:00 a 00:00» para el día entero.
+ *
+ * El caso que se escapa es la medianoche: 24:00 se escribe 00:00, así que un fin
+ * en 0 puede significar «hasta el final del día» o «el día completo», y sin
+ * distinguirlos «19:00 a 00:00» no pinta nada.
+ */
+export function pintarHoras(capa: string, desde: number, hasta: number, valor: string): string {
+  if (desde === hasta) return valor.repeat(SLOTS_POR_DIA) // día completo
+  const fin = hasta === 0 ? SLOTS_POR_DIA : hasta
+  return pintarRango(capa, desde, fin, valor)
+}
+
 export function pintarSlot(capa: string, slot: number, valor: string): string {
   if (slot < 0 || slot >= SLOTS_POR_DIA) return capa
   return capa.slice(0, slot) + valor + capa.slice(slot + 1)
@@ -345,6 +359,38 @@ export function baseDia(perfil: PerfilOperacion, dia: number): DiaRueda {
 
 export function baseSemana(perfil: PerfilOperacion): DiaRueda[] {
   return Array.from({ length: 7 }, (_, d) => baseDia(perfil, d))
+}
+
+/**
+ * Copia el día completo —ocupación e intervenciones— a otros días.
+ *
+ * Cargar el horario real a mano son 7 días por máquina, y en una planta con seis
+ * equipos eso son 42 días de pintado: nadie lo hace, y el módulo se queda con la
+ * base de ejemplo para siempre. De lunes a viernes suele repetirse el mismo
+ * patrón, así que copiar es la diferencia entre cargarlo y no cargarlo.
+ */
+export function copiarDia(maquina: MaquinaRueda, origen: number, destinos: number[]): MaquinaRueda {
+  const dia = maquina.semana[origen]
+  if (!dia) return maquina
+  const set = new Set(destinos.filter((d) => d !== origen && d >= 0 && d < 7))
+  if (!set.size) return maquina
+  return {
+    ...maquina,
+    semana: maquina.semana.map((d, i) => (set.has(i) ? { areas: dia.areas, mant: dia.mant } : d)),
+  }
+}
+
+/**
+ * Trae la semana entera de otra máquina. El estado de confirmación NO viaja: el
+ * horario copiado sigue sin verificarse contra la operación de ESTA máquina, y
+ * heredar el visto bueno de la otra sería dar por confirmado lo que nadie miró.
+ */
+export function copiarSemanaDesde(destino: MaquinaRueda, origen: MaquinaRueda): MaquinaRueda {
+  return {
+    ...destino,
+    semana: origen.semana.map((d) => ({ areas: d.areas, mant: d.mant })),
+    revisadoEnTerreno: false,
+  }
 }
 
 /** Cuántas máquinas tienen el horario confirmado contra la operación real. */
