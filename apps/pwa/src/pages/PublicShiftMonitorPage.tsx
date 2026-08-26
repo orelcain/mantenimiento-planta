@@ -2932,6 +2932,17 @@ export function PublicShiftMonitorPage() {
            la misma base de `monitorCompare`. Con él, cada parada sabe
            dónde cae en el gráfico y se puede saltar a ella sola. */
         t0: serieDelTurno[0]?.t ?? null,
+        /* La ventana del turno: una parada que arranca antes del primer dato
+           solo aporta lo que cae adentro. El caso medido, en
+           `paradasDentroDelTurno.test.ts`. */
+        ventana: {
+          desdeMs: serieDelTurno[0]?.t ? Date.parse(serieDelTurno[0].t) : null,
+          hastaMs: (() => {
+            const ult = serieDelTurno[serieDelTurno.length - 1]?.t
+            // El último punto abre su tramo de 5 min: la ventana llega a su fin.
+            return ult ? Date.parse(ult) + 5 * 60_000 : null
+          })(),
+        },
       }),
     [live, costoParadas, serieDelTurno],
   )
