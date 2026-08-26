@@ -56,6 +56,7 @@ import {
   type Ventana as VentanaPareto,
 } from '@/services/shoplogix/monitorPareto'
 import { parseShiftDocId } from '@/services/shoplogix/shoplogixShift.service'
+import { horaMasFloja, type ParadaConHora } from '@/services/shoplogix/horaMasFloja'
 import { objetivoDelTurno, type OrigenObjetivo } from '@/services/shoplogix/objetivoDelTurno'
 import { agruparEventos } from '@/services/shoplogix/monitorEventos'
 import { costoDeParadas } from '@/services/shoplogix/monitorPerdidas'
@@ -1957,9 +1958,17 @@ function RitmoNecesario({
  * así que sus piezas no se comparan de igual a igual con las de una hora
  * entera — el ritmo sí.
  */
-function PorHora({ series }: { series: PublicMonitorLive['series'] }) {
+function PorHora({ series, paradas }: {
+  series: PublicMonitorLive['series']
+  /** Todas las paradas del turno, para poder explicar la hora que se hundió. */
+  paradas?: ParadaConHora[] | null
+}) {
   const rows = useMemo(() => buildHourlyRows(series), [series])
   const max = useMemo(() => peakPieces(rows), [rows])
+  /* La hora que se hundió y qué se la comió: el desplome estaba en el listado
+     sin ninguna marca (h5 con 379 pz entre horas de ~2.100) y su causa vivía
+     cuatro bloques más abajo. Ver `horaMasFloja`. */
+  const floja = useMemo(() => horaMasFloja(rows, paradas), [rows, paradas])
   if (rows.length === 0) return null
 
   return (
@@ -1978,7 +1987,9 @@ function PorHora({ series }: { series: PublicMonitorLive['series'] }) {
             {/* El nº de hora de TURNO manda, y el tramo de reloj va al lado para
                 poder cruzarlo con lo que dijo el supervisor. La hora 1 de un
                 turno que arrancó 07:45 va a las 08:45, no a las 08:00. */}
-            <span className="w-6 shrink-0 tabular-nums text-muted-foreground">h{r.index}</span>
+            <span className={`w-6 shrink-0 tabular-nums ${
+              floja?.index === r.index ? 'font-semibold text-ink-crit' : 'text-muted-foreground'
+            }`}>h{r.index}</span>
             <span className="w-[5.5rem] shrink-0 whitespace-nowrap tabular-nums text-[11px] text-muted-foreground/70">
               {fmtWallTime(r.from)}–{fmtWallTime(r.to)}
             </span>
@@ -2007,6 +2018,22 @@ function PorHora({ series }: { series: PublicMonitorLive['series'] }) {
           </li>
         ))}
       </ul>
+      {/* Con ocho números en columna, el desplome solo se ve restando de
+          cabeza. Se dice cuál fue y, si una parada lo explica, cuál. */}
+      {floja && (
+        <p className="mt-2 text-[12px] text-foreground/90">
+          La hora más floja fue la <b className="text-ink-crit">h{floja.index}</b>
+          {' '}con <span className="tabular-nums">{fmtInt(floja.pieces)} pz</span>,
+          {' '}<span className="tabular-nums">{Math.round(floja.caidaPct)}%</span> bajo lo habitual del turno
+          {floja.culpable
+            ? (<> · se la comió <b>{floja.culpable.reason}</b> desde
+              las <span className="tabular-nums">{floja.culpable.hora.slice(0, 5)}</span>
+              {' '}(<span className="tabular-nums">{Math.round(floja.culpable.min)} min</span> dentro de esa hora)</>)
+            /* Sin una parada que la explique no se inventa un culpable: puede
+               ser alimentación aguas arriba, y eso no lo sabe esta pantalla. */
+            : '. Ninguna parada registrada la explica.'}
+        </p>
+      )}
       <p className="mt-2 text-[11px] text-muted-foreground/70">
         Horas corridas desde el arranque, como cuenta Shoplogix: la hora 1 va del
         primer ciclo a +60 min.
@@ -2131,7 +2158,14 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
         <span className="text-[42px] font-semibold leading-none tabular-nums text-foreground">
           {parada ? '0,0' : ahora != null ? fmtDec(ahora) : '—'}
         </span>
-        <span className="text-[15px] text-muted-foreground">pz/min andando</span>
+        {/* OJO: la ventana del número grande, pegada al número. Son los últimos 15
+            minutos, no el promedio del turno: sin decirlo se leía «14,1» arriba
+            y «suma 35,1» (las tres Baader del turno entero) tres centímetros
+            más abajo, sin nada que explicara la diferencia. */}
+        <span className="text-[15px] text-muted-foreground">
+          pz/min andando
+          {!parada && <span className="text-[12px] text-muted-foreground/70"> · últimos 15 min</span>}
+        </span>
         {parada ? (
           <span className="ml-auto inline-flex items-center gap-1 text-[12px] font-medium text-ink-crit">
             <span className="inline-block size-1.5 rounded-full bg-current" />
@@ -2157,6 +2191,13 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
           entre ambos delata a la que se quedó atrás. */}
       {maquinas && maquinas.maquinas.length > 1 && (
         <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[12px]">
+          {/* OJO: la ventana, siempre. El número grande es de los últimos minutos y
+              estas tres son del turno ENTERO: pegadas y sin rótulo, se leía
+              «14,1 andando» arriba y «suma 35,1» abajo, que fue exactamente la
+              pregunta de Orel («esos dos ritmos, ¿por qué son distintos?»). */}
+          <span className="basis-full text-[11px] text-muted-foreground/70">
+            Cada máquina, en todo el turno:
+          </span>
           {maquinas.maquinas.map((m) => (
             <span key={m.nombre} className="text-muted-foreground" title={`${m.nombre}: ${fmtInt(m.piezas)} pz`}>
               {nombreCorto(m.nombre)}{' '}
@@ -2852,6 +2893,19 @@ export function PublicShiftMonitorPage() {
         t0: serieDelTurno[0]?.t ?? null,
       }),
     [live, costoParadas, serieDelTurno],
+  )
+
+  /*
+   * Todas las paradas del turno, aplanadas y con su hora de planta. Ya están
+   * agrupadas por dueño para la cascada; acá se las necesita sueltas para
+   * cruzarlas con la hora que se hundió (ver `horaMasFloja`).
+   */
+  const paradasDelTurno = useMemo<ParadaConHora[]>(
+    () => (gruposEventos ?? []).flatMap((g) =>
+      g.causas.flatMap((c) => c.paradas.map((p) => ({
+        reason: c.reason, hora: p.hora, hasta: p.hasta, min: p.min,
+      })))),
+    [gruposEventos],
   )
 
   /*
@@ -4184,7 +4238,7 @@ export function PublicShiftMonitorPage() {
           turno={turnoPareto ?? vista?.shiftId ?? null} onTurno={setTurnoPareto}
         />
 
-        <PorHora series={serieDelTurno} />
+        <PorHora series={serieDelTurno} paradas={paradasDelTurno} />
 
         {/* Desglose por máquina — solo aporta cuando la línea tiene más de una */}
         {live.machines.length > 1 && (
