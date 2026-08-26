@@ -675,7 +675,7 @@ function normShiftName(s) {
 }
 
 async function loadPlannedShift(db, plantSlug, shiftId, scheduledStart) {
-  const vacio = { plannedEnd: null, quotaPieces: null, setPoint: null }
+  const vacio = { plannedEnd: null, quotaPieces: null, setPoint: null, pesoPromedioKg: null, quotaOrigen: null }
   if (!shiftId || !scheduledStart) return vacio
   /*
    * Cada `plantSlug` del monitor es UNA línea, así que el id de config se
@@ -734,9 +734,28 @@ async function loadPlannedShift(db, plantSlug, shiftId, scheduledStart) {
      */
     const quota = Number(entry.quota?.value)
     const enPiezas = entry.quota?.unit === 'pieces'
+    /*
+     * El peso promedio del pescado, cargado a mano durante el turno.
+     *
+     * ⚠ Shoplogix cuenta CICLOS, no kilos: en todo el payload no hay un solo
+     * campo de peso. Pero producción pide TONELADAS —"70 t", y cuántas piezas
+     * son depende del calibre del día— y las toneladas reales salen del Excel
+     * del Grader, que no es en vivo. Con este peso el monitor puede estimar en
+     * vivo cuántas toneladas van y cuántas darían al cierre.
+     */
+    const pesoRaw = Number(entry.pesoPromedioKg)
+    const pesoPromedioKg = Number.isFinite(pesoRaw) && pesoRaw > 0 ? pesoRaw : null
+    const origen = entry.quotaOrigen && Number(entry.quotaOrigen.toneladas) > 0
+      ? {
+        toneladas: Number(entry.quotaOrigen.toneladas),
+        pesoPromedioKg: Number(entry.quotaOrigen.pesoPromedioKg) || null,
+      }
+      : null
     return {
       plannedEnd: end,
       setPoint,
+      pesoPromedioKg,
+      quotaOrigen: origen,
       quotaPieces: enPiezas && Number.isFinite(quota) && quota > 0 ? quota : null,
       /*
        * `endPinned` lo marca quien fija el cierre A PROPÓSITO desde el monitor.
@@ -1279,7 +1298,7 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
    */
   const shiftIdActual = parent.shiftId ?? machines[0]?.shiftId
   const cfg = await loadPlannedShift(db, plantSlug, shiftIdActual, scheduledStart)
-  const planned = { quotaPieces: cfg.quotaPieces }
+  const planned = { quotaPieces: cfg.quotaPieces, pesoPromedioKg: cfg.pesoPromedioKg ?? null, quotaOrigen: cfg.quotaOrigen ?? null }
   const setPoint = cfg.setPoint ?? null
 
   let plannedEnd = null
@@ -1375,6 +1394,8 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
     paceBestCpm: inferido?.paceBestCpm ?? null,
     paceSamples: inferido?.paceSamples ?? null,
     quotaPieces: planned.quotaPieces,
+    pesoPromedioKg: planned.pesoPromedioKg ?? null,
+    quotaOrigen: planned.quotaOrigen ?? null,
     /*
      * Nombre del turno tal como lo da Shoplogix. Va en el payload para que el
      * monitor pueda fijar el cierre DE ESTE turno sin adivinarlo del id del

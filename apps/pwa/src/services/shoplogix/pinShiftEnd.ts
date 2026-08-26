@@ -152,3 +152,155 @@ export async function setMonitorSetPoint(params: {
     updatedAt: serverTimestamp(),
   }, { merge: true })
 }
+
+/**
+ * La cuota del turno, editable desde el monitor.
+ *
+ * Pedido de Orel (26-08): «la cuota ponla en el monitor para seleccionarla,
+ * porque puede variar — 15.000 por turno u otra cantidad».
+ *
+ * No hace falta inventar dónde guardarla: la cuota YA vive por turno en
+ * `graderModuleConfigs/{docId}.shiftSchedule[].quota = { value, unit }`, y el
+ * backend la publica como `live.quotaPieces`. Esto solo la deja cambiar sin
+ * entrar al panel de configuración, con la línea produciendo.
+ *
+ * Se guarda SIEMPRE en piezas: el backend descarta cualquier cuota que no
+ * venga en `pieces` —una cuota en kilos comparada contra ciclos sería un
+ * disparate— y el monitor mide piezas.
+ *
+ * Como `pinShiftEnd`, escribe en `graderModuleConfigs`, cuyas reglas exigen
+ * supervisor: la comprobación de rol de la UI no es la única defensa.
+ */
+export async function setShiftQuota(params: {
+  plantSlug: PlantSlug | string
+  shiftName: string
+  /** Piezas del turno. `null` borra la cuota y devuelve la del sensor. */
+  piezas: number | null
+  por: string | null
+  /**
+   * Lo que producción pidió de verdad, cuando la cuota vino en toneladas.
+   *
+   * ⚠ Regla de Orel (26-08): «están pidiendo TONELADAS, no cantidad de piezas;
+   * para hacer 70 t depende del peso promedio del pescado, así que a veces la
+   * hacen con 15.000 o más». El monitor cuenta piezas —Shoplogix entrega
+   * ciclos, no kilos— así que la meta se guarda convertida, pero con el pedido
+   * original al lado: sin él nadie puede saber de dónde salió el número ni
+   * recalcularlo cuando cambia el calibre.
+   */
+  origen?: { toneladas: number; pesoPromedioKg: number } | null
+}): Promise<void> {
+  const docId = CONFIG_DOC_ID[params.plantSlug]
+  if (!docId) throw new Error(`Línea sin config: ${params.plantSlug}`)
+  if (params.piezas != null && !(params.piezas > 0)) {
+    throw new Error('La cuota tiene que ser un número de piezas mayor que cero.')
+  }
+  // Un dedo de más (150.000 en vez de 15.000) quedaría fijado como meta del
+  // turno y descolocaría todos los porcentajes de la pantalla.
+  if (params.piezas != null && params.piezas > 200_000) {
+    throw new Error('Esa cuota es demasiado alta: revisá el número.')
+  }
+
+  const ref = doc(db, COLLECTION, docId)
+  const snap = await getDoc(ref)
+  const actual: ShiftScheduleEntry[] = Array.isArray(snap.data()?.shiftSchedule)
+    ? (snap.data()!.shiftSchedule as ShiftScheduleEntry[])
+    : []
+
+  const objetivo = normShiftName(params.shiftName)
+  const encontrado = actual.some((e) => normShiftName(e.shiftId) === objetivo)
+  if (!encontrado) {
+    throw new Error(`El turno "${params.shiftName}" no está en el horario de esta línea.`)
+  }
+
+  const siguiente = actual.map((e) => {
+    if (normShiftName(e.shiftId) !== objetivo) return e
+    const resto = { ...e } as ShiftScheduleEntry & { quota?: unknown; quotaPor?: unknown; quotaAt?: unknown }
+    if (params.piezas == null) {
+      delete resto.quota
+      delete resto.quotaPor
+      delete resto.quotaAt
+      delete (resto as { quotaOrigen?: unknown }).quotaOrigen
+      return resto
+    }
+    return {
+      ...resto,
+      quota: { value: params.piezas, unit: 'pieces' },
+      quotaPor: params.por ?? null,
+      quotaAt: new Date().toISOString(),
+      ...(params.origen
+        ? { quotaOrigen: { toneladas: params.origen.toneladas, pesoPromedioKg: params.origen.pesoPromedioKg } }
+        : {}),
+    }
+  })
+
+  await setDoc(ref, { shiftSchedule: siguiente, updatedAt: serverTimestamp() }, { merge: true })
+}
+
+/**
+ * El peso promedio del pescado del turno, que se va ajustando mientras corre.
+ *
+ * Orel (26-08): «pon también el dato para poner el peso promedio además de la
+ * cuota variable… así vamos poniendo el peso promedio durante el turno y
+ * calcula las toneladas más o menos que se pueden lograr, porque las toneladas
+ * las sacamos del Grader y no es en tiempo real ese dato, lo sacamos del Excel».
+ *
+ * Shoplogix cuenta ciclos: sin este número el monitor no puede decir una sola
+ * tonelada. Con él, estima en vivo cuántas van y cuántas darían al cierre — y
+ * si la cuota se había fijado EN TONELADAS, se recalculan las piezas meta con
+ * el peso nuevo, que es justamente lo que cambia cuando cambia el calibre.
+ */
+export async function setPesoPromedio(params: {
+  plantSlug: PlantSlug | string
+  shiftName: string
+  /** Kilos por pieza. `null` lo borra. */
+  pesoKg: number | null
+  por: string | null
+}): Promise<void> {
+  const docId = CONFIG_DOC_ID[params.plantSlug]
+  if (!docId) throw new Error(`Línea sin config: ${params.plantSlug}`)
+  if (params.pesoKg != null && !(params.pesoKg >= 0.5 && params.pesoKg <= 25)) {
+    throw new Error('El peso promedio tiene que estar entre 0,5 y 25 kg.')
+  }
+
+  const ref = doc(db, COLLECTION, docId)
+  const snap = await getDoc(ref)
+  const actual: ShiftScheduleEntry[] = Array.isArray(snap.data()?.shiftSchedule)
+    ? (snap.data()!.shiftSchedule as ShiftScheduleEntry[])
+    : []
+  const objetivo = normShiftName(params.shiftName)
+  if (!actual.some((e) => normShiftName(e.shiftId) === objetivo)) {
+    throw new Error(`El turno "${params.shiftName}" no está en el horario de esta línea.`)
+  }
+
+  const siguiente = actual.map((e) => {
+    if (normShiftName(e.shiftId) !== objetivo) return e
+    const entry = { ...e } as ShiftScheduleEntry & {
+      pesoPromedioKg?: number
+      pesoPromedioAt?: string
+      pesoPromedioPor?: string | null
+      quota?: { value: number; unit: string }
+      quotaOrigen?: { toneladas: number; pesoPromedioKg: number }
+    }
+    if (params.pesoKg == null) {
+      delete entry.pesoPromedioKg
+      delete entry.pesoPromedioAt
+      delete entry.pesoPromedioPor
+      return entry
+    }
+    entry.pesoPromedioKg = params.pesoKg
+    entry.pesoPromedioAt = new Date().toISOString()
+    entry.pesoPromedioPor = params.por ?? null
+    // La cuota pedida en toneladas se mueve con el calibre: si el pescado sale
+    // más chico, las mismas 70 t son más piezas.
+    if (entry.quotaOrigen?.toneladas) {
+      entry.quota = {
+        value: Math.round((entry.quotaOrigen.toneladas * 1000) / params.pesoKg),
+        unit: 'pieces',
+      }
+      entry.quotaOrigen = { ...entry.quotaOrigen, pesoPromedioKg: params.pesoKg }
+    }
+    return entry
+  })
+
+  await setDoc(ref, { shiftSchedule: siguiente, updatedAt: serverTimestamp() }, { merge: true })
+}

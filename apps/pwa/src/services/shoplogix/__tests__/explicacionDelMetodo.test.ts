@@ -47,9 +47,9 @@ describe('explicacionDelMetodo', () => {
       .toContain('desde esta altura sumaron')
   })
 
-  it('ritmo: avisa que NO descuenta colaciones — que es lo que lo dispara', () => {
+  it('ritmo: dice que la colación queda fuera (regla de Orel: es tiempo fuera de proceso)', () => {
     const texto = explicacionDelMetodo('ritmo', HISTORIA, 180)
-    expect(texto).toContain('sin descontar colaciones')
+    expect(texto).toContain('sin contar colaciones')
   })
 
   it('ninguna explicación culpa al horario', () => {

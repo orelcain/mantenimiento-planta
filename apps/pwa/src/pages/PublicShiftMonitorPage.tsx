@@ -43,7 +43,7 @@ import { construirCascada } from './monitor/cascadaTurno'
 import { horaPlanta } from './monitor/horaPlanta'
 import { CascadaTurnoCard } from './monitor/CascadaTurnoCard'
 import { mediaMovil, ritmoAhoraCpm, ritmoAhoraAndando, estadoRitmo, fraccionDeRegla, pedidoAndando, pedidoFueraDeAlcance } from '@/services/shoplogix/monitorRitmo'
-import { pinShiftEnd, unpinShiftEnd, setMonitorSetPoint } from '@/services/shoplogix/pinShiftEnd'
+import { pinShiftEnd, unpinShiftEnd, setMonitorSetPoint, setShiftQuota, setPesoPromedio } from '@/services/shoplogix/pinShiftEnd'
 import {
   buildDayComparison, optimalPace, plannedBreaks, mergeBreaks, cumulativeFromStart,
   breakMinutesBetween, extendOngoingBreaks,
@@ -72,6 +72,8 @@ import { Button } from '@/components/ui/button'
 import { ReAuthConfirmDialog } from '@/components/admin/ReAuthConfirmDialog'
 import { getFunctions, httpsCallable } from 'firebase/functions'
 import { ritmoAndandoDeLinea } from '@/services/shoplogix/ritmoAndandoDeLinea'
+import { piezasDeToneladas, toneladasDePiezas } from '@/services/shoplogix/cuotaEnToneladas'
+import { ritmoPorMaquina, nombreCorto, type RitmosPorMaquina } from '@/services/shoplogix/ritmoPorMaquina'
 
 // ── Formateadores (locales a propósito: esta página no debe arrastrar el
 //    módulo de helpers del Grader, que se lleva echarts al bundle) ───────────
@@ -311,6 +313,208 @@ function Chispa({ turnos, hoy, banda }: {
  * con sesión de supervisor. Pide el MÉTODO además del número — un set point
  * sin cómo se midió es el hardcodeo de vuelta, con otra ropa.
  */
+/**
+ * La cuota del turno, editable en el monitor.
+ *
+ * Pedido de Orel: la cuota cambia —15.000 un turno, otra cosa el siguiente— y
+ * hasta ahora había que entrar a la configuración del módulo para moverla,
+ * mientras la pantalla que la usa está a la vista de producción.
+ *
+ * Solo se ve con sesión de admin y en el turno en curso; el que abre el link
+ * sigue viendo el monitor de solo lectura.
+ */
+/**
+ * El peso promedio del pescado, editable con el turno corriendo.
+ *
+ * Es el dato que convierte piezas en toneladas. Cambia con el calibre del día
+ * y por eso se carga a mano: Shoplogix no manda kilos y el peso real llega
+ * después, por el Excel del Grader.
+ */
+function EditorPeso({ actual, onGuardar }: {
+  actual: number | null
+  onGuardar: (pesoKg: number | null) => Promise<void>
+}) {
+  const [abierto, setAbierto] = useState(false)
+  const [valor, setValor] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [guardando, setGuardando] = useState(false)
+
+  if (!abierto) {
+    return (
+      <button
+        type="button"
+        onClick={() => { setValor(actual != null ? String(actual) : ''); setAbierto(true); setError(null) }}
+        className="tap-44 ml-1 rounded-full border border-border px-2 py-0.5 text-[10px] hover:bg-muted"
+      >
+        {actual != null ? 'Cambiar peso' : 'Poner peso promedio'}
+      </button>
+    )
+  }
+
+  const guardar = async (kg: number | null) => {
+    setGuardando(true)
+    setError(null)
+    try {
+      await onGuardar(kg)
+      setAbierto(false)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo guardar')
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  return (
+    <span className="ml-1 inline-flex flex-wrap items-center gap-1">
+      <input
+        type="number" min={0.5} max={25} step={0.1} inputMode="decimal"
+        value={valor} onChange={(e) => setValor(e.target.value)}
+        placeholder="kg por pieza"
+        className="h-7 w-24 rounded-ctl border border-border bg-background px-2 text-[12px] tabular-nums"
+      />
+      <button
+        type="button" disabled={guardando} onClick={() => guardar(Number(valor))}
+        className="tap-44 rounded-ctl border border-border px-2 py-0.5 text-[11px] font-medium hover:bg-muted disabled:opacity-50"
+      >
+        {guardando ? 'Guardando…' : 'Guardar'}
+      </button>
+      <button
+        type="button" onClick={() => setAbierto(false)}
+        className="tap-44 rounded-ctl px-2 py-0.5 text-[11px] text-muted-foreground hover:text-foreground"
+      >
+        cancelar
+      </button>
+      {error && <span className="w-full text-[11px] text-ink-crit">{error}</span>}
+    </span>
+  )
+}
+
+function EditorCuota({ actual, onGuardar }: {
+  actual: number | null
+  onGuardar: (piezas: number | null, origen?: { toneladas: number; pesoPromedioKg: number } | null) => Promise<void>
+}) {
+  const [abierto, setAbierto] = useState(false)
+  /* Producción pide TONELADAS, así que ese es el modo por defecto: las piezas
+     salen del peso promedio del pescado y cambian turno a turno. */
+  const [modo, setModo] = useState<'toneladas' | 'piezas'>('toneladas')
+  const [valor, setValor] = useState('')
+  const [toneladas, setToneladas] = useState('')
+  const [pesoKg, setPesoKg] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [guardando, setGuardando] = useState(false)
+
+  const convertida = (() => {
+    const t = Number(toneladas)
+    const kg = Number(pesoKg)
+    if (!(t > 0) || !(kg > 0)) return null
+    try { return piezasDeToneladas(t, kg) } catch { return null }
+  })()
+
+  if (!abierto) {
+    return (
+      <button
+        type="button"
+        onClick={() => { setValor(actual != null ? String(actual) : ''); setAbierto(true); setError(null) }}
+        className="tap-44 ml-1 rounded-full border border-border px-2 py-0.5 text-[10px] normal-case tracking-normal hover:bg-muted"
+      >
+        Cambiar cuota
+      </button>
+    )
+  }
+
+  const guardar = async (
+    piezas: number | null,
+    origen?: { toneladas: number; pesoPromedioKg: number } | null,
+  ) => {
+    setGuardando(true)
+    setError(null)
+    try {
+      await onGuardar(piezas, origen)
+      setAbierto(false)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo guardar')
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  return (
+    <span className="ml-1 inline-flex flex-wrap items-center gap-1 normal-case tracking-normal">
+      <span className="inline-flex overflow-hidden rounded-ctl border border-border">
+        {(['toneladas', 'piezas'] as const).map((m) => (
+          <button
+            key={m}
+            type="button"
+            onClick={() => setModo(m)}
+            className={`tap-44 px-2 py-0.5 text-[11px] ${modo === m ? 'bg-primary/[0.15] font-medium text-foreground' : 'text-muted-foreground'}`}
+          >
+            {m === 'toneladas' ? 'toneladas' : 'piezas'}
+          </button>
+        ))}
+      </span>
+      {modo === 'toneladas' ? (
+        <>
+          <input
+            type="number" min={0.1} step={0.5} inputMode="decimal"
+            value={toneladas} onChange={(e) => setToneladas(e.target.value)}
+            placeholder="toneladas"
+            className="h-7 w-24 rounded-ctl border border-border bg-background px-2 text-[12px] tabular-nums"
+          />
+          <input
+            type="number" min={0.5} step={0.1} inputMode="decimal"
+            value={pesoKg} onChange={(e) => setPesoKg(e.target.value)}
+            placeholder="kg por pieza"
+            className="h-7 w-24 rounded-ctl border border-border bg-background px-2 text-[12px] tabular-nums"
+          />
+          {/* Las piezas, a la vista, ANTES de guardar: es el número contra el
+              que va a medir el monitor toda la noche. */}
+          {convertida && (
+            <span className="text-[11px] tabular-nums text-muted-foreground">
+              = <b className="text-foreground">{fmtInt(convertida.piezas)} pz</b>
+            </span>
+          )}
+        </>
+      ) : (
+        <input
+          type="number" min={1} step={100} inputMode="numeric"
+          value={valor} onChange={(e) => setValor(e.target.value)}
+          placeholder="piezas del turno"
+          className="h-7 w-28 rounded-ctl border border-border bg-background px-2 text-[12px] tabular-nums"
+        />
+      )}
+      <button
+        type="button"
+        disabled={guardando || (modo === 'toneladas' && !convertida)}
+        onClick={() => modo === 'toneladas'
+          ? guardar(convertida!.piezas, { toneladas: Number(toneladas), pesoPromedioKg: Number(pesoKg) })
+          : guardar(Number(valor), null)}
+        className="tap-44 rounded-ctl border border-border px-2 py-0.5 text-[11px] font-medium hover:bg-muted disabled:opacity-50"
+      >
+        {guardando ? 'Guardando…' : 'Guardar'}
+      </button>
+      {actual != null && (
+        <button
+          type="button"
+          disabled={guardando}
+          onClick={() => guardar(null, null)}
+          className="tap-44 rounded-ctl px-2 py-0.5 text-[11px] text-muted-foreground underline decoration-dotted hover:text-foreground disabled:opacity-50"
+          title="Vuelve al objetivo que publica Shoplogix"
+        >
+          usar el del sensor
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={() => setAbierto(false)}
+        className="tap-44 rounded-ctl px-2 py-0.5 text-[11px] text-muted-foreground hover:text-foreground"
+      >
+        cancelar
+      </button>
+      {error && <span className="w-full text-[11px] text-ink-crit">{error}</span>}
+    </span>
+  )
+}
+
 function EditorSetPoint({ actual, onGuardar }: {
   actual: number | null
   onGuardar: (cpm: number, metodo: string) => Promise<void>
@@ -1201,9 +1405,11 @@ function CierreDelTurno({ cierre, muestras, fuente, plantSlug, shiftName, startA
 
 function RitmoNecesario({
   pace, cierre, muestras, fuente, plantSlug, shiftName, startAt, historial, horizonte, vsAyer,
-  llenado,
+  llenado, onGuardarCuota,
 }: {
   pace: PaceToTarget | null
+  /** Fijar la cuota del turno desde acá. Solo llega con sesión de admin. */
+  onGuardarCuota?: (piezas: number | null) => Promise<void>
   historial: { medianCpm: number | null; bestCpm: number | null; muestras: number | null } | null
   /**
    * El otro horizonte: hasta dónde llega el pronóstico y con qué cierre. Sin
@@ -1360,6 +1566,12 @@ function RitmoNecesario({
           ({fmtInt(pace.targetPieces)} pz
           {pace.targetSource === 'objetivo-sensor' && ' · objetivo Shoplogix'})
         </span>
+        {onGuardarCuota && (
+          <EditorCuota
+            actual={pace.targetSource === 'cuota' ? Math.round(pace.targetPieces) : null}
+            onGuardar={onGuardarCuota}
+          />
+        )}
       </div>
       {/* El VEREDICTO primero y en grande. Antes todo esto era un párrafo denso
           donde "¿llego o no?" —la única pregunta que importa— había que
@@ -1812,7 +2024,7 @@ function PorHora({ series }: { series: PublicMonitorLive['series'] }) {
  * final de la regla ES lo que falta. No hay que saber que 18 es el techo ni
  * restar 12,5 de 18.
  */
-function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrado, onEditarSetPoint, cerrado, contexto, chispa, corteMs, pulso }: {
+function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrado, onEditarSetPoint, cerrado, contexto, chispa, corteMs, pulso, maquinas, parada }: {
   /**
    * Ritmo de ahora ANDANDO, en pz/min: los últimos 15 min descontando los
    * tramos parados. Va en esta base y no en la de reloj porque es contra lo
@@ -1841,6 +2053,19 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
    * pide la meta ya no es alcanzable.
    */
   techoDemostrado?: number | null
+  /** Cada máquina de la línea, con su ritmo: pedido de Orel (26-08). */
+  maquinas?: RitmosPorMaquina | null
+  /**
+   * La línea NO está produciendo ahora mismo (colación o paro).
+   *
+   * ⚠⚠ Sin esto el número grande MENTÍA: la media móvil corta la cola de ceros
+   * —para que la curva no se desplome al terminar el turno— así que con la
+   * línea parada a mitad de turno seguía mostrando el ritmo de ANTES de parar.
+   * El 26-08, con las tres Baader detenidas desde las 01:34, la tarjeta decía
+   * "25,3 pz/min andando · Últimos 15 min hasta las 01:55" mientras el pulso
+   * marcaba 0,0. Los últimos tres tramos eran 0, 0 y 0.
+   */
+  parada?: { desdeHace: string | null; motivo: string | null } | null
   onEditarSetPoint?: () => void
   cerrado?: boolean
   /** Cómo viene el turno contra los anteriores: el dato que traía la tarjeta
@@ -1891,16 +2116,50 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
           el estado ya lo cuenta la barra (§1.4). */}
       <div className="mt-1 flex flex-wrap items-baseline gap-x-2">
         <span className="text-[42px] font-semibold leading-none tabular-nums text-foreground">
-          {ahora != null ? fmtDec(ahora) : '—'}
+          {parada ? '0,0' : ahora != null ? fmtDec(ahora) : '—'}
         </span>
         <span className="text-[15px] text-muted-foreground">pz/min andando</span>
-        {ahora != null && (
+        {parada ? (
+          <span className="ml-auto inline-flex items-center gap-1 text-[12px] font-medium text-ink-crit">
+            <span className="inline-block size-1.5 rounded-full bg-current" />
+            {parada.motivo ?? 'detenida'}
+          </span>
+        ) : ahora != null && (
           <span className={`ml-auto inline-flex items-center gap-1 text-[12px] font-medium ${colorPunto}`}>
             <span className="inline-block size-1.5 rounded-full bg-current" />
             {palabra}
           </span>
         )}
       </div>
+      {/* Con la línea parada, el ritmo de antes sigue siendo útil —"¿a cuánto
+          veníamos?"— pero como referencia, no como el número de ahora. */}
+      {parada && (
+        <p className="mt-1 text-[12px] text-muted-foreground">
+          Sin producir{parada.desdeHace ? <> <span className="tabular-nums">{parada.desdeHace}</span></> : null}
+          {ahora != null && <> · venía a <span className="tabular-nums text-foreground/90">{fmtDec(ahora)}</span> pz/min</>}
+        </p>
+      )}
+      {/* Cada Baader y los dos agregados: la suma es lo que da la línea con las
+          tres corriendo, el promedio dice cómo viene cada una — y la distancia
+          entre ambos delata a la que se quedó atrás. */}
+      {maquinas && maquinas.maquinas.length > 1 && (
+        <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[12px]">
+          {maquinas.maquinas.map((m) => (
+            <span key={m.nombre} className="text-muted-foreground" title={`${m.nombre}: ${fmtInt(m.piezas)} pz`}>
+              {nombreCorto(m.nombre)}{' '}
+              <b className={`tabular-nums ${m.detenida ? 'text-muted-foreground' : 'text-foreground/90'}`}>
+                {fmtDec(m.cpm)}
+              </b>
+            </span>
+          ))}
+          <span className="text-muted-foreground">
+            suma <b className="tabular-nums text-foreground/90">{fmtDec(maquinas.suma)}</b>
+          </span>
+          <span className="text-muted-foreground">
+            promedio <b className="tabular-nums text-foreground/90">{fmtDec(maquinas.promedio)}</b>
+          </span>
+        </div>
+      )}
 
       {/* ── La regla ──────────────────────────────────────────────────────
           0 → set point. El relleno es AHORA, la marca es el promedio del
@@ -2127,6 +2386,7 @@ export function PublicShiftMonitorPage() {
   /* Los `t` de la serie son wall-clock sellados como UTC; para compararlos con
      el reloj hay que llevar "ahora" a esa misma base (igual que `fmtAgoWall`). */
   const ahoraWallMs = useMemo(() => now - new Date(now).getTimezoneOffset() * 60_000, [now])
+
 
   // Reloj propio: la frescura ("hace X min") tiene que envejecer a la vista
   // aunque el doc no cambie — si no, un sync caído se ve igual que uno al día.
@@ -2946,8 +3206,14 @@ export function PublicShiftMonitorPage() {
       history: historial,
       targetPieces: metaFc,
       shiftClosed: live?.shiftClosed,
+      /* La colación es tiempo planificado FUERA de proceso: ni la que ya pasó
+         baja el ritmo ni la que falta suma piezas (regla de Orel, 26-08). */
+      convenio: {
+        transcurridoMin: live?.timeBreakdown?.plannedMin ?? 0,
+        porDelanteMin: pace?.pendingBreakMin ?? 0,
+      },
     })
-  }, [live, data?.history, data?.forecastHistory, data?.targetPieces, comparacion.currentMinute, vista?.shiftId])
+  }, [live, data?.history, data?.forecastHistory, data?.targetPieces, comparacion.currentMinute, vista?.shiftId, pace?.pendingBreakMin])
 
   /**
    * Hasta cuándo mide el pronóstico, y cuánto sería si el turno cortara en su
@@ -2963,6 +3229,33 @@ export function PublicShiftMonitorPage() {
    * El minuto 0 es la PRIMERA PIEZA, no `scheduledStart` ni el primer tramo
    * sincronizado: es la misma base con que `monitorCompare` indexa las curvas.
    */
+  /*
+   * Las toneladas estimadas. Shoplogix no manda kilos, así que salen del peso
+   * promedio que alguien carga durante el turno; las reales llegan después por
+   * el Excel del Grader. Se dicen SIEMPRE con "≈" y con el peso a la vista.
+   */
+  const toneladas = useMemo(() => {
+    const pesoKg = Number(live?.pesoPromedioKg)
+    if (!(pesoKg > 0) || !live?.totalPieces) return null
+    const ahoraT = toneladasDePiezas(live.totalPieces, pesoKg)
+    if (ahoraT == null) return null
+    const proyectadas = pace?.projectedPieces != null
+      ? toneladasDePiezas(Math.round(pace.projectedPieces), pesoKg)
+      : null
+    return { ahora: ahoraT, alCierre: live.shiftClosed ? null : proyectadas, pesoKg }
+  }, [live?.pesoPromedioKg, live?.totalPieces, live?.shiftClosed, pace?.projectedPieces])
+
+  const onGuardarPeso = esAdminMonitor && esActual && data?.plantSlug && live?.shiftName
+    ? async (pesoKg: number | null) => {
+      await setPesoPromedio({
+        plantSlug: data.plantSlug!,
+        shiftName: live.shiftName!,
+        pesoKg,
+        por: usuarioActual?.email ?? null,
+      })
+    }
+    : undefined
+
   const horizontePronostico = useMemo(() => {
     const t0raw = serieDelTurno[0]?.t
     if (!pronostico || !t0raw) return null
@@ -3292,6 +3585,32 @@ export function PublicShiftMonitorPage() {
             )}
           </div>
 
+          {/* Las TONELADAS, que es lo que pide producción: "70 t", no piezas.
+              Shoplogix no manda un solo kilo —cuenta ciclos— y las toneladas
+              reales salen del Excel del Grader, que no es en vivo. Con el peso
+              promedio cargado a mano se estiman acá, SIEMPRE dichas como
+              estimación y con el peso que se usó a la vista. */}
+          {toneladas && (
+            <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-[13px]">
+              <span className="tabular-nums font-semibold text-foreground">≈ {fmtDec(toneladas.ahora)} t</span>
+              <span className="text-[12px] text-muted-foreground">
+                estimado con <span className="tabular-nums">{fmtDec(toneladas.pesoKg)} kg</span> por pieza
+              </span>
+              {toneladas.alCierre != null && (
+                <span className="text-[12px] text-muted-foreground">
+                  · al cierre ≈ <span className="tabular-nums text-foreground/90">{fmtDec(toneladas.alCierre)} t</span>
+                </span>
+              )}
+              {onGuardarPeso && <EditorPeso actual={toneladas.pesoKg} onGuardar={onGuardarPeso} />}
+            </div>
+          )}
+          {!toneladas && onGuardarPeso && (
+            <div className="mt-1.5 text-[12px] text-muted-foreground">
+              Sin peso promedio no se pueden estimar toneladas.
+              <EditorPeso actual={null} onGuardar={onGuardarPeso} />
+            </div>
+          )}
+
           {/* Cuando el contador vivo no responde, el número es el derivado de
               los buckets y llega hasta 8 min tarde. Decirlo es la diferencia
               entre un dato viejo y un dato viejo que se hace pasar por vivo. */}
@@ -3380,6 +3699,19 @@ export function PublicShiftMonitorPage() {
               espera del turno — que es la mayoría de los links repartidos. */}
           {!live.shiftClosed && <RitmoNecesario
             pace={pace}
+            /* La cuota se edita desde el monitor porque cambia turno a turno.
+               Solo con sesión de admin y en el turno en curso: quien abre el
+               link sigue viendo una pantalla de solo lectura. */
+            onGuardarCuota={esAdminMonitor && esActual && data.plantSlug && live.shiftName
+              ? async (piezas) => {
+                await setShiftQuota({
+                  plantSlug: data.plantSlug!,
+                  shiftName: live.shiftName!,
+                  piezas,
+                  por: usuarioActual?.email ?? null,
+                })
+              }
+              : undefined}
             cierre={live.plannedEnd}
             muestras={live.plannedEndSamples}
             fuente={live.plannedEndSource}
@@ -3475,6 +3807,16 @@ export function PublicShiftMonitorPage() {
                  los 5 que va a durar: si no, el número de "ahora" queda siempre
                  por debajo del que muestra Shoplogix. */
               ahora={ritmoAhoraAndando(serieDelTurno, ahoraWallMs)}
+              maquinas={ritmoPorMaquina(live.machines)}
+              /* Parada = ninguna máquina produciendo. El pulso lo confirma:
+                 con la línea en colación marca 0,0 mientras el número grande
+                 mostraba el ritmo de antes de parar. */
+              parada={live.machinesProducing === 0 && !live.shiftClosed
+                ? {
+                  desdeHace: live.currentSinceAt ? fmtAgoWall(live.currentSinceAt, now) : null,
+                  motivo: live.currentReason ?? null,
+                }
+                : null}
               ahoraReloj={ritmoAhoraCpm(serieDelTurno, ahoraWallMs)}
               /* Fin del último tramo: la serie viene en hora de planta, igual
                  que el resto de la pantalla. */

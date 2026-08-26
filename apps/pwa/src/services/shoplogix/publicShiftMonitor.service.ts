@@ -110,6 +110,14 @@ export interface PublicMonitorLive {
   paceSamples?: number | null
   /** Cuota del turno según la config del módulo. */
   quotaPieces?: number | null
+  /**
+   * Peso promedio del pescado, kg por pieza, cargado a mano durante el turno.
+   * Shoplogix cuenta ciclos y no manda kilos: sin este dato el monitor no puede
+   * estimar una sola tonelada, y las reales llegan después por el Grader.
+   */
+  pesoPromedioKg?: number | null
+  /** Cuando la cuota se pidió en toneladas: el pedido original. */
+  quotaOrigen?: { toneladas: number; pesoPromedioKg: number | null } | null
   effectiveStart: string | null
   effectiveEnd: string | null
   shiftClosed: boolean
