@@ -1652,6 +1652,22 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Links públicos de la rueda: se comparten con Producción e Higiene, que no
+    // tienen cuenta en la app. Lectura abierta A PROPÓSITO, pero acotada por
+    // reglas a tokens NO vencidos — si la expiración se chequeara solo en el
+    // cliente, el snapshot seguiría siendo legible para siempre. expiresAt es
+    // ISO string, así que timestamp.value() lo compara contra el reloj del
+    // servidor y no contra el del visitante.
+    match /ruedaVentanasPublicTokens/{tokenId} {
+      allow read: if resource.data.expiresAt is string
+        && timestamp.value(resource.data.expiresAt) > request.time;
+      allow create, update: if isTechnician()
+        && request.resource.data.token is string
+        && request.resource.data.expiresAt is string
+        && isValidDocSize();
+      allow delete: if isTechnician();
+    }
+
     match /ganttTasks/{taskId} {
       allow read: if isNotAnonymous();
       allow create: if isTechnician() && isValidGanttTask();

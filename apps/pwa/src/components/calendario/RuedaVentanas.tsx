@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Check, CloudOff, Loader2, RotateCcw, Undo2, Eraser } from 'lucide-react'
 import { ListGroup, ListCell, Pill } from '@/components/piel'
 import { FranjaVentanas } from './FranjaVentanas'
+import { CompartirRueda } from './CompartirRueda'
 import { getCurrentUser } from '@/services/auth'
 import { logger } from '@/lib/logger'
 import { cn } from '@/lib/utils'
@@ -161,6 +162,10 @@ export function RuedaVentanas() {
       .catch((e) => {
         if (!vivo) return
         logger.error('Rueda: no se pudo cargar', e instanceof Error ? e : new Error(String(e)))
+        // Si no se pudo leer, tampoco hay que intentar escribir: sin esto el
+        // autosave veía «cambios» (la base contra un ref vacío) y mandaba una
+        // escritura que nadie pidió, condenada al mismo permission-denied.
+        ultimoGuardadoRef.current = JSON.stringify(estadoInicial().maquinas)
         setSync('local')
       })
     return () => {
@@ -388,8 +393,9 @@ export function RuedaVentanas() {
           </div>
         </div>
 
-        <div className="ml-auto flex items-center gap-2 pb-1">
+        <div className="ml-auto flex items-center gap-3 pb-1">
           <EstadoGuardado estado={sync} detalle={errorTexto} />
+          <CompartirRueda maquinas={state.maquinas} revisadoEnTerreno={state.revisadoEnTerreno === true} />
         </div>
       </div>
 

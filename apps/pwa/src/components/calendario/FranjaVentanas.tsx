@@ -148,6 +148,43 @@ function EjeHoras() {
   )
 }
 
+/**
+ * Leyenda. No es decorativa: sin ella la franja depende SOLO del color, y quien
+ * recibe el link compartido no tiene de dónde deducir qué es cada tono.
+ */
+function LeyendaFranja() {
+  const ocupacion: Array<{ clase: string; label: string; opacidad: number }> = [
+    { clase: 'bg-cat-1-tint', label: 'Proceso', opacidad: 0.5 },
+    { clase: 'bg-cat-7-tint', label: 'Higiene', opacidad: 0.62 },
+    { clase: 'bg-cat-3-tint', label: 'Línea parada', opacidad: 0.45 },
+    { clase: 'bg-muted-foreground', label: 'Sin nadie', opacidad: 0.14 },
+  ]
+  return (
+    <div className="flex flex-col gap-2 px-4 py-3">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+        <span className="text-caption text-muted-foreground">Franja:</span>
+        {ocupacion.map((i) => (
+          <span key={i.label} className="flex items-center gap-1.5 text-footnote text-muted-foreground">
+            <span className={cn('h-3 w-3 rounded-[3px]', i.clase)} style={{ opacity: i.opacidad }} />
+            {i.label}
+          </span>
+        ))}
+      </div>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+        <span className="text-caption text-muted-foreground">Banda inferior:</span>
+        <span className="flex items-center gap-1.5 text-footnote text-muted-foreground">
+          <span className="h-2 w-4 rounded-[2px] bg-cat-4-tint" />
+          Mantención interviene
+        </span>
+        <span className="flex items-center gap-1.5 text-footnote text-muted-foreground">
+          <span className="h-2 w-4 rounded-[2px] bg-destructive" />
+          Con higiene encima
+        </span>
+      </div>
+    </div>
+  )
+}
+
 export interface FranjaVentanasProps {
   maquinas: MaquinaRueda[]
   diaIdx: number
@@ -238,6 +275,11 @@ export function FranjaVentanas({ maquinas, diaIdx, maquinaActivaId }: FranjaVent
           </div>
         </ListGroup>
       )}
+
+      {/* Una sola vez para toda la vista: repetirla por bloque era ruido (§63). */}
+      <div className="rounded-card bg-card">
+        <LeyendaFranja />
+      </div>
     </div>
   )
 }
