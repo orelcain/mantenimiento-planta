@@ -213,7 +213,7 @@ export function agruparEventos(args: {
     args.stopEvents ?? [], args.stopReasons ?? [], Number.isNaN(t0Ms) ? null : t0Ms,
     args.ventana,
   )
-  const costo = new Map((args.costo?.porCausa ?? []).map((c) => [c.reason, c.piezas]))
+  const costoPorCausa = new Map((args.costo?.porCausa ?? []).map((c) => [c.reason, c]))
   const cpm = args.cpmGlobal && args.cpmGlobal > 0 ? args.cpmGlobal : null
 
   const grupos = new Map<DuenoPerdida, GrupoDelTurno>()
@@ -225,12 +225,45 @@ export function agruparEventos(args: {
     grupos.set(dueno, g)
   }
 
+  /*
+   * OJO OJO: MINUTOS DE LÍNEA, como el titular del bloque y el Pareto.
+   *
+   * `min` es lo que la causa duró en ALGUNA máquina; `lineMin`, lo que frenó la
+   * línea entera. En el turno del 26-08, KNURO traía 88 y 8. Con `min` la lista
+   * decía «KNURO 1.090 pz · 88 min» y los tres dueños sumaban 2.066 pz debajo
+   * de un titular que —ya corregido— dice 469: el bloque dejaba de cuadrar
+   * consigo mismo, que es peor que el error original porque salta a la vista.
+   *
+   * Los `lineMin` tampoco se descuentan entre sí, así que se escalan al
+   * `recoverableMin` del turno: el total de línea que cierra la ventana.
+   */
+  const sumaLinea = (tb.recoverable ?? []).reduce((a, x) => a + Math.max(0, x.lineMin ?? x.min ?? 0), 0)
+  const escala = tb.recoverableMin > 0 && sumaLinea > tb.recoverableMin
+    ? tb.recoverableMin / sumaLinea
+    : 1
+
   for (const x of tb.recoverable ?? []) {
     const { dueno, categoria, extension } = duenoDe(x.reason)
-    const piezas = costo.get(x.reason) ?? (cpm ? x.min * cpm : null)
+    const minLinea = Math.max(0, x.lineMin ?? x.min ?? 0) * escala
+    /*
+     * El RITMO sigue siendo el local —el que la línea traía justo antes de esa
+     * parada—; solo se corrigen los minutos. `costo` viene calculado sobre los
+     * minutos de máquina, así que de él se toma el ritmo, no el total.
+     */
+    /*
+     * El RITMO es el local de esa causa y los MINUTOS los de línea.
+     *
+     * `c.cpm` ya viene definido en `monitorPerdidas` como
+     * `(piezas x maquinas) / min`: es el ritmo de LÍNEA efectivo, con la
+     * división por máquinas ya deshecha. Escalar `c.piezas` en vez de usar
+     * `c.cpm` aplicaría esa división DOS veces y hundía el costo a un tercio.
+     */
+    const c = costoPorCausa.get(x.reason)
+    const cpmLocal = c?.cpm ?? cpm
+    const piezas = cpmLocal ? minLinea * cpmLocal : null
     push(dueno, {
       reason: x.reason,
-      min: x.min,
+      min: minLinea,
       count: x.count ?? 0,
       piezas,
       categoria,
