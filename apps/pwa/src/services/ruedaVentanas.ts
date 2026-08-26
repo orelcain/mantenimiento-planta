@@ -34,6 +34,27 @@ export const DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'
 export const DIAS_CORTOS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'] as const
 
 /**
+ * Los tres turnos de 8 h en que se parte el día.
+ *
+ * Se rotulan por su horario y no como «T1/T2/T3» a propósito: cada planta los
+ * numera a su manera, y una etiqueta inventada haría que el plan se lea al revés
+ * de como se habla en el turno.
+ */
+export const TURNOS: Array<{ inicio: number; fin: number; etiqueta: string }> = [
+  { inicio: 0, fin: 96, etiqueta: '00–08' },
+  { inicio: 96, fin: 192, etiqueta: '08–16' },
+  { inicio: 192, fin: 288, etiqueta: '16–24' },
+]
+
+/** Horas rotuladas del eje. Cada 4 para que los cortes de turno (08 y 16) caigan en marca. */
+export const HORAS_EJE = [0, 4, 8, 12, 16, 20]
+
+/** ¿Esa hora es un cambio de turno? Se dibuja más marcada que el resto. */
+export function esCorteDeTurno(hora: number): boolean {
+  return TURNOS.some((t) => (t.inicio * MINUTOS_POR_SLOT) / 60 === hora)
+}
+
+/**
  * Quién ocupa el tramo. `0` = nadie.
  *
  * `X` no es un capricho: en esta planta Higiene entra normalmente DURANTE la

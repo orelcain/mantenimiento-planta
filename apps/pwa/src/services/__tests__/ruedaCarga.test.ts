@@ -4,6 +4,7 @@ import {
   balance,
   capacidadSemanal,
   cargaSemanalMinutos,
+  duplicarTarea,
   disponibilidadPorTramo,
   minutosAHorasTexto,
   tareasIniciales,
@@ -228,5 +229,36 @@ describe('minutosAHorasTexto', () => {
     expect(minutosAHorasTexto(150)).toBe('2 h 30')
     expect(minutosAHorasTexto(-90)).toBe('−1 h 30')
     expect(minutosAHorasTexto(0)).toBe('0 h 00')
+  })
+})
+
+describe('duplicarTarea', () => {
+  it('copia los valores pero con id propio', () => {
+    const t = tarea({ id: 'orig', minutos: 45, personas: 2, vecesPorSemana: 3, maquinaId: 'a' })
+    const c = duplicarTarea(t, 'nuevo')
+    expect(c.id).toBe('nuevo')
+    expect(c.minutos).toBe(45)
+    expect(c.personas).toBe(2)
+    expect(c.vecesPorSemana).toBe(3)
+    expect(c.maquinaId).toBe('a')
+  })
+
+  it('el id NUEVO importa: con el mismo, las dos se moverían juntas al arrastrar', () => {
+    const t = tarea({ id: 'orig' })
+    expect(duplicarTarea(t, 'nuevo').id).not.toBe(t.id)
+  })
+
+  it('marca el nombre para que no queden dos filas idénticas', () => {
+    expect(duplicarTarea(tarea({ nombre: 'Engrase' }), 'x').nombre).toBe('Engrase (copia)')
+  })
+
+  it('la copia nace activa aunque el original esté apagado', () => {
+    expect(duplicarTarea(tarea({ activa: false }), 'x').activa).toBe(true)
+  })
+
+  it('no muta el original', () => {
+    const t = tarea({ nombre: 'Engrase' })
+    duplicarTarea(t, 'x')
+    expect(t.nombre).toBe('Engrase')
   })
 })

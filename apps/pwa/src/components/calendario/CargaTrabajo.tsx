@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
-import { Check, Minus, Plus, Trash2, TriangleAlert } from 'lucide-react'
+import { Check, Copy, Minus, Plus, Trash2, TriangleAlert } from 'lucide-react'
 import { ListGroup, ListCell, Pill } from '@/components/piel'
 import { cn } from '@/lib/utils'
 import {
   balance,
   cargaSemanalMinutos,
+  duplicarTarea,
   minutosAHorasDecimal,
   minutosAHorasTexto,
   type ConfigCarga,
@@ -237,6 +238,13 @@ export function CargaTrabajo({
             maquinas={maquinas}
             onActualizar={(cambio) => actualizar(t.id, cambio)}
             onEliminar={() => onCambiarTareas(tareas.filter((x) => x.id !== t.id))}
+            onDuplicar={() => {
+              // Se inserta justo debajo del original: en una lista de quince
+              // preventivas, una copia al final es una copia perdida.
+              const copia = duplicarTarea(t, `t-${Date.now()}`)
+              const i = tareas.findIndex((x) => x.id === t.id)
+              onCambiarTareas([...tareas.slice(0, i + 1), copia, ...tareas.slice(i + 1)])
+            }}
           />
         ))}
 
@@ -361,12 +369,14 @@ function FilaTarea({
   maquinas,
   onActualizar,
   onEliminar,
+  onDuplicar,
 }: {
   tarea: TareaMantencion
   nombreMaquina: string | null | undefined
   maquinas: MaquinaRueda[]
   onActualizar: (cambio: Partial<TareaMantencion>) => void
   onEliminar: () => void
+  onDuplicar: () => void
 }) {
   const [abierta, setAbierta] = useState(false)
   const carga = cargaSemanalMinutos(tarea)
@@ -481,13 +491,22 @@ function FilaTarea({
               {tarea.requiereDetencion ? 'Necesita la máquina detenida' : 'Se puede en marcha'}
             </button>
 
-            <button
-              onClick={onEliminar}
-              className="flex min-h-[44px] items-center gap-1.5 rounded-ctl px-3 text-footnote text-destructive"
-            >
-              <Trash2 className="h-4 w-4" />
-              Eliminar
-            </button>
+            <span className="flex flex-wrap gap-2">
+              <button
+                onClick={onDuplicar}
+                className="flex min-h-[44px] items-center gap-1.5 rounded-ctl border border-border px-3 text-footnote text-muted-foreground"
+              >
+                <Copy className="h-4 w-4" />
+                Duplicar
+              </button>
+              <button
+                onClick={onEliminar}
+                className="flex min-h-[44px] items-center gap-1.5 rounded-ctl px-3 text-footnote text-destructive"
+              >
+                <Trash2 className="h-4 w-4" />
+                Eliminar
+              </button>
+            </span>
           </div>
         </div>
       )}

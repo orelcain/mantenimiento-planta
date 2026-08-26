@@ -175,6 +175,19 @@ export const CONFIG_CARGA_POR_DEFECTO: ConfigCarga = {
   reservaCorrectivasPct: 30,
 }
 
+/**
+ * Copia de una tarea, lista para ajustar.
+ *
+ * Las preventivas de una planta se parecen entre sí —misma duración, misma
+ * dotación, otra máquina— y crearlas de cero obliga a reescribir cinco campos
+ * cada vez. El id es nuevo (si no, las dos se moverían juntas al arrastrar el
+ * plan) y el nombre lleva un sufijo para que no queden dos filas idénticas
+ * imposibles de distinguir en la lista.
+ */
+export function duplicarTarea(t: TareaMantencion, id: string): TareaMantencion {
+  return { ...t, id, nombre: `${t.nombre} (copia)`, activa: true }
+}
+
 /** Horas-hombre que pide una tarea en una semana. */
 export function cargaSemanalMinutos(t: TareaMantencion): number {
   return t.minutos * t.personas * t.vecesPorSemana

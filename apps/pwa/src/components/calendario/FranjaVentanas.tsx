@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { AlertTriangle } from 'lucide-react'
 import { ListGroup, Pill } from '@/components/piel'
 import { cn } from '@/lib/utils'
+import { BandaTurnos, EjeHoras, RejillaHoras } from './EjeDelDia'
 import {
   DIAS_CORTOS,
   OCUPANTES,
@@ -38,8 +39,6 @@ const BG_OCUPANTE: Record<Ocupante, string> = {
   '0': 'bg-muted-foreground',
 }
 const OPACIDAD_OCUPANTE: Record<Ocupante, number> = { P: 0.5, H: 0.62, X: 0.62, C: 0.45, '0': 0.14 }
-
-const HORAS_EJE = [0, 3, 6, 9, 12, 15, 18, 21]
 
 function pct(slots: number): string {
   return `${(slots * 100) / SLOTS_POR_DIA}%`
@@ -95,11 +94,7 @@ function Fila({
         </div>
 
         {/* Rejilla horaria por encima del color, para poder leer a qué hora pasa */}
-        <div className="pointer-events-none absolute inset-0 flex">
-          {HORAS_EJE.map((h) => (
-            <div key={h} className="h-full flex-1 border-l border-border/40 first:border-l-0" />
-          ))}
-        </div>
+        <RejillaHoras />
 
         {/* Intervención de Mantención: banda inferior. Va DENTRO de la misma
             franja y no en una fila aparte para que se lea el solapamiento. */}
@@ -140,22 +135,6 @@ function Fila({
           </span>
         )}
       </div>
-    </div>
-  )
-}
-
-function EjeHoras() {
-  return (
-    <div className="flex items-center gap-3">
-      <span className="w-28 shrink-0 sm:w-36" />
-      <div className="flex min-w-0 flex-1">
-        {HORAS_EJE.map((h) => (
-          <span key={h} className="flex-1 font-mono text-caption tabular-nums text-muted-foreground">
-            {String(h).padStart(2, '0')}
-          </span>
-        ))}
-      </div>
-      <span className="w-24 shrink-0 sm:w-32" />
     </div>
   )
 }
@@ -245,6 +224,7 @@ export function FranjaVentanas({ maquinas, diaIdx, maquinaActivaId }: FranjaVent
           <div className="min-w-[34rem]">
             <div className="flex flex-col gap-2.5">
               <EjeHoras />
+              <BandaTurnos />
               {maquinas.map((m) => {
                 const d = m.semana[diaIdx]
                 if (!d) return null
@@ -291,6 +271,7 @@ export function FranjaVentanas({ maquinas, diaIdx, maquinaActivaId }: FranjaVent
             <div className="min-w-[34rem]">
               <div className="flex flex-col gap-2.5">
                 <EjeHoras />
+                <BandaTurnos />
                 {activa.semana.map((d, i) => (
                   <Fila key={i} dia={d} etiqueta={DIAS_CORTOS[i] ?? ''} destacada={i === diaIdx} />
                 ))}
