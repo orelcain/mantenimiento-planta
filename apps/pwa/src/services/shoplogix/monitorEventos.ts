@@ -106,6 +106,8 @@ function paradasPorCausa(
   stopReasons: string[],
   /** Primer tramo con dato: el minuto 0 del eje que comparten los gráficos. */
   t0Ms: number | null,
+  /** Ventana del turno: lo de afuera no es suyo. Ver el recorte más abajo. */
+  ventana?: { desdeMs: number | null; hastaMs: number | null } | null,
 ): Map<string, ParadaSuelta[]> {
   /*
    * ⚠ EPISODIOS, no eventos crudos. El sensor parte una misma parada en varios
@@ -139,7 +141,26 @@ function paradasPorCausa(
         episodios.push({ ...e })
       }
     }
-    m.set(causa, episodios
+    /*
+     * ⚠ RECORTE a la ventana del turno. Sin esto, una parada que arranca antes
+     * del primer dato entraba entera: en el turno del 25-08 (arranque 21:25) la
+     * lista de «Detencion» abría con **21:15:00→21:25:45 · 10,8 min** — diez de
+     * esos once minutos son de antes de que el turno existiera. Por eso las 10
+     * paradas listadas sumaban 99,7 min mientras la fila decía 85, y por eso
+     * las otras dos causas del mismo turno sí cuadraban: no era redondeo.
+     *
+     * Cargarle al turno tiempo que no es suyo es peor que el descuadre.
+     */
+    const desde = ventana?.desdeMs ?? null
+    const hasta = ventana?.hastaMs ?? null
+    const dentro = episodios
+      .map((ep) => ({
+        ini: desde != null ? Math.max(ep.ini, desde) : ep.ini,
+        fin: hasta != null ? Math.min(ep.fin, hasta) : ep.fin,
+      }))
+      .filter((ep) => ep.fin > ep.ini)
+
+    m.set(causa, dentro
       .map((ep) => ({
         hora: horaSegDe(new Date(ep.ini).toISOString()),
         hasta: horaSegDe(new Date(ep.fin).toISOString()),
@@ -179,12 +200,18 @@ export function agruparEventos(args: {
   cpmGlobal?: number | null
   /** ISO del primer tramo con dato: ubica cada parada en el eje del gráfico. */
   t0?: string | null
+  /**
+   * Ventana del turno en ms. Las paradas se recortan a ella: una que arranca
+   * antes del turno solo aporta lo que cae adentro.
+   */
+  ventana?: { desdeMs: number | null; hastaMs: number | null } | null
 }): GrupoDelTurno[] {
   const { tb } = args
   if (!tb) return []
   const t0Ms = args.t0 ? Date.parse(args.t0) : NaN
   const paradas = paradasPorCausa(
     args.stopEvents ?? [], args.stopReasons ?? [], Number.isNaN(t0Ms) ? null : t0Ms,
+    args.ventana,
   )
   const costo = new Map((args.costo?.porCausa ?? []).map((c) => [c.reason, c.piezas]))
   const cpm = args.cpmGlobal && args.cpmGlobal > 0 ? args.cpmGlobal : null

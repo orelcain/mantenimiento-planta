@@ -989,7 +989,14 @@ function FilaEvento({ c, sel, onCausa, onVentana, onTramo, notas }: {
         <div className="my-1 ml-2 border-l border-border pl-2">
           {muchas && (
             <p className="text-[11px] italic text-muted-foreground/80">
-              {cuantas} paradas de {Math.round(prom)} s en promedio.
+              {/* Segundos SOLO cuando el promedio no llega al minuto: en las
+                  microparadas «30 s» se lee mejor que «0,5 min». Para las
+                  demás era el único número en segundos de toda la pantalla —
+                  «510 s» al lado de una lista en minutos obliga a dividir por
+                  60 de cabeza, parado en planta. */}
+              {cuantas} paradas de {prom < 60
+                ? `${Math.round(prom)} s`
+                : `${fmtDec(prom / 60)} min`} en promedio.
             </p>
           )}
           {/*
