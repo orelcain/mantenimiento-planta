@@ -61,7 +61,9 @@ const fmtTurnosEq = (pz: number, pzPorTurno: number) => {
   if (!(pzPorTurno > 0)) return null
   const t = Math.round((pz / pzPorTurno) * 2) / 2
   if (t < 0.5) return null
-  return t === 1 ? '1 turno' : `${nf1.format(t).replace(',0', '')} turnos`
+  // El adjetivo va ADENTRO: al pegarle « completos» afuera, un solo turno daba
+  // «1 turno completos de producción».
+  return t === 1 ? '1 turno completo' : `${nf1.format(t).replace(',0', '')} turnos completos`
 }
 
 /** «Turno Dia» → «Día». El prefijo se repite en todos y no aporta. */
@@ -233,7 +235,7 @@ export function ParetoDeParadas({
                 const eq = fmtTurnosEq(pareto.totalPiezas, ctx.piezasPorTurno)
                 return eq ? (
                   <span className="block text-[12px] font-normal text-muted-foreground">
-                    ≈ {eq} completos de producción
+                    ≈ {eq} de producción
                   </span>
                 ) : null
               })()}
