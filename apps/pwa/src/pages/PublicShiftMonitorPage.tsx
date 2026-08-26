@@ -71,6 +71,7 @@ import { useAuthStore } from '@/store/authStore'
 import { Button } from '@/components/ui/button'
 import { ReAuthConfirmDialog } from '@/components/admin/ReAuthConfirmDialog'
 import { getFunctions, httpsCallable } from 'firebase/functions'
+import { ritmoAndandoDeLinea } from '@/services/shoplogix/ritmoAndandoDeLinea'
 
 // ── Formateadores (locales a propósito: esta página no debe arrastrar el
 //    módulo de helpers del Grader, que se lleva echarts al bundle) ───────────
@@ -2713,8 +2714,17 @@ export function PublicShiftMonitorPage() {
       .filter((h) => h.producingMin > 0 && h.total > 0)
       .map((h) => h.total / h.producingMin)
       .sort((a, b) => a - b)
-    const uptimeMin = (live?.uptimeSec ?? 0) / 60
-    const hoy = uptimeMin > 0 && live?.totalPieces ? live.totalPieces / uptimeMin : null
+    /* ⚠⚠ `uptimeSec` es la SUMA de las máquinas: con las tres Baader de Planta
+       Principal dividía por casi tres y la pantalla decía "la línea, andando,
+       va a 13,9" cuando iba a 37,3. Los turnos anteriores con los que se
+       compara siempre se calcularon sobre `producingMin`. Ver
+       `ritmoAndandoDeLinea`. */
+    const hoy = ritmoAndandoDeLinea({
+      totalPieces: live?.totalPieces,
+      tiempos: live?.timeBreakdown,
+      uptimeSec: live?.uptimeSec,
+      machinesTotal: live?.machinesTotal,
+    })
     if (previos.length === 0) return { hoy, mediana: null, mejor: null, muestras: 0 }
     return {
       hoy,
@@ -2722,7 +2732,7 @@ export function PublicShiftMonitorPage() {
       mejor: previos[previos.length - 1]!,
       muestras: previos.length,
     }
-  }, [live?.uptimeSec, live?.totalPieces, resumenesAnteriores])
+  }, [live?.uptimeSec, live?.totalPieces, live?.timeBreakdown, live?.machinesTotal, resumenesAnteriores])
 
   /*
    * Ritmo necesario para llegar a la meta. Se recalcula con el mismo reloj que
