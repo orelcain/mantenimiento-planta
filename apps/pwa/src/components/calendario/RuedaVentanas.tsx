@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, Check, CloudOff, Loader2, RotateCcw, Undo2, Eraser } from 'lucide-react'
+import { AlertTriangle, Check, CloudOff, Loader2, RotateCcw, Settings2, Undo2, Eraser } from 'lucide-react'
 import { ListGroup, ListCell, Pill } from '@/components/piel'
 import { FranjaVentanas } from './FranjaVentanas'
 import { CompartirRueda } from './CompartirRueda'
 import { ResumenPlanta } from './ResumenPlanta'
 import { CargaTrabajo } from './CargaTrabajo'
+import { EditorMaquinas } from './EditorMaquinas'
 import { CONFIG_CARGA_POR_DEFECTO, tareasIniciales, type ConfigCarga, type TareaMantencion } from '@/services/ruedaCarga'
 import { getCurrentUser } from '@/services/auth'
 import { logger } from '@/lib/logger'
@@ -128,6 +129,7 @@ export function RuedaVentanas() {
   /* Editar en la rueda, mostrar en la franja: son dos trabajos distintos y cada
      forma es buena en uno solo. Ver el comentario de FranjaVentanas. */
   const [modo, setModo] = useState<'editar' | 'comparar' | 'carga'>('editar')
+  const [editandoMaquinas, setEditandoMaquinas] = useState(false)
   const [sync, setSync] = useState<EstadoSync>('cargando')
   const [errorTexto, setErrorTexto] = useState<string | null>(null)
   const [ahora, setAhora] = useState(() => new Date())
@@ -327,7 +329,23 @@ export function RuedaVentanas() {
   const esHoy = (new Date().getDay() + 6) % 7 === diaIdx
   const anguloAhora = ((ahora.getHours() * 60 + ahora.getMinutes()) * 360) / 1440
 
-  if (!maquina) return null
+  if (!maquina) {
+    return (
+      <div className="flex flex-col items-start gap-3 rounded-card bg-card p-5">
+        <p className="text-headline text-foreground">No hay máquinas en el plan</p>
+        <p className="max-w-[46ch] text-footnote text-muted-foreground">
+          Agrega al menos una para poder pintar su día y calcular las ventanas.
+        </p>
+        <EditorMaquinas
+          maquinas={state.maquinas}
+          tareas={state.tareas ?? []}
+          // El autosave se dispara solo al cambiar `state`; no hay que avisarle.
+          onCambiar={(maquinas) => setState((p) => ({ ...p, maquinas }))}
+          onCerrar={() => setEditandoMaquinas(false)}
+        />
+      </div>
+    )
+  }
 
   const condicionDeChar = (c: string): Condicion =>
     c === 'H' ? 'agua' : c === 'C' ? 'colacion' : c === 'P' ? 'marcha' : 'limpia'
@@ -345,7 +363,10 @@ export function RuedaVentanas() {
             key={id}
             role="tab"
             aria-selected={modo === id}
-            onClick={() => setModo(id)}
+            onClick={() => {
+              setModo(id)
+              if (id !== 'editar') setEditandoMaquinas(false)
+            }}
             className={cn(
               'min-h-[44px] rounded-ctl px-3.5 text-footnote font-semibold transition-colors duration-150',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary motion-reduce:transition-none',
@@ -377,6 +398,19 @@ export function RuedaVentanas() {
           </select>
         </div>
 
+        <button
+          onClick={() => setEditandoMaquinas((v) => !v)}
+          aria-pressed={editandoMaquinas}
+          className={cn(
+            'flex min-h-[44px] items-center gap-2 rounded-ctl border border-border px-3 text-footnote font-medium',
+            'transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary motion-reduce:transition-none',
+            editandoMaquinas ? 'bg-card text-foreground' : 'text-muted-foreground hover:text-foreground',
+          )}
+        >
+          <Settings2 className="h-4 w-4" />
+          Máquinas
+        </button>
+
         <div className="flex flex-col gap-1.5">
           <span className="text-caption text-muted-foreground">Día</span>
           <div className="flex flex-wrap gap-1" role="tablist" aria-label="Día de la semana">
@@ -405,6 +439,16 @@ export function RuedaVentanas() {
           <CompartirRueda maquinas={state.maquinas} revisadoEnTerreno={state.revisadoEnTerreno === true} />
         </div>
       </div>
+
+      {editandoMaquinas && modo === 'editar' && (
+        <EditorMaquinas
+          maquinas={state.maquinas}
+          tareas={state.tareas ?? []}
+          // El autosave se dispara solo al cambiar `state`; no hay que avisarle.
+          onCambiar={(maquinas) => setState((p) => ({ ...p, maquinas }))}
+          onCerrar={() => setEditandoMaquinas(false)}
+        />
+      )}
 
       <div className={cn('grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]', modo === 'comparar' && 'hidden')}>
         {/* ── Rueda ────────────────────────────────────────────────────────── */}
