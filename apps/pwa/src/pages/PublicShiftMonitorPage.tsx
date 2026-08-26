@@ -58,6 +58,7 @@ import {
 import { parseShiftDocId } from '@/services/shoplogix/shoplogixShift.service'
 import { estadoDelLink } from '@/services/shoplogix/estadoDelLink'
 import { convenioFaltante } from '@/services/shoplogix/convenioFaltante'
+import { ventanaDelTurno } from '@/services/shoplogix/ventanaDelTurno'
 import { frescuraDelRitmo, MIN_PARA_VIEJO } from '@/services/shoplogix/datosAlDia'
 import { horaDeLaCuota } from '@/services/shoplogix/horaDeLaCuota'
 import { horaMasFloja, type ParadaConHora } from '@/services/shoplogix/horaMasFloja'
@@ -3023,6 +3024,16 @@ export function PublicShiftMonitorPage() {
      hora de PLANTA. El porqué, en `horaDeLaCuota`. */
   /* Hace cuánto que no llega un tramo nuevo: lo usan el badge de estado, el
      número grande y la cuenta de hora extra. Ver `frescuraDelRitmo`. */
+  /* Horario planificado contra el real: ver `ventanaDelTurno`. */
+  const ventanaTurno = useMemo(() => ventanaDelTurno({
+    scheduledStart: live?.scheduledStart,
+    scheduledEnd: live?.scheduledEnd,
+    realStart: inicioReal,
+    realEnd: serieDelTurno.length
+      ? new Date(Date.parse(serieDelTurno[serieDelTurno.length - 1]!.t) + 5 * 60_000).toISOString()
+      : null,
+  }), [live?.scheduledStart, live?.scheduledEnd, inicioReal, serieDelTurno])
+
   const sinDatosHaceMin = useMemo(() => {
     const ult = serieDelTurno[serieDelTurno.length - 1]?.t
     if (!ult) return null
@@ -3757,6 +3768,19 @@ export function PublicShiftMonitorPage() {
               <span className="tabular-nums">
                 {fmtWallTime(inicioReal)}–{fmtWallTime(live.scheduledEnd)}
               </span>
+            )}
+            {/* El horario REAL al lado del planificado, cuando se corrieron: el
+                mismo «Turno 2» de Chonchi fue 09:15→17:00 el 24-08 y 07:15→15:00
+                el 26-08. Con un solo rango, quien cruza el monitor con la
+                pantalla de Shoplogix no sabe si mira lo mismo. Pedido de Orel.
+                Ver `ventanaDelTurno`. */}
+            {ventanaTurno?.real && (
+              <>
+                <span className="text-muted-foreground/50">·</span>
+                <span className="tabular-nums text-muted-foreground/80">
+                  real {ventanaTurno.real.desde}–{ventanaTurno.real.hasta}
+                </span>
+              </>
             )}
           </div>
         </div>
