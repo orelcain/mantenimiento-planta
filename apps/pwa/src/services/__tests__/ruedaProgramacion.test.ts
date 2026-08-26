@@ -97,9 +97,11 @@ describe('programarSemana · ubicación', () => {
 })
 
 describe('programarSemana · restricciones que no se pueden violar', () => {
-  it('dos tareas no se pisan en la misma máquina', () => {
+  it('dos tareas no se pisan en la misma máquina el mismo día', () => {
+    // Se fuerza el mismo día dejando UN solo día con hueco: si no, el reparto
+    // por carga las manda a días distintos y no se estaría probando nada.
     const m = [maquina('a', [[0, 24, 'P']])]
-    for (const d of m[0]!.semana) d.areas = pintarRango(d.areas, slotDeHora(10), slotDeHora(12), '0')
+    m[0]!.semana[0]!.areas = pintarRango(m[0]!.semana[0]!.areas, slotDeHora(10), slotDeHora(12), '0')
     const p = programarSemana(
       m,
       [
@@ -109,8 +111,26 @@ describe('programarSemana · restricciones que no se pueden violar', () => {
       cfg(4),
     )
     expect(p.asignaciones).toHaveLength(2)
+    expect(new Set(p.asignaciones.map((a) => a.dia)).size).toBe(1)
     const [x, y] = [...p.asignaciones].sort((a, b) => a.inicio - b.inicio)
     expect(x!.inicio + x!.largo).toBeLessThanOrEqual(y!.inicio)
+  })
+
+  it('ninguna máquina tiene dos tareas encimadas, mire el día que se mire', () => {
+    const m = [maquina('a'), maquina('b')]
+    const tareas = Array.from({ length: 8 }, (_, i) =>
+      tarea({ id: `t${i}`, nombre: `T${i}`, maquinaId: i % 2 ? 'a' : 'b', minutos: 120, vecesPorSemana: 2 }),
+    )
+    const p = programarSemana(m, tareas, cfg(4))
+    for (let dia = 0; dia < 7; dia++) {
+      for (const maq of ['a', 'b']) {
+        const uso = new Array(SLOTS_POR_DIA).fill(0)
+        for (const a of asignacionesDe(p, dia).filter((x) => x.maquinaId === maq)) {
+          for (let k = 0; k < a.largo; k++) uso[a.inicio + k]++
+        }
+        expect(Math.max(...uso, 0)).toBeLessThanOrEqual(1)
+      }
+    }
   })
 
   it('no compromete más gente que la dotación en el mismo instante', () => {
@@ -424,5 +444,29 @@ describe('ajustarAPaso · el arrastre salta de 15 en 15', () => {
 
   it('una tarea tan larga como el día solo cabe empezando a las 00:00', () => {
     expect(ajustarAPaso(50, PASO, SLOTS_POR_DIA)).toBe(0)
+  })
+})
+
+describe('reparto en la semana · no amontonar', () => {
+  it('reparte entre días en vez de llenar el primero que sirva', () => {
+    // Con el orden lineal viejo, las seis ejecuciones caían el mismo día.
+    const m = [maquina('a')]
+    const p = programarSemana(m, [tarea({ maquinaId: 'a', minutos: 60, vecesPorSemana: 6 })], cfg(2))
+    const porDia = new Array(7).fill(0)
+    for (const a of p.asignaciones) porDia[a.dia]++
+    expect(p.asignaciones).toHaveLength(6)
+    expect(Math.max(...porDia)).toBe(1)
+  })
+
+  it('el día más cargado no se lleva más del doble que el más vacío', () => {
+    const m = [maquina('a'), maquina('b')]
+    const tareas = [
+      tarea({ id: 'x', maquinaId: 'a', minutos: 60, vecesPorSemana: 5 }),
+      tarea({ id: 'y', maquinaId: 'b', minutos: 30, vecesPorSemana: 5 }),
+    ]
+    const p = programarSemana(m, tareas, cfg(4))
+    const porDia = new Array(7).fill(0)
+    for (const a of p.asignaciones) porDia[a.dia] += a.largo * a.personas
+    expect(Math.max(...porDia)).toBeLessThanOrEqual(Math.min(...porDia) * 2 + 12)
   })
 })
