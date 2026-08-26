@@ -11,9 +11,12 @@ import {
   type MotivoNoCabe,
   type Programacion,
 } from '@/services/ruedaProgramacion'
+import { BandaTurnos, RejillaHoras } from './EjeDelDia'
 import {
   DIAS_CORTOS,
   DIAS_SEMANA,
+  HORAS_EJE,
+  esCorteDeTurno,
   MINUTOS_POR_SLOT,
   SLOTS_POR_DIA,
   slotAHora,
@@ -35,7 +38,6 @@ import {
  * se ve. Si no cabe, el bloque vuelve a su sitio y se dice por qué.
  */
 
-const HORAS_EJE = [0, 3, 6, 9, 12, 15, 18, 21]
 /** Paso del ajuste fino por teclado: 15 min es lo que se corrige en la práctica. */
 const PASO_FINO = 3
 
@@ -249,7 +251,10 @@ export function ProgramacionSemana({
                   {HORAS_EJE.map((h) => (
                     <span
                       key={h}
-                      className="flex-1 font-mono text-caption tabular-nums text-muted-foreground"
+                      className={cn(
+                        'flex-1 font-mono text-caption tabular-nums',
+                        esCorteDeTurno(h) ? 'font-semibold text-foreground' : 'text-muted-foreground',
+                      )}
                     >
                       {String(h).padStart(2, '0')}
                     </span>
@@ -257,6 +262,7 @@ export function ProgramacionSemana({
                 </div>
                 <span className="w-16 shrink-0" />
               </div>
+              <BandaTurnos anchoEtiqueta="w-10" anchoCifra="w-16" />
 
               {DIAS_CORTOS.map((d, i) => {
                 const delDia = asignacionesDe(prog, i)
@@ -281,14 +287,7 @@ export function ProgramacionSemana({
                         arrastre?.dia === i && 'ring-1 ring-inset ring-primary',
                       )}
                     >
-                      <div className="pointer-events-none absolute inset-0 flex">
-                        {HORAS_EJE.map((h) => (
-                          <div
-                            key={h}
-                            className="h-full flex-1 border-l border-border/40 first:border-l-0"
-                          />
-                        ))}
-                      </div>
+                      <RejillaHoras />
 
                       {/* Silueta del destino mientras se arrastra */}
                       {arrastre?.dia === i && (

@@ -2,9 +2,12 @@ import { useMemo } from 'react'
 import { ListGroup, Pill } from '@/components/piel'
 import { cn } from '@/lib/utils'
 import { disponibilidadPorTramo, ordenarVentanas, ventanasDePlanta } from '@/services/ruedaCarga'
+import { RejillaHoras } from './EjeDelDia'
 import {
   DIAS_CORTOS,
+  HORAS_EJE,
   SLOTS_POR_DIA,
+  esCorteDeTurno,
   slotAHora,
   slotsAHorasMinutos,
   type MaquinaRueda,
@@ -22,7 +25,6 @@ import {
  */
 
 const ALTO = 44
-const HORAS_EJE = [0, 3, 6, 9, 12, 15, 18, 21]
 
 export interface ResumenPlantaProps {
   maquinas: MaquinaRueda[]
@@ -97,15 +99,17 @@ export function ResumenPlanta({ maquinas, diaIdx, onVerMaquina }: ResumenPlantaP
                   }}
                 />
               ))}
-              <div className="pointer-events-none absolute inset-0 flex">
-                {HORAS_EJE.map((h) => (
-                  <div key={h} className="h-full flex-1 border-l border-border/40 first:border-l-0" />
-                ))}
-              </div>
+              <RejillaHoras />
             </div>
             <div className="flex pt-1">
               {HORAS_EJE.map((h) => (
-                <span key={h} className="flex-1 font-mono text-caption tabular-nums text-muted-foreground">
+                <span
+                  key={h}
+                  className={cn(
+                    'flex-1 font-mono text-caption tabular-nums',
+                    esCorteDeTurno(h) ? 'font-semibold text-foreground' : 'text-muted-foreground',
+                  )}
+                >
                   {String(h).padStart(2, '0')}
                 </span>
               ))}

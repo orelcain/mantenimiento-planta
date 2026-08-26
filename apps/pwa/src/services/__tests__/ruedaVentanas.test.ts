@@ -22,6 +22,9 @@ import {
   slotDeHora,
   slotsAHorasDecimal,
   slotsAHorasMinutos,
+  TURNOS,
+  HORAS_EJE,
+  esCorteDeTurno,
   type DiaRueda,
 } from '../ruedaVentanas'
 
@@ -368,5 +371,33 @@ describe('copiarSemanaDesde', () => {
     const origen = { ...maquinaNueva('o', 'Origen'), revisadoEnTerreno: true }
     const destino = { ...maquinaNueva('d', 'Destino'), revisadoEnTerreno: true }
     expect(copiarSemanaDesde(destino, origen).revisadoEnTerreno).toBe(false)
+  })
+})
+
+describe('turnos del día', () => {
+  it('los tres turnos cubren el día completo sin huecos ni solapes', () => {
+    expect(TURNOS.reduce((a, t) => a + (t.fin - t.inicio), 0)).toBe(SLOTS_POR_DIA)
+    expect(TURNOS[0]!.inicio).toBe(0)
+    expect(TURNOS[TURNOS.length - 1]!.fin).toBe(SLOTS_POR_DIA)
+    for (let i = 1; i < TURNOS.length; i++) {
+      expect(TURNOS[i]!.inicio).toBe(TURNOS[i - 1]!.fin)
+    }
+  })
+
+  it('cada turno dura 8 horas', () => {
+    for (const t of TURNOS) expect((t.fin - t.inicio) * 5).toBe(8 * 60)
+  })
+
+  it('el eje incluye los cortes de turno: si no, no se ve a qué turno cae la ventana', () => {
+    for (const t of TURNOS) {
+      const hora = (t.inicio * 5) / 60
+      expect(HORAS_EJE).toContain(hora)
+      expect(esCorteDeTurno(hora)).toBe(true)
+    }
+  })
+
+  it('una hora cualquiera no es corte de turno', () => {
+    expect(esCorteDeTurno(4)).toBe(false)
+    expect(esCorteDeTurno(20)).toBe(false)
   })
 })
