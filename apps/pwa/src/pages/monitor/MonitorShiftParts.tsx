@@ -959,7 +959,12 @@ function FilaEvento({ c, sel, onCausa, onVentana, onTramo, notas }: {
             setAbierta((v) => !v)
             onCausa(abierta ? null : c.reason)
           }}
-          className={`flex w-full justify-between gap-2 rounded px-1 py-0.5 text-left ${
+          /* Altura REAL, no `tap-44`: estas filas van apiladas y el área
+             fantasma de 44 px de una pisaría a la vecina — tocar una abriría
+             la de al lado, que es peor que el target chico. Medido con
+             `elementFromPoint` en el monitor de prod: daban 19 px de alto
+             táctil, y son el camino para ir a ver una parada una por una. */
+          className={`flex min-h-[32px] w-full items-center justify-between gap-2 rounded px-1 py-1 text-left ${
             activa ? 'bg-primary/[0.13] font-semibold text-foreground' : 'text-foreground hover:bg-muted'
           }`}
           aria-expanded={abierta}
