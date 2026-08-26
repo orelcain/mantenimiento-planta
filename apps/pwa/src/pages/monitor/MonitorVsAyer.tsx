@@ -151,7 +151,7 @@ export function VsAyerBloque({ r, records }: {
             </div>
           </div>
 
-          <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground/70">
+          <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground/80">
             Contra el último turno del mismo nombre con datos completos. Piezas estimadas al ritmo
             andando de cada día.
             {residuo && Math.round(Math.abs(residuo.piezas)) > 0 && (
@@ -202,7 +202,7 @@ export function VsAyerBloque({ r, records }: {
               )
             })}
           </ul>
-          <p className="mt-1.5 text-[10px] leading-snug text-muted-foreground/70">
+          <p className="mt-1.5 text-[10px] leading-snug text-muted-foreground/80">
             Récords de lo que el turno controla: la duración y el convenio los pone el calendario.
             El de «más piezas» no compite — era solo el turno más largo.
           </p>

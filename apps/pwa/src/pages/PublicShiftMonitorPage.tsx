@@ -199,12 +199,12 @@ function Kpi({
         <span className={`text-title1 tabular-nums ${tone === 'accent' ? 'text-sky-700 dark:text-sky-300' : 'text-foreground'}`}>
           {value}
         </span>
-        {unit && <span className="text-footnote text-muted-foreground/70">{unit}</span>}
+        {unit && <span className="text-footnote text-muted-foreground/80">{unit}</span>}
       </div>
       {/* A todo el ancho, bajo el número: con días y bordes rotulados el spark
           dejó de ser miniatura y necesita la fila completa. */}
       {spark}
-      {hint && <div className="mt-0.5 text-caption text-muted-foreground/70">{hint}</div>}
+      {hint && <div className="mt-0.5 text-caption text-muted-foreground/80">{hint}</div>}
       {lectura && (
         <div
           className={`mt-0.5 text-caption leading-snug ${
@@ -292,7 +292,7 @@ function Chispa({ turnos, hoy, banda }: {
           ))}
         </div>
         {/* Los bordes de la banda, rotulados: el rango se LEE, no se adivina. */}
-        <div className="relative w-7 shrink-0 text-caption tabular-nums text-muted-foreground/70">
+        <div className="relative w-7 shrink-0 text-caption tabular-nums text-muted-foreground/80">
           <span className="absolute -translate-y-1/2" style={{ top: `${yPct(banda.max)}%` }}>
             {fmtDec(banda.max)}
           </span>
@@ -301,7 +301,7 @@ function Chispa({ turnos, hoy, banda }: {
           </span>
         </div>
       </div>
-      <div className="mr-8 flex justify-between text-caption tabular-nums text-muted-foreground/70">
+      <div className="mr-8 flex justify-between text-caption tabular-nums text-muted-foreground/80">
         {turnos.map((t) => (
           <span key={t.dateKey}>{diaCorto(t.dateKey)}</span>
         ))}
@@ -962,7 +962,7 @@ function Sparkbars({
       <div className="flex items-center justify-between text-[11px] uppercase tracking-wide text-muted-foreground">
         <span>
           Velocidad de la línea
-          <span className="normal-case tracking-normal text-muted-foreground/70"> · tramos de 5 min</span>
+          <span className="normal-case tracking-normal text-muted-foreground/80"> · tramos de 5 min</span>
         </span>
         {/* OJO — Acá había un «N pz/min ahora» que salía de `recentPerMinute` —otra
             ventana móvil— mientras la regla de arriba muestra el último punto de
@@ -979,7 +979,7 @@ function Sparkbars({
         )}
       </div>
 
-      <div className="mt-1 text-[11px] uppercase tracking-wide text-muted-foreground/70">pz/min</div>
+      <div className="mt-1 text-[11px] uppercase tracking-wide text-muted-foreground/80">pz/min</div>
 
       {/* ⚠ El eje Y va FUERA del contenedor con scroll y el X adentro: al
           revés, las horas se quedan quietas mientras el gráfico se desplaza y
@@ -994,7 +994,7 @@ function Sparkbars({
           {marcasY.map((v) => (
             <span
               key={v}
-              className="absolute right-1 -translate-y-1/2 text-[11px] tabular-nums text-muted-foreground/70"
+              className="absolute right-1 -translate-y-1/2 text-[11px] tabular-nums text-muted-foreground/80"
               style={{ top: `${(1 - v / escala) * 100}%` }}
             >
               {fmtInt(v)}
@@ -1120,7 +1120,7 @@ function Sparkbars({
           return (
             <span
               key={m.t}
-              className="absolute top-0 whitespace-nowrap text-[11px] tabular-nums text-muted-foreground/70"
+              className="absolute top-0 whitespace-nowrap text-[11px] tabular-nums text-muted-foreground/80"
               style={{ left: `${pct}%`, transform: anclaje }}
             >
               {fmtWallTime(m.t)}
@@ -1158,7 +1158,7 @@ function Sparkbars({
             )}
           </>
         ) : (
-          <span className="text-muted-foreground/60">
+          <span className="text-muted-foreground/80">
             Pasá el dedo o el mouse por el gráfico para ver el detalle de cada tramo.
           </span>
         )}
@@ -1168,7 +1168,7 @@ function Sparkbars({
           el gesto es pellizcar o rodar la rueda, y arrastrar para moverse. Lo
           que NO puede faltar es la salida — un zoom sin "ver todo" visible es
           peor que ninguno, porque quien se pierde no sabe volver. */}
-      <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground/70">
+      <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground/80">
         {([['ambas', 'ambas'], ['barras', 'solo barras'], ['linea', 'solo línea']] as const).map(
           ([v, texto]) => (
             <button
@@ -1195,13 +1195,13 @@ function Sparkbars({
             ver todo · {fmtDec(zoom)}×
           </button>
         ) : (
-          <span className="ml-auto text-[10px] text-muted-foreground/60">
+          <span className="ml-auto text-[10px] text-muted-foreground/80">
             pellizcá o rodá para acercar
           </span>
         )}
       </div>
 
-      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground/70">
+      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground/80">
         {ver !== 'barras' && (
           <span className="inline-flex items-center gap-1">
             <span className="inline-block h-[3px] w-3.5 rounded-sm bg-sky-700 dark:bg-sky-200" />
@@ -1214,7 +1214,7 @@ function Sparkbars({
           ) : (
             <span className="inline-block h-2.5 w-2.5 rounded-sm bg-sky-500/40 dark:bg-sky-400/30" />
           )}
-          tramos de 5 min <span className="text-muted-foreground/60">(el dato crudo)</span>
+          tramos de 5 min <span className="text-muted-foreground/80">(el dato crudo)</span>
         </span>
         {/* El techo de la máquina, no el mejor tramo: es lo que hace que el
             hueco de arriba signifique algo. */}
@@ -1326,7 +1326,7 @@ function CierreDelTurno({ cierre, muestras, fuente, plantSlug, shiftName, startA
   }
 
   return (
-    <div className="mt-0.5 text-[11px] text-muted-foreground/70">
+    <div className="mt-0.5 text-[11px] text-muted-foreground/80">
       <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
         <span>
           Cierre estimado <span className="tabular-nums">{fmtWallTime(cierre)}</span>
@@ -1395,7 +1395,7 @@ function CierreDelTurno({ cierre, muestras, fuente, plantSlug, shiftName, startA
               volver al automático
             </button>
           )}
-          <p className="basis-full text-[10px] text-muted-foreground/60">
+          <p className="basis-full text-[10px] text-muted-foreground/80">
             Se aplica a todos los turnos «{shiftName}» de esta línea. El monitor tarda
             un ciclo de sync (~5 min) en tomarlo.
           </p>
@@ -1547,7 +1547,7 @@ function RitmoNecesario({
         {llenado && (
           <p className="mt-1 text-[12px] text-muted-foreground">
             Con la máquina a{' '}
-            <span className="tabular-nums text-foreground/90">{fmtCpm(llenado.spec.setCpm)} pz/min</span>{llenado.spec.setHz ? <span className="tabular-nums text-muted-foreground/70"> ({llenado.spec.setHz} Hz)</span> : null},
+            <span className="tabular-nums text-foreground/90">{fmtCpm(llenado.spec.setCpm)} pz/min</span>{llenado.spec.setHz ? <span className="tabular-nums text-muted-foreground/80"> ({llenado.spec.setHz} Hz)</span> : null},
             van{' '}
             <b className="tabular-nums text-foreground/90">
               {comoDeCada100(llenado.actual)} de cada 100
@@ -1584,7 +1584,7 @@ function RitmoNecesario({
         {/* Cuál meta, siempre: sin esto no se sabe si el número persigue la
             cuota del turno o lo que el sensor espera, que pueden diferir. */}
         Para llegar a {pace.targetSource === 'cuota' ? 'la meta' : 'lo esperado'}
-        <span className="normal-case tracking-normal text-muted-foreground/70">
+        <span className="normal-case tracking-normal text-muted-foreground/80">
           ({fmtInt(pace.targetPieces)} pz
           {/* De dónde sale la vara. Con el objetivo del sensor se dice sobre
               cuántos turnos se calculó: es una mediana de turnos cerrados, no
@@ -1712,7 +1712,7 @@ function RitmoNecesario({
       {llenado && (
         <p className="mt-1.5 rounded-lg bg-muted/50 px-2.5 py-1.5 text-[12px] text-muted-foreground">
           Con la máquina a{' '}
-          <span className="tabular-nums text-foreground/90">{fmtCpm(llenado.spec.setCpm)} pz/min</span>{llenado.spec.setHz ? <span className="tabular-nums text-muted-foreground/70"> ({llenado.spec.setHz} Hz)</span> : null},
+          <span className="tabular-nums text-foreground/90">{fmtCpm(llenado.spec.setCpm)} pz/min</span>{llenado.spec.setHz ? <span className="tabular-nums text-muted-foreground/80"> ({llenado.spec.setHz} Hz)</span> : null},
           venís llenando{' '}
           <b className="tabular-nums text-foreground/90">
             {comoDeCada100(llenado.actual)} de cada 100
@@ -1731,7 +1731,7 @@ function RitmoNecesario({
             </>
           )}
           .
-          <span className="mt-0.5 block text-[11px] text-muted-foreground/70">
+          <span className="mt-0.5 block text-[11px] text-muted-foreground/80">
             No es velocidad de máquina: es cuántas silletas van con pieza
             (abastecimiento o atochamiento aguas abajo).
           </span>
@@ -1782,7 +1782,7 @@ function RitmoNecesario({
       </button>
 
       {!verDetalle && (
-        <p className="mt-1 text-[11px] text-muted-foreground/70">
+        <p className="mt-1 text-[11px] text-muted-foreground/80">
           Faltan <span className="tabular-nums">{fmtInt(pace.remainingPieces)} pz</span> ·{' '}
           quedan <span className="tabular-nums">{fmtDurationSec(pace.remainingMin * 60)}</span>
           {pace.pendingBreakMin > 0 && (
@@ -1874,7 +1874,7 @@ function RitmoNecesario({
       )}
 
       {pace.maxPerHour != null && (
-        <p className="mt-1.5 text-[11px] text-muted-foreground/70">
+        <p className="mt-1.5 text-[11px] text-muted-foreground/80">
           El <b>techo</b> es el mejor ritmo ANDANDO que la línea alcanzó
           {historial?.muestras ? ` en los últimos ${historial.muestras} turnos` : ' en turnos anteriores'} —
           lo que ya demostró que puede, no lo que dice el objetivo.
@@ -1885,7 +1885,7 @@ function RitmoNecesario({
           juzgar. El objetivo del sensor puede decir 20 y la línea no haber
           pasado nunca de 12,7 — medido en Filete sobre 9 turnos. */}
       {historial?.medianCpm != null && (
-        <p className="mt-1 text-[11px] text-muted-foreground/70">
+        <p className="mt-1 text-[11px] text-muted-foreground/80">
           Andando, lo normal en esta línea:{' '}
           <span className="tabular-nums text-foreground/80">
             {fmtDec(historial.medianCpm)} pz/min ({fmtInt(historial.medianCpm * 60)} pz/h)
@@ -2006,7 +2006,7 @@ function PorHora({ series, paradas }: {
             <span className={`w-6 shrink-0 tabular-nums ${
               floja?.index === r.index ? 'font-semibold text-ink-crit' : 'text-muted-foreground'
             }`}>h{r.index}</span>
-            <span className="w-[5.5rem] shrink-0 whitespace-nowrap tabular-nums text-[11px] text-muted-foreground/70">
+            <span className="w-[5.5rem] shrink-0 whitespace-nowrap tabular-nums text-[11px] text-muted-foreground/80">
               {fmtWallTime(r.from)}–{fmtWallTime(r.to)}
             </span>
             <span className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
@@ -2020,7 +2020,7 @@ function PorHora({ series, paradas }: {
             </span>
             {/* 5.5rem y no 5: con el asterisco de hora parcial, "1.012 pz/h *"
                 se partía en dos líneas y descuadraba la fila. */}
-            <span className="w-[5.5rem] shrink-0 whitespace-nowrap text-right tabular-nums text-[11px] text-muted-foreground/70">
+            <span className="w-[5.5rem] shrink-0 whitespace-nowrap text-right tabular-nums text-[11px] text-muted-foreground/80">
               {fmtInt(r.piecesPerHour)} pz/h
               {r.partial && (
                 <span
@@ -2050,7 +2050,7 @@ function PorHora({ series, paradas }: {
             : '. Ninguna parada registrada la explica.'}
         </p>
       )}
-      <p className="mt-2 text-[11px] text-muted-foreground/70">
+      <p className="mt-2 text-[11px] text-muted-foreground/80">
         Horas corridas desde el arranque, como cuenta Shoplogix: la hora 1 va del
         primer ciclo a +60 min.
         {rows.some((r) => r.partial) && (
@@ -2181,7 +2181,7 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
         <span className="text-[15px] text-muted-foreground">
           pz/min andando
           {!parada && (
-            <span className="text-[12px] text-muted-foreground/70">
+            <span className="text-[12px] text-muted-foreground/80">
               {cerrado ? ' · últimos 15 min del turno' : ' · últimos 15 min'}
             </span>
           )}
@@ -2215,7 +2215,7 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
               estas tres son del turno ENTERO: pegadas y sin rótulo, se leía
               «14,1 andando» arriba y «suma 35,1» abajo, que fue exactamente la
               pregunta de Orel («esos dos ritmos, ¿por qué son distintos?»). */}
-          <span className="basis-full text-[11px] text-muted-foreground/70">
+          <span className="basis-full text-[11px] text-muted-foreground/80">
             Cada máquina, en todo el turno:
           </span>
           {maquinas.maquinas.map((m) => (
@@ -2419,7 +2419,7 @@ function PulsoVivo({ pulse, token, cerrado, onPulso }: {
 
   return (
     <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
-      <span className="tabular-nums text-muted-foreground/70">
+      <span className="tabular-nums text-muted-foreground/80">
         Leído de Shoplogix {hace}
       </span>
       <button
@@ -2430,7 +2430,7 @@ function PulsoVivo({ pulse, token, cerrado, onPulso }: {
       >
         {pidiendo ? 'consultando…' : 'actualizar ahora'}
       </button>
-      {aviso && <span className="w-full text-muted-foreground/70">{aviso}</span>}
+      {aviso && <span className="w-full text-muted-foreground/80">{aviso}</span>}
     </div>
   )
 }
@@ -3605,7 +3605,7 @@ export function PublicShiftMonitorPage() {
                 /* Wall-clock: los ISO del monitor llevan Z pero son hora de
                    planta, así que el día se lee con getUTCDate. */
                 if (ini.getUTCDate() === fin.getUTCDate()) return null
-                return <span className="text-muted-foreground/70"> → {fmtDiaCorto(fin)}</span>
+                return <span className="text-muted-foreground/80"> → {fmtDiaCorto(fin)}</span>
               })()}
             </span>
             <span className="text-muted-foreground/50">·</span>
@@ -3657,7 +3657,7 @@ export function PublicShiftMonitorPage() {
           </button>
 
           <div className="flex items-center gap-2">
-            <span className="text-[11px] text-muted-foreground/70">
+            <span className="text-[11px] text-muted-foreground/80">
               {esActual ? 'Turno actual' : `${idx} turno${idx > 1 ? 's' : ''} atrás`}
             </span>
             {/* Atajo al presente: con seis turnos de historial, volver de a uno
@@ -3696,7 +3696,7 @@ export function PublicShiftMonitorPage() {
           </div>
           <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-1">
             <span className="text-5xl font-bold tabular-nums leading-none">{fmtInt(contador.valor)}</span>
-            <span className="text-sm text-muted-foreground/70">piezas</span>
+            <span className="text-sm text-muted-foreground/80">piezas</span>
             {/* UNA sola hora de corte en toda la pantalla (pedido de Orel,
                 13-ago y 20-ago). Antes acá decía «datos hasta las 23:00» por los
                 buckets y el pie decía «Shoplogix marca ... a las 22:56» por el
@@ -3705,7 +3705,7 @@ export function PublicShiftMonitorPage() {
                 el crudo de Shoplogix y esta es SU hora. Solo con el turno VIVO:
                 cerrado, el total ya es final. */}
             {!live.shiftClosed && contador.corteWallMs != null && (
-              <span className="text-[12px] tabular-nums text-muted-foreground/70">
+              <span className="text-[12px] tabular-nums text-muted-foreground/80">
                 {contador.fuente === 'pulso' ? 'Shoplogix, ' : 'datos hasta las '}
                 {new Date(contador.corteWallMs).toISOString().slice(11, 16)}
               </span>
@@ -3742,7 +3742,7 @@ export function PublicShiftMonitorPage() {
               los buckets y llega hasta 8 min tarde. Decirlo es la diferencia
               entre un dato viejo y un dato viejo que se hace pasar por vivo. */}
           {contador.motivoFallback && (
-            <p className="mt-1 text-[11px] text-muted-foreground/70">
+            <p className="mt-1 text-[11px] text-muted-foreground/80">
               {contador.motivoFallback}: se muestra el acumulado de los tramos de 5 min.
             </p>
           )}
@@ -3754,12 +3754,12 @@ export function PublicShiftMonitorPage() {
           {outside > 0 && (
             <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-muted-foreground">
               <span className="tabular-nums">{fmtInt(contador.valor)} dentro del turno</span>
-              <span className="text-muted-foreground/60">+</span>
+              <span className="text-muted-foreground/80">+</span>
               <Pill tone="warning" className="tabular-nums normal-case">
                 {fmtInt(outside)} fuera del horario
               </Pill>
               {(live.outsideRanges ?? []).map(r => (
-                <span key={r.from} className="text-[11px] tabular-nums text-muted-foreground/70">
+                <span key={r.from} className="text-[11px] tabular-nums text-muted-foreground/80">
                   ({r.kind === 'antes' ? 'antes: ' : ''}{fmtWallTime(r.from)}–{fmtWallTime(r.to)})
                 </span>
               ))}
@@ -4311,9 +4311,9 @@ export function PublicShiftMonitorPage() {
                   <span className="min-w-0 flex-1">
                     <span className="block truncate">
                       {m.name}
-                      {m.model && <span className="ml-1 text-[11px] text-muted-foreground/70">{m.model}</span>}
+                      {m.model && <span className="ml-1 text-[11px] text-muted-foreground/80">{m.model}</span>}
                       {!live.shiftClosed && m.status === 'produciendo' && (
-                        <span className="ml-1 text-[11px] text-muted-foreground/70">· produciendo</span>
+                        <span className="ml-1 text-[11px] text-muted-foreground/80">· produciendo</span>
                       )}
                     </span>
                     {/* Una Baader parada de tres no se veía en ningún lado: el
@@ -4326,7 +4326,7 @@ export function PublicShiftMonitorPage() {
                     )}
                   </span>
                   <span className="tabular-nums text-foreground/80">{fmtInt(m.pieces)} pz</span>
-                  <span className="w-20 text-right tabular-nums text-[11px] text-muted-foreground/70">
+                  <span className="w-20 text-right tabular-nums text-[11px] text-muted-foreground/80">
                     {fmtInt(m.piecesPerHour)} pz/h
                   </span>
                 </li>
@@ -4336,14 +4336,14 @@ export function PublicShiftMonitorPage() {
         )}
 
         {/* Frescura y procedencia */}
-        <footer className="space-y-1 pb-6 pt-1 text-center text-[11px] text-muted-foreground/60">
+        <footer className="space-y-1 pb-6 pt-1 text-center text-[11px] text-muted-foreground/80">
           {/* Con el turno CERRADO no hay sync porque no hay producción: "hace
               4 h — puede estar detenida" de noche alarmaba por lo normal. La
               alerta ámbar queda solo para dato viejo con turno VIVO. ⚠
               `lastSyncAt` es UTC REAL (no wall-clock): la hora se formatea con
               el reloj local del cliente, no con fmtWallTime. */}
           {live.shiftClosed ? (
-            <p className="text-muted-foreground/70">
+            <p className="text-muted-foreground/80">
               Turno cerrado
               {live.lastSyncAt && (
                 <>
@@ -4356,7 +4356,7 @@ export function PublicShiftMonitorPage() {
               . Se actualiza solo cuando arranque el próximo turno.
             </p>
           ) : (
-            <p className={stale ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground/70'}>
+            <p className={stale ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground/80'}>
               <RefreshCw className="mr-1 inline h-3 w-3" />
               Datos de planta actualizados {fmtAgo(live.lastSyncAt, now)}
               {stale && ' — la sincronización puede estar detenida'}
@@ -4384,7 +4384,7 @@ export function PublicShiftMonitorPage() {
             </div>
           )}
           {data.mode === 'line' && (
-            <p className="text-muted-foreground/70">
+            <p className="text-muted-foreground/80">
               Este link no caduca con el turno: al arrancar el siguiente, cambia solo.
             </p>
           )}
@@ -4394,7 +4394,7 @@ export function PublicShiftMonitorPage() {
             })}
           </p>
           {/* Decirlo es parte de hacerlo bien: se cuenta el uso, no a la gente. */}
-          <p className="text-muted-foreground/60">
+          <p className="text-muted-foreground/80">
             Se cuentan las aperturas de forma anónima, para saber si la pantalla sirve.
             No se registra quién la abre.
           </p>

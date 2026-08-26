@@ -39,7 +39,7 @@ export function CascadaTurnoCard({ cascada }: { cascada: Cascada }) {
           Dónde se fueron las piezas
         </h2>
         {corte && (
-          <span className="text-caption tabular-nums text-muted-foreground/70">
+          <span className="text-caption tabular-nums text-muted-foreground/80">
             tramos cerrados hasta las {corte}
           </span>
         )}
@@ -59,7 +59,7 @@ export function CascadaTurnoCard({ cascada }: { cascada: Cascada }) {
                 <span className="text-footnote text-foreground/80">
                   {paso.etiqueta}
                   {detalle && (
-                    <span className="text-caption tabular-nums text-muted-foreground/70"> · {detalle}</span>
+                    <span className="text-caption tabular-nums text-muted-foreground/80"> · {detalle}</span>
                   )}
                 </span>
                 <span

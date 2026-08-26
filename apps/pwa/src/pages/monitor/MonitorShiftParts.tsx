@@ -357,7 +357,7 @@ export function TiempoDelTurno({
            * entre lo pintado y el hueco es la cuota de esta hora. Los valores
            * SIEMPRE afuera: el ancho de un segmento no decide su legibilidad.
            */}
-          <p className="text-right text-[11px] uppercase tracking-wide text-muted-foreground/70">
+          <p className="text-right text-[11px] uppercase tracking-wide text-muted-foreground/80">
             meta <span className="tabular-nums">{fmtInt(metaOk)} pz</span>
           </p>
           {/* Los segmentos son ATAJOS al mismo detalle que su fila (abajo);
@@ -458,7 +458,7 @@ export function TiempoDelTurno({
                             y la fila arranca abierta para que el argumento de
                             imputación siga siendo lo primero que se ve. */}
                         {gruposImputables.length === 0 && (
-                          <p className="py-0.5 text-muted-foreground/70">nada por recuperar</p>
+                          <p className="py-0.5 text-muted-foreground/80">nada por recuperar</p>
                         )}
                         {gruposImputables.map((g) => (
                           <div key={g.dueno}>
@@ -480,7 +480,7 @@ export function TiempoDelTurno({
                           </div>
                         ))}
                         {onCausa && gruposImputables.length > 0 && (
-                          <p className="mt-1.5 text-[11px] text-muted-foreground/70">
+                          <p className="mt-1.5 text-[11px] text-muted-foreground/80">
                             Tocá una causa para ver sus paradas una por una.
                           </p>
                         )}
@@ -661,7 +661,7 @@ export function TiempoDelTurno({
           </p>
 
           {gruposVisibles.length === 0 && (
-            <p className="mt-1 text-[11.5px] text-muted-foreground/60">nada por recuperar</p>
+            <p className="mt-1 text-[11.5px] text-muted-foreground/80">nada por recuperar</p>
           )}
 
           {gruposVisibles.map((g) => (
@@ -689,7 +689,7 @@ export function TiempoDelTurno({
           ))}
 
           {onCausa && gruposVisibles.length > 0 && (
-            <p className="mt-1.5 text-[11px] text-muted-foreground/70">
+            <p className="mt-1.5 text-[11px] text-muted-foreground/80">
               Tocá una causa para ver sus paradas una por una.
             </p>
           )}
@@ -703,7 +703,7 @@ export function TiempoDelTurno({
           único que lo dice; con ella abierta lo dice el grupo y esto se
           calla para no repetirlo. */}
       {proximaParada && (tb.plannedMin === 0 || (restaVisible && parte !== 'programado')) && (
-        <p className="mt-1.5 text-[11px] text-muted-foreground/70">
+        <p className="mt-1.5 text-[11px] text-muted-foreground/80">
           {tb.plannedMin === 0 ? 'Todavía sin paradas de convenio: ' : ''}
           {nombreDeConvenio(proximaParada.reason)} entra a las{' '}
           {/* ~ porque es la mediana de los turnos anteriores, no un pacto. */}
@@ -791,7 +791,7 @@ export function TiempoDelTurno({
             </span>
           </div>
 
-          <p className="mt-2 text-[11px] leading-snug text-muted-foreground/70">
+          <p className="mt-2 text-[11px] leading-snug text-muted-foreground/80">
             Los minutos son los que la causa estuvo activa en alguna máquina; la barra mide la
             LÍNEA, que solo se detiene cuando paran todas.
           </p>
@@ -853,7 +853,7 @@ function GrupoDeEventos({ g, sel, onCausa, onVentana, onTramo, notas, proximaPar
       {/* ⚠ El aviso NO se apaga con la primera parada planificada: 7 min de
           reunión de inicio lo mataban con la colación todavía por delante. */}
       {proximaParada && plannedMin > 0 && (
-        <p className="mt-1 pl-2 text-[11px] text-muted-foreground/70">
+        <p className="mt-1 pl-2 text-[11px] text-muted-foreground/80">
           {/* Con NOMBRE y en mayúscula inicial: la pregunta real es «¿cuándo es
               la colación?» y la respuesta tiene que decir colación. */}
           {nombreDeConvenio(proximaParada.reason)} entra a las{' '}
@@ -946,7 +946,7 @@ function FilaEvento({ c, sel, onCausa, onVentana, onTramo, notas }: {
   const nombre = (
     <span className="min-w-0 truncate">
       {c.reason}
-      {c.paradas.length > 0 && <span className="ml-1 text-[11px] text-muted-foreground/70">{abierta ? '▾' : '▸'}</span>}
+      {c.paradas.length > 0 && <span className="ml-1 text-[11px] text-muted-foreground/80">{abierta ? '▾' : '▸'}</span>}
     </span>
   )
 
@@ -979,7 +979,7 @@ function FilaEvento({ c, sel, onCausa, onVentana, onTramo, notas }: {
       {/* La categoría del curso, para que la etiqueta no sea nuestra: si el
           árbol dice que ATASCAMIENTO es MMPP, nadie discute la fila. */}
       {c.categoria && (
-        <p className="px-1 text-[9.5px] uppercase tracking-wide text-muted-foreground/70">
+        <p className="px-1 text-[9.5px] uppercase tracking-wide text-muted-foreground/80">
           {c.categoria}
           {c.extension && <span className="ml-1 normal-case tracking-normal">· fuera del curso</span>}
         </p>
@@ -988,7 +988,7 @@ function FilaEvento({ c, sel, onCausa, onVentana, onTramo, notas }: {
       {abierta && c.paradas.length > 0 && (
         <div className="my-1 ml-2 border-l border-border pl-2">
           {muchas && (
-            <p className="text-[11px] italic text-muted-foreground/70">
+            <p className="text-[11px] italic text-muted-foreground/80">
               {cuantas} paradas de {Math.round(prom)} s en promedio.
             </p>
           )}
@@ -1004,7 +1004,7 @@ function FilaEvento({ c, sel, onCausa, onVentana, onTramo, notas }: {
               const saltable = onVentana != null && p.desdeMin != null && p.hastaMin != null
               const contenido = (
                 <>
-                  <span className="tabular-nums text-muted-foreground/70">
+                  <span className="tabular-nums text-muted-foreground/80">
                     {p.hora}<span className="px-0.5">→</span>{p.hasta}
                   </span>
                   <span className="tabular-nums">{fmtDec(p.min)} min</span>
@@ -1051,7 +1051,7 @@ function FilaEvento({ c, sel, onCausa, onVentana, onTramo, notas }: {
             })}
           </ul>
           {muchas && (
-            <p className="text-[11px] italic text-muted-foreground/70">
+            <p className="text-[11px] italic text-muted-foreground/80">
               las {c.paradas.length}, de la más larga a la más corta
             </p>
           )}
@@ -1169,7 +1169,7 @@ export function ComparadorDias({ cmp, live, cone, ventana, onVentana, refSel, on
               los 7 turnos medidos de Filete arrancaron todos a las 07:40. Lo
               que sigue siendo cierto —y lo único que hay que advertir— es
               contra qué se alinean los OTROS días. */}
-          <p className="mt-2 text-[11px] leading-snug text-muted-foreground/70">
+          <p className="mt-2 text-[11px] leading-snug text-muted-foreground/80">
             Las horas son las de este turno. Los otros días se alinean por altura de turno
             —minutos desde su propio arranque—, así que si alguno empezó a otra hora, igual se
             compara a la misma altura.
