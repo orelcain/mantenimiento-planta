@@ -44,6 +44,19 @@ export interface RitmoDeMaquina {
   detenida: boolean
   /** % del turno andando, si se conoce: explica la diferencia de rendimiento. */
   uptimePct: number | null
+  /**
+   * Cuánto pone esta máquina en la media de 15 min de la LÍNEA (mismo
+   * denominador que el número de arriba: las tres SUMAN esa media). Lo anexa
+   * la página con `repartoAhoraAndando`; null si el doc aún no trae la serie
+   * por máquina.
+   */
+  ahoraCpm?: number | null
+  /**
+   * Aporte al promedio del turno: piezas ÷ minutos produciendo de la LÍNEA.
+   * Por construcción las tres suman el promedio de línea — a diferencia de
+   * `cpm`, que va sobre los minutos propios y no suma (44,2 vs 34,9).
+   */
+  aporteCpm?: number | null
 }
 
 export interface RitmosPorMaquina {

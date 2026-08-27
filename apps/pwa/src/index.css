@@ -97,6 +97,13 @@
   --mon-hoy: #3e5c7b;
   --mon-cuota: #8b6434;
   --mon-ref: #7e8692;
+  /* Curvas POR MÁQUINA del monitor (velocidad de cada Baader): tres hues
+     separados en OKLCH —azul / naranja / verde azulado— elegidos para
+     distinguirse también con deuteranopia, con la misma luminosidad
+     contenida del resto de la familia (≥3:1 sobre --card en cada tema). */
+  --mon-maq-1: #33628f;
+  --mon-maq-2: #96562c;
+  --mon-maq-3: #2c6b62;
   /* Relleno de la brecha: mismo patrón `-soft` que el resto del archivo,
      sobre los semánticos −50% (no el rojo/verde puros que había). */
   --mon-arriba-soft: rgba(103, 149, 118, 0.22);
@@ -256,6 +263,11 @@
   --mon-hoy: #82a3c4;
   --mon-cuota: #ac8352;
   --mon-ref: #69717d;
+  /* Curvas por máquina, aclaradas para el card oscuro (mismo criterio que
+     --mon-hoy: sobre oscuro el trazo sube de luminosidad, no de saturación). */
+  --mon-maq-1: #7ba7d4;
+  --mon-maq-2: #cf9468;
+  --mon-maq-3: #6fb3a8;
   --mon-arriba-soft: rgba(108, 154, 138, 0.22);
   --mon-abajo-soft: rgba(178, 128, 127, 0.22);
 

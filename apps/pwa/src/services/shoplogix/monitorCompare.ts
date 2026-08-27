@@ -417,13 +417,21 @@ export function buildDayComparison(args: {
   }]
 
   /*
-   * ⚠ Acá NO se filtra ni se reordena por turno: Yal corre tres turnos por
-   * jornada y los compara ENTRE SÍ a propósito (hay test que fija el orden
-   * «lun 10 T1/T2/T3»). La curva de otro turno es una opción legítima y las
-   * etiquetas ya los distinguen. Lo que sí se elige por turno es la REFERENCIA
-   * por defecto — eso vive en `resumenComparacion`.
+   * Solo días del MISMO turno (Orel, 26-08: «no vale la pena comparar con
+   * otro turno en distinto horario»). Antes se mezclaban a propósito los
+   * turnos de la jornada; en la práctica un T1 nocturno contra un T2 diurno
+   * compara dos procesos con otra dotación y otro horario, y la etiqueta
+   * «T2» no alcanza a advertirlo. El fallback a todos queda SOLO para cuando
+   * el turno de hoy no tiene historia con qué compararse (línea nueva o
+   * primer día de un turno): peor es no mostrar nada.
    */
-  for (const prev of (args.previous ?? []).slice(0, args.maxDays ?? 2)) {
+  const candidatos = (() => {
+    const todos = args.previous ?? []
+    if (!args.todayShiftId) return todos
+    const propios = todos.filter((p) => p.shiftId === args.todayShiftId)
+    return propios.length > 0 ? propios : todos
+  })()
+  for (const prev of candidatos.slice(0, args.maxDays ?? 2)) {
     const curve = cumulativeFromStart(prev.series)
     if (curve.length === 0) continue
     days.push({

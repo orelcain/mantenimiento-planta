@@ -140,6 +140,52 @@ export function ritmoAhoraAndando(
   return piezas / minutosAndando
 }
 
+/**
+ * El reparto de la media de 15 min entre las máquinas de la línea.
+ *
+ * ── La matemática que hace que "sume" ──────────────────────────────────────
+ * El ritmo «mientras anduvo» de cada máquina NO suma el de la línea: cada una
+ * corre en minutos distintos (medido: 44,2 de suma contra 34,9 de línea). Para
+ * que la columna de la izquierda del monitor cierre con el número de arriba,
+ * las tres se dividen por el MISMO denominador que usa `ritmoAhoraAndando`:
+ * los minutos andando de la LÍNEA en la misma ventana. Así, por construcción,
+ * la suma de los repartos ES la media de 15 min — cada valor se lee como
+ * "cuánto de esos 28,1 pone esta máquina".
+ *
+ * @param porMaquina  piezas por bucket de cada máquina, alineadas 1:1 con
+ *                    `series` (mismo índice = mismo tramo de 5 min).
+ * @returns un cpm por máquina, en el mismo orden — o null si la línea aún no
+ *          tiene ventana que repartir.
+ */
+export function repartoAhoraAndando(
+  series: readonly TramoSerie[] | null | undefined,
+  porMaquina: ReadonlyArray<readonly number[] | null | undefined>,
+  ahoraWall?: number | null,
+): number[] | null {
+  if (!series || series.length === 0) return null
+  const conDatos = mediaMovil(series).length
+  if (conDatos === 0) return null
+
+  const minUltimo = minutosDelUltimoTramo(series[conDatos - 1]?.t, ahoraWall)
+  const hasta = minUltimo < MIN_TRAMO_UTIL ? conDatos - 1 : conDatos
+  if (hasta <= 0) return null
+
+  const desde = Math.max(0, hasta - VENTANA_TRAMOS)
+  const ventana = series.slice(desde, hasta)
+  const minutosAndando = ventana.reduce((a, p, i) => {
+    if ((p.pieces ?? 0) <= 0) return a
+    return a + (i === ventana.length - 1 && hasta === conDatos ? minUltimo : PASO_MIN)
+  }, 0)
+  if (minutosAndando === 0) return porMaquina.map(() => 0)
+
+  return porMaquina.map((s) => {
+    if (!s) return 0
+    let pz = 0
+    for (let i = desde; i < hasta; i++) pz += s[i] ?? 0
+    return pz / minutosAndando
+  })
+}
+
 /** Cómo se lee un ritmo contra el techo de la máquina. */
 export type EstadoRitmo = 'ok' | 'lento' | 'parada'
 

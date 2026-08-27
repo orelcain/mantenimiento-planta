@@ -150,3 +150,43 @@ describe('reenganches', () => {
     assert.strictEqual(r[0].min, null)
   })
 })
+
+describe('interseccionSec', () => {
+  const { interseccionSec } = require('../kpisMantencion')
+  const min = (m) => m * 60_000
+
+  test('la línea entera detenida = solape de TODAS, no la suma', () => {
+    // Ev1 para 0-10, Ev2 para 5-15: sumados son 20 min, juntas solo 5.
+    const sec = interseccionSec([
+      [[min(0), min(10)]],
+      [[min(5), min(15)]],
+    ])
+    assert.strictEqual(sec, 5 * 60)
+  })
+
+  test('sin solape es 0 aunque cada una haya parado', () => {
+    const sec = interseccionSec([
+      [[min(0), min(10)]],
+      [[min(20), min(30)]],
+    ])
+    assert.strictEqual(sec, 0)
+  })
+
+  test('tramos solapados de UNA máquina no cuentan doble', () => {
+    // Ev1 trae el mismo paro partido en dos states que se pisan.
+    const sec = interseccionSec([
+      [[min(0), min(8)], [min(6), min(10)]],
+      [[min(4), min(12)]],
+    ])
+    assert.strictEqual(sec, 6 * 60)   // 4→10
+  })
+
+  test('tres máquinas: manda la ventana común', () => {
+    const sec = interseccionSec([
+      [[min(0), min(30)]],
+      [[min(10), min(40)]],
+      [[min(25), min(50)]],
+    ])
+    assert.strictEqual(sec, 5 * 60)   // 25→30
+  })
+})
