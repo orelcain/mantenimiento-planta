@@ -3053,10 +3053,15 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
   const frescura = frescuraDelRitmo(corteMs, ahoraWallMs)
   const vara = pedido && pedido > 0 ? pedido : setCpm
   const estado = estadoRitmo(ahora, vara)
-  const fr = fraccionDeRegla(ahora, setCpm)
-  const frTurno = fraccionDeRegla(turno, setCpm)
-  const frPedido = fraccionDeRegla(pedido ?? null, setCpm)
+  /* La ESCALA de la regla: el set point si existe y, si no, el TECHO
+     DEMOSTRADO — el mejor ritmo andando de los últimos turnos. Antes, sin
+     set point (Eviscerado no tiene uno de línea), `fraccionDeRegla` caía al
+     propio ritmo como tope y la barra vivía SIEMPRE llena: solo cambiaba de
+     color, no informaba nada (Orel, ronda de pulido del 27-08). */
   const techoDeLaLinea = setCpm != null && setCpm > 0 ? setCpm : (techoDemostrado ?? null)
+  const fr = fraccionDeRegla(ahora, techoDeLaLinea)
+  const frTurno = fraccionDeRegla(turno, techoDeLaLinea)
+  const frPedido = fraccionDeRegla(pedido ?? null, techoDeLaLinea)
   const pedidoImposible = pedidoFueraDeAlcance(pedido, techoDeLaLinea)
   /* El estado SIEMPRE se dice con palabra además de color: en planta hay
      pantallas quemadas por el sol y gente que no distingue rojo de verde. */
@@ -3211,8 +3216,9 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
         </div>
       )}
       {/* ── La regla ──────────────────────────────────────────────────────
-          0 → set point. El relleno es AHORA, la marca es el promedio del
-          turno y el final es lo que da la máquina. */}
+          0 → set point (o el techo demostrado si la línea no tiene uno). El
+          relleno es la media 15 andando, la marca es la meta (o el promedio)
+          y el final es lo que la línea puede dar. */}
       <div className="mt-3">
         <div className="relative h-2.5 overflow-hidden rounded-full bg-muted">
           <span
@@ -3222,7 +3228,7 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
           {/* La marca es el OBJETIVO: dónde tendría que estar el relleno para
               llegar a la cuota. Que el relleno la pase o no la alcance ES la
               respuesta, sin leer un número. */}
-          {pedido != null && pedido > 0 && setCpm != null && setCpm > 0 && (
+          {pedido != null && pedido > 0 && techoDeLaLinea != null && techoDeLaLinea > 0 && (
             <span
               className={`absolute inset-y-0 w-0.5 ${pedidoImposible ? 'bg-foreground/30' : 'bg-foreground'}`}
               style={{ left: `${frPedido * 100}%` }}
@@ -3232,7 +3238,7 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
             />
           )}
           {/* Sin objetivo conocido, la referencia posible es el promedio del turno. */}
-          {(pedido == null || pedido <= 0) && turno != null && turno > 0 && setCpm != null && setCpm > 0 && (
+          {(pedido == null || pedido <= 0) && turno != null && turno > 0 && techoDeLaLinea != null && techoDeLaLinea > 0 && (
             <span
               className="absolute inset-y-0 w-0.5 bg-foreground/45"
               style={{ left: `${frTurno * 100}%` }}
@@ -3259,8 +3265,9 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
                 : 'línea, todo el turno —'}
           </span>
           {/* La etiqueta del techo ES el control: a 375 px no cabe un lápiz
-              extra sin pisarla. */}
-          {setCpm != null && setCpm > 0 && (
+              extra sin pisarla. Sin set point, el final de la barra es el
+              TECHO DEMOSTRADO y se rotula como tal. */}
+          {setCpm != null && setCpm > 0 ? (
             onEditarSetPoint ? (
               <button
                 type="button"
@@ -3272,7 +3279,14 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
             ) : (
               <span className="tabular-nums">{fmtDec(setCpm)} máquina</span>
             )
-          )}
+          ) : techoDemostrado != null && techoDemostrado > 0 ? (
+            <span
+              className="tabular-nums"
+              title="El mejor ritmo andando de los últimos turnos de este nombre — lo que la línea demostró que puede."
+            >
+              techo {fmtDec(techoDemostrado)}
+            </span>
+          ) : null}
         </div>
       </div>
 
