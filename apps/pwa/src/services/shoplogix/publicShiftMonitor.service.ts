@@ -197,6 +197,10 @@ export interface PublicMonitorLive {
       mtbfMin: number | null
       microN: number
       microMin: number
+      /** Detenciones sin causa anotada: con esto la tarjeta no reclama 100%
+          mientras haya paros que nadie imputó. Ausente en docs previos. */
+      sinImputarN?: number
+      sinImputarMin?: number
       causasFalla: Array<{ causa: string; min: number }>
     }>
     eventos: Array<{

@@ -1519,7 +1519,7 @@ function CierreDelTurno({ cierre, muestras, fuente, plantSlug, shiftName, startA
 }
 
 function RitmoNecesario({
-  pace, cierre, muestras, fuente, plantSlug, shiftName, startAt, historial, horizonte, vsAyer,
+  pace, cierre, muestras, fuente, plantSlug, shiftName, startAt, historial, horizonte, vsAyer, minAndando,
   llenado, onGuardarCuota, origenObjetivo, turnosObjetivo, detenida, sinDatosHaceMin,
 }: {
   pace: PaceToTarget | null
@@ -1542,6 +1542,8 @@ function RitmoNecesario({
   horizonte?: { hasta: string; estimate: number | null; mapePct: number | null; explicacion?: string | null } | null
   /** El día anterior a la MISMA altura de turno, y la diferencia con hoy. */
   vsAyer?: { label: string; pieces: number; diff: number } | null
+  /** Minutos ANDANDO del turno: bajo 30 no se proyecta (rampa de partida). */
+  minAndando?: number | null
   /** Velocidad de la máquina y llenado de silletas, si el modelo se conoce. */
   llenado?: LlenadoSilletas | null
   cierre: string | null | undefined
@@ -1617,6 +1619,41 @@ function RitmoNecesario({
         <Target className="h-3.5 w-3.5 shrink-0" />
         Meta cumplida — todo lo que salga de acá en adelante va por encima.
       </p>
+    )
+  }
+
+  /*
+   * OJO — Turno ARRANCANDO: con menos de 30 min andando, «al ritmo de ahora»
+   * extrapola la rampa de partida. La noche del 26-08, con 8 min de datos, la
+   * tarjeta anunciaba «cierra en 1.327 pz (9% de la meta)» y pedía 90 pz/min
+   * (2,1× el mejor turno) — cifras que no sobreviven a la primera hora. Hasta
+   * la media hora andando: la meta, cuánto falta, y la comparación contra el
+   * turno anterior a la MISMA altura — esa sí usa historia y vale desde el
+   * minuto uno.
+   */
+  if (minAndando != null && minAndando < 30) {
+    return (
+      <div className="mt-2 rounded-ctl border border-border bg-muted px-3 py-2">
+        <p className="text-[15px] font-semibold text-foreground">
+          Arrancando · <span className="tabular-nums">{fmtInt(minAndando)} min</span> andando
+        </p>
+        <p className="mt-0.5 text-[12px] text-muted-foreground">
+          Faltan <span className="tabular-nums text-foreground/90">{fmtInt(pace.remainingPieces)} pz</span>{' '}
+          para {pace.targetSource === 'cuota' ? 'la meta' : 'lo esperado'}. El ritmo necesario y el
+          cierre proyectado aparecen a la media hora de marcha — proyectar la rampa de partida
+          asusta sin informar.
+        </p>
+        {vsAyer && (
+          <p className="mt-0.5 text-[12px] text-muted-foreground">
+            {vsAyer.label} a esta altura llevaba{' '}
+            <span className="tabular-nums text-foreground/90">{fmtInt(vsAyer.pieces)} pz</span>{' '}
+            <span className={vsAyer.diff >= 0 ? 'text-ink-ok' : 'text-ink-warn'}>
+              ({vsAyer.diff >= 0 ? '+' : '−'}{fmtInt(Math.abs(vsAyer.diff))})
+            </span>
+            {' '}— esa comparación sí vale desde el arranque.
+          </p>
+        )}
+      </div>
     )
   }
 
@@ -2224,6 +2261,7 @@ function RespuestaMantencion({ m, cerrado }: {
   const sanas = m.porMaquina.length - conFalla.length
   const mttrGlobal = totalEventos > 0 ? totalFallaMin / totalEventos : null
   const microTotal = m.porMaquina.reduce((a, x) => a + x.microN, 0)
+  const totalSinImputarMin = m.porMaquina.reduce((a, x) => a + (x.sinImputarMin ?? 0), 0)
 
   const colorDisp = (pct: number | null) =>
     pct == null ? 'text-muted-foreground'
@@ -2238,7 +2276,14 @@ function RespuestaMantencion({ m, cerrado }: {
 
       {/* El titular: la historia en una frase, antes que cualquier cifra. */}
       <p className="mt-1.5 text-[15px] leading-snug text-foreground">
-        {totalFallaMin === 0 ? (
+        {totalFallaMin === 0 && totalSinImputarMin >= 3 ? (
+          /* OJO — con paros SIN CAUSA no se reclama el 100%: cualquiera de esos
+             minutos puede ser una falla que nadie imputó todavía. La tarjeta
+             lo dice y EMPUJA a imputar (Orel, 26-08). */
+          <>Sin fallas imputadas por ahora — pero hay{' '}
+            <b className="tabular-nums">{fmtInt(totalSinImputarMin)} min</b> de detenciones{' '}
+            <b>sin causa anotada</b> en Shoplogix. Imputarlas cierra la historia del turno.</>
+        ) : totalFallaMin === 0 ? (
           <>Sin fallas técnicas en el turno: disponibilidad{' '}
             <b className="tabular-nums">100%</b> en las {m.porMaquina.length} máquinas.</>
         ) : (
@@ -2259,14 +2304,19 @@ function RespuestaMantencion({ m, cerrado }: {
         {m.porMaquina.map((x) => (
           <div key={x.name} className="flex items-baseline gap-2">
             <span className="w-9 shrink-0 text-footnote text-muted-foreground">{nombreCorto(x.name)}</span>
-            <span className={`w-14 shrink-0 text-headline tabular-nums ${colorDisp(x.dispTecnicaPct)}`}>
+            <span className={`w-14 shrink-0 text-headline tabular-nums ${
+              /* Con paros sin causa el 100% queda en suspenso: tinta neutra. */
+              x.fallaMin === 0 && (x.sinImputarMin ?? 0) >= 3 ? 'text-muted-foreground' : colorDisp(x.dispTecnicaPct)
+            }`}>
               {x.dispTecnicaPct != null ? `${fmtDec(x.dispTecnicaPct, x.dispTecnicaPct >= 99.9 ? 0 : 1)}%` : '—'}
             </span>
             <span className="min-w-0 flex-1 truncate text-caption tabular-nums text-muted-foreground">
               {x.fallaMin > 0
                 ? `${x.eventosFalla} evento${x.eventosFalla === 1 ? '' : 's'} · ${fmtInt(x.fallaMin)} min` +
                   (x.causasFalla[0] ? ` (${x.causasFalla.map((c) => c.causa).join(', ')})` : '')
-                : 'sin fallas técnicas'}
+                : (x.sinImputarMin ?? 0) >= 3
+                  ? `sin fallas imputadas · ${fmtInt(x.sinImputarMin!)} min sin causa`
+                  : 'sin fallas técnicas'}
             </span>
           </div>
         ))}
@@ -2423,12 +2473,21 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
           cada una tiene su cifra con rótulo propio. Con la línea parada o el
           turno cerrado, AHORA es 0,0 de verdad — el ritmo viejo pasa a
           referencia («venía a…») en el bloque de causa, no al número grande. */}
+      {/* OJO — UNA sola verdad para «Ahora» (Orel, noche del 26-08): había un 5,6
+          grande (media de 15 min sobre tramos cerrados, corre atrás del reloj)
+          y un chip «12,0 ahora mismo» (el PULSO del contador vivo) a tres
+          centímetros. El grande ES el pulso cuando está fresco — el mismo
+          número de la pantalla de planta — y la media de 15 min pasa a
+          contexto. Sin pulso (contador caído), se cae a la media con su
+          etiqueta honesta. */}
       <div className="mt-1.5 flex items-end gap-x-3">
         <div className="min-w-0">
           <div className="text-caption text-muted-foreground">Ahora</div>
           <div className="flex flex-wrap items-baseline gap-x-1.5">
             <span className="text-[42px] font-semibold leading-none tabular-nums text-foreground">
-              {parada || cerrado ? '0,0' : ahora != null ? fmtDec(ahora) : '—'}
+              {parada || cerrado ? '0,0'
+                : pulso?.cpm != null ? fmtDec(pulso.cpm)
+                : ahora != null ? fmtDec(ahora) : '—'}
             </span>
             <span className="text-[15px] text-muted-foreground">pz/min</span>
           </div>
@@ -2447,12 +2506,29 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
       {/* El renglón de estado del número de AHORA. Solo con la línea andando:
           parada y cierre tienen su bloque propio abajo. */}
       {!parada && !cerrado && (
-        <p className="mt-1 flex flex-wrap items-center gap-x-2 text-[12px] text-muted-foreground">
-          {/* Si hace rato que no llega un tramo, el número deja de ser «de
-              ahora»: el turno del 26-08 cerró 15:00, el último dato era de las
-              15:10 y a las 15:35 el bloque seguía diciendo «últimos 15 min · a
-              ritmo». Ver `frescuraDelRitmo`. */}
-          {frescura?.viejo ? (
+        <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12px] text-muted-foreground">
+          {pulso?.cpm != null ? (
+            <>
+              <span className="inline-flex items-center gap-1 font-medium text-foreground/80">
+                <span className="inline-block size-1.5 rounded-full bg-ink-ok" />
+                ahora mismo
+                {pulso.at && (
+                  <span className="tabular-nums text-muted-foreground">
+                    · {new Date(pulso.at).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false })}
+                  </span>
+                )}
+              </span>
+              <span className="text-muted-foreground/80">el contador de la pantalla de planta</span>
+              {ahora != null && (
+                <span className={`inline-flex items-center gap-1 ${colorPunto}`}>
+                  <span className="inline-block size-1.5 rounded-full bg-current" />
+                  media 15 min andando <b className="tabular-nums">{fmtDec(ahora)}</b> · {palabra}
+                </span>
+              )}
+            </>
+          ) : frescura?.viejo ? (
+            /* Si hace rato que no llega un tramo, el número deja de ser «de
+               ahora»: ver `frescuraDelRitmo`. */
             <>
               <span className="inline-flex items-center gap-1 font-medium">
                 <span className="inline-block size-1.5 rounded-full bg-current" />
@@ -2629,20 +2705,9 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
           05:15» debajo de un turno que terminó a las 16:05 del día anterior,
           pegado a «Últimos 15 min · hasta las 16:05». Dos horas contradictorias
           a un centímetro. En un turno cerrado no hay «ahora mismo». */}
-      {!cerrado && pulso?.cpm != null && (
-        <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-border px-3 py-1">
-          <span className="inline-block size-1.5 rounded-full bg-emerald-500" />
-          <span className="text-[13px] font-semibold tabular-nums text-foreground">{fmtDec(pulso.cpm)}</span>
-          <span className="text-[11px] text-muted-foreground">
-            ahora mismo
-            {pulso.at && (
-              <> · <span className="tabular-nums">
-                {new Date(pulso.at).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false })}
-              </span></>
-            )}
-          </span>
-        </div>
-      )}
+      {/* El chip del pulso se fue: el número grande de «Ahora» YA ES el pulso
+          cuando está fresco. Dos «ahora» a tres centímetros era exactamente la
+          contradicción que este monitor viene cerrando (Orel, 26-08). */}
 
       {/* Las dos bases, dichas. El de reloj no se esconde: es el que dice
           cuánto SALE de verdad, y su distancia con el andando es el costo de
@@ -2663,6 +2728,14 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
         <div className="mt-2.5 border-t border-border/50 pt-2.5">
           {contexto && (
             <p className="text-footnote leading-snug text-foreground">{contexto}</p>
+          )}
+          {/* QUÉ velocidad dibuja, escrito (pedido de Orel, 26-08): sin la
+              etiqueta, el gráfico era «una velocidad» más entre varias. */}
+          {chispa && (
+            <p className="mt-1 text-caption text-muted-foreground/80">
+              Ritmo promedio <b className="text-muted-foreground">andando</b> de cada turno, pz/min
+              — la misma vara del «Promedio del turno» de arriba.
+            </p>
           )}
           {chispa}
         </div>
@@ -4400,6 +4473,7 @@ export function PublicShiftMonitorPage() {
                turno" de 9,7 de reloj y anunciaba un récord que no existía. */
             horizonte={horizontePronostico}
             vsAyer={vsAyer}
+            minAndando={live.timeBreakdown?.producingMin ?? null}
             llenado={llenadoSilletas}
             historial={ritmoAndando.mediana != null ? {
               medianCpm: ritmoAndando.mediana,
@@ -4453,6 +4527,14 @@ export function PublicShiftMonitorPage() {
              («en su rango normal — viene aflojando») sin resolver cuál manda. */
           const contexto = (() => {
             if (turnoCpm == null) return null
+            /* OJO — turno joven: el promedio de hoy es la RAMPA de partida y
+               siempre sale «abajo del rango» (la noche del 26-08: «8,4, abajo
+               del rango 20-43» con 20 min de marcha). Se dice que es parcial
+               en vez de dar un veredicto que todavía no existe. */
+            const andandoMin = live.timeBreakdown?.producingMin ?? 0
+            if (!turnoCerrado && andandoMin < 60) {
+              return `El punto de hoy es parcial (${Math.round(andandoMin)} min andando): la comparación con otros turnos vale desde ~1 h de marcha.`
+            }
             if (!banda) {
               return resumenesAnteriores.length === 0
                 ? 'Sin rango habitual todavía: aparece al 5º turno.'

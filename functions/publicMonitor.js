@@ -1396,6 +1396,14 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
         mtbfMin: k.mtbfMin != null ? Math.round(k.mtbfMin * 10) / 10 : null,
         microN: k.grupos.micro?.n ?? 0,
         microMin: Math.round((k.grupos.micro?.sec ?? 0) / 6) / 10,
+        /*
+         * Detenciones SIN causa anotada. Sin esto la tarjeta decía «100% ·
+         * sin fallas» con paros sin imputar a la vista — una falsa realidad
+         * (Orel, 26-08 con el turno noche recién arrancando): cualquiera de
+         * esos paros puede SER una falla que nadie categorizó todavía.
+         */
+        sinImputarN: k.grupos['sin-imputar']?.n ?? 0,
+        sinImputarMin: Math.round((k.grupos['sin-imputar']?.sec ?? 0) / 6) / 10,
         causasFalla,
       }
     })
