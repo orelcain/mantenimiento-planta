@@ -7,6 +7,7 @@ import { ResumenPlanta } from './ResumenPlanta'
 import { CargaTrabajo } from './CargaTrabajo'
 import { EditorMaquinas } from './EditorMaquinas'
 import { CargaRapida } from './CargaRapida'
+import { apilar, desapilar, restaurar, type PasoHistorial } from '@/services/historialRueda'
 import { CONFIG_CARGA_POR_DEFECTO, tareasIniciales, type ConfigCarga, type TareaMantencion } from '@/services/ruedaCarga'
 import { getCurrentUser } from '@/services/auth'
 import { logger } from '@/lib/logger'
@@ -138,7 +139,7 @@ export function RuedaVentanas() {
 
   const svgRef = useRef<SVGSVGElement | null>(null)
   const pintandoRef = useRef(false)
-  const historialRef = useRef<Array<{ maquinaId: string; dia: number; valor: DiaRueda }>>([])
+  const historialRef = useRef<PasoHistorial[]>([])
   const [puedeDeshacer, setPuedeDeshacer] = useState(false)
   const snapshotTomadoRef = useRef(false)
   const ultimoGuardadoRef = useRef<string>('')
@@ -243,15 +244,18 @@ export function RuedaVentanas() {
     [maquinaId, diaIdx],
   )
 
+  /*
+   * Se guarda la MÁQUINA COMPLETA, no el día que se está mirando: «copiar el día
+   * a Lun-Vie» toca cuatro días y «copiar la semana de otra máquina» reemplaza
+   * los siete. Guardando un día, deshacer restauraba ese y dejaba el resto
+   * pisado — trabajo perdido en silencio, con el botón diciendo que ya lo hizo.
+   */
   const tomarSnapshot = useCallback(() => {
     if (snapshotTomadoRef.current || !maquina) return
-    const actual = maquina.semana[diaIdx]
-    if (!actual) return
-    historialRef.current.push({ maquinaId, dia: diaIdx, valor: actual })
-    if (historialRef.current.length > 40) historialRef.current.shift()
+    historialRef.current = apilar(historialRef.current, maquina, diaIdx)
     snapshotTomadoRef.current = true
     setPuedeDeshacer(true)
-  }, [maquina, maquinaId, diaIdx])
+  }, [maquina, diaIdx])
 
   /** Tramo bajo el puntero, desde el ángulo — sin 288 elementos que testear. */
   const slotDesdePunto = useCallback((clientX: number, clientY: number): number | null => {
@@ -312,17 +316,15 @@ export function RuedaVentanas() {
   }, [])
 
   const deshacer = useCallback(() => {
-    const ultimo = historialRef.current.pop()
-    setPuedeDeshacer(historialRef.current.length > 0)
-    if (!ultimo) return
-    setMaquinaId(ultimo.maquinaId)
-    setDiaIdx(ultimo.dia)
-    setState((prev) => ({
-      ...prev,
-      maquinas: prev.maquinas.map((m) =>
-        m.id !== ultimo.maquinaId ? m : { ...m, semana: m.semana.map((d, i) => (i === ultimo.dia ? ultimo.valor : d)) },
-      ),
-    }))
+    const { historial, paso } = desapilar(historialRef.current)
+    historialRef.current = historial
+    setPuedeDeshacer(historial.length > 0)
+    if (!paso) return
+    // Se vuelve a donde estaba el foco al hacer el cambio: deshacer sin mostrar
+    // QUÉ se deshizo deja a la persona sin saber si funcionó.
+    setMaquinaId(paso.maquina.id)
+    setDiaIdx(paso.dia)
+    setState((prev) => ({ ...prev, maquinas: restaurar(prev.maquinas, paso) }))
   }, [])
 
   /* ── Dibujo ─────────────────────────────────────────────────────────────── */
@@ -351,6 +353,10 @@ export function RuedaVentanas() {
           maquinas={state.maquinas}
           tareas={state.tareas ?? []}
           // El autosave se dispara solo al cambiar `state`; no hay que avisarle.
+          /* Sin snapshot a propósito: agregar y renombrar no destruyen nada, y
+             eliminar ya pasa por su propia confirmación. El historial tampoco
+             resucita una máquina borrada — deshacer un borrado deliberado es
+             peor que no poder deshacerlo. */
           onCambiar={(maquinas) => setState((p) => ({ ...p, maquinas }))}
           onCerrar={() => setEditandoMaquinas(false)}
         />
