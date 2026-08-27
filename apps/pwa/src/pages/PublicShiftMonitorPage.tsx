@@ -26,7 +26,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { Activity, AlertCircle, ChevronLeft, ChevronRight, Clock, Gauge, Hourglass, Moon, PauseCircle, RefreshCw, Sun, Target, TrendingUp } from 'lucide-react'
+import { Activity, AlertCircle, ChevronLeft, ChevronRight, Clock, Gauge, Hourglass, Moon, PauseCircle, RefreshCw, Sun, Target, TrendingUp, Wrench } from 'lucide-react'
 import { useTheme } from '@/hooks/useTheme'
 import {
   subscribePublicShiftMonitor,
@@ -2185,6 +2185,94 @@ function PorHora({ series, paradas }: {
  * restar 12,5 de 18.
  */
 /**
+ * ── Respuesta de Mantención ──────────────────────────────────────────────────
+ * La evidencia de que Mantención responde, EN la pantalla que mira Producción
+ * (pedido de Orel, 26-08): quién falló, cuánto costó, qué tan rápido se repuso
+ * y quiénes cerraron en 100%. Los datos los publica el backend en
+ * `live.mantencion` (fallas encadenadas en EVENTOS; micro y planificado aparte
+ * para no pulverizar el MTTR). Se muestra también con el turno cerrado — ahí
+ * ES el informe.
+ */
+function RespuestaMantencion({ m, cerrado }: {
+  m: NonNullable<PublicMonitorLive['mantencion']>
+  cerrado: boolean
+}) {
+  if (!m.porMaquina.length) return null
+  const totalFallaMin = m.porMaquina.reduce((a, x) => a + x.fallaMin, 0)
+  const totalEventos = m.porMaquina.reduce((a, x) => a + x.eventosFalla, 0)
+  const conFalla = [...m.porMaquina].filter((x) => x.fallaMin > 0).sort((a, b) => b.fallaMin - a.fallaMin)
+  const sanas = m.porMaquina.length - conFalla.length
+  const mttrGlobal = totalEventos > 0 ? totalFallaMin / totalEventos : null
+  const microTotal = m.porMaquina.reduce((a, x) => a + x.microN, 0)
+
+  const colorDisp = (pct: number | null) =>
+    pct == null ? 'text-muted-foreground'
+      : pct >= 99.9 ? 'text-ink-ok' : pct >= 90 ? 'text-ink-warn' : 'text-ink-crit'
+
+  return (
+    <section className="rounded-card border border-border bg-card p-4">
+      <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+        <Wrench className="h-3 w-3" />
+        Mantención · respuesta del turno
+      </div>
+
+      {/* El titular: la historia en una frase, antes que cualquier cifra. */}
+      <p className="mt-1.5 text-[15px] leading-snug text-foreground">
+        {totalFallaMin === 0 ? (
+          <>Sin fallas técnicas en el turno: disponibilidad{' '}
+            <b className="tabular-nums">100%</b> en las {m.porMaquina.length} máquinas.</>
+        ) : (
+          <>La falla técnica {cerrado ? 'costó' : 'lleva'}{' '}
+            <b className="tabular-nums">{fmtInt(totalFallaMin)} min</b>
+            {conFalla.length === 1 && <>, toda en <b>{nombreCorto(conFalla[0]!.name)}</b></>}
+            {mttrGlobal != null && <> — MTTR <b className="tabular-nums">{fmtDec(mttrGlobal)} min</b></>}
+            {sanas > 0 && (
+              <> y {sanas === 1 ? 'la otra máquina' : `las otras ${sanas}`} en{' '}
+                <b className="tabular-nums">100%</b></>
+            )}.
+          </>
+        )}
+      </p>
+
+      {/* Una fila por máquina: la disponibilidad TÉCNICA con su palabra. */}
+      <div className="mt-2.5 space-y-1.5 border-t border-border/50 pt-2.5">
+        {m.porMaquina.map((x) => (
+          <div key={x.name} className="flex items-baseline gap-2">
+            <span className="w-9 shrink-0 text-footnote text-muted-foreground">{nombreCorto(x.name)}</span>
+            <span className={`w-14 shrink-0 text-headline tabular-nums ${colorDisp(x.dispTecnicaPct)}`}>
+              {x.dispTecnicaPct != null ? `${fmtDec(x.dispTecnicaPct, x.dispTecnicaPct >= 99.9 ? 0 : 1)}%` : '—'}
+            </span>
+            <span className="min-w-0 flex-1 truncate text-caption tabular-nums text-muted-foreground">
+              {x.fallaMin > 0
+                ? `${x.eventosFalla} evento${x.eventosFalla === 1 ? '' : 's'} · ${fmtInt(x.fallaMin)} min` +
+                  (x.causasFalla[0] ? ` (${x.causasFalla.map((c) => c.causa).join(', ')})` : '')
+                : 'sin fallas técnicas'}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* Los eventos, del más caro al más barato: cuándo, cuánto, qué. */}
+      {m.eventos.length > 0 && (
+        <div className="mt-2 space-y-0.5">
+          {m.eventos.slice(0, 3).map((e) => (
+            <p key={`${e.maquina}-${e.desde}`} className="text-caption tabular-nums text-muted-foreground">
+              {fmtWallTime(e.desde)}–{fmtWallTime(e.hasta)} · <b className="text-foreground/80">{fmtInt(e.min)} min</b>{' '}
+              · {e.causas.join(' + ')}{e.paros > 1 ? ` (${e.paros} paros encadenados)` : ''} · {nombreCorto(e.maquina)}
+            </p>
+          ))}
+        </div>
+      )}
+
+      <p className="mt-2 text-caption leading-snug text-muted-foreground/80">
+        Disponibilidad técnica: solo fallas de equipo — colación, esperas externas y las{' '}
+        <span className="tabular-nums">{fmtInt(microTotal)}</span> microdetenciones van aparte.
+      </p>
+    </section>
+  )
+}
+
+/**
  * La conclusión de la lista de máquinas, dicha en una frase.
  *
  * Cuando corren parejas, la noticia no es la velocidad sino la MARCHA: se
@@ -4322,6 +4410,10 @@ export function PublicShiftMonitorPage() {
                 a ser el informe — es donde el monitor demuestra qué le costó
                 las piezas a la línea (hallazgo del rediseño 26-08). */}
             {cascada && <CascadaTurnoCard cascada={cascada} />}
+            {/* La respuesta de Mantención, junto al «dónde se fueron las
+                piezas»: la cascada dice el costo, esta tarjeta dice quién
+                respondió y cómo. */}
+            {live.mantencion && <RespuestaMantencion m={live.mantencion} cerrado={turnoCerrado} />}
             <ReglaDeRitmo
               /* El tramo en curso se cuenta por los minutos que LLEVA, no por
                  los 5 que va a durar: si no, el número de "ahora" queda siempre

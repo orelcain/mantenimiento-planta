@@ -180,6 +180,34 @@ export interface PublicMonitorLive {
     planned: Array<{ reason: string; min: number; count: number; lineMin?: number }>
     recoverable: Array<{ reason: string; min: number; count: number; lineMin?: number }>
   } | null
+  /**
+   * KPIs de Mantención del turno, calculados por el backend desde los states
+   * (fallas ENCADENADAS en eventos; micro y planificado aparte — ver
+   * `functions/shoplogix/kpisMantencion.js`). Producción mira esta pantalla:
+   * la respuesta de Mantención tiene que estar donde está el público
+   * (pedido de Orel, 26-08). Ausente en docs anteriores al deploy.
+   */
+  mantencion?: {
+    porMaquina: Array<{
+      name: string
+      dispTecnicaPct: number | null
+      eventosFalla: number
+      fallaMin: number
+      mttrMin: number | null
+      mtbfMin: number | null
+      microN: number
+      microMin: number
+      causasFalla: Array<{ causa: string; min: number }>
+    }>
+    eventos: Array<{
+      maquina: string
+      desde: string
+      hasta: string
+      min: number
+      causas: string[]
+      paros: number
+    }>
+  } | null
   /** Razones de detención, referenciadas por índice desde `stopEvents`. */
   stopReasons?: string[]
   /** Detenciones ubicadas: `r` índice de razón, `f` inicio ISO, `s` segundos. */

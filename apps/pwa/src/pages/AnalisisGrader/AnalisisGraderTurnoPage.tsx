@@ -80,6 +80,8 @@ import { SensorStopsCausePanel } from '@/components/grader/SensorStopsCausePanel
 import { UpstreamCorrelationCard } from '@/components/grader/UpstreamCorrelationCard'
 import { UpstreamScatterCard } from '@/components/grader/UpstreamScatterCard'
 import { useUpstreamLineSnapshot } from '@/hooks/useUpstreamLineSnapshot'
+import { kpisDeTurno } from '@/services/shoplogix/kpisMantencionTurno'
+import { MantencionTurnoTab } from '@/components/grader/MantencionTurnoTab'
 import { useShiftOutsidePieces } from '@/hooks/useShiftOutsidePieces'
 import { getPlantLineConfig, DEFAULT_PLANT_LINE_ID } from '@/config/plantLines'
 import { findTriggeredRunbooks } from '@/services/grader/graderRunbooks'
@@ -142,7 +144,7 @@ function parseShiftId(raw: string | undefined): [string, string] {
  * del Grader colgaban al final del Resumen, después de la cuota y antes de los
  * botones de compartir. Esta pestaña es su espejo.
  */
-const ALL_TURNO_VIEWS = ['resumen', 'calidad', 'gates', 'linea', 'accion'] as const
+const ALL_TURNO_VIEWS = ['resumen', 'calidad', 'gates', 'linea', 'mantencion', 'accion'] as const
 type TurnoView = (typeof ALL_TURNO_VIEWS)[number]
 
 const TURNO_VIEW_LABEL: Record<TurnoView, string> = {
@@ -150,6 +152,9 @@ const TURNO_VIEW_LABEL: Record<TurnoView, string> = {
   calidad:  'Calidad',
   gates:    'Gates',
   linea:    'Línea',
+  /* mantencion — ¿cómo respondió Mantención? (MTTR/MTBF por evento, quién
+     falló y cuánto costó). «Línea» describe a las máquinas; esta, a nosotros. */
+  mantencion: 'Mantención',
   accion:   '¿Qué hacer?',
 }
 
@@ -394,6 +399,12 @@ export function AnalisisGraderTurnoPage() {
 
   // Línea upstream (Shoplogix) — usa el plantSlug correcto según la pestaña activa
   const upstreamLine = useUpstreamLineSnapshot(dateKey || null, shiftLabel || null, plantLineCfg.plantSlug)
+  /* KPIs de Mantención para la pestaña homónima: puro cálculo sobre el
+     snapshot que ya está cargado — cero fetch nuevo. */
+  const kpisMant = useMemo(
+    () => (upstreamLine.snapshot ? kpisDeTurno(upstreamLine.snapshot) : null),
+    [upstreamLine.snapshot],
+  )
   // Piezas que Shoplogix dejó fuera de la ventana del turno (mismo criterio que
   // el monitor público y la matriz, para que los tres números coincidan).
   const outsidePieces = useShiftOutsidePieces(
@@ -2120,7 +2131,13 @@ export function AnalisisGraderTurnoPage() {
           views={availableViews}
           active={activeView}
           onChange={setActiveView}
-          badges={{ gates: configSnapshots.length, accion: accionesPendientes + imputacionesPendientes }}
+          badges={{
+            gates: configSnapshots.length,
+            accion: accionesPendientes + imputacionesPendientes,
+            /* Eventos de falla del turno: el contador que hace visible la
+               pestaña cuando hubo algo que responder. */
+            mantencion: kpisMant?.totalEventos || undefined,
+          }}
           /*
            * Sin Excel quedan deshabilitadas solo las vistas que de verdad no
            * tienen nada que mostrar.
@@ -2137,6 +2154,21 @@ export function AnalisisGraderTurnoPage() {
             calidad: MOTIVO_SIN_EXCEL,
             ...(upstreamLine.snapshot ? {} : { accion: MOTIVO_SIN_EXCEL }),
           }}
+        />
+      )}
+
+      {/* ════════ MANTENCIÓN ════════
+          La respuesta de Mantención al turno (vista A del mockup 26-08):
+          titular, MTTR/MTBF por EVENTO, reparto de minutos y el evento mayor.
+          Va FUERA del gate de `summary`: se arma solo con Shoplogix, y las
+          plantas sin Grader son justamente las que más la necesitan. */}
+      {activeView === 'mantencion' && (
+        <MantencionTurnoTab
+          kpis={kpisMant}
+          loading={upstreamLine.loading}
+          plantSlug={plantLineCfg.plantSlug}
+          shiftId={upstreamLine.snapshot?.shiftId ?? shiftLabel ?? null}
+          dateKey={dateKey ?? null}
         />
       )}
 
