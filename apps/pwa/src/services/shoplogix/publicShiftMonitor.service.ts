@@ -35,6 +35,12 @@ export interface PublicMonitorMachine {
   status: MonitorStatus
   currentReason: string | null
   currentSinceAt: string | null
+  /**
+   * Piezas de esta máquina por bucket de 5 min, alineada 1:1 con `series` de
+   * la línea (mismo índice = mismo tramo). Ausente en docs anteriores al
+   * despliegue que la publica.
+   */
+  serie?: number[]
 }
 
 /**
@@ -211,6 +217,12 @@ export interface PublicMonitorLive {
       causas: string[]
       paros: number
     }>
+    /**
+     * Minutos con TODAS las máquinas detenidas sin causa A LA VEZ — el tiempo
+     * de LÍNEA de verdad, contra la suma máquina a máquina de arriba.
+     * Ausente en docs previos al despliegue que lo publica.
+     */
+    sinImputarLineaMin?: number
   } | null
   /** Razones de detención, referenciadas por índice desde `stopEvents`. */
   stopReasons?: string[]

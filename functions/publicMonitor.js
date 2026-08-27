@@ -1222,13 +1222,21 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
   const recoverableMin = aMin(cRec)
 
   // ── Serie temporal (suma de todas las máquinas por bucket de 5 min) ──────
+  // Se guarda también el desglose POR máquina: el monitor dibuja la curva de
+  // velocidad de cada Baader (pedido de Orel 26-08) y reparte la media de
+  // 15 min entre ellas. Mismos buckets, misma ventana — así las curvas
+  // individuales suman la de línea en vez de contar otra historia.
   const byBucket = new Map()
+  const byBucketDeMaquina = new Map()
   for (const m of machines) {
+    const propio = new Map()
+    byBucketDeMaquina.set(m.id, propio)
     for (const ivRaw of m.intervals || []) {
       const s = toDate(ivRaw.startAt)
       if (!s) continue
       const key = s.getTime()
       byBucket.set(key, (byBucket.get(key) || 0) + (ivRaw.cycles || 0))
+      propio.set(key, (propio.get(key) || 0) + (ivRaw.cycles || 0))
     }
   }
   const seriesAll = [...byBucket.entries()]
@@ -1316,6 +1324,9 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
       pieces,
       piecesPerHour: mHours > 0 ? pieces / mHours : 0,
       uptimePct: mTracked > 0 ? (mUptime / mTracked) * 100 : 0,
+      // Piezas de ESTA máquina en cada bucket de `series` (mismo orden). Los
+      // buckets sin dato van en 0 — incluida la cola extendida de paros.
+      serie: series.map(p => byBucketDeMaquina.get(m.id)?.get(Date.parse(p.t)) || 0),
       status: statusOf(st),
       currentReason: st ? (st.reason || st.name || null) : null,
       currentSinceAt: st ? iso(toDate(st.startAt)) : null,
@@ -1365,6 +1376,7 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
     if (!scheduledStart || !fin) return null
     const ventana = { start: scheduledStart, end: new Date(fin.getTime() + 10 * 60_000) }
     const eventosTodos = []
+    const rangosSinCausa = []
     const porMaquina = machines.map((m) => {
       /* Los states traen Timestamps de Firestore; el módulo espera fechas
          parseables (`new Date(Timestamp)` da NaN y el saneo lo bota todo). */
@@ -1373,7 +1385,19 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
         startAt: toDate(s.startAt),
         endAt: toDate(s.endAt),
       }))
-      const k = kpisMantencion.kpisDeMaquina(kpisMantencion.sanearStates(statesNorm, ventana))
+      const saneados = kpisMantencion.sanearStates(statesNorm, ventana)
+      /* Los tramos sin causa de ESTA máquina, recortados a la ventana: abajo
+         se intersectan entre máquinas para decir cuánto estuvo la LÍNEA
+         entera detenida sin causa (no la suma máquina a máquina). */
+      rangosSinCausa.push(
+        saneados
+          .filter((s) => kpisMantencion.clasificaCausa(s) === 'sin-imputar')
+          .map((s) => [
+            Math.max(new Date(s.startAt).getTime(), ventana.start.getTime()),
+            Math.min(new Date(s.endAt).getTime(), ventana.end.getTime()),
+          ]),
+      )
+      const k = kpisMantencion.kpisDeMaquina(saneados)
       for (const e of k.eventosFalla) {
         eventosTodos.push({
           maquina: m.machineName || m.id,
@@ -1411,6 +1435,8 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
       porMaquina,
       /** Los eventos del turno, del más caro al más barato. Tope chico: el doc es público. */
       eventos: eventosTodos.sort((a, b) => b.min - a.min).slice(0, 6),
+      /** Minutos con TODAS las máquinas detenidas sin causa a la vez. */
+      sinImputarLineaMin: Math.round(kpisMantencion.interseccionSec(rangosSinCausa) / 6) / 10,
     }
   })()
 
