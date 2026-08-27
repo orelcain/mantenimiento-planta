@@ -167,26 +167,36 @@ export function plannedBreaks(args: {
  * Solo se predice lo RECURRENTE: una causa entra si aparece en al menos la
  * mitad de los turnos anteriores (la vara del Pareto para «es patrón»). Su
  * horario es la MEDIANA del inicio y la MEDIANA de la duración por turno —
- * un día raro no mueve el pronóstico. Dentro de cada turno la causa se toma
- * como su rango completo (la colación llega partida por el sensor).
+ * un día raro no mueve el pronóstico.
+ *
+ * ⚠⚠ La duración por turno es la SUMA de sus tramos, no el sobre que los
+ * envuelve. Se tomaba «del primer tramo al último» para armar la colación
+ * partida, y con causas que caen VARIAS veces repartidas por el turno el
+ * sobre se tragaba todo lo del medio: la noche del 26-08 el EJERCICIO
+ * COMPENSATORIO (7-16 min reales en 2-6 pausas) se pronosticó como UNA
+ * parada de 267 min — el monitor descontó 4 h 27 de convenio, dejó el turno
+ * en «quedan 2 h 45 de producción» recién empezando y pidió 90 pz/min
+ * (2,1× el mejor turno). La suma da la colación bien igual (sus tramos
+ * suman lo que dura) y al ejercicio lo deja en su tamaño real.
  */
 export function prediccionConvenio(porTurno: PlannedBreak[][]): PlannedBreak[] {
   const conDatos = porTurno.filter((t) => t.length > 0)
   if (conDatos.length === 0) return []
   const mediana = (v: number[]) => [...v].sort((a, b) => a - b)[Math.floor(v.length / 2)]!
 
-  /** reason → un rango por turno en que apareció. */
+  /** reason → por cada turno en que apareció: dónde empezó y CUÁNTO sumó. */
   const porCausa = new Map<string, Array<{ fromMin: number; durMin: number }>>()
   for (const turno of conDatos) {
-    const enEste = new Map<string, { from: number; to: number }>()
+    const enEste = new Map<string, { from: number; durMin: number }>()
     for (const b of turno) {
+      const dur = Math.max(0, b.toMin - b.fromMin)
       const g = enEste.get(b.reason)
-      if (g) { g.from = Math.min(g.from, b.fromMin); g.to = Math.max(g.to, b.toMin) }
-      else enEste.set(b.reason, { from: b.fromMin, to: b.toMin })
+      if (g) { g.from = Math.min(g.from, b.fromMin); g.durMin += dur }
+      else enEste.set(b.reason, { from: b.fromMin, durMin: dur })
     }
     for (const [reason, g] of enEste) {
       const lista = porCausa.get(reason) ?? []
-      lista.push({ fromMin: g.from, durMin: g.to - g.from })
+      lista.push({ fromMin: g.from, durMin: g.durMin })
       porCausa.set(reason, lista)
     }
   }

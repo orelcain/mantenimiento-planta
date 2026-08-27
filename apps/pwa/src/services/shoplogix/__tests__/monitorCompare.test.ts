@@ -680,6 +680,24 @@ describe('prediccionConvenio', () => {
     expect(p.some((b) => b.reason === 'DETENCION PROGRAMADA')).toBe(false)
   })
 
+  it('⚠⚠ una causa repartida por el turno suma sus tramos, no el sobre que los envuelve', () => {
+    /*
+     * La noche del 26-08, real: el ejercicio compensatorio cae 2 veces por
+     * turno (min ~169 y min ~430), 7-16 min REALES en total. El sobre
+     * primer-tramo→último-tramo lo convertía en UNA parada de 267 min: el
+     * monitor descontaba 4 h 27 de convenio, decía «quedan 2 h 45 de
+     * producción» con el turno recién empezando y pedía 90 pz/min.
+     */
+    const p = prediccionConvenio([
+      [{ reason: 'EJERCICIO  COMPENSATORIO', fromMin: 169, toMin: 176 },
+       { reason: 'EJERCICIO  COMPENSATORIO', fromMin: 430, toMin: 436 }],
+      [{ reason: 'EJERCICIO  COMPENSATORIO', fromMin: 150, toMin: 158 },
+       { reason: 'EJERCICIO  COMPENSATORIO', fromMin: 420, toMin: 427 }],
+    ])
+    const ej = p.find((b) => b.reason === 'EJERCICIO  COMPENSATORIO')!
+    expect(ej.toMin - ej.fromMin).toBeLessThan(20)   // ~13-15 min, jamás 267
+  })
+
   it('la colación se predice con la mediana, robusta al día raro', () => {
     const p = prediccionConvenio(TURNOS)
     const col = p.find((b) => b.reason === 'COLACION')!
