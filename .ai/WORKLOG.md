@@ -6,6 +6,43 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-08-26 · Fix: la tinta de marca `--brand-ink` reprobaba AA en oscuro Y en claro (PR #820)
+
+El bloque `.dark` de la piel ACTUAL nunca redefinió `--brand-ink` y heredaba
+el valor claro de `:root` (#2a6aa6): **2,75:1** sobre el card oscuro (#16242f)
+y **2,40:1** sobre el tinte de Pill (`bg-primary/[0.15]`). Afectaba los 31 usos
+de `text-brand-ink` — chip «hoy» del monitor público, links «ver ›» del
+monitor, Pill `info`, admin del Centro de Aprendizaje. Corregido a **#71ade1**
+(el mismo valor que ya usaba la piel Apple oscura): 6,60:1 y 5,66:1.
+
+🔑 **El hallazgo real vino de instrumentar el check, no del bug reportado.** Al
+agregar el par a `check-contrast.mjs` apareció que el valor CLARO tampoco
+pasaba: el #2a6aa6 se había derivado contra el card BLANCO de la piel Apple,
+pero en la piel actual el card es azulado (#e9f0f8) y el tinte puede apoyarse
+en el fondo de la app (#d7e5f2), que es más oscuro → **3,71:1 en el peor caso**.
+Es exactamente la lección ya pagada con las tintas categóricas: *el peor fondo
+no es la tarjeta, es el fondo de la app*. Ahora `:root` usa el **primary-700
+(#245a8c)**, que ya existía en el sistema: 4,72:1 en el peor caso y 6,27:1
+sobre card. La piel Apple clara hereda el valor y su par sube de 4,50 a 5,91:1.
+
+📌 **Un token heredado entre pieles necesita un par por PIEL, no uno global.**
+`--brand-ink` se definió pensando en un solo fondo; sirve a dos pieles × dos
+temas = 4 fondos distintos. Los 4 pares quedaron vigilados en
+`scripts/check-contrast.mjs` (98 pares en total, única falla la pre-existente
+conocida `border/background` oscuro).
+
+Verificación: `tsc` limpio · `eslint --max-warnings 30` → 0 errores / 28
+warnings · `audit-piel` OK (baseline −1, ya venía de main) · en preview, valor
+COMPUTADO de `--brand-ink` en las 4 combinaciones tema×piel y color RENDERIZADO
+de la Pill `info` en `/dev/piel?fixture=1` (claro `rgb(36,90,140)`, oscuro
+`rgb(113,173,225)`). Sin screenshot: el panel de browser no componía frames en
+esta sesión — la evidencia es por valores computados sobre elementos reales.
+
+⚠️ **Fuera de alcance, detectado al levantar el worktree**: `pnpm install` en un
+árbol limpio modifica `pnpm-lock.yaml` (agrega `jspdf`/`jspdf-autotable` a un
+importer). Hay un `package.json` en main cuyo lockfile quedó desactualizado.
+No se tocó en este PR.
+
 ## 2026-08-23 · Feat: plano de partes BAADER 142 (254 figuras) + puente eléctrico→pieza (PR #699)
 
 Noveno plano del Centro de Aprendizaje: catálogo de piezas de fábrica

@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import {
-  mediaMovil, ritmoAhoraCpm, ritmoAhoraAndando, estadoRitmo, fraccionDeRegla, pedidoAndando, PASO_MIN,
+  mediaMovil, ritmoAhoraCpm, ritmoAhoraAndando, repartoAhoraAndando, estadoRitmo, fraccionDeRegla, pedidoAndando, PASO_MIN,
   type TramoSerie,
 } from '../monitorRitmo'
 
@@ -52,6 +52,53 @@ describe('ritmoAhoraCpm', () => {
     // Un 0 se leería como «la línea va lentísima»; null es «todavía no hay ritmo».
     expect(ritmoAhoraCpm(serie([0, 0, 0]))).toBeNull()
     expect(ritmoAhoraCpm([])).toBeNull()
+  })
+})
+
+describe('repartoAhoraAndando', () => {
+  /*
+   * ⚠⚠ EL CONTRATO: los repartos por máquina SUMAN la media de 15 min de la
+   * línea. Es lo que hace intuible la columna del monitor («la Ev 1 pone 9,8
+   * de los 28,1») — si alguien cambia el denominador de uno de los dos lados,
+   * este test cae.
+   */
+  it('los repartos suman exactamente el ritmo andando de la línea', () => {
+    const linea = serie([30, 60, 90, 45])
+    const maquinas = [
+      [10, 20, 30, 15],
+      [10, 20, 30, 15],
+      [10, 20, 30, 15],
+    ]
+    const reparto = repartoAhoraAndando(linea, maquinas)!
+    const suma = reparto.reduce((a, v) => a + v, 0)
+    expect(suma).toBeCloseTo(ritmoAhoraAndando(linea)!, 10)
+    // Y como acá las tres son idénticas, cada una pone un tercio.
+    expect(reparto[0]).toBeCloseTo(ritmoAhoraAndando(linea)! / 3, 10)
+  })
+
+  it('suma también con tramos parados en la ventana (denominador andando)', () => {
+    // Tramo del medio en 0: la línea paró. El denominador es el de la LÍNEA
+    // (10 min andando), no los minutos propios de cada máquina.
+    const linea = serie([60, 50, 0, 40])
+    const maquinas = [
+      [30, 30, 0, 30],
+      [30, 20, 0, 10],
+    ]
+    const reparto = repartoAhoraAndando(linea, maquinas)!
+    expect(reparto.reduce((a, v) => a + v, 0)).toBeCloseTo(ritmoAhoraAndando(linea)!, 10)
+    expect(reparto[0]).toBeCloseTo((30 + 0 + 30) / 10, 10)
+  })
+
+  it('una máquina sin serie reparte 0, sin romper a las demás', () => {
+    const linea = serie([60, 60, 60])
+    const reparto = repartoAhoraAndando(linea, [[20, 20, 20], null])!
+    expect(reparto[1]).toBe(0)
+    expect(reparto[0]).toBeGreaterThan(0)
+  })
+
+  it('sin serie de línea devuelve null, no ceros', () => {
+    expect(repartoAhoraAndando([], [[1, 2]])).toBeNull()
+    expect(repartoAhoraAndando(null, [[1, 2]])).toBeNull()
   })
 })
 

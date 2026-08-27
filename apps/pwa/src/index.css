@@ -97,6 +97,13 @@
   --mon-hoy: #3e5c7b;
   --mon-cuota: #8b6434;
   --mon-ref: #7e8692;
+  /* Curvas POR MÁQUINA del monitor (velocidad de cada Baader): tres hues
+     separados en OKLCH —azul / naranja / verde azulado— elegidos para
+     distinguirse también con deuteranopia, con la misma luminosidad
+     contenida del resto de la familia (≥3:1 sobre --card en cada tema). */
+  --mon-maq-1: #33628f;
+  --mon-maq-2: #96562c;
+  --mon-maq-3: #2c6b62;
   /* Relleno de la brecha: mismo patrón `-soft` que el resto del archivo,
      sobre los semánticos −50% (no el rojo/verde puros que había). */
   --mon-arriba-soft: rgba(103, 149, 118, 0.22);
@@ -180,8 +187,11 @@
   --brand: 46 117 182;              /* #2E75B6 */
   --brand-foreground: 255 255 255;
   /* Tinta de marca para texto SOBRE tinte de marca: el #2E75B6 puro sobre su
-     propio tinte al 15% da 3.98:1 y reprueba AA — medido. */
-  --brand-ink: 42 106 166;          /* #2a6aa6 */
+     propio tinte al 15% da 3.98:1 y reprueba AA — medido. El #2a6aa6 original
+     tampoco alcanzaba sobre el peor fondo de la piel actual (tinte apoyado en
+     el fondo de la app: 3.71:1); este es el primary-700 de siempre, 4.72:1
+     ahí. Vigilado en scripts/check-contrast.mjs. */
+  --brand-ink: 36 90 140;           /* #245a8c = primary-700 */
 
   /* ── PALETA CATEGÓRICA (docs/NUEVA_PIEL_APPLE_HIG.md §1.6) ────────────────
      Hueco real del sistema detectado al barrer Bodega: la piel definía colores
@@ -253,6 +263,11 @@
   --mon-hoy: #82a3c4;
   --mon-cuota: #ac8352;
   --mon-ref: #69717d;
+  /* Curvas por máquina, aclaradas para el card oscuro (mismo criterio que
+     --mon-hoy: sobre oscuro el trazo sube de luminosidad, no de saturación). */
+  --mon-maq-1: #7ba7d4;
+  --mon-maq-2: #cf9468;
+  --mon-maq-3: #6fb3a8;
   --mon-arriba-soft: rgba(108, 154, 138, 0.22);
   --mon-abajo-soft: rgba(178, 128, 127, 0.22);
 
@@ -272,6 +287,12 @@
   --ink-warn: 172 150 110;
   --ink-ok: 108 154 138;
   --ink-info: 109 163 216;
+
+  /* Tinta de marca en oscuro: heredar el #2a6aa6 de :root daba 2,75:1 sobre
+     el card (#16242f) y 2,40:1 sobre el tinte de Pill (primary al 15%) —
+     reprueba AA. Mismo valor que la piel Apple oscura; vigilado en
+     scripts/check-contrast.mjs. */
+  --brand-ink: 113 173 225;         /* #71ade1 */
 
   /* OJO: acá vivía un bloque `--cat-N-ink` con los -400 de julio, rotulado
      "categóricos en la piel ACTUAL". Era CÓDIGO MUERTO: lo pisaban, dentro de

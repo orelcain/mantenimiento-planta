@@ -220,6 +220,47 @@ function reenganches(buckets, eventosFalla, medianaAndando) {
   })
 }
 
+// ── Intersección de tramos entre máquinas ────────────────────────────────────
+
+/**
+ * Segundos en que TODAS las máquinas están dentro de alguno de sus tramos a
+ * la vez. Es la diferencia entre «53 min de máquina sumados» y «cuánto estuvo
+ * la LÍNEA entera detenida» (Orel, 26-08: el total sumado se leía como casi
+ * una hora de línea muerta cuando eran paros de a una).
+ *
+ * @param rangosPorMaquina  una lista de [iniMs, finMs] por máquina.
+ */
+function interseccionSec(rangosPorMaquina) {
+  const n = rangosPorMaquina.length
+  if (n === 0) return 0
+  // Barrido de bordes contando cuántas máquinas cubren cada instante. Los
+  // tramos de una misma máquina pueden solaparse entre sí: primero se unen,
+  // para que una máquina no cuente doble.
+  const eventos = []
+  for (const rangos of rangosPorMaquina) {
+    const orden = [...rangos]
+      .filter(([a, b]) => Number.isFinite(a) && Number.isFinite(b) && b > a)
+      .sort((x, y) => x[0] - y[0])
+    let cur = null
+    for (const [a, b] of orden) {
+      if (cur && a <= cur[1]) cur[1] = Math.max(cur[1], b)
+      else { cur = [a, b]; eventos.push(cur) }
+    }
+  }
+  const bordes = []
+  for (const [a, b] of eventos) { bordes.push([a, 1], [b, -1]) }
+  bordes.sort((x, y) => x[0] - y[0] || y[1] - x[1])
+  let cubren = 0
+  let desde = null
+  let sec = 0
+  for (const [t, d] of bordes) {
+    cubren += d
+    if (cubren === n && desde == null) desde = t
+    else if (cubren < n && desde != null) { sec += (t - desde) / 1000; desde = null }
+  }
+  return sec
+}
+
 module.exports = {
   clasificaCausa,
   sanearStates,
@@ -228,4 +269,5 @@ module.exports = {
   velocidadDesde1min,
   caidaDeLinea,
   reenganches,
+  interseccionSec,
 }
