@@ -2765,14 +2765,10 @@ function CurvasMaquinas({ serie, maquinas }: {
     }
     return { nombre: m.nombre, idx, puntos, paros, targetCpm: m.targetCpm ?? null }
   })
-  /* Un objetivo por VALOR, no por máquina: en Chonchi Ev2 y Ev3 comparten 16
-     y dos punteadas idénticas encimadas se leen como un error de dibujo. */
-  const objetivos = [...new Map(
-    curvas
-      .filter((c) => c.targetCpm != null && c.targetCpm > 0)
-      .map((c) => [c.targetCpm!, curvas.filter((x) => x.targetCpm === c.targetCpm).map((x) => nombreCorto(x.nombre))]),
-  ).entries()]
-  const max = Math.max(1, ...curvas.flatMap((c) => c.puntos), ...objetivos.map(([v]) => v))
+  /* Las punteadas del objetivo se FUERON (Orel, 27-08: ensuciaban más de lo
+     que decían). El objetivo por máquina sigue en el tooltip del hover, que
+     es donde se consulta con la curva al lado. */
+  const max = Math.max(1, ...curvas.flatMap((c) => c.puntos))
   const w = fin - 1
   const y = (v: number) => 100 - (v / max) * 94 - 3
   const t0 = serie[0]?.t ? Date.parse(serie[0].t) : NaN
@@ -2811,24 +2807,12 @@ function CurvasMaquinas({ serie, maquinas }: {
         }}
         onPointerLeave={() => setIdxSel(null)}
       >
-        <svg viewBox={`0 0 ${w} 100`} preserveAspectRatio="none" className="block h-24 w-full" aria-hidden>
-          {/* El OBJETIVO de cada máquina como punteada (como en el detalle de
-              turno): la distancia entre curva y punteada ES la conversación. */}
-          {objetivos.map(([v]) => (
-            <line
-              key={v}
-              x1={0} y1={y(v)} x2={w} y2={y(v)}
-              stroke="var(--mon-cuota)"
-              strokeDasharray="4 3"
-              vectorEffect="non-scaling-stroke"
-            />
-          ))}
-          {objetivos.length === 0 && (
-            <line
-              x1={0} y1={y(max)} x2={w} y2={y(max)}
-              className="stroke-foreground/15" strokeDasharray="3 3" vectorEffect="non-scaling-stroke"
-            />
-          )}
+        <svg viewBox={`0 0 ${w} 100`} preserveAspectRatio="none" className="block h-36 w-full" aria-hidden>
+          {/* La línea de la escala: dónde queda el máximo que se alcanzó. */}
+          <line
+            x1={0} y1={y(max)} x2={w} y2={y(max)}
+            className="stroke-foreground/15" strokeDasharray="3 3" vectorEffect="non-scaling-stroke"
+          />
           {curvas.map((c) => (
             <polyline
               key={c.nombre}
@@ -2842,38 +2826,9 @@ function CurvasMaquinas({ serie, maquinas }: {
             />
           ))}
         </svg>
-        {/* Etiquetas en HTML: dentro del SVG estirado el texto se deforma.
-            Cortas y a la IZQUIERDA: a la derecha chocaban con la leyenda
-            («obj 19 · Ev 1» pisando los nombres — Orel las marcó como
-            elemento roto, 27-08). Quién tiene cada objetivo lo dice el
-            tooltip del hover, máquina por máquina. */}
-        {(() => {
-          /* Apiladas a mano (dos objetivos cercanos se PISABAN — visto en
-             vivo): cada etiqueta va bajo su línea, y si choca con una ya
-             puesta se corre un renglón. Sin ordenar: son 2-3 a lo más. */
-          const puestos: number[] = []
-          return objetivos.map(([v]) => {
-            let top = y(v) + 1
-            for (const p of puestos) {
-              if (Math.abs(top - p) < 12) top = p + 12
-            }
-            puestos.push(top)
-            return (
-              <span
-                key={v}
-                className="absolute left-0 whitespace-nowrap text-[10px] tabular-nums"
-                style={{ top: `${top}%`, color: 'var(--mon-cuota)' }}
-              >
-                obj {fmtDec(v, 0)}
-              </span>
-            )
-          })
-        })()}
-        {objetivos.length === 0 && (
-          <span className="absolute left-0 top-0 text-[10px] tabular-nums text-muted-foreground/80">
-            {fmtDec(max)} pz/min
-          </span>
-        )}
+        <span className="absolute left-0 top-0 text-[10px] tabular-nums text-muted-foreground/80">
+          {fmtDec(max)} pz/min
+        </span>
         {/* ── El detalle bajo el dedo: marcador + valores del tramo ─────────
             La hora sale del TIMESTAMP del tramo, no de aritmética con el
             índice — la serie puede traer huecos (gotcha ya pagada). Todo en
@@ -2972,15 +2927,9 @@ function CurvasMaquinas({ serie, maquinas }: {
         <span className="text-muted-foreground">media de 15 min, pz/min · mientras corre</span>
         <span>{Number.isFinite(t1) ? horaPlanta(t1) : ''}</span>
       </div>
-      <p className="mt-1 text-caption leading-snug text-muted-foreground/80">
-        Pasá el dedo o el mouse por el gráfico para ver la velocidad de cada una en ese momento.{' '}
-        {objetivos.length > 0 && (
-          <>La punteada es el <b>objetivo</b> de cada máquina según Shoplogix
-            {objetivos.length > 1 && ' (no son el mismo modelo: no compararlas entre sí por % del objetivo)'}. </>
-        )}
-        Las franjas de abajo marcan cuándo cada una estuvo <b>detenida</b> (un carril por máquina,
-        mismo color que su curva).
-      </p>
+      {/* El caption largo se fue (Orel, 27-08): el espacio es del gráfico.
+          Las franjas ya se explican con su rótulo y su title; el gesto del
+          hover lo enseña el gráfico grande de abajo, que dice lo mismo. */}
     </div>
   )
 }
