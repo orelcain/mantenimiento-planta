@@ -435,7 +435,7 @@ function EditorCuota({ actual, onGuardar }: {
         onClick={() => { setValor(actual != null ? String(actual) : ''); setAbierto(true); setError(null) }}
         className="tap-44 ml-1 rounded-full border border-border px-2 py-0.5 text-[10px] normal-case tracking-normal hover:bg-muted"
       >
-        Cambiar cuota
+        {actual != null ? 'Cambiar cuota' : 'Poner cuota'}
       </button>
     )
   }
@@ -2976,10 +2976,16 @@ export function PublicShiftMonitorPage() {
     irA(dx < 0 ? 1 : -1)                // arrastrar a la izquierda = ir hacia atrás
   }
 
+  /*
+   * La meta del héroe: la del link si la trajo, si no la de la config del
+   * módulo — que es donde escribe el editor de cuota. Con solo `targetPieces`,
+   * una cuota puesta desde el monitor no movía la barra.
+   */
+  const metaHero = data?.targetPieces ?? live?.quotaPieces ?? null
   const progressPct = useMemo(() => {
-    if (!live || !data?.targetPieces) return null
-    return Math.min(100, (live.totalPieces / data.targetPieces) * 100)
-  }, [live, data?.targetPieces])
+    if (!live || !metaHero) return null
+    return Math.min(100, (live.totalPieces / metaHero) * 100)
+  }, [live, metaHero])
 
   /**
    * Las paradas de convenio del turno: las de hoy como hechos y las de los
@@ -3738,6 +3744,25 @@ export function PublicShiftMonitorPage() {
     }
     : undefined
 
+  /*
+   * La cuota, editable desde el HÉROE y no solo desde el bloque de ritmo:
+   * ese bloque se apaga con el turno cerrado y dejaba a un admin sin ningún
+   * lugar donde poner o corregir la meta (lo cazó Orel el 26-08 mirando el
+   * turno recién cerrado). Mismo guardado que siempre: config del módulo,
+   * solo admin, solo el turno vigente.
+   */
+  const onGuardarCuota = esAdminMonitor && esActual && data?.plantSlug && live?.shiftName
+    ? async (piezas: number | null, origen?: { toneladas: number; pesoPromedioKg: number } | null) => {
+      await setShiftQuota({
+        plantSlug: data.plantSlug!,
+        shiftName: live.shiftName!,
+        piezas,
+        por: usuarioActual?.email ?? null,
+        origen: origen ?? null,
+      })
+    }
+    : undefined
+
   const horizontePronostico = useMemo(() => {
     const t0raw = serieDelTurno[0]?.t
     if (!pronostico || !t0raw) return null
@@ -4178,12 +4203,15 @@ export function PublicShiftMonitorPage() {
           )}
           {/* Sin peso, el hueco se explica —también al que abre el link sin
               sesión— y trae su acción solo para quien puede cargarlo. */}
-          {!toneladas && esActual && !turnoCerrado && (
+          {/* También con el turno CERRADO: el peso se puede cargar después y
+              las toneladas del resultado siguen valiendo (Orel, 26-08 — con
+              el gate en cerrado no había dónde ponerlo). */}
+          {!toneladas && esActual && (
             <div className="mt-1.5 flex items-center gap-2 rounded-ctl bg-muted px-3 py-2">
               <div className="min-w-0 flex-1">
                 <div className="text-[13px] text-foreground">Sin peso promedio no hay toneladas</div>
                 <div className="text-[11px] text-muted-foreground/80">
-                  Con el peso del calibre de hoy se estiman en vivo.
+                  Con el peso del calibre {turnoCerrado ? 'se estiman las del turno' : 'de hoy se estiman en vivo'}.
                 </div>
               </div>
               {onGuardarPeso && <EditorPeso actual={null} onGuardar={onGuardarPeso} />}
@@ -4223,10 +4251,16 @@ export function PublicShiftMonitorPage() {
             </div>
           )}
 
-          {data.targetPieces != null && progressPct != null && (
+          {metaHero != null && progressPct != null && (
             <div className="mt-3">
               <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                <span>Meta del turno: {fmtInt(data.targetPieces)} pz</span>
+                <span className="flex flex-wrap items-center">
+                  Meta del turno: {fmtInt(metaHero)} pz
+                  {/* El editor vive ACÁ, no solo en el bloque de ritmo: ese se
+                      apaga al cerrar el turno y dejaba la cuota sin dónde
+                      tocarse (Orel, 26-08). */}
+                  {onGuardarCuota && <EditorCuota actual={metaHero} onGuardar={onGuardarCuota} />}
+                </span>
                 <span className="tabular-nums">{fmtDec(progressPct, 0)}%</span>
               </div>
               {/*
@@ -4237,7 +4271,7 @@ export function PublicShiftMonitorPage() {
                * (5.000) supera el mejor cierre real (4.915).
                */}
               {(() => {
-                const meta = data.targetPieces!
+                const meta = metaHero!
                 const techo = Math.max(meta, live.totalPieces, banda?.cierres.max ?? 0) * 1.04
                 const pctDe = (v: number) => Math.min(100, (v / techo) * 100)
                 return (
@@ -4278,6 +4312,20 @@ export function PublicShiftMonitorPage() {
             </div>
           )}
 
+          {/* Sin cuota: el hueco se explica y trae su acción (solo admin). Sin
+              esto, un turno sin meta no ofrecía NINGÚN lugar donde ponerla. */}
+          {metaHero == null && onGuardarCuota && (
+            <div className="mt-3 flex flex-wrap items-center gap-2 rounded-ctl bg-muted px-3 py-2">
+              <div className="min-w-0 flex-1">
+                <div className="text-[13px] text-foreground">Sin cuota cargada para este turno</div>
+                <div className="text-[11px] text-muted-foreground/80">
+                  Con la cuota (en toneladas o piezas) aparecen la barra de meta y el camino a cumplirla.
+                </div>
+              </div>
+              <EditorCuota actual={null} onGuardar={onGuardarCuota} />
+            </div>
+          )}
+
           {/* Fuera del bloque de la meta: la recomendación también aplica
               cuando el link se creó sin cuota, midiendo contra lo que el sensor
               espera del turno — que es la mayoría de los links repartidos. */}
@@ -4292,16 +4340,7 @@ export function PublicShiftMonitorPage() {
             /* La cuota se edita desde el monitor porque cambia turno a turno.
                Solo con sesión de admin y en el turno en curso: quien abre el
                link sigue viendo una pantalla de solo lectura. */
-            onGuardarCuota={esAdminMonitor && esActual && data.plantSlug && live.shiftName
-              ? async (piezas) => {
-                await setShiftQuota({
-                  plantSlug: data.plantSlug!,
-                  shiftName: live.shiftName!,
-                  piezas,
-                  por: usuarioActual?.email ?? null,
-                })
-              }
-              : undefined}
+            onGuardarCuota={onGuardarCuota}
             cierre={live.plannedEnd}
             muestras={live.plannedEndSamples}
             fuente={live.plannedEndSource}
