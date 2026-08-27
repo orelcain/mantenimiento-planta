@@ -2842,16 +2842,33 @@ function CurvasMaquinas({ serie, maquinas }: {
             />
           ))}
         </svg>
-        {/* Etiquetas en HTML: dentro del SVG estirado el texto se deforma. */}
-        {objetivos.map(([v, quienes]) => (
-          <span
-            key={v}
-            className="absolute right-0 -translate-y-full whitespace-nowrap text-[10px] tabular-nums"
-            style={{ top: `${y(v)}%`, color: 'var(--mon-cuota)' }}
-          >
-            obj {fmtDec(v, 0)} · {quienes.join('·')}
-          </span>
-        ))}
+        {/* Etiquetas en HTML: dentro del SVG estirado el texto se deforma.
+            Cortas y a la IZQUIERDA: a la derecha chocaban con la leyenda
+            («obj 19 · Ev 1» pisando los nombres — Orel las marcó como
+            elemento roto, 27-08). Quién tiene cada objetivo lo dice el
+            tooltip del hover, máquina por máquina. */}
+        {(() => {
+          /* Apiladas a mano (dos objetivos cercanos se PISABAN — visto en
+             vivo): cada etiqueta va bajo su línea, y si choca con una ya
+             puesta se corre un renglón. Sin ordenar: son 2-3 a lo más. */
+          const puestos: number[] = []
+          return objetivos.map(([v]) => {
+            let top = y(v) + 1
+            for (const p of puestos) {
+              if (Math.abs(top - p) < 12) top = p + 12
+            }
+            puestos.push(top)
+            return (
+              <span
+                key={v}
+                className="absolute left-0 whitespace-nowrap text-[10px] tabular-nums"
+                style={{ top: `${top}%`, color: 'var(--mon-cuota)' }}
+              >
+                obj {fmtDec(v, 0)}
+              </span>
+            )
+          })
+        })()}
         {objetivos.length === 0 && (
           <span className="absolute left-0 top-0 text-[10px] tabular-nums text-muted-foreground/80">
             {fmtDec(max)} pz/min
@@ -2916,12 +2933,20 @@ function CurvasMaquinas({ serie, maquinas }: {
         })()}
       </div>
       {/* Las franjas de DETENCIÓN, un carril por máquina en su color: quién
-          paró y cuándo, sin que la media móvil lo disimule. */}
+          paró y cuándo, sin que la media móvil lo disimule. CON NOMBRE: sin
+          el rótulo, un carril casi lleno se leía como una barra decorativa
+          rota (Orel lo marcó, 27-08 — era la Ev 2 parada el 73% del tramo). */}
       <div className="mt-1 space-y-0.5">
         {curvas.map((c) => (
-          <div key={c.nombre} className="relative h-1 w-full overflow-hidden rounded-full"
+          <div
+            key={c.nombre}
+            /* Full-width y NO en columna con el nombre: los carriles comparten
+               el eje de tiempo del gráfico de arriba y correrlos 40 px haría
+               que «cuándo paró» ya no calce con la curva. El nombre va
+               superpuesto al extremo izquierdo. */
+            className="relative h-1.5 w-full overflow-hidden rounded-full"
             style={{ background: 'color-mix(in srgb, rgb(var(--muted-foreground)) 12%, transparent)' }}
-            title={`${nombreCorto(c.nombre)}: tramos detenida`}
+            title={`${nombreCorto(c.nombre)}: los tramos pintados son cuando estuvo detenida`}
           >
             {c.paros.map((p) => (
               <span
@@ -2934,6 +2959,11 @@ function CurvasMaquinas({ serie, maquinas }: {
                 }}
               />
             ))}
+            <span className="absolute left-0 top-1/2 -translate-y-1/2 rounded-full px-1 text-[9px] leading-[11px] text-muted-foreground"
+              style={{ background: 'rgb(var(--card) / 0.85)' }}
+            >
+              {nombreCorto(c.nombre)}
+            </span>
           </div>
         ))}
       </div>
