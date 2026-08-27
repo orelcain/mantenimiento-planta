@@ -4,6 +4,7 @@ import { ListGroup, ListCell, Pill } from '@/components/piel'
 import { FranjaVentanas } from './FranjaVentanas'
 import { CompartirRueda } from './CompartirRueda'
 import { ResumenPlanta } from './ResumenPlanta'
+import { RuedaPlanta } from './RuedaPlanta'
 import { CargaTrabajo } from './CargaTrabajo'
 import { EditorMaquinas } from './EditorMaquinas'
 import { CargaRapida } from './CargaRapida'
@@ -438,7 +439,7 @@ export function RuedaVentanas() {
           )}
         >
           <Settings2 className="h-4 w-4" />
-          Máquinas
+          Máquinas y áreas
         </button>
 
         <div className="flex flex-col gap-1.5">
@@ -823,6 +824,12 @@ export function RuedaVentanas() {
 
       {modo === 'comparar' && (
         <>
+          <RuedaPlanta
+            maquinas={state.maquinas}
+            diaIdx={diaIdx}
+            maquinaActivaId={maquinaId}
+            onSeleccionar={setMaquinaId}
+          />
           <ResumenPlanta maquinas={state.maquinas} diaIdx={diaIdx} onVerMaquina={setMaquinaId} />
           <FranjaVentanas maquinas={state.maquinas} diaIdx={diaIdx} maquinaActivaId={maquinaId} />
         </>

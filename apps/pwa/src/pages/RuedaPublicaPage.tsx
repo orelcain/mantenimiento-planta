@@ -4,6 +4,7 @@ import { AlertCircle, ExternalLink, Clock } from 'lucide-react'
 import { Spinner } from '@/components/ui'
 import { FranjaVentanas } from '@/components/calendario/FranjaVentanas'
 import { ResumenPlanta } from '@/components/calendario/ResumenPlanta'
+import { RuedaPlanta } from '@/components/calendario/RuedaPlanta'
 import { cn } from '@/lib/utils'
 import {
   cargarTokenPublico,
@@ -205,6 +206,13 @@ export function RuedaPublicaPage() {
             </div>
           )}
         </div>
+
+        <RuedaPlanta
+          maquinas={data.maquinas}
+          diaIdx={diaIdx}
+          maquinaActivaId={maquinaId}
+          onSeleccionar={setMaquinaId}
+        />
 
         <ResumenPlanta maquinas={data.maquinas} diaIdx={diaIdx} onVerMaquina={setMaquinaId} />
 
