@@ -117,3 +117,35 @@ test('ritmoDeVentana: sin dos lecturas no inventa un número', () => {
   assert.equal(ritmoDeVentana([]), null)
   assert.equal(ritmoDeVentana([{ at: new Date().toISOString(), totalCycles: 10 }]), null)
 })
+
+// ── El pulso POR MÁQUINA (pedido de Orel, 27-08) ─────────────────────────────
+
+const lecM = (min, porMaquina) => ({
+  at: new Date(Date.UTC(2026, 7, 27, 13, min)).toISOString(),
+  totalCycles: Object.values(porMaquina).reduce((a, v) => a + v, 0),
+  porMaquina,
+})
+
+test('pulse: los ritmos por máquina SUMAN el de la línea — misma ventana', () => {
+  let p = componerPulso(null, lecM(0, { a: 100, b: 200, c: 50 }))
+  p = componerPulso(p, lecM(2, { a: 120, b: 224, c: 50 }))
+  // Línea: 44 pz en 2 min = 22. Por máquina: 10 + 12 + 0.
+  assert.equal(p.cpm, 22)
+  const suma = p.porMaquina.reduce((a, m) => a + m.cpm, 0)
+  assert.ok(Math.abs(suma - p.cpm) < 1e-9)
+  assert.equal(p.porMaquina.find((m) => m.id === 'c').cpm, 0)
+})
+
+test('pulse: un contador por máquina que BAJA no publica reparto (no sumaría)', () => {
+  let p = componerPulso(null, lecM(0, { a: 100, b: 200 }))
+  p = componerPulso(p, { ...lecM(2, { a: 90, b: 224 }), totalCycles: 314 })
+  assert.equal(p.porMaquina ?? null, null)
+})
+
+test('pulse: lecturas viejas sin desglose no publican reparto, pero el de línea sigue', () => {
+  const vieja = (min, n) => ({ at: new Date(Date.UTC(2026, 7, 27, 13, min)).toISOString(), totalCycles: n })
+  let p = componerPulso(null, vieja(0, 100))
+  p = componerPulso(p, lecM(2, { a: 80, b: 44 }))
+  assert.equal(p.cpm, 12)
+  assert.equal(p.porMaquina ?? null, null)
+})

@@ -54,7 +54,22 @@ async function leerPulso({ query, plantSlug, at = ahoraEnPlanta(), toShoplogixTi
       ? uptime(total)
       : filas.reduce((a, m) => a + uptime(m), 0)
     if (!(totalCycles >= 0)) return null
-    return { at: new Date().toISOString(), totalCycles, diag: totalCycles === 0 ? radiografia(data) : null }
+    /* El acumulado POR máquina, del mismo request: es lo que permite decir el
+       «ahora» de cada Baader sumando el de la línea (pedido de Orel, 27-08).
+       Verificado contra la respuesta real de Chonchi: la fila Total ES la suma
+       de las filas (2.263+612+2.303 = 5.178), así que los ritmos por máquina
+       de la misma ventana suman el de línea por construcción. */
+    const porMaquina = {}
+    for (const m of filas) {
+      if (m.machineid === 'Total') continue
+      porMaquina[m.machineid] = uptime(m)
+    }
+    return {
+      at: new Date().toISOString(),
+      totalCycles,
+      ...(Object.keys(porMaquina).length > 0 ? { porMaquina } : {}),
+      diag: totalCycles === 0 ? radiografia(data) : null,
+    }
   } catch (err) {
     logger.warn(`[pulse][${plantSlug}] no disponible (no bloquea): ${err.message}`)
     return null
@@ -147,10 +162,50 @@ function componerPulso(previo, lectura) {
   const lecturas = (saltoImposible ? [lectura] : [...previas, lectura]).slice(-MAX_LECTURAS)
 
   const cpm = ritmoDeVentana(lecturas)
+  const porMaquina = cpm != null ? ritmoPorMaquinaDeVentana(lecturas) : null
   // El `diag` no entra al pulso: viaja aparte, a su propio doc. Acá solo va lo
-  // que la pantalla necesita.
-  const limpias = lecturas.map(({ at, totalCycles }) => ({ at, totalCycles }))
-  return { at: lectura.at, totalCycles: lectura.totalCycles, cpm, lecturas: limpias }
+  // que la pantalla necesita. `porMaquina` de cada lectura SÍ se conserva: es
+  // la historia con la que la próxima corrida calcula el ritmo por máquina.
+  const limpias = lecturas.map(({ at, totalCycles, porMaquina: pm }) => (
+    pm ? { at, totalCycles, porMaquina: pm } : { at, totalCycles }
+  ))
+  return {
+    at: lectura.at,
+    totalCycles: lectura.totalCycles,
+    cpm,
+    ...(porMaquina ? { porMaquina } : {}),
+    lecturas: limpias,
+  }
+}
+
+/**
+ * El ritmo por MÁQUINA de la misma ventana que `ritmoDeVentana`: mismos
+ * extremos, mismos minutos. Por eso la suma de los ritmos por máquina ES el
+ * ritmo de línea — la garantía que hace legible la columna del monitor.
+ *
+ * Devuelve null si algún extremo no trae el desglose o si algún contador
+ * BAJÓ (reinicio/cambio de turno): publicar un reparto que no suma sería
+ * peor que no publicarlo.
+ */
+function ritmoPorMaquinaDeVentana(lecturas) {
+  if (!Array.isArray(lecturas) || lecturas.length < 2) return null
+  const ventana = lecturas.slice(-VENTANA_RITMO)
+  const primera = ventana[0]
+  const ultima = ventana[ventana.length - 1]
+  if (!primera.porMaquina || !ultima.porMaquina) return null
+  const min = (Date.parse(ultima.at) - Date.parse(primera.at)) / 60000
+  if (!(min >= MIN_MINUTOS)) return null
+  const out = []
+  for (const [id, fin] of Object.entries(ultima.porMaquina)) {
+    const ini = primera.porMaquina[id]
+    if (ini == null) return null
+    const dif = fin - ini
+    if (dif < 0) return null
+    const cpm = dif / min
+    if (cpm > MAX_CPM_PLAUSIBLE) return null
+    out.push({ id, cpm })
+  }
+  return out.length > 0 ? out : null
 }
 
 /**
@@ -199,6 +254,6 @@ function ritmoDeVentana(lecturas) {
 }
 
 module.exports = {
-  leerPulso, componerPulso, ritmoDeVentana, radiografia,
+  leerPulso, componerPulso, ritmoDeVentana, ritmoPorMaquinaDeVentana, radiografia,
   MAX_LECTURAS, VENTANA_RITMO, MAX_CPM_PLAUSIBLE,
 }
