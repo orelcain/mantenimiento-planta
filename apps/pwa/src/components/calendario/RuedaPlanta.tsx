@@ -1,7 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
+import { Download, Loader2 } from 'lucide-react'
 import { ListGroup, Pill } from '@/components/piel'
 import { cn } from '@/lib/utils'
 import { ordenarVentanas, ventanasDePlanta } from '@/services/ruedaCarga'
+import { exportarRuedaPng } from '@/services/exportarRuedaPng'
 import {
   DIAS_SEMANA,
   SLOTS_POR_DIA,
@@ -37,6 +39,31 @@ const R_INT_MIN = 46
 const SEPARACION = 2
 const VB_MARGEN = 26
 const VB_LADO = 400 + VB_MARGEN * 2
+
+/**
+ * Color de identidad de cada máquina, por posición en la lista.
+ *
+ * NO se usa como relleno del anillo: el relleno ya dice quién ocupa el tramo, y
+ * meter una segunda codificación de color encima haría que ninguna de las dos se
+ * lea. La identidad va en el FILO exterior del anillo y en el punto de la lista,
+ * que es suficiente para seguir un anillo con la vista sin competir con el dato.
+ *
+ * Ocho tonos: a partir de la novena máquina se repiten, y ahí la posición y el
+ * rótulo siguen distinguiéndolas.
+ */
+const FILO_MAQUINA = [
+  'fill-cat-1-ink', 'fill-cat-2-ink', 'fill-cat-3-ink', 'fill-cat-4-ink',
+  'fill-cat-5-ink', 'fill-cat-6-ink', 'fill-cat-7-ink', 'fill-cat-8-ink',
+] as const
+const PUNTO_MAQUINA = [
+  'bg-cat-1-ink', 'bg-cat-2-ink', 'bg-cat-3-ink', 'bg-cat-4-ink',
+  'bg-cat-5-ink', 'bg-cat-6-ink', 'bg-cat-7-ink', 'bg-cat-8-ink',
+] as const
+
+export function colorDeMaquina(indice: number): { filo: string; punto: string } {
+  const i = ((indice % 8) + 8) % 8
+  return { filo: FILO_MAQUINA[i]!, punto: PUNTO_MAQUINA[i]! }
+}
 
 const FILL_OCUPANTE: Record<Ocupante, string> = {
   P: 'fill-cat-1-tint',
@@ -82,12 +109,16 @@ export interface RuedaPlantaProps {
 
 export function RuedaPlanta({ maquinas, diaIdx, maquinaActivaId, onSeleccionar }: RuedaPlantaProps) {
   const [encima, setEncima] = useState<string | null>(null)
+  const svgRef = useRef<SVGSVGElement | null>(null)
+  const [exportando, setExportando] = useState(false)
+  const [errorExport, setErrorExport] = useState<string | null>(null)
 
   const anillos = useMemo(() => {
     const n = Math.max(maquinas.length, 1)
     const grosor = (R_EXT - R_INT_MIN) / n
     return maquinas.map((m, i) => ({
       maquina: m,
+      indice: i,
       // La primera de la lista queda por FUERA: es el anillo más largo y el más
       // fácil de leer, y la lista se ordena por importancia.
       rOut: R_EXT - i * grosor,
@@ -117,16 +148,69 @@ export function RuedaPlanta({ maquinas, diaIdx, maquinaActivaId, onSeleccionar }
 
   const totalPleno = plenos.reduce((a, g) => a + g.largo, 0)
 
+  /**
+   * El PNG se compone con los colores REALES del tema en que se está mirando:
+   * se leen del DOM en vez de fijarlos, para que el archivo salga coherente con
+   * lo que la persona tiene en pantalla y no en un tema que no eligió.
+   */
+  const exportar = useCallback(async () => {
+    if (!svgRef.current) return
+    setExportando(true)
+    setErrorExport(null)
+    try {
+      const cs = getComputedStyle(document.documentElement)
+      const leer = (v: string, alt: string) => {
+        const bruto = cs.getPropertyValue(v).trim()
+        return bruto ? (bruto.includes(' ') ? `rgb(${bruto.split(/\s+/).join(' ')})` : bruto) : alt
+      }
+      const leyenda = maquinas.map((m, i) => {
+        const tono = ((i % 8) + 8) % 8 + 1
+        return {
+          color: leer(`--cat-${tono}-ink`, '#666'),
+          texto: `${m.nombre}${m.revisadoEnTerreno !== true ? '  (horario sin confirmar)' : ''}`,
+        }
+      })
+      const ok = await exportarRuedaPng(svgRef.current, {
+        titulo: `Ventanas de intervención · ${DIAS_SEMANA[diaIdx]}`,
+        subtitulo: `${maquinas.length} equipos · ${slotsAHorasMinutos(totalPleno)} con la planta entera libre`,
+        leyenda,
+        fondo: leer('--background', '#ffffff'),
+        tinta: leer('--foreground', '#111827'),
+        nombreArchivo: `ventanas-${(DIAS_SEMANA[diaIdx] ?? '').toLowerCase()}.png`,
+      })
+      if (!ok) setErrorExport('El navegador no dejó generar la imagen.')
+    } catch {
+      setErrorExport('No se pudo generar la imagen.')
+    } finally {
+      setExportando(false)
+    }
+  }, [maquinas, diaIdx, totalPleno])
+
   if (!maquinas.length) return null
 
   return (
     <ListGroup
       title={`La planta completa · ${DIAS_SEMANA[diaIdx]}`}
+      action={
+        <button
+          onClick={exportar}
+          disabled={exportando}
+          className="flex items-center gap-1.5 text-[0.8rem] font-medium text-primary disabled:opacity-50"
+        >
+          {exportando ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" />
+          ) : (
+            <Download className="h-3.5 w-3.5" />
+          )}
+          Descargar PNG
+        </button>
+      }
       footer="Un anillo por máquina, del centro hacia afuera. Donde el radio queda limpio de punta a punta, la planta entera está libre."
     >
       <div className="flex flex-col gap-4 p-4 lg:flex-row lg:items-start">
         <div className="mx-auto w-full max-w-[min(28rem,58vh)] shrink-0 lg:mx-0">
           <svg
+            ref={svgRef}
             viewBox={`${-VB_MARGEN} ${-VB_MARGEN} ${VB_LADO} ${VB_LADO}`}
             className="w-full select-none"
             role="img"
@@ -143,18 +227,32 @@ export function RuedaPlanta({ maquinas, diaIdx, maquinaActivaId, onSeleccionar }
               />
             ))}
 
-            {anillos.map(({ maquina, rIn, rOut }) => {
+            {anillos.map(({ maquina, rIn, rOut, indice }) => {
               const d = maquina.semana[diaIdx]
               if (!d) return null
               const activa = maquina.id === maquinaActivaId || maquina.id === encima
+              // Con el puntero sobre un anillo, los demás se apagan: seguir uno
+              // entre seis anillos concéntricos es imposible sin ese contraste.
+              const apagada = encima !== null && encima !== maquina.id
+              const color = colorDeMaquina(indice)
               return (
                 <g
                   key={maquina.id}
                   onPointerEnter={() => setEncima(maquina.id)}
                   onPointerLeave={() => setEncima((v) => (v === maquina.id ? null : v))}
                   onClick={() => onSeleccionar?.(maquina.id)}
-                  className={onSeleccionar ? 'cursor-pointer' : undefined}
+                  className={cn(
+                    onSeleccionar && 'cursor-pointer',
+                    'transition-opacity duration-150 motion-reduce:transition-none',
+                  )}
+                  opacity={apagada ? 0.3 : 1}
                 >
+                  {/* Filo de identidad: el color propio de la máquina */}
+                  <path
+                    d={sector(0, SLOTS_POR_DIA, rOut - (activa ? 3.5 : 2), rOut)}
+                    className={color.filo}
+                    fillOpacity={activa ? 1 : 0.75}
+                  />
                   {agruparTramos(d.areas).map((g) => {
                     const oc = (['P', 'H', 'C', 'X'] as string[]).includes(g.valor)
                       ? (g.valor as Ocupante)
@@ -230,6 +328,11 @@ export function RuedaPlanta({ maquinas, diaIdx, maquinaActivaId, onSeleccionar }
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col gap-3">
+          {errorExport && (
+            <p role="status" className="rounded-ctl bg-destructive/10 px-3 py-2 text-footnote text-destructive">
+              {errorExport}
+            </p>
+          )}
           <p className="text-body text-foreground">
             {totalPleno > 0 && mejor ? (
               <>
@@ -246,7 +349,7 @@ export function RuedaPlanta({ maquinas, diaIdx, maquinaActivaId, onSeleccionar }
           </p>
 
           <ul className="flex flex-col gap-1.5">
-            {anillos.map(({ maquina }) => {
+            {anillos.map(({ maquina, indice }) => {
               const d = maquina.semana[diaIdx]
               const r = d ? contarDia(d) : null
               const activa = maquina.id === maquinaActivaId || maquina.id === encima
@@ -262,6 +365,10 @@ export function RuedaPlanta({ maquinas, diaIdx, maquinaActivaId, onSeleccionar }
                       activa ? 'bg-muted/60' : 'hover:bg-muted/40',
                     )}
                   >
+                    <span
+                      className={cn('h-3 w-3 shrink-0 rounded-full', colorDeMaquina(indice).punto)}
+                      aria-hidden
+                    />
                     <span className="min-w-0 flex-1 truncate text-footnote text-foreground">
                       {maquina.nombre}
                       {maquina.revisadoEnTerreno !== true && (
