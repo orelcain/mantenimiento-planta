@@ -2737,6 +2737,10 @@ function CurvasMaquinas({ serie, maquinas }: {
   serie: readonly TramoSerie[]
   maquinas: { nombre: string; serie: number[]; targetCpm?: number | null }[]
 }) {
+  /* El tramo bajo el dedo/cursor (pedido de Orel, 27-08: «ver en hover la
+     velocidad en todo momento», como el gráfico del detalle de turno). El
+     hook va ANTES del return condicional — reglas de hooks. */
+  const [idxSel, setIdxSel] = useState<number | null>(null)
   const fin = mediaMovil(serie).length
   if (fin < 2) return null
   const curvas = maquinas.map((m, idx) => {
@@ -2790,7 +2794,23 @@ function CurvasMaquinas({ serie, maquinas }: {
           ))}
         </span>
       </div>
-      <div className="relative mt-1.5">
+      <div
+        className="relative mt-1.5 cursor-crosshair touch-none"
+        /* El tramo se elige por POSICIÓN del puntero, no con un handler por
+           punto: sin zoom cada tramo mide ~4 px (gotcha ya pagada en el
+           gráfico grande). Pointer events cubren mouse y dedo. */
+        onPointerMove={(e) => {
+          const r = e.currentTarget.getBoundingClientRect()
+          const fr = (e.clientX - r.left) / Math.max(1, r.width)
+          setIdxSel(Math.max(0, Math.min(fin - 1, Math.round(fr * (fin - 1)))))
+        }}
+        onPointerDown={(e) => {
+          const r = e.currentTarget.getBoundingClientRect()
+          const fr = (e.clientX - r.left) / Math.max(1, r.width)
+          setIdxSel(Math.max(0, Math.min(fin - 1, Math.round(fr * (fin - 1)))))
+        }}
+        onPointerLeave={() => setIdxSel(null)}
+      >
         <svg viewBox={`0 0 ${w} 100`} preserveAspectRatio="none" className="block h-24 w-full" aria-hidden>
           {/* El OBJETIVO de cada máquina como punteada (como en el detalle de
               turno): la distancia entre curva y punteada ES la conversación. */}
@@ -2837,6 +2857,63 @@ function CurvasMaquinas({ serie, maquinas }: {
             {fmtDec(max)} pz/min
           </span>
         )}
+        {/* ── El detalle bajo el dedo: marcador + valores del tramo ─────────
+            La hora sale del TIMESTAMP del tramo, no de aritmética con el
+            índice — la serie puede traer huecos (gotcha ya pagada). Todo en
+            HTML: dentro del SVG estirado, texto y círculos se deforman. */}
+        {idxSel != null && (() => {
+          const xPct = (idxSel / Math.max(1, fin - 1)) * 100
+          const tSel = serie[idxSel]?.t ? Date.parse(serie[idxSel]!.t!) : NaN
+          const valores = curvas.map((c) => ({ c, v: c.puntos[idxSel] ?? 0 }))
+          const linea = valores.reduce((a, x) => a + x.v, 0)
+          return (
+            <>
+              <span
+                className="pointer-events-none absolute inset-y-0 w-px bg-foreground/40"
+                style={{ left: `${xPct}%` }}
+              />
+              {valores.map(({ c, v }) => (
+                <span
+                  key={c.nombre}
+                  className="pointer-events-none absolute h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full"
+                  style={{
+                    left: `${xPct}%`,
+                    top: `${y(v)}%`,
+                    background: `var(--mon-maq-${c.idx + 1})`,
+                    boxShadow: '0 0 0 1.5px rgb(var(--card))',
+                  }}
+                />
+              ))}
+              <div
+                className="pointer-events-none absolute z-10 rounded-ctl border border-border bg-card px-2 py-1.5 text-[11px] leading-tight shadow-sm"
+                style={{
+                  top: 2,
+                  left: `${Math.min(72, Math.max(0, xPct + 2))}%`,
+                }}
+              >
+                {Number.isFinite(tSel) && (
+                  <div className="mb-0.5 font-semibold tabular-nums text-foreground">
+                    {horaPlanta(tSel)}–{horaPlanta(tSel + PASO_MIN * 60_000)}
+                  </div>
+                )}
+                {valores.map(({ c, v }) => (
+                  <div key={c.nombre} className="flex items-center gap-1.5 tabular-nums text-muted-foreground">
+                    <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: `var(--mon-maq-${c.idx + 1})` }} />
+                    {nombreCorto(c.nombre)} <b className="text-foreground">{fmtDec(v)}</b>
+                    {c.targetCpm != null && c.targetCpm > 0 && (
+                      <span className="text-muted-foreground/70">/ obj {fmtDec(c.targetCpm, 0)}</span>
+                    )}
+                  </div>
+                ))}
+                {/* La suma de las medias por máquina ES la media de la línea:
+                    el total del tooltip cuadra con la curva grande. */}
+                <div className="mt-0.5 border-t border-border/50 pt-0.5 tabular-nums text-muted-foreground">
+                  línea <b className="text-foreground">{fmtDec(linea)}</b> pz/min
+                </div>
+              </div>
+            </>
+          )
+        })()}
       </div>
       {/* Las franjas de DETENCIÓN, un carril por máquina en su color: quién
           paró y cuándo, sin que la media móvil lo disimule. */}
@@ -2866,6 +2943,7 @@ function CurvasMaquinas({ serie, maquinas }: {
         <span>{Number.isFinite(t1) ? horaPlanta(t1) : ''}</span>
       </div>
       <p className="mt-1 text-caption leading-snug text-muted-foreground/80">
+        Pasá el dedo o el mouse por el gráfico para ver la velocidad de cada una en ese momento.{' '}
         {objetivos.length > 0 && (
           <>La punteada es el <b>objetivo</b> de cada máquina según Shoplogix
             {objetivos.length > 1 && ' (no son el mismo modelo: no compararlas entre sí por % del objetivo)'}. </>
