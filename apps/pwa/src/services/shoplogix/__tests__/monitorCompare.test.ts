@@ -680,6 +680,34 @@ describe('prediccionConvenio', () => {
     expect(p.some((b) => b.reason === 'DETENCION PROGRAMADA')).toBe(false)
   })
 
+  it('⚠⚠ hoyVivo: el contador vivo entra como último punto y manda la altura', () => {
+    /*
+     * La noche del 26-08: héroe en 820 pz (contador, 22:12) y comparador en
+     * 599 (tramos cerrados, 22:04) — dos totales en la misma pantalla. Con
+     * `hoyVivo`, «hoy» ES el contador y las referencias se leen a ESA altura.
+     */
+    const serie = (t0: string, piezas: number[]) => piezas.map((p, i) => ({
+      t: new Date(Date.parse(t0) + i * 5 * 60_000).toISOString(), pieces: p,
+    }))
+    const r = buildDayComparison({
+      todaySeries: serie('2026-08-26T21:30:00Z', [100, 200, 299]),   // cierra en 599 al min 10
+      todayDateKey: '2026-08-26',
+      previous: [{ dateKey: '2026-08-25', series: serie('2026-08-25T21:30:00Z', [200, 300, 300, 300, 291]) }],
+      hoyVivo: { pieces: 820, minute: 18 },
+    })
+    const hoy = r.days.find((d) => d.esHoy)!
+    expect(hoy.atCurrentMinute).toBe(820)
+    expect(r.currentMinute).toBe(18)
+    // Un contador caído (menos piezas o más viejo) NO retrocede la curva.
+    const r2 = buildDayComparison({
+      todaySeries: serie('2026-08-26T21:30:00Z', [100, 200, 299]),
+      todayDateKey: '2026-08-26',
+      previous: [],
+      hoyVivo: { pieces: 4, minute: 3 },
+    })
+    expect(r2.days[0]!.atCurrentMinute).toBe(599)
+  })
+
   it('⚠⚠ una causa repartida por el turno suma sus tramos, no el sobre que los envuelve', () => {
     /*
      * La noche del 26-08, real: el ejercicio compensatorio cae 2 veces por
