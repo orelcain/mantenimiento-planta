@@ -180,8 +180,11 @@
   --brand: 46 117 182;              /* #2E75B6 */
   --brand-foreground: 255 255 255;
   /* Tinta de marca para texto SOBRE tinte de marca: el #2E75B6 puro sobre su
-     propio tinte al 15% da 3.98:1 y reprueba AA — medido. */
-  --brand-ink: 42 106 166;          /* #2a6aa6 */
+     propio tinte al 15% da 3.98:1 y reprueba AA — medido. El #2a6aa6 original
+     tampoco alcanzaba sobre el peor fondo de la piel actual (tinte apoyado en
+     el fondo de la app: 3.71:1); este es el primary-700 de siempre, 4.72:1
+     ahí. Vigilado en scripts/check-contrast.mjs. */
+  --brand-ink: 36 90 140;           /* #245a8c = primary-700 */
 
   /* ── PALETA CATEGÓRICA (docs/NUEVA_PIEL_APPLE_HIG.md §1.6) ────────────────
      Hueco real del sistema detectado al barrer Bodega: la piel definía colores
@@ -272,6 +275,12 @@
   --ink-warn: 172 150 110;
   --ink-ok: 108 154 138;
   --ink-info: 109 163 216;
+
+  /* Tinta de marca en oscuro: heredar el #2a6aa6 de :root daba 2,75:1 sobre
+     el card (#16242f) y 2,40:1 sobre el tinte de Pill (primary al 15%) —
+     reprueba AA. Mismo valor que la piel Apple oscura; vigilado en
+     scripts/check-contrast.mjs. */
+  --brand-ink: 113 173 225;         /* #71ade1 */
 
   /* OJO: acá vivía un bloque `--cat-N-ink` con los -400 de julio, rotulado
      "categóricos en la piel ACTUAL". Era CÓDIGO MUERTO: lo pisaban, dentro de
