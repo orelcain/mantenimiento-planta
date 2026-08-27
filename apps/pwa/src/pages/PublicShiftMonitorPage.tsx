@@ -657,18 +657,21 @@ function CeldaStat({ k, v, sub, delta }: { k: string; v: string; sub?: string; d
   )
 }
 
-function EditorCuota({ actual, pesoConocido, onGuardar }: {
+function EditorCuota({ actual, pesoConocido, onGuardar, conToneladas = true }: {
   actual: number | null
   /** Peso promedio ya cargado para el turno: se PRELLENA en el modo toneladas.
       Sin esto, «Guardar» quedaba gris pidiendo un dato que la pantalla ya
       tenía — y nadie decía por qué (lo cazó Orel con el turno noche vivo). */
   pesoConocido?: number | null
   onGuardar: (piezas: number | null, origen?: { toneladas: number; pesoPromedioKg: number } | null) => Promise<void>
+  /** false en Filete: ahí no se trabaja en toneladas, la cuota va directo en
+      piezas y no se pide peso promedio (Orel, 27-08). */
+  conToneladas?: boolean
 }) {
   const [abierto, setAbierto] = useState(false)
   /* Producción pide TONELADAS, así que ese es el modo por defecto: las piezas
      salen del peso promedio del pescado y cambian turno a turno. */
-  const [modo, setModo] = useState<'toneladas' | 'piezas'>('toneladas')
+  const [modo, setModo] = useState<'toneladas' | 'piezas'>(conToneladas ? 'toneladas' : 'piezas')
   const [valor, setValor] = useState('')
   const [toneladas, setToneladas] = useState('')
   const [pesoKg, setPesoKg] = useState('')
@@ -717,6 +720,7 @@ function EditorCuota({ actual, pesoConocido, onGuardar }: {
 
   return (
     <span className="ml-1 inline-flex flex-wrap items-center gap-1 normal-case tracking-normal">
+      {conToneladas && (
       <span className="inline-flex overflow-hidden rounded-ctl border border-border">
         {(['toneladas', 'piezas'] as const).map((m) => (
           <button
@@ -729,6 +733,7 @@ function EditorCuota({ actual, pesoConocido, onGuardar }: {
           </button>
         ))}
       </span>
+      )}
       {modo === 'toneladas' ? (
         <>
           <input
@@ -2726,7 +2731,7 @@ function conRepartoPorMaquina(
  */
 function CurvasMaquinas({ serie, maquinas }: {
   serie: readonly TramoSerie[]
-  maquinas: { nombre: string; serie: number[] }[]
+  maquinas: { nombre: string; serie: number[]; targetCpm?: number | null }[]
 }) {
   const fin = mediaMovil(serie).length
   if (fin < 2) return null
@@ -2741,9 +2746,25 @@ function CurvasMaquinas({ serie, maquinas }: {
       }
       return pz / n / PASO_MIN
     })
-    return { nombre: m.nombre, idx, puntos }
+    /* Los tramos DETENIDA salen del dato crudo, no de la curva: la media de
+       15 min disimula un paro de 5 y las franjas existen justo para verlo. */
+    const paros: Array<{ desde: number; hasta: number }> = []
+    for (let i = 0; i < fin; i++) {
+      if ((propia[i] ?? 0) > 0) continue
+      const desde = i
+      while (i + 1 < fin && (propia[i + 1] ?? 0) === 0) i++
+      paros.push({ desde, hasta: i + 1 })
+    }
+    return { nombre: m.nombre, idx, puntos, paros, targetCpm: m.targetCpm ?? null }
   })
-  const max = Math.max(1, ...curvas.flatMap((c) => c.puntos))
+  /* Un objetivo por VALOR, no por máquina: en Chonchi Ev2 y Ev3 comparten 16
+     y dos punteadas idénticas encimadas se leen como un error de dibujo. */
+  const objetivos = [...new Map(
+    curvas
+      .filter((c) => c.targetCpm != null && c.targetCpm > 0)
+      .map((c) => [c.targetCpm!, curvas.filter((x) => x.targetCpm === c.targetCpm).map((x) => nombreCorto(x.nombre))]),
+  ).entries()]
+  const max = Math.max(1, ...curvas.flatMap((c) => c.puntos), ...objetivos.map(([v]) => v))
   const w = fin - 1
   const y = (v: number) => 100 - (v / max) * 94 - 3
   const t0 = serie[0]?.t ? Date.parse(serie[0].t) : NaN
@@ -2767,11 +2788,23 @@ function CurvasMaquinas({ serie, maquinas }: {
       </div>
       <div className="relative mt-1.5">
         <svg viewBox={`0 0 ${w} 100`} preserveAspectRatio="none" className="block h-24 w-full" aria-hidden>
-          {/* La línea de la escala: dónde queda el máximo que se alcanzó. */}
-          <line
-            x1={0} y1={y(max)} x2={w} y2={y(max)}
-            className="stroke-foreground/15" strokeDasharray="3 3" vectorEffect="non-scaling-stroke"
-          />
+          {/* El OBJETIVO de cada máquina como punteada (como en el detalle de
+              turno): la distancia entre curva y punteada ES la conversación. */}
+          {objetivos.map(([v]) => (
+            <line
+              key={v}
+              x1={0} y1={y(v)} x2={w} y2={y(v)}
+              stroke="var(--mon-cuota)"
+              strokeDasharray="4 3"
+              vectorEffect="non-scaling-stroke"
+            />
+          ))}
+          {objetivos.length === 0 && (
+            <line
+              x1={0} y1={y(max)} x2={w} y2={y(max)}
+              className="stroke-foreground/15" strokeDasharray="3 3" vectorEffect="non-scaling-stroke"
+            />
+          )}
           {curvas.map((c) => (
             <polyline
               key={c.nombre}
@@ -2785,15 +2818,57 @@ function CurvasMaquinas({ serie, maquinas }: {
             />
           ))}
         </svg>
-        <span className="absolute left-0 top-0 text-[10px] tabular-nums text-muted-foreground/80">
-          {fmtDec(max)} pz/min
-        </span>
+        {/* Etiquetas en HTML: dentro del SVG estirado el texto se deforma. */}
+        {objetivos.map(([v, quienes]) => (
+          <span
+            key={v}
+            className="absolute right-0 -translate-y-full whitespace-nowrap text-[10px] tabular-nums"
+            style={{ top: `${y(v)}%`, color: 'var(--mon-cuota)' }}
+          >
+            obj {fmtDec(v, 0)} · {quienes.join('·')}
+          </span>
+        ))}
+        {objetivos.length === 0 && (
+          <span className="absolute left-0 top-0 text-[10px] tabular-nums text-muted-foreground/80">
+            {fmtDec(max)} pz/min
+          </span>
+        )}
+      </div>
+      {/* Las franjas de DETENCIÓN, un carril por máquina en su color: quién
+          paró y cuándo, sin que la media móvil lo disimule. */}
+      <div className="mt-1 space-y-0.5">
+        {curvas.map((c) => (
+          <div key={c.nombre} className="relative h-1 w-full overflow-hidden rounded-full"
+            style={{ background: 'color-mix(in srgb, rgb(var(--muted-foreground)) 12%, transparent)' }}
+            title={`${nombreCorto(c.nombre)}: tramos detenida`}
+          >
+            {c.paros.map((p) => (
+              <span
+                key={p.desde}
+                className="absolute inset-y-0"
+                style={{
+                  left: `${(p.desde / fin) * 100}%`,
+                  width: `${Math.max(0.8, ((p.hasta - p.desde) / fin) * 100)}%`,
+                  background: `var(--mon-maq-${c.idx + 1})`,
+                }}
+              />
+            ))}
+          </div>
+        ))}
       </div>
       <div className="mt-0.5 flex items-baseline justify-between text-[10px] tabular-nums text-muted-foreground/80">
         <span>{Number.isFinite(t0) ? horaPlanta(t0) : ''}</span>
         <span className="text-muted-foreground">media de 15 min, pz/min · mientras corre</span>
         <span>{Number.isFinite(t1) ? horaPlanta(t1) : ''}</span>
       </div>
+      <p className="mt-1 text-caption leading-snug text-muted-foreground/80">
+        {objetivos.length > 0 && (
+          <>La punteada es el <b>objetivo</b> de cada máquina según Shoplogix
+            {objetivos.length > 1 && ' (no son el mismo modelo: no compararlas entre sí por % del objetivo)'}. </>
+        )}
+        Las franjas de abajo marcan cuándo cada una estuvo <b>detenida</b> (un carril por máquina,
+        mismo color que su curva).
+      </p>
     </div>
   )
 }
@@ -2867,7 +2942,7 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
   serieLinea?: readonly TramoSerie[] | null
   /** Piezas por bucket de cada máquina, alineadas a `serieLinea`. Solo llega
       cuando el doc ya trae el desglose (docs nuevos). */
-  seriesMaquinas?: { nombre: string; serie: number[] }[] | null
+  seriesMaquinas?: { nombre: string; serie: number[]; targetCpm?: number | null }[] | null
 }) {
   /*
    * ⚠ El estado se juzga contra el OBJETIVO cuando se conoce, no contra la
@@ -3512,7 +3587,11 @@ export function PublicShiftMonitorPage() {
     if (ms.length < 2 || total === 0) return null
     if (!ms.every((m) => Array.isArray(m.serie) && m.serie.length === total)) return null
     const offset = total - serieDelTurno.length
-    return ms.map((m) => ({ nombre: m.name, serie: (m.serie as number[]).slice(offset) }))
+    return ms.map((m) => ({
+      nombre: m.name,
+      serie: (m.serie as number[]).slice(offset),
+      targetCpm: m.targetCpm ?? null,
+    }))
   }, [live?.machines, live?.series, serieDelTurno])
   /** El arranque que se anuncia: la primera pieza, con el declarado de respaldo. */
   const inicioReal = serieDelTurno[0]?.t ?? live?.scheduledStart
@@ -4409,6 +4488,11 @@ export function PublicShiftMonitorPage() {
     }
     : undefined
 
+  /* Filete NO trabaja en toneladas (Orel, 27-08): ahí la cuota va directo en
+     piezas y la pantalla no pide cargar peso promedio. Las demás plantas sí —
+     producción habla en toneladas. */
+  const usaToneladas = data?.plantSlug !== 'filete'
+
   const horizontePronostico = useMemo(() => {
     const t0raw = serieDelTurno[0]?.t
     if (!pronostico || !t0raw) return null
@@ -4852,7 +4936,8 @@ export function PublicShiftMonitorPage() {
           {/* También con el turno CERRADO: el peso se puede cargar después y
               las toneladas del resultado siguen valiendo (Orel, 26-08 — con
               el gate en cerrado no había dónde ponerlo). */}
-          {!toneladas && esActual && (
+          {/* En Filete no se pide: esa línea no trabaja en toneladas. */}
+          {!toneladas && esActual && usaToneladas && (
             <div className="mt-1.5 flex items-center gap-2 rounded-ctl bg-muted px-3 py-2">
               <div className="min-w-0 flex-1">
                 <div className="text-[13px] text-foreground">Sin peso promedio no hay toneladas</div>
@@ -4910,6 +4995,7 @@ export function PublicShiftMonitorPage() {
                       actual={metaHero}
                       pesoConocido={live.pesoPromedioKg ?? pesoLocal ?? live.quotaOrigen?.pesoPromedioKg}
                       onGuardar={onGuardarCuota}
+                      conToneladas={usaToneladas}
                     />
                   )}
                 </span>
@@ -4978,6 +5064,7 @@ export function PublicShiftMonitorPage() {
                 actual={null}
                 pesoConocido={live.pesoPromedioKg ?? pesoLocal ?? live.quotaOrigen?.pesoPromedioKg}
                 onGuardar={onGuardarCuota}
+                conToneladas={usaToneladas}
               />
             </div>
           )}

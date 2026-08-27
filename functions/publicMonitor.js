@@ -1327,6 +1327,17 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
       // Piezas de ESTA máquina en cada bucket de `series` (mismo orden). Los
       // buckets sin dato van en 0 — incluida la cola extendida de paros.
       serie: series.map(p => byBucketDeMaquina.get(m.id)?.get(Date.parse(p.t)) || 0),
+      // Objetivo de ESTA máquina en pz/min: la mediana del `targetRate` que
+      // Shoplogix reporta por tramo (en Chonchi: Ev1 19, Ev2/Ev3 16 — no son
+      // el mismo modelo). Mediana y no máximo: los tramos parciales traen el
+      // objetivo escalado hacia abajo y un pico raro no debe definirlo.
+      targetCpm: (() => {
+        const ts = (m.intervals || [])
+          .map(iv => iv.targetRate)
+          .filter(v => Number.isFinite(v) && v > 0)
+          .sort((a, b) => a - b)
+        return ts.length ? ts[Math.floor(ts.length / 2)] : null
+      })(),
       status: statusOf(st),
       currentReason: st ? (st.reason || st.name || null) : null,
       currentSinceAt: st ? iso(toDate(st.startAt)) : null,
