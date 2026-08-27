@@ -18,7 +18,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { Wrench, AlertTriangle, TrendingUp } from 'lucide-react'
 import { Pill } from '@/components/piel'
 import type { KpisTurnoMantencion, KpisMaquinaTurno, EventoFalla } from '@/services/shoplogix/kpisMantencionTurno'
-import { targetSospechoso } from '@/services/shoplogix/kpisMantencionTurno'
+import { targetSospechoso, reenganches } from '@/services/shoplogix/kpisMantencionTurno'
 import { nombreCorto } from '@/services/shoplogix/ritmoPorMaquina'
 import { cargarTendenciaMantencion, TURNOS_TENDENCIA, type PuntoTendenciaMantencion } from '@/services/shoplogix/tendenciaMantencion'
 import type { PlantSlug } from '@/services/shoplogix/shoplogixMachines'
@@ -245,6 +245,26 @@ export function MantencionTurnoTab({ kpis, loading, plantSlug, shiftId, dateKey 
      mediana andando) — no al target, que puede estar malo (ver aviso). */
   const pzFalla = conFalla.reduce((a, x) => a + x.reparto.falla * (x.velocidad.medianaAndandoCpm ?? 0), 0)
 
+  /*
+   * Reenganche tras el paro mayor, a resolución de los intervalos de 5 min
+   * (los que el cliente tiene): cuántos minutos tardó la máquina en volver a
+   * su ritmo demostrado después del evento. La resolución fina (1 min) queda
+   * para el endpoint backend — por eso se dice con «≤».
+   */
+  const reengancheMayor = (() => {
+    if (!eventoMayor) return null
+    const m = porMaquina.find((x) => x.maquina.machineName === eventoMayor.maquina)
+    const mediana = m?.velocidad.medianaAndandoCpm
+    if (!m || mediana == null) return null
+    const buckets = (m.maquina.intervals ?? []).map((iv) => ({
+      ms: iv.startAt.getTime(),
+      c: iv.cycles || 0,
+      e: iv.expectedCycles || 0,
+    }))
+    const r = reenganches(buckets, [eventoMayor], mediana * 5)
+    return r[0]?.min != null ? r[0].min * 5 : null
+  })()
+
   return (
     <div className="space-y-4">
       {/* ── El titular: la historia en 10 segundos ── */}
@@ -310,6 +330,18 @@ export function MantencionTurnoTab({ kpis, loading, plantSlug, shiftId, dateKey 
                 MTBF{conFalla[0] ? ` de ${nombreCorto(conFalla[0].maquina.machineName)}` : ''}
               </div>
             </div>
+            {reengancheMayor != null && (
+              <div className="col-span-2 border-t border-border/50 pt-2">
+                <div className="text-headline text-foreground">
+                  {reengancheMayor === 0
+                    ? 'Reenganche inmediato (≤5 min) tras el paro mayor'
+                    : <>Reenganche en <span className="tabular-nums">≤{fmtInt(reengancheMayor + 5)} min</span> tras el paro mayor</>}
+                </div>
+                <div className="text-footnote text-muted-foreground">
+                  De vuelta al ritmo demostrado de la máquina, medido en tramos de 5 min.
+                </div>
+              </div>
+            )}
             <div className="col-span-2 border-t border-border/50 pt-2">
               <div className="text-headline text-foreground">
                 {sanas.length === porMaquina.length
