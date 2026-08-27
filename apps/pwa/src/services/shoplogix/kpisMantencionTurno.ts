@@ -178,6 +178,30 @@ export function targetSospechoso(v: VelocidadMaquina): boolean {
   return v.medianaAndandoCpm < 0.8 * v.esperadoCpm && v.pctLleno < 5
 }
 
+/**
+ * Reenganche: minutos (en buckets) desde el fin de cada evento de falla hasta
+ * que la máquina vuelve a su ritmo demostrado.
+ *
+ * ⚠ El umbral es el 90% de la MEDIANA ANDANDO propia, no del esperado teórico:
+ * la Ev1 (esperado 19, techo 13-15) daba «nunca recuperó» en las cuatro fallas
+ * si se le exigía el target. `umbralPorBucket` va en la MISMA unidad que `c`
+ * (ciclos por bucket): con intervalos de 5 min, mediana pz/min × 5.
+ */
+export function reenganches(
+  buckets: Array<{ ms: number; c: number; e: number }>,
+  eventosFalla: Array<{ hasta: Date }>,
+  umbralPorBucket: number,
+): Array<{ hasta: Date; min: number | null }> {
+  if (!(umbralPorBucket > 0)) return []
+  const umbral = 0.9 * umbralPorBucket
+  return (eventosFalla || []).map((ev) => {
+    const finMs = ev.hasta.getTime()
+    const despues = (buckets || []).filter((b) => b.ms >= finMs && b.e > 0)
+    const idx = despues.findIndex((b) => b.c >= umbral)
+    return { hasta: ev.hasta, min: idx < 0 ? null : idx }
+  })
+}
+
 // ── El turno completo ────────────────────────────────────────────────────────
 
 export interface KpisMaquinaTurno {
