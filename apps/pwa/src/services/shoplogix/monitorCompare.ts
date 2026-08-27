@@ -378,8 +378,25 @@ export function buildDayComparison(args: {
   usefulMin?: number | null
   /** Paradas de convenio: la curva objetivo se aplana durante ellas. */
   breaks?: PlannedBreak[]
+  /**
+   * El contador VIVO de Shoplogix, para que «hoy» sea LA verdad del héroe.
+   *
+   * ⚠ Sin esto había dos totales en la misma pantalla (Orel, noche del
+   * 26-08): el héroe decía 820 pz (contador, 22:12) y el comparador 599
+   * (tramos cerrados, 22:04) — 8 minutos de rezago leídos como descuadre.
+   * El punto vivo se agrega al final de la curva de hoy y TODO lo que cuelga
+   * del comparador (la altura, el vs-ayer, la brecha) queda en la misma
+   * línea de tiempo del contador. Solo si es más nuevo y no va hacia atrás.
+   */
+  hoyVivo?: { pieces: number; minute: number } | null
 }): CompareResult {
-  const hoy = cumulativeFromStart(args.todaySeries)
+  let hoy = cumulativeFromStart(args.todaySeries)
+  if (hoy.length > 0 && args.hoyVivo) {
+    const ult = hoy[hoy.length - 1]!
+    if (args.hoyVivo.minute > ult.minutes && args.hoyVivo.pieces >= ult.pieces) {
+      hoy = [...hoy, { minutes: args.hoyVivo.minute, pieces: args.hoyVivo.pieces }]
+    }
+  }
   if (hoy.length === 0) {
     return {
       days: [], currentMinute: null, optimal: null, optimalAtCurrentMinute: null,

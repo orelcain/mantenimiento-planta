@@ -3624,7 +3624,14 @@ export function PublicShiftMonitorPage() {
       // La cuota del link primero; si no, la de la config del turno.
       targetPieces: data?.targetPieces ?? live.quotaPieces,
       expectedPieces: metaSensor,
-      producedPieces: live.totalPieces,
+      /* El MISMO total que el héroe (contador vivo cuando responde): con
+         `live.totalPieces` el «faltan 14.401» convivía con un héroe en 820 —
+         dos totales a dos tarjetas de distancia (Orel, noche del 26-08). */
+      producedPieces: elegirContador({
+        pulse: data?.pulse ?? null,
+        live,
+        shiftClosed: live.shiftClosed,
+      }).valor,
       // `plannedEnd`, no `scheduledEnd`: aquél corre detrás del reloj y dejaría
       // el tiempo restante en ~0 durante todo el turno.
       scheduledEnd: live.plannedEnd,
@@ -3652,7 +3659,7 @@ export function PublicShiftMonitorPage() {
       shiftClosed: live.shiftClosed,
       pendingBreakMin: Number.isNaN(t0) ? 0 : breakMinutesBetween(breaksTurno, desdeMin, hastaMin),
     })
-  }, [live, data?.targetPieces, now, breaksTurno, ritmoAndando, serieDelTurno, metaSensor])
+  }, [live, data?.targetPieces, data?.pulse, now, breaksTurno, ritmoAndando, serieDelTurno, metaSensor])
 
   /*
    * Comparador con los turnos anteriores, a la misma altura de turno.
@@ -3759,10 +3766,20 @@ export function PublicShiftMonitorPage() {
       targetPieces: meta,
       usefulMin: opt?.usefulMin ?? null,
       breaks,
+      /* UNA sola verdad con el héroe: el contador vivo entra como último
+         punto de la curva de hoy (ver la nota en buildDayComparison). Solo
+         para el turno VIGENTE — mirando uno anterior no hay contador. */
+      hoyVivo: (() => {
+        if (!esActual || !live?.series?.length) return null
+        const cont = elegirContador({ pulse: data?.pulse ?? null, live, shiftClosed: live.shiftClosed })
+        const t0c = Date.parse(live.series[0]!.t)
+        if (cont.fuente !== 'pulso' || cont.corteWallMs == null || Number.isNaN(t0c)) return null
+        return { pieces: cont.valor, minute: (cont.corteWallMs - t0c) / 60_000 }
+      })(),
     })
     // El turno VISTO entra en las dependencias: al navegar a otro turno la
     // comparación tiene que rearmarse contra los días previos a ESE.
-  }, [live, inicioReal, vista?.dateKey, vista?.shiftId, data?.history, data?.targetPieces, breaksTurno, metaSensor])
+  }, [live, inicioReal, vista?.dateKey, vista?.shiftId, data?.history, data?.targetPieces, breaksTurno, metaSensor, esActual, data?.pulse])
 
   /*
    * Pronóstico del cierre. Se alimenta del `history` que YA viaja en el doc:
