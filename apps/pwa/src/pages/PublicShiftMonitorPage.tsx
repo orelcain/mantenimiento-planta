@@ -1593,11 +1593,20 @@ function Sparkbars({
           </span>
         ))}
         {/* Fuera de escala: el número se dice, pero no se dibuja — estirar el
-            eje hasta él aplastaba el turno entero contra el piso. */}
+            eje hasta él aplastaba el turno entero contra el piso.
+            OJO: sobre 2× la escala ni se dice: a 8 min del cierre la leyenda
+            anunciaba «necesitás 598,4 pz/min» — cierto e inútil, se lee como
+            pantalla rota (mismo criterio que la tarjeta de la meta). */}
         {refsFuera.map((r) => (
           <span key={r.label} className="inline-flex items-center gap-1">
-            {r.label} <span className="tabular-nums">{fmtDec(r.cpm)}</span> pz/min
-            <span className="text-muted-foreground/50">(fuera del gráfico)</span>
+            {r.cpm > escala * 2 && r.label === 'necesitás' ? (
+              <>necesitás <span className="text-muted-foreground/70">más de lo que la línea puede — ya no da el tiempo</span></>
+            ) : (
+              <>
+                {r.label} <span className="tabular-nums">{fmtDec(r.cpm)}</span> pz/min
+                <span className="text-muted-foreground/50">(fuera del gráfico)</span>
+              </>
+            )}
           </span>
         ))}
         {convenio.length > 0 && (
@@ -2783,8 +2792,13 @@ function CurvasMaquinas({ serie, maquinas, ahoraPorNombre, ahoraAt }: {
       let i = 0
       while (i < fin && Date.parse(serie[i]?.t ?? '') < t) i++
       if (i <= 0 || i >= fin) continue
+      const x = (i / Math.max(1, w)) * 100
+      /* Pegada a un extremo, la marca se MONTA sobre la hora de inicio/fin
+         (a 375 px se leía «07:2008:00» — visto en el pulido del 27-08). Los
+         extremos ya están rotulados; la marca sobra ahí. */
+      if (x < 10 || x > 88) continue
       const label = horaPlanta(t)
-      if (label) out.push({ x: (i / Math.max(1, w)) * 100, label })
+      if (label) out.push({ x, label })
     }
     return out
   })()
@@ -2853,7 +2867,11 @@ function CurvasMaquinas({ serie, maquinas, ahoraPorNombre, ahoraAt }: {
             />
           ))}
         </svg>
-        <span className="absolute left-0 top-0 text-[10px] tabular-nums text-muted-foreground/80">
+        {/* Con fondo: sobre un pico de las curvas el texto era ilegible. */}
+        <span
+          className="absolute left-0 top-0 rounded-full px-1 text-[10px] tabular-nums text-muted-foreground/80"
+          style={{ background: 'rgb(var(--card) / 0.8)' }}
+        >
           {fmtDec(max)} pz/min
         </span>
         {/* El punto VIVO al final de cada curva (un círculo en el SVG estirado
