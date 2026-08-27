@@ -3680,10 +3680,16 @@ export function PublicShiftMonitorPage() {
    * una cuota puesta desde el monitor no movía la barra.
    */
   const metaHero = data?.targetPieces ?? live?.quotaPieces ?? cuotaLocal ?? null
+  /* Con el MISMO contador del héroe, no con los tramos cerrados: a las 09:00
+     el héroe decía 3.097 (pulso) y el chip 14% (2.800 de buckets, 8 min
+     atrás) — 15,5% real. El mismo descuadre de «dos totales» que #819 cerró
+     en el comparador, sobreviviendo en la barra de meta (visto en la
+     auditoría en vivo del 27-08). */
   const progressPct = useMemo(() => {
     if (!live || !metaHero) return null
-    return Math.min(100, (live.totalPieces / metaHero) * 100)
-  }, [live, metaHero])
+    const total = elegirContador({ pulse: data?.pulse, live, shiftClosed: live.shiftClosed }).valor
+    return Math.min(100, (total / metaHero) * 100)
+  }, [live, metaHero, data?.pulse])
 
   // Al cambiar de turno (rollover del modo línea), lo recién guardado ya no
   // aplica: la cuota y el peso son POR TURNO.
@@ -5010,7 +5016,7 @@ export function PublicShiftMonitorPage() {
                */}
               {(() => {
                 const meta = metaHero!
-                const techo = Math.max(meta, live.totalPieces, banda?.cierres.max ?? 0) * 1.04
+                const techo = Math.max(meta, contador.valor, banda?.cierres.max ?? 0) * 1.04
                 const pctDe = (v: number) => Math.min(100, (v / techo) * 100)
                 return (
                   <div className="relative mt-1 h-3.5 overflow-hidden rounded-md bg-muted">
@@ -5024,9 +5030,11 @@ export function PublicShiftMonitorPage() {
                         title={`Cierres habituales: ${fmtInt(banda.cierres.min)}–${fmtInt(banda.cierres.max)} pz (${banda.muestras} turnos)`}
                       />
                     )}
+                    {/* El relleno con el contador del héroe — el mismo número
+                        que el 3.097 grande de arriba, no los buckets. */}
                     <span
                       className="absolute inset-y-1 left-0 rounded-r-sm bg-sky-500 dark:bg-sky-400 transition-[width] duration-700"
-                      style={{ width: `${pctDe(live.totalPieces)}%` }}
+                      style={{ width: `${pctDe(contador.valor)}%` }}
                     />
                     <span
                       className="absolute inset-y-0 w-[2.5px] bg-foreground"
@@ -5417,8 +5425,15 @@ export function PublicShiftMonitorPage() {
               ventana={ventanaGrafica}
               onVentana={setVentanaGrafica}
               requiredPerMinute={pace && pace.requiredPerMinute > 0 ? pace.requiredPerMinute : null}
-              medianCpm={live.paceMedianCpm}
-              medianSamples={live.paceSamples}
+              medianCpm={
+                /* La MISMA mediana que el riel y la chispa (`ritmoAndando`, 19
+                   turnos), no la del backend (8): eran 29,4 y 29,7 en la misma
+                   pantalla con dos muestras distintas — dos «lo normal» a diez
+                   centímetros (auditoría en vivo, 27-08). El backend queda de
+                   respaldo para docs sin historial. */
+                ritmoAndando.mediana ?? live.paceMedianCpm
+              }
+              medianSamples={ritmoAndando.mediana != null ? ritmoAndando.muestras : live.paceSamples}
               setCpm={setCpmVigente}
               fuenteSetPoint={live.setPoint
                 ? `Set point ${fmtDec(live.setPoint.cpm)} pz/min` +
@@ -5541,8 +5556,15 @@ export function PublicShiftMonitorPage() {
               ventana={ventanaGrafica}
               onVentana={setVentanaGrafica}
               requiredPerMinute={pace && pace.requiredPerMinute > 0 ? pace.requiredPerMinute : null}
-              medianCpm={live.paceMedianCpm}
-              medianSamples={live.paceSamples}
+              medianCpm={
+                /* La MISMA mediana que el riel y la chispa (`ritmoAndando`, 19
+                   turnos), no la del backend (8): eran 29,4 y 29,7 en la misma
+                   pantalla con dos muestras distintas — dos «lo normal» a diez
+                   centímetros (auditoría en vivo, 27-08). El backend queda de
+                   respaldo para docs sin historial. */
+                ritmoAndando.mediana ?? live.paceMedianCpm
+              }
+              medianSamples={ritmoAndando.mediana != null ? ritmoAndando.muestras : live.paceSamples}
               setCpm={setCpmVigente}
               fuenteSetPoint={live.setPoint
                 ? `Set point ${fmtDec(live.setPoint.cpm)} pz/min` +
