@@ -477,7 +477,12 @@ export function RuedaVentanas() {
       <div className={cn('grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]', modo === 'comparar' && 'hidden')}>
         {/* ── Rueda ────────────────────────────────────────────────────────── */}
         <div className="flex flex-col gap-4">
-          <div className="mx-auto w-full max-w-[30rem]">
+          {/* La rueda es cuadrada, así que acotar el ANCHO por la altura de la ventana
+              acota las dos medidas. Sin esto solo se limitaba por ancho: en una
+              pantalla baja —o con el zoom del navegador subido, que deja el
+              viewport igual de bajo— llenaba el 93% del alto y tapaba todo lo
+              demás, obligando a scrollear para leer cualquier cifra. */}
+          <div className="mx-auto w-full max-w-[min(30rem,60vh)]">
             <svg
               ref={svgRef}
               viewBox={`${-VB_MARGEN} ${-VB_MARGEN} ${VB_LADO} ${VB_LADO}`}
