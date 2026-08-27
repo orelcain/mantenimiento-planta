@@ -101,10 +101,15 @@ export function referenciaDe(cmp: CompareResult, clave: string | null) {
   return { clave: efectiva, contra }
 }
 
-/** «La colación» a partir de «COLACION»: el aviso habla, no grita. */
+/** «La colación» a partir de «COLACION»: el aviso habla, no grita.
+    OJO: el artículo fijo solo funciona con la colación: con el reason crudo de
+    otros convenios salía «La ejercicio compensatorio - paro entra a las…»
+    (visto en vivo, 27-08). Para el resto, el nombre va entre comillas con
+    su sustantivo delante. */
 function nombreDeConvenio(reason: string): string {
   const bajo = reason.toLowerCase().replace(/\s+/g, ' ').trim()
-  return 'La ' + (bajo === 'colacion' ? 'colación' : bajo)
+  if (bajo === 'colacion') return 'La colación'
+  return `La parada de convenio «${bajo}»`
 }
 
 function fmtDurMin(min: number): string {
@@ -669,10 +674,18 @@ export function TiempoDelTurno({
                     ALGUNA máquina (86 min de "Detención" contra 67 de línea, el
                     24-08 en Chonchi). Sin decir cuál es cuál, los dos números se
                     leen como si uno estuviera mal. */}
-                Las paradas evitables llevan <b>{fmtDurMin(tb.recoverableMin)}</b>
-                {(tb.recoverable ?? []).some((x) => (x.lineMin ?? x.min) < x.min)
-                  ? ' con la línea entera detenida.'
-                  : '.'}
+                {/* Con cero minutos, fmtDurMin devuelve «—» y la frase decía
+                    «llevan — con la línea entera detenida» (visto en vivo,
+                    27-08 con solo micro y una máquina parada de a una). El
+                    cero acá es una BUENA noticia y se dice como tal. */}
+                {tb.recoverableMin >= 1 ? (
+                  <>Las paradas evitables llevan <b>{fmtDurMin(tb.recoverableMin)}</b>
+                  {(tb.recoverable ?? []).some((x) => (x.lineMin ?? x.min) < x.min)
+                    ? ' con la línea entera detenida.'
+                    : '.'}</>
+                ) : (
+                  <>La línea entera todavía no pierde tiempo por paradas evitables.</>
+                )}
               </p>
             )}
         </div>
