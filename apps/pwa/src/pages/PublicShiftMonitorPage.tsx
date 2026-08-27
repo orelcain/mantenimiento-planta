@@ -407,8 +407,12 @@ function EditorPeso({ actual, onGuardar }: {
   )
 }
 
-function EditorCuota({ actual, onGuardar }: {
+function EditorCuota({ actual, pesoConocido, onGuardar }: {
   actual: number | null
+  /** Peso promedio ya cargado para el turno: se PRELLENA en el modo toneladas.
+      Sin esto, «Guardar» quedaba gris pidiendo un dato que la pantalla ya
+      tenía — y nadie decía por qué (lo cazó Orel con el turno noche vivo). */
+  pesoConocido?: number | null
   onGuardar: (piezas: number | null, origen?: { toneladas: number; pesoPromedioKg: number } | null) => Promise<void>
 }) {
   const [abierto, setAbierto] = useState(false)
@@ -432,7 +436,12 @@ function EditorCuota({ actual, onGuardar }: {
     return (
       <button
         type="button"
-        onClick={() => { setValor(actual != null ? String(actual) : ''); setAbierto(true); setError(null) }}
+        onClick={() => {
+          setValor(actual != null ? String(actual) : '')
+          if (pesoConocido != null && pesoConocido > 0) setPesoKg(String(pesoConocido))
+          setAbierto(true)
+          setError(null)
+        }}
         className="tap-44 ml-1 rounded-full border border-border px-2 py-0.5 text-[10px] normal-case tracking-normal hover:bg-muted"
       >
         {actual != null ? 'Cambiar cuota' : 'Poner cuota'}
@@ -502,7 +511,9 @@ function EditorCuota({ actual, onGuardar }: {
       )}
       <button
         type="button"
-        disabled={guardando || (modo === 'toneladas' && !convertida)}
+        /* En piezas también se valida: Number('') es 0 y guardaba una cuota
+           de cero sin que nadie la escribiera. */
+        disabled={guardando || (modo === 'toneladas' ? !convertida : !(Number(valor) > 0))}
         onClick={() => modo === 'toneladas'
           ? guardar(convertida!.piezas, { toneladas: Number(toneladas), pesoPromedioKg: Number(pesoKg) })
           : guardar(Number(valor), null)}
@@ -510,6 +521,15 @@ function EditorCuota({ actual, onGuardar }: {
       >
         {guardando ? 'Guardando…' : 'Guardar'}
       </button>
+      {/* El PORQUÉ del botón gris, escrito: «no deja cambiar» era esto. */}
+      {modo === 'toneladas' && !convertida && !guardando && (
+        <span className="w-full text-[11px] text-muted-foreground">
+          Para guardar en toneladas falta{!(Number(toneladas) > 0) ? ' cuántas toneladas' : ''}
+          {!(Number(toneladas) > 0) && !(Number(pesoKg) > 0) ? ' y' : ''}
+          {!(Number(pesoKg) > 0) ? ' el kg por pieza (peso promedio del calibre)' : ''}
+          {' '}— o cambiá a «piezas».
+        </span>
+      )}
       {actual != null && (
         <button
           type="button"
@@ -2771,6 +2791,14 @@ export function PublicShiftMonitorPage() {
   const { isDark, toggleTheme } = useTheme()
   const [data, setData] = useState<PublicShiftMonitorDoc | null>(null)
   const [status, setStatus] = useState<'loading' | 'ok' | 'gone' | 'sin-conexion'>('loading')
+  /*
+   * Cuota y peso RECIÉN guardados desde esta pantalla: el backend los publica
+   * en el próximo refresco (~5 min) y mientras tanto la tarjeta no mostraba
+   * nada — «guardé y no pasó nada» (Orel, con el turno noche vivo). Son solo
+   * respaldo: en cuanto `live` trae el valor, gana el del backend.
+   */
+  const [cuotaLocal, setCuotaLocal] = useState<number | null>(null)
+  const [pesoLocal, setPesoLocal] = useState<number | null>(null)
   const [now, setNow] = useState(() => Date.now())
   /* Los `t` de la serie son wall-clock sellados como UTC; para compararlos con
      el reloj hay que llevar "ahora" a esa misma base (igual que `fmtAgoWall`). */
@@ -2981,11 +3009,18 @@ export function PublicShiftMonitorPage() {
    * módulo — que es donde escribe el editor de cuota. Con solo `targetPieces`,
    * una cuota puesta desde el monitor no movía la barra.
    */
-  const metaHero = data?.targetPieces ?? live?.quotaPieces ?? null
+  const metaHero = data?.targetPieces ?? live?.quotaPieces ?? cuotaLocal ?? null
   const progressPct = useMemo(() => {
     if (!live || !metaHero) return null
     return Math.min(100, (live.totalPieces / metaHero) * 100)
   }, [live, metaHero])
+
+  // Al cambiar de turno (rollover del modo línea), lo recién guardado ya no
+  // aplica: la cuota y el peso son POR TURNO.
+  useEffect(() => {
+    setCuotaLocal(null)
+    setPesoLocal(null)
+  }, [data?.shiftDocId])
 
   /**
    * Las paradas de convenio del turno: las de hoy como hechos y las de los
@@ -3720,7 +3755,7 @@ export function PublicShiftMonitorPage() {
    * el Excel del Grader. Se dicen SIEMPRE con "≈" y con el peso a la vista.
    */
   const toneladas = useMemo(() => {
-    const pesoKg = Number(live?.pesoPromedioKg)
+    const pesoKg = Number(live?.pesoPromedioKg ?? pesoLocal)
     if (!(pesoKg > 0) || !live?.totalPieces) return null
     const ahoraT = toneladasDePiezas(live.totalPieces, pesoKg)
     if (ahoraT == null) return null
@@ -3728,10 +3763,10 @@ export function PublicShiftMonitorPage() {
        misma gramática que la meta en piezas (rediseño 26-08). Reemplaza al
        «al cierre ≈ N t» proyectado — la meta es un hecho, la proyección era
        otra cifra más que defender. Solo si hay meta en piezas. */
-    const metaPz = data?.targetPieces ?? live.quotaPieces ?? null
+    const metaPz = data?.targetPieces ?? live.quotaPieces ?? cuotaLocal ?? null
     const metaT = metaPz != null ? toneladasDePiezas(metaPz, pesoKg) : null
     return { ahora: ahoraT, meta: metaT, pesoKg }
-  }, [live?.pesoPromedioKg, live?.totalPieces, live?.quotaPieces, data?.targetPieces])
+  }, [live?.pesoPromedioKg, live?.totalPieces, live?.quotaPieces, data?.targetPieces, pesoLocal, cuotaLocal])
 
   const onGuardarPeso = esAdminMonitor && esActual && data?.plantSlug && live?.shiftName
     ? async (pesoKg: number | null) => {
@@ -3741,6 +3776,7 @@ export function PublicShiftMonitorPage() {
         pesoKg,
         por: usuarioActual?.email ?? null,
       })
+      setPesoLocal(pesoKg)
     }
     : undefined
 
@@ -3760,6 +3796,8 @@ export function PublicShiftMonitorPage() {
         por: usuarioActual?.email ?? null,
         origen: origen ?? null,
       })
+      setCuotaLocal(piezas)
+      if (origen?.pesoPromedioKg) setPesoLocal(origen.pesoPromedioKg)
     }
     : undefined
 
@@ -4259,7 +4297,13 @@ export function PublicShiftMonitorPage() {
                   {/* El editor vive ACÁ, no solo en el bloque de ritmo: ese se
                       apaga al cerrar el turno y dejaba la cuota sin dónde
                       tocarse (Orel, 26-08). */}
-                  {onGuardarCuota && <EditorCuota actual={metaHero} onGuardar={onGuardarCuota} />}
+                  {onGuardarCuota && (
+                    <EditorCuota
+                      actual={metaHero}
+                      pesoConocido={live.pesoPromedioKg ?? pesoLocal ?? live.quotaOrigen?.pesoPromedioKg}
+                      onGuardar={onGuardarCuota}
+                    />
+                  )}
                 </span>
                 <span className="tabular-nums">{fmtDec(progressPct, 0)}%</span>
               </div>
@@ -4322,7 +4366,11 @@ export function PublicShiftMonitorPage() {
                   Con la cuota (en toneladas o piezas) aparecen la barra de meta y el camino a cumplirla.
                 </div>
               </div>
-              <EditorCuota actual={null} onGuardar={onGuardarCuota} />
+              <EditorCuota
+                actual={null}
+                pesoConocido={live.pesoPromedioKg ?? pesoLocal ?? live.quotaOrigen?.pesoPromedioKg}
+                onGuardar={onGuardarCuota}
+              />
             </div>
           )}
 
