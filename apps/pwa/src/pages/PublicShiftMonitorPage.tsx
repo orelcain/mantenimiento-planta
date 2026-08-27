@@ -2724,18 +2724,30 @@ function conRepartoPorMaquina(
  * La velocidad de cada máquina a lo largo del turno, como curvas (pedido de
  * Orel, 26-08: el gráfico del detalle de turno «se vería bien acá»).
  *
- * Es la vista que las columnas no pueden dar: QUIÉN bajó la línea y CUÁNDO.
- * Misma vara que la curva de línea —media móvil de 3 tramos, en pz/min— para
- * que las tres curvas se lean contra el mismo reloj. SVG propio y no echarts:
- * esta página evita a propósito cargarse ese bundle (ver nota en los imports).
+ * ── UNA sola vara: la velocidad REAL de cada tramo ─────────────────────────
+ * Dibujaba la media móvil de 15 min y Orel la leyó —con razón— como «la
+ * velocidad de cada Baader en ese momento»: el último punto sumaba 19,9
+ * mientras arriba el «Ahora» decía 30,1, y nada cuadraba con nada (27-08).
+ * Ahora cada punto es el CRUDO del tramo de 5 min (piezas ÷ 5), y al final
+ * se anexa el PUNTO VIVO del pulso por máquina — el mismo número de la
+ * columna «ahora», así el final del gráfico suma el «Ahora» grande. La media
+ * de 15 min ya tiene su cifra con rótulo en la cabecera; el gráfico no la
+ * repite con rezago.
  *
+ * SVG propio y no echarts: esta página evita a propósito ese bundle.
  * ⚠ El corte de la cola de ceros del final es el de la LÍNEA (`mediaMovil`),
  * no el de cada máquina: si una paró antes del cierre, sus ceros son la
  * información que este gráfico existe para mostrar.
  */
-function CurvasMaquinas({ serie, maquinas }: {
+function CurvasMaquinas({ serie, maquinas, ahoraPorNombre, ahoraAt }: {
   serie: readonly TramoSerie[]
   maquinas: { nombre: string; serie: number[]; targetCpm?: number | null }[]
+  /** El pulso vivo de cada máquina, por nombre — el punto final de la curva.
+      null cuando el contador no está fresco: la curva termina en el último
+      tramo cerrado, sin inventar un presente. */
+  ahoraPorNombre?: Map<string, number> | null
+  /** Hora ISO de esa lectura del pulso, para rotular el punto vivo. */
+  ahoraAt?: string | null
 }) {
   /* El tramo bajo el dedo/cursor (pedido de Orel, 27-08: «ver en hover la
      velocidad en todo momento», como el gráfico del detalle de turno). El
@@ -2743,41 +2755,47 @@ function CurvasMaquinas({ serie, maquinas }: {
   const [idxSel, setIdxSel] = useState<number | null>(null)
   const fin = mediaMovil(serie).length
   if (fin < 2) return null
+  const conVivo = ahoraPorNombre != null
+    && maquinas.every((m) => ahoraPorNombre.get(m.nombre) != null)
   const curvas = maquinas.map((m, idx) => {
-    const propia = m.serie.slice(0, fin)
-    const puntos = propia.map((_, i) => {
-      let pz = 0
-      let n = 0
-      for (let j = Math.max(0, i - 2); j <= i; j++) {
-        pz += propia[j] ?? 0
-        n++
-      }
-      return pz / n / PASO_MIN
-    })
-    /* Los tramos DETENIDA salen del dato crudo, no de la curva: la media de
-       15 min disimula un paro de 5 y las franjas existen justo para verlo. */
-    const paros: Array<{ desde: number; hasta: number }> = []
-    for (let i = 0; i < fin; i++) {
-      if ((propia[i] ?? 0) > 0) continue
-      const desde = i
-      while (i + 1 < fin && (propia[i + 1] ?? 0) === 0) i++
-      paros.push({ desde, hasta: i + 1 })
-    }
-    return { nombre: m.nombre, idx, puntos, paros, targetCpm: m.targetCpm ?? null }
+    const puntos = m.serie.slice(0, fin).map((pz) => pz / PASO_MIN)
+    if (conVivo) puntos.push(ahoraPorNombre!.get(m.nombre)!)
+    return { nombre: m.nombre, idx, puntos, targetCpm: m.targetCpm ?? null }
   })
-  /* Las punteadas del objetivo se FUERON (Orel, 27-08: ensuciaban más de lo
-     que decían). El objetivo por máquina sigue en el tooltip del hover, que
-     es donde se consulta con la curva al lado. */
+  /* Índices: 0..fin-1 son tramos cerrados; con pulso fresco hay un punto
+     extra (el vivo) en el índice `fin`. */
+  const nPuntos = fin + (conVivo ? 1 : 0)
   const max = Math.max(1, ...curvas.flatMap((c) => c.puntos))
-  const w = fin - 1
+  const w = nPuntos - 1
   const y = (v: number) => 100 - (v / max) * 94 - 3
   const t0 = serie[0]?.t ? Date.parse(serie[0].t) : NaN
   const t1 = serie[fin - 1]?.t ? Date.parse(serie[fin - 1]!.t!) + PASO_MIN * 60_000 : NaN
+  /* Marcas del eje X en horas REDONDAS, ubicadas por ÍNDICE del tramo (la
+     serie puede traer huecos — aritmética de tiempo las correría, gotcha ya
+     pagada en el gráfico grande). Paso de 1 o 2 h según el largo. */
+  const marcasHora = (() => {
+    if (!Number.isFinite(t0) || !Number.isFinite(t1)) return []
+    const pasoH = (t1 - t0) / 3_600_000 > 4.5 ? 2 : 1
+    const out: Array<{ x: number; label: string }> = []
+    const primera = new Date(t0)
+    primera.setUTCMinutes(0, 0, 0)
+    for (let t = primera.getTime() + 3_600_000; t < t1 - 15 * 60_000; t += pasoH * 3_600_000) {
+      let i = 0
+      while (i < fin && Date.parse(serie[i]?.t ?? '') < t) i++
+      if (i <= 0 || i >= fin) continue
+      const label = horaPlanta(t)
+      if (label) out.push({ x: (i / Math.max(1, w)) * 100, label })
+    }
+    return out
+  })()
 
   return (
     <div className="mt-3 border-t border-border/50 pt-2.5">
       <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5 text-caption text-muted-foreground">
-        <span>Velocidad de cada máquina</span>
+        <span>
+          Velocidad de cada máquina
+          <span className="text-muted-foreground/70"> · pz/min por tramo de 5 min</span>
+        </span>
         <span className="flex items-center gap-2.5">
           {curvas.map((c) => (
             <span key={c.nombre} className="inline-flex items-center gap-1">
@@ -2798,12 +2816,12 @@ function CurvasMaquinas({ serie, maquinas }: {
         onPointerMove={(e) => {
           const r = e.currentTarget.getBoundingClientRect()
           const fr = (e.clientX - r.left) / Math.max(1, r.width)
-          setIdxSel(Math.max(0, Math.min(fin - 1, Math.round(fr * (fin - 1)))))
+          setIdxSel(Math.max(0, Math.min(nPuntos - 1, Math.round(fr * (nPuntos - 1)))))
         }}
         onPointerDown={(e) => {
           const r = e.currentTarget.getBoundingClientRect()
           const fr = (e.clientX - r.left) / Math.max(1, r.width)
-          setIdxSel(Math.max(0, Math.min(fin - 1, Math.round(fr * (fin - 1)))))
+          setIdxSel(Math.max(0, Math.min(nPuntos - 1, Math.round(fr * (nPuntos - 1)))))
         }}
         onPointerLeave={() => setIdxSel(null)}
       >
@@ -2813,6 +2831,15 @@ function CurvasMaquinas({ serie, maquinas }: {
             x1={0} y1={y(max)} x2={w} y2={y(max)}
             className="stroke-foreground/15" strokeDasharray="3 3" vectorEffect="non-scaling-stroke"
           />
+          {/* Las horas del eje, también como guía vertical tenue: sin ellas
+              los tramos flotaban sin reloj (Orel, 27-08). */}
+          {marcasHora.map((mk) => (
+            <line
+              key={mk.label}
+              x1={(mk.x / 100) * w} y1={0} x2={(mk.x / 100) * w} y2={100}
+              className="stroke-foreground/10" vectorEffect="non-scaling-stroke"
+            />
+          ))}
           {curvas.map((c) => (
             <polyline
               key={c.nombre}
@@ -2829,13 +2856,28 @@ function CurvasMaquinas({ serie, maquinas }: {
         <span className="absolute left-0 top-0 text-[10px] tabular-nums text-muted-foreground/80">
           {fmtDec(max)} pz/min
         </span>
+        {/* El punto VIVO al final de cada curva (un círculo en el SVG estirado
+            sale elipse — va en HTML): es el «ahora» de la columna de arriba. */}
+        {conVivo && curvas.map((c) => (
+          <span
+            key={c.nombre}
+            className="pointer-events-none absolute h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full"
+            style={{
+              left: '100%',
+              top: `${y(c.puntos[nPuntos - 1] ?? 0)}%`,
+              background: `var(--mon-maq-${c.idx + 1})`,
+              boxShadow: '0 0 0 1.5px rgb(var(--card))',
+            }}
+          />
+        ))}
         {/* ── El detalle bajo el dedo: marcador + valores del tramo ─────────
             La hora sale del TIMESTAMP del tramo, no de aritmética con el
             índice — la serie puede traer huecos (gotcha ya pagada). Todo en
             HTML: dentro del SVG estirado, texto y círculos se deforman. */}
         {idxSel != null && (() => {
-          const xPct = (idxSel / Math.max(1, fin - 1)) * 100
-          const tSel = serie[idxSel]?.t ? Date.parse(serie[idxSel]!.t!) : NaN
+          const esVivo = conVivo && idxSel === nPuntos - 1
+          const xPct = (idxSel / Math.max(1, nPuntos - 1)) * 100
+          const tSel = !esVivo && serie[idxSel]?.t ? Date.parse(serie[idxSel]!.t!) : NaN
           const valores = curvas.map((c) => ({ c, v: c.puntos[idxSel] ?? 0 }))
           const linea = valores.reduce((a, x) => a + x.v, 0)
           return (
@@ -2863,7 +2905,11 @@ function CurvasMaquinas({ serie, maquinas }: {
                   left: `${Math.min(72, Math.max(0, xPct + 2))}%`,
                 }}
               >
-                {Number.isFinite(tSel) && (
+                {esVivo ? (
+                  <div className="mb-0.5 font-semibold tabular-nums text-foreground">
+                    ahora mismo{ahoraAt ? ` · ${new Date(ahoraAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false })}` : ''}
+                  </div>
+                ) : Number.isFinite(tSel) && (
                   <div className="mb-0.5 font-semibold tabular-nums text-foreground">
                     {horaPlanta(tSel)}–{horaPlanta(tSel + PASO_MIN * 60_000)}
                   </div>
@@ -2877,8 +2923,8 @@ function CurvasMaquinas({ serie, maquinas }: {
                     )}
                   </div>
                 ))}
-                {/* La suma de las medias por máquina ES la media de la línea:
-                    el total del tooltip cuadra con la curva grande. */}
+                {/* Los crudos por máquina SUMAN el de la línea en ese tramo —
+                    y en el punto vivo, el «Ahora» grande de arriba. */}
                 <div className="mt-0.5 border-t border-border/50 pt-0.5 tabular-nums text-muted-foreground">
                   línea <b className="text-foreground">{fmtDec(linea)}</b> pz/min
                 </div>
@@ -2887,49 +2933,22 @@ function CurvasMaquinas({ serie, maquinas }: {
           )
         })()}
       </div>
-      {/* Las franjas de DETENCIÓN, un carril por máquina en su color: quién
-          paró y cuándo, sin que la media móvil lo disimule. CON NOMBRE: sin
-          el rótulo, un carril casi lleno se leía como una barra decorativa
-          rota (Orel lo marcó, 27-08 — era la Ev 2 parada el 73% del tramo). */}
-      <div className="mt-1 space-y-0.5">
-        {curvas.map((c) => (
-          <div
-            key={c.nombre}
-            /* Full-width y NO en columna con el nombre: los carriles comparten
-               el eje de tiempo del gráfico de arriba y correrlos 40 px haría
-               que «cuándo paró» ya no calce con la curva. El nombre va
-               superpuesto al extremo izquierdo. */
-            className="relative h-1.5 w-full overflow-hidden rounded-full"
-            style={{ background: 'color-mix(in srgb, rgb(var(--muted-foreground)) 12%, transparent)' }}
-            title={`${nombreCorto(c.nombre)}: los tramos pintados son cuando estuvo detenida`}
-          >
-            {c.paros.map((p) => (
-              <span
-                key={p.desde}
-                className="absolute inset-y-0"
-                style={{
-                  left: `${(p.desde / fin) * 100}%`,
-                  width: `${Math.max(0.8, ((p.hasta - p.desde) / fin) * 100)}%`,
-                  background: `var(--mon-maq-${c.idx + 1})`,
-                }}
-              />
-            ))}
-            <span className="absolute left-0 top-1/2 -translate-y-1/2 rounded-full px-1 text-[9px] leading-[11px] text-muted-foreground"
-              style={{ background: 'rgb(var(--card) / 0.85)' }}
-            >
-              {nombreCorto(c.nombre)}
-            </span>
-          </div>
+      {/* Los carriles de detención se FUERON (Orel, 27-08: «no están dando
+          información relevante» — con el crudo, los paros ya se ven como
+          caídas a cero en la propia curva). El eje X gana su espacio: horas
+          redondas ubicadas por índice de tramo, extremos anclados al borde
+          (centrados, media etiqueta queda fuera — gotcha ya pagada). */}
+      <div className="relative mt-0.5 h-4 text-[10px] tabular-nums text-muted-foreground/80">
+        <span className="absolute left-0">{Number.isFinite(t0) ? horaPlanta(t0) : ''}</span>
+        {marcasHora.map((mk) => (
+          <span key={mk.label} className="absolute -translate-x-1/2" style={{ left: `${Math.min(92, Math.max(8, mk.x))}%` }}>
+            {mk.label}
+          </span>
         ))}
+        <span className="absolute right-0">
+          {conVivo ? 'ahora' : Number.isFinite(t1) ? horaPlanta(t1) : ''}
+        </span>
       </div>
-      <div className="mt-0.5 flex items-baseline justify-between text-[10px] tabular-nums text-muted-foreground/80">
-        <span>{Number.isFinite(t0) ? horaPlanta(t0) : ''}</span>
-        <span className="text-muted-foreground">media de 15 min, pz/min · mientras corre</span>
-        <span>{Number.isFinite(t1) ? horaPlanta(t1) : ''}</span>
-      </div>
-      {/* El caption largo se fue (Orel, 27-08): el espacio es del gráfico.
-          Las franjas ya se explican con su rótulo y su title; el gesto del
-          hover lo enseña el gráfico grande de abajo, que dice lo mismo. */}
     </div>
   )
 }
@@ -3330,7 +3349,20 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
           (pedido de Orel, 26-08): acá se ve QUIÉN bajó la línea y cuándo, no
           solo cuánto. Solo con docs nuevos (los viejos no traen el desglose). */}
       {serieLinea && serieLinea.length > 1 && seriesMaquinas && seriesMaquinas.length > 1 && (
-        <CurvasMaquinas serie={serieLinea} maquinas={seriesMaquinas} />
+        <CurvasMaquinas
+          serie={serieLinea}
+          maquinas={seriesMaquinas}
+          /* El punto vivo SOLO con el pulso fresco y completo — la misma
+             condición de la columna «ahora», para que gráfico y columna
+             digan lo mismo. */
+          ahoraPorNombre={
+            !parada && !cerrado && pulso?.cpm != null
+            && maquinas != null && maquinas.maquinas.every((m) => m.pulsoCpm != null)
+              ? new Map(maquinas.maquinas.map((m) => [m.nombre, m.pulsoCpm!]))
+              : null
+          }
+          ahoraAt={pulso?.at ?? null}
+        />
       )}
 
       {/* La hora de corte. El número grande describe los últimos 15 min, pero
