@@ -147,6 +147,22 @@ for (const [name, textHex, colorHex] of [
   }
 }
 
+console.log('\n=== PIEL ACTUAL — tinta de marca (--brand-ink) ===')
+// El bug que motiva estos pares (2026-08-26): `.dark` de la piel actual NO
+// redefinía --brand-ink y heredaba el valor claro de :root → 2.75:1 sobre el
+// card oscuro y 2.40:1 sobre el tinte de Pill. El oscuro es el mismo de la
+// piel Apple oscura (#71ade1). Y al medir, el claro original (#2a6aa6) tampoco
+// pasaba sobre su tinte en esta piel (card azulado, no blanco como en Apple):
+// ahora es el primary-700. El tinte se mide apoyado en el PEOR fondo de cada
+// tema: en claro el fondo de la app (más oscuro que el card), en oscuro el
+// card (más claro que el fondo).
+const brandInkLight = '#245a8c'
+const brandInkDark = '#71ade1'
+check('brand-ink sobre card CLARO', brandInkLight, LIGHT.card, 4.5)
+check('brand-ink sobre tinte marca 15% CLARO (sobre fondo, peor caso)', brandInkLight, composite(LIGHT.background, primary500, 0.15), 4.5)
+check('brand-ink sobre card OSCURO', brandInkDark, DARK.card, 4.5)
+check('brand-ink sobre tinte marca 15% OSCURO (sobre card, peor caso)', brandInkDark, composite(DARK.card, primary500, 0.15), 4.5)
+
 // ============================================================================
 // NUEVA PIEL — Apple HIG (`[data-skin="apple"]` en index.css)
 // docs/NUEVA_PIEL_APPLE_HIG.md · skill /nueva-piel-apple
@@ -166,7 +182,7 @@ check('rojo-600 texto sobre fondo', '#c42d25', AL.bg, 4.5)
 check('verde-600 texto sobre fondo', '#217d38', AL.bg, 4.5)
 check('naranja-600 texto sobre fondo', '#9e5c00', AL.bg, 4.5)
 check('separador sobre card (no textual)', AL.sep, AL.card, 1.5)
-check('marca-ink sobre tinte marca 15%', '#2a6aa6', composite(AL.card, '#2E75B6', 0.15), 4.5)
+check('marca-ink sobre tinte marca 15%', '#245a8c', composite(AL.card, '#2E75B6', 0.15), 4.5)
 
 console.log('\n=== NUEVA PIEL (Apple) — OSCURO (elevado) ===')
 const AD = { bg: '#1c1c1e', card: '#2c2c2e', ink: '#ffffff', sub: '#9f9fa5', sep: '#38383a' }
