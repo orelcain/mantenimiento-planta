@@ -30,6 +30,7 @@
  */
 
 const shoplogixPolling = require('./shoplogix/polling')
+const kpisMantencion = require('./shoplogix/kpisMantencion')
 
 const COLLECTION = 'publicShiftMonitors'
 
@@ -1352,6 +1353,60 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
   })
 
   /*
+   * ── KPIs de Mantención, publicados al monitor ─────────────────────────────
+   * La respuesta del turno: quién falló, cuánto costó y qué tan rápido se
+   * repuso. Van al doc público porque Producción mira ESTA pantalla (pedido de
+   * Orel, 26-08): la evidencia de que Mantención responde tiene que estar donde
+   * está el público, no solo en la vista interna. Sale de los states que este
+   * build ya tiene en la mano — cero lecturas extra.
+   */
+  const mantencion = (() => {
+    const fin = effectiveEnd ?? scheduledEnd
+    if (!scheduledStart || !fin) return null
+    const ventana = { start: scheduledStart, end: new Date(fin.getTime() + 10 * 60_000) }
+    const eventosTodos = []
+    const porMaquina = machines.map((m) => {
+      /* Los states traen Timestamps de Firestore; el módulo espera fechas
+         parseables (`new Date(Timestamp)` da NaN y el saneo lo bota todo). */
+      const statesNorm = (m.states || []).map((s) => ({
+        ...s,
+        startAt: toDate(s.startAt),
+        endAt: toDate(s.endAt),
+      }))
+      const k = kpisMantencion.kpisDeMaquina(kpisMantencion.sanearStates(statesNorm, ventana))
+      for (const e of k.eventosFalla) {
+        eventosTodos.push({
+          maquina: m.machineName || m.id,
+          desde: e.desde,
+          hasta: e.hasta,
+          min: Math.round(e.sec / 6) / 10,
+          causas: e.causas,
+          paros: e.paros,
+        })
+      }
+      const causasFalla = Object.entries(k.grupos.falla?.causas ?? {})
+        .sort((a, b) => b[1] - a[1])
+        .map(([causa, sec]) => ({ causa, min: Math.round(sec / 6) / 10 }))
+      return {
+        name: m.machineName || m.id,
+        dispTecnicaPct: k.dispTecnicaPct != null ? Math.round(k.dispTecnicaPct * 10) / 10 : null,
+        eventosFalla: k.eventosFalla.length,
+        fallaMin: Math.round((k.grupos.falla?.sec ?? 0) / 6) / 10,
+        mttrMin: k.mttrMin != null ? Math.round(k.mttrMin * 10) / 10 : null,
+        mtbfMin: k.mtbfMin != null ? Math.round(k.mtbfMin * 10) / 10 : null,
+        microN: k.grupos.micro?.n ?? 0,
+        microMin: Math.round((k.grupos.micro?.sec ?? 0) / 6) / 10,
+        causasFalla,
+      }
+    })
+    return {
+      porMaquina,
+      /** Los eventos del turno, del más caro al más barato. Tope chico: el doc es público. */
+      eventos: eventosTodos.sort((a, b) => b.min - a.min).slice(0, 6),
+    }
+  })()
+
+  /*
    * Cierre del turno, en tres niveles y en este orden:
    *
    *   1. FIJADO a mano (`endPinned`) — alguien lo decidió mirando la pantalla.
@@ -1476,6 +1531,8 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
     effectiveStart: iso(effectiveStart),
     effectiveEnd: iso(effectiveEnd),
     shiftClosed,
+    /** KPIs de Mantención del turno (ver bloque de arriba). Ausente en docs viejos. */
+    mantencion,
     totalPieces,
     /** Desglose de `totalPieces`: lo que Shoplogix metió dentro del turno… */
     shiftPieces,
