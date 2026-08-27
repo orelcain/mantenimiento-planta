@@ -6,6 +6,40 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-08-26 · Fix: `pnpm-lock.yaml` llevaba semanas desincronizado y nada lo delataba (PR #823)
+
+El PR #643 agregó `jspdf`/`jspdf-autotable` a `functions/package.json` y
+regeneró `functions/package-lock.json` (el que usa el deploy), pero **no** el
+`pnpm-lock.yaml` de la raíz — y `functions` es parte del workspace pnpm.
+`pnpm install --frozen-lockfile` moría con `ERR_PNPM_OUTDATED_LOCKFILE`.
+
+✅ **No hubo bug en producción**, y conviene decirlo porque la primera lectura
+asusta: `deploy-functions.yml` instala con `npm ci` desde el package-lock de
+`functions/`, que sí tenía las dos dependencias. `turnoDefensaPdf.js` nunca
+estuvo roto. Esto era higiene de reproducibilidad.
+
+🔑 **Por qué el CI nunca lo vio: `--frozen-lockfile` es el DEFAULT de pnpm en
+CI, y los tres workflows que usan pnpm lo desactivan explícito** (`deploy.yml`,
+`deploy-miniapps.yml`, `daily-sync.yml`; puesto en 2025-12 por otro motivo,
+mucho antes de este desfase). O sea: la protección existía por defecto y se
+había apagado a mano, así que el lock dejó de cumplir su función sin que nada
+se pusiera rojo. **Un guardarraíl desactivado no avisa que está desactivado.**
+
+📌 **Regenerar un lock con OTRA versión de pnpm reescribe el archivo entero.**
+Se usó la que fija `packageManager` (10.33.0) y `--lockfile-only`: 15 líneas
+añadidas, 0 eliminadas, ninguna versión existente alterada.
+
+Verificación con la prueba que importa (que el fix pueda distinguirse de no
+hacer nada): `--frozen-lockfile` **falla** en main y **pasa** con el cambio —
+comprobado también sobre `origin/main` ya mergeado. Además: install real OK,
+`require('jspdf')` + `require('jspdf-autotable')` + `shoplogix/turnoDefensaPdf.js`
+cargan desde `functions/`, y build de la PWA OK.
+
+⚠️ **Pendiente propuesto, NO hecho** (cambia el comportamiento de los deploys,
+es decisión de Orel): con el lock ya sincronizado, los tres
+`--no-frozen-lockfile` podrían volver a estrictos para que el CI detecte el
+próximo desfase en vez de tragárselo.
+
 ## 2026-08-26 · Fix: la tinta de marca `--brand-ink` reprobaba AA en oscuro Y en claro (PR #820)
 
 El bloque `.dark` de la piel ACTUAL nunca redefinió `--brand-ink` y heredaba
