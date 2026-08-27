@@ -42,7 +42,7 @@ import { elegirContador } from './monitor/contadorCrudo'
 import { construirCascada } from './monitor/cascadaTurno'
 import { horaPlanta } from './monitor/horaPlanta'
 import { CascadaTurnoCard } from './monitor/CascadaTurnoCard'
-import { mediaMovil, ritmoAhoraCpm, ritmoAhoraAndando, estadoRitmo, fraccionDeRegla, pedidoAndando, pedidoFueraDeAlcance } from '@/services/shoplogix/monitorRitmo'
+import { mediaMovil, ritmoAhoraCpm, ritmoAhoraAndando, repartoAhoraAndando, estadoRitmo, fraccionDeRegla, pedidoAndando, pedidoFueraDeAlcance, PASO_MIN, type TramoSerie } from '@/services/shoplogix/monitorRitmo'
 import { pinShiftEnd, unpinShiftEnd, setMonitorSetPoint, setShiftQuota, setPesoPromedio } from '@/services/shoplogix/pinShiftEnd'
 import {
   buildDayComparison, optimalPace, plannedBreaks, mergeBreaks, cumulativeFromStart,
@@ -248,7 +248,7 @@ function diaCorto(dateKey: string): string {
  * con trazo no escalable — texto, puntos y redondeos van en HTML encima, que
  * es la lección que ya nos costó una vez en el gráfico grande.
  */
-function Chispa({ turnos, hoy, banda, escala }: {
+function Chispa({ turnos, hoy, banda, escala, mediana, muestras }: {
   turnos: Array<{ dateKey: string; ritmo: number }>
   hoy: number
   banda: { min: number; max: number }
@@ -259,19 +259,32 @@ function Chispa({ turnos, hoy, banda, escala }: {
    * al siguiente — era la mitad de por qué el gráfico «estaba muerto».
    */
   escala?: { min: number; max: number } | null
+  /** La mediana de la ventana: «lo normal» pasa de texto a POSICIÓN. */
+  mediana?: number | null
+  /** De cuántos turnos sale la mediana, para rotularla honesta. */
+  muestras?: number | null
 }) {
   const todos = [...turnos.map((t) => t.ritmo), hoy, banda.min, banda.max]
   const lo = Math.min(...todos, ...(escala ? [escala.min] : []))
   const hi = Math.max(...todos, ...(escala ? [escala.max] : []))
   const span = hi - lo || 1
-  // En % del alto, con 12% de aire arriba y abajo.
-  const yPct = (v: number) => 88 - ((v - lo) / span) * 76
+  // En % del alto, con aire arriba (para la anotación del mejor) y abajo.
+  const yPct = (v: number) => 88 - ((v - lo) / span) * 72
   const puntos = [...turnos.map((t) => t.ritmo), hoy]
   const xPct = (i: number) => (i / Math.max(1, puntos.length - 1)) * 100
+  /* El mejor de los DIBUJADOS. Hoy no compite (suele ser parcial) — pero si
+     hoy ya lo supera, la anotación mentiría y no se muestra. */
+  const iMejorCandidato = turnos.length >= 2
+    ? turnos.reduce((mi, t, i) => (t.ritmo > turnos[mi]!.ritmo ? i : mi), 0)
+    : null
+  const iMejor = iMejorCandidato != null && turnos[iMejorCandidato]!.ritmo >= hoy
+    ? iMejorCandidato
+    : null
+  const esDomingo = (dateKey: string) => new Date(`${dateKey}T12:00:00Z`).getUTCDay() === 0
   return (
     <div className="mt-1.5" aria-hidden>
       <div className="flex items-stretch gap-1.5">
-        <div className="relative h-16 min-w-0 flex-1">
+        <div className="relative h-[88px] min-w-0 flex-1">
           <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-full w-full">
             <rect
               x="0"
@@ -280,48 +293,105 @@ function Chispa({ turnos, hoy, banda, escala }: {
               height={Math.max(3, yPct(banda.min) - yPct(banda.max))}
               className="fill-muted-foreground/15"
             />
+            {/* Lo normal como LÍNEA: hasta ahora la mediana vivía solo en el
+                texto del detalle y el gráfico no decía dónde queda. */}
+            {mediana != null && (
+              <line
+                x1="0" y1={yPct(mediana)} x2="100" y2={yPct(mediana)}
+                stroke="var(--mon-ref)"
+                strokeWidth="1"
+                vectorEffect="non-scaling-stroke"
+              />
+            )}
             <polyline
               points={puntos.map((v, i) => `${xPct(i)},${yPct(v)}`).join(' ')}
               fill="none"
-              strokeWidth="1.8"
+              strokeWidth="1.5"
               strokeLinejoin="round"
               vectorEffect="non-scaling-stroke"
               className="stroke-muted-foreground/70"
             />
           </svg>
-          {/* Los puntos en HTML: un círculo dentro del SVG estirado sale elipse. */}
-          {puntos.map((v, i) => (
+          {/* Los puntos en HTML: un círculo dentro del SVG estirado sale elipse.
+              El domingo va HUECO — la línea no trabaja igual y su punto bajo
+              arrastraba la lectura de la semana. */}
+          {puntos.map((v, i) => {
+            const esHoy = i === puntos.length - 1
+            const domingo = !esHoy && esDomingo(turnos[i]!.dateKey)
+            return (
+              <span
+                key={i}
+                title={`${esHoy ? 'hoy' : nombreDeDia(turnos[i]!.dateKey)} · ${fmtDec(v)} pz/min`}
+                className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full ${
+                  esHoy ? 'h-2.5 w-2.5' : domingo ? 'h-2 w-2 border-2' : 'h-1.5 w-1.5'
+                }`}
+                style={{
+                  left: `${xPct(i)}%`,
+                  top: `${yPct(v)}%`,
+                  ...(esHoy
+                    ? {
+                        background: 'var(--mon-hoy)',
+                        boxShadow: '0 0 0 2px rgb(var(--card)), 0 0 0 5px color-mix(in srgb, var(--mon-hoy) 40%, transparent)',
+                      }
+                    : domingo
+                      ? { borderColor: 'var(--mon-ref)', background: 'transparent' }
+                      : { background: 'var(--mon-ref)' }),
+                }}
+              />
+            )
+          })}
+          {/* El mejor de la ventana, anotado: es la referencia que uno busca
+              («¿cuándo fue el bueno?») sin abrir ningún tooltip. */}
+          {iMejor != null && (
             <span
-              key={i}
-              title={`${i < turnos.length ? nombreDeDia(turnos[i]!.dateKey) : 'hoy'} · ${fmtDec(v)} pz/min`}
-              className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full ${
-                i === puntos.length - 1
-                  ? 'h-2.5 w-2.5 bg-primary ring-2 ring-primary/35'
-                  : 'h-1.5 w-1.5 bg-muted-foreground/70'
-              }`}
-              style={{ left: `${xPct(i)}%`, top: `${yPct(v)}%` }}
-            />
-          ))}
+              className="absolute -translate-x-1/2 whitespace-nowrap text-[10px] text-muted-foreground"
+              style={{
+                left: `${Math.min(80, Math.max(20, xPct(iMejor)))}%`,
+                top: `${yPct(turnos[iMejor]!.ritmo)}%`,
+                transform: 'translate(-50%, -170%)',
+              }}
+            >
+              mejor de estos {turnos.length + 1}
+            </span>
+          )}
         </div>
-        {/* Los bordes de la banda, rotulados: el rango se LEE, no se adivina. */}
+        {/* El eje, rotulado: bordes de la banda y la mediana en su color. */}
         <div className="relative w-9 shrink-0 text-caption tabular-nums text-muted-foreground/80">
           <span className="absolute -translate-y-1/2" style={{ top: `${yPct(banda.max)}%` }}>
             {fmtDec(banda.max)}
           </span>
+          {mediana != null && Math.abs(yPct(mediana) - yPct(banda.max)) > 12 && Math.abs(yPct(mediana) - yPct(banda.min)) > 12 && (
+            <span className="absolute -translate-y-1/2" style={{ top: `${yPct(mediana)}%`, color: 'var(--mon-ref)' }}>
+              {fmtDec(mediana)}
+            </span>
+          )}
           <span className="absolute -translate-y-1/2" style={{ top: `${yPct(banda.min)}%` }}>
             {fmtDec(banda.min)}
           </span>
-          <span className="absolute bottom-0 text-[10px] text-muted-foreground/80">rango</span>
         </div>
       </div>
-      <div className="mr-9 flex justify-between text-caption tabular-nums text-muted-foreground/80">
+      {/* El valor BAJO cada día: la tabla-gemela del gráfico, sin tooltips.
+          Los puntos sin número eran la otra mitad del «gráfico muerto». */}
+      <div className="mr-9 mt-1 flex justify-between text-center">
         {turnos.map((t) => (
-          <span key={t.dateKey}>{diaCorto(t.dateKey)}</span>
+          <span key={t.dateKey} className="min-w-0">
+            <span className="block text-caption tabular-nums text-foreground/80">{fmtDec(t.ritmo)}</span>
+            <span className="block text-[10px] text-muted-foreground/80">{diaCorto(t.dateKey)}</span>
+          </span>
         ))}
-        {/* «hoy» lleva su valor al lado: los puntos sin número eran la otra
-            mitad del gráfico muerto. Los demás lo dicen en su tooltip. */}
-        <span className="font-semibold text-brand-ink">hoy {fmtDec(hoy)}</span>
+        <span className="min-w-0">
+          <span className="block text-caption font-semibold tabular-nums" style={{ color: 'var(--mon-hoy)' }}>
+            {fmtDec(hoy)}
+          </span>
+          <span className="block text-[10px] font-semibold" style={{ color: 'var(--mon-hoy)' }}>hoy</span>
+        </span>
       </div>
+      {muestras != null && mediana != null && (
+        <p className="mt-1 text-[10px] leading-snug text-muted-foreground/80">
+          La línea horizontal es la mediana de los últimos {muestras} turnos ({fmtDec(mediana)});
+          la banda gris, el rango habitual. Punto hueco = domingo.
+        </p>
+      )}
     </div>
   )
 }
@@ -404,6 +474,186 @@ function EditorPeso({ actual, onGuardar }: {
       </button>
       {error && <span className="w-full text-[11px] text-ink-crit">{error}</span>}
     </span>
+  )
+}
+
+/* ══ Los instrumentos de «Para llegar a la meta» (rediseño B, mockup 26-08) ══
+   Las reglas de honestidad pasan de texto a GEOMETRÍA: lo que no se puede
+   afirmar no se dibuja. En «Arrancando» faltan la marca del necesario y la
+   banda del cierre (son proyecciones); un necesario que supera el techo se
+   SALE del riel y se dice con palabras — dibujarlo al borde fingiría que casi
+   se llega.
+   ⚠ El riel NO usa bg-muted: en oscuro --muted y --card son casi el mismo
+   tono y el riel desaparece (se vio al renderizar el mockup, no al leerlo). */
+
+const PISTA_INSTRUMENTO = 'color-mix(in srgb, rgb(var(--muted-foreground)) 20%, transparent)'
+
+/** El metro de piezas: 0 → meta, con el cierre proyectado como banda. */
+function MetroPiezas({ ahora, meta, banda, etiquetaBanda }: {
+  ahora: number
+  meta: number
+  /** Cierre proyectado entre los dos horizontes. null = sin proyección. */
+  banda: { min: number; max: number } | null
+  etiquetaBanda: string | null
+}) {
+  const escala = Math.max(meta, banda?.max ?? 0, ahora) * 1.04
+  if (!(escala > 0)) return null
+  const pct = (v: number) => Math.max(0, Math.min(100, (v / escala) * 100))
+  const labX = banda ? Math.max(16, Math.min(84, (pct(banda.min) + pct(banda.max)) / 2)) : null
+  return (
+    <div className="relative w-full">
+      <div className="relative mb-0.5 h-[15px] text-[11px] leading-[15px] tabular-nums">
+        <span className="absolute left-0 whitespace-nowrap font-semibold" style={{ color: 'var(--mon-hoy)' }}>
+          {fmtInt(ahora)} ahora
+        </span>
+        {banda && etiquetaBanda && (
+          <span
+            className="absolute -translate-x-1/2 whitespace-nowrap font-semibold text-foreground"
+            style={{ left: `${labX}%` }}
+          >
+            {etiquetaBanda}
+          </span>
+        )}
+      </div>
+      <div className="relative h-3 rounded-full" style={{ background: PISTA_INSTRUMENTO }}>
+        <span
+          className="absolute inset-y-0 left-0 rounded-full"
+          style={{ width: `${pct(ahora)}%`, minWidth: 3, background: 'var(--mon-hoy)' }}
+        />
+        {banda && (
+          <span
+            className="absolute inset-y-0"
+            title={`Cierre proyectado: ${fmtInt(banda.min)}–${fmtInt(banda.max)} pz`}
+            style={{
+              left: `${pct(banda.min)}%`,
+              width: `${Math.max(1.2, pct(banda.max) - pct(banda.min))}%`,
+              background: 'color-mix(in srgb, var(--mon-cuota) 42%, transparent)',
+              borderLeft: '2px solid var(--mon-cuota)',
+              borderRight: '2px solid var(--mon-cuota)',
+            }}
+          />
+        )}
+        <span
+          className="absolute -bottom-[3px] -top-[3px] w-0.5 rounded-[1px] bg-foreground"
+          style={{ left: `calc(${pct(meta)}% - 1px)` }}
+          title={`Meta: ${fmtInt(meta)} pz`}
+        />
+      </div>
+      <div className="relative mt-0.5 h-[15px] text-[11px] leading-[15px] tabular-nums text-muted-foreground">
+        <span className="absolute right-0">meta {fmtInt(meta)}</span>
+      </div>
+    </div>
+  )
+}
+
+/** El riel de ritmo: vas a · lo normal · necesitás · techo, sobre una escala. */
+function RielRitmo({ vasA, normal, necesitas, techo }: {
+  vasA: number | null
+  normal: number | null
+  /** null = sin proyección (arrancando) · 'fuera' = supera el techo, no se dibuja. */
+  necesitas: number | 'fuera' | null
+  techo: number | null
+}) {
+  const mayor = Math.max(vasA ?? 0, normal ?? 0, typeof necesitas === 'number' ? necesitas : 0, techo ?? 0)
+  if (!(mayor > 0)) return null
+  /* El techo cae al 93,7% y el 6,3% final es la zona rayada: lo de más allá
+     del techo no es una meta, es territorio que la línea nunca pisó. */
+  const escala = techo != null && techo > 0 ? techo / 0.937 : mayor * 1.07
+  const pct = (v: number) => Math.max(0, Math.min(100, (v / escala) * 100))
+  const nx = typeof necesitas === 'number' ? Math.max(14, Math.min(86, pct(necesitas))) : null
+  return (
+    <div className="relative w-full">
+      <div className="relative mb-0.5 h-[15px] text-[11px] leading-[15px] tabular-nums">
+        {vasA != null && (
+          <span className="absolute left-0 whitespace-nowrap font-semibold" style={{ color: 'var(--mon-hoy)' }}>
+            vas a {fmtDec(vasA)}
+          </span>
+        )}
+        {typeof necesitas === 'number' && nx != null && (
+          <span className="absolute -translate-x-1/2 whitespace-nowrap font-semibold text-foreground" style={{ left: `${nx}%` }}>
+            necesitás {fmtDec(necesitas)}
+          </span>
+        )}
+        {necesitas === 'fuera' && (
+          <span className="absolute right-0 whitespace-nowrap font-semibold text-ink-warn">
+            necesitás fuera de escala →
+          </span>
+        )}
+      </div>
+      <div className="relative h-2.5 rounded-full" style={{ background: PISTA_INSTRUMENTO }}>
+        {vasA != null && (
+          <span
+            className="absolute inset-y-0 left-0 rounded-full"
+            style={{ width: `${Math.max(1, pct(vasA))}%`, background: 'var(--mon-hoy)' }}
+          />
+        )}
+        {techo != null && techo > 0 && (
+          <span
+            className="absolute inset-y-0 right-0 rounded-r-full"
+            style={{
+              width: '6.3%',
+              background: 'repeating-linear-gradient(135deg, color-mix(in srgb, rgb(var(--muted-foreground)) 45%, transparent) 0 1.5px, transparent 1.5px 5px)',
+            }}
+          />
+        )}
+        {normal != null && normal > 0 && (
+          <span
+            className="absolute -bottom-0.5 -top-0.5 w-px"
+            style={{ left: `${pct(normal)}%`, background: 'var(--mon-ref)' }}
+            title={`Lo normal de la línea: ${fmtDec(normal)} pz/min andando`}
+          />
+        )}
+        {typeof necesitas === 'number' && (
+          <span
+            className="absolute -bottom-1 -top-1 w-[3px] rounded-[2px]"
+            style={{ left: `calc(${pct(necesitas)}% - 1.5px)`, background: 'var(--mon-cuota)' }}
+            title={`Para la meta: ${fmtDec(necesitas)} pz/min andando`}
+          />
+        )}
+        {techo != null && techo > 0 && (
+          <span
+            className="absolute -bottom-1 -top-1 w-0.5"
+            style={{ left: 'calc(93.7% - 1px)', background: 'var(--mon-ref)' }}
+            title={`Techo demostrado: ${fmtDec(techo)} pz/min andando`}
+          />
+        )}
+      </div>
+      <div className="relative mt-0.5 h-[15px] text-[11px] leading-[15px] tabular-nums text-muted-foreground">
+        {/* Con lo normal en la mitad derecha, la etiqueta centrada se PISABA
+            con «techo» (visto en vivo: «lo normal 32,eCho 43,1»). Pasada la
+            mitad, el texto termina EN su marca en vez de cruzarla. */}
+        {normal != null && normal > 0 && (pct(normal) > 55 ? (
+          <span className="absolute -translate-x-full whitespace-nowrap pr-1" style={{ left: `${Math.min(72, pct(normal))}%` }}>
+            lo normal {fmtDec(normal)}
+          </span>
+        ) : (
+          <span className="absolute -translate-x-1/2 whitespace-nowrap" style={{ left: `${Math.max(14, pct(normal))}%` }}>
+            lo normal {fmtDec(normal)}
+          </span>
+        ))}
+        {techo != null && techo > 0 && (
+          <span className="absolute right-0 whitespace-nowrap">techo {fmtDec(techo)}</span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/** Una celda de la fila de estadísticas del instrumento. */
+function CeldaStat({ k, v, sub, delta }: { k: string; v: string; sub?: string; delta?: number | null }) {
+  return (
+    <div className="min-w-0">
+      <div className="text-[11px] text-muted-foreground">{k}</div>
+      <div className="text-[15px] tabular-nums text-foreground">
+        {v}
+        {sub && <span className="text-[11px] text-muted-foreground"> {sub}</span>}
+        {delta != null && (
+          <span className={`text-[11px] tabular-nums ${delta >= 0 ? 'text-ink-ok' : 'text-ink-warn'}`}>
+            {' '}{delta >= 0 ? '+' : '−'}{fmtInt(Math.abs(delta))}
+          </span>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -1637,7 +1887,18 @@ function RitmoNecesario({
         <p className="text-[15px] font-semibold text-foreground">
           Arrancando · <span className="tabular-nums">{fmtInt(minAndando)} min</span> andando
         </p>
-        <p className="mt-0.5 text-[12px] text-muted-foreground">
+        {/* El mismo metro del estado normal, SIN banda de proyección: el avance
+            contra la meta es un hecho desde el minuto uno; el cierre estimado
+            no, y por eso acá no se dibuja. */}
+        <div className="mt-1.5">
+          <MetroPiezas
+            ahora={Math.max(0, pace.targetPieces - pace.remainingPieces)}
+            meta={pace.targetPieces}
+            banda={null}
+            etiquetaBanda={null}
+          />
+        </div>
+        <p className="mt-1.5 text-[12px] text-muted-foreground">
           Faltan <span className="tabular-nums text-foreground/90">{fmtInt(pace.remainingPieces)} pz</span>{' '}
           para {pace.targetSource === 'cuota' ? 'la meta' : 'lo esperado'}. El ritmo necesario y el
           cierre proyectado aparecen a la media hora de marcha — proyectar la rampa de partida
@@ -1732,6 +1993,29 @@ function RitmoNecesario({
      pz/min" en una línea que viene a 10 es verdad solo en teoría — el techo es
      lo mejor que la línea hizo alguna vez, no la tendencia de hoy. */
   const exigente = pace.verdict === 'exigente'
+
+  /* ── Los números del instrumento (rediseño B) ── */
+  const vasA = pace.currentPerHour > 0 ? pace.currentPerHour / 60 : null
+  const techoRiel = historial?.bestCpm ?? (pace.maxPerHour != null ? pace.maxPerHour / 60 : null)
+  const normalRiel = historial?.medianCpm ?? null
+  /* Un necesario por encima del techo NO se dibuja: se sale del riel. */
+  const necesitasRiel: number | 'fuera' | null = fuera
+    ? 'fuera'
+    : techoRiel != null && pace.requiredPerMinute > techoRiel
+      ? 'fuera'
+      : pace.requiredPerMinute > 0 ? pace.requiredPerMinute : null
+  const producidas = Math.max(0, pace.targetPieces - pace.remainingPieces)
+  const bandaCierre = (() => {
+    const vals = [pace.projectedPieces, horizonte?.estimate]
+      .filter((v): v is number => v != null && v > 0)
+    if (vals.length === 0) return null
+    return { min: Math.min(...vals), max: Math.max(...vals) }
+  })()
+  const etiquetaBanda = bandaCierre
+    ? bandaCierre.max - bandaCierre.min < Math.max(60, bandaCierre.max * 0.03)
+      ? `${fmtInt((bandaCierre.min + bandaCierre.max) / 2)} al cierre`
+      : `${fmtInt(bandaCierre.min)}–${fmtInt(bandaCierre.max)} al cierre`
+    : null
   return (
     <div
       className={`mt-2 rounded-xl border px-3 py-2 ${
@@ -1789,79 +2073,71 @@ function RitmoNecesario({
           Con el máximo funcional de la máquina se puede ser más preciso todavía:
           no es que "no alcanza", es que **no existe** — no entra ni con las
           silletas llenas y la máquina en su tope. */}
-      {(exigente || fuera) && llenado?.imposible ? (
-        <p className="mt-0.5 text-[12px] text-muted-foreground">
-          No entra ni con las{' '}
-          <span className="tabular-nums text-foreground/90">{llenado.spec.cantidad} silletas</span>{' '}
-          llenas: faltan{' '}
-          <span className="tabular-nums text-foreground/90">{fmtInt(pace.remainingPieces)} pz</span>
-          {' '}y el máximo de la máquina son{' '}
-          <span className="tabular-nums text-foreground/90">{fmtCpm(llenado.spec.maxCpm)} pz/min</span>.
-        </p>
-      ) : (exigente || fuera) && (
-        pace.maxPerHour != null && pace.requiredPerHour > pace.maxPerHour * 2 ? (
-          <p className="mt-0.5 text-[12px] text-muted-foreground">
-            Ya no da el tiempo: faltan{' '}
-            <span className="tabular-nums text-foreground/90">{fmtInt(pace.remainingPieces)} pz</span>
-            {' '}y quedan{' '}
-            <span className="tabular-nums text-foreground/90">
-              {fmtDurationSec(pace.workMin * 60)}
-            </span>
-            {pace.pendingBreakMin > 0 ? ' de producción.' : '.'}
-          </p>
-        ) : (
-          <p className="mt-0.5 text-[12px] text-muted-foreground">
-            Pide <span className="tabular-nums text-foreground/90">{fmtDec(pace.requiredPerMinute)} pz/min</span>{' '}
-            y la línea, andando, va a{' '}
-            <span className="tabular-nums text-foreground/90">{fmtDec(pace.currentPerHour / 60)}</span>.
-          </p>
-        )
-      )}
-      {/* ⚠⚠ La HORA, siempre. Esta proyección va hasta el horario del turno y
-          el pronóstico va hasta lo que duraron los turnos anteriores: el 14-08
-          a las 12:50 uno decía 4.501 pz y el otro 5.011, a lados opuestos de
-          la meta, sin que nada explicara la diferencia. Son dos horizontes, no
-          dos cuentas — y desde que la tarjeta los dice a los dos, el "¿vamos a
-          llegar?" se contesta acá arriba sin abrir nada. */}
-      <p className="mt-0.5 text-[12px] text-muted-foreground">
-        {cierre ? (
-          <>
-            Al ritmo de ahora, hasta las{' '}
-            <span className="tabular-nums text-foreground/90">{fmtWallTime(cierre)}</span> el turno
-            cierra en{' '}
-          </>
-        ) : (
-          <>Al ritmo de ahora el turno cierra en{' '}</>
-        )}
-        <span className="tabular-nums text-foreground/90">{fmtInt(pace.projectedPieces)} pz</span>
-        {' '}({fmtDec((pace.projectedPieces / pace.targetPieces) * 100, 0)}% de la meta).
-      </p>
-
-      {/* El otro horizonte, el que suele ocurrir: los turnos de esta línea se
-          estiran. El número grande del pronóstico vive tres bloques más abajo;
-          acá va su titular, que es la otra mitad de la respuesta. */}
-      {horizonte?.hasta && horizonte.estimate != null && (
-        <p className="mt-0.5 text-[12px] text-muted-foreground">
-          {/* El rótulo le echaba la culpa al horario —"si se estira como los
-              últimos turnos (≈05:25)"— y no cuadraba: el 26-08 a las 00:34 esa
-              línea decía 18.212 pz justo debajo de "hasta las 05:00, 8.496 pz".
-              Veinticinco minutos no explican 9.716 piezas. La diferencia es que
-              los turnos anteriores, a esta altura, llevaban menos de la mitad
-              de lo que terminaron haciendo — y eso hay que decirlo, porque es
-              lo que uno tiene que creer o no para creerle al número. */}
-          {horizonte.explicacion ? (
-            <>Si el turno rinde como los últimos ({horizonte.explicacion}),{' '}</>
+      {/* ── FILA 1 · el metro de piezas: cómo termina ── */}
+      <div className="mt-3">
+        <MetroPiezas
+          ahora={producidas}
+          meta={pace.targetPieces}
+          banda={bandaCierre}
+          etiquetaBanda={etiquetaBanda}
+        />
+        <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+          {/* «rango entre los dos horizontes» solo cuando de verdad hay dos:
+              sin historia suficiente el horizonte histórico viene null y la
+              banda es un punto — decir «rango» ahí es prometer de más. */}
+          {horizonte?.hasta ? (
+            <>El cierre proyectado como <b className="text-foreground/80">rango entre los dos horizontes</b>:
+              {cierre && <> hasta las <span className="tabular-nums">{fmtWallTime(cierre)}</span> del horario</>}
+              {' '}y hasta las ≈<span className="tabular-nums">{horizonte.hasta}</span> que duran los turnos de esta línea.</>
           ) : (
-            <>
-              Si se estira como los últimos turnos (≈
-              <span className="tabular-nums text-foreground/90">{horizonte.hasta}</span>),{' '}
-            </>
+            <>El cierre proyectado al ritmo del turno
+              {cierre && <>, hasta las <span className="tabular-nums">{fmtWallTime(cierre)}</span> del horario</>}.</>
           )}
-          <span className="tabular-nums text-foreground/90">{fmtInt(horizonte.estimate)} pz</span>
-          {horizonte.mapePct != null && <> ±{fmtDec(horizonte.mapePct)}%</>}
-          {horizonte.explicacion && <> · cierre ≈{horizonte.hasta}</>}.
         </p>
-      )}
+      </div>
+
+      {/* ── FILA 2 · el riel de ritmo: qué hace falta ── */}
+      <div className="mt-3.5">
+        <RielRitmo vasA={vasA} normal={normalRiel} necesitas={necesitasRiel} techo={techoRiel} />
+        {necesitasRiel === 'fuera' && (
+          <p className="mt-1 text-[13px] leading-snug text-ink-warn">
+            {llenado?.imposible ? (
+              <>No entra ni con las <span className="tabular-nums">{llenado.spec.cantidad} silletas</span> llenas:
+                el máximo de la máquina son <span className="tabular-nums">{fmtCpm(llenado.spec.maxCpm)} pz/min</span>.</>
+            ) : (
+              <>Pide <span className="tabular-nums">{fmtDec(pace.requiredPerMinute)} pz/min</span>
+                {techoRiel != null && techoRiel > 0 && (
+                  <>: <span className="tabular-nums">{fmtDec(pace.requiredPerMinute / techoRiel)}×</span> el mejor turno
+                    que esta línea hizo</>
+                )}. Sale de la escala — no es una meta, es que ya no da el tiempo.</>
+            )}
+          </p>
+        )}
+        <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+          pz/min <b className="text-foreground/80">andando</b>, sobre{' '}
+          <span className="tabular-nums">{fmtDurationSec(pace.workMin * 60)}</span> que quedan produciendo
+          {pace.pendingBreakMin > 0 && (
+            <> — los <span className="tabular-nums">{fmtInt(pace.pendingBreakMin)} min</span> de convenio no cuentan</>
+          )}.
+        </p>
+      </div>
+
+      {/* ── La fila de estadísticas ──
+          Grid y no flex-wrap: con el «Queda» y su sub, el wrap apilaba las
+          celdas una bajo otra y la «fila» medía tres renglones (visto en
+          vivo a 375 px). */}
+      <div className="mt-3 grid grid-cols-3 gap-x-3 gap-y-2">
+        <CeldaStat k="Faltan" v={`${fmtInt(pace.remainingPieces)} pz`} />
+        <CeldaStat
+          k="Queda"
+          v={fmtDurationSec((pace.workMin + pace.pendingBreakMin) * 60)}
+          sub={`(${fmtDurationSec(pace.workMin * 60)} prod.)`}
+        />
+        {vsAyer && <CeldaStat k="Ayer a esta altura" v={fmtInt(vsAyer.pieces)} delta={vsAyer.diff} />}
+      </div>
+      {/* Los DOS horizontes ya no van como prosa: son la banda del metro de
+          arriba. Su versión en palabras (auditable, con el ± y la explicación
+          del rendimiento) vive dentro de «ver cómo se calcula». */}
 
       {/* ⚠⚠ El límite NO es la velocidad de la máquina.
           La Baader 200 pasa silletas a una velocidad fija y el operador pone
@@ -1911,52 +2187,42 @@ function RitmoNecesario({
         </p>
       )}
 
-      {/* La referencia que uno busca enseguida: contra el día anterior, a la
-          MISMA altura de turno. Estaba solo dentro del comparador, que ahora
-          arranca plegado. */}
-      {vsAyer && (
-        <p className="mt-0.5 text-[12px] text-muted-foreground">
-          {vsAyer.label} a esta altura llevaba{' '}
-          <span className="tabular-nums text-foreground/90">{fmtInt(vsAyer.pieces)} pz</span>
-          {' '}
-          <span className={
-            vsAyer.diff >= 0
-              ? 'text-emerald-800 dark:text-emerald-300'
-              : 'text-amber-800 dark:text-amber-300'
-          }>
-            ({vsAyer.diff >= 0 ? '+' : '−'}{fmtInt(Math.abs(vsAyer.diff))})
-          </span>.
-        </p>
-      )}
+      {/* «Ayer a esta altura» ya es una celda de la fila de estadísticas. */}
 
-      {/* El detalle, a un toque: qué ritmo hace falta, el techo, lo normal y la
-          hora extra. Antes eran doce líneas siempre abiertas arriba de todo, y
-          la pregunta que la gente hace —¿llegamos?— quedaba enterrada entre
-          ellas. */}
+      {/* Lo AUDITABLE, a un toque: las dos proyecciones en palabras (con su ±
+          y su explicación), el ritmo exacto que hace falta, el techo y la hora
+          extra. El instrumento de arriba muestra; esto respalda. */}
       <button
         type="button"
         onClick={() => setVerDetalle((v) => !v)}
         className="tap-44 mt-2 text-[11px] text-sky-700 underline underline-offset-2 dark:text-sky-300"
         aria-expanded={verDetalle}
       >
-        {verDetalle ? 'ocultar qué hace falta' : 'ver qué hace falta'}
+        {verDetalle ? 'ocultar el cálculo' : 'ver cómo se calcula'}
       </button>
-
-      {!verDetalle && (
-        <p className="mt-1 text-[11px] text-muted-foreground/80">
-          Faltan <span className="tabular-nums">{fmtInt(pace.remainingPieces)} pz</span> ·{' '}
-          quedan <span className="tabular-nums">{fmtDurationSec(pace.remainingMin * 60)}</span>
-          {pace.pendingBreakMin > 0 && (
-            <>
-              {' '}(<span className="tabular-nums">{fmtDurationSec(pace.workMin * 60)}</span>{' '}
-              produciendo)
-            </>
-          )}
-        </p>
-      )}
 
       {/* Los números en filas, no en prosa: se comparan de un vistazo. */}
       <dl className={`mt-2 space-y-0.5 text-[12px] ${verDetalle ? '' : 'hidden'}`}>
+        <div className="flex items-baseline gap-2">
+          <dt className="w-20 shrink-0 text-muted-foreground">Al horario</dt>
+          <dd className="tabular-nums">
+            {fmtInt(pace.projectedPieces)} pz ({fmtDec((pace.projectedPieces / pace.targetPieces) * 100, 0)}%)
+            {cierre && <span className="text-muted-foreground"> · hasta las {fmtWallTime(cierre)}</span>}
+          </dd>
+        </div>
+        {horizonte?.hasta && horizonte.estimate != null && (
+          <div className="flex items-baseline gap-2">
+            <dt className="w-20 shrink-0 text-muted-foreground">Como los últimos</dt>
+            <dd className="tabular-nums">
+              {fmtInt(horizonte.estimate)} pz
+              {horizonte.mapePct != null && <> ±{fmtDec(horizonte.mapePct)}%</>}
+              <span className="text-muted-foreground"> · cierre ≈{horizonte.hasta}</span>
+              {horizonte.explicacion && (
+                <span className="block text-[11px] text-muted-foreground/80">({horizonte.explicacion})</span>
+              )}
+            </dd>
+          </div>
+        )}
         <div className="flex items-baseline gap-2">
           <dt className="w-20 shrink-0 text-muted-foreground">Faltan</dt>
           <dd className="tabular-nums">{fmtInt(pace.remainingPieces)} pz</dd>
@@ -2267,6 +2533,13 @@ function RespuestaMantencion({ m, cerrado }: {
     pct == null ? 'text-muted-foreground'
       : pct >= 99.9 ? 'text-ink-ok' : pct >= 90 ? 'text-ink-warn' : 'text-ink-crit'
 
+  /* Con CERO imputado y minutos sin causa, la tarjeta se ENCOGE al aviso
+     (Orel, 26-08: «¿la ocultamos hasta que estén imputadas?»). No se oculta
+     del todo —el empujón a imputar es el punto— pero tampoco muestra tres
+     «100%» que cualquier paro sin causa puede desmentir: eso era exactamente
+     la falsa realidad que la pregunta señalaba. */
+  const soloAviso = totalFallaMin === 0 && totalSinImputarMin >= 3
+
   return (
     <section className="rounded-card border border-border bg-card p-4">
       <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
@@ -2299,7 +2572,42 @@ function RespuestaMantencion({ m, cerrado }: {
         )}
       </p>
 
-      {/* Una fila por máquina: la disponibilidad TÉCNICA con su palabra. */}
+      {/* El desglose del aviso: los minutos sin causa son TIEMPO DE MÁQUINA
+          sumado entre las tres — no minutos de línea detenida (Orel, 26-08:
+          «53 min» a secas se leía como casi una hora de línea muerta). */}
+      {soloAviso && (
+        <p className="mt-1.5 text-caption leading-snug text-muted-foreground">
+          Son minutos de <b>cada máquina</b>, sumados
+          {' — '}
+          {m.porMaquina
+            .filter((x) => (x.sinImputarMin ?? 0) > 0)
+            .map((x, i) => (
+              <span key={x.name} className="tabular-nums">
+                {i > 0 && ' · '}
+                {nombreCorto(x.name)} {fmtInt(x.sinImputarMin!)} min
+              </span>
+            ))}
+          .
+          {/* El número que la suma NO dice: cuánto estuvo parada la LÍNEA
+              entera (las tres a la vez) sin causa. Lo publica el backend como
+              intersección de los tramos; en docs viejos no viene. */}
+          {m.sinImputarLineaMin != null && (
+            m.sinImputarLineaMin >= 1 ? (
+              <> La línea completa ({m.porMaquina.length === 3 ? 'las tres' : 'todas'} a la vez)
+                estuvo <b className="tabular-nums">{fmtInt(m.sinImputarLineaMin)} min</b> detenida
+                sin causa.</>
+            ) : (
+              <> {m.porMaquina.length === 3 ? 'Las tres' : 'Todas'} nunca pararon a la vez:
+                la línea completa no perdió tiempo por estos paros.</>
+            )
+          )}
+        </p>
+      )}
+
+      {/* Una fila por máquina: la disponibilidad TÉCNICA con su palabra.
+          En modo aviso NO se pintan: un «100%» por máquina debajo de «hay 53
+          min sin causa» es afirmar lo que el propio aviso pone en duda. */}
+      {!soloAviso && (
       <div className="mt-2.5 space-y-1.5 border-t border-border/50 pt-2.5">
         {m.porMaquina.map((x) => (
           <div key={x.name} className="flex items-baseline gap-2">
@@ -2321,9 +2629,10 @@ function RespuestaMantencion({ m, cerrado }: {
           </div>
         ))}
       </div>
+      )}
 
       {/* Los eventos, del más caro al más barato: cuándo, cuánto, qué. */}
-      {m.eventos.length > 0 && (
+      {!soloAviso && m.eventos.length > 0 && (
         <div className="mt-2 space-y-0.5">
           {m.eventos.slice(0, 3).map((e) => (
             <p key={`${e.maquina}-${e.desde}`} className="text-caption tabular-nums text-muted-foreground">
@@ -2334,10 +2643,12 @@ function RespuestaMantencion({ m, cerrado }: {
         </div>
       )}
 
-      <p className="mt-2 text-caption leading-snug text-muted-foreground/80">
-        Disponibilidad técnica: solo fallas de equipo — colación, esperas externas y las{' '}
-        <span className="tabular-nums">{fmtInt(microTotal)}</span> microdetenciones van aparte.
-      </p>
+      {!soloAviso && (
+        <p className="mt-2 text-caption leading-snug text-muted-foreground/80">
+          Disponibilidad técnica: solo fallas de equipo — colación, esperas externas y las{' '}
+          <span className="tabular-nums">{fmtInt(microTotal)}</span> microdetenciones van aparte.
+        </p>
+      )}
     </section>
   )
 }
@@ -2352,7 +2663,9 @@ function RespuestaMantencion({ m, cerrado }: {
 function fraseMaquinas(r: RitmosPorMaquina): string {
   const n = r.maquinas.length
   const cuantas = n === 3 ? 'Las tres' : n === 2 ? 'Las dos' : `Las ${n}`
-  if (!r.parejas) return 'La barra es el % del turno que cada una estuvo andando.'
+  /* Sin conclusión que dar, nada: el caption de la lista ya explica la barra
+     (decía lo mismo dos veces, un renglón bajo el otro — visto en vivo). */
+  if (!r.parejas) return ''
   const cpms = r.maquinas.map((m) => m.cpm)
   const rango = `${fmtDec(Math.min(...cpms))}–${fmtDec(Math.max(...cpms))}`
   const conUptime = r.maquinas.filter((m) => m.uptimePct != null)
@@ -2368,7 +2681,124 @@ function fraseMaquinas(r: RitmosPorMaquina): string {
   return `${cuantas} corren casi igual (${rango}), y también pararon parecido.`
 }
 
-function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrado, onEditarSetPoint, cerrado, contexto, chispa, corteMs, ahoraWallMs, pulso, maquinas, parada }: {
+/**
+ * Anexa a cada máquina los dos repartos que SUMAN los números de la línea:
+ * el de la media de 15 min (`repartoAhoraAndando`, mismo denominador que el
+ * número de arriba) y el aporte al promedio del turno (piezas ÷ minutos
+ * produciendo de la LÍNEA — la misma división que produce `turnoCpm`). El
+ * «mientras anduvo» de `ritmoPorMaquina` se conserva en `cpm`: no suma, pero
+ * sigue siendo el que se compara contra el set point.
+ */
+function conRepartoPorMaquina(
+  r: RitmosPorMaquina | null,
+  seriesMaquinas: { nombre: string; serie: number[] }[] | null,
+  serie: readonly TramoSerie[],
+  ahoraWall: number | null | undefined,
+  producingMin: number | null,
+): RitmosPorMaquina | null {
+  if (!r) return r
+  const porNombre = new Map((seriesMaquinas ?? []).map((s) => [s.nombre, s.serie]))
+  const reparto = seriesMaquinas
+    ? repartoAhoraAndando(serie, r.maquinas.map((m) => porNombre.get(m.nombre) ?? null), ahoraWall)
+    : null
+  return {
+    ...r,
+    maquinas: r.maquinas.map((m, i) => ({
+      ...m,
+      ahoraCpm: reparto?.[i] ?? null,
+      aporteCpm: producingMin != null && producingMin > 0 ? m.piezas / producingMin : null,
+    })),
+  }
+}
+
+/**
+ * La velocidad de cada máquina a lo largo del turno, como curvas (pedido de
+ * Orel, 26-08: el gráfico del detalle de turno «se vería bien acá»).
+ *
+ * Es la vista que las columnas no pueden dar: QUIÉN bajó la línea y CUÁNDO.
+ * Misma vara que la curva de línea —media móvil de 3 tramos, en pz/min— para
+ * que las tres curvas se lean contra el mismo reloj. SVG propio y no echarts:
+ * esta página evita a propósito cargarse ese bundle (ver nota en los imports).
+ *
+ * ⚠ El corte de la cola de ceros del final es el de la LÍNEA (`mediaMovil`),
+ * no el de cada máquina: si una paró antes del cierre, sus ceros son la
+ * información que este gráfico existe para mostrar.
+ */
+function CurvasMaquinas({ serie, maquinas }: {
+  serie: readonly TramoSerie[]
+  maquinas: { nombre: string; serie: number[] }[]
+}) {
+  const fin = mediaMovil(serie).length
+  if (fin < 2) return null
+  const curvas = maquinas.map((m, idx) => {
+    const propia = m.serie.slice(0, fin)
+    const puntos = propia.map((_, i) => {
+      let pz = 0
+      let n = 0
+      for (let j = Math.max(0, i - 2); j <= i; j++) {
+        pz += propia[j] ?? 0
+        n++
+      }
+      return pz / n / PASO_MIN
+    })
+    return { nombre: m.nombre, idx, puntos }
+  })
+  const max = Math.max(1, ...curvas.flatMap((c) => c.puntos))
+  const w = fin - 1
+  const y = (v: number) => 100 - (v / max) * 94 - 3
+  const t0 = serie[0]?.t ? Date.parse(serie[0].t) : NaN
+  const t1 = serie[fin - 1]?.t ? Date.parse(serie[fin - 1]!.t!) + PASO_MIN * 60_000 : NaN
+
+  return (
+    <div className="mt-3 border-t border-border/50 pt-2.5">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5 text-caption text-muted-foreground">
+        <span>Velocidad de cada máquina</span>
+        <span className="flex items-center gap-2.5">
+          {curvas.map((c) => (
+            <span key={c.nombre} className="inline-flex items-center gap-1">
+              <span
+                className="inline-block h-1 w-3.5 rounded-full"
+                style={{ background: `var(--mon-maq-${c.idx + 1})` }}
+              />
+              {nombreCorto(c.nombre)}
+            </span>
+          ))}
+        </span>
+      </div>
+      <div className="relative mt-1.5">
+        <svg viewBox={`0 0 ${w} 100`} preserveAspectRatio="none" className="block h-24 w-full" aria-hidden>
+          {/* La línea de la escala: dónde queda el máximo que se alcanzó. */}
+          <line
+            x1={0} y1={y(max)} x2={w} y2={y(max)}
+            className="stroke-foreground/15" strokeDasharray="3 3" vectorEffect="non-scaling-stroke"
+          />
+          {curvas.map((c) => (
+            <polyline
+              key={c.nombre}
+              points={c.puntos.map((v, i) => `${i},${y(v)}`).join(' ')}
+              fill="none"
+              stroke={`var(--mon-maq-${c.idx + 1})`}
+              strokeWidth={2}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+              vectorEffect="non-scaling-stroke"
+            />
+          ))}
+        </svg>
+        <span className="absolute left-0 top-0 text-[10px] tabular-nums text-muted-foreground/80">
+          {fmtDec(max)} pz/min
+        </span>
+      </div>
+      <div className="mt-0.5 flex items-baseline justify-between text-[10px] tabular-nums text-muted-foreground/80">
+        <span>{Number.isFinite(t0) ? horaPlanta(t0) : ''}</span>
+        <span className="text-muted-foreground">media de 15 min, pz/min · mientras corre</span>
+        <span>{Number.isFinite(t1) ? horaPlanta(t1) : ''}</span>
+      </div>
+    </div>
+  )
+}
+
+function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrado, onEditarSetPoint, cerrado, contexto, chispa, corteMs, ahoraWallMs, pulso, maquinas, parada, serieLinea, seriesMaquinas }: {
   /**
    * Ritmo de ahora ANDANDO, en pz/min: los últimos 15 min descontando los
    * tramos parados. Va en esta base y no en la de reloj porque es contra lo
@@ -2432,6 +2862,12 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
   ahoraWallMs?: number | null
   /** Ritmo casi instantáneo (~4 min) que ya calcula el backend. */
   pulso?: { cpm?: number | null; at?: string | null } | null
+  /** La serie de la línea (la misma de los gráficos), para el eje de tiempo
+      de las curvas por máquina. */
+  serieLinea?: readonly TramoSerie[] | null
+  /** Piezas por bucket de cada máquina, alineadas a `serieLinea`. Solo llega
+      cuando el doc ya trae el desglose (docs nuevos). */
+  seriesMaquinas?: { nombre: string; serie: number[] }[] | null
 }) {
   /*
    * ⚠ El estado se juzga contra el OBJETIVO cuando se conoce, no contra la
@@ -2492,10 +2928,23 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
             <span className="text-[15px] text-muted-foreground">pz/min</span>
           </div>
         </div>
-        <div className="ml-auto shrink-0 text-right">
-          <div className="text-caption text-muted-foreground">Promedio del turno</div>
-          <div className="flex items-baseline justify-end gap-x-1">
-            <span className="text-display tabular-nums text-foreground">
+        {/* La media de 15 min SUBE a esta fila (Orel, 26-08): escondida en la
+            letra chica del renglón de estado era «otro número más» sin
+            jerarquía. Acá queda al lado del promedio, cada una con su rótulo,
+            y la diferencia entre ambas se explica una sola vez abajo. Solo
+            aparece cuando el número grande es el pulso — sin pulso, el grande
+            YA ES la media y repetirla sería el tercer «ahora». */}
+        <div className="ml-auto shrink-0 space-y-0.5 text-right">
+          {!parada && !cerrado && pulso?.cpm != null && ahora != null && (
+            <div className="flex items-baseline justify-end gap-x-1.5">
+              <span className="text-caption text-muted-foreground">media 15 min</span>
+              <span className="text-headline tabular-nums text-foreground">{fmtDec(ahora)}</span>
+              <span className="text-caption text-muted-foreground">pz/min</span>
+            </div>
+          )}
+          <div className="flex items-baseline justify-end gap-x-1.5">
+            <span className="text-caption text-muted-foreground">promedio turno</span>
+            <span className="text-headline tabular-nums text-foreground">
               {turno != null ? fmtDec(turno) : '—'}
             </span>
             <span className="text-caption text-muted-foreground">pz/min</span>
@@ -2519,10 +2968,13 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
                 )}
               </span>
               <span className="text-muted-foreground/80">el contador de la pantalla de planta</span>
+              {/* El número de la media ya vive arriba, con rótulo. Acá queda
+                  solo el VEREDICTO (que se juzga sobre esa media, no sobre el
+                  pulso: el pulso salta demasiado para sentenciar). */}
               {ahora != null && (
                 <span className={`inline-flex items-center gap-1 ${colorPunto}`}>
                   <span className="inline-block size-1.5 rounded-full bg-current" />
-                  media 15 min andando <b className="tabular-nums">{fmtDec(ahora)}</b> · {palabra}
+                  {palabra}
                 </span>
               )}
             </>
@@ -2549,6 +3001,17 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
               <span className="text-muted-foreground/80">andando, últimos 15 min</span>
             </>
           )}
+        </p>
+      )}
+
+      {/* Qué expresa cada cifra, dicho UNA vez (pedido de Orel, 26-08: tres
+          ritmos sin explicación se leían como contradicción). */}
+      {!parada && !cerrado && pulso?.cpm != null && ahora != null && (
+        <p className="mt-1 text-[11px] leading-snug text-muted-foreground/80">
+          <b className="text-muted-foreground">Ahora</b> salta con la línea;{' '}
+          la <b className="text-muted-foreground">media 15 min</b> es el ritmo sostenido reciente
+          (solo minutos andando); el <b className="text-muted-foreground">promedio</b> es todo el
+          turno con esa misma vara.
         </p>
       )}
 
@@ -2646,39 +3109,82 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
           cuál paró, que es exactamente la pregunta de Mantención. NO se
           muestra la suma: las máquinas no andan en los mismos minutos y sumar
           sus ritmos da un número que la línea nunca alcanza (44,2 vs 34,9). */}
-      {maquinas && maquinas.maquinas.length > 1 && (
-        <div className="mt-3 border-t border-border/50 pt-2.5">
-          <div className="text-caption text-muted-foreground">
-            Cada máquina · <b className="font-semibold text-foreground/80">promedio del turno mientras anduvo</b>
-          </div>
-          <div className="mt-1.5 space-y-1.5">
-            {maquinas.maquinas.map((m) => {
-              const pct = m.uptimePct
-              const color = pct == null ? 'bg-muted-foreground/40'
-                : pct >= 75 ? 'bg-ink-ok' : pct >= 50 ? 'bg-ink-warn' : 'bg-ink-crit'
-              return (
-                <div key={m.nombre} className="flex items-center gap-2" title={`${m.nombre}: ${fmtInt(m.piezas)} pz`}>
-                  <span className="w-9 shrink-0 text-footnote text-muted-foreground">{nombreCorto(m.nombre)}</span>
-                  <span className="w-11 shrink-0 text-headline tabular-nums text-foreground">{fmtDec(m.cpm)}</span>
-                  <span className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
-                    {pct != null && (
-                      <span
-                        className={`block h-full rounded-full ${color}`}
-                        style={{ width: `${Math.min(100, Math.max(2, pct))}%` }}
-                      />
+      {/* ── Cada máquina: dos columnas que SUMAN las de arriba ────────────────
+          Propuesta de Orel (26-08): a la izquierda el «ahora» de cada Baader
+          —que sume el de la línea— y a la derecha su promedio —que sume el
+          promedio de la línea—. La trampa era el denominador: el «mientras
+          anduvo» de cada una NO suma (44,2 vs 34,9, ver `ritmoPorMaquina`).
+          Las columnas que SÍ cierran son el reparto de la media de 15 min
+          (`repartoAhoraAndando`) y el aporte al promedio (piezas ÷ minutos
+          produciendo de la línea). El «mientras anduvo» no se pierde: queda en
+          el globito de cada fila y, sobre todo, en las curvas de abajo. */}
+      {maquinas && maquinas.maquinas.length > 1 && (() => {
+        const conReparto = !parada && !cerrado && maquinas.maquinas.every((m) => m.ahoraCpm != null)
+        const conAporte = maquinas.maquinas.every((m) => m.aporteCpm != null)
+        return (
+          <div className="mt-3 border-t border-border/50 pt-2.5">
+            <div className="flex items-baseline justify-between gap-2 text-caption text-muted-foreground">
+              <span>
+                Cada máquina
+                {conReparto && <> · <b className="font-semibold text-foreground/80">media 15 min</b></>}
+              </span>
+              <b className="font-semibold text-foreground/80">
+                {conAporte ? 'aporte al promedio' : 'promedio andando'}
+              </b>
+            </div>
+            <div className="mt-1.5 space-y-1.5">
+              {maquinas.maquinas.map((m) => {
+                const pct = m.uptimePct
+                const color = pct == null ? 'bg-muted-foreground/40'
+                  : pct >= 75 ? 'bg-ink-ok' : pct >= 50 ? 'bg-ink-warn' : 'bg-ink-crit'
+                return (
+                  <div
+                    key={m.nombre}
+                    className="flex items-center gap-2"
+                    title={`${m.nombre}: ${fmtInt(m.piezas)} pz · mientras anduvo ${fmtDec(m.cpm)} pz/min · ${pct != null ? `${Math.round(pct)}% del turno andando` : 'sin uptime'}`}
+                  >
+                    <span className="w-9 shrink-0 text-footnote text-muted-foreground">{nombreCorto(m.nombre)}</span>
+                    {conReparto && (
+                      <span className="w-11 shrink-0 text-headline tabular-nums text-foreground">
+                        {fmtDec(m.ahoraCpm ?? 0)}
+                      </span>
                     )}
-                  </span>
-                  <span className="w-[74px] shrink-0 text-right text-caption tabular-nums text-muted-foreground">
-                    {pct != null ? `${Math.round(pct)}% andando` : '—'}
-                  </span>
-                </div>
-              )
-            })}
+                    <span className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
+                      {pct != null && (
+                        <span
+                          className={`block h-full rounded-full ${color}`}
+                          style={{ width: `${Math.min(100, Math.max(2, pct))}%` }}
+                        />
+                      )}
+                    </span>
+                    <span className="w-11 shrink-0 text-right text-headline tabular-nums text-foreground">
+                      {conAporte ? fmtDec(m.aporteCpm ?? 0) : fmtDec(m.cpm)}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+            <p className="mt-1.5 text-caption leading-snug text-muted-foreground/80">
+              {conReparto && <>Izquierda: lo que cada una pone en la <b>media 15 min</b> — las tres suman la de arriba. </>}
+              {conAporte
+                ? <>Derecha: su aporte al <b>promedio del turno</b> — suman el promedio de la línea. </>
+                : <>Derecha: su ritmo promedio mientras anduvo. </>}
+              La barra es el % del turno que estuvo andando.
+            </p>
+            {fraseMaquinas(maquinas) !== '' && (
+              <p className="mt-1 text-caption leading-snug text-muted-foreground/80">
+                {fraseMaquinas(maquinas)}
+              </p>
+            )}
           </div>
-          <p className="mt-1.5 text-caption leading-snug text-muted-foreground/80">
-            {fraseMaquinas(maquinas)}
-          </p>
-        </div>
+        )
+      })()}
+
+      {/* Las curvas de velocidad de cada máquina, como en el detalle de turno
+          (pedido de Orel, 26-08): acá se ve QUIÉN bajó la línea y cuándo, no
+          solo cuánto. Solo con docs nuevos (los viejos no traen el desglose). */}
+      {serieLinea && serieLinea.length > 1 && seriesMaquinas && seriesMaquinas.length > 1 && (
+        <CurvasMaquinas serie={serieLinea} maquinas={seriesMaquinas} />
       )}
 
       {/* La hora de corte. El número grande describe los últimos 15 min, pero
@@ -2996,6 +3502,18 @@ export function PublicShiftMonitorPage() {
   const pzAntesDelArranque = useMemo(() => piezasAntesDelArranque(live?.series), [live?.series])
   /** La serie que ven los gráficos: desde la primera pieza, como el resto. */
   const serieDelTurno = useMemo(() => desdePrimeraPieza(live?.series), [live?.series])
+  /** Series por máquina, recortadas igual que `serieDelTurno`: el backend las
+      publica alineadas 1:1 con `live.series` y `desdePrimeraPieza` corta el
+      frente, así que acá se corta lo mismo para que los índices sigan calzando.
+      null con docs anteriores al despliegue que publica el desglose. */
+  const seriesMaquinas = useMemo(() => {
+    const ms = live?.machines ?? []
+    const total = live?.series?.length ?? 0
+    if (ms.length < 2 || total === 0) return null
+    if (!ms.every((m) => Array.isArray(m.serie) && m.serie.length === total)) return null
+    const offset = total - serieDelTurno.length
+    return ms.map((m) => ({ nombre: m.name, serie: (m.serie as number[]).slice(offset) }))
+  }, [live?.machines, live?.series, serieDelTurno])
   /** El arranque que se anuncia: la primera pieza, con el declarado de respaldo. */
   const inicioReal = serieDelTurno[0]?.t ?? live?.scheduledStart
 
@@ -4605,7 +5123,15 @@ export function PublicShiftMonitorPage() {
                  los 5 que va a durar: si no, el número de "ahora" queda siempre
                  por debajo del que muestra Shoplogix. */
               ahora={ritmoAhoraAndando(serieDelTurno, ahoraWallMs)}
-              maquinas={ritmoPorMaquina(live.machines, (live.windowHours ?? 0) * 60)}
+              maquinas={conRepartoPorMaquina(
+                ritmoPorMaquina(live.machines, (live.windowHours ?? 0) * 60),
+                seriesMaquinas,
+                serieDelTurno,
+                ahoraWallMs,
+                live.timeBreakdown?.producingMin ?? null,
+              )}
+              serieLinea={serieDelTurno}
+              seriesMaquinas={seriesMaquinas}
               /* Parada = ninguna máquina produciendo. El pulso lo confirma:
                  con la línea en colación marca 0,0 mientras el número grande
                  mostraba el ritmo de antes de parar. También con el turno
@@ -4666,6 +5192,8 @@ export function PublicShiftMonitorPage() {
                         max: Math.max(...banda.turnos.map((t) => t.ritmo)),
                       }
                       : null}
+                    mediana={ritmoAndando.mediana}
+                    muestras={ritmoAndando.muestras}
                   />
                 : undefined}
             />

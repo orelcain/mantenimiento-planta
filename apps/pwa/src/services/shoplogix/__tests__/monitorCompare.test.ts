@@ -344,37 +344,41 @@ describe('etiquetas de los días comparados', () => {
   const hoy = serie('2026-08-12T15:00:00Z', Array(12).fill(50))
   const otro = serie('2026-08-12T07:00:00Z', Array(12).fill(40))
 
-  it('distingue los turnos del MISMO día — Yal corre tres por jornada', () => {
-    // Sin esto el comparador mostraba tres filas "lun 10" indistinguibles.
+  /*
+   * ⚠⚠ REGLA NUEVA (Orel, 26-08): el comparador ofrece SOLO días del mismo
+   * turno — «no vale la pena comparar con otro turno en distinto horario».
+   * Antes se mezclaban a propósito (tres filas «lun 10 T1/T2/T3»); un T1
+   * nocturno contra un T2 diurno compara procesos con otra dotación y otro
+   * horario, y el sufijo no alcanzaba a advertirlo.
+   */
+  it('ofrece SOLO los días del mismo turno — sin T1 contra T2', () => {
     const r = buildDayComparison({
       todaySeries: hoy, todayDateKey: '2026-08-12', todayShiftId: 'Turno 2',
       previous: [
         { dateKey: '2026-08-10', shiftId: 'Turno 1', series: otro },
         { dateKey: '2026-08-10', shiftId: 'Turno 2', series: otro },
+        { dateKey: '2026-08-09', shiftId: 'Turno 2', series: otro },
         { dateKey: '2026-08-10', shiftId: 'Turno 3', series: otro },
       ],
       maxDays: 6,
     })
-    expect(r.days.slice(1).map((d) => d.label)).toEqual(['lun 10 T1', 'lun 10 T2', 'lun 10 T3'])
+    // Solo los dos Turno 2 — y con un solo nombre en la muestra, sin sufijo.
+    expect(r.days.slice(1).map((d) => d.label)).toEqual(['lun 10', 'dom 9'])
   })
 
-  /*
-   * ⚠⚠ EL CASO FILETE (17-08-2026): el nocturno arranca pasada la medianoche,
-   * así que cae en OTRO dateKey. Contando solo fechas repetidas, «dom 16» podía
-   * ser un diurno y «lun 17» un nocturno, y nada en pantalla lo decía.
-   */
-  it('distingue el turno aunque cada uno caiga en una fecha distinta', () => {
+  it('sin historia del mismo turno cae a todos: peor es no comparar nada', () => {
     const r = buildDayComparison({
       todaySeries: hoy, todayDateKey: '2026-08-17', todayShiftId: 'Turno Dia',
       previous: [
         { dateKey: '2026-08-17', shiftId: 'Turno Noche L', series: otro },
-        { dateKey: '2026-08-14', shiftId: 'Turno Dia', series: otro },
+        { dateKey: '2026-08-14', shiftId: 'Turno 1', series: otro },
       ],
       maxDays: 6,
     })
     const labels = r.days.slice(1).map((d) => d.label)
+    expect(labels).toHaveLength(2)
+    // Y en el fallback los nombres distintos SÍ se rotulan (caso Filete).
     expect(labels.some((l) => l.includes('noche l'))).toBe(true)
-    expect(labels.some((l) => l.includes('dia'))).toBe(true)
   })
 
   it('con un turno por día la etiqueta queda corta — no se agrega nada', () => {
