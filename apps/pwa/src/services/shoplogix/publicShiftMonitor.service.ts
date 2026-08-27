@@ -41,6 +41,12 @@ export interface PublicMonitorMachine {
    * despliegue que la publica.
    */
   serie?: number[]
+  /**
+   * Objetivo de esta máquina en pz/min (mediana del targetRate que reporta
+   * Shoplogix por tramo; en Chonchi Ev1=19 y Ev2/Ev3=16). Ausente en docs
+   * previos; null si el sensor nunca lo reportó.
+   */
+  targetCpm?: number | null
 }
 
 /**
