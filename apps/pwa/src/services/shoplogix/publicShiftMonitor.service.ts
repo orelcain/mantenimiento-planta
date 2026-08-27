@@ -266,6 +266,13 @@ export interface PulsoMonitor {
   totalCycles: number
   /** Piezas por minuto entre las dos últimas lecturas. null si no se puede. */
   cpm: number | null
+  /**
+   * El ritmo de AHORA de cada máquina, de la MISMA ventana que `cpm`: por
+   * construcción suman el de la línea (el id es el machineid de Shoplogix,
+   * el mismo de `machines[].id`). Ausente en docs previos al despliegue que
+   * lo publica o cuando el desglose no se puede garantizar.
+   */
+  porMaquina?: Array<{ id: string; cpm: number }>
   /** Las últimas lecturas, para dibujar el pulso reciente. */
   lecturas?: Array<{ at: string; totalCycles: number }>
 }

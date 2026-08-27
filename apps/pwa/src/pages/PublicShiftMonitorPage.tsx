@@ -2700,6 +2700,9 @@ function conRepartoPorMaquina(
   serie: readonly TramoSerie[],
   ahoraWall: number | null | undefined,
   producingMin: number | null,
+  /** El AHORA de cada máquina (pulso del contador, por nombre): la columna
+      que suma el «Ahora» grande. Solo llega con el pulso fresco. */
+  pulsoPorNombre?: Map<string, number> | null,
 ): RitmosPorMaquina | null {
   if (!r) return r
   const porNombre = new Map((seriesMaquinas ?? []).map((s) => [s.nombre, s.serie]))
@@ -2712,6 +2715,7 @@ function conRepartoPorMaquina(
       ...m,
       ahoraCpm: reparto?.[i] ?? null,
       aporteCpm: producingMin != null && producingMin > 0 ? m.piezas / producingMin : null,
+      pulsoCpm: pulsoPorNombre?.get(m.nombre) ?? null,
     })),
   }
 }
@@ -3194,13 +3198,22 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
           produciendo de la línea). El «mientras anduvo» no se pierde: queda en
           el globito de cada fila y, sobre todo, en las curvas de abajo. */}
       {maquinas && maquinas.maquinas.length > 1 && (() => {
-        const conReparto = !parada && !cerrado && maquinas.maquinas.every((m) => m.ahoraCpm != null)
+        /* La columna izquierda, por prioridad (Orel, 27-08): el AHORA real de
+           cada máquina —el pulso del contador, que por construcción SUMA el
+           «Ahora» grande—, y solo si el desglose del pulso no está, la media
+           de 15 min (que suma la media de arriba). Dos varas posibles, nunca
+           las dos: cada una con su rótulo. */
+        const conPulsoMaq = !parada && !cerrado && pulso?.cpm != null
+          && maquinas.maquinas.every((m) => m.pulsoCpm != null)
+        const conReparto = !conPulsoMaq && !parada && !cerrado
+          && maquinas.maquinas.every((m) => m.ahoraCpm != null)
         const conAporte = maquinas.maquinas.every((m) => m.aporteCpm != null)
         return (
           <div className="mt-3 border-t border-border/50 pt-2.5">
             <div className="flex items-baseline justify-between gap-2 text-caption text-muted-foreground">
               <span>
                 Cada máquina
+                {conPulsoMaq && <> · <b className="font-semibold text-foreground/80">ahora</b></>}
                 {conReparto && <> · <b className="font-semibold text-foreground/80">media 15 min</b></>}
               </span>
               <b className="font-semibold text-foreground/80">
@@ -3219,9 +3232,9 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
                     title={`${m.nombre}: ${fmtInt(m.piezas)} pz · mientras anduvo ${fmtDec(m.cpm)} pz/min · ${pct != null ? `${Math.round(pct)}% del turno andando` : 'sin uptime'}`}
                   >
                     <span className="w-9 shrink-0 text-footnote text-muted-foreground">{nombreCorto(m.nombre)}</span>
-                    {conReparto && (
+                    {(conPulsoMaq || conReparto) && (
                       <span className="w-11 shrink-0 text-headline tabular-nums text-foreground">
-                        {fmtDec(m.ahoraCpm ?? 0)}
+                        {fmtDec((conPulsoMaq ? m.pulsoCpm : m.ahoraCpm) ?? 0)}
                       </span>
                     )}
                     <span className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
@@ -3240,6 +3253,7 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
               })}
             </div>
             <p className="mt-1.5 text-caption leading-snug text-muted-foreground/80">
+              {conPulsoMaq && <>Izquierda: el <b>ahora</b> de cada una, del mismo contador — las tres suman el «Ahora» de arriba. </>}
               {conReparto && <>Izquierda: lo que cada una pone en la <b>media 15 min</b> — las tres suman la de arriba. </>}
               {conAporte
                 ? <>Derecha: su aporte al <b>promedio del turno</b> — suman el promedio de la línea. </>
@@ -5224,6 +5238,21 @@ export function PublicShiftMonitorPage() {
                 serieDelTurno,
                 ahoraWallMs,
                 live.timeBreakdown?.producingMin ?? null,
+                /* El pulso por máquina SOLO cuando el número grande es el
+                   pulso: la columna debe sumar exactamente lo de arriba. Los
+                   ids del desglose son los machineid de Shoplogix — se
+                   traducen a nombre con las máquinas del turno. */
+                (() => {
+                  const pm = contador.fuente === 'pulso' ? data.pulse?.porMaquina : null
+                  if (!pm?.length) return null
+                  const nombrePorId = new Map(live.machines.map((m) => [m.id, m.name]))
+                  const out = new Map<string, number>()
+                  for (const x of pm) {
+                    const n = nombrePorId.get(x.id)
+                    if (n != null) out.set(n, x.cpm)
+                  }
+                  return out.size > 0 ? out : null
+                })(),
               )}
               serieLinea={serieDelTurno}
               seriesMaquinas={seriesMaquinas}

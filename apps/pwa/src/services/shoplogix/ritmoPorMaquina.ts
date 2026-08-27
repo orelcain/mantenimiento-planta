@@ -57,6 +57,12 @@ export interface RitmoDeMaquina {
    * `cpm`, que va sobre los minutos propios y no suma (44,2 vs 34,9).
    */
   aporteCpm?: number | null
+  /**
+   * El AHORA de esta máquina: el pulso del contador vivo, misma ventana que
+   * el de línea (por construcción las tres SUMAN el «Ahora» grande — pedido
+   * de Orel, 27-08). null cuando el contador no publica el desglose.
+   */
+  pulsoCpm?: number | null
 }
 
 export interface RitmosPorMaquina {
