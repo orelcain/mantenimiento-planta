@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, Check, CloudOff, Loader2, RotateCcw, Settings2, Undo2, Eraser } from 'lucide-react'
+import { AlertTriangle, Check, CloudOff, Loader2, Maximize2, Minimize2, RotateCcw, Settings2, Undo2, Eraser } from 'lucide-react'
 import { ListGroup, ListCell, Pill } from '@/components/piel'
 import { FranjaVentanas } from './FranjaVentanas'
 import { CompartirRueda } from './CompartirRueda'
@@ -8,6 +8,7 @@ import { RuedaPlanta } from './RuedaPlanta'
 import { CargaTrabajo } from './CargaTrabajo'
 import { EditorMaquinas } from './EditorMaquinas'
 import { CargaRapida } from './CargaRapida'
+import { SugerirIntervencion } from './SugerirIntervencion'
 import { apilar, desapilar, restaurar, type PasoHistorial } from '@/services/historialRueda'
 import { CONFIG_CARGA_POR_DEFECTO, tareasIniciales, type ConfigCarga, type TareaMantencion } from '@/services/ruedaCarga'
 import { getCurrentUser } from '@/services/auth'
@@ -20,6 +21,7 @@ import {
   DIAS_SEMANA,
   OCUPANTES,
   agruparTramos,
+  capaOportunidad,
   SLOTS_POR_DIA,
   baseDia,
   bloquesIntervencion,
@@ -134,6 +136,7 @@ export function RuedaVentanas() {
      forma es buena en uno solo. Ver el comentario de FranjaVentanas. */
   const [modo, setModo] = useState<'editar' | 'comparar' | 'carga'>('editar')
   const [editandoMaquinas, setEditandoMaquinas] = useState(false)
+  const [ampliada, setAmpliada] = useState(false)
   const [sync, setSync] = useState<EstadoSync>('cargando')
   const [errorTexto, setErrorTexto] = useState<string | null>(null)
   const [ahora, setAhora] = useState(() => new Date())
@@ -331,6 +334,15 @@ export function RuedaVentanas() {
   /* ── Dibujo ─────────────────────────────────────────────────────────────── */
   const gruposArea = useMemo(() => agruparTramos(dia.areas), [dia.areas])
   const gruposMant = useMemo(() => agruparTramos(dia.mant), [dia.mant])
+  /* Dónde se PUEDE entrar y no hay nada puesto. Va en el mismo anillo que el
+     plan pero como filo fino: si se pintara con el mismo peso, «lo que voy a
+     hacer» y «lo que podría hacer» se leerían igual, que es justo lo que hay
+     que distinguir. */
+  const gruposOportunidad = useMemo(
+    () => agruparTramos(capaOportunidad(dia)).filter((g) => g.valor === '1'),
+    [dia],
+  )
+
   const gruposCondicion = useMemo(() => {
     // La condición solo se dibuja donde Mantención entra: el anillo exterior
     // responde «cómo entro», no «cómo entraría si entrara».
@@ -481,7 +493,8 @@ export function RuedaVentanas() {
         />
       )}
 
-      <div className={cn('grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]', modo === 'comparar' && 'hidden')}>
+      <div className={cn('grid grid-cols-1 gap-6',
+        !ampliada && 'lg:grid-cols-[minmax(0,1fr)_20rem]', modo === 'comparar' && 'hidden')}>
         {/* ── Rueda ────────────────────────────────────────────────────────── */}
         <div className="flex flex-col gap-4">
           {/* La rueda es cuadrada, así que acotar el ANCHO por la altura de la ventana
@@ -489,7 +502,21 @@ export function RuedaVentanas() {
               pantalla baja —o con el zoom del navegador subido, que deja el
               viewport igual de bajo— llenaba el 93% del alto y tapaba todo lo
               demás, obligando a scrollear para leer cualquier cifra. */}
-          <div className="mx-auto w-full max-w-[min(30rem,60vh)]">
+          <div className="flex justify-end">
+            <button
+              onClick={() => setAmpliada((v) => !v)}
+              aria-pressed={ampliada}
+              className="flex min-h-[44px] items-center gap-1.5 rounded-ctl px-2.5 text-footnote font-medium text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              {ampliada ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+              {ampliada ? 'Reducir' : 'Ampliar'}
+            </button>
+          </div>
+
+          {/* Ampliada usa el ancho completo y hasta el 85% del alto; el panel baja
+              debajo. Los tramos son de 5 min: a tamaño normal, uno mide menos de
+              un milímetro de arco, y pintar fino ahí es imposible. */}
+          <div className={cn('mx-auto w-full', ampliada ? 'max-w-[min(60rem,85vh)]' : 'max-w-[min(30rem,60vh)]')}>
             <svg
               ref={svgRef}
               viewBox={`${-VB_MARGEN} ${-VB_MARGEN} ${VB_LADO} ${VB_LADO}`}
@@ -560,7 +587,18 @@ export function RuedaVentanas() {
                   />
                 ))}
 
-              {/* Anillo 3 · en qué condición se entra */}
+              {/* Anillo 3a · dónde se PUEDE entrar y no hay nada planificado */}
+              {gruposOportunidad.map((g) => (
+                <path
+                  key={`o${g.inicio}`}
+                  d={sector(g.inicio, g.largo, R_COND_OUT - 3.5, R_COND_OUT)}
+                  className="fill-cat-4-tint"
+                  fillOpacity={0.5}
+                  pointerEvents="none"
+                />
+              ))}
+
+              {/* Anillo 3b · en qué condición se entra, donde SÍ hay plan */}
               {gruposCondicion
                 .filter((g) => g.valor !== ' ')
                 .map((g) => {
@@ -709,6 +747,15 @@ export function RuedaVentanas() {
             </div>
           </ListGroup>
 
+          <SugerirIntervencion
+            maquina={maquina}
+            onAplicar={(m) => {
+              tomarSnapshot()
+              snapshotTomadoRef.current = false
+              setState((p) => ({ ...p, maquinas: p.maquinas.map((x) => (x.id === m.id ? m : x)) }))
+            }}
+          />
+
           <CargaRapida
             maquina={maquina}
             maquinas={state.maquinas}
@@ -720,7 +767,14 @@ export function RuedaVentanas() {
             }}
           />
 
-          <ListGroup title="En qué condición entramos">
+          <ListGroup
+        title="En qué condición entramos"
+        footer={
+          resumen.disponibleSinPlan > 0
+            ? `Además quedan ${slotsAHorasMinutos(resumen.disponibleSinPlan)} en que se podría entrar y no hay nada puesto.`
+            : undefined
+        }
+      >
             {resumen.intervencion === 0 ? (
               <div className="px-4 py-5 text-footnote text-muted-foreground">
                 Todavía no hay intervenciones pintadas en este día.
