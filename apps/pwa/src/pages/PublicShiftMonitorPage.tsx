@@ -2748,6 +2748,35 @@ function conRepartoPorMaquina(
  * no el de cada máquina: si una paró antes del cierre, sus ceros son la
  * información que este gráfico existe para mostrar.
  */
+/**
+ * Trazo SUAVE sobre los mismos puntos (pedido de Orel, 28-08: «como el
+ * detalle de turno»). Spline monótona (tangentes de Steffen): suaviza el
+ * dibujo sin inventar picos ni despegar los ceros — un paro suavizado sigue
+ * tocando el piso, que con Catmull-Rom clásico no se cumple. Los datos del
+ * tooltip son los puntos crudos de siempre; esto es solo el lápiz.
+ */
+function pathSuave(ys: number[]): string {
+  const n = ys.length
+  if (n === 0) return ''
+  if (n < 3) return ys.map((y, i) => `${i === 0 ? 'M' : 'L'}${i},${y}`).join(' ')
+  const delta = Array.from({ length: n - 1 }, (_, i) => ys[i + 1]! - ys[i]!)
+  const m = new Array<number>(n)
+  m[0] = delta[0]!
+  m[n - 1] = delta[n - 2]!
+  for (let i = 1; i < n - 1; i++) {
+    const a = delta[i - 1]!
+    const b = delta[i]!
+    m[i] = a * b <= 0 ? 0 : (2 * a * b) / (a + b)
+  }
+  let d = `M0,${ys[0]}`
+  for (let i = 0; i < n - 1; i++) {
+    const c1y = ys[i]! + m[i]! / 3
+    const c2y = ys[i + 1]! - m[i + 1]! / 3
+    d += ` C${i + 1 / 3},${c1y} ${i + 2 / 3},${c2y} ${i + 1},${ys[i + 1]}`
+  }
+  return d
+}
+
 function CurvasMaquinas({ serie, maquinas, ahoraPorNombre, ahoraAt }: {
   serie: readonly TramoSerie[]
   maquinas: { nombre: string; serie: number[]; targetCpm?: number | null }[]
@@ -2855,9 +2884,9 @@ function CurvasMaquinas({ serie, maquinas, ahoraPorNombre, ahoraAt }: {
             />
           ))}
           {curvas.map((c) => (
-            <polyline
+            <path
               key={c.nombre}
-              points={c.puntos.map((v, i) => `${i},${y(v)}`).join(' ')}
+              d={pathSuave(c.puntos.map((v) => y(v)))}
               fill="none"
               stroke={`var(--mon-maq-${c.idx + 1})`}
               strokeWidth={2}
