@@ -6377,23 +6377,57 @@ exports.shoplogixPulseWakeup = onSchedule(
 
     await Promise.all([...porPlanta.entries()].map(async ([plantSlug, docs]) => {
       const lectura = await leerPulso({ query, plantSlug, toShoplogixTime, logger })
-      if (!lectura) return
 
       /* Diagnostico del pulso en cero (2026-08-19, temporal).
          Chonchi y Filete devuelven 0 con la linea produciendo; Yal funciona. Se
          guarda la FORMA de la respuesta en Firestore —no en los logs— para
          poder mirarla con el SDK admin. Un doc por planta, siempre pisado, asi
          que no crece. Sacar cuando el caso este cerrado. */
-      if (lectura.diag) {
+      if (lectura?.diag) {
         await db.doc(`diagnosticos/pulso_${plantSlug}`).set({
           at: new Date(), plantSlug, totalCycles: lectura.totalCycles, ...lectura.diag,
         }).catch((e) => logger.warn('[pulse][diag] no se pudo guardar', { plantSlug, err: e.message }))
       }
-      await Promise.all(docs.map(async (d) => {
-        const pulso = componerPulso(d.data().pulse ?? null, lectura)
-        await d.ref.update({ pulse: pulso })
-      }))
-      logger.info(`[pulse][${plantSlug}] ${lectura.totalCycles} pz`)
+      let pulsoPrimero = null
+      if (lectura) {
+        await Promise.all(docs.map(async (d, i) => {
+          const pulso = componerPulso(d.data().pulse ?? null, lectura)
+          if (i === 0) pulsoPrimero = pulso
+          await d.ref.update({ pulse: pulso })
+        }))
+        logger.info(`[pulse][${plantSlug}] ${lectura.totalCycles} pz`)
+      }
+
+      /* ── Vigía intra-turno ──────────────────────────────────────────────
+         Señales sintéticas con anti-ruido, evaluadas con este mismo tick de
+         1 min (cero requests extra a Shoplogix). Corre TAMBIÉN cuando la
+         lectura falló: «el contador no responde» es una de sus señales.
+         Detalle en shoplogix/vigiaTurno.js. */
+      try {
+        const { correrVigiaTurno } = require('./shoplogix/vigiaTurno')
+        const { PLANT_MACHINES } = require('./shoplogix/machines')
+        const config = await getShoplogixNotifConfig(plantSlug)
+        const data = docs[0]?.data() ?? {}
+        const live = data.live ?? {}
+        const nombres = new Map((PLANT_MACHINES[plantSlug] ?? []).map((m) => [m.machineid, m.name]))
+        const plantLabel = SHOPLOGIX_PLANT_LABEL[plantSlug] || plantSlug
+        await correrVigiaTurno({
+          db, plantSlug, config, nombres, logger,
+          lectura: {
+            shiftDocId: data.shiftDocId ?? null,
+            shiftClosed: Boolean(live.shiftClosed),
+            status: live.status ?? '',
+            reason: live.currentReason ?? '',
+            totalPieces: pulsoPrimero?.totalCycles ?? live.totalPieces ?? 0,
+            pulsoCpm: pulsoPrimero?.cpm ?? null,
+            porMaquina: pulsoPrimero?.porMaquina ?? null,
+            lecturaFallo: !lectura,
+          },
+          enviar: (msg) => sendShoplogixTelegram(config, `🕵️ <b>Vigía · ${plantLabel}</b>\n${msg}`),
+        })
+      } catch (e) {
+        logger.warn(`[vigia][${plantSlug}] error no bloqueante: ${e.message}`)
+      }
     }))
   },
 )

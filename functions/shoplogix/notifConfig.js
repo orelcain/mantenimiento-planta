@@ -47,12 +47,26 @@ const DEFAULTS = Object.freeze({
    * cada arranque — el token NO cambia, para que el QR impreso siga sirviendo.
    */
   monitorLink:   { enabled: true, ttlDays: 30 },
+  /**
+   * Vigía intra-turno (`shoplogix/vigiaTurno.js`): señales sintéticas con
+   * anti-ruido — línea detenida sostenida, una máquina muerta con las demás
+   * corriendo, parada pactada que se alarga, contador caído, ritmo
+   * desplomado — evaluadas cada minuto desde el scheduler del pulso.
+   * Apagado por defecto: se prende planta por planta (Eviscerado Chonchi
+   * abajo). Usa el destino de `channels.telegramDest`, como el resto.
+   */
+  vigia:         { enabled: false },
 })
 
 /**
  * Ajustes por planta. Solo lo que DIFIERE de DEFAULTS — todo lo demás se hereda.
  */
 const PLANT_DEFAULTS = Object.freeze({
+  chonchi: {
+    // El vigía nació para esta línea (guardia real del 27-08: Ev 1 muerta
+    // 4 h, madrugada a goteo — todo detectable con estas señales).
+    vigia: { enabled: true },
+  },
   filete: {
     // Una sola máquina a ~20 pz/min: un turno real son miles de piezas. 200
     // deja pasar cualquier turno de verdad y filtra las pruebas de línea.
@@ -64,7 +78,7 @@ const PLANT_DEFAULTS = Object.freeze({
 })
 
 /** Secciones que se mergean campo por campo. */
-const SECTIONS = ['channels', 'shiftStart', 'shiftEnd', 'firstPiece', 'pieceInterval', 'events', 'monitorLink']
+const SECTIONS = ['channels', 'shiftStart', 'shiftEnd', 'firstPiece', 'pieceInterval', 'events', 'monitorLink', 'vigia']
 
 /**
  * Resuelve la config efectiva de una planta.
