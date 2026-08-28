@@ -130,6 +130,13 @@ export interface PublicMonitorLive {
   /** Cuota del turno según la config del módulo. */
   quotaPieces?: number | null
   /**
+   * Historial de pesos promedio del turno (hora de PLANTA en `atWall`, wall
+   * sellado como UTC — formatear con getUTC*). Cada registro rige desde su
+   * hora; las toneladas se calculan por tramos con `toneladasPorTramos`.
+   * Ausente en docs previos.
+   */
+  pesoRegistros?: Array<{ atWall: string; pesoKg: number }>
+  /**
    * Peso promedio del pescado, kg por pieza, cargado a mano durante el turno.
    * Shoplogix cuenta ciclos y no manda kilos: sin este dato el monitor no puede
    * estimar una sola tonelada, y las reales llegan después por el Grader.
@@ -229,6 +236,14 @@ export interface PublicMonitorLive {
      * Ausente en docs previos al despliegue que lo publica.
      */
     sinImputarLineaMin?: number
+    /**
+     * Las causas IMPUTADAS del turno (todas: técnicas, externas, programadas
+     * y excedidas — minutos de máquina sumados), de la más cara a la más
+     * barata. Es lo que faltaba para que la tarjeta CUANTIFIQUE las
+     * imputaciones que el supervisor sí anotó (Orel, 28-08). Ausente en docs
+     * previos.
+     */
+    imputadas?: Array<{ causa: string; min: number; bucket: string }>
   } | null
   /** Razones de detención, referenciadas por índice desde `stopEvents`. */
   stopReasons?: string[]

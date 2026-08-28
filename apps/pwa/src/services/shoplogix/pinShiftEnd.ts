@@ -278,6 +278,7 @@ export async function setPesoPromedio(params: {
       pesoPromedioKg?: number
       pesoPromedioAt?: string
       pesoPromedioPor?: string | null
+      pesoHistorial?: Array<{ at: string; pesoKg: number; por: string | null }>
       quota?: { value: number; unit: string }
       quotaOrigen?: { toneladas: number; pesoPromedioKg: number }
     }
@@ -285,8 +286,23 @@ export async function setPesoPromedio(params: {
       delete entry.pesoPromedioKg
       delete entry.pesoPromedioAt
       delete entry.pesoPromedioPor
+      delete entry.pesoHistorial
       return entry
     }
+    /*
+     * HISTORIAL del peso (Orel, 28-08): «es una variable cambiante… a tal
+     * hora se registró tal peso, después se puso otro según la pesca y el
+     * lote». Cada registro rige desde su hora hasta el siguiente, y las
+     * toneladas del monitor se calculan POR TRAMOS con el peso vigente de
+     * cada uno. La entry es por NOMBRE de turno y se reusa cada día, así que
+     * acá solo se poda lo viejo (>20 h — turnos anteriores); el backend
+     * además filtra por el arranque del turno vigente al publicar.
+     */
+    const corte = Date.now() - 20 * 3600_000
+    entry.pesoHistorial = [
+      ...(entry.pesoHistorial ?? []).filter((r) => Date.parse(r.at) >= corte),
+      { at: new Date().toISOString(), pesoKg: params.pesoKg, por: params.por ?? null },
+    ].slice(-24)
     entry.pesoPromedioKg = params.pesoKg
     entry.pesoPromedioAt = new Date().toISOString()
     entry.pesoPromedioPor = params.por ?? null

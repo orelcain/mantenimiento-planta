@@ -45,3 +45,40 @@ describe('toneladasDePiezas', () => {
     expect(toneladasDePiezas(piezas, 4.6)).toBeCloseTo(70, 1)
   })
 })
+
+import { toneladasPorTramos } from '../cuotaEnToneladas'
+
+describe('toneladasPorTramos', () => {
+  const wall = (h: number, m: number) => new Date(Date.UTC(2026, 7, 28, h, m)).toISOString()
+  const serie = [
+    { t: wall(8, 0), pieces: 1000 },
+    { t: wall(9, 0), pieces: 1000 },
+    { t: wall(11, 0), pieces: 2000 },
+  ]
+
+  it('cada peso rige desde su hora hasta el siguiente — la suma es por tramos', () => {
+    // Peso 5 kg registrado 08:30 (retro: cubre también las 08:00) y 4 kg a las 10:00.
+    const r = toneladasPorTramos(serie, [
+      { atWall: wall(8, 30), pesoKg: 5 },
+      { atWall: wall(10, 0), pesoKg: 4 },
+    ])!
+    // Tramo 1: 2.000 pz × 5 kg = 10 t · Tramo 2: 2.000 pz × 4 kg = 8 t.
+    expect(r.tramos.map((t) => t.piezas)).toEqual([2000, 2000])
+    expect(r.total).toBeCloseTo(18, 10)
+  })
+
+  it('⚠ lo anterior al primer registro se valoriza con ESE peso, no se pierde', () => {
+    const r = toneladasPorTramos(serie, [{ atWall: wall(12, 0), pesoKg: 5 }])!
+    expect(r.tramos[0]!.piezas).toBe(4000)
+    expect(r.total).toBeCloseTo(20, 10)
+  })
+
+  it('con UN registro equivale al cálculo plano de siempre', () => {
+    const r = toneladasPorTramos(serie, [{ atWall: wall(7, 0), pesoKg: 4.5 }])!
+    expect(r.total).toBeCloseTo((4000 * 4.5) / 1000, 10)
+  })
+
+  it('sin registros devuelve null: quien llama cae al cálculo plano', () => {
+    expect(toneladasPorTramos(serie, [])).toBeNull()
+  })
+})
