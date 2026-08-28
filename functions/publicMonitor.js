@@ -800,6 +800,29 @@ async function loadPlannedShift(db, plantSlug, shiftId, scheduledStart) {
      */
     const pesoRaw = Number(entry.pesoPromedioKg)
     const pesoPromedioKg = Number.isFinite(pesoRaw) && pesoRaw > 0 ? pesoRaw : null
+    /*
+     * El HISTORIAL del peso (Orel, 28-08): el calibre cambia durante el turno
+     * y cada registro rige desde su hora. Acá se filtra al TURNO VIGENTE — la
+     * entry es por nombre y arrastra registros del turno de ayer.
+     *
+     * ⚠ HUSOS: `at` viene en UTC REAL (lo escribió el cliente con
+     * toISOString) y `scheduledStart` es wall-clock de planta sellado como
+     * UTC. Se convierte con `toChileWall` ANTES de comparar — nunca comparar
+     * las dos bases sin convertir. Se publica `atWall` para que la UI
+     * formatee con getUTC* como el resto de las horas de turno.
+     */
+    const pesoRegistros = (Array.isArray(entry.pesoHistorial) ? entry.pesoHistorial : [])
+      .map((r) => {
+        const real = new Date(r?.at ?? '')
+        const kg = Number(r?.pesoKg)
+        if (Number.isNaN(real.getTime()) || !(kg > 0)) return null
+        const wall = shoplogixPolling.toChileWall(real)
+        return { atWall: wall.toISOString(), pesoKg: kg }
+      })
+      .filter(Boolean)
+      .filter((r) => Date.parse(r.atWall) >= scheduledStart.getTime() - 90 * 60_000)
+      .sort((a, b) => Date.parse(a.atWall) - Date.parse(b.atWall))
+      .slice(0, 24)
     const origen = entry.quotaOrigen && Number(entry.quotaOrigen.toneladas) > 0
       ? {
         toneladas: Number(entry.quotaOrigen.toneladas),
@@ -810,6 +833,7 @@ async function loadPlannedShift(db, plantSlug, shiftId, scheduledStart) {
       plannedEnd: end,
       setPoint,
       pesoPromedioKg,
+      pesoRegistros,
       quotaOrigen: origen,
       quotaPieces: enPiezas && Number.isFinite(quota) && quota > 0 ? quota : null,
       /*
@@ -1388,6 +1412,12 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
     const ventana = { start: scheduledStart, end: new Date(fin.getTime() + 10 * 60_000) }
     const eventosTodos = []
     const rangosSinCausa = []
+    /* Las causas IMPUTADAS (todas, no solo las técnicas), agregadas entre
+       máquinas: la tarjeta de Mantención decía «100%» y ni una palabra de los
+       389 min de MMPP que el supervisor SÍ imputó — Orel lo leyó como «el
+       monitor no registra las imputaciones» (28-08, verificado contra la
+       fuente: las imputaciones estaban, el payload no las publicaba). */
+    const imputadasAcc = {}
     const porMaquina = machines.map((m) => {
       /* Los states traen Timestamps de Firestore; el módulo espera fechas
          parseables (`new Date(Timestamp)` da NaN y el saneo lo bota todo). */
@@ -1422,6 +1452,16 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
       const causasFalla = Object.entries(k.grupos.falla?.causas ?? {})
         .sort((a, b) => b[1] - a[1])
         .map(([causa, sec]) => ({ causa, min: Math.round(sec / 6) / 10 }))
+      /* Acumular TODAS las causas con reason anotado (falla, externo,
+         planificado, excedido) para el desglose de imputadas del turno. El
+         bucket viaja para que la UI pueda decir de quién es cada una. */
+      for (const [clase, g] of Object.entries(k.grupos)) {
+        if (clase === 'sin-imputar' || clase === 'micro') continue
+        for (const [causa, sec] of Object.entries(g.causas ?? {})) {
+          const acc = imputadasAcc[causa] || (imputadasAcc[causa] = { sec: 0, bucket: clase })
+          acc.sec += sec
+        }
+      }
       return {
         name: m.machineName || m.id,
         dispTecnicaPct: k.dispTecnicaPct != null ? Math.round(k.dispTecnicaPct * 10) / 10 : null,
@@ -1448,6 +1488,12 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
       eventos: eventosTodos.sort((a, b) => b.min - a.min).slice(0, 6),
       /** Minutos con TODAS las máquinas detenidas sin causa a la vez. */
       sinImputarLineaMin: Math.round(kpisMantencion.interseccionSec(rangosSinCausa) / 6) / 10,
+      /** Las causas IMPUTADAS del turno (minutos de máquina, sumados), de la
+          más cara a la más barata. Tope 8: el doc es público. */
+      imputadas: Object.entries(imputadasAcc)
+        .sort((a, b) => b[1].sec - a[1].sec)
+        .slice(0, 8)
+        .map(([causa, x]) => ({ causa, min: Math.round(x.sec / 6) / 10, bucket: x.bucket })),
     }
   })()
 
@@ -1469,7 +1515,7 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
    */
   const shiftIdActual = parent.shiftId ?? machines[0]?.shiftId
   const cfg = await loadPlannedShift(db, plantSlug, shiftIdActual, scheduledStart)
-  const planned = { quotaPieces: cfg.quotaPieces, pesoPromedioKg: cfg.pesoPromedioKg ?? null, quotaOrigen: cfg.quotaOrigen ?? null }
+  const planned = { quotaPieces: cfg.quotaPieces, pesoPromedioKg: cfg.pesoPromedioKg ?? null, pesoRegistros: cfg.pesoRegistros ?? [], quotaOrigen: cfg.quotaOrigen ?? null }
   const setPoint = cfg.setPoint ?? null
 
   let plannedEnd = null
@@ -1566,6 +1612,9 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
     paceSamples: inferido?.paceSamples ?? null,
     quotaPieces: planned.quotaPieces,
     pesoPromedioKg: planned.pesoPromedioKg ?? null,
+    /** Historial de pesos del turno (atWall + kg): las toneladas del monitor
+        se calculan por TRAMOS con el peso vigente de cada uno. */
+    pesoRegistros: planned.pesoRegistros ?? [],
     quotaOrigen: planned.quotaOrigen ?? null,
     /*
      * Nombre del turno tal como lo da Shoplogix. Va en el payload para que el

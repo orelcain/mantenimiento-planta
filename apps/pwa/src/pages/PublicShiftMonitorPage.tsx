@@ -79,7 +79,7 @@ import { Button } from '@/components/ui/button'
 import { ReAuthConfirmDialog } from '@/components/admin/ReAuthConfirmDialog'
 import { getFunctions, httpsCallable } from 'firebase/functions'
 import { ritmoAndandoDeLinea } from '@/services/shoplogix/ritmoAndandoDeLinea'
-import { piezasDeToneladas, toneladasDePiezas } from '@/services/shoplogix/cuotaEnToneladas'
+import { piezasDeToneladas, toneladasDePiezas, toneladasPorTramos } from '@/services/shoplogix/cuotaEnToneladas'
 import { ritmoPorMaquina, nombreCorto, type RitmosPorMaquina } from '@/services/shoplogix/ritmoPorMaquina'
 import { classifyLossState } from '@/services/shoplogix/lossBuckets'
 
@@ -2657,6 +2657,24 @@ function RespuestaMantencion({ m, cerrado }: {
         </div>
       )}
 
+      {/* Las IMPUTACIONES, cuantificadas — todas, no solo las técnicas.
+          Antes la tarjeta decía «100%» sin una palabra de los 389 min de
+          MMPP que el supervisor SÍ anotó, y eso se leía como «el monitor no
+          registra las imputaciones» (Orel, 28-08). Se muestra también en
+          modo aviso: el contraste «esto ya está imputado / esto falta» es
+          exactamente el empujón. */}
+      {(m.imputadas ?? []).filter((x) => x.min >= 1).length > 0 && (
+        <p className="mt-2 border-t border-border/50 pt-2 text-caption leading-snug text-muted-foreground">
+          <b className="text-foreground/80">Detenciones imputadas del turno:</b>{' '}
+          {(m.imputadas ?? []).filter((x) => x.min >= 1).map((x, i) => (
+            <span key={x.causa} className="tabular-nums">
+              {i > 0 && ' · '}
+              {x.causa} <b className="text-foreground/80">{fmtInt(x.min)} min</b>
+            </span>
+          ))}
+          <span className="text-muted-foreground/70"> (minutos de máquina, sumados)</span>
+        </p>
+      )}
       {!soloAviso && (
         <p className="mt-2 text-caption leading-snug text-muted-foreground/80">
           Disponibilidad técnica: solo fallas de equipo — colación, esperas externas y las{' '}
@@ -4657,16 +4675,27 @@ export function PublicShiftMonitorPage() {
   const toneladas = useMemo(() => {
     const pesoKg = Number(live?.pesoPromedioKg ?? pesoLocal)
     if (!(pesoKg > 0) || !live?.totalPieces) return null
-    const ahoraT = toneladasDePiezas(live.totalPieces, pesoKg)
+    /*
+     * POR TRAMOS cuando hay historial (Orel, 28-08): el calibre cambia
+     * durante el turno, y valorizar todo con el último peso pisa la historia
+     * — cada registro rige desde su hora. Con un solo registro equivale al
+     * cálculo plano; sin registros (docs viejos) se cae al plano.
+     */
+    const porTramos = toneladasPorTramos(live.series ?? [], live.pesoRegistros ?? [])
+    const ahoraT = porTramos?.total ?? toneladasDePiezas(live.totalPieces, pesoKg)
     if (ahoraT == null) return null
-    /* La META en toneladas, con el mismo peso: «≈ 16,4 t de ≈ 24 t» es la
-       misma gramática que la meta en piezas (rediseño 26-08). Reemplaza al
-       «al cierre ≈ N t» proyectado — la meta es un hecho, la proyección era
-       otra cifra más que defender. Solo si hay meta en piezas. */
+    /* La META en toneladas, con el peso VIGENTE: «≈ 16,4 t de ≈ 24 t» es la
+       misma gramática que la meta en piezas (rediseño 26-08). */
     const metaPz = data?.targetPieces ?? live.quotaPieces ?? cuotaLocal ?? null
     const metaT = metaPz != null ? toneladasDePiezas(metaPz, pesoKg) : null
-    return { ahora: ahoraT, meta: metaT, pesoKg }
-  }, [live?.pesoPromedioKg, live?.totalPieces, live?.quotaPieces, data?.targetPieces, pesoLocal, cuotaLocal])
+    return {
+      ahora: ahoraT,
+      meta: metaT,
+      pesoKg,
+      /* El desglose solo cuenta historia con 2+ pesos distintos. */
+      tramos: porTramos && porTramos.tramos.length >= 2 ? porTramos.tramos : null,
+    }
+  }, [live?.pesoPromedioKg, live?.totalPieces, live?.quotaPieces, live?.series, live?.pesoRegistros, data?.targetPieces, pesoLocal, cuotaLocal])
 
   const onGuardarPeso = esAdminMonitor && esActual && data?.plantSlug && live?.shiftName
     ? async (pesoKg: number | null) => {
@@ -5137,11 +5166,27 @@ export function PublicShiftMonitorPage() {
               </p>
               <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[11px] text-muted-foreground">
                 <span>
-                  estimado con peso prom.{' '}
+                  {toneladas.tramos ? 'peso vigente' : 'estimado con peso prom.'}{' '}
                   <span className="tabular-nums">{fmtDec(toneladas.pesoKg)} kg</span> por pieza
                 </span>
                 {onGuardarPeso && <EditorPeso actual={toneladas.pesoKg} onGuardar={onGuardarPeso} />}
               </div>
+              {/* El HISTORIAL del peso, cuantificado por tramo (Orel, 28-08):
+                  el calibre cambia con la pesca y el lote, y cada registro
+                  rige desde su hora — así las toneladas de arriba son la SUMA
+                  de estos tramos, no todo valorizado al último peso. */}
+              {toneladas.tramos && (
+                <div className="mt-1 space-y-0.5 text-[11px] tabular-nums text-muted-foreground/80">
+                  {toneladas.tramos.map((tr, i) => (
+                    <div key={tr.desdeWallMs}>
+                      {i === 0 ? 'desde el arranque' : `desde las ${horaPlanta(tr.desdeWallMs)}`}
+                      {' · '}<span className="text-muted-foreground">{fmtDec(tr.pesoKg)} kg</span>
+                      {' → '}{fmtInt(tr.piezas)} pz ≈{' '}
+                      <span className="text-foreground/80">{fmtDec(tr.toneladas)} t</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
           {/* Sin peso, el hueco se explica —también al que abre el link sin
