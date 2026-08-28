@@ -2788,18 +2788,33 @@ function CurvasMaquinas({ serie, maquinas, ahoraPorNombre, ahoraAt }: {
   ahoraAt?: string | null
 }) {
   /* El tramo bajo el dedo/cursor (pedido de Orel, 27-08: «ver en hover la
-     velocidad en todo momento», como el gráfico del detalle de turno). El
-     hook va ANTES del return condicional — reglas de hooks. */
+     velocidad en todo momento», como el gráfico del detalle de turno). Los
+     hooks van ANTES del return condicional — reglas de hooks. */
   const [idxSel, setIdxSel] = useState<number | null>(null)
+  /* Filtro por máquina (Orel, 28-08): la leyenda es el control — tocar un
+     nombre lo apaga/prende. Nunca cero visibles: apagar la última prende
+     todas de vuelta. La escala se recalcula con las visibles, que es la
+     gracia de aislar una. */
+  const [ocultas, setOcultas] = useState<ReadonlySet<string>>(new Set())
   const fin = mediaMovil(serie).length
+  /* Zoom por pellizco/rueda + paneo por scroll nativo — el MISMO gesto del
+     gráfico grande (`useZoomGesto`), zoom local de este gráfico. */
+  const zg = useZoomGesto({ dominioMin: Math.max(1, fin) * PASO_MIN })
   if (fin < 2) return null
   const conVivo = ahoraPorNombre != null
     && maquinas.every((m) => ahoraPorNombre.get(m.nombre) != null)
-  const curvas = maquinas.map((m, idx) => {
+  const todas = maquinas.map((m, idx) => {
     const puntos = m.serie.slice(0, fin).map((pz) => pz / PASO_MIN)
     if (conVivo) puntos.push(ahoraPorNombre!.get(m.nombre)!)
     return { nombre: m.nombre, idx, puntos, targetCpm: m.targetCpm ?? null }
   })
+  const curvas = todas.filter((c) => !ocultas.has(c.nombre))
+  const alternar = (nombre: string) => {
+    const next = new Set(ocultas)
+    if (next.has(nombre)) next.delete(nombre)
+    else next.add(nombre)
+    setOcultas(next.size >= todas.length ? new Set() : next)
+  }
   /* Índices: 0..fin-1 son tramos cerrados; con pulso fresco hay un punto
      extra (el vivo) en el índice `fin`. */
   const nPuntos = fin + (conVivo ? 1 : 0)
@@ -2839,20 +2854,40 @@ function CurvasMaquinas({ serie, maquinas, ahoraPorNombre, ahoraAt }: {
           Velocidad de cada máquina
           <span className="text-muted-foreground/70"> · pz/min por tramo de 5 min</span>
         </span>
-        <span className="flex items-center gap-2.5">
-          {curvas.map((c) => (
-            <span key={c.nombre} className="inline-flex items-center gap-1">
-              <span
-                className="inline-block h-1 w-3.5 rounded-full"
-                style={{ background: `var(--mon-maq-${c.idx + 1})` }}
-              />
-              {nombreCorto(c.nombre)}
-            </span>
-          ))}
+        <span className="flex items-center gap-1">
+          {/* La leyenda ES el filtro (Orel, 28-08): tocar apaga/prende cada
+              máquina — una, dos o las tres. */}
+          {todas.map((c) => {
+            const oculta = ocultas.has(c.nombre)
+            return (
+              <button
+                key={c.nombre}
+                type="button"
+                onClick={() => alternar(c.nombre)}
+                aria-pressed={!oculta}
+                className={`tap-44 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 ${
+                  oculta ? 'opacity-40' : ''
+                }`}
+              >
+                <span
+                  className="inline-block h-1 w-3.5 rounded-full"
+                  style={{ background: `var(--mon-maq-${c.idx + 1})` }}
+                />
+                {nombreCorto(c.nombre)}
+              </button>
+            )
+          })}
         </span>
       </div>
+      {/* El contenedor con SCROLL (paneo nativo) y adentro el contenido que
+          se ensancha con el zoom — el patrón de `useZoomGesto`. El eje de
+          horas va DENTRO del contenido: fuera se queda quieto al panear y
+          pasa a mentir (gotcha ya pagada en el gráfico grande).
+          Sin `touch-none`: el arrastre de un dedo ES el paneo. */}
+      <div {...zg.props} className="relative mt-1.5 -mx-1 overflow-x-auto px-1">
       <div
-        className="relative mt-1.5 cursor-crosshair touch-none"
+        className="relative cursor-crosshair"
+        style={{ width: `${zg.zoom * 100}%` }}
         /* El tramo se elige por POSICIÓN del puntero, no con un handler por
            punto: sin zoom cada tramo mide ~4 px (gotcha ya pagada en el
            gráfico grande). Pointer events cubren mouse y dedo. */
@@ -2979,12 +3014,9 @@ function CurvasMaquinas({ serie, maquinas, ahoraPorNombre, ahoraAt }: {
             </>
           )
         })()}
-      </div>
-      {/* Los carriles de detención se FUERON (Orel, 27-08: «no están dando
-          información relevante» — con el crudo, los paros ya se ven como
-          caídas a cero en la propia curva). El eje X gana su espacio: horas
-          redondas ubicadas por índice de tramo, extremos anclados al borde
-          (centrados, media etiqueta queda fuera — gotcha ya pagada). */}
+      {/* El eje X, DENTRO del contenido escalado: horas redondas ubicadas
+          por índice de tramo, extremos anclados al borde (centrados, media
+          etiqueta queda fuera — gotcha ya pagada). */}
       <div className="relative mt-0.5 h-4 text-[10px] tabular-nums text-muted-foreground/80">
         <span className="absolute left-0">{Number.isFinite(t0) ? horaPlanta(t0) : ''}</span>
         {marcasHora.map((mk) => (
@@ -2995,6 +3027,17 @@ function CurvasMaquinas({ serie, maquinas, ahoraPorNombre, ahoraAt }: {
         <span className="absolute right-0">
           {conVivo ? 'ahora' : Number.isFinite(t1) ? horaPlanta(t1) : ''}
         </span>
+      </div>
+      </div>
+      </div>
+      <div className="mt-0.5 flex items-center justify-end gap-2 text-[10px] text-muted-foreground/70">
+        {zg.acercado ? (
+          <button type="button" onClick={zg.verTodo} className="tap-44 underline decoration-dotted underline-offset-2">
+            ver todo el turno
+          </button>
+        ) : (
+          <span>pellizcá o rodá (ctrl+rueda) para acercar</span>
+        )}
       </div>
     </div>
   )
