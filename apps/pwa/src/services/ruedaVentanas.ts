@@ -195,24 +195,41 @@ export interface ResumenDia {
   intervencion: number
   /** Tramos que no ocupa nadie: el techo de ventana disponible. */
   libres: number
+  /**
+   * Tramos donde se PODRÍA intervenir y no hay nada planificado.
+   *
+   * «Cuándo intervendrá» y «cuándo puede intervenir» son preguntas distintas y
+   * la rueda solo respondía la primera: el anillo de condición se dibujaba nada
+   * más donde había plan, así que la oportunidad libre no se veía en ninguna
+   * parte — solo aparecía sumada en el número del centro, sin decir a qué hora.
+   * Esto es lo que se está dejando pasar.
+   */
+  disponibleSinPlan: number
 }
 
 export function contarDia(dia: DiaRueda): ResumenDia {
   const ocupacion: Record<Ocupante, number> = { P: 0, H: 0, C: 0, X: 0, '0': 0 }
   const condicion: Record<Condicion, number> = { limpia: 0, colacion: 0, marcha: 0, agua: 0 }
   let intervencion = 0
+  let disponibleSinPlan = 0
 
   for (let i = 0; i < SLOTS_POR_DIA; i++) {
     const bruto = dia.areas[i] ?? '0'
     const ocupante: Ocupante = (OCUPANTES as string[]).includes(bruto) ? (bruto as Ocupante) : '0'
     ocupacion[ocupante]++
+    const cond = condicionDe(ocupante)
     if (dia.mant[i] === '1') {
       intervencion++
-      condicion[condicionDe(ocupante)]++
+      condicion[cond]++
+    } else if (cond === 'limpia' || cond === 'colacion') {
+      // Solo cuentan como oportunidad las condiciones en que se puede entrar de
+      // verdad: con la máquina corriendo o con higiene encima hay tiempo, pero
+      // no es tiempo que se pueda tomar sin pedirlo.
+      disponibleSinPlan++
     }
   }
 
-  return { ocupacion, condicion, intervencion, libres: ocupacion['0'] }
+  return { ocupacion, condicion, intervencion, libres: ocupacion['0'], disponibleSinPlan }
 }
 
 export interface ResumenSemana {
@@ -288,6 +305,25 @@ function contarAgua(dia: DiaRueda, inicio: number, largo: number): number {
     if (oc === 'H' || oc === 'X') n++
   }
   return n
+}
+
+/**
+ * Marca los tramos donde se puede intervenir pero no hay nada planificado, para
+ * poder dibujar la oportunidad además del plan.
+ *
+ * «Cuándo intervendrá» y «cuándo PUEDE intervenir» son preguntas distintas, y la
+ * rueda solo respondía la primera: el anillo de condición se dibujaba nada más
+ * donde había plan, así que el hueco libre no se veía en ninguna parte — solo
+ * aparecía sumado en el número del centro, sin decir a qué hora.
+ */
+export function capaOportunidad(dia: DiaRueda): string {
+  let out = ''
+  for (let i = 0; i < SLOTS_POR_DIA; i++) {
+    const cond = condicionDe(dia.areas[i] ?? '0')
+    const aprovechable = cond === 'limpia' || cond === 'colacion'
+    out += aprovechable && dia.mant[i] !== '1' ? '1' : '0'
+  }
+  return out
 }
 
 export interface TramoAgrupado {
