@@ -838,6 +838,10 @@ async function loadPlannedShift(db, plantSlug, shiftId, scheduledStart) {
       .filter(Boolean)
       .filter((r) => Date.parse(r.atWall) >= scheduledStart.getTime() - 90 * 60_000)
       .sort((a, b) => Date.parse(a.atWall) - Date.parse(b.atWall))
+      /* Registros CONSECUTIVOS con el mismo peso se colapsan al primero: el
+         doble-guardado «por si acaso» (visto en vivo: dos 4.000 seguidos)
+         mostraría dos tramos idénticos que se leen como error. */
+      .filter((r, i, arr) => i === 0 || r.pesoKg !== arr[i - 1].pesoKg)
       .slice(0, 24)
     const origen = entry.quotaOrigen && Number(entry.quotaOrigen.toneladas) > 0
       ? {
