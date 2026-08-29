@@ -3699,6 +3699,11 @@ export function PublicShiftMonitorPage() {
      admin QUITÓ el peso, número = recién guardado. Sin el tercer estado, el
      quitar no se reflejaba hasta el sync. */
   const [pesoLocal, setPesoLocal] = useState<number | null | undefined>(undefined)
+  /* Registros de peso recién ELIMINADOS (por su `at`): el doc tarda en
+     refrescar y sin esto el ✕ parecía no hacer nada por ~15 s (Orel, 29-08). */
+  const [pesosEliminados, setPesosEliminados] = useState<ReadonlySet<string>>(new Set())
+  /* El historial de pesos, plegado por defecto (pedido de Orel, 29-08). */
+  const [verPesos, setVerPesos] = useState(false)
   const [now, setNow] = useState(() => Date.now())
   /* Los `t` de la serie son wall-clock sellados como UTC; para compararlos con
      el reloj hay que llevar "ahora" a esa misma base (igual que `fmtAgoWall`). */
@@ -3942,6 +3947,7 @@ export function PublicShiftMonitorPage() {
   useEffect(() => {
     setCuotaLocal(null)
     setPesoLocal(undefined)
+    setPesosEliminados(new Set())
   }, [data?.shiftDocId])
 
   /**
@@ -4707,7 +4713,13 @@ export function PublicShiftMonitorPage() {
      * — cada registro rige desde su hora. Con un solo registro equivale al
      * cálculo plano; sin registros (docs viejos) se cae al plano.
      */
-    const porTramos = toneladasPorTramos(live.series ?? [], live.pesoRegistros ?? [])
+    /* Los recién eliminados se filtran YA (el ✕ optimista) y los dobles
+       consecutivos se colapsan también acá — el doc puede traerlos hasta que
+       el backend con dedupe rebuildee. */
+    const registros = (live.pesoRegistros ?? [])
+      .filter((r) => !r.at || !pesosEliminados.has(r.at))
+      .filter((r, i, arr) => i === 0 || r.pesoKg !== arr[i - 1]!.pesoKg)
+    const porTramos = toneladasPorTramos(live.series ?? [], registros)
     const ahoraT = porTramos?.total ?? toneladasDePiezas(live.totalPieces, pesoKg)
     if (ahoraT == null) return null
     /* La META en toneladas, con el peso VIGENTE: «≈ 16,4 t de ≈ 24 t» es la
@@ -4721,7 +4733,7 @@ export function PublicShiftMonitorPage() {
       /* El desglose solo cuenta historia con 2+ pesos distintos. */
       tramos: porTramos && porTramos.tramos.length >= 2 ? porTramos.tramos : null,
     }
-  }, [live?.pesoPromedioKg, live?.totalPieces, live?.quotaPieces, live?.series, live?.pesoRegistros, data?.targetPieces, pesoLocal, cuotaLocal])
+  }, [live?.pesoPromedioKg, live?.totalPieces, live?.quotaPieces, live?.series, live?.pesoRegistros, data?.targetPieces, pesoLocal, cuotaLocal, pesosEliminados])
 
   const onGuardarPeso = esAdminMonitor && esActual && data?.plantSlug && live?.shiftName
     ? async (pesoKg: number | null) => {
@@ -4744,6 +4756,8 @@ export function PublicShiftMonitorPage() {
         shiftName: live.shiftName!,
         at,
       })
+      /* Optimista: fuera de la pantalla YA — el doc tarda en refrescar. */
+      setPesosEliminados((prev) => new Set([...prev, at]))
     }
     : undefined
 
@@ -5213,7 +5227,19 @@ export function PublicShiftMonitorPage() {
                   el calibre cambia con la pesca y el lote, y cada registro
                   rige desde su hora — así las toneladas de arriba son la SUMA
                   de estos tramos, no todo valorizado al último peso. */}
+              {/* Plegado por defecto (Orel, 29-08): el desglose es consulta,
+                  no lectura de cada vistazo. El botón dice cuántos hay. */}
               {toneladas.tramos && (
+                <button
+                  type="button"
+                  onClick={() => setVerPesos((v) => !v)}
+                  aria-expanded={verPesos}
+                  className="tap-44 mt-0.5 text-[11px] text-primary underline underline-offset-2"
+                >
+                  {verPesos ? 'ocultar historial de pesos' : `ver historial de pesos (${toneladas.tramos.length})`}
+                </button>
+              )}
+              {toneladas.tramos && verPesos && (
                 <div className="mt-1 space-y-0.5 text-[11px] tabular-nums text-muted-foreground/80">
                   {toneladas.tramos.map((tr, i) => (
                     <div key={tr.desdeWallMs} className="flex items-center gap-1.5">
