@@ -5211,11 +5211,30 @@ export function PublicShiftMonitorPage() {
                 {turnoCerrado && 'Cerró con '}
                 <span className="tabular-nums font-semibold">≈ {fmtDec(toneladas.ahora)} t</span>
                 {toneladas.meta != null && (
-                  <span className="text-muted-foreground">
+                  <span
+                    className="text-muted-foreground"
+                    title={`Las ${fmtInt(pace?.targetPieces ?? 0) || 'piezas de la'} meta valorizadas al peso vigente — cambia si cambia el calibre.`}
+                  >
                     {' '}de ≈ <span className="tabular-nums">{fmtDec(toneladas.meta)} t</span>
                   </span>
                 )}
               </p>
+              {/* La proporción como LLENADO, no como resta mental (Orel,
+                  29-08). Mismo lenguaje de los instrumentos: fill --mon-hoy
+                  sobre la pista estándar; la meta es el final de la barra. */}
+              {toneladas.meta != null && toneladas.meta > 0 && (
+                <div className="relative mt-1 h-2 rounded-full" style={{ background: PISTA_INSTRUMENTO }}>
+                  <span
+                    className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-500 motion-reduce:transition-none"
+                    style={{
+                      width: `${Math.min(100, (toneladas.ahora / toneladas.meta) * 100)}%`,
+                      minWidth: 3,
+                      background: 'var(--mon-hoy)',
+                    }}
+                    title={`≈ ${fmtDec(toneladas.ahora)} de ≈ ${fmtDec(toneladas.meta)} t (${Math.round((toneladas.ahora / toneladas.meta) * 100)}%)`}
+                  />
+                </div>
+              )}
               <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[11px] text-muted-foreground">
                 <span>
                   {toneladas.tramos ? 'peso vigente' : 'estimado con peso prom.'}{' '}
