@@ -6423,7 +6423,13 @@ exports.shoplogixPulseWakeup = onSchedule(
             porMaquina: pulsoPrimero?.porMaquina ?? null,
             lecturaFallo: !lectura,
           },
-          enviar: (msg) => sendShoplogixTelegram(config, `🕵️ <b>Vigía · ${plantLabel}</b>\n${msg}`),
+          /* Con el LINK al monitor: un aviso de «línea detenida» sin dónde
+             mirarla obliga a buscar el QR (mejora natural, 29-08). El id del
+             doc del monitor ES el token público. */
+          enviar: (msg) => sendShoplogixTelegram(
+            config,
+            `🕵️ <b>Vigía · ${plantLabel}</b>\n${msg}\n<a href="https://orelcain.github.io/mantenimiento-planta/monitor/${docs[0].id}">abrir monitor</a>`,
+          ),
         })
       } catch (e) {
         logger.warn(`[vigia][${plantSlug}] error no bloqueante: ${e.message}`)
