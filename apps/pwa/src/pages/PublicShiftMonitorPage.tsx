@@ -38,7 +38,8 @@ import { buildHourlyRows, peakPieces } from '@/services/shoplogix/monitorHourly'
 import { computePaceToTarget, lineMaxPerHour, type PaceToTarget } from '@/services/shoplogix/monitorPace'
 import { ventanaDeActividad, desdePrimeraPieza, piezasAntesDelArranque } from '@/services/shoplogix/monitorActividad'
 import { refrescarPulso, type PulsoMonitor } from '@/services/shoplogix/publicShiftMonitor.service'
-import { elegirContador } from './monitor/contadorCrudo'
+import { elegirContador, pulsoVivo } from './monitor/contadorCrudo'
+import type { PulsoVivoElegido } from './monitor/contadorCrudo'
 import { construirCascada } from './monitor/cascadaTurno'
 import { horaPlanta } from './monitor/horaPlanta'
 import { CascadaTurnoCard } from './monitor/CascadaTurnoCard'
@@ -3111,7 +3112,7 @@ function CurvasMaquinas({ serie, maquinas, ahoraPorNombre, ahoraAt }: {
   )
 }
 
-function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrado, onEditarSetPoint, cerrado, contexto, chispa, corteMs, ahoraWallMs, pulso, maquinas, parada, serieLinea, seriesMaquinas }: {
+function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrado, onEditarSetPoint, cerrado, contexto, chispa, corteMs, ahoraWallMs, pulso, vivo, maquinas, parada, serieLinea, seriesMaquinas }: {
   /**
    * Ritmo de ahora ANDANDO, en pz/min: los últimos 15 min descontando los
    * tramos parados. Va en esta base y no en la de reloj porque es contra lo
@@ -3175,6 +3176,14 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
   ahoraWallMs?: number | null
   /** Ritmo casi instantáneo (~4 min) que ya calcula el backend. */
   pulso?: { cpm?: number | null; at?: string | null } | null
+  /**
+   * El ritmo VIVO elegido por `pulsoVivo`: el cpm fresco o, en los silencios
+   * cortos del contador, el último vivo arrastrado (marcado `recalibrando`).
+   * La tarjeta muestra ESTE como «Ahora» — la media de 15 min queda solo
+   * para cuando ni siquiera hay un vivo reciente (pedido de Orel, 29-08:
+   * «quiero la realidad del ahora, no la media»).
+   */
+  vivo?: PulsoVivoElegido | null
   /** La serie de la línea (la misma de los gráficos), para el eje de tiempo
       de las curvas por máquina. */
   serieLinea?: readonly TramoSerie[] | null
@@ -3240,7 +3249,7 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
           <div className="flex flex-wrap items-baseline gap-x-1.5">
             <span className="text-[42px] font-semibold leading-none tabular-nums text-foreground">
               {parada || cerrado ? '0,0'
-                : pulso?.cpm != null ? fmtDec(pulso.cpm)
+                : vivo != null ? fmtDec(vivo.cpm)
                 : ahora != null ? fmtDec(ahora) : '—'}
             </span>
             <span className="text-[15px] text-muted-foreground">pz/min</span>
@@ -3253,7 +3262,7 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
             aparece cuando el número grande es el pulso — sin pulso, el grande
             YA ES la media y repetirla sería el tercer «ahora». */}
         <div className="ml-auto shrink-0 space-y-0.5 text-right">
-          {!parada && !cerrado && pulso?.cpm != null && ahora != null && (
+          {!parada && !cerrado && vivo != null && ahora != null && (
             <div className="flex items-baseline justify-end gap-x-1.5">
               <span className="text-caption text-muted-foreground">media 15 min</span>
               <span className="text-headline tabular-nums text-foreground">{fmtDec(ahora)}</span>
@@ -3274,19 +3283,21 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
           parada y cierre tienen su bloque propio abajo. */}
       {!parada && !cerrado && (
         <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12px] text-muted-foreground">
-          {pulso?.cpm != null ? (
+          {vivo != null ? (
             <>
               <span className="inline-flex items-center gap-1 font-medium text-foreground/80">
                 <span className="inline-block size-1.5 rounded-full bg-ink-ok" />
                 ahora mismo
-                {pulso.at && (
-                  <span className="tabular-nums text-muted-foreground">
-                    · {new Date(pulso.at).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false })}
-                  </span>
-                )}
+                <span className="tabular-nums text-muted-foreground">
+                  · {new Date(vivo.at).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false })}
+                </span>
               </span>
-              <span className="text-muted-foreground/80">el contador de la pantalla de planta</span>
-              <CuentaAtrasPulso at={pulso.at} />
+              {/* Con el vivo arrastrado la hora de arriba YA es la del dato:
+                  acá solo se dice POR QUÉ no hay uno más nuevo. */}
+              {vivo.recalibrando
+                ? <span className="text-muted-foreground/80">contador recalibrando — último ritmo vivo</span>
+                : <span className="text-muted-foreground/80">el contador de la pantalla de planta</span>}
+              <CuentaAtrasPulso at={pulso?.at} />
               {/* El número de la media ya vive arriba, con rótulo. Acá queda
                   solo el VEREDICTO (que se juzga sobre esa media, no sobre el
                   pulso: el pulso salta demasiado para sentenciar). */}
@@ -3325,7 +3336,7 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
 
       {/* Qué expresa cada cifra, dicho UNA vez (pedido de Orel, 26-08: tres
           ritmos sin explicación se leían como contradicción). */}
-      {!parada && !cerrado && pulso?.cpm != null && ahora != null && (
+      {!parada && !cerrado && vivo != null && ahora != null && (
         <p className="mt-1 text-[11px] leading-snug text-muted-foreground/80">
           <b className="text-muted-foreground">Ahora</b> salta con la línea;{' '}
           la <b className="text-muted-foreground">media 15 min</b> es el ritmo sostenido reciente
@@ -3452,7 +3463,7 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
            «Ahora» grande—, y solo si el desglose del pulso no está, la media
            de 15 min (que suma la media de arriba). Dos varas posibles, nunca
            las dos: cada una con su rótulo. */
-        const conPulsoMaq = !parada && !cerrado && pulso?.cpm != null
+        const conPulsoMaq = !parada && !cerrado && vivo != null
           && maquinas.maquinas.every((m) => m.pulsoCpm != null)
         const conReparto = !conPulsoMaq && !parada && !cerrado
           && maquinas.maquinas.every((m) => m.ahoraCpm != null)
@@ -3529,12 +3540,12 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
              condición de la columna «ahora», para que gráfico y columna
              digan lo mismo. */
           ahoraPorNombre={
-            !parada && !cerrado && pulso?.cpm != null
+            !parada && !cerrado && vivo != null
             && maquinas != null && maquinas.maquinas.every((m) => m.pulsoCpm != null)
               ? new Map(maquinas.maquinas.map((m) => [m.nombre, m.pulsoCpm!]))
               : null
           }
-          ahoraAt={pulso?.at ?? null}
+          ahoraAt={vivo?.at ?? null}
         />
       )}
 
@@ -5610,9 +5621,11 @@ export function PublicShiftMonitorPage() {
                 /* El pulso por máquina SOLO cuando el número grande es el
                    pulso: la columna debe sumar exactamente lo de arriba. Los
                    ids del desglose son los machineid de Shoplogix — se
-                   traducen a nombre con las máquinas del turno. */
+                   traducen a nombre con las máquinas del turno. Sale del VIVO
+                   elegido (fresco o arrastrado): la columna acompaña al
+                   número grande también durante la recalibración. */
                 (() => {
-                  const pm = contador.fuente === 'pulso' ? data.pulse?.porMaquina : null
+                  const pm = contador.fuente === 'pulso' ? pulsoVivo(data.pulse)?.porMaquina : null
                   if (!pm?.length) return null
                   const nombrePorId = new Map(live.machines.map((m) => [m.id, m.name]))
                   const out = new Map<string, number>()
@@ -5656,6 +5669,7 @@ export function PublicShiftMonitorPage() {
                  presentado como medición. `elegirContador` ya hace ese juicio:
                  si cayó al derivado, no hay pulso que mostrar. */
               pulso={contador.fuente === 'pulso' ? (data.pulse ?? null) : null}
+              vivo={contador.fuente === 'pulso' ? pulsoVivo(data.pulse) : null}
               /* El objetivo, en la MISMA base que el ritmo: el requerido de
                  `pace` es sobre el reloj útil que queda, y se convierte a
                  «andando» con el uptime real del turno. */

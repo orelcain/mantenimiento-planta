@@ -86,6 +86,43 @@ export function corteDeBuckets(live: Pick<PublicMonitorLive, 'series'>): number 
 }
 
 /**
+ * El ritmo VIVO que la tarjeta muestra como «Ahora», con su hora.
+ *
+ * El pulso queda mudo (`cpm: null`) unos minutos cuando el contador de
+ * Shoplogix hace una discontinuidad (reconciliación, cambio de turno). La
+ * tarjeta caía a la media de 15 min y en un cierre con goteo decía 33 pz/min
+ * cuando la realidad era 12 — Orel lo cazó en vivo (29-08). El backend ahora
+ * arrastra el último vivo con su hora (`vivoPrevio`); acá se decide si todavía
+ * vale como «ahora»: fresco de verdad, o arrastrado hace poco (se marca
+ * `recalibrando` para decirlo en pantalla). Más viejo que eso, null — y la
+ * tarjeta cae a la media con su etiqueta honesta, que para un contador caído
+ * de verdad ES lo correcto.
+ */
+export interface PulsoVivoElegido {
+  cpm: number
+  /** La hora DEL VIVO (no de la última lectura): con arrastre, es más vieja. */
+  at: string
+  porMaquina: Array<{ id: string; cpm: number }> | null
+  /** true cuando el número es el arrastrado — la pantalla lo dice. */
+  recalibrando: boolean
+}
+
+/** Cuánto arrastre se acepta antes de soltar el vivo y caer a la media. */
+const VIVO_TOLERANCIA_MS = 6 * 60_000
+
+export function pulsoVivo(pulse: PulsoMonitor | null | undefined): PulsoVivoElegido | null {
+  if (!pulse) return null
+  if (pulse.cpm != null) {
+    return { cpm: pulse.cpm, at: pulse.at, porMaquina: pulse.porMaquina ?? null, recalibrando: false }
+  }
+  const v = pulse.vivoPrevio
+  if (!v) return null
+  const edad = Date.parse(pulse.at) - Date.parse(v.at)
+  if (!Number.isFinite(edad) || edad > VIVO_TOLERANCIA_MS) return null
+  return { cpm: v.cpm, at: v.at, porMaquina: v.porMaquina ?? null, recalibrando: true }
+}
+
+/**
  * Elige la fuente del número grande.
  *
  * La regla es «el crudo de Shoplogix manda, salvo que no esté o esté viejo».
