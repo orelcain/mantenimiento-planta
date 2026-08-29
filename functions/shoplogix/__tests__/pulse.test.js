@@ -126,3 +126,32 @@ test('la producción normal no se ve afectada por el tope', () => {
 test('ritmoDeVentana no publica un absurdo aunque la ventana lo contenga', () => {
   assert.strictEqual(ritmoDeVentana([lect(0, 0), lect(4, 12169)]), null)
 })
+
+test('el refresco de 2 min a pleno ritmo NO es una discontinuidad (bug del 0 pz/min, 29-08)', () => {
+  // Caso REAL del turno día 29-08 con techo físico 56 (Chonchi): lecturas cada
+  // 1 min pero el contador salta cada 2 — plano, plano, +80. El +80 en 1 min
+  // aparenta 80 pz/min (> 56) pero es SOLO el refresco: usar el techo físico
+  // como umbral de discontinuidad reiniciaba la ventana en cada salto y el
+  // pulso publicaba null o un 0 falso con la línea a ~40 pz/min.
+  let p = componerPulso(null, lect(0, 1264), 56)
+  p = componerPulso(p, lect(1, 1264), 56)
+  p = componerPulso(p, lect(2, 1344), 56)
+  p = componerPulso(p, lect(3, 1344), 56)
+  p = componerPulso(p, lect(4, 1411), 56)
+  assert.strictEqual(p.lecturas.length, 5, 'la ventana NO se reinicia con el refresco')
+  assert.ok(p.cpm > 30 && p.cpm < 56, `debe publicar el ritmo real (~37), salió ${p.cpm}`)
+})
+
+test('el techo físico sigue callando a la reconciliación (fix 60-69 intacto)', () => {
+  // La ventana entera implica 60-69 pz/min (acreditación de golpe): sobre el
+  // techo físico se publica null, aunque ningún delta individual pase de 120.
+  let p = componerPulso(null, lect(0, 1000), 56)
+  p = componerPulso(p, lect(1, 1065), 56)
+  p = componerPulso(p, lect(2, 1130), 56)
+  assert.strictEqual(p.cpm, null, 'un ritmo sobre el techo físico no se publica')
+
+  // Y un salto de verdad absurdo (>120/min) sigue reiniciando la ventana.
+  let q = componerPulso(null, lect(0, 0), 56)
+  q = componerPulso(q, lect(1, 500), 56)
+  assert.strictEqual(q.lecturas.length, 1, 'el absurdo genérico sigue cortando')
+})

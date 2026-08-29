@@ -168,14 +168,22 @@ function componerPulso(previo, lectura, maxCpm = MAX_CPM_PLAUSIBLE) {
      cambio de turno) y también reinicia la ventana: dejarlo adentro tenía al
      pulso mudo hasta 5 min mientras la lectura envenenada salía sola —
      reiniciando, vuelve a hablar en ~2 (Orel lo cazó en vivo el 29-08:
-     la tarjeta caía a la media de 15 min y mostraba un ritmo viejo). */
+     la tarjeta caía a la media de 15 min y mostraba un ritmo viejo).
+
+     ⚠ El umbral de ESTE corte es el absurdo genérico, NO el techo físico de la
+     planta (`maxCpm`): el contador se refresca cada ~2 min, así que entre dos
+     lecturas de 1 min el delta aparente llega legítimamente al DOBLE del ritmo
+     real — Chonchi a 40 pz/min pisa +80 en el minuto del refresco. Usar el
+     techo físico acá reiniciaba la ventana en CADA refresco y el pulso quedó
+     clavado entre null y un 0 falso con la línea a pleno (29-08, turno día).
+     El techo físico sigue rigiendo lo que se PUBLICA (ritmoDeVentana). */
   const previas = previo?.lecturas ?? []
   const ultima = previas[previas.length - 1]
   const discontinuo = ultima && (() => {
     if (lectura.totalCycles < ultima.totalCycles) return true
     const min = (Date.parse(lectura.at) - Date.parse(ultima.at)) / 60000
     if (!(min > 0)) return false
-    return (lectura.totalCycles - ultima.totalCycles) / min > maxCpm
+    return (lectura.totalCycles - ultima.totalCycles) / min > MAX_CPM_PLAUSIBLE
   })()
 
   const lecturas = (discontinuo ? [lectura] : [...previas, lectura]).slice(-MAX_LECTURAS)
