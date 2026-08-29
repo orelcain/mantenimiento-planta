@@ -32,9 +32,10 @@ export function piezasDeToneladas(
     throw new Error(`El peso promedio tiene que estar entre ${PESO_MIN_KG} y ${PESO_MAX_KG} kg.`)
   }
   const piezas = Math.round((toneladas * 1000) / pesoPromedioKg)
-  const kg = pesoPromedioKg.toLocaleString('es-CL', { maximumFractionDigits: 2 })
+  /* En gramos: el calibre se habla en gramos en planta (Orel, 29-08). */
+  const g = Math.round(pesoPromedioKg * 1000).toLocaleString('es-CL')
   const t = toneladas.toLocaleString('es-CL', { maximumFractionDigits: 1 })
-  return { piezas, detalle: `${t} t a ${kg} kg` }
+  return { piezas, detalle: `${t} t a ${g} g` }
 }
 
 /** El camino inverso, para mostrar cuántas toneladas van con lo producido. */
