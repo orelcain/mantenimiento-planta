@@ -43,7 +43,7 @@ import { construirCascada } from './monitor/cascadaTurno'
 import { horaPlanta } from './monitor/horaPlanta'
 import { CascadaTurnoCard } from './monitor/CascadaTurnoCard'
 import { mediaMovil, ritmoAhoraCpm, ritmoAhoraAndando, repartoAhoraAndando, estadoRitmo, fraccionDeRegla, pedidoAndando, pedidoFueraDeAlcance, PASO_MIN, type TramoSerie } from '@/services/shoplogix/monitorRitmo'
-import { pinShiftEnd, unpinShiftEnd, setMonitorSetPoint, setShiftQuota, setPesoPromedio } from '@/services/shoplogix/pinShiftEnd'
+import { pinShiftEnd, unpinShiftEnd, setMonitorSetPoint, setShiftQuota, setPesoPromedio, eliminarRegistroPeso } from '@/services/shoplogix/pinShiftEnd'
 import {
   buildDayComparison, optimalPace, plannedBreaks, mergeBreaks, cumulativeFromStart,
   breakMinutesBetween, extendOngoingBreaks,
@@ -472,6 +472,16 @@ function EditorPeso({ actual, onGuardar }: {
       >
         {guardando ? 'Guardando…' : 'Guardar'}
       </button>
+      {/* Quitar el peso del turno (Orel, 29-08): un dedo de más no puede
+          quedar pegado en las toneladas. */}
+      {actual != null && (
+        <button
+          type="button" disabled={guardando} onClick={() => guardar(null)}
+          className="tap-44 rounded-ctl px-2 py-0.5 text-[11px] text-muted-foreground underline decoration-dotted hover:text-foreground disabled:opacity-50"
+        >
+          quitar peso
+        </button>
+      )}
       <button
         type="button" onClick={() => setAbierto(false)}
         className="tap-44 rounded-ctl px-2 py-0.5 text-[11px] text-muted-foreground hover:text-foreground"
@@ -4717,6 +4727,18 @@ export function PublicShiftMonitorPage() {
     }
     : undefined
 
+  /* Quitar UN registro del historial de pesos (Orel, 29-08): un dedo de más
+     no puede quedar pegado en las toneladas del turno. */
+  const onEliminarPeso = esAdminMonitor && esActual && data?.plantSlug && live?.shiftName
+    ? async (at: string) => {
+      await eliminarRegistroPeso({
+        plantSlug: data.plantSlug!,
+        shiftName: live.shiftName!,
+        at,
+      })
+    }
+    : undefined
+
   /*
    * La cuota, editable desde el HÉROE y no solo desde el bloque de ritmo:
    * ese bloque se apaga con el turno cerrado y dejaba a un admin sin ningún
@@ -5186,11 +5208,25 @@ export function PublicShiftMonitorPage() {
               {toneladas.tramos && (
                 <div className="mt-1 space-y-0.5 text-[11px] tabular-nums text-muted-foreground/80">
                   {toneladas.tramos.map((tr, i) => (
-                    <div key={tr.desdeWallMs}>
-                      {i === 0 ? 'desde el arranque' : `desde las ${horaPlanta(tr.desdeWallMs)}`}
-                      {' · '}<span className="text-muted-foreground">{fmtInt(tr.pesoKg * 1000)} g</span>
-                      {' → '}{fmtInt(tr.piezas)} pz ≈{' '}
-                      <span className="text-foreground/80">{fmtDec(tr.toneladas)} t</span>
+                    <div key={tr.desdeWallMs} className="flex items-center gap-1.5">
+                      <span>
+                        {i === 0 ? 'desde el arranque' : `desde las ${horaPlanta(tr.desdeWallMs)}`}
+                        {' · '}<span className="text-muted-foreground">{fmtInt(tr.pesoKg * 1000)} g</span>
+                        {' → '}{fmtInt(tr.piezas)} pz ≈{' '}
+                        <span className="text-foreground/80">{fmtDec(tr.toneladas)} t</span>
+                      </span>
+                      {/* Quitar el registro (solo admin): si fue un dedo de
+                          más, se saca y el tramo se funde con el anterior. */}
+                      {onEliminarPeso && tr.at && (
+                        <button
+                          type="button"
+                          onClick={() => { void onEliminarPeso(tr.at!) }}
+                          className="tap-44 rounded-full px-1 text-[11px] leading-none text-muted-foreground/70 hover:text-ink-crit"
+                          title={`Quitar este registro (${fmtInt(tr.pesoKg * 1000)} g)`}
+                        >
+                          ✕
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>

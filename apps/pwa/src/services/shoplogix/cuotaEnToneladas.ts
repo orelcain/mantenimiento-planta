@@ -46,6 +46,8 @@ export function toneladasDePiezas(piezas: number, pesoPromedioKg: number): numbe
 
 /** Un registro del historial de pesos del turno (hora de PLANTA, wall). */
 export interface RegistroPeso {
+  /** Clave del registro (ISO UTC real con que se guardó) — para eliminarlo. */
+  at?: string
   atWall: string
   pesoKg: number
 }
@@ -56,6 +58,8 @@ export interface TramoDePeso {
   pesoKg: number
   piezas: number
   toneladas: number
+  /** La clave del registro que abrió el tramo, si viaja. */
+  at?: string
 }
 
 /**
@@ -84,6 +88,7 @@ export function toneladasPorTramos(
     pesoKg: r.pesoKg,
     piezas: 0,
     toneladas: 0,
+    at: r.at,
   }))
 
   for (const p of serie ?? []) {
