@@ -431,7 +431,10 @@ function EditorPeso({ actual, onGuardar }: {
     return (
       <button
         type="button"
-        onClick={() => { setValor(actual != null ? String(actual) : ''); setAbierto(true); setError(null) }}
+        /* En GRAMOS (Orel, 29-08): en planta el calibre se habla en gramos
+           («5.200») y tipearlo así es más rápido que «5,2». El storage sigue
+           en kg — solo la entrada y la lectura van en g. */
+        onClick={() => { setValor(actual != null ? String(Math.round(actual * 1000)) : ''); setAbierto(true); setError(null) }}
         className="tap-44 ml-1 rounded-full border border-border px-2 py-0.5 text-[10px] hover:bg-muted"
       >
         {actual != null ? 'Cambiar peso' : 'Poner peso promedio'}
@@ -439,11 +442,14 @@ function EditorPeso({ actual, onGuardar }: {
     )
   }
 
-  const guardar = async (kg: number | null) => {
+  const guardar = async (gramos: number | null) => {
     setGuardando(true)
     setError(null)
     try {
-      await onGuardar(kg)
+      if (gramos != null && !(gramos >= 500 && gramos <= 25_000)) {
+        throw new Error('El peso promedio va en gramos: entre 500 y 25.000 g por pieza.')
+      }
+      await onGuardar(gramos != null ? gramos / 1000 : null)
       setAbierto(false)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo guardar')
@@ -455,10 +461,10 @@ function EditorPeso({ actual, onGuardar }: {
   return (
     <span className="ml-1 inline-flex flex-wrap items-center gap-1">
       <input
-        type="number" min={0.5} max={25} step={0.1} inputMode="decimal"
+        type="number" min={500} max={25000} step={50} inputMode="numeric"
         value={valor} onChange={(e) => setValor(e.target.value)}
-        placeholder="kg por pieza"
-        className="h-7 w-24 rounded-ctl border border-border bg-background px-2 text-[12px] tabular-nums"
+        placeholder="gramos por pieza"
+        className="h-7 w-28 rounded-ctl border border-border bg-background px-2 text-[12px] tabular-nums"
       />
       <button
         type="button" disabled={guardando} onClick={() => guardar(Number(valor))}
@@ -674,13 +680,15 @@ function EditorCuota({ actual, pesoConocido, onGuardar, conToneladas = true }: {
   const [modo, setModo] = useState<'toneladas' | 'piezas'>(conToneladas ? 'toneladas' : 'piezas')
   const [valor, setValor] = useState('')
   const [toneladas, setToneladas] = useState('')
-  const [pesoKg, setPesoKg] = useState('')
+  /* En GRAMOS por pieza (Orel, 29-08): el calibre se habla en gramos. Solo
+     esta caja — el storage y la conversión siguen en kg. */
+  const [pesoG, setPesoG] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [guardando, setGuardando] = useState(false)
 
   const convertida = (() => {
     const t = Number(toneladas)
-    const kg = Number(pesoKg)
+    const kg = Number(pesoG) / 1000
     if (!(t > 0) || !(kg > 0)) return null
     try { return piezasDeToneladas(t, kg) } catch { return null }
   })()
@@ -691,7 +699,7 @@ function EditorCuota({ actual, pesoConocido, onGuardar, conToneladas = true }: {
         type="button"
         onClick={() => {
           setValor(actual != null ? String(actual) : '')
-          if (pesoConocido != null && pesoConocido > 0) setPesoKg(String(pesoConocido))
+          if (pesoConocido != null && pesoConocido > 0) setPesoG(String(Math.round(pesoConocido * 1000)))
           setAbierto(true)
           setError(null)
         }}
@@ -743,10 +751,10 @@ function EditorCuota({ actual, pesoConocido, onGuardar, conToneladas = true }: {
             className="h-7 w-24 rounded-ctl border border-border bg-background px-2 text-[12px] tabular-nums"
           />
           <input
-            type="number" min={0.5} step={0.1} inputMode="decimal"
-            value={pesoKg} onChange={(e) => setPesoKg(e.target.value)}
-            placeholder="kg por pieza"
-            className="h-7 w-24 rounded-ctl border border-border bg-background px-2 text-[12px] tabular-nums"
+            type="number" min={500} max={25000} step={50} inputMode="numeric"
+            value={pesoG} onChange={(e) => setPesoG(e.target.value)}
+            placeholder="gramos por pieza"
+            className="h-7 w-28 rounded-ctl border border-border bg-background px-2 text-[12px] tabular-nums"
           />
           {/* Las piezas, a la vista, ANTES de guardar: es el número contra el
               que va a medir el monitor toda la noche. */}
@@ -770,7 +778,7 @@ function EditorCuota({ actual, pesoConocido, onGuardar, conToneladas = true }: {
            de cero sin que nadie la escribiera. */
         disabled={guardando || (modo === 'toneladas' ? !convertida : !(Number(valor) > 0))}
         onClick={() => modo === 'toneladas'
-          ? guardar(convertida!.piezas, { toneladas: Number(toneladas), pesoPromedioKg: Number(pesoKg) })
+          ? guardar(convertida!.piezas, { toneladas: Number(toneladas), pesoPromedioKg: Number(pesoG) / 1000 })
           : guardar(Number(valor), null)}
         className="tap-44 rounded-ctl border border-border px-2 py-0.5 text-[11px] font-medium hover:bg-muted disabled:opacity-50"
       >
@@ -780,8 +788,8 @@ function EditorCuota({ actual, pesoConocido, onGuardar, conToneladas = true }: {
       {modo === 'toneladas' && !convertida && !guardando && (
         <span className="w-full text-[11px] text-muted-foreground">
           Para guardar en toneladas falta{!(Number(toneladas) > 0) ? ' cuántas toneladas' : ''}
-          {!(Number(toneladas) > 0) && !(Number(pesoKg) > 0) ? ' y' : ''}
-          {!(Number(pesoKg) > 0) ? ' el kg por pieza (peso promedio del calibre)' : ''}
+          {!(Number(toneladas) > 0) && !(Number(pesoG) > 0) ? ' y' : ''}
+          {!(Number(pesoG) > 0) ? ' los gramos por pieza (peso promedio del calibre)' : ''}
           {' '}— o cambiá a «piezas».
         </span>
       )}
@@ -5167,7 +5175,7 @@ export function PublicShiftMonitorPage() {
               <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[11px] text-muted-foreground">
                 <span>
                   {toneladas.tramos ? 'peso vigente' : 'estimado con peso prom.'}{' '}
-                  <span className="tabular-nums">{fmtDec(toneladas.pesoKg)} kg</span> por pieza
+                  <span className="tabular-nums">{fmtInt(toneladas.pesoKg * 1000)} g</span> por pieza
                 </span>
                 {onGuardarPeso && <EditorPeso actual={toneladas.pesoKg} onGuardar={onGuardarPeso} />}
               </div>
@@ -5180,7 +5188,7 @@ export function PublicShiftMonitorPage() {
                   {toneladas.tramos.map((tr, i) => (
                     <div key={tr.desdeWallMs}>
                       {i === 0 ? 'desde el arranque' : `desde las ${horaPlanta(tr.desdeWallMs)}`}
-                      {' · '}<span className="text-muted-foreground">{fmtDec(tr.pesoKg)} kg</span>
+                      {' · '}<span className="text-muted-foreground">{fmtInt(tr.pesoKg * 1000)} g</span>
                       {' → '}{fmtInt(tr.piezas)} pz ≈{' '}
                       <span className="text-foreground/80">{fmtDec(tr.toneladas)} t</span>
                     </div>

@@ -798,8 +798,22 @@ async function loadPlannedShift(db, plantSlug, shiftId, scheduledStart) {
      * del Grader, que no es en vivo. Con este peso el monitor puede estimar en
      * vivo cuántas toneladas van y cuántas darían al cierre.
      */
+    /*
+     * ⚠ El peso es DEL TURNO, no del nombre de turno (Orel, 29-08): la entry
+     * se reusa cada día y el peso del turno de ayer aparecía hoy como si
+     * alguien lo hubiera medido. El vigente sale del ÚLTIMO registro del
+     * historial DEL TURNO (filtrado abajo); el campo plano `pesoPromedioKg`
+     * solo vale como legacy si su `pesoPromedioAt` cae dentro del turno
+     * vigente (docs de antes del historial).
+     */
     const pesoRaw = Number(entry.pesoPromedioKg)
-    const pesoPromedioKg = Number.isFinite(pesoRaw) && pesoRaw > 0 ? pesoRaw : null
+    const pesoLegacyValido = (() => {
+      if (!(Number.isFinite(pesoRaw) && pesoRaw > 0)) return false
+      const at = new Date(entry.pesoPromedioAt ?? '')
+      if (Number.isNaN(at.getTime())) return false
+      const wall = shoplogixPolling.toChileWall(at)
+      return wall.getTime() >= scheduledStart.getTime() - 90 * 60_000
+    })()
     /*
      * El HISTORIAL del peso (Orel, 28-08): el calibre cambia durante el turno
      * y cada registro rige desde su hora. Acá se filtra al TURNO VIGENTE — la
@@ -832,7 +846,10 @@ async function loadPlannedShift(db, plantSlug, shiftId, scheduledStart) {
     return {
       plannedEnd: end,
       setPoint,
-      pesoPromedioKg,
+      /* El vigente: último registro DEL turno; legacy solo si cae dentro. */
+      pesoPromedioKg: pesoRegistros.length > 0
+        ? pesoRegistros[pesoRegistros.length - 1].pesoKg
+        : (pesoLegacyValido ? pesoRaw : null),
       pesoRegistros,
       quotaOrigen: origen,
       quotaPieces: enPiezas && Number.isFinite(quota) && quota > 0 ? quota : null,

@@ -11,7 +11,7 @@ describe('piezasDeToneladas', () => {
   it('70 t con pescado de 4,6 kg son ~15.200 piezas', () => {
     const r = piezasDeToneladas(70, 4.6)
     expect(r.piezas).toBe(15_217)
-    expect(r.detalle).toBe('70 t a 4,6 kg')
+    expect(r.detalle).toBe('70 t a 4.600 g')
   })
 
   it('el mismo pedido con pescado más chico son más piezas', () => {
