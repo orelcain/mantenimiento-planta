@@ -188,6 +188,28 @@ test('los buckets de OTRO turno y los Unscheduled no entran al acumulado', () =>
   assert.strictEqual(l.duro.cpm, 15)
 })
 
+test('la serie por minuto es una rejilla continua del turno, con huecos en 0', () => {
+  const data = { machines: [
+    { machineId: 'ev1', machineProduction: [
+      bkt('0828', 12),
+      // 08:29 falta en la respuesta: en la serie queda como 0 explícito.
+      bkt('0830', 10), bkt('0831', 15), bkt('0832', 3, { dur: 20000 }),
+    ] },
+    { machineId: 'ev2', machineProduction: [
+      bkt('0829', 15, { rate: 16 }), bkt('0830', 15, { rate: 16 }), bkt('0831', 13, { rate: 16 }),
+    ] },
+  ] }
+  const s = lecturaDesdeProduccion(data).duro.serieMinuto
+  assert.ok(s.desde.endsWith('T08:28:00.000Z'), 'arranca en el primer bucket del turno')
+  const ev1 = s.maquinas.find((m) => m.id === 'ev1')
+  const ev2 = s.maquinas.find((m) => m.id === 'ev2')
+  // 08:28..08:31 = 4 minutos; el parcial de 08:32 NO entra (cambia retroactivamente).
+  assert.deepStrictEqual(ev1.cycles, [12, 0, 10, 15])
+  assert.deepStrictEqual(ev2.cycles, [0, 15, 15, 13])
+  assert.strictEqual(ev1.esperado, 19)
+  assert.strictEqual(ev2.esperado, 16)
+})
+
 test('con el dato duro presente, componerPulso publica ESE número, no la ventana', () => {
   const duro = (cpm) => ({ cpm, porMaquina: [{ id: 'a', cpm }], esperadoCpm: 51, minuto: { desde: 'x', hasta: 'y' } })
   // La ventana diría 0 (acumulados planos); manda el bucket.

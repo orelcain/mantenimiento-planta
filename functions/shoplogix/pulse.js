@@ -41,6 +41,9 @@ const VENTANA_BUCKETS_HORAS = 12
 /** Un bucket de 1 min está CERRADO cuando cubrió (casi) todo su minuto. */
 const BUCKET_CERRADO_MS = 59_000
 
+/** Tope de la serie por minuto publicada (12 h = el turno más largo, entero). */
+const MAX_SERIE_MINUTOS = 720
+
 /**
  * Convierte la respuesta de `whiteboardproduction` (buckets de 1 minuto por
  * máquina) en una lectura del pulso.
@@ -105,6 +108,43 @@ function lecturaDesdeProduccion(data) {
     totalCycles += suyo
   }
 
+  /* La serie del turno minuto a minuto, por máquina — el gráfico de barras del
+     monitor la dibuja tal cual (opción A elegida por Orel, 29-08). Rejilla
+     CONTINUA desde el primer bucket del turno hasta el minuto común: los
+     índices son minutos y un hueco de Shoplogix queda como 0 explícito.
+     Solo buckets CERRADOS: el parcial cambia retroactivamente. */
+  const serieMinuto = (() => {
+    const comunMs = parseShoplogixTime(minutoComun).getTime()
+    let inicioMs = comunMs
+    const porId = new Map()
+    for (const f of filas) {
+      const mapa = new Map()
+      for (const b of f.buckets) {
+        if (turno != null && b.shift !== turno) continue
+        if (!cerrado(b)) continue
+        const ms = parseShoplogixTime(b.start).getTime()
+        if (ms > comunMs) continue
+        mapa.set(ms, b.cycles || 0)
+        if (ms < inicioMs) inicioMs = ms
+      }
+      porId.set(f.id, mapa)
+    }
+    const n = Math.min(MAX_SERIE_MINUTOS, Math.round((comunMs - inicioMs) / 60_000) + 1)
+    const desdeMs = comunMs - (n - 1) * 60_000
+    return {
+      desde: new Date(desdeMs).toISOString(),
+      maquinas: filas.map((f) => {
+        const mapa = porId.get(f.id)
+        const enComun = f.buckets.find((b) => b.start === minutoComun)
+        return {
+          id: f.id,
+          esperado: Number.isFinite(enComun?.rate) ? enComun.rate : null,
+          cycles: Array.from({ length: n }, (_, i) => mapa.get(desdeMs + i * 60_000) ?? 0),
+        }
+      }),
+    }
+  })()
+
   return {
     at: new Date().toISOString(),
     totalCycles,
@@ -116,6 +156,7 @@ function lecturaDesdeProduccion(data) {
       /* El minuto que se está mostrando, en la misma base wall-clock-as-UTC
          que `series[].t` (los buckets vuelven en el marco de la consulta). */
       minuto: { desde: shoplogixIso(minutoComun), hasta: shoplogixIso(minutoComun, 60_000) },
+      serieMinuto,
     },
   }
 }
@@ -292,6 +333,8 @@ function componerPulso(previo, lectura, maxCpm = MAX_CPM_PLAUSIBLE) {
        pantalla. `esperadoCpm` es el esperado oficial de Shoplogix sumado
        (Ev1 19 + Ev2/3 16 = 51 en Chonchi). */
     ...(duro ? { fuente: 'buckets-1min', minuto: duro.minuto, esperadoCpm: duro.esperadoCpm } : {}),
+    /* La serie del turno minuto a minuto (para las barras del monitor). */
+    ...(duro?.serieMinuto ? { serieMinuto: duro.serieMinuto } : {}),
     lecturas: limpias,
   }
 }
