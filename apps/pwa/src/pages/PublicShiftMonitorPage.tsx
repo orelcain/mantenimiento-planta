@@ -493,6 +493,38 @@ function EditorPeso({ actual, onGuardar }: {
   )
 }
 
+/**
+ * Cuenta atrás hasta la próxima lectura del pulso (pedido de Orel, 29-08:
+ * «que el usuario sepa que se actualiza en 1 min»).
+ *
+ * ── Por qué el anterior murió y este no ────────────────────────────────────
+ * Hubo un cronómetro así y se quitó: suponía un ciclo fijo y prometía «en
+ * 1:39» al lado de un «dato nuevo en 9s» — dos promesas exactas que no se
+ * cumplían. Este cuenta desde la ÚLTIMA lectura real (el scheduler corre
+ * cada minuto), siempre con «~», y si el dato se atrasa dice «llegando…»
+ * en vez de contar negativos. Una estimación humilde que se cumple casi
+ * siempre le gana a una promesa exacta que falla a veces.
+ */
+function CuentaAtrasPulso({ at }: { at: string | null | undefined }) {
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 1000)
+    return () => clearInterval(id)
+  }, [])
+  if (!at) return null
+  const target = Date.parse(at) + 65_000
+  if (Number.isNaN(target)) return null
+  const restante = Math.ceil((target - Date.now()) / 1000)
+  /* Muy atrasado (>2 min): la frescura vieja ya la anuncia otro elemento —
+     este contador se calla en vez de decir «llegando…» para siempre. */
+  if (restante < -55) return null
+  return (
+    <span className="tabular-nums text-muted-foreground/70">
+      {restante > 0 ? `· se refresca en ~${restante} s` : '· llegando…'}
+    </span>
+  )
+}
+
 /* ══ Los instrumentos de «Para llegar a la meta» (rediseño B, mockup 26-08) ══
    Las reglas de honestidad pasan de texto a GEOMETRÍA: lo que no se puede
    afirmar no se dibuja. En «Arrancando» faltan la marca del necesario y la
@@ -3254,6 +3286,7 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
                 )}
               </span>
               <span className="text-muted-foreground/80">el contador de la pantalla de planta</span>
+              <CuentaAtrasPulso at={pulso.at} />
               {/* El número de la media ya vive arriba, con rótulo. Acá queda
                   solo el VEREDICTO (que se juzga sobre esa media, no sobre el
                   pulso: el pulso salta demasiado para sentenciar). */}
@@ -3633,6 +3666,7 @@ function PulsoVivo({ pulse, token, cerrado, onPulso }: {
       <span className="tabular-nums text-muted-foreground/80">
         Leído de Shoplogix {hace}
       </span>
+      <CuentaAtrasPulso at={pulse.at} />
       <button
         type="button"
         onClick={pedir}
