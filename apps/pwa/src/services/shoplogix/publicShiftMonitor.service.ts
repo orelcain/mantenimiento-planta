@@ -295,8 +295,10 @@ export interface PulsoMonitor {
    * media de 15 min. Ausente cuando `cpm` viene con número.
    */
   vivoPrevio?: { cpm: number; at: string; porMaquina?: Array<{ id: string; cpm: number }> }
-  /** Las últimas lecturas, para dibujar el pulso reciente. */
-  lecturas?: Array<{ at: string; totalCycles: number }>
+  /** Las últimas lecturas, para dibujar el pulso reciente. `porMaquina` es el
+      ACUMULADO del turno por máquina en esa lectura (mismo corte que
+      `totalCycles`, minuto parcial incluido). */
+  lecturas?: Array<{ at: string; totalCycles: number; porMaquina?: Record<string, number> }>
   /** 'buckets-1min' cuando el ritmo es el dato duro de Shoplogix (piezas
       contadas del último minuto cerrado), no derivado del contador. */
   fuente?: string

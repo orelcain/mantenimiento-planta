@@ -38,8 +38,9 @@ import { buildHourlyRows, peakPieces } from '@/services/shoplogix/monitorHourly'
 import { computePaceToTarget, lineMaxPerHour, type PaceToTarget } from '@/services/shoplogix/monitorPace'
 import { ventanaDeActividad, desdePrimeraPieza, piezasAntesDelArranque } from '@/services/shoplogix/monitorActividad'
 import { refrescarPulso, type PulsoMonitor } from '@/services/shoplogix/publicShiftMonitor.service'
-import { elegirContador, pulsoVivo } from './monitor/contadorCrudo'
+import { aWallClockMs, elegirContador, pulsoVivo } from './monitor/contadorCrudo'
 import type { PulsoVivoElegido } from './monitor/contadorCrudo'
+import { media15DelDuro, piezasDelDuro, horaEnCursoDelDuro } from './monitor/datoDuro'
 import { construirCascada } from './monitor/cascadaTurno'
 import { horaPlanta } from './monitor/horaPlanta'
 import { CascadaTurnoCard } from './monitor/CascadaTurnoCard'
@@ -2466,12 +2467,24 @@ function RitmoNecesario({
  * así que sus piezas no se comparan de igual a igual con las de una hora
  * entera — el ritmo sí.
  */
-function PorHora({ series, paradas }: {
+function PorHora({ series, paradas, pulse }: {
   series: PublicMonitorLive['series']
   /** Todas las paradas del turno, para poder explicar la hora que se hundió. */
   paradas?: ParadaConHora[] | null
+  /** El pulso FRESCO (o null): recuenta la hora en curso con los buckets de
+      1 min — la fila parcial de 5 min llega hasta 8 min tarde. */
+  pulse?: PulsoMonitor | null
 }) {
-  const rows = useMemo(() => buildHourlyRows(series), [series])
+  const rows = useMemo(() => {
+    const base = buildHourlyRows(series)
+    const ult = base[base.length - 1]
+    if (!pulse || !ult?.partial) return base
+    const duro = horaEnCursoDelDuro(pulse, ult)
+    /* Nunca MENOS que lo ya sumado por los tramos: el duro solo cuenta
+       minutos cerrados. */
+    if (!duro || duro.pieces < ult.pieces) return base
+    return [...base.slice(0, -1), { ...ult, ...duro }]
+  }, [series, pulse])
   const max = useMemo(() => peakPieces(rows), [rows])
   /* La hora que se hundió y qué se la comió: el desplome estaba en el listado
      sin ninguna marca (h5 con 379 pz entre horas de ~2.100) y su causa vivía
@@ -5242,6 +5255,14 @@ export function PublicShiftMonitorPage() {
   const contador = elegirContador({ pulse: data.pulse, live, shiftClosed: live.shiftClosed })
   const outside = contador.fuente === 'pulso' ? contador.fueraDelHorario : (live.outsidePieces ?? 0)
 
+  /* Derivados del DATO DURO (buckets de 1 min) para los números vivos, SOLO
+     con el pulso fresco — el mismo criterio del número grande. Careo 29-08:
+     la media 15 de los tramos de 5 min decía 26,3 con la línea a 33,1 (el
+     tramo a medio formar la hunde SIEMPRE que la línea corre). Pedido de
+     Orel: «todo debe cuadrar con la data de piezas por minuto». */
+  const duro15 = contador.fuente === 'pulso' ? media15DelDuro(data.pulse) : null
+  const piezasDuro = contador.fuente === 'pulso' ? piezasDelDuro(data.pulse) : null
+
   /* La cascada del turno. Se mide contra los TRAMOS CERRADOS, no contra el
      contador vivo: los minutos de `timeBreakdown` salen de esa misma rejilla y
      mezclarlos haría que la suma no cierre. Declara su propio corte. */
@@ -5830,31 +5851,43 @@ export function PublicShiftMonitorPage() {
               /* El tramo en curso se cuenta por los minutos que LLEVA, no por
                  los 5 que va a durar: si no, el número de "ahora" queda siempre
                  por debajo del que muestra Shoplogix. */
-              ahora={ritmoAhoraAndando(serieDelTurno, ahoraWallMs)}
-              maquinas={conRepartoPorMaquina(
-                ritmoPorMaquina(live.machines, (live.windowHours ?? 0) * 60),
-                seriesMaquinas,
-                serieDelTurno,
-                ahoraWallMs,
-                live.timeBreakdown?.producingMin ?? null,
-                /* El pulso por máquina SOLO cuando el número grande es el
-                   pulso: la columna debe sumar exactamente lo de arriba. Los
-                   ids del desglose son los machineid de Shoplogix — se
-                   traducen a nombre con las máquinas del turno. Sale del VIVO
-                   elegido (fresco o arrastrado): la columna acompaña al
-                   número grande también durante la recalibración. */
-                (() => {
-                  const pm = contador.fuente === 'pulso' ? pulsoVivo(data.pulse)?.porMaquina : null
-                  if (!pm?.length) return null
-                  const nombrePorId = new Map(live.machines.map((m) => [m.id, m.name]))
-                  const out = new Map<string, number>()
-                  for (const x of pm) {
-                    const n = nombrePorId.get(x.id)
-                    if (n != null) out.set(n, x.cpm)
-                  }
-                  return out.size > 0 ? out : null
-                })(),
-              )}
+              ahora={duro15?.cpm ?? ritmoAhoraAndando(serieDelTurno, ahoraWallMs)}
+              maquinas={(() => {
+                const base = conRepartoPorMaquina(
+                  ritmoPorMaquina(live.machines, (live.windowHours ?? 0) * 60),
+                  seriesMaquinas,
+                  serieDelTurno,
+                  ahoraWallMs,
+                  live.timeBreakdown?.producingMin ?? null,
+                  /* El pulso por máquina SOLO cuando el número grande es el
+                     pulso: la columna debe sumar exactamente lo de arriba. Los
+                     ids del desglose son los machineid de Shoplogix — se
+                     traducen a nombre con las máquinas del turno. Sale del VIVO
+                     elegido (fresco o arrastrado): la columna acompaña al
+                     número grande también durante la recalibración. */
+                  (() => {
+                    const pm = contador.fuente === 'pulso' ? pulsoVivo(data.pulse)?.porMaquina : null
+                    if (!pm?.length) return null
+                    const nombrePorId = new Map(live.machines.map((m) => [m.id, m.name]))
+                    const out = new Map<string, number>()
+                    for (const x of pm) {
+                      const n = nombrePorId.get(x.id)
+                      if (n != null) out.set(n, x.cpm)
+                    }
+                    return out.size > 0 ? out : null
+                  })(),
+                )
+                /* La columna «media 15 min» por máquina, del dato duro: la
+                   misma ventana y vara que el número de arriba, así SUMAN. */
+                if (!base || !duro15) return base
+                const nombrePorId = new Map(live.machines.map((m) => [m.id, m.name]))
+                const porNombre = new Map(duro15.porMaquina.map((x) => [nombrePorId.get(x.id) ?? x.id, x.cpm]))
+                return {
+                  ...base,
+                  maquinas: base.maquinas.map((m) =>
+                    porNombre.has(m.nombre) ? { ...m, ahoraCpm: porNombre.get(m.nombre)! } : m),
+                }
+              })()}
               serieLinea={serieDelTurno}
               seriesMaquinas={seriesMaquinas}
               /* Las barras minuto a minuto: SOLO cuando el número grande es el
@@ -5889,12 +5922,13 @@ export function PublicShiftMonitorPage() {
                   }) === 'planificado',
                 }
                 : null}
-              ahoraReloj={ritmoAhoraCpm(serieDelTurno, ahoraWallMs)}
+              ahoraReloj={duro15?.cpmReloj ?? ritmoAhoraCpm(serieDelTurno, ahoraWallMs)}
               /* Fin del último tramo: la serie viene en hora de planta, igual
-                 que el resto de la pantalla. */
-              corteMs={serieDelTurno.length
+                 que el resto de la pantalla. Con el dato duro, el corte es el
+                 último MINUTO cerrado. */
+              corteMs={duro15?.hastaWallMs ?? (serieDelTurno.length
                 ? Date.parse(serieDelTurno[serieDelTurno.length - 1]!.t) + 5 * 60_000
-                : null}
+                : null)}
               ahoraWallMs={ahoraWallMs}
               /* ⚠ El pulso SOLO si el contador vivo está respondiendo. Con el
                  contador caído, `totalCycles` viene 0 y `cpm` viene 0 —no
@@ -6290,7 +6324,11 @@ export function PublicShiftMonitorPage() {
           turno={turnoPareto ?? vista?.shiftId ?? null} onTurno={setTurnoPareto}
         />
 
-        <PorHora series={serieDelTurno} paradas={paradasDelTurno} />
+        <PorHora
+          series={serieDelTurno}
+          paradas={paradasDelTurno}
+          pulse={contador.fuente === 'pulso' ? data.pulse : null}
+        />
 
         {/* Desglose por máquina — solo aporta cuando la línea tiene más de una */}
         {live.machines.length > 1 && (
@@ -6326,10 +6364,29 @@ export function PublicShiftMonitorPage() {
                       </span>
                     )}
                   </span>
-                  <span className="tabular-nums text-foreground/80">{fmtInt(m.pieces)} pz</span>
-                  <span className="w-20 text-right tabular-nums text-[11px] text-muted-foreground/80">
-                    {fmtInt(m.piecesPerHour)} pz/h
-                  </span>
+                  {/* Piezas al corte del PULSO cuando está fresco: sin esto,
+                      la lista sumaba 4.392 con el héroe en 4.569 (dos cortes
+                      a dos tarjetas — careo 29-08). El pz/h se recalcula con
+                      la MISMA ventana fresca para no mezclar cortes. */}
+                  {(() => {
+                    const piezas = piezasDuro?.piezas.get(m.id) ?? m.pieces
+                    const horas = (() => {
+                      if (!piezasDuro || !live.effectiveStart) return null
+                      const corte = aWallClockMs(piezasDuro.at)
+                      const ini = Date.parse(live.effectiveStart)
+                      const h = corte != null && Number.isFinite(ini) ? (corte - ini) / 3_600_000 : null
+                      return h != null && h > 0.2 ? h : null
+                    })()
+                    const pzh = horas != null ? piezas / horas : m.piecesPerHour
+                    return (
+                      <>
+                        <span className="tabular-nums text-foreground/80">{fmtInt(piezas)} pz</span>
+                        <span className="w-20 text-right tabular-nums text-[11px] text-muted-foreground/80">
+                          {fmtInt(pzh)} pz/h
+                        </span>
+                      </>
+                    )
+                  })()}
                 </li>
               ))}
             </ul>
