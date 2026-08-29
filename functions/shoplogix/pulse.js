@@ -64,10 +64,22 @@ async function leerPulso({ query, plantSlug, at = ahoraEnPlanta(), toShoplogixTi
       if (m.machineid === 'Total') continue
       porMaquina[m.machineid] = uptime(m)
     }
+    /*
+     * El RITMO como dato duro de Shoplogix, si lo manda: `currentSpeed` y
+     * `expectedRate` viven en la raíz del rollup (radiografía 29-08; con la
+     * línea parada valen 0 — la unidad con producción está POR CONFIRMAR).
+     * Se capturan en paralelo SIN tocar el cpm derivado: un turno de
+     * comparación decide si el crudo pasa a ser EL número («técnicamente
+     * tenemos que sacar el dato duro de Shoplogix y ya» — Orel, 29-08).
+     */
+    const speedCruda = Number(data?.currentSpeed)
+    const rateEsperada = Number(data?.expectedRate)
     return {
       at: new Date().toISOString(),
       totalCycles,
       ...(Object.keys(porMaquina).length > 0 ? { porMaquina } : {}),
+      ...(Number.isFinite(speedCruda) ? { speedCruda } : {}),
+      ...(Number.isFinite(rateEsperada) ? { rateEsperada } : {}),
       diag: totalCycles === 0 ? radiografia(data) : null,
     }
   } catch (err) {
@@ -174,6 +186,11 @@ function componerPulso(previo, lectura, maxCpm = MAX_CPM_PLAUSIBLE) {
     totalCycles: lectura.totalCycles,
     cpm,
     ...(porMaquina ? { porMaquina } : {}),
+    /* El ritmo CRUDO de Shoplogix, en paralelo para validarlo (unidad por
+       confirmar con la línea andando). No es todavía el número que se
+       muestra. */
+    ...(lectura.speedCruda != null ? { speedCruda: lectura.speedCruda } : {}),
+    ...(lectura.rateEsperada != null ? { rateEsperada: lectura.rateEsperada } : {}),
     lecturas: limpias,
   }
 }
