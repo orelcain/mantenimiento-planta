@@ -227,6 +227,27 @@ test('un 0 del dato duro es un 0 DE VERDAD y se publica', () => {
   assert.strictEqual(p.cpm, 0)
 })
 
+test('una serie SIN una sola pieza no se publica (turno cerrado)', () => {
+  // Caso REAL del cierre del 29-08: Shoplogix devuelve una ventana ajena con
+  // todo en cero y PISABA la serie buena del turno.
+  const data = { machines: [
+    { machineId: 'ev1', machineProduction: [bkt('0500', 0), bkt('0501', 0), bkt('0502', 0)] },
+  ] }
+  const l = lecturaDesdeProduccion(data)
+  assert.strictEqual(l.duro.serieMinuto, null, 'sin piezas, no hay serie')
+  assert.strictEqual(l.duro.cpm, 0, 'el ritmo 0 sí es un dato')
+})
+
+test('sin serie nueva se CONSERVA la del turno (no la pisa una vacía)', () => {
+  const duro = (cpm, serie) => ({ cpm, porMaquina: [{ id: 'a', cpm }], esperadoCpm: 51, minuto: { desde: 'x', hasta: 'y' }, serieMinuto: serie })
+  const serieBuena = { desde: '2026-08-29T07:15:00.000Z', maquinas: [{ id: 'a', esperado: 19, cycles: [15, 16] }] }
+  let p = componerPulso(null, { ...lect(0, 100), duro: duro(15, serieBuena) }, 56)
+  assert.strictEqual(p.serieMinuto, serieBuena)
+  // Lectura del turno cerrado: sin serie. La buena sobrevive.
+  p = componerPulso(p, { ...lect(1, 0), duro: duro(0, null) }, 56)
+  assert.strictEqual(p.serieMinuto, serieBuena, 'la serie del turno no se pierde')
+})
+
 test('sin machineProduction no hay lectura (y no revienta)', () => {
   assert.strictEqual(lecturaDesdeProduccion({ machines: [{ machineId: 'ev1' }] }), null)
   assert.strictEqual(lecturaDesdeProduccion(null), null)
