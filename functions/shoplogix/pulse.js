@@ -131,18 +131,27 @@ function lecturaDesdeProduccion(data) {
     }
     const n = Math.min(MAX_SERIE_MINUTOS, Math.round((comunMs - inicioMs) / 60_000) + 1)
     const desdeMs = comunMs - (n - 1) * 60_000
-    return {
-      desde: new Date(desdeMs).toISOString(),
-      maquinas: filas.map((f) => {
-        const mapa = porId.get(f.id)
-        const enComun = f.buckets.find((b) => b.start === minutoComun)
-        return {
-          id: f.id,
-          esperado: Number.isFinite(enComun?.rate) ? enComun.rate : null,
-          cycles: Array.from({ length: n }, (_, i) => mapa.get(desdeMs + i * 60_000) ?? 0),
-        }
-      }),
-    }
+    const maquinas = filas.map((f) => {
+      const mapa = porId.get(f.id)
+      const enComun = f.buckets.find((b) => b.start === minutoComun)
+      return {
+        id: f.id,
+        esperado: Number.isFinite(enComun?.rate) ? enComun.rate : null,
+        cycles: Array.from({ length: n }, (_, i) => mapa.get(desdeMs + i * 60_000) ?? 0),
+      }
+    })
+    /*
+     * Una serie SIN una sola pieza no se publica.
+     *
+     * Medido al cerrar el turno del 29-08: Shoplogix deja de reportar el turno
+     * que terminó y devuelve una ventana ajena (605 min desde las 05:00) con
+     * TODO en cero. Publicarla PISABA la serie buena del turno — el monitor
+     * perdía su gráfico minuto a minuto justo cuando la pantalla pasa a ser el
+     * informe. Sin serie nueva, `componerPulso` conserva la anterior y la
+     * pantalla decide si corresponde al turno que se mira.
+     */
+    if (!maquinas.some((m) => m.cycles.some((v) => v > 0))) return null
+    return { desde: new Date(desdeMs).toISOString(), maquinas }
   })()
 
   return {
@@ -333,8 +342,12 @@ function componerPulso(previo, lectura, maxCpm = MAX_CPM_PLAUSIBLE) {
        pantalla. `esperadoCpm` es el esperado oficial de Shoplogix sumado
        (Ev1 19 + Ev2/3 16 = 51 en Chonchi). */
     ...(duro ? { fuente: 'buckets-1min', minuto: duro.minuto, esperadoCpm: duro.esperadoCpm } : {}),
-    /* La serie del turno minuto a minuto (para las barras del monitor). */
-    ...(duro?.serieMinuto ? { serieMinuto: duro.serieMinuto } : {}),
+    /* La serie del turno minuto a minuto (para las barras del monitor). Si la
+       lectura no trae una (todo en cero: turno cerrado, ventana ajena), se
+       CONSERVA la anterior — la pantalla decide si es del turno que mira. */
+    ...(duro?.serieMinuto
+      ? { serieMinuto: duro.serieMinuto }
+      : previo?.serieMinuto ? { serieMinuto: previo.serieMinuto } : {}),
     lecturas: limpias,
   }
 }

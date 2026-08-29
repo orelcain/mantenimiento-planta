@@ -6144,21 +6144,46 @@ export function PublicShiftMonitorPage() {
               })()}
               serieLinea={serieDelTurno}
               seriesMaquinas={seriesMaquinas}
-              /* Las barras minuto a minuto: SOLO cuando el número grande es el
-                 pulso (mismo criterio que el resto del bloque vivo) y el doc
-                 trae la serie. En turnos pasados o con el contador caído se
-                 vuelve a las curvas de 5 min. */
+              /*
+               * Las barras minuto a minuto salen cuando la serie ES DEL TURNO
+               * QUE SE MIRA — se comprueba por TIEMPO, no por la frescura del
+               * contador.
+               *
+               * OJO: antes el gate era `contador.fuente === 'pulso'`, y al cerrar
+               * el turno (contador vivo en 0) las barras desaparecían justo
+               * cuando la pantalla pasa a ser el informe (Orel, 29-08). La
+               * frescura del contador no dice nada sobre si la serie describe
+               * este turno; la ventana sí.
+               *
+               * La serie se RECORTA a la ventana del turno: el pulso arranca
+               * la suya en el primer bucket que Shoplogix devuelve, que puede
+               * traer minutos anteriores al turno.
+               */
               barras={(() => {
-                const s = contador.fuente === 'pulso' ? data.pulse?.serieMinuto : null
+                const s = data.pulse?.serieMinuto
                 if (!s?.maquinas?.length) return null
+                const t0 = Date.parse(s.desde)
+                const largo = Math.min(...s.maquinas.map((m) => m.cycles.length))
+                if (!Number.isFinite(t0) || !(largo > 1)) return null
+                /* Ventana del turno VISTO, en la misma base wall-as-UTC. */
+                const ini = Date.parse(live.effectiveStart ?? live.scheduledStart ?? '')
+                if (!Number.isFinite(ini)) return null
+                const finSched = Date.parse(live.plannedEnd ?? live.scheduledEnd ?? '')
+                const fin = Number.isFinite(finSched) ? finSched + 30 * 60_000 : t0 + largo * 60_000
+                /* Sin solape real, la serie es de otro turno: a las curvas. */
+                const desdeIdx = Math.max(0, Math.round((ini - t0) / 60_000))
+                const hastaIdx = Math.min(largo, Math.round((fin - t0) / 60_000))
+                if (!(hastaIdx - desdeIdx > 1)) return null
                 const nombrePorId = new Map(live.machines.map((m) => [m.id, m.name]))
-                return {
-                  desde: s.desde,
-                  maquinas: s.maquinas.map((m) => ({
-                    ...m,
-                    nombre: nombrePorId.get(m.id) ?? m.id,
-                  })),
-                }
+                const maquinas = s.maquinas.map((m) => ({
+                  ...m,
+                  nombre: nombrePorId.get(m.id) ?? m.id,
+                  cycles: m.cycles.slice(desdeIdx, hastaIdx),
+                }))
+                /* Una serie sin una sola pieza dentro del turno no dibuja nada
+                   útil (y no es de este turno): a las curvas. */
+                if (!maquinas.some((m) => m.cycles.some((v) => v > 0))) return null
+                return { desde: new Date(t0 + desdeIdx * 60_000).toISOString(), maquinas }
               })()}
               /* Parada = ninguna máquina produciendo. El pulso lo confirma:
                  con la línea en colación marca 0,0 mientras el número grande
