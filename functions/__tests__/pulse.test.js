@@ -149,3 +149,22 @@ test('pulse: lecturas viejas sin desglose no publican reparto, pero el de línea
   assert.equal(p.cpm, 12)
   assert.equal(p.porMaquina ?? null, null)
 })
+
+// ── Techo físico por planta (bug del 29-08: «60-69 pz/min» en pantalla) ──────
+
+test('pulse: un ritmo sobre el techo FÍSICO de la planta no se publica', () => {
+  // Chonchi da 51 nominal: 65 pz/min no es un ritmo, es el contador
+  // reconciliando piezas de golpe. Con el genérico de 120 pasaba el corte.
+  const { PLANT_MAX_CPM } = require('../shoplogix/pulse')
+  let p = componerPulso(null, lec(0, 1000), PLANT_MAX_CPM.chonchi)
+  p = componerPulso(p, lec(2, 1130), PLANT_MAX_CPM.chonchi)   // 130 pz en 2 min = 65
+  assert.equal(p.cpm, null)
+  assert.equal(p.porMaquina ?? null, null)
+})
+
+test('pulse: un ritmo alto pero físicamente posible SÍ se publica', () => {
+  const { PLANT_MAX_CPM } = require('../shoplogix/pulse')
+  let p = componerPulso(null, lec(0, 1000), PLANT_MAX_CPM.chonchi)
+  p = componerPulso(p, lec(2, 1090), PLANT_MAX_CPM.chonchi)   // 45 pz/min: fuerte, real
+  assert.equal(p.cpm, 45)
+})
