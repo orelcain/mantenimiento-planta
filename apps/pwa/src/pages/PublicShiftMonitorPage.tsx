@@ -74,6 +74,7 @@ import { useZoomGesto, type Ventana } from './monitor/useZoomGesto'
 import { TiempoDelTurno, ComparadorDias, Bloque, PronosticoCierre } from './monitor/MonitorShiftParts'
 import { notasPorCausa, notasDelTurno } from './monitor/notasOperador'
 import { VsAyerBloque } from './monitor/MonitorVsAyer'
+import { RepartoDuenoSemanal } from './monitor/RepartoDuenoSemanal'
 import { Pill } from '@/components/piel'
 import { useIsAdmin } from '@/store'
 import { useAuthStore } from '@/store/authStore'
@@ -6320,6 +6321,10 @@ export function PublicShiftMonitorPage() {
           ventana={ventanaPareto} onVentana={setVentanaPareto}
           turno={turnoPareto ?? vista?.shiftId ?? null} onTurno={setTurnoPareto}
         />
+
+        {/* De quién fue la pérdida: el reparto SEMANAL por dueño — la
+            evidencia acumulada del aporte de Mantención (meta grande). */}
+        <RepartoDuenoSemanal stats={data.shiftStats} />
 
         <PorHora
           series={serieDelTurno}
