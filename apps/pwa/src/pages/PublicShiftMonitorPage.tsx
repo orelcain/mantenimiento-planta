@@ -3784,7 +3784,9 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
             )}
           </div>
           <p className="mt-1 text-caption text-muted-foreground/80">
-            {cerrado ? 'Fin de turno. ' : parada?.desdeHace ? `Sin producir hace ${parada.desdeHace}. ` : ''}
+            {/* `desdeHace` YA viene con el «hace» adentro (`fmtAgoWall`): el
+                template lo repetía — «Sin producir hace hace 38 min». */}
+            {cerrado ? 'Fin de turno. ' : parada?.desdeHace ? `Sin producir ${parada.desdeHace}. ` : ''}
             {ahora != null && ahora > 0 && (
               <>Venía a <span className="tabular-nums text-foreground/80">{fmtDec(ahora)}</span> pz/min
               los últimos 15 min corriendo.</>
