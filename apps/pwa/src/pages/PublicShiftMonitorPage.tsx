@@ -3112,7 +3112,200 @@ function CurvasMaquinas({ serie, maquinas, ahoraPorNombre, ahoraAt }: {
   )
 }
 
-function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrado, onEditarSetPoint, cerrado, contexto, chispa, corteMs, ahoraWallMs, pulso, vivo, maquinas, parada, serieLinea, seriesMaquinas }: {
+/**
+ * Las barras minuto a minuto (opción A, Orel 29-08): la serie del turno que
+ * publica el pulso, con el nombre de cada máquina ya resuelto.
+ */
+interface BarrasMinutoDatos {
+  desde: string
+  maquinas: Array<{ id: string; nombre: string; esperado: number | null; cycles: number[] }>
+}
+
+/** Ancho mínimo de barra para que el número de dos cifras quepa sin pisarse. */
+const PX_MIN_NUMERO = 16
+
+/**
+ * Barras de 1 minuto con el número adentro — el ESPEJO del cronómetro de
+ * Shoplogix («que el ahora muestre el dato que la barra muestra en Shoplogix
+ * para cada Baader», Orel 29-08). Una franja por máquina y arriba la de la
+ * línea (la suma). Color por % del esperado, los mismos cortes que usa
+ * Shoplogix en sus barras: ≥75% ok, 50–75% atención, <50% crítico.
+ *
+ * La ventana por defecto son los últimos 40 min SIGUIENDO la cola del turno;
+ * en cuanto la persona zoomea o panea, la vista es suya y no se le mueve.
+ * Alejando todo el turno, los números no caben y se esconden (quedan las
+ * barras y el `title` de cada una).
+ */
+function BarrasMinuto({ datos, cerrado }: { datos: BarrasMinutoDatos; cerrado?: boolean }) {
+  const n = Math.min(...datos.maquinas.map((m) => m.cycles.length))
+  const [tocado, setTocado] = useState(false)
+  const [ventana, setVentana] = useState<Ventana | null>(null)
+  /* El ancho visible se mide en el PADRE del contenedor con scroll (mismo
+     ancho): el ref del scroll es del hook. Decide si los números caben y
+     cuántos minutos entran en la ventana por defecto. */
+  const medidorRef = useRef<HTMLDivElement>(null)
+  const [anchoPx, setAnchoPx] = useState(0)
+  useEffect(() => {
+    const el = medidorRef.current
+    if (!el) return
+    const ro = new ResizeObserver(() => setAnchoPx(el.clientWidth))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  /* Ventana por defecto ADAPTADA al ancho: los minutos que caben con número
+     legible (a 375 px son ~23, en desktop ~60). Sigue la cola del turno hasta
+     que la persona zoomea o panea; ahí la vista es suya. */
+  const ventanaDef = anchoPx > 0
+    ? Math.max(20, Math.min(60, Math.floor(anchoPx / PX_MIN_NUMERO)))
+    : null
+  useEffect(() => {
+    if (tocado || ventanaDef == null) return
+    setVentana(n > ventanaDef ? { desdeMin: n - ventanaDef, hastaMin: n } : null)
+  }, [n, tocado, ventanaDef])
+  const zg = useZoomGesto({
+    dominioMin: Math.max(1, n),
+    ventana,
+    /* El scroll programado también publica ventana: solo cuenta como gesto de
+       la persona cuando la vista DEJÓ la cola — ahí la vista es suya. */
+    onVentana: (v) => {
+      const esCola = v != null && v.hastaMin >= n - 2
+        && ventanaDef != null && Math.abs((v.hastaMin - v.desdeMin) - ventanaDef) <= 2
+      if (!esCola) setTocado(true)
+      setVentana(v)
+    },
+  })
+  /* Mientras nadie tomó el control, el scroll queda CLAVADO a la cola (el
+     presente). La adopción del hook posiciona por rAF y a veces llega antes
+     de que el contenido tenga su ancho nuevo — este ancla es determinista. */
+  const scrollRef = zg.props.ref
+  useEffect(() => {
+    if (tocado) return
+    const el = scrollRef.current
+    if (el) el.scrollLeft = el.scrollWidth
+  })
+  if (n < 2) return null
+
+  const t0 = Date.parse(datos.desde)
+  const suma = Array.from({ length: n }, (_, i) =>
+    datos.maquinas.reduce((a, m) => a + (m.cycles[i] ?? 0), 0))
+  const esperadoLinea = datos.maquinas.every((m) => m.esperado != null && m.esperado > 0)
+    ? datos.maquinas.reduce((a, m) => a + m.esperado!, 0)
+    : null
+  const pxBarra = anchoPx > 0 ? (anchoPx * zg.zoom) / n : 0
+  const conNumeros = pxBarra >= PX_MIN_NUMERO
+
+  /* Marcas de hora cada N minutos, con N elegido para que no se pisen. */
+  const cadaMin = pxBarra > 0 ? Math.max(5, Math.ceil(48 / pxBarra / 5) * 5) : 60
+  const marcas: number[] = []
+  for (let i = 0; i < n; i++) {
+    if ((t0 + i * 60_000) % (cadaMin * 60_000) === 0 && i > 0 && i < n - 2) marcas.push(i)
+  }
+
+  const claseDe = (v: number, esperado: number | null) => {
+    if (esperado == null || esperado <= 0) return 'border-muted-foreground/50 bg-muted text-muted-foreground'
+    const r = v / esperado
+    if (r >= 0.75) return 'border-ink-ok bg-ink-ok/[0.15] text-ink-ok'
+    if (r >= 0.5) return 'border-ink-warn bg-ink-warn/[0.15] text-ink-warn'
+    return 'border-ink-crit bg-ink-crit/[0.15] text-ink-crit'
+  }
+
+  const franja = (nombre: string, esperado: number | null, vals: number[], altoPx: number) => {
+    const tope = Math.max(esperado ?? 0, ...vals.slice(0, n), 1)
+    return (
+      <div key={nombre} className="mt-1.5">
+        {/* Pegado al borde izquierdo VISIBLE (sticky): el contenido está
+            ensanchado por el zoom y un header normal se va con el paneo. */}
+        <div
+          className="sticky left-0 z-10 w-fit rounded-full px-1 text-caption text-muted-foreground"
+          style={{ background: 'rgb(var(--card) / 0.85)' }}
+        >
+          <b className="font-semibold text-foreground/80">{nombre}</b>
+          {esperado != null && <span className="text-muted-foreground/80"> · esperado {fmtDec(esperado, 0)} pz/min</span>}
+        </div>
+        <div className="mt-0.5 flex items-stretch gap-[1px]" style={{ height: altoPx }}>
+          {vals.slice(0, n).map((v, i) => (
+            <div
+              key={i}
+              className="relative flex min-w-0 flex-1 flex-col justify-end"
+              title={`${horaPlanta(t0 + i * 60_000)} · ${nombre}: ${v}${esperado != null ? ` / ${esperado}` : ''} pz`}
+            >
+              <div
+                className={`w-full rounded-t-[3px] border ${claseDe(v, esperado)}`}
+                style={{ height: `${Math.max(v > 0 ? 8 : 2, (v / tope) * 100)}%` }}
+              />
+              {conNumeros && v > 0 && (
+                <b className={`pointer-events-none absolute inset-x-0 bottom-0 text-center text-[10px] font-semibold tabular-nums ${claseDe(v, esperado).split(' ').pop()}`}>
+                  {v}
+                </b>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div ref={medidorRef} className="mt-3 border-t border-border/50 pt-2.5">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5 text-caption text-muted-foreground">
+        <span>
+          Velocidad minuto a minuto
+          <span className="text-muted-foreground/70"> · piezas contadas por Shoplogix</span>
+        </span>
+        <span className="text-muted-foreground/70">
+          {cerrado ? 'turno cerrado' : `hasta las ${horaPlanta(t0 + n * 60_000)}`}
+        </span>
+      </div>
+      <div {...zg.props} className="relative mt-1 -mx-1 overflow-x-auto px-1">
+        <div className="relative" style={{ width: `${zg.zoom * 100}%` }}>
+          {/* Guías verticales de las horas, atrás de todas las franjas. */}
+          {marcas.map((i) => (
+            <span
+              key={`g${i}`}
+              className="pointer-events-none absolute inset-y-0 w-px bg-foreground/10"
+              style={{ left: `${((i + 0.5) / n) * 100}%` }}
+            />
+          ))}
+          {franja(
+            datos.maquinas.length > 1 ? 'Línea (las ' + datos.maquinas.length + ' suman)' : 'Línea',
+            esperadoLinea, suma, 64,
+          )}
+          {datos.maquinas.length > 1 && datos.maquinas.map((m) =>
+            franja(nombreCorto(m.nombre), m.esperado, m.cycles, 48))}
+          <div className="relative mt-0.5 h-4 text-[10px] tabular-nums text-muted-foreground/80">
+            {/* Los extremos van pegados a los bordes VISIBLES (sticky), no a
+                los del contenido ensanchado; las marcas del medio, por índice.
+                Cerca de un extremo la marca se omite para no montarse. */}
+            {marcas
+              .filter((i) => {
+                const x = ((i + 0.5) / n) * 100
+                return x > 6 && x < 94
+              })
+              .map((i) => (
+                <span key={`m${i}`} className="absolute -translate-x-1/2" style={{ left: `${((i + 0.5) / n) * 100}%` }}>
+                  {horaPlanta(t0 + i * 60_000)}
+                </span>
+              ))}
+          </div>
+        </div>
+      </div>
+      <div className="mt-0.5 flex items-center justify-between gap-2 text-[10px] text-muted-foreground/70">
+        <span>
+          cada barra es un minuto — verde ≥75% del esperado, ámbar 50–75%, rojo &lt;50%
+        </span>
+        {zg.acercado ? (
+          <button type="button" onClick={zg.verTodo} className="tap-44 underline decoration-dotted underline-offset-2">
+            ver todo el turno
+          </button>
+        ) : (
+          <span className="shrink-0">pellizcá o rodá (ctrl+rueda) para acercar</span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrado, onEditarSetPoint, cerrado, contexto, chispa, corteMs, ahoraWallMs, pulso, vivo, maquinas, parada, serieLinea, seriesMaquinas, barras }: {
   /**
    * Ritmo de ahora ANDANDO, en pz/min: los últimos 15 min descontando los
    * tramos parados. Va en esta base y no en la de reloj porque es contra lo
@@ -3190,6 +3383,9 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
   /** Piezas por bucket de cada máquina, alineadas a `serieLinea`. Solo llega
       cuando el doc ya trae el desglose (docs nuevos). */
   seriesMaquinas?: { nombre: string; serie: number[]; targetCpm?: number | null }[] | null
+  /** La serie minuto a minuto del pulso (dato duro). Con esto presente, las
+      barras reemplazan a las curvas de 5 min. */
+  barras?: BarrasMinutoDatos | null
 }) {
   /*
    * ⚠ El estado se juzga contra el OBJETIVO cuando se conoce, no contra la
@@ -3529,10 +3725,14 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
         )
       })()}
 
+      {/* Las barras minuto a minuto (dato duro de Shoplogix) cuando el pulso
+          publica la serie; si no, las curvas de 5 min de siempre (turnos
+          pasados y docs sin la serie). */}
+      {barras && <BarrasMinuto datos={barras} cerrado={cerrado} />}
       {/* Las curvas de velocidad de cada máquina, como en el detalle de turno
           (pedido de Orel, 26-08): acá se ve QUIÉN bajó la línea y cuándo, no
           solo cuánto. Solo con docs nuevos (los viejos no traen el desglose). */}
-      {serieLinea && serieLinea.length > 1 && seriesMaquinas && seriesMaquinas.length > 1 && (
+      {!barras && serieLinea && serieLinea.length > 1 && seriesMaquinas && seriesMaquinas.length > 1 && (
         <CurvasMaquinas
           serie={serieLinea}
           maquinas={seriesMaquinas}
@@ -5638,6 +5838,22 @@ export function PublicShiftMonitorPage() {
               )}
               serieLinea={serieDelTurno}
               seriesMaquinas={seriesMaquinas}
+              /* Las barras minuto a minuto: SOLO cuando el número grande es el
+                 pulso (mismo criterio que el resto del bloque vivo) y el doc
+                 trae la serie. En turnos pasados o con el contador caído se
+                 vuelve a las curvas de 5 min. */
+              barras={(() => {
+                const s = contador.fuente === 'pulso' ? data.pulse?.serieMinuto : null
+                if (!s?.maquinas?.length) return null
+                const nombrePorId = new Map(live.machines.map((m) => [m.id, m.name]))
+                return {
+                  desde: s.desde,
+                  maquinas: s.maquinas.map((m) => ({
+                    ...m,
+                    nombre: nombrePorId.get(m.id) ?? m.id,
+                  })),
+                }
+              })()}
               /* Parada = ninguna máquina produciendo. El pulso lo confirma:
                  con la línea en colación marca 0,0 mientras el número grande
                  mostraba el ritmo de antes de parar. También con el turno
