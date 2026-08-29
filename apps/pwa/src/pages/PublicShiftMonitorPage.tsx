@@ -3278,10 +3278,12 @@ function BarrasMinuto({ datos, cerrado }: { datos: BarrasMinutoDatos; cerrado?: 
             />
           ))}
           {/* La SUMA enmarcada con fondo propio (pedido de Orel, 29-08): la
-              elevación por tono la separa de las máquinas — sin línea de
-              borde (§38). Sin padding horizontal: las columnas de minuto
-              deben quedar ALINEADAS con las franjas de abajo. */}
-          <div className="rounded-[10px] bg-muted pb-1.5 pt-1">
+              banda usa el FONDO DE PÁGINA — se ve "hundida" en la tarjeta,
+              más oscura que ella en tema oscuro y más clara en claro (ajuste
+              de contraste pedido por Orel). Sin línea de borde (§38) y sin
+              padding horizontal: las columnas de minuto deben quedar
+              ALINEADAS con las franjas de abajo. */}
+          <div className="rounded-[10px] bg-background pb-1.5 pt-1">
             {franja(
               datos.maquinas.length > 1 ? 'Línea (las ' + datos.maquinas.length + ' suman)' : 'Línea',
               esperadoLinea, suma, 88, true,
