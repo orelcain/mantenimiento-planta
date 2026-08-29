@@ -6364,7 +6364,7 @@ exports.shoplogixPulseWakeup = onSchedule(
       ? (opts) => queryShoplogixBearer({ accessToken: auth.accessToken, ...opts })
       : (opts) => queryShoplogix({ cookie: auth.cookie, ...opts })
 
-    const { leerPulso, componerPulso } = require('./shoplogix/pulse')
+    const { leerPulso, componerPulso, PLANT_MAX_CPM } = require('./shoplogix/pulse')
     const { toShoplogixTime } = require('./shoplogix/time')
 
     /* Una lectura por PLANTA aunque haya varios monitores de la misma línea. */
@@ -6391,7 +6391,10 @@ exports.shoplogixPulseWakeup = onSchedule(
       let pulsoPrimero = null
       if (lectura) {
         await Promise.all(docs.map(async (d, i) => {
-          const pulso = componerPulso(d.data().pulse ?? null, lectura)
+          /* El techo de plausibilidad es el FÍSICO de la planta, no el
+             absurdo genérico: un «65 pz/min» pasaba el corte de 120 y
+             Producción lo vio en pantalla (29-08). */
+          const pulso = componerPulso(d.data().pulse ?? null, lectura, PLANT_MAX_CPM[plantSlug] ?? undefined)
           if (i === 0) pulsoPrimero = pulso
           await d.ref.update({ pulse: pulso })
         }))
