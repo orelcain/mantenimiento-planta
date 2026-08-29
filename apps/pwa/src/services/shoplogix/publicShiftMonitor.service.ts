@@ -288,6 +288,13 @@ export interface PulsoMonitor {
    * lo publica o cuando el desglose no se puede garantizar.
    */
   porMaquina?: Array<{ id: string; cpm: number }>
+  /**
+   * El último ritmo VIVO conocido cuando `cpm` está mudo (discontinuidad del
+   * contador): el backend lo arrastra hasta 10 min con su hora, para que la
+   * pantalla siga mostrando el «ahora» real —con edad— en vez de caer a la
+   * media de 15 min. Ausente cuando `cpm` viene con número.
+   */
+  vivoPrevio?: { cpm: number; at: string; porMaquina?: Array<{ id: string; cpm: number }> }
   /** Las últimas lecturas, para dibujar el pulso reciente. */
   lecturas?: Array<{ at: string; totalCycles: number }>
 }

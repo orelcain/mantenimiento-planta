@@ -168,3 +168,64 @@ test('pulse: un ritmo alto pero físicamente posible SÍ se publica', () => {
   p = componerPulso(p, lec(2, 1090), PLANT_MAX_CPM.chonchi)   // 45 pz/min: fuerte, real
   assert.equal(p.cpm, 45)
 })
+
+// ── El último VIVO durante los silencios (Orel lo cazó en vivo, 29-08) ───────
+// Cuando el contador hace una discontinuidad el cpm queda mudo unos minutos y
+// la pantalla caía a la media de 15 min: mostraba 33 con la línea goteando a
+// 12. El pulso ahora arrastra el último ritmo vivo con su hora para que el
+// «Ahora» siga siendo el ahora, aunque con edad.
+
+test('pulse: un contador que BAJA reinicia la ventana — habla de nuevo en ~2 min', () => {
+  let p = null
+  for (let i = 0; i <= 4; i++) p = componerPulso(p, lec(i, 1000 + i * 20))
+  assert.equal(p.cpm, 20)
+  p = componerPulso(p, lec(5, 900))            // reconciliación: bajó
+  assert.equal(p.cpm, null)
+  assert.equal(p.lecturas.length, 1)           // ventana limpia, no envenenada
+  p = componerPulso(p, lec(6, 915))
+  p = componerPulso(p, lec(7, 930))            // 30 pz en 2 min sobre ventana nueva
+  assert.equal(p.cpm, 15)
+})
+
+test('pulse: mientras el cpm esta mudo se publica el ultimo vivo, con su hora', () => {
+  let p = null
+  for (let i = 0; i <= 4; i++) p = componerPulso(p, lecM(i, { a: 500 + i * 10, b: 300 + i * 10 }))
+  assert.equal(p.cpm, 20)
+  const horaViva = p.at
+  p = componerPulso(p, lecM(5, { a: 100, b: 50 }))  // discontinuidad
+  assert.equal(p.cpm, null)
+  assert.equal(p.vivoPrevio.cpm, 20)
+  assert.equal(p.vivoPrevio.at, horaViva)
+  assert.equal(p.vivoPrevio.porMaquina.length, 2)
+  // El silencio sigue un minuto mas: el vivo se ARRASTRA, no se pierde.
+  p = componerPulso(p, lecM(6, { a: 110, b: 55 }))  // 2 lecturas a 1 min: aun mudo
+  assert.equal(p.cpm, null)
+  assert.equal(p.vivoPrevio.cpm, 20)
+  assert.equal(p.vivoPrevio.at, horaViva)
+})
+
+test('pulse: al volver el cpm, el vivo arrastrado desaparece', () => {
+  let p = null
+  for (let i = 0; i <= 4; i++) p = componerPulso(p, lec(i, 1000 + i * 20))
+  p = componerPulso(p, lec(5, 900))
+  assert.ok(p.vivoPrevio)
+  p = componerPulso(p, lec(6, 915))
+  p = componerPulso(p, lec(7, 930))
+  assert.equal(p.cpm, 15)
+  assert.equal(p.vivoPrevio ?? null, null)
+})
+
+test('pulse: un vivo de hace mas de 10 min ya caduco — no se arrastra', () => {
+  const { VIVO_MAX_EDAD_MIN } = require('../shoplogix/pulse')
+  let p = null
+  for (let i = 0; i <= 4; i++) p = componerPulso(p, lec(i, 1000 + i * 20))
+  // Discontinuidades encadenadas: cada lectura baja respecto de la anterior,
+  // el cpm nunca vuelve y el vivo envejece hasta caducar.
+  let base = 900
+  for (let i = 5; i <= 5 + VIVO_MAX_EDAD_MIN + 1; i++) {
+    p = componerPulso(p, lec(i, base))
+    base -= 10
+  }
+  assert.equal(p.cpm, null)
+  assert.equal(p.vivoPrevio ?? null, null)
+})
