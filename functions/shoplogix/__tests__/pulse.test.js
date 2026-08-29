@@ -8,7 +8,7 @@
 
 const test = require('node:test')
 const assert = require('node:assert')
-const { componerPulso, ritmoDeVentana, radiografia } = require('../pulse')
+const { componerPulso, lecturaDesdeProduccion, ritmoDeVentana, radiografia } = require('../pulse')
 
 const lect = (min, total) => ({ at: new Date(Date.UTC(2026, 7, 19, 5, min)).toISOString(), totalCycles: total })
 
@@ -140,6 +140,74 @@ test('el refresco de 2 min a pleno ritmo NO es una discontinuidad (bug del 0 pz/
   p = componerPulso(p, lect(4, 1411), 56)
   assert.strictEqual(p.lecturas.length, 5, 'la ventana NO se reinicia con el refresco')
   assert.ok(p.cpm > 30 && p.cpm < 56, `debe publicar el ritmo real (~37), salió ${p.cpm}`)
+})
+
+// ── Dato duro: buckets de 1 minuto (swap del 29-08) ─────────────────────────
+
+/** Bucket como los devuelve `whiteboardproduction` (campos que usamos). */
+const bkt = (hhmm, cycles, { dur = 60000, shift = 'Turno 2', rate = 19 } = {}) => ({
+  cycles,
+  expectedCycles: rate * (dur / 60000),
+  totalDuration: dur,
+  start: `20260829T${hhmm}00.000`,
+  end: `20260829T${hhmm}59.999`,
+  rate,
+  shift,
+})
+
+test('el Ahora es el último minuto CERRADO común, la barra de Shoplogix', () => {
+  const data = { machines: [
+    { machineId: 'ev1', machineProduction: [
+      bkt('0829', 8), bkt('0830', 10), bkt('0831', 15), bkt('0832', 3, { dur: 20000 }),
+    ] },
+    { machineId: 'ev2', machineProduction: [
+      bkt('0829', 15, { rate: 16 }), bkt('0830', 15, { rate: 16 }), bkt('0831', 13, { rate: 16 }),
+    ] },
+  ] }
+  const l = lecturaDesdeProduccion(data)
+  // El común es 08:31 (el 08:32 de Ev1 está solo parcial).
+  assert.strictEqual(l.duro.cpm, 15 + 13)
+  assert.deepStrictEqual(l.duro.porMaquina, [{ id: 'ev1', cpm: 15 }, { id: 'ev2', cpm: 13 }])
+  assert.strictEqual(l.duro.esperadoCpm, 35)
+  // El minuto viaja en wall-as-UTC, como series[].t.
+  assert.ok(l.duro.minuto.desde.endsWith('T08:31:00.000Z'))
+  // El acumulado del turno suma TODOS los buckets del turno, incluido el parcial.
+  assert.strictEqual(l.totalCycles, (8 + 10 + 15 + 3) + (15 + 15 + 13))
+})
+
+test('los buckets de OTRO turno y los Unscheduled no entran al acumulado', () => {
+  const data = { machines: [
+    { machineId: 'ev1', machineProduction: [
+      bkt('0700', 12, { shift: 'Turno 1' }),          // cola del turno anterior
+      bkt('0710', 9, { shift: 'Unscheduled' }),       // duplicado fuera de turno
+      bkt('0830', 10), bkt('0831', 15),
+    ] },
+  ] }
+  const l = lecturaDesdeProduccion(data)
+  assert.strictEqual(l.totalCycles, 25, 'solo Turno 2')
+  assert.strictEqual(l.duro.cpm, 15)
+})
+
+test('con el dato duro presente, componerPulso publica ESE número, no la ventana', () => {
+  const duro = (cpm) => ({ cpm, porMaquina: [{ id: 'a', cpm }], esperadoCpm: 51, minuto: { desde: 'x', hasta: 'y' } })
+  // La ventana diría 0 (acumulados planos); manda el bucket.
+  let p = componerPulso(null, { ...lect(0, 100), duro: duro(28) }, 56)
+  p = componerPulso(p, { ...lect(1, 100), duro: duro(31) }, 56)
+  assert.strictEqual(p.cpm, 31)
+  assert.deepStrictEqual(p.porMaquina, [{ id: 'a', cpm: 31 }])
+  assert.strictEqual(p.fuente, 'buckets-1min')
+  assert.strictEqual(p.esperadoCpm, 51)
+  assert.strictEqual(p.vivoPrevio, undefined, 'con ritmo vivo no se arrastra nada')
+})
+
+test('un 0 del dato duro es un 0 DE VERDAD y se publica', () => {
+  const p = componerPulso(null, { ...lect(0, 500), duro: { cpm: 0, porMaquina: [{ id: 'a', cpm: 0 }], esperadoCpm: 51, minuto: { desde: 'x', hasta: 'y' } } }, 56)
+  assert.strictEqual(p.cpm, 0)
+})
+
+test('sin machineProduction no hay lectura (y no revienta)', () => {
+  assert.strictEqual(lecturaDesdeProduccion({ machines: [{ machineId: 'ev1' }] }), null)
+  assert.strictEqual(lecturaDesdeProduccion(null), null)
 })
 
 test('el techo físico sigue callando a la reconciliación (fix 60-69 intacto)', () => {
