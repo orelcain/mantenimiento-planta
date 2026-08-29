@@ -3283,7 +3283,7 @@ function BarrasMinuto({ datos, cerrado }: { datos: BarrasMinutoDatos; cerrado?: 
               de contraste pedido por Orel). Sin línea de borde (§38) y sin
               padding horizontal: las columnas de minuto deben quedar
               ALINEADAS con las franjas de abajo. */}
-          <div className="rounded-[10px] bg-background pb-1.5 pt-1">
+          <div className="rounded-[10px] bg-background/[0.7] pb-1.5 pt-1">
             {franja(
               datos.maquinas.length > 1 ? 'Línea (las ' + datos.maquinas.length + ' suman)' : 'Línea',
               esperadoLinea, suma, 88, true,
