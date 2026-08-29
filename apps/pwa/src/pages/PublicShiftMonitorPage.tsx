@@ -3695,7 +3695,10 @@ export function PublicShiftMonitorPage() {
    * respaldo: en cuanto `live` trae el valor, gana el del backend.
    */
   const [cuotaLocal, setCuotaLocal] = useState<number | null>(null)
-  const [pesoLocal, setPesoLocal] = useState<number | null>(null)
+  /* Tri-estado: `undefined` = sin gesto local (manda el doc), `null` = el
+     admin QUITÓ el peso, número = recién guardado. Sin el tercer estado, el
+     quitar no se reflejaba hasta el sync. */
+  const [pesoLocal, setPesoLocal] = useState<number | null | undefined>(undefined)
   const [now, setNow] = useState(() => Date.now())
   /* Los `t` de la serie son wall-clock sellados como UTC; para compararlos con
      el reloj hay que llevar "ahora" a esa misma base (igual que `fmtAgoWall`). */
@@ -3938,7 +3941,7 @@ export function PublicShiftMonitorPage() {
   // aplica: la cuota y el peso son POR TURNO.
   useEffect(() => {
     setCuotaLocal(null)
-    setPesoLocal(null)
+    setPesoLocal(undefined)
   }, [data?.shiftDocId])
 
   /**
@@ -4691,7 +4694,12 @@ export function PublicShiftMonitorPage() {
    * el Excel del Grader. Se dicen SIEMPRE con "≈" y con el peso a la vista.
    */
   const toneladas = useMemo(() => {
-    const pesoKg = Number(live?.pesoPromedioKg ?? pesoLocal)
+    /* El OPTIMISTA gana: recién guardado un peso, el doc público tarda un
+       sync (~5 min) en traerlo y con `live ?? local` la pantalla seguía
+       mostrando el viejo — «cambié el peso a 4000 pero no hizo nada» (Orel,
+       29-08, guardando dos veces por la duda). `pesoLocal` se resetea al
+       cambiar de turno, así que no puede quedar pegado. */
+    const pesoKg = Number(pesoLocal !== undefined ? pesoLocal : live?.pesoPromedioKg)
     if (!(pesoKg > 0) || !live?.totalPieces) return null
     /*
      * POR TRAMOS cuando hay historial (Orel, 28-08): el calibre cambia
@@ -5295,7 +5303,7 @@ export function PublicShiftMonitorPage() {
                   {onGuardarCuota && (
                     <EditorCuota
                       actual={metaHero}
-                      pesoConocido={live.pesoPromedioKg ?? pesoLocal ?? live.quotaOrigen?.pesoPromedioKg}
+                      pesoConocido={(pesoLocal !== undefined ? pesoLocal : live.pesoPromedioKg) ?? live.quotaOrigen?.pesoPromedioKg}
                       onGuardar={onGuardarCuota}
                       conToneladas={usaToneladas}
                     />
@@ -5366,7 +5374,7 @@ export function PublicShiftMonitorPage() {
               </div>
               <EditorCuota
                 actual={null}
-                pesoConocido={live.pesoPromedioKg ?? pesoLocal ?? live.quotaOrigen?.pesoPromedioKg}
+                pesoConocido={(pesoLocal !== undefined ? pesoLocal : live.pesoPromedioKg) ?? live.quotaOrigen?.pesoPromedioKg}
                 onGuardar={onGuardarCuota}
                 conToneladas={usaToneladas}
               />
