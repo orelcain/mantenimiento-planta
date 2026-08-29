@@ -26,7 +26,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { Activity, AlertCircle, ChevronLeft, ChevronRight, Clock, Gauge, Hourglass, Moon, PauseCircle, RefreshCw, Sun, Target, TrendingUp, Wrench } from 'lucide-react'
+import { Activity, AlertCircle, Check, ChevronLeft, ChevronRight, Clock, Gauge, Hourglass, Moon, PauseCircle, RefreshCw, Sun, Target, TrendingUp, Wrench } from 'lucide-react'
 import { useTheme } from '@/hooks/useTheme'
 import {
   subscribePublicShiftMonitor,
@@ -75,6 +75,8 @@ import { TiempoDelTurno, ComparadorDias, Bloque, PronosticoCierre } from './moni
 import { notasPorCausa, notasDelTurno } from './monitor/notasOperador'
 import { VsAyerBloque } from './monitor/MonitorVsAyer'
 import { RepartoDuenoSemanal } from './monitor/RepartoDuenoSemanal'
+import { DUENO_UI } from './monitor/duenoUi'
+import { duenoDe } from '@/services/shoplogix/monitorEventos'
 import { Pill } from '@/components/piel'
 import { useIsAdmin } from '@/store'
 import { useAuthStore } from '@/store/authStore'
@@ -2595,9 +2597,105 @@ function PorHora({ series, paradas, pulse }: {
  * para no pulverizar el MTTR). Se muestra también con el turno cerrado — ahí
  * ES el informe.
  */
-function RespuestaMantencion({ m, cerrado }: {
+/** Ordinales para la racha («el cuarto de los últimos seis»). */
+const ORDINAL = ['', 'primero', 'segundo', 'tercero', 'cuarto', 'quinto', 'sexto', 'séptimo'] as const
+
+/**
+ * El RIEL de la racha: minutos en reponerse, turno a turno.
+ *
+ * Hace DOS trabajos en un solo objeto de 78 px (idea de la directora, 29-08):
+ * dibuja la tendencia del MTTR y muestra la racha SIN declararla — cada guion
+ * es un turno que cerró sin una sola falla técnica. Barra más alta = más lento
+ * (peor), así que una tendencia a la baja se lee como mejora.
+ *
+ * ⚠ Ventana MÁXIMA: los turnos de `history` (6). No prometer más: `shiftStats`
+ * guarda ~40 pero sus causas no traen el bucket que separa falla técnica de
+ * externo — extender la ventana es backend, no esta tarjeta.
+ */
+function RielDeRacha({ riel, hoy }: {
+  riel?: Array<{ etiqueta: string; mttr: number | null }> | null
+  /** El MTTR de hoy, o null si el turno va sin fallas. */
+  hoy: number | null
+}) {
+  if (!riel?.length) return null
+  const cols = [...riel, { etiqueta: 'hoy', mttr: hoy }]
+  const max = Math.max(...cols.map((c) => c.mttr ?? 0), 1)
+  const limpios = cols.filter((c) => c.mttr == null).length
+  return (
+    <div className="mt-2.5">
+      <div className="flex items-end gap-1" style={{ height: 78 }} aria-hidden>
+        {cols.map((c, i) => {
+          const esHoy = i === cols.length - 1
+          return (
+            <div key={c.etiqueta} className="flex min-w-0 flex-1 flex-col items-center justify-end gap-1">
+              {c.mttr != null ? (
+                <>
+                  <span
+                    className="text-[13px] font-semibold tabular-nums"
+                    style={{ color: esHoy ? 'var(--mon-hoy)' : 'var(--mon-ref)' }}
+                  >
+                    {fmtDec(c.mttr)}
+                  </span>
+                  <span
+                    className="w-full max-w-[34px] rounded-t-[3px]"
+                    style={{
+                      height: `${Math.max(6, (c.mttr / max) * 56)}px`,
+                      background: esHoy
+                        ? 'var(--mon-hoy)'
+                        : 'color-mix(in srgb, var(--mon-ref) 50%, transparent)',
+                    }}
+                  />
+                </>
+              ) : (
+                /* Turno SIN falla: un guion al ras de la línea base. */
+                <span
+                  className="w-full max-w-[24px] rounded-full"
+                  style={{ height: 3, background: 'color-mix(in srgb, var(--mon-ref) 42%, transparent)' }}
+                />
+              )}
+            </div>
+          )
+        })}
+      </div>
+      <div className="h-px bg-border" />
+      <div className="mt-1 flex gap-1 text-center text-[11px] tabular-nums text-muted-foreground/80">
+        {cols.map((c, i) => (
+          <span
+            key={c.etiqueta}
+            className="min-w-0 flex-1"
+            style={i === cols.length - 1 ? { color: 'var(--mon-hoy)', fontWeight: 600 } : undefined}
+          >
+            {c.etiqueta}
+          </span>
+        ))}
+      </div>
+      <p className="mt-2 text-caption leading-snug text-muted-foreground/80">
+        Minutos en reponerse, turno a turno. El guion es un turno que cerró{' '}
+        <b>sin una sola falla técnica</b>
+        {limpios > 0 && <>: {limpios} de los últimos {cols.length}</>}.
+      </p>
+    </div>
+  )
+}
+
+function RespuestaMantencion({ m, cerrado, riel, fallaLineaMin, enCurso }: {
   m: NonNullable<PublicMonitorLive['mantencion']>
   cerrado: boolean
+  /**
+   * El RIEL de la racha (rediseño «La racha», Orel 29-08): MTTR por turno
+   * previo, en orden cronológico. `mttr: null` = turno que cerró SIN una
+   * falla técnica — se dibuja como guion, y los guiones SON la racha.
+   * Ventana máxima: los 6 turnos de `history` (no prometer más).
+   */
+  riel?: Array<{ etiqueta: string; mttr: number | null }> | null
+  /**
+   * Minutos que la LÍNEA ENTERA estuvo parada por las causas de falla
+   * (lineMin del timeBreakdown). ~0 habilita el logro «la línea no perdió
+   * una pieza». null = no se puede afirmar (y no se afirma).
+   */
+  fallaLineaMin?: number | null
+  /** Falla técnica EN CURSO: máquina detenida AHORA con causa de equipos. */
+  enCurso?: { maquina: string; causa: string; min: number; producen: number } | null
 }) {
   if (!m.porMaquina.length) return null
   const totalFallaMin = m.porMaquina.reduce((a, x) => a + x.fallaMin, 0)
@@ -2608,9 +2706,14 @@ function RespuestaMantencion({ m, cerrado }: {
   const microTotal = m.porMaquina.reduce((a, x) => a + x.microN, 0)
   const totalSinImputarMin = m.porMaquina.reduce((a, x) => a + (x.sinImputarMin ?? 0), 0)
 
-  const colorDisp = (pct: number | null) =>
-    pct == null ? 'text-muted-foreground'
-      : pct >= 99.9 ? 'text-ink-ok' : pct >= 90 ? 'text-ink-warn' : 'text-ink-crit'
+  /* La línea no paró por la falla — solo se AFIRMA cuando el dato existe. */
+  const sinCostoDeLinea = fallaLineaMin != null && fallaLineaMin < 0.5
+  /* El último turno CON falla del riel: la referencia del delta del MTTR. */
+  const previoConFalla = [...(riel ?? [])].reverse().find((r) => r.mttr != null) ?? null
+  /* La racha para el titular del turno limpio: cuántos de la ventana
+     cerraron sin falla (hoy incluido). */
+  const ventana = (riel?.length ?? 0) + 1
+  const limpios = (riel ?? []).filter((r) => r.mttr == null).length + 1
 
   /* Con CERO imputado y minutos sin causa, la tarjeta se ENCOGE al aviso
      (Orel, 26-08: «¿la ocultamos hasta que estén imputadas?»). No se oculta
@@ -2626,27 +2729,42 @@ function RespuestaMantencion({ m, cerrado }: {
         Mantención · respuesta del turno
       </div>
 
-      {/* El titular: la historia en una frase, antes que cualquier cifra. */}
+      {/* El titular: la historia en una frase, antes que cualquier cifra.
+          Tres estados y NUNCA repite el número que va grande abajo (la versión
+          vieja decía «9 min … MTTR 8,7 min» — el mismo dato con dos redondeos
+          a dos renglones). */}
       <p className="mt-1.5 text-[15px] leading-snug text-foreground">
-        {totalFallaMin === 0 && totalSinImputarMin >= 3 ? (
-          /* OJO — con paros SIN CAUSA no se reclama el 100%: cualquiera de esos
-             minutos puede ser una falla que nadie imputó todavía. La tarjeta
-             lo dice y EMPUJA a imputar (Orel, 26-08). */
+        {enCurso ? (
+          /* 1 · Falla EN CURSO: la noticia es el ahora, y es el ÚNICO estado
+             donde entra el comentario del operador. */
+          <><b>{nombreCorto(enCurso.maquina)}</b> lleva{' '}
+            <b className="tabular-nums text-ink-crit">{fmtInt(enCurso.min)} min</b> detenida
+            {enCurso.causa && <> por <b>{enCurso.causa}</b></>}.{' '}
+            {enCurso.producen > 0
+              ? `${enCurso.producen === 1 ? 'La otra máquina sigue produciendo' : `Las otras ${enCurso.producen} siguen produciendo`}.`
+              : 'La línea está parada.'}
+          </>
+        ) : totalFallaMin === 0 && totalSinImputarMin >= 3 ? (
+          /* OJO — con paros SIN CAUSA no se reclama el turno limpio: cualquiera
+             de esos minutos puede ser una falla que nadie imputó todavía. La
+             tarjeta lo dice y EMPUJA a imputar (Orel, 26-08). */
           <>Sin fallas imputadas por ahora — pero hay{' '}
             <b className="tabular-nums">{fmtInt(totalSinImputarMin)} min</b> de detenciones{' '}
             <b>sin causa anotada</b> en Shoplogix. Imputarlas cierra la historia del turno.</>
         ) : totalFallaMin === 0 ? (
-          <>Sin fallas técnicas en el turno: disponibilidad{' '}
-            <b className="tabular-nums">100%</b> en las {m.porMaquina.length} máquinas.</>
-        ) : (
-          <>La falla técnica {cerrado ? 'costó' : 'lleva'}{' '}
-            <b className="tabular-nums">{fmtInt(totalFallaMin)} min</b>
-            {conFalla.length === 1 && <>, toda en <b>{nombreCorto(conFalla[0]!.name)}</b></>}
-            {mttrGlobal != null && <> — MTTR <b className="tabular-nums">{fmtDec(mttrGlobal)} min</b></>}
-            {sanas > 0 && (
-              <> y {sanas === 1 ? 'la otra máquina' : `las otras ${sanas}`} en{' '}
-                <b className="tabular-nums">100%</b></>
+          /* 2 · Turno limpio: la racha se dice acá, con su ventana declarada. */
+          <>Turno {cerrado ? 'cerrado' : 'hasta ahora'} <b>sin una sola falla técnica</b>
+            {riel && riel.length > 0 && limpios >= 2 && (
+              <> — el <b>{ORDINAL[limpios] ?? `nº ${limpios}`}</b> de los últimos {ventana}</>
             )}.
+          </>
+        ) : (
+          /* 3 · Falla resuelta: quién y el costo de LÍNEA, que es el logro. */
+          <>{totalEventos === 1 ? 'Una sola falla técnica' : `${totalEventos} fallas técnicas`} en el turno
+            {conFalla.length === 1 && <>, toda en <b>{nombreCorto(conFalla[0]!.name)}</b></>}
+            {sinCostoDeLinea
+              ? <> — y la línea no la sintió.</>
+              : <>{sanas > 0 && <> y {sanas === 1 ? 'la otra máquina' : `las otras ${sanas}`} sin falla</>}.</>}
           </>
         )}
       </p>
@@ -2683,42 +2801,91 @@ function RespuestaMantencion({ m, cerrado }: {
         </p>
       )}
 
-      {/* Una fila por máquina: la disponibilidad TÉCNICA con su palabra.
-          En modo aviso NO se pintan: un «100%» por máquina debajo de «hay 53
-          min sin causa» es afirmar lo que el propio aviso pone en duda. */}
-      {!soloAviso && (
-      <div className="mt-2.5 space-y-1.5 border-t border-border/50 pt-2.5">
-        {m.porMaquina.map((x) => (
-          <div key={x.name} className="flex items-baseline gap-2">
-            <span className="w-9 shrink-0 text-footnote text-muted-foreground">{nombreCorto(x.name)}</span>
-            <span className={`w-14 shrink-0 text-headline tabular-nums ${
-              /* Con paros sin causa el 100% queda en suspenso: tinta neutra. */
-              x.fallaMin === 0 && (x.sinImputarMin ?? 0) >= 3 ? 'text-muted-foreground' : colorDisp(x.dispTecnicaPct)
-            }`}>
-              {x.dispTecnicaPct != null ? `${fmtDec(x.dispTecnicaPct, x.dispTecnicaPct >= 99.9 ? 0 : 1)}%` : '—'}
-            </span>
-            <span className="min-w-0 flex-1 truncate text-caption tabular-nums text-muted-foreground">
-              {x.fallaMin > 0
-                ? `${x.eventosFalla} evento${x.eventosFalla === 1 ? '' : 's'} · ${fmtInt(x.fallaMin)} min` +
-                  (x.causasFalla[0] ? ` (${x.causasFalla.map((c) => c.causa).join(', ')})` : '')
-                : (x.sinImputarMin ?? 0) >= 3
-                  ? `sin fallas imputadas · ${fmtInt(x.sinImputarMin!)} min sin causa`
-                  : 'sin fallas técnicas'}
-            </span>
+      {/* ── El protagonista: QUÉ TAN RÁPIDO se respondió, y su contexto ──────
+          «8,7 min» solo no contesta «¿es bueno?». El riel pone ese número
+          contra los turnos anteriores CON falla y contra los que cerraron sin
+          ninguna — los guiones SON la racha, no hay que declararla. */}
+      {mttrGlobal != null && !soloAviso && (
+        <div className="mt-3">
+          <div className="flex items-end justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-[30px] font-bold leading-none tracking-[-0.03em] tabular-nums text-foreground">
+                {fmtDec(mttrGlobal)}
+                <span className="ml-1 text-[15px] font-normal text-muted-foreground">min</span>
+              </div>
+              <div className="mt-1 text-caption text-muted-foreground">
+                {totalEventos === 1 ? 'en reponerse' : `MTTR · ${totalEventos} eventos`}
+              </div>
+            </div>
+            {previoConFalla?.mttr != null && (
+              <p className="min-w-0 flex-1 text-right text-caption leading-snug text-muted-foreground">
+                {mttrGlobal <= previoConFalla.mttr ? (
+                  <><b className="tabular-nums text-foreground/80">{fmtDec(previoConFalla.mttr - mttrGlobal)} min</b>
+                    {' '}más rápido que el turno con falla anterior</>
+                ) : (
+                  <><b className="tabular-nums text-foreground/80">{fmtDec(mttrGlobal - previoConFalla.mttr)} min</b>
+                    {' '}más lento que el turno con falla anterior</>
+                )}
+                {' '}(<span className="tabular-nums">{fmtDec(previoConFalla.mttr)}</span>)
+              </p>
+            )}
           </div>
-        ))}
-      </div>
+          <RielDeRacha riel={riel} hoy={mttrGlobal} />
+        </div>
       )}
 
-      {/* Los eventos, del más caro al más barato: cuándo, cuánto, qué. */}
-      {!soloAviso && m.eventos.length > 0 && (
-        <div className="mt-2 space-y-0.5">
-          {m.eventos.slice(0, 3).map((e) => (
-            <p key={`${e.maquina}-${e.desde}`} className="text-caption tabular-nums text-muted-foreground">
-              {fmtWallTime(e.desde)}–{fmtWallTime(e.hasta)} · <b className="text-foreground/80">{fmtInt(e.min)} min</b>{' '}
-              · {e.causas.join(' + ')}{e.paros > 1 ? ` (${e.paros} paros encadenados)` : ''} · {nombreCorto(e.maquina)}
-            </p>
-          ))}
+      {/* El riel también en turno LIMPIO: ahí la racha es toda la noticia. */}
+      {mttrGlobal == null && !soloAviso && (riel?.length ?? 0) > 0 && (
+        <div className="mt-3">
+          <RielDeRacha riel={riel} hoy={null} />
+        </div>
+      )}
+
+      {/* ── El logro: la falla no le costó piezas a la LÍNEA ────────────────
+          Aparece UNA sola vez el verde de la tarjeta, y solo cuando el dato
+          existe: es un hecho sobre la línea, no una medida contra la meta. */}
+      {sinCostoDeLinea && totalFallaMin > 0 && !enCurso && (
+        <div className="mt-3 flex items-start gap-2 rounded-ctl bg-ink-ok/[0.12] p-2.5">
+          <Check className="mt-px h-3.5 w-3.5 shrink-0 text-ink-ok" />
+          <p className="text-caption leading-snug text-foreground">
+            La falla no le costó piezas a la línea: <b className="text-ink-ok">0 pz</b> —{' '}
+            {sanas === 1 ? 'la otra máquina' : `las otras ${sanas}`} nunca {sanas === 1 ? 'dejó' : 'dejaron'} de producir.
+          </p>
+        </div>
+      )}
+
+      {/* ── Disponibilidad técnica por máquina ──────────────────────────────
+          Tinta NEUTRA por defecto: tres «100%» en verde eran decoración (y el
+          verde ya trabaja en el semáforo de las barras de 1 min). Solo se tiñe
+          cuando hay noticia. En modo aviso no se pintan: un «100%» debajo de
+          «hay 60 min sin causa» afirma lo que el propio aviso pone en duda. */}
+      {!soloAviso && (
+        <div className="mt-3">
+          <div className="text-caption text-muted-foreground">Disponibilidad técnica</div>
+          <div className="mt-1.5 grid grid-cols-3 gap-2">
+            {m.porMaquina.map((x) => {
+              const conFallaEsta = x.fallaMin > 0
+              return (
+                <div key={x.name} className="min-w-0 rounded-ctl bg-muted p-2">
+                  <div className="text-caption text-muted-foreground">{nombreCorto(x.name)}</div>
+                  <div className={`text-headline tabular-nums ${
+                    x.dispTecnicaPct != null && x.dispTecnicaPct < 90
+                      ? 'text-ink-crit'
+                      : conFallaEsta ? DUENO_UI.mantencion.clase : 'text-foreground'
+                  }`}>
+                    {x.dispTecnicaPct != null ? `${fmtDec(x.dispTecnicaPct, x.dispTecnicaPct >= 99.9 ? 0 : 1)}%` : '—'}
+                  </div>
+                  <div className="truncate text-[11px] tabular-nums text-muted-foreground" title={
+                    conFallaEsta && x.causasFalla[0] ? x.causasFalla.map((c) => c.causa).join(', ') : undefined
+                  }>
+                    {conFallaEsta
+                      ? `${x.eventosFalla} falla${x.eventosFalla === 1 ? '' : 's'} · ${fmtInt(x.fallaMin)} min`
+                      : 'sin fallas'}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         </div>
       )}
 
@@ -2728,16 +2895,45 @@ function RespuestaMantencion({ m, cerrado }: {
           registra las imputaciones» (Orel, 28-08). Se muestra también en
           modo aviso: el contraste «esto ya está imputado / esto falta» es
           exactamente el empujón. */}
-      {(m.imputadas ?? []).filter((x) => x.min >= 1).length > 0 && (
-        <p className="mt-2 border-t border-border/50 pt-2 text-caption leading-snug text-muted-foreground">
-          <b className="text-foreground/80">Detenciones imputadas del turno:</b>{' '}
-          {(m.imputadas ?? []).filter((x) => x.min >= 1).map((x, i) => (
-            <span key={x.causa} className="tabular-nums">
-              {i > 0 && ' · '}
-              {x.causa} <b className="text-foreground/80">{fmtInt(x.min)} min</b>
+      {/* ── El pie: contexto, separado por ESPACIO (§38, sin hairlines) ───── */}
+      {/* Los minutos sin causa, también fuera del modo aviso: sin este renglón,
+          tres «100%» y una racha reconstruyen la falsa realidad que Orel
+          señaló el 26-08. Son minutos de MÁQUINA sumados, no de línea. */}
+      {!soloAviso && totalSinImputarMin >= 3 && (
+        <p className="mt-3 text-footnote leading-snug text-muted-foreground">
+          <b className="text-foreground/80">Sin causa anotada:</b>{' '}
+          <span className="tabular-nums">{fmtInt(totalSinImputarMin)} min</span> de máquina sumados
+          {' ('}
+          {m.porMaquina.filter((x) => (x.sinImputarMin ?? 0) > 0).map((x, i) => (
+            <span key={x.name} className="tabular-nums">
+              {i > 0 && ' · '}{nombreCorto(x.name)} {fmtInt(x.sinImputarMin!)}
             </span>
           ))}
-          <span className="text-muted-foreground/70"> (minutos de máquina, sumados)</span>
+          {'). '}
+          {m.sinImputarLineaMin != null && (
+            m.sinImputarLineaMin >= 1
+              ? <>La línea completa estuvo <span className="tabular-nums">{fmtInt(m.sinImputarLineaMin)} min</span> detenida sin causa. </>
+              : <>{m.porMaquina.length === 3 ? 'Las tres' : 'Todas'} nunca pararon a la vez: la línea completa no perdió tiempo por esos paros. </>
+          )}
+          Imputarlas cierra la historia del turno.
+        </p>
+      )}
+      {(m.imputadas ?? []).filter((x) => x.min >= 1).length > 0 && (
+        <p className="mt-2 text-footnote leading-snug text-muted-foreground">
+          <b className="text-foreground/80">Imputado:</b>{' '}
+          {(m.imputadas ?? []).filter((x) => x.min >= 1).map((x, i) => (
+            <span
+              key={x.causa}
+              className={`tabular-nums ${
+                x.bucket === 'falla' ? DUENO_UI.mantencion.clase
+                  : x.bucket === 'externo' ? DUENO_UI.externo.clase : ''
+              }`}
+            >
+              {i > 0 && <span className="text-muted-foreground"> · </span>}
+              {x.causa} <b>{fmtInt(x.min)}</b>
+            </span>
+          ))}
+          <span className="text-muted-foreground/70"> min de máquina.</span>
         </p>
       )}
       {!soloAviso && (
@@ -5847,7 +6043,64 @@ export function PublicShiftMonitorPage() {
             {/* La respuesta de Mantención, junto al «dónde se fueron las
                 piezas»: la cascada dice el costo, esta tarjeta dice quién
                 respondió y cómo. */}
-            {live.mantencion && <RespuestaMantencion m={live.mantencion} cerrado={turnoCerrado} />}
+            {live.mantencion && (
+              <RespuestaMantencion
+                m={live.mantencion}
+                cerrado={turnoCerrado}
+                /* El riel de la racha: MTTR de los turnos ANTERIORES en orden
+                   cronológico (`scheduledStart` manda; el shiftDocId ordena
+                   Turno 1/2 alfabético, que en Chonchi no es el orden real).
+                   `mttr: null` = turno sin una sola falla técnica. */
+                riel={(() => {
+                  const hs = (data.history ?? [])
+                    .filter((h) => h.live?.mantencion?.porMaquina?.length)
+                    .map((h) => {
+                      const mm = h.live.mantencion!
+                      const ev = mm.porMaquina.reduce((a, x) => a + x.eventosFalla, 0)
+                      const min = mm.porMaquina.reduce((a, x) => a + x.fallaMin, 0)
+                      return {
+                        orden: h.live.scheduledStart ? Date.parse(h.live.scheduledStart) : Date.parse(h.shiftDocId.slice(0, 10)),
+                        etiqueta: `${h.dateKey.slice(8, 10)}·${h.shiftId.replace(/[^0-9]/g, '') || h.shiftId.slice(0, 1)}`,
+                        mttr: ev > 0 ? min / ev : null,
+                      }
+                    })
+                    .sort((a, b) => a.orden - b.orden)
+                    .slice(-6)
+                  return hs.length ? hs.map(({ etiqueta, mttr }) => ({ etiqueta, mttr })) : null
+                })()}
+                /* Lo que la falla le costó a la LÍNEA: `lineMin` de las causas
+                   imputadas a equipos (OJO: NUNCA el `min`, que es de máquina
+                   — la trampa que infló el Pareto 5,6×). Sin el dato, null: no
+                   se afirma «no costó piezas» sin poder probarlo. */
+                fallaLineaMin={(() => {
+                  const causas = new Set((live.mantencion.imputadas ?? [])
+                    .filter((x) => x.bucket === 'falla').map((x) => x.causa))
+                  const rec = live.timeBreakdown?.recoverable
+                  if (!causas.size || !rec?.length) return null
+                  const filas = rec.filter((c) => causas.has(c.reason))
+                  if (!filas.length || filas.some((c) => c.lineMin == null)) return null
+                  return filas.reduce((a, c) => a + (c.lineMin ?? 0), 0)
+                })()}
+                /* Falla EN CURSO: una máquina detenida AHORA con causa cuyo
+                   dueño es Mantención (taxonomía real, no heurística). */
+                enCurso={(() => {
+                  if (turnoCerrado) return null
+                  const parada = live.machines.find((x) =>
+                    x.status === 'detenida' && x.currentReason && x.currentSinceAt
+                    && duenoDe(x.currentReason).dueno === 'mantencion')
+                  if (!parada) return null
+                  const desde = Date.parse(parada.currentSinceAt!)
+                  const min = Number.isFinite(desde) ? (ahoraWallMs - desde) / 60_000 : NaN
+                  if (!(min >= 1)) return null
+                  return {
+                    maquina: parada.name,
+                    causa: parada.currentReason!,
+                    min,
+                    producen: live.machines.filter((x) => x.status === 'produciendo').length,
+                  }
+                })()}
+              />
+            )}
             <ReglaDeRitmo
               /* El tramo en curso se cuenta por los minutos que LLEVA, no por
                  los 5 que va a durar: si no, el número de "ahora" queda siempre
