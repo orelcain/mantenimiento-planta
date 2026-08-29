@@ -162,19 +162,39 @@ function componerPulso(previo, lectura, maxCpm = MAX_CPM_PLAUSIBLE) {
   /* Discontinuidad: si el salto respecto de la última lectura implica un ritmo
      imposible, el contador no "produjo" eso — se reinició o cambió de turno.
      Se arranca la ventana de nuevo desde esta lectura en vez de promediar a
-     través del salto, que es lo que publicó 3.101 pz/min. */
+     través del salto, que es lo que publicó 3.101 pz/min.
+
+     Que el contador BAJE es la misma discontinuidad al revés (reconciliación,
+     cambio de turno) y también reinicia la ventana: dejarlo adentro tenía al
+     pulso mudo hasta 5 min mientras la lectura envenenada salía sola —
+     reiniciando, vuelve a hablar en ~2 (Orel lo cazó en vivo el 29-08:
+     la tarjeta caía a la media de 15 min y mostraba un ritmo viejo). */
   const previas = previo?.lecturas ?? []
   const ultima = previas[previas.length - 1]
-  const saltoImposible = ultima && (() => {
+  const discontinuo = ultima && (() => {
+    if (lectura.totalCycles < ultima.totalCycles) return true
     const min = (Date.parse(lectura.at) - Date.parse(ultima.at)) / 60000
     if (!(min > 0)) return false
     return (lectura.totalCycles - ultima.totalCycles) / min > maxCpm
   })()
 
-  const lecturas = (saltoImposible ? [lectura] : [...previas, lectura]).slice(-MAX_LECTURAS)
+  const lecturas = (discontinuo ? [lectura] : [...previas, lectura]).slice(-MAX_LECTURAS)
 
   const cpm = ritmoDeVentana(lecturas, maxCpm)
   const porMaquina = cpm != null ? ritmoPorMaquinaDeVentana(lecturas) : null
+
+  /* El último ritmo VIVO conocido, arrastrado mientras el cpm esté mudo: la
+     pantalla lo muestra con su hora («ahora mismo · 03:15, recalibrando») en
+     vez de saltar a la media de 15 min, que en un cierre con goteo decía 33
+     cuando la realidad era 12. Caduca solo del lado del que publica: un vivo
+     de hace >10 min ya no es «ahora» de nada. */
+  const vivoPrevio = cpm != null ? null : (() => {
+    const v = previo?.cpm != null
+      ? { cpm: previo.cpm, at: previo.at, ...(previo.porMaquina ? { porMaquina: previo.porMaquina } : {}) }
+      : previo?.vivoPrevio ?? null
+    if (!v) return null
+    return (Date.parse(lectura.at) - Date.parse(v.at)) <= VIVO_MAX_EDAD_MIN * 60000 ? v : null
+  })()
   // El `diag` no entra al pulso: viaja aparte, a su propio doc. Acá solo va lo
   // que la pantalla necesita. `porMaquina` de cada lectura SÍ se conserva: es
   // la historia con la que la próxima corrida calcula el ritmo por máquina.
@@ -186,6 +206,7 @@ function componerPulso(previo, lectura, maxCpm = MAX_CPM_PLAUSIBLE) {
     totalCycles: lectura.totalCycles,
     cpm,
     ...(porMaquina ? { porMaquina } : {}),
+    ...(vivoPrevio ? { vivoPrevio } : {}),
     /* El ritmo CRUDO de Shoplogix, en paralelo para validarlo (unidad por
        confirmar con la línea andando). No es todavía el número que se
        muestra. */
@@ -261,6 +282,8 @@ const PLANT_MAX_CPM = Object.freeze({
 
 /** Lecturas que entran en el ritmo: ~4 min, más que el refresco de Shoplogix. */
 const VENTANA_RITMO = 5
+/** Cuántos minutos se arrastra el último vivo cuando el cpm queda mudo. */
+const VIVO_MAX_EDAD_MIN = 10
 /** Mínimo de minutos entre extremos para publicar un ritmo. */
 const MIN_MINUTOS = 1.5
 
@@ -286,5 +309,5 @@ function ritmoDeVentana(lecturas, maxCpm = MAX_CPM_PLAUSIBLE) {
 
 module.exports = {
   leerPulso, componerPulso, ritmoDeVentana, ritmoPorMaquinaDeVentana, radiografia,
-  MAX_LECTURAS, VENTANA_RITMO, MAX_CPM_PLAUSIBLE, PLANT_MAX_CPM,
+  MAX_LECTURAS, VENTANA_RITMO, MAX_CPM_PLAUSIBLE, PLANT_MAX_CPM, VIVO_MAX_EDAD_MIN,
 }

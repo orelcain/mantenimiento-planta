@@ -13,7 +13,7 @@
 
 import { describe, it, expect } from 'vitest'
 
-import { elegirContador, aWallClockMs, corteDeBuckets } from '../contadorCrudo'
+import { elegirContador, aWallClockMs, corteDeBuckets, pulsoVivo } from '../contadorCrudo'
 import type { PublicMonitorLive, PulsoMonitor } from '@/services/shoplogix/publicShiftMonitor.service'
 
 /** Serie en wall-clock de planta, como la manda el backend. */
@@ -57,6 +57,41 @@ describe('corteDeBuckets', () => {
 
   it('sin serie no hay corte', () => {
     expect(corteDeBuckets({ series: [] } as unknown as PublicMonitorLive)).toBeNull()
+  })
+})
+
+describe('pulsoVivo', () => {
+  // El caso que Orel cazo en vivo (29-08): con el pulso mudo por una
+  // discontinuidad del contador, la tarjeta caia a la media de 15 min y decia
+  // 33 pz/min mientras la linea goteaba a 12.
+  it('con cpm fresco, el vivo es el cpm y no esta recalibrando', () => {
+    const v = pulsoVivo(pulso({ cpm: 12.3, porMaquina: [{ id: 'a', cpm: 12.3 }] }))
+    expect(v).toEqual({ cpm: 12.3, at: '2026-08-21T02:56:00.000Z', porMaquina: [{ id: 'a', cpm: 12.3 }], recalibrando: false })
+  })
+
+  it('un cpm de CERO es un vivo valido — la linea detenida es informacion', () => {
+    expect(pulsoVivo(pulso({ cpm: 0 }))?.cpm).toBe(0)
+  })
+
+  it('con el cpm mudo usa el arrastrado, con SU hora y marcado recalibrando', () => {
+    const v = pulsoVivo(pulso({
+      cpm: null,
+      vivoPrevio: { cpm: 12, at: '2026-08-21T02:53:00.000Z', porMaquina: [{ id: 'a', cpm: 12 }] },
+    }))
+    expect(v).toEqual({ cpm: 12, at: '2026-08-21T02:53:00.000Z', porMaquina: [{ id: 'a', cpm: 12 }], recalibrando: true })
+  })
+
+  it('un arrastrado de hace mas de 6 min ya no es «ahora» — null, que caiga a la media', () => {
+    const v = pulsoVivo(pulso({
+      cpm: null,
+      vivoPrevio: { cpm: 12, at: '2026-08-21T02:49:00.000Z' },
+    }))
+    expect(v).toBeNull()
+  })
+
+  it('sin pulso ni arrastrado no inventa nada', () => {
+    expect(pulsoVivo(null)).toBeNull()
+    expect(pulsoVivo(pulso({ cpm: null }))).toBeNull()
   })
 })
 
