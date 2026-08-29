@@ -320,3 +320,54 @@ export async function setPesoPromedio(params: {
 
   await setDoc(ref, { shiftSchedule: siguiente, updatedAt: serverTimestamp() }, { merge: true })
 }
+
+/**
+ * Elimina UN registro del historial de pesos (Orel, 29-08: «editar o eliminar
+ * los ya agregados» — un dedo de más en los gramos no puede quedar pegado en
+ * las toneladas del turno). Editar = eliminar el malo + poner el bueno.
+ *
+ * `at` es la clave del registro (la ISO UTC con que se guardó; el monitor la
+ * recibe en `pesoRegistros[].at`). El peso VIGENTE pasa al último registro
+ * que quede; sin registros, el campo plano también se limpia — la tarjeta
+ * vuelve a pedir el peso, que es lo honesto.
+ */
+export async function eliminarRegistroPeso(params: {
+  plantSlug: PlantSlug | string
+  shiftName: string
+  at: string
+}): Promise<void> {
+  const docId = CONFIG_DOC_ID[params.plantSlug]
+  if (!docId) throw new Error(`Línea sin config: ${params.plantSlug}`)
+  const ref = doc(db, COLLECTION, docId)
+  const snap = await getDoc(ref)
+  const actual: ShiftScheduleEntry[] = Array.isArray(snap.data()?.shiftSchedule)
+    ? (snap.data()!.shiftSchedule as ShiftScheduleEntry[])
+    : []
+  const objetivo = normShiftName(params.shiftName)
+
+  const siguiente = actual.map((e) => {
+    if (normShiftName(e.shiftId) !== objetivo) return e
+    const entry = { ...e } as ShiftScheduleEntry & {
+      pesoPromedioKg?: number
+      pesoPromedioAt?: string
+      pesoPromedioPor?: string | null
+      pesoHistorial?: Array<{ at: string; pesoKg: number; por: string | null }>
+    }
+    const historial = (entry.pesoHistorial ?? []).filter((r) => r.at !== params.at)
+    entry.pesoHistorial = historial
+    const ultimo = historial[historial.length - 1]
+    if (ultimo) {
+      entry.pesoPromedioKg = ultimo.pesoKg
+      entry.pesoPromedioAt = ultimo.at
+      entry.pesoPromedioPor = ultimo.por ?? null
+    } else {
+      delete entry.pesoPromedioKg
+      delete entry.pesoPromedioAt
+      delete entry.pesoPromedioPor
+      delete entry.pesoHistorial
+    }
+    return entry
+  })
+
+  await setDoc(ref, { shiftSchedule: siguiente, updatedAt: serverTimestamp() }, { merge: true })
+}
