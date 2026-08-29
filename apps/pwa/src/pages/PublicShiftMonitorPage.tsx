@@ -3201,18 +3201,26 @@ function BarrasMinuto({ datos, cerrado }: { datos: BarrasMinutoDatos; cerrado?: 
     if ((t0 + i * 60_000) % (cadaMin * 60_000) === 0 && i > 0 && i < n - 2) marcas.push(i)
   }
 
-  const claseDe = (v: number, esperado: number | null) => {
-    if (esperado == null || esperado <= 0) return 'border-muted-foreground/50 bg-muted text-muted-foreground'
+  /* Semáforo por % del esperado, los mismos cortes de Shoplogix. La franja
+     PRINCIPAL (la línea) va con el tinte pleno; las de máquina, suavizado —
+     jerarquía por intensidad, sin bordes (§38 de la piel: relleno O borde).
+     OJO: clases LITERALES — Tailwind no genera nombres armados en runtime. */
+  const SEMAFORO = {
+    ok: { pleno: 'bg-ink-ok/[0.3]', suave: 'bg-ink-ok/[0.14]', num: 'text-ink-ok' },
+    warn: { pleno: 'bg-ink-warn/[0.3]', suave: 'bg-ink-warn/[0.14]', num: 'text-ink-warn' },
+    crit: { pleno: 'bg-ink-crit/[0.3]', suave: 'bg-ink-crit/[0.14]', num: 'text-ink-crit' },
+  } as const
+  const claseDe = (v: number, esperado: number | null, principal: boolean) => {
+    if (esperado == null || esperado <= 0) return { barra: 'bg-muted', num: 'text-muted-foreground' }
     const r = v / esperado
-    if (r >= 0.75) return 'border-ink-ok bg-ink-ok/[0.15] text-ink-ok'
-    if (r >= 0.5) return 'border-ink-warn bg-ink-warn/[0.15] text-ink-warn'
-    return 'border-ink-crit bg-ink-crit/[0.15] text-ink-crit'
+    const s = SEMAFORO[r >= 0.75 ? 'ok' : r >= 0.5 ? 'warn' : 'crit']
+    return { barra: principal ? s.pleno : s.suave, num: s.num }
   }
 
-  const franja = (nombre: string, esperado: number | null, vals: number[], altoPx: number) => {
+  const franja = (nombre: string, esperado: number | null, vals: number[], altoPx: number, principal = false) => {
     const tope = Math.max(esperado ?? 0, ...vals.slice(0, n), 1)
     return (
-      <div key={nombre} className="mt-1.5">
+      <div key={nombre} className={principal ? '' : 'mt-2'}>
         {/* Pegado al borde izquierdo VISIBLE (sticky): el contenido está
             ensanchado por el zoom y un header normal se va con el paneo. */}
         <div
@@ -3223,23 +3231,26 @@ function BarrasMinuto({ datos, cerrado }: { datos: BarrasMinutoDatos; cerrado?: 
           {esperado != null && <span className="text-muted-foreground/80"> · esperado {fmtDec(esperado, 0)} pz/min</span>}
         </div>
         <div className="mt-0.5 flex items-stretch gap-[1px]" style={{ height: altoPx }}>
-          {vals.slice(0, n).map((v, i) => (
-            <div
-              key={i}
-              className="relative flex min-w-0 flex-1 flex-col justify-end"
-              title={`${horaPlanta(t0 + i * 60_000)} · ${nombre}: ${v}${esperado != null ? ` / ${esperado}` : ''} pz`}
-            >
+          {vals.slice(0, n).map((v, i) => {
+            const c = claseDe(v, esperado, principal)
+            return (
               <div
-                className={`w-full rounded-t-[3px] border ${claseDe(v, esperado)}`}
-                style={{ height: `${Math.max(v > 0 ? 8 : 2, (v / tope) * 100)}%` }}
-              />
-              {conNumeros && v > 0 && (
-                <b className={`pointer-events-none absolute inset-x-0 bottom-0 text-center text-[10px] font-semibold tabular-nums ${claseDe(v, esperado).split(' ').pop()}`}>
-                  {v}
-                </b>
-              )}
-            </div>
-          ))}
+                key={i}
+                className="relative flex min-w-0 flex-1 flex-col justify-end"
+                title={`${horaPlanta(t0 + i * 60_000)} · ${nombre}: ${v}${esperado != null ? ` / ${esperado}` : ''} pz`}
+              >
+                <div
+                  className={`w-full rounded-[3px] ${c.barra}`}
+                  style={{ height: `${Math.max(v > 0 ? 8 : 3, (v / tope) * 100)}%` }}
+                />
+                {conNumeros && v > 0 && (
+                  <b className={`pointer-events-none absolute inset-x-0 bottom-0 text-center font-semibold tabular-nums ${principal ? 'text-[13px] font-bold' : 'text-[11px]'} ${c.num}`}>
+                    {v}
+                  </b>
+                )}
+              </div>
+            )
+          })}
         </div>
       </div>
     )
@@ -3266,13 +3277,19 @@ function BarrasMinuto({ datos, cerrado }: { datos: BarrasMinutoDatos; cerrado?: 
               style={{ left: `${((i + 0.5) / n) * 100}%` }}
             />
           ))}
-          {franja(
-            datos.maquinas.length > 1 ? 'Línea (las ' + datos.maquinas.length + ' suman)' : 'Línea',
-            esperadoLinea, suma, 64,
-          )}
+          {/* La SUMA enmarcada con fondo propio (pedido de Orel, 29-08): la
+              elevación por tono la separa de las máquinas — sin línea de
+              borde (§38). Sin padding horizontal: las columnas de minuto
+              deben quedar ALINEADAS con las franjas de abajo. */}
+          <div className="rounded-[10px] bg-muted pb-1.5 pt-1">
+            {franja(
+              datos.maquinas.length > 1 ? 'Línea (las ' + datos.maquinas.length + ' suman)' : 'Línea',
+              esperadoLinea, suma, 88, true,
+            )}
+          </div>
           {datos.maquinas.length > 1 && datos.maquinas.map((m) =>
-            franja(nombreCorto(m.nombre), m.esperado, m.cycles, 48))}
-          <div className="relative mt-0.5 h-4 text-[10px] tabular-nums text-muted-foreground/80">
+            franja(nombreCorto(m.nombre), m.esperado, m.cycles, 44))}
+          <div className="relative mt-0.5 h-4 text-[11px] tabular-nums text-muted-foreground/80">
             {/* Los extremos van pegados a los bordes VISIBLES (sticky), no a
                 los del contenido ensanchado; las marcas del medio, por índice.
                 Cerca de un extremo la marca se omite para no montarse. */}
@@ -3289,7 +3306,7 @@ function BarrasMinuto({ datos, cerrado }: { datos: BarrasMinutoDatos; cerrado?: 
           </div>
         </div>
       </div>
-      <div className="mt-0.5 flex items-center justify-between gap-2 text-[10px] text-muted-foreground/70">
+      <div className="mt-0.5 flex items-center justify-between gap-2 text-[11px] text-muted-foreground/70">
         <span>
           cada barra es un minuto — verde ≥75% del esperado, ámbar 50–75%, rojo &lt;50%
         </span>
