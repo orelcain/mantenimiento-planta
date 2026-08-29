@@ -831,7 +831,9 @@ async function loadPlannedShift(db, plantSlug, shiftId, scheduledStart) {
         const kg = Number(r?.pesoKg)
         if (Number.isNaN(real.getTime()) || !(kg > 0)) return null
         const wall = shoplogixPolling.toChileWall(real)
-        return { atWall: wall.toISOString(), pesoKg: kg }
+        /* `at` (UTC real) viaja como CLAVE del registro: es lo que permite
+           eliminar o corregir uno puntual desde el monitor. */
+        return { at: real.toISOString(), atWall: wall.toISOString(), pesoKg: kg }
       })
       .filter(Boolean)
       .filter((r) => Date.parse(r.atWall) >= scheduledStart.getTime() - 90 * 60_000)

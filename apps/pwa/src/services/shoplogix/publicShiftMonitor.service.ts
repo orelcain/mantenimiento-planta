@@ -135,7 +135,7 @@ export interface PublicMonitorLive {
    * hora; las toneladas se calculan por tramos con `toneladasPorTramos`.
    * Ausente en docs previos.
    */
-  pesoRegistros?: Array<{ atWall: string; pesoKg: number }>
+  pesoRegistros?: Array<{ at?: string; atWall: string; pesoKg: number }>
   /**
    * Peso promedio del pescado, kg por pieza, cargado a mano durante el turno.
    * Shoplogix cuenta ciclos y no manda kilos: sin este dato el monitor no puede
