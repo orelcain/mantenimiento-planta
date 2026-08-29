@@ -3332,7 +3332,14 @@ interface BarrasMinutoDatos {
 }
 
 /** Ancho mínimo de barra para que el número de dos cifras quepa sin pisarse. */
-const PX_MIN_NUMERO = 16
+const PX_MIN_NUMERO = 15
+/**
+ * Ancho de barra al que APUNTA la ventana por defecto. Va por encima del
+ * mínimo a propósito: calcular la ventana con el mismo umbral que después
+ * decide si los números caben dejaba el resultado justo en el límite, y por
+ * redondeo la vista abría SIN números (Orel, 29-08).
+ */
+const PX_BARRA_OBJETIVO = 19
 
 /**
  * Barras de 1 minuto con el número adentro — el ESPEJO del cronómetro de
@@ -3366,7 +3373,7 @@ function BarrasMinuto({ datos, cerrado }: { datos: BarrasMinutoDatos; cerrado?: 
      legible (a 375 px son ~23, en desktop ~60). Sigue la cola del turno hasta
      que la persona zoomea o panea; ahí la vista es suya. */
   const ventanaDef = anchoPx > 0
-    ? Math.max(20, Math.min(60, Math.floor(anchoPx / PX_MIN_NUMERO)))
+    ? Math.max(20, Math.min(60, Math.floor(anchoPx / PX_BARRA_OBJETIVO)))
     : null
   useEffect(() => {
     if (tocado || ventanaDef == null) return
@@ -3894,13 +3901,18 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
           && maquinas.maquinas.every((m) => m.pulsoCpm != null)
         const conReparto = !conPulsoMaq && !parada && !cerrado
           && maquinas.maquinas.every((m) => m.ahoraCpm != null)
+        /* Línea DETENIDA (o turno cerrado): el número grande de arriba muestra
+           0,0 y la columna desaparecía entera — «si es cero que salga cero»
+           (Orel, 29-08). Un hueco donde debería ir un cero se lee como dato
+           que falta; el cero dice lo que pasa. */
+        const conCero = Boolean(parada) || cerrado
         const conAporte = maquinas.maquinas.every((m) => m.aporteCpm != null)
         return (
           <div className="mt-3 border-t border-border/50 pt-2.5">
             <div className="flex items-baseline justify-between gap-2 text-caption text-muted-foreground">
               <span>
                 Cada máquina
-                {conPulsoMaq && <> · <b className="font-semibold text-foreground/80">ahora</b></>}
+                {(conPulsoMaq || conCero) && <> · <b className="font-semibold text-foreground/80">ahora</b></>}
                 {conReparto && <> · <b className="font-semibold text-foreground/80">media 15 min</b></>}
               </span>
               <b className="font-semibold text-foreground/80">
@@ -3919,9 +3931,11 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
                     title={`${m.nombre}: ${fmtInt(m.piezas)} pz · mientras anduvo ${fmtDec(m.cpm)} pz/min · ${pct != null ? `${Math.round(pct)}% del turno andando` : 'sin uptime'}`}
                   >
                     <span className="w-9 shrink-0 text-footnote text-muted-foreground">{nombreCorto(m.nombre)}</span>
-                    {(conPulsoMaq || conReparto) && (
-                      <span className="w-11 shrink-0 text-headline tabular-nums text-foreground">
-                        {fmtDec((conPulsoMaq ? m.pulsoCpm : m.ahoraCpm) ?? 0)}
+                    {(conPulsoMaq || conReparto || conCero) && (
+                      <span className={`w-11 shrink-0 text-headline tabular-nums ${
+                        conCero ? 'text-muted-foreground' : 'text-foreground'
+                      }`}>
+                        {conCero ? fmtDec(0) : fmtDec((conPulsoMaq ? m.pulsoCpm : m.ahoraCpm) ?? 0)}
                       </span>
                     )}
                     <span className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
@@ -3941,6 +3955,11 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
             </div>
             <p className="mt-1.5 text-caption leading-snug text-muted-foreground/80">
               {conPulsoMaq && <>Izquierda: el <b>ahora</b> de cada una, del mismo contador — las tres suman el «Ahora» de arriba. </>}
+              {conCero && (
+                cerrado
+                  ? <>Izquierda: el <b>ahora</b> de cada una — el turno cerró, ninguna está produciendo. </>
+                  : <>Izquierda: el <b>ahora</b> de cada una — la línea está detenida, las {maquinas.maquinas.length} en cero. </>
+              )}
               {conReparto && <>Izquierda: lo que cada una pone en la <b>media 15 min</b> — las tres suman la de arriba. </>}
               {conAporte
                 ? <>Derecha: su aporte al <b>promedio del turno</b> — suman el promedio de la línea. </>
