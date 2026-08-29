@@ -410,6 +410,10 @@
 }
 
 :root[data-skin="apple"].dark {
+  /* --mon-ref de .dark (#69717d) fue calibrado contra la tarjeta oscura VIEJA
+     (#16242f); sobre la tarjeta Apple (#2C2C2E) mide 2,83:1 — bajo el 3:1 que
+     exige un trazo. Medido en el rediseño de la Chispa (29-08). */
+  --mon-ref: #767e8a;
   color-scheme: dark;
   /* Dark ELEVADO del HIG (el de iPad/ventanas), NO el negro OLED base: Orel
      rechazó #000 por dureza. La elevación se comunica por TONO, no por sombra. */

@@ -240,131 +240,132 @@ function diaCorto(dateKey: string): string {
 }
 
 /**
- * La semana de la línea, con identidad: banda de rango normal con sus BORDES
- * rotulados, un día bajo cada punto (y tooltip con el valor), y HOY con anillo
- * de acento. Antes era una miniatura muda de 86 px: escondía la noticia de la
- * semana (la línea venía acelerando y aflojó) y el rango había que leerlo en
- * el texto.
+ * La semana de la línea como DESVÍO contra lo normal (rediseño «B» del 29-08,
+ * mockup de la directora): cada turno es una barra que crece desde la ESPINA
+ * (la mediana) — la barra no es el ritmo, es cuánto se apartó de lo normal.
+ * Hoy en un pelo sobre la espina = «normal» sin interpretar nada, que es el
+ * trabajo del bloque. Hereda el idioma de las barras de 1 min: barra vertical,
+ * número por barra, color SOLO cuando hay noticia (salir de la banda).
  *
- * ⚠ El SVG va estirado (`preserveAspectRatio="none"`): adentro SOLO geometría
- * con trazo no escalable — texto, puntos y redondeos van en HTML encima, que
- * es la lección que ya nos costó una vez en el gráfico grande.
+ * Todo en HTML posicionado (sin SVG estirado): barras, espina y franja son
+ * divs — la lección del gráfico grande, sin el problema.
  */
-function Chispa({ turnos, hoy, banda, escala, mediana, muestras }: {
+function Chispa({ turnos, hoy, banda, mediana, muestras }: {
   turnos: Array<{ dateKey: string; ritmo: number }>
   hoy: number
   banda: { min: number; max: number }
-  /**
-   * Escala vertical FIJA: peor y mejor de TODOS los turnos de la historia
-   * corta (no solo los dibujados). Sin ella la escala se recalculaba con los
-   * datos de cada día y la misma variación se veía dramática un día y plana
-   * al siguiente — era la mitad de por qué el gráfico «estaba muerto».
-   */
-  escala?: { min: number; max: number } | null
-  /** La mediana de la ventana: «lo normal» pasa de texto a POSICIÓN. */
+  /** La mediana de la ventana: la ESPINA desde la que crecen las barras. */
   mediana?: number | null
   /** De cuántos turnos sale la mediana, para rotularla honesta. */
   muestras?: number | null
 }) {
-  const todos = [...turnos.map((t) => t.ritmo), hoy, banda.min, banda.max]
-  const lo = Math.min(...todos, ...(escala ? [escala.min] : []))
-  const hi = Math.max(...todos, ...(escala ? [escala.max] : []))
+  /* Sin mediana no hay espina: el centro de la banda es el sustituto honesto. */
+  const espina = mediana ?? (banda.min + banda.max) / 2
+  /* Dominio vertical: la banda estirada ×1,3 — con la banda exacta la franja
+     llena el plot y deja de leerse como zona. Los valores que se salgan lo
+     estiran (nunca se recorta una barra). */
+  const centro = (banda.max + banda.min) / 2
+  const medio = Math.max(0.5, ((banda.max - banda.min) / 2) * 1.3)
+  const todos = [...turnos.map((t) => t.ritmo), hoy, espina]
+  const hi = Math.max(centro + medio, ...todos)
+  const lo = Math.min(centro - medio, ...todos)
   const span = hi - lo || 1
-  // En % del alto, con aire arriba (para la anotación del mejor) y abajo.
-  const yPct = (v: number) => 88 - ((v - lo) / span) * 72
-  const puntos = [...turnos.map((t) => t.ritmo), hoy]
-  const xPct = (i: number) => (i / Math.max(1, puntos.length - 1)) * 100
-  /* El mejor de los DIBUJADOS. Hoy no compite (suele ser parcial) — pero si
-     hoy ya lo supera, la anotación mentiría y no se muestra. */
-  const iMejorCandidato = turnos.length >= 2
-    ? turnos.reduce((mi, t, i) => (t.ritmo > turnos[mi]!.ritmo ? i : mi), 0)
-    : null
-  const iMejor = iMejorCandidato != null && turnos[iMejorCandidato]!.ritmo >= hoy
-    ? iMejorCandidato
-    : null
+  const yPct = (v: number) => ((hi - v) / span) * 100
+  const espinaPct = yPct(espina)
   const esDomingo = (dateKey: string) => new Date(`${dateKey}T12:00:00Z`).getUTCDay() === 0
+
+  const columnas = [
+    ...turnos.map((t) => ({ v: t.ritmo, dateKey: t.dateKey as string | null, esHoy: false })),
+    { v: hoy, dateKey: null, esHoy: true },
+  ]
+
   return (
     <div className="mt-1.5" aria-hidden>
       <div className="flex items-stretch gap-1.5">
-        <div className="relative h-[88px] min-w-0 flex-1">
-          <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-full w-full">
-            <rect
-              x="0"
-              y={yPct(banda.max)}
-              width="100"
-              height={Math.max(3, yPct(banda.min) - yPct(banda.max))}
-              className="fill-muted-foreground/15"
-            />
-            {/* Lo normal como LÍNEA: hasta ahora la mediana vivía solo en el
-                texto del detalle y el gráfico no decía dónde queda. */}
-            {mediana != null && (
-              <line
-                x1="0" y1={yPct(mediana)} x2="100" y2={yPct(mediana)}
-                stroke="var(--mon-ref)"
-                strokeWidth="1"
-                vectorEffect="non-scaling-stroke"
-              />
-            )}
-            <polyline
-              points={puntos.map((v, i) => `${xPct(i)},${yPct(v)}`).join(' ')}
-              fill="none"
-              strokeWidth="1.5"
-              strokeLinejoin="round"
-              vectorEffect="non-scaling-stroke"
-              className="stroke-muted-foreground/70"
-            />
-          </svg>
-          {/* Los puntos en HTML: un círculo dentro del SVG estirado sale elipse.
-              El domingo va HUECO — la línea no trabaja igual y su punto bajo
-              arrastraba la lectura de la semana. */}
-          {puntos.map((v, i) => {
-            const esHoy = i === puntos.length - 1
-            const domingo = !esHoy && esDomingo(turnos[i]!.dateKey)
-            return (
-              <span
-                key={i}
-                title={`${esHoy ? 'hoy' : nombreDeDia(turnos[i]!.dateKey)} · ${fmtDec(v)} pz/min`}
-                className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full ${
-                  esHoy ? 'h-2.5 w-2.5' : domingo ? 'h-2 w-2 border-2' : 'h-1.5 w-1.5'
-                }`}
-                style={{
-                  left: `${xPct(i)}%`,
-                  top: `${yPct(v)}%`,
-                  ...(esHoy
-                    ? {
-                        background: 'var(--mon-hoy)',
-                        boxShadow: '0 0 0 2px rgb(var(--card)), 0 0 0 5px color-mix(in srgb, var(--mon-hoy) 40%, transparent)',
-                      }
-                    : domingo
-                      ? { borderColor: 'var(--mon-ref)', background: 'transparent' }
-                      : { background: 'var(--mon-ref)' }),
-                }}
-              />
-            )
-          })}
-          {/* El mejor de la ventana, anotado: es la referencia que uno busca
-              («¿cuándo fue el bueno?») sin abrir ningún tooltip. */}
-          {iMejor != null && (
-            <span
-              className="absolute -translate-x-1/2 whitespace-nowrap text-[10px] text-muted-foreground"
-              style={{
-                left: `${Math.min(80, Math.max(20, xPct(iMejor)))}%`,
-                top: `${yPct(turnos[iMejor]!.ritmo)}%`,
-                transform: 'translate(-50%, -170%)',
-              }}
-            >
-              mejor de estos {turnos.length + 1}
-            </span>
-          )}
+        <div className="relative h-[104px] min-w-0 flex-1">
+          {/* La franja del rango habitual y la espina de la mediana, de fondo. */}
+          <span
+            className="pointer-events-none absolute inset-x-0 rounded-[10px]"
+            style={{
+              top: `${yPct(banda.max)}%`,
+              height: `${Math.max(3, yPct(banda.min) - yPct(banda.max))}%`,
+              background: 'color-mix(in srgb, var(--mon-ref) 18%, transparent)',
+            }}
+          />
+          <span
+            className="pointer-events-none absolute inset-x-0 h-px"
+            style={{ top: `${espinaPct}%`, background: 'var(--mon-ref)' }}
+          />
+          {/* Las columnas: la barra ES el desvío contra la espina. */}
+          <div className="absolute inset-0 flex gap-[2px]">
+            {columnas.map((c) => {
+              const domingo = c.dateKey != null && esDomingo(c.dateKey)
+              const sobre = c.v > banda.max
+              const bajo = c.v < banda.min
+              const arriba = c.v >= espina
+              const vPct = yPct(c.v)
+              const altoPct = Math.abs(espinaPct - vPct)
+              const relleno = c.esHoy
+                ? 'var(--mon-hoy)'
+                : sobre
+                  ? 'color-mix(in srgb, rgb(var(--ink-ok)) 30%, transparent)'
+                  : bajo
+                    ? 'color-mix(in srgb, rgb(var(--ink-crit)) 30%, transparent)'
+                    : 'color-mix(in srgb, var(--mon-ref) 50%, transparent)'
+              const numClase = c.esHoy
+                ? 'font-bold'
+                : sobre ? 'text-ink-ok' : bajo ? 'text-ink-crit' : 'text-foreground/80'
+              return (
+                <div
+                  key={c.dateKey ?? 'hoy'}
+                  className="relative min-w-0 flex-1"
+                  title={`${c.esHoy ? 'hoy' : nombreDeDia(c.dateKey!)}${domingo ? ' (domingo)' : ''} · ${fmtDec(c.v)} pz/min`}
+                >
+                  {/* El localizador de hoy: una columna de fondo apenas teñida. */}
+                  {c.esHoy && (
+                    <span
+                      className="absolute inset-y-0 left-1/2 w-full max-w-[44px] -translate-x-1/2 rounded-[8px]"
+                      style={{ background: 'color-mix(in srgb, var(--mon-hoy) 10%, transparent)' }}
+                    />
+                  )}
+                  {/* La barra: redondeada hacia AFUERA, recta contra la espina. */}
+                  <span
+                    className={`absolute left-1/2 w-full max-w-[36px] -translate-x-1/2 ${
+                      arriba ? 'rounded-t-[4px]' : 'rounded-b-[4px]'
+                    }`}
+                    style={{
+                      top: arriba ? `${vPct}%` : `${espinaPct}%`,
+                      height: `${altoPct}%`,
+                      minHeight: 4,
+                      background: relleno,
+                      ...(domingo ? { opacity: 0.45 } : {}),
+                    }}
+                  />
+                  {/* El número, sobre la punta de su barra. */}
+                  <span
+                    className={`absolute inset-x-0 text-center text-[13px] font-semibold tabular-nums ${numClase}`}
+                    style={{
+                      top: `${arriba ? vPct : espinaPct + altoPct}%`,
+                      transform: arriba ? 'translateY(calc(-100% - 2px))' : 'translateY(2px)',
+                      ...(c.esHoy ? { color: 'var(--mon-hoy)' } : {}),
+                    }}
+                  >
+                    {fmtDec(c.v)}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
         </div>
-        {/* El eje, rotulado: bordes de la banda y la mediana en su color. */}
+        {/* El eje: los bordes de la banda y la espina, rotulados. El borde
+            superior ES el mejor histórico — no necesita anotación aparte. */}
         <div className="relative w-9 shrink-0 text-caption tabular-nums text-muted-foreground/80">
           <span className="absolute -translate-y-1/2" style={{ top: `${yPct(banda.max)}%` }}>
             {fmtDec(banda.max)}
           </span>
-          {mediana != null && Math.abs(yPct(mediana) - yPct(banda.max)) > 12 && Math.abs(yPct(mediana) - yPct(banda.min)) > 12 && (
-            <span className="absolute -translate-y-1/2" style={{ top: `${yPct(mediana)}%`, color: 'var(--mon-ref)' }}>
-              {fmtDec(mediana)}
+          {Math.abs(espinaPct - yPct(banda.max)) > 12 && Math.abs(espinaPct - yPct(banda.min)) > 12 && (
+            <span className="absolute -translate-y-1/2" style={{ top: `${espinaPct}%`, color: 'var(--mon-ref)' }}>
+              {fmtDec(espina)}
             </span>
           )}
           <span className="absolute -translate-y-1/2" style={{ top: `${yPct(banda.min)}%` }}>
@@ -372,26 +373,25 @@ function Chispa({ turnos, hoy, banda, escala, mediana, muestras }: {
           </span>
         </div>
       </div>
-      {/* El valor BAJO cada día: la tabla-gemela del gráfico, sin tooltips.
-          Los puntos sin número eran la otra mitad del «gráfico muerto». */}
-      <div className="mr-9 mt-1 flex justify-between text-center">
-        {turnos.map((t) => (
-          <span key={t.dateKey} className="min-w-0">
-            <span className="block text-caption tabular-nums text-foreground/80">{fmtDec(t.ritmo)}</span>
-            <span className="block text-[10px] text-muted-foreground/80">{diaCorto(t.dateKey)}</span>
+      {/* Bajo el plot queda SOLO el día: el valor ya vive en la punta de su
+          barra (una fila menos que el diseño anterior). */}
+      <div className="mr-9 mt-1 flex gap-[2px] text-center">
+        {columnas.map((c) => (
+          <span
+            key={c.dateKey ?? 'hoy'}
+            className={`min-w-0 flex-1 text-caption font-semibold ${c.esHoy ? '' : 'text-muted-foreground/80'}`}
+            style={c.esHoy ? { color: 'var(--mon-hoy)' } : undefined}
+          >
+            {c.esHoy ? 'hoy' : diaCorto(c.dateKey!)}
+            {c.dateKey != null && esDomingo(c.dateKey) && <span title="domingo"> ·</span>}
           </span>
         ))}
-        <span className="min-w-0">
-          <span className="block text-caption font-semibold tabular-nums" style={{ color: 'var(--mon-hoy)' }}>
-            {fmtDec(hoy)}
-          </span>
-          <span className="block text-[10px] font-semibold" style={{ color: 'var(--mon-hoy)' }}>hoy</span>
-        </span>
       </div>
-      {muestras != null && mediana != null && (
-        <p className="mt-1 text-[10px] leading-snug text-muted-foreground/80">
-          La línea horizontal es la mediana de los últimos {muestras} turnos ({fmtDec(mediana)});
-          la banda gris, el rango habitual. Punto hueco = domingo.
+      {muestras != null && (
+        <p className="mt-1 text-[11px] leading-snug text-muted-foreground/80">
+          Cada barra es cuánto se apartó ese turno de lo normal: la línea es la mediana
+          de los últimos {muestras} turnos ({fmtDec(espina)}) y la franja, el rango habitual.
+          Color solo al salirse. El punto junto al día marca un domingo.
         </p>
       )}
     </div>
@@ -5962,12 +5962,9 @@ export function PublicShiftMonitorPage() {
                     turnos={banda.turnos.slice(-4)}
                     hoy={turnoCpm}
                     banda={banda.ritmo}
-                    escala={banda.turnos.length
-                      ? {
-                        min: Math.min(...banda.turnos.map((t) => t.ritmo)),
-                        max: Math.max(...banda.turnos.map((t) => t.ritmo)),
-                      }
-                      : null}
+                    /* La escala fija por historia ya no hace falta: el dominio
+                       se ancla a la BANDA (estable por construcción) — misma
+                       vista todos los días. */
                     mediana={ritmoAndando.mediana}
                     muestras={ritmoAndando.muestras}
                   />
