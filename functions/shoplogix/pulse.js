@@ -144,7 +144,7 @@ function radiografia(data) {
  * refresco de 2 min y seguir siendo «casi instantáneo» comparado con los
  * buckets de 5.
  */
-function componerPulso(previo, lectura) {
+function componerPulso(previo, lectura, maxCpm = MAX_CPM_PLAUSIBLE) {
   if (!lectura) return previo ?? null
 
   /* Discontinuidad: si el salto respecto de la última lectura implica un ritmo
@@ -156,12 +156,12 @@ function componerPulso(previo, lectura) {
   const saltoImposible = ultima && (() => {
     const min = (Date.parse(lectura.at) - Date.parse(ultima.at)) / 60000
     if (!(min > 0)) return false
-    return (lectura.totalCycles - ultima.totalCycles) / min > MAX_CPM_PLAUSIBLE
+    return (lectura.totalCycles - ultima.totalCycles) / min > maxCpm
   })()
 
   const lecturas = (saltoImposible ? [lectura] : [...previas, lectura]).slice(-MAX_LECTURAS)
 
-  const cpm = ritmoDeVentana(lecturas)
+  const cpm = ritmoDeVentana(lecturas, maxCpm)
   const porMaquina = cpm != null ? ritmoPorMaquinaDeVentana(lecturas) : null
   // El `diag` no entra al pulso: viaja aparte, a su propio doc. Acá solo va lo
   // que la pantalla necesita. `porMaquina` de cada lectura SÍ se conserva: es
@@ -228,6 +228,20 @@ function ritmoPorMaquinaDeVentana(lecturas) {
  */
 const MAX_CPM_PLAUSIBLE = 120
 
+/**
+ * Techo FÍSICO por planta, en pz/min de línea: la capacidad nominal sumada
+ * con ~10% de holgura. El absurdo genérico de 120 dejó pasar un «60-69
+ * pz/min» que Producción vio en el monitor (29-08): para Chonchi
+ * (19+16+16 = 51 nominal) eso no es un ritmo, es el contador de Shoplogix
+ * reconciliando piezas de golpe tras un reenganche. Sobre este techo el
+ * pulso se calla (null) y el número grande cae a la media honesta.
+ */
+const PLANT_MAX_CPM = Object.freeze({
+  chonchi: 56,
+  yal: 56,
+  filete: 25,
+})
+
 /** Lecturas que entran en el ritmo: ~4 min, más que el refresco de Shoplogix. */
 const VENTANA_RITMO = 5
 /** Mínimo de minutos entre extremos para publicar un ritmo. */
@@ -240,7 +254,7 @@ const MIN_MINUTOS = 1.5
  * tiempo, o un acumulado que BAJA — eso último es cambio de turno, no un ritmo
  * negativo.
  */
-function ritmoDeVentana(lecturas) {
+function ritmoDeVentana(lecturas, maxCpm = MAX_CPM_PLAUSIBLE) {
   if (!Array.isArray(lecturas) || lecturas.length < 2) return null
   const ventana = lecturas.slice(-VENTANA_RITMO)
   const primera = ventana[0]
@@ -250,10 +264,10 @@ function ritmoDeVentana(lecturas) {
   if (!(min >= MIN_MINUTOS) || dif < 0) return null
   const cpm = dif / min
   // Cinturón además del tirante: si aun así sale un absurdo, no se publica.
-  return cpm > MAX_CPM_PLAUSIBLE ? null : cpm
+  return cpm > maxCpm ? null : cpm
 }
 
 module.exports = {
   leerPulso, componerPulso, ritmoDeVentana, ritmoPorMaquinaDeVentana, radiografia,
-  MAX_LECTURAS, VENTANA_RITMO, MAX_CPM_PLAUSIBLE,
+  MAX_LECTURAS, VENTANA_RITMO, MAX_CPM_PLAUSIBLE, PLANT_MAX_CPM,
 }
