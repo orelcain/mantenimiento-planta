@@ -499,7 +499,7 @@ export function RuedaVentanas({ disponibles }: RuedaVentanasProps = {}) {
       )}
 
       <div className={cn('grid grid-cols-1 gap-6',
-        !ampliada && 'lg:grid-cols-[minmax(0,1fr)_20rem]', modo === 'comparar' && 'hidden')}>
+        !ampliada && 'lg:grid-cols-[minmax(0,1fr)_20rem]', modo !== 'editar' && 'hidden')}>
         {/* ── Rueda ────────────────────────────────────────────────────────── */}
         <div className="flex flex-col gap-4">
           {/* La rueda es cuadrada, así que acotar el ANCHO por la altura de la ventana
