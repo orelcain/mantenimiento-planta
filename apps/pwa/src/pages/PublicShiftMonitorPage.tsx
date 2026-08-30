@@ -3371,10 +3371,17 @@ function BarrasMinuto({ datos, cerrado }: { datos: BarrasMinutoDatos; cerrado?: 
   }, [])
   /* Ventana por defecto ADAPTADA al ancho: los minutos que caben con número
      legible (a 375 px son ~23, en desktop ~60). Sigue la cola del turno hasta
-     que la persona zoomea o panea; ahí la vista es suya. */
-  const ventanaDef = anchoPx > 0
-    ? Math.max(20, Math.min(60, Math.floor(anchoPx / PX_BARRA_OBJETIVO)))
-    : null
+     que la persona zoomea o panea; ahí la vista es suya.
+     OJO: con ancho de sobra —PC, TV— se muestra el TURNO ENTERO: los números no
+     entran, pero la forma completa del turno vale más que 40 minutos con
+     cifras (en el celular hay que pellizcar para recorrerlo). El corte son
+     ~2,5 px por minuto, medido: menos que eso las barras dejan de leerse. */
+  const cabeEnteroPx = n * 2.5
+  const ventanaDef = anchoPx <= 0
+    ? null
+    : anchoPx >= cabeEnteroPx
+      ? n
+      : Math.max(20, Math.min(60, Math.floor(anchoPx / PX_BARRA_OBJETIVO)))
   useEffect(() => {
     if (tocado || ventanaDef == null) return
     setVentana(n > ventanaDef ? { desdeMin: n - ventanaDef, hastaMin: n } : null)
@@ -3474,7 +3481,10 @@ function BarrasMinuto({ datos, cerrado }: { datos: BarrasMinutoDatos; cerrado?: 
   }
 
   return (
-    <div ref={medidorRef} className="mt-3 border-t border-border/50 pt-2.5">
+    /* `barras-ancho`: la marca que le dice al bloque de ritmo que ESTA pieza
+       sí aprovecha todo el ancho en PC — las demás se acotan para no quedar
+       estiradas (una Chispa de 5 puntos repartida en 1.400 px no se lee). */
+    <div ref={medidorRef} className="barras-ancho mt-3 border-t border-border/50 pt-2.5">
       <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5 text-caption text-muted-foreground">
         <span>
           Velocidad minuto a minuto
@@ -3657,7 +3667,10 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
     ? 'text-ink-ok' : estado === 'lento' ? 'text-ink-warn' : 'text-ink-crit'
 
   return (
-    <section className="rounded-card border border-border bg-card p-4">
+    /* En PC este bloque CRUZA las columnas: adentro va la tira minuto a
+       minuto, que es la pieza que más gana con el ancho — en una columna se
+       ven ~30 minutos, a lo ancho entra el turno entero. */
+    <section className="rounded-card border border-border bg-card p-4 lg:[column-span:all] lg:[&>*:not(.barras-ancho)]:max-w-4xl">
       <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
         <Gauge className="h-3 w-3" />
         Ritmo de la línea
@@ -5649,8 +5662,24 @@ export function PublicShiftMonitorPage() {
         </div>
       )}
 
+      {/*
+       * ── El ancho manda: en PC, columnas ────────────────────────────────
+       * La mitad del uso del monitor es de escritorio (telemetría 30-08:
+       * Chonchi 5 móvil / 4 escritorio, Filete 10 / 13) y hasta ahora esas
+       * pantallas veían la MISMA columna de 768 px estirada, con los costados
+       * vacíos y 6,6 pantallas de scroll. Desde 1100 px la página reparte sus
+       * bloques en dos columnas y desde 1500 px en tres: el mismo contenido,
+       * sin pestañas ni menús, en poco más de una pantalla.
+       *
+       * `space-y-3` no sirve dentro de multicolumna (el margen entre hermanos
+       * salta de columna): la separación pasa a un margen propio de cada
+       * bloque, y `break-inside-avoid` impide que una tarjeta se parta en dos.
+       */}
       <main
-        className="mx-auto max-w-3xl space-y-3 px-4 py-4"
+        className="mx-auto max-w-3xl px-4 py-4 space-y-3
+                   lg:max-w-[1400px] lg:columns-2 lg:gap-3 lg:space-y-0
+                   2xl:max-w-[1840px] 2xl:columns-3
+                   lg:[&>*]:mb-3 lg:[&>*]:break-inside-avoid"
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
       >

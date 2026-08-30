@@ -44,11 +44,19 @@ export function Bloque({ id, titulo, extra, defaultAbierto = true, children }: {
 }) {
   const clave = `monitor-bloque:${id}`
   const [abierto, setAbierto] = useState(() => {
+    /*
+     * Plegar existe por la ALTURA del celular. En pantalla grande la página va
+     * en columnas y esa razón no corre: los bloques nacen abiertos, que es lo
+     * que uno espera de un tablero en el PC. Solo vale como valor INICIAL —
+     * quien pliega a mano manda, y su elección sigue guardada.
+     */
+    const anchaYCabe = typeof window !== 'undefined'
+      && window.matchMedia?.('(min-width: 1100px)').matches
     try {
       const v = localStorage.getItem(clave)
-      return v == null ? defaultAbierto : v === '1'
+      return v == null ? (defaultAbierto || anchaYCabe) : v === '1'
     } catch {
-      return defaultAbierto
+      return defaultAbierto || anchaYCabe
     }
   })
 
