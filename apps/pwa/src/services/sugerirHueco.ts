@@ -37,6 +37,8 @@ export interface Sugerencia {
    * margen para el primer imprevisto.
    */
   holguraMin: number
+  /** Técnicos de turno durante el hueco (el mínimo del tramo), si se conoce la dotación. */
+  tecnicos?: number
 }
 
 const CONDICIONES_ORDEN: Record<Condicion, number> = {
@@ -58,6 +60,12 @@ export function sugerirHuecos(
   maquina: MaquinaRueda,
   trabajo: Trabajo,
   maximo = 3,
+  /**
+   * Cuántos técnicos de Mantención están de turno en cada tramo. Sin esto, el
+   * sugeridor proponía la madrugada del domingo: la máquina está libre, sí —
+   * pero no hay NADIE en la planta para intervenirla.
+   */
+  disponibles?: (dia: number, slot: number) => number,
 ): Sugerencia[] {
   const largo = Math.max(1, Math.ceil(trabajo.minutos / MINUTOS_POR_SLOT))
   if (largo > SLOTS_POR_DIA) return []
@@ -72,6 +80,7 @@ export function sugerirHuecos(
     /** Un tramo sirve si la condición vale y no hay otra intervención ya puesta. */
     const sirve = (i: number): Condicion | null => {
       if (d.mant[i] === '1') return null
+      if (disponibles && disponibles(dia, i) <= 0) return null
       const c = condicionDe(d.areas[i] ?? '0')
       return validas.includes(c) ? c : null
     }
@@ -86,12 +95,18 @@ export function sugerirHuecos(
       if (inicioBloque === null) return
       const largoBloque = fin - inicioBloque
       if (largoBloque >= largo) {
+        let tecnicos: number | undefined
+        if (disponibles) {
+          tecnicos = Infinity
+          for (let i = inicioBloque; i < inicioBloque + largo; i++) tecnicos = Math.min(tecnicos, disponibles(dia, i))
+        }
         candidatas.push({
           dia,
           inicio: inicioBloque,
           largo,
           condicion: peor,
           holguraMin: (largoBloque - largo) * MINUTOS_POR_SLOT,
+          ...(tecnicos !== undefined && Number.isFinite(tecnicos) ? { tecnicos } : {}),
         })
       }
       inicioBloque = null

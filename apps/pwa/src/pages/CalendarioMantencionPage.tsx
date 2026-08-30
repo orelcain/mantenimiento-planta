@@ -1900,6 +1900,33 @@ export function CalendarioMantencionPage() {
     if (destino) setDiaVerticalC(destino.c)
   }
 
+  /**
+   * Técnicos de turno por tramo de 5 minutos, sacado de la semana actualmente
+   * seleccionada del calendario. Es lo que impide que la rueda sugiera intervenir
+   * a horas en que no hay nadie en planta — la madrugada del domingo, típicamente.
+   * Matriz [día Lun=0..Dom=6][tramo 0..287].
+   */
+  const dotacionPorTramo = useMemo(() => {
+    const m = Array.from({ length: 7 }, () => new Array<number>(288).fill(0))
+    weekDays.forEach((d) => {
+      if (!d.dateObj) return
+      const dia = (d.dateObj.getDay() + 6) % 7
+      techRows.forEach((t) => {
+        const w = shiftWindow(t.shifts[d.c] || '')
+        if (!w) return
+        const ini = Math.max(0, Math.floor(w.start / 5))
+        const fin = Math.min(288, Math.ceil(w.end / 5))
+        for (let i = ini; i < fin; i++) m[dia]![i]!++
+      })
+    })
+    return m
+  }, [weekDays, techRows])
+
+  const disponiblesEnTramo = useCallback(
+    (dia: number, slot: number) => dotacionPorTramo[dia]?.[slot] ?? 0,
+    [dotacionPorTramo],
+  )
+
   /** Filas de la vista horizontal: siempre agrupadas por turno, con el fijo al final. */
   const horizontalRows = useMemo(() => {
     return techRows.slice().sort((a, b) => {
@@ -2113,7 +2140,7 @@ export function CalendarioMantencionPage() {
 
       {vistaModulo === 'rueda' && (
         <div className="min-h-0 flex-1 overflow-y-auto">
-          <RuedaVentanas />
+          <RuedaVentanas disponibles={disponiblesEnTramo} />
         </div>
       )}
 
