@@ -1605,9 +1605,17 @@ export function CalendarioMantencionPage() {
     const weekExpectedDays = weekDays.reduce((sum, d) => sum + (countsAsExpectedShift(t.shifts[d.c] || '') ? 1 : 0), 0)
     const monthExpectedDays = monthDays.reduce((sum, d) => sum + (countsAsExpectedShift(t.shifts[d.c] || '') ? 1 : 0), 0)
 
-    const weekExpectedAdjusted = hoursConfig.expectedFromPlannedDays
-      ? Math.max(0, weekExpectedDays * legalDailyTarget)
-      : Math.max(0, expectedWeekBase * (weekDays.length / 7))
+    // La semana se compara contra el TOPE LEGAL, que es lo que interesa saber:
+    // quién se pasó de las 42 h. El prorrateo por días programados hacía que el
+    // que MENOS trabajaba apareciera «más sobre» (37,5 h daba +2,5 contra 35).
+    // Solo se prorratea cuando la semana está a medio cargar en la planilla:
+    // ahí comparar contra 42 diría «‑19,5 h» de una semana que no ha terminado.
+    const semanaCompleta = weekDays.length === 7
+    const weekExpectedAdjusted = semanaCompleta
+      ? expectedWeekBase
+      : (hoursConfig.expectedFromPlannedDays
+        ? Math.max(0, weekExpectedDays * legalDailyTarget)
+        : Math.max(0, expectedWeekBase * (weekDays.length / 7)))
     const monthExpectedAdjusted = hoursConfig.expectedFromPlannedDays
       ? Math.max(0, monthExpectedDays * legalDailyTarget)
       : Math.max(0, expectedMonthAutoBase)
