@@ -127,7 +127,12 @@ const ORDEN_CONDICION: Condicion[] = ['limpia', 'colacion', 'marcha', 'agua']
 
 type EstadoSync = 'cargando' | 'guardado' | 'guardando' | 'error' | 'local'
 
-export function RuedaVentanas() {
+export interface RuedaVentanasProps {
+  /** Técnicos de Mantención de turno por tramo, sacado del calendario de turnos. */
+  disponibles?: (dia: number, slot: number) => number
+}
+
+export function RuedaVentanas({ disponibles }: RuedaVentanasProps = {}) {
   const [state, setState] = useState<RuedaState>(() => estadoInicial())
   const [maquinaId, setMaquinaId] = useState<string>(() => estadoInicial().maquinas[0]?.id ?? '')
   const [diaIdx, setDiaIdx] = useState<number>(() => (new Date().getDay() + 6) % 7)
@@ -749,6 +754,7 @@ export function RuedaVentanas() {
 
           <SugerirIntervencion
             maquina={maquina}
+            disponibles={disponibles}
             onAplicar={(m) => {
               tomarSnapshot()
               snapshotTomadoRef.current = false

@@ -24,6 +24,26 @@ function maquina(rangos: Array<[number, number, string]>, mant: Array<[number, n
 }
 
 describe('sugerirHuecos', () => {
+  it('no propone tramos sin técnicos de turno, aunque la máquina esté libre', () => {
+    // Máquina libre toda la semana; dotación solo el lunes de 08:00 a 16:00.
+    const disponibles = (dia: number, slot: number) =>
+      dia === 0 && slot >= 96 && slot < 192 ? 2 : 0
+    const s = sugerirHuecos(maquina([]), { minutos: 60, requiereDetencion: true }, 10, disponibles)
+    expect(s.length).toBeGreaterThan(0)
+    for (const x of s) {
+      expect(x.dia).toBe(0)
+      expect(x.inicio).toBeGreaterThanOrEqual(96)
+      expect(x.inicio + x.largo).toBeLessThanOrEqual(192)
+      expect(x.tecnicos).toBe(2)
+    }
+  })
+
+  it('sin función de dotación se comporta como antes (sin filtrar)', () => {
+    const s = sugerirHuecos(maquina([]), { minutos: 60, requiereDetencion: true }, 3)
+    expect(s.length).toBeGreaterThan(0)
+    expect(s[0]!.tecnicos).toBeUndefined()
+  })
+
   it('propone un hueco donde la máquina está libre', () => {
     const s = sugerirHuecos(maquina([[8, 20, 'P']]), { minutos: 60, requiereDetencion: true })
     expect(s.length).toBeGreaterThan(0)

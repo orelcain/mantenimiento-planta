@@ -37,17 +37,19 @@ const TONO_CONDICION: Record<Condicion, 'ok' | 'warning' | 'critical' | 'neutral
 export interface SugerirIntervencionProps {
   maquina: MaquinaRueda
   onAplicar: (m: MaquinaRueda, s: Sugerencia) => void
+  /** Técnicos de turno por tramo. Con esto, no se proponen horas sin nadie en planta. */
+  disponibles?: (dia: number, slot: number) => number
 }
 
-export function SugerirIntervencion({ maquina, onAplicar }: SugerirIntervencionProps) {
+export function SugerirIntervencion({ maquina, onAplicar, disponibles }: SugerirIntervencionProps) {
   const [trabajo, setTrabajo] = useState('')
   const [minutos, setMinutos] = useState(60)
   const [requiereDetencion, setRequiereDetencion] = useState(true)
   const [puesto, setPuesto] = useState<string | null>(null)
 
   const sugerencias = useMemo(
-    () => sugerirHuecos(maquina, { minutos, requiereDetencion }, 3),
-    [maquina, minutos, requiereDetencion],
+    () => sugerirHuecos(maquina, { minutos, requiereDetencion }, 3, disponibles),
+    [maquina, minutos, requiereDetencion, disponibles],
   )
 
   const poner = (s: Sugerencia) => {
@@ -61,7 +63,7 @@ export function SugerirIntervencion({ maquina, onAplicar }: SugerirIntervencionP
   return (
     <ListGroup
       title="Sugerir cuándo intervenir"
-      footer="Busca el hueco en el horario de esta máquina y esquiva lo que ya está puesto. Nunca propone sobre higiene."
+      footer="Busca el hueco en el horario de esta máquina, esquiva lo que ya está puesto y solo propone horas con técnicos de turno según el calendario. Nunca propone sobre higiene."
     >
       <div className="flex flex-col gap-3 p-4">
         {puesto && (
@@ -125,6 +127,9 @@ export function SugerirIntervencion({ maquina, onAplicar }: SugerirIntervencionP
                 {s.holguraMin > 0 && (
                   <span className="text-caption text-muted-foreground">
                     {slotsAHorasMinutos(s.holguraMin / 5)} de aire alrededor
+                    {s.tecnicos !== undefined && (
+                      <> · {s.tecnicos === 1 ? '1 técnico de turno' : String(s.tecnicos) + ' técnicos de turno'}</>
+                    )}
                   </span>
                 )}
                 <button
