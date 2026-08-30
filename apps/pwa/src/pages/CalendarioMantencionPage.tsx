@@ -2019,6 +2019,39 @@ export function CalendarioMantencionPage() {
   }
 
   /** Color de la celda según la banda. Tokens de la piel, no clases crudas. */
+  /**
+   * Editor de horario por celda. Los atajos solo producen los turnos estándar y
+   * sus reducidos, así que no había forma de escribir un «19:00 - 00:00» —
+   * y ese horario es justo el que usa la planta los domingos. Doble clic abre esto.
+   */
+  const [celdaEditada, setCeldaEditada] = useState<{ r: number; c: number } | null>(null)
+  const [horaDesde, setHoraDesde] = useState('')
+  const [horaHasta, setHoraHasta] = useState('')
+
+  function abrirEditorDeCelda(tech: TechRow, d: DayCol): void {
+    const actual = tech.shifts[d.c] || ''
+    const t = shiftTimeCompact(actual)
+    setHoraDesde(t?.start || shiftConfig.diaInicio)
+    setHoraHasta(t?.end || shiftConfig.diaFin)
+    setCeldaEditada({ r: tech.r, c: d.c })
+  }
+
+  function guardarEditorDeCelda(): void {
+    if (!celdaEditada || !horaDesde || !horaHasta) return
+    applyShift(celdaEditada.r, celdaEditada.c, `${horaDesde} - ${horaHasta}`)
+    setCeldaEditada(null)
+  }
+
+  /** Horas netas del horario que se está escribiendo, para verlas antes de guardar. */
+  const horasDelEditor = (() => {
+    const a = hhmmToMinutes(horaDesde)
+    const b = hhmmToMinutes(horaHasta)
+    if (a === null || b === null) return null
+    let diff = b - a
+    if (diff <= 0) diff += 24 * 60
+    return Math.max(0, diff / 60 - hoursConfig.breakHours)
+  })()
+
   function bandaClase(banda: 'dia' | 'tarde' | 'noche' | null): string {
     if (banda === 'dia') return 'bg-primary/[0.15] text-brand-ink'
     if (banda === 'tarde') return 'bg-cat-4-tint/[0.15] text-cat-4-ink'
@@ -3026,12 +3059,13 @@ export function CalendarioMantencionPage() {
                           key={`shift-${tech.r}-${d.c}`}
                           className={`border px-1 py-1 text-center cursor-pointer ${cellStyle.className} ${isSelectedCell ? 'ring-2 ring-primary ring-inset shadow-[inset_0_0_0_1px_rgba(255,255,255,0.85)]' : ''} ${selectedCol === d.c ? 'bg-muted-foreground/[0.10]' : ''} ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-4 border-amber-500/[0.25]' : ''} ${isWeekStart(idx) ? 'border-l-2 border-l-cyan-300/80' : ''}`}
                           style={{ minWidth: `${DAY_COL_WIDTH}px`, maxWidth: `${DAY_COL_WIDTH}px`, ...cellStyle.style }}
-                          title={value}
+                          title={`${value} · doble clic para escribir el horario`}
                           onClick={() => {
                             setSelectedRow(tech.r)
                             setSelectedCol(d.c)
                             selectCalendarDate(d)
                           }}
+                          onDoubleClick={() => abrirEditorDeCelda(tech, d)}
                         >
                           <span className="block leading-tight">{value}</span>
                           {tone && tone !== 'ok' ? (
@@ -3059,6 +3093,62 @@ export function CalendarioMantencionPage() {
         </div>
         </div>
       </section>}
+
+      {/* Editor de horario de una celda (doble clic sobre ella) */}
+      {celdaEditada && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 px-6"
+          onClick={() => setCeldaEditada(null)}
+        >
+          <div className="w-full max-w-xs rounded-card border border-border bg-card p-4" onClick={(e) => e.stopPropagation()}>
+            <p className="text-footnote font-semibold text-foreground">Horario de este día</p>
+            <p className="mt-0.5 text-caption text-muted-foreground">
+              {techRows.find((t) => t.r === celdaEditada.r)?.name ?? ''} · {dayLabelByCol(celdaEditada.c)}
+            </p>
+            <div className="mt-3 flex items-center gap-2">
+              <label className="flex-1 grid gap-1">
+                <span className="text-caption text-muted-foreground">Entra</span>
+                <input
+                  className={CONTROL_CLASS}
+                  type="time"
+                  value={horaDesde}
+                  onChange={(e) => setHoraDesde(e.target.value)}
+                />
+              </label>
+              <label className="flex-1 grid gap-1">
+                <span className="text-caption text-muted-foreground">Sale</span>
+                <input
+                  className={CONTROL_CLASS}
+                  type="time"
+                  value={horaHasta}
+                  onChange={(e) => setHoraHasta(e.target.value)}
+                />
+              </label>
+            </div>
+            <p className="mt-2 text-caption text-muted-foreground tabular-nums">
+              {horasDelEditor === null
+                ? 'Horario incompleto'
+                : `${horasDelEditor.toFixed(1)} h netas, descontando ${hoursConfig.breakHours} h de colación.`}
+            </p>
+            <div className="mt-3 flex gap-2">
+              <button
+                className="h-9 flex-1 rounded-ctl border border-border text-footnote text-muted-foreground"
+                onClick={() => setCeldaEditada(null)}
+              >
+                Cancelar
+              </button>
+              <button
+                className="h-9 flex-1 rounded-ctl bg-primary text-footnote font-semibold text-primary-foreground disabled:opacity-40"
+                disabled={horasDelEditor === null || horasDelEditor <= 0}
+                onClick={guardarEditorDeCelda}
+              >
+                Guardar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
 
     </div>
   )
