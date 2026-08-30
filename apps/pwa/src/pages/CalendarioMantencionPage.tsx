@@ -49,7 +49,6 @@ type HoursConfig = {
   workHours: number
   breakHours: number
   expectedWeek: number
-  expectedMonth: number
   autoLegalWeek: boolean
   workDaysPerWeek: number
   expectedFromPlannedDays: boolean
@@ -58,7 +57,6 @@ type HoursConfig = {
   dayReductionHours: number
   afternoonReductionHours: number
   nightReductionHours: number
-  vacationBusinessDaysOnly: boolean
   holidayAsNonWorking: boolean
   holidayBusinessDaysOnly: boolean
 }
@@ -124,7 +122,6 @@ function defaultHoursConfig(): HoursConfig {
     workHours: 8,
     breakHours: 0.5,
     expectedWeek: 44,
-    expectedMonth: 180,
     autoLegalWeek: true,
     workDaysPerWeek: 6,
     expectedFromPlannedDays: true,
@@ -133,7 +130,6 @@ function defaultHoursConfig(): HoursConfig {
     dayReductionHours: 1,
     afternoonReductionHours: 1,
     nightReductionHours: 1,
-    vacationBusinessDaysOnly: true,
     holidayAsNonWorking: true,
     holidayBusinessDaysOnly: true,
   }
@@ -444,7 +440,6 @@ export function CalendarioMantencionPage() {
       workHours: toNumberOr(stored.workHours, 8),
       breakHours: toNumberOr(stored.breakHours, 0.5),
       expectedWeek: toNumberOr(stored.expectedWeek, 44),
-      expectedMonth: toNumberOr(stored.expectedMonth, 180),
       autoLegalWeek: stored.autoLegalWeek !== false,
       workDaysPerWeek: Math.max(1, Math.min(7, Math.floor(toNumberOr(stored.workDaysPerWeek, 6)))),
       expectedFromPlannedDays: stored.expectedFromPlannedDays !== false,
@@ -453,7 +448,6 @@ export function CalendarioMantencionPage() {
       dayReductionHours: toNumberOr(stored.dayReductionHours, 1),
       afternoonReductionHours: toNumberOr(stored.afternoonReductionHours, 1),
       nightReductionHours: toNumberOr(stored.nightReductionHours, 1),
-      vacationBusinessDaysOnly: true,
       holidayAsNonWorking: stored.holidayAsNonWorking !== false,
       holidayBusinessDaysOnly: stored.holidayBusinessDaysOnly !== false,
     }
@@ -1650,7 +1644,6 @@ export function CalendarioMantencionPage() {
       workHours: clampMin(toNumberOr(hoursConfig.workHours, 8), 0),
       breakHours: clampMin(toNumberOr(hoursConfig.breakHours, 0.5), 0),
       expectedWeek: clampMin(toNumberOr(hoursConfig.expectedWeek, 44), 0),
-      expectedMonth: clampMin(toNumberOr(expectedMonthAutoBase, 180), 0),
       autoLegalWeek: hoursConfig.autoLegalWeek !== false,
       workDaysPerWeek: Math.max(1, Math.min(7, Math.floor(toNumberOr(hoursConfig.workDaysPerWeek, 6)))),
       expectedFromPlannedDays: hoursConfig.expectedFromPlannedDays !== false,
@@ -1658,7 +1651,6 @@ export function CalendarioMantencionPage() {
       dayReductionHours: clampMin(toNumberOr(hoursConfig.dayReductionHours, 1), 0),
       afternoonReductionHours: clampMin(toNumberOr(hoursConfig.afternoonReductionHours, 1), 0),
       nightReductionHours: clampMin(toNumberOr(hoursConfig.nightReductionHours, 1), 0),
-      vacationBusinessDaysOnly: true,
       holidayAsNonWorking: hoursConfig.holidayAsNonWorking !== false,
       holidayBusinessDaysOnly: hoursConfig.holidayBusinessDaysOnly !== false,
     }
@@ -2513,11 +2505,11 @@ export function CalendarioMantencionPage() {
             </div>
             <label className="text-muted-foreground self-center" title="Margen permitido bajo la meta esperada sin activar alerta visual en Control.">Tolerancia (h)</label>
             <input className={CONTROL_CLASS} type="number" step="0.25" value={hoursConfig.toleranceHours} onChange={(e) => setHoursConfig((p) => ({ ...p, toleranceHours: toNumberOr(e.target.value, p.toleranceHours) }))} />
-            <label className="text-muted-foreground self-center" title="Reducción de horas por Ley de 40h para turno día (atajo Shift + D).">Reducción por ley 40h - Día (h)</label>
+            <label className="text-muted-foreground self-center" title="Cuántas horas menos dura el turno de día cuando se marca como reducido con Shift + D.">Turno reducido · Día (h menos)</label>
             <input className={CONTROL_CLASS} type="number" step="0.25" min="0" value={hoursConfig.dayReductionHours} onChange={(e) => setHoursConfig((p) => ({ ...p, dayReductionHours: toNumberOr(e.target.value, p.dayReductionHours) }))} />
-            <label className="text-muted-foreground self-center" title="Reducción de horas por Ley de 40h para turno tarde (atajo Shift + T).">Reducción por ley 40h - Tarde (h)</label>
+            <label className="text-muted-foreground self-center" title="Cuántas horas menos dura el turno de tarde cuando se marca como reducido con Shift + T.">Turno reducido · Tarde (h menos)</label>
             <input className={CONTROL_CLASS} type="number" step="0.25" min="0" value={hoursConfig.afternoonReductionHours} onChange={(e) => setHoursConfig((p) => ({ ...p, afternoonReductionHours: toNumberOr(e.target.value, p.afternoonReductionHours) }))} />
-            <label className="text-muted-foreground self-center" title="Reducción de horas por Ley de 40h para turno noche (atajo Shift + N).">Reducción por ley 40h - Noche (h)</label>
+            <label className="text-muted-foreground self-center" title="Cuántas horas menos dura el turno de noche cuando se marca como reducido con Shift + N.">Turno reducido · Noche (h menos)</label>
             <input className={CONTROL_CLASS} type="number" step="0.25" min="0" value={hoursConfig.nightReductionHours} onChange={(e) => setHoursConfig((p) => ({ ...p, nightReductionHours: toNumberOr(e.target.value, p.nightReductionHours) }))} />
             <label className="col-span-2 flex items-center gap-2">
               <input type="checkbox" checked={hoursConfig.useFixedDaily} onChange={(e) => setHoursConfig((p) => ({ ...p, useFixedDaily: e.target.checked }))} />
@@ -2531,12 +2523,11 @@ export function CalendarioMantencionPage() {
               <input type="checkbox" checked={hoursConfig.expectedFromPlannedDays} onChange={(e) => setHoursConfig((p) => ({ ...p, expectedFromPlannedDays: e.target.checked }))} />
               <span title="Activado: esperado por técnico según días realmente programados (no LIBRE/descanso/licencia). Desactivado: prorrateo simple por calendario.">Esperado por días programados (recomendado para 6x1)</span>
             </label>
-            <label className="col-span-2 flex items-center gap-2">
-              <input type="checkbox" checked disabled />
-              <span title={`Fijo por regla legal interna: vacaciones se contabilizan solo en horario administrativo Lun-Vie. Horas de vacación por día = jornada legal semanal/5 (actual: ${expectedWeekBase}h/sem).`}>
-                Vacaciones legales (fijo): solo Lun-Vie
-              </span>
-            </label>
+            {/* Esto no es una opción: es una regla fija. Como casilla marcada y
+                deshabilitada invitaba a hacer clic y no pasaba nada. */}
+            <p className="col-span-2 text-muted-foreground" title={`Horas de vacación por día = jornada legal semanal / 5 (actual: ${expectedWeekBase} h/sem).`}>
+              Las vacaciones se cuentan solo de lunes a viernes, por regla legal.
+            </p>
             <label className="col-span-2 flex items-center gap-2">
               <input type="checkbox" checked={hoursConfig.holidayAsNonWorking} onChange={(e) => setHoursConfig((p) => ({ ...p, holidayAsNonWorking: e.target.checked }))} />
               <span title="Activado: feriado puede tratarse como día no hábil en algunas métricas de meta. Desactivado: se evalúa como día normal.">Feriados como no hábil en métricas</span>
