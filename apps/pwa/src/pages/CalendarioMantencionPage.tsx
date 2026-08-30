@@ -1,37 +1,20 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+﻿import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   AlertTriangle,
-  CalendarDays,
-  Check,
   ChevronDown,
   CornerUpLeft,
-  Pencil,
-  Settings,
-  X as XIcon,
-  Zap,
+  RotateCcw,
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { doc, getDoc, serverTimestamp } from 'firebase/firestore'
 import { db } from '../services/firebase'
 import { setDoc as trackedSetDoc } from '../services/firestoreTracked'
 import { getCurrentUser } from '../services/auth'
-import { getHmiTooltipPwd } from '../services/hmiKnuro'
 import { logger } from '@/lib/logger'
 import { semanaDeApertura } from './calendario/semanaDeApertura'
 import { RuedaVentanas } from '@/components/calendario/RuedaVentanas'
 
-/**
- * Semáforo de 4 niveles para el delta de horas (sobre-asignado → muy bajo).
- * El color ya lo pone la clase del contenedor; el ícono es el segundo canal (§13).
- */
-const deltaIcon = (delta: number, alto: number, ok: number, aviso: number) => {
-  const cls = 'h-3 w-3 shrink-0'
-  if (delta > alto) return <Zap className={cls} aria-label="Por sobre lo asignado" />
-  if (delta >= ok) return <Check className={cls} aria-label="En rango" />
-  if (delta >= aviso) return <AlertTriangle className={cls} aria-label="Bajo lo asignado" />
-  return <XIcon className={cls} aria-label="Muy por debajo" />
-}
 
 type DayCol = {
   c: number
@@ -292,6 +275,36 @@ function getPlanningMonthStart(): Date {
   return new Date(today.getFullYear(), today.getMonth(), 1)
 }
 
+/**
+ * Ventana absoluta de un turno, en minutos desde la medianoche del día de la etiqueta.
+ * Un turno que cierra a las 00:00 (o antes de su inicio) termina al día siguiente.
+ */
+function shiftWindow(shiftText: string): { start: number; end: number } | null {
+  const r = parseTimeRange(shiftText)
+  if (!r) return null
+  const start = hhmmToMinutes(r.start)
+  let end = hhmmToMinutes(r.end)
+  if (start === null || end === null) return null
+  if (end <= start) end += 24 * 60
+  return { start, end }
+}
+
+/** Horas de descanso entre el fin de un turno y el inicio del siguiente. */
+function restHoursBetween(prevDayIndex: number, prevShift: string, nextDayIndex: number, nextShift: string): number | null {
+  const a = shiftWindow(prevShift)
+  const b = shiftWindow(nextShift)
+  if (!a || !b) return null
+  const minutes = (nextDayIndex * 24 * 60 + b.start) - (prevDayIndex * 24 * 60 + a.end)
+  return minutes / 60
+}
+
+/** Semáforo del descanso: <11 h es ilegal, <16 h es el mínimo de un turno seguido. */
+function restTone(hours: number): 'malo' | 'justo' | 'ok' {
+  if (hours < 11) return 'malo'
+  if (hours < 16) return 'justo'
+  return 'ok'
+}
+
 function isoWeekKey(date: Date): string {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
   d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7))
@@ -373,6 +386,7 @@ export function CalendarioMantencionPage() {
   const [syncErrorText, setSyncErrorText] = useState('')
   const [originalFilename, setOriginalFilename] = useState('calendario-mantencion-base.xlsx')
 
+  const [sortByTurno, setSortByTurno] = useState(false)
   const [selectedRow, setSelectedRow] = useState<number | null>(null)
   const [selectedCol, setSelectedCol] = useState<number | null>(null)
   const [selectedWeek, setSelectedWeek] = useState('')
@@ -479,16 +493,8 @@ export function CalendarioMantencionPage() {
   const [todayTick, setTodayTick] = useState(() => Date.now())
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768 || (window.innerWidth < 1100 && window.innerHeight < 500))
   const [isLandscape, setIsLandscape] = useState(() => window.innerHeight < 500 && (window.innerWidth < 768 || window.innerWidth < 1100))
-  const [mobileViewMode, setMobileViewMode] = useState<'badges' | 'times' | 'reduced'>('badges')
-  const [mobileEditMode, setMobileEditMode] = useState(false)
-  const [mobileEditCell, setMobileEditCell] = useState<{ techR: number; dayC: number } | null>(null)
-  const [mobileEditStart, setMobileEditStart] = useState('')
-  const [mobileEditEnd, setMobileEditEnd] = useState('')
-  const [mobileTappedCell, setMobileTappedCell] = useState<{ techR: number; dayC: number } | null>(null)
-  const [mobileAdminGateOpen, setMobileAdminGateOpen] = useState(false)
-  const [mobileAdminGateInput, setMobileAdminGateInput] = useState('')
-  const [mobileAdminGateError, setMobileAdminGateError] = useState('')
-  const touchStartX = useRef<number | null>(null)
+  /** Salida de emergencia de la puerta de rotacion: si el tecnico no puede girar, igual entra. */
+  const [verEnVertical, setVerEnVertical] = useState(false)
 
   const shortcuts = useMemo(() => {
     const dia = `${shiftConfig.diaInicio} - ${shiftConfig.diaFin}`
@@ -650,8 +656,11 @@ export function CalendarioMantencionPage() {
 
   useEffect(() => {
     const onPointerDown = (event: MouseEvent) => {
-      const target = event.target as Node | null
+      const target = event.target as HTMLElement | null
       const insideCalendar = !!(target && calendarSectionRef.current?.contains(target))
+      // Los botones de la cabecera del calendario (ordenar por turno, etc.) son neutros:
+      // no arman los atajos de edición, para que ordenar no deje el teclado editando celdas.
+      if (insideCalendar && target?.closest('button')) return
       setCalendarShortcutsActive(insideCalendar)
     }
 
@@ -1452,6 +1461,82 @@ export function CalendarioMantencionPage() {
     return isoWeekKey(curr) !== isoWeekKey(prev)
   }
 
+  /** Filas en el orden de la planilla, o agrupadas por turno si el usuario lo pide. */
+  const displayTechRows = useMemo(() => {
+    if (!sortByTurno) return techRows
+    return techRows.slice().sort((a, b) => {
+      const ta = (a.turno || '~').trim().toUpperCase()
+      const tb = (b.turno || '~').trim().toUpperCase()
+      if (ta !== tb) return ta.localeCompare(tb)
+      return a.name.localeCompare(b.name)
+    })
+  }, [techRows, sortByTurno])
+
+  /**
+   * Descanso antes de cada turno: horas entre el fin del turno trabajado anterior
+   * y el inicio de este. Clave `r-c`. Sirve para cazar vueltas cortas de un vistazo.
+   */
+  const restByCell = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const tech of techRows) {
+      let prevIdx: number | null = null
+      let prevShift = ''
+      dayCols.forEach((d, idx) => {
+        const value = tech.shifts[d.c] || ''
+        if (!shiftWindow(value)) return
+        if (prevIdx !== null) {
+          const h = restHoursBetween(prevIdx, prevShift, idx, value)
+          if (h !== null) map.set(`${tech.r}-${d.c}`, h)
+        }
+        prevIdx = idx
+        prevShift = value
+      })
+    }
+    return map
+  }, [techRows, dayCols])
+
+  /** Horas trabajadas por técnico en cada semana ISO visible. Clave `r-semana`. */
+  const weekHoursByCell = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const tech of techRows) {
+      dayCols.forEach((d) => {
+        if (!d.dateObj) return
+        const key = `${tech.r}-${isoWeekKey(d.dateObj)}`
+        map.set(key, (map.get(key) || 0) + workedHoursForShift(tech.shifts[d.c] || ''))
+      })
+    }
+    return map
+    // workedHoursForShift se recrea en cada render; sus entradas reales son hoursConfig y shiftConfig.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [techRows, dayCols, hoursConfig, shiftConfig])
+
+  /** Para cada columna que abre semana, la clave ISO de esa semana. */
+  function weekKeyAt(index: number): string | null {
+    const d = dayCols[index]?.dateObj
+    return d ? isoWeekKey(d) : null
+  }
+
+  /**
+   * Qué se va a exportar realmente. Decía «1 días» sin decir de qué: quien elige
+   * «Mes actual» a fin de mes se llevaba un día sin enterarse.
+   */
+  const resumenExport = useMemo(() => {
+    const cols = selectedExportCols()
+    const n = cols.length
+    const primera = cols[0]?.dateRaw ?? ''
+    const ultima = cols[n - 1]?.dateRaw ?? ''
+    const etiqueta = n === 0 ? 'sin días' : n === 1 ? '1 día' : `${n} días`
+    const detalle = n === 0
+      ? 'El alcance elegido no tiene ningún día en la planilla.'
+      : `Se exportarán ${etiqueta}: del ${primera} al ${ultima}.`
+    // Un alcance de mes o «todo» con menos de una semana casi siempre significa
+    // que la planilla todavía no cubre ese período.
+    const escaso = n < 7 && (exportScope === 'month' || exportScope === 'months' || exportScope === 'all')
+    return { etiqueta, detalle: escaso ? detalle + ' La planilla apenas cubre ese período.' : detalle, escaso }
+    // selectedExportCols se recrea en cada render; sus entradas reales son las de abajo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dayCols, exportScope, exportSpanCount, selectedMonth, selectedWeek])
+
   const hoursRows = techRows.map((t) => {
     const weekWorkedHours = weekDays.reduce((sum, d) => sum + workedHoursForShift(t.shifts[d.c] || ''), 0)
     const monthWorkedHours = monthDays.reduce((sum, d) => sum + workedHoursForShift(t.shifts[d.c] || ''), 0)
@@ -1828,23 +1913,32 @@ export function CalendarioMantencionPage() {
   }
 
   // ── Helpers vista móvil ──
-  function shiftToMobileBadge(shift: string | undefined): { letter: string; cls: string } {
-    if (!shift || shift.trim() === '' || shift.trim() === '0') return { letter: '–', cls: 'text-muted-foreground' }
-    const s = shift.trim().toUpperCase()
-    if (s === 'VACACIONES') return { letter: 'V', cls: 'bg-primary/[0.15] text-primary' }
-    if (s === 'FERIADO')    return { letter: 'F', cls: 'bg-amber-500/[0.15] text-ink-warn' }
-    if (s.includes('LIBRE')) return { letter: 'L', cls: 'bg-muted-foreground/[0.10] text-muted-foreground' }
-    // Detectar por hora de inicio (robusto ante turnos reducidos y variantes)
-    const startTime = shift.match(/^(\d{1,2}:\d{2})/)?.[1]
-    if (startTime) {
-      if (startTime === shiftConfig.nocheInicio) return { letter: 'N', cls: 'bg-cat-6-tint/[0.15] text-cat-6-ink' }
-      if (startTime === shiftConfig.tardeInicio) return { letter: 'T', cls: 'bg-amber-500/[0.15] text-ink-warn' }
-      if (startTime === shiftConfig.diaInicio)   return { letter: 'D', cls: 'bg-primary/[0.15] text-primary' }
-    }
-    return { letter: '·', cls: 'text-muted-foreground' }
-  }
 
   // isReducedShift ya definida arriba (línea ~1286)
+
+  /** Banda del turno a partir de su hora de inicio. Null si es libre/vacaciones/feriado. */
+  function bandaDeTurno(shift: string | undefined): 'dia' | 'tarde' | 'noche' | null {
+    if (!shift || !isWorkingShift(shift)) return null
+    const start = shift.match(/^(\d{1,2}:\d{2})/)?.[1]
+    if (!start) return null
+    if (start === shiftConfig.nocheInicio) return 'noche'
+    if (start === shiftConfig.tardeInicio) return 'tarde'
+    if (start === shiftConfig.diaInicio) return 'dia'
+    const h = Number(start.split(':')[0])
+    if (h < 8) return 'noche'
+    if (h < 16) return 'dia'
+    return 'tarde'
+  }
+
+  /** Turnos por banda en un dia. Alimenta el pie de la vista horizontal. */
+  function dotacionDelDia(c: number): { dia: number; tarde: number; noche: number } {
+    const r = { dia: 0, tarde: 0, noche: 0 }
+    for (const t of techRows) {
+      const b = bandaDeTurno(t.shifts[c])
+      if (b) r[b] += 1
+    }
+    return r
+  }
 
   function shiftTimeCompact(shift: string | undefined): { start: string; end: string } | null {
     if (!shift) return null
@@ -1853,19 +1947,93 @@ export function CalendarioMantencionPage() {
     return { start: m[1], end: m[2] }
   }
 
-  function openMobileEdit(tech: TechRow, d: DayCol) {
-    const shift = tech.shifts[d.c] || ''
-    const times = shiftTimeCompact(shift)
-    setMobileEditCell({ techR: tech.r, dayC: d.c })
-    setMobileEditStart(times?.start || shiftConfig.diaInicio)
-    setMobileEditEnd(times?.end || shiftConfig.diaFin)
+  /** «08:00 - 16:00» -> «08–16». Conserva los minutos solo cuando no son en punto. */
+  function horarioCorto(shift: string | undefined): string | null {
+    const t = shiftTimeCompact(shift)
+    if (!t) return null
+    const corto = (hhmm: string) => (hhmm.endsWith(':00') ? hhmm.slice(0, 2) : hhmm)
+    return corto(t.start) + '–' + corto(t.end)
   }
 
-  function saveMobileEdit() {
-    if (!mobileEditCell || !mobileEditStart || !mobileEditEnd) return
-    applyShift(mobileEditCell.techR, mobileEditCell.dayC, `${mobileEditStart} - ${mobileEditEnd}`)
-    setMobileEditCell(null)
+  /**
+   * Pide pantalla completa y bloquea la orientación en horizontal.
+   * Solo funciona en Android; en iOS la API no existe y la promesa se rechaza,
+   * por eso el fallo es silencioso: el usuario gira el teléfono a mano.
+   */
+  async function girarAHorizontal(): Promise<void> {
+    try {
+      const raiz = document.documentElement as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> }
+      if (!document.fullscreenElement) {
+        if (raiz.requestFullscreen) await raiz.requestFullscreen()
+        else if (raiz.webkitRequestFullscreen) await raiz.webkitRequestFullscreen()
+      }
+      const orient = screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> }
+      if (orient?.lock) await orient.lock('landscape')
+    } catch {
+      // Sin API (iOS) o sin permiso: queda la invitación a girar a mano.
+    }
   }
+
+  /** Día que mira la vista vertical. Arranca en hoy si está en la planilla. */
+  const [diaVerticalC, setDiaVerticalC] = useState<number | null>(null)
+  const diaActivo = useMemo(() => {
+    if (dayCols.length === 0) return null
+    if (diaVerticalC !== null) {
+      const encontrado = dayCols.find((d) => d.c === diaVerticalC)
+      if (encontrado) return encontrado
+    }
+    return todayDayCol ?? dayCols[0] ?? null
+  }, [dayCols, diaVerticalC, todayDayCol])
+  const indiceDiaActivo = diaActivo ? dayCols.findIndex((d) => d.c === diaActivo.c) : -1
+  const diaAnterior = indiceDiaActivo > 0 ? dayCols[indiceDiaActivo - 1] : null
+  const diaSiguiente = indiceDiaActivo >= 0 && indiceDiaActivo < dayCols.length - 1 ? dayCols[indiceDiaActivo + 1] : null
+  const esHoy = isSameDate(diaActivo?.dateObj ?? null, todayDayCol?.dateObj ?? null)
+  function irADiaRelativo(paso: number): void {
+    const destino = paso < 0 ? diaAnterior : diaSiguiente
+    if (destino) setDiaVerticalC(destino.c)
+  }
+
+  /** Filas de la vista horizontal: siempre agrupadas por turno, con el fijo al final. */
+  const horizontalRows = useMemo(() => {
+    return techRows.slice().sort((a, b) => {
+      const ta = (a.turno || '~').trim().toUpperCase()
+      const tb = (b.turno || '~').trim().toUpperCase()
+      if (ta !== tb) return ta.localeCompare(tb)
+      return a.name.localeCompare(b.name)
+    })
+  }, [techRows])
+
+  /** Los nombres vienen en mayúsculas desde el Excel; en pantalla se leen mejor capitalizados. */
+  function nombreParaMostrar(name: string): string {
+    // shortName deja «Jose Chodil M.»; la inicial del segundo apellido es lo que
+    // desborda los 132 px de la columna, y no distingue a nadie en un grupo de nueve.
+    return shortName(name).replace(/\s+[A-ZÁÉÍÓÚÑ]\.$/i, '')
+      .toLocaleLowerCase('es-CL')
+      .replace(/(^|[\s'-])([\p{L}])/gu, (_m, sep: string, letra: string) => sep + letra.toLocaleUpperCase('es-CL'))
+  }
+
+  /** Color de la celda según la banda. Tokens de la piel, no clases crudas. */
+  function bandaClase(banda: 'dia' | 'tarde' | 'noche' | null): string {
+    if (banda === 'dia') return 'bg-primary/[0.15] text-brand-ink'
+    if (banda === 'tarde') return 'bg-cat-4-tint/[0.15] text-cat-4-ink'
+    if (banda === 'noche') return 'bg-cat-6-tint/[0.15] text-cat-6-ink'
+    return 'bg-muted text-muted-foreground font-medium'
+  }
+
+  /** Qué escribir en una celda que no es un turno trabajado. */
+  function etiquetaNoLaboral(turno: string): string {
+    const t = (turno || '').trim().toUpperCase()
+    if (!t) return '—'
+    if (t.startsWith('VACAC')) return 'Vac.'
+    if (t.startsWith('FERIA')) return 'Feriado'
+    if (t.includes('LICENCIA')) return 'Licencia'
+    return 'Libre'
+  }
+
+  const syncPuntoClase = 'ml-auto h-2 w-2 shrink-0 rounded-full '
+    + (syncState === 'saving' ? 'bg-ink-warn' : syncState === 'synced' ? 'bg-ink-ok' : syncState === 'error' ? 'bg-ink-crit' : 'bg-muted-foreground')
+
+
 
   function shortName(name: string): string {
     // Formato Excel: "APELLIDO1 APELLIDO2, NOMBRE1 NOMBRE2"
@@ -1884,10 +2052,6 @@ export function CalendarioMantencionPage() {
     return `${parts[0]} ${parts[1]} ${parts[2]![0]}.`
   }
 
-  function shortWeekday(date: Date | null): string {
-    if (!date) return ''
-    return (['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá'] as const)[date.getDay()] ?? ''
-  }
 
   const weekKeys = useMemo(() => Object.keys(weeks).sort(), [weeks])
   const currentWeekIdx = useMemo(() => weekKeys.indexOf(selectedWeek), [weekKeys, selectedWeek])
@@ -1916,15 +2080,12 @@ export function CalendarioMantencionPage() {
     return parts.length === 2 ? `Sem ${parts[1]} · ${parts[0]}` : (selectedWeek || 'Semana actual')
   }, [selectedWeek])
 
-  function handleSwipe(deltaX: number) {
-    // deltaX = startX - endX: positivo = dedo movió izquierda = ir a semana siguiente
-    if (deltaX > 50 && nextWeekKey) setSelectedWeek(nextWeekKey)
-    else if (deltaX < -50 && prevWeekKey) setSelectedWeek(prevWeekKey)
-  }
 
   const TAB_ITEMS: { id: TabId; label: string }[] = [
     { id: 'edicion', label: 'Edición' },
-    { id: 'plantillas', label: 'Turnos' },
+    // «Turnos» chocaba con la pestaña de módulo del mismo nombre: era «Turnos › Turnos».
+    // Aquí se definen las horas de inicio y fin de cada banda, así que es «Horarios».
+    { id: 'plantillas', label: 'Horarios' },
     { id: 'horas', label: 'Horas' },
     { id: 'tecnicos', label: 'Técnicos' },
     { id: 'control', label: 'Control' },
@@ -1936,7 +2097,7 @@ export function CalendarioMantencionPage() {
       {/* ══════════════════════════════════════════
           Conmutador de vista del módulo
           ══════════════════════════════════════════ */}
-      <div className="flex shrink-0 gap-1" role="tablist" aria-label="Vista del calendario">
+      <div className={`shrink-0 gap-1 ${isMobile && isLandscape ? 'hidden' : 'flex'}`} role="tablist" aria-label="Vista del calendario">
         {([['turnos', 'Turnos'], ['rueda', 'Ventanas de intervención']] as const).map(([id, label]) => (
           <button
             key={id}
@@ -1963,470 +2124,244 @@ export function CalendarioMantencionPage() {
       {/* ══════════════════════════════════════════
           VISTA MÓVIL — lectura de turnos por semana
           ══════════════════════════════════════════ */}
-      {vistaModulo === 'turnos' && isMobile && (
-        <div className="h-full min-h-0 flex flex-col gap-1">
-
-          {isLandscape ? (
-            /* ── LANDSCAPE: una sola fila compacta ── */
-            <div className="flex items-center gap-1 rounded-card border bg-card px-1.5 py-0.5 shrink-0">
-              <button onClick={() => prevWeekKey && setSelectedWeek(prevWeekKey)} disabled={!prevWeekKey}
-                className="h-6 w-6 shrink-0 flex items-center justify-center rounded-ctl border border-border text-sm text-muted-foreground disabled:opacity-30 active:bg-muted select-none">‹</button>
-              <div className="text-center min-w-0 flex-1">
-                <span className="text-caption font-semibold text-foreground">{mobileWeekLabel}</span>
-                {isCurrentWeek
-                  ? <span className="ml-1 text-caption text-ink-warn">● hoy</span>
-                  : weekKeys.includes(todayWeekKey) ? (
-                    <button onClick={() => setSelectedWeek(todayWeekKey)}
-                      className="ml-1.5 inline-flex h-5 items-center gap-1 px-1.5 text-caption font-medium text-ink-warn border border-amber-500/[0.25] rounded-ctl bg-amber-500/[0.15] active:bg-amber-500/[0.15] select-none"><CornerUpLeft className="h-3 w-3" />Ir a hoy</button>
-                  ) : finDePlanilla && (
-                    <span className="ml-1.5 text-caption text-ink-warn">· la planilla llega al {finDePlanilla}</span>
-                  )
-                }
-              </div>
-              <button onClick={() => nextWeekKey && setSelectedWeek(nextWeekKey)} disabled={!nextWeekKey}
-                className="h-6 w-6 shrink-0 flex items-center justify-center rounded-ctl border border-border text-sm text-muted-foreground disabled:opacity-30 active:bg-muted select-none">›</button>
-              <div className="w-px h-4 bg-border/50 mx-0.5 shrink-0" />
-              {([
-                { id: 'badges',  label: 'D/T/N' },
-                { id: 'times',   label: 'HH:MM' },
-                { id: 'reduced', label: '↓R' },
-              ] as const).map(v => (
-                <button key={v.id} onClick={() => { setMobileViewMode(v.id); setMobileTappedCell(null) }}
-                  className={`h-6 px-2 rounded-ctl border text-caption font-medium transition-colors select-none ${mobileViewMode === v.id ? 'bg-primary border-primary text-primary-foreground' : 'border-border text-muted-foreground active:bg-muted'}`}>
-                  {v.label}</button>
-              ))}
-              <button
-                onClick={() => { if (mobileEditMode) { setMobileEditMode(false); setMobileEditCell(null); setMobileTappedCell(null) } else { setMobileAdminGateInput(''); setMobileAdminGateError(''); setMobileAdminGateOpen(true) } }}
-                aria-label={mobileEditMode ? 'Salir del modo edición' : 'Editar calendario'}
-                className={`inline-flex h-6 items-center justify-center px-2 rounded-ctl border text-caption font-medium transition-colors select-none ${mobileEditMode ? 'bg-emerald-600 border-emerald-500 text-white' : 'border-border text-muted-foreground active:bg-muted'}`}><Pencil className="h-3 w-3" /></button>
-              <span title={syncIndicator.label} className={`w-1.5 h-1.5 rounded-full shrink-0 ml-0.5 ${syncState === 'saving' ? 'bg-amber-400' : syncState === 'synced' ? 'bg-emerald-400' : syncState === 'error' ? 'bg-red-400' : 'bg-muted-foreground'}`} />
-            </div>
-          ) : (
-            /* ── PORTRAIT: dos filas ── */
-            <>
-              <div className="flex items-center gap-1.5 rounded-card border bg-card px-2 py-1 shrink-0">
-                <button onClick={() => prevWeekKey && setSelectedWeek(prevWeekKey)} disabled={!prevWeekKey}
-                  className="h-7 w-7 shrink-0 flex items-center justify-center rounded-ctl border border-border text-base text-muted-foreground disabled:opacity-30 active:bg-muted select-none">‹</button>
-                <div className="flex-1 text-center min-w-0">
-                  <div className="text-caption font-semibold text-foreground truncate leading-tight">
-                    {mobileWeekLabel}
-                    {isCurrentWeek && <span className="ml-1 text-caption text-ink-warn font-normal">● hoy</span>}
-                  </div>
-                  <div className="text-caption text-muted-foreground leading-tight">
-                    {weekDays[0] ? formatDate(weekDays[0].dateObj) : '—'}–{weekDays.length > 0 ? formatDate(weekDays[weekDays.length - 1]!.dateObj) : '—'}
-                  </div>
-                </div>
-                {!isCurrentWeek && weekKeys.includes(todayWeekKey) && (
-                  <button onClick={() => setSelectedWeek(todayWeekKey)}
-                    className="shrink-0 inline-flex h-6 items-center gap-1 px-1.5 rounded-ctl border border-amber-500/[0.25] bg-amber-500/[0.15] text-caption font-medium text-ink-warn active:bg-amber-500/[0.15] select-none"><CornerUpLeft className="h-3 w-3" />Hoy</button>
-                )}
-                {finDePlanilla && (
-                  <span className="shrink-0 text-caption text-ink-warn leading-tight">
-                    la planilla llega al {finDePlanilla}
-                  </span>
-                )}
-                <span title={syncIndicator.label} className={`w-2 h-2 rounded-full shrink-0 ${syncState === 'saving' ? 'bg-amber-400' : syncState === 'synced' ? 'bg-emerald-400' : syncState === 'error' ? 'bg-red-400' : 'bg-muted-foreground'}`} />
-                <button onClick={() => nextWeekKey && setSelectedWeek(nextWeekKey)} disabled={!nextWeekKey}
-                  className="h-7 w-7 shrink-0 flex items-center justify-center rounded-ctl border border-border text-base text-muted-foreground disabled:opacity-30 active:bg-muted select-none">›</button>
-              </div>
-              <div className="flex items-center gap-1.5 shrink-0">
-                {([
-                  { id: 'badges',  label: 'D/T/N',   title: 'Vista de letras — tap para ver hora' },
-                  { id: 'times',   label: 'HH:MM',   title: 'Muestra el horario de cada turno' },
-                  { id: 'reduced', label: '↓Reducc', title: 'Destaca solo los turnos con reducción horaria' },
-                ] as const).map(v => (
-                  <button key={v.id} title={v.title} onClick={() => { setMobileViewMode(v.id); setMobileTappedCell(null) }}
-                    className={`flex-1 h-6 rounded-ctl border text-caption font-medium transition-colors select-none ${mobileViewMode === v.id ? 'bg-primary border-primary text-primary-foreground' : 'border-border text-muted-foreground hover:text-foreground active:bg-muted'}`}>
-                    {v.label}</button>
-                ))}
-                <button
-                  onClick={() => { if (mobileEditMode) { setMobileEditMode(false); setMobileEditCell(null); setMobileTappedCell(null) } else { setMobileAdminGateInput(''); setMobileAdminGateError(''); setMobileAdminGateOpen(true) } }}
-                  aria-label={mobileEditMode ? 'Salir del modo edición' : 'Editar calendario'}
-                  className={`inline-flex h-6 items-center justify-center px-2.5 rounded-ctl border text-caption font-medium transition-colors select-none ${mobileEditMode ? 'bg-emerald-600 border-emerald-500 text-white' : 'border-border text-muted-foreground hover:text-foreground active:bg-muted'}`}><Pencil className="h-3 w-3" /></button>
-              </div>
-            </>
-          )}
-
-          {/* Grilla semanal */}
-          <div
-            className="flex-1 min-h-0 overflow-auto rounded-card border bg-card"
-            onTouchStart={(e) => { touchStartX.current = e.touches[0]?.clientX ?? null }}
-            onTouchEnd={(e) => {
-              if (touchStartX.current === null) return
-              handleSwipe(touchStartX.current - (e.changedTouches[0]?.clientX ?? touchStartX.current))
-              touchStartX.current = null
-            }}
+      {/* ══ MÓVIL VERTICAL: puerta de rotación ══
+          El calendario es una matriz de 9 técnicos × 7 días: en 375 px no cabe.
+          En horizontal sí, con el horario escrito. Se invita a girar, no se obliga:
+          en iOS no existe API para forzar la orientación, y con el giro bloqueado
+          en los ajustes del teléfono esta pantalla sería un muro. */}
+      {vistaModulo === 'turnos' && isMobile && !isLandscape && !verEnVertical && (
+        <div className="flex h-[calc(100dvh-9rem)] min-h-0 flex-col items-center justify-center gap-4 px-8 text-center">
+          <RotateCcw className="h-14 w-14 text-primary" strokeWidth={1.5} aria-hidden />
+          <div className="space-y-1.5">
+            <p className="text-headline font-semibold text-foreground">Gira el teléfono</p>
+            <p className="text-footnote text-muted-foreground">
+              El calendario de turnos se ve completo en horizontal: los siete días con su horario.
+            </p>
+          </div>
+          <button
+            onClick={girarAHorizontal}
+            className="inline-flex min-h-11 items-center rounded-ctl bg-primary px-5 text-footnote font-semibold text-primary-foreground active:opacity-80 select-none"
           >
-            {weekDays.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full gap-2 text-xs text-muted-foreground p-6 text-center">
-                <CalendarDays className="h-8 w-8 text-muted-foreground/50" />
-                <span>No hay datos cargados.<br/>Usa <strong>"Editar"</strong> para cargar el calendario.</span>
-              </div>
-            ) : (
-              <table className={`border-collapse text-caption ${isLandscape ? 'w-full table-fixed' : 'min-w-max'}`}>
-                <thead className="sticky top-0 z-[15]">
-                  <tr className="bg-muted text-foreground border-b border-border">
-                    <th className="sticky left-0 z-[25] bg-muted px-1.5 py-1.5 text-left font-semibold"
-                      style={isLandscape ? { width: '25%' } : { width: 110, minWidth: 110, maxWidth: 110 }}>
-                      {mobileEditMode ? <span className="inline-flex items-center gap-1 text-ink-ok text-caption"><Pencil className="h-3 w-3" />Toca un día</span> : <span className="text-muted-foreground text-caption tracking-wide">Técnico</span>}
+            Girar ahora
+          </button>
+          <button
+            onClick={() => setVerEnVertical(true)}
+            className="min-h-11 text-footnote font-medium text-primary active:opacity-70 select-none"
+          >
+            Ver igual en vertical
+          </button>
+        </div>
+      )}
+
+      {/* ══ MÓVIL HORIZONTAL: la matriz completa, con el horario a la vista ══ */}
+      {vistaModulo === 'turnos' && isMobile && isLandscape && (
+        // Altura atada al viewport: la cadena de h-full está rota más arriba y sin
+        // esto el pie de dotación queda bajo el borde de la pantalla.
+        <div className="flex h-[calc(100dvh-3.5rem)] min-h-0 flex-col gap-1">
+          <div className="flex shrink-0 items-center gap-2 px-1">
+            <button onClick={() => prevWeekKey && setSelectedWeek(prevWeekKey)} disabled={!prevWeekKey}
+              aria-label="Semana anterior"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-ctl border border-border text-muted-foreground disabled:opacity-30 active:bg-muted select-none">‹</button>
+            <span className="text-footnote font-semibold text-foreground">{mobileWeekLabel}</span>
+            <span className="text-caption text-muted-foreground tabular-nums">
+              {weekDays[0] ? formatDate(weekDays[0].dateObj) : '—'}–{weekDays.length > 0 ? formatDate(weekDays[weekDays.length - 1]!.dateObj) : '—'}
+            </span>
+            {isCurrentWeek
+              ? <span className="text-caption text-ink-warn">● hoy</span>
+              : weekKeys.includes(todayWeekKey) ? (
+                <button onClick={() => setSelectedWeek(todayWeekKey)}
+                  className="inline-flex h-6 items-center gap-1 rounded-ctl border border-border px-1.5 text-caption font-medium text-ink-warn active:bg-muted select-none">
+                  <CornerUpLeft className="h-3 w-3" />Hoy</button>
+              ) : finDePlanilla ? (
+                <span className="text-caption text-ink-warn">la planilla llega al {finDePlanilla}</span>
+              ) : null}
+            <span title={syncIndicator.label} aria-label={syncIndicator.label}
+              className={syncPuntoClase}></span>
+            <button onClick={() => nextWeekKey && setSelectedWeek(nextWeekKey)} disabled={!nextWeekKey}
+              aria-label="Semana siguiente"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-ctl border border-border text-muted-foreground disabled:opacity-30 active:bg-muted select-none">›</button>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-auto rounded-card bg-card px-1.5 py-1">
+            <table className="w-full table-fixed border-separate border-spacing-y-0.5 tabular-nums">
+              <thead>
+                <tr>
+                  <th className="w-[150px] pb-1 pl-1 text-left text-caption font-semibold text-muted-foreground">Técnico</th>
+                  {weekDays.map((d) => (
+                    <th key={d.c} className={isSameDate(d.dateObj, todayDayCol?.dateObj ?? null)
+                      ? 'pb-1 text-center text-caption font-semibold text-ink-warn'
+                      : 'pb-1 text-center text-caption font-semibold text-muted-foreground'}>
+                      {d.dayLabel.slice(0, 3)}
+                      <span className="block text-caption font-normal opacity-70">{d.dateObj ? d.dateObj.getDate() : ''}</span>
                     </th>
-                    {weekDays.map((d) => {
-                      const isT = isSameDate(d.dateObj, todayDayCol?.dateObj ?? null)
-                      return (
-                        <th key={d.c} className={`px-1 py-1 text-center ${isT ? 'bg-amber-500/[0.15] text-ink-warn' : ''}`}
-                          style={isLandscape ? undefined : { minWidth: 46 }}>
-                          <div className="text-caption font-normal text-muted-foreground">{shortWeekday(d.dateObj)}</div>
-                          <div className="font-bold leading-tight text-foreground">{d.dateObj?.getDate()}</div>
-                        </th>
-                      )
-                    })}
-                    <th className="sticky right-0 z-[25] bg-muted px-1 py-1.5 border-l border-border"
-                      style={isLandscape ? { width: '25%' } : { width: 50, minWidth: 50 }}
-                      title="Horas trabajadas esta semana · este mes">
-                      {isLandscape ? (
-                        <div className="flex items-center justify-around text-caption font-normal opacity-90 px-1 gap-0.5">
-                          <span className="whitespace-nowrap">h·sem</span>
-                          <span className="opacity-40">|</span>
-                          <span className="whitespace-nowrap opacity-70">h·mes</span>
-                        </div>
-                      ) : (
-                        <div className="text-caption font-normal opacity-90 text-right pr-0.5 leading-tight">
-                          <div>h.sem</div>
-                          <div className="opacity-70">h.mes</div>
-                        </div>
-                      )}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {techRows.map((tech, idx) => {
-                    const turnoKey = tech.turno.trim().toUpperCase()
-                    const nextTurno = techRows[idx + 1]?.turno.trim().toUpperCase()
-                    const isLastOfGroup = nextTurno && nextTurno !== turnoKey
-                    const rowBg = turnoKey === 'A' ? 'bg-cat-7-tint/[0.15]' : turnoKey === 'B' ? 'bg-amber-500/[0.15]' : turnoKey === 'C' ? 'bg-cat-6-tint/[0.15]' : idx % 2 === 1 ? 'bg-muted' : ''
-                    const stickyBg = turnoKey === 'A' ? 'bg-cat-7-tint/[0.15]' : turnoKey === 'B' ? 'bg-amber-500/[0.15]' : turnoKey === 'C' ? 'bg-cat-6-tint/[0.15]' : 'bg-card'
-                    const cellPy = isLandscape ? 'py-0' : 'py-1.5'
-                    return (
-                    <tr key={tech.r} className={`${isLastOfGroup ? 'border-b-2 border-border' : 'border-b border-border/40'} ${rowBg}`}>
-                      <td className={`sticky left-0 z-[5] ${stickyBg} border-r border-border/30 px-1.5 ${cellPy}`}
-                        style={isLandscape ? { width: '25%' } : { width: 110, minWidth: 110, maxWidth: 110 }}>
-                        <div className="flex items-center gap-1.5">
-                          <span className={`shrink-0 inline-flex h-5 w-5 items-center justify-center rounded-ctl border text-caption font-bold ${turnoBadgeClass(tech.turno)}`}>
-                            {tech.turno || '·'}
-                          </span>
-                          <span className="truncate font-medium text-foreground">{shortName(tech.name)}</span>
-                        </div>
+                  ))}
+                  <th className="w-[54px] pb-1 pr-1 text-right text-caption font-semibold text-muted-foreground">h·sem</th>
+                </tr>
+              </thead>
+              <tbody>
+                {horizontalRows.map((tech) => {
+                  const hr = hoursRows.find((h) => h.tech.r === tech.r)
+                  const semana = hr?.weekHours ?? 0
+                  const sobreTope = semana > expectedWeekBase + 0.01
+                  return (
+                    <tr key={tech.r}>
+                      <td className="max-w-[150px] truncate pl-1 text-caption font-medium text-foreground">
+                        <span className={'mr-1.5 inline-block h-4 w-4 rounded-ctl text-center align-[1px] text-caption font-bold leading-4 ' + turnoBadgeClass(tech.turno)}>
+                          {tech.turno || '·'}
+                        </span>
+                        {nombreParaMostrar(tech.name)}
                       </td>
                       {weekDays.map((d) => {
-                        const shift = tech.shifts[d.c]
-                        const badge = shiftToMobileBadge(shift)
-                        const times = shiftTimeCompact(shift)
-                        const isT = isSameDate(d.dateObj, todayDayCol?.dateObj ?? null)
-                        const isTapped = mobileTappedCell?.techR === tech.r && mobileTappedCell?.dayC === d.c
-                        const isEditing = mobileEditCell?.techR === tech.r && mobileEditCell?.dayC === d.c
-                        const isReduced = isReducedShift(shift ?? '')
-
-                        // Ancho de celda: landscape = 100%, portrait = fijo
-                        const cellW = isLandscape ? 'w-full' : 'w-10'
-                        const cellH = isLandscape ? 'h-6' : 'h-8'
-
-                        // Contenido de la celda según la vista activa
-                        let cellContent: ReactNode
-                        if (mobileEditMode) {
-                          cellContent = (
-                            <button
-                              onClick={() => openMobileEdit(tech, d)}
-                              className={`inline-flex flex-col items-center justify-center ${cellW} ${cellH} rounded-ctl border text-caption font-bold transition-colors ${
-                                isEditing
-                                  ? 'border-emerald-400 bg-emerald-500/[0.15] text-ink-ok'
-                                  : 'border-dashed border-border/60 hover:border-primary/60 active:bg-muted'
-                              } ${badge.cls}`}
-                            >
-                              {times ? (
-                                <>
-                                  <span className="text-caption leading-none">{times.start}</span>
-                                  <span className="text-caption leading-none opacity-60">{times.end}</span>
-                                </>
-                              ) : badge.letter}
-                            </button>
-                          )
-                        } else if (mobileViewMode === 'badges') {
-                          if (isLandscape) {
-                            // Landscape D/T/N: solo letra, sin hora
-                            cellContent = (
-                              <span className={`inline-flex items-center justify-center ${cellW} ${cellH} rounded-ctl font-bold ${badge.cls}`}>
-                                <span className="text-footnote leading-none">{badge.letter}</span>
-                              </span>
-                            )
-                          } else if (isTapped && times) {
-                            // Portrait tapped: muestra hora
-                            cellContent = (
-                              <button
-                                onClick={() => setMobileTappedCell(null)}
-                                className={`inline-flex flex-col items-center justify-center ${cellW} ${cellH} rounded-ctl bg-muted text-foreground`}
-                              >
-                                <span className="text-caption leading-none">{times.start}</span>
-                                <span className="text-caption leading-none opacity-70">{times.end}</span>
-                              </button>
-                            )
-                          } else {
-                            // Portrait normal: solo letra, tap para ver hora
-                            cellContent = (
-                              <button
-                                onClick={() => times && setMobileTappedCell({ techR: tech.r, dayC: d.c })}
-                                className={`inline-flex items-center justify-center ${cellW} ${cellH} rounded-ctl font-bold ${badge.cls} ${times ? 'active:opacity-70' : ''}`}
-                              >
-                                {badge.letter}
-                              </button>
-                            )
-                          }
-                        } else if (mobileViewMode === 'times') {
-                          // Vista HH:MM — horarios con color de turno
-                          cellContent = times ? (
-                            <span className={`inline-flex flex-col items-center justify-center ${cellW} ${cellH} rounded-ctl ${badge.cls}`}>
-                              <span className="text-caption font-bold leading-tight">{times.start}</span>
-                              <span className="text-caption leading-tight opacity-70">{times.end}</span>
-                            </span>
-                          ) : (
-                            <span className={`inline-flex items-center justify-center ${cellW} ${cellH} rounded-ctl font-bold ${badge.cls}`}>{badge.letter}</span>
-                          )
-                        } else {
-                          // Vista C — reducidos destacados, normales como letra
-                          cellContent = isReduced && times ? (
-                            <span className={`inline-flex flex-col items-center justify-center ${cellW} ${cellH} rounded-ctl bg-cat-4-tint/[0.15] border border-cat-4-tint/[0.25]`}>
-                              <span className="text-caption font-semibold text-cat-4-ink leading-tight">{times.start}</span>
-                              <span className="text-caption text-cat-4-ink leading-tight">{times.end}</span>
-                            </span>
-                          ) : (
-                            <span className={`inline-flex items-center justify-center ${cellW} ${cellH} rounded-ctl font-bold ${badge.cls}`}>{badge.letter}</span>
-                          )
-                        }
-
+                        const turno = tech.shifts[d.c] || ''
+                        const banda = bandaDeTurno(turno)
+                        const descanso = restByCell.get(tech.r + '-' + d.c)
+                        const corta = descanso !== undefined && descanso < 11
                         return (
-                          <td key={d.c} className={`${isLandscape ? 'px-1' : 'px-0.5'} ${cellPy} text-center ${isT ? 'bg-amber-500/[0.15]' : ''}`}>
-                            {cellContent}
+                          <td key={d.c} className="px-0.5">
+                            <span className={'relative block h-6 rounded-ctl text-center text-caption font-semibold leading-6 ' + bandaClase(banda)}>
+                              {banda ? horarioCorto(turno) : etiquetaNoLaboral(turno)}
+                              {corta && (
+                                <span
+                                  title={'Solo ' + descanso + ' h de descanso desde el turno anterior'}
+                                  className="absolute -right-0.5 -top-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-ink-crit text-caption font-bold leading-none text-white"
+                                >!</span>
+                              )}
+                            </span>
                           </td>
                         )
                       })}
-                      {/* Columna de horas sticky derecha */}
-                      {(() => {
-                        const hr = hoursRows[idx]
-                        if (!hr) return null
-                        const tol = Math.max(hoursConfig.toleranceHours || 0.5, 0.5)
-                        const wDelta = hr.deltaWeek
-                        const mDelta = hr.deltaMonth
-                        // 4 zonas: sobretiempo | en rango | bajo | muy bajo
-                        const wCls = wDelta > tol * 4 ? 'text-cat-4-ink'
-                                   : wDelta >= -tol ? 'text-emerald-400'
-                                   : wDelta >= -tol * 6 ? 'text-amber-400'
-                                   : 'text-red-400'
-                        const mCls = mDelta > tol * 16 ? 'text-cat-4-ink'
-                                   : mDelta >= -tol * 4 ? 'text-emerald-400'
-                                   : mDelta >= -tol * 24 ? 'text-amber-400'
-                                   : 'text-red-400'
-                        return (
-                          <td className={`sticky right-0 z-[5] border-l border-border/30 px-1 ${cellPy} ${stickyBg}`}
-                            style={isLandscape ? { width: '25%' } : { width: 50, minWidth: 50 }}>
-                            {isLandscape ? (
-                              /* Landscape: sem | mes lado a lado */
-                              <div className="flex items-center justify-around px-1 h-full gap-1">
-                                <div className="flex flex-col items-center">
-                                  <span className={`text-footnote font-bold leading-none ${wCls}`}>{hr.weekHours.toFixed(0)}</span>
-                                  <span className="text-[7px] text-muted-foreground/40 leading-tight">h·sem</span>
-                                </div>
-                                <div className="w-px self-stretch bg-border/30 my-1" />
-                                <div className="flex flex-col items-center">
-                                  <span className={`text-footnote font-bold leading-none ${mCls}`}>{hr.monthHours.toFixed(0)}</span>
-                                  <span className="text-[7px] text-muted-foreground/40 leading-tight">h·mes</span>
-                                </div>
-                              </div>
-                            ) : (
-                              /* Portrait: icono + número compacto */
-                              <div className="flex flex-col items-end pr-0.5 leading-none gap-0.5">
-                                <div className="flex items-center gap-0.5">
-                                  <span className={`inline-flex items-center text-caption ${wCls}`}>{deltaIcon(wDelta, tol * 4, -tol, -tol * 6)}</span>
-                                  <span className={`text-caption font-bold ${wCls}`}>{hr.weekHours.toFixed(0)}</span>
-                                  <span className="text-caption text-muted-foreground/50">h·s</span>
-                                </div>
-                                <div className="flex items-center gap-0.5">
-                                  <span className={`inline-flex items-center text-caption ${mCls}`}>{deltaIcon(mDelta, tol * 16, -tol * 4, -tol * 24)}</span>
-                                  <span className={`text-caption font-bold ${mCls}`}>{hr.monthHours.toFixed(0)}</span>
-                                  <span className="text-caption text-muted-foreground/50">h·m</span>
-                                </div>
-                              </div>
-                            )}
-                          </td>
-                        )
-                      })()}
+                      <td className={sobreTope
+                        ? 'pr-1 text-right text-caption font-bold text-ink-warn'
+                        : 'pr-1 text-right text-caption font-bold text-foreground'}>
+                        {semana > 0 ? semana.toFixed(1) : ''}
+                      </td>
                     </tr>
-                    )
-                  })}
-                  {/* Fila resumen: personal trabajando por día */}
-                  <tr className="border-t border-border/40 bg-muted">
-                    <td className="sticky left-0 z-[5] bg-muted border-r border-border/30 px-1.5 py-1" style={{ minWidth: 110, maxWidth: 110 }}>
-                      <span className="text-caption text-muted-foreground font-medium">Trabajando</span>
-                    </td>
-                    {weekDays.map((d) => {
-                      const isT = isSameDate(d.dateObj, todayDayCol?.dateObj ?? null)
-                      const count = techRows.filter(t => isWorkingShift(t.shifts[d.c] || '')).length
-                      const libre = techRows.filter(t => !isWorkingShift(t.shifts[d.c] || '') && !isVacationShift(t.shifts[d.c] || '') && !isHolidayShift(t.shifts[d.c] || '')).length
-                      const pct = techRows.length > 0 ? count / techRows.length : 0
-                      const countCls = pct >= 0.8 ? 'text-emerald-400' : pct >= 0.5 ? 'text-amber-400' : 'text-red-400'
-                      return (
-                        <td key={d.c} className={`${isLandscape ? 'px-1' : 'px-0.5'} py-1 text-center ${isT ? 'bg-amber-500/[0.15]' : ''}`}>
-                          <span className={`text-caption font-bold ${countCls}`}>{count}</span>
-                          {isLandscape && libre > 0 && <span className="text-caption text-muted-foreground ml-0.5">/{libre}L</span>}
-                        </td>
-                      )
-                    })}
-                    <td className="sticky right-0 z-[5] bg-muted border-l border-border/30 px-1 py-1 text-center"
-                      style={isLandscape ? { width: '25%' } : { width: 50, minWidth: 50 }}>
-                      <span className="text-caption text-muted-foreground/50">/{techRows.length}</span>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            )}
+                  )
+                })}
+              </tbody>
+            </table>
           </div>
 
-          {/* Leyenda (solo en vista badges) + collapse editar — oculto en landscape */}
-          <div className={`shrink-0 space-y-1.5 ${isLandscape ? 'hidden' : ''}`}>
-            {mobileViewMode === 'badges' && !mobileEditMode && (
-              <div className="flex items-center gap-2 px-1 flex-wrap">
-                {([
-                  { letter: 'D', cls: 'bg-primary/[0.15] text-primary', label: 'Día' },
-                  { letter: 'T', cls: 'bg-amber-500/[0.15] text-ink-warn', label: 'Tarde' },
-                  { letter: 'N', cls: 'bg-cat-6-tint/[0.15] text-cat-6-ink', label: 'Noche' },
-                  { letter: 'L', cls: 'bg-muted-foreground/[0.10] text-muted-foreground', label: 'Libre' },
-                  { letter: 'V', cls: 'bg-primary/[0.15] text-primary', label: 'Vac.' },
-                ] as const).map(({ letter, cls, label }) => (
-                  <div key={letter} className="flex items-center gap-1">
-                    <span className={`inline-flex items-center justify-center w-5 h-5 rounded-ctl text-caption font-bold ${cls}`}>{letter}</span>
-                    <span className="text-caption text-muted-foreground">{label}</span>
-                  </div>
-                ))}
-                <span className="text-caption text-muted-foreground ml-1">· Tap celda = ver hora</span>
-              </div>
-            )}
-            {mobileViewMode === 'reduced' && !mobileEditMode && (
-              <div className="flex items-center gap-2 px-1">
-                <span className="inline-flex items-center justify-center h-5 px-1.5 rounded-ctl border border-cat-4-tint/[0.25] bg-cat-4-tint/[0.15] text-caption text-cat-4-ink">08:00 / 15:00</span>
-                <span className="text-caption text-muted-foreground">= turno con reducción horaria</span>
-              </div>
-            )}
-            {mobileEditMode && (
-              <div className="flex items-center gap-2 px-1">
-                <span className="inline-flex items-center gap-1 text-caption text-ink-ok"><Pencil className="h-3 w-3 shrink-0" />Modo edición activo — toca cualquier día para ajustar su horario</span>
-              </div>
-            )}
+          {/* Dotación por banda: fuera del scroll, para que nunca quede bajo el borde.
+              Misma table-fixed y mismos anchos que la tabla de arriba, así las
+              columnas quedan alineadas sin duplicar la lógica de layout. */}
+          <table className="w-full shrink-0 table-fixed border-separate border-spacing-0 rounded-card bg-card px-1.5 py-1 tabular-nums">
+            <tbody>
+              <tr>
+                <td className="w-[150px] pl-1 text-caption text-muted-foreground">Día · tarde · noche</td>
+                {weekDays.map((d) => {
+                  const n = dotacionDelDia(d.c)
+                  return (
+                    <td key={d.c} className="px-0.5 text-center text-caption font-semibold">
+                      <span className={n.dia < 2 ? 'text-ink-crit' : 'text-brand-ink'}>{n.dia}</span>
+                      <span className="text-muted-foreground"> · </span>
+                      <span className={n.tarde < 2 ? 'text-ink-crit' : 'text-cat-4-ink'}>{n.tarde}</span>
+                      <span className="text-muted-foreground"> · </span>
+                      <span className={n.noche < 2 ? 'text-ink-crit' : 'text-cat-6-ink'}>{n.noche}</span>
+                    </td>
+                  )
+                })}
+                <td className="w-[54px]" />
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
 
-            <details className="rounded-card border bg-card group">
-              <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground select-none">
-                <span className="inline-flex items-center gap-1.5"><Settings className="h-3.5 w-3.5" />Editar calendario</span>
-                <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
-              </summary>
-              <div className="border-t border-border p-2 space-y-2">
-                <div className="text-caption text-muted-foreground">Para configurar horarios base, técnicos o exportar Excel, accede desde escritorio o tablet.</div>
-                <div className={`rounded-ctl border px-2 py-1 text-caption ${syncIndicator.className}`}>{syncIndicator.label}</div>
-                <div className="text-caption text-muted-foreground">{originalFilename}</div>
+      {/* ══ MÓVIL VERTICAL (salida de emergencia) ══
+          Para quien no puede girar el teléfono. La matriz no cabe en vertical,
+          así que aquí se mira UN día a la vez, agrupado por banda: responde
+          «¿quién está en este turno?», que es la pregunta que se hace en planta. */}
+      {vistaModulo === 'turnos' && isMobile && !isLandscape && verEnVertical && (
+        <div className="flex min-h-0 flex-1 flex-col gap-2">
+          <div className="flex shrink-0 items-center gap-2 rounded-card bg-card px-2 py-1.5">
+            <button onClick={() => irADiaRelativo(-1)} disabled={!diaAnterior}
+              aria-label="Día anterior"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-ctl border border-border text-muted-foreground disabled:opacity-30 active:bg-muted select-none">‹</button>
+            <div className="min-w-0 flex-1 text-center">
+              <div className="truncate text-footnote font-semibold text-foreground">
+                {diaActivo ? `${diaActivo.dayLabel} ${diaActivo.dateObj ? diaActivo.dateObj.getDate() : ''}` : '—'}
+                {esHoy && <span className="ml-1.5 text-caption font-normal text-ink-warn">● hoy</span>}
               </div>
-            </details>
+              <div className="text-caption text-muted-foreground tabular-nums">
+                {diaActivo ? formatDate(diaActivo.dateObj) : ''}
+              </div>
+            </div>
+            <button onClick={() => irADiaRelativo(1)} disabled={!diaSiguiente}
+              aria-label="Día siguiente"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-ctl border border-border text-muted-foreground disabled:opacity-30 active:bg-muted select-none">›</button>
           </div>
 
-          {/* Panel de edición de celda (bottom sheet) */}
-          {mobileEditMode && mobileEditCell && (
-            <div className="fixed bottom-10 left-0 right-0 z-50 bg-card border-t border-primary/40 shadow-2xl p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="text-xs font-semibold text-foreground">
-                  {techRows.find(t => t.r === mobileEditCell.techR)?.name?.split(/[\s,]+/)[0] ?? ''}
-                  {' · '}
-                  {weekDays.find(d => d.c === mobileEditCell.dayC)?.dayLabel ?? ''}
+          {diaActivo && (
+            <div className="flex shrink-0 gap-1.5">
+              {([
+                { k: 'dia' as const, label: 'Día', n: dotacionDelDia(diaActivo.c).dia },
+                { k: 'tarde' as const, label: 'Tarde', n: dotacionDelDia(diaActivo.c).tarde },
+                { k: 'noche' as const, label: 'Noche', n: dotacionDelDia(diaActivo.c).noche },
+                { k: null, label: 'Libre', n: techRows.filter((t) => !bandaDeTurno(t.shifts[diaActivo.c])).length },
+              ]).map(({ k, label, n }) => (
+                <div key={label} className="flex-1 rounded-card bg-card px-1 py-2 text-center">
+                  <div className={`text-title3 font-bold tabular-nums ${k && n < 2 ? 'text-ink-crit' : 'text-foreground'}`}>{n}</div>
+                  <div className="text-caption text-muted-foreground">{label}</div>
                 </div>
-                <button onClick={() => setMobileEditCell(null)} className="text-muted-foreground text-sm px-2">✕</button>
-              </div>
-              <div className="flex gap-3">
-                <div className="flex-1 space-y-1">
-                  <label className="text-caption text-muted-foreground">Hora inicio</label>
-                  <input
-                    type="time"
-                    className="w-full h-10 rounded-ctl border border-border bg-background px-2 text-sm text-foreground [color-scheme:dark]"
-                    value={mobileEditStart}
-                    onChange={(e) => setMobileEditStart(e.target.value)}
-                  />
-                </div>
-                <div className="flex-1 space-y-1">
-                  <label className="text-caption text-muted-foreground">Hora fin</label>
-                  <input
-                    type="time"
-                    className="w-full h-10 rounded-ctl border border-border bg-background px-2 text-sm text-foreground [color-scheme:dark]"
-                    value={mobileEditEnd}
-                    onChange={(e) => setMobileEditEnd(e.target.value)}
-                  />
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={saveMobileEdit}
-                  className="flex-1 h-10 rounded-ctl bg-primary text-sm font-medium text-primary-foreground active:opacity-90"
-                >Guardar</button>
-                <button
-                  onClick={() => setMobileEditCell(null)}
-                  className="flex-1 h-10 rounded-ctl border border-border text-sm text-muted-foreground active:bg-muted"
-                >Cancelar</button>
-              </div>
+              ))}
             </div>
           )}
 
+          <div className="min-h-0 flex-1 space-y-2 overflow-auto">
+            {diaActivo && ([
+              { k: 'dia' as const, titulo: 'Día', horario: `${shiftConfig.diaInicio}–${shiftConfig.diaFin}` },
+              { k: 'tarde' as const, titulo: 'Tarde', horario: `${shiftConfig.tardeInicio}–${shiftConfig.tardeFin}` },
+              { k: 'noche' as const, titulo: 'Noche', horario: `${shiftConfig.nocheInicio}–${shiftConfig.nocheFin}` },
+              { k: null, titulo: 'Libres', horario: '' },
+            ]).map(({ k, titulo, horario }) => {
+              const gente = horizontalRows.filter((t) => bandaDeTurno(t.shifts[diaActivo.c]) === k)
+              if (gente.length === 0) return null
+              return (
+                <section key={titulo}>
+                  <h3 className="px-1 pb-1 text-caption font-semibold text-muted-foreground">
+                    {titulo}{horario && <span className="ml-1.5 font-normal tabular-nums">{horario}</span>}
+                  </h3>
+                  <div className="overflow-hidden rounded-card bg-card">
+                    {gente.map((tech, i) => {
+                      const turno = tech.shifts[diaActivo.c] || ''
+                      const hr = hoursRows.find((h) => h.tech.r === tech.r)
+                      const semana = hr?.weekHours ?? 0
+                      const reducido = k !== null && horarioCorto(turno) !== null
+                        && turno.trim() !== `${shiftConfig[k === 'dia' ? 'diaInicio' : k === 'tarde' ? 'tardeInicio' : 'nocheInicio']} - ${shiftConfig[k === 'dia' ? 'diaFin' : k === 'tarde' ? 'tardeFin' : 'nocheFin']}`
+                      return (
+                        <div key={tech.r}
+                          className={`flex min-h-11 items-center gap-2.5 px-3 py-2 ${i > 0 ? 'border-t border-border/40' : ''}`}>
+                          <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-ctl text-caption font-bold ${turnoBadgeClass(tech.turno)}`}>
+                            {tech.turno || '·'}
+                          </span>
+                          <span className="min-w-0 flex-1 truncate text-footnote font-medium text-foreground">
+                            {nombreParaMostrar(tech.name)}
+                          </span>
+                          {k !== null && reducido && (
+                            <span className="shrink-0 text-caption tabular-nums text-ink-warn">{horarioCorto(turno)}</span>
+                          )}
+                          <span className="shrink-0 text-caption tabular-nums text-muted-foreground">
+                            {semana > 0 ? `${semana.toFixed(1)} h` : ''}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </section>
+              )
+            })}
+          </div>
+
+          <button
+            onClick={() => setVerEnVertical(false)}
+            className="min-h-11 shrink-0 text-caption font-medium text-primary active:opacity-70 select-none"
+          >
+            Ver la semana completa en horizontal
+          </button>
         </div>
       )}
 
-      {/* ── Modal: Clave de edición (móvil) ── */}
-      {mobileAdminGateOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-6">
-          <div className="w-full max-w-xs rounded-card border border-border bg-card p-5 shadow-2xl">
-            <p className="mb-3 text-sm font-semibold text-foreground">Clave de edición</p>
-            <form
-              onSubmit={async (e) => {
-                e.preventDefault()
-                const correctPwd = await getHmiTooltipPwd()
-                if (mobileAdminGateInput.trim() !== correctPwd) {
-                  setMobileAdminGateError('Clave incorrecta')
-                  return
-                }
-                setMobileAdminGateOpen(false)
-                setMobileEditMode(true)
-                setMobileEditCell(null)
-                setMobileTappedCell(null)
-              }}
-              className="space-y-3"
-            >
-              <input
-                type="password"
-                autoFocus
-                value={mobileAdminGateInput}
-                onChange={(e) => { setMobileAdminGateInput(e.target.value); setMobileAdminGateError('') }}
-                placeholder="Ingresa la clave…"
-                className="w-full h-10 px-3 text-sm bg-muted border border-border rounded-card focus:outline-none focus:ring-2 focus:ring-primary/40 text-foreground [color-scheme:dark]"
-              />
-              {mobileAdminGateError && (
-                <p className="text-xs text-destructive">{mobileAdminGateError}</p>
-              )}
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setMobileAdminGateOpen(false)}
-                  className="flex-1 h-10 rounded-ctl border border-border text-sm text-muted-foreground active:bg-muted"
-                >Cancelar</button>
-                <button
-                  type="submit"
-                  disabled={!mobileAdminGateInput.trim()}
-                  className="flex-1 h-10 rounded-ctl bg-primary text-sm font-medium text-primary-foreground disabled:opacity-40 active:opacity-90"
-                >Confirmar</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* ══════════════════════════════════════════
           VISTA DESKTOP — panel de tabs + tabla
@@ -2477,7 +2412,7 @@ export function CalendarioMantencionPage() {
                   <option value="all">Todo</option>
                 </select>
                 <input
-                  className={CONTROL_CLASS + ' h-7'}
+                  className={`${CONTROL_CLASS} h-7 ${exportScope === 'weeks' || exportScope === 'months' ? '' : 'invisible'}`}
                   type="number"
                   min={1}
                   max={12}
@@ -2486,8 +2421,11 @@ export function CalendarioMantencionPage() {
                   disabled={!(exportScope === 'weeks' || exportScope === 'months')}
                   title="Cantidad para N semanas/N meses"
                 />
-                <div className="h-7 rounded-ctl border border-border px-2 flex items-center text-muted-foreground">
-                  {selectedExportCols().length} días
+                <div
+                  className={`h-7 rounded-ctl border px-2 flex items-center tabular-nums ${resumenExport.escaso ? 'border-ink-warn/40 text-ink-warn' : 'border-border text-muted-foreground'}`}
+                  title={resumenExport.detalle}
+                >
+                  {resumenExport.etiqueta}
                 </div>
               </div>
             </div>
@@ -2619,8 +2557,8 @@ export function CalendarioMantencionPage() {
                 <input className={CONTROL_CLASS} value={newTechRut} onChange={(e) => setNewTechRut(e.target.value)} placeholder="12.345.678-9" />
               </div>
               <div className="grid gap-1">
-                <label className="text-muted-foreground">Grupo/Equipo</label>
-                <select className={CONTROL_CLASS} value={newTechGroup} onChange={(e) => setNewTechGroup(e.target.value)}>
+                <label htmlFor="nuevo-tecnico-grupo" className="text-muted-foreground">Grupo/Equipo</label>
+                <select id="nuevo-tecnico-grupo" className={CONTROL_CLASS} value={newTechGroup} onChange={(e) => setNewTechGroup(e.target.value)}>
                   {techGroups.map((group) => <option key={group} value={group}>{group}</option>)}
                 </select>
               </div>
@@ -2648,8 +2586,9 @@ export function CalendarioMantencionPage() {
                   <div className="text-xs text-muted-foreground">{tech.rut || 'Sin RUT'}</div>
                   <div className="flex gap-2">
                     <div className="flex-1 grid gap-1">
-                      <label className="text-caption text-muted-foreground">Grupo</label>
+                      <label htmlFor={`grupo-${tech.r}`} className="text-caption text-muted-foreground">Grupo</label>
                       <select
+                        id={`grupo-${tech.r}`}
                         className={CONTROL_CLASS + ' w-full'}
                         value={tech.turno || ''}
                         onChange={(e) => handleUpdateTechnicianField(tech.r, 'turno', e.target.value)}
@@ -2660,8 +2599,9 @@ export function CalendarioMantencionPage() {
                       </select>
                     </div>
                     <div className="flex-1 grid gap-1">
-                      <label className="text-caption text-muted-foreground">Área</label>
+                      <label htmlFor={`area-${tech.r}`} className="text-caption text-muted-foreground">Área</label>
                       <input
+                        id={`area-${tech.r}`}
                         className={CONTROL_CLASS + ' w-full'}
                         value={tech.area || ''}
                         onChange={(e) => handleUpdateTechnicianField(tech.r, 'area', e.target.value)}
@@ -2692,6 +2632,7 @@ export function CalendarioMantencionPage() {
                       <td className="px-2 py-1">
                         <select
                           className={CONTROL_CLASS + ' h-7 text-caption'}
+                          aria-label={`Grupo de ${tech.name}`}
                           value={tech.turno || ''}
                           onChange={(e) => handleUpdateTechnicianField(tech.r, 'turno', e.target.value)}
                         >
@@ -2703,6 +2644,7 @@ export function CalendarioMantencionPage() {
                       <td className="px-2 py-1">
                         <input
                           className={CONTROL_CLASS + ' h-7 text-caption'}
+                          aria-label={`Área o equipo de ${tech.name}`}
                           value={tech.area || ''}
                           onChange={(e) => handleUpdateTechnicianField(tech.r, 'area', e.target.value)}
                         />
@@ -2941,6 +2883,13 @@ export function CalendarioMantencionPage() {
                   </th>
                 ))}
                 {dayCols.map((d, idx) => (
+                  <Fragment key={`day-wrap-${d.c}`}>
+                  {isWeekStart(idx) ? (
+                    <th
+                      className="sticky top-0 z-20 border border-border !bg-muted bg-opacity-100 px-1 py-1 backdrop-blur-none"
+                      style={{ minWidth: '46px', maxWidth: '46px' }}
+                    />
+                  ) : null}
                   <th
                     key={`day-${d.c}`}
                     className={`sticky top-0 z-20 border border-border !bg-muted bg-opacity-100 px-1 py-1 backdrop-blur-none cursor-pointer ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-4 border-amber-500/[0.25] shadow-[inset_0_0_0_1px_rgba(253,224,71,0.4)]' : ''} ${selectedCol === d.c ? 'ring-2 ring-white/80 ring-inset' : ''} ${isWeekStart(idx) ? 'border-l-2 border-l-cyan-400/60' : ''}`}
@@ -2955,6 +2904,7 @@ export function CalendarioMantencionPage() {
                       {isWeekStart(idx) ? <span className="rounded-ctl bg-cat-7-tint/[0.15] px-1 text-caption text-cat-7-ink">{weekNumberLabel(d.dateObj)}</span> : null}
                     </div>
                   </th>
+                  </Fragment>
                 ))}
               </tr>
               <tr className="bg-muted text-foreground">
@@ -2964,10 +2914,30 @@ export function CalendarioMantencionPage() {
                     className="sticky top-[30px] z-[60] border border-border !bg-muted bg-opacity-100 px-1 py-1 backdrop-blur-none text-muted-foreground text-caption tracking-wide"
                     style={{ left: `${metaLeftFiltered(vi, visibleMetaIndices, effectiveMetaWidths)}px`, minWidth: `${effectiveMetaWidths[gi]}px`, maxWidth: `${effectiveMetaWidths[gi]}px` }}
                   >
-                    {META_COLS[gi]}
+                    {gi === 0 ? (
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-0.5 rounded-ctl px-1 hover:bg-muted-foreground/[0.15]"
+                        title={sortByTurno ? 'Orden por turno (A, B, C). Click para volver al orden de la planilla' : 'Click para agrupar las filas por turno'}
+                        onClick={() => setSortByTurno((v) => !v)}
+                      >
+                        {META_COLS[gi]}
+                        <ChevronDown className={`h-3 w-3 transition-transform ${sortByTurno ? 'text-primary' : 'opacity-40'}`} />
+                      </button>
+                    ) : META_COLS[gi]}
                   </th>
                 ))}
                 {dayCols.map((d, idx) => (
+                  <Fragment key={`date-wrap-${d.c}`}>
+                  {isWeekStart(idx) ? (
+                    <th
+                      className="sticky top-[30px] z-20 border border-border !bg-muted bg-opacity-100 px-1 py-1 text-caption text-muted-foreground backdrop-blur-none"
+                      style={{ minWidth: '46px', maxWidth: '46px' }}
+                      title="Horas trabajadas por el técnico en esta semana"
+                    >
+                      h/sem
+                    </th>
+                  ) : null}
                   <th
                     key={`date-${d.c}`}
                     className={`sticky top-[30px] z-20 border border-border !bg-muted bg-opacity-100 px-1 py-1 backdrop-blur-none cursor-pointer text-foreground ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-4 border-b-2 border-amber-500/[0.25] font-semibold text-ink-warn shadow-[inset_0_0_0_1px_rgba(253,224,71,0.4)]' : ''} ${selectedCol === d.c ? 'ring-2 ring-white/80 ring-inset' : ''} ${isWeekStart(idx) ? 'border-l-2 border-l-cyan-400/60' : ''}`}
@@ -2979,11 +2949,12 @@ export function CalendarioMantencionPage() {
                   >
                     {formatDate(d.dateObj) || d.dateRaw}
                   </th>
+                  </Fragment>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {techRows.map((tech, idx) => {
+              {displayTechRows.map((tech, idx) => {
                 const isSelectedRow = selectedRow === tech.r
                 const metaValues = [tech.turno, tech.area, tech.ceco, tech.cargo, tech.direccion, tech.rut, tech.name]
                 const dtk = tech.turno.trim().toUpperCase()
@@ -3008,7 +2979,22 @@ export function CalendarioMantencionPage() {
                       const value = tech.shifts[d.c] || ''
                       const isSelectedCell = selectedRow === tech.r && selectedCol === d.c
                       const cellStyle = shiftCellStyle(value)
+                      const rest = restByCell.get(`${tech.r}-${d.c}`)
+                      const tone = rest === undefined ? null : restTone(rest)
+                      const wk = isWeekStart(idx) ? weekKeyAt(idx) : null
+                      const wkHours = wk ? (weekHoursByCell.get(`${tech.r}-${wk}`) ?? 0) : null
+                      const sobreTope = wkHours !== null && wkHours > expectedWeekBase + 0.01
                       return (
+                        <Fragment key={`cellwrap-${tech.r}-${d.c}`}>
+                        {wk ? (
+                          <td
+                            className={`border px-0.5 py-1 text-center text-caption font-semibold tabular-nums !bg-card ${sobreTope ? 'text-ink-warn' : 'text-muted-foreground'}`}
+                            style={{ minWidth: '46px', maxWidth: '46px' }}
+                            title={`${tech.name} · semana ${weekNumberLabel(d.dateObj)}: ${(wkHours ?? 0).toFixed(1)} h trabajadas · objetivo ${expectedWeekBase.toFixed(1)} h${sobreTope ? ` · ${((wkHours ?? 0) - expectedWeekBase).toFixed(1)} h por sobre el tope` : ''}`}
+                          >
+                            {(wkHours ?? 0) > 0 ? (wkHours ?? 0).toFixed(1) : ''}
+                          </td>
+                        ) : null}
                         <td
                           key={`shift-${tech.r}-${d.c}`}
                           className={`border px-1 py-1 text-center cursor-pointer ${cellStyle.className} ${isSelectedCell ? 'ring-2 ring-primary ring-inset shadow-[inset_0_0_0_1px_rgba(255,255,255,0.85)]' : ''} ${selectedCol === d.c ? 'bg-muted-foreground/[0.10]' : ''} ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-4 border-amber-500/[0.25]' : ''} ${isWeekStart(idx) ? 'border-l-2 border-l-cyan-300/80' : ''}`}
@@ -3020,8 +3006,22 @@ export function CalendarioMantencionPage() {
                             selectCalendarDate(d)
                           }}
                         >
-                          {value}
+                          <span className="block leading-tight">{value}</span>
+                          {tone && tone !== 'ok' ? (
+                            <span
+                              className={tone === 'malo'
+                                ? 'mt-0.5 flex items-center justify-center gap-0.5 text-caption font-bold leading-none tabular-nums text-ink-crit'
+                                : 'mt-0.5 flex items-center justify-center gap-0.5 text-caption leading-none tabular-nums text-ink-warn'}
+                              title={tone === 'malo'
+                                ? `Vuelta corta: solo ${rest} h de descanso desde el turno anterior, bajo el mínimo de 11 h`
+                                : `Descanso justo: ${rest} h desde el turno anterior`}
+                            >
+                              {tone === 'malo' ? <AlertTriangle className="h-2.5 w-2.5 shrink-0" aria-hidden /> : null}
+                              {rest}h
+                            </span>
+                          ) : null}
                         </td>
+                        </Fragment>
                       )
                     })}
                   </tr>
