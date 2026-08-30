@@ -2054,6 +2054,62 @@ export function CalendarioMantencionPage() {
     return Math.max(0, diff / 60 - hoursConfig.breakHours)
   })()
 
+  /**
+   * Qué pasaría si se guarda el horario que se está escribiendo: descanso contra el
+   * turno anterior y el siguiente, y horas de esa semana. Avisar antes vale más que
+   * corregir después — es el mismo cálculo que ya delata las vueltas cortas en la tabla.
+   */
+  const avisosDelEditor = useMemo(() => {
+    if (!celdaEditada || !horaDesde || !horaHasta) return []
+    const nuevo = `${horaDesde} - ${horaHasta}`
+    const vent = shiftWindow(nuevo)
+    if (!vent) return []
+    const idx = dayCols.findIndex((d) => d.c === celdaEditada.c)
+    if (idx < 0) return []
+    const tech = techRows.find((t) => t.r === celdaEditada.r)
+    if (!tech) return []
+    const avisos: string[] = []
+
+    // descanso contra el turno trabajado anterior y el siguiente
+    const vecino = (paso: number) => {
+      for (let i = idx + paso; i >= 0 && i < dayCols.length; i += paso) {
+        const col = dayCols[i]
+        if (!col) break
+        const v = tech.shifts[col.c] || ''
+        if (shiftWindow(v)) return { i, v }
+      }
+      return null
+    }
+    const antes = vecino(-1)
+    const despues = vecino(1)
+    if (antes) {
+      const h = restHoursBetween(antes.i, antes.v, idx, nuevo)
+      if (h !== null && h < 11) avisos.push(`Quedan ${h} h desde el turno anterior (${antes.v}). El mínimo son 11.`)
+      else if (h !== null && h < 16) avisos.push(`Quedan ${h} h desde el turno anterior (${antes.v}): es un descanso justo.`)
+    }
+    if (despues) {
+      const h = restHoursBetween(idx, nuevo, despues.i, despues.v)
+      if (h !== null && h < 11) avisos.push(`Deja ${h} h hasta el turno siguiente (${despues.v}). El mínimo son 11.`)
+      else if (h !== null && h < 16) avisos.push(`Deja ${h} h hasta el turno siguiente (${despues.v}): es un descanso justo.`)
+    }
+
+    // horas de la semana con el cambio aplicado
+    const semana = dayCols[idx]?.dateObj ? isoWeekKey(dayCols[idx]!.dateObj!) : null
+    if (semana) {
+      let total = 0
+      dayCols.forEach((d) => {
+        if (!d.dateObj || isoWeekKey(d.dateObj) !== semana) return
+        total += workedHoursForShift(d.c === celdaEditada.c ? nuevo : (tech.shifts[d.c] || ''))
+      })
+      if (total > expectedWeekBase + 0.01) {
+        avisos.push(`Esa semana quedaría en ${total.toFixed(1)} h: ${(total - expectedWeekBase).toFixed(1)} h sobre el tope de ${expectedWeekBase.toFixed(0)}.`)
+      }
+    }
+    return avisos
+    // workedHoursForShift se recrea en cada render; sus entradas reales son las de abajo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [celdaEditada, horaDesde, horaHasta, dayCols, techRows, hoursConfig, shiftConfig, expectedWeekBase])
+
   function bandaClase(banda: 'dia' | 'tarde' | 'noche' | null): string {
     if (banda === 'dia') return 'bg-primary/[0.15] text-brand-ink'
     if (banda === 'tarde') return 'bg-cat-4-tint/[0.15] text-cat-4-ink'
@@ -3132,6 +3188,16 @@ export function CalendarioMantencionPage() {
                 ? 'Horario incompleto'
                 : `${horasDelEditor.toFixed(1)} h netas, descontando ${hoursConfig.breakHours} h de colación.`}
             </p>
+            {avisosDelEditor.length > 0 && (
+              <ul className="mt-2 flex flex-col gap-1">
+                {avisosDelEditor.map((a) => (
+                  <li key={a} className={`flex items-start gap-1.5 text-caption ${/mínimo son 11|sobre el tope/.test(a) ? 'text-ink-crit' : 'text-ink-warn'}`}>
+                    <AlertTriangle className="mt-[1px] h-3 w-3 shrink-0" aria-hidden />
+                    <span>{a}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
             <div className="mt-3 flex gap-2">
               <button
                 className="h-9 flex-1 rounded-ctl border border-border text-footnote text-muted-foreground"
