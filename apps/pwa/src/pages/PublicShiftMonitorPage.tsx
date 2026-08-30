@@ -76,6 +76,7 @@ import { notasPorCausa, notasDelTurno } from './monitor/notasOperador'
 import { VsAyerBloque } from './monitor/MonitorVsAyer'
 import { RepartoDuenoSemanal } from './monitor/RepartoDuenoSemanal'
 import { DUENO_UI } from './monitor/duenoUi'
+import { TarjetaTablero, useTablero, type TarjetaLayout } from './monitor/Tablero'
 import { duenoDe } from '@/services/shoplogix/monitorEventos'
 import { Pill } from '@/components/piel'
 import { useIsAdmin } from '@/store'
@@ -540,6 +541,40 @@ function CuentaAtrasPulso({ at }: { at: string | null | undefined }) {
    tono y el riel desaparece (se vio al renderizar el mockup, no al leerlo). */
 
 const PISTA_INSTRUMENTO = 'color-mix(in srgb, rgb(var(--muted-foreground)) 20%, transparent)'
+
+/*
+ * El orden de FÁBRICA del tablero (pestaña «El turno»), por estado. Es el
+ * orden curado que las dos ramas vivo/cerrado imponían antes con JSX
+ * duplicado: en vivo manda «¿cómo vamos y llegamos?» (cascada y pronóstico
+ * arriba), cerrado es la autopsia (velocidad y meta como evidencia). El
+ * usuario puede pisarlo desde «Personalizar» y su layout vale para ambos
+ * estados; las tarjetas que solo existen en un estado (pronóstico) entran y
+ * salen solas. w en columnas de 6, h en filas de 56 px como MÍNIMO — el
+ * contenido puede empujar, así que estos altos solo aproximan el real.
+ */
+const FABRICA_TURNO_CERRADO: TarjetaLayout[] = [
+  { id: 'resultado', w: 3, h: 4 },
+  { id: 'mantencion', w: 3, h: 8 },
+  { id: 'ritmo', w: 6, h: 12 },
+  { id: 'cascada', w: 3, h: 6 },
+  { id: 'tiempo', w: 3, h: 2 },
+  { id: 'velocidad', w: 3, h: 6 },
+  { id: 'meta', w: 3, h: 10 },
+  { id: 'comparado', w: 3, h: 6 },
+  { id: 'ayer', w: 3, h: 5 },
+]
+const FABRICA_TURNO_VIVO: TarjetaLayout[] = [
+  { id: 'resultado', w: 3, h: 4 },
+  { id: 'cascada', w: 3, h: 6 },
+  { id: 'mantencion', w: 3, h: 8 },
+  { id: 'ritmo', w: 6, h: 12 },
+  { id: 'tiempo', w: 3, h: 2 },
+  { id: 'pronostico', w: 3, h: 5 },
+  { id: 'comparado', w: 3, h: 6 },
+  { id: 'velocidad', w: 3, h: 6 },
+  { id: 'meta', w: 3, h: 10 },
+  { id: 'ayer', w: 3, h: 5 },
+]
 
 /** El metro de piezas: 0 → meta, con el cierre proyectado como banda. */
 function MetroPiezas({ ahora, meta, banda, etiquetaBanda }: {
@@ -3552,7 +3587,7 @@ function BarrasMinuto({ datos, cerrado }: { datos: BarrasMinutoDatos; cerrado?: 
   )
 }
 
-function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrado, onEditarSetPoint, cerrado, contexto, chispa, corteMs, ahoraWallMs, pulso, vivo, maquinas, parada, serieLinea, seriesMaquinas, barras }: {
+function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrado, onEditarSetPoint, cerrado, contexto, chispa, corteMs, ahoraWallMs, pulso, pulsoNodo, vivo, maquinas, parada, serieLinea, seriesMaquinas, barras }: {
   /**
    * Ritmo de ahora ANDANDO, en pz/min: los últimos 15 min descontando los
    * tramos parados. Va en esta base y no en la de reloj porque es contra lo
@@ -3616,6 +3651,9 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
   ahoraWallMs?: number | null
   /** Ritmo casi instantáneo (~4 min) que ya calcula el backend. */
   pulso?: { cpm?: number | null; at?: string | null } | null
+  /** El chip de PulsoVivo (además refresca `data.pulse`): vive dentro de esta
+      tarjeta para viajar con ella cuando el tablero la mueve. */
+  pulsoNodo?: React.ReactNode
   /**
    * El ritmo VIVO elegido por `pulsoVivo`: el cpm fresco o, en los silencios
    * cortos del contador, el último vivo arrastrado (marcado `recalibrando`).
@@ -3897,6 +3935,9 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
         </div>
       </div>
 
+      {/* El chip del pulso, entre la escala y las máquinas: la misma pregunta
+          que el número grande, con la hora del contador de Shoplogix. */}
+      {pulsoNodo}
       {/* ── Cada máquina, como lista con barra de marcha ─────────────────────
           El número que hay que mirar es casi el mismo en las tres, así que el
           LARGO de la barra es el uptime, no la velocidad: el ojo ve de una
@@ -4409,6 +4450,14 @@ export function PublicShiftMonitorPage() {
    * anterior, ese turno terminó. Es verdad por construcción.
    */
   const turnoCerrado = Boolean(live?.shiftClosed) || !esActual
+
+  /* El tablero personalizable de la pestaña «El turno»: orden y tamaño de
+     cada tarjeta, guardados POR APARATO y POR PLANTA. En la TV no corre. */
+  const tablero = useTablero(
+    `monitor-tablero:${data?.plantSlug ?? token ?? 'linea'}`,
+    turnoCerrado ? FABRICA_TURNO_CERRADO : FABRICA_TURNO_VIVO,
+    !modoPantalla,
+  )
 
   /* Supervisor logueado mirando el monitor: puede editar el set point inline
      (mismo patrón que el «Cambiar» del cierre). Las reglas de Firestore son la
@@ -5750,24 +5799,80 @@ export function PublicShiftMonitorPage() {
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
       >
-        {/* Pestaña «El turno»: las zonas de vigilancia y de estado. En la TV
-            la pestaña es siempre esta, así que el tablero no cambia. */}
+        {/* Pestaña «El turno»: la vigilancia y el estado, como TABLERO
+            personalizable. En la TV la pestaña es siempre esta y el tablero
+            no corre: la TV muestra el trío fijo de siempre. */}
         {pestana === 'turno' && (<>
+        {/* La alerta de línea detenida va FUERA del tablero, arriba: una
+            alerta no es una tarjeta que se reordena. Cerrado no se muestra
+            ("Línea detenida hace 6 h" tras el cierre es lo esperable), y en
+            la TV tampoco — cambiaría el alto del tablero fijo. */}
+        {live.status === 'detenida' && esActual && !live.shiftClosed && (
+          <section className="pantalla-oculta rounded-2xl border border-border bg-muted px-4 py-3">
+            <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-red-600 dark:text-red-400">
+              <PauseCircle className="h-3 w-3" />
+              Ahora mismo
+            </div>
+            <p className="mt-1 text-sm text-foreground">
+              Línea detenida{live.currentReason ? ` — ${live.currentReason}` : ''}
+              {live.currentSinceAt && (
+                <span className="text-muted-foreground">
+                  {' '}(desde {fmtWallTime(live.currentSinceAt)}, {fmtAgoWall(live.currentSinceAt, now)})
+                </span>
+              )}
+            </p>
+          </section>
+        )}
+
+        {/* Personalizar: abierto a cualquiera con el link (decisión de Orel,
+            30-08) — cada aparato guarda SU orden, el link sigue mostrando el
+            de fábrica a quien nunca toca nada. Solo en pantallas anchas:
+            arrastrar y estirar son gestos de mouse. */}
+        {!modoPantalla && (
+          <div className="hidden items-center justify-end gap-2 lg:flex">
+            {tablero.editando && (
+              <span className="mr-auto text-[12px] text-muted-foreground">
+                Arrastrá una tarjeta para moverla · estirá desde la esquina ◢ para el ancho y alto
+              </span>
+            )}
+            {tablero.editando && tablero.personalizado && (
+              <button
+                onClick={tablero.restaurar}
+                className="tap-44 rounded-full border border-border bg-muted px-3 py-1.5 text-[12px] text-foreground/80 hover:bg-muted"
+              >
+                Restaurar orden de fábrica
+              </button>
+            )}
+            <button
+              onClick={() => tablero.setEditando(!tablero.editando)}
+              className={`tap-44 rounded-full px-3 py-1.5 text-[12px] transition-colors ${
+                tablero.editando
+                  ? 'bg-primary font-semibold text-primary-foreground'
+                  : 'border border-border bg-muted text-foreground/80 hover:bg-muted'
+              }`}
+            >
+              {tablero.editando ? 'Listo' : 'Personalizar'}
+            </button>
+          </div>
+        )}
+
         {/*
-         * ── ZONA 1 · lo que se vigila ──────────────────────────────────────
-         * Arriba va lo que se mira con la pantalla puesta: cuántas van, a qué
-         * ritmo, si se llega y cómo respondió Mantención. En PC se reparte en
-         * columnas DENTRO de la zona, así el reparto nunca mezcla lo urgente
-         * con el análisis (el defecto de repartir la página entera de una).
+         * ── EL TABLERO ─────────────────────────────────────────────────────
+         * Una sola grilla plana con TODAS las tarjetas del turno; el orden y
+         * el tamaño los pone `useTablero` (fábrica según vivo/cerrado, o lo
+         * que el usuario guardó). En el celular es una columna (`flex-col`,
+         * donde `order` vale y los spans no); en PC, 6 columnas × filas de
+         * 56 px con `dense` para rellenar huecos. Las filas son minmax: el
+         * tamaño guardado es un MÍNIMO y el contenido empuja — ninguna
+         * tarjeta se corta nunca.
          *
-         * OJO: grilla, NO `columns`. La multicolumna reparte por ALTURA, no
-         * por prioridad: llena la primera columna hasta equilibrar y el orden
-         * que declara este archivo deja de ser el que se ve (medido: «camino a
-         * la meta» terminaba último, 475 px debajo de un gráfico de detalle).
-         * Con grilla el orden del código ES el orden de lectura.
+         * Esto reemplazó a las dos ramas vivo/cerrado que duplicaban las
+         * mismas cuatro tarjetas con props idénticos solo para cambiar el
+         * orden — ahora el orden es dato, no estructura.
          */}
-        <div className="space-y-3 lg:grid lg:grid-cols-2 lg:items-start lg:gap-3 lg:space-y-0">
+        <div className="flex flex-col gap-3 lg:grid lg:[grid-template-columns:repeat(6,minmax(0,1fr))] lg:[grid-auto-rows:minmax(56px,auto)] lg:[grid-auto-flow:dense] lg:items-stretch">
         {/* Piezas acumuladas — el número que vienen a ver */}
+        <TarjetaTablero id="resultado" t={tablero}>
         <section className="rounded-2xl border border-border bg-gradient-to-b from-primary/[0.08] to-transparent px-4 py-4">
           <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
             <Activity className="h-3 w-3" />
@@ -6106,6 +6211,7 @@ export function PublicShiftMonitorPage() {
             )}
           </div>
         </section>
+        </TarjetaTablero>
 
         {/* Cadencia */}
         {(() => {
@@ -6153,15 +6259,6 @@ export function PublicShiftMonitorPage() {
           })()
           return (
             <>
-            {/* El pulso va JUNTO a la regla: son la misma pregunta —«¿cómo va
-                ahora?»— y el número de Shoplogix es el que cierra el círculo
-                con la pantalla de planta. */}
-            <PulsoVivo
-              pulse={data.pulse}
-              token={token ?? ''}
-              cerrado={turnoCerrado}
-              onPulso={p => setData(d => (d ? { ...d, pulse: p } : d))}
-            />
             {/* «Dónde se fueron las piezas»: el análisis táctico del turno. Va
                 acá, entre el número crudo y la regla de ritmo, porque responde
                 la pregunta que sigue a «cuántas van».
@@ -6172,12 +6269,19 @@ export function PublicShiftMonitorPage() {
                 documenta. */}
             {/* También con el turno CERRADO: ahí deja de ser distracción y pasa
                 a ser el informe — es donde el monitor demuestra qué le costó
-                las piezas a la línea (hallazgo del rediseño 26-08). */}
-            {cascada && <CascadaTurnoCard cascada={cascada} />}
+                las piezas a la línea (hallazgo del rediseño 26-08).
+                No es del trío de la TV: allá no se renderiza (antes rompía el
+                nth-child del modo pantalla cuando aparecía en vivo). */}
+            {cascada && !modoPantalla && (
+              <TarjetaTablero id="cascada" t={tablero}>
+                <CascadaTurnoCard cascada={cascada} />
+              </TarjetaTablero>
+            )}
             {/* La respuesta de Mantención, junto al «dónde se fueron las
                 piezas»: la cascada dice el costo, esta tarjeta dice quién
                 respondió y cómo. */}
             {live.mantencion && (
+              <TarjetaTablero id="mantencion" t={tablero}>
               <RespuestaMantencion
                 m={live.mantencion}
                 cerrado={turnoCerrado}
@@ -6234,8 +6338,22 @@ export function PublicShiftMonitorPage() {
                   }
                 })()}
               />
+              </TarjetaTablero>
             )}
+            <TarjetaTablero id="ritmo" t={tablero}>
             <ReglaDeRitmo
+              /* El pulso vive DENTRO de la tarjeta de ritmo: son la misma
+                 pregunta —«¿cómo va ahora?»— y así viaja con ella cuando el
+                 usuario la mueve. Es además el componente que refresca
+                 `data.pulse`, por eso se monta siempre que el ritmo exista. */
+              pulsoNodo={
+                <PulsoVivo
+                  pulse={data.pulse}
+                  token={token ?? ''}
+                  cerrado={turnoCerrado}
+                  onPulso={p => setData(d => (d ? { ...d, pulse: p } : d))}
+                />
+              }
               /* El tramo en curso se cuenta por los minutos que LLEVA, no por
                  los 5 que va a durar: si no, el número de "ahora" queda siempre
                  por debajo del que muestra Shoplogix. */
@@ -6383,38 +6501,18 @@ export function PublicShiftMonitorPage() {
                   />
                 : undefined}
             />
+            </TarjetaTablero>
             </>
           )
         })()}
-        </div>
 
-        {/*
-         * ── ZONA 2 · cómo viene el turno ───────────────────────────────────
-         * El estado y la comparación con otros días: se consulta, no se
-         * vigila. Va debajo de lo vivo y arriba del análisis.
-         *
-         * La zona NO se reparte entera en columnas: las tiras de estado y los
-         * avisos van a lo ancho —una frase de una línea en media pantalla deja
-         * el hueco al lado— y solo los bloques grandes bajan a dos columnas,
-         * más abajo y agrupados por tema.
-         */}
-        <div className="space-y-3">
-        {/* Una sola tarjeta desde que el ritmo se unificó arriba: en una grilla
-            de dos columnas quedaba a media pantalla, con el hueco al lado. */}
-        <div className="grid grid-cols-1 gap-3">
-          {/* El número que manda es el ANDANDO: mide a la línea y se compara
-              entre turnos. El de reloj (piezas ÷ ventana) mezcla velocidad con
-              disponibilidad —9,7 vs 9,7 el día que la línea fue la más rápida
-              de los últimos 8 turnos— y queda como segunda línea, con su
-              denominador escrito. */}
-          {/* OJO — Acá vivían DOS tarjetas: «Ritmo andando» y «Últimos N min», y
-              entre ambas repartían cuatro cifras de ritmo más las del gráfico.
-              La grande era el acumulado del turno, que pasada la primera hora
-              casi no se mueve: Orel vio caer el gráfico con el número quieto.
-              Ahora son una sola regla, con el ritmo de AHORA de protagonista y
-              las otras dos como posiciones de la escala. El detalle histórico
-              (rango normal, racha de turnos) vive en «Comparado con otros
-              días», que es el bloque que existe para eso. */}
+        {/* El número que manda es el ANDANDO: mide a la línea y se compara
+            entre turnos. El de reloj (piezas ÷ ventana) mezcla velocidad con
+            disponibilidad —9,7 vs 9,7 el día que la línea fue la más rápida
+            de los últimos 8 turnos— y queda como segunda línea, con su
+            denominador escrito. */}
+        {!modoPantalla && (
+          <TarjetaTablero id="tiempo" t={tablero}>
           <Kpi
             label="Tiempo produciendo"
             /*
@@ -6451,34 +6549,148 @@ export function PublicShiftMonitorPage() {
             }
             sub="Disponible = el turno menos colación, reuniones y paradas programadas."
           />
-        </div>
-
-        {/* Estado actual: por qué NO está corriendo, si es el caso. Con el
-            turno CERRADO no se muestra: "Línea detenida hace 6 h" después del
-            cierre es lo esperable, no una alerta — junto al aviso de sync
-            detenida pintaba alarmante una noche normal. */}
-        {live.status === 'detenida' && esActual && !live.shiftClosed && (
-          <section className="rounded-2xl border border-border bg-muted px-4 py-3">
-            <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-red-600 dark:text-red-400">
-              <PauseCircle className="h-3 w-3" />
-              Ahora mismo
-            </div>
-            <p className="mt-1 text-sm text-foreground">
-              Línea detenida{live.currentReason ? ` — ${live.currentReason}` : ''}
-              {live.currentSinceAt && (
-                <span className="text-muted-foreground">
-                  {' '}(desde {fmtWallTime(live.currentSinceAt)}, {fmtAgoWall(live.currentSinceAt, now)})
-                </span>
-              )}
-            </p>
-          </section>
+          </TarjetaTablero>
         )}
+
+        {/* Adónde va a cerrar el turno, según lo que hicieron los anteriores
+            desde esta misma altura. Solo en VIVO: pronosticar un turno
+            terminado no es un dato, es ruido. */}
+        {!live.shiftClosed && !modoPantalla && (
+          <TarjetaTablero id="pronostico" t={tablero}>
+            <PronosticoCierre
+              f={pronostico}
+              meta={data.targetPieces ?? live.quotaPieces ?? metaSensor}
+              horizonte={horizontePronostico}
+            />
+          </TarjetaTablero>
+        )}
+        {!modoPantalla && (
+          <TarjetaTablero id="velocidad" t={tablero}>
+            {/* ⚠ UN solo gráfico de la serie de 5 min.
+                Había dos tarjetas —"Velocidad de la línea" y "Piezas por tramo"—
+                dibujando exactamente la misma serie, una en pz/min y otra en
+                piezas. La tendencia (media de 15 min) y las referencias de ritmo se
+                mudaron acá, encima de su propio detalle, que además es el gráfico
+                que sabe ubicar las detenciones y el que tiene el zoom a 8×. */}
+            <Sparkbars
+              series={serieDelTurno}
+              cierreMs={(() => {
+                /* El cierre PROGRAMADO (el mismo de la cabecera): cerrado el
+                   turno se usa el horario declarado; en curso, el previsto. */
+                const iso = live.shiftClosed
+                  ? (live.scheduledEnd ?? live.plannedEnd)
+                  : (live.plannedEnd ?? live.scheduledEnd)
+                const ms = iso ? Date.parse(iso) : NaN
+                return Number.isNaN(ms) ? null : ms
+              })()}
+              stopReasons={live.stopReasons}
+              stopEvents={live.stopEvents}
+              comments={live.comments}
+              causaSel={causaSel}
+              onCausa={(c) => { setCausaSel(c); setTramoSel(null) }}
+              tramoSel={tramoSel}
+              breaks={comparacion.breaks}
+              ventana={ventanaGrafica}
+              onVentana={setVentanaGrafica}
+              requiredPerMinute={pace && pace.requiredPerMinute > 0 ? pace.requiredPerMinute : null}
+              medianCpm={
+                /* La MISMA mediana que el riel y la chispa (`ritmoAndando`, 19
+                   turnos), no la del backend (8): eran 29,4 y 29,7 en la misma
+                   pantalla con dos muestras distintas — dos «lo normal» a diez
+                   centímetros (auditoría en vivo, 27-08). El backend queda de
+                   respaldo para docs sin historial. */
+                ritmoAndando.mediana ?? live.paceMedianCpm
+              }
+              medianSamples={ritmoAndando.mediana != null ? ritmoAndando.muestras : live.paceSamples}
+              setCpm={setCpmVigente}
+              fuenteSetPoint={live.setPoint
+                ? `Set point ${fmtDec(live.setPoint.cpm)} pz/min` +
+                  (live.setPoint.medidoEl ? ` · medido el ${live.setPoint.medidoEl}` : '') +
+                  (live.setPoint.metodo ? ` (${live.setPoint.metodo})` : '') +
+                  ' — no es dato del PLC.'
+                : null}
+              onGuardarSetPoint={esAdminMonitor && esActual && data.plantSlug
+                ? async (cpm, metodo) => {
+                  await setMonitorSetPoint({
+                    plantSlug: data.plantSlug!,
+                    cpm,
+                    metodo,
+                    por: usuarioActual?.email ?? null,
+                  })
+                }
+                : undefined}
+            />
+          </TarjetaTablero>
+        )}
+        {/* El gráfico ARRIBA del bloque de la meta era pedido de Orel (tocar
+            una imputación salta al gráfico, hacia algo que ya pasaste): la
+            fábrica los deja vecinos, y desde «Personalizar» cada aparato puede
+            acomodarlos a su gusto. */}
+        {!modoPantalla && (
+          <TarjetaTablero id="meta" t={tablero}>
+            <TiempoDelTurno
+              tb={live.timeBreakdown}
+              causaSel={causaSel}
+              onCausa={(c) => { setCausaSel(c); setTramoSel(null) }}
+              onVentana={setVentanaGrafica}
+              onTramo={setTramoSel}
+              proximaParada={proximaParada}
+              notas={notasDeOperador}
+              /* La resta: minutos parados -> piezas, al ritmo del turno.
+                 En vivo la vara es la cuota a ESTA altura (la curva del
+                 comparador, aplanada en colacion) - contra la meta completa,
+                 el "ritmo" absorberia lo que aun no se juega. */
+              cerrado={turnoCerrado}
+              meta={data.targetPieces ?? live.quotaPieces ?? metaSensor}
+              hechas={live.totalPieces}
+              piezasPulso={data.pulse?.totalCycles ?? null}
+              corteHora={horaPlanta(live.lastSyncAt ? Date.parse(live.lastSyncAt) - new Date().getTimezoneOffset() * 60_000 : null)}
+              cuotaAhora={comparacion.optimalAtCurrentMinute}
+              horaAhora={horaDeCuota}
+              cpmAndando={
+                live.timeBreakdown && live.timeBreakdown.producingMin > 0
+                  ? live.totalPieces / live.timeBreakdown.producingMin
+                  : null
+              }
+              costo={costoParadas}
+              grupos={gruposEventos}
+              notasTurno={notasDeTurnoCompleto}
+            />
+          </TarjetaTablero>
+        )}
+        {/* La curva contra los otros días, antes del «vs ayer» en fábrica
+            (pedido de Orel): esta enseña el turno completo de un vistazo y la
+            de ayer es el detalle numérico de UNA de esas curvas. */}
+        {!modoPantalla && (
+          <TarjetaTablero id="comparado" t={tablero}>
+            <ComparadorDias
+              ventana={ventanaGrafica}
+              onVentana={setVentanaGrafica}
+              refSel={refSel}
+              onRefSel={setRefSel}
+              cmp={comparacion}
+              live={live}
+              /* Solo cuando el pronóstico es creíble: un cono con 20% de error es
+                 una mancha que promete lo que no puede. */
+              cone={pronostico && pronostico.mapePct <= MAX_MAPE_PCT ? pronostico.cone : null}
+            />
+          </TarjetaTablero>
+        )}
+        {/* Qué cambió contra ayer y cómo quedó contra los récords: el paso de
+            "hoy pasó esto" a "esto vuelve todos los turnos". */}
+        {!modoPantalla && (
+          <TarjetaTablero id="ayer" t={tablero}>
+            <VsAyerBloque r={comparadoConAyer} records={recordsLinea} sinConvenio={sinConvenio} />
+          </TarjetaTablero>
+        )}
+        </div>
 
         {/*
           Ahora que la cabecera muestra el arranque REAL, el horario declarado
           no se ve en ninguna otra parte: este aviso es el que lo conserva. Sin
           él, el turno de 06:00 desaparecería de la pantalla sin dejar rastro y
-          nadie podría notar el desfase.
+          nadie podría notar el desfase. Va BAJO el tablero, con los demás
+          avisos: es letra chica, no una tarjeta que se reordena.
         */}
         {recorteActividad && serieDelTurno.length > 0 && (
           <p className="text-[11px] leading-snug text-muted-foreground">
@@ -6490,262 +6702,6 @@ export function PublicShiftMonitorPage() {
             )}
           </p>
         )}
-
-        {/*
-         * Los cuatro bloques grandes, en dos columnas CON TEMA: a la izquierda
-         * el turno propio —la velocidad y, pegado abajo, el camino a la meta—
-         * y a la derecha lo que mira hacia atrás —los otros días y el vs ayer—.
-         *
-         * OJO: agrupados a mano, no repartidos. Con el reparto automático
-         * «velocidad» y «camino a la meta» caían en columnas distintas, y ahí
-         * se rompe el pedido de Orel de que el gráfico esté ARRIBA de la meta:
-         * tocar una imputación salta al gráfico, y el salto tiene que ir hacia
-         * algo que ya pasaste. En columnas separadas ese «arriba» no existe.
-         */}
-        <div className="space-y-3 lg:grid lg:grid-cols-2 lg:items-start lg:gap-3 lg:space-y-0">
-        {/*
-          El ORDEN cuenta la historia del estado (test del §0 del HIG: lo más
-          importante AHORA va primero). En VIVO la pregunta es «¿cómo vamos y
-          llegamos?»: pronóstico → comparador → velocidad → detalle. CERRADO es
-          una autopsia: qué pasó → qué cambió contra ayer → la velocidad como
-          evidencia → la comparación. El pronóstico y el ritmo necesario no se
-          renderizan en cerrado: pronosticar un turno terminado no es un dato,
-          es ruido.
-        */}
-        {live.shiftClosed ? (
-          <>
-            <div className="space-y-3">
-            {/* ⚠ UN solo gráfico de la serie de 5 min.
-                Había dos tarjetas —"Velocidad de la línea" y "Piezas por tramo"—
-                dibujando exactamente la misma serie, una en pz/min y otra en
-                piezas. La tendencia (media de 15 min) y las referencias de ritmo se
-                mudaron acá, encima de su propio detalle, que además es el gráfico
-                que sabe ubicar las detenciones y el que tiene el zoom a 8×. */}
-            <Sparkbars
-              series={serieDelTurno}
-              cierreMs={(() => {
-                /* El cierre PROGRAMADO (el mismo de la cabecera): cerrado el
-                   turno se usa el horario declarado; en curso, el previsto. */
-                const iso = live.shiftClosed
-                  ? (live.scheduledEnd ?? live.plannedEnd)
-                  : (live.plannedEnd ?? live.scheduledEnd)
-                const ms = iso ? Date.parse(iso) : NaN
-                return Number.isNaN(ms) ? null : ms
-              })()}
-              stopReasons={live.stopReasons}
-              stopEvents={live.stopEvents}
-              comments={live.comments}
-              causaSel={causaSel}
-              onCausa={(c) => { setCausaSel(c); setTramoSel(null) }}
-              tramoSel={tramoSel}
-              breaks={comparacion.breaks}
-              ventana={ventanaGrafica}
-              onVentana={setVentanaGrafica}
-              requiredPerMinute={pace && pace.requiredPerMinute > 0 ? pace.requiredPerMinute : null}
-              medianCpm={
-                /* La MISMA mediana que el riel y la chispa (`ritmoAndando`, 19
-                   turnos), no la del backend (8): eran 29,4 y 29,7 en la misma
-                   pantalla con dos muestras distintas — dos «lo normal» a diez
-                   centímetros (auditoría en vivo, 27-08). El backend queda de
-                   respaldo para docs sin historial. */
-                ritmoAndando.mediana ?? live.paceMedianCpm
-              }
-              medianSamples={ritmoAndando.mediana != null ? ritmoAndando.muestras : live.paceSamples}
-              setCpm={setCpmVigente}
-              fuenteSetPoint={live.setPoint
-                ? `Set point ${fmtDec(live.setPoint.cpm)} pz/min` +
-                  (live.setPoint.medidoEl ? ` · medido el ${live.setPoint.medidoEl}` : '') +
-                  (live.setPoint.metodo ? ` (${live.setPoint.metodo})` : '') +
-                  ' — no es dato del PLC.'
-                : null}
-              onGuardarSetPoint={esAdminMonitor && esActual && data.plantSlug
-                ? async (cpm, metodo) => {
-                  await setMonitorSetPoint({
-                    plantSlug: data.plantSlug!,
-                    cpm,
-                    metodo,
-                    por: usuarioActual?.email ?? null,
-                  })
-                }
-                : undefined}
-            />
-            {/* El gráfico va ARRIBA del bloque de la meta (pedido de Orel):
-                tocar una imputación salta al gráfico, y el salto tiene que ser
-                hacia algo que ya pasaste, no hacia abajo. */}
-            <TiempoDelTurno
-              tb={live.timeBreakdown}
-              causaSel={causaSel}
-              onCausa={(c) => { setCausaSel(c); setTramoSel(null) }}
-              onVentana={setVentanaGrafica}
-              onTramo={setTramoSel}
-              proximaParada={proximaParada}
-              notas={notasDeOperador}
-              /* La resta: minutos parados -> piezas, al ritmo del turno.
-                 En vivo la vara es la cuota a ESTA altura (la curva del
-                 comparador, aplanada en colacion) - contra la meta completa,
-                 el "ritmo" absorberia lo que aun no se juega. */
-              cerrado={turnoCerrado}
-              meta={data.targetPieces ?? live.quotaPieces ?? metaSensor}
-              hechas={live.totalPieces}
-              piezasPulso={data.pulse?.totalCycles ?? null}
-              corteHora={horaPlanta(live.lastSyncAt ? Date.parse(live.lastSyncAt) - new Date().getTimezoneOffset() * 60_000 : null)}
-              cuotaAhora={comparacion.optimalAtCurrentMinute}
-              horaAhora={horaDeCuota}
-              cpmAndando={
-                live.timeBreakdown && live.timeBreakdown.producingMin > 0
-                  ? live.totalPieces / live.timeBreakdown.producingMin
-                  : null
-              }
-              costo={costoParadas}
-              grupos={gruposEventos}
-              notasTurno={notasDeTurnoCompleto}
-            />
-            </div>
-            <div className="space-y-3">
-            {/* La curva contra los otros días va ANTES del «vs ayer» (pedido de
-                Orel): las dos miran atrás, pero esta enseña el turno completo de
-                un vistazo y la de ayer es el detalle numérico de UNA de esas
-                curvas. Primero el panorama, después la cuenta. */}
-            <ComparadorDias
-              ventana={ventanaGrafica}
-              onVentana={setVentanaGrafica}
-              refSel={refSel}
-              onRefSel={setRefSel}
-              cmp={comparacion}
-              live={live}
-              /* Solo cuando el pronóstico es creíble: un cono con 20% de error es
-                 una mancha que promete lo que no puede. */
-              cone={pronostico && pronostico.mapePct <= MAX_MAPE_PCT ? pronostico.cone : null}
-            />
-            {/* Cerró el turno: qué cambió contra ayer y cómo quedó contra los
-                récords. Es el paso de "hoy pasó esto" a "esto vuelve todos los
-                turnos". */}
-            <VsAyerBloque r={comparadoConAyer} records={recordsLinea} sinConvenio={sinConvenio} />
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="space-y-3">
-            {/* Adónde va a cerrar el turno, según lo que hicieron los anteriores
-                desde esta misma altura. Antes de la velocidad: primero el
-                desenlace, después el detalle de cómo se está llegando. */}
-            <PronosticoCierre
-              f={pronostico}
-              meta={data.targetPieces ?? live.quotaPieces ?? metaSensor}
-              horizonte={horizontePronostico}
-            />
-            {/* El comparador SUBE hasta acá, pegado al pronóstico: los dos
-                contestan la misma pregunta —si el turno llega— y estaban separados
-                por tres bloques de detalle. Primero el desenlace, después el
-                porqué (velocidad, tramos, tiempo, hora por hora); en PC ese
-                «después» es la columna de al lado, y en el celular sigue siendo
-                lo que viene abajo. */}
-            <ComparadorDias
-              ventana={ventanaGrafica}
-              onVentana={setVentanaGrafica}
-              refSel={refSel}
-              onRefSel={setRefSel}
-              cmp={comparacion}
-              live={live}
-              /* Solo cuando el pronóstico es creíble: un cono con 20% de error es
-                 una mancha que promete lo que no puede. */
-              cone={pronostico && pronostico.mapePct <= MAX_MAPE_PCT ? pronostico.cone : null}
-            />
-            </div>
-            <div className="space-y-3">
-            {/* ⚠ UN solo gráfico de la serie de 5 min.
-                Había dos tarjetas —"Velocidad de la línea" y "Piezas por tramo"—
-                dibujando exactamente la misma serie, una en pz/min y otra en
-                piezas. La tendencia (media de 15 min) y las referencias de ritmo se
-                mudaron acá, encima de su propio detalle, que además es el gráfico
-                que sabe ubicar las detenciones y el que tiene el zoom a 8×. */}
-            <Sparkbars
-              series={serieDelTurno}
-              cierreMs={(() => {
-                /* El cierre PROGRAMADO (el mismo de la cabecera): cerrado el
-                   turno se usa el horario declarado; en curso, el previsto. */
-                const iso = live.shiftClosed
-                  ? (live.scheduledEnd ?? live.plannedEnd)
-                  : (live.plannedEnd ?? live.scheduledEnd)
-                const ms = iso ? Date.parse(iso) : NaN
-                return Number.isNaN(ms) ? null : ms
-              })()}
-              stopReasons={live.stopReasons}
-              stopEvents={live.stopEvents}
-              comments={live.comments}
-              causaSel={causaSel}
-              onCausa={(c) => { setCausaSel(c); setTramoSel(null) }}
-              tramoSel={tramoSel}
-              breaks={comparacion.breaks}
-              ventana={ventanaGrafica}
-              onVentana={setVentanaGrafica}
-              requiredPerMinute={pace && pace.requiredPerMinute > 0 ? pace.requiredPerMinute : null}
-              medianCpm={
-                /* La MISMA mediana que el riel y la chispa (`ritmoAndando`, 19
-                   turnos), no la del backend (8): eran 29,4 y 29,7 en la misma
-                   pantalla con dos muestras distintas — dos «lo normal» a diez
-                   centímetros (auditoría en vivo, 27-08). El backend queda de
-                   respaldo para docs sin historial. */
-                ritmoAndando.mediana ?? live.paceMedianCpm
-              }
-              medianSamples={ritmoAndando.mediana != null ? ritmoAndando.muestras : live.paceSamples}
-              setCpm={setCpmVigente}
-              fuenteSetPoint={live.setPoint
-                ? `Set point ${fmtDec(live.setPoint.cpm)} pz/min` +
-                  (live.setPoint.medidoEl ? ` · medido el ${live.setPoint.medidoEl}` : '') +
-                  (live.setPoint.metodo ? ` (${live.setPoint.metodo})` : '') +
-                  ' — no es dato del PLC.'
-                : null}
-              onGuardarSetPoint={esAdminMonitor && esActual && data.plantSlug
-                ? async (cpm, metodo) => {
-                  await setMonitorSetPoint({
-                    plantSlug: data.plantSlug!,
-                    cpm,
-                    metodo,
-                    por: usuarioActual?.email ?? null,
-                  })
-                }
-                : undefined}
-            />
-            <TiempoDelTurno
-              tb={live.timeBreakdown}
-              causaSel={causaSel}
-              onCausa={(c) => { setCausaSel(c); setTramoSel(null) }}
-              onVentana={setVentanaGrafica}
-              onTramo={setTramoSel}
-              proximaParada={proximaParada}
-              notas={notasDeOperador}
-              /* La resta: minutos parados -> piezas, al ritmo del turno.
-                 En vivo la vara es la cuota a ESTA altura (la curva del
-                 comparador, aplanada en colacion) - contra la meta completa,
-                 el "ritmo" absorberia lo que aun no se juega. */
-              cerrado={turnoCerrado}
-              meta={data.targetPieces ?? live.quotaPieces ?? metaSensor}
-              hechas={live.totalPieces}
-              piezasPulso={data.pulse?.totalCycles ?? null}
-              corteHora={horaPlanta(live.lastSyncAt ? Date.parse(live.lastSyncAt) - new Date().getTimezoneOffset() * 60_000 : null)}
-              cuotaAhora={comparacion.optimalAtCurrentMinute}
-              horaAhora={horaDeCuota}
-              cpmAndando={
-                live.timeBreakdown && live.timeBreakdown.producingMin > 0
-                  ? live.totalPieces / live.timeBreakdown.producingMin
-                  : null
-              }
-              costo={costoParadas}
-              grupos={gruposEventos}
-              notasTurno={notasDeTurnoCompleto}
-            />
-            {/* Pegado al desglose de HOY va el de SIEMPRE: la misma pregunta —qué
-                para la línea— pero mirando los turnos anteriores. Es el paso de
-                "hoy pasó esto" a "esto vuelve todos los turnos". */}
-            {/* Cerró el turno: qué cambió contra ayer y cómo quedó contra los
-                récords. El orden es a propósito — primero qué pasó (arriba),
-                después por qué fue distinto, después qué se repite siempre. */}
-            <VsAyerBloque r={comparadoConAyer} records={recordsLinea} sinConvenio={sinConvenio} />
-            </div>
-          </>
-        )}
-        </div>
 
         {/* ⚠ Turno sin historia (la primera noche del turno noche): medio
             monitor no puede existir y eso es CORRECTO — pero se dice, con el
@@ -6760,7 +6716,6 @@ export function PublicShiftMonitorPage() {
             (2º turno), el pronóstico de cierre (4º), y el rango normal con los récords (5º).
           </div>
         )}
-        </div>
         </>)}
 
         {/*

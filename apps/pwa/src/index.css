@@ -702,9 +702,15 @@
   @media (min-height: 1300px) { .modo-pantalla { zoom: 1.32; } }
   @media (min-height: 1700px) { .modo-pantalla { zoom: 1.72; } }
   @media (min-height: 2000px) { .modo-pantalla { zoom: 2.05; } }
-  /* De las tres zonas solo queda la de vigilancia. */
+  /* Del tablero queda solo el trío (resultado, Mantención, ritmo): las demás
+     tarjetas ni se renderizan en TV (gate !modoPantalla en el JSX) y esto es
+     el cinturón por si alguna se cuela. Los avisos y el pie tampoco van. */
   .modo-pantalla > div:not(:first-of-type),
+  .modo-pantalla > p,
   .modo-pantalla > footer { display: none; }
+  .modo-pantalla > div:first-of-type > *:nth-child(n+4) { display: none; }
+  /* El contenedor trae la grilla de 6 del tablero: acá mandan las 2 fijas. */
+  .modo-pantalla > div:first-of-type { grid-auto-rows: auto; grid-auto-flow: row; }
   /* Y dentro de ella, fuera lo que no se lee de lejos. */
   .modo-pantalla .pantalla-oculta { display: none; }
   /*
