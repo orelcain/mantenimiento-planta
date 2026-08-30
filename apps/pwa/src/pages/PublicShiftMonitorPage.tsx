@@ -2499,10 +2499,9 @@ function PorHora({ series, paradas, pulse }: {
     <Bloque
       id="porhora"
       titulo="Hora por hora"
-      /* Detalle: se abre cuando alguien lo busca. Con todos los bloques
-         abiertos la pantalla medía cuatro pantallas de celular para contestar
-         tres preguntas. */
-      defaultAbierto={false}
+      /* Abierto: vive en la pestaña «Análisis», y tocarla YA es pedir verlo.
+         El plegado por defecto era de cuando compartía scroll con lo vivo
+         («cuatro pantallas para contestar tres preguntas»). */
       extra={<span className="normal-case">desde el arranque</span>}
     >
       <ul className="mt-2 space-y-1.5">
@@ -4278,6 +4277,23 @@ export function PublicShiftMonitorPage() {
    * página en cartel sería quitarle justo lo que fue a buscar.
    */
   const modoPantalla = searchParams.get('pantalla') === '1'
+  /**
+   * La PESTAÑA (`?ver=analisis`): el turno (lo que se vigila y cómo viene) o
+   * el análisis (lo que se mira después: qué se repite, de quién fue la
+   * pérdida, hora por hora, por máquina). En la URL y no en un estado, para
+   * poder compartir la vista de análisis con un link. En la TV no hay
+   * pestañas: el tablero es solo lo vivo.
+   */
+  const pestana = !modoPantalla && searchParams.get('ver') === 'analisis' ? 'analisis' : 'turno'
+  const verPestana = (p: 'turno' | 'analisis') => {
+    const n = new URLSearchParams(searchParams)
+    if (p === 'analisis') n.set('ver', 'analisis')
+    else n.delete('ver')
+    setSearchParams(n, { replace: true })
+    /* Cada pestaña es una página distinta: arrancarla a mitad del scroll de
+       la otra deja al usuario mirando un bloque cualquiera. */
+    window.scrollTo({ top: 0 })
+  }
   /** Causa de detención resaltada sobre el gráfico. */
   const [causaSel, setCausaSel] = useState<string | null>(null)
   /* La parada concreta que se está mirando: marca UNA banda, no las 40 de su
@@ -4434,8 +4450,12 @@ export function PublicShiftMonitorPage() {
     // `replace` para no llenar el historial del navegador con cada flecha: el
     // botón "atrás" del celular tiene que salir de la pantalla, no deshacer
     // turno por turno.
-    if (destino === 0) setSearchParams({}, { replace: true })
-    else setSearchParams({ turno: vistas[destino]!.shiftDocId }, { replace: true })
+    /* Solo se toca `turno`: pisar el resto de los parámetros botaba la
+       pestaña elegida (y `pantalla`, aunque en la TV no hay navegación). */
+    const params = new URLSearchParams(searchParams)
+    if (destino === 0) params.delete('turno')
+    else params.set('turno', vistas[destino]!.shiftDocId)
+    setSearchParams(params, { replace: true })
     // Otro turno, otras detenciones: mantener la selección marcaría bandas que
     // no existen en el turno que se acaba de abrir.
     setCausaSel(null)
@@ -5685,6 +5705,31 @@ export function PublicShiftMonitorPage() {
         </div>
       )}
 
+      {/* Las dos pestañas: el turno (se vigila) y el análisis (se estudia).
+          El análisis dejó de compartir scroll con lo vivo — en el celular eran
+          dos pantallas de pareto y reparto ANTES del pie, y quien entra por el
+          QR viene a ver cómo va el turno. En la TV no se muestra: allá no hay
+          quién toque. */}
+      {!modoPantalla && (
+        <div className="mx-auto max-w-3xl px-4 pt-3">
+          <div className="grid grid-cols-2 gap-1 rounded-full border border-border bg-muted p-1">
+            {([['turno', 'El turno'], ['analisis', 'Análisis']] as const).map(([id, rotulo]) => (
+              <button
+                key={id}
+                onClick={() => verPestana(id)}
+                className={`tap-44 rounded-full py-1.5 text-[12.5px] transition-colors ${
+                  pestana === id
+                    ? 'bg-card font-semibold text-foreground'
+                    : 'text-muted-foreground hover:text-foreground/80'
+                }`}
+              >
+                {rotulo}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/*
        * ── El ancho manda: en PC, columnas ────────────────────────────────
        * La mitad del uso del monitor es de escritorio (telemetría 30-08:
@@ -5705,6 +5750,9 @@ export function PublicShiftMonitorPage() {
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
       >
+        {/* Pestaña «El turno»: las zonas de vigilancia y de estado. En la TV
+            la pestaña es siempre esta, así que el tablero no cambia. */}
+        {pestana === 'turno' && (<>
         {/*
          * ── ZONA 1 · lo que se vigila ──────────────────────────────────────
          * Arriba va lo que se mira con la pantalla puesta: cuántas van, a qué
@@ -6713,17 +6761,17 @@ export function PublicShiftMonitorPage() {
           </div>
         )}
         </div>
+        </>)}
 
         {/*
          * ── ZONA 3 · análisis del turno ────────────────────────────────────
          * Lo que se mira DESPUÉS, no con la línea corriendo: qué se repite, de
-         * quién fue la pérdida, hora por hora, el detalle por máquina. Antes
-         * estaba mezclado con lo vivo; acá tiene su lugar, abajo y rotulado.
+         * quién fue la pérdida, hora por hora, el detalle por máquina. Tiene
+         * pestaña propia (`?ver=analisis`): dejó de compartir scroll con lo
+         * vivo. El rótulo lo pone la pestaña, no un h2.
          */}
+        {pestana === 'analisis' && (
         <div className="pt-1">
-          <h2 className="mb-2 text-[11px] uppercase tracking-wide text-muted-foreground">
-            Análisis del turno
-          </h2>
           {/* Acá SÍ multicolumna, al revés que arriba: entre bloques de
               análisis no hay uno «más importante» —se miran después y por
               separado— y sus alturas son muy dispares (el pareto mide 1.507 px
@@ -6813,6 +6861,7 @@ export function PublicShiftMonitorPage() {
 
           </div>
         </div>
+        )}
 
         {/* Frescura y procedencia */}
         <footer className="space-y-1 pb-6 pt-1 text-center text-[11px] text-muted-foreground/80">

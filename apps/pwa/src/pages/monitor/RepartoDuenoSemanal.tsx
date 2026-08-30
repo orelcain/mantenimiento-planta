@@ -78,7 +78,7 @@ export function RepartoDuenoSemanal({ stats }: { stats?: ShiftStat[] | null }) {
     <Bloque
       id="dueno-semanal"
       titulo="De quién fue la pérdida"
-      defaultAbierto={false}
+      /* Abierto: vive en la pestaña «Análisis», y tocarla YA es pedir verlo. */
       extra={<span className="normal-case tabular-nums">{semanas.length} sem · equipos {pctEquipos}%</span>}
     >
       {/* La conclusión ANTES que el dibujo, como todo el monitor. */}
