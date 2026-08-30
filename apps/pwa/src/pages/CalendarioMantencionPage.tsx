@@ -1791,9 +1791,16 @@ export function CalendarioMantencionPage() {
             ? `${exportSpanCount}semanas`
             : `${exportSpanCount}meses`
 
-    const outputName = originalFilename.replace(/\.xlsx$/i, '') + `_editado_${suffix}.xlsx`
+    // El sufijo del alcance mentía en la carpeta: un archivo «_mes» podía traer
+    // un solo día. Se le agrega el rango real, que no admite interpretación.
+    const guion = (raw: string) => raw.replace(/\//g, '-')
+    const desde = guion(exportCols[0]?.dateRaw ?? '')
+    const hasta = guion(exportCols[exportCols.length - 1]?.dateRaw ?? '')
+    const rango = desde && hasta ? (desde === hasta ? `_${desde}` : `_${desde}_a_${hasta}`) : ''
+    const outputName = originalFilename.replace(/\.xlsx$/i, '') + `_${suffix}${rango}.xlsx`
     XLSX.writeFile(wbExport, outputName, { bookType: 'xlsx', compression: true })
-    setStatus(`Archivo exportado (${exportCols.length} días): ${outputName}`)
+    const cuantos = exportCols.length === 1 ? '1 día' : `${exportCols.length} días`
+    setStatus(`Archivo exportado (${cuantos}): ${outputName}`)
   }
 
   function handleAddTechnician() {
@@ -1930,11 +1937,18 @@ export function CalendarioMantencionPage() {
     return 'tarde'
   }
 
-  /** Turnos por banda en un dia. Alimenta el pie de la vista horizontal. */
-  function dotacionDelDia(c: number): { dia: number; tarde: number; noche: number } {
-    const r = { dia: 0, tarde: 0, noche: 0 }
+  /**
+   * Turnos por banda en un día. Alimenta el pie de la vista horizontal.
+   * `planificado` distingue un día sin cobertura de uno que todavía no se llena:
+   * «Extender» crea las columnas con la celda vacía, y pintar eso en rojo sería
+   * una alarma falsa sobre días que nadie ha programado aún.
+   */
+  function dotacionDelDia(c: number): { dia: number; tarde: number; noche: number; planificado: boolean } {
+    const r = { dia: 0, tarde: 0, noche: 0, planificado: false }
     for (const t of techRows) {
-      const b = bandaDeTurno(t.shifts[c])
+      const v = t.shifts[c]
+      if (v && v.trim() !== '') r.planificado = true
+      const b = bandaDeTurno(v)
       if (b) r[b] += 1
     }
     return r
@@ -2253,11 +2267,17 @@ export function CalendarioMantencionPage() {
                   const n = dotacionDelDia(d.c)
                   return (
                     <td key={d.c} className="px-0.5 text-center text-caption font-semibold">
-                      <span className={n.dia < 2 ? 'text-ink-crit' : 'text-brand-ink'}>{n.dia}</span>
-                      <span className="text-muted-foreground"> · </span>
-                      <span className={n.tarde < 2 ? 'text-ink-crit' : 'text-cat-4-ink'}>{n.tarde}</span>
-                      <span className="text-muted-foreground"> · </span>
-                      <span className={n.noche < 2 ? 'text-ink-crit' : 'text-cat-6-ink'}>{n.noche}</span>
+                      {n.planificado ? (
+                        <>
+                          <span className={n.dia < 2 ? 'text-ink-crit' : 'text-brand-ink'}>{n.dia}</span>
+                          <span className="text-muted-foreground"> · </span>
+                          <span className={n.tarde < 2 ? 'text-ink-crit' : 'text-cat-4-ink'}>{n.tarde}</span>
+                          <span className="text-muted-foreground"> · </span>
+                          <span className={n.noche < 2 ? 'text-ink-crit' : 'text-cat-6-ink'}>{n.noche}</span>
+                        </>
+                      ) : (
+                        <span className="text-muted-foreground" title="Día sin planificar todavía">sin planificar</span>
+                      )}
                     </td>
                   )
                 })}
@@ -2301,7 +2321,7 @@ export function CalendarioMantencionPage() {
                 { k: null, label: 'Libre', n: techRows.filter((t) => !bandaDeTurno(t.shifts[diaActivo.c])).length },
               ]).map(({ k, label, n }) => (
                 <div key={label} className="flex-1 rounded-card bg-card px-1 py-2 text-center">
-                  <div className={`text-title3 font-bold tabular-nums ${k && n < 2 ? 'text-ink-crit' : 'text-foreground'}`}>{n}</div>
+                  <div className={`text-title3 font-bold tabular-nums ${k && n < 2 && dotacionDelDia(diaActivo.c).planificado ? 'text-ink-crit' : 'text-foreground'}`}>{n}</div>
                   <div className="text-caption text-muted-foreground">{label}</div>
                 </div>
               ))}
@@ -2372,7 +2392,13 @@ export function CalendarioMantencionPage() {
           {TAB_ITEMS.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                // La barra de estado es feedback de la acción en curso. Arrastrarla a
+                // otra pestaña deja mensajes sin contexto («Debes ingresar nombre del
+                // técnico.» encima del calendario), y no expiraban nunca.
+                if (tab.id !== activeTab) setStatus('')
+                setActiveTab(tab.id)
+              }}
               className={`px-3 py-1 rounded-t text-xs font-medium transition-colors ${
                 activeTab === tab.id
                   ? 'bg-primary text-primary-foreground'
@@ -2437,21 +2463,21 @@ export function CalendarioMantencionPage() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1.5 text-xs">
             <label className="text-muted-foreground self-center">Día</label>
             <div className="flex gap-1">
-              <input className={CONTROL_CLASS + ' flex-1'} type="time" value={shiftConfig.diaInicio} onChange={(e) => setShiftConfig((p) => ({ ...p, diaInicio: e.target.value }))} />
-              <input className={CONTROL_CLASS + ' flex-1'} type="time" value={shiftConfig.diaFin} onChange={(e) => setShiftConfig((p) => ({ ...p, diaFin: e.target.value }))} />
+              <input className={CONTROL_CLASS + ' flex-1'} type="time" aria-label="Hora en que entra el turno de día" value={shiftConfig.diaInicio} onChange={(e) => setShiftConfig((p) => ({ ...p, diaInicio: e.target.value }))} />
+              <input className={CONTROL_CLASS + ' flex-1'} type="time" aria-label="Hora en que sale el turno de día" value={shiftConfig.diaFin} onChange={(e) => setShiftConfig((p) => ({ ...p, diaFin: e.target.value }))} />
             </div>
             <label className="text-muted-foreground self-center">Tarde</label>
             <div className="flex gap-1">
-              <input className={CONTROL_CLASS + ' flex-1'} type="time" value={shiftConfig.tardeInicio} onChange={(e) => setShiftConfig((p) => ({ ...p, tardeInicio: e.target.value }))} />
-              <input className={CONTROL_CLASS + ' flex-1'} type="time" value={shiftConfig.tardeFin} onChange={(e) => setShiftConfig((p) => ({ ...p, tardeFin: e.target.value }))} />
+              <input className={CONTROL_CLASS + ' flex-1'} type="time" aria-label="Hora en que entra el turno de tarde" value={shiftConfig.tardeInicio} onChange={(e) => setShiftConfig((p) => ({ ...p, tardeInicio: e.target.value }))} />
+              <input className={CONTROL_CLASS + ' flex-1'} type="time" aria-label="Hora en que sale el turno de tarde" value={shiftConfig.tardeFin} onChange={(e) => setShiftConfig((p) => ({ ...p, tardeFin: e.target.value }))} />
             </div>
             <label className="text-muted-foreground self-center">Noche</label>
             <div className="flex gap-1">
-              <input className={CONTROL_CLASS + ' flex-1'} type="time" value={shiftConfig.nocheInicio} onChange={(e) => setShiftConfig((p) => ({ ...p, nocheInicio: e.target.value }))} />
-              <input className={CONTROL_CLASS + ' flex-1'} type="time" value={shiftConfig.nocheFin} onChange={(e) => setShiftConfig((p) => ({ ...p, nocheFin: e.target.value }))} />
+              <input className={CONTROL_CLASS + ' flex-1'} type="time" aria-label="Hora en que entra el turno de noche" value={shiftConfig.nocheInicio} onChange={(e) => setShiftConfig((p) => ({ ...p, nocheInicio: e.target.value }))} />
+              <input className={CONTROL_CLASS + ' flex-1'} type="time" aria-label="Hora en que sale el turno de noche" value={shiftConfig.nocheFin} onChange={(e) => setShiftConfig((p) => ({ ...p, nocheFin: e.target.value }))} />
             </div>
             <label className="text-muted-foreground self-center">Libre</label>
-            <input className={CONTROL_CLASS} value={shiftConfig.libreLabel} onChange={(e) => setShiftConfig((p) => ({ ...p, libreLabel: e.target.value }))} />
+            <input className={CONTROL_CLASS} aria-label="Texto que se escribe en los días libres" value={shiftConfig.libreLabel} onChange={(e) => setShiftConfig((p) => ({ ...p, libreLabel: e.target.value }))} />
             <div className="col-span-2 sm:col-span-4">
               <button className="mt-1 h-8 w-full rounded-ctl bg-primary text-primary-foreground text-xs" onClick={handleShiftConfigApply}>Aplicar plantillas</button>
             </div>
@@ -2705,7 +2731,7 @@ export function CalendarioMantencionPage() {
                     <th className="border-l border-border/20 px-1.5 py-1 text-right text-caption font-semibold text-primary/90" title="Horas totales (trabajadas + vacaciones pagadas + feriados pagados) / Horas esperadas según jornada legal">
                       <div>Horas</div><div className="font-normal text-caption text-muted-foreground">Real / Esp</div>
                     </th>
-                    <th className="px-1 py-1 text-center text-caption font-semibold text-primary/90" style={{ minWidth: 90 }} title="Diferencia = Horas reales − Horas esperadas. Verde = cumple, Rojo = déficit">Diferencia</th>
+                    <th className="px-1 py-1 text-center text-caption font-semibold text-primary/90" style={{ minWidth: 90 }} title="Diferencia = Horas reales − Horas esperadas del período (prorrateado por días programados). No es el tope legal: para eso, mira si las horas reales salen en ámbar.">Diferencia</th>
                     <th className="px-1 py-1 text-center text-caption font-semibold text-primary/90" title="Días efectivamente trabajados (turnos asignados)">
                       <div>Días</div><div className="font-normal text-caption text-muted-foreground">Trab.</div>
                     </th>
@@ -2756,9 +2782,19 @@ export function CalendarioMantencionPage() {
                           </div>
                         </td>
                         <td className="border-l border-border/15 px-1.5 py-1 text-right tabular-nums whitespace-nowrap" title={`Trabajo: ${row.weekWorkedHours.toFixed(1)}h · Vac pagadas: ${row.weekVacationPaidHours.toFixed(1)}h · Fer pagados: ${row.weekHolidayPaidHours.toFixed(1)}h · Colación: ${row.weekBreakHours.toFixed(1)}h`}>
-                          <span className="text-foreground font-medium">{row.weekHours.toFixed(1)}</span>
+                          <span className={row.weekHours > expectedWeekBase + 0.01 ? 'font-bold text-ink-warn' : 'font-medium text-foreground'}>
+                            {row.weekHours.toFixed(1)}
+                          </span>
                           <span className="text-muted-foreground mx-0.5">/</span>
                           <span className="text-muted-foreground">{row.weekExpected.toFixed(1)}</span>
+                          {row.weekHours > expectedWeekBase + 0.01 && (
+                            <span
+                              className="ml-1 text-caption font-semibold text-ink-warn"
+                              title={`Sobre el tope legal de ${expectedWeekBase.toFixed(0)} h: ${(row.weekHours - expectedWeekBase).toFixed(1)} h extraordinarias`}
+                            >
+                              +{(row.weekHours - expectedWeekBase).toFixed(1)} extra
+                            </span>
+                          )}
                         </td>
                         <td className="px-1 py-1" style={{ minWidth: 90 }}>
                           <div className="flex items-center gap-1">
