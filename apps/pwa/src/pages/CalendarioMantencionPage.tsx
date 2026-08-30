@@ -62,9 +62,6 @@ type HoursConfig = {
   expectedFromPlannedDays: boolean
   toleranceHours: number
   useFixedDaily: boolean
-  dayReductionHours: number
-  afternoonReductionHours: number
-  nightReductionHours: number
   holidayAsNonWorking: boolean
   holidayBusinessDaysOnly: boolean
 }
@@ -135,9 +132,6 @@ function defaultHoursConfig(): HoursConfig {
     expectedFromPlannedDays: true,
     toleranceHours: 0.5,
     useFixedDaily: true,
-    dayReductionHours: 1,
-    afternoonReductionHours: 1,
-    nightReductionHours: 1,
     holidayAsNonWorking: true,
     holidayBusinessDaysOnly: true,
   }
@@ -455,9 +449,6 @@ export function CalendarioMantencionPage() {
       expectedFromPlannedDays: stored.expectedFromPlannedDays !== false,
       toleranceHours: toNumberOr(stored.toleranceHours, 0.5),
       useFixedDaily: stored.useFixedDaily !== false,
-      dayReductionHours: toNumberOr(stored.dayReductionHours, 1),
-      afternoonReductionHours: toNumberOr(stored.afternoonReductionHours, 1),
-      nightReductionHours: toNumberOr(stored.nightReductionHours, 1),
       holidayAsNonWorking: stored.holidayAsNonWorking !== false,
       holidayBusinessDaysOnly: stored.holidayBusinessDaysOnly !== false,
     }
@@ -887,9 +878,9 @@ export function CalendarioMantencionPage() {
     } catch (error) {
       const cached = safeStorageGet<PersistedCalendarState | null>(CALENDAR_LOCAL_CACHE_KEY, null)
       if (cached && applyPersistedState(cached)) {
-        setStatus(`Plantilla cargada con respaldo local (sin permisos Firebase): ${filename}`)
+        setStatus(`Calendario cargado desde la copia de este equipo: no se pudo leer la versión del servidor. Puede estar desactualizado.`)
       } else {
-        setStatus(`Plantilla cargada localmente (sin sync Firebase): ${filename}`)
+        setStatus(`Plantilla cargada, pero sin poder leer el servidor y sin copia en este equipo: el calendario puede estar vacío.`)
       }
       logger.error('No se pudo hidratar calendario desde Firebase', error instanceof Error ? error : new Error(String(error)))
     } finally {
@@ -956,7 +947,11 @@ export function CalendarioMantencionPage() {
       if (syncSeqRef.current !== mySeq) return
       setSyncState('error')
       setSyncErrorText(error instanceof Error ? error.message : 'Error desconocido')
-      setStatus('Cambios guardados en este navegador, pero sin permisos para sincronizar en Firebase.')
+      // No se sabe la causa: puede ser señal, permisos o Firebase caído. Lo que
+      // importa primero es que el trabajo no se perdió.
+      setStatus(navigator.onLine
+        ? `Tus cambios quedaron guardados en este equipo, pero no se pudieron subir: ${error instanceof Error ? error.message : 'error desconocido'}.`
+        : 'Sin conexión. Tus cambios quedaron guardados en este equipo y se subirán cuando vuelva la señal.')
     }
   }, [buildLocalPayload])
 
@@ -979,7 +974,7 @@ export function CalendarioMantencionPage() {
   const syncIndicator = useMemo(() => {
     if (syncState === 'saving') return { label: 'Guardando…', className: 'bg-amber-500/[0.15] text-ink-warn border-amber-500/[0.25]' }
     if (syncState === 'synced') return { label: `Sincronizado${lastSyncAt ? ` ${lastSyncAt.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}` : ''}`, className: 'bg-emerald-500/[0.15] text-ink-ok border-emerald-500/[0.25]' }
-    if (syncState === 'error') return { label: `Error de sync${syncErrorText ? `: ${syncErrorText}` : ''}`, className: 'bg-red-500/[0.15] text-ink-crit border-red-500/[0.25]' }
+    if (syncState === 'error') return { label: `Sin subir${syncErrorText ? `: ${syncErrorText}` : ''}`, className: 'bg-red-500/[0.15] text-ink-crit border-red-500/[0.25]' }
     return { label: 'Sin cambios', className: 'bg-muted text-muted-foreground border-border' }
   }, [lastSyncAt, syncErrorText, syncState])
 
