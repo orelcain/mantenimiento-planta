@@ -1674,15 +1674,6 @@ export function CalendarioMantencionPage() {
     setStatus(`Parámetros aplicados. Jornada semanal objetivo: ${expectedWeekBase.toFixed(1)}h. Meta mensual auto: ${expectedMonthAutoBase.toFixed(1)}h`)
   }
 
-  function handleShiftConfigApply() {
-    const next = {
-      ...shiftConfig,
-      libreLabel: (shiftConfig.libreLabel || 'LIBRE').trim().toUpperCase(),
-    }
-    setShiftConfig(next)
-    safeStorageSet(SHIFT_CONFIG_KEY, next)
-    setStatus('Plantillas de turno actualizadas. Atajos en calendario: D=Dia, T=Tarde, N=Noche, L=Libre, V=Vacaciones, F=Feriado, Shift+D=Dia reducida, Shift+T=Tarde reducida, Shift+N=Noche reducida.')
-  }
 
   function handleFileUpload(file: File | null) {
     if (!file) return
@@ -2579,9 +2570,21 @@ export function CalendarioMantencionPage() {
               <input className={CONTROL_CLASS + ' flex-1'} type="time" aria-label="Hora en que sale el turno de noche" value={shiftConfig.nocheFin} onChange={(e) => setShiftConfig((p) => ({ ...p, nocheFin: e.target.value }))} />
             </div>
             <label className="text-muted-foreground self-center">Libre</label>
-            <input className={CONTROL_CLASS} aria-label="Texto que se escribe en los días libres" value={shiftConfig.libreLabel} onChange={(e) => setShiftConfig((p) => ({ ...p, libreLabel: e.target.value }))} />
-            <div className="col-span-2 sm:col-span-4">
-              <button className="mt-1 h-8 w-full rounded-ctl bg-primary text-primary-foreground text-xs" onClick={handleShiftConfigApply}>Aplicar plantillas</button>
+            <input
+              className={CONTROL_CLASS}
+              aria-label="Texto que se escribe en los días libres"
+              value={shiftConfig.libreLabel}
+              onChange={(e) => setShiftConfig((p) => ({ ...p, libreLabel: e.target.value.toUpperCase() }))}
+            />
+            <div className="col-span-2 sm:col-span-4 mt-1 space-y-1 text-caption text-muted-foreground">
+              <p>Los cambios se aplican al instante y se guardan solos.</p>
+              <p>
+                Atajos sobre el calendario: <strong className="text-foreground">D</strong> día ·{' '}
+                <strong className="text-foreground">T</strong> tarde · <strong className="text-foreground">N</strong> noche ·{' '}
+                <strong className="text-foreground">L</strong> libre · <strong className="text-foreground">V</strong> vacaciones ·{' '}
+                <strong className="text-foreground">F</strong> feriado. Con <strong className="text-foreground">Shift</strong>, la versión reducida.
+              </p>
+              <p>Para un horario que no sea ninguno de estos, doble clic en la celda.</p>
             </div>
           </div>
         )}
