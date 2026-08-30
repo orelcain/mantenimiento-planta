@@ -371,6 +371,9 @@ function safeStorageSet(key: string, value: unknown): void {
 }
 
 export function CalendarioMantencionPage() {
+  /** La plantilla base se descarga sola. Si falla, no hay calendario: ahí y solo
+   *  ahí aparece el cargador manual, que es el único rescate. */
+  const [plantillaBaseFallo, setPlantillaBaseFallo] = useState(false)
   const [wb, setWb] = useState<XLSX.WorkBook | null>(null)
   const [ws, setWs] = useState<XLSX.WorkSheet | null>(null)
   const [dayCols, setDayCols] = useState<DayCol[]>([])
@@ -615,8 +618,10 @@ export function CalendarioMantencionPage() {
         const buffer = await response.arrayBuffer()
         const loaded = XLSX.read(buffer, { cellDates: true, cellStyles: true })
         loadWorkbookRef.current(loaded, 'calendario-mantencion-base.xlsx')
+        setPlantillaBaseFallo(false)
       } catch (error) {
-        setStatus(`Error cargando plantilla: ${error instanceof Error ? error.message : 'desconocido'}`)
+        setPlantillaBaseFallo(true)
+        setStatus(`No se pudo cargar la plantilla base: ${error instanceof Error ? error.message : 'error desconocido'}. Carga un Excel a mano para seguir.`)
       }
     }
 
@@ -2179,7 +2184,8 @@ export function CalendarioMantencionPage() {
 
 
   const TAB_ITEMS: { id: TabId; label: string }[] = [
-    { id: 'edicion', label: 'Edición' },
+    // Aquí no se edita: se exporta y se extiende. La edición es la tabla de abajo.
+    { id: 'edicion', label: 'Planilla' },
     // «Turnos» chocaba con la pestaña de módulo del mismo nombre: era «Turnos › Turnos».
     // Aquí se definen las horas de inicio y fin de cada banda, así que es «Horarios».
     { id: 'plantillas', label: 'Horarios' },
@@ -2496,15 +2502,20 @@ export function CalendarioMantencionPage() {
         {/* ── Tab: Edición ── */}
         {activeTab === 'edicion' && (
           <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-            <div className="grid gap-1.5">
-              <label className="text-xs text-muted-foreground">Plantilla Excel opcional</label>
-              <input
-                type="file"
-                accept=".xlsx,.xls"
-                className="text-xs"
-                onChange={(e) => handleFileUpload(e.target.files?.[0] || null)}
-              />
-            </div>
+            {plantillaBaseFallo && (
+              <div className="grid gap-1.5 rounded-ctl border border-ink-crit/40 p-2">
+                <label htmlFor="plantilla-rescate" className="text-xs text-ink-crit">
+                  La plantilla base no cargó. Carga un Excel para poder exportar y extender.
+                </label>
+                <input
+                  id="plantilla-rescate"
+                  type="file"
+                  accept=".xlsx,.xls"
+                  className="text-xs"
+                  onChange={(e) => handleFileUpload(e.target.files?.[0] || null)}
+                />
+              </div>
+            )}
             <div className="grid gap-1.5">
               <label className="text-xs text-muted-foreground">Exportar calendario</label>
               <button className="h-8 rounded-ctl border text-xs" onClick={exportWorkbook}>Exportar</button>
