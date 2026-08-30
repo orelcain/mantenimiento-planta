@@ -36,6 +36,14 @@ type TechRow = {
 }
 
 type ShiftConfig = {
+  // Los reducidos son horarios propios, no «el normal menos N horas»: el de tarde
+  // de la planta empieza más tarde (19:00), y restarle horas al final nunca lo daba.
+  diaRedInicio: string
+  diaRedFin: string
+  tardeRedInicio: string
+  tardeRedFin: string
+  nocheRedInicio: string
+  nocheRedFin: string
   diaInicio: string
   diaFin: string
   tardeInicio: string
@@ -144,6 +152,12 @@ function defaultShiftConfig(): ShiftConfig {
     nocheInicio: '00:00',
     nocheFin: '08:00',
     libreLabel: 'LIBRE',
+    diaRedInicio: '08:00',
+    diaRedFin: '13:00',
+    tardeRedInicio: '19:00',
+    tardeRedFin: '00:00',
+    nocheRedInicio: '00:00',
+    nocheRedFin: '05:00',
   }
 }
 
@@ -214,12 +228,6 @@ function hhmmToMinutes(hhmm: string): number | null {
   return h * 60 + m
 }
 
-function minutesToHHMM(totalMinutes: number): string {
-  const normalized = ((totalMinutes % (24 * 60)) + (24 * 60)) % (24 * 60)
-  const h = Math.floor(normalized / 60)
-  const m = normalized % 60
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
-}
 
 function rangeDurationMinutes(startHHMM: string, endHHMM: string): number | null {
   const start = hhmmToMinutes(startHHMM)
@@ -235,9 +243,6 @@ function toNumberOr(value: unknown, fallback: number): number {
   return Number.isFinite(n) ? n : fallback
 }
 
-function clampMin(value: number, min: number): number {
-  return value < min ? min : value
-}
 
 function getChileToday(): Date {
   const nowChile = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Santiago' }))
@@ -500,35 +505,12 @@ export function CalendarioMantencionPage() {
     const tarde = `${shiftConfig.tardeInicio} - ${shiftConfig.tardeFin}`
     const noche = `${shiftConfig.nocheInicio} - ${shiftConfig.nocheFin}`
     const libre = shiftConfig.libreLabel || 'LIBRE'
-    const reductionMinutesDay = Math.max(0, Math.round(toNumberOr(hoursConfig.dayReductionHours, 1) * 60))
-    const reductionMinutesAfternoon = Math.max(0, Math.round(toNumberOr(hoursConfig.afternoonReductionHours, 1) * 60))
-    const reductionMinutesNight = Math.max(0, Math.round(toNumberOr(hoursConfig.nightReductionHours, 1) * 60))
-    const normalDuration = rangeDurationMinutes(shiftConfig.diaInicio, shiftConfig.diaFin)
-    const dayStartMinutes = hhmmToMinutes(shiftConfig.diaInicio)
-    let diaReducido = dia
-    if (normalDuration !== null && dayStartMinutes !== null && reductionMinutesDay > 0 && normalDuration > reductionMinutesDay) {
-      const reducedEnd = minutesToHHMM(dayStartMinutes + (normalDuration - reductionMinutesDay))
-      diaReducido = `${shiftConfig.diaInicio} - ${reducedEnd}`
-    }
-
-    const normalNightDuration = rangeDurationMinutes(shiftConfig.nocheInicio, shiftConfig.nocheFin)
-    const nightStartMinutes = hhmmToMinutes(shiftConfig.nocheInicio)
-    let nocheReducido = noche
-    if (normalNightDuration !== null && nightStartMinutes !== null && reductionMinutesNight > 0 && normalNightDuration > reductionMinutesNight) {
-      const reducedNightEnd = minutesToHHMM(nightStartMinutes + (normalNightDuration - reductionMinutesNight))
-      nocheReducido = `${shiftConfig.nocheInicio} - ${reducedNightEnd}`
-    }
-
-    const normalAfternoonDuration = rangeDurationMinutes(shiftConfig.tardeInicio, shiftConfig.tardeFin)
-    const afternoonStartMinutes = hhmmToMinutes(shiftConfig.tardeInicio)
-    let tardeReducido = tarde
-    if (normalAfternoonDuration !== null && afternoonStartMinutes !== null && reductionMinutesAfternoon > 0 && normalAfternoonDuration > reductionMinutesAfternoon) {
-      const reducedAfternoonEnd = minutesToHHMM(afternoonStartMinutes + (normalAfternoonDuration - reductionMinutesAfternoon))
-      tardeReducido = `${shiftConfig.tardeInicio} - ${reducedAfternoonEnd}`
-    }
+    const diaReducido = `${shiftConfig.diaRedInicio} - ${shiftConfig.diaRedFin}`
+    const tardeReducido = `${shiftConfig.tardeRedInicio} - ${shiftConfig.tardeRedFin}`
+    const nocheReducido = `${shiftConfig.nocheRedInicio} - ${shiftConfig.nocheRedFin}`
 
     return { dia, tarde, noche, libre, diaReducido, tardeReducido, nocheReducido }
-  }, [hoursConfig.dayReductionHours, hoursConfig.afternoonReductionHours, hoursConfig.nightReductionHours, shiftConfig])
+  }, [shiftConfig])
 
   const weeks = useMemo(() => {
     const map: Record<string, string> = {}
@@ -1104,6 +1086,7 @@ export function CalendarioMantencionPage() {
     const n = parseTimeRange(nocheGuess)
 
     const next: ShiftConfig = {
+      ...shiftConfig,
       diaInicio: d?.start || shiftConfig.diaInicio,
       diaFin: d?.end || shiftConfig.diaFin,
       tardeInicio: t?.start || shiftConfig.tardeInicio,
@@ -1378,14 +1361,17 @@ export function CalendarioMantencionPage() {
     return Math.max(0, hoursConfig.workHours - hoursConfig.breakHours)
   }
 
+  /** Cuántas horas menos dura un turno reducido que el normal de su banda. */
   function reductionHoursForShift(shiftText: string): number {
-    const m = shiftText.match(/(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/)
-    if (!m) return 0
-    const start = m[1] ?? ''
-    if (start === shiftConfig.diaInicio) return clampMin(toNumberOr(hoursConfig.dayReductionHours, 1), 0)
-    if (start === shiftConfig.tardeInicio) return clampMin(toNumberOr(hoursConfig.afternoonReductionHours, 1), 0)
-    if (start === shiftConfig.nocheInicio) return clampMin(toNumberOr(hoursConfig.nightReductionHours, 1), 0)
-    return 0
+    const t = parseTimeRange(shiftText)
+    if (!t) return 0
+    const dur = rangeDurationMinutes(t.start, t.end)
+    if (dur === null) return 0
+    const normal = t.start === shiftConfig.diaRedInicio ? rangeDurationMinutes(shiftConfig.diaInicio, shiftConfig.diaFin)
+      : t.start === shiftConfig.tardeRedInicio ? rangeDurationMinutes(shiftConfig.tardeInicio, shiftConfig.tardeFin)
+      : rangeDurationMinutes(shiftConfig.nocheInicio, shiftConfig.nocheFin)
+    if (normal === null) return 0
+    return Math.max(0, (normal - dur) / 60)
   }
 
   function workedHoursForShift(shiftText: string): number {
@@ -1403,30 +1389,19 @@ export function CalendarioMantencionPage() {
     return Math.max(0, diff / 60 - hoursConfig.breakHours)
   }
 
+  /** Un turno es reducido si coincide con uno de los tres horarios reducidos. */
   function isReducedShift(shiftText: string): boolean {
     const text = shiftText.trim()
     if (!text) return false
     if (text.toUpperCase().includes('[RED]')) return true
-
-    const m = text.match(/(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/)
-    if (!m) return false
-    const shiftStart = m[1] ?? ''
-    const shiftDuration = rangeDurationMinutes(m[1] ?? '', m[2] ?? '')
-    if (shiftDuration === null) return false
-
-    const normalDayDuration = rangeDurationMinutes(shiftConfig.diaInicio, shiftConfig.diaFin)
-    const normalAfternoonDuration = rangeDurationMinutes(shiftConfig.tardeInicio, shiftConfig.tardeFin)
-    const normalNightDuration = rangeDurationMinutes(shiftConfig.nocheInicio, shiftConfig.nocheFin)
-
-    const matchesReducedRange = (start: string, normalDuration: number | null, reductionHours: number): boolean => {
-      const reductionMinutes = Math.max(0, Math.round(reductionHours * 60))
-      if (normalDuration === null || normalDuration <= reductionMinutes) return false
-      return shiftStart === start && shiftDuration === (normalDuration - reductionMinutes)
-    }
-
-    return matchesReducedRange(shiftConfig.diaInicio, normalDayDuration, clampMin(toNumberOr(hoursConfig.dayReductionHours, 1), 0))
-      || matchesReducedRange(shiftConfig.tardeInicio, normalAfternoonDuration, clampMin(toNumberOr(hoursConfig.afternoonReductionHours, 1), 0))
-      || matchesReducedRange(shiftConfig.nocheInicio, normalNightDuration, clampMin(toNumberOr(hoursConfig.nightReductionHours, 1), 0))
+    const t = parseTimeRange(text)
+    if (!t) return false
+    const reducidos: Array<[string, string]> = [
+      [shiftConfig.diaRedInicio, shiftConfig.diaRedFin],
+      [shiftConfig.tardeRedInicio, shiftConfig.tardeRedFin],
+      [shiftConfig.nocheRedInicio, shiftConfig.nocheRedFin],
+    ]
+    return reducidos.some(([a, b]) => t.start === a && t.end === b)
   }
 
   const visibleMetaIndices = useMemo(() => {
@@ -1675,26 +1650,6 @@ export function CalendarioMantencionPage() {
     selectCalendarDate(selectedDay)
   }, [selectedCol, dayCols, selectCalendarDate])
 
-  function handleHoursConfigApply() {
-    const next = {
-      ...hoursConfig,
-      workHours: clampMin(toNumberOr(hoursConfig.workHours, 8), 0),
-      breakHours: clampMin(toNumberOr(hoursConfig.breakHours, 0.5), 0),
-      expectedWeek: clampMin(toNumberOr(hoursConfig.expectedWeek, 44), 0),
-      autoLegalWeek: hoursConfig.autoLegalWeek !== false,
-      workDaysPerWeek: Math.max(1, Math.min(7, Math.floor(toNumberOr(hoursConfig.workDaysPerWeek, 6)))),
-      expectedFromPlannedDays: hoursConfig.expectedFromPlannedDays !== false,
-      toleranceHours: clampMin(toNumberOr(hoursConfig.toleranceHours, 0.5), 0),
-      dayReductionHours: clampMin(toNumberOr(hoursConfig.dayReductionHours, 1), 0),
-      afternoonReductionHours: clampMin(toNumberOr(hoursConfig.afternoonReductionHours, 1), 0),
-      nightReductionHours: clampMin(toNumberOr(hoursConfig.nightReductionHours, 1), 0),
-      holidayAsNonWorking: hoursConfig.holidayAsNonWorking !== false,
-      holidayBusinessDaysOnly: hoursConfig.holidayBusinessDaysOnly !== false,
-    }
-    setHoursConfig(next)
-    safeStorageSet(HOURS_CONFIG_KEY, next)
-    setStatus(`Parámetros aplicados. Jornada semanal objetivo: ${expectedWeekBase.toFixed(1)}h. Meta mensual auto: ${expectedMonthAutoBase.toFixed(1)}h`)
-  }
 
 
   function handleFileUpload(file: File | null) {
@@ -2598,6 +2553,22 @@ export function CalendarioMantencionPage() {
               value={shiftConfig.libreLabel}
               onChange={(e) => setShiftConfig((p) => ({ ...p, libreLabel: e.target.value.toUpperCase() }))}
             />
+            <p className="col-span-2 sm:col-span-4 mt-2 text-caption font-semibold text-foreground">Turnos reducidos</p>
+            <label className="text-muted-foreground self-center" title="Lo que escribe Shift + D">Día reducido</label>
+            <div className="flex gap-1">
+              <input className={CONTROL_CLASS + ' flex-1'} type="time" aria-label="Hora en que entra el día reducido" value={shiftConfig.diaRedInicio} onChange={(e) => setShiftConfig((p) => ({ ...p, diaRedInicio: e.target.value }))} />
+              <input className={CONTROL_CLASS + ' flex-1'} type="time" aria-label="Hora en que sale el día reducido" value={shiftConfig.diaRedFin} onChange={(e) => setShiftConfig((p) => ({ ...p, diaRedFin: e.target.value }))} />
+            </div>
+            <label className="text-muted-foreground self-center" title="Lo que escribe Shift + T">Tarde reducida</label>
+            <div className="flex gap-1">
+              <input className={CONTROL_CLASS + ' flex-1'} type="time" aria-label="Hora en que entra la tarde reducida" value={shiftConfig.tardeRedInicio} onChange={(e) => setShiftConfig((p) => ({ ...p, tardeRedInicio: e.target.value }))} />
+              <input className={CONTROL_CLASS + ' flex-1'} type="time" aria-label="Hora en que sale la tarde reducida" value={shiftConfig.tardeRedFin} onChange={(e) => setShiftConfig((p) => ({ ...p, tardeRedFin: e.target.value }))} />
+            </div>
+            <label className="text-muted-foreground self-center" title="Lo que escribe Shift + N">Noche reducida</label>
+            <div className="flex gap-1">
+              <input className={CONTROL_CLASS + ' flex-1'} type="time" aria-label="Hora en que entra la noche reducida" value={shiftConfig.nocheRedInicio} onChange={(e) => setShiftConfig((p) => ({ ...p, nocheRedInicio: e.target.value }))} />
+              <input className={CONTROL_CLASS + ' flex-1'} type="time" aria-label="Hora en que sale la noche reducida" value={shiftConfig.nocheRedFin} onChange={(e) => setShiftConfig((p) => ({ ...p, nocheRedFin: e.target.value }))} />
+            </div>
             <div className="col-span-2 sm:col-span-4 mt-1 space-y-1 text-caption text-muted-foreground">
               <p>Los cambios se aplican al instante y se guardan solos.</p>
               <p>
@@ -2619,9 +2590,9 @@ export function CalendarioMantencionPage() {
               Lo de aquí abajo es la meta contra la que se comparan y qué escriben los atajos.
             </p>
             <label className="text-muted-foreground self-center" title="Solo se usa para las horas de feriados y días libres, y como respaldo si una celda no tiene horario. Las horas trabajadas salen del horario de la celda.">Jornada diaria de referencia (h)</label>
-            <input className={CONTROL_CLASS} type="number" step="0.25" value={hoursConfig.workHours} onChange={(e) => setHoursConfig((p) => ({ ...p, workHours: toNumberOr(e.target.value, p.workHours) }))} />
+            <input className={CONTROL_CLASS} type="number" step="0.25" min={0} value={hoursConfig.workHours} onChange={(e) => setHoursConfig((p) => ({ ...p, workHours: toNumberOr(e.target.value, p.workHours) }))} />
             <label className="text-muted-foreground self-center" title="Tiempo de colación diario. Se descuenta del cálculo de horas trabajadas.">Colación (h)</label>
-            <input className={CONTROL_CLASS} type="number" step="0.25" value={hoursConfig.breakHours} onChange={(e) => setHoursConfig((p) => ({ ...p, breakHours: toNumberOr(e.target.value, p.breakHours) }))} />
+            <input className={CONTROL_CLASS} type="number" step="0.25" min={0} value={hoursConfig.breakHours} onChange={(e) => setHoursConfig((p) => ({ ...p, breakHours: toNumberOr(e.target.value, p.breakHours) }))} />
             <label className="text-muted-foreground self-center" title="Meta semanal legal. En modo automático usa el tramo vigente en Chile según fecha del período.">Jornada objetivo semanal (h)</label>
             <input
               className={CONTROL_CLASS}
@@ -2640,16 +2611,13 @@ export function CalendarioMantencionPage() {
             <label className="text-muted-foreground self-center">Esperadas mes (auto)</label>
             <div className={CONTROL_CLASS + ' flex items-center justify-between'}>
               <span className="font-medium tabular-nums">{expectedMonthAutoBase.toFixed(1)} h</span>
-              <span className="text-caption text-muted-foreground">{monthCalendarDays} días calendario</span>
+              <span className="text-caption text-muted-foreground">{monthCalendarDays === 1 ? '1 día' : `${monthCalendarDays} días`} de calendario cargados</span>
             </div>
             <label className="text-muted-foreground self-center" title="Margen permitido bajo la meta esperada sin activar alerta visual en Control.">Tolerancia (h)</label>
-            <input className={CONTROL_CLASS} type="number" step="0.25" value={hoursConfig.toleranceHours} onChange={(e) => setHoursConfig((p) => ({ ...p, toleranceHours: toNumberOr(e.target.value, p.toleranceHours) }))} />
-            <label className="text-muted-foreground self-center" title="Cuántas horas menos escribe Shift + D en la celda. No cambia el cálculo de horas: eso lo decide el horario que queda escrito.">Turno reducido · Día (h menos)</label>
-            <input className={CONTROL_CLASS} type="number" step="0.25" min="0" value={hoursConfig.dayReductionHours} onChange={(e) => setHoursConfig((p) => ({ ...p, dayReductionHours: toNumberOr(e.target.value, p.dayReductionHours) }))} />
-            <label className="text-muted-foreground self-center" title="Cuántas horas menos escribe Shift + T en la celda. No cambia el cálculo de horas: eso lo decide el horario que queda escrito.">Turno reducido · Tarde (h menos)</label>
-            <input className={CONTROL_CLASS} type="number" step="0.25" min="0" value={hoursConfig.afternoonReductionHours} onChange={(e) => setHoursConfig((p) => ({ ...p, afternoonReductionHours: toNumberOr(e.target.value, p.afternoonReductionHours) }))} />
-            <label className="text-muted-foreground self-center" title="Cuántas horas menos escribe Shift + N en la celda. No cambia el cálculo de horas: eso lo decide el horario que queda escrito.">Turno reducido · Noche (h menos)</label>
-            <input className={CONTROL_CLASS} type="number" step="0.25" min="0" value={hoursConfig.nightReductionHours} onChange={(e) => setHoursConfig((p) => ({ ...p, nightReductionHours: toNumberOr(e.target.value, p.nightReductionHours) }))} />
+            <input className={CONTROL_CLASS} type="number" step="0.25" min={0} value={hoursConfig.toleranceHours} onChange={(e) => setHoursConfig((p) => ({ ...p, toleranceHours: toNumberOr(e.target.value, p.toleranceHours) }))} />
+            
+            
+            
             <label className="col-span-2 flex items-center gap-2">
               <input type="checkbox" checked={hoursConfig.useFixedDaily} onChange={(e) => setHoursConfig((p) => ({ ...p, useFixedDaily: e.target.checked }))} />
               <span title="Activado: cada día trabajado usa Jornada total - Colación. Desactivado: calcula horas desde el rango del turno (hora inicio/fin).">Horas fijas por día trabajado</span>
@@ -2676,14 +2644,14 @@ export function CalendarioMantencionPage() {
               <span title="Activado: el feriado solo se considera en días hábiles. Desactivado: se considera sin restricción de día.">Feriados descuentan solo días hábiles</span>
             </label>
             <div className="col-span-2 sm:col-span-4 rounded-ctl border border-border/80 bg-muted px-2 py-1 text-caption text-muted-foreground">
-              Jornada trabajada diaria usada en cálculos = Jornada total diaria - Colación.
+              Las horas de cada turno salen de su horario menos la colación. La jornada de referencia solo entra en feriados, días libres y celdas sin horario.
             </div>
             <div className="col-span-2 sm:col-span-4 rounded-ctl border border-border/80 bg-muted px-2 py-1 text-caption text-muted-foreground">
               Jornada objetivo diaria legal = Jornada objetivo semanal / Días trabajo/semana = {expectedWeekBase.toFixed(1)} / {workDaysPerWeekBase} = {legalDailyTarget.toFixed(2)} h.
             </div>
             <div className="col-span-2 sm:col-span-4 rounded-ctl border border-border/80 bg-muted px-2 py-1 text-caption text-muted-foreground">
               {hoursConfig.expectedFromPlannedDays
-                ? 'Semanal esperado (por técnico) = Jornada diaria legal × días programados de ese técnico en la semana.'
+                ? 'Semanal esperado = el tope legal de la semana. Si la semana está a medio cargar en la planilla, se prorratea por los días programados.'
                 : `Semanal esperado (prorrateo) = Jornada semanal legal × (días de la semana visibles / 7). En esta semana: ${expectedWeekBase.toFixed(1)} × (${weekDays.length}/7).`}
             </div>
             <div className="col-span-2 sm:col-span-4 rounded-ctl border border-border/80 bg-muted px-2 py-1 text-caption text-muted-foreground">
@@ -2695,7 +2663,7 @@ export function CalendarioMantencionPage() {
               {legalWeekLabel}
             </div>
             <div className="col-span-2 sm:col-span-4">
-              <button className="mt-1 h-8 w-full rounded-ctl bg-primary text-primary-foreground text-xs" onClick={handleHoursConfigApply}>Aplicar parámetros</button>
+              <p className="mt-1 text-caption text-muted-foreground">Los cambios se aplican al instante y se guardan solos.</p>
             </div>
           </div>
         )}
