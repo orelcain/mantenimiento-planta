@@ -2900,7 +2900,7 @@ function RespuestaMantencion({ m, cerrado, riel, fallaLineaMin, enCurso }: {
           tres «100%» y una racha reconstruyen la falsa realidad que Orel
           señaló el 26-08. Son minutos de MÁQUINA sumados, no de línea. */}
       {!soloAviso && totalSinImputarMin >= 3 && (
-        <p className="mt-3 text-footnote leading-snug text-muted-foreground">
+        <p className="pantalla-oculta mt-3 text-footnote leading-snug text-muted-foreground">
           <b className="text-foreground/80">Sin causa anotada:</b>{' '}
           <span className="tabular-nums">{fmtInt(totalSinImputarMin)} min</span> de máquina sumados
           {' ('}
@@ -2937,7 +2937,7 @@ function RespuestaMantencion({ m, cerrado, riel, fallaLineaMin, enCurso }: {
         </p>
       )}
       {!soloAviso && (
-        <p className="mt-2 text-caption leading-snug text-muted-foreground/80">
+        <p className="pantalla-oculta mt-2 text-caption leading-snug text-muted-foreground/80">
           Disponibilidad técnica: solo fallas de equipo — colación, esperas externas y las{' '}
           <span className="tabular-nums">{fmtInt(microTotal)}</span> microdetenciones van aparte.
         </p>
@@ -3444,7 +3444,9 @@ function BarrasMinuto({ datos, cerrado }: { datos: BarrasMinutoDatos; cerrado?: 
   const franja = (nombre: string, esperado: number | null, vals: number[], altoPx: number, principal = false) => {
     const tope = Math.max(esperado ?? 0, ...vals.slice(0, n), 1)
     return (
-      <div key={nombre} className={principal ? '' : 'mt-2'}>
+      /* En la TV va la LÍNEA y no las tres franjas por máquina: a 3 m no se
+         distinguen y son las que hacen que el tablero no quepa en 1080. */
+      <div key={nombre} className={principal ? '' : 'pantalla-oculta mt-2'}>
         {/* Pegado al borde izquierdo VISIBLE (sticky): el contenido está
             ensanchado por el zoom y un header normal se va con el paneo. */}
         <div
@@ -3535,7 +3537,7 @@ function BarrasMinuto({ datos, cerrado }: { datos: BarrasMinutoDatos; cerrado?: 
           </div>
         </div>
       </div>
-      <div className="mt-0.5 flex items-center justify-between gap-2 text-[11px] text-muted-foreground/70">
+      <div className="pantalla-oculta mt-0.5 flex items-center justify-between gap-2 text-[11px] text-muted-foreground/70">
         <span>
           cada barra es un minuto — verde ≥75% del esperado, ámbar 50–75%, rojo &lt;50%
         </span>
@@ -3966,7 +3968,7 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
                 )
               })}
             </div>
-            <p className="mt-1.5 text-caption leading-snug text-muted-foreground/80">
+            <p className="pantalla-oculta mt-1.5 text-caption leading-snug text-muted-foreground/80">
               {conPulsoMaq && <>Izquierda: el <b>ahora</b> de cada una, del mismo contador — las tres suman el «Ahora» de arriba. </>}
               {conCero && (
                 cerrado
@@ -3980,7 +3982,7 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
               La barra es el % del turno que estuvo andando.
             </p>
             {fraseMaquinas(maquinas) !== '' && (
-              <p className="mt-1 text-caption leading-snug text-muted-foreground/80">
+              <p className="pantalla-oculta mt-1 text-caption leading-snug text-muted-foreground/80">
                 {fraseMaquinas(maquinas)}
               </p>
             )}
@@ -4055,8 +4057,9 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
           86 px de gráfico y 11 px de texto peleando el mismo renglón no ganaba
           ninguno. El veredicto va en 13 px porque ES la conclusión, no una nota
           al pie; el gráfico de abajo la confirma. */}
+      {/* La Chispa (la semana turno a turno) es análisis: no entra en la TV. */}
       {(contexto || chispa) && (
-        <div className="mt-2.5 border-t border-border/50 pt-2.5">
+        <div className="pantalla-oculta mt-2.5 border-t border-border/50 pt-2.5">
           {contexto && (
             <p className="text-footnote leading-snug text-foreground">{contexto}</p>
           )}
@@ -4257,6 +4260,13 @@ export function PublicShiftMonitorPage() {
    */
   const [searchParams, setSearchParams] = useSearchParams()
   const turnoParam = searchParams.get('turno')
+  /**
+   * MODO PANTALLA (`?pantalla=1`): el tablero para la TV de la sala. Explícito
+   * a propósito — nunca por ancho de pantalla: la mitad del uso de escritorio
+   * es gente leyendo el informe completo en un notebook, y convertirle la
+   * página en cartel sería quitarle justo lo que fue a buscar.
+   */
+  const modoPantalla = searchParams.get('pantalla') === '1'
   /** Causa de detención resaltada sobre el gráfico. */
   const [causaSel, setCausaSel] = useState<string | null>(null)
   /* La parada concreta que se está mirando: marca UNA banda, no las 40 de su
@@ -5623,8 +5633,10 @@ export function PublicShiftMonitorPage() {
       </header>
 
       {/* Navegación entre turnos. Solo aparece cuando hay historial: en una
-          línea recién integrada no tiene sentido mostrar flechas muertas. */}
-      {vistas.length > 1 && (
+          línea recién integrada no tiene sentido mostrar flechas muertas.
+          En la TV tampoco: nadie navega turnos en una pantalla de sala, y son
+          44 px de alto que le faltan al tablero. */}
+      {vistas.length > 1 && !modoPantalla && (
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-2 px-4 pt-3">
           <button
             onClick={() => irA(1)}
@@ -5676,7 +5688,9 @@ export function PublicShiftMonitorPage() {
        * bloque, y `break-inside-avoid` impide que una tarjeta se parta en dos.
        */}
       <main
-        className="mx-auto max-w-3xl space-y-4 px-4 py-4 lg:max-w-[1500px] 2xl:max-w-[1840px]"
+        className={`mx-auto max-w-3xl space-y-4 px-4 py-4 lg:max-w-[1500px] 2xl:max-w-[1840px]${
+          modoPantalla ? ' modo-pantalla' : ''
+        }`}
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
       >
@@ -5931,7 +5945,7 @@ export function PublicShiftMonitorPage() {
                 )
               })()}
               {banda && (
-                <p className="mt-1 text-[10.5px] leading-snug text-muted-foreground/80">
+                <p className="pantalla-oculta mt-1 text-[10.5px] leading-snug text-muted-foreground/80">
                   La banda gris es lo que esta línea cierra normalmente{' '}
                   (<span className="tabular-nums">{fmtInt(banda.cierres.min)}–{fmtInt(banda.cierres.max)}</span>
                   , últimos {banda.muestras} turnos)

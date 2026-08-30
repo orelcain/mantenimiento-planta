@@ -670,6 +670,76 @@
 
 @layer utilities {
   /*
+   * ── MODO PANTALLA del monitor público (`?pantalla=1`) ─────────────────────
+   *
+   * La TV de la sala se mira a TRES METROS: ahí no se lee un pareto, una
+   * cascada ni la letra chica de una tarjeta. No es «el monitor ampliado» —
+   * medido en el mockup, ampliar la tarjeta entera la corta— sino la CABEZA de
+   * cada tarjeta, grande: cuántas van, el ritmo con su desglose por máquina y
+   * la tira del minuto. Todo lo demás se oculta; sigue estando en el teléfono
+   * y en el PC.
+   *
+   * Se activa por parámetro y nunca por ancho: quien lee el informe en un
+   * notebook de 1.400 px no quiere que se lo conviertan en cartel.
+   *
+   * ⚠ Va con `zoom`, no con `transform: scale`. Con scale el contenido conserva
+   * su ancho y queda una tarjeta de celular estirada con la mitad de la
+   * pantalla vacía; con zoom refluye al ancho real y los 465 minutos del turno
+   * ocupan la pantalla entera.
+   */
+  /*
+   * El tablero tiene que CABER sin scroll: nadie hace scroll en una TV. El
+   * contenido que queda mide ~980 px propios, así que el zoom se ata a la
+   * ALTURA de la pantalla — en un 1080p llena justo, y en un 4K de sala el
+   * mismo tablero se ve al doble sin tocar nada.
+   */
+  .modo-pantalla {
+    max-width: none;
+    padding: 1vw 1.4vw;
+    zoom: 1.05;
+  }
+  @media (min-height: 1000px) { .modo-pantalla { zoom: 1.1; } }
+  @media (min-height: 1300px) { .modo-pantalla { zoom: 1.32; } }
+  @media (min-height: 1700px) { .modo-pantalla { zoom: 1.72; } }
+  @media (min-height: 2000px) { .modo-pantalla { zoom: 2.05; } }
+  /* De las tres zonas solo queda la de vigilancia. */
+  .modo-pantalla > div:not(:first-of-type),
+  .modo-pantalla > footer { display: none; }
+  /* Y dentro de ella, fuera lo que no se lee de lejos. */
+  .modo-pantalla .pantalla-oculta { display: none; }
+  /*
+   * Lugar fijo, no reparto automático: el resultado y la respuesta de
+   * Mantención arriba lado a lado, y la tira del minuto cruzando abajo. Con
+   * columnas quedaba un hueco muerto bajo la tarjeta más corta.
+   */
+  .modo-pantalla > div:first-of-type {
+    columns: unset;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1vw;
+    align-items: start;
+  }
+  .modo-pantalla > div:first-of-type > * { margin-bottom: 0 !important; }
+  /* Las dos tarjetas de arriba, del mismo alto: con alturas dispares quedaba
+     un hueco muerto bajo la más corta. */
+  .modo-pantalla > div:first-of-type { align-items: stretch; }
+  /*
+   * El bloque de ritmo cruza abajo y ADENTRO se reparte en dos: el «ahora» y
+   * las tres Baader lado a lado, con la tira del minuto cruzando el pie. Sin
+   * esto, su contenido se acota a max-w-4xl y deja media pantalla vacía —
+   * justo lo que la TV no puede permitirse.
+   */
+  .modo-pantalla > div:first-of-type > *:nth-child(3) {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 2vw;
+    align-content: start;
+  }
+  .modo-pantalla > div:first-of-type > *:nth-child(3) > * { max-width: none !important; }
+  .modo-pantalla > div:first-of-type > *:nth-child(3) > .barras-ancho { grid-column: 1 / -1; }
+
+  /*
    * `tap-44` — área táctil de 44x44 sin tocar el tamaño visual (§3 de la
    * Constitución). Para controles chicos por diseño: chips de filtro, cabeceras
    * plegables, flechas de navegación.
