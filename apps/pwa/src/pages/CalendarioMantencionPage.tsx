@@ -2614,7 +2614,11 @@ export function CalendarioMantencionPage() {
         {/* ── Tab: Horas ── */}
         {activeTab === 'horas' && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1.5 text-xs">
-            <label className="text-muted-foreground self-center" title="Horas totales del turno diario (incluye colación).">Jornada total diaria (h)</label>
+            <p className="col-span-2 sm:col-span-4 text-caption text-muted-foreground">
+              Las horas trabajadas salen del <strong className="text-foreground">horario escrito en cada celda</strong>, menos la colación.
+              Lo de aquí abajo es la meta contra la que se comparan y qué escriben los atajos.
+            </p>
+            <label className="text-muted-foreground self-center" title="Solo se usa para las horas de feriados y días libres, y como respaldo si una celda no tiene horario. Las horas trabajadas salen del horario de la celda.">Jornada diaria de referencia (h)</label>
             <input className={CONTROL_CLASS} type="number" step="0.25" value={hoursConfig.workHours} onChange={(e) => setHoursConfig((p) => ({ ...p, workHours: toNumberOr(e.target.value, p.workHours) }))} />
             <label className="text-muted-foreground self-center" title="Tiempo de colación diario. Se descuenta del cálculo de horas trabajadas.">Colación (h)</label>
             <input className={CONTROL_CLASS} type="number" step="0.25" value={hoursConfig.breakHours} onChange={(e) => setHoursConfig((p) => ({ ...p, breakHours: toNumberOr(e.target.value, p.breakHours) }))} />
@@ -2640,11 +2644,11 @@ export function CalendarioMantencionPage() {
             </div>
             <label className="text-muted-foreground self-center" title="Margen permitido bajo la meta esperada sin activar alerta visual en Control.">Tolerancia (h)</label>
             <input className={CONTROL_CLASS} type="number" step="0.25" value={hoursConfig.toleranceHours} onChange={(e) => setHoursConfig((p) => ({ ...p, toleranceHours: toNumberOr(e.target.value, p.toleranceHours) }))} />
-            <label className="text-muted-foreground self-center" title="Cuántas horas menos dura el turno de día cuando se marca como reducido con Shift + D.">Turno reducido · Día (h menos)</label>
+            <label className="text-muted-foreground self-center" title="Cuántas horas menos escribe Shift + D en la celda. No cambia el cálculo de horas: eso lo decide el horario que queda escrito.">Turno reducido · Día (h menos)</label>
             <input className={CONTROL_CLASS} type="number" step="0.25" min="0" value={hoursConfig.dayReductionHours} onChange={(e) => setHoursConfig((p) => ({ ...p, dayReductionHours: toNumberOr(e.target.value, p.dayReductionHours) }))} />
-            <label className="text-muted-foreground self-center" title="Cuántas horas menos dura el turno de tarde cuando se marca como reducido con Shift + T.">Turno reducido · Tarde (h menos)</label>
+            <label className="text-muted-foreground self-center" title="Cuántas horas menos escribe Shift + T en la celda. No cambia el cálculo de horas: eso lo decide el horario que queda escrito.">Turno reducido · Tarde (h menos)</label>
             <input className={CONTROL_CLASS} type="number" step="0.25" min="0" value={hoursConfig.afternoonReductionHours} onChange={(e) => setHoursConfig((p) => ({ ...p, afternoonReductionHours: toNumberOr(e.target.value, p.afternoonReductionHours) }))} />
-            <label className="text-muted-foreground self-center" title="Cuántas horas menos dura el turno de noche cuando se marca como reducido con Shift + N.">Turno reducido · Noche (h menos)</label>
+            <label className="text-muted-foreground self-center" title="Cuántas horas menos escribe Shift + N en la celda. No cambia el cálculo de horas: eso lo decide el horario que queda escrito.">Turno reducido · Noche (h menos)</label>
             <input className={CONTROL_CLASS} type="number" step="0.25" min="0" value={hoursConfig.nightReductionHours} onChange={(e) => setHoursConfig((p) => ({ ...p, nightReductionHours: toNumberOr(e.target.value, p.nightReductionHours) }))} />
             <label className="col-span-2 flex items-center gap-2">
               <input type="checkbox" checked={hoursConfig.useFixedDaily} onChange={(e) => setHoursConfig((p) => ({ ...p, useFixedDaily: e.target.checked }))} />
