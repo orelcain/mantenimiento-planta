@@ -724,6 +724,25 @@
      un hueco muerto bajo la más corta. */
   .modo-pantalla > div:first-of-type { align-items: stretch; }
   /*
+   * La tarjeta del resultado es la más corta de la fila y se estira para
+   * emparejar con Mantención: medido, 216 de sus 470 px quedaban vacíos. En
+   * una TV el hueco no se llena con más bloques sino con más SEÑAL: las
+   * piezas son EL número del tablero, así que crece a cartel y el resto del
+   * contenido se reparte a lo alto de la tarjeta.
+   */
+  .modo-pantalla > div:first-of-type > *:first-child {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-evenly;
+  }
+  .modo-pantalla > div:first-of-type > *:first-child .text-5xl {
+    font-size: 110px;
+    letter-spacing: -0.02em;
+  }
+  /* La frase del resultado y las notas, a tamaño de lejos. */
+  .modo-pantalla > div:first-of-type > *:first-child p { font-size: 18px; line-height: 1.35; }
+
+  /*
    * El bloque de ritmo cruza abajo y ADENTRO se reparte en dos: el «ahora» y
    * las tres Baader lado a lado, con la tira del minuto cruzando el pie. Sin
    * esto, su contenido se acota a max-w-4xl y deja media pantalla vacía —
