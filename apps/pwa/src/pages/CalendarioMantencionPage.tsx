@@ -1546,6 +1546,20 @@ export function CalendarioMantencionPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dayCols, exportScope, exportSpanCount, selectedMonth, selectedWeek])
 
+  /**
+   * Vacaciones y feriados ocupan cuatro columnas que están en «–» cuando no hay
+   * ninguno cargado. Se muestran solo si el período visible tiene alguno.
+   */
+  const hayAusencias = useMemo(() => {
+    const cols = [...weekDays, ...monthDays]
+    return techRows.some((t) => cols.some((d) => {
+      const v = t.shifts[d.c] || ''
+      return isVacationShift(v) || isHolidayShift(v)
+    }))
+    // isVacationShift/isHolidayShift se recrean por render; dependen de hoursConfig.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [techRows, weekDays, monthDays, hoursConfig])
+
   const hoursRows = techRows.map((t) => {
     const weekWorkedHours = weekDays.reduce((sum, d) => sum + workedHoursForShift(t.shifts[d.c] || ''), 0)
     const monthWorkedHours = monthDays.reduce((sum, d) => sum + workedHoursForShift(t.shifts[d.c] || ''), 0)
@@ -2805,11 +2819,19 @@ export function CalendarioMantencionPage() {
                 <div className="flex items-center gap-2">
                   <span className="inline-block h-2 w-2 rounded-full bg-cat-3-tint" />
                   <label className="font-medium text-foreground">Mes</label>
-                  <span className="text-caption text-muted-foreground">({monthDays.length} días)</span>
+                  <span className={`text-caption ${monthDays.length < 7 ? 'text-ink-warn' : 'text-muted-foreground'}`}>
+                    ({monthDays.length === 1 ? '1 día' : `${monthDays.length} días`}{monthDays.length < 7 ? ' en la planilla' : ''})
+                  </span>
                 </div>
                 <select className={CONTROL_CLASS + ' w-full'} value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}>
                   {Object.entries(months).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
                 </select>
+                {monthDays.length < 7 && (
+                  <p className="flex items-start gap-1 text-caption text-ink-warn">
+                    <AlertTriangle className="mt-[1px] h-3 w-3 shrink-0" aria-hidden />
+                    <span>El resumen mensual solo cubre lo que hay cargado de este mes, no el mes completo.</span>
+                  </p>
+                )}
               </div>
             </div>
             <div className="rounded-card border border-border/40 overflow-hidden">
@@ -2820,10 +2842,10 @@ export function CalendarioMantencionPage() {
                     <th rowSpan={2} className="sticky left-0 z-20 border-b border-r border-border/30 bg-muted px-2 md:px-3 py-2 text-left text-xs font-semibold text-foreground" style={{ minWidth: 140 }}>
                       Técnico
                     </th>
-                    <th colSpan={6} className="border-b border-l border-border/30 bg-primary/[0.15] dark:bg-gradient-to-r dark:from-blue-950/80 dark:to-blue-900/40 px-2 py-1.5 text-center text-caption font-bold tracking-wider text-primary">
+                    <th colSpan={hayAusencias ? 6 : 4} className="border-b border-l border-border/30 bg-primary/[0.15] dark:bg-gradient-to-r dark:from-blue-950/80 dark:to-blue-900/40 px-2 py-1.5 text-center text-caption font-bold tracking-wider text-primary">
                       <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-blue-400" />Resumen Semanal</span>
                     </th>
-                    <th colSpan={6} className="border-b border-l-2 border-border/30 bg-cat-3-tint/[0.15] px-2 py-1.5 text-center text-caption font-bold tracking-wider text-cat-3-ink">
+                    <th colSpan={hayAusencias ? 6 : 4} className="border-b border-l-2 border-border/30 bg-cat-3-tint/[0.15] px-2 py-1.5 text-center text-caption font-bold tracking-wider text-cat-3-ink">
                       <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-cat-3-ink" />Resumen Mensual</span>
                     </th>
                     <th rowSpan={2} className="border-b border-l-2 border-border/30 bg-muted px-2 py-1.5 text-center" style={{ minWidth: 44 }} title="Total de días de vacaciones acumulados en todo el calendario">
@@ -2842,8 +2864,8 @@ export function CalendarioMantencionPage() {
                     <th className="px-1 py-1 text-center text-caption font-semibold text-primary/90" title="Días de descanso / libres (NO incluye vacaciones ni feriados)">
                       <div>Días</div><div className="font-normal text-caption text-muted-foreground">Libres</div>
                     </th>
-                    <th className="px-1 py-1 text-center text-caption font-semibold text-primary/90" title="Días de vacaciones (horas pagadas incluidas en Horas Reales)">Vac.</th>
-                    <th className="px-1 py-1 text-center text-caption font-semibold text-primary/90" title="Días feriados (horas pagadas incluidas en Horas Reales)">Fer.</th>
+                    {hayAusencias && (<th className="px-1 py-1 text-center text-caption font-semibold text-primary/90" title="Días de vacaciones (horas pagadas incluidas en Horas Reales)">Vac.</th>)}
+                    {hayAusencias && (<th className="px-1 py-1 text-center text-caption font-semibold text-primary/90" title="Días feriados (horas pagadas incluidas en Horas Reales)">Fer.</th>)}
                     <th className="border-l-2 border-border/30 px-1.5 py-1 text-right text-caption font-semibold text-cat-3-ink" title="Horas totales del mes (trabajadas + vacaciones + feriados pagados) / Horas esperadas">
                       <div>Horas</div><div className="font-normal text-caption text-muted-foreground">Real / Esp</div>
                     </th>
@@ -2854,8 +2876,8 @@ export function CalendarioMantencionPage() {
                     <th className="px-1 py-1 text-center text-caption font-semibold text-cat-3-ink" title="Días de descanso del mes (NO incluye vacaciones ni feriados)">
                       <div>Días</div><div className="font-normal text-caption text-muted-foreground">Libres</div>
                     </th>
-                    <th className="px-1 py-1 text-center text-caption font-semibold text-cat-3-ink" title="Días de vacaciones del mes">Vac.</th>
-                    <th className="px-1 py-1 text-center text-caption font-semibold text-cat-3-ink" title="Días feriados del mes">Fer.</th>
+                    {hayAusencias && (<th className="px-1 py-1 text-center text-caption font-semibold text-cat-3-ink" title="Días de vacaciones del mes">Vac.</th>)}
+                    {hayAusencias && (<th className="px-1 py-1 text-center text-caption font-semibold text-cat-3-ink" title="Días feriados del mes">Fer.</th>)}
                   </tr>
                 </thead>
                 <tbody>
@@ -2914,16 +2936,16 @@ export function CalendarioMantencionPage() {
                           <span className={`font-semibold ${row.weekWorkedDays > 0 ? 'text-emerald-400' : 'text-muted-foreground'}`}>{row.weekWorkedDays}</span>
                         </td>
                         <td className="px-1.5 py-1 text-center tabular-nums text-muted-foreground">{row.weekFreeDays > 0 ? row.weekFreeDays : <span className="text-muted-foreground">–</span>}</td>
-                        <td className="px-1 py-1 text-center">
+                        {hayAusencias && (<td className="px-1 py-1 text-center">
                           {row.weekVacationDays > 0
                             ? <span className="inline-block rounded-full border border-primary/[0.25] bg-primary/[0.15] px-1.5 py-[1px] text-caption font-bold tabular-nums text-primary" title={`${row.weekVacationPaidHours.toFixed(1)}h pagadas`}>{row.weekVacationDays}d</span>
                             : <span className="text-muted-foreground">–</span>}
-                        </td>
-                        <td className="px-1 py-1 text-center">
+                        </td>)}
+                        {hayAusencias && (<td className="px-1 py-1 text-center">
                           {row.weekHolidayDays > 0
                             ? <span className="inline-block rounded-full border border-amber-500/[0.25] bg-amber-500/[0.15] px-1.5 py-[1px] text-caption font-bold tabular-nums text-ink-warn" title={`${row.weekHolidayPaidHours.toFixed(1)}h pagadas`}>{row.weekHolidayDays}d</span>
                             : <span className="text-muted-foreground">–</span>}
-                        </td>
+                        </td>)}
                         <td className="border-l-2 border-border/25 px-1.5 py-1 text-right tabular-nums whitespace-nowrap" title={`Trabajo: ${row.monthWorkedHours.toFixed(1)}h · Vac pagadas: ${row.monthVacationPaidHours.toFixed(1)}h · Fer pagados: ${row.monthHolidayPaidHours.toFixed(1)}h · Colación: ${row.monthBreakHours.toFixed(1)}h`}>
                           <span className="text-foreground font-medium">{row.monthHours.toFixed(1)}</span>
                           <span className="text-muted-foreground mx-0.5">/</span>
@@ -2943,16 +2965,16 @@ export function CalendarioMantencionPage() {
                           <span className={`font-semibold ${row.monthWorkedDays > 0 ? 'text-emerald-400' : 'text-muted-foreground'}`}>{row.monthWorkedDays}</span>
                         </td>
                         <td className="px-1.5 py-1 text-center tabular-nums text-muted-foreground">{row.monthFreeDays > 0 ? row.monthFreeDays : <span className="text-muted-foreground">–</span>}</td>
-                        <td className="px-1 py-1 text-center">
+                        {hayAusencias && (<td className="px-1 py-1 text-center">
                           {row.monthVacationDays > 0
                             ? <span className="inline-block rounded-full border border-primary/[0.25] bg-primary/[0.15] px-1.5 py-[1px] text-caption font-bold tabular-nums text-primary" title={`${row.monthVacationPaidHours.toFixed(1)}h pagadas`}>{row.monthVacationDays}d</span>
                             : <span className="text-muted-foreground">–</span>}
-                        </td>
-                        <td className="px-1 py-1 text-center">
+                        </td>)}
+                        {hayAusencias && (<td className="px-1 py-1 text-center">
                           {row.monthHolidayDays > 0
                             ? <span className="inline-block rounded-full border border-amber-500/[0.25] bg-amber-500/[0.15] px-1.5 py-[1px] text-caption font-bold tabular-nums text-ink-warn" title={`${row.monthHolidayPaidHours.toFixed(1)}h pagadas`}>{row.monthHolidayDays}d</span>
                             : <span className="text-muted-foreground">–</span>}
-                        </td>
+                        </td>)}
                         <td className="border-l-2 border-border/25 px-1.5 py-1 text-center tabular-nums">
                           {row.totalVacationDays > 0
                             ? <span className="font-bold text-primary">{row.totalVacationDays}</span>
