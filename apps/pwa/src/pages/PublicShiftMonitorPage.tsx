@@ -5676,13 +5676,18 @@ export function PublicShiftMonitorPage() {
        * bloque, y `break-inside-avoid` impide que una tarjeta se parta en dos.
        */}
       <main
-        className="mx-auto max-w-3xl px-4 py-4 space-y-3
-                   lg:max-w-[1400px] lg:columns-2 lg:gap-3 lg:space-y-0
-                   2xl:max-w-[1840px] 2xl:columns-3
-                   lg:[&>*]:mb-3 lg:[&>*]:break-inside-avoid"
+        className="mx-auto max-w-3xl space-y-4 px-4 py-4 lg:max-w-[1500px] 2xl:max-w-[1840px]"
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
       >
+        {/*
+         * ── ZONA 1 · lo que se vigila ──────────────────────────────────────
+         * Arriba va lo que se mira con la pantalla puesta: cuántas van, a qué
+         * ritmo, si se llega y cómo respondió Mantención. En PC se reparte en
+         * columnas DENTRO de la zona, así el reparto nunca mezcla lo urgente
+         * con el análisis (el defecto de repartir la página entera de una).
+         */}
+        <div className="space-y-3 lg:columns-2 lg:gap-3 lg:space-y-0 lg:[&>*]:mb-3 lg:[&>*]:break-inside-avoid">
         {/* Piezas acumuladas — el número que vienen a ver */}
         <section className="rounded-2xl border border-border bg-gradient-to-b from-primary/[0.08] to-transparent px-4 py-4">
           <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
@@ -6302,6 +6307,14 @@ export function PublicShiftMonitorPage() {
             </>
           )
         })()}
+        </div>
+
+        {/*
+         * ── ZONA 2 · cómo viene el turno ───────────────────────────────────
+         * El estado y la comparación con otros días: se consulta, no se
+         * vigila. Va debajo de lo vivo y arriba del análisis.
+         */}
+        <div className="space-y-3 lg:columns-2 lg:gap-3 lg:space-y-0 lg:[&>*]:mb-3 lg:[&>*]:break-inside-avoid">
         {/* Una sola tarjeta desde que el ritmo se unificó arriba: en una grilla
             de dos columnas quedaba a media pantalla, con el hueco al lado. */}
         <div className="grid grid-cols-1 gap-3">
@@ -6642,7 +6655,19 @@ export function PublicShiftMonitorPage() {
             (2º turno), el pronóstico de cierre (4º), y el rango normal con los récords (5º).
           </div>
         )}
+        </div>
 
+        {/*
+         * ── ZONA 3 · análisis del turno ────────────────────────────────────
+         * Lo que se mira DESPUÉS, no con la línea corriendo: qué se repite, de
+         * quién fue la pérdida, hora por hora, el detalle por máquina. Antes
+         * estaba mezclado con lo vivo; acá tiene su lugar, abajo y rotulado.
+         */}
+        <div className="pt-1">
+          <h2 className="mb-2 text-[11px] uppercase tracking-wide text-muted-foreground">
+            Análisis del turno
+          </h2>
+          <div className="space-y-3 lg:columns-2 lg:gap-3 lg:space-y-0 2xl:columns-3 lg:[&>*]:mb-3 lg:[&>*]:break-inside-avoid">
         <ParetoDeParadas
           pareto={pareto} ctx={paretoCtx} tendencia={paretoTendencia}
           porTurno={paretoPorTurno}
@@ -6722,6 +6747,9 @@ export function PublicShiftMonitorPage() {
             </ul>
           </section>
         )}
+
+          </div>
+        </div>
 
         {/* Frescura y procedencia */}
         <footer className="space-y-1 pb-6 pt-1 text-center text-[11px] text-muted-foreground/80">

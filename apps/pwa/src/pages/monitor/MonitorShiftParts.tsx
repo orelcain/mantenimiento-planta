@@ -42,21 +42,25 @@ export function Bloque({ id, titulo, extra, defaultAbierto = true, children }: {
   defaultAbierto?: boolean
   children: React.ReactNode
 }) {
-  const clave = `monitor-bloque:${id}`
+  /*
+   * Plegar existe por la ALTURA del celular. En pantalla grande la página va
+   * en columnas y esa razón no corre: los bloques nacen abiertos, que es lo
+   * que uno espera de un tablero en el PC.
+   *
+   * ⚠ Y la preferencia se guarda POR TAMAÑO de pantalla. Con una sola clave,
+   * lo que alguien plegó en su teléfono —donde plegar es lo correcto— viajaba
+   * al PC y dejaba el pareto y «de quién fue la pérdida» cerrados en una
+   * pantalla que los muestra sin costo (visto en local, 30-08).
+   */
+  const ancha = typeof window !== 'undefined'
+    && window.matchMedia?.('(min-width: 1100px)').matches
+  const clave = `monitor-bloque:${id}${ancha ? ':pc' : ''}`
   const [abierto, setAbierto] = useState(() => {
-    /*
-     * Plegar existe por la ALTURA del celular. En pantalla grande la página va
-     * en columnas y esa razón no corre: los bloques nacen abiertos, que es lo
-     * que uno espera de un tablero en el PC. Solo vale como valor INICIAL —
-     * quien pliega a mano manda, y su elección sigue guardada.
-     */
-    const anchaYCabe = typeof window !== 'undefined'
-      && window.matchMedia?.('(min-width: 1100px)').matches
     try {
       const v = localStorage.getItem(clave)
-      return v == null ? (defaultAbierto || anchaYCabe) : v === '1'
+      return v == null ? (defaultAbierto || ancha) : v === '1'
     } catch {
-      return defaultAbierto || anchaYCabe
+      return defaultAbierto || ancha
     }
   })
 
