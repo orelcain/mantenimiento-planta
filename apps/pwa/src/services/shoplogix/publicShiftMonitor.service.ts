@@ -295,8 +295,27 @@ export interface PulsoMonitor {
    * media de 15 min. Ausente cuando `cpm` viene con número.
    */
   vivoPrevio?: { cpm: number; at: string; porMaquina?: Array<{ id: string; cpm: number }> }
-  /** Las últimas lecturas, para dibujar el pulso reciente. */
-  lecturas?: Array<{ at: string; totalCycles: number }>
+  /** Las últimas lecturas, para dibujar el pulso reciente. `porMaquina` es el
+      ACUMULADO del turno por máquina en esa lectura (mismo corte que
+      `totalCycles`, minuto parcial incluido). */
+  lecturas?: Array<{ at: string; totalCycles: number; porMaquina?: Record<string, number> }>
+  /** 'buckets-1min' cuando el ritmo es el dato duro de Shoplogix (piezas
+      contadas del último minuto cerrado), no derivado del contador. */
+  fuente?: string
+  /** El minuto que el ritmo describe, wall-clock-as-UTC como `series[].t`. */
+  minuto?: { desde: string; hasta: string }
+  /** Esperado oficial de Shoplogix sumado (Chonchi: 19+16+16 = 51). */
+  esperadoCpm?: number
+  /**
+   * La serie del turno minuto a minuto por máquina (buckets de 1 min de
+   * Shoplogix, solo cerrados): rejilla continua desde `desde`, índice =
+   * minuto. Es lo que dibujan las barras del monitor. Ausente en docs
+   * anteriores al despliegue que la publica.
+   */
+  serieMinuto?: {
+    desde: string
+    maquinas: Array<{ id: string; esperado: number | null; cycles: number[] }>
+  }
 }
 
 export interface PublicShiftMonitorDoc {
