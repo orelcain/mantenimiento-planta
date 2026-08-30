@@ -3672,7 +3672,14 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
     /* En PC este bloque CRUZA las columnas: adentro va la tira minuto a
        minuto, que es la pieza que más gana con el ancho — en una columna se
        ven ~30 minutos, a lo ancho entra el turno entero. */
-    <section className="rounded-card border border-border bg-card p-4 lg:[column-span:all] lg:[&>*:not(.barras-ancho)]:max-w-4xl">
+    <section className="rounded-card border border-border bg-card p-4 lg:col-span-full lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-6 lg:[&>.barras-ancho]:col-span-2">
+      {/* En PC este bloque cruza las dos columnas de la zona, y ADENTRO se
+          reparte a mano: a la izquierda el estado (el «ahora» y cada máquina),
+          a la derecha el rango habitual, y las barras minuto a minuto cruzando
+          abajo. Acotado a una sola columna, el bloque medía 1.572 px de ancho
+          con el contenido apretado en 784 — 780 px de hueco, el más grande de
+          la página. */}
+      <div className="lg:min-w-0">
       <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
         <Gauge className="h-3 w-3" />
         Ritmo de la línea
@@ -3989,6 +3996,7 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
           </div>
         )
       })()}
+      </div>
 
       {/* Las barras minuto a minuto (dato duro de Shoplogix) cuando el pulso
           publica la serie; si no, las curvas de 5 min de siempre (turnos
@@ -4058,8 +4066,11 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
           ninguno. El veredicto va en 13 px porque ES la conclusión, no una nota
           al pie; el gráfico de abajo la confirma. */}
       {/* La Chispa (la semana turno a turno) es análisis: no entra en la TV. */}
+      {/* En PC sube a la columna de al lado del «ahora»: es el contexto de ese
+          número —si va dentro de lo normal— y leerlo al costado es más corto
+          que bajar. En el celular sigue abajo, con su separador. */}
       {(contexto || chispa) && (
-        <div className="pantalla-oculta mt-2.5 border-t border-border/50 pt-2.5">
+        <div className="pantalla-oculta mt-2.5 border-t border-border/50 pt-2.5 lg:col-start-2 lg:row-start-1 lg:mt-0 lg:border-t-0 lg:pt-0">
           {contexto && (
             <p className="text-footnote leading-snug text-foreground">{contexto}</p>
           )}
@@ -5700,8 +5711,14 @@ export function PublicShiftMonitorPage() {
          * ritmo, si se llega y cómo respondió Mantención. En PC se reparte en
          * columnas DENTRO de la zona, así el reparto nunca mezcla lo urgente
          * con el análisis (el defecto de repartir la página entera de una).
+         *
+         * OJO: grilla, NO `columns`. La multicolumna reparte por ALTURA, no
+         * por prioridad: llena la primera columna hasta equilibrar y el orden
+         * que declara este archivo deja de ser el que se ve (medido: «camino a
+         * la meta» terminaba último, 475 px debajo de un gráfico de detalle).
+         * Con grilla el orden del código ES el orden de lectura.
          */}
-        <div className="space-y-3 lg:columns-2 lg:gap-3 lg:space-y-0 lg:[&>*]:mb-3 lg:[&>*]:break-inside-avoid">
+        <div className="space-y-3 lg:grid lg:grid-cols-2 lg:items-start lg:gap-3 lg:space-y-0">
         {/* Piezas acumuladas — el número que vienen a ver */}
         <section className="rounded-2xl border border-border bg-gradient-to-b from-primary/[0.08] to-transparent px-4 py-4">
           <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
@@ -6327,8 +6344,13 @@ export function PublicShiftMonitorPage() {
          * ── ZONA 2 · cómo viene el turno ───────────────────────────────────
          * El estado y la comparación con otros días: se consulta, no se
          * vigila. Va debajo de lo vivo y arriba del análisis.
+         *
+         * La zona NO se reparte entera en columnas: las tiras de estado y los
+         * avisos van a lo ancho —una frase de una línea en media pantalla deja
+         * el hueco al lado— y solo los bloques grandes bajan a dos columnas,
+         * más abajo y agrupados por tema.
          */}
-        <div className="space-y-3 lg:columns-2 lg:gap-3 lg:space-y-0 lg:[&>*]:mb-3 lg:[&>*]:break-inside-avoid">
+        <div className="space-y-3">
         {/* Una sola tarjeta desde que el ritmo se unificó arriba: en una grilla
             de dos columnas quedaba a media pantalla, con el hueco al lado. */}
         <div className="grid grid-cols-1 gap-3">
@@ -6422,6 +6444,18 @@ export function PublicShiftMonitorPage() {
         )}
 
         {/*
+         * Los cuatro bloques grandes, en dos columnas CON TEMA: a la izquierda
+         * el turno propio —la velocidad y, pegado abajo, el camino a la meta—
+         * y a la derecha lo que mira hacia atrás —los otros días y el vs ayer—.
+         *
+         * OJO: agrupados a mano, no repartidos. Con el reparto automático
+         * «velocidad» y «camino a la meta» caían en columnas distintas, y ahí
+         * se rompe el pedido de Orel de que el gráfico esté ARRIBA de la meta:
+         * tocar una imputación salta al gráfico, y el salto tiene que ir hacia
+         * algo que ya pasaste. En columnas separadas ese «arriba» no existe.
+         */}
+        <div className="space-y-3 lg:grid lg:grid-cols-2 lg:items-start lg:gap-3 lg:space-y-0">
+        {/*
           El ORDEN cuenta la historia del estado (test del §0 del HIG: lo más
           importante AHORA va primero). En VIVO la pregunta es «¿cómo vamos y
           llegamos?»: pronóstico → comparador → velocidad → detalle. CERRADO es
@@ -6432,6 +6466,7 @@ export function PublicShiftMonitorPage() {
         */}
         {live.shiftClosed ? (
           <>
+            <div className="space-y-3">
             {/* ⚠ UN solo gráfico de la serie de 5 min.
                 Había dos tarjetas —"Velocidad de la línea" y "Piezas por tramo"—
                 dibujando exactamente la misma serie, una en pz/min y otra en
@@ -6517,6 +6552,8 @@ export function PublicShiftMonitorPage() {
               grupos={gruposEventos}
               notasTurno={notasDeTurnoCompleto}
             />
+            </div>
+            <div className="space-y-3">
             {/* La curva contra los otros días va ANTES del «vs ayer» (pedido de
                 Orel): las dos miran atrás, pero esta enseña el turno completo de
                 un vistazo y la de ayer es el detalle numérico de UNA de esas
@@ -6536,10 +6573,11 @@ export function PublicShiftMonitorPage() {
                 récords. Es el paso de "hoy pasó esto" a "esto vuelve todos los
                 turnos". */}
             <VsAyerBloque r={comparadoConAyer} records={recordsLinea} sinConvenio={sinConvenio} />
-
+            </div>
           </>
         ) : (
           <>
+            <div className="space-y-3">
             {/* Adónde va a cerrar el turno, según lo que hicieron los anteriores
                 desde esta misma altura. Antes de la velocidad: primero el
                 desenlace, después el detalle de cómo se está llegando. */}
@@ -6550,8 +6588,10 @@ export function PublicShiftMonitorPage() {
             />
             {/* El comparador SUBE hasta acá, pegado al pronóstico: los dos
                 contestan la misma pregunta —si el turno llega— y estaban separados
-                por tres bloques de detalle. Arriba el desenlace, abajo el porqué
-                (velocidad, tramos, tiempo, hora por hora). */}
+                por tres bloques de detalle. Primero el desenlace, después el
+                porqué (velocidad, tramos, tiempo, hora por hora); en PC ese
+                «después» es la columna de al lado, y en el celular sigue siendo
+                lo que viene abajo. */}
             <ComparadorDias
               ventana={ventanaGrafica}
               onVentana={setVentanaGrafica}
@@ -6563,6 +6603,8 @@ export function PublicShiftMonitorPage() {
                  una mancha que promete lo que no puede. */
               cone={pronostico && pronostico.mapePct <= MAX_MAPE_PCT ? pronostico.cone : null}
             />
+            </div>
+            <div className="space-y-3">
             {/* ⚠ UN solo gráfico de la serie de 5 min.
                 Había dos tarjetas —"Velocidad de la línea" y "Piezas por tramo"—
                 dibujando exactamente la misma serie, una en pz/min y otra en
@@ -6652,9 +6694,10 @@ export function PublicShiftMonitorPage() {
                 récords. El orden es a propósito — primero qué pasó (arriba),
                 después por qué fue distinto, después qué se repite siempre. */}
             <VsAyerBloque r={comparadoConAyer} records={recordsLinea} sinConvenio={sinConvenio} />
-
+            </div>
           </>
         )}
+        </div>
 
         {/* ⚠ Turno sin historia (la primera noche del turno noche): medio
             monitor no puede existir y eso es CORRECTO — pero se dice, con el
@@ -6681,7 +6724,13 @@ export function PublicShiftMonitorPage() {
           <h2 className="mb-2 text-[11px] uppercase tracking-wide text-muted-foreground">
             Análisis del turno
           </h2>
-          <div className="space-y-3 lg:columns-2 lg:gap-3 lg:space-y-0 2xl:columns-3 lg:[&>*]:mb-3 lg:[&>*]:break-inside-avoid">
+          {/* Acá SÍ multicolumna, al revés que arriba: entre bloques de
+              análisis no hay uno «más importante» —se miran después y por
+              separado— y sus alturas son muy dispares (el pareto mide 1.507 px
+              y «hora por hora» 332). Con grilla eso deja huecos de ~900 px;
+              con columnas se empaquetan. Dos columnas, no tres: a tres el
+              pareto queda demasiado angosto para leer sus barras. */}
+          <div className="space-y-3 lg:columns-2 lg:gap-3 lg:space-y-0 lg:[&>*]:mb-3 lg:[&>*]:break-inside-avoid">
         <ParetoDeParadas
           pareto={pareto} ctx={paretoCtx} tendencia={paretoTendencia}
           porTurno={paretoPorTurno}

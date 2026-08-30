@@ -738,6 +738,27 @@
   }
   .modo-pantalla > div:first-of-type > *:nth-child(3) > * { max-width: none !important; }
   .modo-pantalla > div:first-of-type > *:nth-child(3) > .barras-ancho { grid-column: 1 / -1; }
+  /*
+   * El estado del ritmo viene envuelto en UN solo hijo (para poder repartirlo
+   * en PC), así que acá hay que volver a abrirlo: sin esto ocupa una sola
+   * columna, deja la otra mitad vacía y empuja la tira del minuto fuera de la
+   * pantalla — medido: 1.077 px de alto con las barras cortadas al pie.
+   */
+  .modo-pantalla > div:first-of-type > *:nth-child(3) > *:first-child {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 2vw;
+    align-content: start;
+  }
+  /* «Cada máquina» a la derecha, a la altura del número grande. */
+  .modo-pantalla > div:first-of-type > *:nth-child(3) > *:first-child > *:last-child {
+    grid-column: 2;
+    grid-row: 1 / span 4;
+    margin-top: 0;
+    border-top: 0;
+    padding-top: 0;
+  }
 
   /*
    * `tap-44` — área táctil de 44x44 sin tocar el tamaño visual (§3 de la
