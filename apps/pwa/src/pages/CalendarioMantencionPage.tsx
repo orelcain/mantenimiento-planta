@@ -382,7 +382,9 @@ export function CalendarioMantencionPage() {
   const [syncErrorText, setSyncErrorText] = useState('')
   const [originalFilename, setOriginalFilename] = useState('calendario-mantencion-base.xlsx')
 
-  const [sortByTurno, setSortByTurno] = useState(false)
+  // Agrupado por turno de entrada: es el orden en que se lee la planilla en planta
+  // (A, B, C y el fijo al final). El botón del encabezado vuelve al orden del Excel.
+  const [sortByTurno, setSortByTurno] = useState(true)
   const [selectedRow, setSelectedRow] = useState<number | null>(null)
   const [selectedCol, setSelectedCol] = useState<number | null>(null)
   const [selectedWeek, setSelectedWeek] = useState('')
@@ -2978,7 +2980,7 @@ export function CalendarioMantencionPage() {
                       <button
                         type="button"
                         className="inline-flex items-center gap-0.5 rounded-ctl px-1 hover:bg-muted-foreground/[0.15]"
-                        title={sortByTurno ? 'Orden por turno (A, B, C). Click para volver al orden de la planilla' : 'Click para agrupar las filas por turno'}
+                        title={sortByTurno ? 'Agrupado por turno (A, B, C y el fijo al final). Click para ver el orden del Excel' : 'Orden del Excel. Click para agrupar por turno'}
                         onClick={() => setSortByTurno((v) => !v)}
                       >
                         {META_COLS[gi]}
