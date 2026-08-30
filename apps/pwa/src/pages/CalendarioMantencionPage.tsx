@@ -2214,7 +2214,11 @@ export function CalendarioMantencionPage() {
                         const corta = descanso !== undefined && descanso < 11
                         return (
                           <td key={d.c} className="px-0.5">
-                            <span className={'relative block h-6 rounded-ctl text-center text-caption font-semibold leading-6 ' + bandaClase(banda)}>
+                            <button
+                              type="button"
+                              onClick={() => abrirEditorDeCelda(tech, d)}
+                              className={'relative block h-6 w-full rounded-ctl text-center text-caption font-semibold leading-6 active:opacity-70 ' + bandaClase(banda)}
+                            >
                               {banda ? horarioCorto(turno) : etiquetaNoLaboral(turno)}
                               {corta && (
                                 <span
@@ -2222,7 +2226,7 @@ export function CalendarioMantencionPage() {
                                   className="absolute -right-0.5 -top-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-ink-crit text-caption font-bold leading-none text-white"
                                 >!</span>
                               )}
-                            </span>
+                            </button>
                           </td>
                         )
                       })}
@@ -2332,8 +2336,11 @@ export function CalendarioMantencionPage() {
                       const reducido = k !== null && horarioCorto(turno) !== null
                         && turno.trim() !== `${shiftConfig[k === 'dia' ? 'diaInicio' : k === 'tarde' ? 'tardeInicio' : 'nocheInicio']} - ${shiftConfig[k === 'dia' ? 'diaFin' : k === 'tarde' ? 'tardeFin' : 'nocheFin']}`
                       return (
-                        <div key={tech.r}
-                          className={`flex min-h-11 items-center gap-2.5 px-3 py-2 ${i > 0 ? 'border-t border-border/40' : ''}`}>
+                        <button
+                          type="button"
+                          key={tech.r}
+                          onClick={() => diaActivo && abrirEditorDeCelda(tech, diaActivo)}
+                          className={`flex min-h-11 w-full items-center gap-2.5 px-3 py-2 text-left active:bg-muted ${i > 0 ? 'border-t border-border/40' : ''}`}>
                           <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-ctl text-caption font-bold ${turnoBadgeClass(tech.turno)}`}>
                             {tech.turno || '·'}
                           </span>
@@ -2346,7 +2353,7 @@ export function CalendarioMantencionPage() {
                           <span className="shrink-0 text-caption tabular-nums text-muted-foreground">
                             {semana > 0 ? `${semana.toFixed(1)} h` : ''}
                           </span>
-                        </div>
+                        </button>
                       )
                     })}
                   </div>
