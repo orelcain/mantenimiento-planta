@@ -612,16 +612,24 @@ export function CalendarioMantencionPage() {
   useEffect(() => {
     const run = async () => {
       try {
-        const url = `${import.meta.env.BASE_URL}templates/calendario-mantencion-base.xlsx`
+        const ruta = 'templates/calendario-mantencion-base.xlsx'
+        const url = `${import.meta.env.BASE_URL}${ruta}`
         const response = await fetch(url)
-        if (!response.ok) throw new Error('No se pudo cargar plantilla base')
+        if (!response.ok) throw new Error(`el servidor respondió ${response.status}`)
         const buffer = await response.arrayBuffer()
+        // Si el archivo no está, el servidor devuelve el index.html de la app —con
+        // estado 200— y XLSX intenta leer ese HTML como Excel: de ahí salía el
+        // «Invalid HTML: could not find <table>». Un .xlsx es un ZIP y empieza con «PK».
+        const firma = new Uint8Array(buffer.slice(0, 2))
+        if (firma[0] !== 0x50 || firma[1] !== 0x4b) {
+          throw new Error(`el archivo ${ruta} no está en el servidor`)
+        }
         const loaded = XLSX.read(buffer, { cellDates: true, cellStyles: true })
         loadWorkbookRef.current(loaded, 'calendario-mantencion-base.xlsx')
         setPlantillaBaseFallo(false)
       } catch (error) {
         setPlantillaBaseFallo(true)
-        setStatus(`No se pudo cargar la plantilla base: ${error instanceof Error ? error.message : 'error desconocido'}. Carga un Excel a mano para seguir.`)
+        setStatus(`No se pudo cargar la plantilla base: ${error instanceof Error ? error.message : 'error desconocido'}. Carga un Excel a mano para poder exportar y extender.`)
       }
     }
 
