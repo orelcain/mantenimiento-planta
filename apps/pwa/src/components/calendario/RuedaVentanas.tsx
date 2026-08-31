@@ -987,7 +987,7 @@ export function RuedaVentanas({ disponibles }: RuedaVentanasProps = {}) {
             </p>
             <button
               onClick={() => setConfirmacionCaida(null)}
-              className="mt-1 self-start text-footnote font-semibold text-primary"
+              className="mt-2 inline-flex min-h-11 items-center self-start rounded-ctl px-3 text-footnote font-semibold text-primary active:opacity-70"
             >
               Entendido
             </button>
@@ -1008,7 +1008,7 @@ export function RuedaVentanas({ disponibles }: RuedaVentanasProps = {}) {
             </p>
             <button
               onClick={() => marcarRevisada(maquina.id, true)}
-              className="mt-1 self-start text-footnote font-semibold text-primary"
+              className="mt-2 inline-flex min-h-11 items-center self-start rounded-ctl bg-primary px-4 text-footnote font-semibold text-primary-foreground active:opacity-70"
             >
               Confirmé el horario de {maquina.nombre}
             </button>
