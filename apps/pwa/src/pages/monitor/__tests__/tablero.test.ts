@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { combinarTablero, type TarjetaLayout } from '../Tablero'
+import { combinarTablero, type TarjetaLayout } from '../tableroLayout'
 
 const FABRICA: TarjetaLayout[] = [
   { id: 'a', w: 3, h: 4 },
