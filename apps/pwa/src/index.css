@@ -483,9 +483,16 @@
     font-size: 87.5%;
   }
 
-  @media (max-width: 640px) {
+  /* El telefono NO escala: el espaciado va en rem, asi que al 85% un `h-11` media
+     37 px y la constitucion pide 44x44 minimo ("uso con guantes"). La tipografia no
+     entra aqui — su escala esta en px a proposito (ver tailwind.config.js). El 87.5%
+     de arriba se mantiene para escritorio, donde manda el mouse y no el dedo.
+     El criterio es `pointer: coarse`, no el ancho: un telefono EN HORIZONTAL mide
+     812 px y se escapaba del breakpoint de 640 — y esa es justo la vista que usa
+     el tecnico en el calendario. El ancho queda como respaldo. */
+  @media (pointer: coarse), (max-width: 640px) {
     html {
-      font-size: 85%;
+      font-size: 100%;
     }
   }
 
