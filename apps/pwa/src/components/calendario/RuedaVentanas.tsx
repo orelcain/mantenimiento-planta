@@ -987,7 +987,7 @@ export function RuedaVentanas({ disponibles }: RuedaVentanasProps = {}) {
             </p>
             <button
               onClick={() => setConfirmacionCaida(null)}
-              className="mt-1 self-start text-footnote font-semibold text-primary"
+              className="mt-2 inline-flex min-h-11 items-center self-start rounded-ctl px-3 text-footnote font-semibold text-primary active:opacity-70"
             >
               Entendido
             </button>
@@ -995,7 +995,10 @@ export function RuedaVentanas({ disponibles }: RuedaVentanasProps = {}) {
         </div>
       )}
 
-      {modo === 'editar' && maquina.revisadoEnTerreno !== true && (
+      {/* Si el sello acaba de caerse, ese aviso ya explica por qué, y con más precisión:
+          decir aquí que las horas "vienen de una base de referencia" sería falso — venían
+          de terreno y se editaron. Una sola tarjeta, la que corresponda. */}
+      {modo === 'editar' && maquina.revisadoEnTerreno !== true && confirmacionCaida !== maquina.nombre && (
         <div className="flex gap-3 rounded-card border border-border bg-card p-4">
           <AlertTriangle className="h-5 w-5 shrink-0 text-cat-4-ink" />
           <div className="flex flex-col gap-1">
@@ -1008,7 +1011,7 @@ export function RuedaVentanas({ disponibles }: RuedaVentanasProps = {}) {
             </p>
             <button
               onClick={() => marcarRevisada(maquina.id, true)}
-              className="mt-1 self-start text-footnote font-semibold text-primary"
+              className="mt-2 inline-flex min-h-11 items-center self-start rounded-ctl bg-primary px-4 text-footnote font-semibold text-primary-foreground active:opacity-70"
             >
               Confirmé el horario de {maquina.nombre}
             </button>
