@@ -10,7 +10,7 @@ const { test } = require('node:test')
 const assert = require('node:assert')
 
 const {
-  applyEvent, sanitizeViewerId, deviceKind, MAX_VIEWERS, MAX_DAYS, OPEN_DEDUPE_MS,
+  applyEvent, sanitizeViewerId, deviceKind, MAX_VIEWERS, MAX_DAYS, OPEN_DEDUPE_MS, MAX_DAY_VIEWERS,
 } = require('../publicMonitorStats')
 
 const wall = (h = 10, d = 10) => new Date(Date.UTC(2026, 7, d, h, 0, 0))
@@ -124,4 +124,18 @@ test('applyEvent no muta el estado que recibe', () => {
   const copia = JSON.parse(JSON.stringify(antes))
   applyEvent(antes, ev({ viewerId: 'bbbbbbbb-2222' }))
   assert.deepEqual(JSON.parse(JSON.stringify(antes)), copia)
+})
+
+test('el array de viewers del día tiene techo (endpoint abierto no infla el doc)', () => {
+  // Simula un atacante con un token válido mandando pings con viewerIds al azar.
+  let s = null
+  const hex = n => n.toString(16).padStart(12, '0')
+  for (let i = 0; i < MAX_DAY_VIEWERS + 200; i++) {
+    s = applyEvent(s, ev({ viewerId: 'ffffffff-' + hex(i), event: 'ping', secs: 1 }))
+  }
+  assert.equal(
+    s.byDay['2026-08-10'].viewers.length,
+    MAX_DAY_VIEWERS,
+    'el array del día se corta en el tope, no crece sin límite',
+  )
 })
