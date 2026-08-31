@@ -3460,6 +3460,22 @@ function BarrasMinuto({ datos, cerrado }: { datos: BarrasMinutoDatos; cerrado?: 
     const el = scrollRef.current
     if (el) el.scrollLeft = el.scrollWidth
   })
+  /* «Que siempre se muestre la última» (Orel, 30-08, mirando Yal en vivo):
+     cuando llegan minutos nuevos, la vista ZOOMEADA también se corre con la
+     cola — antes solo seguía la vista virgen, y a los 20 min de mirar con
+     zoom el presente quedaba fuera de cuadro. La única vista que NO se toca
+     es la que se fue a la HISTORIA: quien revisa un tramo viejo no está
+     mirando la última, y arrancársela cada minuto sería hostil. */
+  const nPrevRef = useRef(n)
+  useEffect(() => {
+    const prev = nPrevRef.current
+    nPrevRef.current = n
+    if (n <= prev) return
+    if (!tocado || ventana == null) return       // la vista virgen ya la ancla el scroll
+    if (ventana.hastaMin < prev - 2) return      // está en la historia: su vista es suya
+    const delta = n - prev
+    setVentana({ desdeMin: ventana.desdeMin + delta, hastaMin: ventana.hastaMin + delta })
+  }, [n, tocado, ventana])
   if (n < 2) return null
 
   const t0 = Date.parse(datos.desde)
@@ -3575,19 +3591,23 @@ function BarrasMinuto({ datos, cerrado }: { datos: BarrasMinutoDatos; cerrado?: 
           {datos.maquinas.length > 1 && datos.maquinas.map((m) =>
             franja(nombreCorto(m.nombre), m.esperado, m.cycles, 44))}
           <div className="relative mt-0.5 h-4 text-[11px] tabular-nums text-muted-foreground/80">
-            {/* Los extremos van pegados a los bordes VISIBLES (sticky), no a
-                los del contenido ensanchado; las marcas del medio, por índice.
-                Cerca de un extremo la marca se omite para no montarse. */}
+            {/* Todas las marcas menos las que se montarían con el rótulo del
+                presente — la colisión se mide en PÍXELES reales, no en % del
+                contenido: el filtro viejo (x<94%) borraba las horas del último
+                tramo del turno, justo donde mira quien sigue la cola (Orel,
+                30-08, Yal en vivo: media hora final sin una sola hora). */}
             {marcas
-              .filter((i) => {
-                const x = ((i + 0.5) / n) * 100
-                return x > 6 && x < 94
-              })
+              .filter((i) => pxBarra <= 0 || (n - i) * pxBarra >= 56)
               .map((i) => (
                 <span key={`m${i}`} className="absolute -translate-x-1/2" style={{ left: `${((i + 0.5) / n) * 100}%` }}>
                   {horaPlanta(t0 + i * 60_000)}
                 </span>
               ))}
+            {/* El PRESENTE, clavado al final del contenido: siguiendo la cola
+                siempre se ve a qué hora llega la última barra. */}
+            <span className="absolute right-0 font-semibold text-foreground/70">
+              {horaPlanta(t0 + n * 60_000)}
+            </span>
           </div>
         </div>
       </div>
