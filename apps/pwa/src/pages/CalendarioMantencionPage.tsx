@@ -62,9 +62,6 @@ type HoursConfig = {
   expectedFromPlannedDays: boolean
   toleranceHours: number
   useFixedDaily: boolean
-  dayReductionHours: number
-  afternoonReductionHours: number
-  nightReductionHours: number
   holidayAsNonWorking: boolean
   holidayBusinessDaysOnly: boolean
 }
@@ -76,7 +73,7 @@ const HIDEABLE_COLS = new Set([2, 3, 4, 5]) // CeCo, Cargo, DIRECCIÓN, RUT
 const MOBILE_ALWAYS_HIDDEN = new Set([1]) // Área - ocultar automáticamente en móvil
 const CALENDAR_FIRESTORE_PATH = ['calendario_mantencion_state', 'current'] as const
 
-type TabId = 'edicion' | 'plantillas' | 'horas' | 'tecnicos' | 'control'
+type TabId = 'edicion' | 'plantillas' | 'tecnicos' | 'control'
 type SyncState = 'idle' | 'saving' | 'synced' | 'error'
 type ExportScope = 'all' | 'week' | 'month' | 'weeks' | 'months'
 
@@ -135,9 +132,6 @@ function defaultHoursConfig(): HoursConfig {
     expectedFromPlannedDays: true,
     toleranceHours: 0.5,
     useFixedDaily: true,
-    dayReductionHours: 1,
-    afternoonReductionHours: 1,
-    nightReductionHours: 1,
     holidayAsNonWorking: true,
     holidayBusinessDaysOnly: true,
   }
@@ -403,7 +397,7 @@ export function CalendarioMantencionPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [activeTab, setActiveTab] = useState<TabId>(() => {
     const fromUrl = searchParams.get('tab')
-    const valid: TabId[] = ['edicion', 'plantillas', 'horas', 'tecnicos', 'control']
+    const valid: TabId[] = ['edicion', 'plantillas', 'tecnicos', 'control']
     return (valid as string[]).includes(fromUrl ?? '') ? (fromUrl as TabId) : 'edicion'
   })
 
@@ -455,9 +449,6 @@ export function CalendarioMantencionPage() {
       expectedFromPlannedDays: stored.expectedFromPlannedDays !== false,
       toleranceHours: toNumberOr(stored.toleranceHours, 0.5),
       useFixedDaily: stored.useFixedDaily !== false,
-      dayReductionHours: toNumberOr(stored.dayReductionHours, 1),
-      afternoonReductionHours: toNumberOr(stored.afternoonReductionHours, 1),
-      nightReductionHours: toNumberOr(stored.nightReductionHours, 1),
       holidayAsNonWorking: stored.holidayAsNonWorking !== false,
       holidayBusinessDaysOnly: stored.holidayBusinessDaysOnly !== false,
     }
@@ -493,7 +484,6 @@ export function CalendarioMantencionPage() {
   const undoRef = useRef<() => void>(() => {})
   const redoRef = useRef<() => void>(() => {})
   const [historyVersion, setHistoryVersion] = useState(0)
-  const [calendarShortcutsActive, setCalendarShortcutsActive] = useState(false)
   const [todayTick, setTodayTick] = useState(() => Date.now())
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768 || (window.innerWidth < 1100 && window.innerHeight < 500))
   const [isLandscape, setIsLandscape] = useState(() => window.innerHeight < 500 && (window.innerWidth < 768 || window.innerWidth < 1100))
@@ -645,19 +635,6 @@ export function CalendarioMantencionPage() {
     if (first) setSelectedMonth(first)
   }, [months, selectedMonth])
 
-  useEffect(() => {
-    const onPointerDown = (event: MouseEvent) => {
-      const target = event.target as HTMLElement | null
-      const insideCalendar = !!(target && calendarSectionRef.current?.contains(target))
-      // Los botones de la cabecera del calendario (ordenar por turno, etc.) son neutros:
-      // no arman los atajos de edición, para que ordenar no deje el teclado editando celdas.
-      if (insideCalendar && target?.closest('button')) return
-      setCalendarShortcutsActive(insideCalendar)
-    }
-
-    document.addEventListener('mousedown', onPointerDown)
-    return () => document.removeEventListener('mousedown', onPointerDown)
-  }, [])
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -683,74 +660,11 @@ export function CalendarioMantencionPage() {
         }
       }
 
-      if (!calendarShortcutsActive) return
-      if (!selectedRow || selectedCol === null) return
-      if (editingField) return
-
-      if (event.ctrlKey || event.altKey || event.metaKey) return
-
-      // Arrow key navigation
-      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
-        event.preventDefault()
-        if (event.key === 'ArrowRight') {
-          const curIdx = dayCols.findIndex((d) => d.c === selectedCol)
-          const nextDayCol = curIdx >= 0 ? dayCols[curIdx + 1] : undefined
-          if (nextDayCol) {
-            setSelectedCol(nextDayCol.c)
-          }
-        } else if (event.key === 'ArrowLeft') {
-          const curIdx = dayCols.findIndex((d) => d.c === selectedCol)
-          const prevDayCol = curIdx > 0 ? dayCols[curIdx - 1] : undefined
-          if (prevDayCol) {
-            setSelectedCol(prevDayCol.c)
-          }
-        } else if (event.key === 'ArrowDown') {
-          const curRowIdx = techRows.findIndex((t) => t.r === selectedRow)
-          const nextRow = curRowIdx >= 0 ? techRows[curRowIdx + 1] : undefined
-          if (nextRow) {
-            setSelectedRow(nextRow.r)
-          }
-        } else if (event.key === 'ArrowUp') {
-          const curRowIdx = techRows.findIndex((t) => t.r === selectedRow)
-          const prevRow = curRowIdx > 0 ? techRows[curRowIdx - 1] : undefined
-          if (prevRow) {
-            setSelectedRow(prevRow.r)
-          }
-        }
-        return
-      }
-
-      const key = event.key.toLowerCase()
-      if (event.shiftKey && key === 'd') {
-        event.preventDefault()
-        applyShiftRef.current(selectedRow, selectedCol, shortcuts.diaReducido)
-        return
-      }
-      if (event.shiftKey && key === 'n') {
-        event.preventDefault()
-        applyShiftRef.current(selectedRow, selectedCol, shortcuts.nocheReducido)
-        return
-      }
-      if (event.shiftKey && key === 't') {
-        event.preventDefault()
-        applyShiftRef.current(selectedRow, selectedCol, shortcuts.tardeReducido)
-        return
-      }
-      if (event.shiftKey) return
-      if (!['d', 't', 'n', 'l', 'v', 'f'].includes(key)) return
-
-      event.preventDefault()
-      if (key === 'd') applyShiftRef.current(selectedRow, selectedCol, shortcuts.dia)
-      if (key === 't') applyShiftRef.current(selectedRow, selectedCol, shortcuts.tarde)
-      if (key === 'n') applyShiftRef.current(selectedRow, selectedCol, shortcuts.noche)
-      if (key === 'l') applyShiftRef.current(selectedRow, selectedCol, shortcuts.libre)
-      if (key === 'v') applyShiftRef.current(selectedRow, selectedCol, 'VACACIONES')
-      if (key === 'f') applyShiftRef.current(selectedRow, selectedCol, 'FERIADO')
     }
 
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [calendarShortcutsActive, selectedRow, selectedCol, shortcuts, dayCols, techRows])
+  }, [])
 
   function loadWorkbook(workbook: XLSX.WorkBook, filename: string) {
     const horario = workbook.SheetNames.find((name) => name.toLowerCase() === 'horario') ?? workbook.SheetNames[0]
@@ -887,9 +801,9 @@ export function CalendarioMantencionPage() {
     } catch (error) {
       const cached = safeStorageGet<PersistedCalendarState | null>(CALENDAR_LOCAL_CACHE_KEY, null)
       if (cached && applyPersistedState(cached)) {
-        setStatus(`Plantilla cargada con respaldo local (sin permisos Firebase): ${filename}`)
+        setStatus(`Calendario cargado desde la copia de este equipo: no se pudo leer la versión del servidor. Puede estar desactualizado.`)
       } else {
-        setStatus(`Plantilla cargada localmente (sin sync Firebase): ${filename}`)
+        setStatus(`Plantilla cargada, pero sin poder leer el servidor y sin copia en este equipo: el calendario puede estar vacío.`)
       }
       logger.error('No se pudo hidratar calendario desde Firebase', error instanceof Error ? error : new Error(String(error)))
     } finally {
@@ -956,7 +870,11 @@ export function CalendarioMantencionPage() {
       if (syncSeqRef.current !== mySeq) return
       setSyncState('error')
       setSyncErrorText(error instanceof Error ? error.message : 'Error desconocido')
-      setStatus('Cambios guardados en este navegador, pero sin permisos para sincronizar en Firebase.')
+      // No se sabe la causa: puede ser señal, permisos o Firebase caído. Lo que
+      // importa primero es que el trabajo no se perdió.
+      setStatus(navigator.onLine
+        ? `Tus cambios quedaron guardados en este equipo, pero no se pudieron subir: ${error instanceof Error ? error.message : 'error desconocido'}.`
+        : 'Sin conexión. Tus cambios quedaron guardados en este equipo y se subirán cuando vuelva la señal.')
     }
   }, [buildLocalPayload])
 
@@ -979,7 +897,7 @@ export function CalendarioMantencionPage() {
   const syncIndicator = useMemo(() => {
     if (syncState === 'saving') return { label: 'Guardando…', className: 'bg-amber-500/[0.15] text-ink-warn border-amber-500/[0.25]' }
     if (syncState === 'synced') return { label: `Sincronizado${lastSyncAt ? ` ${lastSyncAt.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}` : ''}`, className: 'bg-emerald-500/[0.15] text-ink-ok border-emerald-500/[0.25]' }
-    if (syncState === 'error') return { label: `Error de sync${syncErrorText ? `: ${syncErrorText}` : ''}`, className: 'bg-red-500/[0.15] text-ink-crit border-red-500/[0.25]' }
+    if (syncState === 'error') return { label: `Sin subir${syncErrorText ? `: ${syncErrorText}` : ''}`, className: 'bg-red-500/[0.15] text-ink-crit border-red-500/[0.25]' }
     return { label: 'Sin cambios', className: 'bg-muted text-muted-foreground border-border' }
   }, [lastSyncAt, syncErrorText, syncState])
 
@@ -1982,6 +1900,33 @@ export function CalendarioMantencionPage() {
     if (destino) setDiaVerticalC(destino.c)
   }
 
+  /**
+   * Técnicos de turno por tramo de 5 minutos, sacado de la semana actualmente
+   * seleccionada del calendario. Es lo que impide que la rueda sugiera intervenir
+   * a horas en que no hay nadie en planta — la madrugada del domingo, típicamente.
+   * Matriz [día Lun=0..Dom=6][tramo 0..287].
+   */
+  const dotacionPorTramo = useMemo(() => {
+    const m = Array.from({ length: 7 }, () => new Array<number>(288).fill(0))
+    weekDays.forEach((d) => {
+      if (!d.dateObj) return
+      const dia = (d.dateObj.getDay() + 6) % 7
+      techRows.forEach((t) => {
+        const w = shiftWindow(t.shifts[d.c] || '')
+        if (!w) return
+        const ini = Math.max(0, Math.floor(w.start / 5))
+        const fin = Math.min(288, Math.ceil(w.end / 5))
+        for (let i = ini; i < fin; i++) m[dia]![i]!++
+      })
+    })
+    return m
+  }, [weekDays, techRows])
+
+  const disponiblesEnTramo = useCallback(
+    (dia: number, slot: number) => dotacionPorTramo[dia]?.[slot] ?? 0,
+    [dotacionPorTramo],
+  )
+
   /** Filas de la vista horizontal: siempre agrupadas por turno, con el fijo al final. */
   const horizontalRows = useMemo(() => {
     return techRows.slice().sort((a, b) => {
@@ -2165,7 +2110,6 @@ export function CalendarioMantencionPage() {
     // «Turnos» chocaba con la pestaña de módulo del mismo nombre: era «Turnos › Turnos».
     // Aquí se definen las horas de inicio y fin de cada banda, así que es «Horarios».
     { id: 'plantillas', label: 'Horarios' },
-    { id: 'horas', label: 'Horas' },
     { id: 'tecnicos', label: 'Técnicos' },
     { id: 'control', label: 'Control' },
   ]
@@ -2196,7 +2140,7 @@ export function CalendarioMantencionPage() {
 
       {vistaModulo === 'rueda' && (
         <div className="min-h-0 flex-1 overflow-y-auto">
-          <RuedaVentanas />
+          <RuedaVentanas disponibles={disponiblesEnTramo} />
         </div>
       )}
 
@@ -2297,7 +2241,11 @@ export function CalendarioMantencionPage() {
                         const corta = descanso !== undefined && descanso < 11
                         return (
                           <td key={d.c} className="px-0.5">
-                            <span className={'relative block h-6 rounded-ctl text-center text-caption font-semibold leading-6 ' + bandaClase(banda)}>
+                            <button
+                              type="button"
+                              onClick={() => abrirEditorDeCelda(tech, d)}
+                              className={'relative block h-6 w-full rounded-ctl text-center text-caption font-semibold leading-6 active:opacity-70 ' + bandaClase(banda)}
+                            >
                               {banda ? horarioCorto(turno) : etiquetaNoLaboral(turno)}
                               {corta && (
                                 <span
@@ -2305,7 +2253,7 @@ export function CalendarioMantencionPage() {
                                   className="absolute -right-0.5 -top-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-ink-crit text-caption font-bold leading-none text-white"
                                 >!</span>
                               )}
-                            </span>
+                            </button>
                           </td>
                         )
                       })}
@@ -2415,8 +2363,11 @@ export function CalendarioMantencionPage() {
                       const reducido = k !== null && horarioCorto(turno) !== null
                         && turno.trim() !== `${shiftConfig[k === 'dia' ? 'diaInicio' : k === 'tarde' ? 'tardeInicio' : 'nocheInicio']} - ${shiftConfig[k === 'dia' ? 'diaFin' : k === 'tarde' ? 'tardeFin' : 'nocheFin']}`
                       return (
-                        <div key={tech.r}
-                          className={`flex min-h-11 items-center gap-2.5 px-3 py-2 ${i > 0 ? 'border-t border-border/40' : ''}`}>
+                        <button
+                          type="button"
+                          key={tech.r}
+                          onClick={() => diaActivo && abrirEditorDeCelda(tech, diaActivo)}
+                          className={`flex min-h-11 w-full items-center gap-2.5 px-3 py-2 text-left active:bg-muted ${i > 0 ? 'border-t border-border/40' : ''}`}>
                           <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-ctl text-caption font-bold ${turnoBadgeClass(tech.turno)}`}>
                             {tech.turno || '·'}
                           </span>
@@ -2429,7 +2380,7 @@ export function CalendarioMantencionPage() {
                           <span className="shrink-0 text-caption tabular-nums text-muted-foreground">
                             {semana > 0 ? `${semana.toFixed(1)} h` : ''}
                           </span>
-                        </div>
+                        </button>
                       )
                     })}
                   </div>
@@ -2553,120 +2504,33 @@ export function CalendarioMantencionPage() {
               value={shiftConfig.libreLabel}
               onChange={(e) => setShiftConfig((p) => ({ ...p, libreLabel: e.target.value.toUpperCase() }))}
             />
+            <label htmlFor="colacion-h" className="text-muted-foreground self-center" title="Se descuenta de cada turno al calcular las horas trabajadas.">Colación (h)</label>
+            <input id="colacion-h" className={CONTROL_CLASS} type="number" min={0} step="0.25" value={hoursConfig.breakHours} onChange={(e) => setHoursConfig((p) => ({ ...p, breakHours: Math.max(0, toNumberOr(e.target.value, p.breakHours)) }))} />
+            <p className="col-span-2 self-center text-caption text-muted-foreground">{legalWeekLabel}. El tope se aplica solo.</p>
             <p className="col-span-2 sm:col-span-4 mt-2 text-caption font-semibold text-foreground">Turnos reducidos</p>
-            <label className="text-muted-foreground self-center" title="Lo que escribe Shift + D">Día reducido</label>
+            <label className="text-muted-foreground self-center" title="Disponible como botón al tocar una celda.">Día reducido</label>
             <div className="flex gap-1">
               <input className={CONTROL_CLASS + ' flex-1'} type="time" aria-label="Hora en que entra el día reducido" value={shiftConfig.diaRedInicio} onChange={(e) => setShiftConfig((p) => ({ ...p, diaRedInicio: e.target.value }))} />
               <input className={CONTROL_CLASS + ' flex-1'} type="time" aria-label="Hora en que sale el día reducido" value={shiftConfig.diaRedFin} onChange={(e) => setShiftConfig((p) => ({ ...p, diaRedFin: e.target.value }))} />
             </div>
-            <label className="text-muted-foreground self-center" title="Lo que escribe Shift + T">Tarde reducida</label>
+            <label className="text-muted-foreground self-center" title="Disponible como botón al tocar una celda.">Tarde reducida</label>
             <div className="flex gap-1">
               <input className={CONTROL_CLASS + ' flex-1'} type="time" aria-label="Hora en que entra la tarde reducida" value={shiftConfig.tardeRedInicio} onChange={(e) => setShiftConfig((p) => ({ ...p, tardeRedInicio: e.target.value }))} />
               <input className={CONTROL_CLASS + ' flex-1'} type="time" aria-label="Hora en que sale la tarde reducida" value={shiftConfig.tardeRedFin} onChange={(e) => setShiftConfig((p) => ({ ...p, tardeRedFin: e.target.value }))} />
             </div>
-            <label className="text-muted-foreground self-center" title="Lo que escribe Shift + N">Noche reducida</label>
+            <label className="text-muted-foreground self-center" title="Disponible como botón al tocar una celda.">Noche reducida</label>
             <div className="flex gap-1">
               <input className={CONTROL_CLASS + ' flex-1'} type="time" aria-label="Hora en que entra la noche reducida" value={shiftConfig.nocheRedInicio} onChange={(e) => setShiftConfig((p) => ({ ...p, nocheRedInicio: e.target.value }))} />
               <input className={CONTROL_CLASS + ' flex-1'} type="time" aria-label="Hora en que sale la noche reducida" value={shiftConfig.nocheRedFin} onChange={(e) => setShiftConfig((p) => ({ ...p, nocheRedFin: e.target.value }))} />
             </div>
             <div className="col-span-2 sm:col-span-4 mt-1 space-y-1 text-caption text-muted-foreground">
               <p>Los cambios se aplican al instante y se guardan solos.</p>
-              <p>
-                Atajos sobre el calendario: <strong className="text-foreground">D</strong> día ·{' '}
-                <strong className="text-foreground">T</strong> tarde · <strong className="text-foreground">N</strong> noche ·{' '}
-                <strong className="text-foreground">L</strong> libre · <strong className="text-foreground">V</strong> vacaciones ·{' '}
-                <strong className="text-foreground">F</strong> feriado. Con <strong className="text-foreground">Shift</strong>, la versión reducida.
-              </p>
-              <p>Para un horario que no sea ninguno de estos, doble clic en la celda.</p>
+              <p>Para cambiar un turno, toca su celda en el calendario: ahí están estos turnos como botones, y también se puede escribir cualquier otro horario.</p>
             </div>
           </div>
         )}
 
         {/* ── Tab: Horas ── */}
-        {activeTab === 'horas' && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1.5 text-xs">
-            <p className="col-span-2 sm:col-span-4 text-caption text-muted-foreground">
-              Las horas trabajadas salen del <strong className="text-foreground">horario escrito en cada celda</strong>, menos la colación.
-              Lo de aquí abajo es la meta contra la que se comparan y qué escriben los atajos.
-            </p>
-            <label className="text-muted-foreground self-center" title="Solo se usa para las horas de feriados y días libres, y como respaldo si una celda no tiene horario. Las horas trabajadas salen del horario de la celda.">Jornada diaria de referencia (h)</label>
-            <input className={CONTROL_CLASS} type="number" step="0.25" min={0} value={hoursConfig.workHours} onChange={(e) => setHoursConfig((p) => ({ ...p, workHours: toNumberOr(e.target.value, p.workHours) }))} />
-            <label className="text-muted-foreground self-center" title="Tiempo de colación diario. Se descuenta del cálculo de horas trabajadas.">Colación (h)</label>
-            <input className={CONTROL_CLASS} type="number" step="0.25" min={0} value={hoursConfig.breakHours} onChange={(e) => setHoursConfig((p) => ({ ...p, breakHours: toNumberOr(e.target.value, p.breakHours) }))} />
-            <label className="text-muted-foreground self-center" title="Meta semanal legal. En modo automático usa el tramo vigente en Chile según fecha del período.">Jornada objetivo semanal (h)</label>
-            <input
-              className={CONTROL_CLASS}
-              type="number"
-              step="0.5"
-              value={hoursConfig.autoLegalWeek ? expectedWeekBase : hoursConfig.expectedWeek}
-              disabled={hoursConfig.autoLegalWeek}
-              onChange={(e) => setHoursConfig((p) => ({ ...p, expectedWeek: toNumberOr(e.target.value, p.expectedWeek) }))}
-            />
-            <label className="text-muted-foreground self-center" title="Días de trabajo por ciclo semanal del régimen. Para 6x1 usar 6; para 5x2 usar 5.">Días trabajo/semana</label>
-            <select className={CONTROL_CLASS} value={hoursConfig.workDaysPerWeek} onChange={(e) => setHoursConfig((p) => ({ ...p, workDaysPerWeek: Math.max(1, Math.min(7, Math.floor(toNumberOr(e.target.value, p.workDaysPerWeek)))) }))}>
-              <option value={6}>6x1 (6 días trabajo)</option>
-              <option value={5}>5x2 (5 días trabajo)</option>
-              <option value={7}>7x0 (sin libre fijo)</option>
-            </select>
-            <label className="text-muted-foreground self-center">Esperadas mes (auto)</label>
-            <div className={CONTROL_CLASS + ' flex items-center justify-between'}>
-              <span className="font-medium tabular-nums">{expectedMonthAutoBase.toFixed(1)} h</span>
-              <span className="text-caption text-muted-foreground">{monthCalendarDays === 1 ? '1 día' : `${monthCalendarDays} días`} de calendario cargados</span>
-            </div>
-            <label className="text-muted-foreground self-center" title="Margen permitido bajo la meta esperada sin activar alerta visual en Control.">Tolerancia (h)</label>
-            <input className={CONTROL_CLASS} type="number" step="0.25" min={0} value={hoursConfig.toleranceHours} onChange={(e) => setHoursConfig((p) => ({ ...p, toleranceHours: toNumberOr(e.target.value, p.toleranceHours) }))} />
-            
-            
-            
-            <label className="col-span-2 flex items-center gap-2">
-              <input type="checkbox" checked={hoursConfig.useFixedDaily} onChange={(e) => setHoursConfig((p) => ({ ...p, useFixedDaily: e.target.checked }))} />
-              <span title="Activado: cada día trabajado usa Jornada total - Colación. Desactivado: calcula horas desde el rango del turno (hora inicio/fin).">Horas fijas por día trabajado</span>
-            </label>
-            <label className="col-span-2 flex items-center gap-2">
-              <input type="checkbox" checked={hoursConfig.autoLegalWeek} onChange={(e) => setHoursConfig((p) => ({ ...p, autoLegalWeek: e.target.checked }))} />
-              <span title="Activado: usa tramo legal chileno según fecha del período (44h hasta 25-04-2026, 42h desde 26-04-2026, 40h desde 26-04-2028).">Usar jornada legal automática de Chile</span>
-            </label>
-            <label className="col-span-2 flex items-center gap-2">
-              <input type="checkbox" checked={hoursConfig.expectedFromPlannedDays} onChange={(e) => setHoursConfig((p) => ({ ...p, expectedFromPlannedDays: e.target.checked }))} />
-              <span title="Activado: esperado por técnico según días realmente programados (no LIBRE/descanso/licencia). Desactivado: prorrateo simple por calendario.">Esperado por días programados (recomendado para 6x1)</span>
-            </label>
-            {/* Esto no es una opción: es una regla fija. Como casilla marcada y
-                deshabilitada invitaba a hacer clic y no pasaba nada. */}
-            <p className="col-span-2 text-muted-foreground" title={`Horas de vacación por día = jornada legal semanal / 5 (actual: ${expectedWeekBase} h/sem).`}>
-              Las vacaciones se cuentan solo de lunes a viernes, por regla legal.
-            </p>
-            <label className="col-span-2 flex items-center gap-2">
-              <input type="checkbox" checked={hoursConfig.holidayAsNonWorking} onChange={(e) => setHoursConfig((p) => ({ ...p, holidayAsNonWorking: e.target.checked }))} />
-              <span title="Activado: feriado puede tratarse como día no hábil en algunas métricas de meta. Desactivado: se evalúa como día normal.">Feriados como no hábil en métricas</span>
-            </label>
-            <label className="col-span-2 flex items-center gap-2">
-              <input type="checkbox" checked={hoursConfig.holidayBusinessDaysOnly} onChange={(e) => setHoursConfig((p) => ({ ...p, holidayBusinessDaysOnly: e.target.checked }))} />
-              <span title="Activado: el feriado solo se considera en días hábiles. Desactivado: se considera sin restricción de día.">Feriados descuentan solo días hábiles</span>
-            </label>
-            <div className="col-span-2 sm:col-span-4 rounded-ctl border border-border/80 bg-muted px-2 py-1 text-caption text-muted-foreground">
-              Las horas de cada turno salen de su horario menos la colación. La jornada de referencia solo entra en feriados, días libres y celdas sin horario.
-            </div>
-            <div className="col-span-2 sm:col-span-4 rounded-ctl border border-border/80 bg-muted px-2 py-1 text-caption text-muted-foreground">
-              Jornada objetivo diaria legal = Jornada objetivo semanal / Días trabajo/semana = {expectedWeekBase.toFixed(1)} / {workDaysPerWeekBase} = {legalDailyTarget.toFixed(2)} h.
-            </div>
-            <div className="col-span-2 sm:col-span-4 rounded-ctl border border-border/80 bg-muted px-2 py-1 text-caption text-muted-foreground">
-              {hoursConfig.expectedFromPlannedDays
-                ? 'Semanal esperado = el tope legal de la semana. Si la semana está a medio cargar en la planilla, se prorratea por los días programados.'
-                : `Semanal esperado (prorrateo) = Jornada semanal legal × (días de la semana visibles / 7). En esta semana: ${expectedWeekBase.toFixed(1)} × (${weekDays.length}/7).`}
-            </div>
-            <div className="col-span-2 sm:col-span-4 rounded-ctl border border-border/80 bg-muted px-2 py-1 text-caption text-muted-foreground">
-              {hoursConfig.expectedFromPlannedDays
-                ? 'Mensual esperado (por técnico) = Jornada diaria legal × días programados de ese técnico en el mes.'
-                : `Mensual esperado (prorrateo) = Jornada semanal legal × (días calendario del mes / 7). En este período: ${expectedWeekBase.toFixed(1)} × (${monthCalendarDays}/7) = ${expectedMonthAutoBase.toFixed(1)} h.`}
-            </div>
-            <div className="col-span-2 sm:col-span-4 rounded-ctl border border-border/80 bg-muted px-2 py-1 text-caption text-muted-foreground">
-              {legalWeekLabel}
-            </div>
-            <div className="col-span-2 sm:col-span-4">
-              <p className="mt-1 text-caption text-muted-foreground">Los cambios se aplican al instante y se guardan solos.</p>
-            </div>
-          </div>
-        )}
 
         {/* ── Tab: Técnicos ── */}
         {activeTab === 'tecnicos' && (
@@ -3000,14 +2864,22 @@ export function CalendarioMantencionPage() {
           </div>
         </div>
         {!isMobile && <div className="mb-1 flex items-center justify-between gap-2">
-          <div className="text-xs text-muted-foreground">Atajos (click en calendario para activar): D/T/N/L/V/F = Día/Tarde/Noche/Libre/Vacaciones/Feriado · Shift+D/T/N = Turno reducido · Flechas ←↑↓→ = Navegar · Ctrl+Z = Deshacer · Ctrl+Y / Ctrl+Shift+Z = Rehacer</div>
-          <div className="flex items-center gap-1">
-            <div className="shrink-0 rounded-ctl border border-border bg-muted px-2 py-0.5 text-caption text-muted-foreground" title={`Historial de cambios (actualizado: ${historyVersion})`}>
-              Undo {undoStackRef.current.length} · Redo {redoStackRef.current.length}
-            </div>
-            <div className={`shrink-0 rounded-ctl border px-2 py-0.5 text-caption ${calendarShortcutsActive ? 'border-emerald-500/[0.25] bg-emerald-500/[0.15] text-ink-ok' : 'border-border bg-muted text-muted-foreground'}`}>
-              Atajos: {calendarShortcutsActive ? 'Activos' : 'Inactivos'}
-            </div>
+          <div className="text-xs text-muted-foreground">Toca una celda para cambiar su turno.</div>
+          <div className="flex items-center gap-1" title={`Historial de cambios (actualizado: ${historyVersion})`}>
+            <button
+              className="shrink-0 rounded-ctl border border-border bg-muted px-2 py-0.5 text-caption text-muted-foreground hover:text-foreground disabled:opacity-40"
+              disabled={undoStackRef.current.length === 0}
+              onClick={() => undoRef.current()}
+            >
+              Deshacer{undoStackRef.current.length > 0 ? ` (${undoStackRef.current.length})` : ''}
+            </button>
+            <button
+              className="shrink-0 rounded-ctl border border-border bg-muted px-2 py-0.5 text-caption text-muted-foreground hover:text-foreground disabled:opacity-40"
+              disabled={redoStackRef.current.length === 0}
+              onClick={() => redoRef.current()}
+            >
+              Rehacer{redoStackRef.current.length > 0 ? ` (${redoStackRef.current.length})` : ''}
+            </button>
           </div>
         </div>}
         <div ref={calendarSectionRef}>
@@ -3141,13 +3013,13 @@ export function CalendarioMantencionPage() {
                           key={`shift-${tech.r}-${d.c}`}
                           className={`border px-1 py-1 text-center cursor-pointer ${cellStyle.className} ${isSelectedCell ? 'ring-2 ring-primary ring-inset shadow-[inset_0_0_0_1px_rgba(255,255,255,0.85)]' : ''} ${selectedCol === d.c ? 'bg-muted-foreground/[0.10]' : ''} ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-4 border-amber-500/[0.25]' : ''} ${isWeekStart(idx) ? 'border-l-2 border-l-cyan-300/80' : ''}`}
                           style={{ minWidth: `${DAY_COL_WIDTH}px`, maxWidth: `${DAY_COL_WIDTH}px`, ...cellStyle.style }}
-                          title={`${value} · doble clic para escribir el horario`}
+                          title={value || 'Sin turno'}
                           onClick={() => {
                             setSelectedRow(tech.r)
                             setSelectedCol(d.c)
                             selectCalendarDate(d)
+                            abrirEditorDeCelda(tech, d)
                           }}
-                          onDoubleClick={() => abrirEditorDeCelda(tech, d)}
                         >
                           <span className="block leading-tight">{value}</span>
                           {tone && tone !== 'ok' ? (
@@ -3171,6 +3043,42 @@ export function CalendarioMantencionPage() {
                 )
               })}
             </tbody>
+            <tfoot>
+              {/* Dotación por banda: el control de cobertura a la vista, sin abrir nada.
+                  El domingo la noche no se cubre por regla de la planta: ahí un 0 no es alerta. */}
+              <tr className="border-t-2 border-border">
+                <td
+                  colSpan={visibleMetaIndices.length}
+                  className="sticky left-0 z-[35] !bg-muted px-2 py-1 text-caption font-semibold text-muted-foreground"
+                >
+                  Día · tarde · noche
+                </td>
+                {dayCols.map((d, idx) => {
+                  const n = dotacionDelDia(d.c)
+                  const esDomingo = d.dateObj?.getDay() === 0
+                  return (
+                    <Fragment key={`cob-${d.c}`}>
+                      {isWeekStart(idx) ? <td className="bg-muted" style={{ minWidth: '46px', maxWidth: '46px' }} /> : null}
+                      <td className="bg-muted px-0.5 py-1 text-center text-caption font-semibold tabular-nums">
+                        {n.planificado ? (
+                          <>
+                            <span className={n.dia < 2 ? 'text-ink-crit' : 'text-brand-ink'}>{n.dia}</span>
+                            <span className="text-muted-foreground"> · </span>
+                            <span className={n.tarde < 2 ? 'text-ink-crit' : 'text-cat-4-ink'}>{n.tarde}</span>
+                            <span className="text-muted-foreground"> · </span>
+                            {esDomingo
+                              ? <span className="text-muted-foreground" title="La noche del domingo no se cubre, por regla de la planta.">{n.noche > 0 ? n.noche : '–'}</span>
+                              : <span className={n.noche < 2 ? 'text-ink-crit' : 'text-cat-6-ink'}>{n.noche}</span>}
+                          </>
+                        ) : (
+                          <span className="font-normal text-muted-foreground" title="Día sin planificar todavía">—</span>
+                        )}
+                      </td>
+                    </Fragment>
+                  )
+                })}
+              </tr>
+            </tfoot>
           </table>
         </div>
         </div>
@@ -3187,7 +3095,34 @@ export function CalendarioMantencionPage() {
             <p className="mt-0.5 text-caption text-muted-foreground">
               {techRows.find((t) => t.r === celdaEditada.r)?.name ?? ''} · {dayLabelByCol(celdaEditada.c)}
             </p>
-            <div className="mt-3 flex items-center gap-2">
+            {/* Un toque y listo: los turnos de siempre, sin memorizar letras. */}
+            <div className="mt-3 grid grid-cols-3 gap-1.5">
+              {([
+                { texto: shortcuts.dia, nombre: 'Día', cls: 'bg-primary/[0.15] text-brand-ink' },
+                { texto: shortcuts.tarde, nombre: 'Tarde', cls: 'bg-cat-4-tint/[0.15] text-cat-4-ink' },
+                { texto: shortcuts.noche, nombre: 'Noche', cls: 'bg-cat-6-tint/[0.15] text-cat-6-ink' },
+                { texto: shortcuts.diaReducido, nombre: 'Día corto', cls: 'bg-primary/[0.15] text-brand-ink' },
+                { texto: shortcuts.tardeReducido, nombre: 'Tarde corta', cls: 'bg-cat-4-tint/[0.15] text-cat-4-ink' },
+                { texto: shortcuts.nocheReducido, nombre: 'Noche corta', cls: 'bg-cat-6-tint/[0.15] text-cat-6-ink' },
+                { texto: shortcuts.libre, nombre: 'Libre', cls: 'bg-muted text-muted-foreground' },
+                { texto: 'VACACIONES', nombre: 'Vacaciones', cls: 'bg-muted text-muted-foreground' },
+                { texto: 'FERIADO', nombre: 'Feriado', cls: 'bg-muted text-muted-foreground' },
+              ]).map(({ texto, nombre, cls }) => (
+                <button
+                  key={nombre}
+                  className={`flex min-h-11 flex-col items-center justify-center rounded-ctl px-1 leading-tight active:opacity-70 ${cls}`}
+                  onClick={() => {
+                    applyShift(celdaEditada.r, celdaEditada.c, texto)
+                    setCeldaEditada(null)
+                  }}
+                >
+                  <span className="text-caption font-semibold">{nombre}</span>
+                  {/\d/.test(texto) && <span className="text-caption tabular-nums opacity-70">{texto.replace(' - ', '–')}</span>}
+                </button>
+              ))}
+            </div>
+            <p className="mt-3 text-caption text-muted-foreground">O escribe otro horario:</p>
+            <div className="mt-2 flex items-center gap-2">
               <label className="flex-1 grid gap-1">
                 <span className="text-caption text-muted-foreground">Entra</span>
                 <input
