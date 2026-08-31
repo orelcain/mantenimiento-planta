@@ -552,27 +552,35 @@ const PISTA_INSTRUMENTO = 'color-mix(in srgb, rgb(var(--muted-foreground)) 20%, 
  * salen solas. w en columnas de 6, h en filas de 56 px como MÍNIMO — el
  * contenido puede empujar, así que estos altos solo aproximan el real.
  */
+/* El ritmo son TRES tarjetas (pedido de Orel, 30-08): el estado («ritmo»),
+   la tira del minuto («minuto») y el rango habitual («rango»). En fábrica,
+   al lado del estado va «Comparado con otros días» —donde antes el rango
+   dejaba el hueco más grande de la página— y el rango baja con el resto. */
 const FABRICA_TURNO_CERRADO: TarjetaLayout[] = [
   { id: 'resultado', w: 3, h: 4 },
   { id: 'mantencion', w: 3, h: 8 },
-  { id: 'ritmo', w: 6, h: 12 },
+  { id: 'ritmo', w: 3, h: 7 },
+  { id: 'comparado', w: 3, h: 7 },
+  { id: 'minuto', w: 6, h: 7 },
   { id: 'cascada', w: 3, h: 6 },
   { id: 'tiempo', w: 3, h: 2 },
   { id: 'velocidad', w: 3, h: 6 },
   { id: 'meta', w: 3, h: 10 },
-  { id: 'comparado', w: 3, h: 6 },
+  { id: 'rango', w: 3, h: 5 },
   { id: 'ayer', w: 3, h: 5 },
 ]
 const FABRICA_TURNO_VIVO: TarjetaLayout[] = [
   { id: 'resultado', w: 3, h: 4 },
   { id: 'cascada', w: 3, h: 6 },
   { id: 'mantencion', w: 3, h: 8 },
-  { id: 'ritmo', w: 6, h: 12 },
+  { id: 'ritmo', w: 3, h: 7 },
+  { id: 'comparado', w: 3, h: 7 },
+  { id: 'minuto', w: 6, h: 7 },
   { id: 'tiempo', w: 3, h: 2 },
   { id: 'pronostico', w: 3, h: 5 },
-  { id: 'comparado', w: 3, h: 6 },
   { id: 'velocidad', w: 3, h: 6 },
   { id: 'meta', w: 3, h: 10 },
+  { id: 'rango', w: 3, h: 5 },
   { id: 'ayer', w: 3, h: 5 },
 ]
 
@@ -3517,10 +3525,11 @@ function BarrasMinuto({ datos, cerrado }: { datos: BarrasMinutoDatos; cerrado?: 
   }
 
   return (
-    /* `barras-ancho`: la marca que le dice al bloque de ritmo que ESTA pieza
-       sí aprovecha todo el ancho en PC — las demás se acotan para no quedar
-       estiradas (una Chispa de 5 puntos repartida en 1.400 px no se lee). */
-    <div ref={medidorRef} className="barras-ancho mt-3 border-t border-border/50 pt-2.5">
+    /* `barras-ancho`: históricamente la marca de ancho completo; hoy además
+       la ancla del medidor. Ya no vive dentro de la tarjeta de ritmo —es
+       tarjeta propia del tablero— así que perdió el separador de cuando era
+       la tercera cosa de un bloque. */
+    <div ref={medidorRef} className="barras-ancho">
       <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5 text-caption text-muted-foreground">
         <span>
           Velocidad minuto a minuto
@@ -3587,7 +3596,15 @@ function BarrasMinuto({ datos, cerrado }: { datos: BarrasMinutoDatos; cerrado?: 
   )
 }
 
-function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrado, onEditarSetPoint, cerrado, contexto, chispa, corteMs, ahoraWallMs, pulso, pulsoNodo, vivo, maquinas, parada, serieLinea, seriesMaquinas, barras }: {
+function ReglaDeRitmo({ parte, ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrado, onEditarSetPoint, cerrado, contexto, chispa, corteMs, ahoraWallMs, pulso, pulsoNodo, vivo, maquinas, parada, serieLinea, seriesMaquinas, barras }: {
+  /**
+   * Qué TARJETA del tablero renderiza esta llamada (pedido de Orel, 30-08:
+   * «separemos esto en 3 partes para poder acomodarlo mejor»). Era UNA
+   * tarjeta con tres cosas adentro —estado, rango habitual y la tira del
+   * minuto— y así ninguna se podía mover ni dimensionar por separado. El
+   * call-site arma las props UNA vez y llama tres veces.
+   */
+  parte: 'estado' | 'minuto' | 'rango'
   /**
    * Ritmo de ahora ANDANDO, en pz/min: los últimos 15 min descontando los
    * tramos parados. Va en esta base y no en la de reloj porque es contra lo
@@ -3705,18 +3722,72 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
   const colorPunto = estado === 'ok'
     ? 'text-ink-ok' : estado === 'lento' ? 'text-ink-warn' : 'text-ink-crit'
 
+  /* ── Tarjeta «Velocidad minuto a minuto» ──────────────────────────────
+     Las barras del dato duro cuando el pulso publica la serie; si no, las
+     curvas de 5 min de siempre (turnos pasados y docs sin la serie). El
+     call-site solo la monta cuando hay algo que dibujar. */
+  if (parte === 'minuto') {
+    return (
+      <section className="rounded-card border border-border bg-card p-4">
+        {barras ? (
+          <BarrasMinuto datos={barras} cerrado={cerrado} />
+        ) : serieLinea && serieLinea.length > 1 && seriesMaquinas && seriesMaquinas.length > 1 ? (
+          <>
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+              Velocidad de cada máquina
+            </div>
+            {/* Acá se ve QUIÉN bajó la línea y cuándo, no solo cuánto (pedido
+                de Orel, 26-08). Solo con docs nuevos (los viejos no traen el
+                desglose). */}
+            <CurvasMaquinas
+              serie={serieLinea}
+              maquinas={seriesMaquinas}
+              /* El punto vivo SOLO con el pulso fresco y completo — la misma
+                 condición de la columna «ahora», para que gráfico y columna
+                 digan lo mismo. */
+              ahoraPorNombre={
+                !parada && !cerrado && vivo != null
+                && maquinas != null && maquinas.maquinas.every((m) => m.pulsoCpm != null)
+                  ? new Map(maquinas.maquinas.map((m) => [m.nombre, m.pulsoCpm!]))
+                  : null
+              }
+              ahoraAt={vivo?.at ?? null}
+            />
+          </>
+        ) : null}
+      </section>
+    )
+  }
+
+  /* ── Tarjeta «Rango habitual» ─────────────────────────────────────────
+     El histórico, con la conclusión ANTES que el dibujo (rediseño 26-08). Es
+     análisis: no entra en la TV, y como tarjeta propia por fin se puede
+     acomodar — pegada al estado dejaba el hueco más grande de la página. */
+  if (parte === 'rango') {
+    return (
+      <section className="rounded-card border border-border bg-card p-4">
+        <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+          <Gauge className="h-3 w-3" />
+          Rango habitual de la línea
+        </div>
+        {contexto && (
+          <p className="mt-1.5 text-footnote leading-snug text-foreground">{contexto}</p>
+        )}
+        {/* QUÉ velocidad dibuja, escrito (pedido de Orel, 26-08): sin la
+            etiqueta, el gráfico era «una velocidad» más entre varias. */}
+        {chispa && (
+          <p className="mt-1 text-caption text-muted-foreground/80">
+            Ritmo promedio <b className="text-muted-foreground">andando</b> de cada turno, pz/min
+            — la misma vara del «Promedio del turno» de arriba.
+          </p>
+        )}
+        {chispa}
+      </section>
+    )
+  }
+
   return (
-    /* En PC este bloque CRUZA las columnas: adentro va la tira minuto a
-       minuto, que es la pieza que más gana con el ancho — en una columna se
-       ven ~30 minutos, a lo ancho entra el turno entero. */
-    <section className="rounded-card border border-border bg-card p-4 lg:col-span-full lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-6 lg:[&>.barras-ancho]:col-span-2">
-      {/* En PC este bloque cruza las dos columnas de la zona, y ADENTRO se
-          reparte a mano: a la izquierda el estado (el «ahora» y cada máquina),
-          a la derecha el rango habitual, y las barras minuto a minuto cruzando
-          abajo. Acotado a una sola columna, el bloque medía 1.572 px de ancho
-          con el contenido apretado en 784 — 780 px de hueco, el más grande de
-          la página. */}
-      <div className="lg:min-w-0">
+    <section className="rounded-card border border-border bg-card p-4">
       <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
         <Gauge className="h-3 w-3" />
         Ritmo de la línea
@@ -3970,7 +4041,9 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
         const conCero = Boolean(parada) || cerrado
         const conAporte = maquinas.maquinas.every((m) => m.aporteCpm != null)
         return (
-          <div className="mt-3 border-t border-border/50 pt-2.5">
+          /* `ritmo-maquinas`: gancho del modo pantalla — en la TV este bloque
+             sube a la columna derecha, a la altura del número grande. */
+          <div className="ritmo-maquinas mt-3 border-t border-border/50 pt-2.5">
             <div className="flex items-baseline justify-between gap-2 text-caption text-muted-foreground">
               <span>
                 Cada máquina
@@ -4036,31 +4109,6 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
           </div>
         )
       })()}
-      </div>
-
-      {/* Las barras minuto a minuto (dato duro de Shoplogix) cuando el pulso
-          publica la serie; si no, las curvas de 5 min de siempre (turnos
-          pasados y docs sin la serie). */}
-      {barras && <BarrasMinuto datos={barras} cerrado={cerrado} />}
-      {/* Las curvas de velocidad de cada máquina, como en el detalle de turno
-          (pedido de Orel, 26-08): acá se ve QUIÉN bajó la línea y cuándo, no
-          solo cuánto. Solo con docs nuevos (los viejos no traen el desglose). */}
-      {!barras && serieLinea && serieLinea.length > 1 && seriesMaquinas && seriesMaquinas.length > 1 && (
-        <CurvasMaquinas
-          serie={serieLinea}
-          maquinas={seriesMaquinas}
-          /* El punto vivo SOLO con el pulso fresco y completo — la misma
-             condición de la columna «ahora», para que gráfico y columna
-             digan lo mismo. */
-          ahoraPorNombre={
-            !parada && !cerrado && vivo != null
-            && maquinas != null && maquinas.maquinas.every((m) => m.pulsoCpm != null)
-              ? new Map(maquinas.maquinas.map((m) => [m.nombre, m.pulsoCpm!]))
-              : null
-          }
-          ahoraAt={vivo?.at ?? null}
-        />
-      )}
 
       {/* La hora de corte. El número grande describe los últimos 15 min, pero
           un tramo no existe hasta que cierra: sin decir hasta cuándo, quien lo
@@ -4101,30 +4149,6 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
         </p>
       )}
 
-      {/* El histórico, con la conclusión ANTES que el dibujo (rediseño 26-08):
-          86 px de gráfico y 11 px de texto peleando el mismo renglón no ganaba
-          ninguno. El veredicto va en 13 px porque ES la conclusión, no una nota
-          al pie; el gráfico de abajo la confirma. */}
-      {/* La Chispa (la semana turno a turno) es análisis: no entra en la TV. */}
-      {/* En PC sube a la columna de al lado del «ahora»: es el contexto de ese
-          número —si va dentro de lo normal— y leerlo al costado es más corto
-          que bajar. En el celular sigue abajo, con su separador. */}
-      {(contexto || chispa) && (
-        <div className="pantalla-oculta mt-2.5 border-t border-border/50 pt-2.5 lg:col-start-2 lg:row-start-1 lg:mt-0 lg:border-t-0 lg:pt-0">
-          {contexto && (
-            <p className="text-footnote leading-snug text-foreground">{contexto}</p>
-          )}
-          {/* QUÉ velocidad dibuja, escrito (pedido de Orel, 26-08): sin la
-              etiqueta, el gráfico era «una velocidad» más entre varias. */}
-          {chispa && (
-            <p className="mt-1 text-caption text-muted-foreground/80">
-              Ritmo promedio <b className="text-muted-foreground">andando</b> de cada turno, pz/min
-              — la misma vara del «Promedio del turno» de arriba.
-            </p>
-          )}
-          {chispa}
-        </div>
-      )}
     </section>
   )
 }
@@ -6340,25 +6364,28 @@ export function PublicShiftMonitorPage() {
               />
               </TarjetaTablero>
             )}
-            <TarjetaTablero id="ritmo" t={tablero}>
-            <ReglaDeRitmo
+            {(() => {
+            /* Las MISMAS props para las tres tarjetas en que se partió el
+               ritmo (estado / minuto a minuto / rango habitual): se computan
+               una vez y cada llamada renderiza su parte. */
+            const reglaProps = {
               /* El pulso vive DENTRO de la tarjeta de ritmo: son la misma
                  pregunta —«¿cómo va ahora?»— y así viaja con ella cuando el
                  usuario la mueve. Es además el componente que refresca
                  `data.pulse`, por eso se monta siempre que el ritmo exista. */
-              pulsoNodo={
+              pulsoNodo: (
                 <PulsoVivo
                   pulse={data.pulse}
                   token={token ?? ''}
                   cerrado={turnoCerrado}
                   onPulso={p => setData(d => (d ? { ...d, pulse: p } : d))}
                 />
-              }
+              ),
               /* El tramo en curso se cuenta por los minutos que LLEVA, no por
                  los 5 que va a durar: si no, el número de "ahora" queda siempre
                  por debajo del que muestra Shoplogix. */
-              ahora={duro15?.cpm ?? ritmoAhoraAndando(serieDelTurno, ahoraWallMs)}
-              maquinas={(() => {
+              ahora: duro15?.cpm ?? ritmoAhoraAndando(serieDelTurno, ahoraWallMs),
+              maquinas: (() => {
                 const base = conRepartoPorMaquina(
                   ritmoPorMaquina(live.machines, (live.windowHours ?? 0) * 60),
                   seriesMaquinas,
@@ -6393,9 +6420,9 @@ export function PublicShiftMonitorPage() {
                   maquinas: base.maquinas.map((m) =>
                     porNombre.has(m.nombre) ? { ...m, ahoraCpm: porNombre.get(m.nombre)! } : m),
                 }
-              })()}
-              serieLinea={serieDelTurno}
-              seriesMaquinas={seriesMaquinas}
+              })(),
+              serieLinea: serieDelTurno,
+              seriesMaquinas,
               /*
                * Las barras minuto a minuto salen cuando la serie ES DEL TURNO
                * QUE SE MIRA — se comprueba por TIEMPO, no por la frescura del
@@ -6411,7 +6438,7 @@ export function PublicShiftMonitorPage() {
                * la suya en el primer bucket que Shoplogix devuelve, que puede
                * traer minutos anteriores al turno.
                */
-              barras={(() => {
+              barras: (() => {
                 const s = data.pulse?.serieMinuto
                 if (!s?.maquinas?.length) return null
                 const t0 = Date.parse(s.desde)
@@ -6436,13 +6463,13 @@ export function PublicShiftMonitorPage() {
                    útil (y no es de este turno): a las curvas. */
                 if (!maquinas.some((m) => m.cycles.some((v) => v > 0))) return null
                 return { desde: new Date(t0 + desdeIdx * 60_000).toISOString(), maquinas }
-              })()}
+              })(),
               /* Parada = ninguna máquina produciendo. El pulso lo confirma:
                  con la línea en colación marca 0,0 mientras el número grande
                  mostraba el ritmo de antes de parar. También con el turno
                  CERRADO: es la causa del cierre («Detención programada desde
                  las 15:09 · fin de turno»). */
-              parada={live.machinesProducing === 0 && (live.currentReason || live.currentSinceAt)
+              parada: live.machinesProducing === 0 && (live.currentReason || live.currentSinceAt)
                 ? {
                   desdeHace: live.currentSinceAt ? fmtAgoWall(live.currentSinceAt, now) : null,
                   desdeHora: live.currentSinceAt ? fmtWallTime(live.currentSinceAt) : null,
@@ -6452,15 +6479,15 @@ export function PublicShiftMonitorPage() {
                     reason: live.currentReason ?? undefined,
                   }) === 'planificado',
                 }
-                : null}
-              ahoraReloj={duro15?.cpmReloj ?? ritmoAhoraCpm(serieDelTurno, ahoraWallMs)}
+                : null,
+              ahoraReloj: duro15?.cpmReloj ?? ritmoAhoraCpm(serieDelTurno, ahoraWallMs),
               /* Fin del último tramo: la serie viene en hora de planta, igual
                  que el resto de la pantalla. Con el dato duro, el corte es el
                  último MINUTO cerrado. */
-              corteMs={duro15?.hastaWallMs ?? (serieDelTurno.length
+              corteMs: duro15?.hastaWallMs ?? (serieDelTurno.length
                 ? Date.parse(serieDelTurno[serieDelTurno.length - 1]!.t) + 5 * 60_000
-                : null)}
-              ahoraWallMs={ahoraWallMs}
+                : null),
+              ahoraWallMs,
               /* ⚠ El pulso SOLO si el contador vivo está respondiendo. Con el
                  contador caído, `totalCycles` viene 0 y `cpm` viene 0 —no
                  null—, así que el chip pintaba «0,0 · ahora mismo · 15:30» dos
@@ -6468,27 +6495,27 @@ export function PublicShiftMonitorPage() {
                  contador no está respondiendo. Un cero que es ausencia de dato
                  presentado como medición. `elegirContador` ya hace ese juicio:
                  si cayó al derivado, no hay pulso que mostrar. */
-              pulso={contador.fuente === 'pulso' ? (data.pulse ?? null) : null}
-              vivo={contador.fuente === 'pulso' ? pulsoVivo(data.pulse) : null}
+              pulso: contador.fuente === 'pulso' ? (data.pulse ?? null) : null,
+              vivo: contador.fuente === 'pulso' ? pulsoVivo(data.pulse) : null,
               /* El objetivo, en la MISMA base que el ritmo: el requerido de
                  `pace` es sobre el reloj útil que queda, y se convierte a
                  «andando» con el uptime real del turno. */
-              pedido={pedidoAndando(
+              pedido: pedidoAndando(
                 pace?.requiredPerMinute,
                 live.timeBreakdown?.producingMin,
                 live.timeBreakdown
                   ? Math.max(1, live.timeBreakdown.windowMin - (live.timeBreakdown.plannedMin ?? 0))
                   : null,
-              )}
-              turno={turnoCpm}
-              setCpm={setCpmVigente}
-              techoDemostrado={ritmoAndando.mejor}
-              cerrado={turnoCerrado}
-              contexto={contexto}
+              ),
+              turno: turnoCpm,
+              setCpm: setCpmVigente,
+              techoDemostrado: ritmoAndando.mejor,
+              cerrado: turnoCerrado,
+              contexto,
               /* Últimos 4 turnos + hoy (a 375 px veinte puntos se amontonan) y
                  la escala FIJA al peor/mejor de TODA la historia corta, para
                  que la misma pendiente signifique lo mismo todos los días. */
-              chispa={turnoCpm != null && banda
+              chispa: turnoCpm != null && banda
                 ? <Chispa
                     turnos={banda.turnos.slice(-4)}
                     hoy={turnoCpm}
@@ -6499,9 +6526,31 @@ export function PublicShiftMonitorPage() {
                     mediana={ritmoAndando.mediana}
                     muestras={ritmoAndando.muestras}
                   />
-                : undefined}
-            />
-            </TarjetaTablero>
+                : undefined,
+            }
+            return (
+              <>
+              <TarjetaTablero id="ritmo" t={tablero}>
+                <ReglaDeRitmo {...reglaProps} parte="estado" />
+              </TarjetaTablero>
+              {/* La tira del minuto solo cuando hay algo que dibujar (barras
+                  del dato duro o, de respaldo, las curvas por máquina). En la
+                  TV es el pie del tablero, como siempre. */}
+              {(reglaProps.barras != null
+                || (serieDelTurno.length > 1 && (seriesMaquinas?.length ?? 0) > 1)) && (
+                <TarjetaTablero id="minuto" t={tablero}>
+                  <ReglaDeRitmo {...reglaProps} parte="minuto" />
+                </TarjetaTablero>
+              )}
+              {/* El rango habitual es análisis: no entra en la TV. */}
+              {(contexto || reglaProps.chispa) && !modoPantalla && (
+                <TarjetaTablero id="rango" t={tablero}>
+                  <ReglaDeRitmo {...reglaProps} parte="rango" />
+                </TarjetaTablero>
+              )}
+              </>
+            )
+            })()}
             </>
           )
         })()}

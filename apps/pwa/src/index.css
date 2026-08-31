@@ -708,7 +708,7 @@
   .modo-pantalla > div:not(:first-of-type),
   .modo-pantalla > p,
   .modo-pantalla > footer { display: none; }
-  .modo-pantalla > div:first-of-type > *:nth-child(n+4) { display: none; }
+  .modo-pantalla > div:first-of-type > *:nth-child(n+5) { display: none; }
   /* El contenedor trae la grilla de 6 del tablero: acá mandan las 2 fijas. */
   .modo-pantalla > div:first-of-type { grid-auto-rows: auto; grid-auto-flow: row; }
   /* Y dentro de ella, fuera lo que no se lee de lejos. */
@@ -749,10 +749,13 @@
   .modo-pantalla > div:first-of-type > *:first-child p { font-size: 18px; line-height: 1.35; }
 
   /*
-   * El bloque de ritmo cruza abajo y ADENTRO se reparte en dos: el «ahora» y
-   * las tres Baader lado a lado, con la tira del minuto cruzando el pie. Sin
-   * esto, su contenido se acota a max-w-4xl y deja media pantalla vacía —
-   * justo lo que la TV no puede permitirse.
+   * El cuarteto de la TV, tras partir el ritmo en tres tarjetas (30-08):
+   * nth 1-2 = resultado y Mantención lado a lado; nth 3 = el ESTADO del
+   * ritmo, cruzando y abierto en dos adentro (números a la izquierda, «cada
+   * máquina» a la derecha); nth 4 = la tira del minuto cruzando el pie. El
+   * rango habitual ni se renderiza en TV (era `pantalla-oculta`; hoy no se
+   * monta). Sin abrir el estado en dos, media pantalla quedaba vacía y las
+   * barras se salían de los 1.080 px — medido cuando era una sola tarjeta.
    */
   .modo-pantalla > div:first-of-type > *:nth-child(3) {
     grid-column: 1 / -1;
@@ -761,29 +764,15 @@
     gap: 0 2vw;
     align-content: start;
   }
-  .modo-pantalla > div:first-of-type > *:nth-child(3) > * { max-width: none !important; }
-  .modo-pantalla > div:first-of-type > *:nth-child(3) > .barras-ancho { grid-column: 1 / -1; }
-  /*
-   * El estado del ritmo viene envuelto en UN solo hijo (para poder repartirlo
-   * en PC), así que acá hay que volver a abrirlo: sin esto ocupa una sola
-   * columna, deja la otra mitad vacía y empuja la tira del minuto fuera de la
-   * pantalla — medido: 1.077 px de alto con las barras cortadas al pie.
-   */
-  .modo-pantalla > div:first-of-type > *:nth-child(3) > *:first-child {
-    grid-column: 1 / -1;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0 2vw;
-    align-content: start;
-  }
-  /* «Cada máquina» a la derecha, a la altura del número grande. */
-  .modo-pantalla > div:first-of-type > *:nth-child(3) > *:first-child > *:last-child {
+  .modo-pantalla > div:first-of-type > *:nth-child(3) > * { grid-column: 1; }
+  .modo-pantalla > div:first-of-type > *:nth-child(3) > .ritmo-maquinas {
     grid-column: 2;
-    grid-row: 1 / span 4;
+    grid-row: 1 / span 9;
     margin-top: 0;
     border-top: 0;
     padding-top: 0;
   }
+  .modo-pantalla > div:first-of-type > *:nth-child(4) { grid-column: 1 / -1; }
 
   /*
    * `tap-44` — área táctil de 44x44 sin tocar el tamaño visual (§3 de la
