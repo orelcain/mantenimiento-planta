@@ -4907,6 +4907,12 @@ export function PublicShiftMonitorPage() {
     () => objetivoDelTurno(live?.expectedPieces, data?.forecastHistory ?? []),
     [live?.expectedPieces, data?.forecastHistory],
   )
+  /* ⚠ NUNCA como meta (regla de Orel, 30-08: «no le asignes meta si no la
+     pongo yo»). Yal amaneció con una «cuota 27.799» que nadie puso — era la
+     mediana de lo que Shoplogix espera del turno, vestida de meta. La meta es
+     SOLO la del link (`targetPieces`) o la de la config del turno
+     (`quotaPieces`); sin ellas, el monitor no inventa una. Este valor queda
+     únicamente como TECHO de referencia dentro de `computePaceToTarget`. */
   const metaSensor = objetivoSensor?.piezas ?? null
 
   const gruposEventos = useMemo(
@@ -5188,7 +5194,11 @@ export function PublicShiftMonitorPage() {
     return computePaceToTarget({
       // La cuota del link primero; si no, la de la config del turno.
       targetPieces: data?.targetPieces ?? live.quotaPieces,
-      expectedPieces: metaSensor,
+      /* Sin cuota puesta por una persona, NO hay meta que perseguir (regla de
+         Orel, 30-08): el «objetivo del sensor» dejó de ser respaldo y toda la
+         tarjeta de ritmo necesario / hora extra se calla en vez de pedir
+         piezas «para lo esperado». */
+      expectedPieces: null,
       /* El MISMO total que el héroe (contador vivo cuando responde): con
          `live.totalPieces` el «faltan 14.401» convivía con un héroe en 820 —
          dos totales a dos tarjetas de distancia (Orel, noche del 26-08). */
@@ -5240,11 +5250,12 @@ export function PublicShiftMonitorPage() {
    */
   const comparacion = useMemo(() => {
     /*
-     * Sin cuota configurada vale el objetivo de Shoplogix, que es contra lo que
-     * la pantalla ya mide arriba: si no, en Yal el comparador se quedaba sin
-     * referencia y no había con qué contrastar el avance.
+     * SOLO la cuota puesta por una persona (link o config del turno): sin
+     * ella, el comparador contrasta contra los otros días y punto — presentar
+     * el objetivo del sensor como «cuota» le asignaba a Yal una meta que
+     * nadie puso (regla de Orel, 30-08).
      */
-    const meta = data?.targetPieces ?? live?.quotaPieces ?? metaSensor
+    const meta = data?.targetPieces ?? live?.quotaPieces ?? null
     const tb = live?.timeBreakdown
 
     // Las mismas del ritmo necesario y del fondo de los gráficos: `breaksTurno`.
@@ -5344,7 +5355,7 @@ export function PublicShiftMonitorPage() {
     })
     // El turno VISTO entra en las dependencias: al navegar a otro turno la
     // comparación tiene que rearmarse contra los días previos a ESE.
-  }, [live, inicioReal, vista?.dateKey, vista?.shiftId, data?.history, data?.targetPieces, breaksTurno, metaSensor, esActual, data?.pulse])
+  }, [live, inicioReal, vista?.dateKey, vista?.shiftId, data?.history, data?.targetPieces, breaksTurno, esActual, data?.pulse])
 
   /*
    * Pronóstico del cierre. Se alimenta del `history` que YA viaja en el doc:
@@ -5356,7 +5367,9 @@ export function PublicShiftMonitorPage() {
    * ese filtro no queda muestra suficiente, el bloque no aparece.
    */
   const pronostico = useMemo(() => {
-    const metaFc = data?.targetPieces ?? live?.quotaPieces ?? metaSensor
+    /* Sin cuota humana no hay meta (regla de Orel, 30-08): el pronóstico
+       proyecta el cierre igual, solo que sin veredicto de «llega/no llega». */
+    const metaFc = data?.targetPieces ?? live?.quotaPieces ?? null
     /*
      * `forecastHistory` trae hasta 10 turnos del MISMO nombre; el filtro sobre
      * `history` queda de respaldo para los docs anteriores a ese campo (y para
@@ -5388,7 +5401,7 @@ export function PublicShiftMonitorPage() {
         porDelanteMin: pace?.pendingBreakMin ?? 0,
       },
     })
-  }, [live, data?.history, data?.forecastHistory, data?.targetPieces, comparacion.currentMinute, vista?.shiftId, pace?.pendingBreakMin, metaSensor])
+  }, [live, data?.history, data?.forecastHistory, data?.targetPieces, comparacion.currentMinute, vista?.shiftId, pace?.pendingBreakMin])
 
   /**
    * Hasta cuándo mide el pronóstico, y cuánto sería si el turno cortara en su
@@ -6776,7 +6789,7 @@ export function PublicShiftMonitorPage() {
           <TarjetaTablero id="pronostico" t={tablero}>
             <PronosticoCierre
               f={pronostico}
-              meta={data.targetPieces ?? live.quotaPieces ?? metaSensor}
+              meta={data.targetPieces ?? live.quotaPieces ?? null}
               horizonte={horizontePronostico}
             />
           </TarjetaTablero>
@@ -6860,7 +6873,7 @@ export function PublicShiftMonitorPage() {
                  comparador, aplanada en colacion) - contra la meta completa,
                  el "ritmo" absorberia lo que aun no se juega. */
               cerrado={turnoCerrado}
-              meta={data.targetPieces ?? live.quotaPieces ?? metaSensor}
+              meta={data.targetPieces ?? live.quotaPieces ?? null}
               hechas={live.totalPieces}
               piezasPulso={data.pulse?.totalCycles ?? null}
               corteHora={horaPlanta(live.lastSyncAt ? Date.parse(live.lastSyncAt) - new Date().getTimezoneOffset() * 60_000 : null)}
