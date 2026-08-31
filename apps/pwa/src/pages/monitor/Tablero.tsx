@@ -27,10 +27,11 @@
  * un archivo que exporta componentes y funciones a la vez rompe el
  * fast-refresh, y el lint del CI (--max-warnings 30) lo cobra.
  */
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
+import { Plus, X } from 'lucide-react'
 import {
-  TABLERO_MAX_H, TABLERO_MAX_W, TABLERO_MIN_H, TABLERO_MIN_W,
+  TABLERO_MAX_H, TABLERO_MAX_W, TABLERO_MIN_H, TABLERO_MIN_W, TITULO_TARJETA,
   clampaTablero, type Tablero,
 } from './tableroLayout'
 
@@ -48,9 +49,18 @@ export function TarjetaTablero({ id, t, children }: { id: string; t: Tablero; ch
   const ref = useRef<HTMLDivElement>(null)
   const [medida, setMedida] = useState<string | null>(null)
 
+  /* Anotarse como «disponible»: montarse significa que esta tarjeta tiene
+     datos en este turno, y solo esas se pueden agregar desde el panel. Va
+     antes de cualquier return para no romper el orden de los hooks. */
+  const registrar = t.registrar
+  useEffect(() => registrar(id), [id, registrar])
+
   if (!t.activo) return <>{children}</>
   const item = t.mapa.get(id)
   if (!item) return <>{children}</>
+  /* Quitada por el usuario: no se dibuja ni siquiera editando — se vuelve a
+     agregar desde el panel, que es donde vive lo que no está a la vista. */
+  if (item.oculta) return null
 
   const empiezaEstirar = (e: React.PointerEvent<HTMLButtonElement>) => {
     if (!t.editando) return
@@ -117,6 +127,14 @@ export function TarjetaTablero({ id, t, children }: { id: string; t: Tablero; ch
           <div className="absolute inset-0 z-[5] rounded-card" aria-hidden />
           <button
             type="button"
+            onClick={() => t.alternarVisible(id)}
+            title="Quitar del tablero"
+            className="absolute right-1 top-1 z-[6] flex h-6 w-6 items-center justify-center rounded-full border border-border bg-background text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <X className="h-3 w-3" />
+          </button>
+          <button
+            type="button"
             onPointerDown={empiezaEstirar}
             title="Estirar ancho y alto"
             className="absolute bottom-1 right-1 z-[6] flex h-7 w-7 touch-none items-end justify-end rounded-ctl text-primary"
@@ -133,6 +151,43 @@ export function TarjetaTablero({ id, t, children }: { id: string; t: Tablero; ch
           )}
         </>
       )}
+    </div>
+  )
+}
+
+/**
+ * El panel de «qué tarjetas quiero»: mientras se personaliza, una fila de
+ * fichas con TODAS las tarjetas que este turno tiene datos para mostrar.
+ * Encendida = está en el tablero (clic la quita); apagada = clic la agrega en
+ * el lugar donde estaba. Pedido de Orel (31-08): en la TV solo se podían
+ * mover las de fábrica, no elegir cuáles van.
+ */
+export function PanelTarjetas({ t }: { t: Tablero }) {
+  if (!t.activo || !t.editando) return null
+  const items = t.lista.filter((x) => t.disponibles.has(x.id))
+  if (items.length === 0) return null
+  return (
+    <div className="hidden flex-wrap items-center gap-1.5 lg:flex">
+      <span className="text-[12px] text-muted-foreground">Tarjetas del tablero:</span>
+      {items.map((x) => {
+        const dentro = x.oculta !== true
+        return (
+          <button
+            key={x.id}
+            type="button"
+            onClick={() => t.alternarVisible(x.id)}
+            title={dentro ? 'Quitar del tablero' : 'Agregar al tablero'}
+            className={`tap-44 flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] transition-colors ${
+              dentro
+                ? 'bg-primary font-semibold text-primary-foreground'
+                : 'border border-border bg-muted text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {dentro ? <X className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
+            {TITULO_TARJETA[x.id] ?? x.id}
+          </button>
+        )
+      })}
     </div>
   )
 }

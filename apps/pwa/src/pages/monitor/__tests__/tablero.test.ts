@@ -68,6 +68,29 @@ describe('combinarTablero', () => {
     expect(r[1]).toEqual({ id: 'b', w: 6, h: 2 })
   })
 
+  it('conserva las tarjetas QUITADAS por el usuario (oculta) con su lugar', () => {
+    const guardado = [
+      { id: 'a', w: 3, h: 4 },
+      { id: 'b', w: 3, h: 8, oculta: true },
+      { id: 'c', w: 6, h: 12 },
+      { id: 'd', w: 3, h: 2 },
+    ]
+    const r = combinarTablero(guardado, FABRICA)
+    expect(r[1]).toEqual({ id: 'b', w: 3, h: 8, oculta: true })
+    /* Las visibles no se ensucian con `oculta: false`. */
+    expect(r[0]).toEqual({ id: 'a', w: 3, h: 4 })
+  })
+
+  it('una tarjeta que la fábrica trae oculta nace oculta (la TV)', () => {
+    const fabricaTv: TarjetaLayout[] = [
+      { id: 'a', w: 3, h: 4 },
+      { id: 'b', w: 3, h: 4, oculta: true },
+    ]
+    /* El usuario ya tenía guardada solo `a`: `b` entra, pero apagada. */
+    const r = combinarTablero([{ id: 'a', w: 6, h: 4 }], fabricaTv)
+    expect(r).toEqual([{ id: 'a', w: 6, h: 4 }, { id: 'b', w: 3, h: 4, oculta: true }])
+  })
+
   it('el estado del turno cambia la fábrica sin perder lo personalizado', () => {
     /* La fábrica VIVA trae una tarjeta extra (pronóstico): el layout guardado
        en cerrado la recibe en su lugar de fábrica al pasar a vivo. */

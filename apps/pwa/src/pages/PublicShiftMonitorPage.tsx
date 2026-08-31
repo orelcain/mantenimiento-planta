@@ -76,7 +76,7 @@ import { notasPorCausa, notasDelTurno } from './monitor/notasOperador'
 import { VsAyerBloque } from './monitor/MonitorVsAyer'
 import { RepartoDuenoSemanal } from './monitor/RepartoDuenoSemanal'
 import { DUENO_UI } from './monitor/duenoUi'
-import { TarjetaTablero } from './monitor/Tablero'
+import { PanelTarjetas, TarjetaTablero } from './monitor/Tablero'
 import { useTablero, type TarjetaLayout } from './monitor/tableroLayout'
 import { duenoDe } from '@/services/shoplogix/monitorEventos'
 import { Pill } from '@/components/piel'
@@ -570,15 +570,26 @@ const FABRICA_TURNO_CERRADO: TarjetaLayout[] = [
   { id: 'rango', w: 3, h: 5 },
   { id: 'ayer', w: 3, h: 5 },
 ]
-/* La fábrica de la TV: el quinteto de sala. Alturas MÍNIMAS bajas a
-   propósito — el contenido empuja (filas minmax) y así el tablero mide lo
-   que el contenido real mida, como cuando el layout era fijo. */
+/* La fábrica de la TV: el quinteto de sala VISIBLE, y el resto del tablero
+   presente pero oculto — así desde «Personalizar» se puede agregar cualquiera
+   (pedido de Orel, 31-08: la TV solo dejaba mover las de fábrica). Una
+   tarjeta ausente de esta lista sería inalcanzable: `combinarTablero`
+   descarta los ids que la fábrica vigente no conoce.
+   Alturas MÍNIMAS bajas a propósito — el contenido empuja (filas minmax) y
+   así el tablero mide lo que el contenido real mida. */
 const FABRICA_TURNO_TV: TarjetaLayout[] = [
   { id: 'resultado', w: 3, h: 4 },
   { id: 'mantencion', w: 3, h: 4 },
   { id: 'ritmo', w: 3, h: 4 },
   { id: 'meta', w: 3, h: 4 },
   { id: 'minuto', w: 6, h: 4 },
+  { id: 'cascada', w: 3, h: 4, oculta: true },
+  { id: 'pronostico', w: 3, h: 4, oculta: true },
+  { id: 'velocidad', w: 3, h: 4, oculta: true },
+  { id: 'comparado', w: 3, h: 4, oculta: true },
+  { id: 'rango', w: 3, h: 4, oculta: true },
+  { id: 'tiempo', w: 3, h: 2, oculta: true },
+  { id: 'ayer', w: 3, h: 4, oculta: true },
 ]
 const FABRICA_TURNO_VIVO: TarjetaLayout[] = [
   { id: 'resultado', w: 3, h: 4 },
@@ -6012,10 +6023,11 @@ export function PublicShiftMonitorPage() {
             edita (el botón de entrada vive en la banda) para no gastar alto
             del presupuesto de 1080. */}
         {(!modoPantalla || tablero.editando) && (
+          <>
           <div className="hidden items-center justify-end gap-2 lg:flex">
             {tablero.editando && (
               <span className="mr-auto text-[12px] text-muted-foreground">
-                Arrastrá una tarjeta para moverla · estirá desde la esquina ◢ para el ancho y alto
+                Arrastrá para mover · estirá desde ◢ · ✕ quita la tarjeta
               </span>
             )}
             {/* La puerta al tablero de sala: mismo link, `?pantalla=1` y
@@ -6049,6 +6061,9 @@ export function PublicShiftMonitorPage() {
               {tablero.editando ? 'Listo' : 'Personalizar'}
             </button>
           </div>
+          {/* Las fichas de agregar/quitar: solo mientras se personaliza. */}
+          <PanelTarjetas t={tablero} />
+          </>
         )}
 
         {/*
@@ -6465,9 +6480,9 @@ export function PublicShiftMonitorPage() {
             {/* También con el turno CERRADO: ahí deja de ser distracción y pasa
                 a ser el informe — es donde el monitor demuestra qué le costó
                 las piezas a la línea (hallazgo del rediseño 26-08).
-                No es del trío de la TV: allá no se renderiza (antes rompía el
-                nth-child del modo pantalla cuando aparecía en vivo). */}
-            {cascada && !modoPantalla && (
+                En la TV nace OCULTA (fábrica de TV), no ausente: así se puede
+                agregar desde Personalizar cuando la sala la quiera ver. */}
+            {cascada && (
               <TarjetaTablero id="cascada" t={tablero}>
                 <CascadaTurnoCard cascada={cascada} />
               </TarjetaTablero>
@@ -6730,8 +6745,8 @@ export function PublicShiftMonitorPage() {
                   <ReglaDeRitmo {...reglaProps} parte="minuto" />
                 </TarjetaTablero>
               )}
-              {/* El rango habitual es análisis: no entra en la TV. */}
-              {(contexto || reglaProps.chispa) && !modoPantalla && (
+              {/* El rango habitual es análisis: en la TV nace oculto. */}
+              {(contexto || reglaProps.chispa) && (
                 <TarjetaTablero id="rango" t={tablero}>
                   <ReglaDeRitmo {...reglaProps} parte="rango" />
                 </TarjetaTablero>
@@ -6748,8 +6763,7 @@ export function PublicShiftMonitorPage() {
             disponibilidad —9,7 vs 9,7 el día que la línea fue la más rápida
             de los últimos 8 turnos— y queda como segunda línea, con su
             denominador escrito. */}
-        {!modoPantalla && (
-          <TarjetaTablero id="tiempo" t={tablero}>
+        <TarjetaTablero id="tiempo" t={tablero}>
           <Kpi
             label="Tiempo produciendo"
             /*
@@ -6786,13 +6800,12 @@ export function PublicShiftMonitorPage() {
             }
             sub="Disponible = el turno menos colación, reuniones y paradas programadas."
           />
-          </TarjetaTablero>
-        )}
+        </TarjetaTablero>
 
         {/* Adónde va a cerrar el turno, según lo que hicieron los anteriores
             desde esta misma altura. Solo en VIVO: pronosticar un turno
             terminado no es un dato, es ruido. */}
-        {!live.shiftClosed && !modoPantalla && (
+        {!live.shiftClosed && (
           <TarjetaTablero id="pronostico" t={tablero}>
             <PronosticoCierre
               f={pronostico}
@@ -6801,8 +6814,7 @@ export function PublicShiftMonitorPage() {
             />
           </TarjetaTablero>
         )}
-        {!modoPantalla && (
-          <TarjetaTablero id="velocidad" t={tablero}>
+        <TarjetaTablero id="velocidad" t={tablero}>
             {/* ⚠ UN solo gráfico de la serie de 5 min.
                 Había dos tarjetas —"Velocidad de la línea" y "Piezas por tramo"—
                 dibujando exactamente la misma serie, una en pz/min y otra en
@@ -6857,8 +6869,7 @@ export function PublicShiftMonitorPage() {
                 }
                 : undefined}
             />
-          </TarjetaTablero>
-        )}
+        </TarjetaTablero>
         {/* El gráfico ARRIBA del bloque de la meta era pedido de Orel (tocar
             una imputación salta al gráfico, hacia algo que ya pasaste): la
             fábrica los deja vecinos, y desde «Personalizar» cada aparato puede
@@ -6900,8 +6911,7 @@ export function PublicShiftMonitorPage() {
         {/* La curva contra los otros días, antes del «vs ayer» en fábrica
             (pedido de Orel): esta enseña el turno completo de un vistazo y la
             de ayer es el detalle numérico de UNA de esas curvas. */}
-        {!modoPantalla && (
-          <TarjetaTablero id="comparado" t={tablero}>
+        <TarjetaTablero id="comparado" t={tablero}>
             <ComparadorDias
               ventana={ventanaGrafica}
               onVentana={setVentanaGrafica}
@@ -6913,15 +6923,12 @@ export function PublicShiftMonitorPage() {
                  una mancha que promete lo que no puede. */
               cone={pronostico && pronostico.mapePct <= MAX_MAPE_PCT ? pronostico.cone : null}
             />
-          </TarjetaTablero>
-        )}
+        </TarjetaTablero>
         {/* Qué cambió contra ayer y cómo quedó contra los récords: el paso de
             "hoy pasó esto" a "esto vuelve todos los turnos". */}
-        {!modoPantalla && (
-          <TarjetaTablero id="ayer" t={tablero}>
-            <VsAyerBloque r={comparadoConAyer} records={recordsLinea} sinConvenio={sinConvenio} />
-          </TarjetaTablero>
-        )}
+        <TarjetaTablero id="ayer" t={tablero}>
+          <VsAyerBloque r={comparadoConAyer} records={recordsLinea} sinConvenio={sinConvenio} />
+        </TarjetaTablero>
         </div>
 
         {/*
