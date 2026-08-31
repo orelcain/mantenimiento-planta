@@ -670,6 +670,111 @@
 
 @layer utilities {
   /*
+   * ── MODO PANTALLA del monitor público (`?pantalla=1`) ─────────────────────
+   *
+   * La TV de la sala se mira a TRES METROS: ahí no se lee un pareto, una
+   * cascada ni la letra chica de una tarjeta. No es «el monitor ampliado» —
+   * medido en el mockup, ampliar la tarjeta entera la corta— sino la CABEZA de
+   * cada tarjeta, grande: cuántas van, el ritmo con su desglose por máquina y
+   * la tira del minuto. Todo lo demás se oculta; sigue estando en el teléfono
+   * y en el PC.
+   *
+   * Se activa por parámetro y nunca por ancho: quien lee el informe en un
+   * notebook de 1.400 px no quiere que se lo conviertan en cartel.
+   *
+   * ⚠ Va con `zoom`, no con `transform: scale`. Con scale el contenido conserva
+   * su ancho y queda una tarjeta de celular estirada con la mitad de la
+   * pantalla vacía; con zoom refluye al ancho real y los 465 minutos del turno
+   * ocupan la pantalla entera.
+   */
+  /*
+   * El tablero tiene que CABER sin scroll: nadie hace scroll en una TV. El
+   * contenido que queda mide ~980 px propios, así que el zoom se ata a la
+   * ALTURA de la pantalla — en un 1080p llena justo, y en un 4K de sala el
+   * mismo tablero se ve al doble sin tocar nada.
+   */
+  .modo-pantalla {
+    max-width: none;
+    padding: 1vw 1.4vw;
+    zoom: 1.05;
+  }
+  @media (min-height: 1000px) { .modo-pantalla { zoom: 1.1; } }
+  @media (min-height: 1300px) { .modo-pantalla { zoom: 1.32; } }
+  @media (min-height: 1700px) { .modo-pantalla { zoom: 1.72; } }
+  @media (min-height: 2000px) { .modo-pantalla { zoom: 2.05; } }
+  /* Del tablero queda solo el trío (resultado, Mantención, ritmo): las demás
+     tarjetas ni se renderizan en TV (gate !modoPantalla en el JSX) y esto es
+     el cinturón por si alguna se cuela. Los avisos y el pie tampoco van. */
+  .modo-pantalla > div:not(:first-of-type),
+  .modo-pantalla > p,
+  .modo-pantalla > footer { display: none; }
+  .modo-pantalla > div:first-of-type > *:nth-child(n+5) { display: none; }
+  /* El contenedor trae la grilla de 6 del tablero: acá mandan las 2 fijas. */
+  .modo-pantalla > div:first-of-type { grid-auto-rows: auto; grid-auto-flow: row; }
+  /* Y dentro de ella, fuera lo que no se lee de lejos. */
+  .modo-pantalla .pantalla-oculta { display: none; }
+  /*
+   * Lugar fijo, no reparto automático: el resultado y la respuesta de
+   * Mantención arriba lado a lado, y la tira del minuto cruzando abajo. Con
+   * columnas quedaba un hueco muerto bajo la tarjeta más corta.
+   */
+  .modo-pantalla > div:first-of-type {
+    columns: unset;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1vw;
+    align-items: start;
+  }
+  .modo-pantalla > div:first-of-type > * { margin-bottom: 0 !important; }
+  /* Las dos tarjetas de arriba, del mismo alto: con alturas dispares quedaba
+     un hueco muerto bajo la más corta. */
+  .modo-pantalla > div:first-of-type { align-items: stretch; }
+  /*
+   * La tarjeta del resultado es la más corta de la fila y se estira para
+   * emparejar con Mantención: medido, 216 de sus 470 px quedaban vacíos. En
+   * una TV el hueco no se llena con más bloques sino con más SEÑAL: las
+   * piezas son EL número del tablero, así que crece a cartel y el resto del
+   * contenido se reparte a lo alto de la tarjeta.
+   */
+  .modo-pantalla > div:first-of-type > *:first-child {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-evenly;
+  }
+  .modo-pantalla > div:first-of-type > *:first-child .text-5xl {
+    font-size: 110px;
+    letter-spacing: -0.02em;
+  }
+  /* La frase del resultado y las notas, a tamaño de lejos. */
+  .modo-pantalla > div:first-of-type > *:first-child p { font-size: 18px; line-height: 1.35; }
+
+  /*
+   * El cuarteto de la TV, tras partir el ritmo en tres tarjetas (30-08):
+   * nth 1-2 = resultado y Mantención lado a lado; nth 3 = el ESTADO del
+   * ritmo, cruzando y abierto en dos adentro (números a la izquierda, «cada
+   * máquina» a la derecha); nth 4 = la tira del minuto cruzando el pie. El
+   * rango habitual ni se renderiza en TV (era `pantalla-oculta`; hoy no se
+   * monta). Sin abrir el estado en dos, media pantalla quedaba vacía y las
+   * barras se salían de los 1.080 px — medido cuando era una sola tarjeta.
+   */
+  .modo-pantalla > div:first-of-type > *:nth-child(3) {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 2vw;
+    align-content: start;
+  }
+  .modo-pantalla > div:first-of-type > *:nth-child(3) > * { grid-column: 1; }
+  .modo-pantalla > div:first-of-type > *:nth-child(3) > .ritmo-maquinas {
+    grid-column: 2;
+    grid-row: 1 / span 9;
+    margin-top: 0;
+    border-top: 0;
+    padding-top: 0;
+  }
+  .modo-pantalla > div:first-of-type > *:nth-child(4) { grid-column: 1 / -1; }
+
+  /*
    * `tap-44` — área táctil de 44x44 sin tocar el tamaño visual (§3 de la
    * Constitución). Para controles chicos por diseño: chips de filtro, cabeceras
    * plegables, flechas de navegación.
