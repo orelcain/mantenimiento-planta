@@ -103,29 +103,50 @@ export function CargaTrabajo({
     return { ok: r.ok, motivo: r.motivo }
   }
 
+  /**
+   * Con las ruedas vacías, el veredicto salía verde: «todo cabe, quedan 202 h de
+   * holgura». Claro que cabe — contra máquinas sin horario todo cabe. Ausencia de
+   * datos no es holgura.
+   */
+  const sinDatos = maquinas.filter((m) => {
+    const vacia = m.semana.every((d) => !d || !d.areas.split('').some((c) => c !== '0'))
+    return vacia && m.revisadoEnTerreno !== true
+  })
+  const todasSinDatos = maquinas.length > 0 && sinDatos.length === maquinas.length
+
   return (
     <div className="flex flex-col gap-6">
       {/* ── Veredicto ────────────────────────────────────────────────────── */}
       <section
         className={cn(
           'flex flex-col gap-4 rounded-card border-l-[3px] bg-card p-4',
-          v.cabe ? 'border-l-cat-2-ink' : 'border-l-destructive',
+          todasSinDatos ? 'border-l-cat-4-ink' : v.cabe ? 'border-l-cat-2-ink' : 'border-l-destructive',
         )}
       >
         <div className="flex items-start gap-3">
-          {v.cabe ? (
+          {todasSinDatos ? (
+            <TriangleAlert className="mt-0.5 h-6 w-6 shrink-0 text-cat-4-ink" />
+          ) : v.cabe ? (
             <Check className="mt-0.5 h-6 w-6 shrink-0 text-cat-2-ink" />
           ) : (
             <TriangleAlert className="mt-0.5 h-6 w-6 shrink-0 text-destructive" />
           )}
           <div className="flex flex-col gap-1">
             <p className="text-title3 text-foreground">
-              {v.cabe
-                ? 'Todo el trabajo tiene hora'
-                : `${v.pedidas - v.ubicadas} de ${v.pedidas} ejecuciones se quedan sin hora`}
+              {todasSinDatos
+                ? 'Aún no hay horarios contra los que medir'
+                : v.cabe
+                  ? 'Todo el trabajo tiene hora'
+                  : `${v.pedidas - v.ubicadas} de ${v.pedidas} ejecuciones se quedan sin hora`}
             </p>
             <p className="text-body text-muted-foreground">
-              {v.cabe ? (
+              {todasSinDatos ? (
+                <>
+                  Ninguna máquina tiene su horario cargado: contra ruedas vacías todo cabe y la
+                  holgura es ausencia de datos, no tiempo real. Pinta o confirma los horarios en
+                  «Pintar el día» y este veredicto pasará a valer.
+                </>
+              ) : v.cabe ? (
                 <>
                   Las {v.pedidas} ejecuciones de la semana caben en las ventanas, sin pisar a
                   higiene. Quedan{' '}
@@ -146,6 +167,13 @@ export function CargaTrabajo({
           </div>
         </div>
 
+        {!todasSinDatos && sinDatos.length > 0 && (
+          <p className="text-caption text-cat-4-ink">
+            {sinDatos.length === 1
+              ? `${sinDatos[0]!.nombre} no tiene horario cargado y cuenta como siempre libre.`
+              : `${sinDatos.length} máquinas sin horario cargado cuentan como siempre libres.`}
+          </p>
+        )}
         <p className="text-caption text-muted-foreground">
           Las horas sueltas, como contexto: que alcancen no garantiza que quepan.
         </p>
