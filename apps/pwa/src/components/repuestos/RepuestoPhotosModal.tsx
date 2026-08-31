@@ -20,6 +20,7 @@ import { ConfirmUploadDialog } from '@/components/repuestos/ConfirmUploadDialog'
 import { uploadRepuestoFoto, deleteRepuestoFoto } from '@/services/storage'
 import { generateId } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
+import { useToast } from '@/hooks/useToast'
 
 interface RepuestoPhotosModalProps {
   open: boolean
@@ -74,6 +75,7 @@ export function RepuestoPhotosModal({
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const user = useAuthStore((s) => s.user)
+  const { toast } = useToast()
 
   // Archivos seleccionados pendientes de confirmación de destino (no subidos aún)
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
@@ -129,11 +131,19 @@ export function RepuestoPhotosModal({
         await onSaveFotos!(updated)
         setFotosReales(updated)
         clearPending()
+      } catch (error) {
+        // Sin esto el error muere mudo y el botón parece no hacer nada
+        // (caso real: storage/unauthorized por regla faltante).
+        toast({
+          title: 'No se pudieron subir las fotos',
+          description: error instanceof Error ? error.message : String(error),
+          variant: 'destructive',
+        })
       } finally {
         setUploading(false)
       }
     },
-    [pendingFiles, canEdit, user, fotosReales, machineId, repuestoId, onSaveFotos, clearPending],
+    [pendingFiles, canEdit, user, fotosReales, machineId, repuestoId, onSaveFotos, clearPending, toast],
   )
 
   // ── Delete ──
