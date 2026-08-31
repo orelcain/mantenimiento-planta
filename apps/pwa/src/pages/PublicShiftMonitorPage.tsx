@@ -5617,11 +5617,90 @@ export function PublicShiftMonitorPage() {
     ? (now - new Date(live.lastSyncAt).getTime()) / 1000 > 15 * 60
     : true
 
+  /*
+   * La cabecera, la navegación de turnos y las pestañas son UNA banda en PC
+   * (pedido de Orel, 30-08: tres franjas apiladas ocupaban ~250 px de alto
+   * con los costados vacíos) y siguen apiladas en el celular, donde no hay
+   * costado que aprovechar. Mismos controles definidos una vez, rendereados
+   * en el lugar que toque — las clases responsive deciden cuál se ve.
+   */
+  const botonTema = (
+    <button
+      onClick={toggleTheme}
+      className="tap-44 shrink-0 rounded-full border border-border bg-card p-1.5 text-muted-foreground transition-colors hover:text-foreground"
+      title={isDark ? 'Cambiar a vista clara' : 'Cambiar a vista oscura'}
+      aria-label={isDark ? 'Cambiar a vista clara' : 'Cambiar a vista oscura'}
+    >
+      {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+    </button>
+  )
+  /* Solo con historial: en una línea recién integrada las flechas nacen
+     muertas. En la TV tampoco: nadie navega turnos en una pantalla de sala. */
+  const navegacionTurnos = vistas.length > 1 && !modoPantalla ? (
+    <div className="flex w-full items-center justify-between gap-2 lg:w-auto lg:shrink-0 lg:justify-start">
+      <button
+        onClick={() => irA(1)}
+        disabled={idx >= vistas.length - 1}
+        className="tap-44 flex items-center gap-1 rounded-full border border-border bg-muted px-3 py-1.5 text-[12px] text-foreground/80 transition-colors enabled:hover:bg-muted disabled:opacity-30"
+      >
+        <ChevronLeft className="h-3.5 w-3.5" />
+        Anterior
+      </button>
+
+      <div className="flex items-center gap-2">
+        <span className="text-[11px] text-muted-foreground/80">
+          {esActual ? 'Turno actual' : `${idx} turno${idx > 1 ? 's' : ''} atrás`}
+        </span>
+        {/* Atajo al presente: con seis turnos de historial, volver de a uno
+            es tedioso. Solo aparece cuando de verdad hay camino que saltar. */}
+        {idx > 1 && (
+          <button
+            onClick={() => verIndice(0)}
+            className="tap-44 rounded-full bg-primary/[0.13] px-2 py-0.5 text-[11px] font-semibold text-foreground transition-opacity hover:opacity-80"
+          >
+            Ir al actual
+          </button>
+        )}
+      </div>
+
+      <button
+        onClick={() => irA(-1)}
+        disabled={esActual}
+        className="tap-44 flex items-center gap-1 rounded-full border border-border bg-muted px-3 py-1.5 text-[12px] text-foreground/80 transition-colors enabled:hover:bg-muted disabled:opacity-30"
+      >
+        Siguiente
+        <ChevronRight className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  ) : null
+  /* Las dos pestañas: el turno (se vigila) y el análisis (se estudia). */
+  const selectorPestana = !modoPantalla ? (
+    <div className="grid w-full grid-cols-2 gap-1 rounded-full border border-border bg-muted p-1 lg:w-64 lg:shrink-0">
+      {([['turno', 'El turno'], ['analisis', 'Análisis']] as const).map(([id, rotulo]) => (
+        <button
+          key={id}
+          onClick={() => verPestana(id)}
+          className={`tap-44 rounded-full py-1.5 text-[12.5px] transition-colors ${
+            pestana === id
+              ? 'bg-card font-semibold text-foreground'
+              : 'text-muted-foreground hover:text-foreground/80'
+          }`}
+        >
+          {rotulo}
+        </button>
+      ))}
+    </div>
+  ) : null
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Cabecera: qué línea, qué turno, qué día, desde qué hora */}
       <header className="sticky top-0 z-10 border-b border-border bg-background/90 backdrop-blur">
-        <div className="mx-auto max-w-3xl px-4 py-3">
+        {/* En PC la banda es UNA: título+detalle a la izquierda, navegación y
+            pestañas al centro-derecha, el tema al final. En el celular solo
+            vive acá el título; navegación y pestañas se apilan debajo. */}
+        <div className="mx-auto max-w-3xl px-4 py-3 lg:flex lg:max-w-none lg:items-center lg:gap-4 lg:px-6 lg:py-2 xl:gap-6">
+          <div className="lg:min-w-0 lg:flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <h1 className="text-base font-semibold leading-tight">{lineTitle}</h1>
             {/* Con el turno CERRADO no se anuncia el estado en vivo: «Detenida»
@@ -5637,14 +5716,8 @@ export function PublicShiftMonitorPage() {
                 Turno terminado{live.effectiveEnd ? ` ${fmtWallTime(live.effectiveEnd)}` : ''}
               </Pill>
             )}
-          <button
-            onClick={toggleTheme}
-            className="tap-44 ml-auto shrink-0 rounded-full border border-border bg-card p-1.5 text-muted-foreground transition-colors hover:text-foreground"
-            title={isDark ? 'Cambiar a vista clara' : 'Cambiar a vista oscura'}
-            aria-label={isDark ? 'Cambiar a vista clara' : 'Cambiar a vista oscura'}
-          >
-            {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </button>
+          {/* En PC el tema va al final de la banda, no en medio del título. */}
+          <span className="ml-auto inline-flex lg:hidden">{botonTema}</span>
           </div>
 
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[13px] text-muted-foreground">
@@ -5733,74 +5806,24 @@ export function PublicShiftMonitorPage() {
               </>
             )}
           </div>
+          </div>
+
+          {/* El resto de la banda, solo en PC. */}
+          {navegacionTurnos && <div className="hidden lg:block">{navegacionTurnos}</div>}
+          {selectorPestana && <div className="hidden lg:block">{selectorPestana}</div>}
+          <span className="hidden lg:inline-flex">{botonTema}</span>
         </div>
       </header>
 
-      {/* Navegación entre turnos. Solo aparece cuando hay historial: en una
-          línea recién integrada no tiene sentido mostrar flechas muertas.
-          En la TV tampoco: nadie navega turnos en una pantalla de sala, y son
-          44 px de alto que le faltan al tablero. */}
-      {vistas.length > 1 && !modoPantalla && (
-        <div className="mx-auto flex max-w-3xl items-center justify-between gap-2 px-4 pt-3">
-          <button
-            onClick={() => irA(1)}
-            disabled={idx >= vistas.length - 1}
-            className="tap-44 flex items-center gap-1 rounded-full border border-border bg-muted px-3 py-1.5 text-[12px] text-foreground/80 transition-colors enabled:hover:bg-muted disabled:opacity-30"
-          >
-            <ChevronLeft className="h-3.5 w-3.5" />
-            Anterior
-          </button>
-
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] text-muted-foreground/80">
-              {esActual ? 'Turno actual' : `${idx} turno${idx > 1 ? 's' : ''} atrás`}
-            </span>
-            {/* Atajo al presente: con seis turnos de historial, volver de a uno
-                es tedioso. Solo aparece cuando de verdad hay camino que saltar. */}
-            {idx > 1 && (
-              <button
-                onClick={() => verIndice(0)}
-                className="tap-44 rounded-full bg-primary/[0.13] px-2 py-0.5 text-[11px] font-semibold text-foreground transition-opacity hover:opacity-80"
-              >
-                Ir al actual
-              </button>
-            )}
-          </div>
-
-          <button
-            onClick={() => irA(-1)}
-            disabled={esActual}
-            className="tap-44 flex items-center gap-1 rounded-full border border-border bg-muted px-3 py-1.5 text-[12px] text-foreground/80 transition-colors enabled:hover:bg-muted disabled:opacity-30"
-          >
-            Siguiente
-            <ChevronRight className="h-3.5 w-3.5" />
-          </button>
-        </div>
+      {/* En el celular, navegación y pestañas se apilan bajo la cabecera,
+          fuera de lo sticky: pegadas arriba se comerían media pantalla de
+          scroll. El análisis dejó de compartir scroll con lo vivo — quien
+          entra por el QR viene a ver cómo va el turno. */}
+      {navegacionTurnos && (
+        <div className="mx-auto max-w-3xl px-4 pt-3 lg:hidden">{navegacionTurnos}</div>
       )}
-
-      {/* Las dos pestañas: el turno (se vigila) y el análisis (se estudia).
-          El análisis dejó de compartir scroll con lo vivo — en el celular eran
-          dos pantallas de pareto y reparto ANTES del pie, y quien entra por el
-          QR viene a ver cómo va el turno. En la TV no se muestra: allá no hay
-          quién toque. */}
-      {!modoPantalla && (
-        <div className="mx-auto max-w-3xl px-4 pt-3">
-          <div className="grid grid-cols-2 gap-1 rounded-full border border-border bg-muted p-1">
-            {([['turno', 'El turno'], ['analisis', 'Análisis']] as const).map(([id, rotulo]) => (
-              <button
-                key={id}
-                onClick={() => verPestana(id)}
-                className={`tap-44 rounded-full py-1.5 text-[12.5px] transition-colors ${
-                  pestana === id
-                    ? 'bg-card font-semibold text-foreground'
-                    : 'text-muted-foreground hover:text-foreground/80'
-                }`}
-              >
-                {rotulo}
-              </button>
-            ))}
-          </div>
-        </div>
+      {selectorPestana && (
+        <div className="mx-auto max-w-3xl px-4 pt-3 lg:hidden">{selectorPestana}</div>
       )}
 
       {/*
