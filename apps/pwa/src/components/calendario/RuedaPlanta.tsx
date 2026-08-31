@@ -108,6 +108,17 @@ export interface RuedaPlantaProps {
 }
 
 export function RuedaPlanta({ maquinas, diaIdx, maquinaActivaId, onSeleccionar }: RuedaPlantaProps) {
+  /**
+   * Una máquina sin ningún tramo pintado y sin confirmar no está «libre»: está
+   * SIN DATOS. Sumarla como libre convertía la rueda vacía en «la planta entera
+   * queda libre 24 h», que es mentira.
+   */
+  const sinDatos = maquinas.filter((m) => {
+    const d = m.semana[diaIdx]
+    const vacia = !d || !d.areas.split('').some((c) => c !== '0')
+    return vacia && m.revisadoEnTerreno !== true
+  })
+  const todasSinDatos = maquinas.length > 0 && sinDatos.length === maquinas.length
   const [encima, setEncima] = useState<string | null>(null)
   const svgRef = useRef<SVGSVGElement | null>(null)
   const [exportando, setExportando] = useState(false)
@@ -333,20 +344,36 @@ export function RuedaPlanta({ maquinas, diaIdx, maquinaActivaId, onSeleccionar }
               {errorExport}
             </p>
           )}
-          <p className="text-body text-foreground">
-            {totalPleno > 0 && mejor ? (
-              <>
-                La planta entera queda libre{' '}
-                <span className="font-mono font-semibold tabular-nums">
-                  {slotsAHorasMinutos(totalPleno)}
-                </span>
-                . La mejor ventana empieza a las{' '}
-                <span className="font-mono font-semibold tabular-nums">{slotAHora(mejor.inicio)}</span>.
-              </>
-            ) : (
-              <>No hay ningún tramo con todas las máquinas libres a la vez este día.</>
-            )}
-          </p>
+          {todasSinDatos ? (
+            <p className="rounded-ctl bg-cat-4-tint/15 px-3 py-2 text-body text-cat-4-ink">
+              Ninguna máquina tiene su horario cargado todavía. Las {slotsAHorasMinutos(totalPleno)} que
+              se ven libres son ausencia de datos, no tiempo disponible: pinta o confirma los horarios primero.
+            </p>
+          ) : (
+            <>
+              {sinDatos.length > 0 && (
+                <p className="text-footnote text-cat-4-ink">
+                  {sinDatos.length === 1
+                    ? `${sinDatos[0]!.nombre} no tiene horario cargado y cuenta como libre.`
+                    : `${sinDatos.length} máquinas sin horario cargado cuentan como libres.`}
+                </p>
+              )}
+              <p className="text-body text-foreground">
+                {totalPleno > 0 && mejor ? (
+                  <>
+                    La planta entera queda libre{' '}
+                    <span className="font-mono font-semibold tabular-nums">
+                      {slotsAHorasMinutos(totalPleno)}
+                    </span>
+                    . La mejor ventana empieza a las{' '}
+                    <span className="font-mono font-semibold tabular-nums">{slotAHora(mejor.inicio)}</span>.
+                  </>
+                ) : (
+                  <>No hay ningún tramo con todas las máquinas libres a la vez este día.</>
+                )}
+              </p>
+            </>
+          )}
 
           <ul className="flex flex-col gap-1.5">
             {anillos.map(({ maquina, indice }) => {
