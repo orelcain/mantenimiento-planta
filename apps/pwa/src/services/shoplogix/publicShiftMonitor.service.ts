@@ -346,6 +346,18 @@ export interface PublicShiftMonitorDoc {
    * formato que `live`. Ausente en docs creados antes de esta función.
    */
   history?: Array<{ shiftDocId: string; dateKey: string; shiftId: string; live: PublicMonitorLive }>
+  /**
+   * Las series minuto a minuto ARCHIVADAS de los últimos turnos (mismo formato
+   * que `pulse.serieMinuto`, más el turno dueño): Shoplogix solo entrega los
+   * buckets de 1 min en una ventana de ~12 h, y sin este archivo los turnos
+   * viejos caían a las curvas de 5 min. Las guarda `archivarSerieMinuto` en
+   * cada refresh de modo línea. Ausente en docs anteriores a la función.
+   */
+  seriesMinuto?: Array<{
+    shiftDocId: string
+    desde: string
+    maquinas: Array<{ id: string; esperado: number | null; cycles: number[] }>
+  }>
   /** Turnos del MISMO nombre, resumidos, para el pronóstico del cierre. */
   forecastHistory?: ForecastHistoryShift[]
   /**

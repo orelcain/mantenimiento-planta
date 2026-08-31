@@ -2031,6 +2031,65 @@ async function buildForecastHistory(db, plantSlug, currentShiftDocId, shiftId, p
   return out
 }
 
+/** Máximo de series archivadas (≈5-10 KB cada una): las mismas ~6 del historial. */
+const SERIES_ARCHIVO_MAX = 6
+
+/**
+ * Archiva la serie minuto a minuto del turno que el pulso venía midiendo.
+ *
+ * POR QUÉ: Shoplogix solo entrega los buckets de 1 min en una ventana de ~12 h,
+ * así que al navegar a un turno viejo el monitor caía a las curvas de 5 min
+ * («¿es un bug?» — Orel, 30-08, mirando el turno del jueves). Guardando la
+ * serie al refrescar, el historial conserva las barras para siempre.
+ *
+ * Se llama en CADA refresh de modo línea: mientras el turno corre la entrada
+ * se va actualizando (la última, ya cerrado, cubre el turno completo), y al
+ * rotar al turno siguiente la entrada del viejo queda sellada. Solo protege
+ * turnos desde hoy — los que ya salieron de la ventana de 12 h no se pueden
+ * reconstruir.
+ *
+ * @param {object} monitor doc ANTERIOR del monitor (pulse + shiftDocId + live
+ *   describen al turno que se venía midiendo).
+ * @returns {Array<object>|null} lista nueva de `seriesMinuto`, o null si no
+ *   hay nada que archivar (sin serie, serie parcial, o ventana ilegible).
+ */
+function archivarSerieMinuto(monitor) {
+  const prevId = monitor?.shiftDocId
+  const serie = monitor?.pulse?.serieMinuto
+  const liveAnterior = monitor?.live
+  if (!prevId || !serie?.maquinas?.length || !liveAnterior) return null
+
+  const t0 = Date.parse(serie.desde)
+  const ini = Date.parse(liveAnterior.effectiveStart ?? liveAnterior.scheduledStart ?? '')
+  if (!Number.isFinite(t0) || !Number.isFinite(ini)) return null
+  /* Serie PARCIAL (el turno empezó antes de la ventana de 12 h): no se
+     archiva — unas barras que arrancan a mitad del turno se leen como si el
+     turno hubiera arrancado ahí. Mejor las curvas de siempre. */
+  if (t0 > ini + 15 * 60_000) return null
+
+  const finTurno = Date.parse(
+    liveAnterior.effectiveEnd ?? liveAnterior.plannedEnd ?? liveAnterior.scheduledEnd ?? '',
+  )
+  const largo = Math.min(...serie.maquinas.map(m => (m.cycles || []).length))
+  const desdeIdx = Math.max(0, Math.round((ini - t0) / 60_000))
+  /* Recorte con 30 min de gracia tras el fin (la hora extra existe); sin fin
+     legible, todo lo que haya. */
+  const hastaIdx = Number.isFinite(finTurno)
+    ? Math.min(largo, Math.max(desdeIdx + 2, Math.round((finTurno + 30 * 60_000 - t0) / 60_000)))
+    : largo
+  if (hastaIdx - desdeIdx < 2) return null
+
+  const entrada = {
+    shiftDocId: prevId,
+    desde: new Date(t0 + desdeIdx * 60_000).toISOString(),
+    /* `...m` a propósito: conserva id/esperado/lo que el pulso publique, solo
+       recorta los ciclos a la ventana del turno. */
+    maquinas: serie.maquinas.map(m => ({ ...m, cycles: (m.cycles || []).slice(desdeIdx, hastaIdx) })),
+  }
+  const resto = (monitor.seriesMinuto || []).filter(e => e && e.shiftDocId !== prevId)
+  return [entrada, ...resto].slice(0, SERIES_ARCHIVO_MAX)
+}
+
 /**
  * Refresca un monitor. En modo `line` además re-resuelve qué turno está
  * vigente, así que devuelve también los campos de identidad del turno para que
@@ -2080,9 +2139,15 @@ async function buildMonitorPatch(db, monitor, currentShiftDocIdByPlant = new Map
   const fhLinea = await buildForecastHistory(
     db, plantSlug, shiftDocId, shiftDocId.slice(11), monitor.forecastHistory, history,
   )
+  /* El archivo de barras del turno que se venía midiendo (ver
+     `archivarSerieMinuto`). Solo modo línea: en un link de turno fijo el pulso
+     mide al turno VIGENTE de la planta, no al fijo, y archivarle esa serie le
+     colgaría barras de otro turno. */
+  const seriesMinuto = archivarSerieMinuto(monitor)
   return {
     live,
     history,
+    ...(seriesMinuto ? { seriesMinuto } : {}),
     /* Turnos del mismo nombre: es lo que hace posible pronosticar en las
        líneas con varios turnos por día. */
     forecastHistory: fhLinea,
@@ -2230,6 +2295,7 @@ module.exports = {
   buildShiftStats,
   inferShiftEndFromDuration,
   buildMonitorPatch,
+  archivarSerieMinuto,
   resolveCurrentShiftDocId,
   ensureLineMonitor,
   // Lo usa también el brief de fin de turno (checkShiftEndBriefs): la cola de
