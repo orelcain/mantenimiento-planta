@@ -29,8 +29,25 @@ describe('numeroDeTurno', () => {
     expect(numeroDeTurno('Turno 1 Lunes')).not.toBe(numeroDeTurno('Turno 2'))
   })
 
-  it('sin número reconocible cae al nombre completo, no a otro turno', () => {
+  it('los turnos con nombre agrupan por PALABRA — el caso real de Filete', () => {
+    /* Nombres medidos en el espejo: «Turno Dia» ×23, «Turno Noche» ×10 y
+       «Turno Noche L» ×2. Sin esto, el turno noche de un lunes se comparaba
+       solo contra los otros dos lunes y dejaba fuera diez turnos noche. */
+    expect(numeroDeTurno('Turno Noche L')).toBe('turno noche')
+    expect(numeroDeTurno('Turno Noche')).toBe('turno noche')
     expect(numeroDeTurno('Turno Dia')).toBe('turno dia')
+    expect(numeroDeTurno('Turno Día')).toBe('turno dia')
+    // Requisito de Orel: noche con noche, día con día. Nunca cruzados.
+    expect(numeroDeTurno('Turno Noche L')).not.toBe(numeroDeTurno('Turno Dia'))
+  })
+
+  it('el número manda sobre la palabra, y una palabra adentro de otra no cuenta', () => {
+    expect(numeroDeTurno('Turno 1 Noche')).toBe('turno 1')
+    expect(numeroDeTurno('Turno Mediodia')).toBe('turno mediodia')
+  })
+
+  it('sin número ni palabra cae al nombre completo, no a otro turno', () => {
+    expect(numeroDeTurno('Extraordinario')).toBe('extraordinario')
     expect(numeroDeTurno('')).toBeNull()
     expect(numeroDeTurno(null)).toBeNull()
   })

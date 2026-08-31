@@ -88,7 +88,85 @@ function lecturaDesdeProduccion(data) {
     id: f.id,
     bucket: f.buckets.find((b) => b.start === minutoComun) ?? null,
   }))
-  const turno = delMinuto.find((x) => x.bucket)?.bucket?.shift ?? null
+
+  /*
+   * ⚠⚠ `Unscheduled` NUNCA es el turno vigente: es el cajón donde Shoplogix
+   * manda lo producido fuera del horario declarado. La regla del proyecto es
+   * atribuirlo AL TURNO, no dejarlo suelto.
+   *
+   * Tomar el turno del último minuto —sin más— rompía justo eso: el 31-08, con
+   * el Turno 1 de Chonchi en HORA EXTRA pasadas las 07:15, ese minuto ya venía
+   * etiquetado `Unscheduled`, así que el acumulado se filtraba por él y el
+   * número grande del monitor se desplomó de 13.226 pz a 508 (las de la hora
+   * extra), arrastrando la barra de meta a «faltan 14.492». El resto de la
+   * pantalla —que sí atribuye el Unscheduled al turno— seguía en 13.226, y la
+   * misma pantalla mostraba dos verdades distintas.
+   *
+   * Así que el turno es el último shift REAL que aparezca en los buckets, y sus
+   * minutos de hora extra se suman al turno (ver `bucketsDelTurno`).
+   */
+  const esNoProgramado = (s) => s == null || /unscheduled/i.test(String(s))
+  /* `parseShoplogixTime` LANZA con un formato raro. Acá el timestamp solo sirve
+     para ordenar y deduplicar: un bucket ilegible se ignora, nunca tumba la
+     lectura entera del pulso. */
+  const msDe = (b) => {
+    try { return parseShoplogixTime(b.start).getTime() } catch { return null }
+  }
+  const turno = (() => {
+    const delComun = delMinuto.find((x) => x.bucket)?.bucket?.shift ?? null
+    if (!esNoProgramado(delComun)) return delComun
+    /* El minuto común cayó fuera de horario: el turno es el último con nombre
+       propio que haya en la ventana (~12 h), no el cajón. */
+    let mejor = null
+    for (const f of filas) {
+      for (const b of f.buckets) {
+        if (esNoProgramado(b.shift)) continue
+        const ms = msDe(b)
+        if (ms == null) continue
+        if (!mejor || ms > mejor.ms) mejor = { ms, shift: b.shift }
+      }
+    }
+    return mejor?.shift ?? null
+  })()
+
+  /* El primer minuto del turno: los buckets `Unscheduled` ANTERIORES son de
+     otro turno (la ventana trae ~12 h) y no se atribuyen a este. */
+  const inicioTurnoMs = (() => {
+    if (turno == null) return null
+    let min = null
+    for (const f of filas) {
+      for (const b of f.buckets) {
+        if (b.shift !== turno) continue
+        const ms = msDe(b)
+        if (ms != null && (min == null || ms < min)) min = ms
+      }
+    }
+    return min
+  })()
+
+  /**
+   * Los buckets que le corresponden a este turno: los suyos MÁS los del cajón
+   * `Unscheduled` que caen dentro o después de su arranque (la hora extra).
+   *
+   * ⚠ Dedupe por minuto y el propio manda: Shoplogix repite los minutos del
+   * borde en los dos buckets, y sumarlos contaría esas piezas dos veces — el
+   * mismo gotcha que ya está resuelto del lado del doc del turno.
+   */
+  const bucketsDelTurno = (f) => {
+    if (turno == null) return f.buckets
+    const porMinuto = new Map()
+    for (const b of f.buckets) {
+      const propio = b.shift === turno
+      const ms = msDe(b)
+      const extra = esNoProgramado(b.shift) && ms != null
+        && inicioTurnoMs != null && ms >= inicioTurnoMs
+      if (!propio && !extra) continue
+      if (ms == null) continue
+      if (porMinuto.has(ms) && !propio) continue
+      porMinuto.set(ms, b)
+    }
+    return [...porMinuto.values()]
+  }
 
   const cpm = delMinuto.reduce((a, x) => a + (x.bucket?.cycles ?? 0), 0)
   const esperadoCpm = delMinuto.reduce((a, x) => a + (x.bucket?.expectedCycles ?? 0), 0)
@@ -101,9 +179,7 @@ function lecturaDesdeProduccion(data) {
   let totalCycles = 0
   const porMaquina = {}
   for (const f of filas) {
-    const suyo = f.buckets
-      .filter((b) => (turno == null || b.shift === turno))
-      .reduce((a, b) => a + (b.cycles || 0), 0)
+    const suyo = bucketsDelTurno(f).reduce((a, b) => a + (b.cycles || 0), 0)
     porMaquina[f.id] = suyo
     totalCycles += suyo
   }
@@ -119,8 +195,10 @@ function lecturaDesdeProduccion(data) {
     const porId = new Map()
     for (const f of filas) {
       const mapa = new Map()
-      for (const b of f.buckets) {
-        if (turno != null && b.shift !== turno) continue
+      /* La misma atribución que el acumulado: si las barras se quedaran solo
+         con los buckets del turno, el gráfico se cortaría en seco al empezar
+         la hora extra mientras el número grande sigue subiendo. */
+      for (const b of bucketsDelTurno(f)) {
         if (!cerrado(b)) continue
         const ms = parseShoplogixTime(b.start).getTime()
         if (ms > comunMs) continue
