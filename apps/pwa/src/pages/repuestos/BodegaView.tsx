@@ -1711,7 +1711,7 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
               {addPhoto && (
                 <label className="flex items-center gap-1 text-caption text-primary cursor-pointer hover:underline">
                   <Camera className="h-3 w-3" /> Agregar
-                  <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoUpload} disabled={uploading} />
+                  <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} disabled={uploading} />
                 </label>
               )}
             </div>
