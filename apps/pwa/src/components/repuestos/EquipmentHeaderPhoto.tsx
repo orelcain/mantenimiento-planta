@@ -67,7 +67,7 @@ export function EquipmentHeaderPhoto({ equipmentId }: { equipmentId: string }) {
             <Camera className="h-5 w-5 text-muted-foreground/40 transition-colors hover:text-primary/60" />
           )}
           {!uploading && (
-            <input type="file" accept="image/*" capture="environment" className="hidden"
+            <input type="file" accept="image/*" className="hidden"
               onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUpload(f); e.target.value = '' }} />
           )}
         </label>
@@ -118,7 +118,7 @@ export function EquipmentHeaderPhoto({ equipmentId }: { equipmentId: string }) {
               {isAdmin && (
                 <label className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-card border-2 border-dashed border-white/20 transition-colors hover:border-white/40">
                   <Plus className="h-4 w-4 text-white/40" />
-                  <input type="file" accept="image/*" capture="environment" className="hidden"
+                  <input type="file" accept="image/*" className="hidden"
                     onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUpload(f); e.target.value = '' }} />
                 </label>
               )}
