@@ -6610,7 +6610,14 @@ export function PublicShiftMonitorPage() {
                * traer minutos anteriores al turno.
                */
               barras: (() => {
-                const s = data.pulse?.serieMinuto
+                /* Mirando un turno VIEJO, la serie sale del ARCHIVO (el pulso
+                   solo trae la del turno vigente — Shoplogix la entrega en una
+                   ventana de ~12 h). Turnos anteriores al archivador o cuya
+                   serie nació parcial no tienen entrada: curvas de 5 min. */
+                const s = esActual
+                  ? (data.pulse?.serieMinuto
+                    ?? data.seriesMinuto?.find((e) => e.shiftDocId === vista?.shiftDocId))
+                  : data.seriesMinuto?.find((e) => e.shiftDocId === vista?.shiftDocId)
                 if (!s?.maquinas?.length) return null
                 const t0 = Date.parse(s.desde)
                 const largo = Math.min(...s.maquinas.map((m) => m.cycles.length))
