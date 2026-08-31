@@ -570,6 +570,16 @@ const FABRICA_TURNO_CERRADO: TarjetaLayout[] = [
   { id: 'rango', w: 3, h: 5 },
   { id: 'ayer', w: 3, h: 5 },
 ]
+/* La fábrica de la TV: el quinteto de sala. Alturas MÍNIMAS bajas a
+   propósito — el contenido empuja (filas minmax) y así el tablero mide lo
+   que el contenido real mida, como cuando el layout era fijo. */
+const FABRICA_TURNO_TV: TarjetaLayout[] = [
+  { id: 'resultado', w: 3, h: 4 },
+  { id: 'mantencion', w: 3, h: 4 },
+  { id: 'ritmo', w: 3, h: 4 },
+  { id: 'meta', w: 3, h: 4 },
+  { id: 'minuto', w: 6, h: 4 },
+]
 const FABRICA_TURNO_VIVO: TarjetaLayout[] = [
   { id: 'resultado', w: 3, h: 4 },
   { id: 'cascada', w: 3, h: 6 },
@@ -4382,7 +4392,13 @@ export function PublicShiftMonitorPage() {
   }
   useEffect(() => {
     if (!modoPantalla) return
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') salirModoTv() }
+    const h = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      /* Editando, Escape cierra la edición; recién el próximo Escape sale
+         del modo TV. Salir del modo a mitad de un arrastre sería brutal. */
+      if (tablero.editando) tablero.setEditando(false)
+      else salirModoTv()
+    }
     window.addEventListener('keydown', h)
     return () => window.removeEventListener('keydown', h)
     /* salirModoTv se recrea por render; re-suscribir es barato y evita el
@@ -4526,11 +4542,13 @@ export function PublicShiftMonitorPage() {
   const turnoCerrado = Boolean(live?.shiftClosed) || !esActual
 
   /* El tablero personalizable de la pestaña «El turno»: orden y tamaño de
-     cada tarjeta, guardados POR APARATO y POR PLANTA. En la TV no corre. */
+     cada tarjeta, guardados POR APARATO y POR PLANTA. La TV también se edita
+     (pedido de Orel, 30-08) pero con MEMORIA PROPIA: acomodar el tablero de
+     la sala no puede desarmar el del PC de la oficina, ni al revés. */
   const tablero = useTablero(
-    `monitor-tablero:${data?.plantSlug ?? token ?? 'linea'}`,
-    turnoCerrado ? FABRICA_TURNO_CERRADO : FABRICA_TURNO_VIVO,
-    !modoPantalla,
+    `monitor-tablero${modoPantalla ? '-tv' : ''}:${data?.plantSlug ?? token ?? 'linea'}`,
+    modoPantalla ? FABRICA_TURNO_TV : turnoCerrado ? FABRICA_TURNO_CERRADO : FABRICA_TURNO_VIVO,
+    true,
   )
 
   /* Supervisor logueado mirando el monitor: puede editar el set point inline
@@ -5867,6 +5885,17 @@ export function PublicShiftMonitorPage() {
               sale. */}
           {modoPantalla && (
             <>
+              {/* La TV también se edita: el botón vive acá y no en la fila
+                  (que solo aparece mientras se edita, para no gastar alto del
+                  presupuesto de 1080). Se sale con «Listo» en la fila. */}
+              {!tablero.editando && (
+                <button
+                  onClick={() => tablero.setEditando(true)}
+                  className="tap-44 hidden shrink-0 rounded-full border border-border bg-muted px-3 py-1.5 text-[12px] text-muted-foreground transition-colors hover:text-foreground lg:inline-flex"
+                >
+                  Personalizar
+                </button>
+              )}
               <button
                 onClick={alternarPantallaCompleta}
                 className="tap-44 hidden shrink-0 rounded-full border border-border bg-muted px-3 py-1.5 text-[12px] text-muted-foreground transition-colors hover:text-foreground lg:inline-flex"
@@ -5945,8 +5974,11 @@ export function PublicShiftMonitorPage() {
         {/* Personalizar: abierto a cualquiera con el link (decisión de Orel,
             30-08) — cada aparato guarda SU orden, el link sigue mostrando el
             de fábrica a quien nunca toca nada. Solo en pantallas anchas:
-            arrastrar y estirar son gestos de mouse. */}
-        {!modoPantalla && (
+            arrastrar y estirar son gestos de mouse. TAMBIÉN en modo TV, que
+            tiene su tablero propio — allá esta fila solo aparece mientras se
+            edita (el botón de entrada vive en la banda) para no gastar alto
+            del presupuesto de 1080. */}
+        {(!modoPantalla || tablero.editando) && (
           <div className="hidden items-center justify-end gap-2 lg:flex">
             {tablero.editando && (
               <span className="mr-auto text-[12px] text-muted-foreground">
@@ -5956,7 +5988,7 @@ export function PublicShiftMonitorPage() {
             {/* La puerta al tablero de sala: mismo link, `?pantalla=1` y
                 pantalla completa. Solo con las manos quietas (fuera de
                 Personalizar), para no mezclar dos modos de edición. */}
-            {!tablero.editando && (
+            {!tablero.editando && !modoPantalla && (
               <button
                 onClick={entrarModoTv}
                 className="tap-44 flex items-center gap-1.5 rounded-full border border-border bg-muted px-3 py-1.5 text-[12px] text-foreground/80 transition-colors hover:bg-muted"
@@ -6000,7 +6032,7 @@ export function PublicShiftMonitorPage() {
          * mismas cuatro tarjetas con props idénticos solo para cambiar el
          * orden — ahora el orden es dato, no estructura.
          */}
-        <div className="flex flex-col gap-3 lg:grid lg:[grid-template-columns:repeat(6,minmax(0,1fr))] lg:[grid-auto-rows:minmax(56px,auto)] lg:[grid-auto-flow:dense] lg:items-stretch">
+        <div className="tablero-turno flex flex-col gap-3 lg:grid lg:[grid-template-columns:repeat(6,minmax(0,1fr))] lg:[grid-auto-rows:minmax(56px,auto)] lg:[grid-auto-flow:dense] lg:items-stretch">
         {/* Piezas acumuladas — el número que vienen a ver */}
         <TarjetaTablero id="resultado" t={tablero}>
         <section className="rounded-2xl border border-border bg-gradient-to-b from-primary/[0.08] to-transparent px-4 py-4">
@@ -6864,7 +6896,7 @@ export function PublicShiftMonitorPage() {
             monitor no puede existir y eso es CORRECTO — pero se dice, con el
             plan de cuándo aparece cada cosa, en vez de dejar huecos mudos. */}
         {resumenesAnteriores.length === 0 && live.totalPieces > 0 && (
-          <div className="rounded-xl border border-dashed border-border px-3 py-2.5 text-[11.5px] leading-snug text-muted-foreground">
+          <div className="pantalla-oculta rounded-xl border border-dashed border-border px-3 py-2.5 text-[11.5px] leading-snug text-muted-foreground">
             <span className="font-semibold text-amber-700 dark:text-amber-400">
               ◔ Turno sin historia todavía
             </span>{' '}
