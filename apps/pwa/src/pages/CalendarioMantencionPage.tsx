@@ -315,6 +315,13 @@ function startOfISOWeek(date: Date): Date {
   return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
 }
 
+/** Días que tiene el mes "AAAA-MM"; sirve para saber si la planilla lo cubre entero. */
+function diasDelMes(clave: string): number {
+  const [a, m] = clave.split('-').map(Number)
+  if (!a || !m) return 31
+  return new Date(a, m, 0).getDate()
+}
+
 function monthKey(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
 }
@@ -1509,9 +1516,16 @@ export function CalendarioMantencionPage() {
       : (hoursConfig.expectedFromPlannedDays
         ? Math.max(0, weekExpectedDays * legalDailyTarget)
         : Math.max(0, expectedWeekBase * (weekDays.length / 7)))
-    const monthExpectedAdjusted = hoursConfig.expectedFromPlannedDays
-      ? Math.max(0, monthExpectedDays * legalDailyTarget)
-      : Math.max(0, expectedMonthAutoBase)
+    // Mismo criterio que la semana, por la misma razón: con el mes completo en la
+    // planilla el tope es el legal prorrateado (42 h x días/7), no 7 h por día
+    // trabajado. Con el prorrateo por días, quien trabajaba MENOS aparecía «más
+    // sobre» el tope, y el mes contradecía a la semana para el mismo técnico.
+    const mesCompleto = monthCalendarDays >= diasDelMes(selectedMonth)
+    const monthExpectedAdjusted = mesCompleto
+      ? Math.max(0, expectedMonthAutoBase)
+      : (hoursConfig.expectedFromPlannedDays
+        ? Math.max(0, monthExpectedDays * legalDailyTarget)
+        : Math.max(0, expectedMonthAutoBase))
 
     const weekFreeDays = Math.max(0, weekDays.length - weekWorkedDays - weekVacationDays - weekHolidayDays)
     const monthFreeDays = Math.max(0, monthDays.length - monthWorkedDays - monthVacationDays - monthHolidayDays)
@@ -1529,6 +1543,7 @@ export function CalendarioMantencionPage() {
       monthWorkedHours,
       weekExpected: weekExpectedAdjusted,
       monthExpected: monthExpectedAdjusted,
+      mesCompleto,
       weekWorkedDays,
       monthWorkedDays,
       weekFreeDays,
@@ -2729,16 +2744,15 @@ export function CalendarioMantencionPage() {
                     const pctW = pctBar(row.weekHours, row.weekExpected)
                     const pctM = pctBar(row.monthHours, row.monthExpected)
                     const tolC = Math.max(hoursConfig.toleranceHours || 0.5, 0.5)
-                    const wUnder = row.deltaWeek < -tolC
                     const wOver = row.deltaWeek > tolC * 4
-                    const mUnder = row.deltaMonth < -tolC * 4
                     const mOver = row.deltaMonth > tolC * 16
-                    const riskW = wUnder
-                    const riskM = mUnder
-                    const isRisk = wUnder || mUnder
-                    const isOvertime = wOver || mOver
+                    // El tope de 42 h es un TECHO: la alarma es pasarse, que es lo ilegal.
+                    // Quedar bajo se sigue viendo en el número y la barra, pero en tono
+                    // neutro — antes pintaba de rojo 8 de 9 filas de una rotación correcta
+                    // y el rojo dejaba de significar nada.
+                    const isRisk = wOver || mOver
                     const zebra = idx % 2 === 1 ? 'bg-muted' : ''
-                    const rowBg = isRisk ? 'bg-red-500/[0.15] hover:bg-red-500/[0.15] dark:hover:bg-red-500/[0.15]' : isOvertime ? 'bg-cat-4-tint/[0.15] hover:bg-cat-4-tint/[0.15] dark:hover:bg-cat-4-tint/[0.15]' : `${zebra} hover:bg-muted/50`
+                    const rowBg = isRisk ? 'bg-red-500/[0.15] hover:bg-red-500/[0.15] dark:hover:bg-red-500/[0.15]' : `${zebra} hover:bg-muted/50`
                     return (
                       <tr key={row.tech.r} className={`border-t border-border/20 transition-colors ${rowBg}`}>
                         <td className="sticky left-0 z-10 border-r border-border/20 bg-inherit px-2 md:px-3 py-1.5" style={{ minWidth: 140, maxWidth: 200 }}>
@@ -2769,9 +2783,9 @@ export function CalendarioMantencionPage() {
                         <td className="px-1 py-1" style={{ minWidth: 90 }}>
                           <div className="flex items-center gap-1">
                             <div className="flex-1 h-[5px] rounded-full bg-muted overflow-hidden">
-                              <div className={`h-full rounded-full transition-all ${wOver ? 'bg-cat-4-tint' : riskW ? 'bg-red-500' : 'bg-emerald-500'}`} style={{ width: `${pctW}%` }} />
+                              <div className={`h-full rounded-full transition-all ${wOver ? 'bg-red-500' : row.deltaWeek > 0 ? 'bg-cat-4-tint' : 'bg-emerald-500'}`} style={{ width: `${pctW}%` }} />
                             </div>
-                            <span className={`shrink-0 inline-block min-w-[38px] rounded-ctl px-1 py-[1px] text-center text-caption tabular-nums font-bold ${wOver ? 'bg-cat-4-tint/[0.15] text-cat-4-ink' : riskW ? 'bg-red-500/[0.15] text-red-400' : row.deltaWeek > 0 ? 'bg-emerald-500/[0.15] text-emerald-400' : 'bg-muted text-muted-foreground'}`}>
+                            <span className={`shrink-0 inline-block min-w-[38px] rounded-ctl px-1 py-[1px] text-center text-caption tabular-nums font-bold ${wOver ? 'bg-red-500/[0.15] text-red-400' : row.deltaWeek > 0 ? 'bg-cat-4-tint/[0.15] text-cat-4-ink' : 'bg-muted text-muted-foreground'}`}>
                               {formatDelta(row.deltaWeek)}
                             </span>
                           </div>
@@ -2798,10 +2812,16 @@ export function CalendarioMantencionPage() {
                         <td className="px-1 py-1" style={{ minWidth: 90 }}>
                           <div className="flex items-center gap-1">
                             <div className="flex-1 h-[5px] rounded-full bg-muted overflow-hidden">
-                              <div className={`h-full rounded-full transition-all ${mOver ? 'bg-cat-4-tint' : riskM ? 'bg-red-500' : 'bg-emerald-500'}`} style={{ width: `${pctM}%` }} />
+                              <div className={`h-full rounded-full transition-all ${mOver ? 'bg-red-500' : row.deltaMonth > 0 ? 'bg-cat-4-tint' : 'bg-emerald-500'}`} style={{ width: `${pctM}%` }} />
                             </div>
-                            <span className={`shrink-0 inline-block min-w-[38px] rounded-ctl px-1 py-[1px] text-center text-caption tabular-nums font-bold ${mOver ? 'bg-cat-4-tint/[0.15] text-cat-4-ink' : riskM ? 'bg-red-500/[0.15] text-red-400' : row.deltaMonth > 0 ? 'bg-emerald-500/[0.15] text-emerald-400' : 'bg-muted text-muted-foreground'}`}>
-                              {formatDelta(row.deltaMonth)}
+                            <span className={`shrink-0 inline-block min-w-[38px] rounded-ctl px-1 py-[1px] text-center text-caption tabular-nums font-bold ${mOver ? 'bg-red-500/[0.15] text-red-400' : row.deltaMonth > 0 ? 'bg-cat-4-tint/[0.15] text-cat-4-ink' : 'bg-muted text-muted-foreground'}`}>
+                              {row.mesCompleto ? (
+                                formatDelta(row.deltaMonth)
+                              ) : (
+                                <span title="El mes no está cargado entero en la planilla: comparar contra el tope legal todavía no dice nada.">
+                                  –
+                                </span>
+                              )}
                             </span>
                           </div>
                         </td>
