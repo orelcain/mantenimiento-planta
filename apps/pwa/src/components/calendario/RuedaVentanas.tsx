@@ -38,6 +38,7 @@ import {
   slotsAHorasMinutos,
   type Condicion,
   type DiaRueda,
+  type MaquinaRueda,
   type Ocupante,
   type RuedaState,
 } from '@/services/ruedaVentanas'
@@ -135,6 +136,8 @@ export interface RuedaVentanasProps {
 export function RuedaVentanas({ disponibles }: RuedaVentanasProps = {}) {
   const [state, setState] = useState<RuedaState>(() => estadoInicial())
   const [maquinaId, setMaquinaId] = useState<string>(() => estadoInicial().maquinas[0]?.id ?? '')
+  /** Nombre de la máquina cuya confirmación acaba de caerse por una edición. */
+  const [confirmacionCaida, setConfirmacionCaida] = useState<string | null>(null)
   const [diaIdx, setDiaIdx] = useState<number>(() => (new Date().getDay() + 6) % 7)
   const [brocha, setBrocha] = useState<Brocha>({ capa: 'mant', valor: '1' })
   /* Editar en la rueda, mostrar en la franja: son dos trabajos distintos y cada
@@ -240,17 +243,33 @@ export function RuedaVentanas({ disponibles }: RuedaVentanasProps = {}) {
     }
   }, [state, sync])
 
+  /**
+   * «Confirmado en terreno» es sobre el HORARIO de la máquina —la capa de áreas—,
+   * no sobre dónde decidimos intervenir nosotros. Si ese horario cambia después
+   * de confirmarse, el sello dejó de valer: quien lo lea, incluido el link
+   * público, vería «confirmado» sobre horas que nadie verificó.
+   */
+  const invalidarSiCambioElHorario = useCallback((antes: MaquinaRueda, despues: MaquinaRueda): MaquinaRueda => {
+    if (despues.revisadoEnTerreno !== true) return despues
+    const cambio = antes.semana.some((d, i) => (d?.areas ?? '') !== (despues.semana[i]?.areas ?? ''))
+    if (!cambio) return despues
+    setConfirmacionCaida(despues.nombre)
+    return { ...despues, revisadoEnTerreno: false }
+  }, [])
+
   /* ── Edición ────────────────────────────────────────────────────────────── */
   const aplicarADia = useCallback(
     (fn: (d: DiaRueda) => DiaRueda) => {
       setState((prev) => ({
         ...prev,
         maquinas: prev.maquinas.map((m) =>
-          m.id !== maquinaId ? m : { ...m, semana: m.semana.map((d, i) => (i === diaIdx ? fn(d) : d)) },
+          m.id !== maquinaId
+            ? m
+            : invalidarSiCambioElHorario(m, { ...m, semana: m.semana.map((d, i) => (i === diaIdx ? fn(d) : d)) }),
         ),
       }))
     },
-    [maquinaId, diaIdx],
+    [maquinaId, diaIdx, invalidarSiCambioElHorario],
   )
 
   /*
@@ -758,7 +777,7 @@ export function RuedaVentanas({ disponibles }: RuedaVentanasProps = {}) {
             onAplicar={(m) => {
               tomarSnapshot()
               snapshotTomadoRef.current = false
-              setState((p) => ({ ...p, maquinas: p.maquinas.map((x) => (x.id === m.id ? m : x)) }))
+              setState((p) => ({ ...p, maquinas: p.maquinas.map((x) => (x.id === m.id ? invalidarSiCambioElHorario(x, m) : x)) }))
             }}
           />
 
@@ -769,7 +788,7 @@ export function RuedaVentanas({ disponibles }: RuedaVentanasProps = {}) {
             onCambiarMaquina={(m) => {
               tomarSnapshot()
               snapshotTomadoRef.current = false
-              setState((p) => ({ ...p, maquinas: p.maquinas.map((x) => (x.id === m.id ? m : x)) }))
+              setState((p) => ({ ...p, maquinas: p.maquinas.map((x) => (x.id === m.id ? invalidarSiCambioElHorario(x, m) : x)) }))
             }}
           />
 
@@ -953,6 +972,27 @@ export function RuedaVentanas({ disponibles }: RuedaVentanasProps = {}) {
             </div>
           </div>
         </ListGroup>
+      )}
+
+      {confirmacionCaida && (
+        <div className="flex items-start gap-3 rounded-card border border-cat-4-ink/30 bg-cat-4-tint/10 p-4">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-cat-4-ink" />
+          <div className="flex flex-col gap-1">
+            <p className="text-headline text-foreground">
+              {confirmacionCaida} vuelve a quedar sin confirmar
+            </p>
+            <p className="text-footnote text-muted-foreground">
+              Cambiaste su horario después de haberlo confirmado en terreno, así que el sello dejó
+              de valer: vuelve a confirmarlo cuando el horario nuevo esté visto en planta.
+            </p>
+            <button
+              onClick={() => setConfirmacionCaida(null)}
+              className="mt-1 self-start text-footnote font-semibold text-primary"
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
       )}
 
       {modo === 'editar' && maquina.revisadoEnTerreno !== true && (
