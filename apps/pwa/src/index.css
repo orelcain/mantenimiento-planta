@@ -698,7 +698,10 @@
     padding: 1vw 1.4vw;
     zoom: 1.05;
   }
-  @media (min-height: 1000px) { .modo-pantalla { zoom: 1.1; } }
+  /* 1,03 y no 1,1: con la quinta tarjeta (camino a la meta) el presupuesto
+     es main ≤ 1.024 px (1.080 menos la banda de 56) y el contenido sin zoom
+     mide ~989. Medido: a 1,08 la tira del minuto quedaba cortada al pie. */
+  @media (min-height: 1000px) { .modo-pantalla { zoom: 1.03; } }
   @media (min-height: 1300px) { .modo-pantalla { zoom: 1.32; } }
   @media (min-height: 1700px) { .modo-pantalla { zoom: 1.72; } }
   @media (min-height: 2000px) { .modo-pantalla { zoom: 2.05; } }
@@ -708,7 +711,7 @@
   .modo-pantalla > div:not(:first-of-type),
   .modo-pantalla > p,
   .modo-pantalla > footer { display: none; }
-  .modo-pantalla > div:first-of-type > *:nth-child(n+5) { display: none; }
+  .modo-pantalla > div:first-of-type > *:nth-child(n+6) { display: none; }
   /* El contenedor trae la grilla de 6 del tablero: acá mandan las 2 fijas. */
   .modo-pantalla > div:first-of-type { grid-auto-rows: auto; grid-auto-flow: row; }
   /* Y dentro de ella, fuera lo que no se lee de lejos. */
@@ -749,19 +752,18 @@
   .modo-pantalla > div:first-of-type > *:first-child p { font-size: 18px; line-height: 1.35; }
 
   /*
-   * El cuarteto de la TV, tras partir el ritmo en tres tarjetas (30-08):
-   * nth 1-2 = resultado y Mantención lado a lado; nth 3 = el ESTADO del
-   * ritmo, cruzando y abierto en dos adentro (números a la izquierda, «cada
-   * máquina» a la derecha); nth 4 = la tira del minuto cruzando el pie. El
-   * rango habitual ni se renderiza en TV (era `pantalla-oculta`; hoy no se
-   * monta). Sin abrir el estado en dos, media pantalla quedaba vacía y las
-   * barras se salían de los 1.080 px — medido cuando era una sola tarjeta.
+   * El QUINTETO de la TV (30-08, con «camino a la meta» sumada a pedido):
+   * fila 1 = resultado | Mantención; fila 2 = el estado del ritmo (abierto en
+   * dos adentro: números | «cada máquina») | camino a la meta compacta (el
+   * detalle expandido es `pantalla-oculta`); fila 3 = la tira del minuto
+   * cruzando el pie. El rango habitual ni se monta en TV.
    */
   .modo-pantalla > div:first-of-type > *:nth-child(3) {
-    grid-column: 1 / -1;
+    grid-row: 2;
+    grid-column: 1;
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 0 2vw;
+    gap: 0 1.5vw;
     align-content: start;
   }
   .modo-pantalla > div:first-of-type > *:nth-child(3) > * { grid-column: 1; }
@@ -772,7 +774,8 @@
     border-top: 0;
     padding-top: 0;
   }
-  .modo-pantalla > div:first-of-type > *:nth-child(4) { grid-column: 1 / -1; }
+  .modo-pantalla > div:first-of-type > *:nth-child(4) { grid-row: 3; grid-column: 1 / -1; }
+  .modo-pantalla > div:first-of-type > *:nth-child(5) { grid-row: 2; grid-column: 2; }
 
   /*
    * `tap-44` — área táctil de 44x44 sin tocar el tamaño visual (§3 de la
