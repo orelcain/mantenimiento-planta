@@ -77,6 +77,9 @@ import { VsAyerBloque } from './monitor/MonitorVsAyer'
 import { RepartoDuenoSemanal } from './monitor/RepartoDuenoSemanal'
 import { DUENO_UI } from './monitor/duenoUi'
 import { PanelTarjetas, TarjetaTablero } from './monitor/Tablero'
+import {
+  APORTE_MIN_PROD_MIN, deltaAporte, referenciaAporte, type ReferenciaAporte,
+} from './monitor/aporteHistorico'
 import { useTablero, type TarjetaLayout } from './monitor/tableroLayout'
 import { duenoDe } from '@/services/shoplogix/monitorEventos'
 import { Pill } from '@/components/piel'
@@ -3638,7 +3641,7 @@ function BarrasMinuto({ datos, cerrado }: { datos: BarrasMinutoDatos; cerrado?: 
   )
 }
 
-function ReglaDeRitmo({ parte, ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrado, onEditarSetPoint, cerrado, contexto, chispa, corteMs, ahoraWallMs, pulso, pulsoNodo, vivo, maquinas, parada, serieLinea, seriesMaquinas, barras }: {
+function ReglaDeRitmo({ parte, ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrado, onEditarSetPoint, cerrado, contexto, chispa, corteMs, ahoraWallMs, pulso, pulsoNodo, vivo, maquinas, parada, serieLinea, seriesMaquinas, barras, refAporte, producingMin }: {
   /**
    * Qué TARJETA del tablero renderiza esta llamada (pedido de Orel, 30-08:
    * «separemos esto en 3 partes para poder acomodarlo mejor»). Era UNA
@@ -3677,6 +3680,14 @@ function ReglaDeRitmo({ parte, ahora, ahoraReloj, pedido, turno, setCpm, techoDe
   techoDemostrado?: number | null
   /** Cada máquina de la línea, con su ritmo: pedido de Orel (26-08). */
   maquinas?: RitmosPorMaquina | null
+  /**
+   * El aporte promedio de cada máquina en sus últimos 5 turnos del mismo
+   * número, para que cada Baader compita CONTRA SÍ MISMA (Orel, 31-08).
+   * null = no hay muestra todavía y no se muestra ningún delta.
+   */
+  refAporte?: ReferenciaAporte | null
+  /** Minutos produciendo de la línea en el turno visto: la puerta del delta. */
+  producingMin?: number | null
   /**
    * La línea NO está produciendo ahora mismo (colación o paro).
    *
@@ -4082,6 +4093,10 @@ function ReglaDeRitmo({ parte, ahora, ahoraReloj, pedido, turno, setCpm, techoDe
            que falta; el cero dice lo que pasa. */
         const conCero = Boolean(parada) || cerrado
         const conAporte = maquinas.maquinas.every((m) => m.aporteCpm != null)
+        /* El delta solo tiene sentido sobre el aporte (la misma vara que la
+           muestra histórica) y con el turno ya rodado: ver APORTE_MIN_PROD_MIN. */
+        const conDelta = conAporte && refAporte != null
+          && (producingMin ?? 0) >= APORTE_MIN_PROD_MIN
         return (
           /* `ritmo-maquinas`: gancho del modo pantalla — en la TV este bloque
              sube a la columna derecha, a la altura del número grande. */
@@ -4094,6 +4109,7 @@ function ReglaDeRitmo({ parte, ahora, ahoraReloj, pedido, turno, setCpm, techoDe
               </span>
               <b className="font-semibold text-foreground/80">
                 {conAporte ? 'aporte al promedio' : 'promedio andando'}
+                {conDelta && <span className="font-normal text-muted-foreground"> · vs sí misma</span>}
               </b>
             </div>
             <div className="mt-1.5 space-y-1.5">
@@ -4126,6 +4142,30 @@ function ReglaDeRitmo({ parte, ahora, ahoraReloj, pedido, turno, setCpm, techoDe
                     <span className="w-11 shrink-0 text-right text-headline tabular-nums text-foreground">
                       {conAporte ? fmtDec(m.aporteCpm ?? 0) : fmtDec(m.cpm)}
                     </span>
+                    {/* Contra sí misma: ▲/▼ respecto del promedio de esta
+                        máquina en sus últimos turnos del mismo número. Se
+                        renderiza en TODAS las filas cuando hay muestra (aunque
+                        una máquina no esté en ella) para que la columna no se
+                        desalinee. Un desvío menor a 0,3 pz/min es ruido: se
+                        muestra en raya y en tinta neutra, no como logro ni
+                        como caída. */}
+                    {conDelta && (() => {
+                      const d = deltaAporte(refAporte, m.nombre, m.aporteCpm, producingMin)
+                      if (d == null) {
+                        return <span className="w-[52px] shrink-0 text-right text-footnote text-muted-foreground/60">·</span>
+                      }
+                      const chico = Math.abs(d) < 0.3
+                      return (
+                        <span
+                          className={`w-[52px] shrink-0 text-right text-footnote tabular-nums ${
+                            chico ? 'text-muted-foreground' : d > 0 ? 'text-ink-ok' : 'text-ink-crit'
+                          }`}
+                          title={`${m.nombre}: ${fmtDec(m.aporteCpm ?? 0)} pz/min ahora contra ${fmtDec((m.aporteCpm ?? 0) - d)} de sus últimos ${refAporte!.turnos} turnos iguales`}
+                        >
+                          {chico ? '—' : d > 0 ? '▲' : '▼'} {fmtDec(Math.abs(d))}
+                        </span>
+                      )
+                    })()}
                   </div>
                 )
               })}
@@ -4142,6 +4182,11 @@ function ReglaDeRitmo({ parte, ahora, ahoraReloj, pedido, turno, setCpm, techoDe
                 ? <>Derecha: su aporte al <b>promedio del turno</b> — suman el promedio de la línea. </>
                 : <>Derecha: su ritmo promedio mientras anduvo. </>}
               La barra es el % del turno que estuvo andando.
+              {conDelta && (
+                <> <b>▲▼</b>: contra lo que esa MISMA máquina aportó en sus últimos{' '}
+                  {refAporte!.turnos === 1 ? 'turno' : `${refAporte!.turnos} turnos`}{' '}
+                  del mismo número — cada Baader compite consigo misma, no con las otras.</>
+              )}
             </p>
             {fraseMaquinas(maquinas) !== '' && (
               <p className="pantalla-oculta mt-1 text-caption leading-snug text-muted-foreground/80">
@@ -6607,6 +6652,13 @@ export function PublicShiftMonitorPage() {
                     porNombre.has(m.nombre) ? { ...m, ahoraCpm: porNombre.get(m.nombre)! } : m),
                 }
               })(),
+              /* Contra qué compite cada Baader: el promedio de sus últimos 5
+                 turnos del MISMO número (T1 con T1, T2 con T2 — decisión de
+                 Orel, 31-08). El shiftId sale del turno que se está MIRANDO,
+                 no del vigente: navegando a un turno viejo el delta tiene que
+                 ser el de ese turno. */
+              refAporte: referenciaAporte(data.shiftStats, (vista?.shiftDocId ?? '').slice(11)),
+              producingMin: live.timeBreakdown?.producingMin ?? null,
               serieLinea: serieDelTurno,
               seriesMaquinas,
               /*

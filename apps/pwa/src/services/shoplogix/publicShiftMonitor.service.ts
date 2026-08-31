@@ -387,6 +387,13 @@ export interface ShiftStat {
   recoverableMin?: number | null
   /** Causas recuperables del turno: `reason`, minutos y cantidad de paradas. */
   recoverable?: Array<{ reason: string; min: number; count: number }>
+  /**
+   * Piezas de cada máquina en ese turno (`n` nombre, `p` piezas). Con
+   * `producingMin` reconstruye el «aporte al promedio» de turnos pasados —
+   * ver `pages/monitor/aporteHistorico.ts`. Las entradas viejas del espejo no
+   * lo tienen hasta que el backend las rearma.
+   */
+  porMaquina?: Array<{ n: string; p: number }>
   tbv?: number | null
 }
 

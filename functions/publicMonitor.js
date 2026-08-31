@@ -1911,7 +1911,13 @@ async function buildShiftStats(db, plantSlug, currentShiftDocId, prev = [], hist
     const id = ids[i]
     const cacheado = previos.get(id)
     // i === 0 es el turno anterior: el re-sync móvil todavía puede moverlo.
-    if (cacheado && i > 0 && cacheado.tbv === 2) { out.push(cacheado); continue }
+    // `porMaquina` entra con el mismo criterio que `expected` en el pronóstico:
+    // sin forzar el rearmado, las entradas viejas nunca lo tendrían y el delta
+    // por máquina tardaría 45 días en poblarse solo. Se compara contra
+    // `undefined` a propósito — un turno sin máquinas guarda `[]` y NO se rearma.
+    if (cacheado && i > 0 && cacheado.tbv === 2 && cacheado.porMaquina !== undefined) {
+      out.push(cacheado); continue
+    }
     const live = yaConstruidos.get(id)
     if (!live && nuevos >= STATS_NUEVOS_POR_CORRIDA) {
       if (cacheado) out.push(cacheado)
@@ -1951,6 +1957,21 @@ async function buildShiftStats(db, plantSlug, currentShiftDocId, prev = [], hist
         recoverable: (tb.recoverable || []).map(c => ({
           reason: c.reason, min: c.min, count: c.count ?? 0,
         })),
+        /*
+         * Piezas de CADA máquina en ese turno (pedido de Orel, 31-08: «que cada
+         * Baader compita contra sí misma»). Con `producingMin` de acá arriba, la
+         * PWA reconstruye el mismo «aporte al promedio» que muestra en vivo
+         * (piezas ÷ minutos produciendo de la línea) para turnos pasados.
+         *
+         * Va acá y NO en `forecastHistory` a propósito: ese arreglo filtra por
+         * NOMBRE EXACTO de turno, y en Chonchi el turno de hoy se llama «Turno 1
+         * Lunes» mientras los otros lunes se llaman «Turno 1» — comparar por
+         * nombre exacto dejaba 4 turnos en 30 días. Este arreglo trae todos los
+         * nombres y la PWA agrupa por NÚMERO de turno. Además, tocar el filtro
+         * de `forecastHistory` cambiaría el pronóstico, que no está en cuestión.
+         * Costo: ~3 máquinas × 40 turnos ≈ 3,5 KB. Claves cortas por eso.
+         */
+        porMaquina: (l.machines || []).map(m => ({ n: m.name, p: m.pieces ?? 0 })),
         /*
          * ⚠⚠ NUNCA `undefined` en un doc de Firestore: lo rechaza y el write
          * del patch falla ENTERO — no solo este campo. Pasó el 16-08: cada
