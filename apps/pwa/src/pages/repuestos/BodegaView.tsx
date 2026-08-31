@@ -37,6 +37,7 @@ import type {
 } from '@/hooks/repuestos/useBodega'
 import type { Machine } from '@/types/repuestos'
 import { useAuthStore } from '@/store/authStore'
+import { useToast } from '@/hooks/useToast'
 import { ImageLightbox } from '@/components/ui/ImageLightbox'
 
 type BodegaTab = 'stock' | 'inventarios' | 'movimientos' | 'estadisticas'
@@ -1551,6 +1552,7 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
   const [uploading, setUploading] = useState(false)
   const [showQR, setShowQR] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
+  const { toast } = useToast()
 
   useEffect(() => {
     if (!item.bodegaId) { setLoading(false); return }
@@ -1569,7 +1571,18 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
     const file = e.target.files?.[0]
     if (!file || !addPhoto) return
     setUploading(true)
-    try { await addPhoto(item.codigoSAP, file) } finally { setUploading(false) }
+    try {
+      await addPhoto(item.codigoSAP, file)
+    } catch (error) {
+      // Sin esto el error muere mudo y el botón parece no hacer nada
+      toast({
+        title: 'No se pudo subir la foto',
+        description: error instanceof Error ? error.message : String(error),
+        variant: 'destructive',
+      })
+    } finally {
+      setUploading(false)
+    }
     e.target.value = ''
   }
 

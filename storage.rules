@@ -103,6 +103,24 @@ service firebase.storage {
         && request.resource.contentType.matches('image/.*');
     }
 
+    // Fotos reales de repuestos (uploadRepuestoFoto):
+    // repuestos/{machineId}/{repuestoId}/fotos/{fileName} — 4 segmentos, no lo
+    // cubre la regla legacy de arriba (3 segmentos) ni /machines/...
+    match /repuestos/{machineId}/{repuestoId}/{type}/{fileName} {
+      allow create, update: if request.auth != null
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null;
+    }
+
+    // Fotos de ítems de bodega (uploadBodegaPhoto): bodega/{codigoSAP}/fotos/{fileName}
+    match /bodega/{codigoSAP}/{type}/{fileName} {
+      allow create, update: if request.auth != null
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null;
+    }
+
     // Fotos de usuarios
     match /users/{userId}/{fileName} {
       allow write: if request.auth != null && request.auth.uid == userId
