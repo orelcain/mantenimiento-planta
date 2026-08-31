@@ -471,7 +471,10 @@ export function TiempoDelTurno({
                   <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform ${parte === f.p ? '' : '-rotate-90'}`} />
                 </button>
                 {parte === f.p && (
-                  <div className="bg-primary/[0.08] px-3 pb-3 pl-[26px] text-[12.5px] leading-snug">
+                  /* `pantalla-oculta`: en la TV la tarjeta muestra solo la
+                     barra, las filas y el veredicto — el detalle expandido es
+                     para tocar, y en la sala nadie toca. */
+                  <div className="pantalla-oculta bg-primary/[0.08] px-3 pb-3 pl-[26px] text-[12.5px] leading-snug">
                     {f.p === 'hechas' && (
                       <>
                         {([
