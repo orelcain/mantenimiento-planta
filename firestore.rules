@@ -480,7 +480,7 @@ service cloud.firestore {
     match /variadoresCambios/{cambioId} {
       allow read: if isActiveUser();
 
-      allow create: if isAuthenticated()
+      allow create: if isNotAnonymous()
         && isValidDocSize()
         && request.resource.data.incidentId is string
         && request.resource.data.incidentId.size() > 0
@@ -511,7 +511,7 @@ service cloud.firestore {
     match /variadoresAportes/{aporteId} {
       allow read: if isActiveUser();
 
-      allow create: if isAuthenticated()
+      allow create: if isNotAnonymous()
         && isValidDocSize()
         && request.resource.data.tipo in ['dato_faltante', 'correccion']
         && request.resource.data.posicionId is string
@@ -550,7 +550,7 @@ service cloud.firestore {
     match /baader142Protocolo/{lecturaId} {
       allow read: if isActiveUser();
 
-      allow create: if isAuthenticated()
+      allow create: if isNotAnonymous()
         && isValidDocSize()
         && request.resource.data.plantId is string
         && request.resource.data.plantId.size() > 0
@@ -633,7 +633,10 @@ service cloud.firestore {
         && request.resource.data.y is number
         && request.resource.data.y >= 0 && request.resource.data.y <= 1
         && (!('texto' in request.resource.data) || request.resource.data.texto.size() <= 600)
-        && (!('fotoUrl' in request.resource.data) || request.resource.data.fotoUrl.size() <= 800)
+        && (!('fotoUrl' in request.resource.data)
+            || (request.resource.data.fotoUrl.size() <= 800
+                // Solo URL de Storage (https) o data:image local: cierra el XSS por fotoUrl.
+                && request.resource.data.fotoUrl.matches('^(https://|data:image/).*')))
         // Nota vacia no sirve: o dice algo o trae foto.
         && (('texto' in request.resource.data && request.resource.data.texto.size() > 0)
             || ('fotoUrl' in request.resource.data && request.resource.data.fotoUrl.size() > 0))
@@ -1768,7 +1771,7 @@ service cloud.firestore {
 
     match /hmi-grader-history/{entryId} {
       allow read: if isNotAnonymous();
-      allow create: if isAuthenticated() && isValidDocSize();
+      allow create: if isNotAnonymous() && isValidDocSize();
       allow update, delete: if isAdmin();
     }
 

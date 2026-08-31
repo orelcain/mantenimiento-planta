@@ -6621,6 +6621,19 @@ async function _assertAdminCaller(request) {
   }
 }
 
+// Técnico, supervisor o admin. Excluye al rol 'usuario' (el que asigna el
+// auto-registro), para que una cuenta recién creada no dispare acciones pesadas.
+async function _assertTechnicianCaller(request) {
+  const uid = request.auth?.uid
+  if (!uid) throw new HttpsError('unauthenticated', 'Login requerido')
+  const snap = await db.collection('users').doc(uid).get()
+  const rol = snap.exists ? snap.data()?.rol : null
+  if (!['admin', 'supervisor', 'tecnico'].includes(rol)) {
+    throw new HttpsError('permission-denied', 'Solo personal de mantención')
+  }
+  return { uid, user: snap.data() || {} }
+}
+
 exports.shoplogixCredsGet = onCall({ region: 'us-central1' }, async (request) => {
   await _assertAdminCaller(request)
   const snap = await db.doc('system/shoplogixCredentials').get()
@@ -6724,9 +6737,10 @@ exports.shoplogixSyncNow = onCall(
     secrets: ['SHOPLOGIX_COOKIE'],
   },
   async (request) => {
-    if (!request.auth) {
-      throw new HttpsError('unauthenticated', 'Login requerido')
-    }
+    // Re-sync manual con forceAll reescribe TODOS los turnos del día contra
+    // Shoplogix con credenciales de prod: lo restringimos a personal de mantención
+    // (técnico+) para que una cuenta auto-registrada no lo dispare.
+    await _assertTechnicianCaller(request)
 
     const { dateKey, shiftId, plantSlug = 'chonchi' } = (request.data ?? {})
 
