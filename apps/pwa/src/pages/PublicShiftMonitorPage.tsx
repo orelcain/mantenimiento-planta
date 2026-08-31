@@ -26,7 +26,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { Activity, AlertCircle, Check, ChevronLeft, ChevronRight, Clock, Gauge, Hourglass, Moon, PauseCircle, RefreshCw, Sun, Target, TrendingUp, Wrench } from 'lucide-react'
+import { Activity, AlertCircle, Check, ChevronLeft, ChevronRight, Clock, Gauge, Hourglass, Moon, PauseCircle, RefreshCw, Sun, Target, TrendingUp, Tv, Wrench } from 'lucide-react'
 import { useTheme } from '@/hooks/useTheme'
 import {
   subscribePublicShiftMonitor,
@@ -4360,6 +4360,55 @@ export function PublicShiftMonitorPage() {
        la otra deja al usuario mirando un bloque cualquiera. */
     window.scrollTo({ top: 0 })
   }
+  /* Entrar/salir del modo TV con un botón (pedido de Orel, 30-08): antes solo
+     existía escribiendo `?pantalla=1` a mano. La pantalla completa del
+     navegador es OPCIONAL, con su propio botón dentro del modo (decisión de
+     Orel): entrar al modo no te la impone. Escape saca del modo TV — y de la
+     pantalla completa si estaba puesta. */
+  const entrarModoTv = () => {
+    const n = new URLSearchParams(searchParams)
+    n.set('pantalla', '1')
+    setSearchParams(n, { replace: true })
+  }
+  const salirModoTv = () => {
+    const n = new URLSearchParams(searchParams)
+    n.delete('pantalla')
+    setSearchParams(n, { replace: true })
+    if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {})
+  }
+  const alternarPantallaCompleta = () => {
+    if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {})
+    else document.documentElement.requestFullscreen?.().catch(() => {})
+  }
+  useEffect(() => {
+    if (!modoPantalla) return
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') salirModoTv() }
+    window.addEventListener('keydown', h)
+    return () => window.removeEventListener('keydown', h)
+    /* salirModoTv se recrea por render; re-suscribir es barato y evita el
+       closure viejo sobre searchParams. */
+  })
+  /* La TV de sala no puede apagarse sola (pedido de Orel, 30-08). Wake Lock
+     es la herramienta real para esto: le pide a la pantalla no suspenderse
+     mientras el tablero esté visible — el «mover el mouse cada 2 min» no
+     sirve desde una página (un evento sintético de JS no es entrada confiable
+     para el SO). El lock se suelta solo al ocultar la pestaña y acá se vuelve
+     a pedir al volver; sin soporte del navegador, no pasa nada y la config de
+     la TV queda de plan B. */
+  useEffect(() => {
+    if (!modoPantalla) return
+    let lock: WakeLockSentinel | null = null
+    const pedir = async () => {
+      try { lock = (await navigator.wakeLock?.request('screen')) ?? null } catch { /* sin soporte/permiso */ }
+    }
+    const alVolver = () => { if (document.visibilityState === 'visible') void pedir() }
+    void pedir()
+    document.addEventListener('visibilitychange', alVolver)
+    return () => {
+      document.removeEventListener('visibilitychange', alVolver)
+      lock?.release().catch(() => {})
+    }
+  }, [modoPantalla])
   /** Causa de detención resaltada sobre el gráfico. */
   const [causaSel, setCausaSel] = useState<string | null>(null)
   /* La parada concreta que se está mirando: marca UNA banda, no las 40 de su
@@ -5812,6 +5861,27 @@ export function PublicShiftMonitorPage() {
           {/* El resto de la banda, solo en PC. */}
           {navegacionTurnos && <div className="hidden lg:block">{navegacionTurnos}</div>}
           {selectorPestana && <div className="hidden lg:block">{selectorPestana}</div>}
+          {/* Los controles del modo TV, discretos: en la sala nadie los toca,
+              pero quien entró con el botón desde su PC necesita la pantalla
+              completa (opcional, decisión de Orel) y la vuelta. Escape también
+              sale. */}
+          {modoPantalla && (
+            <>
+              <button
+                onClick={alternarPantallaCompleta}
+                className="tap-44 hidden shrink-0 rounded-full border border-border bg-muted px-3 py-1.5 text-[12px] text-muted-foreground transition-colors hover:text-foreground lg:inline-flex"
+              >
+                Pantalla completa
+              </button>
+              <button
+                onClick={salirModoTv}
+                className="tap-44 hidden shrink-0 items-center gap-1.5 rounded-full border border-border bg-muted px-3 py-1.5 text-[12px] text-muted-foreground transition-colors hover:text-foreground lg:inline-flex"
+              >
+                <Tv className="h-3.5 w-3.5" />
+                Salir de TV
+              </button>
+            </>
+          )}
           <span className="hidden lg:inline-flex">{botonTema}</span>
         </div>
       </header>
@@ -5882,6 +5952,18 @@ export function PublicShiftMonitorPage() {
               <span className="mr-auto text-[12px] text-muted-foreground">
                 Arrastrá una tarjeta para moverla · estirá desde la esquina ◢ para el ancho y alto
               </span>
+            )}
+            {/* La puerta al tablero de sala: mismo link, `?pantalla=1` y
+                pantalla completa. Solo con las manos quietas (fuera de
+                Personalizar), para no mezclar dos modos de edición. */}
+            {!tablero.editando && (
+              <button
+                onClick={entrarModoTv}
+                className="tap-44 flex items-center gap-1.5 rounded-full border border-border bg-muted px-3 py-1.5 text-[12px] text-foreground/80 transition-colors hover:bg-muted"
+              >
+                <Tv className="h-3.5 w-3.5" />
+                Modo TV
+              </button>
             )}
             {tablero.editando && tablero.personalizado && (
               <button
@@ -6698,8 +6780,10 @@ export function PublicShiftMonitorPage() {
         {/* El gráfico ARRIBA del bloque de la meta era pedido de Orel (tocar
             una imputación salta al gráfico, hacia algo que ya pasaste): la
             fábrica los deja vecinos, y desde «Personalizar» cada aparato puede
-            acomodarlos a su gusto. */}
-        {!modoPantalla && (
+            acomodarlos a su gusto. TAMBIÉN va a la TV (quinteto): compacta —
+            barra, filas y veredicto; el detalle expandido es `pantalla-oculta`
+            porque en la sala nadie toca. */}
+        {(
           <TarjetaTablero id="meta" t={tablero}>
             <TiempoDelTurno
               tb={live.timeBreakdown}
