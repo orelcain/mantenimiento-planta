@@ -27,17 +27,41 @@ export const APORTE_TURNOS_REF = 5
 export const APORTE_MIN_PROD_MIN = 45
 
 /**
- * El número de turno, sin el día que a veces trae pegado el nombre:
- * «Turno 1 Lunes» → «turno 1», «Turno 2» → «turno 2». Sin número reconocible
- * cae al nombre completo normalizado — comparar contra otra cosa sería peor
- * que no comparar.
+ * El turno, sin el día que a veces trae pegado el nombre. Los nombres REALES
+ * medidos en el espejo (31-08) no son parejos ni entre plantas ni dentro de
+ * una misma planta:
+ *
+ *   Chonchi  «Turno 2» ×20 · «Turno 1» ×14 · «Turno 1 Lunes» ×3
+ *   Filete   «Turno Dia» ×23 · «Turno Noche» ×10 · «Turno Noche L» ×2
+ *   Yal      «Turno 1» / «Turno 2» / «Turno 3»
+ *
+ * Por eso hay DOS reglas y no una: primero el número («Turno 1 Lunes» →
+ * `turno 1`), y si el turno no se llama por número, la palabra que lo nombra
+ * («Turno Noche L» → `turno noche`). Sin la segunda, el turno noche de Filete
+ * se comparaba solo contra los otros dos «Turno Noche L» —los lunes— y dejaba
+ * fuera los diez «Turno Noche». Requisito de Orel: «si es noche compara contra
+ * turno noche, turno día contra turno día solamente».
+ *
+ * Sin número ni palabra reconocible cae al nombre completo normalizado:
+ * comparar contra otra cosa sería peor que no comparar.
  */
+const PALABRAS_TURNO = ['noche', 'tarde', 'mañana', 'manana', 'dia', 'día'] as const
+
 export function numeroDeTurno(shiftId: string | null | undefined): string | null {
   if (!shiftId) return null
   const s = shiftId.trim().toLowerCase()
   if (!s) return null
   const m = /turno\s*(\d+)/.exec(s)
-  return m ? `turno ${m[1]}` : s
+  if (m) return `turno ${m[1]}`
+  /* Palabra completa: «dia» no debe salir de «mediodia» ni de un nombre que
+     la lleve adentro de otra. El orden de la lista importa poco porque los
+     nombres reales traen una sola. */
+  for (const p of PALABRAS_TURNO) {
+    if (new RegExp(`(^|[^a-záéíóúñ])${p}([^a-záéíóúñ]|$)`).test(s)) {
+      return `turno ${p === 'día' ? 'dia' : p === 'mañana' ? 'manana' : p}`
+    }
+  }
+  return s
 }
 
 export type ReferenciaAporte = {

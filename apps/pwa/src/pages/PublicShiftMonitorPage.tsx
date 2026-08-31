@@ -3641,7 +3641,7 @@ function BarrasMinuto({ datos, cerrado }: { datos: BarrasMinutoDatos; cerrado?: 
   )
 }
 
-function ReglaDeRitmo({ parte, ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrado, onEditarSetPoint, cerrado, contexto, chispa, corteMs, ahoraWallMs, pulso, pulsoNodo, vivo, maquinas, parada, serieLinea, seriesMaquinas, barras, refAporte, producingMin }: {
+function ReglaDeRitmo({ parte, ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrado, onEditarSetPoint, cerrado, contexto, chispa, corteMs, ahoraWallMs, pulso, pulsoNodo, vivo, maquinas, parada, serieLinea, seriesMaquinas, barras, refAporte, refAporteUltimo, producingMin }: {
   /**
    * Qué TARJETA del tablero renderiza esta llamada (pedido de Orel, 30-08:
    * «separemos esto en 3 partes para poder acomodarlo mejor»). Era UNA
@@ -3686,6 +3686,8 @@ function ReglaDeRitmo({ parte, ahora, ahoraReloj, pedido, turno, setCpm, techoDe
    * null = no hay muestra todavía y no se muestra ningún delta.
    */
   refAporte?: ReferenciaAporte | null
+  /** La misma referencia pero del turno ANTERIOR solo (muestra de 1). */
+  refAporteUltimo?: ReferenciaAporte | null
   /** Minutos produciendo de la línea en el turno visto: la puerta del delta. */
   producingMin?: number | null
   /**
@@ -4093,24 +4095,61 @@ function ReglaDeRitmo({ parte, ahora, ahoraReloj, pedido, turno, setCpm, techoDe
            que falta; el cero dice lo que pasa. */
         const conCero = Boolean(parada) || cerrado
         const conAporte = maquinas.maquinas.every((m) => m.aporteCpm != null)
-        /* El delta solo tiene sentido sobre el aporte (la misma vara que la
-           muestra histórica) y con el turno ya rodado: ver APORTE_MIN_PROD_MIN. */
-        const conDelta = conAporte && refAporte != null
-          && (producingMin ?? 0) >= APORTE_MIN_PROD_MIN
+        /* Los deltas solo tienen sentido sobre el aporte (la misma vara que la
+           muestra histórica) y con el turno ya rodado: ver APORTE_MIN_PROD_MIN.
+           Son DOS columnas (Orel, 31-08): contra el turno anterior y contra el
+           promedio de los últimos 5 del mismo turno. La del promedio se calla
+           cuando la muestra tiene un solo turno: repetiría la otra columna. */
+        const rodado = (producingMin ?? 0) >= APORTE_MIN_PROD_MIN
+        const conDeltaUlt = conAporte && rodado && refAporteUltimo != null
+        const conDelta5 = conAporte && rodado && refAporte != null && refAporte.turnos > 1
+        const conDelta = conDeltaUlt || conDelta5
+        /** Una celda de delta, alineada con su rótulo del encabezado. */
+        const celdaDelta = (
+          ref: ReferenciaAporte | null | undefined,
+          m: RitmosPorMaquina['maquinas'][number],
+        ) => {
+          const d = deltaAporte(ref ?? null, m.nombre, m.aporteCpm, producingMin)
+          if (d == null) {
+            return <span className="w-[56px] shrink-0 text-right text-footnote text-muted-foreground/60">·</span>
+          }
+          /* Menos de 0,3 pz/min es ruido: raya en tinta neutra — ni logro ni
+             caída. Con color, cada turno parecería un veredicto. */
+          const chico = Math.abs(d) < 0.3
+          return (
+            <span
+              className={`w-[56px] shrink-0 text-right text-footnote tabular-nums ${
+                chico ? 'text-muted-foreground' : d > 0 ? 'text-ink-ok' : 'text-ink-crit'
+              }`}
+              title={`${m.nombre}: ${fmtDec(m.aporteCpm ?? 0)} pz/min ahora contra ${fmtDec((m.aporteCpm ?? 0) - d)} de referencia`}
+            >
+              {chico ? '—' : d > 0 ? '▲' : '▼'} {fmtDec(Math.abs(d))}
+            </span>
+          )
+        }
         return (
           /* `ritmo-maquinas`: gancho del modo pantalla — en la TV este bloque
              sube a la columna derecha, a la altura del número grande. */
           <div className="ritmo-maquinas mt-3 border-t border-border/50 pt-2.5">
-            <div className="flex items-baseline justify-between gap-2 text-caption text-muted-foreground">
-              <span>
+            <div className="flex items-baseline gap-2 text-caption text-muted-foreground">
+              <span className="min-w-0 flex-1">
                 Cada máquina
                 {(conPulsoMaq || conCero) && <> · <b className="font-semibold text-foreground/80">ahora</b></>}
                 {conReparto && <> · <b className="font-semibold text-foreground/80">media 15 min</b></>}
               </span>
               <b className="font-semibold text-foreground/80">
                 {conAporte ? 'aporte al promedio' : 'promedio andando'}
-                {conDelta && <span className="font-normal text-muted-foreground"> · vs sí misma</span>}
               </b>
+              {/* Un rótulo por columna de delta, con el mismo ancho que la
+                  celda: «vs sí misma» no decía contra QUÉ (Orel, 31-08). */}
+              {conDeltaUlt && (
+                <span className="w-[56px] shrink-0 text-right font-normal">vs último</span>
+              )}
+              {conDelta5 && (
+                <span className="w-[56px] shrink-0 text-right font-normal">
+                  vs prom. {refAporte!.turnos}
+                </span>
+              )}
             </div>
             <div className="mt-1.5 space-y-1.5">
               {maquinas.maquinas.map((m) => {
@@ -4142,30 +4181,13 @@ function ReglaDeRitmo({ parte, ahora, ahoraReloj, pedido, turno, setCpm, techoDe
                     <span className="w-11 shrink-0 text-right text-headline tabular-nums text-foreground">
                       {conAporte ? fmtDec(m.aporteCpm ?? 0) : fmtDec(m.cpm)}
                     </span>
-                    {/* Contra sí misma: ▲/▼ respecto del promedio de esta
-                        máquina en sus últimos turnos del mismo número. Se
-                        renderiza en TODAS las filas cuando hay muestra (aunque
-                        una máquina no esté en ella) para que la columna no se
-                        desalinee. Un desvío menor a 0,3 pz/min es ruido: se
-                        muestra en raya y en tinta neutra, no como logro ni
-                        como caída. */}
-                    {conDelta && (() => {
-                      const d = deltaAporte(refAporte, m.nombre, m.aporteCpm, producingMin)
-                      if (d == null) {
-                        return <span className="w-[52px] shrink-0 text-right text-footnote text-muted-foreground/60">·</span>
-                      }
-                      const chico = Math.abs(d) < 0.3
-                      return (
-                        <span
-                          className={`w-[52px] shrink-0 text-right text-footnote tabular-nums ${
-                            chico ? 'text-muted-foreground' : d > 0 ? 'text-ink-ok' : 'text-ink-crit'
-                          }`}
-                          title={`${m.nombre}: ${fmtDec(m.aporteCpm ?? 0)} pz/min ahora contra ${fmtDec((m.aporteCpm ?? 0) - d)} de sus últimos ${refAporte!.turnos} turnos iguales`}
-                        >
-                          {chico ? '—' : d > 0 ? '▲' : '▼'} {fmtDec(Math.abs(d))}
-                        </span>
-                      )
-                    })()}
+                    {/* Contra sí misma, dos varas: el turno anterior y el
+                        promedio de los últimos. Se renderizan en TODAS las
+                        filas cuando hay muestra (aunque una máquina no esté en
+                        ella, que va en raya) para que la columna no se
+                        desalinee. */}
+                    {conDeltaUlt && celdaDelta(refAporteUltimo, m)}
+                    {conDelta5 && celdaDelta(refAporte, m)}
                   </div>
                 )
               })}
@@ -4183,9 +4205,11 @@ function ReglaDeRitmo({ parte, ahora, ahoraReloj, pedido, turno, setCpm, techoDe
                 : <>Derecha: su ritmo promedio mientras anduvo. </>}
               La barra es el % del turno que estuvo andando.
               {conDelta && (
-                <> <b>▲▼</b>: contra lo que esa MISMA máquina aportó en sus últimos{' '}
-                  {refAporte!.turnos === 1 ? 'turno' : `${refAporte!.turnos} turnos`}{' '}
-                  del mismo número — cada Baader compite consigo misma, no con las otras.</>
+                <> Las columnas <b>▲▼</b> comparan cada Baader consigo misma, no con las
+                  otras:{conDeltaUlt && <> <b>vs último</b> es contra el turno anterior del
+                  mismo turno</>}{conDeltaUlt && conDelta5 && ' y'}{conDelta5 && <> <b>vs
+                  prom. {refAporte!.turnos}</b> contra el promedio de sus últimos{' '}
+                  {refAporte!.turnos}</>}.</>
               )}
             </p>
             {fraseMaquinas(maquinas) !== '' && (
@@ -6658,6 +6682,11 @@ export function PublicShiftMonitorPage() {
                  no del vigente: navegando a un turno viejo el delta tiene que
                  ser el de ese turno. */
               refAporte: referenciaAporte(data.shiftStats, (vista?.shiftDocId ?? '').slice(11)),
+              /* La segunda vara: el turno ANTERIOR solo. Orel las quiso a las
+                 dos a la vista (31-08, mirándolo en prod): el último dice «¿me
+                 moví desde la vez pasada?» y el promedio de 5 dice «¿esto es
+                 lo mío o fue un turno raro?». */
+              refAporteUltimo: referenciaAporte(data.shiftStats, (vista?.shiftDocId ?? '').slice(11), 1),
               producingMin: live.timeBreakdown?.producingMin ?? null,
               serieLinea: serieDelTurno,
               seriesMaquinas,
