@@ -6586,7 +6586,17 @@ export function PublicShiftMonitorPage() {
                 const ini = Date.parse(live.effectiveStart ?? live.scheduledStart ?? '')
                 if (!Number.isFinite(ini)) return null
                 const finSched = Date.parse(live.plannedEnd ?? live.scheduledEnd ?? '')
-                const fin = Number.isFinite(finSched) ? finSched + 30 * 60_000 : t0 + largo * 60_000
+                /* ⚠ El tope del fin previsto SOLO con el turno cerrado. En vivo
+                   la cola de la serie ES el presente, y el previsto puede ser
+                   una estimación corta: en Yal (30-08) el turno siguió más
+                   allá de su fin «historial» (20:56) y las barras quedaron
+                   congeladas en 21:26 (+30 min) con el contador vivo en 21:58
+                   dos tarjetas más arriba — dos «ahora» distintos en la misma
+                   pantalla, la clase de contradicción que este monitor viene
+                   cerrando. */
+                const fin = live.shiftClosed && Number.isFinite(finSched)
+                  ? finSched + 30 * 60_000
+                  : t0 + largo * 60_000
                 /* Sin solape real, la serie es de otro turno: a las curvas. */
                 const desdeIdx = Math.max(0, Math.round((ini - t0) / 60_000))
                 const hastaIdx = Math.min(largo, Math.round((fin - t0) / 60_000))
