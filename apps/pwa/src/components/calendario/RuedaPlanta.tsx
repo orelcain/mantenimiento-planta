@@ -109,13 +109,13 @@ export interface RuedaPlantaProps {
 
 export function RuedaPlanta({ maquinas, diaIdx, maquinaActivaId, onSeleccionar }: RuedaPlantaProps) {
   /**
-   * Una máquina sin ningún tramo pintado y sin confirmar no está «libre»: está
-   * SIN DATOS. Sumarla como libre convertía la rueda vacía en «la planta entera
-   * queda libre 24 h», que es mentira.
+   * Una máquina sin NINGÚN tramo pintado en TODA la semana y sin confirmar no
+   * está «libre»: está SIN DATOS. Ojo con mirar solo el día: el domingo vacío de
+   * una máquina con su semana pintada es un domingo genuinamente libre, no un
+   * dato faltante — mirar el día producía un falso positivo justo ahí.
    */
   const sinDatos = maquinas.filter((m) => {
-    const d = m.semana[diaIdx]
-    const vacia = !d || !d.areas.split('').some((c) => c !== '0')
+    const vacia = m.semana.every((d) => !d || !d.areas.split('').some((c) => c !== '0'))
     return vacia && m.revisadoEnTerreno !== true
   })
   const todasSinDatos = maquinas.length > 0 && sinDatos.length === maquinas.length
