@@ -2081,13 +2081,13 @@ function FormularioTerreno({
                 className="rounded-ctl border px-3 py-2 text-footnote"
                 style={{ borderColor: 'var(--lc-border)', background: 'var(--lc-surface)', color: 'var(--lc-ink)' }} />
       {/* La foto de la etiqueta es lo que vuelve irrefutable el vínculo: el
-          que venga después no tiene que creer, ve la placa. `capture` abre
-          la cámara directo en el teléfono. */}
+          que venga después no tiene que creer, ve la placa. Sin `capture`,
+          el teléfono deja elegir cámara o galería. */}
       <label className="flex min-h-[44px] cursor-pointer items-center justify-center gap-2 rounded-ctl border px-3 text-footnote font-medium"
              style={{ borderColor: 'var(--lc-border)', color: fotoNombre ? 'var(--lc-nuevo)' : 'var(--lc-ink-mid)' }}>
         <Camera size={15} />
         {fotoNombre ? 'Foto lista ✓' : 'Foto de la etiqueta (opcional)'}
-        <input type="file" accept="image/*" capture="environment" className="hidden"
+        <input type="file" accept="image/*" className="hidden"
                onChange={(e) => onFoto(e.target.files?.[0] ?? null)} />
       </label>
       {error && (

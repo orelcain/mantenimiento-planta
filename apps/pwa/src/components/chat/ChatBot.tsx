@@ -1697,7 +1697,6 @@ export function ChatBot() {
                 type="file"
                 accept="image/*"
                 multiple
-                capture="environment"
                 onChange={handlePhotoSelect}
                 className="hidden"
               />
