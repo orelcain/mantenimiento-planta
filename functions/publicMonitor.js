@@ -31,6 +31,42 @@
 
 const shoplogixPolling = require('./shoplogix/polling')
 const kpisMantencion = require('./shoplogix/kpisMantencion')
+const { FieldPath } = require('firebase-admin/firestore')
+
+/**
+ * ── Índice de turnos: la lista se lee UNA vez por refresco ──────────────────
+ *
+ * Siete funciones de este módulo necesitan "los turnos de la planta" y cada una
+ * hacía su propio `listDocuments()` de la colección COMPLETA — que Firestore
+ * cobra a una lectura por documento devuelto. Con ~400 turnos acumulados y
+ * hasta 12 `buildMonitorLive` por patch, un solo refresco costaba ~4.000
+ * lecturas, y el trigger corre ~2 veces por minuto: 6-7 MILLONES de lecturas al
+ * día. Fue el 64% de la factura GCP de agosto 2026 (CLP 45.000 solo en reads).
+ *
+ * El índice materializa esa lista una vez, acotada por rango de id (los ids
+ * son `YYYY-MM-DD_Turno`, así que el rango por documentId equivale a un rango
+ * de fechas), y viaja por parámetro a todo el árbol de builders. 45 días = la
+ * ventana de `buildShiftStats`, la más ancha de todas.
+ *
+ * ⚠ Trae los DATOS del doc padre, no solo los ids: la mitad de los consumidores
+ * hacía después un `getAll` de los mismos docs. Con el índice, ambos pasos son
+ * una sola query.
+ *
+ * ⚠ Todos los consumidores conservan su camino LEGADO (listDocuments + getAll)
+ * cuando no reciben índice: los llamadores esporádicos (creación manual de un
+ * link, brief de fin de turno) no lo necesitan, y los stubs de los tests no
+ * implementan `where`.
+ */
+const SHIFT_INDEX_LOOKBACK_DAYS = 45
+
+async function loadShiftIndex(db, plantSlug, nowWall = shoplogixPolling.toChileWall(new Date())) {
+  const desde = shiftDateKey(nowWall, -SHIFT_INDEX_LOOKBACK_DAYS)
+  const snap = await db.collection(`shoplogix/${plantSlug}/shifts`)
+    .where(FieldPath.documentId(), '>=', desde)
+    .get()
+  const entries = snap.docs.map(d => ({ id: d.id, data: d.data() }))
+  return { plantSlug, desde, entries, byId: new Map(entries.map(e => [e.id, e])) }
+}
 
 const COLLECTION = 'publicShiftMonitors'
 
@@ -213,14 +249,20 @@ function shiftDateKey(nowWall, n) {
  *
  * @returns {Promise<string|null>} shiftDocId, o null si la línea no tiene turnos recientes.
  */
-async function resolveCurrentShiftDocId(db, plantSlug, nowWall = shoplogixPolling.toChileWall(new Date())) {
+async function resolveCurrentShiftDocId(db, plantSlug, nowWall = shoplogixPolling.toChileWall(new Date()), index = null) {
   const wanted = new Set([shiftDateKey(nowWall, 0), shiftDateKey(nowWall, -1)])
 
-  const refs = await db.collection(`shoplogix/${plantSlug}/shifts`).listDocuments()
-  const candidates = refs.filter(r => wanted.has(r.id.slice(0, 10)))
-  if (candidates.length === 0) return null
-
-  const docs = await db.getAll(...candidates)
+  let docs
+  if (index) {
+    docs = index.entries
+      .filter(e => wanted.has(e.id.slice(0, 10)))
+      .map(e => ({ id: e.id, exists: true, data: () => e.data }))
+  } else {
+    const refs = await db.collection(`shoplogix/${plantSlug}/shifts`).listDocuments()
+    const candidates = refs.filter(r => wanted.has(r.id.slice(0, 10)))
+    if (candidates.length === 0) return null
+    docs = await db.getAll(...candidates)
+  }
   const parsed = []
   for (const snap of docs) {
     if (!snap.exists) continue
@@ -424,15 +466,23 @@ function agruparTramos(intervals) {
  *
  * @returns {Promise<Map<string, {intervals: Array, states: Array, pieces: number}>>}
  */
-async function loadOutsideShiftProduction(db, plantSlug, shiftDocId, ventanaTurno, yaContados = new Map()) {
+async function loadOutsideShiftProduction(db, plantSlug, shiftDocId, ventanaTurno, yaContados = new Map(), index = null) {
   const dateKey = shiftDocId.slice(0, 10)
   const extras = new Map()
 
-  const refs = await db.collection(`shoplogix/${plantSlug}/shifts`).listDocuments()
-  const delDia = refs.filter(r => r.id.startsWith(dateKey) && r.id !== shiftDocId)
-  if (delDia.length === 0) return extras
-
-  const snaps = await db.getAll(...delDia)
+  let snaps
+  // El índice solo cubre su ventana: para un turno más viejo (link `shift` de
+  // hace meses) se cae al camino legado, que no tiene límite de fecha.
+  if (index && dateKey >= index.desde) {
+    snaps = index.entries
+      .filter(e => e.id.startsWith(dateKey) && e.id !== shiftDocId)
+      .map(e => ({ id: e.id, exists: true, data: () => e.data }))
+  } else {
+    const refs = await db.collection(`shoplogix/${plantSlug}/shifts`).listDocuments()
+    const delDia = refs.filter(r => r.id.startsWith(dateKey) && r.id !== shiftDocId)
+    snaps = delDia.length > 0 ? await db.getAll(...delDia) : []
+  }
+  if (snaps.length === 0) return extras
 
   // Los OTROS turnos con nombre del día: son los que compiten por cada tramo.
   const otrasVentanas = []
@@ -584,20 +634,31 @@ async function loadOutsideShiftProduction(db, plantSlug, shiftDocId, ventanaTurn
 const HISTORIAL_TURNOS = 8
 const MIN_PIEZAS_HISTORIAL = 200
 
-async function inferShiftEndFromHistory(db, plantSlug, shiftId, scheduledStart, currentShiftDocId) {
+async function inferShiftEndFromHistory(db, plantSlug, shiftId, scheduledStart, currentShiftDocId, index = null) {
   if (!shiftId || !scheduledStart) return null
   try {
-    const refs = await db.collection(`shoplogix/${plantSlug}/shifts`).listDocuments()
-    const mismos = refs.filter(r =>
-      r.id !== currentShiftDocId &&
-      !/unscheduled/i.test(r.id) &&
-      normShiftName(r.id.slice(11)) === normShiftName(shiftId),
-    )
-    if (mismos.length === 0) return null
+    const esMismo = (id) =>
+      id !== currentShiftDocId &&
+      !/unscheduled/i.test(id) &&
+      normShiftName(id.slice(11)) === normShiftName(shiftId)
 
-    // Los más recientes primero: el id arranca con el dateKey.
-    mismos.sort((a, b) => b.id.localeCompare(a.id))
-    const snaps = await db.getAll(...mismos.slice(0, HISTORIAL_TURNOS * 2))
+    let snaps
+    if (index) {
+      snaps = index.entries
+        .filter(e => esMismo(e.id))
+        .sort((a, b) => b.id.localeCompare(a.id))
+        .slice(0, HISTORIAL_TURNOS * 2)
+        .map(e => ({ id: e.id, exists: true, data: () => e.data }))
+    } else {
+      const refs = await db.collection(`shoplogix/${plantSlug}/shifts`).listDocuments()
+      const mismos = refs.filter(r => esMismo(r.id))
+      if (mismos.length === 0) return null
+
+      // Los más recientes primero: el id arranca con el dateKey.
+      mismos.sort((a, b) => b.id.localeCompare(a.id))
+      snaps = await db.getAll(...mismos.slice(0, HISTORIAL_TURNOS * 2))
+    }
+    if (snaps.length === 0) return null
 
     /** Minutos desde medianoche del cierre de cada turno con producción real. */
     const cierres = []
@@ -685,16 +746,28 @@ async function inferShiftEndFromHistory(db, plantSlug, shiftId, scheduledStart, 
  */
 const MIN_MUESTRAS_DURACION = 4
 
-async function inferShiftEndFromDuration(db, plantSlug, scheduledStart, currentShiftDocId) {
+async function inferShiftEndFromDuration(db, plantSlug, scheduledStart, currentShiftDocId, index = null) {
   if (!scheduledStart) return null
   try {
-    const refs = await db.collection(`shoplogix/${plantSlug}/shifts`).listDocuments()
     /* Acá SÍ entran todos los nombres: se mide cuánto dura un turno de esta
        línea, no cuándo cierra uno que se llame igual. */
-    const otros = refs.filter((r) => r.id !== currentShiftDocId && !/unscheduled/i.test(r.id))
-    if (otros.length === 0) return null
-    otros.sort((a, b) => b.id.localeCompare(a.id))
-    const snaps = await db.getAll(...otros.slice(0, HISTORIAL_TURNOS * 2))
+    const esOtro = (id) => id !== currentShiftDocId && !/unscheduled/i.test(id)
+
+    let snaps
+    if (index) {
+      snaps = index.entries
+        .filter(e => esOtro(e.id))
+        .sort((a, b) => b.id.localeCompare(a.id))
+        .slice(0, HISTORIAL_TURNOS * 2)
+        .map(e => ({ id: e.id, exists: true, data: () => e.data }))
+    } else {
+      const refs = await db.collection(`shoplogix/${plantSlug}/shifts`).listDocuments()
+      const otros = refs.filter((r) => esOtro(r.id))
+      if (otros.length === 0) return null
+      otros.sort((a, b) => b.id.localeCompare(a.id))
+      snaps = await db.getAll(...otros.slice(0, HISTORIAL_TURNOS * 2))
+    }
+    if (snaps.length === 0) return null
 
     const duraciones = []
     for (const snap of snaps) {
@@ -873,16 +946,19 @@ async function loadPlannedShift(db, plantSlug, shiftId, scheduledStart) {
   }
 }
 
-async function buildMonitorLive(db, plantSlug, shiftDocId) {
+async function buildMonitorLive(db, plantSlug, shiftDocId, index = null) {
   const parentRef = db.doc(`shoplogix/${plantSlug}/shifts/${shiftDocId}`)
+  // El doc padre ya viene en el índice (se cargó en la misma invocación, tras
+  // el write que disparó el trigger): releerlo sería pagar la misma lectura.
+  const enIndice = index?.byId.get(shiftDocId)
   const [parentSnap, machinesSnap] = await Promise.all([
-    parentRef.get(),
+    enIndice ? Promise.resolve(null) : parentRef.get(),
     parentRef.collection('machines').get(),
   ])
 
   if (machinesSnap.empty) return null
 
-  const parent = parentSnap.exists ? parentSnap.data() : {}
+  const parent = enIndice ? enIndice.data : (parentSnap.exists ? parentSnap.data() : {})
 
   const machines = machinesSnap.docs
     .map(d => ({ id: d.id, ...d.data() }))
@@ -906,7 +982,7 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
 
   let extras = new Map()
   try {
-    extras = await loadOutsideShiftProduction(db, plantSlug, shiftDocId, ventanaTurno, yaContados)
+    extras = await loadOutsideShiftProduction(db, plantSlug, shiftDocId, ventanaTurno, yaContados, index)
   } catch (err) {
     // Nunca dejar al monitor sin datos por no poder rescatar la cola.
     extras = new Map()
@@ -1550,7 +1626,7 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
    * pin decide la hora de cierre, pero el ritmo de los turnos pasados sigue
    * siendo la referencia con la que se juzga si la meta es realista.
    */
-  const inferido = await inferShiftEndFromHistory(db, plantSlug, shiftIdActual, scheduledStart, shiftDocId)
+  const inferido = await inferShiftEndFromHistory(db, plantSlug, shiftIdActual, scheduledStart, shiftDocId, index)
 
   if (cfg.plannedEnd && cfg.endPinned) {
     plannedEnd = cfg.plannedEnd
@@ -1574,7 +1650,7 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
          para un `Unscheduled` ese horario es el borde de la ventana (06:00) y
          sumarle la duración daría un cierre a media tarde. */
       const porDuracion = await inferShiftEndFromDuration(
-        db, plantSlug, arranqueProductivo ?? scheduledStart, shiftDocId,
+        db, plantSlug, arranqueProductivo ?? scheduledStart, shiftDocId, index,
       )
       if (porDuracion) {
         plannedEnd = porDuracion.end
@@ -1722,19 +1798,26 @@ const HISTORY_MIN_PIECES = 50
  *
  * @returns {Promise<Array<{shiftDocId: string, dateKey: string, shiftId: string, live: object}>>}
  */
-async function buildMonitorHistory(db, plantSlug, currentShiftDocId, prevHistory = []) {
+async function buildMonitorHistory(db, plantSlug, currentShiftDocId, prevHistory = [], index = null) {
   const nowWall = shoplogixPolling.toChileWall(new Date())
   const desde = shiftDateKey(nowWall, -HISTORY_LOOKBACK_DAYS)
 
-  const refs = await db.collection(`shoplogix/${plantSlug}/shifts`).listDocuments()
-  const candidatos = refs.filter(r =>
-    r.id !== currentShiftDocId &&
-    r.id.slice(0, 10) >= desde &&
-    !/unscheduled/i.test(r.id),
-  )
-  if (candidatos.length === 0) return []
+  const esCandidato = (id) =>
+    id !== currentShiftDocId &&
+    id.slice(0, 10) >= desde &&
+    !/unscheduled/i.test(id)
 
-  const snaps = await db.getAll(...candidatos)
+  let snaps
+  if (index) {
+    snaps = index.entries
+      .filter(e => esCandidato(e.id))
+      .map(e => ({ id: e.id, exists: true, data: () => e.data }))
+  } else {
+    const refs = await db.collection(`shoplogix/${plantSlug}/shifts`).listDocuments()
+    const candidatos = refs.filter(r => esCandidato(r.id))
+    if (candidatos.length === 0) return []
+    snaps = await db.getAll(...candidatos)
+  }
   const turnos = []
   for (const snap of snaps) {
     if (!snap.exists) continue
@@ -1757,7 +1840,7 @@ async function buildMonitorHistory(db, plantSlug, currentShiftDocId, prevHistory
     // «Anterior» mostrando el desglose recortado para siempre.
     if (cacheado?.live && i > 0 && cacheado.live.timeBreakdown?.tbv === 2) { out.push(cacheado); continue }
     try {
-      const live = await buildMonitorLive(db, plantSlug, id)
+      const live = await buildMonitorLive(db, plantSlug, id, index)
       if (live) out.push({ shiftDocId: id, dateKey: id.slice(0, 10), shiftId: id.slice(11), live })
     } catch {
       if (cacheado?.live) out.push(cacheado)
@@ -1880,13 +1963,14 @@ const STATS_NUEVOS_POR_CORRIDA = 5
  * Sin esto, «lo que se repite» solo podía mirar los 6 turnos de `history`, que
  * cargan la serie completa de cada uno y por eso son pocos.
  */
-async function buildShiftStats(db, plantSlug, currentShiftDocId, prev = [], history = [], forecast = []) {
+async function buildShiftStats(db, plantSlug, currentShiftDocId, prev = [], history = [], forecast = [], index = null, descartados = null) {
   const nowWall = shoplogixPolling.toChileWall(new Date())
-  const desde = shiftDateKey(nowWall, -45)
+  const desde = shiftDateKey(nowWall, -SHIFT_INDEX_LOOKBACK_DAYS)
 
-  const refs = await db.collection(`shoplogix/${plantSlug}/shifts`).listDocuments()
-  const ids = refs
-    .map(r => r.id)
+  const idsCrudos = index
+    ? index.entries.map(e => e.id)
+    : (await db.collection(`shoplogix/${plantSlug}/shifts`).listDocuments()).map(r => r.id)
+  const ids = idsCrudos
     /*
      * ⚠ Sin «Unscheduled»: es el cajón de lo que cae fuera de horario, no un
      * turno — el historial ya lo descarta por la misma razón. Se coló en la
@@ -1918,16 +2002,30 @@ async function buildShiftStats(db, plantSlug, currentShiftDocId, prev = [], hist
     if (cacheado && i > 0 && cacheado.tbv === 2 && cacheado.porMaquina !== undefined) {
       out.push(cacheado); continue
     }
+    /*
+     * ⚠ Los DESCARTADOS también se recuerdan. Un turno que no pasa el piso de
+     * piezas (o no tiene desglose) nunca entra al arreglo, así que el caché de
+     * arriba jamás lo encuentra — y se reconstruía COMPLETO en cada refresco,
+     * para siempre. Con 5 pruebas descartadas eran +15 barridos de colección
+     * por patch, permanentes (parte de la fuga de agosto 2026). El descarte de
+     * un turno cerrado es tan estable como su resumen: se anota una vez y no
+     * se vuelve a mirar (salvo en i === 0, que aún puede moverse).
+     */
+    if (descartados && i > 0 && !cacheado && descartados.has(id)) continue
     const live = yaConstruidos.get(id)
     if (!live && nuevos >= STATS_NUEVOS_POR_CORRIDA) {
       if (cacheado) out.push(cacheado)
       continue
     }
     try {
-      const l = live || await buildMonitorLive(db, plantSlug, id)
+      const l = live || await buildMonitorLive(db, plantSlug, id, index)
       if (!live) nuevos++
       const tb = l?.timeBreakdown
-      if (!tb || !(tb.windowMin > 0)) { if (cacheado) out.push(cacheado); continue }
+      if (!tb || !(tb.windowMin > 0)) {
+        if (cacheado) out.push(cacheado)
+        else if (i > 0) descartados?.add(id)
+        continue
+      }
       /*
        * ⚠ El MISMO piso de piezas que el pronóstico, y por la misma razón: en
        * Filete el 1-ago figura con 180 piezas y el 28-jul con 42 — son
@@ -1940,6 +2038,7 @@ async function buildShiftStats(db, plantSlug, currentShiftDocId, prev = [], hist
       const total = l.totalPieces ?? 0
       if (total < FORECAST_MIN_PIECES) {
         if (cacheado) out.push(cacheado)
+        else if (i > 0) descartados?.add(id)
         continue
       }
       out.push({
@@ -2003,17 +2102,19 @@ async function buildShiftStats(db, plantSlug, currentShiftDocId, prev = [], hist
  * así que se reusa lo ya publicado y solo se compone lo que falta. Además se
  * aprovechan los `live` que el historial acaba de construir.
  */
-async function buildForecastHistory(db, plantSlug, currentShiftDocId, shiftId, prev = [], history = []) {
+async function buildForecastHistory(db, plantSlug, currentShiftDocId, shiftId, prev = [], history = [], index = null, descartados = null) {
   if (!shiftId) return []
   const nowWall = shoplogixPolling.toChileWall(new Date())
   const desde = shiftDateKey(nowWall, -30)
 
-  const refs = await db.collection(`shoplogix/${plantSlug}/shifts`).listDocuments()
-  const candidatos = refs.filter(r =>
-    r.id !== currentShiftDocId &&
-    r.id.slice(0, 10) >= desde &&
-    r.id.slice(11) === shiftId,
-  )
+  const esCandidato = (id) =>
+    id !== currentShiftDocId &&
+    id.slice(0, 10) >= desde &&
+    id.slice(11) === shiftId
+
+  const candidatos = index
+    ? index.entries.filter(e => esCandidato(e.id))
+    : (await db.collection(`shoplogix/${plantSlug}/shifts`).listDocuments()).filter(r => esCandidato(r.id))
   if (candidatos.length === 0) return []
 
   const previos = new Map((prev || []).map(h => [h.shiftDocId, h]))
@@ -2040,11 +2141,15 @@ async function buildForecastHistory(db, plantSlug, currentShiftDocId, shiftId, p
     const completo = cacheado && cacheado.windowMin != null && cacheado.tbv === 2
       && cacheado.expected !== undefined
     if (completo && i > 0) { out.push(cacheado); continue }
+    // Descartado conocido (prueba de 180 pz, arranque abortado): no se
+    // reconstruye en cada refresco — misma razón que en `buildShiftStats`.
+    if (descartados && i > 0 && !cacheado && descartados.has(id)) continue
     try {
-      const live = yaConstruidos.get(id) || await buildMonitorLive(db, plantSlug, id)
+      const live = yaConstruidos.get(id) || await buildMonitorLive(db, plantSlug, id, index)
       const resumen = live && resumirParaForecast(live)
       if (resumen) out.push({ shiftDocId: id, dateKey: id.slice(0, 10), ...resumen })
       else if (cacheado) out.push(cacheado)
+      else if (i > 0) descartados?.add(id)
     } catch {
       if (cacheado) out.push(cacheado)
     }
@@ -2118,19 +2223,40 @@ function archivarSerieMinuto(monitor) {
  *
  * @returns {Promise<object|null>} patch a mergear en el doc, o null si no hay nada que publicar.
  */
-async function buildMonitorPatch(db, monitor, currentShiftDocIdByPlant = new Map()) {
+async function buildMonitorPatch(db, monitor, currentShiftDocIdByPlant = new Map(), shiftIndexByPlant = new Map()) {
   const plantSlug = monitor.plantSlug
   if (!plantSlug) return null
+
+  // El índice de turnos se carga UNA vez por planta y se comparte entre los
+  // monitores del mismo evento (ver `loadShiftIndex`). Si no se puede cargar
+  // (stub de tests sin `where`, o un error transitorio), todo el árbol degrada
+  // solo al camino legado — más caro, nunca menos correcto.
+  let index = shiftIndexByPlant.get(plantSlug)
+  if (index === undefined) {
+    try { index = await loadShiftIndex(db, plantSlug) } catch { index = null }
+    shiftIndexByPlant.set(plantSlug, index)
+  }
+
+  // Descartados de las cachés livianas: viajan en el doc para no reconstruir
+  // las mismas pruebas en cada refresco. Los Set se mutan dentro de los
+  // builders; acá solo se serializan de vuelta, podados a su ventana.
+  const statsSkip = new Set(Array.isArray(monitor.statsDescartados) ? monitor.statsDescartados : [])
+  const forecastSkip = new Set(Array.isArray(monitor.forecastDescartados) ? monitor.forecastDescartados : [])
+  const nowWall = shoplogixPolling.toChileWall(new Date())
+  const podado = (set, dias) => {
+    const min = shiftDateKey(nowWall, -dias)
+    return [...set].filter(id => id.slice(0, 10) >= min).sort()
+  }
 
   if (monitor.mode !== 'line') {
     // Un link de turno fijo tampoco tiene por qué ser una isla: se le publican
     // igual los turnos anteriores para poder deslizar.
-    const live = await buildMonitorLive(db, plantSlug, monitor.shiftDocId)
+    const live = await buildMonitorLive(db, plantSlug, monitor.shiftDocId, index)
     if (!live) return null
-    const history = await buildMonitorHistory(db, plantSlug, monitor.shiftDocId, monitor.history)
+    const history = await buildMonitorHistory(db, plantSlug, monitor.shiftDocId, monitor.history, index)
     const fh = await buildForecastHistory(
       db, plantSlug, monitor.shiftDocId, String(monitor.shiftDocId).slice(11),
-      monitor.forecastHistory, history,
+      monitor.forecastHistory, history, index, forecastSkip,
     )
     return {
       live,
@@ -2139,8 +2265,10 @@ async function buildMonitorPatch(db, monitor, currentShiftDocIdByPlant = new Map
       /* Liviano y con TODOS los turnos: habilita elegir la ventana y comparar
          un turno contra el otro. Ver `buildShiftStats`. */
       shiftStats: await buildShiftStats(
-        db, plantSlug, monitor.shiftDocId, monitor.shiftStats, history, fh,
+        db, plantSlug, monitor.shiftDocId, monitor.shiftStats, history, fh, index, statsSkip,
       ),
+      statsDescartados: podado(statsSkip, SHIFT_INDEX_LOOKBACK_DAYS),
+      forecastDescartados: podado(forecastSkip, 30),
     }
   }
 
@@ -2148,17 +2276,17 @@ async function buildMonitorPatch(db, monitor, currentShiftDocIdByPlant = new Map
   // entre los monitores de esa misma línea.
   let shiftDocId = currentShiftDocIdByPlant.get(plantSlug)
   if (shiftDocId === undefined) {
-    shiftDocId = await resolveCurrentShiftDocId(db, plantSlug)
+    shiftDocId = await resolveCurrentShiftDocId(db, plantSlug, undefined, index)
     currentShiftDocIdByPlant.set(plantSlug, shiftDocId)
   }
   if (!shiftDocId) return null
 
-  const live = await buildMonitorLive(db, plantSlug, shiftDocId)
+  const live = await buildMonitorLive(db, plantSlug, shiftDocId, index)
   if (!live) return null
 
-  const history = await buildMonitorHistory(db, plantSlug, shiftDocId, monitor.history)
+  const history = await buildMonitorHistory(db, plantSlug, shiftDocId, monitor.history, index)
   const fhLinea = await buildForecastHistory(
-    db, plantSlug, shiftDocId, shiftDocId.slice(11), monitor.forecastHistory, history,
+    db, plantSlug, shiftDocId, shiftDocId.slice(11), monitor.forecastHistory, history, index, forecastSkip,
   )
   /* El archivo de barras del turno que se venía midiendo (ver
      `archivarSerieMinuto`). Solo modo línea: en un link de turno fijo el pulso
@@ -2174,7 +2302,9 @@ async function buildMonitorPatch(db, monitor, currentShiftDocIdByPlant = new Map
     forecastHistory: fhLinea,
     /* Liviano y con TODOS los turnos: habilita elegir la ventana y comparar
        un turno contra el otro. Ver `buildShiftStats`. */
-    shiftStats: await buildShiftStats(db, plantSlug, shiftDocId, monitor.shiftStats, history, fhLinea),
+    shiftStats: await buildShiftStats(db, plantSlug, shiftDocId, monitor.shiftStats, history, fhLinea, index, statsSkip),
+    statsDescartados: podado(statsSkip, SHIFT_INDEX_LOOKBACK_DAYS),
+    forecastDescartados: podado(forecastSkip, 30),
     shiftDocId,
     dateKey: shiftDocId.slice(0, 10),
     shiftId: shiftDocId.slice(11),
@@ -2224,11 +2354,17 @@ async function ensureLineMonitor(db, plantSlug, { ttlDays = 30, meta = {} } = {}
     return { token: doc.id, created: false }
   }
 
-  const shiftDocId = await resolveCurrentShiftDocId(db, plantSlug)
-  const live = shiftDocId ? await buildMonitorLive(db, plantSlug, shiftDocId) : null
+  // Crear un link compone live + historial: con índice sale por una query en
+  // vez de barrer la colección varias veces. Si no se puede (stub de tests),
+  // el camino legado sigue funcionando igual.
+  let index = null
+  try { index = await loadShiftIndex(db, plantSlug) } catch { index = null }
+
+  const shiftDocId = await resolveCurrentShiftDocId(db, plantSlug, undefined, index)
+  const live = shiftDocId ? await buildMonitorLive(db, plantSlug, shiftDocId, index) : null
   // Con historial desde el minuto uno: un link recién creado ya se puede
   // deslizar hacia atrás, sin esperar al primer refresco del trigger.
-  const history = shiftDocId ? await buildMonitorHistory(db, plantSlug, shiftDocId, []) : []
+  const history = shiftDocId ? await buildMonitorHistory(db, plantSlug, shiftDocId, [], index) : []
 
   const token = require('crypto').randomUUID()
   await db.collection(COLLECTION).doc(token).set({
@@ -2272,7 +2408,7 @@ async function ensureLineMonitor(db, plantSlug, { ttlDays = 30, meta = {} } = {}
  *   `lastPieceAt` va en wall-clock-as-UTC como todo lo derivado de intervals:
  *   quien lo compare con el reloj real tiene que convertirlo.
  */
-async function sumarColaAMaquinas(db, plantSlug, shiftDocId, parent, machines) {
+async function sumarColaAMaquinas(db, plantSlug, shiftDocId, parent, machines, index = null) {
   const vacio = { pieces: 0, start: null, end: null, lastPieceAt: null }
   const ventanaTurno = { start: toDate(parent.scheduledStart), end: toDate(parent.scheduledEnd) }
   if (!ventanaTurno.start || !ventanaTurno.end) return vacio
@@ -2284,7 +2420,7 @@ async function sumarColaAMaquinas(db, plantSlug, shiftDocId, parent, machines) {
     ]),
   )
 
-  const extras = await loadOutsideShiftProduction(db, plantSlug, shiftDocId, ventanaTurno, yaContados)
+  const extras = await loadOutsideShiftProduction(db, plantSlug, shiftDocId, ventanaTurno, yaContados, index)
   if (extras.size === 0) return vacio
 
   let pieces = 0
@@ -2306,6 +2442,50 @@ async function sumarColaAMaquinas(db, plantSlug, shiftDocId, parent, machines) {
   return { pieces, start, end, lastPieceAt: end }
 }
 
+/**
+ * ¿El write del doc padre trae algún cambio REAL, o es solo el sello del sync?
+ *
+ * El sync reescribe el padre en CADA ciclo aunque no haya pasado nada: renueva
+ * `lastSyncAt` (y `officialSyncedAt` / `officialLive.at`) incondicionalmente —
+ * y a propósito, porque el verificador de arranque y la PWA leen esa marca para
+ * saber que el sync está vivo. Pero para el monitor público un write así es
+ * ruido: reconstruir el payload con los mismos datos produce el mismo payload.
+ * De madrugada, con la línea detenida, ese ruido era el 100% de los refrescos.
+ *
+ * Compara before/after IGNORANDO esas marcas de tiempo. Cualquier duda (campos
+ * raros, docs a medio migrar) responde false — o sea "sí cambió, refresca":
+ * el costo de un refresco de más es plata; el de uno de menos, una pantalla
+ * mintiendo.
+ */
+function parentSinCambioReal(before, after) {
+  if (!before || !after) return false
+  try {
+    return huellaParent(before) === huellaParent(after)
+  } catch {
+    return false
+  }
+}
+
+function huellaParent(data) {
+  const limpio = { ...data }
+  delete limpio.lastSyncAt
+  delete limpio.officialSyncedAt
+  if (limpio.officialLive && typeof limpio.officialLive === 'object') {
+    limpio.officialLive = { ...limpio.officialLive }
+    delete limpio.officialLive.at
+  }
+  return huellaEstable(limpio)
+}
+
+/** JSON con claves ordenadas y Timestamps/Dates normalizados a epoch-ms. */
+function huellaEstable(v) {
+  if (v === null || typeof v !== 'object') return JSON.stringify(v)
+  if (typeof v.toMillis === 'function') return String(v.toMillis())
+  if (v instanceof Date) return String(v.getTime())
+  if (Array.isArray(v)) return '[' + v.map(huellaEstable).join(',') + ']'
+  return '{' + Object.keys(v).sort().map(k => JSON.stringify(k) + ':' + huellaEstable(v[k])).join(',') + '}'
+}
+
 module.exports = {
   COLLECTION,
   esTurnoSellado,
@@ -2325,6 +2505,8 @@ module.exports = {
   loadOutsideShiftProduction,
   sumarColaAMaquinas,
   OUTSIDE_MIN_PIECES,
+  loadShiftIndex,
+  parentSinCambioReal,
   // exportados para tests
   currentStateOf,
   statusOf,
