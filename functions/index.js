@@ -6356,6 +6356,21 @@ exports.shoplogixPulseWakeup = onSchedule(
     })
     if (vivos.length === 0) return
 
+    /*
+     * Fuera de proceso no hay nada que pulsar. El encabezado siempre lo
+     * prometió («solo si la planta tiene un turno en curso») pero el chequeo
+     * no existía: la función le preguntaba a Shoplogix cada minuto, 24/7, con
+     * la planta parada — CPU y requests puro desperdicio (fuga de agosto 2026).
+     * El propio monitor sabe si su turno está abierto: `live.shiftClosed` lo
+     * sella el trigger cuando la línea deja de producir, y el primer sync del
+     * turno siguiente lo vuelve a abrir (≤5 min de retardo, que el pulso no
+     * puede adelantar de todos modos: sin turno no hay contador que leer). El
+     * vigía tampoco pierde nada: es intra-turno, y con el turno sellado no
+     * tiene qué vigilar.
+     */
+    const conTurnoAbierto = vivos.filter((d) => d.data().live?.shiftClosed !== true)
+    if (conTurnoAbierto.length === 0) return
+
     const auth = await resolveShoplogixAuth(logger)
     if (auth.mode === 'none') return
     /* El mismo patrón que `syncDay`: Bearer si hay token, cookie si no. */
@@ -6369,7 +6384,7 @@ exports.shoplogixPulseWakeup = onSchedule(
 
     /* Una lectura por PLANTA aunque haya varios monitores de la misma línea. */
     const porPlanta = new Map()
-    for (const d of vivos) {
+    for (const d of conTurnoAbierto) {
       const slug = d.data().plantSlug
       if (!porPlanta.has(slug)) porPlanta.set(slug, [])
       porPlanta.get(slug).push(d)
@@ -8795,6 +8810,16 @@ exports.onShoplogixShiftWrittenPublicMonitor = onDocumentWritten(
   { document: 'shoplogix/{plant}/shifts/{shiftDoc}', region: 'us-central1' },
   async (event) => {
     const { plant, shiftDoc } = event.params
+
+    // Debounce: el sync reescribe el padre en CADA ciclo aunque nada haya
+    // cambiado (renueva `lastSyncAt` a propósito — la PWA y el verificador
+    // leen esa marca). Recomponer los monitores con los mismos datos produce
+    // el mismo payload: de madrugada, con la línea parada, era el 100% de los
+    // refrescos y una parte grande de la fuga de lecturas de agosto 2026.
+    const before = event.data?.before?.exists ? event.data.before.data() : null
+    const after = event.data?.after?.exists ? event.data.after.data() : null
+    if (publicMonitorMod.parentSinCambioReal(before, after)) return
+
     const scopes = [`${plant}|${shiftDoc}`, `line|${plant}`]
 
     const monitors = await db.collection(publicMonitorMod.COLLECTION)
@@ -8806,14 +8831,16 @@ exports.onShoplogixShiftWrittenPublicMonitor = onDocumentWritten(
     const activos = monitors.docs.filter(d => String(d.data()?.expiresAt || '') > nowIso)
     if (activos.length === 0) return
 
-    // El turno vigente se resuelve UNA vez por planta y se comparte entre todos
-    // los monitores de línea de este evento.
+    // El turno vigente y el índice de turnos se resuelven UNA vez por planta y
+    // se comparten entre todos los monitores de este evento (ver
+    // `loadShiftIndex`: el índice es lo que mató los barridos por-función).
     const currentByPlant = new Map()
+    const indexByPlant = new Map()
     let refrescados = 0
 
     for (const d of activos) {
       try {
-        const patch = await publicMonitorMod.buildMonitorPatch(db, d.data(), currentByPlant)
+        const patch = await publicMonitorMod.buildMonitorPatch(db, d.data(), currentByPlant, indexByPlant)
         if (!patch) continue
         await d.ref.set(patch, { merge: true })
         refrescados++

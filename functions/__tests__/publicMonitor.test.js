@@ -1022,3 +1022,123 @@ test('inferShiftEndFromDuration: sin muestras suficientes NO inventa un cierre',
   const r = await inferShiftEndFromDuration(db, 'filete', new Date('2026-08-17T00:20:00Z'), 'x')
   assert.equal(r, null)
 })
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * Control de costo Firestore (fuga de agosto 2026: 6-7M lecturas/día).
+ * Tres mecanismos: el índice de turnos (una query en vez de N barridos), el
+ * debounce del trigger (writes sin cambio real no refrescan) y la memoria de
+ * turnos descartados (las pruebas de 180 pz no se reconstruyen por siempre).
+ * ────────────────────────────────────────────────────────────────────────── */
+const { parentSinCambioReal, buildShiftStats: buildShiftStatsCosto } = require('../publicMonitor')
+
+test('debounce: un write que solo renueva lastSyncAt NO cuenta como cambio', () => {
+  const base = {
+    shiftId: 'Turno Dia',
+    scheduledStart: new Date('2026-08-30T08:00:00Z'),
+    machines: [{ machineid: 'b200', totalCycles: 4000 }],
+    officialLive: { totalCycles: 4100, at: new Date('2026-08-30T14:00:00Z') },
+    officialSyncedAt: new Date('2026-08-30T14:00:00Z'),
+    lastSyncAt: new Date('2026-08-30T14:00:00Z'),
+  }
+  const soloSello = {
+    ...base,
+    lastSyncAt: new Date('2026-08-30T14:05:00Z'),
+    officialSyncedAt: new Date('2026-08-30T14:05:00Z'),
+    officialLive: { ...base.officialLive, at: new Date('2026-08-30T14:05:00Z') },
+  }
+  assert.equal(parentSinCambioReal(base, soloSello), true, 'solo cambió el sello del sync')
+
+  const conPiezas = { ...soloSello, machines: [{ machineid: 'b200', totalCycles: 4100 }] }
+  assert.equal(parentSinCambioReal(base, conPiezas), false, 'las piezas subieron: hay que refrescar')
+
+  assert.equal(parentSinCambioReal(null, base), false, 'un doc nuevo siempre refresca')
+  assert.equal(parentSinCambioReal(base, null), false, 'un borrado también')
+})
+
+test('debounce: los Timestamps de Firestore se comparan por valor, no por identidad', () => {
+  const ts = (ms) => ({ toMillis: () => ms })
+  const a = { scheduledStart: ts(1000), lastSyncAt: ts(5000) }
+  const b = { scheduledStart: ts(1000), lastSyncAt: ts(9000) }
+  assert.equal(parentSinCambioReal(a, b), true)
+  const c = { scheduledStart: ts(2000), lastSyncAt: ts(9000) }
+  assert.equal(parentSinCambioReal(a, c), false)
+})
+
+test('shiftStats recuerda los descartados y no vuelve a leer sus máquinas', async () => {
+  const w = nowWall()
+  const d1 = dk(new Date(w.getTime() - 86_400_000))
+  const d2 = dk(new Date(w.getTime() - 2 * 86_400_000))
+  const actual = `${dk(w)}_Turno Dia`
+  const bueno = `${d1}_Turno Dia`
+  const prueba = `${d2}_Turno Dia`
+  const hDe = (d, h) => new Date(Date.UTC(Number(d.slice(0, 4)), Number(d.slice(5, 7)) - 1, Number(d.slice(8, 10)), h))
+
+  const parents = {
+    [actual]: { shiftId: 'Turno Dia', scheduledStart: hoy(8), scheduledEnd: hoy(16), machines: [{ totalCycles: 3000 }] },
+    [bueno]:  { shiftId: 'Turno Dia', scheduledStart: hDe(d1, 8), scheduledEnd: hDe(d1, 16), machines: [{ totalCycles: 2000 }] },
+    [prueba]: { shiftId: 'Turno Dia', scheduledStart: hDe(d2, 8), scheduledEnd: hDe(d2, 16), machines: [{ totalCycles: 180 }] },
+  }
+  const machinesByShift = {
+    [bueno]:  [maquinaStats(2000, hDe(d1, 8).getTime())],
+    [prueba]: [{
+      machineid: 'b200', machineName: 'Linea 1', machineType: 'baader_200',
+      totalCycles: 180, shiftRuntime: 0.8,
+      shiftRuntimeBreakdown: { uptimeSec: 960, downtimeSec: 60, breakSec: 0 },
+      intervals: intervals(hDe(d2, 8).getTime(), 3, 60), states: [],
+    }],
+  }
+  const lecturasMaquinas = new Map()
+  const conContador = (dbBase) => ({
+    ...dbBase,
+    doc: (path) => {
+      const id = path.split('/shifts/')[1]
+      const original = dbBase.doc(path)
+      return {
+        ...original,
+        collection: (...args) => {
+          lecturasMaquinas.set(id, (lecturasMaquinas.get(id) || 0) + 1)
+          return original.collection(...args)
+        },
+      }
+    },
+  })
+  const db = conContador(fakeShiftsDb(parents, machinesByShift))
+
+  // Primera corrida: la prueba se construye, se descarta y queda anotada.
+  const descartados = new Set()
+  const out1 = await buildShiftStatsCosto(db, 'filete', actual, [], [], [], null, descartados)
+  assert.ok(!out1.some(o => o.shiftDocId === prueba), 'la prueba no entra al arreglo')
+  assert.ok(descartados.has(prueba), 'y queda anotada como descartada')
+
+  // Segunda corrida, con la anotación: la prueba NI SIQUIERA se vuelve a leer.
+  lecturasMaquinas.clear()
+  const out2 = await buildShiftStatsCosto(db, 'filete', actual, out1, [], [], null, descartados)
+  assert.equal(lecturasMaquinas.get(prueba) ?? 0, 0, 'cero lecturas de sus máquinas')
+  assert.ok(out2.some(o => o.shiftDocId === bueno), 'el turno real sigue disponible')
+})
+
+test('el índice de turnos evita el barrido: con índice, resolver no toca listDocuments', async () => {
+  const w = nowWall()
+  const vigenteId = `${dk(w)}_Turno Dia`
+  const index = {
+    plantSlug: 'filete',
+    desde: dk(new Date(w.getTime() - 45 * 86_400_000)),
+    entries: [{
+      id: vigenteId,
+      data: {
+        shiftId: 'Turno Dia',
+        scheduledStart: new Date(w.getTime() - 60 * 60_000),
+        scheduledEnd: new Date(w.getTime() + 60 * 60_000),
+        machines: [{ totalCycles: 500 }],
+      },
+    }],
+    byId: new Map(),
+  }
+  // Un db que revienta si alguien intenta el camino caro.
+  const dbProhibido = {
+    collection: () => { throw new Error('listDocuments NO debe llamarse con índice') },
+    getAll: () => { throw new Error('getAll NO debe llamarse con índice') },
+  }
+  const r = await resolveCurrentShiftDocId(dbProhibido, 'filete', w, index)
+  assert.equal(r, vigenteId)
+})
