@@ -6,6 +6,22 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-02 · Fix: sync y pulso pagaban vCPU completa por esperar red (PR #898)
+
+Tercera pata de la fuga de costos de agosto (tras #895 lecturas y #896 jitter).
+Cloud Run factura vCPU **asignada** × tiempo de instancia, no CPU usada:
+`shoplogixSyncWakeup` (cada 5 min, 24/7) y `shoplogixPulseWakeup` (cada 1 min
+en turno) son ~95% espera de red y pagaban 4× por esperar con la vCPU completa
+por defecto. Se fijó `cpu: 0.25` + `concurrency: 1` (obligatorio con cpu<1) en
+ambas. El cómputo real tolera ir más lento con margen enorme (sync: ciclos
+~60-90 s vs timeout 420 s). Verificado: `node --check` limpio, CI "build"
+verde, mergeado a `31742685...`, deploy automático de Functions y PWA
+confirmados OK (`gh run list`). Ahorro estimado ~CLP 3-4.000/mes. Pendiente:
+confirmar en Cloud Billing la baja en el próximo ciclo.
+
+⚠️ **Este archivo sigue subiendo (~183 KB)** — compactar el historial viejo
+en la próxima sesión que toque el WORKLOG (ver nota del 2026-08-18 abajo).
+
 ## 2026-09-02 · Fix: el sleep del jitter de sync era CPU facturado 24/7 (PR #896)
 
 Segunda pata de la fuga de costos de agosto (la primera se cerró en #895): el
