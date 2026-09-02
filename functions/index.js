@@ -1410,7 +1410,16 @@ exports.purgeSensorReadings = onSchedule(
     schedule: 'every day 03:00',
     timeZone: 'America/Santiago',
     timeoutSeconds: 540,
-    memory: '256MiB',
+    /*
+     * ⚠ 512MiB porque la purga carga TODO `sensors/` de RTDB a memoria
+     * (`once('value')`) antes de recorrer. Con 256MiB llevaba días muriendo
+     * por OOM ("283 MiB used", visto 01-09-2026) — y cada día sin purgar el
+     * árbol crece y el OOM se agrava: espiral. La subida destraba la purga;
+     * el fix de fondo (recorrer por equipo en vez de cargar el árbol entero)
+     * queda anotado en docs/COSTOS_GCP.md. Corre 1 vez/día: el costo extra
+     * de memoria es centavos.
+     */
+    memory: '512MiB',
     retryCount: 1,
   },
   async () => {
@@ -6627,7 +6636,14 @@ exports.shoplogixTokenRefresh = onSchedule(
     schedule: 'every 50 minutes',
     timeZone: 'UTC',
     timeoutSeconds: 60,
-    memory: '128MiB',
+    /*
+     * ⚠ El bundle de index.js creció y ya no arranca en 128MiB: la instancia
+     * moría en el startup probe ("Memory limit of 128 MiB exceeded with
+     * 133 MiB used", visto 01-09-2026) y el refresh de token NUNCA llegó a
+     * ejecutar — parte de por qué el ROPC vivía en backoff y el sync quedaba
+     * pegado a la cookie. 256MiB es el mínimo real para este bundle.
+     */
+    memory: '256MiB',
     retryCount: 2,
     // No secrets: credenciales en Firestore system/shoplogixCredentials
   },
