@@ -49,6 +49,19 @@ colección que crece con el tiempo dentro de un trigger o un cron. Siempre acota
 rango de `documentId`/fecha, y si varios consumidores necesitan la misma lista en una
 invocación, leerla UNA vez y pasarla por parámetro.
 
+### Fix 2 (02-09-2026): el sleep facturado del sync
+
+El jitter anti-bot de `shoplogixSyncWakeup` dormía 0-120 s DENTRO de la función, cada
+5 min, 24/7 — y Cloud Run cobra el CPU también mientras la función duerme: ~4,8 h de
+CPU al día pagadas por un `setTimeout` (~CLP 9.000/mes). Se bajó a 0-20 s (la
+variabilidad contra los boundaries del scheduler se mantiene); el espaciado entre
+requests a Shoplogix (`pauseBetweenMachines`, 1,5-3,5 s) NO se tocó porque ese sí es
+el que imita cadencia humana donde Shoplogix la ve.
+
+**Regla para el futuro:** en Cloud Run con facturación por request, todo `setTimeout`
+/ espera dentro de la función es CPU facturado. Sleeps largos en crons frecuentes son
+plata: preferir jitter corto, o mover la espera fuera de la función.
+
 ## Presupuestos y export (estado desde sept 2026)
 
 - Presupuesto **USD 20/mes** en la cuenta, alertas al 25/50/75/100% del gasto **real**

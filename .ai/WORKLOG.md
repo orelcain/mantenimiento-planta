@@ -6,6 +6,27 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-01 · Fix: monitor público barría la colección de turnos en cada refresco (PR #895)
+
+Factura GCP de agosto: **CLP 71.013** (5x lo normal), 64% eran 114M lecturas
+Firestore del backend del monitor público (7 `listDocuments()` de la colección
+completa de turnos × hasta 12 `buildMonitorLive` por patch × ~2 patches/min).
+Firestore reads Santiago CLP 45.247, Cloud Run CPU CLP 20.593.
+
+Fix: (1) `loadShiftIndex()` lee la lista de turnos UNA vez por evento con
+query acotada a 45 días por rango de `documentId`; (2) debounce del trigger
+con `parentSinCambioReal`; (3) el pulso de 1 min sale temprano si todos los
+monitores tienen `live.shiftClosed`; (4) turnos descartados por piso de
+piezas quedan anotados y no se reconstruyen más; (5) `docs/COSTOS_GCP.md`
+con causa y protocolo de vigilancia. Verificado: 447/449 tests locales
+(2 fallas preexistentes en main, sensibles a fecha), CI "build" verde,
+mergeado a `fbeddd2e`. Deploy automático de Functions y PWA confirmados OK.
+Pendiente: confirmar en Cloud Billing que las lecturas bajan en el próximo
+ciclo de facturación.
+
+⚠️ **Este archivo pasó de ~150 KB** (181 KB al momento de esta entrada) —
+conviene compactar el historial viejo como se hizo el 2026-08-18.
+
 ## 2026-08-26 · Fix: `pnpm-lock.yaml` llevaba semanas desincronizado y nada lo delataba (PR #823)
 
 El PR #643 agregó `jspdf`/`jspdf-autotable` a `functions/package.json` y

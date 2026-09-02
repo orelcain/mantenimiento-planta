@@ -6499,7 +6499,15 @@ exports.shoplogixSyncWakeup = onSchedule(
     // mismo segundo (Cloud Scheduler dispara exacto, pero Shoplogix verá
     // timestamps variables → patrón más humano). Acotado cuando hay días extra
     // para no arriesgar el timeout.
-    const jitterMs = Math.floor(Math.random() * (extraDateKeys.length > 0 ? 30_000 : 120_000))
+    //
+    // ⚠ 0-20 s y no 0-120 s: Cloud Run cobra el CPU también mientras la función
+    // DUERME, y este sleep corre cada 5 min las 24 horas — con 0-120 s eran
+    // ~4,8 h de CPU al día pagadas por no hacer nada (≈CLP 9.000/mes, parte de
+    // la fuga de agosto 2026, ver docs/COSTOS_GCP.md). Para despegarse de los
+    // boundaries :00/:05 del scheduler basta la variación de segundos; el
+    // espaciado anti-bot ENTRE requests lo pone `pauseBetweenMachines` (1,5-3,5 s),
+    // que no se toca porque ese sí imita cadencia humana donde Shoplogix la ve.
+    const jitterMs = Math.floor(Math.random() * (extraDateKeys.length > 0 ? 10_000 : 20_000))
     logger.info(`[shoplogixSyncWakeup] jitter ${Math.round(jitterMs / 1000)}s` +
       (extraDateKeys.length ? ` · re-sync extra: ${extraDateKeys.join(', ')}` : ''))
     await new Promise(r => setTimeout(r, jitterMs))
