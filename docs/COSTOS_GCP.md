@@ -74,6 +74,23 @@ cómputo real que tienen tolera ir más lento con margen enorme de timeout.
 asignarle `cpu: 0.25` (o menos) — misma funcionalidad, cuarto del costo. Reservar
 1 vCPU para las que hacen cómputo pesado de verdad (PDFs, imágenes).
 
+## Auditoría de crons (02-09-2026)
+
+Los 11 jobs de Cloud Scheduler mapean a funciones vivas — sin huérfanos. Costo
+CLP 675/mes (8 jobs pagados a ~USD 0,10 tras los 3 gratis): legítimo. Hallazgos:
+
+- `shoplogixTokenRefresh` llevaba tiempo **muriendo por OOM al arrancar** (128MiB <
+  133MiB del bundle) → el refresh de token ROPC nunca corría (parte del "ROPC en
+  backoff" permanente). Subido a 256MiB.
+- `purgeSensorReadings` **moría por OOM** (256MiB) porque carga TODO `sensors/` de
+  RTDB con `once('value')` — y al fallar, el árbol crece a diario y agrava el OOM
+  (espiral). Subido a 512MiB para destrabar. **Deuda anotada:** refactorizar a
+  recorrido por equipo (shallow keys + purga por rama) para que la memoria no
+  dependa del tamaño del árbol.
+- `animeEstrenosDiarios` + Mini App `anime.html` (bot @anime_estreno_bot): producto
+  personal de Orel alojado aquí a propósito (ver docs/anime-bot-CONTEXT.md). Costo
+  ~CLP 60-100/mes. Se decidió NO tocarlo.
+
 ## Presupuestos y export (estado desde sept 2026)
 
 - Presupuesto **USD 20/mes** en la cuenta, alertas al 25/50/75/100% del gasto **real**
