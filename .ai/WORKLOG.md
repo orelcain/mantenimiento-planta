@@ -6,6 +6,23 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-02 · Fix: dos crons muriendo por OOM sin que nadie lo viera (PR #900)
+
+Auditoría de los 11 jobs de Cloud Scheduler (docs/COSTOS_GCP.md, sin huérfanos):
+`shoplogixTokenRefresh` no arrancaba (bundle 133MiB > límite 128MiB) — el
+refresh del token ROPC nunca corrió, parte del "ROPC en backoff" permanente;
+subido a 256MiB. `purgeSensorReadings` moría por OOM a 256MiB porque carga
+TODO `sensors/` de RTDB con `once('value')` — al fallar, el árbol crece a
+diario y agrava el OOM (espiral); subido a 512MiB para destrabar, con la
+deuda de refactorizar a recorrido por equipo anotada en COSTOS_GCP.md.
+Evidencia: logs de Cloud Run del 01-09 ("Memory limit ... exceeded"). CI
+"build" verde, mergeado (squash --admin) a `7fea9678`, deploy automático de
+Functions y PWA confirmados OK. Pendiente: verificar en terreno que ambas
+funciones dejan de reportar OOM tras el próximo ciclo (purga corre 03:00).
+
+⚠️ **Este archivo sigue subiendo (~184 KB)** — compactar el historial viejo
+en la próxima sesión que toque el WORKLOG.
+
 ## 2026-09-02 · Fix: sync y pulso pagaban vCPU completa por esperar red (PR #898)
 
 Tercera pata de la fuga de costos de agosto (tras #895 lecturas y #896 jitter).
