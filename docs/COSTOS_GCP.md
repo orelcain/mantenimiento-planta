@@ -62,6 +62,18 @@ el que imita cadencia humana donde Shoplogix la ve.
 / espera dentro de la función es CPU facturado. Sleeps largos en crons frecuentes son
 plata: preferir jitter corto, o mover la espera fuera de la función.
 
+### Fix 3 (02-09-2026): ¼ de vCPU para las funciones que solo esperan red
+
+Cloud Run factura **vCPU asignada × tiempo de instancia**, no CPU realmente usada.
+`shoplogixSyncWakeup` y `shoplogixPulseWakeup` corren 24/7 y son ~95% espera de red
+(requests a Shoplogix + pausas anti-bot): con la vCPU completa por defecto pagaban 4×
+por esperar. Se les fijó `cpu: 0.25` (+ `concurrency: 1`, obligatorio con cpu<1). El
+cómputo real que tienen tolera ir más lento con margen enorme de timeout.
+
+**Regla para el futuro:** a toda función programada/trigger que sea mayormente I/O,
+asignarle `cpu: 0.25` (o menos) — misma funcionalidad, cuarto del costo. Reservar
+1 vCPU para las que hacen cómputo pesado de verdad (PDFs, imágenes).
+
 ## Presupuestos y export (estado desde sept 2026)
 
 - Presupuesto **USD 20/mes** en la cuenta, alertas al 25/50/75/100% del gasto **real**
