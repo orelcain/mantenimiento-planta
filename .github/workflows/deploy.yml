@@ -36,7 +36,13 @@ jobs:
         run: npm install -g pnpm@10.33.0
 
       - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile
+        # `--frozen-lockfile` explícito (es el default de pnpm en CI, pero
+        # escribirlo evita depender de que la variable CI esté seteada): si
+        # `pnpm-lock.yaml` no coincide con algún `package.json`, el build falla
+        # en vez de resolver deps distintas a las declaradas. Se restauró el
+        # 2026-08-27 tras el PR #823 — el lock llevaba semanas desincronizado
+        # con `functions/package.json` y nada lo delataba.
+        run: pnpm install --frozen-lockfile
 
       - name: Validate SPA route collisions (GitHub Pages)
         run: node scripts/validate-gh-pages-route-collisions.mjs
