@@ -6339,6 +6339,15 @@ exports.shoplogixPulseWakeup = onSchedule(
     timeZone: 'America/Santiago',
     timeoutSeconds: 60,
     memory: '256MiB',
+    /*
+     * ¼ de vCPU a propósito: la función es 95% espera de red (un request a
+     * Shoplogix + writes chicos), y Cloud Run factura vCPU ASIGNADA × tiempo,
+     * no CPU usada. Con 1 vCPU pagábamos 4× por esperar lo mismo. Igual que
+     * en el sync — parte del cierre de la fuga de agosto 2026 (COSTOS_GCP.md).
+     * ⚠ cpu < 1 exige concurrency: 1 (irrelevante acá: es un cron).
+     */
+    cpu: 0.25,
+    concurrency: 1,
     retryCount: 0,          // si falla, en un minuto hay otro: reintentar sería duplicar
     secrets: ['SHOPLOGIX_COOKIE'],
   },
@@ -6462,6 +6471,16 @@ exports.shoplogixSyncWakeup = onSchedule(
     timeZone: 'America/Santiago',
     timeoutSeconds: 420,   // hoy + hasta 2 días extra de re-sync en el disparo de las 12:00
     memory: '256MiB',
+    /*
+     * ¼ de vCPU a propósito: el ciclo es casi todo espera de red (7 requests a
+     * Shoplogix por planta + pausas anti-bot de 1,5-3,5 s), y Cloud Run factura
+     * vCPU ASIGNADA × tiempo de instancia — con 1 vCPU pagábamos 4× por esperar.
+     * La parte de cómputo real (normalizar el día) tolera ir 4× más lenta con
+     * margen: timeout 420 s vs ciclos de ~60-90 s. Cierre de la fuga de agosto
+     * 2026 (ver docs/COSTOS_GCP.md). ⚠ cpu < 1 exige concurrency: 1.
+     */
+    cpu: 0.25,
+    concurrency: 1,
     retryCount: 1,
     secrets: ['SHOPLOGIX_COOKIE'],
   },
