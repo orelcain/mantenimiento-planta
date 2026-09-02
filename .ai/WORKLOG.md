@@ -6,6 +6,23 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-02 · Fix: el sleep del jitter de sync era CPU facturado 24/7 (PR #896)
+
+Segunda pata de la fuga de costos de agosto (la primera se cerró en #895): el
+jitter anti-bot inicial de `shoplogixSyncWakeup` dormía 0-120 s DENTRO de la
+función, cada 5 min, 24/7 — y Cloud Run cobra el CPU también mientras la
+función duerme, ~4,8 h de CPU/día pagadas por un `setTimeout` (~CLP 9.000/mes).
+Se bajó a 0-20 s (0-10 s con re-sync de días extra); la variación contra los
+boundaries `:00`/`:05` del scheduler se conserva y el espaciado anti-bot real
+entre requests (`pauseBetweenMachines`, 1,5-3,5 s) no se tocó. Verificado:
+`node --check` limpio, sin cambios de lógica de datos, CI "build" verde,
+mergeado a `aef322e3`, deploy automático de Functions y PWA confirmados OK
+(`gh run list`). Pendiente: confirmar en Cloud Billing la baja de CPU en el
+próximo ciclo.
+
+⚠️ **Este archivo sigue sobre ~180 KB** — compactar el historial viejo cuando
+se retome el WORKLOG (ver nota del 2026-08-18 más abajo).
+
 ## 2026-09-01 · Fix: monitor público barría la colección de turnos en cada refresco (PR #895)
 
 Factura GCP de agosto: **CLP 71.013** (5x lo normal), 64% eran 114M lecturas
