@@ -1,6 +1,6 @@
 import { useEffect, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useSearchParams } from 'react-router-dom'
-import { onAuthChange, getUserById, signOut as signOutService } from '@/services/auth'
+import { onAuthChange, getUserByIdConTokenFresco, signOut as signOutService } from '@/services/auth'
 import { useAuthStore, usePermissionsStore, startSessionWatchdog } from '@/store'
 import { logger } from '@/lib/logger'
 import { LoadingScreen } from '@/components/ui'
@@ -196,7 +196,7 @@ export function App() {
     const unsubscribe = onAuthChange(async (firebaseUser) => {
       if (firebaseUser) {
         try {
-          const user = await getUserById(firebaseUser.uid)
+          const user = await getUserByIdConTokenFresco(firebaseUser)
           if (!user) {
             logger.warn('Usuario Auth sin perfil en Firestore; cerrando sesión', { uid: firebaseUser.uid })
             await signOutService()

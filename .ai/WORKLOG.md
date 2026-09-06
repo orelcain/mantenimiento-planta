@@ -6,6 +6,26 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-05 · Fix: "Error de autenticación: permission-denied" al entrar (PR #902)
+
+`mantencion.plantach@aquachile.com` autenticaba bien y la app rechazaba la
+lectura de su perfil `users/{uid}`. Diagnóstico contra producción, en orden
+barato→caro: cuenta activa y sin revocación; reglas vivas idénticas al repo
+(`securityRules().getFirestoreRuleset()` + `diff --strip-trailing-cr`); la
+regla probada con la identidad exacta vía `firebaserules :test` → PERMITE;
+`errorLogs` filtrado por `timestamp` mostró la firma: la pestaña del login y
+la TV del monitor (`?pantalla=1`) del mismo PC (Edge 152) fallaron el MISMO
+segundo a las 16:10 → token compartido vencido en pestañas dormidas; el login
+fresco de las 17:11 reutilizó la conexión Firestore con la credencial vieja.
+Gotchas: el `createTime` del servidor vs el `timestamp` del cliente delata
+pestañas congeladas (desfase de 36 s a 53 min); un token SIN claim `firebase`
+hace que `isNotAnonymous()` falle con error, no con false. Fix:
+`getUserByIdConTokenFresco` reintenta UNA vez con `getIdToken(true)` en los
+tres caminos post-auth (signIn, Google, listener de App.tsx). 5 tests nuevos,
+1559 tests de servicios en verde. Remedio inmediato en el PC: cerrar TODAS
+las pestañas de la app (incluida la TV) y volver a entrar. Pendiente aparte:
+`subscribeToUserPermissions` sigue quedando muerto tras un permission-denied.
+
 ## 2026-09-02 · Fix: dos crons muriendo por OOM sin que nadie lo viera (PR #900)
 
 Auditoría de los 11 jobs de Cloud Scheduler (docs/COSTOS_GCP.md, sin huérfanos):
