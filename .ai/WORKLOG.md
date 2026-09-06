@@ -6,6 +6,19 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-06 · Fix: el listener de permisos ya no queda muerto tras un permission-denied (PR #903)
+
+Segunda mitad del caso del 05-09: `subscribeToUserPermissions` (onSnapshot
+sobre `users/{uid}`) caía a permisos por defecto en el primer error y NO se
+re-suscribía, así que un token vencido en pestaña dormida dejaba al usuario
+con menos módulos hasta recargar. Ahora, ante `permission-denied` con el
+mismo uid en `auth.currentUser`, refresca con `getIdToken(true)` y
+re-suscribe UNA vez; el `Unsubscribe` devuelto corta la suscripción activa
+(sea la primera o la re-suscrita) y una cancelación durante el refresco
+evita re-suscribir. Otro error, un segundo rechazo, o un uid distinto caen al
+fallback como antes. 6 tests nuevos cubren los seis caminos; tsc/eslint
+limpios, suite de servicios en verde. Mismo patrón que PR #902.
+
 ## 2026-09-05 · Fix: "Error de autenticación: permission-denied" al entrar (PR #902)
 
 `mantencion.plantach@aquachile.com` autenticaba bien y la app rechazaba la
