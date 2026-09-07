@@ -30,6 +30,7 @@ const lazyWithReload = (fn: () => Promise<any>) =>
 const LoginPage = lazyWithReload(() => import('@/pages/LoginPage').then((mod) => ({ default: mod.LoginPage })))
 /** Banco de pruebas de la Matriz de turnos — solo montado en dev (ver Routes). */
 const MatrizTurnosDevPage = lazyWithReload(() => import('@/pages/dev/MatrizTurnosDevPage'))
+const PurezaPuertaDevPage = lazyWithReload(() => import('@/pages/dev/PurezaPuertaDevPage'))
 /** Banco de pruebas del resumen ejecutivo — solo montado en dev (ver Routes). */
 const ResumenTurnoDevPage = lazyWithReload(() => import('@/pages/dev/ResumenTurnoDevPage'))
 const ResumenPeriodoDevPage = lazyWithReload(() => import('@/pages/dev/ResumenPeriodoDevPage'))
@@ -282,6 +283,16 @@ export function App() {
                   element={
                     <Suspense fallback={<LoadingScreen />}>
                       <MatrizTurnosDevPage />
+                    </Suspense>
+                  }
+                />
+              )}
+              {import.meta.env.DEV && (
+                <Route
+                  path="/dev/pureza-puerta"
+                  element={
+                    <Suspense fallback={<LoadingScreen />}>
+                      <PurezaPuertaDevPage />
                     </Suspense>
                   }
                 />
