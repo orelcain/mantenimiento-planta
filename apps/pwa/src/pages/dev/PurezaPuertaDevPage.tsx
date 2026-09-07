@@ -44,7 +44,8 @@ function fixture(): PieceRecord[] {
   const recs: PieceRecord[] = [
     ...lote(1, 590, '2-4 lb', 'Premium', ini, fin), ...lote(1, 21, '4-6 lb', 'Premium', ini, fin),
     ...lote(2, 1160, '4-6 lb', 'Premium', ini, fin), ...lote(2, 44, '6-8 lb', 'Premium', ini, fin),
-    ...lote(3, 1120, '4-6 lb', 'Premium', ini, fin), ...lote(3, 68, '2-4 lb', 'Premium', ini, fin),
+    // G3: la máquina manda 6-8 Premium (seteo dice 4-6): seteo ≠ máquina, no mezcla
+    ...lote(3, 1120, '6-8 lb', 'Premium', ini, fin), ...lote(3, 20, '2-4 lb', 'Premium', ini, fin),
     ...lote(4, 1012, '6-8 lb', 'Premium', ini, fin), ...lote(4, 20, '8-10 lb', 'Premium', ini, fin),
     ...lote(5, 970, '6-8 lb', 'Premium', ini, fin), ...lote(5, 40, '4-6 lb', 'Premium', ini, fin),
     // G6: pura hasta las 10:30, después cae mezclada por calibre y calidad
@@ -119,6 +120,8 @@ export default function PurezaPuertaDevPage() {
           gates={snapshots[snapshots.length - 1]!.gates}
           changeBuckets={gateMix.changeBuckets}
           causesFor={causesFor}
+          seteoDistinto={gateMix.seteoDistinto}
+          onAdoptarSeteo={(g, s) => window.alert(`Adoptar G${g}: ${s.calibre} · ${s.quality}`)}
           turnoLabel="07/09 · Turno 1"
         />
       </div>

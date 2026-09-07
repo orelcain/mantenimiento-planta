@@ -84,6 +84,27 @@ export async function saveConfigSnapshot(
 }
 
 /**
+ * Adoptar lo que la máquina hace: si el último snapshot es el INICIAL (sin
+ * cambios manuales) se corrige en su lugar, porque el seteo "siempre fue" el de
+ * la máquina y no un cambio a esa hora. Si ya hubo cambios a mano, se agrega un
+ * snapshot normal: lo que alguien seteó a propósito no se reescribe.
+ */
+export async function adoptarSeteoMaquina(
+  shiftDocId: string,
+  newGates: GateAssignment[],
+  user: { uid: string; name: string },
+  reason: string,
+): Promise<GateConfigSnapshot | null> {
+  const previous = await getLatestSnapshot(shiftDocId)
+  if (previous && !previous.synthetic && previous.changes.length === 0) {
+    const fixed: GateConfigSnapshot = { ...previous, gates: [...newGates], reason, changedBy: user }
+    await setDoc(doc(db, 'graderShifts', shiftDocId, SUBCOLLECTION, previous.id), fixed)
+    return fixed
+  }
+  return saveConfigSnapshot(shiftDocId, newGates, user, reason)
+}
+
+/**
  * Snapshot de tipo "sintético" — escrito por el reclasificador (FASE 26)
  * cuando infiere la config desde los pieceRecords históricos.
  */

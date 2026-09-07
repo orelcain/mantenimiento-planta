@@ -32,7 +32,7 @@ import {
   PUREZA_OK_PCT, PUREZA_WARN_PCT, nivelDePureza, bloqueDeCaida, promedioHasta, type NivelPureza as Nivel,
 } from '@/services/grader/graderPurezaNivel'
 import type { GateAssignment } from '@/services/grader/types'
-import { CAUSA_ORDER, type CausaTipo, type GateCauses, type GateCauseGroup } from '@/services/grader/graderGateObservations'
+import { CAUSA_ORDER, type CausaTipo, type GateCauses, type GateCauseGroup, type SeteoMaquina } from '@/services/grader/graderGateObservations'
 
 // ⚠ Nunca combinar estas clases de color con text-caption/text-title3 dentro
 // de cn(): tailwind-merge no conoce la escala tipográfica propia, toma
@@ -49,7 +49,6 @@ const NIVEL_BG: Record<Nivel, string> = {
   crit: 'bg-ink-crit',
   none: 'bg-muted-foreground',
 }
-const NIVEL_PILL: Record<Nivel, PillTone> = { ok: 'ok', warn: 'warning', crit: 'critical', none: 'neutral' }
 
 const fmtPz = (n: number) => n.toLocaleString('es-CL')
 const fmtPct = (p: number) => {
@@ -96,10 +95,22 @@ interface Props {
    * (v1) la ficha muestra solo los desgloses.
    */
   causesFor?: (gate: number) => GateCauses | null
+  /** Puertas cuyo seteo no coincide con lo que manda la máquina (gateMix v2). */
+  seteoDistinto?: Record<number, SeteoMaquina>
+  /** Corregir el seteo de la app con lo que hace la máquina. Solo supervisor/admin. */
+  onAdoptarSeteo?: (gate: number, seteo: SeteoMaquina) => void
 }
 
 /** Nombre de cada causal y qué mirar. El color nunca es el único canal. */
 const CAUSA_META: Record<CausaTipo, { label: string; hint: (g: GateCauseGroup, self: number) => string }> = {
+  seteo_distinto: {
+    label: 'Seteo distinto a la máquina',
+    hint: (g) => `La máquina manda ${g.value} a esta puerta; el seteo de la app dice otra cosa. No es mezcla: hay que corregir el seteo.${g.debiaIr.length ? ` Según la app eso iba a ${g.debiaIr.map((d) => `G${d}`).join('/')}.` : ''}`,
+  },
+  calibre_no_reconocido: {
+    label: 'Calibre que la app no conoce',
+    hint: () => 'El Excel trae un calibre fuera de la lista de la app (p. ej. 12+ lb) o "Fuera de rango": agregarlo a los rangos de calibre.',
+  },
   calibre_lejano: {
     label: 'Calibre lejano',
     hint: (g, self) => g.origen === 'atras'
@@ -128,12 +139,12 @@ const CAUSA_META: Record<CausaTipo, { label: string; hint: (g: GateCauseGroup, s
 
 /** Colores del gráfico apilado por tema (misma lógica que CHART_INK en otros gráficos). */
 const CAUSA_COLOR: Record<'dark' | 'light', Record<CausaTipo | 'ok', string>> = {
-  light: { ok: '#2e75b6', calibre_lejano: '#b51b1b', calibre_vecino: '#974608', calidad: '#8944ab', conservacion: '#0c7e78', sin_dato: '#6f6f72', otros: '#aeaeb2' },
-  dark:  { ok: '#5aa0dc', calibre_lejano: '#e08a88', calibre_vecino: '#d8b57a', calidad: '#da8fff', conservacion: '#5de7df', sin_dato: '#9db0c2', otros: '#6b7c8c' },
+  light: { ok: '#2e75b6', seteo_distinto: '#1c4cd4', calibre_no_reconocido: '#7f5539', calibre_lejano: '#b51b1b', calibre_vecino: '#974608', calidad: '#8944ab', conservacion: '#0c7e78', sin_dato: '#6f6f72', otros: '#aeaeb2' },
+  dark:  { ok: '#5aa0dc', seteo_distinto: '#409cff', calibre_no_reconocido: '#c3a084', calibre_lejano: '#e08a88', calibre_vecino: '#d8b57a', calidad: '#da8fff', conservacion: '#5de7df', sin_dato: '#9db0c2', otros: '#6b7c8c' },
 }
 const CHART_TEXT = { light: { axis: '#41566a', grid: '#c3d7e9', tipBg: '#ffffff', tipText: '#16242f', tipBorder: '#c3d7e9' }, dark: { axis: '#94a3b8', grid: '#22384a', tipBg: '#1e293b', tipText: '#e2e8f0', tipBorder: '#334155' } }
 
-export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets, causesFor }: Props) {
+export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets, causesFor, seteoDistinto, onAdoptarSeteo }: Props) {
   const navigate = useNavigate()
   const [copiado, setCopiado] = useState(false)
 
@@ -147,23 +158,29 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets,
   const gateCfg = useMemo(() => new Map((gates ?? []).map((g) => [g.gateNumber, g])), [gates])
 
   const totals = useMemo(() => gateMixTotals(gateMix), [gateMix])
+  // Una puerta con seteo distinto no cuenta como mezclada: es otra cosa.
   const conteo = useMemo(() => {
-    let crit = 0, warn = 0
+    let crit = 0, warn = 0, seteo = 0
     for (const e of gateMix.gates) {
+      if (seteoDistinto?.[e.gate]) { seteo++; continue }
       const n = nivelDePureza(e.purityPct)
       if (n === 'crit') crit++
       else if (n === 'warn') warn++
     }
-    return { crit, warn }
-  }, [gateMix])
+    return { crit, warn, seteo }
+  }, [gateMix, seteoDistinto])
 
-  // Arranca abierta en la peor puerta: es lo que el usuario vino a ver.
+  // Arranca abierta en la peor puerta MEZCLADA; si no hay, en la primera con
+  // seteo distinto: es lo que el usuario vino a ver.
   const peor = useMemo(() => {
-    const conPureza = gateMix.gates.filter((e) => e.purityPct != null)
-    if (conPureza.length === 0) return null
-    const min = conPureza.reduce((a, b) => (b.purityPct! < a.purityPct! ? b : a))
-    return nivelDePureza(min.purityPct) === 'ok' ? null : min.gate
-  }, [gateMix])
+    const conPureza = gateMix.gates.filter((e) => e.purityPct != null && !seteoDistinto?.[e.gate])
+    if (conPureza.length > 0) {
+      const min = conPureza.reduce((a, b) => (b.purityPct! < a.purityPct! ? b : a))
+      if (nivelDePureza(min.purityPct) !== 'ok') return min.gate
+    }
+    const conSeteo = gateMix.gates.find((e) => seteoDistinto?.[e.gate])
+    return conSeteo?.gate ?? null
+  }, [gateMix, seteoDistinto])
   const [seleccion, setSeleccion] = useState<number | null>(peor)
   const detalle = seleccion != null ? byGate.get(seleccion) : undefined
   const causas = useMemo(() => (detalle && causesFor ? causesFor(detalle.gate) : null), [detalle, causesFor])
@@ -179,11 +196,12 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets,
   }, [gateMix])
 
   const nivelGlobal: Nivel = conteo.crit > 0 ? 'crit' : conteo.warn > 0 ? 'warn' : 'ok'
-  const resumenPill = conteo.crit > 0
-    ? `${conteo.crit} mezclada${conteo.crit > 1 ? 's' : ''}${conteo.warn > 0 ? ` · ${conteo.warn} en atención` : ''}`
-    : conteo.warn > 0
-      ? `${conteo.warn} en atención`
-      : 'Todas puras'
+  const pillTone: PillTone = conteo.crit > 0 ? 'critical' : conteo.warn > 0 ? 'warning' : conteo.seteo > 0 ? 'info' : 'ok'
+  const resumenPill = [
+    conteo.crit > 0 ? `${conteo.crit} mezclada${conteo.crit > 1 ? 's' : ''}` : '',
+    conteo.warn > 0 ? `${conteo.warn} en atención` : '',
+    conteo.seteo > 0 ? `${conteo.seteo} con seteo ≠ máquina` : '',
+  ].filter(Boolean).join(' · ') || 'Todas puras'
 
   const resumenTexto = () => {
     const lineas = [
@@ -193,6 +211,11 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets,
         : '',
     ]
     for (const e of gateMix.gates) {
+      const s = seteoDistinto?.[e.gate]
+      if (s) {
+        lineas.push(`G${e.gate} (seteo ${etiquetaAsignacion(e, gateCfg.get(e.gate))}): seteo distinto a la máquina, que manda ${s.calibre} · ${s.quality} (${fmtPct(s.pct)})`)
+        continue
+      }
       const n = nivelDePureza(e.purityPct)
       if (n === 'ok' || n === 'none') continue
       const caida = bloqueDeCaida(sinCambios(e.purityByBucket, changeBuckets))
@@ -229,7 +252,7 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets,
         <CardTitle className="text-base flex items-center gap-2 flex-wrap">
           <Layers className="w-4 h-4" />
           Pureza por puerta
-          <Pill tone={NIVEL_PILL[nivelGlobal]} dot className="ml-auto">{resumenPill}</Pill>
+          <Pill tone={pillTone} dot className="ml-auto">{resumenPill}</Pill>
         </CardTitle>
         {totals.purityPct != null && (
           <p className="text-footnote text-muted-foreground">
@@ -246,9 +269,12 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets,
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6" role="list">
           {gateNumbers.map((n) => {
             const e = byGate.get(n)
+            const seteo = seteoDistinto?.[n]
             const nivel = nivelDePureza(e?.purityPct)
             const activa = seleccion === n
             const intruso = e ? textoIntruso(e, true) : null
+            const ink = seteo ? 'text-ink-info' : NIVEL_INK[nivel]
+            const dot = seteo ? 'bg-ink-info' : NIVEL_BG[nivel]
             return (
               <button
                 key={n}
@@ -266,16 +292,18 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets,
                 <span className="flex w-full items-center gap-1.5 text-caption font-semibold text-muted-foreground">
                   G{n}
                   {e && nivel !== 'none' && (
-                    <span aria-hidden className={cn('h-[7px] w-[7px] rounded-full', NIVEL_BG[nivel])} />
+                    <span aria-hidden className={cn('h-[7px] w-[7px] rounded-full', dot)} />
                   )}
                 </span>
-                <span className={`text-title3 tabular-nums ${NIVEL_INK[nivel]}`}>
+                <span className={`text-title3 tabular-nums ${ink}`}>
                   {e?.purityPct != null ? fmtPctEntero(e.purityPct) : '—'}
                 </span>
                 <span className="w-full text-caption leading-tight text-foreground">
                   {etiquetaAsignacion(e, gateCfg.get(n))}
                 </span>
-                {intruso && nivel !== 'ok' ? (
+                {seteo ? (
+                  <span className="w-full text-caption font-medium leading-tight text-ink-info">seteo ≠ máquina</span>
+                ) : intruso && nivel !== 'ok' ? (
                   <span className={`w-full text-caption font-medium leading-tight ${NIVEL_INK[nivel]}`}>{intruso}</span>
                 ) : (
                   <span className="text-caption text-muted-foreground tabular-nums">
@@ -290,11 +318,16 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets,
         <p className="text-footnote text-muted-foreground">
           Pureza = piezas con el calibre <span className="text-foreground">y</span> la calidad asignados ÷ piezas que
           cayeron en la puerta. ≥{PUREZA_OK_PCT} % pura · {PUREZA_WARN_PCT}–{PUREZA_OK_PCT} % en atención · &lt;{PUREZA_WARN_PCT} % mezclada.
+          {' '}Si ≥ 90 % de las piezas llevan una misma combinación distinta a la asignada, no es mezcla: es <span className="text-ink-info">seteo ≠ máquina</span>.
         </p>
 
         {/* ── Ficha de la puerta elegida ── */}
         {detalle && (
-          <DetalleGate mix={gateMix} entry={detalle} cfg={gateCfg.get(detalle.gate)} changeBuckets={changeBuckets} causas={causas} />
+          <DetalleGate
+            mix={gateMix} entry={detalle} cfg={gateCfg.get(detalle.gate)} changeBuckets={changeBuckets} causas={causas}
+            seteo={seteoDistinto?.[detalle.gate]}
+            onAdoptar={onAdoptarSeteo && seteoDistinto?.[detalle.gate] ? () => onAdoptarSeteo(detalle.gate, seteoDistinto[detalle.gate]!) : undefined}
+          />
         )}
 
         <div className="flex flex-wrap gap-2">
@@ -386,8 +419,9 @@ function sinCambios(purity: ReadonlyArray<number | null>, changeBuckets?: number
   return purity.map((v, i) => (set.has(i) ? null : v))
 }
 
-function DetalleGate({ mix, entry, cfg, changeBuckets, causas }: {
+function DetalleGate({ mix, entry, cfg, changeBuckets, causas, seteo, onAdoptar }: {
   mix: GateMix; entry: GateMixEntry; cfg?: GateAssignment; changeBuckets?: number[]; causas?: GateCauses | null
+  seteo?: SeteoMaquina; onAdoptar?: () => void
 }) {
   const { isDark } = useTheme()
   const nivel = nivelDePureza(entry.purityPct)
@@ -400,11 +434,14 @@ function DetalleGate({ mix, entry, cfg, changeBuckets, causas }: {
   const mezclaCalibre = entry.assignedCalibre !== ANY_CALIBRE
     && Object.keys(entry.byCalibre).some((k) => k !== entry.assignedCalibre)
   const mezclaCalidad = Object.keys(entry.byQuality).some((k) => k !== entry.assignedQuality)
-  const veredicto = nivel === 'ok'
-    ? 'Recibe lo que tiene asignado'
-    : nivel === 'none'
-      ? 'Sin asignación en este turno'
-      : `Mezclada por ${[mezclaCalibre && 'calibre', mezclaCalidad && 'calidad'].filter(Boolean).join(' y ')}`
+  const veredicto = seteo
+    ? 'Seteo distinto a la máquina'
+    : nivel === 'ok'
+      ? 'Recibe lo que tiene asignado'
+      : nivel === 'none'
+        ? 'Sin asignación en este turno'
+        : `Mezclada por ${[mezclaCalibre && 'calibre', mezclaCalidad && 'calidad'].filter(Boolean).join(' y ')}`
+  const inkVeredicto = seteo ? 'text-ink-info' : NIVEL_INK[nivel]
 
   return (
     <div className="space-y-4 rounded-card bg-muted p-4" data-testid="pureza-detalle">
@@ -413,13 +450,27 @@ function DetalleGate({ mix, entry, cfg, changeBuckets, causas }: {
           G{entry.gate} · {etiquetaAsignacion(entry, cfg)} ·{' '}
           <span className="tabular-nums">{fmtPz(entry.pieces)} pz</span>
         </p>
-        <span className={`text-footnote font-semibold ${NIVEL_INK[nivel]}`}>{veredicto}</span>
+        <span className={`text-footnote font-semibold ${inkVeredicto}`}>{veredicto}</span>
       </div>
+
+      {seteo && (
+        <div className="space-y-2" data-testid="pureza-seteo">
+          <p className="text-footnote">
+            La máquina manda <span className="font-semibold">{seteo.calibre} · {seteo.quality}</span> a esta puerta
+            (<span className="tabular-nums">{fmtPct(seteo.pct)}</span> de las piezas); el seteo de la app dice{' '}
+            <span className="font-semibold">{etiquetaAsignacion(entry, cfg)}</span>. No es mezcla: la pureza de abajo compara
+            contra el seteo de la app, no contra la máquina.
+          </p>
+          {onAdoptar && (
+            <Button variant="tinted" onClick={onAdoptar}>Adoptar seteo de la máquina</Button>
+          )}
+        </div>
+      )}
 
       {/* ¿Por qué cayó acá? Va antes de los desgloses: es la respuesta, los
           desgloses son la evidencia. Solo con gateMix v2 (causas derivadas
           con la config de cada bloque). */}
-      {causas && causas.groups.length > 0 && (
+      {!seteo && causas && causas.groups.length > 0 && (
         <div data-testid="pureza-causas">
           <p className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">¿Por qué cayó acá?</p>
           <ul className="mt-1.5 space-y-2">
@@ -439,7 +490,7 @@ function DetalleGate({ mix, entry, cfg, changeBuckets, causas }: {
         </div>
       )}
 
-      {causas && causas.judged > 0 && (
+      {!seteo && causas && causas.judged > 0 && (
         <div>
           <p className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">Qué cayó, bloque a bloque</p>
           <div className="mt-1 h-[192px]" data-testid="pureza-apilado">
@@ -453,7 +504,7 @@ function DetalleGate({ mix, entry, cfg, changeBuckets, causas }: {
         <Barras titulo="Por calidad" data={entry.byQuality} esperado={entry.assignedQuality} total={entry.pieces} />
       </div>
 
-      {entry.purityPct != null && buckets.length > 1 && (
+      {!seteo && entry.purityPct != null && buckets.length > 1 && (
         <div>
           <p className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">
             Pureza cada {mix.bucketMinutes} min

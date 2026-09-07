@@ -49,6 +49,44 @@ piel Apple. Gotcha: `cn()` (tailwind-merge) DESCARTA `text-caption` /
 `text-title3` si en la misma llamada va un `text-ink-*` — toma el tamaño
 como color y gana el último; esos pares van en template string.
 
+## 2026-09-07 · Ronda de pulido 1 · pureza por puerta: "seteo ≠ máquina" no es mezcla (PR #913)
+
+Medido sobre las PIEZAS REALES de Firestore (Admin SDK, solo lectura), no
+sobre fixtures. Dos turnos: 2026-08-11 Turno 2 (13.366 pz, turno completo) y
+2026-09-07 Turno 1 Lunes (5.576 pz, cargado a mitad de turno a las 02:37).
+
+**Hallazgo 1 (miente al usuario).** La columna Calibre/Calidad del Excel es
+la DECISIÓN de la máquina: por construcción coincide con lo que la máquina
+tiene seteado. El 11-ago la pureza da 100 % en las 12 puertas; el 07-09 da
+**0 % en 5 de 11 puertas** (G3, G4, G5, G7 por calibre; G2, G6, G9, G10, G12
+por calidad) porque el seteo de la app (borrador del wizard, pre-#909) no
+coincide con la máquina: no hay pescado mezclado, hay un seteo desactualizado,
+y la tarjeta las llamaría "mezcladas". Fix: `deriveGateMix` detecta por
+puerta la combinación dominante de la etiqueta (≥ 90 % de las piezas
+juzgadas) distinta a la asignada → `seteoDistinto`; la tarjeta la muestra
+como "seteo ≠ máquina" (tinta info, no roja), no la cuenta como mezclada, y
+ofrece **"Adoptar seteo de la máquina"** (supervisor/admin): corrige el
+snapshot INICIAL en su lugar si no hubo cambios a mano (`adoptarSeteoMaquina`)
+o agrega uno nuevo si los hubo, y actualiza `gatesUsed`. En causales, la
+combinación dominante sale como `seteo_distinto` con a qué gate iba según la
+app. La etiqueta "Other" del Excel (12+ lb / fuera de rango) ya no es un
+"calibre lejano": es `calibre_no_reconocido` (hoy G12: 38 pz "Other" de
+5,5 kg con seteo 10-12 lb).
+
+**Hallazgo 2 (para la ronda 2).** La mezcla FÍSICA se mide por PESO contra
+el rango del gate, no por la etiqueta: hoy G8 y G9 tienen **10,2 % y 15,6 %**
+de piezas de 4,6–4,9 kg etiquetadas 8-10 lb, sobre el techo 8-10 de la app
+(4.581 g). O el rango 8-10 del Z2 llega más arriba que el de la app, o es
+mezcla real: hay que preguntarle a Orel y medirlo con histograma de peso por
+bloque (bins de 250 g, sin depender de la config) en la observación.
+
+**Hallazgo 3.** Ningún turno histórico tiene `meta/gateMix` (13 turnos con
+piezas desde agosto): la tarjeta queda escondida tras "recargá el Excel".
+Backfill por script (piezas ya guardadas) pendiente de OK de Orel: es
+escritura en prod.
+
+4 tests nuevos (778 del módulo); banco a 375 px en claro y oscuro.
+
 ## 2026-09-07 · Causas de P0 con la config vigente a la hora de cada pieza (PR #912)
 
 Cierra el hueco 2 del análisis «¿reacciona el sistema a lo seteado en los

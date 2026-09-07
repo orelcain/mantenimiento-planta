@@ -199,9 +199,55 @@ export function configTimelineFromSnapshots(
 const MIN_INTRUDER_PCT = 1
 const r1 = (v: number) => Math.round(v * 10) / 10
 
+/** Lo que la máquina manda a una puerta (etiqueta dominante del Excel) cuando no coincide con el seteo de la app. */
+export interface SeteoMaquina {
+  calibre: string
+  quality: string
+  /** % de las piezas juzgadas de la puerta con esa combinación. */
+  pct: number
+}
+
+/** Umbral de dominancia: con ≥ 90 % una sola combinación, la puerta no está mezclada, está seteada distinto. */
+export const SETEO_DOMINANCIA_PCT = 90
+
 export interface DerivedGateMix extends GateMix {
   /** Índices de bloque que contienen un cambio de config: se leen con cautela. */
   changeBuckets: number[]
+  /**
+   * Puertas cuyo seteo en la app no coincide con lo que la máquina manda. La
+   * columna Calibre/Calidad del Excel es la DECISIÓN de la máquina: si ≥ 90 %
+   * de las piezas llevan una misma combinación distinta a la asignada, no hay
+   * mezcla física, hay un seteo desactualizado (medido 07-09: 5 de 11 puertas).
+   */
+  seteoDistinto: Record<number, SeteoMaquina>
+}
+
+/** Combinación dominante (calibre|calidad de la etiqueta) sobre las piezas juzgadas de la puerta. */
+function seteoMaquinaDe(entry: GateObservationsEntry, timeline: ConfigTimeline, from: number, size: number): SeteoMaquina | null {
+  const tally = new Map<string, number>()
+  let judged = 0
+  let lastCfg: GateAssignment | undefined
+  entry.byBucket.forEach((b, i) => {
+    if (!b) return
+    const cfg = timeline.configAt(from + i * size)?.find((g) => g.gateNumber === entry.gate && g.active)
+    if (!cfg) return
+    lastCfg = cfg
+    for (const [key, n] of Object.entries(b)) {
+      const c = splitCombo(key)
+      if (c.calibre === OTROS) continue
+      judged += n
+      const k = `${c.calibre}|${c.quality}`
+      tally.set(k, (tally.get(k) ?? 0) + n)
+    }
+  })
+  if (!lastCfg || judged === 0) return null
+  const [top, n] = [...tally.entries()].sort((a, b) => b[1] - a[1])[0] ?? ['', 0]
+  const pct = r1((n / judged) * 100)
+  if (pct < SETEO_DOMINANCIA_PCT) return null
+  const [calibre, quality] = top.split('|') as [string, string]
+  if (calibre === SIN_DATO || quality === SIN_DATO || calibre === ANY_CALIBRE) return null
+  const coincide = (lastCfg.assignedCalibre === ANY_CALIBRE || calibre === lastCfg.assignedCalibre) && quality === lastCfg.assignedQuality
+  return coincide ? null : { calibre, quality, pct }
 }
 
 /** ¿La combinación observada es lo que la gate tenía asignado? */
@@ -285,20 +331,29 @@ export function deriveGateMix(obs: GateObservations, timeline: ConfigTimeline): 
     }
   })
 
+  const seteoDistinto: Record<number, SeteoMaquina> = {}
+  for (const e of obs.gates) {
+    const s = seteoMaquinaDe(e, timeline, from, size)
+    if (s) seteoDistinto[e.gate] = s
+  }
+
   return {
     bucketsFrom: obs.bucketsFrom,
     bucketMinutes: obs.bucketMinutes,
     bucketCount: obs.bucketCount,
     gates,
     changeBuckets,
+    seteoDistinto,
   }
 }
 
 // ── ¿Por qué cayó acá? ──────────────────────────────────────────────────────
 
-export type CausaTipo = 'calibre_vecino' | 'calibre_lejano' | 'calidad' | 'conservacion' | 'sin_dato' | 'otros'
+export type CausaTipo =
+  | 'seteo_distinto' | 'calibre_no_reconocido'
+  | 'calibre_vecino' | 'calibre_lejano' | 'calidad' | 'conservacion' | 'sin_dato' | 'otros'
 
-export const CAUSA_ORDER: CausaTipo[] = ['calibre_lejano', 'calibre_vecino', 'calidad', 'conservacion', 'sin_dato', 'otros']
+export const CAUSA_ORDER: CausaTipo[] = ['seteo_distinto', 'calibre_lejano', 'calibre_vecino', 'calidad', 'conservacion', 'calibre_no_reconocido', 'sin_dato', 'otros']
 
 /** De dónde vinieron las piezas respecto a esta puerta, según el seteo. */
 export type OrigenCausa = 'atras' | 'adelante' | 'mixto' | 'ninguna'
@@ -341,9 +396,15 @@ function calibreDistance(a: string, b: string): number | null {
   return Math.abs(ia - ib)
 }
 
-function tipoDeCausa(c: Combo, cfg: GateAssignment): { tipo: CausaTipo; value: string } {
+function tipoDeCausa(c: Combo, cfg: GateAssignment, seteo: SeteoMaquina | null): { tipo: CausaTipo; value: string } {
   if (c.calibre === OTROS) return { tipo: 'otros', value: OTROS }
   if (c.calibre === SIN_DATO || c.quality === SIN_DATO) return { tipo: 'sin_dato', value: SIN_DATO }
+  if (seteo && c.calibre === seteo.calibre && c.quality === seteo.quality) {
+    return { tipo: 'seteo_distinto', value: `${seteo.calibre} · ${seteo.quality}` }
+  }
+  // La etiqueta "Other" del Excel es un calibre que la app no conoce (p. ej.
+  // 12+ lb) o "Fuera de rango": no es un vecino ni un lejano, es un hueco del seteo.
+  if (c.calibre === ANY_CALIBRE) return { tipo: 'calibre_no_reconocido', value: 'sin calibre reconocido' }
   if (cfg.assignedCalibre !== ANY_CALIBRE && c.calibre !== cfg.assignedCalibre) {
     const d = calibreDistance(c.calibre, cfg.assignedCalibre)
     return { tipo: d === 1 ? 'calibre_vecino' : 'calibre_lejano', value: c.calibre }
@@ -357,7 +418,7 @@ function gatesQueDebian(all: readonly GateAssignment[] | undefined, self: number
   if (!all) return []
   const ok = (g: GateAssignment) => {
     if (!g.active || g.gateNumber === self) return false
-    if (tipo === 'calibre_vecino' || tipo === 'calibre_lejano') {
+    if (tipo === 'calibre_vecino' || tipo === 'calibre_lejano' || tipo === 'seteo_distinto') {
       return (g.assignedCalibre === c.calibre || g.assignedCalibre === ANY_CALIBRE) && g.assignedQuality === c.quality
     }
     if (tipo === 'calidad') {
@@ -380,6 +441,7 @@ export function classifyGateCauses(obs: GateObservations, gate: number, timeline
   const from = Date.parse(obs.bucketsFrom)
   const n = obs.bucketCount
 
+  const seteo = seteoMaquinaDe(entry, timeline, from, size)
   const okByBucket = Array.from({ length: n }, () => 0)
   const byTipoByBucket = Object.fromEntries(CAUSA_ORDER.map((t) => [t, Array.from({ length: n }, () => 0)])) as Record<CausaTipo, number[]>
   const groups = new Map<string, GateCauseGroup>()
@@ -396,7 +458,7 @@ export function classifyGateCauses(obs: GateObservations, gate: number, timeline
       judged += pieces
       const c = splitCombo(key)
       if (matches(c, cfg)) { okByBucket[i]! += pieces; continue }
-      const { tipo, value } = tipoDeCausa(c, cfg)
+      const { tipo, value } = tipoDeCausa(c, cfg, seteo)
       byTipoByBucket[tipo][i]! += pieces
       const gk = `${tipo}|${value}`
       let g = groups.get(gk)
