@@ -49,6 +49,31 @@ piel Apple. Gotcha: `cn()` (tailwind-merge) DESCARTA `text-caption` /
 `text-title3` si en la misma llamada va un `text-ink-*` — toma el tamaño
 como color y gana el último; esos pares van en template string.
 
+## 2026-09-07 · ¿El sistema reacciona a lo seteado en los gates? Hueco 1: el wizard clasificaba con su borrador (PR #909)
+
+Pregunta de Orel tras ver el panel de pureza. Respuesta verificada en código:
+**a medias**. Las causas de P0 sí se clasifican con las gates y el detalle del
+turno recalcula solo cuando el último snapshot difiere de `gatesUsed` (con
+input P0 guardado). Pero (1) el wizard clasificaba con SU borrador (default +
+localStorage/autosave), sin mirar los snapshots del turno ni la config por
+línea; (2) el recálculo usa una sola config para todo el turno (la versión por
+hora, `getGatesAtTs`, vive en el reclasificador FASE 26 y nadie la llama);
+(3) `gateMix` se calcula una vez al guardar y el recálculo no lo toca.
+
+Este PR cierra el (1): al guardar, para cada turno se lee su último snapshot
+(`getLatestSnapshot`) y esa config alimenta `computeShiftSummary` (causas P0 +
+gateMix). Si el turno no tenía snapshot, las gates del wizard se registran
+como snapshot inicial ("Config inicial al cargar el Excel"), así el detalle
+muestra la config vigente y no hay desfase contra nada. Solo en plantas que
+clasifican. Sin verificación end-to-end (exige subir un Excel real); tsc y
+eslint limpios. Siguiente: persistir en `gateMix` lo observado por bloque
+(puerta × calibre × calidad) y derivar la pureza con la config vigente a cada
+hora, lo que cierra (2) y (3) para la pureza sin releer piezas.
+
+También hoy: PR #908 — chips y líneas seleccionadas en "Evolución de gates"
+(relleno sólido del color del gate, nombre al final de la línea, cromo por
+tema).
+
 ## 2026-09-06 · Fix: el listener de permisos ya no queda muerto tras un permission-denied (PR #903)
 
 Segunda mitad del caso del 05-09: `subscribeToUserPermissions` (onSnapshot
