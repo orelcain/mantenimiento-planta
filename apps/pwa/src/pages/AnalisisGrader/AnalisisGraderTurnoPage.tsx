@@ -26,6 +26,8 @@ import type { ShiftTimeWindow } from '@/services/grader/graderShiftStatus'
 import { DEFAULT_SHIFT_SCHEDULE, normalizeShiftSchedule } from '@/services/grader/graderShiftSchedule'
 import { getShiftDisplayDateKey, getShiftMeta } from '@/services/grader/graderShiftDisplay'
 import { PurezaPorPuertaCard } from '@/components/grader/PurezaPorPuertaCard'
+import { loadGateObservations } from '@/services/grader/graderDailySummary.service'
+import { deriveGateMix, configTimelineFromSnapshots, type GateObservations } from '@/services/grader/graderGateObservations'
 import { parseMatrixErrorString } from '@/services/grader/graderMatrixP0Causes'
 import { HeroScorecard } from '@/components/grader/HeroScorecard'
 import { TurnoOficialChip } from '@/components/grader/TurnoOficialChip'
@@ -661,6 +663,9 @@ export function AnalisisGraderTurnoPage() {
 
   const [shiftDoc, setShiftDoc] = useState<GraderShiftDoc | null>(null)
   const [timelineBuckets, setTimelineBuckets] = useState<TimelineBucket[]>([])
+  // gateMix v2: lo observado por puerta y bloque (meta/gateMix). null = turno
+  // guardado antes de la v2 → la tarjeta cae a summary.gateMix (v1, congelado).
+  const [gateObs, setGateObs] = useState<GateObservations | null>(null)
   const [configSnapshots, setConfigSnapshots] = useState<GateConfigSnapshot[]>([])
   const [gate0Pieces, setGate0Pieces] = useState<FirestorePieceRecord[]>([])
   const [pauses, setPauses] = useState<Pause[]>([])
@@ -1096,6 +1101,17 @@ export function AnalisisGraderTurnoPage() {
       .catch(() => {})
   }, [effectiveSummaryId])
 
+  // Carga meta/gateMix (v2). Una lectura por turno; cambiar una gate no la repite.
+  useEffect(() => {
+    if (!effectiveSummaryId) return
+    let cancelled = false
+    setGateObs(null)
+    loadGateObservations(effectiveSummaryId)
+      .then((obs) => { if (!cancelled) setGateObs(obs) })
+      .catch(() => { if (!cancelled) setGateObs(null) })
+    return () => { cancelled = true }
+  }, [effectiveSummaryId])
+
   // Suscripción en tiempo real a `meta/pauses` — M8.
   // onSnapshot propaga cambios de otros admins al instante (sin reload manual).
   // reloadPauses se mantiene como no-op para compatibilidad con la prop
@@ -1144,6 +1160,14 @@ export function AnalisisGraderTurnoPage() {
     [configSnapshots],
   )
   const turnoGates = useMemo<GateAssignment[]>(() => latestConfigSnapshot?.gates ?? [], [latestConfigSnapshot])
+
+  // Pureza por puerta juzgada con la config vigente en CADA bloque (los
+  // snapshots del turno, convertidos de hora real a hora de pared). Antes del
+  // primer snapshot rige gatesUsed. Se recalcula sola al cambiar una gate.
+  const gateMixDerivado = useMemo(() => {
+    if (!gateObs) return null
+    return deriveGateMix(gateObs, configTimelineFromSnapshots(configSnapshots, summary?.gatesUsed))
+  }, [gateObs, configSnapshots, summary?.gatesUsed])
 
   // ¿El desglose P0 guardado corresponde a estas gates? El análisis se congela al
   // guardar el turno y editar la config después no lo recalcula.
@@ -2537,14 +2561,15 @@ export function AnalisisGraderTurnoPage() {
               terreno («¿la G6 cae mezclada, y desde cuándo?») y la que decide
               si hay que tocar la config de abajo. Lee summary.gateMix, que se
               calcula al guardar el Excel (graderGateMix.ts). */}
-          {activeView === 'gates' && isClassificationPlant && summary.gateMix && (
+          {activeView === 'gates' && isClassificationPlant && (gateMixDerivado ?? summary.gateMix) && (
             <PurezaPorPuertaCard
-              gateMix={summary.gateMix}
-              gates={summary.gatesUsed}
+              gateMix={(gateMixDerivado ?? summary.gateMix)!}
+              gates={turnoGates.length > 0 ? turnoGates : summary.gatesUsed}
+              changeBuckets={gateMixDerivado?.changeBuckets}
               turnoLabel={`${dateKey.slice(8, 10)}/${dateKey.slice(5, 7)} · ${shiftLabel}`}
             />
           )}
-          {activeView === 'gates' && isClassificationPlant && !summary.gateMix && summary.hasPieceData && (
+          {activeView === 'gates' && isClassificationPlant && !gateMixDerivado && !summary.gateMix && summary.hasPieceData && (
             <p className="text-footnote text-muted-foreground px-1">
               Este turno se guardó antes de la pureza por puerta. Recargá su Excel pieza a pieza para verla.
             </p>

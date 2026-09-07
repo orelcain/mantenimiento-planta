@@ -80,9 +80,15 @@ interface Props {
   gates?: GateAssignment[]
   /** Para el título de la incidencia y el resumen copiado. Ej: "07/09 · Turno 1". */
   turnoLabel: string
+  /**
+   * Bloques que contienen un cambio de config de gates (gateMix v2). Se marcan
+   * en la franja y no cuentan para "cae desde": un bloque partido por un
+   * cambio sale contaminado aunque la máquina haya obedecido.
+   */
+  changeBuckets?: number[]
 }
 
-export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel }: Props) {
+export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets }: Props) {
   const navigate = useNavigate()
   const [copiado, setCopiado] = useState(false)
 
@@ -133,7 +139,7 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel }: Props) {
     for (const e of gateMix.gates) {
       const n = nivelDePureza(e.purityPct)
       if (n === 'ok' || n === 'none') continue
-      const caida = bloqueDeCaida(e.purityByBucket)
+      const caida = bloqueDeCaida(sinCambios(e.purityByBucket, changeBuckets))
       lineas.push(
         `G${e.gate} (${etiquetaAsignacion(e, gateCfg.get(e.gate))}): ${fmtPct(e.purityPct!)} pura`
         + (textoIntruso(e) ? ` · ${textoIntruso(e)}` : '')
@@ -227,7 +233,7 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel }: Props) {
 
         {/* ── Ficha de la puerta elegida ── */}
         {detalle && (
-          <DetalleGate mix={gateMix} entry={detalle} cfg={gateCfg.get(detalle.gate)} />
+          <DetalleGate mix={gateMix} entry={detalle} cfg={gateCfg.get(detalle.gate)} changeBuckets={changeBuckets} />
         )}
 
         <div className="flex flex-wrap gap-2">
@@ -276,9 +282,20 @@ function Barras({ titulo, data, esperado, total }: {
   )
 }
 
-function DetalleGate({ mix, entry, cfg }: { mix: GateMix; entry: GateMixEntry; cfg?: GateAssignment }) {
+/** Anula los bloques que contienen un cambio de config: no valen como evidencia de caída. */
+function sinCambios(purity: ReadonlyArray<number | null>, changeBuckets?: number[]): Array<number | null> {
+  if (!changeBuckets?.length) return [...purity]
+  const set = new Set(changeBuckets)
+  return purity.map((v, i) => (set.has(i) ? null : v))
+}
+
+function DetalleGate({ mix, entry, cfg, changeBuckets }: {
+  mix: GateMix; entry: GateMixEntry; cfg?: GateAssignment; changeBuckets?: number[]
+}) {
   const nivel = nivelDePureza(entry.purityPct)
-  const caida = bloqueDeCaida(entry.purityByBucket)
+  const cambios = new Set(changeBuckets ?? [])
+  const purezaSinCambios = sinCambios(entry.purityByBucket, changeBuckets)
+  const caida = bloqueDeCaida(purezaSinCambios)
   const buckets = entry.purityByBucket
   // Etiquetas del eje: inicio, fin y un par intermedias sin amontonarse.
   const paso = Math.max(1, Math.ceil(buckets.length / 4))
@@ -320,8 +337,12 @@ function DetalleGate({ mix, entry, cfg }: { mix: GateMix; entry: GateMixEntry; c
             {buckets.map((v, i) => (
               <span
                 key={i}
-                title={`${horaBloque(mix, i)} · ${v == null ? 'sin piezas' : fmtPct(v)}`}
-                className={cn('block', v == null ? 'bg-border' : NIVEL_BG[nivelDePureza(v)])}
+                title={`${horaBloque(mix, i)} · ${v == null ? 'sin piezas' : fmtPct(v)}${cambios.has(i) ? ' · cambio de gate en este bloque' : ''}`}
+                className={cn(
+                  'block',
+                  v == null ? 'bg-border' : NIVEL_BG[nivelDePureza(v)],
+                  cambios.has(i) && 'ring-2 ring-inset ring-primary',
+                )}
                 style={{ height: v == null ? '15%' : `${Math.max(v, 4)}%` }}
               />
             ))}
@@ -333,12 +354,20 @@ function DetalleGate({ mix, entry, cfg }: { mix: GateMix; entry: GateMixEntry; c
                 : null,
             )}
           </div>
+          {cambios.size > 0 && (
+            <p className="mt-1 text-caption text-muted-foreground">
+              <span className="inline-block h-[9px] w-[9px] align-middle ring-2 ring-inset ring-primary mr-1" aria-hidden />
+              Cambio de gate en el bloque de las{' '}
+              <span className="tabular-nums">{[...cambios].sort((a, b) => a - b).map((i) => horaBloque(mix, i)).join(', ')}</span>:
+              ese bloque se lee con cautela y no cuenta para "cae desde".
+            </p>
+          )}
           <p className="mt-2 text-footnote">
             {caida == null
               ? 'Se mantuvo sobre el umbral todo el turno.'
               : caida === 0
                 ? <>Mezclada <span className="font-semibold text-ink-crit">desde el inicio del turno</span>.</>
-                : <>Cae desde las <span className="font-semibold text-ink-crit tabular-nums">{horaBloque(mix, caida)}</span>; antes iba en {fmtPct(promedioHasta(entry.purityByBucket, caida) ?? 0)}.</>}
+                : <>Cae desde las <span className="font-semibold text-ink-crit tabular-nums">{horaBloque(mix, caida)}</span>; antes iba en {fmtPct(promedioHasta(purezaSinCambios, caida) ?? 0)}.</>}
           </p>
         </div>
       )}

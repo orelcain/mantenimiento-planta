@@ -54,8 +54,10 @@ import {
   loadPausesAggregates,
   mergeAnnotationsIntoPauses,
   updateDailySummary,
+  saveGateObservations,
   type FirestorePieceRecord,
 } from '@/services/grader/graderDailySummary.service'
+import { computeGateObservations } from '@/services/grader/graderGateObservations'
 import { saveGate0Records } from '@/services/grader/graderGate0Store'
 import { getLatestSnapshot, saveConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
 import { detectPauses, collectSortedTimestamps, type PauseDetectionResult } from '@/services/grader/graderPauseDetector'
@@ -640,6 +642,14 @@ export function AnalisisGraderWizardPage() {
         const aggregates = computeTimelineAggregates(segment.pieceRecords, segment.gate0Records)
         if (aggregates.length > 0) {
           await saveTimelineAggregates(summaryId, aggregates)
+        }
+
+        // gateMix v2: lo observado por puerta y bloque, sin juicio, en
+        // meta/gateMix. La pureza se deriva al abrir Gates con los snapshots
+        // del turno (graderGateObservations.ts). Solo plantas que clasifican.
+        if (lineConfig.isClassificationPlant !== false) {
+          const obs = computeGateObservations(segment.pieceRecords)
+          if (obs) await saveGateObservations(summaryId, obs)
         }
 
         // Detalle de pausas (≥5min) + microDetentions.byHour.

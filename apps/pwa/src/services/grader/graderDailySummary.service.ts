@@ -35,6 +35,7 @@ import {
 import { db } from '../firebase'
 import { logger } from '@/lib/logger'
 import type { GraderDailySummary, TimelineBucket, Pause, MicroDetentionsSummary, PauseHistoryEntry } from './types'
+import { GATE_OBS_SCHEMA, type GateObservations } from './graderGateObservations'
 import { fmtTime } from './graderTimeFormat'
 
 const COLLECTION = 'graderDailySummaries'
@@ -720,6 +721,38 @@ export async function loadTimelineAggregates(
   const data = snap.data() as Partial<TimelineAggregatesDoc>
   if (!Array.isArray(data.buckets)) return null
   return data.buckets as TimelineBucket[]
+}
+
+// ============================================================================
+// gateMix v2 — lo observado por puerta y bloque (graderGateObservations.ts)
+// ============================================================================
+//
+// Path: `graderDailySummaries/{id}/meta/gateMix`. ~12 KB medidos por turno:
+// va acá y no en el doc del summary, que la matriz lee por mes (30 docs).
+// Se lee UNA vez al abrir la pestaña Gates; la pureza se deriva en pantalla
+// con los snapshots del turno, así que cambiar una gate no reescribe nada.
+
+const GATE_MIX_META_DOC = 'gateMix'
+
+interface GateObservationsDoc extends GateObservations {
+  updatedAt: string
+}
+
+export async function saveGateObservations(summaryId: string, obs: GateObservations): Promise<void> {
+  const ref = doc(db, COLLECTION, summaryId, TIMELINE_META_SUB, GATE_MIX_META_DOC)
+  const payload: GateObservationsDoc = { ...obs, updatedAt: new Date().toISOString() }
+  await setDoc(ref, payload)
+}
+
+/** null si el turno se guardó antes de la v2 (o no clasifica). */
+export async function loadGateObservations(summaryId: string): Promise<GateObservations | null> {
+  const ref = doc(db, COLLECTION, summaryId, TIMELINE_META_SUB, GATE_MIX_META_DOC)
+  const snap = await getDoc(ref)
+  if (!snap.exists()) return null
+  const data = snap.data() as Partial<GateObservationsDoc>
+  if (data.schema !== GATE_OBS_SCHEMA || !Array.isArray(data.gates) || typeof data.bucketsFrom !== 'string') return null
+  const { updatedAt: _u, ...obs } = data
+  return obs as GateObservations
 }
 
 // ============================================================================
