@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui'
 import { Activity, ChevronDown, ChevronUp } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTheme } from '@/hooks/useTheme'
+import { realIsoToWallClockMs } from '@/services/grader/graderGateObservations'
 import type { TimelineBucket } from '@/services/grader/types'
 import type { GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
 
@@ -103,7 +104,14 @@ export function GateEvolutionChart({ timelineBuckets, configSnapshots }: GateEvo
         ? `G${gate}${calibre ? ` →${String(calibre.after).split(' ')[0]}` : ''}`
         : 'cambio'
       return {
-        xAxis: snap.at,
+        // snap.at es hora REAL UTC y el eje va en hora de pared marcada como Z
+        // (tsMin): sin convertir, la marca caía 3–4 h corrida. Se ancla al
+        // primer minuto del eje ≥ al cambio (el eje es categórico).
+        xAxis: (() => {
+          const wc = realIsoToWallClockMs(snap.at)
+          const hit = timelineBuckets.find((b) => Date.parse(b.tsMin) >= wc)
+          return hit?.tsMin ?? timelineBuckets[timelineBuckets.length - 1]?.tsMin ?? snap.at
+        })(),
         label: {
           formatter: label,
           fontSize: 9,

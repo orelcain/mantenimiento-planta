@@ -18,7 +18,10 @@
  */
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import ReactECharts from 'echarts-for-react'
+import type { EChartsOption } from 'echarts'
 import { Layers, Copy, CheckCircle2 } from 'lucide-react'
+import { useTheme } from '@/hooks/useTheme'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui'
 import { Pill, type PillTone } from '@/components/piel/Pill'
 import { Button } from '@/components/piel/Button'
@@ -29,6 +32,7 @@ import {
   PUREZA_OK_PCT, PUREZA_WARN_PCT, nivelDePureza, bloqueDeCaida, promedioHasta, type NivelPureza as Nivel,
 } from '@/services/grader/graderPurezaNivel'
 import type { GateAssignment } from '@/services/grader/types'
+import { CAUSA_ORDER, type CausaTipo, type GateCauses, type GateCauseGroup } from '@/services/grader/graderGateObservations'
 
 // ⚠ Nunca combinar estas clases de color con text-caption/text-title3 dentro
 // de cn(): tailwind-merge no conoce la escala tipográfica propia, toma
@@ -86,9 +90,50 @@ interface Props {
    * cambio sale contaminado aunque la máquina haya obedecido.
    */
   changeBuckets?: number[]
+  /**
+   * «¿Por qué cayó acá?» para la puerta elegida (gateMix v2): causales,
+   * a qué gate debía ir según el seteo y en qué bloques se concentra. Sin esto
+   * (v1) la ficha muestra solo los desgloses.
+   */
+  causesFor?: (gate: number) => GateCauses | null
 }
 
-export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets }: Props) {
+/** Nombre de cada causal y qué mirar. El color nunca es el único canal. */
+const CAUSA_META: Record<CausaTipo, { label: string; hint: (g: GateCauseGroup, self: number) => string }> = {
+  calibre_lejano: {
+    label: 'Calibre lejano',
+    hint: (g, self) => g.origen === 'atras'
+      ? `Vino de más atrás: ${g.debiaIr.map((d) => `G${d}`).join('/')} no la tomó (puerta no abrió o saturada).`
+      : g.origen === 'adelante'
+        ? `Cayó antes de llegar a ${g.debiaIr.map((d) => `G${d}`).join('/')}: disparo anticipado o rango del Z2 distinto al seteo de la G${self}.`
+        : g.origen === 'mixto'
+          ? `Debía ir a ${g.debiaIr.map((d) => `G${d}`).join('/')}: revisar rangos del Z2 contra el seteo.`
+          : 'Ningún gate tiene ese calibre asignado con esta calidad: falta en el seteo.',
+  },
+  calibre_vecino: {
+    label: 'Calibre vecino',
+    hint: (g) => `Peso al límite del rango: revisar rangos de calibre o calibración de balanza.${g.debiaIr.length ? ` Debía ir a ${g.debiaIr.map((d) => `G${d}`).join('/')}.` : ''}`,
+  },
+  calidad: {
+    label: 'Calidad distinta',
+    hint: (g) => `La pieza venía marcada como ${g.value} en el ingreso.${g.debiaIr.length ? ` Debía ir a ${g.debiaIr.map((d) => `G${d}`).join('/')}.` : ' Ningún gate recibe esa calidad con este calibre.'}`,
+  },
+  conservacion: {
+    label: 'Conservación distinta',
+    hint: (g) => `Cayó ${g.value} en una puerta de otra conservación.${g.debiaIr.length ? ` Debía ir a ${g.debiaIr.map((d) => `G${d}`).join('/')}.` : ''}`,
+  },
+  sin_dato: { label: 'Sin dato en el Excel', hint: () => 'El registro no trae calibre o calidad: no se puede juzgar.' },
+  otros: { label: 'Otras combinaciones', hint: () => 'Fuera de las 8 combinaciones más frecuentes del bloque.' },
+}
+
+/** Colores del gráfico apilado por tema (misma lógica que CHART_INK en otros gráficos). */
+const CAUSA_COLOR: Record<'dark' | 'light', Record<CausaTipo | 'ok', string>> = {
+  light: { ok: '#2e75b6', calibre_lejano: '#b51b1b', calibre_vecino: '#974608', calidad: '#8944ab', conservacion: '#0c7e78', sin_dato: '#6f6f72', otros: '#aeaeb2' },
+  dark:  { ok: '#5aa0dc', calibre_lejano: '#e08a88', calibre_vecino: '#d8b57a', calidad: '#da8fff', conservacion: '#5de7df', sin_dato: '#9db0c2', otros: '#6b7c8c' },
+}
+const CHART_TEXT = { light: { axis: '#41566a', grid: '#c3d7e9', tipBg: '#ffffff', tipText: '#16242f', tipBorder: '#c3d7e9' }, dark: { axis: '#94a3b8', grid: '#22384a', tipBg: '#1e293b', tipText: '#e2e8f0', tipBorder: '#334155' } }
+
+export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets, causesFor }: Props) {
   const navigate = useNavigate()
   const [copiado, setCopiado] = useState(false)
 
@@ -121,6 +166,17 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets 
   }, [gateMix])
   const [seleccion, setSeleccion] = useState<number | null>(peor)
   const detalle = seleccion != null ? byGate.get(seleccion) : undefined
+  const causas = useMemo(() => (detalle && causesFor ? causesFor(detalle.gate) : null), [detalle, causesFor])
+
+  // Hasta qué hora hay piezas: con el Excel cargado a mitad de turno, es lo
+  // primero que hay que saber para leer el resto.
+  const datosHasta = useMemo(() => {
+    let last = -1
+    for (const e of gateMix.gates) e.purityByBucket.forEach((v, i) => { if (v != null && i > last) last = i })
+    if (last < 0) return null
+    const ms = Date.parse(gateMix.bucketsFrom) + (last + 1) * gateMix.bucketMinutes * 60_000
+    return new Date(ms).toISOString().slice(11, 16)
+  }, [gateMix])
 
   const nivelGlobal: Nivel = conteo.crit > 0 ? 'crit' : conteo.warn > 0 ? 'warn' : 'ok'
   const resumenPill = conteo.crit > 0
@@ -145,6 +201,10 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets 
         + (textoIntruso(e) ? ` · ${textoIntruso(e)}` : '')
         + (caida != null ? ` · cae desde ${horaBloque(gateMix, caida)}` : ''),
       )
+      const c = causesFor?.(e.gate)
+      for (const g of c?.groups.slice(0, 3) ?? []) {
+        lineas.push(`  - ${CAUSA_META[g.tipo].label} ${g.value}: ${fmtPz(g.pieces)} pz (${fmtPct(g.pct)})${g.debiaIr.length ? ` · debía ir a ${g.debiaIr.map((d) => `G${d}`).join('/')}` : ''}`)
+      }
     }
     return lineas.filter(Boolean).join('\n')
   }
@@ -176,6 +236,7 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets 
             Coinciden con lo asignado:{' '}
             <span className="text-foreground font-medium tabular-nums">{fmtPz(totals.match)} / {fmtPz(totals.pieces)} pz</span>
             {' '}<span className="tabular-nums">({fmtPct(totals.purityPct)})</span>
+            {datosHasta && <> · piezas hasta las <span className="tabular-nums text-foreground">{datosHasta}</span></>}
           </p>
         )}
       </CardHeader>
@@ -233,7 +294,7 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets 
 
         {/* ── Ficha de la puerta elegida ── */}
         {detalle && (
-          <DetalleGate mix={gateMix} entry={detalle} cfg={gateCfg.get(detalle.gate)} changeBuckets={changeBuckets} />
+          <DetalleGate mix={gateMix} entry={detalle} cfg={gateCfg.get(detalle.gate)} changeBuckets={changeBuckets} causas={causas} />
         )}
 
         <div className="flex flex-wrap gap-2">
@@ -282,6 +343,42 @@ function Barras({ titulo, data, esperado, total }: {
   )
 }
 
+/** Barras apiladas por bloque: coincide + cada causal. Los ejes toman el color del tema. */
+function buildApilado(mix: GateMix, causas: GateCauses, isDark: boolean): EChartsOption {
+  const theme = isDark ? 'dark' : 'light'
+  const colors = CAUSA_COLOR[theme]
+  const text = CHART_TEXT[theme]
+  const n = mix.bucketCount
+  const horas = Array.from({ length: n }, (_, i) => horaBloque(mix, i))
+  const series = [
+    { key: 'ok' as const, name: 'Coincide', data: causas.okByBucket },
+    ...CAUSA_ORDER
+      .filter((t) => causas.byTipoByBucket[t].some((v) => v > 0))
+      .map((t) => ({ key: t, name: CAUSA_META[t].label, data: causas.byTipoByBucket[t] })),
+  ]
+  return {
+    backgroundColor: 'transparent',
+    animation: false,
+    // La leyenda puede ocupar dos líneas a 375 px: el grid arranca debajo.
+    grid: { top: 48, bottom: 22, left: 34, right: 8, containLabel: false },
+    legend: { top: 0, left: 0, itemWidth: 10, itemHeight: 10, itemGap: 10, textStyle: { color: text.axis, fontSize: 11 } },
+    xAxis: { type: 'category', data: horas, axisLabel: { color: text.axis, fontSize: 10, interval: Math.max(0, Math.ceil(n / 8) - 1) }, axisTick: { show: false }, axisLine: { lineStyle: { color: text.grid } } },
+    yAxis: { type: 'value', axisLabel: { color: text.axis, fontSize: 10 }, splitLine: { lineStyle: { color: text.grid, type: 'dashed' } }, minInterval: 1 },
+    tooltip: {
+      trigger: 'axis', backgroundColor: text.tipBg, borderColor: text.tipBorder, textStyle: { color: text.tipText, fontSize: 11 },
+      formatter: (params: unknown) => {
+        const p = params as Array<{ seriesName: string; value: number; color: string; axisValue: string }>
+        if (!p.length) return ''
+        const lines = p.filter((s) => s.value > 0).map((s) => `<span style="color:${s.color}">■</span> ${s.seriesName}: <b>${s.value}</b>`)
+        return `<b>${p[0]!.axisValue}</b><br/>${lines.join('<br/>')}`
+      },
+    },
+    series: series.map((s) => ({
+      type: 'bar', name: s.name, stack: 'pz', data: s.data, itemStyle: { color: colors[s.key] }, emphasis: { disabled: true }, barMaxWidth: 28,
+    })),
+  }
+}
+
 /** Anula los bloques que contienen un cambio de config: no valen como evidencia de caída. */
 function sinCambios(purity: ReadonlyArray<number | null>, changeBuckets?: number[]): Array<number | null> {
   if (!changeBuckets?.length) return [...purity]
@@ -289,9 +386,10 @@ function sinCambios(purity: ReadonlyArray<number | null>, changeBuckets?: number
   return purity.map((v, i) => (set.has(i) ? null : v))
 }
 
-function DetalleGate({ mix, entry, cfg, changeBuckets }: {
-  mix: GateMix; entry: GateMixEntry; cfg?: GateAssignment; changeBuckets?: number[]
+function DetalleGate({ mix, entry, cfg, changeBuckets, causas }: {
+  mix: GateMix; entry: GateMixEntry; cfg?: GateAssignment; changeBuckets?: number[]; causas?: GateCauses | null
 }) {
+  const { isDark } = useTheme()
   const nivel = nivelDePureza(entry.purityPct)
   const cambios = new Set(changeBuckets ?? [])
   const purezaSinCambios = sinCambios(entry.purityByBucket, changeBuckets)
@@ -317,6 +415,38 @@ function DetalleGate({ mix, entry, cfg, changeBuckets }: {
         </p>
         <span className={`text-footnote font-semibold ${NIVEL_INK[nivel]}`}>{veredicto}</span>
       </div>
+
+      {/* ¿Por qué cayó acá? Va antes de los desgloses: es la respuesta, los
+          desgloses son la evidencia. Solo con gateMix v2 (causas derivadas
+          con la config de cada bloque). */}
+      {causas && causas.groups.length > 0 && (
+        <div data-testid="pureza-causas">
+          <p className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">¿Por qué cayó acá?</p>
+          <ul className="mt-1.5 space-y-2">
+            {causas.groups.map((g) => (
+              <li key={`${g.tipo}|${g.value}`} className="text-footnote">
+                <div className="flex flex-wrap items-baseline gap-x-2">
+                  <span className="font-semibold text-foreground">{CAUSA_META[g.tipo].label}{g.tipo !== 'sin_dato' && g.tipo !== 'otros' ? ` · ${g.value}` : ''}</span>
+                  <span className="tabular-nums text-foreground">{fmtPz(g.pieces)} pz · {fmtPct(g.pct)}</span>
+                  <span className="tabular-nums text-muted-foreground">
+                    {g.desde == null ? '' : g.parejo ? 'parejo todo el turno' : g.desde === g.hasta ? `en el bloque de las ${horaBloque(mix, g.desde)}` : `entre ${horaBloque(mix, g.desde)} y ${horaBloque(mix, g.hasta!)}`}
+                  </span>
+                </div>
+                <p className="text-muted-foreground">{CAUSA_META[g.tipo].hint(g, entry.gate)}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {causas && causas.judged > 0 && (
+        <div>
+          <p className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">Qué cayó, bloque a bloque</p>
+          <div className="mt-1 h-[192px]" data-testid="pureza-apilado">
+            <ReactECharts option={buildApilado(mix, causas, isDark)} style={{ height: '100%', width: '100%' }} opts={{ renderer: 'canvas' }} notMerge />
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Barras titulo="Por calibre" data={entry.byCalibre} esperado={entry.assignedCalibre} total={entry.pieces} />

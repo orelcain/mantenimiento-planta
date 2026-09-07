@@ -7,14 +7,18 @@
  *
  * v2 separa las dos cosas:
  *  - `computeGateObservations` produce, por puerta y por bloque de 30 min,
- *    cuántas piezas cayeron de cada combinación `calibre|calidad`. Es un hecho
- *    de la máquina: no depende de ninguna config. Se guarda una vez, en la
- *    subcolección `meta/gateMix` del turno (~12 KB medidos; NO en el doc del
- *    summary, que se lee por mes).
+ *    cuántas piezas cayeron de cada combinación `calibre|calidad|conservación`.
+ *    Es un hecho de la máquina: no depende de ninguna config. Se guarda una
+ *    vez, en la subcolección `meta/gateMix` del turno (~12 KB medidos; NO en
+ *    el doc del summary, que se lee por mes).
  *  - `deriveGateMix` produce, en pantalla, el mismo `GateMix` que consume la
  *    tarjeta de pureza, pero juzgando cada bloque con la config vigente en ese
  *    momento (los snapshots del turno). Cambiar una gate no escribe nada y se
  *    refleja al instante, también hacia atrás.
+ *  - `classifyGateCauses` responde «¿por qué cayó acá?»: agrupa las piezas que
+ *    no coinciden por causal (calibre vecino, calibre lejano, calidad,
+ *    conservación, sin dato), dice a qué gate debían ir según el seteo y en
+ *    qué bloques se concentran.
  *
  * Topes (decisión 07-09): 40 bloques (20 h) y 8 combinaciones por bloque (el
  * resto se suma en `Otros`), para que un Excel con timestamps basura no pueda
@@ -27,6 +31,7 @@
 import type { GateAssignment, PieceRecord } from './types'
 import type { GateConfigSnapshot } from './graderConfigSnapshot.service'
 import { ANY_CALIBRE, SIN_DATO, type GateMix, type GateMixEntry, type GateMixIntruder } from './graderGateMix'
+import { CALIBRE_WEIGHT_RANGES } from './graderAnalyticsThroughput'
 
 export const GATE_OBS_SCHEMA = 2
 export const GATE_OBS_BUCKET_MINUTES = 30
@@ -37,7 +42,7 @@ export const OTROS = 'Otros'
 /** Huso de las plantas (Chonchi y Yal). */
 export const PLANT_TZ = 'America/Santiago'
 
-/** `calibre|calidad` → piezas. `Otros` agrupa lo que quedó fuera del top 8. */
+/** `calibre|calidad[|conservación]` → piezas. `Otros` agrupa lo que quedó fuera del top 8. */
 export type ComboCounts = Record<string, number>
 
 export interface GateObservationsEntry {
@@ -57,13 +62,16 @@ export interface GateObservations {
   gates: GateObservationsEntry[]
 }
 
-export const comboKey = (calibre: string | undefined, quality: string | undefined): string =>
-  `${calibre || SIN_DATO}|${quality || SIN_DATO}`
+/** La conservación solo entra a la clave cuando el Excel la trae: no cambia las claves viejas. */
+export const comboKey = (calibre: string | undefined, quality: string | undefined, conservation?: string): string =>
+  `${calibre || SIN_DATO}|${quality || SIN_DATO}${conservation ? `|${conservation}` : ''}`
 
-export function splitCombo(key: string): { calibre: string; quality: string } {
+export interface Combo { calibre: string; quality: string; conservation?: string }
+
+export function splitCombo(key: string): Combo {
   if (key === OTROS) return { calibre: OTROS, quality: OTROS }
-  const i = key.indexOf('|')
-  return i < 0 ? { calibre: key, quality: SIN_DATO } : { calibre: key.slice(0, i), quality: key.slice(i + 1) }
+  const [calibre = SIN_DATO, quality = SIN_DATO, conservation] = key.split('|')
+  return conservation ? { calibre, quality, conservation } : { calibre, quality }
 }
 
 /** Un ts ISO sin sufijo se parsea como UTC (ver graderGateMix.parseWallClock). */
@@ -119,7 +127,7 @@ export function computeGateObservations(records: readonly PieceRecord[]): GateOb
       buckets = Array.from({ length: bucketCount }, () => new Map<string, number>())
       acc.set(rec.gate, buckets)
     }
-    const key = comboKey(rec.calibre, rec.quality)
+    const key = comboKey(rec.calibre, rec.quality, rec.conservation)
     const b = buckets[bi]!
     b.set(key, (b.get(key) ?? 0) + rec.pieces)
   }
@@ -196,9 +204,13 @@ export interface DerivedGateMix extends GateMix {
   changeBuckets: number[]
 }
 
-function matches(calibre: string, quality: string, g: GateAssignment): boolean {
-  if (calibre === OTROS) return false
-  return (g.assignedCalibre === ANY_CALIBRE || calibre === g.assignedCalibre) && quality === g.assignedQuality
+/** ¿La combinación observada es lo que la gate tenía asignado? */
+function matches(c: Combo, g: GateAssignment): boolean {
+  if (c.calibre === OTROS) return false
+  if (g.assignedCalibre !== ANY_CALIBRE && c.calibre !== g.assignedCalibre) return false
+  if (c.quality !== g.assignedQuality) return false
+  if (g.assignedConservation && c.conservation && c.conservation !== g.assignedConservation) return false
+  return true
 }
 
 /**
@@ -238,14 +250,14 @@ export function deriveGateMix(obs: GateObservations, timeline: ConfigTimeline): 
       let bTot = 0
       let bOk = 0
       for (const [key, n] of Object.entries(b)) {
-        const { calibre, quality } = splitCombo(key)
-        byCalibre[calibre] = (byCalibre[calibre] ?? 0) + n
-        byQuality[quality] = (byQuality[quality] ?? 0) + n
+        const c = splitCombo(key)
+        byCalibre[c.calibre] = (byCalibre[c.calibre] ?? 0) + n
+        byQuality[c.quality] = (byQuality[c.quality] ?? 0) + n
         bTot += n
         if (!cfg) continue
-        if (matches(calibre, quality, cfg)) { bOk += n; continue }
-        if (cfg.assignedCalibre !== ANY_CALIBRE && calibre !== cfg.assignedCalibre) intruCal.set(calibre, (intruCal.get(calibre) ?? 0) + n)
-        if (quality !== cfg.assignedQuality) intruQ.set(quality, (intruQ.get(quality) ?? 0) + n)
+        if (matches(c, cfg)) { bOk += n; continue }
+        if (cfg.assignedCalibre !== ANY_CALIBRE && c.calibre !== cfg.assignedCalibre) intruCal.set(c.calibre, (intruCal.get(c.calibre) ?? 0) + n)
+        if (c.quality !== cfg.assignedQuality) intruQ.set(c.quality, (intruQ.get(c.quality) ?? 0) + n)
       }
       if (cfg) { lastCfg = cfg; match += bOk; judged += bTot }
       purityByBucket.push(cfg && bTot > 0 ? r1((bOk / bTot) * 100) : null)
@@ -280,4 +292,136 @@ export function deriveGateMix(obs: GateObservations, timeline: ConfigTimeline): 
     gates,
     changeBuckets,
   }
+}
+
+// ── ¿Por qué cayó acá? ──────────────────────────────────────────────────────
+
+export type CausaTipo = 'calibre_vecino' | 'calibre_lejano' | 'calidad' | 'conservacion' | 'sin_dato' | 'otros'
+
+export const CAUSA_ORDER: CausaTipo[] = ['calibre_lejano', 'calibre_vecino', 'calidad', 'conservacion', 'sin_dato', 'otros']
+
+/** De dónde vinieron las piezas respecto a esta puerta, según el seteo. */
+export type OrigenCausa = 'atras' | 'adelante' | 'mixto' | 'ninguna'
+
+export interface GateCauseGroup {
+  tipo: CausaTipo
+  /** El valor intruso: el calibre, la calidad o la conservación que cayó. */
+  value: string
+  pieces: number
+  /** % de las piezas juzgadas de la puerta. */
+  pct: number
+  /** Gates que tenían asignado ese valor (con la calidad de la pieza) en la config del bloque. */
+  debiaIr: number[]
+  origen: OrigenCausa
+  /** Piezas de esta causal por bloque (misma longitud que los bloques). */
+  byBucket: number[]
+  /** Primer y último bloque con piezas de la causal. null si no hay. */
+  desde: number | null
+  hasta: number | null
+  /** true si aparece en ≥ 70 % de los bloques con piezas: no es un episodio, es constante. */
+  parejo: boolean
+}
+
+export interface GateCauses {
+  gate: number
+  /** Piezas juzgadas (bloques con asignación). */
+  judged: number
+  okByBucket: number[]
+  /** Piezas fuera de asignación por bloque y por tipo (para el gráfico apilado). */
+  byTipoByBucket: Record<CausaTipo, number[]>
+  groups: GateCauseGroup[]
+}
+
+const CALIBRE_ORDER: string[] = CALIBRE_WEIGHT_RANGES.map((r) => r.calibre)
+
+function calibreDistance(a: string, b: string): number | null {
+  const ia = CALIBRE_ORDER.indexOf(a)
+  const ib = CALIBRE_ORDER.indexOf(b)
+  if (ia < 0 || ib < 0) return null
+  return Math.abs(ia - ib)
+}
+
+function tipoDeCausa(c: Combo, cfg: GateAssignment): { tipo: CausaTipo; value: string } {
+  if (c.calibre === OTROS) return { tipo: 'otros', value: OTROS }
+  if (c.calibre === SIN_DATO || c.quality === SIN_DATO) return { tipo: 'sin_dato', value: SIN_DATO }
+  if (cfg.assignedCalibre !== ANY_CALIBRE && c.calibre !== cfg.assignedCalibre) {
+    const d = calibreDistance(c.calibre, cfg.assignedCalibre)
+    return { tipo: d === 1 ? 'calibre_vecino' : 'calibre_lejano', value: c.calibre }
+  }
+  if (c.quality !== cfg.assignedQuality) return { tipo: 'calidad', value: c.quality }
+  return { tipo: 'conservacion', value: c.conservation ?? SIN_DATO }
+}
+
+/** Gates (activas, distintas de `self`) que en `all` tenían asignada la combinación. */
+function gatesQueDebian(all: readonly GateAssignment[] | undefined, self: number, tipo: CausaTipo, c: Combo): number[] {
+  if (!all) return []
+  const ok = (g: GateAssignment) => {
+    if (!g.active || g.gateNumber === self) return false
+    if (tipo === 'calibre_vecino' || tipo === 'calibre_lejano') {
+      return (g.assignedCalibre === c.calibre || g.assignedCalibre === ANY_CALIBRE) && g.assignedQuality === c.quality
+    }
+    if (tipo === 'calidad') {
+      return g.assignedQuality === c.quality && (g.assignedCalibre === ANY_CALIBRE || g.assignedCalibre === c.calibre)
+    }
+    if (tipo === 'conservacion') return g.assignedConservation === c.conservation && g.assignedQuality === c.quality
+    return false
+  }
+  return all.filter(ok).map((g) => g.gateNumber).sort((a, b) => a - b)
+}
+
+/**
+ * Agrupa lo que cayó fuera de asignación en una puerta por causal y valor,
+ * usando la config vigente en cada bloque. Ordena por piezas.
+ */
+export function classifyGateCauses(obs: GateObservations, gate: number, timeline: ConfigTimeline): GateCauses | null {
+  const entry = obs.gates.find((e) => e.gate === gate)
+  if (!entry) return null
+  const size = obs.bucketMinutes * 60_000
+  const from = Date.parse(obs.bucketsFrom)
+  const n = obs.bucketCount
+
+  const okByBucket = Array.from({ length: n }, () => 0)
+  const byTipoByBucket = Object.fromEntries(CAUSA_ORDER.map((t) => [t, Array.from({ length: n }, () => 0)])) as Record<CausaTipo, number[]>
+  const groups = new Map<string, GateCauseGroup>()
+  let judged = 0
+  let bucketsConPiezas = 0
+
+  entry.byBucket.forEach((b, i) => {
+    if (!b) return
+    const all = timeline.configAt(from + i * size)
+    const cfg = all?.find((g) => g.gateNumber === gate && g.active)
+    if (!cfg) return
+    bucketsConPiezas++
+    for (const [key, pieces] of Object.entries(b)) {
+      judged += pieces
+      const c = splitCombo(key)
+      if (matches(c, cfg)) { okByBucket[i]! += pieces; continue }
+      const { tipo, value } = tipoDeCausa(c, cfg)
+      byTipoByBucket[tipo][i]! += pieces
+      const gk = `${tipo}|${value}`
+      let g = groups.get(gk)
+      if (!g) {
+        g = { tipo, value, pieces: 0, pct: 0, debiaIr: [], origen: 'ninguna', byBucket: Array.from({ length: n }, () => 0), desde: null, hasta: null, parejo: false }
+        groups.set(gk, g)
+      }
+      g.pieces += pieces
+      g.byBucket[i]! += pieces
+      for (const d of gatesQueDebian(all, gate, tipo, c)) if (!g.debiaIr.includes(d)) g.debiaIr.push(d)
+    }
+  })
+
+  const out = [...groups.values()].map((g) => {
+    g.debiaIr.sort((a, b) => a - b)
+    g.pct = judged > 0 ? r1((g.pieces / judged) * 100) : 0
+    const conPiezas = g.byBucket.map((v, i) => (v > 0 ? i : -1)).filter((i) => i >= 0)
+    g.desde = conPiezas[0] ?? null
+    g.hasta = conPiezas[conPiezas.length - 1] ?? null
+    g.parejo = bucketsConPiezas > 0 && conPiezas.length / bucketsConPiezas >= 0.7
+    const atras = g.debiaIr.some((d) => d < gate)
+    const adelante = g.debiaIr.some((d) => d > gate)
+    g.origen = atras && adelante ? 'mixto' : atras ? 'atras' : adelante ? 'adelante' : 'ninguna'
+    return g
+  }).sort((a, b) => b.pieces - a.pieces)
+
+  return { gate, judged, okByBucket, byTipoByBucket, groups: out }
 }

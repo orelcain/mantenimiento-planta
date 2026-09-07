@@ -8,7 +8,7 @@
  */
 import { useMemo, useState } from 'react'
 import { PurezaPorPuertaCard } from '@/components/grader/PurezaPorPuertaCard'
-import { computeGateObservations, deriveGateMix, configTimelineFromSnapshots } from '@/services/grader/graderGateObservations'
+import { computeGateObservations, deriveGateMix, configTimelineFromSnapshots, classifyGateCauses } from '@/services/grader/graderGateObservations'
 import type { GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
 import type { GateAssignment, PieceRecord } from '@/services/grader/types'
 
@@ -54,6 +54,8 @@ function fixture(): PieceRecord[] {
     ...lote(6, 155, '4-6 lb', 'Premium', `${D}10:30:00`, fin),
     ...lote(6, 108, '6-8 lb', 'Grado', `${D}10:30:00`, fin),
     ...lote(6, 30, '8-10 lb', 'Premium', `${D}10:30:00`, fin),
+    ...lote(6, 12, '2-4 lb', 'Premium', `${D}11:00:00`, `${D}11:40:00`),   // lejano: G1 no la tomó
+    ...lote(6, 6, '4-6 lb', 'Premium', `${D}13:00:00`, `${D}13:20:00`).map((r) => ({ ...r, conservation: 'CONGELADO' as const })),
     ...lote(7, 705, '8-10 lb', 'Premium', ini, fin), ...lote(7, 37, '6-8 lb', 'Premium', ini, fin),
     ...lote(8, 620, '8-10 lb', 'Premium', ini, fin), ...lote(8, 63, '8-10 lb', 'Grado', ini, fin), ...lote(8, 22, '10-12 lb', 'Premium', ini, fin),
     ...lote(9, 308, '10-12 lb', 'Premium', ini, fin), ...lote(9, 10, '8-10 lb', 'Premium', ini, fin),
@@ -68,14 +70,15 @@ export default function PurezaPuertaDevPage() {
   const [ancho, setAncho] = useState<375 | 768 | 1024>(375)
   // v2: observación + derivación con un cambio de gate a las 10:18 (hora de
   // pared; el snapshot guarda hora real UTC, Chile en septiembre = UTC-3).
-  const { gateMix, snapshots } = useMemo(() => {
+  const { gateMix, snapshots, causesFor } = useMemo(() => {
     const obs = computeGateObservations(fixture())!
     const g1 = GATES.map((g) => (g.gateNumber === 6 ? { ...g, assignedCalibre: '4-6 lb' } : g))
     const snapshots: GateConfigSnapshot[] = [
       { id: 'a', shiftDocId: 'dev', at: '2026-09-07T10:15:00.000Z', changedBy: { uid: 'dev', name: 'dev' }, gates: GATES, changes: [] },
       { id: 'b', shiftDocId: 'dev', at: '2026-09-07T13:18:00.000Z', changedBy: { uid: 'dev', name: 'dev' }, gates: g1, changes: [{ gateNumber: 6, field: 'assignedCalibre', before: '6-8 lb', after: '4-6 lb' }] as never, reason: 'Llegó lote chico' },
     ]
-    return { gateMix: deriveGateMix(obs, configTimelineFromSnapshots(snapshots, GATES)), snapshots }
+    const timeline = configTimelineFromSnapshots(snapshots, GATES)
+    return { gateMix: deriveGateMix(obs, timeline), snapshots, causesFor: (g: number) => classifyGateCauses(obs, g, timeline) }
   }, [])
 
   return (
@@ -115,6 +118,7 @@ export default function PurezaPuertaDevPage() {
           gateMix={gateMix}
           gates={snapshots[snapshots.length - 1]!.gates}
           changeBuckets={gateMix.changeBuckets}
+          causesFor={causesFor}
           turnoLabel="07/09 · Turno 1"
         />
       </div>

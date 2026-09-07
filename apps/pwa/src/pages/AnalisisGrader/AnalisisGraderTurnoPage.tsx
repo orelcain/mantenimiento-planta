@@ -27,7 +27,7 @@ import { DEFAULT_SHIFT_SCHEDULE, normalizeShiftSchedule } from '@/services/grade
 import { getShiftDisplayDateKey, getShiftMeta } from '@/services/grader/graderShiftDisplay'
 import { PurezaPorPuertaCard } from '@/components/grader/PurezaPorPuertaCard'
 import { loadGateObservations } from '@/services/grader/graderDailySummary.service'
-import { deriveGateMix, configTimelineFromSnapshots, type GateObservations } from '@/services/grader/graderGateObservations'
+import { deriveGateMix, configTimelineFromSnapshots, classifyGateCauses, type GateObservations } from '@/services/grader/graderGateObservations'
 import { parseMatrixErrorString } from '@/services/grader/graderMatrixP0Causes'
 import { HeroScorecard } from '@/components/grader/HeroScorecard'
 import { TurnoOficialChip } from '@/components/grader/TurnoOficialChip'
@@ -1164,10 +1164,19 @@ export function AnalisisGraderTurnoPage() {
   // Pureza por puerta juzgada con la config vigente en CADA bloque (los
   // snapshots del turno, convertidos de hora real a hora de pared). Antes del
   // primer snapshot rige gatesUsed. Se recalcula sola al cambiar una gate.
-  const gateMixDerivado = useMemo(() => {
-    if (!gateObs) return null
-    return deriveGateMix(gateObs, configTimelineFromSnapshots(configSnapshots, summary?.gatesUsed))
-  }, [gateObs, configSnapshots, summary?.gatesUsed])
+  const gateTimeline = useMemo(
+    () => configTimelineFromSnapshots(configSnapshots, summary?.gatesUsed),
+    [configSnapshots, summary?.gatesUsed],
+  )
+  const gateMixDerivado = useMemo(
+    () => (gateObs ? deriveGateMix(gateObs, gateTimeline) : null),
+    [gateObs, gateTimeline],
+  )
+  // «¿Por qué cayó acá?» para la puerta que el usuario toque en la tarjeta.
+  const causesFor = useMemo(
+    () => (gateObs ? (gate: number) => classifyGateCauses(gateObs, gate, gateTimeline) : undefined),
+    [gateObs, gateTimeline],
+  )
 
   // ¿El desglose P0 guardado corresponde a estas gates? El análisis se congela al
   // guardar el turno y editar la config después no lo recalcula.
@@ -2566,6 +2575,7 @@ export function AnalisisGraderTurnoPage() {
               gateMix={(gateMixDerivado ?? summary.gateMix)!}
               gates={turnoGates.length > 0 ? turnoGates : summary.gatesUsed}
               changeBuckets={gateMixDerivado?.changeBuckets}
+              causesFor={causesFor}
               turnoLabel={`${dateKey.slice(8, 10)}/${dateKey.slice(5, 7)} · ${shiftLabel}`}
             />
           )}

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   computeGateObservations, deriveGateMix, configTimelineFromSnapshots, realIsoToWallClockMs,
-  GATE_OBS_MAX_BUCKETS, GATE_OBS_MAX_COMBOS, OTROS,
+  GATE_OBS_MAX_BUCKETS, GATE_OBS_MAX_COMBOS, OTROS, classifyGateCauses,
 } from '../graderGateObservations'
 import { ANY_CALIBRE, SIN_DATO } from '../graderGateMix'
 import type { GateConfigSnapshot } from '../graderConfigSnapshot.service'
@@ -127,5 +127,57 @@ describe('deriveGateMix', () => {
     const o = { ...obs, gates: [{ gate: 6, pieces: 10, byBucket: [{ '6-8 lb|Premium': 8, [OTROS]: 2 }] }], bucketCount: 1 }
     const g6 = deriveGateMix(o, configTimelineFromSnapshots([], G0)).gates[0]!
     expect(g6.purityPct).toBe(80)
+  })
+})
+
+describe('classifyGateCauses · ¿por qué cayó acá?', () => {
+  const ALL = [
+    gate(2, '4-6 lb', 'Premium'), gate(5, '6-8 lb', 'Premium'), gate(6, '6-8 lb', 'Premium'),
+    gate(8, '8-10 lb', 'Premium'), gate(9, '2-4 lb', 'Premium'), gate(11, '6-8 lb', 'Grado'),
+  ]
+  const recs = [
+    ...pieces(6, 80, '6-8 lb', 'Premium', '2026-09-07T09:00:00'),
+    ...pieces(6, 10, '4-6 lb', 'Premium', '2026-09-07T09:10:00'),   // vecino, debía ir a G2 (atrás)
+    ...pieces(6, 4, '2-4 lb', 'Premium', '2026-09-07T09:20:00'),    // lejano, debía ir a G9 (adelante)
+    ...pieces(6, 5, '6-8 lb', 'Grado', '2026-09-07T10:00:00'),      // calidad, debía ir a G11
+    ...pieces(6, 1, undefined, 'Premium', '2026-09-07T10:05:00'),   // sin dato
+  ]
+  const obs = computeGateObservations(recs)!
+  const causes = classifyGateCauses(obs, 6, configTimelineFromSnapshots([], ALL))!
+
+  it('agrupa por causal y valor, ordenado por piezas, con a qué gate debía ir', () => {
+    expect(causes.judged).toBe(100)
+    expect(causes.groups.map((g) => [g.tipo, g.value, g.pieces, g.pct, g.debiaIr, g.origen])).toEqual([
+      ['calibre_vecino', '4-6 lb', 10, 10, [2], 'atras'],
+      ['calidad', 'Grado', 5, 5, [11], 'adelante'],
+      ['calibre_lejano', '2-4 lb', 4, 4, [9], 'adelante'],
+      ['sin_dato', SIN_DATO, 1, 1, [], 'ninguna'],
+    ])
+  })
+
+  it('dice en qué bloques se concentra cada causal', () => {
+    const vecino = causes.groups.find((g) => g.tipo === 'calibre_vecino')!
+    expect([vecino.desde, vecino.hasta, vecino.parejo]).toEqual([0, 0, false])
+    expect(causes.okByBucket).toEqual([80, 0, 0])
+    expect(causes.byTipoByBucket.calidad).toEqual([0, 0, 5])
+  })
+
+  it('la conservación entra a la clave solo si el Excel la trae, y se compara solo si la gate la tiene asignada', () => {
+    const recsC: PieceRecord[] = [
+      ...pieces(5, 9, '6-8 lb', 'Premium', '2026-09-07T09:00:00').map((r) => ({ ...r, conservation: 'FRESCO' as const })),
+      ...pieces(5, 1, '6-8 lb', 'Premium', '2026-09-07T09:00:00').map((r) => ({ ...r, conservation: 'CONGELADO' as const })),
+    ]
+    const o = computeGateObservations(recsC)!
+    expect(Object.keys(o.gates[0]!.byBucket[0]!)).toEqual(['6-8 lb|Premium|FRESCO', '6-8 lb|Premium|CONGELADO'])
+    const sinCons = deriveGateMix(o, configTimelineFromSnapshots([], [gate(5, '6-8 lb', 'Premium')])).gates[0]!
+    expect(sinCons.purityPct).toBe(100)
+    const conCons = deriveGateMix(o, configTimelineFromSnapshots([], [{ ...gate(5, '6-8 lb', 'Premium'), assignedConservation: 'FRESCO' }])).gates[0]!
+    expect(conCons.purityPct).toBe(90)
+    const c = classifyGateCauses(o, 5, configTimelineFromSnapshots([], [{ ...gate(5, '6-8 lb', 'Premium'), assignedConservation: 'FRESCO' }]))!
+    expect(c.groups[0]).toMatchObject({ tipo: 'conservacion', value: 'CONGELADO', pieces: 1 })
+  })
+
+  it('devuelve null si la puerta no tiene piezas', () => {
+    expect(classifyGateCauses(obs, 3, configTimelineFromSnapshots([], ALL))).toBeNull()
   })
 })
