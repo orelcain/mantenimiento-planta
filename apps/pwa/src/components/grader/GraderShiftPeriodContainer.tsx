@@ -7,7 +7,7 @@
  * un componente puro de presentación — así se puede montar con un fixture (ver
  * `pages/dev/MatrizTurnosDevPage`) sin arrastrar Firestore ni autenticación.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useGraderShiftPeriod } from '@/hooks/useGraderShiftPeriod'
 import { GraderShiftPeriodView } from '@/components/grader/GraderShiftPeriodView'
 import type { PeriodShift } from '@/services/grader/graderShiftPeriod'
@@ -37,11 +37,19 @@ export interface GraderShiftPeriodContainerProps {
   onSelectShift?: (shift: PeriodShift) => void
   /** Abrir el análisis completo del turno (equivale al 'Cargar' del calendario). */
   onOpenShift?: (shift: PeriodShift) => void
+  /**
+   * Cambiarlo recarga el período. La página lo incrementa al guardar un
+   * Excel: sin esto la matriz seguía mostrando el estado previo, y el turno
+   * recién cargado (sobre todo el que está en curso, que sin summary y con
+   * pocos ciclos se descarta como ruido) no tenía celda que tocar.
+   */
+  refreshKey?: number
   className?: string
 }
 
 export function GraderShiftPeriodContainer({
-  plantLineId, month, onMonthChange, onSummariesLoaded, onMonthStatsLoaded, onSelectShift, onOpenShift, className,
+  plantLineId, month, onMonthChange, onSummariesLoaded, onMonthStatsLoaded, onSelectShift, onOpenShift,
+  refreshKey = 0, className,
 }: GraderShiftPeriodContainerProps) {
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
   // El calendario retirado era el UNICO emisor de esta seleccion, y
@@ -50,11 +58,20 @@ export function GraderShiftPeriodContainer({
   // 60 dias) sin que nadie lo notara.
   const setSelectedHistorical = useGraderSelectionStore(st => st.setSelectedHistorical)
 
-  const { loading, error, shifts, rows, days, byKey, slxDegraded } = useGraderShiftPeriod({
+  const { loading, error, shifts, rows, days, byKey, slxDegraded, refresh } = useGraderShiftPeriod({
     year: month.getFullYear(),
     month: month.getMonth(),
     plantLineId,
   })
+
+  // Recarga solo cuando la página lo pide (no en el primer render: el hook ya
+  // carga solo al montar y una segunda pasada duplicaría las lecturas).
+  const lastRefreshKey = useRef(refreshKey)
+  useEffect(() => {
+    if (refreshKey === lastRefreshKey.current) return
+    lastRefreshKey.current = refreshKey
+    refresh()
+  }, [refreshKey, refresh])
 
   // Los summaries que ya trae el hook, re-emitidos para los paneles vecinos.
   const summaries = useMemo(
