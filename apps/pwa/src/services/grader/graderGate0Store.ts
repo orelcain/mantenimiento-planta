@@ -26,6 +26,7 @@ import { db } from '../firebase'
 import { classifyRecordToMatrix, CALIBRE_WEIGHT_RANGES } from './graderAnalytics'
 import { updateDailySummary } from './graderDailySummary.service'
 import type { GateAssignment, Gate0Record, GraderDailySummary } from './types'
+import { parseWallClock, type ConfigTimeline } from './graderGateObservations'
 
 const COLLECTION = 'graderDailySummaries'
 const META_SUB = 'meta'
@@ -135,15 +136,24 @@ export async function loadGate0Records(summaryId: string): Promise<StoredGate0Re
   return chunks.flatMap((c) => c.records)
 }
 
-/** Clasifica los registros con una config de gates. Réplica exacta de computeShiftSummary. */
+/**
+ * Clasifica los registros con una config de gates. Réplica exacta de
+ * computeShiftSummary. Acepta una config fija (array) o una línea de tiempo
+ * (`ConfigTimeline`, ver graderGateObservations): con la segunda, cada pieza se
+ * juzga con la config vigente en SU hora, así un cambio de gate a las 10:18 no
+ * reclasifica la mañana como si la config nueva hubiera regido desde las 07:15.
+ */
 export function classifyGate0Records(
   records: StoredGate0Record[],
-  gates: GateAssignment[],
+  gates: GateAssignment[] | ConfigTimeline,
   pointZeroPieces: number,
 ): Array<{ error: string; pieces: number; pct: number }> {
-  const active = gates.filter((g) => g.active)
+  const activeAt: (ts: string) => GateAssignment[] = Array.isArray(gates)
+    ? (() => { const active = gates.filter((g) => g.active); return () => active })()
+    : (ts) => (gates.configAt(parseWallClock(ts)) ?? []).filter((g) => g.active)
   const causeMap = new Map<string, number>()
   for (const rec of records) {
+    const active = activeAt(rec.ts)
     const key = active.length > 0
       ? classifyRecordToMatrix(
         { ...(rec as unknown as Gate0Record), error: rec.error ?? '', gate: 0 as const },
@@ -174,17 +184,20 @@ export interface RecomputeResult {
  */
 export async function recomputeShiftP0Causes(
   summaryId: string,
-  gates: GateAssignment[],
+  gates: GateAssignment[] | ConfigTimeline,
   pointZeroPieces: number,
+  /** Config VIGENTE (último snapshot) que queda en `gatesUsed`; obligatoria con una línea de tiempo. */
+  gatesVigentes?: GateAssignment[],
 ): Promise<RecomputeResult> {
-  if (gates.filter((g) => g.active).length === 0) return { ok: false, reason: 'sin-gates' }
+  const vigentes = (gatesVigentes ?? (Array.isArray(gates) ? gates : [])).filter((g) => g.active)
+  if (vigentes.length === 0) return { ok: false, reason: 'sin-gates' }
   const records = await loadGate0Records(summaryId)
   if (records == null) return { ok: false, reason: 'sin-datos-guardados' }
 
   const causes = classifyGate0Records(records, gates, pointZeroPieces)
   await updateDailySummary(summaryId, {
     topP0Causes: causes,
-    gatesUsed: gates.filter((g) => g.active),
+    gatesUsed: vigentes,
     reclassifiedAt: new Date().toISOString(),
   } as Partial<GraderDailySummary> & Record<string, unknown>)
   return { ok: true, causes }

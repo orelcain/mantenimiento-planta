@@ -59,7 +59,8 @@ import {
 } from '@/services/grader/graderDailySummary.service'
 import { computeGateObservations } from '@/services/grader/graderGateObservations'
 import { saveGate0Records } from '@/services/grader/graderGate0Store'
-import { getLatestSnapshot, saveConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
+import { listSnapshots, saveConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
+import { configTimelineFromSnapshots, type ConfigTimeline } from '@/services/grader/graderGateObservations'
 import { detectPauses, collectSortedTimestamps, type PauseDetectionResult } from '@/services/grader/graderPauseDetector'
 import { DEFAULT_P0_ALERT_PCT, DEFAULT_P0_CRITICAL_PCT } from '@/services/grader/graderP0Thresholds'
 import type { ParsedMatrixData, GateAssignment, GraderAnalysisConfig, GraderDailySummary, Gate0Record } from '@/services/grader/types'
@@ -542,14 +543,19 @@ export function AnalisisGraderWizardPage() {
       // el detalle muestra la config vigente y no detecta "desfase" contra nada.
       // Solo en plantas que clasifican: en Yal las gates no significan nada.
       const gatesBySegment = new Map<string, GateAssignment[]>()
+      // Con más de un snapshot, las piezas de P0 se clasifican con la config
+      // vigente a SU hora, no solo con la última.
+      const timelineBySegment = new Map<string, ConfigTimeline>()
       if (lineConfig.isClassificationPlant !== false) {
         const userName = `${user.nombre ?? ''} ${user.apellido ?? ''}`.trim() || user.email
         await Promise.all(multiDayInfo.entries.map(async ([key, segment]) => {
           const shiftDocId = `${segment.sessionDate}__${segment.shiftId}`
           try {
-            const latest = await getLatestSnapshot(shiftDocId)
+            const snaps = await listSnapshots(shiftDocId)
+            const latest = snaps[snaps.length - 1]
             if (latest && latest.gates.length > 0) {
               gatesBySegment.set(key, latest.gates)
+              timelineBySegment.set(key, configTimelineFromSnapshots(snaps, latest.gates))
               return
             }
             await saveConfigSnapshot(shiftDocId, gates, { uid: user.id, name: userName }, 'Config inicial al cargar el Excel')
@@ -562,7 +568,7 @@ export function AnalisisGraderWizardPage() {
 
       const detectionByKey = new Map<string, PauseDetectionResult>()
       const summaries = multiDayInfo.entries.map(([key, segment]) => {
-        const raw = computeShiftSummary(segment, batchId, sourceNames, user.id, gatesBySegment.get(key) ?? gates)
+        const raw = computeShiftSummary(segment, batchId, sourceNames, user.id, gatesBySegment.get(key) ?? gates, timelineBySegment.get(key)?.configAt)
         const tsSorted = collectSortedTimestamps(segment.pieceRecords, segment.gate0Records)
         // Extraer timestamps de cambios de lote para auto-tag 'cambio_lote' (M10)
         const loteChangeTsMs: number[] = []

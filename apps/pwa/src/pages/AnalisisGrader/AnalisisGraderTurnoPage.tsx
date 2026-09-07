@@ -1203,7 +1203,9 @@ export function AnalisisGraderTurnoPage() {
     if (!summary || !effectiveSummaryId || turnoGates.length === 0) return
     setRecomputing(true)
     try {
-      const res = await recomputeShiftP0Causes(effectiveSummaryId, turnoGates, summary.pointZeroPieces)
+      // Cada pieza de P0 con la config vigente a su hora (snapshots del turno);
+      // gatesUsed queda con la config vigente para que el desfase se cierre.
+      const res = await recomputeShiftP0Causes(effectiveSummaryId, gateTimeline, summary.pointZeroPieces, turnoGates)
       if (res.ok && res.causes) {
         // Actualiza en memoria lo que acaba de persistirse — evita releer el doc.
         setSummary((prev) => (prev
@@ -1215,7 +1217,7 @@ export function AnalisisGraderTurnoPage() {
     } finally {
       setRecomputing(false)
     }
-  }, [summary, effectiveSummaryId, turnoGates])
+  }, [summary, effectiveSummaryId, turnoGates, gateTimeline])
 
   useEffect(() => {
     if (!configDrift?.stale || !summary?.gate0RecordsStored || !effectiveSummaryId) return
@@ -1225,11 +1227,13 @@ export function AnalisisGraderTurnoPage() {
     if (!isSupervisor && !isAdmin) return
     // Una sola tentativa por (turno × config): si el recálculo falla o no cierra
     // el desfase, no reintentar en loop.
-    const attemptKey = `${effectiveSummaryId}|${JSON.stringify(turnoGates)}`
+    // La clave incluye los snapshots: un cambio registrado hacia atrás (misma
+    // config vigente) también merece un recálculo.
+    const attemptKey = `${effectiveSummaryId}|${configSnapshots.map((s) => s.id).join(',')}|${JSON.stringify(turnoGates)}`
     if (recomputeAttemptRef.current === attemptKey) return
     recomputeAttemptRef.current = attemptKey
     void runRecompute()
-  }, [configDrift?.stale, summary?.gate0RecordsStored, effectiveSummaryId, turnoGates, runRecompute, isSupervisor, isAdmin])
+  }, [configDrift?.stale, summary?.gate0RecordsStored, effectiveSummaryId, turnoGates, configSnapshots, runRecompute, isSupervisor, isAdmin])
 
   const turnoConfig = useMemo<GraderAnalysisConfig>(() => ({
     errorThresholds: {

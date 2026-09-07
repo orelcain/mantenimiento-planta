@@ -54,3 +54,24 @@ describe('classifyGate0Records', () => {
     expect(classifyGate0Records([], CON_46, 0)).toEqual([])
   })
 })
+
+describe('classifyGate0Records · config vigente por hora', () => {
+  it('cada pieza se juzga con la config de SU hora, no con la última', async () => {
+    const { configTimelineFromSnapshots } = await import('./graderGateObservations')
+    // Snapshot de las 10:18 hora de pared = 13:18 UTC real (Chile, septiembre).
+    const snaps = [
+      { id: 'a', shiftDocId: 'x', at: '2026-09-07T10:15:00.000Z', changedBy: { uid: 'u', name: 'u' }, gates: CON_46, changes: [] },
+      { id: 'b', shiftDocId: 'x', at: '2026-09-07T13:18:00.000Z', changedBy: { uid: 'u', name: 'u' }, gates: CON_24, changes: [{ gateNumber: 1, field: 'assignedCalibre', before: '4-6 lb', after: '2-4 lb' }] },
+    ] as never
+    const timeline = configTimelineFromSnapshots(snaps, CON_46)
+    const records = [
+      rec({ ts: '2026-09-07T09:00:00.000Z', error: 'Fuera de límites', pieces: 10 }), // antes: 4-6 tiene gate → residual
+      rec({ ts: '2026-09-07T11:00:00.000Z', error: 'Fuera de límites', pieces: 7 }),  // después: ya no → fuera de calibre
+    ]
+    const out = classifyGate0Records(records, timeline, 17)
+    expect(pieces(out, 'fuera_de_limites')).toBe(10)
+    expect(pieces(out, 'fuera_de_calibre')).toBe(7)
+    // Con la última config para todo el turno (lo de antes) las 17 caerían como fuera de calibre.
+    expect(pieces(classifyGate0Records(records, CON_24, 17), 'fuera_de_calibre')).toBe(17)
+  })
+})
