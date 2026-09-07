@@ -125,6 +125,12 @@ export function AnalisisGraderWizardPage() {
 
   const [savingToCalendar, setSavingToCalendar] = useState(false)
   const [savedToCalendar, setSavedToCalendar] = useState(false)
+  // Turnos del último guardado: el banner verde ofrece "Ver turno" por cada
+  // uno, sin depender de que la matriz de abajo ya los muestre.
+  const [savedShifts, setSavedShifts] = useState<Array<{ dateKey: string; shiftId: string }>>([])
+  // Se incrementa al guardar para que la matriz del período se recargue con
+  // el Excel recién cargado (antes seguía con el estado previo).
+  const [periodVersion, setPeriodVersion] = useState(0)
   // Mensaje de error específico cuando el save a Firestore falla. Antes el
   // catch era silencioso y el banner se quedaba en "guardando…" sin avisar.
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -623,6 +629,8 @@ export function AnalisisGraderWizardPage() {
       }
 
       setSavedToCalendar(true)
+      setSavedShifts(multiDayInfo.entries.map(([, s]) => ({ dateKey: s.sessionDate, shiftId: s.shiftId })))
+      setPeriodVersion((v) => v + 1)
 
       // Limpiar el state del upload: banner azul "listo para guardar", botón
       // Cancelar y badge "Cargar Excel N" desaparecen. parsedData=null hace
@@ -774,11 +782,29 @@ export function AnalisisGraderWizardPage() {
       )}
       {savedToCalendar && (
         <Card className="border-emerald-500/[0.25] bg-emerald-500/[0.15]">
-          <CardContent className="py-3 px-4 flex items-center gap-2">
+          <CardContent className="py-3 px-4 flex items-center gap-2 flex-wrap">
             <CheckCircle2 className="h-4 w-4 text-ink-ok shrink-0" />
-            <p className="text-sm text-ink-ok font-medium">
-              Guardado correctamente en <b>{lineConfig.label}</b> · revisá el calendario abajo o cargá otro Excel.
+            <p className="text-sm text-ink-ok font-medium flex-1 min-w-[16rem]">
+              Guardado correctamente en <b>{lineConfig.label}</b>
+              {savedShifts.length > 1 ? ' · elegí qué turno abrir, o cargá otro Excel.' : ' · abriendo el turno…'}
             </p>
+            {/* Salida directa al detalle de cada turno guardado. La matriz de
+                abajo no siempre lo ofrece: un turno en curso sin celda no se
+                puede tocar, y el usuario quedaba sin "Ver turno". */}
+            {savedShifts.map((s) => (
+              <Button
+                key={`${s.dateKey}__${s.shiftId}`}
+                size="sm"
+                variant="outline"
+                className="border-emerald-500/40 text-ink-ok hover:bg-emerald-500/10 shrink-0"
+                onClick={() => {
+                  const linea = lineId !== DEFAULT_PLANT_LINE_ID ? `?linea=${encodeURIComponent(lineId)}` : ''
+                  navigate(`/analisis-grader/turno/${s.dateKey}__${encodeURIComponent(s.shiftId)}${linea}`)
+                }}
+              >
+                Ver turno {s.dateKey.slice(8, 10)}/{s.dateKey.slice(5, 7)} · {s.shiftId} →
+              </Button>
+            ))}
           </CardContent>
         </Card>
       )}
@@ -909,6 +935,7 @@ export function AnalisisGraderWizardPage() {
         onMonthChange={setCalendarMonth}
         onSummariesLoaded={setCalendarSummaries}
         onMonthStatsLoaded={setCalendarSlxStats}
+        refreshKey={periodVersion}
         onSelectShift={(s) => setSelectedDateKey(s.dateKey)}
         onOpenShift={(s) => {
           // Ruta CANÓNICA del detalle de turno. Antes apuntaba a
