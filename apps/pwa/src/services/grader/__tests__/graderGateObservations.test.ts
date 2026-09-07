@@ -181,3 +181,43 @@ describe('classifyGateCauses · ¿por qué cayó acá?', () => {
     expect(classifyGateCauses(obs, 3, configTimelineFromSnapshots([], ALL))).toBeNull()
   })
 })
+
+describe('seteo ≠ máquina (medido 07-09: 5 de 11 puertas)', () => {
+  const G = [gate(3, '4-6 lb', 'Premium'), gate(5, '6-8 lb', 'Premium'), gate(6, '6-8 lb', 'Premium')]
+  // G3: la máquina manda 6-8 Premium el 98 % de las veces; el seteo dice 4-6.
+  const recs = [
+    ...pieces(3, 98, '6-8 lb', 'Premium', '2026-09-07T09:00:00'),
+    ...pieces(3, 2, '2-4 lb', 'Premium', '2026-09-07T09:05:00'),
+    // G6: mezcla real, 70/30
+    ...pieces(6, 70, '6-8 lb', 'Premium', '2026-09-07T09:00:00'),
+    ...pieces(6, 30, '4-6 lb', 'Premium', '2026-09-07T09:05:00'),
+  ]
+  const obs = computeGateObservations(recs)!
+  const timeline = configTimelineFromSnapshots([], G)
+
+  it('detecta la puerta con seteo distinto y no la que está mezclada', () => {
+    const mix = deriveGateMix(obs, timeline)
+    expect(mix.seteoDistinto).toEqual({ 3: { calibre: '6-8 lb', quality: 'Premium', pct: 98 } })
+    expect(mix.gates.find((g) => g.gate === 3)!.purityPct).toBe(0)
+    expect(mix.gates.find((g) => g.gate === 6)!.purityPct).toBe(70)
+  })
+
+  it('en las causales la combinación dominante sale como seteo_distinto, con a qué gate iba según la app', () => {
+    const c = classifyGateCauses(obs, 3, timeline)!
+    expect(c.groups[0]).toMatchObject({ tipo: 'seteo_distinto', value: '6-8 lb · Premium', pieces: 98, debiaIr: [5, 6] })
+    expect(c.groups[1]).toMatchObject({ tipo: 'calibre_vecino', value: '2-4 lb', pieces: 2 })
+    expect(c.byTipoByBucket.seteo_distinto[0]).toBe(98)
+  })
+
+  it('una puerta que coincide con la máquina no se marca aunque tenga 100 % dominante', () => {
+    const ok = computeGateObservations(pieces(5, 50, '6-8 lb', 'Premium', '2026-09-07T09:00:00'))!
+    expect(deriveGateMix(ok, timeline).seteoDistinto).toEqual({})
+  })
+
+  it('la etiqueta Other del Excel es "calibre que la app no conoce", no un lejano', () => {
+    const o = computeGateObservations([...pieces(5, 90, '6-8 lb', 'Premium', '2026-09-07T09:00:00'), ...pieces(5, 10, ANY_CALIBRE, 'Premium', '2026-09-07T09:05:00')])!
+    const c = classifyGateCauses(o, 5, timeline)!
+    expect(c.groups[0]).toMatchObject({ tipo: 'calibre_no_reconocido', pieces: 10 })
+    expect(deriveGateMix(o, timeline).seteoDistinto).toEqual({})
+  })
+})

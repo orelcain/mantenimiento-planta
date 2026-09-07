@@ -19,15 +19,15 @@ import { createPublicToken, revokePublicToken } from '@/services/grader/graderPu
 import { createPublicShiftMonitor, revokePublicShiftMonitor, subscribeMonitorStats, MONITOR_TTL_CHOICES, type MonitorTtlHours, type MonitorMode, type MonitorUsageStats } from '@/services/shoplogix/publicShiftMonitor.service'
 import type { Pause, MicroDetentionsSummary } from '@/services/grader/types'
 import { getModuleRanges, saveModuleShiftSchedule } from '@/services/grader/graderModuleConfig.service'
-import { listSnapshots, saveConfigSnapshot, type GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
+import { listSnapshots, saveConfigSnapshot, adoptarSeteoMaquina, type GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
 import { getShiftDoc } from '@/services/grader/graderShifts.service'
 import { computeShiftTimeWindow, nowAsWallClockUTC } from '@/services/grader/graderShiftStatus'
 import type { ShiftTimeWindow } from '@/services/grader/graderShiftStatus'
 import { DEFAULT_SHIFT_SCHEDULE, normalizeShiftSchedule } from '@/services/grader/graderShiftSchedule'
 import { getShiftDisplayDateKey, getShiftMeta } from '@/services/grader/graderShiftDisplay'
 import { PurezaPorPuertaCard } from '@/components/grader/PurezaPorPuertaCard'
-import { loadGateObservations } from '@/services/grader/graderDailySummary.service'
-import { deriveGateMix, configTimelineFromSnapshots, classifyGateCauses, type GateObservations } from '@/services/grader/graderGateObservations'
+import { loadGateObservations, updateDailySummary } from '@/services/grader/graderDailySummary.service'
+import { deriveGateMix, configTimelineFromSnapshots, classifyGateCauses, type GateObservations, type SeteoMaquina } from '@/services/grader/graderGateObservations'
 import { parseMatrixErrorString } from '@/services/grader/graderMatrixP0Causes'
 import { HeroScorecard } from '@/components/grader/HeroScorecard'
 import { TurnoOficialChip } from '@/components/grader/TurnoOficialChip'
@@ -1283,6 +1283,34 @@ export function AnalisisGraderTurnoPage() {
       .then(() => reloadConfigSnapshots())
       .catch(() => {})
   }, [dateKey, shiftLabel, user, reloadConfigSnapshots])
+
+  /**
+   * "Adoptar seteo de la máquina": la tarjeta de pureza detectó que ≥ 90 % de
+   * las piezas de una puerta llevan una combinación distinta a la asignada. Se
+   * corrige el seteo de ese turno con lo que la máquina hace (el snapshot
+   * inicial en su lugar, o uno nuevo si hubo cambios a mano) y se actualiza
+   * gatesUsed para que el tramo previo al primer snapshot también lo use.
+   */
+  const handleAdoptarSeteo = useCallback((gate: number, s: SeteoMaquina) => {
+    if (!user?.id || !dateKey || !shiftLabel) return
+    const base = turnoGates.length > 0 ? turnoGates : (summary?.gatesUsed ?? [])
+    if (base.length === 0) return
+    const updated = base.map((g) => (g.gateNumber === gate
+      ? { ...g, assignedCalibre: s.calibre, assignedQuality: s.quality as GateAssignment['assignedQuality'], active: true }
+      : g))
+    const docId = `${dateKey}__${shiftLabel}`
+    const userName = `${(user as unknown as Record<string, string>).nombre ?? ''} ${(user as unknown as Record<string, string>).apellido ?? ''}`.trim() || user.email || 'Supervisor'
+    lastEmittedGatesRef.current = JSON.stringify(updated)
+    adoptarSeteoMaquina(docId, updated, { uid: user.id, name: userName }, `G${gate}: adoptado de la máquina (Excel: ${s.calibre} · ${s.quality})`)
+      .then(async () => {
+        if (effectiveSummaryId) {
+          await updateDailySummary(effectiveSummaryId, { gatesUsed: updated.filter((g) => g.active) })
+          setSummary((prev) => (prev ? { ...prev, gatesUsed: updated.filter((g) => g.active) } : prev))
+        }
+        reloadConfigSnapshots()
+      })
+      .catch((err) => logger.warn('No se pudo adoptar el seteo de la máquina', { err: String(err) }))
+  }, [user, dateKey, shiftLabel, turnoGates, summary?.gatesUsed, effectiveSummaryId, reloadConfigSnapshots])
 
   // M3 — Siguiente pausa sin clasificar
   const [nextPauseOpen, setNextPauseOpen] = useState(false)
@@ -2580,6 +2608,8 @@ export function AnalisisGraderTurnoPage() {
               gates={turnoGates.length > 0 ? turnoGates : summary.gatesUsed}
               changeBuckets={gateMixDerivado?.changeBuckets}
               causesFor={causesFor}
+              seteoDistinto={gateMixDerivado?.seteoDistinto}
+              onAdoptarSeteo={isSupervisor || isAdmin ? handleAdoptarSeteo : undefined}
               turnoLabel={`${dateKey.slice(8, 10)}/${dateKey.slice(5, 7)} · ${shiftLabel}`}
             />
           )}
