@@ -650,6 +650,13 @@ export interface GraderDailySummary {
   qualityDistribution?: Array<{ quality: string; pieces: number; pct: number }>;
   /** Distribución de piezas por gate */
   gateDistribution?: Array<{ gate: number; pieces: number; pct: number }>;
+  /**
+   * Pureza por puerta: qué cayó en cada gate contra su asignación (calibre +
+   * calidad) y su evolución en bloques de 30 min. Solo cuando el turno se
+   * guardó con gates activas. Calculado en computeShiftSummary; ver
+   * graderGateMix.ts.
+   */
+  gateMix?: import('./graderGateMix').GateMix;
   /** Nombres de los archivos Excel fuente */
   sourceFileNames?: string[];
   /** ID del lote de carga masiva que generó este resumen */
