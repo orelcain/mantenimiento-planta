@@ -75,7 +75,7 @@ export function splitCombo(key: string): Combo {
 }
 
 /** Un ts ISO sin sufijo se parsea como UTC (ver graderGateMix.parseWallClock). */
-function parseWallClock(ts: string): number {
+export function parseWallClock(ts: string): number {
   const naive = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/.test(ts)
   return Date.parse(naive ? `${ts}Z` : ts)
 }

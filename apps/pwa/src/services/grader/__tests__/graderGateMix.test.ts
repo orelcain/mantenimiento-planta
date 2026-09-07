@@ -127,3 +127,26 @@ describe('computeShiftSummary + gateMix', () => {
 function r(frac: number): number {
   return Math.round(frac * 1000) / 10
 }
+
+describe('computeShiftSummary · causas P0 con la config de cada hora', () => {
+  it('usa configAt por pieza cuando se le pasa', async () => {
+    const { configTimelineFromSnapshots } = await import('../graderGateObservations')
+    const antes = [{ gateNumber: 1, assignedCalibre: '4-6 lb', assignedQuality: 'Industrial', active: true }] as GateAssignment[]
+    const despues = [{ gateNumber: 1, assignedCalibre: '2-4 lb', assignedQuality: 'Industrial', active: true }] as GateAssignment[]
+    const snaps = [
+      { id: 'a', shiftDocId: 'x', at: '2026-09-07T10:15:00.000Z', changedBy: { uid: 'u', name: 'u' }, gates: antes, changes: [] },
+      { id: 'b', shiftDocId: 'x', at: '2026-09-07T13:18:00.000Z', changedBy: { uid: 'u', name: 'u' }, gates: despues, changes: [{ gateNumber: 1, field: 'assignedCalibre', before: '4-6 lb', after: '2-4 lb' }] },
+    ] as never
+    const timeline = configTimelineFromSnapshots(snaps, antes)
+    const p0 = (ts: string, n: number) => ({ ts, gate: 0 as const, pieces: n, error: 'Fuera de límites', weightPerPieceGrams: 2000, quality: 'Industrial' as const })
+    const segment: ShiftSegment = {
+      sessionDate: '2026-09-07', shiftId: 'Turno 1', pieceRecords: [],
+      gate0Records: [p0('2026-09-07T09:00:00.000Z', 10), p0('2026-09-07T11:00:00.000Z', 7)],
+    }
+    const s = computeShiftSummary(segment, 'b', [], 'u', despues, timeline.configAt)
+    const pz = (k: string) => s.topP0Causes?.find((c) => c.error === k)?.pieces ?? 0
+    expect(pz('fuera_de_limites')).toBe(10)
+    expect(pz('fuera_de_calibre')).toBe(7)
+    expect(s.gatesUsed).toEqual(despues)
+  })
+})

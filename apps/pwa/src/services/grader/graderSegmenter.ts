@@ -16,6 +16,7 @@ import type { PieceRecord, Gate0Record, GraderShiftSchedule, GraderDailySummary,
 import { DEFAULT_SHIFT_SCHEDULE } from './graderShiftSchedule'
 import { classifyRecordToMatrix, CALIBRE_WEIGHT_RANGES } from './graderAnalytics'
 import { computeGateMix } from './graderGateMix'
+import type { ConfigAt } from './graderGateObservations'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -479,6 +480,12 @@ export function computeShiftSummary(
   sourceFileNames: string[],
   createdBy: string,
   gates?: GateAssignment[],
+  /**
+   * Config vigente por instante (wall-clock ms). Si viene, cada pieza de P0 se
+   * clasifica con la config de SU hora (los snapshots del turno); `gates`
+   * queda como la config vigente para gatesUsed y gateMix v1.
+   */
+  configAt?: ConfigAt,
 ): GraderDailySummary {
   const { sessionDate, shiftId, pieceRecords, gate0Records } = segment
 
@@ -529,11 +536,15 @@ export function computeShiftSummary(
   const activeGates = (gates ?? []).filter(g => g.active)
   for (const rec of p0Source) {
     let causeKey: string
-    if (activeGates.length > 0) {
-      // Clasificar con la lógica de 9 causas Matrix usando la config de gates activa
+    const gatesDeLaHora = configAt
+      ? (configAt(Date.parse(rec.ts)) ?? []).filter(g => g.active)
+      : activeGates
+    if (gatesDeLaHora.length > 0) {
+      // Clasificar con la lógica de 9 causas Matrix usando la config vigente
+      // a la hora de la pieza (o la única config, si no hay línea de tiempo)
       causeKey = classifyRecordToMatrix(
         { ...rec, error: rec.error ?? '', gate: 0 as const },
-        activeGates,
+        gatesDeLaHora,
         CALIBRE_WEIGHT_RANGES,
       )
     } else {

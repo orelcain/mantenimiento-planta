@@ -49,6 +49,28 @@ piel Apple. Gotcha: `cn()` (tailwind-merge) DESCARTA `text-caption` /
 `text-title3` si en la misma llamada va un `text-ink-*` — toma el tamaño
 como color y gana el último; esos pares van en template string.
 
+## 2026-09-07 · Causas de P0 con la config vigente a la hora de cada pieza (PR #912)
+
+Cierra el hueco 2 del análisis «¿reacciona el sistema a lo seteado en los
+gates?»: el recálculo de causas de Puerta 0 usaba UNA config (el último
+snapshot) para todo el turno, así que un cambio de gate a las 10:18
+reclasificaba la mañana como si la config nueva hubiera regido desde las
+07:15. Ahora `classifyGate0Records` acepta una `ConfigTimeline` (la misma de
+gateMix v2) y juzga cada pieza con la config vigente a SU hora; con un array
+sigue funcionando como antes (mismo camino para ambos). `recomputeShiftP0Causes`
+recibe la línea de tiempo y, aparte, la config VIGENTE para dejarla en
+`gatesUsed` (así `detectConfigDrift` cierra el desfase y no entra en loop).
+El wizard lee TODOS los snapshots del turno (`listSnapshots`, misma lectura
+que antes) y pasa `configAt` a `computeShiftSummary`, que clasifica cada
+pieza P0 con la config de su hora al guardar. La clave anti-reintento del
+recálculo automático incluye los ids de snapshots: un cambio registrado
+hacia atrás también dispara el recálculo.
+
+Límite conocido: `detectConfigDrift` compara la config vigente contra
+`gatesUsed` con una sola config; un snapshot insertado hacia atrás con la
+misma config vigente no marca desfase (sí recalcula si el desfase ya estaba).
+2 tests nuevos (774 del módulo).
+
 ## 2026-09-07 · «¿Por qué cayó acá?»: causales por puerta con el seteo de las gates (PR #911)
 
 Objetivo de Orel: cargar el Excel en cualquier momento del turno y ver al
