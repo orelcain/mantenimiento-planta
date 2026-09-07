@@ -6,6 +6,49 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-07 · Análisis de Turno: "Ver turno" en el turno en curso + pureza por puerta (PRs #905, #906, #907)
+
+Pedido de Orel: al cargar el Excel del Grader el botón "Ver turno" no salía
+para el turno en curso, y en el detalle no había forma rápida de saber si en
+la puerta 6 caía mezclado por calibre o calidad. Tres PRs, uno por paso.
+
+**#905 · el botón.** "Ver turno →" vive en `GraderShiftPeriodMatrix` y solo
+sale al fijar una celda. Tras "Guardar en Calendario" con más de un segmento
+el wizard no navega y la matriz no se recargaba: `useGraderShiftPeriod`
+exponía `refresh` y nadie lo llamaba. El turno en curso, sin summary y con
+menos de 50 ciclos de Shoplogix, se descarta como ruido en `buildPeriodShifts`
+→ sin celda → sin botón. Fix: prop `refreshKey` en el container + botones
+"Ver turno dd/mm · turno" en el banner verde del wizard. Diagnóstico por
+código, no reproducido en navegador (exige sesión y un Excel real):
+**pendiente probarlo con la próxima carga de un turno en curso**. Gotcha: el
+primer CI cayó por `audit-piel` (dos clases `border-emerald-500/40` /
+`hover:bg-emerald-500/10` suman chips translúcidos sobre la línea base);
+correr `node scripts/audit-piel.mjs` desde la RAÍZ antes de pushear UI.
+
+**#906 · el dato.** `gateMix` en `GraderDailySummary`, calculado en
+`computeShiftSummary` con las piezas y la config de gates ya en memoria (0
+lecturas extra, ~2 KB/turno, solo con gates activas → Yal no lo paga). Por
+puerta: pureza = piezas con el calibre Y la calidad asignados ÷ piezas de la
+puerta, desglose por calibre y por calidad, intruso principal y pureza en
+bloques de 30 min alineados al reloj. `assignedCalibre = 'Other'` = cualquier
+calibre; pieza sin dato = no coincide. Antes el cruce puerta × calibre solo
+existía en el dashboard de la sesión de carga y nunca comparaba la calidad.
+Gotcha: un ts ISO sin sufijo Z lo toma `Date.parse` como hora LOCAL del
+navegador; el módulo lo parsea como UTC (`parseWallClock`), igual que la
+convención Z-as-wall-clock del parser. 10 tests. Los turnos ya guardados no
+tienen el campo hasta recargar su Excel (la pestaña Gates lo avisa).
+
+**#907 · la vista.** `PurezaPorPuertaCard` primero en la pestaña Gates:
+semáforo de 12 puertas (≥95 pura · 85–95 atención · <85 mezclada; el 85 es el
+15 % de mezcla con el que ya avisaba `GraderGatesLector`), ficha de la
+puerta con barras y franja de 30 min ("cae desde las 10:30; antes iba en
+96 %"), y acciones registrar incidencia / copiar resumen. Solo tokens y
+primitivos de la piel (Pill, Button tinted/plain). Banco `/dev/pureza-puerta`
+(solo DEV) para mirarla sin sesión; verificada a 375 px en claro/oscuro y
+piel Apple. Gotcha: `cn()` (tailwind-merge) DESCARTA `text-caption` /
+`text-title3` si en la misma llamada va un `text-ink-*` — toma el tamaño
+como color y gana el último; esos pares van en template string.
+
 ## 2026-09-06 · Fix: el listener de permisos ya no queda muerto tras un permission-denied (PR #903)
 
 Segunda mitad del caso del 05-09: `subscribeToUserPermissions` (onSnapshot

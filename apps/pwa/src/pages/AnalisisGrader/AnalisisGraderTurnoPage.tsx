@@ -25,6 +25,7 @@ import { computeShiftTimeWindow, nowAsWallClockUTC } from '@/services/grader/gra
 import type { ShiftTimeWindow } from '@/services/grader/graderShiftStatus'
 import { DEFAULT_SHIFT_SCHEDULE, normalizeShiftSchedule } from '@/services/grader/graderShiftSchedule'
 import { getShiftDisplayDateKey, getShiftMeta } from '@/services/grader/graderShiftDisplay'
+import { PurezaPorPuertaCard } from '@/components/grader/PurezaPorPuertaCard'
 import { parseMatrixErrorString } from '@/services/grader/graderMatrixP0Causes'
 import { HeroScorecard } from '@/components/grader/HeroScorecard'
 import { TurnoOficialChip } from '@/components/grader/TurnoOficialChip'
@@ -2530,6 +2531,23 @@ export function AnalisisGraderTurnoPage() {
                 </button>.
               </p>
             </div>
+          )}
+
+          {/* ¿Qué está cayendo en cada puerta? Va primero: es la pregunta de
+              terreno («¿la G6 cae mezclada, y desde cuándo?») y la que decide
+              si hay que tocar la config de abajo. Lee summary.gateMix, que se
+              calcula al guardar el Excel (graderGateMix.ts). */}
+          {activeView === 'gates' && isClassificationPlant && summary.gateMix && (
+            <PurezaPorPuertaCard
+              gateMix={summary.gateMix}
+              gates={summary.gatesUsed}
+              turnoLabel={`${dateKey.slice(8, 10)}/${dateKey.slice(5, 7)} · ${shiftLabel}`}
+            />
+          )}
+          {activeView === 'gates' && isClassificationPlant && !summary.gateMix && summary.hasPieceData && (
+            <p className="text-footnote text-muted-foreground px-1">
+              Este turno se guardó antes de la pureza por puerta. Recargá su Excel pieza a pieza para verla.
+            </p>
           )}
 
           {/* Corte de control primero: con el turno EN CURSO, lo urgente es lo
