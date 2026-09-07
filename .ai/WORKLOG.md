@@ -49,6 +49,32 @@ piel Apple. Gotcha: `cn()` (tailwind-merge) DESCARTA `text-caption` /
 `text-title3` si en la misma llamada va un `text-ink-*` — toma el tamaño
 como color y gana el último; esos pares van en template string.
 
+## 2026-09-07 · «¿Por qué cayó acá?»: causales por puerta con el seteo de las gates (PR #911)
+
+Objetivo de Orel: cargar el Excel en cualquier momento del turno y ver al
+toque, por puerta, qué cayó que no debía, por qué causal y cuándo. Sobre
+gateMix v2 (#910), `classifyGateCauses` agrupa lo que no coincide usando la
+config vigente en cada bloque: **calibre vecino** (un rango de distancia →
+peso al límite: rangos o balanza), **calibre lejano** (dos o más → si debía ir
+a una gate ANTERIOR, "vino de más atrás: G2 no la tomó, puerta no abrió o
+saturada"; si a una POSTERIOR, "cayó antes de llegar: disparo anticipado o
+rango del Z2 distinto al seteo"), **calidad distinta** (venía marcada así en
+el ingreso), **conservación distinta** (solo si la gate la tiene asignada; la
+conservación entra a la clave de observación solo cuando el Excel la trae, así
+las claves viejas no cambian), **sin dato** y **otros**. Cada causal dice a qué
+gate(s) debía ir según el seteo y en qué bloques se concentra (o si es pareja
+todo el turno). En la ficha de la puerta: lista de causales, gráfico apilado
+por bloque (coincide + cada causal, colores por tema) y "piezas hasta las
+HH:MM" en el encabezado para leer una carga a mitad de turno. El resumen que
+se copia o va a la incidencia incluye las 3 causales principales.
+
+Prioridad de causal cuando falla más de una cosa: calibre manda sobre calidad
+y esta sobre conservación (una pieza 6-8 Grado en una gate 4-6 Premium cuenta
+como calibre). De paso, `GateEvolutionChart` ancla las marcas de cambio de
+config al minuto de pared correcto (`realIsoToWallClockMs`): caían 3–4 h
+corridas. 4 tests nuevos (772 del módulo); verificado en el banco a 375 px en
+claro y oscuro.
+
 ## 2026-09-07 · gateMix v2: guardar lo observado por bloque y derivar la pureza con la config de cada hora (PR #910)
 
 Cierra los huecos 2 y 3 del análisis anterior para la pureza por puerta. v1
