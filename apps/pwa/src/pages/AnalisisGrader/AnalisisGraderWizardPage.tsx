@@ -57,6 +57,7 @@ import {
   type FirestorePieceRecord,
 } from '@/services/grader/graderDailySummary.service'
 import { saveGate0Records } from '@/services/grader/graderGate0Store'
+import { getLatestSnapshot, saveConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
 import { detectPauses, collectSortedTimestamps, type PauseDetectionResult } from '@/services/grader/graderPauseDetector'
 import { DEFAULT_P0_ALERT_PCT, DEFAULT_P0_CRITICAL_PCT } from '@/services/grader/graderP0Thresholds'
 import type { ParsedMatrixData, GateAssignment, GraderAnalysisConfig, GraderDailySummary, Gate0Record } from '@/services/grader/types'
@@ -531,9 +532,35 @@ export function AnalisisGraderWizardPage() {
       // Para líneas no-default (ej: Yal), los docs se guardan con prefix de plantLineId
       const effectivePlantLineId = lineId !== DEFAULT_PLANT_LINE_ID ? lineId : undefined
 
+      // Config de gates POR TURNO, no la del wizard. Si el turno ya tiene
+      // snapshots (alguien cambió una gate desde el detalle antes de cargar el
+      // Excel), esa es la config que clasifica las causas P0 y la pureza por
+      // puerta; el borrador del wizard puede ser de otro turno o de otro día.
+      // Si no tiene, el borrador del wizard pasa a ser su snapshot inicial: así
+      // el detalle muestra la config vigente y no detecta "desfase" contra nada.
+      // Solo en plantas que clasifican: en Yal las gates no significan nada.
+      const gatesBySegment = new Map<string, GateAssignment[]>()
+      if (lineConfig.isClassificationPlant !== false) {
+        const userName = `${user.nombre ?? ''} ${user.apellido ?? ''}`.trim() || user.email
+        await Promise.all(multiDayInfo.entries.map(async ([key, segment]) => {
+          const shiftDocId = `${segment.sessionDate}__${segment.shiftId}`
+          try {
+            const latest = await getLatestSnapshot(shiftDocId)
+            if (latest && latest.gates.length > 0) {
+              gatesBySegment.set(key, latest.gates)
+              return
+            }
+            await saveConfigSnapshot(shiftDocId, gates, { uid: user.id, name: userName }, 'Config inicial al cargar el Excel')
+          } catch (err) {
+            // No es fatal: se clasifica con las gates del wizard, como antes.
+            logger.warn('No se pudo resolver la config de gates del turno', { shiftDocId, err: String(err) })
+          }
+        }))
+      }
+
       const detectionByKey = new Map<string, PauseDetectionResult>()
       const summaries = multiDayInfo.entries.map(([key, segment]) => {
-        const raw = computeShiftSummary(segment, batchId, sourceNames, user.id, gates)
+        const raw = computeShiftSummary(segment, batchId, sourceNames, user.id, gatesBySegment.get(key) ?? gates)
         const tsSorted = collectSortedTimestamps(segment.pieceRecords, segment.gate0Records)
         // Extraer timestamps de cambios de lote para auto-tag 'cambio_lote' (M10)
         const loteChangeTsMs: number[] = []
@@ -664,7 +691,7 @@ export function AnalisisGraderWizardPage() {
     } finally {
       setSavingToCalendar(false)
     }
-  }, [multiDayInfo, parsedData, user?.id, gates, lineId, navigate])
+  }, [multiDayInfo, parsedData, user, gates, lineId, lineConfig.isClassificationPlant, navigate])
 
   if (!canSee('analisisGrader')) return <Navigate to="/" replace />
 
