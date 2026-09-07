@@ -796,7 +796,7 @@ export function AnalisisGraderWizardPage() {
                 key={`${s.dateKey}__${s.shiftId}`}
                 size="sm"
                 variant="outline"
-                className="border-emerald-500/40 text-ink-ok hover:bg-emerald-500/10 shrink-0"
+                className="text-ink-ok shrink-0"
                 onClick={() => {
                   const linea = lineId !== DEFAULT_PLANT_LINE_ID ? `?linea=${encodeURIComponent(lineId)}` : ''
                   navigate(`/analisis-grader/turno/${s.dateKey}__${encodeURIComponent(s.shiftId)}${linea}`)
