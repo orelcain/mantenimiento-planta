@@ -49,6 +49,29 @@ piel Apple. Gotcha: `cn()` (tailwind-merge) DESCARTA `text-caption` /
 `text-title3` si en la misma llamada va un `text-ink-*` — toma el tamaño
 como color y gana el último; esos pares van en template string.
 
+## 2026-09-07 · gateMix v2: guardar lo observado por bloque y derivar la pureza con la config de cada hora (PR #910)
+
+Cierra los huecos 2 y 3 del análisis anterior para la pureza por puerta. v1
+(#906) guardaba el JUICIO (pureza calculada con una config al guardar el
+Excel): cambiar una gate lo dejaba viejo. v2 guarda la OBSERVACIÓN: por puerta
+y bloque de 30 min, cuántas piezas cayeron de cada `calibre|calidad`
+(`computeGateObservations`), en `meta/gateMix` del turno (~12 KB medidos, por
+eso NO en el doc del summary que la matriz lee por mes). La tarjeta deriva en
+pantalla (`deriveGateMix`) juzgando cada bloque con la config vigente en ese
+momento (`configTimelineFromSnapshots`: último snapshot ≤ inicio del bloque;
+antes del primero rige `gatesUsed`). Cambiar una gate no escribe nada y se
+refleja al instante, también hacia atrás. Topes: 40 bloques y 8 combinaciones
+por bloque (resto en `Otros`). El bloque que contiene un cambio se marca en
+la franja y no cuenta para "cae desde". Ejemplo medido y decisiones:
+https://claude.ai/code/artifact/6ce46b2e-b52f-420a-8785-5d30941437a0
+
+Gotcha cerrado: los snapshots guardan hora REAL UTC y las piezas hora de
+pared marcada como Z → `realIsoToWallClockMs` convierte con
+`America/Santiago` (Intl) antes de comparar. ⚠ `GateEvolutionChart` sigue
+poniendo `snap.at` crudo en el eje wall-clock de sus markLines (queda
+desplazado 3–4 h): fuera de alcance, pendiente. v1 se sigue escribiendo como
+fallback para turnos sin `meta/gateMix`. 11 tests nuevos, 768 del módulo.
+
 ## 2026-09-07 · ¿El sistema reacciona a lo seteado en los gates? Hueco 1: el wizard clasificaba con su borrador (PR #909)
 
 Pregunta de Orel tras ver el panel de pureza. Respuesta verificada en código:
