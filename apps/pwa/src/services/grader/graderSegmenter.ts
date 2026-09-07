@@ -15,6 +15,7 @@
 import type { PieceRecord, Gate0Record, GraderShiftSchedule, GraderDailySummary, TimelineBucket, GateAssignment } from './types'
 import { DEFAULT_SHIFT_SCHEDULE } from './graderShiftSchedule'
 import { classifyRecordToMatrix, CALIBRE_WEIGHT_RANGES } from './graderAnalytics'
+import { computeGateMix } from './graderGateMix'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -589,6 +590,11 @@ export function computeShiftSummary(
       pct: r(pieces / (prodPieces || 1) * 100, 1),
     }))
 
+  // ── Pureza por puerta (solo plantas que clasifican: hay gates activas) ─────
+  // Se calcula acá, con las piezas ya en memoria, para que el detalle del
+  // turno responda «¿la G6 cae mezclada y desde cuándo?» sin bajar records.
+  const gateMix = activeGates.length > 0 ? computeGateMix(prodRecords, activeGates) : null
+
   // ── Buckets por hora del día (para drill-down en gráfico de tendencia) ─────
   // Usa getUTCHours porque el parser no aplica timezone — los ts están en
   // hora local del grader, marcados como Z pero sin conversión.
@@ -654,6 +660,7 @@ export function computeShiftSummary(
     calibreDistribution,
     qualityDistribution,
     gateDistribution,
+    ...(gateMix ? { gateMix } : {}),
     hourlyBuckets,
     sourceFileNames,
     batchUploadId,
