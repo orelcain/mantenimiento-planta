@@ -653,6 +653,8 @@ export function AnalisisGraderWizardPage() {
           ...(r.calibre && { calibre: r.calibre }),
           ...('error' in r && r.error && { error: r.error }),
           ...(r.lot && { lot: r.lot }),
+          ...(r.conservation && { conservation: r.conservation }),
+          ...(r.product && { product: r.product }),
           dedupeKey: buildDedupeKey(r),
         }))
         await savePieceRecordsBatch(summaryId, firestoreRecs)

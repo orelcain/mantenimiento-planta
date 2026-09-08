@@ -34,7 +34,7 @@ import {
 } from 'firebase/firestore'
 import { db } from '../firebase'
 import { logger } from '@/lib/logger'
-import type { GraderDailySummary, TimelineBucket, Pause, MicroDetentionsSummary, PauseHistoryEntry } from './types'
+import type { GraderDailySummary, TimelineBucket, Pause, MicroDetentionsSummary, PauseHistoryEntry , GraderConservation, GraderProduct } from './types'
 import { GATE_OBS_SCHEMA, type GateObservations } from './graderGateObservations'
 import { fmtTime } from './graderTimeFormat'
 
@@ -506,6 +506,10 @@ export interface FirestorePieceRecord {
   calibre?: string
   error?: string
   lot?: string
+  /** Columna "Conservacion" del Excel (FRESCO / CONGELADO). Antes no se guardaba. */
+  conservation?: GraderConservation
+  /** Columna "Producto" del Excel (HG / DESTINO FILETE). */
+  product?: GraderProduct | string
   dedupeKey: string
   /** Origen del record cuando fue enriquecido por Excel P0 del Marelec */
   source?: 'P0_EXCEL'
@@ -531,52 +535,82 @@ export function buildDedupeKey(r: { ts: string; gate: number; pieces: number; qu
 }
 
 /**
+ * Identidad de una pieza SIN sus etiquetas: la misma pieza recargada con un
+ * parser nuevo (calibre "Other" → "12-UP lb") o con conservación que antes no
+ * se guardaba es la MISMA pieza. Medido 08-09: con la dedupeKey (que lleva
+ * calibre y calidad) una recarga habría dejado 159 docs "Other" + 159 "12-UP"
+ * en la G12.
+ */
+export function pieceIdentityKey(r: { ts: string; gate: number; pieces: number; weightKg?: number; lot?: string }): string {
+  return `${r.ts}|${r.gate}|${r.pieces}|${r.weightKg ?? ''}|${r.lot ?? ''}`
+}
+
+const LABEL_FIELDS: Array<keyof FirestorePieceRecord> = ['calibre', 'quality', 'conservation', 'product', 'error', 'weightPerPieceGrams']
+
+/** Plan de escritura puro (testeable): qué agregar, qué actualizar, qué saltar. */
+export function planPieceRecordWrites(
+  existing: Array<{ id: string; rec: FirestorePieceRecord }>,
+  incoming: FirestorePieceRecord[],
+): { add: FirestorePieceRecord[]; update: Array<{ id: string; rec: FirestorePieceRecord }>; skipped: number } {
+  const byIdentity = new Map<string, { id: string; rec: FirestorePieceRecord }>()
+  for (const e of existing) {
+    const k = pieceIdentityKey(e.rec)
+    if (!byIdentity.has(k)) byIdentity.set(k, e)
+  }
+  const add: FirestorePieceRecord[] = []
+  const update: Array<{ id: string; rec: FirestorePieceRecord }> = []
+  let skipped = 0
+  const seen = new Set<string>()
+  for (const rec of incoming) {
+    const k = pieceIdentityKey(rec)
+    // El mismo Excel puede traer la misma pieza dos veces (dedupe de origen).
+    if (seen.has(k)) { skipped++; continue }
+    seen.add(k)
+    const prev = byIdentity.get(k)
+    if (!prev) { add.push(rec); continue }
+    const cambio = LABEL_FIELDS.some((f) => (prev.rec[f] ?? undefined) !== (rec[f] ?? undefined))
+    if (cambio) update.push({ id: prev.id, rec })
+    else skipped++
+  }
+  return { add, update, skipped }
+}
+
+/**
  * Guarda registros pieza a pieza como subcollection de un summary.
- * Si `dedup = true`, lee las claves existentes primero y solo escribe los nuevos.
- * Retorna cuántos registros nuevos se escribieron.
+ * Con `dedup = true` lee los existentes: agrega los nuevos, ACTUALIZA los que
+ * cambiaron de etiqueta (recarga con parser nuevo) y salta el resto.
  */
 export async function savePieceRecordsBatch(
   summaryId: string,
   records: FirestorePieceRecord[],
   dedup = true,
-): Promise<{ written: number; skipped: number }> {
-  if (records.length === 0) return { written: 0, skipped: 0 }
+): Promise<{ written: number; updated: number; skipped: number }> {
+  if (records.length === 0) return { written: 0, updated: 0, skipped: 0 }
 
-  let toWrite = records
-  let skipped = 0
-
+  let plan: ReturnType<typeof planPieceRecordWrites> = { add: records, update: [], skipped: 0 }
   if (dedup) {
-    const existing = await fetchExistingDedupeKeys(summaryId)
-    if (existing.size > 0) {
-      toWrite = records.filter((r) => !existing.has(r.dedupeKey))
-      skipped = records.length - toWrite.length
-    }
+    const existing = await fetchExistingPieceRecords(summaryId)
+    if (existing.length > 0) plan = planPieceRecordWrites(existing, records)
   }
 
   const colRef = pieceRecordsCol(summaryId)
-  for (let i = 0; i < toWrite.length; i += FIRESTORE_BATCH_LIMIT) {
-    const chunk = toWrite.slice(i, i + FIRESTORE_BATCH_LIMIT)
+  const ops: Array<{ ref: ReturnType<typeof firestoreDoc>; rec: FirestorePieceRecord }> = [
+    ...plan.add.map((rec) => ({ ref: firestoreDoc(colRef), rec })),
+    ...plan.update.map((u) => ({ ref: firestoreDoc(colRef, u.id), rec: u.rec })),
+  ]
+  for (let i = 0; i < ops.length; i += FIRESTORE_BATCH_LIMIT) {
+    const chunk = ops.slice(i, i + FIRESTORE_BATCH_LIMIT)
     const batch = writeBatch(db)
-    for (const rec of chunk) {
-      const docRef = firestoreDoc(colRef)
-      batch.set(docRef, rec)
-    }
+    for (const op of chunk) batch.set(op.ref, op.rec)
     await batch.commit()
   }
-  return { written: toWrite.length, skipped }
+  return { written: plan.add.length, updated: plan.update.length, skipped: plan.skipped }
 }
 
-/**
- * Lee solo las dedupeKeys de los pieceRecords existentes (minimiza transfer).
- */
-async function fetchExistingDedupeKeys(summaryId: string): Promise<Set<string>> {
+/** Lee los pieceRecords existentes con su id (para actualizar en su lugar). */
+async function fetchExistingPieceRecords(summaryId: string): Promise<Array<{ id: string; rec: FirestorePieceRecord }>> {
   const snap = await getDocs(pieceRecordsCol(summaryId))
-  const keys = new Set<string>()
-  snap.forEach((d) => {
-    const key = d.data().dedupeKey
-    if (typeof key === 'string') keys.add(key)
-  })
-  return keys
+  return snap.docs.map((d) => ({ id: d.id, rec: d.data() as FirestorePieceRecord }))
 }
 
 /**
@@ -617,6 +651,27 @@ export async function listGate0PieceRecords(summaryId: string): Promise<Firestor
     try {
       const cached = await getDocsFromCache(q)
       return cached.docs.map((d) => d.data() as FirestorePieceRecord).sort((a, b) => a.ts.localeCompare(b.ts))
+    } catch {
+      return []
+    }
+  }
+}
+
+/**
+ * Piezas de UNA puerta (vista pieza a pieza). Bajo demanda: cuesta tantas
+ * lecturas como piezas tenga la puerta (4 a ~3.600 en Chonchi), nunca las
+ * ~18.000 del turno. Servidor primero; caché solo sin red.
+ */
+export async function listGatePieceRecords(summaryId: string, gate: number): Promise<FirestorePieceRecord[]> {
+  const q = query(pieceRecordsCol(summaryId), where('gate', '==', gate))
+  const sortByTs = (docs: FirestorePieceRecord[]) => docs.sort((a, b) => a.ts.localeCompare(b.ts))
+  try {
+    const snap = await getDocs(q)
+    return sortByTs(snap.docs.map((d) => d.data() as FirestorePieceRecord))
+  } catch {
+    try {
+      const cached = await getDocsFromCache(q)
+      return sortByTs(cached.docs.map((d) => d.data() as FirestorePieceRecord))
     } catch {
       return []
     }
