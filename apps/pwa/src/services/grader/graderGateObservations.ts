@@ -45,8 +45,15 @@ export const PLANT_TZ = 'America/Santiago'
 /** `calibre|calidad[|conservación]` → piezas. `Otros` agrupa lo que quedó fuera del top 8. */
 export type ComboCounts = Record<string, number>
 
-/** Bin de peso de 250 g. La clave es el límite inferior en gramos ("4500" = 4.500–4.749 g). */
-export const GATE_OBS_WEIGHT_BIN_G = 250
+/**
+ * Bin de peso. La clave es el límite inferior en gramos ("4500" = 4.500–4.599 g).
+ * 100 g desde la ronda 3 (07-09): con 250 g, el bin 4.500–4.750 cruzaba el techo
+ * 4.581 del 8-10 y dejaba un 22 % "al límite" que era resolución, no máquina.
+ * Cada doc guarda su ancho (`weightBinGrams`); los escritos con 250 g siguen valiendo.
+ */
+export const GATE_OBS_WEIGHT_BIN_G = 100
+/** Ancho de bin de los docs anteriores a `weightBinGrams`. */
+const LEGACY_WEIGHT_BIN_G = 250
 export type WeightBins = Record<string, number>
 
 export interface GateObservationsEntry {
@@ -71,6 +78,8 @@ export interface GateObservations {
   bucketsFrom: string
   bucketMinutes: number
   bucketCount: number
+  /** Ancho del bin de peso en gramos. Ausente = 250 (docs anteriores). */
+  weightBinGrams?: number
   gates: GateObservationsEntry[]
 }
 
@@ -180,6 +189,7 @@ export function computeGateObservations(records: readonly PieceRecord[]): GateOb
     bucketsFrom: new Date(from).toISOString(),
     bucketMinutes: GATE_OBS_BUCKET_MINUTES,
     bucketCount,
+    weightBinGrams: GATE_OBS_WEIGHT_BIN_G,
     gates,
   }
 }
@@ -397,6 +407,8 @@ export interface PesoPorPuerta {
   /** Pesos observados fuera, en gramos [min, max]. */
   gramosArriba: [number, number] | null
   gramosAbajo: [number, number] | null
+  /** Ancho del bin con el que se guardó la observación (100 g; 250 en docs viejos). */
+  binGrams: number
 }
 
 /**
@@ -413,10 +425,11 @@ export function derivePesoPorPuerta(
   const size = obs.bucketMinutes * 60_000
   const from = Date.parse(obs.bucketsFrom)
   const rangeOf = (calibre: string) => ranges.find((r) => r.calibre === calibre)
+  const binG = obs.weightBinGrams ?? LEGACY_WEIGHT_BIN_G
   const out: Record<number, PesoPorPuerta> = {}
   for (const e of obs.gates) {
     if (!e.weightByBucket) continue
-    const p: PesoPorPuerta = { gate: e.gate, conPeso: 0, dentro: 0, alLimite: 0, fueraArriba: 0, fueraAbajo: 0, pctFuera: 0, rango: null, gramosArriba: null, gramosAbajo: null }
+    const p: PesoPorPuerta = { gate: e.gate, conPeso: 0, dentro: 0, alLimite: 0, fueraArriba: 0, fueraAbajo: 0, pctFuera: 0, rango: null, gramosArriba: null, gramosAbajo: null, binGrams: binG }
     let juzgado = false
     e.weightByBucket.forEach((bins, i) => {
       if (!bins) return
@@ -428,7 +441,7 @@ export function derivePesoPorPuerta(
       p.rango = { calibre: r.calibre, minGrams: r.minGrams, maxGrams: r.maxGrams }
       for (const [k, n] of Object.entries(bins)) {
         const lo = Number(k)
-        const hi = lo + GATE_OBS_WEIGHT_BIN_G
+        const hi = lo + binG
         p.conPeso += n
         if (lo >= r.maxGrams) {
           p.fueraArriba += n

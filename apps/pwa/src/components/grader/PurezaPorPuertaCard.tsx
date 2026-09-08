@@ -99,6 +99,8 @@ interface Props {
   seteoDistinto?: Record<number, SeteoMaquina>
   /** Corregir el seteo de la app con lo que hace la máquina. Solo supervisor/admin. */
   onAdoptarSeteo?: (gate: number, seteo: SeteoMaquina) => void
+  /** Adoptar de una vez el seteo de la máquina en todas las puertas con seteo distinto. */
+  onAdoptarSeteoTodas?: (seteos: Record<number, SeteoMaquina>) => void
   /**
    * Mezcla FÍSICA: peso de cada pieza contra el rango del calibre asignado
    * (rangos configurados en la app). La etiqueta del Excel no la mide.
@@ -153,7 +155,7 @@ const CAUSA_COLOR: Record<'dark' | 'light', Record<CausaTipo | 'ok', string>> = 
 }
 const CHART_TEXT = { light: { axis: '#41566a', grid: '#c3d7e9', tipBg: '#ffffff', tipText: '#16242f', tipBorder: '#c3d7e9' }, dark: { axis: '#94a3b8', grid: '#22384a', tipBg: '#1e293b', tipText: '#e2e8f0', tipBorder: '#334155' } }
 
-export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets, causesFor, seteoDistinto, onAdoptarSeteo, pesoPorPuerta }: Props) {
+export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets, causesFor, seteoDistinto, onAdoptarSeteo, onAdoptarSeteoTodas, pesoPorPuerta }: Props) {
   const navigate = useNavigate()
   const [copiado, setCopiado] = useState(false)
 
@@ -206,9 +208,14 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets,
 
   const nivelGlobal: Nivel = conteo.crit > 0 ? 'crit' : conteo.warn > 0 ? 'warn' : 'ok'
   const pillTone: PillTone = conteo.crit > 0 ? 'critical' : conteo.warn > 0 ? 'warning' : conteo.seteo > 0 ? 'info' : 'ok'
+  // Una puerta con seteo distinto no se juzga por peso: su rango es el equivocado.
   const conPesoFuera = useMemo(
-    () => Object.values(pesoPorPuerta ?? {}).filter((p) => p.pctFuera >= PESO_FUERA_AVISO_PCT).length,
-    [pesoPorPuerta],
+    () => Object.values(pesoPorPuerta ?? {}).filter((p) => p.pctFuera >= PESO_FUERA_AVISO_PCT && !seteoDistinto?.[p.gate]).length,
+    [pesoPorPuerta, seteoDistinto],
+  )
+  const adoptables = useMemo(
+    () => Object.fromEntries(Object.entries(seteoDistinto ?? {}).filter(([, s]) => !s.noReconocido)) as Record<number, SeteoMaquina>,
+    [seteoDistinto],
   )
   const resumenPill = [
     conteo.crit > 0 ? `${conteo.crit} mezclada${conteo.crit > 1 ? 's' : ''}` : '',
@@ -297,7 +304,7 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets,
             const ink = seteo ? 'text-ink-info' : NIVEL_INK[nivel]
             const dot = seteo ? 'bg-ink-info' : NIVEL_BG[nivel]
             const pw = pesoPorPuerta?.[n]
-            const pesoFuera = pw && pw.pctFuera >= PESO_FUERA_AVISO_PCT ? pw : null
+            const pesoFuera = pw && pw.pctFuera >= PESO_FUERA_AVISO_PCT && !seteo ? pw : null
             return (
               <button
                 key={n}
@@ -345,6 +352,17 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets,
           cayeron en la puerta. ≥{PUREZA_OK_PCT} % pura · {PUREZA_WARN_PCT}–{PUREZA_OK_PCT} % en atención · &lt;{PUREZA_WARN_PCT} % mezclada.
           {' '}Si ≥ 90 % de las piezas llevan una misma combinación distinta a la asignada, no es mezcla: es <span className="text-ink-info">seteo ≠ máquina</span>.
         </p>
+
+        {onAdoptarSeteoTodas && Object.keys(adoptables).length >= 2 && (
+          <div className="flex flex-wrap items-center gap-2" data-testid="pureza-adoptar-todas">
+            <Button variant="tinted" onClick={() => onAdoptarSeteoTodas(adoptables)}>
+              Adoptar seteo de la máquina en {Object.keys(adoptables).length} puertas
+            </Button>
+            <span className="text-caption text-muted-foreground">
+              {Object.entries(adoptables).map(([g, s]) => `G${g} → ${s.calibre} · ${s.quality}`).join(' · ')}
+            </span>
+          </div>
+        )}
 
         {/* ── Ficha de la puerta elegida ── */}
         {detalle && (
@@ -450,7 +468,7 @@ function PorPeso({ peso }: { peso: PesoPorPuerta }) {
   const total = peso.conPeso || 1
   const filas: Array<{ label: string; n: number; cls: string; extra?: string }> = [
     { label: 'Dentro del rango', n: peso.dentro, cls: 'bg-primary' },
-    { label: 'Al límite', n: peso.alLimite, cls: 'bg-ink-warn', extra: 'bins de 250 g que cruzan el borde del rango' },
+    { label: 'Al límite', n: peso.alLimite, cls: 'bg-muted-foreground', extra: `a menos de ${peso.binGrams} g del borde: normal cerca del corte` },
     { label: 'Fuera, más pesado', n: peso.fueraArriba, cls: 'bg-ink-crit', extra: peso.gramosArriba ? `${fmtKg(peso.gramosArriba[0])} a ${fmtKg(peso.gramosArriba[1])}` : undefined },
     { label: 'Fuera, más liviano', n: peso.fueraAbajo, cls: 'bg-ink-crit', extra: peso.gramosAbajo ? `${fmtKg(peso.gramosAbajo[0])} a ${fmtKg(peso.gramosAbajo[1])}` : undefined },
   ].filter((f) => f.n > 0)

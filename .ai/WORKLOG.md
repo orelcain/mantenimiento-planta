@@ -49,6 +49,37 @@ piel Apple. Gotcha: `cn()` (tailwind-merge) DESCARTA `text-caption` /
 `text-title3` si en la misma llamada va un `text-ink-*` — toma el tamaño
 como color y gana el último; esos pares van en template string.
 
+## 2026-09-07 · Ronda de pulido 3 · bins de 100 g, medición de los 37 turnos y adopción en bloque (PR #915)
+
+**Bins de 100 g.** `GATE_OBS_WEIGHT_BIN_G = 100` y cada doc guarda su ancho
+(`weightBinGrams`; ausente = 250, docs viejos siguen valiendo);
+`derivePesoPorPuerta` usa el del doc. Re-backfill de los 37 turnos: 612 KB en
+total (1,5× los 395 KB de 250 g, máximo 20,7 KB por turno), no las 2,5×
+estimadas. Con 100 g la G8 y la G9 de hoy pasan de "al límite" a **10 % y
+15 % fuera por peso**, exactamente lo que dio la primera medición por bandas.
+
+**Medición de los 37 turnos con el módulo real** (esbuild sobre el TS,
+solo lectura). Tres cosas: (1) el "al límite" del ~10 % es inherente
+(piezas a ±100 g del corte, el rango 8-10 mide 916 g): pasó a tono neutro
+con la explicación "normal cerca del corte". (2) **9 turnos de agosto
+(13-08 → 18-08) tienen `gatesUsed` del borrador del wizard en 8 a 10
+puertas** y 0 snapshots: su "fuera por peso" daba 34–50 % porque juzgaba
+contra el rango equivocado. Fix: las puertas con seteo distinto no se juzgan
+por peso (ni baldosa ni conteo del resumen) y la tarjeta ofrece **"Adoptar
+seteo de la máquina en N puertas"** de una vez (`onAdoptarSeteoTodas`,
+mismo `adoptarSeteoMaquina`). Probado en el turno de HOY en prod: G4 → 8-10
+Industrial y G10 → 10-12 Premium, todas al 100 %, resumen "1 con calibre no
+reconocido · 2 con peso fuera de rango", coinciden 5.347/5.385 (99,3 %).
+Los 9 de agosto quedan a un toque cada uno (Orel decide si adoptar).
+(3) 23 turnos (febrero + 31-07) tienen `gatesUsed` vacío: la tarjeta muestra
+"sin asignación" en todas; inferir el seteo desde la etiqueta dominante es
+posible pero son de la temporada pasada — no se hizo.
+
+Regla que dejó la ronda: **la observación (piezas, peso) se guarda una vez;
+todo juicio (pureza, seteo, peso fuera) se deriva con la config vigente**,
+así corregir un seteo corrige el pasado sin releer nada. 2 tests nuevos
+(784 del módulo).
+
 ## 2026-09-07 · Ronda de pulido 2 · mezcla FÍSICA por peso + backfill de 37 turnos (PR #914)
 
 **Peso en la observación.** `computeGateObservations` guarda ahora, por
