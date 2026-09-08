@@ -51,6 +51,34 @@ desde ~4,5 kg: decidir el límite en el Z2 o en la app), G12 «calibre no recono
 (159 pz, la etiqueta exacta del programa 12+), G1 seteo Grado vs máquina Industrial
 (4 pz, un clic en «Adoptar»).
 
+## 2026-09-08 · `deleteFile` y `deleteMapImage` al mismo patrón (PR #924)
+
+Los dos que #922 dejó fuera. Ambos pasan a `deleteStorageObjectByUrl`, con lo
+que propagan y toleran solo `object-not-found`. El test se renombra a
+`storage.delete.test.ts` y usa `describe.each` sobre las CUATRO funciones:
+16 casos, la garantía vale para todas y para la próxima que se agregue.
+
+Lo que destapó hacerlo: **`deleteMapImage` nunca funcionó**. Comprobado con
+token real de admin contra las reglas vivas el 08-09: subida 403 y borrado
+403 en `maps/`. Dos causas que se suman:
+  1. La app sube a `maps/{fileName}` (2 segmentos, `uploadMapImage` y
+     `uploadFloorPlan`) y la única regla es `match /maps/{locationId}/{fileName}`
+     (3 segmentos) → no matchea NINGUNA regla. **Mismo desajuste de segmentos
+     que PR #894**, en otra ruta.
+  2. Aunque matcheara: esa regla no tiene `allow delete` y su `allow write`
+     usa `isAdmin()`, que en Storage deniega siempre (rol IAM faltante, ver la
+     nota de /models3d).
+El `logger.error` se lo tragaba, así que el botón "Eliminar plano" parecía
+funcionar y el archivo seguía en el bucket. El caller de `PolygonZoneEditor`
+ya tenía `try/catch` con `alert`, pero NUNCA llegaba a correr; ahora corre y
+el alert muestra la causa real en vez de un genérico.
+
+**No se tocó la regla de `/maps`**: arreglarla implica decidir quién puede
+subir y borrar planos de planta (el `isAdmin()` de Storage no sirve), y eso
+es decisión de Orel, no un efecto colateral de un fix de manejo de errores.
+Queda como pendiente explícito, junto con la subida de mapas, que está rota
+por la misma causa.
+
 ## 2026-09-08 · Borrado de fotos con error visible + delete en incidents/ (PR #922)
 
 Cierra los dos pendientes de #919. `deleteRepuestoFoto` y `deleteBodegaPhoto`
