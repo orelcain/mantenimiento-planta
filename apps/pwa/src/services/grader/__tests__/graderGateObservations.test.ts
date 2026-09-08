@@ -230,16 +230,25 @@ describe('mezcla física por peso (ronda 2)', () => {
   const conPeso = (g: number, n: number, gateNo = 8, ts = '2026-09-07T09:00:00') =>
     pieces(gateNo, n, '8-10 lb', 'Premium', ts).map((r) => ({ ...r, weightPerPieceGrams: g }))
 
-  it('guarda el histograma de peso por bloque en bins de 250 g', () => {
+  it('guarda el histograma de peso por bloque en bins de 100 g, con el ancho en el doc', () => {
     const obs = computeGateObservations([...conPeso(4120, 3), ...conPeso(4700, 2), ...conPeso(4500, 1)])!
-    expect(obs.gates[0]!.weightByBucket).toEqual([{ '4000': 3, '4500': 3 }])
+    expect(obs.weightBinGrams).toBe(100)
+    expect(obs.gates[0]!.weightByBucket).toEqual([{ '4100': 3, '4700': 2, '4500': 1 }])
+  })
+
+  it('un doc viejo sin weightBinGrams se lee con bins de 250 g', () => {
+    const obs = computeGateObservations(conPeso(4120, 10))!
+    const legacy = { ...obs, weightBinGrams: undefined, gates: [{ ...obs.gates[0]!, weightByBucket: [{ '4500': 10 }] }] }
+    const p = derivePesoPorPuerta(legacy, configTimelineFromSnapshots([], [gate(8, '8-10 lb', 'Premium')]), RANGES)[8]!
+    // 4.500–4.750 cruza el techo 4.581 → al límite; con 100 g sería fuera.
+    expect(p).toMatchObject({ alLimite: 10, fueraArriba: 0, binGrams: 250 })
   })
 
   it('juzga contra el rango del seteo: dentro, al límite (bin que cruza) y fuera con los kilos', () => {
     const obs = computeGateObservations([...conPeso(4120, 80), ...conPeso(4500, 8), ...conPeso(4800, 10), ...conPeso(4900, 2)])!
     const p = derivePesoPorPuerta(obs, configTimelineFromSnapshots([], [gate(8, '8-10 lb', 'Premium')]), RANGES)[8]!
-    expect(p).toMatchObject({ conPeso: 100, dentro: 80, alLimite: 8, fueraArriba: 12, fueraAbajo: 0, pctFuera: 12 })
-    expect(p.gramosArriba).toEqual([4750, 5000])
+    expect(p).toMatchObject({ conPeso: 100, dentro: 80, alLimite: 8, fueraArriba: 12, fueraAbajo: 0, pctFuera: 12, binGrams: 100 })
+    expect(p.gramosArriba).toEqual([4800, 5000])
     expect(p.rango).toEqual({ calibre: '8-10 lb', minGrams: 3665, maxGrams: 4581 })
   })
 

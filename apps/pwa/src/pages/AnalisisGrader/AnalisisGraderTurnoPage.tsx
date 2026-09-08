@@ -1329,6 +1329,30 @@ export function AnalisisGraderTurnoPage() {
       .catch((err) => logger.warn('No se pudo adoptar el seteo de la máquina', { err: String(err) }))
   }, [user, dateKey, shiftLabel, turnoGates, summary?.gatesUsed, effectiveSummaryId, reloadConfigSnapshots])
 
+  /** Igual que handleAdoptarSeteo, para todas las puertas con seteo distinto de una vez (9 turnos de agosto lo necesitan en 8-10 puertas). */
+  const handleAdoptarSeteoTodas = useCallback((seteos: Record<number, SeteoMaquina>) => {
+    if (!user?.id || !dateKey || !shiftLabel) return
+    const base = turnoGates.length > 0 ? turnoGates : (summary?.gatesUsed ?? [])
+    if (base.length === 0) return
+    const updated = base.map((g) => {
+      const s = seteos[g.gateNumber]
+      return s ? { ...g, assignedCalibre: s.calibre, assignedQuality: s.quality as GateAssignment['assignedQuality'], active: true } : g
+    })
+    const docId = `${dateKey}__${shiftLabel}`
+    const userName = `${(user as unknown as Record<string, string>).nombre ?? ''} ${(user as unknown as Record<string, string>).apellido ?? ''}`.trim() || user.email || 'Supervisor'
+    const lista = Object.entries(seteos).map(([g, s]) => `G${g}: ${s.calibre} · ${s.quality}`).join(', ')
+    lastEmittedGatesRef.current = JSON.stringify(updated)
+    adoptarSeteoMaquina(docId, updated, { uid: user.id, name: userName }, `Adoptado de la máquina (Excel): ${lista}`)
+      .then(async () => {
+        if (effectiveSummaryId) {
+          await updateDailySummary(effectiveSummaryId, { gatesUsed: updated.filter((g) => g.active) })
+          setSummary((prev) => (prev ? { ...prev, gatesUsed: updated.filter((g) => g.active) } : prev))
+        }
+        reloadConfigSnapshots()
+      })
+      .catch((err) => logger.warn('No se pudo adoptar el seteo de la máquina', { err: String(err) }))
+  }, [user, dateKey, shiftLabel, turnoGates, summary?.gatesUsed, effectiveSummaryId, reloadConfigSnapshots])
+
   // M3 — Siguiente pausa sin clasificar
   const [nextPauseOpen, setNextPauseOpen] = useState(false)
 
@@ -2627,6 +2651,7 @@ export function AnalisisGraderTurnoPage() {
               causesFor={causesFor}
               seteoDistinto={gateMixDerivado?.seteoDistinto}
               onAdoptarSeteo={isSupervisor || isAdmin ? handleAdoptarSeteo : undefined}
+              onAdoptarSeteoTodas={isSupervisor || isAdmin ? handleAdoptarSeteoTodas : undefined}
               pesoPorPuerta={pesoPorPuerta}
               turnoLabel={`${dateKey.slice(8, 10)}/${dateKey.slice(5, 7)} · ${shiftLabel}`}
             />
