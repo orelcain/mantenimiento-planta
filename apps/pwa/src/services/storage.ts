@@ -174,14 +174,14 @@ export async function uploadSignature(
   return getDownloadURL(storageRef)
 }
 
-// Eliminar archivo
+/**
+ * Eliminar archivo. Propaga el error (ver `deleteStorageObjectByUrl`).
+ *
+ * Hoy no tiene callers: se conserva porque es el borrado genérico por URL y
+ * queda alineado con el resto en vez de dejar el patrón mudo a mano.
+ */
 export async function deleteFile(url: string): Promise<void> {
-  try {
-    const storageRef = ref(storage, url)
-    await deleteObject(storageRef)
-  } catch (error) {
-    logger.error('Error eliminando archivo', error instanceof Error ? error : new Error(String(error)))
-  }
+  await deleteStorageObjectByUrl(url, 'archivo')
 }
 
 /**
@@ -256,14 +256,27 @@ export async function getMapImages(): Promise<string[]> {
   }
 }
 
-// Eliminar mapa
+/**
+ * Eliminar mapa. Propaga el error (ver `deleteStorageObjectByUrl`).
+ *
+ * ⚠ Con las reglas vivas esto DEVUELVE 403 aunque el usuario sea admin, por
+ * dos motivos que se suman:
+ *   1. Los mapas se suben a `maps/{fileName}` (2 segmentos, ver
+ *      `uploadMapImage`/`uploadFloorPlan`) y la única regla es
+ *      `match /maps/{locationId}/{fileName}` (3 segmentos) → no matchea
+ *      NINGUNA regla. Es el mismo desajuste de segmentos de PR #894.
+ *   2. Aunque matcheara, esa regla no tiene `allow delete` y su `allow write`
+ *      usa `isAdmin()`, que en producción deniega siempre (el `firestore.get`
+ *      cross-service falla por el rol IAM que le falta al agente de Rules —
+ *      ver la nota larga en /models3d de `storage.rules`).
+ * Comprobado con token real de admin el 08-09-2026: subida 403 y borrado 403.
+ * Mientras el `logger.error` se lo tragaba, el botón "Eliminar plano" parecía
+ * funcionar y el archivo seguía en el bucket. Ahora el fallo se ve; habilitarlo
+ * de verdad es decisión aparte (arreglar la regla de /maps implica decidir
+ * quién puede borrar planos de planta).
+ */
 export async function deleteMapImage(url: string): Promise<void> {
-  try {
-    const storageRef = ref(storage, url)
-    await deleteObject(storageRef)
-  } catch (error) {
-    logger.error('Error eliminando mapa', error instanceof Error ? error : new Error(String(error)))
-  }
+  await deleteStorageObjectByUrl(url, 'mapa')
 }
 
 /**

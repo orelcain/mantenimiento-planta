@@ -1217,8 +1217,11 @@ export function PolygonZoneEditor() {
                           logger.info('Map deleted', { url })
                           await loadAvailableMaps()
                         } catch (error) {
+                          // Este catch nunca llegaba a correr: deleteMapImage se
+                          // tragaba el error. Ahora propaga, así que el motivo
+                          // real (hoy: 403 por la regla de /maps) se muestra.
                           logger.error('Error eliminando mapa', error instanceof Error ? error : new Error(String(error)), { url })
-                          alert('Error al eliminar el mapa')
+                          alert(`Error al eliminar el mapa: ${error instanceof Error ? error.message : String(error)}`)
                         }
                       }
                     }}
