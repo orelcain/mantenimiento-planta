@@ -16,7 +16,7 @@ import type { PieceRecord, Gate0Record, GraderShiftSchedule, GraderDailySummary,
 import { DEFAULT_SHIFT_SCHEDULE } from './graderShiftSchedule'
 import { classifyRecordToMatrix, CALIBRE_WEIGHT_RANGES } from './graderAnalytics'
 import { computeGateMix } from './graderGateMix'
-import type { ConfigAt } from './graderGateObservations'
+import { rangesFingerprint, type ConfigAt } from './graderGateObservations'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -674,6 +674,7 @@ export function computeShiftSummary(
     qualityDistribution,
     gateDistribution,
     ...(gateMix ? { gateMix } : {}),
+    ...(activeGates.length > 0 ? { rangesFingerprint: rangesFingerprint(ranges?.length ? ranges : CALIBRE_WEIGHT_RANGES) } : {}),
     hourlyBuckets,
     sourceFileNames,
     batchUploadId,

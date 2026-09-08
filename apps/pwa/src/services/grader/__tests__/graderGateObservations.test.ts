@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   computeGateObservations, deriveGateMix, configTimelineFromSnapshots, realIsoToWallClockMs,
   GATE_OBS_MAX_BUCKETS, GATE_OBS_MAX_COMBOS, OTROS, classifyGateCauses, derivePesoPorPuerta, detectSolapesDeRango, inferirSeteoFaltante,
+  detectCambiosDePrograma, wallClockMsToRealIso, rangesFingerprint,
 } from '../graderGateObservations'
 import { ANY_CALIBRE, SIN_DATO } from '../graderGateMix'
 import type { GateConfigSnapshot } from '../graderConfigSnapshot.service'
@@ -351,5 +352,76 @@ describe('etiquetas crudas de Excel viejos (febrero: "2 - 4 LB")', () => {
     const peso = derivePesoPorPuerta(obs, timeline, [{ calibre: '2-4 lb', label: '', minGrams: 916, maxGrams: 1833 }])[4]!
     expect(peso).toMatchObject({ dentro: 50, pctFuera: 0 })
     expect(deriveGateMix(obs, timeline).gates[0]!.byCalibre).toEqual({ '2-4 lb': 50 })
+  })
+})
+
+describe('cambio de programa del Z2 dentro del turno (G10 hoy: 10-12 hasta las 23:30, 8-10 después)', () => {
+  const w = (gateNo: number, cal: string, g: number, n: number, ts: string) =>
+    pieces(gateNo, n, cal, 'Premium', ts).map((r) => ({ ...r, weightPerPieceGrams: g }))
+  const G = [gate(8, '8-10 lb', 'Premium'), gate(10, '10-12 lb', 'Premium')]
+  const obs = computeGateObservations([
+    ...w(10, '10-12 lb', 5200, 40, '2026-09-07T21:30:00'), ...w(10, '10-12 lb', 5200, 40, '2026-09-07T22:30:00'),
+    ...w(10, '8-10 lb', 4200, 60, '2026-09-07T23:30:00'), ...w(10, '8-10 lb', 4200, 60, '2026-09-08T00:30:00'), ...w(10, '8-10 lb', 4200, 60, '2026-09-08T01:30:00'),
+    ...w(8, '8-10 lb', 4100, 50, '2026-09-07T21:30:00'), ...w(8, '8-10 lb', 4100, 50, '2026-09-08T01:30:00'),
+  ])!
+  const timeline = configTimelineFromSnapshots([], G)
+
+  it('detecta desde qué bloque cambió, con qué programa y cuántas piezas', () => {
+    const c = detectCambiosDePrograma(obs, timeline)
+    expect(c).toHaveLength(1)
+    expect(c[0]).toMatchObject({ gate: 10, asignado: { calibre: '10-12 lb', quality: 'Premium' }, nuevo: { calibre: '8-10 lb', quality: 'Premium', pct: 100 }, piezasDesde: 180, piezasNuevo: 180 })
+    expect(new Date(c[0]!.desdeMs).toISOString()).toBe('2026-09-07T23:30:00.000Z')
+    // sin bloques que coincidan antes, no es "cambio": es seteo ≠ máquina
+    const nunca = computeGateObservations(w(10, '8-10 lb', 4200, 60, '2026-09-07T23:30:00'))!
+    expect(detectCambiosDePrograma(nunca, timeline)).toEqual([])
+  })
+
+  it('el solape se atribuye por el programa de cada bloque: la G10 mezclada no inventa un solape', () => {
+    expect(detectSolapesDeRango(obs, timeline)).toEqual([])
+  })
+
+  it('registrado el cambio a esa hora, la puerta queda pura antes y después', () => {
+    const snap = (atWall: string, gates: GateAssignment[], changes = 1): GateConfigSnapshot => ({
+      id: atWall, shiftDocId: 'x', at: wallClockMsToRealIso(Date.parse(atWall + 'Z')), changedBy: { uid: 'u', name: 'u' }, gates,
+      changes: Array.from({ length: changes }, () => ({ gateNumber: 10, field: 'assignedCalibre', before: '10-12 lb', after: '8-10 lb' })) as never,
+    })
+    const tl = configTimelineFromSnapshots([snap('2026-09-07T23:30:00', [gate(8, '8-10 lb', 'Premium'), gate(10, '8-10 lb', 'Premium')])], G)
+    const g10 = deriveGateMix(obs, tl).gates.find((g) => g.gate === 10)!
+    expect(g10.purityPct).toBe(100)
+    expect(detectCambiosDePrograma(obs, tl)).toEqual([])
+  })
+})
+
+describe('wallClockMsToRealIso es la inversa de realIsoToWallClockMs', () => {
+  it('ida y vuelta en verano (UTC-3) e invierno (UTC-4) de Chile', () => {
+    for (const wall of ['2026-09-07T23:30:00Z', '2026-07-15T10:00:00Z']) {
+      const real = wallClockMsToRealIso(Date.parse(wall))
+      expect(realIsoToWallClockMs(real)).toBe(Date.parse(wall))
+    }
+    expect(wallClockMsToRealIso(Date.parse('2026-09-07T23:30:00Z'))).toBe('2026-09-08T02:30:00.000Z')
+  })
+})
+
+describe('rangesFingerprint', () => {
+  it('cambia si cambia cualquier límite y no depende del orden', () => {
+    const a = [{ calibre: '8-10 lb', label: '', minGrams: 3665, maxGrams: 4581 }, { calibre: '10-12 lb', label: '', minGrams: 4581, maxGrams: 5900 }]
+    const b = [a[1]!, a[0]!]
+    const c = [{ ...a[0]!, maxGrams: 4990 }, { ...a[1]!, minGrams: 4990 }]
+    expect(rangesFingerprint(a)).toBe(rangesFingerprint(b))
+    expect(rangesFingerprint(a)).not.toBe(rangesFingerprint(c))
+  })
+})
+
+describe('configTimelineFromSnapshots · antes del snapshot inicial rige el inicial, no gatesUsed', () => {
+  it('gatesUsed es la config MÁS RECIENTE; el tramo previo al inicial (sin cambios) usa el inicial', () => {
+    const inicial: GateConfigSnapshot = {
+      id: 'ini', shiftDocId: 'x', at: '2026-09-08T02:38:55.000Z', changedBy: { uid: 'u', name: 'u' },
+      gates: [gate(4, '8-10 lb', 'Industrial')], changes: [],
+    }
+    const tl = configTimelineFromSnapshots([inicial], [gate(4, '6-8 lb', 'Premium')])
+    expect(tl.configAt(Date.parse('2026-09-07T21:15:00Z'))?.[0]?.assignedCalibre).toBe('8-10 lb')
+    // si el primero es un cambio real (turno viejo sin inicial), sigue rigiendo el fallback
+    const cambio = { ...inicial, changes: [{ gateNumber: 4, field: 'assignedCalibre', before: 'x', after: 'y' }] as never }
+    expect(configTimelineFromSnapshots([cambio], [gate(4, '6-8 lb', 'Premium')]).configAt(Date.parse('2026-09-07T21:15:00Z'))?.[0]?.assignedCalibre).toBe('6-8 lb')
   })
 })
