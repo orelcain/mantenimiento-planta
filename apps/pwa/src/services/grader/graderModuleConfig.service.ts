@@ -113,7 +113,13 @@ export async function saveModulePhysicalConfig(params: {
 export async function getModuleRanges(plantLineId?: string): Promise<GraderModuleConfig | null> {
   const snap = await getDoc(doc(db, COLLECTION, configDocId(plantLineId)))
   if (!snap.exists()) return null
-  return snap.data() as GraderModuleConfig
+  const cfg = snap.data() as GraderModuleConfig
+  // El nombre del calibre se escribe a mano: "12-UP lb " (con espacio) no
+  // coincidía con ninguna etiqueta y la G12 salía "calibre no reconocido".
+  if (Array.isArray(cfg.customWeightRanges)) {
+    cfg.customWeightRanges = cfg.customWeightRanges.map((r) => ({ ...r, calibre: String(r.calibre ?? '').trim() }))
+  }
+  return cfg
 }
 
 /** Persiste configuración del detector de pausas en el doc de la planta (merge). */

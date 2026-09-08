@@ -189,6 +189,7 @@ export function GlobalSettingsModal({ open, onOpenChange, plantLineId, defaultTa
       const auto = /\(\s*[\d.]+\s*[–-]\s*[\d.]+\s*g\s*\)\s*$/
       const conEtiqueta = ranges.map((r) => ({
         ...r,
+        calibre: r.calibre.trim(),
         label: (!r.label || auto.test(r.label))
           ? `${r.calibre.trim()} (${r.minGrams.toLocaleString('es-CL')}–${r.maxGrams.toLocaleString('es-CL')} g)`
           : r.label,

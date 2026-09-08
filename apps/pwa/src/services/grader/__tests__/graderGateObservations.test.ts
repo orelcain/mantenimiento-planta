@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   computeGateObservations, deriveGateMix, configTimelineFromSnapshots, realIsoToWallClockMs,
   GATE_OBS_MAX_BUCKETS, GATE_OBS_MAX_COMBOS, OTROS, classifyGateCauses, derivePesoPorPuerta, detectSolapesDeRango, inferirSeteoFaltante,
-  detectCambiosDePrograma, wallClockMsToRealIso, rangesFingerprint,
+  detectCambiosDePrograma, wallClockMsToRealIso, rangesFingerprint, normalizarCalibre, CALIBRE_12_UP,
 } from '../graderGateObservations'
 import { ANY_CALIBRE, SIN_DATO } from '../graderGateMix'
 import type { GateConfigSnapshot } from '../graderConfigSnapshot.service'
@@ -423,5 +423,32 @@ describe('configTimelineFromSnapshots · antes del snapshot inicial rige el inic
     // si el primero es un cambio real (turno viejo sin inicial), sigue rigiendo el fallback
     const cambio = { ...inicial, changes: [{ gateNumber: 4, field: 'assignedCalibre', before: 'x', after: 'y' }] as never }
     expect(configTimelineFromSnapshots([cambio], [gate(4, '6-8 lb', 'Premium')]).configAt(Date.parse('2026-09-07T21:15:00Z'))?.[0]?.assignedCalibre).toBe('6-8 lb')
+  })
+})
+
+describe('normalizarCalibre · etiquetas crudas de febrero', () => {
+  it('"10" y "12" son 10-12 lb y 12-UP lb; el solape "10 vs 10-12" de febrero desaparece', () => {
+    expect(normalizarCalibre('10')).toBe('10-12 lb')
+    expect(normalizarCalibre('12')).toBe(CALIBRE_12_UP)
+    expect(normalizarCalibre('12-UP lb ')).toBe(CALIBRE_12_UP)
+    expect(normalizarCalibre('10 - 12 lb')).toBe('10-12 lb')
+    expect(normalizarCalibre('2 - 4 LB')).toBe('2-4 lb')
+  })
+})
+
+describe('detectCambiosDePrograma · piso de piezas', () => {
+  it('un barrido de fin de turno con 30 piezas no es un cambio de programa', () => {
+    const w = (cal: string, n: number, ts: string) => pieces(5, n, cal, 'Premium', ts)
+    const obs = computeGateObservations([
+      ...w('4-6 lb', 200, '2026-02-26T00:30:00'), ...w('4-6 lb', 200, '2026-02-26T01:30:00'), ...w('4-6 lb', 200, '2026-02-26T02:30:00'),
+      ...w('6-8 lb', 15, '2026-02-26T04:00:00'), ...w('6-8 lb', 15, '2026-02-26T04:30:00'),
+    ])!
+    const tl = configTimelineFromSnapshots([], [gate(5, '4-6 lb', 'Premium')])
+    expect(detectCambiosDePrograma(obs, tl)).toEqual([])
+    const grande = computeGateObservations([
+      ...w('4-6 lb', 200, '2026-02-26T00:30:00'), ...w('4-6 lb', 200, '2026-02-26T01:30:00'),
+      ...w('6-8 lb', 60, '2026-02-26T04:00:00'), ...w('6-8 lb', 60, '2026-02-26T04:30:00'),
+    ])!
+    expect(detectCambiosDePrograma(grande, tl)).toHaveLength(1)
   })
 })

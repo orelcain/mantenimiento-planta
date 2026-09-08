@@ -94,13 +94,21 @@ export interface Combo { calibre: string; quality: string; conservation?: string
  * normalizan al leer, no al escribir, para que los docs ya guardados también
  * calcen con los calibres de la app (rangos, distancia, programa).
  */
+/** Nombre canónico del programa 12+ (igual que en el parser y la config de rangos). */
+export const CALIBRE_12_UP = '12-UP lb'
+
 export function normalizarCalibre(s: string): string {
   if (s === OTROS || s === SIN_DATO || s === ANY_CALIBRE) return s
   const t = s.toLowerCase().replace(/\s+/g, '').replace(/^hg/, '')
   if (t.includes('fuera') || t.includes('out')) return ANY_CALIBRE
-  if (/\d+-?(up|mas|\+)/.test(t) || /^10-12/.test(t)) return '10-12 lb'
+  // Febrero guardó las etiquetas crudas del Z2: "10" = 10 y más, "12" = 12 y más.
+  const up = t.match(/^(\d+)-?(up|mas|\+)/)
+  if (up) return Number(up[1]) >= 12 ? CALIBRE_12_UP : '10-12 lb'
+  if (/^10-12/.test(t)) return '10-12 lb'
+  const solo = t.match(/^(\d+)(lb)?$/)
+  if (solo) return Number(solo[1]) >= 12 ? CALIBRE_12_UP : Number(solo[1]) >= 10 ? '10-12 lb' : s
   const m = t.match(/^(\d+)-(\d+)(lb)?$/)
-  if (!m) return s
+  if (!m) return s.trim()
   const lb = `${m[1]}-${m[2]} lb`
   return ['0-2 lb', '2-4 lb', '4-6 lb', '6-8 lb', '8-10 lb', '10-12 lb'].includes(lb) ? lb : s
 }
@@ -577,6 +585,13 @@ export interface CambioDePrograma {
   piezasNuevo: number
 }
 
+/**
+ * Piso de piezas desde el cambio. Medido 08-09 sobre 37 turnos: sin piso salían
+ * "cambios" de 9–45 pz a las 04:00 (el barrido de fin de turno de febrero);
+ * los reales tenían 238, 525 y 1.987 pz.
+ */
+export const CAMBIO_MIN_PIEZAS = 100
+
 export function detectCambiosDePrograma(obs: GateObservations, timeline: ConfigTimeline): CambioDePrograma[] {
   const size = obs.bucketMinutes * 60_000
   const from = Date.parse(obs.bucketsFrom)
@@ -604,6 +619,8 @@ export function detectCambiosDePrograma(obs: GateObservations, timeline: ConfigT
       const siguientes = conDato.filter((j) => j >= i)
       const iguales = siguientes.filter((j) => { const q = estados[j]!.p; return q && q.calibre === s.p!.calibre && q.quality === s.p!.quality })
       if (iguales.length * 2 < siguientes.length) continue
+      const piezasSiguientes = siguientes.reduce((a, j) => a + Object.values(e.byBucket[j]!).reduce((x, y) => x + y, 0), 0)
+      if (piezasSiguientes < CAMBIO_MIN_PIEZAS) continue
       let piezasDesde = 0
       let piezasNuevo = 0
       for (const j of siguientes) {
