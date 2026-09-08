@@ -26,7 +26,7 @@ de prueba borradas de Storage y de `fotosReales`. Deploy confirmado:
 
 Gotchas: `web.app` NO es producción (build detenido en el 31-08); prod es
 `orelcain.github.io/mantenimiento-planta/version.json`. El preview
-`pwa-5184` sirve el checkout que diga `dev5184.cmd` (hoy `D:\wt-r6`), no
+`pwa-5184` sirve el checkout que diga `dev5184.cmd` (hoy `D:\a\wt-r6`), no
 el repo principal. Pendiente (sin PR): `deleteRepuestoFoto` y
 `deleteBodegaPhoto` tragan el error de borrado con `logger.error`, y
 `incidents/{id}/{file}` no tiene regla de delete (el objeto queda huérfano).
