@@ -108,6 +108,11 @@ interface Props {
   pesoPorPuerta?: Record<number, PesoPorPuerta>
   /** Programas de calibre solapados en el Z2, detectados por el peso (gateMix v2). */
   solapes?: SolapeDeRango[]
+  /**
+   * Puertas sin seteo guardado cuya asignación se infirió de lo que el Z2 les
+   * etiqueta (turnos viejos). Se muestran como "inferido" hasta guardarlas.
+   */
+  inferidas?: Record<number, SeteoMaquina>
 }
 
 /** Desde este % de piezas fuera del rango por peso, la baldosa lo dice. */
@@ -160,7 +165,7 @@ const CAUSA_COLOR: Record<'dark' | 'light', Record<CausaTipo | 'ok', string>> = 
 }
 const CHART_TEXT = { light: { axis: '#41566a', grid: '#c3d7e9', tipBg: '#ffffff', tipText: '#16242f', tipBorder: '#c3d7e9' }, dark: { axis: '#94a3b8', grid: '#22384a', tipBg: '#1e293b', tipText: '#e2e8f0', tipBorder: '#334155' } }
 
-export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets, causesFor, seteoDistinto, onAdoptarSeteo, onAdoptarSeteoTodas, pesoPorPuerta, solapes }: Props) {
+export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets, causesFor, seteoDistinto, onAdoptarSeteo, onAdoptarSeteoTodas, pesoPorPuerta, solapes, inferidas }: Props) {
   const navigate = useNavigate()
   const [copiado, setCopiado] = useState(false)
 
@@ -222,13 +227,18 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets,
     () => Object.fromEntries(Object.entries(seteoDistinto ?? {}).filter(([, s]) => !s.noReconocido)) as Record<number, SeteoMaquina>,
     [seteoDistinto],
   )
+  const nInferidas = Object.keys(inferidas ?? {}).length
+  const conJuicio = gateMix.gates.some((e) => e.purityPct != null)
   const resumenPill = [
     conteo.crit > 0 ? `${conteo.crit} mezclada${conteo.crit > 1 ? 's' : ''}` : '',
     conteo.warn > 0 ? `${conteo.warn} en atención` : '',
     conteo.seteo > 0 ? `${conteo.seteo} con seteo ≠ máquina` : '',
     conteo.noRec > 0 ? `${conteo.noRec} con calibre no reconocido` : '',
     conPesoFuera > 0 ? `${conPesoFuera} con peso fuera de rango` : '',
-  ].filter(Boolean).join(' · ') || 'Todas puras'
+    (solapes?.length ?? 0) > 0 ? 'programas solapados en el Z2' : '',
+  ].filter(Boolean).join(' · ') || (conJuicio ? 'Todas puras' : 'Sin seteo guardado')
+  // Sin ninguna puerta juzgada no hay "Todas puras" que valga.
+  const pillToneFinal: PillTone = !conJuicio ? 'neutral' : pillTone
 
   const resumenTexto = () => {
     const lineas = [
@@ -237,6 +247,9 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets,
         ? `Coinciden con lo asignado: ${fmtPz(totals.match)} / ${fmtPz(totals.pieces)} pz (${fmtPct(totals.purityPct)})`
         : '',
     ]
+    for (const so of solapes ?? []) {
+      lineas.push(`Programas solapados en el Z2: ${so.calibreA} recibe hasta ${fmtKg(so.hastaA)} y ${so.calibreB} desde ${fmtKg(so.desdeB)} (${so.gramos} g en común; ${fmtPz(so.piezasA)} pz en ${so.calibreA}, ${fmtPz(so.piezasB)} pz en ${so.calibreB})`)
+    }
     for (const e of gateMix.gates) {
       const s = seteoDistinto?.[e.gate]
       if (s) {
@@ -285,7 +298,7 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets,
         <CardTitle className="text-base flex items-center gap-2 flex-wrap">
           <Layers className="w-4 h-4" />
           Pureza por puerta
-          <Pill tone={pillTone} dot className="ml-auto">{resumenPill}</Pill>
+          <Pill tone={pillToneFinal} dot className="ml-auto">{resumenPill}</Pill>
         </CardTitle>
         {totals.purityPct != null && (
           <p className="text-footnote text-muted-foreground">
@@ -335,6 +348,7 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets,
                 </span>
                 <span className="w-full text-caption leading-tight text-foreground">
                   {etiquetaAsignacion(e, gateCfg.get(n))}
+                  {inferidas?.[n] && <span className="text-muted-foreground"> · inferido</span>}
                 </span>
                 {seteo ? (
                   <span className="w-full text-caption font-medium leading-tight text-ink-info">{seteo.noReconocido ? 'calibre no reconocido' : 'seteo ≠ máquina'}</span>
@@ -374,6 +388,18 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets,
           </div>
         )}
 
+        {nInferidas > 0 && (
+          <div className="flex flex-wrap items-center gap-2 rounded-ctl bg-muted px-3 py-2" data-testid="pureza-inferidas">
+            <p className="flex-1 min-w-[14rem] text-footnote text-muted-foreground">
+              Este turno no tiene seteo guardado: en {nInferidas} puerta{nInferidas > 1 ? 's' : ''} se tomó lo que el Z2 etiqueta
+              (≥ 90 % de las piezas) como asignación. Se marca «inferido» hasta guardarlo.
+            </p>
+            {onAdoptarSeteoTodas && (
+              <Button variant="tinted" onClick={() => onAdoptarSeteoTodas(inferidas!)}>Guardar seteo inferido</Button>
+            )}
+          </div>
+        )}
+
         {onAdoptarSeteoTodas && Object.keys(adoptables).length >= 2 && (
           <div className="flex flex-wrap items-center gap-2" data-testid="pureza-adoptar-todas">
             <Button variant="tinted" onClick={() => onAdoptarSeteoTodas(adoptables)}>
@@ -396,7 +422,7 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets,
         )}
 
         <div className="flex flex-wrap gap-2">
-          {nivelGlobal !== 'ok' && (
+          {(nivelGlobal !== 'ok' || conPesoFuera > 0 || (solapes?.length ?? 0) > 0) && (
             <Button variant="tinted" onClick={registrarIncidencia}>Registrar incidencia con esto</Button>
           )}
           <Button variant="plain" onClick={() => void copiar()} aria-live="polite">
