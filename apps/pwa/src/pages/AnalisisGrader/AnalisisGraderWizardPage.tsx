@@ -55,12 +55,14 @@ import {
   mergeAnnotationsIntoPauses,
   updateDailySummary,
   saveGateObservations,
+  listDailySummariesByRange,
   type FirestorePieceRecord,
 } from '@/services/grader/graderDailySummary.service'
 import { computeGateObservations } from '@/services/grader/graderGateObservations'
 import { saveGate0Records } from '@/services/grader/graderGate0Store'
 import { listSnapshots, saveConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
 import { configTimelineFromSnapshots, type ConfigTimeline } from '@/services/grader/graderGateObservations'
+import { pickUltimoSeteo, elegirSeteoInicial } from '@/services/grader/graderSeteoInicial'
 import { detectPauses, collectSortedTimestamps, type PauseDetectionResult } from '@/services/grader/graderPauseDetector'
 import { DEFAULT_P0_ALERT_PCT, DEFAULT_P0_CRITICAL_PCT } from '@/services/grader/graderP0Thresholds'
 import type { ParsedMatrixData, GateAssignment, GraderAnalysisConfig, GraderDailySummary, Gate0Record } from '@/services/grader/types'
@@ -485,7 +487,12 @@ export function AnalisisGraderWizardPage() {
     }
   }, [uploadedFiles.length, parsedData])
 
+  // Si el usuario tocó las gates en esta sesión del wizard, ese seteo manda
+  // sobre el "último conocido" al registrar el snapshot inicial de un turno.
+  const gatesEditadasRef = useRef(false)
+
   const handleApplyGateSuggestion = useCallback((payload: { gateNumber: number; calibre: string; quality: string }) => {
+    gatesEditadasRef.current = true
     setGates((prev) => prev.map((gate) => {
       if (gate.gateNumber !== payload.gateNumber) return gate
       return { ...gate, assignedCalibre: payload.calibre, assignedQuality: payload.quality as GateAssignment['assignedQuality'] }
@@ -542,6 +549,24 @@ export function AnalisisGraderWizardPage() {
       // Si no tiene, el borrador del wizard pasa a ser su snapshot inicial: así
       // el detalle muestra la config vigente y no detecta "desfase" contra nada.
       // Solo en plantas que clasifican: en Yal las gates no significan nada.
+      // Seteo inicial de un turno SIN snapshot: el último conocido de la línea
+      // (gatesUsed del turno más reciente, que la página mantiene al día con
+      // snapshots y adopciones) y no el borrador del wizard. En la carga
+      // parcial del 07-09 Turno 1 el borrador dejó 8 de 12 puertas
+      // "seteo ≠ máquina" y 74 piezas de P0 "fuera de calidad" artificiales.
+      let ultimoConocido: GateAssignment[] | null = null
+      if (lineConfig.isClassificationPlant !== false && !gatesEditadasRef.current) {
+        try {
+          const hoy = new Date()
+          const desde = new Date(hoy.getTime() - 21 * 86_400_000)
+          const recientes = await listDailySummariesByRange(desde.toISOString().slice(0, 10), hoy.toISOString().slice(0, 10), effectivePlantLineId)
+          ultimoConocido = pickUltimoSeteo(recientes)
+        } catch (err) {
+          logger.warn('No se pudo leer el último seteo conocido', { err: String(err) })
+        }
+      }
+      const seteoInicial = elegirSeteoInicial({ wizardGates: gates, gatesEditadas: gatesEditadasRef.current, ultimoConocido })
+
       const gatesBySegment = new Map<string, GateAssignment[]>()
       // Con más de un snapshot, las piezas de P0 se clasifican con la config
       // vigente a SU hora, no solo con la última.
@@ -558,7 +583,11 @@ export function AnalisisGraderWizardPage() {
               timelineBySegment.set(key, configTimelineFromSnapshots(snaps, latest.gates))
               return
             }
-            await saveConfigSnapshot(shiftDocId, gates, { uid: user.id, name: userName }, 'Config inicial al cargar el Excel')
+            gatesBySegment.set(key, seteoInicial.gates)
+            await saveConfigSnapshot(
+              shiftDocId, seteoInicial.gates, { uid: user.id, name: userName },
+              seteoInicial.origen === 'ultimo-conocido' ? 'Config inicial al cargar el Excel (último seteo conocido de la línea)' : 'Config inicial al cargar el Excel',
+            )
           } catch (err) {
             // No es fatal: se clasifica con las gates del wizard, como antes.
             logger.warn('No se pudo resolver la config de gates del turno', { shiftDocId, err: String(err) })
