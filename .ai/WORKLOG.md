@@ -6,6 +6,31 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-08 · Fotos de repuestos sin equipo (PR #919)
+
+Pedido de Orel: "no me deja cargar imágenes a los repuestos". Segunda causa
+distinta a la de #894 (que fue la regla de Storage). Esta vez las reglas
+estaban bien: se probaron las reglas VIVAS con un token real del admin
+(custom token → `signInWithCustomToken` con header `Referer` del dominio,
+porque la API key tiene restricción de referer → POST al bucket) y los tres
+paths de repuestos/bodega dieron 200. La causa era el cliente:
+`RepuestoPhotosModal` exigía `machineId` para habilitar "Agregar foto", y en
+el modelo plano **3.025 de 7.673 repuestos (39 %) tienen `equipos: []`**
+(fila "Transversal"/"Sin equipo") → el admin veía "Sin fotos reales" sin
+botón ni aviso. Fix: `canEdit` sin `machineId`; sin equipo el path usa el
+marcador `repuestos/sin-equipo/{repuestoId}/fotos/`, que cumple la regla de
+4 segmentos existente (storage.rules no cambia). Verificado en local con
+sesión real en el repuesto 3300101237 y contraste con uno con equipo; fotos
+de prueba borradas de Storage y de `fotosReales`. Deploy confirmado:
+`version.json` publicado con `buildSha 1f1d09c`.
+
+Gotchas: `web.app` NO es producción (build detenido en el 31-08); prod es
+`orelcain.github.io/mantenimiento-planta/version.json`. El preview
+`pwa-5184` sirve el checkout que diga `dev5184.cmd` (hoy `D:\wt-r6`), no
+el repo principal. Pendiente (sin PR): `deleteRepuestoFoto` y
+`deleteBodegaPhoto` tragan el error de borrado con `logger.error`, y
+`incidents/{id}/{file}` no tiene regla de delete (el objeto queda huérfano).
+
 ## 2026-09-07 · Análisis de Turno: "Ver turno" en el turno en curso + pureza por puerta (PRs #905, #906, #907)
 
 Pedido de Orel: al cargar el Excel del Grader el botón "Ver turno" no salía
