@@ -171,11 +171,19 @@ export function RepuestoPhotosModal({
         }))
         await onSaveFotos!(withPrincipal)
         setFotosReales(withPrincipal)
+      } catch (error) {
+        // Igual que en la subida: sin catch el fallo moría mudo y la foto
+        // "no se borraba" sin explicación (deleteRepuestoFoto ahora propaga).
+        toast({
+          title: 'No se pudo eliminar la foto',
+          description: error instanceof Error ? error.message : String(error),
+          variant: 'destructive',
+        })
       } finally {
         setDeletingId(null)
       }
     },
-    [canEdit, fotosReales, onSaveFotos],
+    [canEdit, fotosReales, onSaveFotos, toast],
   )
 
   return (

@@ -6,6 +6,26 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-08 · Borrado de fotos con error visible + delete en incidents/ (PR #922)
+
+Cierra los dos pendientes de #919. `deleteRepuestoFoto` y `deleteBodegaPhoto`
+tragaban cualquier error con `logger.error`: el caller quitaba la URL de
+Firestore y el archivo quedaba huérfano en el bucket sin aviso (el mismo
+patrón mudo que escondió el `storage/unauthorized` de la subida en #894).
+Ahora un helper común `deleteStorageObjectByUrl` propaga; solo
+`storage/object-not-found` se tolera con warn, porque si el archivo ya no
+existe la referencia en Firestore es basura y quitarla es lo correcto. El
+modal de fotos de repuesto y el drawer de bodega muestran toast si falla.
+4 tests en `storage.deleteFoto.test.ts`. En `storage.rules`,
+`incidents/{id}/{file}` no tenía delete (403 hasta con admin): se agrega
+para sesión no anónima, mismo criterio que `machines/.../repuestos`.
+
+Regla general que sale de #894, #919 y #922: **todo `try` alrededor de una
+llamada a Storage lleva `catch` que avise (toast) o propague; un
+`logger.error` solo no es manejo, es esconder el fallo.** Quedan con el
+patrón viejo, fuera de alcance: `deleteFile` (sin callers) y
+`deleteMapImage` en `services/storage.ts`.
+
 ## 2026-09-08 · Fotos de repuestos sin equipo (PR #919)
 
 Pedido de Orel: "no me deja cargar imágenes a los repuestos". Segunda causa
