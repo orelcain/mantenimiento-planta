@@ -463,6 +463,80 @@ export function derivePesoPorPuerta(
   return out
 }
 
+// ── Programas de calibre solapados en el Z2 ─────────────────────────────────
+
+export interface SolapeDeRango {
+  /** Calibre de abajo (p. ej. 8-10 lb) y hasta qué peso recibió de verdad. */
+  calibreA: string
+  hastaA: number
+  /** Calibre de arriba (p. ej. 10-12 lb) y desde qué peso recibió de verdad. */
+  calibreB: string
+  desdeB: number
+  /** Ancho del tramo en común, en gramos. */
+  gramos: number
+  /** Piezas del calibre de abajo que pesan dentro del tramo en común. */
+  piezasA: number
+  /** Piezas del calibre de arriba que pesan dentro del tramo en común. */
+  piezasB: number
+}
+
+/** Mínimo de piezas con peso por calibre para opinar, y mínimo de tramo en común. */
+const SOLAPE_MIN_PIEZAS = 30
+const SOLAPE_MIN_GRAMOS = 200
+
+/**
+ * Detecta programas de calibre solapados en el Z2 mirando SOLO el peso de lo que
+ * cayó en las puertas de cada calibre asignado (percentiles 2–98 del histograma,
+ * para no dejarse llevar por una pieza suelta). Medido 07-09: las puertas 8-10
+ * recibían hasta 4,98 kg y las 10-12 desde 4,59 kg: 400 g en común, y el
+ * pescado de ese tramo cae en cualquiera de los dos calibres.
+ */
+export function detectSolapesDeRango(obs: GateObservations, timeline: ConfigTimeline): SolapeDeRango[] {
+  const size = obs.bucketMinutes * 60_000
+  const from = Date.parse(obs.bucketsFrom)
+  const binG = obs.weightBinGrams ?? LEGACY_WEIGHT_BIN_G
+  const hist = new Map<string, Map<number, number>>()
+  for (const e of obs.gates) {
+    if (!e.weightByBucket) continue
+    e.weightByBucket.forEach((bins, i) => {
+      if (!bins) return
+      const cfg = timeline.configAt(from + i * size)?.find((g) => g.gateNumber === e.gate && g.active)
+      if (!cfg || cfg.assignedCalibre === ANY_CALIBRE) return
+      let h = hist.get(cfg.assignedCalibre)
+      if (!h) { h = new Map(); hist.set(cfg.assignedCalibre, h) }
+      for (const [k, n] of Object.entries(bins)) h.set(Number(k), (h.get(Number(k)) ?? 0) + n)
+    })
+  }
+  const spans: Array<{ calibre: string; lo: number; hi: number; total: number; h: Map<number, number> }> = []
+  for (const [calibre, h] of hist) {
+    const total = [...h.values()].reduce((a, b) => a + b, 0)
+    if (total < SOLAPE_MIN_PIEZAS) continue
+    const sorted = [...h.entries()].sort((a, b) => a[0] - b[0])
+    let acc = 0
+    let lo: number | null = null
+    let hi: number | null = null
+    for (const [bin, n] of sorted) {
+      acc += n
+      if (lo == null && acc > total * 0.02) lo = bin
+      if (acc >= total * 0.98) { hi = bin + binG; break }
+    }
+    if (lo == null || hi == null) continue
+    spans.push({ calibre, lo, hi, total, h })
+  }
+  spans.sort((a, b) => a.lo - b.lo)
+  const out: SolapeDeRango[] = []
+  for (let i = 0; i + 1 < spans.length; i++) {
+    const a = spans[i]!
+    const b = spans[i + 1]!
+    const gramos = a.hi - b.lo
+    if (gramos < SOLAPE_MIN_GRAMOS) continue
+    const piezasA = [...a.h.entries()].filter(([bin]) => bin >= b.lo && bin < a.hi).reduce((s, [, n]) => s + n, 0)
+    const piezasB = [...b.h.entries()].filter(([bin]) => bin >= b.lo && bin < a.hi).reduce((s, [, n]) => s + n, 0)
+    out.push({ calibreA: a.calibre, hastaA: a.hi, calibreB: b.calibre, desdeB: b.lo, gramos, piezasA, piezasB })
+  }
+  return out
+}
+
 // ── ¿Por qué cayó acá? ──────────────────────────────────────────────────────
 
 export type CausaTipo =

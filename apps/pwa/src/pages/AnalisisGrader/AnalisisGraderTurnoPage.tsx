@@ -27,7 +27,7 @@ import { DEFAULT_SHIFT_SCHEDULE, normalizeShiftSchedule } from '@/services/grade
 import { getShiftDisplayDateKey, getShiftMeta } from '@/services/grader/graderShiftDisplay'
 import { PurezaPorPuertaCard } from '@/components/grader/PurezaPorPuertaCard'
 import { loadGateObservations, updateDailySummary } from '@/services/grader/graderDailySummary.service'
-import { deriveGateMix, configTimelineFromSnapshots, classifyGateCauses, derivePesoPorPuerta, type GateObservations, type SeteoMaquina } from '@/services/grader/graderGateObservations'
+import { deriveGateMix, configTimelineFromSnapshots, classifyGateCauses, derivePesoPorPuerta, detectSolapesDeRango, type GateObservations, type SeteoMaquina } from '@/services/grader/graderGateObservations'
 import { CALIBRE_WEIGHT_RANGES } from '@/services/grader/graderAnalyticsThroughput'
 import { parseMatrixErrorString } from '@/services/grader/graderMatrixP0Causes'
 import { HeroScorecard } from '@/components/grader/HeroScorecard'
@@ -1183,11 +1183,22 @@ export function AnalisisGraderTurnoPage() {
     () => (gateObs ? deriveGateMix(gateObs, gateTimeline) : null),
     [gateObs, gateTimeline],
   )
-  // Mezcla física por peso, contra los rangos vigentes (override del turno →
-  // línea → constantes).
+  // Rangos de calibre que juzgan al turno: override del turno → línea → constantes.
+  const rangosVigentes = useMemo(
+    () => calibreOverride ?? moduleRanges ?? CALIBRE_WEIGHT_RANGES,
+    [calibreOverride, moduleRanges],
+  )
+
+  // Mezcla física por peso, contra los rangos vigentes.
   const pesoPorPuerta = useMemo(
-    () => (gateObs ? derivePesoPorPuerta(gateObs, gateTimeline, calibreOverride ?? moduleRanges ?? CALIBRE_WEIGHT_RANGES) : undefined),
-    [gateObs, gateTimeline, calibreOverride, moduleRanges],
+    () => (gateObs ? derivePesoPorPuerta(gateObs, gateTimeline, rangosVigentes) : undefined),
+    [gateObs, gateTimeline, rangosVigentes],
+  )
+  // ¿El Z2 tiene dos programas de calibre solapados? Se ve en el peso: las
+  // puertas 8-10 reciben hasta X kg y las 10-12 desde Y kg, con X > Y.
+  const solapes = useMemo(
+    () => (gateObs ? detectSolapesDeRango(gateObs, gateTimeline) : undefined),
+    [gateObs, gateTimeline],
   )
   // «¿Por qué cayó acá?» para la puerta que el usuario toque en la tarjeta.
   const causesFor = useMemo(
@@ -1204,8 +1215,9 @@ export function AnalisisGraderTurnoPage() {
       currentGates: turnoGates,
       gate0Records: gate0Pieces,
       savedCauses: summary.topP0Causes,
+      ranges: rangosVigentes,
     })
-  }, [summary, isClassificationPlant, turnoGates, gate0Pieces])
+  }, [summary, isClassificationPlant, turnoGates, gate0Pieces, rangosVigentes])
 
   // Recálculo automático: si el desglose no corresponde a las gates vigentes y el
   // turno guardó su input de Puerta 0, se reclasifica y se persiste sin pedir nada.
@@ -1222,7 +1234,7 @@ export function AnalisisGraderTurnoPage() {
     try {
       // Cada pieza de P0 con la config vigente a su hora (snapshots del turno);
       // gatesUsed queda con la config vigente para que el desfase se cierre.
-      const res = await recomputeShiftP0Causes(effectiveSummaryId, gateTimeline, summary.pointZeroPieces, turnoGates)
+      const res = await recomputeShiftP0Causes(effectiveSummaryId, gateTimeline, summary.pointZeroPieces, turnoGates, rangosVigentes)
       if (res.ok && res.causes) {
         // Actualiza en memoria lo que acaba de persistirse — evita releer el doc.
         setSummary((prev) => (prev
@@ -1234,7 +1246,7 @@ export function AnalisisGraderTurnoPage() {
     } finally {
       setRecomputing(false)
     }
-  }, [summary, effectiveSummaryId, turnoGates, gateTimeline])
+  }, [summary, effectiveSummaryId, turnoGates, gateTimeline, rangosVigentes])
 
   useEffect(() => {
     if (!configDrift?.stale || !summary?.gate0RecordsStored || !effectiveSummaryId) return
@@ -2653,6 +2665,7 @@ export function AnalisisGraderTurnoPage() {
               onAdoptarSeteo={isSupervisor || isAdmin ? handleAdoptarSeteo : undefined}
               onAdoptarSeteoTodas={isSupervisor || isAdmin ? handleAdoptarSeteoTodas : undefined}
               pesoPorPuerta={pesoPorPuerta}
+              solapes={solapes}
               turnoLabel={`${dateKey.slice(8, 10)}/${dateKey.slice(5, 7)} · ${shiftLabel}`}
             />
           )}

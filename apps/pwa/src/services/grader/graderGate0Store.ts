@@ -25,7 +25,7 @@ import {
 import { db } from '../firebase'
 import { classifyRecordToMatrix, CALIBRE_WEIGHT_RANGES } from './graderAnalytics'
 import { updateDailySummary } from './graderDailySummary.service'
-import type { GateAssignment, Gate0Record, GraderDailySummary } from './types'
+import type { GateAssignment, Gate0Record, GraderDailySummary, CalibreWeightRange } from './types'
 import { parseWallClock, type ConfigTimeline } from './graderGateObservations'
 
 const COLLECTION = 'graderDailySummaries'
@@ -147,6 +147,8 @@ export function classifyGate0Records(
   records: StoredGate0Record[],
   gates: GateAssignment[] | ConfigTimeline,
   pointZeroPieces: number,
+  /** Rangos de calibre configurados en la app. Sin esto, las constantes. */
+  ranges?: CalibreWeightRange[],
 ): Array<{ error: string; pieces: number; pct: number }> {
   const activeAt: (ts: string) => GateAssignment[] = Array.isArray(gates)
     ? (() => { const active = gates.filter((g) => g.active); return () => active })()
@@ -158,7 +160,7 @@ export function classifyGate0Records(
       ? classifyRecordToMatrix(
         { ...(rec as unknown as Gate0Record), error: rec.error ?? '', gate: 0 as const },
         active,
-        CALIBRE_WEIGHT_RANGES,
+        ranges?.length ? ranges : CALIBRE_WEIGHT_RANGES,
       )
       : (rec.error || 'Sin causa')
     causeMap.set(key, (causeMap.get(key) ?? 0) + rec.pieces)
@@ -188,13 +190,14 @@ export async function recomputeShiftP0Causes(
   pointZeroPieces: number,
   /** Config VIGENTE (último snapshot) que queda en `gatesUsed`; obligatoria con una línea de tiempo. */
   gatesVigentes?: GateAssignment[],
+  ranges?: CalibreWeightRange[],
 ): Promise<RecomputeResult> {
   const vigentes = (gatesVigentes ?? (Array.isArray(gates) ? gates : [])).filter((g) => g.active)
   if (vigentes.length === 0) return { ok: false, reason: 'sin-gates' }
   const records = await loadGate0Records(summaryId)
   if (records == null) return { ok: false, reason: 'sin-datos-guardados' }
 
-  const causes = classifyGate0Records(records, gates, pointZeroPieces)
+  const causes = classifyGate0Records(records, gates, pointZeroPieces, ranges)
   await updateDailySummary(summaryId, {
     topP0Causes: causes,
     gatesUsed: vigentes,

@@ -49,6 +49,36 @@ piel Apple. Gotcha: `cn()` (tailwind-merge) DESCARTA `text-caption` /
 `text-title3` si en la misma llamada va un `text-ink-*` — toma el tamaño
 como color y gana el último; esos pares van en template string.
 
+## 2026-09-07 · Ronda de pulido 4 · rangos alineados con el Z2, solape de programas y P0 con rangos configurados (PR #916)
+
+**Rangos alineados.** Orel confirmó que el 8-10 del Z2 llega a 5 kg. Se editó
+desde el apartado de la app (modal "Rangos calibre", sesión de Orel en el
+preview): 8-10 = 3.665–5.000 g y 10-12 = 5.000–5.900 g en
+`graderModuleConfigs/global.customWeightRanges`. La G9 pasó de 6,5 % fuera a
+97 % dentro. Bug de paso: el editor no regeneraba la etiqueta ("8-10 lb
+(3665–4581 g)" seguía en todas las pantallas) → `handleSave` la reconstruye
+si era automática.
+
+**Hallazgo (el de más valor de las 4 rondas).** Percentiles de peso por
+ETIQUETA en 3 turnos: el 11-08 y el 02-09 el Z2 cortaba limpio en 4,58/4,59 kg
+(8-10 max 4.580, 10-12 min 4.590). Hoy las puertas 8-10 reciben hasta 4,98 kg
+(p95 4.770) y las 10-12 SIGUEN recibiendo desde 4,59 kg: **los dos programas
+del Z2 se solapan ~400 g** y el pescado de 4,6–5,0 kg cae en cualquiera. Eso es
+lo que G10/G11 muestran como 28 % fuera con los rangos nuevos, y NO es error de
+la app: es el Z2. `detectSolapesDeRango(obs, timeline)` lo detecta desde el
+histograma de peso por calibre asignado (percentiles 2–98, ≥30 pz, ≥200 g) y
+la tarjeta lo dice: "Las puertas 8-10 lb reciben hasta 4,9 kg y las 10-12 lb
+desde 4,6 kg: 300 g en común (376 pz en 8-10, 47 pz en 10-12). Revisar los
+límites de los dos programas en el Z2." Verificado con el turno de hoy.
+
+**P0 con los rangos configurados.** `classifyRecordToMatrix` recibía las
+constantes (8-10 hasta 4.581) en computeShiftSummary, classifyGate0Records,
+recomputeShiftP0Causes y detectConfigDrift: una pieza de 4,8 kg en P0 era
+"fuera de calibre" aunque la app tuviera el 8-10 hasta 5.000. Ahora todos
+reciben `ranges` (wizard: customWeightRanges de la línea; página:
+override del turno → línea → constantes). Y "fuera por peso" exige ≥30 piezas
+con peso: con 6 pz, 1 pescado ya era 17 %. 4 tests nuevos (787 del módulo).
+
 ## 2026-09-07 · Ronda de pulido 3 · bins de 100 g, medición de los 37 turnos y adopción en bloque (PR #915)
 
 **Bins de 100 g.** `GATE_OBS_WEIGHT_BIN_G = 100` y cada doc guarda su ancho

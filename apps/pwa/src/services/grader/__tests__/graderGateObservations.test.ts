@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   computeGateObservations, deriveGateMix, configTimelineFromSnapshots, realIsoToWallClockMs,
-  GATE_OBS_MAX_BUCKETS, GATE_OBS_MAX_COMBOS, OTROS, classifyGateCauses, derivePesoPorPuerta,
+  GATE_OBS_MAX_BUCKETS, GATE_OBS_MAX_COMBOS, OTROS, classifyGateCauses, derivePesoPorPuerta, detectSolapesDeRango,
 } from '../graderGateObservations'
 import { ANY_CALIBRE, SIN_DATO } from '../graderGateMix'
 import type { GateConfigSnapshot } from '../graderConfigSnapshot.service'
@@ -274,5 +274,41 @@ describe('etiqueta Other dominante = calibre no reconocido, no mezcla (G12 hoy: 
     const timeline = configTimelineFromSnapshots([], [gate(12, '10-12 lb', 'Premium')])
     expect(deriveGateMix(obs, timeline).seteoDistinto).toEqual({ 12: { calibre: ANY_CALIBRE, quality: 'Premium', pct: 100, noReconocido: true } })
     expect(classifyGateCauses(obs, 12, timeline)!.groups[0]).toMatchObject({ tipo: 'calibre_no_reconocido', pieces: 38 })
+  })
+})
+
+describe('programas de calibre solapados en el Z2 (medido hoy: 8-10 hasta 4,98 kg y 10-12 desde 4,59 kg)', () => {
+  const G = [gate(8, '8-10 lb', 'Premium'), gate(10, '10-12 lb', 'Premium')]
+  const w = (gateNo: number, cal: string, g: number, n: number) =>
+    pieces(gateNo, n, cal, 'Premium', '2026-09-07T09:00:00').map((r) => ({ ...r, weightPerPieceGrams: g }))
+
+  it('detecta el tramo en común entre dos calibres consecutivos con los percentiles 2–98', () => {
+    const obs = computeGateObservations([
+      ...w(8, '8-10 lb', 3800, 40), ...w(8, '8-10 lb', 4200, 40), ...w(8, '8-10 lb', 4700, 15), ...w(8, '8-10 lb', 4900, 5),
+      ...w(10, '10-12 lb', 4600, 20), ...w(10, '10-12 lb', 5100, 40), ...w(10, '10-12 lb', 5400, 20),
+    ])!
+    const s = detectSolapesDeRango(obs, configTimelineFromSnapshots([], G))
+    expect(s).toHaveLength(1)
+    expect(s[0]).toMatchObject({ calibreA: '8-10 lb', calibreB: '10-12 lb', hastaA: 5000, desdeB: 4600, gramos: 400, piezasA: 20, piezasB: 20 })
+  })
+
+  it('no avisa cuando el corte es limpio ni con menos de 30 piezas', () => {
+    const limpio = computeGateObservations([...w(8, '8-10 lb', 4200, 50), ...w(8, '8-10 lb', 4500, 10), ...w(10, '10-12 lb', 4700, 50)])!
+    expect(detectSolapesDeRango(limpio, configTimelineFromSnapshots([], G))).toEqual([])
+    const pocas = computeGateObservations([...w(8, '8-10 lb', 4900, 10), ...w(10, '10-12 lb', 4600, 10)])!
+    expect(detectSolapesDeRango(pocas, configTimelineFromSnapshots([], G))).toEqual([])
+  })
+})
+
+describe('P0 con los rangos configurados de la app', () => {
+  it('con el 8-10 hasta 5.000 g, una pieza de 4,8 kg deja de ser "fuera de calibre"', async () => {
+    const { classifyGate0Records } = await import('../graderGate0Store')
+    const gates = [gate(8, '8-10 lb', 'Industrial')]
+    const rec = { ts: '2026-09-07T09:00:00.000Z', pieces: 5, error: 'Fuera de límites', weightPerPieceGrams: 4800, quality: 'Industrial' }
+    const constantes = classifyGate0Records([rec], gates, 5)
+    expect(constantes.find((c) => c.error === 'fuera_de_calibre')?.pieces).toBe(5)
+    const ranges = [{ calibre: '8-10 lb', label: '', minGrams: 3665, maxGrams: 5000 }]
+    const alineado = classifyGate0Records([rec], gates, 5, ranges)
+    expect(alineado.find((c) => c.error === 'fuera_de_calibre')).toBeUndefined()
   })
 })
