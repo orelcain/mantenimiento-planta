@@ -314,12 +314,7 @@ export async function uploadBodegaPhoto(codigoSAP: string, file: File): Promise<
 }
 
 export async function deleteBodegaPhoto(url: string): Promise<void> {
-  try {
-    const storageRef = ref(storage, url)
-    await deleteObject(storageRef)
-  } catch (error) {
-    logger.error('Error eliminando foto bodega', error instanceof Error ? error : new Error(String(error)))
-  }
+  await deleteStorageObjectByUrl(url, 'foto bodega')
 }
 
 // ── Fotos reales de repuestos (catálogo) ──
@@ -356,10 +351,38 @@ export async function uploadRepuestoFoto(
  * Elimina una foto real de un repuesto de Storage.
  */
 export async function deleteRepuestoFoto(url: string): Promise<void> {
+  await deleteStorageObjectByUrl(url, 'foto repuesto')
+}
+
+/**
+ * Borra un objeto de Storage a partir de su downloadURL y PROPAGA el error.
+ *
+ * Antes `deleteRepuestoFoto`/`deleteBodegaPhoto` tragaban cualquier fallo con
+ * `logger.error`: el caller seguía, quitaba la URL de Firestore y el archivo
+ * quedaba huérfano en el bucket sin que nadie lo viera (mismo patrón mudo que
+ * escondió el `storage/unauthorized` de la subida en PR #894).
+ *
+ * Única excepción deliberada: `storage/object-not-found`. Si el archivo ya no
+ * existe, la referencia en Firestore es basura y quitarla es lo correcto; se
+ * deja un warn y se continúa.
+ */
+export async function deleteStorageObjectByUrl(url: string, label: string): Promise<void> {
   try {
-    const storageRef = ref(storage, url)
-    await deleteObject(storageRef)
+    await deleteObject(ref(storage, url))
   } catch (error) {
-    logger.error('Error eliminando foto repuesto', error instanceof Error ? error : new Error(String(error)))
+    if (isStorageObjectNotFound(error)) {
+      logger.warn(`Borrado de ${label}: el archivo ya no existía en Storage`, { url })
+      return
+    }
+    logger.error(`Error eliminando ${label}`, error instanceof Error ? error : new Error(String(error)), { url })
+    throw error
   }
+}
+
+function isStorageObjectNotFound(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    (error as { code?: unknown }).code === 'storage/object-not-found'
+  )
 }

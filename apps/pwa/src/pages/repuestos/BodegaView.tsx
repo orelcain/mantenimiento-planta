@@ -1740,7 +1740,16 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
                   <div key={i} className="relative group aspect-square rounded-card overflow-hidden border border-border cursor-pointer" onClick={() => setLightboxIndex(i)}>
                     <img src={url} alt={`Foto ${i + 1}`} className="w-full h-full object-cover" loading="lazy" />
                     {removePhoto && (
-                      <button onClick={e => { e.stopPropagation(); removePhoto(item.codigoSAP, url) }}
+                      <button onClick={e => {
+                        e.stopPropagation()
+                        // deleteBodegaPhoto propaga el error: sin este catch la
+                        // promesa quedaba sin manejar y el usuario sin aviso.
+                        removePhoto(item.codigoSAP, url).catch((err: unknown) => toast({
+                          title: 'No se pudo eliminar la foto',
+                          description: err instanceof Error ? err.message : String(err),
+                          variant: 'destructive',
+                        }))
+                      }}
                         className="absolute top-0.5 right-0.5 p-0.5 rounded-ctl bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity">
                         <X className="h-3 w-3" />
                       </button>
