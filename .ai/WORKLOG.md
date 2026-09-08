@@ -6,6 +6,51 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-08 · Ronda 7 de pureza por puerta: cambios de programa del Z2 dentro del turno (PR #923)
+
+Pedido de Orel: revisar de nuevo el turno completo `2026-09-07 Turno 1` (21:15→05:45,
+17.844 pz) después de corregir los rangos de peso (8-10 3665–4990 · 10-12 4990–5498 ·
+12-UP 5498–7000).
+
+**Lo que mostraba el turno.** G10 15 % «mezclada» con 85 % de 8-10 lb, G4 4 %, y el
+aviso de solape decía «10-12 desde 3,7 kg: 1200 g». Nada de eso era mezcla: la máquina
+cambió el programa de la G10 a 8-10 · Premium a las 23:30 (99,1 % de 1.987 pz desde
+entonces) y el de la G4 a 6-8 · Premium a las 03:30 (100 % de 525 pz), y nadie lo
+registró en la app. El solape se calculaba con el programa dominante de TODO el turno
+(G10 sin dominante ≥ 90 % → caía al seteo de la app, que estaba mal).
+
+**Lo que cambió.**
+- `detectCambiosDePrograma`: por puerta, bloque de 30 min con programa ≥ 90 % distinto
+  al asignado que se mantiene en la mayoría de los bloques siguientes, y con bloques que
+  SÍ coincidían antes (si nunca coincidió es «seteo ≠ máquina», otro aviso). La tarjeta
+  lo explica y ofrece **«Registrar cambio desde las HH:MM»** (supervisor/admin).
+- `saveConfigSnapshotAt`: snapshot con el `at` de la hora de planta (nueva
+  `wallClockMsToRealIso`, inversa de la conversión real→pared) y DOS cuidados que
+  costaron una ronda cada uno: (1) el cambio se **propaga a los snapshots posteriores**
+  que no tocaron esa puerta (el inicial de las 23:38 «guardado ahora» pisaba a G10
+  desde las 00:00); (2) si el cambio queda ANTES de todos los snapshots, deja una
+  **línea base** un minuto antes con la config previa (antes del primero rige
+  `gatesUsed`, que es la config MÁS RECIENTE, y G4 se juzgaba como 6-8 a las 21:15).
+- `configTimelineFromSnapshots`: antes del primer snapshot, si ese primero es el
+  inicial (sin cambios) rige él y no `gatesUsed`.
+- Solape por el programa de CADA bloque (`programaDeBloque`); sin dominante en el
+  bloque no se atribuye a nadie, jamás al seteo de la app.
+- `rangesFingerprint` en el summary (lo escriben el segmentador y el recálculo): si
+  los rangos vigentes difieren, la página recalcula las causas P0 una vez. Con los
+  rangos nuevos dieron casi igual (365/288/245 vs 367/286/245).
+- Registrar un cambio recalcula P0 y `gatesUsed` con la línea de tiempo nueva de
+  forma explícita: el efecto de desfase solo dispara cuando cambiarían las causas, y
+  dejaba `gatesUsed` con la config vieja.
+
+**Resultado medido en el turno real** (preview con los cambios registrados desde la UI):
+coincidencia 84,3 % → **98,9 %** (16.766 / 16.946 pz), G10 15 % → 99 %, G4 4 % → 100 %,
+solape correcto («8-10 hasta 4,9 kg y 10-12 desde 4,5 kg: 400 g en común»).
+
+**Quedan para Orel/Z2:** G11 49 % más liviano que 4,99 kg (el programa 10-12 del Z2 recibe
+desde ~4,5 kg: decidir el límite en el Z2 o en la app), G12 «calibre no reconocido»
+(159 pz, la etiqueta exacta del programa 12+), G1 seteo Grado vs máquina Industrial
+(4 pz, un clic en «Adoptar»).
+
 ## 2026-09-08 · Borrado de fotos con error visible + delete en incidents/ (PR #922)
 
 Cierra los dos pendientes de #919. `deleteRepuestoFoto` y `deleteBodegaPhoto`
@@ -1269,7 +1314,6 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 - Estado: HECHO | EN REVISIÓN | PENDIENTE
 - Sigue: ...
 ```
-
 
 ## 2026-08-14 - claude - El gráfico de velocidad: alto, ejes, series a elección y zoom por gesto
 

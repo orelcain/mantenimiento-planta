@@ -19,7 +19,7 @@ import { createPublicToken, revokePublicToken } from '@/services/grader/graderPu
 import { createPublicShiftMonitor, revokePublicShiftMonitor, subscribeMonitorStats, MONITOR_TTL_CHOICES, type MonitorTtlHours, type MonitorMode, type MonitorUsageStats } from '@/services/shoplogix/publicShiftMonitor.service'
 import type { Pause, MicroDetentionsSummary } from '@/services/grader/types'
 import { getModuleRanges, saveModuleShiftSchedule } from '@/services/grader/graderModuleConfig.service'
-import { listSnapshots, saveConfigSnapshot, adoptarSeteoMaquina, type GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
+import { listSnapshots, saveConfigSnapshot, saveConfigSnapshotAt, adoptarSeteoMaquina, type GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
 import { getShiftDoc } from '@/services/grader/graderShifts.service'
 import { computeShiftTimeWindow, nowAsWallClockUTC } from '@/services/grader/graderShiftStatus'
 import type { ShiftTimeWindow } from '@/services/grader/graderShiftStatus'
@@ -27,7 +27,7 @@ import { DEFAULT_SHIFT_SCHEDULE, normalizeShiftSchedule } from '@/services/grade
 import { getShiftDisplayDateKey, getShiftMeta } from '@/services/grader/graderShiftDisplay'
 import { PurezaPorPuertaCard } from '@/components/grader/PurezaPorPuertaCard'
 import { loadGateObservations, updateDailySummary } from '@/services/grader/graderDailySummary.service'
-import { deriveGateMix, configTimelineFromSnapshots, classifyGateCauses, derivePesoPorPuerta, detectSolapesDeRango, inferirSeteoFaltante, type GateObservations, type SeteoMaquina } from '@/services/grader/graderGateObservations'
+import { deriveGateMix, configTimelineFromSnapshots, classifyGateCauses, derivePesoPorPuerta, detectSolapesDeRango, inferirSeteoFaltante, detectCambiosDePrograma, wallClockMsToRealIso, rangesFingerprint, type GateObservations, type SeteoMaquina, type CambioDePrograma } from '@/services/grader/graderGateObservations'
 import { CALIBRE_WEIGHT_RANGES } from '@/services/grader/graderAnalyticsThroughput'
 import { parseMatrixErrorString } from '@/services/grader/graderMatrixP0Causes'
 import { HeroScorecard } from '@/components/grader/HeroScorecard'
@@ -1206,6 +1206,11 @@ export function AnalisisGraderTurnoPage() {
     () => (gateObs ? detectSolapesDeRango(gateObs, gateTimeline) : undefined),
     [gateObs, gateTimeline],
   )
+  // Cambios de programa del Z2 dentro del turno que nadie registró en la app.
+  const cambiosDePrograma = useMemo(
+    () => (gateObs ? detectCambiosDePrograma(gateObs, gateTimeline) : undefined),
+    [gateObs, gateTimeline],
+  )
   // «¿Por qué cayó acá?» para la puerta que el usuario toque en la tarjeta.
   const causesFor = useMemo(
     () => (gateObs ? (gate: number) => classifyGateCauses(gateObs, gate, gateTimeline) : undefined),
@@ -1254,8 +1259,13 @@ export function AnalisisGraderTurnoPage() {
     }
   }, [summary, effectiveSummaryId, turnoGates, gateTimeline, rangosVigentes])
 
+  // Los rangos también clasifican P0 ("fuera de calibre"): si cambiaron desde
+  // que se guardó el turno, el desglose está viejo aunque las gates no.
+  // Sin huella (turnos anteriores a este cambio) también recalcula: una sola vez, porque el recálculo la escribe.
+  const rangosDesfasados = !!summary?.gate0RecordsStored && summary.rangesFingerprint !== rangesFingerprint(rangosVigentes)
+
   useEffect(() => {
-    if (!configDrift?.stale || !summary?.gate0RecordsStored || !effectiveSummaryId) return
+    if ((!configDrift?.stale && !rangosDesfasados) || !summary?.gate0RecordsStored || !effectiveSummaryId) return
     // Solo quien puede escribir el turno lo recalcula (firestore.rules exige
     // supervisor). Para el resto queda el aviso, sin intentar una escritura que
     // la regla va a rechazar en cada visita.
@@ -1264,11 +1274,11 @@ export function AnalisisGraderTurnoPage() {
     // el desfase, no reintentar en loop.
     // La clave incluye los snapshots: un cambio registrado hacia atrás (misma
     // config vigente) también merece un recálculo.
-    const attemptKey = `${effectiveSummaryId}|${configSnapshots.map((s) => s.id).join(',')}|${JSON.stringify(turnoGates)}`
+    const attemptKey = `${effectiveSummaryId}|${configSnapshots.map((s) => s.id).join(',')}|${JSON.stringify(turnoGates)}|${rangesFingerprint(rangosVigentes)}`
     if (recomputeAttemptRef.current === attemptKey) return
     recomputeAttemptRef.current = attemptKey
     void runRecompute()
-  }, [configDrift?.stale, summary?.gate0RecordsStored, effectiveSummaryId, turnoGates, configSnapshots, runRecompute, isSupervisor, isAdmin])
+  }, [configDrift?.stale, rangosDesfasados, summary?.gate0RecordsStored, effectiveSummaryId, turnoGates, configSnapshots, rangosVigentes, runRecompute, isSupervisor, isAdmin])
 
   const turnoConfig = useMemo<GraderAnalysisConfig>(() => ({
     errorThresholds: {
@@ -1346,6 +1356,35 @@ export function AnalisisGraderTurnoPage() {
       })
       .catch((err) => logger.warn('No se pudo adoptar el seteo de la máquina', { err: String(err) }))
   }, [user, dateKey, shiftLabel, turnoGates, summary?.gatesUsed, effectiveSummaryId, reloadConfigSnapshots])
+
+  /** Registrar el cambio de programa que la máquina hizo a esa hora (snapshot con ese `at`). */
+  const handleRegistrarCambio = useCallback((c: CambioDePrograma) => {
+    if (!user?.id || !dateKey || !shiftLabel) return
+    const base = gateTimeline.configAt(c.desdeMs) ?? turnoGates
+    if (!base || base.length === 0) return
+    const updated = base.map((g) => (g.gateNumber === c.gate
+      ? { ...g, assignedCalibre: c.nuevo.calibre, assignedQuality: c.nuevo.quality as GateAssignment['assignedQuality'], active: true }
+      : g))
+    const docId = `${dateKey}__${shiftLabel}`
+    const userName = `${(user as unknown as Record<string, string>).nombre ?? ''} ${(user as unknown as Record<string, string>).apellido ?? ''}`.trim() || user.email || 'Supervisor'
+    const hora = new Date(c.desdeMs).toISOString().slice(11, 16)
+    lastEmittedGatesRef.current = JSON.stringify(updated)
+    saveConfigSnapshotAt(docId, [...base], updated, { uid: user.id, name: userName }, `G${c.gate}: la máquina cambió a ${c.nuevo.calibre} · ${c.nuevo.quality} desde las ${hora} (Excel)`, wallClockMsToRealIso(c.desdeMs))
+      .then(async () => {
+        // Recalcular P0 y gatesUsed con la línea de tiempo NUEVA (no con la del
+        // closure): el efecto de desfase no siempre lo dispara y dejaba gatesUsed
+        // con la config vieja (medido 08-09: G10 seguía en 10-12).
+        const all = await listSnapshots(docId)
+        setConfigSnapshots(all)
+        const latest = all[all.length - 1]
+        if (!effectiveSummaryId || !summary || !latest) return
+        const vigentes = latest.gates.filter((g) => g.active)
+        const res = await recomputeShiftP0Causes(effectiveSummaryId, configTimelineFromSnapshots(all, summary.gatesUsed), summary.pointZeroPieces, latest.gates, rangosVigentes)
+        if (!res.ok) await updateDailySummary(effectiveSummaryId, { gatesUsed: vigentes })
+        setSummary((prev) => (prev ? { ...prev, gatesUsed: vigentes, ...(res.ok && res.causes ? { topP0Causes: res.causes } : {}) } : prev))
+      })
+      .catch((err) => logger.warn('No se pudo registrar el cambio de programa', { err: String(err) }))
+  }, [user, dateKey, shiftLabel, gateTimeline, turnoGates, effectiveSummaryId, summary, rangosVigentes])
 
   /** Igual que handleAdoptarSeteo, para todas las puertas con seteo distinto de una vez (9 turnos de agosto lo necesitan en 8-10 puertas). */
   const handleAdoptarSeteoTodas = useCallback((seteos: Record<number, SeteoMaquina>) => {
@@ -2678,6 +2717,8 @@ export function AnalisisGraderTurnoPage() {
               pesoPorPuerta={pesoPorPuerta}
               solapes={solapes}
               inferidas={seteoInferido}
+              cambios={cambiosDePrograma}
+              onRegistrarCambio={isSupervisor || isAdmin ? handleRegistrarCambio : undefined}
               turnoLabel={`${dateKey.slice(8, 10)}/${dateKey.slice(5, 7)} · ${shiftLabel}`}
             />
           )}

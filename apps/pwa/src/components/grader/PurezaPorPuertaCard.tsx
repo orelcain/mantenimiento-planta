@@ -32,7 +32,7 @@ import {
   PUREZA_OK_PCT, PUREZA_WARN_PCT, nivelDePureza, bloqueDeCaida, promedioHasta, type NivelPureza as Nivel,
 } from '@/services/grader/graderPurezaNivel'
 import type { GateAssignment } from '@/services/grader/types'
-import { CAUSA_ORDER, type CausaTipo, type GateCauses, type GateCauseGroup, type SeteoMaquina, type PesoPorPuerta, type SolapeDeRango } from '@/services/grader/graderGateObservations'
+import { CAUSA_ORDER, type CausaTipo, type GateCauses, type GateCauseGroup, type SeteoMaquina, type PesoPorPuerta, type SolapeDeRango, type CambioDePrograma } from '@/services/grader/graderGateObservations'
 
 // ⚠ Nunca combinar estas clases de color con text-caption/text-title3 dentro
 // de cn(): tailwind-merge no conoce la escala tipográfica propia, toma
@@ -113,6 +113,10 @@ interface Props {
    * etiqueta (turnos viejos). Se muestran como "inferido" hasta guardarlas.
    */
   inferidas?: Record<number, SeteoMaquina>
+  /** Cambios de programa del Z2 dentro del turno que nadie registró en la app. */
+  cambios?: CambioDePrograma[]
+  /** Registrar ese cambio como snapshot a la hora en que la máquina lo hizo. Supervisor/admin. */
+  onRegistrarCambio?: (cambio: CambioDePrograma) => void
 }
 
 /** Desde este % de piezas fuera del rango por peso, la baldosa lo dice. */
@@ -165,7 +169,7 @@ const CAUSA_COLOR: Record<'dark' | 'light', Record<CausaTipo | 'ok', string>> = 
 }
 const CHART_TEXT = { light: { axis: '#41566a', grid: '#c3d7e9', tipBg: '#ffffff', tipText: '#16242f', tipBorder: '#c3d7e9' }, dark: { axis: '#94a3b8', grid: '#22384a', tipBg: '#1e293b', tipText: '#e2e8f0', tipBorder: '#334155' } }
 
-export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets, causesFor, seteoDistinto, onAdoptarSeteo, onAdoptarSeteoTodas, pesoPorPuerta, solapes, inferidas }: Props) {
+export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets, causesFor, seteoDistinto, onAdoptarSeteo, onAdoptarSeteoTodas, pesoPorPuerta, solapes, inferidas, cambios, onRegistrarCambio }: Props) {
   const navigate = useNavigate()
   const [copiado, setCopiado] = useState(false)
 
@@ -236,6 +240,7 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets,
     conteo.noRec > 0 ? `${conteo.noRec} con calibre no reconocido` : '',
     conPesoFuera > 0 ? `${conPesoFuera} con peso fuera de rango` : '',
     (solapes?.length ?? 0) > 0 ? 'programas solapados en el Z2' : '',
+    (cambios?.length ?? 0) > 0 ? `${cambios!.length} cambio${cambios!.length > 1 ? 's' : ''} de programa sin registrar` : '',
   ].filter(Boolean).join(' · ') || (conJuicio ? 'Todas puras' : 'Sin seteo guardado')
   // Sin ninguna puerta juzgada no hay "Todas puras" que valga.
   const pillToneFinal: PillTone = !conJuicio ? 'neutral' : pillTone
@@ -247,6 +252,9 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets,
         ? `Coinciden con lo asignado: ${fmtPz(totals.match)} / ${fmtPz(totals.pieces)} pz (${fmtPct(totals.purityPct)})`
         : '',
     ]
+    for (const c of cambios ?? []) {
+      lineas.push(`G${c.gate}: la máquina cambió el programa a ${c.nuevo.calibre} · ${c.nuevo.quality} desde las ${horaBloque(gateMix, c.desde)} (${fmtPct(c.nuevo.pct)} de ${fmtPz(c.piezasDesde)} pz); el seteo dice ${c.asignado.calibre} · ${c.asignado.quality}`)
+    }
     for (const so of solapes ?? []) {
       lineas.push(`Programas solapados en el Z2: ${so.calibreA} recibe hasta ${fmtKg(so.hastaA)} y ${so.calibreB} desde ${fmtKg(so.desdeB)} (${so.gramos} g en común; ${fmtPz(so.piezasA)} pz en ${so.calibreA}, ${fmtPz(so.piezasB)} pz en ${so.calibreB})`)
     }
@@ -418,6 +426,8 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets,
             seteo={seteoDistinto?.[detalle.gate]}
             onAdoptar={onAdoptarSeteo && seteoDistinto?.[detalle.gate] ? () => onAdoptarSeteo(detalle.gate, seteoDistinto[detalle.gate]!) : undefined}
             peso={pesoPorPuerta?.[detalle.gate]}
+            cambio={cambios?.find((c) => c.gate === detalle.gate)}
+            onRegistrarCambio={onRegistrarCambio}
           />
         )}
 
@@ -548,9 +558,10 @@ function PorPeso({ peso }: { peso: PesoPorPuerta }) {
   )
 }
 
-function DetalleGate({ mix, entry, cfg, changeBuckets, causas, seteo, onAdoptar, peso }: {
+function DetalleGate({ mix, entry, cfg, changeBuckets, causas, seteo, onAdoptar, peso, cambio, onRegistrarCambio }: {
   mix: GateMix; entry: GateMixEntry; cfg?: GateAssignment; changeBuckets?: number[]; causas?: GateCauses | null
   seteo?: SeteoMaquina; onAdoptar?: () => void; peso?: PesoPorPuerta
+  cambio?: CambioDePrograma; onRegistrarCambio?: (c: CambioDePrograma) => void
 }) {
   const { isDark } = useTheme()
   const nivel = nivelDePureza(entry.purityPct)
@@ -581,6 +592,24 @@ function DetalleGate({ mix, entry, cfg, changeBuckets, causas, seteo, onAdoptar,
         </p>
         <span className={`text-footnote font-semibold ${inkVeredicto}`}>{veredicto}</span>
       </div>
+
+      {cambio && (
+        <div className="space-y-2" data-testid="pureza-cambio">
+          <p className="text-footnote">
+            La máquina cambió el programa de esta puerta a{' '}
+            <span className="font-semibold">{cambio.nuevo.calibre} · {cambio.nuevo.quality}</span> desde las{' '}
+            <span className="tabular-nums font-semibold">{horaBloque(mix, cambio.desde)}</span>{' '}
+            (<span className="tabular-nums">{fmtPct(cambio.nuevo.pct)}</span> de las {fmtPz(cambio.piezasDesde)} pz desde entonces);
+            el seteo de la app sigue diciendo {cambio.asignado.calibre} · {cambio.asignado.quality}. No es mezcla: es un cambio sin
+            registrar. Registrarlo desde esa hora corrige la pureza y las causas de P0.
+          </p>
+          {onRegistrarCambio && (
+            <Button variant="tinted" onClick={() => onRegistrarCambio(cambio)}>
+              Registrar cambio desde las {horaBloque(mix, cambio.desde)}
+            </Button>
+          )}
+        </div>
+      )}
 
       {seteo?.noReconocido && (
         <div className="space-y-2" data-testid="pureza-seteo">

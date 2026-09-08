@@ -1,4 +1,4 @@
-import { doc, collection, getDocs, setDoc, query, orderBy } from 'firebase/firestore'
+import { doc, collection, getDocs, setDoc, updateDoc, query, orderBy } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import type { GateAssignment } from './types'
 
@@ -80,6 +80,66 @@ export async function saveConfigSnapshot(
   }
   const ref = doc(db, 'graderShifts', shiftDocId, SUBCOLLECTION, snapshot.id)
   await setDoc(ref, snapshot)
+  return snapshot
+}
+
+/**
+ * Registrar un cambio que la máquina hizo a una hora dada (detectado en el
+ * Excel): el snapshot lleva ese `at`, no "ahora", para que la pureza y las
+ * causas P0 juzguen el antes y el después con la config correcta.
+ */
+export async function saveConfigSnapshotAt(
+  shiftDocId: string,
+  /** Config vigente a esa hora (de la línea de tiempo), base del diff. */
+  baseGates: GateAssignment[],
+  newGates: GateAssignment[],
+  user: { uid: string; name: string },
+  reason: string,
+  atIso: string,
+): Promise<GateConfigSnapshot> {
+  const changes = computeGatesDiff(baseGates, newGates)
+  const all = await listSnapshots(shiftDocId)
+  // Si el cambio queda ANTES de todos los snapshots, la línea de tiempo perdería
+  // la config previa (antes del primero rige gatesUsed, que es la MÁS RECIENTE).
+  // Se deja una línea base un minuto antes con la config vigente hasta entonces.
+  if (all.length === 0 || atIso < all[0]!.at) {
+    const base: GateConfigSnapshot = {
+      id: crypto.randomUUID(), shiftDocId, at: new Date(Date.parse(atIso) - 60_000).toISOString(),
+      changedBy: user, gates: [...baseGates], changes: [], reason: 'Config inicial (vigente antes del primer cambio registrado)',
+    }
+    await setDoc(doc(db, 'graderShifts', shiftDocId, SUBCOLLECTION, base.id), base)
+  }
+  const snapshot: GateConfigSnapshot = {
+    id: crypto.randomUUID(),
+    shiftDocId,
+    at: atIso,
+    changedBy: user,
+    gates: [...newGates],
+    changes,
+    reason,
+  }
+  await setDoc(doc(db, 'graderShifts', shiftDocId, SUBCOLLECTION, snapshot.id), snapshot)
+  // El cambio rige desde esa hora en adelante: los snapshots POSTERIORES que no
+  // tocaron esas puertas (el inicial de las 23:38 guardado "ahora", una
+  // adopción, otro cambio) tienen que llevarlo también, si no lo pisan.
+  // Medido 08-09: registrar G10→8-10 a las 23:30 con el inicial a las 23:38
+  // dejaba a G10 en 10-12 otra vez desde las 00:00.
+  const tocadas = new Set(changes.map((c) => c.gateNumber))
+  if (tocadas.size === 0) return snapshot
+  const baseBy = new Map(baseGates.map((g) => [g.gateNumber, g]))
+  const nuevoBy = new Map(newGates.map((g) => [g.gateNumber, g]))
+  const mismo = (a: GateAssignment | undefined, b: GateAssignment | undefined) =>
+    !!a && !!b && a.assignedCalibre === b.assignedCalibre && a.assignedQuality === b.assignedQuality && a.active === b.active
+  for (const later of all) {
+    if (later.at <= atIso || later.id === snapshot.id) continue
+    let cambio = false
+    const gates = later.gates.map((g) => {
+      if (!tocadas.has(g.gateNumber) || !mismo(g, baseBy.get(g.gateNumber))) return g
+      cambio = true
+      return { ...g, ...nuevoBy.get(g.gateNumber)! }
+    })
+    if (cambio) await updateDoc(doc(db, 'graderShifts', shiftDocId, SUBCOLLECTION, later.id), { gates })
+  }
   return snapshot
 }
 

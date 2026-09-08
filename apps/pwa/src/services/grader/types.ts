@@ -657,6 +657,11 @@ export interface GraderDailySummary {
    * graderGateMix.ts.
    */
   gateMix?: import('./graderGateMix').GateMix;
+  /**
+   * Huella de los rangos de calibre con los que se clasificaron las causas P0
+   * (`rangesFingerprint`). Si los rangos vigentes cambian, el detalle recalcula.
+   */
+  rangesFingerprint?: string;
   /** Nombres de los archivos Excel fuente */
   sourceFileNames?: string[];
   /** ID del lote de carga masiva que generó este resumen */

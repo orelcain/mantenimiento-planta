@@ -134,6 +134,26 @@ export function realIsoToWallClockMs(iso: string, timeZone: string = PLANT_TZ): 
   return Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second'))
 }
 
+/**
+ * Inversa de `realIsoToWallClockMs`: un instante en el marco wall-clock del
+ * módulo → ISO real UTC, según el huso de la planta. Necesario para registrar
+ * un cambio de config "a las 23:30 hora de planta" en `GateConfigSnapshot.at`.
+ */
+export function wallClockMsToRealIso(wallMs: number, timeZone: string = PLANT_TZ): string {
+  // El desfase real→pared en ese momento (constante salvo en el cambio de hora).
+  let real = wallMs
+  for (let i = 0; i < 2; i++) {
+    const offset = realIsoToWallClockMs(new Date(real).toISOString(), timeZone) - real
+    real = wallMs - offset
+  }
+  return new Date(real).toISOString()
+}
+
+/** Huella de los rangos de calibre: si cambia, las causas P0 "fuera de calibre" hay que recalcularlas. */
+export function rangesFingerprint(ranges: readonly CalibreWeightRange[]): string {
+  return [...ranges].map((r) => `${r.calibre}:${r.minGrams}-${r.maxGrams}`).sort().join('|')
+}
+
 // ── Observación ──────────────────────────────────────────────────────────────
 
 export function computeGateObservations(records: readonly PieceRecord[]): GateObservations | null {
@@ -236,8 +256,15 @@ export function configTimelineFromSnapshots(
     .map((s) => ({ ms: realIsoToWallClockMs(s.at, timeZone), gates: s.gates, isChange: !s.synthetic && s.changes.length > 0 }))
     .filter((p) => Number.isFinite(p.ms))
     .sort((a, b) => a.ms - b.ms)
+  // Antes del primer snapshot: si ese primero es el INICIAL (sin cambios, el
+  // que se guarda al cargar el Excel), rige él y no `fallback` (gatesUsed), que
+  // la página mantiene como la config MÁS RECIENTE y por eso contamina el
+  // tramo previo. Medido 08-09: registrar G4→6-8 a las 03:30 hacía que G4
+  // fuera 6-8 también a las 21:15.
+  const primero = [...snapshots].sort((a, b) => a.at.localeCompare(b.at))[0]
+  const inicial = primero && !primero.synthetic && primero.changes.length === 0 ? primero.gates : fallback
   const configAt: ConfigAt = (ms) => {
-    let cur: readonly GateAssignment[] | undefined = fallback
+    let cur: readonly GateAssignment[] | undefined = inicial
     for (const p of points) {
       if (p.ms <= ms) cur = p.gates
       else break
@@ -509,6 +536,95 @@ export function programaDominante(entry: GateObservationsEntry): SeteoMaquina | 
   return { calibre, quality, pct }
 }
 
+/** Combinación dominante (≥ 90 %) de UN bloque; null si el bloque está mezclado o vacío. */
+export function programaDeBloque(bins: ComboCounts | null): SeteoMaquina | null {
+  if (!bins) return null
+  const tally = new Map<string, number>()
+  let total = 0
+  for (const [key, n] of Object.entries(bins)) {
+    const c = splitCombo(key)
+    if (c.calibre === OTROS) continue
+    total += n
+    const k = `${c.calibre}|${c.quality}`
+    tally.set(k, (tally.get(k) ?? 0) + n)
+  }
+  if (total === 0) return null
+  const [top, n] = [...tally.entries()].sort((a, b) => b[1] - a[1])[0] ?? ['', 0]
+  const pct = r1((n / total) * 100)
+  if (pct < SETEO_DOMINANCIA_PCT) return null
+  const [calibre, quality] = top.split('|') as [string, string]
+  if (calibre === SIN_DATO || quality === SIN_DATO || calibre === ANY_CALIBRE) return null
+  return { calibre, quality, pct }
+}
+
+/**
+ * Cambio de programa del Z2 dentro del turno que nadie registró en la app:
+ * la puerta venía recibiendo lo asignado y desde cierto bloque recibe otra
+ * combinación (≥ 90 % del bloque) que se mantiene en la mayoría de los
+ * bloques siguientes. Medido 08-09 (2026-09-07 Turno 1): la G10 recibió 10-12
+ * hasta las 23:30 y 8-10 desde entonces (85 % de sus piezas); sin el cambio
+ * registrado salía "mezclada 15 %" y contaminaba el aviso de solape.
+ */
+export interface CambioDePrograma {
+  gate: number
+  /** Índice del bloque desde el que rige el programa nuevo, y su inicio (wall-clock ms). */
+  desde: number
+  desdeMs: number
+  asignado: { calibre: string; quality: string }
+  nuevo: SeteoMaquina
+  /** Piezas de la puerta desde el cambio, y cuántas de ellas son del programa nuevo. */
+  piezasDesde: number
+  piezasNuevo: number
+}
+
+export function detectCambiosDePrograma(obs: GateObservations, timeline: ConfigTimeline): CambioDePrograma[] {
+  const size = obs.bucketMinutes * 60_000
+  const from = Date.parse(obs.bucketsFrom)
+  const out: CambioDePrograma[] = []
+  for (const e of obs.gates) {
+    // Bloque a bloque: ¿el programa del bloque coincide con lo asignado?
+    const estados = e.byBucket.map((b, i) => {
+      if (!b) return null
+      const cfg = timeline.configAt(from + i * size)?.find((g) => g.gateNumber === e.gate && g.active)
+      if (!cfg) return null
+      const p = programaDeBloque(b)
+      const coincide = p != null && (cfg.assignedCalibre === ANY_CALIBRE || p.calibre === cfg.assignedCalibre) && p.quality === cfg.assignedQuality
+      return { cfg, p, coincide }
+    })
+    const conDato = estados.map((s, i) => (s ? i : -1)).filter((i) => i >= 0)
+    if (conDato.length < 3) continue
+    // Debe haber bloques que coinciden ANTES del cambio: si nunca coincidió, es seteo ≠ máquina (otro aviso).
+    const primerOk = conDato.find((i) => estados[i]!.coincide)
+    if (primerOk == null) continue
+    for (const i of conDato) {
+      if (i <= primerOk) continue
+      const s = estados[i]!
+      if (s.coincide || !s.p) continue
+      // ¿El programa nuevo se mantiene en la mayoría de los bloques siguientes con dato?
+      const siguientes = conDato.filter((j) => j >= i)
+      const iguales = siguientes.filter((j) => { const q = estados[j]!.p; return q && q.calibre === s.p!.calibre && q.quality === s.p!.quality })
+      if (iguales.length * 2 < siguientes.length) continue
+      let piezasDesde = 0
+      let piezasNuevo = 0
+      for (const j of siguientes) {
+        for (const [key, n] of Object.entries(e.byBucket[j]!)) {
+          piezasDesde += n
+          const c = splitCombo(key)
+          if (c.calibre === s.p.calibre && c.quality === s.p.quality) piezasNuevo += n
+        }
+      }
+      out.push({
+        gate: e.gate, desde: i, desdeMs: from + i * size,
+        asignado: { calibre: s.cfg.assignedCalibre, quality: s.cfg.assignedQuality },
+        nuevo: { calibre: s.p.calibre, quality: s.p.quality, pct: r1((piezasNuevo / Math.max(1, piezasDesde)) * 100) },
+        piezasDesde, piezasNuevo,
+      })
+      break
+    }
+  }
+  return out
+}
+
 /**
  * Turnos sin seteo guardado (los 23 de la temporada pasada): la puerta que no
  * tiene asignación en NINGÚN bloque toma como asignación lo que el Z2 le
@@ -573,18 +689,18 @@ const SOLAPE_MIN_GRAMOS = 200
  * Medido 07-09: las puertas 8-10 recibían hasta 4,98 kg y las 10-12 desde
  * 4,59 kg: 400 g en común, y el pescado de ese tramo cae en cualquiera.
  */
-export function detectSolapesDeRango(obs: GateObservations, timeline: ConfigTimeline): SolapeDeRango[] {
-  const size = obs.bucketMinutes * 60_000
-  const from = Date.parse(obs.bucketsFrom)
+// `_timeline` ya no decide la atribución (va por el programa de cada bloque); se conserva la firma.
+export function detectSolapesDeRango(obs: GateObservations, _timeline: ConfigTimeline): SolapeDeRango[] {
   const binG = obs.weightBinGrams ?? LEGACY_WEIGHT_BIN_G
   const hist = new Map<string, Map<number, number>>()
   for (const e of obs.gates) {
     if (!e.weightByBucket) continue
-    const programa = programaDominante(e)?.calibre
     e.weightByBucket.forEach((bins, i) => {
       if (!bins) return
-      const cfg = timeline.configAt(from + i * size)?.find((g) => g.gateNumber === e.gate && g.active)
-      const calibre = programa ?? (cfg && cfg.assignedCalibre !== ANY_CALIBRE ? cfg.assignedCalibre : undefined)
+      // El programa del BLOQUE (la G10 fue 10-12 hasta las 23:30 y 8-10 después):
+      // sin dominante en el bloque, no se atribuye a nadie — jamás al seteo de
+      // la app, que puede estar mal.
+      const calibre = programaDeBloque(e.byBucket[i] ?? null)?.calibre
       if (!calibre) return
       let h = hist.get(calibre)
       if (!h) { h = new Map(); hist.set(calibre, h) }

@@ -26,7 +26,7 @@ import { db } from '../firebase'
 import { classifyRecordToMatrix, CALIBRE_WEIGHT_RANGES } from './graderAnalytics'
 import { updateDailySummary } from './graderDailySummary.service'
 import type { GateAssignment, Gate0Record, GraderDailySummary, CalibreWeightRange } from './types'
-import { parseWallClock, type ConfigTimeline } from './graderGateObservations'
+import { parseWallClock, rangesFingerprint, type ConfigTimeline } from './graderGateObservations'
 
 const COLLECTION = 'graderDailySummaries'
 const META_SUB = 'meta'
@@ -202,6 +202,7 @@ export async function recomputeShiftP0Causes(
     topP0Causes: causes,
     gatesUsed: vigentes,
     reclassifiedAt: new Date().toISOString(),
+    rangesFingerprint: rangesFingerprint(ranges?.length ? ranges : CALIBRE_WEIGHT_RANGES),
   } as Partial<GraderDailySummary> & Record<string, unknown>)
   return { ok: true, causes }
 }
