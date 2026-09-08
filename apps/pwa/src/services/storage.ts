@@ -325,8 +325,16 @@ export async function deleteBodegaPhoto(url: string): Promise<void> {
 // ── Fotos reales de repuestos (catálogo) ──
 
 /**
+ * Segmento fijo para repuestos SIN equipo asignado (`equipos: []`). Mantiene la
+ * forma de 4 segmentos que exige storage.rules; el doc del repuesto sigue
+ * siendo la fuente de verdad de a qué pieza pertenece la foto.
+ */
+export const SIN_EQUIPO_STORAGE_SEGMENT = 'sin-equipo'
+
+/**
  * Sube una foto real de un repuesto a Storage.
  * Ruta: repuestos/{machineId}/{repuestoId}/fotos/{uuid}.webp
+ * (machineId = nodeId del equipo, o SIN_EQUIPO_STORAGE_SEGMENT si no tiene).
  */
 export async function uploadRepuestoFoto(
   machineId: string,
