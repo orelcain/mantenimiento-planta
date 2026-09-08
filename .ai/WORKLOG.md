@@ -49,6 +49,33 @@ piel Apple. Gotcha: `cn()` (tailwind-merge) DESCARTA `text-caption` /
 `text-title3` si en la misma llamada va un `text-ink-*` — toma el tamaño
 como color y gana el último; esos pares van en template string.
 
+## 2026-09-08 · Primera carga parcial real con todo en prod + el wizard arranca con el último seteo conocido (PR #918)
+
+**Carga parcial del turno en curso (02:39, 2026-09-07 Turno 1, 21:15→05:45)**,
+revisada en Firestore y en la app con la sesión de Orel. Funcionó todo lo
+de #905–#917: summary (5.835 pz + 59 no aplicables, P0 199 = 3,41 %),
+snapshot inicial, registros P0, `meta/gateMix` v2 con bins de 100 g, la celda
+del turno vivo en la matriz del wizard (26.889 ciclos, "termina otro día") y
+la tarjeta EN VIVO con "piezas hasta las 00:00".
+
+**Hueco confirmado en vivo**: el snapshot inicial salió del BORRADOR del
+wizard: 8 de 12 puertas "seteo ≠ máquina" y 74 piezas de P0 "fuera de
+calidad" que no existían. Se corrigió con "Adoptar seteo de la máquina en 8
+puertas" (todas al 100 %, P0 recalculado solo). Fix: `graderSeteoInicial.ts`
+(`pickUltimoSeteo` + `elegirSeteoInicial`): al guardar un turno SIN snapshot,
+el wizard usa el último `gatesUsed` de la línea (21 días; la página lo
+mantiene al día con snapshots y adopciones) salvo que el usuario haya tocado
+las gates en esa sesión; la razón del snapshot lo dice ("último seteo
+conocido de la línea"). 3 tests (793 del módulo). Sin prueba end-to-end:
+se verá en la próxima carga.
+
+**Dato del Z2 que salió de esta carga**: G10 y G11 (10-12) tienen 73–78 %
+de piezas de 4,6–5,0 kg → el 10-12 del Z2 EMPIEZA en 4,59 kg, no en 5,0;
+con el 8-10 hasta 5,0 (Orel) los dos programas se solapan. La app no puede
+tener los dos límites: decidir en el Z2 y espejarlo en Configuración del
+Grader. G12 sigue recibiendo piezas con etiqueta que la app no reconoce
+(programa 12+): ver su nombre en el Z2 y sumarlo a `normalizeCalibre`.
+
 ## 2026-09-07 · Ronda de pulido 5 · seteo inferido, solape por programa, etiquetas crudas (PR #917)
 
 Recorrido de lo que nadie miró: un turno de febrero, uno de agosto con el
