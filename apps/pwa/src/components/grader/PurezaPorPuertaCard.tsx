@@ -25,14 +25,16 @@ import { useTheme } from '@/hooks/useTheme'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui'
 import { Pill, type PillTone } from '@/components/piel/Pill'
 import { Button } from '@/components/piel/Button'
+import { Tag, type TagTone } from '@/components/piel/Tag'
 import { cn } from '@/lib/utils'
 import { copiarTexto } from '@/lib/clipboard'
-import { gateMixTotals, ANY_CALIBRE, type GateMix, type GateMixEntry } from '@/services/grader/graderGateMix'
+import { gateMixTotals, ANY_CALIBRE, SIN_DATO, type GateMix, type GateMixEntry } from '@/services/grader/graderGateMix'
 import {
   PUREZA_OK_PCT, PUREZA_WARN_PCT, nivelDePureza, bloqueDeCaida, promedioHasta, type NivelPureza as Nivel,
 } from '@/services/grader/graderPurezaNivel'
-import type { GateAssignment } from '@/services/grader/types'
-import { CAUSA_ORDER, type CausaTipo, type GateCauses, type GateCauseGroup, type SeteoMaquina, type PesoPorPuerta, type SolapeDeRango, type CambioDePrograma } from '@/services/grader/graderGateObservations'
+import type { GateAssignment, CalibreWeightRange } from '@/services/grader/types'
+import { CAUSA_ORDER, normalizarCalibre, dimensionIntrusa, bloqueDe, parseWallClock, type CausaTipo, type GateCauses, type GateCauseGroup, type SeteoMaquina, type PesoPorPuerta, type SolapeDeRango, type CambioDePrograma, type MezclaPuerta, type MapaPeso, type DimensionMezcla, type GateObservations, type ComposicionCombo } from '@/services/grader/graderGateObservations'
+import type { FirestorePieceRecord } from '@/services/grader/graderDailySummary.service'
 
 // ⚠ Nunca combinar estas clases de color con text-caption/text-title3 dentro
 // de cn(): tailwind-merge no conoce la escala tipográfica propia, toma
@@ -117,9 +119,23 @@ interface Props {
   cambios?: CambioDePrograma[]
   /** Registrar ese cambio como snapshot a la hora en que la máquina lo hizo. Supervisor/admin. */
   onRegistrarCambio?: (cambio: CambioDePrograma) => void
+  /** Mezcla en los tres ejes (calibre · calidad · conservación), derivada de la observación. */
+  mezcla?: Record<number, MezclaPuerta>
+  /** Observación cruda del turno (para juzgar piezas sueltas con la misma regla). */
+  obs?: GateObservations
+  /** Mapa peso × tiempo de una puerta, 0 lecturas. */
+  mapaPeso?: (gate: number) => MapaPeso | null
+  /** Piezas ya cargadas por puerta (nivel 2, bajo demanda). */
+  piezas?: Record<number, FirestorePieceRecord[]>
+  piezasCargando?: number | null
+  onCargarPiezas?: (gate: number) => void
+  /** Rangos de calibre vigentes: cada pieza se juzga «fuera de rango» contra el calibre que regía en SU bloque. */
+  rangos?: CalibreWeightRange[]
 }
 
 /** Desde este % de piezas fuera del rango por peso, la baldosa lo dice. */
+/** Un intruso de ≥ 2 % se nombra en el mosaico aunque la puerta siga en verde: es lo que se vino a ver. */
+const INTRUSO_VISIBLE_PCT = 2
 const PESO_FUERA_AVISO_PCT = 5
 /** Con menos piezas con peso, un par de pescados ya son un 20 %: no se opina. */
 const PESO_MIN_PIEZAS = 30
@@ -169,7 +185,7 @@ const CAUSA_COLOR: Record<'dark' | 'light', Record<CausaTipo | 'ok', string>> = 
 }
 const CHART_TEXT = { light: { axis: '#41566a', grid: '#c3d7e9', tipBg: '#ffffff', tipText: '#16242f', tipBorder: '#c3d7e9' }, dark: { axis: '#94a3b8', grid: '#22384a', tipBg: '#1e293b', tipText: '#e2e8f0', tipBorder: '#334155' } }
 
-export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets, causesFor, seteoDistinto, onAdoptarSeteo, onAdoptarSeteoTodas, pesoPorPuerta, solapes, inferidas, cambios, onRegistrarCambio }: Props) {
+export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets, causesFor, seteoDistinto, onAdoptarSeteo, onAdoptarSeteoTodas, pesoPorPuerta, solapes, inferidas, cambios, onRegistrarCambio, mezcla, obs, mapaPeso, piezas, piezasCargando, onCargarPiezas, rangos }: Props) {
   const navigate = useNavigate()
   const [copiado, setCopiado] = useState(false)
 
@@ -183,29 +199,44 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets,
   const gateCfg = useMemo(() => new Map((gates ?? []).map((g) => [g.gateNumber, g])), [gates])
 
   const totals = useMemo(() => gateMixTotals(gateMix), [gateMix])
+  // Con mezcla en tres ejes, el titular cuenta lo que coincide en los tres.
+  const totMezcla = useMemo(() => {
+    if (!mezcla) return null
+    let coinciden = 0, juzgadas = 0
+    for (const m of Object.values(mezcla)) {
+      if (m.pct == null) continue
+      coinciden += m.coinciden
+      juzgadas += Math.round((m.coinciden * 100) / Math.max(0.01, m.pct))
+    }
+    return juzgadas > 0 ? { coinciden, juzgadas, pct: (coinciden / juzgadas) * 100 } : null
+  }, [mezcla])
+  const pctDe = (e: GateMixEntry) => mezcla?.[e.gate]?.pct ?? e.purityPct
   // Una puerta con seteo distinto no cuenta como mezclada: es otra cosa.
   const conteo = useMemo(() => {
-    let crit = 0, warn = 0, seteo = 0, noRec = 0
+    let crit = 0, warn = 0, seteo = 0, noRec = 0, intrusas = 0
     for (const e of gateMix.gates) {
       if (seteoDistinto?.[e.gate]) { if (seteoDistinto[e.gate]!.noReconocido) noRec++; else seteo++; continue }
-      const n = nivelDePureza(e.purityPct)
+      const n = nivelDePureza(pctDe(e))
       if (n === 'crit') crit++
       else if (n === 'warn') warn++
+      for (const c of mezcla?.[e.gate]?.composicion ?? []) if (c.intrusa) intrusas += c.pieces
     }
-    return { crit, warn, seteo, noRec }
-  }, [gateMix, seteoDistinto])
+    return { crit, warn, seteo, noRec, intrusas }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gateMix, seteoDistinto, mezcla])
 
   // Arranca abierta en la peor puerta MEZCLADA; si no hay, en la primera con
   // seteo distinto: es lo que el usuario vino a ver.
   const peor = useMemo(() => {
-    const conPureza = gateMix.gates.filter((e) => e.purityPct != null && !seteoDistinto?.[e.gate])
+    const conPureza = gateMix.gates.filter((e) => pctDe(e) != null && !seteoDistinto?.[e.gate])
     if (conPureza.length > 0) {
-      const min = conPureza.reduce((a, b) => (b.purityPct! < a.purityPct! ? b : a))
-      if (nivelDePureza(min.purityPct) !== 'ok') return min.gate
+      const min = conPureza.reduce((a, b) => (pctDe(b)! < pctDe(a)! ? b : a))
+      if (nivelDePureza(pctDe(min)) !== 'ok') return min.gate
     }
     const conSeteo = gateMix.gates.find((e) => seteoDistinto?.[e.gate])
     return conSeteo?.gate ?? null
-  }, [gateMix, seteoDistinto])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gateMix, seteoDistinto, mezcla])
   const [seleccion, setSeleccion] = useState<number | null>(peor)
   const detalle = seleccion != null ? byGate.get(seleccion) : undefined
   const causas = useMemo(() => (detalle && causesFor ? causesFor(detalle.gate) : null), [detalle, causesFor])
@@ -234,7 +265,8 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets,
   const nInferidas = Object.keys(inferidas ?? {}).length
   const conJuicio = gateMix.gates.some((e) => e.purityPct != null)
   const resumenPill = [
-    conteo.crit > 0 ? `${conteo.crit} mezclada${conteo.crit > 1 ? 's' : ''}` : '',
+    conteo.crit > 0 ? `${conteo.crit} con mezcla` : '',
+    conteo.intrusas > 0 ? `${fmtPz(conteo.intrusas)} pz intrusas` : '',
     conteo.warn > 0 ? `${conteo.warn} en atención` : '',
     conteo.seteo > 0 ? `${conteo.seteo} con seteo ≠ máquina` : '',
     conteo.noRec > 0 ? `${conteo.noRec} con calibre no reconocido` : '',
@@ -308,7 +340,14 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets,
           Pureza por puerta
           <Pill tone={pillToneFinal} dot className="ml-auto">{resumenPill}</Pill>
         </CardTitle>
-        {totals.purityPct != null && (
+        {totMezcla ? (
+          <p className="text-footnote text-muted-foreground">
+            Coinciden en calibre, calidad y conservación:{' '}
+            <span className="text-foreground font-medium tabular-nums">{fmtPz(totMezcla.coinciden)} / {fmtPz(totMezcla.juzgadas)} pz</span>
+            {' '}<span className="tabular-nums">({fmtPct(totMezcla.pct)})</span>
+            {datosHasta && <> · piezas hasta las <span className="tabular-nums text-foreground">{datosHasta}</span></>}
+          </p>
+        ) : totals.purityPct != null && (
           <p className="text-footnote text-muted-foreground">
             Coinciden con lo asignado:{' '}
             <span className="text-foreground font-medium tabular-nums">{fmtPz(totals.match)} / {fmtPz(totals.pieces)} pz</span>
@@ -324,13 +363,16 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets,
           {gateNumbers.map((n) => {
             const e = byGate.get(n)
             const seteo = seteoDistinto?.[n]
-            const nivel = nivelDePureza(e?.purityPct)
+            const m = mezcla?.[n]
+            const pctTile = m?.pct ?? e?.purityPct ?? null
+            const nivel = nivelDePureza(pctTile)
             const activa = seleccion === n
-            const intruso = e ? textoIntruso(e, true) : null
+            const intruso = m?.peorIntruso ? textoDimension(m.peorIntruso) : e ? textoIntruso(e, true) : null
             const ink = seteo ? 'text-ink-info' : NIVEL_INK[nivel]
             const dot = seteo ? 'bg-ink-info' : NIVEL_BG[nivel]
             const pw = pesoPorPuerta?.[n]
             const pesoFuera = pesoAvisa(pw) && !seteo ? pw : null
+            const linea1 = m?.dominante && !seteo ? etiquetaCombo(m.dominante) : etiquetaAsignacion(e, gateCfg.get(n))
             return (
               <button
                 key={n}
@@ -352,16 +394,16 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets,
                   )}
                 </span>
                 <span className={`text-title3 tabular-nums ${ink}`}>
-                  {e?.purityPct != null ? fmtPctEntero(e.purityPct) : '—'}
+                  {pctTile != null ? fmtPctEntero(pctTile) : '—'}
                 </span>
                 <span className="w-full text-caption leading-tight text-foreground">
-                  {etiquetaAsignacion(e, gateCfg.get(n))}
+                  {linea1}
                   {inferidas?.[n] && <span className="text-muted-foreground"> · inferido</span>}
                 </span>
                 {seteo ? (
                   <span className="w-full text-caption font-medium leading-tight text-ink-info">{seteo.noReconocido ? 'calibre no reconocido' : 'seteo ≠ máquina'}</span>
-                ) : intruso && nivel !== 'ok' ? (
-                  <span className={`w-full text-caption font-medium leading-tight ${NIVEL_INK[nivel]}`}>{intruso}</span>
+                ) : intruso && (nivel !== 'ok' || (m?.peorIntruso && m.peorIntruso.pct >= INTRUSO_VISIBLE_PCT)) ? (
+                  <span className={`w-full text-caption font-medium leading-tight ${m?.peorIntruso ? DIM_INK[m.peorIntruso.dim] : NIVEL_INK[nivel]}`}>{intruso}</span>
                 ) : pesoFuera ? (
                   <span className="w-full text-caption font-medium leading-tight text-ink-warn">{fmtPctEntero(pesoFuera.pctFuera)} fuera por peso</span>
                 ) : (
@@ -369,14 +411,16 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets,
                     {e ? `${fmtPz(e.pieces)} pz` : 'sin piezas'}
                   </span>
                 )}
+                {m && m.composicion.length > 0 && !seteo && <TiraComposicion composicion={m.composicion} alta={false} />}
               </button>
             )
           })}
         </div>
 
         <p className="text-footnote text-muted-foreground">
-          Pureza = piezas con el calibre <span className="text-foreground">y</span> la calidad asignados ÷ piezas que
-          cayeron en la puerta. ≥{PUREZA_OK_PCT} % pura · {PUREZA_WARN_PCT}–{PUREZA_OK_PCT} % en atención · &lt;{PUREZA_WARN_PCT} % mezclada.
+          {mezcla
+            ? <>El número es el % de piezas que coinciden en <span className="text-foreground">calibre, calidad y conservación</span>. Calibre y calidad se juzgan contra el seteo; la conservación, si el seteo no la fija, contra la dominante de cada bloque de 30 min (un cambio de lote no es mezcla). ≥{PUREZA_OK_PCT} % pura · {PUREZA_WARN_PCT}–{PUREZA_OK_PCT} % en atención · &lt;{PUREZA_WARN_PCT} % con mezcla.</>
+            : <>Pureza = piezas con el calibre <span className="text-foreground">y</span> la calidad asignados ÷ piezas que cayeron en la puerta. ≥{PUREZA_OK_PCT} % pura · {PUREZA_WARN_PCT}–{PUREZA_OK_PCT} % en atención · &lt;{PUREZA_WARN_PCT} % mezclada.</>}
           {' '}Si ≥ 90 % de las piezas llevan una misma combinación distinta a la asignada, no es mezcla: es <span className="text-ink-info">seteo ≠ máquina</span>.
         </p>
 
@@ -428,6 +472,13 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets,
             peso={pesoPorPuerta?.[detalle.gate]}
             cambio={cambios?.find((c) => c.gate === detalle.gate)}
             onRegistrarCambio={onRegistrarCambio}
+            mezclaPuerta={mezcla?.[detalle.gate]}
+            mapa={mapaPeso?.(detalle.gate) ?? null}
+            obs={obs}
+            piezas={piezas?.[detalle.gate]}
+            piezasCargando={piezasCargando === detalle.gate}
+            onCargarPiezas={onCargarPiezas}
+            rangos={rangos}
           />
         )}
 
@@ -558,13 +609,15 @@ function PorPeso({ peso }: { peso: PesoPorPuerta }) {
   )
 }
 
-function DetalleGate({ mix, entry, cfg, changeBuckets, causas, seteo, onAdoptar, peso, cambio, onRegistrarCambio }: {
+function DetalleGate({ mix, entry, cfg, changeBuckets, causas, seteo, onAdoptar, peso, cambio, onRegistrarCambio, mezclaPuerta, mapa, obs, piezas, piezasCargando, onCargarPiezas, rangos }: {
   mix: GateMix; entry: GateMixEntry; cfg?: GateAssignment; changeBuckets?: number[]; causas?: GateCauses | null
   seteo?: SeteoMaquina; onAdoptar?: () => void; peso?: PesoPorPuerta
   cambio?: CambioDePrograma; onRegistrarCambio?: (c: CambioDePrograma) => void
+  mezclaPuerta?: MezclaPuerta; mapa?: MapaPeso | null; obs?: GateObservations
+  piezas?: FirestorePieceRecord[]; piezasCargando?: boolean; onCargarPiezas?: (gate: number) => void; rangos?: CalibreWeightRange[]
 }) {
   const { isDark } = useTheme()
-  const nivel = nivelDePureza(entry.purityPct)
+  const nivel = nivelDePureza(mezclaPuerta?.pct ?? entry.purityPct)
   const cambios = new Set(changeBuckets ?? [])
   const purezaSinCambios = sinCambios(entry.purityByBucket, changeBuckets)
   const caida = bloqueDeCaida(purezaSinCambios)
@@ -574,13 +627,16 @@ function DetalleGate({ mix, entry, cfg, changeBuckets, causas, seteo, onAdoptar,
   const mezclaCalibre = entry.assignedCalibre !== ANY_CALIBRE
     && Object.keys(entry.byCalibre).some((k) => k !== entry.assignedCalibre)
   const mezclaCalidad = Object.keys(entry.byQuality).some((k) => k !== entry.assignedQuality)
+  const dimsMezcla = mezclaPuerta
+    ? [...new Set(mezclaPuerta.composicion.filter((c) => c.intrusa && c.dim).map((c) => DIM_LABEL[c.dim!]))].join(' y ') || 'calibre o calidad'
+    : [mezclaCalibre && 'calibre', mezclaCalidad && 'calidad'].filter(Boolean).join(' y ')
   const veredicto = seteo
     ? (seteo.noReconocido ? 'Calibre que la app no conoce' : 'Seteo distinto a la máquina')
     : nivel === 'ok'
       ? 'Recibe lo que tiene asignado'
       : nivel === 'none'
         ? 'Sin asignación en este turno'
-        : `Mezclada por ${[mezclaCalibre && 'calibre', mezclaCalidad && 'calidad'].filter(Boolean).join(' y ')}`
+        : `Mezclada por ${dimsMezcla}`
   const inkVeredicto = seteo ? 'text-ink-info' : NIVEL_INK[nivel]
 
   return (
@@ -592,6 +648,19 @@ function DetalleGate({ mix, entry, cfg, changeBuckets, causas, seteo, onAdoptar,
         </p>
         <span className={`text-footnote font-semibold ${inkVeredicto}`}>{veredicto}</span>
       </div>
+
+      {mezclaPuerta && !seteo && mezclaPuerta.composicion.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">Qué llegó a esta puerta</p>
+          <TiraComposicion composicion={mezclaPuerta.composicion} alta />
+          <LeyendaComposicion m={mezclaPuerta} />
+          {mezclaPuerta.composicion.length === 1 ? (
+            <p className="text-footnote text-ink-ok">Una sola combinación: calibre, calidad y conservación coinciden con lo asignado.</p>
+          ) : !mezclaPuerta.fijaConservacion && mezclaPuerta.composicion.some((c) => c.conservation) ? (
+            <p className="text-caption text-muted-foreground">La asignación no fija conservación: se marca la minoritaria de cada bloque de 30 min, así un cambio de lote no cuenta como mezcla.</p>
+          ) : null}
+        </div>
+      )}
 
       {cambio && (
         <div className="space-y-2" data-testid="pureza-cambio">
@@ -668,10 +737,20 @@ function DetalleGate({ mix, entry, cfg, changeBuckets, causas, seteo, onAdoptar,
 
       {(!seteo || seteo.noReconocido) && peso && <PorPeso peso={peso} />}
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Barras titulo="Por calibre" data={entry.byCalibre} esperado={entry.assignedCalibre} total={entry.pieces} />
-        <Barras titulo="Por calidad" data={entry.byQuality} esperado={entry.assignedQuality} total={entry.pieces} />
-      </div>
+      {mapa && (!seteo || seteo.noReconocido) && (
+        <div>
+          <p className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">Peso, bloque a bloque</p>
+          <div className="mt-1"><MapaPesoSvg mapa={mapa} mix={mix} rango={peso?.rango ?? undefined} /></div>
+          <p className="text-caption text-muted-foreground">Bins de {mapa.binGrams} g × bloques de {mix.bucketMinutes} min, del mismo agregado que ya se descarga con el turno.</p>
+        </div>
+      )}
+
+      {!mezclaPuerta && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Barras titulo="Por calibre" data={entry.byCalibre} esperado={entry.assignedCalibre} total={entry.pieces} />
+          <Barras titulo="Por calidad" data={entry.byQuality} esperado={entry.assignedQuality} total={entry.pieces} />
+        </div>
+      )}
 
       {!seteo && entry.purityPct != null && buckets.length > 1 && (
         <div>
@@ -721,6 +800,263 @@ function DetalleGate({ mix, entry, cfg, changeBuckets, causas, seteo, onAdoptar,
           </p>
         </div>
       )}
+
+      {obs && mezclaPuerta && !seteo && (
+        <PiezasDePuerta
+          obs={obs} m={mezclaPuerta} piezas={piezas} cargando={!!piezasCargando}
+          onCargar={onCargarPiezas ? () => onCargarPiezas(entry.gate) : undefined}
+          rango={peso?.rango ?? undefined} rangos={rangos} focoMs={cambio ? cambio.desdeMs : undefined} isDark={isDark}
+        />
+      )}
+    </div>
+  )
+}
+
+// ── Mezcla en los tres ejes: composición, mapa de peso y piezas ─────────────
+//
+// Tonos por dimensión (mockup 08-09, medidos contra index.css): calibre 6
+// púrpura, calidad 3 índigo, conservación 7 teal (frío = tono frío), no
+// reconocido 5 rosa. Los tonos 1/2 chocan con --brand/--ink-ok y en oscuro
+// --cat-4-ink es byte-idéntico a --ink-warn, que acá ya significa «fuera por peso».
+const DIM_TONE: Record<DimensionMezcla, TagTone> = { calibre: 6, calidad: 3, conservacion: 7, otros: 5 }
+const DIM_INK: Record<DimensionMezcla, string> = { calibre: 'text-cat-6-ink', calidad: 'text-cat-3-ink', conservacion: 'text-cat-7-ink', otros: 'text-cat-5-ink' }
+const DIM_VAR: Record<DimensionMezcla, string> = { calibre: 'rgb(var(--cat-6-ink))', calidad: 'rgb(var(--cat-3-ink))', conservacion: 'rgb(var(--cat-7-ink))', otros: 'rgb(var(--cat-5-ink))' }
+const DIM_LABEL: Record<DimensionMezcla, string> = { calibre: 'calibre', calidad: 'calidad', conservacion: 'conservación', otros: 'no reconocido' }
+
+const minus = (s: string) => (s === s.toUpperCase() ? s.toLowerCase() : s)
+
+/** «43 % fresco», «14 % 10-12 lb», «6 % Grado»: la dimensión la dice el valor. */
+function textoDimension(p: NonNullable<MezclaPuerta['peorIntruso']>): string {
+  return `${fmtPctEntero(p.pct)} ${p.dim === 'otros' ? 'no reconocido' : minus(p.value)}`
+}
+
+function etiquetaCombo(c: { calibre: string; quality: string; conservation?: string }): string {
+  const cal = c.calibre === ANY_CALIBRE ? 'todo calibre' : c.calibre.replace(' lb', '')
+  return [cal, c.quality, c.conservation ? minus(c.conservation) : null].filter(Boolean).join(' · ')
+}
+
+/** Tira de composición: lo que coincide en azul de marca, cada intruso en el tono de su dimensión. */
+function TiraComposicion({ composicion, alta }: { composicion: ComposicionCombo[]; alta: boolean }) {
+  return (
+    <div
+      className={cn('flex w-full overflow-hidden rounded-full bg-border', alta ? 'h-[22px]' : 'mt-1 h-1.5')}
+      role="img"
+      aria-label={composicion.map((c) => `${etiquetaCombo(c)} ${fmtPct(c.pct)}${c.intrusa ? ' intrusa' : ''}`).join(', ')}
+    >
+      {composicion.map((c, i) => (
+        <span
+          key={c.key}
+          className={cn('flex items-center justify-center text-caption font-semibold tabular-nums text-white', !c.intrusa && 'bg-primary', !c.intrusa && i > 0 && 'opacity-60')}
+          style={{ width: `${c.pct}%`, ...(c.intrusa && c.dim ? { backgroundColor: DIM_VAR[c.dim] } : {}) }}
+        >
+          {alta && c.pct >= 12 ? fmtPctEntero(c.pct) : ''}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+function LeyendaComposicion({ m }: { m: MezclaPuerta }) {
+  return (
+    <ul className="space-y-1" data-testid="pureza-composicion">
+      {m.composicion.map((c) => (
+        <li key={c.key} className="flex items-center gap-2 text-footnote">
+          <span
+            aria-hidden
+            className={cn('h-2.5 w-2.5 shrink-0', c.intrusa ? 'rotate-45' : 'rounded-full bg-primary')}
+            style={c.intrusa && c.dim ? { backgroundColor: DIM_VAR[c.dim] } : undefined}
+          />
+          <span className="min-w-0 flex-1 truncate">
+            {etiquetaCombo(c)}
+            {!c.intrusa && <span className="text-muted-foreground"> · coincide</span>}
+          </span>
+          {c.intrusa && c.dim && <Tag tone={DIM_TONE[c.dim]}>{DIM_LABEL[c.dim]}</Tag>}
+          <span className="tabular-nums text-muted-foreground">{fmtPz(c.pieces)}</span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+/** Mapa peso × tiempo: bins de 100 g × bloques de 30 min del agregado ya descargado. 0 lecturas. */
+function MapaPesoSvg({ mapa, mix, rango }: { mapa: MapaPeso; mix: GateMix; rango?: { minGrams: number; maxGrams: number; calibre: string } }) {
+  const W = 343, H = 176, L = 36, R = 6, TOP = 8, B = 24
+  // Como mucho ~28 filas: si el rango de pesos es más ancho, se agrupan bins.
+  const filasCrudas = Math.round((mapa.maxG - mapa.minG) / mapa.binGrams) + 1
+  const k = Math.max(1, Math.ceil(filasCrudas / 28))
+  const paso = mapa.binGrams * k
+  const lo = Math.floor(mapa.minG / paso) * paso
+  const hi = Math.floor(mapa.maxG / paso) * paso + paso
+  const nb = Math.max(1, Math.round((hi - lo) / paso))
+  const cols = mapa.celdas.length
+  const cw = (W - L - R) / Math.max(1, cols)
+  const ch = (H - TOP - B) / nb
+  const y = (g: number) => TOP + ((hi - g) / paso) * ch
+  const celdas: Array<{ r: number; c: number; n: number }> = []
+  let max = 0
+  mapa.celdas.forEach((row, c) => {
+    if (!row) return
+    const acc = new Map<number, number>()
+    for (const [g, n] of Object.entries(row)) {
+      const r = Math.min(nb - 1, Math.max(0, Math.floor((hi - Number(g) - 1) / paso)))
+      acc.set(r, (acc.get(r) ?? 0) + n)
+    }
+    for (const [r, n] of acc) { celdas.push({ r, c, n }); if (n > max) max = n }
+  })
+  const ticks: number[] = []
+  const tickPaso = Math.max(paso, Math.ceil(nb / 5) * paso)
+  for (let g = hi; g >= lo; g -= tickPaso) ticks.push(g)
+  const etiquetasX = Array.from({ length: cols }, (_, i) => i).filter((i) => i % Math.max(1, Math.ceil(cols / 4)) === 0)
+  const bandaTop = rango ? Math.max(TOP, y(rango.maxGrams)) : null
+  const bandaBot = rango ? Math.min(H - B, y(rango.minGrams)) : null
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" className="text-muted-foreground" data-testid="pureza-mapa-peso"
+      aria-label={`Mapa de peso por bloque de ${mix.bucketMinutes} minutos de la puerta ${mapa.gate}`}>
+      {bandaTop != null && bandaBot != null && bandaBot > bandaTop && (
+        <>
+          <rect x={L} y={bandaTop} width={W - L - R} height={bandaBot - bandaTop} fill="currentColor" opacity="0.10" />
+          <line x1={L} x2={W - R} y1={bandaTop} y2={bandaTop} stroke="currentColor" strokeOpacity="0.5" strokeDasharray="3 3" />
+          <line x1={L} x2={W - R} y1={bandaBot} y2={bandaBot} stroke="currentColor" strokeOpacity="0.5" strokeDasharray="3 3" />
+          <text x={W - R - 3} y={(bandaTop + bandaBot) / 2 + 3.5} textAnchor="end" fontSize="10" fontWeight="600" fill="currentColor" opacity="0.8">rango {rango!.calibre}</text>
+        </>
+      )}
+      {celdas.map(({ r, c, n }) => (
+        <rect key={`${r}-${c}`} x={(L + c * cw).toFixed(1)} y={(TOP + r * ch).toFixed(1)} width={Math.max(0.5, cw - 0.6).toFixed(1)} height={Math.max(0.5, ch - 0.6).toFixed(1)} rx="1.5"
+          fill="rgb(var(--brand))" opacity={(0.14 + 0.78 * Math.pow(n / max, 0.72)).toFixed(2)} />
+      ))}
+      {ticks.map((g) => (
+        <text key={g} x={L - 5} y={(y(g) + 3.5).toFixed(1)} textAnchor="end" fontSize="10" fill="currentColor" className="tabular-nums">{(g / 1000).toFixed(1)}</text>
+      ))}
+      {etiquetasX.map((i) => (
+        <text key={i} x={(L + (i + 0.5) * cw).toFixed(1)} y={H - 8} textAnchor="middle" fontSize="10" fill="currentColor" className="tabular-nums">{horaBloque(mix, i)}</text>
+      ))}
+      <text x="4" y={TOP + 8} fontSize="10" fill="currentColor">kg</text>
+    </svg>
+  )
+}
+
+const VENTANA_PIEZAS_MS = 90 * 60_000
+
+interface PiezaJuzgada { x: number; y: number | null; dim?: DimensionMezcla; fuera: boolean; combo: string; ts: string }
+
+function juzgarPiezas(piezas: FirestorePieceRecord[], obs: GateObservations, m: MezclaPuerta, rango?: { minGrams: number; maxGrams: number }, rangos?: CalibreWeightRange[]): PiezaJuzgada[] {
+  return piezas.map((r) => {
+    const x = parseWallClock(r.ts)
+    const y = r.weightPerPieceGrams ?? (r.weightKg != null ? (r.weightKg * 1000) / Math.max(1, r.pieces || 1) : null)
+    const b = bloqueDe(obs, x)
+    const ref = b >= 0 ? m.referencias[b] ?? null : null
+    const combo = { calibre: normalizarCalibre(r.calibre ?? SIN_DATO), quality: r.quality ?? SIN_DATO, conservation: r.conservation }
+    const dim = ref ? dimensionIntrusa(combo, ref) : undefined
+    // El rango que manda es el del calibre asignado en el bloque de la pieza (la G4 fue 8-10 hasta las 03:30 y 6-8 después).
+    const rangoBloque = (ref?.calibre && rangos?.find((r) => r.calibre === ref.calibre)) || rango
+    const fuera = !!rangoBloque && y != null && (y < rangoBloque.minGrams || y >= rangoBloque.maxGrams)
+    return { x, y, dim, fuera, combo: etiquetaCombo(combo), ts: r.ts }
+  })
+}
+
+/**
+ * Nivel 2: cada pieza de la puerta, cargada bajo demanda (cuesta tantas
+ * lecturas como piezas). Círculo = coincide · rombo = intrusa (tono de su
+ * dimensión) · anillo ámbar = fuera del rango por peso. Ventana inicial de
+ * 90 min sobre la primera intrusa (o el cambio de programa), porque 2.300
+ * puntos en 375 px son una mancha.
+ */
+function PiezasDePuerta({ obs, m, piezas, cargando, onCargar, rango, rangos, focoMs, isDark }: {
+  obs: GateObservations; m: MezclaPuerta; piezas?: FirestorePieceRecord[]; cargando: boolean
+  onCargar?: () => void; rango?: { minGrams: number; maxGrams: number; calibre: string }; rangos?: CalibreWeightRange[]; focoMs?: number; isDark: boolean
+}) {
+  const [soloIntrusas, setSoloIntrusas] = useState(false)
+  const juzgadas = useMemo(() => (piezas && piezas.length ? juzgarPiezas(piezas, obs, m, rango, rangos) : []), [piezas, obs, m, rango, rangos])
+  const option = useMemo<EChartsOption>(() => {
+    const th = isDark ? 'dark' : 'light'
+    const colores = CAUSA_COLOR[th]
+    const texto = CHART_TEXT[th]
+    const warn = isDark ? '#ff9f0a' : '#974608'
+    const visibles = soloIntrusas ? juzgadas.filter((p) => p.dim) : juzgadas
+    const grupos = new Map<string, { name: string; symbol: string; color: string; fuera: boolean; data: Array<[number, number, string, string]> }>()
+    for (const p of visibles) {
+      if (p.y == null) continue
+      const k = `${p.dim ?? 'ok'}|${p.fuera ? 1 : 0}`
+      let g = grupos.get(k)
+      if (!g) {
+        const color = p.dim ? colores[p.dim === 'calibre' ? 'calibre_lejano' : p.dim === 'calidad' ? 'calidad' : p.dim === 'conservacion' ? 'conservacion' : 'otros'] : texto.axis
+        g = { name: (p.dim ? `intrusa por ${DIM_LABEL[p.dim]}` : 'coincide') + (p.fuera ? ' · fuera de rango' : ''), symbol: p.dim ? 'diamond' : 'circle', color, fuera: p.fuera, data: [] }
+        grupos.set(k, g)
+      }
+      g.data.push([p.x, p.y, p.combo, p.ts])
+    }
+    const xs = juzgadas.map((p) => p.x)
+    const min = xs.length ? Math.min(...xs) : 0
+    const max = xs.length ? Math.max(...xs) : 0
+    const foco = focoMs ?? juzgadas.find((p) => p.dim)?.x ?? min
+    const start = Math.max(min, Math.min(foco - VENTANA_PIEZAS_MS / 3, max - VENTANA_PIEZAS_MS))
+    const end = Math.min(max, start + VENTANA_PIEZAS_MS)
+    return {
+      backgroundColor: 'transparent',
+      animation: false,
+      grid: { left: 44, right: 10, top: 10, bottom: 28 },
+      tooltip: {
+        trigger: 'item', backgroundColor: texto.tipBg, borderColor: texto.tipBorder, textStyle: { color: texto.tipText, fontSize: 11 },
+        formatter: (params: unknown) => {
+          const v = (params as { value: [number, number, string, string]; seriesName: string }).value
+          return `<b>${new Date(v[3]).toISOString().slice(11, 19)}</b> · ${Math.round(v[1])} g<br/>${v[2]}<br/>${(params as { seriesName: string }).seriesName}`
+        },
+      },
+      dataZoom: [{ type: 'inside', xAxisIndex: 0, filterMode: 'none', startValue: start, endValue: end }],
+      xAxis: { type: 'time', min, max, axisLabel: { color: texto.axis, fontSize: 10, formatter: (v: number) => new Date(v).toISOString().slice(11, 16) }, axisLine: { lineStyle: { color: texto.grid } }, splitLine: { show: false } },
+      yAxis: { type: 'value', scale: true, axisLabel: { color: texto.axis, fontSize: 10, formatter: (v: number) => `${(v / 1000).toFixed(1)}` }, splitLine: { lineStyle: { color: texto.grid, type: 'dashed' } }, axisLine: { show: false }, axisTick: { show: false } },
+      series: [
+        ...(rango ? [{
+          type: 'line' as const, data: [], markArea: { silent: true, itemStyle: { color: texto.axis, opacity: 0.10 }, data: [[{ yAxis: rango.minGrams }, { yAxis: rango.maxGrams }]] as [[{ yAxis: number }, { yAxis: number }]] },
+          markLine: focoMs != null && focoMs !== juzgadas.find((p) => p.dim)?.x ? { silent: true, symbol: 'none', lineStyle: { color: isDark ? '#5aa0dc' : '#2e75b6', type: 'dashed' as const }, label: { show: false }, data: [{ xAxis: focoMs }] } : undefined,
+        }] : []),
+        ...[...grupos.values()].map((g) => ({
+          name: g.name, type: 'scatter' as const, data: g.data, symbol: g.symbol, symbolSize: g.symbol === 'diamond' ? 8 : 5,
+          itemStyle: g.fuera ? { color: 'transparent', borderColor: warn, borderWidth: 1.5 } : { color: g.color, opacity: g.symbol === 'circle' ? 0.55 : 0.95 },
+        })),
+      ],
+    }
+  }, [juzgadas, soloIntrusas, isDark, rango, focoMs])
+
+  const intrusas = juzgadas.filter((p) => p.dim).length
+  const fuera = juzgadas.filter((p) => p.fuera).length
+
+  if (!piezas) {
+    return (
+      <div className="space-y-2" data-testid="pureza-piezas">
+        <p className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">Ver cada pieza</p>
+        <p className="text-footnote text-muted-foreground">
+          Esta puerta tiene <span className="tabular-nums text-foreground">{fmtPz(m.pieces)}</span> piezas guardadas. Cargarlas son{' '}
+          <span className="tabular-nums text-foreground">{fmtPz(m.pieces)} lecturas</span> de Firestore; el turno completo son ~18.000 y por eso se carga de a una puerta.
+        </p>
+        {onCargar && (
+          <Button variant="tinted" size="lg" onClick={onCargar} disabled={cargando}>
+            {cargando ? 'Cargando…' : `Cargar las ${fmtPz(m.pieces)} piezas`}
+          </Button>
+        )}
+      </div>
+    )
+  }
+  return (
+    <div className="space-y-2" data-testid="pureza-piezas">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">Cada pieza</p>
+        <div className="flex rounded-ctl bg-border p-0.5" role="tablist" aria-label="Qué piezas mostrar">
+          {([false, true] as const).map((v) => (
+            <button key={String(v)} type="button" role="tab" aria-selected={soloIntrusas === v} onClick={() => setSoloIntrusas(v)}
+              className={cn('min-h-[44px] rounded-[8px] px-3 text-footnote font-medium transition-colors', soloIntrusas === v ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground')}>
+              {v ? `Solo intrusas · ${fmtPz(intrusas)}` : `Todas · ${fmtPz(juzgadas.length)}`}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="h-[220px]">
+        <ReactECharts option={option} style={{ height: '100%', width: '100%' }} opts={{ renderer: 'canvas' }} notMerge />
+      </div>
+      <p className="text-caption text-muted-foreground">
+        Círculo = coincide · rombo = intrusa (color de su dimensión) · anillo ámbar = fuera del rango por peso
+        {fuera > 0 && <> ({fmtPz(fuera)} pz)</>}. Ventana de 90 min: arrastrá o pellizcá para moverla.
+      </p>
     </div>
   )
 }

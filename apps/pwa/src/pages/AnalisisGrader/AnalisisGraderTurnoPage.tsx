@@ -10,11 +10,11 @@ import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { useParams, useNavigate, Navigate, useSearchParams } from 'react-router-dom'
 import { logger } from '@/lib/logger'
 import { Button, Card, CardContent, Spinner, Badge } from '@/components/ui'
-import { ArrowLeft, Settings2, AlertCircle, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight, Share2, Copy, Check, QrCode, Download, Tag, FileText, WifiOff, ChevronDown, RefreshCw, Zap, Scale, Sun, Sunset, Moon, Sunrise, Globe2, Radio, ExternalLink, SlidersHorizontal, Image as ImageIcon } from 'lucide-react'
+import { ArrowLeft, Settings2, AlertCircle, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight, Share2, Copy, Check, QrCode, Download, Tag, FileText, WifiOff, ChevronDown, RefreshCw, Zap, Scale, Sun, Sunset, Moon, Sunrise, Radio, ExternalLink, SlidersHorizontal, Image as ImageIcon } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { usePermissionsStore } from '@/store'
 import { useAuthStore, useIsAdmin, useIsSupervisor } from '@/store/authStore'
-import { getDailySummary, buildDailySummaryId, loadTimelineAggregates, subscribePausesAggregates, listDailySummariesByRange, listGate0PieceRecords, type FirestorePieceRecord } from '@/services/grader/graderDailySummary.service'
+import { getDailySummary, buildDailySummaryId, loadTimelineAggregates, subscribePausesAggregates, listDailySummariesByRange, listGate0PieceRecords, listGatePieceRecords, type FirestorePieceRecord } from '@/services/grader/graderDailySummary.service'
 import { createPublicToken, revokePublicToken } from '@/services/grader/graderPublicToken.service'
 import { createPublicShiftMonitor, revokePublicShiftMonitor, subscribeMonitorStats, MONITOR_TTL_CHOICES, type MonitorTtlHours, type MonitorMode, type MonitorUsageStats } from '@/services/shoplogix/publicShiftMonitor.service'
 import type { Pause, MicroDetentionsSummary } from '@/services/grader/types'
@@ -26,8 +26,9 @@ import type { ShiftTimeWindow } from '@/services/grader/graderShiftStatus'
 import { DEFAULT_SHIFT_SCHEDULE, normalizeShiftSchedule } from '@/services/grader/graderShiftSchedule'
 import { getShiftDisplayDateKey, getShiftMeta } from '@/services/grader/graderShiftDisplay'
 import { PurezaPorPuertaCard } from '@/components/grader/PurezaPorPuertaCard'
+import { Disclosure } from '@/components/piel/Disclosure'
 import { loadGateObservations, updateDailySummary } from '@/services/grader/graderDailySummary.service'
-import { deriveGateMix, configTimelineFromSnapshots, classifyGateCauses, derivePesoPorPuerta, detectSolapesDeRango, inferirSeteoFaltante, detectCambiosDePrograma, wallClockMsToRealIso, rangesFingerprint, type GateObservations, type SeteoMaquina, type CambioDePrograma } from '@/services/grader/graderGateObservations'
+import { deriveGateMix, configTimelineFromSnapshots, classifyGateCauses, derivePesoPorPuerta, detectSolapesDeRango, inferirSeteoFaltante, detectCambiosDePrograma, wallClockMsToRealIso, rangesFingerprint, deriveMezcla, mapaPesoDePuerta, type GateObservations, type SeteoMaquina, type CambioDePrograma } from '@/services/grader/graderGateObservations'
 import { CALIBRE_WEIGHT_RANGES } from '@/services/grader/graderAnalyticsThroughput'
 import { parseMatrixErrorString } from '@/services/grader/graderMatrixP0Causes'
 import { HeroScorecard } from '@/components/grader/HeroScorecard'
@@ -669,6 +670,10 @@ export function AnalisisGraderTurnoPage() {
   const [gateObs, setGateObs] = useState<GateObservations | null>(null)
   const [configSnapshots, setConfigSnapshots] = useState<GateConfigSnapshot[]>([])
   const [gate0Pieces, setGate0Pieces] = useState<FirestorePieceRecord[]>([])
+  // Nivel 2 de la pureza: piezas de UNA puerta, cargadas a pedido (cuestan
+  // tantas lecturas como piezas; el turno entero serían ~18.000).
+  const [piezasPorPuerta, setPiezasPorPuerta] = useState<Record<number, FirestorePieceRecord[]>>({})
+  const [piezasCargando, setPiezasCargando] = useState<number | null>(null)
   const [pauses, setPauses] = useState<Pause[]>([])
   const [microDetentions, setMicroDetentions] = useState<MicroDetentionsSummary | null>(null)
   const [selectedCauses, setSelectedCauses] = useState<Set<MatrixP0Cause>>(new Set())
@@ -683,7 +688,7 @@ export function AnalisisGraderTurnoPage() {
    * clics (abrir + elegir la sub-pestaña) y se sentía como "ir a la
    * configuración del Grader", que es justo lo que Orel no quería.
    */
-  const [showConfigPanel, setShowConfigPanel] = useState(true)
+  const [showConfigPanel, setShowConfigPanel] = useState(false)
   const [calibreOverride, setCalibrerOverride] = useState<CalibreWeightRange[] | null>(null)
   // Rangos de calibre de la línea (Configuración del Grader). Con el override
   // del turno encima, son los que juzgan la mezcla por peso.
@@ -1211,6 +1216,21 @@ export function AnalisisGraderTurnoPage() {
     () => (gateObs ? detectCambiosDePrograma(gateObs, gateTimeline) : undefined),
     [gateObs, gateTimeline],
   )
+  // Mezcla en los tres ejes (calibre · calidad · conservación) y mapa de peso.
+  const mezclaPorPuerta = useMemo(
+    () => (gateObs ? deriveMezcla(gateObs, gateTimeline) : undefined),
+    [gateObs, gateTimeline],
+  )
+  const mapaPeso = useCallback((gate: number) => (gateObs ? mapaPesoDePuerta(gateObs, gate) : null), [gateObs])
+  const handleCargarPiezas = useCallback((gate: number) => {
+    if (!effectiveSummaryId || piezasCargando != null) return
+    setPiezasCargando(gate)
+    listGatePieceRecords(effectiveSummaryId, gate)
+      .then((recs) => setPiezasPorPuerta((prev) => ({ ...prev, [gate]: recs })))
+      .catch((err) => logger.warn('No se pudieron cargar las piezas de la puerta', { gate, err: String(err) }))
+      .finally(() => setPiezasCargando(null))
+  }, [effectiveSummaryId, piezasCargando])
+  useEffect(() => { setPiezasPorPuerta({}) }, [effectiveSummaryId])
   // «¿Por qué cayó acá?» para la puerta que el usuario toque en la tarjeta.
   const causesFor = useMemo(
     () => (gateObs ? (gate: number) => classifyGateCauses(gateObs, gate, gateTimeline) : undefined),
@@ -2684,23 +2704,6 @@ export function AnalisisGraderTurnoPage() {
               config vigente → distribución → impacto del cambio → evolución →
               historial → ajustes del turno. Antes estaban repartidos a lo largo
               de toda la página, separados por diez bloques de otra cosa. */}
-          {activeView === 'gates' && (
-            <div className="flex items-start gap-2.5 px-3 py-2.5 rounded-ctl bg-primary/[0.15] border border-primary/[0.25] text-sm">
-              <Globe2 className="w-4 h-4 shrink-0 mt-0.5 text-primary" />
-              <p className="text-muted-foreground flex-1">
-                Acá se ajusta <span className="font-medium text-foreground">este turno</span>. La
-                línea física, los umbrales base y los rangos de calibre valen para todos los turnos
-                y se editan en{' '}
-                <button
-                  onClick={() => navigate(`/analisis-grader/config?linea=${plantLineCfg.id}`)}
-                  className="font-medium text-primary underline underline-offset-2 hover:text-ink-info"
-                >
-                  Configuración del Grader
-                </button>.
-              </p>
-            </div>
-          )}
-
           {/* ¿Qué está cayendo en cada puerta? Va primero: es la pregunta de
               terreno («¿la G6 cae mezclada, y desde cuándo?») y la que decide
               si hay que tocar la config de abajo. Lee summary.gateMix, que se
@@ -2719,6 +2722,13 @@ export function AnalisisGraderTurnoPage() {
               inferidas={seteoInferido}
               cambios={cambiosDePrograma}
               onRegistrarCambio={isSupervisor || isAdmin ? handleRegistrarCambio : undefined}
+              mezcla={mezclaPorPuerta}
+              obs={gateObs ?? undefined}
+              mapaPeso={mapaPeso}
+              piezas={piezasPorPuerta}
+              piezasCargando={piezasCargando}
+              onCargarPiezas={handleCargarPiezas}
+              rangos={rangosVigentes}
               turnoLabel={`${dateKey.slice(8, 10)}/${dateKey.slice(5, 7)} · ${shiftLabel}`}
             />
           )}
@@ -2736,7 +2746,7 @@ export function AnalisisGraderTurnoPage() {
           {/* Contraste contra los turnos anteriores. Va ANTES del análisis del
               propio turno: primero "¿esta config tenía sentido?", después "¿cómo
               rindió?". Al revés se lee como excusa. */}
-          {activeView === 'gates' && gatesHistoryCard}
+          {activeView === 'gates' && shiftWindow?.status === 'live' && gatesHistoryCard}
 
           {/* Config de gates vigente en el turno. Solo en plantas que clasifican
               (Chonchi). Yal no clasifica → las gates del Excel son solo las que
@@ -2854,18 +2864,7 @@ export function AnalisisGraderTurnoPage() {
           {/* Distribución por gate, impacto de cambios mid-turno y evolución.
               Yal no aplica — sus 3-4 gates físicas no clasifican y los charts
               asumen 12 gates con calibre+calidad asignados. */}
-          {activeView === 'gates' && isClassificationPlant && summary.gateDistribution && summary.gateDistribution.length > 0 && (
-            <GateBreakdownCard
-              gateDistribution={summary.gateDistribution}
-              configSnapshots={configSnapshots}
-              totalPieces={summary.totalPieces}
-              pointZeroPieces={summary.pointZeroPieces}
-              pointZeroPct={summary.pointZeroPct}
-              shiftDocId={shiftDocId}
-              onSaved={reloadConfigSnapshots}
-            />
-          )}
-
+          {/* P0 antes/después de cada cambio de gate: es análisis de P0, va a la vista. */}
           {activeView === 'gates' && isClassificationPlant && enrichedTimelineBuckets.length > 0 && configSnapshots.length > 0 && (
             <GateChangeImpactCard
               timelineBuckets={enrichedTimelineBuckets}
@@ -2873,11 +2872,36 @@ export function AnalisisGraderTurnoPage() {
             />
           )}
 
-          {activeView === 'gates' && isClassificationPlant && enrichedTimelineBuckets.length > 0 && configSnapshots.length > 0 && (
-            <GateEvolutionChart
-              timelineBuckets={enrichedTimelineBuckets}
-              configSnapshots={configSnapshots}
-            />
+          {/* Lo que no responde "¿qué está mezclado?" ni "¿por qué P0?" va plegado:
+              distribución por gate, piezas/min por gate y la comparación histórica.
+              Medido 08-09: la pestaña medía 5.615 px a 375 px con todo abierto. */}
+          {activeView === 'gates' && isClassificationPlant && (summary.gateDistribution?.length || enrichedTimelineBuckets.length > 0) && (
+            <Disclosure
+              title="Más análisis de gates"
+              summary="Distribución por gate, piezas por minuto y comparación con turnos anteriores"
+              defaultOpen={false}
+              storageKey="turno.gates.masAnalisis"
+              className="space-y-4"
+            >
+              {summary.gateDistribution && summary.gateDistribution.length > 0 && (
+                <GateBreakdownCard
+                  gateDistribution={summary.gateDistribution}
+                  configSnapshots={configSnapshots}
+                  totalPieces={summary.totalPieces}
+                  pointZeroPieces={summary.pointZeroPieces}
+                  pointZeroPct={summary.pointZeroPct}
+                  shiftDocId={shiftDocId}
+                  onSaved={reloadConfigSnapshots}
+                />
+              )}
+              {enrichedTimelineBuckets.length > 0 && configSnapshots.length > 0 && (
+                <GateEvolutionChart
+                  timelineBuckets={enrichedTimelineBuckets}
+                  configSnapshots={configSnapshots}
+                />
+              )}
+              {shiftWindow?.status !== 'live' && gatesHistoryCard}
+            </Disclosure>
           )}
 
           {/* Composición del turno (lotes + calidad + producto + conservación).

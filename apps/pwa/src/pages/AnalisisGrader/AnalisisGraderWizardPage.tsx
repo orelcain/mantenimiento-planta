@@ -130,6 +130,15 @@ export function AnalisisGraderWizardPage() {
   )
 
   const [savingToCalendar, setSavingToCalendar] = useState(false)
+  // Guardado que no avanza: el 08-09 el botón quedó en "Guardando…" para
+  // siempre sin que llegara UNA escritura al servidor (pestaña con la conexión
+  // de Firestore rota). Sin este aviso el spinner miente.
+  const [saveSlow, setSaveSlow] = useState(false)
+  useEffect(() => {
+    if (!savingToCalendar) { setSaveSlow(false); return }
+    const t = window.setTimeout(() => setSaveSlow(true), 60_000)
+    return () => window.clearTimeout(t)
+  }, [savingToCalendar])
   const [savedToCalendar, setSavedToCalendar] = useState(false)
   // Turnos del último guardado: el banner verde ofrece "Ver turno" por cada
   // uno, sin depender de que la matriz de abajo ya los muestre.
@@ -856,6 +865,15 @@ export function AnalisisGraderWizardPage() {
               }
             </Button>
           </CardContent>
+          {saveSlow && (
+            <CardContent className="pt-0 pb-3 px-4" data-testid="wizard-save-slow">
+              <p className="text-footnote text-ink-warn">
+                Lleva más de un minuto y no llegó nada al servidor. Casi siempre es una pestaña con la
+                conexión caída: cerrá <span className="font-medium">todas</span> las pestañas de la app
+                (incluida la del monitor), abrila de nuevo y volvé a guardar. El Excel no se pierde.
+              </p>
+            </CardContent>
+          )}
         </Card>
       )}
       {savedToCalendar && (

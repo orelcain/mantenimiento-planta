@@ -3,6 +3,7 @@ import {
   computeGateObservations, deriveGateMix, configTimelineFromSnapshots, realIsoToWallClockMs,
   GATE_OBS_MAX_BUCKETS, GATE_OBS_MAX_COMBOS, OTROS, classifyGateCauses, derivePesoPorPuerta, detectSolapesDeRango, inferirSeteoFaltante,
   detectCambiosDePrograma, wallClockMsToRealIso, rangesFingerprint, normalizarCalibre, CALIBRE_12_UP,
+  deriveMezcla, mapaPesoDePuerta,
 } from '../graderGateObservations'
 import { ANY_CALIBRE, SIN_DATO } from '../graderGateMix'
 import type { GateConfigSnapshot } from '../graderConfigSnapshot.service'
@@ -450,5 +451,66 @@ describe('detectCambiosDePrograma · piso de piezas', () => {
       ...w('6-8 lb', 60, '2026-02-26T04:00:00'), ...w('6-8 lb', 60, '2026-02-26T04:30:00'),
     ])!
     expect(detectCambiosDePrograma(grande, tl)).toHaveLength(1)
+  })
+})
+
+describe('deriveMezcla · los tres ejes, conservación contra la dominante del bloque', () => {
+  const pc = (n: number, cal: string, cons: string, ts: string) =>
+    pieces(8, n, cal, 'Premium', ts).map((r) => ({ ...r, conservation: cons as PieceRecord['conservation'] }))
+  const G = [gate(8, '8-10 lb', 'Premium'), gate(10, '10-12 lb', 'Premium')]
+  const tl = configTimelineFromSnapshots([], G)
+
+  it('un cambio de lote fresco→congelado entre bloques NO es mezcla', () => {
+    const obs = computeGateObservations([
+      ...pc(300, '8-10 lb', 'FRESCO', '2026-09-07T21:30:00'), ...pc(300, '8-10 lb', 'FRESCO', '2026-09-07T22:30:00'),
+      ...pc(300, '8-10 lb', 'CONGELADO', '2026-09-08T00:30:00'), ...pc(300, '8-10 lb', 'CONGELADO', '2026-09-08T01:30:00'),
+    ])!
+    const m = deriveMezcla(obs, tl)[8]!
+    expect(m.pct).toBe(100)
+    expect(m.peorIntruso).toBeUndefined()
+    expect(m.fijaConservacion).toBe(false)
+    expect(m.composicion.map((c) => [c.conservation, c.intrusa])).toEqual([['FRESCO', false], ['CONGELADO', false]])
+  })
+
+  it('dos conservaciones en el MISMO bloque sí: la minoritaria es la intrusa, con su dimensión', () => {
+    const obs = computeGateObservations([
+      ...pc(300, '8-10 lb', 'CONGELADO', '2026-09-07T21:30:00'), ...pc(100, '8-10 lb', 'FRESCO', '2026-09-07T21:40:00'),
+    ])!
+    const m = deriveMezcla(obs, tl)[8]!
+    expect(m.pct).toBe(75)
+    expect(m.peorIntruso).toEqual({ dim: 'conservacion', value: 'FRESCO', pieces: 100, pct: 25 })
+    expect(m.dominante).toMatchObject({ calibre: '8-10 lb', quality: 'Premium', conservation: 'CONGELADO', pieces: 300 })
+  })
+
+  it('el calibre manda sobre la conservación en la precedencia, y el seteo con conservación fija la referencia', () => {
+    const obs = computeGateObservations([
+      ...pc(300, '8-10 lb', 'CONGELADO', '2026-09-07T21:30:00'), ...pc(50, '10-12 lb', 'FRESCO', '2026-09-07T21:40:00'),
+    ])!
+    const m = deriveMezcla(obs, tl)[8]!
+    expect(m.peorIntruso).toEqual({ dim: 'calibre', value: '10-12 lb', pieces: 50, pct: 14.3 })
+    const fija = configTimelineFromSnapshots([], [{ ...gate(8, '8-10 lb', 'Premium'), assignedConservation: 'FRESCO' } as GateAssignment])
+    const m2 = deriveMezcla(obs, fija)[8]!
+    expect(m2.fijaConservacion).toBe(true)
+    expect(m2.pct).toBe(0)
+  })
+
+  it('sin seteo no hay juicio, pero sí composición', () => {
+    const obs = computeGateObservations(pc(40, '8-10 lb', 'FRESCO', '2026-09-07T21:30:00'))!
+    const m = deriveMezcla(obs, configTimelineFromSnapshots([], []))[8]!
+    expect(m.pct).toBeNull()
+    expect(m.composicion).toHaveLength(1)
+  })
+})
+
+describe('mapaPesoDePuerta · nivel 1 sin lecturas', () => {
+  it('arma celdas bloque × bin con extremos y máximo', () => {
+    const w = (n: number, g: number, ts: string) => pieces(11, n, '10-12 lb', 'Premium', ts).map((r) => ({ ...r, weightPerPieceGrams: g }))
+    const obs = computeGateObservations([...w(10, 4650, '2026-09-07T21:30:00'), ...w(30, 5050, '2026-09-07T21:40:00'), ...w(5, 5250, '2026-09-07T22:30:00')])!
+    const m = mapaPesoDePuerta(obs, 11)!
+    expect(m.binGrams).toBe(100)
+    expect([m.minG, m.maxG, m.max, m.pieces]).toEqual([4600, 5200, 30, 45])
+    expect(m.celdas[0]).toEqual({ 4600: 10, 5000: 30 })
+    expect(m.celdas[2]).toEqual({ 5200: 5 })
+    expect(mapaPesoDePuerta(obs, 3)).toBeNull()
   })
 })
