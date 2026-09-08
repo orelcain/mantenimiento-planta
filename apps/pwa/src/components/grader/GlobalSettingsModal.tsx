@@ -184,10 +184,19 @@ export function GlobalSettingsModal({ open, onOpenChange, plantLineId, defaultTa
     if (!user) return
     setSaving(true)
     try {
+      // La etiqueta se regenera si era automática: al subir el techo del 8-10
+      // a 5.000 g seguía diciendo "(3665–4581 g)" en todas las pantallas.
+      const auto = /\(\s*[\d.]+\s*[–-]\s*[\d.]+\s*g\s*\)\s*$/
+      const conEtiqueta = ranges.map((r) => ({
+        ...r,
+        label: (!r.label || auto.test(r.label))
+          ? `${r.calibre.trim()} (${r.minGrams.toLocaleString('es-CL')}–${r.maxGrams.toLocaleString('es-CL')} g)`
+          : r.label,
+      }))
       await saveModuleAnalysisConfig({
         alertThreshold,
         criticalThreshold,
-        customWeightRanges: isCustomRanges ? ranges : [],
+        customWeightRanges: isCustomRanges ? conEtiqueta : [],
         updatedBy: user.id,
         plantLineId,
       })

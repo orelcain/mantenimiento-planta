@@ -568,7 +568,11 @@ export function AnalisisGraderWizardPage() {
 
       const detectionByKey = new Map<string, PauseDetectionResult>()
       const summaries = multiDayInfo.entries.map(([key, segment]) => {
-        const raw = computeShiftSummary(segment, batchId, sourceNames, user.id, gatesBySegment.get(key) ?? gates, timelineBySegment.get(key)?.configAt)
+        // Las causas P0 "fuera de calibre" se juzgan con los rangos configurados
+        // en la app (no con las constantes): si el 8-10 termina en 5.000 g, una
+        // pieza de 4,8 kg no es "fuera de calibre".
+        const rangosLinea = moduleCfg?.customWeightRanges?.length ? moduleCfg.customWeightRanges : undefined
+        const raw = computeShiftSummary(segment, batchId, sourceNames, user.id, gatesBySegment.get(key) ?? gates, timelineBySegment.get(key)?.configAt, rangosLinea)
         const tsSorted = collectSortedTimestamps(segment.pieceRecords, segment.gate0Records)
         // Extraer timestamps de cambios de lote para auto-tag 'cambio_lote' (M10)
         const loteChangeTsMs: number[] = []

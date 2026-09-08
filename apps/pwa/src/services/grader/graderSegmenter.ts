@@ -12,7 +12,7 @@
  *   4. saveDailySummaryBatch(summaries) → Firestore
  */
 
-import type { PieceRecord, Gate0Record, GraderShiftSchedule, GraderDailySummary, TimelineBucket, GateAssignment } from './types'
+import type { PieceRecord, Gate0Record, GraderShiftSchedule, GraderDailySummary, TimelineBucket, GateAssignment, CalibreWeightRange } from './types'
 import { DEFAULT_SHIFT_SCHEDULE } from './graderShiftSchedule'
 import { classifyRecordToMatrix, CALIBRE_WEIGHT_RANGES } from './graderAnalytics'
 import { computeGateMix } from './graderGateMix'
@@ -486,6 +486,8 @@ export function computeShiftSummary(
    * queda como la config vigente para gatesUsed y gateMix v1.
    */
   configAt?: ConfigAt,
+  /** Rangos de calibre configurados en la app (línea/turno). Sin esto, las constantes. */
+  ranges?: CalibreWeightRange[],
 ): GraderDailySummary {
   const { sessionDate, shiftId, pieceRecords, gate0Records } = segment
 
@@ -545,7 +547,7 @@ export function computeShiftSummary(
       causeKey = classifyRecordToMatrix(
         { ...rec, error: rec.error ?? '', gate: 0 as const },
         gatesDeLaHora,
-        CALIBRE_WEIGHT_RANGES,
+        ranges?.length ? ranges : CALIBRE_WEIGHT_RANGES,
       )
     } else {
       causeKey = rec.error || 'Sin causa'

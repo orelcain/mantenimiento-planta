@@ -32,7 +32,7 @@ import {
   PUREZA_OK_PCT, PUREZA_WARN_PCT, nivelDePureza, bloqueDeCaida, promedioHasta, type NivelPureza as Nivel,
 } from '@/services/grader/graderPurezaNivel'
 import type { GateAssignment } from '@/services/grader/types'
-import { CAUSA_ORDER, type CausaTipo, type GateCauses, type GateCauseGroup, type SeteoMaquina, type PesoPorPuerta } from '@/services/grader/graderGateObservations'
+import { CAUSA_ORDER, type CausaTipo, type GateCauses, type GateCauseGroup, type SeteoMaquina, type PesoPorPuerta, type SolapeDeRango } from '@/services/grader/graderGateObservations'
 
 // ⚠ Nunca combinar estas clases de color con text-caption/text-title3 dentro
 // de cn(): tailwind-merge no conoce la escala tipográfica propia, toma
@@ -106,10 +106,15 @@ interface Props {
    * (rangos configurados en la app). La etiqueta del Excel no la mide.
    */
   pesoPorPuerta?: Record<number, PesoPorPuerta>
+  /** Programas de calibre solapados en el Z2, detectados por el peso (gateMix v2). */
+  solapes?: SolapeDeRango[]
 }
 
 /** Desde este % de piezas fuera del rango por peso, la baldosa lo dice. */
 const PESO_FUERA_AVISO_PCT = 5
+/** Con menos piezas con peso, un par de pescados ya son un 20 %: no se opina. */
+const PESO_MIN_PIEZAS = 30
+const pesoAvisa = (p: PesoPorPuerta | undefined): p is PesoPorPuerta => !!p && p.conPeso >= PESO_MIN_PIEZAS && p.pctFuera >= PESO_FUERA_AVISO_PCT
 const fmtKg = (g: number) => `${(g / 1000).toFixed(g % 1000 === 0 ? 0 : 1).replace('.', ',')} kg`
 
 /** Nombre de cada causal y qué mirar. El color nunca es el único canal. */
@@ -155,7 +160,7 @@ const CAUSA_COLOR: Record<'dark' | 'light', Record<CausaTipo | 'ok', string>> = 
 }
 const CHART_TEXT = { light: { axis: '#41566a', grid: '#c3d7e9', tipBg: '#ffffff', tipText: '#16242f', tipBorder: '#c3d7e9' }, dark: { axis: '#94a3b8', grid: '#22384a', tipBg: '#1e293b', tipText: '#e2e8f0', tipBorder: '#334155' } }
 
-export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets, causesFor, seteoDistinto, onAdoptarSeteo, onAdoptarSeteoTodas, pesoPorPuerta }: Props) {
+export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets, causesFor, seteoDistinto, onAdoptarSeteo, onAdoptarSeteoTodas, pesoPorPuerta, solapes }: Props) {
   const navigate = useNavigate()
   const [copiado, setCopiado] = useState(false)
 
@@ -210,7 +215,7 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets,
   const pillTone: PillTone = conteo.crit > 0 ? 'critical' : conteo.warn > 0 ? 'warning' : conteo.seteo > 0 ? 'info' : 'ok'
   // Una puerta con seteo distinto no se juzga por peso: su rango es el equivocado.
   const conPesoFuera = useMemo(
-    () => Object.values(pesoPorPuerta ?? {}).filter((p) => p.pctFuera >= PESO_FUERA_AVISO_PCT && !seteoDistinto?.[p.gate]).length,
+    () => Object.values(pesoPorPuerta ?? {}).filter((p) => pesoAvisa(p) && !seteoDistinto?.[p.gate]).length,
     [pesoPorPuerta, seteoDistinto],
   )
   const adoptables = useMemo(
@@ -249,7 +254,7 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets,
         + (caida != null ? ` · cae desde ${horaBloque(gateMix, caida)}` : ''),
       )
       const pw = pesoPorPuerta?.[e.gate]
-      if (pw && pw.pctFuera >= PESO_FUERA_AVISO_PCT) {
+      if (pesoAvisa(pw)) {
         lineas.push(`  - Por peso: ${fmtPct(pw.pctFuera)} fuera del rango ${pw.rango?.calibre ?? ''}${pw.gramosArriba ? ` (arriba: ${fmtKg(pw.gramosArriba[0])}–${fmtKg(pw.gramosArriba[1])})` : ''}${pw.gramosAbajo ? ` (abajo: ${fmtKg(pw.gramosAbajo[0])}–${fmtKg(pw.gramosAbajo[1])})` : ''}`)
       }
       const c = causesFor?.(e.gate)
@@ -304,7 +309,7 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets,
             const ink = seteo ? 'text-ink-info' : NIVEL_INK[nivel]
             const dot = seteo ? 'bg-ink-info' : NIVEL_BG[nivel]
             const pw = pesoPorPuerta?.[n]
-            const pesoFuera = pw && pw.pctFuera >= PESO_FUERA_AVISO_PCT && !seteo ? pw : null
+            const pesoFuera = pesoAvisa(pw) && !seteo ? pw : null
             return (
               <button
                 key={n}
@@ -352,6 +357,22 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets,
           cayeron en la puerta. ≥{PUREZA_OK_PCT} % pura · {PUREZA_WARN_PCT}–{PUREZA_OK_PCT} % en atención · &lt;{PUREZA_WARN_PCT} % mezclada.
           {' '}Si ≥ 90 % de las piezas llevan una misma combinación distinta a la asignada, no es mezcla: es <span className="text-ink-info">seteo ≠ máquina</span>.
         </p>
+
+        {solapes && solapes.length > 0 && (
+          <div className="rounded-ctl bg-muted px-3 py-2 text-footnote" data-testid="pureza-solapes">
+            <p className="font-semibold text-ink-warn">Programas de calibre solapados en el Z2</p>
+            {solapes.map((s) => (
+              <p key={`${s.calibreA}|${s.calibreB}`} className="text-muted-foreground">
+                Las puertas <span className="text-foreground">{s.calibreA}</span> reciben hasta{' '}
+                <span className="tabular-nums text-foreground">{fmtKg(s.hastaA)}</span> y las{' '}
+                <span className="text-foreground">{s.calibreB}</span> desde{' '}
+                <span className="tabular-nums text-foreground">{fmtKg(s.desdeB)}</span>:{' '}
+                <span className="tabular-nums text-foreground">{s.gramos} g</span> en común. El pescado de ese tramo cae en cualquiera de las dos
+                ({fmtPz(s.piezasA)} pz en {s.calibreA}, {fmtPz(s.piezasB)} pz en {s.calibreB}). Revisar los límites de los dos programas en el Z2.
+              </p>
+            ))}
+          </div>
+        )}
 
         {onAdoptarSeteoTodas && Object.keys(adoptables).length >= 2 && (
           <div className="flex flex-wrap items-center gap-2" data-testid="pureza-adoptar-todas">
@@ -472,7 +493,7 @@ function PorPeso({ peso }: { peso: PesoPorPuerta }) {
     { label: 'Fuera, más pesado', n: peso.fueraArriba, cls: 'bg-ink-crit', extra: peso.gramosArriba ? `${fmtKg(peso.gramosArriba[0])} a ${fmtKg(peso.gramosArriba[1])}` : undefined },
     { label: 'Fuera, más liviano', n: peso.fueraAbajo, cls: 'bg-ink-crit', extra: peso.gramosAbajo ? `${fmtKg(peso.gramosAbajo[0])} a ${fmtKg(peso.gramosAbajo[1])}` : undefined },
   ].filter((f) => f.n > 0)
-  const fuera = peso.pctFuera >= PESO_FUERA_AVISO_PCT
+  const fuera = pesoAvisa(peso)
   return (
     <div data-testid="pureza-peso">
       <p className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">

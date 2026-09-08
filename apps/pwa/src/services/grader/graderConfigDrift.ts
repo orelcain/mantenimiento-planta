@@ -16,7 +16,7 @@
  */
 
 import { classifyRecordToMatrix, CALIBRE_WEIGHT_RANGES } from './graderAnalytics'
-import type { GateAssignment, Gate0Record, MatrixP0Cause } from './types'
+import type { GateAssignment, Gate0Record, MatrixP0Cause, CalibreWeightRange } from './types'
 
 /** Causas cuya clasificación depende de la config de gates (las 4 derivadas). */
 export const GATE_DEPENDENT_CAUSES: MatrixP0Cause[] = [
@@ -79,7 +79,7 @@ type P0Record = {
 }
 
 /** Clasifica un set de registros de puerta 0 con una config dada. Réplica exacta de computeShiftSummary. */
-function tallyCauses(records: P0Record[], gates: GateAssignment[]): Map<string, number> {
+function tallyCauses(records: P0Record[], gates: GateAssignment[], ranges?: CalibreWeightRange[]): Map<string, number> {
   const active = gates.filter((g) => g.active)
   const out = new Map<string, number>()
   if (active.length === 0) return out
@@ -87,7 +87,7 @@ function tallyCauses(records: P0Record[], gates: GateAssignment[]): Map<string, 
     const cause = classifyRecordToMatrix(
       { ...(rec as Gate0Record), error: rec.error ?? '', gate: 0 as const },
       active,
-      CALIBRE_WEIGHT_RANGES,
+      ranges?.length ? ranges : CALIBRE_WEIGHT_RANGES,
     )
     out.set(cause, (out.get(cause) ?? 0) + rec.pieces)
   }
@@ -118,21 +118,23 @@ export function detectConfigDrift(params: {
   gate0Records: P0Record[]
   /** `topP0Causes` guardado en el summary. */
   savedCauses?: Array<{ error: string; pieces: number }>
+  /** Rangos de calibre configurados en la app. Sin esto, las constantes. */
+  ranges?: CalibreWeightRange[]
 }): ConfigDriftResult | null {
-  const { gatesUsed, currentGates, gate0Records, savedCauses } = params
+  const { gatesUsed, currentGates, gate0Records, savedCauses, ranges } = params
 
   // Sin config actual con la que comparar no hay nada que avisar. Cubre además
   // las líneas que no clasifican (Yal): sus gates no llevan calibre × calidad.
   if (currentGates.filter((g) => g.active).length === 0) return null
   if (gate0Records.length === 0) return null
 
-  const currentTally = tallyCauses(gate0Records, currentGates)
+  const currentTally = tallyCauses(gate0Records, currentGates, ranges)
 
   // Base de comparación: el recálculo con las gates originales (exacto) o, si el
   // turno no las guardó, el desglose persistido (estimado).
   const mode: ConfigDriftMode = gatesUsed && gatesUsed.length > 0 ? 'exact' : 'estimated'
   const savedTally = mode === 'exact'
-    ? tallyCauses(gate0Records, gatesUsed!)
+    ? tallyCauses(gate0Records, gatesUsed!, ranges)
     : new Map((savedCauses ?? []).map((c) => [c.error, c.pieces]))
 
   // En modo estimado sin causas guardadas no hay base contra la cual comparar.
