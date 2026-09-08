@@ -27,7 +27,8 @@ import { DEFAULT_SHIFT_SCHEDULE, normalizeShiftSchedule } from '@/services/grade
 import { getShiftDisplayDateKey, getShiftMeta } from '@/services/grader/graderShiftDisplay'
 import { PurezaPorPuertaCard } from '@/components/grader/PurezaPorPuertaCard'
 import { loadGateObservations, updateDailySummary } from '@/services/grader/graderDailySummary.service'
-import { deriveGateMix, configTimelineFromSnapshots, classifyGateCauses, type GateObservations, type SeteoMaquina } from '@/services/grader/graderGateObservations'
+import { deriveGateMix, configTimelineFromSnapshots, classifyGateCauses, derivePesoPorPuerta, type GateObservations, type SeteoMaquina } from '@/services/grader/graderGateObservations'
+import { CALIBRE_WEIGHT_RANGES } from '@/services/grader/graderAnalyticsThroughput'
 import { parseMatrixErrorString } from '@/services/grader/graderMatrixP0Causes'
 import { HeroScorecard } from '@/components/grader/HeroScorecard'
 import { TurnoOficialChip } from '@/components/grader/TurnoOficialChip'
@@ -684,6 +685,16 @@ export function AnalisisGraderTurnoPage() {
    */
   const [showConfigPanel, setShowConfigPanel] = useState(true)
   const [calibreOverride, setCalibrerOverride] = useState<CalibreWeightRange[] | null>(null)
+  // Rangos de calibre de la línea (Configuración del Grader). Con el override
+  // del turno encima, son los que juzgan la mezcla por peso.
+  const [moduleRanges, setModuleRanges] = useState<CalibreWeightRange[] | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    getModuleRanges(plantLineCfg.id)
+      .then((cfg) => { if (!cancelled) setModuleRanges(cfg?.customWeightRanges?.length ? cfg.customWeightRanges : null) })
+      .catch(() => { if (!cancelled) setModuleRanges(null) })
+    return () => { cancelled = true }
+  }, [plantLineCfg.id])
   const [turnoThresholdsOverride, setTurnoThresholdsOverride] = useState<{ photocellPctWarn: number; outOfLimitsPctWarn: number; pointZeroPctWarn: number; pointZeroPctCritical: number } | null>(null)
 
   // ── Shoplogix staleness counter + manual refresh ──────────────────────────
@@ -1171,6 +1182,12 @@ export function AnalisisGraderTurnoPage() {
   const gateMixDerivado = useMemo(
     () => (gateObs ? deriveGateMix(gateObs, gateTimeline) : null),
     [gateObs, gateTimeline],
+  )
+  // Mezcla física por peso, contra los rangos vigentes (override del turno →
+  // línea → constantes).
+  const pesoPorPuerta = useMemo(
+    () => (gateObs ? derivePesoPorPuerta(gateObs, gateTimeline, calibreOverride ?? moduleRanges ?? CALIBRE_WEIGHT_RANGES) : undefined),
+    [gateObs, gateTimeline, calibreOverride, moduleRanges],
   )
   // «¿Por qué cayó acá?» para la puerta que el usuario toque en la tarjeta.
   const causesFor = useMemo(
@@ -2610,6 +2627,7 @@ export function AnalisisGraderTurnoPage() {
               causesFor={causesFor}
               seteoDistinto={gateMixDerivado?.seteoDistinto}
               onAdoptarSeteo={isSupervisor || isAdmin ? handleAdoptarSeteo : undefined}
+              pesoPorPuerta={pesoPorPuerta}
               turnoLabel={`${dateKey.slice(8, 10)}/${dateKey.slice(5, 7)} · ${shiftLabel}`}
             />
           )}
