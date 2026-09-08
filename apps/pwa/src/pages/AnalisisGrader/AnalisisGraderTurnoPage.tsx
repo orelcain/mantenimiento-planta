@@ -27,7 +27,7 @@ import { DEFAULT_SHIFT_SCHEDULE, normalizeShiftSchedule } from '@/services/grade
 import { getShiftDisplayDateKey, getShiftMeta } from '@/services/grader/graderShiftDisplay'
 import { PurezaPorPuertaCard } from '@/components/grader/PurezaPorPuertaCard'
 import { loadGateObservations, updateDailySummary } from '@/services/grader/graderDailySummary.service'
-import { deriveGateMix, configTimelineFromSnapshots, classifyGateCauses, derivePesoPorPuerta, detectSolapesDeRango, type GateObservations, type SeteoMaquina } from '@/services/grader/graderGateObservations'
+import { deriveGateMix, configTimelineFromSnapshots, classifyGateCauses, derivePesoPorPuerta, detectSolapesDeRango, inferirSeteoFaltante, type GateObservations, type SeteoMaquina } from '@/services/grader/graderGateObservations'
 import { CALIBRE_WEIGHT_RANGES } from '@/services/grader/graderAnalyticsThroughput'
 import { parseMatrixErrorString } from '@/services/grader/graderMatrixP0Causes'
 import { HeroScorecard } from '@/components/grader/HeroScorecard'
@@ -1175,9 +1175,15 @@ export function AnalisisGraderTurnoPage() {
   // Pureza por puerta juzgada con la config vigente en CADA bloque (los
   // snapshots del turno, convertidos de hora real a hora de pared). Antes del
   // primer snapshot rige gatesUsed. Se recalcula sola al cambiar una gate.
-  const gateTimeline = useMemo(
+  const gateTimelineBase = useMemo(
     () => configTimelineFromSnapshots(configSnapshots, summary?.gatesUsed),
     [configSnapshots, summary?.gatesUsed],
+  )
+  // Turnos sin seteo guardado: la puerta sin asignación toma lo que el Z2 le
+  // etiqueta (≥ 90 %) como asignación "inferida", para poder juzgarla igual.
+  const { timeline: gateTimeline, inferidas: seteoInferido } = useMemo(
+    () => (gateObs ? inferirSeteoFaltante(gateObs, gateTimelineBase) : { timeline: gateTimelineBase, inferidas: {} }),
+    [gateObs, gateTimelineBase],
   )
   const gateMixDerivado = useMemo(
     () => (gateObs ? deriveGateMix(gateObs, gateTimeline) : null),
@@ -1344,8 +1350,13 @@ export function AnalisisGraderTurnoPage() {
   /** Igual que handleAdoptarSeteo, para todas las puertas con seteo distinto de una vez (9 turnos de agosto lo necesitan en 8-10 puertas). */
   const handleAdoptarSeteoTodas = useCallback((seteos: Record<number, SeteoMaquina>) => {
     if (!user?.id || !dateKey || !shiftLabel) return
-    const base = turnoGates.length > 0 ? turnoGates : (summary?.gatesUsed ?? [])
-    if (base.length === 0) return
+    // Sin seteo guardado (turnos viejos) se parte de las 12 puertas inactivas
+    // y se activan las inferidas: es "Guardar seteo inferido".
+    const base: GateAssignment[] = turnoGates.length > 0
+      ? turnoGates
+      : (summary?.gatesUsed?.length
+        ? summary.gatesUsed
+        : Array.from({ length: 12 }, (_, i) => ({ gateNumber: i + 1, assignedCalibre: 'Other', assignedQuality: 'Unknown' as GateAssignment['assignedQuality'], active: false })))
     const updated = base.map((g) => {
       const s = seteos[g.gateNumber]
       return s ? { ...g, assignedCalibre: s.calibre, assignedQuality: s.quality as GateAssignment['assignedQuality'], active: true } : g
@@ -2666,6 +2677,7 @@ export function AnalisisGraderTurnoPage() {
               onAdoptarSeteoTodas={isSupervisor || isAdmin ? handleAdoptarSeteoTodas : undefined}
               pesoPorPuerta={pesoPorPuerta}
               solapes={solapes}
+              inferidas={seteoInferido}
               turnoLabel={`${dateKey.slice(8, 10)}/${dateKey.slice(5, 7)} · ${shiftLabel}`}
             />
           )}

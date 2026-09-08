@@ -89,10 +89,27 @@ export const comboKey = (calibre: string | undefined, quality: string | undefine
 
 export interface Combo { calibre: string; quality: string; conservation?: string }
 
+/**
+ * Etiquetas de calibre de Excel viejos guardadas crudas ("2 - 4 LB", "HG 6-8"): se
+ * normalizan al leer, no al escribir, para que los docs ya guardados también
+ * calcen con los calibres de la app (rangos, distancia, programa).
+ */
+export function normalizarCalibre(s: string): string {
+  if (s === OTROS || s === SIN_DATO || s === ANY_CALIBRE) return s
+  const t = s.toLowerCase().replace(/\s+/g, '').replace(/^hg/, '')
+  if (t.includes('fuera') || t.includes('out')) return ANY_CALIBRE
+  if (/\d+-?(up|mas|\+)/.test(t) || /^10-12/.test(t)) return '10-12 lb'
+  const m = t.match(/^(\d+)-(\d+)(lb)?$/)
+  if (!m) return s
+  const lb = `${m[1]}-${m[2]} lb`
+  return ['0-2 lb', '2-4 lb', '4-6 lb', '6-8 lb', '8-10 lb', '10-12 lb'].includes(lb) ? lb : s
+}
+
 export function splitCombo(key: string): Combo {
   if (key === OTROS) return { calibre: OTROS, quality: OTROS }
   const [calibre = SIN_DATO, quality = SIN_DATO, conservation] = key.split('|')
-  return conservation ? { calibre, quality, conservation } : { calibre, quality }
+  const c = normalizarCalibre(calibre)
+  return conservation ? { calibre: c, quality, conservation } : { calibre: c, quality }
 }
 
 /** Un ts ISO sin sufijo se parsea como UTC (ver graderGateMix.parseWallClock). */
@@ -463,6 +480,69 @@ export function derivePesoPorPuerta(
   return out
 }
 
+// ── Programa dominante de una puerta (lo que el Z2 etiqueta) ────────────────
+
+/**
+ * Combinación calibre|calidad dominante de la puerta en TODO el turno, sin
+ * mirar ninguna config. Es lo que el Z2 tiene seteado para esa puerta.
+ * null si no hay dominante (≥ 90 %), es "Other" o "Sin dato".
+ */
+export function programaDominante(entry: GateObservationsEntry): SeteoMaquina | null {
+  const tally = new Map<string, number>()
+  let total = 0
+  for (const b of entry.byBucket) {
+    if (!b) continue
+    for (const [key, n] of Object.entries(b)) {
+      const c = splitCombo(key)
+      if (c.calibre === OTROS) continue
+      total += n
+      const k = `${c.calibre}|${c.quality}`
+      tally.set(k, (tally.get(k) ?? 0) + n)
+    }
+  }
+  if (total === 0) return null
+  const [top, n] = [...tally.entries()].sort((a, b) => b[1] - a[1])[0] ?? ['', 0]
+  const pct = r1((n / total) * 100)
+  if (pct < SETEO_DOMINANCIA_PCT) return null
+  const [calibre, quality] = top.split('|') as [string, string]
+  if (calibre === SIN_DATO || quality === SIN_DATO || calibre === ANY_CALIBRE) return null
+  return { calibre, quality, pct }
+}
+
+/**
+ * Turnos sin seteo guardado (los 23 de la temporada pasada): la puerta que no
+ * tiene asignación en NINGÚN bloque toma como asignación lo que el Z2 le
+ * etiqueta (programa dominante ≥ 90 %). Así la pureza y el peso se juzgan
+ * igual, y la tarjeta lo marca como "inferido" hasta que alguien lo guarde.
+ * Sin esto la tarjeta decía "Todas puras" con las 12 puertas "sin asignación".
+ */
+export function inferirSeteoFaltante(
+  obs: GateObservations,
+  timeline: ConfigTimeline,
+): { timeline: ConfigTimeline; inferidas: Record<number, SeteoMaquina> } {
+  const size = obs.bucketMinutes * 60_000
+  const from = Date.parse(obs.bucketsFrom)
+  const inferidas: Record<number, SeteoMaquina> = {}
+  for (const e of obs.gates) {
+    let tieneCfg = false
+    for (let i = 0; i < obs.bucketCount; i++) {
+      if (timeline.configAt(from + i * size)?.some((g) => g.gateNumber === e.gate && g.active)) { tieneCfg = true; break }
+    }
+    if (tieneCfg) continue
+    const p = programaDominante(e)
+    if (p) inferidas[e.gate] = p
+  }
+  if (Object.keys(inferidas).length === 0) return { timeline, inferidas }
+  const extra: GateAssignment[] = Object.entries(inferidas).map(([g, p]) => ({
+    gateNumber: Number(g), assignedCalibre: p.calibre, assignedQuality: p.quality as GateAssignment['assignedQuality'], active: true,
+  }))
+  const configAt: ConfigAt = (ms) => {
+    const base = timeline.configAt(ms) ?? []
+    return [...base, ...extra.filter((x) => !base.some((g) => g.gateNumber === x.gateNumber && g.active))]
+  }
+  return { timeline: { configAt, changeTimesMs: timeline.changeTimesMs }, inferidas }
+}
+
 // ── Programas de calibre solapados en el Z2 ─────────────────────────────────
 
 export interface SolapeDeRango {
@@ -486,10 +566,12 @@ const SOLAPE_MIN_GRAMOS = 200
 
 /**
  * Detecta programas de calibre solapados en el Z2 mirando SOLO el peso de lo que
- * cayó en las puertas de cada calibre asignado (percentiles 2–98 del histograma,
- * para no dejarse llevar por una pieza suelta). Medido 07-09: las puertas 8-10
- * recibían hasta 4,98 kg y las 10-12 desde 4,59 kg: 400 g en común, y el
- * pescado de ese tramo cae en cualquiera de los dos calibres.
+ * cayó en las puertas de cada PROGRAMA (la etiqueta dominante de la puerta, que
+ * es lo que el Z2 tiene seteado; no el seteo de la app, que puede estar mal —
+ * ronda 5: con el seteo del borrador decía que 6-8 y 4-6 compartían 1.800 g).
+ * Percentiles 2–98 del histograma para no dejarse llevar por una pieza suelta.
+ * Medido 07-09: las puertas 8-10 recibían hasta 4,98 kg y las 10-12 desde
+ * 4,59 kg: 400 g en común, y el pescado de ese tramo cae en cualquiera.
  */
 export function detectSolapesDeRango(obs: GateObservations, timeline: ConfigTimeline): SolapeDeRango[] {
   const size = obs.bucketMinutes * 60_000
@@ -498,12 +580,14 @@ export function detectSolapesDeRango(obs: GateObservations, timeline: ConfigTime
   const hist = new Map<string, Map<number, number>>()
   for (const e of obs.gates) {
     if (!e.weightByBucket) continue
+    const programa = programaDominante(e)?.calibre
     e.weightByBucket.forEach((bins, i) => {
       if (!bins) return
       const cfg = timeline.configAt(from + i * size)?.find((g) => g.gateNumber === e.gate && g.active)
-      if (!cfg || cfg.assignedCalibre === ANY_CALIBRE) return
-      let h = hist.get(cfg.assignedCalibre)
-      if (!h) { h = new Map(); hist.set(cfg.assignedCalibre, h) }
+      const calibre = programa ?? (cfg && cfg.assignedCalibre !== ANY_CALIBRE ? cfg.assignedCalibre : undefined)
+      if (!calibre) return
+      let h = hist.get(calibre)
+      if (!h) { h = new Map(); hist.set(calibre, h) }
       for (const [k, n] of Object.entries(bins)) h.set(Number(k), (h.get(Number(k)) ?? 0) + n)
     })
   }

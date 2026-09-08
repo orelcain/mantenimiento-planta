@@ -49,6 +49,35 @@ piel Apple. Gotcha: `cn()` (tailwind-merge) DESCARTA `text-caption` /
 `text-title3` si en la misma llamada va un `text-ink-*` — toma el tamaño
 como color y gana el último; esos pares van en template string.
 
+## 2026-09-07 · Ronda de pulido 5 · seteo inferido, solape por programa, etiquetas crudas (PR #917)
+
+Recorrido de lo que nadie miró: un turno de febrero, uno de agosto con el
+seteo del borrador, y el camino "Registrar incidencia".
+
+1. **"Todas puras" con las 12 puertas "sin asignación"** (2026-02-25 T1 y
+   otros 22 turnos sin `gatesUsed`): mentía. `inferirSeteoFaltante`: la
+   puerta sin asignación en ningún bloque toma como asignación lo que el Z2
+   le etiqueta (programa dominante ≥ 90 %, `programaDominante`), la tarjeta
+   la marca "· inferido" y ofrece "Guardar seteo inferido" (mismo
+   `adoptarSeteoMaquina`, partiendo de 12 puertas inactivas). Sin ninguna
+   puerta juzgada la pill dice "Sin seteo guardado", en neutro.
+2. **Solape falso en agosto**: con el seteo del borrador, el aviso decía que
+   6-8 y 4-6 compartían 1.800 g. `detectSolapesDeRango` agrupa ahora por el
+   PROGRAMA que el Z2 etiqueta (dominante de la puerta), no por el seteo de
+   la app: en 2026-08-17 T2 ya no hay aviso; en hoy sigue el real (8-10 y
+   10-12, 300 g).
+3. **"Registrar incidencia con esto"** no aparecía con solo peso fuera o
+   solape (lo más accionable): ahora sí, y el resumen incluye el solape.
+4. **Etiquetas crudas de Excel viejos** ("2 - 4 LB", "HG 6-8") guardadas en
+   `pieceRecords` de febrero: no calzaban con los calibres de la app (sin
+   rango, "calibre lejano", programa distinto). `normalizarCalibre` en
+   `splitCombo`: se normaliza al LEER, así los 37 docs backfilleados sirven
+   sin reescribir.
+
+3 tests nuevos (790 del módulo). Verificado en el preview con sesión sobre
+2026-02-25 T1 (12 inferidas, pesos juzgados), 2026-08-17 T2 (sin solape
+falso) y hoy (incidencia visible, solape real).
+
 ## 2026-09-07 · Ronda de pulido 4 · rangos alineados con el Z2, solape de programas y P0 con rangos configurados (PR #916)
 
 **Rangos alineados.** Orel confirmó que el 8-10 del Z2 llega a 5 kg. Se editó

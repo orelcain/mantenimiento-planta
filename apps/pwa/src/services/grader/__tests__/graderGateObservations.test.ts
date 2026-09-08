@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   computeGateObservations, deriveGateMix, configTimelineFromSnapshots, realIsoToWallClockMs,
-  GATE_OBS_MAX_BUCKETS, GATE_OBS_MAX_COMBOS, OTROS, classifyGateCauses, derivePesoPorPuerta, detectSolapesDeRango,
+  GATE_OBS_MAX_BUCKETS, GATE_OBS_MAX_COMBOS, OTROS, classifyGateCauses, derivePesoPorPuerta, detectSolapesDeRango, inferirSeteoFaltante,
 } from '../graderGateObservations'
 import { ANY_CALIBRE, SIN_DATO } from '../graderGateMix'
 import type { GateConfigSnapshot } from '../graderConfigSnapshot.service'
@@ -310,5 +310,46 @@ describe('P0 con los rangos configurados de la app', () => {
     const ranges = [{ calibre: '8-10 lb', label: '', minGrams: 3665, maxGrams: 5000 }]
     const alineado = classifyGate0Records([rec], gates, 5, ranges)
     expect(alineado.find((c) => c.error === 'fuera_de_calibre')).toBeUndefined()
+  })
+})
+
+describe('seteo inferido y solape por programa (ronda 5)', () => {
+  const w = (gateNo: number, cal: string, g: number, n: number, q: PieceRecord['quality'] = 'Premium') =>
+    pieces(gateNo, n, cal, q, '2026-09-07T09:00:00').map((r) => ({ ...r, weightPerPieceGrams: g }))
+
+  it('sin seteo guardado, la puerta toma lo que el Z2 etiqueta como asignación inferida y se juzga igual', () => {
+    const obs = computeGateObservations([...w(8, '8-10 lb', 4100, 95), ...w(8, '6-8 lb', 3400, 5)])!
+    const { timeline, inferidas } = inferirSeteoFaltante(obs, configTimelineFromSnapshots([], []))
+    expect(inferidas).toEqual({ 8: { calibre: '8-10 lb', quality: 'Premium', pct: 95 } })
+    const g8 = deriveGateMix(obs, timeline).gates[0]!
+    expect(g8.assignedCalibre).toBe('8-10 lb')
+    expect(g8.purityPct).toBe(95)
+    // con seteo guardado no se infiere nada
+    expect(inferirSeteoFaltante(obs, configTimelineFromSnapshots([], [gate(8, '8-10 lb', 'Premium')])).inferidas).toEqual({})
+  })
+
+  it('el solape se mide por el programa que etiqueta el Z2, no por un seteo de la app equivocado', () => {
+    // Puertas 8 y 10: el Z2 etiqueta 8-10 hasta 4,9 kg y 10-12 desde 4,6 kg.
+    // El seteo de la app (borrador) dice que la 8 es 4-6 y la 10 es 6-8: basura.
+    const obs = computeGateObservations([
+      ...w(8, '8-10 lb', 4200, 60), ...w(8, '8-10 lb', 4800, 20),
+      ...w(10, '10-12 lb', 4600, 20), ...w(10, '10-12 lb', 5200, 60),
+    ])!
+    const mal = configTimelineFromSnapshots([], [gate(8, '4-6 lb', 'Premium'), gate(10, '6-8 lb', 'Premium')])
+    const s = detectSolapesDeRango(obs, mal)
+    expect(s).toHaveLength(1)
+    expect(s[0]).toMatchObject({ calibreA: '8-10 lb', calibreB: '10-12 lb', gramos: 300 })
+  })
+})
+
+describe('etiquetas crudas de Excel viejos (febrero: "2 - 4 LB")', () => {
+  it('se normalizan al leer, y así calzan con rangos, distancia y programa', () => {
+    const obs = computeGateObservations(pieces(4, 50, '2 - 4 LB', 'Premium', '2026-02-25T09:00:00').map((r) => ({ ...r, weightPerPieceGrams: 1500 })))!
+    expect(Object.keys(obs.gates[0]!.byBucket[0]!)[0]).toBe('2 - 4 LB|Premium') // crudo en el doc
+    const { inferidas, timeline } = inferirSeteoFaltante(obs, configTimelineFromSnapshots([], []))
+    expect(inferidas[4]?.calibre).toBe('2-4 lb')
+    const peso = derivePesoPorPuerta(obs, timeline, [{ calibre: '2-4 lb', label: '', minGrams: 916, maxGrams: 1833 }])[4]!
+    expect(peso).toMatchObject({ dentro: 50, pctFuera: 0 })
+    expect(deriveGateMix(obs, timeline).gates[0]!.byCalibre).toEqual({ '2-4 lb': 50 })
   })
 })
