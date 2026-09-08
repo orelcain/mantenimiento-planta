@@ -8,7 +8,8 @@
  */
 import { useMemo, useState } from 'react'
 import { PurezaPorPuertaCard } from '@/components/grader/PurezaPorPuertaCard'
-import { computeGateObservations, deriveGateMix, configTimelineFromSnapshots, classifyGateCauses } from '@/services/grader/graderGateObservations'
+import { computeGateObservations, deriveGateMix, configTimelineFromSnapshots, classifyGateCauses, derivePesoPorPuerta } from '@/services/grader/graderGateObservations'
+import { CALIBRE_WEIGHT_RANGES } from '@/services/grader/graderAnalyticsThroughput'
 import type { GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
 import type { GateAssignment, PieceRecord } from '@/services/grader/types'
 
@@ -27,13 +28,17 @@ const GATES: GateAssignment[] = [
   { gateNumber: 12, assignedCalibre: 'Other', assignedQuality: 'Industrial', active: true },
 ]
 
-/** Piezas repartidas parejo entre `from` y `to` (wall-clock marcado como Z). */
-function lote(gate: number, n: number, calibre: string, quality: PieceRecord['quality'], from: string, to: string): PieceRecord[] {
+/** Peso típico (g) por calibre: el centro del rango, con ±150 g de dispersión determinista. */
+const PESO_TIPICO: Record<string, number> = { '2-4 lb': 1375, '4-6 lb': 2290, '6-8 lb': 3200, '8-10 lb': 4120, '10-12 lb': 5200 }
+
+/** Piezas repartidas parejo entre `from` y `to` (wall-clock marcado como Z). `grams` fuerza el peso. */
+function lote(gate: number, n: number, calibre: string, quality: PieceRecord['quality'], from: string, to: string, grams?: number): PieceRecord[] {
   const a = Date.parse(`${from}Z`)
   const b = Date.parse(`${to}Z`)
   return Array.from({ length: n }, (_, i) => ({
     ts: new Date(a + ((b - a) * i) / Math.max(1, n - 1)).toISOString(),
     gate, pieces: 1, calibre, quality,
+    weightPerPieceGrams: grams ?? (PESO_TIPICO[calibre] ?? 3000) + ((i * 37) % 300) - 150,
   }))
 }
 
@@ -59,6 +64,8 @@ function fixture(): PieceRecord[] {
     ...lote(6, 6, '4-6 lb', 'Premium', `${D}13:00:00`, `${D}13:20:00`).map((r) => ({ ...r, conservation: 'CONGELADO' as const })),
     ...lote(7, 705, '8-10 lb', 'Premium', ini, fin), ...lote(7, 37, '6-8 lb', 'Premium', ini, fin),
     ...lote(8, 620, '8-10 lb', 'Premium', ini, fin), ...lote(8, 63, '8-10 lb', 'Grado', ini, fin), ...lote(8, 22, '10-12 lb', 'Premium', ini, fin),
+    // G8: la máquina etiqueta 8-10 pero pesan 4,6–4,9 kg (medido hoy: 10 %)
+    ...lote(8, 70, '8-10 lb', 'Premium', `${D}09:00:00`, fin, 4700),
     ...lote(9, 308, '10-12 lb', 'Premium', ini, fin), ...lote(9, 10, '8-10 lb', 'Premium', ini, fin),
     ...lote(10, 407, '4-6 lb', 'Grado', ini, fin), ...lote(10, 31, '6-8 lb', 'Grado', ini, fin), ...lote(10, 9, '4-6 lb', 'Premium', ini, fin),
     ...lote(11, 382, '6-8 lb', 'Grado', ini, fin), ...lote(11, 20, '4-6 lb', 'Grado', ini, fin),
@@ -71,7 +78,7 @@ export default function PurezaPuertaDevPage() {
   const [ancho, setAncho] = useState<375 | 768 | 1024>(375)
   // v2: observación + derivación con un cambio de gate a las 10:18 (hora de
   // pared; el snapshot guarda hora real UTC, Chile en septiembre = UTC-3).
-  const { gateMix, snapshots, causesFor } = useMemo(() => {
+  const { gateMix, snapshots, causesFor, pesoPorPuerta } = useMemo(() => {
     const obs = computeGateObservations(fixture())!
     const g1 = GATES.map((g) => (g.gateNumber === 6 ? { ...g, assignedCalibre: '4-6 lb' } : g))
     const snapshots: GateConfigSnapshot[] = [
@@ -79,7 +86,11 @@ export default function PurezaPuertaDevPage() {
       { id: 'b', shiftDocId: 'dev', at: '2026-09-07T13:18:00.000Z', changedBy: { uid: 'dev', name: 'dev' }, gates: g1, changes: [{ gateNumber: 6, field: 'assignedCalibre', before: '6-8 lb', after: '4-6 lb' }] as never, reason: 'Llegó lote chico' },
     ]
     const timeline = configTimelineFromSnapshots(snapshots, GATES)
-    return { gateMix: deriveGateMix(obs, timeline), snapshots, causesFor: (g: number) => classifyGateCauses(obs, g, timeline) }
+    return {
+      gateMix: deriveGateMix(obs, timeline), snapshots,
+      causesFor: (g: number) => classifyGateCauses(obs, g, timeline),
+      pesoPorPuerta: derivePesoPorPuerta(obs, timeline, CALIBRE_WEIGHT_RANGES),
+    }
   }, [])
 
   return (
@@ -122,6 +133,7 @@ export default function PurezaPuertaDevPage() {
           causesFor={causesFor}
           seteoDistinto={gateMix.seteoDistinto}
           onAdoptarSeteo={(g, s) => window.alert(`Adoptar G${g}: ${s.calibre} · ${s.quality}`)}
+          pesoPorPuerta={pesoPorPuerta}
           turnoLabel="07/09 · Turno 1"
         />
       </div>

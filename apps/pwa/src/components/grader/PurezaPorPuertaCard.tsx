@@ -32,7 +32,7 @@ import {
   PUREZA_OK_PCT, PUREZA_WARN_PCT, nivelDePureza, bloqueDeCaida, promedioHasta, type NivelPureza as Nivel,
 } from '@/services/grader/graderPurezaNivel'
 import type { GateAssignment } from '@/services/grader/types'
-import { CAUSA_ORDER, type CausaTipo, type GateCauses, type GateCauseGroup, type SeteoMaquina } from '@/services/grader/graderGateObservations'
+import { CAUSA_ORDER, type CausaTipo, type GateCauses, type GateCauseGroup, type SeteoMaquina, type PesoPorPuerta } from '@/services/grader/graderGateObservations'
 
 // ⚠ Nunca combinar estas clases de color con text-caption/text-title3 dentro
 // de cn(): tailwind-merge no conoce la escala tipográfica propia, toma
@@ -99,7 +99,16 @@ interface Props {
   seteoDistinto?: Record<number, SeteoMaquina>
   /** Corregir el seteo de la app con lo que hace la máquina. Solo supervisor/admin. */
   onAdoptarSeteo?: (gate: number, seteo: SeteoMaquina) => void
+  /**
+   * Mezcla FÍSICA: peso de cada pieza contra el rango del calibre asignado
+   * (rangos configurados en la app). La etiqueta del Excel no la mide.
+   */
+  pesoPorPuerta?: Record<number, PesoPorPuerta>
 }
+
+/** Desde este % de piezas fuera del rango por peso, la baldosa lo dice. */
+const PESO_FUERA_AVISO_PCT = 5
+const fmtKg = (g: number) => `${(g / 1000).toFixed(g % 1000 === 0 ? 0 : 1).replace('.', ',')} kg`
 
 /** Nombre de cada causal y qué mirar. El color nunca es el único canal. */
 const CAUSA_META: Record<CausaTipo, { label: string; hint: (g: GateCauseGroup, self: number) => string }> = {
@@ -144,7 +153,7 @@ const CAUSA_COLOR: Record<'dark' | 'light', Record<CausaTipo | 'ok', string>> = 
 }
 const CHART_TEXT = { light: { axis: '#41566a', grid: '#c3d7e9', tipBg: '#ffffff', tipText: '#16242f', tipBorder: '#c3d7e9' }, dark: { axis: '#94a3b8', grid: '#22384a', tipBg: '#1e293b', tipText: '#e2e8f0', tipBorder: '#334155' } }
 
-export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets, causesFor, seteoDistinto, onAdoptarSeteo }: Props) {
+export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets, causesFor, seteoDistinto, onAdoptarSeteo, pesoPorPuerta }: Props) {
   const navigate = useNavigate()
   const [copiado, setCopiado] = useState(false)
 
@@ -160,14 +169,14 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets,
   const totals = useMemo(() => gateMixTotals(gateMix), [gateMix])
   // Una puerta con seteo distinto no cuenta como mezclada: es otra cosa.
   const conteo = useMemo(() => {
-    let crit = 0, warn = 0, seteo = 0
+    let crit = 0, warn = 0, seteo = 0, noRec = 0
     for (const e of gateMix.gates) {
-      if (seteoDistinto?.[e.gate]) { seteo++; continue }
+      if (seteoDistinto?.[e.gate]) { if (seteoDistinto[e.gate]!.noReconocido) noRec++; else seteo++; continue }
       const n = nivelDePureza(e.purityPct)
       if (n === 'crit') crit++
       else if (n === 'warn') warn++
     }
-    return { crit, warn, seteo }
+    return { crit, warn, seteo, noRec }
   }, [gateMix, seteoDistinto])
 
   // Arranca abierta en la peor puerta MEZCLADA; si no hay, en la primera con
@@ -197,10 +206,16 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets,
 
   const nivelGlobal: Nivel = conteo.crit > 0 ? 'crit' : conteo.warn > 0 ? 'warn' : 'ok'
   const pillTone: PillTone = conteo.crit > 0 ? 'critical' : conteo.warn > 0 ? 'warning' : conteo.seteo > 0 ? 'info' : 'ok'
+  const conPesoFuera = useMemo(
+    () => Object.values(pesoPorPuerta ?? {}).filter((p) => p.pctFuera >= PESO_FUERA_AVISO_PCT).length,
+    [pesoPorPuerta],
+  )
   const resumenPill = [
     conteo.crit > 0 ? `${conteo.crit} mezclada${conteo.crit > 1 ? 's' : ''}` : '',
     conteo.warn > 0 ? `${conteo.warn} en atención` : '',
     conteo.seteo > 0 ? `${conteo.seteo} con seteo ≠ máquina` : '',
+    conteo.noRec > 0 ? `${conteo.noRec} con calibre no reconocido` : '',
+    conPesoFuera > 0 ? `${conPesoFuera} con peso fuera de rango` : '',
   ].filter(Boolean).join(' · ') || 'Todas puras'
 
   const resumenTexto = () => {
@@ -213,7 +228,9 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets,
     for (const e of gateMix.gates) {
       const s = seteoDistinto?.[e.gate]
       if (s) {
-        lineas.push(`G${e.gate} (seteo ${etiquetaAsignacion(e, gateCfg.get(e.gate))}): seteo distinto a la máquina, que manda ${s.calibre} · ${s.quality} (${fmtPct(s.pct)})`)
+        lineas.push(s.noReconocido
+          ? `G${e.gate} (seteo ${etiquetaAsignacion(e, gateCfg.get(e.gate))}): la máquina etiqueta ${fmtPct(s.pct)} de las piezas con un calibre que la app no conoce (${s.quality})`
+          : `G${e.gate} (seteo ${etiquetaAsignacion(e, gateCfg.get(e.gate))}): seteo distinto a la máquina, que manda ${s.calibre} · ${s.quality} (${fmtPct(s.pct)})`)
         continue
       }
       const n = nivelDePureza(e.purityPct)
@@ -224,6 +241,10 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets,
         + (textoIntruso(e) ? ` · ${textoIntruso(e)}` : '')
         + (caida != null ? ` · cae desde ${horaBloque(gateMix, caida)}` : ''),
       )
+      const pw = pesoPorPuerta?.[e.gate]
+      if (pw && pw.pctFuera >= PESO_FUERA_AVISO_PCT) {
+        lineas.push(`  - Por peso: ${fmtPct(pw.pctFuera)} fuera del rango ${pw.rango?.calibre ?? ''}${pw.gramosArriba ? ` (arriba: ${fmtKg(pw.gramosArriba[0])}–${fmtKg(pw.gramosArriba[1])})` : ''}${pw.gramosAbajo ? ` (abajo: ${fmtKg(pw.gramosAbajo[0])}–${fmtKg(pw.gramosAbajo[1])})` : ''}`)
+      }
       const c = causesFor?.(e.gate)
       for (const g of c?.groups.slice(0, 3) ?? []) {
         lineas.push(`  - ${CAUSA_META[g.tipo].label} ${g.value}: ${fmtPz(g.pieces)} pz (${fmtPct(g.pct)})${g.debiaIr.length ? ` · debía ir a ${g.debiaIr.map((d) => `G${d}`).join('/')}` : ''}`)
@@ -275,6 +296,8 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets,
             const intruso = e ? textoIntruso(e, true) : null
             const ink = seteo ? 'text-ink-info' : NIVEL_INK[nivel]
             const dot = seteo ? 'bg-ink-info' : NIVEL_BG[nivel]
+            const pw = pesoPorPuerta?.[n]
+            const pesoFuera = pw && pw.pctFuera >= PESO_FUERA_AVISO_PCT ? pw : null
             return (
               <button
                 key={n}
@@ -302,9 +325,11 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets,
                   {etiquetaAsignacion(e, gateCfg.get(n))}
                 </span>
                 {seteo ? (
-                  <span className="w-full text-caption font-medium leading-tight text-ink-info">seteo ≠ máquina</span>
+                  <span className="w-full text-caption font-medium leading-tight text-ink-info">{seteo.noReconocido ? 'calibre no reconocido' : 'seteo ≠ máquina'}</span>
                 ) : intruso && nivel !== 'ok' ? (
                   <span className={`w-full text-caption font-medium leading-tight ${NIVEL_INK[nivel]}`}>{intruso}</span>
+                ) : pesoFuera ? (
+                  <span className="w-full text-caption font-medium leading-tight text-ink-warn">{fmtPctEntero(pesoFuera.pctFuera)} fuera por peso</span>
                 ) : (
                   <span className="text-caption text-muted-foreground tabular-nums">
                     {e ? `${fmtPz(e.pieces)} pz` : 'sin piezas'}
@@ -327,6 +352,7 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets,
             mix={gateMix} entry={detalle} cfg={gateCfg.get(detalle.gate)} changeBuckets={changeBuckets} causas={causas}
             seteo={seteoDistinto?.[detalle.gate]}
             onAdoptar={onAdoptarSeteo && seteoDistinto?.[detalle.gate] ? () => onAdoptarSeteo(detalle.gate, seteoDistinto[detalle.gate]!) : undefined}
+            peso={pesoPorPuerta?.[detalle.gate]}
           />
         )}
 
@@ -419,9 +445,47 @@ function sinCambios(purity: ReadonlyArray<number | null>, changeBuckets?: number
   return purity.map((v, i) => (set.has(i) ? null : v))
 }
 
-function DetalleGate({ mix, entry, cfg, changeBuckets, causas, seteo, onAdoptar }: {
+/** Mezcla física: barras dentro / al límite / fuera, con los kilos observados. */
+function PorPeso({ peso }: { peso: PesoPorPuerta }) {
+  const total = peso.conPeso || 1
+  const filas: Array<{ label: string; n: number; cls: string; extra?: string }> = [
+    { label: 'Dentro del rango', n: peso.dentro, cls: 'bg-primary' },
+    { label: 'Al límite', n: peso.alLimite, cls: 'bg-ink-warn', extra: 'bins de 250 g que cruzan el borde del rango' },
+    { label: 'Fuera, más pesado', n: peso.fueraArriba, cls: 'bg-ink-crit', extra: peso.gramosArriba ? `${fmtKg(peso.gramosArriba[0])} a ${fmtKg(peso.gramosArriba[1])}` : undefined },
+    { label: 'Fuera, más liviano', n: peso.fueraAbajo, cls: 'bg-ink-crit', extra: peso.gramosAbajo ? `${fmtKg(peso.gramosAbajo[0])} a ${fmtKg(peso.gramosAbajo[1])}` : undefined },
+  ].filter((f) => f.n > 0)
+  const fuera = peso.pctFuera >= PESO_FUERA_AVISO_PCT
+  return (
+    <div data-testid="pureza-peso">
+      <p className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">
+        Por peso · rango {peso.rango?.calibre} {peso.rango ? `(${fmtKg(peso.rango.minGrams)} a ${fmtKg(peso.rango.maxGrams)})` : ''}
+      </p>
+      <ul className="mt-1.5 space-y-1.5">
+        {filas.map((f) => (
+          <li key={f.label} className="grid grid-cols-[minmax(0,8.5rem)_1fr_3.5rem] items-center gap-2 text-footnote">
+            <span className="leading-tight">
+              {f.label}
+              {f.extra && <span className="block text-caption text-muted-foreground">{f.extra}</span>}
+            </span>
+            <span className="h-2.5 overflow-hidden rounded-full bg-background">
+              <span className={cn('block h-full rounded-full', f.cls)} style={{ width: `${Math.max((f.n / total) * 100, f.n > 0 ? 2 : 0)}%` }} />
+            </span>
+            <span className="text-right tabular-nums font-medium">{fmtPct((f.n / total) * 100)}</span>
+          </li>
+        ))}
+      </ul>
+      <p className={cn('mt-2 text-footnote', fuera ? 'text-ink-warn' : 'text-muted-foreground')}>
+        {fuera
+          ? `${fmtPct(peso.pctFuera)} de las piezas pesan fuera del rango ${peso.rango?.calibre ?? ''} de la app aunque la máquina las etiquetó así. O el rango del Z2 es más ancho que el de la app (alinear en Configuración del Grader), o es mezcla real.`
+          : 'El peso de las piezas cae dentro del rango del calibre asignado.'}
+      </p>
+    </div>
+  )
+}
+
+function DetalleGate({ mix, entry, cfg, changeBuckets, causas, seteo, onAdoptar, peso }: {
   mix: GateMix; entry: GateMixEntry; cfg?: GateAssignment; changeBuckets?: number[]; causas?: GateCauses | null
-  seteo?: SeteoMaquina; onAdoptar?: () => void
+  seteo?: SeteoMaquina; onAdoptar?: () => void; peso?: PesoPorPuerta
 }) {
   const { isDark } = useTheme()
   const nivel = nivelDePureza(entry.purityPct)
@@ -435,7 +499,7 @@ function DetalleGate({ mix, entry, cfg, changeBuckets, causas, seteo, onAdoptar 
     && Object.keys(entry.byCalibre).some((k) => k !== entry.assignedCalibre)
   const mezclaCalidad = Object.keys(entry.byQuality).some((k) => k !== entry.assignedQuality)
   const veredicto = seteo
-    ? 'Seteo distinto a la máquina'
+    ? (seteo.noReconocido ? 'Calibre que la app no conoce' : 'Seteo distinto a la máquina')
     : nivel === 'ok'
       ? 'Recibe lo que tiene asignado'
       : nivel === 'none'
@@ -453,7 +517,16 @@ function DetalleGate({ mix, entry, cfg, changeBuckets, causas, seteo, onAdoptar 
         <span className={`text-footnote font-semibold ${inkVeredicto}`}>{veredicto}</span>
       </div>
 
-      {seteo && (
+      {seteo?.noReconocido && (
+        <div className="space-y-2" data-testid="pureza-seteo">
+          <p className="text-footnote">
+            El Excel etiqueta el <span className="tabular-nums font-semibold">{fmtPct(seteo.pct)}</span> de las piezas de esta puerta con un
+            calibre que la app no conoce (12+ lb o «fuera de rango»), calidad {seteo.quality}. No es mezcla ni seteo
+            distinto: falta ese calibre en los rangos de la app (Configuración del Grader). El peso de abajo sí se juzga.
+          </p>
+        </div>
+      )}
+      {seteo && !seteo.noReconocido && (
         <div className="space-y-2" data-testid="pureza-seteo">
           <p className="text-footnote">
             La máquina manda <span className="font-semibold">{seteo.calibre} · {seteo.quality}</span> a esta puerta
@@ -498,6 +571,8 @@ function DetalleGate({ mix, entry, cfg, changeBuckets, causas, seteo, onAdoptar 
           </div>
         </div>
       )}
+
+      {(!seteo || seteo.noReconocido) && peso && <PorPeso peso={peso} />}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Barras titulo="Por calibre" data={entry.byCalibre} esperado={entry.assignedCalibre} total={entry.pieces} />

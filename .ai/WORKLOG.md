@@ -49,6 +49,41 @@ piel Apple. Gotcha: `cn()` (tailwind-merge) DESCARTA `text-caption` /
 `text-title3` si en la misma llamada va un `text-ink-*` — toma el tamaño
 como color y gana el último; esos pares van en template string.
 
+## 2026-09-07 · Ronda de pulido 2 · mezcla FÍSICA por peso + backfill de 37 turnos (PR #914)
+
+**Peso en la observación.** `computeGateObservations` guarda ahora, por
+puerta y bloque, un histograma de peso en bins de 250 g (`weightByBucket`,
+clave = límite inferior en gramos), sin depender de ningún rango.
+`derivePesoPorPuerta(obs, timeline, ranges)` lo juzga contra el rango del
+calibre ASIGNADO en cada bloque, con los rangos vigentes de la app (override
+del turno → `customWeightRanges` de la línea → constantes): dentro / al
+límite (bin que cruza un borde: no se puede decir de qué lado cae) / fuera
+más pesado / fuera más liviano, con los kilos observados. La tarjeta lo
+muestra como "N % fuera por peso" en la baldosa (desde 5 %), en el resumen y
+en la ficha ("Por peso · rango 8-10 lb (3,7 a 4,6 kg)"), con la pregunta
+honesta: o el rango del Z2 es más ancho que el de la app, o es mezcla real.
+Con el turno de HOY (datos reales): G9 71,4 % dentro · 22,1 % al límite ·
+6,5 % fuera (4,8–5,0 kg). Trampa: el bin de 250 g es grueso en el borde
+(4.500–4.750 cruza el 4.581 del 8-10): ese 22 % "al límite" es la resolución,
+no la máquina. Bins de 100 g costarían ~2,5× el doc; decidir con Orel.
+
+**Etiqueta Other dominante = calibre no reconocido.** Hoy G12 (seteo
+10-12 lb) recibe 38 pz de 5,5 kg etiquetadas "Other" (12+ lb / fuera de
+rango): salía como "mezclada". Ahora `seteoDistinto` la marca
+`noReconocido` → baldosa y ficha "calibre no reconocido", sin botón de
+adoptar, y el peso sí se juzga.
+
+**Backfill.** Con OK de Orel, `meta/gateMix` se escribió en los **37 turnos
+con piezas guardadas** (febrero + agosto + septiembre; 21 turnos de febrero
+con `hasPieceData` no tienen `pieceRecords` y se saltaron), 395 KB en total
+(2,4–14,8 KB por turno). El script compila el módulo TS real con esbuild
+(`node_modules/.pnpm/esbuild@0.25.12`) en vez de portarlo a JS; vive en el
+scratchpad de la sesión (`backfill-gatemix.js`) y se corre copiado a
+`scripts/_x.tmp.js` desde la raíz del repo principal (clave del Admin SDK).
+Verificado en el preview con sesión sobre el turno de hoy: 2 puertas con
+seteo ≠ máquina (G4, G10), 1 con calibre no reconocido (G12), 4 con peso
+fuera de rango. 5 tests nuevos (783 del módulo).
+
 ## 2026-09-07 · Ronda de pulido 1 · pureza por puerta: "seteo ≠ máquina" no es mezcla (PR #913)
 
 Medido sobre las PIEZAS REALES de Firestore (Admin SDK, solo lectura), no

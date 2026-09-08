@@ -28,7 +28,7 @@
  * del parser); los snapshots guardan hora real UTC. Antes de comparar hay que
  * pasar el snapshot por `realIsoToWallClockMs` con el huso de la planta.
  */
-import type { GateAssignment, PieceRecord } from './types'
+import type { GateAssignment, PieceRecord, CalibreWeightRange } from './types'
 import type { GateConfigSnapshot } from './graderConfigSnapshot.service'
 import { ANY_CALIBRE, SIN_DATO, type GateMix, type GateMixEntry, type GateMixIntruder } from './graderGateMix'
 import { CALIBRE_WEIGHT_RANGES } from './graderAnalyticsThroughput'
@@ -45,12 +45,24 @@ export const PLANT_TZ = 'America/Santiago'
 /** `calibre|calidad[|conservación]` → piezas. `Otros` agrupa lo que quedó fuera del top 8. */
 export type ComboCounts = Record<string, number>
 
+/** Bin de peso de 250 g. La clave es el límite inferior en gramos ("4500" = 4.500–4.749 g). */
+export const GATE_OBS_WEIGHT_BIN_G = 250
+export type WeightBins = Record<string, number>
+
 export interface GateObservationsEntry {
   gate: number
   /** Piezas de la puerta dentro de los bloques guardados. */
   pieces: number
   /** Un elemento por bloque; null = sin piezas en ese bloque. */
   byBucket: Array<ComboCounts | null>
+  /**
+   * Histograma de peso por bloque (bins de 250 g), sin depender de ningún
+   * rango: la mezcla FÍSICA se juzga después contra los rangos configurados.
+   * Medido 07-09: la etiqueta Calibre del Excel es la decisión de la máquina y
+   * coincide siempre con su seteo; el peso es lo único que dice si la pieza
+   * pertenecía a ese calibre. Ausente en turnos guardados antes de este campo.
+   */
+  weightByBucket?: Array<WeightBins | null>
 }
 
 export interface GateObservations {
@@ -117,6 +129,7 @@ export function computeGateObservations(records: readonly PieceRecord[]): GateOb
   const bucketCount = Math.min(GATE_OBS_MAX_BUCKETS, Math.floor((maxMs - from) / size) + 1)
 
   const acc = new Map<number, Array<Map<string, number>>>()
+  const accW = new Map<number, Array<Map<string, number>>>()
   for (const rec of prod) {
     const ms = parseWallClock(rec.ts)
     if (Number.isNaN(ms)) continue
@@ -130,6 +143,17 @@ export function computeGateObservations(records: readonly PieceRecord[]): GateOb
     const key = comboKey(rec.calibre, rec.quality, rec.conservation)
     const b = buckets[bi]!
     b.set(key, (b.get(key) ?? 0) + rec.pieces)
+
+    const grams = rec.weightPerPieceGrams ?? (rec.weightKg && rec.pieces > 0 ? (rec.weightKg * 1000) / rec.pieces : undefined)
+    if (grams != null && grams > 0 && Number.isFinite(grams)) {
+      let wb = accW.get(rec.gate)
+      if (!wb) {
+        wb = Array.from({ length: bucketCount }, () => new Map<string, number>())
+        accW.set(rec.gate, wb)
+      }
+      const bin = String(Math.floor(grams / GATE_OBS_WEIGHT_BIN_G) * GATE_OBS_WEIGHT_BIN_G)
+      wb[bi]!.set(bin, (wb[bi]!.get(bin) ?? 0) + rec.pieces)
+    }
   }
 
   const gates: GateObservationsEntry[] = []
@@ -145,7 +169,9 @@ export function computeGateObservations(records: readonly PieceRecord[]): GateOb
       for (const n of Object.values(out)) pieces += n
       return out
     })
-    gates.push({ gate, pieces, byBucket })
+    const wb = accW.get(gate)
+    const weightByBucket = wb ? wb.map((m) => (m.size ? Object.fromEntries(m) : null)) : undefined
+    gates.push({ gate, pieces, byBucket, ...(weightByBucket ? { weightByBucket } : {}) })
   }
   gates.sort((a, b) => a.gate - b.gate)
 
@@ -205,6 +231,11 @@ export interface SeteoMaquina {
   quality: string
   /** % de las piezas juzgadas de la puerta con esa combinación. */
   pct: number
+  /**
+   * La etiqueta dominante es "Other": un calibre que la app no conoce (12+ lb)
+   * o "fuera de rango". No es seteo distinto ni mezcla: falta en los rangos.
+   */
+  noReconocido?: boolean
 }
 
 /** Umbral de dominancia: con ≥ 90 % una sola combinación, la puerta no está mezclada, está seteada distinto. */
@@ -245,9 +276,10 @@ function seteoMaquinaDe(entry: GateObservationsEntry, timeline: ConfigTimeline, 
   const pct = r1((n / judged) * 100)
   if (pct < SETEO_DOMINANCIA_PCT) return null
   const [calibre, quality] = top.split('|') as [string, string]
-  if (calibre === SIN_DATO || quality === SIN_DATO || calibre === ANY_CALIBRE) return null
+  if (calibre === SIN_DATO || quality === SIN_DATO) return null
   const coincide = (lastCfg.assignedCalibre === ANY_CALIBRE || calibre === lastCfg.assignedCalibre) && quality === lastCfg.assignedQuality
-  return coincide ? null : { calibre, quality, pct }
+  if (coincide) return null
+  return calibre === ANY_CALIBRE ? { calibre, quality, pct, noReconocido: true } : { calibre, quality, pct }
 }
 
 /** ¿La combinación observada es lo que la gate tenía asignado? */
@@ -347,6 +379,77 @@ export function deriveGateMix(obs: GateObservations, timeline: ConfigTimeline): 
   }
 }
 
+// ── Mezcla física: peso contra el rango del seteo ───────────────────────────
+
+export interface PesoPorPuerta {
+  gate: number
+  /** Piezas con peso conocido en bloques con asignación. */
+  conPeso: number
+  dentro: number
+  /** Bins de 250 g que cruzan un límite del rango: no se puede decir de qué lado caen. */
+  alLimite: number
+  fueraArriba: number
+  fueraAbajo: number
+  /** % fuera (arriba + abajo) sobre las piezas con peso. */
+  pctFuera: number
+  /** Rango del calibre asignado en el último bloque con piezas, en gramos. */
+  rango: { calibre: string; minGrams: number; maxGrams: number } | null
+  /** Pesos observados fuera, en gramos [min, max]. */
+  gramosArriba: [number, number] | null
+  gramosAbajo: [number, number] | null
+}
+
+/**
+ * Juzga el histograma de peso de cada puerta contra el rango del calibre que
+ * tenía asignado en cada bloque (`ranges`: los configurados en la app, no la
+ * etiqueta del Excel). Una puerta con "Other" asignado recibe de todo → sin juicio.
+ * Devuelve solo las puertas con peso guardado y asignación con rango conocido.
+ */
+export function derivePesoPorPuerta(
+  obs: GateObservations,
+  timeline: ConfigTimeline,
+  ranges: readonly CalibreWeightRange[],
+): Record<number, PesoPorPuerta> {
+  const size = obs.bucketMinutes * 60_000
+  const from = Date.parse(obs.bucketsFrom)
+  const rangeOf = (calibre: string) => ranges.find((r) => r.calibre === calibre)
+  const out: Record<number, PesoPorPuerta> = {}
+  for (const e of obs.gates) {
+    if (!e.weightByBucket) continue
+    const p: PesoPorPuerta = { gate: e.gate, conPeso: 0, dentro: 0, alLimite: 0, fueraArriba: 0, fueraAbajo: 0, pctFuera: 0, rango: null, gramosArriba: null, gramosAbajo: null }
+    let juzgado = false
+    e.weightByBucket.forEach((bins, i) => {
+      if (!bins) return
+      const cfg = timeline.configAt(from + i * size)?.find((g) => g.gateNumber === e.gate && g.active)
+      if (!cfg || cfg.assignedCalibre === ANY_CALIBRE) return
+      const r = rangeOf(cfg.assignedCalibre)
+      if (!r) return
+      juzgado = true
+      p.rango = { calibre: r.calibre, minGrams: r.minGrams, maxGrams: r.maxGrams }
+      for (const [k, n] of Object.entries(bins)) {
+        const lo = Number(k)
+        const hi = lo + GATE_OBS_WEIGHT_BIN_G
+        p.conPeso += n
+        if (lo >= r.maxGrams) {
+          p.fueraArriba += n
+          p.gramosArriba = p.gramosArriba ? [Math.min(p.gramosArriba[0], lo), Math.max(p.gramosArriba[1], hi)] : [lo, hi]
+        } else if (hi <= r.minGrams) {
+          p.fueraAbajo += n
+          p.gramosAbajo = p.gramosAbajo ? [Math.min(p.gramosAbajo[0], lo), Math.max(p.gramosAbajo[1], hi)] : [lo, hi]
+        } else if (lo >= r.minGrams && hi <= r.maxGrams) {
+          p.dentro += n
+        } else {
+          p.alLimite += n
+        }
+      }
+    })
+    if (!juzgado || p.conPeso === 0) continue
+    p.pctFuera = r1(((p.fueraArriba + p.fueraAbajo) / p.conPeso) * 100)
+    out[e.gate] = p
+  }
+  return out
+}
+
 // ── ¿Por qué cayó acá? ──────────────────────────────────────────────────────
 
 export type CausaTipo =
@@ -399,7 +502,7 @@ function calibreDistance(a: string, b: string): number | null {
 function tipoDeCausa(c: Combo, cfg: GateAssignment, seteo: SeteoMaquina | null): { tipo: CausaTipo; value: string } {
   if (c.calibre === OTROS) return { tipo: 'otros', value: OTROS }
   if (c.calibre === SIN_DATO || c.quality === SIN_DATO) return { tipo: 'sin_dato', value: SIN_DATO }
-  if (seteo && c.calibre === seteo.calibre && c.quality === seteo.quality) {
+  if (seteo && !seteo.noReconocido && c.calibre === seteo.calibre && c.quality === seteo.quality) {
     return { tipo: 'seteo_distinto', value: `${seteo.calibre} · ${seteo.quality}` }
   }
   // La etiqueta "Other" del Excel es un calibre que la app no conoce (p. ej.

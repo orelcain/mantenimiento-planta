@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   computeGateObservations, deriveGateMix, configTimelineFromSnapshots, realIsoToWallClockMs,
-  GATE_OBS_MAX_BUCKETS, GATE_OBS_MAX_COMBOS, OTROS, classifyGateCauses,
+  GATE_OBS_MAX_BUCKETS, GATE_OBS_MAX_COMBOS, OTROS, classifyGateCauses, derivePesoPorPuerta,
 } from '../graderGateObservations'
 import { ANY_CALIBRE, SIN_DATO } from '../graderGateMix'
 import type { GateConfigSnapshot } from '../graderConfigSnapshot.service'
@@ -219,5 +219,51 @@ describe('seteo ≠ máquina (medido 07-09: 5 de 11 puertas)', () => {
     const c = classifyGateCauses(o, 5, timeline)!
     expect(c.groups[0]).toMatchObject({ tipo: 'calibre_no_reconocido', pieces: 10 })
     expect(deriveGateMix(o, timeline).seteoDistinto).toEqual({})
+  })
+})
+
+describe('mezcla física por peso (ronda 2)', () => {
+  const RANGES = [
+    { calibre: '6-8 lb', label: '', minGrams: 2749, maxGrams: 3665 },
+    { calibre: '8-10 lb', label: '', minGrams: 3665, maxGrams: 4581 },
+  ]
+  const conPeso = (g: number, n: number, gateNo = 8, ts = '2026-09-07T09:00:00') =>
+    pieces(gateNo, n, '8-10 lb', 'Premium', ts).map((r) => ({ ...r, weightPerPieceGrams: g }))
+
+  it('guarda el histograma de peso por bloque en bins de 250 g', () => {
+    const obs = computeGateObservations([...conPeso(4120, 3), ...conPeso(4700, 2), ...conPeso(4500, 1)])!
+    expect(obs.gates[0]!.weightByBucket).toEqual([{ '4000': 3, '4500': 3 }])
+  })
+
+  it('juzga contra el rango del seteo: dentro, al límite (bin que cruza) y fuera con los kilos', () => {
+    const obs = computeGateObservations([...conPeso(4120, 80), ...conPeso(4500, 8), ...conPeso(4800, 10), ...conPeso(4900, 2)])!
+    const p = derivePesoPorPuerta(obs, configTimelineFromSnapshots([], [gate(8, '8-10 lb', 'Premium')]), RANGES)[8]!
+    expect(p).toMatchObject({ conPeso: 100, dentro: 80, alLimite: 8, fueraArriba: 12, fueraAbajo: 0, pctFuera: 12 })
+    expect(p.gramosArriba).toEqual([4750, 5000])
+    expect(p.rango).toEqual({ calibre: '8-10 lb', minGrams: 3665, maxGrams: 4581 })
+  })
+
+  it('la etiqueta no importa: el peso se juzga contra el calibre ASIGNADO en cada bloque', () => {
+    const obs = computeGateObservations(conPeso(4120, 10))!
+    const p = derivePesoPorPuerta(obs, configTimelineFromSnapshots([], [gate(8, '6-8 lb', 'Premium')]), RANGES)[8]!
+    expect(p).toMatchObject({ fueraArriba: 10, pctFuera: 100 })
+  })
+
+  it('sin rango conocido, con Other asignado o sin peso guardado no juzga', () => {
+    const obs = computeGateObservations(conPeso(4120, 10))!
+    expect(derivePesoPorPuerta(obs, configTimelineFromSnapshots([], [gate(8, ANY_CALIBRE, 'Premium')]), RANGES)).toEqual({})
+    expect(derivePesoPorPuerta(obs, configTimelineFromSnapshots([], [gate(8, '2-4 lb', 'Premium')]), RANGES)).toEqual({})
+    const sinPeso = computeGateObservations(pieces(8, 5, '8-10 lb', 'Premium', '2026-09-07T09:00:00'))!
+    expect(sinPeso.gates[0]!.weightByBucket).toBeUndefined()
+    expect(derivePesoPorPuerta(sinPeso, configTimelineFromSnapshots([], [gate(8, '8-10 lb', 'Premium')]), RANGES)).toEqual({})
+  })
+})
+
+describe('etiqueta Other dominante = calibre no reconocido, no mezcla (G12 hoy: 38 pz de 5,5 kg)', () => {
+  it('marca noReconocido y no ofrece seteo_distinto', () => {
+    const obs = computeGateObservations(pieces(12, 38, ANY_CALIBRE, 'Premium', '2026-09-07T09:00:00'))!
+    const timeline = configTimelineFromSnapshots([], [gate(12, '10-12 lb', 'Premium')])
+    expect(deriveGateMix(obs, timeline).seteoDistinto).toEqual({ 12: { calibre: ANY_CALIBRE, quality: 'Premium', pct: 100, noReconocido: true } })
+    expect(classifyGateCauses(obs, 12, timeline)!.groups[0]).toMatchObject({ tipo: 'calibre_no_reconocido', pieces: 38 })
   })
 })
