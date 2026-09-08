@@ -6,6 +6,37 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-08 · Ronda 8 de pureza por puerta: medir los 37 turnos, programa 12+ y piso de piezas (PR #925)
+
+Ronda hecha al revés de las anteriores: primero medir sobre PROD lo que la tarjeta
+derivaría en los 37 turnos con `meta/gateMix` (script `medir-cambios.js` del scratchpad,
+mismo TS compilado con esbuild), después tocar código. Lo que salió, por gravedad:
+
+1. **Cambios de programa de 9–45 piezas** en febrero (G1/G3/G5/G8 «a las 04:00»): el
+   barrido de fin de turno, no un cambio del Z2. Los reales tenían 238, 525 y 1.987 pz.
+   → `CAMBIO_MIN_PIEZAS = 100`. Cambios detectados en los 37 turnos: 4 → 2 (ambos reales).
+2. **Etiquetas "10" y "12" de febrero** (guardadas crudas): "10" pesa 4,6–6,3 kg (10 y más)
+   y "12" 5,5–7,2 kg (12 y más). La app las trataba como calibres desconocidos → solapes
+   falsos de 900–1.800 g y un «cambio» 8-10→12. Peor: el parser ACTUAL mapea "12-UP" al
+   10-12 y "12" a `Other` — por eso la G12 de hoy (5,9–6,8 kg, 159 pz) sale «calibre no
+   reconocido». → calibre canónico **`12-UP lb`** (`CALIBRE_12_UP`, el mismo nombre que
+   Orel puso en los rangos): parser (`normalizeCalibre`, ahora exportado) y lectura
+   (`normalizarCalibre`) mapean "12", "12-UP", "12+", "N≥12-UP" → 12-UP lb; "10", "10-UP"
+   → 10-12 lb. Solapes en los 37 turnos: 9 → 7; los que quedan de febrero son reales de
+   esa temporada (programas del Z2 con nombre y rango desajustados: un "4-6 Industrial"
+   recibiendo 2,8–3,6 kg).
+3. **Espacio final en el nombre del calibre** (`"12-UP lb "`, escrito a mano en el modal
+   de rangos): no coincidía con ninguna etiqueta. → `trim()` al guardar (modal) y al leer
+   (`getModuleRanges`); el doc de prod corregido por script.
+
+⚠ La G12 de hoy sigue «Other» porque los `pieceRecords` ya se guardaron normalizados
+(el parser pierde la etiqueta cruda): se corrige recargando el Excel del turno. Con eso
+se confirma además que la etiqueta real del programa 12+ es "12" (hoy es inferencia
+desde febrero + los pesos).
+
+Sin cambios de UI. tsc/eslint/audit-piel OK; vitest grader 984/984 (tests nuevos:
+parser 12+/10+, normalizador de febrero, piso de piezas del cambio).
+
 ## 2026-09-08 · Ronda 7 de pureza por puerta: cambios de programa del Z2 dentro del turno (PR #923)
 
 Pedido de Orel: revisar de nuevo el turno completo `2026-09-07 Turno 1` (21:15→05:45,
