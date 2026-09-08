@@ -17,7 +17,7 @@ import {
 import { Button } from '@/components/ui'
 import { ImageLightbox } from '@/components/ui/ImageLightbox'
 import { ConfirmUploadDialog } from '@/components/repuestos/ConfirmUploadDialog'
-import { uploadRepuestoFoto, deleteRepuestoFoto } from '@/services/storage'
+import { uploadRepuestoFoto, deleteRepuestoFoto, SIN_EQUIPO_STORAGE_SEGMENT } from '@/services/storage'
 import { generateId } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 import { useToast } from '@/hooks/useToast'
@@ -32,7 +32,11 @@ interface RepuestoPhotosModalProps {
   repuestoName: string
   /** Habilita subir / eliminar fotos reales. */
   isAdmin?: boolean
-  /** machineId del doc raíz — requerido para el path de Storage cuando isAdmin. */
+  /**
+   * nodeId del equipo — segmento del path de Storage. Puede venir vacío: en el
+   * modelo plano un repuesto puede no tener equipo (`equipos: []`, fila
+   * "Transversal"/"Sin equipo"), y esos también tienen que poder llevar fotos.
+   */
   machineId?: string
   /** repuestoId del doc — requerido para el path de Storage cuando isAdmin. */
   repuestoId?: string
@@ -85,7 +89,10 @@ export function RepuestoPhotosModal({
   // El lightbox indexa sobre TODAS las imágenes visibles: fotos reales + manual + galería heredada.
   const allPhotoUrls = [...allPhotos.map((p) => p.url), ...gallery.map((g) => g.url)].filter((u): u is string => !!u)
 
-  const canEdit = !!(isAdmin && machineId && repuestoId && onSaveFotos)
+  // ⚠ NO exigir machineId: 3.025 de 7.673 repuestos (39 %) no tienen equipo
+  // asignado y con esa condición el modal quedaba en solo-lectura sin avisar
+  // (caso real 08-09-2026: "no me deja cargar imágenes a los repuestos").
+  const canEdit = !!(isAdmin && repuestoId && onSaveFotos)
 
   // ── Selección: NO sube todavía — pide confirmar el destino primero ──
   const handleFiles = useCallback(
@@ -113,7 +120,9 @@ export function RepuestoPhotosModal({
         const subidaPor = user ? `${user.nombre} ${user.apellido}`.trim() : ''
         const nuevas: ImagenRepuesto[] = []
         for (const file of pendingFiles) {
-          const url = await uploadRepuestoFoto(machineId!, repuestoId!, file)
+          // Sin equipo, el segmento del path lleva un marcador fijo para seguir
+          // cumpliendo la regla de Storage repuestos/{machineId}/{repuestoId}/fotos/.
+          const url = await uploadRepuestoFoto(machineId || SIN_EQUIPO_STORAGE_SEGMENT, repuestoId!, file)
           nuevas.push({
             id: generateId(),
             url,
