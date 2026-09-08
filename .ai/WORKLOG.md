@@ -6,6 +6,27 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-08 · Recarga del Excel: las piezas se ACTUALIZAN, no se duplican + conservación guardada (PR #926)
+
+Al pedirle a Orel que recargara el Excel de anoche para que la G12 saliera 12-UP, leí
+el camino de escritura y encontré que no habría servido: `savePieceRecordsBatch` deduplica
+por `dedupeKey`, que lleva calibre y calidad → la misma pieza con etiqueta nueva es "otra"
+pieza y se AGREGA. La G12 habría quedado con 159 docs "Other" + 159 "12-UP lb", y los
+P0 y cualquier vista pieza a pieza contarían doble.
+
+- `pieceIdentityKey` (ts · gate · piezas · peso · lote, SIN etiquetas) y
+  `planPieceRecordWrites` (puro, testeado): agregar las nuevas, **actualizar en su doc**
+  las que cambiaron calibre/calidad/conservación/producto/error, saltar el resto.
+  `savePieceRecordsBatch` lo usa (lee los existentes con id; escribe solo lo que cambió).
+- `FirestorePieceRecord` guarda `conservation` y `product` (el wizard no los mandaba; la
+  vista pieza a pieza los necesita para mostrar FRESCO/CONGELADO).
+- `listGatePieceRecords(summaryId, gate)`: piezas de UNA puerta bajo demanda (4–3.600
+  lecturas, nunca las ~18.000 del turno). Base de la vista pieza a pieza que viene.
+
+⚠ Dato de hoy: Orel guardó dos veces desde el wizard y **ninguna escritura llegó a
+Firestore** (sin cargas, borradores, resúmenes ni errores de cliente desde las 09:40Z;
+usuario admin activo). Pendiente ver qué muestra el wizard bajo «Guardar en Calendario».
+
 ## 2026-09-08 · Ronda 8 de pureza por puerta: medir los 37 turnos, programa 12+ y piso de piezas (PR #925)
 
 Ronda hecha al revés de las anteriores: primero medir sobre PROD lo que la tarjeta
