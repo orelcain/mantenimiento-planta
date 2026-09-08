@@ -894,3 +894,187 @@ export function classifyGateCauses(obs: GateObservations, gate: number, timeline
 
   return { gate, judged, okByBucket, byTipoByBucket, groups: out }
 }
+
+// ── Mezcla en los tres ejes (calibre · calidad · conservación) ───────────────
+//
+// La pureza (`deriveGateMix`) compara calibre ∧ calidad contra el seteo. Medido
+// 08-09 sobre 2026-09-07 Turno 1: la G8 marcaba 100 % con 2.032 CONGELADO y
+// 1.537 FRESCO por el mismo tobogán. La mezcla mira las tres dimensiones:
+//  - calibre y calidad contra el seteo vigente en el bloque (igual que la pureza);
+//  - la dimensión que el seteo NO fija (conservación casi siempre) contra la
+//    DOMINANTE DE ESE BLOQUE de la propia puerta. Así un cambio de lote
+//    fresco→congelado a las 02:00 no cuenta como mezcla; dos conservaciones en
+//    el mismo bloque de 30 min sí.
+// El % de pureza guardado no se toca: esto es una lectura nueva sobre el mismo
+// agregado (`meta/gateMix`).
+
+export type DimensionMezcla = 'calibre' | 'calidad' | 'conservacion' | 'otros'
+
+export interface ReferenciaBloque {
+  calibre: string | null
+  quality: string | null
+  conservation: string | null
+  /** true si la conservación de referencia salió de la propia puerta (el seteo no la fija). */
+  conservacionInferida: boolean
+}
+
+export interface ComposicionCombo {
+  key: string
+  calibre: string
+  quality: string
+  conservation?: string
+  pieces: number
+  pct: number
+  intrusa: boolean
+  /** Primera dimensión que difiere (calibre → calidad → conservación). */
+  dim?: DimensionMezcla
+}
+
+export interface MezclaPuerta {
+  gate: number
+  pieces: number
+  /** Piezas que coinciden en los tres ejes (o en los que se pudieron juzgar). */
+  coinciden: number
+  /** null sin seteo (no hay contra qué juzgar). */
+  pct: number | null
+  dominante: { calibre: string; quality: string; conservation?: string; pieces: number } | null
+  composicion: ComposicionCombo[]
+  peorIntruso?: { dim: DimensionMezcla; value: string; pieces: number; pct: number }
+  /** El seteo fija conservación (raro): entonces se juzga contra él. */
+  fijaConservacion: boolean
+  /** Referencia por bloque, para juzgar piezas sueltas con la misma regla. */
+  referencias: Array<ReferenciaBloque | null>
+}
+
+function dominanteDe(bins: ComboCounts, pick: (c: Combo) => string | undefined): string | null {
+  const tally = new Map<string, number>()
+  for (const [key, n] of Object.entries(bins)) {
+    if (key === OTROS) continue
+    const v = pick(splitCombo(key))
+    if (!v || v === SIN_DATO) continue
+    tally.set(v, (tally.get(v) ?? 0) + n)
+  }
+  let best: string | null = null
+  let max = 0
+  for (const [v, n] of tally) if (n > max) { max = n; best = v }
+  return best
+}
+
+/** Dimensión en la que una combinación difiere de la referencia; undefined si coincide. */
+export function dimensionIntrusa(c: Combo, ref: ReferenciaBloque): DimensionMezcla | undefined {
+  if (c.calibre === OTROS) return 'otros'
+  if (ref.calibre && ref.calibre !== ANY_CALIBRE && c.calibre !== SIN_DATO && c.calibre !== ref.calibre) return 'calibre'
+  if (ref.quality && c.quality !== SIN_DATO && c.quality !== ref.quality) return 'calidad'
+  if (ref.conservation && c.conservation && c.conservation !== ref.conservation) return 'conservacion'
+  return undefined
+}
+
+export function referenciaDeBloque(bins: ComboCounts, cfg: GateAssignment | undefined): ReferenciaBloque | null {
+  if (!cfg) return null
+  const calibre = cfg.assignedCalibre === ANY_CALIBRE ? (dominanteDe(bins, (c) => c.calibre) ?? ANY_CALIBRE) : cfg.assignedCalibre
+  const conservationCfg = cfg.assignedConservation ? cfg.assignedConservation : null
+  const conservation = conservationCfg ?? dominanteDe(bins, (c) => c.conservation)
+  return { calibre, quality: cfg.assignedQuality, conservation, conservacionInferida: !conservationCfg }
+}
+
+export function deriveMezcla(obs: GateObservations, timeline: ConfigTimeline): Record<number, MezclaPuerta> {
+  const size = obs.bucketMinutes * 60_000
+  const from = Date.parse(obs.bucketsFrom)
+  const out: Record<number, MezclaPuerta> = {}
+  for (const e of obs.gates) {
+    const porCombo = new Map<string, { pieces: number; intrusas: number; dim?: DimensionMezcla }>()
+    const porDim = new Map<string, number>()
+    let juzgadas = 0
+    let coinciden = 0
+    let fijaConservacion = false
+    const referencias: Array<ReferenciaBloque | null> = []
+    e.byBucket.forEach((bins, i) => {
+      if (!bins) { referencias.push(null); return }
+      const cfg = timeline.configAt(from + i * size)?.find((g) => g.gateNumber === e.gate && g.active)
+      const ref = referenciaDeBloque(bins, cfg)
+      referencias.push(ref)
+      if (ref && !ref.conservacionInferida) fijaConservacion = true
+      for (const [key, n] of Object.entries(bins)) {
+        const c = key === OTROS ? { calibre: OTROS, quality: OTROS } : splitCombo(key)
+        const norm = key === OTROS ? OTROS : comboKey(c.calibre, c.quality, c.conservation)
+        const acc = porCombo.get(norm) ?? { pieces: 0, intrusas: 0 }
+        acc.pieces += n
+        if (ref) {
+          juzgadas += n
+          const dim = dimensionIntrusa(c, ref)
+          if (dim) {
+            acc.intrusas += n
+            acc.dim = acc.dim ?? dim
+            const dk = `${dim}|${dim === 'calibre' ? c.calibre : dim === 'calidad' ? c.quality : dim === 'conservacion' ? c.conservation : OTROS}`
+            porDim.set(dk, (porDim.get(dk) ?? 0) + n)
+          } else coinciden += n
+        }
+        porCombo.set(norm, acc)
+      }
+    })
+    const composicion: ComposicionCombo[] = [...porCombo.entries()]
+      .map(([key, v]) => {
+        const c = key === OTROS ? { calibre: OTROS, quality: OTROS } : splitCombo(key)
+        return { key, calibre: c.calibre, quality: c.quality, conservation: c.conservation, pieces: v.pieces, pct: r1((v.pieces / Math.max(1, e.pieces)) * 100), intrusa: v.intrusas > v.pieces / 2, dim: v.intrusas > v.pieces / 2 ? v.dim : undefined }
+      })
+      .sort((a, b) => b.pieces - a.pieces)
+    const dom = composicion.find((c) => c.calibre !== OTROS) ?? null
+    let peor: MezclaPuerta['peorIntruso']
+    for (const [dk, n] of porDim) {
+      if (!peor || n > peor.pieces) {
+        const [dim, value] = dk.split('|') as [DimensionMezcla, string]
+        peor = { dim, value, pieces: n, pct: r1((n / Math.max(1, juzgadas)) * 100) }
+      }
+    }
+    out[e.gate] = {
+      gate: e.gate, pieces: e.pieces, coinciden,
+      pct: juzgadas > 0 ? r1((coinciden / juzgadas) * 100) : null,
+      dominante: dom ? { calibre: dom.calibre, quality: dom.quality, conservation: dom.conservation, pieces: dom.pieces } : null,
+      composicion, peorIntruso: peor, fijaConservacion, referencias,
+    }
+  }
+  return out
+}
+
+/** Índice del bloque de una pieza (wall-clock ms) dentro de la observación; -1 si queda fuera. */
+export function bloqueDe(obs: GateObservations, wallMs: number): number {
+  const i = Math.floor((wallMs - Date.parse(obs.bucketsFrom)) / (obs.bucketMinutes * 60_000))
+  return i >= 0 && i < obs.bucketCount ? i : -1
+}
+
+// ── Mapa peso × tiempo (nivel 1, 0 lecturas) ────────────────────────────────
+
+export interface MapaPeso {
+  gate: number
+  binGrams: number
+  /** Gramos del bin más liviano y más pesado con piezas. */
+  minG: number
+  maxG: number
+  /** Por bloque: Map binStart → piezas (null = sin piezas). */
+  celdas: Array<Record<number, number> | null>
+  max: number
+  pieces: number
+}
+
+export function mapaPesoDePuerta(obs: GateObservations, gate: number): MapaPeso | null {
+  const e = obs.gates.find((g) => g.gate === gate)
+  if (!e?.weightByBucket) return null
+  const binGrams = obs.weightBinGrams ?? LEGACY_WEIGHT_BIN_G
+  let minG = Infinity, maxG = -Infinity, max = 0, pieces = 0
+  const celdas = e.weightByBucket.map((bins) => {
+    if (!bins) return null
+    const row: Record<number, number> = {}
+    for (const [k, n] of Object.entries(bins)) {
+      const g = Number(k)
+      if (!Number.isFinite(g)) continue
+      row[g] = n
+      pieces += n
+      if (g < minG) minG = g
+      if (g > maxG) maxG = g
+      if (n > max) max = n
+    }
+    return Object.keys(row).length ? row : null
+  })
+  if (pieces === 0) return null
+  return { gate, binGrams, minG, maxG, celdas, max, pieces }
+}

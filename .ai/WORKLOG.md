@@ -6,6 +6,51 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-09 · Ronda 9: mezcla en los tres ejes, vista pieza a pieza y poda de la pestaña Gates (PR #927)
+
+Pedido de Orel: «que sea claro la mezcla de calibres en las gates, por calidad, por lo
+que sea… que se pueda ver bien en el gráfico cada pieza… revisá lo que ya está de más:
+enfoquémonos en analizar problemas en la Grader, gates con mezcla o P0».
+
+**Mockup primero** (directora creativa, artifact 1669d095): encontró que la pureza era
+CIEGA a la conservación —la G8 marcaba 100 % con 2.032 CONGELADO + 1.537 FRESCO por el
+mismo tobogán— y que `weightByBucket` (bins de 100 g × 30 min) ya estaba guardado y no
+se dibujaba en ninguna parte. Opción A (grilla física de 12, número redefinido, tira de
+composición) con el titular de C.
+
+**Lo construido.**
+- `deriveMezcla` (módulo, 4 tests): % de piezas que coinciden en calibre, calidad Y
+  conservación. Calibre y calidad contra el seteo del bloque; la dimensión que el seteo
+  no fija (conservación) contra la **dominante de ese bloque de 30 min**: así un cambio
+  de lote fresco→congelado a las 02:00 no es mezcla, dos conservaciones en el mismo
+  bloque sí. Regla decidida acá, no en el mockup (que proponía la dominante del turno y
+  habría puesto a la G8 en 57 %). Medido: G8 100 → 95 %, G9 100 → 99 %, G10 99 → 97 %;
+  titular «coinciden en los tres ejes 16.513 / 16.778 (98,4 %)». La pureza guardada no
+  se toca.
+- Mosaico: número = mezcla en tres ejes, línea 1 = combinación dominante («8-10 ·
+  Premium · congelado»), línea 2 = el peor intruso con su dimensión («5 % fresco», visible
+  desde 2 % aunque la puerta siga en verde), tira de composición de 6 px. Tonos por
+  dimensión medidos contra `index.css`: calibre cat-6, calidad cat-3, conservación cat-7,
+  no reconocido cat-5 (cat-4 en oscuro es byte-idéntico a `--ink-warn`, reservado al peso).
+- Detalle: «Qué llegó a esta puerta» (tira de 22 px + leyenda con Tag por dimensión),
+  «Peso, bloque a bloque» (`mapaPesoDePuerta`, SVG con la banda del rango, **0 lecturas**)
+  y «Ver cada pieza» (nivel 2): dice cuántas lecturas cuesta ANTES del botón, carga solo
+  esa puerta (`listGatePieceRecords`), scatter ECharts hora × peso con círculo = coincide,
+  rombo = intrusa (tono de su dimensión), anillo ámbar = fuera de rango, banda del rango,
+  línea del cambio de programa, ventana inicial de 90 min y segmentado «Todas / Solo
+  intrusas». Las piezas se juzgan con la MISMA regla por bloque (`referencias`).
+- **Poda de Gates** (medido: 5.615 → 2.648 px a 375 px): fuera el banner explicativo;
+  `GateChangeImpactCard` (P0 ±10 min por cambio) se queda a la vista porque es análisis
+  de P0; `GateBreakdownCard`, `GateEvolutionChart` y la comparación histórica (cerrado
+  el turno) van a un `Disclosure` plegado «Más análisis de gates»; el editor completo de
+  las 12 compuertas arranca plegado (ya hay un panel compacto arriba).
+- Wizard: si «Guardar en Calendario» pasa de 60 s sin terminar, aviso con el remedio
+  (cerrar TODAS las pestañas de la app y reintentar). Hoy Orel lo vio girando para
+  siempre en el navegador del PC sin que llegara una escritura al servidor.
+
+Sin tocar: la advertencia preexistente «Cannot update a component while rendering»
+de `AnalisisGraderGatesConfigPage` (aparecía antes de esta ronda).
+
 ## 2026-09-08 · Recarga del Excel: las piezas se ACTUALIZAN, no se duplican + conservación guardada (PR #926)
 
 Al pedirle a Orel que recargara el Excel de anoche para que la G12 saliera 12-UP, leí
