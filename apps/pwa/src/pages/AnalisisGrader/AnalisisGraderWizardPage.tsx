@@ -851,6 +851,9 @@ export function AnalisisGraderWizardPage() {
                     </>
                   )}
                 </p>
+                {parsedData?.inferred?.p0CoverageWarning && (
+                  <p className="text-caption text-ink-warn mt-1" data-testid="wizard-p0-cobertura">{parsedData.inferred.p0CoverageWarning}</p>
+                )}
               </div>
             </div>
             <Button

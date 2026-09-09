@@ -6,6 +6,26 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-09 · El Excel de Puerta 0 cubre menos que el pieza a pieza: P0 mentía (PR #932)
+
+Segunda carga parcial del 2026-09-08 T1 (05:37Z): el pieza a pieza llega a las 02:37 con
+12.610 pz y **211 rechazos gate=0**, pero el Excel de Puerta 0 se exportó solo hasta las 23:57
+con **116**. `mergeParsedData` tomaba el P0 entero como fuente de los rechazos → el resumen
+decía **P0 0,92 % · 116 pz** (real sobre lo cargado: 1,67 % · 211) y 95 rechazos de después de
+las 00:00 desaparecían del panel de causas, de la capa del timeline y de «Rechazos sin puerta».
+
+- `mergeParsedData`: los gate=0 del pieza a pieza que quedan FUERA de la ventana [min, max] del
+  Excel de Puerta 0 se agregan con la causa inferida por peso (`inferGate0FromPieceRecords`);
+  los de adentro ya vienen en el P0. Aviso en `fileMeta.warnings` del P0 y en
+  `inferred.p0CoverageWarning` («El Excel de Puerta 0 cubre 21:35–23:57 y el pieza a pieza
+  21:28–02:37: 95 rechazos fuera de esa ventana… Exportar los dos archivos con el mismo rango»).
+- Wizard: el aviso se muestra en el banner de guardado (antes las `warnings` por archivo solo
+  se guardaban en `graderUploads`, nadie las veía).
+- 2 tests (`graderExcelParser.p0Cobertura.test.ts`).
+
+Vale al recargar: el turno cargado sigue con 116 hasta la próxima carga (pedirle a Orel que
+exporte P0 y pieza a pieza con el mismo rango, o recargar los dos).
+
 ## 2026-09-09 · Se retira la dispersión P0 aparte: la capa por causa del timeline la reemplaza (PR #931)
 
 Pedido de Orel tras ver funcionar la capa por causa (#930): «retira la dispersión P0, dejemos

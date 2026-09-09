@@ -1032,6 +1032,8 @@ export interface ParsedMatrixData {
     deviceId?: string;
     startAt?: string;
     endAt?: string;
+    /** El Excel de Puerta 0 cubre menos que el pieza a pieza: los rechazos de afuera se infirieron por peso. */
+    p0CoverageWarning?: string;
   };
 }
 

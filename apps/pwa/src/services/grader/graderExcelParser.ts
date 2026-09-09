@@ -932,8 +932,27 @@ export function mergeParsedData(
   const ppGate0 = merged.pieceRecords.filter((r) => r.gate === 0)
 
   if (hasP0File && realGate0Records.length > 0) {
-    // P0 tiene datos reales con columna Error de la máquina
-    merged.gate0Records = realGate0Records
+    // P0 tiene datos reales con columna Error de la máquina… pero solo para la
+    // ventana que ese Excel cubre. Medido 09-09 (2026-09-08 T1 parcial): el
+    // pieza a pieza llegaba a las 02:37 con 211 rechazos y el de Puerta 0 solo
+    // hasta las 23:57 con 116 → la app decía P0 0,92 % (real 1,67 %) y 95
+    // rechazos desaparecían del panel, del timeline y de «Rechazos sin puerta».
+    // Los gate=0 del pieza a pieza FUERA de la ventana del P0 se agregan con la
+    // causa inferida por peso; los de adentro ya están en el P0.
+    const tsP0 = realGate0Records.map((r) => r.ts).filter(Boolean).sort()
+    const p0Min = tsP0[0]!, p0Max = tsP0[tsP0.length - 1]!
+    const fueraDeVentana = ppGate0.filter((r) => r.ts && (r.ts < p0Min || r.ts > p0Max))
+    merged.gate0Records = fueraDeVentana.length > 0
+      ? [...realGate0Records, ...inferGate0FromPieceRecords(fueraDeVentana)]
+      : realGate0Records
+    if (fueraDeVentana.length > 0) {
+      const tsPP = merged.pieceRecords.map((r) => r.ts).filter(Boolean).sort()
+      const hhmm = (iso: string) => iso.slice(11, 16)
+      const n = fueraDeVentana.reduce((s, r) => s + (r.pieces || 1), 0)
+      const aviso = `El Excel de Puerta 0 cubre ${hhmm(p0Min)}–${hhmm(p0Max)} y el pieza a pieza ${hhmm(tsPP[0] ?? p0Min)}–${hhmm(tsPP[tsPP.length - 1] ?? p0Max)}: ${n} rechazos fuera de esa ventana se toman del pieza a pieza con la causa inferida por peso. Exportar los dos archivos con el mismo rango.`
+      for (const f of merged.files) if (f.kind === 'PUERTA_0') f.warnings = [...(f.warnings ?? []), aviso]
+      merged.inferred.p0CoverageWarning = aviso
+    }
   } else {
     // Inferir errores desde gate=0 del PP
     merged.gate0Records = inferGate0FromPieceRecords(ppGate0)
