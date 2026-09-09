@@ -6,6 +6,22 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-09 · «Adoptar seteo» en turno cerrado reescribe todos los snapshots (PR #928)
+
+Pedido de Orel tras adoptar G1 y G12 del 2026-09-07 T1 por script: «arregla el botón adoptar
+para turnos cerrados». El botón hacía lo mismo en vivo y cerrado: snapshot inicial corregido si
+nadie tocó nada, o un snapshot NUEVO «ahora». En un turno cerrado ese «ahora» rige solo desde
+ahora y el turno entero sigue juzgado con el seteo viejo (la G12 seguía «seteo ≠ máquina» tras
+adoptar). Medido con el script: reescribir la puerta en los 4 snapshots llevó la coincidencia de
+98,9 % a 99,9 %.
+
+- `graderAdoptarSeteo.ts` (puro, 3 tests): `puertasAdoptadas(base, nuevas)` y
+  `reescribirEnTodos(snapshots, adoptadas)` — solo las puertas que cambian, en TODOS los
+  snapshots, sin tocar las demás puertas ni los cambios registrados a mano.
+- `adoptarSeteoMaquina(..., { turnoCerrado, baseGates })`: cerrado → reescribe todos (el motivo
+  queda en el último snapshot); en vivo → como antes. La página pasa
+  `turnoCerrado: shiftWindow?.status !== 'live'` desde los dos botones (una puerta / N puertas).
+
 ## 2026-09-09 · Ronda 9: mezcla en los tres ejes, vista pieza a pieza y poda de la pestaña Gates (PR #927)
 
 Pedido de Orel: «que sea claro la mezcla de calibres en las gates, por calidad, por lo

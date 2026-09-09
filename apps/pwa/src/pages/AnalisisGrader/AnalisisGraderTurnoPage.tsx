@@ -1366,7 +1366,7 @@ export function AnalisisGraderTurnoPage() {
     const docId = `${dateKey}__${shiftLabel}`
     const userName = `${(user as unknown as Record<string, string>).nombre ?? ''} ${(user as unknown as Record<string, string>).apellido ?? ''}`.trim() || user.email || 'Supervisor'
     lastEmittedGatesRef.current = JSON.stringify(updated)
-    adoptarSeteoMaquina(docId, updated, { uid: user.id, name: userName }, `G${gate}: adoptado de la máquina (Excel: ${s.calibre} · ${s.quality})`)
+    adoptarSeteoMaquina(docId, updated, { uid: user.id, name: userName }, `G${gate}: adoptado de la máquina (Excel: ${s.calibre} · ${s.quality})`, { turnoCerrado: shiftWindow?.status !== 'live', baseGates: base })
       .then(async () => {
         if (effectiveSummaryId) {
           await updateDailySummary(effectiveSummaryId, { gatesUsed: updated.filter((g) => g.active) })
@@ -1375,7 +1375,7 @@ export function AnalisisGraderTurnoPage() {
         reloadConfigSnapshots()
       })
       .catch((err) => logger.warn('No se pudo adoptar el seteo de la máquina', { err: String(err) }))
-  }, [user, dateKey, shiftLabel, turnoGates, summary?.gatesUsed, effectiveSummaryId, reloadConfigSnapshots])
+  }, [user, dateKey, shiftLabel, turnoGates, summary?.gatesUsed, effectiveSummaryId, reloadConfigSnapshots, shiftWindow?.status])
 
   /** Registrar el cambio de programa que la máquina hizo a esa hora (snapshot con ese `at`). */
   const handleRegistrarCambio = useCallback((c: CambioDePrograma) => {
@@ -1424,7 +1424,7 @@ export function AnalisisGraderTurnoPage() {
     const userName = `${(user as unknown as Record<string, string>).nombre ?? ''} ${(user as unknown as Record<string, string>).apellido ?? ''}`.trim() || user.email || 'Supervisor'
     const lista = Object.entries(seteos).map(([g, s]) => `G${g}: ${s.calibre} · ${s.quality}`).join(', ')
     lastEmittedGatesRef.current = JSON.stringify(updated)
-    adoptarSeteoMaquina(docId, updated, { uid: user.id, name: userName }, `Adoptado de la máquina (Excel): ${lista}`)
+    adoptarSeteoMaquina(docId, updated, { uid: user.id, name: userName }, `Adoptado de la máquina (Excel): ${lista}`, { turnoCerrado: shiftWindow?.status !== 'live', baseGates: base })
       .then(async () => {
         if (effectiveSummaryId) {
           await updateDailySummary(effectiveSummaryId, { gatesUsed: updated.filter((g) => g.active) })
@@ -1433,7 +1433,7 @@ export function AnalisisGraderTurnoPage() {
         reloadConfigSnapshots()
       })
       .catch((err) => logger.warn('No se pudo adoptar el seteo de la máquina', { err: String(err) }))
-  }, [user, dateKey, shiftLabel, turnoGates, summary?.gatesUsed, effectiveSummaryId, reloadConfigSnapshots])
+  }, [user, dateKey, shiftLabel, turnoGates, summary?.gatesUsed, effectiveSummaryId, reloadConfigSnapshots, shiftWindow?.status])
 
   // M3 — Siguiente pausa sin clasificar
   const [nextPauseOpen, setNextPauseOpen] = useState(false)
