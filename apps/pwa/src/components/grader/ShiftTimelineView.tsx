@@ -23,6 +23,8 @@ import type { FirestorePieceRecord } from '@/services/grader/graderDailySummary.
 import type { UpstreamLineSnapshot } from '@/services/shoplogix/types'
 import { MATRIX_P0_CAUSES, parseMatrixErrorString } from '@/services/grader/graderMatrixP0Causes'
 import { classifyRecordToMatrix, CALIBRE_WEIGHT_RANGES } from '@/services/grader/graderAnalytics'
+import { realIsoToWallClockMs, parseWallClock } from '@/services/grader/graderGateObservations'
+import type { CalibreWeightRange } from '@/services/grader/types'
 import { PauseAnnotationDialog } from './PauseAnnotationDialog'
 import { MinuteDetailDialog } from './MinuteDetailDialog'
 import type { GateAssignment } from '@/services/grader/types'
@@ -92,6 +94,8 @@ interface ShiftTimelineViewProps {
   selectedCauses?: Set<MatrixP0Cause>
   /** Callback para limpiar todas las selecciones desde el badge */
   onClearSelectedCauses?: () => void
+  /** Rangos de calibre vigentes: la capa por causa juzga cada pieza igual que el desglose guardado. */
+  ranges?: CalibreWeightRange[]
   /** P0% final del turno (summary.pointZeroPct) — color de línea según verdict */
   summaryP0Pct?: number
   /** Umbrales para semáforo y líneas horizontales (defaults 2% / 3.5%) */
@@ -139,10 +143,13 @@ interface ShiftTimelineViewProps {
  */
 const CHECKPOINT_PREVIEW = 3
 
-function classifyPiece(piece: FirestorePieceRecord, configSnapshots?: GateConfigSnapshot[]): MatrixP0Cause {
+function classifyPiece(piece: FirestorePieceRecord, configSnapshots?: GateConfigSnapshot[], ranges?: CalibreWeightRange[]): MatrixP0Cause {
   let activeGates: GateConfigSnapshot['gates'] = []
   if (configSnapshots && configSnapshots.length > 0) {
-    const eligible = configSnapshots.filter(s => s.at <= piece.ts)
+    // `at` es hora REAL (UTC) y `ts` hora de pared del Grader: comparar sin
+    // convertir corría la config 3 h (trampa §13 de la memoria del proyecto).
+    const tsMs = parseWallClock(piece.ts)
+    const eligible = configSnapshots.filter(s => realIsoToWallClockMs(s.at) <= tsMs)
     const snap = eligible[eligible.length - 1] ?? configSnapshots[configSnapshots.length - 1]
     activeGates = snap?.gates ?? []
   }
@@ -155,7 +162,7 @@ function classifyPiece(piece: FirestorePieceRecord, configSnapshots?: GateConfig
     calibre: piece.calibre,
     error: piece.error ?? '',
   } as Parameters<typeof classifyRecordToMatrix>[0]
-  return classifyRecordToMatrix(gate0Record, activeGates, CALIBRE_WEIGHT_RANGES)
+  return classifyRecordToMatrix(gate0Record, activeGates, ranges?.length ? ranges : CALIBRE_WEIGHT_RANGES)
 }
 
 
@@ -163,7 +170,7 @@ export function ShiftTimelineView({
   timelineBuckets, shiftDoc, shiftWindow, configSnapshots,
   gate0Pieces, pauses, microDetentions,
   summaryId, adminUid, onPauseUpdated,
-  selectedCauses, onClearSelectedCauses,
+  selectedCauses, onClearSelectedCauses, ranges,
   summaryP0Pct,
   alertThreshold = DEFAULT_P0_ALERT_PCT,
   criticalThreshold = DEFAULT_P0_CRITICAL_PCT,
@@ -553,14 +560,14 @@ export function ShiftTimelineView({
     for (const p of gate0Pieces) {
       const grams = p.weightPerPieceGrams ?? (p.weightKg ? p.weightKg * 1000 : 0)
       if (grams <= 0) continue
-      const cause = classifyPiece(p, configSnapshots)
+      const cause = classifyPiece(p, configSnapshots, ranges)
       if (!causesArr.includes(cause)) continue
       const pt: Point = { time: fmtTime(p.ts), grams, ts: p.ts, calibre: p.calibre, quality: p.quality, error: p.error }
       if (!map.has(cause)) map.set(cause, [])
       map.get(cause)!.push(pt)
     }
     return map
-  }, [causesArr, hasSelection, gate0Pieces, configSnapshots])
+  }, [causesArr, hasSelection, gate0Pieces, configSnapshots, ranges])
 
   const totalScatterPts = [...piecesByCause.values()].reduce((s, arr) => s + arr.length, 0)
   const scatterAxisShow = totalScatterPts > 0

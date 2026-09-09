@@ -2683,6 +2683,12 @@ export function AnalisisGraderTurnoPage() {
                 else next.add(cause)
                 return next
               })}
+              onToggleFamily={(causes) => setSelectedCauses(prev => {
+                const next = new Set(prev)
+                const todas = causes.every((c) => next.has(c))
+                for (const c of causes) { if (todas) next.delete(c); else next.add(c) }
+                return next
+              })}
               isClassificationPlant={isClassificationPlant}
             />
           )}
@@ -2786,7 +2792,8 @@ export function AnalisisGraderTurnoPage() {
             shiftDoc={shiftDoc}
             shiftWindow={shiftWindow}
             configSnapshots={configSnapshots}
-            gate0Pieces={gate0Pieces}
+            gate0Pieces={p0Fuente}
+            ranges={rangosVigentes}
             pauses={pauses}
             microDetentions={microDetentions}
             summaryId={effectiveSummaryId}
