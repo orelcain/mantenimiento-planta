@@ -272,16 +272,21 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets,
   )
   const nInferidas = Object.keys(inferidas ?? {}).length
   const conJuicio = gateMix.gates.some((e) => e.purityPct != null)
-  const resumenPill = [
-    conteo.crit > 0 ? `${conteo.crit} con mezcla` : '',
-    conteo.intrusas > 0 ? `${fmtPz(conteo.intrusas)} pz intrusas` : '',
+  // Un solo aviso en la píldora, el más grave; el resto en una nota debajo.
+  // Medido 09-09: con seis avisos del mismo peso («1 con mezcla · 411 pz
+  // intrusas · 2 en atención · 3 con peso fuera · solapados · 1 cambio sin
+  // registrar») no se priorizaba nada. El solape del Z2 no compite: es un
+  // aviso fijo mientras la máquina siga así y tiene su bloque propio.
+  const avisos = [
+    (cambios?.length ?? 0) > 0 ? `${cambios!.length} cambio${cambios!.length > 1 ? 's' : ''} de programa sin registrar` : '',
+    conteo.crit > 0 ? `${conteo.crit} con mezcla${conteo.intrusas > 0 ? ` · ${fmtPz(conteo.intrusas)} pz intrusas` : ''}` : '',
     conteo.warn > 0 ? `${conteo.warn} en atención` : '',
     conteo.seteo > 0 ? `${conteo.seteo} con seteo ≠ máquina` : '',
     conteo.noRec > 0 ? `${conteo.noRec} con calibre no reconocido` : '',
     conPesoFuera > 0 ? `${conPesoFuera} con peso fuera de rango` : '',
-    (solapes?.length ?? 0) > 0 ? 'programas solapados en el Z2' : '',
-    (cambios?.length ?? 0) > 0 ? `${cambios!.length} cambio${cambios!.length > 1 ? 's' : ''} de programa sin registrar` : '',
-  ].filter(Boolean).join(' · ') || (conJuicio ? 'Todas puras' : 'Sin seteo guardado')
+  ].filter(Boolean)
+  const resumenPill = avisos[0] ?? (conJuicio ? 'Todas puras' : 'Sin seteo guardado')
+  const notaAvisos = avisos.slice(1).join(' · ')
   // Sin ninguna puerta juzgada no hay "Todas puras" que valga.
   const pillToneFinal: PillTone = !conJuicio ? 'neutral' : pillTone
 
@@ -348,6 +353,7 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets,
           Pureza por puerta
           <Pill tone={pillToneFinal} dot className="ml-auto">{resumenPill}</Pill>
         </CardTitle>
+        {notaAvisos && <p className="text-caption text-muted-foreground" data-testid="pureza-avisos">También: {notaAvisos}.</p>}
         {totMezcla ? (
           <p className="text-footnote text-muted-foreground">
             Coinciden en calibre, calidad y conservación:{' '}
@@ -642,9 +648,6 @@ function DetalleGate({ mix, entry, cfg, changeBuckets, causas, seteo, onAdoptar,
   const cambios = new Set(changeBuckets ?? [])
   const purezaSinCambios = sinCambios(entry.purityByBucket, changeBuckets)
   const caida = bloqueDeCaida(purezaSinCambios)
-  const buckets = entry.purityByBucket
-  // Etiquetas del eje: inicio, fin y un par intermedias sin amontonarse.
-  const paso = Math.max(1, Math.ceil(buckets.length / 4))
   const mezclaCalibre = entry.assignedCalibre !== ANY_CALIBRE
     && Object.keys(entry.byCalibre).some((k) => k !== entry.assignedCalibre)
   const mezclaCalidad = Object.keys(entry.byQuality).some((k) => k !== entry.assignedQuality)
@@ -753,16 +756,33 @@ function DetalleGate({ mix, entry, cfg, changeBuckets, causas, seteo, onAdoptar,
           <div className="mt-1 h-[192px]" data-testid="pureza-apilado">
             <ReactECharts option={buildApilado(mix, causas, isDark)} style={{ height: '100%', width: '100%' }} opts={{ renderer: 'canvas' }} notMerge />
           </div>
+          {entry.purityPct != null && (
+            <p className="mt-1 text-footnote" data-testid="pureza-caida">
+              {caida == null
+                ? 'Se mantuvo sobre el umbral todo el turno.'
+                : caida === 0
+                  ? <>Mezclada <span className="font-semibold text-ink-crit">desde el inicio del turno</span>.</>
+                  : <>Cae desde las <span className="font-semibold text-ink-crit tabular-nums">{horaBloque(mix, caida)}</span>; antes iba en {fmtPct(promedioHasta(purezaSinCambios, caida) ?? 0)}.</>}
+              {cambios.size > 0 && <span className="text-muted-foreground"> Cambio de gate a las {[...cambios].sort((a, b) => a - b).map((i) => horaBloque(mix, i)).join(', ')}: ese bloque no cuenta para «cae desde».</span>}
+            </p>
+          )}
         </div>
       )}
 
-      {(!seteo || seteo.noReconocido) && peso && <PorPeso peso={peso} />}
+      {(!seteo || seteo.noReconocido) && peso && !mapa && <PorPeso peso={peso} />}
 
       {mapa && (!seteo || seteo.noReconocido) && (
         <div>
           <p className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">Peso, bloque a bloque</p>
           <div className="mt-1"><MapaPesoSvg mapa={mapa} mix={mix} rango={peso?.rango ?? undefined} /></div>
-          <p className="text-caption text-muted-foreground">Bins de {mapa.binGrams} g × bloques de {mix.bucketMinutes} min, del mismo agregado que ya se descarga con el turno.</p>
+          {peso && (
+            <p className={cn('mt-1 text-footnote', pesoAvisa(peso) ? 'text-ink-warn' : 'text-muted-foreground')} data-testid="pureza-peso-frase">
+              {pesoAvisa(peso)
+                ? `${fmtPct(peso.pctFuera)} de las piezas pesan fuera del rango ${peso.rango?.calibre ?? ''} de la app${peso.gramosAbajo ? ` (más livianas: ${fmtKg(peso.gramosAbajo[0])} a ${fmtKg(peso.gramosAbajo[1])})` : ''}${peso.gramosArriba ? ` (más pesadas: ${fmtKg(peso.gramosArriba[0])} a ${fmtKg(peso.gramosArriba[1])})` : ''}. O el rango del Z2 es más ancho que el de la app, o es mezcla real.`
+                : 'El peso de las piezas cae dentro del rango del calibre asignado.'}
+            </p>
+          )}
+          <p className="text-caption text-muted-foreground">Bins de {mapa.binGrams} g × bloques de {mix.bucketMinutes} min.</p>
         </div>
       )}
 
@@ -773,54 +793,6 @@ function DetalleGate({ mix, entry, cfg, changeBuckets, causas, seteo, onAdoptar,
         </div>
       )}
 
-      {!seteo && entry.purityPct != null && buckets.length > 1 && (
-        <div>
-          <p className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">
-            Pureza cada {mix.bucketMinutes} min
-          </p>
-          <div
-            className="mt-2 grid h-12 items-end gap-px"
-            style={{ gridTemplateColumns: `repeat(${buckets.length}, minmax(0, 1fr))` }}
-            role="img"
-            aria-label={`Pureza de la G${entry.gate} por bloque de ${mix.bucketMinutes} minutos`}
-          >
-            {buckets.map((v, i) => (
-              <span
-                key={i}
-                title={`${horaBloque(mix, i)} · ${v == null ? 'sin piezas' : fmtPct(v)}${cambios.has(i) ? ' · cambio de gate en este bloque' : ''}`}
-                className={cn(
-                  'block',
-                  v == null ? 'bg-border' : NIVEL_BG[nivelDePureza(v)],
-                  cambios.has(i) && 'ring-2 ring-inset ring-primary',
-                )}
-                style={{ height: v == null ? '15%' : `${Math.max(v, 4)}%` }}
-              />
-            ))}
-          </div>
-          <div className="mt-1 flex justify-between text-caption tabular-nums text-muted-foreground">
-            {buckets.map((_, i) =>
-              i % paso === 0 || i === buckets.length - 1
-                ? <span key={i}>{horaBloque(mix, i)}</span>
-                : null,
-            )}
-          </div>
-          {cambios.size > 0 && (
-            <p className="mt-1 text-caption text-muted-foreground">
-              <span className="inline-block h-[9px] w-[9px] align-middle ring-2 ring-inset ring-primary mr-1" aria-hidden />
-              Cambio de gate en el bloque de las{' '}
-              <span className="tabular-nums">{[...cambios].sort((a, b) => a - b).map((i) => horaBloque(mix, i)).join(', ')}</span>:
-              ese bloque se lee con cautela y no cuenta para "cae desde".
-            </p>
-          )}
-          <p className="mt-2 text-footnote">
-            {caida == null
-              ? 'Se mantuvo sobre el umbral todo el turno.'
-              : caida === 0
-                ? <>Mezclada <span className="font-semibold text-ink-crit">desde el inicio del turno</span>.</>
-                : <>Cae desde las <span className="font-semibold text-ink-crit tabular-nums">{horaBloque(mix, caida)}</span>; antes iba en {fmtPct(promedioHasta(purezaSinCambios, caida) ?? 0)}.</>}
-          </p>
-        </div>
-      )}
 
       {obs && mezclaPuerta && !seteo && (
         <PiezasDePuerta

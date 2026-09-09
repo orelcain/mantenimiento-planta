@@ -6,6 +6,31 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-09 · Gates: menos avisos iguales, menos vistas repetidas del mismo tiempo (PR #933)
+
+Orel: «¿en qué más podemos afinar o simplificar?». Medido a 375 px sobre el turno cerrado
+2026-09-08 T1: Gates 5.905 px (tarjeta de pureza 3.189, detalle de una puerta 1.752). Cuatro
+cosas sobraban o se repetían:
+
+1. **La píldora era una frase de seis avisos** con el mismo peso («1 con mezcla · 411 pz
+   intrusas · 2 en atención · 3 con peso fuera de rango · programas solapados en el Z2 · 1
+   cambio de programa sin registrar»). Ahora muestra UN aviso, el más grave (cambio sin
+   registrar > mezcla > atención > seteo ≠ máquina > no reconocido > peso), y el resto va en
+   una nota «También: …». El solape del Z2 sale de la píldora: es fijo mientras la máquina siga
+   así y ya tiene su bloque.
+2. **Tres vistas del mismo tiempo en el detalle**: apilado por causa, tira «Pureza cada 30 min»
+   y mapa de peso. La tira era un subconjunto del apilado → se va; su frase «cae desde las
+   HH:MM» (y la nota del bloque con cambio de gate) queda bajo el apilado. La tabla «Por peso»
+   repetía el mapa → solo aparece si el turno no tiene mapa (sin `weightByBucket`); bajo el
+   mapa va la frase del % fuera de rango.
+3. **Historial de configuración** (291 px a la vista) → dentro de «Más análisis de gates»; la
+   config compacta de arriba ya marca los cambios del turno.
+4. **Dos editores de compuertas en la misma pestaña** → el completo («Las 12 compuertas de
+   este turno», plegado) se va de Gates; quedan el panel compacto con «Cambiar gate» y
+   Configuración del Grader para rangos y umbrales.
+
+Sin mockup previo: cambios sustractivos y un orden de prioridad, verificados en el preview.
+
 ## 2026-09-09 · El Excel de Puerta 0 cubre menos que el pieza a pieza: P0 mentía (PR #932)
 
 Segunda carga parcial del 2026-09-08 T1 (05:37Z): el pieza a pieza llega a las 02:37 con
