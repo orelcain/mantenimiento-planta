@@ -1,6 +1,7 @@
 import { doc, collection, getDocs, setDoc, updateDoc, query, orderBy } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import type { GateAssignment } from './types'
+import { puertasAdoptadas, reescribirEnTodos } from './graderAdoptarSeteo'
 
 export interface ConfigDiff {
   gateNumber: number
@@ -154,8 +155,29 @@ export async function adoptarSeteoMaquina(
   newGates: GateAssignment[],
   user: { uid: string; name: string },
   reason: string,
+  opts: {
+    /**
+     * Turno CERRADO: la máquina tuvo ese programa todo el turno, así que la
+     * puerta se reescribe en TODOS los snapshots (un snapshot «ahora» regiría
+     * solo desde ahora y dejaría el turno juzgado con el seteo viejo).
+     */
+    turnoCerrado?: boolean
+    /** Config de la que parte `newGates` (para saber qué puertas cambian). */
+    baseGates?: GateAssignment[]
+  } = {},
 ): Promise<GateConfigSnapshot | null> {
   const previous = await getLatestSnapshot(shiftDocId)
+  if (opts.turnoCerrado && previous) {
+    const all = await listSnapshots(shiftDocId)
+    const adoptadas = puertasAdoptadas(opts.baseGates ?? previous.gates, newGates)
+    if (adoptadas.size === 0) return previous
+    for (const r of reescribirEnTodos(all, adoptadas)) {
+      if (!r.cambio) continue
+      const esUltimo = r.id === previous.id
+      await updateDoc(doc(db, 'graderShifts', shiftDocId, SUBCOLLECTION, r.id), esUltimo ? { gates: r.gates, reason: `${previous.reason ? previous.reason + ' · ' : ''}${reason}`, changedBy: user } : { gates: r.gates })
+    }
+    return { ...previous, gates: reescribirEnTodos([previous], adoptadas)[0]!.gates, reason, changedBy: user }
+  }
   if (previous && !previous.synthetic && previous.changes.length === 0) {
     const fixed: GateConfigSnapshot = { ...previous, gates: [...newGates], reason, changedBy: user }
     await setDoc(doc(db, 'graderShifts', shiftDocId, SUBCOLLECTION, previous.id), fixed)
