@@ -6,6 +6,14 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-09 · Se retira la dispersión P0 aparte: la capa por causa del timeline la reemplaza (PR #931)
+
+Pedido de Orel tras ver funcionar la capa por causa (#930): «retira la dispersión P0, dejemos
+solo el timeline». `PieceScatterChart` (dispersión segundo a segundo de piezas P0, colapsada
+por defecto) decía lo mismo que el timeline con una causa marcada, pero sin el contexto de
+pausas, lotes y config. Se elimina el componente (único uso: la vista Calidad de la página del
+turno) y su import. Sin cambios en datos ni en el resto de la vista.
+
 ## 2026-09-09 · Timeline + dispersión P0: la unificación ya existía y estaba ciega (PR #930)
 
 Pregunta de Orel con el Excel parcial del turno en curso: «¿el timeline y la dispersión P0 se

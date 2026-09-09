@@ -78,7 +78,6 @@ import { effectiveProductionWindow, shouldFrameOnProduction } from '@/services/s
 import { buildScatterData, scatterSlopeMagnitude } from '@/components/grader/shiftTimelineHelpers'
 import { DEFAULT_P0_ALERT_PCT, DEFAULT_P0_CRITICAL_PCT } from '@/services/grader/graderP0Thresholds'
 import { fmtTime } from '@/services/grader/graderTimeFormat'
-import { PieceScatterChart } from '@/components/grader/PieceScatterChart'
 import { UpstreamMachinesPanel } from '@/components/grader/UpstreamMachinesPanel'
 import { MonitorUsagePanel } from '@/components/grader/MonitorUsagePanel'
 import { SensorStopsCausePanel } from '@/components/grader/SensorStopsCausePanel'
@@ -2811,10 +2810,8 @@ export function AnalisisGraderTurnoPage() {
           />
           )}
 
-          {/* Dispersión segundo a segundo de piezas P0 (drill-down del timeline) */}
-          {activeView === 'calidad' && p0Fuente.length >= 5 && (
-            <PieceScatterChart gate0Pieces={p0Fuente} />
-          )}
+          {/* La dispersión P0 aparte se retiró (09-09, pedido de Orel): la capa por
+              causa del timeline la reemplaza (marcar una causa en el panel P0). */}
 
           {/* ════════ LÍNEA (upstream Shoplogix) ════════
               Evisceradoras Baader 142: lo que alimenta al Grader. Junto con su
