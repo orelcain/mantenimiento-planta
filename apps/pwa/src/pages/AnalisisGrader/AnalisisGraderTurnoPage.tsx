@@ -2898,7 +2898,7 @@ export function AnalisisGraderTurnoPage() {
           {activeView === 'gates' && isClassificationPlant && (summary.gateDistribution?.length || enrichedTimelineBuckets.length > 0) && (
             <Disclosure
               title="Más análisis de gates"
-              summary="Distribución por gate, piezas por minuto y comparación con turnos anteriores"
+              summary="Distribución por gate, piezas por minuto, comparación con turnos anteriores e historial de configuración"
               defaultOpen={false}
               storageKey="turno.gates.masAnalisis"
               className="space-y-4"
@@ -2921,6 +2921,14 @@ export function AnalisisGraderTurnoPage() {
                 />
               )}
               {shiftWindow?.status !== 'live' && gatesHistoryCard}
+              {/* Historial de snapshots: la config compacta de arriba ya marca los cambios del turno. */}
+              <ConfigChangeHistory
+                shiftDocId={shiftDocId}
+                snapshots={configSnapshots}
+                timelineBuckets={enrichedTimelineBuckets}
+                onChange={reloadConfigSnapshots}
+                allowEdit={shiftWindow?.status === 'live'}
+              />
             </Disclosure>
           )}
 
@@ -2933,18 +2941,6 @@ export function AnalisisGraderTurnoPage() {
             productoBreakdown={summary.productoBreakdown}
             conservacionBreakdown={summary.conservacionBreakdown}
           />
-          )}
-
-          {/* Historial de cambios de configuración del turno — solo Chonchi
-              (gates con calibre+calidad). Yal no clasifica → no aplica. */}
-          {activeView === 'gates' && isClassificationPlant && (
-            <ConfigChangeHistory
-              shiftDocId={shiftDocId}
-              snapshots={configSnapshots}
-              timelineBuckets={enrichedTimelineBuckets}
-              onChange={reloadConfigSnapshots}
-              allowEdit={shiftWindow?.status === 'live'}
-            />
           )}
 
           {/* Sección IA — solo Chonchi. El generador asume gates de
@@ -3057,7 +3053,6 @@ export function AnalisisGraderTurnoPage() {
 
           {/* Ajustes de ESTE turno — al pie, después del análisis: acá el Excel
               ya existe, así que primero se lee cómo fue y después se corrige. */}
-          {activeView === 'gates' && isClassificationPlant && gatesEditorCard}
         </>
       )}
 
