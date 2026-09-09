@@ -39,7 +39,7 @@ import { ShoplogixOnlyScorecard } from '@/components/grader/ShoplogixOnlyScoreca
 import { P0CausesPanel } from '@/components/grader/P0CausesPanel'
 import { ConfigDriftBanner } from '@/components/grader/ConfigDriftBanner'
 import { detectConfigDrift } from '@/services/grader/graderConfigDrift'
-import { recomputeShiftP0Causes } from '@/services/grader/graderGate0Store'
+import { recomputeShiftP0Causes, loadGate0Records, p0SinPuerta } from '@/services/grader/graderGate0Store'
 import { GraderCoverageBar } from '@/components/grader/GraderCoverageBar'
 import { TurnoTiemposLine } from '@/components/grader/TurnoTiemposLine'
 import { ShiftTimelineView } from '@/components/grader/ShiftTimelineView'
@@ -670,6 +670,10 @@ export function AnalisisGraderTurnoPage() {
   const [gateObs, setGateObs] = useState<GateObservations | null>(null)
   const [configSnapshots, setConfigSnapshots] = useState<GateConfigSnapshot[]>([])
   const [gate0Pieces, setGate0Pieces] = useState<FirestorePieceRecord[]>([])
+  // El input de Puerta 0 que usó la clasificación (Excel P0 del Marelec, CON el
+  // texto de la causa). Las piezas gate=0 del pieza-a-pieza no traen causa:
+  // con ellas la dispersión P0 decía «95 Otro» (medido 09-09).
+  const [gate0Input, setGate0Input] = useState<FirestorePieceRecord[] | null>(null)
   // Nivel 2 de la pureza: piezas de UNA puerta, cargadas a pedido (cuestan
   // tantas lecturas como piezas; el turno entero serían ~18.000).
   const [piezasPorPuerta, setPiezasPorPuerta] = useState<Record<number, FirestorePieceRecord[]>>({})
@@ -1154,6 +1158,10 @@ export function AnalisisGraderTurnoPage() {
     listGate0PieceRecords(effectiveSummaryId)
       .then(setGate0Pieces)
       .catch(() => setGate0Pieces([]))
+    setGate0Input(null)
+    loadGate0Records(effectiveSummaryId)
+      .then((recs) => setGate0Input(recs ? recs.map((r) => ({ ...r, gate: 0, dedupeKey: '' }) as unknown as FirestorePieceRecord) : null))
+      .catch(() => setGate0Input(null))
   }, [effectiveSummaryId])
 
   // Carga historial de config de gates (FASE 27)
@@ -1239,16 +1247,22 @@ export function AnalisisGraderTurnoPage() {
 
   // ¿El desglose P0 guardado corresponde a estas gates? El análisis se congela al
   // guardar el turno y editar la config después no lo recalcula.
+  // P0 con causa cuando está guardado; si no, las piezas gate=0 del pieza a pieza.
+  const p0Fuente = gate0Input ?? gate0Pieces
   const configDrift = useMemo(() => {
     if (!summary || !isClassificationPlant || turnoGates.length === 0) return null
     return detectConfigDrift({
       gatesUsed: summary.gatesUsed,
       currentGates: turnoGates,
-      gate0Records: gate0Pieces,
+      gate0Records: p0Fuente,
       savedCauses: summary.topP0Causes,
       ranges: rangosVigentes,
     })
-  }, [summary, isClassificationPlant, turnoGates, gate0Pieces, rangosVigentes])
+  }, [summary, isClassificationPlant, turnoGates, p0Fuente, rangosVigentes])
+  const p0SinPuertaData = useMemo(
+    () => (isClassificationPlant && p0Fuente.length > 0 ? p0SinPuerta(p0Fuente, gateTimeline, rangosVigentes) : undefined),
+    [isClassificationPlant, p0Fuente, gateTimeline, rangosVigentes],
+  )
 
   // Recálculo automático: si el desglose no corresponde a las gates vigentes y el
   // turno guardó su input de Puerta 0, se reclasifica y se persiste sin pedir nada.
@@ -2729,6 +2743,8 @@ export function AnalisisGraderTurnoPage() {
               piezasCargando={piezasCargando}
               onCargarPiezas={handleCargarPiezas}
               rangos={rangosVigentes}
+              p0SinPuerta={p0SinPuertaData}
+              hastaIso={summary.endAt}
               turnoLabel={`${dateKey.slice(8, 10)}/${dateKey.slice(5, 7)} · ${shiftLabel}`}
             />
           )}
@@ -2789,8 +2805,8 @@ export function AnalisisGraderTurnoPage() {
           )}
 
           {/* Dispersión segundo a segundo de piezas P0 (drill-down del timeline) */}
-          {activeView === 'calidad' && gate0Pieces.length >= 5 && (
-            <PieceScatterChart gate0Pieces={gate0Pieces} />
+          {activeView === 'calidad' && p0Fuente.length >= 5 && (
+            <PieceScatterChart gate0Pieces={p0Fuente} />
           )}
 
           {/* ════════ LÍNEA (upstream Shoplogix) ════════

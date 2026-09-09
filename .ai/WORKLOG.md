@@ -6,6 +6,30 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-09 · Ronda 10 con la carga parcial del 08-09 T1: P0 con causa, rechazos sin puerta, hora real (PR #929)
+
+Orel cargó a las 23:38 el pieza a pieza + Puerta 0 del turno en curso (2026-09-08 Turno 1,
+21:28→23:37, 6.283 pz, P0 96 = 1,53 %). Lo que funcionó solo: snapshot inicial desde el
+último seteo conocido (#918), G12 leída como 12-UP por el parser (#925), conservación por
+pieza (#926), tarjeta EN VIVO; tres puertas «seteo ≠ máquina» (G2, G4, G12: hoy el Z2 las
+tiene distintas a anoche) adoptadas desde el botón en 3 puertas → el snapshot inicial se
+reescribió en su lugar y la coincidencia quedó 6.188 / 6.188 (100 %). Lo que estaba mal:
+
+1. **La dispersión P0 decía «95 Otro»**: leía las piezas gate=0 del pieza a pieza, que NO
+   traen el texto de la causa; el input de Puerta 0 guardado (`meta/gate0`, el que usó la
+   clasificación) sí lo trae. → la página carga `loadGate0Records` y lo usa para la
+   dispersión y para el desfase de config (`p0Fuente = gate0Input ?? gate0Pieces`). Ahora:
+   «50 Fuera límites · 46 Sin fotocélula».
+2. **37 de los 96 P0 pesaban 0,34–0,90 kg**: la app los clasifica «fuera de calibre» porque
+   ninguna puerta tiene 0-2 lb, pero nadie lo decía. → `p0SinPuerta(records, timeline,
+   ranges)` (puro, 3 tests; una puerta «Other» cuenta como puerta) + bloque «Rechazos sin
+   puerta» en la tarjeta de pureza. Encontró además **7 pz de 12-UP (5,5–6,1 kg) sin
+   puerta** porque hoy la G12 va en 4-6 Industrial. Es decisión de seteo, no falla.
+3. **«piezas hasta las 00:00»** con datos hasta las 23:37: usaba el fin del último bloque de
+   30 min. → `hastaIso = summary.endAt`.
+
+Pendiente Orel/Z2 (sigue): G11 71 % más liviano que 4,99 kg (el 10-12 del Z2 arranca en ~4,5).
+
 ## 2026-09-09 · «Adoptar seteo» en turno cerrado reescribe todos los snapshots (PR #928)
 
 Pedido de Orel tras adoptar G1 y G12 del 2026-09-07 T1 por script: «arregla el botón adoptar

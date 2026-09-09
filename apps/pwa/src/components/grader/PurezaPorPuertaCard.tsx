@@ -33,6 +33,7 @@ import {
   PUREZA_OK_PCT, PUREZA_WARN_PCT, nivelDePureza, bloqueDeCaida, promedioHasta, type NivelPureza as Nivel,
 } from '@/services/grader/graderPurezaNivel'
 import type { GateAssignment, CalibreWeightRange } from '@/services/grader/types'
+import type { P0SinPuerta } from '@/services/grader/graderGate0Store'
 import { CAUSA_ORDER, normalizarCalibre, dimensionIntrusa, bloqueDe, parseWallClock, type CausaTipo, type GateCauses, type GateCauseGroup, type SeteoMaquina, type PesoPorPuerta, type SolapeDeRango, type CambioDePrograma, type MezclaPuerta, type MapaPeso, type DimensionMezcla, type GateObservations, type ComposicionCombo } from '@/services/grader/graderGateObservations'
 import type { FirestorePieceRecord } from '@/services/grader/graderDailySummary.service'
 
@@ -131,6 +132,10 @@ interface Props {
   onCargarPiezas?: (gate: number) => void
   /** Rangos de calibre vigentes: cada pieza se juzga «fuera de rango» contra el calibre que regía en SU bloque. */
   rangos?: CalibreWeightRange[]
+  /** P0 cuyo calibre por peso no tiene puerta asignada (decisión de seteo, no falla). */
+  p0SinPuerta?: P0SinPuerta[]
+  /** Hasta qué hora llegan las piezas (ISO wall-clock del turno). Sin esto se usa el fin del último bloque. */
+  hastaIso?: string
 }
 
 /** Desde este % de piezas fuera del rango por peso, la baldosa lo dice. */
@@ -185,7 +190,7 @@ const CAUSA_COLOR: Record<'dark' | 'light', Record<CausaTipo | 'ok', string>> = 
 }
 const CHART_TEXT = { light: { axis: '#41566a', grid: '#c3d7e9', tipBg: '#ffffff', tipText: '#16242f', tipBorder: '#c3d7e9' }, dark: { axis: '#94a3b8', grid: '#22384a', tipBg: '#1e293b', tipText: '#e2e8f0', tipBorder: '#334155' } }
 
-export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets, causesFor, seteoDistinto, onAdoptarSeteo, onAdoptarSeteoTodas, pesoPorPuerta, solapes, inferidas, cambios, onRegistrarCambio, mezcla, obs, mapaPeso, piezas, piezasCargando, onCargarPiezas, rangos }: Props) {
+export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets, causesFor, seteoDistinto, onAdoptarSeteo, onAdoptarSeteoTodas, pesoPorPuerta, solapes, inferidas, cambios, onRegistrarCambio, mezcla, obs, mapaPeso, piezas, piezasCargando, onCargarPiezas, rangos, p0SinPuerta, hastaIso }: Props) {
   const navigate = useNavigate()
   const [copiado, setCopiado] = useState(false)
 
@@ -244,12 +249,15 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets,
   // Hasta qué hora hay piezas: con el Excel cargado a mitad de turno, es lo
   // primero que hay que saber para leer el resto.
   const datosHasta = useMemo(() => {
+    // La hora real de la última pieza, si el turno la trae: «hasta las 00:00»
+    // cuando el Excel llegaba a las 23:37 hacía creer que faltaban 23 min.
+    if (hastaIso && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(hastaIso)) return hastaIso.slice(11, 16)
     let last = -1
     for (const e of gateMix.gates) e.purityByBucket.forEach((v, i) => { if (v != null && i > last) last = i })
     if (last < 0) return null
     const ms = Date.parse(gateMix.bucketsFrom) + (last + 1) * gateMix.bucketMinutes * 60_000
     return new Date(ms).toISOString().slice(11, 16)
-  }, [gateMix])
+  }, [gateMix, hastaIso])
 
   const nivelGlobal: Nivel = conteo.crit > 0 ? 'crit' : conteo.warn > 0 ? 'warn' : 'ok'
   const pillTone: PillTone = conteo.crit > 0 ? 'critical' : conteo.warn > 0 ? 'warning' : conteo.seteo > 0 ? 'info' : 'ok'
@@ -435,6 +443,19 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets,
                 <span className="tabular-nums text-foreground">{fmtKg(s.desdeB)}</span>:{' '}
                 <span className="tabular-nums text-foreground">{s.gramos} g</span> en común. El pescado de ese tramo cae en cualquiera de las dos
                 ({fmtPz(s.piezasA)} pz en {s.calibreA}, {fmtPz(s.piezasB)} pz en {s.calibreB}). Revisar los límites de los dos programas en el Z2.
+              </p>
+            ))}
+          </div>
+        )}
+
+        {p0SinPuerta && p0SinPuerta.length > 0 && (
+          <div className="rounded-ctl bg-muted px-3 py-2 text-footnote" data-testid="pureza-p0-sin-puerta">
+            <p className="font-semibold text-foreground">Rechazos sin puerta</p>
+            {p0SinPuerta.map((p) => (
+              <p key={p.calibre} className="text-muted-foreground">
+                <span className="tabular-nums text-foreground">{fmtPz(p.pieces)} pz</span> de{' '}
+                <span className="text-foreground">{p.calibre}</span> ({fmtKg(p.minG)}–{fmtKg(p.maxG)}) cayeron a P0 porque ninguna puerta tiene{' '}
+                {p.calibre} asignado. No es falla: decidir si va una puerta para ese calibre o si el rechazo se asume.
               </p>
             ))}
           </div>
