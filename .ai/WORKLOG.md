@@ -6,6 +6,28 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-09 · Timeline + dispersión P0: la unificación ya existía y estaba ciega (PR #930)
+
+Pregunta de Orel con el Excel parcial del turno en curso: «¿el timeline y la dispersión P0 se
+pueden unificar o dicen cosas distintas? ¿seleccionar la causa y mostrarla en el timeline?».
+Dicen cosas distintas y complementarias —el timeline es el pulso P0 % minuto a minuto con
+pausas, lotes y cambios de config; la dispersión es cada pieza con su peso y su causa— y **la
+unificación ya estaba construida**: al marcar una causa en el panel de P0 el timeline superpone
+un punto por pieza con el peso en el eje derecho. Nadie la había visto funcionar porque:
+
+1. El timeline recibía las piezas gate=0 del pieza a pieza, SIN causa (mismo defecto que #929
+   en la dispersión) → ninguna pieza calzaba con la causa elegida. → `gate0Pieces={p0Fuente}`.
+2. `classifyPiece` comparaba `snapshot.at` (hora real) con `piece.ts` (hora de pared) sin
+   convertir (trampa §13) y clasificaba con `CALIBRE_WEIGHT_RANGES` en vez de los rangos de la
+   línea. → `realIsoToWallClockMs` + prop `ranges` (la página pasa `rangosVigentes`).
+3. Marcar el paraguas «Fuera de límites» seleccionaba solo el estricto (piezas sin peso) →
+   «0 pzas con peso». → `onToggleFamily`: el paraguas marca/desmarca su familia (estricto + 5
+   derivadas) y aparece marcado solo cuando la familia entera lo está.
+
+Verificado en el turno 2026-09-08 T1 (parcial): «Fuera de calibre» → «44 pzas con peso» y en el
+timeline se ven las dos nubes sin puerta (< 1 kg y 5,5–6 kg). La dispersión aparte sigue,
+plegada; si Orel prefiere, se puede retirar.
+
 ## 2026-09-09 · Ronda 10 con la carga parcial del 08-09 T1: P0 con causa, rechazos sin puerta, hora real (PR #929)
 
 Orel cargó a las 23:38 el pieza a pieza + Puerta 0 del turno en curso (2026-09-08 Turno 1,

@@ -91,6 +91,12 @@ interface P0CausesPanelProps {
   /** Toggle add/remove una causa del set seleccionado. */
   onToggleCause?: (cause: MatrixP0Cause) => void
   /**
+   * El paraguas «Fuera de límites» selecciona su FAMILIA (el estricto + las 5
+   * derivadas): el estricto solo son las piezas sin peso y marcarlo dejaba el
+   * timeline en «0 pzas con peso» (medido 09-09).
+   */
+  onToggleFamily?: (causes: MatrixP0Cause[]) => void
+  /**
    * Cuando true (Chonchi), el copy menciona Matrix HMI / unsorted pcs.
    * Cuando false (Yal), copy genérico — Yal no usa HMI Matrix de MS4/12 ni
    * exporta archivo Punto Cero separado: los rechazos vienen embebidos en
@@ -368,7 +374,7 @@ function SubCauseRow({
   )
 }
 
-export function P0CausesPanel({ byMatrixCause, totalP0Pct, unsortedPcs, selectedCauses, onToggleCause, isClassificationPlant = true }: P0CausesPanelProps) {
+export function P0CausesPanel({ byMatrixCause, totalP0Pct, unsortedPcs, selectedCauses, onToggleCause, onToggleFamily, isClassificationPlant = true }: P0CausesPanelProps) {
   const [expanded, setExpanded] = useState<MatrixP0Cause | null>(null)
   const hasCauseData = byMatrixCause != null
   const selSet = selectedCauses ?? new Set<MatrixP0Cause>()
@@ -444,10 +450,10 @@ export function P0CausesPanel({ byMatrixCause, totalP0Pct, unsortedPcs, selected
                         derivedStats={derivedStats}
                         totalP0Pct={totalP0Pct}
                         expanded={expanded === cause}
-                        selected={selSet.has(cause)}
+                        selected={[cause, ...MATRIX_CAUSE_ORDER_DERIVED].every((c) => selSet.has(c))}
                         selectedCauses={selSet}
                         onToggle={() => toggleExpand(cause)}
-                        onSelectChange={() => onToggleCause?.(cause)}
+                        onSelectChange={() => (onToggleFamily ? onToggleFamily([cause, ...MATRIX_CAUSE_ORDER_DERIVED]) : onToggleCause?.(cause))}
                         onSelectSubCause={(c) => onToggleCause?.(c)}
                       />
                     )
