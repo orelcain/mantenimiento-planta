@@ -206,3 +206,52 @@ export async function recomputeShiftP0Causes(
   } as Partial<GraderDailySummary> & Record<string, unknown>)
   return { ok: true, causes }
 }
+
+
+// ── Rechazos por calibre SIN puerta ──────────────────────────────────────────
+//
+// Medido 09-09 (2026-09-08 Turno 1, carga parcial): 37 de 96 P0 pesaban
+// 0,34–0,90 kg. La app los clasifica «fuera de calibre» porque ninguna puerta
+// tiene 0-2 lb asignado, pero eso no se decía en ninguna parte: es una
+// decisión de seteo (¿una puerta para 0-2 o rechazo asumido?), no una falla.
+
+export interface P0SinPuerta {
+  calibre: string
+  pieces: number
+  /** Gramos de la pieza más liviana y más pesada del grupo. */
+  minG: number
+  maxG: number
+}
+
+/**
+ * P0 cuyo peso cae en un rango de calibre que NINGUNA puerta activa tenía
+ * asignado a esa hora (una puerta «Other» acepta cualquier calibre y cuenta
+ * como puerta). Solo piezas con peso.
+ */
+export function p0SinPuerta(
+  records: ReadonlyArray<{ ts: string; pieces: number; weightKg?: number; weightPerPieceGrams?: number }>,
+  gates: GateAssignment[] | ConfigTimeline,
+  ranges?: CalibreWeightRange[],
+): P0SinPuerta[] {
+  const rangos = ranges?.length ? ranges : CALIBRE_WEIGHT_RANGES
+  const activeAt: (ts: string) => GateAssignment[] = Array.isArray(gates)
+    ? (() => { const active = gates.filter((g) => g.active); return () => active })()
+    : (ts) => (gates.configAt(parseWallClock(ts)) ?? []).filter((g) => g.active)
+  const acc = new Map<string, P0SinPuerta>()
+  for (const r of records) {
+    const bruto = r.weightPerPieceGrams ?? (r.weightKg != null && r.pieces > 0 ? (r.weightKg * 1000) / r.pieces : undefined)
+    if (bruto == null || bruto < 10) continue
+    const g = Math.round(bruto)
+    const rango = rangos.find((x) => g >= x.minGrams && g < x.maxGrams)
+    if (!rango) continue
+    const active = activeAt(r.ts)
+    if (active.length === 0) continue
+    if (active.some((a) => a.assignedCalibre === rango.calibre || a.assignedCalibre === 'Other')) continue
+    const cur = acc.get(rango.calibre) ?? { calibre: rango.calibre, pieces: 0, minG: Infinity, maxG: -Infinity }
+    cur.pieces += r.pieces || 1
+    cur.minG = Math.min(cur.minG, g)
+    cur.maxG = Math.max(cur.maxG, g)
+    acc.set(rango.calibre, cur)
+  }
+  return [...acc.values()].sort((a, b) => b.pieces - a.pieces)
+}
