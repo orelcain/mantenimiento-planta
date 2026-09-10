@@ -6,6 +6,52 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-10 · Las dos correlaciones de Línea: el scatter no mostraba nada y la tabla cortaba el texto (PR #937)
+
+Orel: «sigamos con las dos correlaciones de línea». Antes de tocar el layout medí cuántas
+veces cada una dice algo: la de paros señala algo en **6 de 40 turnos**; la del ritmo alcanza
+R² ≥ 0,10 en 11 de 28. Pero al mirarlas de verdad a 375 px apareció algo peor que el espacio
+que ocupan.
+
+**1. El scatter dibujaba puntos que sus propias estadísticas descartan, y por eso no se veía
+nada.** `usableScatterPoints` filtra los buckets de menos de 5 piezas para la regresión, la
+mediana y la zona crítica — pero el gráfico dibujaba `s.points` entero. Esos buckets de 1-2
+piezas llegan al 100 % de P0 y estiraban el eje Y hasta ahí, aplastando contra el piso la nube
+real, que vive entre 0 y 6 %. Medido: **en 256 de 377 turnos había buckets que estiraban el
+eje**. Ahora el gráfico dibuja solo los usables y el eje se corta con `scatterYMax` en el
+percentil 98 (nunca por debajo del triple del umbral crítico), avisando cuántos puntos quedan
+fuera — recortar sin decirlo sería esconder los peores tramos. En 2026-09-08 T1 el eje pasa de
+100 % a 16 % y la nube por fin se lee.
+
+**2. En tema claro los puntos eran casi invisibles.** Los colores estaban fijos en el tono
+oscuro (emerald-400 / blue-400 / amber-400 al 85 %) y la grilla y los ejes en `#1e293b` /
+`#64748b`. Ahora hay una paleta por tema (los mismos matices dos pasos más oscuros para el
+claro) y ejes, grilla y tooltip salen del mismo juego que usa la tarjeta de pureza.
+
+**3. La leyenda se comía el gráfico.** Seis entradas (3 máquinas + 3 tendencias) a 9 px en un
+grid que reservaba 30 px: se dibujaban encima de los puntos y del eje X. Ahora son tres, con
+nombre corto y a 11 px, con 46 px reservados. De paso, los `fontSize` 8 y 9 de las opciones de
+ECharts suben a 11, el piso de la constitución.
+
+**4. El chip decía «min» y contaba tramos.** «Zona crítica: 31 de 243 min» eran 243 puntos, y
+cada punto es un intervalo de 5 min de UNA máquina: con 3 Baader, 96 intervalos cada una dan
+288. Se leía como que el turno había durado 243 minutos. Ahora dice «tramos» y el tooltip lo
+explica.
+
+**5. La tabla de paros cortaba la única frase que dice qué pasó.** En una fila de 375 px la
+hipótesis quedaba en «Coi…» entre la duración y la confianza. Va en su propia línea y completa;
+y el texto del caso «programado» se acortó porque repetía entero el encabezado de la tarjeta.
+
+También se fue la fila de R² por máquina: decía lo mismo que el veredicto de arriba repartido
+por serie, y con los nombres largos ocupaba dos líneas.
+
+Las dos tarjetas pasan de 645 a 709 px en 2026-09-08 T1. Es más alto y está bien: antes esos
+645 px no mostraban ni el texto ni los datos.
+
+Mockup de la fusión de ambas tarjetas (opción C, veredicto + hoja):
+https://claude.ai/code/artifact/df42faa3-6466-49eb-9309-45f73324c9f8 — queda para la próxima,
+con el diseño ya decidido.
+
 ## 2026-09-10 · Lo que sobra y lo que se repite: dos afirmaciones sin sustento y tres bloques con el mismo número (PR #936)
 
 Orel: «veamos qué partes están de más y qué partes están duplicadas… simplificar para a

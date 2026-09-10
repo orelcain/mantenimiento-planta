@@ -10,6 +10,7 @@ import {
   scatterBaaderMedian,
   scatterCriticalZone,
   scatterSlopeMagnitude,
+  scatterYMax,
   SCATTER_R2_MIN,
   usableScatterPoints,
   verdictBandColor,
@@ -831,5 +832,48 @@ describe('buildCadenceMarkLines', () => {
     const lines = buildCadenceMarkLines(stats) as Array<{ name: string }>
     expect(lines).toHaveLength(1)
     expect(lines[0]!.name).toBe('Ritmo típico')
+  })
+})
+
+describe('scatterYMax · el eje deja ver la nube', () => {
+  const serie = (p0s: number[], piezas = 100): ScatterSeriesData[] => ([{
+    machineid: 'm1', machineName: 'E1',
+    points: p0s.map((v, i) => ({ tsMs: i, baaderCycles: 20, baaderRatio: 1, graderP0Pct: v / 100, graderPieces: piezas, baaderColor: 'green' })),
+    regression: null,
+  }])
+
+  it('un pico aislado no estira el eje: se corta y se avisa', () => {
+    // El caso real: la nube vive entre 0 y 6 %, y un bucket al 100 % llevaba el
+    // eje hasta ahí, aplastando todo contra el piso (256 de 377 turnos).
+    const p0s = [...Array.from({ length: 99 }, (_, i) => (i % 6) + 1), 100]
+    const { max, fuera } = scatterYMax(serie(p0s), 3.5)
+    expect(max).toBeLessThan(20)
+    expect(fuera).toBe(1)
+  })
+
+  it('sin picos no deja nada fuera', () => {
+    const { max, fuera } = scatterYMax(serie([1, 2, 3, 4, 5, 6]), 3.5)
+    expect(fuera).toBe(0)
+    expect(max).toBeGreaterThanOrEqual(6)
+  })
+
+  it('nunca corta por debajo del triple del umbral crítico', () => {
+    // Un turno redondo (todo el P0 en 0) no puede dejar el umbral fuera de la
+    // escala: sin la zona crítica dibujada el gráfico no se entiende.
+    const { max } = scatterYMax(serie([0, 0, 0, 0]), 3.5)
+    expect(max).toBeGreaterThanOrEqual(10.5)
+  })
+
+  it('los buckets de menos de 5 piezas no cuentan para la escala', () => {
+    // Son los mismos que la regresión y la zona crítica ya descartan.
+    const s = serie([1, 2, 3], 100)
+    s[0]!.points.push({ tsMs: 99, baaderCycles: 20, baaderRatio: 1, graderP0Pct: 1, graderPieces: 2, baaderColor: 'green' })
+    const { max, fuera } = scatterYMax(s, 3.5)
+    expect(max).toBeLessThan(20)
+    expect(fuera).toBe(0)
+  })
+
+  it('sin puntos usables cae al piso del umbral', () => {
+    expect(scatterYMax([], 3.5)).toEqual({ max: 11, fuera: 0 })
   })
 })
