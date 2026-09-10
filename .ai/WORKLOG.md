@@ -6,6 +6,32 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-10 · El CSV del turno salía desordenado y sin nombre; el chip del target no decía de quién hablaba (PR #942)
+
+Ronda de pulido sobre las dos pestañas que nunca había recorrido a fondo, Resumen y
+¿Qué hacer?, más el otro botón de exportación.
+
+**⚠️ El CSV partía en dos los turnos de noche.** Las filas se ordenaban con
+`hourLabel.localeCompare`, o sea alfabéticamente por reloj: el archivo del 07-09 salía
+`00, 01, 02, 03, 04, 21, 22, 23`, con las tres primeras horas del turno al final, como si
+fueran posteriores a las 04. En Chonchi el turno 1 va de 21:15 a 05:00, así que le pasaba a la
+mayoría de los turnos, y quien graficara ese archivo obtenía una secuencia que no ocurrió.
+Ahora cada fila guarda el instante de su primer bucket y el orden es el del turno.
+
+**El archivo se llamaba `resumen-turno.csv` a secas**, el mismo problema que tenía el PNG
+(#941) y por la misma causa: `shiftDoc` solo existe si alguien registró una acción o una carga.
+Tres turnos descargados quedaban indistinguibles. Ahora sale
+`resumen-2026-09-07__Turno 1.csv`.
+
+**El chip decía «68 % del target oficial» sin decir de quién.** En la misma pantalla, la
+tarjeta de cuota dice «119,0 % · Meta alcanzada»: a simple vista parecen contradecirse. Son dos
+cosas distintas —el chip mide las máquinas de la LÍNEA contra el target del sensor, la cuota
+mide el GRADER contra la meta de la app—, y la única aclaración vivía en un tooltip. Ahora dice
+«Línea 68 % del target oficial».
+
+Los tres se ven solo usando la app como se usa: bajando el archivo y mirando la pantalla
+completa. Ninguno rompe un test.
+
 ## 2026-09-10 · El PNG del turno vuelve a explicarse solo (PR #941)
 
 Ronda de pulido. Lo primero que revisé fue mi propio trabajo: el riel (#939) sacó los rótulos
