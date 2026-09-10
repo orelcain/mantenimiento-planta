@@ -41,6 +41,9 @@ import {
   construirEventosTurno,
   agruparEventosRiel,
   buildRielMarkLines,
+  tramosDeConfig,
+  tramoDe,
+  type TramoConfig,
   RIEL_COLOR,
   RIEL_GLIFO,
   type TipoEventoTurno,
@@ -327,7 +330,11 @@ export function ShiftTimelineView({
       {
         uploads: shiftDoc?.uploads,
         acciones: shiftDoc?.actions,
-        configs: (configSnapshots ?? []).slice(1),
+        /* Mismo criterio que `tramosDeConfig`: los snapshots NO sintéticos son
+           los cambios que hizo una persona. Con `slice(1)` el snapshot que abría
+           el segundo tramo no llegaba a la lista y el encabezado de ese tramo
+           desaparecía: se veía «Tramo 1» y después «Tramo 3». */
+        configs: (configSnapshots ?? []).filter((c) => !c.synthetic),
         buckets: timelineBuckets,
         pausas: (pauses ?? []).map((p) => ({ startAt: p.startAt, durationSec: p.durationSec, causeTag: p.tag ?? null })),
       },
@@ -1331,6 +1338,31 @@ export function ShiftTimelineView({
     [timelineBuckets],
   )
 
+  /*
+   * Los tramos entre cambios de compuertas, con el P0 de cada uno: es lo que
+   * convierte la lista en el argumento de la reunión («cambié las compuertas a
+   * las 02:33 y el P0 bajó de 14,2 % a 9,4 %»). Con un solo tramo la lista se
+   * muestra plana: encabezar un único tramo sería ruido.
+   */
+  const tramos = useMemo<TramoConfig[]>(() => {
+    const inicio = productionWindow?.startMs ?? Date.parse(timelineBuckets[0]?.tsMin ?? '')
+    if (!Number.isFinite(inicio)) return []
+    const verdicts = computeSegmentVerdicts(configSnapshots ?? [], timelineBuckets)
+    return tramosDeConfig(configSnapshots ?? [], verdicts, inicio, timelineBuckets)
+  }, [configSnapshots, timelineBuckets, productionWindow])
+
+  /** Las filas visibles, con el encabezado del tramo delante de la primera de cada uno. */
+  const filasConTramo = useMemo(() => {
+    const visibles = checkpointsExpanded ? checkpoints : checkpoints.slice(0, CHECKPOINT_PREVIEW)
+    let ultimo: number | null = null
+    return visibles.map((cp) => {
+      const t = tramos.length > 1 ? tramoDe(tramos, Date.parse(cp.at)) : null
+      const abre = t != null && t.n !== ultimo
+      if (t) ultimo = t.n
+      return { cp, tramo: abre ? t : null }
+    })
+  }, [checkpoints, checkpointsExpanded, tramos])
+
   const hasData = timelineBuckets.some(b => b.pieces > 0)
 
   return (
@@ -1585,9 +1617,29 @@ export function ShiftTimelineView({
                 </button>
               )}
             </div>
-            {(checkpointsExpanded ? checkpoints : checkpoints.slice(0, CHECKPOINT_PREVIEW)).map((cp, i) => (
+            {filasConTramo.map(({ cp, tramo }, i) => (
+              <div key={i}>
+              {tramo && (
+                <p
+                  className={cn(
+                    'pt-2 pb-1 text-caption tracking-wide first:pt-0',
+                    tramo.status === 'improved' ? 'text-ink-ok' : tramo.status === 'worsened' ? 'text-ink-crit' : 'text-muted-foreground',
+                  )}
+                  data-testid="timeline-tramo"
+                >
+                  Tramo {tramo.n}
+                  {tramo.snapshotAt ? ` · desde las ${fmtTime(tramo.snapshotAt)}` : ' · desde el inicio'}
+                  {tramo.p0Pct != null
+                    ? <> · P0 <span className="tabular-nums">{tramo.p0Pct.toFixed(1)} %</span></>
+                    : <> · <span className="tabular-nums">{tramo.piezas.toLocaleString('es-CL')}</span> pz, muy pocas para su P0</>}
+                  {tramo.delta != null && tramo.status !== 'insufficient-data' && (
+                    <span className="tabular-nums">
+                      {' '}{tramo.delta < 0 ? '▼' : tramo.delta > 0 ? '▲' : '='} {Math.abs(tramo.delta).toFixed(1)} pts
+                    </span>
+                  )}
+                </p>
+              )}
               <div
-                key={i}
                 className="flex items-start gap-2.5 text-xs cursor-pointer hover:bg-muted/20 rounded-ctl px-1 -mx-1 py-0.5 transition-colors"
                 onClick={() => handleCheckpointClick(cp.at)}
                 title="Click para centrar el gráfico en este evento"
@@ -1626,6 +1678,7 @@ export function ShiftTimelineView({
                     </span>
                   )}
                 </div>
+              </div>
               </div>
             ))}
             {!checkpointsExpanded && checkpoints.length > CHECKPOINT_PREVIEW && (

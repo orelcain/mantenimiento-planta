@@ -6,6 +6,43 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-10 · La lista del timeline se agrupa por tramo de configuración (PR #940)
+
+Lo que quedaba del mockup de anotaciones: que la lista deje de ser una bitácora y sea el
+argumento de la reunión. Ahora cada bloque de eventos va bajo el tramo de compuertas en el que
+ocurrió, con el P0 de ese tramo y su diferencia contra el anterior.
+
+Tres cosas salieron mal en el camino y las tres eran reales:
+
+**1. El mapa de veredictos se indexa por `id`, no por `at`.** `computeSegmentVerdicts` hace
+`result.set(snap.id, …)`; yo buscaba por la hora. Los encabezados salían sin P0 ni delta, o sea
+sin lo único que los justifica.
+
+**2. Dos criterios distintos para «cambio manual».** La lista tomaba
+`configSnapshots.slice(1)` y los tramos `!synthetic`. Con eso el snapshot que abría el segundo
+tramo no llegaba a la lista y el encabezado desaparecía: se leía «Tramo 1» y después «Tramo 3»,
+con un salto que además hacía incomprensible el delta. Ahora ambos usan `!synthetic`.
+
+**3. ⚠️ Un tramo de 6 piezas afirmaba «P0 33,3 % ▼ 31,5 pts».** El 07-09 hubo dos cambios de
+compuertas con un minuto de diferencia; el tramo entre ambos tenía 6 piezas y su P0 salía como
+si fuera comparable, arrastrando un delta de 31,5 puntos al tramo siguiente. `TRAMO_MIN_PIEZAS`
+(30, el mismo piso que ya usa `computeSegmentVerdicts` para emitir veredicto): bajo eso el
+encabezado dice «6 pz, muy pocas para su P0» y **el tramo siguiente tampoco puede compararse
+contra él**. En el turno real quedan «Tramo 3 · P0 1,8 %» sin delta y «Tramo 4 · P0 4,8 %
+▲ 3,0 pts».
+
+**El blanco táctil de 44 px sobre los marcadores no se hizo, y por una razón:** probado con un
+`rect` transparente de 30×44 en el markLine, ECharts lo pinta igual en el extremo inferior y
+tapaba las horas del eje. El blanco táctil de cada evento es su fila en la lista, que ya mide
+más de 44 px y además centra el gráfico al tocarla.
+
+Sobre el mockup: los encabezados van en capitalización normal («Tramo 2 · desde las 02:30») y
+no en versalitas como proponía, por §10 de la constitución.
+
+Tests: 6 casos de `tramosDeConfig` y `tramoDe` — el primer tramo toma el «antes» del primer
+cambio, los sintéticos no abren tramo, un cambio anterior al inicio tampoco, cada evento cae en
+su tramo, el último queda abierto, y el tramo sin piezas no dice su P0 ni sirve de referencia.
+
 ## 2026-09-10 · El timeline pasa a un riel de eventos: cero texto sobre el gráfico (PR #939)
 
 Orel aprobó el mockup de la capa de anotaciones. Mockup con las tres opciones y la traza de la

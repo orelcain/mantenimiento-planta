@@ -11,6 +11,8 @@ import {
   scatterCriticalZone,
   scatterSlopeMagnitude,
   agruparEventosRiel,
+  tramosDeConfig,
+  tramoDe,
   RIEL_UMBRAL_PX,
   scatterYMax,
   SCATTER_R2_MIN,
@@ -935,5 +937,74 @@ describe('agruparEventosRiel · el riel no puede solaparse', () => {
 
   it('sin eventos no hay marcadores', () => {
     expect(agruparEventosRiel([], xDe)).toEqual([])
+  })
+})
+
+describe('tramosDeConfig · la lista se vuelve un argumento', () => {
+  const T0 = Date.parse('2026-09-07T21:15:00Z')
+  const at = (min: number) => new Date(T0 + min * 60_000).toISOString()
+  const v = (before: number, after: number): SegmentVerdict => ({
+    beforePct: before, afterPct: after, afterMinutes: 60, afterPieces: 900,
+    delta: +(after - before).toFixed(2),
+    status: after < before ? 'improved' : after > before ? 'worsened' : 'neutral',
+  })
+
+  it('sin cambios manuales hay un solo tramo y la lista queda plana', () => {
+    const t = tramosDeConfig([], new Map(), T0)
+    expect(t).toHaveLength(1)
+    expect(t[0]!.snapshotAt).toBeNull()
+  })
+
+  it('el primer tramo toma el «antes» del primer cambio', () => {
+    // El mapa se indexa por `id`, que es como lo devuelve computeSegmentVerdicts.
+    const verdicts = new Map([['s1', v(14.2, 9.4)]])
+    const t = tramosDeConfig([{ id: 's1', at: at(120) }], verdicts, T0)
+    expect(t).toHaveLength(2)
+    expect(t[0]!.p0Pct).toBe(14.2)
+    expect(t[1]!.p0Pct).toBe(9.4)
+    expect(t[1]!.delta).toBeCloseTo(-4.8, 5)
+    expect(t[1]!.status).toBe('improved')
+  })
+
+  it('los snapshots sintéticos no abren tramo', () => {
+    // El snapshot inicial del turno no es una intervención del operador.
+    const t = tramosDeConfig([{ id: 's0', at: at(120), synthetic: true }, { id: 's1', at: at(200) }], new Map(), T0)
+    expect(t).toHaveLength(2)
+    expect(t[1]!.desdeMs).toBe(T0 + 200 * 60_000)
+  })
+
+  it('un cambio anterior al inicio del turno no abre tramo', () => {
+    // 258 snapshots del histórico caen fuera de la ventana dibujada.
+    const t = tramosDeConfig([{ id: 's1', at: new Date(T0 - 60 * 60_000).toISOString() }], new Map(), T0)
+    expect(t).toHaveLength(1)
+  })
+
+  it('un tramo sin piezas suficientes no dice su P0 ni sirve de referencia', () => {
+    // Caso real del 07-09: dos cambios de compuertas con un minuto de
+    // diferencia dejaban un tramo de 3 piezas que salía «P0 33,3 % ▼ 31,5 pts».
+    const buckets = [
+      { tsMin: at(10), pieces: 500 },
+      { tsMin: at(121), pieces: 3 },
+      { tsMin: at(200), pieces: 800 },
+    ]
+    const verdicts = new Map([
+      ['s1', v(5.3, 33.3)],
+      ['s2', v(33.3, 1.8)],
+    ])
+    const t = tramosDeConfig([{ id: 's1', at: at(120) }, { id: 's2', at: at(122) }], verdicts, T0, buckets)
+    expect(t[1]!.piezas).toBe(3)
+    expect(t[1]!.p0Pct).toBeNull()
+    expect(t[1]!.delta).toBeNull()
+    // Y el tramo siguiente tampoco puede compararse contra él.
+    expect(t[2]!.delta).toBeNull()
+    expect(t[2]!.p0Pct).toBe(1.8)
+  })
+
+  it('cada evento cae en su tramo, y el último queda abierto', () => {
+    const t = tramosDeConfig([{ id: 's1', at: at(100) }, { id: 's2', at: at(200) }], new Map(), T0)
+    expect(tramoDe(t, T0 + 50 * 60_000)!.n).toBe(1)
+    expect(tramoDe(t, T0 + 150 * 60_000)!.n).toBe(2)
+    expect(tramoDe(t, T0 + 900 * 60_000)!.n).toBe(3)
+    expect(t[2]!.hastaMs).toBeNull()
   })
 })
