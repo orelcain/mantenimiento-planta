@@ -6,6 +6,52 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-10 · El timeline pasa a un riel de eventos: cero texto sobre el gráfico (PR #939)
+
+Orel aprobó el mockup de la capa de anotaciones. Mockup con las tres opciones y la traza de la
+regla: https://claude.ai/code/artifact/45db560e-7507-4aec-b548-4eb4c9ddfe65
+
+**Por qué no alcanzaba acomodar rótulos.** A 375 px el área de dibujo mide 278 px para un turno
+de ~8 h: 0,58 px por minuto. Una etiqueta de 40 px ocupa **68 minutos de eje**, y el peor grupo
+tiene 4 eventos en 25 minutos. Medido sobre lo que el gráfico realmente dibuja (descartando los
+258 snapshots de configuración que caen fuera de la ventana de producción): en los turnos con
+datos completos, **julio 2026 en adelante, 7 de 16 tenían al menos un choque**, con 4,2
+anotaciones de media; en los turnos viejos y pobres era el 1-2 %. Cuanto más completo el turno,
+más choca.
+
+**La solución: el lienzo dice cuándo y de qué tipo, la lista dice qué pasó.**
+
+- `agruparEventosRiel` agrupa en píxeles de marcador, no en minutos, así que **no puede haber
+  solape por construcción** y el umbral se afloja solo en pantallas anchas. Primero fusiona los
+  eventos del MISMO MINUTO —63 de 122 turnos guardan varias configuraciones dentro del mismo
+  minuto, y en 61 de 66 grupos con seteos distintos: es un acto del operador guardado varias
+  veces—, y después absorbe por distancia sin mover el marcador ya abierto.
+- El riel son `markLine` con una píldora arriba: glifo del tipo y, si agrupa, cuántos trae.
+  Va dentro del canvas a propósito, porque el PNG se exporta desde ahí.
+- **Salen del lienzo 15-17 rótulos y quedan cero**: «▶ Inicio», «◀ Fin», los dos umbrales de
+  P0, «típico N» y «máx 10min N», «Cfg», «L ####», «↑», «⚙» y el texto de las bandas de pausa.
+  Las líneas punteadas se quedan; lo que se va es el texto.
+- Las líneas de carga, acción, configuración y lote se eliminaron: el riel dibuja una vertical
+  por marcador y esas cuatro repetían la misma. De paso desaparece un bug viejo — ECharts
+  imprimía su `name` («Upload 01:02», «Acción 02:10») encima del gráfico.
+- ⚠️ Los bordes de pausa no definían `label`, y sin él ECharts dibuja el valor del eje: eran
+  ellos los que escribían horas sueltas superpuestas sobre el turno.
+- La lista «Eventos del turno» pasa de llevar solo cargas y acciones a llevar los cinco tipos,
+  con el mismo glifo y color que el riel, y muestra hasta 8 filas antes de plegar.
+- Los umbrales y el ritmo vuelven como una línea de texto al pie del gráfico: son constantes de
+  todo el turno y no necesitan estar ancladas a un minuto.
+
+En 2026-09-07 T1 el gráfico pasa de un amasijo de horas y rótulos a dos píldoras; la tarjeta
+crece de 569 a 816 px porque ahora la lista existe y se lee.
+
+Tests: 6 casos de `agruparEventosRiel` (mismo minuto, sin solape sobre el turno peor, anclaje
+al primer evento, glifo por prioridad, umbral que se afloja con el ancho, vacío). Roto el
+agrupado espacial, el test falla con el síntoma: 5,79 px entre marcadores en vez de 30.
+
+Pendiente del mockup, sobre una base que ya funciona: agrupar la lista por tramo de
+configuración con su veredicto («cambié las compuertas a las 02:33 y el P0 bajó de 14,2 a
+9,4 %»), y el blanco táctil de 44 px sobre cada marcador.
+
 ## 2026-09-10 · Calidad: la causa del P0 se leía «Fuera / de / límites» y el lote tapaba el timeline (PR #938)
 
 Orel: «potenciemos la pestaña calidad que tiene el detalle en el timeline de todo lo que pasa».

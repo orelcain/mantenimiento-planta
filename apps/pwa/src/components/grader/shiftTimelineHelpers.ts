@@ -192,6 +192,204 @@ export function resolveAxisWindow(
   return { effectiveStartMs, effectiveEndMs, lineTimes, axisIndexByLabel }
 }
 
+// ── Riel de eventos del turno ────────────────────────────────────────────────
+//
+// A 375 px el área de dibujo mide 278 px para un turno de ~8 h: 0,58 px por
+// minuto. Una etiqueta de texto de 40 px ocupa por eso unos 68 minutos de eje, y
+// dos eventos separados por menos de una hora se pisaban. Medido el 10-09 sobre
+// los turnos con datos completos (julio 2026 en adelante): 7 de 16 tenían al
+// menos un choque, el peor con 7.
+//
+// La salida es un riel de marcadores sin texto: el lienzo dice CUÁNDO y DE QUÉ
+// TIPO, la lista de abajo lleva las palabras. El umbral de agrupación se mide en
+// píxeles de marcador, no en minutos, así que no puede haber solape por
+// construcción y se afloja solo en pantallas anchas.
+
+export type TipoEventoTurno = 'accion' | 'pausa' | 'config' | 'carga' | 'lote'
+
+export interface EventoTurno {
+  tipo: TipoEventoTurno
+  /** Instante del evento (ms). */
+  ms: number
+  /** Etiqueta del eje X donde cae (HH:MM). */
+  label: string
+  /** Título para la lista. */
+  titulo: string
+  detalle?: string
+}
+
+export interface MarcadorRiel {
+  /** Se ancla en el PRIMER evento del grupo: el marcador no se mueve al absorber. */
+  ms: number
+  label: string
+  eventos: EventoTurno[]
+  tipo: TipoEventoTurno
+  glifo: string
+}
+
+/** Ancho de la píldora de grupo (26 px) más 4 px de aire. */
+export const RIEL_UMBRAL_PX = 30
+
+/**
+ * De más a menos importante. La acción de mantención va primera a propósito: es
+ * el evento que la pestaña existe para evidenciar. La pausa no gasta color en el
+ * riel porque su banda sobre el gráfico ya lleva el del tag.
+ */
+export const RIEL_PRIORIDAD: readonly TipoEventoTurno[] = ['accion', 'pausa', 'config', 'carga', 'lote']
+
+export const RIEL_GLIFO: Record<TipoEventoTurno, string> = {
+  accion: '⚙',
+  pausa: '▮',
+  config: '◈',
+  carga: '↑',
+  lote: '◆',
+}
+
+/**
+ * Agrupa los eventos en marcadores que no se solapan.
+ *
+ * 1. Los del MISMO MINUTO se fusionan siempre, antes de mirar el espacio: tres
+ *    configuraciones seguidas son un acto del operador guardado tres veces
+ *    (medido: 63 de 122 turnos con más de un snapshot tienen varios en el mismo
+ *    minuto, y en 61 de 66 grupos el contenido es distinto).
+ * 2. Después, de izquierda a derecha: si el evento cae a menos de `umbralPx` del
+ *    marcador abierto, lo absorbe y el marcador NO se mueve.
+ */
+export function agruparEventosRiel(
+  eventos: readonly EventoTurno[],
+  xDe: (ms: number) => number,
+  umbralPx: number = RIEL_UMBRAL_PX,
+): MarcadorRiel[] {
+  if (eventos.length === 0) return []
+  const orden = [...eventos].sort((a, b) => a.ms - b.ms)
+
+  // 1. mismo minuto
+  const porMinuto: EventoTurno[][] = []
+  for (const e of orden) {
+    const ultimo = porMinuto[porMinuto.length - 1]
+    if (ultimo && Math.floor(ultimo[0]!.ms / 60_000) === Math.floor(e.ms / 60_000)) ultimo.push(e)
+    else porMinuto.push([e])
+  }
+
+  // 2. distancia en píxeles contra el marcador abierto
+  const out: MarcadorRiel[] = []
+  let abierto: { x: number; eventos: EventoTurno[] } | null = null
+  for (const grupo of porMinuto) {
+    const x = xDe(grupo[0]!.ms)
+    if (abierto && x - abierto.x < umbralPx) {
+      abierto.eventos.push(...grupo)
+      continue
+    }
+    abierto = { x, eventos: [...grupo] }
+    out.push({ ms: grupo[0]!.ms, label: grupo[0]!.label, eventos: abierto.eventos, tipo: 'lote', glifo: '' })
+  }
+
+  // el glifo del grupo es el del tipo más importante que contiene
+  for (const m of out) {
+    const tipo = RIEL_PRIORIDAD.find((t) => m.eventos.some((e) => e.tipo === t)) ?? m.eventos[0]!.tipo
+    m.tipo = tipo
+    m.glifo = RIEL_GLIFO[tipo]
+  }
+  return out
+}
+
+export interface FuentesEventosTurno {
+  uploads?: ReadonlyArray<{ at: string; byName?: string; files?: { pp?: unknown; p0?: unknown } }>
+  acciones?: ReadonlyArray<{ at: string; field?: string; byName?: string; reason?: string }>
+  configs?: ReadonlyArray<{ at: string }>
+  buckets?: ReadonlyArray<{ tsMin: string; lot?: string | null }>
+  pausas?: ReadonlyArray<{ startAt: string; durationSec?: number; causeTag?: string | null }>
+}
+
+/**
+ * Los eventos del turno que el riel marca y la lista describe, en un solo lugar
+ * para que ambos digan exactamente lo mismo.
+ *
+ * `dentro` recorta a la ventana que el gráfico dibuja: 258 snapshots de
+ * configuración del histórico caen fuera de ella y marcarlos sería marcar algo
+ * que no se ve.
+ */
+export function construirEventosTurno(
+  f: FuentesEventosTurno,
+  dentro: (ms: number) => boolean,
+  fmtLabel: (ms: number) => string,
+): EventoTurno[] {
+  const out: EventoTurno[] = []
+  const add = (tipo: TipoEventoTurno, at: string, titulo: string, detalle?: string) => {
+    const ms = Date.parse(at)
+    if (!Number.isFinite(ms) || !dentro(ms)) return
+    out.push({ tipo, ms, label: fmtLabel(ms), titulo, detalle })
+  }
+
+  for (const u of f.uploads ?? []) {
+    const archivos = [u.files?.pp && 'PP', u.files?.p0 && 'P0'].filter(Boolean).join(' + ')
+    add('carga', u.at, archivos ? `Carga de Excel · ${archivos}` : 'Carga de Excel', u.byName)
+  }
+  for (const a of f.acciones ?? []) {
+    add('accion', a.at, a.field || 'Acción de mantención', [a.byName, a.reason].filter(Boolean).join(' · ') || undefined)
+  }
+  for (const c of f.configs ?? []) {
+    add('config', c.at, 'Cambio de compuertas')
+  }
+  const buckets = f.buckets ?? []
+  for (let i = 1; i < buckets.length; i++) {
+    const prev = buckets[i - 1], curr = buckets[i]
+    if (prev?.lot && curr?.lot && prev.lot !== curr.lot) {
+      add('lote', curr.tsMin, `Cambio de lote · ${curr.lot}`)
+    }
+  }
+  for (const p of f.pausas ?? []) {
+    const min = Math.round((p.durationSec ?? 0) / 60)
+    if (min < PAUSA_MIN_EVENTO && !p.causeTag) continue
+    add('pausa', p.startAt, p.causeTag ? `Pausa · ${p.causeTag}` : 'Pausa', min > 0 ? `${min} min` : undefined)
+  }
+  return out.sort((a, b) => a.ms - b.ms)
+}
+
+/** Bajo estos minutos, una pausa sin causa anotada no llega al riel: es micro-detención. */
+export const PAUSA_MIN_EVENTO = 10
+
+/** Color del glifo de cada tipo en el riel (paleta oscura: el chart va en `theme="dark"`). */
+export const RIEL_COLOR: Record<TipoEventoTurno, string> = {
+  accion: '#FF9F0A',
+  pausa: '#9F9FA5',
+  config: '#40C8E0',
+  carga: '#4CA5FF',
+  lote: '#D085F5',
+}
+
+/**
+ * Marcadores del riel como `markLine` verticales: la línea marca el instante
+ * sobre el gráfico y la píldora de arriba lleva el glifo del tipo y, si el
+ * marcador agrupa, cuántos eventos trae. Va dentro del canvas a propósito —
+ * el PNG se exporta desde ahí y un overlay HTML no saldría.
+ */
+export function buildRielMarkLines(marcadores: readonly MarcadorRiel[]): object[] {
+  return marcadores.map((m) => {
+    const color = RIEL_COLOR[m.tipo]
+    const n = m.eventos.length
+    return {
+      name: m.eventos.map((e) => e.titulo).join(' · '),
+      xAxis: m.label,
+      lineStyle: { color, type: 'dashed' as const, width: 1, opacity: 0.45 },
+      label: {
+        show: true,
+        position: 'insideEndTop' as const,
+        distance: 6,
+        formatter: n > 1 ? `${m.glifo} ${n}` : m.glifo,
+        color,
+        fontSize: 11,
+        lineHeight: 14,
+        padding: [2, 5, 2, 5],
+        borderRadius: 4.5,
+        backgroundColor: 'rgba(15,23,42,0.92)',
+        borderColor: color,
+        borderWidth: 1,
+      },
+    }
+  })
+}
+
 // ── Mark lines del chart ──────────────────────────────────────────────────────
 
 export interface MarkLinesResult {
@@ -229,13 +427,13 @@ export function buildMarkLines(
       name: `Inicio turno\n${fmtTime(startLabelTs)}`,
       xAxis: fmtTime(startLabelTs),
       lineStyle: { color: '#10b981', type: 'solid' as const, width: 1 },
-      label: { show: true, formatter: '▶ Inicio', color: '#10b981', fontSize: 11, position: 'insideStartTop' as const },
+      label: { show: false },
     },
     {
       name: `Fin turno\n${fmtTime(endLabelTs)}`,
       xAxis: fmtTime(endLabelTs),
       lineStyle: { color: '#6b7280', type: 'solid' as const, width: 1 },
-      label: { show: true, formatter: '◀ Fin', color: '#6b7280', fontSize: 11, position: 'insideEndTop' as const },
+      label: { show: false },
     },
   ]
 
@@ -243,12 +441,12 @@ export function buildMarkLines(
     {
       yAxis: alertThreshold,
       lineStyle: { color: '#f59e0b', type: 'dashed' as const, width: 1, opacity: 0.5 },
-      label: { show: true, formatter: `${alertThreshold}%`, color: '#f59e0b', fontSize: 10, position: 'insideStartTop' as const },
+      label: { show: false },
     },
     {
       yAxis: criticalThreshold,
       lineStyle: { color: '#ef4444', type: 'dashed' as const, width: 1, opacity: 0.5 },
-      label: { show: true, formatter: `${criticalThreshold}%`, color: '#ef4444', fontSize: 10, position: 'insideStartTop' as const },
+      label: { show: false },
     },
   ]
 
@@ -256,21 +454,21 @@ export function buildMarkLines(
     name: `Upload\n${fmtTime(u.at)}`,
     xAxis: fmtTime(u.at),
     lineStyle: { color: '#3b82f6', type: 'dashed' as const, width: 1.5 },
-    label: { show: true, formatter: '↑', color: '#3b82f6', fontSize: 10 },
+    label: { show: false },
   }))
 
   const actionLines = (shiftDoc?.actions ?? []).map(a => ({
     name: `Acción\n${fmtTime(a.at)}`,
     xAxis: fmtTime(a.at),
     lineStyle: { color: '#f59e0b', type: 'dashed' as const, width: 1.5 },
-    label: { show: true, formatter: '⚙', color: '#f59e0b', fontSize: 10 },
+    label: { show: false },
   }))
 
   const configChangeLines = (configSnapshots ?? []).slice(1).map(s => ({
     name: `Config gates\n${fmtTime(s.at)}`,
     xAxis: fmtTime(s.at),
     lineStyle: { color: '#06b6d4', type: 'dashed' as const, width: 1.5 },
-    label: { show: true, formatter: 'Cfg', color: '#06b6d4', fontSize: 11 },
+    label: { show: false },
   }))
 
   const lotChangeLines: object[] = []
@@ -291,7 +489,7 @@ export function buildMarkLines(
         xAxis: fmtTime(curr.tsMin),
         lineStyle: { color: '#8b5cf6', type: 'dotted' as const, width: 1.5 },
         label: {
-          show: conAire,
+          show: false,
           // Los últimos 4 dígitos alcanzan para distinguir lotes dentro de un
           // turno; el número entero (9 dígitos) se dibujaba en vertical y tapaba
           // el gráfico. Va abajo porque arriba ya están las bandas de pausa —
@@ -377,7 +575,7 @@ export function buildCadenceMarkLines(stats: CadenceStats): object[] {
       name: 'Ritmo típico',
       yAxis: stats.typicalPzMin,
       lineStyle: { color: '#38bdf8', type: 'dashed' as const, width: 1.5, opacity: 0.8 },
-      label: { show: true, formatter: `típico ${v}`, color: '#38bdf8', fontSize: 10, position: 'insideEndTop' as const },
+      label: { show: false },
       tooltip: { show: true, formatter: `Ritmo típico: mediana de pz/min en los minutos activos del turno (${v} pz/min).` },
     })
   }
@@ -387,7 +585,7 @@ export function buildCadenceMarkLines(stats: CadenceStats): object[] {
       name: 'Máx sostenida (10min)',
       yAxis: stats.bestSustained10MinPzMin,
       lineStyle: { color: '#facc15', type: 'dashed' as const, width: 1.5, opacity: 0.8 },
-      label: { show: true, formatter: `máx 10min ${v}`, color: '#facc15', fontSize: 10, position: 'insideEndTop' as const },
+      label: { show: false },
       tooltip: { show: true, formatter: `Máx sostenida: mejor promedio móvil de 10 min activos del turno — capacidad demostrada (${v} pz/min).` },
     })
   }
@@ -459,13 +657,14 @@ export function buildMarkAreas(
       labelColor = '#94a3b8'
       labelText = `${durMin}min${rangeAdjusted ? ' *' : ''}`
     }
-    const showLabel = durMin >= 10 || !!effectiveTag || rangeAdjusted
     return [
       {
         name: p.id,
         xAxis: tA,
         itemStyle: { color: areaColor },
-        label: { show: showLabel, formatter: labelText, color: labelColor, fontSize: 10, position: 'insideTopRight' as const },
+        // El texto de la banda pasó al riel y a la lista (10-09): con dos pausas
+        // cercanas los rótulos se pisaban entre sí y con los del lote.
+        label: { show: false, formatter: labelText, color: labelColor, fontSize: 11, position: 'insideTopRight' as const },
       },
       { xAxis: tB },
     ]
@@ -499,17 +698,22 @@ export function buildPauseBoundaryMarkLines(
     if (!isDominant) continue
     const color = effectiveTag?.color ?? (p.tier === 'parada' ? '#94a3b8' : '#cbd5e1')
     lines.push(
+      /* Sin `label` explícito, ECharts dibuja el valor del eje sobre la línea:
+         estos dos bordes eran los que escribían horas sueltas encima del
+         gráfico («01:02», «02:10»), superpuestas entre sí. */
       {
         name: `pause-start-${p.id}`,
         xAxis: fmtTime(p.startAt),
         lineStyle: { color, type: 'dashed' as const, width: 1, opacity: 0.5 },
         symbol: 'none' as const,
+        label: { show: false },
       },
       {
         name: `pause-end-${p.id}`,
         xAxis: fmtTime(p.endAt),
         lineStyle: { color, type: 'dashed' as const, width: 1, opacity: 0.5 },
         symbol: 'none' as const,
+        label: { show: false },
       },
     )
   }

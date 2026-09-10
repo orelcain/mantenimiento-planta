@@ -10,6 +10,8 @@ import {
   scatterBaaderMedian,
   scatterCriticalZone,
   scatterSlopeMagnitude,
+  agruparEventosRiel,
+  RIEL_UMBRAL_PX,
   scatterYMax,
   SCATTER_R2_MIN,
   usableScatterPoints,
@@ -810,16 +812,19 @@ describe('computeCadenceStats', () => {
 })
 
 describe('buildCadenceMarkLines', () => {
-  it('caso normal: 2 líneas con el valor y label esperados', () => {
+  it('2 líneas en su valor, y SIN texto sobre el gráfico', () => {
+    // Los dos números viven desde el 10-09 en la franja bajo el chart: son
+    // constantes de todo el turno y no necesitan estar anclados a un minuto,
+    // mientras que sobre el eje competían con el resto de las anotaciones.
     const stats: CadenceStats = { typicalPzMin: 45, bestSustained10MinPzMin: 55 }
-    const lines = buildCadenceMarkLines(stats) as Array<{ name: string; yAxis: number; label: { formatter: string } }>
+    const lines = buildCadenceMarkLines(stats) as Array<{ name: string; yAxis: number; label: { show?: boolean } }>
     expect(lines).toHaveLength(2)
     expect(lines[0]!.name).toBe('Ritmo típico')
     expect(lines[0]!.yAxis).toBe(45)
-    expect(lines[0]!.label.formatter).toBe('típico 45')
     expect(lines[1]!.name).toBe('Máx sostenida (10min)')
     expect(lines[1]!.yAxis).toBe(55)
-    expect(lines[1]!.label.formatter).toBe('máx 10min 55')
+    expect(lines[0]!.label.show).toBe(false)
+    expect(lines[1]!.label.show).toBe(false)
   })
 
   it('turno vacío: sin stats → sin líneas (nunca NaN visible)', () => {
@@ -875,5 +880,60 @@ describe('scatterYMax · el eje deja ver la nube', () => {
 
   it('sin puntos usables cae al piso del umbral', () => {
     expect(scatterYMax([], 3.5)).toEqual({ max: 11, fuera: 0 })
+  })
+})
+
+describe('agruparEventosRiel · el riel no puede solaparse', () => {
+  // Escala real medida a 375 px: 278 px de plot para un turno de 480 min.
+  const PX_POR_MIN = 278 / 480
+  const T0 = Date.parse('2026-09-07T21:15:00Z')
+  const xDe = (ms: number) => 40 + ((ms - T0) / 60_000) * PX_POR_MIN
+  const ev = (min: number, tipo: 'accion' | 'pausa' | 'config' | 'carga' | 'lote') => ({
+    tipo, ms: T0 + min * 60_000, label: 'x', titulo: tipo,
+  })
+
+  it('los eventos del mismo minuto se fusionan aunque sean distintos', () => {
+    // 63 de 122 turnos guardan varias configs dentro del mismo minuto, con
+    // seteos distintos: es un acto del operador guardado varias veces.
+    const m = agruparEventosRiel([ev(100, 'config'), ev(100, 'config'), ev(100, 'config')], xDe)
+    expect(m).toHaveLength(1)
+    expect(m[0]!.eventos).toHaveLength(3)
+  })
+
+  it('ningún par de marcadores queda a menos del umbral', () => {
+    // El turno peor (2026-09-07 T1): 11 eventos, 7 choques con etiquetas de texto.
+    const eventos = [
+      ev(0, 'carga'), ev(10, 'pausa'), ev(85, 'lote'), ev(89, 'pausa'),
+      ev(134, 'lote'), ev(155, 'config'), ev(158, 'lote'), ev(164, 'config'),
+      ev(240, 'accion'), ev(300, 'pausa'), ev(465, 'lote'),
+    ]
+    const m = agruparEventosRiel(eventos, xDe)
+    for (let i = 1; i < m.length; i++) {
+      expect(xDe(m[i]!.ms) - xDe(m[i - 1]!.ms)).toBeGreaterThanOrEqual(RIEL_UMBRAL_PX)
+    }
+    expect(m.length).toBeLessThan(eventos.length)
+    expect(m.reduce((a, x) => a + x.eventos.length, 0)).toBe(eventos.length)
+  })
+
+  it('el marcador se ancla en el primer evento y no se mueve al absorber', () => {
+    const m = agruparEventosRiel([ev(100, 'lote'), ev(110, 'lote'), ev(120, 'lote')], xDe)
+    expect(m).toHaveLength(1)
+    expect(m[0]!.ms).toBe(T0 + 100 * 60_000)
+  })
+
+  it('el glifo del grupo es el del tipo más importante', () => {
+    const m = agruparEventosRiel([ev(100, 'lote'), ev(101, 'accion'), ev(102, 'config')], xDe)
+    expect(m[0]!.tipo).toBe('accion')
+    expect(m[0]!.glifo).toBe('⚙')
+  })
+
+  it('con más ancho el umbral se afloja solo y agrupa menos', () => {
+    const eventos = [ev(0, 'lote'), ev(40, 'lote'), ev(80, 'lote')]
+    const ancho = (ms: number) => 40 + ((ms - T0) / 60_000) * (1000 / 480)
+    expect(agruparEventosRiel(eventos, xDe).length).toBeLessThan(agruparEventosRiel(eventos, ancho).length)
+  })
+
+  it('sin eventos no hay marcadores', () => {
+    expect(agruparEventosRiel([], xDe)).toEqual([])
   })
 })
