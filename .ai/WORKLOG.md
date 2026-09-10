@@ -6,6 +6,38 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-10 · Calidad: la causa del P0 se leía «Fuera / de / límites» y el lote tapaba el timeline (PR #938)
+
+Orel: «potenciemos la pestaña calidad que tiene el detalle en el timeline de todo lo que pasa».
+Antes de agregar nada, la recorrí a 375 px sobre 2026-09-07 T1 (1.448 px: causas 335 · timeline
+569 · IA 61) y lo primero que se ve estaba roto.
+
+**1. La tarjeta que responde la pregunta del turno era ilegible en el teléfono.** La fila del
+paraguas metía en una sola línea horizontal el nombre, el chip, la descripción, la barra Y las
+tres cifras con `min-w-[68px]`: al centro le quedaban unos 100 px y «Fuera de límites» salía
+partido en tres renglones, con la descripción cortada en «Peso fuer…». Desde `sm` nada cambia;
+en 375 px las cifras pasan a su propio renglón bajo el nombre, y quedan las dos que se usan
+—cuánto del turno y cuántas piezas—; el reparto dentro del P0 sigue en el desglose y en la
+vista ancha. El nombre entra en una línea y la descripción se lee entera. 335 → 351 px.
+
+**2. El número de lote tapaba el gráfico.** La etiqueta del cambio de lote imprimía los 9
+dígitos completos, que ECharts dibujaba en vertical sobre las barras, y encima coincidía con la
+banda de pausa del mismo evento («Cambio N min»): dos rótulos en el mismo minuto. Ahora dice
+«L» y los últimos 4 dígitos, va abajo en vez de arriba, y solo se dibuja si pasaron 25 min
+desde la etiqueta anterior — la línea punteada sigue en todos los cambios, y el número completo
+sigue en el tooltip.
+
+**3.** Los rótulos «Inicio», «Fin» y «Cfg» estaban en 9 px, bajo el piso de 11 de la
+constitución.
+
+Lo que NO toqué y por qué: «Total unsorted pcs (Matrix)» se ve en inglés pero es el nombre
+literal del campo en el HMI Matrix — el operador lo lee así en la máquina.
+
+Queda abierto: en la franja donde caen juntos un cambio de config, dos cambios de lote y sus
+pausas, las anotaciones del timeline siguen apilándose («01:02:10» sobre «Cambio 12min» sobre
+«Cfg»). Es un rediseño de la capa de anotaciones, no un ajuste de etiqueta: merece su ronda con
+mockup.
+
 ## 2026-09-10 · Las dos correlaciones de Línea: el scatter no mostraba nada y la tabla cortaba el texto (PR #937)
 
 Orel: «sigamos con las dos correlaciones de línea». Antes de tocar el layout medí cuántas
