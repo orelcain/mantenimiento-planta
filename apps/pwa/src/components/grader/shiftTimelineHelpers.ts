@@ -827,6 +827,32 @@ export function usableScatterPoints(points: ScatterPoint[]): ScatterPoint[] {
   return points.filter(p => p.baaderCycles > 0 && p.graderPieces >= 5)
 }
 
+/**
+ * Techo del eje Y del scatter, en puntos de P0%, y cuántos puntos quedan por
+ * encima.
+ *
+ * El eje llegaba al P0 más alto del turno, y con eso la nube real —que vive
+ * entre 0 y ~6 %— quedaba aplastada contra el piso: medido el 10-09, en 256 de
+ * 377 turnos había buckets que estiraban el eje hasta el 100 %. Se corta en el
+ * percentil 98 de los puntos usables, nunca por debajo del triple del umbral
+ * crítico, y la tarjeta avisa cuántos puntos quedaron fuera: recortar la escala
+ * sin decirlo sería esconder los peores tramos.
+ */
+export function scatterYMax(
+  seriesData: ScatterSeriesData[],
+  criticalP0Pct: number,
+): { max: number; fuera: number } {
+  const pcts = seriesData
+    .flatMap(s => usableScatterPoints(s.points))
+    .map(p => p.graderP0Pct * 100)
+    .sort((a, b) => a - b)
+  const piso = Math.max(1, criticalP0Pct * 3)
+  if (pcts.length === 0) return { max: Math.ceil(piso), fuera: 0 }
+  const p98 = pcts[Math.min(pcts.length - 1, Math.floor(pcts.length * 0.98))]!
+  const max = Math.ceil(Math.max(piso, p98))
+  return { max, fuera: pcts.filter(v => v > max).length }
+}
+
 /** Mediana clásica de un array numérico. Vacío → 0. */
 export function median(arr: number[]): number {
   if (arr.length === 0) return 0

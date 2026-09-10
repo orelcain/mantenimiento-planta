@@ -58,7 +58,7 @@ function CorrelationRow({ corr, expanded, onToggle }: {
     <div className="py-2">
       <button
         onClick={onToggle}
-        className={`w-full flex items-center gap-2 text-left p-2 rounded-ctl border ${s.bg} ${s.border} group`}
+        className={`w-full flex flex-wrap items-center gap-x-2 gap-y-1 text-left p-2 rounded-ctl border ${s.bg} ${s.border} group`}
         aria-expanded={expanded}
       >
         {expanded
@@ -71,7 +71,6 @@ function CorrelationRow({ corr, expanded, onToggle }: {
         <Badge variant="outline" className={`text-caption px-1.5 py-0 h-4 ${s.text} ${s.border} flex-shrink-0`}>
           {fmtDurationSec(corr.pauseDurSec)}
         </Badge>
-        <span className={`text-xs ${s.text} truncate`}>{corr.hypothesis}</span>
         <Badge
           variant="outline"
           className={`ml-auto text-caption px-1.5 py-0 h-4 border-border ${conf.color} flex-shrink-0`}
@@ -79,6 +78,10 @@ function CorrelationRow({ corr, expanded, onToggle }: {
         >
           confianza {conf.text}
         </Badge>
+        {/* La hipótesis es lo único que dice QUÉ pasó, y en una sola fila de
+            375 px quedaba en «Coi…» entre la duración y la confianza. Va en su
+            propia línea (basis-full) y completa. */}
+        <span className={`basis-full text-xs ${s.text}`}>{corr.hypothesis}</span>
       </button>
 
       {expanded && corr.contributors.length > 0 && (

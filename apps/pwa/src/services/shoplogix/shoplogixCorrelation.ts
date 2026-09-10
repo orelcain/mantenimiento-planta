@@ -223,7 +223,10 @@ export function correlatePausesWithUpstream(
       confidence = 0.1
       const reasons = [...new Set(plannedContribs.map(c => c.reason).filter(Boolean))]
       const reasonsText = reasons.length > 0 ? ` (${reasons.join(', ')})` : ''
-      hypothesis = `Coincide con paro programado de Baaders${reasonsText} — probable causa organizacional, no upstream.`
+      // Corto a propósito: la tarjeta ya encabeza con «N paros coinciden con
+      // paros programados de Baader — excluidos del conteo upstream causal», y
+      // repetirlo entero en cada fila la llevaba a tres líneas en 375 px.
+      hypothesis = `Paro programado de Baaders${reasonsText} — organizacional, no upstream.`
       topContributors = plannedContribs
     } else {
       // Hay al menos un contributor operacional — evaluar SOLO esos
