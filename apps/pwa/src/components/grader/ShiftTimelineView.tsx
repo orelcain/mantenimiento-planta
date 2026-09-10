@@ -837,6 +837,8 @@ export function ShiftTimelineView({
     const buckets = timelineBuckets.filter(b => b.pieces > 0 && inWin(b.tsMin))
     type HourRow = {
       hourLabel: string
+      /** Primer minuto con datos de esa hora: es lo que ordena las filas. */
+      primerMs: number
       pieces: number; ok: number; p0: number
       weightKgSum: number; weightCount: number
       calibres: Record<string, number>
@@ -848,9 +850,10 @@ export function ShiftTimelineView({
       const hh = String(d.getUTCHours()).padStart(2, '0')
       const key = `${hh}:00`
       const row = hourMap.get(key) ?? {
-        hourLabel: key, pieces: 0, ok: 0, p0: 0,
+        hourLabel: key, primerMs: d.getTime(), pieces: 0, ok: 0, p0: 0,
         weightKgSum: 0, weightCount: 0, calibres: {}, pausesSec: 0,
       }
+      if (d.getTime() < row.primerMs) row.primerMs = d.getTime()
       row.pieces += b.pieces
       row.ok += b.pieces - b.p0Pieces
       row.p0 += b.p0Pieces
@@ -871,7 +874,12 @@ export function ShiftTimelineView({
 
     const SEP = ';'
     const header = ['Hora', 'Piezas totales', 'Piezas OK', 'Piezas P0', 'P0%', 'Peso prom (g)', 'Calibre dominante', 'Tiempo muerto (min)'].join(SEP)
-    const rows = [...hourMap.values()].sort((a, b) => a.hourLabel.localeCompare(b.hourLabel)).map(row => {
+    /* Ordenar por la hora del reloj partía en dos los turnos de noche: el
+       archivo salía 00, 01, 02, 03, 04, 21, 22, 23 y las últimas horas del
+       turno (21-23) quedaban al final, como si fueran posteriores a las 04.
+       En Chonchi el turno 1 va de 21:15 a 05:00, así que le pasaba a la
+       mayoría de los turnos. */
+    const rows = [...hourMap.values()].sort((a, b) => a.primerMs - b.primerMs).map(row => {
       const p0Pct = row.pieces > 0 ? ((row.p0 / row.pieces) * 100).toFixed(2) : '0,00'
       const avgG = row.weightCount > 0 ? Math.round((row.weightKgSum / row.weightCount) * 1000) : ''
       const calibre = Object.entries(row.calibres).sort((a, b) => b[1] - a[1])[0]?.[0] ?? ''
@@ -884,10 +892,12 @@ export function ShiftTimelineView({
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `resumen-${shiftDoc?.id ?? 'turno'}.csv`
+    /* Con `shiftDoc` ausente el archivo salía «resumen-turno.csv» a secas y
+       tres turnos bajados quedaban indistinguibles. `summaryId` siempre está. */
+    a.download = `resumen-${shiftDoc?.id || summaryId || 'turno'}.csv`.replace(/[/\\:*?"<>|]+/g, '-')
     a.click()
     URL.revokeObjectURL(url)
-  }, [timelineBuckets, productionWindow, pauses, shiftDoc?.id])
+  }, [timelineBuckets, productionWindow, pauses, shiftDoc?.id, summaryId])
 
   // Abre el dialog de anotación para el PRIMER paro sin clasificar del turno.
   // Permite al admin ir directo a la acción desde el badge de cobertura.

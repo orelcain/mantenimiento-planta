@@ -35,7 +35,9 @@ describe('TurnoOficialChip', () => {
       />,
     )
     expect(screen.getByText('COHO')).toBeTruthy()
-    expect(screen.getByText('99% del target oficial')).toBeTruthy()
+    // Dice «Línea» delante: el chip mide las máquinas de la línea contra el
+    // target del sensor, no el cumplimiento del turno.
+    expect(screen.getByText('Línea 99% del target oficial')).toBeTruthy()
     // El horario oficial NO va acá: vive en la línea de tiempos del turno,
     // etiquetado como "Programado". Verlo dos veces en la misma pantalla
     // obligaba a compararlos para descubrir que eran el mismo número.
@@ -69,7 +71,7 @@ describe('TurnoOficialChip', () => {
         machines={[{ machineid: 'a', totalCycles: 1000 }]}
       />,
     )
-    const badge = screen.getByText('20% del target oficial')
+    const badge = screen.getByText('Línea 20% del target oficial')
     expect(badge.closest('[class*="red-400"]')).not.toBeNull()
   })
 })

@@ -61,7 +61,12 @@ export function TurnoOficialChip({ rollup, machines, className }: TurnoOficialCh
           title={`Target oficial: ${Math.round(compliance.targetTotal).toLocaleString('es-CL')} piezas · ${Math.round(compliance.totalCycles).toLocaleString('es-CL')} producidas`}
         >
           <Target className="w-3 h-3" />
-          {(compliance.pct * 100).toFixed(0)}% del target oficial
+          {/* «68 % del target oficial» a secas se leía como el cumplimiento del
+              turno, y en la misma pantalla la tarjeta de cuota dice «119 %
+              cumplido»: son dos cosas distintas —esto mide las máquinas de la
+              línea contra el target del sensor, la cuota mide el Grader contra
+              la meta de la app— y a simple vista parecían contradecirse. */}
+          Línea {(compliance.pct * 100).toFixed(0)}% del target oficial
         </Badge>
       )}
     </div>
