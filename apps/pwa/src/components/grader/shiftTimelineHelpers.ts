@@ -229,13 +229,13 @@ export function buildMarkLines(
       name: `Inicio turno\n${fmtTime(startLabelTs)}`,
       xAxis: fmtTime(startLabelTs),
       lineStyle: { color: '#10b981', type: 'solid' as const, width: 1 },
-      label: { show: true, formatter: '▶ Inicio', color: '#10b981', fontSize: 9, position: 'insideStartTop' as const },
+      label: { show: true, formatter: '▶ Inicio', color: '#10b981', fontSize: 11, position: 'insideStartTop' as const },
     },
     {
       name: `Fin turno\n${fmtTime(endLabelTs)}`,
       xAxis: fmtTime(endLabelTs),
       lineStyle: { color: '#6b7280', type: 'solid' as const, width: 1 },
-      label: { show: true, formatter: '◀ Fin', color: '#6b7280', fontSize: 9, position: 'insideEndTop' as const },
+      label: { show: true, formatter: '◀ Fin', color: '#6b7280', fontSize: 11, position: 'insideEndTop' as const },
     },
   ]
 
@@ -270,25 +270,39 @@ export function buildMarkLines(
     name: `Config gates\n${fmtTime(s.at)}`,
     xAxis: fmtTime(s.at),
     lineStyle: { color: '#06b6d4', type: 'dashed' as const, width: 1.5 },
-    label: { show: true, formatter: 'Cfg', color: '#06b6d4', fontSize: 9 },
+    label: { show: true, formatter: 'Cfg', color: '#06b6d4', fontSize: 11 },
   }))
 
   const lotChangeLines: object[] = []
+  /* Dos cambios de lote a pocos minutos apilaban sus etiquetas una encima de
+     otra hasta volverlas ilegibles. La línea punteada se dibuja siempre; la
+     etiqueta, solo si hay aire desde la anterior. */
+  const LOT_LABEL_GAP_MIN = 25
+  let ultimaEtiquetaMs: number | null = null
   for (let i = 1; i < activeBuckets.length; i++) {
     const prev = activeBuckets[i - 1]
     const curr = activeBuckets[i]
     if (prev?.lot && curr?.lot && prev.lot !== curr.lot) {
+      const currMs = new Date(curr.tsMin).getTime()
+      const conAire = ultimaEtiquetaMs == null || currMs - ultimaEtiquetaMs >= LOT_LABEL_GAP_MIN * 60_000
+      if (conAire) ultimaEtiquetaMs = currMs
       lotChangeLines.push({
         name: `Cambio a Lote ${curr.lot}`,
         xAxis: fmtTime(curr.tsMin),
         lineStyle: { color: '#8b5cf6', type: 'dotted' as const, width: 1.5 },
         label: {
-          show: true,
-          formatter: curr.lot,
+          show: conAire,
+          // Los últimos 4 dígitos alcanzan para distinguir lotes dentro de un
+          // turno; el número entero (9 dígitos) se dibujaba en vertical y tapaba
+          // el gráfico. Va abajo porque arriba ya están las bandas de pausa —
+          // un cambio de lote suele traer su propia pausa «Cambio N min», y las
+          // dos etiquetas caían una encima de la otra. El número completo sigue
+          // en el nombre, que es lo que muestra el tooltip.
+          formatter: `L ${String(curr.lot).slice(-4)}`,
           color: '#a78bfa',
-          fontSize: 9,
+          fontSize: 11,
           fontWeight: 600 as const,
-          position: 'insideEndTop' as const,
+          position: 'insideEndBottom' as const,
           backgroundColor: 'rgba(139,92,246,0.15)',
           borderColor: 'rgba(139,92,246,0.4)',
           borderWidth: 1,
