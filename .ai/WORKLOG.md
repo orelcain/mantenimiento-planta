@@ -6,6 +6,36 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-10 · La hoja ejecutiva acusaba a la máquina equivocada en 65 de 144 turnos (PR #943)
+
+Ronda de pulido sobre las exportaciones que quedaban: el CSV del encabezado (correcto: nombre
+con fecha, secciones, pausas en orden), el resumen ejecutivo en PNG y el PDF.
+
+**⚠️⚠️ La hoja ejecutiva señalaba culpable por posición en una lista.** La frase de causa
+tomaba `machines[machines.length - 1]`, y como `buildMachineRows` ordena por ciclos
+DESCENDENTE, eso era la máquina con MENOS producción — no la de peor ritmo, que es justamente
+el número que la frase cita. Medido sobre los 144 turnos con dos o más máquinas y datos:
+
+| | |
+|---|---|
+| Señalaban bien | 79 |
+| **Señalaban a otra máquina** | **65** |
+| De esas, señalaban justo a la MEJOR | 11 |
+
+En el turno del 07-09 la hoja decía «Eviscerador 3 es la que más arrastra, con 80 % de su
+objetivo», con la tabla de arriba mostrando 78 % / 78 % / 80 %: acusaba a la única que había
+andado mejor, y el propio número la exculpaba. Es la hoja que se comparte con gerencia.
+
+Ahora `buildCause` elige por peor ritmo y, **cuando las máquinas van parejas (menos de 5 puntos
+entre la peor y la mejor), no acusa a ninguna**: dice «Las 3 máquinas fueron parejas (entre
+78 % y 80 % de su objetivo): la pérdida no viene de una en particular». Es el mismo criterio
+que ya usaba el diagnóstico de `PlantKPIBoard`, que no señala cuando la diferencia con la mejor
+es marginal — el patrón correcto ya existía en el proyecto, solo que esta hoja no lo usaba.
+
+Tests: 5 casos de `buildCause` (peor ritmo y no la última, parejas sin acusar, umbral justo,
+máquina detenida por encima del ritmo, sin datos no inventa culpable). Simulado el bug original
+(`orden[orden.length - 1]`), dos tests fallan con el síntoma real.
+
 ## 2026-09-10 · El CSV del turno salía desordenado y sin nombre; el chip del target no decía de quién hablaba (PR #942)
 
 Ronda de pulido sobre las dos pestañas que nunca había recorrido a fondo, Resumen y
