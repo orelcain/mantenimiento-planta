@@ -6,6 +6,31 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-10 · El PDF del turno escribía «21:28 ! 05:21» (PR #944)
+
+En la ronda anterior di el PDF por revisado sin haberlo abierto. Lo abrí: 3 páginas, contenido
+correcto y ya con el arreglo de #943 («Las 3 máquinas fueron parejas»). Pero una cadena salía
+mal.
+
+**⚠️ La ventana del turno se leía «21:28 ! 05:21 · 7 h 53».** La hoja escribe
+`${hhmm(start)} → ${hhmm(end)}`, y las fuentes estándar del PDF (Helvetica, WinAnsiEncoding) no
+tienen el glifo `→`. jsPDF, al no encontrarlo, pasa **toda la cadena** a UTF-16 y el visor la
+dibuja con el carácter equivocado. Medido sobre el PDF real del 07-09: de **169 cadenas, solo
+esa** se rompía, y solo por la flecha — los acentos y el punto medio están en WinAnsi y salen
+bien.
+
+`textoParaPdf` reemplaza los caracteres sin glifo (flechas, ▲ ▼, ≈ ≥ ≤, comillas tipográficas,
+guiones largos, puntos suspensivos) y `conTextoSeguro` envuelve el documento para que **todo lo
+que se dibuje pase por ahí**, en vez de confiar en recordarlo en cada `doc.text(...)` — que es
+justo lo que se olvida. Verificado sobre el archivo generado: de 1 cadena rota a 0, y la ventana
+ahora dice «21:28 - 05:21 · 7 h 53».
+
+Tests: 4 casos, incluido que el envoltorio sanea también `splitTextToSize` y las listas de
+líneas, no solo la primera llamada.
+
+Con esto quedan revisadas de verdad las tres exportaciones del encabezado (CSV, PNG ejecutivo,
+PDF) más el PNG y el CSV del timeline.
+
 ## 2026-09-10 · La hoja ejecutiva acusaba a la máquina equivocada en 65 de 144 turnos (PR #943)
 
 Ronda de pulido sobre las exportaciones que quedaban: el CSV del encabezado (correcto: nombre
