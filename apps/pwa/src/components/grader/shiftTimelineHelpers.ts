@@ -372,6 +372,10 @@ export function buildRielMarkLines(marcadores: readonly MarcadorRiel[]): object[
       name: m.eventos.map((e) => e.titulo).join(' · '),
       xAxis: m.label,
       lineStyle: { color, type: 'dashed' as const, width: 1, opacity: 0.45 },
+      /* Sin símbolo de blanco táctil sobre el chart: probado con un `rect`
+         transparente de 30×44, ECharts lo pinta igual en el extremo inferior y
+         tapaba las horas del eje. El blanco táctil de cada evento es su fila en
+         la lista de abajo, que además centra el gráfico al tocarla. */
       label: {
         show: true,
         position: 'insideEndTop' as const,
@@ -388,6 +392,110 @@ export function buildRielMarkLines(marcadores: readonly MarcadorRiel[]): object[
       },
     }
   })
+}
+
+export interface TramoConfig {
+  /** 1..N, para el encabezado de la lista. */
+  n: number
+  desdeMs: number
+  /** null en el último tramo: sigue abierto hasta el fin del turno. */
+  hastaMs: number | null
+  /** ISO del cambio que abrió el tramo; null en el primero, que abre el turno. */
+  snapshotAt: string | null
+  /** P0 % del tramo. Null cuando el tramo no junta piezas para decirlo. */
+  p0Pct: number | null
+  /** Puntos de P0 contra el tramo anterior. Null si alguno de los dos no junta piezas. */
+  delta: number | null
+  status: SegmentVerdict['status'] | null
+  /** Piezas contadas en el tramo. */
+  piezas: number
+}
+
+/**
+ * Piso de piezas para que un tramo muestre su P0.
+ *
+ * El 07-09 hubo dos cambios de compuertas con un minuto de diferencia: el tramo
+ * entre ambos tenía 3 piezas y salía «P0 33,3 % ▼ 31,5 pts», que es ruido con
+ * forma de hallazgo. Es el mismo piso que usa `computeSegmentVerdicts` para
+ * emitir veredicto.
+ */
+export const TRAMO_MIN_PIEZAS = 30
+
+/**
+ * Los tramos entre cambios manuales de compuertas, con el P0 de cada uno.
+ *
+ * Es lo que convierte la lista de eventos en un argumento: «cambié las
+ * compuertas a las 02:33 y el P0 bajó de 14,2 % a 9,4 %». Sin cambios manuales
+ * devuelve un solo tramo, y la lista se muestra plana — encabezar un único
+ * tramo sería ruido.
+ */
+export function tramosDeConfig(
+  snapshots: ReadonlyArray<{ id: string; at: string; synthetic?: boolean }>,
+  /** Indexado por `id` del snapshot, que es como lo devuelve `computeSegmentVerdicts`. */
+  verdicts: Map<string, SegmentVerdict>,
+  inicioMs: number,
+  buckets: ReadonlyArray<{ tsMin: string; pieces: number }> = [],
+): TramoConfig[] {
+  const manuales = snapshots
+    .filter((s) => !s.synthetic && Number.isFinite(Date.parse(s.at)))
+    .sort((a, b) => a.at.localeCompare(b.at))
+    .filter((s) => Date.parse(s.at) > inicioMs)
+
+  const piezasEntre = (desde: number, hasta: number | null) =>
+    buckets.reduce((a, b) => {
+      const t = Date.parse(b.tsMin)
+      return t >= desde && (hasta == null || t < hasta) ? a + (b.pieces || 0) : a
+    }, 0)
+
+  const primero = manuales[0]
+  const tramos: TramoConfig[] = [{
+    n: 1,
+    desdeMs: inicioMs,
+    hastaMs: primero ? Date.parse(primero.at) : null,
+    snapshotAt: null,
+    // El «antes» del primer cambio ES el primer tramo.
+    p0Pct: primero ? verdicts.get(primero.id)?.beforePct ?? null : null,
+    delta: null,
+    status: null,
+    piezas: piezasEntre(inicioMs, primero ? Date.parse(primero.at) : null),
+  }]
+
+  manuales.forEach((s, i) => {
+    const v = verdicts.get(s.id)
+    const sig = manuales[i + 1]
+    const desdeMs = Date.parse(s.at)
+    const hastaMs = sig ? Date.parse(sig.at) : null
+    tramos.push({
+      n: i + 2,
+      desdeMs,
+      hastaMs,
+      snapshotAt: s.at,
+      p0Pct: v?.afterPct ?? null,
+      delta: v?.delta ?? null,
+      status: v?.status ?? null,
+      piezas: piezasEntre(desdeMs, hastaMs),
+    })
+  })
+
+  /* Un tramo que no junta piezas no puede decir su P0, y tampoco sirve como
+     referencia del siguiente: el delta contra él sería contra ruido. */
+  if (buckets.length > 0) {
+    tramos.forEach((t, i) => {
+      if (t.piezas < TRAMO_MIN_PIEZAS) { t.p0Pct = null; t.delta = null; t.status = null }
+      const prev = tramos[i - 1]
+      if (prev && prev.piezas < TRAMO_MIN_PIEZAS) { t.delta = null; t.status = null }
+    })
+  }
+  return tramos
+}
+
+/** El tramo al que pertenece un instante. */
+export function tramoDe(tramos: readonly TramoConfig[], ms: number): TramoConfig | null {
+  for (let i = tramos.length - 1; i >= 0; i--) {
+    const t = tramos[i]!
+    if (ms >= t.desdeMs && (t.hastaMs == null || ms < t.hastaMs)) return t
+  }
+  return tramos[0] ?? null
 }
 
 // ── Mark lines del chart ──────────────────────────────────────────────────────
