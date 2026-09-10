@@ -6,6 +6,32 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-10 · El PNG del turno vuelve a explicarse solo (PR #941)
+
+Ronda de pulido. Lo primero que revisé fue mi propio trabajo: el riel (#939) sacó los rótulos
+del gráfico y los puso en la lista HTML, pero **el PNG compone cabecera + chart y nada más**.
+Desde ese cambio el PNG que se comparte en una reunión salía con «◈» y «▮» sueltos, sin una
+palabra que los explicara. La directora lo había advertido en el mockup; lo confirmé leyendo
+`downloadPNG` y generando el archivo.
+
+**El pie del PNG** repite ahora lo que la app muestra bajo el gráfico: la franja de umbrales y
+ritmo, y la lista de eventos agrupada por tramo de compuertas con su P0 (hasta 12 eventos, con
+un «+N eventos más en la app» si sobran). Verificado sobre el PNG real, no sobre el código:
+interceptando la descarga y mirando la imagen. Pasa de 556×671 a 556×895 px.
+
+**⚠️ La cabecera decía «Turno · Fecha desconocida».** No era del riel: `shiftDoc` solo existe
+cuando alguien registró una acción o una carga, y sin él la cabecera no tenía de dónde sacar la
+fecha ni el turno. Una evidencia sin fechar no sirve para una reunión. El `summaryId`
+(«2026-09-07__Turno 1») siempre está y trae los dos datos; ahora la cabecera dice «GRADER Z2 ·
+Turno 1 · lunes, 7 de septiembre de 2026».
+
+**El contador de la píldora salía girado.** Con `formatter: '◈ 3'` y `lineHeight`, ECharts
+partía la píldora en dos renglones y el número quedaba de costado. Sin espacio y sin
+`lineHeight` entra en una línea.
+
+Los tres se ven solo mirando el archivo exportado: ninguno rompe un test ni da error en
+consola.
+
 ## 2026-09-10 · La lista del timeline se agrupa por tramo de configuración (PR #940)
 
 Lo que quedaba del mockup de anotaciones: que la lista deje de ser una bitácora y sea el
