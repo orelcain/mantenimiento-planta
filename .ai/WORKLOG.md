@@ -6,6 +6,39 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-10 · Mapa de peso: banda por tramo de calibre y texto que no escala (PR #935)
+
+Orel, mirando el mapa de la G10 en el PC: «¿de qué nos sirve esto?». Sirve para separar
+seteo del Z2 de pesaje del Grader —un bloque limpio de 5,0-5,5 kg es cambio de programa; un
+desparramo alrededor del límite sería la balanza— pero dos cosas le restaban.
+
+**1. La banda mentía cuando el calibre cambia a mitad de turno.** `derivePesoPorPuerta`
+sobrescribe `p.rango` en cada bloque, así que el mapa encuadraba TODO el turno con el rango
+del último bloque juzgado. Medido sobre los 38 turnos: 4 puertas de 456 cambian de calibre y
+en ellas **454 piezas quedaban bajo la banda equivocada** (la peor, G10 del 07-09: 321 de
+2.308; también G4 07-09, G12 08-09 y G1 03-08). Ahora `tramosDeCalibre` devuelve un tramo por
+calibre asignado y el mapa dibuja una banda por tramo. Un bloque sin piezas no parte la banda
+(la G10 tenía un hueco y salían tres bandas con «8-10 lb» escrito dos veces); un bloque con
+piezas y sin referencia sí corta; el tramo se recorta al primer y último bloque con piezas.
+Con un solo tramo todo queda igual que antes, etiqueta a la derecha incluida. La frase de
+abajo deja de nombrar un solo calibre cuando hay varios.
+
+**2. En el PC se veía gigante.** El SVG tenía viewBox de 343 estirado al 100 %: en 1.130 px
+todo se multiplicaba por 3,3 y el «5.5» salía a 32 px, con el mapa ocupando 563 px de alto.
+Ahora se dibuja a escala 1:1 sobre el ancho real medido (ResizeObserver), con alto 176 bajo
+520 px y 240 encima. El texto queda en 11 px reales siempre —antes en móvil salía a 7 px, por
+debajo del piso de la constitución— y el ancho de más se gasta en celdas anchas y en más
+etiquetas de hora: **de 4 a 16 horas visibles** en 1.280 px. El «kg» pasó arriba de la columna
+de valores: a 11 px se pisaba con el tick superior.
+
+Tests: 5 casos nuevos de `tramosDeCalibre` (uno por cada trampa: cambio a mitad, hueco sin
+producción, cola vacía, tramo vacío, calibre desconocido). Roto a propósito el agrupado por
+calibre, el test falla con el síntoma real («expected [ { desde: 0, hasta: 3 } ] to have a
+length of 2»).
+
+Verificado en el preview a 375 y a 1.280 px, en tema oscuro y claro, sobre la G10 del 07-09
+(dos tramos) y la G5 del mismo turno (banda única sin cambios).
+
 ## 2026-09-09 · Línea sin los Gantts por máquina; el detalle se abre en Mantención (PR #934)
 
 Punto 5 de la revisión del 09-09, decidido por Orel («OK tu recomendación»): Línea mostraba

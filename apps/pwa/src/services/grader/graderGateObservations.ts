@@ -1056,6 +1056,66 @@ export interface MapaPeso {
   pieces: number
 }
 
+/** Un tramo contiguo de bloques con el mismo calibre asignado, con su rango. */
+export interface TramoCalibre {
+  /** Índices de bloque, ambos inclusive. */
+  desde: number
+  hasta: number
+  calibre: string
+  minGrams: number
+  maxGrams: number
+}
+
+/**
+ * Los tramos de calibre de una puerta, bloque a bloque. El mapa de peso dibuja
+ * una banda por tramo: hasta el 09-09 dibujaba UNA banda para todo el turno
+ * —la del último bloque juzgado, porque `derivePesoPorPuerta` sobrescribe
+ * `rango` en cada vuelta—, así que en las 4 puertas de los 38 turnos que
+ * cambian de calibre a mitad de turno había 454 piezas juzgadas contra la
+ * banda equivocada (la G10 del 07-09: 321 de 2.308).
+ *
+ * Un bloque sin piezas no corta el tramo: el hueco queda cubierto si después
+ * vuelve el mismo calibre (la G10 del 07-09 tenía uno y la banda 8-10 salía
+ * partida en dos, con su etiqueta repetida). Un bloque CON piezas y sin
+ * referencia sí corta: no se sabe contra qué encuadrarlas. Y el tramo se
+ * recorta al primer y al último bloque con piezas, para que la banda no se
+ * estire sobre las colas vacías del turno.
+ */
+export function tramosDeCalibre(
+  celdas: Array<Record<number, number> | null>,
+  referencias: Array<ReferenciaBloque | null>,
+  ranges: readonly CalibreWeightRange[],
+): TramoCalibre[] {
+  const out: TramoCalibre[] = []
+  let cur: (TramoCalibre & { piezas: number; primero: number; ultimo: number }) | null = null
+  const cerrar = () => {
+    if (cur && cur.piezas > 0) {
+      const { piezas: _p, primero, ultimo, ...t } = cur
+      out.push({ ...t, desde: primero, hasta: ultimo })
+    }
+    cur = null
+  }
+  for (let i = 0; i < celdas.length; i++) {
+    const bins = celdas[i]
+    const piezas = bins ? Object.values(bins).reduce((a, b) => a + b, 0) : 0
+    const calibre = referencias[i]?.calibre ?? null
+    const r = calibre && calibre !== ANY_CALIBRE ? ranges.find((x) => x.calibre === calibre) : undefined
+    if (!r) { if (piezas > 0) cerrar(); continue }
+    if (!cur || cur.calibre !== r.calibre) {
+      cerrar()
+      cur = { desde: i, hasta: i, calibre: r.calibre, minGrams: r.minGrams, maxGrams: r.maxGrams, piezas: 0, primero: i, ultimo: i }
+    }
+    cur.hasta = i
+    if (piezas > 0) {
+      if (cur.piezas === 0) cur.primero = i
+      cur.ultimo = i
+      cur.piezas += piezas
+    }
+  }
+  cerrar()
+  return out
+}
+
 export function mapaPesoDePuerta(obs: GateObservations, gate: number): MapaPeso | null {
   const e = obs.gates.find((g) => g.gate === gate)
   if (!e?.weightByBucket) return null
