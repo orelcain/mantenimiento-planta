@@ -10,6 +10,7 @@ import {
   scatterBaaderMedian,
   scatterCriticalZone,
   scatterSlopeMagnitude,
+  SCATTER_R2_MIN,
   usableScatterPoints,
   verdictBandColor,
   type CadenceStats,
@@ -526,6 +527,50 @@ describe('scatterSlopeMagnitude', () => {
     // Por -10 ciclos → +0.4 puntos P0%
     expect(result.deltaP0_per_minus10cycles).toBeCloseTo(0.4, 5)
     expect(result.direction).toBe('neg')
+  })
+
+  it('con R² por debajo del piso la dirección no se puede afirmar', () => {
+    // El caso real de la G10 del 07-09 y de otros 13 turnos: pendiente marcada
+    // pero R² 0,00-0,02, y la tarjeta decía «Confirma que ritmo upstream
+    // impacta calidad».
+    const series: ScatterSeriesData[] = [
+      {
+        machineid: 'm1', machineName: 'E1',
+        points: Array.from({ length: 20 }, (_, i) => ({
+          tsMs: i, baaderCycles: 20, baaderRatio: 1, graderP0Pct: 0.05, graderPieces: 100, baaderColor: 'green',
+        })),
+        regression: { slope: -0.05, intercept: 5, r2: 0.02 },
+      },
+    ]
+    const result = scatterSlopeMagnitude(series)!
+    expect(result.direction).toBe('neg')
+    expect(result.r2Max).toBeCloseTo(0.02, 5)
+    expect(result.explica).toBe(false)
+  })
+
+  it('con R² en el piso o encima sí se puede afirmar', () => {
+    const mk = (r2: number): ScatterSeriesData[] => ([{
+      machineid: 'm1', machineName: 'E1',
+      points: Array.from({ length: 20 }, (_, i) => ({
+        tsMs: i, baaderCycles: 20, baaderRatio: 1, graderP0Pct: 0.05, graderPieces: 100, baaderColor: 'green',
+      })),
+      regression: { slope: -0.05, intercept: 5, r2 },
+    }])
+    expect(scatterSlopeMagnitude(mk(SCATTER_R2_MIN))!.explica).toBe(true)
+    expect(scatterSlopeMagnitude(mk(SCATTER_R2_MIN - 0.001))!.explica).toBe(false)
+  })
+
+  it('r2Max toma el mayor de las máquinas, no el promedio', () => {
+    const series: ScatterSeriesData[] = [0.01, 0.18, 0.03].map((r2, i) => ({
+      machineid: 'm' + i, machineName: 'E' + i,
+      points: Array.from({ length: 10 }, (_, k) => ({
+        tsMs: k, baaderCycles: 20, baaderRatio: 1, graderP0Pct: 0.05, graderPieces: 100, baaderColor: 'green',
+      })),
+      regression: { slope: -0.05, intercept: 5, r2 },
+    }))
+    const result = scatterSlopeMagnitude(series)!
+    expect(result.r2Max).toBeCloseTo(0.18, 5)
+    expect(result.explica).toBe(true)
   })
 
   it('clasifica direction "flat" cuando |slope| < 0.005', () => {

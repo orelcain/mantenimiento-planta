@@ -877,6 +877,19 @@ export function scatterCriticalZone(
  * Convierte la magnitud a "puntos P0% por -10 ciclos/5min" — operacional para
  * el operador en lugar de un slope académico.
  */
+/**
+ * Piso de R² para que la nube de puntos sostenga una frase sobre la relación
+ * entre el ritmo de la línea y el P0. Por debajo, el ritmo explica menos de una
+ * décima de la variación: la pendiente es ruido.
+ *
+ * Medido el 10-09 sobre los 38 turnos: la tarjeta afirmaba una dirección en 25
+ * de 28 turnos con datos y en 14 de ellos el R² máximo no llegaba a 0,10; el
+ * mayor R² de todo el histórico es 0,22. Además la dirección se daba vuelta
+ * entre turnos (17 «más línea, menos P0» contra 8 al revés), que es justo lo
+ * que hace el ruido.
+ */
+export const SCATTER_R2_MIN = 0.1
+
 export function scatterSlopeMagnitude(
   seriesData: ScatterSeriesData[],
 ): {
@@ -884,13 +897,18 @@ export function scatterSlopeMagnitude(
   /** Cambio de P0% (en puntos %) cuando el ritmo Baader cae 10 ciclos/5min. Signo positivo = sube P0%. */
   deltaP0_per_minus10cycles: number
   direction: 'neg' | 'pos' | 'flat'
+  /** Mayor R² entre las máquinas con regresión utilizable (null si ninguna la tiene). */
+  r2Max: number | null
+  /** true solo si algún R² llega al piso: sin esto la dirección no se puede afirmar. */
+  explica: boolean
 } | null {
   const withSlope = seriesData
     .map(s => ({
       slope: s.regression?.slope ?? null,
+      r2: s.regression?.r2 ?? null,
       pts: usableScatterPoints(s.points).length,
     }))
-    .filter(x => x.slope != null && x.pts >= 3) as { slope: number; pts: number }[]
+    .filter(x => x.slope != null && x.pts >= 3) as { slope: number; r2: number | null; pts: number }[]
 
   if (withSlope.length === 0) return null
   const totalPts = withSlope.reduce((a, x) => a + x.pts, 0)
@@ -898,10 +916,14 @@ export function scatterSlopeMagnitude(
   const wSum = withSlope.reduce((a, x) => a + x.slope * x.pts, 0)
   const avgSlope = wSum / totalPts
   const deltaP0_per_minus10cycles = -avgSlope * 10
+  const r2s = withSlope.map(x => x.r2).filter((r): r is number => r != null)
+  const r2Max = r2s.length ? Math.max(...r2s) : null
   return {
     avgSlope,
     deltaP0_per_minus10cycles,
     direction: avgSlope < -0.005 ? 'neg' : avgSlope > 0.005 ? 'pos' : 'flat',
+    r2Max,
+    explica: r2Max != null && r2Max >= SCATTER_R2_MIN,
   }
 }
 

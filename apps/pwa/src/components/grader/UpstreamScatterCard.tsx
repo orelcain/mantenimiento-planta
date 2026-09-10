@@ -277,22 +277,38 @@ export function UpstreamScatterCard({
     : criticalKpi.pct >= 10 ? 'text-amber-400'
     : 'text-emerald-400'
 
-  // Narrativa direccional con magnitud operacional
+  /*
+   * La frase depende del R², no solo del signo de la pendiente. Hasta el 10-09
+   * decía «Confirma que ritmo upstream impacta calidad» con R² 0,00-0,02: en 14
+   * de 25 turnos afirmaba una relación que sus propios números negaban. Con la
+   * nube dispersa se dice eso mismo —que no se ve relación— y la pendiente no
+   * se muestra: un número que sale de puntos sin correlación no significa nada.
+   */
+  const pctExplicado = slopeMagnitude?.r2Max != null ? Math.round(slopeMagnitude.r2Max * 100) : null
   const trendNarrative = slopeMagnitude == null
     ? null
-    : slopeMagnitude.direction === 'neg'
+    : !slopeMagnitude.explica
+      ? {
+          icon: <Minus className="w-3 h-3" />,
+          text: 'Sin relación visible en este turno',
+          color: 'text-muted-foreground',
+          tone: pctExplicado != null
+            ? `El ritmo de la línea explica el ${pctExplicado} % de la variación del P0: la nube está dispersa.`
+            : 'Los puntos no alcanzan para medir una relación.',
+        }
+      : slopeMagnitude.direction === 'neg'
       ? {
           icon: <TrendingDown className="w-3 h-3" />,
           text: `Cada -10 ciclos/5min Baader → +${slopeMagnitude.deltaP0_per_minus10cycles.toFixed(2)} pts P0%`,
           color: 'text-cat-5-ink',
-          tone: 'Más Baader → menos P0%. Confirma que ritmo upstream impacta calidad.',
+          tone: `Cuando la línea bajó el ritmo, el P0 subió. Explica el ${pctExplicado} % de la variación de este turno — no vale para otros.`,
         }
       : slopeMagnitude.direction === 'pos'
       ? {
           icon: <TrendingUp className="w-3 h-3" />,
           text: `Cada -10 ciclos/5min Baader → ${slopeMagnitude.deltaP0_per_minus10cycles.toFixed(2)} pts P0%`,
           color: 'text-amber-400',
-          tone: 'P0% sube cuando Baader sube. Anti-intuitivo — investigar.',
+          tone: `P0% sube cuando Baader sube, al revés de lo esperado. Explica el ${pctExplicado} % de la variación — mirar antes de concluir.`,
         }
       : {
           icon: <Minus className="w-3 h-3" />,
