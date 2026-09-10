@@ -3,12 +3,12 @@
  * (upstream del Grader) durante el mismo turno, para correlacionar paros y
  * ritmos con los P0 del Grader.
  *
- * Diseño inspirado en la UI de Shoplogix (saas139.shoplogix.com):
- *   - Header con nombre + ritmo vs objetivo
- *   - Gantt horizontal con paros coloreados + leyenda de durations abajo
- *   - Bar chart de producción por intervalo de 5 min + línea objetivo
- *   - KPI row: piezas en verde/amarillo/rojo (%) como en Shoplogix
- *   - Expandable: click para ver detalle completo por máquina
+ * Qué muestra (09-09): la tasa pz/min por máquina, la cascada de pérdidas y
+ * la imputación — lo que responde «¿la línea alimentó al Grader?». El detalle
+ * por máquina (Gantt con paros, barras de producción de 5 min, eventos con el
+ * comentario del operador) vive en `MachineShiftDetail`, que la pestaña
+ * Mantención abre bajo la barra de reparto de cada máquina: antes las mismas
+ * tres máquinas aparecían en las dos pestañas (1.061 px de Gantts acá).
  *
  * Data viene de Shoplogix (Cloud Function — Fase 2b). Mientras tanto,
  * en DEV usa datos sintéticos realistas (shoplogixDemoData).
@@ -18,9 +18,9 @@ import { useState, useMemo, useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils'
 import { Card, CardContent, Badge } from '@/components/ui'
 import {
-  ChevronDown, ChevronRight, Factory, Activity, AlertCircle, Zap,
-  TrendingUp, TrendingDown, Timer, Gauge, Pause, AlertTriangle, Download, MessageSquare,
-  Coffee, PauseCircle, Scissors, WifiOff,
+  ChevronDown, ChevronRight, Activity, AlertCircle, Zap,
+  Timer, Gauge, Pause, AlertTriangle, Download, MessageSquare,
+  Coffee, PauseCircle, Scissors, WifiOff, Wrench,
 } from 'lucide-react'
 import type {
   UpstreamLineSnapshot,
@@ -36,7 +36,6 @@ import {
   reachedStatusFromPct,
   reachedStatusColor,
   reachedStatusLabel,
-  detectMicroAnomalies,
   isStaleSync,
   varianceDirection,
   varianceLabel,
@@ -48,7 +47,7 @@ import ReactECharts from 'echarts-for-react'
 import { animate, stagger } from 'animejs'
 import type { MachineTrendPoint } from '@/services/shoplogix/shoplogixShift.service'
 import type { PlantSlug } from '@/services/shoplogix/shoplogixMachines'
-import { machineTypeLabel, lineMachinesLabel } from '@/services/shoplogix/shoplogixMachines'
+import { lineMachinesLabel } from '@/services/shoplogix/shoplogixMachines'
 import { useTimelineSyncOptional } from './useTimelineSync'
 import { StateTimelineEC } from './StateTimelineEC'
 import { ProductionBarsEC } from './ProductionBarsEC'
@@ -63,7 +62,6 @@ import { fmtTime, fmtDurationSec } from '@/services/grader/graderTimeFormat'
 import { slxStateColor } from '@/services/shoplogix/shoplogixColors'
 import { logger } from '@/lib/logger'
 import { softenAccentHex } from '@/lib/softenColor'
-import { shortMachineName } from '@/services/grader/graderMachineNames'
 
 interface Props {
   snapshot: UpstreamLineSnapshot | null | undefined
@@ -107,6 +105,8 @@ interface Props {
    * se desactiva automáticamente para datos demo.
    */
   dataSource?: 'firestore' | 'demo' | 'none'
+  /** Abre la pestaña Mantención, donde vive el detalle por máquina. */
+  onVerMantencion?: () => void
 }
 
 // ============================================================================
@@ -763,35 +763,21 @@ function ProductionKpiRow({ kpis }: { kpis: MachineKpis }) {
 }
 
 // ============================================================================
-// MachineRow — 1 máquina
+// MachineShiftDetail — el turno de UNA máquina
 // ============================================================================
 
-// Mismo color por índice de máquina en TODO el panel (Gantt, dot, borde
-// izquierdo) — consistente con machineColors de BaaderTrendMultiChart/
-// TrendBarsWithMovingAverage (M0 sky, M1 violet, M2 amber). Antes las 3
-// máquinas se separaban solo por un `divide-y` tenue — "no se ve bien dónde
-// empieza una y termina la otra" (Orel 2026-07-22) — el borde de color
-// resuelve eso sin depender de leer el nombre.
-// `bg` = tinte tenue del color de acento (10%) mezclado sobre la superficie
-// normal — "que se vea rápido" sin tener que leer el borde (Orel 2026-07-23).
-const MACHINE_ACCENT = [
-  { border: 'border-l-blue-500/70',    dot: 'bg-ink-info',    bg: 'bg-primary/[0.15]' },
-  { border: 'border-l-violet-500/70', dot: 'bg-cat-6-tint', bg: 'bg-cat-6-tint/[0.15]' },
-  { border: 'border-l-amber-500/70',  dot: 'bg-amber-400',  bg: 'bg-amber-500/[0.15]' },
-] as const
-
-function MachineRow({ shift, machineIndex = 0, expanded, onToggle, windowStart, windowEnd, microAlert }: {
+/**
+ * Gantt de estados (clic en un tramo → detalle + resalte en el chart de
+ * velocidad), barras de producción de 5 min, KPIs verde/amarillo/rojo y, con
+ * `expanded`, la tabla de eventos con el comentario del operador. Lo monta la
+ * pestaña Mantención bajo la barra de reparto de cada máquina.
+ */
+export function MachineShiftDetail({ shift, expanded, onToggle, windowStart, windowEnd }: {
   shift: UpstreamMachineShift
-  /** Índice de la máquina en la línea (0,1,2) — define su color de acento. */
-  machineIndex?: number
   expanded: boolean
   onToggle: () => void
   windowStart?: Date
   windowEnd?: Date
-  /** Si es true, esta máquina tiene >50% más microparadas que el promedio de la línea. */
-  microAlert?: boolean
-  /** Reservado para carga lazy de tendencia histórica — no usado aún. */
-  plantSlug?: PlantSlug
 }) {
   // Estado seleccionado al clickear un segmento del Gantt (drill-down rico).
   // Click sobre el mismo state lo cierra (toggle).
@@ -857,52 +843,8 @@ function MachineRow({ shift, machineIndex = 0, expanded, onToggle, windowStart, 
     return { eventos, byState, orphans }
   }, [shift.states, shift.comments])
 
-  const ratioColor =
-    shift.overallRatio >= 0.85 ? 'text-emerald-400'
-    : shift.overallRatio >= 0.5 ? 'text-amber-400'
-    : 'text-cat-5-ink'
-
-  const RatioIcon = shift.runtimeVariance >= 0 ? TrendingUp : TrendingDown
-
-  const accent = MACHINE_ACCENT[machineIndex % MACHINE_ACCENT.length]!
-
   return (
-    <div className={cn('py-3 pl-3 pr-1 space-y-2 rounded-ctl border-l-4', accent.bg, accent.border)}>
-      {/* Row header — clickeable para expandir */}
-      <button
-        onClick={onToggle}
-        className="w-full flex items-center justify-between gap-2 text-left group"
-        aria-expanded={expanded}
-      >
-        <div className="flex items-center gap-2 min-w-0">
-          {expanded
-            ? <ChevronDown  className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground" />
-            : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground" />}
-          <span className={cn('w-2 h-2 rounded-full shrink-0', accent.dot)} />
-          <Factory className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-          <span className="font-medium text-sm truncate">{shortMachineName(shift.machineName)}</span>
-          {machineTypeLabel(shift.machineType) && (
-            <Badge variant="outline" className="text-caption px-1.5 py-0 h-4 border-border text-muted-foreground">
-              {machineTypeLabel(shift.machineType)}
-            </Badge>
-          )}
-          {microAlert && (
-            <Badge variant="outline" className="text-caption px-1.5 py-0 h-4 border-amber-500/[0.25] bg-amber-500/[0.15] text-ink-warn flex items-center gap-1" title="Microparadas anómalas (>50% sobre promedio línea). Revisar mantención.">
-              <AlertTriangle className="w-3 h-3" /> Atención
-            </Badge>
-          )}
-        </div>
-        <div className="flex items-center gap-3 text-xs flex-shrink-0">
-          <span className={`font-semibold tabular-nums flex items-center gap-0.5 ${ratioColor}`} title="Ritmo vs objetivo">
-            <RatioIcon className="w-3 h-3" />
-            {fmtPct(shift.overallRatio)}
-          </span>
-          <span className="text-muted-foreground tabular-nums" title="Piezas totales">
-            {fmtInt(shift.totalCycles)} pz
-          </span>
-        </div>
-      </button>
-
+    <div className="space-y-2">
       {/* KPI row siempre visible (verde/amarillo/rojo). Badge "del rango"
           aparece cuando hay zoom activo — los KPIs se recalculan sólo del
           rango temporal visible (F5a). */}
@@ -1126,9 +1068,9 @@ export function UpstreamMachinesPanel({
   framedOnProduction = false,
   onToggleFraming,
   graderTotalPieces = null,
+  onVerMantencion,
 }: Props) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed)
-  const [expandedMachines, setExpandedMachines] = useState<Set<string>>(new Set())
   // Capa opcional del gráfico de tasa: cuánto faltó para el objetivo en cada
   // tramo. Apagada por default — en un turno normal casi todo está cerca del
   // objetivo y el sombreado sería ruido.
@@ -1238,18 +1180,6 @@ export function UpstreamMachinesPanel({
     return sumLineTimeTotals(snapshot.machines)
   }, [snapshot])
 
-  // Detector de microparadas anómalas — usa helper testable + umbrales
-  // exportados (ver MICRO_ANOMALY_THRESHOLDS en graderUpstreamHealth.ts).
-  const microAlertSet = useMemo<Set<string>>(() => {
-    if (!snapshot) return new Set()
-    return detectMicroAnomalies(
-      snapshot.machines.map(m => ({
-        machineid: m.machineid,
-        microCount: m.states.filter(s => s.name === 'Micro Detencion').length,
-      })),
-    )
-  }, [snapshot])
-
   const empty = !loading && !error && (!snapshot || snapshot.machines.length === 0)
 
   /**
@@ -1271,14 +1201,6 @@ export function UpstreamMachinesPanel({
   // Modelo de las máquinas del turno, derivado de los datos: en Filete la
   // máquina es una Baader 200 y el header decía "Baader 142" igual.
   const lineLabel = snapshot ? lineMachinesLabel(snapshot.machines) : ''
-
-  const toggleMachine = (id: string) => {
-    setExpandedMachines(prev => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id); else next.add(id)
-      return next
-    })
-  }
 
   return (
     <Card className="border-border bg-muted/50">
@@ -1418,8 +1340,8 @@ export function UpstreamMachinesPanel({
                 {fmtInt(snapshot.lineThroughputActual)} / {fmtInt(snapshot.lineThroughputExpected)} pz/h
               </span>
             )}
-            {/* F5c — Botón export PNG combinado: captura Grader + 3 Gantts +
-                3 ProductionBars en un solo PNG vertical, listo para
+            {/* F5c — Botón export PNG combinado: captura los charts del grupo
+                (Grader + tasa de la línea) en un solo PNG vertical, listo para
                 compartir (Slack, ticket, email). Sólo visible cuando hay
                 snapshot cargado y echarts.connect activo. */}
             {snapshot && !loading && timelineSync && (
@@ -1436,7 +1358,7 @@ export function UpstreamMachinesPanel({
                   }).catch((err) => logger.error('Export combinado falló', err instanceof Error ? err : new Error(String(err))))
                 }}
                 className="flex items-center gap-1 text-caption text-muted-foreground hover:text-foreground transition-colors px-1.5 py-1 rounded-ctl border border-border hover:border-foreground/30"
-                title="Exportar timeline completo (Grader + 3 Baaders) como PNG único"
+                title="Exportar el timeline del Grader y la tasa de la línea como PNG único"
               >
                 <Download className="w-3 h-3" />
                 <span>PNG</span>
@@ -1544,31 +1466,20 @@ export function UpstreamMachinesPanel({
               <ImputacionParetoCard machines={snapshot.machines} />
             )}
 
-            {snapshot && snapshot.machines.length > 0 && (
-              <div className="space-y-2">
-                {/* Filtro fino de la Cascada del turno (Ev1/Ev2/Ev3 dentro de
-                    una causal) aísla esa Baader: las otras 2 se OCULTAN (no
-                    solo dejan de resaltarse) para verla sin bajar con scroll
-                    a buscarla entre las 3 (Orel 2026-07-23). machineIndex se
-                    calcula sobre la lista COMPLETA (no la filtrada) para que
-                    el color de cada máquina no cambie al aislar/desaislar. */}
-                {snapshot.machines
-                  .map((m, idx) => ({ m, idx }))
-                  .filter(({ m }) => !timelineSync?.isolatedMachineId || m.machineid === timelineSync.isolatedMachineId)
-                  .map(({ m, idx }) => (
-                    <MachineRow
-                      key={m.machineid}
-                      shift={m}
-                      machineIndex={idx}
-                      expanded={expandedMachines.has(m.machineid)}
-                      onToggle={() => toggleMachine(m.machineid)}
-                      windowStart={chartWindowStart}
-                      windowEnd={chartWindowEnd}
-                      microAlert={microAlertSet.has(m.machineid)}
-                      plantSlug={plantSlug}
-                    />
-                  ))}
-              </div>
+            {/* El Gantt, las barras de 5 min y los eventos de cada máquina se
+                abren en Mantención (bajo su barra de reparto): es la pestaña
+                que demuestra el trabajo por máquina, y acá repetían 1.061 px. */}
+            {snapshot && snapshot.machines.length > 0 && onVerMantencion && (
+              <button
+                type="button"
+                onClick={onVerMantencion}
+                className="mt-1 flex w-full min-h-11 items-center gap-2 rounded-ctl px-2 text-left text-footnote text-ink-info hover:bg-muted"
+                data-testid="linea-ver-mantencion"
+              >
+                <Wrench className="h-4 w-4 shrink-0" />
+                <span className="flex-1">Gantt, paros y comentarios de cada máquina: en Mantención, bajo su barra de reparto</span>
+                <ChevronRight className="h-4 w-4 shrink-0" />
+              </button>
             )}
 
             {snapshot && syncedAt && (

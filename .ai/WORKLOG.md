@@ -6,6 +6,33 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-09 · Línea sin los Gantts por máquina; el detalle se abre en Mantención (PR #934)
+
+Punto 5 de la revisión del 09-09, decidido por Orel («OK tu recomendación»): Línea mostraba
+un Gantt por Baader y Mantención una barra de reparto por Baader — las mismas tres máquinas
+en dos pestañas. Cuando hay que demostrar el trabajo de Mantención, la pestaña que se muestra
+es Mantención, así que la evidencia por máquina queda ahí.
+
+Medido a 375 px sobre 2026-09-08 T1, antes → después:
+
+- **Línea**: 5.103 → 4.096 px. El panel de la línea pasa de 3.938 a 2.932: se van las tres
+  filas por máquina (348 px cada una) y queda un enlace de una línea que abre Mantención.
+  Siguen la tasa pz/min, la cascada, la imputación, la correlación y el scatter.
+- **Mantención**: la barra de reparto de cada máquina ahora es un botón (44 px) que abre el
+  detalle de esa máquina: Gantt con paros (clic en un tramo → detalle), barras de 5 min,
+  KPIs verde/amarillo/rojo y la tabla de eventos con el comentario del operador. Cerrado no
+  cambia la altura de la pestaña (2.355 → 2.411 px); abierto en Ev 1 suma 667 px.
+- La insignia «Atención» por micro-paros anómalos, que solo vivía en la fila de Línea, pasa
+  a la barra de reparto como pill «micro-paros» (mismo detector, `detectMicroAnomalies`).
+
+Código: `MachineRow` deja de existir; su cuerpo es `MachineShiftDetail` (exportado desde
+`UpstreamMachinesPanel.tsx`) y lo monta `MantencionTurnoTab`. El panel pierde el estado de
+filas expandidas y el aislamiento por máquina de la cascada ya no oculta nada (solo resalta
+en el chart de tasa; la pista de texto se ajustó). El PNG combinado captura Grader + tasa.
+
+Sin mockup previo: cambio sustractivo en Línea y reutilización del componente existente en
+Mantención, verificado en el preview (enlace → pestaña, barra → detalle con 2 canvases).
+
 ## 2026-09-09 · Gates: menos avisos iguales, menos vistas repetidas del mismo tiempo (PR #933)
 
 Orel: «¿en qué más podemos afinar o simplificar?». Medido a 375 px sobre el turno cerrado

@@ -15,13 +15,15 @@
  */
 
 import { useEffect, useState, type ReactNode } from 'react'
-import { Wrench, AlertTriangle, TrendingUp } from 'lucide-react'
+import { Wrench, AlertTriangle, TrendingUp, ChevronDown, ChevronRight } from 'lucide-react'
 import { Pill } from '@/components/piel'
 import type { KpisTurnoMantencion, KpisMaquinaTurno, EventoFalla } from '@/services/shoplogix/kpisMantencionTurno'
 import { targetSospechoso, reenganches } from '@/services/shoplogix/kpisMantencionTurno'
 import { nombreCorto } from '@/services/shoplogix/ritmoPorMaquina'
 import { cargarTendenciaMantencion, TURNOS_TENDENCIA, type PuntoTendenciaMantencion } from '@/services/shoplogix/tendenciaMantencion'
 import type { PlantSlug } from '@/services/shoplogix/shoplogixMachines'
+import { detectMicroAnomalies } from '@/services/grader/graderUpstreamHealth'
+import { MachineShiftDetail } from './UpstreamMachinesPanel'
 
 const nf = new Intl.NumberFormat('es-CL')
 const fmtInt = (n: number) => nf.format(Math.round(n))
@@ -49,21 +51,47 @@ function Cap({ children }: { children: ReactNode }) {
   )
 }
 
-/** Una barra de reparto: mismos 100% (la ventana) para las tres máquinas. */
-function BarraReparto({ x, ventanaMin }: { x: KpisMaquinaTurno; ventanaMin: number }) {
+/**
+ * Una barra de reparto: mismos 100% (la ventana) para las tres máquinas.
+ * Tocarla abre el detalle de esa máquina (Gantt, barras de 5 min, eventos con
+ * comentario): antes ese detalle vivía en Línea, repetido para las mismas
+ * máquinas (09-09).
+ */
+function BarraReparto({ x, ventanaMin, ventana, microAlert }: {
+  x: KpisMaquinaTurno
+  ventanaMin: number
+  ventana: { start: Date; end: Date }
+  /** Micro-paros muy por sobre el promedio de la línea (ver graderUpstreamHealth). */
+  microAlert: boolean
+}) {
   const r = x.reparto
+  const [abierta, setAbierta] = useState(false)
   const seg = (min: number, fill: string, title: string) =>
     min > 0.2 ? (
       <span key={title} title={`${title}: ${fmtInt(min)} min`} style={{ width: `${(min / ventanaMin) * 100}%`, background: fill }} />
     ) : null
   return (
     <div className="space-y-1">
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="text-headline text-foreground">{nombreCorto(x.maquina.machineName)}</span>
+      <button
+        type="button"
+        onClick={() => setAbierta((v) => !v)}
+        aria-expanded={abierta}
+        className="-my-1.5 flex w-full min-h-11 items-center justify-between gap-2 text-left"
+        data-testid="reparto-maquina"
+      >
+        <span className="flex min-w-0 items-center gap-1.5">
+          {abierta ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+          <span className="text-headline text-foreground">{nombreCorto(x.maquina.machineName)}</span>
+          {microAlert && (
+            <Pill tone="warning" className="normal-case" title="Micro-paros muy por sobre el promedio de la línea">
+              <AlertTriangle className="h-3 w-3" /> micro-paros
+            </Pill>
+          )}
+        </span>
         <span className="text-caption tabular-nums text-muted-foreground">
           {fmtInt(x.maquina.totalCycles)} pz · {Math.round((x.kpi.uptimeMin / ventanaMin) * 100)}% produciendo
         </span>
-      </div>
+      </button>
       <div className="flex h-3.5 overflow-hidden rounded-full bg-muted">
         {seg(r.falla, FILL.falla, 'Falla técnica')}
         {seg(r.micro, FILL.micro, 'Micro-paros')}
@@ -76,6 +104,11 @@ function BarraReparto({ x, ventanaMin }: { x: KpisMaquinaTurno; ventanaMin: numb
         {fmtInt(r.falla)} falla · {fmtDec(r.micro)} micro ({x.kpi.grupos.micro?.n ?? 0}×) ·{' '}
         {fmtDec(r.externo + r.excedido)} ext · {fmtDec(r.planificado)} plan
       </p>
+      {abierta && (
+        <div className="pt-2" data-testid="reparto-maquina-detalle">
+          <MachineShiftDetail shift={x.maquina} expanded onToggle={() => undefined} windowStart={ventana.start} windowEnd={ventana.end} />
+        </div>
+      )}
     </div>
   )
 }
@@ -240,6 +273,14 @@ export function MantencionTurnoTab({ kpis, loading, plantSlug, shiftId, dateKey 
     ? porMaquina.find((x) => x.maquina.machineName === eventoMayor.maquina)?.kpi.fallas ?? []
     : []
   const sospechosas = porMaquina.filter((x) => targetSospechoso(x.velocidad))
+  /* Micro-paros anómalos por máquina (>50 % sobre el promedio de la línea):
+     antes era la insignia «Atención» de la fila en Línea. */
+  const microAnomalas = detectMicroAnomalies(
+    porMaquina.map((x) => ({
+      machineid: x.maquina.machineid,
+      microCount: (x.maquina.states ?? []).filter((s) => s.name === 'Micro Detencion').length,
+    })),
+  )
 
   /* Piezas estimadas de la falla, al ritmo DEMOSTRADO de cada máquina (su
      mediana andando) — no al target, que puede estar malo (ver aviso). */
@@ -393,7 +434,9 @@ export function MantencionTurnoTab({ kpis, loading, plantSlug, shiftId, dateKey 
       <section className="rounded-card border border-border bg-card p-4">
         <Cap>Reparto del turno · {fmtInt(ventanaMin)} min por máquina</Cap>
         <div className="mt-3 space-y-4">
-          {porMaquina.map((x) => <BarraReparto key={x.maquina.machineid} x={x} ventanaMin={ventanaMin} />)}
+          {porMaquina.map((x) => (
+            <BarraReparto key={x.maquina.machineid} x={x} ventanaMin={ventanaMin} ventana={kpis.ventana} microAlert={microAnomalas.has(x.maquina.machineid)} />
+          ))}
         </div>
         <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 border-t border-border/50 pt-2.5 text-caption text-muted-foreground/80">
           <span className="inline-flex items-center gap-1"><i className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: FILL.falla }} />Falla técnica</span>
@@ -404,6 +447,7 @@ export function MantencionTurnoTab({ kpis, loading, plantSlug, shiftId, dateKey 
         </div>
         <p className="mt-1.5 text-caption text-muted-foreground/80">
           Las {porMaquina.length} barras miden el mismo turno y arrancan por falla técnica: el bloque rojo se compara de un vistazo.
+          Toca una máquina para ver su Gantt, sus paros y los comentarios del operador.
         </p>
       </section>
 

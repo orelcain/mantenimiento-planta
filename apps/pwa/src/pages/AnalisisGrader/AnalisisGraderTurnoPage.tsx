@@ -2456,6 +2456,7 @@ export function AnalisisGraderTurnoPage() {
             graderTotalPieces={null}
             framedOnProduction={framedOnProduction}
             onToggleFraming={slxProductionWindow ? () => setFramingOverride(framedOnProduction ? 'turno' : 'produccion') : undefined}
+            onVerMantencion={() => setActiveView('mantencion')}
           />
 
         </div>
@@ -2814,8 +2815,10 @@ export function AnalisisGraderTurnoPage() {
               causa del timeline la reemplaza (marcar una causa en el panel P0). */}
 
           {/* ════════ LÍNEA (upstream Shoplogix) ════════
-              Evisceradoras Baader 142: lo que alimenta al Grader. Junto con su
-              correlación contra las pausas del Grader y el scatter. */}
+              Evisceradoras Baader 142: lo que alimenta al Grader (tasa, cascada,
+              imputación) más la correlación contra las pausas del Grader y el
+              scatter. El detalle por máquina (Gantt, eventos) vive en Mantención
+              desde el 09-09: las mismas tres máquinas salían en las dos pestañas. */}
           {/* Barra Shoplogix: contador de staleness + botón refresh */}
           {activeView === 'linea' && (upstreamLine.snapshot || upstreamLine.loading) && (
             <div className="flex items-center justify-between gap-2 -mb-1 px-1">
@@ -2859,6 +2862,7 @@ export function AnalisisGraderTurnoPage() {
             graderTotalPieces={summary?.totalPieces ?? null}
             framedOnProduction={framedOnProduction}
             onToggleFraming={slxProductionWindow ? () => setFramingOverride(framedOnProduction ? 'turno' : 'produccion') : undefined}
+            onVerMantencion={() => setActiveView('mantencion')}
           />
 
           {/* Correlación automática Grader↔Baader y scatter — solo aplican
