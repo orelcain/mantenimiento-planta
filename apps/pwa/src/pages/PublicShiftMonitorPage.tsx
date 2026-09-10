@@ -92,6 +92,7 @@ import { ritmoAndandoDeLinea } from '@/services/shoplogix/ritmoAndandoDeLinea'
 import { piezasDeToneladas, toneladasDePiezas, toneladasPorTramos } from '@/services/shoplogix/cuotaEnToneladas'
 import { ritmoPorMaquina, nombreCorto, type RitmosPorMaquina } from '@/services/shoplogix/ritmoPorMaquina'
 import { classifyLossState } from '@/services/shoplogix/lossBuckets'
+import { motivoEnEspanol } from '@/services/shoplogix/shoplogixColors'
 
 // ── Formateadores (locales a propósito: esta página no debe arrastrar el
 //    módulo de helpers del Grader, que se lleva echarts al bundle) ───────────
@@ -2828,7 +2829,10 @@ function RespuestaMantencion({ m, cerrado, riel, fallaLineaMin, enCurso }: {
         ) : (
           /* 3 · Falla resuelta: quién y el costo de LÍNEA, que es el logro. */
           <>{totalEventos === 1 ? 'Una sola falla técnica' : `${totalEventos} fallas técnicas`} en el turno
-            {conFalla.length === 1 && <>, toda en <b>{nombreCorto(conFalla[0]!.name)}</b></>}
+            {/* El número concuerda con las FALLAS, no con las máquinas: con
+                tres fallas en una sola máquina se leía «3 fallas técnicas en el
+                turno, toda en Li 1» en la pantalla de la TV de planta. */}
+            {conFalla.length === 1 && <>, {totalEventos === 1 ? '' : 'todas '}en <b>{nombreCorto(conFalla[0]!.name)}</b></>}
             {sinCostoDeLinea
               ? <> — y la línea no la sintió.</>
               : <>{sanas > 0 && <> y {sanas === 1 ? 'la otra máquina' : `las otras ${sanas}`} sin falla</>}.</>}
@@ -6757,7 +6761,9 @@ export function PublicShiftMonitorPage() {
                 ? {
                   desdeHace: live.currentSinceAt ? fmtAgoWall(live.currentSinceAt, now) : null,
                   desdeHora: live.currentSinceAt ? fmtWallTime(live.currentSinceAt) : null,
-                  motivo: live.currentReason ?? null,
+                  // El sensor pone «Planned Downtime» en inglés; el resto de
+                  // los motivos los escribe el operador y ya vienen en español.
+                  motivo: motivoEnEspanol(live.currentReason),
                   programada: classifyLossState({
                     type: 'break',
                     reason: live.currentReason ?? undefined,
