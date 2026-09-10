@@ -6,6 +6,31 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-10 · El monitor público decía «Planned Downtime» y «3 fallas … toda en Li 1» (PR #945)
+
+Ronda de pulido sobre la superficie que nunca se había revisado: el monitor público
+(`/monitor/:token`), que es el link que se comparte y la pantalla de la TV de planta. Recorrido
+con un token ya existente y **sin sesión**, borrando el auth del navegador.
+
+**⚠️ «Planned Downtime», en inglés, en la píldora del estado.** La causa de un paro la escribe
+el operador en Shoplogix y ya viene en español; este estado lo pone el sistema. Medido sobre
+los datos: de los **42 motivos distintos, exactamente uno está en inglés** —«Planned Downtime»,
+**301 apariciones**—, y aparece justo cuando la línea está en parada programada o cerró el
+turno, que es cuando más se mira la TV. `motivoEnEspanol` traduce los estados del sistema
+(dejando intacto lo que escribe el operador) y el monitor lo usa.
+
+**«3 fallas técnicas en el turno, toda en Li 1».** El singular concordaba con el número de
+MÁQUINAS con falla (una), no con el de fallas (tres). Ahora concuerda con las fallas.
+
+**Un falso positivo que verifiqué en vez de reportar:** en la pantalla aparecía un botón
+«Cambiar cuota», y una página pública con un control de escritura sería grave. Lo revisé:
+`onGuardarCuota` está detrás de `esAdminMonitor && esActual`, y al abrir el monitor sin sesión
+el botón no está. La protección funciona.
+
+**Otra comprobación:** al borrar el auth y recargar, la ruta redirigió a `/login` — pero
+navegando directo a la URL sin sesión el monitor carga perfecto. Era un estado transitorio del
+borrado, no un problema del link compartido.
+
 ## 2026-09-10 · El PDF del turno escribía «21:28 ! 05:21» (PR #944)
 
 En la ronda anterior di el PDF por revisado sin haberlo abierto. Lo abrí: 3 páginas, contenido
