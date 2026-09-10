@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { drawExecutivePdfPage, type PdfDoc } from '../graderExecutivePdfPage'
+import { drawExecutivePdfPage, textoParaPdf, conTextoSeguro, type PdfDoc } from '../graderExecutivePdfPage'
 import { buildExecutiveSummary } from '../graderExecutiveSummary'
 import type { GraderDailySummary } from '@/services/grader/types'
 import type { UpstreamLineSnapshot, UpstreamMachineShift } from '@/services/shoplogix/types'
@@ -142,5 +142,38 @@ describe('página ejecutiva del PDF', () => {
     expect(f.pages).toBe(1)
     expect(endY).toBeLessThan(297 - 14)
     expect(f.all()).toContain('RESULTADO DEL TURNO')
+  })
+})
+
+describe('textoParaPdf · lo que Helvetica no puede dibujar', () => {
+  it('la flecha de la ventana del turno deja de salir como «!»', () => {
+    // Medido sobre el PDF real del 07-09: de 169 cadenas solo esa se rompía, y
+    // jsPDF la pasaba entera a UTF-16 al no encontrar el glifo.
+    expect(textoParaPdf('21:28 → 05:21 · 7 h 53')).toBe('21:28 - 05:21 · 7 h 53')
+  })
+
+  it('deja intactos los acentos y el punto medio, que sí existen en WinAnsi', () => {
+    expect(textoParaPdf('Mantención · pérdida · 78%')).toBe('Mantención · pérdida · 78%')
+  })
+
+  it('cubre las flechas de tendencia y los signos de comparación', () => {
+    expect(textoParaPdf('▲ 3,0 pts · ▼ 4,8 pts')).toBe('+ 3,0 pts · - 4,8 pts')
+    expect(textoParaPdf('≈855 pz · ≥30 · ≤5')).toBe('~855 pz · >=30 · <=5')
+  })
+
+  it('el envoltorio sanea todo lo que se dibuja, no solo la primera llamada', () => {
+    const escrito: string[] = []
+    const doc = {
+      internal: { pageSize: { getWidth: () => 210, getHeight: () => 297 } },
+      setFont() {}, setFontSize() {}, setTextColor() {}, setDrawColor() {},
+      setFillColor() {}, setLineWidth() {}, line() {}, rect() {}, addPage() {},
+      text(t: string | string[]) { escrito.push(...(Array.isArray(t) ? t : [t])) },
+      splitTextToSize(t: string) { return [t] },
+    } as unknown as PdfDoc
+    const seguro = conTextoSeguro(doc)
+    seguro.text('21:28 → 05:21', 0, 0)
+    seguro.text(['▲ sube', '▼ baja'], 0, 0)
+    expect(escrito).toEqual(['21:28 - 05:21', '+ sube', '- baja'])
+    expect(seguro.splitTextToSize('a → b', 100)).toEqual(['a - b'])
   })
 })
