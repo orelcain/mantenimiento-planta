@@ -229,9 +229,21 @@ export function UpstreamCorrelationCard({ pauses, snapshot }: Props) {
                     )
                   })}
                 </div>
-                <div className="text-caption text-muted-foreground mt-1.5">
-                  Recomendación: priorizar mantención en la máquina con mayor overlap.
-                </div>
+                {/* Con el solape repartido parejo no hay a quién priorizar:
+                    el 10-09 salía «priorizar la máquina con mayor overlap» con
+                    36 % / 34 % / 30 % de 5 min, que es elegir por ruido. */}
+                {(() => {
+                  const suma = summary.byMachine.reduce((a, x) => a + x.totalOverlapSec, 0)
+                  const top = summary.byMachine[0]
+                  const share = suma > 0 && top ? (top.totalOverlapSec / suma) * 100 : 0
+                  return (
+                    <div className="text-caption text-muted-foreground mt-1.5">
+                      {share >= 50 && top
+                        ? `Recomendación: priorizar ${shortMachineName(top.machineName)}, que concentra el ${Math.round(share)} % del solape.`
+                        : 'El solape se reparte parejo entre las máquinas: no hay una a la que priorizar.'}
+                    </div>
+                  )
+                })()}
               </div>
             )}
 

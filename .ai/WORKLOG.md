@@ -6,6 +6,44 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-10 · Lo que sobra y lo que se repite: dos afirmaciones sin sustento y tres bloques con el mismo número (PR #936)
+
+Orel: «veamos qué partes están de más y qué partes están duplicadas… simplificar para a
+simple vista tener claro». Inventario de las 6 pestañas a 375 px sobre 2026-09-07 T1
+(Resumen 1.346 · Calidad 1.448 · Gates 3.310 con el plegado cerrado · Línea 4.574 ·
+Mantención 2.411 · ¿Qué hacer? 1.843). Lo que salió no fue solo relleno: dos tarjetas
+afirmaban cosas que sus propios números no sostienen.
+
+**1. «Correlación Baader → P0%» afirmaba causalidad ignorando el R².**
+`scatterSlopeMagnitude` decidía la frase solo por el signo de la pendiente. Medido sobre los
+38 turnos: la tarjeta **afirmaba una dirección en 25 de 28 turnos con datos, y en 14 de ellos
+el R² máximo no llegaba a 0,10**. El mayor R² de todo el histórico es 0,22, y la dirección se
+daba vuelta entre turnos (17 «más línea, menos P0» contra 8 al revés), que es justo lo que
+hace el ruido. La frase era «Confirma que ritmo upstream impacta calidad» con R² 0,00-0,02.
+Ahora el helper devuelve `r2Max` y `explica` (piso `SCATTER_R2_MIN` = 0,10): bajo el piso dice
+«Sin relación visible en este turno · el ritmo de la línea explica el 2 % de la variación del
+P0» y **no muestra la pendiente**, que sale de puntos sin correlación. Sobre el piso describe
+sin la palabra «confirma» y acota el alcance: «Explica el 17 % de la variación de este turno
+— no vale para otros».
+
+**2. «Recomendación: priorizar mantención en la máquina con mayor overlap»** salía con 5 min
+repartidos 36 % / 34 % / 30 % entre las tres Baader: elegir por ruido. Ahora solo aparece si
+una máquina concentra ≥ 50 % del solape; si no, dice que se reparte parejo y que no hay a
+quién priorizar.
+
+**3. Mantención decía el mismo número tres veces.** Los 5 min de falla estaban en el titular y
+otra vez como cifra grande de «Lo que costó»; el MTTR de 1,8 min en el titular y como cifra
+grande de «Nuestra respuesta»; y las máquinas sanas en la frase del titular, en las píldoras y
+en «N de M máquinas sin una sola falla». Ahora cada bloque tiene UNA cifra propia: minutos
+(titular), MTTR (respuesta), piezas (costo, que antes iba en letra chica y es lo único que
+entiende Producción). El mensaje de «la disponibilidad que no se nota» queda una sola vez,
+junto a las píldoras que lo respaldan. 806 → 653 px, pestaña 2.411 → 2.258.
+
+Tests: 3 casos nuevos de `scatterSlopeMagnitude` (bajo el piso no afirma, en el piso sí,
+`r2Max` toma el mayor y no el promedio). Forzado `explica: true`, el test falla con el síntoma
+real. Verificado en el preview a 375 px en ambos temas, con un turno bajo el piso (07-09, R²
+0,02) y otro encima (08-09, R² 0,17).
+
 ## 2026-09-10 · Mapa de peso: banda por tramo de calibre y texto que no escala (PR #935)
 
 Orel, mirando el mapa de la G10 en el PC: «¿de qué nos sirve esto?». Sirve para separar
