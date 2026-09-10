@@ -159,6 +159,8 @@ const GRID_LEFT = 40
 const GRID_RIGHT = 16
 const GRID_TOP = 44
 const CHECKPOINT_PREVIEW = 8
+/** Eventos que entran en el pie del PNG antes de cortar. */
+const PNG_MAX_EVENTOS = 12
 
 function classifyPiece(piece: FirestorePieceRecord, configSnapshots?: GateConfigSnapshot[], ranges?: CalibreWeightRange[]): MatrixP0Cause {
   let activeGates: GateConfigSnapshot['gates'] = []
@@ -540,18 +542,98 @@ export function ShiftTimelineView({
     })
   }, [externalHoverMs, axisAnchorMs])
 
+  /* Los umbrales y el ritmo se leían como rótulos sobre el lienzo, en la misma
+     franja donde se apilaba todo lo demás. Son valores constantes de todo el
+     turno: no necesitan estar anclados a un minuto, alcanza una línea al pie.
+     Las líneas punteadas del gráfico siguen ahí; lo que se fue es el texto. */
+  const cadencia = useMemo(
+    () => computeCadenceStats(timelineBuckets.filter((b) => b.pieces > 0)),
+    [timelineBuckets],
+  )
+  /*
+   * Los tramos entre cambios de compuertas, con el P0 de cada uno: es lo que
+   * convierte la lista en el argumento de la reunión («cambié las compuertas a
+   * las 02:33 y el P0 bajó de 14,2 % a 9,4 %»). Con un solo tramo la lista se
+   * muestra plana: encabezar un único tramo sería ruido.
+   */
+  const tramos = useMemo<TramoConfig[]>(() => {
+    const inicio = productionWindow?.startMs ?? Date.parse(timelineBuckets[0]?.tsMin ?? '')
+    if (!Number.isFinite(inicio)) return []
+    const verdicts = computeSegmentVerdicts(configSnapshots ?? [], timelineBuckets)
+    return tramosDeConfig(configSnapshots ?? [], verdicts, inicio, timelineBuckets)
+  }, [configSnapshots, timelineBuckets, productionWindow])
+  const checkpoints = useMemo(() => {
+    const list: Array<{
+      kind: TipoEventoTurno
+      at: string
+      label: string
+      sub: string
+      verdict?: string
+      p0Pct?: number
+      p0Delta?: number
+    }> = eventosTurno.map((e) => ({
+      kind: e.tipo,
+      at: new Date(e.ms).toISOString(),
+      label: e.titulo,
+      sub: e.detalle ?? '',
+    }))
+
+    // Cargas y acciones traen además su efecto medido, que ya se calculaba.
+    for (const u of shiftDoc?.uploads ?? []) {
+      const fila = list.find((x) => x.kind === 'carga' && Date.parse(x.at) === Date.parse(u.at))
+      if (!fila) continue
+      fila.sub = `${u.byName} · ${u.snapshot.totalPieces.toLocaleString('es-CL')} pzas · P0 ${u.snapshot.p0Pct.toFixed(1)}%`
+      fila.p0Pct = u.snapshot.p0Pct
+    }
+    for (const a of shiftDoc?.actions ?? []) {
+      const fila = list.find((x) => x.kind === 'accion' && Date.parse(x.at) === Date.parse(a.at))
+      if (fila) fila.verdict = a.outcome?.verdict
+    }
+
+    const sorted = list.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime())
+    // Calcular delta P0% entre cargas consecutivas para indicador ▲/▼
+    let lastUploadP0: number | null = null
+    for (const item of sorted) {
+      if (item.kind === 'carga' && item.p0Pct != null) {
+        if (lastUploadP0 != null) {
+          item.p0Delta = +(item.p0Pct - lastUploadP0).toFixed(2)
+        }
+        lastUploadP0 = item.p0Pct
+      }
+    }
+    return sorted
+  }, [shiftDoc, eventosTurno])
+  /** Las filas visibles, con el encabezado del tramo delante de la primera de cada uno. */
+  const filasConTramo = useMemo(() => {
+    const visibles = checkpointsExpanded ? checkpoints : checkpoints.slice(0, CHECKPOINT_PREVIEW)
+    let ultimo: number | null = null
+    return visibles.map((cp) => {
+      const t = tramos.length > 1 ? tramoDe(tramos, Date.parse(cp.at)) : null
+      const abre = t != null && t.n !== ultimo
+      if (t) ultimo = t.n
+      return { cp, tramo: abre ? t : null }
+    })
+  }, [checkpoints, checkpointsExpanded, tramos])
+
   const downloadPNG = useCallback(() => {
     const instance = echartsRef.current?.getEchartsInstance()
     if (!instance) return
     const chartUrl = instance.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: '#111827' }) as string
 
-    // ── Metadata para la cabecera ──────────────────────────────────────────
-    const dateLabel = shiftDoc?.dateKey
-      ? new Date(`${shiftDoc.dateKey}T12:00:00`).toLocaleDateString('es-CL', {
+    /* ── Metadata para la cabecera ─────────────────────────────────────────
+     *
+     * `shiftDoc` no siempre existe —solo se crea cuando alguien registra una
+     * acción o una carga—, y sin él la cabecera del PNG salía «Turno · Fecha
+     * desconocida»: una evidencia sin fechar no sirve para una reunión. El
+     * `summaryId` («2026-09-07__Turno 1») siempre está y trae las dos cosas. */
+    const [idFecha, idTurno] = (summaryId ?? '').split('__')
+    const dateKeyPng = shiftDoc?.dateKey || idFecha || ''
+    const dateLabel = /^\d{4}-\d{2}-\d{2}$/.test(dateKeyPng)
+      ? new Date(`${dateKeyPng}T12:00:00`).toLocaleDateString('es-CL', {
           weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
         })
       : 'Fecha desconocida'
-    const shiftLabel = shiftDoc?.shiftId ?? 'Turno'
+    const shiftLabel = shiftDoc?.shiftId || idTurno || 'Turno'
 
     // Rango visible: convertir porcentaje de zoom a timestamps reales
     const activeBuckets = timelineBuckets.filter(b => b.pieces > 0)
@@ -574,14 +656,48 @@ export function ShiftTimelineView({
       ? '#94a3b8'
       : p0StatusHex(p0StatusFromPct(p0Pct, { alert: alertThreshold, critical: criticalThreshold }))
 
-    // ── Componer canvas: cabecera + chart ──────────────────────────────────
+    /* ── Pie del PNG: los eventos con sus palabras ─────────────────────────
+     *
+     * Desde el riel (#939) el gráfico lleva glifos sin texto y las palabras
+     * viven en la lista HTML, que no se exporta: un PNG con «◈» y «▮» sueltos
+     * no le sirve a nadie en una reunión. El pie repite la lista —tramo, hora,
+     * glifo y título— y la franja de umbrales y ritmo. */
+    const filasPng: Array<{ tramo: string | null; hora: string; glifo: string; color: string; texto: string }> = []
+    {
+      let ultimo: number | null = null
+      for (const cp of checkpoints.slice(0, PNG_MAX_EVENTOS)) {
+        const t = tramos.length > 1 ? tramoDe(tramos, Date.parse(cp.at)) : null
+        const abre = t != null && t.n !== ultimo
+        if (t) ultimo = t.n
+        filasPng.push({
+          tramo: abre && t
+            ? `Tramo ${t.n}${t.snapshotAt ? ` · desde las ${fmtTime(t.snapshotAt)}` : ' · desde el inicio'}${t.p0Pct != null ? ` · P0 ${t.p0Pct.toFixed(1)} %` : ''}${t.delta != null ? ` ${t.delta < 0 ? '▼' : '▲'} ${Math.abs(t.delta).toFixed(1)} pts` : ''}`
+            : null,
+          hora: fmtTime(cp.at),
+          glifo: RIEL_GLIFO[cp.kind],
+          color: RIEL_COLOR[cp.kind],
+          texto: [cp.label, cp.sub].filter(Boolean).join(' · '),
+        })
+      }
+    }
+    const constantesPng = [
+      `Umbrales de P0: alerta ${alertThreshold ?? DEFAULT_P0_ALERT_PCT} % · crítico ${criticalThreshold ?? DEFAULT_P0_CRITICAL_PCT} %`,
+      cadencia.typicalPzMin != null ? `ritmo típico ${Math.round(cadencia.typicalPzMin)} pz/min` : '',
+      cadencia.bestSustained10MinPzMin != null ? `máximo sostenido en 10 min ${Math.round(cadencia.bestSustained10MinPzMin)}` : '',
+    ].filter(Boolean).join(' · ')
+
+    // ── Componer canvas: cabecera + chart + pie ────────────────────────────
     const img = new Image()
     img.onload = () => {
       const W = img.width
       const HEADER_H = Math.round(W * 0.055)   // ~5.5% del ancho → ~88px a 1600px
+      const base0 = Math.round(W * 0.016)
+      const FILA_H = Math.round(base0 * 1.9)
+      const nLineas = filasPng.length + filasPng.filter((f) => f.tramo).length + (constantesPng ? 1 : 0)
+      const FOOT_H = nLineas > 0 ? Math.round(base0 * 2.2) + nLineas * FILA_H : 0
       const canvas = document.createElement('canvas')
       canvas.width = W
-      canvas.height = img.height + HEADER_H
+      canvas.height = img.height + HEADER_H + FOOT_H
       const ctx = canvas.getContext('2d')!
 
       // Fondo cabecera
@@ -615,13 +731,51 @@ export function ShiftTimelineView({
       // Chart
       ctx.drawImage(img, 0, HEADER_H)
 
+      // Pie: umbrales y la lista de eventos con sus palabras
+      if (FOOT_H > 0) {
+        const x0 = Math.round(W * 0.013)
+        let y = HEADER_H + img.height
+        ctx.fillStyle = '#111827'
+        ctx.fillRect(0, y, W, FOOT_H)
+        ctx.fillStyle = 'rgba(148,163,184,0.35)'
+        ctx.fillRect(x0, y, W - x0 * 2, 1)
+        y += Math.round(base0 * 1.9)
+        if (constantesPng) {
+          ctx.fillStyle = '#94a3b8'
+          ctx.font = `${base0}px system-ui,sans-serif`
+          ctx.fillText(constantesPng, x0, y)
+          y += FILA_H
+        }
+        for (const f of filasPng) {
+          if (f.tramo) {
+            ctx.fillStyle = '#cbd5e1'
+            ctx.font = `600 ${base0}px system-ui,sans-serif`
+            ctx.fillText(f.tramo, x0, y)
+            y += FILA_H
+          }
+          ctx.fillStyle = f.color
+          ctx.font = `${Math.round(base0 * 1.1)}px system-ui,sans-serif`
+          ctx.fillText(f.glifo, x0 + Math.round(base0 * 0.6), y)
+          ctx.fillStyle = '#94a3b8'
+          ctx.font = `${base0}px system-ui,sans-serif`
+          ctx.fillText(f.hora, x0 + Math.round(base0 * 2.2), y)
+          ctx.fillStyle = '#e2e8f0'
+          ctx.fillText(f.texto, x0 + Math.round(base0 * 6), y)
+          y += FILA_H
+        }
+        if (checkpoints.length > PNG_MAX_EVENTOS) {
+          ctx.fillStyle = '#64748b'
+          ctx.fillText(`+${checkpoints.length - PNG_MAX_EVENTOS} eventos más en la app`, x0, y)
+        }
+      }
+
       const a = document.createElement('a')
       a.href = canvas.toDataURL('image/png')
       a.download = `timeline-${shiftDoc?.id ?? 'turno'}.png`
       a.click()
     }
     img.src = chartUrl
-  }, [shiftDoc, timelineBuckets, zoomState, summaryP0Pct, alertThreshold, criticalThreshold])
+  }, [shiftDoc, summaryId, timelineBuckets, zoomState, summaryP0Pct, alertThreshold, criticalThreshold, checkpoints, tramos, cadencia])
 
   // Indexar piezas con peso por su causa clasificada (cliente-side)
   const piecesByCause = useMemo(() => {
@@ -1287,81 +1441,9 @@ export function ShiftTimelineView({
    * que los cambios de lote, de compuertas y las pausas solo existían como
    * rótulos sobre el lienzo — que era justamente lo que se pisaba.
    */
-  const checkpoints = useMemo(() => {
-    const list: Array<{
-      kind: TipoEventoTurno
-      at: string
-      label: string
-      sub: string
-      verdict?: string
-      p0Pct?: number
-      p0Delta?: number
-    }> = eventosTurno.map((e) => ({
-      kind: e.tipo,
-      at: new Date(e.ms).toISOString(),
-      label: e.titulo,
-      sub: e.detalle ?? '',
-    }))
 
-    // Cargas y acciones traen además su efecto medido, que ya se calculaba.
-    for (const u of shiftDoc?.uploads ?? []) {
-      const fila = list.find((x) => x.kind === 'carga' && Date.parse(x.at) === Date.parse(u.at))
-      if (!fila) continue
-      fila.sub = `${u.byName} · ${u.snapshot.totalPieces.toLocaleString('es-CL')} pzas · P0 ${u.snapshot.p0Pct.toFixed(1)}%`
-      fila.p0Pct = u.snapshot.p0Pct
-    }
-    for (const a of shiftDoc?.actions ?? []) {
-      const fila = list.find((x) => x.kind === 'accion' && Date.parse(x.at) === Date.parse(a.at))
-      if (fila) fila.verdict = a.outcome?.verdict
-    }
 
-    const sorted = list.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime())
-    // Calcular delta P0% entre cargas consecutivas para indicador ▲/▼
-    let lastUploadP0: number | null = null
-    for (const item of sorted) {
-      if (item.kind === 'carga' && item.p0Pct != null) {
-        if (lastUploadP0 != null) {
-          item.p0Delta = +(item.p0Pct - lastUploadP0).toFixed(2)
-        }
-        lastUploadP0 = item.p0Pct
-      }
-    }
-    return sorted
-  }, [shiftDoc, eventosTurno])
 
-  /* Los umbrales y el ritmo se leían como rótulos sobre el lienzo, en la misma
-     franja donde se apilaba todo lo demás. Son valores constantes de todo el
-     turno: no necesitan estar anclados a un minuto, alcanza una línea al pie.
-     Las líneas punteadas del gráfico siguen ahí; lo que se fue es el texto. */
-  const cadencia = useMemo(
-    () => computeCadenceStats(timelineBuckets.filter((b) => b.pieces > 0)),
-    [timelineBuckets],
-  )
-
-  /*
-   * Los tramos entre cambios de compuertas, con el P0 de cada uno: es lo que
-   * convierte la lista en el argumento de la reunión («cambié las compuertas a
-   * las 02:33 y el P0 bajó de 14,2 % a 9,4 %»). Con un solo tramo la lista se
-   * muestra plana: encabezar un único tramo sería ruido.
-   */
-  const tramos = useMemo<TramoConfig[]>(() => {
-    const inicio = productionWindow?.startMs ?? Date.parse(timelineBuckets[0]?.tsMin ?? '')
-    if (!Number.isFinite(inicio)) return []
-    const verdicts = computeSegmentVerdicts(configSnapshots ?? [], timelineBuckets)
-    return tramosDeConfig(configSnapshots ?? [], verdicts, inicio, timelineBuckets)
-  }, [configSnapshots, timelineBuckets, productionWindow])
-
-  /** Las filas visibles, con el encabezado del tramo delante de la primera de cada uno. */
-  const filasConTramo = useMemo(() => {
-    const visibles = checkpointsExpanded ? checkpoints : checkpoints.slice(0, CHECKPOINT_PREVIEW)
-    let ultimo: number | null = null
-    return visibles.map((cp) => {
-      const t = tramos.length > 1 ? tramoDe(tramos, Date.parse(cp.at)) : null
-      const abre = t != null && t.n !== ultimo
-      if (t) ultimo = t.n
-      return { cp, tramo: abre ? t : null }
-    })
-  }, [checkpoints, checkpointsExpanded, tramos])
 
   const hasData = timelineBuckets.some(b => b.pieces > 0)
 

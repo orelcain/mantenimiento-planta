@@ -380,10 +380,11 @@ export function buildRielMarkLines(marcadores: readonly MarcadorRiel[]): object[
         show: true,
         position: 'insideEndTop' as const,
         distance: 6,
-        formatter: n > 1 ? `${m.glifo} ${n}` : m.glifo,
+        // Sin espacio ni `lineHeight`: con «◈ 3» ECharts partía la píldora en
+        // dos renglones y el número salía de costado, girado.
+        formatter: n > 1 ? `${m.glifo}${n}` : m.glifo,
         color,
         fontSize: 11,
-        lineHeight: 14,
         padding: [2, 5, 2, 5],
         borderRadius: 4.5,
         backgroundColor: 'rgba(15,23,42,0.92)',
