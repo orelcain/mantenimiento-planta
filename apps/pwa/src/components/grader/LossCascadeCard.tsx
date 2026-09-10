@@ -483,7 +483,7 @@ export function LossCascadeCard({
               <span className="w-2 h-2 rounded-ctl shrink-0 bg-amber-400" />
               <span>
                 Resaltando: <b>{causeMachine.label}</b> en <b>{causeMachine.machine}</b>
-                <span className="text-muted-foreground"> · mira las bandas amarillas en el Gantt de esa máquina y en la velocidad upstream</span>
+                <span className="text-muted-foreground"> · mira las bandas amarillas en la velocidad upstream</span>
               </span>
               <button
                 type="button"
