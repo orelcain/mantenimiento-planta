@@ -16,7 +16,7 @@
  * Umbrales: ≥95 ok · 85–95 atención · <85 crítico. El 85 es el mismo 15 % de
  * mezcla con el que GraderGatesLector ya avisa en el dashboard de la carga.
  */
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import ReactECharts from 'echarts-for-react'
 import type { EChartsOption } from 'echarts'
@@ -34,7 +34,7 @@ import {
 } from '@/services/grader/graderPurezaNivel'
 import type { GateAssignment, CalibreWeightRange } from '@/services/grader/types'
 import type { P0SinPuerta } from '@/services/grader/graderGate0Store'
-import { CAUSA_ORDER, normalizarCalibre, dimensionIntrusa, bloqueDe, parseWallClock, type CausaTipo, type GateCauses, type GateCauseGroup, type SeteoMaquina, type PesoPorPuerta, type SolapeDeRango, type CambioDePrograma, type MezclaPuerta, type MapaPeso, type DimensionMezcla, type GateObservations, type ComposicionCombo } from '@/services/grader/graderGateObservations'
+import { CAUSA_ORDER, normalizarCalibre, tramosDeCalibre, dimensionIntrusa, bloqueDe, parseWallClock, type CausaTipo, type GateCauses, type GateCauseGroup, type SeteoMaquina, type PesoPorPuerta, type SolapeDeRango, type CambioDePrograma, type MezclaPuerta, type MapaPeso, type DimensionMezcla, type GateObservations, type ComposicionCombo, type TramoCalibre } from '@/services/grader/graderGateObservations'
 import type { FirestorePieceRecord } from '@/services/grader/graderDailySummary.service'
 
 // ⚠ Nunca combinar estas clases de color con text-caption/text-title3 dentro
@@ -648,6 +648,15 @@ function DetalleGate({ mix, entry, cfg, changeBuckets, causas, seteo, onAdoptar,
   const cambios = new Set(changeBuckets ?? [])
   const purezaSinCambios = sinCambios(entry.purityByBucket, changeBuckets)
   const caida = bloqueDeCaida(purezaSinCambios)
+  /* Un tramo por calibre asignado: la banda del mapa sigue los cambios de
+     programa en vez de aplicar el último rango a todo el turno. Si no hay
+     mezcla derivada (sin referencias por bloque) cae al rango único de `peso`. */
+  const tramosPeso = useMemo<TramoCalibre[]>(() => {
+    if (!mapa) return []
+    const porBloque = mezclaPuerta && rangos ? tramosDeCalibre(mapa.celdas, mezclaPuerta.referencias, rangos) : []
+    if (porBloque.length > 0) return porBloque
+    return peso?.rango ? [{ desde: 0, hasta: mapa.celdas.length - 1, ...peso.rango }] : []
+  }, [mapa, mezclaPuerta, rangos, peso])
   const mezclaCalibre = entry.assignedCalibre !== ANY_CALIBRE
     && Object.keys(entry.byCalibre).some((k) => k !== entry.assignedCalibre)
   const mezclaCalidad = Object.keys(entry.byQuality).some((k) => k !== entry.assignedQuality)
@@ -774,11 +783,11 @@ function DetalleGate({ mix, entry, cfg, changeBuckets, causas, seteo, onAdoptar,
       {mapa && (!seteo || seteo.noReconocido) && (
         <div>
           <p className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">Peso, bloque a bloque</p>
-          <div className="mt-1"><MapaPesoSvg mapa={mapa} mix={mix} rango={peso?.rango ?? undefined} /></div>
+          <div className="mt-1"><MapaPesoSvg mapa={mapa} mix={mix} tramos={tramosPeso} /></div>
           {peso && (
             <p className={cn('mt-1 text-footnote', pesoAvisa(peso) ? 'text-ink-warn' : 'text-muted-foreground')} data-testid="pureza-peso-frase">
               {pesoAvisa(peso)
-                ? `${fmtPct(peso.pctFuera)} de las piezas pesan fuera del rango ${peso.rango?.calibre ?? ''} de la app${peso.gramosAbajo ? ` (más livianas: ${fmtKg(peso.gramosAbajo[0])} a ${fmtKg(peso.gramosAbajo[1])})` : ''}${peso.gramosArriba ? ` (más pesadas: ${fmtKg(peso.gramosArriba[0])} a ${fmtKg(peso.gramosArriba[1])})` : ''}. O el rango del Z2 es más ancho que el de la app, o es mezcla real.`
+                ? `${fmtPct(peso.pctFuera)} de las piezas pesan fuera ${tramosPeso.length > 1 ? 'del rango del calibre asignado en cada bloque' : `del rango ${peso.rango?.calibre ?? ''} de la app`}${peso.gramosAbajo ? ` (más livianas: ${fmtKg(peso.gramosAbajo[0])} a ${fmtKg(peso.gramosAbajo[1])})` : ''}${peso.gramosArriba ? ` (más pesadas: ${fmtKg(peso.gramosArriba[0])} a ${fmtKg(peso.gramosArriba[1])})` : ''}. O el rango del Z2 es más ancho que el de la app, o es mezcla real.`
                 : 'El peso de las piezas cae dentro del rango del calibre asignado.'}
             </p>
           )}
@@ -872,8 +881,34 @@ function LeyendaComposicion({ m }: { m: MezclaPuerta }) {
 }
 
 /** Mapa peso × tiempo: bins de 100 g × bloques de 30 min del agregado ya descargado. 0 lecturas. */
-function MapaPesoSvg({ mapa, mix, rango }: { mapa: MapaPeso; mix: GateMix; rango?: { minGrams: number; maxGrams: number; calibre: string } }) {
-  const W = 343, H = 176, L = 36, R = 6, TOP = 8, B = 24
+/**
+ * Mapa de peso: una columna por bloque, una fila por bin de gramos, opacidad =
+ * piezas. La banda encuadra el rango del calibre asignado en cada tramo.
+ *
+ * El SVG se dibuja al ancho REAL del contenedor (no un viewBox de 343 estirado
+ * al 100 %): con el viewBox escalado, en el PC todo se multiplicaba por ~3,2 y
+ * los «5.5» y el «kg» salían a 32 px (Orel, 09-09). Dibujando a escala 1:1 el
+ * texto queda en 10 px siempre y el ancho de más se gasta en celdas anchas y
+ * en más etiquetas de hora.
+ */
+function MapaPesoSvg({ mapa, mix, tramos }: { mapa: MapaPeso; mix: GateMix; tramos: TramoCalibre[] }) {
+  const box = useRef<HTMLDivElement>(null)
+  const [ancho, setAncho] = useState(0)
+  useEffect(() => {
+    const el = box.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(() => setAncho(el.clientWidth))
+    ro.observe(el)
+    setAncho(el.clientWidth)
+    return () => ro.disconnect()
+  }, [])
+  // Escala 1:1 con el contenedor: cualquier mínimo por encima del ancho real
+  // vuelve a escalar (con 300 el texto salía a 12 px en un hueco de 246).
+  // 246 = el ancho de la tarjeta a 375 px, mientras no haya medición.
+  const W = Math.round(Math.min(1200, Math.max(200, ancho || 246)))
+  const H = W < 520 ? 176 : 240
+  // TOP deja aire para el 'kg', que a 11 px se pisaba con el tick de arriba.
+  const L = 36, R = 6, TOP = 20, B = 24
   // Como mucho ~28 filas: si el rango de pesos es más ancho, se agrupan bins.
   const filasCrudas = Math.round((mapa.maxG - mapa.minG) / mapa.binGrams) + 1
   const k = Math.max(1, Math.ceil(filasCrudas / 28))
@@ -899,32 +934,48 @@ function MapaPesoSvg({ mapa, mix, rango }: { mapa: MapaPeso; mix: GateMix; rango
   const ticks: number[] = []
   const tickPaso = Math.max(paso, Math.ceil(nb / 5) * paso)
   for (let g = hi; g >= lo; g -= tickPaso) ticks.push(g)
-  const etiquetasX = Array.from({ length: cols }, (_, i) => i).filter((i) => i % Math.max(1, Math.ceil(cols / 4)) === 0)
-  const bandaTop = rango ? Math.max(TOP, y(rango.maxGrams)) : null
-  const bandaBot = rango ? Math.min(H - B, y(rango.minGrams)) : null
+  // Una etiqueta de hora cada ~46 px: en el PC salen todas, en 375 px cuatro.
+  const cabenX = Math.max(2, Math.floor((W - L - R) / 50))
+  const etiquetasX = Array.from({ length: cols }, (_, i) => i).filter((i) => i % Math.max(1, Math.ceil(cols / cabenX)) === 0)
+  const bandas = tramos.map((t) => {
+    const top = Math.max(TOP, y(t.maxGrams))
+    const bot = Math.min(H - B, y(t.minGrams))
+    const x0 = L + t.desde * cw
+    const x1 = L + Math.min(cols, t.hasta + 1) * cw
+    return { t, top, bot, x0, x1 }
+  }).filter((b) => b.bot > b.top && b.x1 > b.x0)
+  const unaBanda = bandas.length === 1
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" className="text-muted-foreground" data-testid="pureza-mapa-peso"
-      aria-label={`Mapa de peso por bloque de ${mix.bucketMinutes} minutos de la puerta ${mapa.gate}`}>
-      {bandaTop != null && bandaBot != null && bandaBot > bandaTop && (
-        <>
-          <rect x={L} y={bandaTop} width={W - L - R} height={bandaBot - bandaTop} fill="currentColor" opacity="0.10" />
-          <line x1={L} x2={W - R} y1={bandaTop} y2={bandaTop} stroke="currentColor" strokeOpacity="0.5" strokeDasharray="3 3" />
-          <line x1={L} x2={W - R} y1={bandaBot} y2={bandaBot} stroke="currentColor" strokeOpacity="0.5" strokeDasharray="3 3" />
-          <text x={W - R - 3} y={(bandaTop + bandaBot) / 2 + 3.5} textAnchor="end" fontSize="10" fontWeight="600" fill="currentColor" opacity="0.8">rango {rango!.calibre}</text>
-        </>
-      )}
+    <div ref={box} className="w-full">
+    <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} style={{ maxWidth: '100%' }} role="img" className="text-muted-foreground" data-testid="pureza-mapa-peso"
+      aria-label={`Mapa de peso por bloque de ${mix.bucketMinutes} minutos de la puerta ${mapa.gate}${tramos.length > 1 ? `, con ${tramos.length} tramos de calibre` : ''}`}>
+      {bandas.map(({ t, top, bot, x0, x1 }) => (
+        <g key={`${t.desde}-${t.calibre}`}>
+          <rect x={x0.toFixed(1)} y={top.toFixed(1)} width={(x1 - x0).toFixed(1)} height={(bot - top).toFixed(1)} fill="currentColor" opacity="0.10" />
+          <line x1={x0.toFixed(1)} x2={x1.toFixed(1)} y1={top.toFixed(1)} y2={top.toFixed(1)} stroke="currentColor" strokeOpacity="0.5" strokeDasharray="3 3" />
+          <line x1={x0.toFixed(1)} x2={x1.toFixed(1)} y1={bot.toFixed(1)} y2={bot.toFixed(1)} stroke="currentColor" strokeOpacity="0.5" strokeDasharray="3 3" />
+          {/* Con una sola banda la etiqueta va al margen derecho, como siempre;
+              con varias, centrada en su tramo y solo si el tramo le da ancho. */}
+          {unaBanda ? (
+            <text x={W - R - 3} y={(top + bot) / 2 + 3.5} textAnchor="end" fontSize="11" fontWeight="600" fill="currentColor" opacity="0.8">rango {t.calibre}</text>
+          ) : x1 - x0 >= 58 ? (
+            <text x={((x0 + x1) / 2).toFixed(1)} y={(top + bot) / 2 + 3.5} textAnchor="middle" fontSize="11" fontWeight="600" fill="currentColor" opacity="0.8">{t.calibre}</text>
+          ) : null}
+        </g>
+      ))}
       {celdas.map(({ r, c, n }) => (
         <rect key={`${r}-${c}`} x={(L + c * cw).toFixed(1)} y={(TOP + r * ch).toFixed(1)} width={Math.max(0.5, cw - 0.6).toFixed(1)} height={Math.max(0.5, ch - 0.6).toFixed(1)} rx="1.5"
           fill="rgb(var(--brand))" opacity={(0.14 + 0.78 * Math.pow(n / max, 0.72)).toFixed(2)} />
       ))}
       {ticks.map((g) => (
-        <text key={g} x={L - 5} y={(y(g) + 3.5).toFixed(1)} textAnchor="end" fontSize="10" fill="currentColor" className="tabular-nums">{(g / 1000).toFixed(1)}</text>
+        <text key={g} x={L - 5} y={(y(g) + 3.5).toFixed(1)} textAnchor="end" fontSize="11" fill="currentColor" className="tabular-nums">{(g / 1000).toFixed(1)}</text>
       ))}
       {etiquetasX.map((i) => (
-        <text key={i} x={(L + (i + 0.5) * cw).toFixed(1)} y={H - 8} textAnchor="middle" fontSize="10" fill="currentColor" className="tabular-nums">{horaBloque(mix, i)}</text>
+        <text key={i} x={(L + (i + 0.5) * cw).toFixed(1)} y={H - 8} textAnchor="middle" fontSize="11" fill="currentColor" className="tabular-nums">{horaBloque(mix, i)}</text>
       ))}
-      <text x="4" y={TOP + 8} fontSize="10" fill="currentColor">kg</text>
+      <text x={L - 5} y="11" textAnchor="end" fontSize="11" fill="currentColor" opacity="0.8">kg</text>
     </svg>
+    </div>
   )
 }
 

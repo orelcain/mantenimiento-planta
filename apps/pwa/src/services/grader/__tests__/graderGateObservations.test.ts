@@ -3,7 +3,7 @@ import {
   computeGateObservations, deriveGateMix, configTimelineFromSnapshots, realIsoToWallClockMs,
   GATE_OBS_MAX_BUCKETS, GATE_OBS_MAX_COMBOS, OTROS, classifyGateCauses, derivePesoPorPuerta, detectSolapesDeRango, inferirSeteoFaltante,
   detectCambiosDePrograma, wallClockMsToRealIso, rangesFingerprint, normalizarCalibre, CALIBRE_12_UP,
-  deriveMezcla, mapaPesoDePuerta,
+  deriveMezcla, mapaPesoDePuerta, tramosDeCalibre,
 } from '../graderGateObservations'
 import { ANY_CALIBRE, SIN_DATO } from '../graderGateMix'
 import type { GateConfigSnapshot } from '../graderConfigSnapshot.service'
@@ -512,5 +512,70 @@ describe('mapaPesoDePuerta · nivel 1 sin lecturas', () => {
     expect(m.celdas[0]).toEqual({ 4600: 10, 5000: 30 })
     expect(m.celdas[2]).toEqual({ 5200: 5 })
     expect(mapaPesoDePuerta(obs, 3)).toBeNull()
+  })
+})
+
+describe('tramosDeCalibre · la banda del mapa sigue los cambios de programa', () => {
+  const RANGOS = [
+    { calibre: '8-10 lb', label: '8-10 lb', minGrams: 3665, maxGrams: 4990 },
+    { calibre: '10-12 lb', label: '10-12 lb', minGrams: 4990, maxGrams: 5498 },
+  ]
+  const llena = (n: number) => ({ 4000: n })
+  const ref = (calibre: string | null) => (calibre ? { calibre, quality: 'Premium', conservation: null, conservacionInferida: true } : null)
+
+  it('un solo calibre todo el turno → un tramo que cubre todos los bloques', () => {
+    const t = tramosDeCalibre([llena(5), llena(9), llena(3)], [ref('8-10 lb'), ref('8-10 lb'), ref('8-10 lb')], RANGOS)
+    expect(t).toEqual([{ desde: 0, hasta: 2, calibre: '8-10 lb', minGrams: 3665, maxGrams: 4990 }])
+  })
+
+  it('cambio a mitad → dos tramos, cada uno con SU rango', () => {
+    // Antes del 09-09 el mapa dibujaba una sola banda —la del último bloque—
+    // sobre todo el turno: en los 38 turnos eso dejaba 454 piezas encuadradas
+    // contra el rango equivocado.
+    const t = tramosDeCalibre(
+      [llena(4), llena(6), llena(7), llena(2)],
+      [ref('8-10 lb'), ref('8-10 lb'), ref('10-12 lb'), ref('10-12 lb')],
+      RANGOS,
+    )
+    expect(t).toHaveLength(2)
+    expect(t[0]).toMatchObject({ desde: 0, hasta: 1, calibre: '8-10 lb', maxGrams: 4990 })
+    expect(t[1]).toMatchObject({ desde: 2, hasta: 3, calibre: '10-12 lb', minGrams: 4990 })
+  })
+
+  it('un bloque sin piezas no parte la banda', () => {
+    const t = tramosDeCalibre([llena(4), null, llena(6)], [ref('8-10 lb'), ref('8-10 lb'), ref('8-10 lb')], RANGOS)
+    expect(t).toEqual([{ desde: 0, hasta: 2, calibre: '8-10 lb', minGrams: 3665, maxGrams: 4990 }])
+  })
+
+  it('un hueco sin producción no parte la banda ni repite su etiqueta', () => {
+    // El caso real de la G10 del 07-09: entre los dos tramos 8-10 hay un bloque
+    // sin piezas, y `deriveMezcla` deja su referencia en null. Antes salían
+    // tres bandas (con «8-10 lb» escrito dos veces) en vez de dos.
+    const t = tramosDeCalibre(
+      [llena(4), null, llena(6), llena(2)],
+      [ref('8-10 lb'), null, ref('8-10 lb'), ref('8-10 lb')],
+      RANGOS,
+    )
+    expect(t).toEqual([{ desde: 0, hasta: 3, calibre: '8-10 lb', minGrams: 3665, maxGrams: 4990 }])
+  })
+
+  it('la banda no se estira sobre las colas vacías del turno', () => {
+    const t = tramosDeCalibre(
+      [null, llena(4), llena(5), null, null],
+      [ref('8-10 lb'), ref('8-10 lb'), ref('8-10 lb'), ref('8-10 lb'), ref('8-10 lb')],
+      RANGOS,
+    )
+    expect(t).toEqual([{ desde: 1, hasta: 2, calibre: '8-10 lb', minGrams: 3665, maxGrams: 4990 }])
+  })
+
+  it('un tramo sin ninguna pieza no se dibuja', () => {
+    const t = tramosDeCalibre([null, null, llena(6)], [ref('8-10 lb'), ref('8-10 lb'), ref('10-12 lb')], RANGOS)
+    expect(t).toEqual([{ desde: 2, hasta: 2, calibre: '10-12 lb', minGrams: 4990, maxGrams: 5498 }])
+  })
+
+  it('sin asignación o con un calibre que la app no conoce no hay banda', () => {
+    expect(tramosDeCalibre([llena(4)], [null], RANGOS)).toEqual([])
+    expect(tramosDeCalibre([llena(4)], [ref(ANY_CALIBRE)], RANGOS)).toEqual([])
+    expect(tramosDeCalibre([llena(4)], [ref('14-16 lb')], RANGOS)).toEqual([])
   })
 })
