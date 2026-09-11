@@ -10,7 +10,7 @@ import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { useParams, useNavigate, Navigate, useSearchParams } from 'react-router-dom'
 import { logger } from '@/lib/logger'
 import { Button, Card, CardContent, Spinner, Badge } from '@/components/ui'
-import { ArrowLeft, Settings2, AlertCircle, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight, Share2, Copy, Check, QrCode, Download, Tag, FileText, WifiOff, ChevronDown, RefreshCw, Zap, Scale, Sun, Sunset, Moon, Sunrise, Radio, ExternalLink, SlidersHorizontal, Image as ImageIcon } from 'lucide-react'
+import { ArrowLeft, Settings2, AlertCircle, Clock, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight, Share2, Copy, Check, QrCode, Download, Tag, FileText, WifiOff, ChevronDown, RefreshCw, Zap, Scale, Sun, Sunset, Moon, Sunrise, Radio, ExternalLink, SlidersHorizontal, Image as ImageIcon } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { usePermissionsStore } from '@/store'
 import { useAuthStore, useIsAdmin, useIsSupervisor } from '@/store/authStore'
@@ -114,6 +114,29 @@ async function waitUntil(check: () => boolean, timeoutMs: number): Promise<boole
     await new Promise(r => setTimeout(r, 60))
   }
   return check()
+}
+
+/**
+ * Hora de pizarra de un borde de la ventana del turno.
+ *
+ * Los ISO de `ShiftTimeWindow` vienen en la convención wall-clock-as-UTC que
+ * usa Shoplogix (la hora local escrita con sufijo Z), así que se leen con los
+ * getters UTC. Con `toLocaleTimeString` el huso les restaría horas y un turno
+ * que arranca a las 21:30 se anunciaría a las 18:30.
+ */
+function horaDeVentana(iso: string): string {
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return '—'
+  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
+}
+
+/** Espera hasta el arranque, en el formato corto del chip de turno en curso. */
+function formatearEspera(min: number): string {
+  const total = Math.max(0, Math.round(min))
+  if (total < 60) return `${total} min`
+  const h = Math.floor(total / 60)
+  const m = total % 60
+  return m === 0 ? `${h} h` : `${h} h ${m} min`
 }
 
 /** Parsea `YYYY-MM-DD__Turno día` → [dateKey, shiftLabel] */
@@ -649,11 +672,13 @@ export function AnalisisGraderTurnoPage() {
     prevIsOnline.current = isOnline
   }, [isOnline, toast])
 
-  // Auto-refresh cada minuto si el turno está en vivo.
+  // Auto-refresh cada minuto mientras el turno está en vivo o por empezar.
   // Depende solo de `shiftWindow?.status` para evitar resetear el interval
   // en cada tick (el callback re-lee dateKey/shiftLabel via closure estable).
+  // Con el turno PROGRAMADO el tick mantiene viva la cuenta regresiva y hace
+  // que la pantalla pase sola a EN VIVO a la hora de arranque.
   useEffect(() => {
-    if (shiftWindow?.status !== 'live') return
+    if (shiftWindow?.status === 'closed') return
     const id = setInterval(() => {
       setShiftWindow(computeEffectiveWindow())
     }, 60_000)
@@ -1092,8 +1117,11 @@ export function AnalisisGraderTurnoPage() {
       .then(([s, sd]) => {
         if (!s) {
           const win = computeShiftTimeWindow(dateKey, shiftLabel, plantSchedule)
-          if (win.status !== 'live') {
-            setError(`Turno ${shiftLabel} del ${dateKey} no encontrado en el historial.`)
+          // Solo un turno ya CERRADO puede faltar en el historial. Uno que
+          // todavía no empezó no se perdió: no ocurrió, y tiene su propia
+          // tarjeta más abajo. (`shiftLabel` ya trae la palabra "Turno".)
+          if (win.status === 'closed') {
+            setError(`${shiftLabel} del ${dateKey} no encontrado en el historial.`)
           }
           // Si es live: summary=null + error=null → renderiza empty-state con CTA de upload
         } else {
@@ -2124,15 +2152,23 @@ export function AnalisisGraderTurnoPage() {
                   </Badge>
                 )}
                 {shiftWindow && (
+                  /* Tres estados, no dos. El tercero (`future`) se separa por
+                     FORMA —relleno en vez de contorno— para no competir con
+                     EN VIVO, que es el único que pide atención. */
                   <Badge
                     variant="outline"
                     className={`text-caption px-1.5 py-0 shrink-0 ${
                       shiftWindow.status === 'live'
                         ? 'border-red-500/[0.25] text-red-400'
-                        : 'border-muted-foreground/30 text-muted-foreground'
+                        : shiftWindow.status === 'future'
+                          ? 'bg-muted text-foreground border-transparent inline-flex items-center gap-1'
+                          : 'border-muted-foreground/30 text-muted-foreground'
                     }`}
                   >
-                    {shiftWindow.status === 'live' ? 'EN VIVO' : 'CERRADO'}
+                    {shiftWindow.status === 'future' && <Clock className="w-2.5 h-2.5" />}
+                    {shiftWindow.status === 'live'
+                      ? 'EN VIVO'
+                      : shiftWindow.status === 'future' ? 'Programado' : 'CERRADO'}
                   </Badge>
                 )}
               </div>
@@ -2312,8 +2348,10 @@ export function AnalisisGraderTurnoPage() {
         </div>
       )}
 
-      {/* Error real: turno no encontrado y sin datos Shoplogix disponibles */}
-      {error && !upstreamLine.loading && !upstreamLine.snapshot && (
+      {/* Error real: turno no encontrado y sin datos Shoplogix disponibles.
+          Nunca para un turno PROGRAMADO: ahí la ausencia de datos es lo
+          esperado, y pintarla de rojo se lee como pérdida de información. */}
+      {error && !upstreamLine.loading && !upstreamLine.snapshot && shiftWindow?.status !== 'future' && (
         <Card className="border-destructive/40">
           <CardContent className="p-4 flex items-center gap-3 text-destructive">
             <AlertCircle className="w-5 h-5 shrink-0" />
@@ -2482,12 +2520,55 @@ export function AnalisisGraderTurnoPage() {
         </Card>
       )}
 
+      {/* Turno PROGRAMADO — todavía no empieza.
+          `graderShiftStatus` calculaba este estado desde siempre, pero ningún
+          componente lo consumía: todo preguntaba `=== 'live'` y el resto caía en
+          el trato de turno cerrado. Un turno que aún no ocurrió mostraba el badge
+          CERRADO, un banner rojo de "no encontrado en el historial" y "Sin datos
+          registrados" — tres maneras de anunciar la pérdida de datos que nunca
+          existieron. Acá se contesta con el dato que el usuario vino a buscar
+          (cuándo empieza) y con lo único que sí se puede hacer ahora: revisar en
+          Gates cómo quedan las compuertas frente a lo que suele venir. */}
+      {activeView !== 'gates' && !loading && !summary && !upstreamLine.loading
+        && shiftWindow?.status === 'future' && !upstreamLine.snapshot && (
+        <Card className="border-muted-foreground/[0.10]">
+          <CardContent className="p-5 flex flex-col items-center text-center gap-3">
+            <span className="w-12 h-12 rounded-full bg-muted text-muted-foreground flex items-center justify-center shrink-0">
+              <Clock className="w-6 h-6" />
+            </span>
+            <div className="space-y-1">
+              <p className="text-title1 tabular-nums">{horaDeVentana(shiftWindow.startAt)}</p>
+              <p className="text-headline text-foreground">Este turno todavía no empieza</p>
+              {shiftWindow.startsInMin != null && shiftWindow.startsInMin < 24 * 60 && (
+                <p className="text-footnote text-muted-foreground tabular-nums">
+                  Empieza en {formatearEspera(shiftWindow.startsInMin)}
+                </p>
+              )}
+            </div>
+            <Button onClick={() => setActiveView('gates')} className="gap-2 mt-1">
+              <SlidersHorizontal className="w-4 h-4" />
+              Revisar las compuertas
+            </Button>
+            <details className="w-full text-left mt-1">
+              <summary className="text-footnote text-muted-foreground cursor-pointer select-none">
+                ¿Cómo entran los datos de este turno?
+              </summary>
+              <p className="text-footnote text-muted-foreground mt-2 leading-relaxed">
+                Shoplogix sincroniza las Baader solo cada 5 min mientras operan. El Excel de
+                Matrix —P0%, causas y timeline— se carga al cierre del turno, y la captura de
+                la Marel HG se ingresa a mano junto con ese Excel.
+              </p>
+            </details>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Turno sin datos — estado "listo para recibir data"
           Aparece cuando: no hay summary (sin Excel Grader), no hay datos SLX reales,
           y el turno NO está live (ese caso ya tiene su propio card arriba).
           Comunica claramente los 3 canales de ingreso de datos. */}
       {activeView !== 'gates' && !loading && !summary && !upstreamLine.loading
-        && shiftWindow?.status !== 'live'
+        && shiftWindow?.status === 'closed'
         && upstreamLine.source !== 'firestore' && (
         <Card className="border-muted-foreground/[0.10]">
           <CardContent className="p-5 space-y-3">

@@ -17,6 +17,35 @@ describe('computeShiftTimeWindow — Turno día', () => {
     expect(result.remainingMin).toBeGreaterThan(0)
   })
 
+  it('un turno futuro dice cuántos minutos faltan para empezar', () => {
+    // El defecto que motiva el campo: antes de arrancar, `elapsedMin` vale 0 y
+    // `remainingMin`/`progressPct` son null — exactamente igual que un turno
+    // cerrado. La UI no tenía con qué distinguirlos y mostraba CERRADO.
+    const now = new Date('2026-04-17T06:30:00Z')
+    const r = computeShiftTimeWindow('2026-04-17', 'Turno día', SCHEDULE, now)
+    expect(r.status).toBe('future')
+    expect(r.startsInMin).toBe(30)
+  })
+
+  it('un turno vivo o cerrado no reporta minutos para empezar', () => {
+    const vivo = computeShiftTimeWindow('2026-04-17', 'Turno día', SCHEDULE, new Date('2026-04-17T12:00:00Z'))
+    const cerrado = computeShiftTimeWindow('2026-04-17', 'Turno día', SCHEDULE, new Date('2026-04-17T20:00:00Z'))
+    expect(vivo.startsInMin).toBeNull()
+    expect(cerrado.startsInMin).toBeNull()
+  })
+
+  it('con bounds reales de Shoplogix también reporta los minutos que faltan', () => {
+    // El caso de planta: Shoplogix arranca el Turno 1 a las 21:15 y la página
+    // solo tiene esos bounds cuando el doc del turno ya se sincronizó.
+    const now = new Date('2026-09-10T21:05:00Z')
+    const r = computeShiftTimeWindow('2026-09-10', 'Turno 1', SCHEDULE, now, {
+      startAt: new Date('2026-09-10T21:15:00Z'),
+      endAt: new Date('2026-09-11T05:00:00Z'),
+    })
+    expect(r.status).toBe('future')
+    expect(r.startsInMin).toBe(10)
+  })
+
   it('retorna future cuando now es antes del inicio', () => {
     // `Z` (UTC) para que sea independiente del huso del runner: computeShiftTimeWindow
     // compara contra límites wall-clock-as-UTC, así 06:00 < 07:00 (inicio) → future.
