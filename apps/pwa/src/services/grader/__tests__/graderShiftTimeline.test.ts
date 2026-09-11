@@ -18,6 +18,7 @@ const WINDOW: ShiftTimeWindow = {
   progressPct: null,
   elapsedMin: 720,
   remainingMin: null,
+  startsInMin: null,
 }
 
 describe('analyzeSegment', () => {

@@ -6,6 +6,81 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-10 · El turno que todavía no empieza decía CERRADO (PR #946)
+
+Ronda de pulido sobre lo único grande del Análisis de Turno que nunca se había mirado: el
+**turno en vivo**. Todo lo anterior (#934–#945) se revisó sobre turnos cerrados. El defecto
+apareció a los tres minutos de recorrido, antes de que el turno arrancara.
+
+**⚠️⚠️ `graderShiftStatus` calcula tres estados y la UI solo consumía uno.** El tipo es
+`live | closed | future` y `future` se calcula en las tres ramas de `computeShiftTimeWindow`,
+pero **grep sobre todo `src/` no encontró ni un consumidor**: cada pantalla pregunta
+`status === 'live'` y todo lo demás cae en el trato de turno cerrado. Un turno que todavía no
+ocurrió mostraba, a la vez: el badge **CERRADO**, un banner rojo **«Turno Turno 1 del
+2026-09-10 no encontrado en el historial»** (con la palabra duplicada, porque `shiftLabel` ya
+trae «Turno») y la tarjeta **«Sin datos registrados para este turno»** con los tres canales de
+carga. Tres maneras distintas de anunciar la pérdida de datos que nunca existieron.
+
+**Medido en producción esta noche, no en un turno de prueba.** A las **21:15:18**, con el
+Turno 1 ya arrancado según Shoplogix, la pantalla decía CERRADO. El doc del turno
+(`shoplogix/chonchi/shifts/2026-09-10_Turno 1`) **apareció recién a las 21:21:41 — 6 min 41 s**
+después del arranque real, y hasta ese momento la página no tiene los bounds reales y cae al
+horario configurado en la app. Ese horario quedó desfasado del que reporta Shoplogix:
+**Turno 1 configurado 21:30 contra 21:15 real en 28 de 51 turnos** (desfase mediano 15 min) y
+**Turno 2 configurado 09:00 contra 07:15 real en 33 de 64** (105 min). O sea que la ventana
+CERRADO no es un borde teórico: cae justo sobre los primeros minutos de producción. Y fuera de
+esa ventana el estado es alcanzable todo el día — la grilla «Turnos del período» deja abrir el
+turno de hoy que aún no empezó, y las flechas ‹ › navegan a los adyacentes.
+
+**Lo que hay ahora** (mockup de la directora, opción A de tres:
+https://claude.ai/code/artifact/7324adba-28e2-4e59-8e8b-65d3fcec0851):
+
+- Badge **Programado** con reloj. Los tres estados se separan por FORMA —relleno contra
+  contorno— para que el tercero no compita con EN VIVO, que es el único que pide atención.
+  Contraste medido 14:1 en oscuro y equivalente en claro.
+- Tarjeta con la hora de arranque en grande, «Este turno todavía no empieza», la espera
+  («Empieza en 11 h 30 min») y un solo botón. Los tres canales de carga pasan a un `<details>`
+  cerrado: con el turno programado no hay nada que cargar y «Cargar Excel» pedía el informe de
+  cierre de un turno que no ocurrió.
+- El banner rojo y la tarjeta de canales quedan solo para `closed`, que es el único estado en
+  que un turno puede de verdad faltar en el historial.
+- El auto-refresh de 60 s ahora corre también con el turno programado: mantiene viva la cuenta
+  regresiva y hace que la pantalla pase sola a EN VIVO a la hora de arranque, sin recargar.
+
+**La cuenta regresiva se muestra solo dentro de las 24 h.** Con el turno de mañana decía
+«Empieza en 24 h 7 min», y navegando la grilla del mes habría llegado a «718 h 12 min». La
+fecha ya está en el encabezado.
+
+**⚠️ El botón prometía más de lo que la pantalla permite.** Decía «Dejar las compuertas
+listas», pero `ShiftConfigPanel` recibe `allowEdit={status === 'live'}`: en un turno que no
+empezó el panel es de SOLO LECTURA — sin «Cambié gate» ni edición de especie. Se verificó
+clickeándolo, no leyendo el código. Lo que esa pestaña sí ofrece es el contraste contra los
+turnos anteriores («mové una gate del 4-6 al Other»), que es con lo que se decide la
+configuración antes del arranque, así que el botón dice **«Revisar las compuertas»**.
+**No se extendió `allowEdit` a `future` a propósito:** el botón «Cambié gate» guarda con
+`at: new Date()` —la hora del CLIC— y el timeline usa esa marca para clasificar «las piezas
+posteriores» (razón documentada en `GatesHistoryHintCard`). Qué significa esa marca antes de
+que el turno exista no está medido, y la skill de pulido dice no tocar lo que no se pudo
+verificar.
+
+El botón quedó en **40 px** de alto (el `Button` por defecto de la app con `html{font-size:85%}`
+a ≤640 px), no 36 como salía con `size="sm"`. Sigue bajo los 44 px táctiles, pero igualarlo al
+resto es consistencia; subirlo es una decisión del design system, no de esta ronda.
+
+**Campo nuevo:** `ShiftTimeWindow.startsInMin` (null salvo en `future`). Existía el problema de
+que antes del arranque `elapsedMin` se satura en 0 y `progressPct`/`remainingMin` son null —
+exactamente igual que un turno cerrado: no había con qué distinguirlos. Tres tests nuevos, y se
+confirmó que fallan con el síntoma real (`expected undefined to be 30`) revirtiendo el fix.
+
+Verificado a 375 px en los dos temas, sobre los tres estados: programado (turno de mañana),
+en vivo (el Turno 1 de esta noche, ya con la ventana real 21:15–05:00 de Shoplogix) y cerrado
+(06-09, que sigue mostrando el banner y los tres canales, ahora sin el «Turno Turno 1»).
+
+**Fuera de alcance, anotado:** el mismo `future` sin consumidor probablemente afecta a la grilla
+«Turnos del período», que pinta el turno futuro igual que uno cerrado — no se revisó. Y
+`audit-piel` viene reportando −8 clases crudas contra su baseline **desde antes de esta rama**
+(verificado corriéndolo sobre `origin/main` limpio): alguien bajó la deuda sin actualizar el
+baseline.
 ## 2026-09-10 · El monitor público decía «Planned Downtime» y «3 fallas … toda en Li 1» (PR #945)
 
 Ronda de pulido sobre la superficie que nunca se había revisado: el monitor público

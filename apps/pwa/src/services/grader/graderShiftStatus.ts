@@ -19,6 +19,14 @@ export interface ShiftTimeWindow {
   elapsedMin: number
   /** Minutos restantes al cierre (null si ya cerró o es futuro) */
   remainingMin: number | null
+  /**
+   * Minutos que faltan para que el turno EMPIECE (null si ya empezó).
+   *
+   * Existe porque `elapsedMin` se satura en 0 antes del inicio: sin este campo
+   * un turno futuro es indistinguible de uno recién arrancado, y la UI lo
+   * terminaba mostrando como CERRADO.
+   */
+  startsInMin: number | null
 }
 
 function padTwo(n: number): string {
@@ -77,6 +85,9 @@ function windowFromBounds(startDate: Date, endDate: Date, now: Date): ShiftTimeW
     status,
     startAt: startDate.toISOString(),
     endAt: endDate.toISOString(),
+    startsInMin: status === 'future'
+      ? Math.max(0, (startDate.getTime() - now.getTime()) / 60_000)
+      : null,
     progressPct: status === 'live' && durationMin > 0
       ? Math.min(100, Math.max(0, (elapsedMin / durationMin) * 100))
       : null,
@@ -136,6 +147,9 @@ export function computeShiftTimeWindow(
       status,
       startAt: prodStart.toISOString(),
       endAt:   prodEnd.toISOString(),
+      startsInMin: status === 'future'
+        ? Math.max(0, (prodStart.getTime() - now.getTime()) / 60_000)
+        : null,
       progressPct: status === 'live' ? Math.min(100, Math.max(0, (elapsedMin / durationMin) * 100)) : null,
       elapsedMin,
       remainingMin: status === 'live' ? Math.max(0, durationMin - elapsedMin) : null,
@@ -180,7 +194,11 @@ export function computeShiftTimeWindow(
     ? Math.max(0, durationMin - elapsedMin)
     : null
 
-  return { status, startAt, endAt, progressPct, elapsedMin, remainingMin }
+  const startsInMin = status === 'future'
+    ? Math.max(0, (startDate.getTime() - now.getTime()) / 60_000)
+    : null
+
+  return { status, startAt, endAt, progressPct, elapsedMin, remainingMin, startsInMin }
 }
 
 /**
