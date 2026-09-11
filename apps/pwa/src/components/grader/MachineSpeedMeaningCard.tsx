@@ -45,7 +45,14 @@ interface Props {
 const fmt = (n: number) => Math.round(n).toLocaleString('es-CL')
 
 export function MachineSpeedMeaningCard({ machines, className }: Props) {
-  const [abierto, setAbierto] = useState(true)
+  /*
+   * Arranca PLEGADO: el desglose por máquina, la leyenda y la advertencia de
+   * objetivos miden 786 px a 375 px para explicar un gráfico de 232. La
+   * conclusión —cuántas piezas dejó la línea en el camino y por qué— queda
+   * fuera del plegado, arriba: es el titular, no el detalle. Mismo patrón que
+   * el veredicto de origen (#947) y la puerta de Gates (#948).
+   */
+  const [abierto, setAbierto] = useState(false)
   const sync = useTimelineSyncOptional()
 
   /*
@@ -145,7 +152,9 @@ export function MachineSpeedMeaningCard({ machines, className }: Props) {
             )}
           />
         </button>
-        {abierto && (
+        {/* SIEMPRE visible: es la conclusión del bloque. Plegarla junto con el
+            detalle dejaba la tarjeta en un título sin dato. */}
+        {(
           <p className="text-xs text-muted-foreground">
             {sync?.range
               ? 'Del tramo que elegiste en el gráfico. '
@@ -154,9 +163,17 @@ export function MachineSpeedMeaningCard({ machines, className }: Props) {
               : ''}
             {totalPerdido > 0 && s && (
               <>
-                La línea dejó <span className="tabular-nums font-medium text-foreground">{fmt(totalPerdido)}</span> piezas
-                en el camino: <span className="tabular-nums text-ink-warn">{fmt(s.totalPorRitmo)}</span> por ir bajo el
-                ritmo de la línea y <span className="tabular-nums text-ink-crit">{fmt(s.totalPorDetencion)}</span> por
+                {/* La vara va en la frase, no en el tooltip. En la misma pestaña
+                    conviven dos cifras de «piezas perdidas» que NUNCA coinciden
+                    —medido en 7 de 7 turnos, con hasta 7× de diferencia (03-08:
+                    374 acá contra 2.647 en la cascada)— porque se miden contra
+                    varas distintas: acá la cadencia de la línea, allá el máximo
+                    teórico de cada máquina. Sin nombrarlas, la pestaña se
+                    contradice sola. */}
+                Contra la cadencia de la línea dejó{' '}
+                <span className="tabular-nums font-medium text-foreground">{fmt(totalPerdido)}</span> piezas
+                en el camino: <span className="tabular-nums text-ink-warn">{fmt(s.totalPorRitmo)}</span> por ir bajo
+                ritmo y <span className="tabular-nums text-ink-crit">{fmt(s.totalPorDetencion)}</span> por
                 estar detenidas.
               </>
             )}
