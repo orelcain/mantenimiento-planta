@@ -6,6 +6,63 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-11 · La tabla del período ordenaba por el nombre del turno, no por el reloj (PR #955)
+
+Los dos bloques que quedaban sin revisar en Periodo: la tabla «Turnos del período» (470 px) y
+«Comparativa por Turno» (172 px).
+
+## ⚠️ El orden de la tabla contradecía al reloj
+
+El sort comparaba la columna elegida y, **sin desempate**, dejaba los turnos del mismo día en el
+orden en que vinieran del array. Y en Chonchi **los nombres de turno no siguen el reloj**:
+«Turno 1» es la NOCHE (~21:15), «Turno 2» la mañana (~07:15) y «Turno 1 Lunes» arranca a las
+00:00.
+
+El 2026-08-17 es el único día del período con sus tres turnos, y se leía así:
+
+| | orden |
+|---|---|
+| mostraba | 1 (21:19) · 1 Lunes (00:12) · 2 (10:17) |
+| real | 1 Lunes (00:12) · 2 (10:17) · 1 (21:19) |
+
+También el 13-08 salía «1 · 2» cuando el 2 (mañana) ocurrió antes. Los `startAt` verificados en
+Firestore: **los 14 resúmenes recientes lo traen**, así que hay instante real para ordenar.
+
+Es la misma trampa del CSV del turno (#942): **ordenar por la etiqueta —ahí el reloj, acá el
+nombre— en vez de por el instante.** Ahora el desempate va por `startAt` y sigue la dirección
+elegida: con fechas descendentes, dentro del día también se ve primero el más reciente.
+
+## ⚠️ El CSV se llamaba `grader--ltimo-mes.csv`
+
+El slug era `rangeLabel.replace(/[^a-zA-Z0-9-]/g, '-')`, que convierte **cada** carácter no ASCII
+en un guion: «Último mes» perdía la «Ú» y dejaba el guion doble. Ahora los acentos se pliegan a su
+letra base antes de limpiar → **`grader-ultimo-mes.csv`**.
+
+Solo se ve **mirando el archivo que baja**, no la pantalla — como los cinco defectos de las
+exportaciones del turno (#941–#944).
+
+⚠️ **Al plegar acentos, no dejar el rango de marcas combinantes como regex literal.** Escrito
+`/[\u0300-\u036f]/`, el archivo termina guardando los caracteres combinantes de verdad:
+invisibles en el editor y fáciles de romper al copiar (ya pasó con los catálogos BAADER). Acá se
+filtra por código de punto, que se lee sin ambigüedad.
+
+## «Comparativa por Turno»: revisada, sin hallazgo
+
+«Turno 1 Lunes» aparece con **1 turno** junto a otros de 5, con el mismo borde y número de
+semáforo. Se miró con cuidado y **no es un defecto**: el porcentaje está calculado sobre 15.438
+piezas —base más que suficiente— y la tarjeta **escribe su base** («1 turno», piezas y P0 pz).
+Lo que no hay es comparación implícita ni ranking. Se deja como está.
+
+## Verificación
+
+En pantalla: el 17-08 pasa a «1 Lunes · 2 · 1» y el 13-08 a «2 · 1»; el archivo baja como
+`grader-ultimo-mes.csv`. Lógica en `services/grader/graderPeriodoTabla.ts` (módulo puro) con
+**8 tests**, confirmados anulando el desempate: fallan con el orden viejo exacto. `tsc` ·
+`eslint` (27 warnings = las de `main`) · `audit-piel` · `audit-graficos` · **2.281 tests**.
+
+⚠️ **Se repitió la trampa de los backticks**: un comentario con `` `GraderDailySummary` `` pasado
+por `node -e` dentro de bash se ejecutó como sustitución de comando y quedó vacío en el archivo.
+Para texto con backticks o `${}`, SIEMPRE un script `.mjs` escrito con Write.
 ## 2026-09-11 · La tendencia del período comparaba dos ventanas que se pisan (PR #954)
 
 Desglose de «Período analizado» (1.848 px de los 3.146 de la página), que nunca se había mirado.
