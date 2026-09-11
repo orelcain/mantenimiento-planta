@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle, Button } from '@/components/u
 import { Upload, Clock, X, Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { TimelineBucket, MatrixP0Cause, Pause, MicroDetentionsSummary } from '@/services/grader/types'
+import { altoDelTimeline } from '@/services/grader/graderRateChartLayout'
 import type { GraderShiftDoc } from '@/services/grader/graderShifts.service'
 import type { ShiftTimeWindow } from '@/services/grader/graderShiftStatus'
 import type { GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
@@ -1620,7 +1621,7 @@ export function ShiftTimelineView({
           <ReactECharts
             ref={echartsRef}
             option={chartOption}
-            style={{ height: scatterAxisShow ? 360 : 320 }}
+            style={{ height: altoDelTimeline(anchoChart, scatterAxisShow) }}
             theme="dark"
             opts={{ renderer: 'canvas' }}
             notMerge={true}

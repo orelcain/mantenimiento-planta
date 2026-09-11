@@ -40,3 +40,24 @@ export function altoDelGrafico(anchoDisponible: number, filasDeLeyenda: number):
   )
   return plot + filasDeLeyenda * 15
 }
+
+/**
+ * Alto del TIMELINE del turno (`ShiftTimelineView`).
+ *
+ * Tenía alto FIJO (320 px, o 360 con el eje del scatter). Con el contenedor
+ * del turno en 1.760 px pasó a medir 1.689 px de ancho: **ratio 5,3:1** para un
+ * gráfico de barras minuto a minuto de las 8 h del turno, con su riel de
+ * eventos encima.
+ *
+ * A diferencia del gráfico de tasa, acá el piso NO es 108: es el alto que el
+ * timeline ya tenía. Así el teléfono y 1440 px quedan exactamente igual (a
+ * 278 px de ancho la división da 66 y a 1.223 px da 291, los dos por debajo
+ * del piso) y solo crece en monitores anchos.
+ */
+export function altoDelTimeline(anchoDisponible: number, conEjeScatter: boolean): number {
+  const piso = conEjeScatter ? 360 : 320
+  return Math.max(
+    piso,
+    Math.min(ALTO_MAX_PLOT, Math.round(anchoDisponible / RELACION_ANCHO_ALTO)),
+  )
+}

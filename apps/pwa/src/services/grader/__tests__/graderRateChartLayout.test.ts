@@ -3,6 +3,7 @@ import {
   altoDelGrafico,
   ALTO_MIN_PLOT,
   ALTO_MAX_PLOT,
+  altoDelTimeline,
 } from '@/services/grader/graderRateChartLayout'
 
 /**
@@ -52,5 +53,31 @@ describe('altoDelGrafico', () => {
 
   it('cada fila de leyenda suma su alto sin comerse el plot', () => {
     expect(altoDelGrafico(1109, 3) - altoDelGrafico(1109, 1)).toBe(30)
+  })
+})
+
+/**
+ * El timeline del turno tenía alto FIJO (320 px). Con el contenedor del turno
+ * en 1.760 px pasó a 1.689 px de ancho: ratio 5,3:1 para barras minuto a minuto
+ * de 8 h con su riel de eventos.
+ */
+describe('altoDelTimeline', () => {
+  it('el teléfono y 1440 px quedan exactamente como estaban', () => {
+    // Su piso NO es el del gráfico de tasa: es el alto que ya tenía.
+    expect(altoDelTimeline(278, false)).toBe(320)
+    expect(altoDelTimeline(1223, false)).toBe(320)
+    expect(altoDelTimeline(278, true)).toBe(360)
+  })
+
+  it('en un monitor ancho deja de estar achatado', () => {
+    const alto = altoDelTimeline(1689, false)
+    expect(alto).toBeGreaterThan(320)
+    expect(1689 / alto).toBeLessThan(4.5)
+  })
+
+  it('el eje del scatter nunca lo deja más bajo que sin él', () => {
+    for (const ancho of [278, 1223, 1689, 4000]) {
+      expect(altoDelTimeline(ancho, true)).toBeGreaterThanOrEqual(altoDelTimeline(ancho, false))
+    }
   })
 })

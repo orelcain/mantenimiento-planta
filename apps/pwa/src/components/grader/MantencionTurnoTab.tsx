@@ -419,6 +419,20 @@ export function MantencionTurnoTab({ kpis, loading, plantSlug, shiftId, dateKey 
         </section>
       </div>
 
+      {/* ── CARRILES en monitores anchos (≥1700 px) ──────────────────────
+          A 1920 las cuatro secciones de abajo se apilaban a 1.732 px de ancho
+          para contenidos que no lo necesitan: reparto y tendencia son listas
+          de 3 máquinas y el evento es una ficha. Medido: reparto 325 px,
+          evento 140, tendencia 355.
+
+          El reparto se hace por SECUENCIA (los primeros a la izquierda, el
+          resto a la derecha) para que el orden de lectura del teléfono no
+          cambie: [reparto + evento] | [tendencia] = 481 contra 355 px.
+
+          `items-start` es obligatorio: sin él las dos columnas se estiran a la
+          más alta y la corta queda con fondo vacío debajo. */}
+      <div className="grid grid-cols-1 gap-4 min-[1700px]:grid-cols-2 min-[1700px]:items-start">
+        <div className="flex flex-col gap-4">
       {/* ── Reparto del turno ── */}
       <section className="rounded-card border border-border bg-card p-4">
         <Cap>Reparto del turno · {fmtInt(ventanaMin)} min por máquina</Cap>
@@ -482,11 +496,18 @@ export function MantencionTurnoTab({ kpis, loading, plantSlug, shiftId, dateKey 
           </p>
         </section>
       ))}
+        </div>
+
+        {/* Columna derecha: la tendencia, que es el HISTÓRICO. A la izquierda
+            queda todo lo de ESTE turno, en su orden original. */}
+        <div className="flex flex-col gap-4">
 
       {/* ── La tendencia: la alerta temprana que justifica todo esto ── */}
       {shiftId && dateKey && (
         <TendenciaMantencion plantSlug={plantSlug} shiftId={shiftId} hastaDateKey={dateKey} />
       )}
+        </div>
+      </div>
     </div>
   )
 }
