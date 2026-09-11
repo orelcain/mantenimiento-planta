@@ -6,6 +6,65 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-10 · Línea tenía tres cifras de «piezas perdidas» que no coinciden (PR #949)
+
+Sigue la simplificación con la vara de Calidad. Desglose de Línea a 375 px (3.790 px):
+encabezado y KPIs 252 · **Tasa de producción 1.018** (gráfico 232 + «¿Qué significa ese ritmo?»
+**786**) · **Cascada del turno 1.152** (uso por máquina 252 · perdidas por causal 236 · pausas
+planificadas 150) · **Imputación 473** · veredicto de origen 198.
+
+**⚠️⚠️ Tres cifras de «piezas perdidas» en la misma pestaña, con tres varas distintas y sin
+nombrar ninguna.** Medido en pantalla sobre 7 turnos:
+
+| Turno | «dejó N en el camino» | «bajo el máximo teórico» | «pérdida neta» |
+|---|---|---|---|
+| 2026-09-07 | 1.341 | 727 | 0 |
+| 2026-09-08 | 863 | 481 | 0 |
+| 2026-08-17 T1 | 2.774 | 2.615 | 1.142 |
+| 2026-08-13 T2 | 2.188 | 1.387 | 0 |
+| **2026-08-03 T2** | **374** | **2.647** | 0 |
+| 2026-08-11 T2 | 1.492 | 1.424 | 0 |
+| 2026-07-31 T1 | 2.817 | 3.282 | 2.508 |
+
+**7 de 7 turnos difieren**, con hasta **7× de diferencia** (03-08: 374 contra 2.647, y encima
+en dirección opuesta al resto). Y en **5 de 7** la pestaña remata con «pérdida neta 0» debajo
+de un bloque que anuncia entre 374 y 2.188 piezas perdidas.
+
+Cada una es correcta en su propia definición: la primera mide contra la **cadencia de la línea**
+(mediana de las máquinas que produjeron), la segunda contra el **máximo teórico de cada máquina**
+(`piezasMax − piezasReales` del techo), la tercera descuenta lo que rescató la línea manual.
+Juntas, sin sujeto, la pestaña se contradice sola. Ahora cada cifra nombra su vara en la misma
+frase —mismo remedio que el chip «Línea 68 % del target oficial» (#942)—:
+
+- «**Contra la cadencia de la línea** dejó 1.341 piezas en el camino: 86 por ir bajo ritmo y
+  1.255 por estar detenidas.»
+- «Piezas perdidas por causal · 727 pz bajo el **máximo teórico de cada máquina**»
+- «→ **neta de máquina** 0»
+
+**Regla:** cuando dos bloques de la misma pantalla publican la misma magnitud con distinta vara,
+no alcanza con que el tooltip lo explique — la vara va en la frase. Se caza leyendo la pantalla
+de corrido, no bloque por bloque.
+
+## Y la simplificación: 3.790 → 3.147 px (−17 %)
+
+`MachineSpeedMeaningCard` arrancaba con `useState(true)`: 786 px desplegados en cada carga para
+explicar un gráfico de 232, y sin recordar el estado. Ahora arranca plegado **con la conclusión
+fuera del plegado**: cerrarlo dejaba la tarjeta en un título sin dato, que es el error opuesto
+al que veníamos arreglando. Mismo patrón que el veredicto de origen (#947) y la puerta de Gates
+(#948): el titular se lee sin tocar nada, el detalle se abre si se busca.
+
+Al abrirlo vuelve todo (desglose por máquina, leyenda, aviso de objetivos distintos, «Ctrl +
+rueda»). Verificado a 375 px en los dos temas (titular a 9,2:1 en claro) y sobre los dos turnos
+extremos de la tabla.
+
+**Lo que NO se tocó:** la línea «6.005 pz · 16.4 pz/min» de «Uso real por máquina» repite lo que
+ya dice el bloque de ritmo, pero tiene una decisión deliberada documentada encima («sin esto,
+dos máquinas con el mismo % de uso se veían iguales aunque una produjera el triple») y ahí
+contrasta con el % de uso, que el otro bloque no tiene.
+
+**Trampa de medición, otra vez:** el `resize_window` se pierde al navegar. Hay que incluirlo
+DENTRO del mismo `browser_batch` que navega, y confirmar `window.innerWidth` en cada medición
+(dos veces en esta ronda salieron números de escritorio disfrazados de teléfono).
 ## 2026-09-10 · Gates abría el detalle de una puerta que ella misma muestra pura (PR #948)
 
 **⚠️⚠️ Antes que nada, una corrección de MEDICIÓN.** La ronda anterior registró «Gates 5.551 px»
