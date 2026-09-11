@@ -6,6 +6,61 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-11 · Wizard y Dashboard salieron limpios; el aplastado estaba en Periodo (PR #953)
+
+Las tres pantallas del módulo que recibieron el tope de 1.760 px en #951 pero nunca se
+recorrieron a ese ancho.
+
+## Wizard y Dashboard: medí y no había nada
+
+A 1920 el wizard mide **1.760 × 1.780 px**, **cero desbordes horizontales** y **ningún canvas**
+aplastado. Su parte superior **ya venía en dos columnas** (873 + 873: «Planta Principal» con los
+KPIs a la izquierda, «Resumen del mes» a la derecha) y la matriz de turnos del mes usa el ancho
+completo con celdas de 51 px para los 30 días. El tope nuevo (venía de 1.869 px) **no apretó
+nada**: era lo que había que verificar y quedó verificado.
+
+Aclaración de mapa que conviene anotar: **`AnalisisGraderDashboardPage` no es una ruta.** Se
+monta DENTRO del wizard (`AnalisisGraderWizardPage.tsx:1069`), así que lo que se ve como
+«dashboard» —Indicadores de Rendimiento, Resumen del mes, Turnos del período, OEE del área,
+Paros de etapa— ya estaba cubierto al medir el wizard. Su `max-w-[1760px]` queda redundante con
+el del wizard, pero es inocuo (mismo valor).
+
+## ⚠️ Periodo: el tercer gráfico aplastado
+
+`/analisis-grader/periodo` mide 3.062 px y es la página más larga del módulo. Su serie
+«Tendencia P0% diaria» estaba en **1.689 × 280 px, ratio 6:1**.
+
+La causa es distinta de las dos anteriores y por eso vale registrarla: no era una fórmula mal
+calibrada (#950) ni un alto fijo en JS (#952), sino **una clase Tailwind que topa en un
+breakpoint**: `h-64 lg:h-80`. `lg` es 1024 px — de ahí en adelante el alto **no vuelve a crecer**
+mientras el ancho sí, así que cuanto más grande el monitor, más achatada la serie.
+
+Ahora `h-64 lg:h-80 min-[1700px]:h-[26rem]` → **1.689 × 364 (4,6:1)**.
+
+**Los otros dos charts del archivo NO se tocaron**: viven en media columna, miden 816 px de ancho
+y ya dan 3,6:1. El criterio es la relación de aspecto, no el alto en sí.
+
+**Tres causas distintas para el mismo síntoma**, ya vistas en tres rondas seguidas:
+1. fórmula que depende de la leyenda y no del ancho (#950),
+2. alto fijo en JS sin relación con el ancho (#952),
+3. clase responsive que topa en `lg` (este PR).
+Al auditar un gráfico en PC conviene preguntarse **de dónde sale su alto**, no solo medirlo.
+
+## Verificación
+
+| | 375 | 1440 | 1920 |
+|---|---|---|---|
+| Tendencia P0 (Periodo) | 278 × 256 | 1.318 × 280 | **1.689 × 364** |
+
+1440 y el teléfono quedan **idénticos** (el breakpoint es 1700). `tsc` · `eslint` (27 warnings =
+las de `main`) · `audit-piel` · `audit-graficos` · **2.267 tests**.
+
+**Sin test unitario, a propósito:** el cambio es una clase CSS, no lógica — no hay función que
+testear. Se verificó en el navegador en los tres anchos.
+
+⚠️ **Trampa de esta ronda:** un comentario JSX `{/* … */}` **no puede ir dentro de un ternario**
+(`cond ? ( … ) : ( … )`). El parche lo insertó ahí y rompió el build con cuatro errores de
+sintaxis a la vez; va sobre el `<CardContent>`, fuera de la expresión.
 ## 2026-09-11 · Calidad y Mantención con el ancho nuevo (PR #952)
 
 Cierra la vista PC del detalle del turno: las dos pestañas que habían quedado en una sola

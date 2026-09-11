@@ -798,13 +798,18 @@ export function GraderPeriodView({ data }: Props) {
             </p>
           )}
         </CardHeader>
+        {/* Alto de las dos series temporales de ancho completo: `lg:h-80` topa
+            en 1024 px y no volvía a crecer, así que con el módulo en 1.760 px
+            (#951) la tendencia P0 quedaba en 1.689 × 280 — ratio 6:1. Los dos
+            charts de media columna de más abajo se quedan en `h-64`: miden
+            816 px de ancho y ya dan 3,6:1. */}
         <CardContent>
           {useHourlyView && hourlyChartData ? (
-            <div className="h-64 lg:h-80">
+            <div className="h-64 lg:h-80 min-[1700px]:h-[26rem]">
               <Line data={hourlyChartData} options={hourlyChartOptions as any} />
             </div>
           ) : trendChartData ? (
-            <div className="h-64 lg:h-80">
+            <div className="h-64 lg:h-80 min-[1700px]:h-[26rem]">
               <Line ref={trendChartRef} data={trendChartData} options={trendChartOptions as any} />
             </div>
           ) : (
