@@ -6,6 +6,64 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-11 · La tendencia del período comparaba dos ventanas que se pisan (PR #954)
+
+Desglose de «Período analizado» (1.848 px de los 3.146 de la página), que nunca se había mirado.
+El defecto no estaba en el layout sino en lo que la página **afirma**.
+
+## ⚠️⚠️ «Tendencia período» se calculaba con ventanas solapadas
+
+```js
+const firstAvg = avg(dailyP0Series.slice(0, 7).map(d => d.p0Pct))
+const lastAvg  = avg(dailyP0Series.slice(-7).map(d => d.p0Pct))
+```
+
+Con **menos de 14 días** esas dos ventanas **comparten días**:
+
+| días del período | comparten |
+|---|---|
+| 7 | 7 de 7 (100 %) — la ventana contra sí misma, delta 0 |
+| 8 | 6 de 7 (86 %) |
+| 10 | 4 de 7 (57 %) |
+| 12 | 2 de 7 (29 %) |
+| 14+ | 0 |
+
+Y no es un caso de borde: la temporada 2026-27 arrancó con **7 días de datos en agosto y 4 en
+septiembre**, así que **el período por defecto de la página son 8 días (86 % de solape)** y el
+«último trimestre» **12 (29 %)**. Justo cuando más se mira el panel, al arrancar la temporada.
+
+**El otro extremo es igual de malo.** Con «Temporada» (228 días), la tendencia se decidía con
+**14 días de 228** —los 7 primeros y los 7 últimos—, o sea tirando el **94 %** de los datos.
+
+Ahora se comparan las **dos mitades del período**, que nunca se solapan, y el pie dice **sobre
+cuántos días** se calculó cada promedio. Medido en pantalla, antes → después:
+
+| Período | Antes | Ahora |
+|---|---|---|
+| 8 días (defecto) | inicio 3.29 % → fin 3.15 % (**−0.14pp**) | primeros 4 días 3.15 % → últimos 4 3.25 % (**+0.11pp**) |
+| 12 días (trimestre) | inicio 3.87 % → fin 3.15 % (−0.71pp) | primeros 6 días 3.95 % → últimos 6 3.24 % (−0.7pp) |
+| 228 días (temporada) | 7 contra 7 días | primeros 114 días 4.91 % → últimos 114 3.70 % (−1.21pp) |
+
+⚠️ **Con 8 días el signo se daba vuelta**: el cálculo viejo decía −0,14 pp (bajando) y el nuevo
+da +0,11 pp (subiendo). La etiqueta «Estable» coincidía por casualidad, no porque midiera bien.
+
+## Y «Mejor semana» elegía entre dos candidatas casi idénticas
+
+El loop de ventanas de 7 días con un período de 8 solo tiene **dos posiciones posibles, y
+comparten 6 días**. Decir «la mejor semana» ahí se lee como una elección entre muchas. Ahora
+exige **≥ 14 días** (`hayMejorSemana`): desaparece en los períodos de 8 y 12, y vuelve con
+«Temporada», donde sí significa algo.
+
+**Regla, otra vez la misma de #936 y #940:** antes de publicar una conclusión derivada, mirar
+sobre qué base se calculó — y si esa base se pisa consigo misma, no hay comparación.
+
+## Verificación
+
+Los tres períodos revisados en pantalla (8, 12 y 228 días), ambos temas. La lógica salió a
+`services/grader/graderTendenciaPeriodo.ts` (módulo puro, como `graderPurezaNivel`) con **6
+tests**, confirmados volviendo al `slice(0,7)`/`slice(-7)`: fallan con el síntoma real
+(`expected 3.29 to be 5` — el promedio diluido por el solape). `tsc` · `eslint` (27 warnings =
+las de `main`) · `audit-piel` · `audit-graficos` · **2.273 tests**.
 ## 2026-09-11 · Wizard y Dashboard salieron limpios; el aplastado estaba en Periodo (PR #953)
 
 Las tres pantallas del módulo que recibieron el tope de 1.760 px en #951 pero nunca se
