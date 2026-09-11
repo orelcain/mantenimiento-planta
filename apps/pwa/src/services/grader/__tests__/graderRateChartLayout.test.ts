@@ -33,6 +33,14 @@ describe('altoDelGrafico', () => {
     }
   })
 
+  it('el contenedor ancho del turno (1.760 px) no vuelve a achatarlo', () => {
+    // Al subir el tope de la página a 1.760 px el gráfico pasó a 1.703 px de
+    // ancho; con el techo viejo de 280 quedaba en ratio 5,8:1 — el mismo
+    // achatamiento que este módulo evita, provocado por ensanchar la página.
+    const alto = altoDelGrafico(1703, 1)
+    expect(1703 / alto).toBeLessThan(4.5)
+  })
+
   it('no crece sin fin en un monitor muy ancho', () => {
     expect(altoDelGrafico(4000, 1)).toBe(ALTO_MAX_PLOT + 15)
   })

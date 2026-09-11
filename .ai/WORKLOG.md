@@ -6,6 +6,72 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-11 · Abrir un turno encogía la página 590 px (PR #951)
+
+Segunda ronda de vista PC. El punto de partida era «sobra aire en monitores anchos», pero al
+medir apareció la causa real: **la página del turno se encoge respecto de la pantalla desde la
+que se entra**.
+
+| Viewport | Contenido del turno | Aire | % |
+|---|---|---|---|
+| 1440 | 1.138 px | 7 px | 1 % |
+| 1920 | **1.280 px** | **631 px** | **33 %** |
+| 2560 | **1.280 px** | **1.271 px** | **50 %** |
+
+**El listado (`AnalisisGraderWizardPage`, sin tope) mide 1.869 px a 1920 y el detalle 1.280:
+abrir un turno angostaba la página 590 px.** No era un criterio de legibilidad aplicado con
+coherencia — era una inconsistencia dentro del mismo módulo.
+
+Mockup con las tres opciones a 1440/1920/2560 y sus descartes:
+https://claude.ai/code/artifact/469e337c-ba0f-4201-b4ef-7199933bd03c — Orel eligió la recomendada
+(**C · Carriles**).
+
+### Por qué NO era «estirar todo»
+
+Medido antes de decidir: los párrafos de Línea **ya caben en una sola línea a 1.223 px**, con
+hasta **157 caracteres**. Estirarlos a 1.900 px los empeora (lo cómodo son 45-75). El ancho lo
+aprovecha **un solo bloque**: el gráfico de tasa, que es una serie de las 8 h del turno con 3
+Baader — ahí cada píxel es resolución temporal.
+
+Otro dato que acotó la decisión: **quitar el `max-w-screen-xl` no da ancho libre**. El proyecto
+no personaliza `container` ni `screens`, así que el `container` de Tailwind ya topa en 1536 —
+sacarlo habría dejado 375 px de aire a 1920 y un salto de 333 px.
+
+### Lo construido
+
+**Un solo ancho de módulo: `max-w-[1760px]`** en Wizard, Turno, Dashboard y Periodo.
+`AnalisisGraderConfigPage` se queda en 1.280: es un formulario. El salto listado→detalle pasa de
+590 px a ~109.
+
+**Carriles en la pestaña Línea** (`UpstreamMachinesPanel`): el gráfico de tasa queda a ancho
+completo **fuera** de la grilla, y debajo `grid min-[1700px]:grid-cols-5` reparte la cascada
+(`col-span-3`) junto a la imputación (`col-span-2`). `items-start` es obligatorio: sin él las dos
+columnas se estiran a la más alta y la corta queda con fondo vacío.
+
+| Ancho | Contenido | Columnas | Gráfico | Scroll de Línea |
+|---|---|---|---|---|
+| 375 | — | apiladas | 294 × 138 (**idéntico**) | 3.182 |
+| 1440 | 1.332 | apiladas | 1.332 × 332 (4:1) | 2.131 |
+| 1920 | **1.760** | 1.016 + 673 | 1.703 × 395 (4,3:1) | **1.751** (era 2.089) |
+| 2560 | 1.760 | 1.016 + 673 | 1.703 × 395 | 1.751 |
+
+### ⚠️ Ensanchar la página volvió a achatar el gráfico
+
+Efecto secundario del propio cambio, y es la trampa a recordar: al llevar el contenedor a 1.760
+px el gráfico pasó a 1.703 px de ancho, pero **el techo `ALTO_MAX_PLOT = 280` que se puso ayer
+(#950) estaba calibrado para 1.223 px** → ratio **5,8:1**, el mismo achatamiento que ese PR
+existía para evitar. Techo subido a **380** → 4,3:1.
+
+**Regla: un tope de alto calibrado para un ancho deja de servir cuando se cambia ese ancho.** Al
+ensanchar un contenedor hay que volver a medir los gráficos que contiene.
+
+### Verificación
+
+Breakpoint probado por los dos lados: **1699 px apiladas · 1701 px lado a lado** (950 + 629).
+La advertencia del mockup sobre el `resize()` de ECharts **no aplica**: el único canvas está
+fuera de la grilla y sigue a su contenedor sin desfase (1.591 → 1.593 px, desfase 0). Sin texto
+truncado en la columna angosta a 1701 px. Ambos temas. `tsc` · `eslint` (27 warnings = las de
+`main`) · `audit-piel` · `audit-graficos` · **2.264 tests**.
 ## 2026-09-11 · En PC el gráfico del turno era MÁS CHICO que en el teléfono (PR #950)
 
 Primera ronda sobre la **vista de escritorio** (pedido de Orel: el móvil queda como está). Turno

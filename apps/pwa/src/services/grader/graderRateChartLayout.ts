@@ -16,8 +16,15 @@
 
 /** Piso del área de trazado. Es el alto que tenía el gráfico en un teléfono. */
 export const ALTO_MIN_PLOT = 108
-/** Techo: en un monitor muy ancho el gráfico no tiene por qué seguir creciendo. */
-export const ALTO_MAX_PLOT = 280
+/**
+ * Techo: en un monitor muy ancho el gráfico no tiene por qué seguir creciendo.
+ *
+ * Subido de 280 a 380 el 11-09: al llevar el contenedor del turno a 1.760 px, el
+ * gráfico pasó a medir 1.703 px de ancho y el techo viejo lo dejaba en ratio
+ * 5,8:1 — el mismo achatamiento que este módulo existe para evitar, esta vez
+ * provocado por ensanchar la página.
+ */
+export const ALTO_MAX_PLOT = 380
 /** Relación ancho/alto objetivo del área de trazado. */
 export const RELACION_ANCHO_ALTO = 4.2
 

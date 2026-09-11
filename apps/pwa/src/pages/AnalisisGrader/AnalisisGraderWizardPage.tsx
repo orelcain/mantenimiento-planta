@@ -762,7 +762,9 @@ export function AnalisisGraderWizardPage() {
   return (
     // `gap-6` en vez de `space-y-4`: el aire entre secciones es la mitad de lo
     // que hace que una pantalla se lea como Apple y no como panel denso.
-    <div className="flex flex-col gap-6">
+    // El mismo tope que el detalle del turno: sin esto el listado llegaba a
+    // 1.869 px a 1920 y abrir un turno ENCOGÍA la página 590 px.
+    <div className="flex flex-col gap-6 mx-auto w-full max-w-[1760px]">
       {/*
         Encabezado con TÍTULO GRANDE (rol `display`, §2). Antes era `text-xl` con
         un ícono al lado y una regla dura debajo — tres cosas que aplastaban la
