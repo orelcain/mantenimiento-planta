@@ -216,7 +216,11 @@ export function UpstreamCorrelationCard({ pauses, snapshot }: Props) {
                         key={m.machineid}
                         className={`flex items-center gap-2 text-caption tabular-nums ${isTop ? 'text-cat-5-ink' : 'text-muted-foreground'}`}
                       >
-                        <span className="min-w-[8rem]">{shortMachineName(m.machineName)}</span>
+                        {/* 8rem reservaba 128 px para «Baader 3». En la hoja de detalle,
+                            que es más angosta que la pestaña, esa holgura empujaba
+                            el porcentaje fuera del borde: 278 px pedidos contra 245
+                            disponibles. */}
+                        <span className="min-w-[4.5rem]">{shortMachineName(m.machineName)}</span>
                         <span className="opacity-80">{m.pauseCount} paro{m.pauseCount !== 1 ? 's' : ''}</span>
                         <span>·</span>
                         <span className="font-semibold">{fmtDurationSec(m.totalOverlapSec)} overlap</span>
