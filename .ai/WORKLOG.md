@@ -6,6 +6,62 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-11 · En PC el gráfico del turno era MÁS CHICO que en el teléfono (PR #950)
+
+Primera ronda sobre la **vista de escritorio** (pedido de Orel: el móvil queda como está). Turno
+con Excel del Grader cargado, medido a 1440 × 900. Inventario de alto: Resumen 900 · Gates 1.017
+· Calidad 1.355 · ¿Qué hacer? 1.234 · Mantención 1.471 · Línea 1.933. Todo entra en 1-2
+pantallas; el contenido usa **1.138 px de 1.440** (`max-w-screen-xl`).
+
+**⚠️⚠️ El gráfico de tasa de producción se ACHICA al ensanchar la pantalla.**
+
+| | ancho | alto | ratio |
+|---|---|---|---|
+| Teléfono 375 | 294 px | **138 px** | 2,1:1 |
+| PC 1440 | 1.109 px | **123 px** | **9:1** |
+
+La causa: `const chartHeight = 108 + legendRowCount * 15`. El alto salía **solo** de cuántas
+filas ocupaba la leyenda. En un celular la leyenda va en 2-3 filas y el gráfico crecía; en PC,
+donde entra en una sola, quedaba en el mínimo. Ocho horas de turno y tres máquinas aplastadas en
+123 px, en una pantalla de 900 donde la pestaña usa 1.933 px de scroll.
+
+Ahora el alto sale del ancho disponible con una relación de aspecto legible (~4:1) entre un piso
+y un techo: **PC 279 px (ratio 4:1)**, tablet 177, y el **teléfono exactamente igual, 138 px**,
+porque a 294 px de ancho la división da 70 y gana el piso de 108. La fórmula vive en
+`services/grader/graderRateChartLayout.ts` — módulo aparte por el mismo motivo que
+`graderPurezaNivel`: testearla y no romper el fast-refresh de la tarjeta (eslint lo avisa con
+`react-refresh/only-export-components`, y el proyecto ya había resuelto eso antes).
+
+**Regla:** un gráfico cuyo alto depende de la leyenda se encoge cuando la pantalla crece. Al
+revisar un chart, medir su **relación de aspecto en los dos extremos de ancho**, no solo si
+«entra».
+
+## ⚠️ Tres runbooks distintos mostraban el mismo texto
+
+En «¿Qué hacer?», la ruta del HMI de cada runbook (`z2Path`) vivía en un `max-w-[240px]` fijo
+con `truncate`. **`z2Path` no aparece en ningún otro lugar del componente** —ni al expandir la
+tarjeta, ni en un `title`—, así que lo cortado no se podía recuperar de ninguna forma.
+
+De los **6 runbooks, 3 se cortan, y los 3 en el mismo punto**: «MENU → Servicio → Cambiar
+parámetr…», aunque lleven a lugares distintos del HMI:
+
+- `MENU → Servicio → Cambiar parámetros → 8620 → Static Grader → ZBelt → Pocket [1-4] → fsWc`
+- `MENU → Servicio → Cambiar parámetros → 8620 → Eye sync`
+- `MENU → Servicio → Cambiar parámetros → 8620`
+
+Tres tarjetas indistinguibles, y la ruta es **la instrucción**: dice dónde tocar en la máquina.
+Desde `sm` toma su propia línea y se lee entera (557 px de los 629 que tenía libres la caja); en
+el teléfono sigue truncada pero ahora el `title` la muestra.
+
+**Verificado** a 1440, 768 y 375 px: el gráfico da 295/177/138 px y la ruta se lee completa en PC.
+`tsc` · `eslint` (0 errores, 27 warnings = las de main) · `audit-piel` · `audit-graficos` ·
+**2.263 tests**. Los 6 nuevos fallan con el síntoma real al volver a la fórmula vieja
+(`expected 123 to be 279`).
+
+**Trampa de la vista PC:** `computer{action:"zoom"}` con región **no está soportado** en el
+Browser pane (devuelve la captura entera), y un screenshot de 1440 vuelve escalado a 800×500,
+ilegible. Para auditar escritorio conviene **medir por geometría** —`scrollWidth > clientWidth`,
+relación ancho/alto de cada `canvas`— y usar la captura solo para ver la estructura.
 ## 2026-09-10 · Línea tenía tres cifras de «piezas perdidas» que no coinciden (PR #949)
 
 Sigue la simplificación con la vara de Calidad. Desglose de Línea a 375 px (3.790 px):
