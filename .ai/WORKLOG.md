@@ -6,6 +6,54 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-11 · Calidad y Mantención con el ancho nuevo (PR #952)
+
+Cierra la vista PC del detalle del turno: las dos pestañas que habían quedado en una sola
+columna después de #951.
+
+## Mantención · 1.471 → 1.117 px
+
+A 1920 sus cuatro secciones se apilaban a 1.732 px de ancho para contenidos que no lo piden:
+reparto y tendencia son listas de 3 máquinas y el evento es una ficha. Medido: reparto 325 px ·
+evento 140 · tendencia 355.
+
+El reparto se hizo **por SECUENCIA** —los primeros a la izquierda, el resto a la derecha— para
+que el orden de lectura del teléfono no cambie: **[reparto + evento + avisos] | [tendencia]**,
+495 contra 355 px. Además queda coherente con el significado: a la izquierda lo de ESTE turno,
+a la derecha el histórico.
+
+⚠️ **Al envolver hijos en columnas, mirar qué queda en cada una.** El primer intento dejó el
+aviso «Target sospechoso» (que en este turno no aparece, pero existe) en la columna del
+histórico, junto a la tendencia: un aviso del turno mezclado con la serie de 30 turnos. Se ve
+solo leyendo el JSX resultante, no el diff.
+
+## Calidad · el timeline tenía alto FIJO
+
+`style={{ height: scatterAxisShow ? 360 : 320 }}` — sin relación con el ancho. Con el contenedor
+del turno en 1.760 px (#951) el timeline pasó a 1.689 px de ancho: **ratio 5,3:1** para barras
+minuto a minuto de las 8 h con su riel de eventos encima. Ahora **1.689 × 380 (4,4:1)**.
+
+A diferencia del gráfico de tasa, acá el piso **no** es 108 sino el alto que ya tenía: a 278 px
+de ancho la división da 66 y a 1.223 px da 291, los dos bajo el piso, así que **el teléfono y
+1440 px quedan exactamente igual (320 px)** y solo crece en monitores anchos.
+
+Calidad sube de 1.355 a 1.415 px: son los 60 px que gana el gráfico. Acá el premio es
+legibilidad, no scroll — y conviene decirlo así.
+
+## Verificación
+
+| | 375 | 1440 | 1920 |
+|---|---|---|---|
+| Timeline de Calidad | 278 × 320 | 1.318 × 320 | **1.689 × 380** |
+| Mantención | apilada · 3.0k | apilada · 1.471 | **carriles · 1.117** |
+
+Los dos temas, sin desbordes horizontales a 1920. `tsc` · `eslint` (27 warnings = las de `main`)
+· `audit-piel` · `audit-graficos` · **2.267 tests**. Los 3 nuevos fallan con el síntoma real al
+devolver el piso fijo (`expected 320 to be greater than 320`).
+
+**Estado de la vista PC del turno (1920):** Resumen ~900 · Gates 1.017 · ¿Qué hacer? 1.234 ·
+Mantención 1.117 · Calidad 1.415 · Línea 1.751. Ninguna pasa de dos pantallas y cuatro entran
+en una.
 ## 2026-09-11 · Abrir un turno encogía la página 590 px (PR #951)
 
 Segunda ronda de vista PC. El punto de partida era «sobra aire en monitores anchos», pero al
