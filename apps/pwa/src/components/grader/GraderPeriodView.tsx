@@ -34,6 +34,7 @@ import { computeStatsFromSummaries } from '@/services/grader/graderPeriodAggrega
 import type { GraderDailySummary } from '@/services/grader/types'
 import { p0StatusFromPct, p0StatusColor, p0StatusBorderClass, DEFAULT_P0_CRITICAL_PCT } from '@/services/grader/graderP0Thresholds'
 import { tendenciaDelPeriodo, hayMejorSemana } from '@/services/grader/graderTendenciaPeriodo'
+import { compararFilas, nombreArchivoCsv } from '@/services/grader/graderPeriodoTabla'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Tooltip, Legend, Filler, zoomPlugin)
 
@@ -76,7 +77,7 @@ function exportToCSV(shifts: GraderDailySummary[], rangeLabel: string): void {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `grader-${rangeLabel.replace(/[^a-zA-Z0-9-]/g, '-').toLowerCase()}.csv`
+  a.download = nombreArchivoCsv(rangeLabel)
   a.click()
   URL.revokeObjectURL(url)
 }
@@ -438,15 +439,10 @@ export function GraderPeriodView({ data }: Props) {
   // ── Tabla ordenable ──────────────────────────────────────────────────────
   const sortedShifts = useMemo(() => {
     const arr = [...shifts]
-    arr.sort((a, b) => {
-      const aVal = a[sortKey] as number | string | undefined
-      const bVal = b[sortKey] as number | string | undefined
-      if (aVal == null && bVal == null) return 0
-      if (aVal == null) return 1
-      if (bVal == null) return -1
-      const cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0
-      return sortDir === 'asc' ? cmp : -cmp
-    })
+    // El desempate va por `startAt` (el instante real), no por el nombre del
+    // turno: en Chonchi «Turno 1» es la NOCHE y «Turno 2» la manana, asi que
+    // el orden alfabetico contradice al reloj. Ver graderPeriodoTabla.ts.
+    arr.sort((a, b) => compararFilas(a, b, sortKey, sortDir))
     return arr
   }, [shifts, sortKey, sortDir])
 
