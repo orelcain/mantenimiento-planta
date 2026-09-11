@@ -2074,7 +2074,7 @@ export function AnalisisGraderTurnoPage() {
 
   return (
     <TimelineSyncProvider key={shiftDocId ?? 'default'} groupId={timelineGroupId}>
-    <div className="container mx-auto p-3 sm:p-4 space-y-4 max-w-screen-xl">
+    <div className="container mx-auto p-3 sm:p-4 space-y-4 max-w-[1760px]">
       {/* M18 — Banner offline */}
       {!isOnline && (
         <div className="flex items-center gap-2 px-3 py-2 rounded-ctl bg-amber-500/[0.15] border border-amber-500/[0.25] text-amber-400 text-sm">

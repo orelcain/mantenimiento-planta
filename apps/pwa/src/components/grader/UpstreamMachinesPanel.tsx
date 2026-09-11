@@ -1453,17 +1453,39 @@ export function UpstreamMachinesPanel({
               </div>
             )}
 
-            {/* Cascada de pérdidas del turno — quién limitó la producción y
-                cuántas piezas costó cada causal. Ver LossCascadeCard. */}
-            {snapshot && snapshot.machines.length > 0 && (
-              <LossCascadeCard machines={snapshot.machines} graderTotalPieces={graderTotalPieces} />
-            )}
+            {/* CARRILES en monitores anchos (≥1700 px).
 
-            {/* Las mismas pérdidas leídas con el árbol oficial de imputación:
-                de qué TIPO fue el tiempo perdido y, sobre todo, cuánto llegó
-                con causal anotada. Ver ImputacionParetoCard. */}
+                El ancho no es un premio parejo: el gráfico de tasa de arriba es
+                una serie de las 8 h del turno con 3 Baader —cada píxel es
+                resolución temporal— y por eso se queda a ancho completo, FUERA
+                de esta grilla. La cascada y la imputación son listas y prosa:
+                a 1.223 px ya venían con líneas de hasta 157 caracteres, así que
+                estirarlas las empeora. Puestas una al lado de la otra, el ancho
+                sobrante deja de ser aire y la pestaña deja de pedir scroll.
+
+                Medido a 1920: la cascada mide 580 px y la imputación 382, así
+                que el reparto 3/2 calza casi parejo. `items-start` es
+                obligatorio: sin él las dos columnas se estiran a la más alta y
+                la corta queda con fondo vacío debajo.
+
+                El breakpoint es arbitrario (`min-[1700px]`) en vez de `2xl`
+                (1536): a 1600 con la barra lateral abierta la columna angosta
+                cae a ~590 px y la imputación empieza a truncar causales. */}
             {snapshot && snapshot.machines.length > 0 && (
-              <ImputacionParetoCard machines={snapshot.machines} />
+              <div className="grid grid-cols-1 gap-4 min-[1700px]:grid-cols-5 min-[1700px]:items-start">
+                {/* Quién limitó la producción y cuántas piezas costó cada
+                    causal. Ver LossCascadeCard. */}
+                <div className="min-[1700px]:col-span-3">
+                  <LossCascadeCard machines={snapshot.machines} graderTotalPieces={graderTotalPieces} />
+                </div>
+
+                {/* Las mismas pérdidas leídas con el árbol oficial de
+                    imputación: de qué TIPO fue el tiempo perdido y, sobre todo,
+                    cuánto llegó con causal anotada. Ver ImputacionParetoCard. */}
+                <div className="min-[1700px]:col-span-2">
+                  <ImputacionParetoCard machines={snapshot.machines} />
+                </div>
+              </div>
             )}
 
             {/* El Gantt, las barras de 5 min y los eventos de cada máquina se
