@@ -81,8 +81,7 @@ import { fmtTime } from '@/services/grader/graderTimeFormat'
 import { UpstreamMachinesPanel } from '@/components/grader/UpstreamMachinesPanel'
 import { MonitorUsagePanel } from '@/components/grader/MonitorUsagePanel'
 import { SensorStopsCausePanel } from '@/components/grader/SensorStopsCausePanel'
-import { UpstreamCorrelationCard } from '@/components/grader/UpstreamCorrelationCard'
-import { UpstreamScatterCard } from '@/components/grader/UpstreamScatterCard'
+import { OrigenDelTurnoCard } from '@/components/grader/OrigenDelTurnoCard'
 import { useUpstreamLineSnapshot } from '@/hooks/useUpstreamLineSnapshot'
 import { kpisDeTurno } from '@/services/shoplogix/kpisMantencionTurno'
 import { MantencionTurnoTab } from '@/components/grader/MantencionTurnoTab'
@@ -2946,22 +2945,20 @@ export function AnalisisGraderTurnoPage() {
             onVerMantencion={() => setActiveView('mantencion')}
           />
 
-          {/* Correlación automática Grader↔Baader y scatter — solo aplican
-              en plantas donde el Grader Marelec MS4/12 procesa downstream de
-              las Baader. Yal evisera y va directo a camión, sin Grader → no
-              hay correlación posible. */}
+          {/* ¿Vino de la línea? Un veredicto; el detalle —tabla de paros y
+              nube de puntos— en una hoja. Las dos tarjetas que vivían acá
+              medían 1.153 px juntas y en la mayoría de los turnos solo decían
+              que no había nada (6 de 40 y 11 de 28 con hallazgo).
+                Solo aplica en plantas donde el Grader Marelec MS4/12 procesa
+              downstream de las Baader. Yal evisera y va directo a camión, sin
+              Grader → no hay correlación posible. */}
           {isClassificationPlant && (
-            <UpstreamCorrelationCard
+            <OrigenDelTurnoCard
               pauses={pauses}
-              snapshot={upstreamLine.snapshot}
-            />
-          )}
-
-          {isClassificationPlant && (
-            <UpstreamScatterCard
               snapshot={upstreamLine.snapshot}
               timelineBuckets={enrichedTimelineBuckets}
               criticalThreshold={criticalThreshold}
+              loading={upstreamLine.loading}
             />
           )}
           </>)}

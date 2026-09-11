@@ -6,6 +6,78 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-10 · 1.018 px para decir que no vino de la línea (PR #947)
+
+Ronda de pulido con la vara que puso Orel: **Calidad es la pestaña que mejor informa**, y se
+trata de simplificar el resto hacia ahí. Inventario a 375 px sobre 2026-09-07 T1, medido por
+bloque con `getBoundingClientRect`:
+
+| Pestaña | Alto | Bloques de contenido |
+|---|---|---|
+| Resumen | 1.346 px | 1 |
+| **Calidad** | **1.904 px** | **3** (causas 352 · timeline 1.006 · IA 62) |
+| Gates | 5.551 px | 4 (pureza 2.621 · config 84 · impacto 53 · más análisis 2.294) |
+| Línea | 4.762 px | 4 (35 · tasa+cascada+imputación 3.075 · correlación 736 · scatter 417) |
+| Mantención | 2.258 px | 1 |
+
+Gates y Línea son **2,9× y 2,5×** Calidad. Lo que hace buena a Calidad es la forma: una
+pregunta, un gráfico con su lista, un remate. Tres bloques.
+
+**Lo simplificado esta ronda:** las dos tarjetas de correlación de Línea, que contestan la
+MISMA pregunta —¿lo que le pasó al Grader vino de la línea?— con dos evidencias distintas
+(paros y ritmo) y que ya estaban medidas en #937: la de paros señala algo en **6 de 40**
+turnos y la de ritmo alcanza R² ≥ 0,10 en **11 de 28**. El pendiente estaba decidido desde
+esa ronda con mockup y sin construir.
+
+Ahora hay un veredicto en prosa (`OrigenDelTurnoCard` + `origenDelTurno.ts`) y el detalle
+completo —tabla de paros y nube— en una hoja sobre `dialog.tsx`, como `MinuteDetailDialog`.
+Medido antes y después en los mismos turnos:
+
+- **17-08 T1** (sin solape, el caso mayoritario): 601 + 417 = **1.018 px → 157 px** (−85 %).
+  Pestaña Línea 4.575 → 3.673 px.
+- **07-09 T1** (con solape): 736 + 417 = **1.153 px → 198 px** (−83 %). Pestaña 4.762 → 3.790.
+
+El caso mayoritario ya no es un vacío sino una frase: «Las causas son internas del Grader»,
+que además es la evidencia de que Mantención está mirando donde corresponde.
+
+**⚠️⚠️ El veredicto se emitía con el snapshot a medio llegar.** Apareció solo porque el mismo
+turno se abrió dos veces: el 17-08 decía «Las causas son internas del Grader» en una carga y
+«30 min vinieron de la línea, casi todos de Evisceradora 3» en la siguiente. `useUpstreamLineSnapshot`
+emite más de una vez y con `machines` todavía vacío la correlación da **cero por falta de**
+**datos**, no por ausencia de causa — y de las dos lecturas la falsa es justo la que
+tranquiliza. Ahora la tarjeta calla mientras `loading` o si el snapshot no trae máquinas.
+**Regla:** antes de convertir un cálculo en una afirmación categórica, mirar si sus insumos
+pueden llegar incompletos; con la tarjeta vieja el mismo bug existía pero se leía como una
+lista corta, no como un veredicto.
+
+**⚠️ El mockup afirmaba algo que el código no hace.** Decía que la tarjeta de paros «se oculta
+entera» sin correlación (lo dice el docblock de `UpstreamCorrelationCard`, que quedó viejo).
+El código solo se calla si falta el snapshot o no hay paros: el mensaje existía, pero al pie,
+en gris, después del encabezado y el KPI. Verificado antes de repetirlo en el PR.
+
+**Dos defectos que solo se ven mirando la pantalla:**
+
+- La tarjeta decía «Ninguno de los 2 paros coincidió con las Baader» y en el renglón siguiente
+  «2 paros coinciden con paros programados de Baader». Las dos afirmaciones eran ciertas y
+  juntas se leían como un error. Ahora va en una sola frase: «ninguno coincidió con una parada
+  **imprevista** de las Baader (los 2 cayeron en colación o reunión, que no es causa)».
+- Dentro de la hoja, los porcentajes del «Impacto por máquina» quedaban **cortados por el
+  borde**: la fila pedía 278 px y tenía 245. La causa era un `min-w-[8rem]` que reservaba
+  128 px para «Baader 3». Una tarjeta que entra en la pestaña no entra necesariamente en un
+  diálogo: el diálogo es más angosto que la página que la contenía.
+- El botón de detalle en `text-primary` daba **4,2:1** en tema claro, bajo AA para 14 px.
+  Con `text-brand-ink`: 6,3 claro / 6,6 oscuro.
+
+Verificado a 375 px en los dos temas sobre las cuatro ramas del veredicto con turnos reales:
+interno (17-08 antes del fix de carga), ritmo por encima del umbral (08-09), solape repartido
+(07-09) y una máquina concentrando (17-08). `tsc` · `eslint` (0 errores) · `audit-piel` ·
+`audit-graficos` · **2.251 tests**, y los 8 nuevos confirmados rompiendo el umbral de
+concentración a propósito.
+
+**Lo que NO se hizo:** dentro de la hoja siguen las dos tarjetas enteras, con sus dos títulos.
+El mockup pedía además fundir los duplicados de adentro (dos desgloses por máquina, cuatro
+capas de prosa sobre el scatter). Se dejó para otra ronda: el 83 % del ahorro está en sacarlas
+de la vista en reposo, y reescribirlas hubiera puesto en riesgo el trabajo de #937.
 ## 2026-09-10 · El turno que todavía no empieza decía CERRADO (PR #946)
 
 Ronda de pulido sobre lo único grande del Análisis de Turno que nunca se había mirado: el
