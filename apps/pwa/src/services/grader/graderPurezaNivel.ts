@@ -43,3 +43,31 @@ function promedioHasta(purity: ReadonlyArray<number | null>, hasta: number): num
 }
 
 export { promedioHasta }
+
+/**
+ * Qué puerta abre sola la tarjeta al entrar a Gates.
+ *
+ * El detalle de una puerta mide **1.288 px a 375 px — el 39 % de la pestaña**,
+ * así que desplegarlo tiene que ganárselo. Hasta el 10-09 abría también cuando
+ * la única novedad era una puerta con «seteo distinto», que es un aviso de
+ * configuración y no un problema de proceso: el turno entero arrancaba
+ * desplegado para contar algo que la grilla ya marca.
+ *
+ * Ahora abre **solo con mezcla real** (una puerta bajo el umbral). Decisión de
+ * Orel, 10-09.
+ *
+ * @param puertas pureza de cada puerta ya resuelta (null = sin dato).
+ * @param conSeteoDistinto puertas cuyo seteo no coincide con la máquina: no
+ *   cuentan como mezcladas, son otra cosa.
+ */
+export function puertaQueAbreSola(
+  puertas: ReadonlyArray<{ gate: number; pct: number | null }>,
+  conSeteoDistinto: ReadonlySet<number> = new Set(),
+): number | null {
+  const juzgables = puertas.filter(
+    (p): p is { gate: number; pct: number } => p.pct != null && !conSeteoDistinto.has(p.gate),
+  )
+  if (juzgables.length === 0) return null
+  const peor = juzgables.reduce((a, b) => (b.pct < a.pct ? b : a))
+  return nivelDePureza(peor.pct) === 'ok' ? null : peor.gate
+}

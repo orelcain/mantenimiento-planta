@@ -30,7 +30,7 @@ import { cn } from '@/lib/utils'
 import { copiarTexto } from '@/lib/clipboard'
 import { gateMixTotals, ANY_CALIBRE, SIN_DATO, type GateMix, type GateMixEntry } from '@/services/grader/graderGateMix'
 import {
-  PUREZA_OK_PCT, PUREZA_WARN_PCT, nivelDePureza, bloqueDeCaida, promedioHasta, type NivelPureza as Nivel,
+  PUREZA_OK_PCT, PUREZA_WARN_PCT, nivelDePureza, puertaQueAbreSola, bloqueDeCaida, promedioHasta, type NivelPureza as Nivel,
 } from '@/services/grader/graderPurezaNivel'
 import type { GateAssignment, CalibreWeightRange } from '@/services/grader/types'
 import type { P0SinPuerta } from '@/services/grader/graderGate0Store'
@@ -230,19 +230,34 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gateMix, seteoDistinto, mezcla])
 
-  // Arranca abierta en la peor puerta MEZCLADA; si no hay, en la primera con
-  // seteo distinto: es lo que el usuario vino a ver.
-  const peor = useMemo(() => {
-    const conPureza = gateMix.gates.filter((e) => pctDe(e) != null && !seteoDistinto?.[e.gate])
-    if (conPureza.length > 0) {
-      const min = conPureza.reduce((a, b) => (pctDe(b)! < pctDe(a)! ? b : a))
-      if (nivelDePureza(pctDe(min)) !== 'ok') return min.gate
-    }
-    const conSeteo = gateMix.gates.find((e) => seteoDistinto?.[e.gate])
-    return conSeteo?.gate ?? null
+  // Arranca abierta SOLO si hay mezcla real: el detalle mide 1.288 px a 375 px
+  // (el 39 % de la pestaña) y una puerta con «seteo distinto» es un aviso de
+  // configuración que la grilla ya marca, no un problema de proceso.
+  const peor = useMemo(
+    () => puertaQueAbreSola(
+      gateMix.gates.map((e) => ({ gate: e.gate, pct: pctDe(e) ?? null })),
+      new Set(Object.keys(seteoDistinto ?? {}).map(Number)),
+    ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gateMix, seteoDistinto, mezcla])
+    [gateMix, seteoDistinto, mezcla],
+  )
+  /*
+   * `useState(peor)` congelaba el valor del PRIMER render, y en ese momento
+   * `mezcla` todavía no llegó: `pctDe` cae entonces a `purityPct`, la pureza
+   * cruda del gateMix, que juzga la conservación contra el seteo en vez de
+   * contra la dominante del bloque. En el turno 2026-09-07 eso daba 53,5 %
+   * para G10 y abría su detalle; cuando llegaba `mezcla` la misma puerta
+   * pasaba a 97 % en la grilla, pero el detalle YA estaba abierto. La pantalla
+   * terminaba destacando una puerta que ella misma mostraba como pura.
+   *
+   * Ahora la selección sigue a `peor` mientras el usuario no haya tocado
+   * ninguna puerta. En cuanto toca una, manda él.
+   */
   const [seleccion, setSeleccion] = useState<number | null>(peor)
+  const elegidaAMano = useRef(false)
+  useEffect(() => {
+    if (!elegidaAMano.current) setSeleccion(peor)
+  }, [peor])
   const detalle = seleccion != null ? byGate.get(seleccion) : undefined
   const causas = useMemo(() => (detalle && causesFor ? causesFor(detalle.gate) : null), [detalle, causesFor])
 
@@ -393,7 +408,10 @@ export function PurezaPorPuertaCard({ gateMix, gates, turnoLabel, changeBuckets,
                 type="button"
                 role="listitem"
                 aria-pressed={activa}
-                onClick={() => setSeleccion(activa ? null : n)}
+                onClick={() => {
+                  elegidaAMano.current = true
+                  setSeleccion(activa ? null : n)
+                }}
                 className={cn(
                   'flex min-h-[44px] flex-col items-start gap-0.5 rounded-ctl bg-muted px-3 py-2 text-left',
                   'transition-[transform] duration-[180ms] active:scale-[.97] motion-reduce:active:scale-100',

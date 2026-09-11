@@ -6,6 +6,66 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-10 · Gates abría el detalle de una puerta que ella misma muestra pura (PR #948)
+
+**⚠️⚠️ Antes que nada, una corrección de MEDICIÓN.** La ronda anterior registró «Gates 5.551 px»
+y ese número era mío: `disclosure:turno.gates.masAnalisis` estaba en 1 en el navegador que midió,
+porque yo había abierto ese plegable en una sesión previa. Con los `disclosure:*` en su valor
+por defecto, Gates mide **3.305 px** — que es lo que ya decía la memoria de Gates (3.310).
+Inventario corregido a 375 px: Resumen 1.346 · Calidad 1.904 · Mantención 2.258 · **Gates 3.305**
+· **Línea 3.790**. La más pesada es Línea, no Gates.
+
+**Regla:** el alto de una pantalla depende del `localStorage` del navegador que mide. Antes de
+inventariar, borrar las claves `disclosure:*` y recargar — y confirmar el viewport con
+`window.innerWidth`, porque un `resize_window` olvidado da números de escritorio que parecen de
+teléfono (pasó también en esta ronda: 1.987 px que eran desktop).
+
+## Tres hipótesis medidas y descartadas
+
+Antes de tocar Gates se probaron tres sospechas contra los datos reales (38 turnos con
+`meta/gateMix`, 456 puertas con piezas). **Las tres se cayeron:**
+
+1. *«El % de pureza se calcula sin mirar el tamaño de la muestra»* — cierto en el código
+   (`nivelDePureza` no tiene piso), pero **solo 24 de 456 puertas tienen < 30 pz y las 24 están
+   en verde**: ninguna se pinta roja o amarilla por muestra chica. Un piso habría ocultado 24
+   «100 %» legítimos sin arreglar nada.
+2. *«Una puerta verde puede esconder mezcla física por peso»* — el dato existe: **26 de 162
+   puertas verdes tienen ≥ 25 % de piezas fuera de rango y 20 superan el 50 %, todas 10-12 lb**.
+   Pero la tarjeta **ya lo explica** en su propio bloque «Programas de calibre solapados en el
+   Z2», con las cifras del turno. Está resuelto; lo que queda es el pendiente de Orel sobre el
+   piso del 10-12.
+3. *«La grilla de 12 puertas ocupa 2.476 px»* — falso: la grilla es de 3 columnas y mide **556 px**.
+
+## ⚠️⚠️ Lo que sí había: la selección congelada en el primer render
+
+`const [seleccion, setSeleccion] = useState<number | null>(peor)` toma el valor inicial **una
+sola vez**, y en ese primer render `mezcla` todavía no llegó. Sin `mezcla`, `pctDe` cae a
+`purityPct` —la pureza CRUDA del gateMix, que juzga la conservación contra el seteo en vez de
+contra la dominante del bloque—. En el turno **2026-09-07** eso daba **53,5 % para G10** y abría
+su detalle; cuando llegaba `mezcla` la misma puerta pasaba a **97 %** en la grilla, pero el
+detalle ya estaba abierto. **La pantalla destacaba una puerta que ella misma mostraba como pura**,
+y gastaba 1.288 px (el 39 % de la pestaña) en hacerlo.
+
+Peor todavía: en **2026-09-08** abría **G12 (95 %)** cuando la que tenía el problema era **G10
+con 83 %**. Elegía mal la puerta, no solo el momento.
+
+Ahora la selección sigue a `peor` mientras el usuario no haya tocado ninguna puerta (`useRef`
++ `useEffect`); en cuanto toca una, manda él, y cerrarla no la reabre.
+
+**Regla que sale de acá:** `useState(valorDerivado)` con un derivado que depende de datos
+asíncronos es un valor congelado, no un default. Se ve abriendo la misma pantalla y comparando
+lo que destaca contra lo que muestra al lado.
+
+## Y la decisión de producto (Orel, 10-09)
+
+El detalle abría en dos casos: puerta mezclada de verdad, **o** puerta con «seteo distinto» (un
+aviso de configuración que la grilla ya marca). Orel eligió que abra **solo con mezcla real**.
+La regla salió del componente a `puertaQueAbreSola` en `graderPurezaNivel.ts`, que es módulo puro
+y testeable — mismo motivo por el que en su día se separó `nivelDePureza`.
+
+Medido en pantalla a 375 px: **2026-09-07 pasa de 3.305 a 2.001 px (−39 %)** y no abre nada
+(sus 12 puertas están ≥ 95 %); **2026-09-08 abre G10**, la peor real. 6 tests nuevos, confirmados
+rompiendo el umbral a propósito (`expected 3 to be null`).
 ## 2026-09-10 · 1.018 px para decir que no vino de la línea (PR #947)
 
 Ronda de pulido con la vara que puso Orel: **Calidad es la pestaña que mejor informa**, y se
