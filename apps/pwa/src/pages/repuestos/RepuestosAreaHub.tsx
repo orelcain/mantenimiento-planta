@@ -14,6 +14,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef, Fragment } from 'react'
 import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ClipboardList, Menu, History, Trash2, Star, Download, X, MoreVertical, Copy, Check, Package, PackageCheck, PackageMinus, PackageX, GripVertical, Boxes, Wrench, Settings2, MapPin } from 'lucide-react'
 import { isCommonPartSap, machinesForCommonSap } from '@/data/commonPartsByMachine'
+import { esComun, esDespiece, esFavoritoDe, contarCon } from '@/hooks/repuestos/filtrosDeRepuestos'
 import { findMachineBySlug, LEARNING_MACHINES, isCourseMachine } from '@/data/learningMachines'
 import { Badge, Button, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui'
 import { AreaSidebar } from '@/components/repuestos/AreaSidebar'
@@ -777,8 +778,8 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   // despiece oculto y mostrarlo en el interruptor.
   const filteredBase = useMemo(() => {
     let res = scopedRepuestos
-    if (repFavOnly) res = res.filter((r) => favKeys.has(r.rowKey))
-    if (repComunOnly) res = res.filter((r) => isCommonPartSap(r.codigoSAP) || (r.comunEn?.length ?? 0) > 0)
+    if (repFavOnly) res = res.filter(esFavoritoDe(favKeys))
+    if (repComunOnly) res = res.filter(esComun)
     if (listFilter !== 'all') {
       const l = favLists.find((x) => x.name === listFilter)
       const ids = new Set(l?.repuestoIds ?? [])
@@ -816,24 +817,24 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   // filtro ya trabajaba sobre el alcance, pero el contador mostraba el total global — decía
   // "(7)" y al activarlo aparecía 1 sola fila.
   const favoritosEnScope = useMemo(
-    () => scopedRepuestos.reduce((n, r) => n + (favKeys.has(r.rowKey) ? 1 : 0), 0),
+    () => contarCon(scopedRepuestos, esFavoritoDe(favKeys)),
     [scopedRepuestos, favKeys],
   )
 
   // Cuántos comunes hay en el alcance actual (lista estática por SAP + marca comunEn).
   const comunesEnScope = useMemo(
-    () => scopedRepuestos.reduce((n, r) => n + (isCommonPartSap(r.codigoSAP) || (r.comunEn?.length ?? 0) > 0 ? 1 : 0), 0),
+    () => contarCon(scopedRepuestos, esComun),
     [scopedRepuestos],
   )
 
   // Foco SAP: oculta el despiece sin código SAP (default). El conteo de lo oculto
   // alimenta el interruptor "ver despiece".
   const filteredRep = useMemo(
-    () => (repSoloSap ? filteredBase.filter((r) => !!r.codigoSAP) : filteredBase),
+    () => (repSoloSap ? filteredBase.filter((r) => !esDespiece(r)) : filteredBase),
     [filteredBase, repSoloSap],
   )
   const despieceOcultos = useMemo(
-    () => (repSoloSap ? filteredBase.reduce((n, r) => n + (r.codigoSAP ? 0 : 1), 0) : 0),
+    () => (repSoloSap ? contarCon(filteredBase, esDespiece) : 0),
     [filteredBase, repSoloSap],
   )
 
