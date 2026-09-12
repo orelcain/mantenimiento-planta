@@ -6,6 +6,60 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-12 · Dos Excel de la temporada estan truncados (PR #969)
+
+Venia persiguiendo el pendiente de #966 —resumenes de julio con el DOBLE de piezas que el Excel— y
+el camino llevo a otra parte.
+
+## ⚠⚠ Un XLSX cortado a la mitad se lee vacio, y SheetJS no avisa
+
+Parseados **los 40 Excel del Grader** de la temporada 2025-26. Dos pieza a pieza de ~8,6 MB dan
+**cero registros**:
+
+```
+Pieza pieza Grader STATICGRADER1 (20251110_000000 - 20251120_000000).xlsx
+Pieza pieza Grader STATICGRADER1 (20251120_000000 - 20251130_000000).xlsx
+```
+
+Su `xl/worksheets/sheet1.xml` **corta a media celda** en la fila ~204.100 de las 308.539 que declara
+el `<dimension>`, sin cerrar `</sheetData>` ni `</worksheet>`: la exportacion desde Matrix se corto.
+**SheetJS no lanza error** — devuelve la hoja con el rango declarado y cero celdas.
+
+El aviso que salia era «No se encontro fila de cabecera valida», que manda a revisar las columnas de
+un archivo cuyas columnas estan perfectas. Ahora dice que el archivo esta incompleto, cuantas filas
+declara y que hacer.
+
+Y el remedio ya estaba a la vista: **los mismos dias salen bien en dos archivos de 5 dias**
+(`20251110-20251115` y `20251115-20251120`), en la misma carpeta. Orel lo habia resuelto a mano sin
+saber por que fallaba.
+
+## 🔍 Como diagnosticar un XLSX que se lee vacio
+
+`unzip -l archivo.xlsx` para ver el tamaño de `xl/worksheets/sheet1.xml`, y
+`unzip -p archivo.xlsx xl/worksheets/sheet1.xml | tail -c 200` para ver **si cierra los tags**. Un
+truncado termina a media celda. En SheetJS la huella es `!ref` con un rango grande y
+`Object.keys(ws)` sin ninguna celda.
+
+## ⚠ Lo que medi y NO era: tres hipotesis caidas
+
+- **Archivos con rangos solapados que se suman:** hay tres exportes que cubren los mismos dias de
+  noviembre, pero el que parecia el duplicado **es uno de los truncados** — aporta cero.
+- **`dedupePieceRecords` que no colapsa:** si colapsa. En el dia del solape quito exactamente los 3
+  duplicados internos y nada mas. Mi primera lectura marco «NO COLAPSA» comparando el dedupe contra
+  el archivo **sin** dedupear: **la vara estaba mal planteada, no el codigo**.
+- **El tamaño del archivo:** el `sheet1.xml` mas grande de la temporada tiene **135 MB** y parsea sus
+  277.841 registros sin problema, contra los 93 MB de los truncados. El limite no es el tamaño.
+
+El **doble de piezas** sigue sin causa confirmada y sigue anotado como pendiente.
+
+## Verificacion
+
+3 tests del modulo puro (`graderArchivoIncompleto`) y 2 de integracion contra los archivos reales,
+que se saltan si no estan en disco. Confirmados desactivando el aviso: falla con `expected 'No se
+encontro fila de cabecera valid…' to contain 'El archivo esta incompleto'`.
+
+`tsc` · `eslint` · `audit-piel` · `audit-graficos` · **2358 tests**. Verificado en el bundle
+publicado (`buildSha cd074a5`).
 ## 2026-09-12 · 37 de los 54 turnos detectados no tenian ni una pieza (PR #966)
 
 Primera ronda sobre **el turno con los datos del Excel ya cargados** (Planta Principal ·
