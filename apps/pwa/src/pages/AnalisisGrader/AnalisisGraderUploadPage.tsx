@@ -16,11 +16,13 @@ import {
   X,
   Loader2,
   Info,
+  AlertTriangle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { fmt } from '@/lib/format'
 import { useAuthStore } from '@/store'
 import { parseFile, mergeParsedData } from '@/services/grader/graderExcelParser'
+import { avisosDelArchivo } from '@/services/grader/graderAvisosDeCarga'
 import { getModuleRanges } from '@/services/grader/graderModuleConfig.service'
 import { deleteDailySummary } from '@/services/grader/graderDailySummary.service'
 import { listGraderUploads, saveGraderUpload, updateGraderUpload, uploadGraderFile, deleteGraderUpload } from '@/services/grader/graderUpload.service'
@@ -504,9 +506,32 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
           {/* Archivos cargados */}
           {files.length > 0 && (
             <div className="space-y-1.5">
-              {files.map((f) => (
-                <div key={f.fileMeta.id} className="flex items-center gap-2 bg-muted rounded-ctl px-2 py-1.5 text-xs">
-                  <CheckCircle className="h-3.5 w-3.5 text-green-500 shrink-0" />
+              {files.map((f) => {
+                /*
+                 * `parseFile` ya devolvía avisos reales del archivo y NADIE los
+                 * mostraba: la fila pintaba un tilde verde, el tipo, el nombre y
+                 * los registros. Medido sobre los Excel de la temporada 2025-26,
+                 * dos de tres archivos traen aviso, y uno de ellos es el que
+                 * explica por qué la app y el Matrix nunca dan el mismo número
+                 * («registros sin pieza: el Matrix los cuenta, la app no»).
+                 * Ver graderAvisosDeCarga.ts.
+                 */
+                const avisos = avisosDelArchivo(
+                  f.fileMeta.warnings,
+                  currentTurnoDate,
+                  f.partialData.inferred ?? {},
+                )
+                return (
+                <div key={f.fileMeta.id} className="bg-muted rounded-ctl px-2 py-1.5 text-xs">
+                  <div className="flex items-center gap-2">
+                  {/* El tilde verde decía «todo bien» incluso sobre un archivo
+                      con avisos. Con avisos, el icono lo dice — y el color vive
+                      SOLO en el icono: el texto del aviso en ink-warn sobre
+                      bg-muted da 4,4:1 en tema claro, bajo el 4,5 que pide AA
+                      para 11 px. */}
+                  {avisos.length > 0
+                    ? <AlertTriangle className="h-3.5 w-3.5 text-ink-warn shrink-0" />
+                    : <CheckCircle className="h-3.5 w-3.5 text-green-500 shrink-0" />}
                   <Badge className={cn('text-caption h-4 px-1 shrink-0', KIND_COLORS[f.fileMeta.kind])}>
                     {KIND_LABELS[f.fileMeta.kind]}
                   </Badge>
@@ -526,8 +551,17 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
                   >
                     <X className="h-3 w-3" />
                   </button>
+                  </div>
+                  {avisos.length > 0 && (
+                    <ul className="mt-1 space-y-0.5 pl-5">
+                      {avisos.map((a) => (
+                        <li key={a} className="text-caption leading-snug text-foreground">{a}</li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
-              ))}
+                )
+              })}
             </div>
           )}
 

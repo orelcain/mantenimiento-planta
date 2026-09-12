@@ -6,6 +6,67 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-11 · El parser avisaba sobre el Excel y nadie lo mostraba (PR #956)
+
+Primera ronda sobre el **flujo de carga del Excel del Grader** (Planta Principal · Eviscerado).
+Todas las rondas anteriores miraron turnos con el Excel **ya cargado**; el acto de cargarlo no se
+había recorrido nunca.
+
+## ⚠️⚠️ `fileMeta.warnings` se escribía y no se mostraba en ninguna parte
+
+Grep sobre todo `src/`: `parseFile` llena `fileMeta.warnings`, el propio Upload le agrega uno más
+(«Tipo X detectado — solo se requiere Pieza-Pieza y Puerta 0») y **no hay un solo lugar que los
+lea**. La fila de cada archivo cargado pinta un **tilde verde**, el badge de tipo, el nombre y
+«N reg». Nada más.
+
+Medido parseando los Excel **reales** de la temporada 2025-26 (los mismos que usa el test de
+integración): **2 de 3 archivos traen avisos**, y uno de ellos es el que explica una pregunta
+recurrente —por qué la app y el Matrix nunca dan el mismo número—:
+
+- `1075 registros sin pieza ("No aplicable"): el Matrix los cuenta como registros, la app no como piezas.`
+- `Se encontraron 7586 registros Gate 0 en archivo pieza-pieza.`
+
+Es el mismo patrón del estado `future` sin consumidor (#946): **un dato generado que nadie
+consume**. Ahora los avisos van bajo la fila del archivo, y **el tilde verde pasa a triángulo**
+cuando hay alguno: antes decía «todo bien» sobre un archivo que traía advertencias.
+
+## ⚠️ Y un aviso que faltaba: el archivo que no cubre el turno
+
+`handleFiles` calcula `inferredDate` del archivo pero **solo lo usa como fallback**:
+
+```js
+const sessionDate = currentTurnoDate || inferredDate   // nunca los compara
+```
+
+Los Excel del Grader cubren **rangos largos** —medido: el de julio va del **2025-07-01 al
+2025-07-14** y el de agosto del **2025-08-25 al 2025-08-30**, 55 días de distancia— y el usuario
+elige un turno dentro de ese rango. Si carga el archivo del mes equivocado, el turno elegido no
+está en el archivo y **nadie avisa**.
+
+Y no queda en un resumen vacío: al aceptar un `PIEZA_PIEZA` o `PUERTA_0` el flujo llama a
+`deleteDailySummary(sessionDate, shiftId, lineId)` **antes de saber si el archivo contiene ese
+turno**. Sin aviso, el resumen bueno se pierde en silencio. Ahora se avisa cuando el turno de la
+sesión cae fuera del rango del archivo.
+
+## Verificación — y lo que NO se pudo verificar
+
+La lógica está en `services/grader/graderAvisosDeCarga.ts` (módulo puro) con **8 tests** cuyos
+rangos son los medidos de los archivos reales; confirmados silenciando el aviso: fallan con el
+síntoma («expected null not to be null»). Estilo verificado a 1920 en los dos temas.
+
+⚠️ **El render con un archivo de verdad NO se verificó, a propósito.** Cargar un Excel escribe en
+Firestore y Storage y **borra el resumen del turno** — justo el efecto que este PR viene a
+advertir—, y las fechas que infieren los archivos disponibles (julio y agosto 2025) tienen
+resúmenes reales en producción. Queda para probar cargando un Excel a mano.
+
+**Nota de contraste (segunda vez):** el texto del aviso en `text-ink-warn` sobre `bg-muted` da
+**4,4:1 en tema claro**, bajo el 4,5 que pide AA para 11 px — el mismo caso que `text-primary`
+en #947. El color quedó **solo en el ícono** y el texto en `text-foreground`: 10,7:1 claro /
+14:1 oscuro, y de paso el color deja de ser el único canal.
+
+**Dato de mapa:** los Excel reales viven en
+`OneDrive/ANTARFOOD/⚙️ EQUIPOS PLANTA/⚙️ GRADER/temporada 2025-2026/{pieza a pieza,punto 0}/<mes>/`
+y el test de integración los lee desde ahí resolviendo el HOME.
 ## 2026-09-11 · La tabla del período ordenaba por el nombre del turno, no por el reloj (PR #955)
 
 Los dos bloques que quedaban sin revisar en Periodo: la tabla «Turnos del período» (470 px) y
