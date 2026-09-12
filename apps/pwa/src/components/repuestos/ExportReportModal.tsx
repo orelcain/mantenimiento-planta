@@ -262,6 +262,35 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
     }
   }
 
+  /**
+   * Cuantas posiciones saldran DE VERDAD en la BOM.
+   *
+   * El contador de la seleccion no sirve para esta pestana y enganaba por mucho: los
+   * materiales sin codigo SAP no entran en la lista (en SELLADO la seleccion deci­a 832 y
+   * salian 27 posiciones) y, al reves, un material compartido genera una posicion por CADA
+   * equipo donde sirve (en EMPAQUE 74 seleccionados daban 112 filas). Se calcula con las
+   * mismas funciones que hacen la exportacion, para que el numero no pueda divergir.
+   */
+  const sapPreview = useMemo(() => {
+    if (reportType !== 'sap_bom') return null
+    const selected = repuestos.filter((r) => selectedIds.has(r.id))
+    if (selected.length === 0) return { posiciones: 0, equipos: 0 }
+    if (sapEquipo) {
+      const bom = repuestoExports.buildBomIB01(selected, {
+        equipoCodigo: sapEquipo.codigo,
+        equipoNombre: sapEquipo.nombre,
+        centro: sapEquipo.centro,
+        incluirSinSap,
+      })
+      return { posiciones: bom.resumen.total, equipos: bom.rows.length > 0 ? 1 : 0 }
+    }
+    if (sapEquipos?.length) {
+      const r = repuestoExports.resumirBoms(repuestoExports.buildBomsIB01(selected, sapEquipos, { incluirSinSap }))
+      return { posiciones: r.posiciones, equipos: r.equipos }
+    }
+    return { posiciones: 0, equipos: 0 }
+  }, [reportType, repuestos, selectedIds, sapEquipo, sapEquipos, incluirSinSap])
+
   const totalSelected = selectedIds.size
 
   return (
@@ -454,11 +483,13 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
 
         <DialogFooter className="p-4 border-t bg-background shrink-0">
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-          <Button onClick={handleExport} disabled={selectedIds.size === 0 || isExporting} className="gap-2 min-w-[180px]">
+          <Button onClick={handleExport} disabled={selectedIds.size === 0 || isExporting || sapPreview?.posiciones === 0} className="gap-2 min-w-[180px]">
             {isExporting ? (
                 <>Generando...</>
             ) : (
-                <>Exportar Selección ({selectedIds.size})</>
+                sapPreview
+                    ? <>Exportar {sapPreview.posiciones} {sapPreview.posiciones === 1 ? 'posición' : 'posiciones'}{sapPreview.equipos > 1 ? ' · ' + sapPreview.equipos + ' equipos' : ''}</>
+                    : <>Exportar Selección ({selectedIds.size})</>
             )}
           </Button>
         </DialogFooter>
