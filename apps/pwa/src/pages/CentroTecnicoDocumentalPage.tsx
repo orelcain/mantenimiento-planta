@@ -1934,9 +1934,26 @@ function ExpedienteDialog({
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
   const [editingNoteText, setEditingNoteText] = useState('')
 
+  /*
+   * El panel NO scrolleaba en PC con una lista larga (los 476 del BOM de la
+   * Baader 142): el contenido quedaba cortado y no habia forma de recorrerlo.
+   *
+   * Por que: los contenedores del layout usan `min-h-screen`, no `h-screen`, asi
+   * que el `h-full` del CTD no resuelve a una altura fija. Sin altura que lo
+   * limite, el panel CRECE con el contenido y su `overflow-y-auto` nunca se
+   * activa. Y el `body` tiene `overflow: hidden`, asi que tampoco hay scroll de
+   * documento que lo salve.
+   *
+   * Medido inyectando 4.000 px en el panel: pasaba de 710 a 4.482 px de alto,
+   * `scrollHeight === clientHeight`, y el body quedaba en 4.573 sin scrollear.
+   * Con `lg:sticky lg:top-0 lg:max-h-screen` el panel queda acotado al alto de
+   * la ventana y su overflow SI se activa (medido: clientH 1.080, scrollH 4.482).
+   *
+   * En telefono no aplica: ahi es `fixed inset-0` y ya scrolleaba.
+   */
   return (
     <section
-      className="fixed inset-0 z-50 flex flex-col overflow-y-auto bg-[var(--panel-surface)] dark:bg-background lg:static lg:z-auto lg:w-[44%] lg:min-w-[440px] lg:max-w-[680px] lg:shrink-0 lg:border-l xl:w-[40%]"
+      className="fixed inset-0 z-50 flex flex-col overflow-y-auto bg-[var(--panel-surface)] dark:bg-background lg:sticky lg:top-0 lg:max-h-screen lg:z-auto lg:w-[44%] lg:min-w-[440px] lg:max-w-[680px] lg:shrink-0 lg:border-l xl:w-[40%]"
       role="dialog"
       aria-modal="true"
     >
