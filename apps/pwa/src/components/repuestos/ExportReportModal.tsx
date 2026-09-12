@@ -3,14 +3,15 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogFooter } f
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
-import { FileText, FileSpreadsheet, ClipboardList, Factory } from 'lucide-react'
+import { FileText, ClipboardList, Factory } from 'lucide-react'
 import type { Repuesto } from '@/types/repuestos'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import * as repuestoExports from '@/utils/repuestos'
 import type { EquipoSap } from '@/utils/repuestos/exportBomSAP'
+import { rowKeyDeRepuesto } from '@/hooks/repuestos/identidadDeRepuesto'
 import { logger } from '@/lib/logger'
 
-export type ReportType = 'technical_sheet' | 'catalog' | 'excel' | 'sap_bom'
+export type ReportType = 'catalog' | 'sap_bom' | 'technical_sheet'
 
 /** Identidad del equipo para la BOM de SAP. Si no viene, la opción SAP ni se ofrece. */
 export interface SapEquipoContext {
@@ -27,6 +28,13 @@ interface ExportReportModalProps {
   repuestos: Repuesto[]
   filteredRepuestos?: Repuesto[] 
   machineName?: string
+  /**
+   * Claves de favoritos del usuario (las del módulo Repuestos). Habilitan las fichas técnicas:
+   * medido sobre el catálogo, solo el 1% de los repuestos tiene foto y ninguno tiene ficha
+   * técnica — una ficha por página del catálogo entero son miles de hojas en blanco. Entre los
+   * favoritos, en cambio, más de la mitad tiene foto: es el subconjunto que la gente documenta.
+   */
+  favKeys?: ReadonlySet<string>
   /** Presente solo cuando se está viendo UN equipo: habilita la exportación IB01. */
   sapEquipo?: SapEquipoContext
   /** Equipos del alcance visible: habilita la exportacion masiva cuando no hay uno solo elegido. */
@@ -48,9 +56,9 @@ const unicosPorId = <T extends { id: string }>(items: T[]): T[] => {
   return items.filter((r) => (vistos.has(r.id) ? false : (vistos.add(r.id), true)))
 }
 
-export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuestos, machineName = 'General', sapEquipo, sapEquipos }: ExportReportModalProps) {
+export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuestos, machineName = 'General', sapEquipo, sapEquipos, favKeys }: ExportReportModalProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [reportType, setReportType] = useState<ReportType>('technical_sheet')
+  const [reportType, setReportType] = useState<ReportType>('catalog')
   const [includeImages, setIncludeImages] = useState(true)
   const [isExporting, setIsExporting] = useState(false)
   const [filterMode, setFilterMode] = useState<'all' | 'filtered'>('all')
@@ -101,19 +109,15 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
     try {
         switch (reportType) {
             case 'technical_sheet':
-                await repuestoExports.exportMultipleTechnicalSheetsToPDF(selected, machineName)
+                // Solo los favoritos: ver el comentario de `favKeys` en las props.
+                if (favoritosSeleccionados.length === 0) break
+                await repuestoExports.exportMultipleTechnicalSheetsToPDF(favoritosSeleccionados, machineName)
                 break
             case 'catalog':
                 await repuestoExports.exportRepuestosToPDF(selected, { 
                     machineName, 
                     includeStats: true
                 }) 
-                break
-            case 'excel':
-                await repuestoExports.exportRepuestosToExcel(selected, {
-                    machineName,
-                    includeImages: includeImages
-                })
                 break
             case 'sap_bom': {
                 const unicos = unicosPorId(selected)
@@ -153,6 +157,12 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
    * equipo donde sirve (en EMPAQUE 74 seleccionados daban 112 filas). Se calcula con las
    * mismas funciones que hacen la exportacion, para que el numero no pueda divergir.
    */
+  /** Los favoritos que hay dentro de la selección actual (identidad estable, no docId). */
+  const favoritosSeleccionados = useMemo(() => {
+    if (!favKeys?.size) return []
+    return unicosPorId(repuestos.filter((r) => selectedIds.has(r.id) && favKeys.has(rowKeyDeRepuesto(r))))
+  }, [favKeys, repuestos, selectedIds])
+
   const sapPreview = useMemo(() => {
     if (reportType !== 'sap_bom') return null
     const selected = unicosPorId(repuestos.filter((r) => selectedIds.has(r.id)))
@@ -288,24 +298,8 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
                     </h3>
                     <Tabs value={reportType} onValueChange={(v) => setReportType(v as ReportType)} className="w-full">
                         <TabsList className="grid w-full grid-cols-1 h-auto gap-3 bg-transparent p-0">
-                            <TabsTrigger 
-                                value="technical_sheet" 
-                                className="justify-start px-4 py-3 border bg-background hover:bg-muted/50 data-[state=active]:border-primary data-[state=active]:ring-1 data-[state=active]:ring-primary/20 transition-all shadow-sm rounded-card"
-                            >
-                                <div className="flex items-start gap-4">
-                                    <div className="p-2.5 bg-blue-500/[0.15] text-blue-600 rounded-card shrink-0 mt-0.5">
-                                        <ClipboardList className="h-5 w-5"/>
-                                    </div>
-                                    <div className="text-left space-y-1">
-                                        <div className="font-semibold text-foreground">Fichas Técnicas</div>
-                                        <div className="text-xs text-muted-foreground font-normal leading-relaxed">
-                                            Genera un documento PDF detallado donde cada ítem ocupa una página completa. Incluye fotos grandes, galería y todas las especificaciones técnicas.
-                                        </div>
-                                    </div>
-                                </div>
-                            </TabsTrigger>
-                            <TabsTrigger 
-                                value="catalog" 
+                            <TabsTrigger
+                                value="catalog"
                                 className="justify-start px-4 py-3 border bg-background hover:bg-muted/50 data-[state=active]:border-primary data-[state=active]:ring-1 data-[state=active]:ring-primary/20 transition-all shadow-sm rounded-card"
                             >
                                 <div className="flex items-start gap-4">
@@ -315,23 +309,7 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
                                     <div className="text-left space-y-1">
                                         <div className="font-semibold text-foreground">Catálogo Resumen</div>
                                         <div className="text-xs text-muted-foreground font-normal leading-relaxed">
-                                            Genera un listado compacto en formato tabla. Optimizado para mostrar la mayor cantidad de ítems por página.
-                                        </div>
-                                    </div>
-                                </div>
-                            </TabsTrigger>
-                            <TabsTrigger 
-                                value="excel" 
-                                className="justify-start px-4 py-3 border bg-background hover:bg-muted/50 data-[state=active]:border-primary data-[state=active]:ring-1 data-[state=active]:ring-primary/20 transition-all shadow-sm rounded-card"
-                            >
-                                <div className="flex items-start gap-4">
-                                    <div className="p-2.5 bg-emerald-500/[0.15] text-ink-ok rounded-card shrink-0 mt-0.5">
-                                        <FileSpreadsheet className="h-5 w-5"/>
-                                    </div>
-                                    <div className="text-left space-y-1">
-                                        <div className="font-semibold text-foreground">Datos Excel</div>
-                                        <div className="text-xs text-muted-foreground font-normal leading-relaxed">
-                                            Descarga los datos crudos en formato .xlsx. Estructura tabular plana ideal para Power BI.
+                                            Listado compacto en formato tabla, para imprimir o revisar en papel. Optimizado para la mayor cantidad de ítems por página.
                                         </div>
                                     </div>
                                 </div>
@@ -351,6 +329,24 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
                                             {sapEquipo
                                                 ? <>Planilla lista para cargar la BOM del equipo {sapEquipo.codigo} en SAP PM, centro {sapEquipo.centro || 'sin determinar'}. Uso de lista 4 (Mantenimiento).</>
                                                 : <>Una BOM por cada uno de los {sapEquipos?.length} equipos del alcance, en un solo archivo con las posiciones en hoja plana (formato de carga masiva). Uso de lista 4 (Mantenimiento).</>}
+                                        </div>
+                                    </div>
+                                </div>
+                            </TabsTrigger>
+                            )}
+                            {(favKeys?.size ?? 0) > 0 && (
+                            <TabsTrigger
+                                value="technical_sheet"
+                                className="justify-start px-4 py-3 border bg-background hover:bg-muted/50 data-[state=active]:border-primary data-[state=active]:ring-1 data-[state=active]:ring-primary/20 transition-all shadow-sm rounded-card"
+                            >
+                                <div className="flex items-start gap-4">
+                                    <div className="p-2.5 bg-blue-500/[0.15] text-blue-600 rounded-card shrink-0 mt-0.5">
+                                        <ClipboardList className="h-5 w-5"/>
+                                    </div>
+                                    <div className="text-left space-y-1">
+                                        <div className="font-semibold text-foreground">Fichas de mis favoritos</div>
+                                        <div className="text-xs text-muted-foreground font-normal leading-relaxed">
+                                            Una página por repuesto, con fotos grandes y especificaciones. Solo tus favoritos: {favoritosSeleccionados.length} de los seleccionados. Sobre el catálogo entero saldrían miles de páginas en blanco.
                                         </div>
                                     </div>
                                 </div>
@@ -393,9 +389,7 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
                                     Incluir Imágenes
                                 </Label>
                                 <p className="text-xs text-muted-foreground leading-relaxed">
-                                    {reportType === 'excel' 
-                                        ? 'Agrega una columna con el conteo de imágenes disponibles.' 
-                                        : 'Intenta renderizar las imágenes disponibles en el documento PDF.'}
+                                    Intenta renderizar las imágenes disponibles en el documento PDF.
                                 </p>
                             </div>
                          </div>
@@ -408,13 +402,15 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
 
         <DialogFooter className="p-4 border-t bg-background shrink-0">
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-          <Button onClick={handleExport} disabled={selectedIds.size === 0 || isExporting || sapPreview?.posiciones === 0} className="gap-2 min-w-[180px]">
+          <Button onClick={handleExport} disabled={selectedIds.size === 0 || isExporting || sapPreview?.posiciones === 0 || (reportType === 'technical_sheet' && favoritosSeleccionados.length === 0)} className="gap-2 min-w-[180px]">
             {isExporting ? (
                 <>Generando...</>
             ) : (
                 sapPreview
                     ? <>Exportar {sapPreview.posiciones} {sapPreview.posiciones === 1 ? 'posición' : 'posiciones'}{sapPreview.equipos > 1 ? ' · ' + sapPreview.equipos + ' equipos' : ''}</>
-                    : <>Exportar Selección ({selectedIds.size})</>
+                    : reportType === 'technical_sheet'
+                        ? <>Exportar {favoritosSeleccionados.length} {favoritosSeleccionados.length === 1 ? 'ficha' : 'fichas'}</>
+                        : <>Exportar Selección ({selectedIds.size})</>
             )}
           </Button>
         </DialogFooter>
