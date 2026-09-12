@@ -43,6 +43,20 @@ type TreeNode = {
     parentId?: string
 }
 
+
+/**
+ * Items unicos por id.
+ *
+ * La lista que llega al modal trae una fila POR CADA equipo donde sirve el repuesto (un
+ * material de la Baader 142 aparece 3 veces, una por maquina hermana de Chonchi). Para una BOM
+ * eso es veneno: SAP rechaza la lista entera si un material se repite, y sin esto la 142
+ * exportaba 1.428 posiciones en vez de 476.
+ */
+const unicosPorId = <T extends { id: string }>(items: T[]): T[] => {
+  const vistos = new Set<string>()
+  return items.filter((r) => (vistos.has(r.id) ? false : (vistos.add(r.id), true)))
+}
+
 export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuestos, categories, machineName = 'General', sapEquipo, sapEquipos }: ExportReportModalProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [reportType, setReportType] = useState<ReportType>('technical_sheet')
@@ -235,8 +249,9 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
                 })
                 break
             case 'sap_bom': {
+                const unicos = unicosPorId(selected)
                 if (sapEquipo) {
-                    const bom = repuestoExports.buildBomIB01(selected, {
+                    const bom = repuestoExports.buildBomIB01(unicos, {
                         equipoCodigo: sapEquipo.codigo,
                         equipoNombre: sapEquipo.nombre,
                         centro: sapEquipo.centro,
@@ -244,7 +259,7 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
                     })
                     repuestoExports.exportBomIB01ToExcel(bom)
                 } else if (sapEquipos?.length) {
-                    const boms = repuestoExports.buildBomsIB01(selected, sapEquipos, { incluirSinSap })
+                    const boms = repuestoExports.buildBomsIB01(unicos, sapEquipos, { incluirSinSap })
                     if (boms.length === 0) {
                         logger.warn('BOM SAP: ningun equipo del alcance tiene posiciones que exportar')
                         break
@@ -273,7 +288,7 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
    */
   const sapPreview = useMemo(() => {
     if (reportType !== 'sap_bom') return null
-    const selected = repuestos.filter((r) => selectedIds.has(r.id))
+    const selected = unicosPorId(repuestos.filter((r) => selectedIds.has(r.id)))
     if (selected.length === 0) return { posiciones: 0, equipos: 0 }
     if (sapEquipo) {
       const bom = repuestoExports.buildBomIB01(selected, {
