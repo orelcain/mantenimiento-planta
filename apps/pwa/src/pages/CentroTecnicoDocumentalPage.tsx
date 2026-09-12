@@ -53,6 +53,8 @@ import { TableroExpediente } from '@/components/equipment/TableroExpediente'
 import { PhotoAnnotationEditor } from '@/components/PhotoAnnotationEditor'
 import { useManualesDeEquipos } from '@/hooks/repuestos/useManualesDeEquipos'
 import { useRepuestosDeEquipo } from '@/hooks/repuestos/useRepuestosDeEquipo'
+import { particionarRepuestosDeEquipo } from '@/services/repuestos/bomDeEquipo'
+import { cn } from '@/lib/utils'
 import { logger } from '@/lib/logger'
 import {
   BUCKETS,
@@ -1412,11 +1414,16 @@ function OtBadge({ ot }: { ot?: OtCount }) {
   )
 }
 
+/** Cuantas filas del equipo comparten ese nombre del despiece. */
+const GRUPO_TITULO = (n: number): string => n + ' filas con este mismo nombre'
+
 /** Recursos · repuestos del equipo (N:M) + buscador embebido para vincular/desvincular. */
 function RecursosRepuestos({ equipment, canEdit }: { equipment: Equipment; canEdit: boolean }) {
   const nodeId = equipment.hierarchyNodeId
   const [reloadKey, setReloadKey] = useState(0)
   const { repuestos, loading } = useRepuestosDeEquipo(nodeId, reloadKey)
+  const [despieceAbierto, setDespieceAbierto] = useState(false)
+  const particion = useMemo(() => particionarRepuestosDeEquipo(repuestos), [repuestos])
   const [adding, setAdding] = useState(false)
   const [maestro, setMaestro] = useState<RepuestoMaestroItem[] | null>(null)
   const [loadingMaestro, setLoadingMaestro] = useState(false)
@@ -1535,30 +1542,112 @@ function RecursosRepuestos({ equipment, canEdit }: { equipment: Equipment; canEd
             Sin repuestos vinculados{nodeId ? '' : ' (equipo sin nodo de jerarquía)'}.
           </p>
         ) : (
-          <div className="divide-y">
-            {repuestos.map((r) => (
-              <div key={r.id} className="flex items-center gap-3 py-2 text-sm">
-                <span className="w-28 shrink-0 font-mono text-xs text-muted-foreground">{r.codigoSAP || '—'}</span>
-                <span className="min-w-0 flex-1 truncate">
-                  {r.nombre}
-                  {r.tipo ? <span className="text-caption text-muted-foreground"> · {r.tipo}</span> : null}
-                </span>
-                {typeof r.stockFisico === 'number' && (
-                  <span className="shrink-0 text-xs text-muted-foreground">stock {r.stockFisico}</span>
+          <div className="space-y-1">
+            {/*
+              Antes era UNA lista alfabética con todo mezclado. En la Baader 142
+              son 1.804 filas donde lo primero que se ve es «Abrazadera de
+              manguera» cuatro veces seguidas, sin código. Los 476 con código SAP
+              son la lista de materiales —la que se carga en IB01, con la
+              cantidad que lleva la máquina— y los otros 1.328 son despiece del
+              fabricante: identifica la pieza en el plano, no se puede pedir.
+              Ver services/repuestos/bomDeEquipo.ts.
+            */}
+            {particion.bom.length > 0 && (
+              <>
+                <div className="flex flex-wrap items-baseline gap-x-2 pt-1">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-ink-ok">
+                    Lista de materiales SAP · {particion.bom.length}
+                  </span>
+                  <span className="text-caption text-muted-foreground">
+                    con código y cantidad — es la que se carga en IB01
+                  </span>
+                </div>
+                <div className="divide-y">
+                  {particion.bom.map((r) => (
+                    <div key={r.id} className="flex items-center gap-3 py-2 text-sm">
+                      <span className="w-28 shrink-0 font-mono text-xs tabular-nums text-muted-foreground">{r.codigoSAP}</span>
+                      <span className="min-w-0 flex-1 truncate">
+                        {r.nombre}
+                        {r.tipo ? <span className="text-caption text-muted-foreground"> · {r.tipo}</span> : null}
+                      </span>
+                      {typeof r.cantidadPorMaquina === 'number' && (
+                        <span
+                          className="shrink-0 rounded-ctl bg-muted px-1.5 font-mono text-xs tabular-nums text-ink-ok"
+                          title="Cantidad que lleva la máquina"
+                        >
+                          ×{r.cantidadPorMaquina}
+                        </span>
+                      )}
+                      {typeof r.stockFisico === 'number' && (
+                        <span className="shrink-0 text-xs text-muted-foreground">stock {r.stockFisico}</span>
+                      )}
+                      {canEdit && nodeId && (
+                        <button
+                          disabled={busy}
+                          onClick={() => desvincular(r.id)}
+                          className="shrink-0 p-1 text-muted-foreground hover:text-destructive"
+                          title="Quitar del equipo"
+                          aria-label="Quitar repuesto"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {particion.despiece.length > 0 && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setDespieceAbierto((v) => !v)}
+                  aria-expanded={despieceAbierto}
+                  className="flex w-full flex-wrap items-baseline gap-x-2 border-t pt-2 text-left"
+                >
+                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Despiece sin código · {particion.filasSinCodigo}
+                  </span>
+                  <span className="text-caption text-muted-foreground">
+                    identifica la pieza en el plano; no se puede pedir
+                  </span>
+                  <ChevronDown
+                    className={cn('ml-auto h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform', despieceAbierto && 'rotate-180')}
+                  />
+                </button>
+                {despieceAbierto && (
+                  <div className="divide-y">
+                    {particion.despiece.map((g) => (
+                      <div key={g.nombre.toLowerCase()} className="flex items-center gap-3 py-2 text-sm">
+                        <span className="min-w-0 flex-1 truncate">
+                          {g.nombre}
+                          {g.tipo ? <span className="text-caption text-muted-foreground"> · {g.tipo}</span> : null}
+                        </span>
+                        {g.veces > 1 ? (
+                          <span
+                            className="shrink-0 rounded-ctl bg-muted px-1.5 font-mono text-xs tabular-nums text-muted-foreground"
+                            title={GRUPO_TITULO(g.veces)}
+                          >
+                            {g.veces}
+                          </span>
+                        ) : canEdit && nodeId ? (
+                          <button
+                            disabled={busy}
+                            onClick={() => desvincular(g.ids[0]!)}
+                            className="shrink-0 p-1 text-muted-foreground hover:text-destructive"
+                            title="Quitar del equipo"
+                            aria-label="Quitar repuesto"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
                 )}
-                {canEdit && nodeId && (
-                  <button
-                    disabled={busy}
-                    onClick={() => desvincular(r.id)}
-                    className="shrink-0 p-1 text-muted-foreground hover:text-destructive"
-                    title="Quitar del equipo"
-                    aria-label="Quitar repuesto"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                )}
-              </div>
-            ))}
+              </>
+            )}
           </div>
         )}
         <p className="text-caption text-muted-foreground">
