@@ -6,6 +6,63 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-12 · Quitar el archivo dejaba el turno sin resumen (PR #962)
+
+Cuarta y ultima ronda del flujo de carga: `handleRemoveFile`.
+
+## ⚠⚠ No se podia deshacer... y la invalidacion no hacia falta
+
+`handleRemoveFile` borra el upload de Firestore y Storage, pero **el resumen que la carga habia
+invalidado no vuelve**: `deleteDailySummary` hace `deleteDoc`. Cargabas el Excel, te arrepentias, lo
+quitabas, y el turno quedaba sin resumen. Medido en produccion: **3 de 243 dias** con Excel cargado
+no tienen resumen.
+
+Como restaurar no es posible, la pregunta pasa a ser otra: **para que se invalidaba al cargar?**
+
+- `saveDailySummaryBatch` hace `batch.set(ref, ...)` **SIN merge** para un upload con pieza a pieza:
+  **sobrescribe el documento entero al guardar**. El borrado previo no aportaba nada ahi.
+- Para un P0 suelto usa `merge` a proposito, con el comentario «preserva los KPIs del PP si ya
+  existen» — que es **exactamente lo que el borrado previo destruia**.
+- Nadie documento por que se borraba: entro en un commit `chore: lint y mejoras grader`.
+
+Asi que la invalidacion al cargar sobraba, y su unico efecto observable era el daño. Se quito.
+
+**Regla que deja esto:** antes de compensar un efecto destructivo, preguntarse si el efecto hacia
+falta. Dos rondas —#956 le puso un aviso, #960 lo acoto a los turnos que el archivo contiene—
+estuvieron amortiguando un borrado que sobraba entero.
+
+## ⚠ Y la fila se iba aunque el servidor fallara
+
+```ts
+try { await deleteGraderUpload(upload); setUploads(...) }
+catch { setUploadError("No se pudo eliminar el archivo del servidor.") }
+updateFiles((prev) => prev.filter(...))   // <- corria igual
+```
+
+El `updateFiles` estaba **fuera del try**: si el servidor no podia borrarlo, el aviso decia «no se
+pudo eliminar» y la fila se quitaba lo mismo. El archivo seguia en el servidor sin nada que lo
+mostrara, y volvia al recargar el turno. Ahora se queda en pantalla y el aviso lo dice.
+
+## Lo que medi y NO era
+
+La hipotesis mas fuerte leyendo el codigo: como el guardado P0-only hace `merge` para preservar los
+KPIs del pieza a pieza, y el borrado al cargar los destruye, deberia haber resumenes con causas de
+Puerta 0 y sin piezas. **No hay ninguno: 0 de 410.** Cargar un P0 suelto sobre un turno ya guardado
+no se usa en la practica: siempre se cargan los dos juntos. El cambio lo arregla igual, pero no era
+lo que estaba rompiendo.
+
+## Verificacion
+
+4 tests montando la pagina como la monta el Wizard. Confirmados volviendo atras los dos cambios:
+fallan con `expected "vi.fn()" to not be called at all, but actually been called 1 times` y
+`Unable to find an element with the text: /Sigue cargado/`.
+
+`tsc` · `eslint` · `audit-piel` · `audit-graficos` · **2302 tests**. Verificado en el bundle
+publicado (`buildSha c589a38`): el chunk del Wizard ya no referencia `graderDailySummaries`.
+
+**Con esto el flujo de carga del Excel queda recorrido entero**: avisos del parser (#956), la rama
+que nadie montaba (#957), el borrado del resumen (#960 y #962) y el merge PP+P0 (medido, sin
+defectos propios).
 ## 2026-09-12 · Cargar el Excel equivocado borraba el resumen bueno del turno (PR #960)
 
 Tercera ronda sobre el flujo de carga: el **borrado del resumen** y el **merge PP+P0**.
