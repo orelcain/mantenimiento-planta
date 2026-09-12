@@ -40,8 +40,8 @@ import { RepuestoFormModal } from '@/components/repuestos/RepuestoForm'
 import { TechnicalSpecsModal } from '@/components/repuestos/TechnicalSpecsModal'
 import { RepuestoPhotosModal } from '@/components/repuestos/RepuestoPhotosModal'
 import { RepuestoManualModal } from '@/components/repuestos/RepuestoManualModal'
-import { ExportReportModal } from '@/components/repuestos/ExportReportModal'
-import { normalizeForSearch, haystackMatchesAll } from '@/utils/repuestos'
+import { ExportReportModal, type SapEquipoContext } from '@/components/repuestos/ExportReportModal'
+import { normalizeForSearch, haystackMatchesAll, deriveCentro } from '@/utils/repuestos'
 import { InlineEditName } from '@/components/repuestos/InlineEditName'
 import { CLASE_LABEL, type MaterialClase, type Machine, type Repuesto, type RepuestoFormData, type TechnicalSpecs, type MachineImage } from '@/types/repuestos'
 
@@ -117,7 +117,7 @@ interface RepuestosAreaHubProps {
 }
 
 export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate, onPendingCreateConsumed }: RepuestosAreaHubProps = {}) {
-  const { areaTree, findNode, getNodePath, expandNode } = useHierarchyAreaTree()
+  const { areaTree, findNode, getNodePath, expandNode, nodeNameMap } = useHierarchyAreaTree()
 
   // El catálogo (colección plana `repuestos`) referencia nodos de hierarchy por id;
   // el equipment cache aporta nombre/alias/path de cada nodo-equipo.
@@ -600,6 +600,20 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     () => (selectedAreaId ? findNode(selectedAreaId) : null),
     [selectedAreaId, findNode],
   )
+
+  // Identidad SAP del equipo que se está viendo, para exportar su lista de materiales (IB01).
+  // El centro sale del ÁRBOL, nunca del nombre: los equipos se llaman igual en las dos plantas.
+  const sapEquipo = useMemo((): SapEquipoContext | undefined => {
+    if (!selectedEquipMachineId) return undefined
+    const eq = (getGlobalEquipmentCache() || []).find((e) => e.id === selectedEquipMachineId)
+    if (!eq?.codigo) return undefined
+    const ancestros = (eq.path || []).map((id) => nodeNameMap.get(id) || '').filter(Boolean)
+    return {
+      codigo: eq.codigo,
+      nombre: eq.alias || eq.nombre || selectedEquipName || eq.codigo,
+      centro: deriveCentro(ancestros),
+    }
+  }, [selectedEquipMachineId, selectedEquipName, nodeNameMap])
 
   // (Fase 4 normalización) La sección "Motores y bombas" desapareció: los motores/
   // bombas físicos del levantamiento ahora son REPUESTOS de la colección plana
@@ -2382,6 +2396,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
         filteredRepuestos={exportFiltered}
         categories={[]}
         machineName={showingAll ? 'Todas las áreas' : (selectedNode?.nombre ?? 'Área')}
+        sapEquipo={sapEquipo}
       />
 
       {/* Gestor de listas de favoritos con nombre (para el repuesto objetivo) */}

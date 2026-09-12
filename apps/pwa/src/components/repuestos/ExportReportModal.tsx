@@ -3,13 +3,22 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogFooter } f
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
-import { FileText, FileSpreadsheet, ClipboardList, ChevronRight, ChevronDown, CheckSquare, Square } from 'lucide-react'
+import { FileText, FileSpreadsheet, ClipboardList, ChevronRight, ChevronDown, CheckSquare, Square, Factory } from 'lucide-react'
 import type { Repuesto } from '@/types/repuestos'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import * as repuestoExports from '@/utils/repuestos'
 import { logger } from '@/lib/logger'
 
-export type ReportType = 'technical_sheet' | 'catalog' | 'excel'
+export type ReportType = 'technical_sheet' | 'catalog' | 'excel' | 'sap_bom'
+
+/** Identidad del equipo para la BOM de SAP. Si no viene, la opción SAP ni se ofrece. */
+export interface SapEquipoContext {
+  /** Número de equipo SAP (los `720004...`). */
+  codigo: string
+  nombre: string
+  /** Centro: derivado del árbol, NUNCA del nombre del equipo. */
+  centro: string
+}
 
 interface ExportReportModalProps {
   isOpen: boolean
@@ -18,6 +27,8 @@ interface ExportReportModalProps {
   filteredRepuestos?: Repuesto[] 
   categories: { id: string, nombre: string, parentId?: string | null }[]
   machineName?: string
+  /** Presente solo cuando se está viendo UN equipo: habilita la exportación IB01. */
+  sapEquipo?: SapEquipoContext
 }
 
 type TreeNode = {
@@ -29,13 +40,16 @@ type TreeNode = {
     parentId?: string
 }
 
-export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuestos, categories, machineName = 'General' }: ExportReportModalProps) {
+export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuestos, categories, machineName = 'General', sapEquipo }: ExportReportModalProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [reportType, setReportType] = useState<ReportType>('technical_sheet')
   const [includeImages, setIncludeImages] = useState(true)
   const [isExporting, setIsExporting] = useState(false)
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set())
   const [filterMode, setFilterMode] = useState<'all' | 'filtered'>('all')
+  // Las posiciones de texto (despiece sin código SAP) quedan fuera por defecto: incluirlas
+  // multiplica el largo de la lista y la vuelve inmanejable al elegir componentes en IW31.
+  const [incluirSinSap, setIncluirSinSap] = useState(false)
 
   useEffect(() => {
     if (isOpen && filteredRepuestos && filteredRepuestos.length < repuestos.length) {
@@ -213,6 +227,17 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
                     includeImages: includeImages
                 })
                 break
+            case 'sap_bom': {
+                if (!sapEquipo) break
+                const bom = repuestoExports.buildBomIB01(selected, {
+                    equipoCodigo: sapEquipo.codigo,
+                    equipoNombre: sapEquipo.nombre,
+                    centro: sapEquipo.centro,
+                    incluirSinSap,
+                })
+                repuestoExports.exportBomIB01ToExcel(bom)
+                break
+            }
         }
         onClose()
     } catch (error) {
@@ -343,6 +368,24 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
                                     </div>
                                 </div>
                             </TabsTrigger>
+                            {sapEquipo && (
+                            <TabsTrigger
+                                value="sap_bom"
+                                className="justify-start px-4 py-3 border bg-background hover:bg-muted/50 data-[state=active]:border-primary data-[state=active]:ring-1 data-[state=active]:ring-primary/20 transition-all shadow-sm rounded-card"
+                            >
+                                <div className="flex items-start gap-4">
+                                    <div className="p-2.5 bg-amber-500/[0.15] text-amber-700 dark:text-amber-400 rounded-card shrink-0 mt-0.5">
+                                        <Factory className="h-5 w-5"/>
+                                    </div>
+                                    <div className="text-left space-y-1">
+                                        <div className="font-semibold text-foreground">Lista de materiales SAP (IB01)</div>
+                                        <div className="text-xs text-muted-foreground font-normal leading-relaxed">
+                                            Planilla lista para cargar la BOM del equipo {sapEquipo.codigo} en SAP PM, centro {sapEquipo.centro || 'sin determinar'}. Uso de lista 4 (Mantenimiento).
+                                        </div>
+                                    </div>
+                                </div>
+                            </TabsTrigger>
+                            )}
                         </TabsList>
                     </Tabs>
                 </div>
@@ -353,6 +396,24 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
                         Configuración
                     </h3>
                     
+                    {reportType === 'sap_bom' && (
+                    <div className="p-4 border rounded-card bg-background shadow-sm">
+                         <div className="flex items-start space-x-3">
+                            <Checkbox id="incluir-sin-sap" checked={incluirSinSap} onCheckedChange={(c) => setIncluirSinSap(!!c)} className="mt-1" />
+                            <div className="grid gap-1.5 leading-none">
+                                <Label htmlFor="incluir-sin-sap" className="text-sm font-medium cursor-pointer">
+                                    Incluir despiece sin código SAP
+                                </Label>
+                                <p className="text-xs text-muted-foreground leading-relaxed">
+                                    Los agrega como posiciones de texto (tipo T), identificadas por código de fabricante.
+                                    Hace la lista mucho más larga: déjalo apagado si la BOM es para elegir componentes en una orden.
+                                </p>
+                            </div>
+                         </div>
+                    </div>
+                    )}
+
+                    {reportType !== 'sap_bom' && (
                     <div className="p-4 border rounded-card bg-background shadow-sm">
                          <div className="flex items-start space-x-3">
                             <Checkbox id="include-images" checked={includeImages} onCheckedChange={(c) => setIncludeImages(!!c)} className="mt-1" />
@@ -368,6 +429,7 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
                             </div>
                          </div>
                     </div>
+                    )}
                 </div>
 
             </div>

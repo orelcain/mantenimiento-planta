@@ -1,5 +1,7 @@
 export { optimizeImage, validateImageFile, getImageDimensions, fileToBase64, downloadImage } from './imageUtils'
 export { exportRepuestosToExcel, exportCantidadesTemplate } from './exportToExcel'
+export { buildBomIB01, exportBomIB01ToExcel, deriveCentro, bomFileName, toUnidadSAP } from './exportBomSAP'
+export type { BomIB01, BomIB01Row, BomIB01Header, BuildBomOptions } from './exportBomSAP'
 export { exportRepuestosToPDF, exportTagsReportToPDF } from './exportToPDF'
 export { exportTechnicalSheetToPDF, exportMultipleTechnicalSheetsToPDF } from './exportTechnicalSheet'
 export { normalizeForSearch, matchesSearch, termVariants, haystackMatchesAll } from './searchNormalize'
