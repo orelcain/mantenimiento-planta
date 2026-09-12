@@ -42,6 +42,7 @@ import { RepuestoPhotosModal } from '@/components/repuestos/RepuestoPhotosModal'
 import { RepuestoManualModal } from '@/components/repuestos/RepuestoManualModal'
 import { ExportReportModal, type SapEquipoContext } from '@/components/repuestos/ExportReportModal'
 import { normalizeForSearch, haystackMatchesAll, deriveCentro } from '@/utils/repuestos'
+import type { EquipoSap } from '@/utils/repuestos/exportBomSAP'
 import { InlineEditName } from '@/components/repuestos/InlineEditName'
 import { CLASE_LABEL, type MaterialClase, type Machine, type Repuesto, type RepuestoFormData, type TechnicalSpecs, type MachineImage } from '@/types/repuestos'
 
@@ -614,6 +615,22 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
       centro: deriveCentro(ancestros),
     }
   }, [selectedEquipMachineId, selectedEquipName, nodeNameMap])
+
+
+  // Equipos del alcance visible (area elegida, o toda la planta), para exportar sus BOM de una
+  // pasada. Solo los que tienen codigo SAP: un nodo sin codigo no es un equipo cargable en SAP.
+  const sapEquipos = useMemo((): EquipoSap[] => {
+    const cache = getGlobalEquipmentCache() || []
+    return cache
+      .filter((e) => !e.oculto && !!e.codigo)
+      .filter((e) => showingAll || !selectedAreaId || (e.path || []).includes(selectedAreaId))
+      .map((e) => ({
+        id: e.id,
+        codigo: e.codigo,
+        nombre: e.alias || e.nombre || e.codigo,
+        centro: deriveCentro((e.path || []).map((id) => nodeNameMap.get(id) || '').filter(Boolean)),
+      }))
+  }, [showingAll, selectedAreaId, nodeNameMap])
 
   // (Fase 4 normalización) La sección "Motores y bombas" desapareció: los motores/
   // bombas físicos del levantamiento ahora son REPUESTOS de la colección plana
@@ -2397,6 +2414,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
         categories={[]}
         machineName={showingAll ? 'Todas las áreas' : (selectedNode?.nombre ?? 'Área')}
         sapEquipo={sapEquipo}
+        sapEquipos={sapEquipos}
       />
 
       {/* Gestor de listas de favoritos con nombre (para el repuesto objetivo) */}

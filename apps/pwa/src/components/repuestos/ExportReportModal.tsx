@@ -7,6 +7,7 @@ import { FileText, FileSpreadsheet, ClipboardList, ChevronRight, ChevronDown, Ch
 import type { Repuesto } from '@/types/repuestos'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import * as repuestoExports from '@/utils/repuestos'
+import type { EquipoSap } from '@/utils/repuestos/exportBomSAP'
 import { logger } from '@/lib/logger'
 
 export type ReportType = 'technical_sheet' | 'catalog' | 'excel' | 'sap_bom'
@@ -29,6 +30,8 @@ interface ExportReportModalProps {
   machineName?: string
   /** Presente solo cuando se está viendo UN equipo: habilita la exportación IB01. */
   sapEquipo?: SapEquipoContext
+  /** Equipos del alcance visible: habilita la exportacion masiva cuando no hay uno solo elegido. */
+  sapEquipos?: EquipoSap[]
 }
 
 type TreeNode = {
@@ -40,7 +43,7 @@ type TreeNode = {
     parentId?: string
 }
 
-export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuestos, categories, machineName = 'General', sapEquipo }: ExportReportModalProps) {
+export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuestos, categories, machineName = 'General', sapEquipo, sapEquipos }: ExportReportModalProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [reportType, setReportType] = useState<ReportType>('technical_sheet')
   const [includeImages, setIncludeImages] = useState(true)
@@ -50,6 +53,10 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
   // Las posiciones de texto (despiece sin código SAP) quedan fuera por defecto: incluirlas
   // multiplica el largo de la lista y la vuelve inmanejable al elegir componentes en IW31.
   const [incluirSinSap, setIncluirSinSap] = useState(false)
+
+  // Un equipo elegido manda; si no hay, se ofrece la exportacion masiva del alcance visible.
+  const sapMasivo = !sapEquipo && (sapEquipos?.length ?? 0) > 0
+  const sapDisponible = !!sapEquipo || sapMasivo
 
   useEffect(() => {
     if (isOpen && filteredRepuestos && filteredRepuestos.length < repuestos.length) {
@@ -228,14 +235,22 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
                 })
                 break
             case 'sap_bom': {
-                if (!sapEquipo) break
-                const bom = repuestoExports.buildBomIB01(selected, {
-                    equipoCodigo: sapEquipo.codigo,
-                    equipoNombre: sapEquipo.nombre,
-                    centro: sapEquipo.centro,
-                    incluirSinSap,
-                })
-                repuestoExports.exportBomIB01ToExcel(bom)
+                if (sapEquipo) {
+                    const bom = repuestoExports.buildBomIB01(selected, {
+                        equipoCodigo: sapEquipo.codigo,
+                        equipoNombre: sapEquipo.nombre,
+                        centro: sapEquipo.centro,
+                        incluirSinSap,
+                    })
+                    repuestoExports.exportBomIB01ToExcel(bom)
+                } else if (sapEquipos?.length) {
+                    const boms = repuestoExports.buildBomsIB01(selected, sapEquipos, { incluirSinSap })
+                    if (boms.length === 0) {
+                        logger.warn('BOM SAP: ningun equipo del alcance tiene posiciones que exportar')
+                        break
+                    }
+                    repuestoExports.exportBomsIB01ToExcel(boms)
+                }
                 break
             }
         }
@@ -368,7 +383,7 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
                                     </div>
                                 </div>
                             </TabsTrigger>
-                            {sapEquipo && (
+                            {sapDisponible && (
                             <TabsTrigger
                                 value="sap_bom"
                                 className="justify-start px-4 py-3 border bg-background hover:bg-muted/50 data-[state=active]:border-primary data-[state=active]:ring-1 data-[state=active]:ring-primary/20 transition-all shadow-sm rounded-card"
@@ -380,7 +395,9 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
                                     <div className="text-left space-y-1">
                                         <div className="font-semibold text-foreground">Lista de materiales SAP (IB01)</div>
                                         <div className="text-xs text-muted-foreground font-normal leading-relaxed">
-                                            Planilla lista para cargar la BOM del equipo {sapEquipo.codigo} en SAP PM, centro {sapEquipo.centro || 'sin determinar'}. Uso de lista 4 (Mantenimiento).
+                                            {sapEquipo
+                                                ? <>Planilla lista para cargar la BOM del equipo {sapEquipo.codigo} en SAP PM, centro {sapEquipo.centro || 'sin determinar'}. Uso de lista 4 (Mantenimiento).</>
+                                                : <>Una BOM por cada uno de los {sapEquipos?.length} equipos del alcance, en un solo archivo con las posiciones en hoja plana (formato de carga masiva). Uso de lista 4 (Mantenimiento).</>}
                                         </div>
                                     </div>
                                 </div>
