@@ -614,7 +614,9 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
       nombre: eq.alias || eq.nombre || selectedEquipName || eq.codigo,
       centro: deriveCentro(ancestros),
     }
-  }, [selectedEquipMachineId, selectedEquipName, nodeNameMap])
+    // eqLoading: el cache de equipos no es reactivo, sin esto el primer render se queda
+    // con el cache vacio y la pestana SAP no aparece hasta reabrir el modal.
+  }, [selectedEquipMachineId, selectedEquipName, nodeNameMap, eqLoading])
 
 
   // Equipos del alcance visible (area elegida, o toda la planta), para exportar sus BOM de una
@@ -630,7 +632,8 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
         nombre: e.alias || e.nombre || e.codigo,
         centro: deriveCentro((e.path || []).map((id) => nodeNameMap.get(id) || '').filter(Boolean)),
       }))
-  }, [showingAll, selectedAreaId, nodeNameMap])
+    // Idem: sin eqLoading la primera apertura del modal ofrece 0 equipos.
+  }, [showingAll, selectedAreaId, nodeNameMap, eqLoading])
 
   // (Fase 4 normalización) La sección "Motores y bombas" desapareció: los motores/
   // bombas físicos del levantamiento ahora son REPUESTOS de la colección plana
