@@ -27,7 +27,7 @@ import { db } from '@/services/firebase'
 import { useGlobalSearch } from '@/hooks/repuestos/useGlobalSearch'
 import { haystackMatchesAll, normalizeForSearch } from '@/utils/repuestos'
 import { getGlobalEquipmentCache, useGlobalEquipmentSearch } from '@/hooks/useGlobalEquipmentSearch'
-import { stockStatusOf } from '@/hooks/repuestos/estadoDeStock'
+import { aplicarFiltroDeStock, contarParaFiltro } from '@/hooks/repuestos/filtrosDeStock'
 import { useBodega } from '@/hooks/repuestos/useBodega'
 // `Tag` colisiona con el ícono homónimo de lucide ya usado acá.
 import { Tag as CatTag, type TagTone } from '@/components/piel'
@@ -237,21 +237,16 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
   const [sortField, setSortField] = useState<SortField>('nombre')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
 
-  const favCount = items.filter(i => i.isWatched).length
 
   const toggleSort = useCallback((field: SortField) => {
     setSortField(prev => { if (prev === field) { setSortDir(d => d === 'asc' ? 'desc' : 'asc'); return prev } setSortDir('asc'); return field })
   }, [])
 
   const filtered = useMemo(() => {
-    let result = items
-    if (stockFilter === 'configurados') result = result.filter(i => i.bodegaId)
-    // Misma definicion que las tarjetas (estadoDeStock.ts). El filtro se habia quedado con la
-    // regla vieja —exigia `stockMinimo > 0`— asi que "Sin stock" anunciaba 545 y mostraba 21.
-    else if (stockFilter === 'bajo') result = result.filter(i => stockStatusOf(i) === 'low')
-    else if (stockFilter === 'sin') result = result.filter(i => stockStatusOf(i) === 'out')
-    else if (stockFilter === 'sinConfig') result = result.filter(i => !i.bodegaId)
-    else if (stockFilter === 'favoritos') result = result.filter(i => i.isWatched)
+    // Un solo sitio decide quien queda en cada filtro (filtrosDeStock.ts). Las tarjetas de
+    // arriba cuentan con el MISMO predicado, asi que su numero es siempre el de filas que
+    // aparecen al pulsarlas — que es justo lo que se habia roto tres veces en este modulo.
+    let result = aplicarFiltroDeStock(items, stockFilter)
 
     if (searchQuery.trim()) {
       const terms = normalizeForSearch(searchQuery).split(/\s+/).filter(Boolean)
@@ -293,12 +288,12 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
     <>
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
-        <StatCard icon={Package} label="Con SAP" value={stats.total} color="text-primary" bg="bg-primary/[0.15]" onClick={() => setStockFilter('todos')} active={stockFilter === 'todos'} />
-        <StatCard icon={PackageCheck} label="Configurados" value={stats.conStock} color="text-ink-ok" bg="bg-emerald-500/[0.15]" onClick={() => setStockFilter('configurados')} active={stockFilter === 'configurados'} />
-        <StatCard icon={TrendingDown} label="Bajo stock" value={stats.bajoStock} color="text-ink-warn" bg="bg-amber-500/[0.15]" onClick={() => setStockFilter('bajo')} active={stockFilter === 'bajo'} />
-        <StatCard icon={PackageX} label="Sin stock" value={stats.sinStock} color="text-ink-crit" bg="bg-red-500/[0.15]" onClick={() => setStockFilter('sin')} active={stockFilter === 'sin'} />
-        <StatCard icon={Settings2} label="Sin configurar" value={stats.sinConfig} color="text-muted-foreground" bg="bg-muted-foreground/[0.10]" onClick={() => setStockFilter('sinConfig')} active={stockFilter === 'sinConfig'} />
-        <StatCard icon={Star} label="Favoritos" value={favCount} color="text-ink-warn" bg="bg-amber-500/[0.15]" onClick={() => setStockFilter('favoritos')} active={stockFilter === 'favoritos'} />
+        <StatCard icon={Package} label="Con SAP" value={contarParaFiltro(items, 'todos')} color="text-primary" bg="bg-primary/[0.15]" onClick={() => setStockFilter('todos')} active={stockFilter === 'todos'} />
+        <StatCard icon={PackageCheck} label="Configurados" value={contarParaFiltro(items, 'configurados')} color="text-ink-ok" bg="bg-emerald-500/[0.15]" onClick={() => setStockFilter('configurados')} active={stockFilter === 'configurados'} />
+        <StatCard icon={TrendingDown} label="Bajo stock" value={contarParaFiltro(items, 'bajo')} color="text-ink-warn" bg="bg-amber-500/[0.15]" onClick={() => setStockFilter('bajo')} active={stockFilter === 'bajo'} />
+        <StatCard icon={PackageX} label="Sin stock" value={contarParaFiltro(items, 'sin')} color="text-ink-crit" bg="bg-red-500/[0.15]" onClick={() => setStockFilter('sin')} active={stockFilter === 'sin'} />
+        <StatCard icon={Settings2} label="Sin configurar" value={contarParaFiltro(items, 'sinConfig')} color="text-muted-foreground" bg="bg-muted-foreground/[0.10]" onClick={() => setStockFilter('sinConfig')} active={stockFilter === 'sinConfig'} />
+        <StatCard icon={Star} label="Favoritos" value={contarParaFiltro(items, 'favoritos')} color="text-ink-warn" bg="bg-amber-500/[0.15]" onClick={() => setStockFilter('favoritos')} active={stockFilter === 'favoritos'} />
       </div>
 
       {/* Search + Actions */}
