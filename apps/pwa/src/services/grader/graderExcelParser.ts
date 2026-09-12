@@ -16,6 +16,7 @@ function pushAll<T>(target: T[], source: readonly T[]): void {
 }
 
 import * as XLSX from 'xlsx'
+import { avisoDeArchivoIncompleto } from './graderArchivoIncompleto'
 import { generateId } from '@/lib/utils'
 import { CALIBRE_WEIGHT_RANGES } from './graderAnalytics'
 import type {
@@ -712,13 +713,24 @@ export async function parseFile(file: File): Promise<{
   const sheet = workbook.Sheets[sheetName]!
   const rows: unknown[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null })
 
+  /*
+   * Un XLSX truncado no da error: SheetJS devuelve la hoja con el rango que
+   * declara el <dimension> y CERO celdas. Medido: dos pieza a pieza reales de
+   * ~8,6 MB cortan a media celda en la fila ~204.100 de 308.539. Sin esto el
+   * aviso era «No se encontró fila de cabecera válida», que manda a revisar las
+   * columnas de un archivo cuyas columnas están perfectas.
+   */
+  const celdasLeidas = Object.keys(sheet).filter((k) => !k.startsWith('!')).length
+  const avisoIncompleto = avisoDeArchivoIncompleto(sheet['!ref'], celdasLeidas)
+  if (avisoIncompleto) warnings.push(avisoIncompleto)
+
   const kind = detectFileKind(rows, file.name)
   if (kind === 'UNKNOWN') {
     warnings.push('No se pudo detectar el tipo de archivo. Verifique las columnas.')
   }
 
   const headerInfo = findHeaderRow(rows)
-  if (!headerInfo) {
+  if (!headerInfo && !avisoIncompleto) {
     warnings.push('No se encontró fila de cabecera válida.')
   }
 
