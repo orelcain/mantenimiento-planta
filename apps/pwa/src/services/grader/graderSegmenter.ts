@@ -791,7 +791,19 @@ export function dedupeGate0Records(records: Gate0Record[]): {
   const unique: Gate0Record[] = []
   for (let i = 0; i < records.length; i++) {
     const r = records[i]!
-    const key = `${r.ts}|${r.pieces}|${r.error ?? ''}|${r.quality ?? ''}|${r.calibre ?? ''}|${r.weightKg ?? ''}`
+    /*
+     * Sin `calibre`: es el campo que rompia el dedupe entre el Excel del mes y
+     * el recorte por turno. Medido sobre el mismo registro de Puerta 0 del
+     * 2025-07-08 22:14:01, el recorte trae `calibre: "Other"` y el Excel del mes
+     * no trae calibre — mismo rechazo, dos claves. Cargando los dos, la ventana
+     * del turno quedaba con 838 registros en vez de 419.
+     *
+     * No cuesta nada: sobre los 26.878 registros de Puerta 0 de julio 2025, la
+     * clave con `calibre` y sin el dejan los mismos 26.878 unicos. `error` se
+     * queda: es la causa del rechazo, coincide entre las dos fuentes y es lo que
+     * distingue dos rechazos del mismo instante.
+     */
+    const key = `${r.ts}|${r.pieces}|${r.error ?? ''}|${r.quality ?? ''}|${r.weightKg ?? ''}`
     if (seen.has(key)) continue
     seen.add(key)
     unique.push(r)

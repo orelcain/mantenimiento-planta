@@ -335,8 +335,13 @@ function procesarArchivo(buf, nombre, segmentos, existentes) {
       acumularPP(seg, { ts, gate, pieces, weightKg, weightPerPieceGrams, quality, calibre, lot })
       usadas++
     } else {
-      // Misma clave que dedupeGate0Records del PWA
-      const k = `${ts}|${pieces}|${errRaw}|${quality ?? ''}|${calibre ?? ''}|${weightKg ?? ''}`
+      /*
+       * Misma clave que dedupeGate0Records del PWA. Sin `calibre`: el recorte
+       * por turno lo trae y el Excel del mes no, asi que el mismo rechazo eran
+       * dos claves distintas. Sobre los 26.878 registros de Puerta 0 de julio
+       * la clave con y sin calibre dejan los mismos unicos.
+       */
+      const k = `${ts}|${pieces}|${errRaw}|${quality ?? ''}|${weightKg ?? ''}`
       if (seg.vistosP0.has(k)) continue
       seg.vistosP0.add(k)
       seg.p0Records.push({
