@@ -24,6 +24,7 @@ import {
   Wrench,
   X,
   Zap,
+  Search,
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import ReactECharts from 'echarts-for-react'
@@ -55,7 +56,8 @@ import { TableroExpediente } from '@/components/equipment/TableroExpediente'
 import { PhotoAnnotationEditor } from '@/components/PhotoAnnotationEditor'
 import { useManualesDeEquipos } from '@/hooks/repuestos/useManualesDeEquipos'
 import { useRepuestosDeEquipo } from '@/hooks/repuestos/useRepuestosDeEquipo'
-import { particionarRepuestosDeEquipo } from '@/services/repuestos/bomDeEquipo'
+import { particionarRepuestosDeEquipo, filtrarRepuestosDeEquipo, opcionesBomDesdeEquipo } from '@/services/repuestos/bomDeEquipo'
+import { buildBomIB01, exportBomIB01ToExcel } from '@/utils/repuestos/exportBomSAP'
 import { ubicacionCorta } from '@/services/equipos/ubicacionCorta'
 import { cn } from '@/lib/utils'
 import { logger } from '@/lib/logger'
@@ -1452,7 +1454,35 @@ function RecursosRepuestos({ equipment, canEdit }: { equipment: Equipment; canEd
   const [reloadKey, setReloadKey] = useState(0)
   const { repuestos, loading } = useRepuestosDeEquipo(nodeId, reloadKey)
   const [despieceAbierto, setDespieceAbierto] = useState(false)
-  const particion = useMemo(() => particionarRepuestosDeEquipo(repuestos), [repuestos])
+  const [filtro, setFiltro] = useState('')
+  const particionTotal = useMemo(() => particionarRepuestosDeEquipo(repuestos), [repuestos])
+  const particion = useMemo(
+    () => (filtro.trim() ? particionarRepuestosDeEquipo(filtrarRepuestosDeEquipo(repuestos, filtro)) : particionTotal),
+    [repuestos, filtro, particionTotal],
+  )
+  const filtrando = filtro.trim().length > 0
+  // Buscando algo, esconder el despiece es esconder la mitad de los resultados.
+  const verDespiece = despieceAbierto || filtrando
+  const sinResultados = filtrando && particion.bom.length === 0 && particion.despiece.length === 0
+
+  /*
+   * Exportar la lista de materiales para cargarla en SAP (IB01).
+   *
+   * Usa las MISMAS funciones que el exportador del módulo Repuestos
+   * (`buildBomIB01` + `exportBomIB01ToExcel`), así que el archivo que sale de
+   * acá es el mismo que sale de allá. Lo que cambia es no tener que ir a
+   * buscar el equipo de nuevo en el otro módulo.
+   *
+   * Va sobre `particionTotal.bom`, no sobre lo filtrado: un filtro es para
+   * mirar, no para decidir qué lleva la máquina.
+   */
+  const opcionesBom = useMemo(() => opcionesBomDesdeEquipo(equipment), [equipment])
+  const puedeExportarBom = opcionesBom !== null && particionTotal.bom.length > 0
+
+  function exportarBom() {
+    if (!opcionesBom) return
+    exportBomIB01ToExcel(buildBomIB01(particionTotal.bom.map((r) => r.doc), opcionesBom))
+  }
   const [adding, setAdding] = useState(false)
   const [maestro, setMaestro] = useState<RepuestoMaestroItem[] | null>(null)
   const [loadingMaestro, setLoadingMaestro] = useState(false)
@@ -1589,6 +1619,23 @@ function RecursosRepuestos({ equipment, canEdit }: { equipment: Equipment; canEd
           </div>
         )}
 
+        {/*
+          Con 476 en la lista de materiales y 1.328 de despiece, encontrar una
+          pieza scrolleando no es viable. Usa el mismo normalizador que los
+          buscadores del módulo Repuestos (sin acentos, con plurales).
+        */}
+        {repuestos.length > 0 && (
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={filtro}
+              onChange={(ev) => setFiltro(ev.target.value)}
+              placeholder="Buscar por código SAP, nombre o tipo…"
+              className="h-8 pl-7 text-sm"
+              aria-label="Buscar en los materiales del equipo"
+            />
+          </div>
+        )}
         {loading ? (
           <p className="text-sm italic text-muted-foreground">Cargando…</p>
         ) : repuestos.length === 0 ? (
@@ -1611,10 +1658,22 @@ function RecursosRepuestos({ equipment, canEdit }: { equipment: Equipment; canEd
                 <div className="flex flex-wrap items-baseline gap-x-2 pt-1">
                   <span className="text-xs font-semibold uppercase tracking-wide text-ink-ok">
                     Lista de materiales SAP · {particion.bom.length}
+                    {filtrando && ` de ${particionTotal.bom.length}`}
                   </span>
                   <span className="text-caption text-muted-foreground">
                     con código y cantidad — es la que se carga en IB01
                   </span>
+                  {puedeExportarBom && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={exportarBom}
+                      className="ml-auto h-6 px-2 text-caption"
+                      title={`Descargar la lista de materiales de ${opcionesBom?.equipoCodigo} para cargar en SAP (IB01), centro ${opcionesBom?.centro || 'sin determinar'}`}
+                    >
+                      <Download className="mr-1 h-3 w-3" /> Exportar para SAP
+                    </Button>
+                  )}
                 </div>
                 <div className="divide-y">
                   {particion.bom.map((r) => (
@@ -1663,25 +1722,32 @@ function RecursosRepuestos({ equipment, canEdit }: { equipment: Equipment; canEd
               </>
             )}
 
+            {sinResultados && (
+              <p className="py-2 text-sm italic text-muted-foreground">
+                Ningún material de este equipo coincide con «{filtro.trim()}».
+              </p>
+            )}
+
             {particion.despiece.length > 0 && (
               <>
                 <button
                   type="button"
                   onClick={() => setDespieceAbierto((v) => !v)}
-                  aria-expanded={despieceAbierto}
+                  aria-expanded={verDespiece}
                   className="flex w-full flex-wrap items-baseline gap-x-2 border-t pt-2 text-left"
                 >
                   <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     Despiece sin código · {particion.filasSinCodigo}
+                    {filtrando && ` de ${particionTotal.filasSinCodigo}`}
                   </span>
                   <span className="text-caption text-muted-foreground">
                     identifica la pieza en el plano; no se puede pedir
                   </span>
                   <ChevronDown
-                    className={cn('ml-auto h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform', despieceAbierto && 'rotate-180')}
+                    className={cn('ml-auto h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform', verDespiece && 'rotate-180')}
                   />
                 </button>
-                {despieceAbierto && (
+                {verDespiece && (
                   <div className="divide-y">
                     {particion.despiece.map((g) => (
                       <div key={g.nombre.toLowerCase()} className="flex items-center gap-3 py-2 text-sm">

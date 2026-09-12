@@ -19,7 +19,8 @@
  * El corte NO se inventa acá: es `esCodigoSapValido`, el mismo que decide qué
  * entra en el export IB01.
  */
-import { esCodigoSapValido } from '@/utils/repuestos/exportBomSAP'
+import { esCodigoSapValido, deriveCentro } from '@/utils/repuestos/exportBomSAP'
+import { normalizeForSearch, haystackMatchesAll } from '@/utils/repuestos/searchNormalize'
 
 /** Lo mínimo que necesita la partición; `useRepuestosDeEquipo` devuelve esto. */
 export interface RepuestoParticionable {
@@ -81,4 +82,56 @@ export function particionarRepuestosDeEquipo<T extends RepuestoParticionable>(
     despiece,
     filasSinCodigo: despiece.reduce((s, g) => s + g.veces, 0),
   }
+}
+
+/**
+ * La cabecera IB01 de un equipo, sacada de su ficha.
+ *
+ * Devuelve null cuando el equipo **no tiene código SAP**: sin ese número no hay
+ * cabecera posible —es el equipo contra el que se carga la lista— y ofrecer el
+ * export sería prometer algo que SAP va a rechazar.
+ *
+ * ⚠️ El **centro sale del árbol, nunca del nombre**: los equipos se llaman igual
+ * en las dos plantas (hay una «EVISCERADORA BAADER 142 N3» en Chonchi y otra en
+ * Yal), así que tomarlo del nombre significaría cargar la lista de una planta
+ * contra el centro de la otra.
+ */
+export function opcionesBomDesdeEquipo(equipo: {
+  codigo?: string
+  nombre?: string
+  hierarchyPath?: string
+}): { equipoCodigo: string; equipoNombre: string; centro: string } | null {
+  const codigo = (equipo.codigo ?? '').trim()
+  if (!codigo) return null
+  const ancestros = (equipo.hierarchyPath ?? '').split('>').map((s) => s.trim()).filter(Boolean)
+  return {
+    equipoCodigo: codigo,
+    equipoNombre: (equipo.nombre ?? '').trim() || codigo,
+    centro: deriveCentro(ancestros),
+  }
+}
+
+
+/**
+ * Filtra los materiales de un equipo por código SAP, nombre o tipo.
+ *
+ * Con 476 en la lista de materiales y 1.328 de despiece, encontrar una pieza
+ * scrolleando no es viable. Usa el mismo normalizador que los buscadores del
+ * módulo Repuestos —sin acentos, y con variantes de plural, así que «guantes»
+ * encuentra «GUANTE ANTICORTE»— para que buscar lo mismo dé lo mismo en los dos
+ * lados de la app.
+ *
+ * Filtra ANTES de partir: así los contadores de cada grupo hablan de lo que se
+ * está viendo, no del total.
+ */
+export function filtrarRepuestosDeEquipo<T extends RepuestoParticionable>(
+  repuestos: readonly T[],
+  consulta: string,
+): T[] {
+  const q = normalizeForSearch(consulta)
+  if (!q) return [...repuestos]
+  const terminos = q.split(' ').filter(Boolean)
+  return repuestos.filter((r) =>
+    haystackMatchesAll(normalizeForSearch(`${r.codigoSAP} ${r.nombre} ${r.tipo ?? ''}`), terminos),
+  )
 }
