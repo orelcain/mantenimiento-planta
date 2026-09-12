@@ -321,7 +321,15 @@ function procesarArchivo(buf, nombre, segmentos, existentes) {
     if (tipo === 'PIEZA_PIEZA') {
       const gate = parseNum(iGate != null ? row[iGate] : undefined) ?? 0
       // Misma clave que buildDedupeKey del PWA
-      const k = `${ts}|${gate}|${pieces}|${quality ?? ''}|${calibre ?? ''}|${weightKg ?? ''}|${lot ?? ''}|${errRaw}|${weightPerPieceGrams ?? ''}`
+      /*
+       * Misma clave que dedupePieceRecords del PWA. Incluia `lot`, `errRaw` y
+       * `weightPerPieceGrams`, y eso rompia el dedupe entre el Excel del mes y
+       * el recorte por turno: el recorte no trae `lot`, asi que las dos copias
+       * del mismo turno eran claves distintas y las piezas se contaban DOS
+       * VECES. Doce turnos de julio 2025 quedaron guardados al doble; los
+       * rehace scripts/rehacer-turnos-inflados.js.
+       */
+      const k = `${ts}|${gate}|${pieces}|${quality ?? ''}|${calibre ?? ''}|${weightKg ?? ''}`
       if (seg.vistos.has(k)) continue
       seg.vistos.add(k)
       acumularPP(seg, { ts, gate, pieces, weightKg, weightPerPieceGrams, quality, calibre, lot })
@@ -436,7 +444,7 @@ async function escribirSegmento(seg, summary) {
 
 // ── Main ────────────────────────────────────────────────────────────────────
 
-;(async () => {
+async function main() {
   console.log(CONFIRM ? '⚠️  MODO ESCRITURA (--confirm)\n' : '🔍 DRY RUN — no se escribe nada. Usa --confirm para aplicar.\n')
 
   const sums = await db.collection('graderDailySummaries').get()
@@ -498,4 +506,16 @@ async function escribirSegmento(seg, summary) {
   if (CONFIRM) console.log(`  ESCRITOS:       ${escritos}`)
   else console.log('\n  (dry-run: no se escribió nada — usa --confirm para aplicar)')
   process.exit(0)
-})().catch((e) => { console.error('ERR', e); process.exit(1) })
+}
+
+// Se ejecuta solo si lo llamas directo; `rehacer-turnos-inflados.js` lo requiere
+// como modulo para reusar el mismo pipeline, y asi el doc regenerado tiene
+// exactamente la misma forma que los otros 335.
+if (require.main === module) {
+  main().catch((e) => { console.error('ERR', e); process.exit(1) })
+}
+
+module.exports = {
+  db, bucket, nuevoSegmento, procesarArchivo, construirSummary,
+  construirTimeline, escribirSegmento,
+}
