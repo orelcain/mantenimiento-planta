@@ -15,6 +15,7 @@ import { useState, useMemo, useEffect, useCallback, useRef, Fragment } from 'rea
 import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ClipboardList, Menu, History, Trash2, Star, Download, X, MoreVertical, Copy, Check, Package, PackageCheck, PackageMinus, PackageX, GripVertical, Boxes, Wrench, Settings2, MapPin } from 'lucide-react'
 import { isCommonPartSap, machinesForCommonSap } from '@/data/commonPartsByMachine'
 import { esComun, esDespiece, esFavoritoDe, contarCon } from '@/hooks/repuestos/filtrosDeRepuestos'
+import { esCodigoSapValido } from '@/utils/repuestos/exportBomSAP'
 import { findMachineBySlug, LEARNING_MACHINES, isCourseMachine } from '@/data/learningMachines'
 import { Badge, Button, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui'
 import { AreaSidebar } from '@/components/repuestos/AreaSidebar'
@@ -1145,7 +1146,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     async (sapRaw: string) => {
       if (!selectedRep) return
       const sap = sapRaw.trim()
-      if (!/^\d{6,}$/.test(sap)) {
+      if (!esCodigoSapValido(sap)) {
         toast({ variant: 'destructive', title: 'Código SAP inválido', description: 'Debe ser numérico de 6 o más dígitos.' })
         return
       }
@@ -2361,7 +2362,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
             />
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" size="sm" onClick={() => setAsignarSapOpen(false)} disabled={asignarSapSaving}>Cancelar</Button>
-              <Button type="submit" size="sm" disabled={asignarSapSaving || !/^\d{6,}$/.test(asignarSapValue.trim())}>
+              <Button type="submit" size="sm" disabled={asignarSapSaving || !esCodigoSapValido(asignarSapValue)}>
                 {asignarSapSaving ? 'Asignando…' : 'Asignar'}
               </Button>
             </div>
