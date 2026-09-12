@@ -3,6 +3,9 @@ import type { Repuesto } from '@/types/repuestos'
 import type { BomIB01, BomIB01Row } from '../exportBomSAP'
 import {
   buildBomIB01,
+  buildBomsIB01,
+  resumirBoms,
+  bomsFileName,
   bomFileName,
   deriveCentro,
   toUnidadSAP,
@@ -194,6 +197,105 @@ describe('deriveCentro', () => {
   it('con un árbol degenerado no revienta ni inventa un centro', () => {
     expect(deriveCentro([])).toBe('')
     expect(deriveCentro(['Empresa'])).toBe('')
+  })
+})
+
+describe('buildBomsIB01 — exportación masiva', () => {
+  const CHONCHI_N1 = { id: 'n-cho-1', codigo: '720004441', nombre: 'BAADER 142 N1', centro: 'PLANTA CHONCHI' }
+  const CHONCHI_N2 = { id: 'n-cho-2', codigo: '720004447', nombre: 'BAADER 142 N2', centro: 'PLANTA CHONCHI' }
+  const YAL_N1 = { id: 'n-yal-1', codigo: '720004247', nombre: 'BAADER 142 N1', centro: 'PLANTA YAL' }
+
+  /** Un repuesto compartido por las tres máquinas (relación N:M por modelo). */
+  const comun = rep({ codigoSAP: '3300011612', textoBreve: 'SOPORTE', cantidadPorMaquina: 30,
+    equipos: ['n-cho-1', 'n-cho-2', 'n-yal-1'] } as Partial<Repuesto>)
+  const soloYal = rep({ codigoSAP: '3300099999', textoBreve: 'EXCLUSIVO YAL', cantidadPorMaquina: 2,
+    equipos: ['n-yal-1'] } as Partial<Repuesto>)
+
+  it('genera una BOM por equipo', () => {
+    const boms = buildBomsIB01([comun, soloYal], [CHONCHI_N1, CHONCHI_N2, YAL_N1])
+    expect(boms.map((b) => b.header.equipoCodigo)).toEqual(['720004441', '720004447', '720004247'])
+  })
+
+  it('un repuesto compartido aparece en la BOM de CADA equipo', () => {
+    const boms = buildBomsIB01([comun], [CHONCHI_N1, CHONCHI_N2, YAL_N1])
+    expect(boms).toHaveLength(3)
+    boms.forEach((b) => expect(b.rows[0]?.material).toBe('3300011612'))
+  })
+
+  it('cada equipo recibe solo lo suyo', () => {
+    const boms = buildBomsIB01([comun, soloYal], [CHONCHI_N1, YAL_N1])
+    expect(boms[0]?.rows).toHaveLength(1)
+    expect(boms[1]?.rows).toHaveLength(2)
+  })
+
+  it('cada BOM conserva SU centro — no se contagian entre plantas', () => {
+    const boms = buildBomsIB01([comun], [CHONCHI_N1, YAL_N1])
+    expect(boms.map((b) => b.header.centro)).toEqual(['PLANTA CHONCHI', 'PLANTA YAL'])
+  })
+
+  it('omite equipos sin posiciones: una BOM vacía no se puede cargar', () => {
+    const huerfano = { id: 'n-sin-nada', codigo: '720000000', nombre: 'SIN MATERIALES', centro: 'PLANTA YAL' }
+    const boms = buildBomsIB01([comun], [CHONCHI_N1, huerfano])
+    expect(boms.map((b) => b.header.equipoCodigo)).toEqual(['720004441'])
+  })
+
+  it('omite equipos sin código SAP', () => {
+    const sinCodigo = { id: 'n-cho-1', codigo: '', nombre: 'CINTA SIN CODIGO', centro: 'PLANTA CHONCHI' }
+    expect(buildBomsIB01([comun], [sinCodigo])).toHaveLength(0)
+  })
+
+  it('la numeración de posiciones arranca de 0010 en cada equipo', () => {
+    const boms = buildBomsIB01([comun, soloYal], [YAL_N1])
+    expect(boms[0]?.rows.map((r) => r.posicion)).toEqual(['0010', '0020'])
+  })
+
+  it('propaga incluirSinSap a todas las BOM', () => {
+    const sinSap = rep({ codigoFabricante: 'X-1', textoBreve: 'pieza', equipos: ['n-cho-1'] } as Partial<Repuesto>)
+    expect(buildBomsIB01([sinSap], [CHONCHI_N1])).toHaveLength(0)
+    const con = buildBomsIB01([sinSap], [CHONCHI_N1], { incluirSinSap: true })
+    expect(con[0]?.rows[0]?.categoria).toBe('T')
+  })
+
+  it('un repuesto sin equipos asignados no entra en ninguna BOM', () => {
+    const transversal = rep({ codigoSAP: '3300000777', textoBreve: 'GUANTE' })
+    expect(buildBomsIB01([transversal], [CHONCHI_N1, YAL_N1])).toHaveLength(0)
+  })
+})
+
+describe('resumirBoms', () => {
+  const mk = (codigo: string, centro: string, reps: Repuesto[]) =>
+    buildBomIB01(reps, { equipoCodigo: codigo, equipoNombre: 'EQ ' + codigo, centro })
+
+  it('suma las posiciones de todas las BOM', () => {
+    const boms = [
+      mk('720000001', 'PLANTA CHONCHI', [rep({ codigoSAP: '3300000001', cantidadPorMaquina: 2 })]),
+      mk('720000002', 'PLANTA YAL', [rep({ codigoSAP: '3300000002', cantidadPorMaquina: 1 }), rep({ codigoSAP: '3300000003', cantidadPorMaquina: 0 })]),
+    ]
+    expect(resumirBoms(boms)).toMatchObject({ equipos: 2, posiciones: 3, posicionesL: 3, sinCantidadReal: 1 })
+  })
+
+  it('lista los centros distintos, sin repetir', () => {
+    const boms = [
+      mk('720000001', 'PLANTA CHONCHI', [rep({ codigoSAP: '3300000001' })]),
+      mk('720000002', 'PLANTA CHONCHI', [rep({ codigoSAP: '3300000002' })]),
+      mk('720000003', 'PLANTA YAL', [rep({ codigoSAP: '3300000003' })]),
+    ]
+    expect(resumirBoms(boms).centros).toEqual(['PLANTA CHONCHI', 'PLANTA YAL'])
+  })
+
+  it('sin BOM no revienta', () => {
+    expect(resumirBoms([])).toMatchObject({ equipos: 0, posiciones: 0, centros: [] })
+  })
+})
+
+describe('bomsFileName', () => {
+  it('nombra por cantidad de equipos y fecha', () => {
+    const boms = buildBomsIB01(
+      [rep({ codigoSAP: '3300000001', equipos: ['n1'] } as Partial<Repuesto>)],
+      [{ id: 'n1', codigo: '720000001', nombre: 'EQ', centro: 'PLANTA YAL' }],
+      { validoDesde: '2026-09-11' },
+    )
+    expect(bomsFileName(boms)).toBe('BOM_IB01_MASIVO_1_equipos_2026-09-11.xlsx')
   })
 })
 

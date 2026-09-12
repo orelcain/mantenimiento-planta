@@ -218,3 +218,137 @@ export function exportBomIB01ToExcel(bom: BomIB01): void {
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(posiciones), 'Posiciones')
   XLSX.writeFile(wb, bomFileName(header))
 }
+
+/* ------------------------------------------------------------------ *
+ * Exportación masiva: varias BOM en un solo archivo                   *
+ * ------------------------------------------------------------------ */
+
+/** Un equipo del árbol, ya resuelto a su identidad SAP. */
+export interface EquipoSap {
+  /** docId del nodo en `hierarchy` — es lo que guarda `repuesto.equipos[]`. */
+  id: string
+  codigo: string
+  nombre: string
+  centro: string
+}
+
+/**
+ * Arma una BOM por equipo a partir del catálogo completo del alcance.
+ *
+ * Un mismo repuesto pertenece a varios equipos (relación N:M por modelo de máquina), así que
+ * aparece en la BOM de cada uno: en SAP cada equipo lleva su propia lista. Los equipos que no
+ * tienen ninguna posición se omiten — una BOM vacía no se puede cargar.
+ */
+export function buildBomsIB01(
+  repuestos: Repuesto[],
+  equipos: EquipoSap[],
+  options: { incluirSinSap?: boolean; validoDesde?: string } = {},
+): BomIB01[] {
+  // Índice en UNA pasada sobre el catálogo. Filtrar el array por cada equipo sería
+  // O(repuestos × equipos) — con ~7.700 repuestos y cientos de equipos eso cuelga la pestaña.
+  const porEquipo = new Map<string, Repuesto[]>()
+  const buscados = new Set(equipos.filter((e) => e.codigo).map((e) => e.id))
+  for (const r of repuestos) {
+    if (!Array.isArray(r.equipos)) continue
+    for (const id of r.equipos) {
+      if (!buscados.has(id)) continue
+      const lista = porEquipo.get(id)
+      if (lista) lista.push(r)
+      else porEquipo.set(id, [r])
+    }
+  }
+
+  const boms: BomIB01[] = []
+  for (const eq of equipos) {
+    if (!eq.codigo) continue
+    const delEquipo = porEquipo.get(eq.id)
+    if (!delEquipo || delEquipo.length === 0) continue
+    const bom = buildBomIB01(delEquipo, {
+      equipoCodigo: eq.codigo,
+      equipoNombre: eq.nombre,
+      centro: eq.centro,
+      ...options,
+    })
+    if (bom.rows.length > 0) boms.push(bom)
+  }
+  return boms
+}
+
+export interface BomsMasivasResumen {
+  equipos: number
+  posiciones: number
+  posicionesL: number
+  posicionesT: number
+  sinCantidadReal: number
+  centros: string[]
+}
+
+export function resumirBoms(boms: BomIB01[]): BomsMasivasResumen {
+  return {
+    equipos: boms.length,
+    posiciones: boms.reduce((n, b) => n + b.resumen.total, 0),
+    posicionesL: boms.reduce((n, b) => n + b.resumen.posicionesL, 0),
+    posicionesT: boms.reduce((n, b) => n + b.resumen.posicionesT, 0),
+    sinCantidadReal: boms.reduce((n, b) => n + b.resumen.sinCantidadReal, 0),
+    centros: [...new Set(boms.map((b) => b.header.centro).filter(Boolean))].sort(),
+  }
+}
+
+export function bomsFileName(boms: BomIB01[], fecha?: string): string {
+  const f = fecha || boms[0]?.header.validoDesde || new Date().toISOString().slice(0, 10)
+  return 'BOM_IB01_MASIVO_' + boms.length + '_equipos_' + f + '.xlsx'
+}
+
+/**
+ * Escribe todas las BOM en UN archivo, con las posiciones en una hoja plana.
+ *
+ * Plano y no una hoja por equipo a propósito: así es como lo espera una carga masiva
+ * (LSMW / LTMC), que lee una fila por posición con el equipo y el centro como columnas.
+ * Una hoja por equipo obligaría a recomponer el archivo a mano antes de cargarlo.
+ */
+export function exportBomsIB01ToExcel(boms: BomIB01[], fecha?: string): void {
+  const cabeceras = boms.map((b) => ({
+    'Equipo': b.header.equipoCodigo,
+    'Denominación': b.header.equipoNombre,
+    'Centro': b.header.centro,
+    'Uso de lista': b.header.uso,
+    'Válido desde': b.header.validoDesde,
+    'Posiciones': b.resumen.total,
+    'Tipo L': b.resumen.posicionesL,
+    'Tipo T': b.resumen.posicionesT,
+    'Sin cantidad real': b.resumen.sinCantidadReal,
+  }))
+
+  const posiciones = boms.flatMap((b) =>
+    b.rows.map((r) => ({
+      'Equipo': b.header.equipoCodigo,
+      'Centro': b.header.centro,
+      'Posición': r.posicion,
+      'Categoría': r.categoria,
+      'Material': r.material,
+      'Cantidad': r.cantidad,
+      'UM': r.unidad,
+      'Texto de posición': r.texto,
+      'Texto completo': r.textoCompleto,
+      'Código fabricante': r.codigoFabricante,
+    })),
+  )
+
+  const r = resumirBoms(boms)
+  const resumen = [
+    { Campo: 'Transacción', Valor: 'IB01 — Listas de materiales de equipo (carga masiva)' },
+    { Campo: 'Uso de lista', Valor: SAP_USO_MANTENIMIENTO + ' (Mantenimiento)' },
+    { Campo: 'Equipos', Valor: r.equipos },
+    { Campo: 'Centros', Valor: r.centros.join(' · ') },
+    { Campo: 'Total posiciones', Valor: r.posiciones },
+    { Campo: '· tipo L (material de stock)', Valor: r.posicionesL },
+    { Campo: '· tipo T (texto, sin código SAP)', Valor: r.posicionesT },
+    { Campo: 'Posiciones sin cantidad real (quedaron en 1)', Valor: r.sinCantidadReal },
+  ]
+
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(resumen), 'Resumen')
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(cabeceras), 'Cabeceras IB01')
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(posiciones), 'Posiciones')
+  XLSX.writeFile(wb, bomsFileName(boms, fecha))
+}
