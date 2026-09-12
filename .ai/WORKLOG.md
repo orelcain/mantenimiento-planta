@@ -6,6 +6,60 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-12 · El dedupe de Puerta 0 fallaba por el calibre (PR #977)
+
+Lo que faltaba medir de #973/#975. `dedupeGate0Records` tenia el mismo problema **pero por otro
+campo**. El mismo rechazo del `2025-07-08 22:14:01`, en los dos archivos:
+
+```
+recorte: { ts, pieces: 1, weightKg: 6.88, error: "No leido por fotocelula",
+           quality: "Premium", calibre: "Other" }
+mes:     { ts, pieces: 1, weightKg: 6.88, error: "No leido por fotocelula",
+           quality: "Premium", weightPerPieceGrams: 6880, lot, shift }
+```
+
+El recorte trae `calibre` y el Excel del mes no: con `calibre` en la clave, la ventana del turno
+quedaba con **838 registros de Puerta 0 en vez de 419**. **No es `error`**, que coincide entre las
+dos fuentes — ese se queda: es la causa del rechazo y lo que distingue dos rechazos del mismo
+instante. Costo de sacar `calibre`: **cero** (26.878 unicos con y sin el).
+
+### ⚠ Lo que medi y NO era un problema
+
+El recorte de Puerta 0 trae **cada registro exactamente dos veces** (838 = 2x419, los 413 timestamps
+repetidos con registros identicos). Parecia un segundo foco de inflado, pero **el dedupe si colapsa
+esos**, asi que los 335 turnos generados desde recortes tienen el Puerta 0 correcto. **No hubo que
+regenerar nada.**
+
+### Nota de metodo
+
+La primera medicion dio «P0 del mes: 0 registros» — porque le pase a `parseFile` un nombre de
+archivo inventado, y `detectFileKind` **usa el nombre**. ⚠ Al medir con archivos reales, pasar
+siempre el `path.basename` real.
+
+## 2026-09-12 · Revision: la lista de repuestos por equipo
+
+**Se despliega bien.** Verificado en pantalla a 1920 (CTD → equipo → pestaña **Recursos** →
+«Repuestos del equipo»), en los dos extremos: con datos, y «Sin repuestos vinculados.» cuando el
+equipo no tiene. La UI no es el problema.
+
+**Los datos si.** Medido contra Firestore:
+
+- **458 de 511 nodos hoja no tienen ni un repuesto**; solo 53 tienen lista.
+- Las **seis Baader 142** (N1/N2/N3 de las dos plantas) tienen **1.803-1.804 cada una**, y el BOM
+  real son **476 lineas**. Que las seis tengan el mismo numero delata vinculo masivo, no despiece:
+  **99,9 %** de esos repuestos estan vinculados a 6 o mas equipos.
+- De esos 1.804: **73,6 % sin codigo SAP** y **707 filas sobran** por nombre repetido (211 nombres
+  distintos) — «soporte» x58, «tornillo hexagonal» x38, «arandela» x18. En 184 de esos grupos
+  **ninguno** tiene SAP, asi que nada los distingue.
+
+En pantalla se lee «Abrazadera de manguera» cuatro veces seguidas, sin codigo. Se despliega, pero no
+sirve para buscar.
+
+⚠ **Gotcha de medicion:** los nodos de `hierarchy` tienen `tipoNodo`, **no** `tipo`. Filtrar por
+`tipo` devuelve 0 equipos y parece que no existe ninguno.
+
+Queda a decision de Orel: reemplazar el vinculo masivo por el BOM real y consolidar los duplicados
+sin SAP. No se toco ningun dato.
 ## 2026-09-12 · Rehechos los 12 turnos que quedaron al doble (PR #975) · APLICADO EN PROD
 
 ## ⚠⚠ El script de carga tenia SU PROPIA copia de la clave del dedupe
