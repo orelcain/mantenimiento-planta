@@ -22,9 +22,8 @@ import { cn } from '@/lib/utils'
 import { fmt } from '@/lib/format'
 import { useAuthStore } from '@/store'
 import { parseFile, mergeParsedData } from '@/services/grader/graderExcelParser'
-import { avisosDelArchivo, cubreElTurno } from '@/services/grader/graderAvisosDeCarga'
+import { avisosDelArchivo } from '@/services/grader/graderAvisosDeCarga'
 import { getModuleRanges } from '@/services/grader/graderModuleConfig.service'
-import { deleteDailySummary } from '@/services/grader/graderDailySummary.service'
 import { listGraderUploads, saveGraderUpload, updateGraderUpload, uploadGraderFile, deleteGraderUpload } from '@/services/grader/graderUpload.service'
 import { DEFAULT_SHIFT_SCHEDULE, inferShiftIdFromSchedule, normalizeShiftSchedule, shiftIdToKey } from '@/services/grader/graderShiftSchedule'
 import { getPlantLineConfig, DEFAULT_PLANT_LINE_ID, type PlantLineId } from '@/config/plantLines'
@@ -227,7 +226,6 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
 
     try {
       const parsed: FileParsed[] = []
-      const aInvalidar = new Map<string, { sessionDate: string; shiftId: string }>()
       for (const file of fileArray) {
         const result = await parseFile(file)
         const inferred = result.partialData.inferred
@@ -271,29 +269,24 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
           }
           setUploads((prev) => normalizeUploads([upload, ...prev], shiftSchedule))
           /*
-           * Invalidar el resumen del turno se decide aca y se hace al final de
-           * la tanda. Antes se borraba archivo por archivo y SIEMPRE, antes de
-           * saber si el archivo contenia ese turno: medido sobre los Excel
-           * reales de julio (el pieza a pieza cubre 07-01 -> 07-14 y el Puerta 0
-           * 07-01 -> 07-30), eligiendo el turno del 2025-07-20 el analisis da
-           * 0 piezas y 0 rechazos y el resumen bueno ya estaba borrado, dos
-           * veces, una por archivo. #956 agrego el aviso; el borrado seguia
-           * pasando igual.
+           * Aca se invalidaba el resumen del turno (`deleteDailySummary`).
+           * Ya no: **el guardado lo pisa solo**. `saveDailySummaryBatch` hace
+           * `batch.set(ref, ...)` SIN merge para un upload con pieza a pieza,
+           * o sea sobrescribe el documento entero; y para un P0 suelto usa
+           * merge a proposito, «preserva los KPIs del PP si ya existen» --lo
+           * que el borrado previo destruia--.
+           *
+           * Lo que si hacia el borrado era dejar el turno SIN resumen cuando la
+           * carga no llegaba a guardarse: quitar el archivo (`handleRemoveFile`)
+           * borra el upload, pero `deleteDoc` no se deshace y el resumen no
+           * vuelve. Medido: 3 de 243 dias con Excel cargado no tienen resumen.
+           * #960 dejo de invalidar turnos que el archivo no contiene; esto
+           * cierra el resto, porque la invalidacion no hacia falta.
            */
-          if (ACCEPTED_KINDS.includes(result.fileMeta.kind) && cubreElTurno(sessionDate, inferred ?? {})) {
-            aInvalidar.set(`${sessionDate}|${shiftId}`, { sessionDate, shiftId })
-          }
         }
         if (!currentTurnoDate) setCurrentTurnoDate(sessionDate)
         if (!currentTurnoShift) setCurrentTurnoShift(shiftId)
         parsed.push({ ...result, file })
-      }
-      for (const t of aInvalidar.values()) {
-        try {
-          await deleteDailySummary(t.sessionDate, t.shiftId, lineId)
-        } catch {
-          // Evitar bloquear carga si no hay permisos para invalidar el resumen.
-        }
       }
       updateFiles((prev) => {
         const map = new Map<string, FileParsed>()
@@ -324,9 +317,14 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
         await deleteGraderUpload(upload)
         setUploads((prev) => prev.filter((u) => u.id !== id))
       } catch {
-        setUploadError('No se pudo eliminar el archivo del servidor.')
+        // La fila se quitaba igual: el aviso decia «no se pudo eliminar» y el
+        // archivo desaparecia de la pantalla, asi que quedaba en el servidor
+        // sin nada que lo muestre --y volvia al recargar el turno--.
+        setUploadError('No se pudo eliminar el archivo del servidor. Sigue cargado: volvé a intentar.')
+        return
       }
     }
+    setUploadError(null)
     updateFiles((prev) => prev.filter((f) => f.fileMeta.id !== id))
   }, [uploads, updateFiles])
 
