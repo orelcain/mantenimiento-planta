@@ -261,6 +261,37 @@ const SHIFT_META_TABLE: Record<string, ShiftMeta> = {
     isDayLike: true,
     scheduleHint: '07:30–15:45',
   },
+  /*
+   * Filete emite "Turno Noche L" desde el 2026-08-17 (la variante de los lunes,
+   * igual que "Turno 1 Lunes" en Chonchi). Sin entrada propia caia en el
+   * fallback y la pantalla mostraba «?» donde va el nombre del turno.
+   * Sin `scheduleHint`: no se sabe su horario y no se inventa.
+   */
+  'Turno Noche L': {
+    label: 'Turno Noche Lunes',
+    shortLabel: 'NocheL',
+    period: 'noche',
+    textColorClass: 'text-indigo-600 dark:text-indigo-400',
+    bgColorClass: 'bg-indigo-500/10',
+    borderColorClass: 'border-indigo-500/30',
+    iconName: 'Sunrise',
+    emoji: '\u{1F304}',
+    isDayLike: false,
+    scheduleHint: '',
+  },
+  /* Los resumenes historicos que quedaron sin turno atribuido: decirlo, no «?». */
+  'Sin turno': {
+    label: 'Sin turno asignado',
+    shortLabel: 'S/T',
+    period: 'desconocido',
+    textColorClass: 'text-muted-foreground',
+    bgColorClass: 'bg-muted/20',
+    borderColorClass: 'border-muted-foreground/30',
+    iconName: 'Clock',
+    emoji: '\u23f1',
+    isDayLike: false,
+    scheduleHint: '',
+  },
   'Turno noche': {
     label: 'Turno noche',
     shortLabel: 'Noche',
@@ -326,8 +357,41 @@ const VISUAL_BY_PERIOD: Record<'mañana' | 'tarde' | 'noche',
  *   El label sigue diciendo "Turno 1" (fiel a Shoplogix) pero con 🌙 noche.
  *   Si se omite o es inválido → cae a la tabla por nombre (comportamiento previo).
  */
+/**
+ * La misma tabla, indexada por clave normalizada, para que una diferencia de
+ * mayusculas o de acento no convierta un turno conocido en «turno desconocido».
+ */
+const TABLA_NORMALIZADA: Record<string, ShiftMeta> = Object.fromEntries(
+  Object.entries(SHIFT_META_TABLE).map(([k, v]) => [claveNormalizadaDeTurno(k), v]),
+)
+
+/**
+ * Clave tolerante para buscar un turno en la tabla.
+ *
+ * **Por que:** cada linea nombra sus turnos a su manera y basta una mayuscula
+ * para caer en el fallback, cuyo `shortLabel` es literalmente `'?'`. Medido
+ * sobre los turnos de Shoplogix: **Filete emite "Turno Noche"** (la tabla tenia
+ * "Turno noche") y **Yal emite "Turno 3*"** con asterisco — 24 de 127 turnos de
+ * Filete (19 %) y 7 de Yal se mostraban como turno desconocido.
+ *
+ * Normaliza acentos, mayusculas y espacios, y quita el asterisco de variante.
+ * Las variantes que SI son otro turno —como "Turno Noche L", el de los lunes—
+ * tienen su propia entrada: no se las colapsa con esto.
+ */
+export function claveNormalizadaDeTurno(shiftId: string): string {
+  return (shiftId || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\s*\*+$/, '')
+}
+
 export function getShiftMeta(shiftId: string, scheduledStart?: string | Date | null): ShiftMeta {
-  const base = SHIFT_META_TABLE[shiftId] ?? FALLBACK_META
+  const base = SHIFT_META_TABLE[shiftId]
+    ?? TABLA_NORMALIZADA[claveNormalizadaDeTurno(shiftId)]
+    ?? FALLBACK_META
   if (scheduledStart == null) return base
   const d = scheduledStart instanceof Date ? scheduledStart : new Date(scheduledStart)
   if (isNaN(d.getTime())) return base
