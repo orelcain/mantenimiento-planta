@@ -313,7 +313,7 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
    */
   const hayDespieceEnSeleccion = useMemo(() => {
     if (reportType !== 'sap_bom') return false
-    return repuestos.some((r) => selectedIds.has(r.id) && !/^\d{6,}$/.test((r.codigoSAP || '').trim()))
+    return repuestos.some((r) => selectedIds.has(r.id) && !repuestoExports.esCodigoSapValido(r.codigoSAP))
   }, [reportType, repuestos, selectedIds])
 
   const totalSelected = selectedIds.size
