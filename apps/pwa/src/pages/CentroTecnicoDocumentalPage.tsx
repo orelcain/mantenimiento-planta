@@ -372,12 +372,19 @@ export function CentroTecnicoDocumentalPage() {
     <div className="relative flex h-full bg-background">
       {/* Izquierda: jerarquía del equipo seleccionado (desktop) */}
       {detailEquipment && (
-        <aside className="hidden w-64 shrink-0 flex-col overflow-y-auto border-r bg-[var(--panel-surface)] dark:bg-transparent p-3 lg:flex">
+        <aside className="hidden w-64 shrink-0 flex-col overflow-y-auto border-r bg-[var(--panel-surface)] dark:bg-transparent p-3 lg:flex lg:sticky lg:top-0 lg:max-h-screen">
           <UbicacionRail equipment={detailEquipment} onMoved={reload} />
         </aside>
       )}
       {/* Centro: lista del programa */}
-      <main className="min-w-0 flex-1 overflow-y-auto">
+      {/*
+        Mismo caso que el panel del expediente (ver el comentario largo en ExpedienteDialog):
+        `overflow-y-auto` sin altura que lo acote no scrollea nada — el layout usa
+        `min-h-screen`, asi que `h-full` no resuelve a una altura fija y el listado CRECE
+        (medido: 3.513 px de alto, scrollHeight === clientHeight). Con el expediente abierto,
+        que es `sticky`/`fixed`, el listado no se podia recorrer.
+      */}
+      <main className="min-w-0 flex-1 overflow-y-auto lg:sticky lg:top-0 lg:max-h-screen">
         <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-4">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
