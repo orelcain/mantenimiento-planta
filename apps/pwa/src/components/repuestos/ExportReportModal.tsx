@@ -306,6 +306,16 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
     return { posiciones: 0, equipos: 0 }
   }, [reportType, repuestos, selectedIds, sapEquipo, sapEquipos, incluirSinSap])
 
+  /**
+   * Si la seleccion no trae ningun material SIN codigo SAP, la casilla de despiece no puede
+   * hacer nada: el hub filtra por defecto a los ordenables, asi que marcarla no cambiaba una
+   * sola posicion y no habia forma de notarlo.
+   */
+  const hayDespieceEnSeleccion = useMemo(() => {
+    if (reportType !== 'sap_bom') return false
+    return repuestos.some((r) => selectedIds.has(r.id) && !/^\d{6,}$/.test((r.codigoSAP || '').trim()))
+  }, [reportType, repuestos, selectedIds])
+
   const totalSelected = selectedIds.size
 
   return (
@@ -460,14 +470,15 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
                     {reportType === 'sap_bom' && (
                     <div className="p-4 border rounded-card bg-background shadow-sm">
                          <div className="flex items-start space-x-3">
-                            <Checkbox id="incluir-sin-sap" checked={incluirSinSap} onCheckedChange={(c) => setIncluirSinSap(!!c)} className="mt-1" />
+                            <Checkbox id="incluir-sin-sap" checked={incluirSinSap && hayDespieceEnSeleccion} disabled={!hayDespieceEnSeleccion} onCheckedChange={(c) => setIncluirSinSap(!!c)} className="mt-1" />
                             <div className="grid gap-1.5 leading-none">
                                 <Label htmlFor="incluir-sin-sap" className="text-sm font-medium cursor-pointer">
                                     Incluir despiece sin código SAP
                                 </Label>
                                 <p className="text-xs text-muted-foreground leading-relaxed">
-                                    Los agrega como posiciones de texto (tipo T), identificadas por código de fabricante.
-                                    Hace la lista mucho más larga: déjalo apagado si la BOM es para elegir componentes en una orden.
+                                    {hayDespieceEnSeleccion
+                                        ? 'Los agrega como posiciones de texto (tipo T), identificadas por código de fabricante. Hace la lista mucho más larga: déjalo apagado si la BOM es para elegir componentes en una orden.'
+                                        : 'La vista actual solo trae materiales con código SAP, así que no hay despiece que agregar. Actívalo con el filtro «+N despiece» de la lista y vuelve a abrir este panel.'}
                                 </p>
                             </div>
                          </div>
