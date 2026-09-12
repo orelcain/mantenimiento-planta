@@ -6,6 +6,51 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-12 · Rehechos los 12 turnos que quedaron al doble (PR #975) · APLICADO EN PROD
+
+## ⚠⚠ El script de carga tenia SU PROPIA copia de la clave del dedupe
+
+`scripts/load-missing-shifts.js` es JS plano, no usa el `src/` del PWA: repetia la clave del dedupe
+con `lot` adentro. **El fix #973 no lo alcanzaba.**
+
+**Regla:** al arreglar una regla de negocio, grepear si hay copias en `scripts/`. Una regla
+duplicada se arregla una vez y sigue rota en la otra copia.
+
+## Alcance, acotado por una huella
+
+Solo pudieron doblarse los resumenes que nombran **a la vez** el Excel del mes y un recorte
+`_pp.xlsx`. Son **12**, todos de julio 2025, todos escritos por ese script, **todos con factor
+exactamente 2.000**:
+
+```
+  2025-07-01__Turno noche    8434 → 4217 pz · P0  7,40 % → 14,80 %
+  2025-07-08__Turno noche   11228 → 5614 pz · P0  3,73 % →  7,46 %
+  2025-07-14__Turno dia     13286 → 6643 pz · P0  9,16 % → 18,32 %
+  (y 9 mas, todos factor 2.000)
+```
+
+⚠ **El KPI de Puerta 0 estaba a la MITAD** en esos turnos: el porcentaje se calcula contra el total
+inflado. **Julio 2025 se veia mejor de lo que fue.**
+
+Los otros 335 resumenes del script usan solo los dos recortes y estaban bien. Los 50 que escribio la
+app **no se tocan**: calcula campos que este pipeline no produce y pisarlos seria destruirlos.
+
+## 📏 Como rehacer datos historicos sin romper nada
+
+1. **Acotar por una huella verificable**, no por fecha ni por corazonada.
+2. **Reusar el mismo pipeline que los escribio**: `rehacer-turnos-inflados.js` hace `require` de
+   `load-missing-shifts.js`, que se envolvio en `if (require.main === module)` para que no corra su
+   main al importarlo. Asi el doc regenerado tiene exactamente la misma forma que el resto.
+3. **Dry-run por defecto**, respaldo JSON de cada doc antes de escribir, escritura **de a uno**.
+4. **Validar con un segundo camino independiente**: los valores nuevos coincidieron con los que dio
+   el pipeline del PWA sobre el Excel del mes, medidos en otra ronda (4.217 · 5.265 · 5.614 · 7.101 ·
+   6.791 · 5.256).
+5. **Verificar despues, con sumas internas**: `totalWeightKg` a la mitad exacta (54.009,08 →
+   27.004,54), `gateDistribution` y `qualityDistribution` suman 5.195 = 5.614 − 419, `hourlyBuckets`
+   suma 5.614, y `avgWeightGrams` **igual** (5.198): es un promedio, si cambiaba era señal de que algo
+   andaba mal.
+
+Resultado: 12/12 verificados contra Firestore y **cero** resumenes con la huella del doble.
 ## 2026-09-12 · El mismo turno contado dos veces porque un archivo no traia el lote (PR #973)
 
 **Cerrado** el pendiente del doble de piezas, que venia midiendo desde #966 y no habia podido
