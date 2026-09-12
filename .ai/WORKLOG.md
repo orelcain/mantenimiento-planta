@@ -6,6 +6,69 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-12 · Cargar el Excel equivocado borraba el resumen bueno del turno (PR #960)
+
+Tercera ronda sobre el flujo de carga: el **borrado del resumen** y el **merge PP+P0**.
+
+## ⚠⚠ El borrado corria antes de saber si el archivo contenia el turno
+
+Al aceptar un `PIEZA_PIEZA` o `PUERTA_0`, `handleFiles` llamaba a `deleteDailySummary` para
+invalidar el resumen del turno. Lo hacia **siempre** y **una vez por archivo**. #956 agrego el aviso
+en pantalla, pero el borrado ocurria igual, antes del aviso.
+
+**Lo que lo hace alcanzable sin equivocarse de mes:** los dos Excel de un mismo mes **no cubren el
+mismo rango**. Medido sobre los reales de julio 2025:
+
+| archivo | rango real |
+|---|---|
+| pieza a pieza | `2025-07-01` → **`2025-07-14`** |
+| Puerta 0 | `2025-07-01` → **`2025-07-30`** |
+
+16 dias de diferencia. Eligiendo el turno del **2025-07-20** y cargando los dos:
+
+```
+2025-07-08  piezas=4704  rechazos=459    <- turno cubierto, todo bien
+2025-07-20  piezas=0     rechazos=0      <- y el resumen ya estaba borrado, dos veces
+   aviso PP: El archivo cubre del 2025-07-01 al 2025-07-14 ... no esta adentro.
+   aviso P0: (ninguno)
+```
+
+Ahora la invalidacion se decide por archivo con `cubreElTurno()` y se ejecuta **una sola vez por
+turno** al final de la tanda: ningun archivo lo contiene → no se borra nada; PP+P0 del mismo turno →
+una llamada, no dos; el PP no lo cubre pero el P0 si → se borra, hay datos nuevos. Sin fechas con
+que juzgar se borra, como antes: no se bloquea por una duda, solo cuando **consta** que el turno no
+esta en el archivo. `cubreElTurno` vive en `graderAvisosDeCarga.ts` y `avisoDeRango` la usa: una
+sola definicion de «el archivo contiene este turno».
+
+## Lo que medi del merge y NO era
+
+- **Orden de los archivos:** `mergeParsedData([pp, p0])` y `[p0, pp]` dan identico (67.271 piezas,
+  26.878 rechazos). No depende del orden.
+- **Mismo archivo dos veces:** el merge SI duplica (67.271 → 134.542 piezas), pero el Wizard pasa
+  `dedupePieceRecords` y `dedupeGate0Records` antes de segmentar. Cubierto aguas abajo.
+- **Solo P0 sin pieza a pieza:** 0 piezas y 26.878 rechazos, pero el Wizard ya lo detecta con
+  `isP0Only`. Cubierto.
+
+Los tres parecian defectos leyendo el merge aislado. Mirar al consumidor antes de acusar.
+
+## 📍 Como medir el parser sin tocar produccion
+
+Un test temporal en `services/grader/__tests__/` que llame a `parseFile` + `mergeParsedData` sobre
+los Excel reales (resolviendo `USERPROFILE`, como el test de integracion que ya existe). **Parsear
+es local**: no escribe en Firestore ni en Storage, a diferencia de cargar por la UI.
+
+⚠ vitest **no muestra los `console.log`** del test: acumular en un array y `fs.writeFileSync` al
+final.
+
+## Verificacion
+
+9 tests: 5 del modulo puro con los rangos medidos de los archivos reales, 4 del flujo montando la
+pagina como la monta el Wizard (`compact`) y disparando la carga con `fireEvent.change` sobre el
+input. Confirmados volviendo al borrado incondicional: fallan con `expected "vi.fn()" to not be
+called at all, but actually been called 1 times` y `expected 1 times, but got 2 times`.
+
+`tsc` · `eslint` · `audit-piel` · `audit-graficos` · **2302 tests**. Verificado en el bundle
+publicado (`buildSha 43a21f2`).
 ## 2026-09-12 · La carga del Excel mostraba un contador y escondia todo lo demas (PR #957)
 
 Segunda ronda sobre el flujo de carga. Empezo midiendo y **cerro tres hipotesis en negativo**
