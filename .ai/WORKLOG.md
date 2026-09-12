@@ -6,6 +6,70 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-12 · 37 de los 54 turnos detectados no tenian ni una pieza (PR #966)
+
+Primera ronda sobre **el turno con los datos del Excel ya cargados** (Planta Principal ·
+Eviscerado). El angulo: el turno recien cargado y el turno guardado son dos caminos al mismo numero.
+
+## 📏 El metodo: reproducir el pipeline del Wizard en un test
+
+`parseFile` → `mergeParsedData` → `dedupePieceRecords`/`dedupeGate0Records` →
+`segmentByDayAndShift` → `computeShiftSummary`, sobre los Excel reales, y comparar contra
+`graderDailySummaries` de produccion. **No escribe nada.** De ahi salio todo lo de abajo.
+
+## ⚠⚠ Los dos Excel del mismo mes no cubren el mismo rango
+
+| archivo | rango real |
+|---|---|
+| pieza a pieza | `2025-07-01` → **`2025-07-14`** |
+| Puerta 0 | `2025-07-01` → **`2025-07-30`** |
+
+Cargar los dos —el uso normal— produce **54 turnos, de los cuales 37 no tienen ninguna pieza**: los
+dias que solo alcanza el Puerta 0. El **69 %**.
+
+La barra del Wizard decia «Archivo multi-dia detectado · 54 turnos», listaba los tres primeros con
+«…+51» y ofrecia **Guardar en Calendario** sin distinguirlos. Guardarlos no es inocuo: un turno sin
+piezas se escribe con `merge` y queda con causas de Puerta 0 sobre los KPIs que hubiera de antes.
+
+⚠ **`isP0Only` no cubre el caso**: mira `parsedData.pieceRecords.length === 0`, o sea el archivo
+ENTERO, y con un pieza a pieza cargado siempre es `false`. **Un contador global no responde una
+pregunta por segmento.**
+
+## ⚠ Lo que medi y NO era: el doble de piezas en produccion
+
+Comparando recien-cargado contra guardado aparecieron **7 de 13 dias con exactamente el doble**
+(4.217 vs 8.434 · 5.614 vs 11.228 · 7.101 vs 14.202) **con los Puerta 0 identicos**. Persegui dos
+hipotesis y **ninguna se sostuvo**:
+
+- *el mismo turno guardado dos veces con dos nombres de turno* (la coleccion tiene dos vocabularios):
+  **0 pares** de turnos distintos con identicas piezas, sobre 242 dias;
+- *pieceRecords duplicados en la subcoleccion*: esta **vacia** para ese turno.
+
+Lo que si se ve: esos resumenes tienen en `sourceFileNames` el Excel del mes **mas un recorte del
+mismo turno** (`2025-07-08_turno_noche_pp.xlsx`) y un `updatedAt` de un backfill de 2026-08-05. No es
+atribuible al flujo vivo con lo medido, asi que **no se acuso**: queda como pendiente anotado.
+
+## ⚠ El preview `pwa-5184` sirve el REPO PRINCIPAL, no el worktree
+
+El `launch.json` que lee el tool es el del **directorio de la sesion** (`ANTARFOOD/.claude/`), no el
+del worktree ni el del repo. Para servir un worktree hay que agregar la entrada ahi, y como `cwd`
+debe ser relativo al proyecto, el unico camino es un `.cmd` en el scratchpad que haga `cd /d` — que
+es exactamente lo que hace `pwa-5184`.
+
+Y ⚠ **en un puerto nuevo no hay sesion**: otro origen, otro storage. La app queda en el login y al
+Wizard no se llega. Por eso el render de la barra **no se verifico a ojo** y se declaro: queda
+verificado por lectura (unico `return`, dentro de `{multiDayInfo && !savedToCalendar && (…)}`, al
+lado de `p0CoverageWarning`, sin ramas intermedias) y por el bundle publicado.
+
+## Verificacion
+
+`avisoDeTurnosSinPiezas` como modulo puro (4 tests) y **un test de integracion que fija la medicion**:
+54 turnos, 37 sin piezas, rangos 07-14 / 07-30, con la misma expresion que usa `multiDayInfo`. Se
+salta si los Excel no estan en disco. `tsc` · `eslint` · `audit-piel` · `audit-graficos` · **2333
+tests**. Verificado en el bundle publicado (`buildSha 05d1314`).
+
+Nota de proceso: el PR necesito rebase dos veces — hay otros carriles mergeando en paralelo, y tras
+un rebase `gh pr checks` muestra el run VIEJO hasta que arranca el nuevo.
 ## 2026-09-12 · Quitar el archivo dejaba el turno sin resumen (PR #962)
 
 Cuarta y ultima ronda del flujo de carga: `handleRemoveFile`.
