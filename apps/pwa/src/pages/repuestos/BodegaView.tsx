@@ -27,6 +27,7 @@ import { db } from '@/services/firebase'
 import { useGlobalSearch } from '@/hooks/repuestos/useGlobalSearch'
 import { haystackMatchesAll, normalizeForSearch } from '@/utils/repuestos'
 import { getGlobalEquipmentCache, useGlobalEquipmentSearch } from '@/hooks/useGlobalEquipmentSearch'
+import { stockStatusOf } from '@/hooks/repuestos/estadoDeStock'
 import { useBodega } from '@/hooks/repuestos/useBodega'
 // `Tag` colisiona con el ícono homónimo de lucide ya usado acá.
 import { Tag as CatTag, type TagTone } from '@/components/piel'
@@ -245,8 +246,10 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
   const filtered = useMemo(() => {
     let result = items
     if (stockFilter === 'configurados') result = result.filter(i => i.bodegaId)
-    else if (stockFilter === 'bajo') result = result.filter(i => i.bodegaId && i.stockMinimo > 0 && i.stockActual <= i.stockMinimo && i.stockActual > 0)
-    else if (stockFilter === 'sin') result = result.filter(i => i.bodegaId && i.stockActual === 0 && i.stockMinimo > 0)
+    // Misma definicion que las tarjetas (estadoDeStock.ts). El filtro se habia quedado con la
+    // regla vieja —exigia `stockMinimo > 0`— asi que "Sin stock" anunciaba 545 y mostraba 21.
+    else if (stockFilter === 'bajo') result = result.filter(i => stockStatusOf(i) === 'low')
+    else if (stockFilter === 'sin') result = result.filter(i => stockStatusOf(i) === 'out')
     else if (stockFilter === 'sinConfig') result = result.filter(i => !i.bodegaId)
     else if (stockFilter === 'favoritos') result = result.filter(i => i.isWatched)
 
