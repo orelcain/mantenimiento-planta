@@ -64,6 +64,8 @@ export interface BomIB01Resumen {
   /** Posiciones que quedaron en cantidad 1 por no tener dato real. */
   sinCantidadReal: number
   textosTruncados: number
+  /** Posiciones que salieron con la UM por defecto porque el material no traia unidad. */
+  unidadAsumida: number
   /** Posiciones cuyo material esta marcado como codigo SAP obsoleto. */
   obsoletos: number
   /**
@@ -150,6 +152,7 @@ export function buildBomIB01(repuestos: Repuesto[], options: BuildBomOptions): B
   let sinCantidadReal = 0
   let textosTruncados = 0
   let obsoletos = 0
+  let unidadAsumida = 0
 
   const rows: BomIB01Row[] = ordenadas.map((rep, i) => {
     const esL = tieneCodigoSap(rep)
@@ -165,6 +168,10 @@ export function buildBomIB01(repuestos: Repuesto[], options: BuildBomOptions): B
       : textoCompleto
     if (base.length > SAP_TEXTO_POSICION_MAX) textosTruncados++
     if (MARCA_OBSOLETO.test(textoCompleto)) obsoletos++
+    // Sin unidad en el maestro la posicion sale como pieza. Es un default sensato para un
+    // repuesto, pero el que carga tiene que poder revisar cuales se asumieron: un material
+    // que se pide por metro cargado como pieza hace pedir 1 unidad de algo que va en rollo.
+    if (!String(rep.unidad || '').trim()) unidadAsumida++
 
     return {
       posicion: String((i + 1) * 10).padStart(4, '0'),
@@ -190,6 +197,7 @@ export function buildBomIB01(repuestos: Repuesto[], options: BuildBomOptions): B
       posicionesT: rows.filter((r) => r.categoria === 'T').length,
       sinCantidadReal,
       textosTruncados,
+      unidadAsumida,
       obsoletos,
       materialesDuplicados,
     },
@@ -224,6 +232,7 @@ export function exportBomIB01ToExcel(bom: BomIB01): void {
     { Campo: '· tipo T (texto, sin código SAP)', Valor: resumen.posicionesT },
     { Campo: 'Posiciones sin cantidad real (quedaron en 1)', Valor: resumen.sinCantidadReal },
     { Campo: 'Textos truncados a 40 caracteres', Valor: resumen.textosTruncados },
+    { Campo: 'Posiciones con UM asumida (el material no traia unidad)', Valor: resumen.unidadAsumida },
     { Campo: 'Materiales con codigo OBSOLETO (NO USAR)', Valor: resumen.obsoletos },
     { Campo: 'Materiales REPETIDOS en esta lista (SAP la rechaza)', Valor: resumen.materialesDuplicados },
   ]
@@ -306,6 +315,7 @@ export interface BomsMasivasResumen {
   posicionesL: number
   posicionesT: number
   sinCantidadReal: number
+  unidadAsumida: number
   obsoletos: number
   materialesDuplicados: number
   centros: string[]
@@ -318,6 +328,7 @@ export function resumirBoms(boms: BomIB01[]): BomsMasivasResumen {
     posicionesL: boms.reduce((n, b) => n + b.resumen.posicionesL, 0),
     posicionesT: boms.reduce((n, b) => n + b.resumen.posicionesT, 0),
     sinCantidadReal: boms.reduce((n, b) => n + b.resumen.sinCantidadReal, 0),
+    unidadAsumida: boms.reduce((n, b) => n + b.resumen.unidadAsumida, 0),
     obsoletos: boms.reduce((n, b) => n + b.resumen.obsoletos, 0),
     materialesDuplicados: boms.reduce((n, b) => n + b.resumen.materialesDuplicados, 0),
     centros: [...new Set(boms.map((b) => b.header.centro).filter(Boolean))].sort(),
@@ -347,6 +358,7 @@ export function exportBomsIB01ToExcel(boms: BomIB01[], fecha?: string): void {
     'Tipo L': b.resumen.posicionesL,
     'Tipo T': b.resumen.posicionesT,
     'Sin cantidad real': b.resumen.sinCantidadReal,
+    'UM asumida': b.resumen.unidadAsumida,
     'Obsoletos (NO USAR)': b.resumen.obsoletos,
     'Materiales repetidos': b.resumen.materialesDuplicados,
   }))
@@ -376,6 +388,7 @@ export function exportBomsIB01ToExcel(boms: BomIB01[], fecha?: string): void {
     { Campo: '· tipo L (material de stock)', Valor: r.posicionesL },
     { Campo: '· tipo T (texto, sin código SAP)', Valor: r.posicionesT },
     { Campo: 'Posiciones sin cantidad real (quedaron en 1)', Valor: r.sinCantidadReal },
+    { Campo: 'Posiciones con UM asumida (el material no traia unidad)', Valor: r.unidadAsumida },
     { Campo: 'Materiales con codigo OBSOLETO (NO USAR)', Valor: r.obsoletos },
     { Campo: 'Materiales REPETIDOS dentro de una lista (SAP la rechaza)', Valor: r.materialesDuplicados },
   ]

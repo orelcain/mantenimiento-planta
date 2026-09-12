@@ -179,6 +179,28 @@ describe('avisos previos a la carga en SAP', () => {
     expect(bom.resumen.obsoletos).toBe(0)
   })
 
+  it('cuenta las posiciones que salieron con la unidad asumida', () => {
+    const bom = buildBomIB01(
+      [
+        rep({ codigoSAP: '3300011612', textoBreve: 'SOPORTE' }), // sin unidad -> ST asumido
+        rep({ codigoSAP: '3300011999', textoBreve: 'CABLE', unidad: 'MT' } as Partial<Repuesto>),
+      ],
+      opts,
+    )
+    expect(bom.resumen.unidadAsumida).toBe(1)
+    expect(bom.rows.map((r) => r.unidad)).toEqual(['ST', 'M'])
+  })
+
+  it('una unidad en blanco cuenta como asumida', () => {
+    const bom = buildBomIB01([rep({ codigoSAP: '3300011612', unidad: '   ' } as Partial<Repuesto>)], opts)
+    expect(bom.resumen.unidadAsumida).toBe(1)
+  })
+
+  it('con unidad declarada no cuenta como asumida', () => {
+    const bom = buildBomIB01([rep({ codigoSAP: '3300011612', unidad: 'UN' } as Partial<Repuesto>)], opts)
+    expect(bom.resumen.unidadAsumida).toBe(0)
+  })
+
   it('detecta un material repetido — SAP rechaza la BOM entera', () => {
     const bom = buildBomIB01(
       [
