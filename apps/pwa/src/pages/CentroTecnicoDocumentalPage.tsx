@@ -164,6 +164,25 @@ export function CentroTecnicoDocumentalPage() {
     [detailId, equipos],
   )
 
+  /*
+   * Entrada desde el modulo Repuestos: `?nodo=<hierarchyNodeId>`.
+   *
+   * El expediente se abre con `?eq=<id del Equipment>`, pero Repuestos trabaja
+   * con nodeIds de `hierarchy` (`repuesto.equipos[]` los guarda). Traducirlos
+   * alla obligaria a cargar los equipos solo para armar un link, asi que se
+   * resuelve aca y se reescribe la URL a `?eq=`, que es lo que usa el resto de
+   * la pagina. `replace` para no dejar el paso intermedio en el historial.
+   */
+  const nodoParam = searchParams.get('nodo')
+  useEffect(() => {
+    if (!nodoParam || equipos.length === 0) return
+    const eq = equipos.find((e) => e.hierarchyNodeId === nodoParam)
+    const p = new URLSearchParams(searchParams)
+    p.delete('nodo')
+    if (eq) p.set('eq', eq.id)
+    setSearchParams(p, { replace: true })
+  }, [nodoParam, equipos, searchParams, setSearchParams])
+
   // Cargar incidencias + historial del equipo abierto (timeline de la Ficha y reporte PDF)
   useEffect(() => {
     if (!detailId) {
