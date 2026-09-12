@@ -737,16 +737,46 @@ export function dedupePieceRecords(records: PieceRecord[]): {
   unique: PieceRecord[]
   duplicatesRemoved: number
 } {
-  const seen = new Set<string>()
-  const unique: PieceRecord[] = []
+  /*
+   * La clave incluia `lot`, `error` y `weightPerPieceGrams`, y eso rompia el
+   * dedupe contra un archivo que no trae esas columnas.
+   *
+   * Medido: el Excel del mes y el recorte por turno del MISMO turno
+   * (2025-07-08 noche) traen los mismos 5.614 registros, pero el recorte no
+   * trae `lot`, `product`, `conservation` ni `shift`. Con `lot` en la clave las
+   * dos copias son distintas: el merge daba **11.228 piezas, el doble**, y asi
+   * quedo guardado en produccion.
+   *
+   * Sacarlos no cuesta nada: sobre **5.374.920 registros reales** de la
+   * temporada 2025-26, la clave vieja y esta detectan **los mismos 555
+   * duplicados**. La identidad de una pieza es cuando paso, por que puerta,
+   * cuanto peso y con que calidad/calibre; el lote y el destino son contexto.
+   *
+   * Cuando dos copias colapsan se conserva la mas completa, para no perder el
+   * lote si uno de los dos archivos lo trae.
+   */
+  const porClave = new Map<string, PieceRecord>()
+  const orden: string[] = []
   for (let i = 0; i < records.length; i++) {
     const r = records[i]!
-    const key = `${r.ts}|${r.gate}|${r.pieces}|${r.quality ?? ''}|${r.calibre ?? ''}|${r.weightKg ?? ''}|${r.lot ?? ''}|${r.error ?? ''}|${r.weightPerPieceGrams ?? ''}`
-    if (seen.has(key)) continue
-    seen.add(key)
-    unique.push(r)
+    const key = `${r.ts}|${r.gate}|${r.pieces}|${r.quality ?? ''}|${r.calibre ?? ''}|${r.weightKg ?? ''}`
+    const previo = porClave.get(key)
+    if (previo === undefined) {
+      porClave.set(key, r)
+      orden.push(key)
+    } else if (camposDefinidos(r) > camposDefinidos(previo)) {
+      porClave.set(key, r)
+    }
   }
+  const unique = orden.map((k) => porClave.get(k)!)
   return { unique, duplicatesRemoved: records.length - unique.length }
+}
+
+/** Cuantos campos trae realmente un registro (para quedarse con el mas completo). */
+function camposDefinidos(r: PieceRecord): number {
+  let n = 0
+  for (const v of Object.values(r)) if (v !== undefined && v !== null) n++
+  return n
 }
 
 /**
