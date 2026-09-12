@@ -22,7 +22,7 @@ import { cn } from '@/lib/utils'
 import { fmt } from '@/lib/format'
 import { useAuthStore } from '@/store'
 import { parseFile, mergeParsedData } from '@/services/grader/graderExcelParser'
-import { avisosDelArchivo } from '@/services/grader/graderAvisosDeCarga'
+import { avisosDelArchivo, cubreElTurno } from '@/services/grader/graderAvisosDeCarga'
 import { getModuleRanges } from '@/services/grader/graderModuleConfig.service'
 import { deleteDailySummary } from '@/services/grader/graderDailySummary.service'
 import { listGraderUploads, saveGraderUpload, updateGraderUpload, uploadGraderFile, deleteGraderUpload } from '@/services/grader/graderUpload.service'
@@ -227,6 +227,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
 
     try {
       const parsed: FileParsed[] = []
+      const aInvalidar = new Map<string, { sessionDate: string; shiftId: string }>()
       for (const file of fileArray) {
         const result = await parseFile(file)
         const inferred = result.partialData.inferred
@@ -269,17 +270,30 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
             setUploadError('No se pudo subir el archivo a Storage.')
           }
           setUploads((prev) => normalizeUploads([upload, ...prev], shiftSchedule))
-          if (result.fileMeta.kind === 'PIEZA_PIEZA' || result.fileMeta.kind === 'PUERTA_0') {
-            try {
-              await deleteDailySummary(sessionDate, shiftId, lineId)
-            } catch {
-              // Evitar bloquear carga si no hay permisos para invalidar el resumen.
-            }
+          /*
+           * Invalidar el resumen del turno se decide aca y se hace al final de
+           * la tanda. Antes se borraba archivo por archivo y SIEMPRE, antes de
+           * saber si el archivo contenia ese turno: medido sobre los Excel
+           * reales de julio (el pieza a pieza cubre 07-01 -> 07-14 y el Puerta 0
+           * 07-01 -> 07-30), eligiendo el turno del 2025-07-20 el analisis da
+           * 0 piezas y 0 rechazos y el resumen bueno ya estaba borrado, dos
+           * veces, una por archivo. #956 agrego el aviso; el borrado seguia
+           * pasando igual.
+           */
+          if (ACCEPTED_KINDS.includes(result.fileMeta.kind) && cubreElTurno(sessionDate, inferred ?? {})) {
+            aInvalidar.set(`${sessionDate}|${shiftId}`, { sessionDate, shiftId })
           }
         }
         if (!currentTurnoDate) setCurrentTurnoDate(sessionDate)
         if (!currentTurnoShift) setCurrentTurnoShift(shiftId)
         parsed.push({ ...result, file })
+      }
+      for (const t of aInvalidar.values()) {
+        try {
+          await deleteDailySummary(t.sessionDate, t.shiftId, lineId)
+        } catch {
+          // Evitar bloquear carga si no hay permisos para invalidar el resumen.
+        }
       }
       updateFiles((prev) => {
         const map = new Map<string, FileParsed>()
