@@ -8,6 +8,8 @@
  */
 
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
+import { avisoDeTurnosSinPiezas } from '@/services/grader/graderTurnosSinPiezas'
+
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, Button, Badge } from '@/components/ui'
 import { BarChart3, Loader2, CheckCircle2, Calendar, Upload, AlertCircle, ChevronDown } from 'lucide-react'
@@ -262,7 +264,19 @@ export function AnalisisGraderWizardPage() {
     if (entries.length === 0) return null
     const uniqueDays = new Set(entries.map(([, s]) => s.sessionDate)).size
     const isP0Only = parsedData.pieceRecords.length === 0
-    return { entries, uniqueDays, totalSegments: entries.length, isP0Only }
+    /*
+     * `isP0Only` mira el archivo ENTERO, asi que con un pieza a pieza cargado
+     * siempre es false — y no cubre el caso real: los dos Excel de un mismo mes
+     * no cubren el mismo rango. Medido en julio 2025 (PP 07-01 -> 07-14,
+     * P0 07-01 -> 07-30): de los 54 turnos detectados, **37 no tienen ni una
+     * pieza**. La barra ofrecia guardar los 54 sin distinguirlos.
+     */
+    const soloP0 = entries.filter(([, s]) => s.pieceRecords.length === 0).length
+    return {
+      entries, uniqueDays, totalSegments: entries.length, isP0Only,
+      segmentosSoloP0: soloP0,
+      segmentosConPiezas: entries.length - soloP0,
+    }
   }, [parsedData, shiftSchedule, slxWindows])
 
   // Consultar Firestore: cuántos de los turnos detectados ya existen
@@ -853,6 +867,11 @@ export function AnalisisGraderWizardPage() {
                     </>
                   )}
                 </p>
+                {avisoDeTurnosSinPiezas(multiDayInfo.segmentosConPiezas, multiDayInfo.segmentosSoloP0) && (
+                  <p className="text-caption text-ink-warn mt-1" data-testid="wizard-turnos-sin-piezas">
+                    {avisoDeTurnosSinPiezas(multiDayInfo.segmentosConPiezas, multiDayInfo.segmentosSoloP0)}
+                  </p>
+                )}
                 {parsedData?.inferred?.p0CoverageWarning && (
                   <p className="text-caption text-ink-warn mt-1" data-testid="wizard-p0-cobertura">{parsedData.inferred.p0CoverageWarning}</p>
                 )}
