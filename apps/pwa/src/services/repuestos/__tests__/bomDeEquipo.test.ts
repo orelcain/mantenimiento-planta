@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { particionarRepuestosDeEquipo, filtrarRepuestosDeEquipo } from '../bomDeEquipo'
+import { particionarRepuestosDeEquipo } from '../bomDeEquipo'
 
 /** Filas reales de la EVISCERADORA BAADER 142 N1. */
 const CON_CODIGO = [
@@ -64,48 +64,5 @@ describe('particionarRepuestosDeEquipo', () => {
     expect(r.bom).toHaveLength(0)
     expect(r.despiece).toHaveLength(0)
     expect(r.filasSinCodigo).toBe(0)
-  })
-})
-
-describe('filtrarRepuestosDeEquipo', () => {
-  /** Filas reales de la Baader 142 N1. */
-  const REPS = [
-    { id: 'a', codigoSAP: '3300120607', nombre: 'ABRAZADERA 34752009', tipo: 'ABRAZADERA' },
-    { id: 'b', codigoSAP: '3300011873', nombre: 'ABRAZADERA 38030218', tipo: 'RESORTE' },
-    { id: 'c', codigoSAP: '3300098563', nombre: 'AMORTIGUADOR 1420704000', tipo: 'AMORTIGUADOR' },
-    { id: 'd', codigoSAP: '', nombre: 'Ángulo', tipo: 'ÁNGULO/PERFIL' },
-    { id: 'e', codigoSAP: '', nombre: 'Canal para cables', tipo: 'CABLE/CONECT.' },
-  ]
-
-  it('sin consulta devuelve todo', () => {
-    expect(filtrarRepuestosDeEquipo(REPS, '')).toHaveLength(5)
-    expect(filtrarRepuestosDeEquipo(REPS, '   ')).toHaveLength(5)
-  })
-
-  it('busca por código SAP, incluso por un trozo', () => {
-    expect(filtrarRepuestosDeEquipo(REPS, '3300011873').map((r) => r.id)).toEqual(['b'])
-    expect(filtrarRepuestosDeEquipo(REPS, '33001206').map((r) => r.id)).toEqual(['a'])
-  })
-
-  it('busca por nombre sin importar acentos ni mayúsculas', () => {
-    expect(filtrarRepuestosDeEquipo(REPS, 'angulo').map((r) => r.id)).toEqual(['d'])
-    expect(filtrarRepuestosDeEquipo(REPS, 'ABRAZADERA')).toHaveLength(2)
-  })
-
-  it('busca por tipo', () => {
-    expect(filtrarRepuestosDeEquipo(REPS, 'resorte').map((r) => r.id)).toEqual(['b'])
-  })
-
-  it('exige todos los términos, en cualquier orden', () => {
-    expect(filtrarRepuestosDeEquipo(REPS, 'abrazadera resorte').map((r) => r.id)).toEqual(['b'])
-    expect(filtrarRepuestosDeEquipo(REPS, 'resorte abrazadera').map((r) => r.id)).toEqual(['b'])
-  })
-
-  it('encuentra el singular buscando en plural', () => {
-    expect(filtrarRepuestosDeEquipo(REPS, 'cables').map((r) => r.id)).toEqual(['e'])
-  })
-
-  it('sin coincidencias devuelve vacío, no todo', () => {
-    expect(filtrarRepuestosDeEquipo(REPS, 'turbina')).toHaveLength(0)
   })
 })

@@ -20,7 +20,6 @@
  * entra en el export IB01.
  */
 import { esCodigoSapValido } from '@/utils/repuestos/exportBomSAP'
-import { normalizeForSearch, haystackMatchesAll } from '@/utils/repuestos/searchNormalize'
 
 /** Lo mínimo que necesita la partición; `useRepuestosDeEquipo` devuelve esto. */
 export interface RepuestoParticionable {
@@ -82,28 +81,4 @@ export function particionarRepuestosDeEquipo<T extends RepuestoParticionable>(
     despiece,
     filasSinCodigo: despiece.reduce((s, g) => s + g.veces, 0),
   }
-}
-
-/**
- * Filtra los repuestos de un equipo por código SAP, nombre o tipo.
- *
- * Con 476 en la lista de materiales y 1.328 de despiece, encontrar una pieza
- * scrolleando no es viable. Usa el mismo normalizador que los buscadores del
- * módulo Repuestos —sin acentos, y con variantes de plural, así que «guantes»
- * encuentra «GUANTE ANTICORTE»— para que buscar lo mismo dé lo mismo en los dos
- * lados de la app.
- *
- * Filtra ANTES de partir: así los contadores de cada grupo hablan de lo que se
- * está viendo, no del total.
- */
-export function filtrarRepuestosDeEquipo<T extends RepuestoParticionable>(
-  repuestos: readonly T[],
-  consulta: string,
-): T[] {
-  const q = normalizeForSearch(consulta)
-  if (!q) return [...repuestos]
-  const terminos = q.split(' ').filter(Boolean)
-  return repuestos.filter((r) =>
-    haystackMatchesAll(normalizeForSearch(`${r.codigoSAP} ${r.nombre} ${r.tipo ?? ''}`), terminos),
-  )
 }

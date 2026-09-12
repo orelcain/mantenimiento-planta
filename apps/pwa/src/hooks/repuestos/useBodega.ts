@@ -13,6 +13,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { rowKeyDeRepuesto } from './identidadDeRepuesto'
 import {
   collection,
   collectionGroup,
@@ -375,10 +376,11 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
     for (const r of catalogRepuestos) {
       const rep = r.repuesto
       const sap = (rep.codigoSAP || '').trim()
-      const fab = (rep.codigoFabricante || '').trim()
       // Colección plana: rep.id es globalmente único (un doc puede venir N veces,
-      // una por equipo) → la clave id NO incluye machineId para reagrupar el doc.
-      const key = sap || (fab ? `fab:${fab}` : `id:${rep.id}`)
+      // una por equipo) → la clave NO incluye machineId, para reagrupar el doc.
+      // La construye `identidadDeRepuesto.ts`: es la misma clave con la que se
+      // guardan los favoritos, y ahora tambien la usa el Centro Tecnico Documental.
+      const key = rowKeyDeRepuesto(rep)
 
       const existing = byKey.get(key)
       if (existing) {
