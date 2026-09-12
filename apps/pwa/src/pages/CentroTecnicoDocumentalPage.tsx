@@ -54,6 +54,7 @@ import { PhotoAnnotationEditor } from '@/components/PhotoAnnotationEditor'
 import { useManualesDeEquipos } from '@/hooks/repuestos/useManualesDeEquipos'
 import { useRepuestosDeEquipo } from '@/hooks/repuestos/useRepuestosDeEquipo'
 import { particionarRepuestosDeEquipo } from '@/services/repuestos/bomDeEquipo'
+import { ubicacionCorta } from '@/services/equipos/ubicacionCorta'
 import { cn } from '@/lib/utils'
 import { logger } from '@/lib/logger'
 import {
@@ -2754,6 +2755,8 @@ function CtdEquipoRow({
   const cond = e.fichaTecnica?.condicion
   const pct = completitud(e)
   const foto = e.photos?.[0]
+  const ubicacion = ubicacionCorta(e.hierarchyPath)
+
   return (
     <div
       className={`flex items-center gap-3 px-3 cursor-pointer border-l-2 ${compact ? 'py-1.5' : 'py-3'} ${selected ? 'border-primary bg-primary/20' : 'border-transparent hover:bg-muted/40'}`}
@@ -2781,7 +2784,16 @@ function CtdEquipoRow({
 
       <div className="flex-1 min-w-0">
         <div className="text-xs font-medium truncate">{e.nombre}</div>
-        <div className="text-caption text-muted-foreground font-mono truncate">{e.codigo}</div>
+        {/*
+          Hay seis KNURO y seis EVISCERADORA BAADER 142 que se llaman IGUAL en
+          las dos plantas: sin la ubicación no se sabía cuál era cuál sin abrir
+          el equipo, salvo que uno se supiera los códigos SAP de memoria. El dato
+          ya estaba en `hierarchyPath`; ver services/equipos/ubicacionCorta.ts.
+        */}
+        <div className="text-caption text-muted-foreground truncate">
+          <span className="font-mono">{e.codigo}</span>
+          {ubicacion && <span> · {ubicacion}</span>}
+        </div>
         {e.nombreComun && <div className="text-caption text-muted-foreground truncate">“{e.nombreComun}”</div>}
         <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs md:hidden">
           <Badge variant="outline" className={`${crit.cls}`}>{crit.nivel}</Badge>
