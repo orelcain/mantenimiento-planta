@@ -2081,7 +2081,7 @@ function ExpedienteDialog({
               <TabsTrigger value="ficha">Ficha NFPA 70B</TabsTrigger>
               <TabsTrigger value="protocolo">Protocolo</TabsTrigger>
               <TabsTrigger value="tablero">Tablero</TabsTrigger>
-              <TabsTrigger value="recursos" title="Repuestos vinculados al equipo. Los que tienen codigo SAP y cantidad son la lista de materiales que se carga en IB01.">Materiales</TabsTrigger>
+              <TabsTrigger value="recursos" title="Repuestos vinculados al equipo. Los que tienen codigo SAP y cantidad son la lista que se carga en IB01.">Lista de materiales</TabsTrigger>
               <TabsTrigger value="trabajos">Trabajos ({workOrders.length})</TabsTrigger>
               {isFavorite && <TabsTrigger value="mediciones">Mediciones</TabsTrigger>}
               <TabsTrigger value="fotos">Fotos ({equipment.photos?.length || 0})</TabsTrigger>
