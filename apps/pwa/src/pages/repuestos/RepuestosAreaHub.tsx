@@ -2449,6 +2449,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
         machineName={showingAll ? 'Todas las áreas' : (selectedNode?.nombre ?? 'Área')}
         sapEquipo={sapEquipo}
         sapEquipos={sapEquipos}
+        favKeys={favKeys}
       />
 
       {/* Gestor de listas de favoritos con nombre (para el repuesto objetivo) */}
