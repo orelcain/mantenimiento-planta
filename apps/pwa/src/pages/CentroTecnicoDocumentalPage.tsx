@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   AlertTriangle,
@@ -24,7 +24,6 @@ import {
   Wrench,
   X,
   Zap,
-  Search,
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import ReactECharts from 'echarts-for-react'
@@ -42,6 +41,8 @@ import { createWorkOrder, getWorkOrders, updateWorkOrder } from '@/services/work
 import { descargarPlantillaPlaca, importarPlacaExcel } from '@/services/equipmentFichaExcel'
 import { generarReporteEquipo } from '@/services/equipmentReportPdf'
 import { useAuthStore } from '@/store'
+import { rowKeyDeRepuesto } from '@/hooks/repuestos/identidadDeRepuesto'
+import { getRepuestoFavs, saveRepuestoFavs } from '@/services/userPreferences'
 import { useEquipmentFavorites } from '@/hooks/useEquipmentFavorites'
 import { useEquipmentNotes } from '@/hooks/useEquipmentNotes'
 import type { EquipmentNote } from '@/hooks/useEquipmentNotes'
@@ -54,7 +55,7 @@ import { TableroExpediente } from '@/components/equipment/TableroExpediente'
 import { PhotoAnnotationEditor } from '@/components/PhotoAnnotationEditor'
 import { useManualesDeEquipos } from '@/hooks/repuestos/useManualesDeEquipos'
 import { useRepuestosDeEquipo } from '@/hooks/repuestos/useRepuestosDeEquipo'
-import { particionarRepuestosDeEquipo, filtrarRepuestosDeEquipo } from '@/services/repuestos/bomDeEquipo'
+import { particionarRepuestosDeEquipo } from '@/services/repuestos/bomDeEquipo'
 import { ubicacionCorta } from '@/services/equipos/ubicacionCorta'
 import { cn } from '@/lib/utils'
 import { logger } from '@/lib/logger'
@@ -1445,27 +1446,43 @@ function OtBadge({ ot }: { ot?: OtCount }) {
 /** Cuantas filas del equipo comparten ese nombre del despiece. */
 const GRUPO_TITULO = (n: number): string => n + ' filas con este mismo nombre'
 
-/** Recursos · repuestos del equipo (N:M) + buscador embebido para vincular/desvincular. */
+/** Materiales · repuestos del equipo (N:M) + buscador embebido para vincular/desvincular. */
 function RecursosRepuestos({ equipment, canEdit }: { equipment: Equipment; canEdit: boolean }) {
   const nodeId = equipment.hierarchyNodeId
   const [reloadKey, setReloadKey] = useState(0)
   const { repuestos, loading } = useRepuestosDeEquipo(nodeId, reloadKey)
   const [despieceAbierto, setDespieceAbierto] = useState(false)
-  const [filtro, setFiltro] = useState('')
-  const particionTotal = useMemo(() => particionarRepuestosDeEquipo(repuestos), [repuestos])
-  const particion = useMemo(
-    () => (filtro.trim() ? particionarRepuestosDeEquipo(filtrarRepuestosDeEquipo(repuestos, filtro)) : particionTotal),
-    [repuestos, filtro, particionTotal],
-  )
-  const filtrando = filtro.trim().length > 0
-  // Buscando algo, esconder el despiece es esconder la mitad de los resultados.
-  const verDespiece = despieceAbierto || filtrando
-  const sinResultados = filtrando && particion.bom.length === 0 && particion.despiece.length === 0
+  const particion = useMemo(() => particionarRepuestosDeEquipo(repuestos), [repuestos])
   const [adding, setAdding] = useState(false)
   const [maestro, setMaestro] = useState<RepuestoMaestroItem[] | null>(null)
   const [loadingMaestro, setLoadingMaestro] = useState(false)
   const [q, setQ] = useState('')
   const [busy, setBusy] = useState(false)
+
+  /*
+   * Los favoritos son los MISMOS que los del modulo Repuestos: se guardan en
+   * `repuestoFavs` del usuario, keyed por la identidad estable de la pieza
+   * (`identidadDeRepuesto.ts`). Marcar aqui un material se ve marcado alla, que es
+   * lo que uno espera de "mis favoritos" — no una segunda lista paralela.
+   */
+  const userId = useAuthStore((s) => s.user?.id)
+  const [favs, setFavs] = useState<Set<string>>(new Set())
+  useEffect(() => {
+    if (!userId) return
+    getRepuestoFavs(userId).then((arr) => setFavs(new Set(arr))).catch(() => {})
+  }, [userId])
+
+  const toggleFav = useCallback((rep: { id?: string; codigoSAP?: string | null; codigoFabricante?: string | null }) => {
+    if (!userId) return
+    const key = rowKeyDeRepuesto(rep)
+    setFavs((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      void saveRepuestoFavs(userId, [...next])
+      return next
+    })
+  }, [userId])
 
   async function openAdd() {
     setAdding(true)
@@ -1572,23 +1589,6 @@ function RecursosRepuestos({ equipment, canEdit }: { equipment: Equipment; canEd
           </div>
         )}
 
-        {/*
-          Con 476 en la lista de materiales y 1.328 de despiece, encontrar una
-          pieza scrolleando no es viable. Usa el mismo normalizador que los
-          buscadores del módulo Repuestos (sin acentos, con plurales).
-        */}
-        {repuestos.length > 0 && (
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={filtro}
-              onChange={(ev) => setFiltro(ev.target.value)}
-              placeholder="Buscar por código SAP, nombre o tipo…"
-              className="h-8 pl-7 text-sm"
-              aria-label="Buscar en los repuestos del equipo"
-            />
-          </div>
-        )}
         {loading ? (
           <p className="text-sm italic text-muted-foreground">Cargando…</p>
         ) : repuestos.length === 0 ? (
@@ -1611,7 +1611,6 @@ function RecursosRepuestos({ equipment, canEdit }: { equipment: Equipment; canEd
                 <div className="flex flex-wrap items-baseline gap-x-2 pt-1">
                   <span className="text-xs font-semibold uppercase tracking-wide text-ink-ok">
                     Lista de materiales SAP · {particion.bom.length}
-                    {filtrando && ` de ${particionTotal.bom.length}`}
                   </span>
                   <span className="text-caption text-muted-foreground">
                     con código y cantidad — es la que se carga en IB01
@@ -1620,6 +1619,17 @@ function RecursosRepuestos({ equipment, canEdit }: { equipment: Equipment; canEd
                 <div className="divide-y">
                   {particion.bom.map((r) => (
                     <div key={r.id} className="flex items-center gap-3 py-2 text-sm">
+                      {userId && (
+                        <button
+                          onClick={() => toggleFav(r)}
+                          className={['shrink-0 rounded-ctl p-0.5 transition', favs.has(rowKeyDeRepuesto(r)) ? 'text-ink-warn' : 'text-muted-foreground/30 hover:text-ink-warn'].join(' ')}
+                          title={favs.has(rowKeyDeRepuesto(r)) ? 'Quitar de mis favoritos' : 'Marcar como favorito (los mismos de Repuestos)'}
+                          aria-label="Favorito"
+                          aria-pressed={favs.has(rowKeyDeRepuesto(r))}
+                        >
+                          <Star className={['h-3.5 w-3.5', favs.has(rowKeyDeRepuesto(r)) ? 'fill-current' : ''].join(' ')} />
+                        </button>
+                      )}
                       <span className="w-28 shrink-0 font-mono text-xs tabular-nums text-muted-foreground">{r.codigoSAP}</span>
                       <span className="min-w-0 flex-1 truncate">
                         {r.nombre}
@@ -1653,32 +1663,25 @@ function RecursosRepuestos({ equipment, canEdit }: { equipment: Equipment; canEd
               </>
             )}
 
-            {sinResultados && (
-              <p className="py-2 text-sm italic text-muted-foreground">
-                Ningún repuesto de este equipo coincide con «{filtro.trim()}».
-              </p>
-            )}
-
             {particion.despiece.length > 0 && (
               <>
                 <button
                   type="button"
                   onClick={() => setDespieceAbierto((v) => !v)}
-                  aria-expanded={verDespiece}
+                  aria-expanded={despieceAbierto}
                   className="flex w-full flex-wrap items-baseline gap-x-2 border-t pt-2 text-left"
                 >
                   <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     Despiece sin código · {particion.filasSinCodigo}
-                    {filtrando && ` de ${particionTotal.filasSinCodigo}`}
                   </span>
                   <span className="text-caption text-muted-foreground">
                     identifica la pieza en el plano; no se puede pedir
                   </span>
                   <ChevronDown
-                    className={cn('ml-auto h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform', verDespiece && 'rotate-180')}
+                    className={cn('ml-auto h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform', despieceAbierto && 'rotate-180')}
                   />
                 </button>
-                {verDespiece && (
+                {despieceAbierto && (
                   <div className="divide-y">
                     {particion.despiece.map((g) => (
                       <div key={g.nombre.toLowerCase()} className="flex items-center gap-3 py-2 text-sm">
@@ -2078,7 +2081,7 @@ function ExpedienteDialog({
               <TabsTrigger value="ficha">Ficha NFPA 70B</TabsTrigger>
               <TabsTrigger value="protocolo">Protocolo</TabsTrigger>
               <TabsTrigger value="tablero">Tablero</TabsTrigger>
-              <TabsTrigger value="recursos">Recursos</TabsTrigger>
+              <TabsTrigger value="recursos" title="Repuestos vinculados al equipo. Los que tienen codigo SAP y cantidad son la lista de materiales que se carga en IB01.">Materiales</TabsTrigger>
               <TabsTrigger value="trabajos">Trabajos ({workOrders.length})</TabsTrigger>
               {isFavorite && <TabsTrigger value="mediciones">Mediciones</TabsTrigger>}
               <TabsTrigger value="fotos">Fotos ({equipment.photos?.length || 0})</TabsTrigger>
