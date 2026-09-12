@@ -812,6 +812,14 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     return res
   }, [scopedRepuestos, repFavOnly, repComunOnly, favKeys, listFilter, favLists, repStockFilter, repClaseFilter, repTipoFilter, repQuery])
 
+  // Cuántos favoritos tuyos hay EN ESTE alcance (equipo o área), no en toda la planta: el
+  // filtro ya trabajaba sobre el alcance, pero el contador mostraba el total global — decía
+  // "(7)" y al activarlo aparecía 1 sola fila.
+  const favoritosEnScope = useMemo(
+    () => scopedRepuestos.reduce((n, r) => n + (favKeys.has(r.rowKey) ? 1 : 0), 0),
+    [scopedRepuestos, favKeys],
+  )
+
   // Cuántos comunes hay en el alcance actual (lista estática por SAP + marca comunEn).
   const comunesEnScope = useMemo(
     () => scopedRepuestos.reduce((n, r) => n + (isCommonPartSap(r.codigoSAP) || (r.comunEn?.length ?? 0) > 0 ? 1 : 0), 0),
@@ -1841,11 +1849,14 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                 variant={repFavOnly ? 'default' : 'outline'}
                 size="sm"
                 className="gap-1.5"
+                disabled={favoritosEnScope === 0 && !repFavOnly}
                 onClick={() => setRepFavOnly((v) => !v)}
-                title="Mis favoritos: atajos personales tuyos (cada usuario tiene los suyos). Distinto de «Comunes», que es la lista compartida de la máquina."
+                title={favoritosEnScope === 0
+                  ? 'No marcaste ningún favorito en este equipo. Tus favoritos son atajos personales tuyos y se marcan con la estrella de cada fila.'
+                  : 'Mis favoritos: atajos personales tuyos (cada usuario tiene los suyos). Distinto de «Comunes», que es la lista compartida de la máquina.'}
               >
                 <Star className={['h-4 w-4', repFavOnly ? 'fill-current' : ''].join(' ')} /> Mis favoritos
-                {favKeys.size > 0 && <span className="tabular-nums opacity-70">({favKeys.size})</span>}
+                {(favoritosEnScope > 0 || repFavOnly) && <span className="tabular-nums opacity-70">({favoritosEnScope})</span>}
               </Button>
               {comunesEnScope > 0 && (
                 <Button
