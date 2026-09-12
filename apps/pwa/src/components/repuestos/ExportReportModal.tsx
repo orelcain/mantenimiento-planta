@@ -300,16 +300,16 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
                         <TabsList className="grid w-full grid-cols-1 h-auto gap-3 bg-transparent p-0">
                             <TabsTrigger
                                 value="catalog"
-                                className="justify-start px-4 py-3 border bg-background hover:bg-muted/50 data-[state=active]:border-primary data-[state=active]:ring-1 data-[state=active]:ring-primary/20 transition-all shadow-sm rounded-card"
+                                className="w-full justify-start whitespace-normal px-4 py-3 border bg-background hover:bg-muted/50 data-[state=active]:border-primary data-[state=active]:ring-1 data-[state=active]:ring-primary/20 transition-all shadow-sm rounded-card"
                             >
                                 <div className="flex items-start gap-4">
                                     <div className="p-2.5 bg-cat-4-tint/[0.15] text-cat-4-ink rounded-card shrink-0 mt-0.5">
                                         <FileText className="h-5 w-5"/>
                                     </div>
-                                    <div className="text-left space-y-1">
+                                    <div className="min-w-0 whitespace-normal text-left space-y-1">
                                         <div className="font-semibold text-foreground">Catálogo Resumen</div>
                                         <div className="text-xs text-muted-foreground font-normal leading-relaxed">
-                                            Listado compacto en formato tabla, para imprimir o revisar en papel. Optimizado para la mayor cantidad de ítems por página.
+                                            Listado compacto en tabla, para imprimir o revisar en papel.
                                         </div>
                                     </div>
                                 </div>
@@ -317,13 +317,13 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
                             {sapDisponible && (
                             <TabsTrigger
                                 value="sap_bom"
-                                className="justify-start px-4 py-3 border bg-background hover:bg-muted/50 data-[state=active]:border-primary data-[state=active]:ring-1 data-[state=active]:ring-primary/20 transition-all shadow-sm rounded-card"
+                                className="w-full justify-start whitespace-normal px-4 py-3 border bg-background hover:bg-muted/50 data-[state=active]:border-primary data-[state=active]:ring-1 data-[state=active]:ring-primary/20 transition-all shadow-sm rounded-card"
                             >
                                 <div className="flex items-start gap-4">
                                     <div className="p-2.5 bg-cat-8-tint/[0.15] text-cat-8-ink rounded-card shrink-0 mt-0.5">
                                         <Factory className="h-5 w-5"/>
                                     </div>
-                                    <div className="text-left space-y-1">
+                                    <div className="min-w-0 whitespace-normal text-left space-y-1">
                                         <div className="font-semibold text-foreground">Lista de materiales SAP (IB01)</div>
                                         <div className="text-xs text-muted-foreground font-normal leading-relaxed">
                                             {sapEquipo
@@ -337,16 +337,16 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
                             {(favKeys?.size ?? 0) > 0 && (
                             <TabsTrigger
                                 value="technical_sheet"
-                                className="justify-start px-4 py-3 border bg-background hover:bg-muted/50 data-[state=active]:border-primary data-[state=active]:ring-1 data-[state=active]:ring-primary/20 transition-all shadow-sm rounded-card"
+                                className="w-full justify-start whitespace-normal px-4 py-3 border bg-background hover:bg-muted/50 data-[state=active]:border-primary data-[state=active]:ring-1 data-[state=active]:ring-primary/20 transition-all shadow-sm rounded-card"
                             >
                                 <div className="flex items-start gap-4">
                                     <div className="p-2.5 bg-blue-500/[0.15] text-blue-600 rounded-card shrink-0 mt-0.5">
                                         <ClipboardList className="h-5 w-5"/>
                                     </div>
-                                    <div className="text-left space-y-1">
+                                    <div className="min-w-0 whitespace-normal text-left space-y-1">
                                         <div className="font-semibold text-foreground">Fichas de mis favoritos</div>
                                         <div className="text-xs text-muted-foreground font-normal leading-relaxed">
-                                            Una página por repuesto, con fotos grandes y especificaciones. Solo tus favoritos: {favoritosSeleccionados.length} de los seleccionados. Sobre el catálogo entero saldrían miles de páginas en blanco.
+                                            Una página por repuesto, con fotos y especificaciones. Solo tus favoritos: {favoritosSeleccionados.length} de los seleccionados.
                                         </div>
                                     </div>
                                 </div>
