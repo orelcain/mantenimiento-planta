@@ -8,8 +8,8 @@
  * turno quedaba con 11.228 piezas — el doble — así guardado en producción.
  */
 import { describe, it, expect } from 'vitest'
-import { dedupePieceRecords } from '../graderSegmenter'
-import type { PieceRecord } from '../types'
+import { dedupePieceRecords, dedupeGate0Records } from '../graderSegmenter'
+import type { PieceRecord, Gate0Record } from '../types'
 
 /** Una pieza como la trae el Excel del mes: con lote, producto, conservación y turno. */
 const delMes: PieceRecord = {
@@ -58,5 +58,50 @@ describe('dedupePieceRecords con archivos de distinto detalle', () => {
     const a = { ...delMes, ts: '2025-07-08T22:00:00.000Z' }
     const b = { ...delMes, ts: '2025-07-08T23:00:00.000Z' }
     expect(dedupePieceRecords([b, a, b]).unique.map((x) => x.ts)).toEqual([b.ts, a.ts])
+  })
+})
+
+/**
+ * Lo mismo para Puerta 0: el recorte por turno trae `calibre` y el Excel del mes
+ * no. Medido sobre el rechazo del 2025-07-08 22:14:01 — mismo registro, dos
+ * claves: la ventana del turno quedaba con 838 registros en vez de 419.
+ */
+describe('dedupeGate0Records con archivos de distinto detalle', () => {
+  const delMes = {
+    ts: '2025-07-08T22:14:01.000Z',
+    gate: 0,
+    pieces: 1,
+    weightKg: 6.88,
+    weightPerPieceGrams: 6880,
+    error: 'No leído por fotocélula',
+    quality: 'Premium',
+    lot: '720250351',
+    shift: 'A',
+  } as unknown as Gate0Record
+
+  const delRecorte = {
+    ts: '2025-07-08T22:14:01.000Z',
+    gate: 0,
+    pieces: 1,
+    weightKg: 6.88,
+    error: 'No leído por fotocélula',
+    quality: 'Premium',
+    calibre: 'Other',
+  } as unknown as Gate0Record
+
+  it('colapsa el mismo rechazo aunque un archivo traiga el calibre y el otro no', () => {
+    const r = dedupeGate0Records([delMes, delRecorte])
+    expect(r.unique).toHaveLength(1)
+    expect(r.duplicatesRemoved).toBe(1)
+  })
+
+  it('no colapsa dos rechazos del mismo instante con distinta causa', () => {
+    const otraCausa = { ...delMes, error: 'Fuera de límites' }
+    expect(dedupeGate0Records([delMes, otraCausa]).unique).toHaveLength(2)
+  })
+
+  it('no colapsa dos rechazos del mismo instante con distinto peso', () => {
+    const otroPeso = { ...delMes, weightKg: 3.15 }
+    expect(dedupeGate0Records([delMes, otroPeso]).unique).toHaveLength(2)
   })
 })
