@@ -6,6 +6,72 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-12 · El mismo turno contado dos veces porque un archivo no traia el lote (PR #973)
+
+**Cerrado** el pendiente del doble de piezas, que venia midiendo desde #966 y no habia podido
+atribuir en dos rondas.
+
+## ⚠⚠ La causa
+
+En produccion **756 de los 791 uploads son recortes por turno** (`2025-07-08_turno_noche_pp.xlsx`,
+generados por un script), y varios resumenes nombran en `sourceFileNames` **el Excel del mes Y el
+recorte del mismo turno**.
+
+Baje el recorte de Storage y lo compare con el Excel del mes. Traen **los mismos 5.614 registros**,
+pero el recorte **no trae `lot`, `product`, `conservation` ni `shift`**:
+
+```
+recorte[0]:   { ts, gate: 9, pieces: 1, weightKg: 4.37, quality: "Premium", calibre: "Other" }
+mes mismo ts: { ts, gate: 9, pieces: 1, weightKg: 4.37, quality: "Premium", calibre: "Other",
+                lot: "720250351", product: "DESTINO FILETE", conservation: "FRESCO", shift: "A" }
+campos que DIFIEREN: lot, product, conservation, shift
+```
+
+`dedupePieceRecords` tenia `lot` en la clave, asi que las dos copias eran **claves distintas**:
+
+```
+merge mes+recorte en la ventana del turno: 11228
+tras dedupe:                               11228   << NO COLAPSA
+```
+
+11.228 = 2 x 5.614, que es **exactamente** lo que tiene guardado el resumen de ese turno.
+
+## El fix, y por que no cuesta nada
+
+Clave nueva: `ts | gate | pieces | quality | calibre | weightKg`. Medido sobre los **5.374.920
+registros reales** de los 30 Excel de pieza a pieza de la temporada: la clave vieja y la nueva
+detectan **exactamente los mismos 555 duplicados**, en todos los archivos. Cero registros extra
+colapsados.
+
+La identidad de una pieza es *cuando paso, por que puerta, cuanto peso y con que calidad y calibre*;
+el lote y el destino son contexto. Al colapsar se conserva **la copia mas completa**, para no perder
+el lote si uno de los dos archivos lo trae.
+
+**Regla:** una clave de identidad no puede incluir campos que una fuente valida puede no traer. El
+mismo dato exportado de dos formas distintas sigue siendo el mismo dato.
+
+## 🔍 El metodo que lo cerro
+
+Bajar de **Storage** el archivo que nombra `sourceFileNames` y **comparar campo por campo** contra el
+archivo local, sobre el mismo `ts`. Tres rondas de hipotesis caidas antes (turnos gemelos,
+subcoleccion, archivos solapados, dedupe roto, tamaño) y la diferencia salto sola en cuanto compare
+los dos registros.
+
+## Alcance — lo que NO hace
+
+- **No toca `dedupeGate0Records`**, que tiene `error` en su clave y podria sufrir lo mismo. No lo
+  medi, asi que no lo cambio.
+- **No corrige los resumenes ya guardados al doble.** Evita que vuelva a pasar; los historicos siguen
+  inflados y hay que decidir aparte si se regeneran.
+
+## Verificacion
+
+4 tests con los campos reales de las dos copias, incluido el orden de aparicion y que no colapse
+piezas que si son distintas. Confirmados devolviendo `lot` a la clave: fallan con `expected
+[ { …(10) }, { …(6) } ] to have a length of 1 but got 2`.
+
+`tsc` · `eslint` · `audit-piel` · `audit-graficos` · **2365 tests**. Verificado en el bundle
+publicado (`buildSha 481273e`): la clave minificada sale sin `lot`.
 ## 2026-09-12 · Dos Excel de la temporada estan truncados (PR #969)
 
 Venia persiguiendo el pendiente de #966 —resumenes de julio con el DOBLE de piezas que el Excel— y
