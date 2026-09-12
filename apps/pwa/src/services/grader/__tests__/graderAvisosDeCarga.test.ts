@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { avisoDeRango, avisosDelArchivo } from '../graderAvisosDeCarga'
+import { avisoDeRango, avisosDelArchivo, cubreElTurno } from '../graderAvisosDeCarga'
 
 /** Rangos medidos con los Excel reales de la temporada 2025-26. */
 const JULIO = { startAt: '2025-07-01T00:46:48.000Z', endAt: '2025-07-14T23:24:05.000Z' }
@@ -56,5 +56,33 @@ describe('avisosDelArchivo', () => {
 
   it('sin avisos devuelve lista vacía, no null', () => {
     expect(avisosDelArchivo(undefined, '2025-07-08', JULIO)).toEqual([])
+  })
+})
+
+describe('cubreElTurno', () => {
+  // Rangos medidos de los Excel reales de la temporada 2025-26.
+  const JULIO_PP = { startAt: '2025-07-01T00:46:48.000Z', endAt: '2025-07-14T23:24:05.000Z' }
+  const JULIO_P0 = { startAt: '2025-07-01T00:46:48.000Z', endAt: '2025-07-30T06:05:40.000Z' }
+
+  it('el turno dentro del rango esta cubierto', () => {
+    expect(cubreElTurno('2025-07-08', JULIO_PP)).toBe(true)
+  })
+
+  it('el 2025-07-20 NO esta en el pieza a pieza (que llega al 07-14)', () => {
+    expect(cubreElTurno('2025-07-20', JULIO_PP)).toBe(false)
+  })
+
+  it('pero SI esta en el rango del Puerta 0 (que llega al 07-30)', () => {
+    expect(cubreElTurno('2025-07-20', JULIO_P0)).toBe(true)
+  })
+
+  it('los bordes cuentan como cubiertos', () => {
+    expect(cubreElTurno('2025-07-01', JULIO_PP)).toBe(true)
+    expect(cubreElTurno('2025-07-14', JULIO_PP)).toBe(true)
+  })
+
+  it('sin fechas con que juzgar no bloquea: devuelve true', () => {
+    expect(cubreElTurno('2025-07-20', {})).toBe(true)
+    expect(cubreElTurno(null, JULIO_PP)).toBe(true)
   })
 })

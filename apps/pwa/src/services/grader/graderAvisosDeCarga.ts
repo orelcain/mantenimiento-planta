@@ -45,12 +45,39 @@ const diaDe = (iso: string | undefined): string | null => {
  *   juzgar: sin fechas no se inventa una alarma).
  */
 export function avisoDeRango(sessionDate: string | null | undefined, rango: RangoInferido): string | null {
-  if (!sessionDate) return null
+  const r = rangoDelArchivo(rango)
+  if (!sessionDate || !r) return null
+  if (cubreElTurno(sessionDate, rango)) return null
+  return `El archivo cubre del ${r.desde} al ${r.hasta}, y el turno que estás cargando es del ${sessionDate}: no está adentro. Revisá que sea el Excel correcto.`
+}
+
+/** El rango en dias del archivo, o null si no hay con que juzgar. */
+function rangoDelArchivo(rango: RangoInferido): { desde: string; hasta: string } | null {
   const desde = diaDe(rango.startAt)
   const hasta = diaDe(rango.endAt) ?? desde
-  if (!desde || !hasta) return null
-  if (sessionDate >= desde && sessionDate <= hasta) return null
-  return `El archivo cubre del ${desde} al ${hasta}, y el turno que estás cargando es del ${sessionDate}: no está adentro. Revisá que sea el Excel correcto.`
+  return desde && hasta ? { desde, hasta } : null
+}
+
+/**
+ * ¿El archivo contiene el turno que se esta cargando?
+ *
+ * **Para que existe:** al aceptar un PIEZA_PIEZA o PUERTA_0 el flujo llama a
+ * `deleteDailySummary` para invalidar el resumen del turno. Lo hacia siempre,
+ * antes de saber si el archivo contenia ese turno, asi que cargar el Excel
+ * equivocado **destruia el resumen bueno a cambio de nada**.
+ *
+ * Medido sobre los Excel reales de julio 2025 (el pieza a pieza cubre
+ * 07-01 → 07-14 y el Puerta 0 07-01 → 07-30): eligiendo el turno del
+ * **2025-07-20** el analisis da **0 piezas y 0 rechazos**, y el resumen de ese
+ * turno ya habia sido borrado --dos veces, una por archivo--.
+ *
+ * Sin fechas con que juzgar devuelve `true`: no se bloquea la invalidacion por
+ * una duda, se bloquea solo cuando consta que el turno no esta en el archivo.
+ */
+export function cubreElTurno(sessionDate: string | null | undefined, rango: RangoInferido): boolean {
+  const r = rangoDelArchivo(rango)
+  if (!sessionDate || !r) return true
+  return sessionDate >= r.desde && sessionDate <= r.hasta
 }
 
 /**
