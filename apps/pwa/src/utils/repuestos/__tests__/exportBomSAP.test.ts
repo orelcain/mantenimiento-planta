@@ -155,6 +155,81 @@ describe('cabecera y resumen', () => {
   })
 })
 
+describe('avisos previos a la carga en SAP', () => {
+  it('cuenta los materiales con código obsoleto, sin excluirlos', () => {
+    const bom = buildBomIB01(
+      [
+        rep({ codigoSAP: '3300100657', textoBreve: '(NO USAR) CALEFACTOR', cantidadPorMaquina: 1 }),
+        rep({ codigoSAP: '3300011612', textoBreve: 'SOPORTE SECCION', cantidadPorMaquina: 30 }),
+      ],
+      opts,
+    )
+    // Se cuentan pero SIGUEN en la lista: tienen stock físico y la decisión es de quien carga.
+    expect(bom.resumen.obsoletos).toBe(1)
+    expect(bom.rows).toHaveLength(2)
+  })
+
+  it('reconoce la marca en minúsculas y a media frase', () => {
+    const bom = buildBomIB01([rep({ codigoSAP: '3300100657', textoBreve: 'CALEFACTOR (no usar) viejo' })], opts)
+    expect(bom.resumen.obsoletos).toBe(1)
+  })
+
+  it('no marca como obsoleto un texto normal', () => {
+    const bom = buildBomIB01([rep({ codigoSAP: '3300011612', textoBreve: 'SOPORTE SECCION' })], opts)
+    expect(bom.resumen.obsoletos).toBe(0)
+  })
+
+  it('detecta un material repetido — SAP rechaza la BOM entera', () => {
+    const bom = buildBomIB01(
+      [
+        rep({ codigoSAP: '3300011612', textoBreve: 'SOPORTE' }),
+        rep({ codigoSAP: '3300011612', textoBreve: 'SOPORTE (duplicado)' }),
+        rep({ codigoSAP: '3300011999', textoBreve: 'OTRO' }),
+      ],
+      opts,
+    )
+    expect(bom.resumen.materialesDuplicados).toBe(1)
+  })
+
+  it('sin repetidos el contador queda en cero', () => {
+    const bom = buildBomIB01(
+      [rep({ codigoSAP: '3300011612' }), rep({ codigoSAP: '3300011999' })],
+      opts,
+    )
+    expect(bom.resumen.materialesDuplicados).toBe(0)
+  })
+
+  it('las posiciones de texto no cuentan como duplicadas entre sí (no llevan material)', () => {
+    const bom = buildBomIB01(
+      [
+        rep({ codigoFabricante: 'A-1', textoBreve: 'pieza uno' }),
+        rep({ codigoFabricante: 'A-2', textoBreve: 'pieza dos' }),
+      ],
+      { ...opts, incluirSinSap: true },
+    )
+    expect(bom.resumen.materialesDuplicados).toBe(0)
+  })
+})
+
+describe('resumirBoms — avisos agregados', () => {
+  it('suma obsoletos y repetidos de todas las BOM', () => {
+    const equipos = [
+      { id: 'n1', codigo: '720000001', nombre: 'EQ1', centro: 'PLANTA CHONCHI' },
+      { id: 'n2', codigo: '720000002', nombre: 'EQ2', centro: 'PLANTA YAL' },
+    ]
+    const boms = buildBomsIB01(
+      [
+        rep({ codigoSAP: '3300100657', textoBreve: '(NO USAR) CALEFACTOR', equipos: ['n1', 'n2'] } as Partial<Repuesto>),
+        rep({ codigoSAP: '3300011612', textoBreve: 'SOPORTE', equipos: ['n1'] } as Partial<Repuesto>),
+      ],
+      equipos,
+    )
+    const r = resumirBoms(boms)
+    expect(r.obsoletos).toBe(2) // uno por cada equipo donde aparece
+    expect(r.materialesDuplicados).toBe(0)
+  })
+})
+
 describe('toUnidadSAP', () => {
   it('mapea nuestras unidades a las de SAP', () => {
     expect(toUnidadSAP('UN')).toBe('ST')

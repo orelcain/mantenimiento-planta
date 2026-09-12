@@ -24,6 +24,16 @@ export const SAP_USO_MANTENIMIENTO = '4'
 
 export type SapItemCategory = 'L' | 'T'
 
+/**
+ * Marca de codigo SAP obsoleto en el texto del material.
+ *
+ * "(NO USAR)" significa "no comprar contra este codigo", NO "material inservible": muchos
+ * tienen stock fisico real, por eso se conservan en el maestro. Aqui NO se excluyen de la
+ * BOM — se CUENTAN, para que quien carga en SAP lo vea y decida. Excluirlos en silencio
+ * seria tomar por el una decision que ya esta tomada al reves.
+ */
+const MARCA_OBSOLETO = /\(NO USAR\)/i
+
 export interface BomIB01Row {
   /** Nº de posición SAP, en decenas: 0010, 0020, … */
   posicion: string
@@ -54,6 +64,13 @@ export interface BomIB01Resumen {
   /** Posiciones que quedaron en cantidad 1 por no tener dato real. */
   sinCantidadReal: number
   textosTruncados: number
+  /** Posiciones cuyo material esta marcado como codigo SAP obsoleto. */
+  obsoletos: number
+  /**
+   * Materiales que aparecen mas de una vez en ESTA misma lista. SAP rebota la carga entera
+   * si una BOM trae el mismo material repetido, y nada mas lo detectaria antes de intentarlo.
+   */
+  materialesDuplicados: number
 }
 
 export interface BomIB01 {
@@ -132,6 +149,7 @@ export function buildBomIB01(repuestos: Repuesto[], options: BuildBomOptions): B
 
   let sinCantidadReal = 0
   let textosTruncados = 0
+  let obsoletos = 0
 
   const rows: BomIB01Row[] = ordenadas.map((rep, i) => {
     const esL = tieneCodigoSap(rep)
@@ -146,6 +164,7 @@ export function buildBomIB01(repuestos: Repuesto[], options: BuildBomOptions): B
       ? (rep.codigoFabricante + ' ' + textoCompleto).trim()
       : textoCompleto
     if (base.length > SAP_TEXTO_POSICION_MAX) textosTruncados++
+    if (MARCA_OBSOLETO.test(textoCompleto)) obsoletos++
 
     return {
       posicion: String((i + 1) * 10).padStart(4, '0'),
@@ -159,6 +178,9 @@ export function buildBomIB01(repuestos: Repuesto[], options: BuildBomOptions): B
     }
   })
 
+  const materiales = rows.filter((r) => r.material).map((r) => r.material)
+  const materialesDuplicados = materiales.length - new Set(materiales).size
+
   return {
     header: { equipoCodigo, equipoNombre, centro, uso: SAP_USO_MANTENIMIENTO, validoDesde },
     rows,
@@ -168,6 +190,8 @@ export function buildBomIB01(repuestos: Repuesto[], options: BuildBomOptions): B
       posicionesT: rows.filter((r) => r.categoria === 'T').length,
       sinCantidadReal,
       textosTruncados,
+      obsoletos,
+      materialesDuplicados,
     },
   }
 }
@@ -200,6 +224,8 @@ export function exportBomIB01ToExcel(bom: BomIB01): void {
     { Campo: '· tipo T (texto, sin código SAP)', Valor: resumen.posicionesT },
     { Campo: 'Posiciones sin cantidad real (quedaron en 1)', Valor: resumen.sinCantidadReal },
     { Campo: 'Textos truncados a 40 caracteres', Valor: resumen.textosTruncados },
+    { Campo: 'Materiales con codigo OBSOLETO (NO USAR)', Valor: resumen.obsoletos },
+    { Campo: 'Materiales REPETIDOS en esta lista (SAP la rechaza)', Valor: resumen.materialesDuplicados },
   ]
 
   const posiciones = rows.map((r) => ({
@@ -280,6 +306,8 @@ export interface BomsMasivasResumen {
   posicionesL: number
   posicionesT: number
   sinCantidadReal: number
+  obsoletos: number
+  materialesDuplicados: number
   centros: string[]
 }
 
@@ -290,6 +318,8 @@ export function resumirBoms(boms: BomIB01[]): BomsMasivasResumen {
     posicionesL: boms.reduce((n, b) => n + b.resumen.posicionesL, 0),
     posicionesT: boms.reduce((n, b) => n + b.resumen.posicionesT, 0),
     sinCantidadReal: boms.reduce((n, b) => n + b.resumen.sinCantidadReal, 0),
+    obsoletos: boms.reduce((n, b) => n + b.resumen.obsoletos, 0),
+    materialesDuplicados: boms.reduce((n, b) => n + b.resumen.materialesDuplicados, 0),
     centros: [...new Set(boms.map((b) => b.header.centro).filter(Boolean))].sort(),
   }
 }
@@ -317,6 +347,8 @@ export function exportBomsIB01ToExcel(boms: BomIB01[], fecha?: string): void {
     'Tipo L': b.resumen.posicionesL,
     'Tipo T': b.resumen.posicionesT,
     'Sin cantidad real': b.resumen.sinCantidadReal,
+    'Obsoletos (NO USAR)': b.resumen.obsoletos,
+    'Materiales repetidos': b.resumen.materialesDuplicados,
   }))
 
   const posiciones = boms.flatMap((b) =>
@@ -344,6 +376,8 @@ export function exportBomsIB01ToExcel(boms: BomIB01[], fecha?: string): void {
     { Campo: '· tipo L (material de stock)', Valor: r.posicionesL },
     { Campo: '· tipo T (texto, sin código SAP)', Valor: r.posicionesT },
     { Campo: 'Posiciones sin cantidad real (quedaron en 1)', Valor: r.sinCantidadReal },
+    { Campo: 'Materiales con codigo OBSOLETO (NO USAR)', Valor: r.obsoletos },
+    { Campo: 'Materiales REPETIDOS dentro de una lista (SAP la rechaza)', Valor: r.materialesDuplicados },
   ]
 
   const wb = XLSX.utils.book_new()
