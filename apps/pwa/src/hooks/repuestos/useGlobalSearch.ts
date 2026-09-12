@@ -327,6 +327,7 @@ export function useGlobalSearch(machines: Machine[]) {
     if (cached) {
       setAllRepuestos(cached)
       loadedAreaIdsRef.current.add(areaId)
+      setLoaded(true)
       return
     }
 
@@ -351,6 +352,10 @@ export function useGlobalSearch(machines: Machine[]) {
         }
         return merged
       })
+      // Sin esto la tabla se queda en esqueletos para siempre: el hub calcula su estado de
+      // carga como `!loaded || ...`, y entrar directo a un área (el camino normal) solo pasa
+      // por aquí. Solo parecía funcionar cuando el caché de módulo venía tibio de un loadAll.
+      setLoaded(true)
     } catch (err) {
       logger.error('Error cargando repuestos del área', err instanceof Error ? err : new Error(String(err)))
       setError('Error al cargar los repuestos del área')
