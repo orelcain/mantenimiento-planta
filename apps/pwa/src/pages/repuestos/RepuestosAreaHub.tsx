@@ -2446,7 +2446,6 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
         onClose={() => setExportOpen(false)}
         repuestos={exportRepuestos}
         filteredRepuestos={exportFiltered}
-        categories={[]}
         machineName={showingAll ? 'Todas las áreas' : (selectedNode?.nombre ?? 'Área')}
         sapEquipo={sapEquipo}
         sapEquipos={sapEquipos}

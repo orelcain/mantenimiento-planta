@@ -1,9 +1,9 @@
-import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
-import { FileText, FileSpreadsheet, ClipboardList, ChevronRight, ChevronDown, CheckSquare, Square, Factory } from 'lucide-react'
+import { FileText, FileSpreadsheet, ClipboardList, Factory } from 'lucide-react'
 import type { Repuesto } from '@/types/repuestos'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import * as repuestoExports from '@/utils/repuestos'
@@ -26,7 +26,6 @@ interface ExportReportModalProps {
   onClose: () => void
   repuestos: Repuesto[]
   filteredRepuestos?: Repuesto[] 
-  categories: { id: string, nombre: string, parentId?: string | null }[]
   machineName?: string
   /** Presente solo cuando se está viendo UN equipo: habilita la exportación IB01. */
   sapEquipo?: SapEquipoContext
@@ -34,14 +33,6 @@ interface ExportReportModalProps {
   sapEquipos?: EquipoSap[]
 }
 
-type TreeNode = {
-    id: string
-    label: string
-    type: 'category' | 'subcategory' | 'item'
-    children: TreeNode[]
-    item?: Repuesto
-    parentId?: string
-}
 
 
 /**
@@ -57,12 +48,11 @@ const unicosPorId = <T extends { id: string }>(items: T[]): T[] => {
   return items.filter((r) => (vistos.has(r.id) ? false : (vistos.add(r.id), true)))
 }
 
-export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuestos, categories, machineName = 'General', sapEquipo, sapEquipos }: ExportReportModalProps) {
+export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuestos, machineName = 'General', sapEquipo, sapEquipos }: ExportReportModalProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [reportType, setReportType] = useState<ReportType>('technical_sheet')
   const [includeImages, setIncludeImages] = useState(true)
   const [isExporting, setIsExporting] = useState(false)
-  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set())
   const [filterMode, setFilterMode] = useState<'all' | 'filtered'>('all')
   // Las posiciones de texto (despiece sin código SAP) quedan fuera por defecto: incluirlas
   // multiplica el largo de la lista y la vuelve inmanejable al elegir componentes en IW31.
@@ -82,149 +72,26 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
     }
   }, [isOpen, filteredRepuestos, repuestos.length])
 
-  // Helper to determine category for a repuesto (sin tags, usa matching por nombre)
-    const getRepuestoCategoryId = useCallback((_rep: Repuesto): string | undefined => {
-      // Sin tags, los repuestos no tienen categoría asignada directamente.
-      // Se agrupan todos bajo "Sin Categoría" a menos que se implemente otro mecanismo.
-      return undefined
-    }, [])
 
-  const treeData = useMemo(() => {
-    const sourceList = filterMode === 'filtered' && filteredRepuestos ? filteredRepuestos : repuestos
+  /** Los ítems que se pueden elegir: el mismo origen que alimentaba el árbol. */
+  const itemsDelAlcance = useMemo(
+    // `unicosPorId` por la misma razon que en la exportacion (#978): la lista trae una fila por
+    // cada equipo donde sirve el repuesto, asi que la Baader 142 daba 5.409 filas para 1.803
+    // materiales. El arbol lo ocultaba estando colapsado; una lista plana lo muestra repetido.
+    () => unicosPorId(filterMode === 'filtered' && filteredRepuestos ? filteredRepuestos : repuestos),
+    [filterMode, filteredRepuestos, repuestos],
+  )
 
-    const rootNodes: TreeNode[] = []
-    const categoryNodes = new Map<string, TreeNode>()
+  /*
+   * Se RENDERIZAN los primeros TOPE_VISIBLE; la selección sigue siendo de todos.
+   * El árbol los tenía colapsados, así que pintarlos todos de golpe fue una regresión medible:
+   * con el despiece de la Baader 142 (1.803 ítems) el diálogo tardaba 2,5 s en abrir. Este panel
+   * es para AJUSTAR la selección —"Todos", "Ninguno", destildar un par—, no para leer 1.800
+   * filas: para eso están los filtros de la lista de atrás. Mismo patrón que CargaRapidaModal.
+   */
+  const TOPE_VISIBLE = 150
+  const itemsVisibles = useMemo(() => itemsDelAlcance.slice(0, TOPE_VISIBLE), [itemsDelAlcance])
 
-    categories.forEach(cat => {
-        categoryNodes.set(cat.id, {
-            id: cat.id,
-            label: cat.nombre,
-            type: cat.parentId ? 'subcategory' : 'category',
-            children: [],
-            parentId: cat.parentId ?? undefined
-        })
-    })
-
-    categoryNodes.forEach(node => {
-        if (node.parentId && categoryNodes.has(node.parentId)) {
-            const parent = categoryNodes.get(node.parentId)!
-            parent.children.push(node)
-        } else if (!node.parentId) {
-            rootNodes.push(node)
-        }
-    })
-
-    const unassignedNode: TreeNode = { id: 'unassigned', label: 'Sin Categoría', type: 'category', children: [] }
-    let hasUnassigned = false
-
-    sourceList.forEach(rep => {
-        const catId = getRepuestoCategoryId(rep)
-        
-        const itemNode: TreeNode = {
-            id: rep.id,
-            label: `${rep.codigoSAP || 'S/C'} - ${rep.textoBreve}`,
-            type: 'item',
-            children: [],
-            item: rep,
-            parentId: catId
-        }
-
-        if (catId && categoryNodes.has(catId)) {
-            categoryNodes.get(catId)!.children.push(itemNode)
-        } else {
-            unassignedNode.children.push(itemNode)
-            hasUnassigned = true
-        }
-    })
-
-    const prune = (nodes: TreeNode[]): TreeNode[] => {
-        return nodes.filter(node => {
-            if (node.type === 'item') return true
-            node.children = prune(node.children)
-            return node.children.length > 0
-        })
-    }
-
-    const prunedRoots = prune(rootNodes)
-    if (hasUnassigned) prunedRoots.push(unassignedNode)
-
-    return prunedRoots
-    }, [repuestos, filteredRepuestos, categories, filterMode, getRepuestoCategoryId])
-
-  const getNodeItemIds = (node: TreeNode): string[] => {
-      if (node.type === 'item') return [node.id]
-      return node.children.flatMap(getNodeItemIds)
-  }
-
-  const handleToggleNode = (node: TreeNode, checked: boolean) => {
-      const idsToToggle = getNodeItemIds(node)
-      const newSet = new Set(selectedIds)
-      
-      idsToToggle.forEach(id => {
-          if (checked) newSet.add(id)
-          else newSet.delete(id)
-      })
-      setSelectedIds(newSet)
-  }
-
-  const handleToggleExpand = (nodeId: string) => {
-      const newSet = new Set(expandedNodes)
-      if (newSet.has(nodeId)) newSet.delete(nodeId)
-      else newSet.add(nodeId)
-      setExpandedNodes(newSet)
-  }
-
-  const getNodeState = (node: TreeNode): 'checked' | 'unchecked' | 'indeterminate' => {
-      const allIds = getNodeItemIds(node)
-      if (allIds.length === 0) return 'unchecked'
-      
-      const selectedCount = allIds.filter(id => selectedIds.has(id)).length
-      if (selectedCount === allIds.length) return 'checked'
-      if (selectedCount === 0) return 'unchecked'
-      return 'indeterminate'
-  }
-
-  const renderTree = (nodes: TreeNode[]) => {
-      return (
-          <div className="pl-4 border-l ml-1 border-border/50">
-              {nodes.map(node => {
-                  const state = getNodeState(node)
-                  const isExpanded = expandedNodes.has(node.id)
-                  const hasChildren = node.children.length > 0
-
-                  return (
-                      <div key={node.id} className="py-0.5">
-                          <div className="flex items-center gap-2 hover:bg-muted/50 rounded-ctl p-1 group">
-                                {hasChildren && node.type !== 'item' ? (
-                                    <button onClick={(e) => { e.stopPropagation(); handleToggleExpand(node.id) }} className="p-0.5 hover:bg-muted rounded-ctl text-muted-foreground">
-                                        {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                                    </button>
-                                ) : <span className="w-5" />}
-                                
-                                <div 
-                                    className="cursor-pointer text-muted-foreground hover:text-foreground flex items-center gap-2 flex-1"
-                                    onClick={() => handleToggleNode(node, state !== 'checked')}
-                                >
-                                    {state === 'checked' && <CheckSquare className="h-4 w-4 text-primary shrink-0" />}
-                                    {state === 'unchecked' && <Square className="h-4 w-4 shrink-0" />}
-                                    {state === 'indeterminate' && <div className="h-4 w-4 flex items-center justify-center shrink-0"><div className="h-2 w-2 bg-primary rounded-ctl" /></div>}
-                                    
-                                    <span className={`text-sm select-none truncate ${node.type === 'category' ? 'font-semibold text-foreground' : ''} ${node.type === 'item' ? 'text-muted-foreground' : ''}`}>
-                                        {node.label}
-                                    </span>
-                                </div>
-                          </div>
-                          {hasChildren && isExpanded && (
-                              <div className="ml-1">
-                                  {renderTree(node.children)}
-                              </div>
-                          )}
-                      </div>
-                  )
-              })}
-          </div>
-      )
-  }
 
   const handleExport = async () => {
     const selected = repuestos.filter(r => selectedIds.has(r.id)) 
@@ -352,10 +219,16 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
         </div>
 
         <div className="flex flex-1 overflow-hidden">
-            {/* Sidebar: Tree Selection */}
-            <div className="w-[45%] border-r flex flex-col bg-background">
+            {/*
+              Era un "Arbol de Navegacion" que ocupaba el 45% del dialogo y NUNCA agrupaba nada:
+              `getRepuestoCategoryId` devuelve siempre undefined y el hub pasa `categories={[]}`,
+              asi que por construccion habia una sola rama ("Sin Categoria") con todo dentro. El
+              panel de formato quedaba apretado por un arbol de un solo nivel. Ahora es la lista
+              plana que siempre fue, y el espacio va donde se decide algo.
+            */}
+            <div className="w-[30%] min-w-[200px] border-r flex flex-col bg-background">
                 <div className="p-3 border-b bg-muted font-medium text-xs tracking-wider text-muted-foreground flex justify-between items-center">
-                    <span>Árbol de Navegación</span>
+                    <span>Ítems</span>
                     <div className="space-x-1">
                         <Button variant="ghost" className="h-6 text-xs" onClick={() => setSelectedIds(new Set())}>Ninguno</Button>
                         <Button variant="ghost" className="h-6 text-xs" onClick={() => {
@@ -364,15 +237,41 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
                         }}>Todos</Button>
                     </div>
                 </div>
-                <div className="flex-1 overflow-y-auto p-2">
-                    {treeData.length === 0 ? (
+                <div className="flex-1 overflow-y-auto p-1">
+                    {itemsVisibles.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-40 text-muted-foreground text-sm">
                             <p>No se encontraron ítems</p>
                         </div>
                     ) : (
-                        <div className="-ml-4">
-                            {renderTree(treeData)}
+                        <div className="divide-y divide-border/50">
+                            {itemsVisibles.map((rep) => (
+                                <label
+                                    key={rep.id}
+                                    className="flex cursor-pointer items-center gap-2 px-2 py-1.5 text-sm hover:bg-muted/40"
+                                >
+                                    <Checkbox
+                                        checked={selectedIds.has(rep.id)}
+                                        onCheckedChange={(c) => {
+                                            setSelectedIds((prev) => {
+                                                const next = new Set(prev)
+                                                if (c) next.add(rep.id)
+                                                else next.delete(rep.id)
+                                                return next
+                                            })
+                                        }}
+                                    />
+                                    {rep.codigoSAP && (
+                                        <span className="w-24 shrink-0 font-mono text-xs tabular-nums text-muted-foreground">{rep.codigoSAP}</span>
+                                    )}
+                                    <span className="min-w-0 flex-1 truncate">{rep.textoBreve || rep.descripcion || '(sin nombre)'}</span>
+                                </label>
+                            ))}
                         </div>
+                    )}
+                    {itemsDelAlcance.length > TOPE_VISIBLE && (
+                        <p className="px-2 py-2 text-center text-caption text-muted-foreground">
+                            Mostrando {TOPE_VISIBLE} de {itemsDelAlcance.length}. «Todos» y «Ninguno» actúan sobre los {itemsDelAlcance.length}; para acotar, usa los filtros de la lista.
+                        </p>
                     )}
                 </div>
                 <div className="p-2 border-t text-xs text-muted-foreground text-center bg-muted">
@@ -381,7 +280,7 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
             </div>
 
             {/* Right Panel: Options */}
-            <div className="w-[55%] flex flex-col p-6 space-y-8 bg-muted overflow-y-auto">
+            <div className="w-[70%] flex flex-col p-6 space-y-8 bg-muted overflow-y-auto">
                 <div className="space-y-4">
                     <h3 className="font-semibold text-sm tracking-wide text-foreground flex items-center gap-2">
                         <span className="w-1 h-4 bg-primary rounded-full"/>
