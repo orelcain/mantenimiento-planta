@@ -6,6 +6,63 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-12 · La carga del Excel mostraba un contador y escondia todo lo demas (PR #957)
+
+Segunda ronda sobre el flujo de carga. Empezo midiendo y **cerro tres hipotesis en negativo**
+antes de encontrar el defecto mirando la pantalla.
+
+## ⚠⚠ El Wizard monta la pagina SIEMPRE con `compact`, y esa rama cortaba antes de todo
+
+`AnalisisGraderUploadPage` tiene dos ramas de render. Grep de quien la importa: **un solo montaje**,
+en `AnalisisGraderWizardPage.tsx`, y con `compact`. Esa rama devuelve la fila del boton y **corta
+antes de la lista de archivos**.
+
+Asi que cargar un Excel se veia, en pantalla, como un boton «Cargar Excel» con un contador. No se
+veia el nombre del archivo, ni los avisos del parser (`fileMeta.warnings` — los que agrego #956, que
+**nunca llegaron a dibujarse**), ni «Sin Puerta 0: el desglose sera inferido», ni el error de parseo,
+ni el de subida a Storage.
+
+Es el patron de #946 y #956 un escalon mas arriba: ahi el dato no tenia consumidor; **aca el
+consumidor existia y estaba en la rama muerta**. El propio archivo tenia el comentario que lo decia
+(«el Wizard es el unico que monta esta pagina y siempre con `compact`») y no lo lei como advertencia.
+
+Ahora la evidencia del archivo vive una sola vez (`listaDeArchivos`, `avisoSinPuerta0`,
+`mensajesDeError`) y la usan las dos ramas.
+
+## ⚠ `lineId` fuera de las dependencias de `handleFiles`
+
+Lo delataba un warning de eslint pre-existente. `lineId` sale de `searchParams`, pero el callback
+memoizado se quedaba con el del render anterior: tras cambiar de linea, la carga guardaba el upload
+—y llamaba a `deleteDailySummary`— sobre la **linea equivocada**.
+
+## Lo que medi y NO era
+
+Contra los 791 uploads y 410 resumenes de produccion:
+
+- `currentTurnoShift` arranca en el literal `Turno noche`, asi que `if (!currentTurnoShift)` nunca
+  dispara. Parecia explicar archivos de un turno repartidos en dos shiftIds — **no lo explica**: de
+  243 dias, los 2 que mezclan vocabulario son cargas dobles con los pares consistentes, y el 62 % de
+  dias con mas de un shiftId son simplemente dia y noche.
+- Turnos con Excel aceptado y sin resumen (la huella del borrado prematuro): **3 de 243**, los tres
+  con un solo archivo.
+- Uploads sin `downloadURL`, que `handleLoadTurno` saltea en silencio: **0 de 791**.
+
+**Por que la base no sirve para esto:** `graderUploads` esta dominada por un backfill masivo —una
+sola tanda de 700+ archivos cargados en segundos—, asi que agrupar por `createdAt` no separa
+sesiones reales de usuario. Y ⚠ en esa coleccion `createdAt` es **string ISO, no Timestamp**: un
+`.toDate?.()` devolvio 0 tandas y casi lo tomo por resultado en vez de por bug del medidor.
+
+## Verificacion
+
+4 tests que montan la pagina **como la monta el Wizard** (`compact`, con `initialFiles`).
+Confirmados quitando el render: fallan con `Unable to find an element with the text:
+pieza-pieza-julio.xlsx`. `tsc` · `eslint` · `audit-piel` (bajo: 1582 → 1574 colores crudos, baseline
+actualizado) · `audit-graficos` · 2293 tests. Ancho medido del panel del Wizard a 1920: la fila tiene
+**909 px**. Verificado en el bundle publicado (`buildSha c2d59c7`): la rama compacta es el
+`space-y-2` que envuelve la fila del boton.
+
+⚠ **El render con un Excel de verdad sigue sin verificarse a ojo**, por lo declarado en #956:
+cargar un Excel escribe en Firestore y Storage y borra el resumen del turno.
 ## 2026-09-11 · El parser avisaba sobre el Excel y nadie lo mostraba (PR #956)
 
 Primera ronda sobre el **flujo de carga del Excel del Grader** (Planta Principal · Eviscerado).
