@@ -104,7 +104,20 @@ export function toUnidadSAP(unidad?: string): string {
   return UNIDAD_SAP[key] ?? (key || 'ST')
 }
 
-const tieneCodigoSap = (rep: Repuesto): boolean => /^\d{6,}$/.test((rep.codigoSAP || '').trim())
+/**
+ * El corte entre la lista de materiales y el resto: **tener codigo SAP**.
+ *
+ * No hay que inventar un criterio — un repuesto con codigo es un material que
+ * existe en SAP y se puede pedir; uno sin codigo es despiece del fabricante,
+ * sirve para identificar la pieza en el plano y nada mas. Medido en la Baader
+ * 142: de 1.804 repuestos ligados, **476 tienen codigo** y son la BOM.
+ *
+ * Lo usa tambien el expediente del equipo, para mostrar la BOM antes que el
+ * despiece. Una sola definicion del corte.
+ */
+export const esCodigoSapValido = (codigo?: string): boolean => /^\d{6,}$/.test((codigo || '').trim())
+
+const tieneCodigoSap = (rep: Repuesto): boolean => esCodigoSapValido(rep.codigoSAP)
 
 /**
  * Deriva el Centro a partir de los nombres de los ancestros del equipo en `hierarchy`.

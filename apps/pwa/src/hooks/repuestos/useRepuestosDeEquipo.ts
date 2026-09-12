@@ -16,6 +16,12 @@ export interface RepuestoDeEquipo {
   nombre: string
   tipo?: string
   stockFisico?: number
+  /**
+   * Cuantas lleva la maquina. Es `cantidadPorMaquina`, NO `cantidadPorEquipo`:
+   * ese ultimo esta en el esquema documentado pero en cero docs. Va a la
+   * posicion de la BOM en IB01.
+   */
+  cantidadPorMaquina?: number
 }
 
 export function useRepuestosDeEquipo(nodeId?: string, reloadKey?: number): { repuestos: RepuestoDeEquipo[]; loading: boolean } {
@@ -40,6 +46,7 @@ export function useRepuestosDeEquipo(nodeId?: string, reloadKey?: number): { rep
             nombre: String(r.textoBreve || r.descripcion || r.alias || r.nombreManual || 'Repuesto'),
             tipo: typeof r.tipo === 'string' ? r.tipo : undefined,
             stockFisico: typeof r.stockFisico === 'number' ? r.stockFisico : undefined,
+            cantidadPorMaquina: typeof r.cantidadPorMaquina === 'number' ? r.cantidadPorMaquina : undefined,
           }
         })
         rows.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
