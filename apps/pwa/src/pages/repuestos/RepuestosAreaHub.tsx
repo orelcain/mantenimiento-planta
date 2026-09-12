@@ -29,6 +29,8 @@ import { getTrashCount } from '@/services/auditLog'
 import { useHierarchyAreaTree, type AreaTreeNode } from '@/hooks/useHierarchyAreaTree'
 import { useGlobalSearch, invalidateGlobalRepuestosCache, type GlobalSearchResult } from '@/hooks/repuestos/useGlobalSearch'
 import { useGlobalEquipmentSearch, getGlobalEquipmentCache } from '@/hooks/useGlobalEquipmentSearch'
+import { Link } from 'react-router-dom'
+import { rutaExpedienteEquipo } from '@/services/equipos/enlaceExpediente'
 import { useBodega } from '@/hooks/repuestos/useBodega'
 import { useAreaRepuestos, type StockStatus, type AreaRepuestoRow } from '@/hooks/repuestos/useAreaRepuestos'
 import { useHierarchyPaths } from '@/hooks/repuestos/useHierarchyPaths'
@@ -1717,13 +1719,30 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                 )}
               </div>
               {selectedEquipKey ? (
-                <button
-                  onClick={() => { setRepEquipoFilter('all'); setSelectedEquipKey(null); setSelectedEquipMachineId(null); setSelectedEquipName('') }}
-                  className="mt-1 inline-flex max-w-full items-center gap-1.5 rounded-full border border-border bg-muted px-2.5 py-1 text-caption font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
-                  title="Volver a ver todos los repuestos del área"
-                >
-                  <ChevronLeft className="h-3 w-3 shrink-0" /> Volver a <span className="truncate font-semibold">{selectedNode?.nombre ?? 'el área'}</span>
-                </button>
+                <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                  <button
+                    onClick={() => { setRepEquipoFilter('all'); setSelectedEquipKey(null); setSelectedEquipMachineId(null); setSelectedEquipName('') }}
+                    className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border bg-muted px-2.5 py-1 text-caption font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                    title="Volver a ver todos los repuestos del área"
+                  >
+                    <ChevronLeft className="h-3 w-3 shrink-0" /> Volver a <span className="truncate font-semibold">{selectedNode?.nombre ?? 'el área'}</span>
+                  </button>
+                  {/*
+                    La lista de materiales del equipo, sus manuales y su ficha viven en el
+                    expediente (Centro Técnico Documental), que está en otro grupo del menú.
+                    Sin esto había que cambiar de módulo y volver a buscar el equipo a mano.
+                    Ver services/equipos/enlaceExpediente.ts.
+                  */}
+                  {selectedEquipMachineId && (
+                    <Link
+                      to={rutaExpedienteEquipo(selectedEquipMachineId)}
+                      className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border bg-muted px-2.5 py-1 text-caption font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                      title="Abrir el expediente de este equipo: lista de materiales, manuales y ficha"
+                    >
+                      <ClipboardList className="h-3 w-3 shrink-0" /> Ver expediente
+                    </Link>
+                  )}
+                </div>
               ) : repEquipoFilter !== 'all' ? (
                 <button
                   onClick={() => { setRepEquipoFilter('all'); setSelectedEquipName('') }}
