@@ -2,6 +2,7 @@ import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import type { Repuesto, TechnicalDataField } from '@/types/repuestos'
 import { logger } from '@/lib/logger'
+import { etiquetaDeCampo } from './plantillasFichaTecnica'
 
 /**
  * Convierte una URL de imagen a Base64
@@ -82,8 +83,11 @@ async function addTechnicalSheetToDoc(
 
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
-  // Ajuste: si machineName es un ID largo (probable auto-ID), mostrar "Planta General" o similar
-  const displayName = (!machineName || machineName.length > 20) ? 'Planta General / Sin Asignar' : machineName;
+  // No se adivina por largo: quien llama manda el NOMBRE del equipo o no manda nada.
+  // Antes había un `machineName.length > 20` para tapar los auto-ID de Firestore, y fallaba
+  // justo con ellos — miden exactamente 20 — así que la ficha salía con
+  // «Equipo: 23kemhGhbN22YIwHd2VN» impreso en la cabecera.
+  const displayName = machineName?.trim() || 'Sin equipo asignado';
   doc.text(`Equipo: ${displayName}`, pageWidth / 2, yPos, { align: 'center' });
   yPos += 5;
   doc.text(`Fecha: ${new Date().toLocaleDateString('es-CL')}`, pageWidth / 2, yPos, { align: 'center' });
@@ -120,11 +124,13 @@ async function addTechnicalSheetToDoc(
     // Datos Standard
     if (specs.standardValues) {
         Object.entries(specs.standardValues).forEach(([key, value]) => {
-           // Traducir clave si existe en el diccionario
+           // La etiqueta sale de la MISMA plantilla que usa el modal: si no, el PDF imprimía
+           // la clave cruda en mayúscula («DIAMETROPISTON» por «Diámetro Pistón (mm)»).
+           // El diccionario de traducción queda como red para claves importadas en inglés.
            const upperKey = key.toUpperCase();
-           const label = TECHNICAL_KEY_TRANSLATIONS[upperKey] || upperKey;
-           // Formato de valor si es numérico y tiene unidad conocida (simple heurística)
-           // Por ahora raw
+           const label = etiquetaDeCampo(specs.type, key) !== key
+             ? etiquetaDeCampo(specs.type, key)
+             : (TECHNICAL_KEY_TRANSLATIONS[upperKey] || upperKey);
            tableData.push([label, value.toString()]);
         });
     }

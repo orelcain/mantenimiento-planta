@@ -2551,7 +2551,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
           open
           onOpenChange={(o) => !o && setActionTarget(null)}
           repuesto={actionRep}
-          machineId={actionMachineId}
+          machineName={actionMachine?.nombre ?? actionTarget?.source.machineName ?? ''}
           onSave={handleSaveSpecs}
           readOnly={!isAdmin}
         />
