@@ -758,6 +758,19 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
       .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value))
   }, [scopedRepuestos])
 
+  /**
+   * Tipos que ya existen, para sugerirlos al editar/crear un material.
+   *
+   * Sale de `areaRepuestos` y NO de `scopedRepuestos`: las sugerencias no deben encogerse
+   * porque el usuario tenga un equipo enfocado. `tipo` es texto libre (66 valores en uso y la
+   * lista no está cerrada), así que esto alimenta un <datalist> — sugiere, no obliga.
+   */
+  const tiposConocidos = useMemo(() => {
+    const s = new Set<string>()
+    for (const r of areaRepuestos) { const t = (r.tipo || '').trim(); if (t) s.add(t) }
+    return [...s].sort((a, b) => a.localeCompare(b))
+  }, [areaRepuestos])
+
   // Opciones del filtro "Clase" (repuesto/insumo/herramienta/…) con conteo.
   const claseOptions = useMemo(() => {
     const counts = new Map<string, number>()
@@ -2513,6 +2526,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
         machineName={createTransversal || !createTargetEquipos ? '' : `${createTargetEquipos.label}${createTargetEquipos.nodeIds.length > 1 ? ` · ${createTargetEquipos.nodeIds.length} equipos` : ''}`}
         transversal={createTransversal}
         defaultClase={createTransversal ? 'insumo' : 'repuesto'}
+        tiposConocidos={tiposConocidos}
         onCheckDuplicate={checkDuplicate}
         onChangeTarget={() => { setCreateOpen(false); setCreateEquipoQuery(''); setCreateEquipoSel(new Set()); setCreatePicker(true) }}
         onSubmit={handleCreateSubmit}
@@ -2526,6 +2540,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
         mode="edit"
         machineName={actionMachine?.nombre ?? actionTarget?.source.machineName ?? ''}
         initialData={actionTarget?.kind === 'edit' ? actionRep : undefined}
+        tiposConocidos={tiposConocidos}
         onSubmit={handleEditSubmit}
         loading={savingRep}
       />
