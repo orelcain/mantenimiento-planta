@@ -2,6 +2,7 @@ import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import type { Repuesto, TechnicalDataField } from '@/types/repuestos'
 import { logger } from '@/lib/logger'
+import { etiquetaDeCampo } from './plantillasFichaTecnica'
 
 /**
  * Convierte una URL de imagen a Base64
@@ -120,11 +121,13 @@ async function addTechnicalSheetToDoc(
     // Datos Standard
     if (specs.standardValues) {
         Object.entries(specs.standardValues).forEach(([key, value]) => {
-           // Traducir clave si existe en el diccionario
+           // La etiqueta sale de la MISMA plantilla que usa el modal: si no, el PDF imprimía
+           // la clave cruda en mayúscula («DIAMETROPISTON» por «Diámetro Pistón (mm)»).
+           // El diccionario de traducción queda como red para claves importadas en inglés.
            const upperKey = key.toUpperCase();
-           const label = TECHNICAL_KEY_TRANSLATIONS[upperKey] || upperKey;
-           // Formato de valor si es numérico y tiene unidad conocida (simple heurística)
-           // Por ahora raw
+           const label = etiquetaDeCampo(specs.type, key) !== key
+             ? etiquetaDeCampo(specs.type, key)
+             : (TECHNICAL_KEY_TRANSLATIONS[upperKey] || upperKey);
            tableData.push([label, value.toString()]);
         });
     }
