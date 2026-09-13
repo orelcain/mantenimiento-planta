@@ -67,7 +67,7 @@ export function ResumenPlanta({ maquinas, diaIdx, onVerMaquina }: ResumenPlantaP
             <>
               La mejor ventana es{' '}
               <span className="font-mono font-semibold tabular-nums">
-                {slotAHora(mejor.inicio)}–{slotAHora(mejor.inicio + mejor.largo)}
+                {mejor.largo >= 288 ? 'todo el día' : `${slotAHora(mejor.inicio)}–${slotAHora(mejor.inicio + mejor.largo)}`}
               </span>{' '}
               con {mejor.maquinaIds.length}{' '}
               {mejor.maquinaIds.length === 1 ? 'máquina libre' : 'máquinas libres'}.

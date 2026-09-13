@@ -145,7 +145,8 @@ export function ParetoDeParadas({
           {turnosMedidos} turnos{pareto.totalPiezas > 0 && ` · ≈${fmtPzCentena(pareto.totalPiezas)} pz`}
         </span>
       }
-      defaultAbierto={false}
+      /* Abierto: vive en la pestaña «Análisis», y tocarla YA es pedir verlo.
+         El plegado por defecto era de cuando compartía scroll con lo vivo. */
     >
       <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
         Tiempo <b>recuperable</b> de los últimos <span className="tabular-nums">{turnosMedidos}</span>{' '}

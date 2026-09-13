@@ -138,7 +138,7 @@ export function NotasAparato({ anclaId, notas, onCrear, onBorrar, onEditar }: Pr
           )}
 
           <div className="flex items-center gap-2">
-            <input ref={fileRef} type="file" accept="image/*" multiple capture="environment" hidden
+            <input ref={fileRef} type="file" accept="image/*" multiple hidden
                    onChange={(e) => setArchivos(Array.from(e.target.files ?? []).slice(0, 6))} />
             <button type="button" onClick={() => fileRef.current?.click()}
                     className="flex items-center gap-1.5 rounded-ctl border px-2.5 py-1.5 text-footnote"

@@ -1160,7 +1160,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
   return (
     <div
       ref={dashRef}
-      className={cn('space-y-4 max-w-screen-xl mx-auto', reportMode === 'light' && 'grader-light-mode')}
+      className={cn('space-y-4 max-w-[1760px] mx-auto', reportMode === 'light' && 'grader-light-mode')}
     >
       {/* Top actions */}
       <div className={cn('flex items-center flex-wrap gap-2', onBack ? 'justify-between' : 'justify-end')}>

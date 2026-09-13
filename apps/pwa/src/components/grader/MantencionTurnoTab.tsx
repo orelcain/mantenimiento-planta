@@ -15,13 +15,15 @@
  */
 
 import { useEffect, useState, type ReactNode } from 'react'
-import { Wrench, AlertTriangle, TrendingUp } from 'lucide-react'
+import { Wrench, AlertTriangle, TrendingUp, ChevronDown, ChevronRight } from 'lucide-react'
 import { Pill } from '@/components/piel'
 import type { KpisTurnoMantencion, KpisMaquinaTurno, EventoFalla } from '@/services/shoplogix/kpisMantencionTurno'
 import { targetSospechoso, reenganches } from '@/services/shoplogix/kpisMantencionTurno'
 import { nombreCorto } from '@/services/shoplogix/ritmoPorMaquina'
 import { cargarTendenciaMantencion, TURNOS_TENDENCIA, type PuntoTendenciaMantencion } from '@/services/shoplogix/tendenciaMantencion'
 import type { PlantSlug } from '@/services/shoplogix/shoplogixMachines'
+import { detectMicroAnomalies } from '@/services/grader/graderUpstreamHealth'
+import { MachineShiftDetail } from './UpstreamMachinesPanel'
 
 const nf = new Intl.NumberFormat('es-CL')
 const fmtInt = (n: number) => nf.format(Math.round(n))
@@ -49,21 +51,47 @@ function Cap({ children }: { children: ReactNode }) {
   )
 }
 
-/** Una barra de reparto: mismos 100% (la ventana) para las tres máquinas. */
-function BarraReparto({ x, ventanaMin }: { x: KpisMaquinaTurno; ventanaMin: number }) {
+/**
+ * Una barra de reparto: mismos 100% (la ventana) para las tres máquinas.
+ * Tocarla abre el detalle de esa máquina (Gantt, barras de 5 min, eventos con
+ * comentario): antes ese detalle vivía en Línea, repetido para las mismas
+ * máquinas (09-09).
+ */
+function BarraReparto({ x, ventanaMin, ventana, microAlert }: {
+  x: KpisMaquinaTurno
+  ventanaMin: number
+  ventana: { start: Date; end: Date }
+  /** Micro-paros muy por sobre el promedio de la línea (ver graderUpstreamHealth). */
+  microAlert: boolean
+}) {
   const r = x.reparto
+  const [abierta, setAbierta] = useState(false)
   const seg = (min: number, fill: string, title: string) =>
     min > 0.2 ? (
       <span key={title} title={`${title}: ${fmtInt(min)} min`} style={{ width: `${(min / ventanaMin) * 100}%`, background: fill }} />
     ) : null
   return (
     <div className="space-y-1">
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="text-headline text-foreground">{nombreCorto(x.maquina.machineName)}</span>
+      <button
+        type="button"
+        onClick={() => setAbierta((v) => !v)}
+        aria-expanded={abierta}
+        className="-my-1.5 flex w-full min-h-11 items-center justify-between gap-2 text-left"
+        data-testid="reparto-maquina"
+      >
+        <span className="flex min-w-0 items-center gap-1.5">
+          {abierta ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+          <span className="text-headline text-foreground">{nombreCorto(x.maquina.machineName)}</span>
+          {microAlert && (
+            <Pill tone="warning" className="normal-case" title="Micro-paros muy por sobre el promedio de la línea">
+              <AlertTriangle className="h-3 w-3" /> micro-paros
+            </Pill>
+          )}
+        </span>
         <span className="text-caption tabular-nums text-muted-foreground">
           {fmtInt(x.maquina.totalCycles)} pz · {Math.round((x.kpi.uptimeMin / ventanaMin) * 100)}% produciendo
         </span>
-      </div>
+      </button>
       <div className="flex h-3.5 overflow-hidden rounded-full bg-muted">
         {seg(r.falla, FILL.falla, 'Falla técnica')}
         {seg(r.micro, FILL.micro, 'Micro-paros')}
@@ -76,6 +104,11 @@ function BarraReparto({ x, ventanaMin }: { x: KpisMaquinaTurno; ventanaMin: numb
         {fmtInt(r.falla)} falla · {fmtDec(r.micro)} micro ({x.kpi.grupos.micro?.n ?? 0}×) ·{' '}
         {fmtDec(r.externo + r.excedido)} ext · {fmtDec(r.planificado)} plan
       </p>
+      {abierta && (
+        <div className="pt-2" data-testid="reparto-maquina-detalle">
+          <MachineShiftDetail shift={x.maquina} expanded onToggle={() => undefined} windowStart={ventana.start} windowEnd={ventana.end} />
+        </div>
+      )}
     </div>
   )
 }
@@ -240,6 +273,14 @@ export function MantencionTurnoTab({ kpis, loading, plantSlug, shiftId, dateKey 
     ? porMaquina.find((x) => x.maquina.machineName === eventoMayor.maquina)?.kpi.fallas ?? []
     : []
   const sospechosas = porMaquina.filter((x) => targetSospechoso(x.velocidad))
+  /* Micro-paros anómalos por máquina (>50 % sobre el promedio de la línea):
+     antes era la insignia «Atención» de la fila en Línea. */
+  const microAnomalas = detectMicroAnomalies(
+    porMaquina.map((x) => ({
+      machineid: x.maquina.machineid,
+      microCount: (x.maquina.states ?? []).filter((s) => s.name === 'Micro Detencion').length,
+    })),
+  )
 
   /* Piezas estimadas de la falla, al ritmo DEMOSTRADO de cada máquina (su
      mediana andando) — no al target, que puede estar malo (ver aviso). */
@@ -283,15 +324,6 @@ export function MantencionTurnoTab({ kpis, loading, plantSlug, shiftId, dateKey 
               {conFalla.length === 1 && <>, toda en <b>{nombreCorto(conFalla[0]!.maquina.machineName)}</b></>}
               {eventoMayor && eventoMayor.sec / 60 > totalFallaMin * 0.6 && <> y casi toda en un solo evento</>}.
             </p>
-            <p className="mt-1.5 text-[15px] leading-snug text-foreground">
-              Mantención {cerrado ? 'cerró' : 'va cerrando'} las intervenciones con{' '}
-              <b className="tabular-nums">{mttrGlobalMin != null ? fmtDec(mttrGlobalMin) : '—'} min</b> de MTTR por evento
-              {sanas.length > 0 && (
-                <> y {sanas.length === 1 ? 'dejó' : 'dejó'}{' '}
-                  <b className="text-ink-ok">{sanas.map((x) => nombreCorto(x.maquina.machineName)).join(' y ')} en 100%</b>{' '}
-                  de disponibilidad técnica</>
-              )}.
-            </p>
           </>
         )}
         <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border/50 pt-2.5">
@@ -306,6 +338,14 @@ export function MantencionTurnoTab({ kpis, loading, plantSlug, shiftId, dateKey 
             </Pill>
           ))}
           <span className="basis-full text-caption text-muted-foreground/80">
+            {/* El mensaje de «la disponibilidad que no se nota» vive acá, junto a
+                las píldoras que lo respaldan: antes estaba además en «Nuestra
+                respuesta», o sea el mismo hecho escrito dos veces. */}
+            {sanas.length > 0 && (
+              sanas.length === porMaquina.length
+                ? `Las ${porMaquina.length} máquinas cerraron sin una sola intervención. `
+                : `${sanas.length} de ${porMaquina.length} máquinas ${sanas.length === 1 ? 'cerró' : 'cerraron'} sin una sola intervención. `
+            )}
             Disponibilidad técnica: solo fallas de equipo — colación, micro y externos van aparte.
           </span>
         </div>
@@ -342,26 +382,20 @@ export function MantencionTurnoTab({ kpis, loading, plantSlug, shiftId, dateKey 
                 </div>
               </div>
             )}
-            <div className="col-span-2 border-t border-border/50 pt-2">
-              <div className="text-headline text-foreground">
-                {sanas.length === porMaquina.length
-                  ? 'Todas las máquinas sin intervenir'
-                  : `${sanas.length} de ${porMaquina.length} máquinas sin una sola falla`}
-              </div>
-              <div className="text-footnote text-muted-foreground">La disponibilidad que no se nota es la que se mantiene.</div>
-            </div>
           </div>
         </section>
 
         <section className="rounded-card border border-border bg-card p-4">
           <Cap>Lo que costó</Cap>
+          {/* La cifra grande son las PIEZAS: los minutos de falla ya los dio el
+              titular y repetirlos acá era el mismo número dos veces en pantalla. */}
           <div className="mt-2 flex items-end justify-between gap-2">
             <div>
               <div className="text-display tabular-nums text-ink-crit">
-                {fmtInt(totalFallaMin)}<span className="text-[15px] font-semibold"> min</span>
+                ≈ {fmtInt(pzFalla)}<span className="text-[15px] font-semibold"> pz</span>
               </div>
               <div className="text-footnote text-muted-foreground">
-                falla técnica{conFalla[0] ? ` · ${Math.round((conFalla[0].reparto.falla / ventanaMin) * 100)}% del turno de ${nombreCorto(conFalla[0].maquina.machineName)}` : ''}
+                al ritmo demostrado{conFalla[0] ? ` · ${fmtInt(totalFallaMin)} min de falla en ${nombreCorto(conFalla[0].maquina.machineName)}` : ''}
               </div>
             </div>
             {conFalla[0] && conFalla[0].kpi.grupos.falla && (
@@ -378,22 +412,34 @@ export function MantencionTurnoTab({ kpis, loading, plantSlug, shiftId, dateKey 
               <span className="text-muted-foreground">Línea completa abajo</span>
               <span className="tabular-nums"><b>{fmtInt(linea.caidaTotalMin)} min</b> · <span className="text-ink-crit">{fmtInt(linea.caidaNoPlanificadaMin)} no planificados</span></span>
             </div>
-            <div className="flex justify-between gap-2">
-              <span className="text-muted-foreground">Piezas estimadas</span>
-              <span className="tabular-nums"><b>≈ {fmtInt(pzFalla)} pz</b></span>
-            </div>
             <p className="text-caption text-muted-foreground/80">
-              Estimadas al ritmo andando demostrado de cada máquina, no al target del sensor.
+              Piezas estimadas al ritmo andando demostrado de cada máquina, no al target del sensor.
             </p>
           </div>
         </section>
       </div>
 
+      {/* ── CARRILES en monitores anchos (≥1700 px) ──────────────────────
+          A 1920 las cuatro secciones de abajo se apilaban a 1.732 px de ancho
+          para contenidos que no lo necesitan: reparto y tendencia son listas
+          de 3 máquinas y el evento es una ficha. Medido: reparto 325 px,
+          evento 140, tendencia 355.
+
+          El reparto se hace por SECUENCIA (los primeros a la izquierda, el
+          resto a la derecha) para que el orden de lectura del teléfono no
+          cambie: [reparto + evento] | [tendencia] = 481 contra 355 px.
+
+          `items-start` es obligatorio: sin él las dos columnas se estiran a la
+          más alta y la corta queda con fondo vacío debajo. */}
+      <div className="grid grid-cols-1 gap-4 min-[1700px]:grid-cols-2 min-[1700px]:items-start">
+        <div className="flex flex-col gap-4">
       {/* ── Reparto del turno ── */}
       <section className="rounded-card border border-border bg-card p-4">
         <Cap>Reparto del turno · {fmtInt(ventanaMin)} min por máquina</Cap>
         <div className="mt-3 space-y-4">
-          {porMaquina.map((x) => <BarraReparto key={x.maquina.machineid} x={x} ventanaMin={ventanaMin} />)}
+          {porMaquina.map((x) => (
+            <BarraReparto key={x.maquina.machineid} x={x} ventanaMin={ventanaMin} ventana={kpis.ventana} microAlert={microAnomalas.has(x.maquina.machineid)} />
+          ))}
         </div>
         <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 border-t border-border/50 pt-2.5 text-caption text-muted-foreground/80">
           <span className="inline-flex items-center gap-1"><i className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: FILL.falla }} />Falla técnica</span>
@@ -404,6 +450,7 @@ export function MantencionTurnoTab({ kpis, loading, plantSlug, shiftId, dateKey 
         </div>
         <p className="mt-1.5 text-caption text-muted-foreground/80">
           Las {porMaquina.length} barras miden el mismo turno y arrancan por falla técnica: el bloque rojo se compara de un vistazo.
+          Toca una máquina para ver su Gantt, sus paros y los comentarios del operador.
         </p>
       </section>
 
@@ -449,11 +496,18 @@ export function MantencionTurnoTab({ kpis, loading, plantSlug, shiftId, dateKey 
           </p>
         </section>
       ))}
+        </div>
+
+        {/* Columna derecha: la tendencia, que es el HISTÓRICO. A la izquierda
+            queda todo lo de ESTE turno, en su orden original. */}
+        <div className="flex flex-col gap-4">
 
       {/* ── La tendencia: la alerta temprana que justifica todo esto ── */}
       {shiftId && dateKey && (
         <TendenciaMantencion plantSlug={plantSlug} shiftId={shiftId} hastaDateKey={dateKey} />
       )}
+        </div>
+      </div>
     </div>
   )
 }

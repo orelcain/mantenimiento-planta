@@ -192,6 +192,313 @@ export function resolveAxisWindow(
   return { effectiveStartMs, effectiveEndMs, lineTimes, axisIndexByLabel }
 }
 
+// ── Riel de eventos del turno ────────────────────────────────────────────────
+//
+// A 375 px el área de dibujo mide 278 px para un turno de ~8 h: 0,58 px por
+// minuto. Una etiqueta de texto de 40 px ocupa por eso unos 68 minutos de eje, y
+// dos eventos separados por menos de una hora se pisaban. Medido el 10-09 sobre
+// los turnos con datos completos (julio 2026 en adelante): 7 de 16 tenían al
+// menos un choque, el peor con 7.
+//
+// La salida es un riel de marcadores sin texto: el lienzo dice CUÁNDO y DE QUÉ
+// TIPO, la lista de abajo lleva las palabras. El umbral de agrupación se mide en
+// píxeles de marcador, no en minutos, así que no puede haber solape por
+// construcción y se afloja solo en pantallas anchas.
+
+export type TipoEventoTurno = 'accion' | 'pausa' | 'config' | 'carga' | 'lote'
+
+export interface EventoTurno {
+  tipo: TipoEventoTurno
+  /** Instante del evento (ms). */
+  ms: number
+  /** Etiqueta del eje X donde cae (HH:MM). */
+  label: string
+  /** Título para la lista. */
+  titulo: string
+  detalle?: string
+}
+
+export interface MarcadorRiel {
+  /** Se ancla en el PRIMER evento del grupo: el marcador no se mueve al absorber. */
+  ms: number
+  label: string
+  eventos: EventoTurno[]
+  tipo: TipoEventoTurno
+  glifo: string
+}
+
+/** Ancho de la píldora de grupo (26 px) más 4 px de aire. */
+export const RIEL_UMBRAL_PX = 30
+
+/**
+ * De más a menos importante. La acción de mantención va primera a propósito: es
+ * el evento que la pestaña existe para evidenciar. La pausa no gasta color en el
+ * riel porque su banda sobre el gráfico ya lleva el del tag.
+ */
+export const RIEL_PRIORIDAD: readonly TipoEventoTurno[] = ['accion', 'pausa', 'config', 'carga', 'lote']
+
+export const RIEL_GLIFO: Record<TipoEventoTurno, string> = {
+  accion: '⚙',
+  pausa: '▮',
+  config: '◈',
+  carga: '↑',
+  lote: '◆',
+}
+
+/**
+ * Agrupa los eventos en marcadores que no se solapan.
+ *
+ * 1. Los del MISMO MINUTO se fusionan siempre, antes de mirar el espacio: tres
+ *    configuraciones seguidas son un acto del operador guardado tres veces
+ *    (medido: 63 de 122 turnos con más de un snapshot tienen varios en el mismo
+ *    minuto, y en 61 de 66 grupos el contenido es distinto).
+ * 2. Después, de izquierda a derecha: si el evento cae a menos de `umbralPx` del
+ *    marcador abierto, lo absorbe y el marcador NO se mueve.
+ */
+export function agruparEventosRiel(
+  eventos: readonly EventoTurno[],
+  xDe: (ms: number) => number,
+  umbralPx: number = RIEL_UMBRAL_PX,
+): MarcadorRiel[] {
+  if (eventos.length === 0) return []
+  const orden = [...eventos].sort((a, b) => a.ms - b.ms)
+
+  // 1. mismo minuto
+  const porMinuto: EventoTurno[][] = []
+  for (const e of orden) {
+    const ultimo = porMinuto[porMinuto.length - 1]
+    if (ultimo && Math.floor(ultimo[0]!.ms / 60_000) === Math.floor(e.ms / 60_000)) ultimo.push(e)
+    else porMinuto.push([e])
+  }
+
+  // 2. distancia en píxeles contra el marcador abierto
+  const out: MarcadorRiel[] = []
+  let abierto: { x: number; eventos: EventoTurno[] } | null = null
+  for (const grupo of porMinuto) {
+    const x = xDe(grupo[0]!.ms)
+    if (abierto && x - abierto.x < umbralPx) {
+      abierto.eventos.push(...grupo)
+      continue
+    }
+    abierto = { x, eventos: [...grupo] }
+    out.push({ ms: grupo[0]!.ms, label: grupo[0]!.label, eventos: abierto.eventos, tipo: 'lote', glifo: '' })
+  }
+
+  // el glifo del grupo es el del tipo más importante que contiene
+  for (const m of out) {
+    const tipo = RIEL_PRIORIDAD.find((t) => m.eventos.some((e) => e.tipo === t)) ?? m.eventos[0]!.tipo
+    m.tipo = tipo
+    m.glifo = RIEL_GLIFO[tipo]
+  }
+  return out
+}
+
+export interface FuentesEventosTurno {
+  uploads?: ReadonlyArray<{ at: string; byName?: string; files?: { pp?: unknown; p0?: unknown } }>
+  acciones?: ReadonlyArray<{ at: string; field?: string; byName?: string; reason?: string }>
+  configs?: ReadonlyArray<{ at: string }>
+  buckets?: ReadonlyArray<{ tsMin: string; lot?: string | null }>
+  pausas?: ReadonlyArray<{ startAt: string; durationSec?: number; causeTag?: string | null }>
+}
+
+/**
+ * Los eventos del turno que el riel marca y la lista describe, en un solo lugar
+ * para que ambos digan exactamente lo mismo.
+ *
+ * `dentro` recorta a la ventana que el gráfico dibuja: 258 snapshots de
+ * configuración del histórico caen fuera de ella y marcarlos sería marcar algo
+ * que no se ve.
+ */
+export function construirEventosTurno(
+  f: FuentesEventosTurno,
+  dentro: (ms: number) => boolean,
+  fmtLabel: (ms: number) => string,
+): EventoTurno[] {
+  const out: EventoTurno[] = []
+  const add = (tipo: TipoEventoTurno, at: string, titulo: string, detalle?: string) => {
+    const ms = Date.parse(at)
+    if (!Number.isFinite(ms) || !dentro(ms)) return
+    out.push({ tipo, ms, label: fmtLabel(ms), titulo, detalle })
+  }
+
+  for (const u of f.uploads ?? []) {
+    const archivos = [u.files?.pp && 'PP', u.files?.p0 && 'P0'].filter(Boolean).join(' + ')
+    add('carga', u.at, archivos ? `Carga de Excel · ${archivos}` : 'Carga de Excel', u.byName)
+  }
+  for (const a of f.acciones ?? []) {
+    add('accion', a.at, a.field || 'Acción de mantención', [a.byName, a.reason].filter(Boolean).join(' · ') || undefined)
+  }
+  for (const c of f.configs ?? []) {
+    add('config', c.at, 'Cambio de compuertas')
+  }
+  const buckets = f.buckets ?? []
+  for (let i = 1; i < buckets.length; i++) {
+    const prev = buckets[i - 1], curr = buckets[i]
+    if (prev?.lot && curr?.lot && prev.lot !== curr.lot) {
+      add('lote', curr.tsMin, `Cambio de lote · ${curr.lot}`)
+    }
+  }
+  for (const p of f.pausas ?? []) {
+    const min = Math.round((p.durationSec ?? 0) / 60)
+    if (min < PAUSA_MIN_EVENTO && !p.causeTag) continue
+    add('pausa', p.startAt, p.causeTag ? `Pausa · ${p.causeTag}` : 'Pausa', min > 0 ? `${min} min` : undefined)
+  }
+  return out.sort((a, b) => a.ms - b.ms)
+}
+
+/** Bajo estos minutos, una pausa sin causa anotada no llega al riel: es micro-detención. */
+export const PAUSA_MIN_EVENTO = 10
+
+/** Color del glifo de cada tipo en el riel (paleta oscura: el chart va en `theme="dark"`). */
+export const RIEL_COLOR: Record<TipoEventoTurno, string> = {
+  accion: '#FF9F0A',
+  pausa: '#9F9FA5',
+  config: '#40C8E0',
+  carga: '#4CA5FF',
+  lote: '#D085F5',
+}
+
+/**
+ * Marcadores del riel como `markLine` verticales: la línea marca el instante
+ * sobre el gráfico y la píldora de arriba lleva el glifo del tipo y, si el
+ * marcador agrupa, cuántos eventos trae. Va dentro del canvas a propósito —
+ * el PNG se exporta desde ahí y un overlay HTML no saldría.
+ */
+export function buildRielMarkLines(marcadores: readonly MarcadorRiel[]): object[] {
+  return marcadores.map((m) => {
+    const color = RIEL_COLOR[m.tipo]
+    const n = m.eventos.length
+    return {
+      name: m.eventos.map((e) => e.titulo).join(' · '),
+      xAxis: m.label,
+      lineStyle: { color, type: 'dashed' as const, width: 1, opacity: 0.45 },
+      /* Sin símbolo de blanco táctil sobre el chart: probado con un `rect`
+         transparente de 30×44, ECharts lo pinta igual en el extremo inferior y
+         tapaba las horas del eje. El blanco táctil de cada evento es su fila en
+         la lista de abajo, que además centra el gráfico al tocarla. */
+      label: {
+        show: true,
+        position: 'insideEndTop' as const,
+        distance: 6,
+        // Sin espacio ni `lineHeight`: con «◈ 3» ECharts partía la píldora en
+        // dos renglones y el número salía de costado, girado.
+        formatter: n > 1 ? `${m.glifo}${n}` : m.glifo,
+        color,
+        fontSize: 11,
+        padding: [2, 5, 2, 5],
+        borderRadius: 4.5,
+        backgroundColor: 'rgba(15,23,42,0.92)',
+        borderColor: color,
+        borderWidth: 1,
+      },
+    }
+  })
+}
+
+export interface TramoConfig {
+  /** 1..N, para el encabezado de la lista. */
+  n: number
+  desdeMs: number
+  /** null en el último tramo: sigue abierto hasta el fin del turno. */
+  hastaMs: number | null
+  /** ISO del cambio que abrió el tramo; null en el primero, que abre el turno. */
+  snapshotAt: string | null
+  /** P0 % del tramo. Null cuando el tramo no junta piezas para decirlo. */
+  p0Pct: number | null
+  /** Puntos de P0 contra el tramo anterior. Null si alguno de los dos no junta piezas. */
+  delta: number | null
+  status: SegmentVerdict['status'] | null
+  /** Piezas contadas en el tramo. */
+  piezas: number
+}
+
+/**
+ * Piso de piezas para que un tramo muestre su P0.
+ *
+ * El 07-09 hubo dos cambios de compuertas con un minuto de diferencia: el tramo
+ * entre ambos tenía 3 piezas y salía «P0 33,3 % ▼ 31,5 pts», que es ruido con
+ * forma de hallazgo. Es el mismo piso que usa `computeSegmentVerdicts` para
+ * emitir veredicto.
+ */
+export const TRAMO_MIN_PIEZAS = 30
+
+/**
+ * Los tramos entre cambios manuales de compuertas, con el P0 de cada uno.
+ *
+ * Es lo que convierte la lista de eventos en un argumento: «cambié las
+ * compuertas a las 02:33 y el P0 bajó de 14,2 % a 9,4 %». Sin cambios manuales
+ * devuelve un solo tramo, y la lista se muestra plana — encabezar un único
+ * tramo sería ruido.
+ */
+export function tramosDeConfig(
+  snapshots: ReadonlyArray<{ id: string; at: string; synthetic?: boolean }>,
+  /** Indexado por `id` del snapshot, que es como lo devuelve `computeSegmentVerdicts`. */
+  verdicts: Map<string, SegmentVerdict>,
+  inicioMs: number,
+  buckets: ReadonlyArray<{ tsMin: string; pieces: number }> = [],
+): TramoConfig[] {
+  const manuales = snapshots
+    .filter((s) => !s.synthetic && Number.isFinite(Date.parse(s.at)))
+    .sort((a, b) => a.at.localeCompare(b.at))
+    .filter((s) => Date.parse(s.at) > inicioMs)
+
+  const piezasEntre = (desde: number, hasta: number | null) =>
+    buckets.reduce((a, b) => {
+      const t = Date.parse(b.tsMin)
+      return t >= desde && (hasta == null || t < hasta) ? a + (b.pieces || 0) : a
+    }, 0)
+
+  const primero = manuales[0]
+  const tramos: TramoConfig[] = [{
+    n: 1,
+    desdeMs: inicioMs,
+    hastaMs: primero ? Date.parse(primero.at) : null,
+    snapshotAt: null,
+    // El «antes» del primer cambio ES el primer tramo.
+    p0Pct: primero ? verdicts.get(primero.id)?.beforePct ?? null : null,
+    delta: null,
+    status: null,
+    piezas: piezasEntre(inicioMs, primero ? Date.parse(primero.at) : null),
+  }]
+
+  manuales.forEach((s, i) => {
+    const v = verdicts.get(s.id)
+    const sig = manuales[i + 1]
+    const desdeMs = Date.parse(s.at)
+    const hastaMs = sig ? Date.parse(sig.at) : null
+    tramos.push({
+      n: i + 2,
+      desdeMs,
+      hastaMs,
+      snapshotAt: s.at,
+      p0Pct: v?.afterPct ?? null,
+      delta: v?.delta ?? null,
+      status: v?.status ?? null,
+      piezas: piezasEntre(desdeMs, hastaMs),
+    })
+  })
+
+  /* Un tramo que no junta piezas no puede decir su P0, y tampoco sirve como
+     referencia del siguiente: el delta contra él sería contra ruido. */
+  if (buckets.length > 0) {
+    tramos.forEach((t, i) => {
+      if (t.piezas < TRAMO_MIN_PIEZAS) { t.p0Pct = null; t.delta = null; t.status = null }
+      const prev = tramos[i - 1]
+      if (prev && prev.piezas < TRAMO_MIN_PIEZAS) { t.delta = null; t.status = null }
+    })
+  }
+  return tramos
+}
+
+/** El tramo al que pertenece un instante. */
+export function tramoDe(tramos: readonly TramoConfig[], ms: number): TramoConfig | null {
+  for (let i = tramos.length - 1; i >= 0; i--) {
+    const t = tramos[i]!
+    if (ms >= t.desdeMs && (t.hastaMs == null || ms < t.hastaMs)) return t
+  }
+  return tramos[0] ?? null
+}
+
 // ── Mark lines del chart ──────────────────────────────────────────────────────
 
 export interface MarkLinesResult {
@@ -229,13 +536,13 @@ export function buildMarkLines(
       name: `Inicio turno\n${fmtTime(startLabelTs)}`,
       xAxis: fmtTime(startLabelTs),
       lineStyle: { color: '#10b981', type: 'solid' as const, width: 1 },
-      label: { show: true, formatter: '▶ Inicio', color: '#10b981', fontSize: 9, position: 'insideStartTop' as const },
+      label: { show: false },
     },
     {
       name: `Fin turno\n${fmtTime(endLabelTs)}`,
       xAxis: fmtTime(endLabelTs),
       lineStyle: { color: '#6b7280', type: 'solid' as const, width: 1 },
-      label: { show: true, formatter: '◀ Fin', color: '#6b7280', fontSize: 9, position: 'insideEndTop' as const },
+      label: { show: false },
     },
   ]
 
@@ -243,12 +550,12 @@ export function buildMarkLines(
     {
       yAxis: alertThreshold,
       lineStyle: { color: '#f59e0b', type: 'dashed' as const, width: 1, opacity: 0.5 },
-      label: { show: true, formatter: `${alertThreshold}%`, color: '#f59e0b', fontSize: 10, position: 'insideStartTop' as const },
+      label: { show: false },
     },
     {
       yAxis: criticalThreshold,
       lineStyle: { color: '#ef4444', type: 'dashed' as const, width: 1, opacity: 0.5 },
-      label: { show: true, formatter: `${criticalThreshold}%`, color: '#ef4444', fontSize: 10, position: 'insideStartTop' as const },
+      label: { show: false },
     },
   ]
 
@@ -256,39 +563,53 @@ export function buildMarkLines(
     name: `Upload\n${fmtTime(u.at)}`,
     xAxis: fmtTime(u.at),
     lineStyle: { color: '#3b82f6', type: 'dashed' as const, width: 1.5 },
-    label: { show: true, formatter: '↑', color: '#3b82f6', fontSize: 10 },
+    label: { show: false },
   }))
 
   const actionLines = (shiftDoc?.actions ?? []).map(a => ({
     name: `Acción\n${fmtTime(a.at)}`,
     xAxis: fmtTime(a.at),
     lineStyle: { color: '#f59e0b', type: 'dashed' as const, width: 1.5 },
-    label: { show: true, formatter: '⚙', color: '#f59e0b', fontSize: 10 },
+    label: { show: false },
   }))
 
   const configChangeLines = (configSnapshots ?? []).slice(1).map(s => ({
     name: `Config gates\n${fmtTime(s.at)}`,
     xAxis: fmtTime(s.at),
     lineStyle: { color: '#06b6d4', type: 'dashed' as const, width: 1.5 },
-    label: { show: true, formatter: 'Cfg', color: '#06b6d4', fontSize: 9 },
+    label: { show: false },
   }))
 
   const lotChangeLines: object[] = []
+  /* Dos cambios de lote a pocos minutos apilaban sus etiquetas una encima de
+     otra hasta volverlas ilegibles. La línea punteada se dibuja siempre; la
+     etiqueta, solo si hay aire desde la anterior. */
+  const LOT_LABEL_GAP_MIN = 25
+  let ultimaEtiquetaMs: number | null = null
   for (let i = 1; i < activeBuckets.length; i++) {
     const prev = activeBuckets[i - 1]
     const curr = activeBuckets[i]
     if (prev?.lot && curr?.lot && prev.lot !== curr.lot) {
+      const currMs = new Date(curr.tsMin).getTime()
+      const conAire = ultimaEtiquetaMs == null || currMs - ultimaEtiquetaMs >= LOT_LABEL_GAP_MIN * 60_000
+      if (conAire) ultimaEtiquetaMs = currMs
       lotChangeLines.push({
         name: `Cambio a Lote ${curr.lot}`,
         xAxis: fmtTime(curr.tsMin),
         lineStyle: { color: '#8b5cf6', type: 'dotted' as const, width: 1.5 },
         label: {
-          show: true,
-          formatter: curr.lot,
+          show: false,
+          // Los últimos 4 dígitos alcanzan para distinguir lotes dentro de un
+          // turno; el número entero (9 dígitos) se dibujaba en vertical y tapaba
+          // el gráfico. Va abajo porque arriba ya están las bandas de pausa —
+          // un cambio de lote suele traer su propia pausa «Cambio N min», y las
+          // dos etiquetas caían una encima de la otra. El número completo sigue
+          // en el nombre, que es lo que muestra el tooltip.
+          formatter: `L ${String(curr.lot).slice(-4)}`,
           color: '#a78bfa',
-          fontSize: 9,
+          fontSize: 11,
           fontWeight: 600 as const,
-          position: 'insideEndTop' as const,
+          position: 'insideEndBottom' as const,
           backgroundColor: 'rgba(139,92,246,0.15)',
           borderColor: 'rgba(139,92,246,0.4)',
           borderWidth: 1,
@@ -363,7 +684,7 @@ export function buildCadenceMarkLines(stats: CadenceStats): object[] {
       name: 'Ritmo típico',
       yAxis: stats.typicalPzMin,
       lineStyle: { color: '#38bdf8', type: 'dashed' as const, width: 1.5, opacity: 0.8 },
-      label: { show: true, formatter: `típico ${v}`, color: '#38bdf8', fontSize: 10, position: 'insideEndTop' as const },
+      label: { show: false },
       tooltip: { show: true, formatter: `Ritmo típico: mediana de pz/min en los minutos activos del turno (${v} pz/min).` },
     })
   }
@@ -373,7 +694,7 @@ export function buildCadenceMarkLines(stats: CadenceStats): object[] {
       name: 'Máx sostenida (10min)',
       yAxis: stats.bestSustained10MinPzMin,
       lineStyle: { color: '#facc15', type: 'dashed' as const, width: 1.5, opacity: 0.8 },
-      label: { show: true, formatter: `máx 10min ${v}`, color: '#facc15', fontSize: 10, position: 'insideEndTop' as const },
+      label: { show: false },
       tooltip: { show: true, formatter: `Máx sostenida: mejor promedio móvil de 10 min activos del turno — capacidad demostrada (${v} pz/min).` },
     })
   }
@@ -445,13 +766,14 @@ export function buildMarkAreas(
       labelColor = '#94a3b8'
       labelText = `${durMin}min${rangeAdjusted ? ' *' : ''}`
     }
-    const showLabel = durMin >= 10 || !!effectiveTag || rangeAdjusted
     return [
       {
         name: p.id,
         xAxis: tA,
         itemStyle: { color: areaColor },
-        label: { show: showLabel, formatter: labelText, color: labelColor, fontSize: 10, position: 'insideTopRight' as const },
+        // El texto de la banda pasó al riel y a la lista (10-09): con dos pausas
+        // cercanas los rótulos se pisaban entre sí y con los del lote.
+        label: { show: false, formatter: labelText, color: labelColor, fontSize: 11, position: 'insideTopRight' as const },
       },
       { xAxis: tB },
     ]
@@ -485,17 +807,22 @@ export function buildPauseBoundaryMarkLines(
     if (!isDominant) continue
     const color = effectiveTag?.color ?? (p.tier === 'parada' ? '#94a3b8' : '#cbd5e1')
     lines.push(
+      /* Sin `label` explícito, ECharts dibuja el valor del eje sobre la línea:
+         estos dos bordes eran los que escribían horas sueltas encima del
+         gráfico («01:02», «02:10»), superpuestas entre sí. */
       {
         name: `pause-start-${p.id}`,
         xAxis: fmtTime(p.startAt),
         lineStyle: { color, type: 'dashed' as const, width: 1, opacity: 0.5 },
         symbol: 'none' as const,
+        label: { show: false },
       },
       {
         name: `pause-end-${p.id}`,
         xAxis: fmtTime(p.endAt),
         lineStyle: { color, type: 'dashed' as const, width: 1, opacity: 0.5 },
         symbol: 'none' as const,
+        label: { show: false },
       },
     )
   }
@@ -827,6 +1154,32 @@ export function usableScatterPoints(points: ScatterPoint[]): ScatterPoint[] {
   return points.filter(p => p.baaderCycles > 0 && p.graderPieces >= 5)
 }
 
+/**
+ * Techo del eje Y del scatter, en puntos de P0%, y cuántos puntos quedan por
+ * encima.
+ *
+ * El eje llegaba al P0 más alto del turno, y con eso la nube real —que vive
+ * entre 0 y ~6 %— quedaba aplastada contra el piso: medido el 10-09, en 256 de
+ * 377 turnos había buckets que estiraban el eje hasta el 100 %. Se corta en el
+ * percentil 98 de los puntos usables, nunca por debajo del triple del umbral
+ * crítico, y la tarjeta avisa cuántos puntos quedaron fuera: recortar la escala
+ * sin decirlo sería esconder los peores tramos.
+ */
+export function scatterYMax(
+  seriesData: ScatterSeriesData[],
+  criticalP0Pct: number,
+): { max: number; fuera: number } {
+  const pcts = seriesData
+    .flatMap(s => usableScatterPoints(s.points))
+    .map(p => p.graderP0Pct * 100)
+    .sort((a, b) => a - b)
+  const piso = Math.max(1, criticalP0Pct * 3)
+  if (pcts.length === 0) return { max: Math.ceil(piso), fuera: 0 }
+  const p98 = pcts[Math.min(pcts.length - 1, Math.floor(pcts.length * 0.98))]!
+  const max = Math.ceil(Math.max(piso, p98))
+  return { max, fuera: pcts.filter(v => v > max).length }
+}
+
 /** Mediana clásica de un array numérico. Vacío → 0. */
 export function median(arr: number[]): number {
   if (arr.length === 0) return 0
@@ -877,6 +1230,19 @@ export function scatterCriticalZone(
  * Convierte la magnitud a "puntos P0% por -10 ciclos/5min" — operacional para
  * el operador en lugar de un slope académico.
  */
+/**
+ * Piso de R² para que la nube de puntos sostenga una frase sobre la relación
+ * entre el ritmo de la línea y el P0. Por debajo, el ritmo explica menos de una
+ * décima de la variación: la pendiente es ruido.
+ *
+ * Medido el 10-09 sobre los 38 turnos: la tarjeta afirmaba una dirección en 25
+ * de 28 turnos con datos y en 14 de ellos el R² máximo no llegaba a 0,10; el
+ * mayor R² de todo el histórico es 0,22. Además la dirección se daba vuelta
+ * entre turnos (17 «más línea, menos P0» contra 8 al revés), que es justo lo
+ * que hace el ruido.
+ */
+export const SCATTER_R2_MIN = 0.1
+
 export function scatterSlopeMagnitude(
   seriesData: ScatterSeriesData[],
 ): {
@@ -884,13 +1250,18 @@ export function scatterSlopeMagnitude(
   /** Cambio de P0% (en puntos %) cuando el ritmo Baader cae 10 ciclos/5min. Signo positivo = sube P0%. */
   deltaP0_per_minus10cycles: number
   direction: 'neg' | 'pos' | 'flat'
+  /** Mayor R² entre las máquinas con regresión utilizable (null si ninguna la tiene). */
+  r2Max: number | null
+  /** true solo si algún R² llega al piso: sin esto la dirección no se puede afirmar. */
+  explica: boolean
 } | null {
   const withSlope = seriesData
     .map(s => ({
       slope: s.regression?.slope ?? null,
+      r2: s.regression?.r2 ?? null,
       pts: usableScatterPoints(s.points).length,
     }))
-    .filter(x => x.slope != null && x.pts >= 3) as { slope: number; pts: number }[]
+    .filter(x => x.slope != null && x.pts >= 3) as { slope: number; r2: number | null; pts: number }[]
 
   if (withSlope.length === 0) return null
   const totalPts = withSlope.reduce((a, x) => a + x.pts, 0)
@@ -898,10 +1269,14 @@ export function scatterSlopeMagnitude(
   const wSum = withSlope.reduce((a, x) => a + x.slope * x.pts, 0)
   const avgSlope = wSum / totalPts
   const deltaP0_per_minus10cycles = -avgSlope * 10
+  const r2s = withSlope.map(x => x.r2).filter((r): r is number => r != null)
+  const r2Max = r2s.length ? Math.max(...r2s) : null
   return {
     avgSlope,
     deltaP0_per_minus10cycles,
     direction: avgSlope < -0.005 ? 'neg' : avgSlope > 0.005 ? 'pos' : 'flat',
+    r2Max,
+    explica: r2Max != null && r2Max >= SCATTER_R2_MIN,
   }
 }
 

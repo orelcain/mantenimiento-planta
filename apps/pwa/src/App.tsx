@@ -1,6 +1,6 @@
 import { useEffect, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useSearchParams } from 'react-router-dom'
-import { onAuthChange, getUserById, signOut as signOutService } from '@/services/auth'
+import { onAuthChange, getUserByIdConTokenFresco, signOut as signOutService } from '@/services/auth'
 import { useAuthStore, usePermissionsStore, startSessionWatchdog } from '@/store'
 import { logger } from '@/lib/logger'
 import { LoadingScreen } from '@/components/ui'
@@ -30,6 +30,7 @@ const lazyWithReload = (fn: () => Promise<any>) =>
 const LoginPage = lazyWithReload(() => import('@/pages/LoginPage').then((mod) => ({ default: mod.LoginPage })))
 /** Banco de pruebas de la Matriz de turnos — solo montado en dev (ver Routes). */
 const MatrizTurnosDevPage = lazyWithReload(() => import('@/pages/dev/MatrizTurnosDevPage'))
+const PurezaPuertaDevPage = lazyWithReload(() => import('@/pages/dev/PurezaPuertaDevPage'))
 /** Banco de pruebas del resumen ejecutivo — solo montado en dev (ver Routes). */
 const ResumenTurnoDevPage = lazyWithReload(() => import('@/pages/dev/ResumenTurnoDevPage'))
 const ResumenPeriodoDevPage = lazyWithReload(() => import('@/pages/dev/ResumenPeriodoDevPage'))
@@ -196,7 +197,7 @@ export function App() {
     const unsubscribe = onAuthChange(async (firebaseUser) => {
       if (firebaseUser) {
         try {
-          const user = await getUserById(firebaseUser.uid)
+          const user = await getUserByIdConTokenFresco(firebaseUser)
           if (!user) {
             logger.warn('Usuario Auth sin perfil en Firestore; cerrando sesión', { uid: firebaseUser.uid })
             await signOutService()
@@ -282,6 +283,16 @@ export function App() {
                   element={
                     <Suspense fallback={<LoadingScreen />}>
                       <MatrizTurnosDevPage />
+                    </Suspense>
+                  }
+                />
+              )}
+              {import.meta.env.DEV && (
+                <Route
+                  path="/dev/pureza-puerta"
+                  element={
+                    <Suspense fallback={<LoadingScreen />}>
+                      <PurezaPuertaDevPage />
                     </Suspense>
                   }
                 />

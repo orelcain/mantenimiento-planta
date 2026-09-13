@@ -8,6 +8,8 @@
  */
 
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
+import { avisoDeTurnosSinPiezas } from '@/services/grader/graderTurnosSinPiezas'
+
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, Button, Badge } from '@/components/ui'
 import { BarChart3, Loader2, CheckCircle2, Calendar, Upload, AlertCircle, ChevronDown } from 'lucide-react'
@@ -54,9 +56,15 @@ import {
   loadPausesAggregates,
   mergeAnnotationsIntoPauses,
   updateDailySummary,
+  saveGateObservations,
+  listDailySummariesByRange,
   type FirestorePieceRecord,
 } from '@/services/grader/graderDailySummary.service'
+import { computeGateObservations } from '@/services/grader/graderGateObservations'
 import { saveGate0Records } from '@/services/grader/graderGate0Store'
+import { listSnapshots, saveConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
+import { configTimelineFromSnapshots, type ConfigTimeline } from '@/services/grader/graderGateObservations'
+import { pickUltimoSeteo, elegirSeteoInicial } from '@/services/grader/graderSeteoInicial'
 import { detectPauses, collectSortedTimestamps, type PauseDetectionResult } from '@/services/grader/graderPauseDetector'
 import { DEFAULT_P0_ALERT_PCT, DEFAULT_P0_CRITICAL_PCT } from '@/services/grader/graderP0Thresholds'
 import type { ParsedMatrixData, GateAssignment, GraderAnalysisConfig, GraderDailySummary, Gate0Record } from '@/services/grader/types'
@@ -124,7 +132,22 @@ export function AnalisisGraderWizardPage() {
   )
 
   const [savingToCalendar, setSavingToCalendar] = useState(false)
+  // Guardado que no avanza: el 08-09 el botón quedó en "Guardando…" para
+  // siempre sin que llegara UNA escritura al servidor (pestaña con la conexión
+  // de Firestore rota). Sin este aviso el spinner miente.
+  const [saveSlow, setSaveSlow] = useState(false)
+  useEffect(() => {
+    if (!savingToCalendar) { setSaveSlow(false); return }
+    const t = window.setTimeout(() => setSaveSlow(true), 60_000)
+    return () => window.clearTimeout(t)
+  }, [savingToCalendar])
   const [savedToCalendar, setSavedToCalendar] = useState(false)
+  // Turnos del último guardado: el banner verde ofrece "Ver turno" por cada
+  // uno, sin depender de que la matriz de abajo ya los muestre.
+  const [savedShifts, setSavedShifts] = useState<Array<{ dateKey: string; shiftId: string }>>([])
+  // Se incrementa al guardar para que la matriz del período se recargue con
+  // el Excel recién cargado (antes seguía con el estado previo).
+  const [periodVersion, setPeriodVersion] = useState(0)
   // Mensaje de error específico cuando el save a Firestore falla. Antes el
   // catch era silencioso y el banner se quedaba en "guardando…" sin avisar.
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -241,7 +264,19 @@ export function AnalisisGraderWizardPage() {
     if (entries.length === 0) return null
     const uniqueDays = new Set(entries.map(([, s]) => s.sessionDate)).size
     const isP0Only = parsedData.pieceRecords.length === 0
-    return { entries, uniqueDays, totalSegments: entries.length, isP0Only }
+    /*
+     * `isP0Only` mira el archivo ENTERO, asi que con un pieza a pieza cargado
+     * siempre es false — y no cubre el caso real: los dos Excel de un mismo mes
+     * no cubren el mismo rango. Medido en julio 2025 (PP 07-01 -> 07-14,
+     * P0 07-01 -> 07-30): de los 54 turnos detectados, **37 no tienen ni una
+     * pieza**. La barra ofrecia guardar los 54 sin distinguirlos.
+     */
+    const soloP0 = entries.filter(([, s]) => s.pieceRecords.length === 0).length
+    return {
+      entries, uniqueDays, totalSegments: entries.length, isP0Only,
+      segmentosSoloP0: soloP0,
+      segmentosConPiezas: entries.length - soloP0,
+    }
   }, [parsedData, shiftSchedule, slxWindows])
 
   // Consultar Firestore: cuántos de los turnos detectados ya existen
@@ -475,7 +510,12 @@ export function AnalisisGraderWizardPage() {
     }
   }, [uploadedFiles.length, parsedData])
 
+  // Si el usuario tocó las gates en esta sesión del wizard, ese seteo manda
+  // sobre el "último conocido" al registrar el snapshot inicial de un turno.
+  const gatesEditadasRef = useRef(false)
+
   const handleApplyGateSuggestion = useCallback((payload: { gateNumber: number; calibre: string; quality: string }) => {
+    gatesEditadasRef.current = true
     setGates((prev) => prev.map((gate) => {
       if (gate.gateNumber !== payload.gateNumber) return gate
       return { ...gate, assignedCalibre: payload.calibre, assignedQuality: payload.quality as GateAssignment['assignedQuality'] }
@@ -525,9 +565,66 @@ export function AnalisisGraderWizardPage() {
       // Para líneas no-default (ej: Yal), los docs se guardan con prefix de plantLineId
       const effectivePlantLineId = lineId !== DEFAULT_PLANT_LINE_ID ? lineId : undefined
 
+      // Config de gates POR TURNO, no la del wizard. Si el turno ya tiene
+      // snapshots (alguien cambió una gate desde el detalle antes de cargar el
+      // Excel), esa es la config que clasifica las causas P0 y la pureza por
+      // puerta; el borrador del wizard puede ser de otro turno o de otro día.
+      // Si no tiene, el borrador del wizard pasa a ser su snapshot inicial: así
+      // el detalle muestra la config vigente y no detecta "desfase" contra nada.
+      // Solo en plantas que clasifican: en Yal las gates no significan nada.
+      // Seteo inicial de un turno SIN snapshot: el último conocido de la línea
+      // (gatesUsed del turno más reciente, que la página mantiene al día con
+      // snapshots y adopciones) y no el borrador del wizard. En la carga
+      // parcial del 07-09 Turno 1 el borrador dejó 8 de 12 puertas
+      // "seteo ≠ máquina" y 74 piezas de P0 "fuera de calidad" artificiales.
+      let ultimoConocido: GateAssignment[] | null = null
+      if (lineConfig.isClassificationPlant !== false && !gatesEditadasRef.current) {
+        try {
+          const hoy = new Date()
+          const desde = new Date(hoy.getTime() - 21 * 86_400_000)
+          const recientes = await listDailySummariesByRange(desde.toISOString().slice(0, 10), hoy.toISOString().slice(0, 10), effectivePlantLineId)
+          ultimoConocido = pickUltimoSeteo(recientes)
+        } catch (err) {
+          logger.warn('No se pudo leer el último seteo conocido', { err: String(err) })
+        }
+      }
+      const seteoInicial = elegirSeteoInicial({ wizardGates: gates, gatesEditadas: gatesEditadasRef.current, ultimoConocido })
+
+      const gatesBySegment = new Map<string, GateAssignment[]>()
+      // Con más de un snapshot, las piezas de P0 se clasifican con la config
+      // vigente a SU hora, no solo con la última.
+      const timelineBySegment = new Map<string, ConfigTimeline>()
+      if (lineConfig.isClassificationPlant !== false) {
+        const userName = `${user.nombre ?? ''} ${user.apellido ?? ''}`.trim() || user.email
+        await Promise.all(multiDayInfo.entries.map(async ([key, segment]) => {
+          const shiftDocId = `${segment.sessionDate}__${segment.shiftId}`
+          try {
+            const snaps = await listSnapshots(shiftDocId)
+            const latest = snaps[snaps.length - 1]
+            if (latest && latest.gates.length > 0) {
+              gatesBySegment.set(key, latest.gates)
+              timelineBySegment.set(key, configTimelineFromSnapshots(snaps, latest.gates))
+              return
+            }
+            gatesBySegment.set(key, seteoInicial.gates)
+            await saveConfigSnapshot(
+              shiftDocId, seteoInicial.gates, { uid: user.id, name: userName },
+              seteoInicial.origen === 'ultimo-conocido' ? 'Config inicial al cargar el Excel (último seteo conocido de la línea)' : 'Config inicial al cargar el Excel',
+            )
+          } catch (err) {
+            // No es fatal: se clasifica con las gates del wizard, como antes.
+            logger.warn('No se pudo resolver la config de gates del turno', { shiftDocId, err: String(err) })
+          }
+        }))
+      }
+
       const detectionByKey = new Map<string, PauseDetectionResult>()
       const summaries = multiDayInfo.entries.map(([key, segment]) => {
-        const raw = computeShiftSummary(segment, batchId, sourceNames, user.id, gates)
+        // Las causas P0 "fuera de calibre" se juzgan con los rangos configurados
+        // en la app (no con las constantes): si el 8-10 termina en 5.000 g, una
+        // pieza de 4,8 kg no es "fuera de calibre".
+        const rangosLinea = moduleCfg?.customWeightRanges?.length ? moduleCfg.customWeightRanges : undefined
+        const raw = computeShiftSummary(segment, batchId, sourceNames, user.id, gatesBySegment.get(key) ?? gates, timelineBySegment.get(key)?.configAt, rangosLinea)
         const tsSorted = collectSortedTimestamps(segment.pieceRecords, segment.gate0Records)
         // Extraer timestamps de cambios de lote para auto-tag 'cambio_lote' (M10)
         const loteChangeTsMs: number[] = []
@@ -579,6 +676,8 @@ export function AnalisisGraderWizardPage() {
           ...(r.calibre && { calibre: r.calibre }),
           ...('error' in r && r.error && { error: r.error }),
           ...(r.lot && { lot: r.lot }),
+          ...(r.conservation && { conservation: r.conservation }),
+          ...(r.product && { product: r.product }),
           dedupeKey: buildDedupeKey(r),
         }))
         await savePieceRecordsBatch(summaryId, firestoreRecs)
@@ -609,6 +708,14 @@ export function AnalisisGraderWizardPage() {
           await saveTimelineAggregates(summaryId, aggregates)
         }
 
+        // gateMix v2: lo observado por puerta y bloque, sin juicio, en
+        // meta/gateMix. La pureza se deriva al abrir Gates con los snapshots
+        // del turno (graderGateObservations.ts). Solo plantas que clasifican.
+        if (lineConfig.isClassificationPlant !== false) {
+          const obs = computeGateObservations(segment.pieceRecords)
+          if (obs) await saveGateObservations(summaryId, obs)
+        }
+
         // Detalle de pausas (≥5min) + microDetentions.byHour.
         // Merge preserva tag/note/annotatedBy/annotatedAt de anotaciones
         // manuales previas antes de sobrescribir.
@@ -623,6 +730,8 @@ export function AnalisisGraderWizardPage() {
       }
 
       setSavedToCalendar(true)
+      setSavedShifts(multiDayInfo.entries.map(([, s]) => ({ dateKey: s.sessionDate, shiftId: s.shiftId })))
+      setPeriodVersion((v) => v + 1)
 
       // Limpiar el state del upload: banner azul "listo para guardar", botón
       // Cancelar y badge "Cargar Excel N" desaparecen. parsedData=null hace
@@ -656,7 +765,7 @@ export function AnalisisGraderWizardPage() {
     } finally {
       setSavingToCalendar(false)
     }
-  }, [multiDayInfo, parsedData, user?.id, gates, lineId, navigate])
+  }, [multiDayInfo, parsedData, user, gates, lineId, lineConfig.isClassificationPlant, navigate])
 
   if (!canSee('analisisGrader')) return <Navigate to="/" replace />
 
@@ -667,7 +776,9 @@ export function AnalisisGraderWizardPage() {
   return (
     // `gap-6` en vez de `space-y-4`: el aire entre secciones es la mitad de lo
     // que hace que una pantalla se lea como Apple y no como panel denso.
-    <div className="flex flex-col gap-6">
+    // El mismo tope que el detalle del turno: sin esto el listado llegaba a
+    // 1.869 px a 1920 y abrir un turno ENCOGÍA la página 590 px.
+    <div className="flex flex-col gap-6 mx-auto w-full max-w-[1760px]">
       {/*
         Encabezado con TÍTULO GRANDE (rol `display`, §2). Antes era `text-xl` con
         un ícono al lado y una regla dura debajo — tres cosas que aplastaban la
@@ -756,6 +867,14 @@ export function AnalisisGraderWizardPage() {
                     </>
                   )}
                 </p>
+                {avisoDeTurnosSinPiezas(multiDayInfo.segmentosConPiezas, multiDayInfo.segmentosSoloP0) && (
+                  <p className="text-caption text-ink-warn mt-1" data-testid="wizard-turnos-sin-piezas">
+                    {avisoDeTurnosSinPiezas(multiDayInfo.segmentosConPiezas, multiDayInfo.segmentosSoloP0)}
+                  </p>
+                )}
+                {parsedData?.inferred?.p0CoverageWarning && (
+                  <p className="text-caption text-ink-warn mt-1" data-testid="wizard-p0-cobertura">{parsedData.inferred.p0CoverageWarning}</p>
+                )}
               </div>
             </div>
             <Button
@@ -770,15 +889,42 @@ export function AnalisisGraderWizardPage() {
               }
             </Button>
           </CardContent>
+          {saveSlow && (
+            <CardContent className="pt-0 pb-3 px-4" data-testid="wizard-save-slow">
+              <p className="text-footnote text-ink-warn">
+                Lleva más de un minuto y no llegó nada al servidor. Casi siempre es una pestaña con la
+                conexión caída: cerrá <span className="font-medium">todas</span> las pestañas de la app
+                (incluida la del monitor), abrila de nuevo y volvé a guardar. El Excel no se pierde.
+              </p>
+            </CardContent>
+          )}
         </Card>
       )}
       {savedToCalendar && (
         <Card className="border-emerald-500/[0.25] bg-emerald-500/[0.15]">
-          <CardContent className="py-3 px-4 flex items-center gap-2">
+          <CardContent className="py-3 px-4 flex items-center gap-2 flex-wrap">
             <CheckCircle2 className="h-4 w-4 text-ink-ok shrink-0" />
-            <p className="text-sm text-ink-ok font-medium">
-              Guardado correctamente en <b>{lineConfig.label}</b> · revisá el calendario abajo o cargá otro Excel.
+            <p className="text-sm text-ink-ok font-medium flex-1 min-w-[16rem]">
+              Guardado correctamente en <b>{lineConfig.label}</b>
+              {savedShifts.length > 1 ? ' · elegí qué turno abrir, o cargá otro Excel.' : ' · abriendo el turno…'}
             </p>
+            {/* Salida directa al detalle de cada turno guardado. La matriz de
+                abajo no siempre lo ofrece: un turno en curso sin celda no se
+                puede tocar, y el usuario quedaba sin "Ver turno". */}
+            {savedShifts.map((s) => (
+              <Button
+                key={`${s.dateKey}__${s.shiftId}`}
+                size="sm"
+                variant="outline"
+                className="text-ink-ok shrink-0"
+                onClick={() => {
+                  const linea = lineId !== DEFAULT_PLANT_LINE_ID ? `?linea=${encodeURIComponent(lineId)}` : ''
+                  navigate(`/analisis-grader/turno/${s.dateKey}__${encodeURIComponent(s.shiftId)}${linea}`)
+                }}
+              >
+                Ver turno {s.dateKey.slice(8, 10)}/{s.dateKey.slice(5, 7)} · {s.shiftId} →
+              </Button>
+            ))}
           </CardContent>
         </Card>
       )}
@@ -909,6 +1055,7 @@ export function AnalisisGraderWizardPage() {
         onMonthChange={setCalendarMonth}
         onSummariesLoaded={setCalendarSummaries}
         onMonthStatsLoaded={setCalendarSlxStats}
+        refreshKey={periodVersion}
         onSelectShift={(s) => setSelectedDateKey(s.dateKey)}
         onOpenShift={(s) => {
           // Ruta CANÓNICA del detalle de turno. Antes apuntaba a

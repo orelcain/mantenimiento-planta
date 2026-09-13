@@ -68,8 +68,21 @@ export function RunbookCard({ runbook, compact = false, defaultExpanded = false,
                 Clave: {runbook.serviceKey}
               </Badge>
             )}
+            {/* La ruta del HMI es LA instrucción del runbook: dice dónde tocar
+                en la máquina. Vivía en un `max-w-[240px]` fijo y `z2Path` no
+                aparece en ningún otro lado del componente —ni al expandir, ni
+                en un title—, así que lo cortado no se podía recuperar.
+                De los 6 runbooks, **3 se cortan, y los 3 en el mismo punto**:
+                «MENU → Servicio → Cambiar parámetr…», aunque lleven a lugares
+                distintos (…8620 → Static Grader → ZBelt → Pocket [1-4] → fsWc,
+                …8620 → Eye sync, y …8620). Tres tarjetas indistinguibles.
+                Desde `sm` toma su propia línea y se lee entera; en el teléfono
+                sigue truncada, pero ahora el `title` la muestra. */}
             {runbook.z2Path && (
-              <span className="text-xs text-muted-foreground font-mono truncate max-w-[240px]">
+              <span
+                className="text-xs text-muted-foreground font-mono truncate max-w-[240px] sm:max-w-none sm:basis-full sm:overflow-visible sm:whitespace-normal"
+                title={runbook.z2Path.join(' → ')}
+              >
                 {runbook.z2Path.join(' → ')}
               </span>
             )}

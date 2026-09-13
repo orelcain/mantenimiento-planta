@@ -22,179 +22,43 @@ import {
   Textarea, Badge,
 } from '@/components/ui'
 import type { Repuesto, TechnicalSpecs, MachineImage, TechnicalDataType } from '@/types/repuestos'
+import { PLANTILLAS_FICHA, CAMPOS_COMUNES, normalizarTipoFicha } from '@/utils/repuestos/plantillasFichaTecnica'
 import { exportTechnicalSheetToPDF } from '@/utils/repuestos/exportTechnicalSheet'
 import { useToast } from '@/hooks/useToast'
 import { logger } from '@/lib/logger'
 
 // ─── Templates ──────────────────────────────────────────────
 
-/** Campos comunes que aplican a TODOS los tipos */
-const COMMON_FIELDS: Record<string, string> = {
-  fabricante: 'Fabricante / Marca',
-  modelo: 'Modelo',
-  numeroSerie: 'N° Serie',
-  anoInstalacion: 'Año Instalación',
-  proveedor: 'Proveedor',
-  garantiaMeses: 'Garantía (meses)',
+/** Campos comunes que aplican a TODOS los tipos — compartidos con el PDF. */
+const COMMON_FIELDS = CAMPOS_COMUNES
+
+/** Lo que la UI agrega sobre la plantilla compartida: icono y color del tipo. */
+const ADORNO: Record<string, { icon: typeof Zap; color: string }> = {
+  motor: { icon: Zap, color: 'text-ink-warn' },
+  bomba: { icon: Droplets, color: 'text-blue-400' },
+  reductor: { icon: Cog, color: 'text-muted-foreground' },
+  cinta: { icon: ArrowRightLeft, color: 'text-green-400' },
+  valvula: { icon: GitBranch, color: 'text-red-400' },
+  sensor: { icon: Gauge, color: 'text-cat-6-ink' },
+  cilindro: { icon: CircleDot, color: 'text-cat-4-ink' },
+  compresor: { icon: Wind, color: 'text-cat-7-ink' },
+  intercambiador: { icon: Thermometer, color: 'text-cat-5-ink' },
+  filtro: { icon: Filter, color: 'text-emerald-400' },
+  general: { icon: Package, color: 'text-muted-foreground' },
 }
 
-interface TemplateConfig {
-  label: string
-  icon: typeof Zap
-  color: string
-  fields: Record<string, string>
-}
+/**
+ * Las etiquetas y los campos salen de `plantillasFichaTecnica.ts` — los MISMOS que imprime el
+ * PDF. Estaban duplicados acá y el PDF, que no los conocía, imprimía la clave en mayúscula.
+ */
+const TEMPLATES: Record<string, { label: string; fields: Record<string, string>; icon: typeof Zap; color: string }> =
+  Object.fromEntries(
+    Object.entries(PLANTILLAS_FICHA).map(([k, tpl]) => [
+      k,
+      { ...tpl, ...(ADORNO[k] ?? ADORNO['general']!) },
+    ]),
+  )
 
-const TEMPLATES: Record<string, TemplateConfig> = {
-  motor: {
-    label: 'Motor Eléctrico',
-    icon: Zap,
-    color: 'text-ink-warn',
-    fields: {
-      potencia: 'Potencia (HP/kW)',
-      rpm: 'RPM',
-      voltaje: 'Voltaje (V)',
-      amperaje: 'Amperaje (A)',
-      frecuencia: 'Frecuencia (Hz)',
-      frame: 'Frame / Carcasa',
-      fases: 'Fases',
-      tipoArranque: 'Tipo de Arranque',
-      gradoProteccion: 'Grado Protección (IP)',
-      claseAislacion: 'Clase de Aislación',
-    },
-  },
-  bomba: {
-    label: 'Bomba',
-    icon: Droplets,
-    color: 'text-blue-400',
-    fields: {
-      tipoBomba: 'Tipo de Bomba',
-      caudal: 'Caudal (L/min)',
-      presion: 'Presión (bar/psi)',
-      altura: 'Altura (m)',
-      entrada: 'Entrada (pulgadas)',
-      salida: 'Salida (pulgadas)',
-      materialCuerpo: 'Material Cuerpo',
-      tipoSello: 'Tipo de Sello',
-    },
-  },
-  reductor: {
-    label: 'Reductor / Motorreductor',
-    icon: Cog,
-    color: 'text-muted-foreground',
-    fields: {
-      relacion: 'Relación (Ratio)',
-      torqueSalida: 'Torque Salida (Nm)',
-      ejeSalida: 'Eje Salida (mm)',
-      ejeEntrada: 'Eje Entrada (mm)',
-      tipoReductor: 'Tipo (Helicoidal/Sin fin/Planetario)',
-      posicionMontaje: 'Posición de Montaje',
-    },
-  },
-  cinta: {
-    label: 'Cinta Transportadora',
-    icon: ArrowRightLeft,
-    color: 'text-green-400',
-    fields: {
-      anchoBanda: 'Ancho Banda (mm)',
-      largoTotal: 'Largo Total (mm)',
-      materialBanda: 'Material Banda',
-      tipoBanda: 'Tipo de Banda',
-      velocidad: 'Velocidad (m/min)',
-      capacidad: 'Capacidad (kg/h)',
-    },
-  },
-  valvula: {
-    label: 'Válvula',
-    icon: GitBranch,
-    color: 'text-red-400',
-    fields: {
-      tipoValvula: 'Tipo (Bola/Mariposa/Globo/Check)',
-      diametro: 'Diámetro (pulgadas)',
-      presionTrabajo: 'Presión de Trabajo (bar)',
-      materialCuerpo: 'Material Cuerpo',
-      tipoConexion: 'Tipo de Conexión',
-      actuador: 'Tipo de Actuador',
-    },
-  },
-  sensor: {
-    label: 'Sensor / Instrumento',
-    icon: Gauge,
-    color: 'text-cat-6-ink',
-    fields: {
-      tipoSensor: 'Tipo (Temp/Presión/Flujo/Nivel/pH)',
-      rangoMedicion: 'Rango de Medición',
-      senalSalida: 'Señal Salida (4-20mA/0-10V/Digital)',
-      conexionProceso: 'Conexión al Proceso',
-      alimentacion: 'Alimentación (V)',
-      precision: 'Precisión (%)',
-    },
-  },
-  cilindro: {
-    label: 'Cilindro Neumático/Hidráulico',
-    icon: CircleDot,
-    color: 'text-cat-4-ink',
-    fields: {
-      tipoCilindro: 'Tipo (Neumático/Hidráulico)',
-      diametroPiston: 'Diámetro Pistón (mm)',
-      carrera: 'Carrera (mm)',
-      presionMax: 'Presión Máx. (bar)',
-      tipoMontaje: 'Tipo de Montaje',
-      amortiguacion: 'Amortiguación',
-    },
-  },
-  compresor: {
-    label: 'Compresor',
-    icon: Wind,
-    color: 'text-cat-7-ink',
-    fields: {
-      tipoCompresor: 'Tipo (Pistón/Tornillo/Centrífugo)',
-      caudalAire: 'Caudal (CFM / m³/min)',
-      presionMax: 'Presión Máx. (bar)',
-      potenciaMotor: 'Potencia Motor (HP)',
-      refrigerante: 'Refrigerante/Lubricante',
-      volumenTanque: 'Volumen Tanque (L)',
-    },
-  },
-  intercambiador: {
-    label: 'Intercambiador de Calor',
-    icon: Thermometer,
-    color: 'text-cat-5-ink',
-    fields: {
-      tipoIntercambiador: 'Tipo (Placas/Tubular/Carcasa)',
-      capacidadTermica: 'Capacidad Térmica (kW)',
-      flujoCaliente: 'Flujo Lado Caliente',
-      flujoFrio: 'Flujo Lado Frío',
-      materialPlacas: 'Material Placas/Tubos',
-      conexiones: 'Conexiones (pulgadas)',
-    },
-  },
-  filtro: {
-    label: 'Filtro',
-    icon: Filter,
-    color: 'text-emerald-400',
-    fields: {
-      tipoFiltro: 'Tipo (Bolsa/Cartucho/Prensa/Arena)',
-      retencion: 'Tamaño Retención (μm)',
-      caudalMax: 'Caudal Máx. (L/min)',
-      materialCuerpo: 'Material Cuerpo',
-      superficieFiltrado: 'Superficie Filtrado (m²)',
-    },
-  },
-  general: {
-    label: 'General / Otro',
-    icon: Package,
-    color: 'text-muted-foreground',
-    fields: {},
-  },
-}
-
-/** Normaliza tipos legacy de Firestore */
-function normalizeType(t: string): string {
-  if (t === 'pump') return 'bomba'
-  if (t === 'conveyor') return 'cinta'
-  return t
-}
 
 // ─── Props ──────────────────────────────────────────────────
 
@@ -202,7 +66,11 @@ interface TechnicalSpecsModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   repuesto: Repuesto | null
-  machineId?: string
+  /**
+   * Nombre del equipo para la cabecera del PDF. Antes llegaba el `machineId` y se imprimía
+   * crudo: un auto-ID de Firestore no le dice nada a quien recibe la ficha.
+   */
+  machineName?: string
   initialTab?: 'specs' | 'gallery' // kept for backward compat, ignored
   readOnly?: boolean
   onSave?: (repuestoId: string, specs: TechnicalSpecs, gallery: MachineImage[]) => Promise<void>
@@ -214,7 +82,7 @@ export function TechnicalSpecsModal({
   open,
   onOpenChange,
   repuesto,
-  machineId,
+  machineName,
   readOnly = false,
   onSave,
 }: TechnicalSpecsModalProps) {
@@ -234,7 +102,7 @@ export function TechnicalSpecsModal({
       if (repuesto.technicalSpecs) {
         setSpecs({
           ...repuesto.technicalSpecs,
-          type: normalizeType(repuesto.technicalSpecs.type) as TechnicalDataType,
+          type: normalizarTipoFicha(repuesto.technicalSpecs.type) as TechnicalDataType,
         })
       } else {
         setSpecs({ type: 'general', standardValues: {}, customFields: [], updatedAt: Date.now() })
@@ -293,7 +161,7 @@ export function TechnicalSpecsModal({
     if (!repuesto) return
     setExporting(true)
     try {
-      await exportTechnicalSheetToPDF({ ...repuesto, technicalSpecs: specs }, machineId)
+      await exportTechnicalSheetToPDF({ ...repuesto, technicalSpecs: specs }, machineName)
       toast({ title: 'PDF Exportado', description: 'La ficha técnica se ha descargado.' })
     } catch (err) {
       logger.error('Error al exportar PDF de ficha técnica', err instanceof Error ? err : new Error(String(err)))

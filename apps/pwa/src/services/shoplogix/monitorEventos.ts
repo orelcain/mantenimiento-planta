@@ -181,7 +181,7 @@ function paradasPorCausa(
  * exactamente lo que pasa: no hay dato para atribuirla. Inventarle dueño a una
  * detención es lo único que no se puede hacer acá.
  */
-function duenoDe(reason: string): { dueno: DuenoPerdida; categoria: string | null; extension: boolean } {
+export function duenoDe(reason: string): { dueno: DuenoPerdida; categoria: string | null; extension: boolean } {
   const m = matchImputacion(reason)
   const categoria = m.leaf ? categoriaLabel(m.leaf) : null
   const extension = Boolean(m.leaf?.extension)

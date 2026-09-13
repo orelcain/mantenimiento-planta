@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   AlertTriangle,
@@ -24,6 +24,7 @@ import {
   Wrench,
   X,
   Zap,
+  Search,
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import ReactECharts from 'echarts-for-react'
@@ -41,6 +42,8 @@ import { createWorkOrder, getWorkOrders, updateWorkOrder } from '@/services/work
 import { descargarPlantillaPlaca, importarPlacaExcel } from '@/services/equipmentFichaExcel'
 import { generarReporteEquipo } from '@/services/equipmentReportPdf'
 import { useAuthStore } from '@/store'
+import { rowKeyDeRepuesto } from '@/hooks/repuestos/identidadDeRepuesto'
+import { getRepuestoFavs, saveRepuestoFavs } from '@/services/userPreferences'
 import { useEquipmentFavorites } from '@/hooks/useEquipmentFavorites'
 import { useEquipmentNotes } from '@/hooks/useEquipmentNotes'
 import type { EquipmentNote } from '@/hooks/useEquipmentNotes'
@@ -53,6 +56,10 @@ import { TableroExpediente } from '@/components/equipment/TableroExpediente'
 import { PhotoAnnotationEditor } from '@/components/PhotoAnnotationEditor'
 import { useManualesDeEquipos } from '@/hooks/repuestos/useManualesDeEquipos'
 import { useRepuestosDeEquipo } from '@/hooks/repuestos/useRepuestosDeEquipo'
+import { particionarRepuestosDeEquipo, filtrarRepuestosDeEquipo, opcionesBomDesdeEquipo } from '@/services/repuestos/bomDeEquipo'
+import { buildBomIB01, exportBomIB01ToExcel } from '@/utils/repuestos/exportBomSAP'
+import { ubicacionCorta } from '@/services/equipos/ubicacionCorta'
+import { cn } from '@/lib/utils'
 import { logger } from '@/lib/logger'
 import {
   BUCKETS,
@@ -160,6 +167,25 @@ export function CentroTecnicoDocumentalPage() {
     () => (detailId ? equipos.find((e) => e.id === detailId) ?? null : null),
     [detailId, equipos],
   )
+
+  /*
+   * Entrada desde el modulo Repuestos: `?nodo=<hierarchyNodeId>`.
+   *
+   * El expediente se abre con `?eq=<id del Equipment>`, pero Repuestos trabaja
+   * con nodeIds de `hierarchy` (`repuesto.equipos[]` los guarda). Traducirlos
+   * alla obligaria a cargar los equipos solo para armar un link, asi que se
+   * resuelve aca y se reescribe la URL a `?eq=`, que es lo que usa el resto de
+   * la pagina. `replace` para no dejar el paso intermedio en el historial.
+   */
+  const nodoParam = searchParams.get('nodo')
+  useEffect(() => {
+    if (!nodoParam || equipos.length === 0) return
+    const eq = equipos.find((e) => e.hierarchyNodeId === nodoParam)
+    const p = new URLSearchParams(searchParams)
+    p.delete('nodo')
+    if (eq) p.set('eq', eq.id)
+    setSearchParams(p, { replace: true })
+  }, [nodoParam, equipos, searchParams, setSearchParams])
 
   // Cargar incidencias + historial del equipo abierto (timeline de la Ficha y reporte PDF)
   useEffect(() => {
@@ -350,12 +376,19 @@ export function CentroTecnicoDocumentalPage() {
     <div className="relative flex h-full bg-background">
       {/* Izquierda: jerarquía del equipo seleccionado (desktop) */}
       {detailEquipment && (
-        <aside className="hidden w-64 shrink-0 flex-col overflow-y-auto border-r bg-[var(--panel-surface)] dark:bg-transparent p-3 lg:flex">
+        <aside className="hidden w-64 shrink-0 flex-col overflow-y-auto border-r bg-[var(--panel-surface)] dark:bg-transparent p-3 lg:flex lg:sticky lg:top-0 lg:max-h-screen">
           <UbicacionRail equipment={detailEquipment} onMoved={reload} />
         </aside>
       )}
       {/* Centro: lista del programa */}
-      <main className="min-w-0 flex-1 overflow-y-auto">
+      {/*
+        Mismo caso que el panel del expediente (ver el comentario largo en ExpedienteDialog):
+        `overflow-y-auto` sin altura que lo acote no scrollea nada — el layout usa
+        `min-h-screen`, asi que `h-full` no resuelve a una altura fija y el listado CRECE
+        (medido: 3.513 px de alto, scrollHeight === clientHeight). Con el expediente abierto,
+        que es `sticky`/`fixed`, el listado no se podia recorrer.
+      */}
+      <main className="min-w-0 flex-1 overflow-y-auto lg:sticky lg:top-0 lg:max-h-screen">
         <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-4">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
@@ -1412,16 +1445,74 @@ function OtBadge({ ot }: { ot?: OtCount }) {
   )
 }
 
-/** Recursos · repuestos del equipo (N:M) + buscador embebido para vincular/desvincular. */
+/** Cuantas filas del equipo comparten ese nombre del despiece. */
+const GRUPO_TITULO = (n: number): string => n + ' filas con este mismo nombre'
+
+/** Materiales · repuestos del equipo (N:M) + buscador embebido para vincular/desvincular. */
 function RecursosRepuestos({ equipment, canEdit }: { equipment: Equipment; canEdit: boolean }) {
   const nodeId = equipment.hierarchyNodeId
   const [reloadKey, setReloadKey] = useState(0)
   const { repuestos, loading } = useRepuestosDeEquipo(nodeId, reloadKey)
+  const [despieceAbierto, setDespieceAbierto] = useState(false)
+  const [filtro, setFiltro] = useState('')
+  const particionTotal = useMemo(() => particionarRepuestosDeEquipo(repuestos), [repuestos])
+  const particion = useMemo(
+    () => (filtro.trim() ? particionarRepuestosDeEquipo(filtrarRepuestosDeEquipo(repuestos, filtro)) : particionTotal),
+    [repuestos, filtro, particionTotal],
+  )
+  const filtrando = filtro.trim().length > 0
+  // Buscando algo, esconder el despiece es esconder la mitad de los resultados.
+  const verDespiece = despieceAbierto || filtrando
+  const sinResultados = filtrando && particion.bom.length === 0 && particion.despiece.length === 0
+
+  /*
+   * Exportar la lista de materiales para cargarla en SAP (IB01).
+   *
+   * Usa las MISMAS funciones que el exportador del módulo Repuestos
+   * (`buildBomIB01` + `exportBomIB01ToExcel`), así que el archivo que sale de
+   * acá es el mismo que sale de allá. Lo que cambia es no tener que ir a
+   * buscar el equipo de nuevo en el otro módulo.
+   *
+   * Va sobre `particionTotal.bom`, no sobre lo filtrado: un filtro es para
+   * mirar, no para decidir qué lleva la máquina.
+   */
+  const opcionesBom = useMemo(() => opcionesBomDesdeEquipo(equipment), [equipment])
+  const puedeExportarBom = opcionesBom !== null && particionTotal.bom.length > 0
+
+  function exportarBom() {
+    if (!opcionesBom) return
+    exportBomIB01ToExcel(buildBomIB01(particionTotal.bom.map((r) => r.doc), opcionesBom))
+  }
   const [adding, setAdding] = useState(false)
   const [maestro, setMaestro] = useState<RepuestoMaestroItem[] | null>(null)
   const [loadingMaestro, setLoadingMaestro] = useState(false)
   const [q, setQ] = useState('')
   const [busy, setBusy] = useState(false)
+
+  /*
+   * Los favoritos son los MISMOS que los del modulo Repuestos: se guardan en
+   * `repuestoFavs` del usuario, keyed por la identidad estable de la pieza
+   * (`identidadDeRepuesto.ts`). Marcar aqui un material se ve marcado alla, que es
+   * lo que uno espera de "mis favoritos" — no una segunda lista paralela.
+   */
+  const userId = useAuthStore((s) => s.user?.id)
+  const [favs, setFavs] = useState<Set<string>>(new Set())
+  useEffect(() => {
+    if (!userId) return
+    getRepuestoFavs(userId).then((arr) => setFavs(new Set(arr))).catch(() => {})
+  }, [userId])
+
+  const toggleFav = useCallback((rep: { id?: string; codigoSAP?: string | null; codigoFabricante?: string | null }) => {
+    if (!userId) return
+    const key = rowKeyDeRepuesto(rep)
+    setFavs((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      void saveRepuestoFavs(userId, [...next])
+      return next
+    })
+  }, [userId])
 
   async function openAdd() {
     setAdding(true)
@@ -1528,6 +1619,23 @@ function RecursosRepuestos({ equipment, canEdit }: { equipment: Equipment; canEd
           </div>
         )}
 
+        {/*
+          Con 476 en la lista de materiales y 1.328 de despiece, encontrar una
+          pieza scrolleando no es viable. Usa el mismo normalizador que los
+          buscadores del módulo Repuestos (sin acentos, con plurales).
+        */}
+        {repuestos.length > 0 && (
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={filtro}
+              onChange={(ev) => setFiltro(ev.target.value)}
+              placeholder="Buscar por código SAP, nombre o tipo…"
+              className="h-8 pl-7 text-sm"
+              aria-label="Buscar en los materiales del equipo"
+            />
+          </div>
+        )}
         {loading ? (
           <p className="text-sm italic text-muted-foreground">Cargando…</p>
         ) : repuestos.length === 0 ? (
@@ -1535,30 +1643,142 @@ function RecursosRepuestos({ equipment, canEdit }: { equipment: Equipment; canEd
             Sin repuestos vinculados{nodeId ? '' : ' (equipo sin nodo de jerarquía)'}.
           </p>
         ) : (
-          <div className="divide-y">
-            {repuestos.map((r) => (
-              <div key={r.id} className="flex items-center gap-3 py-2 text-sm">
-                <span className="w-28 shrink-0 font-mono text-xs text-muted-foreground">{r.codigoSAP || '—'}</span>
-                <span className="min-w-0 flex-1 truncate">
-                  {r.nombre}
-                  {r.tipo ? <span className="text-caption text-muted-foreground"> · {r.tipo}</span> : null}
-                </span>
-                {typeof r.stockFisico === 'number' && (
-                  <span className="shrink-0 text-xs text-muted-foreground">stock {r.stockFisico}</span>
+          <div className="space-y-1">
+            {/*
+              Antes era UNA lista alfabética con todo mezclado. En la Baader 142
+              son 1.804 filas donde lo primero que se ve es «Abrazadera de
+              manguera» cuatro veces seguidas, sin código. Los 476 con código SAP
+              son la lista de materiales —la que se carga en IB01, con la
+              cantidad que lleva la máquina— y los otros 1.328 son despiece del
+              fabricante: identifica la pieza en el plano, no se puede pedir.
+              Ver services/repuestos/bomDeEquipo.ts.
+            */}
+            {particion.bom.length > 0 && (
+              <>
+                <div className="flex flex-wrap items-baseline gap-x-2 pt-1">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-ink-ok">
+                    Lista de materiales SAP · {particion.bom.length}
+                    {filtrando && ` de ${particionTotal.bom.length}`}
+                  </span>
+                  <span className="text-caption text-muted-foreground">
+                    con código y cantidad — es la que se carga en IB01
+                  </span>
+                  {puedeExportarBom && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={exportarBom}
+                      className="ml-auto h-6 px-2 text-caption"
+                      title={`Descargar la lista de materiales de ${opcionesBom?.equipoCodigo} para cargar en SAP (IB01), centro ${opcionesBom?.centro || 'sin determinar'}`}
+                    >
+                      <Download className="mr-1 h-3 w-3" /> Exportar para SAP
+                    </Button>
+                  )}
+                </div>
+                <div className="divide-y">
+                  {particion.bom.map((r) => (
+                    <div key={r.id} className="flex items-center gap-3 py-2 text-sm">
+                      {userId && (
+                        <button
+                          onClick={() => toggleFav(r)}
+                          className={['shrink-0 rounded-ctl p-0.5 transition', favs.has(rowKeyDeRepuesto(r)) ? 'text-ink-warn' : 'text-muted-foreground/30 hover:text-ink-warn'].join(' ')}
+                          title={favs.has(rowKeyDeRepuesto(r)) ? 'Quitar de mis favoritos' : 'Marcar como favorito (los mismos de Repuestos)'}
+                          aria-label="Favorito"
+                          aria-pressed={favs.has(rowKeyDeRepuesto(r))}
+                        >
+                          <Star className={['h-3.5 w-3.5', favs.has(rowKeyDeRepuesto(r)) ? 'fill-current' : ''].join(' ')} />
+                        </button>
+                      )}
+                      <span className="w-28 shrink-0 font-mono text-xs tabular-nums text-muted-foreground">{r.codigoSAP}</span>
+                      <span className="min-w-0 flex-1 truncate">
+                        {r.nombre}
+                        {r.tipo ? <span className="text-caption text-muted-foreground"> · {r.tipo}</span> : null}
+                      </span>
+                      {typeof r.cantidadPorMaquina === 'number' && (
+                        <span
+                          className="shrink-0 rounded-ctl bg-muted px-1.5 font-mono text-xs tabular-nums text-ink-ok"
+                          title="Cantidad que lleva la máquina"
+                        >
+                          ×{r.cantidadPorMaquina}
+                        </span>
+                      )}
+                      {typeof r.stockFisico === 'number' && (
+                        <span className="shrink-0 text-xs text-muted-foreground">stock {r.stockFisico}</span>
+                      )}
+                      {canEdit && nodeId && (
+                        <button
+                          disabled={busy}
+                          onClick={() => desvincular(r.id)}
+                          className="shrink-0 p-1 text-muted-foreground hover:text-destructive"
+                          title="Quitar del equipo"
+                          aria-label="Quitar repuesto"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {sinResultados && (
+              <p className="py-2 text-sm italic text-muted-foreground">
+                Ningún material de este equipo coincide con «{filtro.trim()}».
+              </p>
+            )}
+
+            {particion.despiece.length > 0 && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setDespieceAbierto((v) => !v)}
+                  aria-expanded={verDespiece}
+                  className="flex w-full flex-wrap items-baseline gap-x-2 border-t pt-2 text-left"
+                >
+                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Despiece sin código · {particion.filasSinCodigo}
+                    {filtrando && ` de ${particionTotal.filasSinCodigo}`}
+                  </span>
+                  <span className="text-caption text-muted-foreground">
+                    identifica la pieza en el plano; no se puede pedir
+                  </span>
+                  <ChevronDown
+                    className={cn('ml-auto h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform', verDespiece && 'rotate-180')}
+                  />
+                </button>
+                {verDespiece && (
+                  <div className="divide-y">
+                    {particion.despiece.map((g) => (
+                      <div key={g.nombre.toLowerCase()} className="flex items-center gap-3 py-2 text-sm">
+                        <span className="min-w-0 flex-1 truncate">
+                          {g.nombre}
+                          {g.tipo ? <span className="text-caption text-muted-foreground"> · {g.tipo}</span> : null}
+                        </span>
+                        {g.veces > 1 ? (
+                          <span
+                            className="shrink-0 rounded-ctl bg-muted px-1.5 font-mono text-xs tabular-nums text-muted-foreground"
+                            title={GRUPO_TITULO(g.veces)}
+                          >
+                            {g.veces}
+                          </span>
+                        ) : canEdit && nodeId ? (
+                          <button
+                            disabled={busy}
+                            onClick={() => desvincular(g.ids[0]!)}
+                            className="shrink-0 p-1 text-muted-foreground hover:text-destructive"
+                            title="Quitar del equipo"
+                            aria-label="Quitar repuesto"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
                 )}
-                {canEdit && nodeId && (
-                  <button
-                    disabled={busy}
-                    onClick={() => desvincular(r.id)}
-                    className="shrink-0 p-1 text-muted-foreground hover:text-destructive"
-                    title="Quitar del equipo"
-                    aria-label="Quitar repuesto"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                )}
-              </div>
-            ))}
+              </>
+            )}
           </div>
         )}
         <p className="text-caption text-muted-foreground">
@@ -1844,9 +2064,26 @@ function ExpedienteDialog({
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
   const [editingNoteText, setEditingNoteText] = useState('')
 
+  /*
+   * El panel NO scrolleaba en PC con una lista larga (los 476 del BOM de la
+   * Baader 142): el contenido quedaba cortado y no habia forma de recorrerlo.
+   *
+   * Por que: los contenedores del layout usan `min-h-screen`, no `h-screen`, asi
+   * que el `h-full` del CTD no resuelve a una altura fija. Sin altura que lo
+   * limite, el panel CRECE con el contenido y su `overflow-y-auto` nunca se
+   * activa. Y el `body` tiene `overflow: hidden`, asi que tampoco hay scroll de
+   * documento que lo salve.
+   *
+   * Medido inyectando 4.000 px en el panel: pasaba de 710 a 4.482 px de alto,
+   * `scrollHeight === clientHeight`, y el body quedaba en 4.573 sin scrollear.
+   * Con `lg:sticky lg:top-0 lg:max-h-screen` el panel queda acotado al alto de
+   * la ventana y su overflow SI se activa (medido: clientH 1.080, scrollH 4.482).
+   *
+   * En telefono no aplica: ahi es `fixed inset-0` y ya scrolleaba.
+   */
   return (
     <section
-      className="fixed inset-0 z-50 flex flex-col overflow-y-auto bg-[var(--panel-surface)] dark:bg-background lg:static lg:z-auto lg:w-[44%] lg:min-w-[440px] lg:max-w-[680px] lg:shrink-0 lg:border-l xl:w-[40%]"
+      className="fixed inset-0 z-50 flex flex-col overflow-y-auto bg-[var(--panel-surface)] dark:bg-background lg:sticky lg:top-0 lg:max-h-screen lg:z-auto lg:w-[44%] lg:min-w-[440px] lg:max-w-[680px] lg:shrink-0 lg:border-l xl:w-[40%]"
       role="dialog"
       aria-modal="true"
     >
@@ -1910,7 +2147,7 @@ function ExpedienteDialog({
               <TabsTrigger value="ficha">Ficha NFPA 70B</TabsTrigger>
               <TabsTrigger value="protocolo">Protocolo</TabsTrigger>
               <TabsTrigger value="tablero">Tablero</TabsTrigger>
-              <TabsTrigger value="recursos">Recursos</TabsTrigger>
+              <TabsTrigger value="recursos" title="Repuestos vinculados al equipo. Los que tienen codigo SAP y cantidad son la lista que se carga en IB01.">Lista de materiales</TabsTrigger>
               <TabsTrigger value="trabajos">Trabajos ({workOrders.length})</TabsTrigger>
               {isFavorite && <TabsTrigger value="mediciones">Mediciones</TabsTrigger>}
               <TabsTrigger value="fotos">Fotos ({equipment.photos?.length || 0})</TabsTrigger>
@@ -2665,6 +2902,8 @@ function CtdEquipoRow({
   const cond = e.fichaTecnica?.condicion
   const pct = completitud(e)
   const foto = e.photos?.[0]
+  const ubicacion = ubicacionCorta(e.hierarchyPath)
+
   return (
     <div
       className={`flex items-center gap-3 px-3 cursor-pointer border-l-2 ${compact ? 'py-1.5' : 'py-3'} ${selected ? 'border-primary bg-primary/20' : 'border-transparent hover:bg-muted/40'}`}
@@ -2692,7 +2931,16 @@ function CtdEquipoRow({
 
       <div className="flex-1 min-w-0">
         <div className="text-xs font-medium truncate">{e.nombre}</div>
-        <div className="text-caption text-muted-foreground font-mono truncate">{e.codigo}</div>
+        {/*
+          Hay seis KNURO y seis EVISCERADORA BAADER 142 que se llaman IGUAL en
+          las dos plantas: sin la ubicación no se sabía cuál era cuál sin abrir
+          el equipo, salvo que uno se supiera los códigos SAP de memoria. El dato
+          ya estaba en `hierarchyPath`; ver services/equipos/ubicacionCorta.ts.
+        */}
+        <div className="text-caption text-muted-foreground truncate">
+          <span className="font-mono">{e.codigo}</span>
+          {ubicacion && <span> · {ubicacion}</span>}
+        </div>
         {e.nombreComun && <div className="text-caption text-muted-foreground truncate">“{e.nombreComun}”</div>}
         <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs md:hidden">
           <Badge variant="outline" className={`${crit.cls}`}>{crit.nivel}</Badge>

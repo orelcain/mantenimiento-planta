@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, Check, CloudOff, Loader2, RotateCcw, Settings2, Undo2, Eraser } from 'lucide-react'
+import { AlertTriangle, Check, CloudOff, Loader2, Maximize2, Minimize2, RotateCcw, Settings2, Undo2, Eraser } from 'lucide-react'
 import { ListGroup, ListCell, Pill } from '@/components/piel'
 import { FranjaVentanas } from './FranjaVentanas'
 import { CompartirRueda } from './CompartirRueda'
 import { ResumenPlanta } from './ResumenPlanta'
+import { RuedaPlanta } from './RuedaPlanta'
 import { CargaTrabajo } from './CargaTrabajo'
 import { EditorMaquinas } from './EditorMaquinas'
 import { CargaRapida } from './CargaRapida'
+import { SugerirIntervencion } from './SugerirIntervencion'
+import { apilar, desapilar, restaurar, type PasoHistorial } from '@/services/historialRueda'
 import { CONFIG_CARGA_POR_DEFECTO, tareasIniciales, type ConfigCarga, type TareaMantencion } from '@/services/ruedaCarga'
 import { getCurrentUser } from '@/services/auth'
 import { logger } from '@/lib/logger'
@@ -18,6 +21,7 @@ import {
   DIAS_SEMANA,
   OCUPANTES,
   agruparTramos,
+  capaOportunidad,
   SLOTS_POR_DIA,
   baseDia,
   bloquesIntervencion,
@@ -34,6 +38,7 @@ import {
   slotsAHorasMinutos,
   type Condicion,
   type DiaRueda,
+  type MaquinaRueda,
   type Ocupante,
   type RuedaState,
 } from '@/services/ruedaVentanas'
@@ -123,22 +128,30 @@ const ORDEN_CONDICION: Condicion[] = ['limpia', 'colacion', 'marcha', 'agua']
 
 type EstadoSync = 'cargando' | 'guardado' | 'guardando' | 'error' | 'local'
 
-export function RuedaVentanas() {
+export interface RuedaVentanasProps {
+  /** Técnicos de Mantención de turno por tramo, sacado del calendario de turnos. */
+  disponibles?: (dia: number, slot: number) => number
+}
+
+export function RuedaVentanas({ disponibles }: RuedaVentanasProps = {}) {
   const [state, setState] = useState<RuedaState>(() => estadoInicial())
   const [maquinaId, setMaquinaId] = useState<string>(() => estadoInicial().maquinas[0]?.id ?? '')
+  /** Nombre de la máquina cuya confirmación acaba de caerse por una edición. */
+  const [confirmacionCaida, setConfirmacionCaida] = useState<string | null>(null)
   const [diaIdx, setDiaIdx] = useState<number>(() => (new Date().getDay() + 6) % 7)
   const [brocha, setBrocha] = useState<Brocha>({ capa: 'mant', valor: '1' })
   /* Editar en la rueda, mostrar en la franja: son dos trabajos distintos y cada
      forma es buena en uno solo. Ver el comentario de FranjaVentanas. */
   const [modo, setModo] = useState<'editar' | 'comparar' | 'carga'>('editar')
   const [editandoMaquinas, setEditandoMaquinas] = useState(false)
+  const [ampliada, setAmpliada] = useState(false)
   const [sync, setSync] = useState<EstadoSync>('cargando')
   const [errorTexto, setErrorTexto] = useState<string | null>(null)
   const [ahora, setAhora] = useState(() => new Date())
 
   const svgRef = useRef<SVGSVGElement | null>(null)
   const pintandoRef = useRef(false)
-  const historialRef = useRef<Array<{ maquinaId: string; dia: number; valor: DiaRueda }>>([])
+  const historialRef = useRef<PasoHistorial[]>([])
   const [puedeDeshacer, setPuedeDeshacer] = useState(false)
   const snapshotTomadoRef = useRef(false)
   const ultimoGuardadoRef = useRef<string>('')
@@ -230,28 +243,47 @@ export function RuedaVentanas() {
     }
   }, [state, sync])
 
+  /**
+   * «Confirmado en terreno» es sobre el HORARIO de la máquina —la capa de áreas—,
+   * no sobre dónde decidimos intervenir nosotros. Si ese horario cambia después
+   * de confirmarse, el sello dejó de valer: quien lo lea, incluido el link
+   * público, vería «confirmado» sobre horas que nadie verificó.
+   */
+  const invalidarSiCambioElHorario = useCallback((antes: MaquinaRueda, despues: MaquinaRueda): MaquinaRueda => {
+    if (despues.revisadoEnTerreno !== true) return despues
+    const cambio = antes.semana.some((d, i) => (d?.areas ?? '') !== (despues.semana[i]?.areas ?? ''))
+    if (!cambio) return despues
+    setConfirmacionCaida(despues.nombre)
+    return { ...despues, revisadoEnTerreno: false }
+  }, [])
+
   /* ── Edición ────────────────────────────────────────────────────────────── */
   const aplicarADia = useCallback(
     (fn: (d: DiaRueda) => DiaRueda) => {
       setState((prev) => ({
         ...prev,
         maquinas: prev.maquinas.map((m) =>
-          m.id !== maquinaId ? m : { ...m, semana: m.semana.map((d, i) => (i === diaIdx ? fn(d) : d)) },
+          m.id !== maquinaId
+            ? m
+            : invalidarSiCambioElHorario(m, { ...m, semana: m.semana.map((d, i) => (i === diaIdx ? fn(d) : d)) }),
         ),
       }))
     },
-    [maquinaId, diaIdx],
+    [maquinaId, diaIdx, invalidarSiCambioElHorario],
   )
 
+  /*
+   * Se guarda la MÁQUINA COMPLETA, no el día que se está mirando: «copiar el día
+   * a Lun-Vie» toca cuatro días y «copiar la semana de otra máquina» reemplaza
+   * los siete. Guardando un día, deshacer restauraba ese y dejaba el resto
+   * pisado — trabajo perdido en silencio, con el botón diciendo que ya lo hizo.
+   */
   const tomarSnapshot = useCallback(() => {
     if (snapshotTomadoRef.current || !maquina) return
-    const actual = maquina.semana[diaIdx]
-    if (!actual) return
-    historialRef.current.push({ maquinaId, dia: diaIdx, valor: actual })
-    if (historialRef.current.length > 40) historialRef.current.shift()
+    historialRef.current = apilar(historialRef.current, maquina, diaIdx)
     snapshotTomadoRef.current = true
     setPuedeDeshacer(true)
-  }, [maquina, maquinaId, diaIdx])
+  }, [maquina, diaIdx])
 
   /** Tramo bajo el puntero, desde el ángulo — sin 288 elementos que testear. */
   const slotDesdePunto = useCallback((clientX: number, clientY: number): number | null => {
@@ -312,22 +344,29 @@ export function RuedaVentanas() {
   }, [])
 
   const deshacer = useCallback(() => {
-    const ultimo = historialRef.current.pop()
-    setPuedeDeshacer(historialRef.current.length > 0)
-    if (!ultimo) return
-    setMaquinaId(ultimo.maquinaId)
-    setDiaIdx(ultimo.dia)
-    setState((prev) => ({
-      ...prev,
-      maquinas: prev.maquinas.map((m) =>
-        m.id !== ultimo.maquinaId ? m : { ...m, semana: m.semana.map((d, i) => (i === ultimo.dia ? ultimo.valor : d)) },
-      ),
-    }))
+    const { historial, paso } = desapilar(historialRef.current)
+    historialRef.current = historial
+    setPuedeDeshacer(historial.length > 0)
+    if (!paso) return
+    // Se vuelve a donde estaba el foco al hacer el cambio: deshacer sin mostrar
+    // QUÉ se deshizo deja a la persona sin saber si funcionó.
+    setMaquinaId(paso.maquina.id)
+    setDiaIdx(paso.dia)
+    setState((prev) => ({ ...prev, maquinas: restaurar(prev.maquinas, paso) }))
   }, [])
 
   /* ── Dibujo ─────────────────────────────────────────────────────────────── */
   const gruposArea = useMemo(() => agruparTramos(dia.areas), [dia.areas])
   const gruposMant = useMemo(() => agruparTramos(dia.mant), [dia.mant])
+  /* Dónde se PUEDE entrar y no hay nada puesto. Va en el mismo anillo que el
+     plan pero como filo fino: si se pintara con el mismo peso, «lo que voy a
+     hacer» y «lo que podría hacer» se leerían igual, que es justo lo que hay
+     que distinguir. */
+  const gruposOportunidad = useMemo(
+    () => agruparTramos(capaOportunidad(dia)).filter((g) => g.valor === '1'),
+    [dia],
+  )
+
   const gruposCondicion = useMemo(() => {
     // La condición solo se dibuja donde Mantención entra: el anillo exterior
     // responde «cómo entro», no «cómo entraría si entrara».
@@ -351,6 +390,10 @@ export function RuedaVentanas() {
           maquinas={state.maquinas}
           tareas={state.tareas ?? []}
           // El autosave se dispara solo al cambiar `state`; no hay que avisarle.
+          /* Sin snapshot a propósito: agregar y renombrar no destruyen nada, y
+             eliminar ya pasa por su propia confirmación. El historial tampoco
+             resucita una máquina borrada — deshacer un borrado deliberado es
+             peor que no poder deshacerlo. */
           onCambiar={(maquinas) => setState((p) => ({ ...p, maquinas }))}
           onCerrar={() => setEditandoMaquinas(false)}
         />
@@ -432,7 +475,7 @@ export function RuedaVentanas() {
           )}
         >
           <Settings2 className="h-4 w-4" />
-          Máquinas
+          Máquinas y áreas
         </button>
 
         <div className="flex flex-col gap-1.5">
@@ -474,7 +517,8 @@ export function RuedaVentanas() {
         />
       )}
 
-      <div className={cn('grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]', modo === 'comparar' && 'hidden')}>
+      <div className={cn('grid grid-cols-1 gap-6',
+        !ampliada && 'lg:grid-cols-[minmax(0,1fr)_20rem]', modo !== 'editar' && 'hidden')}>
         {/* ── Rueda ────────────────────────────────────────────────────────── */}
         <div className="flex flex-col gap-4">
           {/* La rueda es cuadrada, así que acotar el ANCHO por la altura de la ventana
@@ -482,7 +526,21 @@ export function RuedaVentanas() {
               pantalla baja —o con el zoom del navegador subido, que deja el
               viewport igual de bajo— llenaba el 93% del alto y tapaba todo lo
               demás, obligando a scrollear para leer cualquier cifra. */}
-          <div className="mx-auto w-full max-w-[min(30rem,60vh)]">
+          <div className="flex justify-end">
+            <button
+              onClick={() => setAmpliada((v) => !v)}
+              aria-pressed={ampliada}
+              className="flex min-h-[44px] items-center gap-1.5 rounded-ctl px-2.5 text-footnote font-medium text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              {ampliada ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+              {ampliada ? 'Reducir' : 'Ampliar'}
+            </button>
+          </div>
+
+          {/* Ampliada usa el ancho completo y hasta el 85% del alto; el panel baja
+              debajo. Los tramos son de 5 min: a tamaño normal, uno mide menos de
+              un milímetro de arco, y pintar fino ahí es imposible. */}
+          <div className={cn('mx-auto w-full', ampliada ? 'max-w-[min(60rem,85vh)]' : 'max-w-[min(30rem,60vh)]')}>
             <svg
               ref={svgRef}
               viewBox={`${-VB_MARGEN} ${-VB_MARGEN} ${VB_LADO} ${VB_LADO}`}
@@ -553,7 +611,18 @@ export function RuedaVentanas() {
                   />
                 ))}
 
-              {/* Anillo 3 · en qué condición se entra */}
+              {/* Anillo 3a · dónde se PUEDE entrar y no hay nada planificado */}
+              {gruposOportunidad.map((g) => (
+                <path
+                  key={`o${g.inicio}`}
+                  d={sector(g.inicio, g.largo, R_COND_OUT - 3.5, R_COND_OUT)}
+                  className="fill-cat-4-tint"
+                  fillOpacity={0.5}
+                  pointerEvents="none"
+                />
+              ))}
+
+              {/* Anillo 3b · en qué condición se entra, donde SÍ hay plan */}
               {gruposCondicion
                 .filter((g) => g.valor !== ' ')
                 .map((g) => {
@@ -702,6 +771,16 @@ export function RuedaVentanas() {
             </div>
           </ListGroup>
 
+          <SugerirIntervencion
+            maquina={maquina}
+            disponibles={disponibles}
+            onAplicar={(m) => {
+              tomarSnapshot()
+              snapshotTomadoRef.current = false
+              setState((p) => ({ ...p, maquinas: p.maquinas.map((x) => (x.id === m.id ? invalidarSiCambioElHorario(x, m) : x)) }))
+            }}
+          />
+
           <CargaRapida
             maquina={maquina}
             maquinas={state.maquinas}
@@ -709,11 +788,18 @@ export function RuedaVentanas() {
             onCambiarMaquina={(m) => {
               tomarSnapshot()
               snapshotTomadoRef.current = false
-              setState((p) => ({ ...p, maquinas: p.maquinas.map((x) => (x.id === m.id ? m : x)) }))
+              setState((p) => ({ ...p, maquinas: p.maquinas.map((x) => (x.id === m.id ? invalidarSiCambioElHorario(x, m) : x)) }))
             }}
           />
 
-          <ListGroup title="En qué condición entramos">
+          <ListGroup
+        title="En qué condición entramos"
+        footer={
+          resumen.disponibleSinPlan > 0
+            ? `Además quedan ${slotsAHorasMinutos(resumen.disponibleSinPlan)} en que se podría entrar y no hay nada puesto.`
+            : undefined
+        }
+      >
             {resumen.intervencion === 0 ? (
               <div className="px-4 py-5 text-footnote text-muted-foreground">
                 Todavía no hay intervenciones pintadas en este día.
@@ -817,6 +903,12 @@ export function RuedaVentanas() {
 
       {modo === 'comparar' && (
         <>
+          <RuedaPlanta
+            maquinas={state.maquinas}
+            diaIdx={diaIdx}
+            maquinaActivaId={maquinaId}
+            onSeleccionar={setMaquinaId}
+          />
           <ResumenPlanta maquinas={state.maquinas} diaIdx={diaIdx} onVerMaquina={setMaquinaId} />
           <FranjaVentanas maquinas={state.maquinas} diaIdx={diaIdx} maquinaActivaId={maquinaId} />
         </>
@@ -882,7 +974,31 @@ export function RuedaVentanas() {
         </ListGroup>
       )}
 
-      {modo === 'editar' && maquina.revisadoEnTerreno !== true && (
+      {confirmacionCaida && (
+        <div className="flex items-start gap-3 rounded-card border border-cat-4-ink/30 bg-cat-4-tint/10 p-4">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-cat-4-ink" />
+          <div className="flex flex-col gap-1">
+            <p className="text-headline text-foreground">
+              {confirmacionCaida} vuelve a quedar sin confirmar
+            </p>
+            <p className="text-footnote text-muted-foreground">
+              Cambiaste su horario después de haberlo confirmado en terreno, así que el sello dejó
+              de valer: vuelve a confirmarlo cuando el horario nuevo esté visto en planta.
+            </p>
+            <button
+              onClick={() => setConfirmacionCaida(null)}
+              className="mt-2 inline-flex min-h-11 items-center self-start rounded-ctl px-3 text-footnote font-semibold text-primary active:opacity-70"
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Si el sello acaba de caerse, ese aviso ya explica por qué, y con más precisión:
+          decir aquí que las horas "vienen de una base de referencia" sería falso — venían
+          de terreno y se editaron. Una sola tarjeta, la que corresponda. */}
+      {modo === 'editar' && maquina.revisadoEnTerreno !== true && confirmacionCaida !== maquina.nombre && (
         <div className="flex gap-3 rounded-card border border-border bg-card p-4">
           <AlertTriangle className="h-5 w-5 shrink-0 text-cat-4-ink" />
           <div className="flex flex-col gap-1">
@@ -895,7 +1011,7 @@ export function RuedaVentanas() {
             </p>
             <button
               onClick={() => marcarRevisada(maquina.id, true)}
-              className="mt-1 self-start text-footnote font-semibold text-primary"
+              className="mt-2 inline-flex min-h-11 items-center self-start rounded-ctl bg-primary px-4 text-footnote font-semibold text-primary-foreground active:opacity-70"
             >
               Confirmé el horario de {maquina.nombre}
             </button>

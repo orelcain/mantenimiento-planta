@@ -16,13 +16,14 @@ import {
   X,
   Loader2,
   Info,
+  AlertTriangle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { fmt } from '@/lib/format'
 import { useAuthStore } from '@/store'
 import { parseFile, mergeParsedData } from '@/services/grader/graderExcelParser'
+import { avisosDelArchivo } from '@/services/grader/graderAvisosDeCarga'
 import { getModuleRanges } from '@/services/grader/graderModuleConfig.service'
-import { deleteDailySummary } from '@/services/grader/graderDailySummary.service'
 import { listGraderUploads, saveGraderUpload, updateGraderUpload, uploadGraderFile, deleteGraderUpload } from '@/services/grader/graderUpload.service'
 import { DEFAULT_SHIFT_SCHEDULE, inferShiftIdFromSchedule, normalizeShiftSchedule, shiftIdToKey } from '@/services/grader/graderShiftSchedule'
 import { getPlantLineConfig, DEFAULT_PLANT_LINE_ID, type PlantLineId } from '@/config/plantLines'
@@ -267,13 +268,21 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
             setUploadError('No se pudo subir el archivo a Storage.')
           }
           setUploads((prev) => normalizeUploads([upload, ...prev], shiftSchedule))
-          if (result.fileMeta.kind === 'PIEZA_PIEZA' || result.fileMeta.kind === 'PUERTA_0') {
-            try {
-              await deleteDailySummary(sessionDate, shiftId, lineId)
-            } catch {
-              // Evitar bloquear carga si no hay permisos para invalidar el resumen.
-            }
-          }
+          /*
+           * Aca se invalidaba el resumen del turno (`deleteDailySummary`).
+           * Ya no: **el guardado lo pisa solo**. `saveDailySummaryBatch` hace
+           * `batch.set(ref, ...)` SIN merge para un upload con pieza a pieza,
+           * o sea sobrescribe el documento entero; y para un P0 suelto usa
+           * merge a proposito, «preserva los KPIs del PP si ya existen» --lo
+           * que el borrado previo destruia--.
+           *
+           * Lo que si hacia el borrado era dejar el turno SIN resumen cuando la
+           * carga no llegaba a guardarse: quitar el archivo (`handleRemoveFile`)
+           * borra el upload, pero `deleteDoc` no se deshace y el resumen no
+           * vuelve. Medido: 3 de 243 dias con Excel cargado no tienen resumen.
+           * #960 dejo de invalidar turnos que el archivo no contiene; esto
+           * cierra el resto, porque la invalidacion no hacia falta.
+           */
         }
         if (!currentTurnoDate) setCurrentTurnoDate(sessionDate)
         if (!currentTurnoShift) setCurrentTurnoShift(shiftId)
@@ -295,7 +304,10 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
     } finally {
       setParsing(false)
     }
-  }, [updateFiles, user, shiftSchedule, currentTurnoDate, currentTurnoShift])
+  // `lineId` faltaba: handleFiles se quedaba con la linea del render anterior,
+  // asi que tras cambiar de linea la carga guardaba el upload --y borraba el
+  // resumen-- de la linea ANTERIOR.
+  }, [updateFiles, user, shiftSchedule, currentTurnoDate, currentTurnoShift, lineId])
 
   const handleRemoveFile = useCallback(async (id: string) => {
     // Eliminar de Firestore + Storage si existe en uploads
@@ -305,9 +317,14 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
         await deleteGraderUpload(upload)
         setUploads((prev) => prev.filter((u) => u.id !== id))
       } catch {
-        setUploadError('No se pudo eliminar el archivo del servidor.')
+        // La fila se quitaba igual: el aviso decia «no se pudo eliminar» y el
+        // archivo desaparecia de la pantalla, asi que quedaba en el servidor
+        // sin nada que lo muestre --y volvia al recargar el turno--.
+        setUploadError('No se pudo eliminar el archivo del servidor. Sigue cargado: volvé a intentar.')
+        return
       }
     }
+    setUploadError(null)
     updateFiles((prev) => prev.filter((f) => f.fileMeta.id !== id))
   }, [uploads, updateFiles])
 
@@ -389,7 +406,91 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
     onCompleteRef.current(merged)
   }, [files])
 
+  /*
+   * El Wizard es el UNICO que monta esta pagina, y siempre con `compact`
+   * (AnalisisGraderWizardPage.tsx). La rama compacta cortaba antes de la lista
+   * de archivos, asi que TODO lo que dice que paso con el Excel cargado --los
+   * avisos del parser (#956), el «Sin Puerta 0», el error de parseo y el de
+   * subida a Storage-- se dibujaba solo en la rama que nadie monta. En pantalla
+   * quedaba un boton con un contador. Ahora la evidencia del archivo vive una
+   * sola vez y la usan las dos ramas.
+   */
+  const listaDeArchivos = files.length > 0 && (
+    <div className="space-y-1.5">
+      {files.map((f) => {
+        const avisos = avisosDelArchivo(
+          f.fileMeta.warnings,
+          currentTurnoDate,
+          f.partialData.inferred ?? {},
+        )
+        return (
+          <div key={f.fileMeta.id} className="bg-muted rounded-ctl px-2 py-1.5 text-xs">
+            <div className="flex items-center gap-2">
+              {/* El tilde verde decia «todo bien» incluso sobre un archivo con
+                  avisos. El color vive SOLO en el icono: ink-warn sobre bg-muted
+                  da 4,4:1 en tema claro, bajo el 4,5 que pide AA para 11 px. */}
+              {avisos.length > 0
+                ? <AlertTriangle className="h-3.5 w-3.5 text-ink-warn shrink-0" />
+                : <CheckCircle className="h-3.5 w-3.5 text-green-500 shrink-0" />}
+              <Badge className={cn('text-caption h-4 px-1 shrink-0', KIND_COLORS[f.fileMeta.kind])}>
+                {KIND_LABELS[f.fileMeta.kind]}
+              </Badge>
+              <span className="truncate flex-1">{f.fileMeta.name}</span>
+              <span className="text-muted-foreground shrink-0 tabular-nums">
+                {f.fileMeta.kind === 'PIEZA_PIEZA'
+                  ? `${fmt(f.partialData.pieceRecords?.length ?? 0)} reg`
+                  : f.fileMeta.kind === 'PUERTA_0'
+                    ? `${fmt(f.partialData.gate0Records?.length ?? 0)} reg P0`
+                    : ''}
+              </span>
+              <button
+                type="button"
+                onClick={() => handleRemoveFile(f.fileMeta.id)}
+                className="text-muted-foreground hover:text-destructive shrink-0"
+                title="Eliminar"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+            {avisos.length > 0 && (
+              <ul className="mt-1 space-y-0.5 pl-5">
+                {avisos.map((a) => (
+                  <li key={a} className="text-caption leading-snug text-foreground">{a}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+
+  const avisoSinPuerta0 = hasPiezaPieza && files.every((f) => f.fileMeta.kind !== 'PUERTA_0') && (
+    <p className="text-caption text-ink-warn flex items-center gap-1">
+      <Info className="h-3 w-3" />
+      Sin Puerta 0: el desglose de errores sera inferido desde los pesos
+    </p>
+  )
+
+  const mensajesDeError = (error || uploadError) && (
+    <>
+      {error && (
+        <div className="flex items-center gap-2 text-sm text-destructive">
+          <AlertCircle className="h-4 w-4" />
+          {error}
+        </div>
+      )}
+      {uploadError && (
+        <div className="flex items-center gap-2 text-xs text-ink-warn">
+          <AlertCircle className="h-3.5 w-3.5" />
+          {uploadError}
+        </div>
+      )}
+    </>
+  )
+
   if (compact) return (
+    <div className="space-y-2">
       <div className="flex items-center gap-2 flex-wrap">
         <button
           type="button"
@@ -446,6 +547,10 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
           onChange={(e) => e.target.files && handleFiles(e.target.files)}
         />
       </div>
+      {listaDeArchivos}
+      {avisoSinPuerta0}
+      {mensajesDeError}
+    </div>
   )
 
   return (
@@ -501,35 +606,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
             onChange={(e) => e.target.files && handleFiles(e.target.files)}
           />
 
-          {/* Archivos cargados */}
-          {files.length > 0 && (
-            <div className="space-y-1.5">
-              {files.map((f) => (
-                <div key={f.fileMeta.id} className="flex items-center gap-2 bg-muted rounded-ctl px-2 py-1.5 text-xs">
-                  <CheckCircle className="h-3.5 w-3.5 text-green-500 shrink-0" />
-                  <Badge className={cn('text-caption h-4 px-1 shrink-0', KIND_COLORS[f.fileMeta.kind])}>
-                    {KIND_LABELS[f.fileMeta.kind]}
-                  </Badge>
-                  <span className="truncate flex-1">{f.fileMeta.name}</span>
-                  <span className="text-muted-foreground shrink-0 tabular-nums">
-                    {f.fileMeta.kind === 'PIEZA_PIEZA'
-                      ? `${fmt(f.partialData.pieceRecords?.length ?? 0)} reg`
-                      : f.fileMeta.kind === 'PUERTA_0'
-                        ? `${fmt(f.partialData.gate0Records?.length ?? 0)} reg P0`
-                        : ''}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveFile(f.fileMeta.id)}
-                    className="text-muted-foreground hover:text-destructive shrink-0"
-                    title="Eliminar"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
+          {listaDeArchivos}
 
           {/* Turno detectado */}
           {turnoRange && (
@@ -540,30 +617,12 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
             </div>
           )}
 
-          {/* Aviso Puerta 0 faltante */}
-          {hasPiezaPieza && files.filter((f) => f.fileMeta.kind === 'PUERTA_0').length === 0 && (
-            <p className="text-caption text-ink-warn flex items-center gap-1">
-              <Info className="h-3 w-3" />
-              Sin Puerta 0: el desglose de errores será inferido desde los pesos
-            </p>
-          )}
+          {avisoSinPuerta0}
         </CardContent>
       </Card>
       </div>
 
-      {/* Errores */}
-      {error && (
-        <div className="flex items-center gap-2 text-sm text-destructive">
-          <AlertCircle className="h-4 w-4" />
-          {error}
-        </div>
-      )}
-      {uploadError && (
-        <div className="flex items-center gap-2 text-xs text-ink-warn">
-          <AlertCircle className="h-3.5 w-3.5" />
-          {uploadError}
-        </div>
-      )}
+      {mensajesDeError}
 
     </div>
   )

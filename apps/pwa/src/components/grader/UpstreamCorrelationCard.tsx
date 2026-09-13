@@ -58,7 +58,7 @@ function CorrelationRow({ corr, expanded, onToggle }: {
     <div className="py-2">
       <button
         onClick={onToggle}
-        className={`w-full flex items-center gap-2 text-left p-2 rounded-ctl border ${s.bg} ${s.border} group`}
+        className={`w-full flex flex-wrap items-center gap-x-2 gap-y-1 text-left p-2 rounded-ctl border ${s.bg} ${s.border} group`}
         aria-expanded={expanded}
       >
         {expanded
@@ -71,7 +71,6 @@ function CorrelationRow({ corr, expanded, onToggle }: {
         <Badge variant="outline" className={`text-caption px-1.5 py-0 h-4 ${s.text} ${s.border} flex-shrink-0`}>
           {fmtDurationSec(corr.pauseDurSec)}
         </Badge>
-        <span className={`text-xs ${s.text} truncate`}>{corr.hypothesis}</span>
         <Badge
           variant="outline"
           className={`ml-auto text-caption px-1.5 py-0 h-4 border-border ${conf.color} flex-shrink-0`}
@@ -79,6 +78,10 @@ function CorrelationRow({ corr, expanded, onToggle }: {
         >
           confianza {conf.text}
         </Badge>
+        {/* La hipótesis es lo único que dice QUÉ pasó, y en una sola fila de
+            375 px quedaba en «Coi…» entre la duración y la confianza. Va en su
+            propia línea (basis-full) y completa. */}
+        <span className={`basis-full text-xs ${s.text}`}>{corr.hypothesis}</span>
       </button>
 
       {expanded && corr.contributors.length > 0 && (
@@ -213,7 +216,11 @@ export function UpstreamCorrelationCard({ pauses, snapshot }: Props) {
                         key={m.machineid}
                         className={`flex items-center gap-2 text-caption tabular-nums ${isTop ? 'text-cat-5-ink' : 'text-muted-foreground'}`}
                       >
-                        <span className="min-w-[8rem]">{shortMachineName(m.machineName)}</span>
+                        {/* 8rem reservaba 128 px para «Baader 3». En la hoja de detalle,
+                            que es más angosta que la pestaña, esa holgura empujaba
+                            el porcentaje fuera del borde: 278 px pedidos contra 245
+                            disponibles. */}
+                        <span className="min-w-[4.5rem]">{shortMachineName(m.machineName)}</span>
                         <span className="opacity-80">{m.pauseCount} paro{m.pauseCount !== 1 ? 's' : ''}</span>
                         <span>·</span>
                         <span className="font-semibold">{fmtDurationSec(m.totalOverlapSec)} overlap</span>
@@ -229,9 +236,21 @@ export function UpstreamCorrelationCard({ pauses, snapshot }: Props) {
                     )
                   })}
                 </div>
-                <div className="text-caption text-muted-foreground mt-1.5">
-                  Recomendación: priorizar mantención en la máquina con mayor overlap.
-                </div>
+                {/* Con el solape repartido parejo no hay a quién priorizar:
+                    el 10-09 salía «priorizar la máquina con mayor overlap» con
+                    36 % / 34 % / 30 % de 5 min, que es elegir por ruido. */}
+                {(() => {
+                  const suma = summary.byMachine.reduce((a, x) => a + x.totalOverlapSec, 0)
+                  const top = summary.byMachine[0]
+                  const share = suma > 0 && top ? (top.totalOverlapSec / suma) * 100 : 0
+                  return (
+                    <div className="text-caption text-muted-foreground mt-1.5">
+                      {share >= 50 && top
+                        ? `Recomendación: priorizar ${shortMachineName(top.machineName)}, que concentra el ${Math.round(share)} % del solape.`
+                        : 'El solape se reparte parejo entre las máquinas: no hay una a la que priorizar.'}
+                    </div>
+                  )
+                })()}
               </div>
             )}
 

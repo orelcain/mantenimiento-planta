@@ -16,6 +16,7 @@ function pushAll<T>(target: T[], source: readonly T[]): void {
 }
 
 import * as XLSX from 'xlsx'
+import { avisoDeArchivoIncompleto } from './graderArchivoIncompleto'
 import { generateId } from '@/lib/utils'
 import { CALIBRE_WEIGHT_RANGES } from './graderAnalytics'
 import type {
@@ -151,11 +152,16 @@ function normalizeQuality(v: unknown): GraderQuality {
   return 'Unknown'
 }
 
+/** Nombre canónico del programa 12+ del Z2 (el mismo que la config de rangos de la app). */
+export const CALIBRE_12_UP: CalibreRange = '12-UP lb'
+
 /** Normaliza calibre a CalibreRange.
  * Soporta formatos: "6-8", "6-8 lb", "HG 6-8", "HG6-8",
- * "10-UP", "Fuera de Rango", "fuera rango", etc.
+ * "10-UP", "12-UP", "12", "10", "Fuera de Rango", "fuera rango", etc.
+ * Medido 08-09 sobre febrero: el Z2 etiqueta "10" (4,6–6,3 kg = 10 y más) y
+ * "12" (5,5–7,2 kg = 12 y más); hoy la G12 salía "Other" con 5,9–6,8 kg.
  */
-function normalizeCalibre(v: unknown): CalibreRange {
+export function normalizeCalibre(v: unknown): CalibreRange {
   const raw = norm(v)
   if (!raw) return 'Other'
 
@@ -167,8 +173,10 @@ function normalizeCalibre(v: unknown): CalibreRange {
   // Strip "HG" / "hg" prefix (e.g. "HG 6-8" → "6-8")
   const stripped = s.replace(/^hg/i, '')
 
-  // Handle "10-UP", "12-Up", "N-UP", "10+", "10-mas" — todos al calibre máximo
-  if (/\d+\s*[-]?\s*(up|mas|\+)/i.test(stripped) || /10\s*-\s*12/.test(stripped)) return '10-12 lb'
+  // "10-UP", "12-Up", "N-UP", "10+", "12-mas": desde 12 es el programa 12+; antes, 10-12.
+  const up = stripped.match(/^(\d+)\s*-?\s*(up|mas|\+)/i)
+  if (up) return Number(up[1]) >= 12 ? CALIBRE_12_UP : '10-12 lb'
+  if (/10\s*-\s*12/.test(stripped)) return '10-12 lb'
   // E.g. "6-8", "6-8 lb", "6-8lb"
   const m = stripped.match(/(\d+)\s*-\s*(\d+)/)
   if (m) {
@@ -176,6 +184,9 @@ function normalizeCalibre(v: unknown): CalibreRange {
     const valid: CalibreRange[] = ['0-2 lb', '2-4 lb', '4-6 lb', '6-8 lb', '8-10 lb', '10-12 lb']
     return valid.includes(lb as CalibreRange) ? (lb as CalibreRange) : 'Other'
   }
+  // Un número solo: "12" = 12 y más, "10" = 10 y más (10-12 en la app).
+  const solo = stripped.match(/^(\d+)(lb)?$/)
+  if (solo) return Number(solo[1]) >= 12 ? CALIBRE_12_UP : Number(solo[1]) >= 10 ? '10-12 lb' : 'Other'
   return 'Other'
 }
 
@@ -702,13 +713,24 @@ export async function parseFile(file: File): Promise<{
   const sheet = workbook.Sheets[sheetName]!
   const rows: unknown[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null })
 
+  /*
+   * Un XLSX truncado no da error: SheetJS devuelve la hoja con el rango que
+   * declara el <dimension> y CERO celdas. Medido: dos pieza a pieza reales de
+   * ~8,6 MB cortan a media celda en la fila ~204.100 de 308.539. Sin esto el
+   * aviso era «No se encontró fila de cabecera válida», que manda a revisar las
+   * columnas de un archivo cuyas columnas están perfectas.
+   */
+  const celdasLeidas = Object.keys(sheet).filter((k) => !k.startsWith('!')).length
+  const avisoIncompleto = avisoDeArchivoIncompleto(sheet['!ref'], celdasLeidas)
+  if (avisoIncompleto) warnings.push(avisoIncompleto)
+
   const kind = detectFileKind(rows, file.name)
   if (kind === 'UNKNOWN') {
     warnings.push('No se pudo detectar el tipo de archivo. Verifique las columnas.')
   }
 
   const headerInfo = findHeaderRow(rows)
-  if (!headerInfo) {
+  if (!headerInfo && !avisoIncompleto) {
     warnings.push('No se encontró fila de cabecera válida.')
   }
 
@@ -922,8 +944,27 @@ export function mergeParsedData(
   const ppGate0 = merged.pieceRecords.filter((r) => r.gate === 0)
 
   if (hasP0File && realGate0Records.length > 0) {
-    // P0 tiene datos reales con columna Error de la máquina
-    merged.gate0Records = realGate0Records
+    // P0 tiene datos reales con columna Error de la máquina… pero solo para la
+    // ventana que ese Excel cubre. Medido 09-09 (2026-09-08 T1 parcial): el
+    // pieza a pieza llegaba a las 02:37 con 211 rechazos y el de Puerta 0 solo
+    // hasta las 23:57 con 116 → la app decía P0 0,92 % (real 1,67 %) y 95
+    // rechazos desaparecían del panel, del timeline y de «Rechazos sin puerta».
+    // Los gate=0 del pieza a pieza FUERA de la ventana del P0 se agregan con la
+    // causa inferida por peso; los de adentro ya están en el P0.
+    const tsP0 = realGate0Records.map((r) => r.ts).filter(Boolean).sort()
+    const p0Min = tsP0[0]!, p0Max = tsP0[tsP0.length - 1]!
+    const fueraDeVentana = ppGate0.filter((r) => r.ts && (r.ts < p0Min || r.ts > p0Max))
+    merged.gate0Records = fueraDeVentana.length > 0
+      ? [...realGate0Records, ...inferGate0FromPieceRecords(fueraDeVentana)]
+      : realGate0Records
+    if (fueraDeVentana.length > 0) {
+      const tsPP = merged.pieceRecords.map((r) => r.ts).filter(Boolean).sort()
+      const hhmm = (iso: string) => iso.slice(11, 16)
+      const n = fueraDeVentana.reduce((s, r) => s + (r.pieces || 1), 0)
+      const aviso = `El Excel de Puerta 0 cubre ${hhmm(p0Min)}–${hhmm(p0Max)} y el pieza a pieza ${hhmm(tsPP[0] ?? p0Min)}–${hhmm(tsPP[tsPP.length - 1] ?? p0Max)}: ${n} rechazos fuera de esa ventana se toman del pieza a pieza con la causa inferida por peso. Exportar los dos archivos con el mismo rango.`
+      for (const f of merged.files) if (f.kind === 'PUERTA_0') f.warnings = [...(f.warnings ?? []), aviso]
+      merged.inferred.p0CoverageWarning = aviso
+    }
   } else {
     // Inferir errores desde gate=0 del PP
     merged.gate0Records = inferGate0FromPieceRecords(ppGate0)

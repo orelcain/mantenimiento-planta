@@ -26,35 +26,255 @@
  */
 const { PLANT_AREA_ID } = require('./machines')
 const { ahoraEnPlanta } = require('./polling')
+const { parseShoplogixTime } = require('./time')
 
 /** Cuántas lecturas se conservan: 10 min de historia a un pulso por minuto. */
 const MAX_LECTURAS = 10
 
 /**
- * Lee el contador vivo de una planta.
+ * Ventana que se pide a `whiteboardproduction`: cubre el turno más largo
+ * (nocturno ~10 h) para poder sumar el acumulado del turno desde los mismos
+ * buckets. Los buckets de otros turnos se filtran por su campo `shift`.
+ */
+const VENTANA_BUCKETS_HORAS = 12
+
+/** Un bucket de 1 min está CERRADO cuando cubrió (casi) todo su minuto. */
+const BUCKET_CERRADO_MS = 59_000
+
+/** Tope de la serie por minuto publicada (12 h = el turno más largo, entero). */
+const MAX_SERIE_MINUTOS = 720
+
+/**
+ * Convierte la respuesta de `whiteboardproduction` (buckets de 1 minuto por
+ * máquina) en una lectura del pulso.
+ *
+ * ── El dato duro (29-08, pedido de Orel) ────────────────────────────────────
+ * «Que el ahora muestre el dato que la barra muestra en Shoplogix para cada
+ * Baader — esa es la verdad absoluta.» Cada bucket trae las piezas CONTADAS de
+ * ese minuto (`cycles`) y el esperado oficial (`rate`: Ev1=19, Ev2/3=16), así
+ * que el ritmo ya no se DERIVA de un contador con refresco de 2 min: se lee.
+ * Sonda del 29-08: rezago 10–65 s, buckets estables una vez cerrados; solo el
+ * minuto en curso se rellena retroactivamente — por eso solo se publica el
+ * último minuto CERRADO común a todas las máquinas.
+ *
+ * ⚠ El acumulado del turno sale de sumar los buckets del MISMO turno (campo
+ * `shift` del bucket). Eso además deja fuera los buckets `Unscheduled`, que
+ * duplican minutos del turno (ver memoria del proyecto).
+ *
+ * @returns lectura para `componerPulso` o null si no hay buckets utilizables.
+ */
+function lecturaDesdeProduccion(data) {
+  const filas = (data?.machines || [])
+    .map((m) => ({ id: m.machineId || m.machineid, buckets: m.machineProduction }))
+    .filter((m) => m.id && Array.isArray(m.buckets) && m.buckets.length > 0)
+  if (!filas.length) return null
+
+  const cerrado = (b) => (b?.totalDuration ?? 0) >= BUCKET_CERRADO_MS
+
+  /* El último minuto cerrado COMÚN: el mínimo entre los últimos cerrados de
+     cada máquina — si una va un minuto atrás, se espera a esa (los buckets
+     comparten rejilla, así que el minuto existe en todas). */
+  let minutoComun = null
+  for (const f of filas) {
+    let ultimo = null
+    for (let i = f.buckets.length - 1; i >= 0; i--) {
+      if (cerrado(f.buckets[i])) { ultimo = f.buckets[i].start; break }
+    }
+    if (!ultimo) return null
+    if (minutoComun === null || ultimo < minutoComun) minutoComun = ultimo
+  }
+
+  const delMinuto = filas.map((f) => ({
+    id: f.id,
+    bucket: f.buckets.find((b) => b.start === minutoComun) ?? null,
+  }))
+
+  /*
+   * ⚠⚠ `Unscheduled` NUNCA es el turno vigente: es el cajón donde Shoplogix
+   * manda lo producido fuera del horario declarado. La regla del proyecto es
+   * atribuirlo AL TURNO, no dejarlo suelto.
+   *
+   * Tomar el turno del último minuto —sin más— rompía justo eso: el 31-08, con
+   * el Turno 1 de Chonchi en HORA EXTRA pasadas las 07:15, ese minuto ya venía
+   * etiquetado `Unscheduled`, así que el acumulado se filtraba por él y el
+   * número grande del monitor se desplomó de 13.226 pz a 508 (las de la hora
+   * extra), arrastrando la barra de meta a «faltan 14.492». El resto de la
+   * pantalla —que sí atribuye el Unscheduled al turno— seguía en 13.226, y la
+   * misma pantalla mostraba dos verdades distintas.
+   *
+   * Así que el turno es el último shift REAL que aparezca en los buckets, y sus
+   * minutos de hora extra se suman al turno (ver `bucketsDelTurno`).
+   */
+  const esNoProgramado = (s) => s == null || /unscheduled/i.test(String(s))
+  /* `parseShoplogixTime` LANZA con un formato raro. Acá el timestamp solo sirve
+     para ordenar y deduplicar: un bucket ilegible se ignora, nunca tumba la
+     lectura entera del pulso. */
+  const msDe = (b) => {
+    try { return parseShoplogixTime(b.start).getTime() } catch { return null }
+  }
+  const turno = (() => {
+    const delComun = delMinuto.find((x) => x.bucket)?.bucket?.shift ?? null
+    if (!esNoProgramado(delComun)) return delComun
+    /* El minuto común cayó fuera de horario: el turno es el último con nombre
+       propio que haya en la ventana (~12 h), no el cajón. */
+    let mejor = null
+    for (const f of filas) {
+      for (const b of f.buckets) {
+        if (esNoProgramado(b.shift)) continue
+        const ms = msDe(b)
+        if (ms == null) continue
+        if (!mejor || ms > mejor.ms) mejor = { ms, shift: b.shift }
+      }
+    }
+    return mejor?.shift ?? null
+  })()
+
+  /* El primer minuto del turno: los buckets `Unscheduled` ANTERIORES son de
+     otro turno (la ventana trae ~12 h) y no se atribuyen a este. */
+  const inicioTurnoMs = (() => {
+    if (turno == null) return null
+    let min = null
+    for (const f of filas) {
+      for (const b of f.buckets) {
+        if (b.shift !== turno) continue
+        const ms = msDe(b)
+        if (ms != null && (min == null || ms < min)) min = ms
+      }
+    }
+    return min
+  })()
+
+  /**
+   * Los buckets que le corresponden a este turno: los suyos MÁS los del cajón
+   * `Unscheduled` que caen dentro o después de su arranque (la hora extra).
+   *
+   * ⚠ Dedupe por minuto y el propio manda: Shoplogix repite los minutos del
+   * borde en los dos buckets, y sumarlos contaría esas piezas dos veces — el
+   * mismo gotcha que ya está resuelto del lado del doc del turno.
+   */
+  const bucketsDelTurno = (f) => {
+    if (turno == null) return f.buckets
+    const porMinuto = new Map()
+    for (const b of f.buckets) {
+      const propio = b.shift === turno
+      const ms = msDe(b)
+      const extra = esNoProgramado(b.shift) && ms != null
+        && inicioTurnoMs != null && ms >= inicioTurnoMs
+      if (!propio && !extra) continue
+      if (ms == null) continue
+      if (porMinuto.has(ms) && !propio) continue
+      porMinuto.set(ms, b)
+    }
+    return [...porMinuto.values()]
+  }
+
+  const cpm = delMinuto.reduce((a, x) => a + (x.bucket?.cycles ?? 0), 0)
+  const esperadoCpm = delMinuto.reduce((a, x) => a + (x.bucket?.expectedCycles ?? 0), 0)
+  /* Piezas contadas no pueden ser un artefacto de reconciliación, pero un
+     absurdo genérico sigue siendo un absurdo: ante eso, mejor mudo. */
+  if (!(cpm >= 0) || cpm > MAX_CPM_PLAUSIBLE) return null
+
+  /* Acumulado del turno = suma de TODOS sus buckets (cerrados y el parcial:
+     las piezas del minuto en curso ya están contadas). */
+  let totalCycles = 0
+  const porMaquina = {}
+  for (const f of filas) {
+    const suyo = bucketsDelTurno(f).reduce((a, b) => a + (b.cycles || 0), 0)
+    porMaquina[f.id] = suyo
+    totalCycles += suyo
+  }
+
+  /* La serie del turno minuto a minuto, por máquina — el gráfico de barras del
+     monitor la dibuja tal cual (opción A elegida por Orel, 29-08). Rejilla
+     CONTINUA desde el primer bucket del turno hasta el minuto común: los
+     índices son minutos y un hueco de Shoplogix queda como 0 explícito.
+     Solo buckets CERRADOS: el parcial cambia retroactivamente. */
+  const serieMinuto = (() => {
+    const comunMs = parseShoplogixTime(minutoComun).getTime()
+    let inicioMs = comunMs
+    const porId = new Map()
+    for (const f of filas) {
+      const mapa = new Map()
+      /* La misma atribución que el acumulado: si las barras se quedaran solo
+         con los buckets del turno, el gráfico se cortaría en seco al empezar
+         la hora extra mientras el número grande sigue subiendo. */
+      for (const b of bucketsDelTurno(f)) {
+        if (!cerrado(b)) continue
+        const ms = parseShoplogixTime(b.start).getTime()
+        if (ms > comunMs) continue
+        mapa.set(ms, b.cycles || 0)
+        if (ms < inicioMs) inicioMs = ms
+      }
+      porId.set(f.id, mapa)
+    }
+    const n = Math.min(MAX_SERIE_MINUTOS, Math.round((comunMs - inicioMs) / 60_000) + 1)
+    const desdeMs = comunMs - (n - 1) * 60_000
+    const maquinas = filas.map((f) => {
+      const mapa = porId.get(f.id)
+      const enComun = f.buckets.find((b) => b.start === minutoComun)
+      return {
+        id: f.id,
+        esperado: Number.isFinite(enComun?.rate) ? enComun.rate : null,
+        cycles: Array.from({ length: n }, (_, i) => mapa.get(desdeMs + i * 60_000) ?? 0),
+      }
+    })
+    /*
+     * Una serie SIN una sola pieza no se publica.
+     *
+     * Medido al cerrar el turno del 29-08: Shoplogix deja de reportar el turno
+     * que terminó y devuelve una ventana ajena (605 min desde las 05:00) con
+     * TODO en cero. Publicarla PISABA la serie buena del turno — el monitor
+     * perdía su gráfico minuto a minuto justo cuando la pantalla pasa a ser el
+     * informe. Sin serie nueva, `componerPulso` conserva la anterior y la
+     * pantalla decide si corresponde al turno que se mira.
+     */
+    if (!maquinas.some((m) => m.cycles.some((v) => v > 0))) return null
+    return { desde: new Date(desdeMs).toISOString(), maquinas }
+  })()
+
+  return {
+    at: new Date().toISOString(),
+    totalCycles,
+    porMaquina,
+    duro: {
+      cpm,
+      porMaquina: delMinuto.map((x) => ({ id: x.id, cpm: x.bucket?.cycles ?? 0 })),
+      esperadoCpm: Math.round(esperadoCpm * 10) / 10,
+      /* El minuto que se está mostrando, en la misma base wall-clock-as-UTC
+         que `series[].t` (los buckets vuelven en el marco de la consulta). */
+      minuto: { desde: shoplogixIso(minutoComun), hasta: shoplogixIso(minutoComun, 60_000) },
+      serieMinuto,
+    },
+  }
+}
+
+/** "20260829T083100.000" → ISO wall-as-UTC (más un corrimiento opcional en ms). */
+function shoplogixIso(s, plusMs = 0) {
+  return new Date(parseShoplogixTime(s).getTime() + plusMs).toISOString()
+}
+
+/**
+ * Lee el pulso de una planta: los buckets de 1 MINUTO por máquina del área
+ * (`whiteboardproduction`), el mismo dato de las barras del cronómetro de
+ * Shoplogix. UN request por planta, igual que antes del swap — antes se leía
+ * el rollup del whiteboard y el ritmo se derivaba del contador acumulado.
  * @returns {Promise<{at: string, totalCycles: number} | null>}
  */
 async function leerPulso({ query, plantSlug, at = ahoraEnPlanta(), toShoplogixTime, logger = console }) {
   const areaId = PLANT_AREA_ID[plantSlug]
   if (!areaId) return null
   try {
+    const desde = new Date(at.getTime() - VENTANA_BUCKETS_HORAS * 3_600_000)
     const data = await query({
-      type: 'whiteboard',
-      params: { rollup: 1, areas: areaId, start: toShoplogixTime(at) },
+      type: 'whiteboardproduction',
+      params: { areas: areaId, start: toShoplogixTime(desde), end: toShoplogixTime(at), minutes: 1 },
     })
-    const filas = (data?.machines || []).filter((m) => m.machineid)
-    if (!filas.length) return null
-    /* El acumulado real del turno: los estados «Uptime» de cada fila. Es el
-       MISMO número que muestra la pantalla de planta. */
-    const uptime = (row) => (row.states || [])
-      .filter((s) => s.type === 'Uptime')
-      .reduce((a, s) => a + (s.cycles || 0), 0)
-    const total = filas.find((m) => m.machineid === 'Total')
-    const totalCycles = total
-      ? uptime(total)
-      : filas.reduce((a, m) => a + uptime(m), 0)
-    if (!(totalCycles >= 0)) return null
-    return { at: new Date().toISOString(), totalCycles, diag: totalCycles === 0 ? radiografia(data) : null }
+    const lectura = lecturaDesdeProduccion(data)
+    if (!lectura) {
+      logger.warn(`[pulse][${plantSlug}] sin buckets utilizables`)
+      return null
+    }
+    return { ...lectura, diag: lectura.totalCycles === 0 ? radiografia(data) : null }
   } catch (err) {
     logger.warn(`[pulse][${plantSlug}] no disponible (no bloquea): ${err.message}`)
     return null
@@ -92,7 +312,7 @@ function radiografia(data) {
       .filter(([, v]) => typeof v === 'number' || typeof v === 'string').slice(0, 10)),
     filas: filas.length,
     muestra: filas.slice(0, 4).map((f) => ({
-      machineid: String(f.machineid ?? '(sin id)').slice(0, 40),
+      machineid: String(f.machineid ?? f.machineId ?? '(sin id)').slice(0, 40),
       nombre: f.name ?? f.machinename ?? null,
       turno: f.shift ?? null,
       // Segunda pasada (2026-08-19): la primera radiografia mostro que `states`
@@ -129,28 +349,115 @@ function radiografia(data) {
  * refresco de 2 min y seguir siendo «casi instantáneo» comparado con los
  * buckets de 5.
  */
-function componerPulso(previo, lectura) {
+function componerPulso(previo, lectura, maxCpm = MAX_CPM_PLAUSIBLE) {
   if (!lectura) return previo ?? null
 
   /* Discontinuidad: si el salto respecto de la última lectura implica un ritmo
      imposible, el contador no "produjo" eso — se reinició o cambió de turno.
      Se arranca la ventana de nuevo desde esta lectura en vez de promediar a
-     través del salto, que es lo que publicó 3.101 pz/min. */
+     través del salto, que es lo que publicó 3.101 pz/min.
+
+     Que el contador BAJE es la misma discontinuidad al revés (reconciliación,
+     cambio de turno) y también reinicia la ventana: dejarlo adentro tenía al
+     pulso mudo hasta 5 min mientras la lectura envenenada salía sola —
+     reiniciando, vuelve a hablar en ~2 (Orel lo cazó en vivo el 29-08:
+     la tarjeta caía a la media de 15 min y mostraba un ritmo viejo).
+
+     ⚠ El umbral de ESTE corte es el absurdo genérico, NO el techo físico de la
+     planta (`maxCpm`): el contador se refresca cada ~2 min, así que entre dos
+     lecturas de 1 min el delta aparente llega legítimamente al DOBLE del ritmo
+     real — Chonchi a 40 pz/min pisa +80 en el minuto del refresco. Usar el
+     techo físico acá reiniciaba la ventana en CADA refresco y el pulso quedó
+     clavado entre null y un 0 falso con la línea a pleno (29-08, turno día).
+     El techo físico sigue rigiendo lo que se PUBLICA (ritmoDeVentana). */
   const previas = previo?.lecturas ?? []
   const ultima = previas[previas.length - 1]
-  const saltoImposible = ultima && (() => {
+  const discontinuo = ultima && (() => {
+    if (lectura.totalCycles < ultima.totalCycles) return true
     const min = (Date.parse(lectura.at) - Date.parse(ultima.at)) / 60000
     if (!(min > 0)) return false
     return (lectura.totalCycles - ultima.totalCycles) / min > MAX_CPM_PLAUSIBLE
   })()
 
-  const lecturas = (saltoImposible ? [lectura] : [...previas, lectura]).slice(-MAX_LECTURAS)
+  const lecturas = (discontinuo ? [lectura] : [...previas, lectura]).slice(-MAX_LECTURAS)
 
-  const cpm = ritmoDeVentana(lecturas)
+  /* El DATO DURO manda: si la lectura trae el último minuto cerrado de los
+     buckets de Shoplogix (`duro`), ese ES el ritmo — piezas contadas, no
+     derivadas. La ventana sobre el acumulado queda solo de respaldo para
+     lecturas sin buckets. */
+  const duro = lectura.duro ?? null
+  const cpm = duro ? duro.cpm : ritmoDeVentana(lecturas, maxCpm)
+  const porMaquina = duro
+    ? (duro.porMaquina?.length ? duro.porMaquina : null)
+    : (cpm != null ? ritmoPorMaquinaDeVentana(lecturas) : null)
+
+  /* El último ritmo VIVO conocido, arrastrado mientras el cpm esté mudo: la
+     pantalla lo muestra con su hora («ahora mismo · 03:15, recalibrando») en
+     vez de saltar a la media de 15 min, que en un cierre con goteo decía 33
+     cuando la realidad era 12. Caduca solo del lado del que publica: un vivo
+     de hace >10 min ya no es «ahora» de nada. */
+  const vivoPrevio = cpm != null ? null : (() => {
+    const v = previo?.cpm != null
+      ? { cpm: previo.cpm, at: previo.at, ...(previo.porMaquina ? { porMaquina: previo.porMaquina } : {}) }
+      : previo?.vivoPrevio ?? null
+    if (!v) return null
+    return (Date.parse(lectura.at) - Date.parse(v.at)) <= VIVO_MAX_EDAD_MIN * 60000 ? v : null
+  })()
   // El `diag` no entra al pulso: viaja aparte, a su propio doc. Acá solo va lo
-  // que la pantalla necesita.
-  const limpias = lecturas.map(({ at, totalCycles }) => ({ at, totalCycles }))
-  return { at: lectura.at, totalCycles: lectura.totalCycles, cpm, lecturas: limpias }
+  // que la pantalla necesita. `porMaquina` de cada lectura SÍ se conserva: es
+  // la historia con la que la próxima corrida calcula el ritmo por máquina.
+  const limpias = lecturas.map(({ at, totalCycles, porMaquina: pm }) => (
+    pm ? { at, totalCycles, porMaquina: pm } : { at, totalCycles }
+  ))
+  return {
+    at: lectura.at,
+    totalCycles: lectura.totalCycles,
+    cpm,
+    ...(porMaquina ? { porMaquina } : {}),
+    ...(vivoPrevio ? { vivoPrevio } : {}),
+    /* De dónde salió el ritmo y qué minuto es: `minuto` viaja en la misma base
+       wall-as-UTC que `series[].t`, para poder decir «minuto 08:31» en la
+       pantalla. `esperadoCpm` es el esperado oficial de Shoplogix sumado
+       (Ev1 19 + Ev2/3 16 = 51 en Chonchi). */
+    ...(duro ? { fuente: 'buckets-1min', minuto: duro.minuto, esperadoCpm: duro.esperadoCpm } : {}),
+    /* La serie del turno minuto a minuto (para las barras del monitor). Si la
+       lectura no trae una (todo en cero: turno cerrado, ventana ajena), se
+       CONSERVA la anterior — la pantalla decide si es del turno que mira. */
+    ...(duro?.serieMinuto
+      ? { serieMinuto: duro.serieMinuto }
+      : previo?.serieMinuto ? { serieMinuto: previo.serieMinuto } : {}),
+    lecturas: limpias,
+  }
+}
+
+/**
+ * El ritmo por MÁQUINA de la misma ventana que `ritmoDeVentana`: mismos
+ * extremos, mismos minutos. Por eso la suma de los ritmos por máquina ES el
+ * ritmo de línea — la garantía que hace legible la columna del monitor.
+ *
+ * Devuelve null si algún extremo no trae el desglose o si algún contador
+ * BAJÓ (reinicio/cambio de turno): publicar un reparto que no suma sería
+ * peor que no publicarlo.
+ */
+function ritmoPorMaquinaDeVentana(lecturas) {
+  if (!Array.isArray(lecturas) || lecturas.length < 2) return null
+  const ventana = lecturas.slice(-VENTANA_RITMO)
+  const primera = ventana[0]
+  const ultima = ventana[ventana.length - 1]
+  if (!primera.porMaquina || !ultima.porMaquina) return null
+  const min = (Date.parse(ultima.at) - Date.parse(primera.at)) / 60000
+  if (!(min >= MIN_MINUTOS)) return null
+  const out = []
+  for (const [id, fin] of Object.entries(ultima.porMaquina)) {
+    const ini = primera.porMaquina[id]
+    if (ini == null) return null
+    const dif = fin - ini
+    if (dif < 0) return null
+    const cpm = dif / min
+    if (cpm > MAX_CPM_PLAUSIBLE) return null
+    out.push({ id, cpm })
+  }
+  return out.length > 0 ? out : null
 }
 
 /**
@@ -173,8 +480,24 @@ function componerPulso(previo, lectura) {
  */
 const MAX_CPM_PLAUSIBLE = 120
 
+/**
+ * Techo FÍSICO por planta, en pz/min de línea: la capacidad nominal sumada
+ * con ~10% de holgura. El absurdo genérico de 120 dejó pasar un «60-69
+ * pz/min» que Producción vio en el monitor (29-08): para Chonchi
+ * (19+16+16 = 51 nominal) eso no es un ritmo, es el contador de Shoplogix
+ * reconciliando piezas de golpe tras un reenganche. Sobre este techo el
+ * pulso se calla (null) y el número grande cae a la media honesta.
+ */
+const PLANT_MAX_CPM = Object.freeze({
+  chonchi: 56,
+  yal: 56,
+  filete: 25,
+})
+
 /** Lecturas que entran en el ritmo: ~4 min, más que el refresco de Shoplogix. */
 const VENTANA_RITMO = 5
+/** Cuántos minutos se arrastra el último vivo cuando el cpm queda mudo. */
+const VIVO_MAX_EDAD_MIN = 10
 /** Mínimo de minutos entre extremos para publicar un ritmo. */
 const MIN_MINUTOS = 1.5
 
@@ -185,7 +508,7 @@ const MIN_MINUTOS = 1.5
  * tiempo, o un acumulado que BAJA — eso último es cambio de turno, no un ritmo
  * negativo.
  */
-function ritmoDeVentana(lecturas) {
+function ritmoDeVentana(lecturas, maxCpm = MAX_CPM_PLAUSIBLE) {
   if (!Array.isArray(lecturas) || lecturas.length < 2) return null
   const ventana = lecturas.slice(-VENTANA_RITMO)
   const primera = ventana[0]
@@ -195,10 +518,10 @@ function ritmoDeVentana(lecturas) {
   if (!(min >= MIN_MINUTOS) || dif < 0) return null
   const cpm = dif / min
   // Cinturón además del tirante: si aun así sale un absurdo, no se publica.
-  return cpm > MAX_CPM_PLAUSIBLE ? null : cpm
+  return cpm > maxCpm ? null : cpm
 }
 
 module.exports = {
-  leerPulso, componerPulso, ritmoDeVentana, radiografia,
-  MAX_LECTURAS, VENTANA_RITMO, MAX_CPM_PLAUSIBLE,
+  leerPulso, componerPulso, lecturaDesdeProduccion, ritmoDeVentana, ritmoPorMaquinaDeVentana,
+  radiografia, MAX_LECTURAS, VENTANA_RITMO, MAX_CPM_PLAUSIBLE, PLANT_MAX_CPM, VIVO_MAX_EDAD_MIN,
 }

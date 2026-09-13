@@ -30,6 +30,7 @@
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import ReactECharts from 'echarts-for-react'
+import { altoDelGrafico } from '@/services/grader/graderRateChartLayout'
 import type { UpstreamMachineShift } from '@/services/shoplogix/types'
 import { useTimelineSyncOptional } from './useTimelineSync'
 import { useChartReadyConnect } from './useEChartsConnect'
@@ -739,13 +740,8 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd, showGap
 
   if (timeAxis.length < 2) return null
 
-  /*
-   * El alto crece con las filas de leyenda: con 6 ítems en un celular la
-   * leyenda ocupa 3 filas, y si el alto quedara fijo el plot se comprimía a
-   * ~90 px y las curvas se aplastaban hasta ser indistinguibles.
-   */
   const legendRowCount = legendRows(legendLabelsForHeight, wrapWidth)
-  const chartHeight = 108 + legendRowCount * 15
+  const chartHeight = altoDelGrafico(wrapWidth, legendRowCount)
 
   return (
     <div ref={wrapRef}>

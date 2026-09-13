@@ -15,7 +15,7 @@
 
 import type { GraderDailySummary, Pause } from './types'
 import { buildExecutiveSummary } from '@/services/grader/graderExecutiveSummary'
-import { drawExecutivePdfPage, type PdfDoc } from '@/services/grader/graderExecutivePdfPage'
+import { drawExecutivePdfPage, conTextoSeguro, type PdfDoc } from '@/services/grader/graderExecutivePdfPage'
 import { computeMaintenanceReliability } from '@/services/grader/graderReliability'
 import { displayShiftName } from '@/services/grader/graderShiftDisplay'
 import type { UpstreamLineSnapshot } from '../shoplogix/types'
@@ -92,7 +92,10 @@ export async function exportTurnToPDF(params: {
     uptimePct: upstreamSnapshot ? upstreamSnapshot.lineAvailability * 100 : null,
   })
 
-  drawExecutivePdfPage(doc as unknown as PdfDoc, executive)
+  /* Envuelto: la hoja escribe «21:28 → 05:21» y Helvetica no tiene la flecha,
+     así que el visor la dibujaba como «!». El envoltorio sanea todo lo que se
+     dibuja, en vez de confiar en recordarlo en cada `doc.text(...)`. */
+  drawExecutivePdfPage(conTextoSeguro(doc as unknown as PdfDoc), executive)
 
   // El detalle arranca en hoja nueva: la página 1 se entrega sola.
   doc.addPage()

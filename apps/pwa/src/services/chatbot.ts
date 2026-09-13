@@ -3,6 +3,7 @@
  * v4 — Memoria Firestore, turnos, resumen semanal, auto-seguimiento, alertas proactivas
  */
 import { estadoDePreventiva } from './chatbot/estadoPreventiva'
+import { esCodigoSapValido } from '@/utils/repuestos/exportBomSAP'
 import { collection, getDocs, getDoc, setDoc, doc, query, where, orderBy, limit, serverTimestamp } from 'firebase/firestore'
 import { db } from './firebase'
 import { callGroq, callGemini, isAIConfigured, isGeminiConfigured, RateLimitError } from './ai'
@@ -1474,7 +1475,7 @@ async function fetchRepuestosSummary(userQuery: string): Promise<string> {
         equipos: Array.isArray(r.equipos) ? r.equipos.filter(Boolean) : [],
         equiposCodigos: Array.isArray(r.equiposCodigos) ? r.equiposCodigos.filter(Boolean) : [],
         valorUnitario: r.valorUnitario ?? 0,
-        tieneSap: /^\d{6,}$/.test(sap),
+        tieneSap: esCodigoSapValido(sap),
       }
     })
 

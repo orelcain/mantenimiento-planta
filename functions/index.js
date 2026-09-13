@@ -1410,7 +1410,16 @@ exports.purgeSensorReadings = onSchedule(
     schedule: 'every day 03:00',
     timeZone: 'America/Santiago',
     timeoutSeconds: 540,
-    memory: '256MiB',
+    /*
+     * ⚠ 512MiB porque la purga carga TODO `sensors/` de RTDB a memoria
+     * (`once('value')`) antes de recorrer. Con 256MiB llevaba días muriendo
+     * por OOM ("283 MiB used", visto 01-09-2026) — y cada día sin purgar el
+     * árbol crece y el OOM se agrava: espiral. La subida destraba la purga;
+     * el fix de fondo (recorrer por equipo en vez de cargar el árbol entero)
+     * queda anotado en docs/COSTOS_GCP.md. Corre 1 vez/día: el costo extra
+     * de memoria es centavos.
+     */
+    memory: '512MiB',
     retryCount: 1,
   },
   async () => {
@@ -6339,6 +6348,15 @@ exports.shoplogixPulseWakeup = onSchedule(
     timeZone: 'America/Santiago',
     timeoutSeconds: 60,
     memory: '256MiB',
+    /*
+     * ¼ de vCPU a propósito: la función es 95% espera de red (un request a
+     * Shoplogix + writes chicos), y Cloud Run factura vCPU ASIGNADA × tiempo,
+     * no CPU usada. Con 1 vCPU pagábamos 4× por esperar lo mismo. Igual que
+     * en el sync — parte del cierre de la fuga de agosto 2026 (COSTOS_GCP.md).
+     * ⚠ cpu < 1 exige concurrency: 1 (irrelevante acá: es un cron).
+     */
+    cpu: 0.25,
+    concurrency: 1,
     retryCount: 0,          // si falla, en un minuto hay otro: reintentar sería duplicar
     secrets: ['SHOPLOGIX_COOKIE'],
   },
@@ -6356,6 +6374,21 @@ exports.shoplogixPulseWakeup = onSchedule(
     })
     if (vivos.length === 0) return
 
+    /*
+     * Fuera de proceso no hay nada que pulsar. El encabezado siempre lo
+     * prometió («solo si la planta tiene un turno en curso») pero el chequeo
+     * no existía: la función le preguntaba a Shoplogix cada minuto, 24/7, con
+     * la planta parada — CPU y requests puro desperdicio (fuga de agosto 2026).
+     * El propio monitor sabe si su turno está abierto: `live.shiftClosed` lo
+     * sella el trigger cuando la línea deja de producir, y el primer sync del
+     * turno siguiente lo vuelve a abrir (≤5 min de retardo, que el pulso no
+     * puede adelantar de todos modos: sin turno no hay contador que leer). El
+     * vigía tampoco pierde nada: es intra-turno, y con el turno sellado no
+     * tiene qué vigilar.
+     */
+    const conTurnoAbierto = vivos.filter((d) => d.data().live?.shiftClosed !== true)
+    if (conTurnoAbierto.length === 0) return
+
     const auth = await resolveShoplogixAuth(logger)
     if (auth.mode === 'none') return
     /* El mismo patrón que `syncDay`: Bearer si hay token, cookie si no. */
@@ -6364,12 +6397,12 @@ exports.shoplogixPulseWakeup = onSchedule(
       ? (opts) => queryShoplogixBearer({ accessToken: auth.accessToken, ...opts })
       : (opts) => queryShoplogix({ cookie: auth.cookie, ...opts })
 
-    const { leerPulso, componerPulso } = require('./shoplogix/pulse')
+    const { leerPulso, componerPulso, PLANT_MAX_CPM } = require('./shoplogix/pulse')
     const { toShoplogixTime } = require('./shoplogix/time')
 
     /* Una lectura por PLANTA aunque haya varios monitores de la misma línea. */
     const porPlanta = new Map()
-    for (const d of vivos) {
+    for (const d of conTurnoAbierto) {
       const slug = d.data().plantSlug
       if (!porPlanta.has(slug)) porPlanta.set(slug, [])
       porPlanta.get(slug).push(d)
@@ -6377,23 +6410,66 @@ exports.shoplogixPulseWakeup = onSchedule(
 
     await Promise.all([...porPlanta.entries()].map(async ([plantSlug, docs]) => {
       const lectura = await leerPulso({ query, plantSlug, toShoplogixTime, logger })
-      if (!lectura) return
 
       /* Diagnostico del pulso en cero (2026-08-19, temporal).
          Chonchi y Filete devuelven 0 con la linea produciendo; Yal funciona. Se
          guarda la FORMA de la respuesta en Firestore —no en los logs— para
          poder mirarla con el SDK admin. Un doc por planta, siempre pisado, asi
          que no crece. Sacar cuando el caso este cerrado. */
-      if (lectura.diag) {
+      if (lectura?.diag) {
         await db.doc(`diagnosticos/pulso_${plantSlug}`).set({
           at: new Date(), plantSlug, totalCycles: lectura.totalCycles, ...lectura.diag,
         }).catch((e) => logger.warn('[pulse][diag] no se pudo guardar', { plantSlug, err: e.message }))
       }
-      await Promise.all(docs.map(async (d) => {
-        const pulso = componerPulso(d.data().pulse ?? null, lectura)
-        await d.ref.update({ pulse: pulso })
-      }))
-      logger.info(`[pulse][${plantSlug}] ${lectura.totalCycles} pz`)
+      let pulsoPrimero = null
+      if (lectura) {
+        await Promise.all(docs.map(async (d, i) => {
+          /* El techo de plausibilidad es el FÍSICO de la planta, no el
+             absurdo genérico: un «65 pz/min» pasaba el corte de 120 y
+             Producción lo vio en pantalla (29-08). */
+          const pulso = componerPulso(d.data().pulse ?? null, lectura, PLANT_MAX_CPM[plantSlug] ?? undefined)
+          if (i === 0) pulsoPrimero = pulso
+          await d.ref.update({ pulse: pulso })
+        }))
+        logger.info(`[pulse][${plantSlug}] ${lectura.totalCycles} pz`)
+      }
+
+      /* ── Vigía intra-turno ──────────────────────────────────────────────
+         Señales sintéticas con anti-ruido, evaluadas con este mismo tick de
+         1 min (cero requests extra a Shoplogix). Corre TAMBIÉN cuando la
+         lectura falló: «el contador no responde» es una de sus señales.
+         Detalle en shoplogix/vigiaTurno.js. */
+      try {
+        const { correrVigiaTurno } = require('./shoplogix/vigiaTurno')
+        const { PLANT_MACHINES } = require('./shoplogix/machines')
+        const config = await getShoplogixNotifConfig(plantSlug)
+        const data = docs[0]?.data() ?? {}
+        const live = data.live ?? {}
+        const nombres = new Map((PLANT_MACHINES[plantSlug] ?? []).map((m) => [m.machineid, m.name]))
+        const plantLabel = SHOPLOGIX_PLANT_LABEL[plantSlug] || plantSlug
+        await correrVigiaTurno({
+          db, plantSlug, config, nombres, logger,
+          lectura: {
+            shiftDocId: data.shiftDocId ?? null,
+            shiftClosed: Boolean(live.shiftClosed),
+            status: live.status ?? '',
+            reason: live.currentReason ?? '',
+            totalPieces: pulsoPrimero?.totalCycles ?? live.totalPieces ?? 0,
+            pulsoCpm: pulsoPrimero?.cpm ?? null,
+            porMaquina: pulsoPrimero?.porMaquina ?? null,
+            lecturaFallo: !lectura,
+          },
+          /* Con el LINK al monitor: un aviso de «línea detenida» sin dónde
+             mirarla obliga a buscar el QR (mejora natural, 29-08). El id del
+             doc del monitor ES el token público. */
+          enviar: (msg) => sendShoplogixTelegram(
+            config,
+            `🕵️ <b>Vigía · ${plantLabel}</b>\n${msg}\n<a href="https://orelcain.github.io/mantenimiento-planta/monitor/${docs[0].id}">abrir monitor</a>`,
+          ),
+        })
+      } catch (e) {
+        logger.warn(`[vigia][${plantSlug}] error no bloqueante: ${e.message}`)
+      }
     }))
   },
 )
@@ -6404,6 +6480,16 @@ exports.shoplogixSyncWakeup = onSchedule(
     timeZone: 'America/Santiago',
     timeoutSeconds: 420,   // hoy + hasta 2 días extra de re-sync en el disparo de las 12:00
     memory: '256MiB',
+    /*
+     * ¼ de vCPU a propósito: el ciclo es casi todo espera de red (7 requests a
+     * Shoplogix por planta + pausas anti-bot de 1,5-3,5 s), y Cloud Run factura
+     * vCPU ASIGNADA × tiempo de instancia — con 1 vCPU pagábamos 4× por esperar.
+     * La parte de cómputo real (normalizar el día) tolera ir 4× más lenta con
+     * margen: timeout 420 s vs ciclos de ~60-90 s. Cierre de la fuga de agosto
+     * 2026 (ver docs/COSTOS_GCP.md). ⚠ cpu < 1 exige concurrency: 1.
+     */
+    cpu: 0.25,
+    concurrency: 1,
     retryCount: 1,
     secrets: ['SHOPLOGIX_COOKIE'],
   },
@@ -6441,7 +6527,15 @@ exports.shoplogixSyncWakeup = onSchedule(
     // mismo segundo (Cloud Scheduler dispara exacto, pero Shoplogix verá
     // timestamps variables → patrón más humano). Acotado cuando hay días extra
     // para no arriesgar el timeout.
-    const jitterMs = Math.floor(Math.random() * (extraDateKeys.length > 0 ? 30_000 : 120_000))
+    //
+    // ⚠ 0-20 s y no 0-120 s: Cloud Run cobra el CPU también mientras la función
+    // DUERME, y este sleep corre cada 5 min las 24 horas — con 0-120 s eran
+    // ~4,8 h de CPU al día pagadas por no hacer nada (≈CLP 9.000/mes, parte de
+    // la fuga de agosto 2026, ver docs/COSTOS_GCP.md). Para despegarse de los
+    // boundaries :00/:05 del scheduler basta la variación de segundos; el
+    // espaciado anti-bot ENTRE requests lo pone `pauseBetweenMachines` (1,5-3,5 s),
+    // que no se toca porque ese sí imita cadencia humana donde Shoplogix la ve.
+    const jitterMs = Math.floor(Math.random() * (extraDateKeys.length > 0 ? 10_000 : 20_000))
     logger.info(`[shoplogixSyncWakeup] jitter ${Math.round(jitterMs / 1000)}s` +
       (extraDateKeys.length ? ` · re-sync extra: ${extraDateKeys.join(', ')}` : ''))
     await new Promise(r => setTimeout(r, jitterMs))
@@ -6542,7 +6636,14 @@ exports.shoplogixTokenRefresh = onSchedule(
     schedule: 'every 50 minutes',
     timeZone: 'UTC',
     timeoutSeconds: 60,
-    memory: '128MiB',
+    /*
+     * ⚠ El bundle de index.js creció y ya no arranca en 128MiB: la instancia
+     * moría en el startup probe ("Memory limit of 128 MiB exceeded with
+     * 133 MiB used", visto 01-09-2026) y el refresh de token NUNCA llegó a
+     * ejecutar — parte de por qué el ROPC vivía en backoff y el sync quedaba
+     * pegado a la cookie. 256MiB es el mínimo real para este bundle.
+     */
+    memory: '256MiB',
     retryCount: 2,
     // No secrets: credenciales en Firestore system/shoplogixCredentials
   },
@@ -6576,6 +6677,19 @@ async function _assertAdminCaller(request) {
   if (!snap.exists || snap.data()?.rol !== 'admin') {
     throw new HttpsError('permission-denied', 'Solo administradores')
   }
+}
+
+// Técnico, supervisor o admin. Excluye al rol 'usuario' (el que asigna el
+// auto-registro), para que una cuenta recién creada no dispare acciones pesadas.
+async function _assertTechnicianCaller(request) {
+  const uid = request.auth?.uid
+  if (!uid) throw new HttpsError('unauthenticated', 'Login requerido')
+  const snap = await db.collection('users').doc(uid).get()
+  const rol = snap.exists ? snap.data()?.rol : null
+  if (!['admin', 'supervisor', 'tecnico'].includes(rol)) {
+    throw new HttpsError('permission-denied', 'Solo personal de mantención')
+  }
+  return { uid, user: snap.data() || {} }
 }
 
 exports.shoplogixCredsGet = onCall({ region: 'us-central1' }, async (request) => {
@@ -6681,9 +6795,10 @@ exports.shoplogixSyncNow = onCall(
     secrets: ['SHOPLOGIX_COOKIE'],
   },
   async (request) => {
-    if (!request.auth) {
-      throw new HttpsError('unauthenticated', 'Login requerido')
-    }
+    // Re-sync manual con forceAll reescribe TODOS los turnos del día contra
+    // Shoplogix con credenciales de prod: lo restringimos a personal de mantención
+    // (técnico+) para que una cuenta auto-registrada no lo dispare.
+    await _assertTechnicianCaller(request)
 
     const { dateKey, shiftId, plantSlug = 'chonchi' } = (request.data ?? {})
 
@@ -8738,6 +8853,16 @@ exports.onShoplogixShiftWrittenPublicMonitor = onDocumentWritten(
   { document: 'shoplogix/{plant}/shifts/{shiftDoc}', region: 'us-central1' },
   async (event) => {
     const { plant, shiftDoc } = event.params
+
+    // Debounce: el sync reescribe el padre en CADA ciclo aunque nada haya
+    // cambiado (renueva `lastSyncAt` a propósito — la PWA y el verificador
+    // leen esa marca). Recomponer los monitores con los mismos datos produce
+    // el mismo payload: de madrugada, con la línea parada, era el 100% de los
+    // refrescos y una parte grande de la fuga de lecturas de agosto 2026.
+    const before = event.data?.before?.exists ? event.data.before.data() : null
+    const after = event.data?.after?.exists ? event.data.after.data() : null
+    if (publicMonitorMod.parentSinCambioReal(before, after)) return
+
     const scopes = [`${plant}|${shiftDoc}`, `line|${plant}`]
 
     const monitors = await db.collection(publicMonitorMod.COLLECTION)
@@ -8749,14 +8874,16 @@ exports.onShoplogixShiftWrittenPublicMonitor = onDocumentWritten(
     const activos = monitors.docs.filter(d => String(d.data()?.expiresAt || '') > nowIso)
     if (activos.length === 0) return
 
-    // El turno vigente se resuelve UNA vez por planta y se comparte entre todos
-    // los monitores de línea de este evento.
+    // El turno vigente y el índice de turnos se resuelven UNA vez por planta y
+    // se comparten entre todos los monitores de este evento (ver
+    // `loadShiftIndex`: el índice es lo que mató los barridos por-función).
     const currentByPlant = new Map()
+    const indexByPlant = new Map()
     let refrescados = 0
 
     for (const d of activos) {
       try {
-        const patch = await publicMonitorMod.buildMonitorPatch(db, d.data(), currentByPlant)
+        const patch = await publicMonitorMod.buildMonitorPatch(db, d.data(), currentByPlant, indexByPlant)
         if (!patch) continue
         await d.ref.set(patch, { merge: true })
         refrescados++

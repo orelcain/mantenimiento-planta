@@ -27,6 +27,7 @@ import { db } from '@/services/firebase'
 import { useGlobalSearch } from '@/hooks/repuestos/useGlobalSearch'
 import { haystackMatchesAll, normalizeForSearch } from '@/utils/repuestos'
 import { getGlobalEquipmentCache, useGlobalEquipmentSearch } from '@/hooks/useGlobalEquipmentSearch'
+import { aplicarFiltroDeStock, contarParaFiltro } from '@/hooks/repuestos/filtrosDeStock'
 import { useBodega } from '@/hooks/repuestos/useBodega'
 // `Tag` colisiona con el ícono homónimo de lucide ya usado acá.
 import { Tag as CatTag, type TagTone } from '@/components/piel'
@@ -37,6 +38,7 @@ import type {
 } from '@/hooks/repuestos/useBodega'
 import type { Machine } from '@/types/repuestos'
 import { useAuthStore } from '@/store/authStore'
+import { useToast } from '@/hooks/useToast'
 import { ImageLightbox } from '@/components/ui/ImageLightbox'
 
 type BodegaTab = 'stock' | 'inventarios' | 'movimientos' | 'estadisticas'
@@ -235,19 +237,16 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
   const [sortField, setSortField] = useState<SortField>('nombre')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
 
-  const favCount = items.filter(i => i.isWatched).length
 
   const toggleSort = useCallback((field: SortField) => {
     setSortField(prev => { if (prev === field) { setSortDir(d => d === 'asc' ? 'desc' : 'asc'); return prev } setSortDir('asc'); return field })
   }, [])
 
   const filtered = useMemo(() => {
-    let result = items
-    if (stockFilter === 'configurados') result = result.filter(i => i.bodegaId)
-    else if (stockFilter === 'bajo') result = result.filter(i => i.bodegaId && i.stockMinimo > 0 && i.stockActual <= i.stockMinimo && i.stockActual > 0)
-    else if (stockFilter === 'sin') result = result.filter(i => i.bodegaId && i.stockActual === 0 && i.stockMinimo > 0)
-    else if (stockFilter === 'sinConfig') result = result.filter(i => !i.bodegaId)
-    else if (stockFilter === 'favoritos') result = result.filter(i => i.isWatched)
+    // Un solo sitio decide quien queda en cada filtro (filtrosDeStock.ts). Las tarjetas de
+    // arriba cuentan con el MISMO predicado, asi que su numero es siempre el de filas que
+    // aparecen al pulsarlas — que es justo lo que se habia roto tres veces en este modulo.
+    let result = aplicarFiltroDeStock(items, stockFilter)
 
     if (searchQuery.trim()) {
       const terms = normalizeForSearch(searchQuery).split(/\s+/).filter(Boolean)
@@ -289,12 +288,12 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
     <>
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
-        <StatCard icon={Package} label="Con SAP" value={stats.total} color="text-primary" bg="bg-primary/[0.15]" onClick={() => setStockFilter('todos')} active={stockFilter === 'todos'} />
-        <StatCard icon={PackageCheck} label="Configurados" value={stats.conStock} color="text-ink-ok" bg="bg-emerald-500/[0.15]" onClick={() => setStockFilter('configurados')} active={stockFilter === 'configurados'} />
-        <StatCard icon={TrendingDown} label="Bajo stock" value={stats.bajoStock} color="text-ink-warn" bg="bg-amber-500/[0.15]" onClick={() => setStockFilter('bajo')} active={stockFilter === 'bajo'} />
-        <StatCard icon={PackageX} label="Sin stock" value={stats.sinStock} color="text-ink-crit" bg="bg-red-500/[0.15]" onClick={() => setStockFilter('sin')} active={stockFilter === 'sin'} />
-        <StatCard icon={Settings2} label="Sin configurar" value={stats.sinConfig} color="text-muted-foreground" bg="bg-muted-foreground/[0.10]" onClick={() => setStockFilter('sinConfig')} active={stockFilter === 'sinConfig'} />
-        <StatCard icon={Star} label="Favoritos" value={favCount} color="text-ink-warn" bg="bg-amber-500/[0.15]" onClick={() => setStockFilter('favoritos')} active={stockFilter === 'favoritos'} />
+        <StatCard icon={Package} label="Con SAP" value={contarParaFiltro(items, 'todos')} color="text-primary" bg="bg-primary/[0.15]" onClick={() => setStockFilter('todos')} active={stockFilter === 'todos'} />
+        <StatCard icon={PackageCheck} label="Configurados" value={contarParaFiltro(items, 'configurados')} color="text-ink-ok" bg="bg-emerald-500/[0.15]" onClick={() => setStockFilter('configurados')} active={stockFilter === 'configurados'} />
+        <StatCard icon={TrendingDown} label="Bajo stock" value={contarParaFiltro(items, 'bajo')} color="text-ink-warn" bg="bg-amber-500/[0.15]" onClick={() => setStockFilter('bajo')} active={stockFilter === 'bajo'} />
+        <StatCard icon={PackageX} label="Sin stock" value={contarParaFiltro(items, 'sin')} color="text-ink-crit" bg="bg-red-500/[0.15]" onClick={() => setStockFilter('sin')} active={stockFilter === 'sin'} />
+        <StatCard icon={Settings2} label="Sin configurar" value={contarParaFiltro(items, 'sinConfig')} color="text-muted-foreground" bg="bg-muted-foreground/[0.10]" onClick={() => setStockFilter('sinConfig')} active={stockFilter === 'sinConfig'} />
+        <StatCard icon={Star} label="Favoritos" value={contarParaFiltro(items, 'favoritos')} color="text-ink-warn" bg="bg-amber-500/[0.15]" onClick={() => setStockFilter('favoritos')} active={stockFilter === 'favoritos'} />
       </div>
 
       {/* Search + Actions */}
@@ -1551,6 +1550,7 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
   const [uploading, setUploading] = useState(false)
   const [showQR, setShowQR] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
+  const { toast } = useToast()
 
   useEffect(() => {
     if (!item.bodegaId) { setLoading(false); return }
@@ -1569,7 +1569,18 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
     const file = e.target.files?.[0]
     if (!file || !addPhoto) return
     setUploading(true)
-    try { await addPhoto(item.codigoSAP, file) } finally { setUploading(false) }
+    try {
+      await addPhoto(item.codigoSAP, file)
+    } catch (error) {
+      // Sin esto el error muere mudo y el botón parece no hacer nada
+      toast({
+        title: 'No se pudo subir la foto',
+        description: error instanceof Error ? error.message : String(error),
+        variant: 'destructive',
+      })
+    } finally {
+      setUploading(false)
+    }
     e.target.value = ''
   }
 
@@ -1711,7 +1722,7 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
               {addPhoto && (
                 <label className="flex items-center gap-1 text-caption text-primary cursor-pointer hover:underline">
                   <Camera className="h-3 w-3" /> Agregar
-                  <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoUpload} disabled={uploading} />
+                  <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} disabled={uploading} />
                 </label>
               )}
             </div>
@@ -1727,7 +1738,16 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
                   <div key={i} className="relative group aspect-square rounded-card overflow-hidden border border-border cursor-pointer" onClick={() => setLightboxIndex(i)}>
                     <img src={url} alt={`Foto ${i + 1}`} className="w-full h-full object-cover" loading="lazy" />
                     {removePhoto && (
-                      <button onClick={e => { e.stopPropagation(); removePhoto(item.codigoSAP, url) }}
+                      <button onClick={e => {
+                        e.stopPropagation()
+                        // deleteBodegaPhoto propaga el error: sin este catch la
+                        // promesa quedaba sin manejar y el usuario sin aviso.
+                        removePhoto(item.codigoSAP, url).catch((err: unknown) => toast({
+                          title: 'No se pudo eliminar la foto',
+                          description: err instanceof Error ? err.message : String(err),
+                          variant: 'destructive',
+                        }))
+                      }}
                         className="absolute top-0.5 right-0.5 p-0.5 rounded-ctl bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity">
                         <X className="h-3 w-3" />
                       </button>

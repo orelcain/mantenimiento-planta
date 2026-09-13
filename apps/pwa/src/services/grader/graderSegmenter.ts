@@ -12,9 +12,11 @@
  *   4. saveDailySummaryBatch(summaries) → Firestore
  */
 
-import type { PieceRecord, Gate0Record, GraderShiftSchedule, GraderDailySummary, TimelineBucket, GateAssignment } from './types'
+import type { PieceRecord, Gate0Record, GraderShiftSchedule, GraderDailySummary, TimelineBucket, GateAssignment, CalibreWeightRange } from './types'
 import { DEFAULT_SHIFT_SCHEDULE } from './graderShiftSchedule'
 import { classifyRecordToMatrix, CALIBRE_WEIGHT_RANGES } from './graderAnalytics'
+import { computeGateMix } from './graderGateMix'
+import { rangesFingerprint, type ConfigAt } from './graderGateObservations'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -478,6 +480,14 @@ export function computeShiftSummary(
   sourceFileNames: string[],
   createdBy: string,
   gates?: GateAssignment[],
+  /**
+   * Config vigente por instante (wall-clock ms). Si viene, cada pieza de P0 se
+   * clasifica con la config de SU hora (los snapshots del turno); `gates`
+   * queda como la config vigente para gatesUsed y gateMix v1.
+   */
+  configAt?: ConfigAt,
+  /** Rangos de calibre configurados en la app (línea/turno). Sin esto, las constantes. */
+  ranges?: CalibreWeightRange[],
 ): GraderDailySummary {
   const { sessionDate, shiftId, pieceRecords, gate0Records } = segment
 
@@ -528,12 +538,16 @@ export function computeShiftSummary(
   const activeGates = (gates ?? []).filter(g => g.active)
   for (const rec of p0Source) {
     let causeKey: string
-    if (activeGates.length > 0) {
-      // Clasificar con la lógica de 9 causas Matrix usando la config de gates activa
+    const gatesDeLaHora = configAt
+      ? (configAt(Date.parse(rec.ts)) ?? []).filter(g => g.active)
+      : activeGates
+    if (gatesDeLaHora.length > 0) {
+      // Clasificar con la lógica de 9 causas Matrix usando la config vigente
+      // a la hora de la pieza (o la única config, si no hay línea de tiempo)
       causeKey = classifyRecordToMatrix(
         { ...rec, error: rec.error ?? '', gate: 0 as const },
-        activeGates,
-        CALIBRE_WEIGHT_RANGES,
+        gatesDeLaHora,
+        ranges?.length ? ranges : CALIBRE_WEIGHT_RANGES,
       )
     } else {
       causeKey = rec.error || 'Sin causa'
@@ -588,6 +602,11 @@ export function computeShiftSummary(
       pieces,
       pct: r(pieces / (prodPieces || 1) * 100, 1),
     }))
+
+  // ── Pureza por puerta (solo plantas que clasifican: hay gates activas) ─────
+  // Se calcula acá, con las piezas ya en memoria, para que el detalle del
+  // turno responda «¿la G6 cae mezclada y desde cuándo?» sin bajar records.
+  const gateMix = activeGates.length > 0 ? computeGateMix(prodRecords, activeGates) : null
 
   // ── Buckets por hora del día (para drill-down en gráfico de tendencia) ─────
   // Usa getUTCHours porque el parser no aplica timezone — los ts están en
@@ -654,6 +673,8 @@ export function computeShiftSummary(
     calibreDistribution,
     qualityDistribution,
     gateDistribution,
+    ...(gateMix ? { gateMix } : {}),
+    ...(activeGates.length > 0 ? { rangesFingerprint: rangesFingerprint(ranges?.length ? ranges : CALIBRE_WEIGHT_RANGES) } : {}),
     hourlyBuckets,
     sourceFileNames,
     batchUploadId,
@@ -716,16 +737,46 @@ export function dedupePieceRecords(records: PieceRecord[]): {
   unique: PieceRecord[]
   duplicatesRemoved: number
 } {
-  const seen = new Set<string>()
-  const unique: PieceRecord[] = []
+  /*
+   * La clave incluia `lot`, `error` y `weightPerPieceGrams`, y eso rompia el
+   * dedupe contra un archivo que no trae esas columnas.
+   *
+   * Medido: el Excel del mes y el recorte por turno del MISMO turno
+   * (2025-07-08 noche) traen los mismos 5.614 registros, pero el recorte no
+   * trae `lot`, `product`, `conservation` ni `shift`. Con `lot` en la clave las
+   * dos copias son distintas: el merge daba **11.228 piezas, el doble**, y asi
+   * quedo guardado en produccion.
+   *
+   * Sacarlos no cuesta nada: sobre **5.374.920 registros reales** de la
+   * temporada 2025-26, la clave vieja y esta detectan **los mismos 555
+   * duplicados**. La identidad de una pieza es cuando paso, por que puerta,
+   * cuanto peso y con que calidad/calibre; el lote y el destino son contexto.
+   *
+   * Cuando dos copias colapsan se conserva la mas completa, para no perder el
+   * lote si uno de los dos archivos lo trae.
+   */
+  const porClave = new Map<string, PieceRecord>()
+  const orden: string[] = []
   for (let i = 0; i < records.length; i++) {
     const r = records[i]!
-    const key = `${r.ts}|${r.gate}|${r.pieces}|${r.quality ?? ''}|${r.calibre ?? ''}|${r.weightKg ?? ''}|${r.lot ?? ''}|${r.error ?? ''}|${r.weightPerPieceGrams ?? ''}`
-    if (seen.has(key)) continue
-    seen.add(key)
-    unique.push(r)
+    const key = `${r.ts}|${r.gate}|${r.pieces}|${r.quality ?? ''}|${r.calibre ?? ''}|${r.weightKg ?? ''}`
+    const previo = porClave.get(key)
+    if (previo === undefined) {
+      porClave.set(key, r)
+      orden.push(key)
+    } else if (camposDefinidos(r) > camposDefinidos(previo)) {
+      porClave.set(key, r)
+    }
   }
+  const unique = orden.map((k) => porClave.get(k)!)
   return { unique, duplicatesRemoved: records.length - unique.length }
+}
+
+/** Cuantos campos trae realmente un registro (para quedarse con el mas completo). */
+function camposDefinidos(r: PieceRecord): number {
+  let n = 0
+  for (const v of Object.values(r)) if (v !== undefined && v !== null) n++
+  return n
 }
 
 /**
@@ -740,7 +791,19 @@ export function dedupeGate0Records(records: Gate0Record[]): {
   const unique: Gate0Record[] = []
   for (let i = 0; i < records.length; i++) {
     const r = records[i]!
-    const key = `${r.ts}|${r.pieces}|${r.error ?? ''}|${r.quality ?? ''}|${r.calibre ?? ''}|${r.weightKg ?? ''}`
+    /*
+     * Sin `calibre`: es el campo que rompia el dedupe entre el Excel del mes y
+     * el recorte por turno. Medido sobre el mismo registro de Puerta 0 del
+     * 2025-07-08 22:14:01, el recorte trae `calibre: "Other"` y el Excel del mes
+     * no trae calibre — mismo rechazo, dos claves. Cargando los dos, la ventana
+     * del turno quedaba con 838 registros en vez de 419.
+     *
+     * No cuesta nada: sobre los 26.878 registros de Puerta 0 de julio 2025, la
+     * clave con `calibre` y sin el dejan los mismos 26.878 unicos. `error` se
+     * queda: es la causa del rechazo, coincide entre las dos fuentes y es lo que
+     * distingue dos rechazos del mismo instante.
+     */
+    const key = `${r.ts}|${r.pieces}|${r.error ?? ''}|${r.quality ?? ''}|${r.weightKg ?? ''}`
     if (seen.has(key)) continue
     seen.add(key)
     unique.push(r)

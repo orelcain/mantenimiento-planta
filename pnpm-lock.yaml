@@ -27,7 +27,7 @@ overrides:
   body-parser@<1.20.6: '>=1.20.6 <2.0.0'
   brace-expansion@<1.1.16: '>=1.1.16 <2.0.0'
   brace-expansion@>=2.0.0 <2.1.2: '>=2.1.2 <3.0.0'
-  dompurify@<=3.4.11: '>=3.4.12'
+  dompurify@<=3.4.12: '>=3.4.13'
 
 importers:
 
@@ -158,8 +158,8 @@ importers:
         specifier: ^3.67.6
         version: 3.67.6
       dompurify:
-        specifier: '>=3.4.12'
-        version: 3.4.12
+        specifier: '>=3.4.13'
+        version: 3.4.14
       dxf:
         specifier: ^5.3.1
         version: 5.3.1
@@ -3276,8 +3276,8 @@ packages:
   dom-accessibility-api@0.5.16:
     resolution: {integrity: sha512-X7BJ2yElsnOJ30pZF4uIIDfBEVgF4XEBxL9Bxhy6dnrm5hkzqmsWHGTiHqRiITNhMyFLyAiWndIJP7Z1NTteDg==}
 
-  dompurify@3.4.12:
-    resolution: {integrity: sha512-zQvGet8Z2sWbQhCmfFz/T5QWH2oBmjnqK3qvOjaqaNLrLEF912WamU+ohnTp0TCep/MFVHpdJuCZEdFOdTnEFg==}
+  dompurify@3.4.14:
+    resolution: {integrity: sha512-dVoH9z+MY+C9IilgGCk3YfFqjLi3fChm2OiKJMzh6axrJ5qwxqWaZamgmHrpv22CN/KdbZJuGEGgfQoL00LTdg==}
 
   draco3d@1.5.7:
     resolution: {integrity: sha512-m6WCKt/erDXcw+70IJXnG7M3awwQPAsZvJGX5zY7beBqpELw6RDGkYVU0W43AFxye4pDZ5i2Lbyc/NNGqwjUVQ==}
@@ -8202,7 +8202,7 @@ snapshots:
 
   '@types/dompurify@3.2.0':
     dependencies:
-      dompurify: 3.4.12
+      dompurify: 3.4.14
 
   '@types/draco3d@1.4.10': {}
 
@@ -9008,7 +9008,7 @@ snapshots:
 
   dom-accessibility-api@0.5.16: {}
 
-  dompurify@3.4.12:
+  dompurify@3.4.14:
     optionalDependencies:
       '@types/trusted-types': 2.0.7
 
@@ -10025,7 +10025,7 @@ snapshots:
     optionalDependencies:
       canvg: 3.0.11
       core-js: 3.47.0
-      dompurify: 3.4.12
+      dompurify: 3.4.14
       html2canvas: 1.4.1
 
   jszip@3.10.1:

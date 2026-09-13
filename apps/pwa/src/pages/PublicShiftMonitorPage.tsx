@@ -26,7 +26,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { Activity, AlertCircle, ChevronLeft, ChevronRight, Clock, Gauge, Hourglass, Moon, PauseCircle, RefreshCw, Sun, Target, TrendingUp, Wrench } from 'lucide-react'
+import { Activity, AlertCircle, Check, ChevronLeft, ChevronRight, Clock, Gauge, Hourglass, Moon, PauseCircle, RefreshCw, Sun, Target, TrendingUp, Tv, Wrench } from 'lucide-react'
 import { useTheme } from '@/hooks/useTheme'
 import {
   subscribePublicShiftMonitor,
@@ -38,12 +38,14 @@ import { buildHourlyRows, peakPieces } from '@/services/shoplogix/monitorHourly'
 import { computePaceToTarget, lineMaxPerHour, type PaceToTarget } from '@/services/shoplogix/monitorPace'
 import { ventanaDeActividad, desdePrimeraPieza, piezasAntesDelArranque } from '@/services/shoplogix/monitorActividad'
 import { refrescarPulso, type PulsoMonitor } from '@/services/shoplogix/publicShiftMonitor.service'
-import { elegirContador } from './monitor/contadorCrudo'
+import { aWallClockMs, elegirContador, pulsoVivo } from './monitor/contadorCrudo'
+import type { PulsoVivoElegido } from './monitor/contadorCrudo'
+import { media15DelDuro, piezasDelDuro, horaEnCursoDelDuro } from './monitor/datoDuro'
 import { construirCascada } from './monitor/cascadaTurno'
 import { horaPlanta } from './monitor/horaPlanta'
 import { CascadaTurnoCard } from './monitor/CascadaTurnoCard'
 import { mediaMovil, ritmoAhoraCpm, ritmoAhoraAndando, repartoAhoraAndando, estadoRitmo, fraccionDeRegla, pedidoAndando, pedidoFueraDeAlcance, PASO_MIN, type TramoSerie } from '@/services/shoplogix/monitorRitmo'
-import { pinShiftEnd, unpinShiftEnd, setMonitorSetPoint, setShiftQuota, setPesoPromedio } from '@/services/shoplogix/pinShiftEnd'
+import { pinShiftEnd, unpinShiftEnd, setMonitorSetPoint, setShiftQuota, setPesoPromedio, eliminarRegistroPeso } from '@/services/shoplogix/pinShiftEnd'
 import {
   buildDayComparison, optimalPace, plannedBreaks, mergeBreaks, cumulativeFromStart,
   breakMinutesBetween, extendOngoingBreaks,
@@ -72,6 +74,14 @@ import { useZoomGesto, type Ventana } from './monitor/useZoomGesto'
 import { TiempoDelTurno, ComparadorDias, Bloque, PronosticoCierre } from './monitor/MonitorShiftParts'
 import { notasPorCausa, notasDelTurno } from './monitor/notasOperador'
 import { VsAyerBloque } from './monitor/MonitorVsAyer'
+import { RepartoDuenoSemanal } from './monitor/RepartoDuenoSemanal'
+import { DUENO_UI } from './monitor/duenoUi'
+import { PanelTarjetas, TarjetaTablero } from './monitor/Tablero'
+import {
+  APORTE_MIN_PROD_MIN, deltaAporte, referenciaAporte, type ReferenciaAporte,
+} from './monitor/aporteHistorico'
+import { useTablero, type TarjetaLayout } from './monitor/tableroLayout'
+import { duenoDe } from '@/services/shoplogix/monitorEventos'
 import { Pill } from '@/components/piel'
 import { useIsAdmin } from '@/store'
 import { useAuthStore } from '@/store/authStore'
@@ -79,9 +89,10 @@ import { Button } from '@/components/ui/button'
 import { ReAuthConfirmDialog } from '@/components/admin/ReAuthConfirmDialog'
 import { getFunctions, httpsCallable } from 'firebase/functions'
 import { ritmoAndandoDeLinea } from '@/services/shoplogix/ritmoAndandoDeLinea'
-import { piezasDeToneladas, toneladasDePiezas } from '@/services/shoplogix/cuotaEnToneladas'
+import { piezasDeToneladas, toneladasDePiezas, toneladasPorTramos } from '@/services/shoplogix/cuotaEnToneladas'
 import { ritmoPorMaquina, nombreCorto, type RitmosPorMaquina } from '@/services/shoplogix/ritmoPorMaquina'
 import { classifyLossState } from '@/services/shoplogix/lossBuckets'
+import { motivoEnEspanol } from '@/services/shoplogix/shoplogixColors'
 
 // ── Formateadores (locales a propósito: esta página no debe arrastrar el
 //    módulo de helpers del Grader, que se lleva echarts al bundle) ───────────
@@ -238,131 +249,132 @@ function diaCorto(dateKey: string): string {
 }
 
 /**
- * La semana de la línea, con identidad: banda de rango normal con sus BORDES
- * rotulados, un día bajo cada punto (y tooltip con el valor), y HOY con anillo
- * de acento. Antes era una miniatura muda de 86 px: escondía la noticia de la
- * semana (la línea venía acelerando y aflojó) y el rango había que leerlo en
- * el texto.
+ * La semana de la línea como DESVÍO contra lo normal (rediseño «B» del 29-08,
+ * mockup de la directora): cada turno es una barra que crece desde la ESPINA
+ * (la mediana) — la barra no es el ritmo, es cuánto se apartó de lo normal.
+ * Hoy en un pelo sobre la espina = «normal» sin interpretar nada, que es el
+ * trabajo del bloque. Hereda el idioma de las barras de 1 min: barra vertical,
+ * número por barra, color SOLO cuando hay noticia (salir de la banda).
  *
- * ⚠ El SVG va estirado (`preserveAspectRatio="none"`): adentro SOLO geometría
- * con trazo no escalable — texto, puntos y redondeos van en HTML encima, que
- * es la lección que ya nos costó una vez en el gráfico grande.
+ * Todo en HTML posicionado (sin SVG estirado): barras, espina y franja son
+ * divs — la lección del gráfico grande, sin el problema.
  */
-function Chispa({ turnos, hoy, banda, escala, mediana, muestras }: {
+function Chispa({ turnos, hoy, banda, mediana, muestras }: {
   turnos: Array<{ dateKey: string; ritmo: number }>
   hoy: number
   banda: { min: number; max: number }
-  /**
-   * Escala vertical FIJA: peor y mejor de TODOS los turnos de la historia
-   * corta (no solo los dibujados). Sin ella la escala se recalculaba con los
-   * datos de cada día y la misma variación se veía dramática un día y plana
-   * al siguiente — era la mitad de por qué el gráfico «estaba muerto».
-   */
-  escala?: { min: number; max: number } | null
-  /** La mediana de la ventana: «lo normal» pasa de texto a POSICIÓN. */
+  /** La mediana de la ventana: la ESPINA desde la que crecen las barras. */
   mediana?: number | null
   /** De cuántos turnos sale la mediana, para rotularla honesta. */
   muestras?: number | null
 }) {
-  const todos = [...turnos.map((t) => t.ritmo), hoy, banda.min, banda.max]
-  const lo = Math.min(...todos, ...(escala ? [escala.min] : []))
-  const hi = Math.max(...todos, ...(escala ? [escala.max] : []))
+  /* Sin mediana no hay espina: el centro de la banda es el sustituto honesto. */
+  const espina = mediana ?? (banda.min + banda.max) / 2
+  /* Dominio vertical: la banda estirada ×1,3 — con la banda exacta la franja
+     llena el plot y deja de leerse como zona. Los valores que se salgan lo
+     estiran (nunca se recorta una barra). */
+  const centro = (banda.max + banda.min) / 2
+  const medio = Math.max(0.5, ((banda.max - banda.min) / 2) * 1.3)
+  const todos = [...turnos.map((t) => t.ritmo), hoy, espina]
+  const hi = Math.max(centro + medio, ...todos)
+  const lo = Math.min(centro - medio, ...todos)
   const span = hi - lo || 1
-  // En % del alto, con aire arriba (para la anotación del mejor) y abajo.
-  const yPct = (v: number) => 88 - ((v - lo) / span) * 72
-  const puntos = [...turnos.map((t) => t.ritmo), hoy]
-  const xPct = (i: number) => (i / Math.max(1, puntos.length - 1)) * 100
-  /* El mejor de los DIBUJADOS. Hoy no compite (suele ser parcial) — pero si
-     hoy ya lo supera, la anotación mentiría y no se muestra. */
-  const iMejorCandidato = turnos.length >= 2
-    ? turnos.reduce((mi, t, i) => (t.ritmo > turnos[mi]!.ritmo ? i : mi), 0)
-    : null
-  const iMejor = iMejorCandidato != null && turnos[iMejorCandidato]!.ritmo >= hoy
-    ? iMejorCandidato
-    : null
+  const yPct = (v: number) => ((hi - v) / span) * 100
+  const espinaPct = yPct(espina)
   const esDomingo = (dateKey: string) => new Date(`${dateKey}T12:00:00Z`).getUTCDay() === 0
+
+  const columnas = [
+    ...turnos.map((t) => ({ v: t.ritmo, dateKey: t.dateKey as string | null, esHoy: false })),
+    { v: hoy, dateKey: null, esHoy: true },
+  ]
+
   return (
     <div className="mt-1.5" aria-hidden>
       <div className="flex items-stretch gap-1.5">
-        <div className="relative h-[88px] min-w-0 flex-1">
-          <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-full w-full">
-            <rect
-              x="0"
-              y={yPct(banda.max)}
-              width="100"
-              height={Math.max(3, yPct(banda.min) - yPct(banda.max))}
-              className="fill-muted-foreground/15"
-            />
-            {/* Lo normal como LÍNEA: hasta ahora la mediana vivía solo en el
-                texto del detalle y el gráfico no decía dónde queda. */}
-            {mediana != null && (
-              <line
-                x1="0" y1={yPct(mediana)} x2="100" y2={yPct(mediana)}
-                stroke="var(--mon-ref)"
-                strokeWidth="1"
-                vectorEffect="non-scaling-stroke"
-              />
-            )}
-            <polyline
-              points={puntos.map((v, i) => `${xPct(i)},${yPct(v)}`).join(' ')}
-              fill="none"
-              strokeWidth="1.5"
-              strokeLinejoin="round"
-              vectorEffect="non-scaling-stroke"
-              className="stroke-muted-foreground/70"
-            />
-          </svg>
-          {/* Los puntos en HTML: un círculo dentro del SVG estirado sale elipse.
-              El domingo va HUECO — la línea no trabaja igual y su punto bajo
-              arrastraba la lectura de la semana. */}
-          {puntos.map((v, i) => {
-            const esHoy = i === puntos.length - 1
-            const domingo = !esHoy && esDomingo(turnos[i]!.dateKey)
-            return (
-              <span
-                key={i}
-                title={`${esHoy ? 'hoy' : nombreDeDia(turnos[i]!.dateKey)} · ${fmtDec(v)} pz/min`}
-                className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full ${
-                  esHoy ? 'h-2.5 w-2.5' : domingo ? 'h-2 w-2 border-2' : 'h-1.5 w-1.5'
-                }`}
-                style={{
-                  left: `${xPct(i)}%`,
-                  top: `${yPct(v)}%`,
-                  ...(esHoy
-                    ? {
-                        background: 'var(--mon-hoy)',
-                        boxShadow: '0 0 0 2px rgb(var(--card)), 0 0 0 5px color-mix(in srgb, var(--mon-hoy) 40%, transparent)',
-                      }
-                    : domingo
-                      ? { borderColor: 'var(--mon-ref)', background: 'transparent' }
-                      : { background: 'var(--mon-ref)' }),
-                }}
-              />
-            )
-          })}
-          {/* El mejor de la ventana, anotado: es la referencia que uno busca
-              («¿cuándo fue el bueno?») sin abrir ningún tooltip. */}
-          {iMejor != null && (
-            <span
-              className="absolute -translate-x-1/2 whitespace-nowrap text-[10px] text-muted-foreground"
-              style={{
-                left: `${Math.min(80, Math.max(20, xPct(iMejor)))}%`,
-                top: `${yPct(turnos[iMejor]!.ritmo)}%`,
-                transform: 'translate(-50%, -170%)',
-              }}
-            >
-              mejor de estos {turnos.length + 1}
-            </span>
-          )}
+        <div className="relative h-[104px] min-w-0 flex-1">
+          {/* La franja del rango habitual y la espina de la mediana, de fondo. */}
+          <span
+            className="pointer-events-none absolute inset-x-0 rounded-[10px]"
+            style={{
+              top: `${yPct(banda.max)}%`,
+              height: `${Math.max(3, yPct(banda.min) - yPct(banda.max))}%`,
+              background: 'color-mix(in srgb, var(--mon-ref) 18%, transparent)',
+            }}
+          />
+          <span
+            className="pointer-events-none absolute inset-x-0 h-px"
+            style={{ top: `${espinaPct}%`, background: 'var(--mon-ref)' }}
+          />
+          {/* Las columnas: la barra ES el desvío contra la espina. */}
+          <div className="absolute inset-0 flex gap-[2px]">
+            {columnas.map((c) => {
+              const domingo = c.dateKey != null && esDomingo(c.dateKey)
+              const sobre = c.v > banda.max
+              const bajo = c.v < banda.min
+              const arriba = c.v >= espina
+              const vPct = yPct(c.v)
+              const altoPct = Math.abs(espinaPct - vPct)
+              const relleno = c.esHoy
+                ? 'var(--mon-hoy)'
+                : sobre
+                  ? 'color-mix(in srgb, rgb(var(--ink-ok)) 30%, transparent)'
+                  : bajo
+                    ? 'color-mix(in srgb, rgb(var(--ink-crit)) 30%, transparent)'
+                    : 'color-mix(in srgb, var(--mon-ref) 50%, transparent)'
+              const numClase = c.esHoy
+                ? 'font-bold'
+                : sobre ? 'text-ink-ok' : bajo ? 'text-ink-crit' : 'text-foreground/80'
+              return (
+                <div
+                  key={c.dateKey ?? 'hoy'}
+                  className="relative min-w-0 flex-1"
+                  title={`${c.esHoy ? 'hoy' : nombreDeDia(c.dateKey!)}${domingo ? ' (domingo)' : ''} · ${fmtDec(c.v)} pz/min`}
+                >
+                  {/* El localizador de hoy: una columna de fondo apenas teñida. */}
+                  {c.esHoy && (
+                    <span
+                      className="absolute inset-y-0 left-1/2 w-full max-w-[44px] -translate-x-1/2 rounded-[8px]"
+                      style={{ background: 'color-mix(in srgb, var(--mon-hoy) 10%, transparent)' }}
+                    />
+                  )}
+                  {/* La barra: redondeada hacia AFUERA, recta contra la espina. */}
+                  <span
+                    className={`absolute left-1/2 w-full max-w-[36px] -translate-x-1/2 ${
+                      arriba ? 'rounded-t-[4px]' : 'rounded-b-[4px]'
+                    }`}
+                    style={{
+                      top: arriba ? `${vPct}%` : `${espinaPct}%`,
+                      height: `${altoPct}%`,
+                      minHeight: 4,
+                      background: relleno,
+                      ...(domingo ? { opacity: 0.45 } : {}),
+                    }}
+                  />
+                  {/* El número, sobre la punta de su barra. */}
+                  <span
+                    className={`absolute inset-x-0 text-center text-[13px] font-semibold tabular-nums ${numClase}`}
+                    style={{
+                      top: `${arriba ? vPct : espinaPct + altoPct}%`,
+                      transform: arriba ? 'translateY(calc(-100% - 2px))' : 'translateY(2px)',
+                      ...(c.esHoy ? { color: 'var(--mon-hoy)' } : {}),
+                    }}
+                  >
+                    {fmtDec(c.v)}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
         </div>
-        {/* El eje, rotulado: bordes de la banda y la mediana en su color. */}
+        {/* El eje: los bordes de la banda y la espina, rotulados. El borde
+            superior ES el mejor histórico — no necesita anotación aparte. */}
         <div className="relative w-9 shrink-0 text-caption tabular-nums text-muted-foreground/80">
           <span className="absolute -translate-y-1/2" style={{ top: `${yPct(banda.max)}%` }}>
             {fmtDec(banda.max)}
           </span>
-          {mediana != null && Math.abs(yPct(mediana) - yPct(banda.max)) > 12 && Math.abs(yPct(mediana) - yPct(banda.min)) > 12 && (
-            <span className="absolute -translate-y-1/2" style={{ top: `${yPct(mediana)}%`, color: 'var(--mon-ref)' }}>
-              {fmtDec(mediana)}
+          {Math.abs(espinaPct - yPct(banda.max)) > 12 && Math.abs(espinaPct - yPct(banda.min)) > 12 && (
+            <span className="absolute -translate-y-1/2" style={{ top: `${espinaPct}%`, color: 'var(--mon-ref)' }}>
+              {fmtDec(espina)}
             </span>
           )}
           <span className="absolute -translate-y-1/2" style={{ top: `${yPct(banda.min)}%` }}>
@@ -370,26 +382,25 @@ function Chispa({ turnos, hoy, banda, escala, mediana, muestras }: {
           </span>
         </div>
       </div>
-      {/* El valor BAJO cada día: la tabla-gemela del gráfico, sin tooltips.
-          Los puntos sin número eran la otra mitad del «gráfico muerto». */}
-      <div className="mr-9 mt-1 flex justify-between text-center">
-        {turnos.map((t) => (
-          <span key={t.dateKey} className="min-w-0">
-            <span className="block text-caption tabular-nums text-foreground/80">{fmtDec(t.ritmo)}</span>
-            <span className="block text-[10px] text-muted-foreground/80">{diaCorto(t.dateKey)}</span>
+      {/* Bajo el plot queda SOLO el día: el valor ya vive en la punta de su
+          barra (una fila menos que el diseño anterior). */}
+      <div className="mr-9 mt-1 flex gap-[2px] text-center">
+        {columnas.map((c) => (
+          <span
+            key={c.dateKey ?? 'hoy'}
+            className={`min-w-0 flex-1 text-caption font-semibold ${c.esHoy ? '' : 'text-muted-foreground/80'}`}
+            style={c.esHoy ? { color: 'var(--mon-hoy)' } : undefined}
+          >
+            {c.esHoy ? 'hoy' : diaCorto(c.dateKey!)}
+            {c.dateKey != null && esDomingo(c.dateKey) && <span title="domingo"> ·</span>}
           </span>
         ))}
-        <span className="min-w-0">
-          <span className="block text-caption font-semibold tabular-nums" style={{ color: 'var(--mon-hoy)' }}>
-            {fmtDec(hoy)}
-          </span>
-          <span className="block text-[10px] font-semibold" style={{ color: 'var(--mon-hoy)' }}>hoy</span>
-        </span>
       </div>
-      {muestras != null && mediana != null && (
-        <p className="mt-1 text-[10px] leading-snug text-muted-foreground/80">
-          La línea horizontal es la mediana de los últimos {muestras} turnos ({fmtDec(mediana)});
-          la banda gris, el rango habitual. Punto hueco = domingo.
+      {muestras != null && (
+        <p className="mt-1 text-[11px] leading-snug text-muted-foreground/80">
+          Cada barra es cuánto se apartó ese turno de lo normal: la línea es la mediana
+          de los últimos {muestras} turnos ({fmtDec(espina)}) y la franja, el rango habitual.
+          Color solo al salirse. El punto junto al día marca un domingo.
         </p>
       )}
     </div>
@@ -431,7 +442,10 @@ function EditorPeso({ actual, onGuardar }: {
     return (
       <button
         type="button"
-        onClick={() => { setValor(actual != null ? String(actual) : ''); setAbierto(true); setError(null) }}
+        /* En GRAMOS (Orel, 29-08): en planta el calibre se habla en gramos
+           («5.200») y tipearlo así es más rápido que «5,2». El storage sigue
+           en kg — solo la entrada y la lectura van en g. */
+        onClick={() => { setValor(actual != null ? String(Math.round(actual * 1000)) : ''); setAbierto(true); setError(null) }}
         className="tap-44 ml-1 rounded-full border border-border px-2 py-0.5 text-[10px] hover:bg-muted"
       >
         {actual != null ? 'Cambiar peso' : 'Poner peso promedio'}
@@ -439,11 +453,14 @@ function EditorPeso({ actual, onGuardar }: {
     )
   }
 
-  const guardar = async (kg: number | null) => {
+  const guardar = async (gramos: number | null) => {
     setGuardando(true)
     setError(null)
     try {
-      await onGuardar(kg)
+      if (gramos != null && !(gramos >= 500 && gramos <= 25_000)) {
+        throw new Error('El peso promedio va en gramos: entre 500 y 25.000 g por pieza.')
+      }
+      await onGuardar(gramos != null ? gramos / 1000 : null)
       setAbierto(false)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo guardar')
@@ -455,10 +472,10 @@ function EditorPeso({ actual, onGuardar }: {
   return (
     <span className="ml-1 inline-flex flex-wrap items-center gap-1">
       <input
-        type="number" min={0.5} max={25} step={0.1} inputMode="decimal"
+        type="number" min={500} max={25000} step={50} inputMode="numeric"
         value={valor} onChange={(e) => setValor(e.target.value)}
-        placeholder="kg por pieza"
-        className="h-7 w-24 rounded-ctl border border-border bg-background px-2 text-[12px] tabular-nums"
+        placeholder="gramos por pieza"
+        className="h-7 w-28 rounded-ctl border border-border bg-background px-2 text-[12px] tabular-nums"
       />
       <button
         type="button" disabled={guardando} onClick={() => guardar(Number(valor))}
@@ -466,6 +483,16 @@ function EditorPeso({ actual, onGuardar }: {
       >
         {guardando ? 'Guardando…' : 'Guardar'}
       </button>
+      {/* Quitar el peso del turno (Orel, 29-08): un dedo de más no puede
+          quedar pegado en las toneladas. */}
+      {actual != null && (
+        <button
+          type="button" disabled={guardando} onClick={() => guardar(null)}
+          className="tap-44 rounded-ctl px-2 py-0.5 text-[11px] text-muted-foreground underline decoration-dotted hover:text-foreground disabled:opacity-50"
+        >
+          quitar peso
+        </button>
+      )}
       <button
         type="button" onClick={() => setAbierto(false)}
         className="tap-44 rounded-ctl px-2 py-0.5 text-[11px] text-muted-foreground hover:text-foreground"
@@ -473,6 +500,38 @@ function EditorPeso({ actual, onGuardar }: {
         cancelar
       </button>
       {error && <span className="w-full text-[11px] text-ink-crit">{error}</span>}
+    </span>
+  )
+}
+
+/**
+ * Cuenta atrás hasta la próxima lectura del pulso (pedido de Orel, 29-08:
+ * «que el usuario sepa que se actualiza en 1 min»).
+ *
+ * ── Por qué el anterior murió y este no ────────────────────────────────────
+ * Hubo un cronómetro así y se quitó: suponía un ciclo fijo y prometía «en
+ * 1:39» al lado de un «dato nuevo en 9s» — dos promesas exactas que no se
+ * cumplían. Este cuenta desde la ÚLTIMA lectura real (el scheduler corre
+ * cada minuto), siempre con «~», y si el dato se atrasa dice «llegando…»
+ * en vez de contar negativos. Una estimación humilde que se cumple casi
+ * siempre le gana a una promesa exacta que falla a veces.
+ */
+function CuentaAtrasPulso({ at }: { at: string | null | undefined }) {
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 1000)
+    return () => clearInterval(id)
+  }, [])
+  if (!at) return null
+  const target = Date.parse(at) + 65_000
+  if (Number.isNaN(target)) return null
+  const restante = Math.ceil((target - Date.now()) / 1000)
+  /* Muy atrasado (>2 min): la frescura vieja ya la anuncia otro elemento —
+     este contador se calla en vez de decir «llegando…» para siempre. */
+  if (restante < -55) return null
+  return (
+    <span className="tabular-nums text-muted-foreground/70">
+      {restante > 0 ? `· se refresca en ~${restante} s` : '· llegando…'}
     </span>
   )
 }
@@ -487,6 +546,69 @@ function EditorPeso({ actual, onGuardar }: {
    tono y el riel desaparece (se vio al renderizar el mockup, no al leerlo). */
 
 const PISTA_INSTRUMENTO = 'color-mix(in srgb, rgb(var(--muted-foreground)) 20%, transparent)'
+
+/*
+ * El orden de FÁBRICA del tablero (pestaña «El turno»), por estado. Es el
+ * orden curado que las dos ramas vivo/cerrado imponían antes con JSX
+ * duplicado: en vivo manda «¿cómo vamos y llegamos?» (cascada y pronóstico
+ * arriba), cerrado es la autopsia (velocidad y meta como evidencia). El
+ * usuario puede pisarlo desde «Personalizar» y su layout vale para ambos
+ * estados; las tarjetas que solo existen en un estado (pronóstico) entran y
+ * salen solas. w en columnas de 6, h en filas de 56 px como MÍNIMO — el
+ * contenido puede empujar, así que estos altos solo aproximan el real.
+ */
+/* El ritmo son TRES tarjetas (pedido de Orel, 30-08): el estado («ritmo»),
+   la tira del minuto («minuto») y el rango habitual («rango»). En fábrica,
+   al lado del estado va «Comparado con otros días» —donde antes el rango
+   dejaba el hueco más grande de la página— y el rango baja con el resto. */
+const FABRICA_TURNO_CERRADO: TarjetaLayout[] = [
+  { id: 'resultado', w: 3, h: 4 },
+  { id: 'mantencion', w: 3, h: 8 },
+  { id: 'ritmo', w: 3, h: 7 },
+  { id: 'comparado', w: 3, h: 7 },
+  { id: 'minuto', w: 6, h: 7 },
+  { id: 'cascada', w: 3, h: 6 },
+  { id: 'tiempo', w: 3, h: 2 },
+  { id: 'velocidad', w: 3, h: 6 },
+  { id: 'meta', w: 3, h: 10 },
+  { id: 'rango', w: 3, h: 5 },
+  { id: 'ayer', w: 3, h: 5 },
+]
+/* La fábrica de la TV: el quinteto de sala VISIBLE, y el resto del tablero
+   presente pero oculto — así desde «Personalizar» se puede agregar cualquiera
+   (pedido de Orel, 31-08: la TV solo dejaba mover las de fábrica). Una
+   tarjeta ausente de esta lista sería inalcanzable: `combinarTablero`
+   descarta los ids que la fábrica vigente no conoce.
+   Alturas MÍNIMAS bajas a propósito — el contenido empuja (filas minmax) y
+   así el tablero mide lo que el contenido real mida. */
+const FABRICA_TURNO_TV: TarjetaLayout[] = [
+  { id: 'resultado', w: 3, h: 4 },
+  { id: 'mantencion', w: 3, h: 4 },
+  { id: 'ritmo', w: 3, h: 4 },
+  { id: 'meta', w: 3, h: 4 },
+  { id: 'minuto', w: 6, h: 4 },
+  { id: 'cascada', w: 3, h: 4, oculta: true },
+  { id: 'pronostico', w: 3, h: 4, oculta: true },
+  { id: 'velocidad', w: 3, h: 4, oculta: true },
+  { id: 'comparado', w: 3, h: 4, oculta: true },
+  { id: 'rango', w: 3, h: 4, oculta: true },
+  { id: 'tiempo', w: 3, h: 2, oculta: true },
+  { id: 'ayer', w: 3, h: 4, oculta: true },
+]
+const FABRICA_TURNO_VIVO: TarjetaLayout[] = [
+  { id: 'resultado', w: 3, h: 4 },
+  { id: 'cascada', w: 3, h: 6 },
+  { id: 'mantencion', w: 3, h: 8 },
+  { id: 'ritmo', w: 3, h: 7 },
+  { id: 'comparado', w: 3, h: 7 },
+  { id: 'minuto', w: 6, h: 7 },
+  { id: 'tiempo', w: 3, h: 2 },
+  { id: 'pronostico', w: 3, h: 5 },
+  { id: 'velocidad', w: 3, h: 6 },
+  { id: 'meta', w: 3, h: 10 },
+  { id: 'rango', w: 3, h: 5 },
+  { id: 'ayer', w: 3, h: 5 },
+]
 
 /** El metro de piezas: 0 → meta, con el cierre proyectado como banda. */
 function MetroPiezas({ ahora, meta, banda, etiquetaBanda }: {
@@ -674,13 +796,15 @@ function EditorCuota({ actual, pesoConocido, onGuardar, conToneladas = true }: {
   const [modo, setModo] = useState<'toneladas' | 'piezas'>(conToneladas ? 'toneladas' : 'piezas')
   const [valor, setValor] = useState('')
   const [toneladas, setToneladas] = useState('')
-  const [pesoKg, setPesoKg] = useState('')
+  /* En GRAMOS por pieza (Orel, 29-08): el calibre se habla en gramos. Solo
+     esta caja — el storage y la conversión siguen en kg. */
+  const [pesoG, setPesoG] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [guardando, setGuardando] = useState(false)
 
   const convertida = (() => {
     const t = Number(toneladas)
-    const kg = Number(pesoKg)
+    const kg = Number(pesoG) / 1000
     if (!(t > 0) || !(kg > 0)) return null
     try { return piezasDeToneladas(t, kg) } catch { return null }
   })()
@@ -691,7 +815,7 @@ function EditorCuota({ actual, pesoConocido, onGuardar, conToneladas = true }: {
         type="button"
         onClick={() => {
           setValor(actual != null ? String(actual) : '')
-          if (pesoConocido != null && pesoConocido > 0) setPesoKg(String(pesoConocido))
+          if (pesoConocido != null && pesoConocido > 0) setPesoG(String(Math.round(pesoConocido * 1000)))
           setAbierto(true)
           setError(null)
         }}
@@ -743,10 +867,10 @@ function EditorCuota({ actual, pesoConocido, onGuardar, conToneladas = true }: {
             className="h-7 w-24 rounded-ctl border border-border bg-background px-2 text-[12px] tabular-nums"
           />
           <input
-            type="number" min={0.5} step={0.1} inputMode="decimal"
-            value={pesoKg} onChange={(e) => setPesoKg(e.target.value)}
-            placeholder="kg por pieza"
-            className="h-7 w-24 rounded-ctl border border-border bg-background px-2 text-[12px] tabular-nums"
+            type="number" min={500} max={25000} step={50} inputMode="numeric"
+            value={pesoG} onChange={(e) => setPesoG(e.target.value)}
+            placeholder="gramos por pieza"
+            className="h-7 w-28 rounded-ctl border border-border bg-background px-2 text-[12px] tabular-nums"
           />
           {/* Las piezas, a la vista, ANTES de guardar: es el número contra el
               que va a medir el monitor toda la noche. */}
@@ -770,7 +894,7 @@ function EditorCuota({ actual, pesoConocido, onGuardar, conToneladas = true }: {
            de cero sin que nadie la escribiera. */
         disabled={guardando || (modo === 'toneladas' ? !convertida : !(Number(valor) > 0))}
         onClick={() => modo === 'toneladas'
-          ? guardar(convertida!.piezas, { toneladas: Number(toneladas), pesoPromedioKg: Number(pesoKg) })
+          ? guardar(convertida!.piezas, { toneladas: Number(toneladas), pesoPromedioKg: Number(pesoG) / 1000 })
           : guardar(Number(valor), null)}
         className="tap-44 rounded-ctl border border-border px-2 py-0.5 text-[11px] font-medium hover:bg-muted disabled:opacity-50"
       >
@@ -780,8 +904,8 @@ function EditorCuota({ actual, pesoConocido, onGuardar, conToneladas = true }: {
       {modo === 'toneladas' && !convertida && !guardando && (
         <span className="w-full text-[11px] text-muted-foreground">
           Para guardar en toneladas falta{!(Number(toneladas) > 0) ? ' cuántas toneladas' : ''}
-          {!(Number(toneladas) > 0) && !(Number(pesoKg) > 0) ? ' y' : ''}
-          {!(Number(pesoKg) > 0) ? ' el kg por pieza (peso promedio del calibre)' : ''}
+          {!(Number(toneladas) > 0) && !(Number(pesoG) > 0) ? ' y' : ''}
+          {!(Number(pesoG) > 0) ? ' los gramos por pieza (peso promedio del calibre)' : ''}
           {' '}— o cambiá a «piezas».
         </span>
       )}
@@ -1593,11 +1717,20 @@ function Sparkbars({
           </span>
         ))}
         {/* Fuera de escala: el número se dice, pero no se dibuja — estirar el
-            eje hasta él aplastaba el turno entero contra el piso. */}
+            eje hasta él aplastaba el turno entero contra el piso.
+            OJO: sobre 2× la escala ni se dice: a 8 min del cierre la leyenda
+            anunciaba «necesitás 598,4 pz/min» — cierto e inútil, se lee como
+            pantalla rota (mismo criterio que la tarjeta de la meta). */}
         {refsFuera.map((r) => (
           <span key={r.label} className="inline-flex items-center gap-1">
-            {r.label} <span className="tabular-nums">{fmtDec(r.cpm)}</span> pz/min
-            <span className="text-muted-foreground/50">(fuera del gráfico)</span>
+            {r.cpm > escala * 2 && r.label === 'necesitás' ? (
+              <>necesitás <span className="text-muted-foreground/70">más de lo que la línea puede — ya no da el tiempo</span></>
+            ) : (
+              <>
+                {r.label} <span className="tabular-nums">{fmtDec(r.cpm)}</span> pz/min
+                <span className="text-muted-foreground/50">(fuera del gráfico)</span>
+              </>
+            )}
           </span>
         ))}
         {convenio.length > 0 && (
@@ -2406,12 +2539,24 @@ function RitmoNecesario({
  * así que sus piezas no se comparan de igual a igual con las de una hora
  * entera — el ritmo sí.
  */
-function PorHora({ series, paradas }: {
+function PorHora({ series, paradas, pulse }: {
   series: PublicMonitorLive['series']
   /** Todas las paradas del turno, para poder explicar la hora que se hundió. */
   paradas?: ParadaConHora[] | null
+  /** El pulso FRESCO (o null): recuenta la hora en curso con los buckets de
+      1 min — la fila parcial de 5 min llega hasta 8 min tarde. */
+  pulse?: PulsoMonitor | null
 }) {
-  const rows = useMemo(() => buildHourlyRows(series), [series])
+  const rows = useMemo(() => {
+    const base = buildHourlyRows(series)
+    const ult = base[base.length - 1]
+    if (!pulse || !ult?.partial) return base
+    const duro = horaEnCursoDelDuro(pulse, ult)
+    /* Nunca MENOS que lo ya sumado por los tramos: el duro solo cuenta
+       minutos cerrados. */
+    if (!duro || duro.pieces < ult.pieces) return base
+    return [...base.slice(0, -1), { ...ult, ...duro }]
+  }, [series, pulse])
   const max = useMemo(() => peakPieces(rows), [rows])
   /* La hora que se hundió y qué se la comió: el desplome estaba en el listado
      sin ninguna marca (h5 con 379 pz entre horas de ~2.100) y su causa vivía
@@ -2423,10 +2568,9 @@ function PorHora({ series, paradas }: {
     <Bloque
       id="porhora"
       titulo="Hora por hora"
-      /* Detalle: se abre cuando alguien lo busca. Con todos los bloques
-         abiertos la pantalla medía cuatro pantallas de celular para contestar
-         tres preguntas. */
-      defaultAbierto={false}
+      /* Abierto: vive en la pestaña «Análisis», y tocarla YA es pedir verlo.
+         El plegado por defecto era de cuando compartía scroll con lo vivo
+         («cuatro pantallas para contestar tres preguntas»). */
       extra={<span className="normal-case">desde el arranque</span>}
     >
       <ul className="mt-2 space-y-1.5">
@@ -2521,9 +2665,105 @@ function PorHora({ series, paradas }: {
  * para no pulverizar el MTTR). Se muestra también con el turno cerrado — ahí
  * ES el informe.
  */
-function RespuestaMantencion({ m, cerrado }: {
+/** Ordinales para la racha («el cuarto de los últimos seis»). */
+const ORDINAL = ['', 'primero', 'segundo', 'tercero', 'cuarto', 'quinto', 'sexto', 'séptimo'] as const
+
+/**
+ * El RIEL de la racha: minutos en reponerse, turno a turno.
+ *
+ * Hace DOS trabajos en un solo objeto de 78 px (idea de la directora, 29-08):
+ * dibuja la tendencia del MTTR y muestra la racha SIN declararla — cada guion
+ * es un turno que cerró sin una sola falla técnica. Barra más alta = más lento
+ * (peor), así que una tendencia a la baja se lee como mejora.
+ *
+ * ⚠ Ventana MÁXIMA: los turnos de `history` (6). No prometer más: `shiftStats`
+ * guarda ~40 pero sus causas no traen el bucket que separa falla técnica de
+ * externo — extender la ventana es backend, no esta tarjeta.
+ */
+function RielDeRacha({ riel, hoy }: {
+  riel?: Array<{ etiqueta: string; mttr: number | null }> | null
+  /** El MTTR de hoy, o null si el turno va sin fallas. */
+  hoy: number | null
+}) {
+  if (!riel?.length) return null
+  const cols = [...riel, { etiqueta: 'hoy', mttr: hoy }]
+  const max = Math.max(...cols.map((c) => c.mttr ?? 0), 1)
+  const limpios = cols.filter((c) => c.mttr == null).length
+  return (
+    <div className="mt-2.5">
+      <div className="flex items-end gap-1" style={{ height: 78 }} aria-hidden>
+        {cols.map((c, i) => {
+          const esHoy = i === cols.length - 1
+          return (
+            <div key={c.etiqueta} className="flex min-w-0 flex-1 flex-col items-center justify-end gap-1">
+              {c.mttr != null ? (
+                <>
+                  <span
+                    className="text-[13px] font-semibold tabular-nums"
+                    style={{ color: esHoy ? 'var(--mon-hoy)' : 'var(--mon-ref)' }}
+                  >
+                    {fmtDec(c.mttr)}
+                  </span>
+                  <span
+                    className="w-full max-w-[34px] rounded-t-[3px]"
+                    style={{
+                      height: `${Math.max(6, (c.mttr / max) * 56)}px`,
+                      background: esHoy
+                        ? 'var(--mon-hoy)'
+                        : 'color-mix(in srgb, var(--mon-ref) 50%, transparent)',
+                    }}
+                  />
+                </>
+              ) : (
+                /* Turno SIN falla: un guion al ras de la línea base. */
+                <span
+                  className="w-full max-w-[24px] rounded-full"
+                  style={{ height: 3, background: 'color-mix(in srgb, var(--mon-ref) 42%, transparent)' }}
+                />
+              )}
+            </div>
+          )
+        })}
+      </div>
+      <div className="h-px bg-border" />
+      <div className="mt-1 flex gap-1 text-center text-[11px] tabular-nums text-muted-foreground/80">
+        {cols.map((c, i) => (
+          <span
+            key={c.etiqueta}
+            className="min-w-0 flex-1"
+            style={i === cols.length - 1 ? { color: 'var(--mon-hoy)', fontWeight: 600 } : undefined}
+          >
+            {c.etiqueta}
+          </span>
+        ))}
+      </div>
+      <p className="mt-2 text-caption leading-snug text-muted-foreground/80">
+        Minutos en reponerse, turno a turno. El guion es un turno que cerró{' '}
+        <b>sin una sola falla técnica</b>
+        {limpios > 0 && <>: {limpios} de los últimos {cols.length}</>}.
+      </p>
+    </div>
+  )
+}
+
+function RespuestaMantencion({ m, cerrado, riel, fallaLineaMin, enCurso }: {
   m: NonNullable<PublicMonitorLive['mantencion']>
   cerrado: boolean
+  /**
+   * El RIEL de la racha (rediseño «La racha», Orel 29-08): MTTR por turno
+   * previo, en orden cronológico. `mttr: null` = turno que cerró SIN una
+   * falla técnica — se dibuja como guion, y los guiones SON la racha.
+   * Ventana máxima: los 6 turnos de `history` (no prometer más).
+   */
+  riel?: Array<{ etiqueta: string; mttr: number | null }> | null
+  /**
+   * Minutos que la LÍNEA ENTERA estuvo parada por las causas de falla
+   * (lineMin del timeBreakdown). ~0 habilita el logro «la línea no perdió
+   * una pieza». null = no se puede afirmar (y no se afirma).
+   */
+  fallaLineaMin?: number | null
+  /** Falla técnica EN CURSO: máquina detenida AHORA con causa de equipos. */
+  enCurso?: { maquina: string; causa: string; min: number; producen: number } | null
 }) {
   if (!m.porMaquina.length) return null
   const totalFallaMin = m.porMaquina.reduce((a, x) => a + x.fallaMin, 0)
@@ -2534,9 +2774,14 @@ function RespuestaMantencion({ m, cerrado }: {
   const microTotal = m.porMaquina.reduce((a, x) => a + x.microN, 0)
   const totalSinImputarMin = m.porMaquina.reduce((a, x) => a + (x.sinImputarMin ?? 0), 0)
 
-  const colorDisp = (pct: number | null) =>
-    pct == null ? 'text-muted-foreground'
-      : pct >= 99.9 ? 'text-ink-ok' : pct >= 90 ? 'text-ink-warn' : 'text-ink-crit'
+  /* La línea no paró por la falla — solo se AFIRMA cuando el dato existe. */
+  const sinCostoDeLinea = fallaLineaMin != null && fallaLineaMin < 0.5
+  /* El último turno CON falla del riel: la referencia del delta del MTTR. */
+  const previoConFalla = [...(riel ?? [])].reverse().find((r) => r.mttr != null) ?? null
+  /* La racha para el titular del turno limpio: cuántos de la ventana
+     cerraron sin falla (hoy incluido). */
+  const ventana = (riel?.length ?? 0) + 1
+  const limpios = (riel ?? []).filter((r) => r.mttr == null).length + 1
 
   /* Con CERO imputado y minutos sin causa, la tarjeta se ENCOGE al aviso
      (Orel, 26-08: «¿la ocultamos hasta que estén imputadas?»). No se oculta
@@ -2552,27 +2797,45 @@ function RespuestaMantencion({ m, cerrado }: {
         Mantención · respuesta del turno
       </div>
 
-      {/* El titular: la historia en una frase, antes que cualquier cifra. */}
+      {/* El titular: la historia en una frase, antes que cualquier cifra.
+          Tres estados y NUNCA repite el número que va grande abajo (la versión
+          vieja decía «9 min … MTTR 8,7 min» — el mismo dato con dos redondeos
+          a dos renglones). */}
       <p className="mt-1.5 text-[15px] leading-snug text-foreground">
-        {totalFallaMin === 0 && totalSinImputarMin >= 3 ? (
-          /* OJO — con paros SIN CAUSA no se reclama el 100%: cualquiera de esos
-             minutos puede ser una falla que nadie imputó todavía. La tarjeta
-             lo dice y EMPUJA a imputar (Orel, 26-08). */
+        {enCurso ? (
+          /* 1 · Falla EN CURSO: la noticia es el ahora, y es el ÚNICO estado
+             donde entra el comentario del operador. */
+          <><b>{nombreCorto(enCurso.maquina)}</b> lleva{' '}
+            <b className="tabular-nums text-ink-crit">{fmtInt(enCurso.min)} min</b> detenida
+            {enCurso.causa && <> por <b>{enCurso.causa}</b></>}.{' '}
+            {enCurso.producen > 0
+              ? `${enCurso.producen === 1 ? 'La otra máquina sigue produciendo' : `Las otras ${enCurso.producen} siguen produciendo`}.`
+              : 'La línea está parada.'}
+          </>
+        ) : totalFallaMin === 0 && totalSinImputarMin >= 3 ? (
+          /* OJO — con paros SIN CAUSA no se reclama el turno limpio: cualquiera
+             de esos minutos puede ser una falla que nadie imputó todavía. La
+             tarjeta lo dice y EMPUJA a imputar (Orel, 26-08). */
           <>Sin fallas imputadas por ahora — pero hay{' '}
             <b className="tabular-nums">{fmtInt(totalSinImputarMin)} min</b> de detenciones{' '}
             <b>sin causa anotada</b> en Shoplogix. Imputarlas cierra la historia del turno.</>
         ) : totalFallaMin === 0 ? (
-          <>Sin fallas técnicas en el turno: disponibilidad{' '}
-            <b className="tabular-nums">100%</b> en las {m.porMaquina.length} máquinas.</>
-        ) : (
-          <>La falla técnica {cerrado ? 'costó' : 'lleva'}{' '}
-            <b className="tabular-nums">{fmtInt(totalFallaMin)} min</b>
-            {conFalla.length === 1 && <>, toda en <b>{nombreCorto(conFalla[0]!.name)}</b></>}
-            {mttrGlobal != null && <> — MTTR <b className="tabular-nums">{fmtDec(mttrGlobal)} min</b></>}
-            {sanas > 0 && (
-              <> y {sanas === 1 ? 'la otra máquina' : `las otras ${sanas}`} en{' '}
-                <b className="tabular-nums">100%</b></>
+          /* 2 · Turno limpio: la racha se dice acá, con su ventana declarada. */
+          <>Turno {cerrado ? 'cerrado' : 'hasta ahora'} <b>sin una sola falla técnica</b>
+            {riel && riel.length > 0 && limpios >= 2 && (
+              <> — el <b>{ORDINAL[limpios] ?? `nº ${limpios}`}</b> de los últimos {ventana}</>
             )}.
+          </>
+        ) : (
+          /* 3 · Falla resuelta: quién y el costo de LÍNEA, que es el logro. */
+          <>{totalEventos === 1 ? 'Una sola falla técnica' : `${totalEventos} fallas técnicas`} en el turno
+            {/* El número concuerda con las FALLAS, no con las máquinas: con
+                tres fallas en una sola máquina se leía «3 fallas técnicas en el
+                turno, toda en Li 1» en la pantalla de la TV de planta. */}
+            {conFalla.length === 1 && <>, {totalEventos === 1 ? '' : 'todas '}en <b>{nombreCorto(conFalla[0]!.name)}</b></>}
+            {sinCostoDeLinea
+              ? <> — y la línea no la sintió.</>
+              : <>{sanas > 0 && <> y {sanas === 1 ? 'la otra máquina' : `las otras ${sanas}`} sin falla</>}.</>}
           </>
         )}
       </p>
@@ -2609,47 +2872,143 @@ function RespuestaMantencion({ m, cerrado }: {
         </p>
       )}
 
-      {/* Una fila por máquina: la disponibilidad TÉCNICA con su palabra.
-          En modo aviso NO se pintan: un «100%» por máquina debajo de «hay 53
-          min sin causa» es afirmar lo que el propio aviso pone en duda. */}
-      {!soloAviso && (
-      <div className="mt-2.5 space-y-1.5 border-t border-border/50 pt-2.5">
-        {m.porMaquina.map((x) => (
-          <div key={x.name} className="flex items-baseline gap-2">
-            <span className="w-9 shrink-0 text-footnote text-muted-foreground">{nombreCorto(x.name)}</span>
-            <span className={`w-14 shrink-0 text-headline tabular-nums ${
-              /* Con paros sin causa el 100% queda en suspenso: tinta neutra. */
-              x.fallaMin === 0 && (x.sinImputarMin ?? 0) >= 3 ? 'text-muted-foreground' : colorDisp(x.dispTecnicaPct)
-            }`}>
-              {x.dispTecnicaPct != null ? `${fmtDec(x.dispTecnicaPct, x.dispTecnicaPct >= 99.9 ? 0 : 1)}%` : '—'}
-            </span>
-            <span className="min-w-0 flex-1 truncate text-caption tabular-nums text-muted-foreground">
-              {x.fallaMin > 0
-                ? `${x.eventosFalla} evento${x.eventosFalla === 1 ? '' : 's'} · ${fmtInt(x.fallaMin)} min` +
-                  (x.causasFalla[0] ? ` (${x.causasFalla.map((c) => c.causa).join(', ')})` : '')
-                : (x.sinImputarMin ?? 0) >= 3
-                  ? `sin fallas imputadas · ${fmtInt(x.sinImputarMin!)} min sin causa`
-                  : 'sin fallas técnicas'}
-            </span>
+      {/* ── El protagonista: QUÉ TAN RÁPIDO se respondió, y su contexto ──────
+          «8,7 min» solo no contesta «¿es bueno?». El riel pone ese número
+          contra los turnos anteriores CON falla y contra los que cerraron sin
+          ninguna — los guiones SON la racha, no hay que declararla. */}
+      {mttrGlobal != null && !soloAviso && (
+        <div className="mt-3">
+          <div className="flex items-end justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-[30px] font-bold leading-none tracking-[-0.03em] tabular-nums text-foreground">
+                {fmtDec(mttrGlobal)}
+                <span className="ml-1 text-[15px] font-normal text-muted-foreground">min</span>
+              </div>
+              <div className="mt-1 text-caption text-muted-foreground">
+                {totalEventos === 1 ? 'en reponerse' : `MTTR · ${totalEventos} eventos`}
+              </div>
+            </div>
+            {previoConFalla?.mttr != null && (
+              <p className="min-w-0 flex-1 text-right text-caption leading-snug text-muted-foreground">
+                {mttrGlobal <= previoConFalla.mttr ? (
+                  <><b className="tabular-nums text-foreground/80">{fmtDec(previoConFalla.mttr - mttrGlobal)} min</b>
+                    {' '}más rápido que el turno con falla anterior</>
+                ) : (
+                  <><b className="tabular-nums text-foreground/80">{fmtDec(mttrGlobal - previoConFalla.mttr)} min</b>
+                    {' '}más lento que el turno con falla anterior</>
+                )}
+                {' '}(<span className="tabular-nums">{fmtDec(previoConFalla.mttr)}</span>)
+              </p>
+            )}
           </div>
-        ))}
-      </div>
-      )}
-
-      {/* Los eventos, del más caro al más barato: cuándo, cuánto, qué. */}
-      {!soloAviso && m.eventos.length > 0 && (
-        <div className="mt-2 space-y-0.5">
-          {m.eventos.slice(0, 3).map((e) => (
-            <p key={`${e.maquina}-${e.desde}`} className="text-caption tabular-nums text-muted-foreground">
-              {fmtWallTime(e.desde)}–{fmtWallTime(e.hasta)} · <b className="text-foreground/80">{fmtInt(e.min)} min</b>{' '}
-              · {e.causas.join(' + ')}{e.paros > 1 ? ` (${e.paros} paros encadenados)` : ''} · {nombreCorto(e.maquina)}
-            </p>
-          ))}
+          <RielDeRacha riel={riel} hoy={mttrGlobal} />
         </div>
       )}
 
+      {/* El riel también en turno LIMPIO: ahí la racha es toda la noticia. */}
+      {mttrGlobal == null && !soloAviso && (riel?.length ?? 0) > 0 && (
+        <div className="mt-3">
+          <RielDeRacha riel={riel} hoy={null} />
+        </div>
+      )}
+
+      {/* ── El logro: la falla no le costó piezas a la LÍNEA ────────────────
+          Aparece UNA sola vez el verde de la tarjeta, y solo cuando el dato
+          existe: es un hecho sobre la línea, no una medida contra la meta. */}
+      {sinCostoDeLinea && totalFallaMin > 0 && !enCurso && (
+        <div className="mt-3 flex items-start gap-2 rounded-ctl bg-ink-ok/[0.12] p-2.5">
+          <Check className="mt-px h-3.5 w-3.5 shrink-0 text-ink-ok" />
+          <p className="text-caption leading-snug text-foreground">
+            La falla no le costó piezas a la línea: <b className="text-ink-ok">0 pz</b> —{' '}
+            {sanas === 1 ? 'la otra máquina' : `las otras ${sanas}`} nunca {sanas === 1 ? 'dejó' : 'dejaron'} de producir.
+          </p>
+        </div>
+      )}
+
+      {/* ── Disponibilidad técnica por máquina ──────────────────────────────
+          Tinta NEUTRA por defecto: tres «100%» en verde eran decoración (y el
+          verde ya trabaja en el semáforo de las barras de 1 min). Solo se tiñe
+          cuando hay noticia. En modo aviso no se pintan: un «100%» debajo de
+          «hay 60 min sin causa» afirma lo que el propio aviso pone en duda. */}
       {!soloAviso && (
-        <p className="mt-2 text-caption leading-snug text-muted-foreground/80">
+        <div className="mt-3">
+          <div className="text-caption text-muted-foreground">Disponibilidad técnica</div>
+          <div className="mt-1.5 grid grid-cols-3 gap-2">
+            {m.porMaquina.map((x) => {
+              const conFallaEsta = x.fallaMin > 0
+              return (
+                <div key={x.name} className="min-w-0 rounded-ctl bg-muted p-2">
+                  <div className="text-caption text-muted-foreground">{nombreCorto(x.name)}</div>
+                  <div className={`text-headline tabular-nums ${
+                    x.dispTecnicaPct != null && x.dispTecnicaPct < 90
+                      ? 'text-ink-crit'
+                      : conFallaEsta ? DUENO_UI.mantencion.clase : 'text-foreground'
+                  }`}>
+                    {x.dispTecnicaPct != null ? `${fmtDec(x.dispTecnicaPct, x.dispTecnicaPct >= 99.9 ? 0 : 1)}%` : '—'}
+                  </div>
+                  <div className="truncate text-[11px] tabular-nums text-muted-foreground" title={
+                    conFallaEsta && x.causasFalla[0] ? x.causasFalla.map((c) => c.causa).join(', ') : undefined
+                  }>
+                    {conFallaEsta
+                      ? `${x.eventosFalla} falla${x.eventosFalla === 1 ? '' : 's'} · ${fmtInt(x.fallaMin)} min`
+                      : 'sin fallas'}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Las IMPUTACIONES, cuantificadas — todas, no solo las técnicas.
+          Antes la tarjeta decía «100%» sin una palabra de los 389 min de
+          MMPP que el supervisor SÍ anotó, y eso se leía como «el monitor no
+          registra las imputaciones» (Orel, 28-08). Se muestra también en
+          modo aviso: el contraste «esto ya está imputado / esto falta» es
+          exactamente el empujón. */}
+      {/* ── El pie: contexto, separado por ESPACIO (§38, sin hairlines) ───── */}
+      {/* Los minutos sin causa, también fuera del modo aviso: sin este renglón,
+          tres «100%» y una racha reconstruyen la falsa realidad que Orel
+          señaló el 26-08. Son minutos de MÁQUINA sumados, no de línea. */}
+      {!soloAviso && totalSinImputarMin >= 3 && (
+        <p className="pantalla-oculta mt-3 text-footnote leading-snug text-muted-foreground">
+          <b className="text-foreground/80">Sin causa anotada:</b>{' '}
+          <span className="tabular-nums">{fmtInt(totalSinImputarMin)} min</span> de máquina sumados
+          {' ('}
+          {m.porMaquina.filter((x) => (x.sinImputarMin ?? 0) > 0).map((x, i) => (
+            <span key={x.name} className="tabular-nums">
+              {i > 0 && ' · '}{nombreCorto(x.name)} {fmtInt(x.sinImputarMin!)}
+            </span>
+          ))}
+          {'). '}
+          {m.sinImputarLineaMin != null && (
+            m.sinImputarLineaMin >= 1
+              ? <>La línea completa estuvo <span className="tabular-nums">{fmtInt(m.sinImputarLineaMin)} min</span> detenida sin causa. </>
+              : <>{m.porMaquina.length === 3 ? 'Las tres' : 'Todas'} nunca pararon a la vez: la línea completa no perdió tiempo por esos paros. </>
+          )}
+          Imputarlas cierra la historia del turno.
+        </p>
+      )}
+      {(m.imputadas ?? []).filter((x) => x.min >= 1).length > 0 && (
+        <p className="mt-2 text-footnote leading-snug text-muted-foreground">
+          <b className="text-foreground/80">Imputado:</b>{' '}
+          {(m.imputadas ?? []).filter((x) => x.min >= 1).map((x, i) => (
+            <span
+              key={x.causa}
+              className={`tabular-nums ${
+                x.bucket === 'falla' ? DUENO_UI.mantencion.clase
+                  : x.bucket === 'externo' ? DUENO_UI.externo.clase : ''
+              }`}
+            >
+              {i > 0 && <span className="text-muted-foreground"> · </span>}
+              {x.causa} <b>{fmtInt(x.min)}</b>
+            </span>
+          ))}
+          <span className="text-muted-foreground/70"> min de máquina.</span>
+        </p>
+      )}
+      {!soloAviso && (
+        <p className="pantalla-oculta mt-2 text-caption leading-snug text-muted-foreground/80">
           Disponibilidad técnica: solo fallas de equipo — colación, esperas externas y las{' '}
           <span className="tabular-nums">{fmtInt(microTotal)}</span> microdetenciones van aparte.
         </p>
@@ -2700,6 +3059,9 @@ function conRepartoPorMaquina(
   serie: readonly TramoSerie[],
   ahoraWall: number | null | undefined,
   producingMin: number | null,
+  /** El AHORA de cada máquina (pulso del contador, por nombre): la columna
+      que suma el «Ahora» grande. Solo llega con el pulso fresco. */
+  pulsoPorNombre?: Map<string, number> | null,
 ): RitmosPorMaquina | null {
   if (!r) return r
   const porNombre = new Map((seriesMaquinas ?? []).map((s) => [s.nombre, s.serie]))
@@ -2712,6 +3074,7 @@ function conRepartoPorMaquina(
       ...m,
       ahoraCpm: reparto?.[i] ?? null,
       aporteCpm: producingMin != null && producingMin > 0 ? m.piezas / producingMin : null,
+      pulsoCpm: pulsoPorNombre?.get(m.nombre) ?? null,
     })),
   }
 }
@@ -2720,95 +3083,195 @@ function conRepartoPorMaquina(
  * La velocidad de cada máquina a lo largo del turno, como curvas (pedido de
  * Orel, 26-08: el gráfico del detalle de turno «se vería bien acá»).
  *
- * Es la vista que las columnas no pueden dar: QUIÉN bajó la línea y CUÁNDO.
- * Misma vara que la curva de línea —media móvil de 3 tramos, en pz/min— para
- * que las tres curvas se lean contra el mismo reloj. SVG propio y no echarts:
- * esta página evita a propósito cargarse ese bundle (ver nota en los imports).
+ * ── UNA sola vara: la velocidad REAL de cada tramo ─────────────────────────
+ * Dibujaba la media móvil de 15 min y Orel la leyó —con razón— como «la
+ * velocidad de cada Baader en ese momento»: el último punto sumaba 19,9
+ * mientras arriba el «Ahora» decía 30,1, y nada cuadraba con nada (27-08).
+ * Ahora cada punto es el CRUDO del tramo de 5 min (piezas ÷ 5), y al final
+ * se anexa el PUNTO VIVO del pulso por máquina — el mismo número de la
+ * columna «ahora», así el final del gráfico suma el «Ahora» grande. La media
+ * de 15 min ya tiene su cifra con rótulo en la cabecera; el gráfico no la
+ * repite con rezago.
  *
+ * SVG propio y no echarts: esta página evita a propósito ese bundle.
  * ⚠ El corte de la cola de ceros del final es el de la LÍNEA (`mediaMovil`),
  * no el de cada máquina: si una paró antes del cierre, sus ceros son la
  * información que este gráfico existe para mostrar.
  */
-function CurvasMaquinas({ serie, maquinas }: {
+/**
+ * Trazo SUAVE sobre los mismos puntos (pedido de Orel, 28-08: «como el
+ * detalle de turno»). Spline monótona (tangentes de Steffen): suaviza el
+ * dibujo sin inventar picos ni despegar los ceros — un paro suavizado sigue
+ * tocando el piso, que con Catmull-Rom clásico no se cumple. Los datos del
+ * tooltip son los puntos crudos de siempre; esto es solo el lápiz.
+ */
+function pathSuave(ys: number[]): string {
+  const n = ys.length
+  if (n === 0) return ''
+  if (n < 3) return ys.map((y, i) => `${i === 0 ? 'M' : 'L'}${i},${y}`).join(' ')
+  const delta = Array.from({ length: n - 1 }, (_, i) => ys[i + 1]! - ys[i]!)
+  const m = new Array<number>(n)
+  m[0] = delta[0]!
+  m[n - 1] = delta[n - 2]!
+  for (let i = 1; i < n - 1; i++) {
+    const a = delta[i - 1]!
+    const b = delta[i]!
+    m[i] = a * b <= 0 ? 0 : (2 * a * b) / (a + b)
+  }
+  let d = `M0,${ys[0]}`
+  for (let i = 0; i < n - 1; i++) {
+    const c1y = ys[i]! + m[i]! / 3
+    const c2y = ys[i + 1]! - m[i + 1]! / 3
+    d += ` C${i + 1 / 3},${c1y} ${i + 2 / 3},${c2y} ${i + 1},${ys[i + 1]}`
+  }
+  return d
+}
+
+function CurvasMaquinas({ serie, maquinas, ahoraPorNombre, ahoraAt }: {
   serie: readonly TramoSerie[]
   maquinas: { nombre: string; serie: number[]; targetCpm?: number | null }[]
+  /** El pulso vivo de cada máquina, por nombre — el punto final de la curva.
+      null cuando el contador no está fresco: la curva termina en el último
+      tramo cerrado, sin inventar un presente. */
+  ahoraPorNombre?: Map<string, number> | null
+  /** Hora ISO de esa lectura del pulso, para rotular el punto vivo. */
+  ahoraAt?: string | null
 }) {
+  /* El tramo bajo el dedo/cursor (pedido de Orel, 27-08: «ver en hover la
+     velocidad en todo momento», como el gráfico del detalle de turno). Los
+     hooks van ANTES del return condicional — reglas de hooks. */
+  const [idxSel, setIdxSel] = useState<number | null>(null)
+  /* Filtro por máquina (Orel, 28-08): la leyenda es el control — tocar un
+     nombre lo apaga/prende. Nunca cero visibles: apagar la última prende
+     todas de vuelta. La escala se recalcula con las visibles, que es la
+     gracia de aislar una. */
+  const [ocultas, setOcultas] = useState<ReadonlySet<string>>(new Set())
   const fin = mediaMovil(serie).length
+  /* Zoom por pellizco/rueda + paneo por scroll nativo — el MISMO gesto del
+     gráfico grande (`useZoomGesto`), zoom local de este gráfico. */
+  const zg = useZoomGesto({ dominioMin: Math.max(1, fin) * PASO_MIN })
   if (fin < 2) return null
-  const curvas = maquinas.map((m, idx) => {
-    const propia = m.serie.slice(0, fin)
-    const puntos = propia.map((_, i) => {
-      let pz = 0
-      let n = 0
-      for (let j = Math.max(0, i - 2); j <= i; j++) {
-        pz += propia[j] ?? 0
-        n++
-      }
-      return pz / n / PASO_MIN
-    })
-    /* Los tramos DETENIDA salen del dato crudo, no de la curva: la media de
-       15 min disimula un paro de 5 y las franjas existen justo para verlo. */
-    const paros: Array<{ desde: number; hasta: number }> = []
-    for (let i = 0; i < fin; i++) {
-      if ((propia[i] ?? 0) > 0) continue
-      const desde = i
-      while (i + 1 < fin && (propia[i + 1] ?? 0) === 0) i++
-      paros.push({ desde, hasta: i + 1 })
-    }
-    return { nombre: m.nombre, idx, puntos, paros, targetCpm: m.targetCpm ?? null }
+  const conVivo = ahoraPorNombre != null
+    && maquinas.every((m) => ahoraPorNombre.get(m.nombre) != null)
+  const todas = maquinas.map((m, idx) => {
+    const puntos = m.serie.slice(0, fin).map((pz) => pz / PASO_MIN)
+    if (conVivo) puntos.push(ahoraPorNombre!.get(m.nombre)!)
+    return { nombre: m.nombre, idx, puntos, targetCpm: m.targetCpm ?? null }
   })
-  /* Un objetivo por VALOR, no por máquina: en Chonchi Ev2 y Ev3 comparten 16
-     y dos punteadas idénticas encimadas se leen como un error de dibujo. */
-  const objetivos = [...new Map(
-    curvas
-      .filter((c) => c.targetCpm != null && c.targetCpm > 0)
-      .map((c) => [c.targetCpm!, curvas.filter((x) => x.targetCpm === c.targetCpm).map((x) => nombreCorto(x.nombre))]),
-  ).entries()]
-  const max = Math.max(1, ...curvas.flatMap((c) => c.puntos), ...objetivos.map(([v]) => v))
-  const w = fin - 1
+  const curvas = todas.filter((c) => !ocultas.has(c.nombre))
+  const alternar = (nombre: string) => {
+    const next = new Set(ocultas)
+    if (next.has(nombre)) next.delete(nombre)
+    else next.add(nombre)
+    setOcultas(next.size >= todas.length ? new Set() : next)
+  }
+  /* Índices: 0..fin-1 son tramos cerrados; con pulso fresco hay un punto
+     extra (el vivo) en el índice `fin`. */
+  const nPuntos = fin + (conVivo ? 1 : 0)
+  const max = Math.max(1, ...curvas.flatMap((c) => c.puntos))
+  const w = nPuntos - 1
   const y = (v: number) => 100 - (v / max) * 94 - 3
   const t0 = serie[0]?.t ? Date.parse(serie[0].t) : NaN
   const t1 = serie[fin - 1]?.t ? Date.parse(serie[fin - 1]!.t!) + PASO_MIN * 60_000 : NaN
+  /* Marcas del eje X en horas REDONDAS, ubicadas por ÍNDICE del tramo (la
+     serie puede traer huecos — aritmética de tiempo las correría, gotcha ya
+     pagada en el gráfico grande). Paso de 1 o 2 h según el largo. */
+  const marcasHora = (() => {
+    if (!Number.isFinite(t0) || !Number.isFinite(t1)) return []
+    const pasoH = (t1 - t0) / 3_600_000 > 4.5 ? 2 : 1
+    const out: Array<{ x: number; label: string }> = []
+    const primera = new Date(t0)
+    primera.setUTCMinutes(0, 0, 0)
+    for (let t = primera.getTime() + 3_600_000; t < t1 - 15 * 60_000; t += pasoH * 3_600_000) {
+      let i = 0
+      while (i < fin && Date.parse(serie[i]?.t ?? '') < t) i++
+      if (i <= 0 || i >= fin) continue
+      const x = (i / Math.max(1, w)) * 100
+      /* Pegada a un extremo, la marca se MONTA sobre la hora de inicio/fin
+         (a 375 px se leía «07:2008:00» — visto en el pulido del 27-08). Los
+         extremos ya están rotulados; la marca sobra ahí. */
+      if (x < 10 || x > 88) continue
+      const label = horaPlanta(t)
+      if (label) out.push({ x, label })
+    }
+    return out
+  })()
 
   return (
     <div className="mt-3 border-t border-border/50 pt-2.5">
       <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5 text-caption text-muted-foreground">
-        <span>Velocidad de cada máquina</span>
-        <span className="flex items-center gap-2.5">
-          {curvas.map((c) => (
-            <span key={c.nombre} className="inline-flex items-center gap-1">
-              <span
-                className="inline-block h-1 w-3.5 rounded-full"
-                style={{ background: `var(--mon-maq-${c.idx + 1})` }}
-              />
-              {nombreCorto(c.nombre)}
-            </span>
-          ))}
+        <span>
+          Velocidad de cada máquina
+          <span className="text-muted-foreground/70"> · pz/min por tramo de 5 min</span>
+        </span>
+        <span className="flex items-center gap-1">
+          {/* La leyenda ES el filtro (Orel, 28-08): tocar apaga/prende cada
+              máquina — una, dos o las tres. */}
+          {todas.map((c) => {
+            const oculta = ocultas.has(c.nombre)
+            return (
+              <button
+                key={c.nombre}
+                type="button"
+                onClick={() => alternar(c.nombre)}
+                aria-pressed={!oculta}
+                className={`tap-44 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 ${
+                  oculta ? 'opacity-40' : ''
+                }`}
+              >
+                <span
+                  className="inline-block h-1 w-3.5 rounded-full"
+                  style={{ background: `var(--mon-maq-${c.idx + 1})` }}
+                />
+                {nombreCorto(c.nombre)}
+              </button>
+            )
+          })}
         </span>
       </div>
-      <div className="relative mt-1.5">
-        <svg viewBox={`0 0 ${w} 100`} preserveAspectRatio="none" className="block h-24 w-full" aria-hidden>
-          {/* El OBJETIVO de cada máquina como punteada (como en el detalle de
-              turno): la distancia entre curva y punteada ES la conversación. */}
-          {objetivos.map(([v]) => (
+      {/* El contenedor con SCROLL (paneo nativo) y adentro el contenido que
+          se ensancha con el zoom — el patrón de `useZoomGesto`. El eje de
+          horas va DENTRO del contenido: fuera se queda quieto al panear y
+          pasa a mentir (gotcha ya pagada en el gráfico grande).
+          Sin `touch-none`: el arrastre de un dedo ES el paneo. */}
+      <div {...zg.props} className="relative mt-1.5 -mx-1 overflow-x-auto px-1">
+      <div
+        className="relative cursor-crosshair"
+        style={{ width: `${zg.zoom * 100}%` }}
+        /* El tramo se elige por POSICIÓN del puntero, no con un handler por
+           punto: sin zoom cada tramo mide ~4 px (gotcha ya pagada en el
+           gráfico grande). Pointer events cubren mouse y dedo. */
+        onPointerMove={(e) => {
+          const r = e.currentTarget.getBoundingClientRect()
+          const fr = (e.clientX - r.left) / Math.max(1, r.width)
+          setIdxSel(Math.max(0, Math.min(nPuntos - 1, Math.round(fr * (nPuntos - 1)))))
+        }}
+        onPointerDown={(e) => {
+          const r = e.currentTarget.getBoundingClientRect()
+          const fr = (e.clientX - r.left) / Math.max(1, r.width)
+          setIdxSel(Math.max(0, Math.min(nPuntos - 1, Math.round(fr * (nPuntos - 1)))))
+        }}
+        onPointerLeave={() => setIdxSel(null)}
+      >
+        <svg viewBox={`0 0 ${w} 100`} preserveAspectRatio="none" className="block h-36 w-full" aria-hidden>
+          {/* La línea de la escala: dónde queda el máximo que se alcanzó. */}
+          <line
+            x1={0} y1={y(max)} x2={w} y2={y(max)}
+            className="stroke-foreground/15" strokeDasharray="3 3" vectorEffect="non-scaling-stroke"
+          />
+          {/* Las horas del eje, también como guía vertical tenue: sin ellas
+              los tramos flotaban sin reloj (Orel, 27-08). */}
+          {marcasHora.map((mk) => (
             <line
-              key={v}
-              x1={0} y1={y(v)} x2={w} y2={y(v)}
-              stroke="var(--mon-cuota)"
-              strokeDasharray="4 3"
-              vectorEffect="non-scaling-stroke"
+              key={mk.label}
+              x1={(mk.x / 100) * w} y1={0} x2={(mk.x / 100) * w} y2={100}
+              className="stroke-foreground/10" vectorEffect="non-scaling-stroke"
             />
           ))}
-          {objetivos.length === 0 && (
-            <line
-              x1={0} y1={y(max)} x2={w} y2={y(max)}
-              className="stroke-foreground/15" strokeDasharray="3 3" vectorEffect="non-scaling-stroke"
-            />
-          )}
           {curvas.map((c) => (
-            <polyline
+            <path
               key={c.nombre}
-              points={c.puntos.map((v, i) => `${i},${y(v)}`).join(' ')}
+              d={pathSuave(c.puntos.map((v) => y(v)))}
               fill="none"
               stroke={`var(--mon-maq-${c.idx + 1})`}
               strokeWidth={2}
@@ -2818,62 +3281,379 @@ function CurvasMaquinas({ serie, maquinas }: {
             />
           ))}
         </svg>
-        {/* Etiquetas en HTML: dentro del SVG estirado el texto se deforma. */}
-        {objetivos.map(([v, quienes]) => (
+        {/* Con fondo: sobre un pico de las curvas el texto era ilegible. */}
+        <span
+          className="absolute left-0 top-0 rounded-full px-1 text-[10px] tabular-nums text-muted-foreground/80"
+          style={{ background: 'rgb(var(--card) / 0.8)' }}
+        >
+          {fmtDec(max)} pz/min
+        </span>
+        {/* El punto VIVO al final de cada curva (un círculo en el SVG estirado
+            sale elipse — va en HTML): es el «ahora» de la columna de arriba. */}
+        {conVivo && curvas.map((c) => (
           <span
-            key={v}
-            className="absolute right-0 -translate-y-full whitespace-nowrap text-[10px] tabular-nums"
-            style={{ top: `${y(v)}%`, color: 'var(--mon-cuota)' }}
-          >
-            obj {fmtDec(v, 0)} · {quienes.join('·')}
-          </span>
+            key={c.nombre}
+            className="pointer-events-none absolute h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full"
+            style={{
+              left: '100%',
+              top: `${y(c.puntos[nPuntos - 1] ?? 0)}%`,
+              background: `var(--mon-maq-${c.idx + 1})`,
+              boxShadow: '0 0 0 1.5px rgb(var(--card))',
+            }}
+          />
         ))}
-        {objetivos.length === 0 && (
-          <span className="absolute left-0 top-0 text-[10px] tabular-nums text-muted-foreground/80">
-            {fmtDec(max)} pz/min
-          </span>
-        )}
-      </div>
-      {/* Las franjas de DETENCIÓN, un carril por máquina en su color: quién
-          paró y cuándo, sin que la media móvil lo disimule. */}
-      <div className="mt-1 space-y-0.5">
-        {curvas.map((c) => (
-          <div key={c.nombre} className="relative h-1 w-full overflow-hidden rounded-full"
-            style={{ background: 'color-mix(in srgb, rgb(var(--muted-foreground)) 12%, transparent)' }}
-            title={`${nombreCorto(c.nombre)}: tramos detenida`}
-          >
-            {c.paros.map((p) => (
+        {/* ── El detalle bajo el dedo: marcador + valores del tramo ─────────
+            La hora sale del TIMESTAMP del tramo, no de aritmética con el
+            índice — la serie puede traer huecos (gotcha ya pagada). Todo en
+            HTML: dentro del SVG estirado, texto y círculos se deforman. */}
+        {idxSel != null && (() => {
+          const esVivo = conVivo && idxSel === nPuntos - 1
+          const xPct = (idxSel / Math.max(1, nPuntos - 1)) * 100
+          const tSel = !esVivo && serie[idxSel]?.t ? Date.parse(serie[idxSel]!.t!) : NaN
+          const valores = curvas.map((c) => ({ c, v: c.puntos[idxSel] ?? 0 }))
+          const linea = valores.reduce((a, x) => a + x.v, 0)
+          return (
+            <>
               <span
-                key={p.desde}
-                className="absolute inset-y-0"
-                style={{
-                  left: `${(p.desde / fin) * 100}%`,
-                  width: `${Math.max(0.8, ((p.hasta - p.desde) / fin) * 100)}%`,
-                  background: `var(--mon-maq-${c.idx + 1})`,
-                }}
+                className="pointer-events-none absolute inset-y-0 w-px bg-foreground/40"
+                style={{ left: `${xPct}%` }}
               />
-            ))}
-          </div>
+              {valores.map(({ c, v }) => (
+                <span
+                  key={c.nombre}
+                  className="pointer-events-none absolute h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full"
+                  style={{
+                    left: `${xPct}%`,
+                    top: `${y(v)}%`,
+                    background: `var(--mon-maq-${c.idx + 1})`,
+                    boxShadow: '0 0 0 1.5px rgb(var(--card))',
+                  }}
+                />
+              ))}
+              <div
+                className="pointer-events-none absolute z-10 rounded-ctl border border-border bg-card px-2 py-1.5 text-[11px] leading-tight shadow-sm"
+                style={{
+                  top: 2,
+                  left: `${Math.min(72, Math.max(0, xPct + 2))}%`,
+                }}
+              >
+                {esVivo ? (
+                  <div className="mb-0.5 font-semibold tabular-nums text-foreground">
+                    ahora mismo{ahoraAt ? ` · ${new Date(ahoraAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false })}` : ''}
+                  </div>
+                ) : Number.isFinite(tSel) && (
+                  <div className="mb-0.5 font-semibold tabular-nums text-foreground">
+                    {horaPlanta(tSel)}–{horaPlanta(tSel + PASO_MIN * 60_000)}
+                  </div>
+                )}
+                {valores.map(({ c, v }) => (
+                  <div key={c.nombre} className="flex items-center gap-1.5 tabular-nums text-muted-foreground">
+                    <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: `var(--mon-maq-${c.idx + 1})` }} />
+                    {nombreCorto(c.nombre)} <b className="text-foreground">{fmtDec(v)}</b>
+                    {c.targetCpm != null && c.targetCpm > 0 && (
+                      <span className="text-muted-foreground/70">/ obj {fmtDec(c.targetCpm, 0)}</span>
+                    )}
+                  </div>
+                ))}
+                {/* Los crudos por máquina SUMAN el de la línea en ese tramo —
+                    y en el punto vivo, el «Ahora» grande de arriba. */}
+                <div className="mt-0.5 border-t border-border/50 pt-0.5 tabular-nums text-muted-foreground">
+                  línea <b className="text-foreground">{fmtDec(linea)}</b> pz/min
+                </div>
+              </div>
+            </>
+          )
+        })()}
+      {/* El eje X, DENTRO del contenido escalado: horas redondas ubicadas
+          por índice de tramo, extremos anclados al borde (centrados, media
+          etiqueta queda fuera — gotcha ya pagada). */}
+      <div className="relative mt-0.5 h-4 text-[10px] tabular-nums text-muted-foreground/80">
+        <span className="absolute left-0">{Number.isFinite(t0) ? horaPlanta(t0) : ''}</span>
+        {marcasHora.map((mk) => (
+          <span key={mk.label} className="absolute -translate-x-1/2" style={{ left: `${Math.min(92, Math.max(8, mk.x))}%` }}>
+            {mk.label}
+          </span>
         ))}
+        <span className="absolute right-0">
+          {conVivo ? 'ahora' : Number.isFinite(t1) ? horaPlanta(t1) : ''}
+        </span>
       </div>
-      <div className="mt-0.5 flex items-baseline justify-between text-[10px] tabular-nums text-muted-foreground/80">
-        <span>{Number.isFinite(t0) ? horaPlanta(t0) : ''}</span>
-        <span className="text-muted-foreground">media de 15 min, pz/min · mientras corre</span>
-        <span>{Number.isFinite(t1) ? horaPlanta(t1) : ''}</span>
       </div>
-      <p className="mt-1 text-caption leading-snug text-muted-foreground/80">
-        {objetivos.length > 0 && (
-          <>La punteada es el <b>objetivo</b> de cada máquina según Shoplogix
-            {objetivos.length > 1 && ' (no son el mismo modelo: no compararlas entre sí por % del objetivo)'}. </>
+      </div>
+      <div className="mt-0.5 flex items-center justify-end gap-2 text-[10px] text-muted-foreground/70">
+        {zg.acercado ? (
+          <button type="button" onClick={zg.verTodo} className="tap-44 underline decoration-dotted underline-offset-2">
+            ver todo el turno
+          </button>
+        ) : (
+          <span>pellizcá o rodá (ctrl+rueda) para acercar</span>
         )}
-        Las franjas de abajo marcan cuándo cada una estuvo <b>detenida</b> (un carril por máquina,
-        mismo color que su curva).
-      </p>
+      </div>
     </div>
   )
 }
 
-function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrado, onEditarSetPoint, cerrado, contexto, chispa, corteMs, ahoraWallMs, pulso, maquinas, parada, serieLinea, seriesMaquinas }: {
+/**
+ * Las barras minuto a minuto (opción A, Orel 29-08): la serie del turno que
+ * publica el pulso, con el nombre de cada máquina ya resuelto.
+ */
+interface BarrasMinutoDatos {
+  desde: string
+  maquinas: Array<{ id: string; nombre: string; esperado: number | null; cycles: number[] }>
+}
+
+/** Ancho mínimo de barra para que el número de dos cifras quepa sin pisarse. */
+const PX_MIN_NUMERO = 15
+/**
+ * Ancho de barra al que APUNTA la ventana por defecto. Va por encima del
+ * mínimo a propósito: calcular la ventana con el mismo umbral que después
+ * decide si los números caben dejaba el resultado justo en el límite, y por
+ * redondeo la vista abría SIN números (Orel, 29-08).
+ */
+const PX_BARRA_OBJETIVO = 19
+
+/**
+ * Barras de 1 minuto con el número adentro — el ESPEJO del cronómetro de
+ * Shoplogix («que el ahora muestre el dato que la barra muestra en Shoplogix
+ * para cada Baader», Orel 29-08). Una franja por máquina y arriba la de la
+ * línea (la suma). Color por % del esperado, los mismos cortes que usa
+ * Shoplogix en sus barras: ≥75% ok, 50–75% atención, <50% crítico.
+ *
+ * La ventana por defecto son los últimos 40 min SIGUIENDO la cola del turno;
+ * en cuanto la persona zoomea o panea, la vista es suya y no se le mueve.
+ * Alejando todo el turno, los números no caben y se esconden (quedan las
+ * barras y el `title` de cada una).
+ */
+function BarrasMinuto({ datos, cerrado }: { datos: BarrasMinutoDatos; cerrado?: boolean }) {
+  const n = Math.min(...datos.maquinas.map((m) => m.cycles.length))
+  const [tocado, setTocado] = useState(false)
+  const [ventana, setVentana] = useState<Ventana | null>(null)
+  /* El ancho visible se mide en el PADRE del contenedor con scroll (mismo
+     ancho): el ref del scroll es del hook. Decide si los números caben y
+     cuántos minutos entran en la ventana por defecto. */
+  const medidorRef = useRef<HTMLDivElement>(null)
+  const [anchoPx, setAnchoPx] = useState(0)
+  useEffect(() => {
+    const el = medidorRef.current
+    if (!el) return
+    const ro = new ResizeObserver(() => setAnchoPx(el.clientWidth))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  /* Ventana por defecto ADAPTADA al ancho: los minutos que caben con número
+     legible (a 375 px son ~23, en desktop ~60). Sigue la cola del turno hasta
+     que la persona zoomea o panea; ahí la vista es suya.
+     OJO: con ancho de sobra —PC, TV— se muestra el TURNO ENTERO: los números no
+     entran, pero la forma completa del turno vale más que 40 minutos con
+     cifras (en el celular hay que pellizcar para recorrerlo). El corte son
+     ~2,5 px por minuto, medido: menos que eso las barras dejan de leerse. */
+  const cabeEnteroPx = n * 2.5
+  const ventanaDef = anchoPx <= 0
+    ? null
+    : anchoPx >= cabeEnteroPx
+      ? n
+      : Math.max(20, Math.min(60, Math.floor(anchoPx / PX_BARRA_OBJETIVO)))
+  useEffect(() => {
+    if (tocado || ventanaDef == null) return
+    setVentana(n > ventanaDef ? { desdeMin: n - ventanaDef, hastaMin: n } : null)
+  }, [n, tocado, ventanaDef])
+  const zg = useZoomGesto({
+    dominioMin: Math.max(1, n),
+    ventana,
+    /* El scroll programado también publica ventana: solo cuenta como gesto de
+       la persona cuando la vista DEJÓ la cola — ahí la vista es suya. */
+    onVentana: (v) => {
+      const esCola = v != null && v.hastaMin >= n - 2
+        && ventanaDef != null && Math.abs((v.hastaMin - v.desdeMin) - ventanaDef) <= 2
+      if (!esCola) setTocado(true)
+      setVentana(v)
+    },
+  })
+  /* Mientras nadie tomó el control, el scroll queda CLAVADO a la cola (el
+     presente). La adopción del hook posiciona por rAF y a veces llega antes
+     de que el contenido tenga su ancho nuevo — este ancla es determinista. */
+  const scrollRef = zg.props.ref
+  useEffect(() => {
+    if (tocado) return
+    const el = scrollRef.current
+    if (el) el.scrollLeft = el.scrollWidth
+  })
+  /* «Que siempre se muestre la última» (Orel, 30-08, mirando Yal en vivo):
+     cuando llegan minutos nuevos, la vista ZOOMEADA también se corre con la
+     cola — antes solo seguía la vista virgen, y a los 20 min de mirar con
+     zoom el presente quedaba fuera de cuadro. La única vista que NO se toca
+     es la que se fue a la HISTORIA: quien revisa un tramo viejo no está
+     mirando la última, y arrancársela cada minuto sería hostil. */
+  const nPrevRef = useRef(n)
+  useEffect(() => {
+    const prev = nPrevRef.current
+    nPrevRef.current = n
+    if (n <= prev) return
+    if (!tocado || ventana == null) return       // la vista virgen ya la ancla el scroll
+    if (ventana.hastaMin < prev - 2) return      // está en la historia: su vista es suya
+    const delta = n - prev
+    setVentana({ desdeMin: ventana.desdeMin + delta, hastaMin: ventana.hastaMin + delta })
+  }, [n, tocado, ventana])
+  if (n < 2) return null
+
+  const t0 = Date.parse(datos.desde)
+  const suma = Array.from({ length: n }, (_, i) =>
+    datos.maquinas.reduce((a, m) => a + (m.cycles[i] ?? 0), 0))
+  const esperadoLinea = datos.maquinas.every((m) => m.esperado != null && m.esperado > 0)
+    ? datos.maquinas.reduce((a, m) => a + m.esperado!, 0)
+    : null
+  const pxBarra = anchoPx > 0 ? (anchoPx * zg.zoom) / n : 0
+  const conNumeros = pxBarra >= PX_MIN_NUMERO
+
+  /* Marcas de hora cada N minutos, con N elegido para que no se pisen. */
+  const cadaMin = pxBarra > 0 ? Math.max(5, Math.ceil(48 / pxBarra / 5) * 5) : 60
+  const marcas: number[] = []
+  for (let i = 0; i < n; i++) {
+    if ((t0 + i * 60_000) % (cadaMin * 60_000) === 0 && i > 0 && i < n - 2) marcas.push(i)
+  }
+
+  /* Semáforo por % del esperado, los mismos cortes de Shoplogix. La franja
+     PRINCIPAL (la línea) va con el tinte pleno; las de máquina, suavizado —
+     jerarquía por intensidad, sin bordes (§38 de la piel: relleno O borde).
+     OJO: clases LITERALES — Tailwind no genera nombres armados en runtime. */
+  const SEMAFORO = {
+    ok: { pleno: 'bg-ink-ok/[0.3]', suave: 'bg-ink-ok/[0.14]', num: 'text-ink-ok' },
+    warn: { pleno: 'bg-ink-warn/[0.3]', suave: 'bg-ink-warn/[0.14]', num: 'text-ink-warn' },
+    crit: { pleno: 'bg-ink-crit/[0.3]', suave: 'bg-ink-crit/[0.14]', num: 'text-ink-crit' },
+  } as const
+  const claseDe = (v: number, esperado: number | null, principal: boolean) => {
+    if (esperado == null || esperado <= 0) return { barra: 'bg-muted', num: 'text-muted-foreground' }
+    const r = v / esperado
+    const s = SEMAFORO[r >= 0.75 ? 'ok' : r >= 0.5 ? 'warn' : 'crit']
+    return { barra: principal ? s.pleno : s.suave, num: s.num }
+  }
+
+  const franja = (nombre: string, esperado: number | null, vals: number[], altoPx: number, principal = false) => {
+    const tope = Math.max(esperado ?? 0, ...vals.slice(0, n), 1)
+    return (
+      /* En la TV va la LÍNEA y no las tres franjas por máquina: a 3 m no se
+         distinguen y son las que hacen que el tablero no quepa en 1080. */
+      <div key={nombre} className={principal ? '' : 'pantalla-oculta mt-2'}>
+        {/* Pegado al borde izquierdo VISIBLE (sticky): el contenido está
+            ensanchado por el zoom y un header normal se va con el paneo. */}
+        <div
+          className="sticky left-0 z-10 w-fit rounded-full px-1 text-caption text-muted-foreground"
+          style={{ background: 'rgb(var(--card) / 0.85)' }}
+        >
+          <b className="font-semibold text-foreground/80">{nombre}</b>
+          {esperado != null && <span className="text-muted-foreground/80"> · esperado {fmtDec(esperado, 0)} pz/min</span>}
+        </div>
+        <div className="mt-0.5 flex items-stretch gap-[1px]" style={{ height: altoPx }}>
+          {vals.slice(0, n).map((v, i) => {
+            const c = claseDe(v, esperado, principal)
+            return (
+              <div
+                key={i}
+                className="relative flex min-w-0 flex-1 flex-col justify-end"
+                title={`${horaPlanta(t0 + i * 60_000)} · ${nombre}: ${v}${esperado != null ? ` / ${esperado}` : ''} pz`}
+              >
+                <div
+                  className={`w-full rounded-[3px] ${c.barra}`}
+                  style={{ height: `${Math.max(v > 0 ? 8 : 3, (v / tope) * 100)}%` }}
+                />
+                {conNumeros && v > 0 && (
+                  <b className={`pointer-events-none absolute inset-x-0 bottom-0 text-center font-semibold tabular-nums ${principal ? 'text-[13px] font-bold' : 'text-[11px]'} ${c.num}`}>
+                    {v}
+                  </b>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    /* `barras-ancho`: históricamente la marca de ancho completo; hoy además
+       la ancla del medidor. Ya no vive dentro de la tarjeta de ritmo —es
+       tarjeta propia del tablero— así que perdió el separador de cuando era
+       la tercera cosa de un bloque. */
+    <div ref={medidorRef} className="barras-ancho">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5 text-caption text-muted-foreground">
+        <span>
+          Velocidad minuto a minuto
+          <span className="text-muted-foreground/70"> · piezas contadas por Shoplogix</span>
+        </span>
+        <span className="text-muted-foreground/70">
+          {cerrado ? 'turno cerrado' : `hasta las ${horaPlanta(t0 + n * 60_000)}`}
+        </span>
+      </div>
+      <div {...zg.props} className="relative mt-1 -mx-1 overflow-x-auto px-1">
+        <div className="relative" style={{ width: `${zg.zoom * 100}%` }}>
+          {/* Guías verticales de las horas, atrás de todas las franjas. */}
+          {marcas.map((i) => (
+            <span
+              key={`g${i}`}
+              className="pointer-events-none absolute inset-y-0 w-px bg-foreground/10"
+              style={{ left: `${((i + 0.5) / n) * 100}%` }}
+            />
+          ))}
+          {/* La SUMA enmarcada con fondo propio (pedido de Orel, 29-08): la
+              banda usa el FONDO DE PÁGINA — se ve "hundida" en la tarjeta,
+              más oscura que ella en tema oscuro y más clara en claro (ajuste
+              de contraste pedido por Orel). Sin línea de borde (§38) y sin
+              padding horizontal: las columnas de minuto deben quedar
+              ALINEADAS con las franjas de abajo. */}
+          <div className="rounded-[10px] bg-background/[0.7] pb-1.5 pt-1">
+            {franja(
+              datos.maquinas.length > 1 ? 'Línea (las ' + datos.maquinas.length + ' suman)' : 'Línea',
+              esperadoLinea, suma, 88, true,
+            )}
+          </div>
+          {datos.maquinas.length > 1 && datos.maquinas.map((m) =>
+            franja(nombreCorto(m.nombre), m.esperado, m.cycles, 44))}
+          <div className="relative mt-0.5 h-4 text-[11px] tabular-nums text-muted-foreground/80">
+            {/* Todas las marcas menos las que se montarían con el rótulo del
+                presente — la colisión se mide en PÍXELES reales, no en % del
+                contenido: el filtro viejo (x<94%) borraba las horas del último
+                tramo del turno, justo donde mira quien sigue la cola (Orel,
+                30-08, Yal en vivo: media hora final sin una sola hora). */}
+            {marcas
+              .filter((i) => pxBarra <= 0 || (n - i) * pxBarra >= 56)
+              .map((i) => (
+                <span key={`m${i}`} className="absolute -translate-x-1/2" style={{ left: `${((i + 0.5) / n) * 100}%` }}>
+                  {horaPlanta(t0 + i * 60_000)}
+                </span>
+              ))}
+            {/* El PRESENTE, clavado al final del contenido: siguiendo la cola
+                siempre se ve a qué hora llega la última barra. */}
+            <span className="absolute right-0 font-semibold text-foreground/70">
+              {horaPlanta(t0 + n * 60_000)}
+            </span>
+          </div>
+        </div>
+      </div>
+      <div className="pantalla-oculta mt-0.5 flex items-center justify-between gap-2 text-[11px] text-muted-foreground/70">
+        <span>
+          cada barra es un minuto — verde ≥75% del esperado, ámbar 50–75%, rojo &lt;50%
+        </span>
+        {zg.acercado ? (
+          <button type="button" onClick={zg.verTodo} className="tap-44 underline decoration-dotted underline-offset-2">
+            ver todo el turno
+          </button>
+        ) : (
+          <span className="shrink-0">pellizcá o rodá (ctrl+rueda) para acercar</span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function ReglaDeRitmo({ parte, ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrado, onEditarSetPoint, cerrado, contexto, chispa, corteMs, ahoraWallMs, pulso, pulsoNodo, vivo, maquinas, parada, serieLinea, seriesMaquinas, barras, refAporte, refAporteUltimo, producingMin }: {
+  /**
+   * Qué TARJETA del tablero renderiza esta llamada (pedido de Orel, 30-08:
+   * «separemos esto en 3 partes para poder acomodarlo mejor»). Era UNA
+   * tarjeta con tres cosas adentro —estado, rango habitual y la tira del
+   * minuto— y así ninguna se podía mover ni dimensionar por separado. El
+   * call-site arma las props UNA vez y llama tres veces.
+   */
+  parte: 'estado' | 'minuto' | 'rango'
   /**
    * Ritmo de ahora ANDANDO, en pz/min: los últimos 15 min descontando los
    * tramos parados. Va en esta base y no en la de reloj porque es contra lo
@@ -2904,6 +3684,16 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
   techoDemostrado?: number | null
   /** Cada máquina de la línea, con su ritmo: pedido de Orel (26-08). */
   maquinas?: RitmosPorMaquina | null
+  /**
+   * El aporte promedio de cada máquina en sus últimos 5 turnos del mismo
+   * número, para que cada Baader compita CONTRA SÍ MISMA (Orel, 31-08).
+   * null = no hay muestra todavía y no se muestra ningún delta.
+   */
+  refAporte?: ReferenciaAporte | null
+  /** La misma referencia pero del turno ANTERIOR solo (muestra de 1). */
+  refAporteUltimo?: ReferenciaAporte | null
+  /** Minutos produciendo de la línea en el turno visto: la puerta del delta. */
+  producingMin?: number | null
   /**
    * La línea NO está produciendo ahora mismo (colación o paro).
    *
@@ -2937,12 +3727,26 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
   ahoraWallMs?: number | null
   /** Ritmo casi instantáneo (~4 min) que ya calcula el backend. */
   pulso?: { cpm?: number | null; at?: string | null } | null
+  /** El chip de PulsoVivo (además refresca `data.pulse`): vive dentro de esta
+      tarjeta para viajar con ella cuando el tablero la mueve. */
+  pulsoNodo?: React.ReactNode
+  /**
+   * El ritmo VIVO elegido por `pulsoVivo`: el cpm fresco o, en los silencios
+   * cortos del contador, el último vivo arrastrado (marcado `recalibrando`).
+   * La tarjeta muestra ESTE como «Ahora» — la media de 15 min queda solo
+   * para cuando ni siquiera hay un vivo reciente (pedido de Orel, 29-08:
+   * «quiero la realidad del ahora, no la media»).
+   */
+  vivo?: PulsoVivoElegido | null
   /** La serie de la línea (la misma de los gráficos), para el eje de tiempo
       de las curvas por máquina. */
   serieLinea?: readonly TramoSerie[] | null
   /** Piezas por bucket de cada máquina, alineadas a `serieLinea`. Solo llega
       cuando el doc ya trae el desglose (docs nuevos). */
   seriesMaquinas?: { nombre: string; serie: number[]; targetCpm?: number | null }[] | null
+  /** La serie minuto a minuto del pulso (dato duro). Con esto presente, las
+      barras reemplazan a las curvas de 5 min. */
+  barras?: BarrasMinutoDatos | null
 }) {
   /*
    * ⚠ El estado se juzga contra el OBJETIVO cuando se conoce, no contra la
@@ -2955,10 +3759,15 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
   const frescura = frescuraDelRitmo(corteMs, ahoraWallMs)
   const vara = pedido && pedido > 0 ? pedido : setCpm
   const estado = estadoRitmo(ahora, vara)
-  const fr = fraccionDeRegla(ahora, setCpm)
-  const frTurno = fraccionDeRegla(turno, setCpm)
-  const frPedido = fraccionDeRegla(pedido ?? null, setCpm)
+  /* La ESCALA de la regla: el set point si existe y, si no, el TECHO
+     DEMOSTRADO — el mejor ritmo andando de los últimos turnos. Antes, sin
+     set point (Eviscerado no tiene uno de línea), `fraccionDeRegla` caía al
+     propio ritmo como tope y la barra vivía SIEMPRE llena: solo cambiaba de
+     color, no informaba nada (Orel, ronda de pulido del 27-08). */
   const techoDeLaLinea = setCpm != null && setCpm > 0 ? setCpm : (techoDemostrado ?? null)
+  const fr = fraccionDeRegla(ahora, techoDeLaLinea)
+  const frTurno = fraccionDeRegla(turno, techoDeLaLinea)
+  const frPedido = fraccionDeRegla(pedido ?? null, techoDeLaLinea)
   const pedidoImposible = pedidoFueraDeAlcance(pedido, techoDeLaLinea)
   /* El estado SIEMPRE se dice con palabra además de color: en planta hay
      pantallas quemadas por el sol y gente que no distingue rojo de verde. */
@@ -2971,6 +3780,70 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
     ? 'bg-ink-ok' : estado === 'lento' ? 'bg-ink-warn' : 'bg-ink-crit'
   const colorPunto = estado === 'ok'
     ? 'text-ink-ok' : estado === 'lento' ? 'text-ink-warn' : 'text-ink-crit'
+
+  /* ── Tarjeta «Velocidad minuto a minuto» ──────────────────────────────
+     Las barras del dato duro cuando el pulso publica la serie; si no, las
+     curvas de 5 min de siempre (turnos pasados y docs sin la serie). El
+     call-site solo la monta cuando hay algo que dibujar. */
+  if (parte === 'minuto') {
+    return (
+      <section className="rounded-card border border-border bg-card p-4">
+        {barras ? (
+          <BarrasMinuto datos={barras} cerrado={cerrado} />
+        ) : serieLinea && serieLinea.length > 1 && seriesMaquinas && seriesMaquinas.length > 1 ? (
+          <>
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+              Velocidad de cada máquina
+            </div>
+            {/* Acá se ve QUIÉN bajó la línea y cuándo, no solo cuánto (pedido
+                de Orel, 26-08). Solo con docs nuevos (los viejos no traen el
+                desglose). */}
+            <CurvasMaquinas
+              serie={serieLinea}
+              maquinas={seriesMaquinas}
+              /* El punto vivo SOLO con el pulso fresco y completo — la misma
+                 condición de la columna «ahora», para que gráfico y columna
+                 digan lo mismo. */
+              ahoraPorNombre={
+                !parada && !cerrado && vivo != null
+                && maquinas != null && maquinas.maquinas.every((m) => m.pulsoCpm != null)
+                  ? new Map(maquinas.maquinas.map((m) => [m.nombre, m.pulsoCpm!]))
+                  : null
+              }
+              ahoraAt={vivo?.at ?? null}
+            />
+          </>
+        ) : null}
+      </section>
+    )
+  }
+
+  /* ── Tarjeta «Rango habitual» ─────────────────────────────────────────
+     El histórico, con la conclusión ANTES que el dibujo (rediseño 26-08). Es
+     análisis: no entra en la TV, y como tarjeta propia por fin se puede
+     acomodar — pegada al estado dejaba el hueco más grande de la página. */
+  if (parte === 'rango') {
+    return (
+      <section className="rounded-card border border-border bg-card p-4">
+        <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+          <Gauge className="h-3 w-3" />
+          Rango habitual de la línea
+        </div>
+        {contexto && (
+          <p className="mt-1.5 text-footnote leading-snug text-foreground">{contexto}</p>
+        )}
+        {/* QUÉ velocidad dibuja, escrito (pedido de Orel, 26-08): sin la
+            etiqueta, el gráfico era «una velocidad» más entre varias. */}
+        {chispa && (
+          <p className="mt-1 text-caption text-muted-foreground/80">
+            Ritmo promedio <b className="text-muted-foreground">andando</b> de cada turno, pz/min
+            — la misma vara del «Promedio del turno» de arriba.
+          </p>
+        )}
+        {chispa}
+      </section>
+    )
+  }
 
   return (
     <section className="rounded-card border border-border bg-card p-4">
@@ -2997,7 +3870,7 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
           <div className="flex flex-wrap items-baseline gap-x-1.5">
             <span className="text-[42px] font-semibold leading-none tabular-nums text-foreground">
               {parada || cerrado ? '0,0'
-                : pulso?.cpm != null ? fmtDec(pulso.cpm)
+                : vivo != null ? fmtDec(vivo.cpm)
                 : ahora != null ? fmtDec(ahora) : '—'}
             </span>
             <span className="text-[15px] text-muted-foreground">pz/min</span>
@@ -3010,7 +3883,7 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
             aparece cuando el número grande es el pulso — sin pulso, el grande
             YA ES la media y repetirla sería el tercer «ahora». */}
         <div className="ml-auto shrink-0 space-y-0.5 text-right">
-          {!parada && !cerrado && pulso?.cpm != null && ahora != null && (
+          {!parada && !cerrado && vivo != null && ahora != null && (
             <div className="flex items-baseline justify-end gap-x-1.5">
               <span className="text-caption text-muted-foreground">media 15 min</span>
               <span className="text-headline tabular-nums text-foreground">{fmtDec(ahora)}</span>
@@ -3031,18 +3904,21 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
           parada y cierre tienen su bloque propio abajo. */}
       {!parada && !cerrado && (
         <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12px] text-muted-foreground">
-          {pulso?.cpm != null ? (
+          {vivo != null ? (
             <>
               <span className="inline-flex items-center gap-1 font-medium text-foreground/80">
                 <span className="inline-block size-1.5 rounded-full bg-ink-ok" />
                 ahora mismo
-                {pulso.at && (
-                  <span className="tabular-nums text-muted-foreground">
-                    · {new Date(pulso.at).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false })}
-                  </span>
-                )}
+                <span className="tabular-nums text-muted-foreground">
+                  · {new Date(vivo.at).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false })}
+                </span>
               </span>
-              <span className="text-muted-foreground/80">el contador de la pantalla de planta</span>
+              {/* Con el vivo arrastrado la hora de arriba YA es la del dato:
+                  acá solo se dice POR QUÉ no hay uno más nuevo. */}
+              {vivo.recalibrando
+                ? <span className="text-muted-foreground/80">contador recalibrando — último ritmo vivo</span>
+                : <span className="text-muted-foreground/80">el contador de la pantalla de planta</span>}
+              <CuentaAtrasPulso at={pulso?.at} />
               {/* El número de la media ya vive arriba, con rótulo. Acá queda
                   solo el VEREDICTO (que se juzga sobre esa media, no sobre el
                   pulso: el pulso salta demasiado para sentenciar). */}
@@ -3081,7 +3957,7 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
 
       {/* Qué expresa cada cifra, dicho UNA vez (pedido de Orel, 26-08: tres
           ritmos sin explicación se leían como contradicción). */}
-      {!parada && !cerrado && pulso?.cpm != null && ahora != null && (
+      {!parada && !cerrado && vivo != null && ahora != null && (
         <p className="mt-1 text-[11px] leading-snug text-muted-foreground/80">
           <b className="text-muted-foreground">Ahora</b> salta con la línea;{' '}
           la <b className="text-muted-foreground">media 15 min</b> es el ritmo sostenido reciente
@@ -3104,7 +3980,9 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
             )}
           </div>
           <p className="mt-1 text-caption text-muted-foreground/80">
-            {cerrado ? 'Fin de turno. ' : parada?.desdeHace ? `Sin producir hace ${parada.desdeHace}. ` : ''}
+            {/* `desdeHace` YA viene con el «hace» adentro (`fmtAgoWall`): el
+                template lo repetía — «Sin producir hace hace 38 min». */}
+            {cerrado ? 'Fin de turno. ' : parada?.desdeHace ? `Sin producir ${parada.desdeHace}. ` : ''}
             {ahora != null && ahora > 0 && (
               <>Venía a <span className="tabular-nums text-foreground/80">{fmtDec(ahora)}</span> pz/min
               los últimos 15 min corriendo.</>
@@ -3113,8 +3991,9 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
         </div>
       )}
       {/* ── La regla ──────────────────────────────────────────────────────
-          0 → set point. El relleno es AHORA, la marca es el promedio del
-          turno y el final es lo que da la máquina. */}
+          0 → set point (o el techo demostrado si la línea no tiene uno). El
+          relleno es la media 15 andando, la marca es la meta (o el promedio)
+          y el final es lo que la línea puede dar. */}
       <div className="mt-3">
         <div className="relative h-2.5 overflow-hidden rounded-full bg-muted">
           <span
@@ -3124,7 +4003,7 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
           {/* La marca es el OBJETIVO: dónde tendría que estar el relleno para
               llegar a la cuota. Que el relleno la pase o no la alcance ES la
               respuesta, sin leer un número. */}
-          {pedido != null && pedido > 0 && setCpm != null && setCpm > 0 && (
+          {pedido != null && pedido > 0 && techoDeLaLinea != null && techoDeLaLinea > 0 && (
             <span
               className={`absolute inset-y-0 w-0.5 ${pedidoImposible ? 'bg-foreground/30' : 'bg-foreground'}`}
               style={{ left: `${frPedido * 100}%` }}
@@ -3134,7 +4013,7 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
             />
           )}
           {/* Sin objetivo conocido, la referencia posible es el promedio del turno. */}
-          {(pedido == null || pedido <= 0) && turno != null && turno > 0 && setCpm != null && setCpm > 0 && (
+          {(pedido == null || pedido <= 0) && turno != null && turno > 0 && techoDeLaLinea != null && techoDeLaLinea > 0 && (
             <span
               className="absolute inset-y-0 w-0.5 bg-foreground/45"
               style={{ left: `${frTurno * 100}%` }}
@@ -3161,8 +4040,9 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
                 : 'línea, todo el turno —'}
           </span>
           {/* La etiqueta del techo ES el control: a 375 px no cabe un lápiz
-              extra sin pisarla. */}
-          {setCpm != null && setCpm > 0 && (
+              extra sin pisarla. Sin set point, el final de la barra es el
+              TECHO DEMOSTRADO y se rotula como tal. */}
+          {setCpm != null && setCpm > 0 ? (
             onEditarSetPoint ? (
               <button
                 type="button"
@@ -3174,10 +4054,20 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
             ) : (
               <span className="tabular-nums">{fmtDec(setCpm)} máquina</span>
             )
-          )}
+          ) : techoDemostrado != null && techoDemostrado > 0 ? (
+            <span
+              className="tabular-nums"
+              title="El mejor ritmo andando de los últimos turnos de este nombre — lo que la línea demostró que puede."
+            >
+              techo {fmtDec(techoDemostrado)}
+            </span>
+          ) : null}
         </div>
       </div>
 
+      {/* El chip del pulso, entre la escala y las máquinas: la misma pregunta
+          que el número grande, con la hora del contador de Shoplogix. */}
+      {pulsoNodo}
       {/* ── Cada máquina, como lista con barra de marcha ─────────────────────
           El número que hay que mirar es casi el mismo en las tres, así que el
           LARGO de la barra es el uptime, no la velocidad: el ojo ve de una
@@ -3194,18 +4084,76 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
           produciendo de la línea). El «mientras anduvo» no se pierde: queda en
           el globito de cada fila y, sobre todo, en las curvas de abajo. */}
       {maquinas && maquinas.maquinas.length > 1 && (() => {
-        const conReparto = !parada && !cerrado && maquinas.maquinas.every((m) => m.ahoraCpm != null)
+        /* La columna izquierda, por prioridad (Orel, 27-08): el AHORA real de
+           cada máquina —el pulso del contador, que por construcción SUMA el
+           «Ahora» grande—, y solo si el desglose del pulso no está, la media
+           de 15 min (que suma la media de arriba). Dos varas posibles, nunca
+           las dos: cada una con su rótulo. */
+        const conPulsoMaq = !parada && !cerrado && vivo != null
+          && maquinas.maquinas.every((m) => m.pulsoCpm != null)
+        const conReparto = !conPulsoMaq && !parada && !cerrado
+          && maquinas.maquinas.every((m) => m.ahoraCpm != null)
+        /* Línea DETENIDA (o turno cerrado): el número grande de arriba muestra
+           0,0 y la columna desaparecía entera — «si es cero que salga cero»
+           (Orel, 29-08). Un hueco donde debería ir un cero se lee como dato
+           que falta; el cero dice lo que pasa. */
+        const conCero = Boolean(parada) || cerrado
         const conAporte = maquinas.maquinas.every((m) => m.aporteCpm != null)
+        /* Los deltas solo tienen sentido sobre el aporte (la misma vara que la
+           muestra histórica) y con el turno ya rodado: ver APORTE_MIN_PROD_MIN.
+           Son DOS columnas (Orel, 31-08): contra el turno anterior y contra el
+           promedio de los últimos 5 del mismo turno. La del promedio se calla
+           cuando la muestra tiene un solo turno: repetiría la otra columna. */
+        const rodado = (producingMin ?? 0) >= APORTE_MIN_PROD_MIN
+        const conDeltaUlt = conAporte && rodado && refAporteUltimo != null
+        const conDelta5 = conAporte && rodado && refAporte != null && refAporte.turnos > 1
+        const conDelta = conDeltaUlt || conDelta5
+        /** Una celda de delta, alineada con su rótulo del encabezado. */
+        const celdaDelta = (
+          ref: ReferenciaAporte | null | undefined,
+          m: RitmosPorMaquina['maquinas'][number],
+        ) => {
+          const d = deltaAporte(ref ?? null, m.nombre, m.aporteCpm, producingMin)
+          if (d == null) {
+            return <span className="w-[56px] shrink-0 text-right text-footnote text-muted-foreground/60">·</span>
+          }
+          /* Menos de 0,3 pz/min es ruido: raya en tinta neutra — ni logro ni
+             caída. Con color, cada turno parecería un veredicto. */
+          const chico = Math.abs(d) < 0.3
+          return (
+            <span
+              className={`w-[56px] shrink-0 text-right text-footnote tabular-nums ${
+                chico ? 'text-muted-foreground' : d > 0 ? 'text-ink-ok' : 'text-ink-crit'
+              }`}
+              title={`${m.nombre}: ${fmtDec(m.aporteCpm ?? 0)} pz/min ahora contra ${fmtDec((m.aporteCpm ?? 0) - d)} de referencia`}
+            >
+              {chico ? '—' : d > 0 ? '▲' : '▼'} {fmtDec(Math.abs(d))}
+            </span>
+          )
+        }
         return (
-          <div className="mt-3 border-t border-border/50 pt-2.5">
-            <div className="flex items-baseline justify-between gap-2 text-caption text-muted-foreground">
-              <span>
+          /* `ritmo-maquinas`: gancho del modo pantalla — en la TV este bloque
+             sube a la columna derecha, a la altura del número grande. */
+          <div className="ritmo-maquinas mt-3 border-t border-border/50 pt-2.5">
+            <div className="flex items-baseline gap-2 text-caption text-muted-foreground">
+              <span className="min-w-0 flex-1">
                 Cada máquina
+                {(conPulsoMaq || conCero) && <> · <b className="font-semibold text-foreground/80">ahora</b></>}
                 {conReparto && <> · <b className="font-semibold text-foreground/80">media 15 min</b></>}
               </span>
               <b className="font-semibold text-foreground/80">
                 {conAporte ? 'aporte al promedio' : 'promedio andando'}
               </b>
+              {/* Un rótulo por columna de delta, con el mismo ancho que la
+                  celda: «vs sí misma» no decía contra QUÉ (Orel, 31-08). */}
+              {conDeltaUlt && (
+                <span className="w-[56px] shrink-0 text-right font-normal">vs último</span>
+              )}
+              {conDelta5 && (
+                <span className="w-[56px] shrink-0 text-right font-normal">
+                  vs prom. {refAporte!.turnos}
+                </span>
+              )}
             </div>
             <div className="mt-1.5 space-y-1.5">
               {maquinas.maquinas.map((m) => {
@@ -3219,9 +4167,11 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
                     title={`${m.nombre}: ${fmtInt(m.piezas)} pz · mientras anduvo ${fmtDec(m.cpm)} pz/min · ${pct != null ? `${Math.round(pct)}% del turno andando` : 'sin uptime'}`}
                   >
                     <span className="w-9 shrink-0 text-footnote text-muted-foreground">{nombreCorto(m.nombre)}</span>
-                    {conReparto && (
-                      <span className="w-11 shrink-0 text-headline tabular-nums text-foreground">
-                        {fmtDec(m.ahoraCpm ?? 0)}
+                    {(conPulsoMaq || conReparto || conCero) && (
+                      <span className={`w-11 shrink-0 text-headline tabular-nums ${
+                        conCero ? 'text-muted-foreground' : 'text-foreground'
+                      }`}>
+                        {conCero ? fmtDec(0) : fmtDec((conPulsoMaq ? m.pulsoCpm : m.ahoraCpm) ?? 0)}
                       </span>
                     )}
                     <span className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
@@ -3235,32 +4185,45 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
                     <span className="w-11 shrink-0 text-right text-headline tabular-nums text-foreground">
                       {conAporte ? fmtDec(m.aporteCpm ?? 0) : fmtDec(m.cpm)}
                     </span>
+                    {/* Contra sí misma, dos varas: el turno anterior y el
+                        promedio de los últimos. Se renderizan en TODAS las
+                        filas cuando hay muestra (aunque una máquina no esté en
+                        ella, que va en raya) para que la columna no se
+                        desalinee. */}
+                    {conDeltaUlt && celdaDelta(refAporteUltimo, m)}
+                    {conDelta5 && celdaDelta(refAporte, m)}
                   </div>
                 )
               })}
             </div>
-            <p className="mt-1.5 text-caption leading-snug text-muted-foreground/80">
+            <p className="pantalla-oculta mt-1.5 text-caption leading-snug text-muted-foreground/80">
+              {conPulsoMaq && <>Izquierda: el <b>ahora</b> de cada una, del mismo contador — las tres suman el «Ahora» de arriba. </>}
+              {conCero && (
+                cerrado
+                  ? <>Izquierda: el <b>ahora</b> de cada una — el turno cerró, ninguna está produciendo. </>
+                  : <>Izquierda: el <b>ahora</b> de cada una — la línea está detenida, las {maquinas.maquinas.length} en cero. </>
+              )}
               {conReparto && <>Izquierda: lo que cada una pone en la <b>media 15 min</b> — las tres suman la de arriba. </>}
               {conAporte
                 ? <>Derecha: su aporte al <b>promedio del turno</b> — suman el promedio de la línea. </>
                 : <>Derecha: su ritmo promedio mientras anduvo. </>}
               La barra es el % del turno que estuvo andando.
+              {conDelta && (
+                <> Las columnas <b>▲▼</b> comparan cada Baader consigo misma, no con las
+                  otras:{conDeltaUlt && <> <b>vs último</b> es contra el turno anterior del
+                  mismo turno</>}{conDeltaUlt && conDelta5 && ' y'}{conDelta5 && <> <b>vs
+                  prom. {refAporte!.turnos}</b> contra el promedio de sus últimos{' '}
+                  {refAporte!.turnos}</>}.</>
+              )}
             </p>
             {fraseMaquinas(maquinas) !== '' && (
-              <p className="mt-1 text-caption leading-snug text-muted-foreground/80">
+              <p className="pantalla-oculta mt-1 text-caption leading-snug text-muted-foreground/80">
                 {fraseMaquinas(maquinas)}
               </p>
             )}
           </div>
         )
       })()}
-
-      {/* Las curvas de velocidad de cada máquina, como en el detalle de turno
-          (pedido de Orel, 26-08): acá se ve QUIÉN bajó la línea y cuándo, no
-          solo cuánto. Solo con docs nuevos (los viejos no traen el desglose). */}
-      {serieLinea && serieLinea.length > 1 && seriesMaquinas && seriesMaquinas.length > 1 && (
-        <CurvasMaquinas serie={serieLinea} maquinas={seriesMaquinas} />
-      )}
 
       {/* La hora de corte. El número grande describe los últimos 15 min, pero
           un tramo no existe hasta que cierra: sin decir hasta cuándo, quien lo
@@ -3301,26 +4264,6 @@ function ReglaDeRitmo({ ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrad
         </p>
       )}
 
-      {/* El histórico, con la conclusión ANTES que el dibujo (rediseño 26-08):
-          86 px de gráfico y 11 px de texto peleando el mismo renglón no ganaba
-          ninguno. El veredicto va en 13 px porque ES la conclusión, no una nota
-          al pie; el gráfico de abajo la confirma. */}
-      {(contexto || chispa) && (
-        <div className="mt-2.5 border-t border-border/50 pt-2.5">
-          {contexto && (
-            <p className="text-footnote leading-snug text-foreground">{contexto}</p>
-          )}
-          {/* QUÉ velocidad dibuja, escrito (pedido de Orel, 26-08): sin la
-              etiqueta, el gráfico era «una velocidad» más entre varias. */}
-          {chispa && (
-            <p className="mt-1 text-caption text-muted-foreground/80">
-              Ritmo promedio <b className="text-muted-foreground">andando</b> de cada turno, pz/min
-              — la misma vara del «Promedio del turno» de arriba.
-            </p>
-          )}
-          {chispa}
-        </div>
-      )}
     </section>
   )
 }
@@ -3390,6 +4333,7 @@ function PulsoVivo({ pulse, token, cerrado, onPulso }: {
       <span className="tabular-nums text-muted-foreground/80">
         Leído de Shoplogix {hace}
       </span>
+      <CuentaAtrasPulso at={pulse.at} />
       <button
         type="button"
         onClick={pedir}
@@ -3452,7 +4396,15 @@ export function PublicShiftMonitorPage() {
    * respaldo: en cuanto `live` trae el valor, gana el del backend.
    */
   const [cuotaLocal, setCuotaLocal] = useState<number | null>(null)
-  const [pesoLocal, setPesoLocal] = useState<number | null>(null)
+  /* Tri-estado: `undefined` = sin gesto local (manda el doc), `null` = el
+     admin QUITÓ el peso, número = recién guardado. Sin el tercer estado, el
+     quitar no se reflejaba hasta el sync. */
+  const [pesoLocal, setPesoLocal] = useState<number | null | undefined>(undefined)
+  /* Registros de peso recién ELIMINADOS (por su `at`): el doc tarda en
+     refrescar y sin esto el ✕ parecía no hacer nada por ~15 s (Orel, 29-08). */
+  const [pesosEliminados, setPesosEliminados] = useState<ReadonlySet<string>>(new Set())
+  /* El historial de pesos, plegado por defecto (pedido de Orel, 29-08). */
+  const [verPesos, setVerPesos] = useState(false)
   const [now, setNow] = useState(() => Date.now())
   /* Los `t` de la serie son wall-clock sellados como UTC; para compararlos con
      el reloj hay que llevar "ahora" a esa misma base (igual que `fmtAgoWall`). */
@@ -3498,6 +4450,85 @@ export function PublicShiftMonitorPage() {
    */
   const [searchParams, setSearchParams] = useSearchParams()
   const turnoParam = searchParams.get('turno')
+  /**
+   * MODO PANTALLA (`?pantalla=1`): el tablero para la TV de la sala. Explícito
+   * a propósito — nunca por ancho de pantalla: la mitad del uso de escritorio
+   * es gente leyendo el informe completo en un notebook, y convertirle la
+   * página en cartel sería quitarle justo lo que fue a buscar.
+   */
+  const modoPantalla = searchParams.get('pantalla') === '1'
+  /**
+   * La PESTAÑA (`?ver=analisis`): el turno (lo que se vigila y cómo viene) o
+   * el análisis (lo que se mira después: qué se repite, de quién fue la
+   * pérdida, hora por hora, por máquina). En la URL y no en un estado, para
+   * poder compartir la vista de análisis con un link. En la TV no hay
+   * pestañas: el tablero es solo lo vivo.
+   */
+  const pestana = !modoPantalla && searchParams.get('ver') === 'analisis' ? 'analisis' : 'turno'
+  const verPestana = (p: 'turno' | 'analisis') => {
+    const n = new URLSearchParams(searchParams)
+    if (p === 'analisis') n.set('ver', 'analisis')
+    else n.delete('ver')
+    setSearchParams(n, { replace: true })
+    /* Cada pestaña es una página distinta: arrancarla a mitad del scroll de
+       la otra deja al usuario mirando un bloque cualquiera. */
+    window.scrollTo({ top: 0 })
+  }
+  /* Entrar/salir del modo TV con un botón (pedido de Orel, 30-08): antes solo
+     existía escribiendo `?pantalla=1` a mano. La pantalla completa del
+     navegador es OPCIONAL, con su propio botón dentro del modo (decisión de
+     Orel): entrar al modo no te la impone. Escape saca del modo TV — y de la
+     pantalla completa si estaba puesta. */
+  const entrarModoTv = () => {
+    const n = new URLSearchParams(searchParams)
+    n.set('pantalla', '1')
+    setSearchParams(n, { replace: true })
+  }
+  const salirModoTv = () => {
+    const n = new URLSearchParams(searchParams)
+    n.delete('pantalla')
+    setSearchParams(n, { replace: true })
+    if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {})
+  }
+  const alternarPantallaCompleta = () => {
+    if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {})
+    else document.documentElement.requestFullscreen?.().catch(() => {})
+  }
+  useEffect(() => {
+    if (!modoPantalla) return
+    const h = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      /* Editando, Escape cierra la edición; recién el próximo Escape sale
+         del modo TV. Salir del modo a mitad de un arrastre sería brutal. */
+      if (tablero.editando) tablero.setEditando(false)
+      else salirModoTv()
+    }
+    window.addEventListener('keydown', h)
+    return () => window.removeEventListener('keydown', h)
+    /* salirModoTv se recrea por render; re-suscribir es barato y evita el
+       closure viejo sobre searchParams. */
+  })
+  /* La TV de sala no puede apagarse sola (pedido de Orel, 30-08). Wake Lock
+     es la herramienta real para esto: le pide a la pantalla no suspenderse
+     mientras el tablero esté visible — el «mover el mouse cada 2 min» no
+     sirve desde una página (un evento sintético de JS no es entrada confiable
+     para el SO). El lock se suelta solo al ocultar la pestaña y acá se vuelve
+     a pedir al volver; sin soporte del navegador, no pasa nada y la config de
+     la TV queda de plan B. */
+  useEffect(() => {
+    if (!modoPantalla) return
+    let lock: WakeLockSentinel | null = null
+    const pedir = async () => {
+      try { lock = (await navigator.wakeLock?.request('screen')) ?? null } catch { /* sin soporte/permiso */ }
+    }
+    const alVolver = () => { if (document.visibilityState === 'visible') void pedir() }
+    void pedir()
+    document.addEventListener('visibilitychange', alVolver)
+    return () => {
+      document.removeEventListener('visibilitychange', alVolver)
+      lock?.release().catch(() => {})
+    }
+  }, [modoPantalla])
   /** Causa de detención resaltada sobre el gráfico. */
   const [causaSel, setCausaSel] = useState<string | null>(null)
   /* La parada concreta que se está mirando: marca UNA banda, no las 40 de su
@@ -3614,6 +4645,16 @@ export function PublicShiftMonitorPage() {
    */
   const turnoCerrado = Boolean(live?.shiftClosed) || !esActual
 
+  /* El tablero personalizable de la pestaña «El turno»: orden y tamaño de
+     cada tarjeta, guardados POR APARATO y POR PLANTA. La TV también se edita
+     (pedido de Orel, 30-08) pero con MEMORIA PROPIA: acomodar el tablero de
+     la sala no puede desarmar el del PC de la oficina, ni al revés. */
+  const tablero = useTablero(
+    `monitor-tablero${modoPantalla ? '-tv' : ''}:${data?.plantSlug ?? token ?? 'linea'}`,
+    modoPantalla ? FABRICA_TURNO_TV : turnoCerrado ? FABRICA_TURNO_CERRADO : FABRICA_TURNO_VIVO,
+    true,
+  )
+
   /* Supervisor logueado mirando el monitor: puede editar el set point inline
      (mismo patrón que el «Cambiar» del cierre). Las reglas de Firestore son la
      defensa real; esto solo decide si se muestra el botón. */
@@ -3654,8 +4695,12 @@ export function PublicShiftMonitorPage() {
     // `replace` para no llenar el historial del navegador con cada flecha: el
     // botón "atrás" del celular tiene que salir de la pantalla, no deshacer
     // turno por turno.
-    if (destino === 0) setSearchParams({}, { replace: true })
-    else setSearchParams({ turno: vistas[destino]!.shiftDocId }, { replace: true })
+    /* Solo se toca `turno`: pisar el resto de los parámetros botaba la
+       pestaña elegida (y `pantalla`, aunque en la TV no hay navegación). */
+    const params = new URLSearchParams(searchParams)
+    if (destino === 0) params.delete('turno')
+    else params.set('turno', vistas[destino]!.shiftDocId)
+    setSearchParams(params, { replace: true })
     // Otro turno, otras detenciones: mantener la selección marcaría bandas que
     // no existen en el turno que se acaba de abrir.
     setCausaSel(null)
@@ -3680,16 +4725,23 @@ export function PublicShiftMonitorPage() {
    * una cuota puesta desde el monitor no movía la barra.
    */
   const metaHero = data?.targetPieces ?? live?.quotaPieces ?? cuotaLocal ?? null
+  /* Con el MISMO contador del héroe, no con los tramos cerrados: a las 09:00
+     el héroe decía 3.097 (pulso) y el chip 14% (2.800 de buckets, 8 min
+     atrás) — 15,5% real. El mismo descuadre de «dos totales» que #819 cerró
+     en el comparador, sobreviviendo en la barra de meta (visto en la
+     auditoría en vivo del 27-08). */
   const progressPct = useMemo(() => {
     if (!live || !metaHero) return null
-    return Math.min(100, (live.totalPieces / metaHero) * 100)
-  }, [live, metaHero])
+    const total = elegirContador({ pulse: data?.pulse, live, shiftClosed: live.shiftClosed }).valor
+    return Math.min(100, (total / metaHero) * 100)
+  }, [live, metaHero, data?.pulse])
 
   // Al cambiar de turno (rollover del modo línea), lo recién guardado ya no
   // aplica: la cuota y el peso son POR TURNO.
   useEffect(() => {
     setCuotaLocal(null)
-    setPesoLocal(null)
+    setPesoLocal(undefined)
+    setPesosEliminados(new Set())
   }, [data?.shiftDocId])
 
   /**
@@ -3939,6 +4991,12 @@ export function PublicShiftMonitorPage() {
     () => objetivoDelTurno(live?.expectedPieces, data?.forecastHistory ?? []),
     [live?.expectedPieces, data?.forecastHistory],
   )
+  /* ⚠ NUNCA como meta (regla de Orel, 30-08: «no le asignes meta si no la
+     pongo yo»). Yal amaneció con una «cuota 27.799» que nadie puso — era la
+     mediana de lo que Shoplogix espera del turno, vestida de meta. La meta es
+     SOLO la del link (`targetPieces`) o la de la config del turno
+     (`quotaPieces`); sin ellas, el monitor no inventa una. Este valor queda
+     únicamente como TECHO de referencia dentro de `computePaceToTarget`. */
   const metaSensor = objetivoSensor?.piezas ?? null
 
   const gruposEventos = useMemo(
@@ -4220,7 +5278,11 @@ export function PublicShiftMonitorPage() {
     return computePaceToTarget({
       // La cuota del link primero; si no, la de la config del turno.
       targetPieces: data?.targetPieces ?? live.quotaPieces,
-      expectedPieces: metaSensor,
+      /* Sin cuota puesta por una persona, NO hay meta que perseguir (regla de
+         Orel, 30-08): el «objetivo del sensor» dejó de ser respaldo y toda la
+         tarjeta de ritmo necesario / hora extra se calla en vez de pedir
+         piezas «para lo esperado». */
+      expectedPieces: null,
       /* El MISMO total que el héroe (contador vivo cuando responde): con
          `live.totalPieces` el «faltan 14.401» convivía con un héroe en 820 —
          dos totales a dos tarjetas de distancia (Orel, noche del 26-08). */
@@ -4272,11 +5334,12 @@ export function PublicShiftMonitorPage() {
    */
   const comparacion = useMemo(() => {
     /*
-     * Sin cuota configurada vale el objetivo de Shoplogix, que es contra lo que
-     * la pantalla ya mide arriba: si no, en Yal el comparador se quedaba sin
-     * referencia y no había con qué contrastar el avance.
+     * SOLO la cuota puesta por una persona (link o config del turno): sin
+     * ella, el comparador contrasta contra los otros días y punto — presentar
+     * el objetivo del sensor como «cuota» le asignaba a Yal una meta que
+     * nadie puso (regla de Orel, 30-08).
      */
-    const meta = data?.targetPieces ?? live?.quotaPieces ?? metaSensor
+    const meta = data?.targetPieces ?? live?.quotaPieces ?? null
     const tb = live?.timeBreakdown
 
     // Las mismas del ritmo necesario y del fondo de los gráficos: `breaksTurno`.
@@ -4376,7 +5439,7 @@ export function PublicShiftMonitorPage() {
     })
     // El turno VISTO entra en las dependencias: al navegar a otro turno la
     // comparación tiene que rearmarse contra los días previos a ESE.
-  }, [live, inicioReal, vista?.dateKey, vista?.shiftId, data?.history, data?.targetPieces, breaksTurno, metaSensor, esActual, data?.pulse])
+  }, [live, inicioReal, vista?.dateKey, vista?.shiftId, data?.history, data?.targetPieces, breaksTurno, esActual, data?.pulse])
 
   /*
    * Pronóstico del cierre. Se alimenta del `history` que YA viaja en el doc:
@@ -4388,7 +5451,9 @@ export function PublicShiftMonitorPage() {
    * ese filtro no queda muestra suficiente, el bloque no aparece.
    */
   const pronostico = useMemo(() => {
-    const metaFc = data?.targetPieces ?? live?.quotaPieces ?? metaSensor
+    /* Sin cuota humana no hay meta (regla de Orel, 30-08): el pronóstico
+       proyecta el cierre igual, solo que sin veredicto de «llega/no llega». */
+    const metaFc = data?.targetPieces ?? live?.quotaPieces ?? null
     /*
      * `forecastHistory` trae hasta 10 turnos del MISMO nombre; el filtro sobre
      * `history` queda de respaldo para los docs anteriores a ese campo (y para
@@ -4420,7 +5485,7 @@ export function PublicShiftMonitorPage() {
         porDelanteMin: pace?.pendingBreakMin ?? 0,
       },
     })
-  }, [live, data?.history, data?.forecastHistory, data?.targetPieces, comparacion.currentMinute, vista?.shiftId, pace?.pendingBreakMin, metaSensor])
+  }, [live, data?.history, data?.forecastHistory, data?.targetPieces, comparacion.currentMinute, vista?.shiftId, pace?.pendingBreakMin])
 
   /**
    * Hasta cuándo mide el pronóstico, y cuánto sería si el turno cortara en su
@@ -4442,18 +5507,40 @@ export function PublicShiftMonitorPage() {
    * el Excel del Grader. Se dicen SIEMPRE con "≈" y con el peso a la vista.
    */
   const toneladas = useMemo(() => {
-    const pesoKg = Number(live?.pesoPromedioKg ?? pesoLocal)
+    /* El OPTIMISTA gana: recién guardado un peso, el doc público tarda un
+       sync (~5 min) en traerlo y con `live ?? local` la pantalla seguía
+       mostrando el viejo — «cambié el peso a 4000 pero no hizo nada» (Orel,
+       29-08, guardando dos veces por la duda). `pesoLocal` se resetea al
+       cambiar de turno, así que no puede quedar pegado. */
+    const pesoKg = Number(pesoLocal !== undefined ? pesoLocal : live?.pesoPromedioKg)
     if (!(pesoKg > 0) || !live?.totalPieces) return null
-    const ahoraT = toneladasDePiezas(live.totalPieces, pesoKg)
+    /*
+     * POR TRAMOS cuando hay historial (Orel, 28-08): el calibre cambia
+     * durante el turno, y valorizar todo con el último peso pisa la historia
+     * — cada registro rige desde su hora. Con un solo registro equivale al
+     * cálculo plano; sin registros (docs viejos) se cae al plano.
+     */
+    /* Los recién eliminados se filtran YA (el ✕ optimista) y los dobles
+       consecutivos se colapsan también acá — el doc puede traerlos hasta que
+       el backend con dedupe rebuildee. */
+    const registros = (live.pesoRegistros ?? [])
+      .filter((r) => !r.at || !pesosEliminados.has(r.at))
+      .filter((r, i, arr) => i === 0 || r.pesoKg !== arr[i - 1]!.pesoKg)
+    const porTramos = toneladasPorTramos(live.series ?? [], registros)
+    const ahoraT = porTramos?.total ?? toneladasDePiezas(live.totalPieces, pesoKg)
     if (ahoraT == null) return null
-    /* La META en toneladas, con el mismo peso: «≈ 16,4 t de ≈ 24 t» es la
-       misma gramática que la meta en piezas (rediseño 26-08). Reemplaza al
-       «al cierre ≈ N t» proyectado — la meta es un hecho, la proyección era
-       otra cifra más que defender. Solo si hay meta en piezas. */
+    /* La META en toneladas, con el peso VIGENTE: «≈ 16,4 t de ≈ 24 t» es la
+       misma gramática que la meta en piezas (rediseño 26-08). */
     const metaPz = data?.targetPieces ?? live.quotaPieces ?? cuotaLocal ?? null
     const metaT = metaPz != null ? toneladasDePiezas(metaPz, pesoKg) : null
-    return { ahora: ahoraT, meta: metaT, pesoKg }
-  }, [live?.pesoPromedioKg, live?.totalPieces, live?.quotaPieces, data?.targetPieces, pesoLocal, cuotaLocal])
+    return {
+      ahora: ahoraT,
+      meta: metaT,
+      pesoKg,
+      /* El desglose solo cuenta historia con 2+ pesos distintos. */
+      tramos: porTramos && porTramos.tramos.length >= 2 ? porTramos.tramos : null,
+    }
+  }, [live?.pesoPromedioKg, live?.totalPieces, live?.quotaPieces, live?.series, live?.pesoRegistros, data?.targetPieces, pesoLocal, cuotaLocal, pesosEliminados])
 
   const onGuardarPeso = esAdminMonitor && esActual && data?.plantSlug && live?.shiftName
     ? async (pesoKg: number | null) => {
@@ -4464,6 +5551,20 @@ export function PublicShiftMonitorPage() {
         por: usuarioActual?.email ?? null,
       })
       setPesoLocal(pesoKg)
+    }
+    : undefined
+
+  /* Quitar UN registro del historial de pesos (Orel, 29-08): un dedo de más
+     no puede quedar pegado en las toneladas del turno. */
+  const onEliminarPeso = esAdminMonitor && esActual && data?.plantSlug && live?.shiftName
+    ? async (at: string) => {
+      await eliminarRegistroPeso({
+        plantSlug: data.plantSlug!,
+        shiftName: live.shiftName!,
+        at,
+      })
+      /* Optimista: fuera de la pantalla YA — el doc tarda en refrescar. */
+      setPesosEliminados((prev) => new Set([...prev, at]))
     }
     : undefined
 
@@ -4684,6 +5785,14 @@ export function PublicShiftMonitorPage() {
   const contador = elegirContador({ pulse: data.pulse, live, shiftClosed: live.shiftClosed })
   const outside = contador.fuente === 'pulso' ? contador.fueraDelHorario : (live.outsidePieces ?? 0)
 
+  /* Derivados del DATO DURO (buckets de 1 min) para los números vivos, SOLO
+     con el pulso fresco — el mismo criterio del número grande. Careo 29-08:
+     la media 15 de los tramos de 5 min decía 26,3 con la línea a 33,1 (el
+     tramo a medio formar la hunde SIEMPRE que la línea corre). Pedido de
+     Orel: «todo debe cuadrar con la data de piezas por minuto». */
+  const duro15 = contador.fuente === 'pulso' ? media15DelDuro(data.pulse) : null
+  const piezasDuro = contador.fuente === 'pulso' ? piezasDelDuro(data.pulse) : null
+
   /* La cascada del turno. Se mide contra los TRAMOS CERRADOS, no contra el
      contador vivo: los minutos de `timeBreakdown` salen de esa misma rejilla y
      mezclarlos haría que la suma no cierre. Declara su propio corte. */
@@ -4693,11 +5802,90 @@ export function PublicShiftMonitorPage() {
     ? (now - new Date(live.lastSyncAt).getTime()) / 1000 > 15 * 60
     : true
 
+  /*
+   * La cabecera, la navegación de turnos y las pestañas son UNA banda en PC
+   * (pedido de Orel, 30-08: tres franjas apiladas ocupaban ~250 px de alto
+   * con los costados vacíos) y siguen apiladas en el celular, donde no hay
+   * costado que aprovechar. Mismos controles definidos una vez, rendereados
+   * en el lugar que toque — las clases responsive deciden cuál se ve.
+   */
+  const botonTema = (
+    <button
+      onClick={toggleTheme}
+      className="tap-44 shrink-0 rounded-full border border-border bg-card p-1.5 text-muted-foreground transition-colors hover:text-foreground"
+      title={isDark ? 'Cambiar a vista clara' : 'Cambiar a vista oscura'}
+      aria-label={isDark ? 'Cambiar a vista clara' : 'Cambiar a vista oscura'}
+    >
+      {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+    </button>
+  )
+  /* Solo con historial: en una línea recién integrada las flechas nacen
+     muertas. En la TV tampoco: nadie navega turnos en una pantalla de sala. */
+  const navegacionTurnos = vistas.length > 1 && !modoPantalla ? (
+    <div className="flex w-full items-center justify-between gap-2 lg:w-auto lg:shrink-0 lg:justify-start">
+      <button
+        onClick={() => irA(1)}
+        disabled={idx >= vistas.length - 1}
+        className="tap-44 flex items-center gap-1 rounded-full border border-border bg-muted px-3 py-1.5 text-[12px] text-foreground/80 transition-colors enabled:hover:bg-muted disabled:opacity-30"
+      >
+        <ChevronLeft className="h-3.5 w-3.5" />
+        Anterior
+      </button>
+
+      <div className="flex items-center gap-2">
+        <span className="text-[11px] text-muted-foreground/80">
+          {esActual ? 'Turno actual' : `${idx} turno${idx > 1 ? 's' : ''} atrás`}
+        </span>
+        {/* Atajo al presente: con seis turnos de historial, volver de a uno
+            es tedioso. Solo aparece cuando de verdad hay camino que saltar. */}
+        {idx > 1 && (
+          <button
+            onClick={() => verIndice(0)}
+            className="tap-44 rounded-full bg-primary/[0.13] px-2 py-0.5 text-[11px] font-semibold text-foreground transition-opacity hover:opacity-80"
+          >
+            Ir al actual
+          </button>
+        )}
+      </div>
+
+      <button
+        onClick={() => irA(-1)}
+        disabled={esActual}
+        className="tap-44 flex items-center gap-1 rounded-full border border-border bg-muted px-3 py-1.5 text-[12px] text-foreground/80 transition-colors enabled:hover:bg-muted disabled:opacity-30"
+      >
+        Siguiente
+        <ChevronRight className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  ) : null
+  /* Las dos pestañas: el turno (se vigila) y el análisis (se estudia). */
+  const selectorPestana = !modoPantalla ? (
+    <div className="grid w-full grid-cols-2 gap-1 rounded-full border border-border bg-muted p-1 lg:w-64 lg:shrink-0">
+      {([['turno', 'El turno'], ['analisis', 'Análisis']] as const).map(([id, rotulo]) => (
+        <button
+          key={id}
+          onClick={() => verPestana(id)}
+          className={`tap-44 rounded-full py-1.5 text-[12.5px] transition-colors ${
+            pestana === id
+              ? 'bg-card font-semibold text-foreground'
+              : 'text-muted-foreground hover:text-foreground/80'
+          }`}
+        >
+          {rotulo}
+        </button>
+      ))}
+    </div>
+  ) : null
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Cabecera: qué línea, qué turno, qué día, desde qué hora */}
       <header className="sticky top-0 z-10 border-b border-border bg-background/90 backdrop-blur">
-        <div className="mx-auto max-w-3xl px-4 py-3">
+        {/* En PC la banda es UNA: título+detalle a la izquierda, navegación y
+            pestañas al centro-derecha, el tema al final. En el celular solo
+            vive acá el título; navegación y pestañas se apilan debajo. */}
+        <div className="mx-auto max-w-3xl px-4 py-3 lg:flex lg:max-w-none lg:items-center lg:gap-4 lg:px-6 lg:py-2 xl:gap-6">
+          <div className="lg:min-w-0 lg:flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <h1 className="text-base font-semibold leading-tight">{lineTitle}</h1>
             {/* Con el turno CERRADO no se anuncia el estado en vivo: «Detenida»
@@ -4713,14 +5901,8 @@ export function PublicShiftMonitorPage() {
                 Turno terminado{live.effectiveEnd ? ` ${fmtWallTime(live.effectiveEnd)}` : ''}
               </Pill>
             )}
-          <button
-            onClick={toggleTheme}
-            className="tap-44 ml-auto shrink-0 rounded-full border border-border bg-card p-1.5 text-muted-foreground transition-colors hover:text-foreground"
-            title={isDark ? 'Cambiar a vista clara' : 'Cambiar a vista oscura'}
-            aria-label={isDark ? 'Cambiar a vista clara' : 'Cambiar a vista oscura'}
-          >
-            {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </button>
+          {/* En PC el tema va al final de la banda, no en medio del título. */}
+          <span className="ml-auto inline-flex lg:hidden">{botonTema}</span>
           </div>
 
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[13px] text-muted-foreground">
@@ -4809,55 +5991,171 @@ export function PublicShiftMonitorPage() {
               </>
             )}
           </div>
+          </div>
+
+          {/* El resto de la banda, solo en PC. */}
+          {navegacionTurnos && <div className="hidden lg:block">{navegacionTurnos}</div>}
+          {selectorPestana && <div className="hidden lg:block">{selectorPestana}</div>}
+          {/* Los controles del modo TV, discretos: en la sala nadie los toca,
+              pero quien entró con el botón desde su PC necesita la pantalla
+              completa (opcional, decisión de Orel) y la vuelta. Escape también
+              sale. */}
+          {modoPantalla && (
+            <>
+              {/* La TV también se edita: el botón vive acá y no en la fila
+                  (que solo aparece mientras se edita, para no gastar alto del
+                  presupuesto de 1080). Se sale con «Listo» en la fila. */}
+              {!tablero.editando && (
+                <button
+                  onClick={() => tablero.setEditando(true)}
+                  className="tap-44 hidden shrink-0 rounded-full border border-border bg-muted px-3 py-1.5 text-[12px] text-muted-foreground transition-colors hover:text-foreground lg:inline-flex"
+                >
+                  Personalizar
+                </button>
+              )}
+              <button
+                onClick={alternarPantallaCompleta}
+                className="tap-44 hidden shrink-0 rounded-full border border-border bg-muted px-3 py-1.5 text-[12px] text-muted-foreground transition-colors hover:text-foreground lg:inline-flex"
+              >
+                Pantalla completa
+              </button>
+              <button
+                onClick={salirModoTv}
+                className="tap-44 hidden shrink-0 items-center gap-1.5 rounded-full border border-border bg-muted px-3 py-1.5 text-[12px] text-muted-foreground transition-colors hover:text-foreground lg:inline-flex"
+              >
+                <Tv className="h-3.5 w-3.5" />
+                Salir de TV
+              </button>
+            </>
+          )}
+          <span className="hidden lg:inline-flex">{botonTema}</span>
         </div>
       </header>
 
-      {/* Navegación entre turnos. Solo aparece cuando hay historial: en una
-          línea recién integrada no tiene sentido mostrar flechas muertas. */}
-      {vistas.length > 1 && (
-        <div className="mx-auto flex max-w-3xl items-center justify-between gap-2 px-4 pt-3">
-          <button
-            onClick={() => irA(1)}
-            disabled={idx >= vistas.length - 1}
-            className="tap-44 flex items-center gap-1 rounded-full border border-border bg-muted px-3 py-1.5 text-[12px] text-foreground/80 transition-colors enabled:hover:bg-muted disabled:opacity-30"
-          >
-            <ChevronLeft className="h-3.5 w-3.5" />
-            Anterior
-          </button>
-
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] text-muted-foreground/80">
-              {esActual ? 'Turno actual' : `${idx} turno${idx > 1 ? 's' : ''} atrás`}
-            </span>
-            {/* Atajo al presente: con seis turnos de historial, volver de a uno
-                es tedioso. Solo aparece cuando de verdad hay camino que saltar. */}
-            {idx > 1 && (
-              <button
-                onClick={() => verIndice(0)}
-                className="tap-44 rounded-full bg-primary/[0.13] px-2 py-0.5 text-[11px] font-semibold text-foreground transition-opacity hover:opacity-80"
-              >
-                Ir al actual
-              </button>
-            )}
-          </div>
-
-          <button
-            onClick={() => irA(-1)}
-            disabled={esActual}
-            className="tap-44 flex items-center gap-1 rounded-full border border-border bg-muted px-3 py-1.5 text-[12px] text-foreground/80 transition-colors enabled:hover:bg-muted disabled:opacity-30"
-          >
-            Siguiente
-            <ChevronRight className="h-3.5 w-3.5" />
-          </button>
-        </div>
+      {/* En el celular, navegación y pestañas se apilan bajo la cabecera,
+          fuera de lo sticky: pegadas arriba se comerían media pantalla de
+          scroll. El análisis dejó de compartir scroll con lo vivo — quien
+          entra por el QR viene a ver cómo va el turno. */}
+      {navegacionTurnos && (
+        <div className="mx-auto max-w-3xl px-4 pt-3 lg:hidden">{navegacionTurnos}</div>
+      )}
+      {selectorPestana && (
+        <div className="mx-auto max-w-3xl px-4 pt-3 lg:hidden">{selectorPestana}</div>
       )}
 
+      {/*
+       * ── El ancho manda: en PC, columnas ────────────────────────────────
+       * La mitad del uso del monitor es de escritorio (telemetría 30-08:
+       * Chonchi 5 móvil / 4 escritorio, Filete 10 / 13) y hasta ahora esas
+       * pantallas veían la MISMA columna de 768 px estirada, con los costados
+       * vacíos y 6,6 pantallas de scroll. Desde 1100 px la página reparte sus
+       * bloques en dos columnas y desde 1500 px en tres: el mismo contenido,
+       * sin pestañas ni menús, en poco más de una pantalla.
+       *
+       * `space-y-3` no sirve dentro de multicolumna (el margen entre hermanos
+       * salta de columna): la separación pasa a un margen propio de cada
+       * bloque, y `break-inside-avoid` impide que una tarjeta se parta en dos.
+       */}
       <main
-        className="mx-auto max-w-3xl space-y-3 px-4 py-4"
+        className={`mx-auto max-w-3xl space-y-4 px-4 py-4 lg:max-w-[1500px] 2xl:max-w-[1840px]${
+          modoPantalla ? ' modo-pantalla' : ''
+        }`}
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
       >
+        {/* Pestaña «El turno»: la vigilancia y el estado, como TABLERO
+            personalizable. En la TV la pestaña es siempre esta y el tablero
+            no corre: la TV muestra el trío fijo de siempre. */}
+        {pestana === 'turno' && (<>
+        {/* La alerta de línea detenida va FUERA del tablero, arriba: una
+            alerta no es una tarjeta que se reordena. Cerrado no se muestra
+            ("Línea detenida hace 6 h" tras el cierre es lo esperable), y en
+            la TV tampoco — cambiaría el alto del tablero fijo. */}
+        {live.status === 'detenida' && esActual && !live.shiftClosed && (
+          <section className="pantalla-oculta rounded-2xl border border-border bg-muted px-4 py-3">
+            <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-red-600 dark:text-red-400">
+              <PauseCircle className="h-3 w-3" />
+              Ahora mismo
+            </div>
+            <p className="mt-1 text-sm text-foreground">
+              Línea detenida{live.currentReason ? ` — ${live.currentReason}` : ''}
+              {live.currentSinceAt && (
+                <span className="text-muted-foreground">
+                  {' '}(desde {fmtWallTime(live.currentSinceAt)}, {fmtAgoWall(live.currentSinceAt, now)})
+                </span>
+              )}
+            </p>
+          </section>
+        )}
+
+        {/* Personalizar: abierto a cualquiera con el link (decisión de Orel,
+            30-08) — cada aparato guarda SU orden, el link sigue mostrando el
+            de fábrica a quien nunca toca nada. Solo en pantallas anchas:
+            arrastrar y estirar son gestos de mouse. TAMBIÉN en modo TV, que
+            tiene su tablero propio — allá esta fila solo aparece mientras se
+            edita (el botón de entrada vive en la banda) para no gastar alto
+            del presupuesto de 1080. */}
+        {(!modoPantalla || tablero.editando) && (
+          <>
+          <div className="hidden items-center justify-end gap-2 lg:flex">
+            {tablero.editando && (
+              <span className="mr-auto text-[12px] text-muted-foreground">
+                Arrastrá para mover · estirá desde ◢ · ✕ quita la tarjeta
+              </span>
+            )}
+            {/* La puerta al tablero de sala: mismo link, `?pantalla=1` y
+                pantalla completa. Solo con las manos quietas (fuera de
+                Personalizar), para no mezclar dos modos de edición. */}
+            {!tablero.editando && !modoPantalla && (
+              <button
+                onClick={entrarModoTv}
+                className="tap-44 flex items-center gap-1.5 rounded-full border border-border bg-muted px-3 py-1.5 text-[12px] text-foreground/80 transition-colors hover:bg-muted"
+              >
+                <Tv className="h-3.5 w-3.5" />
+                Modo TV
+              </button>
+            )}
+            {tablero.editando && tablero.personalizado && (
+              <button
+                onClick={tablero.restaurar}
+                className="tap-44 rounded-full border border-border bg-muted px-3 py-1.5 text-[12px] text-foreground/80 hover:bg-muted"
+              >
+                Restaurar orden de fábrica
+              </button>
+            )}
+            <button
+              onClick={() => tablero.setEditando(!tablero.editando)}
+              className={`tap-44 rounded-full px-3 py-1.5 text-[12px] transition-colors ${
+                tablero.editando
+                  ? 'bg-primary font-semibold text-primary-foreground'
+                  : 'border border-border bg-muted text-foreground/80 hover:bg-muted'
+              }`}
+            >
+              {tablero.editando ? 'Listo' : 'Personalizar'}
+            </button>
+          </div>
+          {/* Las fichas de agregar/quitar: solo mientras se personaliza. */}
+          <PanelTarjetas t={tablero} />
+          </>
+        )}
+
+        {/*
+         * ── EL TABLERO ─────────────────────────────────────────────────────
+         * Una sola grilla plana con TODAS las tarjetas del turno; el orden y
+         * el tamaño los pone `useTablero` (fábrica según vivo/cerrado, o lo
+         * que el usuario guardó). En el celular es una columna (`flex-col`,
+         * donde `order` vale y los spans no); en PC, 6 columnas × filas de
+         * 56 px con `dense` para rellenar huecos. Las filas son minmax: el
+         * tamaño guardado es un MÍNIMO y el contenido empuja — ninguna
+         * tarjeta se corta nunca.
+         *
+         * Esto reemplazó a las dos ramas vivo/cerrado que duplicaban las
+         * mismas cuatro tarjetas con props idénticos solo para cambiar el
+         * orden — ahora el orden es dato, no estructura.
+         */}
+        <div className="tablero-turno flex flex-col gap-3 lg:grid lg:[grid-template-columns:repeat(6,minmax(0,1fr))] lg:[grid-auto-rows:minmax(56px,auto)] lg:[grid-auto-flow:dense] lg:items-stretch">
         {/* Piezas acumuladas — el número que vienen a ver */}
+        <TarjetaTablero id="resultado" t={tablero}>
         <section className="rounded-2xl border border-border bg-gradient-to-b from-primary/[0.08] to-transparent px-4 py-4">
           <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
             <Activity className="h-3 w-3" />
@@ -4917,18 +6215,79 @@ export function PublicShiftMonitorPage() {
                 {turnoCerrado && 'Cerró con '}
                 <span className="tabular-nums font-semibold">≈ {fmtDec(toneladas.ahora)} t</span>
                 {toneladas.meta != null && (
-                  <span className="text-muted-foreground">
+                  <span
+                    className="text-muted-foreground"
+                    title={`Las ${fmtInt(pace?.targetPieces ?? 0) || 'piezas de la'} meta valorizadas al peso vigente — cambia si cambia el calibre.`}
+                  >
                     {' '}de ≈ <span className="tabular-nums">{fmtDec(toneladas.meta)} t</span>
                   </span>
                 )}
               </p>
+              {/* La proporción como LLENADO, no como resta mental (Orel,
+                  29-08). Mismo lenguaje de los instrumentos: fill --mon-hoy
+                  sobre la pista estándar; la meta es el final de la barra. */}
+              {toneladas.meta != null && toneladas.meta > 0 && (
+                <div className="relative mt-1 h-2 rounded-full" style={{ background: PISTA_INSTRUMENTO }}>
+                  <span
+                    className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-500 motion-reduce:transition-none"
+                    style={{
+                      width: `${Math.min(100, (toneladas.ahora / toneladas.meta) * 100)}%`,
+                      minWidth: 3,
+                      background: 'var(--mon-hoy)',
+                    }}
+                    title={`≈ ${fmtDec(toneladas.ahora)} de ≈ ${fmtDec(toneladas.meta)} t (${Math.round((toneladas.ahora / toneladas.meta) * 100)}%)`}
+                  />
+                </div>
+              )}
               <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[11px] text-muted-foreground">
                 <span>
-                  estimado con peso prom.{' '}
-                  <span className="tabular-nums">{fmtDec(toneladas.pesoKg)} kg</span> por pieza
+                  {toneladas.tramos ? 'peso vigente' : 'estimado con peso prom.'}{' '}
+                  <span className="tabular-nums">{fmtInt(toneladas.pesoKg * 1000)} g</span> por pieza
                 </span>
                 {onGuardarPeso && <EditorPeso actual={toneladas.pesoKg} onGuardar={onGuardarPeso} />}
               </div>
+              {/* El HISTORIAL del peso, cuantificado por tramo (Orel, 28-08):
+                  el calibre cambia con la pesca y el lote, y cada registro
+                  rige desde su hora — así las toneladas de arriba son la SUMA
+                  de estos tramos, no todo valorizado al último peso. */}
+              {/* Plegado por defecto (Orel, 29-08): el desglose es consulta,
+                  no lectura de cada vistazo. El botón dice cuántos hay. */}
+              {toneladas.tramos && (
+                <button
+                  type="button"
+                  onClick={() => setVerPesos((v) => !v)}
+                  aria-expanded={verPesos}
+                  className="tap-44 mt-0.5 text-[11px] text-primary underline underline-offset-2"
+                >
+                  {verPesos ? 'ocultar historial de pesos' : `ver historial de pesos (${toneladas.tramos.length})`}
+                </button>
+              )}
+              {toneladas.tramos && verPesos && (
+                <div className="mt-1 space-y-0.5 text-[11px] tabular-nums text-muted-foreground/80">
+                  {toneladas.tramos.map((tr, i) => (
+                    <div key={tr.desdeWallMs} className="flex items-center gap-1.5">
+                      <span>
+                        {i === 0 ? 'desde el arranque' : `desde las ${horaPlanta(tr.desdeWallMs)}`}
+                        {' · '}<span className="text-muted-foreground">{fmtInt(tr.pesoKg * 1000)} g</span>
+                        {' → '}{fmtInt(tr.piezas)} pz ≈{' '}
+                        <span className="text-foreground/80">{fmtDec(tr.toneladas)} t</span>
+                      </span>
+                      {/* Quitar el registro (solo admin): si fue un dedo de
+                          más, se saca y el tramo se funde con el anterior. */}
+                      {onEliminarPeso && tr.at && (
+                        <button
+                          type="button"
+                          onClick={() => { void onEliminarPeso(tr.at!) }}
+                          className="tap-44 rounded-full px-1 text-[11px] leading-none text-muted-foreground/70 hover:text-ink-crit"
+                          title={`Quitar este registro (${fmtInt(tr.pesoKg * 1000)} g)`}
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
           {/* Sin peso, el hueco se explica —también al que abre el link sin
@@ -4993,7 +6352,7 @@ export function PublicShiftMonitorPage() {
                   {onGuardarCuota && (
                     <EditorCuota
                       actual={metaHero}
-                      pesoConocido={live.pesoPromedioKg ?? pesoLocal ?? live.quotaOrigen?.pesoPromedioKg}
+                      pesoConocido={(pesoLocal !== undefined ? pesoLocal : live.pesoPromedioKg) ?? live.quotaOrigen?.pesoPromedioKg}
                       onGuardar={onGuardarCuota}
                       conToneladas={usaToneladas}
                     />
@@ -5010,7 +6369,7 @@ export function PublicShiftMonitorPage() {
                */}
               {(() => {
                 const meta = metaHero!
-                const techo = Math.max(meta, live.totalPieces, banda?.cierres.max ?? 0) * 1.04
+                const techo = Math.max(meta, contador.valor, banda?.cierres.max ?? 0) * 1.04
                 const pctDe = (v: number) => Math.min(100, (v / techo) * 100)
                 return (
                   <div className="relative mt-1 h-3.5 overflow-hidden rounded-md bg-muted">
@@ -5024,9 +6383,11 @@ export function PublicShiftMonitorPage() {
                         title={`Cierres habituales: ${fmtInt(banda.cierres.min)}–${fmtInt(banda.cierres.max)} pz (${banda.muestras} turnos)`}
                       />
                     )}
+                    {/* El relleno con el contador del héroe — el mismo número
+                        que el 3.097 grande de arriba, no los buckets. */}
                     <span
                       className="absolute inset-y-1 left-0 rounded-r-sm bg-sky-500 dark:bg-sky-400 transition-[width] duration-700"
-                      style={{ width: `${pctDe(live.totalPieces)}%` }}
+                      style={{ width: `${pctDe(contador.valor)}%` }}
                     />
                     <span
                       className="absolute inset-y-0 w-[2.5px] bg-foreground"
@@ -5037,7 +6398,7 @@ export function PublicShiftMonitorPage() {
                 )
               })()}
               {banda && (
-                <p className="mt-1 text-[10.5px] leading-snug text-muted-foreground/80">
+                <p className="pantalla-oculta mt-1 text-[10.5px] leading-snug text-muted-foreground/80">
                   La banda gris es lo que esta línea cierra normalmente{' '}
                   (<span className="tabular-nums">{fmtInt(banda.cierres.min)}–{fmtInt(banda.cierres.max)}</span>
                   , últimos {banda.muestras} turnos)
@@ -5062,7 +6423,7 @@ export function PublicShiftMonitorPage() {
               </div>
               <EditorCuota
                 actual={null}
-                pesoConocido={live.pesoPromedioKg ?? pesoLocal ?? live.quotaOrigen?.pesoPromedioKg}
+                pesoConocido={(pesoLocal !== undefined ? pesoLocal : live.pesoPromedioKg) ?? live.quotaOrigen?.pesoPromedioKg}
                 onGuardar={onGuardarCuota}
                 conToneladas={usaToneladas}
               />
@@ -5133,6 +6494,7 @@ export function PublicShiftMonitorPage() {
             )}
           </div>
         </section>
+        </TarjetaTablero>
 
         {/* Cadencia */}
         {(() => {
@@ -5180,15 +6542,6 @@ export function PublicShiftMonitorPage() {
           })()
           return (
             <>
-            {/* El pulso va JUNTO a la regla: son la misma pregunta —«¿cómo va
-                ahora?»— y el número de Shoplogix es el que cierra el círculo
-                con la pantalla de planta. */}
-            <PulsoVivo
-              pulse={data.pulse}
-              token={token ?? ''}
-              cerrado={turnoCerrado}
-              onPulso={p => setData(d => (d ? { ...d, pulse: p } : d))}
-            />
             {/* «Dónde se fueron las piezas»: el análisis táctico del turno. Va
                 acá, entre el número crudo y la regla de ritmo, porque responde
                 la pregunta que sigue a «cuántas van».
@@ -5199,49 +6552,232 @@ export function PublicShiftMonitorPage() {
                 documenta. */}
             {/* También con el turno CERRADO: ahí deja de ser distracción y pasa
                 a ser el informe — es donde el monitor demuestra qué le costó
-                las piezas a la línea (hallazgo del rediseño 26-08). */}
-            {cascada && <CascadaTurnoCard cascada={cascada} />}
+                las piezas a la línea (hallazgo del rediseño 26-08).
+                En la TV nace OCULTA (fábrica de TV), no ausente: así se puede
+                agregar desde Personalizar cuando la sala la quiera ver. */}
+            {cascada && (
+              <TarjetaTablero id="cascada" t={tablero}>
+                <CascadaTurnoCard cascada={cascada} />
+              </TarjetaTablero>
+            )}
             {/* La respuesta de Mantención, junto al «dónde se fueron las
                 piezas»: la cascada dice el costo, esta tarjeta dice quién
                 respondió y cómo. */}
-            {live.mantencion && <RespuestaMantencion m={live.mantencion} cerrado={turnoCerrado} />}
-            <ReglaDeRitmo
+            {live.mantencion && (
+              <TarjetaTablero id="mantencion" t={tablero}>
+              <RespuestaMantencion
+                m={live.mantencion}
+                cerrado={turnoCerrado}
+                /* El riel de la racha: MTTR de los turnos ANTERIORES en orden
+                   cronológico (`scheduledStart` manda; el shiftDocId ordena
+                   Turno 1/2 alfabético, que en Chonchi no es el orden real).
+                   `mttr: null` = turno sin una sola falla técnica. */
+                riel={(() => {
+                  const hs = (data.history ?? [])
+                    .filter((h) => h.live?.mantencion?.porMaquina?.length)
+                    .map((h) => {
+                      const mm = h.live.mantencion!
+                      const ev = mm.porMaquina.reduce((a, x) => a + x.eventosFalla, 0)
+                      const min = mm.porMaquina.reduce((a, x) => a + x.fallaMin, 0)
+                      return {
+                        orden: h.live.scheduledStart ? Date.parse(h.live.scheduledStart) : Date.parse(h.shiftDocId.slice(0, 10)),
+                        etiqueta: `${h.dateKey.slice(8, 10)}·${h.shiftId.replace(/[^0-9]/g, '') || h.shiftId.slice(0, 1)}`,
+                        mttr: ev > 0 ? min / ev : null,
+                      }
+                    })
+                    .sort((a, b) => a.orden - b.orden)
+                    .slice(-6)
+                  return hs.length ? hs.map(({ etiqueta, mttr }) => ({ etiqueta, mttr })) : null
+                })()}
+                /* Lo que la falla le costó a la LÍNEA: `lineMin` de las causas
+                   imputadas a equipos (OJO: NUNCA el `min`, que es de máquina
+                   — la trampa que infló el Pareto 5,6×). Sin el dato, null: no
+                   se afirma «no costó piezas» sin poder probarlo. */
+                fallaLineaMin={(() => {
+                  const causas = new Set((live.mantencion.imputadas ?? [])
+                    .filter((x) => x.bucket === 'falla').map((x) => x.causa))
+                  const rec = live.timeBreakdown?.recoverable
+                  if (!causas.size || !rec?.length) return null
+                  const filas = rec.filter((c) => causas.has(c.reason))
+                  if (!filas.length || filas.some((c) => c.lineMin == null)) return null
+                  return filas.reduce((a, c) => a + (c.lineMin ?? 0), 0)
+                })()}
+                /* Falla EN CURSO: una máquina detenida AHORA con causa cuyo
+                   dueño es Mantención (taxonomía real, no heurística). */
+                enCurso={(() => {
+                  if (turnoCerrado) return null
+                  const parada = live.machines.find((x) =>
+                    x.status === 'detenida' && x.currentReason && x.currentSinceAt
+                    && duenoDe(x.currentReason).dueno === 'mantencion')
+                  if (!parada) return null
+                  const desde = Date.parse(parada.currentSinceAt!)
+                  const min = Number.isFinite(desde) ? (ahoraWallMs - desde) / 60_000 : NaN
+                  if (!(min >= 1)) return null
+                  return {
+                    maquina: parada.name,
+                    causa: parada.currentReason!,
+                    min,
+                    producen: live.machines.filter((x) => x.status === 'produciendo').length,
+                  }
+                })()}
+              />
+              </TarjetaTablero>
+            )}
+            {(() => {
+            /* Las MISMAS props para las tres tarjetas en que se partió el
+               ritmo (estado / minuto a minuto / rango habitual): se computan
+               una vez y cada llamada renderiza su parte. */
+            const reglaProps = {
+              /* El pulso vive DENTRO de la tarjeta de ritmo: son la misma
+                 pregunta —«¿cómo va ahora?»— y así viaja con ella cuando el
+                 usuario la mueve. Es además el componente que refresca
+                 `data.pulse`, por eso se monta siempre que el ritmo exista. */
+              pulsoNodo: (
+                <PulsoVivo
+                  pulse={data.pulse}
+                  token={token ?? ''}
+                  cerrado={turnoCerrado}
+                  onPulso={p => setData(d => (d ? { ...d, pulse: p } : d))}
+                />
+              ),
               /* El tramo en curso se cuenta por los minutos que LLEVA, no por
                  los 5 que va a durar: si no, el número de "ahora" queda siempre
                  por debajo del que muestra Shoplogix. */
-              ahora={ritmoAhoraAndando(serieDelTurno, ahoraWallMs)}
-              maquinas={conRepartoPorMaquina(
-                ritmoPorMaquina(live.machines, (live.windowHours ?? 0) * 60),
-                seriesMaquinas,
-                serieDelTurno,
-                ahoraWallMs,
-                live.timeBreakdown?.producingMin ?? null,
-              )}
-              serieLinea={serieDelTurno}
-              seriesMaquinas={seriesMaquinas}
+              ahora: duro15?.cpm ?? ritmoAhoraAndando(serieDelTurno, ahoraWallMs),
+              maquinas: (() => {
+                const base = conRepartoPorMaquina(
+                  ritmoPorMaquina(live.machines, (live.windowHours ?? 0) * 60),
+                  seriesMaquinas,
+                  serieDelTurno,
+                  ahoraWallMs,
+                  live.timeBreakdown?.producingMin ?? null,
+                  /* El pulso por máquina SOLO cuando el número grande es el
+                     pulso: la columna debe sumar exactamente lo de arriba. Los
+                     ids del desglose son los machineid de Shoplogix — se
+                     traducen a nombre con las máquinas del turno. Sale del VIVO
+                     elegido (fresco o arrastrado): la columna acompaña al
+                     número grande también durante la recalibración. */
+                  (() => {
+                    const pm = contador.fuente === 'pulso' ? pulsoVivo(data.pulse)?.porMaquina : null
+                    if (!pm?.length) return null
+                    const nombrePorId = new Map(live.machines.map((m) => [m.id, m.name]))
+                    const out = new Map<string, number>()
+                    for (const x of pm) {
+                      const n = nombrePorId.get(x.id)
+                      if (n != null) out.set(n, x.cpm)
+                    }
+                    return out.size > 0 ? out : null
+                  })(),
+                )
+                /* La columna «media 15 min» por máquina, del dato duro: la
+                   misma ventana y vara que el número de arriba, así SUMAN. */
+                if (!base || !duro15) return base
+                const nombrePorId = new Map(live.machines.map((m) => [m.id, m.name]))
+                const porNombre = new Map(duro15.porMaquina.map((x) => [nombrePorId.get(x.id) ?? x.id, x.cpm]))
+                return {
+                  ...base,
+                  maquinas: base.maquinas.map((m) =>
+                    porNombre.has(m.nombre) ? { ...m, ahoraCpm: porNombre.get(m.nombre)! } : m),
+                }
+              })(),
+              /* Contra qué compite cada Baader: el promedio de sus últimos 5
+                 turnos del MISMO número (T1 con T1, T2 con T2 — decisión de
+                 Orel, 31-08). El shiftId sale del turno que se está MIRANDO,
+                 no del vigente: navegando a un turno viejo el delta tiene que
+                 ser el de ese turno. */
+              refAporte: referenciaAporte(data.shiftStats, (vista?.shiftDocId ?? '').slice(11)),
+              /* La segunda vara: el turno ANTERIOR solo. Orel las quiso a las
+                 dos a la vista (31-08, mirándolo en prod): el último dice «¿me
+                 moví desde la vez pasada?» y el promedio de 5 dice «¿esto es
+                 lo mío o fue un turno raro?». */
+              refAporteUltimo: referenciaAporte(data.shiftStats, (vista?.shiftDocId ?? '').slice(11), 1),
+              producingMin: live.timeBreakdown?.producingMin ?? null,
+              serieLinea: serieDelTurno,
+              seriesMaquinas,
+              /*
+               * Las barras minuto a minuto salen cuando la serie ES DEL TURNO
+               * QUE SE MIRA — se comprueba por TIEMPO, no por la frescura del
+               * contador.
+               *
+               * OJO: antes el gate era `contador.fuente === 'pulso'`, y al cerrar
+               * el turno (contador vivo en 0) las barras desaparecían justo
+               * cuando la pantalla pasa a ser el informe (Orel, 29-08). La
+               * frescura del contador no dice nada sobre si la serie describe
+               * este turno; la ventana sí.
+               *
+               * La serie se RECORTA a la ventana del turno: el pulso arranca
+               * la suya en el primer bucket que Shoplogix devuelve, que puede
+               * traer minutos anteriores al turno.
+               */
+              barras: (() => {
+                /* Mirando un turno VIEJO, la serie sale del ARCHIVO (el pulso
+                   solo trae la del turno vigente — Shoplogix la entrega en una
+                   ventana de ~12 h). Turnos anteriores al archivador o cuya
+                   serie nació parcial no tienen entrada: curvas de 5 min. */
+                const s = esActual
+                  ? (data.pulse?.serieMinuto
+                    ?? data.seriesMinuto?.find((e) => e.shiftDocId === vista?.shiftDocId))
+                  : data.seriesMinuto?.find((e) => e.shiftDocId === vista?.shiftDocId)
+                if (!s?.maquinas?.length) return null
+                const t0 = Date.parse(s.desde)
+                const largo = Math.min(...s.maquinas.map((m) => m.cycles.length))
+                if (!Number.isFinite(t0) || !(largo > 1)) return null
+                /* Ventana del turno VISTO, en la misma base wall-as-UTC. */
+                const ini = Date.parse(live.effectiveStart ?? live.scheduledStart ?? '')
+                if (!Number.isFinite(ini)) return null
+                const finSched = Date.parse(live.plannedEnd ?? live.scheduledEnd ?? '')
+                /* ⚠ El tope del fin previsto SOLO con el turno cerrado. En vivo
+                   la cola de la serie ES el presente, y el previsto puede ser
+                   una estimación corta: en Yal (30-08) el turno siguió más
+                   allá de su fin «historial» (20:56) y las barras quedaron
+                   congeladas en 21:26 (+30 min) con el contador vivo en 21:58
+                   dos tarjetas más arriba — dos «ahora» distintos en la misma
+                   pantalla, la clase de contradicción que este monitor viene
+                   cerrando. */
+                const fin = live.shiftClosed && Number.isFinite(finSched)
+                  ? finSched + 30 * 60_000
+                  : t0 + largo * 60_000
+                /* Sin solape real, la serie es de otro turno: a las curvas. */
+                const desdeIdx = Math.max(0, Math.round((ini - t0) / 60_000))
+                const hastaIdx = Math.min(largo, Math.round((fin - t0) / 60_000))
+                if (!(hastaIdx - desdeIdx > 1)) return null
+                const nombrePorId = new Map(live.machines.map((m) => [m.id, m.name]))
+                const maquinas = s.maquinas.map((m) => ({
+                  ...m,
+                  nombre: nombrePorId.get(m.id) ?? m.id,
+                  cycles: m.cycles.slice(desdeIdx, hastaIdx),
+                }))
+                /* Una serie sin una sola pieza dentro del turno no dibuja nada
+                   útil (y no es de este turno): a las curvas. */
+                if (!maquinas.some((m) => m.cycles.some((v) => v > 0))) return null
+                return { desde: new Date(t0 + desdeIdx * 60_000).toISOString(), maquinas }
+              })(),
               /* Parada = ninguna máquina produciendo. El pulso lo confirma:
                  con la línea en colación marca 0,0 mientras el número grande
                  mostraba el ritmo de antes de parar. También con el turno
                  CERRADO: es la causa del cierre («Detención programada desde
                  las 15:09 · fin de turno»). */
-              parada={live.machinesProducing === 0 && (live.currentReason || live.currentSinceAt)
+              parada: live.machinesProducing === 0 && (live.currentReason || live.currentSinceAt)
                 ? {
                   desdeHace: live.currentSinceAt ? fmtAgoWall(live.currentSinceAt, now) : null,
                   desdeHora: live.currentSinceAt ? fmtWallTime(live.currentSinceAt) : null,
-                  motivo: live.currentReason ?? null,
+                  // El sensor pone «Planned Downtime» en inglés; el resto de
+                  // los motivos los escribe el operador y ya vienen en español.
+                  motivo: motivoEnEspanol(live.currentReason),
                   programada: classifyLossState({
                     type: 'break',
                     reason: live.currentReason ?? undefined,
                   }) === 'planificado',
                 }
-                : null}
-              ahoraReloj={ritmoAhoraCpm(serieDelTurno, ahoraWallMs)}
+                : null,
+              ahoraReloj: duro15?.cpmReloj ?? ritmoAhoraCpm(serieDelTurno, ahoraWallMs),
               /* Fin del último tramo: la serie viene en hora de planta, igual
-                 que el resto de la pantalla. */
-              corteMs={serieDelTurno.length
+                 que el resto de la pantalla. Con el dato duro, el corte es el
+                 último MINUTO cerrado. */
+              corteMs: duro15?.hastaWallMs ?? (serieDelTurno.length
                 ? Date.parse(serieDelTurno[serieDelTurno.length - 1]!.t) + 5 * 60_000
-                : null}
-              ahoraWallMs={ahoraWallMs}
+                : null),
+              ahoraWallMs,
               /* ⚠ El pulso SOLO si el contador vivo está respondiendo. Con el
                  contador caído, `totalCycles` viene 0 y `cpm` viene 0 —no
                  null—, así que el chip pintaba «0,0 · ahora mismo · 15:30» dos
@@ -5249,60 +6785,72 @@ export function PublicShiftMonitorPage() {
                  contador no está respondiendo. Un cero que es ausencia de dato
                  presentado como medición. `elegirContador` ya hace ese juicio:
                  si cayó al derivado, no hay pulso que mostrar. */
-              pulso={contador.fuente === 'pulso' ? (data.pulse ?? null) : null}
+              pulso: contador.fuente === 'pulso' ? (data.pulse ?? null) : null,
+              vivo: contador.fuente === 'pulso' ? pulsoVivo(data.pulse) : null,
               /* El objetivo, en la MISMA base que el ritmo: el requerido de
                  `pace` es sobre el reloj útil que queda, y se convierte a
                  «andando» con el uptime real del turno. */
-              pedido={pedidoAndando(
+              pedido: pedidoAndando(
                 pace?.requiredPerMinute,
                 live.timeBreakdown?.producingMin,
                 live.timeBreakdown
                   ? Math.max(1, live.timeBreakdown.windowMin - (live.timeBreakdown.plannedMin ?? 0))
                   : null,
-              )}
-              turno={turnoCpm}
-              setCpm={setCpmVigente}
-              techoDemostrado={ritmoAndando.mejor}
-              cerrado={turnoCerrado}
-              contexto={contexto}
+              ),
+              turno: turnoCpm,
+              setCpm: setCpmVigente,
+              techoDemostrado: ritmoAndando.mejor,
+              cerrado: turnoCerrado,
+              contexto,
               /* Últimos 4 turnos + hoy (a 375 px veinte puntos se amontonan) y
                  la escala FIJA al peor/mejor de TODA la historia corta, para
                  que la misma pendiente signifique lo mismo todos los días. */
-              chispa={turnoCpm != null && banda
+              chispa: turnoCpm != null && banda
                 ? <Chispa
                     turnos={banda.turnos.slice(-4)}
                     hoy={turnoCpm}
                     banda={banda.ritmo}
-                    escala={banda.turnos.length
-                      ? {
-                        min: Math.min(...banda.turnos.map((t) => t.ritmo)),
-                        max: Math.max(...banda.turnos.map((t) => t.ritmo)),
-                      }
-                      : null}
+                    /* La escala fija por historia ya no hace falta: el dominio
+                       se ancla a la BANDA (estable por construcción) — misma
+                       vista todos los días. */
                     mediana={ritmoAndando.mediana}
                     muestras={ritmoAndando.muestras}
                   />
-                : undefined}
-            />
+                : undefined,
+            }
+            return (
+              <>
+              <TarjetaTablero id="ritmo" t={tablero}>
+                <ReglaDeRitmo {...reglaProps} parte="estado" />
+              </TarjetaTablero>
+              {/* La tira del minuto solo cuando hay algo que dibujar (barras
+                  del dato duro o, de respaldo, las curvas por máquina). En la
+                  TV es el pie del tablero, como siempre. */}
+              {(reglaProps.barras != null
+                || (serieDelTurno.length > 1 && (seriesMaquinas?.length ?? 0) > 1)) && (
+                <TarjetaTablero id="minuto" t={tablero}>
+                  <ReglaDeRitmo {...reglaProps} parte="minuto" />
+                </TarjetaTablero>
+              )}
+              {/* El rango habitual es análisis: en la TV nace oculto. */}
+              {(contexto || reglaProps.chispa) && (
+                <TarjetaTablero id="rango" t={tablero}>
+                  <ReglaDeRitmo {...reglaProps} parte="rango" />
+                </TarjetaTablero>
+              )}
+              </>
+            )
+            })()}
             </>
           )
         })()}
-        {/* Una sola tarjeta desde que el ritmo se unificó arriba: en una grilla
-            de dos columnas quedaba a media pantalla, con el hueco al lado. */}
-        <div className="grid grid-cols-1 gap-3">
-          {/* El número que manda es el ANDANDO: mide a la línea y se compara
-              entre turnos. El de reloj (piezas ÷ ventana) mezcla velocidad con
-              disponibilidad —9,7 vs 9,7 el día que la línea fue la más rápida
-              de los últimos 8 turnos— y queda como segunda línea, con su
-              denominador escrito. */}
-          {/* OJO — Acá vivían DOS tarjetas: «Ritmo andando» y «Últimos N min», y
-              entre ambas repartían cuatro cifras de ritmo más las del gráfico.
-              La grande era el acumulado del turno, que pasada la primera hora
-              casi no se mueve: Orel vio caer el gráfico con el número quieto.
-              Ahora son una sola regla, con el ritmo de AHORA de protagonista y
-              las otras dos como posiciones de la escala. El detalle histórico
-              (rango normal, racha de turnos) vive en «Comparado con otros
-              días», que es el bloque que existe para eso. */}
+
+        {/* El número que manda es el ANDANDO: mide a la línea y se compara
+            entre turnos. El de reloj (piezas ÷ ventana) mezcla velocidad con
+            disponibilidad —9,7 vs 9,7 el día que la línea fue la más rápida
+            de los últimos 8 turnos— y queda como segunda línea, con su
+            denominador escrito. */}
+        <TarjetaTablero id="tiempo" t={tablero}>
           <Kpi
             label="Tiempo produciendo"
             /*
@@ -5339,34 +6887,143 @@ export function PublicShiftMonitorPage() {
             }
             sub="Disponible = el turno menos colación, reuniones y paradas programadas."
           />
-        </div>
+        </TarjetaTablero>
 
-        {/* Estado actual: por qué NO está corriendo, si es el caso. Con el
-            turno CERRADO no se muestra: "Línea detenida hace 6 h" después del
-            cierre es lo esperable, no una alerta — junto al aviso de sync
-            detenida pintaba alarmante una noche normal. */}
-        {live.status === 'detenida' && esActual && !live.shiftClosed && (
-          <section className="rounded-2xl border border-border bg-muted px-4 py-3">
-            <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-red-600 dark:text-red-400">
-              <PauseCircle className="h-3 w-3" />
-              Ahora mismo
-            </div>
-            <p className="mt-1 text-sm text-foreground">
-              Línea detenida{live.currentReason ? ` — ${live.currentReason}` : ''}
-              {live.currentSinceAt && (
-                <span className="text-muted-foreground">
-                  {' '}(desde {fmtWallTime(live.currentSinceAt)}, {fmtAgoWall(live.currentSinceAt, now)})
-                </span>
-              )}
-            </p>
-          </section>
+        {/* Adónde va a cerrar el turno, según lo que hicieron los anteriores
+            desde esta misma altura. Solo en VIVO: pronosticar un turno
+            terminado no es un dato, es ruido. */}
+        {!live.shiftClosed && (
+          <TarjetaTablero id="pronostico" t={tablero}>
+            <PronosticoCierre
+              f={pronostico}
+              meta={data.targetPieces ?? live.quotaPieces ?? null}
+              horizonte={horizontePronostico}
+            />
+          </TarjetaTablero>
         )}
+        <TarjetaTablero id="velocidad" t={tablero}>
+            {/* ⚠ UN solo gráfico de la serie de 5 min.
+                Había dos tarjetas —"Velocidad de la línea" y "Piezas por tramo"—
+                dibujando exactamente la misma serie, una en pz/min y otra en
+                piezas. La tendencia (media de 15 min) y las referencias de ritmo se
+                mudaron acá, encima de su propio detalle, que además es el gráfico
+                que sabe ubicar las detenciones y el que tiene el zoom a 8×. */}
+            <Sparkbars
+              series={serieDelTurno}
+              cierreMs={(() => {
+                /* El cierre PROGRAMADO (el mismo de la cabecera): cerrado el
+                   turno se usa el horario declarado; en curso, el previsto. */
+                const iso = live.shiftClosed
+                  ? (live.scheduledEnd ?? live.plannedEnd)
+                  : (live.plannedEnd ?? live.scheduledEnd)
+                const ms = iso ? Date.parse(iso) : NaN
+                return Number.isNaN(ms) ? null : ms
+              })()}
+              stopReasons={live.stopReasons}
+              stopEvents={live.stopEvents}
+              comments={live.comments}
+              causaSel={causaSel}
+              onCausa={(c) => { setCausaSel(c); setTramoSel(null) }}
+              tramoSel={tramoSel}
+              breaks={comparacion.breaks}
+              ventana={ventanaGrafica}
+              onVentana={setVentanaGrafica}
+              requiredPerMinute={pace && pace.requiredPerMinute > 0 ? pace.requiredPerMinute : null}
+              medianCpm={
+                /* La MISMA mediana que el riel y la chispa (`ritmoAndando`, 19
+                   turnos), no la del backend (8): eran 29,4 y 29,7 en la misma
+                   pantalla con dos muestras distintas — dos «lo normal» a diez
+                   centímetros (auditoría en vivo, 27-08). El backend queda de
+                   respaldo para docs sin historial. */
+                ritmoAndando.mediana ?? live.paceMedianCpm
+              }
+              medianSamples={ritmoAndando.mediana != null ? ritmoAndando.muestras : live.paceSamples}
+              setCpm={setCpmVigente}
+              fuenteSetPoint={live.setPoint
+                ? `Set point ${fmtDec(live.setPoint.cpm)} pz/min` +
+                  (live.setPoint.medidoEl ? ` · medido el ${live.setPoint.medidoEl}` : '') +
+                  (live.setPoint.metodo ? ` (${live.setPoint.metodo})` : '') +
+                  ' — no es dato del PLC.'
+                : null}
+              onGuardarSetPoint={esAdminMonitor && esActual && data.plantSlug
+                ? async (cpm, metodo) => {
+                  await setMonitorSetPoint({
+                    plantSlug: data.plantSlug!,
+                    cpm,
+                    metodo,
+                    por: usuarioActual?.email ?? null,
+                  })
+                }
+                : undefined}
+            />
+        </TarjetaTablero>
+        {/* El gráfico ARRIBA del bloque de la meta era pedido de Orel (tocar
+            una imputación salta al gráfico, hacia algo que ya pasaste): la
+            fábrica los deja vecinos, y desde «Personalizar» cada aparato puede
+            acomodarlos a su gusto. TAMBIÉN va a la TV (quinteto): compacta —
+            barra, filas y veredicto; el detalle expandido es `pantalla-oculta`
+            porque en la sala nadie toca. */}
+        {(
+          <TarjetaTablero id="meta" t={tablero}>
+            <TiempoDelTurno
+              tb={live.timeBreakdown}
+              causaSel={causaSel}
+              onCausa={(c) => { setCausaSel(c); setTramoSel(null) }}
+              onVentana={setVentanaGrafica}
+              onTramo={setTramoSel}
+              proximaParada={proximaParada}
+              notas={notasDeOperador}
+              /* La resta: minutos parados -> piezas, al ritmo del turno.
+                 En vivo la vara es la cuota a ESTA altura (la curva del
+                 comparador, aplanada en colacion) - contra la meta completa,
+                 el "ritmo" absorberia lo que aun no se juega. */
+              cerrado={turnoCerrado}
+              meta={data.targetPieces ?? live.quotaPieces ?? null}
+              hechas={live.totalPieces}
+              piezasPulso={data.pulse?.totalCycles ?? null}
+              corteHora={horaPlanta(live.lastSyncAt ? Date.parse(live.lastSyncAt) - new Date().getTimezoneOffset() * 60_000 : null)}
+              cuotaAhora={comparacion.optimalAtCurrentMinute}
+              horaAhora={horaDeCuota}
+              cpmAndando={
+                live.timeBreakdown && live.timeBreakdown.producingMin > 0
+                  ? live.totalPieces / live.timeBreakdown.producingMin
+                  : null
+              }
+              costo={costoParadas}
+              grupos={gruposEventos}
+              notasTurno={notasDeTurnoCompleto}
+            />
+          </TarjetaTablero>
+        )}
+        {/* La curva contra los otros días, antes del «vs ayer» en fábrica
+            (pedido de Orel): esta enseña el turno completo de un vistazo y la
+            de ayer es el detalle numérico de UNA de esas curvas. */}
+        <TarjetaTablero id="comparado" t={tablero}>
+            <ComparadorDias
+              ventana={ventanaGrafica}
+              onVentana={setVentanaGrafica}
+              refSel={refSel}
+              onRefSel={setRefSel}
+              cmp={comparacion}
+              live={live}
+              /* Solo cuando el pronóstico es creíble: un cono con 20% de error es
+                 una mancha que promete lo que no puede. */
+              cone={pronostico && pronostico.mapePct <= MAX_MAPE_PCT ? pronostico.cone : null}
+            />
+        </TarjetaTablero>
+        {/* Qué cambió contra ayer y cómo quedó contra los récords: el paso de
+            "hoy pasó esto" a "esto vuelve todos los turnos". */}
+        <TarjetaTablero id="ayer" t={tablero}>
+          <VsAyerBloque r={comparadoConAyer} records={recordsLinea} sinConvenio={sinConvenio} />
+        </TarjetaTablero>
+        </div>
 
         {/*
           Ahora que la cabecera muestra el arranque REAL, el horario declarado
           no se ve en ninguna otra parte: este aviso es el que lo conserva. Sin
           él, el turno de 06:00 desaparecería de la pantalla sin dejar rastro y
-          nadie podría notar el desfase.
+          nadie podría notar el desfase. Va BAJO el tablero, con los demás
+          avisos: es letra chica, no una tarjeta que se reordena.
         */}
         {recorteActividad && serieDelTurno.length > 0 && (
           <p className="text-[11px] leading-snug text-muted-foreground">
@@ -5379,232 +7036,11 @@ export function PublicShiftMonitorPage() {
           </p>
         )}
 
-        {/*
-          El ORDEN cuenta la historia del estado (test del §0 del HIG: lo más
-          importante AHORA va primero). En VIVO la pregunta es «¿cómo vamos y
-          llegamos?»: pronóstico → comparador → velocidad → detalle. CERRADO es
-          una autopsia: qué pasó → qué cambió contra ayer → la velocidad como
-          evidencia → la comparación. El pronóstico y el ritmo necesario no se
-          renderizan en cerrado: pronosticar un turno terminado no es un dato,
-          es ruido.
-        */}
-        {live.shiftClosed ? (
-          <>
-            {/* ⚠ UN solo gráfico de la serie de 5 min.
-                Había dos tarjetas —"Velocidad de la línea" y "Piezas por tramo"—
-                dibujando exactamente la misma serie, una en pz/min y otra en
-                piezas. La tendencia (media de 15 min) y las referencias de ritmo se
-                mudaron acá, encima de su propio detalle, que además es el gráfico
-                que sabe ubicar las detenciones y el que tiene el zoom a 8×. */}
-            <Sparkbars
-              series={serieDelTurno}
-              cierreMs={(() => {
-                /* El cierre PROGRAMADO (el mismo de la cabecera): cerrado el
-                   turno se usa el horario declarado; en curso, el previsto. */
-                const iso = live.shiftClosed
-                  ? (live.scheduledEnd ?? live.plannedEnd)
-                  : (live.plannedEnd ?? live.scheduledEnd)
-                const ms = iso ? Date.parse(iso) : NaN
-                return Number.isNaN(ms) ? null : ms
-              })()}
-              stopReasons={live.stopReasons}
-              stopEvents={live.stopEvents}
-              comments={live.comments}
-              causaSel={causaSel}
-              onCausa={(c) => { setCausaSel(c); setTramoSel(null) }}
-              tramoSel={tramoSel}
-              breaks={comparacion.breaks}
-              ventana={ventanaGrafica}
-              onVentana={setVentanaGrafica}
-              requiredPerMinute={pace && pace.requiredPerMinute > 0 ? pace.requiredPerMinute : null}
-              medianCpm={live.paceMedianCpm}
-              medianSamples={live.paceSamples}
-              setCpm={setCpmVigente}
-              fuenteSetPoint={live.setPoint
-                ? `Set point ${fmtDec(live.setPoint.cpm)} pz/min` +
-                  (live.setPoint.medidoEl ? ` · medido el ${live.setPoint.medidoEl}` : '') +
-                  (live.setPoint.metodo ? ` (${live.setPoint.metodo})` : '') +
-                  ' — no es dato del PLC.'
-                : null}
-              onGuardarSetPoint={esAdminMonitor && esActual && data.plantSlug
-                ? async (cpm, metodo) => {
-                  await setMonitorSetPoint({
-                    plantSlug: data.plantSlug!,
-                    cpm,
-                    metodo,
-                    por: usuarioActual?.email ?? null,
-                  })
-                }
-                : undefined}
-            />
-            {/* El gráfico va ARRIBA del bloque de la meta (pedido de Orel):
-                tocar una imputación salta al gráfico, y el salto tiene que ser
-                hacia algo que ya pasaste, no hacia abajo. */}
-            <TiempoDelTurno
-              tb={live.timeBreakdown}
-              causaSel={causaSel}
-              onCausa={(c) => { setCausaSel(c); setTramoSel(null) }}
-              onVentana={setVentanaGrafica}
-              onTramo={setTramoSel}
-              proximaParada={proximaParada}
-              notas={notasDeOperador}
-              /* La resta: minutos parados -> piezas, al ritmo del turno.
-                 En vivo la vara es la cuota a ESTA altura (la curva del
-                 comparador, aplanada en colacion) - contra la meta completa,
-                 el "ritmo" absorberia lo que aun no se juega. */
-              cerrado={turnoCerrado}
-              meta={data.targetPieces ?? live.quotaPieces ?? metaSensor}
-              hechas={live.totalPieces}
-              piezasPulso={data.pulse?.totalCycles ?? null}
-              corteHora={horaPlanta(live.lastSyncAt ? Date.parse(live.lastSyncAt) - new Date().getTimezoneOffset() * 60_000 : null)}
-              cuotaAhora={comparacion.optimalAtCurrentMinute}
-              horaAhora={horaDeCuota}
-              cpmAndando={
-                live.timeBreakdown && live.timeBreakdown.producingMin > 0
-                  ? live.totalPieces / live.timeBreakdown.producingMin
-                  : null
-              }
-              costo={costoParadas}
-              grupos={gruposEventos}
-              notasTurno={notasDeTurnoCompleto}
-            />
-            {/* La curva contra los otros días va ANTES del «vs ayer» (pedido de
-                Orel): las dos miran atrás, pero esta enseña el turno completo de
-                un vistazo y la de ayer es el detalle numérico de UNA de esas
-                curvas. Primero el panorama, después la cuenta. */}
-            <ComparadorDias
-              ventana={ventanaGrafica}
-              onVentana={setVentanaGrafica}
-              refSel={refSel}
-              onRefSel={setRefSel}
-              cmp={comparacion}
-              live={live}
-              /* Solo cuando el pronóstico es creíble: un cono con 20% de error es
-                 una mancha que promete lo que no puede. */
-              cone={pronostico && pronostico.mapePct <= MAX_MAPE_PCT ? pronostico.cone : null}
-            />
-            {/* Cerró el turno: qué cambió contra ayer y cómo quedó contra los
-                récords. Es el paso de "hoy pasó esto" a "esto vuelve todos los
-                turnos". */}
-            <VsAyerBloque r={comparadoConAyer} records={recordsLinea} sinConvenio={sinConvenio} />
-
-          </>
-        ) : (
-          <>
-            {/* Adónde va a cerrar el turno, según lo que hicieron los anteriores
-                desde esta misma altura. Antes de la velocidad: primero el
-                desenlace, después el detalle de cómo se está llegando. */}
-            <PronosticoCierre
-              f={pronostico}
-              meta={data.targetPieces ?? live.quotaPieces ?? metaSensor}
-              horizonte={horizontePronostico}
-            />
-            {/* El comparador SUBE hasta acá, pegado al pronóstico: los dos
-                contestan la misma pregunta —si el turno llega— y estaban separados
-                por tres bloques de detalle. Arriba el desenlace, abajo el porqué
-                (velocidad, tramos, tiempo, hora por hora). */}
-            <ComparadorDias
-              ventana={ventanaGrafica}
-              onVentana={setVentanaGrafica}
-              refSel={refSel}
-              onRefSel={setRefSel}
-              cmp={comparacion}
-              live={live}
-              /* Solo cuando el pronóstico es creíble: un cono con 20% de error es
-                 una mancha que promete lo que no puede. */
-              cone={pronostico && pronostico.mapePct <= MAX_MAPE_PCT ? pronostico.cone : null}
-            />
-            {/* ⚠ UN solo gráfico de la serie de 5 min.
-                Había dos tarjetas —"Velocidad de la línea" y "Piezas por tramo"—
-                dibujando exactamente la misma serie, una en pz/min y otra en
-                piezas. La tendencia (media de 15 min) y las referencias de ritmo se
-                mudaron acá, encima de su propio detalle, que además es el gráfico
-                que sabe ubicar las detenciones y el que tiene el zoom a 8×. */}
-            <Sparkbars
-              series={serieDelTurno}
-              cierreMs={(() => {
-                /* El cierre PROGRAMADO (el mismo de la cabecera): cerrado el
-                   turno se usa el horario declarado; en curso, el previsto. */
-                const iso = live.shiftClosed
-                  ? (live.scheduledEnd ?? live.plannedEnd)
-                  : (live.plannedEnd ?? live.scheduledEnd)
-                const ms = iso ? Date.parse(iso) : NaN
-                return Number.isNaN(ms) ? null : ms
-              })()}
-              stopReasons={live.stopReasons}
-              stopEvents={live.stopEvents}
-              comments={live.comments}
-              causaSel={causaSel}
-              onCausa={(c) => { setCausaSel(c); setTramoSel(null) }}
-              tramoSel={tramoSel}
-              breaks={comparacion.breaks}
-              ventana={ventanaGrafica}
-              onVentana={setVentanaGrafica}
-              requiredPerMinute={pace && pace.requiredPerMinute > 0 ? pace.requiredPerMinute : null}
-              medianCpm={live.paceMedianCpm}
-              medianSamples={live.paceSamples}
-              setCpm={setCpmVigente}
-              fuenteSetPoint={live.setPoint
-                ? `Set point ${fmtDec(live.setPoint.cpm)} pz/min` +
-                  (live.setPoint.medidoEl ? ` · medido el ${live.setPoint.medidoEl}` : '') +
-                  (live.setPoint.metodo ? ` (${live.setPoint.metodo})` : '') +
-                  ' — no es dato del PLC.'
-                : null}
-              onGuardarSetPoint={esAdminMonitor && esActual && data.plantSlug
-                ? async (cpm, metodo) => {
-                  await setMonitorSetPoint({
-                    plantSlug: data.plantSlug!,
-                    cpm,
-                    metodo,
-                    por: usuarioActual?.email ?? null,
-                  })
-                }
-                : undefined}
-            />
-            <TiempoDelTurno
-              tb={live.timeBreakdown}
-              causaSel={causaSel}
-              onCausa={(c) => { setCausaSel(c); setTramoSel(null) }}
-              onVentana={setVentanaGrafica}
-              onTramo={setTramoSel}
-              proximaParada={proximaParada}
-              notas={notasDeOperador}
-              /* La resta: minutos parados -> piezas, al ritmo del turno.
-                 En vivo la vara es la cuota a ESTA altura (la curva del
-                 comparador, aplanada en colacion) - contra la meta completa,
-                 el "ritmo" absorberia lo que aun no se juega. */
-              cerrado={turnoCerrado}
-              meta={data.targetPieces ?? live.quotaPieces ?? metaSensor}
-              hechas={live.totalPieces}
-              piezasPulso={data.pulse?.totalCycles ?? null}
-              corteHora={horaPlanta(live.lastSyncAt ? Date.parse(live.lastSyncAt) - new Date().getTimezoneOffset() * 60_000 : null)}
-              cuotaAhora={comparacion.optimalAtCurrentMinute}
-              horaAhora={horaDeCuota}
-              cpmAndando={
-                live.timeBreakdown && live.timeBreakdown.producingMin > 0
-                  ? live.totalPieces / live.timeBreakdown.producingMin
-                  : null
-              }
-              costo={costoParadas}
-              grupos={gruposEventos}
-              notasTurno={notasDeTurnoCompleto}
-            />
-            {/* Pegado al desglose de HOY va el de SIEMPRE: la misma pregunta —qué
-                para la línea— pero mirando los turnos anteriores. Es el paso de
-                "hoy pasó esto" a "esto vuelve todos los turnos". */}
-            {/* Cerró el turno: qué cambió contra ayer y cómo quedó contra los
-                récords. El orden es a propósito — primero qué pasó (arriba),
-                después por qué fue distinto, después qué se repite siempre. */}
-            <VsAyerBloque r={comparadoConAyer} records={recordsLinea} sinConvenio={sinConvenio} />
-
-          </>
-        )}
-
         {/* ⚠ Turno sin historia (la primera noche del turno noche): medio
             monitor no puede existir y eso es CORRECTO — pero se dice, con el
             plan de cuándo aparece cada cosa, en vez de dejar huecos mudos. */}
         {resumenesAnteriores.length === 0 && live.totalPieces > 0 && (
-          <div className="rounded-xl border border-dashed border-border px-3 py-2.5 text-[11.5px] leading-snug text-muted-foreground">
+          <div className="pantalla-oculta rounded-xl border border-dashed border-border px-3 py-2.5 text-[11.5px] leading-snug text-muted-foreground">
             <span className="font-semibold text-amber-700 dark:text-amber-400">
               ◔ Turno sin historia todavía
             </span>{' '}
@@ -5613,7 +7049,24 @@ export function PublicShiftMonitorPage() {
             (2º turno), el pronóstico de cierre (4º), y el rango normal con los récords (5º).
           </div>
         )}
+        </>)}
 
+        {/*
+         * ── ZONA 3 · análisis del turno ────────────────────────────────────
+         * Lo que se mira DESPUÉS, no con la línea corriendo: qué se repite, de
+         * quién fue la pérdida, hora por hora, el detalle por máquina. Tiene
+         * pestaña propia (`?ver=analisis`): dejó de compartir scroll con lo
+         * vivo. El rótulo lo pone la pestaña, no un h2.
+         */}
+        {pestana === 'analisis' && (
+        <div className="pt-1">
+          {/* Acá SÍ multicolumna, al revés que arriba: entre bloques de
+              análisis no hay uno «más importante» —se miran después y por
+              separado— y sus alturas son muy dispares (el pareto mide 1.507 px
+              y «hora por hora» 332). Con grilla eso deja huecos de ~900 px;
+              con columnas se empaquetan. Dos columnas, no tres: a tres el
+              pareto queda demasiado angosto para leer sus barras. */}
+          <div className="space-y-3 lg:columns-2 lg:gap-3 lg:space-y-0 lg:[&>*]:mb-3 lg:[&>*]:break-inside-avoid">
         <ParetoDeParadas
           pareto={pareto} ctx={paretoCtx} tendencia={paretoTendencia}
           porTurno={paretoPorTurno}
@@ -5621,7 +7074,15 @@ export function PublicShiftMonitorPage() {
           turno={turnoPareto ?? vista?.shiftId ?? null} onTurno={setTurnoPareto}
         />
 
-        <PorHora series={serieDelTurno} paradas={paradasDelTurno} />
+        {/* De quién fue la pérdida: el reparto SEMANAL por dueño — la
+            evidencia acumulada del aporte de Mantención (meta grande). */}
+        <RepartoDuenoSemanal stats={data.shiftStats} />
+
+        <PorHora
+          series={serieDelTurno}
+          paradas={paradasDelTurno}
+          pulse={contador.fuente === 'pulso' ? data.pulse : null}
+        />
 
         {/* Desglose por máquina — solo aporta cuando la línea tiene más de una */}
         {live.machines.length > 1 && (
@@ -5657,14 +7118,37 @@ export function PublicShiftMonitorPage() {
                       </span>
                     )}
                   </span>
-                  <span className="tabular-nums text-foreground/80">{fmtInt(m.pieces)} pz</span>
-                  <span className="w-20 text-right tabular-nums text-[11px] text-muted-foreground/80">
-                    {fmtInt(m.piecesPerHour)} pz/h
-                  </span>
+                  {/* Piezas al corte del PULSO cuando está fresco: sin esto,
+                      la lista sumaba 4.392 con el héroe en 4.569 (dos cortes
+                      a dos tarjetas — careo 29-08). El pz/h se recalcula con
+                      la MISMA ventana fresca para no mezclar cortes. */}
+                  {(() => {
+                    const piezas = piezasDuro?.piezas.get(m.id) ?? m.pieces
+                    const horas = (() => {
+                      if (!piezasDuro || !live.effectiveStart) return null
+                      const corte = aWallClockMs(piezasDuro.at)
+                      const ini = Date.parse(live.effectiveStart)
+                      const h = corte != null && Number.isFinite(ini) ? (corte - ini) / 3_600_000 : null
+                      return h != null && h > 0.2 ? h : null
+                    })()
+                    const pzh = horas != null ? piezas / horas : m.piecesPerHour
+                    return (
+                      <>
+                        <span className="tabular-nums text-foreground/80">{fmtInt(piezas)} pz</span>
+                        <span className="w-20 text-right tabular-nums text-[11px] text-muted-foreground/80">
+                          {fmtInt(pzh)} pz/h
+                        </span>
+                      </>
+                    )
+                  })()}
                 </li>
               ))}
             </ul>
           </section>
+        )}
+
+          </div>
+        </div>
         )}
 
         {/* Frescura y procedencia */}

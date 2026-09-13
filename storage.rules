@@ -53,10 +53,17 @@ service firebase.storage {
     }
 
     // Fotos de incidencias (max 10MB, solo imágenes)
+    // Delete: sin esta línea NINGÚN cliente podía borrar un objeto acá (403
+    // comprobado con token de admin el 08-09-2026) y cualquier subida fallida
+    // o de prueba quedaba huérfana para siempre. Mismo criterio que
+    // machines/.../repuestos y planosAguas: sesión no anónima. No se puede
+    // exigir isAdmin(): ver la nota en /models3d (el cross-service deniega).
     match /incidents/{incidentId}/{fileName} {
       allow write: if request.auth != null
         && request.resource.size < 10 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null
+        && request.auth.token.firebase.sign_in_provider != 'anonymous';
     }
     
     // Fotos de evidencias fotográficas (before/after)
@@ -101,6 +108,24 @@ service firebase.storage {
       allow write: if request.auth != null
         && request.resource.size < 10 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
+    }
+
+    // Fotos reales de repuestos (uploadRepuestoFoto):
+    // repuestos/{machineId}/{repuestoId}/fotos/{fileName} — 4 segmentos, no lo
+    // cubre la regla legacy de arriba (3 segmentos) ni /machines/...
+    match /repuestos/{machineId}/{repuestoId}/{type}/{fileName} {
+      allow create, update: if request.auth != null
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null;
+    }
+
+    // Fotos de ítems de bodega (uploadBodegaPhoto): bodega/{codigoSAP}/fotos/{fileName}
+    match /bodega/{codigoSAP}/{type}/{fileName} {
+      allow create, update: if request.auth != null
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null;
     }
 
     // Fotos de usuarios

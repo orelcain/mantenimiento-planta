@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react'
 import { collection, getDocs, query, where } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import { logger } from '@/lib/logger'
+import type { Repuesto } from '@/types/repuestos'
 
 export interface RepuestoDeEquipo {
   id: string
@@ -16,6 +17,18 @@ export interface RepuestoDeEquipo {
   nombre: string
   tipo?: string
   stockFisico?: number
+  /**
+   * Cuantas lleva la maquina. Es `cantidadPorMaquina`, NO `cantidadPorEquipo`:
+   * ese ultimo esta en el esquema documentado pero en cero docs. Va a la
+   * posicion de la BOM en IB01.
+   */
+  cantidadPorMaquina?: number
+  /**
+   * El documento completo. El export IB01 necesita campos que esta vista no
+   * muestra (textoBreve, unidad, obsoleto), y volver a leerlos de Firestore
+   * solo para exportar seria pagar la misma query dos veces.
+   */
+  doc: Repuesto
 }
 
 export function useRepuestosDeEquipo(nodeId?: string, reloadKey?: number): { repuestos: RepuestoDeEquipo[]; loading: boolean } {
@@ -40,6 +53,8 @@ export function useRepuestosDeEquipo(nodeId?: string, reloadKey?: number): { rep
             nombre: String(r.textoBreve || r.descripcion || r.alias || r.nombreManual || 'Repuesto'),
             tipo: typeof r.tipo === 'string' ? r.tipo : undefined,
             stockFisico: typeof r.stockFisico === 'number' ? r.stockFisico : undefined,
+            doc: { id: d.id, ...r } as unknown as Repuesto,
+            cantidadPorMaquina: typeof r.cantidadPorMaquina === 'number' ? r.cantidadPorMaquina : undefined,
           }
         })
         rows.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))

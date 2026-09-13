@@ -410,6 +410,10 @@
 }
 
 :root[data-skin="apple"].dark {
+  /* --mon-ref de .dark (#69717d) fue calibrado contra la tarjeta oscura VIEJA
+     (#16242f); sobre la tarjeta Apple (#2C2C2E) mide 2,83:1 — bajo el 3:1 que
+     exige un trazo. Medido en el rediseño de la Chispa (29-08). */
+  --mon-ref: #767e8a;
   color-scheme: dark;
   /* Dark ELEVADO del HIG (el de iPad/ventanas), NO el negro OLED base: Orel
      rechazó #000 por dureza. La elevación se comunica por TONO, no por sombra. */
@@ -479,9 +483,16 @@
     font-size: 87.5%;
   }
 
-  @media (max-width: 640px) {
+  /* El telefono NO escala: el espaciado va en rem, asi que al 85% un `h-11` media
+     37 px y la constitucion pide 44x44 minimo ("uso con guantes"). La tipografia no
+     entra aqui — su escala esta en px a proposito (ver tailwind.config.js). El 87.5%
+     de arriba se mantiene para escritorio, donde manda el mouse y no el dedo.
+     El criterio es `pointer: coarse`, no el ancho: un telefono EN HORIZONTAL mide
+     812 px y se escapaba del breakpoint de 640 — y esa es justo la vista que usa
+     el tecnico en el calendario. El ancho queda como respaldo. */
+  @media (pointer: coarse), (max-width: 640px) {
     html {
-      font-size: 85%;
+      font-size: 100%;
     }
   }
 
@@ -665,6 +676,97 @@
 }
 
 @layer utilities {
+  /*
+   * ── MODO PANTALLA del monitor público (`?pantalla=1`) ─────────────────────
+   *
+   * La TV de la sala se mira a TRES METROS: ahí no se lee un pareto, una
+   * cascada ni la letra chica de una tarjeta. No es «el monitor ampliado» —
+   * medido en el mockup, ampliar la tarjeta entera la corta— sino la CABEZA de
+   * cada tarjeta, grande: cuántas van, el ritmo con su desglose por máquina y
+   * la tira del minuto. Todo lo demás se oculta; sigue estando en el teléfono
+   * y en el PC.
+   *
+   * Se activa por parámetro y nunca por ancho: quien lee el informe en un
+   * notebook de 1.400 px no quiere que se lo conviertan en cartel.
+   *
+   * ⚠ Va con `zoom`, no con `transform: scale`. Con scale el contenido conserva
+   * su ancho y queda una tarjeta de celular estirada con la mitad de la
+   * pantalla vacía; con zoom refluye al ancho real y los 465 minutos del turno
+   * ocupan la pantalla entera.
+   */
+  /*
+   * El tablero tiene que CABER sin scroll: nadie hace scroll en una TV. El
+   * contenido que queda mide ~980 px propios, así que el zoom se ata a la
+   * ALTURA de la pantalla — en un 1080p llena justo, y en un 4K de sala el
+   * mismo tablero se ve al doble sin tocar nada.
+   */
+  .modo-pantalla {
+    max-width: none;
+    padding: 0.6vw 1.4vw 1vw;
+    zoom: 1;
+  }
+  /* 0,97: con el tablero editable las filas de la grilla suman más gaps que
+     el layout fijo (medido: contenedor 1.011 px sin zoom) y el presupuesto es
+     main ≤ 1.024 (1.080 menos la banda de 56). El cartel pierde un 3%
+     imperceptible a 3 metros; cortar la tira del minuto sí se ve. */
+  @media (min-height: 1000px) { .modo-pantalla { zoom: 0.97; } }
+  @media (min-height: 1300px) { .modo-pantalla { zoom: 1.32; } }
+  @media (min-height: 1700px) { .modo-pantalla { zoom: 1.72; } }
+  @media (min-height: 2000px) { .modo-pantalla { zoom: 2.05; } }
+  /*
+   * La TV corre el MISMO tablero que el PC (editable, pedido de Orel 30-08)
+   * con fábrica y memoria propias (`monitor-tablero-tv:*`): el layout ya no
+   * lo fija este CSS —lo ponen los envoltorios del tablero— y acá solo queda
+   * lo que es de TV: qué se oculta y los tamaños de cartel. El quinteto de
+   * fábrica vive en FABRICA_TURNO_TV; las tarjetas fuera del quinteto ni se
+   * renderizan (gate !modoPantalla en el JSX).
+   */
+  .modo-pantalla > p,
+  .modo-pantalla > footer { display: none; }
+  /* Fuera lo que no se lee de lejos. */
+  .modo-pantalla .pantalla-oculta { display: none; }
+  /*
+   * El resultado a CARTEL: las piezas son EL número del tablero. El resto del
+   * contenido se reparte a lo alto de la tarjeta (que el tablero estira al
+   * tamaño que el usuario le dé).
+   */
+  .modo-pantalla [data-tarjeta='resultado'] > section {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-evenly;
+  }
+  .modo-pantalla [data-tarjeta='resultado'] .text-5xl {
+    font-size: 110px;
+    letter-spacing: -0.02em;
+  }
+  /* La frase del resultado y las notas, a tamaño de lejos. */
+  .modo-pantalla [data-tarjeta='resultado'] p { font-size: 18px; line-height: 1.35; }
+
+  /*
+   * El estado del ritmo, abierto en dos adentro: números a la izquierda y
+   * «cada máquina» a la derecha — apilados dejaban media tarjeta muerta.
+   */
+  .modo-pantalla [data-tarjeta='ritmo'] > section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 1.5vw;
+    align-content: start;
+  }
+  /* Una sola máquina (Filete, B200): «cada máquina» no se renderiza y la
+     columna derecha quedaba VACÍA — medido en prod: contenido hasta 440 px de
+     una tarjeta de 910. Sin ese bloque, el estado vuelve a una columna. */
+  .modo-pantalla [data-tarjeta='ritmo'] > section:not(:has(.ritmo-maquinas)) {
+    display: block;
+  }
+  .modo-pantalla [data-tarjeta='ritmo'] > section > * { grid-column: 1; }
+  .modo-pantalla [data-tarjeta='ritmo'] > section > .ritmo-maquinas {
+    grid-column: 2;
+    grid-row: 1 / span 9;
+    margin-top: 0;
+    border-top: 0;
+    padding-top: 0;
+  }
+
   /*
    * `tap-44` — área táctil de 44x44 sin tocar el tamaño visual (§3 de la
    * Constitución). Para controles chicos por diseño: chips de filtro, cabeceras

@@ -211,7 +211,7 @@ export function AnalisisGraderPeriodoPage() {
   }
 
   return (
-    <div className="container mx-auto p-3 sm:p-4 space-y-4 max-w-screen-xl">
+    <div className="container mx-auto p-3 sm:p-4 space-y-4 max-w-[1760px]">
       {/* ── Header ──────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-3">

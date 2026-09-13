@@ -2459,6 +2459,13 @@ function pintarPins(){
 function escapeHtml(s){
   return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
+// Una fotoUrl solo puede ser una URL https (Storage) o un data:image local.
+// Cualquier otra cosa (javascript:, texto suelto, un intento de romper el atributo)
+// se descarta: es la barrera contra XSS almacenado en las notas compartidas.
+function safeFotoSrc(u){
+  u=String(u||'');
+  return /^(https:\/\/|data:image\/(png|jpe?g|webp|gif|avif);)/i.test(u)?u:'';
+}
 
 const tip=document.getElementById('pintip');
 function mostrarTip(ev,n){
@@ -2497,7 +2504,7 @@ function abrirNota(key,id){
     '<h4>'+t+'</h4>'+
     '<div class="meta">'+escapeHtml(CAPTIONS[key]||key)+(n.autor?' · '+escapeHtml(n.autor):'')+(n.fecha?' · '+escapeHtml(n.fecha):'')+'</div>'+
     (n.texto?'<div class="txt">'+escapeHtml(n.texto)+'</div>':'')+
-    (n.foto?'<img class="nf" src="'+n.foto+'" alt="Foto de la nota">':'')+
+    (safeFotoSrc(n.foto)?'<img class="nf" src="'+escapeHtml(safeFotoSrc(n.foto))+'" alt="Foto de la nota">':'')+
     '<div class="row">'+
       '<button class="btn ghost" data-a="edit">Editar</button>'+
       '<button class="btn ghost" data-a="del" style="color:var(--stop);border-color:var(--stop)">Borrar</button>'+
@@ -2521,13 +2528,15 @@ function abrirNota(key,id){
     guardarNotas(); pintarPins(); marcarMiniaturas(); cerrarSheet();
   };
   const f=sheet.querySelector('img.nf');
-  if(f)f.onclick=()=>verFotoNota(n.foto);
+  if(f)f.onclick=()=>verFotoNota(safeFotoSrc(n.foto));
   sheet.classList.add('on'); sheetbg.classList.add('on');
 }
 
 /* La foto de una nota se ve en el mismo visor, con su propio zoom. */
 let fotoPrevia=null;
 function verFotoNota(dataUri){
+  dataUri=safeFotoSrc(dataUri);
+  if(!dataUri)return;
   fotoPrevia={key:view.key,scale:view.scale,tx:view.tx,ty:view.ty};
   cerrarSheet();
   document.getElementById('fv-t').textContent='Foto de la nota — tocá ✕ para volver a la figura';

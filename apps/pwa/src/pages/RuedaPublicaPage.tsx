@@ -4,6 +4,7 @@ import { AlertCircle, ExternalLink, Clock } from 'lucide-react'
 import { Spinner } from '@/components/ui'
 import { FranjaVentanas } from '@/components/calendario/FranjaVentanas'
 import { ResumenPlanta } from '@/components/calendario/ResumenPlanta'
+import { RuedaPlanta } from '@/components/calendario/RuedaPlanta'
 import { cn } from '@/lib/utils'
 import {
   cargarTokenPublico,
@@ -29,7 +30,13 @@ export function RuedaPublicaPage() {
   const { token } = useParams<{ token: string }>()
   const navigate = useNavigate()
   const [data, setData] = useState<RuedaPublicTokenDoc | null>(null)
-  const [estado, setEstado] = useState<'cargando' | 'vencido' | 'noExiste' | 'ok'>('cargando')
+  /**
+   * `vencido` solo cuando se leyó el doc y su fecha ya pasó: eso se SABE.
+   * Un permission-denied no distingue «venció y se borró» de «el link viene mal
+   * copiado» —lo segundo es lo más común, porque los mensajeros cortan URLs— así
+   * que ese caso es `noDisponible` y no afirma una causa.
+   */
+  const [estado, setEstado] = useState<'cargando' | 'vencido' | 'noDisponible' | 'noExiste' | 'ok'>('cargando')
   const [diaIdx, setDiaIdx] = useState<number>(() => (new Date().getDay() + 6) % 7)
   const [maquinaId, setMaquinaId] = useState<string>('')
 
@@ -56,7 +63,7 @@ export function RuedaPublicaPage() {
       })
       .catch((e) => {
         if (!vivo) return
-        setEstado(esAccesoDenegado(e) ? 'vencido' : 'noExiste')
+        setEstado(esAccesoDenegado(e) ? 'noDisponible' : 'noExiste')
       })
     return () => {
       vivo = false
@@ -87,12 +94,12 @@ export function RuedaPublicaPage() {
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background px-6 text-center">
         <AlertCircle className="h-12 w-12 text-destructive" />
         <p className="text-title3 text-foreground">
-          {estado === 'vencido' ? 'Este link ya venció' : 'Plan no encontrado'}
+          {estado === 'vencido' ? 'Este link ya venció' : 'Este link no está disponible'}
         </p>
         <p className="max-w-xs text-body text-muted-foreground">
           {estado === 'vencido'
             ? 'Los links del plan valen 30 días. Pídele uno nuevo a Mantención.'
-            : 'El link no es válido o fue eliminado.'}
+            : 'Puede haber vencido —valen 30 días— o llegar cortado: revisa que el link esté completo antes de pedir otro.'}
         </p>
         <button
           onClick={() => navigate('/login')}
@@ -205,6 +212,13 @@ export function RuedaPublicaPage() {
             </div>
           )}
         </div>
+
+        <RuedaPlanta
+          maquinas={data.maquinas}
+          diaIdx={diaIdx}
+          maquinaActivaId={maquinaId}
+          onSeleccionar={setMaquinaId}
+        />
 
         <ResumenPlanta maquinas={data.maquinas} diaIdx={diaIdx} onVerMaquina={setMaquinaId} />
 

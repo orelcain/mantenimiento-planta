@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildExecutiveSummary, formatDuration } from '../graderExecutiveSummary'
+import { buildExecutiveSummary, formatDuration, buildCause, CAUSA_MIN_DIFERENCIA_PTS } from '../graderExecutiveSummary'
 import type { GraderDailySummary } from '@/services/grader/types'
 import type { UpstreamLineSnapshot, UpstreamMachineShift } from '@/services/shoplogix/types'
 
@@ -175,5 +175,43 @@ describe('formatDuration', () => {
     expect(formatDuration(429)).toBe('7 h 09')
     expect(formatDuration(60)).toBe('1 h 00')
     expect(formatDuration(45)).toBe('45 min')
+  })
+})
+
+describe('buildCause · a quién señala la hoja ejecutiva', () => {
+  const fila = (name: string, ratePct: number | null, cycles = 1000) =>
+    ({ name, cycles, uptimePct: null, ratePct, flag: '', stopped: false })
+
+  it('señala a la de PEOR ritmo, no a la última de la lista', () => {
+    // buildMachineRows ordena por ciclos descendente. Hasta el 10-09 se tomaba
+    // machines[length-1] —la de menos producción— y se citaba su ritmo: medido
+    // sobre 144 turnos, 65 nombraban a la máquina equivocada y 11 de esos
+    // acusaban justo a la que mejor había andado.
+    const machines = [fila('Ev 1', 60, 9000), fila('Ev 2', 95, 5000), fila('Ev 3', 90, 1000)]
+    expect(buildCause(machines)).toContain('Ev 1')
+    expect(buildCause(machines)).not.toContain('Ev 3')
+  })
+
+  it('con las máquinas parejas no acusa a ninguna', () => {
+    // El caso del 07-09: 78 % / 78 % / 80 %. Elegir una era elegir por ruido.
+    const c = buildCause([fila('Ev 1', 78), fila('Ev 2', 78), fila('Ev 3', 80)])
+    expect(c).toContain('parejas')
+    expect(c).not.toContain('arrastra')
+  })
+
+  it('justo en el umbral ya señala', () => {
+    const c = buildCause([fila('Ev 1', 70), fila('Ev 2', 70 + CAUSA_MIN_DIFERENCIA_PTS)])
+    expect(c).toContain('Ev 1')
+    expect(c).toContain('arrastra')
+  })
+
+  it('una máquina detenida manda sobre el ritmo de las demás', () => {
+    const machines = [fila('Ev 1', 60), { ...fila('Ev 2', null, 0), stopped: true }]
+    expect(buildCause(machines)).toContain('Ev 2')
+    expect(buildCause(machines)).toContain('no registró producción')
+  })
+
+  it('sin ritmos no inventa un culpable', () => {
+    expect(buildCause([fila('Ev 1', null), fila('Ev 2', null)])).toContain('Sin datos')
   })
 })

@@ -29,6 +29,58 @@ export interface PdfDoc {
   addPage(): void
 }
 
+/**
+ * Caracteres que las fuentes estándar del PDF (Helvetica, WinAnsiEncoding) no
+ * tienen, con su reemplazo.
+ *
+ * jsPDF, al encontrarlos, pasa toda la cadena a UTF-16 y el visor la dibuja
+ * con el glifo equivocado: la ventana del turno salía «21:28 ! 05:21» en vez de
+ * «21:28 → 05:21». Medido sobre el PDF real del 07-09: de 169 cadenas, solo esa
+ * se rompía, y solo por la flecha.
+ */
+const SIN_GLIFO: ReadonlyArray<readonly [RegExp, string]> = [
+  [/[→⟶]/g, '-'],
+  [/[←⟵]/g, '-'],
+  [/▲/g, '+'],
+  [/▼/g, '-'],
+  [/[≈∼]/g, '~'],
+  [/≥/g, '>='],
+  [/≤/g, '<='],
+  [/[–—]/g, '-'],
+  [/[“”]/g, '"'],
+  [/[‘’]/g, "'"],
+  [/…/g, '...'],
+]
+
+/** Deja el texto en caracteres que la fuente del PDF sí puede dibujar. */
+export function textoParaPdf(t: string): string {
+  let out = t
+  for (const [re, rep] of SIN_GLIFO) out = out.replace(re, rep)
+  return out
+}
+
+/**
+ * Envuelve el documento para que TODO lo que se dibuje pase por
+ * `textoParaPdf`. Se aplica una vez al entrar, en lugar de recordar saneando
+ * cada `doc.text(...)` — que es justo lo que se olvida.
+ */
+export function conTextoSeguro<T extends PdfDoc>(doc: T): T {
+  const text = doc.text.bind(doc)
+  const split = doc.splitTextToSize.bind(doc)
+  return new Proxy(doc, {
+    get(target, prop, receiver) {
+      if (prop === 'text') {
+        return (t: string | string[], x: number, y: number, opts?: { align?: string }) =>
+          text(Array.isArray(t) ? t.map(textoParaPdf) : textoParaPdf(t), x, y, opts)
+      }
+      if (prop === 'splitTextToSize') {
+        return (t: string, maxWidth: number) => split(textoParaPdf(t), maxWidth)
+      }
+      return Reflect.get(target, prop, receiver)
+    },
+  }) as T
+}
+
 export type RGB = readonly [number, number, number]
 
 export const INK: RGB = [20, 32, 44]

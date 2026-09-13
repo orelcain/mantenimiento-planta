@@ -38,7 +38,7 @@ export async function setAuthPersistence(remember: boolean): Promise<void> {
 // Iniciar sesión con email/password
 export async function signIn(email: string, password: string): Promise<User> {
   const credential = await signInWithEmailAndPassword(auth, email, password)
-  const user = await getUserById(credential.user.uid)
+  const user = await getUserByIdConTokenFresco(credential.user)
   if (!user) {
     throw new Error('Usuario no encontrado en la base de datos')
   }
@@ -116,7 +116,7 @@ async function signInWithGoogleToken(idToken: string): Promise<User> {
   const result = await signInWithCredential(auth, credential)
   const firebaseUser = result.user
 
-  let user = await getUserById(firebaseUser.uid)
+  let user = await getUserByIdConTokenFresco(firebaseUser)
 
   if (user) {
     if (!user.activo) {
@@ -243,6 +243,36 @@ export async function createUser(
 // Cerrar sesión
 export async function signOut(): Promise<void> {
   await firebaseSignOut(auth)
+}
+
+/**
+ * Lee el perfil del usuario RECIÉN autenticado, reintentando UNA vez con un
+ * ID token fresco si Firestore rechaza con permission-denied.
+ *
+ * Caso 2026-09-05 (mantencion.plantach): un PC de planta con la TV del monitor
+ * abierta horas en otra pestaña. El token compartido venció con las pestañas
+ * dormidas de Edge y el login fresco reutilizó la conexión Firestore con la
+ * credencial vieja → `users/{uid}` fallaba con "Missing or insufficient
+ * permissions" aunque la regla lo permite. `getIdToken(true)` obliga al SDK a
+ * tomar el token nuevo antes del reintento. Cualquier otro error se propaga
+ * igual que antes; un segundo permission-denied también (no hay bucle).
+ */
+export async function getUserByIdConTokenFresco(firebaseUser: FirebaseUser): Promise<User | null> {
+  try {
+    return await getUserById(firebaseUser.uid)
+  } catch (error) {
+    if (!esPermissionDenied(error)) throw error
+    logger.warn('Perfil rechazado con permission-denied tras autenticar; reintentando con token fresco', {
+      uid: firebaseUser.uid,
+    })
+    await firebaseUser.getIdToken(true)
+    return getUserById(firebaseUser.uid)
+  }
+}
+
+function esPermissionDenied(error: unknown): boolean {
+  const code = (error as { code?: unknown } | null)?.code
+  return code === 'permission-denied' || code === 'firestore/permission-denied'
 }
 
 // Obtener usuario por ID

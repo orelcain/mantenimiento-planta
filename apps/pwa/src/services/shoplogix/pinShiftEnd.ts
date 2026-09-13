@@ -278,6 +278,7 @@ export async function setPesoPromedio(params: {
       pesoPromedioKg?: number
       pesoPromedioAt?: string
       pesoPromedioPor?: string | null
+      pesoHistorial?: Array<{ at: string; pesoKg: number; por: string | null }>
       quota?: { value: number; unit: string }
       quotaOrigen?: { toneladas: number; pesoPromedioKg: number }
     }
@@ -285,8 +286,23 @@ export async function setPesoPromedio(params: {
       delete entry.pesoPromedioKg
       delete entry.pesoPromedioAt
       delete entry.pesoPromedioPor
+      delete entry.pesoHistorial
       return entry
     }
+    /*
+     * HISTORIAL del peso (Orel, 28-08): «es una variable cambiante… a tal
+     * hora se registró tal peso, después se puso otro según la pesca y el
+     * lote». Cada registro rige desde su hora hasta el siguiente, y las
+     * toneladas del monitor se calculan POR TRAMOS con el peso vigente de
+     * cada uno. La entry es por NOMBRE de turno y se reusa cada día, así que
+     * acá solo se poda lo viejo (>20 h — turnos anteriores); el backend
+     * además filtra por el arranque del turno vigente al publicar.
+     */
+    const corte = Date.now() - 20 * 3600_000
+    entry.pesoHistorial = [
+      ...(entry.pesoHistorial ?? []).filter((r) => Date.parse(r.at) >= corte),
+      { at: new Date().toISOString(), pesoKg: params.pesoKg, por: params.por ?? null },
+    ].slice(-24)
     entry.pesoPromedioKg = params.pesoKg
     entry.pesoPromedioAt = new Date().toISOString()
     entry.pesoPromedioPor = params.por ?? null
@@ -298,6 +314,57 @@ export async function setPesoPromedio(params: {
         unit: 'pieces',
       }
       entry.quotaOrigen = { ...entry.quotaOrigen, pesoPromedioKg: params.pesoKg }
+    }
+    return entry
+  })
+
+  await setDoc(ref, { shiftSchedule: siguiente, updatedAt: serverTimestamp() }, { merge: true })
+}
+
+/**
+ * Elimina UN registro del historial de pesos (Orel, 29-08: «editar o eliminar
+ * los ya agregados» — un dedo de más en los gramos no puede quedar pegado en
+ * las toneladas del turno). Editar = eliminar el malo + poner el bueno.
+ *
+ * `at` es la clave del registro (la ISO UTC con que se guardó; el monitor la
+ * recibe en `pesoRegistros[].at`). El peso VIGENTE pasa al último registro
+ * que quede; sin registros, el campo plano también se limpia — la tarjeta
+ * vuelve a pedir el peso, que es lo honesto.
+ */
+export async function eliminarRegistroPeso(params: {
+  plantSlug: PlantSlug | string
+  shiftName: string
+  at: string
+}): Promise<void> {
+  const docId = CONFIG_DOC_ID[params.plantSlug]
+  if (!docId) throw new Error(`Línea sin config: ${params.plantSlug}`)
+  const ref = doc(db, COLLECTION, docId)
+  const snap = await getDoc(ref)
+  const actual: ShiftScheduleEntry[] = Array.isArray(snap.data()?.shiftSchedule)
+    ? (snap.data()!.shiftSchedule as ShiftScheduleEntry[])
+    : []
+  const objetivo = normShiftName(params.shiftName)
+
+  const siguiente = actual.map((e) => {
+    if (normShiftName(e.shiftId) !== objetivo) return e
+    const entry = { ...e } as ShiftScheduleEntry & {
+      pesoPromedioKg?: number
+      pesoPromedioAt?: string
+      pesoPromedioPor?: string | null
+      pesoHistorial?: Array<{ at: string; pesoKg: number; por: string | null }>
+    }
+    const historial = (entry.pesoHistorial ?? []).filter((r) => r.at !== params.at)
+    entry.pesoHistorial = historial
+    const ultimo = historial[historial.length - 1]
+    if (ultimo) {
+      entry.pesoPromedioKg = ultimo.pesoKg
+      entry.pesoPromedioAt = ultimo.at
+      entry.pesoPromedioPor = ultimo.por ?? null
+    } else {
+      delete entry.pesoPromedioKg
+      delete entry.pesoPromedioAt
+      delete entry.pesoPromedioPor
+      delete entry.pesoHistorial
     }
     return entry
   })

@@ -17,9 +17,10 @@ import {
 import { Button } from '@/components/ui'
 import { ImageLightbox } from '@/components/ui/ImageLightbox'
 import { ConfirmUploadDialog } from '@/components/repuestos/ConfirmUploadDialog'
-import { uploadRepuestoFoto, deleteRepuestoFoto } from '@/services/storage'
+import { uploadRepuestoFoto, deleteRepuestoFoto, SIN_EQUIPO_STORAGE_SEGMENT } from '@/services/storage'
 import { generateId } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
+import { useToast } from '@/hooks/useToast'
 
 interface RepuestoPhotosModalProps {
   open: boolean
@@ -31,7 +32,11 @@ interface RepuestoPhotosModalProps {
   repuestoName: string
   /** Habilita subir / eliminar fotos reales. */
   isAdmin?: boolean
-  /** machineId del doc raíz — requerido para el path de Storage cuando isAdmin. */
+  /**
+   * nodeId del equipo — segmento del path de Storage. Puede venir vacío: en el
+   * modelo plano un repuesto puede no tener equipo (`equipos: []`, fila
+   * "Transversal"/"Sin equipo"), y esos también tienen que poder llevar fotos.
+   */
   machineId?: string
   /** repuestoId del doc — requerido para el path de Storage cuando isAdmin. */
   repuestoId?: string
@@ -74,6 +79,7 @@ export function RepuestoPhotosModal({
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const user = useAuthStore((s) => s.user)
+  const { toast } = useToast()
 
   // Archivos seleccionados pendientes de confirmación de destino (no subidos aún)
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
@@ -83,7 +89,10 @@ export function RepuestoPhotosModal({
   // El lightbox indexa sobre TODAS las imágenes visibles: fotos reales + manual + galería heredada.
   const allPhotoUrls = [...allPhotos.map((p) => p.url), ...gallery.map((g) => g.url)].filter((u): u is string => !!u)
 
-  const canEdit = !!(isAdmin && machineId && repuestoId && onSaveFotos)
+  // ⚠ NO exigir machineId: 3.025 de 7.673 repuestos (39 %) no tienen equipo
+  // asignado y con esa condición el modal quedaba en solo-lectura sin avisar
+  // (caso real 08-09-2026: "no me deja cargar imágenes a los repuestos").
+  const canEdit = !!(isAdmin && repuestoId && onSaveFotos)
 
   // ── Selección: NO sube todavía — pide confirmar el destino primero ──
   const handleFiles = useCallback(
@@ -111,7 +120,9 @@ export function RepuestoPhotosModal({
         const subidaPor = user ? `${user.nombre} ${user.apellido}`.trim() : ''
         const nuevas: ImagenRepuesto[] = []
         for (const file of pendingFiles) {
-          const url = await uploadRepuestoFoto(machineId!, repuestoId!, file)
+          // Sin equipo, el segmento del path lleva un marcador fijo para seguir
+          // cumpliendo la regla de Storage repuestos/{machineId}/{repuestoId}/fotos/.
+          const url = await uploadRepuestoFoto(machineId || SIN_EQUIPO_STORAGE_SEGMENT, repuestoId!, file)
           nuevas.push({
             id: generateId(),
             url,
@@ -129,11 +140,19 @@ export function RepuestoPhotosModal({
         await onSaveFotos!(updated)
         setFotosReales(updated)
         clearPending()
+      } catch (error) {
+        // Sin esto el error muere mudo y el botón parece no hacer nada
+        // (caso real: storage/unauthorized por regla faltante).
+        toast({
+          title: 'No se pudieron subir las fotos',
+          description: error instanceof Error ? error.message : String(error),
+          variant: 'destructive',
+        })
       } finally {
         setUploading(false)
       }
     },
-    [pendingFiles, canEdit, user, fotosReales, machineId, repuestoId, onSaveFotos, clearPending],
+    [pendingFiles, canEdit, user, fotosReales, machineId, repuestoId, onSaveFotos, clearPending, toast],
   )
 
   // ── Delete ──
@@ -152,11 +171,19 @@ export function RepuestoPhotosModal({
         }))
         await onSaveFotos!(withPrincipal)
         setFotosReales(withPrincipal)
+      } catch (error) {
+        // Igual que en la subida: sin catch el fallo moría mudo y la foto
+        // "no se borraba" sin explicación (deleteRepuestoFoto ahora propaga).
+        toast({
+          title: 'No se pudo eliminar la foto',
+          description: error instanceof Error ? error.message : String(error),
+          variant: 'destructive',
+        })
       } finally {
         setDeletingId(null)
       }
     },
-    [canEdit, fotosReales, onSaveFotos],
+    [canEdit, fotosReales, onSaveFotos, toast],
   )
 
   return (
@@ -207,7 +234,6 @@ export function RepuestoPhotosModal({
                       ref={inputRef}
                       type="file"
                       accept="image/*"
-                      capture="environment"
                       multiple
                       className="hidden"
                       onChange={(e) => handleFiles(e.target.files)}

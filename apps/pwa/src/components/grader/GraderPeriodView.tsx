@@ -33,6 +33,8 @@ import type { PeriodAggregate, PeriodStats } from '@/services/grader/graderPerio
 import { computeStatsFromSummaries } from '@/services/grader/graderPeriodAggregate'
 import type { GraderDailySummary } from '@/services/grader/types'
 import { p0StatusFromPct, p0StatusColor, p0StatusBorderClass, DEFAULT_P0_CRITICAL_PCT } from '@/services/grader/graderP0Thresholds'
+import { tendenciaDelPeriodo, hayMejorSemana } from '@/services/grader/graderTendenciaPeriodo'
+import { compararFilas, nombreArchivoCsv } from '@/services/grader/graderPeriodoTabla'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Tooltip, Legend, Filler, zoomPlugin)
 
@@ -75,7 +77,7 @@ function exportToCSV(shifts: GraderDailySummary[], rangeLabel: string): void {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `grader-${rangeLabel.replace(/[^a-zA-Z0-9-]/g, '-').toLowerCase()}.csv`
+  a.download = nombreArchivoCsv(rangeLabel)
   a.click()
   URL.revokeObjectURL(url)
 }
@@ -437,15 +439,10 @@ export function GraderPeriodView({ data }: Props) {
   // ── Tabla ordenable ──────────────────────────────────────────────────────
   const sortedShifts = useMemo(() => {
     const arr = [...shifts]
-    arr.sort((a, b) => {
-      const aVal = a[sortKey] as number | string | undefined
-      const bVal = b[sortKey] as number | string | undefined
-      if (aVal == null && bVal == null) return 0
-      if (aVal == null) return 1
-      if (bVal == null) return -1
-      const cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0
-      return sortDir === 'asc' ? cmp : -cmp
-    })
+    // El desempate va por `startAt` (el instante real), no por el nombre del
+    // turno: en Chonchi «Turno 1» es la NOCHE y «Turno 2» la manana, asi que
+    // el orden alfabetico contradice al reloj. Ver graderPeriodoTabla.ts.
+    arr.sort((a, b) => compararFilas(a, b, sortKey, sortDir))
     return arr
   }, [shifts, sortKey, sortDir])
 
@@ -478,12 +475,16 @@ export function GraderPeriodView({ data }: Props) {
     const avg = (arr: number[]) =>
       arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0
 
-    // Tendencia: primera semana vs última semana del período
-    const firstAvg = avg(dailyP0Series.slice(0, 7).map((d) => d.p0Pct))
-    const lastAvg = avg(dailyP0Series.slice(-7).map((d) => d.p0Pct))
-    const delta = Math.round((lastAvg - firstAvg) * 100) / 100
-    const trendDir: 'better' | 'worse' | 'stable' =
-      delta < -0.3 ? 'better' : delta > 0.3 ? 'worse' : 'stable'
+    /*
+     * Tendencia: las dos MITADES del período, que nunca se solapan.
+     *
+     * Antes era `slice(0,7)` contra `slice(-7)`: con menos de 14 días esas dos
+     * ventanas comparten días —con 8 días, 6 de 7— y el delta se diluye por
+     * construcción. No es un caso raro: la temporada 2026-27 arrancó con 7
+     * días en agosto y 4 en septiembre, así que el período por defecto daba 8
+     * días y el «trimestre» 12. Ver graderTendenciaPeriodo.ts.
+     */
+    const tendencia = tendenciaDelPeriodo(dailyP0Series.map((d) => d.p0Pct))
 
     // Días críticos (P0% >= 3.5%) y racha máxima consecutiva
     let criticalCount = 0
@@ -517,10 +518,7 @@ export function GraderPeriodView({ data }: Props) {
     }
 
     return {
-      trendDir,
-      firstAvg: Math.round(firstAvg * 100) / 100,
-      lastAvg: Math.round(lastAvg * 100) / 100,
-      delta,
+      tendencia,
       criticalCount,
       criticalPct: Math.round((criticalCount / dailyP0Series.length) * 100),
       maxStreak,
@@ -702,22 +700,26 @@ export function GraderPeriodView({ data }: Props) {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-              {/* Tendencia */}
+              {/* Tendencia. El pie dice sobre CUÁNTOS días se calculó cada
+                  promedio: es lo que permite juzgar si el delta significa algo. */}
+              {insights.tendencia && (
               <div className="rounded-card border border-border bg-background px-3 py-2">
                 <p className="text-caption text-muted-foreground tracking-wider mb-1">Tendencia período</p>
                 <p className={cn(
                   'font-semibold text-sm',
-                  insights.trendDir === 'better' && 'text-ink-ok',
-                  insights.trendDir === 'worse'  && 'text-red-500',
-                  insights.trendDir === 'stable' && 'text-muted-foreground',
+                  insights.tendencia.direccion === 'better' && 'text-ink-ok',
+                  insights.tendencia.direccion === 'worse'  && 'text-red-500',
+                  insights.tendencia.direccion === 'stable' && 'text-muted-foreground',
                 )}>
-                  {insights.trendDir === 'better' ? '↓ Mejorando' : insights.trendDir === 'worse' ? '↑ Empeorando' : '→ Estable'}
+                  {insights.tendencia.direccion === 'better' ? '↓ Mejorando' : insights.tendencia.direccion === 'worse' ? '↑ Empeorando' : '→ Estable'}
                 </p>
                 <p className="text-caption text-muted-foreground mt-0.5">
-                  inicio {insights.firstAvg}% → fin {insights.lastAvg}%
-                  {' '}({insights.delta > 0 ? '+' : ''}{insights.delta}pp)
+                  primeros {insights.tendencia.diasPorMitad} días {insights.tendencia.inicioPct}%
+                  {' → últimos '}{insights.tendencia.diasPorMitad} {insights.tendencia.finPct}%
+                  {' '}({insights.tendencia.deltaPp > 0 ? '+' : ''}{insights.tendencia.deltaPp}pp)
                 </p>
               </div>
+              )}
               {/* Días críticos */}
               <div className="rounded-card border border-border bg-background px-3 py-2">
                 <p className="text-caption text-muted-foreground tracking-wider mb-1">Días críticos ≥3.5%</p>
@@ -748,7 +750,9 @@ export function GraderPeriodView({ data }: Props) {
                 </div>
               )}
               {/* Mejor semana */}
-              {insights.bestWeekStart && (
+              {/* Con menos de 14 días solo hay dos ventanas de 7 posibles y
+                  comparten 6: «la mejor» entre esas dos no distingue nada. */}
+              {insights.bestWeekStart && hayMejorSemana(insights.totalDays) && (
                 <div className="rounded-card border border-border bg-background px-3 py-2">
                   <p className="text-caption text-muted-foreground tracking-wider mb-1">Mejor semana</p>
                   <p className="font-semibold text-sm text-ink-ok">{insights.bestWeekAvg}% P0 prom.</p>
@@ -798,13 +802,18 @@ export function GraderPeriodView({ data }: Props) {
             </p>
           )}
         </CardHeader>
+        {/* Alto de las dos series temporales de ancho completo: `lg:h-80` topa
+            en 1024 px y no volvía a crecer, así que con el módulo en 1.760 px
+            (#951) la tendencia P0 quedaba en 1.689 × 280 — ratio 6:1. Los dos
+            charts de media columna de más abajo se quedan en `h-64`: miden
+            816 px de ancho y ya dan 3,6:1. */}
         <CardContent>
           {useHourlyView && hourlyChartData ? (
-            <div className="h-64 lg:h-80">
+            <div className="h-64 lg:h-80 min-[1700px]:h-[26rem]">
               <Line data={hourlyChartData} options={hourlyChartOptions as any} />
             </div>
           ) : trendChartData ? (
-            <div className="h-64 lg:h-80">
+            <div className="h-64 lg:h-80 min-[1700px]:h-[26rem]">
               <Line ref={trendChartRef} data={trendChartData} options={trendChartOptions as any} />
             </div>
           ) : (

@@ -14,6 +14,8 @@
 import { useState, useMemo, useEffect, useCallback, useRef, Fragment } from 'react'
 import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ClipboardList, Menu, History, Trash2, Star, Download, X, MoreVertical, Copy, Check, Package, PackageCheck, PackageMinus, PackageX, GripVertical, Boxes, Wrench, Settings2, MapPin } from 'lucide-react'
 import { isCommonPartSap, machinesForCommonSap } from '@/data/commonPartsByMachine'
+import { esComun, esDespiece, esFavoritoDe, contarCon } from '@/hooks/repuestos/filtrosDeRepuestos'
+import { esCodigoSapValido } from '@/utils/repuestos/exportBomSAP'
 import { findMachineBySlug, LEARNING_MACHINES, isCourseMachine } from '@/data/learningMachines'
 import { Badge, Button, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui'
 import { AreaSidebar } from '@/components/repuestos/AreaSidebar'
@@ -29,6 +31,8 @@ import { getTrashCount } from '@/services/auditLog'
 import { useHierarchyAreaTree, type AreaTreeNode } from '@/hooks/useHierarchyAreaTree'
 import { useGlobalSearch, invalidateGlobalRepuestosCache, type GlobalSearchResult } from '@/hooks/repuestos/useGlobalSearch'
 import { useGlobalEquipmentSearch, getGlobalEquipmentCache } from '@/hooks/useGlobalEquipmentSearch'
+import { Link } from 'react-router-dom'
+import { rutaExpedienteEquipo } from '@/services/equipos/enlaceExpediente'
 import { useBodega } from '@/hooks/repuestos/useBodega'
 import { useAreaRepuestos, type StockStatus, type AreaRepuestoRow } from '@/hooks/repuestos/useAreaRepuestos'
 import { useHierarchyPaths } from '@/hooks/repuestos/useHierarchyPaths'
@@ -40,8 +44,9 @@ import { RepuestoFormModal } from '@/components/repuestos/RepuestoForm'
 import { TechnicalSpecsModal } from '@/components/repuestos/TechnicalSpecsModal'
 import { RepuestoPhotosModal } from '@/components/repuestos/RepuestoPhotosModal'
 import { RepuestoManualModal } from '@/components/repuestos/RepuestoManualModal'
-import { ExportReportModal } from '@/components/repuestos/ExportReportModal'
-import { normalizeForSearch, haystackMatchesAll } from '@/utils/repuestos'
+import { ExportReportModal, type SapEquipoContext } from '@/components/repuestos/ExportReportModal'
+import { normalizeForSearch, haystackMatchesAll, deriveCentro } from '@/utils/repuestos'
+import type { EquipoSap } from '@/utils/repuestos/exportBomSAP'
 import { InlineEditName } from '@/components/repuestos/InlineEditName'
 import { CLASE_LABEL, type MaterialClase, type Machine, type Repuesto, type RepuestoFormData, type TechnicalSpecs, type MachineImage } from '@/types/repuestos'
 
@@ -117,7 +122,7 @@ interface RepuestosAreaHubProps {
 }
 
 export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate, onPendingCreateConsumed }: RepuestosAreaHubProps = {}) {
-  const { areaTree, findNode, getNodePath, expandNode } = useHierarchyAreaTree()
+  const { areaTree, findNode, getNodePath, expandNode, nodeNameMap } = useHierarchyAreaTree()
 
   // El catálogo (colección plana `repuestos`) referencia nodos de hierarchy por id;
   // el equipment cache aporta nombre/alias/path de cada nodo-equipo.
@@ -601,6 +606,39 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     [selectedAreaId, findNode],
   )
 
+  // Identidad SAP del equipo que se está viendo, para exportar su lista de materiales (IB01).
+  // El centro sale del ÁRBOL, nunca del nombre: los equipos se llaman igual en las dos plantas.
+  const sapEquipo = useMemo((): SapEquipoContext | undefined => {
+    if (!selectedEquipMachineId) return undefined
+    const eq = (getGlobalEquipmentCache() || []).find((e) => e.id === selectedEquipMachineId)
+    if (!eq?.codigo) return undefined
+    const ancestros = (eq.path || []).map((id) => nodeNameMap.get(id) || '').filter(Boolean)
+    return {
+      codigo: eq.codigo,
+      nombre: eq.alias || eq.nombre || selectedEquipName || eq.codigo,
+      centro: deriveCentro(ancestros),
+    }
+    // eqLoading: el cache de equipos no es reactivo, sin esto el primer render se queda
+    // con el cache vacio y la pestana SAP no aparece hasta reabrir el modal.
+  }, [selectedEquipMachineId, selectedEquipName, nodeNameMap, eqLoading])
+
+
+  // Equipos del alcance visible (area elegida, o toda la planta), para exportar sus BOM de una
+  // pasada. Solo los que tienen codigo SAP: un nodo sin codigo no es un equipo cargable en SAP.
+  const sapEquipos = useMemo((): EquipoSap[] => {
+    const cache = getGlobalEquipmentCache() || []
+    return cache
+      .filter((e) => !e.oculto && !!e.codigo)
+      .filter((e) => showingAll || !selectedAreaId || (e.path || []).includes(selectedAreaId))
+      .map((e) => ({
+        id: e.id,
+        codigo: e.codigo,
+        nombre: e.alias || e.nombre || e.codigo,
+        centro: deriveCentro((e.path || []).map((id) => nodeNameMap.get(id) || '').filter(Boolean)),
+      }))
+    // Idem: sin eqLoading la primera apertura del modal ofrece 0 equipos.
+  }, [showingAll, selectedAreaId, nodeNameMap, eqLoading])
+
   // (Fase 4 normalización) La sección "Motores y bombas" desapareció: los motores/
   // bombas físicos del levantamiento ahora son REPUESTOS de la colección plana
   // (con marca/modelo/foto) y aparecen en la tabla como cualquier otro repuesto.
@@ -720,6 +758,19 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
       .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value))
   }, [scopedRepuestos])
 
+  /**
+   * Tipos que ya existen, para sugerirlos al editar/crear un material.
+   *
+   * Sale de `areaRepuestos` y NO de `scopedRepuestos`: las sugerencias no deben encogerse
+   * porque el usuario tenga un equipo enfocado. `tipo` es texto libre (66 valores en uso y la
+   * lista no está cerrada), así que esto alimenta un <datalist> — sugiere, no obliga.
+   */
+  const tiposConocidos = useMemo(() => {
+    const s = new Set<string>()
+    for (const r of areaRepuestos) { const t = (r.tipo || '').trim(); if (t) s.add(t) }
+    return [...s].sort((a, b) => a.localeCompare(b))
+  }, [areaRepuestos])
+
   // Opciones del filtro "Clase" (repuesto/insumo/herramienta/…) con conteo.
   const claseOptions = useMemo(() => {
     const counts = new Map<string, number>()
@@ -743,8 +794,8 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   // despiece oculto y mostrarlo en el interruptor.
   const filteredBase = useMemo(() => {
     let res = scopedRepuestos
-    if (repFavOnly) res = res.filter((r) => favKeys.has(r.rowKey))
-    if (repComunOnly) res = res.filter((r) => isCommonPartSap(r.codigoSAP) || (r.comunEn?.length ?? 0) > 0)
+    if (repFavOnly) res = res.filter(esFavoritoDe(favKeys))
+    if (repComunOnly) res = res.filter(esComun)
     if (listFilter !== 'all') {
       const l = favLists.find((x) => x.name === listFilter)
       const ids = new Set(l?.repuestoIds ?? [])
@@ -778,20 +829,28 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     return res
   }, [scopedRepuestos, repFavOnly, repComunOnly, favKeys, listFilter, favLists, repStockFilter, repClaseFilter, repTipoFilter, repQuery])
 
+  // Cuántos favoritos tuyos hay EN ESTE alcance (equipo o área), no en toda la planta: el
+  // filtro ya trabajaba sobre el alcance, pero el contador mostraba el total global — decía
+  // "(7)" y al activarlo aparecía 1 sola fila.
+  const favoritosEnScope = useMemo(
+    () => contarCon(scopedRepuestos, esFavoritoDe(favKeys)),
+    [scopedRepuestos, favKeys],
+  )
+
   // Cuántos comunes hay en el alcance actual (lista estática por SAP + marca comunEn).
   const comunesEnScope = useMemo(
-    () => scopedRepuestos.reduce((n, r) => n + (isCommonPartSap(r.codigoSAP) || (r.comunEn?.length ?? 0) > 0 ? 1 : 0), 0),
+    () => contarCon(scopedRepuestos, esComun),
     [scopedRepuestos],
   )
 
   // Foco SAP: oculta el despiece sin código SAP (default). El conteo de lo oculto
   // alimenta el interruptor "ver despiece".
   const filteredRep = useMemo(
-    () => (repSoloSap ? filteredBase.filter((r) => !!r.codigoSAP) : filteredBase),
+    () => (repSoloSap ? filteredBase.filter((r) => !esDespiece(r)) : filteredBase),
     [filteredBase, repSoloSap],
   )
   const despieceOcultos = useMemo(
-    () => (repSoloSap ? filteredBase.reduce((n, r) => n + (r.codigoSAP ? 0 : 1), 0) : 0),
+    () => (repSoloSap ? contarCon(filteredBase, esDespiece) : 0),
     [filteredBase, repSoloSap],
   )
 
@@ -1100,7 +1159,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     async (sapRaw: string) => {
       if (!selectedRep) return
       const sap = sapRaw.trim()
-      if (!/^\d{6,}$/.test(sap)) {
+      if (!esCodigoSapValido(sap)) {
         toast({ variant: 'destructive', title: 'Código SAP inválido', description: 'Debe ser numérico de 6 o más dígitos.' })
         return
       }
@@ -1675,13 +1734,30 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                 )}
               </div>
               {selectedEquipKey ? (
-                <button
-                  onClick={() => { setRepEquipoFilter('all'); setSelectedEquipKey(null); setSelectedEquipMachineId(null); setSelectedEquipName('') }}
-                  className="mt-1 inline-flex max-w-full items-center gap-1.5 rounded-full border border-border bg-muted px-2.5 py-1 text-caption font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
-                  title="Volver a ver todos los repuestos del área"
-                >
-                  <ChevronLeft className="h-3 w-3 shrink-0" /> Volver a <span className="truncate font-semibold">{selectedNode?.nombre ?? 'el área'}</span>
-                </button>
+                <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                  <button
+                    onClick={() => { setRepEquipoFilter('all'); setSelectedEquipKey(null); setSelectedEquipMachineId(null); setSelectedEquipName('') }}
+                    className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border bg-muted px-2.5 py-1 text-caption font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                    title="Volver a ver todos los repuestos del área"
+                  >
+                    <ChevronLeft className="h-3 w-3 shrink-0" /> Volver a <span className="truncate font-semibold">{selectedNode?.nombre ?? 'el área'}</span>
+                  </button>
+                  {/*
+                    La lista de materiales del equipo, sus manuales y su ficha viven en el
+                    expediente (Centro Técnico Documental), que está en otro grupo del menú.
+                    Sin esto había que cambiar de módulo y volver a buscar el equipo a mano.
+                    Ver services/equipos/enlaceExpediente.ts.
+                  */}
+                  {selectedEquipMachineId && (
+                    <Link
+                      to={rutaExpedienteEquipo(selectedEquipMachineId)}
+                      className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border bg-muted px-2.5 py-1 text-caption font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                      title="Abrir el expediente de este equipo: lista de materiales, manuales y ficha"
+                    >
+                      <ClipboardList className="h-3 w-3 shrink-0" /> Ver expediente
+                    </Link>
+                  )}
+                </div>
               ) : repEquipoFilter !== 'all' ? (
                 <button
                   onClick={() => { setRepEquipoFilter('all'); setSelectedEquipName('') }}
@@ -1807,11 +1883,14 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                 variant={repFavOnly ? 'default' : 'outline'}
                 size="sm"
                 className="gap-1.5"
+                disabled={favoritosEnScope === 0 && !repFavOnly}
                 onClick={() => setRepFavOnly((v) => !v)}
-                title="Mis favoritos: atajos personales tuyos (cada usuario tiene los suyos). Distinto de «Comunes», que es la lista compartida de la máquina."
+                title={favoritosEnScope === 0
+                  ? 'No marcaste ningún favorito en este equipo. Tus favoritos son atajos personales tuyos y se marcan con la estrella de cada fila.'
+                  : 'Mis favoritos: atajos personales tuyos (cada usuario tiene los suyos). Distinto de «Comunes», que es la lista compartida de la máquina.'}
               >
                 <Star className={['h-4 w-4', repFavOnly ? 'fill-current' : ''].join(' ')} /> Mis favoritos
-                {favKeys.size > 0 && <span className="tabular-nums opacity-70">({favKeys.size})</span>}
+                {(favoritosEnScope > 0 || repFavOnly) && <span className="tabular-nums opacity-70">({favoritosEnScope})</span>}
               </Button>
               {comunesEnScope > 0 && (
                 <Button
@@ -2296,7 +2375,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
             />
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" size="sm" onClick={() => setAsignarSapOpen(false)} disabled={asignarSapSaving}>Cancelar</Button>
-              <Button type="submit" size="sm" disabled={asignarSapSaving || !/^\d{6,}$/.test(asignarSapValue.trim())}>
+              <Button type="submit" size="sm" disabled={asignarSapSaving || !esCodigoSapValido(asignarSapValue)}>
                 {asignarSapSaving ? 'Asignando…' : 'Asignar'}
               </Button>
             </div>
@@ -2380,8 +2459,10 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
         onClose={() => setExportOpen(false)}
         repuestos={exportRepuestos}
         filteredRepuestos={exportFiltered}
-        categories={[]}
         machineName={showingAll ? 'Todas las áreas' : (selectedNode?.nombre ?? 'Área')}
+        sapEquipo={sapEquipo}
+        sapEquipos={sapEquipos}
+        favKeys={favKeys}
       />
 
       {/* Gestor de listas de favoritos con nombre (para el repuesto objetivo) */}
@@ -2445,6 +2526,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
         machineName={createTransversal || !createTargetEquipos ? '' : `${createTargetEquipos.label}${createTargetEquipos.nodeIds.length > 1 ? ` · ${createTargetEquipos.nodeIds.length} equipos` : ''}`}
         transversal={createTransversal}
         defaultClase={createTransversal ? 'insumo' : 'repuesto'}
+        tiposConocidos={tiposConocidos}
         onCheckDuplicate={checkDuplicate}
         onChangeTarget={() => { setCreateOpen(false); setCreateEquipoQuery(''); setCreateEquipoSel(new Set()); setCreatePicker(true) }}
         onSubmit={handleCreateSubmit}
@@ -2458,6 +2540,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
         mode="edit"
         machineName={actionMachine?.nombre ?? actionTarget?.source.machineName ?? ''}
         initialData={actionTarget?.kind === 'edit' ? actionRep : undefined}
+        tiposConocidos={tiposConocidos}
         onSubmit={handleEditSubmit}
         loading={savingRep}
       />
@@ -2468,7 +2551,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
           open
           onOpenChange={(o) => !o && setActionTarget(null)}
           repuesto={actionRep}
-          machineId={actionMachineId}
+          machineName={actionMachine?.nombre ?? actionTarget?.source.machineName ?? ''}
           onSave={handleSaveSpecs}
           readOnly={!isAdmin}
         />

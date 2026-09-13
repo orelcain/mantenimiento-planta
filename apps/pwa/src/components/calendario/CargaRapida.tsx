@@ -5,7 +5,6 @@ import { cn } from '@/lib/utils'
 import {
   DIAS_CORTOS,
   DIAS_SEMANA,
-  OCUPANTE_LABEL,
   copiarDia,
   copiarSemanaDesde,
   pintarHoras,
@@ -25,14 +24,32 @@ import {
  * 13 hay proceso», «el martes es igual al lunes», «la N3 funciona como la N2».
  */
 
-const OCUPANTES_PINTABLES: Ocupante[] = ['P', 'H', 'X', 'C', '0']
+/**
+ * Lo que se puede pintar por horas. Incluye la capa de Mantención: antes solo
+ * estaban los ocupantes, así que el horario de proceso se podía escribir —«de 8
+ * a 13 hay proceso»— pero el tiempo de intervención había que dibujarlo a mano
+ * sobre la rueda. Era el único dato del módulo sin forma de escribirse.
+ */
+type Pintable = Ocupante | 'M1' | 'M0'
 
-const COLOR_SWATCH: Record<Ocupante, string> = {
+const PINTABLES: Array<{ valor: Pintable; label: string; capa: 'areas' | 'mant' }> = [
+  { valor: 'P', label: 'Proceso', capa: 'areas' },
+  { valor: 'H', label: 'Higiene', capa: 'areas' },
+  { valor: 'X', label: 'Higiene en colación', capa: 'areas' },
+  { valor: 'C', label: 'Colación sola', capa: 'areas' },
+  { valor: '0', label: 'Liberar', capa: 'areas' },
+  { valor: 'M1', label: 'Mantención interviene', capa: 'mant' },
+  { valor: 'M0', label: 'Quitar mantención', capa: 'mant' },
+]
+
+const COLOR_SWATCH: Record<Pintable, string> = {
   P: 'bg-cat-1-tint',
   H: 'bg-cat-7-tint',
   X: 'bg-cat-7-tint ring-2 ring-inset ring-cat-3-tint',
   C: 'bg-cat-3-tint',
   '0': 'bg-muted-foreground/20',
+  M1: 'bg-cat-4-tint',
+  M0: 'border border-dashed border-muted-foreground',
 }
 
 export interface CargaRapidaProps {
@@ -45,7 +62,7 @@ export interface CargaRapidaProps {
 export function CargaRapida({ maquina, maquinas, diaIdx, onCambiarMaquina }: CargaRapidaProps) {
   const [desde, setDesde] = useState('08:00')
   const [hasta, setHasta] = useState('13:00')
-  const [ocupante, setOcupante] = useState<Ocupante>('P')
+  const [pintable, setPintable] = useState<Pintable>('P')
   const [destinos, setDestinos] = useState<number[]>([])
   const [origenMaquina, setOrigenMaquina] = useState('')
   const [hecho, setHecho] = useState<string | null>(null)
@@ -67,12 +84,20 @@ export function CargaRapida({ maquina, maquinas, diaIdx, onCambiarMaquina }: Car
     if (a === null || b === null) return
     const dia = maquina.semana[diaIdx]
     if (!dia) return
-    const areas = pintarHoras(dia.areas, a, b, ocupante)
+
+    const def = PINTABLES.find((p) => p.valor === pintable)!
+    // La capa de Mantención se pinta ENCIMA sin tocar la de abajo, igual que con
+    // la brocha: si borrara la ocupación, se perdería el registro del choque.
+    const nuevo =
+      def.capa === 'mant'
+        ? { ...dia, mant: pintarHoras(dia.mant, a, b, pintable === 'M1' ? '1' : '0') }
+        : { ...dia, areas: pintarHoras(dia.areas, a, b, pintable) }
+
     onCambiarMaquina({
       ...maquina,
-      semana: maquina.semana.map((d, i) => (i === diaIdx ? { ...d, areas } : d)),
+      semana: maquina.semana.map((d, i) => (i === diaIdx ? nuevo : d)),
     })
-    avisar(`${OCUPANTE_LABEL[ocupante]} de ${desde} a ${hasta} en ${DIAS_SEMANA[diaIdx]}`)
+    avisar(`${def.label} de ${desde} a ${hasta} en ${DIAS_SEMANA[diaIdx]}`)
   }
 
   const copiar = () => {
@@ -135,24 +160,46 @@ export function CargaRapida({ maquina, maquinas, diaIdx, onCambiarMaquina }: Car
               Pintar
             </button>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {OCUPANTES_PINTABLES.map((o) => (
-              <button
-                key={o}
-                onClick={() => setOcupante(o)}
-                aria-pressed={ocupante === o}
-                className={cn(
-                  'flex items-center gap-2',
-                  chip,
-                  ocupante === o
-                    ? 'bg-primary/10 text-foreground ring-1 ring-inset ring-primary'
-                    : 'bg-muted/50 text-muted-foreground',
-                )}
-              >
-                <span className={cn('h-3 w-3 shrink-0 rounded-[3px]', COLOR_SWATCH[o])} />
-                {OCUPANTE_LABEL[o]}
-              </button>
-            ))}
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-wrap gap-2">
+              {PINTABLES.filter((p) => p.capa === 'areas').map((p) => (
+                <button
+                  key={p.valor}
+                  onClick={() => setPintable(p.valor)}
+                  aria-pressed={pintable === p.valor}
+                  className={cn(
+                    'flex items-center gap-2',
+                    chip,
+                    pintable === p.valor
+                      ? 'bg-primary/10 text-foreground ring-1 ring-inset ring-primary'
+                      : 'bg-muted/50 text-muted-foreground',
+                  )}
+                >
+                  <span className={cn('h-3 w-3 shrink-0 rounded-[3px]', COLOR_SWATCH[p.valor])} />
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-caption text-muted-foreground">Encima:</span>
+              {PINTABLES.filter((p) => p.capa === 'mant').map((p) => (
+                <button
+                  key={p.valor}
+                  onClick={() => setPintable(p.valor)}
+                  aria-pressed={pintable === p.valor}
+                  className={cn(
+                    'flex items-center gap-2',
+                    chip,
+                    pintable === p.valor
+                      ? 'bg-primary/10 text-foreground ring-1 ring-inset ring-primary'
+                      : 'bg-muted/50 text-muted-foreground',
+                  )}
+                >
+                  <span className={cn('h-3 w-3 shrink-0 rounded-[3px]', COLOR_SWATCH[p.valor])} />
+                  {p.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 

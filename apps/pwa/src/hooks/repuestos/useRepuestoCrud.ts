@@ -71,6 +71,7 @@ export function useRepuestoCrud() {
       nombreManual: data.nombreManual || '',
       valorUnitario: data.valorUnitario,
       cantidadPorMaquina: data.cantidadPorMaquina || 0,
+      tipo: data.tipo || '',
       ubicacionEnPlanta: data.ubicacionEnPlanta || '',
       observaciones: data.observaciones || '',
       vinculosManual: [],

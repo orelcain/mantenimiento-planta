@@ -483,7 +483,7 @@ export function LossCascadeCard({
               <span className="w-2 h-2 rounded-ctl shrink-0 bg-amber-400" />
               <span>
                 Resaltando: <b>{causeMachine.label}</b> en <b>{causeMachine.machine}</b>
-                <span className="text-muted-foreground"> · mira las bandas amarillas en el Gantt de esa máquina y en la velocidad upstream</span>
+                <span className="text-muted-foreground"> · mira las bandas amarillas en la velocidad upstream</span>
               </span>
               <button
                 type="button"
@@ -519,7 +519,7 @@ export function LossCascadeCard({
             <div>
               <p className="text-caption text-muted-foreground tracking-wider mb-1">
                 {filter === 'all'
-                  ? `Piezas perdidas por causal · ${piezasPerdidas.toLocaleString('es-CL')} pz bajo el máximo teórico`
+                  ? `Piezas perdidas por causal · ${piezasPerdidas.toLocaleString('es-CL')} pz bajo el máximo teórico de cada máquina`
                   : 'Eventos del grupo · con su costo en piezas'}
               </p>
               {/* La pérdida de arriba es de capacidad de MÁQUINA. Parte de esa
@@ -536,8 +536,13 @@ export function LossCascadeCard({
                   <span className="ml-auto shrink-0 tabular-nums text-cat-6-ink">
                     −{recuperadas.toLocaleString('es-CL')} pz
                   </span>
+                  {/* «pérdida neta 0» sin sujeto se lee como que el turno no
+                      perdió nada, justo debajo de un bloque que anuncia miles de
+                      piezas en el camino. Es la pérdida de capacidad DE MÁQUINA
+                      de esta cascada, ya descontado lo que rescató la línea
+                      manual — otra vara, y hay que decirlo. */}
                   <span className="shrink-0 tabular-nums text-muted-foreground">
-                    → pérdida neta <b className="text-foreground/90">{piezasPerdidasNetas.toLocaleString('es-CL')}</b>
+                    → neta de máquina <b className="text-foreground/90">{piezasPerdidasNetas.toLocaleString('es-CL')}</b>
                   </span>
                 </div>
               )}

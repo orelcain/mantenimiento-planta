@@ -91,6 +91,12 @@ interface P0CausesPanelProps {
   /** Toggle add/remove una causa del set seleccionado. */
   onToggleCause?: (cause: MatrixP0Cause) => void
   /**
+   * El paraguas «Fuera de límites» selecciona su FAMILIA (el estricto + las 5
+   * derivadas): el estricto solo son las piezas sin peso y marcarlo dejaba el
+   * timeline en «0 pzas con peso» (medido 09-09).
+   */
+  onToggleFamily?: (causes: MatrixP0Cause[]) => void
+  /**
    * Cuando true (Chonchi), el copy menciona Matrix HMI / unsorted pcs.
    * Cuando false (Yal), copy genérico — Yal no usa HMI Matrix de MS4/12 ni
    * exporta archivo Punto Cero separado: los rechazos vienen embebidos en
@@ -242,21 +248,34 @@ function UmbrellaCauseRow({
           />
         )}
         <button
-          className="flex items-center gap-3 flex-1 min-w-0 text-left"
+          className="flex items-start gap-3 flex-1 min-w-0 text-left"
           onClick={onToggle}
           type="button"
         >
-          <span className={cn('p-1.5 rounded-ctl', colors.badge)}>
+          <span className={cn('p-1.5 rounded-ctl shrink-0', colors.badge)}>
             <Icon className="w-4 h-4" />
           </span>
           <div className="flex-1 min-w-0">
             <div className="font-medium text-sm flex flex-wrap items-center gap-1.5 min-w-0">
-              <span className="break-words">{def.label}</span>
+              <span>{def.label}</span>
               <span className="text-caption px-1.5 py-0.5 rounded-ctl bg-muted font-mono text-muted-foreground shrink-0">
                 paraguas · 6 sub
               </span>
             </div>
-            <div className="text-xs text-muted-foreground break-words line-clamp-2">{def.description}</div>
+            {/* Las tres cifras van a la derecha desde sm; en 375 px se ponen en
+                línea propia bajo el nombre, que es lo que le devuelve el ancho
+                al título (antes: «Fuera / de / límites»). */}
+            <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 sm:hidden">
+              <span className="font-mono font-bold text-sm whitespace-nowrap">
+                {pctOfTotal.toFixed(2)}%
+                <span className="text-caption font-normal text-muted-foreground ml-0.5">total</span>
+              </span>
+              {/* En 375 px solo las dos cifras que se usan: cuánto del turno y
+                  cuántas piezas. El reparto dentro del P0 sigue en el desglose
+                  y en la vista ancha. */}
+              <span className="text-xs text-muted-foreground whitespace-nowrap">{umbrellaStats.pieces.toLocaleString('es-CL')} pzas</span>
+            </div>
+            <div className="text-xs text-muted-foreground">{def.description}</div>
             <div className="mt-1.5 h-1 bg-muted rounded-full overflow-hidden w-full">
               <div
                 className={cn('h-full rounded-full transition-all', colors.bar)}
@@ -264,7 +283,7 @@ function UmbrellaCauseRow({
               />
             </div>
           </div>
-          <div className="text-right shrink-0 min-w-[68px]">
+          <div className="hidden sm:block text-right shrink-0 min-w-[68px]">
             <div className="font-mono font-bold text-sm">
               {pctOfTotal.toFixed(2)}%
               <span className="text-caption font-normal text-muted-foreground ml-0.5">total</span>
@@ -274,7 +293,7 @@ function UmbrellaCauseRow({
             </div>
             <div className="text-xs text-muted-foreground">{umbrellaStats.pieces.toLocaleString('es-CL')} pzas</div>
           </div>
-          <ChevronDown className={cn('w-4 h-4 text-muted-foreground transition-transform shrink-0', expanded && 'rotate-180')} />
+          <ChevronDown className={cn('w-4 h-4 text-muted-foreground transition-transform shrink-0 mt-1', expanded && 'rotate-180')} />
         </button>
         <div className="shrink-0">
           <CauseTooltip meta={def} />
@@ -368,7 +387,7 @@ function SubCauseRow({
   )
 }
 
-export function P0CausesPanel({ byMatrixCause, totalP0Pct, unsortedPcs, selectedCauses, onToggleCause, isClassificationPlant = true }: P0CausesPanelProps) {
+export function P0CausesPanel({ byMatrixCause, totalP0Pct, unsortedPcs, selectedCauses, onToggleCause, onToggleFamily, isClassificationPlant = true }: P0CausesPanelProps) {
   const [expanded, setExpanded] = useState<MatrixP0Cause | null>(null)
   const hasCauseData = byMatrixCause != null
   const selSet = selectedCauses ?? new Set<MatrixP0Cause>()
@@ -444,10 +463,10 @@ export function P0CausesPanel({ byMatrixCause, totalP0Pct, unsortedPcs, selected
                         derivedStats={derivedStats}
                         totalP0Pct={totalP0Pct}
                         expanded={expanded === cause}
-                        selected={selSet.has(cause)}
+                        selected={[cause, ...MATRIX_CAUSE_ORDER_DERIVED].every((c) => selSet.has(c))}
                         selectedCauses={selSet}
                         onToggle={() => toggleExpand(cause)}
-                        onSelectChange={() => onToggleCause?.(cause)}
+                        onSelectChange={() => (onToggleFamily ? onToggleFamily([cause, ...MATRIX_CAUSE_ORDER_DERIVED]) : onToggleCause?.(cause))}
                         onSelectSubCause={(c) => onToggleCause?.(c)}
                       />
                     )

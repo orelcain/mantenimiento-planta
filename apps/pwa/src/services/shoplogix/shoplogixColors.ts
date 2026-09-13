@@ -31,6 +31,32 @@ import { softenAccentHex } from '@/lib/softenColor'
  * @param stored  - Color almacenado en Firestore (opcional, usado como fallback
  *                  si no es rojo genérico '#ff0000')
  */
+/**
+ * Los estados que pone el SISTEMA Shoplogix, traducidos.
+ *
+ * Las causas las escribe el operador y ya vienen en español («COLACION»,
+ * «ATASCAMIENTO», «FALTA MMPP»): de los 42 motivos distintos que hay en los
+ * datos, **exactamente uno está en inglés** —«Planned Downtime», con 301
+ * apariciones— porque no lo escribe nadie, lo pone el sensor. Se veía así en el
+ * monitor público, que es la pantalla de la TV de planta.
+ */
+const ESTADO_SISTEMA_ES: Readonly<Record<string, string>> = {
+  'planned downtime': 'Parada programada',
+  'unscheduled': 'Fuera de turno',
+  'unscheduled downtime': 'Parada no programada',
+  'running': 'Produciendo',
+  'idle': 'Sin producir',
+  'no job': 'Sin trabajo asignado',
+  'changeover': 'Cambio de formato',
+  'setup': 'Preparación',
+}
+
+/** Deja el motivo en español. Lo que ya viene en español pasa intacto. */
+export function motivoEnEspanol(motivo: string | null | undefined): string | null {
+  if (!motivo) return motivo ?? null
+  return ESTADO_SISTEMA_ES[motivo.trim().toLowerCase()] ?? motivo
+}
+
 export function slxStateColor(
   type: string,
   reason: string,

@@ -130,6 +130,13 @@ export interface PublicMonitorLive {
   /** Cuota del turno según la config del módulo. */
   quotaPieces?: number | null
   /**
+   * Historial de pesos promedio del turno (hora de PLANTA en `atWall`, wall
+   * sellado como UTC — formatear con getUTC*). Cada registro rige desde su
+   * hora; las toneladas se calculan por tramos con `toneladasPorTramos`.
+   * Ausente en docs previos.
+   */
+  pesoRegistros?: Array<{ at?: string; atWall: string; pesoKg: number }>
+  /**
    * Peso promedio del pescado, kg por pieza, cargado a mano durante el turno.
    * Shoplogix cuenta ciclos y no manda kilos: sin este dato el monitor no puede
    * estimar una sola tonelada, y las reales llegan después por el Grader.
@@ -229,6 +236,14 @@ export interface PublicMonitorLive {
      * Ausente en docs previos al despliegue que lo publica.
      */
     sinImputarLineaMin?: number
+    /**
+     * Las causas IMPUTADAS del turno (todas: técnicas, externas, programadas
+     * y excedidas — minutos de máquina sumados), de la más cara a la más
+     * barata. Es lo que faltaba para que la tarjeta CUANTIFIQUE las
+     * imputaciones que el supervisor sí anotó (Orel, 28-08). Ausente en docs
+     * previos.
+     */
+    imputadas?: Array<{ causa: string; min: number; bucket: string }>
   } | null
   /** Razones de detención, referenciadas por índice desde `stopEvents`. */
   stopReasons?: string[]
@@ -266,8 +281,41 @@ export interface PulsoMonitor {
   totalCycles: number
   /** Piezas por minuto entre las dos últimas lecturas. null si no se puede. */
   cpm: number | null
-  /** Las últimas lecturas, para dibujar el pulso reciente. */
-  lecturas?: Array<{ at: string; totalCycles: number }>
+  /**
+   * El ritmo de AHORA de cada máquina, de la MISMA ventana que `cpm`: por
+   * construcción suman el de la línea (el id es el machineid de Shoplogix,
+   * el mismo de `machines[].id`). Ausente en docs previos al despliegue que
+   * lo publica o cuando el desglose no se puede garantizar.
+   */
+  porMaquina?: Array<{ id: string; cpm: number }>
+  /**
+   * El último ritmo VIVO conocido cuando `cpm` está mudo (discontinuidad del
+   * contador): el backend lo arrastra hasta 10 min con su hora, para que la
+   * pantalla siga mostrando el «ahora» real —con edad— en vez de caer a la
+   * media de 15 min. Ausente cuando `cpm` viene con número.
+   */
+  vivoPrevio?: { cpm: number; at: string; porMaquina?: Array<{ id: string; cpm: number }> }
+  /** Las últimas lecturas, para dibujar el pulso reciente. `porMaquina` es el
+      ACUMULADO del turno por máquina en esa lectura (mismo corte que
+      `totalCycles`, minuto parcial incluido). */
+  lecturas?: Array<{ at: string; totalCycles: number; porMaquina?: Record<string, number> }>
+  /** 'buckets-1min' cuando el ritmo es el dato duro de Shoplogix (piezas
+      contadas del último minuto cerrado), no derivado del contador. */
+  fuente?: string
+  /** El minuto que el ritmo describe, wall-clock-as-UTC como `series[].t`. */
+  minuto?: { desde: string; hasta: string }
+  /** Esperado oficial de Shoplogix sumado (Chonchi: 19+16+16 = 51). */
+  esperadoCpm?: number
+  /**
+   * La serie del turno minuto a minuto por máquina (buckets de 1 min de
+   * Shoplogix, solo cerrados): rejilla continua desde `desde`, índice =
+   * minuto. Es lo que dibujan las barras del monitor. Ausente en docs
+   * anteriores al despliegue que la publica.
+   */
+  serieMinuto?: {
+    desde: string
+    maquinas: Array<{ id: string; esperado: number | null; cycles: number[] }>
+  }
 }
 
 export interface PublicShiftMonitorDoc {
@@ -298,6 +346,18 @@ export interface PublicShiftMonitorDoc {
    * formato que `live`. Ausente en docs creados antes de esta función.
    */
   history?: Array<{ shiftDocId: string; dateKey: string; shiftId: string; live: PublicMonitorLive }>
+  /**
+   * Las series minuto a minuto ARCHIVADAS de los últimos turnos (mismo formato
+   * que `pulse.serieMinuto`, más el turno dueño): Shoplogix solo entrega los
+   * buckets de 1 min en una ventana de ~12 h, y sin este archivo los turnos
+   * viejos caían a las curvas de 5 min. Las guarda `archivarSerieMinuto` en
+   * cada refresh de modo línea. Ausente en docs anteriores a la función.
+   */
+  seriesMinuto?: Array<{
+    shiftDocId: string
+    desde: string
+    maquinas: Array<{ id: string; esperado: number | null; cycles: number[] }>
+  }>
   /** Turnos del MISMO nombre, resumidos, para el pronóstico del cierre. */
   forecastHistory?: ForecastHistoryShift[]
   /**
@@ -327,6 +387,13 @@ export interface ShiftStat {
   recoverableMin?: number | null
   /** Causas recuperables del turno: `reason`, minutos y cantidad de paradas. */
   recoverable?: Array<{ reason: string; min: number; count: number }>
+  /**
+   * Piezas de cada máquina en ese turno (`n` nombre, `p` piezas). Con
+   * `producingMin` reconstruye el «aporte al promedio» de turnos pasados —
+   * ver `pages/monitor/aporteHistorico.ts`. Las entradas viejas del espejo no
+   * lo tienen hasta que el backend las rearma.
+   */
+  porMaquina?: Array<{ n: string; p: number }>
   tbv?: number | null
 }
 

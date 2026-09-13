@@ -10,21 +10,26 @@ import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { useParams, useNavigate, Navigate, useSearchParams } from 'react-router-dom'
 import { logger } from '@/lib/logger'
 import { Button, Card, CardContent, Spinner, Badge } from '@/components/ui'
-import { ArrowLeft, Settings2, AlertCircle, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight, Share2, Copy, Check, QrCode, Download, Tag, FileText, WifiOff, ChevronDown, RefreshCw, Zap, Scale, Sun, Sunset, Moon, Sunrise, Globe2, Radio, ExternalLink, SlidersHorizontal, Image as ImageIcon } from 'lucide-react'
+import { ArrowLeft, Settings2, AlertCircle, Clock, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight, Share2, Copy, Check, QrCode, Download, Tag, FileText, WifiOff, ChevronDown, RefreshCw, Zap, Scale, Sun, Sunset, Moon, Sunrise, Radio, ExternalLink, SlidersHorizontal, Image as ImageIcon } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { usePermissionsStore } from '@/store'
 import { useAuthStore, useIsAdmin, useIsSupervisor } from '@/store/authStore'
-import { getDailySummary, buildDailySummaryId, loadTimelineAggregates, subscribePausesAggregates, listDailySummariesByRange, listGate0PieceRecords, type FirestorePieceRecord } from '@/services/grader/graderDailySummary.service'
+import { getDailySummary, buildDailySummaryId, loadTimelineAggregates, subscribePausesAggregates, listDailySummariesByRange, listGate0PieceRecords, listGatePieceRecords, type FirestorePieceRecord } from '@/services/grader/graderDailySummary.service'
 import { createPublicToken, revokePublicToken } from '@/services/grader/graderPublicToken.service'
 import { createPublicShiftMonitor, revokePublicShiftMonitor, subscribeMonitorStats, MONITOR_TTL_CHOICES, type MonitorTtlHours, type MonitorMode, type MonitorUsageStats } from '@/services/shoplogix/publicShiftMonitor.service'
 import type { Pause, MicroDetentionsSummary } from '@/services/grader/types'
 import { getModuleRanges, saveModuleShiftSchedule } from '@/services/grader/graderModuleConfig.service'
-import { listSnapshots, saveConfigSnapshot, type GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
+import { listSnapshots, saveConfigSnapshot, saveConfigSnapshotAt, adoptarSeteoMaquina, type GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
 import { getShiftDoc } from '@/services/grader/graderShifts.service'
 import { computeShiftTimeWindow, nowAsWallClockUTC } from '@/services/grader/graderShiftStatus'
 import type { ShiftTimeWindow } from '@/services/grader/graderShiftStatus'
 import { DEFAULT_SHIFT_SCHEDULE, normalizeShiftSchedule } from '@/services/grader/graderShiftSchedule'
 import { getShiftDisplayDateKey, getShiftMeta } from '@/services/grader/graderShiftDisplay'
+import { PurezaPorPuertaCard } from '@/components/grader/PurezaPorPuertaCard'
+import { Disclosure } from '@/components/piel/Disclosure'
+import { loadGateObservations, updateDailySummary } from '@/services/grader/graderDailySummary.service'
+import { deriveGateMix, configTimelineFromSnapshots, classifyGateCauses, derivePesoPorPuerta, detectSolapesDeRango, inferirSeteoFaltante, detectCambiosDePrograma, wallClockMsToRealIso, rangesFingerprint, deriveMezcla, mapaPesoDePuerta, type GateObservations, type SeteoMaquina, type CambioDePrograma } from '@/services/grader/graderGateObservations'
+import { CALIBRE_WEIGHT_RANGES } from '@/services/grader/graderAnalyticsThroughput'
 import { parseMatrixErrorString } from '@/services/grader/graderMatrixP0Causes'
 import { HeroScorecard } from '@/components/grader/HeroScorecard'
 import { TurnoOficialChip } from '@/components/grader/TurnoOficialChip'
@@ -34,7 +39,7 @@ import { ShoplogixOnlyScorecard } from '@/components/grader/ShoplogixOnlyScoreca
 import { P0CausesPanel } from '@/components/grader/P0CausesPanel'
 import { ConfigDriftBanner } from '@/components/grader/ConfigDriftBanner'
 import { detectConfigDrift } from '@/services/grader/graderConfigDrift'
-import { recomputeShiftP0Causes } from '@/services/grader/graderGate0Store'
+import { recomputeShiftP0Causes, loadGate0Records, p0SinPuerta } from '@/services/grader/graderGate0Store'
 import { GraderCoverageBar } from '@/components/grader/GraderCoverageBar'
 import { TurnoTiemposLine } from '@/components/grader/TurnoTiemposLine'
 import { ShiftTimelineView } from '@/components/grader/ShiftTimelineView'
@@ -73,12 +78,10 @@ import { effectiveProductionWindow, shouldFrameOnProduction } from '@/services/s
 import { buildScatterData, scatterSlopeMagnitude } from '@/components/grader/shiftTimelineHelpers'
 import { DEFAULT_P0_ALERT_PCT, DEFAULT_P0_CRITICAL_PCT } from '@/services/grader/graderP0Thresholds'
 import { fmtTime } from '@/services/grader/graderTimeFormat'
-import { PieceScatterChart } from '@/components/grader/PieceScatterChart'
 import { UpstreamMachinesPanel } from '@/components/grader/UpstreamMachinesPanel'
 import { MonitorUsagePanel } from '@/components/grader/MonitorUsagePanel'
 import { SensorStopsCausePanel } from '@/components/grader/SensorStopsCausePanel'
-import { UpstreamCorrelationCard } from '@/components/grader/UpstreamCorrelationCard'
-import { UpstreamScatterCard } from '@/components/grader/UpstreamScatterCard'
+import { OrigenDelTurnoCard } from '@/components/grader/OrigenDelTurnoCard'
 import { useUpstreamLineSnapshot } from '@/hooks/useUpstreamLineSnapshot'
 import { kpisDeTurno } from '@/services/shoplogix/kpisMantencionTurno'
 import { MantencionTurnoTab } from '@/components/grader/MantencionTurnoTab'
@@ -110,6 +113,29 @@ async function waitUntil(check: () => boolean, timeoutMs: number): Promise<boole
     await new Promise(r => setTimeout(r, 60))
   }
   return check()
+}
+
+/**
+ * Hora de pizarra de un borde de la ventana del turno.
+ *
+ * Los ISO de `ShiftTimeWindow` vienen en la convención wall-clock-as-UTC que
+ * usa Shoplogix (la hora local escrita con sufijo Z), así que se leen con los
+ * getters UTC. Con `toLocaleTimeString` el huso les restaría horas y un turno
+ * que arranca a las 21:30 se anunciaría a las 18:30.
+ */
+function horaDeVentana(iso: string): string {
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return '—'
+  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
+}
+
+/** Espera hasta el arranque, en el formato corto del chip de turno en curso. */
+function formatearEspera(min: number): string {
+  const total = Math.max(0, Math.round(min))
+  if (total < 60) return `${total} min`
+  const h = Math.floor(total / 60)
+  const m = total % 60
+  return m === 0 ? `${h} h` : `${h} h ${m} min`
 }
 
 /** Parsea `YYYY-MM-DD__Turno día` → [dateKey, shiftLabel] */
@@ -645,11 +671,13 @@ export function AnalisisGraderTurnoPage() {
     prevIsOnline.current = isOnline
   }, [isOnline, toast])
 
-  // Auto-refresh cada minuto si el turno está en vivo.
+  // Auto-refresh cada minuto mientras el turno está en vivo o por empezar.
   // Depende solo de `shiftWindow?.status` para evitar resetear el interval
   // en cada tick (el callback re-lee dateKey/shiftLabel via closure estable).
+  // Con el turno PROGRAMADO el tick mantiene viva la cuenta regresiva y hace
+  // que la pantalla pase sola a EN VIVO a la hora de arranque.
   useEffect(() => {
-    if (shiftWindow?.status !== 'live') return
+    if (shiftWindow?.status === 'closed') return
     const id = setInterval(() => {
       setShiftWindow(computeEffectiveWindow())
     }, 60_000)
@@ -660,8 +688,19 @@ export function AnalisisGraderTurnoPage() {
 
   const [shiftDoc, setShiftDoc] = useState<GraderShiftDoc | null>(null)
   const [timelineBuckets, setTimelineBuckets] = useState<TimelineBucket[]>([])
+  // gateMix v2: lo observado por puerta y bloque (meta/gateMix). null = turno
+  // guardado antes de la v2 → la tarjeta cae a summary.gateMix (v1, congelado).
+  const [gateObs, setGateObs] = useState<GateObservations | null>(null)
   const [configSnapshots, setConfigSnapshots] = useState<GateConfigSnapshot[]>([])
   const [gate0Pieces, setGate0Pieces] = useState<FirestorePieceRecord[]>([])
+  // El input de Puerta 0 que usó la clasificación (Excel P0 del Marelec, CON el
+  // texto de la causa). Las piezas gate=0 del pieza-a-pieza no traen causa:
+  // con ellas la dispersión P0 decía «95 Otro» (medido 09-09).
+  const [gate0Input, setGate0Input] = useState<FirestorePieceRecord[] | null>(null)
+  // Nivel 2 de la pureza: piezas de UNA puerta, cargadas a pedido (cuestan
+  // tantas lecturas como piezas; el turno entero serían ~18.000).
+  const [piezasPorPuerta, setPiezasPorPuerta] = useState<Record<number, FirestorePieceRecord[]>>({})
+  const [piezasCargando, setPiezasCargando] = useState<number | null>(null)
   const [pauses, setPauses] = useState<Pause[]>([])
   const [microDetentions, setMicroDetentions] = useState<MicroDetentionsSummary | null>(null)
   const [selectedCauses, setSelectedCauses] = useState<Set<MatrixP0Cause>>(new Set())
@@ -676,8 +715,18 @@ export function AnalisisGraderTurnoPage() {
    * clics (abrir + elegir la sub-pestaña) y se sentía como "ir a la
    * configuración del Grader", que es justo lo que Orel no quería.
    */
-  const [showConfigPanel, setShowConfigPanel] = useState(true)
+  const [showConfigPanel, setShowConfigPanel] = useState(false)
   const [calibreOverride, setCalibrerOverride] = useState<CalibreWeightRange[] | null>(null)
+  // Rangos de calibre de la línea (Configuración del Grader). Con el override
+  // del turno encima, son los que juzgan la mezcla por peso.
+  const [moduleRanges, setModuleRanges] = useState<CalibreWeightRange[] | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    getModuleRanges(plantLineCfg.id)
+      .then((cfg) => { if (!cancelled) setModuleRanges(cfg?.customWeightRanges?.length ? cfg.customWeightRanges : null) })
+      .catch(() => { if (!cancelled) setModuleRanges(null) })
+    return () => { cancelled = true }
+  }, [plantLineCfg.id])
   const [turnoThresholdsOverride, setTurnoThresholdsOverride] = useState<{ photocellPctWarn: number; outOfLimitsPctWarn: number; pointZeroPctWarn: number; pointZeroPctCritical: number } | null>(null)
 
   // ── Shoplogix staleness counter + manual refresh ──────────────────────────
@@ -1067,8 +1116,11 @@ export function AnalisisGraderTurnoPage() {
       .then(([s, sd]) => {
         if (!s) {
           const win = computeShiftTimeWindow(dateKey, shiftLabel, plantSchedule)
-          if (win.status !== 'live') {
-            setError(`Turno ${shiftLabel} del ${dateKey} no encontrado en el historial.`)
+          // Solo un turno ya CERRADO puede faltar en el historial. Uno que
+          // todavía no empezó no se perdió: no ocurrió, y tiene su propia
+          // tarjeta más abajo. (`shiftLabel` ya trae la palabra "Turno".)
+          if (win.status === 'closed') {
+            setError(`${shiftLabel} del ${dateKey} no encontrado en el historial.`)
           }
           // Si es live: summary=null + error=null → renderiza empty-state con CTA de upload
         } else {
@@ -1093,6 +1145,17 @@ export function AnalisisGraderTurnoPage() {
     loadTimelineAggregates(effectiveSummaryId)
       .then(buckets => setTimelineBuckets(buckets ?? []))
       .catch(() => {})
+  }, [effectiveSummaryId])
+
+  // Carga meta/gateMix (v2). Una lectura por turno; cambiar una gate no la repite.
+  useEffect(() => {
+    if (!effectiveSummaryId) return
+    let cancelled = false
+    setGateObs(null)
+    loadGateObservations(effectiveSummaryId)
+      .then((obs) => { if (!cancelled) setGateObs(obs) })
+      .catch(() => { if (!cancelled) setGateObs(null) })
+    return () => { cancelled = true }
   }, [effectiveSummaryId])
 
   // Suscripción en tiempo real a `meta/pauses` — M8.
@@ -1121,6 +1184,10 @@ export function AnalisisGraderTurnoPage() {
     listGate0PieceRecords(effectiveSummaryId)
       .then(setGate0Pieces)
       .catch(() => setGate0Pieces([]))
+    setGate0Input(null)
+    loadGate0Records(effectiveSummaryId)
+      .then((recs) => setGate0Input(recs ? recs.map((r) => ({ ...r, gate: 0, dedupeKey: '' }) as unknown as FirestorePieceRecord) : null))
+      .catch(() => setGate0Input(null))
   }, [effectiveSummaryId])
 
   // Carga historial de config de gates (FASE 27)
@@ -1144,17 +1211,84 @@ export function AnalisisGraderTurnoPage() {
   )
   const turnoGates = useMemo<GateAssignment[]>(() => latestConfigSnapshot?.gates ?? [], [latestConfigSnapshot])
 
+  // Pureza por puerta juzgada con la config vigente en CADA bloque (los
+  // snapshots del turno, convertidos de hora real a hora de pared). Antes del
+  // primer snapshot rige gatesUsed. Se recalcula sola al cambiar una gate.
+  const gateTimelineBase = useMemo(
+    () => configTimelineFromSnapshots(configSnapshots, summary?.gatesUsed),
+    [configSnapshots, summary?.gatesUsed],
+  )
+  // Turnos sin seteo guardado: la puerta sin asignación toma lo que el Z2 le
+  // etiqueta (≥ 90 %) como asignación "inferida", para poder juzgarla igual.
+  const { timeline: gateTimeline, inferidas: seteoInferido } = useMemo(
+    () => (gateObs ? inferirSeteoFaltante(gateObs, gateTimelineBase) : { timeline: gateTimelineBase, inferidas: {} }),
+    [gateObs, gateTimelineBase],
+  )
+  const gateMixDerivado = useMemo(
+    () => (gateObs ? deriveGateMix(gateObs, gateTimeline) : null),
+    [gateObs, gateTimeline],
+  )
+  // Rangos de calibre que juzgan al turno: override del turno → línea → constantes.
+  const rangosVigentes = useMemo(
+    () => calibreOverride ?? moduleRanges ?? CALIBRE_WEIGHT_RANGES,
+    [calibreOverride, moduleRanges],
+  )
+
+  // Mezcla física por peso, contra los rangos vigentes.
+  const pesoPorPuerta = useMemo(
+    () => (gateObs ? derivePesoPorPuerta(gateObs, gateTimeline, rangosVigentes) : undefined),
+    [gateObs, gateTimeline, rangosVigentes],
+  )
+  // ¿El Z2 tiene dos programas de calibre solapados? Se ve en el peso: las
+  // puertas 8-10 reciben hasta X kg y las 10-12 desde Y kg, con X > Y.
+  const solapes = useMemo(
+    () => (gateObs ? detectSolapesDeRango(gateObs, gateTimeline) : undefined),
+    [gateObs, gateTimeline],
+  )
+  // Cambios de programa del Z2 dentro del turno que nadie registró en la app.
+  const cambiosDePrograma = useMemo(
+    () => (gateObs ? detectCambiosDePrograma(gateObs, gateTimeline) : undefined),
+    [gateObs, gateTimeline],
+  )
+  // Mezcla en los tres ejes (calibre · calidad · conservación) y mapa de peso.
+  const mezclaPorPuerta = useMemo(
+    () => (gateObs ? deriveMezcla(gateObs, gateTimeline) : undefined),
+    [gateObs, gateTimeline],
+  )
+  const mapaPeso = useCallback((gate: number) => (gateObs ? mapaPesoDePuerta(gateObs, gate) : null), [gateObs])
+  const handleCargarPiezas = useCallback((gate: number) => {
+    if (!effectiveSummaryId || piezasCargando != null) return
+    setPiezasCargando(gate)
+    listGatePieceRecords(effectiveSummaryId, gate)
+      .then((recs) => setPiezasPorPuerta((prev) => ({ ...prev, [gate]: recs })))
+      .catch((err) => logger.warn('No se pudieron cargar las piezas de la puerta', { gate, err: String(err) }))
+      .finally(() => setPiezasCargando(null))
+  }, [effectiveSummaryId, piezasCargando])
+  useEffect(() => { setPiezasPorPuerta({}) }, [effectiveSummaryId])
+  // «¿Por qué cayó acá?» para la puerta que el usuario toque en la tarjeta.
+  const causesFor = useMemo(
+    () => (gateObs ? (gate: number) => classifyGateCauses(gateObs, gate, gateTimeline) : undefined),
+    [gateObs, gateTimeline],
+  )
+
   // ¿El desglose P0 guardado corresponde a estas gates? El análisis se congela al
   // guardar el turno y editar la config después no lo recalcula.
+  // P0 con causa cuando está guardado; si no, las piezas gate=0 del pieza a pieza.
+  const p0Fuente = gate0Input ?? gate0Pieces
   const configDrift = useMemo(() => {
     if (!summary || !isClassificationPlant || turnoGates.length === 0) return null
     return detectConfigDrift({
       gatesUsed: summary.gatesUsed,
       currentGates: turnoGates,
-      gate0Records: gate0Pieces,
+      gate0Records: p0Fuente,
       savedCauses: summary.topP0Causes,
+      ranges: rangosVigentes,
     })
-  }, [summary, isClassificationPlant, turnoGates, gate0Pieces])
+  }, [summary, isClassificationPlant, turnoGates, p0Fuente, rangosVigentes])
+  const p0SinPuertaData = useMemo(
+    () => (isClassificationPlant && p0Fuente.length > 0 ? p0SinPuerta(p0Fuente, gateTimeline, rangosVigentes) : undefined),
+    [isClassificationPlant, p0Fuente, gateTimeline, rangosVigentes],
+  )
 
   // Recálculo automático: si el desglose no corresponde a las gates vigentes y el
   // turno guardó su input de Puerta 0, se reclasifica y se persiste sin pedir nada.
@@ -1169,7 +1303,9 @@ export function AnalisisGraderTurnoPage() {
     if (!summary || !effectiveSummaryId || turnoGates.length === 0) return
     setRecomputing(true)
     try {
-      const res = await recomputeShiftP0Causes(effectiveSummaryId, turnoGates, summary.pointZeroPieces)
+      // Cada pieza de P0 con la config vigente a su hora (snapshots del turno);
+      // gatesUsed queda con la config vigente para que el desfase se cierre.
+      const res = await recomputeShiftP0Causes(effectiveSummaryId, gateTimeline, summary.pointZeroPieces, turnoGates, rangosVigentes)
       if (res.ok && res.causes) {
         // Actualiza en memoria lo que acaba de persistirse — evita releer el doc.
         setSummary((prev) => (prev
@@ -1181,21 +1317,28 @@ export function AnalisisGraderTurnoPage() {
     } finally {
       setRecomputing(false)
     }
-  }, [summary, effectiveSummaryId, turnoGates])
+  }, [summary, effectiveSummaryId, turnoGates, gateTimeline, rangosVigentes])
+
+  // Los rangos también clasifican P0 ("fuera de calibre"): si cambiaron desde
+  // que se guardó el turno, el desglose está viejo aunque las gates no.
+  // Sin huella (turnos anteriores a este cambio) también recalcula: una sola vez, porque el recálculo la escribe.
+  const rangosDesfasados = !!summary?.gate0RecordsStored && summary.rangesFingerprint !== rangesFingerprint(rangosVigentes)
 
   useEffect(() => {
-    if (!configDrift?.stale || !summary?.gate0RecordsStored || !effectiveSummaryId) return
+    if ((!configDrift?.stale && !rangosDesfasados) || !summary?.gate0RecordsStored || !effectiveSummaryId) return
     // Solo quien puede escribir el turno lo recalcula (firestore.rules exige
     // supervisor). Para el resto queda el aviso, sin intentar una escritura que
     // la regla va a rechazar en cada visita.
     if (!isSupervisor && !isAdmin) return
     // Una sola tentativa por (turno × config): si el recálculo falla o no cierra
     // el desfase, no reintentar en loop.
-    const attemptKey = `${effectiveSummaryId}|${JSON.stringify(turnoGates)}`
+    // La clave incluye los snapshots: un cambio registrado hacia atrás (misma
+    // config vigente) también merece un recálculo.
+    const attemptKey = `${effectiveSummaryId}|${configSnapshots.map((s) => s.id).join(',')}|${JSON.stringify(turnoGates)}|${rangesFingerprint(rangosVigentes)}`
     if (recomputeAttemptRef.current === attemptKey) return
     recomputeAttemptRef.current = attemptKey
     void runRecompute()
-  }, [configDrift?.stale, summary?.gate0RecordsStored, effectiveSummaryId, turnoGates, runRecompute, isSupervisor, isAdmin])
+  }, [configDrift?.stale, rangosDesfasados, summary?.gate0RecordsStored, effectiveSummaryId, turnoGates, configSnapshots, rangosVigentes, runRecompute, isSupervisor, isAdmin])
 
   const turnoConfig = useMemo<GraderAnalysisConfig>(() => ({
     errorThresholds: {
@@ -1245,6 +1388,92 @@ export function AnalisisGraderTurnoPage() {
       .then(() => reloadConfigSnapshots())
       .catch(() => {})
   }, [dateKey, shiftLabel, user, reloadConfigSnapshots])
+
+  /**
+   * "Adoptar seteo de la máquina": la tarjeta de pureza detectó que ≥ 90 % de
+   * las piezas de una puerta llevan una combinación distinta a la asignada. Se
+   * corrige el seteo de ese turno con lo que la máquina hace (el snapshot
+   * inicial en su lugar, o uno nuevo si hubo cambios a mano) y se actualiza
+   * gatesUsed para que el tramo previo al primer snapshot también lo use.
+   */
+  const handleAdoptarSeteo = useCallback((gate: number, s: SeteoMaquina) => {
+    if (!user?.id || !dateKey || !shiftLabel) return
+    const base = turnoGates.length > 0 ? turnoGates : (summary?.gatesUsed ?? [])
+    if (base.length === 0) return
+    const updated = base.map((g) => (g.gateNumber === gate
+      ? { ...g, assignedCalibre: s.calibre, assignedQuality: s.quality as GateAssignment['assignedQuality'], active: true }
+      : g))
+    const docId = `${dateKey}__${shiftLabel}`
+    const userName = `${(user as unknown as Record<string, string>).nombre ?? ''} ${(user as unknown as Record<string, string>).apellido ?? ''}`.trim() || user.email || 'Supervisor'
+    lastEmittedGatesRef.current = JSON.stringify(updated)
+    adoptarSeteoMaquina(docId, updated, { uid: user.id, name: userName }, `G${gate}: adoptado de la máquina (Excel: ${s.calibre} · ${s.quality})`, { turnoCerrado: shiftWindow?.status !== 'live', baseGates: base })
+      .then(async () => {
+        if (effectiveSummaryId) {
+          await updateDailySummary(effectiveSummaryId, { gatesUsed: updated.filter((g) => g.active) })
+          setSummary((prev) => (prev ? { ...prev, gatesUsed: updated.filter((g) => g.active) } : prev))
+        }
+        reloadConfigSnapshots()
+      })
+      .catch((err) => logger.warn('No se pudo adoptar el seteo de la máquina', { err: String(err) }))
+  }, [user, dateKey, shiftLabel, turnoGates, summary?.gatesUsed, effectiveSummaryId, reloadConfigSnapshots, shiftWindow?.status])
+
+  /** Registrar el cambio de programa que la máquina hizo a esa hora (snapshot con ese `at`). */
+  const handleRegistrarCambio = useCallback((c: CambioDePrograma) => {
+    if (!user?.id || !dateKey || !shiftLabel) return
+    const base = gateTimeline.configAt(c.desdeMs) ?? turnoGates
+    if (!base || base.length === 0) return
+    const updated = base.map((g) => (g.gateNumber === c.gate
+      ? { ...g, assignedCalibre: c.nuevo.calibre, assignedQuality: c.nuevo.quality as GateAssignment['assignedQuality'], active: true }
+      : g))
+    const docId = `${dateKey}__${shiftLabel}`
+    const userName = `${(user as unknown as Record<string, string>).nombre ?? ''} ${(user as unknown as Record<string, string>).apellido ?? ''}`.trim() || user.email || 'Supervisor'
+    const hora = new Date(c.desdeMs).toISOString().slice(11, 16)
+    lastEmittedGatesRef.current = JSON.stringify(updated)
+    saveConfigSnapshotAt(docId, [...base], updated, { uid: user.id, name: userName }, `G${c.gate}: la máquina cambió a ${c.nuevo.calibre} · ${c.nuevo.quality} desde las ${hora} (Excel)`, wallClockMsToRealIso(c.desdeMs))
+      .then(async () => {
+        // Recalcular P0 y gatesUsed con la línea de tiempo NUEVA (no con la del
+        // closure): el efecto de desfase no siempre lo dispara y dejaba gatesUsed
+        // con la config vieja (medido 08-09: G10 seguía en 10-12).
+        const all = await listSnapshots(docId)
+        setConfigSnapshots(all)
+        const latest = all[all.length - 1]
+        if (!effectiveSummaryId || !summary || !latest) return
+        const vigentes = latest.gates.filter((g) => g.active)
+        const res = await recomputeShiftP0Causes(effectiveSummaryId, configTimelineFromSnapshots(all, summary.gatesUsed), summary.pointZeroPieces, latest.gates, rangosVigentes)
+        if (!res.ok) await updateDailySummary(effectiveSummaryId, { gatesUsed: vigentes })
+        setSummary((prev) => (prev ? { ...prev, gatesUsed: vigentes, ...(res.ok && res.causes ? { topP0Causes: res.causes } : {}) } : prev))
+      })
+      .catch((err) => logger.warn('No se pudo registrar el cambio de programa', { err: String(err) }))
+  }, [user, dateKey, shiftLabel, gateTimeline, turnoGates, effectiveSummaryId, summary, rangosVigentes])
+
+  /** Igual que handleAdoptarSeteo, para todas las puertas con seteo distinto de una vez (9 turnos de agosto lo necesitan en 8-10 puertas). */
+  const handleAdoptarSeteoTodas = useCallback((seteos: Record<number, SeteoMaquina>) => {
+    if (!user?.id || !dateKey || !shiftLabel) return
+    // Sin seteo guardado (turnos viejos) se parte de las 12 puertas inactivas
+    // y se activan las inferidas: es "Guardar seteo inferido".
+    const base: GateAssignment[] = turnoGates.length > 0
+      ? turnoGates
+      : (summary?.gatesUsed?.length
+        ? summary.gatesUsed
+        : Array.from({ length: 12 }, (_, i) => ({ gateNumber: i + 1, assignedCalibre: 'Other', assignedQuality: 'Unknown' as GateAssignment['assignedQuality'], active: false })))
+    const updated = base.map((g) => {
+      const s = seteos[g.gateNumber]
+      return s ? { ...g, assignedCalibre: s.calibre, assignedQuality: s.quality as GateAssignment['assignedQuality'], active: true } : g
+    })
+    const docId = `${dateKey}__${shiftLabel}`
+    const userName = `${(user as unknown as Record<string, string>).nombre ?? ''} ${(user as unknown as Record<string, string>).apellido ?? ''}`.trim() || user.email || 'Supervisor'
+    const lista = Object.entries(seteos).map(([g, s]) => `G${g}: ${s.calibre} · ${s.quality}`).join(', ')
+    lastEmittedGatesRef.current = JSON.stringify(updated)
+    adoptarSeteoMaquina(docId, updated, { uid: user.id, name: userName }, `Adoptado de la máquina (Excel): ${lista}`, { turnoCerrado: shiftWindow?.status !== 'live', baseGates: base })
+      .then(async () => {
+        if (effectiveSummaryId) {
+          await updateDailySummary(effectiveSummaryId, { gatesUsed: updated.filter((g) => g.active) })
+          setSummary((prev) => (prev ? { ...prev, gatesUsed: updated.filter((g) => g.active) } : prev))
+        }
+        reloadConfigSnapshots()
+      })
+      .catch((err) => logger.warn('No se pudo adoptar el seteo de la máquina', { err: String(err) }))
+  }, [user, dateKey, shiftLabel, turnoGates, summary?.gatesUsed, effectiveSummaryId, reloadConfigSnapshots, shiftWindow?.status])
 
   // M3 — Siguiente pausa sin clasificar
   const [nextPauseOpen, setNextPauseOpen] = useState(false)
@@ -1845,7 +2074,7 @@ export function AnalisisGraderTurnoPage() {
 
   return (
     <TimelineSyncProvider key={shiftDocId ?? 'default'} groupId={timelineGroupId}>
-    <div className="container mx-auto p-3 sm:p-4 space-y-4 max-w-screen-xl">
+    <div className="container mx-auto p-3 sm:p-4 space-y-4 max-w-[1760px]">
       {/* M18 — Banner offline */}
       {!isOnline && (
         <div className="flex items-center gap-2 px-3 py-2 rounded-ctl bg-amber-500/[0.15] border border-amber-500/[0.25] text-amber-400 text-sm">
@@ -1922,15 +2151,23 @@ export function AnalisisGraderTurnoPage() {
                   </Badge>
                 )}
                 {shiftWindow && (
+                  /* Tres estados, no dos. El tercero (`future`) se separa por
+                     FORMA —relleno en vez de contorno— para no competir con
+                     EN VIVO, que es el único que pide atención. */
                   <Badge
                     variant="outline"
                     className={`text-caption px-1.5 py-0 shrink-0 ${
                       shiftWindow.status === 'live'
                         ? 'border-red-500/[0.25] text-red-400'
-                        : 'border-muted-foreground/30 text-muted-foreground'
+                        : shiftWindow.status === 'future'
+                          ? 'bg-muted text-foreground border-transparent inline-flex items-center gap-1'
+                          : 'border-muted-foreground/30 text-muted-foreground'
                     }`}
                   >
-                    {shiftWindow.status === 'live' ? 'EN VIVO' : 'CERRADO'}
+                    {shiftWindow.status === 'future' && <Clock className="w-2.5 h-2.5" />}
+                    {shiftWindow.status === 'live'
+                      ? 'EN VIVO'
+                      : shiftWindow.status === 'future' ? 'Programado' : 'CERRADO'}
                   </Badge>
                 )}
               </div>
@@ -2110,8 +2347,10 @@ export function AnalisisGraderTurnoPage() {
         </div>
       )}
 
-      {/* Error real: turno no encontrado y sin datos Shoplogix disponibles */}
-      {error && !upstreamLine.loading && !upstreamLine.snapshot && (
+      {/* Error real: turno no encontrado y sin datos Shoplogix disponibles.
+          Nunca para un turno PROGRAMADO: ahí la ausencia de datos es lo
+          esperado, y pintarla de rojo se lee como pérdida de información. */}
+      {error && !upstreamLine.loading && !upstreamLine.snapshot && shiftWindow?.status !== 'future' && (
         <Card className="border-destructive/40">
           <CardContent className="p-4 flex items-center gap-3 text-destructive">
             <AlertCircle className="w-5 h-5 shrink-0" />
@@ -2254,6 +2493,7 @@ export function AnalisisGraderTurnoPage() {
             graderTotalPieces={null}
             framedOnProduction={framedOnProduction}
             onToggleFraming={slxProductionWindow ? () => setFramingOverride(framedOnProduction ? 'turno' : 'produccion') : undefined}
+            onVerMantencion={() => setActiveView('mantencion')}
           />
 
         </div>
@@ -2279,12 +2519,55 @@ export function AnalisisGraderTurnoPage() {
         </Card>
       )}
 
+      {/* Turno PROGRAMADO — todavía no empieza.
+          `graderShiftStatus` calculaba este estado desde siempre, pero ningún
+          componente lo consumía: todo preguntaba `=== 'live'` y el resto caía en
+          el trato de turno cerrado. Un turno que aún no ocurrió mostraba el badge
+          CERRADO, un banner rojo de "no encontrado en el historial" y "Sin datos
+          registrados" — tres maneras de anunciar la pérdida de datos que nunca
+          existieron. Acá se contesta con el dato que el usuario vino a buscar
+          (cuándo empieza) y con lo único que sí se puede hacer ahora: revisar en
+          Gates cómo quedan las compuertas frente a lo que suele venir. */}
+      {activeView !== 'gates' && !loading && !summary && !upstreamLine.loading
+        && shiftWindow?.status === 'future' && !upstreamLine.snapshot && (
+        <Card className="border-muted-foreground/[0.10]">
+          <CardContent className="p-5 flex flex-col items-center text-center gap-3">
+            <span className="w-12 h-12 rounded-full bg-muted text-muted-foreground flex items-center justify-center shrink-0">
+              <Clock className="w-6 h-6" />
+            </span>
+            <div className="space-y-1">
+              <p className="text-title1 tabular-nums">{horaDeVentana(shiftWindow.startAt)}</p>
+              <p className="text-headline text-foreground">Este turno todavía no empieza</p>
+              {shiftWindow.startsInMin != null && shiftWindow.startsInMin < 24 * 60 && (
+                <p className="text-footnote text-muted-foreground tabular-nums">
+                  Empieza en {formatearEspera(shiftWindow.startsInMin)}
+                </p>
+              )}
+            </div>
+            <Button onClick={() => setActiveView('gates')} className="gap-2 mt-1">
+              <SlidersHorizontal className="w-4 h-4" />
+              Revisar las compuertas
+            </Button>
+            <details className="w-full text-left mt-1">
+              <summary className="text-footnote text-muted-foreground cursor-pointer select-none">
+                ¿Cómo entran los datos de este turno?
+              </summary>
+              <p className="text-footnote text-muted-foreground mt-2 leading-relaxed">
+                Shoplogix sincroniza las Baader solo cada 5 min mientras operan. El Excel de
+                Matrix —P0%, causas y timeline— se carga al cierre del turno, y la captura de
+                la Marel HG se ingresa a mano junto con ese Excel.
+              </p>
+            </details>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Turno sin datos — estado "listo para recibir data"
           Aparece cuando: no hay summary (sin Excel Grader), no hay datos SLX reales,
           y el turno NO está live (ese caso ya tiene su propio card arriba).
           Comunica claramente los 3 canales de ingreso de datos. */}
       {activeView !== 'gates' && !loading && !summary && !upstreamLine.loading
-        && shiftWindow?.status !== 'live'
+        && shiftWindow?.status === 'closed'
         && upstreamLine.source !== 'firestore' && (
         <Card className="border-muted-foreground/[0.10]">
           <CardContent className="p-5 space-y-3">
@@ -2480,6 +2763,12 @@ export function AnalisisGraderTurnoPage() {
                 else next.add(cause)
                 return next
               })}
+              onToggleFamily={(causes) => setSelectedCauses(prev => {
+                const next = new Set(prev)
+                const todas = causes.every((c) => next.has(c))
+                for (const c of causes) { if (todas) next.delete(c); else next.add(c) }
+                return next
+              })}
               isClassificationPlant={isClassificationPlant}
             />
           )}
@@ -2515,21 +2804,40 @@ export function AnalisisGraderTurnoPage() {
               config vigente → distribución → impacto del cambio → evolución →
               historial → ajustes del turno. Antes estaban repartidos a lo largo
               de toda la página, separados por diez bloques de otra cosa. */}
-          {activeView === 'gates' && (
-            <div className="flex items-start gap-2.5 px-3 py-2.5 rounded-ctl bg-primary/[0.15] border border-primary/[0.25] text-sm">
-              <Globe2 className="w-4 h-4 shrink-0 mt-0.5 text-primary" />
-              <p className="text-muted-foreground flex-1">
-                Acá se ajusta <span className="font-medium text-foreground">este turno</span>. La
-                línea física, los umbrales base y los rangos de calibre valen para todos los turnos
-                y se editan en{' '}
-                <button
-                  onClick={() => navigate(`/analisis-grader/config?linea=${plantLineCfg.id}`)}
-                  className="font-medium text-primary underline underline-offset-2 hover:text-ink-info"
-                >
-                  Configuración del Grader
-                </button>.
-              </p>
-            </div>
+          {/* ¿Qué está cayendo en cada puerta? Va primero: es la pregunta de
+              terreno («¿la G6 cae mezclada, y desde cuándo?») y la que decide
+              si hay que tocar la config de abajo. Lee summary.gateMix, que se
+              calcula al guardar el Excel (graderGateMix.ts). */}
+          {activeView === 'gates' && isClassificationPlant && (gateMixDerivado ?? summary.gateMix) && (
+            <PurezaPorPuertaCard
+              gateMix={(gateMixDerivado ?? summary.gateMix)!}
+              gates={turnoGates.length > 0 ? turnoGates : summary.gatesUsed}
+              changeBuckets={gateMixDerivado?.changeBuckets}
+              causesFor={causesFor}
+              seteoDistinto={gateMixDerivado?.seteoDistinto}
+              onAdoptarSeteo={isSupervisor || isAdmin ? handleAdoptarSeteo : undefined}
+              onAdoptarSeteoTodas={isSupervisor || isAdmin ? handleAdoptarSeteoTodas : undefined}
+              pesoPorPuerta={pesoPorPuerta}
+              solapes={solapes}
+              inferidas={seteoInferido}
+              cambios={cambiosDePrograma}
+              onRegistrarCambio={isSupervisor || isAdmin ? handleRegistrarCambio : undefined}
+              mezcla={mezclaPorPuerta}
+              obs={gateObs ?? undefined}
+              mapaPeso={mapaPeso}
+              piezas={piezasPorPuerta}
+              piezasCargando={piezasCargando}
+              onCargarPiezas={handleCargarPiezas}
+              rangos={rangosVigentes}
+              p0SinPuerta={p0SinPuertaData}
+              hastaIso={summary.endAt}
+              turnoLabel={`${dateKey.slice(8, 10)}/${dateKey.slice(5, 7)} · ${shiftLabel}`}
+            />
+          )}
+          {activeView === 'gates' && isClassificationPlant && !gateMixDerivado && !summary.gateMix && summary.hasPieceData && (
+            <p className="text-footnote text-muted-foreground px-1">
+              Este turno se guardó antes de la pureza por puerta. Recargá su Excel pieza a pieza para verla.
+            </p>
           )}
 
           {/* Corte de control primero: con el turno EN CURSO, lo urgente es lo
@@ -2540,7 +2848,7 @@ export function AnalisisGraderTurnoPage() {
           {/* Contraste contra los turnos anteriores. Va ANTES del análisis del
               propio turno: primero "¿esta config tenía sentido?", después "¿cómo
               rindió?". Al revés se lee como excusa. */}
-          {activeView === 'gates' && gatesHistoryCard}
+          {activeView === 'gates' && shiftWindow?.status === 'live' && gatesHistoryCard}
 
           {/* Config de gates vigente en el turno. Solo en plantas que clasifican
               (Chonchi). Yal no clasifica → las gates del Excel son solo las que
@@ -2564,7 +2872,8 @@ export function AnalisisGraderTurnoPage() {
             shiftDoc={shiftDoc}
             shiftWindow={shiftWindow}
             configSnapshots={configSnapshots}
-            gate0Pieces={gate0Pieces}
+            gate0Pieces={p0Fuente}
+            ranges={rangosVigentes}
             pauses={pauses}
             microDetentions={microDetentions}
             summaryId={effectiveSummaryId}
@@ -2582,14 +2891,14 @@ export function AnalisisGraderTurnoPage() {
           />
           )}
 
-          {/* Dispersión segundo a segundo de piezas P0 (drill-down del timeline) */}
-          {activeView === 'calidad' && gate0Pieces.length >= 5 && (
-            <PieceScatterChart gate0Pieces={gate0Pieces} />
-          )}
+          {/* La dispersión P0 aparte se retiró (09-09, pedido de Orel): la capa por
+              causa del timeline la reemplaza (marcar una causa en el panel P0). */}
 
           {/* ════════ LÍNEA (upstream Shoplogix) ════════
-              Evisceradoras Baader 142: lo que alimenta al Grader. Junto con su
-              correlación contra las pausas del Grader y el scatter. */}
+              Evisceradoras Baader 142: lo que alimenta al Grader (tasa, cascada,
+              imputación) más la correlación contra las pausas del Grader y el
+              scatter. El detalle por máquina (Gantt, eventos) vive en Mantención
+              desde el 09-09: las mismas tres máquinas salían en las dos pestañas. */}
           {/* Barra Shoplogix: contador de staleness + botón refresh */}
           {activeView === 'linea' && (upstreamLine.snapshot || upstreamLine.loading) && (
             <div className="flex items-center justify-between gap-2 -mb-1 px-1">
@@ -2633,24 +2942,23 @@ export function AnalisisGraderTurnoPage() {
             graderTotalPieces={summary?.totalPieces ?? null}
             framedOnProduction={framedOnProduction}
             onToggleFraming={slxProductionWindow ? () => setFramingOverride(framedOnProduction ? 'turno' : 'produccion') : undefined}
+            onVerMantencion={() => setActiveView('mantencion')}
           />
 
-          {/* Correlación automática Grader↔Baader y scatter — solo aplican
-              en plantas donde el Grader Marelec MS4/12 procesa downstream de
-              las Baader. Yal evisera y va directo a camión, sin Grader → no
-              hay correlación posible. */}
+          {/* ¿Vino de la línea? Un veredicto; el detalle —tabla de paros y
+              nube de puntos— en una hoja. Las dos tarjetas que vivían acá
+              medían 1.153 px juntas y en la mayoría de los turnos solo decían
+              que no había nada (6 de 40 y 11 de 28 con hallazgo).
+                Solo aplica en plantas donde el Grader Marelec MS4/12 procesa
+              downstream de las Baader. Yal evisera y va directo a camión, sin
+              Grader → no hay correlación posible. */}
           {isClassificationPlant && (
-            <UpstreamCorrelationCard
+            <OrigenDelTurnoCard
               pauses={pauses}
-              snapshot={upstreamLine.snapshot}
-            />
-          )}
-
-          {isClassificationPlant && (
-            <UpstreamScatterCard
               snapshot={upstreamLine.snapshot}
               timelineBuckets={enrichedTimelineBuckets}
               criticalThreshold={criticalThreshold}
+              loading={upstreamLine.loading}
             />
           )}
           </>)}
@@ -2658,18 +2966,7 @@ export function AnalisisGraderTurnoPage() {
           {/* Distribución por gate, impacto de cambios mid-turno y evolución.
               Yal no aplica — sus 3-4 gates físicas no clasifican y los charts
               asumen 12 gates con calibre+calidad asignados. */}
-          {activeView === 'gates' && isClassificationPlant && summary.gateDistribution && summary.gateDistribution.length > 0 && (
-            <GateBreakdownCard
-              gateDistribution={summary.gateDistribution}
-              configSnapshots={configSnapshots}
-              totalPieces={summary.totalPieces}
-              pointZeroPieces={summary.pointZeroPieces}
-              pointZeroPct={summary.pointZeroPct}
-              shiftDocId={shiftDocId}
-              onSaved={reloadConfigSnapshots}
-            />
-          )}
-
+          {/* P0 antes/después de cada cambio de gate: es análisis de P0, va a la vista. */}
           {activeView === 'gates' && isClassificationPlant && enrichedTimelineBuckets.length > 0 && configSnapshots.length > 0 && (
             <GateChangeImpactCard
               timelineBuckets={enrichedTimelineBuckets}
@@ -2677,11 +2974,44 @@ export function AnalisisGraderTurnoPage() {
             />
           )}
 
-          {activeView === 'gates' && isClassificationPlant && enrichedTimelineBuckets.length > 0 && configSnapshots.length > 0 && (
-            <GateEvolutionChart
-              timelineBuckets={enrichedTimelineBuckets}
-              configSnapshots={configSnapshots}
-            />
+          {/* Lo que no responde "¿qué está mezclado?" ni "¿por qué P0?" va plegado:
+              distribución por gate, piezas/min por gate y la comparación histórica.
+              Medido 08-09: la pestaña medía 5.615 px a 375 px con todo abierto. */}
+          {activeView === 'gates' && isClassificationPlant && (summary.gateDistribution?.length || enrichedTimelineBuckets.length > 0) && (
+            <Disclosure
+              title="Más análisis de gates"
+              summary="Distribución por gate, piezas por minuto, comparación con turnos anteriores e historial de configuración"
+              defaultOpen={false}
+              storageKey="turno.gates.masAnalisis"
+              className="space-y-4"
+            >
+              {summary.gateDistribution && summary.gateDistribution.length > 0 && (
+                <GateBreakdownCard
+                  gateDistribution={summary.gateDistribution}
+                  configSnapshots={configSnapshots}
+                  totalPieces={summary.totalPieces}
+                  pointZeroPieces={summary.pointZeroPieces}
+                  pointZeroPct={summary.pointZeroPct}
+                  shiftDocId={shiftDocId}
+                  onSaved={reloadConfigSnapshots}
+                />
+              )}
+              {enrichedTimelineBuckets.length > 0 && configSnapshots.length > 0 && (
+                <GateEvolutionChart
+                  timelineBuckets={enrichedTimelineBuckets}
+                  configSnapshots={configSnapshots}
+                />
+              )}
+              {shiftWindow?.status !== 'live' && gatesHistoryCard}
+              {/* Historial de snapshots: la config compacta de arriba ya marca los cambios del turno. */}
+              <ConfigChangeHistory
+                shiftDocId={shiftDocId}
+                snapshots={configSnapshots}
+                timelineBuckets={enrichedTimelineBuckets}
+                onChange={reloadConfigSnapshots}
+                allowEdit={shiftWindow?.status === 'live'}
+              />
+            </Disclosure>
           )}
 
           {/* Composición del turno (lotes + calidad + producto + conservación).
@@ -2693,18 +3023,6 @@ export function AnalisisGraderTurnoPage() {
             productoBreakdown={summary.productoBreakdown}
             conservacionBreakdown={summary.conservacionBreakdown}
           />
-          )}
-
-          {/* Historial de cambios de configuración del turno — solo Chonchi
-              (gates con calibre+calidad). Yal no clasifica → no aplica. */}
-          {activeView === 'gates' && isClassificationPlant && (
-            <ConfigChangeHistory
-              shiftDocId={shiftDocId}
-              snapshots={configSnapshots}
-              timelineBuckets={enrichedTimelineBuckets}
-              onChange={reloadConfigSnapshots}
-              allowEdit={shiftWindow?.status === 'live'}
-            />
           )}
 
           {/* Sección IA — solo Chonchi. El generador asume gates de
@@ -2817,7 +3135,6 @@ export function AnalisisGraderTurnoPage() {
 
           {/* Ajustes de ESTE turno — al pie, después del análisis: acá el Excel
               ya existe, así que primero se lee cómo fue y después se corrige. */}
-          {activeView === 'gates' && isClassificationPlant && gatesEditorCard}
         </>
       )}
 

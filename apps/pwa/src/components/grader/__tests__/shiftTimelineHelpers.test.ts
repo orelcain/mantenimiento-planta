@@ -10,6 +10,12 @@ import {
   scatterBaaderMedian,
   scatterCriticalZone,
   scatterSlopeMagnitude,
+  agruparEventosRiel,
+  tramosDeConfig,
+  tramoDe,
+  RIEL_UMBRAL_PX,
+  scatterYMax,
+  SCATTER_R2_MIN,
   usableScatterPoints,
   verdictBandColor,
   type CadenceStats,
@@ -528,6 +534,50 @@ describe('scatterSlopeMagnitude', () => {
     expect(result.direction).toBe('neg')
   })
 
+  it('con R² por debajo del piso la dirección no se puede afirmar', () => {
+    // El caso real de la G10 del 07-09 y de otros 13 turnos: pendiente marcada
+    // pero R² 0,00-0,02, y la tarjeta decía «Confirma que ritmo upstream
+    // impacta calidad».
+    const series: ScatterSeriesData[] = [
+      {
+        machineid: 'm1', machineName: 'E1',
+        points: Array.from({ length: 20 }, (_, i) => ({
+          tsMs: i, baaderCycles: 20, baaderRatio: 1, graderP0Pct: 0.05, graderPieces: 100, baaderColor: 'green',
+        })),
+        regression: { slope: -0.05, intercept: 5, r2: 0.02 },
+      },
+    ]
+    const result = scatterSlopeMagnitude(series)!
+    expect(result.direction).toBe('neg')
+    expect(result.r2Max).toBeCloseTo(0.02, 5)
+    expect(result.explica).toBe(false)
+  })
+
+  it('con R² en el piso o encima sí se puede afirmar', () => {
+    const mk = (r2: number): ScatterSeriesData[] => ([{
+      machineid: 'm1', machineName: 'E1',
+      points: Array.from({ length: 20 }, (_, i) => ({
+        tsMs: i, baaderCycles: 20, baaderRatio: 1, graderP0Pct: 0.05, graderPieces: 100, baaderColor: 'green',
+      })),
+      regression: { slope: -0.05, intercept: 5, r2 },
+    }])
+    expect(scatterSlopeMagnitude(mk(SCATTER_R2_MIN))!.explica).toBe(true)
+    expect(scatterSlopeMagnitude(mk(SCATTER_R2_MIN - 0.001))!.explica).toBe(false)
+  })
+
+  it('r2Max toma el mayor de las máquinas, no el promedio', () => {
+    const series: ScatterSeriesData[] = [0.01, 0.18, 0.03].map((r2, i) => ({
+      machineid: 'm' + i, machineName: 'E' + i,
+      points: Array.from({ length: 10 }, (_, k) => ({
+        tsMs: k, baaderCycles: 20, baaderRatio: 1, graderP0Pct: 0.05, graderPieces: 100, baaderColor: 'green',
+      })),
+      regression: { slope: -0.05, intercept: 5, r2 },
+    }))
+    const result = scatterSlopeMagnitude(series)!
+    expect(result.r2Max).toBeCloseTo(0.18, 5)
+    expect(result.explica).toBe(true)
+  })
+
   it('clasifica direction "flat" cuando |slope| < 0.005', () => {
     const series: ScatterSeriesData[] = [
       {
@@ -764,16 +814,19 @@ describe('computeCadenceStats', () => {
 })
 
 describe('buildCadenceMarkLines', () => {
-  it('caso normal: 2 líneas con el valor y label esperados', () => {
+  it('2 líneas en su valor, y SIN texto sobre el gráfico', () => {
+    // Los dos números viven desde el 10-09 en la franja bajo el chart: son
+    // constantes de todo el turno y no necesitan estar anclados a un minuto,
+    // mientras que sobre el eje competían con el resto de las anotaciones.
     const stats: CadenceStats = { typicalPzMin: 45, bestSustained10MinPzMin: 55 }
-    const lines = buildCadenceMarkLines(stats) as Array<{ name: string; yAxis: number; label: { formatter: string } }>
+    const lines = buildCadenceMarkLines(stats) as Array<{ name: string; yAxis: number; label: { show?: boolean } }>
     expect(lines).toHaveLength(2)
     expect(lines[0]!.name).toBe('Ritmo típico')
     expect(lines[0]!.yAxis).toBe(45)
-    expect(lines[0]!.label.formatter).toBe('típico 45')
     expect(lines[1]!.name).toBe('Máx sostenida (10min)')
     expect(lines[1]!.yAxis).toBe(55)
-    expect(lines[1]!.label.formatter).toBe('máx 10min 55')
+    expect(lines[0]!.label.show).toBe(false)
+    expect(lines[1]!.label.show).toBe(false)
   })
 
   it('turno vacío: sin stats → sin líneas (nunca NaN visible)', () => {
@@ -786,5 +839,172 @@ describe('buildCadenceMarkLines', () => {
     const lines = buildCadenceMarkLines(stats) as Array<{ name: string }>
     expect(lines).toHaveLength(1)
     expect(lines[0]!.name).toBe('Ritmo típico')
+  })
+})
+
+describe('scatterYMax · el eje deja ver la nube', () => {
+  const serie = (p0s: number[], piezas = 100): ScatterSeriesData[] => ([{
+    machineid: 'm1', machineName: 'E1',
+    points: p0s.map((v, i) => ({ tsMs: i, baaderCycles: 20, baaderRatio: 1, graderP0Pct: v / 100, graderPieces: piezas, baaderColor: 'green' })),
+    regression: null,
+  }])
+
+  it('un pico aislado no estira el eje: se corta y se avisa', () => {
+    // El caso real: la nube vive entre 0 y 6 %, y un bucket al 100 % llevaba el
+    // eje hasta ahí, aplastando todo contra el piso (256 de 377 turnos).
+    const p0s = [...Array.from({ length: 99 }, (_, i) => (i % 6) + 1), 100]
+    const { max, fuera } = scatterYMax(serie(p0s), 3.5)
+    expect(max).toBeLessThan(20)
+    expect(fuera).toBe(1)
+  })
+
+  it('sin picos no deja nada fuera', () => {
+    const { max, fuera } = scatterYMax(serie([1, 2, 3, 4, 5, 6]), 3.5)
+    expect(fuera).toBe(0)
+    expect(max).toBeGreaterThanOrEqual(6)
+  })
+
+  it('nunca corta por debajo del triple del umbral crítico', () => {
+    // Un turno redondo (todo el P0 en 0) no puede dejar el umbral fuera de la
+    // escala: sin la zona crítica dibujada el gráfico no se entiende.
+    const { max } = scatterYMax(serie([0, 0, 0, 0]), 3.5)
+    expect(max).toBeGreaterThanOrEqual(10.5)
+  })
+
+  it('los buckets de menos de 5 piezas no cuentan para la escala', () => {
+    // Son los mismos que la regresión y la zona crítica ya descartan.
+    const s = serie([1, 2, 3], 100)
+    s[0]!.points.push({ tsMs: 99, baaderCycles: 20, baaderRatio: 1, graderP0Pct: 1, graderPieces: 2, baaderColor: 'green' })
+    const { max, fuera } = scatterYMax(s, 3.5)
+    expect(max).toBeLessThan(20)
+    expect(fuera).toBe(0)
+  })
+
+  it('sin puntos usables cae al piso del umbral', () => {
+    expect(scatterYMax([], 3.5)).toEqual({ max: 11, fuera: 0 })
+  })
+})
+
+describe('agruparEventosRiel · el riel no puede solaparse', () => {
+  // Escala real medida a 375 px: 278 px de plot para un turno de 480 min.
+  const PX_POR_MIN = 278 / 480
+  const T0 = Date.parse('2026-09-07T21:15:00Z')
+  const xDe = (ms: number) => 40 + ((ms - T0) / 60_000) * PX_POR_MIN
+  const ev = (min: number, tipo: 'accion' | 'pausa' | 'config' | 'carga' | 'lote') => ({
+    tipo, ms: T0 + min * 60_000, label: 'x', titulo: tipo,
+  })
+
+  it('los eventos del mismo minuto se fusionan aunque sean distintos', () => {
+    // 63 de 122 turnos guardan varias configs dentro del mismo minuto, con
+    // seteos distintos: es un acto del operador guardado varias veces.
+    const m = agruparEventosRiel([ev(100, 'config'), ev(100, 'config'), ev(100, 'config')], xDe)
+    expect(m).toHaveLength(1)
+    expect(m[0]!.eventos).toHaveLength(3)
+  })
+
+  it('ningún par de marcadores queda a menos del umbral', () => {
+    // El turno peor (2026-09-07 T1): 11 eventos, 7 choques con etiquetas de texto.
+    const eventos = [
+      ev(0, 'carga'), ev(10, 'pausa'), ev(85, 'lote'), ev(89, 'pausa'),
+      ev(134, 'lote'), ev(155, 'config'), ev(158, 'lote'), ev(164, 'config'),
+      ev(240, 'accion'), ev(300, 'pausa'), ev(465, 'lote'),
+    ]
+    const m = agruparEventosRiel(eventos, xDe)
+    for (let i = 1; i < m.length; i++) {
+      expect(xDe(m[i]!.ms) - xDe(m[i - 1]!.ms)).toBeGreaterThanOrEqual(RIEL_UMBRAL_PX)
+    }
+    expect(m.length).toBeLessThan(eventos.length)
+    expect(m.reduce((a, x) => a + x.eventos.length, 0)).toBe(eventos.length)
+  })
+
+  it('el marcador se ancla en el primer evento y no se mueve al absorber', () => {
+    const m = agruparEventosRiel([ev(100, 'lote'), ev(110, 'lote'), ev(120, 'lote')], xDe)
+    expect(m).toHaveLength(1)
+    expect(m[0]!.ms).toBe(T0 + 100 * 60_000)
+  })
+
+  it('el glifo del grupo es el del tipo más importante', () => {
+    const m = agruparEventosRiel([ev(100, 'lote'), ev(101, 'accion'), ev(102, 'config')], xDe)
+    expect(m[0]!.tipo).toBe('accion')
+    expect(m[0]!.glifo).toBe('⚙')
+  })
+
+  it('con más ancho el umbral se afloja solo y agrupa menos', () => {
+    const eventos = [ev(0, 'lote'), ev(40, 'lote'), ev(80, 'lote')]
+    const ancho = (ms: number) => 40 + ((ms - T0) / 60_000) * (1000 / 480)
+    expect(agruparEventosRiel(eventos, xDe).length).toBeLessThan(agruparEventosRiel(eventos, ancho).length)
+  })
+
+  it('sin eventos no hay marcadores', () => {
+    expect(agruparEventosRiel([], xDe)).toEqual([])
+  })
+})
+
+describe('tramosDeConfig · la lista se vuelve un argumento', () => {
+  const T0 = Date.parse('2026-09-07T21:15:00Z')
+  const at = (min: number) => new Date(T0 + min * 60_000).toISOString()
+  const v = (before: number, after: number): SegmentVerdict => ({
+    beforePct: before, afterPct: after, afterMinutes: 60, afterPieces: 900,
+    delta: +(after - before).toFixed(2),
+    status: after < before ? 'improved' : after > before ? 'worsened' : 'neutral',
+  })
+
+  it('sin cambios manuales hay un solo tramo y la lista queda plana', () => {
+    const t = tramosDeConfig([], new Map(), T0)
+    expect(t).toHaveLength(1)
+    expect(t[0]!.snapshotAt).toBeNull()
+  })
+
+  it('el primer tramo toma el «antes» del primer cambio', () => {
+    // El mapa se indexa por `id`, que es como lo devuelve computeSegmentVerdicts.
+    const verdicts = new Map([['s1', v(14.2, 9.4)]])
+    const t = tramosDeConfig([{ id: 's1', at: at(120) }], verdicts, T0)
+    expect(t).toHaveLength(2)
+    expect(t[0]!.p0Pct).toBe(14.2)
+    expect(t[1]!.p0Pct).toBe(9.4)
+    expect(t[1]!.delta).toBeCloseTo(-4.8, 5)
+    expect(t[1]!.status).toBe('improved')
+  })
+
+  it('los snapshots sintéticos no abren tramo', () => {
+    // El snapshot inicial del turno no es una intervención del operador.
+    const t = tramosDeConfig([{ id: 's0', at: at(120), synthetic: true }, { id: 's1', at: at(200) }], new Map(), T0)
+    expect(t).toHaveLength(2)
+    expect(t[1]!.desdeMs).toBe(T0 + 200 * 60_000)
+  })
+
+  it('un cambio anterior al inicio del turno no abre tramo', () => {
+    // 258 snapshots del histórico caen fuera de la ventana dibujada.
+    const t = tramosDeConfig([{ id: 's1', at: new Date(T0 - 60 * 60_000).toISOString() }], new Map(), T0)
+    expect(t).toHaveLength(1)
+  })
+
+  it('un tramo sin piezas suficientes no dice su P0 ni sirve de referencia', () => {
+    // Caso real del 07-09: dos cambios de compuertas con un minuto de
+    // diferencia dejaban un tramo de 3 piezas que salía «P0 33,3 % ▼ 31,5 pts».
+    const buckets = [
+      { tsMin: at(10), pieces: 500 },
+      { tsMin: at(121), pieces: 3 },
+      { tsMin: at(200), pieces: 800 },
+    ]
+    const verdicts = new Map([
+      ['s1', v(5.3, 33.3)],
+      ['s2', v(33.3, 1.8)],
+    ])
+    const t = tramosDeConfig([{ id: 's1', at: at(120) }, { id: 's2', at: at(122) }], verdicts, T0, buckets)
+    expect(t[1]!.piezas).toBe(3)
+    expect(t[1]!.p0Pct).toBeNull()
+    expect(t[1]!.delta).toBeNull()
+    // Y el tramo siguiente tampoco puede compararse contra él.
+    expect(t[2]!.delta).toBeNull()
+    expect(t[2]!.p0Pct).toBe(1.8)
+  })
+
+  it('cada evento cae en su tramo, y el último queda abierto', () => {
+    const t = tramosDeConfig([{ id: 's1', at: at(100) }, { id: 's2', at: at(200) }], new Map(), T0)
+    expect(tramoDe(t, T0 + 50 * 60_000)!.n).toBe(1)
+    expect(tramoDe(t, T0 + 150 * 60_000)!.n).toBe(2)
+    expect(tramoDe(t, T0 + 900 * 60_000)!.n).toBe(3)
+    expect(t[2]!.hastaMs).toBeNull()
   })
 })

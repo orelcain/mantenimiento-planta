@@ -94,6 +94,9 @@ export function ProgramacionSemana({
   const [diaAbierto, setDiaAbierto] = useState<number | null>(null)
   const [arrastre, setArrastre] = useState<Arrastre | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
+  const [seleccion, setSeleccion] = useState<{ tareaId: string; ocurrencia: number } | null>(
+    null,
+  )
   const contenedorRef = useRef<HTMLDivElement | null>(null)
 
   const nombrePorId = useMemo(() => new Map(maquinas.map((m) => [m.id, m.nombre])), [maquinas])
@@ -159,6 +162,10 @@ export function ProgramacionSemana({
   const empezarArrastre = (e: React.PointerEvent, a: Asignacion) => {
     e.preventDefault()
     e.stopPropagation()
+    // Tocar un bloque lo deja seleccionado aunque no se arrastre: en el telefono
+    // estos bloques miden 7-20 px de ancho y el dedo no los agarra. Seleccionado,
+    // se mueve con los botones de abajo, que usan el mismo paso que las flechas.
+    setSeleccion({ tareaId: a.tareaId, ocurrencia: a.ocurrencia })
     const fila = (e.currentTarget as HTMLElement).closest('[data-fila-dia]') as HTMLElement | null
     const r = fila?.getBoundingClientRect()
     const offset = r?.width
@@ -249,6 +256,48 @@ export function ProgramacionSemana({
             </p>
           )}
 
+          {/* El bloque seleccionado se mueve con el dedo desde aqui: los bloques de la
+              grilla miden 7-20 px de ancho en un telefono y no hay nada que agarrar. */}
+          {(() => {
+            if (!seleccion) return null
+            const a = asignacionesDe(prog, 0)
+              .concat(...[1, 2, 3, 4, 5, 6].map((d) => asignacionesDe(prog, d)))
+              .find((x) => x.tareaId === seleccion.tareaId && x.ocurrencia === seleccion.ocurrencia)
+            if (!a) return null
+            return (
+              <div className="flex flex-wrap items-center gap-2 rounded-card bg-muted/50 p-2">
+                <span className="min-w-0 flex-1 truncate text-footnote text-foreground">
+                  {a.nombre}
+                </span>
+                <span className="font-mono text-footnote tabular-nums text-muted-foreground">
+                  {DIAS_CORTOS[a.dia]} {slotAHora(a.inicio)}–{slotAHora(a.inicio + a.largo)}
+                </span>
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => mover(a, -PASO_FINO)}
+                    aria-label="Adelantar 5 minutos"
+                    className="flex min-h-11 min-w-11 items-center justify-center rounded-ctl bg-card text-foreground active:opacity-70"
+                  >
+                    <ChevronLeft className="h-5 w-5" />
+                  </button>
+                  <button
+                    onClick={() => mover(a, PASO_FINO)}
+                    aria-label="Atrasar 5 minutos"
+                    className="flex min-h-11 min-w-11 items-center justify-center rounded-ctl bg-card text-foreground active:opacity-70"
+                  >
+                    <ChevronRight className="h-5 w-5" />
+                  </button>
+                  <button
+                    onClick={() => setSeleccion(null)}
+                    className="flex min-h-11 items-center rounded-ctl px-3 text-footnote font-semibold text-primary active:opacity-70"
+                  >
+                    Listo
+                  </button>
+                </div>
+              </div>
+            )
+          })()}
+
           <div className="overflow-x-auto">
             <div className="flex min-w-[32rem] flex-col gap-2">
               <div className="flex items-center gap-3">
@@ -331,6 +380,9 @@ export function ProgramacionSemana({
                               COLOR_CONDICION[a.condicion],
                               arrastrando && 'opacity-40',
                               a.anclada && 'ring-1 ring-inset ring-foreground/40',
+                              seleccion?.tareaId === a.tareaId &&
+                                seleccion.ocurrencia === a.ocurrencia &&
+                                'ring-2 ring-foreground',
                             )}
                             style={{
                               left: `${(a.inicio * 100) / SLOTS_POR_DIA}%`,

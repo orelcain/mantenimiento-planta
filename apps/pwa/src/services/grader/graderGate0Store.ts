@@ -25,7 +25,8 @@ import {
 import { db } from '../firebase'
 import { classifyRecordToMatrix, CALIBRE_WEIGHT_RANGES } from './graderAnalytics'
 import { updateDailySummary } from './graderDailySummary.service'
-import type { GateAssignment, Gate0Record, GraderDailySummary } from './types'
+import type { GateAssignment, Gate0Record, GraderDailySummary, CalibreWeightRange } from './types'
+import { parseWallClock, rangesFingerprint, type ConfigTimeline } from './graderGateObservations'
 
 const COLLECTION = 'graderDailySummaries'
 const META_SUB = 'meta'
@@ -135,20 +136,31 @@ export async function loadGate0Records(summaryId: string): Promise<StoredGate0Re
   return chunks.flatMap((c) => c.records)
 }
 
-/** Clasifica los registros con una config de gates. Réplica exacta de computeShiftSummary. */
+/**
+ * Clasifica los registros con una config de gates. Réplica exacta de
+ * computeShiftSummary. Acepta una config fija (array) o una línea de tiempo
+ * (`ConfigTimeline`, ver graderGateObservations): con la segunda, cada pieza se
+ * juzga con la config vigente en SU hora, así un cambio de gate a las 10:18 no
+ * reclasifica la mañana como si la config nueva hubiera regido desde las 07:15.
+ */
 export function classifyGate0Records(
   records: StoredGate0Record[],
-  gates: GateAssignment[],
+  gates: GateAssignment[] | ConfigTimeline,
   pointZeroPieces: number,
+  /** Rangos de calibre configurados en la app. Sin esto, las constantes. */
+  ranges?: CalibreWeightRange[],
 ): Array<{ error: string; pieces: number; pct: number }> {
-  const active = gates.filter((g) => g.active)
+  const activeAt: (ts: string) => GateAssignment[] = Array.isArray(gates)
+    ? (() => { const active = gates.filter((g) => g.active); return () => active })()
+    : (ts) => (gates.configAt(parseWallClock(ts)) ?? []).filter((g) => g.active)
   const causeMap = new Map<string, number>()
   for (const rec of records) {
+    const active = activeAt(rec.ts)
     const key = active.length > 0
       ? classifyRecordToMatrix(
         { ...(rec as unknown as Gate0Record), error: rec.error ?? '', gate: 0 as const },
         active,
-        CALIBRE_WEIGHT_RANGES,
+        ranges?.length ? ranges : CALIBRE_WEIGHT_RANGES,
       )
       : (rec.error || 'Sin causa')
     causeMap.set(key, (causeMap.get(key) ?? 0) + rec.pieces)
@@ -174,18 +186,72 @@ export interface RecomputeResult {
  */
 export async function recomputeShiftP0Causes(
   summaryId: string,
-  gates: GateAssignment[],
+  gates: GateAssignment[] | ConfigTimeline,
   pointZeroPieces: number,
+  /** Config VIGENTE (último snapshot) que queda en `gatesUsed`; obligatoria con una línea de tiempo. */
+  gatesVigentes?: GateAssignment[],
+  ranges?: CalibreWeightRange[],
 ): Promise<RecomputeResult> {
-  if (gates.filter((g) => g.active).length === 0) return { ok: false, reason: 'sin-gates' }
+  const vigentes = (gatesVigentes ?? (Array.isArray(gates) ? gates : [])).filter((g) => g.active)
+  if (vigentes.length === 0) return { ok: false, reason: 'sin-gates' }
   const records = await loadGate0Records(summaryId)
   if (records == null) return { ok: false, reason: 'sin-datos-guardados' }
 
-  const causes = classifyGate0Records(records, gates, pointZeroPieces)
+  const causes = classifyGate0Records(records, gates, pointZeroPieces, ranges)
   await updateDailySummary(summaryId, {
     topP0Causes: causes,
-    gatesUsed: gates.filter((g) => g.active),
+    gatesUsed: vigentes,
     reclassifiedAt: new Date().toISOString(),
+    rangesFingerprint: rangesFingerprint(ranges?.length ? ranges : CALIBRE_WEIGHT_RANGES),
   } as Partial<GraderDailySummary> & Record<string, unknown>)
   return { ok: true, causes }
+}
+
+
+// ── Rechazos por calibre SIN puerta ──────────────────────────────────────────
+//
+// Medido 09-09 (2026-09-08 Turno 1, carga parcial): 37 de 96 P0 pesaban
+// 0,34–0,90 kg. La app los clasifica «fuera de calibre» porque ninguna puerta
+// tiene 0-2 lb asignado, pero eso no se decía en ninguna parte: es una
+// decisión de seteo (¿una puerta para 0-2 o rechazo asumido?), no una falla.
+
+export interface P0SinPuerta {
+  calibre: string
+  pieces: number
+  /** Gramos de la pieza más liviana y más pesada del grupo. */
+  minG: number
+  maxG: number
+}
+
+/**
+ * P0 cuyo peso cae en un rango de calibre que NINGUNA puerta activa tenía
+ * asignado a esa hora (una puerta «Other» acepta cualquier calibre y cuenta
+ * como puerta). Solo piezas con peso.
+ */
+export function p0SinPuerta(
+  records: ReadonlyArray<{ ts: string; pieces: number; weightKg?: number; weightPerPieceGrams?: number }>,
+  gates: GateAssignment[] | ConfigTimeline,
+  ranges?: CalibreWeightRange[],
+): P0SinPuerta[] {
+  const rangos = ranges?.length ? ranges : CALIBRE_WEIGHT_RANGES
+  const activeAt: (ts: string) => GateAssignment[] = Array.isArray(gates)
+    ? (() => { const active = gates.filter((g) => g.active); return () => active })()
+    : (ts) => (gates.configAt(parseWallClock(ts)) ?? []).filter((g) => g.active)
+  const acc = new Map<string, P0SinPuerta>()
+  for (const r of records) {
+    const bruto = r.weightPerPieceGrams ?? (r.weightKg != null && r.pieces > 0 ? (r.weightKg * 1000) / r.pieces : undefined)
+    if (bruto == null || bruto < 10) continue
+    const g = Math.round(bruto)
+    const rango = rangos.find((x) => g >= x.minGrams && g < x.maxGrams)
+    if (!rango) continue
+    const active = activeAt(r.ts)
+    if (active.length === 0) continue
+    if (active.some((a) => a.assignedCalibre === rango.calibre || a.assignedCalibre === 'Other')) continue
+    const cur = acc.get(rango.calibre) ?? { calibre: rango.calibre, pieces: 0, minG: Infinity, maxG: -Infinity }
+    cur.pieces += r.pieces || 1
+    cur.minG = Math.min(cur.minG, g)
+    cur.maxG = Math.max(cur.maxG, g)
+    acc.set(rango.calibre, cur)
+  }
+  return [...acc.values()].sort((a, b) => b.pieces - a.pieces)
 }

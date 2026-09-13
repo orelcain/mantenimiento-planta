@@ -24,6 +24,11 @@ const COLLECTION_STATS = 'publicShiftMonitorStats'
 const MAX_VIEWERS = 60
 /** Días de historial diario. */
 const MAX_DAYS = 14
+/** Tope de viewerIds únicos por día. El link es público (sin sesión): sin este
+ *  techo, pings con viewerIds aleatorios engordarían el array del día hasta
+ *  romper el doc de 1 MB. Por encima del tope el conteo diario se subestima,
+ *  cosa aceptable para telemetría; el uso real no se acerca. */
+const MAX_DAY_VIEWERS = 500
 /** Una apertura del mismo dispositivo no vuelve a contar antes de esto. */
 const OPEN_DEDUPE_MS = 10 * 60 * 1000
 /** Tope de segundos que puede sumar un solo latido (evita inflar el total). */
@@ -102,7 +107,7 @@ function applyEvent(prev, ev) {
         s.viewersCount += 1
         s.devices[ev.device] = (s.devices[ev.device] || 0) + 1
       }
-      if (!día.viewers.includes(viewerId)) día.viewers.push(viewerId)
+      if (!día.viewers.includes(viewerId) && día.viewers.length < MAX_DAY_VIEWERS) día.viewers.push(viewerId)
     }
     s.viewers[viewerId] = {
       ...(prevViewer || { firstSeen: nowMs, opens: 0, secs: 0 }),
@@ -125,7 +130,7 @@ function applyEvent(prev, ev) {
       secs: (prevViewer?.secs || 0) + secs,
     }
     if (nuevoDispositivo) s.viewersCount += 1
-    if (!día.viewers.includes(viewerId)) día.viewers.push(viewerId)
+    if (!día.viewers.includes(viewerId) && día.viewers.length < MAX_DAY_VIEWERS) día.viewers.push(viewerId)
   }
 
   if (ev.viewingPast) s.shiftViews.anteriores += 1
@@ -153,6 +158,7 @@ module.exports = {
   COLLECTION_STATS,
   MAX_VIEWERS,
   MAX_DAYS,
+  MAX_DAY_VIEWERS,
   OPEN_DEDUPE_MS,
   MAX_HEARTBEAT_SEC,
   sanitizeViewerId,

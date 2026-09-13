@@ -17,7 +17,7 @@ import {
   serverTimestamp,
   Unsubscribe,
 } from '@/services/firestoreTracked'
-import { db } from './firebase'
+import { db, auth } from './firebase'
 import { logger } from '@/lib/logger'
 import type {
   PermissionsMap,
@@ -266,7 +266,14 @@ export function subscribeToRolePermissions(
 }
 
 /**
- * Escucha cambios en el usuario (incluyendo override)
+ * Escucha cambios en el usuario (incluyendo override).
+ *
+ * Si el listener muere con permission-denied, refresca el ID token con
+ * `getIdToken(true)` y re-suscribe UNA vez antes de caer a los permisos por
+ * defecto. Caso 2026-09-05: la pestaña del login y la TV del monitor del
+ * mismo PC perdieron el listener el mismo segundo — token compartido vencido
+ * en pestañas dormidas — y quedaban con permisos por defecto hasta recargar.
+ * Un segundo rechazo, o cualquier otro error, cae al fallback como antes.
  */
 export function subscribeToUserPermissions(
   userId: string,
@@ -274,27 +281,11 @@ export function subscribeToUserPermissions(
   callback: (resolved: ResolvedPermissions) => void
 ): Unsubscribe {
   const userRef = doc(db, 'users', userId)
-  
-  return onSnapshot(userRef, async (doc) => {
-    if (doc.exists()) {
-      const userData = doc.data() as User
-      const rolePerms = await getRolePermissions(userRol)
-      const override = userData.permissionsOverride
-      
-      const finalPerms = override?.activo 
-        ? mergePermissions(rolePerms, override.permisos)
-        : rolePerms
-      
-      callback({
-        userId,
-        rol: userRol,
-        permisos: finalPerms,
-        tieneOverride: override?.activo || false,
-        cargadoDesde: 'firestore',
-      })
-    }
-  }, (error) => {
-    logger.error('Error en listener de permisos de usuario', error)
+  let unsubscribeActual: Unsubscribe = () => {}
+  let cancelado = false
+  let reintentado = false
+
+  const caerADefault = () =>
     callback({
       userId,
       rol: userRol,
@@ -302,7 +293,58 @@ export function subscribeToUserPermissions(
       tieneOverride: false,
       cargadoDesde: 'default',
     })
-  })
+
+  const suscribir = () => {
+    unsubscribeActual = onSnapshot(userRef, async (doc) => {
+      if (doc.exists()) {
+        const userData = doc.data() as User
+        const rolePerms = await getRolePermissions(userRol)
+        const override = userData.permissionsOverride
+
+        const finalPerms = override?.activo
+          ? mergePermissions(rolePerms, override.permisos)
+          : rolePerms
+
+        callback({
+          userId,
+          rol: userRol,
+          permisos: finalPerms,
+          tieneOverride: override?.activo || false,
+          cargadoDesde: 'firestore',
+        })
+      }
+    }, async (error) => {
+      logger.error('Error en listener de permisos de usuario', error)
+      const usuario = auth.currentUser
+      if (reintentado || cancelado || !esPermissionDenied(error) || !usuario || usuario.uid !== userId) {
+        caerADefault()
+        return
+      }
+      reintentado = true
+      logger.warn('Listener de permisos rechazado con permission-denied; reintentando con token fresco', { userId })
+      try {
+        await usuario.getIdToken(true)
+      } catch (e) {
+        logger.error('No se pudo refrescar el token para re-suscribir permisos', e instanceof Error ? e : new Error(String(e)))
+        caerADefault()
+        return
+      }
+      if (cancelado) return
+      suscribir()
+    })
+  }
+
+  suscribir()
+
+  return () => {
+    cancelado = true
+    unsubscribeActual()
+  }
+}
+
+function esPermissionDenied(error: unknown): boolean {
+  const code = (error as { code?: unknown } | null)?.code
+  return code === 'permission-denied' || code === 'firestore/permission-denied'
 }
 
 // ============================================================================

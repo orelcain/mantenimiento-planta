@@ -169,6 +169,43 @@ function buildMachineRows(machines: readonly UpstreamMachineShift[]): ExecutiveM
  * máquina no estuvo encendida, acelerarla no sirve de nada. Solo cuando el
  * tiempo estuvo disponible tiene sentido hablar de ritmo.
  */
+/**
+ * Diferencia mínima, en puntos de ritmo, para señalar a una máquina.
+ *
+ * Con las tres dentro de este margen la hoja no acusa a nadie: el 07-09 iban
+ * 78 % / 78 % / 80 % y nombrar a una era elegir por ruido. Mismo criterio que
+ * ya usa el diagnóstico de `PlantKPIBoard`, que no señala cuando la diferencia
+ * con la mejor es marginal.
+ */
+export const CAUSA_MIN_DIFERENCIA_PTS = 5
+
+/**
+ * La frase de causa de la hoja ejecutiva.
+ *
+ * ⚠️ Hasta el 10-09 tomaba `machines[machines.length - 1]`, y como
+ * `buildMachineRows` ordena por ciclos DESCENDENTE, eso era la máquina con
+ * MENOS producción — no la de peor ritmo, que es el número que la frase cita.
+ * Medido sobre 144 turnos: **65 nombraban a la máquina equivocada y 11 de esos
+ * acusaban justo a la que mejor había andado**. Una hoja que se comparte con
+ * gerencia no puede señalar por posición en una lista.
+ */
+export function buildCause(machines: readonly ExecutiveMachineRow[]): string {
+  const parada = machines.find(m => m.stopped)
+  if (parada) {
+    return `${parada.name} no registró producción: es la capacidad que falta para explicar la brecha del turno.`
+  }
+  const conRitmo = machines.filter(m => !m.stopped && m.ratePct != null) as Array<ExecutiveMachineRow & { ratePct: number }>
+  if (conRitmo.length === 0) return 'Sin datos por máquina para atribuir la pérdida.'
+
+  const orden = [...conRitmo].sort((a, b) => a.ratePct - b.ratePct)
+  const peor = orden[0]!
+  const mejor = orden[orden.length - 1]!
+  if (orden.length > 1 && mejor.ratePct - peor.ratePct < CAUSA_MIN_DIFERENCIA_PTS) {
+    return `Las ${orden.length} máquinas fueron parejas (entre ${pct(peor.ratePct)} y ${pct(mejor.ratePct)} de su objetivo): la pérdida no viene de una en particular.`
+  }
+  return `${peor.name} es la que más arrastra, con ${pct(peor.ratePct)} de su objetivo de ritmo.`
+}
+
 function resolveLossDriver(
   machines: readonly ExecutiveMachineRow[],
   uptimePct: number | null | undefined,
@@ -359,16 +396,7 @@ export function buildExecutiveSummary(input: BuildExecutiveSummaryInput): Execut
     })
   }
 
-  // Causa: se nombra la máquina que más arrastra, con su número.
-  let cause: string
-  const worst = machines.find(m => m.stopped) ?? machines[machines.length - 1]
-  if (worst?.stopped) {
-    cause = `${worst.name} no registró producción: es la capacidad que falta para explicar la brecha del turno.`
-  } else if (worst && worst.ratePct != null) {
-    cause = `${worst.name} es la que más arrastra, con ${pct(worst.ratePct)} de su objetivo de ritmo.`
-  } else {
-    cause = 'Sin datos por máquina para atribuir la pérdida.'
-  }
+  const cause = buildCause(machines)
 
   const hasGrader = summary.totalPieces > 0
   const sourceNote = hasGrader

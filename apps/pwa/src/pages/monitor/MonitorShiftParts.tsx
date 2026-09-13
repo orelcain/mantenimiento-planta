@@ -42,13 +42,25 @@ export function Bloque({ id, titulo, extra, defaultAbierto = true, children }: {
   defaultAbierto?: boolean
   children: React.ReactNode
 }) {
-  const clave = `monitor-bloque:${id}`
+  /*
+   * Plegar existe por la ALTURA del celular. En pantalla grande la página va
+   * en columnas y esa razón no corre: los bloques nacen abiertos, que es lo
+   * que uno espera de un tablero en el PC.
+   *
+   * ⚠ Y la preferencia se guarda POR TAMAÑO de pantalla. Con una sola clave,
+   * lo que alguien plegó en su teléfono —donde plegar es lo correcto— viajaba
+   * al PC y dejaba el pareto y «de quién fue la pérdida» cerrados en una
+   * pantalla que los muestra sin costo (visto en local, 30-08).
+   */
+  const ancha = typeof window !== 'undefined'
+    && window.matchMedia?.('(min-width: 1100px)').matches
+  const clave = `monitor-bloque:${id}${ancha ? ':pc' : ''}`
   const [abierto, setAbierto] = useState(() => {
     try {
       const v = localStorage.getItem(clave)
-      return v == null ? defaultAbierto : v === '1'
+      return v == null ? (defaultAbierto || ancha) : v === '1'
     } catch {
-      return defaultAbierto
+      return defaultAbierto || ancha
     }
   })
 
@@ -101,10 +113,15 @@ export function referenciaDe(cmp: CompareResult, clave: string | null) {
   return { clave: efectiva, contra }
 }
 
-/** «La colación» a partir de «COLACION»: el aviso habla, no grita. */
+/** «La colación» a partir de «COLACION»: el aviso habla, no grita.
+    OJO: el artículo fijo solo funciona con la colación: con el reason crudo de
+    otros convenios salía «La ejercicio compensatorio - paro entra a las…»
+    (visto en vivo, 27-08). Para el resto, el nombre va entre comillas con
+    su sustantivo delante. */
 function nombreDeConvenio(reason: string): string {
   const bajo = reason.toLowerCase().replace(/\s+/g, ' ').trim()
-  return 'La ' + (bajo === 'colacion' ? 'colación' : bajo)
+  if (bajo === 'colacion') return 'La colación'
+  return `La parada de convenio «${bajo}»`
 }
 
 function fmtDurMin(min: number): string {
@@ -454,7 +471,10 @@ export function TiempoDelTurno({
                   <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform ${parte === f.p ? '' : '-rotate-90'}`} />
                 </button>
                 {parte === f.p && (
-                  <div className="bg-primary/[0.08] px-3 pb-3 pl-[26px] text-[12.5px] leading-snug">
+                  /* `pantalla-oculta`: en la TV la tarjeta muestra solo la
+                     barra, las filas y el veredicto — el detalle expandido es
+                     para tocar, y en la sala nadie toca. */
+                  <div className="pantalla-oculta bg-primary/[0.08] px-3 pb-3 pl-[26px] text-[12.5px] leading-snug">
                     {f.p === 'hechas' && (
                       <>
                         {([
@@ -669,10 +689,18 @@ export function TiempoDelTurno({
                     ALGUNA máquina (86 min de "Detención" contra 67 de línea, el
                     24-08 en Chonchi). Sin decir cuál es cuál, los dos números se
                     leen como si uno estuviera mal. */}
-                Las paradas evitables llevan <b>{fmtDurMin(tb.recoverableMin)}</b>
-                {(tb.recoverable ?? []).some((x) => (x.lineMin ?? x.min) < x.min)
-                  ? ' con la línea entera detenida.'
-                  : '.'}
+                {/* Con cero minutos, fmtDurMin devuelve «—» y la frase decía
+                    «llevan — con la línea entera detenida» (visto en vivo,
+                    27-08 con solo micro y una máquina parada de a una). El
+                    cero acá es una BUENA noticia y se dice como tal. */}
+                {tb.recoverableMin >= 1 ? (
+                  <>Las paradas evitables llevan <b>{fmtDurMin(tb.recoverableMin)}</b>
+                  {(tb.recoverable ?? []).some((x) => (x.lineMin ?? x.min) < x.min)
+                    ? ' con la línea entera detenida.'
+                    : '.'}</>
+                ) : (
+                  <>La línea entera todavía no pierde tiempo por paradas evitables.</>
+                )}
               </p>
             )}
         </div>

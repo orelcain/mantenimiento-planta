@@ -650,6 +650,18 @@ export interface GraderDailySummary {
   qualityDistribution?: Array<{ quality: string; pieces: number; pct: number }>;
   /** Distribución de piezas por gate */
   gateDistribution?: Array<{ gate: number; pieces: number; pct: number }>;
+  /**
+   * Pureza por puerta: qué cayó en cada gate contra su asignación (calibre +
+   * calidad) y su evolución en bloques de 30 min. Solo cuando el turno se
+   * guardó con gates activas. Calculado en computeShiftSummary; ver
+   * graderGateMix.ts.
+   */
+  gateMix?: import('./graderGateMix').GateMix;
+  /**
+   * Huella de los rangos de calibre con los que se clasificaron las causas P0
+   * (`rangesFingerprint`). Si los rangos vigentes cambian, el detalle recalcula.
+   */
+  rangesFingerprint?: string;
   /** Nombres de los archivos Excel fuente */
   sourceFileNames?: string[];
   /** ID del lote de carga masiva que generó este resumen */
@@ -1020,6 +1032,8 @@ export interface ParsedMatrixData {
     deviceId?: string;
     startAt?: string;
     endAt?: string;
+    /** El Excel de Puerta 0 cubre menos que el pieza a pieza: los rechazos de afuera se infirieron por peso. */
+    p0CoverageWarning?: string;
   };
 }
 

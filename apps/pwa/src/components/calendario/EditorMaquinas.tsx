@@ -65,14 +65,14 @@ export function EditorMaquinas({ maquinas, tareas, onCambiar, onCerrar }: Editor
 
   return (
     <ListGroup
-      title="Máquinas del plan"
+      title="Máquinas y áreas del plan"
       action={
         <button onClick={onCerrar} className="flex items-center gap-1 text-[0.8rem] font-medium text-primary">
           <X className="h-3.5 w-3.5" />
           Listo
         </button>
       }
-      footer="El horario de una máquina nueva arranca del perfil elegido y se corrige pintando."
+      footer="Sirve para cualquier cosa que ocupe tiempo del equipo: una máquina, el acopio, una sala. El horario arranca del perfil elegido y se corrige pintando."
     >
       {maquinas.map((m) => {
         const enPeligro = porBorrar?.id === m.id
@@ -159,7 +159,7 @@ export function EditorMaquinas({ maquinas, tareas, onCambiar, onCerrar }: Editor
             onKeyDown={(e) => {
               if (e.key === 'Enter') agregar()
             }}
-            placeholder="Agregar máquina…"
+            placeholder="Agregar máquina o área…"
             className="h-11 min-w-0 flex-1 rounded-ctl border border-border bg-background px-3 text-body text-foreground placeholder:text-muted-foreground"
           />
           <button
