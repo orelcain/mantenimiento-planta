@@ -31,6 +31,32 @@ export interface RepuestoDeEquipo {
   doc: Repuesto
 }
 
+/**
+ * Lee los repuestos de un equipo UNA vez, sin React.
+ *
+ * Existe aparte del hook porque el PDF del expediente necesita la misma lista pero **solo
+ * cuando alguien pulsa el botón**. Llamar al hook desde el diálogo hacía la consulta al ABRIR
+ * el expediente, así que una Baader leía sus 1.803 documentos dos veces: una para la pestaña
+ * de materiales y otra por si acaso. Este proyecto tiene techo de costos en GCP.
+ */
+export async function leerRepuestosDeEquipo(nodeId: string): Promise<RepuestoDeEquipo[]> {
+  const snap = await getDocs(query(collection(db, 'repuestos'), where('equipos', 'array-contains', nodeId)))
+  const rows: RepuestoDeEquipo[] = snap.docs.map((d) => {
+    const r = d.data() as Record<string, unknown>
+    return {
+      id: d.id,
+      codigoSAP: String(r.codigoSAP ?? ''),
+      nombre: String(r.textoBreve || r.descripcion || r.alias || r.nombreManual || 'Repuesto'),
+      tipo: typeof r.tipo === 'string' ? r.tipo : undefined,
+      stockFisico: typeof r.stockFisico === 'number' ? r.stockFisico : undefined,
+      doc: { id: d.id, ...r } as unknown as Repuesto,
+      cantidadPorMaquina: typeof r.cantidadPorMaquina === 'number' ? r.cantidadPorMaquina : undefined,
+    }
+  })
+  rows.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+  return rows
+}
+
 export function useRepuestosDeEquipo(nodeId?: string, reloadKey?: number): { repuestos: RepuestoDeEquipo[]; loading: boolean } {
   const [repuestos, setRepuestos] = useState<RepuestoDeEquipo[]>([])
   const [loading, setLoading] = useState(false)
@@ -42,23 +68,9 @@ export function useRepuestosDeEquipo(nodeId?: string, reloadKey?: number): { rep
     }
     let alive = true
     setLoading(true)
-    getDocs(query(collection(db, 'repuestos'), where('equipos', 'array-contains', nodeId)))
-      .then((snap) => {
-        if (!alive) return
-        const rows: RepuestoDeEquipo[] = snap.docs.map((d) => {
-          const r = d.data() as Record<string, unknown>
-          return {
-            id: d.id,
-            codigoSAP: String(r.codigoSAP ?? ''),
-            nombre: String(r.textoBreve || r.descripcion || r.alias || r.nombreManual || 'Repuesto'),
-            tipo: typeof r.tipo === 'string' ? r.tipo : undefined,
-            stockFisico: typeof r.stockFisico === 'number' ? r.stockFisico : undefined,
-            doc: { id: d.id, ...r } as unknown as Repuesto,
-            cantidadPorMaquina: typeof r.cantidadPorMaquina === 'number' ? r.cantidadPorMaquina : undefined,
-          }
-        })
-        rows.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
-        setRepuestos(rows)
+    leerRepuestosDeEquipo(nodeId)
+      .then((rows) => {
+        if (alive) setRepuestos(rows)
       })
       .catch((err) => {
         if (alive) {
