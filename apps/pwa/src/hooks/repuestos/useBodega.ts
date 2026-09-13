@@ -32,6 +32,8 @@ import {
 import { db } from '@/services/firebase'
 import { logger } from '@/lib/logger'
 import { contarPorEstado, esAlertaDeStock } from '@/hooks/repuestos/estadoDeStock'
+import { useRepuestoFavoritos } from './useRepuestoFavoritos'
+import { useAuthStore } from '@/store'
 import { uploadBodegaPhoto, deleteBodegaPhoto } from '@/services/storage'
 import type { GlobalSearchResult } from '@/hooks/repuestos/useGlobalSearch'
 import type { MaterialClase } from '@/types/repuestos'
@@ -250,64 +252,18 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
   }, [])
 
   // ── Watch list (Firestore + localStorage fallback) ──
-  const [watchlist, setWatchlist] = useState<Set<string>>(() => {
-    try {
-      const stored = localStorage.getItem('bodega_watchlist')
-      return stored ? new Set(JSON.parse(stored) as string[]) : new Set<string>()
-    } catch { return new Set<string>() }
-  })
-  const watchLoadedRef = useRef(false)
+  /**
+   * Los favoritos son LOS MISMOS que los de la pestaña Áreas y el expediente.
+   *
+   * Antes Bodega tenía su propia lista (`bodegaWatchlist`, keyed por SAP y guardada también en
+   * localStorage): misma palabra «Favoritos», misma estrella, otra lista. El técnico marcaba
+   * en Áreas y acá seguía diciendo «Favoritos 0». Medido antes de unificar: `repuestoFavs`
+   * tenía 8 y 2 en los dos únicos usuarios con preferencias y `bodegaWatchlist` estaba vacía
+   * para todos, así que nadie pierde una marca.
+   */
+  const uid = useAuthStore((st) => st.user?.id)
+  const { favKeys, toggleFav: toggleWatch } = useRepuestoFavoritos(uid)
 
-  // Cargar watchlist desde Firestore al montar
-  useEffect(() => {
-    if (watchLoadedRef.current) return
-    watchLoadedRef.current = true
-    const userId = localStorage.getItem('auth-storage')
-    if (!userId) return
-    try {
-      const parsed = JSON.parse(userId)
-      const uid = parsed?.state?.user?.id
-      if (!uid) return
-      import('@/services/userPreferences').then(({ getUserPreferences }) => {
-        getUserPreferences(uid).then(prefs => {
-          if (prefs.bodegaWatchlist.length > 0) {
-            setWatchlist(new Set(prefs.bodegaWatchlist))
-          } else {
-            // Migrar localStorage a Firestore
-            const local = localStorage.getItem('bodega_watchlist')
-            if (local) {
-              const ids: string[] = JSON.parse(local)
-              if (ids.length > 0) {
-                import('@/services/userPreferences').then(({ saveBodegaWatchlist }) => {
-                  saveBodegaWatchlist(uid, ids)
-                })
-              }
-            }
-          }
-        })
-      })
-    } catch { /* noop */ }
-  }, [])
-
-  const toggleWatch = useCallback((sap: string) => {
-    setWatchlist(prev => {
-      const next = new Set(prev)
-      if (next.has(sap)) next.delete(sap); else next.add(sap)
-      const arr = [...next]
-      localStorage.setItem('bodega_watchlist', JSON.stringify(arr))
-      // Persistir en Firestore
-      try {
-        const parsed = JSON.parse(localStorage.getItem('auth-storage') || '{}')
-        const uid = parsed?.state?.user?.id
-        if (uid) {
-          import('@/services/userPreferences').then(({ saveBodegaWatchlist }) => {
-            saveBodegaWatchlist(uid, arr)
-          })
-        }
-      } catch { /* noop */ }
-      return next
-    })
-  }, [])
 
   // ── Cargar datos de bodega ──
   // `force` salta la caché (tras una escritura que no se pueda parchear local).
@@ -443,12 +399,12 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
         fotosCatalogo: doc.fotos.length ? doc.fotos : undefined,
         tieneFicha: doc.tieneFicha,
         manuales: doc.manuales,
-        isWatched: sap ? watchlist.has(sap) : false,
+        isWatched: favKeys.has(key),
       })
     }
 
     return [...byKey.values()].sort((a, b) => a.textoBreve.localeCompare(b.textoBreve, 'es'))
-  }, [catalogRepuestos, bodegaOverlays, watchlist])
+  }, [catalogRepuestos, bodegaOverlays, favKeys])
 
   // Solo repuestos con SAP (lo que consume Bodega): subconjunto de allItems con su orden propio.
   const items = useMemo((): BodegaMergedItem[] => {
@@ -907,7 +863,7 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
     loadMovimientosRecientes,
     reloadBodega,
     // Watch list
-    watchlist,
+    favKeys,
     toggleWatch,
     // Fotos
     addPhoto,
