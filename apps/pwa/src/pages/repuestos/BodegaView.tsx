@@ -179,9 +179,16 @@ export function BodegaView({ onViewInEquipo, onSearchSimilar }: BodegaViewProps 
             >
               <Icon className="hidden sm:block h-3.5 w-3.5" />
               {t.label}
-              {t.id === 'stock' && bodega.stats.bajoStock + bodega.stats.sinStock > 0 && (
-                <span className="h-4 min-w-[16px] px-1 rounded-full bg-red-500/[0.15] text-white text-caption font-bold flex items-center justify-center">
-                  {bodega.stats.bajoStock + bodega.stats.sinStock}
+              {/* La MISMA lista que muestra la banda de alertas. Antes era
+                  `bajoStock + sinStock` = 585, mientras la banda de la misma pantalla decía
+                  «61 alertas de stock»: el badge sumaba los 524 ítems en cero que nadie
+                  configuró, que no son una alerta sino un pendiente de configuración. */}
+              {t.id === 'stock' && bodega.stats.alertas.length > 0 && (
+                <span
+                  className="h-4 min-w-[16px] px-1 rounded-full bg-red-500/[0.15] text-white text-caption font-bold flex items-center justify-center"
+                  title={`${bodega.stats.alertas.length} ítems con mínimo definido en o bajo su mínimo`}
+                >
+                  {bodega.stats.alertas.length}
                 </span>
               )}
             </button>
