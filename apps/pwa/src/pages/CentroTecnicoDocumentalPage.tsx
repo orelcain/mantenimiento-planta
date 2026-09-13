@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   AlertTriangle,
@@ -43,7 +43,7 @@ import { descargarPlantillaPlaca, importarPlacaExcel } from '@/services/equipmen
 import { generarReporteEquipo } from '@/services/equipmentReportPdf'
 import { useAuthStore } from '@/store'
 import { rowKeyDeRepuesto } from '@/hooks/repuestos/identidadDeRepuesto'
-import { getRepuestoFavs, saveRepuestoFavs } from '@/services/userPreferences'
+import { useRepuestoFavoritos } from '@/hooks/repuestos/useRepuestoFavoritos'
 import { useEquipmentFavorites } from '@/hooks/useEquipmentFavorites'
 import { useEquipmentNotes } from '@/hooks/useEquipmentNotes'
 import type { EquipmentNote } from '@/hooks/useEquipmentNotes'
@@ -1496,23 +1496,7 @@ function RecursosRepuestos({ equipment, canEdit }: { equipment: Equipment; canEd
    * lo que uno espera de "mis favoritos" — no una segunda lista paralela.
    */
   const userId = useAuthStore((s) => s.user?.id)
-  const [favs, setFavs] = useState<Set<string>>(new Set())
-  useEffect(() => {
-    if (!userId) return
-    getRepuestoFavs(userId).then((arr) => setFavs(new Set(arr))).catch(() => {})
-  }, [userId])
-
-  const toggleFav = useCallback((rep: { id?: string; codigoSAP?: string | null; codigoFabricante?: string | null }) => {
-    if (!userId) return
-    const key = rowKeyDeRepuesto(rep)
-    setFavs((prev) => {
-      const next = new Set(prev)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      void saveRepuestoFavs(userId, [...next])
-      return next
-    })
-  }, [userId])
+  const { favKeys: favs, toggleFav } = useRepuestoFavoritos(userId)
 
   async function openAdd() {
     setAdding(true)

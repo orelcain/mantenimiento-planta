@@ -352,7 +352,7 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
           {filtered.map(item => (
             <BodegaRow key={item.codigoSAP} item={item}
               onEdit={() => setEditingItem(item)} onMovimiento={() => setMovimientoItem(item)}
-              onHistorial={() => setHistorialItem(item)} onToggleWatch={() => toggleWatch(item.codigoSAP)}
+              onHistorial={() => setHistorialItem(item)} onToggleWatch={() => toggleWatch(item.rowKey)}
               onOpenDrawer={() => setDrawerItem(item)} />
           ))}
         </div>

@@ -37,7 +37,7 @@ import { useBodega } from '@/hooks/repuestos/useBodega'
 import { useAreaRepuestos, type StockStatus, type AreaRepuestoRow } from '@/hooks/repuestos/useAreaRepuestos'
 import { useHierarchyPaths } from '@/hooks/repuestos/useHierarchyPaths'
 import { useManualesDeEquipos } from '@/hooks/repuestos/useManualesDeEquipos'
-import { getRepuestoFavs, saveRepuestoFavs, getRepuestoFavListsGlobal, saveRepuestoFavListsGlobal, getUserPreferences, saveFavoriteLists, type RepuestoFavList, type FavList } from '@/services/userPreferences'
+import { getRepuestoFavListsGlobal, saveRepuestoFavListsGlobal, getUserPreferences, saveFavoriteLists, type RepuestoFavList, type FavList } from '@/services/userPreferences'
 import { useRepuestoCrud } from '@/hooks/repuestos/useRepuestoCrud'
 import { useToast } from '@/hooks/useToast'
 import { RepuestoFormModal } from '@/components/repuestos/RepuestoForm'
@@ -50,6 +50,7 @@ import type { EquipoSap } from '@/utils/repuestos/exportBomSAP'
 import { InlineEditName } from '@/components/repuestos/InlineEditName'
 import { CLASE_LABEL, type MaterialClase, type Machine, type Repuesto, type RepuestoFormData, type TechnicalSpecs, type MachineImage } from '@/types/repuestos'
 import { AREA_TACTIL_COMPACTA, AREA_TACTIL_EN_TARJETA } from '@/lib/areaTactil'
+import { useRepuestoFavoritos } from '@/hooks/repuestos/useRepuestoFavoritos'
 
 // Fase 4 normalización (2026-06): el hub lee/escribe la colección plana `repuestos`
 // (equipos:[nodeIds]). Quedan para Fase 5: reubicar/importar/duplicados/manuales de
@@ -367,7 +368,8 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   const [exportOpen, setExportOpen] = useState(false)
 
   // ── Favoritos de repuestos (globales por usuario, keyed por rowKey) ──
-  const [favKeys, setFavKeys] = useState<Set<string>>(new Set())
+  // Los favoritos salen del hook compartido: la misma lista que usan el expediente y Bodega.
+  const { favKeys, toggleFav } = useRepuestoFavoritos(user?.id)
   const [repFavOnly, setRepFavOnly] = useState(false)
   // Filtro "Comunes": repuestos de la lista curada COMPARTIDA (commonPartsByMachine
   // estática + marca `comunEn` del doc), la misma que se ve en la pestaña "Repuestos
@@ -376,21 +378,6 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   // Picker "marcar como común de [máquina]" (abierto desde el panel de detalle).
   const [comunPickerOpen, setComunPickerOpen] = useState(false)
   const [comunQuery, setComunQuery] = useState('')
-  useEffect(() => {
-    if (!user?.id) return
-    getRepuestoFavs(user.id).then((arr) => setFavKeys(new Set(arr))).catch(() => {})
-  }, [user?.id])
-  const toggleFav = useCallback((rowKey: string) => {
-    const uid = user?.id
-    if (!uid) return
-    setFavKeys((prev) => {
-      const next = new Set(prev)
-      if (next.has(rowKey)) next.delete(rowKey)
-      else next.add(rowKey)
-      saveRepuestoFavs(uid, [...next])
-      return next
-    })
-  }, [user?.id])
 
   // ── Listas de favoritos con nombre (globales por usuario, keyed por rowKey) ──
   const [favLists, setFavLists] = useState<RepuestoFavList[]>([])
