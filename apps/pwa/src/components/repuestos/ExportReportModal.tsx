@@ -7,6 +7,7 @@ import { FileText, ClipboardList, Factory } from 'lucide-react'
 import type { Repuesto } from '@/types/repuestos'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import * as repuestoExports from '@/utils/repuestos'
+import { unicosPorId } from '@/utils/repuestos/alcanceDeExportacion'
 import type { EquipoSap } from '@/utils/repuestos/exportBomSAP'
 import { rowKeyDeRepuesto } from '@/hooks/repuestos/identidadDeRepuesto'
 import { logger } from '@/lib/logger'
@@ -51,11 +52,6 @@ interface ExportReportModalProps {
  * eso es veneno: SAP rechaza la lista entera si un material se repite, y sin esto la 142
  * exportaba 1.428 posiciones en vez de 476.
  */
-const unicosPorId = <T extends { id: string }>(items: T[]): T[] => {
-  const vistos = new Set<string>()
-  return items.filter((r) => (vistos.has(r.id) ? false : (vistos.add(r.id), true)))
-}
-
 export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuestos, machineName = 'General', sapEquipo, sapEquipos, favKeys }: ExportReportModalProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [reportType, setReportType] = useState<ReportType>('catalog')
@@ -71,15 +67,27 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
   const sapDisponible = !!sapEquipo || sapMasivo
 
   useEffect(() => {
+    // Las dos ramas preseleccionan su alcance. Antes la de «todo el catálogo» lo dejaba
+    // vacío, así que el diálogo abría anunciando 6026 ítems y con «Exportar Selección (0)».
     if (isOpen && filteredRepuestos && filteredRepuestos.length < repuestos.length) {
         setFilterMode('filtered')
         setSelectedIds(new Set(filteredRepuestos.map(r => r.id)))
     } else if (isOpen) {
         setFilterMode('all')
-        setSelectedIds(new Set())
+        setSelectedIds(new Set(repuestos.map(r => r.id)))
     }
-  }, [isOpen, filteredRepuestos, repuestos.length])
+  }, [isOpen, filteredRepuestos, repuestos])
 
+
+  /**
+   * Los dos alcances, YA deduplicados. Antes los botones contaban la lista cruda: decían
+   * «Catálogo Completo (6026)» con el listado de al lado diciendo «Mostrando 150 de 2102»
+   * — casi 3x de diferencia, porque el catálogo trae una fila por cada equipo donde sirve
+   * el repuesto. Lo que se exporta son los únicos, así que el botón cuenta los únicos.
+   */
+  const catalogoUnico = useMemo(() => unicosPorId(repuestos), [repuestos])
+  const vistaUnica = useMemo(() => unicosPorId(filteredRepuestos ?? []), [filteredRepuestos])
+  const hayVistaAcotada = !!filteredRepuestos && filteredRepuestos.length < repuestos.length
 
   /** Los ítems que se pueden elegir: el mismo origen que alimentaba el árbol. */
   const itemsDelAlcance = useMemo(
@@ -163,6 +171,20 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
     return unicosPorId(repuestos.filter((r) => selectedIds.has(r.id) && favKeys.has(rowKeyDeRepuesto(r))))
   }, [favKeys, repuestos, selectedIds])
 
+  /**
+   * Los favoritos del usuario que este reporte NO puede alcanzar.
+   *
+   * El hub carga el catálogo por área, así que un favorito cuyo repuesto no quedó cargado
+   * —porque no está asignado a ningún equipo, o su equipo está en un área que no se abrió—
+   * simplemente no aparece, y el diálogo decía «Exportar 5 fichas» a alguien con 8 favoritos
+   * sin mencionar los 3 que faltaban. Un reporte que omite en silencio es peor que uno vacío:
+   * el que lo recibe cree que eso es todo lo que hay.
+   */
+  const favoritosFueraDeAlcance = useMemo(
+    () => Math.max(0, (favKeys?.size ?? 0) - favoritosSeleccionados.length),
+    [favKeys, favoritosSeleccionados.length],
+  )
+
   const sapPreview = useMemo(() => {
     if (reportType !== 'sap_bom') return null
     const selected = unicosPorId(repuestos.filter((r) => selectedIds.has(r.id)))
@@ -210,19 +232,19 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
                 <Button 
                     variant={filterMode === 'all' ? 'secondary' : 'ghost'} 
                     size="sm" 
-                    onClick={() => { setFilterMode('all'); setSelectedIds(new Set()) }}
+                    onClick={() => { setFilterMode('all'); setSelectedIds(new Set(repuestos.map(r => r.id))) }}
                     className="text-xs h-8"
                 >
-                    Catálogo Completo ({repuestos.length})
+                    Catálogo Completo ({catalogoUnico.length})
                 </Button>
-                {filteredRepuestos && filteredRepuestos.length < repuestos.length && (
+                {hayVistaAcotada && (
                     <Button 
                         variant={filterMode === 'filtered' ? 'secondary' : 'ghost'} 
                         size="sm" 
-                        onClick={() => { setFilterMode('filtered'); setSelectedIds(new Set(filteredRepuestos.map(r => r.id))) }}
+                        onClick={() => { setFilterMode('filtered'); setSelectedIds(new Set(filteredRepuestos!.map(r => r.id))) }}
                         className="text-xs h-8"
                     >
-                        Vista Actual ({filteredRepuestos.length})
+                        Vista Actual ({vistaUnica.length})
                     </Button>
                 )}
             </div>
@@ -347,6 +369,11 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
                                         <div className="font-semibold text-foreground">Fichas de mis favoritos</div>
                                         <div className="text-xs text-muted-foreground font-normal leading-relaxed">
                                             Una página por repuesto, con fotos y especificaciones. Solo tus favoritos: {favoritosSeleccionados.length} de los seleccionados.
+                                            {favoritosFueraDeAlcance > 0 && (
+                                                <span className="block mt-1 text-ink-warn">
+                                                    {favoritosFueraDeAlcance} {favoritosFueraDeAlcance === 1 ? 'favorito tuyo no está' : 'favoritos tuyos no están'} en este alcance y {favoritosFueraDeAlcance === 1 ? 'quedará' : 'quedarán'} fuera del reporte.
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
