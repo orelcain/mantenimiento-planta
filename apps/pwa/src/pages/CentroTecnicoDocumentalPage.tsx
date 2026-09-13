@@ -78,8 +78,7 @@ import {
   formatCosto,
   lineaDe,
   qrUrl,
-  seccionDe,
-} from '@/lib/ctd'
+  seccionDe, criticidadParaMostrar } from '@/lib/ctd'
 import type { Bucket, EstadoFiltro, OrdenCampo, OtCount } from '@/lib/ctd'
 import { FAMILIA_LABEL, checklistDe, familiaDe, medicionesDe } from '@/lib/nfpa70b'
 import type { CampoMedicion } from '@/lib/nfpa70b'
@@ -317,6 +316,9 @@ export function CentroTecnicoDocumentalPage() {
         'Tipo': e.tipo ?? '',
         'Favorito': favorites.has(e.id) ? 'Sí' : 'No',
         'Criticidad': CRIT[e.criticidad].nivel,
+        // Sin esta columna el handoff de auditoría afirma 553 equipos clasificados «B»
+        // cuando ese valor lo puso la importación y no lo evaluó nadie.
+        'Criticidad evaluada': criticidadEvaluada(e) ? 'Sí' : 'No',
         'Condición': e.fichaTecnica?.condicion ?? '',
         'Estado': ESTADO[e.estado].label,
         'Vida útil (años)': e.fichaTecnica?.vidaUtilAnios ?? '',
@@ -1938,7 +1940,7 @@ function ExpedienteDialog({
   onEditNote: (noteId: string, text: string) => void
   onDeleteNote: (noteId: string) => void
 }) {
-  const crit = CRIT[equipment.criticidad]
+  const crit = criticidadParaMostrar(equipment)
   const est = ESTADO[equipment.estado]
   const ubicacion = equipment.hierarchyPath || equipment.zoneId
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -2761,7 +2763,7 @@ function AgendaInspecciones({
               </div>
               <div className="divide-y border-t">
                 {items.map((e) => {
-                  const crit = CRIT[e.criticidad]
+                  const crit = criticidadParaMostrar(e)
                   const cond = e.fichaTecnica?.condicion
                   const dias = diasVencida(e.fichaTecnica?.proximaInspeccion)
                   const prox = e.fichaTecnica?.proximaInspeccion
@@ -2776,7 +2778,7 @@ function AgendaInspecciones({
                       }}
                       className="w-full flex items-center gap-3 px-4 py-2 text-left hover:bg-muted/40 cursor-pointer"
                     >
-                      <Badge variant="outline" className={`${crit.cls} text-xs`}>{crit.nivel}</Badge>
+                      <Badge variant="outline" className={`${crit.cls} text-xs`} title={crit.title}>{crit.nivel}</Badge>
                       <span className="w-6 text-center">{cond ? <CondDot cond={cond} /> : '—'}</span>
                       <span className="flex-1 min-w-0 truncate">
                         {e.nombre} <span className="text-caption text-muted-foreground font-mono">· {e.codigo}</span>
@@ -2817,7 +2819,7 @@ function CtdEquipoCard({
   onToggleFavorite: () => void
   onOpen: (tab: string) => void
 }) {
-  const crit = CRIT[e.criticidad]
+  const crit = criticidadParaMostrar(e)
   const est = ESTADO[e.estado]
   const cond = e.fichaTecnica?.condicion
   const pct = completitud(e)
@@ -2850,7 +2852,7 @@ function CtdEquipoCard({
         <div className="text-caption text-muted-foreground font-mono truncate">{e.codigo}</div>
         {e.nombreComun && <div className="text-caption text-muted-foreground truncate">“{e.nombreComun}”</div>}
         <div className="flex flex-wrap items-center gap-1.5">
-          <Badge variant="outline" className={`${crit.cls} text-xs`}>{crit.nivel}</Badge>
+          <Badge variant="outline" className={`${crit.cls} text-xs`} title={crit.title}>{crit.nivel}</Badge>
           {cond ? <CondDot cond={cond} /> : null}
           <Badge variant="outline" className={`${est.cls} text-xs`}>{est.label}</Badge>
           <OtBadge ot={ot} />
@@ -2881,7 +2883,7 @@ function CtdEquipoRow({
   onToggleFavorite: () => void
   onOpen: (tab: string) => void
 }) {
-  const crit = CRIT[e.criticidad]
+  const crit = criticidadParaMostrar(e)
   const est = ESTADO[e.estado]
   const cond = e.fichaTecnica?.condicion
   const pct = completitud(e)
@@ -2927,7 +2929,7 @@ function CtdEquipoRow({
         </div>
         {e.nombreComun && <div className="text-caption text-muted-foreground truncate">“{e.nombreComun}”</div>}
         <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs md:hidden">
-          <Badge variant="outline" className={`${crit.cls}`}>{crit.nivel}</Badge>
+          <Badge variant="outline" className={`${crit.cls}`} title={crit.title}>{crit.nivel}</Badge>
           {cond ? <CondDot cond={cond} /> : null}
           <Badge variant="outline" className={`${est.cls}`}>{est.label}</Badge>
           <OtBadge ot={ot} />
@@ -2945,7 +2947,7 @@ function CtdEquipoRow({
       </div>
 
       <div className="hidden md:flex items-center gap-3 shrink-0 text-sm">
-        <Badge variant="outline" className={`${crit.cls} text-xs`}>{crit.nivel}</Badge>
+        <Badge variant="outline" className={`${crit.cls} text-xs`} title={crit.title}>{crit.nivel}</Badge>
         <span className="w-6 text-center">{cond ? <CondDot cond={cond} /> : <span className="text-muted-foreground">—</span>}</span>
         <Badge variant="outline" className={`${est.cls} text-xs`}>{est.label}</Badge>
         <span className="w-12 text-right"><OtBadge ot={ot} /></span>

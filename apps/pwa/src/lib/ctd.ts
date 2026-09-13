@@ -225,3 +225,45 @@ export function contarOtPorEquipo(workOrders: WorkOrder[]): Map<string, OtCount>
   }
   return map
 }
+
+/**
+ * Cómo se PINTA la criticidad de un equipo — una sola definición.
+ *
+ * POR QUÉ EXISTE
+ * --------------
+ * `criticidad` la trae la importación con el valor por defecto `media`, así que los 553 equipos
+ * muestran **B**. `criticidadEvaluada` distingue eso de una evaluación real, y la ficha ya lo
+ * hacía: atenuaba la insignia y explicaba en el `title` que era el valor de importación.
+ *
+ * El LISTADO no. Pintaba la B con el color pleno en sus cuatro vistas (compacta, tarjeta, móvil
+ * y PC), mientras el KPI de la misma pantalla decía **«553 Criticidad sin evaluar»**. Las dos
+ * cosas no pueden ser ciertas, y el listado es la pantalla desde la que se decide.
+ *
+ * Importa más de lo que parece: de la criticidad sale el intervalo de inspección
+ * (A=180 · B=365 · C=1095 días). Si las 553 son «B» porque nadie las tocó, el plan entero de
+ * inspecciones se apoya en un valor que no evaluó nadie — y eso hay que poder verlo.
+ */
+export interface CriticidadParaMostrar {
+  /** A · B · C */
+  nivel: string
+  /** Clases de la insignia: color pleno si está evaluada, atenuado si viene de la importación. */
+  cls: string
+  /** Explicación cuando no está evaluada; `undefined` cuando sí lo está. */
+  title: string | undefined
+  evaluada: boolean
+}
+
+export function criticidadParaMostrar(
+  e: Pick<Equipment, 'criticidad' | 'criticidadEvaluadaEl'>,
+): CriticidadParaMostrar {
+  const base = CRIT[e.criticidad]
+  const evaluada = criticidadEvaluada(e)
+  return {
+    nivel: base.nivel,
+    cls: evaluada ? base.cls : 'border-border text-muted-foreground',
+    title: evaluada
+      ? undefined
+      : 'Es el valor con que se importó el equipo, no una evaluación. Se fija editando el equipo.',
+    evaluada,
+  }
+}
