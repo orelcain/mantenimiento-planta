@@ -21,6 +21,7 @@ import { getEquipments } from '@/services/equipment'
 import { getIncidents } from '@/services/incidents'
 import type { Equipment, Incident } from '@/types'
 import { logger } from '@/lib/logger'
+import { criticidadEvaluada } from '@/lib/ctd'
 
 type EquipmentNote = {
   id: string
@@ -270,8 +271,19 @@ export function PublicEquipmentView() {
                     <Badge className={STATUS_CONFIG[equipment.estado].className}>
                       {STATUS_CONFIG[equipment.estado].label}
                     </Badge>
-                    <Badge className={CRITICIDAD_CONFIG[equipment.criticidad].className}>
+                    {/*
+                      Esta es la pantalla que ve quien escanea el QR pegado en la máquina, y
+                      puede ser alguien de fuera. Decía «Criticidad: Media» a secas para los 553
+                      equipos, cuando ese valor lo trajo la importación y no lo evaluó nadie.
+                      El aviso va en TEXTO, no en un `title`: aquí no hay ratón que haga hover.
+                    */}
+                    <Badge
+                      className={criticidadEvaluada(equipment)
+                        ? CRITICIDAD_CONFIG[equipment.criticidad].className
+                        : 'bg-muted text-muted-foreground'}
+                    >
                       Criticidad: {CRITICIDAD_CONFIG[equipment.criticidad].label}
+                      {!criticidadEvaluada(equipment) && ' · sin evaluar'}
                     </Badge>
                   </div>
                 </CardHeader>
