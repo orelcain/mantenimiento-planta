@@ -83,8 +83,11 @@ async function addTechnicalSheetToDoc(
 
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
-  // Ajuste: si machineName es un ID largo (probable auto-ID), mostrar "Planta General" o similar
-  const displayName = (!machineName || machineName.length > 20) ? 'Planta General / Sin Asignar' : machineName;
+  // No se adivina por largo: quien llama manda el NOMBRE del equipo o no manda nada.
+  // Antes había un `machineName.length > 20` para tapar los auto-ID de Firestore, y fallaba
+  // justo con ellos — miden exactamente 20 — así que la ficha salía con
+  // «Equipo: 23kemhGhbN22YIwHd2VN» impreso en la cabecera.
+  const displayName = machineName?.trim() || 'Sin equipo asignado';
   doc.text(`Equipo: ${displayName}`, pageWidth / 2, yPos, { align: 'center' });
   yPos += 5;
   doc.text(`Fecha: ${new Date().toLocaleDateString('es-CL')}`, pageWidth / 2, yPos, { align: 'center' });

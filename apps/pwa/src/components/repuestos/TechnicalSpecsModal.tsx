@@ -66,7 +66,11 @@ interface TechnicalSpecsModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   repuesto: Repuesto | null
-  machineId?: string
+  /**
+   * Nombre del equipo para la cabecera del PDF. Antes llegaba el `machineId` y se imprimía
+   * crudo: un auto-ID de Firestore no le dice nada a quien recibe la ficha.
+   */
+  machineName?: string
   initialTab?: 'specs' | 'gallery' // kept for backward compat, ignored
   readOnly?: boolean
   onSave?: (repuestoId: string, specs: TechnicalSpecs, gallery: MachineImage[]) => Promise<void>
@@ -78,7 +82,7 @@ export function TechnicalSpecsModal({
   open,
   onOpenChange,
   repuesto,
-  machineId,
+  machineName,
   readOnly = false,
   onSave,
 }: TechnicalSpecsModalProps) {
@@ -157,7 +161,7 @@ export function TechnicalSpecsModal({
     if (!repuesto) return
     setExporting(true)
     try {
-      await exportTechnicalSheetToPDF({ ...repuesto, technicalSpecs: specs }, machineId)
+      await exportTechnicalSheetToPDF({ ...repuesto, technicalSpecs: specs }, machineName)
       toast({ title: 'PDF Exportado', description: 'La ficha técnica se ha descargado.' })
     } catch (err) {
       logger.error('Error al exportar PDF de ficha técnica', err instanceof Error ? err : new Error(String(err)))
