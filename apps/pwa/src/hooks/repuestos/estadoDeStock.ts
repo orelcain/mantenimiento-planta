@@ -45,3 +45,34 @@ export function contarPorEstado(items: readonly ItemConStock[]): ConteoDeStock {
   for (const item of items) conteo[stockStatusOf(item)] += 1
   return conteo
 }
+
+/**
+ * Una ALERTA de stock: un ítem con mínimo definido cuyo stock cayó al mínimo o por debajo.
+ *
+ * POR QUÉ NO ES `low + out`
+ * -------------------------
+ * Porque `out` incluye los ítems en cero que **nadie configuró**: no son una alerta, son un
+ * pendiente de configuración. Nadie declaró cuántas unidades deben existir, así que cero no
+ * es «se acabó», es «no sabemos».
+ *
+ * La divergencia estaba viva en la misma pantalla de Bodega, a 300 px de distancia:
+ *
+ *     badge rojo de la pestaña «Stock»   585   (bajoStock + sinStock)
+ *     banda de alertas                    61   («21 sin stock · 40 bajo mínimo»)
+ *                                              «+524 en cero sin mínimo definido»
+ *
+ * La banda ya llevaba un comentario explicando la diferencia — la habían encontrado y
+ * arreglado ahí, pero el badge de la pestaña se quedó con la cuenta vieja y gritaba en rojo
+ * casi 10 veces la urgencia real. Es el mismo defecto de siempre del módulo: dos expresiones
+ * para lo mismo y una se queda atrás. Acá vive la única.
+ */
+export function esAlertaDeStock(item: ItemConStock): boolean {
+  return item.stockMinimo > 0 && item.stockActual <= item.stockMinimo
+}
+
+/** Cuenta las alertas con el MISMO predicado que las lista. */
+export function contarAlertas(items: readonly ItemConStock[]): number {
+  let n = 0
+  for (const item of items) if (esAlertaDeStock(item)) n++
+  return n
+}

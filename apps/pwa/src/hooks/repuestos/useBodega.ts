@@ -31,7 +31,7 @@ import {
 } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import { logger } from '@/lib/logger'
-import { contarPorEstado } from '@/hooks/repuestos/estadoDeStock'
+import { contarPorEstado, esAlertaDeStock } from '@/hooks/repuestos/estadoDeStock'
 import { uploadBodegaPhoto, deleteBodegaPhoto } from '@/services/storage'
 import type { GlobalSearchResult } from '@/hooks/repuestos/useGlobalSearch'
 import type { MaterialClase } from '@/types/repuestos'
@@ -839,8 +839,11 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
         .sort((a, b) => b.valorInventario - a.valorInventario)
         .slice(0, 10),
       // Ítems bajo stock (para alertas)
+      // `esAlertaDeStock` y no `low + out`: los ítems en cero SIN mínimo definido no son
+      // una alerta sino un pendiente de configuración. El badge de la pestaña los contaba
+      // y gritaba 585 donde lo accionable eran 61.
       alertas: conStock
-        .filter(i => i.stockMinimo > 0 && i.stockActual <= i.stockMinimo)
+        .filter(esAlertaDeStock)
         .sort((a, b) => (a.stockActual / (a.stockMinimo || 1)) - (b.stockActual / (b.stockMinimo || 1))),
     }
   }, [items])
