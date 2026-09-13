@@ -46,6 +46,8 @@ interface RepuestoFormModalProps {
   transversal?: boolean
   /** Clase inicial al crear (transversal → 'insumo'; equipo-bound → 'repuesto'). */
   defaultClase?: MaterialClase
+  /** Tipos que ya existen en el catálogo, para sugerir sin cerrar la lista. */
+  tiposConocidos?: string[]
   /** Detecta si ya existe un material con el SAP o nombre tecleado (aviso de duplicado). */
   onCheckDuplicate?: (args: { codigoSAP: string; textoBreve: string }) => { id: string; textoBreve: string; codigoSAP: string } | null
   /** Cambiar el equipo/destino (reabre el picker). Muestra el enlace "Cambiar". */
@@ -63,6 +65,7 @@ const defaultForm: RepuestoFormData = {
   clase: 'repuesto',
   valorUnitario: 0,
   cantidadPorMaquina: 0,
+  tipo: '',
   ubicacionEnPlanta: '',
   observaciones: '',
   stockInicial: 0,
@@ -83,6 +86,7 @@ export function RepuestoFormModal({
   equipmentName,
   transversal = false,
   defaultClase,
+  tiposConocidos = [],
   onCheckDuplicate,
   onChangeTarget,
   loading = false,
@@ -111,6 +115,7 @@ export function RepuestoFormModal({
           clase: initialData.clase || 'repuesto',
           valorUnitario: initialData.valorUnitario || 0,
           cantidadPorMaquina: initialData.cantidadPorMaquina || 0,
+          tipo: initialData.tipo || '',
           ubicacionEnPlanta: initialData.ubicacionEnPlanta || '',
           observaciones: initialData.observaciones || '',
         })
@@ -133,6 +138,9 @@ export function RepuestoFormModal({
         clase: form.clase || (transversal ? 'insumo' : 'repuesto'),
         valorUnitario: Number(form.valorUnitario) || 0,
         cantidadPorMaquina: Number(form.cantidadPorMaquina) || 0,
+        // Cadena vacía, NUNCA undefined: este Firestore no tiene `ignoreUndefinedProperties`
+        // y un undefined en el payload hace fallar el updateDoc ENTERO (no solo el tipo).
+        tipo: (form.tipo || '').trim(),
         ubicacionEnPlanta: form.ubicacionEnPlanta?.trim() || '',
         observaciones: form.observaciones?.trim() || '',
         stockInicial: Number(form.stockInicial) || 0,
@@ -300,6 +308,26 @@ export function RepuestoFormModal({
                 />
               </div>
             )}
+            {/*
+              Tipo = familia de la pieza (colorea el badge de la tabla y alimenta el filtro
+              «Todos los tipos»). Texto libre con sugerencias: hay 66 valores en uso, 3.117 de
+              7.673 repuestos sin ninguno, y la lista no está cerrada — un <select> dejaría
+              fuera la familia que todavía no existe. El datalist ofrece las que ya existen
+              para no crear variantes distintas de lo mismo.
+            */}
+            <div className="space-y-2">
+              <Label htmlFor="tipoRepuesto">Tipo</Label>
+              <Input
+                id="tipoRepuesto"
+                list="tipos-de-repuesto"
+                value={form.tipo ?? ''}
+                onChange={(e) => setForm({ ...form, tipo: e.target.value })}
+                placeholder="RODAMIENTO, SELLO/JUNTA, TORNILLERÍA…"
+              />
+              <datalist id="tipos-de-repuesto">
+                {tiposConocidos.map((t) => <option key={t} value={t} />)}
+              </datalist>
+            </div>
           </div>
 
           {!transversal && (

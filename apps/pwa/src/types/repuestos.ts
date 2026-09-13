@@ -268,6 +268,12 @@ export interface RepuestoFormData {
   valorUnitario: number;
   /** Cuántas unidades de este repuesto usa la máquina */
   cantidadPorMaquina: number;
+  /**
+   * Familia de la pieza (RODAMIENTO, SELLO/JUNTA, TORNILLERÍA…). Colorea el badge de la tabla
+   * y alimenta el filtro «Todos los tipos». Texto libre a propósito: hay 66 valores en uso y la
+   * lista no está cerrada; el formulario ofrece los que ya existen y deja escribir otro.
+   */
+  tipo?: string;
   /** Dónde se encuentra/usa dentro de la máquina */
   ubicacionEnPlanta?: string;
   /** Observaciones o notas adicionales */
