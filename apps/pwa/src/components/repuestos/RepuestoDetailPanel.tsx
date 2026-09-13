@@ -17,6 +17,7 @@ import { useManualesDeEquipos } from '@/hooks/repuestos/useManualesDeEquipos'
 import { CLASE_LABEL } from '@/types/repuestos'
 import type { AreaRepuestoRow } from '@/hooks/repuestos/useAreaRepuestos'
 import type { MovimientoBodega } from '@/hooks/repuestos/useBodega'
+import { AREA_TACTIL, AREA_TACTIL_COMPACTA } from '@/lib/areaTactil'
 
 export interface UbicacionEstructurada { pasillo?: string; estante?: string; nivel?: string }
 
@@ -320,14 +321,16 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
           {onToggleFavorite && (
             <button
               onClick={onToggleFavorite}
-              className={['rounded-ctl p-1 transition', isFavorite ? 'text-amber-400' : 'text-muted-foreground hover:text-amber-400'].join(' ')}
+              /* 44x44 REALES, sin margen negativo: entre este botón y «Cerrar» solo hay 4 px
+                 medidos, así que invadir hacia los lados haría que tocar uno active el otro. */
+              className={[AREA_TACTIL, 'rounded-ctl transition', isFavorite ? 'text-amber-400' : 'text-muted-foreground hover:text-amber-400'].join(' ')}
               title={isFavorite ? 'Quitar de favoritos' : 'Agregar a favoritos'}
               aria-label="Favorito"
             >
               <Star className={['h-4 w-4', isFavorite ? 'fill-current' : ''].join(' ')} />
             </button>
           )}
-          <button onClick={onClose} className="rounded-ctl p-1 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Cerrar">
+          <button onClick={onClose} className={`${AREA_TACTIL} rounded-ctl text-muted-foreground hover:bg-muted hover:text-foreground`} aria-label="Cerrar">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -369,7 +372,9 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
             <span className="inline-flex items-center gap-1">
               <span className="text-caption tracking-wide text-muted-foreground">SAP</span>
               <span className="font-mono text-sm text-foreground">{sap}</span>
-              <button onClick={copySap} className="rounded-ctl p-0.5 text-muted-foreground hover:text-primary" title="Copiar SAP">
+              {/* Era 18×18: el target más chico de la pantalla y la acción que más se usa en
+                  planta. Crece hacia afuera — medidos 61 px libres arriba y 13 abajo. */}
+              <button onClick={copySap} className={`${AREA_TACTIL_COMPACTA} rounded-ctl text-muted-foreground hover:text-primary`} title="Copiar SAP" aria-label="Copiar código SAP">
                 {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
               </button>
             </span>
@@ -476,7 +481,9 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
                 <div className="px-2 text-caption text-muted-foreground">y {familiasEquipos.length - 6} familias más…</div>
               )}
               {onAssignEquipo && (
-                <button onClick={onAssignEquipo} className="mt-0.5 inline-flex items-center gap-1 px-1 text-caption text-primary hover:underline">
+                /* 15 px de alto. Sube a 44 sin estirar la lista: medidos 65 px libres arriba
+                   y 86 abajo, así que el área crece hacia afuera sin pisar nada. */
+                <button onClick={onAssignEquipo} className={`${AREA_TACTIL_COMPACTA} mt-0.5 inline-flex items-center gap-1 px-1 text-caption text-primary hover:underline`}>
                   <Plus className="h-3 w-3" /> Agregar equipo
                 </button>
               )}
