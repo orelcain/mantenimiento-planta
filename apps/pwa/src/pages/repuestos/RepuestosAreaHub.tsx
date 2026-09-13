@@ -49,6 +49,7 @@ import { normalizeForSearch, haystackMatchesAll, deriveCentro } from '@/utils/re
 import type { EquipoSap } from '@/utils/repuestos/exportBomSAP'
 import { InlineEditName } from '@/components/repuestos/InlineEditName'
 import { CLASE_LABEL, type MaterialClase, type Machine, type Repuesto, type RepuestoFormData, type TechnicalSpecs, type MachineImage } from '@/types/repuestos'
+import { AREA_TACTIL_COMPACTA, AREA_TACTIL_EN_TARJETA } from '@/lib/areaTactil'
 
 // Fase 4 normalización (2026-06): el hub lee/escribe la colección plana `repuestos`
 // (equipos:[nodeIds]). Quedan para Fase 5: reubicar/importar/duplicados/manuales de
@@ -2062,7 +2063,11 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                                 {r.codigoSAP && (
                                   <button
                                     onClick={(e) => { e.stopPropagation(); copySapFromRow(r.rowKey, r.codigoSAP) }}
-                                    className="inline-flex items-center gap-0.5 font-mono text-muted-foreground active:text-primary"
+                                    /* 15 px de alto. Sube a 32, no a 44: este botón vive DENTRO
+                                       de la tarjeta y llevarlo a 44 se comería casi la mitad —
+                                       el tap de «abrir la ficha» pasaría a ser «copiar». El
+                                       botón bueno de copiar está en el panel. */
+                                    className={`${AREA_TACTIL_EN_TARJETA} inline-flex items-center gap-0.5 font-mono text-muted-foreground active:text-primary`}
                                     aria-label="Copiar código SAP"
                                   >
                                     {r.codigoSAP}
@@ -2120,7 +2125,11 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                             <td className="px-3 py-2">
                               <button
                                 onClick={(e) => { e.stopPropagation(); toggleFav(r.rowKey) }}
-                                className={['rounded-ctl p-0.5 transition', favKeys.has(r.rowKey) ? 'text-ink-warn' : 'text-muted-foreground/30 hover:text-amber-400'].join(' ')}
+                                /* Era 20×20. Holgura medida a su alrededor: 104 arriba, 32
+                                   abajo, 47 a cada lado — el área de 44 crece sin tocar la
+                                   fila vecina (marcar el favorito de otra pieza sin querer
+                                   ya pasó una vez). */
+                                className={[AREA_TACTIL_COMPACTA, 'rounded-ctl transition', favKeys.has(r.rowKey) ? 'text-ink-warn' : 'text-muted-foreground/30 hover:text-amber-400'].join(' ')}
                                 title={favKeys.has(r.rowKey) ? 'Quitar de favoritos' : 'Agregar a favoritos'}
                                 aria-label="Favorito"
                               >
