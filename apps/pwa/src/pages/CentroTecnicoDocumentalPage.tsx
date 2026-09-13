@@ -41,6 +41,7 @@ import type { AreaNode } from '@/services/hierarchyMove'
 import { createWorkOrder, getWorkOrders, updateWorkOrder } from '@/services/workOrders'
 import { descargarPlantillaPlaca, importarPlacaExcel } from '@/services/equipmentFichaExcel'
 import { generarReporteEquipo } from '@/services/equipmentReportPdf'
+import { qrComoPng } from '@/utils/pdf/qrDataUrl'
 import { useAuthStore } from '@/store'
 import { rowKeyDeRepuesto } from '@/hooks/repuestos/identidadDeRepuesto'
 import { useRepuestoFavoritos } from '@/hooks/repuestos/useRepuestoFavoritos'
@@ -55,9 +56,9 @@ import { CondDot } from '@/components/equipment/CondDot'
 import { TableroExpediente } from '@/components/equipment/TableroExpediente'
 import { PhotoAnnotationEditor } from '@/components/PhotoAnnotationEditor'
 import { useManualesDeEquipos } from '@/hooks/repuestos/useManualesDeEquipos'
-import { useRepuestosDeEquipo } from '@/hooks/repuestos/useRepuestosDeEquipo'
+import { useRepuestosDeEquipo, leerRepuestosDeEquipo } from '@/hooks/repuestos/useRepuestosDeEquipo'
 import { particionarRepuestosDeEquipo, filtrarRepuestosDeEquipo, opcionesBomDesdeEquipo } from '@/services/repuestos/bomDeEquipo'
-import { buildBomIB01, exportBomIB01ToExcel } from '@/utils/repuestos/exportBomSAP'
+import { buildBomIB01, exportBomIB01ToExcel, toUnidadSAP } from '@/utils/repuestos/exportBomSAP'
 import { ubicacionCorta } from '@/services/equipos/ubicacionCorta'
 import { cn } from '@/lib/utils'
 import { logger } from '@/lib/logger'
@@ -1944,6 +1945,37 @@ function ExpedienteDialog({
   const est = ESTADO[equipment.estado]
   const ubicacion = equipment.hierarchyPath || equipment.zoneId
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [generandoPdf, setGenerandoPdf] = useState(false)
+  /**
+   * El PDF lee la lista de materiales AL PULSAR, no al abrir el expediente.
+   *
+   * Llamar al hook acá hacía que abrir una Baader leyera sus 1.803 documentos DOS veces —una
+   * para la pestaña de materiales y otra por si alguien exportaba—. Este proyecto tiene techo
+   * de costos en GCP: una consulta que casi nadie usa no se paga en cada apertura.
+   */
+  async function exportarExpediente() {
+    setGenerandoPdf(true)
+    try {
+      const nodeId = equipment.hierarchyNodeId
+      const repuestos = nodeId ? await leerRepuestosDeEquipo(nodeId) : []
+      const materiales = particionarRepuestosDeEquipo(repuestos).bom.map((r) => ({
+        codigoSAP: r.codigoSAP,
+        textoBreve: r.doc.textoBreve || r.nombre,
+        cantidad: r.cantidadPorMaquina,
+        // `toUnidadSAP` es la MISMA conversión que usa el export IB01: así la UM del PDF y la
+        // del Excel que se carga en SAP no pueden decir cosas distintas.
+        unidad: toUnidadSAP(r.doc.unidad),
+      }))
+      generarReporteEquipo(equipment, incidents, log, {
+        materiales,
+        qrDataUrl: qrComoPng(qrUrl(equipment.id)),
+      })
+    } catch (e) {
+      logger.error('Error generando el PDF del expediente', e instanceof Error ? e : new Error(String(e)))
+    } finally {
+      setGenerandoPdf(false)
+    }
+  }
 
   // Ciclo de vida + confiabilidad (datos ya existentes)
   const edad = aniosDesde(equipment.fechaInstalacion)
@@ -2113,8 +2145,8 @@ function ExpedienteDialog({
               </div>
             </div>
             <div className="flex items-center gap-1 shrink-0">
-              <Button variant="outline" size="sm" onClick={() => generarReporteEquipo(equipment, incidents, log)}>
-                <Download className="h-3.5 w-3.5 mr-1.5" /> PDF
+              <Button variant="outline" size="sm" onClick={exportarExpediente} disabled={generandoPdf}>
+                <Download className="h-3.5 w-3.5 mr-1.5" /> {generandoPdf ? 'Armando…' : 'PDF'}
               </Button>
               {canEdit && (
                 <Button variant="outline" size="sm" onClick={onEdit}>
