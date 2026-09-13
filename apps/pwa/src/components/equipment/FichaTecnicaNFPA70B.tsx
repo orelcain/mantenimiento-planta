@@ -9,7 +9,7 @@ import {
   getMaintenanceLog,
   updateMaintenanceLogEntry,
 } from '@/services/maintenanceLog'
-import { criticidadEvaluada } from '@/lib/ctd'
+import { criticidadEvaluada, criticidadParaMostrar } from '@/lib/ctd'
 import { usePermissions } from '@/hooks/usePermissions'
 import { useAppStore } from '@/store'
 import { logger } from '@/lib/logger'
@@ -199,6 +199,9 @@ export function FichaTecnicaNFPA70B({
   }, [equipment.id, equipment.fichaTecnica])
 
   const crit = CRITICIDAD[equipment.criticidad]
+  // Color y aviso salen de la definición compartida; el `label` sigue siendo el de
+  // la tabla local de este componente (dice «Crítica/Media/Baja», no «A · Alta»).
+  const critVis = criticidadParaMostrar(equipment)
   const fechaInstalacion = equipment.fechaInstalacion
     ? new Date(equipment.fechaInstalacion).toLocaleDateString()
     : undefined
@@ -492,13 +495,10 @@ export function FichaTecnicaNFPA70B({
             Criticidad · RCM
           </SectionTitle>
           <div className="flex items-center gap-3 flex-wrap">
-            <Badge
-              variant="outline"
-              className={`${criticidadEvaluada(equipment) ? crit.cls : 'border-border text-muted-foreground'} text-sm`}
-              title={criticidadEvaluada(equipment)
-                ? undefined
-                : 'Es el valor con que se importó el equipo, no una evaluación. Se fija editando el equipo.'}
-            >
+            {/* Color y explicación salen de `criticidadParaMostrar`: el listado pintaba la
+                misma insignia con el color pleno mientras el KPI de su pantalla decía «553 sin
+                evaluar». Mientras los dos deriven de acá, no pueden volver a contradecirse. */}
+            <Badge variant="outline" className={`${critVis.cls} text-sm`} title={critVis.title}>
               Criticidad {crit.nivel} · {crit.label}
             </Badge>
             {!criticidadEvaluada(equipment) && (
