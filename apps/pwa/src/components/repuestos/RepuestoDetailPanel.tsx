@@ -69,16 +69,48 @@ interface RepuestoDetailPanelProps {
   onRemoveComun?: (slug: string) => void
 }
 
-/** Botón de acción compacto del panel (icono + etiqueta). */
-function ActionBtn({ icon: Icon, label, onClick, danger }: { icon: typeof FileText; label: string; onClick: () => void; danger?: boolean }) {
+/**
+ * Botón de acción compacto del panel (icono + etiqueta).
+ *
+ * `contenido` dice si detrás HAY algo. Sin eso los tres botones de consulta se veían idénticos
+ * tuvieran o no contenido, y con la cobertura real del catálogo (ficha 0,1 %, foto 1,0 %,
+ * manual 0,04 % — medido el 13-09 sobre 7.673 documentos) eso significa que casi todos los
+ * clics caen en un formulario vacío y las pocas piezas documentadas no se distinguen.
+ *
+ * Nunca se deshabilita: el botón vacío es justamente la puerta para CARGAR lo que falta.
+ * Se atenúa, que es distinto — informa sin cerrar el paso.
+ */
+function ActionBtn({ icon: Icon, label, onClick, danger, contenido }: {
+  icon: typeof FileText
+  label: string
+  onClick: () => void
+  danger?: boolean
+  /** `undefined` = este botón no lleva señal · `0`/`false` = vacío · nº o `true` = tiene. */
+  contenido?: number | boolean
+}) {
+  const senal = contenido !== undefined
+  const tiene = typeof contenido === 'number' ? contenido > 0 : !!contenido
+  const cuantos = typeof contenido === 'number' && contenido > 1 ? contenido : null
   return (
     <button
       onClick={onClick}
+      title={senal ? (tiene ? `${label}: hay contenido cargado` : `${label}: sin contenido — pulsa para cargarlo`) : undefined}
       className={[
-        'flex flex-col items-center gap-1 rounded-card border border-border bg-card px-2 py-2 text-caption font-medium transition',
-        danger ? 'text-red-500 hover:bg-red-500/[0.15] hover:border-red-500/[0.25]' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+        'relative flex flex-col items-center gap-1 rounded-card border bg-card px-2 py-2 text-caption font-medium transition',
+        danger
+          ? 'border-border text-red-500 hover:bg-red-500/[0.15] hover:border-red-500/[0.25]'
+          : senal && tiene
+            ? 'border-primary/[0.35] text-foreground hover:bg-muted'
+            : senal
+              ? 'border-border/[0.6] text-muted-foreground/[0.7] hover:bg-muted hover:text-foreground'
+              : 'border-border text-muted-foreground hover:bg-muted hover:text-foreground',
       ].join(' ')}
     >
+      {senal && tiene && (
+        <span className="absolute right-1 top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold leading-none text-primary-foreground">
+          {cuantos ?? '✓'}
+        </span>
+      )}
       <Icon className="h-4 w-4" />
       {label}
     </button>
@@ -388,9 +420,22 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
         {/* Acciones de consulta (todos los usuarios) */}
         {(onSpecs || onPhotos || onManual) && (
           <div className="mb-3 grid grid-cols-3 gap-1.5">
-            {onSpecs && <ActionBtn icon={FileText} label="Ficha" onClick={onSpecs} />}
-            {onPhotos && <ActionBtn icon={ImageIcon} label="Fotos" onClick={onPhotos} />}
-            {onManual && <ActionBtn icon={BookOpen} label="Manual" onClick={onManual} />}
+            {onSpecs && <ActionBtn icon={FileText} label="Ficha" onClick={onSpecs} contenido={!!item.tieneFicha} />}
+            {onPhotos && <ActionBtn icon={ImageIcon} label="Fotos" onClick={onPhotos} contenido={(item.fotos?.length ?? 0) + (item.fotosCatalogo?.length ?? 0)} />}
+            {/*
+              El modal de manual muestra los vínculos PROPIOS del repuesto Y los HEREDADOS de
+              sus equipos, así que la señal tiene que sumar los dos: contar solo los propios
+              habría dejado en gris un botón que abre el manual del KNURO. Mientras carga no se
+              afirma nada (`undefined` = sin señal), para no decir «vacío» antes de saberlo.
+            */}
+            {onManual && (
+              <ActionBtn
+                icon={BookOpen}
+                label="Manual"
+                onClick={onManual}
+                contenido={manualesLoading ? undefined : (item.manuales ?? 0) + manualesHeredados.length}
+              />
+            )}
           </div>
         )}
 

@@ -14,6 +14,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { rowKeyDeRepuesto } from './identidadDeRepuesto'
+import { documentacionDe, fusionarDocumentacion } from './documentacionDeRepuesto'
 import {
   collection,
   collectionGroup,
@@ -122,6 +123,10 @@ export interface BodegaMergedItem {
    *  Complementan `fotos` (overlay de bodega) para mostrar el repuesto aunque
    *  bodega no tenga foto propia. */
   fotosCatalogo?: string[]
+  /** ¿Tiene ficha técnica CON CONTENIDO? Alimenta el badge del botón «Ficha». */
+  tieneFicha?: boolean
+  /** Cuántos manuales/documentos vinculados tiene. */
+  manuales?: number
   isWatched?: boolean
 }
 
@@ -367,11 +372,6 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
   const allItems = useMemo((): BodegaMergedItem[] => {
     const byKey = new Map<string, BodegaMergedItem>()
 
-    // Fotos del doc de catálogo, priorizando foto real sobre captura del manual.
-    const catalogPhotosOf = (rep: GlobalSearchResult['repuesto']): string[] =>
-      [...(rep.fotosReales || []), ...(rep.imagenesManual || []), ...(rep.gallery || [])]
-        .map(i => i.url)
-        .filter(Boolean)
 
     for (const r of catalogRepuestos) {
       const rep = r.repuesto
@@ -387,15 +387,21 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
         if (!existing.equipos.find(e => e.machineId === r.machineId)) {
           existing.equipos.push({ machineId: r.machineId, machineName: r.machineName })
         }
-        // Si el doc ya fusionado no aportó fotos, tomar las de este duplicado.
-        if (!existing.fotosCatalogo?.length) {
-          const dupPhotos = catalogPhotosOf(rep)
-          if (dupPhotos.length) existing.fotosCatalogo = dupPhotos
-        }
+        // Rescatar del duplicado lo que el doc ya fusionado no aportó. Antes solo se
+        // miraban las fotos: una ficha que viviera en el SEGUNDO documento del mismo SAP
+        // se perdía por el orden de llegada (`3300138387` tiene dos documentos).
+        const doc = fusionarDocumentacion(
+          { fotos: existing.fotosCatalogo ?? [], tieneFicha: !!existing.tieneFicha, manuales: existing.manuales ?? 0 },
+          documentacionDe(rep),
+        )
+        existing.fotosCatalogo = doc.fotos.length ? doc.fotos : undefined
+        existing.tieneFicha = doc.tieneFicha
+        existing.manuales = doc.manuales
         continue
       }
 
       const overlay = sap ? bodegaOverlays.get(sap) : undefined
+      const doc = documentacionDe(rep)
       byKey.set(key, {
         rowKey: key,
         codigoSAP: sap,
@@ -434,7 +440,9 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
         ultimoConteoAt: overlay?.ultimoConteoAt,
         ultimoConteoPor: overlay?.ultimoConteoPor,
         fotos: overlay?.fotos,
-        fotosCatalogo: (() => { const p = catalogPhotosOf(rep); return p.length ? p : undefined })(),
+        fotosCatalogo: doc.fotos.length ? doc.fotos : undefined,
+        tieneFicha: doc.tieneFicha,
+        manuales: doc.manuales,
         isWatched: sap ? watchlist.has(sap) : false,
       })
     }
