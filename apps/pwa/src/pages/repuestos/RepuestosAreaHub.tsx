@@ -37,6 +37,7 @@ import { useBodega } from '@/hooks/repuestos/useBodega'
 import { useAreaRepuestos, type StockStatus, type AreaRepuestoRow } from '@/hooks/repuestos/useAreaRepuestos'
 import { useHierarchyPaths } from '@/hooks/repuestos/useHierarchyPaths'
 import { claveDeEquipo, opcionesDeEquipo } from '@/hooks/repuestos/dondeSeUsa'
+import { areaContenedora, conteosConfiables } from '@/hooks/repuestos/alcanceDeAreas'
 import { useManualesDeEquipos } from '@/hooks/repuestos/useManualesDeEquipos'
 import { getRepuestoFavListsGlobal, saveRepuestoFavListsGlobal, getUserPreferences, saveFavoriteLists, type RepuestoFavList, type FavList } from '@/services/userPreferences'
 import { useRepuestoCrud } from '@/hooks/repuestos/useRepuestoCrud'
@@ -155,6 +156,15 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eqLoading])
 
+  // nodeId de equipo → parentId. 456 de 648 equipos cuelgan de OTRO equipo: sin esto, elegir un
+  // subequipo guardaba al equipo padre como «área» (ver alcanceDeAreas).
+  const padreDeEquipo = useMemo(() => {
+    const m = new Map<string, string | null>()
+    for (const e of (getGlobalEquipmentCache() || [])) m.set(e.id, e.parentId ?? null)
+    return m
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eqLoading])
+
   // Nombre amigable por machineId/equipId (para los chips de favoritos de equipos):
   // alias o nombre del equipo desde el cache, igual que EquipmentNavigator.
   const equipNameMap = useMemo(() => {
@@ -189,7 +199,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eqLoading])
 
-  const { allRepuestos, loadAll, loadArea, loaded: repuestosLoaded, loading: repuestosLoading } = useGlobalSearch(machines)
+  const { allRepuestos, loadAll, loadArea, loaded: repuestosLoaded, loading: repuestosLoading, catalogoCompleto, areasCargadas } = useGlobalSearch(machines)
   // allItems = TODOS los repuestos del área (con y sin SAP); el stock se engancha si hay SAP.
   const { allItems: bodegaItems, loading: bodegaLoading, loadMovimientos, saveStock, registrarMovimiento, registrarConteoRapido } = useBodega(allRepuestos)
 
@@ -211,12 +221,19 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   // completo, que además deja tibio el caché para cualquier área futura.
   useEffect(() => {
     if (!machines.length) return
+    // Un id guardado que es un EQUIPO (lo dejaba el buscador de la barra) se corrige a su área
+    // antes de consultar: si no, se bajaban los ~2.000 docs de una Baader con «Selecciona un área».
+    const area = areaContenedora(selectedAreaId, padreDeEquipo)
+    if (selectedAreaId && area !== selectedAreaId) {
+      setSelectedAreaId(area)
+      return
+    }
     if (showingAll || !selectedAreaId) {
       loadAll()
     } else {
       loadArea(selectedAreaId)
     }
-  }, [machines, showingAll, selectedAreaId, loadAll, loadArea])
+  }, [machines, showingAll, selectedAreaId, loadAll, loadArea, padreDeEquipo])
   const [openNodes, setOpenNodes] = useState<Record<string, boolean>>(() => {
     try { const s = localStorage.getItem('repuestos-open-nodes'); return s ? (JSON.parse(s) as Record<string, boolean>) : {} } catch { return {} }
   })
@@ -527,7 +544,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     const e = eq.find((x) => (x.linkedMachineId || x.id) === favKey) || eq.find((x) => x.id === favKey)
     // areaIdHint: el área que el sidebar ya conoce (no depende del cache). Si no
     // viene (chips de favoritos), se deriva del cache de equipos.
-    const areaId = areaIdHint || e?.parentId || (e?.path && e.path.length ? e.path[e.path.length - 1] : null)
+    const areaId = areaContenedora(areaIdHint || e?.parentId || (e?.path && e.path.length ? e.path[e.path.length - 1] : null), padreDeEquipo)
     if (areaId) {
       setSelectedAreaId(areaId)
       setShowingAll(false)
@@ -552,7 +569,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     setSelectedEquipName(displayName || (e as { alias?: string } | undefined)?.alias || e?.nombre || (m ? m.nombre : favKey))
     setSelectedRowKey(null)
     setSidebarMobileOpen(false)
-  }, [machines, getNodePath])
+  }, [machines, getNodePath, padreDeEquipo])
   useEffect(() => {
     if (isAdmin) getTrashCount().then(setTrashCount).catch(() => {})
   }, [isAdmin, trashOpen])
@@ -579,7 +596,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   // Conteo de repuestos por nodeId (badge "N rep" del sidebar). Una pasada sobre
   // los items: cada repuesto cuenta en todas las áreas ancestras de sus equipos
   // (misma lógica que machineInArea → coincide con areaRepuestos.length del área).
-  const repCountByNode = useMemo(() => {
+  const repCountTodos = useMemo(() => {
     const out: Record<string, number> = {}
     for (const it of bodegaItems) {
       const nodes = new Set<string>()
@@ -591,6 +608,12 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     }
     return out
   }, [bodegaItems, machineAreas])
+  // Solo los nodos cuyos repuestos están TODOS en memoria: el hub carga el área guardada, no el
+  // catálogo, y contar las demás con eso daba «PLANTA CHONCHI · 1961» siendo 4.409.
+  const repCountByNode = useMemo(
+    () => conteosConfiables(repCountTodos, catalogoCompleto, areasCargadas, isUnder),
+    [repCountTodos, catalogoCompleto, areasCargadas, isUnder],
+  )
 
   const selectedNode = useMemo(
     () => (selectedAreaId ? findNode(selectedAreaId) : null),
