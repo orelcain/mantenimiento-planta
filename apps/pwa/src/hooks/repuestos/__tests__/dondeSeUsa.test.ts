@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { agruparDondeSeUsa, totalDondeSeUsa, plantaCorta, opcionesDeEquipo, claveDeEquipo } from '../dondeSeUsa'
+import { agruparDondeSeUsa, totalDondeSeUsa, plantaCorta, opcionesDeEquipo, claveDeEquipo, equipoParaMostrar } from '../dondeSeUsa'
 import { plantaDeNodo } from '../useHierarchyPaths'
 
 /**
@@ -113,6 +113,26 @@ describe('opcionesDeEquipo — el filtro «Equipo» de Repuestos', () => {
   it('ordena con criterio numérico', () => {
     const eqs = ['N10', 'N2'].map((u, i) => ({ machineId: `m${i}`, machineName: `ENZUNCHADORA ${u}` }))
     expect(opcionesDeEquipo(eqs, () => 'PLANTA YAL').map((o) => o.etiqueta)).toEqual(['ENZUNCHADORA N2', 'ENZUNCHADORA N10'])
+  })
+})
+
+describe('equipoParaMostrar — la columna «Equipo»', () => {
+  it('con el filtro «KNURO N2 · Yal», la fila nombra ESE equipo y no «KNURO N1 +5»', () => {
+    const n2Yal = (e: { machineId: string }) => e.machineId === 'FTj1pS2TG1lsZTkgW9M0'
+    expect(equipoParaMostrar(CILINDRO_2A, n2Yal)).toEqual({ nombre: 'KNURO N2', mas: 5 })
+  })
+
+  it('sin filtro, el primero real', () => {
+    expect(equipoParaMostrar(CILINDRO_2A)).toEqual({ nombre: 'KNURO N1', mas: 5 })
+  })
+
+  it('el marcador «Sin equipo» de un doc duplicado no es un equipo (3300138387 decía «Sin equipo +6»)', () => {
+    const conDuplicado = [{ machineId: '', machineName: 'Sin equipo' }, ...CILINDRO_2A]
+    expect(equipoParaMostrar(conDuplicado)).toEqual({ nombre: 'KNURO N1', mas: 5 })
+  })
+
+  it('sin ningún equipo real es transversal', () => {
+    expect(equipoParaMostrar([{ machineId: '', machineName: 'Sin equipo' }])).toEqual({ nombre: 'Transversal', mas: 0 })
   })
 })
 

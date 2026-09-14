@@ -133,6 +133,26 @@ export function opcionesDeEquipo(
     .sort((a, b) => a.etiqueta.localeCompare(b.etiqueta, 'es', { numeric: true }))
 }
 
+/**
+ * Qué equipo nombra la columna «Equipo» de una fila, y cuántos más hay.
+ *
+ * Mostraba siempre `equipos[0]`. Medido el 14-09 filtrando «KNURO N2 · Yal»: 23 de las 25 filas
+ * de la página decían «KNURO N1 +5» — el equipo que NO estabas mirando. Y el cilindro 3300138387
+ * decía «Sin equipo +6»: tiene un documento duplicado sin equipos, cuyo marcador (`machineId`
+ * vacío) llegaba primero y se contaba como un equipo más.
+ *
+ * `preferir` elige el equipo del filtro o del foco; sin él, el primero REAL.
+ */
+export function equipoParaMostrar(
+  equipos: readonly EquipoDelRepuesto[],
+  preferir?: (e: EquipoDelRepuesto) => boolean,
+): { nombre: string; mas: number } {
+  const reales = equipos.filter((e) => e.machineId)
+  if (reales.length === 0) return { nombre: 'Transversal', mas: 0 }
+  const principal = (preferir && reales.find(preferir)) || reales[0]!
+  return { nombre: principal.machineName || principal.machineId, mas: reales.length - 1 }
+}
+
 /** Cuántos equipos distintos: lo que dice el encabezado, y lo que la fila de la tabla cuenta. */
 export function totalDondeSeUsa(grupos: readonly GrupoDondeSeUsa[]): number {
   return grupos.reduce((n, g) => n + g.unidades.length, 0)
