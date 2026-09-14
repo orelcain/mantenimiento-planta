@@ -3,6 +3,7 @@
  * v4 — Memoria Firestore, turnos, resumen semanal, auto-seguimiento, alertas proactivas
  */
 import { estadoDePreventiva } from './chatbot/estadoPreventiva'
+import { codigosEnConsulta, esTerminoNumerico, materialesPorCodigo, listarEquiposConPlanta } from './chatbot/busquedaMaestro'
 import { esCodigoSapValido } from '@/utils/repuestos/exportBomSAP'
 import { collection, getDocs, getDoc, setDoc, doc, query, where, orderBy, limit, serverTimestamp } from 'firebase/firestore'
 import { db } from './firebase'
@@ -705,6 +706,8 @@ function setCache(key: string, data: string): void {
 function fuzzyMatch(text: string, term: string): boolean {
   // Exact substring match
   if (text.includes(term)) return true
+  // Un número no se «parece» a otro: 3300100386 es OTRA pieza que 3300138386 (ver busquedaMaestro).
+  if (esTerminoNumerico(term)) return false
   // Partial match: el term aparece como parte de una palabra en text
   const words = text.split(/\s+/)
   for (const word of words) {
@@ -1439,11 +1442,13 @@ async function fetchRepuestosSummary(userQuery: string): Promise<string> {
 
     // nodeId → nombre del equipo; lista de nodos-equipo para detección
     const nodeName = new Map<string, string>()
+    const nodeParent = new Map<string, string | null>()
     const equipoNodes: { id: string; norm: string }[] = []
     hierSnap.docs.forEach((d) => {
       const n = d.data() as Record<string, unknown>
       const label = String(n.alias || n.nombre || d.id)
       nodeName.set(d.id, label)
+      nodeParent.set(d.id, typeof n.parentId === 'string' ? n.parentId : null)
       if (n.tipoNodo === 'equipo') equipoNodes.push({ id: d.id, norm: normalizeText(label) })
     })
 
@@ -1552,8 +1557,12 @@ async function fetchRepuestosSummary(userQuery: string): Promise<string> {
     logger.info(`Chatbot repuestos(maestro): raw="${userQuery}" → terms=[${searchTerms.join(', ')}] → equipo=[${[...matchedNodeIds].map((id) => nodeName.get(id) || id).join(', ')}] → comp=[${componentTerms.join(', ')}]${corrections.length ? ` (corregido: ${corrections.join(', ')})` : ''}`)
 
     // ── Matching sobre el maestro ──
-    const matched: MaestroMat[] = []
-    for (const m of materials) {
+    // Un código completo en la pregunta manda: match EXACTO, sin exigir las demás palabras
+    // («en qué equipos se usa el SAP 3300138386» no tiene por qué decir «usa» en el material).
+    const codigosPedidos = codigosEnConsulta(normalizedQuery)
+    const porCodigo = materialesPorCodigo(materials, codigosPedidos)
+    const matched: MaestroMat[] = [...porCodigo]
+    for (const m of porCodigo.length > 0 ? [] : materials) {
       if (!inEquipoScope(m)) continue
       if (listAllForEquipo) { matched.push(m); continue }
       if (componentTerms.length === 0) continue
@@ -1588,13 +1597,24 @@ async function fetchRepuestosSummary(userQuery: string): Promise<string> {
     if (matched.length > 0) {
       const conStockN = matched.filter((m) => tier(m) === 2).length
       const sinSapN = matched.filter((m) => !m.tieneSap).length
-      const label = matchedNodeIds.size > 0
-        ? (componentTerms.length > 0 ? `"${componentTerms.join(' ')}" en ${equipoNames}` : `todos los materiales de ${equipoNames}`)
-        : `"${searchTerms.join(' ')}"`
+      const label = porCodigo.length > 0
+        ? `el código ${codigosPedidos.join(', ')} (coincidencia EXACTA)`
+        : matchedNodeIds.size > 0
+          ? (componentTerms.length > 0 ? `"${componentTerms.join(' ')}" en ${equipoNames}` : `todos los materiales de ${equipoNames}`)
+          : `"${searchTerms.join(' ')}"`
       lines.push('', `COINCIDENCIAS con ${label} — TOTAL: ${matched.length} (${conStockN} con stock, ${sinSapN} sin SAP/despiece):`)
       lines.push(`⚠️ ARIA: lista TODOS los materiales de abajo (con stock, sin stock y despiece). NO omitas ninguno. Los "despiece/sin SAP" no se pueden pedir hasta asignarles un SAP.`)
       const LIMIT = 40
-      lines.push(...matched.slice(0, LIMIT).map((m) => fmtRow(m)))
+      if (porCodigo.length > 0) {
+        // Pregunta por una pieza concreta: TODOS sus equipos con la planta, no «KNURO N1 +5».
+        lines.push(`⚠️ ARIA: el mismo nombre de equipo existe en las dos plantas; di siempre la planta entre paréntesis.`)
+        for (const m of matched.slice(0, LIMIT)) {
+          lines.push(fmtRow(m))
+          if (m.equipos.length > 0) lines.push(`    Equipos donde se usa (${m.equipos.length}): ${listarEquiposConPlanta(m.equipos, nodeParent, nodeName)}`)
+        }
+      } else {
+        lines.push(...matched.slice(0, LIMIT).map((m) => fmtRow(m)))
+      }
       if (matched.length > LIMIT) lines.push(`... y ${matched.length - LIMIT} más`)
     } else if (searchTerms.length > 0) {
       // 0 coincidencias estrictas → búsqueda flexible GLOBAL (sin scope de equipo).
