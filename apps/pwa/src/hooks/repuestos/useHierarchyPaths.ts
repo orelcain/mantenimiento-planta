@@ -18,9 +18,11 @@ import { logger } from '@/lib/logger'
 // nodeId → Set(ancestorIds incl. self)
 let cache: Map<string, Set<string>> | null = null
 let cacheTs = 0
+// nodeId → nombre. Sale de la MISMA lectura de `hierarchy`: no cuesta ni un documento más.
+let nombresCache: Map<string, string> = new Map()
 const TTL = 5 * 60 * 1000
 
-export function invalidateHierarchyPathsCache() { cache = null; cacheTs = 0 }
+export function invalidateHierarchyPathsCache() { cache = null; cacheTs = 0; nombresCache = new Map() }
 
 async function loadAncestorsMap(): Promise<Map<string, Set<string>>> {
   if (cache && Date.now() - cacheTs < TTL) return cache
@@ -31,8 +33,10 @@ async function loadAncestorsMap(): Promise<Map<string, Set<string>>> {
       id: d.id,
       parentId: (data.parentId ?? null) as string | null,
       path: Array.isArray(data.path) ? (data.path as string[]) : [],
+      nombre: typeof data.nombre === 'string' ? data.nombre : '',
     }
   })
+  nombresCache = new Map(nodes.map((n) => [n.id, n.nombre]))
   const m = build(nodes)
   cache = m
   cacheTs = Date.now()
@@ -65,7 +69,7 @@ export function unionAncestors(map: Map<string, Set<string>>, equipoIds: string[
   return [...out]
 }
 
-export function build(nodes: { id: string; parentId: string | null; path: string[] }[]): Map<string, Set<string>> {
+export function build(nodes: { id: string; parentId: string | null; path: string[]; nombre?: string }[]): Map<string, Set<string>> {
   const parentOf = new Map<string, string | null>()
   for (const n of nodes) parentOf.set(n.id, n.parentId)
   const out = new Map<string, Set<string>>()
@@ -83,6 +87,27 @@ export function build(nodes: { id: string; parentId: string | null; path: string
     out.set(n.id, s)
   }
   return out
+}
+
+/**
+ * La PLANTA a la que pertenece un nodo: el ancestro cuyo nombre empieza por «PLANTA».
+ *
+ * Existe porque los equipos se llaman igual en las dos plantas —hay seis KNURO y seis Baader
+ * 142— y agrupar solo por nombre visible juntaba KNURO N1 de Chonchi con KNURO N1 de Yal. El
+ * panel del repuesto decía «Dónde se usa · 3 equipos» para un cilindro montado en 6.
+ *
+ * Pura y testeable: recibe los ancestros y los nombres, no lee Firestore.
+ */
+export function plantaDeNodo(
+  ancestros: ReadonlySet<string> | undefined,
+  nombres: ReadonlyMap<string, string>,
+): string | undefined {
+  if (!ancestros) return undefined
+  for (const id of ancestros) {
+    const nombre = (nombres.get(id) ?? '').trim()
+    if (/^PLANTA\b/i.test(nombre)) return nombre
+  }
+  return undefined
 }
 
 export function useHierarchyPaths() {
@@ -112,5 +137,14 @@ export function useHierarchyPaths() {
     [map],
   )
 
-  return { isUnder, loading, ready: !!map }
+  /** Nombre de la planta del nodo («PLANTA CHONCHI» / «PLANTA YAL»), si se conoce. */
+  const plantaDe = useCallback(
+    (nodeId: string | undefined | null): string | undefined => {
+      if (!nodeId || !map) return undefined
+      return plantaDeNodo(map.get(nodeId), nombresCache)
+    },
+    [map],
+  )
+
+  return { isUnder, plantaDe, loading, ready: !!map }
 }

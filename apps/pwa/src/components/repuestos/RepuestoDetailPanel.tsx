@@ -18,11 +18,19 @@ import { CLASE_LABEL } from '@/types/repuestos'
 import type { AreaRepuestoRow } from '@/hooks/repuestos/useAreaRepuestos'
 import type { MovimientoBodega } from '@/hooks/repuestos/useBodega'
 import { AREA_TACTIL, AREA_TACTIL_COMPACTA } from '@/lib/areaTactil'
+import { Link } from 'react-router-dom'
+import { agruparDondeSeUsa, totalDondeSeUsa, plantaCorta } from '@/hooks/repuestos/dondeSeUsa'
+import { rutaExpedienteEquipo } from '@/services/equipos/enlaceExpediente'
 
 export interface UbicacionEstructurada { pasillo?: string; estante?: string; nivel?: string }
 
 interface RepuestoDetailPanelProps {
   item: AreaRepuestoRow | null
+  /**
+   * Planta de un nodo de la jerarquía. Sin ella los equipos se agrupan solo por nombre y
+   * «KNURO N1» de Chonchi y de Yal se colapsan en uno: el panel decía 3 equipos para 6.
+   */
+  plantaDe?: (nodeId: string) => string | undefined
   areaName: string
   onClose: () => void
   loadMovimientos: (bodegaDocId: string, max?: number) => Promise<MovimientoBodega[]>
@@ -128,31 +136,6 @@ function formatUbicacion(item: AreaRepuestoRow): string {
   return item.ubicacionBodega || '—'
 }
 
-/**
- * Agrupa los equipos donde se usa el material por familia de máquina:
- * "KNURO N1/N2/N3" → una fila "KNURO · N1 N2 N3". La jerarquía puede traer
- * nodos duplicados con el mismo nombre visible → se deduplica por nombre.
- */
-function agruparEquiposPorFamilia(equipos: { machineId: string; machineName: string }[]): { familia: string; unidades: string[] }[] {
-  const vistos = new Set<string>()
-  const familias = new Map<string, { familia: string; unidades: string[] }>()
-  for (const e of equipos) {
-    const nombre = (e.machineName || '').trim()
-    const clave = nombre.toUpperCase()
-    if (!nombre || vistos.has(clave)) continue
-    vistos.add(clave)
-    const m = nombre.match(/^(.*\S)\s+(N[°º]?\s?\d+)$/i)
-    const familia = m?.[1] ?? nombre
-    const unidad = m?.[2]?.toUpperCase().replace(/\s+/g, '') ?? ''
-    const famKey = familia.toUpperCase()
-    const g: { familia: string; unidades: string[] } = familias.get(famKey) ?? { familia, unidades: [] }
-    if (unidad) g.unidades.push(unidad)
-    familias.set(famKey, g)
-  }
-  for (const g of familias.values()) g.unidades.sort((a, b) => a.localeCompare(b, 'es', { numeric: true }))
-  return [...familias.values()]
-}
-
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline justify-between gap-3 py-1.5">
@@ -174,7 +157,7 @@ function fmtDate(d: Date): string {
   } catch { return '' }
 }
 
-export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, onSaveLocation, onSolicitar, onAssignSap, onAssignEquipo, isAdmin, onRename, onEditRepuesto, onDeleteRepuesto, onSpecs, onPhotos, onManual, isFavorite, onToggleFavorite, onAddToList, onSaveApodos, onContar, comunEn, onMarkComun, onRemoveComun }: RepuestoDetailPanelProps) {
+export function RepuestoDetailPanel({ item, plantaDe, areaName, onClose, loadMovimientos, onSaveLocation, onSolicitar, onAssignSap, onAssignEquipo, isAdmin, onRename, onEditRepuesto, onDeleteRepuesto, onSpecs, onPhotos, onManual, isFavorite, onToggleFavorite, onAddToList, onSaveApodos, onContar, comunEn, onMarkComun, onRemoveComun }: RepuestoDetailPanelProps) {
   const [copied, setCopied] = useState(false)
   const [movs, setMovs] = useState<MovimientoBodega[] | null>(null)
   const [movsLoading, setMovsLoading] = useState(false)
@@ -266,9 +249,11 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
 
   // Equipos N:M donde se usa el material (nodeIds) y manuales heredados de ellos.
   const equiposReales = (item?.equipos ?? []).filter((e) => e.machineId)
-  // Vista agrupada por familia (KNURO N1/N2/N3 → "KNURO · N1 N2 N3") — deduplicada.
-  const familiasEquipos = agruparEquiposPorFamilia(equiposReales)
-  const totalEquiposUnicos = familiasEquipos.reduce((n, f) => n + Math.max(1, f.unidades.length), 0)
+  // Agrupado por PLANTA y familia: los equipos se llaman igual en las dos plantas.
+  const familiasEquipos = agruparDondeSeUsa(equiposReales, plantaDe)
+  const totalEquiposUnicos = totalDondeSeUsa(familiasEquipos)
+  // Con qué se llega filtrada la lista del expediente: el código de ESTA pieza.
+  const buscarEnExpediente = (item?.codigoSAP || item?.codigoFabricante || '').trim()
   const { manuales: manualesHeredados, loading: manualesLoading } = useManualesDeEquipos(equiposReales.map((e) => e.machineId))
 
   // Cargar movimientos al cambiar de repuesto (para "última actualización")
@@ -468,13 +453,33 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
           {equiposReales.length > 0 ? (
             <div className="space-y-1">
               {familiasEquipos.slice(0, 6).map((f) => (
-                <div key={f.familia} className="flex items-center gap-1.5 rounded-ctl bg-muted px-2 py-1 text-footnote text-foreground" title={f.unidades.length ? `${f.familia} ${f.unidades.join(', ')}` : f.familia}>
-                  <span className="min-w-0 truncate">{f.familia}</span>
-                  {f.unidades.length > 0 && (
-                    <span className="ml-auto shrink-0 rounded-ctl bg-muted px-1.5 py-0.5 font-mono text-caption text-muted-foreground">
-                      {f.unidades.join(' · ')}
-                    </span>
-                  )}
+                <div
+                  key={`${f.planta ?? ''}|${f.familia}`}
+                  className="flex items-center gap-1.5 rounded-ctl bg-muted px-2 py-1 text-footnote text-foreground"
+                >
+                  <span className="min-w-0 truncate">
+                    {f.familia}
+                    {f.planta && <span className="text-muted-foreground"> · {plantaCorta(f.planta)}</span>}
+                  </span>
+                  {/*
+                    Cada unidad abre el expediente de ESE equipo, en la lista de materiales y ya
+                    filtrada por el código de esta pieza. Por eso la agrupación tenía que saber la
+                    planta: «N1» a secas habría llevado a Chonchi o a Yal según el orden de llegada.
+                  */}
+                  <span className="ml-auto flex shrink-0 items-center gap-1">
+                    {f.unidades.map((u) => (
+                      <Link
+                        key={u.nodeId}
+                        to={rutaExpedienteEquipo(u.nodeId, 'recursos', { buscar: buscarEnExpediente })}
+                        title={`Abrir el expediente de ${u.nombre}${f.planta ? ` (${plantaCorta(f.planta)})` : ''}`}
+                        /* Tamaño REAL y no un área ampliada: N1, N2 y N3 quedan a 4 px entre sí y un pseudo-
+                           elemento de 44 px se solaparía con el vecino — tocar N1 abriría N2. */
+                        className="inline-flex min-h-[32px] min-w-[38px] items-center justify-center rounded-ctl bg-background px-2 font-mono text-caption text-primary hover:underline"
+                      >
+                        {u.unidad || 'Ver'}
+                      </Link>
+                    ))}
+                  </span>
                 </div>
               ))}
               {familiasEquipos.length > 6 && (

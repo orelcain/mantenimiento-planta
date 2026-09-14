@@ -129,7 +129,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   // El catálogo (colección plana `repuestos`) referencia nodos de hierarchy por id;
   // el equipment cache aporta nombre/alias/path de cada nodo-equipo.
   const { loading: eqLoading } = useGlobalEquipmentSearch('', 999)
-  const { isUnder, loading: pathsLoading } = useHierarchyPaths()
+  const { isUnder, plantaDe, loading: pathsLoading } = useHierarchyPaths()
 
   // "machines" = nodos-equipo de hierarchy (modelo plano: r.equipos[] = nodeIds).
   // machineAreas: nodeId → Set(ancestros) para pertenencia a áreas (cada nodo trae path).
@@ -2186,6 +2186,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
       {selectedRep && (
         <RepuestoDetailPanel
           item={selectedRep}
+          plantaDe={plantaDe}
           areaName={showingAll ? 'Todas las áreas' : (selectedNode?.nombre ?? '')}
           onClose={() => setSelectedRowKey(null)}
           loadMovimientos={loadMovimientos}

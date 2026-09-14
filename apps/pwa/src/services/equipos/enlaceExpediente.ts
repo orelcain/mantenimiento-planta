@@ -24,8 +24,17 @@ export const RUTA_EXPEDIENTE = '/centro-tecnico-documental'
 /**
  * @param nodeId el nodo de `hierarchy` del equipo
  * @param tab a qué pestaña entrar; por defecto la de repuestos y documentos
+ * @param opciones.buscar texto con que llega filtrada la lista de materiales. Viniendo desde
+ *   un repuesto concreto es su código: sin él se llegaba a la lista completa (476 posiciones en
+ *   una Baader) y había que volver a buscar la pieza que se estaba mirando.
  */
-export function rutaExpedienteEquipo(nodeId: string, tab: TabExpediente = 'recursos'): string {
+export function rutaExpedienteEquipo(
+  nodeId: string,
+  tab: TabExpediente = 'recursos',
+  opciones: { buscar?: string } = {},
+): string {
   const p = new URLSearchParams({ nodo: nodeId, tab })
+  const buscar = opciones.buscar?.trim()
+  if (buscar) p.set('q', buscar)
   return `${RUTA_EXPEDIENTE}?${p.toString()}`
 }
