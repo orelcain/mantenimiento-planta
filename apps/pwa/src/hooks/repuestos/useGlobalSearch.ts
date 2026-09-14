@@ -245,6 +245,10 @@ export function useGlobalSearch(machines: Machine[]) {
   // de instancia (no de módulo, a diferencia de cachedRepuestos): perderlo al
   // desmontar es aceptable, es solo una optimización de sesión.
   const loadedAreaIdsRef = useRef<Set<string>>(new Set())
+  // Qué hay en memoria, para quien CUENTA sobre `allRepuestos`: `loaded` también se prende con
+  // un área sola, y contar todas las áreas con eso da números parciales (ver alcanceDeAreas).
+  const [catalogoCompleto, setCatalogoCompleto] = useState(() => !!getGlobalRepuestosCache())
+  const [areasCargadas, setAreasCargadas] = useState<string[]>([])
 
   // Si cambia el set de máquinas, invalidar cache solo si realmente cambió
   const prevMachineIdsRef = useRef<string>('')
@@ -253,6 +257,7 @@ export function useGlobalSearch(machines: Machine[]) {
     if (prevMachineIdsRef.current && prevMachineIdsRef.current !== key) {
       invalidateGlobalRepuestosCache()
       setLoaded(false)
+      setCatalogoCompleto(false)
     }
     prevMachineIdsRef.current = key
   }, [machines])
@@ -270,6 +275,7 @@ export function useGlobalSearch(machines: Machine[]) {
     if (cached) {
       setAllRepuestos(cached)
       setLoaded(true)
+      setCatalogoCompleto(true)
       return
     }
 
@@ -296,6 +302,7 @@ export function useGlobalSearch(machines: Machine[]) {
 
       setAllRepuestos(results)
       setLoaded(true)
+      setCatalogoCompleto(true)
       setProgress({ loaded: 2, total: 2, phase: 'done' })
     } catch (err) {
       logger.error('Error en búsqueda global', err instanceof Error ? err : new Error(String(err)))
@@ -328,6 +335,7 @@ export function useGlobalSearch(machines: Machine[]) {
       setAllRepuestos(cached)
       loadedAreaIdsRef.current.add(areaId)
       setLoaded(true)
+      setCatalogoCompleto(true)
       return
     }
 
@@ -356,6 +364,7 @@ export function useGlobalSearch(machines: Machine[]) {
       // carga como `!loaded || ...`, y entrar directo a un área (el camino normal) solo pasa
       // por aquí. Solo parecía funcionar cuando el caché de módulo venía tibio de un loadAll.
       setLoaded(true)
+      setAreasCargadas((prev) => (prev.includes(areaId) ? prev : [...prev, areaId]))
     } catch (err) {
       logger.error('Error cargando repuestos del área', err instanceof Error ? err : new Error(String(err)))
       setError('Error al cargar los repuestos del área')
@@ -400,6 +409,8 @@ export function useGlobalSearch(machines: Machine[]) {
     allRepuestos,
     loading,
     loaded,
+    catalogoCompleto,
+    areasCargadas,
     error,
     progress,
     loadAll,
