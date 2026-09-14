@@ -62,7 +62,7 @@ export function agruparDondeSeUsa(
     const planta = plantaDe(e.machineId)
     // PLANTA + nombre: el mismo nombre en dos plantas son dos equipos; dos nodos repetidos de la
     // jerarquía en la misma planta, uno solo.
-    const clave = `${(planta ?? '').toUpperCase()}|${nombre.toUpperCase()}`
+    const clave = claveDeEquipo(nombre, planta)
     if (vistos.has(clave)) continue
     vistos.add(clave)
 
@@ -82,6 +82,55 @@ export function agruparDondeSeUsa(
   return [...grupos.values()].sort(
     (a, b) => a.familia.localeCompare(b.familia, 'es') || (a.planta ?? '').localeCompare(b.planta ?? '', 'es'),
   )
+}
+
+/** La identidad visible de un equipo: PLANTA + nombre, en mayúsculas. */
+export function claveDeEquipo(nombre: string, planta: string | undefined): string {
+  return `${(planta ?? '').toUpperCase()}|${nombre.trim().toUpperCase()}`
+}
+
+export interface OpcionDeEquipo {
+  /** `claveDeEquipo` — lo que guarda el filtro. */
+  valor: string
+  /** El nombre, y la planta solo si ese nombre existe en más de una. */
+  etiqueta: string
+  nodeIds: string[]
+}
+
+/**
+ * Las opciones del filtro «Equipo» de Repuestos.
+ *
+ * El filtro armaba sus opciones con `equipos[0]` —el PRIMER equipo de cada repuesto— y después
+ * filtraba por CUALQUIERA, comparando el nombre. Medido el 14-09: de 70 nombres con repuestos,
+ * 11 no aparecían nunca (KNURO N2 y N3, EVISCERADORA BAADER 142 N2 y N3, ENZUNCHADORA N2 y N3…:
+ * siempre van detrás de la N1), y elegir «KNURO N1» traía mezclados el de Chonchi y el de Yal.
+ */
+export function opcionesDeEquipo(
+  equipos: Iterable<EquipoDelRepuesto>,
+  plantaDe: (nodeId: string) => string | undefined = () => undefined,
+): OpcionDeEquipo[] {
+  const porClave = new Map<string, { nombre: string; planta: string | undefined; nodeIds: Set<string> }>()
+  const plantasPorNombre = new Map<string, Set<string>>()
+  for (const e of equipos) {
+    const nombre = (e.machineName || '').trim()
+    if (!e.machineId || !nombre) continue
+    const planta = plantaDe(e.machineId)
+    const clave = claveDeEquipo(nombre, planta)
+    const o =porClave.get(clave) ?? { nombre, planta, nodeIds: new Set<string>() }
+    o.nodeIds.add(e.machineId)
+    porClave.set(clave, o)
+    const n = nombre.toUpperCase()
+    const ps = plantasPorNombre.get(n) ?? new Set<string>()
+    ps.add((planta ?? '').toUpperCase())
+    plantasPorNombre.set(n, ps)
+  }
+  return [...porClave.entries()]
+    .map(([valor, o]) => {
+      const repetido = (plantasPorNombre.get(o.nombre.toUpperCase())?.size ?? 0) > 1
+      const donde = plantaCorta(o.planta) || 'sin planta'
+      return { valor, etiqueta: repetido ? `${o.nombre} · ${donde}` : o.nombre, nodeIds: [...o.nodeIds] }
+    })
+    .sort((a, b) => a.etiqueta.localeCompare(b.etiqueta, 'es', { numeric: true }))
 }
 
 /** Cuántos equipos distintos: lo que dice el encabezado, y lo que la fila de la tabla cuenta. */
