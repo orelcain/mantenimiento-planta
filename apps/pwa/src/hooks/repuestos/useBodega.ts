@@ -343,6 +343,15 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
         if (!existing.equipos.find(e => e.machineId === r.machineId)) {
           existing.equipos.push({ machineId: r.machineId, machineName: r.machineName })
         }
+        // Un doc duplicado SIN equipos trae el marcador «Sin equipo» (machineId vacío): con equipos
+        // reales en la fila, sobra. 3300138387 decía «Sin equipo +6» estando en seis Knuro.
+        if (existing.equipos.some(e => e.machineId)) {
+          existing.equipos = existing.equipos.filter(e => e.machineId)
+        }
+        // Lo mismo que la documentación: el dato que el primer doc no traía puede estar en el otro
+        // (el código de fabricante 999 0543 de 3300138387 vive solo en el segundo documento).
+        if (!existing.codigoFabricante && rep.codigoFabricante) existing.codigoFabricante = rep.codigoFabricante
+        if (!existing.textoBreve && (rep.textoBreve || rep.descripcion)) existing.textoBreve = rep.textoBreve || rep.descripcion || ''
         // Rescatar del duplicado lo que el doc ya fusionado no aportó. Antes solo se
         // miraban las fotos: una ficha que viviera en el SEGUNDO documento del mismo SAP
         // se perdía por el orden de llegada (`3300138387` tiene dos documentos).

@@ -36,7 +36,7 @@ import { rutaExpedienteEquipo } from '@/services/equipos/enlaceExpediente'
 import { useBodega } from '@/hooks/repuestos/useBodega'
 import { useAreaRepuestos, type StockStatus, type AreaRepuestoRow } from '@/hooks/repuestos/useAreaRepuestos'
 import { useHierarchyPaths } from '@/hooks/repuestos/useHierarchyPaths'
-import { claveDeEquipo, opcionesDeEquipo } from '@/hooks/repuestos/dondeSeUsa'
+import { claveDeEquipo, equipoParaMostrar, opcionesDeEquipo } from '@/hooks/repuestos/dondeSeUsa'
 import { areaContenedora, conteosConfiables } from '@/hooks/repuestos/alcanceDeAreas'
 import { useManualesDeEquipos } from '@/hooks/repuestos/useManualesDeEquipos'
 import { getRepuestoFavListsGlobal, saveRepuestoFavListsGlobal, getUserPreferences, saveFavoriteLists, type RepuestoFavList, type FavList } from '@/services/userPreferences'
@@ -761,6 +761,14 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     [areaRepuestos, plantaDe],
   )
   const etiquetaFiltroEquipo = equipoOptions.find((o) => o.valor === repEquipoFilter)?.etiqueta ?? repEquipoFilter
+  // Qué equipo nombra la columna «Equipo» cuando hay filtro o foco (ver equipoParaMostrar).
+  const preferirEquipo = useMemo(() => {
+    if (selectedEquipMachineId) return (e: { machineId: string }) => e.machineId === selectedEquipMachineId
+    if (repEquipoFilter !== 'all') {
+      return (e: { machineId: string; machineName: string }) => claveDeEquipo(e.machineName || '', plantaDe(e.machineId)) === repEquipoFilter
+    }
+    return undefined
+  }, [selectedEquipMachineId, repEquipoFilter, plantaDe])
   const valorSelectEquipo = selectedEquipMachineId
     ? (equipoOptions.find((o) => o.nodeIds.includes(selectedEquipMachineId))?.valor ?? 'all')
     : repEquipoFilter
@@ -965,7 +973,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
         case 'codigoSAP': return r.codigoSAP || ''
         case 'codigoFabricante': return r.codigoFabricante || ''
         case 'textoBreve': return r.textoBreve || r.alias || ''
-        case 'equipo': return r.equipos[0]?.machineName || ''
+        case 'equipo': return equipoParaMostrar(r.equipos).nombre
         case 'stock': return r.bodegaId ? r.stockActual : -1
         case 'tipo': return tipoLabelOf(r.tipo)
       }
@@ -1976,10 +1984,9 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                     <tbody className="divide-y divide-border">
                       {pagedRep.map((r, idx) => {
                         const meta = STOCK_META[r.stockStatus]
-                        // Transversal = material sin nodo-equipo real (insumo/herramienta del maestro).
-                        const esTransversal = !r.equipos.some((e) => e.machineId)
-                        const equipo = esTransversal ? 'Transversal' : (r.equipos[0]?.machineName ?? '-')
-                        const extra = !esTransversal && r.equipos.length > 1 ? ` +${r.equipos.length - 1}` : ''
+                        // El equipo del filtro/foco primero; el marcador «Sin equipo» de un doc duplicado no cuenta.
+                        const { nombre: equipo, mas } = equipoParaMostrar(r.equipos, preferirEquipo)
+                        const extra = mas > 0 ? ` +${mas}` : ''
                         const isSel = selectedRowKey === r.rowKey
                         // Fotos: las de bodega (reales del físico) primero, luego las del catálogo
                         const fotos = [...(r.fotos ?? []), ...(r.fotosCatalogo ?? [])]
