@@ -36,6 +36,7 @@ import { rutaExpedienteEquipo } from '@/services/equipos/enlaceExpediente'
 import { useBodega } from '@/hooks/repuestos/useBodega'
 import { useAreaRepuestos, type StockStatus, type AreaRepuestoRow } from '@/hooks/repuestos/useAreaRepuestos'
 import { useHierarchyPaths } from '@/hooks/repuestos/useHierarchyPaths'
+import { claveDeEquipo, opcionesDeEquipo } from '@/hooks/repuestos/dondeSeUsa'
 import { useManualesDeEquipos } from '@/hooks/repuestos/useManualesDeEquipos'
 import { getRepuestoFavListsGlobal, saveRepuestoFavListsGlobal, getUserPreferences, saveFavoriteLists, type RepuestoFavList, type FavList } from '@/services/userPreferences'
 import { useRepuestoCrud } from '@/hooks/repuestos/useRepuestoCrud'
@@ -540,7 +541,9 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
       setSelectedAreaId(null)
     }
     const m = machines.find((x) => x.id === (e?.id ?? favKey))
-    setRepEquipoFilter(m ? m.nombre : 'all')
+    // El equipo enfocado manda sobre el filtro (ver scopedRepuestos) y el select lo refleja
+    // desde `valorSelectEquipo`: guardar acá el nombre dejaba un valor que no es opción.
+    setRepEquipoFilter('all')
     // Clave = id del NODO del equipo (para resaltarlo en el sidebar).
     setSelectedEquipKey(e?.id ?? favKey)
     // Identidad del equipo en el modelo plano = nodeId (clave de r.equipos[].machineId).
@@ -683,8 +686,9 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
       return areaRepuestos.filter((r) => r.equipos.some((e) => e.machineId === selectedEquipMachineId))
     }
     if (repEquipoFilter === 'all') return areaRepuestos
-    return areaRepuestos.filter((r) => r.equipos.some((e) => e.machineName === repEquipoFilter))
-  }, [areaRepuestos, selectedEquipKey, selectedEquipMachineId, repEquipoFilter])
+    // Por PLANTA + nombre: «KNURO N1» de Chonchi y el de Yal son dos equipos.
+    return areaRepuestos.filter((r) => r.equipos.some((e) => claveDeEquipo(e.machineName || '', plantaDe(e.machineId)) === repEquipoFilter))
+  }, [areaRepuestos, selectedEquipKey, selectedEquipMachineId, repEquipoFilter, plantaDe])
 
   const stockKpis = useMemo(() => {
     let ok = 0, low = 0, out = 0
@@ -727,12 +731,16 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     }
   }, [scopedRepuestos])
 
-  // Opciones del filtro "Equipo" (nombres distintos del área)
-  const equipoOptions = useMemo(() => {
-    const s = new Set<string>()
-    for (const r of areaRepuestos) { const n = r.equipos[0]?.machineName; if (n) s.add(n) }
-    return [...s].sort((a, b) => a.localeCompare(b))
-  }, [areaRepuestos])
+  // Opciones del filtro "Equipo": TODOS los equipos de cada repuesto, no solo el primero
+  // (ver opcionesDeEquipo).
+  const equipoOptions = useMemo(
+    () => opcionesDeEquipo(areaRepuestos.flatMap((r) => r.equipos), plantaDe),
+    [areaRepuestos, plantaDe],
+  )
+  const etiquetaFiltroEquipo = equipoOptions.find((o) => o.valor === repEquipoFilter)?.etiqueta ?? repEquipoFilter
+  const valorSelectEquipo = selectedEquipMachineId
+    ? (equipoOptions.find((o) => o.nodeIds.includes(selectedEquipMachineId))?.valor ?? 'all')
+    : repEquipoFilter
 
   // Opciones del filtro "Tipo" presentes en el alcance, ordenadas por frecuencia (con conteo)
   const tipoOptions = useMemo(() => {
@@ -847,7 +855,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   // haría "desaparecer" repuestos sin explicación). `repSoloSap` no cuenta:
   // true ES el default.
   const filtrosActivos =
-    (repEquipoFilter !== 'all' ? 1 : 0) +
+    (repEquipoFilter !== 'all' || selectedEquipKey ? 1 : 0) +
     (repClaseFilter !== 'all' ? 1 : 0) +
     (repTipoFilter !== 'all' ? 1 : 0) +
     (repStockFilter !== 'all' ? 1 : 0) +
@@ -1752,7 +1760,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                   className="mt-1 inline-flex max-w-full items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-caption font-medium text-primary transition hover:bg-primary/20"
                   title="Quitar filtro de equipo — ver todos los repuestos del área"
                 >
-                  <Cog className="h-3 w-3 shrink-0" /> <span className="truncate">{repEquipoFilter}</span> <X className="h-3 w-3 shrink-0 opacity-70" />
+                  <Cog className="h-3 w-3 shrink-0" /> <span className="truncate">{etiquetaFiltroEquipo}</span> <X className="h-3 w-3 shrink-0 opacity-70" />
                 </button>
               ) : null}
             </div>
@@ -1823,11 +1831,11 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
             <div className={[mobileExtrasOpen ? 'flex' : 'hidden', 'mb-3 flex-wrap items-center gap-2 sm:flex'].join(' ')}>
               {/* Selects: 2-up en móvil (grid), fila única en ≥sm (sm:contents disuelve el grid) */}
               <div className="grid grid-cols-2 gap-2 sm:contents">
-              <Select value={repEquipoFilter} onValueChange={(v) => { setRepEquipoFilter(v); setSelectedEquipKey(null); setSelectedEquipMachineId(null); setSelectedEquipName('') }}>
+              <Select value={valorSelectEquipo} onValueChange={(v) => { setRepEquipoFilter(v); setSelectedEquipKey(null); setSelectedEquipMachineId(null); setSelectedEquipName('') }}>
                 <SelectTrigger className="w-full sm:w-[190px]"><SelectValue placeholder="Todos los equipos" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos los equipos</SelectItem>
-                  {equipoOptions.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
+                  {equipoOptions.map((e) => <SelectItem key={e.valor} value={e.valor}>{e.etiqueta}</SelectItem>)}
                 </SelectContent>
               </Select>
               <Select value={repClaseFilter} onValueChange={setRepClaseFilter}>

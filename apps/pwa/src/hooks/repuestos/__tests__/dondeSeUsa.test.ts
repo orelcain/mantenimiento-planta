@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { agruparDondeSeUsa, totalDondeSeUsa, plantaCorta } from '../dondeSeUsa'
+import { agruparDondeSeUsa, totalDondeSeUsa, plantaCorta, opcionesDeEquipo, claveDeEquipo } from '../dondeSeUsa'
 import { plantaDeNodo } from '../useHierarchyPaths'
 
 /**
@@ -69,6 +69,50 @@ describe('lo que la deduplicación original sí tenía que hacer', () => {
   it('ordena las unidades con criterio numérico: N2 antes que N10', () => {
     const eqs = ['N10', 'N2', 'N1'].map((u, i) => ({ machineId: `m${i}`, machineName: `GRADER ${u}` }))
     expect(agruparDondeSeUsa(eqs, () => 'PLANTA YAL')[0]!.unidades.map((u) => u.unidad)).toEqual(['N1', 'N2', 'N10'])
+  })
+})
+
+describe('opcionesDeEquipo — el filtro «Equipo» de Repuestos', () => {
+  it('ofrece N2 y N3 aunque nunca sean el PRIMER equipo del repuesto', () => {
+    // El filtro viejo leía equipos[0]: con el orden real del cilindro solo salía «KNURO N1».
+    const etiquetas = opcionesDeEquipo(CILINDRO_2A, plantaReal).map((o) => o.etiqueta)
+    expect(etiquetas).toEqual([
+      'KNURO N1 · Chonchi',
+      'KNURO N1 · Yal',
+      'KNURO N2 · Chonchi',
+      'KNURO N2 · Yal',
+      'KNURO N3 · Chonchi',
+      'KNURO N3 · Yal',
+    ])
+  })
+
+  it('la opción de una planta NO trae el equipo de la otra', () => {
+    const n1Yal = opcionesDeEquipo(CILINDRO_2A, plantaReal).find((o) => o.etiqueta === 'KNURO N1 · Yal')!
+    expect(n1Yal.nodeIds).toEqual(['Eu5FXEOF1c6QPRYamgr0'])
+    expect(n1Yal.valor).toBe(claveDeEquipo('KNURO N1', 'PLANTA YAL'))
+    expect(n1Yal.valor).not.toBe(claveDeEquipo('KNURO N1', 'PLANTA CHONCHI'))
+  })
+
+  it('un nombre que existe en una sola planta no carga la planta en la etiqueta', () => {
+    const opciones = opcionesDeEquipo([{ machineId: 'g', machineName: 'GRADER' }], () => 'PLANTA CHONCHI')
+    expect(opciones).toEqual([{ valor: 'PLANTA CHONCHI|GRADER', etiqueta: 'GRADER', nodeIds: ['g'] }])
+  })
+
+  it('nodos duplicados en la misma planta son una sola opción con los dos nodos', () => {
+    const o = opcionesDeEquipo(
+      [
+        { machineId: 'a', machineName: 'BOMBA AGUA MAR' },
+        { machineId: 'b', machineName: 'bomba agua mar ' },
+      ],
+      () => 'PLANTA YAL',
+    )
+    expect(o).toHaveLength(1)
+    expect(o[0]!.nodeIds).toEqual(['a', 'b'])
+  })
+
+  it('ordena con criterio numérico', () => {
+    const eqs = ['N10', 'N2'].map((u, i) => ({ machineId: `m${i}`, machineName: `ENZUNCHADORA ${u}` }))
+    expect(opcionesDeEquipo(eqs, () => 'PLANTA YAL').map((o) => o.etiqueta)).toEqual(['ENZUNCHADORA N2', 'ENZUNCHADORA N10'])
   })
 })
 
