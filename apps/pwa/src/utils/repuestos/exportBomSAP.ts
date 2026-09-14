@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx'
 import type { Repuesto } from '@/types/repuestos'
+import { cantidadDePosicion } from '@/services/repuestos/cantidadDePosicion'
 
 /**
  * Exportador de Lista de Materiales de Equipo para SAP PM (transacción IB01).
@@ -169,8 +170,7 @@ export function buildBomIB01(repuestos: Repuesto[], options: BuildBomOptions): B
 
   const rows: BomIB01Row[] = ordenadas.map((rep, i) => {
     const esL = tieneCodigoSap(rep)
-    const cantidadReal = Number(rep.cantidadPorMaquina)
-    const tieneCantidad = Number.isFinite(cantidadReal) && cantidadReal > 0
+    const { real: tieneCantidad, cantidad } = cantidadDePosicion(rep.cantidadPorMaquina)
     if (!tieneCantidad) sinCantidadReal++
 
     const textoCompleto = (rep.textoBreve || rep.descripcion || '').trim()
@@ -190,7 +190,7 @@ export function buildBomIB01(repuestos: Repuesto[], options: BuildBomOptions): B
       posicion: String((i + 1) * 10).padStart(4, '0'),
       categoria: esL ? 'L' : 'T',
       material: esL ? (rep.codigoSAP || '').trim() : '',
-      cantidad: tieneCantidad ? cantidadReal : 1,
+      cantidad,
       unidad: toUnidadSAP(rep.unidad),
       texto: base.slice(0, SAP_TEXTO_POSICION_MAX),
       textoCompleto: base,
