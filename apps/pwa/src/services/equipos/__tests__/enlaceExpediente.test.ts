@@ -26,3 +26,23 @@ describe('rutaExpedienteEquipo', () => {
     )
   })
 })
+
+describe('llegar filtrado desde un repuesto', () => {
+  it('lleva el código a la lista de materiales', () => {
+    const ruta = rutaExpedienteEquipo('23kemhGhbN22YIwHd2VN', 'recursos', { buscar: '3300138386' })
+    const p = new URLSearchParams(ruta.split('?')[1])
+    expect(p.get('nodo')).toBe('23kemhGhbN22YIwHd2VN')
+    expect(p.get('tab')).toBe('recursos')
+    expect(p.get('q')).toBe('3300138386')
+  })
+
+  it('sin búsqueda no agrega un q vacío', () => {
+    expect(rutaExpedienteEquipo('n1')).not.toContain('q=')
+    expect(rutaExpedienteEquipo('n1', 'recursos', { buscar: '   ' })).not.toContain('q=')
+  })
+
+  it('un código de fabricante con espacios viaja escapado y vuelve igual', () => {
+    const ruta = rutaExpedienteEquipo('n1', 'recursos', { buscar: '999 0543' })
+    expect(new URLSearchParams(ruta.split('?')[1]).get('q')).toBe('999 0543')
+  })
+})

@@ -153,6 +153,8 @@ export function CentroTecnicoDocumentalPage() {
   // viven en la URL (?eq=<id>&tab=<tab>) → deep-link, refresh y botón atrás.
   const detailId = searchParams.get('eq')
   const detailTab = searchParams.get('tab') ?? 'info'
+  /** Código con que llega filtrada la lista de materiales (viene del panel de un repuesto). */
+  const detailBuscar = searchParams.get('q') ?? undefined
   const [detailIncidents, setDetailIncidents] = useState<Incident[]>([])
   const [detailLog, setDetailLog] = useState<MaintenanceLogEntry[]>([])
   const [lightbox, setLightbox] = useState<string | null>(null)
@@ -706,6 +708,7 @@ export function CentroTecnicoDocumentalPage() {
       {detailEquipment && (
         <ExpedienteDialog
           equipment={detailEquipment}
+          buscarInicial={detailBuscar}
           incidents={detailIncidents}
           log={detailLog}
           tab={detailTab}
@@ -1452,12 +1455,20 @@ function OtBadge({ ot }: { ot?: OtCount }) {
 const GRUPO_TITULO = (n: number): string => n + ' filas con este mismo nombre'
 
 /** Materiales · repuestos del equipo (N:M) + buscador embebido para vincular/desvincular. */
-function RecursosRepuestos({ equipment, canEdit }: { equipment: Equipment; canEdit: boolean }) {
+function RecursosRepuestos({ equipment, canEdit, buscarInicial }: { equipment: Equipment; canEdit: boolean; buscarInicial?: string }) {
   const nodeId = equipment.hierarchyNodeId
   const [reloadKey, setReloadKey] = useState(0)
   const { repuestos, loading } = useRepuestosDeEquipo(nodeId, reloadKey)
   const [despieceAbierto, setDespieceAbierto] = useState(false)
-  const [filtro, setFiltro] = useState('')
+  const [filtro, setFiltro] = useState(buscarInicial ?? '')
+  /*
+   * Sincronizar y no solo inicializar: `useState(derivado)` CONGELA el primer valor. Si con el
+   * expediente de este mismo equipo abierto se llega desde OTRO repuesto, la lista se quedaba
+   * filtrada por la pieza anterior.
+   */
+  useEffect(() => {
+    if (buscarInicial != null) setFiltro(buscarInicial)
+  }, [buscarInicial])
   const particionTotal = useMemo(() => particionarRepuestosDeEquipo(repuestos), [repuestos])
   const particion = useMemo(
     () => (filtro.trim() ? particionarRepuestosDeEquipo(filtrarRepuestosDeEquipo(repuestos, filtro)) : particionTotal),
@@ -1902,6 +1913,7 @@ function UbicacionRail({ equipment, onMoved }: { equipment: Equipment; onMoved?:
 
 function ExpedienteDialog({
   equipment,
+  buscarInicial,
   incidents,
   log,
   tab,
@@ -1922,6 +1934,8 @@ function ExpedienteDialog({
   onDeleteNote,
 }: {
   equipment: Equipment
+  /** Filtro con que se abre la lista de materiales (`?q=` de la URL). */
+  buscarInicial?: string
   incidents: Incident[]
   log: MaintenanceLogEntry[]
   tab: string
@@ -2376,7 +2390,7 @@ function ExpedienteDialog({
 
             <TabsContent value="recursos">
               <div className="space-y-3">
-                <RecursosRepuestos equipment={equipment} canEdit={canEdit} />
+                <RecursosRepuestos equipment={equipment} canEdit={canEdit} buscarInicial={buscarInicial} />
 
                 <Card>
                   <CardContent className="p-4 space-y-2">
