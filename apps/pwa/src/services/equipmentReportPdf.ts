@@ -4,6 +4,7 @@ import type { Equipment, Incident, MaintenanceLogEntry } from '@/types'
 import { criticidadEvaluada, CRIT } from '@/lib/ctd'
 import { FAMILIA_LABEL, familiaDe, checklistDe, medicionesDe } from '@/lib/nfpa70b'
 import { textoSeguroPdf, filaSegura } from '@/utils/pdf/textoSeguroPdf'
+import { cantidadDePosicion, contarSinCantidad } from '@/services/repuestos/cantidadDePosicion'
 
 /**
  * Reporte PDF del expediente de un equipo (handoff de auditoría NFPA 70B).
@@ -204,6 +205,9 @@ export function generarReporteEquipo(
   // ── Lista de materiales: SOLO las posiciones con SAP, las que se cargan en IB01 ──
   const materiales = datos.materiales ?? []
   if (materiales.length > 0) {
+    // Sin cantidad real la casilla queda en blanco para anotarla en terreno; el Excel de SAP
+    // la sube como 1 (ver cantidadDePosicion).
+    const sinCantidad = contarSinCantidad(materiales.map((m) => ({ cantidadPorMaquina: m.cantidad })))
     doc.addPage()
     autoTable(doc, {
       startY: 26,
@@ -213,7 +217,7 @@ export function generarReporteEquipo(
           String((i + 1) * 10),
           m.codigoSAP,
           m.textoBreve,
-          m.cantidad != null && m.cantidad > 0 ? String(m.cantidad) : '',
+          cantidadDePosicion(m.cantidad).real ? String(m.cantidad) : '',
           m.unidad || 'UN',
           '______',
         ]),
@@ -232,7 +236,7 @@ export function generarReporteEquipo(
       didDrawPage: () => {
         doc.setFontSize(9)
         doc.text(
-          textoSeguroPdf(`Lista de materiales · carga IB01 · uso de lista 4 · ${materiales.length} posiciones con SAP`),
+          textoSeguroPdf(`Lista de materiales · carga IB01 · uso de lista 4 · ${materiales.length} posiciones con SAP${sinCantidad ? ` · ${sinCantidad} sin cantidad: anotarla` : ''}`),
           MARGEN,
           20,
         )

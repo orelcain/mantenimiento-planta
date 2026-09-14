@@ -58,6 +58,7 @@ import { PhotoAnnotationEditor } from '@/components/PhotoAnnotationEditor'
 import { useManualesDeEquipos } from '@/hooks/repuestos/useManualesDeEquipos'
 import { useRepuestosDeEquipo, leerRepuestosDeEquipo } from '@/hooks/repuestos/useRepuestosDeEquipo'
 import { particionarRepuestosDeEquipo, filtrarRepuestosDeEquipo, opcionesBomDesdeEquipo } from '@/services/repuestos/bomDeEquipo'
+import { cantidadDePosicion, contarSinCantidad } from '@/services/repuestos/cantidadDePosicion'
 import { buildBomIB01, exportBomIB01ToExcel, toUnidadSAP } from '@/utils/repuestos/exportBomSAP'
 import { ubicacionCorta } from '@/services/equipos/ubicacionCorta'
 import { cn } from '@/lib/utils'
@@ -1492,6 +1493,8 @@ function RecursosRepuestos({ equipment, canEdit, buscarInicial }: { equipment: E
    */
   const opcionesBom = useMemo(() => opcionesBomDesdeEquipo(equipment), [equipment])
   const puedeExportarBom = opcionesBom !== null && particionTotal.bom.length > 0
+  // Sobre la lista entera, no la filtrada: es lo que va a salir en el Excel.
+  const bomSinCantidad = useMemo(() => contarSinCantidad(particionTotal.bom), [particionTotal])
 
   function exportarBom() {
     if (!opcionesBom) return
@@ -1661,6 +1664,14 @@ function RecursosRepuestos({ equipment, canEdit, buscarInicial }: { equipment: E
                   <span className="text-caption text-muted-foreground">
                     con código y cantidad — es la que se carga en IB01
                   </span>
+                  {bomSinCantidad > 0 && (
+                    <span
+                      className="text-caption font-medium text-ink-warn"
+                      title="Sin cantidad cargada en el maestro: «Exportar para SAP» las sube como 1. Corregir en Repuestos → Editar → Cantidad por máquina."
+                    >
+                      {bomSinCantidad} sin cantidad — salen como 1
+                    </span>
+                  )}
                   {puedeExportarBom && (
                     <Button
                       variant="outline"
@@ -1692,12 +1703,19 @@ function RecursosRepuestos({ equipment, canEdit, buscarInicial }: { equipment: E
                         {r.nombre}
                         {r.tipo ? <span className="text-caption text-muted-foreground"> · {r.tipo}</span> : null}
                       </span>
-                      {typeof r.cantidadPorMaquina === 'number' && (
+                      {cantidadDePosicion(r.cantidadPorMaquina).real ? (
                         <span
                           className="shrink-0 rounded-ctl bg-muted px-1.5 font-mono text-xs tabular-nums text-ink-ok"
                           title="Cantidad que lleva la máquina"
                         >
                           ×{r.cantidadPorMaquina}
+                        </span>
+                      ) : (
+                        <span
+                          className="shrink-0 rounded-ctl border border-dashed border-border px-1.5 text-caption text-ink-warn"
+                          title="Sin cantidad cargada: «Exportar para SAP» la sube como 1"
+                        >
+                          sin cant.
                         </span>
                       )}
                       {typeof r.stockFisico === 'number' && (
