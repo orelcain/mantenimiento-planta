@@ -1974,7 +1974,8 @@ function EquipmentDetailDialog({
     <Dialog open onOpenChange={onClose}>
       <DialogContent className="max-w-4xl">
         <DialogHeader>
-          <DialogTitle className="flex items-center justify-between gap-2">
+          {/* pr-[32px]: la estrella quedaba bajo la X del diálogo (su esquina recibía el toque de cerrar). */}
+          <DialogTitle className="flex items-center justify-between gap-2 pr-[32px]">
             <span className="truncate">{equipment.nombre}</span>
             <Button
               variant="ghost"
