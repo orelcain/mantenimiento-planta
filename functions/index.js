@@ -4508,9 +4508,16 @@ async function ariaDataSolicitudes() {
   if (snap.empty) return 'No hay solicitudes de repuestos registradas.'
   const lines = snap.docs.map((d) => {
     const x = d.data()
-    return `- ${ariaFmtFecha(x.createdAt)} [${x.estado || '?'}] ${x.textoBreve || x.codigoSAP || '?'} x${x.cantidad || 1} — ${x.solicitadoPorNombre || '?'}`
+    // Traza (#1017): quién aprobó y quién entregó; las viejas no la tienen y no se inventa.
+    const traza = [
+      x.aprobadaPor ? `aprobada por ${x.aprobadaPor} el ${ariaFmtFecha(x.aprobadaAt)}` : '',
+      x.entregadaPor ? `entregada por ${x.entregadaPor} el ${ariaFmtFecha(x.entregadaAt)}` : '',
+    ].filter(Boolean).join(' · ')
+    return `- ${ariaFmtFecha(x.createdAt)} [${x.estado || '?'}] ${x.textoBreve || x.codigoSAP || '?'} x${x.cantidad || 1} — ${x.solicitadoPorNombre || '?'}${traza ? ` · ${traza}` : ''}`
   })
-  return `Solicitudes de repuestos (últimas ${snap.size}):\n${lines.join('\n')}`
+  const cuenta = (e) => snap.docs.filter((d) => d.data().estado === e).length
+  return `Solicitudes de repuestos (últimas ${snap.size}): pendientes de aprobar ${cuenta('pendiente')}, aprobadas por entregar ${cuenta('aprobada')}, entregadas ${cuenta('entregada')}.\n${lines.join('\n')}\n` +
+    '(Esta es la fuente de solicitudes. Un repuesto del catálogo con fabricante «pendiente» NO es una solicitud.)'
 }
 
 async function ariaDataPreventivos() {
