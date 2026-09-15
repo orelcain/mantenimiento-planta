@@ -129,9 +129,12 @@ interface RepuestosAreaHubProps {
   /** Abrir el form de crear repuesto prellenado (desde Códigos fabricante). */
   pendingCreate?: PendingCreateRepuesto | null
   onPendingCreateConsumed?: () => void
+  /** Abrir el panel de Solicitudes al entrar (enlace `?solicitudes=1` del aviso de Telegram). */
+  abrirSolicitudes?: boolean
+  onSolicitudesAbiertas?: () => void
 }
 
-export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate, onPendingCreateConsumed }: RepuestosAreaHubProps = {}) {
+export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate, onPendingCreateConsumed, abrirSolicitudes, onSolicitudesAbiertas }: RepuestosAreaHubProps = {}) {
   const { areaTree, findNode, getNodePath, expandNode, nodeNameMap } = useHierarchyAreaTree()
 
   // El catálogo (colección plana `repuestos`) referencia nodos de hierarchy por id;
@@ -309,6 +312,11 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   const [solicitarOpen, setSolicitarOpen] = useState(false)
   const [solicitarRepuesto, setSolicitarRepuesto] = useState<RepuestoLite | null>(null)
   const [solicitudesOpen, setSolicitudesOpen] = useState(false)
+  useEffect(() => {
+    if (!abrirSolicitudes) return
+    setSolicitudesOpen(true)
+    onSolicitudesAbiertas?.()
+  }, [abrirSolicitudes, onSolicitudesAbiertas])
 
   // Drawer del sidebar de áreas en móvil
   const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false)
@@ -600,8 +608,14 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   const handleCrearSolicitud = useCallback(
     async (data: Parameters<typeof crearSolicitud>[0]) => {
       await crearSolicitud(data, user?.id ?? 'anon', user?.nombre ?? 'Anónimo')
+      // Antes el formulario solo se cerraba: nada decía que la solicitud había salido ni dónde verla.
+      toast({
+        title: 'Solicitud creada',
+        description: `${data.textoBreve || data.codigoSAP} ×${data.cantidad}. Queda en «Solicitudes» y se avisa al grupo de Mantención en Telegram.`,
+        variant: 'success',
+      })
     },
-    [crearSolicitud, user],
+    [crearSolicitud, user, toast],
   )
 
   // Persistir selección

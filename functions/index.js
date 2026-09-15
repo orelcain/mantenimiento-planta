@@ -882,24 +882,27 @@ exports.onSolicitudRepuestoCreated = onDocumentCreated('solicitudes_repuestos/{s
   const solicitudId = event.params.solicitudId
   if (!sol) return
 
-  // Escape mínimo para HTML de Telegram (los campos vienen de texto libre del usuario)
-  const esc = (v) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-
+  // El mensaje vive en solicitudRepuesto.js (probado): stock al pedir + enlace al panel.
+  const { mensajeTelegram, esc, RUTA_SOLICITUDES } = require('./solicitudRepuesto')
   const nombre = esc(sol.textoBreve) || '(sin nombre)'
-  const sap = esc(sol.codigoSAP) || '—'
   const cantidad = sol.cantidad ?? 1
   const solicitante = esc(sol.solicitadoPorNombre) || 'Desconocido'
-  const obs = sol.observaciones ? `\n📝 ${esc(sol.observaciones)}` : ''
+
+  // Stock al momento de pedir: UNA lectura por solicitud (hubo 1 en 3,5 meses → costo nulo).
+  // Si falla, el aviso sale igual y dice que no hay registro.
+  let bodega = null
+  try {
+    const sapLimpio = String(sol.codigoSAP || '').trim()
+    if (sapLimpio) {
+      const b = await db.collection('bodega').doc(sapLimpio).get()
+      bodega = b.exists ? b.data() : null
+    }
+  } catch (err) {
+    logger.warn('Solicitud de repuesto: no se pudo leer bodega', err)
+  }
 
   // Telegram → topic de Repuestos (cae a General si no está configurado)
-  await sendTelegramMessage(
-    `📦 <b>Nueva solicitud de repuesto</b>\n\n` +
-    `🔧 ${nombre}\n` +
-    `🏷️ SAP ${sap}  ·  Cantidad: <b>${cantidad}</b>\n` +
-    `👤 ${solicitante}${obs}\n` +
-    `🔗 <a href="https://orelcain.github.io/mantenimiento-planta/repuestos">Ver en Repuestos</a>`,
-    undefined, { topicId: getTopicId('repuestos') }
-  )
+  await sendTelegramMessage(mensajeTelegram(sol, bodega), undefined, { topicId: getTopicId('repuestos') })
 
   // Push FCM a supervisores/admins
   try {
@@ -910,7 +913,7 @@ exports.onSolicitudRepuestoCreated = onDocumentCreated('solicitudes_repuestos/{s
         type: 'SOLICITUD_REPUESTO_CREATED',
         solicitudId,
         codigoSAP: sol.codigoSAP || '',
-        url: '/mantenimiento-planta/repuestos',
+        url: RUTA_SOLICITUDES,
       })
     }
   } catch (err) {

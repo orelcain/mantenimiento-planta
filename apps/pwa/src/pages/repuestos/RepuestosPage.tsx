@@ -54,6 +54,10 @@ export function RepuestosPage() {
   const [jumpQuery, setJumpQuery] = useState<string>('')
   // pendingCreate: saltar a Áreas y abrir el form de crear prellenado (desde Códigos fabricante)
   const [pendingCreate, setPendingCreate] = useState<CrearDesdeCatalogo | null>(null)
+  // ?solicitudes=1 (enlace del aviso de Telegram y de la push): el panel de Solicitudes vive en
+  // Áreas. Sin forzar la pestaña, quien estuvo por última vez en Bodega aterrizaba donde no hay
+  // botón de Solicitudes.
+  const [abrirSolicitudes, setAbrirSolicitudes] = useState(false)
 
   // Deep-link ?q=<SAP> (ej. desde "Ver en Repuestos" de la pestaña Repuestos comunes
   // del Centro de Aprendizaje): abre Áreas con ese código pre-buscado.
@@ -64,6 +68,12 @@ export function RepuestosPage() {
       setJumpQuery(q.trim())
       setActiveTab('areas')
       searchParams.delete('q')
+      setSearchParams(searchParams, { replace: true })
+    }
+    if (searchParams.get('solicitudes')) {
+      setAbrirSolicitudes(true)
+      setActiveTab('areas')
+      searchParams.delete('solicitudes')
       setSearchParams(searchParams, { replace: true })
     }
     // solo al montar / cambiar el param
@@ -146,6 +156,8 @@ export function RepuestosPage() {
               onQueryConsumed={handleQueryConsumed}
               pendingCreate={pendingCreate}
               onPendingCreateConsumed={handlePendingCreateConsumed}
+              abrirSolicitudes={abrirSolicitudes}
+              onSolicitudesAbiertas={() => setAbrirSolicitudes(false)}
             />
           )}
         </div>
