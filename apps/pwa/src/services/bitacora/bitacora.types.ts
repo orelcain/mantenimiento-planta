@@ -24,7 +24,28 @@ export interface TurnoMantencion {
   fin: Date
 }
 
-export type TipoEvento = 'falla' | 'ajuste' | 'inspeccion' | 'preventivo' | 'novedad'
+export interface CierrePendiente {
+  tipo: 'resuelto' | 'no-aplica'
+  /** Turno en que se cerró. */
+  turnoId: string
+  porNombre: string
+  /** Evento que lo resolvió (solo `resuelto`). */
+  eventoId?: string | null
+  /** Motivo (solo `no-aplica`). */
+  motivo?: string | null
+  en?: Timestamp | null
+}
+
+/** Copia mínima del pendiente original, para mostrarlo sin volver a leerlo. */
+export interface OrigenPendiente {
+  id: string
+  turnoId: string
+  equipo: string
+  descripcion: string
+  registradoPor: string
+}
+
+export type TipoEvento ='falla' | 'ajuste' | 'inspeccion' | 'preventivo' | 'novedad'
 
 /**
  * Qué le costó el evento a producción.
@@ -79,6 +100,13 @@ export interface EventoBitacora {
   participantes?: string[]
   /** Nodo de `hierarchy` si el equipo se eligió del buscador (null = texto libre). */
   equipoId?: string | null
+  /**
+   * En un PENDIENTE: cómo y dónde se cerró. `resuelto` = otro evento lo resolvió
+   * (cuenta como cerrado por Mantención); `no-aplica` = se descartó con motivo.
+   */
+  cierre?: CierrePendiente | null
+  /** En el evento que RESUELVE un pendiente de un turno anterior: de cuál. */
+  resuelvePendiente?: OrigenPendiente | null
   actualizadoPorNombre?: string
   createdAt?: Timestamp | null
   updatedAt?: Timestamp | null
@@ -100,6 +128,10 @@ export type EventoBitacoraDatos = Pick<
 > & {
   participantes: string[]
   equipoId: string | null
+  /** Al editar: las fotos que tenía el evento al abrirlo (para guardar solo los cambios). */
+  fotosAntes?: FotoEvento[]
+  /** Solo al crear desde «Resolver»: el pendiente que este evento cierra. */
+  resuelvePendiente?: OrigenPendiente | null
   /** Al crear: quién registra. Al editar: quién edita (queda en actualizadoPorNombre). */
   quien: string
 }

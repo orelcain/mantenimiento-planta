@@ -26,6 +26,12 @@ export interface SheetProps {
 export function Sheet({ open, onClose, title, description, actions, children }: SheetProps) {
   const panelRef = React.useRef<HTMLDivElement>(null)
   const returnFocusRef = React.useRef<HTMLElement | null>(null)
+  // onClose en una ref: casi todos los que usan el Sheet le pasan una función
+  // nueva en cada render. Con `onClose` en las dependencias, CADA tecla re-corría
+  // el efecto: devolvía el foco al disparador y luego al panel → en el celular el
+  // teclado se cerraba letra a letra (encontrado en la Bitácora, 15-09-2026).
+  const onCloseRef = React.useRef(onClose)
+  onCloseRef.current = onClose
 
   React.useEffect(() => {
     if (!open) return
@@ -34,7 +40,7 @@ export function Sheet({ open, onClose, title, description, actions, children }: 
     document.body.style.overflow = 'hidden'
     panelRef.current?.focus()
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') onCloseRef.current()
     }
     document.addEventListener('keydown', onKey)
     return () => {
@@ -42,7 +48,7 @@ export function Sheet({ open, onClose, title, description, actions, children }: 
       document.body.style.overflow = prevOverflow
       returnFocusRef.current?.focus?.()
     }
-  }, [open, onClose])
+  }, [open])
 
   if (!open) return null
 

@@ -1,17 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, ClipboardCopy, FileDown, Loader2, MessageSquareText, NotebookPen, Plus } from 'lucide-react'
-import { Button, Pill, Sheet } from '@/components/piel'
+import { Check, ChevronLeft, ChevronRight, ClipboardCopy, FileDown, Loader2, MessageSquareText, NotebookPen, Plus } from 'lucide-react'
+import { Button, Pill, Sheet, Tag } from '@/components/piel'
 import { EventoBitacoraFila } from '@/components/bitacora/EventoBitacoraFila'
 import { EventoBitacoraSheet } from '@/components/bitacora/EventoBitacoraSheet'
 import { VisorFotosBitacora } from '@/components/bitacora/VisorFotosBitacora'
 import { SelectorTecnico } from '@/components/bitacora/SelectorTecnico'
 import { ListaTecnicosSheet, TecnicosDelTurnoSheet } from '@/components/bitacora/TecnicosTurnoSheets'
 import { construirListaTecnicos, tecnicosPresentes } from '@/services/bitacora/listaTecnicos'
+import { origenDePendiente } from '@/services/bitacora/entregaTurno'
 import { tecnicoRecordado } from '@/components/bitacora/tecnicoRecordado'
 import { useToast } from '@/hooks/useToast'
 import { FUENTE_FIRESTORE, useTurnoMantencionActual, type FuenteBitacora } from '@/hooks/useBitacoraTurno'
-import { BITACORA_PLANTA } from '@/config/bitacora'
+import { BITACORA_PLANTA, ETIQUETA_TIPO } from '@/config/bitacora'
 import { copiarHtml, copiarTexto } from '@/lib/clipboard'
 import type { EventoBitacora, FotoEvento, TurnoMantencion } from '@/services/bitacora/bitacora.types'
 import { bitacoraAHtmlCorreo, bitacoraATextoPlano, tituloCorreo } from '@/services/bitacora/bitacoraCorreo'
@@ -44,7 +45,7 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
   const [params, setParams] = useSearchParams()
   const turnoActual = useTurnoMantencionActual()
   const turnoParam = params.get('turno')
-  const [editor, setEditor] = useState<{ evento: EventoBitacora | null; idNuevo: string; turno: TurnoMantencion } | null>(null)
+  const [editor, setEditor] = useState<{ evento: EventoBitacora | null; idNuevo: string; turno: TurnoMantencion; pendienteOrigen?: EventoBitacora | null } | null>(null)
   // La jerarquía (702 nodos) se carga recién al abrir el editor, y queda en caché.
   const { opciones: opcionesEquipo, cargando: cargandoEquipos } = fuente.useOpcionesEquipo(Boolean(editor))
   const turnoNavegado = useMemo(() => turnoDesdeId(turnoParam) ?? turnoActual, [turnoParam, turnoActual])
@@ -71,6 +72,13 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
     [presentes.nombres, listaTecnicos],
   )
   const [hojaTecnicos, setHojaTecnicos] = useState<null | 'presentes' | 'lista'>(null)
+  // Borrador de «Técnicos del turno»: se toma al tocar Editar y sobrevive a ir y volver de la lista.
+  const [borradorPresentes, setBorradorPresentes] = useState<string[]>([])
+  // Nombre recordado en el teléfono, solo si sigue en la lista (pudo corregirse o quitarse).
+  const nombreRecordadoValido = () => {
+    const recordado = tecnicoRecordado()
+    return tecnicos.todos.length === 0 || tecnicos.todos.includes(recordado) ? recordado : ''
+  }
   const r = useMemo(() => resumirBitacora(eventos), [eventos])
 
   const [trabajando, setTrabajando] = useState<null | 'copiar' | 'copiar-incrustadas' | 'pdf'>(null)
@@ -78,6 +86,11 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
   const [textoObs, setTextoObs] = useState('')
   const [quienObs, setQuienObs] = useState('')
   const [visor, setVisor] = useState<{ fotos: FotoEvento[]; indice: number; titulo: string } | null>(null)
+  // Entrega de turno: pendientes abiertos de turnos anteriores.
+  const { pendientes: pendientesPrevios, cerrarNoAplica } = fuente.usePendientesAnteriores(turno)
+  const [noAplica, setNoAplica] = useState<EventoBitacora | null>(null)
+  const [motivoNoAplica, setMotivoNoAplica] = useState('')
+  const [quienNoAplica, setQuienNoAplica] = useState('')
 
   const abrirNuevo = useCallback(() => setEditor({ evento: null, idNuevo: nuevoId(), turno }), [nuevoId, turno])
 
@@ -105,8 +118,15 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
   }
 
   const datosCorreo = useMemo(
-    () => ({ turno, eventos, tecnicos: presentes.nombres, planta: BITACORA_PLANTA.nombre, observacion: observacion.texto }),
-    [turno, eventos, presentes.nombres, observacion.texto],
+    () => ({
+      turno,
+      eventos,
+      tecnicos: presentes.nombres,
+      planta: BITACORA_PLANTA.nombre,
+      observacion: observacion.texto,
+      pendientesAnteriores: pendientesPrevios,
+    }),
+    [turno, eventos, presentes.nombres, observacion.texto, pendientesPrevios],
   )
   const htmlCorreo = useMemo(() => bitacoraAHtmlCorreo(datosCorreo), [datosCorreo])
   const asunto = tituloCorreo(turno)
@@ -258,10 +278,53 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
       </div>
 
       {/* Técnicos del turno: quién está de verdad (mockup aprobado, pieza 1). */}
+      {/* Entrega de turno: lo primero que ve el turno que llega (mockup aprobado). */}
+      {pendientesPrevios.length > 0 && (
+        <section aria-label="Pendientes de turnos anteriores" className="flex flex-col">
+          <h2 className="px-4 pb-2 text-footnote text-muted-foreground">
+            <span className="font-semibold text-foreground">Vienen de turnos anteriores</span> · {pendientesPrevios.length}
+          </h2>
+          <div className="overflow-hidden rounded-card bg-card shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
+            {pendientesPrevios.map((p) => (
+              <div
+                key={p.id}
+                className='relative flex flex-col gap-1.5 px-4 py-3 before:absolute before:left-4 before:right-0 before:top-0 before:h-px before:bg-border before:content-[""] first:before:hidden'
+              >
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-headline leading-tight">{p.equipo?.trim() || 'Sin equipo'}</span>
+                  <Tag>{ETIQUETA_TIPO[p.tipo]}</Tag>
+                  <Pill tone="warning">Pendiente</Pill>
+                </div>
+                <p className="line-clamp-3 whitespace-pre-line text-body">{p.descripcion}</p>
+                <p className="text-footnote text-muted-foreground">{origenDePendiente(p, turno)}</p>
+                <div className="flex flex-wrap gap-2 pt-0.5">
+                  <Button variant="tinted" onClick={() => setEditor({ evento: null, idNuevo: nuevoId(), turno, pendienteOrigen: p })}>
+                    <Check /> Resolver
+                  </Button>
+                  <Button
+                    variant="plain"
+                    onClick={() => {
+                      setNoAplica(p)
+                      setMotivoNoAplica('')
+                      setQuienNoAplica(nombreRecordadoValido())
+                    }}
+                  >
+                    Ya no aplica
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       <section aria-label="Técnicos del turno" className="flex flex-col gap-2.5 rounded-card bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
         <div className="flex items-baseline justify-between gap-2">
           <h2 className="text-footnote text-muted-foreground">Técnicos del turno</h2>
-          <Button variant="plain" size="sm" onClick={() => setHojaTecnicos('presentes')}>
+          <Button variant="plain" size="sm" onClick={() => {
+              setBorradorPresentes(presentes.nombres)
+              setHojaTecnicos('presentes')
+            }}>
             Editar
           </Button>
         </div>
@@ -302,7 +365,7 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
         type="button"
         onClick={() => {
           setTextoObs(observacion.texto)
-          setQuienObs(tecnicoRecordado())
+          setQuienObs(nombreRecordadoValido())
           setEditandoObs(true)
         }}
         className="flex min-h-[44px] w-full items-start gap-3 rounded-card bg-card px-4 py-3 text-left shadow-[0_1px_4px_rgba(0,0,0,0.05)] transition-colors duration-150 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary motion-reduce:transition-none dark:shadow-none"
@@ -408,6 +471,7 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
         open={!!editor}
         turno={turno}
         evento={editor?.evento ?? null}
+        pendienteOrigen={editor?.pendienteOrigen ?? null}
         idNuevo={editor?.idNuevo ?? ''}
         sugerenciasEquipo={sugerenciasEquipo}
         tecnicos={tecnicos}
@@ -464,11 +528,66 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
         />
       </Sheet>
 
+      <Sheet
+        open={Boolean(noAplica)}
+        onClose={() => setNoAplica(null)}
+        title="Ya no aplica"
+        description={noAplica ? `${noAplica.equipo || 'Sin equipo'} · ${origenDePendiente(noAplica, turno)}` : undefined}
+        actions={
+          <>
+            <Button variant="tinted" onClick={() => setNoAplica(null)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                if (!noAplica) return
+                if (tecnicos.todos.length > 0 && !quienNoAplica.trim()) {
+                  toast({ title: 'Elige quién cierra el pendiente', variant: 'destructive' })
+                  return
+                }
+                if (!motivoNoAplica.trim()) {
+                  toast({ title: 'Escribe por qué ya no aplica', variant: 'destructive' })
+                  return
+                }
+                void cerrarNoAplica(noAplica, motivoNoAplica, quienNoAplica)
+                  .then(() => {
+                    toast({ title: 'Pendiente cerrado', description: 'No cuenta como resuelto por Mantención.' })
+                    setNoAplica(null)
+                  })
+                  .catch((e: unknown) => toast({ title: e instanceof Error ? e.message : 'No se pudo cerrar', variant: 'destructive' }))
+              }}
+            >
+              Cerrar pendiente
+            </Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          {tecnicos.todos.length > 0 && (
+            <SelectorTecnico etiqueta="Quién lo cierra" deTurno={tecnicos.deTurno} todos={tecnicos.todos} valor={quienNoAplica} onChange={setQuienNoAplica} />
+          )}
+          <div>
+            <label htmlFor="bitacora-motivo-no-aplica" className="mb-1.5 block text-footnote text-muted-foreground">
+              Por qué ya no aplica
+            </label>
+            <textarea
+              id="bitacora-motivo-no-aplica"
+              value={motivoNoAplica}
+              onChange={(e) => setMotivoNoAplica(e.target.value)}
+              maxLength={300}
+              placeholder="Se resolvió solo, estaba duplicado, se cambió el equipo…"
+              className="min-h-[88px] w-full resize-y rounded-ctl border-0 bg-muted-foreground/10 px-3 py-2.5 text-[16px] leading-snug text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary"
+            />
+          </div>
+        </div>
+      </Sheet>
+
       <TecnicosDelTurnoSheet
         open={hojaTecnicos === 'presentes'}
         lista={listaTecnicos}
         deTurnoCalendario={deTurnoCalendario}
-        presentes={presentes.nombres}
+        marcados={borradorPresentes}
+        onMarcados={setBorradorPresentes}
         onGuardar={(nombres) => {
           void guardarPresentes(nombres).catch((e: unknown) =>
             toast({ title: e instanceof Error ? e.message : 'No se pudo guardar', variant: 'destructive' }),

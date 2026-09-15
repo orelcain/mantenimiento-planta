@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { ETIQUETA_FOTO } from '@/config/bitacora'
@@ -24,11 +24,15 @@ export function VisorFotosBitacora({
   const total = fotos.length
   const foto = fotos[Math.min(i, total - 1)]
 
+  // onClose en ref: el padre pasa una función nueva en cada render (ver Sheet.tsx).
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+
   useEffect(() => {
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') onCloseRef.current()
       if (e.key === 'ArrowRight') setI((v) => Math.min(total - 1, v + 1))
       if (e.key === 'ArrowLeft') setI((v) => Math.max(0, v - 1))
     }
@@ -37,7 +41,7 @@ export function VisorFotosBitacora({
       document.removeEventListener('keydown', onKey)
       document.body.style.overflow = prev
     }
-  }, [onClose, total])
+  }, [total])
 
   if (!foto) return null
 

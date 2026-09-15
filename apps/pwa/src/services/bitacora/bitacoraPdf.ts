@@ -1,7 +1,7 @@
 import { ETIQUETA_FOTO } from '@/config/bitacora'
 import { textoSeguroPdf } from '@/utils/pdf/textoSeguroPdf'
 import { autorVisible, type EventoBitacora, type FotoEvento, type TurnoMantencion } from './bitacora.types'
-import { horarioEvento, lineaImpacto, lineaTecnicos } from './bitacoraCorreo'
+import { horarioEvento, lineaImpacto, lineaPendienteAnterior, lineaTecnicos } from './bitacoraCorreo'
 import { cargarFotoComoJpeg, type ImagenCargada } from './fotosBitacora'
 import { ordenarEventos, resumirBitacora } from './resumenBitacora'
 import { etiquetaTurno, fechaTurnoLarga, formatoMinutos, horarioTurno } from './turnoMantencion'
@@ -29,9 +29,10 @@ export interface DatosPdfBitacora {
   tecnicos: readonly string[]
   planta: string
   observacion?: string
+  pendientesAnteriores?: readonly EventoBitacora[]
 }
 
-export async function generarPdfBitacora({ turno, eventos, tecnicos, planta, observacion }: DatosPdfBitacora): Promise<{ archivo: string; fotosFallidas: number }> {
+export async function generarPdfBitacora({ turno, eventos, tecnicos, planta, observacion, pendientesAnteriores = [] }: DatosPdfBitacora): Promise<{ archivo: string; fotosFallidas: number }> {
   const { jsPDF } = await import('jspdf')
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   // NFKC antes del saneo: convierte subíndices y superíndices a dígitos
@@ -77,21 +78,28 @@ export async function generarPdfBitacora({ turno, eventos, tecnicos, planta, obs
   const fecha = fechaTurnoLarga(turno)
   pdf.text(t(`${fecha.charAt(0).toUpperCase()}${fecha.slice(1)} ·${horarioTurno(turno).replace('–', 'a')} · ${planta}`), M, y)
   y += 5
-  if (tecnicos.length) {
-    pdf.text(t(`Técnicos de turno: ${tecnicos.join(', ')}`), M, y)
-    y += 5
+  // Líneas que pueden ser largas (6 técnicos, equipos de nombre largo) se
+  // envuelven: con pdf.text a secas se salían por el borde derecho (revisión 15-09).
+  const envuelto = (texto: string, x: number, ancho: number, alto: number) => {
+    for (const l of pdf.splitTextToSize(t(texto), ancho) as string[]) {
+      saltoSiHaceFalta(alto)
+      pdf.text(l, x, y)
+      y += alto
+    }
   }
+  if (tecnicos.length) envuelto(`Técnicos de turno: ${tecnicos.join(', ')}`, M, ANCHO, 5)
   const autores = [...new Set(eventos.map(autorVisible).filter(Boolean))]
-  if (autores.length) {
-    pdf.text(t(`Registrado por: ${autores.join(', ')}`), M, y)
-    y += 5
-  }
+  if (autores.length) envuelto(`Registrado por: ${autores.join(', ')}`, M, ANCHO, 5)
 
   // ── Resumen ──
   const r = resumirBitacora(eventos)
   const kpis: Array<[string, string, RGB]> = [
     [String(r.eventos), r.eventos === 1 ? 'evento' : 'eventos', TINTA],
-    [formatoMinutos(r.minutosParada), `de parada${r.conParada ? ` (${r.conParada})` : ''}`, r.minutosParada > 0 ? PARADA : TINTA],
+    [
+      formatoMinutos(r.minutosParada),
+      r.conParada ? `de parada (${r.conParada}${r.paradasSinDuracion ? `, ${r.paradasSinDuracion} s/dur.` : ''})` : 'de parada',
+      r.conParada > 0 ? PARADA : TINTA,
+    ],
     [r.mttrMin == null ? '-' : formatoMinutos(r.mttrMin), 'MTTR', TINTA],
     [String(r.enVentana), 'sin detener producción', r.enVentana > 0 ? VENTANA : TINTA],
     [String(r.pendientes), r.pendientes === 1 ? 'pendiente' : 'pendientes', TINTA],
@@ -139,17 +147,17 @@ export async function generarPdfBitacora({ turno, eventos, tecnicos, planta, obs
     pdf.setFont('helvetica', 'bold')
     pdf.setFontSize(11)
     color(TINTA)
-    pdf.text(t([horarioEvento(e), e.equipo?.trim()].filter(Boolean).join(' · ')), x, y + 4)
-    y += 9
+    y += 4
+    envuelto([horarioEvento(e), e.equipo?.trim()].filter(Boolean).join(' · '), x, ancho, 5)
+    y += 0.5
     pdf.setFont('helvetica', 'normal')
     pdf.setFontSize(9)
     color(e.impacto === 'con-parada' ? PARADA : e.impacto === 'en-ventana' ? VENTANA : SEC)
-    pdf.text(t(lineaImpacto(e)), x, y)
-    y += 5
+    envuelto(lineaImpacto(e), x, ancho, 4.6)
+    y += 0.4
     if (lineaTecnicos(e)) {
       color(SEC)
-      pdf.text(t(lineaTecnicos(e)), x, y)
-      y += 5
+      envuelto(lineaTecnicos(e), x, ancho, 4.4)
     }
     if (lineasDesc.length) {
       pdf.setFontSize(10)
@@ -242,6 +250,32 @@ export async function generarPdfBitacora({ turno, eventos, tecnicos, planta, obs
       }
       dibujarEvento(e, 4)
     })
+  }
+
+  // ── Pendientes de turnos anteriores que siguen abiertos ──
+  if (pendientesAnteriores.length) {
+    saltoSiHaceFalta(30)
+    y += 4
+    pdf.setFillColor(PEND_FONDO[0], PEND_FONDO[1], PEND_FONDO[2])
+    pdf.rect(M, y, ANCHO, 9, 'F')
+    pdf.setFillColor(PEND_BORDE[0], PEND_BORDE[1], PEND_BORDE[2])
+    pdf.rect(M, y, 1.2, 9, 'F')
+    pdf.setFont('helvetica', 'bold')
+    pdf.setFontSize(12)
+    color(TINTA)
+    pdf.text(t('Sigue pendiente de turnos anteriores'), M + 4, y + 6.2)
+    y += 13
+    pdf.setFont('helvetica', 'normal')
+    pdf.setFontSize(10)
+    for (const e of pendientesAnteriores) {
+      const lineas = pdf.splitTextToSize(t(`• ${lineaPendienteAnterior(e)}`), ANCHO - 4) as string[]
+      for (const l of lineas) {
+        saltoSiHaceFalta(5)
+        pdf.text(l, M + 4, y)
+        y += 4.6
+      }
+      y += 1.5
+    }
   }
 
   // ── Pie con numeración ──
