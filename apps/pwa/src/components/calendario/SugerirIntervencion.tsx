@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Check, Wand2 } from 'lucide-react'
 import { ListGroup, Pill } from '@/components/piel'
 import { cn } from '@/lib/utils'
+import { CampoEntero } from './CampoEntero'
 import { aplicarSugerencia, sugerirHuecos, type Sugerencia } from '@/services/sugerirHueco'
 import {
   DIAS_CORTOS,
@@ -85,12 +86,12 @@ export function SugerirIntervencion({ maquina, onAplicar, disponibles }: Sugerir
           </label>
           <label className="flex w-24 flex-col gap-1 text-caption text-muted-foreground">
             Minutos
-            <input
-              type="number"
+            <CampoEntero
               min={5}
               step={5}
               value={minutos}
-              onChange={(e) => setMinutos(Math.max(5, Number(e.target.value) || 5))}
+              onChange={setMinutos}
+              aria-label="Minutos de la intervención"
               className={cn(campo, 'w-full')}
             />
           </label>

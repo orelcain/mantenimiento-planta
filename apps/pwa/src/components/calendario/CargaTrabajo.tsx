@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Check, Copy, Minus, Plus, Trash2, TriangleAlert } from 'lucide-react'
 import { ListGroup, ListCell, Pill } from '@/components/piel'
 import { cn } from '@/lib/utils'
+import { CampoEntero } from './CampoEntero'
 import {
   balance,
   cargaSemanalMinutos,
@@ -456,35 +457,33 @@ function FilaTarea({
           <div className="grid grid-cols-3 gap-2">
             <label className="flex flex-col gap-1 text-caption text-muted-foreground">
               Minutos
-              <input
-                type="number"
+              <CampoEntero
                 min={5}
                 step={5}
                 className={campo}
+                aria-label={`Minutos de ${tarea.nombre}`}
                 value={tarea.minutos}
-                onChange={(e) => onActualizar({ minutos: Math.max(5, Number(e.target.value) || 5) })}
+                onChange={(minutos) => onActualizar({ minutos })}
               />
             </label>
             <label className="flex flex-col gap-1 text-caption text-muted-foreground">
               Personas
-              <input
-                type="number"
+              <CampoEntero
                 min={1}
                 className={campo}
+                aria-label={`Personas de ${tarea.nombre}`}
                 value={tarea.personas}
-                onChange={(e) => onActualizar({ personas: Math.max(1, Number(e.target.value) || 1) })}
+                onChange={(personas) => onActualizar({ personas })}
               />
             </label>
             <label className="flex flex-col gap-1 text-caption text-muted-foreground">
               Veces/semana
-              <input
-                type="number"
+              <CampoEntero
                 min={1}
                 className={campo}
+                aria-label={`Veces por semana de ${tarea.nombre}`}
                 value={tarea.vecesPorSemana}
-                onChange={(e) =>
-                  onActualizar({ vecesPorSemana: Math.max(1, Number(e.target.value) || 1) })
-                }
+                onChange={(vecesPorSemana) => onActualizar({ vecesPorSemana })}
               />
             </label>
           </div>
