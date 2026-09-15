@@ -21,6 +21,9 @@ import type {
 import { autorVisible } from '@/services/bitacora/bitacora.types'
 import { borrarFotoBitacora, subirFotoBitacora } from '@/services/bitacora/fotosBitacora'
 import { SelectorTecnico } from './SelectorTecnico'
+import { SelectorParticipantes } from './SelectorParticipantes'
+import { BuscadorEquipo } from './BuscadorEquipo'
+import type { OpcionEquipo } from '@/services/bitacora/buscarEquipos'
 import { tecnicoRecordado } from './tecnicoRecordado'
 import { formatoMinutos, horaSugeridaParaEvento, minutosEntre } from '@/services/bitacora/turnoMantencion'
 
@@ -39,8 +42,11 @@ export interface EventoBitacoraSheetProps {
   /** Id reservado para un evento nuevo (sus fotos se suben a esa carpeta). */
   idNuevo: string
   sugerenciasEquipo: string[]
-  /** Planilla del calendario: de aquí elige su nombre quien registra. */
+  /** `deTurno` = presentes del turno (botones rápidos); `todos` = lista de técnicos completa. */
   tecnicos: { deTurno: string[]; todos: string[] }
+  /** Equipos y áreas de la jerarquía para el buscador. */
+  opcionesEquipo: readonly OpcionEquipo[]
+  cargandoEquipos: boolean
   /** Por defecto sube a Storage; la vitrina de desarrollo la reemplaza. */
   subirFoto?: typeof subirFotoBitacora
   onGuardar: (id: string, datos: EventoBitacoraDatos, esNuevo: boolean) => Promise<void>
@@ -101,6 +107,8 @@ export function EventoBitacoraSheet({
   idNuevo,
   sugerenciasEquipo,
   tecnicos,
+  opcionesEquipo,
+  cargandoEquipos,
   subirFoto = subirFotoBitacora,
   onGuardar,
   onBorrar,
@@ -111,6 +119,8 @@ export function EventoBitacoraSheet({
   const eventoId = evento?.id ?? idNuevo
 
   const [quien, setQuien] = useState('')
+  const [participantes, setParticipantes] = useState<string[]>([])
+  const [equipoId, setEquipoId] = useState<string | null>(null)
   const [tipo, setTipo] = useState<TipoEvento>('falla')
   const [equipo, setEquipo] = useState('')
   const [descripcion, setDescripcion] = useState('')
@@ -137,6 +147,8 @@ export function EventoBitacoraSheet({
   useEffect(() => {
     if (!open) return
     setQuien(tecnicoRecordado())
+    setParticipantes(evento?.participantes ?? [])
+    setEquipoId(evento?.equipoId ?? null)
     setTipo(evento?.tipo ?? 'falla')
     setEquipo(evento?.equipo ?? '')
     setDescripcion(evento?.descripcion ?? '')
@@ -281,6 +293,11 @@ export function EventoBitacoraSheet({
           pendiente,
           fotos,
           quien,
+          // Quien registra no se repite como participante (pudo quedar marcado antes de elegirlo).
+          participantes: participantes.filter(
+            (p) => p.trim().toLowerCase() !== (esNuevo ? quien : (evento?.registradoPor ?? quien)).trim().toLowerCase(),
+          ),
+          equipoId,
         },
         esNuevo,
       )
@@ -356,6 +373,15 @@ export function EventoBitacoraSheet({
             )}
           </div>
         )}
+        {tecnicos.todos.length > 0 && (
+          <SelectorParticipantes
+            presentes={tecnicos.deTurno}
+            todos={tecnicos.todos}
+            excluir={esNuevo ? quien : (evento?.registradoPor ?? quien)}
+            valor={participantes}
+            onChange={setParticipantes}
+          />
+        )}
 
         {/* Tipo — con rótulo propio: sin él se confundía con la fila de nombres de arriba. */}
         <div>
@@ -371,23 +397,16 @@ export function EventoBitacoraSheet({
 
         {/* Equipo y horas */}
         <div className="flex flex-col gap-3">
-          <div>
-            <label htmlFor="bitacora-equipo" className={ETIQUETA_CAMPO}>Equipo o área</label>
-            <input
-              id="bitacora-equipo"
-              className={CAMPO}
-              value={equipo}
-              onChange={(e) => setEquipo(e.target.value)}
-              list="bitacora-equipos"
-              placeholder="BAADER 142, Grader, sala de bombas…"
-              autoComplete="off"
-            />
-            <datalist id="bitacora-equipos">
-              {equiposSugeridos.map((e) => (
-                <option key={e} value={e} />
-              ))}
-            </datalist>
-          </div>
+          <BuscadorEquipo
+            texto={equipo}
+            onChange={(texto, id) => {
+              setEquipo(texto)
+              setEquipoId(id)
+            }}
+            opciones={opcionesEquipo}
+            cargando={cargandoEquipos}
+            recientes={equiposSugeridos}
+          />
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label htmlFor="bitacora-inicio" className={ETIQUETA_CAMPO}>Inicio</label>

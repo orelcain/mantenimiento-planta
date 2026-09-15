@@ -75,6 +75,10 @@ export interface EventoBitacora {
    * nombre que se muestra: con la cuenta compartida, `autorNombre` no dice quién fue.
    */
   registradoPor?: string | null
+  /** Otros técnicos que trabajaron en el evento (además de quien registra). */
+  participantes?: string[]
+  /** Nodo de `hierarchy` si el equipo se eligió del buscador (null = texto libre). */
+  equipoId?: string | null
   actualizadoPorNombre?: string
   createdAt?: Timestamp | null
   updatedAt?: Timestamp | null
@@ -94,6 +98,8 @@ export type EventoBitacoraDatos = Pick<
   | 'pendiente'
   | 'fotos'
 > & {
+  participantes: string[]
+  equipoId: string | null
   /** Al crear: quién registra. Al editar: quién edita (queda en actualizadoPorNombre). */
   quien: string
 }
@@ -101,4 +107,18 @@ export type EventoBitacoraDatos = Pick<
 /** Nombre a mostrar como autor de un evento. */
 export function autorVisible(e: Pick<EventoBitacora, 'registradoPor' | 'autorNombre'>): string {
   return e.registradoPor?.trim() || e.autorNombre
+}
+
+/** Todos los técnicos del evento: quien registra primero y luego los que participaron, sin repetir. */
+export function tecnicosDelEvento(e: Pick<EventoBitacora, 'registradoPor' | 'autorNombre' | 'participantes'>): string[] {
+  const vistos = new Set<string>()
+  return [autorVisible(e), ...(e.participantes ?? [])]
+    .map((n) => n?.trim())
+    .filter((n): n is string => {
+      if (!n) return false
+      const k = n.toLowerCase()
+      if (vistos.has(k)) return false
+      vistos.add(k)
+      return true
+    })
 }

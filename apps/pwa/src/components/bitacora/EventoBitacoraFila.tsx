@@ -1,7 +1,7 @@
 import { Camera } from 'lucide-react'
 import { Pill, Tag } from '@/components/piel'
 import { ETIQUETA_FOTO, ETIQUETA_TIPO } from '@/config/bitacora'
-import { autorVisible, type EventoBitacora, type FotoEvento } from '@/services/bitacora/bitacora.types'
+import { autorVisible, tecnicosDelEvento, type EventoBitacora, type FotoEvento } from '@/services/bitacora/bitacora.types'
 import { minutosParadaDe } from '@/services/bitacora/resumenBitacora'
 import { formatoMinutos } from '@/services/bitacora/turnoMantencion'
 
@@ -107,7 +107,7 @@ export function EventoBitacoraFila({
         )}
 
         <span className="text-caption text-muted-foreground">
-          {autorVisible(evento)}
+          {tecnicosDelEvento(evento).join(', ')}
           {evento.actualizadoPorNombre && evento.actualizadoPorNombre !== autorVisible(evento)
             ? ` · editado por ${evento.actualizadoPorNombre}`
             : ''}

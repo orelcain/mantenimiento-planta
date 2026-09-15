@@ -1,7 +1,7 @@
 import { ETIQUETA_FOTO } from '@/config/bitacora'
 import { textoSeguroPdf } from '@/utils/pdf/textoSeguroPdf'
 import { autorVisible, type EventoBitacora, type FotoEvento, type TurnoMantencion } from './bitacora.types'
-import { horarioEvento, lineaImpacto } from './bitacoraCorreo'
+import { horarioEvento, lineaImpacto, lineaTecnicos } from './bitacoraCorreo'
 import { cargarFotoComoJpeg, type ImagenCargada } from './fotosBitacora'
 import { ordenarEventos, resumirBitacora } from './resumenBitacora'
 import { etiquetaTurno, fechaTurnoLarga, formatoMinutos, horarioTurno } from './turnoMantencion'
@@ -146,6 +146,11 @@ export async function generarPdfBitacora({ turno, eventos, tecnicos, planta, obs
     color(e.impacto === 'con-parada' ? PARADA : e.impacto === 'en-ventana' ? VENTANA : SEC)
     pdf.text(t(lineaImpacto(e)), x, y)
     y += 5
+    if (lineaTecnicos(e)) {
+      color(SEC)
+      pdf.text(t(lineaTecnicos(e)), x, y)
+      y += 5
+    }
     if (lineasDesc.length) {
       pdf.setFontSize(10)
       color(TINTA)
