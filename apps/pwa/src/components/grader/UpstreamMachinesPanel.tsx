@@ -62,6 +62,7 @@ import { fmtTime, fmtDurationSec } from '@/services/grader/graderTimeFormat'
 import { slxStateColor } from '@/services/shoplogix/shoplogixColors'
 import { logger } from '@/lib/logger'
 import { softenAccentHex } from '@/lib/softenColor'
+import { syncCubreElTurno } from '@/services/grader/frescuraDelSync'
 
 interface Props {
   snapshot: UpstreamLineSnapshot | null | undefined
@@ -1076,7 +1077,12 @@ export function UpstreamMachinesPanel({
   // objetivo y el sombreado sería ruido.
   const [showRateGap, setShowRateGap] = useState(false)
 
-  const isStale = useMemo(() => isStaleSync(syncedAt), [syncedAt])
+  // «Desactualizado» solo mientras el dato puede cambiar: si el sync es posterior
+  // al fin del turno, el turno está completo y la alarma sobra (ver frescuraDelSync).
+  const isStale = useMemo(
+    () => isStaleSync(syncedAt) && !syncCubreElTurno(syncedAt, shiftWindow?.endAt ? new Date(shiftWindow.endAt) : null),
+    [syncedAt, shiftWindow?.endAt],
+  )
 
   // Ventana temporal a usar para alinear el Gantt.
   // Prioridad de fuentes (Synchronized Timeline):
