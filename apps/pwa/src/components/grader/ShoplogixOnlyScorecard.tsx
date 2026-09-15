@@ -19,6 +19,7 @@ import type { ShiftTimeWindow } from '@/services/grader/graderShiftStatus'
 import { getShiftMeta } from '@/services/grader/graderShiftDisplay'
 import { fmtTime } from '@/services/grader/graderTimeFormat'
 import { ShiftMachinesHalf } from './ShiftMachinesHalf'
+import { textoPuerta0 } from '@/services/grader/textoPuerta0'
 
 /** Colores del reparto de ciclos entre máquinas — categóricos, no semánticos:
  *  codifican QUÉ máquina, no si está bien o mal. */
@@ -32,6 +33,12 @@ interface Props {
    * como un número suelto de ciclos.
    */
   plannedTargetPieces?: number
+  /**
+   * Si la línea pasa por Grader. Filete no (`hasGraderData: false`): ahí decir
+   * que el P0 «se calcula con el Excel del Grader» prometía algo que nunca va a
+   * pasar. Por defecto true, que es lo que vale para Chonchi y Yal.
+   */
+  tieneGrader?: boolean
   shiftWindow: ShiftTimeWindow | null
   shiftLabel: string
   dateKey: string
@@ -43,7 +50,7 @@ interface Props {
   outside?: { pieces: number; ranges: Array<{ from: Date; to: Date; pieces: number; kind: 'antes' | 'despues' }> }
 }
 
-export function ShoplogixOnlyScorecard({ snapshot, shiftWindow, shiftLabel, dateKey, plannedTargetPieces, outside }: Props) {
+export function ShoplogixOnlyScorecard({ snapshot, shiftWindow, shiftLabel, dateKey, plannedTargetPieces, outside, tieneGrader = true}: Props) {
   const cyclesEnTurno = snapshot.machines.reduce((s, m) => s + (m.totalCycles ?? 0), 0)
   const outsidePieces = outside?.pieces ?? 0
   // El número grande es la JORNADA: lo que la línea produjo, sin importar dónde
@@ -133,7 +140,7 @@ export function ShoplogixOnlyScorecard({ snapshot, shiftWindow, shiftLabel, date
           {/* Sin Excel no hay P0: se dice, en vez de dejar el hueco. */}
           <div className="mt-2">
             <span className="inline-flex items-center rounded-full border border-border bg-secondary px-2 py-0.5 text-xs text-muted-foreground">
-              P0 — se calcula con el Excel del Grader
+              {textoPuerta0(tieneGrader)}
             </span>
           </div>
 

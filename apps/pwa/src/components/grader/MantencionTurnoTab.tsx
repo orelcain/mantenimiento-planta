@@ -24,6 +24,7 @@ import { cargarTendenciaMantencion, TURNOS_TENDENCIA, type PuntoTendenciaMantenc
 import type { PlantSlug } from '@/services/shoplogix/shoplogixMachines'
 import { detectMicroAnomalies } from '@/services/grader/graderUpstreamHealth'
 import { MachineShiftDetail } from './UpstreamMachinesPanel'
+import { enLasMaquinas, sinIntervencion, leyendaReparto } from '@/services/grader/textosPorMaquinas'
 
 const nf = new Intl.NumberFormat('es-CL')
 const fmtInt = (n: number) => nf.format(Math.round(n))
@@ -314,7 +315,7 @@ export function MantencionTurnoTab({ kpis, loading, plantSlug, shiftId, dateKey 
         {totalFallaMin === 0 ? (
           <p className="mt-2 text-[15px] leading-snug text-foreground">
             {cerrado ? 'El turno cerró sin fallas técnicas' : 'El turno va sin fallas técnicas'}:
-            disponibilidad <b className="tabular-nums">100%</b> en las {porMaquina.length} máquinas.
+            disponibilidad <b className="tabular-nums">100%</b> {enLasMaquinas(porMaquina.length)}.
           </p>
         ) : (
           <>
@@ -341,11 +342,7 @@ export function MantencionTurnoTab({ kpis, loading, plantSlug, shiftId, dateKey 
             {/* El mensaje de «la disponibilidad que no se nota» vive acá, junto a
                 las píldoras que lo respaldan: antes estaba además en «Nuestra
                 respuesta», o sea el mismo hecho escrito dos veces. */}
-            {sanas.length > 0 && (
-              sanas.length === porMaquina.length
-                ? `Las ${porMaquina.length} máquinas cerraron sin una sola intervención. `
-                : `${sanas.length} de ${porMaquina.length} máquinas ${sanas.length === 1 ? 'cerró' : 'cerraron'} sin una sola intervención. `
-            )}
+            {sinIntervencion(sanas.length, porMaquina.length)}
             Disponibilidad técnica: solo fallas de equipo — colación, micro y externos van aparte.
           </span>
         </div>
@@ -449,8 +446,8 @@ export function MantencionTurnoTab({ kpis, loading, plantSlug, shiftId, dateKey 
           <span className="inline-flex items-center gap-1"><i className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: FILL.produccion }} />Produciendo</span>
         </div>
         <p className="mt-1.5 text-caption text-muted-foreground/80">
-          Las {porMaquina.length} barras miden el mismo turno y arrancan por falla técnica: el bloque rojo se compara de un vistazo.
-          Toca una máquina para ver su Gantt, sus paros y los comentarios del operador.
+          {/* Filete tiene UNA máquina: «Las 1 barras … se compara de un vistazo». */}
+          {leyendaReparto(porMaquina.length)}
         </p>
       </section>
 
