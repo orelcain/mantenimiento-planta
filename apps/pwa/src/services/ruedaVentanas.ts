@@ -567,6 +567,25 @@ export async function cargarRueda(): Promise<RuedaState | null> {
   return normalizarEstado(snap.data())
 }
 
+/**
+ * Lo que el autoguardado compara para decidir si hay algo que escribir: EXACTAMENTE lo que
+ * `guardarRueda` escribe.
+ *
+ * Comparaba solo `state.maquinas`. Todo lo de «¿Alcanza el tiempo?» —tareas, minutos, personas,
+ * veces por semana, dotación, reserva de correctivas, anclajes— vive en otros campos, así que
+ * editarlo no disparaba ninguna escritura y se perdía al recargar (verificado el 15-09: apagar
+ * una tarea no escribió nada y volvió a «Activa»). Solo se guardaba si después alguien tocaba
+ * una máquina. El documento tiene las 6 tareas de ejemplo intactas desde el 31-08.
+ */
+export function firmaDeGuardado(state: RuedaState): string {
+  return JSON.stringify({
+    maquinas: state.maquinas,
+    tareas: state.tareas ?? [],
+    configCarga: state.configCarga ?? CONFIG_CARGA_POR_DEFECTO,
+    anclajes: state.anclajes ?? [],
+  })
+}
+
 export async function guardarRueda(state: RuedaState, uid: string | null): Promise<void> {
   await trackedSetDoc(
     doc(db, RUEDA_FIRESTORE_PATH[0], RUEDA_FIRESTORE_PATH[1]),

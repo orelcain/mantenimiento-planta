@@ -8,6 +8,7 @@ import {
   contarSemana,
   diaVacio,
   estadoInicial,
+  firmaDeGuardado,
   maquinaNueva,
   normalizarEstado,
   confirmadas,
@@ -399,5 +400,25 @@ describe('turnos del día', () => {
   it('una hora cualquiera no es corte de turno', () => {
     expect(esCorteDeTurno(4)).toBe(false)
     expect(esCorteDeTurno(20)).toBe(false)
+  })
+})
+
+describe('firmaDeGuardado — lo que decide si el autoguardado escribe', () => {
+  it('abrir sin tocar nada no cambia la firma (no escribe al entrar)', () => {
+    expect(firmaDeGuardado(estadoInicial())).toBe(firmaDeGuardado(estadoInicial()))
+  })
+
+  it('apagar una tarea SÍ cambia la firma — antes solo se miraban las máquinas y se perdía', () => {
+    const base = estadoInicial()
+    const tareas = (base.tareas ?? []).map((t, i) => (i === 5 ? { ...t, activa: false } : t))
+    expect(firmaDeGuardado({ ...base, tareas })).not.toBe(firmaDeGuardado(base))
+  })
+
+  it('minutos, dotación y anclajes también cuentan', () => {
+    const base = estadoInicial()
+    const minutos = (base.tareas ?? []).map((t, i) => (i === 0 ? { ...t, minutos: t.minutos + 5 } : t))
+    expect(firmaDeGuardado({ ...base, tareas: minutos })).not.toBe(firmaDeGuardado(base))
+    expect(firmaDeGuardado({ ...base, configCarga: { dotacion: 3, reservaCorrectivasPct: 30 } })).not.toBe(firmaDeGuardado(base))
+    expect(firmaDeGuardado({ ...base, anclajes: [{ tareaId: 'seed-0', ocurrencia: 0, dia: 1, inicio: 20 }] as never })).not.toBe(firmaDeGuardado(base))
   })
 })
