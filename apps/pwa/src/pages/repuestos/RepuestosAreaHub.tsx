@@ -44,6 +44,7 @@ import { useAreaRepuestos, type StockStatus, type AreaRepuestoRow } from '@/hook
 import { useHierarchyPaths } from '@/hooks/repuestos/useHierarchyPaths'
 import { claveDeEquipo, equipoParaMostrar, opcionesDeEquipo } from '@/hooks/repuestos/dondeSeUsa'
 import { areaContenedora, conteosConfiables } from '@/hooks/repuestos/alcanceDeAreas'
+import { apodosCambiaron, apodosDesdeTexto } from '@/hooks/repuestos/apodosDeRepuesto'
 import { useManualesDeEquipos } from '@/hooks/repuestos/useManualesDeEquipos'
 import { getRepuestoFavListsGlobal, saveRepuestoFavListsGlobal, getUserPreferences, saveFavoriteLists, type RepuestoFavList, type FavList } from '@/services/userPreferences'
 import { useRepuestoCrud } from '@/hooks/repuestos/useRepuestoCrud'
@@ -1187,6 +1188,9 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   const [savingApodos, setSavingApodos] = useState(false)
   const persistApodos = useCallback(
     async (row: AreaRepuestoRow, arr: string[]) => {
+      // Abrir y cerrar el editor sin cambiar nada no escribe, no audita, no recarga ~7.700 docs y
+      // no dice «guardados» (ver apodosDeRepuesto). Lo usan la tabla y el panel del repuesto.
+      if (!apodosCambiaron(row.nombresComunes, arr)) return
       setSavingApodos(true)
       try {
         const sources = resolveSources(row)
@@ -1205,7 +1209,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   )
   const saveApodos = useCallback(
     async (row: AreaRepuestoRow) => {
-      await persistApodos(row, editApodosVal.split(',').map((s) => s.trim()).filter(Boolean))
+      await persistApodos(row, apodosDesdeTexto(editApodosVal))
       setEditApodosKey(null)
     },
     [editApodosVal, persistApodos],
