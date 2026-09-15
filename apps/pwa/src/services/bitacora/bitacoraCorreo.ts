@@ -1,5 +1,5 @@
 import { ETIQUETA_FOTO, ETIQUETA_TIPO } from '@/config/bitacora'
-import type { EventoBitacora, FotoEvento, TurnoMantencion } from './bitacora.types'
+import { autorVisible, type EventoBitacora, type FotoEvento, type TurnoMantencion } from './bitacora.types'
 import { minutosParadaDe, ordenarEventos, resumirBitacora } from './resumenBitacora'
 import { etiquetaTurno, fechaTurnoLarga, formatoMinutos, horarioTurno } from './turnoMantencion'
 
@@ -131,7 +131,7 @@ export function bitacoraAHtmlCorreo({ turno, eventos, tecnicos, planta, observac
   const r = resumirBitacora(eventos)
   const hechos = ordenados.filter((e) => !e.pendiente)
   const pendientes = ordenados.filter((e) => e.pendiente)
-  const autores = [...new Set(eventos.map((e) => e.autorNombre).filter(Boolean))]
+  const autores = [...new Set(eventos.map(autorVisible).filter(Boolean))]
 
   const kpis = [
     htmlKpi(String(r.eventos), r.eventos === 1 ? 'evento' : 'eventos'),

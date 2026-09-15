@@ -4891,3 +4891,18 @@ Pendiente: prueba real de Orel en el celular (fotos de cámara) y pegado en SU O
   caber en la columna; antes la 2ª foto quedaba cortada (la columna mide distinto con/sin menú).
 - Verificado en `/dev/bitacora` (5189): observación, visor, dock 52 px, flujo offline completo
   simulando `navigator.onLine`, correo sin scroll horizontal. 21 tests, lint 28/30, audit-piel OK.
+
+### 2026-09-15 · Bitácora · PR #1021 en producción + «Quién registra»
+
+- **#1021 mergeado** (`9b10975`) y verificado en prod: `version.json` con el sha, chunks
+  `BitacoraTurnoPage` / `BitacoraTurnoCard` / `useBitacoraTurno` publicados, reglas de Firestore y
+  Storage publicadas 21:29 UTC con los `match` nuevos (API firebaserules, no el estado del workflow).
+- **`scripts/probar-reglas-bitacora.cjs`**: prueba el ruleset PUBLICADO con `projects:test`
+  (16 casos ALLOW/DENY con usuarios simulados, no escribe datos). 16/16.
+- **Decisión de Orel**: no hay cuentas por técnico; usan la **cuenta compartida de Mantención**
+  (`mantencion.plantach…`, activa) y **cada uno elige su nombre de la planilla del calendario**.
+  → selector «Quién registra» (técnicos de turno primero + «Otro técnico» con la planilla completa),
+  recordado por teléfono en localStorage. Se guarda `registradoPor` al crear y
+  `actualizadoPorNombre` al editar (registradoPor no se pisa). Lista, correo y PDF muestran el
+  técnico elegido (`autorVisible`), nunca el nombre de la cuenta. También en la observación.
+- Sin cambios de reglas (campo extra permitido). 23 tests.
