@@ -25,6 +25,7 @@ import type { PlantSlug } from '@/services/shoplogix/shoplogixMachines'
 import { detectMicroAnomalies } from '@/services/grader/graderUpstreamHealth'
 import { MachineShiftDetail } from './UpstreamMachinesPanel'
 import { enLasMaquinas, sinIntervencion, leyendaReparto } from '@/services/grader/textosPorMaquinas'
+import { dondeOcurrioLaFalla, causasDeFallaDelTurno } from '@/services/shoplogix/fallaDelTurno'
 
 const nf = new Intl.NumberFormat('es-CL')
 const fmtInt = (n: number) => nf.format(Math.round(n))
@@ -286,6 +287,12 @@ export function MantencionTurnoTab({ kpis, loading, plantSlug, shiftId, dateKey 
   /* Piezas estimadas de la falla, al ritmo DEMOSTRADO de cada máquina (su
      mediana andando) — no al target, que puede estar malo (ver aviso). */
   const pzFalla = conFalla.reduce((a, x) => a + x.reparto.falla * (x.velocidad.medianaAndandoCpm ?? 0), 0)
+  const maquinasConFalla = conFalla.map((x) => ({
+    nombreCorto: nombreCorto(x.maquina.machineName),
+    fallaMin: x.reparto.falla,
+    causas: x.kpi.grupos.falla?.causas ?? {},
+  }))
+  const causasDelTurno = causasDeFallaDelTurno(maquinasConFalla)
 
   /*
    * Reenganche tras el paro mayor, a resolución de los intervalos de 5 min
@@ -392,15 +399,17 @@ export function MantencionTurnoTab({ kpis, loading, plantSlug, shiftId, dateKey 
                 ≈ {fmtInt(pzFalla)}<span className="text-[15px] font-semibold"> pz</span>
               </div>
               <div className="text-footnote text-muted-foreground">
-                al ritmo demostrado{conFalla[0] ? ` · ${fmtInt(totalFallaMin)} min de falla en ${nombreCorto(conFalla[0].maquina.machineName)}` : ''}
+                {/* Los minutos son del TURNO: nombrar una máquina les cargaba a
+                    ella los de las otras dos (Yal 11-09 T2: «63 min en YA 1»,
+                    cuando YA 1 tuvo 24). */}
+                al ritmo demostrado{maquinasConFalla.length ? ` · ${dondeOcurrioLaFalla(maquinasConFalla, totalFallaMin)}` : ''}
               </div>
             </div>
-            {conFalla[0] && conFalla[0].kpi.grupos.falla && (
+            {/* Las causas son las de TODAS las máquinas con falla: antes salían
+                solo las de la primera y el resto del turno quedaba sin explicar. */}
+            {causasDelTurno.length > 0 && (
               <Pill tone="critical" className="tabular-nums normal-case">
-                {Object.entries(conFalla[0].kpi.grupos.falla.causas)
-                  .sort((a, b) => b[1] - a[1])
-                  .map(([c, s]) => `${c} ${fmtInt(s / 60)}`)
-                  .join(' + ')}
+                {causasDelTurno.map((c) => `${c.causa} ${c.min}`).join(' + ')}
               </Pill>
             )}
           </div>
