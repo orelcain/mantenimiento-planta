@@ -12,8 +12,11 @@
  * Una futura iteración puede sumar carga lazy desde la tool si el caso de
  * uso lo justifica (refactor de useGlobalSearch para extraer loader puro).
  */
+import { collection, getDocs, limit, orderBy, query } from 'firebase/firestore'
+import { db } from '@/services/firebase'
 import { registerTool } from './registry'
 import { getGlobalRepuestosCache, type GlobalSearchResult } from '@/hooks/repuestos/useGlobalSearch'
+import { resumenDeSolicitudes, type SolicitudParaAria } from './resumenSolicitudes'
 
 const normalizeText = (s: string) =>
   s
@@ -96,6 +99,50 @@ registerTool({
       data: { query, count: matches.length, results: top },
       summary: `${matches.length} coincidencia(s) para "${query}" (mostrando ${top.length}):\n\n${body}`,
       label: 'Buscar repuesto',
+    }
+  },
+})
+
+// ─── repuestos.solicitudes ─────────────────────────────────────────────
+// Sin esta tool, ARIA decía que el módulo no existía e inventaba «pendientes» buscando la
+// palabra en el catálogo (ver resumenSolicitudes). Lee a lo más 30 documentos por pregunta.
+
+registerTool({
+  name: 'repuestos.solicitudes',
+  category: 'repuestos',
+  description:
+    'Solicitudes de repuesto a bodega (pedidos): cuántas hay pendientes de aprobar, aprobadas por entregar y entregadas; quién pidió, quién aprobó y quién entregó.',
+  params: [],
+  triggers: [
+    /\bsolicitud(es)?\b/i,
+    /\bped(id[oa]s?|imos|ieron|[ií]|[ií]ste)\b.*\brepuestos?\b/i,
+    /\bpor\s+entregar\b/i,
+  ],
+  execute: async () => {
+    const snap = await getDocs(query(collection(db, 'solicitudes_repuestos'), orderBy('createdAt', 'desc'), limit(30)))
+    const aFecha = (v: unknown): Date | undefined =>
+      v && typeof (v as { toDate?: () => Date }).toDate === 'function' ? (v as { toDate: () => Date }).toDate() : undefined
+    const solicitudes: SolicitudParaAria[] = snap.docs.map((d) => {
+      const x = d.data() as Record<string, unknown>
+      return {
+        codigoSAP: String(x.codigoSAP ?? ''),
+        textoBreve: String(x.textoBreve ?? ''),
+        cantidad: typeof x.cantidad === 'number' ? x.cantidad : 1,
+        estado: String(x.estado ?? 'pendiente'),
+        solicitadoPorNombre: String(x.solicitadoPorNombre ?? ''),
+        observaciones: typeof x.observaciones === 'string' ? x.observaciones : undefined,
+        createdAt: aFecha(x.createdAt),
+        aprobadaPor: typeof x.aprobadaPor === 'string' ? x.aprobadaPor : undefined,
+        aprobadaAt: aFecha(x.aprobadaAt),
+        entregadaPor: typeof x.entregadaPor === 'string' ? x.entregadaPor : undefined,
+        entregadaAt: aFecha(x.entregadaAt),
+      }
+    })
+    return {
+      ok: true,
+      data: { total: solicitudes.length },
+      summary: resumenDeSolicitudes(solicitudes),
+      label: 'Solicitudes de repuesto',
     }
   },
 })

@@ -40,7 +40,7 @@ export const APP_MODULES: readonly AppModule[] = [
   { ruta: '/bitacora', nombre: 'Bitácora de turno', grupo: 'Principal', estado: 'desarrollo', descripcion: 'Bitácora del turno de Mantención: eventos con fotos antes/después, minutos de parada (MTTR) o ventana en que se intervino sin detener producción, y pendientes; se copia al correo o se exporta a PDF' },
   // ── Equipamiento ──
   { ruta: '/equipment', nombre: 'Equipos', grupo: 'Equipamiento', estado: 'desarrollo', descripcion: 'Expediente de cada equipo (Centro Técnico Documental): placa, criticidad NFPA 70B, condición, historial y tableros', puedesPreguntar: 'estado, criticidad, condición e historial de un equipo por TAG' },
-  { ruta: '/repuestos', nombre: 'Repuestos', grupo: 'Equipamiento', estado: 'produccion', descripcion: 'Maestro SAP de repuestos e insumos por área, con stock de bodega y manuales', puedesPreguntar: 'repuestos por SAP/nombre, stock, ubicación, valor, repuestos de una máquina' },
+  { ruta: '/repuestos', nombre: 'Repuestos', grupo: 'Equipamiento', estado: 'produccion', descripcion: 'Maestro SAP de repuestos e insumos por área, con stock de bodega y manuales. Incluye SOLICITUDES de repuesto a bodega (botón «Solicitudes»: pendiente → aprobada → entregada, y al entregar descuenta stock)', puedesPreguntar: 'repuestos por SAP/nombre, stock, ubicación, valor, repuestos de una máquina, solicitudes de repuesto pendientes o entregadas' },
   { ruta: '/sensors', nombre: 'Sensores', grupo: 'Equipamiento', estado: 'desarrollo', descripcion: 'Sensores IoT de la planta en tiempo real' },
   { ruta: '/sensors/monitor', nombre: 'Panel Sensores', grupo: 'Equipamiento', estado: 'desarrollo', descripcion: 'Panel de monitoreo continuo de sensores con semáforos' },
   // ── Herramientas ──
