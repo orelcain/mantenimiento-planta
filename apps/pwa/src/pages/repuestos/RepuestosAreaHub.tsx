@@ -22,6 +22,12 @@ import { AreaSidebar } from '@/components/repuestos/AreaSidebar'
 import { RepuestoDetailPanel } from '@/components/repuestos/RepuestoDetailPanel'
 import { ImageLightbox } from '@/components/ui/ImageLightbox'
 import { SolicitarRepuestoModal, type RepuestoLite } from '@/components/repuestos/SolicitarRepuestoModal'
+import type { StockDeSolicitud } from '@/hooks/repuestos/solicitudDeRepuesto'
+
+/** Lo que el formulario de solicitud muestra de bodega. Sin `bodegaId` el stock no se conoce. */
+function stockDeSolicitud(r: { bodegaId?: string | null; stockActual: number; unidad?: string; ubicacionBodega?: string }): StockDeSolicitud {
+  return { configurado: !!r.bodegaId, stockActual: r.stockActual, unidad: r.unidad, ubicacionBodega: r.ubicacionBodega }
+}
 import { SolicitudesPanel } from '@/components/repuestos/SolicitudesPanel'
 import { useSolicitudes, type SolicitudEstado } from '@/hooks/repuestos/useSolicitudes'
 import { useAuthStore, useIsAdmin } from '@/store/authStore'
@@ -812,7 +818,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
 
   // Opciones para el selector del modal de solicitud (repuestos del área con SAP)
   const solicitarOptions = useMemo<RepuestoLite[]>(
-    () => areaRepuestos.map((r) => ({ codigoSAP: r.codigoSAP, textoBreve: r.textoBreve })),
+    () => areaRepuestos.map((r) => ({ codigoSAP: r.codigoSAP, textoBreve: r.textoBreve, stock: stockDeSolicitud(r) })),
     [areaRepuestos],
   )
 
@@ -2229,7 +2235,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
           onClose={() => setSelectedRowKey(null)}
           loadMovimientos={loadMovimientos}
           onSaveLocation={handleSaveLocation}
-          onSolicitar={(r) => openSolicitar({ codigoSAP: r.codigoSAP, textoBreve: r.textoBreve })}
+          onSolicitar={(r) => openSolicitar({ codigoSAP: r.codigoSAP, textoBreve: r.textoBreve, stock: stockDeSolicitud(r) })}
           onAssignSap={!selectedRep.codigoSAP ? () => { setAsignarSapValue(''); setAsignarSapOpen(true) } : undefined}
           onAssignEquipo={() => { setAsignarEquipoQuery(''); setAsignarEquipoOpen(true) }}
           isAdmin={isAdmin}
