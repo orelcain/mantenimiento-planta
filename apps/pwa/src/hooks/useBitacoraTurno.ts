@@ -14,6 +14,7 @@ import {
 import { auth, db } from '@/services/firebase'
 import { useAuthStore } from '@/store'
 import { toast } from '@/hooks/useToast'
+import { useAjustesTecnicos, useOpcionesEquipo } from '@/hooks/useListasBitacora'
 import { BITACORA_COLECCION, BITACORA_PLANTA, BITACORA_TURNOS_COLECCION } from '@/config/bitacora'
 import type { EventoBitacora, EventoBitacoraDatos, FotoEvento, TurnoMantencion } from '@/services/bitacora/bitacora.types'
 import { ordenarEventos } from '@/services/bitacora/resumenBitacora'
@@ -106,6 +107,8 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
         ventana: datos.impacto === 'en-ventana' ? datos.ventana?.trim() || null : null,
         pendiente: datos.pendiente,
         fotos,
+        participantes: [...new Set(datos.participantes.map((p) => p.trim()).filter(Boolean))].slice(0, 12),
+        equipoId: datos.equipoId || null,
       }
       const ref = doc(db, BITACORA_COLECCION, id)
       // SIN await: la promesa de Firestore se resuelve recién cuando el SERVIDOR
@@ -204,6 +207,8 @@ export function useTecnicosDeTurno(turno: TurnoMantencion): TecnicosCalendario {
 export interface ObservacionTurno {
   texto: string
   actualizadoPorNombre: string | null
+  /** Técnicos presentes ajustados a mano; null = nadie los ajustó (manda el calendario). */
+  presentes: string[] | null
 }
 
 /**
@@ -211,12 +216,12 @@ export interface ObservacionTurno {
  * entrega de turno…). Doc `bitacoraTurnos/{plantId}_{turnoId}`.
  */
 export function useObservacionTurno(turno: TurnoMantencion) {
-  const [obs, setObs] = useState<ObservacionTurno>({ texto: '', actualizadoPorNombre: null })
+  const [obs, setObs] = useState<ObservacionTurno>({ texto: '', actualizadoPorNombre: null, presentes: null })
   const user = useAuthStore((s) => s.user)
   const docId = `${BITACORA_PLANTA.id}_${turno.id}`
 
   useEffect(() => {
-    setObs({ texto: '', actualizadoPorNombre: null })
+    setObs({ texto: '', actualizadoPorNombre: null, presentes: null })
     const off = onSnapshot(
       doc(db, BITACORA_TURNOS_COLECCION, docId),
       (snap) => {
@@ -224,6 +229,7 @@ export function useObservacionTurno(turno: TurnoMantencion) {
         setObs({
           texto: typeof d?.observacion === 'string' ? d.observacion : '',
           actualizadoPorNombre: typeof d?.actualizadoPorNombre === 'string' ? d.actualizadoPorNombre : null,
+          presentes: Array.isArray(d?.presentes) ? d.presentes.filter((x: unknown): x is string => typeof x === 'string') : null,
         })
       },
       () => {
@@ -243,19 +249,44 @@ export function useObservacionTurno(turno: TurnoMantencion) {
         u.displayName ||
         'Sin nombre'
       // Sin await, igual que los eventos: queda en el teléfono si no hay señal.
-      void setDoc(doc(db, BITACORA_TURNOS_COLECCION, docId), {
-        plantId: BITACORA_PLANTA.id,
-        turnoId: turno.id,
-        observacion: texto.trim(),
-        actualizadoPor: u.uid,
-        actualizadoPorNombre: nombre,
-        updatedAt: serverTimestamp(),
-      }).catch(() => toast({ title: 'La observación no se guardó en el servidor', variant: 'destructive' }))
+      // merge: el mismo doc guarda también los técnicos presentes.
+      void setDoc(
+        doc(db, BITACORA_TURNOS_COLECCION, docId),
+        {
+          plantId: BITACORA_PLANTA.id,
+          turnoId: turno.id,
+          observacion: texto.trim(),
+          actualizadoPor: u.uid,
+          actualizadoPorNombre: nombre,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true },
+      ).catch(() => toast({ title: 'La observación no se guardó en el servidor', variant: 'destructive' }))
     },
     [docId, turno.id, user],
   )
 
-  return { observacion: obs, guardarObservacion }
+  /** Guarda quiénes están realmente en el turno (reemplaza lo que dice el calendario). */
+  const guardarPresentes = useCallback(
+    async (presentes: string[]) => {
+      const u = auth.currentUser
+      if (!u) throw new Error('Hay que iniciar sesión para escribir en la bitácora.')
+      void setDoc(
+        doc(db, BITACORA_TURNOS_COLECCION, docId),
+        {
+          plantId: BITACORA_PLANTA.id,
+          turnoId: turno.id,
+          presentes: presentes.slice(0, 30),
+          actualizadoPor: u.uid,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true },
+      ).catch(() => toast({ title: 'Los técnicos del turno no se guardaron en el servidor', variant: 'destructive' }))
+    },
+    [docId, turno.id],
+  )
+
+  return { observacion: obs, guardarObservacion, guardarPresentes }
 }
 
 /**
@@ -267,6 +298,8 @@ export interface FuenteBitacora {
   useEventos: (turno: TurnoMantencion) => ReturnType<typeof useBitacoraTurno>
   useTecnicos: (turno: TurnoMantencion) => TecnicosCalendario
   useObservacion: (turno: TurnoMantencion) => ReturnType<typeof useObservacionTurno>
+  useAjustes: () => ReturnType<typeof useAjustesTecnicos>
+  useOpcionesEquipo: (activo: boolean) => ReturnType<typeof useOpcionesEquipo>
   /** Reemplaza la subida a Storage. */
   subirFoto?: typeof subirFotoBitacora
 }
@@ -275,4 +308,6 @@ export const FUENTE_FIRESTORE: FuenteBitacora = {
   useEventos: useBitacoraTurno,
   useTecnicos: useTecnicosDeTurno,
   useObservacion: useObservacionTurno,
+  useAjustes: useAjustesTecnicos,
+  useOpcionesEquipo,
 }

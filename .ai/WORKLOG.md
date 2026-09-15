@@ -4933,3 +4933,27 @@ Pendiente: prueba real de Orel en el celular (fotos de cámara) y pegado en SU O
   `actualizadoPorNombre` al editar (registradoPor no se pisa). Lista, correo y PDF muestran el
   técnico elegido (`autorVisible`), nunca el nombre de la cuenta. También en la observación.
 - Sin cambios de reglas (campo extra permitido). 23 tests.
+
+### 2026-09-15 · Bitácora · técnicos del turno, participantes, lista maestra y buscador de equipos
+
+Pedido de Orel (las tres opciones + buscador), mockup aprobado «tal cual»:
+https://claude.ai/artifact/Ubsj3WqTs5EZ8agfUkf7bc
+
+- **Técnicos del turno**: fila en la página + hoja con buscador para marcar quién está de verdad.
+  Se guarda por turno en `bitacoraTurnos.presentes` (merge con la observación); sin ajuste manda el
+  calendario. Da los botones rápidos del editor y el «Técnicos de turno» del correo.
+- **Varios técnicos por evento**: «También participaron» (toggles + «Otro») → `participantes[]`.
+  Correo/PDF: línea «Técnicos: …» solo si hubo participantes.
+- **Lista maestra**: `bitacoraConfig/{plantId}` = ajustes sobre la planilla del calendario
+  (agregados / ocultos / renombres). Quitar a alguien del calendario lo OCULTA; el calendario no se
+  toca. Presentes guardados se traducen con los renombres vigentes.
+- **Buscador de equipos**: jerarquía completa (702 nodos, 1 carga cada 30 min, se filtra en el
+  teléfono), sin tildes, por palabras en cualquier orden, nombre/alias/código, con PLANTA y ÁREA
+  (hay equipos con el mismo nombre en Chonchi y Yal), resaltado, teclado, texto libre permitido.
+  Guarda `equipoId` del nodo (para contar paradas por máquina después).
+- Reglas: `bitacoraConfig` nueva, `bitacoraTurnos` con observación/presentes opcionales, eventos con
+  `participantes` (≤12) y `equipoId`. `scripts/probar-reglas-bitacora.cjs --local` prueba el archivo
+  ANTES de publicar: 23/23.
+- ⚠ Gotcha: la hoja de presentes reiniciaba lo marcado en cada re-render (dependía de un array que
+  se recrea) → cargar solo al abrir, vía ref.
+- 33 tests de bitácora, verificado en `/dev/bitacora` a 375 px.

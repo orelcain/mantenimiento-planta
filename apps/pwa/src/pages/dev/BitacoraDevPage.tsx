@@ -6,6 +6,8 @@ import { BITACORA_PLANTA } from '@/config/bitacora'
 import type { EventoBitacora, EventoBitacoraDatos, FotoEvento, TurnoMantencion } from '@/services/bitacora/bitacora.types'
 import { ordenarEventos } from '@/services/bitacora/resumenBitacora'
 import { turnoMantencionEn } from '@/services/bitacora/turnoMantencion'
+import { AJUSTES_VACIOS, type AjustesTecnicos } from '@/services/bitacora/listaTecnicos'
+import { construirOpcionesEquipo, type NodoJerarquia } from '@/services/bitacora/buscarEquipos'
 
 /**
  * Vitrina de la Bitácora con DATOS DE EJEMPLO — solo desarrollo (la ruta va
@@ -179,20 +181,48 @@ function useEventosEjemplo(turno: TurnoMantencion) {
 }
 
 function useObservacionEjemplo() {
-  const [obs, setObs] = useState({ texto: '', actualizadoPorNombre: null as string | null })
+  const [obs, setObs] = useState({ texto: '', actualizadoPorNombre: null as string | null, presentes: null as string[] | null })
   return {
     observacion: obs,
-    guardarObservacion: async (t: string, quien: string) => setObs({ texto: t.trim(), actualizadoPorNombre: quien || null }),
+    guardarObservacion: async (t: string, quien: string) => setObs((o) => ({ ...o, texto: t.trim(), actualizadoPorNombre: quien || null })),
+    guardarPresentes: async (presentes: string[]) => setObs((o) => ({ ...o, presentes })),
   }
 }
 
 // Nombres reales de la planilla del calendario (15-09-2026), ya en formato corto.
 const PLANILLA = ['Jose Chodil', 'Lucas Adrade', 'Ernesto Diaz', 'Pablo Almazabal', 'Leandro Igor', 'Danilo Cortes', 'Mauricio Gallardo', 'Diego Cardenas', 'Matias Serpa']
 
+function useAjustesEjemplo() {
+  const [ajustes, setAjustes] = useState<AjustesTecnicos>(AJUSTES_VACIOS)
+  return { ajustes, guardarAjustes: async (a: AjustesTecnicos) => setAjustes(a) }
+}
+
+// Muestra de la jerarquía real (15-09-2026), con la misma forma que `hierarchy`.
+const NODOS_EJEMPLO: NodoJerarquia[] = [
+  { id: 'aq-in-cho', nombre: 'Aquachile Antarfood Chonchi', tipoNodo: 'area', path: [] },
+  { id: 'pcho', nombre: 'PLANTA CHONCHI', tipoNodo: 'area', path: ['aq-in-cho'] },
+  { id: 'pyal', nombre: 'PLANTA YAL', tipoNodo: 'area', path: ['aq-in-cho'] },
+  { id: 'evis', nombre: 'EVISCERADO', tipoNodo: 'area', path: ['aq-in-cho', 'pcho'] },
+  { id: 'evis-yal', nombre: 'EVISCERADO', tipoNodo: 'area', path: ['aq-in-cho', 'pyal'] },
+  { id: 'empa', nombre: 'EMPARRILLADO', tipoNodo: 'area', path: ['aq-in-cho', 'pcho'] },
+  { id: 'empq', nombre: 'EMPAQUE', tipoNodo: 'area', path: ['aq-in-cho', 'pcho'] },
+  { id: 'e1', nombre: 'EVISCERADORA BAADER 142 N2', codigo: '720004411', tipoNodo: 'equipo', path: ['aq-in-cho', 'pyal', 'evis-yal'] },
+  { id: 'e2', nombre: 'EVISCERADORA BAADER 142 N3', codigo: '720004412', tipoNodo: 'equipo', path: ['aq-in-cho', 'pcho', 'evis'] },
+  { id: 'e3', nombre: 'TABLERO ELECTRICO BAADER 142 N1', codigo: '720004413', tipoNodo: 'equipo', path: ['aq-in-cho', 'pcho', 'evis'] },
+  { id: 'e4', nombre: 'TABLERO ELECTRICO BAADER 142 N3', codigo: '720004414', tipoNodo: 'equipo', path: ['aq-in-cho', 'pcho', 'evis'] },
+  { id: 'e5', nombre: 'KNURO N1', codigo: '720004415', tipoNodo: 'equipo', path: ['aq-in-cho', 'pcho', 'evis'] },
+  { id: 'e6', nombre: 'KNURO N1', codigo: '720004416', tipoNodo: 'equipo', path: ['aq-in-cho', 'pyal', 'evis-yal'] },
+  { id: 'e7', nombre: 'CELDA CARGA AK300 MARELEC STATIC GRADER', codigo: '720004417', tipoNodo: 'equipo', path: ['aq-in-cho', 'pcho', 'empa'] },
+  { id: 'e8', nombre: 'ENZUNCHADORA N1', codigo: '720004418', tipoNodo: 'equipo', path: ['aq-in-cho', 'pcho', 'empq'] },
+]
+const OPCIONES_EJEMPLO = construirOpcionesEquipo(NODOS_EJEMPLO)
+
 const FUENTE_EJEMPLO: FuenteBitacora = {
   useEventos: useEventosEjemplo,
   useTecnicos: () => ({ deTurno: ['Danilo Cortes', 'Matias Serpa'], todos: PLANILLA }),
   useObservacion: useObservacionEjemplo,
+  useAjustes: useAjustesEjemplo,
+  useOpcionesEquipo: () => ({ opciones: OPCIONES_EJEMPLO, cargando: false }),
   subirFoto: async (_turnoId, _eventoId, archivo, etiqueta) => {
     const url = await new Promise<string>((resolve, reject) => {
       const lector = new FileReader()

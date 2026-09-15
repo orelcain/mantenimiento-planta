@@ -6,6 +6,8 @@ import { EventoBitacoraFila } from '@/components/bitacora/EventoBitacoraFila'
 import { EventoBitacoraSheet } from '@/components/bitacora/EventoBitacoraSheet'
 import { VisorFotosBitacora } from '@/components/bitacora/VisorFotosBitacora'
 import { SelectorTecnico } from '@/components/bitacora/SelectorTecnico'
+import { ListaTecnicosSheet, TecnicosDelTurnoSheet } from '@/components/bitacora/TecnicosTurnoSheets'
+import { construirListaTecnicos, tecnicosPresentes } from '@/services/bitacora/listaTecnicos'
 import { tecnicoRecordado } from '@/components/bitacora/tecnicoRecordado'
 import { useToast } from '@/hooks/useToast'
 import { FUENTE_FIRESTORE, useTurnoMantencionActual, type FuenteBitacora } from '@/hooks/useBitacoraTurno'
@@ -43,6 +45,8 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
   const turnoActual = useTurnoMantencionActual()
   const turnoParam = params.get('turno')
   const [editor, setEditor] = useState<{ evento: EventoBitacora | null; idNuevo: string; turno: TurnoMantencion } | null>(null)
+  // La jerarquía (702 nodos) se carga recién al abrir el editor, y queda en caché.
+  const { opciones: opcionesEquipo, cargando: cargandoEquipos } = fuente.useOpcionesEquipo(Boolean(editor))
   const turnoNavegado = useMemo(() => turnoDesdeId(turnoParam) ?? turnoActual, [turnoParam, turnoActual])
   // Con el editor abierto el turno queda CONGELADO: si el reloj cruza las
   // 16:00 a mitad de escribir, el formulario no se borra y el evento se guarda
@@ -51,8 +55,22 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
   const esActual = turno.id === turnoActual.id
 
   const { eventos, cargando, error, sincronizando, ultimaSync, nuevoId, guardar, borrar } = fuente.useEventos(turno)
-  const tecnicos = fuente.useTecnicos(turno)
-  const { observacion, guardarObservacion } = fuente.useObservacion(turno)
+  const calendario = fuente.useTecnicos(turno)
+  const { observacion, guardarObservacion, guardarPresentes } = fuente.useObservacion(turno)
+  const { ajustes, guardarAjustes } = fuente.useAjustes()
+  // Lista de técnicos = planilla del calendario + ajustes; presentes = ajuste del
+  // turno o, si nadie lo tocó, lo que dice el calendario.
+  const listaTecnicos = useMemo(() => construirListaTecnicos(calendario.todos, ajustes), [calendario.todos, ajustes])
+  const presentes = useMemo(
+    () => tecnicosPresentes(observacion.presentes, calendario.deTurno, listaTecnicos),
+    [observacion.presentes, calendario.deTurno, listaTecnicos],
+  )
+  const deTurnoCalendario = useMemo(() => tecnicosPresentes(null, calendario.deTurno, listaTecnicos).nombres, [calendario.deTurno, listaTecnicos])
+  const tecnicos = useMemo(
+    () => ({ deTurno: presentes.nombres, todos: listaTecnicos.map((t) => t.nombre) }),
+    [presentes.nombres, listaTecnicos],
+  )
+  const [hojaTecnicos, setHojaTecnicos] = useState<null | 'presentes' | 'lista'>(null)
   const r = useMemo(() => resumirBitacora(eventos), [eventos])
 
   const [trabajando, setTrabajando] = useState<null | 'copiar' | 'copiar-incrustadas' | 'pdf'>(null)
@@ -87,8 +105,8 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
   }
 
   const datosCorreo = useMemo(
-    () => ({ turno, eventos, tecnicos: tecnicos.deTurno, planta: BITACORA_PLANTA.nombre, observacion: observacion.texto }),
-    [turno, eventos, tecnicos.deTurno, observacion.texto],
+    () => ({ turno, eventos, tecnicos: presentes.nombres, planta: BITACORA_PLANTA.nombre, observacion: observacion.texto }),
+    [turno, eventos, presentes.nombres, observacion.texto],
   )
   const htmlCorreo = useMemo(() => bitacoraAHtmlCorreo(datosCorreo), [datosCorreo])
   const asunto = tituloCorreo(turno)
@@ -237,8 +255,35 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
             </>
           )}
         </p>
-        {tecnicos.deTurno.length > 0 && <p>De turno: {tecnicos.deTurno.join(', ')}</p>}
       </div>
+
+      {/* Técnicos del turno: quién está de verdad (mockup aprobado, pieza 1). */}
+      <section aria-label="Técnicos del turno" className="flex flex-col gap-2.5 rounded-card bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
+        <div className="flex items-baseline justify-between gap-2">
+          <h2 className="text-footnote text-muted-foreground">Técnicos del turno</h2>
+          <Button variant="plain" size="sm" onClick={() => setHojaTecnicos('presentes')}>
+            Editar
+          </Button>
+        </div>
+        {presentes.nombres.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {presentes.nombres.map((n) => (
+              <span key={n} className="inline-flex min-h-[32px] items-center rounded-full bg-primary/[0.13] px-3 text-footnote font-semibold text-brand-ink">
+                {n}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <p className="text-body text-muted-foreground">Nadie marcado. Toca «Editar» para marcar quién está.</p>
+        )}
+        <p className="text-footnote text-muted-foreground">
+          {presentes.ajustado
+            ? deTurnoCalendario.length
+              ? `Ajustado a mano · el calendario decía ${deTurnoCalendario.join(', ')}`
+              : 'Ajustado a mano'
+            : 'Según el calendario de Mantención'}
+        </p>
+      </section>
 
       {/* Resumen del turno: los números que demuestran el trabajo */}
       <section aria-label="Resumen del turno" className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-card bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none sm:grid-cols-4">
@@ -366,6 +411,8 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
         idNuevo={editor?.idNuevo ?? ''}
         sugerenciasEquipo={sugerenciasEquipo}
         tecnicos={tecnicos}
+        opcionesEquipo={opcionesEquipo}
+        cargandoEquipos={cargandoEquipos}
         subirFoto={fuente.subirFoto}
         onGuardar={guardar}
         onBorrar={borrar}
@@ -416,6 +463,33 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
           className="min-h-[160px] w-full resize-y rounded-ctl border-0 bg-muted-foreground/10 px-3 py-2.5 text-[16px] leading-snug text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary"
         />
       </Sheet>
+
+      <TecnicosDelTurnoSheet
+        open={hojaTecnicos === 'presentes'}
+        lista={listaTecnicos}
+        deTurnoCalendario={deTurnoCalendario}
+        presentes={presentes.nombres}
+        onGuardar={(nombres) => {
+          void guardarPresentes(nombres).catch((e: unknown) =>
+            toast({ title: e instanceof Error ? e.message : 'No se pudo guardar', variant: 'destructive' }),
+          )
+          toast({ title: 'Técnicos del turno guardados', variant: 'success' })
+        }}
+        onAbrirLista={() => setHojaTecnicos('lista')}
+        onClose={() => setHojaTecnicos(null)}
+      />
+      <ListaTecnicosSheet
+        open={hojaTecnicos === 'lista'}
+        lista={listaTecnicos}
+        ajustes={ajustes}
+        onGuardar={(nuevos) => {
+          void guardarAjustes(nuevos).catch((e: unknown) =>
+            toast({ title: e instanceof Error ? e.message : 'No se pudo guardar', variant: 'destructive' }),
+          )
+        }}
+        // Al cerrar vuelve a «Técnicos del turno», que es desde donde se abrió.
+        onClose={() => setHojaTecnicos('presentes')}
+      />
 
       {visor && (
         <VisorFotosBitacora fotos={visor.fotos} indiceInicial={visor.indice} titulo={visor.titulo} onClose={() => setVisor(null)} />

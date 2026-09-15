@@ -1,8 +1,12 @@
 // Prueba las reglas de Firestore PUBLICADAS de la Bitácora con la API projects:test.
 // NO escribe datos: simula create/update/delete/get con usuarios de mentira (functionMocks).
-// Uso (desde la raíz del repo, con serviceAccountKey.json): node scripts/probar-reglas-bitacora.cjs
-// Sale con código 2 si algún caso no dio lo esperado. Correrlo tras cada cambio de reglas publicado.
+// Uso (desde la raíz del repo, con serviceAccountKey.json):
+//   node scripts/probar-reglas-bitacora.cjs           → prueba las reglas PUBLICADAS
+//   node scripts/probar-reglas-bitacora.cjs --local   → prueba firestore.rules del repo ANTES de publicar
+// Sale con código 2 si algún caso no dio lo esperado.
+const fs = require('fs')
 const path = require('path')
+const LOCAL = process.argv.includes('--local')
 const admin = require('firebase-admin')
 const P = 'mantenimiento-planta-771a3'
 
@@ -52,6 +56,18 @@ const casos = [
   ['Observación con id que no calza con el turno', 'DENY', { method: 'create', uid: 'tecnico1', col: 'bitacoraTurnos', id: 'chonchi_2026-09-14_tarde', data: { plantId: 'chonchi', turnoId: '2026-09-15_tarde', observacion: 'x', actualizadoPor: 'tecnico1' } }, usuario(true, 'tecnico')],
 ]
 
+// Casos de lo agregado después de #1024 (técnicos presentes, lista maestra, participantes).
+// Solo aplican al ruleset que ya los trae: con --local, o cuando estén publicados.
+const CASOS_TECNICOS = [
+  ['Evento con participantes y equipo de la jerarquía', 'ALLOW', { method: 'create', uid: 'tecnico1', col: 'bitacoraEventos', data: evento({ participantes: ['Lucas Adrade', 'Matias Serpa'], equipoId: '09DK1IcV8BaDCp9vU4Tf' }) }, usuario(true, 'tecnico')],
+  ['Evento con 13 participantes', 'DENY', { method: 'create', uid: 'tecnico1', col: 'bitacoraEventos', data: evento({ participantes: Array(13).fill('X') }) }, usuario(true, 'tecnico')],
+  ['Turno con solo técnicos presentes (sin observación)', 'ALLOW', { method: 'create', uid: 'tecnico1', col: 'bitacoraTurnos', id: 'chonchi_2026-09-15_tarde', data: { plantId: 'chonchi', turnoId: '2026-09-15_tarde', presentes: ['Danilo Cortes', 'Lucas Adrade'], actualizadoPor: 'tecnico1' } }, usuario(true, 'tecnico')],
+  ['Presentes que no son lista', 'DENY', { method: 'create', uid: 'tecnico1', col: 'bitacoraTurnos', id: 'chonchi_2026-09-15_tarde', data: { plantId: 'chonchi', turnoId: '2026-09-15_tarde', presentes: 'Danilo', actualizadoPor: 'tecnico1' } }, usuario(true, 'tecnico')],
+  ['Técnico activo ajusta la lista maestra', 'ALLOW', { method: 'create', uid: 'tecnico1', col: 'bitacoraConfig', id: 'chonchi', data: { agregados: ['Juan Pérez'], ocultos: [], renombres: { 'Lucas Adrade': 'Lucas Andrade' }, actualizadoPor: 'tecnico1' } }, usuario(true, 'tecnico')],
+  ['Lista maestra firmada por otro', 'DENY', { method: 'create', uid: 'tecnico1', col: 'bitacoraConfig', id: 'chonchi', data: { agregados: [], ocultos: [], renombres: {}, actualizadoPor: 'tecnico2' } }, usuario(true, 'tecnico')],
+  ['Usuario inactivo ajusta la lista maestra', 'DENY', { method: 'create', uid: 'tecnico1', col: 'bitacoraConfig', id: 'chonchi', data: { agregados: [], ocultos: [], renombres: {}, actualizadoPor: 'tecnico1' } }, usuario(false, 'tecnico')],
+]
+
 ;(async () => {
   const cred = admin.credential.cert(require(path.join(__dirname, '..', 'serviceAccountKey.json')))
   const { access_token: token } = await cred.getAccessToken()
@@ -66,9 +82,21 @@ const casos = [
     return j
   }
   // Se prueba el ruleset PUBLICADO, no el archivo del repo: "está en el código" ≠ "está vivo".
-  const { releases } = await api(`https://firebaserules.googleapis.com/v1/projects/${P}/releases`)
-  const rel = releases.find((r) => r.name.endsWith('cloud.firestore'))
-  const rs = await api(`https://firebaserules.googleapis.com/v1/${rel.rulesetName}`)
+  let source
+  let origen
+  if (LOCAL) {
+    const archivo = path.join(__dirname, '..', 'firestore.rules')
+    source = { files: [{ name: 'firestore.rules', content: fs.readFileSync(archivo, 'utf8') }] }
+    origen = 'firestore.rules LOCAL (sin publicar)'
+  } else {
+    const { releases } = await api(`https://firebaserules.googleapis.com/v1/projects/${P}/releases`)
+    const rel = releases.find((r) => r.name.endsWith('cloud.firestore'))
+    const rs = await api(`https://firebaserules.googleapis.com/v1/${rel.rulesetName}`)
+    source = rs.source
+    origen = `PUBLICADO ${rel.rulesetName.split('/').pop()} · ${rel.updateTime}`
+  }
+  const contenido = source.files.map((f) => f.content).join('\n')
+  if (contenido.includes('/bitacoraConfig/')) casos.push(...CASOS_TECNICOS)
 
   const testCases = casos.map(([, expectation, c, mocks]) => {
     const id = c.id ?? 'evento1'
@@ -81,7 +109,7 @@ const casos = [
       functionMocks: mocks,
     }
   })
-  const res = await api(`https://firebaserules.googleapis.com/v1/projects/${P}:test`, { source: rs.source, testSuite: { testCases } })
+  const res = await api(`https://firebaserules.googleapis.com/v1/projects/${P}:test`, { source, testSuite: { testCases } })
   let fallas = 0
   res.testResults.forEach((t, i) => {
     const ok = t.state === 'SUCCESS'
@@ -89,9 +117,11 @@ const casos = [
     const detalle = ok ? '' : ` ← ${JSON.stringify(t.debugMessages ?? t.errorPosition ?? '').slice(0, 300)}`
     console.log(`${ok ? 'OK   ' : 'FALLA'} [${casos[i][1]}] ${casos[i][0]}${detalle}`)
   })
-  console.log(`\n${casos.length - fallas}/${casos.length} casos como se esperaba · ruleset ${rel.rulesetName.split('/').pop()} · publicado ${rel.updateTime}`)
-  process.exit(fallas ? 2 : 0)
+  console.log(`\n${casos.length - fallas}/${casos.length} casos como se esperaba · ${origen}`)
+  // exitCode y no process.exit(): en Windows (Node 24) cortar con conexiones de
+  // fetch abiertas revienta libuv al salir y el código de salida queda basura.
+  process.exitCode = fallas ? 2 : 0
 })().catch((e) => {
   console.error(e.message)
-  process.exit(1)
+  process.exitCode = 1
 })

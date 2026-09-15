@@ -231,6 +231,13 @@ describe('correo de la bitácora', () => {
     expect(html).not.toContain('mantencion.plantach')
   })
 
+  it('con participantes, el evento lista a todos sus técnicos sin repetir; sin ellos no agrega ruido', () => {
+    const conEquipo = ev({ registradoPor: 'Danilo Cortes', participantes: ['Lucas Adrade', 'danilo cortes', ' '] })
+    expect(bitacoraAHtmlCorreo({ ...base, eventos: [conEquipo] })).toContain('Técnicos: Danilo Cortes, Lucas Adrade')
+    expect(bitacoraATextoPlano({ ...base, eventos: [conEquipo] })).toContain('  Técnicos: Danilo Cortes, Lucas Adrade')
+    expect(bitacoraAHtmlCorreo({ ...base, eventos: [ev({ registradoPor: 'Danilo Cortes', participantes: [] })] })).not.toContain('Técnicos: ')
+  })
+
   it('un turno sin eventos lo dice', () => {
     expect(bitacoraAHtmlCorreo({ ...base, eventos: [] })).toContain('Sin eventos registrados en el turno.')
   })
