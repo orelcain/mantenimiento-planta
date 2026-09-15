@@ -166,6 +166,26 @@ export function velocidadDesdeIntervals(intervals: UpstreamProductionInterval[])
 }
 
 /**
+ * El ritmo con que se valorizan las piezas que se dejaron de hacer en un paro.
+ *
+ * Es el **ritmo andando demostrado** (mediana de los intervalos con ciclos), no
+ * el target del sensor. Medido desde el 1-sep, el ritmo real es el 75–84% del
+ * target en Chonchi, el 81–96% en Yal y **el 50% en Filete**: valorizar al
+ * target inflaba las piezas perdidas un 20–33% en Chonchi y al DOBLE en Filete,
+ * y ¿Qué hacer? contradecía a Mantención (5 min = 100 pz en una, 44 en la otra).
+ *
+ * Sin intervalos andando (la máquina no corrió) no hay ritmo demostrado: se usa
+ * el target, que es mejor que no decir nada.
+ */
+export function ritmoParaPiezasPerdidas(intervals: UpstreamProductionInterval[]): number | null {
+  const demostrado = velocidadDesdeIntervals(intervals).medianaAndandoCpm
+  if (demostrado != null && demostrado > 0) return demostrado
+  let maxEsperado = 0
+  for (const iv of intervals || []) if ((iv.expectedCycles || 0) > maxEsperado) maxEsperado = iv.expectedCycles
+  return maxEsperado > 0 ? maxEsperado / 5 : null
+}
+
+/**
  * ¿El esperado del sensor no calza con lo que la máquina demuestra?
  *
  * Umbral: techo observado bajo el 80% del esperado Y casi ningún intervalo

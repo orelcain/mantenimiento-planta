@@ -27,7 +27,7 @@ import { addMaintenanceLogEntry } from '@/services/maintenanceLog'
 import { refineText } from '@/services/ai'
 import { logger } from '@/lib/logger'
 import { isMaintenanceState } from '@/services/grader/shoplogixMaintenance'
-import { targetCpmFromIntervals } from '@/services/grader/plantKpiCompute'
+import { ritmoParaPiezasPerdidas } from '@/services/shoplogix/kpisMantencionTurno'
 import type { PlantLineId } from '@/config/plantLines'
 import type { PlantSlug } from '@/services/shoplogix/shoplogixMachines'
 import type { UpstreamLineSnapshot, UpstreamMachineState } from '@/services/shoplogix/types'
@@ -58,7 +58,7 @@ interface SensorStop {
   durationMin: number
   /** Causa que ya trae el sensor (vacía = hay que anotarla). */
   sensorReason: string
-  /** Piezas que dejó de producir, al objetivo de la máquina. null sin objetivo. */
+  /** Piezas que dejó de producir, al ritmo demostrado de la máquina (ver `ritmoParaPiezasPerdidas`). */
   lostPieces: number | null
   isMaintenance: boolean
 }
@@ -116,7 +116,7 @@ export function SensorStopsCausePanel({
   const stops = useMemo<SensorStop[]>(() => {
     const out: SensorStop[] = []
     for (const m of snapshot.machines) {
-      const targetCpm = targetCpmFromIntervals(m.intervals)
+      const ritmoCpm = ritmoParaPiezasPerdidas(m.intervals)
       for (const s of m.states) {
         if (!isRealStop(s)) continue
         const durationMin = s.durationSec / 60
@@ -128,7 +128,7 @@ export function SensorStopsCausePanel({
           startAt: s.startAt,
           durationMin,
           sensorReason: (s.reason || '').trim(),
-          lostPieces: targetCpm != null ? Math.round(durationMin * targetCpm) : null,
+          lostPieces: ritmoCpm != null ? Math.round(durationMin * ritmoCpm) : null,
           isMaintenance: isMaintenanceState(s),
         })
       }
@@ -295,10 +295,10 @@ export function SensorStopsCausePanel({
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-mono tabular-nums text-muted-foreground w-11">{fmtHora(stop.startAt)}</span>
                 <span className="font-mono tabular-nums font-semibold w-16">
-                  {stop.durationMin >= 10 ? Math.round(stop.durationMin) : stop.durationMin.toFixed(1)} min
+                  {stop.durationMin >= 10 ? Math.round(stop.durationMin) : stop.durationMin.toLocaleString('es-CL', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} min
                 </span>
                 {stop.lostPieces != null && stop.lostPieces > 0 && (
-                  <span className="font-mono tabular-nums text-muted-foreground" title={`Al objetivo de la máquina: ${Math.round(stop.durationMin)} min sin producir`}>
+                  <span className="font-mono tabular-nums text-muted-foreground" title={`Al ritmo que la máquina demostró andando en el turno: ${Math.round(stop.durationMin)} min sin producir`}>
                     ≈{stop.lostPieces.toLocaleString('es-CL')} pz
                   </span>
                 )}
