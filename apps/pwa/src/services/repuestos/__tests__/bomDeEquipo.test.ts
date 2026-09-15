@@ -142,3 +142,37 @@ describe('filtrarRepuestosDeEquipo', () => {
     expect(filtrarRepuestosDeEquipo(REPS, 'turbina')).toHaveLength(0)
   })
 })
+
+describe('el despiece conserva el código de fabricante de cada pieza', () => {
+  /**
+   * Filas reales de la Baader 142 N1: los 58 «Soporte» NO son duplicados, son
+   * piezas distintas del despiece, cada una con su código de fabricante.
+   */
+  const SOPORTES = [
+    { id: 's1', codigoSAP: '', nombre: 'Soporte', tipo: 'SOPORTE', codigoFabricante: '1420100002' },
+    { id: 's2', codigoSAP: '', nombre: 'Soporte', tipo: 'SOPORTE', codigoFabricante: '1420100011' },
+    { id: 's3', codigoSAP: '', nombre: 'Soporte', tipo: 'SOPORTE', codigoFabricante: '1420100015' },
+  ]
+
+  it('el grupo guarda los códigos en el mismo orden que los ids', () => {
+    const g = particionarRepuestosDeEquipo(SOPORTES).despiece[0]!
+    expect(g.veces).toBe(3)
+    expect(g.ids).toEqual(['s1', 's2', 's3'])
+    expect(g.codigos).toEqual(['1420100002', '1420100011', '1420100015'])
+  })
+
+  it('agrupar por nombre no pierde ningún código: son piezas distintas', () => {
+    const g = particionarRepuestosDeEquipo(SOPORTES).despiece[0]!
+    expect(new Set(g.codigos).size).toBe(3)
+  })
+
+  it('una pieza sin código de fabricante queda con cadena vacía, no se descarta', () => {
+    const g = particionarRepuestosDeEquipo([{ id: 'x', codigoSAP: '', nombre: 'Cinta' }]).despiece[0]!
+    expect(g.codigos).toEqual([''])
+  })
+
+  it('el buscador encuentra una pieza del despiece por su código de fabricante', () => {
+    const r = filtrarRepuestosDeEquipo(SOPORTES, '1420100011')
+    expect(r.map((x) => x.id)).toEqual(['s2'])
+  })
+})
