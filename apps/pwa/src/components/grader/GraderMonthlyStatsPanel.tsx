@@ -32,9 +32,11 @@ interface Props {
    * comportamiento de Chonchi cuando se omita el prop.
    */
   isClassificationPlant?: boolean
+  /** Si la línea pasa por Grader. Filete no: la tarjeta de P0% nunca se llena. */
+  tieneGrader?: boolean
 }
 
-export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isClassificationPlant = true }: Props) {
+export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isClassificationPlant = true, tieneGrader = true }: Props) {
   const monthLabel = `${MONTH_NAMES[currentMonth.getMonth()]} ${currentMonth.getFullYear()}`
 
   const stats = useMemo(() => {
@@ -177,8 +179,9 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
       </div>
 
       {/* ── Fila 1: Grader KPI | Shoplogix KPI ── */}
-      <div className="grid grid-cols-2 gap-2">
-        {/* Grader */}
+      <div className={tieneGrader ? 'grid grid-cols-2 gap-2' : 'grid grid-cols-1 gap-2'}>
+        {/* Grader. En Filete no hay Excel: la tarjeta era un «—» permanente. */}
+        {tieneGrader && (
         <Card className={stats ? '' : 'opacity-40'}>
           <CardContent className="pt-2 pb-2 px-3">
             <p className="text-caption text-muted-foreground mb-0.5">P0% promedio</p>
@@ -193,6 +196,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
             )}
           </CardContent>
         </Card>
+        )}
 
         {/* Shoplogix */}
         <Card className={slxStats ? '' : 'opacity-40'}>

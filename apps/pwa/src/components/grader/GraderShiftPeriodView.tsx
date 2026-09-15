@@ -12,7 +12,8 @@ import { cn } from '@/lib/utils'
 import { Info, ChevronLeft, ChevronRight, Clock, Image as ImageIcon, FileText, Loader2 } from 'lucide-react'
 import { GraderShiftPeriodMatrix } from '@/components/grader/GraderShiftPeriodMatrix'
 import type { PeriodShift } from '@/services/grader/graderShiftPeriod'
-import { MATRIX_KPIS, DEFAULT_MATRIX_KPI, type MatrixKpi } from '@/services/grader/graderShiftMatrixKpi'
+import { DEFAULT_MATRIX_KPI, type MatrixKpi } from '@/services/grader/graderShiftMatrixKpi'
+import { kpisDeMatriz } from '@/services/grader/graderShiftMatrixKpi'
 
 export interface GraderShiftPeriodViewProps {
   shifts: readonly PeriodShift[]
@@ -23,6 +24,8 @@ export interface GraderShiftPeriodViewProps {
   error?: string | null
   /** Shoplogix no respondió: lo que se ve viene solo del Grader. */
   slxDegraded?: boolean
+  /** Si la línea pasa por Grader. Filete no: sin «Pzs OK» ni «P0 %». */
+  tieneGrader?: boolean
   selectedKey?: string | null
   onSelect?: (shift: PeriodShift) => void
   /** Abrir el análisis completo del turno. */
@@ -39,10 +42,13 @@ export interface GraderShiftPeriodViewProps {
 
 export function GraderShiftPeriodView({
   shifts, rows, days, byKey, loading = false, error = null,
-  slxDegraded = false, selectedKey = null, onSelect, onOpenShift,
+  slxDegraded = false, tieneGrader = true, selectedKey = null, onSelect, onOpenShift,
   month, onMonthChange, onExport, exporting = null, className,
 }: GraderShiftPeriodViewProps) {
   const [kpi, setKpi] = useState<MatrixKpi>(DEFAULT_MATRIX_KPI)
+  const kpisDisponibles = useMemo(() => kpisDeMatriz(tieneGrader), [tieneGrader])
+  // Si la línea no ofrece el KPI elegido (se cambió de línea), volver al default.
+  const kpiVigente = kpisDisponibles.some((k) => k.id === kpi) ? kpi : DEFAULT_MATRIX_KPI
   const [onlyOutOfShift, setOnlyOutOfShift] = useState(false)
 
   const visible = useMemo(
@@ -121,16 +127,16 @@ export function GraderShiftPeriodView({
         )}
 
         <div className="inline-flex rounded-ctl border border-border overflow-hidden" role="group" aria-label="Indicador">
-          {MATRIX_KPIS.map(k => (
+          {kpisDisponibles.map(k => (
             <button
               key={k.id}
               type="button"
               onClick={() => setKpi(k.id)}
-              aria-pressed={kpi === k.id}
+              aria-pressed={kpiVigente === k.id}
               className={cn(
                 'px-2.5 py-1.5 text-xs font-mono border-0 transition-colors',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:z-10',
-                kpi === k.id
+                kpiVigente === k.id
                   ? 'bg-primary text-primary-foreground font-semibold'
                   : 'bg-card text-muted-foreground hover:bg-accent',
               )}
@@ -231,7 +237,7 @@ export function GraderShiftPeriodView({
       )}
 
       <GraderShiftPeriodMatrix
-        shifts={visible} rows={visibleRows} days={days} byKey={byKey} kpi={kpi}
+        shifts={visible} rows={visibleRows} days={days} byKey={byKey} kpi={kpiVigente}
         loading={loading} selectedKey={selectedKey} onSelect={onSelect}
         onOpenShift={onOpenShift}
       />
