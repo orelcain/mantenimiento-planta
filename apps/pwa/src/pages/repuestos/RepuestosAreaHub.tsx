@@ -360,7 +360,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
           }
         }
       }
-      await avanzarEstado(id, next)
+      await avanzarEstado(id, next, user?.id ?? '', user?.nombre ?? '')
     },
     [solicitudes, bodegaItems, user, registrarMovimiento, avanzarEstado, toast],
   )
