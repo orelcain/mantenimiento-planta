@@ -119,6 +119,7 @@ const PlanosAguasPage = lazyWithReload(() => import('@/pages/PlanosAguasPage').t
 const RuedaPublicaPage = lazyWithReload(() => import('@/pages/RuedaPublicaPage').then((mod) => ({ default: mod.RuedaPublicaPage })))
 const CalendarioMantencionPage = lazyWithReload(() => import('@/pages/CalendarioMantencionPage').then((mod) => ({ default: mod.CalendarioMantencionPage })))
 const BitacoraTurnoPage = lazyWithReload(() => import('@/pages/BitacoraTurnoPage').then((mod) => ({ default: mod.BitacoraTurnoPage })))
+const HistorialBitacoraPage = lazyWithReload(() => import('@/pages/HistorialBitacoraPage').then((mod) => ({ default: mod.HistorialBitacoraPage })))
 const HmiKnuroPage = lazyWithReload(() => import('@/pages/HmiKnuroPage').then((mod) => ({ default: mod.HmiKnuroPage })))
 const HmiGraderPage = lazyWithReload(() => import('@/pages/HmiGraderPage').then((mod) => ({ default: mod.HmiGraderPage })))
 const Baader200LearningPublicPage = lazyWithReload(() => import('@/pages/Baader200LearningPublicPage').then((mod) => ({ default: mod.Baader200LearningPublicPage })))
@@ -863,6 +864,11 @@ export function App() {
             <Route path="bitacora" element={
               <Suspense fallback={<LoadingScreen />}>
                 <BitacoraTurnoPage />
+              </Suspense>
+            } />
+            <Route path="bitacora/historial" element={
+              <Suspense fallback={<LoadingScreen />}>
+                <HistorialBitacoraPage />
               </Suspense>
             } />
             <Route path="aria-actions" element={

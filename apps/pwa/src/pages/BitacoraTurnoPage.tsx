@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
-import { Check, ChevronLeft, ChevronRight, ClipboardCopy, FileDown, Loader2, MessageSquareText, NotebookPen, Plus } from 'lucide-react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { BarChart3, Check, ChevronLeft, ChevronRight, ClipboardCopy, FileDown, Loader2, MessageSquareText, NotebookPen, Plus } from 'lucide-react'
 import { Button, Pill, Sheet, Tag } from '@/components/piel'
 import { EventoBitacoraFila } from '@/components/bitacora/EventoBitacoraFila'
 import { EventoBitacoraSheet } from '@/components/bitacora/EventoBitacoraSheet'
@@ -43,6 +43,7 @@ export function BitacoraTurnoPage() {
 export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
   const { toast } = useToast()
   const [params, setParams] = useSearchParams()
+  const navigate = useNavigate()
   const turnoActual = useTurnoMantencionActual()
   const turnoParam = params.get('turno')
   const [editor, setEditor] = useState<{ evento: EventoBitacora | null; idNuevo: string; turno: TurnoMantencion; pendienteOrigen?: EventoBitacora | null } | null>(null)
@@ -209,11 +210,16 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
         <div className="min-w-0 flex-1 md:flex-none">
           <div className="flex items-center justify-between gap-3">
             <h1 className="text-display">Bitácora</h1>
-            {esActual ? (
-              <Pill tone="info" dot="pulse">En curso</Pill>
-            ) : (
-              <Button variant="plain" size="sm" onClick={irAlActual}>Ir al turno actual</Button>
-            )}
+            <span className="flex items-center gap-1">
+              {esActual ? (
+                <Pill tone="info" dot="pulse">En curso</Pill>
+              ) : (
+                <Button variant="plain" size="sm" onClick={irAlActual}>Ir al turno actual</Button>
+              )}
+              <Button variant="plain" size="sm" onClick={() => navigate('/bitacora/historial')}>
+                <BarChart3 /> Historial
+              </Button>
+            </span>
           </div>
           {/* Navegación de turnos: una sola fila que no se parte (las flechas
               quedan siempre a los lados del turno, también a 375 px). */}

@@ -5003,3 +5003,20 @@ turnos anteriores». Consulta por igualdad `plantId + pendiente==true` (sin índ
 
 Reglas 27/27 `--local`. 40 tests de bitácora. ⚠ Lección: mis pruebas llenaban campos por script y
 NO podían ver el bug del foco; en formularios hay que TECLEAR (`computer type`) en la verificación.
+
+
+## 2026-09-15 · Bitacora ronda 7 · Historial del periodo (7/14/30 dias)
+
+- `services/bitacora/historialBitacora.ts` + tests (6): `filasPorTurno`, `resumirPeriodo`
+  (turnos, eventos, sin detener, MTTR, pendientes cerrados/abiertos, equipos top-5,
+  quien registro) y `tesisDelPeriodo` — la frase que demuestra el aporte de Mantencion.
+- `historialCorreo.ts` (HTML + texto plano) y `historialPdf.ts` (jsPDF + autoTable).
+- `hooks/useHistorialBitacora.ts`: un solo `getDocs` con rango sobre `fechaTurno` y filtro
+  de `plantId` en memoria (evita indice compuesto).
+- `pages/HistorialBitacoraPage.tsx`: chips de periodo, tesis resaltada, KPIs, grafico de
+  barras CSS (rojo = con parada, verde = turno sin paradas), lista de turnos que abre la
+  bitacora de ese turno por query param, equipos top y quien registro. Ruta
+  `bitacora/historial` + boton "Historial" en la cabecera. Vitrina en `/dev/bitacora`.
+- Barras con `bg-ink-crit`/`bg-ink-ok` (tokens): la deuda de piel BAJO 1 (baseline al dia).
+- Verificado a 375 px en el preview 5189: tesis, KPIs, grafico, 30 turnos, equipos y
+  "Quien registro" renderizan; sin errores nuevos en consola.
