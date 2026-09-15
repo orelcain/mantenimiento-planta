@@ -87,7 +87,7 @@ import { useUpstreamLineSnapshot } from '@/hooks/useUpstreamLineSnapshot'
 import { kpisDeTurno } from '@/services/shoplogix/kpisMantencionTurno'
 import { MantencionTurnoTab } from '@/components/grader/MantencionTurnoTab'
 import { useShiftOutsidePieces } from '@/hooks/useShiftOutsidePieces'
-import { getPlantLineConfig, DEFAULT_PLANT_LINE_ID } from '@/config/plantLines'
+import { getPlantLineConfig, getMachineKind, DEFAULT_PLANT_LINE_ID } from '@/config/plantLines'
 import { findTriggeredRunbooks } from '@/services/grader/graderRunbooks'
 import { analyzeGraderFromSummary } from '@/services/grader/graderSummaryAI'
 import { loadSeasonBenchmark, type SeasonBenchmark } from '@/services/grader/graderBenchmarks'
@@ -2440,7 +2440,11 @@ export function AnalisisGraderTurnoPage() {
             <div className="flex items-center gap-2 basis-full sm:basis-auto sm:flex-1 min-w-0">
               <Activity className="w-4 h-4 shrink-0" />
               <span className="flex-1 min-w-0">
-                {shiftWindow?.status === 'live'
+                {/* Filete no pasa por Grader: «Sin Excel del Grader» y el botón
+                    Cargar Excel mandaban a buscar un archivo que la línea no produce. */}
+                {!hasGraderData
+                  ? 'Datos de Shoplogix · esta línea no pasa por Grader'
+                  : shiftWindow?.status === 'live'
                   ? 'Turno en curso · Sin datos Grader aún — vista basada en Shoplogix'
                   : 'Sin Excel del Grader · mostrando datos Shoplogix'}
               </span>
@@ -2467,7 +2471,7 @@ export function AnalisisGraderTurnoPage() {
               {slxSyncing ? 'Actualizando…' : 'Actualizar ahora'}
             </Button>
 
-            {isAdmin && (
+            {isAdmin && hasGraderData && (
               <Button
                 size="sm"
                 variant="outline"
@@ -2511,13 +2515,22 @@ export function AnalisisGraderTurnoPage() {
           <CardContent className="p-8 flex flex-col items-center gap-3 text-center">
             <Activity className="w-8 h-8 text-red-400 animate-pulse" />
             <p className="font-medium">Turno en curso — sin datos cargados aún</p>
-            <p className="text-sm text-muted-foreground">
-              Cargá el primer Excel de Matrix para ver el estado del proceso.
-            </p>
-            <Button onClick={() => navigate(wizardUrl)} className="gap-2 mt-1">
-              <Upload className="w-4 h-4" />
-              Cargar Excel
-            </Button>
+            {hasGraderData ? (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  Cargá el primer Excel de Matrix para ver el estado del proceso.
+                </p>
+                <Button onClick={() => navigate(wizardUrl)} className="gap-2 mt-1">
+                  <Upload className="w-4 h-4" />
+                  Cargar Excel
+                </Button>
+              </>
+            ) : (
+              // Filete no pasa por Grader: no hay Excel que cargar, el dato llega solo.
+              <p className="text-sm text-muted-foreground">
+                Shoplogix sincroniza la {getMachineKind(plantLineCfg.id).long} cada 5 min: el primer dato aparece a los pocos minutos de arrancar.
+              </p>
+            )}
           </CardContent>
         </Card>
       )}
@@ -2547,18 +2560,24 @@ export function AnalisisGraderTurnoPage() {
                 </p>
               )}
             </div>
-            <Button onClick={() => setActiveView('gates')} className="gap-2 mt-1">
-              <SlidersHorizontal className="w-4 h-4" />
-              Revisar las compuertas
-            </Button>
+            {/* Gates solo existe en la planta que clasifica: en Yal y Filete el
+                botón llevaba a una pestaña que no está. */}
+            {isClassificationPlant && (
+              <Button onClick={() => setActiveView('gates')} className="gap-2 mt-1">
+                <SlidersHorizontal className="w-4 h-4" />
+                Revisar las compuertas
+              </Button>
+            )}
             <details className="w-full text-left mt-1">
               <summary className="text-footnote text-muted-foreground cursor-pointer select-none">
                 ¿Cómo entran los datos de este turno?
               </summary>
               <p className="text-footnote text-muted-foreground mt-2 leading-relaxed">
-                Shoplogix sincroniza las Baader solo cada 5 min mientras operan. El Excel de
-                Matrix —P0%, causas y timeline— se carga al cierre del turno, y la captura de
-                la Marel HG se ingresa a mano junto con ese Excel.
+                {!hasGraderData
+                  ? `Shoplogix sincroniza la ${getMachineKind(plantLineCfg.id).long} cada 5 min mientras opera. Esta línea no pasa por Grader: no hay Excel que cargar.`
+                  : isClassificationPlant
+                  ? 'Shoplogix sincroniza las Baader solo cada 5 min mientras operan. El Excel de Matrix —P0%, causas y timeline— se carga al cierre del turno, y la captura de la Marel HG se ingresa a mano junto con ese Excel.'
+                  : 'Shoplogix sincroniza las Baader solo cada 5 min mientras operan. El Excel de Matrix —P0%, causas y timeline— se carga al cierre del turno.'}
               </p>
             </details>
           </CardContent>
@@ -2582,7 +2601,7 @@ export function AnalisisGraderTurnoPage() {
             <div className="flex items-start gap-3 p-3 rounded-card bg-cat-6-tint/[0.15] border border-cat-6-tint/[0.25] dark:bg-cat-6-tint/[0.15] dark:border-cat-6-tint/[0.25]">
               <Zap className="w-4 h-4 text-cat-6-ink mt-0.5 shrink-0" />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-cat-6-ink">Shoplogix — Evisceradoras Baader 142</p>
+                <p className="text-sm font-medium text-cat-6-ink">Shoplogix — {hasGraderData ? 'Evisceradoras Baader 142' : getMachineKind(plantLineCfg.id).long}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   Se sincroniza automáticamente cada 5 min cuando las máquinas están en operación.
                   No requiere acción manual.
@@ -2593,7 +2612,8 @@ export function AnalisisGraderTurnoPage() {
               </Badge>
             </div>
 
-            {/* Grader — manual */}
+            {/* Grader — manual. Filete no pasa por Grader: no se ofrece. */}
+            {hasGraderData && (
             <div className="flex items-start gap-3 p-3 rounded-card bg-primary/[0.15] border border-primary/[0.25]">
               <Upload className="w-4 h-4 text-ink-info mt-0.5 shrink-0" />
               <div className="flex-1 min-w-0">
@@ -2614,6 +2634,7 @@ export function AnalisisGraderTurnoPage() {
                 </Button>
               )}
             </div>
+            )}
 
             {/* Marel HG (corta-cabeza) — solo Chonchi. Yal no tiene
                 corta-cabeza, los salmones salen evisecerados con cabeza. */}
