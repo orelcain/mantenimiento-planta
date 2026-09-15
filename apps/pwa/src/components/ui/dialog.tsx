@@ -60,7 +60,13 @@ const DialogContent = React.forwardRef<
       {...props}
     >
       {children}
-      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-ctl opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+      {/*
+        Área táctil de 44×44 px REALES (px, no rem: la raíz mide 14 px en PC y 16 en móvil). Medía
+        16×16 en el teléfono y 14×14 en el PC. El ícono queda donde estaba (centro a ~23 px de la
+        esquina). Lo que se ponga en la esquina superior derecha del diálogo tiene que dejar libres
+        esos 45 px: en Equipos y en el Centro de Reportes la X ya se comía la esquina de un botón.
+      */}
+      <DialogPrimitive.Close className="absolute right-px top-px inline-flex h-[44px] w-[44px] items-center justify-center rounded-ctl opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
         <X className="h-4 w-4" />
         <span className="sr-only">Cerrar</span>
       </DialogPrimitive.Close>
