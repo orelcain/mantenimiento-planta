@@ -16,6 +16,7 @@
  */
 
 import { useState, useEffect } from 'react'
+import { etiquetaDeAntiguedad } from '@/services/grader/frescuraDelSync'
 
 const STALE_SEC       = 10 * 60   // > 10 min → rojo
 const WARN_SEC        =  5 * 60   // > 5 min  → ámbar
@@ -29,7 +30,15 @@ export interface SyncAge {
   isStale: boolean
 }
 
-export function useSyncAge(syncedAt: Date | null | undefined): SyncAge {
+export function useSyncAge(
+  syncedAt: Date | null | undefined,
+  /**
+   * El turno ya terminó y el último sync es posterior: el dato está completo y
+   * no puede envejecer. Sin esto, un turno del 11-09 mostraba «hace 1930m 54s»
+   * en rojo dos días después, alarmando por algo que no va a cambiar.
+   */
+  opciones?: { completo?: boolean },
+): SyncAge {
   const [now, setNow] = useState(() => Date.now())
 
   useEffect(() => {
@@ -49,14 +58,10 @@ export function useSyncAge(syncedAt: Date | null | undefined): SyncAge {
 
   const seconds = Math.max(0, Math.round((now - syncedAt.getTime()) / 1000))
 
-  // Etiqueta legible
-  let label: string
-  if (seconds < 60) {
-    label = `hace ${seconds}s`
-  } else {
-    const min = Math.floor(seconds / 60)
-    const sec = seconds % 60
-    label = sec > 0 ? `hace ${min}m ${sec}s` : `hace ${min}m`
+  const label = opciones?.completo ? 'sincronizado al cierre' : etiquetaDeAntiguedad(seconds)
+
+  if (opciones?.completo) {
+    return { label, colorClass: 'text-muted-foreground', bgClass: 'bg-muted/40', seconds, isStale: false }
   }
 
   const isStale = seconds > STALE_SEC
