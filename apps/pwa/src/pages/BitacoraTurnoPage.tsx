@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, ClipboardCopy, FileDown, Loader2, NotebookPen, Plus } from 'lucide-react'
-import { Button, Pill } from '@/components/piel'
+import { ChevronLeft, ChevronRight, ClipboardCopy, FileDown, Loader2, MessageSquareText, NotebookPen, Plus } from 'lucide-react'
+import { Button, Pill, Sheet } from '@/components/piel'
 import { EventoBitacoraFila } from '@/components/bitacora/EventoBitacoraFila'
 import { EventoBitacoraSheet } from '@/components/bitacora/EventoBitacoraSheet'
+import { VisorFotosBitacora } from '@/components/bitacora/VisorFotosBitacora'
 import { useToast } from '@/hooks/useToast'
 import { FUENTE_FIRESTORE, useTurnoMantencionActual, type FuenteBitacora } from '@/hooks/useBitacoraTurno'
 import { BITACORA_PLANTA } from '@/config/bitacora'
-import { copiarHtml } from '@/lib/clipboard'
-import type { EventoBitacora, TurnoMantencion } from '@/services/bitacora/bitacora.types'
-import { bitacoraAHtmlCorreo, bitacoraATextoPlano } from '@/services/bitacora/bitacoraCorreo'
+import { copiarHtml, copiarTexto } from '@/lib/clipboard'
+import type { EventoBitacora, FotoEvento, TurnoMantencion } from '@/services/bitacora/bitacora.types'
+import { bitacoraAHtmlCorreo, bitacoraATextoPlano, tituloCorreo } from '@/services/bitacora/bitacoraCorreo'
 import { cargarFotoComoJpeg } from '@/services/bitacora/fotosBitacora'
 import { resumirBitacora } from '@/services/bitacora/resumenBitacora'
 import {
@@ -49,9 +50,13 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
 
   const { eventos, cargando, error, sincronizando, ultimaSync, nuevoId, guardar, borrar } = fuente.useEventos(turno)
   const tecnicos = fuente.useTecnicos(turno)
+  const { observacion, guardarObservacion } = fuente.useObservacion(turno)
   const r = useMemo(() => resumirBitacora(eventos), [eventos])
 
   const [trabajando, setTrabajando] = useState<null | 'copiar' | 'copiar-incrustadas' | 'pdf'>(null)
+  const [editandoObs, setEditandoObs] = useState(false)
+  const [textoObs, setTextoObs] = useState('')
+  const [visor, setVisor] = useState<{ fotos: FotoEvento[]; indice: number; titulo: string } | null>(null)
 
   const abrirNuevo = useCallback(() => setEditor({ evento: null, idNuevo: nuevoId(), turno }), [nuevoId, turno])
 
@@ -79,10 +84,20 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
   }
 
   const datosCorreo = useMemo(
-    () => ({ turno, eventos, tecnicos, planta: BITACORA_PLANTA.nombre }),
-    [turno, eventos, tecnicos],
+    () => ({ turno, eventos, tecnicos, planta: BITACORA_PLANTA.nombre, observacion: observacion.texto }),
+    [turno, eventos, tecnicos, observacion.texto],
   )
   const htmlCorreo = useMemo(() => bitacoraAHtmlCorreo(datosCorreo), [datosCorreo])
+  const asunto = tituloCorreo(turno)
+
+  const copiarAsunto = async () => {
+    try {
+      await copiarTexto(asunto)
+      toast({ title: 'Asunto copiado', variant: 'success' })
+    } catch {
+      toast({ title: 'No se pudo copiar el asunto', variant: 'destructive' })
+    }
+  }
 
   const copiar = async () => {
     setTrabajando('copiar')
@@ -146,7 +161,8 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
   const fecha = fechaTurnoLarga(turno)
 
   return (
-    <div className="flex flex-col gap-5 pb-8">
+    // pb-28 en móvil: el botón fijo «Nuevo evento» no debe tapar el último evento.
+    <div className="flex flex-col gap-5 pb-28 md:pb-8">
       {/* Encabezado: título grande (uno por pantalla) + navegación de turnos */}
       <header className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3 px-1">
         <div className="min-w-0 flex-1 md:flex-none">
@@ -233,19 +249,49 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
         <Stat valor={String(r.pendientes)} etiqueta={r.pendientes === 1 ? 'pendiente' : 'pendientes'} tinta={r.pendientes > 0 ? 'text-ink-warn' : undefined} />
       </section>
 
-      {/* Acciones de móvil: aquí la principal es registrar. */}
-      <div className="flex flex-col gap-2 md:hidden">
+      {/* Observación general del turno (del mockup aprobado). */}
+      <button
+        type="button"
+        onClick={() => {
+          setTextoObs(observacion.texto)
+          setEditandoObs(true)
+        }}
+        className="flex min-h-[44px] w-full items-start gap-3 rounded-card bg-card px-4 py-3 text-left shadow-[0_1px_4px_rgba(0,0,0,0.05)] transition-colors duration-150 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary motion-reduce:transition-none dark:shadow-none"
+      >
+        <MessageSquareText className="mt-0.5 size-5 shrink-0 text-muted-foreground" aria-hidden />
+        <span className="min-w-0 flex-1">
+          <span className="block text-footnote text-muted-foreground">Observación general del turno</span>
+          {observacion.texto ? (
+            <span className="line-clamp-4 block whitespace-pre-line text-body">{observacion.texto}</span>
+          ) : (
+            <span className="block text-body text-muted-foreground">Agregar una nota: estado de la planta, entrega de turno…</span>
+          )}
+          {observacion.texto && observacion.actualizadoPorNombre && (
+            <span className="block pt-0.5 text-caption text-muted-foreground">{observacion.actualizadoPorNombre}</span>
+          )}
+        </span>
+        <ChevronRight className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
+      </button>
+
+      {/* Acciones secundarias de móvil. La principal (Nuevo evento) va fija abajo. */}
+      <div className="grid grid-cols-2 gap-2 md:hidden">
+        <Button variant="tinted" onClick={copiar} disabled={!!trabajando || eventos.length === 0}>
+          {trabajando === 'copiar' ? <Loader2 className="animate-spin" /> : <ClipboardCopy />} Copiar
+        </Button>
+        <Button variant="tinted" onClick={exportarPdf} disabled={!!trabajando || eventos.length === 0}>
+          {trabajando === 'pdf' ? <Loader2 className="animate-spin" /> : <FileDown />} PDF
+        </Button>
+      </div>
+
+      {/* «Nuevo evento» siempre a mano en el celular: justo sobre la barra de
+          pestañas (h-16 = 4rem; 2.5rem cuando el teléfono está acostado), así no
+          hay que volver arriba con 10 eventos cargados. */}
+      <div
+        className="fixed inset-x-0 z-30 bg-background/80 px-4 pb-3 pt-2 backdrop-blur-xl md:hidden bottom-[calc(4rem+env(safe-area-inset-bottom))] [@media(max-height:500px)]:bottom-[calc(2.5rem+env(safe-area-inset-bottom))]"
+      >
         <Button size="block" onClick={abrirNuevo}>
           <Plus /> Nuevo evento
         </Button>
-        <div className="grid grid-cols-2 gap-2">
-          <Button variant="tinted" onClick={copiar} disabled={!!trabajando || eventos.length === 0}>
-            {trabajando === 'copiar' ? <Loader2 className="animate-spin" /> : <ClipboardCopy />} Copiar
-          </Button>
-          <Button variant="tinted" onClick={exportarPdf} disabled={!!trabajando || eventos.length === 0}>
-            {trabajando === 'pdf' ? <Loader2 className="animate-spin" /> : <FileDown />} PDF
-          </Button>
-        </div>
       </div>
 
       <div className="grid items-start gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
@@ -272,7 +318,12 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
           ) : (
             <div className="overflow-hidden rounded-card bg-card shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
               {eventos.map((e) => (
-                <EventoBitacoraFila key={e.id} evento={e} onAbrir={() => setEditor({ evento: e, idNuevo: e.id, turno })} />
+                <EventoBitacoraFila
+                  key={e.id}
+                  evento={e}
+                  onAbrir={() => setEditor({ evento: e, idNuevo: e.id, turno })}
+                  onVerFoto={(fotos, indice) => setVisor({ fotos, indice, titulo: [e.horaInicio, e.equipo].filter(Boolean).join(' · ') })}
+                />
               ))}
             </div>
           )}
@@ -280,12 +331,22 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
 
         {/* Vista previa del correo (solo PC) */}
         <section aria-label="Vista previa del correo" className="hidden flex-col md:flex md:sticky md:top-4">
-          <div className="flex items-baseline justify-between gap-2 px-4 pb-2">
-            <h2 className="text-caption font-semibold text-muted-foreground">Así queda al pegar en el correo</h2>
-            <Button variant="plain" size="sm" onClick={copiarIncrustadas} disabled={!!trabajando}>
-              {trabajando === 'copiar-incrustadas' ? <Loader2 className="animate-spin" /> : null}
-              Copiar con fotos incrustadas
-            </Button>
+          <div className="flex flex-col gap-1 px-4 pb-2">
+            <div className="flex items-baseline justify-between gap-2">
+              <h2 className="text-caption font-semibold text-muted-foreground">Así queda al pegar en el correo</h2>
+              <Button variant="plain" size="sm" onClick={copiarIncrustadas} disabled={!!trabajando}>
+                {trabajando === 'copiar-incrustadas' ? <Loader2 className="animate-spin" /> : null}
+                Copiar con fotos incrustadas
+              </Button>
+            </div>
+            {/* El portapapeles lleva el CUERPO; el asunto se copia aparte. */}
+            <div className="flex min-w-0 items-center gap-2 text-footnote">
+              <span className="shrink-0 text-muted-foreground">Asunto:</span>
+              <span className="min-w-0 truncate">{asunto}</span>
+              <Button variant="plain" size="sm" className="shrink-0" onClick={copiarAsunto}>
+                Copiar asunto
+              </Button>
+            </div>
           </div>
           <VistaPreviaCorreo html={htmlCorreo} />
           <p className="px-4 pt-2 text-footnote text-muted-foreground">
@@ -305,6 +366,46 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
         onBorrar={borrar}
         onClose={() => setEditor(null)}
       />
+
+      <Sheet
+        open={editandoObs}
+        onClose={() => setEditandoObs(false)}
+        title="Observación general del turno"
+        description="Sale en el correo y en el PDF, debajo del resumen."
+        actions={
+          <>
+            <Button variant="tinted" onClick={() => setEditandoObs(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                void guardarObservacion(textoObs)
+                  .then(() => {
+                    toast({ title: 'Observación guardada', variant: 'success' })
+                    setEditandoObs(false)
+                  })
+                  .catch((e: unknown) => toast({ title: e instanceof Error ? e.message : 'No se pudo guardar', variant: 'destructive' }))
+              }}
+            >
+              Guardar
+            </Button>
+          </>
+        }
+      >
+        <label htmlFor="bitacora-observacion" className="sr-only">Observación general del turno</label>
+        <textarea
+          id="bitacora-observacion"
+          value={textoObs}
+          onChange={(e) => setTextoObs(e.target.value)}
+          maxLength={3000}
+          placeholder="Planta operando normal. Queda pendiente el motor de tensado de la enzunchadora…"
+          className="min-h-[160px] w-full resize-y rounded-ctl border-0 bg-muted-foreground/10 px-3 py-2.5 text-[16px] leading-snug text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary"
+        />
+      </Sheet>
+
+      {visor && (
+        <VisorFotosBitacora fotos={visor.fotos} indiceInicial={visor.indice} titulo={visor.titulo} onClose={() => setVisor(null)} />
+      )}
     </div>
   )
 }
@@ -324,15 +425,35 @@ function Stat({ valor, etiqueta, tinta }: { valor: string; etiqueta: string; tin
  * tiene que ser lo mismo que ve Outlook. Sin scripts: `sandbox` sin
  * `allow-scripts`; `allow-same-origin` solo para medir la altura.
  */
+/** Ancho con que se arma el correo (680 px de cuerpo + 20 px de margen por lado). */
+const ANCHO_CORREO = 720
+
 function VistaPreviaCorreo({ html }: { html: string }) {
   const ref = useRef<HTMLIFrameElement>(null)
   const [alto, setAlto] = useState(480)
-  const doc = `<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;padding:20px;background:#fff;}</style></head><body>${html}</body></html>`
+  const doc = `<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:#fff;}body{padding:20px;width:${ANCHO_CORREO - 40}px;}</style></head><body>${html}</body></html>`
 
-  const medir = () => {
-    const body = ref.current?.contentDocument?.body
-    if (body) setAlto(Math.max(240, body.scrollHeight + 4))
-  }
+  /**
+   * El correo se dibuja a SU ancho real y se escala para caber en la columna.
+   * Achicar las fotos para que quepan no sirve: la columna mide distinto con y
+   * sin menú lateral, y la vista previa dejaría de mostrar lo que llega a Outlook.
+   */
+  const ajustar = useCallback(() => {
+    const iframe = ref.current
+    const d = iframe?.contentDocument
+    if (!iframe || !d?.body) return
+    const escala = Math.min(1, iframe.clientWidth / ANCHO_CORREO)
+    d.documentElement.style.zoom = String(escala)
+    setAlto(Math.max(240, Math.ceil(d.body.scrollHeight * escala) + 4))
+  }, [])
+
+  useEffect(() => {
+    const iframe = ref.current
+    if (!iframe) return
+    const ro = new ResizeObserver(() => ajustar())
+    ro.observe(iframe)
+    return () => ro.disconnect()
+  }, [ajustar])
 
   return (
     <iframe
@@ -341,9 +462,9 @@ function VistaPreviaCorreo({ html }: { html: string }) {
       sandbox="allow-same-origin"
       srcDoc={doc}
       onLoad={() => {
-        medir()
+        ajustar()
         // Las fotos terminan de cargar después del onLoad del documento.
-        ref.current?.contentDocument?.querySelectorAll('img').forEach((img) => img.addEventListener('load', medir))
+        ref.current?.contentDocument?.querySelectorAll('img').forEach((img) => img.addEventListener('load', ajustar))
       }}
       // Fondo blanco fijo en ambos temas: es el papel del correo, no cromo de la app.
       style={{ height: alto, background: '#fff' }}

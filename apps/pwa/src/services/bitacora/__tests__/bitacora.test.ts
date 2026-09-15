@@ -207,6 +207,13 @@ describe('correo de la bitácora', () => {
     expect(texto).toContain('Técnicos de turno: Danilo Cortes')
   })
 
+  it('incluye la observación general escapada y con saltos de línea', () => {
+    const html = bitacoraAHtmlCorreo({ ...base, eventos: [ev({})], observacion: 'Planta sin agua caliente <2 h>\nSe avisó a jefatura' })
+    expect(html).toContain('Observaciones del turno: </span>Planta sin agua caliente &lt;2 h&gt;<br>Se avisó a jefatura')
+    expect(bitacoraAHtmlCorreo({ ...base, eventos: [ev({})], observacion: '   ' })).not.toContain('Observaciones del turno')
+    expect(bitacoraATextoPlano({ ...base, eventos: [ev({})], observacion: 'Sin novedad' })).toContain('Observaciones del turno: Sin novedad')
+  })
+
   it('un turno sin eventos lo dice', () => {
     expect(bitacoraAHtmlCorreo({ ...base, eventos: [] })).toContain('Sin eventos registrados en el turno.')
   })

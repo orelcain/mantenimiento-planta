@@ -44,6 +44,7 @@ export interface EventoBitacoraSheetProps {
 }
 
 const CLAVE_RECIENTES = 'bitacora.equiposRecientes.v1'
+const SIN_SENAL = 'Sin señal. Se sube sola cuando vuelva la conexión.'
 
 function leerRecientes(): string[] {
   try {
@@ -116,6 +117,7 @@ export function EventoBitacoraSheet({
   const [subidas, setSubidas] = useState<Subida[]>([])
   const [guardando, setGuardando] = useState(false)
   const [confirmarBorrado, setConfirmarBorrado] = useState(false)
+  const [confirmarSinFotos, setConfirmarSinFotos] = useState(false)
   const [error, setError] = useState<string | null>(null)
   /** Fotos subidas en ESTA edición: si se cancela, se borran de Storage. */
   const subidasNuevas = useRef<string[]>([])
@@ -140,6 +142,7 @@ export function EventoBitacoraSheet({
     setSubidas([])
     setGuardando(false)
     setConfirmarBorrado(false)
+    setConfirmarSinFotos(false)
     setError(null)
     subidasNuevas.current = []
     quitadas.current = []
@@ -157,6 +160,12 @@ export function EventoBitacoraSheet({
   }, [sugerenciasEquipo, open])
 
   const subir = async (s: Subida) => {
+    if (!navigator.onLine) {
+      // Sin señal, Storage reintenta hasta 10 min con la ruedita girando. Mejor
+      // decirlo al tiro: la foto queda en la hoja y se sube sola al volver la red.
+      setSubidas((prev) => prev.map((x) => (x.clave === s.clave ? { ...x, error: SIN_SENAL } : x)))
+      return
+    }
     setSubidas((prev) => prev.map((x) => (x.clave === s.clave ? { ...x, error: undefined } : x)))
     try {
       const foto = await subirFoto(turno.id, eventoId, s.archivo, s.etiqueta)
@@ -213,10 +222,32 @@ export function EventoBitacoraSheet({
     onClose()
   }
 
+  // Al volver la señal, reintentar solas las fotos que fallaron.
+  const subidasRef = useRef(subidas)
+  subidasRef.current = subidas
+  const subirRef = useRef(subir)
+  subirRef.current = subir
+  useEffect(() => {
+    if (!open) return
+    const alVolver = () => subidasRef.current.filter((s) => s.error).forEach((s) => void subirRef.current(s))
+    window.addEventListener('online', alVolver)
+    return () => window.removeEventListener('online', alVolver)
+  }, [open])
+
   const guardar = async () => {
     setError(null)
     if (!descripcion.trim()) {
       setError('Escribe qué pasó y qué se hizo.')
+      return
+    }
+    const fallidas = subidas.filter((s) => s.error).length
+    if (fallidas > 0 && !confirmarSinFotos) {
+      // Nunca perder una foto en silencio: se avisa y se pide un segundo toque.
+      setConfirmarSinFotos(true)
+      setError(
+        `${fallidas === 1 ? 'Una foto no se ha subido' : `${fallidas} fotos no se han subido`}. ` +
+          'Espera a que se suban o toca Guardar otra vez para guardar sin ellas.',
+      )
       return
     }
     setGuardando(true)
@@ -242,7 +273,11 @@ export function EventoBitacoraSheet({
       subidasNuevas.current = []
       quitadas.current.forEach((p) => void borrarFotoBitacora(p).catch(() => undefined))
       quitadas.current = []
-      toast({ title: esNuevo ? 'Evento agregado' : 'Evento actualizado', variant: 'success' })
+      toast({
+        title: esNuevo ? 'Evento agregado' : 'Evento actualizado',
+        description: navigator.onLine ? undefined : 'Quedó guardado en el teléfono; se sube cuando haya señal.',
+        variant: 'success',
+      })
       onClose()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo guardar. Reintenta.')

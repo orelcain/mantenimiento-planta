@@ -9,6 +9,8 @@ import type { BandaTurno, EtiquetaFoto, ImpactoEvento, TipoEvento } from '@/serv
 export const BITACORA_PLANTA = { id: 'chonchi', nombre: 'Planta Chonchi' } as const
 
 export const BITACORA_COLECCION = 'bitacoraEventos'
+/** Un doc por turno (`{plantId}_{turnoId}`) con la observación general. */
+export const BITACORA_TURNOS_COLECCION = 'bitacoraTurnos'
 
 /** Hora de inicio de cada banda (horario de Mantención, ver calendario). */
 export const INICIO_BANDA: Record<BandaTurno, number> = { noche: 0, dia: 8, tarde: 16 }

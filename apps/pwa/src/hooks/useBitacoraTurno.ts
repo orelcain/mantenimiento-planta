@@ -13,7 +13,8 @@ import {
 } from 'firebase/firestore'
 import { auth, db } from '@/services/firebase'
 import { useAuthStore } from '@/store'
-import { BITACORA_COLECCION, BITACORA_PLANTA } from '@/config/bitacora'
+import { toast } from '@/hooks/useToast'
+import { BITACORA_COLECCION, BITACORA_PLANTA, BITACORA_TURNOS_COLECCION } from '@/config/bitacora'
 import type { EventoBitacora, EventoBitacoraDatos, FotoEvento, TurnoMantencion } from '@/services/bitacora/bitacora.types'
 import { ordenarEventos } from '@/services/bitacora/resumenBitacora'
 import { tecnicosDeTurno, type CalendarioDoc } from '@/services/bitacora/tecnicosDeTurno'
@@ -107,8 +108,21 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
         fotos,
       }
       const ref = doc(db, BITACORA_COLECCION, id)
+      // SIN await: la promesa de Firestore se resuelve recién cuando el SERVIDOR
+      // confirma. Sin señal quedaba colgada y «Guardar» giraba para siempre. La
+      // app usa `persistentLocalCache`, así que la escritura ya quedó en el
+      // teléfono (sobrevive a cerrar la app) y el onSnapshot la muestra al tiro
+      // con `hasPendingWrites` → «Guardando…». Si el servidor la rechaza, se avisa.
+      const avisarRechazo = (e: unknown) =>
+        toast({
+          title: 'El evento no se guardó en el servidor',
+          description: (e as { code?: string })?.code === 'permission-denied'
+            ? 'Sin permiso para escribir en la bitácora.'
+            : 'Vuelve a intentarlo cuando haya señal.',
+          variant: 'destructive',
+        })
       if (esNuevo) {
-        await setDoc(ref, {
+        void setDoc(ref, {
           ...cuerpo,
           plantId: BITACORA_PLANTA.id,
           turnoId: turno.id,
@@ -118,19 +132,22 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
           autorNombre: nombreAutor(),
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
-        })
+        }).catch(avisarRechazo)
       } else {
-        await updateDoc(ref, { ...cuerpo, actualizadoPorNombre: nombreAutor(), updatedAt: serverTimestamp() })
+        void updateDoc(ref, { ...cuerpo, actualizadoPorNombre: nombreAutor(), updatedAt: serverTimestamp() }).catch(avisarRechazo)
       }
     },
     [turno, nombreAutor],
   )
 
   const borrar = useCallback(async (evento: EventoBitacora) => {
-    await deleteDoc(doc(db, BITACORA_COLECCION, evento.id))
+    // Mismo criterio que guardar: no esperar al servidor (ver arriba).
+    void deleteDoc(doc(db, BITACORA_COLECCION, evento.id)).catch(() =>
+      toast({ title: 'No se pudo borrar el evento', description: 'Solo quien lo creó o un supervisor puede borrarlo.', variant: 'destructive' }),
+    )
     // Las fotos después del doc: si alguna falla queda huérfana en Storage,
     // pero el evento ya no se ve, que es lo que se pidió.
-    await Promise.allSettled((evento.fotos ?? []).map((f) => borrarFotoBitacora(f.path)))
+    void Promise.allSettled((evento.fotos ?? []).map((f) => borrarFotoBitacora(f.path)))
   }, [])
 
   return { eventos, cargando, error, sincronizando, ultimaSync, nuevoId, guardar, borrar }
@@ -174,6 +191,60 @@ export function useTecnicosDeTurno(turno: TurnoMantencion): string[] {
   return useMemo(() => tecnicosDeTurno(cal, turno), [cal, turno])
 }
 
+export interface ObservacionTurno {
+  texto: string
+  actualizadoPorNombre: string | null
+}
+
+/**
+ * Observación general del turno (una nota por turno: estado de la planta,
+ * entrega de turno…). Doc `bitacoraTurnos/{plantId}_{turnoId}`.
+ */
+export function useObservacionTurno(turno: TurnoMantencion) {
+  const [obs, setObs] = useState<ObservacionTurno>({ texto: '', actualizadoPorNombre: null })
+  const user = useAuthStore((s) => s.user)
+  const docId = `${BITACORA_PLANTA.id}_${turno.id}`
+
+  useEffect(() => {
+    setObs({ texto: '', actualizadoPorNombre: null })
+    const off = onSnapshot(
+      doc(db, BITACORA_TURNOS_COLECCION, docId),
+      (snap) => {
+        const d = snap.data()
+        setObs({
+          texto: typeof d?.observacion === 'string' ? d.observacion : '',
+          actualizadoPorNombre: typeof d?.actualizadoPorNombre === 'string' ? d.actualizadoPorNombre : null,
+        })
+      },
+      () => {
+        // Sin permiso o sin red: la observación es opcional, la pantalla sigue.
+      },
+    )
+    return off
+  }, [docId])
+
+  const guardarObservacion = useCallback(
+    async (texto: string) => {
+      const u = auth.currentUser
+      if (!u) throw new Error('Hay que iniciar sesión para escribir en la bitácora.')
+      const nombre =
+        [user?.nombre?.split(' ')[0], user?.apellido?.split(' ')[0]].filter(Boolean).join(' ') || u.displayName || 'Sin nombre'
+      // Sin await, igual que los eventos: queda en el teléfono si no hay señal.
+      void setDoc(doc(db, BITACORA_TURNOS_COLECCION, docId), {
+        plantId: BITACORA_PLANTA.id,
+        turnoId: turno.id,
+        observacion: texto.trim(),
+        actualizadoPor: u.uid,
+        actualizadoPorNombre: nombre,
+        updatedAt: serverTimestamp(),
+      }).catch(() => toast({ title: 'La observación no se guardó en el servidor', variant: 'destructive' }))
+    },
+    [docId, turno.id, user],
+  )
+
+  return { observacion: obs, guardarObservacion }
+}
+
 /**
  * De dónde saca la pantalla de la bitácora sus datos. En la app es Firestore;
  * la vitrina de desarrollo (`/dev/bitacora`) inyecta datos de ejemplo para
@@ -182,6 +253,7 @@ export function useTecnicosDeTurno(turno: TurnoMantencion): string[] {
 export interface FuenteBitacora {
   useEventos: (turno: TurnoMantencion) => ReturnType<typeof useBitacoraTurno>
   useTecnicos: (turno: TurnoMantencion) => string[]
+  useObservacion: (turno: TurnoMantencion) => ReturnType<typeof useObservacionTurno>
   /** Reemplaza la subida a Storage. */
   subirFoto?: typeof subirFotoBitacora
 }
@@ -189,4 +261,5 @@ export interface FuenteBitacora {
 export const FUENTE_FIRESTORE: FuenteBitacora = {
   useEventos: useBitacoraTurno,
   useTecnicos: useTecnicosDeTurno,
+  useObservacion: useObservacionTurno,
 }

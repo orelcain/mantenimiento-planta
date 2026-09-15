@@ -4872,3 +4872,22 @@ colación empaque…) · Outlook "varía" → dos formas de copiar.
 
 Pendiente: prueba real de Orel en el celular (fotos de cámara) y pegado en SU Outlook; ver si
 «Copiar para correo» basta o hace falta la variante incrustada.
+
+### 2026-09-15 · Bitácora · ronda de pulido 1 (mismo PR #1021)
+
+- **Guardar sin señal**: `await setDoc` se resuelve recién con el ACK del servidor → sin señal
+  «Guardar» giraba para siempre. Ahora no se espera (la app ya usa `persistentLocalCache`: la
+  escritura queda en el teléfono y el onSnapshot la muestra con «Guardando…»); si el servidor la
+  rechaza, toast. Igual para borrar y para la observación.
+- **Fotos sin señal**: aviso inmediato («se sube sola cuando vuelva la conexión») en vez de la
+  ruedita de 10 min de Storage; reintento automático con el evento `online`; guardar con fotos sin
+  subir pide un segundo toque (nunca se pierde una foto en silencio).
+- **Observación general del turno** (estaba en el mockup aprobado y faltaba): doc
+  `bitacoraTurnos/{plantId}_{turnoId}` + regla; sale en correo, texto plano y PDF.
+- **Copiar asunto** en la vista previa del PC (el portapapeles lleva solo el cuerpo).
+- **Fotos en grande**: tocar una miniatura abre un visor a pantalla completa (flechas/teclado/Esc).
+- **«Nuevo evento» fijo** sobre la barra de pestañas en el celular.
+- **Vista previa del correo escalada**: se dibuja a su ancho real (720 px) y se aplica `zoom` para
+  caber en la columna; antes la 2ª foto quedaba cortada (la columna mide distinto con/sin menú).
+- Verificado en `/dev/bitacora` (5189): observación, visor, dock 52 px, flujo offline completo
+  simulando `navigator.onLine`, correo sin scroll horizontal. 21 tests, lint 28/30, audit-piel OK.

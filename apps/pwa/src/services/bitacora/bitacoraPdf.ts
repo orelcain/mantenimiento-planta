@@ -28,9 +28,10 @@ export interface DatosPdfBitacora {
   eventos: readonly EventoBitacora[]
   tecnicos: readonly string[]
   planta: string
+  observacion?: string
 }
 
-export async function generarPdfBitacora({ turno, eventos, tecnicos, planta }: DatosPdfBitacora): Promise<{ archivo: string; fotosFallidas: number }> {
+export async function generarPdfBitacora({ turno, eventos, tecnicos, planta, observacion }: DatosPdfBitacora): Promise<{ archivo: string; fotosFallidas: number }> {
   const { jsPDF } = await import('jspdf')
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   // NFKC antes del saneo: convierte subíndices y superíndices a dígitos
@@ -111,6 +112,19 @@ export async function generarPdfBitacora({ turno, eventos, tecnicos, planta }: D
     pdf.text(t(etiqueta), x + 3, y + 11.5)
   })
   y += 22
+
+  // ── Observación general ──
+  if (observacion?.trim()) {
+    pdf.setFontSize(10)
+    const lineas = pdf.splitTextToSize(t(`Observaciones del turno: ${observacion.trim()}`), ANCHO) as string[]
+    color(TINTA)
+    for (const l of lineas) {
+      saltoSiHaceFalta(5)
+      pdf.text(l, M, y)
+      y += 4.6
+    }
+    y += 4
+  }
 
   // ── Eventos ──
   const ANCHO_FOTO = (ANCHO - 6) / 2

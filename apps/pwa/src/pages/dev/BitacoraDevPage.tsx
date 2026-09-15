@@ -172,9 +172,18 @@ function useEventosEjemplo(turno: TurnoMantencion) {
   }
 }
 
+function useObservacionEjemplo() {
+  const [texto, setTexto] = useState('')
+  return {
+    observacion: { texto, actualizadoPorNombre: texto ? 'Usuario de ejemplo' : null },
+    guardarObservacion: async (t: string) => setTexto(t.trim()),
+  }
+}
+
 const FUENTE_EJEMPLO: FuenteBitacora = {
   useEventos: useEventosEjemplo,
   useTecnicos: () => ['Danilo Cortes', 'Matias Serpa'],
+  useObservacion: useObservacionEjemplo,
   subirFoto: async (_turnoId, _eventoId, archivo, etiqueta) => {
     const url = await new Promise<string>((resolve, reject) => {
       const lector = new FileReader()

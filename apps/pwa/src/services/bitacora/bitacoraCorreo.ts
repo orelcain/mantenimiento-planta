@@ -23,6 +23,8 @@ export interface DatosCorreoBitacora {
   eventos: readonly EventoBitacora[]
   tecnicos: readonly string[]
   planta: string
+  /** Observación general del turno (opcional). */
+  observacion?: string
   /** Permite reemplazar la URL de cada foto (p. ej. por un data URI). */
   fuenteFoto?: (foto: FotoEvento) => string
 }
@@ -123,7 +125,7 @@ function htmlKpi(valor: string, etiqueta: string, color = C.tinta): string {
   )
 }
 
-export function bitacoraAHtmlCorreo({ turno, eventos, tecnicos, planta, fuenteFoto }: DatosCorreoBitacora): string {
+export function bitacoraAHtmlCorreo({ turno, eventos, tecnicos, planta, observacion, fuenteFoto }: DatosCorreoBitacora): string {
   const fuente = fuenteFoto ?? ((f: FotoEvento) => f.url)
   const ordenados = ordenarEventos(turno, eventos)
   const r = resumirBitacora(eventos)
@@ -150,7 +152,12 @@ export function bitacoraAHtmlCorreo({ turno, eventos, tecnicos, planta, fuenteFo
       ? `<div style="font-family:${FUENTE};font-size:13px;color:${C.sec};">Registrado por: ${escaparHtml(autores.join(', '))}</div>`
       : '')
 
-  const tablaKpis = `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin:12px 0 4px;"><tr>${kpis}</tr></table>`
+  const tablaKpis =
+    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin:12px 0 4px;"><tr>${kpis}</tr></table>` +
+    (observacion?.trim()
+      ? `<div style="font-family:${FUENTE};font-size:14px;color:${C.tinta};padding:8px 0 4px;">` +
+        `<span style="font-weight:600;">Observaciones del turno: </span>${conSaltos(observacion)}</div>`
+      : '')
 
   const cuerpo = hechos.length
     ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;width:100%;margin-top:8px;">${hechos
@@ -175,7 +182,7 @@ export function bitacoraAHtmlCorreo({ turno, eventos, tecnicos, planta, fuenteFo
 }
 
 /** Versión en texto plano: va junto al HTML en el portapapeles, por si el destino no acepta HTML. */
-export function bitacoraATextoPlano({ turno, eventos, tecnicos, planta }: DatosCorreoBitacora): string {
+export function bitacoraATextoPlano({ turno, eventos, tecnicos, planta, observacion }: DatosCorreoBitacora): string {
   const r = resumirBitacora(eventos)
   const ordenados = ordenarEventos(turno, eventos)
   const linea = (e: EventoBitacora) =>
@@ -203,6 +210,7 @@ export function bitacoraATextoPlano({ turno, eventos, tecnicos, planta }: DatosC
   return [
     cabecera,
     resumen,
+    ...(observacion?.trim() ? [`Observaciones del turno: ${observacion.trim()}`] : []),
     ...hechos.map(linea),
     ...(pendientes.length ? ['PENDIENTE PARA EL TURNO SIGUIENTE', ...pendientes.map(linea)] : []),
   ].join('\n\n')

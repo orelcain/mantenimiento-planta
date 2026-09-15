@@ -1,7 +1,7 @@
 import { Camera } from 'lucide-react'
 import { Pill, Tag } from '@/components/piel'
 import { ETIQUETA_FOTO, ETIQUETA_TIPO } from '@/config/bitacora'
-import type { EventoBitacora } from '@/services/bitacora/bitacora.types'
+import type { EventoBitacora, FotoEvento } from '@/services/bitacora/bitacora.types'
 import { minutosParadaDe } from '@/services/bitacora/resumenBitacora'
 import { formatoMinutos } from '@/services/bitacora/turnoMantencion'
 
@@ -13,7 +13,16 @@ import { formatoMinutos } from '@/services/bitacora/turnoMantencion'
  * (parada o ventana) va en una línea propia porque es el dato que demuestra el
  * aporte de Mantención: no se esconde en el texto libre.
  */
-export function EventoBitacoraFila({ evento, onAbrir }: { evento: EventoBitacora; onAbrir: () => void }) {
+export function EventoBitacoraFila({
+  evento,
+  onAbrir,
+  onVerFoto,
+}: {
+  evento: EventoBitacora
+  onAbrir: () => void
+  /** Tocar una miniatura abre la foto en grande (no el editor). */
+  onVerFoto?: (fotos: FotoEvento[], indice: number) => void
+}) {
   const parada = minutosParadaDe(evento)
   const orden = { antes: 0, despues: 1, foto: 2 } as const
   const fotos = [...(evento.fotos ?? [])].sort((a, b) => orden[a.etiqueta] - orden[b.etiqueta])
@@ -68,15 +77,25 @@ export function EventoBitacoraFila({ evento, onAbrir }: { evento: EventoBitacora
                 {esAntesDespues && i === 1 && f.etiqueta === 'despues' && (
                   <span className="text-footnote text-muted-foreground" aria-hidden>→</span>
                 )}
-                <figure className="m-0">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (onVerFoto) onVerFoto(fotos, i)
+                    else onAbrir()
+                  }}
+                  onKeyDown={(e) => e.stopPropagation()}
+                  aria-label={`Ver foto ${ETIQUETA_FOTO[f.etiqueta]}`}
+                  className="flex flex-col items-start rounded-ctl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
                   <img
                     src={f.url}
-                    alt={ETIQUETA_FOTO[f.etiqueta]}
+                    alt=""
                     loading="lazy"
                     className="size-16 rounded-ctl bg-muted-foreground/10 object-cover"
                   />
-                  <figcaption className="pt-0.5 text-caption text-muted-foreground">{ETIQUETA_FOTO[f.etiqueta]}</figcaption>
-                </figure>
+                  <span className="pt-0.5 text-caption text-muted-foreground">{ETIQUETA_FOTO[f.etiqueta]}</span>
+                </button>
               </div>
             ))}
             {fotos.length > 4 && (
