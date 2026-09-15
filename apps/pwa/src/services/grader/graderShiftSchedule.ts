@@ -4,6 +4,7 @@
  */
 
 import type { GraderShiftSchedule } from './types'
+import { claveNormalizadaDeTurno } from './graderShiftDisplay'
 
 /**
  * Horarios por defecto de turnos del Grader.
@@ -68,8 +69,22 @@ export function normalizeShiftSchedule(
   for (const item of base) {
     map.set(item.shiftId, { ...item })
   }
-  for (const item of schedule || []) {
-    if (!item.shiftId || !map.has(item.shiftId)) continue
+  /*
+   * Buscar el turno de la config en la base SIN distinguir mayusculas ni acentos.
+   *
+   * Comparaba literal (`map.has`), asi que una config con "Turno Dia" no
+   * encontraba el "Turno día" de la base y se descartaba en silencio: la config
+   * de Filete que existe en Firestore nunca se aplicaba. Se conserva el nombre de
+   * la BASE, que es el que buscan los consumidores.
+   */
+  const porClave = new Map<string, string>()
+  for (const item of base) porClave.set(claveNormalizadaDeTurno(item.shiftId), item.shiftId)
+
+  for (const raw of schedule || []) {
+    if (!raw.shiftId) continue
+    const nombreBase = map.has(raw.shiftId) ? raw.shiftId : porClave.get(claveNormalizadaDeTurno(raw.shiftId))
+    if (!nombreBase) continue
+    const item = { ...raw, shiftId: nombreBase }
     const quota = item.quota && Number.isFinite(item.quota.value) && item.quota.value > 0
       ? {
           value: Math.max(0, Math.round(item.quota.value)),
