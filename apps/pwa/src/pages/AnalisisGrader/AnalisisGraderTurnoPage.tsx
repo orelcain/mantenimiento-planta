@@ -8,6 +8,7 @@
 
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { useParams, useNavigate, Navigate, useSearchParams } from 'react-router-dom'
+import { vistasDelTurno } from '@/services/grader/vistasDelTurno'
 import { logger } from '@/lib/logger'
 import { Button, Card, CardContent, Spinner, Badge } from '@/components/ui'
 import { ArrowLeft, Settings2, AlertCircle, Clock, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight, Share2, Copy, Check, QrCode, Download, Tag, FileText, WifiOff, ChevronDown, RefreshCw, Zap, Scale, Sun, Sunset, Moon, Sunrise, Radio, ExternalLink, SlidersHorizontal, Image as ImageIcon } from 'lucide-react'
@@ -485,11 +486,12 @@ export function AnalisisGraderTurnoPage() {
   // las 3 Baaders y no hay clasificación por calidad.
   const isClassificationPlant = plantLineCfg.isClassificationPlant !== false
 
+  // Gates solo en la planta que clasifica; Calidad solo en líneas que pasan por
+  // Grader (Filete no: la pestaña se abría en blanco). Ver vistasDelTurno.ts.
+  const hasGraderData = plantLineCfg.hasGraderData !== false
   const availableViews = useMemo<TurnoView[]>(
-    // Yal no clasifica: sus gates físicas no tienen calibre+calidad y todos
-    // los bloques de la pestaña serían tarjetas vacías.
-    () => (isClassificationPlant ? [...ALL_TURNO_VIEWS] : ALL_TURNO_VIEWS.filter(v => v !== 'gates')),
-    [isClassificationPlant],
+    () => vistasDelTurno({ clasifica: isClassificationPlant, tieneGrader: hasGraderData }),
+    [isClassificationPlant, hasGraderData],
   )
 
   /**
@@ -2635,6 +2637,27 @@ export function AnalisisGraderTurnoPage() {
       {/* Contenido principal
           Mobile (stack vertical): Scorecard → Acciones → Causas (acciones arriba del todo)
           Desktop (grid 3-col 2 filas): Scorecard + Causas izq (2 cols apilados), Acciones der (col 3 × 2 filas) */}
+      {/*
+        Calidad sin Excel del Grader: antes la pestaña quedaba COMPLETAMENTE en
+        blanco, porque todo su contenido cuelga de `summary` (el resumen del
+        Excel). Medido desde el 1 de agosto: Chonchi 51 de 77 turnos, Yal 109 de
+        109. Se dice por qué y se ofrece cargarlo.
+      */}
+      {activeView === 'calidad' && !summary && !loading && (
+        <div className="flex flex-col items-start gap-3 rounded-card border bg-card p-5 sm:flex-row sm:items-center">
+          <div className="min-w-0 flex-1 space-y-1">
+            <p className="text-sm font-semibold text-foreground">Este turno no tiene el Excel del Grader</p>
+            <p className="max-w-prose text-sm text-muted-foreground">
+              Todo lo de esta pestaña —las causas de Puerta 0, cuándo ocurrieron y los lotes— sale de ese
+              archivo. La producción y los paros del turno ya están en Resumen y Mantención, con los datos de Shoplogix.
+            </p>
+          </div>
+          <Button size="sm" variant="outline" onClick={() => navigate(wizardUrl)} className="shrink-0">
+            Cargar Excel
+          </Button>
+        </div>
+      )}
+
       {summary && shiftWindow && (
         <>
           {/* ════════ RESUMEN ════════ */}
