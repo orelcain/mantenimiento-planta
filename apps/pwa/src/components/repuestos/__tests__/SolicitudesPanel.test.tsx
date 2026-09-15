@@ -68,17 +68,29 @@ describe('lo que se escribe al avanzar', () => {
 describe('lo que se ve en el panel', () => {
   it('una entregada con traza dice quién y cuánto tardó desde que se pidió', () => {
     panel([{ ...base, entregadaPor: 'Bodega', entregadaAt: new Date('2026-09-15T11:10:00') }])
-    expect(screen.getByText('por Bodega · en 3 h 10 min')).toBeTruthy()
+    expect(screen.getAllByText('por Bodega · en 3 h 10 min').length).toBeGreaterThan(0)
   })
 
   it('una aprobada dice quién la aprobó', () => {
     panel([{ ...base, estado: 'aprobada', aprobadaPor: 'Orel', aprobadaAt: new Date('2026-09-15T09:30:00') }])
-    expect(screen.getByText(/^por Orel · /)).toBeTruthy()
+    expect(screen.getAllByText(/^por Orel · /).length).toBeGreaterThan(0)
   })
 
   it('la solicitud de mayo, sin traza, NO inventa autor ni duración', () => {
     panel([base])
-    expect(screen.queryByText(/^por /)).toBeNull()
-    expect(screen.getByText('Entregada')).toBeTruthy()
+    expect(screen.queryAllByText(/^por /)).toHaveLength(0)
+    expect(screen.getAllByText('Entregada').length).toBeGreaterThan(0)
+  })
+})
+
+describe('en el teléfono', () => {
+  it('la tarjeta trae el botón de acción: en la tabla quedaba fuera de la pantalla a 375 px', () => {
+    const { container } = panel([{ ...base, estado: 'pendiente' }])
+    const lista = [...container.ownerDocument.querySelectorAll('ul')].find((u) => u.className.includes('sm:hidden'))
+    const tarjeta = lista?.querySelector('li')
+    expect(tarjeta).toBeTruthy()
+    const boton = [...tarjeta!.querySelectorAll('button')].find((b) => b.textContent?.includes('Aprobar'))
+    expect(boton).toBeTruthy()
+    expect(boton!.className).toContain('min-h-[44px]')
   })
 })
