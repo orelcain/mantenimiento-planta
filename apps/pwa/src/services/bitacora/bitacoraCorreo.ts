@@ -1,5 +1,5 @@
 import { ETIQUETA_FOTO, ETIQUETA_TIPO } from '@/config/bitacora'
-import { autorVisible, type EventoBitacora, type FotoEvento, type TurnoMantencion } from './bitacora.types'
+import { autorVisible, tecnicosDelEvento, type EventoBitacora, type FotoEvento, type TurnoMantencion } from './bitacora.types'
 import { minutosParadaDe, ordenarEventos, resumirBitacora } from './resumenBitacora'
 import { etiquetaTurno, fechaTurnoLarga, formatoMinutos, horarioTurno } from './turnoMantencion'
 
@@ -74,6 +74,15 @@ export function lineaImpacto(e: EventoBitacora): string {
   return partes.join(' · ')
 }
 
+/**
+ * "Técnicos: Danilo Cortes, Lucas Adrade" — solo si hubo participantes: con un
+ * solo técnico ya lo dice «Registrado por» en la cabecera y sería ruido.
+ */
+export function lineaTecnicos(e: EventoBitacora): string {
+  if (!e.participantes?.some((p) => p.trim())) return ''
+  return `Técnicos: ${tecnicosDelEvento(e).join(', ')}`
+}
+
 function dimensionesFoto(f: FotoEvento): { w: number; h: number } {
   if (f.ancho && f.alto && f.ancho > 0) {
     const w = Math.min(ANCHO_FOTO, f.ancho)
@@ -111,6 +120,7 @@ function htmlEvento(e: EventoBitacora, fuente: (f: FotoEvento) => string, separa
     `<tr><td style="padding:12px 0;${separador ? `border-top:1px solid ${C.linea};` : ''}font-family:${FUENTE};">` +
     `<div style="font-size:15px;font-weight:600;color:${C.tinta};">${escaparHtml(titulo)}</div>` +
     `<div style="font-size:13px;color:${colorImpacto};padding-top:2px;">${escaparHtml(lineaImpacto(e))}</div>` +
+    (lineaTecnicos(e) ? `<div style="font-size:13px;color:${C.sec};">${escaparHtml(lineaTecnicos(e))}</div>` : '') +
     (e.descripcion?.trim() ? `<div style="font-size:14px;color:${C.tinta};padding-top:4px;">${conSaltos(e.descripcion)}</div>` : '') +
     htmlFotos(e.fotos ?? [], fuente) +
     `</td></tr>`
@@ -189,6 +199,7 @@ export function bitacoraATextoPlano({ turno, eventos, tecnicos, planta, observac
     [
       `${horarioEvento(e)}${e.equipo?.trim() ? ` · ${e.equipo.trim()}` : ''}`,
       `  ${lineaImpacto(e)}`,
+      lineaTecnicos(e) ? `  ${lineaTecnicos(e)}` : '',
       e.descripcion?.trim() ? `  ${e.descripcion.trim().replace(/\r?\n/g, '\n  ')}` : '',
       e.fotos?.length ? `  Fotos: ${e.fotos.length}` : '',
     ]

@@ -1174,7 +1174,10 @@ service cloud.firestore {
           && (d.minutosParada == null || (d.minutosParada is number && d.minutosParada >= 0 && d.minutosParada <= 1440))
           && (d.ventana == null || (d.ventana is string && d.ventana.size() <= 120))
           && d.pendiente is bool
-          && d.fotos is list && d.fotos.size() <= 8;
+          && d.fotos is list && d.fotos.size() <= 8
+          // Opcionales: quién participó y el nodo de la jerarquía elegido en el buscador.
+          && (!('participantes' in d) || (d.participantes is list && d.participantes.size() <= 12))
+          && (!('equipoId' in d) || d.equipoId == null || (d.equipoId is string && d.equipoId.size() <= 60));
       }
 
       allow read: if isActiveUser();
@@ -1193,8 +1196,9 @@ service cloud.firestore {
         && (resource.data.creadoPor == request.auth.uid || isSupervisor());
     }
 
-    // Observación general del turno: un doc por turno `{plantId}_{turnoId}`.
-    // Compartida como los eventos; quien la edita queda en actualizadoPor.
+    // Datos del turno: un doc por turno `{plantId}_{turnoId}` con la observación
+    // general y los técnicos presentes (ajustados a mano sobre el calendario).
+    // Ambos opcionales: se escriben por separado con merge.
     match /bitacoraTurnos/{turnoDocId} {
       allow read: if isActiveUser();
       allow create, update: if isActiveUser()
@@ -1203,8 +1207,23 @@ service cloud.firestore {
         && request.resource.data.turnoId is string
         && request.resource.data.turnoId.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}_(dia|tarde|noche)$')
         && turnoDocId == request.resource.data.plantId + '_' + request.resource.data.turnoId
-        && request.resource.data.observacion is string
-        && request.resource.data.observacion.size() <= 3000
+        && (!('observacion' in request.resource.data)
+            || (request.resource.data.observacion is string && request.resource.data.observacion.size() <= 3000))
+        && (!('presentes' in request.resource.data)
+            || (request.resource.data.presentes is list && request.resource.data.presentes.size() <= 30))
+        && request.resource.data.actualizadoPor == request.auth.uid;
+      allow delete: if isSupervisor();
+    }
+
+    // Lista de técnicos de la bitácora: ajustes sobre la planilla del calendario
+    // (agregados, ocultos, renombres). Un doc por planta. El calendario no se toca.
+    match /bitacoraConfig/{plantId} {
+      allow read: if isActiveUser();
+      allow create, update: if isActiveUser()
+        && isValidDocSize()
+        && request.resource.data.agregados is list && request.resource.data.agregados.size() <= 60
+        && request.resource.data.ocultos is list && request.resource.data.ocultos.size() <= 60
+        && request.resource.data.renombres is map
         && request.resource.data.actualizadoPor == request.auth.uid;
       allow delete: if isSupervisor();
     }
