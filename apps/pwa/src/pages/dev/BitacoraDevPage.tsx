@@ -5,7 +5,9 @@ import type { FuenteBitacora } from '@/hooks/useBitacoraTurno'
 import { BITACORA_PLANTA } from '@/config/bitacora'
 import type { EventoBitacora, EventoBitacoraDatos, FotoEvento, TurnoMantencion } from '@/services/bitacora/bitacora.types'
 import { ordenarEventos } from '@/services/bitacora/resumenBitacora'
-import { turnoAdyacente, turnoDesdeId, turnoMantencionEn } from '@/services/bitacora/turnoMantencion'
+import { fechaLocal, turnoAdyacente, turnoDesdeId, turnoMantencionEn } from '@/services/bitacora/turnoMantencion'
+import { HistorialBitacoraVista } from '@/pages/HistorialBitacoraPage'
+import { fechaDesde, filasPorTurno, resumirPeriodo } from '@/services/bitacora/historialBitacora'
 import { AJUSTES_VACIOS, type AjustesTecnicos } from '@/services/bitacora/listaTecnicos'
 import { construirOpcionesEquipo, type NodoJerarquia } from '@/services/bitacora/buscarEquipos'
 
@@ -284,6 +286,61 @@ const FUENTE_EJEMPLO: FuenteBitacora = {
   },
 }
 
+/** Historial de ejemplo: 10 turnos hacia atrás con paradas, ventanas y pendientes. */
+function useHistorialEjemplo(dias: number) {
+  const eventos = useMemo(() => {
+    const actual = turnoMantencionEn()
+    const lista: EventoBitacora[] = []
+    let t = actual
+    for (let i = 0; i < Math.min(30, dias * 3); i++) {
+      const base = {
+        plantId: BITACORA_PLANTA.id,
+        turnoId: t.id,
+        fechaTurno: t.fecha,
+        banda: t.banda,
+        creadoPor: 'ejemplo',
+        autorNombre: 'mantencion.plantach',
+        fotos: [],
+        pendiente: false,
+        ventana: null as string | null,
+        minutosParada: null as number | null,
+      }
+      const quien = ['Danilo Cortes', 'Matias Serpa', 'Leandro Igor'][i % 3]!
+      if (i % 4 !== 3) {
+        lista.push({
+          ...base,
+          id: `h-${i}-a`,
+          tipo: 'falla',
+          equipo: i % 3 === 0 ? 'EVISCERADORA BAADER 142 N3' : i % 3 === 1 ? 'KNURO N1' : 'CELDA CARGA AK300 MARELEC STATIC GRADER',
+          descripcion: 'Intervención de ejemplo con parada.',
+          horaInicio: '02:10',
+          horaTermino: '02:45',
+          impacto: 'con-parada',
+          minutosParada: 10 + ((i * 7) % 45),
+          registradoPor: quien,
+        })
+      }
+      lista.push({
+        ...base,
+        id: `h-${i}-b`,
+        tipo: 'ajuste',
+        equipo: 'ENZUNCHADORA N1',
+        descripcion: 'Ajuste aprovechando la colación.',
+        horaInicio: '04:00',
+        horaTermino: '04:20',
+        impacto: 'en-ventana',
+        ventana: i % 2 ? 'Colación HG' : 'Línea sin producción',
+        registradoPor: quien,
+      })
+      t = turnoAdyacente(t, -1)
+    }
+    return lista
+  }, [dias])
+  const filas = useMemo(() => filasPorTurno(eventos), [eventos])
+  const resumen = useMemo(() => resumirPeriodo(eventos, fechaDesde(dias), fechaLocal(new Date())), [eventos, dias])
+  return { eventos, filas, resumen, cargando: false, error: null as string | null }
+}
+
 export function BitacoraDevPage() {
   return (
     <div className="min-h-screen bg-background px-4 pb-10 pt-4 text-foreground md:px-8">
@@ -295,6 +352,8 @@ export function BitacoraDevPage() {
           <BitacoraTurnoCard useEventos={useEventosEjemplo} alAgregar={() => undefined} alVer={() => undefined} />
         </div>
         <BitacoraTurnoVista fuente={FUENTE_EJEMPLO} />
+        <hr className="border-border" />
+        <HistorialBitacoraVista fuente={{ useHistorial: useHistorialEjemplo }} alAbrirTurno={() => undefined} />
       </div>
     </div>
   )
