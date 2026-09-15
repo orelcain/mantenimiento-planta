@@ -1,11 +1,11 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { BitacoraTurnoCard } from '@/components/bitacora/BitacoraTurnoCard'
 import { BitacoraTurnoVista } from '@/pages/BitacoraTurnoPage'
 import type { FuenteBitacora } from '@/hooks/useBitacoraTurno'
 import { BITACORA_PLANTA } from '@/config/bitacora'
 import type { EventoBitacora, EventoBitacoraDatos, FotoEvento, TurnoMantencion } from '@/services/bitacora/bitacora.types'
 import { ordenarEventos } from '@/services/bitacora/resumenBitacora'
-import { turnoMantencionEn } from '@/services/bitacora/turnoMantencion'
+import { turnoAdyacente, turnoDesdeId, turnoMantencionEn } from '@/services/bitacora/turnoMantencion'
 import { AJUSTES_VACIOS, type AjustesTecnicos } from '@/services/bitacora/listaTecnicos'
 import { construirOpcionesEquipo, type NodoJerarquia } from '@/services/bitacora/buscarEquipos'
 
@@ -157,6 +157,10 @@ function useEventosEjemplo(turno: TurnoMantencion) {
         }
         return { ...prev, [turno.id]: esNuevo ? [...lista, evento] : lista.map((e) => (e.id === id ? evento : e)) }
       })
+      if (esNuevo && datos.resuelvePendiente?.id) {
+        cerradosEjemplo.add(datos.resuelvePendiente.id)
+        avisarPendientes()
+      }
     },
     [turno],
   )
@@ -177,6 +181,51 @@ function useEventosEjemplo(turno: TurnoMantencion) {
     nuevoId: () => `nuevo-${Date.now()}`,
     guardar,
     borrar,
+  }
+}
+
+// Pendientes de ejemplo de turnos anteriores (entrega de turno). Store de módulo:
+// el editor (useEventosEjemplo) los cierra y la sección (usePendientesEjemplo) se entera.
+const cerradosEjemplo = new Set<string>()
+const oyentesPendientes = new Set<() => void>()
+function avisarPendientes() {
+  oyentesPendientes.forEach((f) => f())
+}
+
+function usePendientesEjemplo(turno: TurnoMantencion) {
+  const [, forzar] = useState(0)
+  useEffect(() => {
+    const f = () => forzar((n) => n + 1)
+    oyentesPendientes.add(f)
+    return () => {
+      oyentesPendientes.delete(f)
+    }
+  }, [])
+  const actual = turnoMantencionEn()
+  const anterior = turnoAdyacente(actual, -1)
+  const dosAtras = turnoAdyacente(anterior, -1)
+  const base = {
+    plantId: BITACORA_PLANTA.id,
+    impacto: 'no-aplica' as const,
+    minutosParada: null,
+    ventana: null,
+    pendiente: true,
+    fotos: [],
+    creadoPor: 'ejemplo',
+    autorNombre: 'mantencion.plantach',
+    horaTermino: null,
+  }
+  const todos: EventoBitacora[] = [
+    { ...base, id: 'pend-1', turnoId: anterior.id, fechaTurno: anterior.fecha, banda: anterior.banda, tipo: 'novedad', equipo: 'ENZUNCHADORA N1', descripcion: 'Motor de tensado con ruido. Sin repuesto en bodega.', horaInicio: '22:30', registradoPor: 'Matias Serpa' },
+    { ...base, id: 'pend-2', turnoId: dosAtras.id, fechaTurno: dosAtras.fecha, banda: dosAtras.banda, tipo: 'falla', equipo: 'KNURO N1', equipoId: 'e5', descripcion: 'Pusher con golpes irregulares; revisar disco de pulsos.', horaInicio: '11:40', registradoPor: 'Leandro Igor' },
+  ]
+  const pendientes = todos.filter((e) => !cerradosEjemplo.has(e.id) && e.turnoId !== turno.id && (turnoDesdeId(e.turnoId)?.inicio ?? turno.inicio) < turno.inicio)
+  return {
+    pendientes,
+    cerrarNoAplica: async (p: EventoBitacora) => {
+      cerradosEjemplo.add(p.id)
+      avisarPendientes()
+    },
   }
 }
 
@@ -222,6 +271,7 @@ const FUENTE_EJEMPLO: FuenteBitacora = {
   useTecnicos: () => ({ deTurno: ['Danilo Cortes', 'Matias Serpa'], todos: PLANILLA }),
   useObservacion: useObservacionEjemplo,
   useAjustes: useAjustesEjemplo,
+  usePendientesAnteriores: usePendientesEjemplo,
   useOpcionesEquipo: () => ({ opciones: OPCIONES_EJEMPLO, cargando: false }),
   subirFoto: async (_turnoId, _eventoId, archivo, etiqueta) => {
     const url = await new Promise<string>((resolve, reject) => {

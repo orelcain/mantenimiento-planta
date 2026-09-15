@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
+  arrayRemove,
+  arrayUnion,
   collection,
   deleteDoc,
   doc,
@@ -10,7 +12,9 @@ import {
   setDoc,
   updateDoc,
   where,
+  writeBatch,
 } from 'firebase/firestore'
+import { pendientesAnteriores } from '@/services/bitacora/entregaTurno'
 import { auth, db } from '@/services/firebase'
 import { useAuthStore } from '@/store'
 import { toast } from '@/hooks/useToast'
@@ -126,7 +130,7 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
         })
       const quien = datos.quien.trim() || nombreAutor()
       if (esNuevo) {
-        void setDoc(ref, {
+        const nuevo = {
           ...cuerpo,
           registradoPor: quien,
           plantId: BITACORA_PLANTA.id,
@@ -137,10 +141,42 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
           autorNombre: nombreAutor(),
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
-        }).catch(avisarRechazo)
+        }
+        if (datos.resuelvePendiente?.id) {
+          // Entrega de turno: el evento nuevo y el cierre del pendiente original
+          // van en UN lote. Si uno falla, no queda un pendiente "cerrado" sin el
+          // evento que lo cierra (ni al revés).
+          const lote = writeBatch(db)
+          lote.set(ref, { ...nuevo, resuelvePendiente: datos.resuelvePendiente })
+          lote.update(doc(db, BITACORA_COLECCION, datos.resuelvePendiente.id), {
+            pendiente: false,
+            cierre: { tipo: 'resuelto', turnoId: turno.id, porNombre: quien, eventoId: id, motivo: null, en: serverTimestamp() },
+            updatedAt: serverTimestamp(),
+          })
+          void lote.commit().catch(avisarRechazo)
+        } else {
+          void setDoc(ref, nuevo).catch(avisarRechazo)
+        }
       } else {
         // Al editar NO se toca registradoPor: quien edita queda aparte.
-        void updateDoc(ref, { ...cuerpo, actualizadoPorNombre: quien, updatedAt: serverTimestamp() }).catch(avisarRechazo)
+        // Las fotos van como CAMBIOS (arrayUnion/arrayRemove) y no como la lista
+        // entera: si otro teléfono agregó la foto «Después» mientras este editaba
+        // un texto, reescribir `fotos` completo la borraba (revisión 15-09).
+        const antes = datos.fotosAntes ?? []
+        const agregadas = fotos.filter((f) => !antes.some((a) => a.path === f.path))
+        const quitadas = antes.filter((a) => !fotos.some((f) => f.path === a.path))
+        const { fotos: _todas, ...sinFotos } = cuerpo
+        void _todas
+        const lote = writeBatch(db)
+        lote.update(ref, { ...sinFotos, actualizadoPorNombre: quien, updatedAt: serverTimestamp() })
+        if (agregadas.length) lote.update(ref, { fotos: arrayUnion(...agregadas) })
+        if (quitadas.length) lote.update(ref, { fotos: arrayRemove(...quitadas) })
+        void lote
+          .commit()
+          // Las quitadas se borran de Storage recién con el OK del servidor: si la
+          // regla rechaza la edición, el evento vuelve con sus fotos intactas.
+          .then(() => Promise.allSettled(quitadas.map((f) => borrarFotoBitacora(f.path))))
+          .catch(avisarRechazo)
       }
     },
     [turno, nombreAutor],
@@ -148,15 +184,69 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
 
   const borrar = useCallback(async (evento: EventoBitacora) => {
     // Mismo criterio que guardar: no esperar al servidor (ver arriba).
-    void deleteDoc(doc(db, BITACORA_COLECCION, evento.id)).catch(() =>
-      toast({ title: 'No se pudo borrar el evento', description: 'Solo quien lo creó o un supervisor puede borrarlo.', variant: 'destructive' }),
-    )
-    // Las fotos después del doc: si alguna falla queda huérfana en Storage,
-    // pero el evento ya no se ve, que es lo que se pidió.
-    void Promise.allSettled((evento.fotos ?? []).map((f) => borrarFotoBitacora(f.path)))
+    const avisar = () =>
+      toast({ title: 'No se pudo borrar el evento', description: 'Solo quien lo creó o un supervisor puede borrarlo.', variant: 'destructive' })
+    // Las fotos se borran de Storage recién cuando el servidor ACEPTA el borrado:
+    // si la regla lo rechaza (no es el autor ni supervisor), el evento vuelve con
+    // sus fotos sanas en vez de con enlaces rotos (revisión 15-09).
+    const borrarFotos = () => Promise.allSettled((evento.fotos ?? []).map((f) => borrarFotoBitacora(f.path)))
+    if (evento.resuelvePendiente?.id) {
+      // Borrar el evento que cerraba un pendiente lo vuelve a abrir: si no, el
+      // pendiente quedaría "cerrado" por un evento que ya no existe.
+      const lote = writeBatch(db)
+      lote.delete(doc(db, BITACORA_COLECCION, evento.id))
+      lote.update(doc(db, BITACORA_COLECCION, evento.resuelvePendiente.id), { pendiente: true, cierre: null, updatedAt: serverTimestamp() })
+      void lote.commit().then(borrarFotos).catch(avisar)
+    } else {
+      void deleteDoc(doc(db, BITACORA_COLECCION, evento.id)).then(borrarFotos).catch(avisar)
+    }
   }, [])
 
   return { eventos, cargando, error, sincronizando, ultimaSync, nuevoId, guardar, borrar }
+}
+
+/**
+ * Pendientes ABIERTOS de turnos anteriores (entrega de turno), en vivo.
+ * Consulta por igualdad (`plantId` + `pendiente == true`): sin índice compuesto
+ * y con pocos documentos, porque cada pendiente sale de la consulta al cerrarse.
+ */
+export function usePendientesAnteriores(turno: TurnoMantencion) {
+  const [abiertos, setAbiertos] = useState<EventoBitacora[]>([])
+
+  useEffect(() => {
+    const q = query(
+      collection(db, BITACORA_COLECCION),
+      where('plantId', '==', BITACORA_PLANTA.id),
+      where('pendiente', '==', true),
+    )
+    const off = onSnapshot(
+      q,
+      (snap) => setAbiertos(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as EventoBitacora)),
+      () => {
+        // Sin permiso o sin red: la entrega de turno es un extra, la bitácora sigue.
+      },
+    )
+    return off
+  }, [])
+
+  const pendientes = useMemo(() => pendientesAnteriores(abiertos, turno), [abiertos, turno])
+
+  /** «Ya no aplica»: cierra sin evento, con motivo. No cuenta como cerrado por Mantención. */
+  const cerrarNoAplica = useCallback(
+    async (pendiente: EventoBitacora, motivo: string, quien: string) => {
+      if (!auth.currentUser) throw new Error('Hay que iniciar sesión para escribir en la bitácora.')
+      const m = motivo.trim()
+      if (!m) throw new Error('Escribe por qué ya no aplica.')
+      void updateDoc(doc(db, BITACORA_COLECCION, pendiente.id), {
+        pendiente: false,
+        cierre: { tipo: 'no-aplica', turnoId: turno.id, porNombre: quien.trim() || 'Sin nombre', eventoId: null, motivo: m.slice(0, 300), en: serverTimestamp() },
+        updatedAt: serverTimestamp(),
+      }).catch(() => toast({ title: 'No se pudo cerrar el pendiente', variant: 'destructive' }))
+    },
+    [turno.id],
+  )
+
+  return { pendientes, cerrarNoAplica }
 }
 
 /** El turno en curso, que cambia solo al pasar las 00, 08 y 16 h. */
@@ -299,6 +389,7 @@ export interface FuenteBitacora {
   useTecnicos: (turno: TurnoMantencion) => TecnicosCalendario
   useObservacion: (turno: TurnoMantencion) => ReturnType<typeof useObservacionTurno>
   useAjustes: () => ReturnType<typeof useAjustesTecnicos>
+  usePendientesAnteriores: (turno: TurnoMantencion) => ReturnType<typeof usePendientesAnteriores>
   useOpcionesEquipo: (activo: boolean) => ReturnType<typeof useOpcionesEquipo>
   /** Reemplaza la subida a Storage. */
   subirFoto?: typeof subirFotoBitacora
@@ -309,5 +400,6 @@ export const FUENTE_FIRESTORE: FuenteBitacora = {
   useTecnicos: useTecnicosDeTurno,
   useObservacion: useObservacionTurno,
   useAjustes: useAjustesTecnicos,
+  usePendientesAnteriores,
   useOpcionesEquipo,
 }

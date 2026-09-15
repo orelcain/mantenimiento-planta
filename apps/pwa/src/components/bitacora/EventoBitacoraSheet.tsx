@@ -19,6 +19,7 @@ import type {
   TurnoMantencion,
 } from '@/services/bitacora/bitacora.types'
 import { autorVisible } from '@/services/bitacora/bitacora.types'
+import { copiaDeOrigen, etiquetaCortaTurno } from '@/services/bitacora/entregaTurno'
 import { borrarFotoBitacora, subirFotoBitacora } from '@/services/bitacora/fotosBitacora'
 import { SelectorTecnico } from './SelectorTecnico'
 import { SelectorParticipantes } from './SelectorParticipantes'
@@ -51,6 +52,8 @@ export interface EventoBitacoraSheetProps {
   subirFoto?: typeof subirFotoBitacora
   onGuardar: (id: string, datos: EventoBitacoraDatos, esNuevo: boolean) => Promise<void>
   onBorrar: (evento: EventoBitacora) => Promise<void>
+  /** Si viene de «Resolver»: el pendiente de un turno anterior que este evento cierra. */
+  pendienteOrigen?: EventoBitacora | null
   onClose: () => void
 }
 
@@ -113,6 +116,7 @@ export function EventoBitacoraSheet({
   onGuardar,
   onBorrar,
   onClose,
+  pendienteOrigen = null,
 }: EventoBitacoraSheetProps) {
   const { toast } = useToast()
   const esNuevo = !evento
@@ -142,15 +146,28 @@ export function EventoBitacoraSheet({
   const quitadas = useRef<string[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
   const etiquetaPendiente = useRef<EtiquetaFoto>('foto')
+  /**
+   * Cambia al abrir, cancelar y guardar. Una subida que termina con otra
+   * «sesión» ya no pertenece a este formulario: se borra de Storage en vez de
+   * quedar huérfana o, peor, colarse en el siguiente evento que se abra.
+   */
+  const sesion = useRef(0)
+  const tecnicosRef = useRef(tecnicos)
+  tecnicosRef.current = tecnicos
 
   // Cargar el formulario cada vez que se abre (nuevo o edición).
   useEffect(() => {
     if (!open) return
-    setQuien(tecnicoRecordado())
+    sesion.current++
+    // El nombre recordado solo vale si sigue en la lista (pudo corregirse o quitarse).
+    const recordado = tecnicoRecordado()
+    const lista = tecnicosRef.current.todos
+    setQuien(lista.length === 0 || lista.includes(recordado) ? recordado : '')
     setParticipantes(evento?.participantes ?? [])
-    setEquipoId(evento?.equipoId ?? null)
-    setTipo(evento?.tipo ?? 'falla')
-    setEquipo(evento?.equipo ?? '')
+    // «Resolver pendiente»: el equipo, su vínculo y el tipo vienen del pendiente original.
+    setEquipoId(evento?.equipoId ?? pendienteOrigen?.equipoId ?? null)
+    setTipo(evento?.tipo ?? pendienteOrigen?.tipo ?? 'falla')
+    setEquipo(evento?.equipo ?? pendienteOrigen?.equipo ?? '')
     setDescripcion(evento?.descripcion ?? '')
     setHoraInicio(evento?.horaInicio ?? horaSugeridaParaEvento(turno))
     setHoraTermino(evento?.horaTermino ?? '')
@@ -166,7 +183,7 @@ export function EventoBitacoraSheet({
     setError(null)
     subidasNuevas.current = []
     quitadas.current = []
-  }, [open, evento, turno])
+  }, [open, evento, turno, pendienteOrigen])
 
   const duracion = minutosEntre(horaInicio, horaTermino || null)
   const equiposSugeridos = useMemo(() => {
@@ -187,12 +204,19 @@ export function EventoBitacoraSheet({
       return
     }
     setSubidas((prev) => prev.map((x) => (x.clave === s.clave ? { ...x, error: undefined } : x)))
+    const miSesion = sesion.current
     try {
       const foto = await subirFoto(turno.id, eventoId, s.archivo, s.etiqueta)
+      if (miSesion !== sesion.current) {
+        // Se canceló o se guardó sin esperarla mientras subía.
+        void borrarFotoBitacora(foto.path).catch(() => undefined)
+        return
+      }
       subidasNuevas.current.push(foto.path)
       setFotos((prev) => [...prev, foto])
       setSubidas((prev) => prev.filter((x) => x.clave !== s.clave))
     } catch (e) {
+      if (miSesion !== sesion.current) return
       const mensaje = (e as { code?: string })?.code === 'storage/unauthorized'
         ? 'Sin permiso para subir (faltan reglas de Storage).'
         : e instanceof Error && e.message.startsWith('Formato')
@@ -236,7 +260,9 @@ export function EventoBitacoraSheet({
   }
 
   const cancelar = () => {
-    // Lo subido en esta edición y no guardado no debe quedar huérfano.
+    // Lo subido en esta edición y no guardado no debe quedar huérfano; lo que
+    // todavía está subiendo se borra solo al terminar (cambia la sesión).
+    sesion.current++
     subidasNuevas.current.forEach((p) => void borrarFotoBitacora(p).catch(() => undefined))
     subidasNuevas.current = []
     onClose()
@@ -266,19 +292,31 @@ export function EventoBitacoraSheet({
       setError('Escribe qué pasó y qué se hizo.')
       return
     }
-    const fallidas = subidas.filter((s) => s.error).length
-    if (fallidas > 0 && !confirmarSinFotos) {
-      // Nunca perder una foto en silencio: se avisa y se pide un segundo toque.
+    // Un término "antes" del inicio suele ser un typo (10:30 → 10:15) y daba
+    // paradas de casi 24 h. Cruzar la medianoche real no pasa de unas horas.
+    if (duracion != null && duracion > 12 * 60) {
+      setError(`El término (${horaTermino}) queda antes del inicio (${horaInicio}). Revisa las horas.`)
+      return
+    }
+    const minutosNum = minutos.trim() === '' ? null : Number(minutos)
+    if (impacto === 'con-parada' && minutosNum != null && (!Number.isFinite(minutosNum) || minutosNum < 0 || minutosNum > 1440)) {
+      setError('Los minutos de parada deben estar entre 0 y 1440.')
+      return
+    }
+    // Pendientes de subir = fallidas + las que siguen subiendo (con señal mala
+    // Storage reintenta hasta 10 min). Nunca perder una foto en silencio: se
+    // avisa y se pide un segundo toque para guardar sin ellas.
+    const sinSubir = subidas.length
+    if (sinSubir > 0 && !confirmarSinFotos) {
       setConfirmarSinFotos(true)
       setError(
-        `${fallidas === 1 ? 'Una foto no se ha subido' : `${fallidas} fotos no se han subido`}. ` +
-          'Espera a que se suban o toca Guardar otra vez para guardar sin ellas.',
+        `${sinSubir === 1 ? 'Una foto aún no se sube' : `${sinSubir} fotos aún no se suben`}. ` +
+          'Espera o toca Guardar otra vez para guardar sin ellas.',
       )
       return
     }
     setGuardando(true)
     try {
-      const minutosNum = minutos.trim() === '' ? null : Number(minutos)
       await onGuardar(
         eventoId,
         {
@@ -292,8 +330,10 @@ export function EventoBitacoraSheet({
           ventana: ventana || null,
           pendiente,
           fotos,
+          fotosAntes: evento?.fotos ?? [],
           quien,
           // Quien registra no se repite como participante (pudo quedar marcado antes de elegirlo).
+          resuelvePendiente: pendienteOrigen && esNuevo ? copiaDeOrigen(pendienteOrigen) : null,
           participantes: participantes.filter(
             (p) => p.trim().toLowerCase() !== (esNuevo ? quien : (evento?.registradoPor ?? quien)).trim().toLowerCase(),
           ),
@@ -302,8 +342,10 @@ export function EventoBitacoraSheet({
         esNuevo,
       )
       recordarEquipo(equipo)
+      // Lo que seguía subiendo ya no entra en este evento (se borra al terminar).
+      sesion.current++
       subidasNuevas.current = []
-      quitadas.current.forEach((p) => void borrarFotoBitacora(p).catch(() => undefined))
+      // Las fotos quitadas las borra el hook DESPUÉS del OK del servidor.
       quitadas.current = []
       toast({
         title: esNuevo ? 'Evento agregado' : 'Evento actualizado',
@@ -342,15 +384,15 @@ export function EventoBitacoraSheet({
     <Sheet
       open={open}
       onClose={cancelar}
-      title={esNuevo ? 'Nuevo evento' : 'Editar evento'}
+      title={pendienteOrigen && esNuevo ? 'Resolver pendiente' : esNuevo ? 'Nuevo evento' : 'Editar evento'}
       actions={
         <>
           <Button variant="tinted" onClick={cancelar} disabled={guardando}>
             Cancelar
           </Button>
-          <Button onClick={guardar} disabled={guardando || subiendo}>
+          <Button onClick={guardar} disabled={guardando}>
             {guardando ? <Loader2 className="animate-spin" /> : null}
-            {subiendo ? 'Subiendo fotos…' : 'Guardar'}
+            {subiendo ? 'Subiendo fotos…' : pendienteOrigen && esNuevo ? 'Guardar y cerrar pendiente' : 'Guardar'}
           </Button>
         </>
       }
@@ -358,6 +400,17 @@ export function EventoBitacoraSheet({
       {/* `[&>*]:shrink-0`: en un flex vertical con alto acotado, un hijo con
           overflow-x (la fila de tipos) se encoge a 0 px y desaparece. */}
       <div className="-mx-6 flex max-h-[min(68vh,640px)] flex-col gap-5 overflow-y-auto px-6 pb-1 [&>*]:shrink-0">
+        {pendienteOrigen && esNuevo && (
+          <div className="rounded-ctl bg-muted-foreground/10 px-3 py-2.5">
+            <p className="text-footnote font-semibold text-ink-warn">
+              Viene del {etiquetaCortaTurno(pendienteOrigen.turnoId)} · {autorVisible(pendienteOrigen)}
+            </p>
+            <p className="line-clamp-3 text-footnote text-foreground">
+              {[pendienteOrigen.equipo, pendienteOrigen.descripcion].filter(Boolean).join(' · ')}
+            </p>
+          </div>
+        )}
+
         {/* Quién: con la cuenta compartida de Mantención es el único dato de autoría. */}
         {tecnicos.todos.length > 0 && (
           <div>
@@ -425,6 +478,7 @@ export function EventoBitacoraSheet({
           <label htmlFor="bitacora-descripcion" className={ETIQUETA_CAMPO}>Qué pasó y qué se hizo</label>
           <textarea
             id="bitacora-descripcion"
+            maxLength={3000}
             className="min-h-[112px] w-full resize-y rounded-ctl border-0 bg-muted-foreground/10 px-3 py-2.5 text-[16px] leading-snug text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary"
             value={descripcion}
             onChange={(e) => setDescripcion(e.target.value)}
@@ -450,6 +504,7 @@ export function EventoBitacoraSheet({
                 type="number"
                 inputMode="numeric"
                 min={0}
+                max={1440}
                 className={`${CAMPO} tabular-nums`}
                 value={minutos}
                 onChange={(e) => setMinutos(e.target.value)}
@@ -470,6 +525,7 @@ export function EventoBitacoraSheet({
               </div>
               <input
                 id="bitacora-ventana"
+                maxLength={120}
                 className={CAMPO}
                 value={ventana}
                 onChange={(e) => setVentana(e.target.value)}

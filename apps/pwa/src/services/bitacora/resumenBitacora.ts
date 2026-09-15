@@ -8,8 +8,10 @@ import { minutosDesdeInicioTurno, minutosEntre } from './turnoMantencion'
  */
 export interface ResumenBitacora {
   eventos: number
-  /** Eventos que detuvieron la máquina. */
+  /** Eventos que detuvieron la máquina (incluye los que aún no tienen duración). */
   conParada: number
+  /** Paradas sin término ni minutos: se cuentan, pero no suman minutos ni entran al MTTR. */
+  paradasSinDuracion: number
   /** Suma de minutos de parada de esos eventos. */
   minutosParada: number
   /** Tiempo medio de reparación: minutos de parada / eventos con parada. */
@@ -17,6 +19,8 @@ export interface ResumenBitacora {
   /** Intervenciones hechas sin detener producción (en una ventana). */
   enVentana: number
   pendientes: number
+  /** Pendientes de turnos anteriores que este turno resolvió (entrega de turno). */
+  pendientesCerrados: number
   /** Equipos distintos mencionados (sin distinguir mayúsculas ni espacios). */
   equipos: number
   /** Minutos de intervención registrados (inicio → término). */
@@ -38,20 +42,26 @@ export function resumirBitacora(eventos: readonly EventoBitacora[]): ResumenBita
   const porTipo: Record<TipoEvento, number> = { falla: 0, ajuste: 0, inspeccion: 0, preventivo: 0, novedad: 0 }
   const equipos = new Set<string>()
   let conParada = 0
+  let paradasSinDuracion = 0
   let minutosParada = 0
   let enVentana = 0
   let pendientes = 0
+  let pendientesCerrados = 0
   let minutosIntervencion = 0
 
   for (const e of eventos) {
     porTipo[e.tipo] = (porTipo[e.tipo] ?? 0) + 1
     if (e.equipo?.trim()) equipos.add(normalizarEquipo(e.equipo))
     if (e.pendiente) pendientes++
+    if (e.resuelvePendiente?.id) pendientesCerrados++
     if (e.impacto === 'en-ventana') enVentana++
-    const parada = minutosParadaDe(e)
-    if (parada != null) {
+    if (e.impacto === 'con-parada') {
       conParada++
-      minutosParada += parada
+      const parada = minutosParadaDe(e)
+      // Una parada aún abierta (sin término ni minutos) no desaparece del
+      // resumen: cuenta como parada y se avisa aparte que le falta la duración.
+      if (parada == null) paradasSinDuracion++
+      else minutosParada += parada
     }
     minutosIntervencion += minutosEntre(e.horaInicio, e.horaTermino) ?? 0
   }
@@ -59,10 +69,12 @@ export function resumirBitacora(eventos: readonly EventoBitacora[]): ResumenBita
   return {
     eventos: eventos.length,
     conParada,
+    paradasSinDuracion,
     minutosParada,
-    mttrMin: conParada > 0 ? minutosParada / conParada : null,
+    mttrMin: conParada - paradasSinDuracion > 0 ? minutosParada / (conParada - paradasSinDuracion) : null,
     enVentana,
     pendientes,
+    pendientesCerrados,
     equipos: equipos.size,
     minutosIntervencion,
     porTipo,

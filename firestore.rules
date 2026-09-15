@@ -1177,7 +1177,10 @@ service cloud.firestore {
           && d.fotos is list && d.fotos.size() <= 8
           // Opcionales: quién participó y el nodo de la jerarquía elegido en el buscador.
           && (!('participantes' in d) || (d.participantes is list && d.participantes.size() <= 12))
-          && (!('equipoId' in d) || d.equipoId == null || (d.equipoId is string && d.equipoId.size() <= 60));
+          && (!('equipoId' in d) || d.equipoId == null || (d.equipoId is string && d.equipoId.size() <= 60))
+          // Entrega de turno: cierre del pendiente (en el original) y de cuál viene (en el que lo resuelve).
+          && (!('cierre' in d) || d.cierre == null || d.cierre is map)
+          && (!('resuelvePendiente' in d) || d.resuelvePendiente == null || d.resuelvePendiente is map);
       }
 
       allow read: if isActiveUser();

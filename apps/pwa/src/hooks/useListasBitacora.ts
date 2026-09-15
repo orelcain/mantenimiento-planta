@@ -68,6 +68,9 @@ export function useOpcionesEquipo(activo: boolean) {
     if (!activo) return
     if (cacheOpciones && Date.now() - cacheOpciones.en < TTL_OPCIONES) {
       setOpciones(cacheOpciones.opciones)
+      // Si una carga anterior se interrumpió (hoja cerrada a mitad), el spinner
+      // quedaba girando para siempre al reabrir (revisión 15-09).
+      setCargando(false)
       return
     }
     let vivo = true
@@ -96,7 +99,8 @@ export function useOpcionesEquipo(activo: boolean) {
         // Sin jerarquía el campo sigue aceptando texto libre.
       })
       .finally(() => {
-        if (vivo) setCargando(false)
+        // Siempre: el hook vive en la página (no se desmonta al cerrar la hoja).
+        setCargando(false)
       })
     return () => {
       vivo = false
