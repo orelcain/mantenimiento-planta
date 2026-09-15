@@ -19,10 +19,13 @@ import {
 } from '@/components/ui'
 import { normalizeForSearch, haystackMatchesAll } from '@/utils/repuestos'
 import type { NuevaSolicitud } from '@/hooks/repuestos/useSolicitudes'
+import { avisoDeStock, cantidadDesdeTexto, CANTIDAD_MAXIMA, type StockDeSolicitud } from '@/hooks/repuestos/solicitudDeRepuesto'
 
 export interface RepuestoLite {
   codigoSAP: string
   textoBreve: string
+  /** Stock de bodega al abrir el formulario (ver solicitudDeRepuesto). */
+  stock?: StockDeSolicitud
 }
 
 interface Props {
@@ -38,7 +41,9 @@ interface Props {
 export function SolicitarRepuestoModal({ open, onOpenChange, repuesto, options = [], onSubmit }: Props) {
   const [sap, setSap] = useState('')
   const [query, setQuery] = useState('')
-  const [cantidad, setCantidad] = useState(1)
+  // TEXTO, no número: un número controlado volvía a 1 al borrar y «5» quedaba «15».
+  const [cantidadTexto, setCantidadTexto] = useState('1')
+  const cantidad = cantidadDesdeTexto(cantidadTexto)
   const [observaciones, setObservaciones] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -48,7 +53,7 @@ export function SolicitarRepuestoModal({ open, onOpenChange, repuesto, options =
     if (open) {
       setSap(repuesto?.codigoSAP ?? '')
       setQuery('')
-      setCantidad(1)
+      setCantidadTexto('1')
       setObservaciones('')
       setError(null)
       setSaving(false)
@@ -79,7 +84,7 @@ export function SolicitarRepuestoModal({ open, onOpenChange, repuesto, options =
 
   const submit = async () => {
     if (!selected) { setError('Selecciona un repuesto.'); return }
-    if (cantidad < 1) { setError('La cantidad debe ser al menos 1.'); return }
+    if (cantidad == null) { setError(`Escribe una cantidad entera entre 1 y ${CANTIDAD_MAXIMA}.`); return }
     setSaving(true)
     setError(null)
     try {
@@ -96,6 +101,8 @@ export function SolicitarRepuestoModal({ open, onOpenChange, repuesto, options =
       setSaving(false)
     }
   }
+
+  const aviso = selected ? avisoDeStock(selected.stock, cantidad) : null
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -167,14 +174,27 @@ export function SolicitarRepuestoModal({ open, onOpenChange, repuesto, options =
             </div>
           )}
 
+          {aviso && (
+            <p
+              className={['text-caption', aviso.nivel === 'sin-stock' || aviso.nivel === 'insuficiente' ? 'font-medium text-ink-warn' : 'text-muted-foreground'].join(' ')}
+              role={aviso.nivel === 'sin-stock' || aviso.nivel === 'insuficiente' ? 'status' : undefined}
+            >
+              {aviso.texto}
+            </p>
+          )}
+
           {/* Cantidad */}
           <div>
-            <label className="mb-1 block text-caption tracking-wide text-muted-foreground">Cantidad</label>
+            <label htmlFor="solicitud-cantidad" className="mb-1 block text-caption tracking-wide text-muted-foreground">Cantidad</label>
             <Input
-              type="number"
-              min={1}
-              value={cantidad}
-              onChange={(e) => setCantidad(Math.max(1, Math.round(Number(e.target.value) || 1)))}
+              id="solicitud-cantidad"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              value={cantidadTexto}
+              onChange={(e) => setCantidadTexto(e.target.value.replace(/[^0-9]/g, ''))}
+              onFocus={(e) => e.currentTarget.select()}
+              aria-invalid={cantidad == null}
               className="w-32"
             />
           </div>
@@ -195,7 +215,7 @@ export function SolicitarRepuestoModal({ open, onOpenChange, repuesto, options =
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancelar</Button>
-          <Button onClick={submit} disabled={saving || !selected} className="gap-1.5">
+          <Button onClick={submit} disabled={saving || !selected || cantidad == null} className="gap-1.5">
             {saving && <Loader2 className="h-4 w-4 animate-spin" />}
             Crear solicitud
           </Button>
