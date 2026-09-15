@@ -22,6 +22,7 @@ import {
 } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import { logger } from '@/lib/logger'
+import { camposDeTraza } from './trazaDeSolicitud'
 
 export type SolicitudEstado = 'pendiente' | 'aprobada' | 'entregada'
 
@@ -35,6 +36,11 @@ export interface SolicitudRepuesto {
   solicitadoPorNombre: string
   observaciones?: string
   createdAt: Date
+  /** Traza de cada paso (ver trazaDeSolicitud). Las solicitudes viejas no la tienen. */
+  aprobadaAt?: Date
+  aprobadaPor?: string
+  entregadaAt?: Date
+  entregadaPor?: string
 }
 
 export interface NuevaSolicitud {
@@ -51,6 +57,10 @@ export const ESTADO_SIGUIENTE: Record<SolicitudEstado, SolicitudEstado | null> =
   pendiente: 'aprobada',
   aprobada: 'entregada',
   entregada: null,
+}
+
+function tsOpcional(ts: Timestamp | Date | undefined | null): Date | undefined {
+  return ts ? tsToDate(ts) : undefined
 }
 
 function tsToDate(ts: Timestamp | Date | undefined | null): Date {
@@ -82,6 +92,10 @@ export function useSolicitudes() {
               solicitadoPorNombre: data.solicitadoPorNombre || '',
               observaciones: data.observaciones || undefined,
               createdAt: tsToDate(data.createdAt),
+              aprobadaAt: tsOpcional(data.aprobadaAt),
+              aprobadaPor: data.aprobadaPor || undefined,
+              entregadaAt: tsOpcional(data.entregadaAt),
+              entregadaPor: data.entregadaPor || undefined,
             }
           }),
         )
@@ -112,8 +126,12 @@ export function useSolicitudes() {
     await addDoc(collection(db, SOLICITUDES_COL), payload)
   }, [])
 
-  const avanzarEstado = useCallback(async (id: string, estado: SolicitudEstado) => {
-    await updateDoc(doc(db, SOLICITUDES_COL, id), { estado })
+  const avanzarEstado = useCallback(async (id: string, estado: SolicitudEstado, userId: string, userName: string) => {
+    // Antes escribía solo { estado }: «Entregada» sin quién ni cuándo.
+    const traza = estado === 'aprobada' || estado === 'entregada'
+      ? { ...camposDeTraza(estado, userId, userName), [`${estado}At`]: serverTimestamp() }
+      : {}
+    await updateDoc(doc(db, SOLICITUDES_COL, id), { estado, ...traza })
   }, [])
 
   const pendientesCount = useMemo(

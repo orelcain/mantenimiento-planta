@@ -18,6 +18,7 @@ import {
   type SolicitudRepuesto,
   type SolicitudEstado,
 } from '@/hooks/repuestos/useSolicitudes'
+import { duracionLegible } from '@/hooks/repuestos/trazaDeSolicitud'
 
 interface Props {
   open: boolean
@@ -42,6 +43,21 @@ function fmtDate(d: Date): string {
   try {
     return d.toLocaleString('es-CL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
   } catch { return '' }
+}
+
+/**
+ * Quién dio el último paso y, al entregar, cuánto tardó desde que se pidió. Las solicitudes
+ * anteriores a la traza no dicen nada: no se inventa una fecha.
+ */
+function trazaVisible(s: SolicitudRepuesto): string | null {
+  if (s.estado === 'entregada' && s.entregadaPor) {
+    const tardo = duracionLegible(s.createdAt, s.entregadaAt)
+    return `por ${s.entregadaPor}${tardo ? ` · en ${tardo}` : ''}`
+  }
+  if (s.estado === 'aprobada' && s.aprobadaPor) {
+    return `por ${s.aprobadaPor}${s.aprobadaAt ? ` · ${fmtDate(s.aprobadaAt)}` : ''}`
+  }
+  return null
 }
 
 type Filtro = 'all' | SolicitudEstado
@@ -143,6 +159,7 @@ export function SolicitudesPanel({ open, onOpenChange, solicitudes, loading, onA
                       <td className="px-3 py-2 text-muted-foreground">{s.solicitadoPorNombre || '—'}</td>
                       <td className="px-3 py-2">
                         <span className={['inline-block rounded-ctl px-1.5 py-0.5 text-caption font-medium', meta.cls].join(' ')}>{meta.label}</span>
+                        {trazaVisible(s) && <div className="mt-0.5 text-caption text-muted-foreground">{trazaVisible(s)}</div>}
                       </td>
                       <td className="px-3 py-2 text-right">
                         {next ? (
