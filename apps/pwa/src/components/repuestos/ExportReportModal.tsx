@@ -220,7 +220,8 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-5xl h-[85vh] flex flex-col p-0 overflow-hidden gap-0">
-        <div className="px-6 py-4 border-b flex justify-between items-center bg-muted shrink-0">
+        {/* pr-[56px]: libre para la X de 44 px del diálogo, que se comía la esquina de «Vista Actual». */}
+        <div className="pl-6 pr-[56px] py-4 border-b flex justify-between items-center bg-muted shrink-0">
             <div>
                  <DialogTitle className="text-xl flex items-center gap-2">
                     <FileText className="w-5 h-5"/> Centro de Reportes
