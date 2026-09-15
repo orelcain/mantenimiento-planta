@@ -68,7 +68,13 @@ export interface EventoBitacora {
   pendiente: boolean
   fotos: FotoEvento[]
   creadoPor: string
+  /** Nombre de la CUENTA con que se escribió (a menudo la compartida de Mantención). */
   autorNombre: string
+  /**
+   * Técnico que registró el evento, elegido de la lista del calendario. Es el
+   * nombre que se muestra: con la cuenta compartida, `autorNombre` no dice quién fue.
+   */
+  registradoPor?: string | null
   actualizadoPorNombre?: string
   createdAt?: Timestamp | null
   updatedAt?: Timestamp | null
@@ -87,4 +93,12 @@ export type EventoBitacoraDatos = Pick<
   | 'ventana'
   | 'pendiente'
   | 'fotos'
->
+> & {
+  /** Al crear: quién registra. Al editar: quién edita (queda en actualizadoPorNombre). */
+  quien: string
+}
+
+/** Nombre a mostrar como autor de un evento. */
+export function autorVisible(e: Pick<EventoBitacora, 'registradoPor' | 'autorNombre'>): string {
+  return e.registradoPor?.trim() || e.autorNombre
+}

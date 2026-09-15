@@ -64,6 +64,24 @@ export function nombreCorto(nombre: string): string {
   return [nombrePila, apellido].filter(Boolean).map((p) => capitalizar(p as string)).join(' ')
 }
 
+/**
+ * Todos los técnicos del calendario, en el orden de la planilla. Es la lista de
+ * la que cada uno elige su nombre al registrar: la bitácora se usa con la cuenta
+ * compartida de Mantención, así que la cuenta NO dice quién escribió.
+ */
+export function tecnicosDelCalendario(cal: CalendarioDoc | null | undefined): string[] {
+  const vistos = new Set<string>()
+  const nombres: string[] = []
+  for (const fila of cal?.techRows ?? []) {
+    const n = fila.name?.trim() ? nombreCorto(fila.name) : ''
+    if (n && !vistos.has(n)) {
+      vistos.add(n)
+      nombres.push(n)
+    }
+  }
+  return nombres
+}
+
 export function tecnicosDeTurno(cal: CalendarioDoc | null | undefined, turno: Pick<TurnoMantencion, 'fecha' | 'banda'>): string[] {
   const col = cal?.dayCols?.find((d) => normalizarFechaCalendario(d.dateRaw) === turno.fecha)
   if (!col) return []

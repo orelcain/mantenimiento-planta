@@ -17,7 +17,7 @@ import { toast } from '@/hooks/useToast'
 import { BITACORA_COLECCION, BITACORA_PLANTA, BITACORA_TURNOS_COLECCION } from '@/config/bitacora'
 import type { EventoBitacora, EventoBitacoraDatos, FotoEvento, TurnoMantencion } from '@/services/bitacora/bitacora.types'
 import { ordenarEventos } from '@/services/bitacora/resumenBitacora'
-import { tecnicosDeTurno, type CalendarioDoc } from '@/services/bitacora/tecnicosDeTurno'
+import { tecnicosDelCalendario, tecnicosDeTurno, type CalendarioDoc } from '@/services/bitacora/tecnicosDeTurno'
 import { turnoMantencionEn } from '@/services/bitacora/turnoMantencion'
 import { borrarFotoBitacora, type subirFotoBitacora } from '@/services/bitacora/fotosBitacora'
 
@@ -121,9 +121,11 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
             : 'Vuelve a intentarlo cuando haya señal.',
           variant: 'destructive',
         })
+      const quien = datos.quien.trim() || nombreAutor()
       if (esNuevo) {
         void setDoc(ref, {
           ...cuerpo,
+          registradoPor: quien,
           plantId: BITACORA_PLANTA.id,
           turnoId: turno.id,
           fechaTurno: turno.fecha,
@@ -134,7 +136,8 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
           updatedAt: serverTimestamp(),
         }).catch(avisarRechazo)
       } else {
-        void updateDoc(ref, { ...cuerpo, actualizadoPorNombre: nombreAutor(), updatedAt: serverTimestamp() }).catch(avisarRechazo)
+        // Al editar NO se toca registradoPor: quien edita queda aparte.
+        void updateDoc(ref, { ...cuerpo, actualizadoPorNombre: quien, updatedAt: serverTimestamp() }).catch(avisarRechazo)
       }
     },
     [turno, nombreAutor],
@@ -169,8 +172,15 @@ export function useTurnoMantencionActual(): TurnoMantencion {
 let cacheCalendario: { doc: CalendarioDoc | null; en: number } | null = null
 const TTL_CALENDARIO = 5 * 60_000
 
-/** Técnicos de turno según el calendario de Mantención (1 lectura cada 5 min). */
-export function useTecnicosDeTurno(turno: TurnoMantencion): string[] {
+export interface TecnicosCalendario {
+  /** Los que tienen esa banda ese día (van primero y en el correo). */
+  deTurno: string[]
+  /** Toda la planilla: de aquí elige su nombre quien usa la cuenta compartida. */
+  todos: string[]
+}
+
+/** Técnicos según el calendario de Mantención (1 lectura cada 5 min). */
+export function useTecnicosDeTurno(turno: TurnoMantencion): TecnicosCalendario {
   const [cal, setCal] = useState<CalendarioDoc | null>(cacheCalendario?.doc ?? null)
   useEffect(() => {
     if (cacheCalendario && Date.now() - cacheCalendario.en < TTL_CALENDARIO) return
@@ -188,7 +198,7 @@ export function useTecnicosDeTurno(turno: TurnoMantencion): string[] {
       vivo = false
     }
   }, [])
-  return useMemo(() => tecnicosDeTurno(cal, turno), [cal, turno])
+  return useMemo(() => ({ deTurno: tecnicosDeTurno(cal, turno), todos: tecnicosDelCalendario(cal) }), [cal, turno])
 }
 
 export interface ObservacionTurno {
@@ -224,11 +234,14 @@ export function useObservacionTurno(turno: TurnoMantencion) {
   }, [docId])
 
   const guardarObservacion = useCallback(
-    async (texto: string) => {
+    async (texto: string, quien: string) => {
       const u = auth.currentUser
       if (!u) throw new Error('Hay que iniciar sesión para escribir en la bitácora.')
       const nombre =
-        [user?.nombre?.split(' ')[0], user?.apellido?.split(' ')[0]].filter(Boolean).join(' ') || u.displayName || 'Sin nombre'
+        quien.trim() ||
+        [user?.nombre?.split(' ')[0], user?.apellido?.split(' ')[0]].filter(Boolean).join(' ') ||
+        u.displayName ||
+        'Sin nombre'
       // Sin await, igual que los eventos: queda en el teléfono si no hay señal.
       void setDoc(doc(db, BITACORA_TURNOS_COLECCION, docId), {
         plantId: BITACORA_PLANTA.id,
@@ -252,7 +265,7 @@ export function useObservacionTurno(turno: TurnoMantencion) {
  */
 export interface FuenteBitacora {
   useEventos: (turno: TurnoMantencion) => ReturnType<typeof useBitacoraTurno>
-  useTecnicos: (turno: TurnoMantencion) => string[]
+  useTecnicos: (turno: TurnoMantencion) => TecnicosCalendario
   useObservacion: (turno: TurnoMantencion) => ReturnType<typeof useObservacionTurno>
   /** Reemplaza la subida a Storage. */
   subirFoto?: typeof subirFotoBitacora

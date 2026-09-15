@@ -5,6 +5,8 @@ import { Button, Pill, Sheet } from '@/components/piel'
 import { EventoBitacoraFila } from '@/components/bitacora/EventoBitacoraFila'
 import { EventoBitacoraSheet } from '@/components/bitacora/EventoBitacoraSheet'
 import { VisorFotosBitacora } from '@/components/bitacora/VisorFotosBitacora'
+import { SelectorTecnico } from '@/components/bitacora/SelectorTecnico'
+import { tecnicoRecordado } from '@/components/bitacora/tecnicoRecordado'
 import { useToast } from '@/hooks/useToast'
 import { FUENTE_FIRESTORE, useTurnoMantencionActual, type FuenteBitacora } from '@/hooks/useBitacoraTurno'
 import { BITACORA_PLANTA } from '@/config/bitacora'
@@ -56,6 +58,7 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
   const [trabajando, setTrabajando] = useState<null | 'copiar' | 'copiar-incrustadas' | 'pdf'>(null)
   const [editandoObs, setEditandoObs] = useState(false)
   const [textoObs, setTextoObs] = useState('')
+  const [quienObs, setQuienObs] = useState('')
   const [visor, setVisor] = useState<{ fotos: FotoEvento[]; indice: number; titulo: string } | null>(null)
 
   const abrirNuevo = useCallback(() => setEditor({ evento: null, idNuevo: nuevoId(), turno }), [nuevoId, turno])
@@ -84,8 +87,8 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
   }
 
   const datosCorreo = useMemo(
-    () => ({ turno, eventos, tecnicos, planta: BITACORA_PLANTA.nombre, observacion: observacion.texto }),
-    [turno, eventos, tecnicos, observacion.texto],
+    () => ({ turno, eventos, tecnicos: tecnicos.deTurno, planta: BITACORA_PLANTA.nombre, observacion: observacion.texto }),
+    [turno, eventos, tecnicos.deTurno, observacion.texto],
   )
   const htmlCorreo = useMemo(() => bitacoraAHtmlCorreo(datosCorreo), [datosCorreo])
   const asunto = tituloCorreo(turno)
@@ -234,7 +237,7 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
             </>
           )}
         </p>
-        {tecnicos.length > 0 && <p>De turno: {tecnicos.join(', ')}</p>}
+        {tecnicos.deTurno.length > 0 && <p>De turno: {tecnicos.deTurno.join(', ')}</p>}
       </div>
 
       {/* Resumen del turno: los números que demuestran el trabajo */}
@@ -254,6 +257,7 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
         type="button"
         onClick={() => {
           setTextoObs(observacion.texto)
+          setQuienObs(tecnicoRecordado())
           setEditandoObs(true)
         }}
         className="flex min-h-[44px] w-full items-start gap-3 rounded-card bg-card px-4 py-3 text-left shadow-[0_1px_4px_rgba(0,0,0,0.05)] transition-colors duration-150 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary motion-reduce:transition-none dark:shadow-none"
@@ -361,6 +365,7 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
         evento={editor?.evento ?? null}
         idNuevo={editor?.idNuevo ?? ''}
         sugerenciasEquipo={sugerenciasEquipo}
+        tecnicos={tecnicos}
         subirFoto={fuente.subirFoto}
         onGuardar={guardar}
         onBorrar={borrar}
@@ -379,7 +384,11 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
             </Button>
             <Button
               onClick={() => {
-                void guardarObservacion(textoObs)
+                if (tecnicos.todos.length > 0 && !quienObs.trim()) {
+                  toast({ title: 'Elige quién escribe la observación', variant: 'destructive' })
+                  return
+                }
+                void guardarObservacion(textoObs, quienObs)
                   .then(() => {
                     toast({ title: 'Observación guardada', variant: 'success' })
                     setEditandoObs(false)
@@ -392,6 +401,11 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
           </>
         }
       >
+        {tecnicos.todos.length > 0 && (
+          <div className="mb-4">
+            <SelectorTecnico etiqueta="Quién escribe" deTurno={tecnicos.deTurno} todos={tecnicos.todos} valor={quienObs} onChange={setQuienObs} />
+          </div>
+        )}
         <label htmlFor="bitacora-observacion" className="sr-only">Observación general del turno</label>
         <textarea
           id="bitacora-observacion"

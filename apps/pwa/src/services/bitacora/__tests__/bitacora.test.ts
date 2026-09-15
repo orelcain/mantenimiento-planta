@@ -9,7 +9,7 @@ import {
   turnoMantencionEn,
 } from '../turnoMantencion'
 import { minutosParadaDe, ordenarEventos, resumirBitacora } from '../resumenBitacora'
-import { bandaDeCelda, nombreCorto, normalizarFechaCalendario, tecnicosDeTurno } from '../tecnicosDeTurno'
+import { bandaDeCelda, nombreCorto, normalizarFechaCalendario, tecnicosDelCalendario, tecnicosDeTurno } from '../tecnicosDeTurno'
 import { bitacoraAHtmlCorreo, bitacoraATextoPlano, escaparHtml } from '../bitacoraCorreo'
 
 const ev = (p: Partial<EventoBitacora>): EventoBitacora => ({
@@ -148,6 +148,12 @@ describe('técnicos de turno desde el calendario', () => {
     expect(nombreCorto('ERNESTO DIAZ')).toBe('Ernesto Diaz')
   })
 
+  it('lista a TODOS los técnicos del calendario, sin repetidos y en orden de planilla', () => {
+    const conRepetido = { ...cal, techRows: [...cal.techRows, { name: 'CORTES BARRIA, DANILO FELIPE', shifts: {} }, { name: '  ', shifts: {} }] }
+    expect(tecnicosDelCalendario(conRepetido)).toEqual(['Jose Chodil', 'Lucas Adrade', 'Leandro Igor', 'Danilo Cortes', 'Matias Serpa'])
+    expect(tecnicosDelCalendario(null)).toEqual([])
+  })
+
   it('lista a quienes tienen esa banda ese día, incluido el turno reducido', () => {
     expect(tecnicosDeTurno(cal, { fecha: '2026-09-15', banda: 'tarde' })).toEqual(['Danilo Cortes', 'Matias Serpa'])
     expect(tecnicosDeTurno(cal, { fecha: '2026-09-15', banda: 'noche' })).toEqual(['Leandro Igor'])
@@ -212,6 +218,17 @@ describe('correo de la bitácora', () => {
     expect(html).toContain('Observaciones del turno: </span>Planta sin agua caliente &lt;2 h&gt;<br>Se avisó a jefatura')
     expect(bitacoraAHtmlCorreo({ ...base, eventos: [ev({})], observacion: '   ' })).not.toContain('Observaciones del turno')
     expect(bitacoraATextoPlano({ ...base, eventos: [ev({})], observacion: 'Sin novedad' })).toContain('Observaciones del turno: Sin novedad')
+  })
+
+  it('«Registrado por» usa el técnico elegido, no la cuenta compartida', () => {
+    const eventos = [
+      ev({ id: 'a', autorNombre: 'mantencion.plantach', registradoPor: 'Matias Serpa' }),
+      ev({ id: 'b', autorNombre: 'mantencion.plantach', registradoPor: 'Danilo Cortes', horaInicio: '18:00' }),
+      ev({ id: 'c', autorNombre: 'Leandro Igor', registradoPor: null, horaInicio: '19:00' }),
+    ]
+    const html = bitacoraAHtmlCorreo({ ...base, eventos })
+    expect(html).toContain('Registrado por: Matias Serpa, Danilo Cortes, Leandro Igor')
+    expect(html).not.toContain('mantencion.plantach')
   })
 
   it('un turno sin eventos lo dice', () => {
