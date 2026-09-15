@@ -1154,6 +1154,46 @@ service cloud.firestore {
     }
 
     // ============================================
+    // BITÁCORA DE TURNO (Mantención)
+    // ============================================
+    // Un doc por EVENTO del turno (`turnoId` = `YYYY-MM-DD_dia|tarde|noche`).
+    // Es COMPARTIDA: cualquier usuario activo del equipo agrega y corrige
+    // eventos del turno (decisión de Orel, 15-09-2026); cada uno queda firmado
+    // con `creadoPor` inmutable. Borrar: el autor o un supervisor.
+    match /bitacoraEventos/{eventoId} {
+      function eventoValido(d) {
+        return isValidDocSize()
+          && d.plantId is string
+          && d.turnoId is string && d.turnoId.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}_(dia|tarde|noche)$')
+          && d.tipo in ['falla', 'ajuste', 'inspeccion', 'preventivo', 'novedad']
+          && d.equipo is string && d.equipo.size() <= 120
+          && isNonEmptyString(d.descripcion, 1, 3000)
+          && d.horaInicio is string && d.horaInicio.matches('^[0-9]{2}:[0-9]{2}$')
+          && (d.horaTermino == null || (d.horaTermino is string && d.horaTermino.matches('^[0-9]{2}:[0-9]{2}$')))
+          && d.impacto in ['no-aplica', 'con-parada', 'en-ventana']
+          && (d.minutosParada == null || (d.minutosParada is number && d.minutosParada >= 0 && d.minutosParada <= 1440))
+          && (d.ventana == null || (d.ventana is string && d.ventana.size() <= 120))
+          && d.pendiente is bool
+          && d.fotos is list && d.fotos.size() <= 8;
+      }
+
+      allow read: if isActiveUser();
+
+      allow create: if isActiveUser()
+        && eventoValido(request.resource.data)
+        && request.resource.data.creadoPor == request.auth.uid;
+
+      allow update: if isActiveUser()
+        && eventoValido(request.resource.data)
+        && request.resource.data.creadoPor == resource.data.creadoPor
+        && request.resource.data.turnoId == resource.data.turnoId
+        && request.resource.data.plantId == resource.data.plantId;
+
+      allow delete: if isActiveUser()
+        && (resource.data.creadoPor == request.auth.uid || isSupervisor());
+    }
+
+    // ============================================
     // CONFIGURACIÓN
     // ============================================
     match /settings/{settingId} {

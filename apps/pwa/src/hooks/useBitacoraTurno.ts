@@ -1,0 +1,192 @@
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  onSnapshot,
+  query,
+  serverTimestamp,
+  setDoc,
+  updateDoc,
+  where,
+} from 'firebase/firestore'
+import { auth, db } from '@/services/firebase'
+import { useAuthStore } from '@/store'
+import { BITACORA_COLECCION, BITACORA_PLANTA } from '@/config/bitacora'
+import type { EventoBitacora, EventoBitacoraDatos, FotoEvento, TurnoMantencion } from '@/services/bitacora/bitacora.types'
+import { ordenarEventos } from '@/services/bitacora/resumenBitacora'
+import { tecnicosDeTurno, type CalendarioDoc } from '@/services/bitacora/tecnicosDeTurno'
+import { turnoMantencionEn } from '@/services/bitacora/turnoMantencion'
+import { borrarFotoBitacora, type subirFotoBitacora } from '@/services/bitacora/fotosBitacora'
+
+/**
+ * Eventos de la bitácora de UN turno, en tiempo real.
+ *
+ * Una sola consulta por igualdad (`plantId` + `turnoId`): no necesita índice
+ * compuesto y trae pocos documentos (un turno tiene decenas de eventos, no
+ * miles), así que el costo es despreciable aunque la tarjeta del Inicio la
+ * mantenga abierta. Se ordena en memoria.
+ *
+ * `sincronizando` sale de `hasPendingWrites`: en planta la señal es mala y la
+ * Constitución pide no esconder el estado de sincronización.
+ */
+export function useBitacoraTurno(turno: TurnoMantencion) {
+  const [crudos, setCrudos] = useState<EventoBitacora[]>([])
+  const [cargando, setCargando] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [sincronizando, setSincronizando] = useState(false)
+  const [ultimaSync, setUltimaSync] = useState<Date | null>(null)
+  const user = useAuthStore((s) => s.user)
+  const turnoId = turno.id
+
+  useEffect(() => {
+    setCargando(true)
+    setCrudos([])
+    const q = query(
+      collection(db, BITACORA_COLECCION),
+      where('plantId', '==', BITACORA_PLANTA.id),
+      where('turnoId', '==', turnoId),
+    )
+    const off = onSnapshot(
+      q,
+      { includeMetadataChanges: true },
+      (snap) => {
+        setCrudos(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as EventoBitacora))
+        setSincronizando(snap.metadata.hasPendingWrites)
+        if (!snap.metadata.hasPendingWrites && !snap.metadata.fromCache) setUltimaSync(new Date())
+        setError(null)
+        setCargando(false)
+      },
+      (e) => {
+        setError(
+          e.code === 'permission-denied'
+            ? 'No tienes permiso para ver la bitácora. Si recién se publicó el módulo, pueden faltar las reglas de Firestore.'
+            : 'No se pudo cargar la bitácora. Revisa la conexión.',
+        )
+        setCargando(false)
+      },
+    )
+    return off
+  }, [turnoId])
+
+  const eventos = useMemo(() => ordenarEventos(turno, crudos), [turno, crudos])
+
+  const nombreAutor = useCallback(() => {
+    const nombre = [user?.nombre?.split(' ')[0], user?.apellido?.split(' ')[0]].filter(Boolean).join(' ')
+    return nombre || auth.currentUser?.displayName || auth.currentUser?.email || 'Sin nombre'
+  }, [user])
+
+  /** Id para un evento nuevo ANTES de guardarlo: las fotos se suben a su carpeta. */
+  const nuevoId = useCallback(() => doc(collection(db, BITACORA_COLECCION)).id, [])
+
+  const guardar = useCallback(
+    async (id: string, datos: EventoBitacoraDatos, esNuevo: boolean) => {
+      const u = auth.currentUser
+      if (!u) throw new Error('Hay que iniciar sesión para escribir en la bitácora.')
+      const descripcion = datos.descripcion.trim()
+      if (!descripcion) throw new Error('Escribe qué pasó.')
+      if (!/^\d{2}:\d{2}$/.test(datos.horaInicio)) throw new Error('Falta la hora de inicio.')
+      const fotos: FotoEvento[] = datos.fotos.map((f) => ({
+        url: f.url,
+        path: f.path,
+        etiqueta: f.etiqueta,
+        ...(f.ancho ? { ancho: f.ancho } : {}),
+        ...(f.alto ? { alto: f.alto } : {}),
+      }))
+      const cuerpo = {
+        tipo: datos.tipo,
+        equipo: datos.equipo.trim(),
+        descripcion,
+        horaInicio: datos.horaInicio,
+        horaTermino: datos.horaTermino || null,
+        impacto: datos.impacto,
+        minutosParada: datos.impacto === 'con-parada' && datos.minutosParada != null ? Math.max(0, Math.round(datos.minutosParada)) : null,
+        ventana: datos.impacto === 'en-ventana' ? datos.ventana?.trim() || null : null,
+        pendiente: datos.pendiente,
+        fotos,
+      }
+      const ref = doc(db, BITACORA_COLECCION, id)
+      if (esNuevo) {
+        await setDoc(ref, {
+          ...cuerpo,
+          plantId: BITACORA_PLANTA.id,
+          turnoId: turno.id,
+          fechaTurno: turno.fecha,
+          banda: turno.banda,
+          creadoPor: u.uid,
+          autorNombre: nombreAutor(),
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        })
+      } else {
+        await updateDoc(ref, { ...cuerpo, actualizadoPorNombre: nombreAutor(), updatedAt: serverTimestamp() })
+      }
+    },
+    [turno, nombreAutor],
+  )
+
+  const borrar = useCallback(async (evento: EventoBitacora) => {
+    await deleteDoc(doc(db, BITACORA_COLECCION, evento.id))
+    // Las fotos después del doc: si alguna falla queda huérfana en Storage,
+    // pero el evento ya no se ve, que es lo que se pidió.
+    await Promise.allSettled((evento.fotos ?? []).map((f) => borrarFotoBitacora(f.path)))
+  }, [])
+
+  return { eventos, cargando, error, sincronizando, ultimaSync, nuevoId, guardar, borrar }
+}
+
+/** El turno en curso, que cambia solo al pasar las 00, 08 y 16 h. */
+export function useTurnoMantencionActual(): TurnoMantencion {
+  const [turno, setTurno] = useState(() => turnoMantencionEn())
+  useEffect(() => {
+    const t = setInterval(() => {
+      const ahora = turnoMantencionEn()
+      setTurno((prev) => (prev.id === ahora.id ? prev : ahora))
+    }, 30_000)
+    return () => clearInterval(t)
+  }, [])
+  return turno
+}
+
+let cacheCalendario: { doc: CalendarioDoc | null; en: number } | null = null
+const TTL_CALENDARIO = 5 * 60_000
+
+/** Técnicos de turno según el calendario de Mantención (1 lectura cada 5 min). */
+export function useTecnicosDeTurno(turno: TurnoMantencion): string[] {
+  const [cal, setCal] = useState<CalendarioDoc | null>(cacheCalendario?.doc ?? null)
+  useEffect(() => {
+    if (cacheCalendario && Date.now() - cacheCalendario.en < TTL_CALENDARIO) return
+    let vivo = true
+    getDoc(doc(db, 'calendario_mantencion_state', 'current'))
+      .then((snap) => {
+        const d = snap.exists() ? (snap.data() as CalendarioDoc) : null
+        cacheCalendario = { doc: d, en: Date.now() }
+        if (vivo) setCal(d)
+      })
+      .catch(() => {
+        // Sin calendario el correo sale igual, solo sin la línea de técnicos.
+      })
+    return () => {
+      vivo = false
+    }
+  }, [])
+  return useMemo(() => tecnicosDeTurno(cal, turno), [cal, turno])
+}
+
+/**
+ * De dónde saca la pantalla de la bitácora sus datos. En la app es Firestore;
+ * la vitrina de desarrollo (`/dev/bitacora`) inyecta datos de ejemplo para
+ * revisar el módulo sin sesión ni reglas desplegadas.
+ */
+export interface FuenteBitacora {
+  useEventos: (turno: TurnoMantencion) => ReturnType<typeof useBitacoraTurno>
+  useTecnicos: (turno: TurnoMantencion) => string[]
+  /** Reemplaza la subida a Storage. */
+  subirFoto?: typeof subirFotoBitacora
+}
+
+export const FUENTE_FIRESTORE: FuenteBitacora = {
+  useEventos: useBitacoraTurno,
+  useTecnicos: useTecnicosDeTurno,
+}

@@ -36,6 +36,7 @@ const ROUTE_OPTIONS: readonly RouteOption[] = [
   { path: '/analisis-grader',    label: 'Análisis de Turno',     description: 'Detalle del turno + Grader + Shoplogix' },
   { path: '/dashboard',          label: 'Dashboard (legacy)',    description: 'Panel original de control' },
   { path: '/calendario-mantencion', label: 'Calendario Mantención', description: 'Programación de tareas preventivas' },
+  { path: '/bitacora',           label: 'Bitácora de turno',     description: 'Eventos del turno con fotos, para el correo' },
   { path: '/repuestos',          label: 'Repuestos',             description: 'Inventario y bodega' },
   { path: '/map',                label: 'Visor Planta 3D',       description: 'Mapa interactivo de la planta' },
   { path: '/aprendizaje',        label: 'Centro de Aprendizaje', description: 'Manuales y guías' },

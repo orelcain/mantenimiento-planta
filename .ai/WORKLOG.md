@@ -4832,3 +4832,43 @@ tiempo. Desplegado y verificado en producción (`buildSha 285e0bf`) abriendo la 
 - 113 tests. Reglas `rueda_ventanas_state` y `ruedaVentanasPublicTokens` desplegadas.
 
 ⚠ Los horarios cargados son una BASE DE EJEMPLO, no el horario real de planta.
+
+
+## 2026-09-15 · Bitácora de turno de Mantención (módulo nuevo, PR abierto)
+
+Pedido de Orel: una bitácora por turno que se llena en el celular (texto + fotos antes/después),
+se ve actualizada en el PC y desde el PC se copia al correo de Mantención o se exporta a PDF.
+Ruta `/bitacora` + tarjeta arriba del Inicio móvil + entrada en el menú lateral.
+Mockup aprobado: https://claude.ai/artifact/JYnbiYBeKLujwRgpYYCcQY (opción A, línea de tiempo).
+
+Decisiones de Orel (15-09): turno de **Mantención por reloj** (día 08-16, tarde 16-00, noche 00-08,
+no Shoplogix) · bitácora **compartida** del turno (cada evento firmado) · cada evento lleva
+**minutos de parada (MTTR)** o, si se intervino sin detener, **en qué ventana** (colación HG,
+colación empaque…) · Outlook "varía" → dos formas de copiar.
+
+- Datos: colección plana `bitacoraEventos` (`plantId`, `turnoId` = `YYYY-MM-DD_banda`), fotos en
+  Storage `bitacora/{turnoId}/{eventoId}/{archivo}`. Reglas nuevas en `firestore.rules` y
+  `storage.rules` (se despliegan al mergear). Costo: 1 onSnapshot por turno abierto + 1 lectura del
+  calendario cada 5 min; despreciable frente al techo de CLP 20.000.
+- Lógica pura con 20 tests en `services/bitacora/` (turno, resumen/MTTR, técnicos del calendario
+  real, HTML del correo). Los técnicos de turno salen de `calendario_mantencion_state/current`.
+- Correo: HTML con estilos en línea + `<table>` + `<img width height>` (lo único que respeta
+  Outlook clásico al pegar). «Copiar con fotos incrustadas» (base64) para Outlook nuevo/web.
+- Vitrina `/dev/bitacora` (solo DEV) con datos de ejemplo: verificado ahí a 375 px y en PC, ambos
+  temas, crear/editar/guardar, copiar (portapapeles con HTML + texto) y PDF (2 págs, fotos).
+
+⚠ Gotchas encontrados (cada uno costó una vuelta):
+- **CORS del bucket autoriza SOLO `https://orelcain.github.io`**, no localhost: en local el PDF y la
+  copia incrustada no pueden leer fotos reales de Storage (en prod sí). Medido con curl + Origin.
+- **La CSP (`connect-src`) no admite `data:`** → `fetch(dataUrl)` falla. Fotos a canvas con `<img>`
+  y dataURL→Blob a mano.
+- **`processImageForUpload` devuelve un WebP chico TAL CUAL aunque se pida `preferWebP:false`**
+  (idempotencia). Outlook clásico y jsPDF no aceptan WebP → se re-codifica en `fotosBitacora.ts`.
+- **Flex vertical con alto acotado + hijo `overflow-x-auto` = hijo de 0 px** (la fila de tipos
+  desaparecía en el Sheet). Fix: `[&>*]:shrink-0`.
+- jsPDF: «NH₃» salía «NH» (el saneo cp1252 descarta subíndices) → `normalize('NFKC')` antes.
+- Con el editor abierto el turno se CONGELA: si el reloj cruza las 16:00 a mitad de escribir, el
+  formulario se reseteaba y el evento caía en el turno siguiente.
+
+Pendiente: prueba real de Orel en el celular (fotos de cámara) y pegado en SU Outlook; ver si
+«Copiar para correo» basta o hace falta la variante incrustada.

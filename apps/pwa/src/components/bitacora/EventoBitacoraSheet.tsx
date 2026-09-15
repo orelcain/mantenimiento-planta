@@ -1,0 +1,483 @@
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { AlertTriangle, ImagePlus, Loader2, RotateCw, Trash2, X } from 'lucide-react'
+import { Button, Sheet } from '@/components/piel'
+import { useToast } from '@/hooks/useToast'
+import {
+  ETIQUETA_FOTO,
+  IMPACTOS,
+  MAX_FOTOS_EVENTO,
+  TIPOS_EVENTO,
+  VENTANAS_SUGERIDAS,
+} from '@/config/bitacora'
+import type {
+  EtiquetaFoto,
+  EventoBitacora,
+  EventoBitacoraDatos,
+  FotoEvento,
+  ImpactoEvento,
+  TipoEvento,
+  TurnoMantencion,
+} from '@/services/bitacora/bitacora.types'
+import { borrarFotoBitacora, subirFotoBitacora } from '@/services/bitacora/fotosBitacora'
+import { formatoMinutos, horaSugeridaParaEvento, minutosEntre } from '@/services/bitacora/turnoMantencion'
+
+interface Subida {
+  clave: string
+  etiqueta: EtiquetaFoto
+  archivo: File
+  error?: string
+}
+
+export interface EventoBitacoraSheetProps {
+  open: boolean
+  turno: TurnoMantencion
+  /** null = evento nuevo. */
+  evento: EventoBitacora | null
+  /** Id reservado para un evento nuevo (sus fotos se suben a esa carpeta). */
+  idNuevo: string
+  sugerenciasEquipo: string[]
+  /** Por defecto sube a Storage; la vitrina de desarrollo la reemplaza. */
+  subirFoto?: typeof subirFotoBitacora
+  onGuardar: (id: string, datos: EventoBitacoraDatos, esNuevo: boolean) => Promise<void>
+  onBorrar: (evento: EventoBitacora) => Promise<void>
+  onClose: () => void
+}
+
+const CLAVE_RECIENTES = 'bitacora.equiposRecientes.v1'
+
+function leerRecientes(): string[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(CLAVE_RECIENTES) ?? '[]')
+    return Array.isArray(v) ? v.filter((s) => typeof s === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+function recordarEquipo(equipo: string) {
+  const e = equipo.trim()
+  if (!e) return
+  try {
+    const lista = [e, ...leerRecientes().filter((x) => x.toLowerCase() !== e.toLowerCase())].slice(0, 12)
+    localStorage.setItem(CLAVE_RECIENTES, JSON.stringify(lista))
+  } catch {
+    /* sin almacenamiento local: solo se pierde la sugerencia */
+  }
+}
+
+// Estilo de control iOS: relleno suave, sin borde. 16 px en inputs para que
+// iOS no haga zoom al enfocar.
+const CAMPO =
+  'h-[44px] w-full rounded-ctl border-0 bg-muted-foreground/10 px-3 text-[16px] text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary'
+const ETIQUETA_CAMPO = 'mb-1.5 block text-footnote text-muted-foreground'
+
+function Chip({ activo, onClick, children }: { activo: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={activo}
+      className={[
+        'min-h-[44px] shrink-0 rounded-full px-4 text-footnote font-semibold transition-colors duration-150 motion-reduce:transition-none',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+        activo ? 'bg-primary text-primary-foreground' : 'bg-muted-foreground/10 text-foreground hover:bg-muted-foreground/15',
+      ].join(' ')}
+    >
+      {children}
+    </button>
+  )
+}
+
+export function EventoBitacoraSheet({
+  open,
+  turno,
+  evento,
+  idNuevo,
+  sugerenciasEquipo,
+  subirFoto = subirFotoBitacora,
+  onGuardar,
+  onBorrar,
+  onClose,
+}: EventoBitacoraSheetProps) {
+  const { toast } = useToast()
+  const esNuevo = !evento
+  const eventoId = evento?.id ?? idNuevo
+
+  const [tipo, setTipo] = useState<TipoEvento>('falla')
+  const [equipo, setEquipo] = useState('')
+  const [descripcion, setDescripcion] = useState('')
+  const [horaInicio, setHoraInicio] = useState('')
+  const [horaTermino, setHoraTermino] = useState('')
+  const [impacto, setImpacto] = useState<ImpactoEvento>('no-aplica')
+  const [minutos, setMinutos] = useState('')
+  const [ventana, setVentana] = useState('')
+  const [pendiente, setPendiente] = useState(false)
+  const [fotos, setFotos] = useState<FotoEvento[]>([])
+  const [subidas, setSubidas] = useState<Subida[]>([])
+  const [guardando, setGuardando] = useState(false)
+  const [confirmarBorrado, setConfirmarBorrado] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  /** Fotos subidas en ESTA edición: si se cancela, se borran de Storage. */
+  const subidasNuevas = useRef<string[]>([])
+  /** Fotos del evento guardado que se quitaron: se borran recién al guardar. */
+  const quitadas = useRef<string[]>([])
+  const inputRef = useRef<HTMLInputElement>(null)
+  const etiquetaPendiente = useRef<EtiquetaFoto>('foto')
+
+  // Cargar el formulario cada vez que se abre (nuevo o edición).
+  useEffect(() => {
+    if (!open) return
+    setTipo(evento?.tipo ?? 'falla')
+    setEquipo(evento?.equipo ?? '')
+    setDescripcion(evento?.descripcion ?? '')
+    setHoraInicio(evento?.horaInicio ?? horaSugeridaParaEvento(turno))
+    setHoraTermino(evento?.horaTermino ?? '')
+    setImpacto(evento?.impacto ?? 'no-aplica')
+    setMinutos(evento?.minutosParada != null ? String(evento.minutosParada) : '')
+    setVentana(evento?.ventana ?? '')
+    setPendiente(evento?.pendiente ?? false)
+    setFotos(evento?.fotos ?? [])
+    setSubidas([])
+    setGuardando(false)
+    setConfirmarBorrado(false)
+    setError(null)
+    subidasNuevas.current = []
+    quitadas.current = []
+  }, [open, evento, turno])
+
+  const duracion = minutosEntre(horaInicio, horaTermino || null)
+  const equiposSugeridos = useMemo(() => {
+    const vistos = new Set<string>()
+    return [...sugerenciasEquipo, ...(open ? leerRecientes() : [])].filter((e) => {
+      const k = e.trim().toLowerCase()
+      if (!k || vistos.has(k)) return false
+      vistos.add(k)
+      return true
+    })
+  }, [sugerenciasEquipo, open])
+
+  const subir = async (s: Subida) => {
+    setSubidas((prev) => prev.map((x) => (x.clave === s.clave ? { ...x, error: undefined } : x)))
+    try {
+      const foto = await subirFoto(turno.id, eventoId, s.archivo, s.etiqueta)
+      subidasNuevas.current.push(foto.path)
+      setFotos((prev) => [...prev, foto])
+      setSubidas((prev) => prev.filter((x) => x.clave !== s.clave))
+    } catch (e) {
+      const mensaje = (e as { code?: string })?.code === 'storage/unauthorized'
+        ? 'Sin permiso para subir (faltan reglas de Storage).'
+        : e instanceof Error && e.message.startsWith('Formato')
+          ? e.message
+          : 'No se pudo subir. Revisa la señal y reintenta.'
+      setSubidas((prev) => prev.map((x) => (x.clave === s.clave ? { ...x, error: mensaje } : x)))
+    }
+  }
+
+  const elegirFotos = (etiqueta: EtiquetaFoto) => {
+    etiquetaPendiente.current = etiqueta
+    inputRef.current?.click()
+  }
+
+  const alElegir = (lista: FileList | null) => {
+    if (!lista?.length) return
+    const libres = MAX_FOTOS_EVENTO - fotos.length - subidas.length
+    const archivos = Array.from(lista).slice(0, Math.max(0, libres))
+    if (archivos.length < lista.length) {
+      toast({ title: `Máximo ${MAX_FOTOS_EVENTO} fotos por evento`, description: 'Las demás no se agregaron.' })
+    }
+    const nuevas = archivos.map((archivo, i) => ({
+      clave: `${Date.now()}-${i}-${archivo.name}`,
+      // Si eligen varias desde "Antes", solo la primera es "antes".
+      etiqueta: i === 0 ? etiquetaPendiente.current : ('foto' as EtiquetaFoto),
+      archivo,
+    }))
+    setSubidas((prev) => [...prev, ...nuevas])
+    nuevas.forEach((s) => void subir(s))
+    if (inputRef.current) inputRef.current.value = ''
+  }
+
+  const quitarFoto = (foto: FotoEvento) => {
+    setFotos((prev) => prev.filter((f) => f.path !== foto.path))
+    if (subidasNuevas.current.includes(foto.path)) {
+      subidasNuevas.current = subidasNuevas.current.filter((p) => p !== foto.path)
+      void borrarFotoBitacora(foto.path).catch(() => undefined)
+    } else {
+      quitadas.current.push(foto.path)
+    }
+  }
+
+  const cancelar = () => {
+    // Lo subido en esta edición y no guardado no debe quedar huérfano.
+    subidasNuevas.current.forEach((p) => void borrarFotoBitacora(p).catch(() => undefined))
+    subidasNuevas.current = []
+    onClose()
+  }
+
+  const guardar = async () => {
+    setError(null)
+    if (!descripcion.trim()) {
+      setError('Escribe qué pasó y qué se hizo.')
+      return
+    }
+    setGuardando(true)
+    try {
+      const minutosNum = minutos.trim() === '' ? null : Number(minutos)
+      await onGuardar(
+        eventoId,
+        {
+          tipo,
+          equipo,
+          descripcion,
+          horaInicio,
+          horaTermino: horaTermino || null,
+          impacto,
+          minutosParada: minutosNum != null && Number.isFinite(minutosNum) ? minutosNum : null,
+          ventana: ventana || null,
+          pendiente,
+          fotos,
+        },
+        esNuevo,
+      )
+      recordarEquipo(equipo)
+      subidasNuevas.current = []
+      quitadas.current.forEach((p) => void borrarFotoBitacora(p).catch(() => undefined))
+      quitadas.current = []
+      toast({ title: esNuevo ? 'Evento agregado' : 'Evento actualizado', variant: 'success' })
+      onClose()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo guardar. Reintenta.')
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  const borrar = async () => {
+    if (!evento) return
+    if (!confirmarBorrado) {
+      setConfirmarBorrado(true)
+      return
+    }
+    setGuardando(true)
+    try {
+      subidasNuevas.current.forEach((p) => void borrarFotoBitacora(p).catch(() => undefined))
+      await onBorrar(evento)
+      toast({ title: 'Evento borrado' })
+      onClose()
+    } catch {
+      setError('No se pudo borrar. Solo quien lo creó o un supervisor puede borrarlo.')
+      setGuardando(false)
+    }
+  }
+
+  const subiendo = subidas.some((s) => !s.error)
+
+  return (
+    <Sheet
+      open={open}
+      onClose={cancelar}
+      title={esNuevo ? 'Nuevo evento' : 'Editar evento'}
+      actions={
+        <>
+          <Button variant="tinted" onClick={cancelar} disabled={guardando}>
+            Cancelar
+          </Button>
+          <Button onClick={guardar} disabled={guardando || subiendo}>
+            {guardando ? <Loader2 className="animate-spin" /> : null}
+            {subiendo ? 'Subiendo fotos…' : 'Guardar'}
+          </Button>
+        </>
+      }
+    >
+      {/* `[&>*]:shrink-0`: en un flex vertical con alto acotado, un hijo con
+          overflow-x (la fila de tipos) se encoge a 0 px y desaparece. */}
+      <div className="-mx-6 flex max-h-[min(68vh,640px)] flex-col gap-5 overflow-y-auto px-6 pb-1 [&>*]:shrink-0">
+        {/* Tipo */}
+        <div className="-mx-1 flex gap-2 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="group" aria-label="Tipo de evento">
+          {TIPOS_EVENTO.map((t) => (
+            <Chip key={t.id} activo={tipo === t.id} onClick={() => setTipo(t.id)}>
+              {t.label}
+            </Chip>
+          ))}
+        </div>
+
+        {/* Equipo y horas */}
+        <div className="flex flex-col gap-3">
+          <div>
+            <label htmlFor="bitacora-equipo" className={ETIQUETA_CAMPO}>Equipo o área</label>
+            <input
+              id="bitacora-equipo"
+              className={CAMPO}
+              value={equipo}
+              onChange={(e) => setEquipo(e.target.value)}
+              list="bitacora-equipos"
+              placeholder="BAADER 142, Grader, sala de bombas…"
+              autoComplete="off"
+            />
+            <datalist id="bitacora-equipos">
+              {equiposSugeridos.map((e) => (
+                <option key={e} value={e} />
+              ))}
+            </datalist>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="bitacora-inicio" className={ETIQUETA_CAMPO}>Inicio</label>
+              <input id="bitacora-inicio" type="time" className={`${CAMPO} tabular-nums`} value={horaInicio} onChange={(e) => setHoraInicio(e.target.value)} />
+            </div>
+            <div>
+              <label htmlFor="bitacora-termino" className={ETIQUETA_CAMPO}>Término</label>
+              <input id="bitacora-termino" type="time" className={`${CAMPO} tabular-nums`} value={horaTermino} onChange={(e) => setHoraTermino(e.target.value)} />
+            </div>
+          </div>
+          {duracion != null && <p className="-mt-1 text-footnote text-muted-foreground">Duración: {formatoMinutos(duracion)}</p>}
+        </div>
+
+        {/* Qué pasó */}
+        <div>
+          <label htmlFor="bitacora-descripcion" className={ETIQUETA_CAMPO}>Qué pasó y qué se hizo</label>
+          <textarea
+            id="bitacora-descripcion"
+            className="min-h-[112px] w-full resize-y rounded-ctl border-0 bg-muted-foreground/10 px-3 py-2.5 text-[16px] leading-snug text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary"
+            value={descripcion}
+            onChange={(e) => setDescripcion(e.target.value)}
+            placeholder="Detención por E777. Muelle de tracción del carro cortado; se cambia y se prueba en vacío."
+          />
+        </div>
+
+        {/* Impacto en producción */}
+        <div>
+          <span className={ETIQUETA_CAMPO}>¿Afectó a producción?</span>
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Impacto en producción">
+            {IMPACTOS.map((i) => (
+              <Chip key={i.id} activo={impacto === i.id} onClick={() => setImpacto(i.id)}>
+                {i.label}
+              </Chip>
+            ))}
+          </div>
+          {impacto === 'con-parada' && (
+            <div className="mt-3">
+              <label htmlFor="bitacora-minutos" className={ETIQUETA_CAMPO}>Minutos de máquina detenida</label>
+              <input
+                id="bitacora-minutos"
+                type="number"
+                inputMode="numeric"
+                min={0}
+                className={`${CAMPO} tabular-nums`}
+                value={minutos}
+                onChange={(e) => setMinutos(e.target.value)}
+                placeholder={duracion != null ? `${duracion} (la duración del evento)` : 'Ej: 35'}
+              />
+              <p className="mt-1.5 text-footnote text-muted-foreground">Cuenta para el MTTR del turno. Si lo dejas vacío se usa la duración.</p>
+            </div>
+          )}
+          {impacto === 'en-ventana' && (
+            <div className="mt-3">
+              <label htmlFor="bitacora-ventana" className={ETIQUETA_CAMPO}>¿En qué momento se intervino?</label>
+              <div className="mb-2 flex flex-wrap gap-2">
+                {VENTANAS_SUGERIDAS.map((v) => (
+                  <Chip key={v} activo={ventana === v} onClick={() => setVentana(v)}>
+                    {v}
+                  </Chip>
+                ))}
+              </div>
+              <input
+                id="bitacora-ventana"
+                className={CAMPO}
+                value={ventana}
+                onChange={(e) => setVentana(e.target.value)}
+                placeholder="O escríbelo: durante colación filete…"
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Fotos */}
+        <div>
+          <span className={ETIQUETA_CAMPO}>Fotos</span>
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={(e) => alElegir(e.target.files)}
+          />
+          {(fotos.length > 0 || subidas.length > 0) && (
+            <div className="mb-3 grid grid-cols-3 gap-2">
+              {fotos.map((f) => (
+                <figure key={f.path} className="relative m-0">
+                  <img src={f.url} alt={ETIQUETA_FOTO[f.etiqueta]} className="aspect-square w-full rounded-ctl bg-muted-foreground/10 object-cover" />
+                  <figcaption className="pt-1 text-caption text-muted-foreground">{ETIQUETA_FOTO[f.etiqueta]}</figcaption>
+                  <button
+                    type="button"
+                    onClick={() => quitarFoto(f)}
+                    aria-label={`Quitar foto ${ETIQUETA_FOTO[f.etiqueta]}`}
+                    className="absolute right-0 top-0 flex size-[44px] items-start justify-end p-1.5"
+                  >
+                    <span className="flex size-6 items-center justify-center rounded-full bg-black/60 text-white">
+                      <X className="size-3.5" />
+                    </span>
+                  </button>
+                </figure>
+              ))}
+              {subidas.map((s) => (
+                <div key={s.clave} className="flex aspect-square w-full flex-col items-center justify-center gap-1 rounded-ctl bg-muted-foreground/10 p-2 text-center">
+                  {s.error ? (
+                    <>
+                      <AlertTriangle className="size-5 text-ink-warn" aria-hidden />
+                      <span className="text-caption text-muted-foreground">{s.error}</span>
+                      <button type="button" onClick={() => void subir(s)} className="inline-flex min-h-[32px] items-center gap-1 text-footnote font-semibold text-primary">
+                        <RotateCw className="size-3.5" /> Reintentar
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <Loader2 className="size-5 animate-spin text-muted-foreground" aria-hidden />
+                      <span className="text-caption text-muted-foreground">Subiendo {ETIQUETA_FOTO[s.etiqueta].toLowerCase()}…</span>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="grid grid-cols-3 gap-2">
+            {(['antes', 'despues', 'foto'] as const).map((et) => (
+              <Button key={et} variant="tinted" size="md" className="rounded-ctl px-2" onClick={() => elegirFotos(et)} disabled={fotos.length + subidas.length >= MAX_FOTOS_EVENTO}>
+                <ImagePlus /> {et === 'foto' ? 'Otra' : ETIQUETA_FOTO[et]}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        {/* Pendiente */}
+        <button
+          type="button"
+          role="switch"
+          aria-checked={pendiente}
+          onClick={() => setPendiente((v) => !v)}
+          className="flex min-h-[44px] w-full items-center justify-between gap-3 rounded-card bg-muted-foreground/10 px-4 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          <span className="flex flex-col">
+            <span className="text-body font-semibold">Queda pendiente</span>
+            <span className="text-footnote text-muted-foreground">Sale destacado en el correo para el turno siguiente.</span>
+          </span>
+          <span className={`relative h-[31px] w-[51px] shrink-0 rounded-full transition-colors duration-200 motion-reduce:transition-none ${pendiente ? 'bg-primary' : 'bg-muted-foreground/30'}`}>
+            <span className={`absolute top-[2px] size-[27px] rounded-full bg-white shadow transition-transform duration-200 motion-reduce:transition-none ${pendiente ? 'translate-x-[22px]' : 'translate-x-[2px]'}`} />
+          </span>
+        </button>
+
+        {error && (
+          <p role="alert" className="text-footnote font-semibold text-ink-crit">
+            {error}
+          </p>
+        )}
+
+        {!esNuevo && (
+          <Button variant="destructive" onClick={borrar} disabled={guardando} className="self-start">
+            <Trash2 /> {confirmarBorrado ? 'Toca de nuevo para borrar' : 'Borrar evento'}
+          </Button>
+        )}
+      </div>
+    </Sheet>
+  )
+}
