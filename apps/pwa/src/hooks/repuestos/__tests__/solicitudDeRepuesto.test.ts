@@ -1,5 +1,19 @@
 import { describe, it, expect } from 'vitest'
-import { cantidadDesdeTexto, avisoDeStock, CANTIDAD_MAXIMA } from '../solicitudDeRepuesto'
+import { cantidadDesdeTexto, avisoDeStock, CANTIDAD_MAXIMA, planDeEntrega } from '../solicitudDeRepuesto'
+
+describe('planDeEntrega', () => {
+  it('con bodega alcanza: descuenta y no hay faltante', () => {
+    expect(planDeEntrega(2, { stockActual: 3 })).toEqual({ accion: 'descontar', stockAntes: 3, stockDespues: 1, faltante: 0 })
+  })
+
+  it('entregar más de lo registrado NO se calla: queda en 0 y dice cuánto faltaba', () => {
+    expect(planDeEntrega(5, { stockActual: 3 })).toEqual({ accion: 'descontar', stockAntes: 3, stockDespues: 0, faltante: 2 })
+  })
+
+  it('sin documento de bodega no se inventa uno', () => {
+    expect(planDeEntrega(2, undefined)).toEqual({ accion: 'sin-bodega' })
+  })
+})
 
 describe('cantidadDesdeTexto', () => {
   it('borrar el campo NO es «1»: queda sin cantidad hasta que se escriba una', () => {

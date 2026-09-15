@@ -19,6 +19,7 @@ import {
   type SolicitudEstado,
 } from '@/hooks/repuestos/useSolicitudes'
 import { duracionLegible } from '@/hooks/repuestos/trazaDeSolicitud'
+import { avisoDeStock, type StockDeSolicitud } from '@/hooks/repuestos/solicitudDeRepuesto'
 
 interface Props {
   open: boolean
@@ -26,6 +27,8 @@ interface Props {
   solicitudes: SolicitudRepuesto[]
   loading: boolean
   onAvanzar: (id: string, estado: SolicitudEstado) => Promise<void>
+  /** Stock de bodega por SAP: quien aprueba o entrega tiene que ver si hay antes de apretar. */
+  stockDe?: (codigoSAP: string) => StockDeSolicitud | undefined
 }
 
 const ESTADO_META: Record<SolicitudEstado, { label: string; cls: string }> = {
@@ -62,7 +65,7 @@ function trazaVisible(s: SolicitudRepuesto): string | null {
 
 type Filtro = 'all' | SolicitudEstado
 
-export function SolicitudesPanel({ open, onOpenChange, solicitudes, loading, onAvanzar }: Props) {
+export function SolicitudesPanel({ open, onOpenChange, solicitudes, loading, onAvanzar, stockDe }: Props) {
   const [busyId, setBusyId] = useState<string | null>(null)
   const [filtro, setFiltro] = useState<Filtro>('all')
 
@@ -154,6 +157,12 @@ export function SolicitudesPanel({ open, onOpenChange, solicitudes, loading, onA
                         <div className="font-medium text-foreground">{s.textoBreve || '(sin nombre)'}</div>
                         <div className="font-mono text-caption text-muted-foreground">SAP {s.codigoSAP} · {fmtDate(s.createdAt)}</div>
                         {s.observaciones && <div className="mt-0.5 text-caption italic text-muted-foreground">{s.observaciones}</div>}
+                        {next && stockDe && (() => {
+                          // Solo mientras falta entregar: después el stock ya no dice nada de esta solicitud.
+                          const aviso = avisoDeStock(stockDe(s.codigoSAP), s.cantidad)
+                          const alerta = aviso.nivel === 'sin-stock' || aviso.nivel === 'insuficiente'
+                          return <div className={['mt-0.5 text-caption', alerta ? 'font-medium text-ink-warn' : 'text-muted-foreground'].join(' ')}>{aviso.texto}</div>
+                        })()}
                       </td>
                       <td className="px-3 py-2 tabular-nums">{s.cantidad}</td>
                       <td className="px-3 py-2 text-muted-foreground">{s.solicitadoPorNombre || '—'}</td>

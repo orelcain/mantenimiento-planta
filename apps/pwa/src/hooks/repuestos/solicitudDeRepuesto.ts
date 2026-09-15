@@ -24,6 +24,30 @@ export function cantidadDesdeTexto(texto: string): number | null {
   return n >= 1 && n <= CANTIDAD_MAXIMA ? n : null
 }
 
+/**
+ * Qué hace «Entregar» con bodega.
+ *
+ * Antes buscaba el repuesto en las filas del CATÁLOGO cargado, que va por área: una solicitud de
+ * un repuesto de otra área no lo encontraba, se marcaba «Entregada» y el stock no se descontaba,
+ * sin aviso. Y si se entregaba más de lo registrado, el stock quedaba en 0 en silencio mientras
+ * el aviso decía «Stock descontado −5». Ahora se decide sobre el documento de BODEGA (que está
+ * entero en memoria) y el faltante se dice.
+ */
+export type PlanDeEntrega =
+  | { accion: 'sin-bodega' }
+  | { accion: 'descontar'; stockAntes: number; stockDespues: number; faltante: number }
+
+export function planDeEntrega(cantidad: number, bodega: { stockActual: number } | undefined): PlanDeEntrega {
+  if (!bodega) return { accion: 'sin-bodega' }
+  const stockAntes = Math.max(0, bodega.stockActual)
+  return {
+    accion: 'descontar',
+    stockAntes,
+    stockDespues: Math.max(0, stockAntes - cantidad),
+    faltante: Math.max(0, cantidad - stockAntes),
+  }
+}
+
 export interface StockDeSolicitud {
   /** Tiene documento en bodega. Sin él, el stock no se conoce: no es «cero». */
   configurado: boolean

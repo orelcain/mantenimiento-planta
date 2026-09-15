@@ -33,6 +33,7 @@ import { db } from '@/services/firebase'
 import { logger } from '@/lib/logger'
 import { contarPorEstado, esAlertaDeStock } from '@/hooks/repuestos/estadoDeStock'
 import { useRepuestoFavoritos } from './useRepuestoFavoritos'
+import { planDeEntrega, type PlanDeEntrega } from './solicitudDeRepuesto'
 import { useAuthStore } from '@/store'
 import { uploadBodegaPhoto, deleteBodegaPhoto } from '@/services/storage'
 import type { GlobalSearchResult } from '@/hooks/repuestos/useGlobalSearch'
@@ -462,6 +463,34 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
     patchOverlay(key, { ...data, id: existing?.id ?? key, codigoSAP: key, updatedAt: new Date() })
   }, [bodegaOverlays, patchOverlay, denormNombre])
 
+  /** El documento de bodega de un SAP. La bodega entera está en memoria; el catálogo, por área. */
+  const overlayDeSap = useCallback((sap: string) => bodegaOverlays.get(sap.trim()), [bodegaOverlays])
+
+  /**
+   * Salida por la entrega de una solicitud, decidida sobre BODEGA y no sobre las filas del
+   * catálogo cargado (ver `planDeEntrega`). Devuelve el plan para que quien llama diga la verdad.
+   */
+  const registrarSalidaDeSolicitud = useCallback(async (
+    codigoSAP: string,
+    cantidad: number,
+    motivo: string,
+    userId: string,
+    userName: string,
+  ): Promise<PlanDeEntrega> => {
+    const key = codigoSAP.trim()
+    const overlay = bodegaOverlays.get(key)
+    const plan = planDeEntrega(cantidad, overlay)
+    if (plan.accion !== 'descontar' || !overlay) return plan
+    await updateDoc(doc(db, BODEGA_COL, overlay.id), { stockActual: plan.stockDespues, updatedAt: serverTimestamp() })
+    await addDoc(collection(db, BODEGA_COL, overlay.id, 'movimientos'), {
+      bodegaItemId: overlay.id, tipo: 'salida', cantidad, stockResultante: plan.stockDespues,
+      motivo: plan.faltante > 0 ? `${motivo} · bodega registraba ${plan.stockAntes}` : motivo,
+      realizadoPor: userId, realizadoPorNombre: userName, createdAt: serverTimestamp(),
+    })
+    patchOverlay(key, { id: overlay.id, codigoSAP: key, stockActual: plan.stockDespues, updatedAt: new Date() })
+    return plan
+  }, [bodegaOverlays, patchOverlay])
+
   // ── Registrar movimiento ──
   const registrarMovimiento = useCallback(async (
     item: BodegaMergedItem,
@@ -866,6 +895,8 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
     stats,
     saveStock,
     registrarMovimiento,
+    registrarSalidaDeSolicitud,
+    overlayDeSap,
     registrarConteoRapido,
     registrarMovimientoBatch,
     loadMovimientos,

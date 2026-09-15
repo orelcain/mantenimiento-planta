@@ -207,7 +207,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
 
   const { allRepuestos, loadAll, loadArea, loaded: repuestosLoaded, loading: repuestosLoading, catalogoCompleto, areasCargadas } = useGlobalSearch(machines)
   // allItems = TODOS los repuestos del área (con y sin SAP); el stock se engancha si hay SAP.
-  const { allItems: bodegaItems, loading: bodegaLoading, loadMovimientos, saveStock, registrarMovimiento, registrarConteoRapido } = useBodega(allRepuestos)
+  const { allItems: bodegaItems, loading: bodegaLoading, loadMovimientos, saveStock, registrarSalidaDeSolicitud, overlayDeSap, registrarConteoRapido } = useBodega(allRepuestos)
 
   // membership repuesto(machineId) → área: vía equipment cache, con fallback a ancestría directa
   const machineInArea = useCallback(
@@ -337,23 +337,35 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   const { createRepuesto: crudCreate, updateRepuesto: crudUpdate, deleteRepuesto: crudDelete } = useRepuestoCrud()
 
   // Avanzar solicitud a "entregada" → descuenta stock real de bodega (si el SAP ya está
-  // configurado ahí). Sin esto, "Entregar" era solo una etiqueta que no tocaba el inventario.
-  // Si no hay bodega configurada para el SAP, no se inventa un registro (evita el latente
-  // rechazo de firestore.rules por ubicacionBodega vacía) — solo avanza el estado igual.
+  // configurado ahí). Si no hay bodega para el SAP, no se inventa un registro (evita el latente
+  // rechazo de firestore.rules por ubicacionBodega vacía) — avanza el estado y LO DICE.
+  // Se decide sobre la bodega (entera en memoria), no sobre las filas del catálogo cargado:
+  // el catálogo va por área y una solicitud de otra área se entregaba sin descontar nada.
   const handleAvanzarSolicitud = useCallback(
     async (id: string, next: SolicitudEstado) => {
       if (next === 'entregada' && user) {
         const sol = solicitudes.find((s) => s.id === id)
-        const item = sol ? bodegaItems.find((b) => b.codigoSAP === sol.codigoSAP) : undefined
-        if (sol && item?.bodegaId) {
+        if (sol) {
           try {
-            await registrarMovimiento(
-              item,
-              { tipo: 'salida', cantidad: sol.cantidad, motivo: `Entrega solicitud · ${sol.solicitadoPorNombre || 'usuario'}` },
+            const plan = await registrarSalidaDeSolicitud(
+              sol.codigoSAP,
+              sol.cantidad,
+              `Entrega solicitud · ${sol.solicitadoPorNombre || 'usuario'}`,
               user.id,
               user.nombre,
             )
-            toast({ title: 'Stock descontado', description: `-${sol.cantidad} ${item.textoBreve || item.codigoSAP}`, variant: 'success' })
+            const nombre = sol.textoBreve || sol.codigoSAP
+            if (plan.accion === 'sin-bodega') {
+              toast({ title: 'Entregada sin descontar stock', description: `${nombre} no tiene registro en bodega.` })
+            } else if (plan.faltante > 0) {
+              toast({
+                title: 'Stock descontado, pero no alcanzaba',
+                description: `Bodega registraba ${plan.stockAntes} y se entregaron ${sol.cantidad}: quedó en 0. Conviene contar ${nombre}.`,
+                variant: 'destructive',
+              })
+            } else {
+              toast({ title: 'Stock descontado', description: `-${sol.cantidad} ${nombre} · quedan ${plan.stockDespues}`, variant: 'success' })
+            }
           } catch {
             toast({ title: 'No se pudo descontar el stock', description: 'La solicitud sigue pendiente de entrega — reintenta.', variant: 'destructive' })
             return // no avanzar a "entregada" si el descuento de stock falló
@@ -362,7 +374,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
       }
       await avanzarEstado(id, next, user?.id ?? '', user?.nombre ?? '')
     },
-    [solicitudes, bodegaItems, user, registrarMovimiento, avanzarEstado, toast],
+    [solicitudes, user, registrarSalidaDeSolicitud, avanzarEstado, toast],
   )
   const [actionTarget, setActionTarget] = useState<{ kind: RepAction; source: GlobalSearchResult } | null>(null)
   const [equipoPicker, setEquipoPicker] = useState<{ kind: RepAction; sources: GlobalSearchResult[] } | null>(null)
@@ -2270,6 +2282,10 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
         solicitudes={solicitudes}
         loading={solicitudesLoading}
         onAvanzar={handleAvanzarSolicitud}
+        stockDe={(sap) => {
+          const o = overlayDeSap(sap)
+          return o ? { configurado: true, stockActual: o.stockActual, unidad: o.unidad, ubicacionBodega: o.ubicacionBodega } : { configurado: false }
+        }}
       />
 
       {/* Herramientas admin de catálogo */}
