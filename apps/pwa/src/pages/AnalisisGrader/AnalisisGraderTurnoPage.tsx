@@ -2423,6 +2423,7 @@ export function AnalisisGraderTurnoPage() {
         <div className="space-y-4">
           {/* Scorecard principal — mismo patrón visual que HeroScorecard */}
           <ShoplogixOnlyScorecard
+            tieneGrader={hasGraderData}
             snapshot={upstreamLine.snapshot}
             plannedTargetPieces={plantLineCfg.shiftTargetPieces}
             shiftWindow={shiftWindow}
