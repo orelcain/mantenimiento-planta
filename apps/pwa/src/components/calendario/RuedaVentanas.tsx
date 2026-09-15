@@ -30,6 +30,7 @@ import {
   contarSemana,
   diaVacio,
   estadoInicial,
+  firmaDeGuardado,
   guardarRueda,
   sinConfirmar,
   pintarSlot,
@@ -170,12 +171,12 @@ export function RuedaVentanas({ disponibles }: RuedaVentanasProps = {}) {
         if (!remoto) {
           // Sin documento remoto: la base queda solo en pantalla. El documento
           // se crea cuando alguien edita, no por el hecho de abrir la pestaña.
-          ultimoGuardadoRef.current = JSON.stringify(estadoInicial().maquinas)
+          ultimoGuardadoRef.current = firmaDeGuardado(estadoInicial())
         }
         if (remoto) {
           setState(remoto)
           setMaquinaId((actual) => (remoto.maquinas.some((m) => m.id === actual) ? actual : (remoto.maquinas[0]?.id ?? actual)))
-          ultimoGuardadoRef.current = JSON.stringify(remoto.maquinas)
+          ultimoGuardadoRef.current = firmaDeGuardado(remoto)
         }
         setSync('guardado')
       })
@@ -185,7 +186,7 @@ export function RuedaVentanas({ disponibles }: RuedaVentanasProps = {}) {
         // Si no se pudo leer, tampoco hay que intentar escribir: sin esto el
         // autosave veía «cambios» (la base contra un ref vacío) y mandaba una
         // escritura que nadie pidió, condenada al mismo permission-denied.
-        ultimoGuardadoRef.current = JSON.stringify(estadoInicial().maquinas)
+        ultimoGuardadoRef.current = firmaDeGuardado(estadoInicial())
         setSync('local')
       })
     return () => {
@@ -215,7 +216,8 @@ export function RuedaVentanas({ disponibles }: RuedaVentanasProps = {}) {
         objeto: con deps de identidad, cada render dispara una escritura. ───── */
   useEffect(() => {
     if (sync === 'cargando') return
-    const serializado = JSON.stringify(state.maquinas)
+    // Todo lo que se guarda, no solo las máquinas: si no, «¿Alcanza el tiempo?» nunca se guardaba.
+    const serializado = firmaDeGuardado(state)
     if (serializado === ultimoGuardadoRef.current) return
     if (serializado === falloRef.current) return // ya falló tal cual; espera un cambio
 
