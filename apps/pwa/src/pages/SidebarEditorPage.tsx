@@ -40,6 +40,7 @@ const DEFAULT_GROUPS: Group[] = [
   {
     id: 'principal', label: 'Principal',
     items: [
+      { id: 'bitacora', name: 'Bitácora de turno', href: '/bitacora', groupId: 'principal' },
       { id: 'dashboard', name: 'Dashboard', href: '/', groupId: 'principal' },
       { id: 'incidencias', name: 'Incidencias', href: '/incidents', groupId: 'principal' },
       { id: 'evidencias', name: 'Evidencias', href: '/photo-evidence', groupId: 'principal' },

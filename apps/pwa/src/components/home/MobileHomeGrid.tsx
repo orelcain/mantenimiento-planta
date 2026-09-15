@@ -10,6 +10,7 @@ import {
 import { QRCodeSVG } from 'qrcode.react'
 import { cn } from '@/lib/utils'
 import { ListGroup, ListCell, Pill } from '@/components/piel'
+import { BitacoraTurnoCard } from '@/components/bitacora/BitacoraTurnoCard'
 import { useAuthStore, useAppStore } from '@/store'
 import { useWipOverrides } from '@/hooks/useWipOverrides'
 import type { UserRole } from '@/types'
@@ -412,6 +413,9 @@ export function MobileHomeGrid() {
           {ROLE_LABEL[role]}
         </span>
       </div>
+
+      {/* Bitácora del turno en curso: lo primero al abrir la app en el celular. */}
+      <BitacoraTurnoCard />
 
       {/* Grupos */}
       {groups.map((group) => {
