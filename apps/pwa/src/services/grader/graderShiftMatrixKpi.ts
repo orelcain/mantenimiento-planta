@@ -35,6 +35,17 @@ export const MATRIX_KPIS: readonly MatrixKpiMeta[] = [
 
 export const DEFAULT_MATRIX_KPI: MatrixKpi = 'cycles'
 
+/**
+ * Los indicadores que esa linea puede llenar.
+ *
+ * «Pzs OK» y «P0 %» salen del Excel del Grader. Filete no pasa por Grader
+ * (`hasGraderData: false`): los dos botones pintaban una matriz entera vacia y
+ * el selector prometia un analisis que la linea no puede dar.
+ */
+export function kpisDeMatriz(tieneGrader: boolean): readonly MatrixKpiMeta[] {
+  return tieneGrader ? MATRIX_KPIS : MATRIX_KPIS.filter((k) => k.id !== 'pieces' && k.id !== 'p0')
+}
+
 export function matrixKpiMeta(kpi: MatrixKpi): MatrixKpiMeta {
   return MATRIX_KPIS.find(k => k.id === kpi) ?? MATRIX_KPIS[0]!
 }

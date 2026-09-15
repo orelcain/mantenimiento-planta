@@ -20,6 +20,7 @@ import { loadPeriodReliability } from '@/services/grader/graderPeriodReliability
 import { exportPeriodSummaryPng } from '@/services/grader/graderPeriodSummaryPng'
 import { exportPeriodSummaryPdf } from '@/services/grader/graderPeriodSummaryPdf'
 import { getAreaDisplayLabel, DEFAULT_PLANT_LINE_ID } from '@/config/plantLines'
+import { getPlantLineConfig } from '@/config/plantLines'
 
 export interface GraderShiftPeriodContainerProps {
   plantLineId?: PlantLineId
@@ -112,6 +113,7 @@ export function GraderShiftPeriodContainer({
       month={month} onMonthChange={onMonthChange}
       shifts={shifts} rows={rows} days={days} byKey={byKey}
       loading={loading} error={error} slxDegraded={slxDegraded}
+      tieneGrader={getPlantLineConfig(plantLineId).hasGraderData !== false}
       selectedKey={selectedKey}
       onSelect={(s) => {
         const next = selectedKey === s.key ? null : s.key

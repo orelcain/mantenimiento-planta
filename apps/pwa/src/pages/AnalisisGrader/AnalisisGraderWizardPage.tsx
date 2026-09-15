@@ -1042,6 +1042,7 @@ export function AnalisisGraderWizardPage() {
           summaries={calendarSummaries}
           slxStats={calendarSlxStats}
           isClassificationPlant={lineConfig.isClassificationPlant !== false}
+          tieneGrader={lineConfig.hasGraderData !== false}
         />
       </div>
 
