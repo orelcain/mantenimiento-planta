@@ -29,6 +29,8 @@ export interface RepuestoParticionable {
   nombre: string
   tipo?: string
   cantidadPorMaquina?: number
+  /** El código del fabricante: lo único que distingue una pieza del despiece de otra. */
+  codigoFabricante?: string
 }
 
 /** Un nombre del despiece y cuántas veces aparece en el equipo. */
@@ -38,6 +40,17 @@ export interface GrupoDespiece {
   veces: number
   /** Los ids de todas las filas del grupo, para poder desvincularlas. */
   ids: string[]
+  /**
+   * El código de fabricante de cada fila, en el mismo orden que `ids`.
+   *
+   * **El agrupado por nombre NO junta duplicados: junta piezas distintas que se
+   * llaman igual.** Medido en la Baader 142 N1: de los 184 nombres repetidos del
+   * despiece, **0 tienen filas idénticas** y los 184 se distinguen por el código
+   * de fabricante —los 58 «Soporte» son `1420100002`, `1420100011`,
+   * `1420100015`…—. Mostrar «Soporte 58» sin estos códigos escondía
+   * justamente el dato con que se pide la pieza.
+   */
+  codigos: string[]
 }
 
 export interface ParticionDeEquipo<T extends RepuestoParticionable> {
@@ -65,10 +78,11 @@ export function particionarRepuestosDeEquipo<T extends RepuestoParticionable>(
     if (previo) {
       previo.veces++
       previo.ids.push(r.id)
+      previo.codigos.push((r.codigoFabricante ?? '').trim())
       // El tipo puede faltar en unas filas y estar en otras: vale la que lo trae.
       if (!previo.tipo && r.tipo) previo.tipo = r.tipo
     } else {
-      grupos.set(clave, { nombre: r.nombre, tipo: r.tipo, veces: 1, ids: [r.id] })
+      grupos.set(clave, { nombre: r.nombre, tipo: r.tipo, veces: 1, ids: [r.id], codigos: [(r.codigoFabricante ?? '').trim()] })
     }
   }
 
@@ -132,6 +146,6 @@ export function filtrarRepuestosDeEquipo<T extends RepuestoParticionable>(
   if (!q) return [...repuestos]
   const terminos = q.split(' ').filter(Boolean)
   return repuestos.filter((r) =>
-    haystackMatchesAll(normalizeForSearch(`${r.codigoSAP} ${r.nombre} ${r.tipo ?? ''}`), terminos),
+    haystackMatchesAll(normalizeForSearch(`${r.codigoSAP} ${r.codigoFabricante ?? ''} ${r.nombre} ${r.tipo ?? ''}`), terminos),
   )
 }

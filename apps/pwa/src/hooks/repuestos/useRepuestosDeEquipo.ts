@@ -15,6 +15,8 @@ export interface RepuestoDeEquipo {
   id: string
   codigoSAP: string
   nombre: string
+  /** El código del fabricante; en el despiece es lo que distingue una pieza de otra. */
+  codigoFabricante?: string
   tipo?: string
   stockFisico?: number
   /**
@@ -48,6 +50,7 @@ export async function leerRepuestosDeEquipo(nodeId: string): Promise<RepuestoDeE
       codigoSAP: String(r.codigoSAP ?? ''),
       nombre: String(r.textoBreve || r.descripcion || r.alias || r.nombreManual || 'Repuesto'),
       tipo: typeof r.tipo === 'string' ? r.tipo : undefined,
+      codigoFabricante: typeof r.codigoFabricante === 'string' ? r.codigoFabricante : undefined,
       stockFisico: typeof r.stockFisico === 'number' ? r.stockFisico : undefined,
       doc: { id: d.id, ...r } as unknown as Repuesto,
       cantidadPorMaquina: typeof r.cantidadPorMaquina === 'number' ? r.cantidadPorMaquina : undefined,
