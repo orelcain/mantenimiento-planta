@@ -1,6 +1,6 @@
 import { ETIQUETA_FOTO } from '@/config/bitacora'
 import { textoSeguroPdf } from '@/utils/pdf/textoSeguroPdf'
-import type { EventoBitacora, FotoEvento, TurnoMantencion } from './bitacora.types'
+import { autorVisible, type EventoBitacora, type FotoEvento, type TurnoMantencion } from './bitacora.types'
 import { horarioEvento, lineaImpacto } from './bitacoraCorreo'
 import { cargarFotoComoJpeg, type ImagenCargada } from './fotosBitacora'
 import { ordenarEventos, resumirBitacora } from './resumenBitacora'
@@ -81,7 +81,7 @@ export async function generarPdfBitacora({ turno, eventos, tecnicos, planta, obs
     pdf.text(t(`Técnicos de turno: ${tecnicos.join(', ')}`), M, y)
     y += 5
   }
-  const autores = [...new Set(eventos.map((e) => e.autorNombre).filter(Boolean))]
+  const autores = [...new Set(eventos.map(autorVisible).filter(Boolean))]
   if (autores.length) {
     pdf.text(t(`Registrado por: ${autores.join(', ')}`), M, y)
     y += 5

@@ -61,7 +61,8 @@ function eventosDeEjemplo(turno: TurnoMantencion): EventoBitacora[] {
         { ...fotoDeEjemplo('Antes', '#7a4b3a'), etiqueta: 'antes' },
         { ...fotoDeEjemplo('Después', '#3a6a7a'), etiqueta: 'despues' },
       ],
-      autorNombre: 'Danilo Cortes',
+      autorNombre: 'mantencion.plantach',
+      registradoPor: 'Danilo Cortes',
     },
     {
       ...base,
@@ -76,7 +77,8 @@ function eventosDeEjemplo(turno: TurnoMantencion): EventoBitacora[] {
       ventana: 'Colación HG',
       pendiente: false,
       fotos: [],
-      autorNombre: 'Matias Serpa',
+      autorNombre: 'mantencion.plantach',
+      registradoPor: 'Matias Serpa',
     },
     {
       ...base,
@@ -91,7 +93,8 @@ function eventosDeEjemplo(turno: TurnoMantencion): EventoBitacora[] {
       ventana: null,
       pendiente: false,
       fotos: [{ ...fotoDeEjemplo('Ronda', '#4a5a3a', 900, 1200), etiqueta: 'foto' }],
-      autorNombre: 'Danilo Cortes',
+      autorNombre: 'mantencion.plantach',
+      registradoPor: 'Danilo Cortes',
     },
     {
       ...base,
@@ -106,7 +109,8 @@ function eventosDeEjemplo(turno: TurnoMantencion): EventoBitacora[] {
       ventana: null,
       pendiente: true,
       fotos: [],
-      autorNombre: 'Matias Serpa',
+      autorNombre: 'mantencion.plantach',
+      registradoPor: 'Matias Serpa',
     },
   ]
 }
@@ -134,6 +138,7 @@ function useEventosEjemplo(turno: TurnoMantencion) {
       setPorTurno((prev) => {
         const lista = prev[turno.id] ?? ejemploDe(turno)
         const previo = lista.find((e) => e.id === id)
+        const { quien, ...resto } = datos
         const evento: EventoBitacora = {
           ...(previo ?? {
             id,
@@ -142,10 +147,11 @@ function useEventosEjemplo(turno: TurnoMantencion) {
             fechaTurno: turno.fecha,
             banda: turno.banda,
             creadoPor: 'ejemplo',
-            autorNombre: 'Usuario de ejemplo',
+            autorNombre: 'mantencion.plantach',
+            registradoPor: quien,
           }),
-          ...datos,
-          ...(esNuevo ? {} : { actualizadoPorNombre: 'Usuario de ejemplo' }),
+          ...resto,
+          ...(esNuevo ? {} : { actualizadoPorNombre: quien }),
         }
         return { ...prev, [turno.id]: esNuevo ? [...lista, evento] : lista.map((e) => (e.id === id ? evento : e)) }
       })
@@ -173,16 +179,19 @@ function useEventosEjemplo(turno: TurnoMantencion) {
 }
 
 function useObservacionEjemplo() {
-  const [texto, setTexto] = useState('')
+  const [obs, setObs] = useState({ texto: '', actualizadoPorNombre: null as string | null })
   return {
-    observacion: { texto, actualizadoPorNombre: texto ? 'Usuario de ejemplo' : null },
-    guardarObservacion: async (t: string) => setTexto(t.trim()),
+    observacion: obs,
+    guardarObservacion: async (t: string, quien: string) => setObs({ texto: t.trim(), actualizadoPorNombre: quien || null }),
   }
 }
 
+// Nombres reales de la planilla del calendario (15-09-2026), ya en formato corto.
+const PLANILLA = ['Jose Chodil', 'Lucas Adrade', 'Ernesto Diaz', 'Pablo Almazabal', 'Leandro Igor', 'Danilo Cortes', 'Mauricio Gallardo', 'Diego Cardenas', 'Matias Serpa']
+
 const FUENTE_EJEMPLO: FuenteBitacora = {
   useEventos: useEventosEjemplo,
-  useTecnicos: () => ['Danilo Cortes', 'Matias Serpa'],
+  useTecnicos: () => ({ deTurno: ['Danilo Cortes', 'Matias Serpa'], todos: PLANILLA }),
   useObservacion: useObservacionEjemplo,
   subirFoto: async (_turnoId, _eventoId, archivo, etiqueta) => {
     const url = await new Promise<string>((resolve, reject) => {

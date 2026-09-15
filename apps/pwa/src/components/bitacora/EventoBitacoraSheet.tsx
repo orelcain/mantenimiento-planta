@@ -18,7 +18,10 @@ import type {
   TipoEvento,
   TurnoMantencion,
 } from '@/services/bitacora/bitacora.types'
+import { autorVisible } from '@/services/bitacora/bitacora.types'
 import { borrarFotoBitacora, subirFotoBitacora } from '@/services/bitacora/fotosBitacora'
+import { SelectorTecnico } from './SelectorTecnico'
+import { tecnicoRecordado } from './tecnicoRecordado'
 import { formatoMinutos, horaSugeridaParaEvento, minutosEntre } from '@/services/bitacora/turnoMantencion'
 
 interface Subida {
@@ -36,6 +39,8 @@ export interface EventoBitacoraSheetProps {
   /** Id reservado para un evento nuevo (sus fotos se suben a esa carpeta). */
   idNuevo: string
   sugerenciasEquipo: string[]
+  /** Planilla del calendario: de aquí elige su nombre quien registra. */
+  tecnicos: { deTurno: string[]; todos: string[] }
   /** Por defecto sube a Storage; la vitrina de desarrollo la reemplaza. */
   subirFoto?: typeof subirFotoBitacora
   onGuardar: (id: string, datos: EventoBitacoraDatos, esNuevo: boolean) => Promise<void>
@@ -95,6 +100,7 @@ export function EventoBitacoraSheet({
   evento,
   idNuevo,
   sugerenciasEquipo,
+  tecnicos,
   subirFoto = subirFotoBitacora,
   onGuardar,
   onBorrar,
@@ -104,6 +110,7 @@ export function EventoBitacoraSheet({
   const esNuevo = !evento
   const eventoId = evento?.id ?? idNuevo
 
+  const [quien, setQuien] = useState('')
   const [tipo, setTipo] = useState<TipoEvento>('falla')
   const [equipo, setEquipo] = useState('')
   const [descripcion, setDescripcion] = useState('')
@@ -129,6 +136,7 @@ export function EventoBitacoraSheet({
   // Cargar el formulario cada vez que se abre (nuevo o edición).
   useEffect(() => {
     if (!open) return
+    setQuien(tecnicoRecordado())
     setTipo(evento?.tipo ?? 'falla')
     setEquipo(evento?.equipo ?? '')
     setDescripcion(evento?.descripcion ?? '')
@@ -236,6 +244,12 @@ export function EventoBitacoraSheet({
 
   const guardar = async () => {
     setError(null)
+    // Con la cuenta compartida, sin esto no se sabría quién registró. Si el
+    // calendario no cargó (sin lista), se guarda con el nombre de la cuenta.
+    if (tecnicos.todos.length > 0 && !quien.trim()) {
+      setError(esNuevo ? 'Elige quién registra el evento.' : 'Elige quién está editando.')
+      return
+    }
     if (!descripcion.trim()) {
       setError('Escribe qué pasó y qué se hizo.')
       return
@@ -266,6 +280,7 @@ export function EventoBitacoraSheet({
           ventana: ventana || null,
           pendiente,
           fotos,
+          quien,
         },
         esNuevo,
       )
@@ -326,13 +341,32 @@ export function EventoBitacoraSheet({
       {/* `[&>*]:shrink-0`: en un flex vertical con alto acotado, un hijo con
           overflow-x (la fila de tipos) se encoge a 0 px y desaparece. */}
       <div className="-mx-6 flex max-h-[min(68vh,640px)] flex-col gap-5 overflow-y-auto px-6 pb-1 [&>*]:shrink-0">
-        {/* Tipo */}
-        <div className="-mx-1 flex gap-2 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="group" aria-label="Tipo de evento">
-          {TIPOS_EVENTO.map((t) => (
-            <Chip key={t.id} activo={tipo === t.id} onClick={() => setTipo(t.id)}>
-              {t.label}
-            </Chip>
-          ))}
+        {/* Quién: con la cuenta compartida de Mantención es el único dato de autoría. */}
+        {tecnicos.todos.length > 0 && (
+          <div>
+            <SelectorTecnico
+              etiqueta={esNuevo ? 'Quién registra' : 'Quién edita'}
+              deTurno={tecnicos.deTurno}
+              todos={tecnicos.todos}
+              valor={quien}
+              onChange={setQuien}
+            />
+            {!esNuevo && evento && (
+              <p className="mt-1.5 text-footnote text-muted-foreground">Registró: {autorVisible(evento)}</p>
+            )}
+          </div>
+        )}
+
+        {/* Tipo — con rótulo propio: sin él se confundía con la fila de nombres de arriba. */}
+        <div>
+          <span className={ETIQUETA_CAMPO}>Tipo</span>
+          <div className="-mx-1 flex gap-2 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="group" aria-label="Tipo de evento">
+            {TIPOS_EVENTO.map((t) => (
+              <Chip key={t.id} activo={tipo === t.id} onClick={() => setTipo(t.id)}>
+                {t.label}
+              </Chip>
+            ))}
+          </div>
         </div>
 
         {/* Equipo y horas */}
