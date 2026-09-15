@@ -1452,15 +1452,22 @@ function OtBadge({ ot }: { ot?: OtCount }) {
   )
 }
 
-/** Cuantas filas del equipo comparten ese nombre del despiece. */
-const GRUPO_TITULO = (n: number): string => n + ' filas con este mismo nombre'
-
 /** Materiales · repuestos del equipo (N:M) + buscador embebido para vincular/desvincular. */
 function RecursosRepuestos({ equipment, canEdit, buscarInicial }: { equipment: Equipment; canEdit: boolean; buscarInicial?: string }) {
   const nodeId = equipment.hierarchyNodeId
   const [reloadKey, setReloadKey] = useState(0)
   const { repuestos, loading } = useRepuestosDeEquipo(nodeId, reloadKey)
   const [despieceAbierto, setDespieceAbierto] = useState(false)
+  // Grupos del despiece desplegados, por nombre. Un grupo junta piezas DISTINTAS que se
+  // llaman igual (los 58 «Soporte» tienen 58 códigos de fabricante): hay que poder abrirlo.
+  const [gruposAbiertos, setGruposAbiertos] = useState<Set<string>>(() => new Set())
+  const alternarGrupo = (clave: string) =>
+    setGruposAbiertos((prev) => {
+      const next = new Set(prev)
+      if (next.has(clave)) next.delete(clave)
+      else next.add(clave)
+      return next
+    })
   const [filtro, setFiltro] = useState(buscarInicial ?? '')
   /*
    * Sincronizar y no solo inicializar: `useState(derivado)` CONGELA el primer valor. Si con el
@@ -1765,32 +1772,84 @@ function RecursosRepuestos({ equipment, canEdit, buscarInicial }: { equipment: E
                 </button>
                 {verDespiece && (
                   <div className="divide-y">
-                    {particion.despiece.map((g) => (
-                      <div key={g.nombre.toLowerCase()} className="flex items-center gap-3 py-2 text-sm">
-                        <span className="min-w-0 flex-1 truncate">
-                          {g.nombre}
-                          {g.tipo ? <span className="text-caption text-muted-foreground"> · {g.tipo}</span> : null}
-                        </span>
-                        {g.veces > 1 ? (
-                          <span
-                            className="shrink-0 rounded-ctl bg-muted px-1.5 font-mono text-xs tabular-nums text-muted-foreground"
-                            title={GRUPO_TITULO(g.veces)}
-                          >
-                            {g.veces}
-                          </span>
-                        ) : canEdit && nodeId ? (
+                    {particion.despiece.map((g) => {
+                      const clave = g.nombre.toLowerCase()
+                      /*
+                       * Un grupo NO es un duplicado: son piezas distintas que se llaman
+                       * igual, y lo que las distingue es el código de fabricante. Medido en
+                       * la 142: de 184 nombres repetidos, 0 con filas idénticas. Por eso la
+                       * pieza suelta muestra su código, y el grupo se despliega en códigos.
+                       */
+                      if (g.veces === 1) {
+                        return (
+                          <div key={clave} className="flex items-center gap-3 py-2 text-sm">
+                            <span className="w-28 shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
+                              {g.codigos[0] || '—'}
+                            </span>
+                            <span className="min-w-0 flex-1 truncate">
+                              {g.nombre}
+                              {g.tipo ? <span className="text-caption text-muted-foreground"> · {g.tipo}</span> : null}
+                            </span>
+                            {canEdit && nodeId && (
+                              <button
+                                disabled={busy}
+                                onClick={() => desvincular(g.ids[0]!)}
+                                className="shrink-0 p-1 text-muted-foreground hover:text-destructive"
+                                title="Quitar del equipo"
+                                aria-label="Quitar repuesto"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        )
+                      }
+                      const abierto = gruposAbiertos.has(clave)
+                      return (
+                        <div key={clave}>
                           <button
-                            disabled={busy}
-                            onClick={() => desvincular(g.ids[0]!)}
-                            className="shrink-0 p-1 text-muted-foreground hover:text-destructive"
-                            title="Quitar del equipo"
-                            aria-label="Quitar repuesto"
+                            type="button"
+                            onClick={() => alternarGrupo(clave)}
+                            aria-expanded={abierto}
+                            className="flex w-full items-center gap-3 py-2 text-left text-sm"
+                            title={`${g.veces} piezas distintas con este nombre: se distinguen por el código de fabricante`}
                           >
-                            <Trash2 className="h-3.5 w-3.5" />
+                            <span className="w-28 shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
+                              {g.veces} códigos
+                            </span>
+                            <span className="min-w-0 flex-1 truncate">
+                              {g.nombre}
+                              {g.tipo ? <span className="text-caption text-muted-foreground"> · {g.tipo}</span> : null}
+                            </span>
+                            <ChevronDown
+                              className={cn('h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform', abierto && 'rotate-180')}
+                            />
                           </button>
-                        ) : null}
-                      </div>
-                    ))}
+                          {abierto && (
+                            <div className="mb-1 ml-2 divide-y border-l pl-3">
+                              {g.ids.map((id, i) => (
+                                <div key={id} className="flex items-center gap-3 py-1.5 text-sm">
+                                  <span className="min-w-0 flex-1 truncate font-mono text-xs tabular-nums">
+                                    {g.codigos[i] || '— sin código de fabricante'}
+                                  </span>
+                                  {canEdit && nodeId && (
+                                    <button
+                                      disabled={busy}
+                                      onClick={() => desvincular(id)}
+                                      className="shrink-0 p-1 text-muted-foreground hover:text-destructive"
+                                      title="Quitar esta pieza del equipo"
+                                      aria-label="Quitar pieza"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
               </>
