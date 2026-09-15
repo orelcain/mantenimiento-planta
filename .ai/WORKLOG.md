@@ -6,6 +6,22 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-15 · Fuera `maplibre-gl`: las 2 alertas críticas de Dependabot eran una dependencia muerta (chore/quitar-maplibre)
+
+Dependabot #241 (lock) + #242 (package.json) = **una sola** vulnerabilidad: GHSA-jrc7-96c5-q579 / CVE-2026-85061
+(CVSS 10, XSS sin clic por el texto de atribución; `DOM.sanitize` se salta un atributo al borrar
+el anterior). Parche solo en 6.4.1, sin backport a 5.x; la instalada era 5.23.0 con el código
+vulnerable. **No era explotable**: la agregó `ffb4d364` (08-03) y `b00c69e7` (13-03) la reemplazó
+por Three.js, pero quedó en el `package.json`. Medido: 0 imports en el repo (control del grep: 69
+archivos con `firebase/firestore`); bundle de prod 4.2.0 recorrido entero = 261 chunks, 0 con
+maplibre (control: sí alcanza el chunk lazy de Three.js).
+
+Fix: `pnpm --filter @mantenimiento/pwa remove maplibre-gl` → solo borra (1 línea de package.json +
+195 del lock, 27 paquetes transitivos: `@mapbox/*`, `@maplibre/*`, supercluster, pbf, earcut…).
+Verificado local: `install --frozen-lockfile`, tsc, eslint, vitest 2633 ✓, build ✓, `dist` sin maplibre.
+⚠ El sw.js de Pages es la página 404: para listar chunks de prod hay que recorrer el grafo desde
+`index-*.js`. Queda sin tocar `docs/DEMO_COMPARATIVA_MAPAS_3D_CHONCHI.html` (demo que carga 5.19.0 de unpkg).
+
 ## 2026-09-15 · Los tests de `functions/__tests__` no corrían en CI (fix/tests-functions-ci)
 
 `deploy.yml` corría `shoplogix/__tests__/*.test.js` + `__tests__/solicitudRepuesto.test.js`: el
