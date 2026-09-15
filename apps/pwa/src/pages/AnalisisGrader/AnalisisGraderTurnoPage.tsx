@@ -96,6 +96,7 @@ import type { GraderDailySummary, MatrixP0Cause, PointZeroClassification, Timeli
 import type { GraderShiftDoc } from '@/services/grader/graderShifts.service'
 import type { AIGraderOutput } from '@/services/grader/types'
 import { AnalisisGraderGatesConfigPage } from './AnalisisGraderGatesConfigPage'
+import { syncCubreElTurno } from '@/services/grader/frescuraDelSync'
 
 /**
  * ¿El dataURL corresponde a un gráfico ya pintado?
@@ -738,7 +739,9 @@ export function AnalisisGraderTurnoPage() {
   const slxBestSyncedAt = slxLastManualSync && upstreamLine.syncedAt
     ? (slxLastManualSync > upstreamLine.syncedAt ? slxLastManualSync : upstreamLine.syncedAt)
     : (slxLastManualSync ?? upstreamLine.syncedAt)
-  const syncAge = useSyncAge(slxBestSyncedAt)
+  const syncAge = useSyncAge(slxBestSyncedAt, {
+    completo: syncCubreElTurno(slxBestSyncedAt, shiftWindow?.endAt ? new Date(shiftWindow.endAt) : null),
+  })
 
   // ── Share (token público) — estado; handlers después de enrichedTimelineBuckets ──
   const [sharing, setSharing] = useState(false)
