@@ -65,9 +65,15 @@ jobs:
         run: pnpm exec vitest run --reporter=dot
 
       # Los tests de las Cloud Functions (node:test nativo, sin dependencias).
+      # Van los DOS directorios enteros por glob. Hasta el 15-09-2026 se
+      # listaba solo `shoplogix/__tests__` + un archivo suelto de `__tests__`,
+      # y el resto (publicMonitor, pulse, vigiaTurno, archivarSerieMinuto…)
+      # no corría nunca: dos tests del monitor público llevaban un mes rotos
+      # (desde #529 y #564) sin que nadie se enterara. Un archivo nuevo en
+      # cualquiera de los dos directorios entra solo.
       - name: Tests functions
         working-directory: functions
-        run: node --test shoplogix/__tests__/*.test.js __tests__/solicitudRepuesto.test.js
+        run: node --test shoplogix/__tests__/*.test.js __tests__/*.test.js
 
       # Guardia de las guías de visualización: falla solo con deuda NUEVA
       # (ejes truncados en barras, leyendas apagadas con multi-serie, sort
