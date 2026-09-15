@@ -239,33 +239,57 @@ const hoy = (h, m = 0) => {
 }
 const dk = (d) => d.toISOString().slice(0, 10)
 
+/*
+ * Reloj de planta FIJO (wall-clock-as-UTC). `resolveCurrentShiftDocId` recibe
+ * el ahora por parámetro, así que estos escenarios no tienen por qué depender
+ * de la hora a la que corre el test. Armados con `nowWall()` fallaban de
+ * madrugada: a las 00:xx el turno «viejo» y el vigente arrancaban los dos a las
+ * 00:00 y empataban; a las 03:xx pasaba lo mismo con el guard `hora < 3`.
+ */
+const enPlanta = (dia, h, m = 0) => new Date(Date.UTC(2026, 8, dia, h, m))
+
 test('modo línea: elige el turno cuya ventana contiene el reloj de planta', async () => {
-  const w = nowWall()
-  const hora = w.getUTCHours()
-  // Turno "vigente" = una ventana de 2 h centrada en el ahora; el otro terminó
-  // varias horas antes.
-  const vigenteId = `${dk(w)}_Turno Dia`
-  const viejoId = `${dk(w)}_Turno Madrugada`
+  const w = enPlanta(15, 12, 20)
+  // Turno "vigente" = arrancó a las 11:00 y sigue; el de madrugada terminó hace
+  // horas, y el corto arrancó DESPUÉS pero ya cerró (fuera de la gracia de 30
+  // min): si ganara «el último que empezó», saldría ese.
+  const vigenteId = '2026-09-15_Turno Dia'
+  const viejoId = '2026-09-15_Turno Madrugada'
+  const cortoId = '2026-09-15_Turno Corto'
 
   const db = fakeShiftsDb({
-    [viejoId]:   { shiftId: 'Turno Madrugada', scheduledStart: hoy(Math.max(0, hora - 8)), scheduledEnd: hoy(Math.max(1, hora - 6)), machines: [{ totalCycles: 900 }] },
-    [vigenteId]: { shiftId: 'Turno Dia',       scheduledStart: hoy(hora, 0),               scheduledEnd: new Date(w.getTime() + 60 * 60_000), machines: [{ totalCycles: 500 }] },
+    [viejoId]:   { shiftId: 'Turno Madrugada', scheduledStart: enPlanta(15, 4), scheduledEnd: enPlanta(15, 6), machines: [{ totalCycles: 900 }] },
+    [vigenteId]: { shiftId: 'Turno Dia',       scheduledStart: enPlanta(15, 11), scheduledEnd: enPlanta(15, 13, 20), machines: [{ totalCycles: 500 }] },
+    [cortoId]:   { shiftId: 'Turno Corto',     scheduledStart: enPlanta(15, 11, 15), scheduledEnd: enPlanta(15, 11, 30), machines: [{ totalCycles: 120 }] },
   })
 
   assert.equal(await resolveCurrentShiftDocId(db, 'filete', w), vigenteId)
 })
 
-test('modo línea: entre turnos cae al último que ya empezó, no a una pantalla vacía', async () => {
-  const w = nowWall()
-  const hora = w.getUTCHours()
-  if (hora < 3) return   // a esta hora no se puede construir el escenario "más temprano hoy"
-
-  const tempranoId = `${dk(w)}_Turno A`
-  const anteriorId = `${dk(w)}_Turno B`
+test('modo línea: pasada la medianoche sigue al turno noche que arrancó AYER', async () => {
+  // La hora a la que el test de arriba fallaba cuando dependía del reloj real:
+  // acá se prueba el código en ese mismo minuto, con el caso de planta.
+  const w = enPlanta(15, 0, 20)
+  const nocheAyer = '2026-09-14_Turno Noche'
 
   const db = fakeShiftsDb({
-    [tempranoId]: { shiftId: 'Turno A', scheduledStart: hoy(0), scheduledEnd: hoy(1), machines: [{ totalCycles: 100 }] },
-    [anteriorId]: { shiftId: 'Turno B', scheduledStart: hoy(hora - 3), scheduledEnd: hoy(hora - 2), machines: [{ totalCycles: 800 }] },
+    '2026-09-14_Turno Dia': { shiftId: 'Turno Dia',   scheduledStart: enPlanta(14, 8),     scheduledEnd: enPlanta(14, 16), machines: [{ totalCycles: 3000 }] },
+    [nocheAyer]:            { shiftId: 'Turno Noche', scheduledStart: enPlanta(14, 21, 30), scheduledEnd: enPlanta(15, 5), machines: [{ totalCycles: 1200 }] },
+    '2026-09-15_Turno Dia': { shiftId: 'Turno Dia',   scheduledStart: enPlanta(15, 8),     scheduledEnd: enPlanta(15, 16), machines: [{ totalCycles: 0 }] },
+  })
+
+  assert.equal(await resolveCurrentShiftDocId(db, 'filete', w), nocheAyer)
+})
+
+test('modo línea: entre turnos cae al último que ya empezó, no a una pantalla vacía', async () => {
+  const w = enPlanta(15, 12, 20)
+
+  const tempranoId = '2026-09-15_Turno A'
+  const anteriorId = '2026-09-15_Turno B'
+
+  const db = fakeShiftsDb({
+    [tempranoId]: { shiftId: 'Turno A', scheduledStart: enPlanta(15, 0), scheduledEnd: enPlanta(15, 1), machines: [{ totalCycles: 100 }] },
+    [anteriorId]: { shiftId: 'Turno B', scheduledStart: enPlanta(15, 9), scheduledEnd: enPlanta(15, 10), machines: [{ totalCycles: 800 }] },
   })
 
   // Ninguno contiene el ahora (el más reciente terminó hace ~2 h, fuera de la
@@ -617,6 +641,11 @@ test('los minutos que el turno YA tiene no se suman aunque Shoplogix los repita'
   // El caso real: el doc del turno guarda intervals MÁS ALLÁ de su propio
   // `scheduledEnd` (15:30 y 15:35), y Shoplogix repite esos mismos minutos en
   // `Unscheduled`. Filtrar solo por la ventana declarada los contaba dos veces.
+  //
+  // Desde #529 (13-08) «fuera del horario» lo decide la HORA del tramo y no el
+  // doc del que vino: 15:30 y 15:35 ya pasaron el cierre, así que son hora
+  // extra aunque estén en el doc del turno. Antes quedaban «dentro» y el chip
+  // de hora extra no aparecía hasta que Shoplogix dejaba de escribirlos ahí.
   const delTurno = [...intervals(inicio, 88, 50), ...intervals(cierre, 2, 56)]
   const delUnsch = [...intervals(cierre, 2, 56), ...intervals(Date.UTC(2026, 7, 10, 15, 40), 10, 50)]
 
@@ -633,9 +662,10 @@ test('los minutos que el turno YA tiene no se suman aunque Shoplogix los repita'
 
   const live = await buildMonitorLive(db, 'filete', turnoId)
 
-  assert.equal(live.outsidePieces, 500, 'solo los 10 tramos que el turno NO tenía')
   assert.equal(live.totalPieces, 5012, 'sin las 112 piezas repetidas')
-  assert.equal(fmtHHMM(live.outsideRanges[0].from), '15:40', 'el tramo arranca donde termina lo ya contado')
+  assert.equal(live.outsidePieces, 612, 'los 2 tramos pasado el cierre + los 10 que el turno NO tenía, cada uno UNA vez')
+  assert.equal(live.shiftPieces, 4400, 'dentro del horario quedan solo los 88 tramos de 08:00 a 15:30')
+  assert.equal(fmtHHMM(live.outsideRanges[0].from), '15:30', 'la hora extra se ve desde el primer minuto pasado el cierre')
 
   // Y la serie tampoco puede tener el minuto repetido.
   const claves = live.series.map(p => p.t)
@@ -743,16 +773,26 @@ test('el historial reusa lo ya publicado salvo el turno inmediatamente anterior'
   )
 
   // El de anteayer viene cacheado con un valor imposible: si se reusa, sale tal
-  // cual; si se recompusiera, saldría 1000.
+  // cual; si se recompusiera, saldría 1000. Desde #564 solo se reusa un live
+  // medido con la rejilla vigente (`timeBreakdown.tbv === 2`).
   const prev = [
-    { shiftDocId: ayer, dateKey: d1, shiftId: 'Turno Dia', live: { totalPieces: 999999 } },
-    { shiftDocId: anteayer, dateKey: d2, shiftId: 'Turno Dia', live: { totalPieces: 888888 } },
+    { shiftDocId: ayer, dateKey: d1, shiftId: 'Turno Dia', live: { totalPieces: 999999, timeBreakdown: { tbv: 2 } } },
+    { shiftDocId: anteayer, dateKey: d2, shiftId: 'Turno Dia', live: { totalPieces: 888888, timeBreakdown: { tbv: 2 } } },
   ]
 
   const hist = await buildMonitorHistory(db, 'filete', actual, prev)
 
   assert.equal(hist[0].live.totalPieces, 2000, 'el turno anterior se recompone: el re-sync móvil todavía lo toca')
   assert.equal(hist[1].live.totalPieces, 888888, 'los más viejos se reusan: ya no cambian')
+
+  // …pero un live medido con la rejilla vieja (sin tbv, o con otra) se
+  // recompone: reusarlo dejaba «Anterior» con el desglose recortado para
+  // siempre y envenenaba la caché del pronóstico (#564).
+  const prevViejo = [
+    { shiftDocId: anteayer, dateKey: d2, shiftId: 'Turno Dia', live: { totalPieces: 888888 } },
+  ]
+  const histViejo = await buildMonitorHistory(db, 'filete', actual, prevViejo)
+  assert.equal(histViejo[1].live.totalPieces, 1000, 'sin la rejilla vigente no se reusa')
 })
 
 test('Unscheduled NUNCA gana como turno vigente, ni con mucha producción', async () => {

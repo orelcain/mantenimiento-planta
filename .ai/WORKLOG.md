@@ -6,6 +6,33 @@
 > Respaldo del archivo previo (223.820 B) en:
 > `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
 
+## 2026-09-15 · Los tests de `functions/__tests__` no corrían en CI (fix/tests-functions-ci)
+
+`deploy.yml` corría `shoplogix/__tests__/*.test.js` + `__tests__/solicitudRepuesto.test.js`: el
+resto de `functions/__tests__` (publicMonitor, publicMonitorStats, pulse, pulseHoraExtra,
+vigiaTurno, archivarSerieMinuto, briefFinTurnoCola) **no corría nunca**. A mano: 106 tests, 2 rotos.
+
+**Diagnóstico por bisect** (cada commit y su padre, `git archive` de `functions/`):
+- «los minutos que el turno YA tiene…» (612 vs 500): se rompió en **#529** (13-08), que cambió A
+  PROPÓSITO el criterio de «fuera del horario» a la HORA del tramo (hora extra visible desde el
+  primer minuto). El total no cambió (5.012); el test seguía con el criterio viejo. **Test viejo.**
+- «el historial reusa…» (1000 vs 888888): se rompió en **#564** (15-08), que exige
+  `timeBreakdown.tbv === 2` para reusar (cache poisoning). El fixture no traía `tbv`. **Test viejo.**
+Ninguno de los dos commits tocó el test. Código de prod SIN cambios.
+
+**Lo que se sumó**: aserción de `shiftPieces` (4.400), caso «live sin tbv se recompone» (el guard de
+#564 no tenía test), y mutaciones M1–M6 que caen con el síntoma exacto.
+
+⚠ **Relojes**: barriendo las 24 h con un `Date` falso (`NODE_OPTIONS=--require fake-now.js`)
+aparecieron 2 tests más que fallaban según la hora — «modo línea: elige el turno…» a las 00:xx de
+Chile y «entre turnos cae al último…» a las 03:xx. Eran FIXTURES que empataban (dos turnos a las
+00:00), no el código. Sumarlos así a CI tumbaba los deploys de madrugada. Ahora usan reloj fijo
+(`resolveCurrentShiftDocId` lo recibe por parámetro) + caso nuevo «pasada la medianoche sigue al
+turno noche de AYER». Barrido final: **192 corridas (cada 10 min + cambios de horario + fin de
+mes/año), 454/454 en todas**. Receta del preload: si otro test depende del reloj, barrer así.
+
+CI: `node --test shoplogix/__tests__/*.test.js __tests__/*.test.js` (glob: los nuevos entran solos).
+
 ## 2026-09-12 · El dedupe de Puerta 0 fallaba por el calibre (PR #977)
 
 Lo que faltaba medir de #973/#975. `dedupeGate0Records` tenia el mismo problema **pero por otro
