@@ -4,6 +4,7 @@ import { ETIQUETA_FOTO, ETIQUETA_TIPO } from '@/config/bitacora'
 import { autorVisible, tecnicosDelEvento, type EventoBitacora, type FotoEvento } from '@/services/bitacora/bitacora.types'
 import { minutosParadaDe } from '@/services/bitacora/resumenBitacora'
 import { formatoMinutos } from '@/services/bitacora/turnoMantencion'
+import { etiquetaCortaTurno } from '@/services/bitacora/entregaTurno'
 
 /**
  * Un evento en la línea de tiempo del turno (opción A del mockup, aprobada).
@@ -68,7 +69,20 @@ export function EventoBitacoraFila({
           </span>
         )}
 
+        {evento.resuelvePendiente?.turnoId && (
+          <span className="text-footnote font-semibold text-ink-ok">Cierra pendiente del {etiquetaCortaTurno(evento.resuelvePendiente.turnoId)}</span>
+        )}
+
         <p className="line-clamp-3 whitespace-pre-line text-body">{evento.descripcion}</p>
+
+        {/* En el pendiente original (visto en su propio turno): dónde y cómo se cerró. */}
+        {evento.cierre && (
+          <span className="text-footnote text-muted-foreground">
+            {evento.cierre.tipo === 'resuelto'
+              ? `Resuelto en ${etiquetaCortaTurno(evento.cierre.turnoId)} · ${evento.cierre.porNombre}`
+              : `Ya no aplica (${etiquetaCortaTurno(evento.cierre.turnoId)} · ${evento.cierre.porNombre}): ${evento.cierre.motivo ?? ''}`}
+          </span>
+        )}
 
         {fotos.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 pt-0.5">

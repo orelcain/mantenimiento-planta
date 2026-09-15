@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Check, Pencil, Search, Trash2 } from 'lucide-react'
 import { Button, Sheet, Tag } from '@/components/piel'
 import {
@@ -23,7 +23,8 @@ export function TecnicosDelTurnoSheet({
   open,
   lista,
   deTurnoCalendario,
-  presentes,
+  marcados,
+  onMarcados,
   onGuardar,
   onAbrirLista,
   onClose,
@@ -32,29 +33,27 @@ export function TecnicosDelTurnoSheet({
   lista: TecnicoDeLista[]
   /** Nombres (ya renombrados) que el calendario pone de turno: llevan la etiqueta «Calendario». */
   deTurnoCalendario: string[]
-  presentes: string[]
+  /**
+   * Borrador de marcas CONTROLADO por la página: vive fuera de la hoja para que
+   * ir a «Lista de técnicos» y volver no borre lo marcado (revisión 15-09), y
+   * para que un snapshot que llega no lo pise.
+   */
+  marcados: string[]
+  onMarcados: (marcados: string[]) => void
   onGuardar: (presentes: string[]) => void
   onAbrirLista: () => void
   onClose: () => void
 }) {
-  const [marcados, setMarcados] = useState<string[]>([])
   const [busqueda, setBusqueda] = useState('')
-  // Se carga SOLO al abrir: con `presentes` en las dependencias, cualquier
-  // re-render del padre (un snapshot que llega) borraba lo que se iba marcando.
-  const presentesRef = useRef(presentes)
-  presentesRef.current = presentes
 
   useEffect(() => {
-    if (!open) return
-    setMarcados(presentesRef.current)
-    setBusqueda('')
+    if (open) setBusqueda('')
   }, [open])
 
   const esDeCalendario = useMemo(() => new Set(deTurnoCalendario.map(claveNombre)), [deTurnoCalendario])
   const visibles = lista.filter((t) => claveNombre(t.nombre).includes(claveNombre(busqueda)))
   const marcado = (n: string) => marcados.some((m) => claveNombre(m) === claveNombre(n))
-  const alternar = (n: string) =>
-    setMarcados((prev) => (marcado(n) ? prev.filter((m) => claveNombre(m) !== claveNombre(n)) : [...prev, n]))
+  const alternar = (n: string) => onMarcados(marcado(n) ? marcados.filter((m) => claveNombre(m) !== claveNombre(n)) : [...marcados, n])
 
   return (
     <Sheet
@@ -68,8 +67,11 @@ export function TecnicosDelTurnoSheet({
           </Button>
           <Button
             onClick={() => {
-              // Orden de la lista, no el orden en que se tocaron.
-              onGuardar(lista.map((t) => t.nombre).filter((n) => marcado(n)))
+              // Orden de la lista, no el orden en que se tocaron; y quien estaba
+              // presente pero ya salió de la lista NO se pierde (va al final).
+              const enLista = lista.map((t) => t.nombre).filter((n) => marcado(n))
+              const fuera = marcados.filter((m) => !lista.some((t) => claveNombre(t.nombre) === claveNombre(m)))
+              onGuardar([...enLista, ...fuera])
               onClose()
             }}
           >

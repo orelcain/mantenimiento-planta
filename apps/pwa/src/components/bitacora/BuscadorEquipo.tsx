@@ -102,6 +102,7 @@ export function BuscadorEquipo({
           aria-controls={`${id}-lista`}
           aria-autocomplete="list"
           autoComplete="off"
+          maxLength={120}
           value={texto}
           placeholder="Escribe: baader, grader, túnel…"
           onFocus={() => setAbierto(true)}

@@ -2,6 +2,7 @@ import { ETIQUETA_FOTO, ETIQUETA_TIPO } from '@/config/bitacora'
 import { autorVisible, tecnicosDelEvento, type EventoBitacora, type FotoEvento, type TurnoMantencion } from './bitacora.types'
 import { minutosParadaDe, ordenarEventos, resumirBitacora } from './resumenBitacora'
 import { etiquetaTurno, fechaTurnoLarga, formatoMinutos, horarioTurno } from './turnoMantencion'
+import { etiquetaCortaTurno } from './entregaTurno'
 
 /**
  * Convierte la bitácora en el cuerpo de un correo.
@@ -25,6 +26,8 @@ export interface DatosCorreoBitacora {
   planta: string
   /** Observación general del turno (opcional). */
   observacion?: string
+  /** Pendientes de turnos anteriores que siguen abiertos (entrega de turno). */
+  pendientesAnteriores?: readonly EventoBitacora[]
   /** Permite reemplazar la URL de cada foto (p. ej. por un data URI). */
   fuenteFoto?: (foto: FotoEvento) => string
 }
@@ -71,6 +74,7 @@ export function lineaImpacto(e: EventoBitacora): string {
   const partes = [ETIQUETA_TIPO[e.tipo]]
   if (e.impacto === 'con-parada') partes.push(`Detuvo la máquina ${formatoMinutos(minutosParadaDe(e))}`)
   if (e.impacto === 'en-ventana') partes.push(e.ventana?.trim() ? `Sin detener: ${e.ventana.trim()}` : 'Sin detener producción')
+  if (e.resuelvePendiente?.turnoId) partes.push(`Cierra pendiente del ${etiquetaCortaTurno(e.resuelvePendiente.turnoId)}`)
   return partes.join(' · ')
 }
 
@@ -135,7 +139,21 @@ function htmlKpi(valor: string, etiqueta: string, color = C.tinta): string {
   )
 }
 
-export function bitacoraAHtmlCorreo({ turno, eventos, tecnicos, planta, observacion, fuenteFoto }: DatosCorreoBitacora): string {
+/** "de parada (2)" o "de parada (2, 1 sin duración)". */
+export function etiquetaParada(r: { conParada: number; paradasSinDuracion: number }): string {
+  if (!r.conParada) return 'de parada'
+  return r.paradasSinDuracion ? `de parada (${r.conParada}, ${r.paradasSinDuracion} sin duración)` : `de parada (${r.conParada})`
+}
+
+/** "KNURO N1 · Pusher con golpes… · desde Turno día 15-09 (Leandro Igor)". */
+export function lineaPendienteAnterior(e: EventoBitacora): string {
+  const texto = (e.descripcion ?? '').trim().replace(/\s+/g, ' ')
+  return [e.equipo?.trim(), texto.length > 140 ? `${texto.slice(0, 137)}…` : texto, `desde ${etiquetaCortaTurno(e.turnoId)} (${autorVisible(e)})`]
+    .filter(Boolean)
+    .join(' · ')
+}
+
+export function bitacoraAHtmlCorreo({ turno, eventos, tecnicos, planta, observacion, pendientesAnteriores = [], fuenteFoto }: DatosCorreoBitacora): string {
   const fuente = fuenteFoto ?? ((f: FotoEvento) => f.url)
   const ordenados = ordenarEventos(turno, eventos)
   const r = resumirBitacora(eventos)
@@ -145,10 +163,14 @@ export function bitacoraAHtmlCorreo({ turno, eventos, tecnicos, planta, observac
 
   const kpis = [
     htmlKpi(String(r.eventos), r.eventos === 1 ? 'evento' : 'eventos'),
-    htmlKpi(formatoMinutos(r.minutosParada), `de parada${r.conParada ? ` (${r.conParada})` : ''}`, r.minutosParada > 0 ? C.parada : C.tinta),
+    htmlKpi(formatoMinutos(r.minutosParada), etiquetaParada(r), r.conParada > 0 ? C.parada : C.tinta),
     htmlKpi(r.mttrMin == null ? '—' : formatoMinutos(r.mttrMin), 'MTTR'),
     htmlKpi(String(r.enVentana), 'sin detener producción', r.enVentana > 0 ? C.ventana : C.tinta),
     htmlKpi(String(r.pendientes), r.pendientes === 1 ? 'pendiente' : 'pendientes'),
+    // Solo si hubo: es el número que demuestra la entrega de turno.
+    r.pendientesCerrados > 0
+      ? htmlKpi(String(r.pendientesCerrados), r.pendientesCerrados === 1 ? 'pendiente cerrado' : 'pendientes cerrados', C.ventana)
+      : '',
   ].join('')
 
   const encabezado =
@@ -186,13 +208,23 @@ export function bitacoraAHtmlCorreo({ turno, eventos, tecnicos, planta, observac
         .join('')}</table></td></tr></table>`
     : ''
 
+  const bloqueAnteriores = pendientesAnteriores.length
+    ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;width:100%;margin-top:12px;">` +
+      `<tr><td style="background:${C.pendFondo};border-left:3px solid ${C.pendBorde};padding:10px 12px;font-family:${FUENTE};">` +
+      `<div style="font-size:15px;font-weight:600;color:${C.tinta};">Sigue pendiente de turnos anteriores</div>` +
+      pendientesAnteriores
+        .map((e) => `<div style="font-size:13px;color:${C.tinta};padding-top:4px;">${escaparHtml(lineaPendienteAnterior(e))}</div>`)
+        .join('') +
+      `</td></tr></table>`
+    : ''
+
   const pie = `<div style="font-family:${FUENTE};font-size:11px;color:${C.sec};padding-top:16px;">Generado con la app de Mantención.</div>`
 
-  return `<div style="max-width:680px;color:${C.tinta};">${encabezado}${tablaKpis}${cuerpo}${bloquePendientes}${pie}</div>`
+  return `<div style="max-width:680px;color:${C.tinta};">${encabezado}${tablaKpis}${cuerpo}${bloquePendientes}${bloqueAnteriores}${pie}</div>`
 }
 
 /** Versión en texto plano: va junto al HTML en el portapapeles, por si el destino no acepta HTML. */
-export function bitacoraATextoPlano({ turno, eventos, tecnicos, planta, observacion }: DatosCorreoBitacora): string {
+export function bitacoraATextoPlano({ turno, eventos, tecnicos, planta, observacion, pendientesAnteriores = [] }: DatosCorreoBitacora): string {
   const r = resumirBitacora(eventos)
   const ordenados = ordenarEventos(turno, eventos)
   const linea = (e: EventoBitacora) =>
@@ -215,7 +247,9 @@ export function bitacoraATextoPlano({ turno, eventos, tecnicos, planta, observac
   ]
     .filter(Boolean)
     .join('\n')
-  const resumen = `${r.eventos} eventos · ${formatoMinutos(r.minutosParada)} de parada · MTTR ${r.mttrMin == null ? '—' : formatoMinutos(r.mttrMin)} · ${r.enVentana} sin detener producción · ${r.pendientes} pendientes`
+  const resumen =
+    `${r.eventos} eventos · ${formatoMinutos(r.minutosParada)} de parada · MTTR ${r.mttrMin == null ? '—' : formatoMinutos(r.mttrMin)} · ${r.enVentana} sin detener producción · ${r.pendientes} pendientes` +
+    (r.pendientesCerrados > 0 ? ` · ${r.pendientesCerrados} pendientes cerrados` : '')
   // Bloques separados por una línea en blanco: pegado en un correo sin formato
   // cada evento se lee aparte.
   return [
@@ -224,5 +258,8 @@ export function bitacoraATextoPlano({ turno, eventos, tecnicos, planta, observac
     ...(observacion?.trim() ? [`Observaciones del turno: ${observacion.trim()}`] : []),
     ...hechos.map(linea),
     ...(pendientes.length ? ['PENDIENTE PARA EL TURNO SIGUIENTE', ...pendientes.map(linea)] : []),
+    ...(pendientesAnteriores.length
+      ? ['SIGUE PENDIENTE DE TURNOS ANTERIORES', pendientesAnteriores.map((e) => `- ${lineaPendienteAnterior(e)}`).join('\n')]
+      : []),
   ].join('\n\n')
 }

@@ -95,7 +95,10 @@ export function minutosDesdeInicioTurno(turno: Pick<TurnoMantencion, 'banda'>, h
   const m = hhmm.match(/^(\d{1,2}):(\d{2})$/)
   if (!m) return Number.MAX_SAFE_INTEGER
   const total = Number(m[1]) * 60 + Number(m[2])
-  return (total - INICIO_BANDA[turno.banda] * 60 + 1440) % 1440
+  const desde = (((total - INICIO_BANDA[turno.banda] * 60) % 1440) + 1440) % 1440
+  // Más de 20 h "después" del inicio es en realidad un poco ANTES del inicio
+  // (un evento de las 15:50 cargado en la tarde): va primero, no último.
+  return desde > 20 * 60 ? desde - 1440 : desde
 }
 
 /**

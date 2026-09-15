@@ -68,6 +68,14 @@ const CASOS_TECNICOS = [
   ['Usuario inactivo ajusta la lista maestra', 'DENY', { method: 'create', uid: 'tecnico1', col: 'bitacoraConfig', id: 'chonchi', data: { agregados: [], ocultos: [], renombres: {}, actualizadoPor: 'tecnico1' } }, usuario(false, 'tecnico')],
 ]
 
+// Entrega de turno (pendientes que pasan al turno siguiente).
+const CASOS_ENTREGA = [
+  ['Otro técnico CIERRA un pendiente de un turno anterior', 'ALLOW', { method: 'update', uid: 'tecnico2', col: 'bitacoraEventos', data: evento({ pendiente: false, cierre: { tipo: 'resuelto', turnoId: '2026-09-16_noche', porNombre: 'Diego Cardenas', eventoId: 'r1', motivo: null } }), previo: evento({ pendiente: true }) }, usuario(true, 'tecnico')],
+  ['Reabrir un pendiente (cierre null)', 'ALLOW', { method: 'update', uid: 'tecnico2', col: 'bitacoraEventos', data: evento({ pendiente: true, cierre: null }), previo: evento({ pendiente: false, cierre: { tipo: 'resuelto' } }) }, usuario(true, 'tecnico')],
+  ['Crear el evento que resuelve un pendiente', 'ALLOW', { method: 'create', uid: 'tecnico1', col: 'bitacoraEventos', data: evento({ turnoId: '2026-09-16_noche', resuelvePendiente: { id: 'p1', turnoId: '2026-09-15_tarde', equipo: 'Enzunchadora', descripcion: 'x', registradoPor: 'Matias Serpa' } }) }, usuario(true, 'tecnico')],
+  ['Cierre que no es un mapa', 'DENY', { method: 'update', uid: 'tecnico2', col: 'bitacoraEventos', data: evento({ pendiente: false, cierre: 'resuelto' }), previo: evento() }, usuario(true, 'tecnico')],
+]
+
 ;(async () => {
   const cred = admin.credential.cert(require(path.join(__dirname, '..', 'serviceAccountKey.json')))
   const { access_token: token } = await cred.getAccessToken()
@@ -97,6 +105,7 @@ const CASOS_TECNICOS = [
   }
   const contenido = source.files.map((f) => f.content).join('\n')
   if (contenido.includes('/bitacoraConfig/')) casos.push(...CASOS_TECNICOS)
+  if (contenido.includes("'resuelvePendiente' in d")) casos.push(...CASOS_ENTREGA)
 
   const testCases = casos.map(([, expectation, c, mocks]) => {
     const id = c.id ?? 'evento1'

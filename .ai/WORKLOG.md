@@ -4973,3 +4973,33 @@ https://claude.ai/artifact/Ubsj3WqTs5EZ8agfUkf7bc
 - ⚠ Gotcha: la hoja de presentes reiniciaba lo marcado en cada re-render (dependía de un array que
   se recrea) → cargar solo al abrir, vía ref.
 - 33 tests de bitácora, verificado en `/dev/bitacora` a 375 px.
+
+### 2026-09-15 · Bitácora · entrega de turno + 12 hallazgos de revisión adversaria
+
+**Entrega de turno** (mockup aprobado «tal cual»: https://claude.ai/artifact/VXnx3kC7rPNVf7F8kdB9Vf):
+los pendientes abiertos de turnos anteriores aparecen arriba de la bitácora del turno que llega
+(turno de origen, técnico, «hace N turnos»). «Resolver» abre el editor precargado y en UN lote crea
+el evento (`resuelvePendiente`) y cierra el original (`pendiente:false`, `cierre`). «Ya no aplica»
+cierra con motivo sin contar como resuelto. Borrar el evento que resolvía reabre el pendiente.
+Correo/PDF: KPI «pendientes cerrados», «Cierra pendiente del Turno …» y recuadro «Sigue pendiente de
+turnos anteriores». Consulta por igualdad `plantId + pendiente==true` (sin índice compuesto).
+
+**Revisión adversaria** (subagente, 12 hallazgos, todos corregidos):
+1. ⚠⚠ ALTA — **el primitivo `Sheet` devolvía el foco al disparador en CADA tecla** (efecto con
+   `onClose` inline en dependencias) → en el celular el teclado se cerraba letra a letra. Afecta a
+   TODA la app que use `Sheet` con `onClose` inline. Fix: `onClose` en ref. Probado A/B tecleando de
+   verdad: sin fix el foco termina en `DIV/dialog`, con fix queda en el campo.
+2. Editar pisaba fotos agregadas desde otro teléfono → fotos como `arrayUnion/arrayRemove` en lote.
+3. Topes de las reglas sin topes en el formulario → maxLength/max + validación.
+4. Guardar bloqueado hasta 10 min con señal mala → se puede guardar sin las fotos que suben (2º toque).
+5/3b. Fotos borradas de Storage ANTES del OK del servidor → se borran en `.then` del commit.
+6. PDF cortaba líneas largas → `splitTextToSize`.
+7. Término < inicio (typo) daba paradas de ~24 h → validación >12 h; orden de eventos previos al inicio.
+8. Nombre recordado que ya no existe se guardaba igual → solo si sigue en la lista.
+9. Foto que termina de subir tras cancelar se colaba en otro evento → «sesión» del formulario.
+10. Marcas de técnicos se perdían al ir y volver de la lista → borrador controlado en la página.
+11. Spinner eterno del buscador → `setCargando(false)` siempre.
+12. Parada sin duración no contaba → cuenta, fuera del MTTR, «(N, M sin duración)».
+
+Reglas 27/27 `--local`. 40 tests de bitácora. ⚠ Lección: mis pruebas llenaban campos por script y
+NO podían ver el bug del foco; en formularios hay que TECLEAR (`computer type`) en la verificación.
