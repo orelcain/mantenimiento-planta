@@ -31,6 +31,7 @@ const LoginPage = lazyWithReload(() => import('@/pages/LoginPage').then((mod) =>
 /** Banco de pruebas de la Matriz de turnos — solo montado en dev (ver Routes). */
 const MatrizTurnosDevPage = lazyWithReload(() => import('@/pages/dev/MatrizTurnosDevPage'))
 const PurezaPuertaDevPage = lazyWithReload(() => import('@/pages/dev/PurezaPuertaDevPage'))
+const BitacoraDevPage = lazyWithReload(() => import('@/pages/dev/BitacoraDevPage').then((mod) => ({ default: mod.BitacoraDevPage })))
 /** Banco de pruebas del resumen ejecutivo — solo montado en dev (ver Routes). */
 const ResumenTurnoDevPage = lazyWithReload(() => import('@/pages/dev/ResumenTurnoDevPage'))
 const ResumenPeriodoDevPage = lazyWithReload(() => import('@/pages/dev/ResumenPeriodoDevPage'))
@@ -117,6 +118,7 @@ const ClimaPortPage = lazyWithReload(() => import('@/pages/ClimaPortPage').then(
 const PlanosAguasPage = lazyWithReload(() => import('@/pages/PlanosAguasPage').then((mod) => ({ default: mod.PlanosAguasPage })))
 const RuedaPublicaPage = lazyWithReload(() => import('@/pages/RuedaPublicaPage').then((mod) => ({ default: mod.RuedaPublicaPage })))
 const CalendarioMantencionPage = lazyWithReload(() => import('@/pages/CalendarioMantencionPage').then((mod) => ({ default: mod.CalendarioMantencionPage })))
+const BitacoraTurnoPage = lazyWithReload(() => import('@/pages/BitacoraTurnoPage').then((mod) => ({ default: mod.BitacoraTurnoPage })))
 const HmiKnuroPage = lazyWithReload(() => import('@/pages/HmiKnuroPage').then((mod) => ({ default: mod.HmiKnuroPage })))
 const HmiGraderPage = lazyWithReload(() => import('@/pages/HmiGraderPage').then((mod) => ({ default: mod.HmiGraderPage })))
 const Baader200LearningPublicPage = lazyWithReload(() => import('@/pages/Baader200LearningPublicPage').then((mod) => ({ default: mod.Baader200LearningPublicPage })))
@@ -293,6 +295,16 @@ export function App() {
                   element={
                     <Suspense fallback={<LoadingScreen />}>
                       <PurezaPuertaDevPage />
+                    </Suspense>
+                  }
+                />
+              )}
+              {import.meta.env.DEV && (
+                <Route
+                  path="/dev/bitacora"
+                  element={
+                    <Suspense fallback={<LoadingScreen />}>
+                      <BitacoraDevPage />
                     </Suspense>
                   }
                 />
@@ -846,6 +858,11 @@ export function App() {
             <Route path="calendario-mantencion" element={
               <Suspense fallback={<LoadingScreen />}>
                 <CalendarioMantencionPage />
+              </Suspense>
+            } />
+            <Route path="bitacora" element={
+              <Suspense fallback={<LoadingScreen />}>
+                <BitacoraTurnoPage />
               </Suspense>
             } />
             <Route path="aria-actions" element={

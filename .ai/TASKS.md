@@ -6,6 +6,9 @@ No tomes una tarea que ya está EN CURSO por otro.
 
 ## En curso
 
+- [ ] **Bitácora de turno de Mantención (`/bitacora`)** — EN REVISIÓN — claude (rama `feat/bitacora-turno`; ver WORKLOG 2026-09-15).
+  Eventos del turno con fotos antes/después, parada (MTTR) o ventana sin detener, pendientes; copiar
+  al correo (Outlook clásico y nuevo) y PDF. Falta: prueba real de Orel en celular + pegado en su Outlook.
 - [ ] **Perilla 5 · Diagnóstico BAADER 142 → módulo de Aprendizaje** — EN REVISIÓN — claude (PR abierto; ver WORKLOG 2026-08-08).
   Handoff de Claude mobile (2026-08-08, sesión de terreno con Danilo): herramienta HTML validada
   en planta (`⚙️ EQUIPOS PLANTA/⚙️ BAADER 142/MANUAL_PERILLA5_BAADER_142.html`, ya con 55 figuras
