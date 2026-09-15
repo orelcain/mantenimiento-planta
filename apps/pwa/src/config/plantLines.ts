@@ -191,16 +191,26 @@ export const PLANT_LINES: readonly PlantLineConfig[] = [
     stagesWithoutSensor: ['GEA', 'Cinta de entrada', 'Cinta de salida', 'Enzunchadora', 'Empaque filete'],
     kpiScopeNote:
       'Alcance: la Baader 200 de Línea 1 (única máquina instrumentada en Shoplogix). La GEA todavía no tiene integración y el Filete no pasa por Grader: la Calidad no aplica.',
-    // FALLBACK de horarios — la VERDAD son los scheduledStart/End que emite
-    // Shoplogix (scheduleSource='shoplogix'). Se copian los de Chonchi porque
-    // Filete corre dentro de la misma jornada de la planta principal; en cuanto
-    // haya turnos reales sincronizados, esto deja de usarse.
+    /*
+     * Horarios de Filete, MEDIDOS en sus turnos sincronizados de Shoplogix.
+     *
+     * Antes se copiaban los de Chonchi ("Turno día 07-19", "Turno noche 19-07",
+     * "Turno 1", "Turno 2"…) con la idea de que dejarían de usarse. Pero Filete
+     * emite OTROS nombres y ninguno coincidía: el chip de turno le aplicaba el
+     * horario de Chonchi —a las 19:49 decía «Programado · Turno noche», cuando
+     * Filete arranca 21:30— y la config de Firestore se descartaba entera.
+     *
+     * Medido sobre shoplogix/filete/shifts al 15-09:
+     *   Turno Dia      07:45–15:30  (33 de 50; lunes a sábado)
+     *   Turno Noche    21:30–05:15  (21 de 21; lunes a viernes, desde el 2026-08-17)
+     *   Turno Noche L  00:15–08:00  (5 de 5; la madrugada del lunes)
+     *
+     * Siguen siendo fallback: la verdad son los scheduledStart/End de cada turno.
+     */
     defaultShiftSchedule: [
-      { shiftId: 'Turno día',     startHour: 7,  startMinute: 0,  endHour: 19, endMinute: 0  },
-      { shiftId: 'Turno noche',   startHour: 19, startMinute: 0,  endHour: 7,  endMinute: 0  },
-      { shiftId: 'Turno 1',       startHour: 21, startMinute: 30, endHour: 5,  endMinute: 45 },
-      { shiftId: 'Turno 1 Lunes', startHour: 0,  startMinute: 0,  endHour: 7,  endMinute: 0  },
-      { shiftId: 'Turno 2',       startHour: 9,  startMinute: 0,  endHour: 17, endMinute: 15 },
+      { shiftId: 'Turno Dia',     startHour: 7,  startMinute: 45, endHour: 15, endMinute: 30 },
+      { shiftId: 'Turno Noche',   startHour: 21, startMinute: 30, endHour: 5,  endMinute: 15 },
+      { shiftId: 'Turno Noche L', startHour: 0,  startMinute: 15, endHour: 8,  endMinute: 0  },
     ],
   },
   {
