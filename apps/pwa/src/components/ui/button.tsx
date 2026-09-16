@@ -7,8 +7,12 @@ import { cn } from '@/lib/utils'
 type ButtonVariant = 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link' | 'success' | 'warning'
 type ButtonSize = 'default' | 'sm' | 'lg' | 'icon'
 
+// CAPSULA (`rounded-full`), no `rounded-ctl`: Apple lo documenta como default
+// desde iOS 26 ("bordered buttons now have a capsule shape by default") y es lo
+// que pide DESIGN.md §5. `rounded-ctl` (10px) sigue siendo el radio de inputs,
+// chips y segmented — un boton y un campo de texto NO comparten forma en iOS.
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-ctl text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
+  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
   {
     variants: {
       variant: {
@@ -41,8 +45,8 @@ const buttonVariants = cva(
       // minimo de 44 de la constitucion en TODA la app.
       size: {
         default: 'h-11 px-4 py-2',   // 44px tactil — el estandar
-        sm: 'h-9 rounded-ctl px-3',  // 36px — solo donde el espacio aprieta; piso a11y 28
-        lg: 'h-12 rounded-ctl px-8', // 48px — el "ideal" de la constitucion
+        sm: 'h-9 rounded-full px-3',  // 36px — solo donde el espacio aprieta; piso a11y 28
+        lg: 'h-12 rounded-full px-8', // 48px — el "ideal" de la constitucion
         icon: 'h-11 w-11',           // 44x44
       },
     },
