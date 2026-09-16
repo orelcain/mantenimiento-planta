@@ -1414,7 +1414,7 @@ export function ChatBot() {
                     <Cpu className="w-3.5 h-3.5" />
                     <span className="max-w-[60px] truncate">
                       {selectedAgent
-                        ? (availableAgents().find(a => a.id === selectedAgent)?.emoji || '🤖') + ' ' + (availableAgents().find(a => a.id === selectedAgent)?.name?.split(' ')[0] || '')
+                        ? (availableAgents().find(a => a.id === selectedAgent)?.emoji || '') + ' ' + (availableAgents().find(a => a.id === selectedAgent)?.name?.split(' ')[0] || '')
                         : 'Auto'}
                     </span>
                     <ChevronDown className={`w-3 h-3 transition-transform ${showAgentSelector ? 'rotate-180' : ''}`} />
