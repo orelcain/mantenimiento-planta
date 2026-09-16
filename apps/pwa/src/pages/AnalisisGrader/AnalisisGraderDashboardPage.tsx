@@ -22,11 +22,9 @@ import {
   Layers,
   Loader2,
   Minus,
-  Moon,
   PieChart,
   Save,
   Scale,
-  Sun,
   Target,
   TrendingDown,
   TrendingUp,
@@ -82,6 +80,7 @@ import type {
   GraderSession,
 } from '@/services/grader/types'
 import { dec1, dec2 } from '@/utils/formatoNumeros'
+import { useIsDark } from '@/hooks/useTheme'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, ArcElement, Title, Tooltip, Legend, TimeScale, Filler)
 
@@ -169,11 +168,9 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
   // tenia su PROPIO interruptor de tema (sol/luna), o sea un tercer modo de color
   // por encima del claro/oscuro de la app: entrabas en claro y el Grader se veia
   // oscuro igual. En iOS el tema es del sistema, nunca del modulo.
-  // El toggle se conserva a proposito: sirve para presentar o exportar en claro
-  // desde una sesion oscura. Lo que cambia es el punto de partida.
-  const [reportMode, setReportMode] = useState<'light' | 'dark'>(
-    () => (document.documentElement.classList.contains('dark') ? 'dark' : 'light')
-  )
+  // DESIGN.md §6b: ningún módulo tiene tema propio. El Grader sigue al tema de la
+  // app en vivo; para presentar en claro se cambia el tema en Configuración.
+  const isDark = useIsDark()
   const [selectedCauseLabel, setSelectedCauseLabel] = useState<string | null>(null)
   const [timeFilterFrom, setTimeFilterFrom] = useState<string>('')
   const [timeFilterTo, setTimeFilterTo] = useState<string>('')
@@ -1169,7 +1166,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
   return (
     <div
       ref={dashRef}
-      className={cn('space-y-4 max-w-[1760px] mx-auto', reportMode === 'light' && 'grader-light-mode')}
+      className={cn('space-y-4 max-w-[1760px] mx-auto', !isDark && 'grader-light-mode')}
     >
       {/* Top actions */}
       <div className={cn('flex items-center flex-wrap gap-2', onBack ? 'justify-between' : 'justify-end')}>
@@ -1201,14 +1198,6 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
           </Button>
           <Button variant="outline" size="sm" onClick={handleExport} title="Exportar JSON">
             <Download className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setReportMode(reportMode === 'dark' ? 'light' : 'dark')}
-            title={reportMode === 'dark' ? 'Cambiar a modo día' : 'Cambiar a modo noche'}
-          >
-            {reportMode === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
         </div>
         {saveError && (

@@ -383,8 +383,8 @@ propia de la app modulando una variable de opacidad.
 - La app tiene **dos temas, claro y oscuro, y los decide el sistema o el usuario en Ajustes**.
   **Ningún módulo tiene un modo de color propio.** En iOS el tema es del sistema, nunca de
   una sección. El Grader tenía un tercer modo (un toggle sol/luna que arrancaba siempre en
-  oscuro, ignorando el tema de la app); desde 2026-09-16 hereda el tema y el toggle queda
-  solo como atajo para presentar o exportar.
+  oscuro, ignorando el tema de la app); desde 2026-09-16 hereda el tema en vivo y el toggle
+  se retiró. `useIsDark()` en `hooks/useTheme.ts` es la forma de preguntar por el tema.
 - **Los grises son neutros.** Sesgo de hue ≤ 5 (diferencia máx. entre canales RGB). La
   escala *slate* de Tailwind tiene sesgo 27–34 y hace que un módulo se lea como de otra app
   aunque cada color cumpla contraste. Los grises de iOS: `#1C1C1E` (2), `#6E6E71` (3),
@@ -574,7 +574,10 @@ con un script Node local (`writeFileSync` en `utf8`).
    cuatro decisiones. ⚠ Los 20 tokens `--lc-*` SIGUEN en index.css: los usan el editor admin
    de Aprendizaje, los planos, variadores y dos vistas del Grader. Se retiran cuando migren.
 
-6. **Decidir claro frío `#F2F2F7` vs cálido `#EAE7E0`** — abierto desde 2026-08-09.
+6. ~~Decidir claro frío `#F2F2F7` vs cálido `#EAE7E0`~~ — **cerrado 2026-09-16: frío.** Es el
+   `systemGroupedBackground` de iOS y la piel Apple ya lo trae; medidos sus grises, ninguno pasa
+   de sesgo 6. El celeste `#d7e5f2` (sesgo 27) de la piel vieja queda hasta que la piel Apple
+   sea la predeterminada (decisión de despliegue, no de diseño).
 7. **Los 228 `<button>` a mano** con 13 alturas distintas (25–64 px). No es un barrido: chips,
    flechas e íconos en tablas no van a 44. Dirigirlo pantalla por pantalla con el medidor de
    `scripts/medir-en-pantalla.md`. Análisis de Turno es el caso extremo: 64 de 67 a mano.
@@ -585,7 +588,9 @@ con un script Node local (`writeFileSync` en `utf8`).
 10. **Decidir los `lc-*` del Centro de Aprendizaje**: cumplen AA (tres con más margen que
     Apple) pero son una familia que no existe en iOS. Migrar gana coherencia y pierde
     contraste (`lc-warn` 6.54 → 5.28). Depende de si esa sección tiene identidad propia.
-11. **Decidir si el Grader conserva el toggle sol/luna** o hereda el tema sin atajo.
+11. ~~Decidir si el Grader conserva el toggle sol/luna~~ — **cerrado 2026-09-16: se retiró.**
+    Sigue al tema de la app en vivo (`useIsDark`, observa la clase del documento). Para
+    presentar en claro se cambia el tema en Configuración, como en cualquier app de iOS.
 12. ~~`body` sigue en 15 px~~ — hecho 2026-09-16: `body` 17, `title2` 22, `display` 34,
     más `subhead` (15) y `callout` (16) nuevos. Verificado en el home a 375 px: 4 de 36
     títulos de celda saltan de línea (nombres largos de cursos) — iOS envuelve, se acepta.
