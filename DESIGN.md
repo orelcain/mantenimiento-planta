@@ -453,6 +453,10 @@ propia de la app modulando una variable de opacidad.
 | Grises de la escala *slate* | grises neutros de iOS (§6b) |
 | Un módulo con su propio toggle de tema | heredar el tema de la app (§6b) |
 | Botón o input bajo 44 px táctiles | el primitivo (`h-11`) o `min-h-[44px]` — nunca `min-h-11`, no existe |
+| Número de KPI grande (≥ 20 px) en color de estado | número en `text-foreground`; el estado en la barra, el punto o el rótulo de al lado (Salud, Bolsa) |
+| `cat-5-ink` (rosa de *categoría*) como "crítico" | `text-ink-crit` / `bg-red-500/[0.15]` — categoría y estado son escalas distintas |
+| `text-amber-400` / `text-emerald-400` / `text-red-400` como estado | `text-ink-warn` / `text-ink-ok` / `text-ink-crit` (adaptativas y ya medidas) |
+| Ícono de tile del home tintado con glifo en tono 500 vivo | tile neutro: `bg-muted-foreground/[0.12]` + glifo `text-muted-foreground` |
 | Tinte de botón con alfa (`bg-x/13`) | tinte opaco precalculado sobre card |
 | Modales centrados | Sheet |
 | Spinners centrados | Skeletons |

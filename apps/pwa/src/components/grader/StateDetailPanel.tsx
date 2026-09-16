@@ -33,10 +33,10 @@ function fmtPct(frac: number, decimals = 1): string {
 
 /** Icono según el tipo de estado. */
 function StateIcon({ type }: { type: UpstreamMachineState['type'] }) {
-  if (type === 'uptime') return <Activity className="w-4 h-4 text-emerald-400" />
-  if (type === 'downtime') return <AlertCircle className="w-4 h-4 text-cat-5-ink" />
+  if (type === 'uptime') return <Activity className="w-4 h-4 text-ink-ok" />
+  if (type === 'downtime') return <AlertCircle className="w-4 h-4 text-ink-crit" />
   if (type === 'break') return <Pause className="w-4 h-4 text-cat-7-ink" />
-  return <Wrench className="w-4 h-4 text-amber-400" />
+  return <Wrench className="w-4 h-4 text-ink-warn" />
 }
 
 const TYPE_LABEL: Record<UpstreamMachineState['type'], string> = {

@@ -1540,9 +1540,9 @@ export function ShiftTimelineView({
             {hourlySegments.map(seg => {
               const segId = `h${seg.hour}`
               const colorClass =
-                seg.p0Pct >= criticalThreshold ? 'text-red-400' :
-                seg.p0Pct >= alertThreshold    ? 'text-amber-400' :
-                seg.pieces > 0                 ? 'text-emerald-400' :
+                seg.p0Pct >= criticalThreshold ? 'text-ink-crit' :
+                seg.p0Pct >= alertThreshold    ? 'text-ink-warn' :
+                seg.pieces > 0                 ? 'text-ink-ok' :
                 'text-muted-foreground'
               return (
                 <button
@@ -1755,7 +1755,7 @@ export function ShiftTimelineView({
                     <span
                       className={cn(
                         'ml-2 tabular-nums text-caption font-medium',
-                        cp.p0Delta > 0 ? 'text-cat-5-ink' : cp.p0Delta < 0 ? 'text-emerald-400' : 'text-muted-foreground',
+                        cp.p0Delta > 0 ? 'text-ink-crit' : cp.p0Delta < 0 ? 'text-ink-ok' : 'text-muted-foreground',
                       )}
                       title="Δ P0% respecto a la carga anterior"
                     >

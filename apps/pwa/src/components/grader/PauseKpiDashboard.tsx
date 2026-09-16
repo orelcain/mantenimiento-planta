@@ -101,10 +101,11 @@ const DEAD_TIME_PCT_THRESHOLDS = {
   /** > 20% — crítico. */
 } as const
 
-function deadTimePctColor(pct: number): string {
-  if (pct <= DEAD_TIME_PCT_THRESHOLDS.okBelow) return 'text-emerald-400'
-  if (pct <= DEAD_TIME_PCT_THRESHOLDS.warnBelow) return 'text-amber-400'
-  return 'text-cat-5-ink'
+// Número grande (text-lg en KpiCard): el estado ya se explica en el texto del
+// `sub` ("saludable/atención/crítico"), que no admite color propio sin tocar
+// la estructura de KpiCard — el número queda en la tinta de etiqueta.
+function deadTimePctColor(_pct: number): string {
+  return 'text-foreground'
 }
 
 // SIN_TAG_ID y summarizeByCategory viven en services/grader/pauseKpiAnalytics

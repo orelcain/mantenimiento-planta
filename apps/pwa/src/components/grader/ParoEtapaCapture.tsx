@@ -214,7 +214,7 @@ export function ParoEtapaCapture({ plantLineId, areaLabel, onChanged, className 
           <Button type="button" variant="destructive" onClick={handleSave} disabled={saving}>
             {saving ? <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" />Guardando…</> : <><CheckCircle2 className="h-4 w-4 mr-1.5" />Registrar paro</>}
           </Button>
-          {justSaved && <span className="flex items-center gap-1 text-xs text-emerald-400 font-medium"><CheckCircle2 className="h-3.5 w-3.5" /> Registrado</span>}
+          {justSaved && <span className="flex items-center gap-1 text-xs text-ink-ok font-medium"><CheckCircle2 className="h-3.5 w-3.5" /> Registrado</span>}
         </div>
 
         {/* Pareto: qué etapa para más */}
@@ -257,7 +257,7 @@ export function ParoEtapaCapture({ plantLineId, areaLabel, onChanged, className 
                 <span className="text-foreground/80 min-w-0 flex-1 break-words">{p.causa || '—'}</span>
                 <span className="text-muted-foreground/60 shrink-0 hidden sm:inline">{fmtFecha(p.fecha)}</span>
                 {isAdmin && (
-                  <button type="button" onClick={() => handleDelete(p.id)} title="Eliminar" className="shrink-0 text-muted-foreground/60 hover:text-red-400">
+                  <button type="button" onClick={() => handleDelete(p.id)} title="Eliminar" className="shrink-0 text-muted-foreground/60 hover:text-ink-crit">
                     <Trash2 className="h-3 w-3" />
                   </button>
                 )}

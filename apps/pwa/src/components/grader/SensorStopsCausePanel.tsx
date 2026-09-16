@@ -391,7 +391,7 @@ export function SensorStopsCausePanel({
                   )}
 
                   {error && (
-                    <p className="text-caption text-cat-5-ink">{error}</p>
+                    <p className="text-caption text-ink-crit">{error}</p>
                   )}
 
                   <div className="flex justify-end gap-1.5">

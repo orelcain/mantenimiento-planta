@@ -297,9 +297,9 @@ export function UpstreamScatterCard({
 
   // Color del KPI zona crítica según severidad
   const criticalColor =
-    criticalKpi.pct >= 20 ? 'text-cat-5-ink'
-    : criticalKpi.pct >= 10 ? 'text-amber-400'
-    : 'text-emerald-400'
+    criticalKpi.pct >= 20 ? 'text-ink-crit'
+    : criticalKpi.pct >= 10 ? 'text-ink-warn'
+    : 'text-ink-ok'
 
   /*
    * La frase depende del R², no solo del signo de la pendiente. Hasta el 10-09
@@ -324,14 +324,14 @@ export function UpstreamScatterCard({
       ? {
           icon: <TrendingDown className="w-3 h-3" />,
           text: `Cada -10 ciclos/5min Baader → +${dec2(slopeMagnitude.deltaP0_per_minus10cycles)} pts P0%`,
-          color: 'text-cat-5-ink',
+          color: 'text-ink-crit',
           tone: `Cuando la línea bajó el ritmo, el P0 subió. Explica el ${pctExplicado} % de la variación de este turno — no vale para otros.`,
         }
       : slopeMagnitude.direction === 'pos'
       ? {
           icon: <TrendingUp className="w-3 h-3" />,
           text: `Cada -10 ciclos/5min Baader → ${dec2(slopeMagnitude.deltaP0_per_minus10cycles)} pts P0%`,
-          color: 'text-amber-400',
+          color: 'text-ink-warn',
           tone: `P0% sube cuando Baader sube, al revés de lo esperado. Explica el ${pctExplicado} % de la variación — mirar antes de concluir.`,
         }
       : {
@@ -385,7 +385,7 @@ export function UpstreamScatterCard({
           {ejeY.fuera > 0 && (
             <> <span className="text-ink-warn">{ejeY.fuera} {ejeY.fuera === 1 ? 'punto queda' : 'puntos quedan'} sobre el {ejeY.max} % y no {ejeY.fuera === 1 ? 'entra' : 'entran'} en la escala.</span></>
           )}
-          {' '}Líneas: <span className="text-cat-5-ink">P0% crítico {criticalThreshold}%</span>
+          {' '}Líneas: <span className="text-ink-crit">P0% crítico {criticalThreshold}%</span>
           {' · '}<span className="text-muted-foreground">mediana ritmo {Math.round(baaderMedian)} ciclos</span>.
         </div>
 

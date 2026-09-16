@@ -48,12 +48,11 @@ function fmtDur(min: number): string {
   const h = Math.floor(min / 60); const m = Math.round(min % 60)
   return m === 0 ? `${h}h` : `${h}h ${m}m`
 }
+// Número grande: la tinta de estado se retiró (no hay rótulo/punto chico al
+// lado que la sostenga) y pasa a la tinta de etiqueta estándar.
 function oeeColor(v: number | null): string {
   if (v === null) return 'text-muted-foreground'
-  if (v >= 0.85) return 'text-emerald-400'
-  if (v >= 0.65) return 'text-ink-info'
-  if (v >= 0.50) return 'text-amber-400'
-  return 'text-cat-5-ink'
+  return 'text-foreground'
 }
 
 export function LineOeeCard({ plantLineId, plantSlug, graderSummaries, currentMonth, areaLabel, refreshKey = 0, className }: LineOeeCardProps) {
@@ -141,7 +140,7 @@ export function LineOeeCard({ plantLineId, plantSlug, graderSummaries, currentMo
             {/* Explicación del ajuste */}
             <p className="text-caption text-muted-foreground leading-relaxed">
               {calc.etapaMin > 0
-                ? <>Área = la máquina penalizada por <b className="text-cat-5-ink">{fmtDur(calc.etapaMin)}</b> de paros de etapa este mes (disponibilidad {pct(calc.availabilityMachine)} → {pct(calc.availabilityArea)}, sobre una base de {fmtDur(calc.baseMin)}). El rendimiento sigue siendo el de la máquina instrumentada.</>
+                ? <>Área = la máquina penalizada por <b className="text-ink-crit">{fmtDur(calc.etapaMin)}</b> de paros de etapa este mes (disponibilidad {pct(calc.availabilityMachine)} → {pct(calc.availabilityArea)}, sobre una base de {fmtDur(calc.baseMin)}). El rendimiento sigue siendo el de la máquina instrumentada.</>
                 : <>Todavía no registraste paros de etapa → el OEE del área es el de la máquina. Registra abajo los paros de las etapas sin sensor (la GEA, cintas) y este número se separa.</>}
             </p>
 
@@ -157,7 +156,7 @@ export function LineOeeCard({ plantLineId, plantSlug, graderSummaries, currentMo
                   return (
                     <div key={p.label} className="space-y-0.5">
                       <div className="flex items-center justify-between text-caption">
-                        <span className={cn('font-medium flex items-center gap-1.5 min-w-0', i === 0 ? 'text-cat-5-ink' : 'text-foreground')}>
+                        <span className={cn('font-medium flex items-center gap-1.5 min-w-0', i === 0 ? 'text-ink-crit' : 'text-foreground')}>
                           <span className="truncate">{i + 1}. {p.label}</span>
                           <span
                             className="text-caption px-1 rounded-ctl bg-muted-foreground/12 text-muted-foreground shrink-0"
@@ -171,7 +170,7 @@ export function LineOeeCard({ plantLineId, plantSlug, graderSummaries, currentMo
                         <span className="tabular-nums text-muted-foreground">{fmtDur(p.min)}</span>
                       </div>
                       <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                        <div className={cn('h-full rounded-full', i === 0 ? 'bg-red-500' : 'bg-cat-5-tint/[0.15]')} style={{ width: `${w}%` }} />
+                        <div className={cn('h-full rounded-full', i === 0 ? 'bg-red-500' : 'bg-red-500/[0.15]')} style={{ width: `${w}%` }} />
                       </div>
                     </div>
                   )
