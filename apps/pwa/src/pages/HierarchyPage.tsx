@@ -739,7 +739,7 @@ export function HierarchyPage() {
               'flex items-center gap-2 p-2 rounded-card transition-colors group',
               'border',
               isActive
-                ? 'border-emerald-500/[0.25] bg-emerald-500/[0.15] dark:border-emerald-500/[0.25] dark:bg-emerald-500/[0.15]'
+                ? 'border-transparent bg-emerald-500/[0.15] dark:border-transparent dark:bg-emerald-500/[0.15]'
                 : 'border-transparent hover:border-border hover:bg-muted',
               !node.activo && 'opacity-60'
             )}
@@ -764,9 +764,9 @@ export function HierarchyPage() {
 
             {/* Icon */}
             {node.nivel === 1 ? (
-              <Building2 className="h-4 w-4 text-blue-500" />
+              <Building2 className="h-4 w-4 text-brand-ink" />
             ) : hasChildren ? (
-              <FolderOpen className="h-4 w-4 text-amber-500" />
+              <FolderOpen className="h-4 w-4 text-ink-warn" />
             ) : (
               <Folder className="h-4 w-4 text-muted-foreground" />
             )}
@@ -811,7 +811,7 @@ export function HierarchyPage() {
                 {node.isBaseStructure ? (
                   <Badge 
                     variant="outline" 
-                    className="text-xs flex items-center gap-1 border-blue-500/[0.25] text-ink-info bg-blue-500/[0.15] opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="text-xs flex items-center gap-1 border-transparent text-ink-info bg-blue-500/[0.15] opacity-0 group-hover:opacity-100 transition-opacity"
                     title={`Estructura base - ${node.baseStructureDate ? new Date(node.baseStructureDate.toDate()).toLocaleDateString() : 'Fecha no disponible'}`}
                   >
                     <Clock className="h-2.5 w-2.5" />
@@ -956,7 +956,7 @@ export function HierarchyPage() {
     <div className="space-y-6">
       {/* Banner de actualizaciones disponibles */}
       {hasUpdates && (
-        <div className="bg-primary/[0.15] border border-primary/[0.25] text-ink-info px-4 py-3 rounded-card flex items-center justify-between">
+        <div className="bg-primary/[0.15] border border-transparent text-ink-info px-4 py-3 rounded-card flex items-center justify-between">
           <div className="flex items-center gap-3">
             <CheckCircle className="h-5 w-5" />
             <span className="font-medium">

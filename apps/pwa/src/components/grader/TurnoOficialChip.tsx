@@ -25,9 +25,9 @@ interface TurnoOficialChipProps {
 
 
 const LEVEL_STYLES: Record<'ok' | 'warn' | 'critical', string> = {
-  ok:       'border-emerald-500/[0.25] text-emerald-400',
-  warn:     'border-amber-500/[0.25] text-amber-400',
-  critical: 'border-red-500/[0.25] text-red-400',
+  ok:       'border-emerald-500/[0.25] text-ink-ok',
+  warn:     'border-amber-500/[0.25] text-ink-warn',
+  critical: 'border-red-500/[0.25] text-ink-crit',
 }
 
 export function TurnoOficialChip({ rollup, machines, className }: TurnoOficialChipProps) {

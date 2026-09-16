@@ -163,7 +163,7 @@ export function ShoplogixCredentialsPage() {
       </div>
 
       {error && (
-        <Card className="border-cat-5-tint/[0.25] bg-cat-5-tint/[0.15]">
+        <Card className="border-transparent bg-cat-5-tint/[0.15]">
           <CardContent className="flex items-start gap-2 py-3 text-sm text-cat-5-ink">
             <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
             <div>
@@ -183,7 +183,7 @@ export function ShoplogixCredentialsPage() {
           <CardTitle className="text-base flex items-center gap-2">
             Estado actual
             {info?.hasPassword && (
-              <span className="inline-flex items-center gap-1 text-xs font-normal text-emerald-400">
+              <span className="inline-flex items-center gap-1 text-xs font-normal text-ink-ok">
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 Activas
               </span>
@@ -217,7 +217,7 @@ export function ShoplogixCredentialsPage() {
           ) : (
             <div className="text-sm text-muted-foreground space-y-2">
               <div className="flex items-start gap-2">
-                <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+                <AlertTriangle className="w-4 h-4 text-ink-warn mt-0.5 shrink-0" />
                 <div>
                   <div className="font-medium text-ink-warn">Sin credenciales configuradas</div>
                   <div className="text-muted-foreground text-xs mt-1">
@@ -310,7 +310,7 @@ export function ShoplogixCredentialsPage() {
             <Button
               variant="outline"
               onClick={() => setDeleteOpen(true)}
-              className="text-cat-5-ink border-cat-5-tint/[0.25] hover:bg-cat-5-tint/[0.15]"
+              className="text-cat-5-ink border-transparent hover:bg-cat-5-tint/[0.15]"
             >
               <Trash2 className="w-4 h-4 mr-2" />
               Eliminar credenciales (volver al modo cookie)

@@ -75,7 +75,7 @@ function RepuestoThumbnail({ rep, onPreview, onOpenGallery }: {
     return (
       <button
         onClick={(e) => { e.stopPropagation(); onOpenGallery?.(rep) }}
-        className="h-11 w-11 rounded-card bg-muted/50 flex items-center justify-center shrink-0 border border-dashed border-border hover:border-primary/50 hover:bg-primary/5 transition-all cursor-pointer group"
+        className="h-11 w-11 rounded-card bg-muted/50 flex items-center justify-center shrink-0 border border-dashed border-border hover:border-transparent hover:bg-primary/5 transition-all cursor-pointer group"
         title="Agregar imagen"
       >
         <Camera className="h-4 w-4 text-muted-foreground/40 group-hover:text-primary/60 transition-colors" />
@@ -491,7 +491,7 @@ export function RepuestosTable({
                       {onViewInManual && (rep.vinculosManual?.length ?? 0) > 0 && (
                         <Tip label="Ver en Manual">
                           <button onClick={() => onViewInManual(rep)}
-                            className="h-7 w-7 inline-flex items-center justify-center rounded-ctl text-ink-ok/60 hover:text-green-400 hover:bg-green-500/[0.15] transition-colors">
+                            className="h-7 w-7 inline-flex items-center justify-center rounded-ctl text-ink-ok/60 hover:text-ink-ok hover:bg-green-500/[0.15] transition-colors">
                             <Eye className="h-3.5 w-3.5" />
                           </button>
                         </Tip>
@@ -522,7 +522,7 @@ export function RepuestosTable({
                       {onRelocate && (
                         <Tip label="Reubicar">
                           <button onClick={() => onRelocate(rep)}
-                            className="h-7 w-7 inline-flex items-center justify-center rounded-ctl text-ink-warn/60 hover:text-amber-400 hover:bg-amber-500/[0.15] transition-colors">
+                            className="h-7 w-7 inline-flex items-center justify-center rounded-ctl text-ink-warn/60 hover:text-ink-warn hover:bg-amber-500/[0.15] transition-colors">
                             <ArrowRightLeft className="h-3.5 w-3.5" />
                           </button>
                         </Tip>

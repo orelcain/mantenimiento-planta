@@ -686,7 +686,7 @@ function LineTimeSummaryBadges({ totals }: { totals: LineTimeTotals }) {
     <div className="flex items-center gap-1.5 flex-wrap" title="Suma de tiempos de las 3 Baaders (horas-máquina, no tiempo de línea)">
       <Badge
         variant="outline"
-        className="bg-emerald-500/[0.15] border-emerald-500/[0.25] text-ink-ok tabular-nums text-caption px-2 py-0.5 h-5"
+        className="bg-emerald-500/[0.15] border-transparent text-ink-ok tabular-nums text-caption px-2 py-0.5 h-5"
         title="Tiempo total procesando (suma de las 3 Baaders)"
       >
         ▲ {fmtDurationSec(totals.uptimeSec)}
@@ -694,7 +694,7 @@ function LineTimeSummaryBadges({ totals }: { totals: LineTimeTotals }) {
       {totals.downtimeSec > 0 && (
         <Badge
           variant="outline"
-          className="bg-red-500/[0.15] border-red-500/[0.25] text-ink-crit tabular-nums text-caption px-2 py-0.5 h-5 gap-1"
+          className="bg-red-500/[0.15] border-transparent text-ink-crit tabular-nums text-caption px-2 py-0.5 h-5 gap-1"
           title="Tiempo total de detención/paro (suma de las 3 Baaders)"
         >
           <PauseCircle className="h-3 w-3" />
@@ -704,7 +704,7 @@ function LineTimeSummaryBadges({ totals }: { totals: LineTimeTotals }) {
       {totals.breakSec > 0 && (
         <Badge
           variant="outline"
-          className="bg-amber-500/[0.15] border-amber-500/[0.25] text-ink-warn tabular-nums text-caption px-2 py-0.5 h-5 gap-1"
+          className="bg-amber-500/[0.15] border-transparent text-ink-warn tabular-nums text-caption px-2 py-0.5 h-5 gap-1"
           title="Pausas programadas (colación/reunión), suma de las 3 Baaders"
         >
           <Coffee className="h-3 w-3" />
@@ -741,21 +741,21 @@ function ProductionKpiRow({ kpis }: { kpis: MachineKpis }) {
       </Badge>
       <Badge
         variant="outline"
-        className="bg-emerald-500/[0.15] border-emerald-500/[0.25] text-ink-ok tabular-nums text-caption px-2 py-0.5 h-5"
+        className="bg-emerald-500/[0.15] border-transparent text-ink-ok tabular-nums text-caption px-2 py-0.5 h-5"
         title="Verde: piezas en intervalos donde el ritmo cumplió el objetivo (dentro de tolerancia)"
       >
         {fmtInt(kpis.greenCycles)} ({fmtPct(kpis.greenPct, 0)})
       </Badge>
       <Badge
         variant="outline"
-        className="bg-amber-500/[0.15] border-amber-500/[0.25] text-ink-warn tabular-nums text-caption px-2 py-0.5 h-5"
+        className="bg-amber-500/[0.15] border-transparent text-ink-warn tabular-nums text-caption px-2 py-0.5 h-5"
         title="Amarillo: piezas en intervalos con ritmo bajo el objetivo (dentro de tolerancia)"
       >
         {fmtInt(kpis.yellowCycles)} ({fmtPct(kpis.yellowPct, 0)})
       </Badge>
       <Badge
         variant="outline"
-        className="bg-red-500/[0.15] border-red-500/[0.25] text-ink-crit tabular-nums text-caption px-2 py-0.5 h-5"
+        className="bg-red-500/[0.15] border-transparent text-ink-crit tabular-nums text-caption px-2 py-0.5 h-5"
         title="Rojo: piezas en intervalos con ritmo MUY bajo el objetivo (fuera de tolerancia — atención)"
       >
         {fmtInt(kpis.redCycles)} ({fmtPct(kpis.redPct, 0)})
@@ -855,7 +855,7 @@ export function MachineShiftDetail({ shift, expanded, onToggle, windowStart, win
         {isZoomActive && (
           <Badge
             variant="outline"
-            className="bg-cat-6-tint/[0.15] border-cat-6-tint/[0.25] text-cat-6-ink text-caption px-1.5 py-0.5 h-5 gap-1"
+            className="bg-cat-6-tint/[0.15] border-transparent text-cat-6-ink text-caption px-1.5 py-0.5 h-5 gap-1"
             title="KPIs recalculados sólo del rango temporal visible (no del turno completo)"
           >
             <Scissors className="h-3 w-3" /> del rango
@@ -1243,7 +1243,7 @@ export function UpstreamMachinesPanel({
             {dataSource === 'demo' && (
               <Badge
                 variant="outline"
-                className="text-caption px-1.5 py-0 h-4 border-amber-500/[0.25] text-ink-warn bg-amber-500/[0.15]"
+                className="text-caption px-1.5 py-0 h-4 border-transparent text-ink-warn bg-amber-500/[0.15]"
                 title="Datos sintéticos de demostración — no hay datos reales de Shoplogix para este turno en Firestore"
               >
                 DEMO
@@ -1272,7 +1272,7 @@ export function UpstreamMachinesPanel({
               className={cn(
                 'text-caption px-1.5 py-0.5 rounded-ctl border shrink-0 transition-colors',
                 framedOnProduction
-                  ? 'border-primary/50 bg-primary/15 text-brand-ink hover:bg-primary/25'
+                  ? 'border-transparent bg-primary/15 text-brand-ink hover:bg-primary/25'
                   : 'border-border text-muted-foreground hover:text-foreground hover:bg-muted',
               )}
             >
@@ -1291,7 +1291,7 @@ export function UpstreamMachinesPanel({
             {isLineZoomActive && (
               <Badge
                 variant="outline"
-                className="bg-cat-6-tint/[0.15] border-cat-6-tint/[0.25] text-cat-6-ink text-caption px-1.5 py-0.5 h-5 gap-1"
+                className="bg-cat-6-tint/[0.15] border-transparent text-cat-6-ink text-caption px-1.5 py-0.5 h-5 gap-1"
                 title="KPIs recalculados sólo del rango temporal visible"
               >
                 <Scissors className="h-3 w-3" /> del rango
@@ -1303,7 +1303,7 @@ export function UpstreamMachinesPanel({
             {correlationSummary && correlationSummary.upstreamCaused > 0 && (
               <Badge
                 variant="outline"
-                className="bg-cat-4-tint/[0.15] border-cat-4-tint/[0.25] text-cat-4-ink text-caption px-2 py-0.5 h-5 gap-1 cursor-help"
+                className="bg-cat-4-tint/[0.15] border-transparent text-cat-4-ink text-caption px-2 py-0.5 h-5 gap-1 cursor-help"
                 title={
                   `${correlationSummary.upstreamCaused} de ${correlationSummary.total} paros del Grader coinciden con paros upstream (±2 min). ` +
                   `Probable root cause en línea Baader. Ver detalle en card de correlación abajo.`
@@ -1330,7 +1330,7 @@ export function UpstreamMachinesPanel({
             {slxWindowMismatch && (
               <Badge
                 variant="outline"
-                className="bg-red-500/[0.15] border-red-500/[0.25] text-ink-crit text-caption px-2 py-0.5 h-5 gap-1 cursor-help"
+                className="bg-red-500/[0.15] border-transparent text-ink-crit text-caption px-2 py-0.5 h-5 gap-1 cursor-help"
                 title={
                   `Datos SLX fuera de ventana: rango real ${fmtTime(slxWindowMismatch.actualStart.getTime())}–${fmtTime(slxWindowMismatch.actualEnd.getTime())} ` +
                   `no coincide con el turno actual. Probable causa: documento Firestore con datos de otro turno. ` +
@@ -1423,7 +1423,7 @@ export function UpstreamMachinesPanel({
                     className={cn(
                       'text-caption px-1.5 py-0.5 rounded-ctl border transition-colors',
                       showRateGap
-                        ? 'border-red-500/[0.25] bg-red-500/[0.15] text-ink-crit'
+                        ? 'border-transparent bg-red-500/[0.15] text-ink-crit'
                         : 'border-border text-muted-foreground hover:text-foreground hover:bg-muted',
                     )}
                   >

@@ -149,7 +149,7 @@ export function MidShiftCheckCard({
             {moves.map((m, i) => (
               <div
                 key={`${m.fromKey}->${m.toKey}-${i}`}
-                className="flex items-start gap-2.5 flex-wrap p-2.5 rounded-ctl bg-primary/[0.12] border border-primary/[0.25]"
+                className="flex items-start gap-2.5 flex-wrap p-2.5 rounded-ctl bg-primary/[0.12] border border-transparent"
               >
                 <TrendingUp className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5" />
                 <div className="flex-1 min-w-[14rem] text-xs">

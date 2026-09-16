@@ -353,7 +353,7 @@ export function PauseAnnotationDialog({
               <span className="text-muted-foreground"> · {fmtTime(pause.startAt)} – {fmtTime(pause.endAt)} · </span>
               <span className="font-medium text-foreground">{fmtDurationSec(pause.durationSec)}</span>
               {isAutoTag && (
-                <span className="block text-xs text-amber-400 mt-1">
+                <span className="block text-xs text-ink-warn mt-1">
                   Tag sugerido por el sistema — confírmalo o cámbialo
                 </span>
               )}
@@ -443,11 +443,11 @@ export function PauseAnnotationDialog({
             />
           </div>
 
-          {error && <p className="text-xs text-red-400">{error}</p>}
+          {error && <p className="text-xs text-ink-crit">{error}</p>}
 
           {/* M18 — aviso offline */}
           {!isOnline && (
-            <p className="text-xs text-amber-400 flex items-center gap-1.5">
+            <p className="text-xs text-ink-warn flex items-center gap-1.5">
               <CloudOff className="inline h-3 w-3" /> Sin conexión — el cambio se guardará localmente y se sincronizará al reconectarse.
             </p>
           )}
@@ -506,7 +506,7 @@ export function PauseAnnotationDialog({
             {/* Duración live */}
             <div className="flex items-center justify-between">
               <span className="text-xs text-muted-foreground">
-                Duración: <span className={cn('font-medium', editedDurationSec < 60 ? 'text-red-400' : 'text-foreground')}>
+                Duración: <span className={cn('font-medium', editedDurationSec < 60 ? 'text-ink-crit' : 'text-foreground')}>
                   {editedDurationSec > 0 ? fmtDurationSec(editedDurationSec) : '—'}
                 </span>
               </span>
@@ -525,11 +525,11 @@ export function PauseAnnotationDialog({
                 </Button>
               )}
               {rangeSaved && (
-                <span className="text-xs text-emerald-400">✓ Rango guardado</span>
+                <span className="text-xs text-ink-ok">✓ Rango guardado</span>
               )}
             </div>
 
-            {rangeError && <p className="text-xs text-red-400">{rangeError}</p>}
+            {rangeError && <p className="text-xs text-ink-crit">{rangeError}</p>}
           </div>
 
           {/* ── M13: Historial de cambios ── */}
@@ -583,7 +583,7 @@ export function PauseAnnotationDialog({
                 size="sm"
                 onClick={handleClearTag}
                 disabled={saving}
-                className="text-muted-foreground hover:text-red-400"
+                className="text-muted-foreground hover:text-ink-crit"
               >
                 Quitar tag
               </Button>

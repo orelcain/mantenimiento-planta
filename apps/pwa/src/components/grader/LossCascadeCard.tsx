@@ -249,7 +249,7 @@ export function LossCascadeCard({
       id: 'externo' as LossBucket, label: '− Externo', sec: totals.externoSec,
       pct: `${dec1(pctOfTurno(totals.externoSec))}% del turno`,
       pct2: `${dec1(pctOfTecho(totals.externoSec))}% del techo`,
-      bg: 'bg-amber-500/[0.15]', text: 'text-amber-500',
+      bg: 'bg-amber-500/[0.15]', text: 'text-ink-warn',
       ringHover: 'hover:ring-amber-400/40', ringActive: 'ring-1 ring-amber-400/70',
       tip: 'Falta MMPP, cumplimiento de cuota, energía — la máquina disponible pero el proceso no la alimentó. NO es pérdida de Mantención. Click para ver sus eventos.',
     },
@@ -295,7 +295,7 @@ export function LossCascadeCard({
           desplegar" (Orel 2026-07-22). */}
       <button
         onClick={() => setExpanded(e => !e)}
-        className="w-full flex items-center gap-2 group rounded-ctl border border-primary/[0.25] bg-primary/[0.15] px-3 py-2 hover:bg-primary/[0.15] transition-colors"
+        className="w-full flex items-center gap-2 group rounded-ctl border border-transparent bg-primary/[0.15] px-3 py-2 hover:bg-primary/[0.15] transition-colors"
         aria-expanded={expanded}
       >
         {expanded
@@ -333,14 +333,14 @@ export function LossCascadeCard({
               onClick={() => setCalcOpen((v) => !v)}
               className={cn(
                 'text-caption px-2 py-0.5 rounded-ctl border transition-colors',
-                calcOpen ? 'bg-primary/[0.15] text-ink-info border-primary/[0.25]' : 'bg-muted text-muted-foreground border-border hover:bg-accent',
+                calcOpen ? 'bg-primary/[0.15] text-ink-info border-transparent' : 'bg-muted text-muted-foreground border-border hover:bg-accent',
               )}
             >
               ¿cómo se calcula?
             </button>
           </div>
           {calcOpen && (
-            <div className="rounded-ctl border border-primary/[0.25] bg-primary/[0.15] px-3 py-2 text-caption space-y-1 font-mono tabular-nums">
+            <div className="rounded-ctl border border-transparent bg-primary/[0.15] px-3 py-2 text-caption space-y-1 font-mono tabular-nums">
               <div>
                 <span className="text-muted-foreground">Turno (Σ máq) = tiempo rastreado por Shoplogix en el turno × 3 Baader (procesando + pausas + paros + setup; colación incluida hasta el paso siguiente) = </span>
                 <b>{fmtHm(turnoSec)}</b>
@@ -480,7 +480,7 @@ export function LossCascadeCard({
           })()}
 
           {causeMachine ? (
-            <div className="flex items-center gap-2 text-caption rounded-ctl border border-amber-500/[0.25] bg-amber-500/[0.15] px-2 py-1.5">
+            <div className="flex items-center gap-2 text-caption rounded-ctl border border-transparent bg-amber-500/[0.15] px-2 py-1.5">
               <span className="w-2 h-2 rounded-ctl shrink-0 bg-amber-400" />
               <span>
                 Resaltando: <b>{causeMachine.label}</b> en <b>{causeMachine.machine}</b>
@@ -529,7 +529,7 @@ export function LossCascadeCard({
                   pérdida (31-jul: 3.282 "perdidas" cuando 774 salieron igual). */}
               {filter === 'all' && recuperadas > 0 && (
                 <div
-                  className="mb-1.5 flex items-center gap-2 text-caption rounded-ctl px-2 py-1 bg-cat-6-tint/[0.15] border border-cat-6-tint/[0.25] cursor-help"
+                  className="mb-1.5 flex items-center gap-2 text-caption rounded-ctl px-2 py-1 bg-cat-6-tint/[0.15] border border-transparent cursor-help"
                   title={`${MANUAL_LINE_LABEL}: la planta procesó ${manual!.manualPieces.toLocaleString('es-CL')} piezas por fuera de las Baader. ${MANUAL_LINE_TOOLTIP}`}
                 >
                   <span className="w-2 h-2 rounded-ctl shrink-0 bg-cat-6-tint/[0.15]" />
@@ -573,7 +573,7 @@ export function LossCascadeCard({
                               )}
                               className={cn(
                                 'text-caption px-1 rounded-ctl bg-muted border transition-colors hover:border-amber-500/[0.25] hover:text-foreground',
-                                active ? 'border-amber-500/[0.25] text-amber-400 bg-amber-500/[0.15]' : 'border-border/60 text-muted-foreground',
+                                active ? 'border-transparent text-ink-warn bg-amber-500/[0.15]' : 'border-border/60 text-muted-foreground',
                               )}
                               title={`Ver solo los eventos de "${c.label}" en ${mn}`}
                             >

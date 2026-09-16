@@ -48,7 +48,7 @@ export function DistanciasTab({ physicalConfig, setPhysicalConfig, updateFlipper
               key={gateNum}
               className={cn(
                 'rounded-card border bg-muted dark:bg-muted-foreground/[0.10] p-3 space-y-2',
-                isCritical ? 'border-red-500/[0.25] bg-red-500/[0.15]' : 'border-border dark:border-muted-foreground/[0.10]',
+                isCritical ? 'border-transparent bg-red-500/[0.15]' : 'border-border dark:border-muted-foreground/[0.10]',
               )}
             >
               {/* Header */}
@@ -112,7 +112,7 @@ export function DistanciasTab({ physicalConfig, setPhysicalConfig, updateFlipper
                     {z2TimeSec != null ? `${dec2(z2TimeSec)} s` : '—'}
                   </p>
                   {deltaMm != null && (
-                    <p className={cn('text-caption font-mono', deltaMm < 0 ? 'text-amber-500' : 'text-muted-foreground')}>
+                    <p className={cn('text-caption font-mono', deltaMm < 0 ? 'text-ink-warn' : 'text-muted-foreground')}>
                       {deltaMm > 0 ? '+' : ''}{deltaMm.toFixed(0)} mm
                     </p>
                   )}

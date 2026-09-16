@@ -182,7 +182,7 @@ export function ShiftQuotaCard({
             <span className="text-xs text-muted-foreground">Sin cuota definida para este turno.</span>
             <button
               onClick={() => setEditing(true)}
-              className="ml-auto text-caption px-2 py-0.5 rounded-ctl border border-primary/30 bg-primary/5 text-brand-ink hover:bg-primary/10 transition-colors"
+              className="ml-auto text-caption px-2 py-0.5 rounded-ctl border border-transparent bg-primary/5 text-brand-ink hover:bg-primary/10 transition-colors"
             >
               Definir cuota
             </button>
@@ -218,7 +218,7 @@ export function ShiftQuotaCard({
     : 'bg-fill-critical'
 
   const verdictTextClass =
-    progressPct >= 100 ? 'text-emerald-400'
+    progressPct >= 100 ? 'text-ink-ok'
     : progressPct >= 90 ? 'text-ink-ok'
     : progressPct >= 50 ? 'text-ink-warn'
     : 'text-ink-crit'
@@ -238,7 +238,7 @@ export function ShiftQuotaCard({
           </span>
           {usingFallback && (
             <span
-              className="flex items-center gap-1 text-caption px-1.5 py-0.5 rounded-ctl bg-emerald-500/[0.15] text-ink-ok border border-emerald-500/[0.25] cursor-help"
+              className="flex items-center gap-1 text-caption px-1.5 py-0.5 rounded-ctl bg-emerald-500/[0.15] text-ink-ok border border-transparent cursor-help"
               title="No hay Excel del Grader cargado aún. Se muestra avance estimado desde ciclos Baader (Shoplogix), que será reemplazado por la cifra real cuando se cargue el Excel."
             >
               <Radio className="w-2.5 h-2.5 animate-pulse" />
@@ -246,7 +246,7 @@ export function ShiftQuotaCard({
             </span>
           )}
           {cumplio && (
-            <span className="flex items-center gap-1 text-caption px-1.5 py-0.5 rounded-ctl bg-emerald-500/[0.15] text-ink-ok border border-emerald-500/[0.25]">
+            <span className="flex items-center gap-1 text-caption px-1.5 py-0.5 rounded-ctl bg-emerald-500/[0.15] text-ink-ok border border-transparent">
               <CheckCircle2 className="w-2.5 h-2.5" />
               Cumplido
             </span>
@@ -298,14 +298,14 @@ export function ShiftQuotaCard({
                   Faltan <span className="text-foreground font-medium">{fmt(remaining, quota!.unit)}</span>
                 </span>
               ) : (
-                <span className="text-emerald-400 font-medium">Meta alcanzada</span>
+                <span className="text-ink-ok font-medium">Meta alcanzada</span>
               )}
 
               {projected != null && projectedPct != null && shiftWindow.status === 'live' && (
                 <span
                   className={cn(
                     'flex items-center gap-1 ml-auto cursor-help',
-                    willHit ? 'text-emerald-400' : 'text-amber-400',
+                    willHit ? 'text-ink-ok' : 'text-ink-warn',
                   )}
                   title="Proyección al final del turno asumiendo el ritmo actual."
                 >
@@ -326,10 +326,10 @@ export function ShiftQuotaCard({
                 un dato que está bien. */}
             {discrepancy && discrepancy.missing > 0 && (
               <div
-                className="flex items-start gap-2 rounded-ctl bg-amber-500/[0.15] border border-amber-500/[0.25] px-2.5 py-1.5"
+                className="flex items-start gap-2 rounded-ctl bg-amber-500/[0.15] border border-transparent px-2.5 py-1.5"
                 title="Shoplogix reporta más ciclos en las Baader que piezas pesadas en el Grader. Como todas las piezas deberían pasar por el Grader, la diferencia puede ser: Excel parcial, fallas de registro del Marelec, o pérdidas físicas."
               >
-                <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-px" />
+                <AlertTriangle className="w-3.5 h-3.5 text-ink-warn shrink-0 mt-px" />
                 <div className="text-caption text-ink-warn leading-tight">
                   <span className="font-semibold tabular-nums">
                     {Math.round(discrepancy.missing).toLocaleString('es-CL')} piezas sin confirmar
@@ -399,7 +399,7 @@ function QuotaEditor({
         <button
           onClick={() => void onSave()}
           disabled={saving || !numValid}
-          className="flex items-center gap-1 text-xs px-3 py-1 rounded-ctl border border-primary/40 bg-primary/10 text-brand-ink hover:bg-primary/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          className="flex items-center gap-1 text-xs px-3 py-1 rounded-ctl border border-transparent bg-primary/10 text-brand-ink hover:bg-primary/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {saving && <Loader2 className="w-3 h-3 animate-spin" />}
           Guardar

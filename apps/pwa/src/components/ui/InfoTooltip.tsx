@@ -199,7 +199,7 @@ export function InfoTooltip({
           className={cn(
             'fixed z-[9999]',
             'rounded-card shadow-2xl',
-            'bg-slate-800 text-slate-100',
+            'bg-slate-800 text-foreground',
             'text-xs leading-relaxed',
             'transition-all duration-150 ease-out',
             visible
@@ -244,7 +244,7 @@ export function InfoTooltip({
               )}
             </span>
           ) : (
-            <span className="text-slate-200">{text}</span>
+            <span className="text-foreground">{text}</span>
           )}
         </span>,
         document.body,

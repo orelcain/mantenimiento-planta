@@ -901,7 +901,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident, 
                     </button>
                     {/* Metadatos (overlay en hover o siempre visible pequeño) */}
                     {photoMeta[index] && (
-                       <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-caption text-white p-1 text-center truncate rounded-b-lg backdrop-blur-[2px] leading-tight">
+                       <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-caption text-white p-1 text-center truncate rounded-b-ctl backdrop-blur-[2px] leading-tight">
                          <div className="font-semibold text-ink-warn">{photoMeta[index].compressed} ({photoMeta[index].format})</div>
                          <div className="opacity-75">{photoMeta[index].dim}</div>
                          <div className="scale-[0.8] opacity-50 line-through">{photoMeta[index].original}</div>

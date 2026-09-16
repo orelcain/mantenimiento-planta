@@ -42,9 +42,9 @@ const CATEGORY_META: Record<SuggestedAction['category'], {
   color: string
   bg: string
 }> = {
-  terreno: { label: 'Terreno', icon: Wrench, color: 'text-ink-warn', bg: 'bg-amber-500/[0.15] border-amber-500/[0.25]' },
-  oficina: { label: 'Oficina', icon: Monitor, color: 'text-brand-ink', bg: 'bg-primary/[0.15] border-primary/[0.25]' },
-  verificar: { label: 'Verificar', icon: Eye, color: 'text-cat-6-ink', bg: 'bg-cat-6-tint/[0.15] border-cat-6-tint/[0.25]' },
+  terreno: { label: 'Terreno', icon: Wrench, color: 'text-ink-warn', bg: 'bg-amber-500/[0.15] border-transparent' },
+  oficina: { label: 'Oficina', icon: Monitor, color: 'text-brand-ink', bg: 'bg-primary/[0.15] border-transparent' },
+  verificar: { label: 'Verificar', icon: Eye, color: 'text-cat-6-ink', bg: 'bg-cat-6-tint/[0.15] border-transparent' },
 }
 
 const SEVERITY_ICON: Record<SuggestedAction['severity'], typeof AlertTriangle> = {
@@ -54,8 +54,8 @@ const SEVERITY_ICON: Record<SuggestedAction['severity'], typeof AlertTriangle> =
 }
 
 const SEVERITY_COLOR: Record<SuggestedAction['severity'], string> = {
-  critical: 'text-red-400',
-  warning: 'text-amber-400',
+  critical: 'text-ink-crit',
+  warning: 'text-ink-warn',
   recommended: 'text-muted-foreground',
 }
 
@@ -109,7 +109,7 @@ function ActionItem({
           aria-label={checked ? 'Desmarcar' : 'Marcar como hecho'}
         >
           {checked
-            ? <CheckSquare className="w-4 h-4 text-emerald-400" />
+            ? <CheckSquare className="w-4 h-4 text-ink-ok" />
             : <Square className="w-4 h-4" />}
         </button>
 
@@ -121,7 +121,7 @@ function ActionItem({
             </span>
           </div>
           {action.estimatedImpact && (
-            <span className="text-xs text-emerald-400 ml-5">
+            <span className="text-xs text-ink-ok ml-5">
               ≈ {action.estimatedImpact.deltaPct > 0 ? '+' : ''}{action.estimatedImpact.deltaPct}% {action.estimatedImpact.metric}
             </span>
           )}
@@ -131,7 +131,7 @@ function ActionItem({
           {action.actionTrigger && (
             <button
               onClick={handleTrigger}
-              className="mt-2 flex items-center gap-1 text-caption px-2 py-1 rounded-ctl border border-primary/30 bg-primary/5 text-brand-ink hover:bg-primary/10 transition-colors font-medium"
+              className="mt-2 flex items-center gap-1 text-caption px-2 py-1 rounded-ctl border border-transparent bg-primary/5 text-brand-ink hover:bg-primary/10 transition-colors font-medium"
             >
               {action.actionLabel ?? TRIGGER_LABELS[action.actionTrigger]}
               <ArrowRight className="w-3 h-3" />
@@ -230,7 +230,7 @@ export function ActionPlanPanel({ shiftDocId, suggestions, status, relatedRunboo
         <div className="flex items-center justify-between">
           <CardTitle className="text-base">¿Qué hacer?</CardTitle>
           {doneCount > 0 && (
-            <span className="text-xs text-emerald-400 font-medium">
+            <span className="text-xs text-ink-ok font-medium">
               {doneCount}/{suggestions.length} completadas
             </span>
           )}

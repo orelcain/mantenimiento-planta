@@ -115,7 +115,7 @@ const SpeechInput = React.forwardRef<HTMLInputElement, SpeechInputProps>(
             className={cn(
               "absolute right-0 top-0 size-11 p-0 rounded-full",
               isListening 
-                ? "bg-red-500/[0.15] text-red-600 hover:bg-red-500/[0.15] hover:text-ink-crit animate-pulse" 
+                ? "bg-red-500/[0.15] text-ink-crit hover:bg-red-500/[0.15] hover:text-ink-crit animate-pulse" 
                 : "text-muted-foreground hover:text-foreground"
             )}
             onClick={toggleListening}

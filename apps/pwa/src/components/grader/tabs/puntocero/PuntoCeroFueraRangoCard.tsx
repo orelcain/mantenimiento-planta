@@ -16,7 +16,7 @@ export function PuntoCeroFueraRangoCard({ analytics }: Props) {
     <Card>
       <CardHeader>
         <CardTitle className="text-sm flex items-center gap-2">
-          <AlertTriangle className="h-4 w-4 text-amber-500" />
+          <AlertTriangle className="h-4 w-4 text-ink-warn" />
           Fuera de Rango — Distribución por Peso
           <InfoTooltip {...getTooltipProps('pz.fueraRango')} />
         </CardTitle>

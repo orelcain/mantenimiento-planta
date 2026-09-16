@@ -274,7 +274,7 @@ export function GlobalSettingsModal({ open, onOpenChange, plantLineId, defaultTa
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-xs">Umbral alerta P0% <span className="text-amber-500">●</span></Label>
+                  <Label className="text-xs">Umbral alerta P0% <span className="text-ink-warn">●</span></Label>
                   <Input
                     type="number"
                     min={0} max={100} step={0.5}
@@ -286,7 +286,7 @@ export function GlobalSettingsModal({ open, onOpenChange, plantLineId, defaultTa
                 </div>
 
                 <div>
-                  <Label className="text-xs">Umbral crítico P0% <span className="text-red-500">●</span></Label>
+                  <Label className="text-xs">Umbral crítico P0% <span className="text-ink-crit">●</span></Label>
                   <Input
                     type="number"
                     min={0} max={100} step={0.5}

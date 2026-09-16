@@ -17,9 +17,9 @@ import type { GraderDailySummary } from '@/services/grader/types'
 import { dec1 } from '@/utils/formatoNumeros'
 
 const P0_COLOR: Record<ReturnType<typeof verdictFromP0Pct>, string> = {
-  ok:       'text-emerald-400',
-  warn:     'text-amber-400',
-  critical: 'text-red-400',
+  ok:       'text-ink-ok',
+  warn:     'text-ink-warn',
+  critical: 'text-ink-crit',
 }
 
 interface LineStatusWidgetProps {
@@ -55,7 +55,7 @@ export function LineStatusWidget({
 
   return (
     <div
-      className="rounded-card border border-red-500/[0.25] bg-red-500/[0.15] px-3 py-2.5 cursor-pointer hover:bg-red-500/[0.15] transition-colors"
+      className="rounded-card border border-transparent bg-red-500/[0.15] px-3 py-2.5 cursor-pointer hover:bg-red-500/[0.15] transition-colors"
       onClick={() => navigate(`/analisis-grader/turno/${shiftDocId}`)}
       role="button"
       tabIndex={0}
@@ -63,8 +63,8 @@ export function LineStatusWidget({
     >
       {/* Header */}
       <div className="flex items-center gap-2 mb-2">
-        <Activity className="w-3.5 h-3.5 text-red-400 animate-pulse shrink-0" />
-        <span className="text-xs font-semibold text-red-400">{shortShift} en curso</span>
+        <Activity className="w-3.5 h-3.5 text-ink-crit animate-pulse shrink-0" />
+        <span className="text-xs font-semibold text-ink-crit">{shortShift} en curso</span>
         <ShiftStartLabel iso={shiftStart} />
         <span className="ml-auto text-caption text-muted-foreground/50 flex items-center gap-1">
           Ver turno <ArrowRight className="w-3 h-3" />

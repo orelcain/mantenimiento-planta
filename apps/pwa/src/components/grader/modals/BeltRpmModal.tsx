@@ -187,7 +187,7 @@ export function BeltRpmModal({
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium">{BELT_LABELS[beltId]}</span>
                 {!calibrated && (
-                  <span className="flex items-center gap-1 text-caption text-amber-400">
+                  <span className="flex items-center gap-1 text-caption text-ink-warn">
                     <AlertTriangle className="w-2.5 h-2.5" />
                     Sin factor calibrado
                   </span>

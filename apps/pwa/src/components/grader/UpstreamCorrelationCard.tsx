@@ -37,13 +37,13 @@ function fmtLead(sec: number): string {
 }
 
 const KIND_STYLE: Record<CorrelationKind, { bg: string; border: string; text: string; icon: typeof AlertTriangle; label: string }> = {
-  upstream_global:      { bg: 'bg-red-500/[0.15]',    border: 'border-red-500/[0.25] dark:border-red-500/[0.25]',    text: 'text-ink-crit',    icon: AlertTriangle, label: 'Causa upstream' },
-  upstream_majority:    { bg: 'bg-amber-500/[0.15]',   border: 'border-amber-500/[0.25] dark:border-amber-500/[0.25]',   text: 'text-ink-warn',   icon: AlertTriangle, label: 'Upstream parcial' },
+  upstream_global:      { bg: 'bg-red-500/[0.15]',    border: 'border-transparent dark:border-transparent',    text: 'text-ink-crit',    icon: AlertTriangle, label: 'Causa upstream' },
+  upstream_majority:    { bg: 'bg-amber-500/[0.15]',   border: 'border-transparent dark:border-transparent',   text: 'text-ink-warn',   icon: AlertTriangle, label: 'Upstream parcial' },
   upstream_single:      { bg: 'bg-muted dark:bg-muted-foreground/[0.10]',   border: 'border-border dark:border-border',      text: 'text-muted-foreground dark:text-muted-foreground',   icon: Info,          label: 'Verificar' },
   // Coincidencia organizacional (colación, reunión) — NO es causal upstream.
   // Tono cyan/info para diferenciarlo claramente de los upstream "reales".
-  coincidental_planned: { bg: 'bg-cat-7-tint/[0.15]',    border: 'border-cat-7-tint/[0.25] dark:border-cat-7-tint/[0.25]',    text: 'text-cat-7-ink',    icon: Info,          label: 'Coincidencia programada' },
-  no_correlation:       { bg: 'bg-emerald-500/[0.15]', border: 'border-emerald-500/[0.25] dark:border-emerald-500/[0.25]', text: 'text-ink-ok', icon: CheckCircle2,  label: 'Interna' },
+  coincidental_planned: { bg: 'bg-cat-7-tint/[0.15]',    border: 'border-transparent dark:border-transparent',    text: 'text-cat-7-ink',    icon: Info,          label: 'Coincidencia programada' },
+  no_correlation:       { bg: 'bg-emerald-500/[0.15]', border: 'border-transparent dark:border-transparent', text: 'text-ink-ok', icon: CheckCircle2,  label: 'Interna' },
 }
 
 function CorrelationRow({ corr, expanded, onToggle }: {
@@ -188,7 +188,7 @@ export function UpstreamCorrelationCard({ pauses, snapshot }: Props) {
 
         {summary.upstreamCaused === 0 && coincidentalCount === 0 ? (
           <div className="text-xs text-muted-foreground py-2 flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+            <CheckCircle2 className="w-4 h-4 text-ink-ok" />
             Ninguno de los {pauses.length} paros correlacionó con eventos upstream. Las Baaders estaban corriendo normal → las causas son internas del Grader.
           </div>
         ) : (

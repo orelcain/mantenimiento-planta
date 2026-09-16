@@ -823,7 +823,7 @@ export function AnalisisGraderWizardPage() {
               {autosaveState === 'queued' && <>Guardado pendiente</>}
             </Badge>
           )}
-          <Button variant="outline" onClick={() => navigate('/analisis-grader/periodo')} className="border-primary/30 text-brand-ink hover:bg-primary/10">
+          <Button variant="outline" onClick={() => navigate('/analisis-grader/periodo')} className="border-transparent text-brand-ink hover:bg-primary/10">
             <BarChart3 className="h-4 w-4 mr-1.5" />
             <span className="hidden sm:inline">Análisis </span>período
           </Button>
@@ -861,9 +861,9 @@ export function AnalisisGraderWizardPage() {
                   {multiDayCounts && multiDayCounts.replace > 0 && (
                     <>
                       {' · '}
-                      <span className="text-emerald-400 font-medium">{multiDayCounts.new} nuevo{multiDayCounts.new !== 1 ? 's' : ''}</span>
+                      <span className="text-ink-ok font-medium">{multiDayCounts.new} nuevo{multiDayCounts.new !== 1 ? 's' : ''}</span>
                       <span className="text-muted-foreground"> · </span>
-                      <span className="text-amber-400 font-medium">{multiDayCounts.replace} reemplazo{multiDayCounts.replace !== 1 ? 's' : ''}</span>
+                      <span className="text-ink-warn font-medium">{multiDayCounts.replace} reemplazo{multiDayCounts.replace !== 1 ? 's' : ''}</span>
                     </>
                   )}
                 </p>
@@ -901,7 +901,7 @@ export function AnalisisGraderWizardPage() {
         </Card>
       )}
       {savedToCalendar && (
-        <Card className="border-emerald-500/[0.25] bg-emerald-500/[0.15]">
+        <Card className="border-transparent bg-emerald-500/[0.15]">
           <CardContent className="py-3 px-4 flex items-center gap-2 flex-wrap">
             <CheckCircle2 className="h-4 w-4 text-ink-ok shrink-0" />
             <p className="text-sm text-ink-ok font-medium flex-1 min-w-[16rem]">
@@ -929,7 +929,7 @@ export function AnalisisGraderWizardPage() {
         </Card>
       )}
       {saveError && (
-        <Card className="border-red-500/[0.25] bg-red-500/[0.15]">
+        <Card className="border-transparent bg-red-500/[0.15]">
           <CardContent className="py-3 px-4 flex items-start gap-2">
             <AlertCircle className="h-4 w-4 text-ink-crit shrink-0 mt-0.5" />
             <div className="flex-1 min-w-0">
@@ -981,7 +981,7 @@ export function AnalisisGraderWizardPage() {
               `lineId` de la pestaña activa se propaga al guardar el doc
               con el prefix correcto (`yal-eviscerado__...` cuando aplica). */}
           {lineConfig.hasGraderData && (
-            <div className="rounded-card border border-primary/[0.25] bg-primary/[0.15]">
+            <div className="rounded-card border border-transparent bg-primary/[0.15]">
               <button
                 type="button"
                 onClick={() => setUploadPanelExpanded((v) => !v)}

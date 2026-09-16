@@ -295,7 +295,7 @@ export function MonitorUsagePanel({ stats, token }: { stats: MonitorUsageStats |
               <div
                 key={d.dia}
                 title={`${d.dia}: ${d.opens} aperturas`}
-                className="flex-1 rounded-sm bg-primary/[0.7] min-h-[2px]"
+                className="flex-1 rounded-ctl bg-primary/[0.7] min-h-[2px]"
                 style={{ height: `${Math.max(6, (d.opens / maxDia) * 100)}%` }}
               />
             ))}

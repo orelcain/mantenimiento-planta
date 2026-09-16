@@ -31,7 +31,7 @@ const buttonVariants = cva(
         filled: 'bg-primary text-primary-foreground hover:brightness-[1.06]',
         tinted: 'bg-primary/[0.13] text-brand-ink hover:bg-primary/[0.18]',
         plain: 'bg-transparent text-primary font-medium hover:opacity-70',
-        destructive: 'bg-red-500/[0.13] text-red-600 hover:bg-red-500/[0.18]',
+        destructive: 'bg-red-500/[0.13] text-ink-crit hover:bg-red-500/[0.18]',
       },
       size: {
         // Alturas ≥44px salvo `sm`, que es para barras densas de escritorio.

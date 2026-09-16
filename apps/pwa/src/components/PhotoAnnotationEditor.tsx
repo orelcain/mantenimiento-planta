@@ -294,7 +294,7 @@ export function PhotoAnnotationEditor({
                     variant="outline"
                     size="sm"
                     onClick={selectedShapeId ? handleDeleteShape : handleDeleteText}
-                    className="text-red-600"
+                    className="text-ink-crit"
                   >
                     <Trash2 className="h-4 w-4 mr-2" />
                     Eliminar

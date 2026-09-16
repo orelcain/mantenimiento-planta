@@ -72,6 +72,6 @@ describe('TurnoOficialChip', () => {
       />,
     )
     const badge = screen.getByText('Línea 20% del target oficial')
-    expect(badge.closest('[class*="red-400"]')).not.toBeNull()
+    expect(badge.closest('[class*="ink-crit"]')).not.toBeNull()
   })
 })

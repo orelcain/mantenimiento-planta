@@ -59,7 +59,7 @@ export function EquipmentHeaderPhoto({ equipmentId }: { equipmentId: string }) {
         </button>
       ) : (
         <label className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-card border-2 border-dashed transition-all sm:h-14 sm:w-14 ${
-          uploading ? 'border-primary/50 bg-primary/5' : 'cursor-pointer border-border hover:border-primary/50 hover:bg-primary/5'
+          uploading ? 'border-transparent bg-primary/5' : 'cursor-pointer border-border hover:border-transparent hover:bg-primary/5'
         }`}>
           {uploading ? (
             <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />

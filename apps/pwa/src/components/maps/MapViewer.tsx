@@ -512,7 +512,7 @@ export const MapViewer = forwardRef<MapViewerHandle, MapViewerProps>(({
 
       {/* Botones de confirmación para posición pendiente - FUERA del overflow */}
       {pendingPosition && onPositionConfirm && onPositionCancel && (
-        <div className="shrink-0 flex justify-center gap-2 p-3 bg-background border-t rounded-b-lg">
+        <div className="shrink-0 flex justify-center gap-2 p-3 bg-background border-t rounded-b-ctl">
           <Button
             variant="outline"
             size="sm"

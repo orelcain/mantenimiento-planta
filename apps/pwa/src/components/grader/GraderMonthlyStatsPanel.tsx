@@ -227,7 +227,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
         <Card className={`border-0 bg-ink-ok/[0.15] ${!best ? 'opacity-40' : ''}`}>
           <CardContent className="pt-1.5 pb-1.5 px-3">
             <div className="flex items-center gap-1 mb-0.5">
-              <TrendingDown className="w-3 h-3 text-emerald-500" />
+              <TrendingDown className="w-3 h-3 text-ink-ok" />
               <p className="text-caption text-ink-ok font-medium">
                 Mejor · {best?.metric ?? '—'}
               </p>
@@ -275,7 +275,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
               <div>
                 <p className="text-xl font-bold leading-none tabular-nums">{dayShifts}</p>
                 <p className="text-caption text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
-                  <Sun className="w-3 h-3 text-amber-500" /> Día
+                  <Sun className="w-3 h-3 text-ink-warn" /> Día
                 </p>
               </div>
               <div className="w-px bg-border" />
@@ -291,7 +291,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
               <div>
                 <p className="text-xl font-bold leading-none tabular-nums">{t1Shifts}</p>
                 <p className="text-caption text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
-                  <Sunrise className="w-3 h-3 text-amber-400" /> T1
+                  <Sunrise className="w-3 h-3 text-ink-warn" /> T1
                 </p>
               </div>
               <div className="w-px bg-border" />

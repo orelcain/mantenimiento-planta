@@ -96,7 +96,7 @@ export function DefaultRoutePage() {
 
       <div className="space-y-1">
         <h1 className="text-2xl font-semibold flex items-center gap-2">
-          <LayoutDashboard className="w-6 h-6 text-emerald-400" />
+          <LayoutDashboard className="w-6 h-6 text-ink-ok" />
           Página de inicio por defecto
         </h1>
         <p className="text-sm text-muted-foreground">
@@ -106,7 +106,7 @@ export function DefaultRoutePage() {
         </p>
       </div>
 
-      <Card className="border-emerald-500/[0.25] bg-emerald-500/[0.15]">
+      <Card className="border-transparent bg-emerald-500/[0.15]">
         <CardContent className="p-3 flex items-start gap-2 text-xs text-ink-ok">
           <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
           <span>

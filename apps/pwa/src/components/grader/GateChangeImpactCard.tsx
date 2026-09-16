@@ -140,7 +140,7 @@ export function GateChangeImpactCard({
                     'text-caption tabular-nums shrink-0 w-12 text-right',
                     seg.p0Before === null
                       ? 'text-muted-foreground/30'
-                      : seg.p0Before > 5 ? 'text-red-400' : 'text-muted-foreground',
+                      : seg.p0Before > 5 ? 'text-ink-crit' : 'text-muted-foreground',
                   )}>
                     {seg.p0Before !== null ? `${dec1(seg.p0Before)}%` : '—'}
                   </span>
@@ -154,8 +154,8 @@ export function GateChangeImpactCard({
                       ? 'text-ink-warn italic text-caption'
                       : seg.p0After === null
                         ? 'text-muted-foreground/30'
-                        : improved ? 'text-emerald-400'
-                          : worsened ? 'text-red-400'
+                        : improved ? 'text-ink-ok'
+                          : worsened ? 'text-ink-crit'
                             : 'text-muted-foreground',
                   )}>
                     {inProgress

@@ -35,15 +35,15 @@ const COMMON_FIELDS = CAMPOS_COMUNES
 /** Lo que la UI agrega sobre la plantilla compartida: icono y color del tipo. */
 const ADORNO: Record<string, { icon: typeof Zap; color: string }> = {
   motor: { icon: Zap, color: 'text-ink-warn' },
-  bomba: { icon: Droplets, color: 'text-blue-400' },
+  bomba: { icon: Droplets, color: 'text-brand-ink' },
   reductor: { icon: Cog, color: 'text-muted-foreground' },
-  cinta: { icon: ArrowRightLeft, color: 'text-green-400' },
-  valvula: { icon: GitBranch, color: 'text-red-400' },
+  cinta: { icon: ArrowRightLeft, color: 'text-ink-ok' },
+  valvula: { icon: GitBranch, color: 'text-ink-crit' },
   sensor: { icon: Gauge, color: 'text-cat-6-ink' },
   cilindro: { icon: CircleDot, color: 'text-cat-4-ink' },
   compresor: { icon: Wind, color: 'text-cat-7-ink' },
   intercambiador: { icon: Thermometer, color: 'text-cat-5-ink' },
-  filtro: { icon: Filter, color: 'text-emerald-400' },
+  filtro: { icon: Filter, color: 'text-ink-ok' },
   general: { icon: Package, color: 'text-muted-foreground' },
 }
 

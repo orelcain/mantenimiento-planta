@@ -1065,7 +1065,7 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
               <svg viewBox="0 0 36 36" className="h-full w-full -rotate-90">
                 <circle cx="18" cy="18" r="15.5" fill="none" stroke="currentColor" strokeWidth="3" className="text-muted/30" />
                 <circle cx="18" cy="18" r="15.5" fill="none" stroke="currentColor" strokeWidth="3"
-                  className={coberturaPct >= 80 ? 'text-emerald-500' : coberturaPct >= 50 ? 'text-amber-500' : 'text-red-500'}
+                  className={coberturaPct >= 80 ? 'text-ink-ok' : coberturaPct >= 50 ? 'text-ink-warn' : 'text-ink-crit'}
                   strokeDasharray={`${(coberturaPct / 100) * 97.4} ${97.4 - (coberturaPct / 100) * 97.4}`} strokeLinecap="round" />
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
@@ -1663,14 +1663,14 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
             <button onClick={onClose} className="p-1 rounded-ctl hover:bg-muted shrink-0"><X className="h-5 w-5 text-muted-foreground" /></button>
           </div>
           <div className="flex gap-2 mt-3">
-            <button onClick={onMovimiento} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-emerald-500/[0.15] border border-emerald-500/[0.25] rounded-card hover:bg-emerald-500/[0.15] text-ink-ok">
+            <button onClick={onMovimiento} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-emerald-500/[0.15] border border-transparent rounded-card hover:bg-emerald-500/[0.15] text-ink-ok">
               <ArrowDownCircle className="h-3.5 w-3.5" /> Movimiento
             </button>
             <button onClick={onEdit} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-muted border border-border rounded-card hover:bg-muted text-muted-foreground">
               <Pencil className="h-3.5 w-3.5" /> {has ? 'Editar' : 'Configurar'}
             </button>
             {onSearchSimilar && (
-              <button onClick={() => { onSearchSimilar(item.textoBreve || item.codigoSAP); onClose() }} className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-primary/[0.15] border border-primary/[0.25] rounded-card hover:bg-primary/[0.15] text-brand-ink">
+              <button onClick={() => { onSearchSimilar(item.textoBreve || item.codigoSAP); onClose() }} className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-primary/[0.15] border border-transparent rounded-card hover:bg-primary/[0.15] text-brand-ink">
                 <Search className="h-3.5 w-3.5" />
               </button>
             )}
@@ -1725,7 +1725,7 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
 
           {/* Punto de reorden */}
           {reorder && (
-            <div className={`rounded-card border p-3 ${reorder.necesitaPedir ? 'border-red-500/[0.25] bg-red-500/[0.15]' : 'border-border'}`}>
+            <div className={`rounded-card border p-3 ${reorder.necesitaPedir ? 'border-transparent bg-red-500/[0.15]' : 'border-border'}`}>
               <p className="text-caption text-muted-foreground tracking-wide mb-2 flex items-center gap-1">
                 <ShoppingCart className="h-3 w-3" /> Reposición
                 {reorder.necesitaPedir && <span className="ml-auto text-caption px-1.5 py-0.5 rounded-ctl bg-red-500/[0.15] text-ink-crit font-bold">Pedir ahora</span>}
@@ -1813,7 +1813,7 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
                   <button onClick={handleDownloadQR} className="flex items-center gap-1 px-3 py-1.5 text-caption font-medium bg-muted border border-border rounded-card hover:bg-muted text-muted-foreground">
                     <Download className="h-3 w-3" /> Descargar PNG
                   </button>
-                  <button onClick={handlePrintQR} className="flex items-center gap-1 px-3 py-1.5 text-caption font-medium bg-primary/10 border border-primary/30 rounded-card hover:bg-primary/20 text-brand-ink">
+                  <button onClick={handlePrintQR} className="flex items-center gap-1 px-3 py-1.5 text-caption font-medium bg-primary/10 border border-transparent rounded-card hover:bg-primary/20 text-brand-ink">
                     <QrCode className="h-3 w-3" /> Imprimir
                   </button>
                 </div>
@@ -1916,7 +1916,7 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
 function ModalBackdrop({ onClose, children, wide }: { onClose: () => void; children: React.ReactNode; wide?: boolean }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div className={`bg-card border border-border rounded-t-2xl sm:rounded-panel shadow-2xl w-full ${wide ? 'max-w-2xl' : 'max-w-lg'} max-h-[90dvh] sm:max-h-[85vh] overflow-y-auto`} onClick={e => e.stopPropagation()}>{children}</div>
+      <div className={`bg-card border border-border rounded-t-panel sm:rounded-panel shadow-2xl w-full ${wide ? 'max-w-2xl' : 'max-w-lg'} max-h-[90dvh] sm:max-h-[85vh] overflow-y-auto`} onClick={e => e.stopPropagation()}>{children}</div>
     </div>
   )
 }
@@ -2017,9 +2017,9 @@ function MovimientoModal({ item, onSave, onClose }: {
   const handleTipoChange = (t: typeof tipo) => { setTipo(t); setMotivoKey('') }
 
   const OPTS = [
-    { v: 'entrada' as const, l: 'Entrada', icon: ArrowDownCircle, c: 'text-ink-ok bg-emerald-500/[0.15] border-emerald-500/[0.25]' },
-    { v: 'salida' as const, l: 'Salida', icon: ArrowUpCircle, c: 'text-ink-crit bg-red-500/[0.15] border-red-500/[0.25]' },
-    { v: 'ajuste' as const, l: 'Ajuste', icon: Settings2, c: 'text-brand-ink bg-primary/[0.15] border-primary/[0.25]' },
+    { v: 'entrada' as const, l: 'Entrada', icon: ArrowDownCircle, c: 'text-ink-ok bg-emerald-500/[0.15] border-transparent' },
+    { v: 'salida' as const, l: 'Salida', icon: ArrowUpCircle, c: 'text-ink-crit bg-red-500/[0.15] border-transparent' },
+    { v: 'ajuste' as const, l: 'Ajuste', icon: Settings2, c: 'text-brand-ink bg-primary/[0.15] border-transparent' },
   ]
 
   return (
@@ -2185,11 +2185,11 @@ function BatchMovimientoModal({ items, registrarMovimientoBatch, user, onClose }
             {/* Tipo */}
             <div className="grid grid-cols-2 gap-2">
               <button type="button" onClick={() => { setTipo('entrada'); setMotivoKey('') }}
-                className={`flex items-center justify-center gap-2 py-3 rounded-card border-2 transition-all text-sm font-medium ${tipo === 'entrada' ? 'text-ink-ok bg-emerald-500/[0.15] border-emerald-500/[0.25]' : 'border-border bg-muted text-muted-foreground'}`}>
+                className={`flex items-center justify-center gap-2 py-3 rounded-card border-2 transition-all text-sm font-medium ${tipo === 'entrada' ? 'text-ink-ok bg-emerald-500/[0.15] border-transparent' : 'border-border bg-muted text-muted-foreground'}`}>
                 <ArrowDownCircle className="h-5 w-5" /> Entrada
               </button>
               <button type="button" onClick={() => { setTipo('salida'); setMotivoKey('') }}
-                className={`flex items-center justify-center gap-2 py-3 rounded-card border-2 transition-all text-sm font-medium ${tipo === 'salida' ? 'text-ink-crit bg-red-500/[0.15] border-red-500/[0.25]' : 'border-border bg-muted text-muted-foreground'}`}>
+                className={`flex items-center justify-center gap-2 py-3 rounded-card border-2 transition-all text-sm font-medium ${tipo === 'salida' ? 'text-ink-crit bg-red-500/[0.15] border-transparent' : 'border-border bg-muted text-muted-foreground'}`}>
                 <ArrowUpCircle className="h-5 w-5" /> Salida
               </button>
             </div>

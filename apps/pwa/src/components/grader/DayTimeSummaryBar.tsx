@@ -95,7 +95,7 @@ export function DayTimeSummaryBar({ dateKey, plantSlug, enabled, className }: Pr
         <Clock className="w-3.5 h-3.5" />
         Tiempos del día · {maquinasLabel}, todos los turnos
       </span>
-      <span className="text-emerald-400 tabular-nums" title={`Tiempo total procesando (suma de ${maquinasLabel}, todos los turnos)`}>
+      <span className="text-ink-ok tabular-nums" title={`Tiempo total procesando (suma de ${maquinasLabel}, todos los turnos)`}>
         ▲ {fmtDurationSec(totals.uptimeSec)} procesando
       </span>
       <span className="text-ink-crit tabular-nums" title={`Tiempo total de detención/paro (suma de ${maquinasLabel}, todos los turnos)`}>
@@ -105,7 +105,7 @@ export function DayTimeSummaryBar({ dateKey, plantSlug, enabled, className }: Pr
           "procesando" y "detenidas" — y en el teléfono no hay hover que muestre
           el title. Se dice la palabra, como sus dos vecinos. */}
       {totals.breakSec > 0 && (
-        <span className="text-amber-400 tabular-nums" title="Pausas programadas (colación/reunión), todos los turnos">
+        <span className="text-ink-warn tabular-nums" title="Pausas programadas (colación/reunión), todos los turnos">
           <Coffee className="h-3 w-3 shrink-0" />{fmtDurationSec(totals.breakSec)} en colación
         </span>
       )}

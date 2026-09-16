@@ -45,8 +45,8 @@ function CorridaRow({ corrida }: { corrida: PowerBIExportCorrida }) {
   return (
     <div className="border-b border-border/60 last:border-0 flex items-center gap-2 py-2 text-sm">
       {corrida.ok
-        ? <CircleCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-        : <CircleAlert className="w-4 h-4 text-red-400 shrink-0" />}
+        ? <CircleCheck className="w-4 h-4 text-ink-ok shrink-0" />
+        : <CircleAlert className="w-4 h-4 text-ink-crit shrink-0" />}
       <span className="text-xs text-muted-foreground w-32 shrink-0">{fmt(corrida.at)}</span>
       <span className="flex-1 truncate">
         {corrida.ok ? 'Export OK' : (corrida.error ?? 'Error')}
@@ -86,11 +86,11 @@ export function PowerBIExportPage() {
   const online = agenteEnLinea(config.agenteVistoAt)
 
   const estadoUI = useMemo(() => {
-    if (config.ordenPendiente) return { icon: <Loader2 className="w-4 h-4 animate-spin text-amber-400" />, texto: 'Orden pendiente — el agente la toma en ≤15 min' }
+    if (config.ordenPendiente) return { icon: <Loader2 className="w-4 h-4 animate-spin text-ink-warn" />, texto: 'Orden pendiente — el agente la toma en ≤15 min' }
     switch (config.estado) {
-      case 'corriendo': return { icon: <Loader2 className="w-4 h-4 animate-spin text-blue-400" />, texto: 'Exportando y refrescando ahora…' }
-      case 'ok':        return { icon: <CircleCheck className="w-4 h-4 text-emerald-400" />, texto: 'Última actualización exitosa' }
-      case 'error':     return { icon: <CircleAlert className="w-4 h-4 text-red-400" />, texto: config.mensajeError ?? 'Error en la última corrida' }
+      case 'corriendo': return { icon: <Loader2 className="w-4 h-4 animate-spin text-brand-ink" />, texto: 'Exportando y refrescando ahora…' }
+      case 'ok':        return { icon: <CircleCheck className="w-4 h-4 text-ink-ok" />, texto: 'Última actualización exitosa' }
+      case 'error':     return { icon: <CircleAlert className="w-4 h-4 text-ink-crit" />, texto: config.mensajeError ?? 'Error en la última corrida' }
       default:          return { icon: <CircleDashed className="w-4 h-4 text-muted-foreground" />, texto: 'Sin corridas a demanda aún' }
     }
   }, [config])
@@ -141,7 +141,7 @@ export function PowerBIExportPage() {
             <Laptop className="w-4 h-4" />
             Agente del PC de mantención
             <span className={['ml-auto inline-flex items-center gap-1.5 text-xs font-normal',
-              online ? 'text-emerald-400' : 'text-red-400'].join(' ')}>
+              online ? 'text-ink-ok' : 'text-ink-crit'].join(' ')}>
               <span className={['w-2 h-2 rounded-full', online ? 'bg-emerald-400' : 'bg-red-400'].join(' ')} />
               {online ? 'En línea' : 'Sin señal'}
             </span>

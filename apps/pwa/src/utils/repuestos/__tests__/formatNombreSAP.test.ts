@@ -22,6 +22,7 @@ describe('formatNombreSAP', () => {
       ['BALANZA DINAMICA MARELEC', 'Balanza dinámica Marelec'],
       ['SALA DE MAQUINAS', 'Sala de máquinas'],
       ['CAJA 8', 'Caja 8'],
+      ['AQUACHILE ANTARFOOD CHONCHI', 'AquaChile Antarfood Chonchi'],
     ]
     for (const [entrada, esperado] of casos) {
       expect(formatNombreSAP(entrada).nombre).toBe(esperado)
