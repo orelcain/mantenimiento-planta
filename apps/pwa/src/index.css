@@ -1100,6 +1100,17 @@
   .grader-light-mode .text-red-500 { color: #ef4444 !important; }
   .grader-light-mode .text-blue-500 { color: #3b82f6 !important; }
 
+  /* Tarjetas (primitivo Card). Hueco anterior al 2026-09-16: las reglas de este
+     bloque cubrian el patron viejo `rounded-xl` + `border`, pero el primitivo
+     de hoy renderiza `rounded-card border-card-edge bg-card`, que ninguna
+     regla veia. Resultado: pagina clara con las tarjetas del Dashboard oscuras
+     y una fila blanca adentro (la regla de button si disparaba). Se leia roto. */
+  .grader-light-mode [class*="bg-card"] {
+    background-color: var(--grader-card) !important;
+    color: var(--grader-card-fg) !important;
+    border-color: var(--grader-border) !important;
+  }
+
   /* Tooltip popover in light mode */
   .grader-light-mode [class*="bg-popover"] {
     background-color: var(--grader-popover) !important;
