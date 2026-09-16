@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   arrayRemove,
   arrayUnion,
@@ -19,12 +19,86 @@ import { auth, db } from '@/services/firebase'
 import { useAuthStore } from '@/store'
 import { toast } from '@/hooks/useToast'
 import { useAjustesTecnicos, useOpcionesEquipo } from '@/hooks/useListasBitacora'
-import { BITACORA_COLECCION, BITACORA_PLANTA, BITACORA_TURNOS_COLECCION } from '@/config/bitacora'
+import { BITACORA_COLECCION, BITACORA_PLANTA, BITACORA_TURNOS_COLECCION, MAX_FOTOS_EVENTO } from '@/config/bitacora'
 import type { EventoBitacora, EventoBitacoraDatos, FotoEvento, TurnoMantencion } from '@/services/bitacora/bitacora.types'
 import { ordenarEventos } from '@/services/bitacora/resumenBitacora'
 import { tecnicosDelCalendario, tecnicosDeTurno, type CalendarioDoc } from '@/services/bitacora/tecnicosDeTurno'
 import { turnoMantencionEn } from '@/services/bitacora/turnoMantencion'
 import { borrarFotoBitacora, type subirFotoBitacora } from '@/services/bitacora/fotosBitacora'
+
+/**
+ * Cierra el pendiente que un evento nuevo acaba de resolver.
+ *
+ * Va SEPARADO de la escritura del evento a propósito. Antes iban en un lote, y
+ * `update()` lleva precondición de existencia: si el pendiente original ya no
+ * estaba (lo borraron desde otro teléfono), el lote fallaba ENTERO y el evento
+ * recién escrito —con sus fotos— se perdía con un aviso que hablaba de señal
+ * (revisión 15-09). Ahora el evento se guarda igual y el cierre avisa aparte.
+ *
+ * Además NO pisa un cierre ajeno: si otro turno ya lo cerró, lo dice en vez de
+ * sobrescribirlo.
+ */
+async function cerrarPendienteResuelto(
+  pendienteId: string,
+  eventoId: string,
+  turnoId: string,
+  quien: string,
+): Promise<void> {
+  const ref = doc(db, BITACORA_COLECCION, pendienteId)
+  const cierre = {
+    pendiente: false,
+    cierre: { tipo: 'resuelto', turnoId, porNombre: quien, eventoId, motivo: null, en: serverTimestamp() },
+    updatedAt: serverTimestamp(),
+  }
+  let snap
+  try {
+    snap = await getDoc(ref)
+  } catch {
+    // Sin señal y sin el pendiente en caché: se intenta igual (queda en la cola
+    // de escrituras del teléfono). El evento ya está guardado pase lo que pase.
+    void updateDoc(ref, cierre).catch(() => undefined)
+    return
+  }
+  if (!snap.exists()) {
+    toast({
+      title: 'El evento quedó guardado',
+      description: 'El pendiente original ya no existe, así que no había nada que cerrar.',
+    })
+    return
+  }
+  const previo = (snap.data() as EventoBitacora).cierre
+  if (previo && previo.eventoId !== eventoId) {
+    toast({
+      title: 'El evento quedó guardado',
+      description: `Ese pendiente ya lo había cerrado ${previo.porNombre || 'otro turno'}.`,
+    })
+    return
+  }
+  void updateDoc(ref, cierre).catch(() =>
+    toast({ title: 'El evento se guardó, pero el pendiente sigue abierto', variant: 'destructive' }),
+  )
+}
+
+/**
+ * Reabre un pendiente al borrar el evento que lo cerraba, SOLO si sigue cerrado
+ * por ese evento: si otro evento lo resolvió después, reabrirlo mandaba al turno
+ * siguiente una falla ya reparada (revisión 15-09).
+ */
+async function reabrirPendiente(pendienteId: string, eventoId: string): Promise<void> {
+  const ref = doc(db, BITACORA_COLECCION, pendienteId)
+  const reabrir = { pendiente: true, cierre: null, updatedAt: serverTimestamp() }
+  let snap
+  try {
+    snap = await getDoc(ref)
+  } catch {
+    void updateDoc(ref, reabrir).catch(() => undefined)
+    return
+  }
+  if (!snap.exists()) return
+  const previo = (snap.data() as EventoBitacora).cierre
+  if (previo && previo.eventoId !== eventoId) return
+  void updateDoc(ref, reabrir).catch(() => undefined)
+}
 
 /**
  * Eventos de la bitácora de UN turno, en tiempo real.
@@ -77,6 +151,10 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
   }, [turnoId])
 
   const eventos = useMemo(() => ordenarEventos(turno, crudos), [turno, crudos])
+  // Para leer el estado vivo dentro de `guardar` sin recrear el callback (lo que
+  // haría remontar la hoja de edición en cada snapshot).
+  const eventosRef = useRef(crudos)
+  eventosRef.current = crudos
 
   const nombreAutor = useCallback(() => {
     const nombre = [user?.nombre?.split(' ')[0], user?.apellido?.split(' ')[0]].filter(Boolean).join(' ')
@@ -143,17 +221,11 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
           updatedAt: serverTimestamp(),
         }
         if (datos.resuelvePendiente?.id) {
-          // Entrega de turno: el evento nuevo y el cierre del pendiente original
-          // van en UN lote. Si uno falla, no queda un pendiente "cerrado" sin el
-          // evento que lo cierra (ni al revés).
-          const lote = writeBatch(db)
-          lote.set(ref, { ...nuevo, resuelvePendiente: datos.resuelvePendiente })
-          lote.update(doc(db, BITACORA_COLECCION, datos.resuelvePendiente.id), {
-            pendiente: false,
-            cierre: { tipo: 'resuelto', turnoId: turno.id, porNombre: quien, eventoId: id, motivo: null, en: serverTimestamp() },
-            updatedAt: serverTimestamp(),
-          })
-          void lote.commit().catch(avisarRechazo)
+          // Entrega de turno: PRIMERO el evento (nunca se pierde), después el
+          // cierre del pendiente, que puede fallar sin arrastrarlo (ver
+          // `cerrarPendienteResuelto`).
+          void setDoc(ref, { ...nuevo, resuelvePendiente: datos.resuelvePendiente }).catch(avisarRechazo)
+          void cerrarPendienteResuelto(datos.resuelvePendiente.id, id, turno.id, quien)
         } else {
           void setDoc(ref, nuevo).catch(avisarRechazo)
         }
@@ -163,12 +235,34 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
         // entera: si otro teléfono agregó la foto «Después» mientras este editaba
         // un texto, reescribir `fotos` completo la borraba (revisión 15-09).
         const antes = datos.fotosAntes ?? []
-        const agregadas = fotos.filter((f) => !antes.some((a) => a.path === f.path))
+        // Las que ya están EN EL SERVIDOR (último snapshot), no las que vio este
+        // teléfono: el tope de 8 se calculaba por dispositivo y dos que agregaban
+        // a la vez dejaban el evento en 10 fotos, con la regla rechazando desde
+        // ahí toda edición posterior (revisión 15-09).
+        const vivas = eventosRef.current.find((e) => e.id === id)?.fotos ?? antes
         const quitadas = antes.filter((a) => !fotos.some((f) => f.path === a.path))
+        const cupo = Math.max(0, MAX_FOTOS_EVENTO - vivas.length + quitadas.length)
+        const nuevas = fotos.filter((f) => !vivas.some((a) => a.path === f.path))
+        const agregadas = nuevas.slice(0, cupo)
+        if (agregadas.length < nuevas.length) {
+          toast({
+            title: `El evento ya llegó a ${MAX_FOTOS_EVENTO} fotos`,
+            description: `Otro teléfono subió fotos mientras editabas: ${nuevas.length - agregadas.length} no se guardaron.`,
+            variant: 'destructive',
+          })
+        }
         const { fotos: _todas, ...sinFotos } = cuerpo
         void _todas
         const lote = writeBatch(db)
-        lote.update(ref, { ...sinFotos, actualizadoPorNombre: quien, updatedAt: serverTimestamp() })
+        lote.update(ref, {
+          ...sinFotos,
+          // Reabrir un pendiente ya cerrado tiene que BORRAR el cierre: si no,
+          // la fila decía «Pendiente» y «Resuelto en…» a la vez y la entrega de
+          // turno —que filtra por `!cierre`— nunca lo volvía a mostrar.
+          ...(datos.pendiente && datos.cierreAntes ? { cierre: null } : {}),
+          actualizadoPorNombre: quien,
+          updatedAt: serverTimestamp(),
+        })
         if (agregadas.length) lote.update(ref, { fotos: arrayUnion(...agregadas) })
         if (quitadas.length) lote.update(ref, { fotos: arrayRemove(...quitadas) })
         void lote
@@ -191,12 +285,14 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
     // sus fotos sanas en vez de con enlaces rotos (revisión 15-09).
     const borrarFotos = () => Promise.allSettled((evento.fotos ?? []).map((f) => borrarFotoBitacora(f.path)))
     if (evento.resuelvePendiente?.id) {
-      // Borrar el evento que cerraba un pendiente lo vuelve a abrir: si no, el
-      // pendiente quedaría "cerrado" por un evento que ya no existe.
-      const lote = writeBatch(db)
-      lote.delete(doc(db, BITACORA_COLECCION, evento.id))
-      lote.update(doc(db, BITACORA_COLECCION, evento.resuelvePendiente.id), { pendiente: true, cierre: null, updatedAt: serverTimestamp() })
-      void lote.commit().then(borrarFotos).catch(avisar)
+      // Borrar el evento que cerraba un pendiente lo vuelve a abrir, pero no en
+      // un lote: si el pendiente ya no existía, el lote fallaba y el evento
+      // quedaba IMPOSIBLE de borrar, con un aviso de permisos que mentía.
+      const pendienteId = evento.resuelvePendiente.id
+      void deleteDoc(doc(db, BITACORA_COLECCION, evento.id))
+        .then(borrarFotos)
+        .then(() => reabrirPendiente(pendienteId, evento.id))
+        .catch(avisar)
     } else {
       void deleteDoc(doc(db, BITACORA_COLECCION, evento.id)).then(borrarFotos).catch(avisar)
     }
@@ -237,6 +333,19 @@ export function usePendientesAnteriores(turno: TurnoMantencion) {
       if (!auth.currentUser) throw new Error('Hay que iniciar sesión para escribir en la bitácora.')
       const m = motivo.trim()
       if (!m) throw new Error('Escribe por qué ya no aplica.')
+      // No pisar un cierre ajeno: si otro teléfono lo resolvió con un evento
+      // mientras esta lista estaba vieja, quedaba un evento diciendo «cierra el
+      // pendiente» y el original diciendo «ya no aplica» (revisión 15-09).
+      try {
+        const actual = await getDoc(doc(db, BITACORA_COLECCION, pendiente.id))
+        const previo = actual.exists() ? (actual.data() as EventoBitacora).cierre : null
+        if (previo?.tipo === 'resuelto') {
+          throw new Error(`Ya lo resolvió ${previo.porNombre || 'otro turno'}. Actualiza la lista.`)
+        }
+      } catch (e) {
+        // Un error de red no bloquea el cierre; uno de negocio (arriba) sí.
+        if (e instanceof Error && e.message.startsWith('Ya lo resolvió')) throw e
+      }
       void updateDoc(doc(db, BITACORA_COLECCION, pendiente.id), {
         pendiente: false,
         cierre: { tipo: 'no-aplica', turnoId: turno.id, porNombre: quien.trim() || 'Sin nombre', eventoId: null, motivo: m.slice(0, 300), en: serverTimestamp() },

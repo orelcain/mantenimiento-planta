@@ -96,9 +96,12 @@ export function minutosDesdeInicioTurno(turno: Pick<TurnoMantencion, 'banda'>, h
   if (!m) return Number.MAX_SAFE_INTEGER
   const total = Number(m[1]) * 60 + Number(m[2])
   const desde = (((total - INICIO_BANDA[turno.banda] * 60) % 1440) + 1440) % 1440
-  // Más de 20 h "después" del inicio es en realidad un poco ANTES del inicio
-  // (un evento de las 15:50 cargado en la tarde): va primero, no último.
-  return desde > 20 * 60 ? desde - 1440 : desde
+  // Una hora "después" del inicio que cae más allá de las 16 h es en realidad un
+  // poco ANTES del inicio (un evento de las 15:50 cargado en la tarde): va
+  // primero, no último. El corte va en 16 h, el punto MÁS LEJOS de las dos horas
+  // plausibles —el fin del turno (8 h) y su inicio (24 h)—: así el minuto en que
+  // el orden salta queda a 8 h de cualquier evento real (revisión 15-09).
+  return desde > 16 * 60 ? desde - 1440 : desde
 }
 
 /**

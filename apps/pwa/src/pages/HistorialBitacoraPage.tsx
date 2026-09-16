@@ -145,7 +145,10 @@ export function HistorialBitacoraVista({ fuente, alAbrirTurno }: { fuente: Fuent
       <GraficoParadas filas={filas} />
 
       <div className="grid items-start gap-5 md:grid-cols-2">
-        <section aria-label="Turnos del período" className="flex flex-col">
+        {/* min-w-0: un hijo de grilla mide `min-width:auto` y el contenido más
+            ancho de la lista estiraba la columna a 396 px, dejando la página
+            con scroll horizontal a 375 px (medido 15-09). */}
+        <section aria-label="Turnos del período" className="flex min-w-0 flex-col">
           <h2 className="px-4 pb-2 text-caption font-semibold text-muted-foreground">Turnos</h2>
           {filas.length === 0 && !cargando ? (
             <p className="rounded-card bg-card px-6 py-8 text-center text-footnote text-muted-foreground">
@@ -177,8 +180,8 @@ export function HistorialBitacoraVista({ fuente, alAbrirTurno }: { fuente: Fuent
           )}
         </section>
 
-        <div className="flex flex-col gap-5">
-          <section aria-label="Equipos que más pararon" className="flex flex-col">
+        <div className="flex min-w-0 flex-col gap-5">
+          <section aria-label="Equipos que más pararon" className="flex min-w-0 flex-col">
             <h2 className="px-4 pb-2 text-caption font-semibold text-muted-foreground">Equipos que más pararon</h2>
             <div className="flex flex-col gap-3 rounded-card bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
               {resumen.equipos.length === 0 ? (

@@ -5020,3 +5020,36 @@ NO podían ver el bug del foco; en formularios hay que TECLEAR (`computer type`)
 - Barras con `bg-ink-crit`/`bg-ink-ok` (tokens): la deuda de piel BAJO 1 (baseline al dia).
 - Verificado a 375 px en el preview 5189: tesis, KPIs, grafico, 30 turnos, equipos y
   "Quien registro" renderizan; sin errores nuevos en consola.
+
+
+## 2026-09-15 · Bitacora ronda 8 · Robustez de la entrega de turno (revision adversaria)
+
+Una revision adversaria del codigo de entrega de turno encontro 10 bugs; se arreglaron los 10.
+
+- **El lote ya no puede perder el evento.** `update()` lleva precondicion de existencia: si el
+  pendiente original ya no estaba, el lote fallaba ENTERO y el evento recien escrito (con sus
+  fotos) se perdia con un aviso que hablaba de senal. Ahora el evento se escribe primero y el
+  cierre del pendiente va aparte (`cerrarPendienteResuelto`), con aviso propio.
+- **Borrar ya no deja el evento atrapado**: el borrado tambien se separo del reabrir. Antes, si el
+  pendiente original no existia, el evento quedaba IMPOSIBLE de borrar y el aviso culpaba a los
+  permisos.
+- **No se reabre un pendiente que otro evento ya resolvio** (`reabrirPendiente` compara
+  `cierre.eventoId`), y **"Ya no aplica" no pisa un cierre "resuelto"**.
+- **Reabrir un pendiente cerrado borra el cierre** (`cierreAntes`): antes la fila decia
+  "Pendiente" y "Resuelto en..." a la vez y la entrega de turno no lo volvia a mostrar nunca.
+- **El tope de 8 fotos se calcula contra el estado vivo del servidor**, no contra lo que vio este
+  telefono: dos que agregaban a la vez dejaban el evento en 10 fotos y la regla congelaba toda
+  edicion posterior.
+- **La bitacora archivada ya no cambia sola**: `pendientesDelTurno` cuenta tambien los pendientes
+  que un turno POSTERIOR cerro, asi que reexportar un turno viejo sigue coincidiendo con el correo
+  que se envio; el KPI dice "3 pendientes (2 ya cerrados)" y el evento muestra "Resuelto en Turno
+  noche 16-09 por ...". Los "pendientes anteriores" solo salen en el turno EN CURSO.
+- **Pantalla, correo y PDF dicen lo mismo**: la pantalla suma "(2, 1 sin duracion)" y el PDF suma
+  el KPI de pendientes cerrados; `pendientesCerrados` cuenta pendientes distintos, no eventos.
+- **Corte del orden a 16 h** del inicio del turno (antes 20 h): el minuto en que el orden salta
+  queda a 8 h de cualquier hora real.
+- **Mensaje honesto en la validacion de 12 h** (antes afirmaba que el termino iba antes del inicio)
+  y **"guardar sin las fotos que faltan" se vuelve a pedir por cada foto nueva**.
+- Ademas: la grilla del Historial tenia **scroll horizontal a 375 px** (hijo de grilla con
+  `min-width:auto` estirado a 396 px) — medido y corregido con `min-w-0`.
+- 4 pruebas nuevas (50 en total en bitacora).

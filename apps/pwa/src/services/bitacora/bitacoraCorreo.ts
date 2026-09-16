@@ -1,6 +1,6 @@
 import { ETIQUETA_FOTO, ETIQUETA_TIPO } from '@/config/bitacora'
 import { autorVisible, tecnicosDelEvento, type EventoBitacora, type FotoEvento, type TurnoMantencion } from './bitacora.types'
-import { minutosParadaDe, ordenarEventos, resumirBitacora } from './resumenBitacora'
+import { fuePendiente, minutosParadaDe, ordenarEventos, resumirBitacora } from './resumenBitacora'
 import { etiquetaTurno, fechaTurnoLarga, formatoMinutos, horarioTurno } from './turnoMantencion'
 import { etiquetaCortaTurno } from './entregaTurno'
 
@@ -75,6 +75,15 @@ export function lineaImpacto(e: EventoBitacora): string {
   if (e.impacto === 'con-parada') partes.push(`Detuvo la máquina ${formatoMinutos(minutosParadaDe(e))}`)
   if (e.impacto === 'en-ventana') partes.push(e.ventana?.trim() ? `Sin detener: ${e.ventana.trim()}` : 'Sin detener producción')
   if (e.resuelvePendiente?.turnoId) partes.push(`Cierra pendiente del ${etiquetaCortaTurno(e.resuelvePendiente.turnoId)}`)
+  // Un pendiente que otro turno ya cerró: sin esto, al reexportar una bitácora
+  // vieja el evento aparecía como pendiente eterno (revisión 15-09).
+  if (e.cierre) {
+    partes.push(
+      e.cierre.tipo === 'no-aplica'
+        ? `Ya no aplica desde ${etiquetaCortaTurno(e.cierre.turnoId)}${e.cierre.motivo ? `: ${e.cierre.motivo}` : ''}`
+        : `Resuelto en ${etiquetaCortaTurno(e.cierre.turnoId)}${e.cierre.porNombre ? ` por ${e.cierre.porNombre}` : ''}`,
+    )
+  }
   return partes.join(' · ')
 }
 
@@ -145,6 +154,13 @@ export function etiquetaParada(r: { conParada: number; paradasSinDuracion: numbe
   return r.paradasSinDuracion ? `de parada (${r.conParada}, ${r.paradasSinDuracion} sin duración)` : `de parada (${r.conParada})`
 }
 
+/** "pendientes" o "pendientes (2 ya cerrados)" al mirar un turno viejo. */
+export function etiquetaPendientes(r: { pendientesDelTurno: number; pendientesResueltosDespues: number }): string {
+  const base = r.pendientesDelTurno === 1 ? 'pendiente' : 'pendientes'
+  if (!r.pendientesResueltosDespues) return base
+  return `${base} (${r.pendientesResueltosDespues} ya ${r.pendientesResueltosDespues === 1 ? 'cerrado' : 'cerrados'})`
+}
+
 /** "KNURO N1 · Pusher con golpes… · desde Turno día 15-09 (Leandro Igor)". */
 export function lineaPendienteAnterior(e: EventoBitacora): string {
   const texto = (e.descripcion ?? '').trim().replace(/\s+/g, ' ')
@@ -157,8 +173,8 @@ export function bitacoraAHtmlCorreo({ turno, eventos, tecnicos, planta, observac
   const fuente = fuenteFoto ?? ((f: FotoEvento) => f.url)
   const ordenados = ordenarEventos(turno, eventos)
   const r = resumirBitacora(eventos)
-  const hechos = ordenados.filter((e) => !e.pendiente)
-  const pendientes = ordenados.filter((e) => e.pendiente)
+  const hechos = ordenados.filter((e) => !fuePendiente(e))
+  const pendientes = ordenados.filter(fuePendiente)
   const autores = [...new Set(eventos.map(autorVisible).filter(Boolean))]
 
   const kpis = [
@@ -166,7 +182,7 @@ export function bitacoraAHtmlCorreo({ turno, eventos, tecnicos, planta, observac
     htmlKpi(formatoMinutos(r.minutosParada), etiquetaParada(r), r.conParada > 0 ? C.parada : C.tinta),
     htmlKpi(r.mttrMin == null ? '—' : formatoMinutos(r.mttrMin), 'MTTR'),
     htmlKpi(String(r.enVentana), 'sin detener producción', r.enVentana > 0 ? C.ventana : C.tinta),
-    htmlKpi(String(r.pendientes), r.pendientes === 1 ? 'pendiente' : 'pendientes'),
+    htmlKpi(String(r.pendientesDelTurno), etiquetaPendientes(r)),
     // Solo si hubo: es el número que demuestra la entrega de turno.
     r.pendientesCerrados > 0
       ? htmlKpi(String(r.pendientesCerrados), r.pendientesCerrados === 1 ? 'pendiente cerrado' : 'pendientes cerrados', C.ventana)
@@ -238,8 +254,8 @@ export function bitacoraATextoPlano({ turno, eventos, tecnicos, planta, observac
       .filter(Boolean)
       .join('\n')
 
-  const hechos = ordenados.filter((e) => !e.pendiente)
-  const pendientes = ordenados.filter((e) => e.pendiente)
+  const hechos = ordenados.filter((e) => !fuePendiente(e))
+  const pendientes = ordenados.filter(fuePendiente)
   const cabecera = [
     `Bitácora de Mantención · ${etiquetaTurno(turno)}`,
     `${capitalizarPrimera(fechaTurnoLarga(turno))} · ${horarioTurno(turno).replace('–', 'a')} · ${planta}`,
@@ -248,7 +264,7 @@ export function bitacoraATextoPlano({ turno, eventos, tecnicos, planta, observac
     .filter(Boolean)
     .join('\n')
   const resumen =
-    `${r.eventos} eventos · ${formatoMinutos(r.minutosParada)} de parada · MTTR ${r.mttrMin == null ? '—' : formatoMinutos(r.mttrMin)} · ${r.enVentana} sin detener producción · ${r.pendientes} pendientes` +
+    `${r.eventos} eventos · ${formatoMinutos(r.minutosParada)} ${etiquetaParada(r)} · MTTR ${r.mttrMin == null ? '—' : formatoMinutos(r.mttrMin)} · ${r.enVentana} sin detener producción · ${r.pendientesDelTurno} ${etiquetaPendientes(r)}` +
     (r.pendientesCerrados > 0 ? ` · ${r.pendientesCerrados} pendientes cerrados` : '')
   // Bloques separados por una línea en blanco: pegado en un correo sin formato
   // cada evento se lee aparte.
