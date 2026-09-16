@@ -99,12 +99,12 @@ export function LearningAdminMachinePage() {
           <Icon className="h-7 w-7" style={{ color: machine.color }} />
         </div>
         <div className="flex-1 min-w-0">
-          <h1 className="text-2xl font-bold">{machine.name}</h1>
+          <h1 className="text-title1 font-bold">{machine.name}</h1>
           <p className="text-sm text-muted-foreground">Editor de contenido · {machine.area}</p>
         </div>
         <button
           onClick={() => window.open(previewUrl, '_blank', 'noopener')}
-          className="flex items-center gap-2 px-3 py-2 rounded-card border border-border text-sm text-primary-700 dark:text-[#9DC3E6] hover:bg-muted transition-colors flex-shrink-0"
+          className="flex items-center gap-2 px-3 py-2 rounded-card border border-border text-sm text-brand-ink hover:bg-muted transition-colors flex-shrink-0"
           title="Ver como lo ve el técnico — solo lectura, abre en pestaña nueva"
           style={{ minHeight: '40px' }}
         >
@@ -321,7 +321,7 @@ function ProcedureForm({
       <div>
         <div className="flex items-center justify-between mb-2">
           <label className="text-xs font-semibold tracking-wider text-muted-foreground">
-            Pasos <span className="text-destructive dark:text-[#e0697d]">*</span>
+            Pasos <span className="text-ink-crit">*</span>
           </label>
           <button
             onClick={addStep}
@@ -384,7 +384,7 @@ function ProcedureForm({
                 <button
                   onClick={() => removeStep(index)}
                   disabled={procedure.steps.length <= 1}
-                  className="p-1.5 hover:bg-destructive/15 text-destructive dark:text-[#e0697d] rounded-ctl disabled:opacity-30"
+                  className="p-1.5 hover:bg-destructive/15 text-ink-crit rounded-ctl disabled:opacity-30"
                   title="Eliminar paso"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
@@ -453,8 +453,7 @@ function StepImageUploader({
           />
           <button
             onClick={handleRemove}
-            className="absolute -top-2 -right-2 flex items-center justify-center w-6 h-6 rounded-full text-white hover:opacity-90"
-            style={{ background: '#e0697d' }}
+            className="absolute -top-2 -right-2 flex size-7 items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow hover:opacity-90"
             title="Eliminar imagen"
           >
             <X className="h-3.5 w-3.5" />
@@ -490,7 +489,7 @@ function StepImageUploader({
           e.target.value = ''
         }}
       />
-      {error && <p className="text-caption text-destructive dark:text-[#e0697d] mt-1">{error}</p>}
+      {error && <p className="text-caption text-ink-crit mt-1">{error}</p>}
     </div>
   )
 }
@@ -808,7 +807,7 @@ function SectionQuizEditor({ quiz, onChange }: { quiz: SectionQuizItem[]; onChan
                 />
                 <button
                   onClick={() => removeQuestion(qi)}
-                  className="mt-0.5 flex-shrink-0 rounded-ctl p-1.5 text-destructive dark:text-[#e0697d] hover:bg-destructive/15"
+                  className="mt-0.5 flex-shrink-0 rounded-ctl p-1.5 text-ink-crit hover:bg-destructive/15"
                   title="Eliminar pregunta"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
@@ -826,7 +825,7 @@ function SectionQuizEditor({ quiz, onChange }: { quiz: SectionQuizItem[]; onChan
                         ? 'flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border text-caption font-bold'
                         : 'flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border border-border text-caption font-bold text-muted-foreground'}
                       style={oi === q.correctIndex
-                        ? { background: LC.nuevo, borderColor: LC.nuevo, color: '#0d1722' }
+                        ? { background: LC.nuevoSoft, borderColor: LC.nuevo, color: LC.nuevo }
                         : undefined}
                     >
                       {oi === q.correctIndex ? '✓' : String.fromCharCode(65 + oi)}
@@ -841,7 +840,7 @@ function SectionQuizEditor({ quiz, onChange }: { quiz: SectionQuizItem[]; onChan
                     <button
                       onClick={() => removeOption(qi, oi)}
                       disabled={q.options.length <= 2}
-                      className="flex-shrink-0 rounded-ctl p-1 text-destructive dark:text-[#e0697d] hover:bg-destructive/15 disabled:opacity-30"
+                      className="flex-shrink-0 rounded-ctl p-1 text-ink-crit hover:bg-destructive/15 disabled:opacity-30"
                       title="Eliminar opción"
                     >
                       <Trash2 className="h-3 w-3" />
@@ -1006,7 +1005,7 @@ function EditableTextList({
             />
             <button
               onClick={() => onRemove(index)}
-              className="p-1.5 mt-1 hover:bg-destructive/15 text-destructive dark:text-[#e0697d] rounded-ctl"
+              className="p-1.5 mt-1 hover:bg-destructive/15 text-ink-crit rounded-ctl"
               title="Eliminar"
             >
               <Trash2 className="h-3.5 w-3.5" />
@@ -1071,7 +1070,7 @@ function ManualImagesEditor({
         </button>
       </div>
       {error && (
-        <p className="mb-2 rounded-card border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive/80 dark:text-[#f1a3ae]">
+        <p className="mb-2 rounded-card border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-ink-crit">
           {error}
         </p>
       )}
@@ -1137,7 +1136,7 @@ function ManualImagesEditor({
               <button
                 type="button"
                 onClick={() => onRemove(index)}
-                className="p-2 hover:bg-destructive/15 text-destructive dark:text-[#e0697d] rounded-ctl justify-self-start"
+                className="p-2 hover:bg-destructive/15 text-ink-crit rounded-ctl justify-self-start"
                 title="Eliminar imagen"
               >
                 <Trash2 className="h-4 w-4" />
@@ -1305,7 +1304,7 @@ function FlowForm({
       <div>
         <div className="flex items-center justify-between mb-2">
           <label className="text-xs font-semibold tracking-wider text-muted-foreground">
-            Acciones a seguir <span className="text-destructive dark:text-[#e0697d]">*</span>
+            Acciones a seguir <span className="text-ink-crit">*</span>
           </label>
           <button
             onClick={addAction}
@@ -1350,7 +1349,7 @@ function FlowForm({
               <button
                 onClick={() => removeAction(index)}
                 disabled={flow.actions.length <= 1}
-                className="p-1.5 hover:bg-destructive/15 text-destructive dark:text-[#e0697d] rounded-ctl disabled:opacity-30"
+                className="p-1.5 hover:bg-destructive/15 text-ink-crit rounded-ctl disabled:opacity-30"
                 title="Eliminar acción"
               >
                 <Trash2 className="h-3.5 w-3.5" />
@@ -1516,7 +1515,7 @@ function DiagnosisForm({
       <div>
         <div className="flex items-center justify-between mb-2">
           <label className="text-xs font-semibold tracking-wider text-muted-foreground">
-            Causas posibles <span className="text-destructive dark:text-[#e0697d]">*</span>
+            Causas posibles <span className="text-ink-crit">*</span>
           </label>
           <button
             onClick={addCause}
@@ -1543,7 +1542,7 @@ function DiagnosisForm({
               <button
                 onClick={() => removeCause(index)}
                 disabled={entry.possibleCauses.length <= 1}
-                className="p-1.5 hover:bg-destructive/15 text-destructive dark:text-[#e0697d] rounded-ctl disabled:opacity-30"
+                className="p-1.5 hover:bg-destructive/15 text-ink-crit rounded-ctl disabled:opacity-30"
                 title="Eliminar causa"
               >
                 <Trash2 className="h-3.5 w-3.5" />
@@ -1789,7 +1788,7 @@ function ComponentPhotoForm({
                     </div>
                     <button
                       onClick={() => removePoint(pt.id)}
-                      className="p-1.5 hover:bg-destructive/15 text-destructive dark:text-[#e0697d] rounded-ctl flex-shrink-0"
+                      className="p-1.5 hover:bg-destructive/15 text-ink-crit rounded-ctl flex-shrink-0"
                       title="Eliminar punto"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
@@ -1999,7 +1998,7 @@ function ItemCard({
           </button>
           <button
             onClick={onDelete}
-            className="p-2 rounded-ctl hover:bg-destructive/15 text-destructive dark:text-[#e0697d] transition-colors"
+            className="p-2 rounded-ctl hover:bg-destructive/15 text-ink-crit transition-colors"
             title="Eliminar"
           >
             <Trash2 className="h-4 w-4" />
@@ -2024,7 +2023,7 @@ function FormField({
   return (
     <div className={className}>
       <label className="block text-xs font-semibold tracking-wider mb-1.5 text-muted-foreground">
-        {label} {required && <span className="text-destructive dark:text-[#e0697d]">*</span>}
+        {label} {required && <span className="text-ink-crit">*</span>}
       </label>
       {children}
     </div>

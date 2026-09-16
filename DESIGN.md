@@ -99,6 +99,11 @@ Todo número que se lee como **dato** va `tabular-nums`, para que las columnas n
 refrescar. Importante: **Apple no tiene regla escrita sobre esto** — la HIG de tipografía no lo
 menciona. La capacidad existe en la API; la regla es nuestra, y es buena. No atribuirla a Apple.
 
+`tabular-nums` es solo `font-variant-numeric`: **no cambia la familia**. La piel anterior lo
+mapeaba a IBM Plex Mono en toda la app; bajo la piel Apple ese mapeo se apagó (una sola familia,
+la del sistema) y solo lo conserva el monitor de TV (`.monitor-tv`). Lo que deba verse
+monoespaciado (códigos, lecturas de PLC) lo pide con `font-mono`.
+
 ### ⚠️ADELANTA 2 — MAYÚSCULAS: se van
 
 **iOS 26 quitó las mayúsculas de los encabezados de sección.** Donde Ajustes decía "VISION",
@@ -615,6 +620,11 @@ con un script Node local (`writeFileSync` en `utf8`).
    y los resaltados amarillos de ETT y de búsqueda: vivos a propósito. Auditoría: 1516 → 1368.
 10. ~~Decidir los `lc-*` del Centro de Aprendizaje~~ — cerrado 2026-09-16 con el hub (5e): el hub
     usa los tokens del sistema; los `--lc-*` siguen solo para el editor admin y los planos.
+    ✅ 2026-09-16 (ronda 3): los 26 `--lc-*` dejaron de ser paleta. Son **alias** de los tokens
+    del sistema en un solo bloque de `:root` (fondos y tinta neutros, acento = marca, estados =
+    tinta + tinte 15 %), así que Variadores, Perilla 5, Planos y el editor admin cambian de tema
+    sin tocar sus ~550 estilos en línea. Los hex que quedan en Variadores y Perilla 5 son la
+    placa ABB replicada y los colores de series de gráficos: a propósito.
 11. ~~Decidir si el Grader conserva el toggle sol/luna~~ — **cerrado 2026-09-16: se retiró.**
     Sigue al tema de la app en vivo (`useIsDark`, observa la clase del documento). Para
     presentar en claro se cambia el tema en Configuración, como en cualquier app de iOS.
@@ -625,3 +635,13 @@ con un script Node local (`writeFileSync` en `utf8`).
     neutra como el móvil (tarjeta sin tinte, ícono en tile gris, rótulo en tinta de etiqueta);
     el mapa `COLOR` y la cinta rotada de 6,5 px en mayúsculas se eliminaron; «En desarrollo»
     es una etiqueta de 11 px en formato oración, y sigue siendo el toque que libera el módulo.
+14. ~~Pantallas de administración en PC~~ — hecho 2026-09-16 (ronda 3). Un solo título de página
+    (`text-title1 font-bold`, sin ícono de color dentro) y subtítulo `subhead` en las 14 páginas;
+    unos 60 rótulos en oración; el Panel de administración es una lista agrupada con ícono en
+    recuadro neutro y la advertencia de reconfirmación en el pie del grupo; Configuración usa la
+    pista cápsula de `Tabs` (ocho pestañas en una línea, caben desde 1024 px); Mission Control
+    lleva las cifras neutras con el estado en un punto, los agentes como celdas con punto y
+    sin emoji, y la cadena de respaldo en fichas neutras. `CardTitle` pasó de 24 px con
+    interletrado apretado a Título 3. Los nombres de módulo del menú («Análisis de Turno»,
+    «Centro de Aprendizaje») se dejaron como están: cambiarlos es una decisión de toda la app.
+    Las páginas bajo `/admin/*` piden contraseña: se verificaron por código, no en pantalla.

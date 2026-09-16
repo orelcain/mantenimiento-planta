@@ -14,7 +14,12 @@ import {
   SelectValue,
   Switch,
 } from '@/components/ui'
-import { Bell, Save, Loader2, RotateCcw, AlertCircle } from 'lucide-react'
+import {
+  Save,
+  Loader2,
+  RotateCcw,
+  AlertCircle,
+} from 'lucide-react'
 import { collection, getCountFromServer } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import { avisoDispositivosPush } from '@/components/settings/avisoDispositivosPush'
@@ -386,11 +391,8 @@ export function ShoplogixNotificationsConfigPage() {
   return (
     <div className="container mx-auto p-4 sm:p-6 max-w-2xl space-y-4">
       <div className="space-y-1">
-        <h1 className="text-2xl font-semibold flex items-center gap-2">
-          <Bell className="w-6 h-6 text-cat-4-ink" />
-          Notificaciones Shoplogix
-        </h1>
-        <p className="text-sm text-muted-foreground">
+        <h1 className="text-title1 font-bold">Notificaciones Shoplogix</h1>
+        <p className="text-subhead text-muted-foreground">
           Configura por planta cuándo y cómo se envían alertas de eventos productivos.
         </p>
       </div>

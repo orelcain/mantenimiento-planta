@@ -28,7 +28,12 @@ import {
   Spinner,
   Badge,
 } from '@/components/ui'
-import { Gauge, Save, AlertTriangle, CheckCircle2, RotateCcw } from 'lucide-react'
+import {
+  Save,
+  AlertTriangle,
+  CheckCircle2,
+  RotateCcw,
+} from 'lucide-react'
 import { PLANT_LINES } from '@/config/plantLines'
 import type { PlantSlug } from '@/services/shoplogix/shoplogixMachines'
 import {
@@ -166,12 +171,9 @@ export function MachineCapacityPage() {
   return (
     <div className="container mx-auto p-4 sm:p-6 max-w-2xl space-y-6">
       <div className="space-y-1">
-        <h1 className="text-xl font-semibold flex items-center gap-2">
-          <Gauge className="w-5 h-5 text-cat-7-ink" />
-          Velocidad Nameplate — Baader 142
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Capacidad física máxima de cada Evisceradora según su panel de control.
+        <h1 className="text-title1 font-bold">Velocidad nameplate · Baader 142</h1>
+        <p className="text-subhead text-muted-foreground">
+          Capacidad física máxima de cada evisceradora según su panel de control.
           Es una <b>referencia documental</b>: hoy no alimenta el cálculo de OEE — el
           Rendimiento se mide contra el objetivo de Shoplogix (<code>expectedCycles</code>).
         </p>

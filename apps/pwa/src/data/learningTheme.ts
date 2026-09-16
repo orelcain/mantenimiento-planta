@@ -1,20 +1,15 @@
 /**
- * learningTheme — Paleta del módulo Centro de Aprendizaje (dark + AquaChile).
+ * learningTheme — nombres de color del módulo Centro de Aprendizaje.
  *
- * Fuente de verdad compartida entre el hub público (LearningHubPage) y el
- * editor admin (LearningAdminMachinePage / LearningAdminPage), para que ambas
- * superficies del módulo compartan una misma identidad visual, distinta del
- * shell industrial genérico de la app.
+ * Desde la vara iOS 27 (2026-09, DESIGN.md) el módulo NO tiene paleta propia: cada
+ * nombre es una variable CSS `--lc-*` que en index.css es un ALIAS del token del
+ * sistema (fondos/tinta neutros, acento = marca, estados = tinta + tinte 15 %).
+ * Se conservan los nombres para no tocar los ~550 estilos inline del hub, el editor
+ * admin, Variadores, Perilla 5 y Planos eléctricos.
  *
- * Colores corporativos AquaChile (azulMedio #2E75B6, azulClaro #9DC3E6 —
- * fuente: utils/exportETTWord.ts). Neutros tintados hacia el azul de marca.
+ * ⚠ Un valor LC no es un hex parseable: no usarlo con `tint()` ni concatenarle alfa
+ * (`${LC.x}18`); para canvas/echarts usar colores resueltos, no LC.
  */
-// Desde el tema claro/oscuro global (2026-07): cada color es una VARIABLE CSS
-// definida en index.css (`--lc-*`, con valores para `:root` claro y `.dark`).
-// Así el hub, el admin y los primitives cambian de tema sin tocar sus 60+
-// estilos inline. ⚠ Por eso un valor LC ya NO es un hex parseable: no usarlo
-// con `tint()` ni concatenarle alfa (`${LC.x}18`); para canvas/echarts usar
-// colores resueltos, no LC.
 export const LC = {
   // Fondos (de más oscuro a más claro)
   bg:        'var(--lc-bg)',

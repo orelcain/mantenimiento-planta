@@ -420,7 +420,7 @@ function MessageBubble({
               <div className="flex gap-1.5">
                 <button
                   onClick={handleSubmitCorrection}
-                  className="flex-1 text-caption py-1 px-2 rounded-ctl bg-amber-500/[0.15] text-ink-warn hover:brightness-95/[0.15] transition-colors font-medium"
+                  className="flex-1 text-caption py-1 px-2 rounded-ctl bg-amber-500/[0.15] text-ink-warn hover:brightness-95 transition-colors font-medium"
                 >
                   {correctionText.trim() ? 'Enviar corrección' : 'Marcar como incorrecto'}
                 </button>
@@ -911,7 +911,7 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
       <div className="flex items-center gap-2">
         <button
           onClick={onConfirm}
-          className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-ctl bg-green-500/[0.15] text-ink-ok hover:brightness-95/[0.15] transition-colors font-medium"
+          className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-ctl bg-green-500/[0.15] text-ink-ok hover:brightness-95 transition-colors font-medium"
         >
           <CheckCircle className="w-3 h-3" />
           Confirmar

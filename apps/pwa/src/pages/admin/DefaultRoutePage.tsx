@@ -13,7 +13,11 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle, Button } from '@/components/ui'
-import { ArrowLeft, LayoutDashboard, Save, CheckCircle2 } from 'lucide-react'
+import {
+  ArrowLeft,
+  Save,
+  CheckCircle2,
+} from 'lucide-react'
 import { useToast } from '@/hooks/useToast'
 import {
   DEFAULT_HOME_PATH,
@@ -95,18 +99,15 @@ export function DefaultRoutePage() {
       </div>
 
       <div className="space-y-1">
-        <h1 className="text-2xl font-semibold flex items-center gap-2">
-          <LayoutDashboard className="w-6 h-6 text-ink-ok" />
-          Página de inicio por defecto
-        </h1>
-        <p className="text-sm text-muted-foreground">
+        <h1 className="text-title1 font-bold">Página de inicio por defecto</h1>
+        <p className="text-subhead text-muted-foreground">
           Cuando un usuario navega a <code className="text-xs px-1 py-0.5 rounded-ctl bg-muted">/</code>,
           la app redirige automáticamente al módulo elegido acá. Aplica a TODOS
           los usuarios (no por dispositivo).
         </p>
       </div>
 
-      <Card className="border-transparent bg-emerald-500/[0.15]">
+      <Card className="border-transparent bg-ink-ok/[0.15]">
         <CardContent className="p-3 flex items-start gap-2 text-xs text-ink-ok">
           <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
           <span>

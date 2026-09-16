@@ -1,6 +1,6 @@
 /**
  * AriaMonitorPanel — Panel de administración para ARIA thinking mode
- * 
+ *
  * Muestra:
  * - Configuración global (límite diario, budget)
  * - Límites por usuario
@@ -20,7 +20,7 @@ import {
 } from '@/components/ui'
 import { Brain, Save, RefreshCw, Users, BarChart3, Settings2, AlertTriangle, Volume2, Play } from 'lucide-react'
 import { setVoicePref, getGoogleVoices, speakWith, stopSpeaking, ARIA_VOICE_OPTIONS } from '@/lib/ariaVoice'
-import { 
+import {
   getAriaConfig,
   saveAriaConfig,
   getDailyUsage,
@@ -149,7 +149,7 @@ export function AriaMonitorPanel() {
             <Brain className="h-5 w-5 text-cat-6-ink" />
           </div>
           <div>
-            <h2 className="text-lg font-semibold">ARIA — Pensamiento Profundo</h2>
+            <h2 className="text-title3 font-semibold">Pensamiento profundo de ARIA</h2>
             <p className="text-sm text-muted-foreground">
               Gestiona el consumo del modo thinking de Gemini
             </p>
@@ -166,7 +166,7 @@ export function AriaMonitorPanel() {
         <CardHeader className="pb-3">
           <CardTitle className="text-sm flex items-center gap-2">
             <Settings2 className="h-4 w-4" />
-            Configuración Global
+            Configuración global
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -205,7 +205,7 @@ export function AriaMonitorPanel() {
           <div className="flex justify-end">
             <Button onClick={handleSaveConfig} disabled={isSaving} className="gap-2">
               <Save className="h-4 w-4" />
-              {isSaving ? 'Guardando...' : 'Guardar Configuración'}
+              {isSaving ? 'Guardando…' : 'Guardar configuración'}
             </Button>
           </div>
         </CardContent>
@@ -216,7 +216,7 @@ export function AriaMonitorPanel() {
         <CardHeader className="pb-3">
           <CardTitle className="text-sm flex items-center gap-2">
             <Volume2 className="h-4 w-4" />
-            Voz del Asistente
+            Voz del asistente
             <span className="text-xs text-muted-foreground font-normal ml-2">
               (lectura en voz alta del chat)
             </span>
@@ -288,7 +288,7 @@ export function AriaMonitorPanel() {
             </Button>
             <Button onClick={handleSaveConfig} disabled={isSaving} size="sm" className="gap-2">
               <Save className="h-4 w-4" />
-              {isSaving ? 'Guardando...' : 'Guardar Voz'}
+              {isSaving ? 'Guardando…' : 'Guardar voz'}
             </Button>
           </div>
         </CardContent>
@@ -299,7 +299,7 @@ export function AriaMonitorPanel() {
         <CardHeader className="pb-3">
           <CardTitle className="text-sm flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
-            Consumo de Hoy
+            Consumo de hoy
             <Badge variant="outline" className="ml-auto text-xs">
               {todayUsage?.date || '-'}
             </Badge>
@@ -422,7 +422,7 @@ export function AriaMonitorPanel() {
         <CardHeader className="pb-3">
           <CardTitle className="text-sm flex items-center gap-2">
             <Users className="h-4 w-4" />
-            Límites por Usuario
+            Límites por usuario
             <span className="text-xs text-muted-foreground font-normal ml-2">
               (vacío = usa límite global de {config.dailyThinkingLimit})
             </span>
@@ -466,7 +466,7 @@ export function AriaMonitorPanel() {
           <div className="flex justify-end mt-4">
             <Button onClick={handleSaveConfig} disabled={isSaving} size="sm" className="gap-2">
               <Save className="h-4 w-4" />
-              {isSaving ? 'Guardando...' : 'Guardar Límites'}
+              {isSaving ? 'Guardando…' : 'Guardar Límites'}
             </Button>
           </div>
         </CardContent>

@@ -109,7 +109,7 @@ export function ClimaPortoTestCard() {
         )}
 
         {state === 'done' && (
-          <div className="flex items-center justify-between rounded-card border border-transparent bg-emerald-500/[0.15] px-4 py-3 dark:border-transparent dark:bg-emerald-600">
+          <div className="flex items-center justify-between rounded-card border border-transparent bg-ink-ok/[0.15] px-4 py-3 dark:border-transparent dark:bg-emerald-600">
             <p className="text-sm text-ink-ok">Notificación enviada</p>
             <Button size="sm" variant="ghost" onClick={() => setState('idle')}>Reiniciar</Button>
           </div>

@@ -13,7 +13,12 @@
 import { Link } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle, Button } from '@/components/ui'
 import { Switch } from '@/components/ui/switch'
-import { ArrowLeft, EyeOff, RotateCcw, Wrench, Lock } from 'lucide-react'
+import {
+  ArrowLeft,
+  EyeOff,
+  RotateCcw,
+  Lock,
+} from 'lucide-react'
 import { useDevModulesVisibility } from '@/hooks/useDevModulesVisibility'
 import { ALL_NAV_ITEMS, type NavItemMeta } from '@/components/layout/MainLayout'
 
@@ -73,19 +78,16 @@ export function DevModulesPage() {
       </div>
 
       <div className="space-y-1">
-        <h1 className="text-2xl font-semibold flex items-center gap-2">
-          <Wrench className="w-6 h-6 text-cat-6-ink" />
-          Módulos del sidebar
-        </h1>
-        <p className="text-sm text-muted-foreground">
+        <h1 className="text-title1 font-bold">Módulos del menú lateral</h1>
+        <p className="text-subhead text-muted-foreground">
           Muestra u oculta cualquier módulo del menú lateral a conveniencia. Los
-          módulos en desarrollo vienen ocultos por default; los de producción,
+          módulos en desarrollo vienen ocultos por defecto; los de producción,
           visibles. La preferencia se guarda en este dispositivo — no afecta a
           otros usuarios.
         </p>
       </div>
 
-      <Card className="border-transparent bg-amber-500/[0.15]">
+      <Card className="border-transparent bg-ink-warn/[0.15]">
         <CardContent className="p-3 flex items-start gap-2 text-xs text-ink-warn">
           <EyeOff className="w-4 h-4 shrink-0 mt-0.5" />
           <span>
@@ -107,7 +109,7 @@ export function DevModulesPage() {
         <CardHeader className="pb-2">
           <CardTitle className="text-base">En desarrollo</CardTitle>
           <p className="text-xs text-muted-foreground">
-            Ocultos por default. Activa los que quieras probar.
+            Ocultos por defecto. Activa los que quieras probar.
           </p>
         </CardHeader>
         <CardContent className="divide-y divide-border/40">
@@ -119,7 +121,7 @@ export function DevModulesPage() {
         <CardHeader className="pb-2">
           <CardTitle className="text-base">En producción</CardTitle>
           <p className="text-xs text-muted-foreground">
-            Visibles por default. Oculta los que no quieras ver en el menú.
+            Visibles por defecto. Oculta los que no quieras ver en el menú.
           </p>
         </CardHeader>
         <CardContent className="divide-y divide-border/40">

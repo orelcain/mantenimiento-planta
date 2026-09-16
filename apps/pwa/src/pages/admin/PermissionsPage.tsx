@@ -20,16 +20,16 @@ import {
 } from '@/components/ui'
 import { Search, Shield, RotateCcw } from 'lucide-react'
 import { getAllUsers } from '@/services/auth'
-import { 
-  getRolePermissions, 
-  getUserPermissionsOverride, 
-  saveUserPermissionsOverride 
+import {
+  getRolePermissions,
+  getUserPermissionsOverride,
+  saveUserPermissionsOverride
 } from '@/services/permissions'
 import { logger } from '@/lib/logger'
 import type { User } from '@/types'
-import { 
-  APP_MODULES, 
-  MODULE_ACTIONS, 
+import {
+  APP_MODULES,
+  MODULE_ACTIONS,
   MODULES_CONFIG,
   DEFAULT_ROLE_PERMISSIONS,
   type PermissionsMap,
@@ -45,13 +45,13 @@ export function PermissionsPage({ isEmbedded = false }: { isEmbedded?: boolean }
   const [searchQuery, setSearchQuery] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
-  
+
   // Estado para el editor de permisos
   const [isEditing, setIsEditing] = useState(false)
   const [isLoadingPermissions, setIsLoadingPermissions] = useState(false)
   const [currentUserPerms, setCurrentUserPerms] = useState<PermissionsMap>({})
   const [isSaving, setIsSaving] = useState(false)
-  
+
   const { toast } = useToast()
 
   const loadUsers = useCallback(async () => {
@@ -81,25 +81,25 @@ export function PermissionsPage({ isEmbedded = false }: { isEmbedded?: boolean }
     setSelectedUser(user)
     setIsEditing(true)
     setIsLoadingPermissions(true)
-    
+
     try {
       // 1. Obtener permisos base del rol
       // getRolePermissions retorna ya el PermissionsMap
       const rolePerms = await getRolePermissions(user.rol)
-      
+
       // 2. Obtener override específico del usuario
       const override = await getUserPermissionsOverride(user.id)
-      
+
       let effectivePerms: PermissionsMap
-      
+
       if (override && override.activo) {
         effectivePerms = override.permisos
       } else {
         effectivePerms = rolePerms || DEFAULT_ROLE_PERMISSIONS[user.rol]
       }
-      
+
       setCurrentUserPerms(effectivePerms)
-      
+
     } catch (error) {
       logger.error('Error cargando permisos de usuario', error as Error)
       toast({
@@ -117,7 +117,7 @@ export function PermissionsPage({ isEmbedded = false }: { isEmbedded?: boolean }
     setCurrentUserPerms(prev => {
       const newPerms = { ...prev }
       const modulePerms = newPerms[modulo]
-      
+
       if (enabled) {
         if (!modulePerms) {
           // Si no existía el módulo, inicializar
@@ -143,15 +143,15 @@ export function PermissionsPage({ isEmbedded = false }: { isEmbedded?: boolean }
           }
         }
       }
-      
+
       return newPerms
     })
   }
-  
+
   const handleModuleToggle = (modulo: AppModule, enabled: boolean) => {
     setCurrentUserPerms(prev => {
       const newPerms = { ...prev }
-      
+
       if (enabled) {
         // Habilitar con acciones por defecto (ver)
         if (!newPerms[modulo]) {
@@ -174,14 +174,14 @@ export function PermissionsPage({ isEmbedded = false }: { isEmbedded?: boolean }
           }
         }
       }
-      
+
       return newPerms
     })
   }
 
   const handleSave = async () => {
     if (!selectedUser) return
-    
+
     setIsSaving(true)
     try {
       const override: UserPermissionsOverride = {
@@ -190,15 +190,15 @@ export function PermissionsPage({ isEmbedded = false }: { isEmbedded?: boolean }
         updatedAt: new Date(),
         updatedBy: 'admin',
       }
-      
+
       // Pasar userId como argumento separado
       await saveUserPermissionsOverride(selectedUser.id, override, 'admin')
-      
+
       toast({
         title: 'Permisos actualizados',
         description: `Los permisos para ${selectedUser.nombre} han sido guardados.`,
       })
-      
+
       setIsEditing(false)
     } catch (error) {
       logger.error('Error guardando permisos', error as Error)
@@ -211,18 +211,18 @@ export function PermissionsPage({ isEmbedded = false }: { isEmbedded?: boolean }
       setIsSaving(false)
     }
   }
-  
+
   const handleResetToDefault = async () => {
     if (!selectedUser) return
-    
+
     // Simplemente recargamos los permisos base del rol
     const rolePerms = await getRolePermissions(selectedUser.rol)
     const defaults = rolePerms || DEFAULT_ROLE_PERMISSIONS[selectedUser.rol]
-    
+
     setCurrentUserPerms(defaults)
-    
+
     toast({
-      description: 'Permisos restablecidos al valor por defecto del rol. Recuerda Guardar.',
+      description: 'Permisos restablecidos al valor por defecto del rol. Recuerda guardar.',
     })
   }
 
@@ -230,7 +230,7 @@ export function PermissionsPage({ isEmbedded = false }: { isEmbedded?: boolean }
     <div className="space-y-6">
       {!isEmbedded && (
         <div className="flex flex-col gap-2">
-          <h1 className="text-3xl font-bold tracking-tight">Gestión de Permisos</h1>
+          <h1 className="text-title1 font-bold">Permisos por usuario</h1>
           <p className="text-muted-foreground">
             Configura los accesos y permisos específicos por usuario.
           </p>
@@ -275,8 +275,8 @@ export function PermissionsPage({ isEmbedded = false }: { isEmbedded?: boolean }
               ) : (
                 <div className="space-y-2">
                   {filteredUsers.map((user) => (
-                    <div 
-                      key={user.id} 
+                    <div
+                      key={user.id}
                       className="flex flex-col md:flex-row items-start md:items-center p-3 border rounded-card hover:bg-muted/50 transition-colors gap-3"
                     >
                       <div className="flex-1 font-medium min-w-[200px]">
@@ -289,9 +289,9 @@ export function PermissionsPage({ isEmbedded = false }: { isEmbedded?: boolean }
                         <Badge variant={user.rol === 'admin' ? 'default' : 'secondary'} className="w-24 justify-center">
                           {user.rol}
                         </Badge>
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
+                        <Button
+                          size="sm"
+                          variant="outline"
                           onClick={() => handleEditUser(user)}
                         >
                           <Shield className="h-3.5 w-3.5 mr-2" />
@@ -310,7 +310,7 @@ export function PermissionsPage({ isEmbedded = false }: { isEmbedded?: boolean }
       <Dialog open={isEditing} onOpenChange={setIsEditing}>
         <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Editar Permisos</DialogTitle>
+            <DialogTitle>Editar permisos</DialogTitle>
             <DialogDescription>
               Configurando permisos para <span className="font-semibold">{selectedUser?.nombre} {selectedUser?.apellido}</span> ({selectedUser?.rol})
             </DialogDescription>
@@ -325,7 +325,7 @@ export function PermissionsPage({ isEmbedded = false }: { isEmbedded?: boolean }
               <div className="flex justify-end gap-2 mb-4">
                 <Button variant="outline" size="sm" onClick={handleResetToDefault}>
                   <RotateCcw className="h-4 w-4 mr-2" />
-                  Restaurar Default
+                  Restablecer valores del rol
                 </Button>
               </div>
 
@@ -335,13 +335,13 @@ export function PermissionsPage({ isEmbedded = false }: { isEmbedded?: boolean }
                   const isVisible = perms?.visible ?? false
                   const moduleConfig = MODULES_CONFIG.find(m => m.id === moduleName)
                   const availableActions = moduleConfig?.accionesDisponibles ?? MODULE_ACTIONS
-                  
+
                   return (
                     <Card key={moduleName} className={!isVisible ? 'opacity-70 bg-secondary/20' : ''}>
                       <CardHeader className="pb-3">
                         <div className="flex items-center justify-between">
                           <CardTitle className="text-base">{moduleConfig?.nombre ?? moduleName}</CardTitle>
-                          <Switch 
+                          <Switch
                             checked={isVisible}
                             onCheckedChange={(checked) => handleModuleToggle(moduleName, checked)}
                           />
@@ -351,7 +351,7 @@ export function PermissionsPage({ isEmbedded = false }: { isEmbedded?: boolean }
                         <div className="space-y-3">
                           {availableActions.map((action) => (
                             <div key={`${moduleName}-${action}`} className="flex items-center space-x-2">
-                              <Switch 
+                              <Switch
                                 id={`${moduleName}-${action}`}
                                 checked={perms?.actions.includes(action) || false}
                                 onCheckedChange={(checked) => handlePermissionChange(moduleName, action, checked)}
