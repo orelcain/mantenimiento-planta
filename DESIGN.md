@@ -544,6 +544,20 @@ con un script Node local (`writeFileSync` en `utf8`).
    el mockup. Primitivos nuevos en la piel: `SegmentedControl` (cápsula, 44 px) y `SwipeRow`
    (deslizar en táctil, hover en PC). `formatNombreSAP` en `utils/repuestos` con 22 tests.
    Pendiente de Orel: probar el deslizamiento con guantes en el teléfono de pruebas.
+5c. **Centro Técnico Documental** — mockup publicado el 2026-09-16:
+   https://claude.ai/artifact/3zhE9CC4CJpgRFazhTBf4v. Medido a 375 px: 214 de 220 objetivos
+   bajo 44 px, seis `<select>` nativos de 31 px en fila, cuatro tiles con la cifra en color,
+   fila con cinco badges y dos botones fantasma, nombres SAP en mayúsculas. Respuesta: chips de
+   filtro, botón «Filtros» con badge que abre una hoja (radio 32) con lista agrupada, fila con
+   criticidad como letra en círculo neutro (solo «A» en relleno de etiqueta) y estado en rótulo,
+   deslizar para QR/Tablero/favorito, «⋯» para datos, `formatNombreSAP` para nombres.
+   ⏳ Cuatro decisiones de Orel en el mockup. No construir hasta que las cierre.
+5d. **Barrido medido del 2026-09-16 (teléfono, `?skin=apple`):** Home, Bitácora, Calendario,
+   Repuestos, Aprendizaje, Configuración y CTD dan 0 diminutos, 0 mayúsculas y 0 px² de color
+   saturado en superficies grandes. Lo que queda son objetivos táctiles bajo 44 px y botones
+   sin cápsula (corregidos en el mismo PR) y las dos pantallas grandes (Bodega ✅, CTD ⏳).
+   Clima Puerto es un iframe externo: fuera de alcance del contrato.
+
 6. **Decidir claro frío `#F2F2F7` vs cálido `#EAE7E0`** — abierto desde 2026-08-09.
 7. **Los 228 `<button>` a mano** con 13 alturas distintas (25–64 px). No es un barrido: chips,
    flechas e íconos en tablas no van a 44. Dirigirlo pantalla por pantalla con el medidor de
