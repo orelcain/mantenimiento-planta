@@ -91,7 +91,7 @@ export function ImputacionPeriodCard({ imputacion }: { imputacion: PeriodImputac
                   return (
                     <div
                       key={`${t.dateKey}-${t.shiftId}-${i}`}
-                      className={cn('flex-1 min-w-[2px] rounded-t-sm', nivel(p).bar)}
+                      className={cn('flex-1 min-w-[2px] rounded-t-ctl', nivel(p).bar)}
                       style={{ height: `${Math.max(4, p)}%` }}
                       title={`${t.dateKey.slice(5)} · ${t.shiftId}: ${p.toFixed(0)}% con causal · ${fmtSecPanoramic(t.totalSec)} detenidos`}
                     />

@@ -826,7 +826,7 @@ export function MainLayout() {
       {shouldHideDesktopSidebar && (
         <button
           type="button"
-          className="hidden lg:flex fixed left-0 top-1/2 -translate-y-1/2 z-40 items-center justify-center w-6 h-14 bg-card/80 backdrop-blur-sm border border-l-0 rounded-r-lg shadow-md hover:bg-muted hover:w-8 transition-all duration-200 group"
+          className="hidden lg:flex fixed left-0 top-1/2 -translate-y-1/2 z-40 items-center justify-center w-6 h-14 bg-card/80 backdrop-blur-sm border border-l-0 rounded-r-ctl shadow-md hover:bg-muted hover:w-8 transition-all duration-200 group"
           onClick={toggleSidebarCollapse}
           aria-label="Expandir menú lateral"
           title="Expandir menú lateral"
