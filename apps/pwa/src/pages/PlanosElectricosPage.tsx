@@ -248,11 +248,10 @@ function Catalogo() {
           {planosPorEquipo().map(({ equipo, planos }) => (
             <section key={equipo.id} className="flex min-w-0 flex-col gap-0">
               <div className="flex items-baseline gap-2 px-0.5 pb-2">
-                <span className="font-mono text-caption uppercase tracking-[.13em]"
-                      style={{ color: 'var(--lc-ink-ghost)' }}>
+                <span className="text-footnote" style={{ color: 'var(--lc-ink-mid)' }}>
                   {equipo.funcion}
                 </span>
-                <span className="ml-auto font-mono text-caption" style={{ color: 'var(--lc-ink-ghost)' }}>
+                <span className="ml-auto text-footnote tabular-nums" style={{ color: 'var(--lc-ink-mid)' }}>
                   {planos.length} plano{planos.length !== 1 ? 's' : ''}
                 </span>
               </div>

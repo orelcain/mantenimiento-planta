@@ -40,18 +40,21 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Tabs,
+  TabsList,
+  TabsTrigger,
   Spinner,
 } from '@/components/ui'
 import { useAuthStore } from '@/store'
 import { useTheme } from '@/hooks/useTheme'
 import { createInviteCode } from '@/services/auth'
 import { fixPCBOtoPCHO } from '@/scripts/fixPCBOtoPCHO'
-import { 
-  collection, 
-  getDocs, 
+import {
+  collection,
+  getDocs,
   getDoc,
-  doc, 
-  updateDoc, 
+  doc,
+  updateDoc,
   deleteDoc,
   setDoc,
   serverTimestamp,
@@ -78,7 +81,7 @@ export function SettingsPage() {
   const [activeTab, setActiveTab] = useState<TabType>('general')
 
   const isAdmin = user?.rol === 'admin'
-  
+
   // Si no es admin, forzar tab de notificaciones
   useEffect(() => {
     if (!isAdmin && activeTab !== 'notifications') {
@@ -103,28 +106,26 @@ export function SettingsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold">Configuración</h1>
-        <p className="text-muted-foreground">
+      <div className="space-y-1">
+        <h1 className="text-title1 font-bold">Configuración</h1>
+        <p className="text-subhead text-muted-foreground">
           {isAdmin ? 'Administra la configuración del sistema' : 'Gestiona tus notificaciones'}
         </p>
       </div>
 
       {/* Tabs (solo mostrar si es admin) */}
       {isAdmin && (
-        <div className="flex flex-wrap gap-2 border-b border-border pb-2">
-          {tabs.map((tab) => (
-            <Button
-              key={tab.id}
-              variant={activeTab === tab.id ? 'default' : 'ghost'}
-              onClick={() => setActiveTab(tab.id)}
-              className="gap-2"
-            >
-              <tab.icon className="h-4 w-4" />
-              {tab.label}
-            </Button>
-          ))}
-        </div>
+        // Pista cápsula del primitivo (DESIGN.md §5): una sola línea que se desplaza,
+        // no ocho botones que se parten en dos filas.
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabType)}>
+          <TabsList aria-label="Secciones de configuración">
+            {tabs.map((tab) => (
+              <TabsTrigger key={tab.id} value={tab.id} className="px-3">
+                {tab.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
       )}
 
       {/* Content */}
@@ -186,7 +187,7 @@ function GeneralSettings() {
         <CardContent className="space-y-6">
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <Label>Modo Oscuro</Label>
+              <Label>Modo oscuro</Label>
               <p className="text-sm text-muted-foreground">
                 Cambiar entre tema claro y oscuro
               </p>
@@ -215,12 +216,12 @@ function GeneralSettings() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Flujo de Incidencias</CardTitle>
+          <CardTitle>Flujo de incidencias</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <Label>Validación de Incidencias</Label>
+              <Label>Validación de incidencias</Label>
               <p className="text-sm text-muted-foreground">
                 Requiere que un supervisor valide las incidencias reportadas
               </p>
@@ -233,7 +234,7 @@ function GeneralSettings() {
 
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <Label>Auto-asignación</Label>
+              <Label>Autoasignación</Label>
               <p className="text-sm text-muted-foreground">
                 Asigna automáticamente incidencias a técnicos disponibles
               </p>
@@ -291,7 +292,7 @@ function GeneralSettings() {
           ) : (
             <>
               <Save className="h-4 w-4 mr-2" />
-              Guardar Cambios
+              Guardar cambios
             </>
           )}
         </Button>
@@ -470,7 +471,7 @@ function UsersSettings() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Usuarios del Sistema ({users.length})</CardTitle>
+          <CardTitle>Usuarios del sistema ({users.length})</CardTitle>
         </CardHeader>
         <CardContent>
         <div className="divide-y divide-border">
@@ -627,10 +628,10 @@ function InvitesSettings() {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h3 className="text-lg font-medium">Códigos de Invitación</h3>
+        <h3 className="text-title3 font-semibold">Códigos de invitación</h3>
         <Button onClick={() => setShowCreateDialog(true)}>
           <Plus className="h-4 w-4 mr-2" />
-          Nuevo Código
+          Nuevo código
         </Button>
       </div>
 
@@ -703,7 +704,7 @@ function InvitesSettings() {
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Crear Código de Invitación</DialogTitle>
+            <DialogTitle>Crear código de invitación</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
@@ -759,12 +760,12 @@ function SystemSettings() {
     try {
       const initialized = await isHierarchyInitialized()
       setIsInitialized(initialized)
-      
+
       // Contar nodos de jerarquía
       const q = query(collection(db, 'hierarchy'), where('activo', '==', true))
       const snapshot = await getDocs(q)
       setHierarchyCount(snapshot.size)
-      
+
       logger.info('Hierarchy system check', { initialized, count: snapshot.size })
     } catch (error) {
       logger.error('Error checking hierarchy initialization', error instanceof Error ? error : new Error(String(error)))
@@ -774,21 +775,21 @@ function SystemSettings() {
 
   const handleInitialize = async () => {
     if (!user?.id) return
-    
+
     setIsInitializing(true)
     setInitError(null)
     setInitSuccess(false)
-    
+
     try {
       logger.info('Initializing hierarchy system', { userId: user.id })
       await initializeHierarchySystem(user.id)
-      
+
       setInitSuccess(true)
       setIsInitialized(true)
-      
+
       // Recargar count
       await checkInitialization()
-      
+
       logger.info('Hierarchy system initialized successfully')
       setTimeout(() => setInitSuccess(false), 3000)
     } catch (error) {
@@ -796,7 +797,7 @@ function SystemSettings() {
       logger.error('Error initializing hierarchy system', error instanceof Error ? error : new Error(String(error)))
       setInitError(errorMessage)
     }
-    
+
     setIsInitializing(false)
   }
 
@@ -813,7 +814,7 @@ function SystemSettings() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Database className="h-5 w-5" />
-            Sistema de Jerarquías
+            Sistema de jerarquías
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -827,10 +828,10 @@ function SystemSettings() {
               {/* Estado del sistema */}
               <div className="flex items-center justify-between p-4 rounded-card bg-muted/50">
                 <div className="space-y-1">
-                  <p className="font-medium">Estado del Sistema</p>
+                  <p className="font-medium">Estado del sistema</p>
                   <p className="text-sm text-muted-foreground">
-                    {isInitialized 
-                      ? `Sistema inicializado - ${hierarchyCount} nodos activos` 
+                    {isInitialized
+                      ? `Sistema inicializado - ${hierarchyCount} nodos activos`
                       : 'Sistema no inicializado'}
                   </p>
                 </div>
@@ -884,8 +885,8 @@ function SystemSettings() {
               {/* Acciones */}
               <div className="flex gap-3 pt-4 border-t">
                 {!isInitialized ? (
-                  <Button 
-                    onClick={handleInitialize} 
+                  <Button
+                    onClick={handleInitialize}
                     disabled={isInitializing}
                     className="flex-1"
                   >
@@ -897,14 +898,14 @@ function SystemSettings() {
                     ) : (
                       <>
                         <Database className="h-4 w-4 mr-2" />
-                        Inicializar Sistema
+                        Inicializar sistema
                       </>
                     )}
                   </Button>
                 ) : (
                   <>
-                    <Button 
-                      onClick={handleReinitialize} 
+                    <Button
+                      onClick={handleReinitialize}
                       disabled={isInitializing}
                       variant="outline"
                     >
@@ -920,8 +921,8 @@ function SystemSettings() {
                         </>
                       )}
                     </Button>
-                    <Button 
-                      onClick={checkInitialization} 
+                    <Button
+                      onClick={checkInitialization}
                       variant="ghost"
                     >
                       <RefreshCw className="h-4 w-4 mr-2" />
@@ -934,7 +935,7 @@ function SystemSettings() {
               {/* Advertencia */}
               {!isInitialized && (
                 <div className="p-3 rounded-card bg-amber-500/[0.15] text-ink-warn text-sm">
-                  <strong>Nota:</strong> La inicialización creará la estructura base de Aquachile Antarfood Chonchi 
+                  <strong>Nota:</strong> La inicialización creará la estructura base de AquaChile Antarfood Chonchi
                   con 4 áreas principales y ejemplos de sub-estructuras.
                 </div>
               )}
@@ -948,7 +949,7 @@ function SystemSettings() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Wrench className="h-5 w-5" />
-            Corrección de Datos: PCBO → PCHO
+            Corrección de datos: PCBO → PCHO
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -1007,7 +1008,7 @@ function HmiTooltipPwdCard() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Key className="h-5 w-5" />
-          Clave de Edición
+          Clave de edición
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -1090,7 +1091,7 @@ function FixPCBOButton() {
     try {
       const fixResult = await fixPCBOtoPCHO()
       setResult(fixResult)
-      
+
       if (fixResult.success && fixResult.updated > 0) {
         // Recargar página después de 2 segundos
         setTimeout(() => {
@@ -1110,8 +1111,8 @@ function FixPCBOButton() {
 
   return (
     <div className="space-y-3">
-      <Button 
-        onClick={handleFix} 
+      <Button
+        onClick={handleFix}
         disabled={isFixing}
         variant="default"
         className="gap-2"
@@ -1131,8 +1132,8 @@ function FixPCBOButton() {
 
       {result && (
         <div className={`p-3 rounded-card ${
-          result.success 
-            ? 'bg-green-500/[0.15] text-ink-ok' 
+          result.success
+            ? 'bg-green-500/[0.15] text-ink-ok'
             : 'bg-red-500/[0.15] text-ink-crit'
         }`}>
           {result.success ? (

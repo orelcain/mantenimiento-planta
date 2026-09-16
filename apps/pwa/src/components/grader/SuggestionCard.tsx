@@ -115,7 +115,7 @@ export function SuggestionCard({ suggestion: s }: Props) {
               <button
                 type="button"
                 onClick={s.applyFn}
-                className="px-3 py-1.5 rounded-ctl bg-emerald-500/[0.15] hover:brightness-95/[0.15] text-ink-ok font-medium text-xs transition-colors"
+                className="px-3 py-1.5 rounded-ctl bg-emerald-500/[0.15] hover:brightness-95 text-ink-ok font-medium text-xs transition-colors"
               >
                 Aplicar
               </button>

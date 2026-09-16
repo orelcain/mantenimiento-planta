@@ -16,7 +16,15 @@ import {
   CardTitle,
   Button,
 } from '@/components/ui'
-import { BarChart3, Loader2, RefreshCw, CircleCheck, CircleAlert, CircleDashed, Laptop, History } from 'lucide-react'
+import {
+  Loader2,
+  RefreshCw,
+  CircleCheck,
+  CircleAlert,
+  CircleDashed,
+  Laptop,
+  History,
+} from 'lucide-react'
 import { useAuthStore } from '@/store'
 import { useToast } from '@/hooks/useToast'
 import { logger } from '@/lib/logger'
@@ -120,11 +128,8 @@ export function PowerBIExportPage() {
   return (
     <div className="container mx-auto p-4 sm:p-6 max-w-6xl space-y-4">
       <div className="space-y-1">
-        <h1 className="text-2xl font-semibold flex items-center gap-2">
-          <BarChart3 className="w-6 h-6 text-ink-warn" />
-          Actualizar Power BI
-        </h1>
-        <p className="text-sm text-muted-foreground">
+        <h1 className="text-title1 font-bold">Actualizar Power BI</h1>
+        <p className="text-subhead text-muted-foreground">
           Exporta los KPIs de Mantención (CSVs modelo-estrella) a OneDrive empresa y refresca
           el dataset en Power BI Service. La cadena automática ya corre sola (export c/3 h +
           refresh 4×/día); este botón es para tener datos frescos AHORA, antes de una reunión.
@@ -142,7 +147,7 @@ export function PowerBIExportPage() {
             Agente del PC de mantención
             <span className={['ml-auto inline-flex items-center gap-1.5 text-xs font-normal',
               online ? 'text-ink-ok' : 'text-ink-crit'].join(' ')}>
-              <span className={['w-2 h-2 rounded-full', online ? 'bg-emerald-400' : 'bg-red-400'].join(' ')} />
+              <span className={['w-2 h-2 rounded-full', online ? 'bg-fill-ok' : 'bg-fill-critical'].join(' ')} />
               {online ? 'En línea' : 'Sin señal'}
             </span>
           </CardTitle>

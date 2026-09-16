@@ -125,7 +125,7 @@ function QuickImagePreview({ url, name, allImages, onClose, onAddPhoto }: {
     <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center" onClick={onClose}>
       <div className="relative max-w-4xl w-full max-h-[90vh] flex flex-col items-center" onClick={e => e.stopPropagation()}>
         {/* Cerrar */}
-        <button onClick={onClose} className="absolute top-2 right-2 z-10 h-8 w-8 rounded-full bg-black/50 flex items-center justify-center text-ink-crit hover:brightness-95/[0.15] transition-colors">
+        <button onClick={onClose} className="absolute top-2 right-2 z-10 h-8 w-8 rounded-full bg-black/50 flex items-center justify-center text-ink-crit hover:brightness-95 transition-colors">
           <X className="h-4 w-4" />
         </button>
 

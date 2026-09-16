@@ -1,19 +1,18 @@
 /**
  * MissionControlPanel — Sala de control de agentes IA
- * 
+ *
  * Muestra:
  * - Status en tiempo real de cada agente (Online/Rate-limited/Offline/Disabled)
  * - Log de misiones con resultados, fallbacks, latencia
  * - Configuración: habilitar/deshabilitar agentes, prioridades
  * - Estadísticas: requests y tokens por agente
  */
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, type ReactNode } from 'react'
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
-  Button,
   Badge,
   Switch,
   Spinner,
@@ -21,15 +20,11 @@ import {
 import {
   Satellite,
   RefreshCw,
-  Activity,
   Zap,
-  Shield,
   Clock,
-  ArrowUpDown,
   CheckCircle2,
   XCircle,
   ArrowRightLeft,
-  Radio,
   Brain,
   TrendingUp,
   MessageSquare,
@@ -45,6 +40,7 @@ import {
   Check,
   HelpCircle,
   X,
+  ChevronRight,
 } from 'lucide-react'
 import {
   getAllAgents,
@@ -64,6 +60,7 @@ import {
   type LearningStats,
   type AriaCorrection,
 } from '@/services/ariaLearning'
+import { ListCell, ListGroup } from '@/components/piel'
 import { useAuthStore } from '@/store/authStore'
 import { useToast } from '@/hooks/useToast'
 import { dec1, dec2 } from '@/utils/formatoNumeros'
@@ -74,9 +71,9 @@ import { dec1, dec2 } from '@/utils/formatoNumeros'
 
 function statusColor(status: AIAgent['status']): string {
   switch (status) {
-    case 'online': return 'bg-green-500'
-    case 'rate-limited': return 'bg-amber-500'
-    case 'offline': return 'bg-red-500'
+    case 'online': return 'bg-fill-ok'
+    case 'rate-limited': return 'bg-fill-warning'
+    case 'offline': return 'bg-fill-critical'
     case 'disabled': return 'bg-muted-foreground'
     default: return 'bg-muted-foreground'
   }
@@ -88,7 +85,7 @@ function CorrectionRow({ correction: c, onDelete, onToggle }: {
   onToggle: (id: string, active: boolean) => void
 }) {
   return (
-    <div className={`flex items-start gap-2 p-2 rounded-ctl border text-xs ${c.active ? 'border-transparent bg-amber-500/[0.15]' : 'border-border bg-muted opacity-60'}`}>
+    <div className={`flex items-start gap-2 p-2 rounded-ctl border text-xs ${c.active ? 'border-transparent bg-ink-warn/[0.15]' : 'border-border bg-muted opacity-60'}`}>
       <div className="flex-1 min-w-0">
         <div className="flex items-start gap-1 text-muted-foreground" title={c.userQuery}>
           <HelpCircle className="mt-0.5 size-2.5 shrink-0" aria-label="Preguntó" />
@@ -115,7 +112,7 @@ function CorrectionRow({ correction: c, onDelete, onToggle }: {
         </button>
         <button
           onClick={() => onDelete(c.id!)}
-          className="p-0.5 rounded-ctl hover:bg-red-500/[0.15] dark:bg-red-500/[0.15] text-ink-crit"
+          className="p-0.5 rounded-ctl hover:bg-ink-crit/[0.15] text-ink-crit"
           title="Eliminar corrección"
         >
           <Trash2 className="h-3 w-3" />
@@ -127,9 +124,9 @@ function CorrectionRow({ correction: c, onDelete, onToggle }: {
 
 function statusLabel(status: AIAgent['status']): string {
   switch (status) {
-    case 'online': return 'Online'
-    case 'rate-limited': return 'Rate Limited'
-    case 'offline': return 'Offline'
+    case 'online': return 'En línea'
+    case 'rate-limited': return 'En su límite'
+    case 'offline': return 'Sin conexión'
     case 'disabled': return 'Deshabilitado'
     default: return status
   }
@@ -156,6 +153,32 @@ function capabilityIcon(cap: string) {
     case 'analysis': return BarChart3
     default: return Dot
   }
+}
+
+type Tono = 'ok' | 'warning' | 'critical'
+const PUNTO: Record<Tono, string> = { ok: 'bg-fill-ok', warning: 'bg-fill-warning', critical: 'bg-fill-critical' }
+
+function tonoPorUmbral(valor: number, bueno: number, regular: number): Tono {
+  return valor >= bueno ? 'ok' : valor >= regular ? 'warning' : 'critical'
+}
+
+/** Cifra con rótulo. El número va siempre en tinta neutra; el estado, en el punto. */
+function Cifra({ valor, rotulo, tono, dentro = false }: {
+  valor: ReactNode
+  rotulo: string
+  tono?: Tono
+  /** `true` dentro de una tarjeta: relleno gris en vez de tarjeta sobre tarjeta. */
+  dentro?: boolean
+}) {
+  return (
+    <div className={`rounded-card p-3 text-center ${dentro ? 'bg-muted' : 'bg-card'}`}>
+      <div className={`${dentro ? 'text-title3' : 'text-title2'} font-bold tabular-nums`}>{valor}</div>
+      <div className="mt-0.5 flex items-center justify-center gap-1.5 text-footnote text-muted-foreground">
+        {tono && <span aria-hidden className={`size-2 shrink-0 rounded-full ${PUNTO[tono]}`} />}
+        {rotulo}
+      </div>
+    </div>
+  )
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -260,164 +283,111 @@ export function MissionControlPanel() {
 
   return (
     <div className="space-y-6">
-      {/* ─── Header ─── */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <div className="p-2.5 bg-gradient-to-br from-purple-500/20 to-blue-500/20 rounded-card">
-              <Satellite className="h-6 w-6 text-cat-6-ink" />
-            </div>
-            {/* Pulse indicador */}
-            <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500" />
-            </span>
-          </div>
-          <div>
-            <h2 className="text-lg font-bold">ARIA — Control de Misión</h2>
-            <p className="text-sm text-muted-foreground">
-              Orquestación multi-agente · {onlineCount}/{agents.length} agentes online
-            </p>
-          </div>
+      {/* ─── Encabezado ─── */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 space-y-0.5">
+          <h2 className="text-title3 font-semibold">Control de misión de ARIA</h2>
+          <p className="text-subhead text-muted-foreground">
+            Orquestación de agentes · {onlineCount} de {agents.length} en línea
+          </p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Radio className={`h-3 w-3 ${autoRefresh ? 'text-ink-ok animate-pulse' : 'text-muted-foreground'}`} />
-            <button onClick={() => setAutoRefresh(!autoRefresh)} className="hover:underline">
-              {autoRefresh ? 'Live' : 'Paused'}
-            </button>
-          </div>
-          <Button variant="ghost" size="sm" onClick={loadData}>
-            <RefreshCw className="h-4 w-4" />
-          </Button>
+        <div className="flex shrink-0 items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setAutoRefresh(!autoRefresh)}
+            aria-pressed={autoRefresh}
+            className="inline-flex h-11 items-center gap-2 rounded-full px-3 text-subhead text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          >
+            <span aria-hidden className={`size-2 rounded-full ${autoRefresh ? 'bg-fill-ok' : 'bg-muted-foreground/50'}`} />
+            {autoRefresh ? 'En vivo' : 'En pausa'}
+          </button>
+          <button
+            type="button"
+            onClick={loadData}
+            aria-label="Actualizar"
+            className="flex size-11 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          >
+            <RefreshCw className="size-5" />
+          </button>
         </div>
       </div>
 
-      {/* ─── KPIs ─── */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <div className="p-3 bg-muted/50 rounded-card text-center">
-          <div className="text-2xl font-bold text-ink-ok">{onlineCount}</div>
-          <div className="text-xs text-muted-foreground">Agentes Online</div>
-        </div>
-        <div className="p-3 bg-muted/50 rounded-card text-center">
-          <div className="text-2xl font-bold">{totalRequests}</div>
-          <div className="text-xs text-muted-foreground">Requests Hoy</div>
-        </div>
-        <div className="p-3 bg-muted/50 rounded-card text-center">
-          <div className="text-2xl font-bold">
-            {totalTokens > 1000 ? `${Math.round(totalTokens / 1000)}K` : totalTokens}
-          </div>
-          <div className="text-xs text-muted-foreground">Tokens Hoy</div>
-        </div>
-        <div className="p-3 bg-muted/50 rounded-card text-center">
-          <div className={`text-2xl font-bold ${successRate >= 90 ? 'text-ink-ok' : successRate >= 70 ? 'text-ink-warn' : 'text-ink-crit'}`}>
-            {successRate}%
-          </div>
-          <div className="text-xs text-muted-foreground">Tasa Éxito</div>
-        </div>
-        <div className="p-3 bg-muted/50 rounded-card text-center col-span-2 md:col-span-1">
-          <div className={`text-2xl font-bold ${totalCostUsd > 0 ? 'text-cat-4-ink' : 'text-ink-ok'}`}>
-            ${totalCostUsd < 0.01 && totalCostUsd > 0 ? '<0.01' : dec2(totalCostUsd)}
-          </div>
-          <div className="text-xs text-muted-foreground">Costo Est. USD</div>
+      {/* ─── Cifras del día ─── */}
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+        <Cifra
+          valor={onlineCount}
+          rotulo="Agentes en línea"
+          tono={onlineCount === agents.length ? 'ok' : onlineCount > 0 ? 'warning' : 'critical'}
+        />
+        <Cifra valor={totalRequests} rotulo="Solicitudes hoy" />
+        <Cifra valor={totalTokens > 1000 ? `${Math.round(totalTokens / 1000)}K` : totalTokens} rotulo="Tokens hoy" />
+        <Cifra valor={`${successRate} %`} rotulo="Tasa de éxito" tono={tonoPorUmbral(successRate, 90, 70)} />
+        <div className="col-span-2 md:col-span-1">
+          <Cifra
+            valor={`$${totalCostUsd < 0.01 && totalCostUsd > 0 ? '<0,01' : dec2(totalCostUsd)}`}
+            rotulo="Costo estimado (USD)"
+          />
         </div>
       </div>
 
-      {/* ─── Panel de Agentes ─── */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm flex items-center gap-2">
-            <Shield className="h-4 w-4" />
-            Agentes IA
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {agents.map((agent) => {
-            const isEnabled = !config.disabledAgents.includes(agent.id)
-            const hasKey = agent.status !== 'disabled' || isEnabled
-            return (
-              <div
-                key={agent.id}
-                className={`flex items-center gap-3 p-3 rounded-card border transition-all ${
-                  agent.status === 'online'
-                    ? 'border-transparent bg-green-500/[0.15]'
-                    : agent.status === 'rate-limited'
-                    ? 'border-transparent bg-amber-500/[0.15]'
-                    : 'border-border bg-muted'
-                }`}
-              >
-                {/* Status dot */}
-                <div className={`h-3 w-3 rounded-full ${statusColor(agent.status)} shrink-0`} />
-
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">{agent.emoji}</span>
-                    <span className="font-semibold text-sm">{agent.name}</span>
-                    <Badge variant="outline" className="text-caption px-1.5 py-0">
-                      {agent.provider}
-                    </Badge>
-                    {agent.thinking && (
-                      <Badge variant="outline" className="text-caption px-1.5 py-0 border-cat-6-tint/[0.25] text-cat-6-ink">
-                        Thinking
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-caption text-muted-foreground">
-                      <span className="inline-flex items-center gap-1">
-                        {agent.capabilities.map(c => {
-                          const Icon = capabilityIcon(c)
-                          return <Icon key={c} className="size-3" aria-label={c} />
-                        })}
-                      </span>
-                    </span>
-                    <span className="text-caption text-muted-foreground">
-                      · P{agent.priority} · {agent.costTier}
-                    </span>
-                    <span className="text-caption text-muted-foreground">
-                      · {statusLabel(agent.status)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Stats */}
-                <div className="text-right text-xs shrink-0">
-                  <div className="font-mono">{agent.usedToday} req</div>
-                  <div className="text-muted-foreground">
-                    {agent.tokensToday > 1000 ? `${Math.round(agent.tokensToday / 1000)}K tok` : `${agent.tokensToday} tok`}
-                  </div>
-                  {(() => {
-                    const cost = costSummary.find(c => c.agentId === agent.id)?.estimatedCostUsd || 0
-                    return cost > 0 ? (
-                      <div className="text-cat-4-ink font-mono text-caption">
-                        ${cost < 0.01 ? '<0.01' : cost.toFixed(3)}
-                      </div>
-                    ) : null
-                  })()}
-                </div>
-
-                {/* Toggle */}
+      {/* ─── Agentes ─── */}
+      <ListGroup title="Agentes de IA" footer="El punto indica el estado: verde en línea, ámbar en su límite, rojo sin conexión.">
+        {agents.map((agent) => {
+          const isEnabled = !config.disabledAgents.includes(agent.id)
+          const hasKey = agent.status !== 'disabled' || isEnabled
+          const cost = costSummary.find(c => c.agentId === agent.id)?.estimatedCostUsd || 0
+          const tokens = agent.tokensToday > 1000 ? `${Math.round(agent.tokensToday / 1000)}K` : `${agent.tokensToday}`
+          return (
+            <ListCell
+              key={agent.id}
+              leading={
+                <span className="flex w-7 justify-center" title={statusLabel(agent.status)}>
+                  <span aria-hidden className={`size-2.5 rounded-full ${statusColor(agent.status)}`} />
+                </span>
+              }
+              title={
+                <span className="inline-flex items-center gap-2">
+                  {agent.name}
+                  {agent.thinking && (
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-caption font-medium text-muted-foreground">Razona</span>
+                  )}
+                </span>
+              }
+              subtitle={
+                // Texto en línea (no flex): así el recorte a una línea de la celda sí aplica.
+                <>
+                  {agent.provider} · P{agent.priority} · {agent.costTier} · {statusLabel(agent.status)}{' '}
+                  <span className="ml-1 inline-flex translate-y-0.5 items-center gap-1" aria-label={`Capacidades: ${agent.capabilities.join(', ')}`}>
+                    {agent.capabilities.map(c => {
+                      const Icon = capabilityIcon(c)
+                      return <Icon key={c} className="size-3" aria-hidden />
+                    })}
+                  </span>
+                </>
+              }
+              value={`${agent.usedToday} solicitudes`}
+              valueSub={`${tokens} tokens${cost > 0 ? ` · $${cost < 0.01 ? '<0,01' : cost.toFixed(3)}` : ''}`}
+              trailing={
                 <Switch
                   checked={isEnabled && hasKey}
                   onCheckedChange={(checked: boolean) => handleToggleAgent(agent.id, checked)}
                   disabled={isSaving}
+                  aria-label={`Usar ${agent.name}`}
                 />
-              </div>
-            )
-          })}
-        </CardContent>
-      </Card>
+              }
+            />
+          )
+        })}
+      </ListGroup>
 
       {/* ─── Mission Log ─── */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm flex items-center gap-2">
-            <Activity className="h-4 w-4" />
-            Log de Misiones
-            <Badge variant="outline" className="ml-auto text-xs">
-              {logs.length} entradas hoy
-            </Badge>
+          <CardTitle className="flex items-center gap-2 text-headline">
+            Registro de misiones
+            <span className="ml-auto text-footnote font-normal text-muted-foreground tabular-nums">
+              {logs.length} hoy
+            </span>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -465,7 +435,7 @@ export function MissionControlPanel() {
                       </span>
                     )}
                     {(log.estimatedCostUsd ?? 0) > 0 && (
-                      <span className="text-cat-4-ink text-caption font-mono">
+                      <span className="text-caption tabular-nums text-muted-foreground">
                         ${(log.estimatedCostUsd ?? 0).toFixed(4)}
                       </span>
                     )}
@@ -473,7 +443,7 @@ export function MissionControlPanel() {
 
                   {/* Fallback indicator */}
                   {log.status === 'fallback' && log.fallbackTo && (
-                    <span className="text-ink-warn" title={`Fallback a ${log.fallbackTo}`}>
+                    <span className="text-ink-warn" title={`Pasó a ${log.fallbackTo}`}>
                       <ArrowRightLeft className="h-3 w-3" />
                     </span>
                   )}
@@ -494,39 +464,24 @@ export function MissionControlPanel() {
       {/* ─── API Keys (admin) ─── */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm flex items-center gap-2">
-            <Brain className="h-4 w-4" />
-            Aprendizaje ARIA
-            {learningStats && learningStats.totalFeedback > 0 && (
-              <Badge variant="outline" className="ml-auto text-xs">
-                {learningStats.satisfactionRate}% satisfacción
-              </Badge>
-            )}
+          <CardTitle className="flex items-center gap-2 text-headline">
+            Aprendizaje de ARIA
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {learningStats ? (
             <>
-              {/* KPIs de aprendizaje */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                <div className="p-2 bg-muted/50 rounded-card text-center">
-                  <div className="text-lg font-bold text-brand-ink">{learningStats.totalFeedback}</div>
-                  <div className="text-caption text-muted-foreground">Feedback Total</div>
-                </div>
-                <div className="p-2 bg-muted/50 rounded-card text-center">
-                  <div className={`text-lg font-bold ${learningStats.satisfactionRate >= 70 ? 'text-ink-ok' : learningStats.satisfactionRate >= 40 ? 'text-ink-warn' : 'text-ink-crit'}`}>
-                    {learningStats.satisfactionRate}%
-                  </div>
-                  <div className="text-caption text-muted-foreground">Satisfacción</div>
-                </div>
-                <div className="p-2 bg-muted/50 rounded-card text-center">
-                  <div className="text-lg font-bold text-cat-6-ink">{learningStats.totalKnowledge}</div>
-                  <div className="text-caption text-muted-foreground">Conocimientos</div>
-                </div>
-                <div className="p-2 bg-muted/50 rounded-card text-center">
-                  <div className="text-lg font-bold text-ink-warn">{learningStats.activeCorrections}</div>
-                  <div className="text-caption text-muted-foreground">Correcciones</div>
-                </div>
+              {/* Cifras de aprendizaje: neutras; la satisfacción lleva su punto */}
+              <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                <Cifra dentro valor={learningStats.totalFeedback} rotulo="Valoraciones" />
+                <Cifra
+                  dentro
+                  valor={`${learningStats.satisfactionRate} %`}
+                  rotulo="Satisfacción"
+                  tono={learningStats.totalFeedback > 0 ? tonoPorUmbral(learningStats.satisfactionRate, 70, 40) : undefined}
+                />
+                <Cifra dentro valor={learningStats.totalKnowledge} rotulo="Conocimientos" />
+                <Cifra dentro valor={learningStats.activeCorrections} rotulo="Correcciones" />
               </div>
 
               {/* Gráfico de satisfacción por día (barras simples CSS) */}
@@ -534,7 +489,7 @@ export function MissionControlPanel() {
                 <div>
                   <div className="flex items-center gap-2 mb-2">
                     <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span className="text-xs font-medium">Tendencia de Satisfacción</span>
+                    <span className="text-footnote font-semibold">Tendencia de satisfacción</span>
                   </div>
                   <div className="flex items-end gap-0.5 h-16">
                     {learningStats.feedbackByDay.slice(-14).map((day, i) => {
@@ -559,26 +514,26 @@ export function MissionControlPanel() {
                     <span>Hoy</span>
                   </div>
                   <div className="flex items-center gap-3 mt-1 text-caption text-muted-foreground">
-                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-ctl bg-green-500" /> &ge;70%</span>
-                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-ctl bg-amber-500" /> 40-69%</span>
-                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-ctl bg-red-500" /> &lt;40%</span>
+                    <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-fill-ok" /> &ge;70%</span>
+                    <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-fill-warning" /> 40-69%</span>
+                    <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-fill-critical" /> &lt;40%</span>
                   </div>
                 </div>
               )}
 
               {/* Desglose de métricas */}
               <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="flex items-center gap-2 p-2 bg-green-500/[0.15] rounded-ctl">
+                <div className="flex items-center gap-2 rounded-ctl bg-muted p-2">
                   <MessageSquare className="h-3.5 w-3.5 text-ink-ok" />
                   <div>
-                    <div className="font-medium">{learningStats.positiveFeedback} positivos</div>
+                    <div className="font-medium">{learningStats.positiveFeedback} {learningStats.positiveFeedback === 1 ? 'positiva' : 'positivas'}</div>
                     <div className="text-caption text-muted-foreground">Respuestas marcadas útiles</div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 p-2 bg-red-500/[0.15] rounded-ctl">
+                <div className="flex items-center gap-2 rounded-ctl bg-muted p-2">
                   <AlertTriangle className="h-3.5 w-3.5 text-ink-crit" />
                   <div>
-                    <div className="font-medium">{learningStats.negativeFeedback} negativos</div>
+                    <div className="font-medium">{learningStats.negativeFeedback} {learningStats.negativeFeedback === 1 ? 'negativa' : 'negativas'}</div>
                     <div className="text-caption text-muted-foreground">Respuestas marcadas incorrectas</div>
                   </div>
                 </div>
@@ -588,7 +543,7 @@ export function MissionControlPanel() {
               {learningStats.totalKnowledge > 0 && (
                 <div>
                   <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="text-muted-foreground">Confianza promedio del knowledge base</span>
+                    <span className="text-muted-foreground">Confianza promedio de la base de conocimiento</span>
                     <span className="font-medium">{learningStats.avgConfidence}%</span>
                   </div>
                   <div className="w-full bg-muted rounded-full h-1.5">
@@ -607,7 +562,7 @@ export function MissionControlPanel() {
               {/* Correcciones activas */}
               {learningStats.topCorrections.length > 0 && (
                 <div>
-                  <div className="text-xs font-medium mb-1.5">Correcciones Activas ({learningStats.activeCorrections})</div>
+                  <div className="text-xs font-medium mb-1.5">Correcciones activas ({learningStats.activeCorrections})</div>
                   <div className="space-y-1.5 max-h-40 overflow-y-auto">
                     {learningStats.topCorrections.map((c) => (
                       <CorrectionRow key={c.id} correction={c} onDelete={async (id) => {
@@ -641,10 +596,7 @@ export function MissionControlPanel() {
       {/* ─── Arquitectura visual ─── */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm flex items-center gap-2">
-            <ArrowUpDown className="h-4 w-4" />
-            Cadena de Fallback
-          </CardTitle>
+          <CardTitle className="text-headline">Cadena de respaldo</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center gap-1 flex-wrap">
@@ -653,25 +605,19 @@ export function MissionControlPanel() {
               .sort((a, b) => b.priority - a.priority)
               .map((agent, i, arr) => (
                 <div key={agent.id} className="flex items-center gap-1">
-                  <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border ${
-                    agent.status === 'online'
-                      ? 'border-transparent bg-green-500/[0.15] text-ink-ok'
-                      : agent.status === 'rate-limited'
-                      ? 'border-transparent bg-amber-500/[0.15] text-ink-warn'
-                      : 'border-border bg-muted text-muted-foreground'
-                  }`}>
-                    <span>{agent.emoji}</span>
+                  <div className="flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-footnote font-medium">
+                    <span aria-hidden className={`size-2 rounded-full ${statusColor(agent.status)}`} />
                     <span>{agent.name}</span>
-                    <span className="opacity-50">P{agent.priority}</span>
+                    <span className="text-muted-foreground tabular-nums">P{agent.priority}</span>
                   </div>
                   {i < arr.length - 1 && (
-                    <span className="text-muted-foreground text-xs">→</span>
+                    <ChevronRight aria-hidden className="size-4 text-muted-foreground/60" />
                   )}
                 </div>
               ))}
           </div>
-          <p className="text-caption text-muted-foreground text-center mt-2">
-            Si el primer agente falla o está rate-limited, ARIA pasa automáticamente al siguiente
+          <p className="mt-3 text-center text-footnote text-muted-foreground">
+            Si un agente falla o llega a su límite, ARIA pasa solo al siguiente.
           </p>
         </CardContent>
       </Card>

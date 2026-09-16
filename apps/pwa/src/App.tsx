@@ -403,7 +403,10 @@ export function App() {
             path="/monitor/:token"
             element={
               <Suspense fallback={<LoadingScreen />}>
-                <PublicShiftMonitorPage />
+                {/* `monitor-tv`: la TV conserva sus cifras en Plex Mono bajo la piel Apple (index.css). */}
+                <div className="monitor-tv contents">
+                  <PublicShiftMonitorPage />
+                </div>
               </Suspense>
             }
           />

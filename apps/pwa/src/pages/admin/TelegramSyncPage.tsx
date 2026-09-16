@@ -17,7 +17,17 @@ import {
   Input,
   Label,
 } from '@/components/ui'
-import { Send, Loader2, RefreshCw, CircleCheck, CircleAlert, CircleDashed, Laptop, History, ChevronDown, ChevronRight } from 'lucide-react'
+import {
+  Loader2,
+  RefreshCw,
+  CircleCheck,
+  CircleAlert,
+  CircleDashed,
+  Laptop,
+  History,
+  ChevronDown,
+  ChevronRight,
+} from 'lucide-react'
 import { useAuthStore } from '@/store'
 import { useToast } from '@/hooks/useToast'
 import { logger } from '@/lib/logger'
@@ -175,11 +185,8 @@ export function TelegramSyncPage() {
   return (
     <div className="container mx-auto p-4 sm:p-6 max-w-6xl space-y-4">
       <div className="space-y-1">
-        <h1 className="text-2xl font-semibold flex items-center gap-2">
-          <Send className="w-6 h-6 text-ink-info" />
-          Sincronización Telegram
-        </h1>
-        <p className="text-sm text-muted-foreground">
+        <h1 className="text-title1 font-bold">Sincronización Telegram</h1>
+        <p className="text-subhead text-muted-foreground">
           Baja lo nuevo de los temas del grupo de mantención a las carpetas de cada equipo
           (OneDrive) y alimenta la bandeja de novedades de la app.
         </p>
@@ -196,7 +203,7 @@ export function TelegramSyncPage() {
             Agente del PC de mantención
             <span className={['ml-auto inline-flex items-center gap-1.5 text-xs font-normal',
               online ? 'text-ink-ok' : 'text-ink-crit'].join(' ')}>
-              <span className={['w-2 h-2 rounded-full', online ? 'bg-emerald-400' : 'bg-red-400'].join(' ')} />
+              <span className={['w-2 h-2 rounded-full', online ? 'bg-fill-ok' : 'bg-fill-critical'].join(' ')} />
               {online ? 'En línea' : 'Sin señal'}
             </span>
           </CardTitle>

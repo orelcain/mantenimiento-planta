@@ -1,7 +1,7 @@
 /**
  * Página de Administración de Mapas
  * Solo accesible para administradores
- * 
+ *
  * Permite:
  * - Crear ubicaciones
  * - Subir mapas (versiones)
@@ -260,15 +260,12 @@ export function MapsAdminPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Map className="h-6 w-6" />
-            Gestión de Mapas
-          </h1>
+          <h1 className="text-title1 font-bold">Mapas y planos</h1>
           <p className="text-muted-foreground">Administra ubicaciones y mapas de planta</p>
         </div>
         <Button onClick={() => setShowCreateLocation(true)} className="gap-2">
           <Plus className="h-4 w-4" />
-          Nueva Ubicación
+          Nueva ubicación
         </Button>
       </div>
 
@@ -431,7 +428,7 @@ export function MapsAdminPage() {
       <Dialog open={showCreateLocation} onOpenChange={setShowCreateLocation}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Nueva Ubicación</DialogTitle>
+            <DialogTitle>Nueva ubicación</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
@@ -440,7 +437,7 @@ export function MapsAdminPage() {
                 id="loc-name"
                 value={locationName}
                 onChange={(e) => setLocationName(e.target.value)}
-                placeholder="Ej: Planta Principal"
+                placeholder="Ej.: Planta principal"
               />
             </div>
             <div className="space-y-2">
@@ -469,7 +466,7 @@ export function MapsAdminPage() {
       <Dialog open={!!editingLocation} onOpenChange={(open) => !open && setEditingLocation(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Editar Ubicación</DialogTitle>
+            <DialogTitle>Editar ubicación</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
@@ -478,7 +475,7 @@ export function MapsAdminPage() {
                 id="edit-loc-name"
                 value={locationName}
                 onChange={(e) => setLocationName(e.target.value)}
-                placeholder="Ej: Planta Principal"
+                placeholder="Ej.: Planta principal"
               />
             </div>
             <div className="space-y-2">
@@ -514,7 +511,7 @@ export function MapsAdminPage() {
       }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Subir Mapa - {uploadingTo?.nombre}</DialogTitle>
+            <DialogTitle>Subir mapa · {uploadingTo?.nombre}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div
@@ -562,7 +559,7 @@ export function MapsAdminPage() {
             </Button>
             <Button onClick={handleUploadMap} disabled={!selectedFile || saving}>
               {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Upload className="h-4 w-4 mr-2" />}
-              Subir Mapa
+              Subir mapa
             </Button>
           </DialogFooter>
         </DialogContent>

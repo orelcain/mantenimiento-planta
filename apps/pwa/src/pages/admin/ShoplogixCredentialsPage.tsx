@@ -155,9 +155,9 @@ export function ShoplogixCredentialsPage() {
       <div className="flex items-center gap-3">
         <Key className="w-5 h-5 text-muted-foreground" />
         <div>
-          <h1 className="text-xl font-semibold">Credenciales Shoplogix</h1>
+          <h1 className="text-title1 font-bold">Credenciales Shoplogix</h1>
           <p className="text-xs text-muted-foreground">
-            Auto-login ROPC para Cloud Functions de sync de Evisceradoras Baader 142
+            Inicio de sesión automático (ROPC) de la sincronización de las evisceradoras Baader 142
           </p>
         </div>
       </div>
@@ -341,7 +341,7 @@ export function ShoplogixCredentialsPage() {
             <Button
               onClick={handleDelete}
               disabled={deleting}
-              className="bg-red-500/[0.15] hover:brightness-95/[0.15] text-ink-crit"
+              className="bg-ink-crit/[0.15] hover:brightness-95 text-ink-crit"
             >
               {deleting ? <Spinner /> : 'Eliminar'}
             </Button>

@@ -3136,7 +3136,7 @@ export function AnalisisGraderTurnoPage() {
                     </code>
                     <button
                       onClick={handleCopy}
-                      className="shrink-0 flex items-center gap-1 rounded-ctl bg-amber-500/[0.15] hover:brightness-95/[0.15] text-ink-warn text-caption px-2 py-1 transition-colors"
+                      className="shrink-0 flex items-center gap-1 rounded-ctl bg-amber-500/[0.15] hover:brightness-95 text-ink-warn text-caption px-2 py-1 transition-colors"
                       title="Copiar link"
                     >
                       {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}

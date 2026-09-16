@@ -1,20 +1,20 @@
 /**
  * PermissionsManager v2 - Sistema de permisos dinámicos
- * 
+ *
  * Permite configurar permisos:
  * - Por rol (aplicado a todos los usuarios del rol)
  * - Por usuario (override individual)
- * 
+ *
  * Los permisos se guardan en Firestore y se aplican en tiempo real.
  */
 
 import { useState, useEffect, useCallback } from 'react'
-import { 
-  Shield, 
-  Save, 
-  AlertCircle, 
-  Users, 
-  UserCog, 
+import {
+  Shield,
+  Save,
+  AlertCircle,
+  Users,
+  UserCog,
   Check,
   X,
   RefreshCw,
@@ -40,13 +40,13 @@ import { logger } from '@/lib/logger'
 import { useAuthStore } from '@/store'
 import type { User, UserRole } from '@/types'
 import type {
-  AppModule, 
-  ModuleAction, 
+  AppModule,
+  ModuleAction,
   PermissionsMap,
 } from '@/types/permissions'
-import { 
-  MODULES_CONFIG, 
-  ACTION_LABELS, 
+import {
+  MODULES_CONFIG,
+  ACTION_LABELS,
   DEFAULT_ROLE_PERMISSIONS,
 } from '@/types/permissions'
 import {
@@ -93,19 +93,19 @@ export function PermissionsManagerV2() {
         <div className="flex items-center gap-3">
           <Shield className="h-6 w-6 text-primary" />
           <div>
-            <h2 className="text-2xl font-bold">Gestión de Permisos</h2>
+            <h2 className="text-title2 font-bold">Permisos</h2>
             <p className="text-sm text-muted-foreground">
               Configura accesos por rol o usuario individual
             </p>
           </div>
         </div>
-        <Button 
-          variant="outline" 
+        <Button
+          variant="outline"
           onClick={handleInitializeRoles}
           disabled={isInitializing}
         >
           {isInitializing ? <Spinner size="sm" /> : <RefreshCw className="h-4 w-4 mr-2" />}
-          Inicializar Roles
+          Inicializar roles
         </Button>
       </div>
 
@@ -120,7 +120,7 @@ export function PermissionsManagerV2() {
           }`}
         >
           <Users className="h-4 w-4" />
-          Permisos por Rol
+          Permisos por rol
         </button>
         <button
           onClick={() => setActiveTab('users')}
@@ -131,7 +131,7 @@ export function PermissionsManagerV2() {
           }`}
         >
           <UserCog className="h-4 w-4" />
-          Permisos por Usuario
+          Permisos por usuario
         </button>
       </div>
 
@@ -164,7 +164,7 @@ function RolePermissionsTab() {
     try {
       const roles = await getAllRolePermissions()
       const roleData = roles.find(r => r.id === selectedRole)
-      
+
       if (roleData) {
         setPermissions(roleData.permisos)
         setOriginalPermissions(roleData.permisos)
@@ -311,7 +311,7 @@ function RolePermissionsTab() {
 
           return (
             <Card key={module.id} className={modulePerms.visible ? '' : 'opacity-60'}>
-              <div 
+              <div
                 className="flex items-center p-4 cursor-pointer"
                 onClick={() => toggleModule(module.id)}
               >
@@ -387,7 +387,7 @@ function UserPermissionsTab() {
   const [searchTerm, setSearchTerm] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
-  
+
   // Override de permisos para el usuario seleccionado
   const [overrideActive, setOverrideActive] = useState(false)
   const [overridePermissions, setOverridePermissions] = useState<PermissionsMap>({})
@@ -442,11 +442,11 @@ function UserPermissionsTab() {
     }
   }
 
-  const hasChanges = 
+  const hasChanges =
     overrideActive !== originalOverride.active ||
     JSON.stringify(overridePermissions) !== JSON.stringify(originalOverride.perms)
 
-  const filteredUsers = users.filter(u => 
+  const filteredUsers = users.filter(u =>
     `${u.nombre} ${u.apellido} ${u.email}`.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
@@ -539,7 +539,7 @@ function UserPermissionsTab() {
       {/* Lista de usuarios */}
       <Card className="lg:col-span-1">
         <CardHeader>
-          <CardTitle className="text-lg">Seleccionar Usuario</CardTitle>
+          <CardTitle className="text-headline">Seleccionar usuario</CardTitle>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -608,7 +608,7 @@ function UserPermissionsTab() {
               {/* Toggle de override */}
               <div className="flex items-center justify-between p-4 bg-muted/50 rounded-card">
                 <div>
-                  <Label className="font-medium">Permisos Personalizados</Label>
+                  <Label className="font-medium">Permisos personalizados</Label>
                   <p className="text-sm text-muted-foreground">
                     Activar para sobrescribir los permisos del rol
                   </p>
@@ -631,7 +631,7 @@ function UserPermissionsTab() {
 
                     return (
                       <Card key={module.id} className={modulePerms.visible ? '' : 'opacity-60'}>
-                        <div 
+                        <div
                           className="flex items-center p-3 cursor-pointer"
                           onClick={() => toggleModule(module.id)}
                         >
@@ -682,7 +682,7 @@ function UserPermissionsTab() {
                 <p className="text-center text-muted-foreground py-8">
                   Este usuario usa los permisos de su rol ({selectedUser.rol}).
                   <br />
-                  Activa "Permisos Personalizados" para sobrescribirlos.
+                  Activa «Permisos personalizados» para sobrescribirlos.
                 </p>
               )}
             </CardContent>

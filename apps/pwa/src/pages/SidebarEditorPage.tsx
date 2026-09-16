@@ -336,7 +336,7 @@ export function SidebarEditorPage() {
           <ArrowLeft className="h-5 w-5" />
         </button>
         <div className="flex-1">
-          <h1 className="text-xl font-bold text-foreground">Editor de Sidebar</h1>
+          <h1 className="text-title1 font-bold">Barra lateral</h1>
           <p className="text-xs text-muted-foreground mt-0.5">Arrastra para reordenar grupos y módulos</p>
         </div>
         <button

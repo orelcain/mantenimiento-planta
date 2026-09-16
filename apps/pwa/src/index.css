@@ -11,6 +11,17 @@
   font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
+/* Piel Apple (DESIGN.md §2: una sola familia, la del sistema). En iOS las cifras de dato
+   son la misma fuente con figuras tabulares, no un monoespaciado: aquí `tabular-nums`
+   vuelve a ser solo `font-variant-numeric`. Lo que pide mono lo dice con `font-mono`,
+   y el monitor de TV conserva su lectura tipo instrumento. */
+:root[data-skin="apple"] .tabular-nums:not(.font-mono) {
+  font-family: inherit;
+}
+:root[data-skin="apple"] .monitor-tv .tabular-nums {
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
 /* Ocultar elementos en landscape móvil (celular horizontal) */
 @media (orientation: landscape) and (max-height: 500px) {
   .landscape-mobile-hidden { display: none !important; }
@@ -56,34 +67,36 @@
   --sidebar-surface: #b0c7de;
   --panel-surface: #cdddec;
 
-  /* Paleta LC del Centro de Aprendizaje (data/learningTheme.ts) — variante clara
-     (mismo criterio mate azulado: superficies sin blanco puro) */
-  --lc-bg: #d7e5f2;
-  --lc-bg-panel: #dae6f0;
-  --lc-surface: #e9f0f8;
-  --lc-surface-hi: #cddfee;
-  --lc-ink: #16242f;
-  --lc-ink-mid: #374756;
-  --lc-ink-lo: #4b5b69;
-  --lc-ink-ghost: #8c9fb0;
-  --lc-aqua: #2E75B6;
-  --lc-aqua-bright: #245a8c;
-  --lc-aqua-light: #2a6aa6;
-  --lc-aqua-soft: rgba(46, 117, 182, 0.10);
-  --lc-border: #585e64;
-  --lc-border-hi: #555c61;
-  --lc-danger: #b8394f;
-  --lc-danger-soft: rgba(184, 57, 79, 0.10);
-  --lc-prep: #8a6a2f;
-  --lc-prep-soft: rgba(138, 106, 47, 0.10);
-  --lc-nuevo: #177a5b;
-  --lc-nuevo-soft: rgba(23, 122, 91, 0.10);
-  --lc-ok: #0e8060;
-  --lc-ok-soft: rgba(14, 128, 96, 0.10);
-  --lc-warn: #875105;
-  --lc-warn-soft: rgba(161, 98, 7, 0.10);
-  --lc-crit: #dc2626;
-  --lc-star: #b7791f;
+  /* Paleta LC del Centro de Aprendizaje (data/learningTheme.ts): desde la vara iOS 27
+     (2026-09) son ALIAS de los tokens del sistema, no una paleta propia. Un solo bloque
+     sirve a los cuatro temas porque cada alias resuelve el token del tema activo.
+     Fondos y tinta = neutros del sistema; acento = marca; estados = tinta 100 % / tinte 15 %. */
+  --lc-bg: rgb(var(--background));
+  --lc-bg-panel: rgb(var(--background));
+  --lc-surface: rgb(var(--card));
+  --lc-surface-hi: rgb(var(--muted));
+  --lc-ink: rgb(var(--foreground));
+  --lc-ink-mid: rgb(var(--muted-foreground));
+  --lc-ink-lo: rgb(var(--muted-foreground) / 0.8);
+  --lc-ink-ghost: rgb(var(--muted-foreground) / 0.55);
+  --lc-aqua: rgb(var(--brand));
+  --lc-aqua-bright: rgb(var(--brand-ink));
+  --lc-aqua-light: rgb(var(--brand-ink));
+  --lc-aqua-soft: rgb(var(--brand) / 0.12);
+  --lc-border: rgb(var(--border));
+  --lc-border-hi: rgb(var(--border));
+  --lc-danger: rgb(var(--ink-crit));
+  --lc-danger-soft: rgb(var(--ink-crit) / 0.15);
+  --lc-prep: rgb(var(--ink-warn));
+  --lc-prep-soft: rgb(var(--ink-warn) / 0.15);
+  --lc-nuevo: rgb(var(--ink-ok));
+  --lc-nuevo-soft: rgb(var(--ink-ok) / 0.15);
+  --lc-ok: rgb(var(--ink-ok));
+  --lc-ok-soft: rgb(var(--ink-ok) / 0.15);
+  --lc-warn: rgb(var(--ink-warn));
+  --lc-warn-soft: rgb(var(--ink-warn) / 0.15);
+  --lc-crit: rgb(var(--ink-crit));
+  --lc-star: rgb(var(--ink-warn));
 
   /* Monitor público de turno — TRES roles, no una paleta de identidades.
      Las curvas de los gráficos se dibujaban con hex crudos de Tailwind
@@ -229,35 +242,6 @@
   --sidebar-surface: #16242f;       /* oscuro byte-idéntico: el card de siempre */
   --panel-surface: #16242f;
 
-  /* Paleta LC — los valores oscuros de siempre (learningTheme.ts pre-tema) */
-  --lc-bg: #0d1722;
-  --lc-bg-panel: #0f1d2b;
-  --lc-surface: #16242f;
-  --lc-surface-hi: #1b2f3f;
-  --lc-ink: #e9eef3;
-  --lc-ink-mid: #9db0c2;
-  --lc-ink-lo: #6d8298;
-  --lc-ink-ghost: #51677b;
-  --lc-aqua: #2E75B6;
-  --lc-aqua-bright: #5aa6e8;
-  --lc-aqua-light: #9DC3E6;
-  --lc-aqua-soft: rgba(46, 117, 182, 0.16);
-  --lc-border: #22384a;
-  --lc-border-hi: #2f4d65;
-  --lc-danger: #e0697d;
-  --lc-danger-soft: rgba(224, 105, 125, 0.14);
-  --lc-prep: #cf9f54;
-  --lc-prep-soft: rgba(207, 159, 84, 0.13);
-  --lc-nuevo: #3fb98f;
-  --lc-nuevo-soft: rgba(63, 185, 143, 0.14);
-  /* Acentos desaturados "mate" (2026-07-17): misma luminosidad, menos croma */
-  --lc-ok: #2aa07e;
-  --lc-ok-soft: rgba(42, 160, 126, 0.14);
-  --lc-warn: #cf9636;
-  --lc-warn-soft: rgba(207, 150, 54, 0.14);
-  --lc-crit: #d95757;
-  --lc-star: #d9ab4e;
-
   /* Monitor público — mismos tres roles, aclarados para el card oscuro
      (#16242f). Ver el comentario largo en :root. */
   --mon-hoy: #82a3c4;
@@ -366,18 +350,6 @@
   --sidebar-surface: #ededf2;
   --panel-surface: #f2f2f7;
 
-  /* Centro de Aprendizaje bajo la piel nueva (mismos nombres, valores Apple) */
-  --lc-bg: #f2f2f7;
-  --lc-bg-panel: #f2f2f7;
-  --lc-surface: #ffffff;
-  --lc-surface-hi: #e5e5ea;
-  --lc-ink: #1c1c1e;
-  --lc-ink-mid: #6f6f72;
-  --lc-ink-lo: #8e8e93;
-  --lc-ink-ghost: #aeaeb2;
-  --lc-border: #c6c6c8;
-  --lc-border-hi: #aeaeb2;
-
   /* Semánticos: tintes de sistema (§1.4 del doc). Los tonos 400/500 son los
      vivos de Apple (uso en superficies chicas: puntos, pills, íconos); el 600
      es la variante ACCESIBLE oficial de Apple, porque es la que el código usa
@@ -444,17 +416,6 @@
   --sidebar-active-foreground: #71ade1;
   --sidebar-surface: #161618;
   --panel-surface: #1c1c1e;
-
-  --lc-bg: #1c1c1e;
-  --lc-bg-panel: #1c1c1e;
-  --lc-surface: #2c2c2e;
-  --lc-surface-hi: #3a3a3c;
-  --lc-ink: #ffffff;
-  --lc-ink-mid: #9f9fa5;
-  --lc-ink-lo: #8e8e93;
-  --lc-ink-ghost: #636366;
-  --lc-border: #38383a;
-  --lc-border-hi: #48484a;
 
   /* Tintes dark del sistema; el 600 usa la variante accesible dark de Apple. */
   --tw-emerald-400: 48 209 88;   --tw-emerald-500: 48 209 88;   --tw-emerald-600: 48 209 88;

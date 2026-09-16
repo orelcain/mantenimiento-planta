@@ -281,7 +281,7 @@ export function RepuestoPhotosModal({
                           <button
                             onClick={(e) => { e.stopPropagation(); handleDelete(foto) }}
                             disabled={deletingId === foto.id}
-                            className="rounded-ctl bg-black/60 p-1 text-ink-crit opacity-0 transition hover:brightness-95/[0.15] group-hover:opacity-100"
+                            className="rounded-ctl bg-black/60 p-1 text-ink-crit opacity-0 transition hover:brightness-95 group-hover:opacity-100"
                             title="Eliminar foto"
                           >
                             {deletingId === foto.id ? (

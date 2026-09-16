@@ -254,7 +254,7 @@ export function AnalisisGraderPeriodoPage() {
               size="sm"
               onClick={handleMigrate}
               disabled={migrating}
-              className="bg-amber-500/[0.15] hover:brightness-95/[0.15] text-ink-warn shrink-0"
+              className="bg-amber-500/[0.15] hover:brightness-95 text-ink-warn shrink-0"
             >
               {migrating
                 ? <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />Migrando…</>

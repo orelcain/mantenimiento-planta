@@ -70,7 +70,7 @@ export function LearningAdminPage() {
           <GraduationCap className="h-6 w-6 text-brand-ink" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold">Administrar contenido</h1>
+          <h1 className="text-title1 font-bold">Administrar contenido</h1>
           <p className="text-sm text-muted-foreground">
             Gestiona manuales, procedimientos, flujos y diagnósticos por máquina
           </p>

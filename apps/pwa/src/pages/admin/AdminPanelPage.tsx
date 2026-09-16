@@ -10,20 +10,14 @@
  * `/admin/permissions` de memoria.
  */
 
-import { Link } from 'react-router-dom'
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui'
+import { useNavigate } from 'react-router-dom'
+import { ListCell, ListGroup } from '@/components/piel'
 import {
   Key,
   Shield,
   Map as MapIcon,
   Settings,
   Layers,
-  ChevronRight,
   FolderTree,
   Map,
   GraduationCap,
@@ -42,8 +36,6 @@ interface AdminItem {
   title: string
   description: string
   icon: ReactNode
-  /** Color tailwind para el ícono (ej: 'text-ink-warn') */
-  iconColor: string
   /** Agrupador visual ("Sensibles" requieren re-auth, "Configuración" general). */
   section: 'sensible' | 'config'
 }
@@ -53,65 +45,57 @@ const ADMIN_ITEMS: AdminItem[] = [
   {
     to: '/admin/shoplogix-credentials',
     title: 'Credenciales Shoplogix',
-    description: 'Auto-login ROPC para sync de Evisceradoras Baader 142. Rota la pass cuando AquaChile la cambie.',
-    icon: <Key className="w-5 h-5" />,
-    iconColor: 'text-ink-warn',
+    description: 'Inicio de sesión automático de la sincronización de las Baader 142',
+    icon: <Key className="size-4" />,
     section: 'sensible',
   },
   {
     to: '/admin/permissions',
     title: 'Permisos por usuario',
-    description: 'Define qué módulos puede ver y editar cada usuario, anulando los defaults del rol.',
-    icon: <Shield className="w-5 h-5" />,
-    iconColor: 'text-ink-ok',
+    description: 'Qué módulos ve y edita cada persona, por sobre su rol',
+    icon: <Shield className="size-4" />,
     section: 'sensible',
   },
   {
     to: '/admin/maps',
     title: 'Mapas y planos',
-    description: 'Sube planos DXF, edita capas, gestiona ubicaciones y marcadores de equipos.',
-    icon: <MapIcon className="w-5 h-5" />,
-    iconColor: 'text-brand-ink',
+    description: 'Planos DXF, capas, ubicaciones y marcadores de equipos',
+    icon: <MapIcon className="size-4" />,
     section: 'sensible',
   },
   {
     to: '/admin/mapa-terreno',
     title: 'Editor de terreno',
-    description: 'Modelos DEM y configuración del terreno 3D de la planta.',
-    icon: <Map className="w-5 h-5" />,
-    iconColor: 'text-brand-ink',
+    description: 'Modelos DEM y terreno 3D de la planta',
+    icon: <Map className="size-4" />,
     section: 'sensible',
   },
   {
     to: '/admin/ett',
     title: 'Configuración ETT',
-    description: 'Parámetros del módulo de Estudios Técnicos de Trabajo.',
-    icon: <FileText className="w-5 h-5" />,
-    iconColor: 'text-muted-foreground',
+    description: 'Parámetros de los Estudios Técnicos de Trabajo',
+    icon: <FileText className="size-4" />,
     section: 'sensible',
   },
   {
     to: '/admin/sidebar',
-    title: 'Editor de sidebar',
-    description: 'Personaliza el orden y visibilidad de los items del menú lateral.',
-    icon: <Layers className="w-5 h-5" />,
-    iconColor: 'text-cat-6-ink',
+    title: 'Barra lateral',
+    description: 'Orden y visibilidad de los módulos del menú lateral',
+    icon: <Layers className="size-4" />,
     section: 'sensible',
   },
   {
     to: '/admin/machine-capacity',
-    title: 'Velocidad Nameplate Baader',
-    description: 'Capacidad física máxima (pz/min) de cada Evisceradora. Referencia documental: hoy NO alimenta el cálculo de OEE — el Rendimiento usa el target de Shoplogix.',
-    icon: <Gauge className="w-5 h-5" />,
-    iconColor: 'text-cat-7-ink',
+    title: 'Velocidad nameplate Baader',
+    description: 'Capacidad máxima de cada evisceradora, como referencia',
+    icon: <Gauge className="size-4" />,
     section: 'sensible',
   },
   {
     to: '/admin/notifications-shoplogix',
     title: 'Notificaciones Shoplogix',
-    description: 'Configura canales (push, Telegram), período de gracia de inicio, hitos de piezas y alertas de detenciones por planta.',
-    icon: <Bell className="w-5 h-5" />,
-    iconColor: 'text-cat-4-ink',
+    description: 'Canales, gracia de inicio, hitos de piezas y detenciones',
+    icon: <Bell className="size-4" />,
     section: 'sensible',
   },
 
@@ -119,109 +103,92 @@ const ADMIN_ITEMS: AdminItem[] = [
   {
     to: '/admin/sync-telegram',
     title: 'Sincronización Telegram',
-    description: 'Baja lo nuevo del grupo de mantención a las carpetas de equipo y alimenta la bandeja de novedades. Orden inmediata o periodicidad automática.',
-    icon: <Send className="w-5 h-5" />,
-    iconColor: 'text-ink-info',
+    description: 'Baja lo nuevo del grupo a las carpetas de cada equipo',
+    icon: <Send className="size-4" />,
     section: 'config',
   },
   {
     to: '/admin/powerbi-export',
     title: 'Actualizar Power BI',
-    description: 'Exporta los KPIs de Mantención a OneDrive empresa y refresca el dataset en Power BI Service. Para tener datos frescos antes de una reunión.',
-    icon: <BarChart3 className="w-5 h-5" />,
-    iconColor: 'text-ink-warn',
+    description: 'Exporta los KPIs de Mantención y refresca el informe',
+    icon: <BarChart3 className="size-4" />,
     section: 'config',
   },
   {
     to: '/admin/dev-modules',
     title: 'Módulos en desarrollo',
-    description: 'Mostrar/ocultar items del menú lateral que aún están en desarrollo. La preferencia se guarda en este dispositivo.',
-    icon: <Wrench className="w-5 h-5" />,
-    iconColor: 'text-cat-6-ink',
+    description: 'Muestra u oculta módulos en prueba en este dispositivo',
+    icon: <Wrench className="size-4" />,
     section: 'config',
   },
   {
     to: '/admin/default-route',
     title: 'Página de inicio por defecto',
-    description: 'Define qué módulo se carga al entrar a la app (la home "/"). Por defecto: Análisis de Turno.',
-    icon: <LayoutDashboard className="w-5 h-5" />,
-    iconColor: 'text-ink-ok',
+    description: 'Qué módulo abre la app al entrar',
+    icon: <LayoutDashboard className="size-4" />,
     section: 'config',
   },
   {
     to: '/settings',
     title: 'Configuración',
-    description: 'Configuración general del módulo de mantenimiento.',
-    icon: <Settings className="w-5 h-5" />,
-    iconColor: 'text-muted-foreground',
+    description: 'Ajustes generales del módulo de mantenimiento',
+    icon: <Settings className="size-4" />,
     section: 'config',
   },
   {
     to: '/hierarchy',
     title: 'Jerarquías',
-    description: 'Estructura de equipos y zonas de la planta.',
-    icon: <FolderTree className="w-5 h-5" />,
-    iconColor: 'text-cat-3-ink',
+    description: 'Estructura de equipos y zonas de la planta',
+    icon: <FolderTree className="size-4" />,
     section: 'config',
   },
   {
     to: '/aprendizaje/admin',
-    title: 'Editor de Aprendizaje',
-    description: 'Edita el contenido del Centro de Aprendizaje.',
-    icon: <GraduationCap className="w-5 h-5" />,
-    iconColor: 'text-cat-7-ink',
+    title: 'Editor de aprendizaje',
+    description: 'Contenido del Centro de Aprendizaje',
+    icon: <GraduationCap className="size-4" />,
     section: 'config',
   },
 ]
 
-const SECTION_LABELS: Record<AdminItem['section'], string> = {
-  sensible: 'Sensibles · re-confirmación al entrar',
-  config: 'Configuración general',
+const SECTION_LABELS: Record<AdminItem['section'], { title: string; footer?: string }> = {
+  sensible: { title: 'Sensibles', footer: 'Al entrar a cada una se vuelve a confirmar tu identidad.' },
+  config: { title: 'Configuración general' },
 }
 
 export function AdminPanelPage() {
+  const navigate = useNavigate()
   return (
-    <div className="container mx-auto p-4 sm:p-6 max-w-3xl space-y-4">
+    <div className="container mx-auto max-w-3xl space-y-6 p-4 sm:p-6">
       <div className="space-y-1">
-        <h1 className="text-2xl font-semibold flex items-center gap-2">
-          <Shield className="w-6 h-6 text-ink-warn" />
-          Panel de administración
-        </h1>
-        <p className="text-sm text-muted-foreground">
+        <h1 className="text-title1 font-bold">Panel de administración</h1>
+        <p className="text-subhead text-muted-foreground">
           Configuración sensible del sistema. Cada vez que entras a una opción se confirma tu identidad
           para evitar cambios accidentales.
         </p>
       </div>
 
-      {/* Render por secciones para que el admin tenga claridad de qué requiere
-          re-confirmación y qué no. */}
+      {/* Lista agrupada como Ajustes de iOS: ícono en recuadro neutro, título, una línea de
+          descripción y chevron. El color queda para el estado, no para distinguir filas. */}
       {(['sensible', 'config'] as const).map((section) => {
         const items = ADMIN_ITEMS.filter((it) => it.section === section)
         if (items.length === 0) return null
         return (
-          <section key={section} className="space-y-2">
-            <h2 className="text-xs font-medium tracking-wider text-muted-foreground px-1">
-              {SECTION_LABELS[section]}
-            </h2>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {items.map((item) => (
-                <Link key={item.to} to={item.to} className="group">
-                  <Card className="h-full hover:border-amber-500/[0.25] transition-colors">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <span className={item.iconColor}>{item.icon}</span>
-                        <span className="flex-1">{item.title}</span>
-                        <ChevronRight className="w-4 h-4 text-muted-foreground/50 group-hover:text-foreground transition-colors" />
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="text-xs text-muted-foreground">
-                      {item.description}
-                    </CardContent>
-                  </Card>
-                </Link>
-              ))}
-            </div>
-          </section>
+          <ListGroup key={section} title={SECTION_LABELS[section].title} footer={SECTION_LABELS[section].footer}>
+            {items.map((item) => (
+              <ListCell
+                key={item.to}
+                leading={
+                  <span className="flex size-7 items-center justify-center rounded-ctl bg-muted-foreground/[0.12] text-muted-foreground">
+                    {item.icon}
+                  </span>
+                }
+                title={item.title}
+                subtitle={item.description}
+                onClick={() => navigate(item.to)}
+              />
+            ))}
+          </ListGroup>
         )
       })}
     </div>
