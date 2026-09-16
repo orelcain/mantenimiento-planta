@@ -1,5 +1,5 @@
 /**
- * ETTTemplatePicker — Pantalla "¿Cómo querés empezar?"
+ * ETTTemplatePicker — Pantalla "¿Cómo quieres empezar?"
  *
  * Primera pantalla al crear una ETT nueva. Ofrece 3 vías de entrada:
  *
@@ -87,7 +87,7 @@ export function ETTTemplatePicker({
     if (!iaDescripcion.trim()) {
       toast({
         title: 'Descripción vacía',
-        description: 'Describí el trabajo para que la IA pueda completar la plantilla.',
+        description: 'Describe el trabajo para que la IA pueda completar la plantilla.',
         variant: 'destructive',
       })
       return
@@ -177,7 +177,7 @@ export function ETTTemplatePicker({
 
             <div>
               <label className="block text-sm font-medium mb-2">
-                Describí el trabajo que necesitas:
+                Describe el trabajo que necesitas:
               </label>
               <Textarea
                 value={iaDescripcion}
@@ -229,7 +229,7 @@ export function ETTTemplatePicker({
   return (
     <div className="max-w-3xl mx-auto p-6">
       <div className="mb-6 flex items-center justify-between">
-        <h2 className="text-2xl font-bold">¿Cómo querés empezar?</h2>
+        <h2 className="text-2xl font-bold">¿Cómo quieres empezar?</h2>
         <Button variant="ghost" onClick={onCancelar}>
           Cancelar
         </Button>
@@ -300,7 +300,7 @@ export function ETTTemplatePicker({
             Asistente IA
           </h3>
           <p className="text-sm text-gray-600">
-            Describí el trabajo que necesitás y la IA arma la ETT por vos.
+            Describe el trabajo que necesitas y la IA arma la ETT por ti.
             Ideal para ETTs rápidas dictando por voz.
           </p>
         </CardContent>

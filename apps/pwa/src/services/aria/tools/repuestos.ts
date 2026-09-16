@@ -70,7 +70,7 @@ registerTool({
       return {
         ok: true,
         data: { query, count: 0, cacheCold: true },
-        summary: `Aún no hay repuestos cargados en cache (TTL 5min). Abrí la pestaña **Repuestos** una vez y vuelvo a poder buscar "${query}".`,
+        summary: `Aún no hay repuestos cargados en cache (TTL 5min). Abre la pestaña **Repuestos** una vez y vuelvo a poder buscar "${query}".`,
         label: 'Buscar repuesto',
       }
     }
@@ -88,7 +88,7 @@ registerTool({
       return {
         ok: true,
         data: { query, count: 0 },
-        summary: `Sin coincidencias para "${query}" entre ${cache.length} repuestos cacheados. Probá con SAP o código de fabricante.`,
+        summary: `Sin coincidencias para "${query}" entre ${cache.length} repuestos cacheados. Prueba con SAP o código de fabricante.`,
         label: 'Buscar repuesto',
       }
     }

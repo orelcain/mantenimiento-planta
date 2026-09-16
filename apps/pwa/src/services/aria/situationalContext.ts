@@ -219,7 +219,7 @@ export function formatSituationalSnapshot(s: SituationalSnapshot, opts?: Situati
     `• **Incidencias**: ${s.incidents.text}`,
     `• **Equipos**: ${s.equipment.text}`,
     '',
-    'INSTRUCCIONES: este contexto es siempre vigente — NO digas "no sé" sobre estos datos. Si la pregunta del usuario los toca tangencialmente, menciónalos brevemente al inicio (ej: "tenés 2 críticas abiertas, una de ellas en la baader 200…"). Si conocés el nombre del usuario, podés dirigirte a él/ella por su nombre cuando sea natural. Mantené la respuesta breve y operacional.',
+    'INSTRUCCIONES: este contexto es siempre vigente — NO digas "no sé" sobre estos datos. Si la pregunta del usuario los toca tangencialmente, menciónalos brevemente al inicio (ej: "tienes 2 críticas abiertas, una de ellas en la baader 200…"). Si conoces el nombre del usuario, puedes dirigirte a él/ella por su nombre cuando sea natural. Mantén la respuesta breve y operacional.',
   )
   return lines.join('\n')
 }

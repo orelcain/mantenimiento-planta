@@ -44,7 +44,7 @@ const stamp = { createdAt: DETECTOR_CONTENT_UPDATED_AT, updatedAt: DETECTOR_CONT
  */
 const MANUAL_DIDACTIC: Record<string, { objetivo?: string; porque?: string; quiz?: RawQuiz[] }> = {
   'det-manual-familia-vistus': {
-    objetivo: 'Al terminar vas a poder explicar cómo el Vistus detecta metal —un campo electromagnético que la partícula altera— y reconocer qué configuración de la familia Vistus tenés en la línea.',
+    objetivo: 'Al terminar vas a poder explicar cómo el Vistus detecta metal —un campo electromagnético que la partícula altera— y reconocer qué configuración de la familia Vistus tienes en la línea.',
     porque: 'saber qué detecta y qué le cuesta fija la expectativa correcta: si algo pasa sin detectarse, muchas veces no es una falla del equipo. En BOLAS DE TEST el inox no magnético (AISI 304 / V2A) es el más difícil; en ALAMBRES depende de la orientación (ahí el hierro es el que se detecta mal en 2 de 3 posiciones); y lo más difícil de todo son las piezas no homogéneas, tipo virutas.',
     quiz: [
       {
@@ -72,8 +72,8 @@ const MANUAL_DIDACTIC: Record<string, { objetivo?: string; porque?: string; quiz
         explanation: 'El campo puede afectar marcapasos/desfibriladores: el equipo lleva 4 signos «Prohibido a personas con marcapasos» y hay una distancia mínima que fija el usuario según normativa.',
       },
       {
-        question: 'Hay una avería no descrita en el manual. ¿Qué hacés?',
-        options: ['La reparás vos mismo', 'Puenteás el dispositivo de seguridad', 'Contactás al servicio técnico de Sartorius sin modificar nada', 'Seguís produciendo'],
+        question: 'Hay una avería no descrita en el manual. ¿Qué haces?',
+        options: ['La reparas tú mismo', 'Puenteas el dispositivo de seguridad', 'Contactas al servicio técnico de Sartorius sin modificar nada', 'Sigues produciendo'],
         correctIndex: 2,
         explanation: 'No se repara ni modifica por cuenta propia; ante una avería no descrita se contacta al servicio técnico y no se eluden los dispositivos de seguridad.',
       },

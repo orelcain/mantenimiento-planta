@@ -454,9 +454,9 @@ export function ETTPage() {
         <Alert className="mt-6">
           <Sparkles className="h-4 w-4" />
           <AlertDescription>
-            <strong>Tip:</strong> Al crear una nueva ETT podés elegir entre
+            <strong>Tip:</strong> Al crear una nueva ETT puedes elegir entre
             duplicar una anterior, empezar desde plantilla, o dictarle al
-            asistente IA qué trabajo necesitás.
+            asistente IA qué trabajo necesitas.
           </AlertDescription>
         </Alert>
       </div>

@@ -71,7 +71,7 @@ registerTool({
       return {
         ok: true,
         data: { query, count: 0 },
-        summary: `No encontré equipos que coincidan con "${query}". Probá con otro nombre, código o ser más específico.`,
+        summary: `No encontré equipos que coincidan con "${query}". Prueba con otro nombre, código o ser más específico.`,
         label: 'Localizar equipo',
       }
     }

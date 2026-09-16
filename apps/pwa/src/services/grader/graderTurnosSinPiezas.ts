@@ -24,5 +24,5 @@ export function avisoDeTurnosSinPiezas(conPiezas: number, soloP0: number): strin
   if (soloP0 <= 0) return null
   if (conPiezas <= 0) return null // archivo de P0 suelto: el Wizard ya lo dice
   const t = soloP0 === 1 ? 'turno' : 'turnos'
-  return `${soloP0} de los ${conPiezas + soloP0} ${t} no tienen ninguna pieza: solo rechazos de Puerta 0. El Puerta 0 cubre más días que el pieza a pieza — revisá que sean los dos archivos del mismo rango antes de guardar.`
+  return `${soloP0} de los ${conPiezas + soloP0} ${t} no tienen ninguna pieza: solo rechazos de Puerta 0. El Puerta 0 cubre más días que el pieza a pieza — revisa que sean los dos archivos del mismo rango antes de guardar.`
 }

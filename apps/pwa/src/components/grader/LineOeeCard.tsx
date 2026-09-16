@@ -141,7 +141,7 @@ export function LineOeeCard({ plantLineId, plantSlug, graderSummaries, currentMo
             <p className="text-caption text-muted-foreground leading-relaxed">
               {calc.etapaMin > 0
                 ? <>Área = la máquina penalizada por <b className="text-cat-5-ink">{fmtDur(calc.etapaMin)}</b> de paros de etapa este mes (disponibilidad {pct(calc.availabilityMachine)} → {pct(calc.availabilityArea)}, sobre una base de {fmtDur(calc.baseMin)}). El rendimiento sigue siendo el de la máquina instrumentada.</>
-                : <>Todavía no registraste paros de etapa → el OEE del área es el de la máquina. Registrá abajo los paros de las etapas sin sensor (la GEA, cintas) y este número se separa.</>}
+                : <>Todavía no registraste paros de etapa → el OEE del área es el de la máquina. Registra abajo los paros de las etapas sin sensor (la GEA, cintas) y este número se separa.</>}
             </p>
 
             {/* Pareto unificado de pérdidas de la línea */}

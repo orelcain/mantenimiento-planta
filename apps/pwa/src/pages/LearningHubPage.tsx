@@ -318,7 +318,7 @@ export function LearningHubPage() {
             {noResults ? (
               <div className="mt-5 rounded-card p-8 text-center" style={{ background: C.surface, border: `1px solid ${C.border}` }}>
                 <p className="text-sm" style={{ color: C.inkMid }}>Sin resultados para "{query.trim()}".</p>
-                <p className="text-xs mt-1" style={{ color: C.inkLo }}>Probá con el nombre de la máquina o un síntoma más general.</p>
+                <p className="text-xs mt-1" style={{ color: C.inkLo }}>Prueba con el nombre de la máquina o un síntoma más general.</p>
               </div>
             ) : (
               <div className="mt-5 space-y-5">

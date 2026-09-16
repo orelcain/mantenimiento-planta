@@ -2496,7 +2496,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="text-base">Marcar como común de…</DialogTitle>
-            <DialogDescription>Elegí la máquina para la que este repuesto es común / más usado. Aparecerá en su lista del Centro de Aprendizaje y con el badge «común» acá.</DialogDescription>
+            <DialogDescription>Elige la máquina para la que este repuesto es común / más usado. Aparecerá en su lista del Centro de Aprendizaje y con el badge «común» acá.</DialogDescription>
           </DialogHeader>
           <Input value={comunQuery} onChange={(e) => setComunQuery(e.target.value)} placeholder="Buscar máquina…" autoFocus />
           <div className="mt-2 max-h-[50vh] space-y-1 overflow-y-auto">

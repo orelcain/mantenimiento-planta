@@ -328,7 +328,7 @@ export function MapaPlantaPage() {
           </button>
           <button
             onClick={toggleBoxSelect}
-            title="Selección por recuadro — arrastrá para seleccionar varios. Shift+arrastre en desktop."
+            title="Selección por recuadro — arrastra para seleccionar varios. Shift+arrastre en desktop."
             className={[
               'flex items-center gap-1 text-[11px] px-2 sm:px-3 py-1.5 rounded-lg transition-all border',
               boxSelectMode

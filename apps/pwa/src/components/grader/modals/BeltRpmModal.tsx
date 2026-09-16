@@ -178,7 +178,7 @@ export function BeltRpmModal({
         </DialogHeader>
 
         <div className="space-y-1 text-caption text-muted-foreground mb-1">
-          Ingresá el RPM que muestra el display de cada variador.
+          Ingresa el RPM que muestra el display de cada variador.
         </div>
 
         <div className="space-y-3">

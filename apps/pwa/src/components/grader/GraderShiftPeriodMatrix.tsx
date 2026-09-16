@@ -476,7 +476,7 @@ export function GraderShiftPeriodMatrix({
             </div>
           ) : (
             <span className="text-muted-foreground">
-              Tocá un turno para fijarlo acá y poder abrir su análisis.
+              Toca un turno para fijarlo acá y poder abrir su análisis.
             </span>
           )}
         </div>

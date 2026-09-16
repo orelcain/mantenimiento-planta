@@ -107,7 +107,7 @@ export function DevModulesPage() {
         <CardHeader className="pb-2">
           <CardTitle className="text-base">En desarrollo</CardTitle>
           <p className="text-xs text-muted-foreground">
-            Ocultos por default. Activá los que quieras probar.
+            Ocultos por default. Activa los que quieras probar.
           </p>
         </CardHeader>
         <CardContent className="divide-y divide-border/40">

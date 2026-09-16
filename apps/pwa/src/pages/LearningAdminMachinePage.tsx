@@ -816,7 +816,7 @@ function SectionQuizEditor({ quiz, onChange }: { quiz: SectionQuizItem[]; onChan
               </div>
 
               <div className="space-y-1.5 pl-8">
-                <p className="text-caption tracking-wider text-muted-foreground">Opciones · marcá la correcta</p>
+                <p className="text-caption tracking-wider text-muted-foreground">Opciones · marca la correcta</p>
                 {q.options.map((opt, oi) => (
                   <div key={oi} className="flex items-center gap-2">
                     <button

@@ -2092,7 +2092,7 @@ export function AnalisisGraderTurnoPage() {
       {/* ── Header sticky con navegación contextual ───────────────────── */}
       {/*
         En MÓVIL son dos filas, no una: arriba qué turno estás mirando, abajo qué
-        podés hacer con él.
+        puedes hacer con él.
 
         ⚠ En una sola fila se rompía. Los botones de la derecha son `shrink-0` y
         ocupan ~290 px de los 351 útiles, así que el grupo del título quedaba con
@@ -2180,7 +2180,7 @@ export function AnalisisGraderTurnoPage() {
           )}
         </div>
 
-        {/* Fila 2 en móvil · derecha en desktop: qué podés hacer con él.
+        {/* Fila 2 en móvil · derecha en desktop: qué puedes hacer con él.
             El orden importa: primero las acciones sobre ESTE turno (clasificar,
             compartir, exportar) y al final Anterior/Siguiente, que es irse a
             otro. Pegados al borde derecho en las dos anchuras, así el pulgar los
@@ -2521,7 +2521,7 @@ export function AnalisisGraderTurnoPage() {
             {hasGraderData ? (
               <>
                 <p className="text-sm text-muted-foreground">
-                  Cargá el primer Excel de Matrix para ver el estado del proceso.
+                  Carga el primer Excel de Matrix para ver el estado del proceso.
                 </p>
                 <Button onClick={() => navigate(wizardUrl)} className="gap-2 mt-1">
                   <Upload className="w-4 h-4" />

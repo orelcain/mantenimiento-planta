@@ -239,7 +239,7 @@ function probarSalidasSection(): ManualSection {
         explanation: 'Los pockets usan los comandos 1–4; el 3 prueba el pocket 3. El 135 es el flipper 3 y el 143 el flipper 7.',
       },
       {
-        question: 'Querés probar el CAPACHO 5 y tipeás 141. ¿Qué pasa?',
+        question: 'Quieres probar el CAPACHO 5 y tipeas 141. ¿Qué pasa?',
         options: [
           'Se acciona el capacho 5, es el comando correcto',
           'No pasa nada, el comando no existe',

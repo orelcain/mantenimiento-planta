@@ -263,7 +263,7 @@ export function GateEvolutionChart({ timelineBuckets, configSnapshots }: GateEvo
                     !active && 'opacity-40 line-through',
                   )}
                   style={selected ? { backgroundColor: color, color: inkOn(color) } : {}}
-                  title={`Gate ${n}${!active ? ' (inactivo)' : ''}${selected ? ' · tocá para ocultar' : ' · tocá para mostrar'}`}
+                  title={`Gate ${n}${!active ? ' (inactivo)' : ''}${selected ? ' · toca para ocultar' : ' · toca para mostrar'}`}
                 >
                   G{n}
                 </button>

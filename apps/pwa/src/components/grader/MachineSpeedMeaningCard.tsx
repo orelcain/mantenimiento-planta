@@ -274,7 +274,7 @@ export function MachineSpeedMeaningCard({ machines, className }: Props) {
                 <span className="font-medium text-foreground">Los objetivos no son iguales</span> — estas máquinas no son
                 todas el mismo modelo, así que su «% del objetivo» <span className="font-medium">no se compara entre
                 ellas</span>: la de mayor capacidad puede entregar más piezas y aun así lucir peor. Para compararlas,
-                mirá las piezas perdidas, que se miden contra la cadencia de la línea.
+                mira las piezas perdidas, que se miden contra la cadencia de la línea.
               </span>
             </p>
           )}

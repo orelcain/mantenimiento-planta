@@ -91,7 +91,7 @@ export function MidShiftCheckCard({
             <Upload className="w-4 h-4 text-ink-warn shrink-0 mt-0.5" />
             <p className="flex-1 min-w-[14rem] text-xs text-muted-foreground">
               El Excel llega hasta {summary?.endAt ? fmtTime(summary.endAt) : '—'} y la línea siguió
-              produciendo. <span className="text-foreground font-medium">Exportá de Matrix otra vez</span>{' '}
+              produciendo. <span className="text-foreground font-medium">Exporta de Matrix otra vez</span>{' '}
               antes de mover una gate con esto.
             </p>
             <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5" onClick={onLoadExcel}>

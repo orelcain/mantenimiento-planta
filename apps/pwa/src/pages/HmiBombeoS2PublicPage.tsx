@@ -694,7 +694,7 @@ export function HmiBombeoS2PublicPage() {
 
           {!currentState && (
             <div className="px-3 pb-2 text-[10px] text-[#3a5a7a]">
-              <span className="uppercase tracking-wider">Tocá un bookmark para saltar a ese momento del video + aplicar estado al simulador.</span>
+              <span className="uppercase tracking-wider">Toca un bookmark para saltar a ese momento del video + aplicar estado al simulador.</span>
               <span className="ml-2 hidden sm:inline">Próx fase: edición manual de pipes + captura de snapshots reales.</span>
             </div>
           )}

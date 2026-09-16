@@ -202,7 +202,7 @@ export function SensorStopsCausePanel({
 
   const guardar = async (stop: SensorStop) => {
     const causa = texto.trim()
-    if (!causa) { setError('Escribí o dictá la causa antes de guardar.'); return }
+    if (!causa) { setError('Escribe o dicta la causa antes de guardar.'); return }
     setSaving(true)
     setError(null)
     try {

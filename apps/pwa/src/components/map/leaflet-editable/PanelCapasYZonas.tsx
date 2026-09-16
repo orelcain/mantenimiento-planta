@@ -671,7 +671,7 @@ export function PanelCapasYZonas() {
             {elementosFiltrados.length === 0 ? (
               <div className="text-center text-[11px] text-gray-500 py-6 italic">
                 {elementos.length === 0
-                  ? <>Sin elementos.<br />Activá <span className="text-blue-400">Editar</span> y dibujá zonas.</>
+                  ? <>Sin elementos.<br />Activa <span className="text-blue-400">Editar</span> y dibuja zonas.</>
                   : 'Sin resultados con esos filtros.'}
               </div>
             ) : (
