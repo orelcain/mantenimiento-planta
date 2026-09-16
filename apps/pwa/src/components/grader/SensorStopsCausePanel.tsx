@@ -27,7 +27,7 @@ import { addMaintenanceLogEntry } from '@/services/maintenanceLog'
 import { refineText } from '@/services/ai'
 import { logger } from '@/lib/logger'
 import { isMaintenanceState } from '@/services/grader/shoplogixMaintenance'
-import { ritmoParaPiezasPerdidas } from '@/services/shoplogix/kpisMantencionTurno'
+import { ritmoParaPiezasPerdidas, clasificaCausa } from '@/services/shoplogix/kpisMantencionTurno'
 import type { PlantLineId } from '@/config/plantLines'
 import type { PlantSlug } from '@/services/shoplogix/shoplogixMachines'
 import type { UpstreamLineSnapshot, UpstreamMachineState } from '@/services/shoplogix/types'
@@ -60,6 +60,14 @@ interface SensorStop {
   sensorReason: string
   /** Piezas que dejó de producir, al ritmo demostrado de la máquina (ver `ritmoParaPiezasPerdidas`). */
   lostPieces: number | null
+  /**
+   * Pausa acordada (colación, reunión, ejercicio compensatorio…).
+   *
+   * No se le cuentan piezas perdidas: la cascada del turno las deja FUERA del
+   * techo —«no cuentan como pérdida»— y acá la misma colación aparecía con
+   * «≈666 pz», contradiciendo a la pantalla de al lado.
+   */
+  planificado: boolean
   isMaintenance: boolean
 }
 
@@ -129,6 +137,7 @@ export function SensorStopsCausePanel({
           durationMin,
           sensorReason: (s.reason || '').trim(),
           lostPieces: ritmoCpm != null ? Math.round(durationMin * ritmoCpm) : null,
+          planificado: clasificaCausa(s) === 'planificado',
           isMaintenance: isMaintenanceState(s),
         })
       }
@@ -237,7 +246,7 @@ export function SensorStopsCausePanel({
   if (stops.length === 0) return null
 
   const minutosSinCausa = sinCausa.reduce((a, s) => a + s.durationMin, 0)
-  const piezasSinCausa = sinCausa.reduce((a, s) => a + (s.lostPieces ?? 0), 0)
+  const piezasSinCausa = sinCausa.reduce((a, s) => a + (s.planificado ? 0 : s.lostPieces ?? 0), 0)
 
   // Por defecto se listan SOLO los paros que falta explicar. En Yal/Chonchi el
   // sensor ya clasifica casi todo (COLACION, FALTA MMPP, CUMPLIMIENTO CUOTA…) y
@@ -297,7 +306,7 @@ export function SensorStopsCausePanel({
                 <span className="font-mono tabular-nums font-semibold w-16">
                   {stop.durationMin >= 10 ? Math.round(stop.durationMin) : stop.durationMin.toLocaleString('es-CL', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} min
                 </span>
-                {stop.lostPieces != null && stop.lostPieces > 0 && (
+                {!stop.planificado && stop.lostPieces != null && stop.lostPieces > 0 && (
                   <span className="font-mono tabular-nums text-muted-foreground" title={`Al ritmo que la máquina demostró andando en el turno: ${Math.round(stop.durationMin)} min sin producir`}>
                     ≈{stop.lostPieces.toLocaleString('es-CL')} pz
                   </span>
