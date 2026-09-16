@@ -531,6 +531,10 @@ con un script Node local (`writeFileSync` en `utf8`).
    MILIMETROS"): 153 en la pestaña Bodega. Es dato, no CSS, y es lo que da el aspecto de
    ERP. Corregirlo es un formateador de presentación con protección de siglas (VITON,
    NFPA, SAP), no una clase — decisión de producto.
+   ✅ 2026-09-16: `formatNombreSAP` con diccionario de tildes de planta, nombres propios
+   (Chonchi, Yal, Marelec…) y siglas de área (DAF, RILES), aplicado a repuestos, ubicaciones de
+   bodega, árbol de áreas, selectores del CTD y listas de Equipos y Jerarquía. Lo que no está en
+   el diccionario baja de caja sin tilde: se agregan palabras ahí, no parches por pantalla.
 5b. **Bodega (Repuestos)** — mockup publicado el 2026-09-16:
    https://claude.ai/artifact/VYgqKho8xrCyR6zGQnuTPL (375 px, claro y oscuro, datos reales).
    Diagnóstico: seis tiles de KPI con círculo de color, botones de acción con relleno
