@@ -314,7 +314,7 @@ function aplicar(doc, plan) {
 
 async function main() {
   const firestore = db()
-  console.log(CONFIRM ? '=== ESCRIBIENDO ===' : '=== DRY-RUN (agregá --confirm para escribir) ===\n')
+  console.log(CONFIRM ? '=== ESCRIBIENDO ===' : '=== DRY-RUN (agrega --confirm para escribir) ===\n')
   let tocados = 0
 
   for (const [id, plan] of Object.entries(CAMBIOS)) {

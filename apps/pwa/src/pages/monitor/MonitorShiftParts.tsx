@@ -1519,7 +1519,7 @@ export function PronosticoCierre({ f, meta, horizonte }: {
       <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground/80">
         Método <span className="text-foreground/80">{nombreMetodo}</span> — el que menos se
         equivocó en esta línea, medido turno por turno sobre los últimos{' '}
-        <span className="tabular-nums">{f.samples}</span>. Llevás{' '}
+        <span className="tabular-nums">{f.samples}</span>. Llevas{' '}
         <span className="tabular-nums text-foreground/80">{fmtInt(f.current)}</span>.
       </p>
     </Bloque>

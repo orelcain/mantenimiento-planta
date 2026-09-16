@@ -409,7 +409,7 @@ describe('diffCurve', () => {
   const hoy = cumulativeFromStart(serie('2026-08-12T07:45:00Z', Array(12).fill(50)))   // 60 min
   const ayer = cumulativeFromStart(serie('2026-08-11T08:00:00Z', Array(12).fill(40)))
 
-  it('dice cuántas piezas de ventaja llevás en cada tramo', () => {
+  it('dice cuántas piezas de ventaja llevas en cada tramo', () => {
     const d = diffCurve(hoy, ayer)
     expect(d[0]).toEqual({ minutes: 5, pieces: 10 })
     expect(d[d.length - 1]).toEqual({ minutes: 60, pieces: 120 })

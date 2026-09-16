@@ -193,7 +193,7 @@ export function MachineSpeedMeaningCard({ machines, className }: Props) {
         <CardContent className="space-y-3">
           {sinDatosEnVentana && (
             <p className="text-sm text-muted-foreground">
-              Sin producción registrada en ese tramo. Ampliá la selección del gráfico o quitá el zoom.
+              Sin producción registrada en ese tramo. Amplía la selección del gráfico o quita el zoom.
             </p>
           )}
 

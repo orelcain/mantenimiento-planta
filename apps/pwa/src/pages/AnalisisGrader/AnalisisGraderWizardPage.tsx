@@ -893,7 +893,7 @@ export function AnalisisGraderWizardPage() {
             <CardContent className="pt-0 pb-3 px-4" data-testid="wizard-save-slow">
               <p className="text-footnote text-ink-warn">
                 Lleva más de un minuto y no llegó nada al servidor. Casi siempre es una pestaña con la
-                conexión caída: cerrá <span className="font-medium">todas</span> las pestañas de la app
+                conexión caída: cierra <span className="font-medium">todas</span> las pestañas de la app
                 (incluida la del monitor), ábrela de nuevo y vuelve a guardar. El Excel no se pierde.
               </p>
             </CardContent>

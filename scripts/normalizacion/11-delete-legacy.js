@@ -50,7 +50,7 @@ async function countCollection(col) {
       ? fs.readdirSync(path.join(ROOT, 'backups')).filter(d => d.startsWith('fase5-'))
       : [];
     if (backups.length === 0) {
-      console.error('❌ No hay backup fase5-* en backups/. Corré primero 10-backup-fase5.js. Abortado.');
+      console.error('❌ No hay backup fase5-* en backups/. Ejecuta primero 10-backup-fase5.js. Abortado.');
       process.exit(1);
     }
     console.log('  Backup encontrado:', backups.sort().pop());
@@ -67,7 +67,7 @@ async function countCollection(col) {
   const total = Object.values(counts).reduce((a, b) => a + b, 0) + hierRep;
   console.log(`  ── TOTAL a borrar: ${total} docs`);
 
-  if (!WRITE) { console.log('\nDRY-RUN: nada borrado. Corré con --write (tras backup) para aplicar.\n'); process.exit(0); }
+  if (!WRITE) { console.log('\nDRY-RUN: nada borrado. Ejecuta con --write (tras backup) para aplicar.\n'); process.exit(0); }
 
   console.log('\nBorrando…');
   for (const col of TOP_LEVEL) {

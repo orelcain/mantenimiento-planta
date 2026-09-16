@@ -74,7 +74,7 @@ async function listCollections() {
   const cols = await db().listCollections()
   console.log(`Colecciones raíz (${cols.length}):`)
   for (const c of cols) console.log(`  · ${c.id}`)
-  console.log('\nPara subcolecciones, pasá la ruta completa, ej:')
+  console.log('\nPara subcolecciones, pasa la ruta completa, ej:')
   console.log('  node scripts/firestore-snapshot.js --dump learningContent/grader/components')
 }
 
@@ -137,11 +137,11 @@ async function restore(file, { confirm, prune }) {
     console.log(`  creados DESPUÉS del snapshot (${extras.length}): ${extras.join(', ')}`)
     console.log(prune
       ? '  → --prune activo: se BORRARÍAN.'
-      : '  → se DEJAN intactos (usá --prune solo si de verdad querés borrarlos).')
+      : '  → se DEJAN intactos (usa --prune solo si de verdad quieres borrarlos).')
   }
 
   if (!confirm) {
-    console.log('\n[DRY-RUN] Nada se escribió. Agregá --confirm para restaurar de verdad.')
+    console.log('\n[DRY-RUN] Nada se escribió. Agrega --confirm para restaurar de verdad.')
     return
   }
   if (prune && !has('--confirm-prune')) {

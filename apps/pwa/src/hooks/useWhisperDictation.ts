@@ -76,7 +76,7 @@ export function useWhisperDictation(
         try {
           const text = await transcribeAudioBlob(blob, optsRef.current)
           if (text) onTextRef.current(text)
-          else setError('No se reconoció voz. Intentá de nuevo.')
+          else setError('No se reconoció voz. Intenta de nuevo.')
         } catch (err) {
           logger.error('Error transcribiendo audio', err instanceof Error ? err : new Error(String(err)))
           setError('No se pudo transcribir. Revisa tu conexión.')

@@ -78,7 +78,7 @@ export function DevModulesPage() {
           Módulos del sidebar
         </h1>
         <p className="text-sm text-muted-foreground">
-          Mostrá u ocultá cualquier módulo del menú lateral a conveniencia. Los
+          Muestra u oculta cualquier módulo del menú lateral a conveniencia. Los
           módulos en desarrollo vienen ocultos por default; los de producción,
           visibles. La preferencia se guarda en este dispositivo — no afecta a
           otros usuarios.
@@ -119,7 +119,7 @@ export function DevModulesPage() {
         <CardHeader className="pb-2">
           <CardTitle className="text-base">En producción</CardTitle>
           <p className="text-xs text-muted-foreground">
-            Visibles por default. Ocultá los que no quieras ver en el menú.
+            Visibles por default. Oculta los que no quieras ver en el menú.
           </p>
         </CardHeader>
         <CardContent className="divide-y divide-border/40">
@@ -129,7 +129,7 @@ export function DevModulesPage() {
 
       <p className="text-caption text-muted-foreground px-1">
         Los cambios se aplican al instante. Si no ves un item después de
-        activarlo, refrescá la página.
+        activarlo, refresca la página.
       </p>
     </div>
   )

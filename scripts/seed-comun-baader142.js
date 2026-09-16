@@ -50,7 +50,7 @@ const SAPS = [
   }
   console.log(`\nEncontrados: ${found}/${SAPS.length} | ya marcados: ${already} | por marcar: ${found - already}`);
   if (missing.length) console.log('NO encontrados en el maestro:', missing.join(', '));
-  if (!WRITE) console.log('\n(DRY-RUN — nada escrito. Corré con --write para aplicar.)');
+  if (!WRITE) console.log('\n(DRY-RUN — nada escrito. Ejecuta con --write para aplicar.)');
   else console.log('\n✓ Aplicado.');
   process.exit(0);
 })().catch((e) => { console.error(e); process.exit(1); });

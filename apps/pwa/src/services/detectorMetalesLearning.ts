@@ -102,7 +102,7 @@ const MANUAL_DIDACTIC: Record<string, { objetivo?: string; porque?: string; quiz
         explanation: 'Muchos productos generan su propia señal (efecto de producto); el detector la aprende para descontarla y recién así detectar el metal que sobra.',
       },
       {
-        question: 'Producto húmedo y salado, empaquetado en film metálico. ¿Qué esperás?',
+        question: 'Producto húmedo y salado, empaquetado en film metálico. ¿Qué esperas?',
         options: ['Ningún efecto de producto', 'Efecto de producto fuerte, que exige un buen aprendizaje', 'Que no se pueda inspeccionar nunca', 'Que detecte mejor'],
         correctIndex: 1,
         explanation: 'El manual documenta tres causas de efecto de producto: producto húmedo, envoltorio conductor (film metálico) y tinta conductora en el envase. La sal es criterio de planta, no del manual, pero apunta en el mismo sentido. En cualquiera de esos casos hay que aprender bien el efecto o habrá falsos rechazos.',

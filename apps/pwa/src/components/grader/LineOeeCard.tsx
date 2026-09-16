@@ -97,7 +97,7 @@ export function LineOeeCard({ plantLineId, plantSlug, graderSummaries, currentMo
           <GitMerge className="h-4 w-4 text-ink-info" />
           OEE del área (estimado)
           <InfoTooltip
-            text={'Aproxima el OEE de TODA el área, no solo la máquina instrumentada.\n\nA_área = uptime de la máquina / (tiempo rastreado por el sensor + paros de etapa registrados)\nR_área ≈ R de la máquina (proxy del cuello de botella)\nQ_área = calidad del Grader donde existe; donde no hay Grader el OEE se muestra como A×R y se rotula.\n\nUn paro de etapa solo SUMA tiempo si no detuvo a la máquina: si la detuvo, ya está en el downtime del sensor y se anota como causa de ese paro. Así el mismo minuto no se castiga dos veces.\n\nESTIMADO: mejora a medida que registrás paros de etapa.'}
+            text={'Aproxima el OEE de TODA el área, no solo la máquina instrumentada.\n\nA_área = uptime de la máquina / (tiempo rastreado por el sensor + paros de etapa registrados)\nR_área ≈ R de la máquina (proxy del cuello de botella)\nQ_área = calidad del Grader donde existe; donde no hay Grader el OEE se muestra como A×R y se rotula.\n\nUn paro de etapa solo SUMA tiempo si no detuvo a la máquina: si la detuvo, ya está en el downtime del sensor y se anota como causa de ese paro. Así el mismo minuto no se castiga dos veces.\n\nESTIMADO: mejora a medida que registras paros de etapa.'}
             iconSize={11}
             position="top"
           />

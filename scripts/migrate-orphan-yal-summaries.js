@@ -107,7 +107,7 @@ async function main() {
     console.log(`\n→ Para aplicar la migración, ejecutá:`)
     console.log(`  node scripts/migrate-orphan-yal-summaries.js --apply\n`)
   } else {
-    console.log(`\n✅ Migración completa. Refrescá la PWA para ver los turnos en la pestaña Yal.\n`)
+    console.log(`\n✅ Migración completa. Refresca la PWA para ver los turnos en la pestaña Yal.\n`)
   }
 }
 

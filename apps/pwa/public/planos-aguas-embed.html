@@ -1029,8 +1029,8 @@ document.querySelectorAll('.galAdd input[type=file]').forEach(inp=>inp.addEventL
 }));
 document.querySelectorAll('.galAdd button[data-act=paste]').forEach(btn=>btn.onclick=async()=>{
   const cat=btn.dataset.cat;activePhotoCat=cat;if(!sel)return;
-  try{const items=await navigator.clipboard.read();for(const it of items)for(const ty of it.types)if(ty.startsWith('image/')){const b=await it.getType(ty);readImgFile(b,d=>addPhoto(sel,cat,d));return;}toast('No hay imagen en el portapapeles. Copiá una y reintentá (o Ctrl+V).');}
-  catch(e){toast('Copiá una imagen y pegá con Ctrl+V (con el panel abierto).');}
+  try{const items=await navigator.clipboard.read();for(const it of items)for(const ty of it.types)if(ty.startsWith('image/')){const b=await it.getType(ty);readImgFile(b,d=>addPhoto(sel,cat,d));return;}toast('No hay imagen en el portapapeles. Copia una y reintenta (o Ctrl+V).');}
+  catch(e){toast('Copia una imagen y pega con Ctrl+V (con el panel abierto).');}
 });
 window.addEventListener('paste',e=>{if(READONLY||!sel||!document.getElementById('panel').classList.contains('open'))return;const it=[...((e.clipboardData&&e.clipboardData.items)||[])].find(i=>i.type.startsWith('image/'));if(it){readImgFile(it.getAsFile(),d=>addPhoto(sel,activePhotoCat||'ent',d));}});
 document.getElementById('pDelPoint').onclick=()=>{if(sel&&confirm('¿Eliminar el punto '+sel+'?\n(Si es del plano, lo puedes recuperar con "Restaurar ocultos".)')){removePoint(sel);document.getElementById('pClose').click();}};
@@ -1363,7 +1363,7 @@ function setCotaSize(id,v){const sh=getShape(id);if(sh){sh.cotaSize=Math.max(8,M
 function delSelShape(){if(!selShape){toast('Selecciona una figura primero');return;}if(confirm('¿Borrar esta figura?')){state.shapes=state.shapes.filter(s=>s.id!==selShape);selShape=null;save();renderShapes();renderEditbar();toast('Figura borrada');}}
 function setShapeW(id,v){const sh=getShape(id);if(!sh)return;v=Math.max(1,Math.min(14,v|0));if(sh.type==='rect'||sh.type==='circle')sh.sw=v;else sh.w=v;save();renderShapes();const wv=document.getElementById('selWv');if(wv)wv.textContent=v;const sl=document.getElementById('selW');if(sl&&+sl.value!==v)sl.value=v;}
 function setShapeSize(id,v){const sh=getShape(id);if(!sh)return;sh.size=Math.max(8,Math.min(48,v|0));save();renderShapes();const wv=document.getElementById('selSv');if(wv)wv.textContent=sh.size;const sl=document.getElementById('selS');if(sl&&+sl.value!==sh.size)sl.value=sh.size;}
-function continuePipe(id){const sh=getShape(id);if(!sh||sh.type!=='pipe')return;draft={type:'pipe',kind:sh.kind,w:sh.w||pipeW,editId:id,pts:JSON.parse(JSON.stringify(sh.pts))};document.body.classList.add('drafting');selShape=null;renderShapes();renderEditbar();toast('Continuá la cañería · doble-clic o Terminar');}
+function continuePipe(id){const sh=getShape(id);if(!sh||sh.type!=='pipe')return;draft={type:'pipe',kind:sh.kind,w:sh.w||pipeW,editId:id,pts:JSON.parse(JSON.stringify(sh.pts))};document.body.classList.add('drafting');selShape=null;renderShapes();renderEditbar();toast('Continúa la cañería · doble-clic o Terminar');}
 function redrawPipe(id){const sh=getShape(id);if(!sh||sh.type!=='pipe')return;draft={type:'pipe',kind:sh.kind,w:sh.w||pipeW,editId:id,pts:[sh.pts[0].slice()]};document.body.classList.add('drafting');selShape=null;renderShapes();renderEditbar();toast('Redibuja desde el punto de bajada');}
 function delVertex(id,i){const sh=getShape(id);if(!sh||!sh.pts||sh.pts.length<=2)return;sh.pts.splice(i,1);save();renderShapes();toast('Vértice borrado');}
 function snapPt(prev,x,y){const dx=x-prev[0],dy=y-prev[1],a=Math.round(Math.atan2(dy,dx)/(Math.PI/4))*(Math.PI/4),d=Math.hypot(dx,dy);return {x:prev[0]+Math.cos(a)*d,y:prev[1]+Math.sin(a)*d};}
@@ -2106,7 +2106,7 @@ document.getElementById('frCopy').onclick=async()=>{
   const css=`matrix(${Mfa.toFixed(6)},${Mfc.toFixed(6)},${Mfb.toFixed(6)},${Mfd.toFixed(6)},${Mfe.toFixed(4)},${Mff.toFixed(4)})`;
   const msg=`Matriz CSS calibrada:\n\n${css}\n\nReemplazá la línea transform en .world img.recinto del CSS.`;
   try{await navigator.clipboard.writeText(css); alert(msg+'\n\n(Copiada al portapapeles)');}
-  catch(e){prompt('Copiá manualmente:', css);}
+  catch(e){prompt('Copia manualmente:', css);}
 };
 document.getElementById('btnFineRec').onclick=()=>{const p=document.getElementById('frPanel');p.style.display=(p.style.display==='none'||!p.style.display)?'block':'none';if(p.style.display==='block'){vectorPanelRender();vectorPanelExtrasRender();}};
 // El panel ⚙ vive dentro del #stage: sin esto, scrollear adentro dispara el zoom del plano.
@@ -2130,7 +2130,7 @@ function syncState(){
   const conn = (bridge.active && bridge.authed) || (cloud.db && cloud.user);
   if(conn)return {t:'Conectado',cls:'',tip:'Conectado a la nube. Haz un cambio para guardar.',d:'Conectado a la nube. Haz un cambio o toca "Sincronizar ahora" para subir todo lo de este dispositivo.'};
   if(!cloud.db&&!inIframe())return {t:'Local',cls:'swarn',tip:'Sin Firebase (offline).',d:'Firebase no está disponible ahora. Tus cambios se guardan en este dispositivo.'};
-  return {t:'Solo local',cls:'swarn',tip:'Sin sesión de supervisor para el plano.',d:'No hay sesión de supervisor disponible para el plano: tus cambios quedan SOLO en este dispositivo (no se ven en el celular ni por QR). Si estás en la PWA, asegurate de estar logueado como supervisor; si recién abrís, esperá unos segundos a que conecte.'};
+  return {t:'Solo local',cls:'swarn',tip:'Sin sesión de supervisor para el plano.',d:'No hay sesión de supervisor disponible para el plano: tus cambios quedan SOLO en este dispositivo (no se ven en el celular ni por QR). Si estás en la PWA, asegurate de estar logueado como supervisor; si recién abres, espera unos segundos a que conecte.'};
 }
 function renderSync(){const b=document.getElementById('btnSync');if(!b)return;const s=syncState();b.textContent=s.t;b.classList.remove('sok','swarn','sbusy');if(s.cls)b.classList.add(s.cls);b.title=s.tip;}
 function forceSync(){
@@ -2273,7 +2273,7 @@ function toast(m,opts){
   if(window.ResizeObserver){let t;new ResizeObserver(()=>{clearTimeout(t);t=setTimeout(()=>{if(!userMoved)fit();},120);}).observe(stage);}
   // Hint pinch primera vez en móvil — para que el usuario sepa que existen los gestos sin manual.
   if(window.innerWidth<=700&&!READONLY&&!localStorage.getItem('planosAguas.hintPinch')){
-    setTimeout(()=>{toast('Pellizcá para zoom · arrastra con un dedo para mover');localStorage.setItem('planosAguas.hintPinch','1');},1500);
+    setTimeout(()=>{toast('Pellizca para zoom · arrastra con un dedo para mover');localStorage.setItem('planosAguas.hintPinch','1');},1500);
   }
 })();
 </script>

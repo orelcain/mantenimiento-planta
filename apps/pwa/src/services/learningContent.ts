@@ -370,7 +370,7 @@ const B200_MANUAL_DIDACTIC: Record<string, { objetivo?: string; porque?: string;
   },
   'segunda-alimentacion': {
     objetivo: 'Ajustar la 2da alimentación (leva, chapaletas, topes) dejando las chapaletas por dentro del filo de los cuchillos dorsales ±0.5 mm, y reajustarlas al montar cuchillos nuevos.',
-    porque: 'si no reajustás las chapaletas al cambiar cuchillos, al bajar el mando dorsal los cuchillos rozan con ellas y se dañan; el ±0.5 mm es la diferencia entre corte limpio y rotura.',
+    porque: 'si no reajustas las chapaletas al cambiar cuchillos, al bajar el mando dorsal los cuchillos rozan con ellas y se dañan; el ±0.5 mm es la diferencia entre corte limpio y rotura.',
     quiz: [
       { question: '¿A qué tolerancia deben quedar las chapaletas respecto del filo de los cuchillos dorsales?', options: ['±5 mm', '±0.5 mm (casi chocando)', '10 mm', 'No importa'], correctIndex: 1, explanation: 'Las chapaletas quedan por dentro del filo de los dorsales a ±0.5 mm; los topes de seguridad, a 0.5 mm de los amortiguadores.' },
       { question: 'Al montar cuchillos nuevos, ¿qué hay que reajustar en la 2da alimentación?', options: ['Nada', 'Las chapaletas (con pernos M10)', 'La leva', 'Solo los resortes'], correctIndex: 1, explanation: 'Con cuchillos nuevos hay que reajustar las chapaletas de la 2da alimentación con pernos M10, o al bajar el mando dorsal rozarían.' },
@@ -393,7 +393,7 @@ const B200_MANUAL_DIDACTIC: Record<string, { objetivo?: string; porque?: string;
   },
   'guias-flotantes': {
     objetivo: 'Ajustar las guías flotantes (abertura máx. 4.8 mm, 5 mm por debajo de las guías de la 2da alimentación) SIEMPRE después de los cuchillos ventrales y con la silleta en reposo.',
-    porque: 'el orden importa: si ajustás las guías flotantes antes que los ventrales quedan descalibradas; y con la silleta fuera de reposo la medida sale falsa.',
+    porque: 'el orden importa: si ajustas las guías flotantes antes que los ventrales quedan descalibradas; y con la silleta fuera de reposo la medida sale falsa.',
     quiz: [
       { question: '¿Cuándo se ajustan las guías flotantes?', options: ['Antes de los cuchillos ventrales', 'Siempre después de los cuchillos ventrales', 'En cualquier orden', 'Solo en mantención anual'], correctIndex: 1, explanation: 'Las guías flotantes se ajustan SIEMPRE después de los cuchillos ventrales, con la silleta en posición de reposo.' },
       { question: '¿Cuál es la abertura máxima de las guías flotantes?', options: ['4.8 mm', '12 mm', '17-18 mm', '5 mm'], correctIndex: 0, explanation: 'La abertura no debe ser más de 4.8 mm; la altura, 5 mm por debajo de las guías de la 2da alimentación.' },

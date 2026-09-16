@@ -755,7 +755,7 @@ function VistaProtocolo() {
     setError(null)
     setGuardadoOk(false)
     if (!isAuthenticated || !user?.id) {
-      setError('Iniciá sesión para guardar lecturas.')
+      setError('Inicia sesión para guardar lecturas.')
       return
     }
     if (fish <= 0) {
@@ -2197,7 +2197,7 @@ function VistaProtocolo() {
           </button>
           {!isAuthenticated && (
             <p className="mt-2 text-xs" style={{ color: LC.inkLo }}>
-              Iniciá sesión para guardar. La herramienta de diagnóstico funciona igual sin sesión.
+              Inicia sesión para guardar. La herramienta de diagnóstico funciona igual sin sesión.
             </p>
           )}
         </div>

@@ -1562,7 +1562,7 @@
       const out = lines.join('\n');
       editOutput.value = out;
       navigator.clipboard?.writeText(out);
-      editOutput.placeholder = '📦 Bloque completo copiado (' + pipesGroup.querySelectorAll('[data-pipe]').length + ' pipes). Pegá en HTML reemplazando <g class="pipes">...</g>';
+      editOutput.placeholder = '📦 Bloque completo copiado (' + pipesGroup.querySelectorAll('[data-pipe]').length + ' pipes). Pega en HTML reemplazando <g class="pipes">...</g>';
     });
 
     svg.addEventListener('click', (e) => {

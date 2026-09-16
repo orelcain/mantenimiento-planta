@@ -17,7 +17,7 @@
  * corten (vencido o revocado) o que el token esté mal formado. Todo lo demás
  * —`unavailable`, `deadline-exceeded`, `internal`, `cancelled`, el offline del
  * navegador— es transitorio, y ante la duda se trata como transitorio: decir
- * «esperá, volvemos» y equivocarse cuesta una recarga; decir «tu link murió» y
+ * «espera, volvemos» y equivocarse cuesta una recarga; decir «tu link murió» y
  * equivocarse cuesta un llamado y un turno sin mirar.
  */
 

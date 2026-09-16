@@ -67,7 +67,7 @@ function componerRechazo(ing) {
     l.push('<b>No se pudo cargar:</b> el barrido quedó incompleto.')
     l.push(`Faltan ${rot}.`)
     l.push('')
-    l.push('Grabá otro barrido que llegue hasta <code>E825-C</code>, o completa')
+    l.push('Graba otro barrido que llegue hasta <code>E825-C</code>, o completa')
     l.push('esos valores a mano en la app.')
   } else {
     l.push(`<b>No se pudo cargar</b> (${ing.regla || 'error'}).`)

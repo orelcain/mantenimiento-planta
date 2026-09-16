@@ -254,7 +254,7 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
       {total > 0 && (
         <p className="text-footnote text-muted-foreground">
           {total > TOPE
-            ? `${TOPE} de ${total.toLocaleString('es-CL')} piezas — afiná la búsqueda para ver el resto.`
+            ? `${TOPE} de ${total.toLocaleString('es-CL')} piezas — afina la búsqueda para ver el resto.`
             : `${total} pieza${total === 1 ? '' : 's'}.`}
         </p>
       )}

@@ -1632,7 +1632,7 @@ function Sparkbars({
           </>
         ) : (
           <span className="text-muted-foreground/80">
-            Pasá el dedo o el mouse por el gráfico para ver el detalle de cada tramo.
+            Pasa el dedo o el mouse por el gráfico para ver el detalle de cada tramo.
           </span>
         )}
       </div>
@@ -2196,7 +2196,7 @@ function RitmoNecesario({
           ? 'Dentro del horario no alcanza'
           : exigente
           ? 'Se alcanza, pero solo apurando'
-          : 'Se alcanza al ritmo que traés'}
+          : 'Se alcanza al ritmo que traes'}
       </p>
       {/* Sin adornos históricos: con techo desconocido no se puede afirmar
           que la línea "lo logró alguna vez" — los dos números ya lo dicen.
@@ -2496,7 +2496,7 @@ function RitmoNecesario({
                     pronóstico, que a la misma hora decía "no entra": este
                     número cabe en el techo pero está por encima del ritmo que
                     la línea trae, así que se dice condicional. */}
-                {pace.withExtraHour.realistic ? 'el ritmo que ya traés' : 'alcanzaría, pero apurando'}
+                {pace.withExtraHour.realistic ? 'el ritmo que ya traes' : 'alcanzaría, pero apurando'}
               </span>.
             </>
           ) : (
