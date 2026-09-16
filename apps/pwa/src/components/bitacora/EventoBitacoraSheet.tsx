@@ -245,6 +245,10 @@ export function EventoBitacoraSheet({
       archivo,
     }))
     setSubidas((prev) => [...prev, ...nuevas])
+    // Cada foto nueva vuelve a pedir la confirmación: si no, el «toca Guardar
+    // otra vez» de una foto anterior servía de permiso para guardar sin ESTA,
+    // en silencio (revisión 15-09).
+    setConfirmarSinFotos(false)
     nuevas.forEach((s) => void subir(s))
     if (inputRef.current) inputRef.current.value = ''
   }
@@ -295,7 +299,11 @@ export function EventoBitacoraSheet({
     // Un término "antes" del inicio suele ser un typo (10:30 → 10:15) y daba
     // paradas de casi 24 h. Cruzar la medianoche real no pasa de unas horas.
     if (duracion != null && duracion > 12 * 60) {
-      setError(`El término (${horaTermino}) queda antes del inicio (${horaInicio}). Revisa las horas.`)
+      const horas = Math.floor(duracion / 60)
+      setError(
+        `De ${horaInicio} a ${horaTermino} son ${horas} h. Si el término está bien, registra hasta el fin del turno ` +
+          'y abre otro evento en el turno siguiente; si no, corrige la hora.',
+      )
       return
     }
     const minutosNum = minutos.trim() === '' ? null : Number(minutos)
@@ -331,6 +339,7 @@ export function EventoBitacoraSheet({
           pendiente,
           fotos,
           fotosAntes: evento?.fotos ?? [],
+          cierreAntes: evento?.cierre ?? null,
           quien,
           // Quien registra no se repite como participante (pudo quedar marcado antes de elegirlo).
           resuelvePendiente: pendienteOrigen && esNuevo ? copiaDeOrigen(pendienteOrigen) : null,

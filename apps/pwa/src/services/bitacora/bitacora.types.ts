@@ -132,6 +132,8 @@ export type EventoBitacoraDatos = Pick<
   fotosAntes?: FotoEvento[]
   /** Solo al crear desde «Resolver»: el pendiente que este evento cierra. */
   resuelvePendiente?: OrigenPendiente | null
+  /** Al editar: el cierre que tenía el evento al abrirlo (para poder reabrirlo). */
+  cierreAntes?: CierrePendiente | null
   /** Al crear: quién registra. Al editar: quién edita (queda en actualizadoPorNombre). */
   quien: string
 }

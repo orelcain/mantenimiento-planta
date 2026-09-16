@@ -8,7 +8,8 @@ import {
   turnoDesdeId,
   turnoMantencionEn,
 } from '../turnoMantencion'
-import { minutosParadaDe, ordenarEventos, resumirBitacora } from '../resumenBitacora'
+import { fuePendiente, minutosParadaDe, ordenarEventos, resumirBitacora } from '../resumenBitacora'
+import { minutosDesdeInicioTurno } from '../turnoMantencion'
 import { bandaDeCelda, nombreCorto, normalizarFechaCalendario, tecnicosDelCalendario, tecnicosDeTurno } from '../tecnicosDeTurno'
 import { bitacoraAHtmlCorreo, bitacoraATextoPlano, escaparHtml } from '../bitacoraCorreo'
 
@@ -31,6 +32,58 @@ const ev = (p: Partial<EventoBitacora>): EventoBitacora => ({
   creadoPor: 'u1',
   autorNombre: 'Danilo',
   ...p,
+})
+
+describe('la bitácora archivada no cambia sola (revisión 15-09)', () => {
+  const cierre = { tipo: 'resuelto' as const, turnoId: '2026-09-16_noche', porNombre: 'Lucas Adrade', eventoId: 'e9', motivo: null }
+
+  it('un pendiente que otro turno cerró sigue contando como pendiente de SU turno', () => {
+    const r = resumirBitacora([
+      ev({ id: 'a', pendiente: true }),
+      ev({ id: 'b', pendiente: false, cierre }),
+      ev({ id: 'c' }),
+    ])
+    expect(r.pendientes).toBe(1)
+    expect(r.pendientesDelTurno).toBe(2)
+    expect(r.pendientesResueltosDespues).toBe(1)
+    expect(fuePendiente({ pendiente: false, cierre })).toBe(true)
+  })
+
+  it('el correo lo deja en el bloque de pendientes y dice quién lo resolvió', () => {
+    const html = bitacoraAHtmlCorreo({
+      turno: turnoDesdeId('2026-09-15_tarde')!,
+      eventos: [ev({ id: 'b', equipo: 'KNURO N1', pendiente: false, cierre })],
+      tecnicos: [],
+      planta: 'Planta Chonchi',
+    })
+    expect(html).toContain('Pendiente para el turno siguiente')
+    expect(html).toContain('Resuelto en Turno noche 16-09 por Lucas Adrade')
+    expect(html).toContain('pendiente (1 ya cerrado)')
+  })
+
+  it('dos eventos que resuelven el MISMO pendiente cuentan como uno cerrado', () => {
+    const origen = { id: 'p1', turnoId: '2026-09-14_noche', equipo: 'KNURO N1', descripcion: 'x', registradoPor: 'Danilo' }
+    const r = resumirBitacora([
+      ev({ id: 'a', resuelvePendiente: origen }),
+      ev({ id: 'b', resuelvePendiente: origen }),
+      ev({ id: 'c', resuelvePendiente: { ...origen, id: 'p2' } }),
+    ])
+    expect(r.pendientesCerrados).toBe(2)
+  })
+})
+
+describe('orden dentro del turno', () => {
+  it('el corte queda a 16 h del inicio, lejos de cualquier hora real', () => {
+    // Turno tarde (16:00): el fin del turno (00:00) y el inicio son las horas
+    // plausibles; el salto del orden cae a las 08:00, a 8 h de las dos.
+    const tarde = { banda: 'tarde' as const }
+    expect(minutosDesdeInicioTurno(tarde, '16:00')).toBe(0)
+    expect(minutosDesdeInicioTurno(tarde, '23:59')).toBe(479)
+    expect(minutosDesdeInicioTurno(tarde, '15:50')).toBe(-10)
+    // 07:59 todavía se ordena al final; 08:01 ya cuenta como "antes del turno".
+    expect(minutosDesdeInicioTurno(tarde, '07:59')).toBeGreaterThan(0)
+    expect(minutosDesdeInicioTurno(tarde, '08:01')).toBeLessThan(0)
+  })
 })
 
 describe('turno de Mantención por reloj', () => {
@@ -209,7 +262,7 @@ describe('correo de la bitácora', () => {
     expect(html.indexOf('Pendiente para el turno siguiente')).toBeGreaterThan(html.indexOf('Grader MS4/12'))
     expect(html.indexOf('Enzunchadora')).toBeGreaterThan(html.indexOf('Pendiente para el turno siguiente'))
     const texto = bitacoraATextoPlano({ ...base, eventos })
-    expect(texto).toContain('3 eventos · 35 min de parada · MTTR 35 min · 1 sin detener producción · 1 pendientes')
+    expect(texto).toContain('3 eventos · 35 min de parada (1) · MTTR 35 min · 1 sin detener producción · 1 pendiente')
     expect(texto).toContain('Técnicos de turno: Danilo Cortes')
   })
 

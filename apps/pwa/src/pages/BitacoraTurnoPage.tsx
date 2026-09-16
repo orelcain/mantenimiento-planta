@@ -15,7 +15,7 @@ import { FUENTE_FIRESTORE, useTurnoMantencionActual, type FuenteBitacora } from 
 import { BITACORA_PLANTA, ETIQUETA_TIPO } from '@/config/bitacora'
 import { copiarHtml, copiarTexto } from '@/lib/clipboard'
 import type { EventoBitacora, FotoEvento, TurnoMantencion } from '@/services/bitacora/bitacora.types'
-import { bitacoraAHtmlCorreo, bitacoraATextoPlano, tituloCorreo } from '@/services/bitacora/bitacoraCorreo'
+import { bitacoraAHtmlCorreo, bitacoraATextoPlano, etiquetaParada, etiquetaPendientes, tituloCorreo } from '@/services/bitacora/bitacoraCorreo'
 import { cargarFotoComoJpeg } from '@/services/bitacora/fotosBitacora'
 import { resumirBitacora } from '@/services/bitacora/resumenBitacora'
 import {
@@ -125,9 +125,11 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
       tecnicos: presentes.nombres,
       planta: BITACORA_PLANTA.nombre,
       observacion: observacion.texto,
-      pendientesAnteriores: pendientesPrevios,
+      // Solo en el turno EN CURSO: para uno pasado, «sigue pendiente» listaba
+      // los pendientes abiertos HOY, una entrega de turno que nunca ocurrió.
+      pendientesAnteriores: esActual ? pendientesPrevios : [],
     }),
-    [turno, eventos, presentes.nombres, observacion.texto, pendientesPrevios],
+    [turno, eventos, presentes.nombres, observacion.texto, pendientesPrevios, esActual],
   )
   const htmlCorreo = useMemo(() => bitacoraAHtmlCorreo(datosCorreo), [datosCorreo])
   const asunto = tituloCorreo(turno)
@@ -359,11 +361,20 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
         <Stat valor={String(r.eventos)} etiqueta={r.eventos === 1 ? 'evento' : 'eventos'} />
         <Stat
           valor={formatoMinutos(r.minutosParada)}
-          etiqueta={r.mttrMin != null ? `de parada · MTTR ${formatoMinutos(r.mttrMin)}` : 'de parada'}
+          // La pantalla decía solo «de parada» mientras el correo y el PDF
+          // avisaban «1 sin duración»: el dato faltante se veía recién al pegar.
+          etiqueta={`${etiquetaParada(r)}${r.mttrMin != null ? ` · MTTR ${formatoMinutos(r.mttrMin)}` : ''}`}
           tinta={r.minutosParada > 0 ? 'text-ink-crit' : undefined}
         />
         <Stat valor={String(r.enVentana)} etiqueta="sin detener producción" tinta={r.enVentana > 0 ? 'text-ink-ok' : undefined} />
-        <Stat valor={String(r.pendientes)} etiqueta={r.pendientes === 1 ? 'pendiente' : 'pendientes'} tinta={r.pendientes > 0 ? 'text-ink-warn' : undefined} />
+        <Stat
+          valor={String(r.pendientesDelTurno)}
+          etiqueta={etiquetaPendientes(r)}
+          tinta={r.pendientes > 0 ? 'text-ink-warn' : undefined}
+        />
+        {r.pendientesCerrados > 0 ? (
+          <Stat valor={String(r.pendientesCerrados)} etiqueta={r.pendientesCerrados === 1 ? 'pendiente cerrado' : 'pendientes cerrados'} tinta="text-ink-ok" />
+        ) : null}
       </section>
 
       {/* Observación general del turno (del mockup aprobado). */}

@@ -1,9 +1,9 @@
 import { ETIQUETA_FOTO } from '@/config/bitacora'
 import { textoSeguroPdf } from '@/utils/pdf/textoSeguroPdf'
 import { autorVisible, type EventoBitacora, type FotoEvento, type TurnoMantencion } from './bitacora.types'
-import { horarioEvento, lineaImpacto, lineaPendienteAnterior, lineaTecnicos } from './bitacoraCorreo'
+import { etiquetaPendientes, horarioEvento, lineaImpacto, lineaPendienteAnterior, lineaTecnicos } from './bitacoraCorreo'
 import { cargarFotoComoJpeg, type ImagenCargada } from './fotosBitacora'
-import { ordenarEventos, resumirBitacora } from './resumenBitacora'
+import { fuePendiente, ordenarEventos, resumirBitacora } from './resumenBitacora'
 import { etiquetaTurno, fechaTurnoLarga, formatoMinutos, horarioTurno } from './turnoMantencion'
 
 /**
@@ -102,7 +102,12 @@ export async function generarPdfBitacora({ turno, eventos, tecnicos, planta, obs
     ],
     [r.mttrMin == null ? '-' : formatoMinutos(r.mttrMin), 'MTTR', TINTA],
     [String(r.enVentana), 'sin detener producción', r.enVentana > 0 ? VENTANA : TINTA],
-    [String(r.pendientes), r.pendientes === 1 ? 'pendiente' : 'pendientes', TINTA],
+    [String(r.pendientesDelTurno), etiquetaPendientes(r), TINTA],
+    // Solo si hubo: es el número que demuestra la entrega de turno (y hasta
+    // ahora salía en el correo pero no aquí — revisión 15-09).
+    ...(r.pendientesCerrados > 0
+      ? ([[String(r.pendientesCerrados), r.pendientesCerrados === 1 ? 'pendiente cerrado' : 'pendientes cerrados', VENTANA]] as Array<[string, string, RGB]>)
+      : []),
   ]
   y += 2
   const anchoKpi = ANCHO / kpis.length
@@ -208,8 +213,8 @@ export async function generarPdfBitacora({ turno, eventos, tecnicos, planta, obs
   }
 
   const ordenados = ordenarEventos(turno, eventos)
-  const hechos = ordenados.filter((e) => !e.pendiente)
-  const pendientes = ordenados.filter((e) => e.pendiente)
+  const hechos = ordenados.filter((e) => !fuePendiente(e))
+  const pendientes = ordenados.filter(fuePendiente)
 
   if (!eventos.length) {
     pdf.setFontSize(10)

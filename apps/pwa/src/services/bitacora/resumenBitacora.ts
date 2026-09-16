@@ -18,7 +18,17 @@ export interface ResumenBitacora {
   mttrMin: number | null
   /** Intervenciones hechas sin detener producción (en una ventana). */
   enVentana: number
+  /** Pendientes de este turno que siguen abiertos HOY. */
   pendientes: number
+  /**
+   * Pendientes con los que CERRÓ este turno, incluidos los que un turno
+   * posterior ya resolvió. Es el número que salió en el correo de ese turno: sin
+   * él, reexportar una bitácora vieja mostraba 0 pendientes y dejaba de coincidir
+   * con lo que se envió (revisión 15-09).
+   */
+  pendientesDelTurno: number
+  /** De esos, los que otro turno ya cerró. */
+  pendientesResueltosDespues: number
   /** Pendientes de turnos anteriores que este turno resolvió (entrega de turno). */
   pendientesCerrados: number
   /** Equipos distintos mencionados (sin distinguir mayúsculas ni espacios). */
@@ -38,6 +48,14 @@ export function minutosParadaDe(e: Pick<EventoBitacora, 'impacto' | 'minutosPara
   return minutosEntre(e.horaInicio, e.horaTermino)
 }
 
+/**
+ * ¿Este evento quedó pendiente al cerrar su turno? Un evento con `cierre`
+ * necesariamente estuvo pendiente: lo cerró otro turno después.
+ */
+export function fuePendiente(e: Pick<EventoBitacora, 'pendiente' | 'cierre'>): boolean {
+  return Boolean(e.pendiente || e.cierre)
+}
+
 export function resumirBitacora(eventos: readonly EventoBitacora[]): ResumenBitacora {
   const porTipo: Record<TipoEvento, number> = { falla: 0, ajuste: 0, inspeccion: 0, preventivo: 0, novedad: 0 }
   const equipos = new Set<string>()
@@ -46,14 +64,18 @@ export function resumirBitacora(eventos: readonly EventoBitacora[]): ResumenBita
   let minutosParada = 0
   let enVentana = 0
   let pendientes = 0
-  let pendientesCerrados = 0
+  let pendientesResueltosDespues = 0
+  // Por ID: si dos teléfonos resolvieron el MISMO pendiente casi a la vez, son
+  // dos eventos pero UN pendiente cerrado (revisión 15-09).
+  const cerrados = new Set<string>()
   let minutosIntervencion = 0
 
   for (const e of eventos) {
     porTipo[e.tipo] = (porTipo[e.tipo] ?? 0) + 1
     if (e.equipo?.trim()) equipos.add(normalizarEquipo(e.equipo))
     if (e.pendiente) pendientes++
-    if (e.resuelvePendiente?.id) pendientesCerrados++
+    else if (e.cierre) pendientesResueltosDespues++
+    if (e.resuelvePendiente?.id) cerrados.add(e.resuelvePendiente.id)
     if (e.impacto === 'en-ventana') enVentana++
     if (e.impacto === 'con-parada') {
       conParada++
@@ -74,7 +96,9 @@ export function resumirBitacora(eventos: readonly EventoBitacora[]): ResumenBita
     mttrMin: conParada - paradasSinDuracion > 0 ? minutosParada / (conParada - paradasSinDuracion) : null,
     enVentana,
     pendientes,
-    pendientesCerrados,
+    pendientesDelTurno: pendientes + pendientesResueltosDespues,
+    pendientesResueltosDespues,
+    pendientesCerrados: cerrados.size,
     equipos: equipos.size,
     minutosIntervencion,
     porTipo,
