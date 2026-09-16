@@ -141,3 +141,44 @@ export function fusionarFormulario(base: CamposFormulario, local: CamposFormular
     conflictos: conflictos.filter((c) => c !== 'equipoId' || !conflictos.includes('equipo')),
   }
 }
+
+/** Nombres de los campos del DOCUMENTO que corresponden a cada campo del formulario. */
+const CAMPOS_DOC: Record<CampoFormulario, readonly string[]> = {
+  tipo: ['tipo'],
+  equipo: ['equipo', 'equipoId'],
+  equipoId: ['equipo', 'equipoId'],
+  descripcion: ['descripcion'],
+  horaInicio: ['horaInicio'],
+  horaTermino: ['horaTermino'],
+  // Van juntos: los minutos y la ventana se guardan según el impacto.
+  impacto: ['impacto', 'minutosParada', 'ventana'],
+  minutos: ['impacto', 'minutosParada', 'ventana'],
+  ventana: ['impacto', 'minutosParada', 'ventana'],
+  pendiente: ['pendiente'],
+}
+
+/**
+ * Los campos del documento que HAY que escribir: solo los que cambiaron
+ * respecto de lo último que se sabe del servidor.
+ *
+ * Escribir el documento entero en cada guardado hacía que un guardado atrasado
+ * (señal mala: queda en la cola del teléfono) devolviera a su valor viejo lo
+ * que otro equipo cambió en el intertanto, sin aviso (revisión 16-09).
+ */
+export function camposACambiar(
+  base: CamposFormulario,
+  local: CamposFormulario,
+  participantesBase: readonly string[],
+  participantes: readonly string[],
+): string[] {
+  const salida = new Set<string>()
+  for (const campo of CAMPOS) {
+    if (base[campo] !== local[campo]) for (const d of CAMPOS_DOC[campo]) salida.add(d)
+  }
+  if (!mismaLista(participantesBase, participantes)) salida.add('participantes')
+  return [...salida]
+}
+
+export function mismaLista(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((x, i) => x === b[i])
+}

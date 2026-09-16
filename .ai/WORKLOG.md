@@ -5140,3 +5140,34 @@ turno; eliminar = quien lo creo + supervisores (como antes).
   pierde, «Guardando borrador…» → «Borrador guardado · 14:20 · el turno lo ve», cerrar deja el
   borrador en la lista, continuar el de otro muestra el aviso de presencia, «Listo» lo publica y
   el resumen pasa de 4 a 5 eventos.
+
+### Ronda 11b · revisión adversaria de la cooperativa (antes del merge)
+
+Revisión adversaria: 5 ALTA de pérdida de datos. Arreglados todos antes de mergear.
+
+- **Se escribe SOLO lo que cambió** (`camposACambiar`, 4 pruebas). Cada autoguardado mandaba el
+  documento entero: uno atrasado en la cola de un teléfono sin señal devolvía a su valor viejo lo que
+  otro equipo cambió, y la fusión del otro lado lo adoptaba sin avisar.
+- **Un evento publicado no vuelve a borrador**: el autoguardado nunca manda `estado` y la regla lo
+  prohíbe (un autoguardado atrasado lo sacaba de números, correo y entrega de turno sin que nadie lo notara).
+- **Abrir, mirar y cerrar no escribe** (antes dejaba en cola una copia vieja del evento).
+- **Un borrador no se recorta** (el espacio que se estaba tecleando desaparecía bajo el cursor).
+- **«Cerrar» avisa también por las fotos que fallaron por falta de señal** (se perdían sin aviso).
+- Autoguardado decidido al ABRIR: si otro publica, lo tecleado sigue guardándose (antes el mismo
+  botón pasaba a «Cancelar» y lo descartaba). Creación fallida → se vuelve a crear, no se actualiza
+  un documento inexistente; «Listo» crea si nunca se vio el documento. Sin hora de inicio no se
+  intenta guardar y se avisa.
+- Participantes entran en la fusión. Descartar un borrador de «Resolver» no reabre el pendiente.
+  «Volver a crearlo» sin las fotos borradas. Eliminar se muestra solo a quien puede (autor/supervisor).
+- Regla: `registradoPor` solo cambia mientras es borrador. 46/46 casos contra la API (5 nuevos).
+- Presencia: desfase solo con el latido PROPIO recién confirmado (uno viejo en caché daba horas de
+  desfase y todos figuraban conectados); un id por PESTAÑA; sin actividad en 15 min deja de latir.
+- **Nombre en «conectados»** (pregunta de Orel: «¿por qué dice Matias Serpa en PC?»): salía del último
+  técnico elegido en ese navegador. Ahora: cuenta personal → su nombre; cuenta compartida → «PC de
+  Mantención» en el PC y el técnico elegido en el celular (`nombreEnPresencia`).
+- **Técnicos del turno parten VACÍOS** (pedido de Orel: el calendario a veces no refleja el turno
+  real): cada uno se agrega a mano; el calendario queda como «El calendario sugiere: …» y como
+  etiqueta dentro de la hoja, sin marcar a nadie (`sugeridosPorCalendario`).
+- 78 pruebas en services/bitacora. Verificado tecleando: el espacio final sobrevive al autoguardado,
+  sin conflicto falso.
+- Pendiente anotado: un borrador abandonado al cambiar de turno no se avisa en el turno siguiente.

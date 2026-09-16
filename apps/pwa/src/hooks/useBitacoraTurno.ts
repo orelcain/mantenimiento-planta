@@ -199,11 +199,15 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
     async (id: string, datos: EventoBitacoraDatos, esNuevo: boolean) => {
       const u = auth.currentUser
       if (!u) throw new Error('Hay que iniciar sesión para escribir en la bitácora.')
-      const descripcion = datos.descripcion.trim()
       const estado = datos.estado ?? 'listo'
       const esBorradorAhora = estado === 'borrador'
+      // Un borrador se guarda TAL CUAL: recortarle el espacio final hacía que la
+      // vista local lo devolviera recortado y el espacio que se estaba
+      // tecleando desapareciera bajo el cursor (revisión 16-09). Se recorta al publicar.
+      const limpiar = (t: string) => (esBorradorAhora ? t : t.trim())
+      const descripcion = limpiar(datos.descripcion)
       // Un borrador se guarda como vaya: la descripción se exige al publicar.
-      if (!descripcion && !esBorradorAhora) throw new Error('Escribe qué pasó.')
+      if (!descripcion.trim() && !esBorradorAhora) throw new Error('Escribe qué pasó.')
       if (!/^\d{2}:\d{2}$/.test(datos.horaInicio)) throw new Error('Falta la hora de inicio.')
       const fotos: FotoEvento[] = datos.fotos.map((f) => ({
         url: f.url,
@@ -214,13 +218,13 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
       }))
       const cuerpo = {
         tipo: datos.tipo,
-        equipo: datos.equipo.trim(),
+        equipo: limpiar(datos.equipo),
         descripcion,
         horaInicio: datos.horaInicio,
         horaTermino: datos.horaTermino || null,
         impacto: datos.impacto,
         minutosParada: datos.impacto === 'con-parada' && datos.minutosParada != null ? Math.max(0, Math.round(datos.minutosParada)) : null,
-        ventana: datos.impacto === 'en-ventana' ? datos.ventana?.trim() || null : null,
+        ventana: datos.impacto === 'en-ventana' ? (datos.ventana ? limpiar(datos.ventana) : '') || null : null,
         pendiente: datos.pendiente,
         fotos,
         participantes: [...new Set(datos.participantes.map((p) => p.trim()).filter(Boolean))].slice(0, 12),
@@ -299,15 +303,32 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
             variant: 'destructive',
           })
         }
-        const { fotos: _todas, ...sinFotos } = cuerpo
+        const { fotos: _todas, estado: _estado, dispositivo, ...sinFotos } = cuerpo
         void _todas
+        void _estado
+        // SOLO lo que cambió en esta pantalla: un guardado atrasado (en la cola
+        // de un teléfono sin señal) que manda el documento entero devolvía a su
+        // valor viejo lo que otro equipo cambió en el intertanto (revisión 16-09).
+        const soloEstos = datos.camposCambiados
+        const campos: Record<string, unknown> = soloEstos
+          ? Object.fromEntries(Object.entries(sinFotos).filter(([k]) => soloEstos.includes(k)))
+          : { ...sinFotos }
+        const cambiaPendiente = !soloEstos || soloEstos.includes('pendiente')
+        // Nada que escribir (abrir, mirar y cerrar): no se escribe. Si no, cada
+        // «Cerrar» sin señal dejaba en cola una copia vieja del evento.
+        if (esBorradorAhora && !Object.keys(campos).length && !agregadas.length && !quitadas.length && !datos.fijarAutor) return
         const lote = writeBatch(db)
         lote.update(ref, {
-          ...sinFotos,
+          ...campos,
+          dispositivo,
+          // `estado` solo se escribe al PUBLICAR. Un autoguardado nunca manda
+          // «borrador»: si llegaba tarde, despublicaba un evento que otro ya
+          // había publicado (revisión 16-09; la regla también lo impide).
+          ...(esBorradorAhora ? {} : { estado: 'listo' }),
           // Reabrir un pendiente ya cerrado tiene que BORRAR el cierre: si no,
           // la fila decía «Pendiente» y «Resuelto en…» a la vez y la entrega de
           // turno —que filtra por `!cierre`— nunca lo volvía a mostrar.
-          ...(datos.pendiente && datos.cierreAntes ? { cierre: null } : {}),
+          ...(cambiaPendiente && datos.pendiente && datos.cierreAntes ? { cierre: null } : {}),
           // Un borrador propio todavía puede cambiar de autor; uno ajeno o
           // publicado deja constancia de quién lo tocó.
           ...(datos.fijarAutor ? { registradoPor: quien } : { actualizadoPorNombre: quien }),
@@ -334,7 +355,9 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
     // si la regla lo rechaza (no es el autor ni supervisor), el evento vuelve con
     // sus fotos sanas en vez de con enlaces rotos (revisión 15-09).
     const borrarFotos = () => Promise.allSettled((evento.fotos ?? []).map((f) => borrarFotoOEncolar(f.path)))
-    if (evento.resuelvePendiente?.id) {
+    // Un BORRADOR de «Resolver» nunca cerró el pendiente: descartarlo no
+    // puede reabrir nada (revisión 16-09).
+    if (evento.resuelvePendiente?.id && evento.estado !== 'borrador') {
       // Borrar el evento que cerraba un pendiente lo vuelve a abrir, pero no en
       // un lote: si el pendiente ya no existía, el lote fallaba y el evento
       // quedaba IMPOSIBLE de borrar, con un aviso de permisos que mentía.

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { EventoBitacora, PresenciaBitacora } from '../bitacora.types'
-import { aFormulario, esBorrador, fusionarFormulario, soloListos, tieneContenido, type CamposFormulario } from '../borradores'
+import { aFormulario, camposACambiar, esBorrador, fusionarFormulario, soloListos, tieneContenido, type CamposFormulario } from '../borradores'
 import { desfaseServidor, estadoSincronizacion, haceCuanto, iniciales, otrosEditando, presentesVigentes } from '../presencia'
 import { resumirBitacora } from '../resumenBitacora'
 import { pendientesAnteriores } from '../entregaTurno'
@@ -136,6 +136,27 @@ describe('fusión campo por campo al editar entre varios', () => {
   it('null y texto vacío del servidor no son un cambio', () => {
     const e = ev({ horaTermino: null, ventana: null, minutosParada: null })
     expect(aFormulario(e)).toMatchObject({ horaTermino: '', ventana: '', minutos: '' })
+  })
+})
+
+describe('solo se escribe lo que cambió (revisión 16-09)', () => {
+  it('nada cambiado = nada que escribir', () => {
+    expect(camposACambiar(form(), form(), ['Matias Serpa'], ['Matias Serpa'])).toEqual([])
+  })
+
+  it('cambiar solo la descripción NO reescribe la hora que cambió otro equipo', () => {
+    const cambios = camposACambiar(form(), form({ descripcion: 'Disco de pulsos sucio' }), [], [])
+    expect(cambios).toEqual(['descripcion'])
+    expect(cambios).not.toContain('horaTermino')
+  })
+
+  it('impacto, minutos y ventana van juntos; equipo con su vínculo', () => {
+    expect(camposACambiar(form(), form({ minutos: '12' }), [], []).sort()).toEqual(['impacto', 'minutosParada', 'ventana'])
+    expect(camposACambiar(form(), form({ equipo: 'GRADER MS4/12' }), [], []).sort()).toEqual(['equipo', 'equipoId'])
+  })
+
+  it('los participantes cuentan como cambio', () => {
+    expect(camposACambiar(form(), form(), [], ['Leandro Igor'])).toEqual(['participantes'])
   })
 })
 

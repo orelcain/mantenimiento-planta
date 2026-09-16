@@ -1196,6 +1196,12 @@ service cloud.firestore {
 
       allow update: if isActiveUser()
         && eventoValido(request.resource.data)
+        // Un evento publicado no vuelve a borrador (un autoguardado atrasado no
+        // puede sacarlo de los números ni del correo).
+        && !(resource.data.get('estado', 'listo') == 'listo' && request.resource.data.get('estado', 'listo') == 'borrador')
+        // Quién lo registró solo se ajusta mientras es borrador.
+        && (resource.data.get('estado', 'listo') == 'borrador'
+            || request.resource.data.get('registradoPor', null) == resource.data.get('registradoPor', null))
         && request.resource.data.creadoPor == resource.data.creadoPor
         && request.resource.data.turnoId == resource.data.turnoId
         && request.resource.data.plantId == resource.data.plantId;

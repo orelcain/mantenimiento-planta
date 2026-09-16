@@ -6,6 +6,9 @@ import type { PresenciaBitacora, TurnoMantencion } from '@/services/bitacora/bit
 import { dispositivoActual, idDispositivo } from '@/services/bitacora/dispositivo'
 import { desfaseServidor, presentesVigentes } from '@/services/bitacora/presencia'
 
+/** Sin tocar la pantalla por este tiempo, el equipo deja de latir. */
+const INACTIVIDAD_MS = 15 * 60_000
+
 export interface PresenciaTurno {
   /** Dispositivos con la bitácora de este turno abierta ahora (este primero). */
   presentes: PresenciaBitacora[]
@@ -42,6 +45,16 @@ export function usePresenciaBitacora(
       q,
       (snap) => {
         const recibido = Date.now()
+        // El desfase SOLO con MI latido recién confirmado por el servidor: un
+        // latido viejo en caché (de la sesión anterior) daba un desfase de
+        // horas y todos figuraban conectados (revisión 16-09).
+        if (!snap.metadata.fromCache) {
+          for (const c of snap.docChanges()) {
+            if (c.doc.id !== docId || c.doc.metadata.hasPendingWrites) continue
+            const visto = (c.doc.data({ serverTimestamps: 'none' }) as { vistoEn?: Timestamp | null }).vistoEn
+            if (visto) desfase.current = desfaseServidor(visto.toMillis(), recibido)
+          }
+        }
         const docs = snap.docs.map((d) => {
           // `none`: el latido propio aún sin confirmar trae `vistoEn` null, y
           // `presentesVigentes` lo cuenta igual (es este dispositivo).
@@ -57,10 +70,6 @@ export function usePresenciaBitacora(
             vistoEnMs: data.vistoEn ? data.vistoEn.toMillis() : null,
             uid: data.uid,
           }
-          // La hora del servidor de MI latido, contra mi reloj: el desfase.
-          if (p.dispositivoId === miDispositivoId && p.vistoEnMs != null && !d.metadata.hasPendingWrites) {
-            desfase.current = desfaseServidor(p.vistoEnMs, recibido)
-          }
           return p
         })
         setCrudos(docs)
@@ -70,7 +79,7 @@ export function usePresenciaBitacora(
         // Sin permiso o sin red: la presencia es un extra, la bitácora sigue.
       },
     )
-  }, [turno.id, miDispositivoId])
+  }, [turno.id, miDispositivoId, docId])
 
   // Recalcular vigencias aunque no llegue nada (alguien que se fue deja de latir).
   useEffect(() => {
@@ -81,11 +90,26 @@ export function usePresenciaBitacora(
   // Latir: al entrar, al cambiar lo que estoy editando y cada minuto.
   const yoRef = useRef(yo)
   yoRef.current = yo
+  const ultimaActividad = useRef(Date.now())
+  const [reactivado, setReactivado] = useState(0)
+  useEffect(() => {
+    const marcar = () => {
+      const estabaInactivo = Date.now() - ultimaActividad.current > INACTIVIDAD_MS
+      ultimaActividad.current = Date.now()
+      if (estabaInactivo) setReactivado((n) => n + 1)
+    }
+    const eventos = ['pointerdown', 'keydown', 'touchstart', 'wheel'] as const
+    eventos.forEach((e) => window.addEventListener(e, marcar, { passive: true }))
+    return () => eventos.forEach((e) => window.removeEventListener(e, marcar))
+  }, [])
   useEffect(() => {
     const ref = doc(db, BITACORA_PRESENCIA_COLECCION, docId)
     const latir = () => {
       const u = auth.currentUser
       if (!u || document.visibilityState !== 'visible') return
+      // Pestaña visible no es «alguien mirando»: un PC con el monitor apagado
+      // latía toda la noche. Sin tocar nada en 15 min, deja de figurar.
+      if (Date.now() - ultimaActividad.current > INACTIVIDAD_MS) return
       void setDoc(ref, {
         plantId: BITACORA_PLANTA.id,
         turnoId: turno.id,
@@ -128,7 +152,7 @@ export function usePresenciaBitacora(
       vistoEn: serverTimestamp(),
       uid: u.uid,
     }).catch(() => undefined)
-  }, [yo.editandoEventoId, yo.nombre, docId, turno.id, miDispositivoId])
+  }, [yo.editandoEventoId, yo.nombre, docId, turno.id, miDispositivoId, reactivado])
 
   const presentes = useMemo(
     () =>

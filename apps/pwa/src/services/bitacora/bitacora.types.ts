@@ -169,6 +169,11 @@ export type EventoBitacoraDatos = Pick<
    * cambiar (se eligió el nombre después de empezar a escribir).
    */
   fijarAutor?: boolean
+  /**
+   * Al actualizar: SOLO estos campos del documento se escriben (los que
+   * cambiaron en esta pantalla). Sin el dato, se escriben todos.
+   */
+  camposCambiados?: readonly string[]
   /** Al crear: quién registra. Al editar: quién edita (queda en actualizadoPorNombre). */
   quien: string
 }

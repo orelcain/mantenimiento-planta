@@ -7,6 +7,7 @@ import type { DispositivoBitacora } from './bitacora.types'
  */
 
 const CLAVE_ID = 'bitacora.dispositivoId.v1'
+const CLAVE_PESTANA = 'bitacora.pestana.v1'
 let idEnMemoria: string | null = null
 
 /** Id estable de ESTE navegador (sobrevive a cerrar la app; no es un dato personal). */
@@ -27,8 +28,20 @@ export function idDispositivo(): string {
       /* sin almacenamiento: queda en memoria */
     }
   }
-  idEnMemoria = id
-  return id
+  // Sufijo por PESTAÑA: dos pestañas del mismo PC con el mismo id se borraban
+  // la presencia la una a la otra al cerrarse (revisión 16-09).
+  let pestana: string | null = null
+  try {
+    pestana = window.sessionStorage.getItem(CLAVE_PESTANA)
+    if (!pestana) {
+      pestana = Math.random().toString(36).slice(2, 8)
+      window.sessionStorage.setItem(CLAVE_PESTANA, pestana)
+    }
+  } catch {
+    pestana = Math.random().toString(36).slice(2, 8)
+  }
+  idEnMemoria = `${id}-${pestana.replace(/[^A-Za-z0-9]/g, '').slice(0, 6)}`
+  return idEnMemoria
 }
 
 /** Celular = pantalla angosta o puntero táctil; lo demás, PC. */

@@ -49,6 +49,32 @@ export function iniciales(nombre: string): string {
   return (partes.length === 1 ? a.slice(0, 1) : `${a.slice(0, 1)}${b.slice(0, 1)}`).toUpperCase()
 }
 
+/**
+ * La cuenta compartida de Mantención (`mantencion.plantach…`). Con ella, el
+ * nombre de la cuenta no dice quién es.
+ */
+export function esCuentaCompartida(correo: string | null | undefined): boolean {
+  return /^mantencion[._-]/i.test(correo ?? '')
+}
+
+/**
+ * Nombre con que figura ESTE equipo en «conectados».
+ * - Cuenta personal → el nombre de la cuenta.
+ * - Cuenta compartida en un celular → el técnico elegido en ese teléfono.
+ * - Cuenta compartida en un PC → «PC de Mantención»: el último técnico elegido
+ *   en un PC que usan todos no es quien está sentado ahora.
+ */
+export function nombreEnPresencia(o: {
+  correo: string | null | undefined
+  nombreCuenta: string
+  recordado: string
+  dispositivo: DispositivoBitacora
+}): string {
+  if (!esCuentaCompartida(o.correo)) return o.nombreCuenta.trim() || o.recordado.trim() || 'Sin nombre'
+  if (o.dispositivo === 'pc') return 'PC de Mantención'
+  return o.recordado.trim() || 'Celular de Mantención'
+}
+
 export const NOMBRE_DISPOSITIVO: Record<DispositivoBitacora, string> = { celular: 'celular', pc: 'PC' }
 
 export type EstadoSincronizacion = 'sincronizado' | 'guardando' | 'sin-senal'

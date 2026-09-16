@@ -8,7 +8,7 @@ import { EventoBitacoraSheet } from '@/components/bitacora/EventoBitacoraSheet'
 import { VisorFotosBitacora } from '@/components/bitacora/VisorFotosBitacora'
 import { SelectorTecnico } from '@/components/bitacora/SelectorTecnico'
 import { ListaTecnicosSheet, TecnicosDelTurnoSheet } from '@/components/bitacora/TecnicosTurnoSheets'
-import { construirListaTecnicos, tecnicosPresentes } from '@/services/bitacora/listaTecnicos'
+import { construirListaTecnicos, sugeridosPorCalendario, tecnicosPresentes } from '@/services/bitacora/listaTecnicos'
 import { origenDePendiente } from '@/services/bitacora/entregaTurno'
 import { tecnicoRecordado } from '@/components/bitacora/tecnicoRecordado'
 import { useToast } from '@/hooks/useToast'
@@ -20,7 +20,9 @@ import { bitacoraAHtmlCorreo, bitacoraATextoPlano, etiquetaParada, etiquetaPendi
 import { cargarFotoComoJpeg, purgarFotosPendientes } from '@/services/bitacora/fotosBitacora'
 import { resumirBitacora } from '@/services/bitacora/resumenBitacora'
 import { esBorrador, soloListos } from '@/services/bitacora/borradores'
-import { otrosEditando } from '@/services/bitacora/presencia'
+import { nombreEnPresencia as nombrePresencia, otrosEditando } from '@/services/bitacora/presencia'
+import { dispositivoActual } from '@/services/bitacora/dispositivo'
+import { auth } from '@/services/firebase'
 import { useAuthStore } from '@/store'
 import type { TagTone } from '@/components/piel'
 import {
@@ -71,7 +73,7 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
     () => tecnicosPresentes(observacion.presentes, calendario.deTurno, listaTecnicos),
     [observacion.presentes, calendario.deTurno, listaTecnicos],
   )
-  const deTurnoCalendario = useMemo(() => tecnicosPresentes(null, calendario.deTurno, listaTecnicos).nombres, [calendario.deTurno, listaTecnicos])
+  const deTurnoCalendario = useMemo(() => sugeridosPorCalendario(calendario.deTurno, listaTecnicos), [calendario.deTurno, listaTecnicos])
   const tecnicos = useMemo(
     () => ({ deTurno: presentes.nombres, todos: listaTecnicos.map((t) => t.nombre) }),
     [presentes.nombres, listaTecnicos],
@@ -93,8 +95,15 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
   // Presencia: quién tiene esta bitácora abierta y qué evento está escribiendo.
   const usuario = useAuthStore((s) => s.user)
   const editandoEventoId = editor ? (editor.evento?.id ?? editor.idNuevo) : null
-  const nombreEnPresencia =
-    tecnicoRecordado() || [usuario?.nombre?.split(' ')[0], usuario?.apellido?.split(' ')[0]].filter(Boolean).join(' ')
+  // Cuenta personal → su nombre; compartida → «PC de Mantención» en el PC y el
+  // técnico elegido en el celular (el último elegido en un PC que usan todos
+  // no es quien está sentado ahora).
+  const nombreEnPresencia = nombrePresencia({
+    correo: auth.currentUser?.email ?? usuario?.email,
+    nombreCuenta: [usuario?.nombre?.split(' ')[0], usuario?.apellido?.split(' ')[0]].filter(Boolean).join(' '),
+    recordado: tecnicoRecordado(),
+    dispositivo: dispositivoActual(),
+  })
   const { presentes: conectados, miDispositivoId } = fuente.usePresencia(turno, { nombre: nombreEnPresencia, editandoEventoId })
   // Color estable por técnico: su posición en la lista (no un hash del nombre).
   const tonoDe = useCallback(
@@ -203,7 +212,7 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
   const copiarIncrustadas = async () => {
     setTrabajando('copiar-incrustadas')
     try {
-      const urls = [...new Set(eventos.flatMap((e) => (e.fotos ?? []).map((f) => f.url)))]
+      const urls = [...new Set(soloListos(eventos).flatMap((e) => (e.fotos ?? []).map((f) => f.url)))]
       const mapa = new Map<string, string>()
       await Promise.all(
         urls.map(async (u) => {
@@ -367,7 +376,7 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
               setBorradorPresentes(presentes.nombres)
               setHojaTecnicos('presentes')
             }}>
-            Editar
+            {presentes.nombres.length ? 'Editar' : 'Agregar'}
           </Button>
         </div>
         {presentes.nombres.length > 0 ? (
@@ -379,15 +388,14 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
             ))}
           </div>
         ) : (
-          <p className="text-body text-muted-foreground">Nadie marcado. Toca «Editar» para marcar quién está.</p>
+          <p className="text-body text-muted-foreground">Nadie marcado todavía. Toca «Agregar» y marca quién está en el turno.</p>
         )}
-        <p className="text-footnote text-muted-foreground">
-          {presentes.ajustado
-            ? deTurnoCalendario.length
-              ? `Ajustado a mano · el calendario decía ${deTurnoCalendario.join(', ')}`
-              : 'Ajustado a mano'
-            : 'Según el calendario de Mantención'}
-        </p>
+        {/* El calendario no siempre refleja el turno real: solo sugiere, no marca. */}
+        {deTurnoCalendario.length > 0 && (
+          <p className="text-footnote text-muted-foreground">
+            {presentes.ajustado ? 'El calendario decía' : 'El calendario sugiere'}: {deTurnoCalendario.join(', ')}
+          </p>
+        )}
       </section>
 
       {/* Resumen del turno: los números que demuestran el trabajo */}
