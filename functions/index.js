@@ -2352,7 +2352,7 @@ async function tgHandlePhoto(chatId, message, fromName, telegramUserId, topicId)
       { text: '❌ Cancelar', callback_data: 'photo:cancel' },
     ]]
     return sendTelegramButtons(
-      `📸 Foto #${count} agregada. Mandá más o tocá <b>Adjuntar</b>.`,
+      `📸 Foto #${count} agregada. Manda más o toca <b>Adjuntar</b>.`,
       chatId, buttons, { topicId }
     )
   }
@@ -2376,7 +2376,7 @@ async function cbFoto(chatId, messageId, params, topicId) {
   if (sub === 'select_incident') {
     const session = await getPhotoSession(chatId)
     if (!session) return editTelegramMessage(chatId, messageId,
-      '⏱️ Sesión expirada (10 min). Mandá la foto de nuevo.',
+      '⏱️ Sesión expirada (10 min). Manda la foto de nuevo.',
       [[{ text: '← Menú', callback_data: 'menu' }]])
     return tgShowIncidentSelectorEdit(chatId, messageId, (session.fileIds || []).length)
   }
@@ -2391,7 +2391,7 @@ async function cbFoto(chatId, messageId, params, topicId) {
     const incidentId = params.slice(1).join(':')
     const session = await getPhotoSession(chatId)
     if (!session) return editTelegramMessage(chatId, messageId,
-      '⏱️ Sesión expirada. Mandá la foto de nuevo.', [])
+      '⏱️ Sesión expirada. Manda la foto de nuevo.', [])
 
     await setPhotoSession(chatId, { ...session, incidentId, step: 'selecting_type' })
 
@@ -2417,7 +2417,7 @@ async function cbFoto(chatId, messageId, params, topicId) {
     const photoType = params[1] // 'before' | 'after'
     const session = await getPhotoSession(chatId)
     if (!session || !session.incidentId) return editTelegramMessage(chatId, messageId,
-      '⏱️ Sesión expirada. Mandá la foto de nuevo.', [])
+      '⏱️ Sesión expirada. Manda la foto de nuevo.', [])
 
     await editTelegramMessage(chatId, messageId, '⏳ Subiendo foto(s)...', [])
 
@@ -2443,7 +2443,7 @@ async function cbFoto(chatId, messageId, params, topicId) {
       const typeLabel = photoType === 'before' ? '🔴 Antes (problema)' : '🟢 Después (solución)'
 
       return editTelegramMessage(chatId, messageId,
-        `✅ <b>${count} foto${count > 1 ? 's' : ''} guardada${count > 1 ? 's' : ''}</b>\n\n📋 ${incTitle}\n📍 ${typeLabel}\n\n💡 Mandá otra foto para seguir agregando evidencias.`,
+        `✅ <b>${count} foto${count > 1 ? 's' : ''} guardada${count > 1 ? 's' : ''}</b>\n\n📋 ${incTitle}\n📍 ${typeLabel}\n\n💡 Manda otra foto para seguir agregando evidencias.`,
         [[{ text: '← Menú', callback_data: 'menu' }]])
     } catch (err) {
       logger.error('Error uploading Telegram photo to Storage', err)
@@ -2455,7 +2455,7 @@ async function cbFoto(chatId, messageId, params, topicId) {
 
   if (sub === 'new_inc') {
     return editTelegramMessage(chatId, messageId,
-      '📝 <b>Para crear una incidencia con foto:</b>\n\n1. Primero creá la incidencia:\n<code>/incidencia [descripción del problema]</code>\n\n2. Luego mandá la foto — el bot la adjuntará.',
+      '📝 <b>Para crear una incidencia con foto:</b>\n\n1. Primero creá la incidencia:\n<code>/incidencia [descripción del problema]</code>\n\n2. Luego manda la foto — el bot la adjuntará.',
       [[{ text: '← Cancelar', callback_data: 'photo:cancel' }]])
   }
 }
@@ -2541,8 +2541,8 @@ async function tgHandleAyuda(chatId, topicId) {
     '/incidencia critica [desc] — Prioridad crítica\n' +
     '/estado — Incidencias activas\n\n' +
     '<b>📸 Evidencia fotográfica</b>\n' +
-    'Mandá una foto directamente — el bot te pregunta a qué incidencia adjuntarla\n' +
-    'Podés mandar varias fotos seguidas antes de adjuntar\n\n' +
+    'Manda una foto directamente — el bot te pregunta a qué incidencia adjuntarla\n' +
+    'Puedes mandar varias fotos seguidas antes de adjuntar\n\n' +
     '<b>🔧 Equipos y Repuestos</b>\n' +
     '/equipo [nombre] — Info de un equipo\n' +
     '/equipo — Lista de equipos registrados\n' +
@@ -2557,7 +2557,7 @@ async function tgHandleAyuda(chatId, topicId) {
     '/abrir — Mensaje pineable con botón para abrir la app desde grupos\n\n' +
     '<b>ℹ️ General</b>\n' +
     '/ayuda — Este menú\n\n' +
-    '💡 También podés escribir el problema directamente sin comandos.',
+    '💡 También puedes escribir el problema directamente sin comandos.',
     chatId, { topicId }
   )
 }
@@ -2946,14 +2946,14 @@ const ARIA_HISTORY_LIMIT = 12
 const ARIA_CACHE_TTL_MS = 10 * 60 * 1000
 
 const ARIA_PERSONA =
-  'Sos ARIA, la asistente de Mantención de la planta Antarfood (proceso de salmón). ' +
+  'Eres ARIA, la asistente de Mantención de la planta Antarfood (proceso de salmón). ' +
   'Hablás español chileno cercano y profesional. Respuestas BREVES para chat móvil ' +
   '(máximo ~8 líneas), emojis con moderación. ' +
-  'FORMATO: usá **negrita** para títulos y nombres clave, `código` para códigos SAP/tags/valores exactos, ' +
+  'FORMATO: usa **negrita** para títulos y nombres clave, `código` para códigos SAP/tags/valores exactos, ' +
   'y viñetas con "- " para listas. Nada de tablas, encabezados # ni links markdown (pegá las URLs directas). ' +
-  'HONESTIDAD CON FOTOS: solo podés ver una foto en el momento en que te la mandan. Si después te preguntan de nuevo por algo de esa foto, ' +
-  'NUNCA digas que la "revisaste de nuevo" — respondé en base a lo que ya describiste en tu análisis anterior (está en el historial), ' +
-  'y si no alcanza, decí que no lo detectaste en ese análisis y pedí que reenvíen la foto para mirarla de nuevo.\n' +
+  'HONESTIDAD CON FOTOS: solo puedes ver una foto en el momento en que te la mandan. Si después te preguntan de nuevo por algo de esa foto, ' +
+  'NUNCA digas que la "revisaste de nuevo" — responde en base a lo que ya describiste en tu análisis anterior (está en el historial), ' +
+  'y si no alcanza, di que no lo detectaste en ese análisis y pide que reenvíen la foto para mirarla de nuevo.\n' +
   'Tu misión es dar acceso rápido a los datos de la app de mantenimiento y ' +
   'evidenciar con datos el aporte de Mantención al proceso.'
 
@@ -3255,10 +3255,10 @@ async function sendTelegramVoice(chatId, buffer, opts = {}) {
  */
 async function ariaGroqVision(imageBase64, mime, hint) {
   const prompt =
-    'Sos ARIA, asistente de mantención de una planta de proceso de salmón. Analizá la foto y respondé SOLO ' +
+    'Eres ARIA, asistente de mantención de una planta de proceso de salmón. Analizá la foto y responde SOLO ' +
     'un objeto JSON válido: {"descripcion": string, "codigos": string[], "falla": boolean}\n' +
     '- "descripcion": 2-3 frases — qué equipo/componente se ve y si hay falla/daño visible (correa cortada, fuga, óxido, cable suelto, desgaste). Si no hay falla, decilo con claridad.\n' +
-    '- "codigos": TODO texto impreso en etiquetas/tags que parezca un código (códigos SAP —usualmente 8-10 dígitos—, part numbers, códigos de fabricante, tags de inventario). Mirá con atención las etiquetas blancas/amarillas pegadas al componente. Array vacío si no hay ninguno legible.\n' +
+    '- "codigos": TODO texto impreso en etiquetas/tags que parezca un código (códigos SAP —usualmente 8-10 dígitos—, part numbers, códigos de fabricante, tags de inventario). Mira con atención las etiquetas blancas/amarillas pegadas al componente. Array vacío si no hay ninguno legible.\n' +
     '- "falla": true si hay daño/falla visible, false si no.' +
     (hint ? `\nContexto del usuario: ${hint}` : '')
   const raw = await _ariaGeminiChat(
@@ -3300,10 +3300,10 @@ async function ariaGroqVision(imageBase64, mime, hint) {
 async function ariaGroqVisionLote(imagenes) {
   const n = imagenes.length
   const prompt =
-    `Sos ARIA, asistente de mantención de una planta de proceso de salmón. Te mando ${n} fotos, numeradas del 1 al ${n} en ESE ORDEN. ` +
+    `Eres ARIA, asistente de mantención de una planta de proceso de salmón. Te mando ${n} fotos, numeradas del 1 al ${n} en ESE ORDEN. ` +
     'Para CADA foto, analizá igual que si fuera una sola: qué equipo/componente se ve, si hay falla/daño visible, y TODO texto impreso en etiquetas ' +
     'que parezca un código (SAP —usualmente 8-10 dígitos—, part numbers, tags de inventario). ' +
-    `Respondé SOLO un objeto JSON válido: {"items": [{"indice": number, "descripcion": string, "codigos": string[], "falla": boolean}, ...]} ` +
+    `Responde SOLO un objeto JSON válido: {"items": [{"indice": number, "descripcion": string, "codigos": string[], "falla": boolean}, ...]} ` +
     `con EXACTAMENTE ${n} elementos, uno por foto, "indice" = posición de la foto (1 a ${n}).`
   const parts = [{ text: prompt }, ...imagenes.map((img) => ({ inlineData: { mimeType: img.mime, data: img.base64 } }))]
   try {
@@ -3645,7 +3645,7 @@ async function ariaDecidirRepuesto({ userText = '', ocrCodigos = [], descripcion
   const sapsUsuario = String(userText || '').match(/\b\d{10}\b/g) || []
   let sapUsuario = sapsUsuario.find((s) => s !== sapPendiente) || sapsUsuario[0] || null
 
-  // "el SAP termina en 8398" / "...398" → elegí el código de la foto que termina así
+  // "el SAP termina en 8398" / "...398" → elige el código de la foto que termina así
   const mTermina = String(userText || '').match(/termin\w*\s+(?:en\s+)?[.…\s]*(\d{3,9})/i) ||
     String(userText || '').match(/[.…]{1,3}\s*(\d{3,9})\b/)
   if (!sapUsuario && mTermina) {
@@ -3695,14 +3695,14 @@ async function ariaDecidirRepuesto({ userText = '', ocrCodigos = [], descripcion
     .map((r, i) => `${i + 1}. SAP ${r.codigoSAP || 's/SAP'} — ${r.textoBreve || r.descripcion} (${r.clase || 's/clase'})`)
     .join('\n') || '(ninguno)'
   const prompt =
-    'Sos ARIA. El usuario quiere dar de alta un material en el maestro de repuestos desde una foto. ' +
-    'Decidí con criterio si es un material NUEVO o uno que YA existe, y respondé SOLO JSON: ' +
+    'Eres ARIA. El usuario quiere dar de alta un material en el maestro de repuestos desde una foto. ' +
+    'Decidí con criterio si es un material NUEVO o uno que YA existe, y responde SOLO JSON: ' +
     '{"accion":"crear_nuevo"|"vincular_existente"|"preguntar","codigoSAP":string,"nombre":string,"pregunta":string,"razon":string}\n' +
     'REGLAS DURAS:\n' +
     '- Un SAP válido del maestro tiene 10 dígitos. Números de 6-8 dígitos o con letras (part numbers de fabricante como "552791" o "CRDSNU-32-200") NO son SAP y NO prueban que el material exista.\n' +
     '- "vincular_existente" SOLO si el codigoSAP que uses aparece EXACTO en los candidatos de abajo. Si ningún candidato tiene ese SAP exacto, NO es vincular.\n' +
     '- Dos part numbers parecidos (p.ej. -105 vs -200, distinta medida) son materiales DISTINTOS: no los confundas.\n' +
-    '- Si no hay datos para decidir con seguridad, usá "preguntar" y escribí en "pregunta" qué necesitás (típicamente el SAP de 10 dígitos y el equipo).\n\n' +
+    '- Si no hay datos para decidir con seguridad, usa "preguntar" y escribe en "pregunta" qué necesitas (típicamente el SAP de 10 dígitos y el equipo).\n\n' +
     `MENSAJE DEL USUARIO: ${userText || '(mandó una foto)'}\n` +
     `DESCRIPCIÓN DE LA FOTO: ${descripcionFoto || '(sin descripción)'}\n` +
     `CÓDIGOS LEÍDOS EN LA ETIQUETA: ${(ocrCodigos || []).join(', ') || '(ninguno)'}\n` +
@@ -3725,7 +3725,7 @@ async function ariaDecidirRepuesto({ userText = '', ocrCodigos = [], descripcion
     return { accion: 'preguntar', codigoSAP: '', nombre: nombreFoto, equipoTexto, existente: null, razon: d.razon || '', pregunta: d.pregunta || '¿Me confirmás el código SAP del material y a qué equipo va?' }
   } catch (err) {
     logger.warn('ariaDecidirRepuesto: criterio LLM falló, caigo a preguntar', { error: err?.message })
-    return { accion: 'preguntar', codigoSAP: '', nombre: nombreFoto, equipoTexto, existente: null, razon: 'sin SAP legible', pregunta: 'No pude leer un código SAP claro. ¿Me lo pasás (10 dígitos) y de qué equipo es?' }
+    return { accion: 'preguntar', codigoSAP: '', nombre: nombreFoto, equipoTexto, existente: null, razon: 'sin SAP legible', pregunta: 'No pude leer un código SAP claro. ¿Me lo pasas (10 dígitos) y de qué equipo es?' }
   }
 }
 
@@ -3743,7 +3743,7 @@ async function ariaHandleFoto(chatId, message, fromName, telegramUserId, topicId
     const largest = message.photo[message.photo.length - 1]
     const buffer = await downloadTelegramFile(largest.file_id)
     if (buffer.length > 3.5 * 1024 * 1024) {
-      await sendTelegramMessage('📸 La foto es muy pesada para analizarla. Probá con una más liviana.', chatId, {})
+      await sendTelegramMessage('📸 La foto es muy pesada para analizarla. Prueba con una más liviana.', chatId, {})
       return
     }
     const caption = (message.caption || '').trim()
@@ -3784,8 +3784,8 @@ async function ariaHandleFoto(chatId, message, fromName, telegramUserId, topicId
         kind: 'adjuntar_foto_repuesto', codigoSAP: modoAdjuntar.codigoSAP,
         nombreRepuesto: modoAdjuntar.nombre, fotoFileId: largest.file_id, at: Date.now(),
       })
-      const rT = `📸 ${desc}\n\n¿Le sumo esta foto también a **${modoAdjuntar.nombre || 'ese repuesto'}** (SAP \`${modoAdjuntar.codigoSAP}\`)? (sí / no)\nSi es de otra cosa, decime "no" y contame qué es.`
-      const rH = `📸 ${ariaEscapeHtml(desc)}\n\n¿Le sumo esta foto también a <b>${ariaEscapeHtml(modoAdjuntar.nombre || 'ese repuesto')}</b> (SAP <code>${ariaEscapeHtml(modoAdjuntar.codigoSAP)}</code>)? (sí / no)\nSi es de otra cosa, decime "no" y contame qué es.`
+      const rT = `📸 ${desc}\n\n¿Le sumo esta foto también a **${modoAdjuntar.nombre || 'ese repuesto'}** (SAP \`${modoAdjuntar.codigoSAP}\`)? (sí / no)\nSi es de otra cosa, dime "no" y cuéntame qué es.`
+      const rH = `📸 ${ariaEscapeHtml(desc)}\n\n¿Le sumo esta foto también a <b>${ariaEscapeHtml(modoAdjuntar.nombre || 'ese repuesto')}</b> (SAP <code>${ariaEscapeHtml(modoAdjuntar.codigoSAP)}</code>)? (sí / no)\nSi es de otra cosa, dime "no" y cuéntame qué es.`
       await sendTelegramMessage(rH, chatId, {})
       await ariaSaveTurns(chatId, '[foto]', rT)
       return
@@ -3810,8 +3810,8 @@ async function ariaHandleFoto(chatId, message, fromName, telegramUserId, topicId
       // SAP legible que NO está en el maestro: casi siempre es un repuesto por dar
       // de alta, no una incidencia. No fijamos acción por defecto: guiamos para
       // crearlo (o pedir incidencia explícita si en realidad es una falla).
-      reply = `**Esto veo:**\n${desc}\n\n🔎 Leí el código SAP \`${sapLeido}\` y no está en el maestro de repuestos.\n\n📦 Si es un repuesto/material, decime **"créalo como repuesto del [equipo]"** y lo doy de alta con esta foto y ese SAP. Si es una falla para reportar, decime "creá una incidencia".`
-      replyHtml = `📸 <b>Esto veo:</b>\n${ariaEscapeHtml(desc)}\n\n🔎 Leí el código SAP <code>${ariaEscapeHtml(sapLeido)}</code> y no está en el maestro de repuestos.\n\n📦 Si es un repuesto/material, decime <b>"créalo como repuesto del [equipo]"</b> y lo doy de alta con esta foto y ese SAP. Si es una falla para reportar, decime "creá una incidencia".`
+      reply = `**Esto veo:**\n${desc}\n\n🔎 Leí el código SAP \`${sapLeido}\` y no está en el maestro de repuestos.\n\n📦 Si es un repuesto/material, dime **"créalo como repuesto del [equipo]"** y lo doy de alta con esta foto y ese SAP. Si es una falla para reportar, dime "creá una incidencia".`
+      replyHtml = `📸 <b>Esto veo:</b>\n${ariaEscapeHtml(desc)}\n\n🔎 Leí el código SAP <code>${ariaEscapeHtml(sapLeido)}</code> y no está en el maestro de repuestos.\n\n📦 Si es un repuesto/material, dime <b>"créalo como repuesto del [equipo]"</b> y lo doy de alta con esta foto y ese SAP. Si es una falla para reportar, dime "creá una incidencia".`
     } else {
       const descripcion = (caption ? `${caption} — ` : '') + desc +
         (codigos.length ? ` (código visible: ${codigos.join(', ')}, sin coincidencia en el maestro)` : '')
@@ -3820,7 +3820,7 @@ async function ariaHandleFoto(chatId, message, fromName, telegramUserId, topicId
         fotoFileId: largest.file_id, at: Date.now(),
       })
       const notaCodigo = codigos.length ? `\n\n🔎 Vi el código "${codigos[0]}" pero no parece un SAP del maestro.` : ''
-      const notaRepuesto = '\n\n📦 ¿Es un repuesto/material? Decime "agrégalo como repuesto del [equipo]" y lo creo en el maestro con esta foto.'
+      const notaRepuesto = '\n\n📦 ¿Es un repuesto/material? Dime "agrégalo como repuesto del [equipo]" y lo creo en el maestro con esta foto.'
       reply = `**Esto veo:**\n${desc}${notaCodigo}\n\n¿Creo una incidencia con esta foto adjunta? (sí / no)${notaRepuesto}`
       replyHtml = `📸 <b>Esto veo:</b>\n${ariaEscapeHtml(desc)}${ariaEscapeHtml(notaCodigo)}\n\n¿Creo una incidencia con esta foto adjunta? (sí / no)${ariaEscapeHtml(notaRepuesto)}`
     }
@@ -3866,7 +3866,7 @@ async function ariaQueueFotoLote(chatId, message) {
 
   if (esGrupoNuevo) {
     await sendTelegramMessage(
-      `📸 Recibiendo tus fotos (van ${batch.length}). Mandá más o decime **"hazme la lista"** cuando termines.`,
+      `📸 Recibiendo tus fotos (van ${batch.length}). Manda más o dime **"hazme la lista"** cuando termines.`,
       chatId, {}
     )
   }
@@ -4027,15 +4027,15 @@ async function ariaAppKnowledgeBlock(esAdmin) {
   const linea = (m) => `- ${m.nombre} (${baseUrl}${m.ruta}): ${m.descripcion || m.grupo}`
   const prod = modulos.filter((m) => m.estado === 'produccion')
   const dev = modulos.filter((m) => m.estado === 'desarrollo')
-  let block = '\n\nMAPA DE LA APP DE MANTENIMIENTO (sos el pivote de la app: cuando corresponda, ' +
+  let block = '\n\nMAPA DE LA APP DE MANTENIMIENTO (eres el pivote de la app: cuando corresponda, ' +
     'orientá al usuario sobre qué módulo usar e incluí el link):\n' + prod.map(linea).join('\n')
   if (esAdmin) {
     block += '\n\nMÓDULOS EN DESARROLLO (este usuario es ADMIN y sí puede verlos; aclarale que están en desarrollo):\n' +
       dev.map(linea).join('\n')
   } else {
-    block += '\n\nIMPORTANTE: existen módulos de la app en desarrollo que NO debés listar, recomendar ni linkear a este usuario. ' +
-      'Si pregunta por uno, respondé simple: "ese módulo está en desarrollo, pronto va a estar disponible" — y si vos manejás esos DATOS ' +
-      'por chat (ej. tareas planificadas, incidencias, kpis), ofrecé dárselos vos directamente aquí mismo.'
+    block += '\n\nIMPORTANTE: existen módulos de la app en desarrollo que NO debes listar, recomendar ni linkear a este usuario. ' +
+      'Si pregunta por uno, responde simple: "ese módulo está en desarrollo, pronto va a estar disponible" — y si tú manejas esos DATOS ' +
+      'por chat (ej. tareas planificadas, incidencias, kpis), ofrece dárselos tú directamente aquí mismo.'
   }
   return block
 }
@@ -4645,18 +4645,18 @@ exports.ariaDailyBrief = onSchedule(
 // ---- Orquestador del chat natural ----
 
 const ARIA_ROUTER_SPEC =
-  'Clasificá el último mensaje del usuario y respondé SOLO un objeto JSON válido: ' +
+  'Clasificá el último mensaje del usuario y responde SOLO un objeto JSON válido: ' +
   '{"accion": string, "consulta": string, "respuesta": string, "prioridad": string, "equipo": string}\n' +
   'Acciones disponibles (todas de solo lectura):\n' +
   '- "kpi": indicadores de hoy (incidencias creadas/resueltas/abiertas, estado de equipos)\n' +
   '- "turno": resumen del turno (incidencias abiertas por prioridad, preventivos de hoy, equipos fuera de servicio)\n' +
   '- "estado": lista de incidencias activas\n' +
   '- "sensores": lecturas de sensores en tiempo real\n' +
-  '- "equipo": ficha de un equipo — poné el nombre o código en "consulta"\n' +
-  '- "repuestos": buscar repuestos/insumos/materiales — poné el término o código SAP en "consulta"\n' +
+  '- "equipo": ficha de un equipo — pon el nombre o código en "consulta"\n' +
+  '- "repuestos": buscar repuestos/insumos/materiales — pon el término o código SAP en "consulta"\n' +
   '- "historial": historial/bitácora de intervenciones de mantención (inspecciones, capturas rápidas) — término opcional en "consulta" (equipo, área, técnico)\n' +
-  '- "produccion": producción EN VIVO del turno EN CURSO desde Shoplogix — piezas totales y por máquina, uptime, POR QUÉ está detenida cada máquina, averías y causas de parada. Usá esto para "cuántas piezas llevamos", "cómo va el turno/la producción ahora", "por qué está detenida la línea", "qué fallas/averías", "en vivo". Detectá el área en "consulta" (yal / chonchi / filete).\n' +
-  '- "grader": resumen de los últimos turnos CERRADOS del Grader (Excel: piezas, peso, compuertas, P0%, microdetenciones). Para el turno EN CURSO usá "produccion", no "grader".\n' +
+  '- "produccion": producción EN VIVO del turno EN CURSO desde Shoplogix — piezas totales y por máquina, uptime, POR QUÉ está detenida cada máquina, averías y causas de parada. Usa esto para "cuántas piezas llevamos", "cómo va el turno/la producción ahora", "por qué está detenida la línea", "qué fallas/averías", "en vivo". Detectá el área en "consulta" (yal / chonchi / filete).\n' +
+  '- "grader": resumen de los últimos turnos CERRADOS del Grader (Excel: piezas, peso, compuertas, P0%, microdetenciones). Para el turno EN CURSO usa "produccion", no "grader".\n' +
   '- "gantt": tareas planificadas del Gantt (abiertas, atrasadas, próximas a vencer) — "consulta" SOLO si nombran un proyecto/responsable/equipo específico; NO pongas palabras de estado como "atrasadas" o "pendientes"\n' +
   '- "stockbajo": repuestos en o bajo su stock mínimo en bodega\n' +
   '- "solicitudes": solicitudes de repuestos a bodega y su estado\n' +
@@ -4664,24 +4664,24 @@ const ARIA_ROUTER_SPEC =
   '- "brief": brief/resumen matinal completo de Mantención a demanda (todo junto: turno, alertas, gantt, stock, grader)\n' +
   '- "brief_activar": el usuario pide recibir el brief automático cada mañana\n' +
   '- "brief_desactivar": el usuario pide dejar de recibir el brief automático\n' +
-  '- "charla": saludo, agradecimiento, pregunta general O pregunta sobre la APP misma (qué módulos hay, dónde se hace algo, cómo usar una función) — escribí la respuesta directa en "respuesta" como ARIA usando el MAPA DE LA APP. ' +
+  '- "charla": saludo, agradecimiento, pregunta general O pregunta sobre la APP misma (qué módulos hay, dónde se hace algo, cómo usar una función) — escribe la respuesta directa en "respuesta" como ARIA usando el MAPA DE LA APP. ' +
   'Cuando la respuesta incluya una enumeración (módulos, equipos, ítems), formateala SIEMPRE como lista: una línea por ítem con "- " y el nombre en **negrita**. ' +
-  'Si preguntan qué sabés hacer, contá tus capacidades: turno, KPIs, incidencias, equipos, repuestos y stock, historial de mantención, Grader, Gantt, preventivos, solicitudes, sensores, brief matinal, alertas inmediatas, gráficos de tendencia; crear y cerrar incidencias (siempre con confirmación); mirar fotos que te manden (visión) y proponer la incidencia con la foto adjunta; si mandan VARIAS fotos juntas (álbum) las junto en un lote y con "hazme la lista" las proceso todas de una y las adjunto a sus repuestos; si la foto es de un material que NO está en el maestro, con "agrégalo como repuesto del [equipo]" lo creo y lo dejo vinculado a su equipo (con confirmación);recordar datos que te pidan; entendés notas de voz y respondés con voz cuando te hablan.\n' +
-  '- "incidencia_crear": el usuario REPORTA una falla/problema NUEVO en su último mensaje (verbos típicos: anota, registra, reporta, crea una incidencia) — poné la descripción completa en "consulta" y la prioridad deducida en "prioridad" (critica|alta|media|baja; default "media"). NO resucites reportes ya cancelados del historial. NO se crea de inmediato: se pide confirmación.\n' +
-  '- "incidencia_cerrar": el usuario pide cerrar/resolver/dar por lista una incidencia — poné en "consulta" la referencia a cuál (palabras del título). También pide confirmación.\n' +
+  'Si preguntan qué sabes hacer, cuenta tus capacidades: turno, KPIs, incidencias, equipos, repuestos y stock, historial de mantención, Grader, Gantt, preventivos, solicitudes, sensores, brief matinal, alertas inmediatas, gráficos de tendencia; crear y cerrar incidencias (siempre con confirmación); mirar fotos que te manden (visión) y proponer la incidencia con la foto adjunta; si mandan VARIAS fotos juntas (álbum) las junto en un lote y con "hazme la lista" las proceso todas de una y las adjunto a sus repuestos; si la foto es de un material que NO está en el maestro, con "agrégalo como repuesto del [equipo]" lo creo y lo dejo vinculado a su equipo (con confirmación);recordar datos que te pidan; entiendes notas de voz y respondes con voz cuando te hablan.\n' +
+  '- "incidencia_crear": el usuario REPORTA una falla/problema NUEVO en su último mensaje (verbos típicos: anota, registra, reporta, crea una incidencia) — pon la descripción completa en "consulta" y la prioridad deducida en "prioridad" (critica|alta|media|baja; default "media"). NO resucites reportes ya cancelados del historial. NO se crea de inmediato: se pide confirmación.\n' +
+  '- "incidencia_cerrar": el usuario pide cerrar/resolver/dar por lista una incidencia — pon en "consulta" la referencia a cuál (palabras del título). También pide confirmación.\n' +
   '- "confirmar": el usuario confirma la acción pendiente (sí, dale, confirmo, hazlo, ok créala)\n' +
   '- "cancelar": el usuario cancela o descarta la acción pendiente (no, cancela, olvídalo, mejor no)\n' +
-  '- "recordar": el usuario te pide que recuerdes/anotes un dato o preferencia PERSONAL suya ("recuerda que...", "para que sepas...") — poné el hecho en "consulta"\n' +
+  '- "recordar": el usuario te pide que recuerdes/anotes un dato o preferencia PERSONAL suya ("recuerda que...", "para que sepas...") — pon el hecho en "consulta"\n' +
   '- "olvidar": el usuario pide que borres tus notas sobre él\n' +
-  '- "aprender": el usuario te ENSEÑA un hecho general de la planta para que lo sepas con TODOS ("aprende:", "aprende que", "para que aprendas") — poné el hecho completo en "consulta"\n' +
+  '- "aprender": el usuario te ENSEÑA un hecho general de la planta para que lo sepas con TODOS ("aprende:", "aprende que", "para que aprendas") — pon el hecho completo en "consulta"\n' +
   '- "lagunas": el usuario pregunta qué no supiste responder, qué te falta saber o qué preguntas quedaron sin respuesta\n' +
   '- "alertas_activar": pide recibir aviso inmediato cuando entre una incidencia crítica o alta\n' +
   '- "alertas_desactivar": pide dejar de recibir esos avisos inmediatos\n' +
-  '- "grafico": el usuario pide un gráfico/tendencia/curva — poné en "consulta" exactamente "grader" o "incidencias" según el tema\n' +
+  '- "grafico": el usuario pide un gráfico/tendencia/curva — pon en "consulta" exactamente "grader" o "incidencias" según el tema\n' +
   '- "fotos_lote": el usuario pide procesar/listar/resumir las FOTOS que mandó (en plural: "las fotos", "todas", "la lista de sap", "agrega las fotos a sus repuestos") o dice "listo"/"ya está" después de mandar varias fotos juntas\n' +
-  '- "repuesto_agregar": el usuario pide AGREGAR/crear un repuesto/material/insumo en el maestro, vincularlo a un equipo, O agregar la foto que mandó a un repuesto EXISTENTE que nombra por código o nombre (típico tras mandar UNA foto: "agrégalo a los repuestos del compresor GA90", "crea este aceite como repuesto de la grader", "agrégale esta foto también, va en el repuesto SAP 3300104630", "agregale esta foto a ese mismo repuesto") — poné en "consulta" el nombre corto del material o el código SAP que nombre, y en "equipo" el equipo que menciona (vacío si no nombra ninguno)\n' +
-  '- "repuesto_editar": el usuario pide EDITAR/actualizar un dato de un repuesto que YA existe — por ahora el CÓDIGO DE FABRICANTE ("ponele/agregale el código de fabricante 999 0566", "el cód de fábrica es X", "actualiza el código de fabricante del SAP 3300138398"). Poné en "consulta" el código SAP del repuesto si lo nombra (si dice "ese mismo/al mismo" dejalo vacío, se usa el último repuesto). El valor lo extrae el sistema del mensaje.\n' +
-  'Cualquier OTRA escritura (pedir repuestos a bodega, editar datos maestros existentes) NO está disponible: usá "charla" y explicá en "respuesta" que eso se hace en la app.'
+  '- "repuesto_agregar": el usuario pide AGREGAR/crear un repuesto/material/insumo en el maestro, vincularlo a un equipo, O agregar la foto que mandó a un repuesto EXISTENTE que nombra por código o nombre (típico tras mandar UNA foto: "agrégalo a los repuestos del compresor GA90", "crea este aceite como repuesto de la grader", "agrégale esta foto también, va en el repuesto SAP 3300104630", "agregale esta foto a ese mismo repuesto") — pon en "consulta" el nombre corto del material o el código SAP que nombre, y en "equipo" el equipo que menciona (vacío si no nombra ninguno)\n' +
+  '- "repuesto_editar": el usuario pide EDITAR/actualizar un dato de un repuesto que YA existe — por ahora el CÓDIGO DE FABRICANTE ("ponle/agregale el código de fabricante 999 0566", "el cód de fábrica es X", "actualiza el código de fabricante del SAP 3300138398"). Pon en "consulta" el código SAP del repuesto si lo nombra (si dice "ese mismo/al mismo" dejalo vacío, se usa el último repuesto). El valor lo extrae el sistema del mensaje.\n' +
+  'Cualquier OTRA escritura (pedir repuestos a bodega, editar datos maestros existentes) NO está disponible: usa "charla" y explicá en "respuesta" que eso se hace en la app.'
 
 async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topicId, esAdmin = false) {
   await callTelegramApi('sendChatAction', { chat_id: chatId, action: 'typing' })
@@ -4715,12 +4715,12 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
   const fotoBatchHint = fotoBatchCount > 0
     ? `\n\nESTADO ACTUAL: el usuario tiene ${fotoBatchCount} foto(s) en un LOTE esperando ser procesadas (las mandó como álbum). ` +
       'Si pide una lista/resumen de esas fotos, que las agregue a sus repuestos, o dice algo tipo "listo"/"ya está"/"eso es todo" ' +
-      'refiriéndose a las fotos que mandó, usá accion "fotos_lote" — NO "charla".'
+      'refiriéndose a las fotos que mandó, usa accion "fotos_lote" — NO "charla".'
     : ''
   const ultimoRepuestoHint = ultimoRepuesto
     ? `\n\nCONTEXTO: el ÚLTIMO repuesto que ARIA creó/tocó fue **${ultimoRepuesto.nombre || 'un repuesto'}** (SAP ${ultimoRepuesto.codigoSAP}). ` +
       'Si el usuario dice "ese mismo repuesto", "al mismo", "el que creaste", "ese ítem", etc., se refiere a ESTE. ' +
-      'Para "ponele/agregale el código de fabricante X" o editar un dato de un repuesto existente → accion "repuesto_editar".'
+      'Para "ponle/agregale el código de fabricante X" o editar un dato de un repuesto existente → accion "repuesto_editar".'
     : ''
 
   // 0) Con acción pendiente, confirmar/cancelar se resuelve DETERMINISTA:
@@ -4779,7 +4779,7 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
     const descripcion = String(route.consulta || '').trim()
     const prioridad = PRIORITY_LABELS.includes(route.prioridad) ? route.prioridad : 'media'
     if (!descripcion) {
-      reply = 'Contame qué pasó (equipo, qué falla y dónde) y armo la incidencia para que la confirmes.'
+      reply = 'Cuéntame qué pasó (equipo, qué falla y dónde) y armo la incidencia para que la confirmes.'
     } else {
       await ariaSetPending(chatId, { kind: 'crear', descripcion, prioridad, at: Date.now() })
       reply = `**Voy a crear esta incidencia:**\n\n📋 ${descripcion}\n🎯 Prioridad: **${prioridad}**\n👤 Reporta: ${fromName}\n\n¿La creo? (sí / no)`
@@ -4798,7 +4798,7 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
         ? `No encontré incidencias abiertas que calcen con "${route.consulta}".`
         : 'No hay incidencias abiertas para cerrar.'
     } else if (hits.length > 1) {
-      reply = 'Encontré varias abiertas — ¿cuál cierro? Decímelo con más detalle:\n' +
+      reply = 'Encontré varias abiertas — ¿cuál cierro? Dímelo con más detalle:\n' +
         hits.slice(0, 5).map((x) => `- ${x.titulo || 'Sin título'} [${x.prioridad}]`).join('\n')
     } else {
       await ariaSetPending(chatId, { kind: 'cerrar', incidentId: hits[0].id, titulo: hits[0].titulo || 'Sin título', at: Date.now() })
@@ -4806,7 +4806,7 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
     }
   } else if (route.accion === 'confirmar' || route.accion === 'confirmar_sin_equipo') {
     if (!pending) {
-      reply = 'No tengo ninguna acción pendiente de confirmar. Si querés reportar algo, contame qué pasó.'
+      reply = 'No tengo ninguna acción pendiente de confirmar. Si quieres reportar algo, cuéntame qué pasó.'
     } else if (pending.kind === 'cerrar') {
       await db.collection('incidents').doc(pending.incidentId).update({
         status: 'resuelta',
@@ -4822,11 +4822,11 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
         await ariaSetPending(chatId, null)
         await ariaSetUltimoRepuesto(chatId, pending.codigoSAP, pending.nombreRepuesto)
         await ariaSetModoAdjuntar(chatId, { codigoSAP: pending.codigoSAP, nombre: pending.nombreRepuesto })
-        reply = `✅ Foto agregada al repuesto **${pending.nombreRepuesto}** (SAP \`${pending.codigoSAP}\`). Ya la vas a ver en su ficha del módulo Repuestos.\n\nSi tenés más fotos de este repuesto, mandámelas y las voy sumando.`
+        reply = `✅ Foto agregada al repuesto **${pending.nombreRepuesto}** (SAP \`${pending.codigoSAP}\`). Ya la vas a ver en su ficha del módulo Repuestos.\n\nSi tienes más fotos de este repuesto, mándamelas y las voy sumando.`
       } catch (err) {
         logger.error('ariaAdjuntarFotoARepuesto error', { error: err?.message })
         await ariaSetPending(chatId, null)
-        reply = '❌ No pude adjuntar la foto al repuesto. Probá de nuevo en un rato.'
+        reply = '❌ No pude adjuntar la foto al repuesto. Prueba de nuevo en un rato.'
       }
     } else if (pending.kind === 'adjuntar_fotos_lote') {
       const resultados = await Promise.allSettled(
@@ -4835,13 +4835,13 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
       const ok = resultados.filter((r) => r.status === 'fulfilled').length
       const fail = resultados.length - ok
       await ariaSetPending(chatId, null)
-      reply = `✅ Agregadas ${ok} foto${ok === 1 ? '' : 's'} a sus repuestos.` + (fail ? ` ⚠️ ${fail} fallaron — probá esas de nuevo.` : '')
+      reply = `✅ Agregadas ${ok} foto${ok === 1 ? '' : 's'} a sus repuestos.` + (fail ? ` ⚠️ ${fail} fallaron — prueba esas de nuevo.` : '')
     } else if (pending.kind === 'repuesto_nuevo' && !pending.equipoNodeId && pending.clase === 'repuesto' && route.accion !== 'confirmar_sin_equipo') {
       // Guard: un REPUESTO no se crea huérfano por descuido (quedaba en "Sin
       // equipo" y nadie lo volvía a vincular). Insumos/herramientas/etc. sí
       // pueden ser transversales sin preguntar.
-      reply = `🔧 Antes de crear **${pending.nombre}**: ¿de qué equipo es? Decímelo (ej. "de la KNURO N1") y lo dejo vinculado. ` +
-        'Si de verdad no va atado a un equipo, respondé **"sin equipo"** y lo creo transversal.'
+      reply = `🔧 Antes de crear **${pending.nombre}**: ¿de qué equipo es? Dímelo (ej. "de la KNURO N1") y lo dejo vinculado. ` +
+        'Si de verdad no va atado a un equipo, responde **"sin equipo"** y lo creo transversal.'
     } else if (pending.kind === 'repuesto_nuevo') {
       try {
         await ariaCrearRepuestoNuevo(pending, fromName, telegramUserId)
@@ -4850,14 +4850,14 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
         reply = `✅ Creado en el maestro: **${pending.nombre}** (clase ${pending.clase}${pending.codigoSAP ? `, SAP \`${pending.codigoSAP}\`` : ', sin SAP'})` +
           (pending.equipoNombre ? ` vinculado a **${pending.equipoNombre}**` : '') +
           (pending.fotoFileId ? ' con su foto' : '') +
-          '. Ya lo podés ver en el módulo Repuestos.' +
-          (pending.codigoSAP ? '\n\nSi querés, sumale más fotos (mandámelas) o decime "ponele el código de fabricante ___".' : '')
+          '. Ya lo puedes ver en el módulo Repuestos.' +
+          (pending.codigoSAP ? '\n\nSi quieres, súmale más fotos (mándamelas) o dime "ponle el código de fabricante ___".' : '')
       } catch (err) {
         logger.error('ariaCrearRepuestoNuevo error', { error: err?.message })
         await ariaSetPending(chatId, null)
         reply = err?.code === 6 // ALREADY_EXISTS: ya hay un doc con ese SAP como id
-          ? `❌ Ya existe un material con SAP ${pending.codigoSAP} en el maestro — no lo dupliqué. Si querés, mandame la foto de nuevo y la adjunto a ese.`
-          : '❌ No pude crear el material en el maestro. Probá de nuevo en un rato.'
+          ? `❌ Ya existe un material con SAP ${pending.codigoSAP} en el maestro — no lo dupliqué. Si quieres, mándame la foto de nuevo y la adjunto a ese.`
+          : '❌ No pude crear el material en el maestro. Prueba de nuevo en un rato.'
       }
     } else if (pending.kind === 'repuesto_ligar') {
       try {
@@ -4868,7 +4868,7 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
       } catch (err) {
         logger.error('ariaLigarRepuestoAEquipo error', { error: err?.message })
         await ariaSetPending(chatId, null)
-        reply = '❌ No pude vincular el repuesto al equipo. Probá de nuevo en un rato.'
+        reply = '❌ No pude vincular el repuesto al equipo. Prueba de nuevo en un rato.'
       }
     } else if (pending.kind === 'repuesto_editar') {
       try {
@@ -4879,7 +4879,7 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
       } catch (err) {
         logger.error('ariaEditarRepuesto error', { error: err?.message })
         await ariaSetPending(chatId, null)
-        reply = '❌ No pude actualizar el repuesto. Probá de nuevo en un rato.'
+        reply = '❌ No pude actualizar el repuesto. Prueba de nuevo en un rato.'
       }
     } else {
       const newId = await ariaCrearIncidencia(pending, fromName, telegramUserId)
@@ -4889,7 +4889,7 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
   } else if (route.accion === 'recordar') {
     const nota = String(route.consulta || '').trim().slice(0, 200)
     if (!nota) {
-      reply = '¿Qué querés que recuerde?'
+      reply = '¿Qué quieres que recuerde?'
     } else {
       const nuevas = [...notas, nota].slice(-20)
       await db.collection('telegramAriaSessions').doc(String(chatId)).set({ notas: nuevas }, { merge: true })
@@ -4897,14 +4897,14 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
     }
   } else if (route.accion === 'olvidar') {
     await db.collection('telegramAriaSessions').doc(String(chatId)).set({ notas: [] }, { merge: true })
-    reply = '🧠 Listo, borré mis notas sobre vos. Empezamos de cero.'
+    reply = '🧠 Listo, borré mis notas sobre ti. Empezamos de cero.'
   } else if (route.accion === 'aprender') {
     const hecho = String(route.consulta || '').trim().slice(0, 300)
     if (!esAdmin) {
       reply = 'Los hechos globales de la planta me los enseña el admin (Orel). ' +
-        'Si es algo tuyo personal, decime **"recuerda que..."** y lo anoto en tus notas 😉'
+        'Si es algo tuyo personal, dime **"recuerda que..."** y lo anoto en tus notas 😉'
     } else if (!hecho) {
-      reply = '¿Qué querés que aprenda? Decímelo así: **aprende: los cilindros de la grader van 2 por lado**'
+      reply = '¿Qué quieres que aprenda? Dímelo así: **aprende: los cilindros de la grader van 2 por lado**'
     } else {
       await ariaAddHecho(hecho, fromName)
       reply = `📚 **Aprendido para siempre:**\n"${hecho}"\n\nDesde ahora lo uso en mis respuestas con todo el equipo.`
@@ -4924,7 +4924,7 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
       const g = cual === 'incidencias' ? await ariaGraficoIncidencias() : await ariaGraficoGrader()
       if (g) {
         await sendTelegramPhoto(chatId, g.url, g.caption, null, { topicId })
-        reply = 'Ahí te va el gráfico 📊 ¿Querés que te lo comente?'
+        reply = 'Ahí te va el gráfico 📊 ¿Quieres que te lo comente?'
       } else {
         reply = `No hay datos suficientes para el gráfico de ${cual}.`
       }
@@ -4961,9 +4961,9 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
         })
         reply = `Ese SAP es **${decision.nombre}** (\`${decision.codigoSAP}\`).\n\n¿Le agrego la foto que me mandaste? (sí / no)`
       } else if (!decision.equipoTexto) {
-        reply = `Ese SAP ya está en el maestro: **${decision.nombre}** (\`${decision.codigoSAP}\`). Mandame la foto y decime "agrégala al SAP ${decision.codigoSAP}", o decime a qué equipo lo vinculo.`
+        reply = `Ese SAP ya está en el maestro: **${decision.nombre}** (\`${decision.codigoSAP}\`). Mándame la foto y dime "agrégala al SAP ${decision.codigoSAP}", o dime a qué equipo lo vinculo.`
       } else if (!equipo.mejor) {
-        reply = `No encontré el equipo "${decision.equipoTexto}" en la jerarquía SAP. Decime el nombre como figura en la app (o su código) y lo intento de nuevo.`
+        reply = `No encontré el equipo "${decision.equipoTexto}" en la jerarquía SAP. Dime el nombre como figura en la app (o su código) y lo intento de nuevo.`
       } else {
         await ariaSetPending(chatId, {
           kind: 'repuesto_ligar', codigoSAP: decision.codigoSAP, nombreRepuesto: decision.nombre,
@@ -4979,9 +4979,9 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
     } else { // crear_nuevo
       const nombre = String(decision.nombre || '').trim().slice(0, 120)
       if (!nombre) {
-        reply = '¿Qué material agrego? Decime por ejemplo: **"agrega el aceite Roto-Inject como repuesto del compresor GA90"** — y si me mandás la foto antes, la dejo en su ficha.'
+        reply = '¿Qué material agrego? Dime por ejemplo: **"agrega el aceite Roto-Inject como repuesto del compresor GA90"** — y si me mandás la foto antes, la dejo en su ficha.'
       } else if (decision.equipoTexto && !equipo.mejor) {
-        reply = `No encontré el equipo "${decision.equipoTexto}" en la jerarquía SAP. Decime el nombre como figura en la app (o su código) y lo creo vinculado.`
+        reply = `No encontré el equipo "${decision.equipoTexto}" en la jerarquía SAP. Dime el nombre como figura en la app (o su código) y lo creo vinculado.`
       } else {
         const clase = ariaDeducirClase(`${nombre} ${ultimaFoto?.descripcion || ''}`)
         const codigoNuevo = decision.codigoSAP || ''
@@ -4999,16 +4999,16 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
         })
         const lineaEquipo = equipo.mejor
           ? `🔧 Equipo: **${equipo.mejor.alias || equipo.mejor.nombre}**${equipo.mejor.codigo ? ` (${equipo.mejor.codigo})` : ''}` +
-            (equipo.candidatos.length > 1 && !equipo.exacto ? ' *(si no es ese, decime "no" y dame el nombre exacto)*' : '')
+            (equipo.candidatos.length > 1 && !equipo.exacto ? ' *(si no es ese, dime "no" y dame el nombre exacto)*' : '')
           : clase === 'repuesto'
-            ? '🔧 ¿De qué equipo es? Decímelo (ej. "de la KNURO N1") y lo dejo vinculado; si es transversal respondé "sin equipo"'
-            : '🔧 Sin equipo vinculado (lo podés vincular después en la app)'
+            ? '🔧 ¿De qué equipo es? Dímelo (ej. "de la KNURO N1") y lo dejo vinculado; si es transversal responde "sin equipo"'
+            : '🔧 Sin equipo vinculado (lo puedes vincular después en la app)'
         reply = '**Voy a crear este material en el maestro:**\n\n' +
           `📦 ${nombre}\n` +
           `🏷️ Clase: **${clase}** · ${codigoNuevo ? `SAP \`${codigoNuevo}\`` : 'sin código SAP'}\n` +
           `${lineaEquipo}\n` +
           (ultimaFoto ? '📸 Con la foto que me mandaste\n' : '') +
-          (parecidos.length ? `\n⚠️ Ojo, hay parecidos en el maestro: ${parecidos.map((p) => `${p.textoBreve || p.descripcion}${p.codigoSAP ? ` (SAP ${p.codigoSAP})` : ''}`).join(' · ')} — si es uno de esos, decime "no" y lo vinculamos en vez de duplicar.\n` : '') +
+          (parecidos.length ? `\n⚠️ Ojo, hay parecidos en el maestro: ${parecidos.map((p) => `${p.textoBreve || p.descripcion}${p.codigoSAP ? ` (SAP ${p.codigoSAP})` : ''}`).join(' · ')} — si es uno de esos, dime "no" y lo vinculamos en vez de duplicar.\n` : '') +
           '\n¿Lo creo? (sí / no)'
       }
     }
@@ -5018,14 +5018,14 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
     const targetSap = sapMsg || ultimoRepuesto?.codigoSAP || null
     const valor = ariaParseCodigoFabricante(userText)
     if (!targetSap) {
-      reply = '¿A qué repuesto le pongo el código de fabricante? Decime el SAP (10 dígitos), o "al mismo" si es el último que tocamos.'
+      reply = '¿A qué repuesto le pongo el código de fabricante? Dime el SAP (10 dígitos), o "al mismo" si es el último que tocamos.'
     } else if (!valor) {
-      reply = '¿Cuál es el código de fabricante? Decímelo así: **"el código de fabricante es 999 0566"**.'
+      reply = '¿Cuál es el código de fabricante? Dímelo así: **"el código de fabricante es 999 0566"**.'
     } else {
       const maestro = await ariaGetRepuestos()
       const rep = maestro.find((r) => r.codigoSAP && String(r.codigoSAP) === String(targetSap)) || null
       if (!rep) {
-        reply = `No encontré un repuesto con SAP \`${targetSap}\` en el maestro. Revisá el código y probamos de nuevo.`
+        reply = `No encontré un repuesto con SAP \`${targetSap}\` en el maestro. Revisa el código y probamos de nuevo.`
       } else {
         // Si el usuario mezcla "agregale la foto Y el código", sumamos la última foto de paso
         const sumaFoto = ultimaFoto?.fileId && /\b(foto|imagen|im[aá]gen)/i.test(userText) ? ultimaFoto.fileId : null
@@ -5044,7 +5044,7 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
     const sessionDoc = await sessionRef.get()
     const batch = Array.isArray(sessionDoc.data()?.fotoBatch) ? sessionDoc.data().fotoBatch : []
     if (!batch.length) {
-      reply = 'No tengo fotos pendientes en el lote. Mandame varias fotos juntas (como álbum) y después pedime la lista.'
+      reply = 'No tengo fotos pendientes en el lote. Mándame varias fotos juntas (como álbum) y después pedime la lista.'
     } else {
       await callTelegramApi('sendChatAction', { chat_id: chatId, action: 'typing' })
       try {
@@ -5052,7 +5052,7 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
         for (const item of batch) buffers.push(await downloadTelegramFile(item.fileId))
         const totalBytes = buffers.reduce((s, b) => s + b.length, 0)
         if (totalBytes > 15 * 1024 * 1024) {
-          reply = `El lote pesa mucho (${(totalBytes / 1024 / 1024).toFixed(1)} MB) para analizarlo junto. Probá con menos fotos o más livianas.`
+          reply = `El lote pesa mucho (${(totalBytes / 1024 / 1024).toFixed(1)} MB) para analizarlo junto. Prueba con menos fotos o más livianas.`
         } else {
           const imagenes = buffers.map((b) => ({ base64: b.toString('base64'), mime: 'image/jpeg' }))
           const resultados = await ariaGroqVisionLote(imagenes)
@@ -5061,7 +5061,7 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
           // vivos) y avisamos con honestidad en vez de "ninguna matcheó".
           const todasFallaron = resultados.length > 0 && resultados.every((r) => /no pude analizar/i.test(r.descripcion || ''))
           if (todasFallaron) {
-            reply = '❌ No pude analizar las fotos del lote ahora (el servicio de visión falló). Las dejé en cola — probá de nuevo en un rato con **"hazme la lista"**, o mandámelas de a una.'
+            reply = '❌ No pude analizar las fotos del lote ahora (el servicio de visión falló). Las dejé en cola — prueba de nuevo en un rato con **"hazme la lista"**, o mándamelas de a una.'
           } else {
             const matches = []
             const lineas = []
@@ -5088,7 +5088,7 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
             await sessionRef.set({ fotoBatch: [] }, { merge: true }) // el lote ya se analizó, que no se mezcle con el próximo
 
             const hintSinMatch = matches.length < resultados.length
-              ? '\n\n📦 Las sin match las podés dar de alta en el maestro: mandá esa foto suelta y decime "créala como repuesto del [equipo]".'
+              ? '\n\n📦 Las sin match las puedes dar de alta en el maestro: manda esa foto suelta y dime "créala como repuesto del [equipo]".'
               : ''
             if (matches.length) {
               await ariaSetPending(chatId, { kind: 'adjuntar_fotos_lote', items: matches, at: Date.now() })
@@ -5100,7 +5100,7 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
         }
       } catch (err) {
         logger.error('ARIA fotos_lote error', { error: err?.message })
-        reply = '❌ No pude procesar el lote de fotos. Probá de nuevo.'
+        reply = '❌ No pude procesar el lote de fotos. Prueba de nuevo.'
       }
     }
   } else if (route.accion === 'brief') {
@@ -5110,8 +5110,8 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
     await db.collection('telegramAriaSessions').doc(String(chatId))
       .set({ briefDiario: activar }, { merge: true })
     reply = activar
-      ? '✅ Listo. Te voy a mandar el brief de Mantención todos los días a las 7:00 AM. Si te aburro, decime "desactiva el brief" nomás 😉'
-      : 'Listo, no te mando más el brief automático. Igual me lo podés pedir cuando quieras con "dame el brief".'
+      ? '✅ Listo. Te voy a mandar el brief de Mantención todos los días a las 7:00 AM. Si te aburro, dime "desactiva el brief" nomás 😉'
+      : 'Listo, no te mando más el brief automático. Igual me lo puedes pedir cuando quieras con "dame el brief".'
   } else if (route.accion === 'charla' && route.respuesta) {
     reply = route.respuesta
   } else {
@@ -5145,9 +5145,9 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
             role: 'system',
             content: `${ARIA_PERSONA}${notasHint}${appBlock}${hechosBlock}\n\nRespondé al usuario usando SOLO estos datos reales de la app ` +
               '(más los HECHOS enseñados si aplican). NO inventes cifras ni nombres. ' +
-              'Si los datos NO alcanzan para responder, decí exactamente QUÉ dato falta' +
+              'Si los datos NO alcanzan para responder, di exactamente QUÉ dato falta' +
               (esAdmin
-                ? ' y ofrecé aprenderlo: "si me lo decís con \'aprende: ...\' lo guardo para siempre".'
+                ? ' y ofrece aprenderlo: "si me lo dices con \'aprende: ...\' lo guardo para siempre".'
                 : ' y sugerí pedirle al admin (Orel) que me enseñe ese dato.') +
               `\n\nDATOS:\n${datos || '(sin datos para esta consulta)'}`,
           },
@@ -5162,7 +5162,7 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
     }
   }
 
-  reply = String(reply || '').trim() || 'No pude procesar la consulta 😕 Probá de nuevo en un rato.'
+  reply = String(reply || '').trim() || 'No pude procesar la consulta 😕 Prueba de nuevo en un rato.'
 
   // Registro de lagunas: si ARIA quedó corta, la pregunta se guarda en ariaGaps
   // para revisarla ("qué no has sabido responder?") y enseñarle el dato que falta.
@@ -5200,7 +5200,7 @@ async function tgHandleStart(chatId, fromName, chatType, topicId) {
   const isPrivate = chatType === 'private'
   const greeting = fromName ? `¡Hola, ${fromName}! 👋` : '¡Hola! 👋'
   const text = isPrivate
-    ? `${greeting}\n\nSoy el bot de mantenimiento de planta Antarfood. Tocá el botón para abrir el catálogo (repuestos, insumos, manuales, conteos).`
+    ? `${greeting}\n\nSoy el bot de mantenimiento de planta Antarfood. Toca el botón para abrir el catálogo (repuestos, insumos, manuales, conteos).`
     : `${greeting}\n\nSoy el bot de mantenimiento. En este grupo, un admin debe usar /autorizar y luego /abrir para postear el banner con la app.`
   const buttons = isPrivate
     ? [[{ text: '📦 Abrir Mantenimiento', url: 'https://t.me/antarfood_mant_bot/repuestos' }]]
@@ -5242,7 +5242,7 @@ async function tgHandleAbrir(chatId, chatType, telegramUserId, topicId) {
     [{ text: '📦 Abrir Mantenimiento', url: 'https://t.me/antarfood_mant_bot/repuestos' }],
   ]
   const text = '🏭 <b>Mantenimiento Antarfood</b>\n\n' +
-    'Tocá el botón para abrir el catálogo (repuestos, insumos, manuales, conteos).\n\n' +
+    'Toca el botón para abrir el catálogo (repuestos, insumos, manuales, conteos).\n\n' +
     '<i>💡 Tip: pineá este mensaje para tenerlo siempre a mano.</i>'
   await sendTelegramButtons(text, chatId, buttons, { topicId })
 }
@@ -5294,13 +5294,13 @@ async function tgHandleAutorizar(chatId, chatTitle, chatType, telegramUserId, to
     }, { merge: true })
     await sendTelegramMessage(
       `✅ <b>Chat autorizado</b>\n\n` +
-      `Ya podés usar todos los comandos del bot acá.\n` +
-      `Probá /abrir para postear el banner pineable.`,
+      `Ya puedes usar todos los comandos del bot acá.\n` +
+      `Prueba /abrir para postear el banner pineable.`,
       chatId, { topicId }
     )
   } catch (e) {
     logger.error('Error authorizing chat', e)
-    await sendTelegramMessage('❌ Error al autorizar. Revisá los logs.', chatId, { topicId })
+    await sendTelegramMessage('❌ Error al autorizar. Revisa los logs.', chatId, { topicId })
   }
 }
 
@@ -5559,7 +5559,7 @@ async function cbFavoritos(chatId, messageId, params) {
     })
     buttons.push([{ text: '← Menú', callback_data: 'menu' }])
     return editTelegramMessage(chatId, messageId,
-      '<b>⭐ Acceso Rápido</b>\n\nMáquinas activas — elegí una:', buttons)
+      '<b>⭐ Acceso Rápido</b>\n\nMáquinas activas — elige una:', buttons)
   }
 
   if (sub === 'maq') {
@@ -5573,7 +5573,7 @@ async function cbFavoritos(chatId, messageId, params) {
       [{ text: '← Acceso Rápido', callback_data: 'fav:list' }, { text: '← Menú', callback_data: 'menu' }],
     ]
     return editTelegramMessage(chatId, messageId,
-      `<b>⭐ ${machineName}</b>\n\n¿Qué querés ver?`, buttons)
+      `<b>⭐ ${machineName}</b>\n\n¿Qué quieres ver?`, buttons)
   }
 
   if (sub === 'info') {
@@ -5772,7 +5772,7 @@ exports.telegramWebhook = onRequest(
         const voiceBuffer = await downloadTelegramFile(voiceFileId)
         const transcript = await ariaTranscribeVoice(voiceBuffer)
         if (!transcript) {
-          await sendTelegramMessage('🎙️ No logré entender el audio. Probá de nuevo.', chatId, { topicId: incomingTopicId })
+          await sendTelegramMessage('🎙️ No logré entender el audio. Prueba de nuevo.', chatId, { topicId: incomingTopicId })
         } else {
           await sendTelegramMessage(`🎙️ <i>«${ariaEscapeHtml(transcript)}»</i>`, chatId, { topicId: incomingTopicId })
           const respuesta = await tgHandleAriaChat(chatId, transcript, fromName, telegramUserId, incomingTopicId, authVoz.rol === 'admin')
@@ -5822,7 +5822,7 @@ exports.telegramWebhook = onRequest(
     } else if (text.startsWith('/')) {
       // Cualquier otro comando: silencio en grupos, respuesta breve en privados
       if (chatType === 'private') {
-        await sendTelegramMessage('Usá /abrir para abrir el catálogo.', chatId, { topicId: incomingTopicId })
+        await sendTelegramMessage('Usa /abrir para abrir el catálogo.', chatId, { topicId: incomingTopicId })
       }
     } else if (chatType === 'private') {
       // Texto libre en privado → ARIA (chat natural, solo usuarios autorizados)
@@ -5874,7 +5874,7 @@ exports.onGraderSummaryCreated = onDocumentCreated('graderDailySummaries/{summar
     })
   }
 
-  msg += '\n💡 Abrí la app para ver el análisis completo.'
+  msg += '\n💡 Abre la app para ver el análisis completo.'
 
   const generalTopicId = getTopicId('general')
   await sendTelegramMessage(msg, null, { topicId: generalTopicId })
@@ -6017,7 +6017,7 @@ exports.setupTelegramTopics = onRequest({ region: 'us-central1' }, async (req, r
 
   res.json({
     created,
-    instructions: 'Agregá estas líneas a functions/.env y re-deployer:',
+    instructions: 'Agrega estas líneas a functions/.env y re-deployer:',
     envLines,
   })
 })

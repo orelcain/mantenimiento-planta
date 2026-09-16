@@ -1702,7 +1702,7 @@ async function buildMonitorLive(db, plantSlug, shiftDocId, index = null) {
     plannedEndSamples,
     /*
      * Ritmo de los turnos anteriores, en pz/min sobre tiempo de reloj. Es la
-     * referencia con la que se juzga si un "necesitás 16 pz/min" es realista:
+     * referencia con la que se juzga si un "necesitas 16 pz/min" es realista:
      * el objetivo del sensor puede decir 20 y la línea no haber pasado nunca
      * de 12,7 — medido en Filete sobre 9 turnos.
      */

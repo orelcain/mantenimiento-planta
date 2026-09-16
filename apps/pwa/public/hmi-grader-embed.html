@@ -954,7 +954,7 @@ html.in-iframe, html.in-iframe body {
         <div class="param-list-col">
           <div class="param-tree" id="param-tree"></div>
         </div>
-        <div class="param-help-col" id="param-help"><span class="param-help-empty">Seleccioná un parámetro para ver su descripción.</span></div>
+        <div class="param-help-col" id="param-help"><span class="param-help-empty">Selecciona un parámetro para ver su descripción.</span></div>
       </div>
       <div class="btn-bar">
         <button class="btn" onclick="goBack()">Cancelar</button>
@@ -2505,7 +2505,7 @@ function hmiGoto(target) {
   target.screens.forEach(id => navigateTo(id));
   if (target.zone && target.param) {
     pendingParamGoto = { zone: target.zone, param: target.param };
-    addLog('Práctica: ingresá la clave de servicio del procedimiento');
+    addLog('Práctica: ingresa la clave de servicio del procedimiento');
   }
   addLog('Modo práctica: ' + (target.label || 'ruta del procedimiento'));
   logEventToParent('practice-goto', target.label || target.screens.join('>'));
