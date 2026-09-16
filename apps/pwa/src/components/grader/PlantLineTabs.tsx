@@ -67,7 +67,7 @@ export function PlantLineTabs({ selected, onSelect, className }: PlantLineTabsPr
             >
               <span
                 className={cn(
-                  'text-[0.78rem] font-medium leading-tight',
+                  'text-footnote font-medium leading-tight',
                   isActive && 'font-semibold text-foreground',
                   soon && 'text-muted-foreground/60',
                 )}

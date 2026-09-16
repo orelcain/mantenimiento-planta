@@ -616,7 +616,7 @@ con un script Node local (`writeFileSync` en `utf8`).
 12. ~~`body` sigue en 15 px~~ — hecho 2026-09-16: `body` 17, `title2` 22, `display` 34,
     más `subhead` (15) y `callout` (16) nuevos. Verificado en el home a 375 px: 4 de 36
     títulos de celda saltan de línea (nombres largos de cursos) — iOS envuelve, se acepta.
-13. **Tiles de ícono en el escritorio** (`MobileHomeGrid.tsx` ~línea 296 y el mapa `COLOR`):
-    siguen tintados con el glifo vivo. El móvil ya es neutro. Y el ribbon "en desarrollo"
-    de esa variante está a **6,5 px en mayúsculas** (línea ~274): viola el piso de 11 y la
-    regla de mayúsculas a la vez.
+13. ~~Tiles de ícono en el escritorio~~ — hecho 2026-09-16: la tarjeta CTA del Home de PC es
+    neutra como el móvil (tarjeta sin tinte, ícono en tile gris, rótulo en tinta de etiqueta);
+    el mapa `COLOR` y la cinta rotada de 6,5 px en mayúsculas se eliminaron; «En desarrollo»
+    es una etiqueta de 11 px en formato oración, y sigue siendo el toque que libera el módulo.

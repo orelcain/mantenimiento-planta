@@ -45,7 +45,7 @@ export function Pill({ tone = 'neutral', dot, className, children, ...props }: P
     <span
       className={cn(
         'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1',
-        'text-[0.7rem] font-semibold leading-none whitespace-nowrap',
+        'text-caption font-semibold leading-none whitespace-nowrap',
         TONES[tone],
         className,
       )}
