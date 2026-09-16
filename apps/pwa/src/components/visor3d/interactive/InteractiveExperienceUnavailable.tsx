@@ -39,7 +39,7 @@ export function InteractiveExperienceUnavailable({
 
       <div className="flex flex-1 items-center justify-center p-4 sm:p-6">
         <div className="w-full max-w-2xl rounded-2xl border bg-background/90 p-6 text-center shadow-sm">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-brand-ink">
             <Sparkles className="h-7 w-7" />
           </div>
           <h3 className="text-lg font-semibold">Experiencia aun no configurada</h3>

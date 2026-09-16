@@ -76,7 +76,7 @@ export function ColorPalette({
             <Paintbrush className="h-4 w-4 text-primary" />
             <span className="text-sm font-medium">Pintar</span>
             {paintedCount > 0 && (
-              <span className="text-caption bg-primary/20 text-primary px-1.5 rounded-full">
+              <span className="text-caption bg-primary/20 text-brand-ink px-1.5 rounded-full">
                 {paintedCount}
               </span>
             )}

@@ -71,7 +71,7 @@ export function HistorialBitacoraVista({ fuente, alAbrirTurno }: { fuente: Fuent
     <div className="flex flex-col gap-5 pb-10">
       <header className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3 px-1">
         <div className="min-w-0">
-          <Button variant="plain" size="sm" className="-ml-2" onClick={() => navigate('/bitacora')}>
+          <Button variant="plain" className="-ml-2" onClick={() => navigate('/bitacora')}>
             <ChevronLeft /> Bitácora
           </Button>
           <h1 className="text-display">Historial</h1>

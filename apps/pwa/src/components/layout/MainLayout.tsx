@@ -633,7 +633,7 @@ export function MainLayout() {
                 className="flex items-center gap-3 w-full p-2 rounded-card hover:bg-muted transition-colors"
               >
                 <Avatar className="h-8 w-8">
-                  <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                  <AvatarFallback className="bg-primary/10 text-brand-ink text-xs">
                     {userInitials}
                   </AvatarFallback>
                 </Avatar>
@@ -776,7 +776,7 @@ export function MainLayout() {
                     className="flex items-center gap-3 w-full p-2 rounded-card hover:bg-muted transition-colors"
                   >
                     <Avatar className="h-8 w-8">
-                      <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                      <AvatarFallback className="bg-primary/10 text-brand-ink text-xs">
                         {userInitials}
                       </AvatarFallback>
                     </Avatar>
@@ -912,7 +912,7 @@ export function MainLayout() {
               {user?.nombre} {user?.apellido}
             </span>
             <Avatar className="h-8 w-8">
-              <AvatarFallback className="bg-primary/10 text-primary text-xs">
+              <AvatarFallback className="bg-primary/10 text-brand-ink text-xs">
                 {userInitials}
               </AvatarFallback>
             </Avatar>

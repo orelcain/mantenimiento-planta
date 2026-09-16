@@ -2043,7 +2043,7 @@ export function SensorsPage() {
                       ) : (
                         <>
                           {filteredEquipment.length > 5 && (
-                            <div className="sticky top-0 z-10 p-2 text-xs text-center bg-primary/[0.15] border-b text-primary">
+                            <div className="sticky top-0 z-10 p-2 text-xs text-center bg-primary/[0.15] border-b text-brand-ink">
                               <ChevronsDown className="inline size-3.5" /> Desliza hacia abajo para ver todos los equipos ({filteredEquipment.length})
                             </div>
                           )}

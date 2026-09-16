@@ -33,7 +33,7 @@ interface Props {
 
 const ESTADO_META: Record<SolicitudEstado, { label: string; cls: string }> = {
   pendiente: { label: 'Pendiente', cls: 'bg-amber-500/[0.15] text-ink-warn' },
-  aprobada: { label: 'Aprobada', cls: 'bg-primary/[0.15] text-primary' },
+  aprobada: { label: 'Aprobada', cls: 'bg-primary/[0.15] text-brand-ink' },
   entregada: { label: 'Entregada', cls: 'bg-emerald-500/[0.15] text-ink-ok' },
 }
 

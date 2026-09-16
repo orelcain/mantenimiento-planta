@@ -197,7 +197,7 @@ export function TerrainEditorModal({
             </div>
           )}
 
-          <div className="rounded-lg border p-3 bg-primary/5 border-primary/20 text-xs text-primary space-y-1">
+          <div className="rounded-lg border p-3 bg-primary/5 border-primary/20 text-xs text-brand-ink space-y-1">
             <p>Click y arrastra para trabajar continuo. Mantén Shift para activar Rodillo temporal.</p>
             <p>Con Niveladora, el terreno se corta/rellena a la cota exacta configurada.</p>
           </div>

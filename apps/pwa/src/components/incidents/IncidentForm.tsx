@@ -719,7 +719,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident, 
                 size="sm"
                 onClick={handleRefineDescription}
                 disabled={isRefining || !formData.descripcion || formData.descripcion.length < 5}
-                className="h-6 px-2 text-xs text-primary hover:text-primary hover:bg-primary/10"
+                className="h-6 px-2 text-xs text-brand-ink hover:text-brand-ink hover:bg-primary/10"
               >
                 {isRefining ? (
                   <>
@@ -782,7 +782,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident, 
                               setIsGeneratingSymptoms(false)
                           }
                       }}
-                      className="h-6 px-2 text-primary hover:bg-primary/10"
+                      className="h-6 px-2 text-brand-ink hover:bg-primary/10"
                       title="Proponer variantes de síntomas"
                    >
                        <Sparkles className="h-3 w-3 mr-1" />

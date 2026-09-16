@@ -188,7 +188,7 @@ export function AuditLogPanel({ open, onOpenChange }: Props) {
                   className={[
                     'flex items-center gap-1 px-2 py-1 rounded-ctl text-caption font-medium transition-colors border',
                     isActive
-                      ? 'border-primary bg-primary/10 text-primary'
+                      ? 'border-primary bg-primary/10 text-brand-ink'
                       : 'border-transparent bg-muted text-muted-foreground hover:bg-muted',
                   ].join(' ')}
                 >

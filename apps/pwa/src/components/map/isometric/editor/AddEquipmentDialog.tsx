@@ -126,7 +126,7 @@ export function AddEquipmentDialog({
         {/* Search */}
         <div className="px-4 pt-3">
           {selectedAreaLabel && (
-            <div className="mb-2 text-xs rounded-lg border bg-primary/5 border-primary/20 px-2.5 py-1.5 text-primary">
+            <div className="mb-2 text-xs rounded-lg border bg-primary/5 border-primary/20 px-2.5 py-1.5 text-brand-ink">
               Se agregará dentro de: <span className="font-semibold">{selectedAreaLabel}</span>
             </div>
           )}

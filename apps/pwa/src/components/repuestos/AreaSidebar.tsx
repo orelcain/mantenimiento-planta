@@ -97,7 +97,7 @@ function EquipmentRow({
         className={[
           'group relative flex items-center gap-2 pr-2 py-2 cursor-pointer select-none border-l-2 transition-colors',
           selected
-            ? 'border-l-primary bg-primary/10 text-primary'
+            ? 'border-l-primary bg-primary/10 text-brand-ink'
             : 'border-l-transparent text-foreground/70 hover:bg-muted/40 hover:text-foreground',
         ].join(' ')}
         title={leaf.nombre}
@@ -186,7 +186,7 @@ function AreaRow({
           'group relative flex items-center gap-2 pr-2 py-2 cursor-pointer select-none',
           'border-l-2 transition-colors',
           isSelected
-            ? 'border-l-primary bg-primary/10 text-primary'
+            ? 'border-l-primary bg-primary/10 text-brand-ink'
             : 'border-l-transparent text-foreground/80 hover:bg-muted/50 hover:text-foreground',
         ].join(' ')}
       >
@@ -459,7 +459,7 @@ export function AreaSidebar({
                     onClick={() => handlePickEquipment(eq)}
                     className={[
                       'flex w-full items-center gap-2 rounded-ctl px-2 py-1.5 text-left transition-colors',
-                      isSel ? 'bg-primary/10 text-primary' : 'text-foreground/80 hover:bg-muted/50 hover:text-foreground',
+                      isSel ? 'bg-primary/10 text-brand-ink' : 'text-foreground/80 hover:bg-muted/50 hover:text-foreground',
                     ].join(' ')}
                     title={eq.nombre}
                   >
@@ -509,7 +509,7 @@ export function AreaSidebar({
         onClick={handleShowAll}
         className={[
           'flex min-h-[44px] items-center justify-center gap-2 rounded-full border-t border-border px-3 py-2.5 text-xs font-medium transition-colors',
-          showingAll ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
+          showingAll ? 'bg-primary/10 text-brand-ink' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
         ].join(' ')}
       >
         <List className="h-3.5 w-3.5" /> Ver todas las áreas

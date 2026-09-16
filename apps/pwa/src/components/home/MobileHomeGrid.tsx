@@ -396,7 +396,7 @@ export function MobileHomeGrid() {
         {/* Botón Menú — a la izquierda del nombre */}
         <button
           onClick={() => setSidebarOpen(true)}
-          className="w-9 h-9 rounded-card bg-muted flex items-center justify-center shrink-0 active:scale-90 transition-transform touch-manipulation"
+          className="size-11 rounded-full bg-muted flex items-center justify-center shrink-0 active:scale-90 transition-transform touch-manipulation"
           aria-label="Menú"
         >
           <Menu className="h-4 w-4 text-foreground" />

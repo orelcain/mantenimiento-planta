@@ -735,7 +735,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                       size="sm"
                       onClick={handleRefineRejection}
                       disabled={isRefiningRejection || !rejectionReason || rejectionReason.length < 5}
-                      className="h-6 px-2 text-xs text-primary hover:text-primary hover:bg-primary/10"
+                      className="h-6 px-2 text-xs text-brand-ink hover:text-brand-ink hover:bg-primary/10"
                     >
                       {isRefiningRejection ? (
                          <>
@@ -789,7 +789,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                       size="sm"
                       onClick={handleRefineResolution}
                       disabled={isRefiningResolution || !resolution || resolution.length < 5}
-                      className="h-6 px-2 text-xs text-primary hover:text-primary hover:bg-primary/10"
+                      className="h-6 px-2 text-xs text-brand-ink hover:text-brand-ink hover:bg-primary/10"
                     >
                       {isRefiningResolution ? (
                          <>
@@ -843,7 +843,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                       size="sm"
                       onClick={handleRefineResolution}
                       disabled={isRefiningResolution || !resolution || resolution.length < 5}
-                      className="h-6 px-2 text-xs text-primary hover:text-primary hover:bg-primary/10"
+                      className="h-6 px-2 text-xs text-brand-ink hover:text-brand-ink hover:bg-primary/10"
                     >
                       {isRefiningResolution ? (
                          <>
@@ -962,7 +962,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                 onClick={handleSelfAssign} 
                 disabled={isLoading}
                 variant="secondary"
-                className="w-full sm:w-auto border-primary/20 text-primary hover:bg-primary/10"
+                className="w-full sm:w-auto border-primary/20 text-brand-ink hover:bg-primary/10"
               >
                 <UserPlus className="mr-2 h-4 w-4" />
                 Asignarme a mí

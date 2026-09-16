@@ -575,7 +575,7 @@ function InventarioTab({ bodega, user }: { bodega: ReturnType<typeof useBodega>;
           </div>
           {activeSesion.estado === 'en_curso' && (
             <button onClick={handleFinalizar}
-              className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 text-white text-sm font-medium rounded-card hover:bg-emerald-500 transition-colors">
+              className="flex h-11 items-center gap-1.5 rounded-full bg-primary px-5 text-subhead font-medium text-primary-foreground transition-colors hover:brightness-95">
               <CheckCircle2 className="h-4 w-4" /> Finalizar y ajustar
             </button>
           )}
@@ -606,12 +606,12 @@ function InventarioTab({ bodega, user }: { bodega: ReturnType<typeof useBodega>;
             <input type="text" value={nuevoNombre} onChange={e => setNuevoNombre(e.target.value)}
               placeholder={`Inventario ${new Date().toLocaleDateString('es-CL')}`} className={INPUT} />
           </div>
-          <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer shrink-0 pb-2">
-            <input type="checkbox" checked={soloConStock} onChange={e => setSoloConStock(e.target.checked)} className="rounded-ctl" />
+          <label className="flex min-h-[44px] items-center gap-2 text-xs text-muted-foreground cursor-pointer shrink-0">
+            <input type="checkbox" checked={soloConStock} onChange={e => setSoloConStock(e.target.checked)} className="size-5 rounded-ctl" />
             Solo con stock configurado
           </label>
-          <button onClick={handleCrear} disabled={creando || !nuevoNombre.trim()}
-            className="flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-card hover:bg-primary/90 disabled:opacity-50 transition-colors shrink-0">
+          <button type="button" onClick={handleCrear} disabled={creando || !nuevoNombre.trim()}
+            className="flex h-11 items-center gap-1.5 rounded-full bg-primary px-5 text-subhead font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors shrink-0">
             {creando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Crear
           </button>
         </div>
@@ -629,8 +629,8 @@ function InventarioTab({ bodega, user }: { bodega: ReturnType<typeof useBodega>;
       ) : (
         <div className="space-y-2">
           {sesiones.map(s => (
-            <button key={s.id} onClick={() => handleOpenSesion(s)}
-              className="w-full flex items-center gap-4 p-4 bg-card border border-border rounded-card hover:bg-muted transition-colors text-left">
+            <button key={s.id} type="button" onClick={() => handleOpenSesion(s)}
+              className="w-full min-h-[44px] flex items-center gap-4 p-4 bg-card border border-border rounded-card hover:bg-muted transition-colors text-left">
               <div className={`h-10 w-10 rounded-card flex items-center justify-center shrink-0 ${s.estado === 'finalizado' ? 'bg-emerald-500/[0.15]' : 'bg-amber-500/[0.15]'}`}>
                 {s.estado === 'finalizado' ? <CheckCircle2 className="h-5 w-5 text-ink-ok" /> : <ClipboardList className="h-5 w-5 text-ink-warn" />}
               </div>
@@ -704,7 +704,7 @@ function ConteoList({ conteos, isFinalizado, onConteo }: {
           { id: 'diferencias' as const, label: 'Diferencias', count: conDif.length, color: 'text-ink-crit' },
         ].map(t => (
           <button key={t.id} onClick={() => setTab(t.id)}
-            className={`px-3 py-1.5 rounded-card text-xs font-medium transition-all ${tab === t.id ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted'}`}>
+            className={`h-9 rounded-full px-3.5 text-subhead font-medium transition-all ${tab === t.id ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground hover:bg-muted'}`}>
             {t.label} <span className={t.color}>{t.count}</span>
           </button>
         ))}
@@ -721,7 +721,7 @@ function ConteoList({ conteos, isFinalizado, onConteo }: {
         <div className="relative mb-3">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <input type="text" placeholder="Buscar por nombre o SAP…" value={conteoSearch} onChange={e => setConteoSearch(e.target.value)}
-            className="w-full pl-8 pr-7 py-1.5 text-xs bg-muted border border-border rounded-card focus:outline-none focus:ring-2 focus:ring-primary/40 text-foreground placeholder:text-muted-foreground" />
+            className="h-11 w-full rounded-full bg-muted pl-10 pr-9 text-body focus:outline-none focus:ring-2 focus:ring-primary/40 text-foreground placeholder:text-muted-foreground" />
           {conteoSearch && <button onClick={() => setConteoSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2"><X className="h-3 w-3 text-muted-foreground" /></button>}
         </div>
       )}
@@ -770,7 +770,7 @@ function ConteoList({ conteos, isFinalizado, onConteo }: {
                     </div>
                   ) : (
                     <button onClick={() => { setEditingSAP(c.codigoSAP); setEditValue(c.stockSistema) }}
-                      className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-primary bg-primary/10 rounded-card hover:bg-primary/20 transition-colors shrink-0">
+                      className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-brand-ink bg-primary/10 rounded-card hover:bg-primary/20 transition-colors shrink-0">
                       <CircleDot className="h-3.5 w-3.5" /> Contar
                     </button>
                   )
@@ -841,19 +841,27 @@ function MovimientosTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-4 gap-2">
-        {[
-          { f: 'todos' as MovFilter, label: 'Total', count: movimientos.length, icon: History, color: 'text-primary', border: 'border-primary/40 bg-primary/5 ring-1 ring-primary/20' },
-          { f: 'entrada' as MovFilter, label: 'Entradas', count: entradas, icon: ArrowDownCircle, color: 'text-ink-ok', border: 'border-emerald-500/[0.25] bg-emerald-500/[0.15] ring-1 ring-emerald-500/20' },
-          { f: 'salida' as MovFilter, label: 'Salidas', count: salidas, icon: ArrowUpCircle, color: 'text-ink-crit', border: 'border-red-500/[0.25] bg-red-500/[0.15] ring-1 ring-red-500/20' },
-          { f: 'ajuste' as MovFilter, label: 'Ajustes', count: ajustes, icon: Settings2, color: 'text-primary', border: 'border-primary/[0.25] bg-primary/[0.15] ring-1 ring-blue-500/20' },
-        ].map(o => {
-          const I = o.icon
+      <div className="-mx-3 flex gap-2 overflow-x-auto px-3 no-scrollbar sm:mx-0 sm:flex-wrap sm:px-0">
+        {([
+          { f: 'todos' as MovFilter, label: 'Total', count: movimientos.length },
+          { f: 'entrada' as MovFilter, label: 'Entradas', count: entradas },
+          { f: 'salida' as MovFilter, label: 'Salidas', count: salidas },
+          { f: 'ajuste' as MovFilter, label: 'Ajustes', count: ajustes },
+        ]).map(o => {
+          const on = filtroTipo === o.f
           return (
-            <button key={o.f} onClick={() => setFiltroTipo(o.f)}
-              className={`flex items-center gap-2 p-3 rounded-card border transition-all text-left ${filtroTipo === o.f ? o.border : 'border-border bg-card hover:bg-muted'}`}>
-              <I className={`h-4 w-4 ${o.color}`} />
-              <div><p className="text-lg font-bold text-foreground tabular-nums">{o.count}</p><p className="text-caption text-muted-foreground">{o.label}</p></div>
+            <button
+              key={o.f}
+              type="button"
+              aria-pressed={on}
+              onClick={() => setFiltroTipo(o.f)}
+              className={cn(
+                'inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-subhead font-medium transition-colors',
+                on ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground hover:bg-muted-foreground/[0.15]',
+              )}
+            >
+              {o.label}
+              <span className={cn('text-footnote font-semibold tabular-nums', on ? 'text-primary-foreground/80' : 'text-muted-foreground')}>{o.count}</span>
             </button>
           )
         })}
@@ -861,12 +869,21 @@ function MovimientosTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
 
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <input type="text" placeholder="Buscar por SAP, motivo, usuario…" value={searchMov} onChange={e => setSearchMov(e.target.value)}
-            className="w-full pl-9 pr-8 py-2 text-sm bg-muted border border-border rounded-card focus:outline-none focus:ring-2 focus:ring-primary/40 text-foreground placeholder:text-muted-foreground" />
-          {searchMov && <button onClick={() => setSearchMov('')} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-ctl hover:bg-muted"><X className="h-3.5 w-3.5 text-muted-foreground" /></button>}
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="search"
+            placeholder="Buscar por SAP, motivo, usuario…"
+            value={searchMov}
+            onChange={e => setSearchMov(e.target.value)}
+            className="h-11 w-full rounded-full bg-muted pl-10 pr-9 text-body text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+          />
+          {searchMov && (
+            <button type="button" onClick={() => setSearchMov('')} aria-label="Borrar búsqueda" className="absolute right-1 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-muted-foreground/[0.12]">
+              <X className="size-4" />
+            </button>
+          )}
         </div>
-        <button onClick={() => exportMovsCsv(filtered)} title="Exportar CSV" className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-muted border border-border rounded-card hover:bg-muted text-muted-foreground transition-colors shrink-0">
+        <button type="button" onClick={() => exportMovsCsv(filtered)} title="Exportar CSV" className="flex h-11 shrink-0 items-center gap-1.5 rounded-full bg-muted px-4 text-subhead font-medium text-foreground hover:bg-muted-foreground/[0.15] transition-colors">
           <Download className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Exportar</span>
         </button>
       </div>
@@ -883,7 +900,7 @@ function MovimientosTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
               const tipoConfig = {
                 entrada: { label: 'Entrada', color: 'text-ink-ok', bg: 'bg-emerald-500/[0.15]', icon: ArrowDownCircle },
                 salida: { label: 'Salida', color: 'text-ink-crit', bg: 'bg-red-500/[0.15]', icon: ArrowUpCircle },
-                ajuste: { label: 'Ajuste', color: 'text-primary', bg: 'bg-primary/[0.15]', icon: Settings2 },
+                ajuste: { label: 'Ajuste', color: 'text-brand-ink', bg: 'bg-primary/[0.15]', icon: Settings2 },
               }[m.tipo]
               const TIcon = tipoConfig.icon
               return (
@@ -1637,7 +1654,7 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
             <div className="min-w-0 flex-1">
               <p className={item.textoBreve ? 'text-base font-bold text-foreground' : 'text-base font-bold italic text-muted-foreground'}>{item.textoBreve || `(sin nombre — SAP ${item.codigoSAP})`}</p>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
-                <span className="text-caption px-1.5 py-0.5 rounded-ctl bg-primary/[0.15] text-primary font-mono">{item.codigoSAP}</span>
+                <span className="text-caption px-1.5 py-0.5 rounded-ctl bg-primary/[0.15] text-brand-ink font-mono">{item.codigoSAP}</span>
                 {item.codigoFabricante && <span className="text-caption px-1.5 py-0.5 rounded-ctl bg-cat-6-tint/[0.15] text-cat-6-ink font-mono">{item.codigoFabricante}</span>}
                 {item.tipo && <CatTag tone={tipoTag(item.tipo)} className="uppercase">{item.tipo}</CatTag>}
                 {item.categoria && <span className={`text-caption px-1.5 py-0.5 rounded-ctl font-bold ${item.categoria === 'A' ? 'bg-red-500/[0.15] text-ink-crit' : item.categoria === 'B' ? 'bg-amber-500/[0.15] text-ink-warn' : 'bg-emerald-500/[0.15] text-ink-ok'}`}>ABC: {item.categoria}</span>}
@@ -1653,7 +1670,7 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
               <Pencil className="h-3.5 w-3.5" /> {has ? 'Editar' : 'Configurar'}
             </button>
             {onSearchSimilar && (
-              <button onClick={() => { onSearchSimilar(item.textoBreve || item.codigoSAP); onClose() }} className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-primary/[0.15] border border-primary/[0.25] rounded-card hover:bg-primary/[0.15] text-primary">
+              <button onClick={() => { onSearchSimilar(item.textoBreve || item.codigoSAP); onClose() }} className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-primary/[0.15] border border-primary/[0.25] rounded-card hover:bg-primary/[0.15] text-brand-ink">
                 <Search className="h-3.5 w-3.5" />
               </button>
             )}
@@ -1796,7 +1813,7 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
                   <button onClick={handleDownloadQR} className="flex items-center gap-1 px-3 py-1.5 text-caption font-medium bg-muted border border-border rounded-card hover:bg-muted text-muted-foreground">
                     <Download className="h-3 w-3" /> Descargar PNG
                   </button>
-                  <button onClick={handlePrintQR} className="flex items-center gap-1 px-3 py-1.5 text-caption font-medium bg-primary/10 border border-primary/30 rounded-card hover:bg-primary/20 text-primary">
+                  <button onClick={handlePrintQR} className="flex items-center gap-1 px-3 py-1.5 text-caption font-medium bg-primary/10 border border-primary/30 rounded-card hover:bg-primary/20 text-brand-ink">
                     <QrCode className="h-3 w-3" /> Imprimir
                   </button>
                 </div>
@@ -1924,7 +1941,7 @@ function StockFormModal({ item, onSave, onClose }: { item: BodegaMergedItem; onS
         <div className="px-5 py-4 border-b border-border">
           <h3 className="text-base font-bold">{item.bodegaId ? 'Editar stock' : 'Configurar stock'}</h3>
           <p className="text-xs text-muted-foreground truncate mt-0.5">{item.textoBreve}</p>
-          <span className="text-caption px-1.5 py-0.5 rounded-ctl bg-primary/[0.15] text-primary font-mono">{item.codigoSAP}</span>
+          <span className="text-caption px-1.5 py-0.5 rounded-ctl bg-primary/[0.15] text-brand-ink font-mono">{item.codigoSAP}</span>
         </div>
         <div className="px-5 py-4 space-y-3">
           <div className="grid grid-cols-4 gap-3">
@@ -2002,7 +2019,7 @@ function MovimientoModal({ item, onSave, onClose }: {
   const OPTS = [
     { v: 'entrada' as const, l: 'Entrada', icon: ArrowDownCircle, c: 'text-ink-ok bg-emerald-500/[0.15] border-emerald-500/[0.25]' },
     { v: 'salida' as const, l: 'Salida', icon: ArrowUpCircle, c: 'text-ink-crit bg-red-500/[0.15] border-red-500/[0.25]' },
-    { v: 'ajuste' as const, l: 'Ajuste', icon: Settings2, c: 'text-primary bg-primary/[0.15] border-primary/[0.25]' },
+    { v: 'ajuste' as const, l: 'Ajuste', icon: Settings2, c: 'text-brand-ink bg-primary/[0.15] border-primary/[0.25]' },
   ]
 
   return (
@@ -2067,7 +2084,7 @@ function HistorialModal({ item, loadMovimientos, onClose }: {
           : <div className="space-y-2">{movs.map(m => {
             const cfg = { entrada: { l: 'Entrada', c: 'text-ink-ok bg-emerald-500/[0.15]', i: ArrowDownCircle },
               salida: { l: 'Salida', c: 'text-ink-crit bg-red-500/[0.15]', i: ArrowUpCircle },
-              ajuste: { l: 'Ajuste', c: 'text-primary bg-primary/[0.15]', i: Settings2 } }[m.tipo]
+              ajuste: { l: 'Ajuste', c: 'text-brand-ink bg-primary/[0.15]', i: Settings2 } }[m.tipo]
             const I = cfg.i
             return (
               <div key={m.id} className="flex items-start gap-3 p-3 rounded-card bg-muted border border-border">

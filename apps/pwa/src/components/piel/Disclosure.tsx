@@ -78,7 +78,7 @@ export function Disclosure({
           'transition-colors duration-150 motion-reduce:transition-none',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary',
           inline
-            ? 'min-h-9 text-footnote text-muted-foreground hover:text-foreground'
+            ? 'min-h-[44px] text-footnote text-muted-foreground hover:text-foreground'
             : 'min-h-[44px] gap-3 px-4 py-3 hover:bg-accent',
         )}
       >
