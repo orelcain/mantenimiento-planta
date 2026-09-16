@@ -77,9 +77,9 @@ const STORAGE_KEY = 'repuestos-nav-node' // compartido con EquipmentNavigator
 const tipoLabelOf = (tipo?: string): string => (tipo || '').trim() || 'Sin clasificar'
 
 const STOCK_META: Record<StockStatus, { label: string; dot: string; text: string }> = {
-  ok: { label: 'Disponible', dot: 'bg-emerald-500', text: 'text-emerald-500' },
-  low: { label: 'Bajo', dot: 'bg-amber-500', text: 'text-amber-500' },
-  out: { label: 'Sin stock', dot: 'bg-red-500', text: 'text-red-500' },
+  ok: { label: 'Disponible', dot: 'bg-emerald-500', text: 'text-ink-ok' },
+  low: { label: 'Bajo', dot: 'bg-amber-500', text: 'text-ink-warn' },
+  out: { label: 'Sin stock', dot: 'bg-red-500', text: 'text-ink-crit' },
   unset: { label: 'Sin config', dot: 'bg-muted-foreground/40', text: 'text-muted-foreground' },
 }
 

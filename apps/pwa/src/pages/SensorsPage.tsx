@@ -293,15 +293,15 @@ export function SensorsPage() {
     const q = getRssiQuality(rssi, online)
     switch (q) {
       case 'Excelente':
-        return 'bg-emerald-500'
+        return 'bg-fill-ok'
       case 'Buena':
-        return 'bg-green-500'
+        return 'bg-fill-ok'
       case 'Regular':
-        return 'bg-amber-500'
+        return 'bg-fill-warning'
       case 'Mala':
-        return 'bg-cat-4-tint'
+        return 'bg-fill-warning'
       default:
-        return 'bg-red-500'
+        return 'bg-fill-critical'
     }
   }
 
@@ -2396,8 +2396,8 @@ export function SensorsPage() {
                                 apPassword.length < 8
                                   ? 'w-1/3 bg-fill-critical'
                                   : apPassword.length < 12
-                                    ? 'w-2/3 bg-amber-500'
-                                    : 'w-full bg-green-500'
+                                    ? 'w-2/3 bg-fill-warning'
+                                    : 'w-full bg-fill-ok'
                               }`}
                             />
                           </div>

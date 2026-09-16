@@ -640,7 +640,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident, 
                   className={cn(
                     'p-2 rounded-card border text-center transition-all flex flex-col items-center justify-center h-20 shadow-sm relative overflow-hidden',
                     formData.prioridad === opt.value 
-                      ? `${opt.color} text-white border-transparent ring-2 ring-offset-1 ring-offset-background`
+                      ? 'bg-primary text-primary-foreground border-transparent ring-2 ring-offset-1 ring-offset-background'
                       : 'bg-card border-muted hover:border-sidebar-accent hover:bg-sidebar-accent/50 text-muted-foreground hover:text-foreground'
                   )}
                 > 

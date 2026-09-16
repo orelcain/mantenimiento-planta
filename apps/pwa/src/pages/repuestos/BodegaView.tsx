@@ -1484,7 +1484,7 @@ function Sparkline({ data, width = 80, height = 24, color = '#3b82f6' }: { data:
 function StockBar({ actual, minimo, maximo }: { actual: number; minimo: number; maximo?: number }) {
   const tope = maximo && maximo > 0 ? maximo : Math.max(minimo * 2, actual, 1)
   const pct = Math.min(100, (actual / tope) * 100)
-  const color = actual === 0 ? 'bg-red-500' : actual <= minimo ? 'bg-amber-500' : 'bg-emerald-500'
+  const color = actual === 0 ? 'bg-fill-critical' : actual <= minimo ? 'bg-fill-warning' : 'bg-fill-ok'
   const minimoPct = tope > 0 ? Math.min(100, (minimo / tope) * 100) : 0
 
   return (

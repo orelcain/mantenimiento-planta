@@ -212,10 +212,10 @@ export function ShiftQuotaCard({
   const { current, target, progressPct, remaining, projected, projectedPct, willHit, usingFallback, discrepancy } = view
 
   const barClass =
-    progressPct >= 100 ? 'bg-emerald-500'
-    : progressPct >= 90 ? 'bg-emerald-400'
-    : progressPct >= 50 ? 'bg-amber-400'
-    : 'bg-red-400'
+    progressPct >= 100 ? 'bg-fill-ok'
+    : progressPct >= 90 ? 'bg-fill-ok'
+    : progressPct >= 50 ? 'bg-fill-warning'
+    : 'bg-fill-critical'
 
   const verdictTextClass =
     progressPct >= 100 ? 'text-emerald-400'

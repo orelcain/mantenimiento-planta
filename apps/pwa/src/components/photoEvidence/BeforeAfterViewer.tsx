@@ -204,7 +204,7 @@ export function BeforeAfterViewer({ before, after, titulo }: BeforeAfterViewerPr
             />
             <div className={cn(
               "absolute top-4 left-4 px-3 py-1.5 text-white text-sm font-medium rounded-ctl",
-              fullscreenImage === 'before' ? 'bg-red-500' : 'bg-green-500'
+              'bg-muted-foreground text-background'
             )}>
               {fullscreenImage === 'before' ? 'ANTES' : 'DESPUÉS'}
             </div>

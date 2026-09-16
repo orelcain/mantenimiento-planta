@@ -606,8 +606,13 @@ con un script Node local (`writeFileSync` en `utf8`).
    h-1..3 o color en variable de barra) → `bg-fill-*`, badge o botón con texto blanco → tinte
    15 % + tinta de estado, azul de gráfico → marca. Se quedan puntos de 8 px, tiles de 40 px,
    badges numéricos y la acción de favorito por deslizamiento. Fuera de alcance: leyendas de
-   mapa, monitores de TV y HMI. 73 líneas son funciones que devuelven color para puntos y
-   quedan vivas a propósito. Auditoría: 1516 → 1421.
+   mapa, monitores de TV y HMI. Las 73 líneas sin regla se revisaron una por una: 28 cambiaron
+   (barras de cuota, RSSI, fuerza de clave y stock → `bg-fill-*`; botones «Resolver» en verde
+   sólido → primario de marca; prioridad elegida en marca con el color de severidad solo en el
+   punto; paletas de técnicos y de series → `bg-cat-N-tint`; rótulo sobre foto neutro; tintas
+   `text-*-400/500` sobre tinte → `text-ink-*`). Las 45 restantes son puntos de estado, el
+   ping «en vivo», la acción de favorito al deslizar, la línea de alerta del monitor de sensores
+   y los resaltados amarillos de ETT y de búsqueda: vivos a propósito. Auditoría: 1516 → 1368.
 10. ~~Decidir los `lc-*` del Centro de Aprendizaje~~ — cerrado 2026-09-16 con el hub (5e): el hub
     usa los tokens del sistema; los `--lc-*` siguen solo para el editor admin y los planos.
 11. ~~Decidir si el Grader conserva el toggle sol/luna~~ — **cerrado 2026-09-16: se retiró.**

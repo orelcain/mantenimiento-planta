@@ -820,7 +820,7 @@ export function HierarchyPage() {
                 ) : node.creadoEn && (
                   <Badge 
                     variant="default" 
-                    className="text-xs flex items-center gap-1 bg-green-500 hover:bg-green-600"
+                    className="flex items-center gap-1"
                     title={`Expansión agregada - ${new Date(node.creadoEn.toDate()).toLocaleDateString()}`}
                   >
                     <Sparkles className="h-2.5 w-2.5" />
