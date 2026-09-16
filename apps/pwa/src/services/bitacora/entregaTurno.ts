@@ -31,7 +31,8 @@ export function turnosEntre(origenId: string, actual: Pick<TurnoMantencion, 'ini
  */
 export function pendientesAnteriores(eventos: readonly EventoBitacora[], turno: Pick<TurnoMantencion, 'id' | 'inicio'>): EventoBitacora[] {
   return eventos
-    .filter((e) => e.pendiente && !e.cierre && e.turnoId !== turno.id)
+    // Un borrador marcado pendiente todavía no se entrega: nadie lo publicó.
+    .filter((e) => e.pendiente && !e.cierre && e.estado !== 'borrador' && e.turnoId !== turno.id)
     .map((e) => ({ e, t: turnoDesdeId(e.turnoId) }))
     .filter((x): x is { e: EventoBitacora; t: TurnoMantencion } => Boolean(x.t) && x.t!.inicio < turno.inicio)
     .sort((a, b) => b.t.inicio.getTime() - a.t.inicio.getTime() || b.e.horaInicio.localeCompare(a.e.horaInicio))

@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { BarChart3, Check, ChevronLeft, ChevronRight, ClipboardCopy, FileDown, Loader2, MessageSquareText, NotebookPen, Plus } from 'lucide-react'
 import { Button, Pill, Sheet, Tag } from '@/components/piel'
 import { EventoBitacoraFila } from '@/components/bitacora/EventoBitacoraFila'
+import { BarraSincronizacion } from '@/components/bitacora/BarraSincronizacion'
 import { EventoBitacoraSheet } from '@/components/bitacora/EventoBitacoraSheet'
 import { VisorFotosBitacora } from '@/components/bitacora/VisorFotosBitacora'
 import { SelectorTecnico } from '@/components/bitacora/SelectorTecnico'
@@ -18,11 +19,14 @@ import type { EventoBitacora, FotoEvento, TurnoMantencion } from '@/services/bit
 import { bitacoraAHtmlCorreo, bitacoraATextoPlano, etiquetaParada, etiquetaPendientes, tituloCorreo } from '@/services/bitacora/bitacoraCorreo'
 import { cargarFotoComoJpeg, purgarFotosPendientes } from '@/services/bitacora/fotosBitacora'
 import { resumirBitacora } from '@/services/bitacora/resumenBitacora'
+import { esBorrador, soloListos } from '@/services/bitacora/borradores'
+import { otrosEditando } from '@/services/bitacora/presencia'
+import { useAuthStore } from '@/store'
+import type { TagTone } from '@/components/piel'
 import {
   etiquetaTurno,
   fechaTurnoLarga,
   formatoMinutos,
-  horaDe,
   horarioTurno,
   turnoAdyacente,
   turnoDesdeId,
@@ -56,7 +60,7 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
   const turno = editor?.turno ?? turnoNavegado
   const esActual = turno.id === turnoActual.id
 
-  const { eventos, cargando, error, sincronizando, ultimaSync, nuevoId, guardar, borrar } = fuente.useEventos(turno)
+  const { eventos, cargando, error, ultimaSync, cambiosPorSubir, novedad, nuevoId, guardar, borrar } = fuente.useEventos(turno)
   const calendario = fuente.useTecnicos(turno)
   const { observacion, guardarObservacion, guardarPresentes } = fuente.useObservacion(turno)
   const { ajustes, guardarAjustes } = fuente.useAjustes()
@@ -81,6 +85,26 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
     return tecnicos.todos.length === 0 || tecnicos.todos.includes(recordado) ? recordado : ''
   }
   const r = useMemo(() => resumirBitacora(eventos), [eventos])
+  // Publicados primero (en orden del turno) y los borradores al final: se ven,
+  // pero todavía no son un hecho del turno.
+  const borradores = useMemo(() => eventos.filter(esBorrador), [eventos])
+  const enLista = useMemo(() => [...soloListos(eventos), ...borradores], [eventos, borradores])
+
+  // Presencia: quién tiene esta bitácora abierta y qué evento está escribiendo.
+  const usuario = useAuthStore((s) => s.user)
+  const editandoEventoId = editor ? (editor.evento?.id ?? editor.idNuevo) : null
+  const nombreEnPresencia =
+    tecnicoRecordado() || [usuario?.nombre?.split(' ')[0], usuario?.apellido?.split(' ')[0]].filter(Boolean).join(' ')
+  const { presentes: conectados, miDispositivoId } = fuente.usePresencia(turno, { nombre: nombreEnPresencia, editandoEventoId })
+  // Color estable por técnico: su posición en la lista (no un hash del nombre).
+  const tonoDe = useCallback(
+    (nombre: string): TagTone => {
+      const i = listaTecnicos.findIndex((t) => t.nombre === nombre)
+      return i < 0 ? 'neutral' : ((((i % 8) + 8) % 8) + 1) as TagTone
+    },
+    [listaTecnicos],
+  )
+  const hayEventoConId = useCallback((id: string) => eventos.some((e) => e.id === id), [eventos])
 
   const [trabajando, setTrabajando] = useState<null | 'copiar' | 'copiar-incrustadas' | 'pdf'>(null)
   const [editandoObs, setEditandoObs] = useState(false)
@@ -157,7 +181,13 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
     setTrabajando('copiar')
     try {
       await copiarHtml(htmlCorreo, bitacoraATextoPlano(datosCorreo))
-      toast({ title: 'Copiado', description: 'Pégalo en el correo con Ctrl+V.', variant: 'success' })
+      toast({
+        title: 'Copiado',
+        description: borradores.length
+          ? `Pégalo con Ctrl+V. ${borradores.length === 1 ? '1 evento en redacción no va' : `${borradores.length} eventos en redacción no van`} en el correo.`
+          : 'Pégalo en el correo con Ctrl+V.',
+        variant: 'success',
+      })
     } catch {
       toast({ title: 'No se pudo copiar', description: 'El navegador bloqueó el portapapeles. Prueba de nuevo o usa el PDF.', variant: 'destructive' })
     } finally {
@@ -275,25 +305,19 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
         </div>
       </header>
 
-      {/* Estado de sincronización: nunca se esconde (Constitución, estados de datos). */}
-      <div className="-mt-3 flex flex-col gap-0.5 px-1 text-footnote text-muted-foreground">
-        <p className="flex items-center gap-2" aria-live="polite">
-          {error ? (
-            <span className="font-semibold text-ink-crit">{error}</span>
-          ) : sincronizando ? (
-            <>
-              <Loader2 className="size-3.5 shrink-0 animate-spin" aria-hidden /> Guardando…
-            </>
-          ) : cargando ? (
-            'Cargando…'
-          ) : (
-            <>
-              <span className="size-2 shrink-0 rounded-full bg-primary" aria-hidden />
-              Sincronizado{ultimaSync ? ` a las ${horaDe(ultimaSync)}` : ''}
-            </>
-          )}
-        </p>
-      </div>
+      {/* Estado de sincronización y quién está conectado: nunca se esconde
+          (mockup aprobado 16-09-2026). */}
+      <BarraSincronizacion
+        cargando={cargando}
+        error={error}
+        ultimaSync={ultimaSync}
+        cambiosPorSubir={cambiosPorSubir}
+        novedad={novedad}
+        presentes={conectados}
+        miDispositivoId={miDispositivoId}
+        editandoPorEvento={hayEventoConId}
+        tonoDe={tonoDe}
+      />
 
       {/* Técnicos del turno: quién está de verdad (mockup aprobado, pieza 1). */}
       {/* Entrega de turno: lo primero que ve el turno que llega (mockup aprobado). */}
@@ -456,10 +480,11 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
             </div>
           ) : (
             <div className="overflow-hidden rounded-card bg-card shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
-              {eventos.map((e) => (
+              {enLista.map((e) => (
                 <EventoBitacoraFila
                   key={e.id}
                   evento={e}
+                  abiertoPor={otrosEditando(conectados, e.id, miDispositivoId)}
                   onAbrir={() => setEditor({ evento: e, idNuevo: e.id, turno })}
                   onVerFoto={(fotos, indice) => setVisor({ fotos, indice, titulo: [e.horaInicio, e.equipo].filter(Boolean).join(' · ') })}
                 />
@@ -507,6 +532,8 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
         subirFoto={fuente.subirFoto}
         onGuardar={guardar}
         onBorrar={borrar}
+        eventoVivo={editandoEventoId ? (eventos.find((e) => e.id === editandoEventoId) ?? null) : null}
+        otrosEditando={editandoEventoId ? otrosEditando(conectados, editandoEventoId, miDispositivoId) : []}
         onClose={() => setEditor(null)}
       />
 

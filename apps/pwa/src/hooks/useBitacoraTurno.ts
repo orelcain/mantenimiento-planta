@@ -25,6 +25,9 @@ import { ordenarEventos } from '@/services/bitacora/resumenBitacora'
 import { tecnicosDelCalendario, tecnicosDeTurno, type CalendarioDoc } from '@/services/bitacora/tecnicosDeTurno'
 import { turnoMantencionEn } from '@/services/bitacora/turnoMantencion'
 import { borrarFotoOEncolar, type subirFotoBitacora } from '@/services/bitacora/fotosBitacora'
+import { autorVisible } from '@/services/bitacora/bitacora.types'
+import { dispositivoActual } from '@/services/bitacora/dispositivo'
+import { usePresenciaBitacora } from '@/hooks/usePresenciaBitacora'
 
 /**
  * Cierra el pendiente que un evento nuevo acaba de resolver.
@@ -117,12 +120,21 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
   const [error, setError] = useState<string | null>(null)
   const [sincronizando, setSincronizando] = useState(false)
   const [ultimaSync, setUltimaSync] = useState<Date | null>(null)
+  /** Documentos con cambios guardados en este equipo que el servidor aún no confirma. */
+  const [cambiosPorSubir, setCambiosPorSubir] = useState(0)
+  /** Lo último que llegó de OTRO equipo («Leandro agregó un evento»). */
+  const [novedad, setNovedad] = useState<{ texto: string; en: number } | null>(null)
   const user = useAuthStore((s) => s.user)
   const turnoId = turno.id
 
   useEffect(() => {
     setCargando(true)
     setCrudos([])
+    setNovedad(null)
+    // Lo que ya estaba al abrir no es «novedad»: se empieza a avisar recién
+    // después de la primera respuesta del SERVIDOR (la de caché no cuenta).
+    let sincronizadoUnaVez = false
+    const estadoPrevio = new Map<string, string | undefined>()
     const q = query(
       collection(db, BITACORA_COLECCION),
       where('plantId', '==', BITACORA_PLANTA.id),
@@ -132,7 +144,24 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
       q,
       { includeMetadataChanges: true },
       (snap) => {
-        setCrudos(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as EventoBitacora))
+        const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as EventoBitacora)
+        if (sincronizadoUnaVez) {
+          for (const c of snap.docChanges()) {
+            // Con cambios pendientes = lo escribió ESTE equipo: no es novedad.
+            if (c.doc.metadata.hasPendingWrites) continue
+            const e = { id: c.doc.id, ...c.doc.data() } as EventoBitacora
+            const quien = autorVisible(e) || 'Alguien'
+            if (c.type === 'added') {
+              setNovedad({ texto: e.estado === 'borrador' ? `${quien} empezó un evento` : `${quien} agregó un evento`, en: Date.now() })
+            } else if (c.type === 'modified' && estadoPrevio.get(e.id) === 'borrador' && e.estado !== 'borrador') {
+              setNovedad({ texto: `${e.actualizadoPorNombre || quien} publicó un evento`, en: Date.now() })
+            }
+          }
+        }
+        for (const e of docs) estadoPrevio.set(e.id, e.estado)
+        if (!snap.metadata.fromCache) sincronizadoUnaVez = true
+        setCrudos(docs)
+        setCambiosPorSubir(snap.docs.filter((d) => d.metadata.hasPendingWrites).length)
         setSincronizando(snap.metadata.hasPendingWrites)
         if (!snap.metadata.hasPendingWrites && !snap.metadata.fromCache) setUltimaSync(new Date())
         setError(null)
@@ -161,6 +190,8 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
     return nombre || auth.currentUser?.displayName || auth.currentUser?.email || 'Sin nombre'
   }, [user])
 
+  const ultimoAvisoBorrador = useRef(0)
+
   /** Id para un evento nuevo ANTES de guardarlo: las fotos se suben a su carpeta. */
   const nuevoId = useCallback(() => doc(collection(db, BITACORA_COLECCION)).id, [])
 
@@ -169,7 +200,10 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
       const u = auth.currentUser
       if (!u) throw new Error('Hay que iniciar sesión para escribir en la bitácora.')
       const descripcion = datos.descripcion.trim()
-      if (!descripcion) throw new Error('Escribe qué pasó.')
+      const estado = datos.estado ?? 'listo'
+      const esBorradorAhora = estado === 'borrador'
+      // Un borrador se guarda como vaya: la descripción se exige al publicar.
+      if (!descripcion && !esBorradorAhora) throw new Error('Escribe qué pasó.')
       if (!/^\d{2}:\d{2}$/.test(datos.horaInicio)) throw new Error('Falta la hora de inicio.')
       const fotos: FotoEvento[] = datos.fotos.map((f) => ({
         url: f.url,
@@ -191,6 +225,8 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
         fotos,
         participantes: [...new Set(datos.participantes.map((p) => p.trim()).filter(Boolean))].slice(0, 12),
         equipoId: datos.equipoId || null,
+        estado,
+        dispositivo: dispositivoActual(),
       }
       const ref = doc(db, BITACORA_COLECCION, id)
       // SIN await: la promesa de Firestore se resuelve recién cuando el SERVIDOR
@@ -198,7 +234,11 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
       // app usa `persistentLocalCache`, así que la escritura ya quedó en el
       // teléfono (sobrevive a cerrar la app) y el onSnapshot la muestra al tiro
       // con `hasPendingWrites` → «Guardando…». Si el servidor la rechaza, se avisa.
-      const avisarRechazo = (e: unknown) =>
+      const avisarRechazo = (e: unknown) => {
+        // El autoguardado escribe cada pocos segundos: un rechazo repetido no
+        // puede llenar la pantalla de avisos iguales.
+        if (esBorradorAhora && Date.now() - ultimoAvisoBorrador.current < 30_000) return
+        if (esBorradorAhora) ultimoAvisoBorrador.current = Date.now()
         toast({
           title: 'El evento no se guardó en el servidor',
           description: (e as { code?: string })?.code === 'permission-denied'
@@ -206,6 +246,7 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
             : 'Vuelve a intentarlo cuando haya señal.',
           variant: 'destructive',
         })
+      }
       const quien = datos.quien.trim() || nombreAutor()
       if (esNuevo) {
         const nuevo = {
@@ -223,9 +264,9 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
         if (datos.resuelvePendiente?.id) {
           // Entrega de turno: PRIMERO el evento (nunca se pierde), después el
           // cierre del pendiente, que puede fallar sin arrastrarlo (ver
-          // `cerrarPendienteResuelto`).
+          // `cerrarPendienteResuelto`). Un borrador todavía no cierra nada.
           void setDoc(ref, { ...nuevo, resuelvePendiente: datos.resuelvePendiente }).catch(avisarRechazo)
-          void cerrarPendienteResuelto(datos.resuelvePendiente.id, id, turno.id, quien)
+          if (!esBorradorAhora) void cerrarPendienteResuelto(datos.resuelvePendiente.id, id, turno.id, quien)
         } else {
           void setDoc(ref, nuevo).catch(avisarRechazo)
         }
@@ -239,12 +280,19 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
         // teléfono: el tope de 8 se calculaba por dispositivo y dos que agregaban
         // a la vez dejaban el evento en 10 fotos, con la regla rechazando desde
         // ahí toda edición posterior (revisión 15-09).
-        const vivas = eventosRef.current.find((e) => e.id === id)?.fotos ?? antes
+        const vivo = eventosRef.current.find((e) => e.id === id)
+        const vivas = vivo?.fotos ?? antes
+        // Se PUBLICA un borrador que venía de «Resolver»: recién ahora se cierra
+        // el pendiente original.
+        if (!esBorradorAhora && vivo?.estado === 'borrador' && vivo.resuelvePendiente?.id) {
+          void cerrarPendienteResuelto(vivo.resuelvePendiente.id, id, turno.id, quien)
+        }
         const quitadas = antes.filter((a) => !fotos.some((f) => f.path === a.path))
         const cupo = Math.max(0, MAX_FOTOS_EVENTO - vivas.length + quitadas.length)
         const nuevas = fotos.filter((f) => !vivas.some((a) => a.path === f.path))
         const agregadas = nuevas.slice(0, cupo)
-        if (agregadas.length < nuevas.length) {
+        if (agregadas.length < nuevas.length && !(esBorradorAhora && Date.now() - ultimoAvisoBorrador.current < 30_000)) {
+          if (esBorradorAhora) ultimoAvisoBorrador.current = Date.now()
           toast({
             title: `El evento ya llegó a ${MAX_FOTOS_EVENTO} fotos`,
             description: `Otro teléfono subió fotos mientras editabas: ${nuevas.length - agregadas.length} no se guardaron.`,
@@ -260,7 +308,9 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
           // la fila decía «Pendiente» y «Resuelto en…» a la vez y la entrega de
           // turno —que filtra por `!cierre`— nunca lo volvía a mostrar.
           ...(datos.pendiente && datos.cierreAntes ? { cierre: null } : {}),
-          actualizadoPorNombre: quien,
+          // Un borrador propio todavía puede cambiar de autor; uno ajeno o
+          // publicado deja constancia de quién lo tocó.
+          ...(datos.fijarAutor ? { registradoPor: quien } : { actualizadoPorNombre: quien }),
           updatedAt: serverTimestamp(),
         })
         if (agregadas.length) lote.update(ref, { fotos: arrayUnion(...agregadas) })
@@ -298,7 +348,7 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
     }
   }, [])
 
-  return { eventos, cargando, error, sincronizando, ultimaSync, nuevoId, guardar, borrar }
+  return { eventos, cargando, error, sincronizando, ultimaSync, cambiosPorSubir, novedad, nuevoId, guardar, borrar }
 }
 
 /**
@@ -500,6 +550,7 @@ export interface FuenteBitacora {
   useAjustes: () => ReturnType<typeof useAjustesTecnicos>
   usePendientesAnteriores: (turno: TurnoMantencion) => ReturnType<typeof usePendientesAnteriores>
   useOpcionesEquipo: (activo: boolean) => ReturnType<typeof useOpcionesEquipo>
+  usePresencia: typeof usePresenciaBitacora
   /** Reemplaza la subida a Storage. */
   subirFoto?: typeof subirFotoBitacora
 }
@@ -511,4 +562,5 @@ export const FUENTE_FIRESTORE: FuenteBitacora = {
   useAjustes: useAjustesTecnicos,
   usePendientesAnteriores,
   useOpcionesEquipo,
+  usePresencia: usePresenciaBitacora,
 }

@@ -4,6 +4,7 @@ import { autorVisible, type EventoBitacora, type FotoEvento, type TurnoMantencio
 import { etiquetaPendientes, horarioEvento, lineaImpacto, lineaPendienteAnterior, lineaTecnicos } from './bitacoraCorreo'
 import { cargarFotoComoJpeg, type ImagenCargada } from './fotosBitacora'
 import { fuePendiente, ordenarEventos, resumirBitacora } from './resumenBitacora'
+import { soloListos } from './borradores'
 import { etiquetaTurno, fechaTurnoLarga, formatoMinutos, horarioTurno } from './turnoMantencion'
 
 /**
@@ -32,7 +33,8 @@ export interface DatosPdfBitacora {
   pendientesAnteriores?: readonly EventoBitacora[]
 }
 
-export async function generarPdfBitacora({ turno, eventos, tecnicos, planta, observacion, pendientesAnteriores = [] }: DatosPdfBitacora): Promise<{ archivo: string; fotosFallidas: number }> {
+export async function generarPdfBitacora({ turno, eventos: todos, tecnicos, planta, observacion, pendientesAnteriores = [] }: DatosPdfBitacora): Promise<{ archivo: string; fotosFallidas: number }> {
+  const eventos = soloListos(todos)
   const { jsPDF } = await import('jspdf')
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   // NFKC antes del saneo: convierte subíndices y superíndices a dígitos

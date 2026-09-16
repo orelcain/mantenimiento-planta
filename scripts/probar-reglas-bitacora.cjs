@@ -76,6 +76,36 @@ const CASOS_ENTREGA = [
   ['Cierre que no es un mapa', 'DENY', { method: 'update', uid: 'tecnico2', col: 'bitacoraEventos', data: evento({ pendiente: false, cierre: 'resuelto' }), previo: evento() }, usuario(true, 'tecnico')],
 ]
 
+// Bitácora cooperativa (16-09): borradores que se guardan solos + presencia.
+const PRES_ID = 'chonchi_2026-09-16_tarde_disp-celular-01'
+const presencia = (extra = {}) => ({
+  plantId: 'chonchi',
+  turnoId: '2026-09-16_tarde',
+  dispositivoId: 'disp-celular-01',
+  dispositivo: 'celular',
+  nombre: 'Danilo Cortes',
+  editandoEventoId: null,
+  vistoEn: '__AHORA__',
+  uid: 'tecnico1',
+  ...extra,
+})
+const CASOS_COOPERATIVA = [
+  ['Borrador SIN descripción todavía', 'ALLOW', { method: 'create', uid: 'tecnico1', col: 'bitacoraEventos', data: evento({ estado: 'borrador', descripcion: '', equipo: 'KNURO N1', dispositivo: 'celular' }) }, usuario(true, 'tecnico')],
+  ['Publicado (listo) sin descripción', 'DENY', { method: 'create', uid: 'tecnico1', col: 'bitacoraEventos', data: evento({ estado: 'listo', descripcion: '' }) }, usuario(true, 'tecnico')],
+  ['Otro equipo PUBLICA el borrador de otro (lo continúa en el PC)', 'ALLOW', { method: 'update', uid: 'tecnico2', col: 'bitacoraEventos', data: evento({ estado: 'listo', descripcion: 'Se cambió el sensor B2.', dispositivo: 'pc' }), previo: evento({ estado: 'borrador', descripcion: '' }) }, usuario(true, 'tecnico')],
+  ['Publicar un borrador dejando la descripción vacía', 'DENY', { method: 'update', uid: 'tecnico1', col: 'bitacoraEventos', data: evento({ estado: 'listo', descripcion: '' }), previo: evento({ estado: 'borrador', descripcion: '' }) }, usuario(true, 'tecnico')],
+  ['Estado inventado', 'DENY', { method: 'create', uid: 'tecnico1', col: 'bitacoraEventos', data: evento({ estado: 'archivado' }) }, usuario(true, 'tecnico')],
+  ['Dispositivo inventado', 'DENY', { method: 'create', uid: 'tecnico1', col: 'bitacoraEventos', data: evento({ dispositivo: 'tablet' }) }, usuario(true, 'tecnico')],
+  ['Otro técnico borra un BORRADOR ajeno', 'DENY', { method: 'delete', uid: 'tecnico2', col: 'bitacoraEventos', previo: evento({ estado: 'borrador' }) }, usuario(true, 'tecnico')],
+  ['Latido de presencia válido', 'ALLOW', { method: 'create', uid: 'tecnico1', col: 'bitacoraPresencia', id: PRES_ID, data: presencia() }, usuario(true, 'tecnico')],
+  ['Presencia editando un evento', 'ALLOW', { method: 'update', uid: 'tecnico1', col: 'bitacoraPresencia', id: PRES_ID, data: presencia({ editandoEventoId: 'evento1' }), previo: presencia() }, usuario(true, 'tecnico')],
+  ['Presencia con la hora del TELÉFONO', 'DENY', { method: 'create', uid: 'tecnico1', col: 'bitacoraPresencia', id: PRES_ID, data: presencia({ vistoEn: '2026-09-16T17:00:00Z' }) }, usuario(true, 'tecnico')],
+  ['Presencia firmada por otro', 'DENY', { method: 'create', uid: 'tecnico1', col: 'bitacoraPresencia', id: PRES_ID, data: presencia({ uid: 'tecnico2' }) }, usuario(true, 'tecnico')],
+  ['Presencia con id que no calza', 'DENY', { method: 'create', uid: 'tecnico1', col: 'bitacoraPresencia', id: 'chonchi_2026-09-16_tarde_otro-dispositivo', data: presencia() }, usuario(true, 'tecnico')],
+  ['Presencia con campos de más', 'DENY', { method: 'create', uid: 'tecnico1', col: 'bitacoraPresencia', id: PRES_ID, data: presencia({ ubicacion: 'sala de maquinas' }) }, usuario(true, 'tecnico')],
+  ['Usuario inactivo marca presencia', 'DENY', { method: 'create', uid: 'tecnico1', col: 'bitacoraPresencia', id: PRES_ID, data: presencia() }, usuario(false, 'tecnico')],
+]
+
 ;(async () => {
   const cred = admin.credential.cert(require(path.join(__dirname, '..', 'serviceAccountKey.json')))
   const { access_token: token } = await cred.getAccessToken()
@@ -106,11 +136,16 @@ const CASOS_ENTREGA = [
   const contenido = source.files.map((f) => f.content).join('\n')
   if (contenido.includes('/bitacoraConfig/')) casos.push(...CASOS_TECNICOS)
   if (contenido.includes("'resuelvePendiente' in d")) casos.push(...CASOS_ENTREGA)
+  if (contenido.includes('/bitacoraPresencia/')) casos.push(...CASOS_COOPERATIVA)
 
   const testCases = casos.map(([, expectation, c, mocks]) => {
     const id = c.id ?? 'evento1'
-    const req = { auth: auth(c.uid), path: ruta(c.col, id), method: c.method, time: new Date().toISOString() }
-    if (c.data) req.resource = { __name__: ruta(c.col, id), id, data: c.data }
+    const ahora = new Date().toISOString()
+    const req = { auth: auth(c.uid), path: ruta(c.col, id), method: c.method, time: ahora }
+    // `__AHORA__` = la hora de ESTA petición (lo que pone serverTimestamp()).
+    const conHora = (d) => (d && d.vistoEn === '__AHORA__' ? { ...d, vistoEn: ahora } : d)
+    if (c.data) req.resource = { __name__: ruta(c.col, id), id, data: conHora(c.data) }
+    if (c.previo) c.previo = conHora(c.previo)
     return {
       expectation,
       request: req,
