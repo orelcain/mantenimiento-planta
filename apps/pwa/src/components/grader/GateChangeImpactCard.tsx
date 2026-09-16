@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils'
 import { fmtTime } from '@/services/grader/graderTimeFormat'
 import type { TimelineBucket } from '@/services/grader/types'
 import type { GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
+import { dec1 } from '@/utils/formatoNumeros'
 
 const WINDOW_MIN = 10
 const MIN_AFTER_BUCKETS = 5
@@ -141,7 +142,7 @@ export function GateChangeImpactCard({
                       ? 'text-muted-foreground/30'
                       : seg.p0Before > 5 ? 'text-red-400' : 'text-muted-foreground',
                   )}>
-                    {seg.p0Before !== null ? `${seg.p0Before.toFixed(1)}%` : '—'}
+                    {seg.p0Before !== null ? `${dec1(seg.p0Before)}%` : '—'}
                   </span>
 
                   <span className="text-muted-foreground/30 text-xs shrink-0">→</span>
@@ -159,7 +160,7 @@ export function GateChangeImpactCard({
                   )}>
                     {inProgress
                       ? 'en curso'
-                      : seg.p0After !== null ? `${seg.p0After.toFixed(1)}%` : '—'}
+                      : seg.p0After !== null ? `${dec1(seg.p0After)}%` : '—'}
                   </span>
 
                   {/* Delta badge */}
@@ -173,7 +174,7 @@ export function GateChangeImpactCard({
                       {improved  ? <TrendingDown className="w-2.5 h-2.5" />
                         : worsened ? <TrendingUp   className="w-2.5 h-2.5" />
                           : <Minus className="w-2.5 h-2.5" />}
-                      {delta > 0 ? '+' : ''}{delta.toFixed(1)}%
+                      {delta > 0 ? '+' : ''}{dec1(delta)}%
                     </span>
                   )}
                 </div>

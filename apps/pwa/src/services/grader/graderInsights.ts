@@ -12,6 +12,7 @@ import type {
 import { computePerGateResponseTime } from './graderGateTiming'
 import { getGradingBelt } from './graderBeltHelpers'
 import { MACHINE_LIMITS, TIMING_THRESHOLDS } from './graderThresholds'
+import { dec1, dec2 } from '@/utils/formatoNumeros'
 
 let insightCounter = 0
 function nextId(): string {
@@ -142,8 +143,8 @@ export function computeDeterministicInsights(
         severity: growthPct > 100 ? 'critical' : 'warn',
         title: 'Punto Cero creciente en el tiempo',
         evidence: [
-          `Promedio primera mitad del turno: ${avgFirst.toFixed(1)} piezas/intervalo`,
-          `Promedio segunda mitad: ${avgSecond.toFixed(1)} piezas/intervalo`,
+          `Promedio primera mitad del turno: ${dec1(avgFirst)} piezas/intervalo`,
+          `Promedio segunda mitad: ${dec1(avgSecond)} piezas/intervalo`,
           `Incremento: +${growthPct}%`,
         ],
         recommendations: [
@@ -220,7 +221,7 @@ export function computeDeterministicInsights(
           evidence: [
             `Lote "${prev.lot}": peso prom. ${prev.avgWeightGrams}g (${prev.pieces} pz)`,
             `Lote "${curr.lot}": peso prom. ${curr.avgWeightGrams}g (${curr.pieces} pz)`,
-            `Diferencia: ${diff.toFixed(0)}g (${diffPct.toFixed(1)}%)`,
+            `Diferencia: ${diff.toFixed(0)}g (${dec1(diffPct)}%)`,
           ],
           recommendations: [
             'Al cambiar de lote, el peso promedio cambió significativamente.',
@@ -249,7 +250,7 @@ export function computeDeterministicInsights(
         evidence: [
           `Primera mitad: ${avgFirst.toFixed(0)}g promedio`,
           `Segunda mitad: ${avgSecond.toFixed(0)}g promedio`,
-          `Cambio: ${diff > 0 ? '+' : ''}${diff.toFixed(0)}g (${diffPct.toFixed(1)}%)`,
+          `Cambio: ${diff > 0 ? '+' : ''}${diff.toFixed(0)}g (${dec1(diffPct)}%)`,
         ],
         recommendations: [
           'El peso promedio del producto está cambiando durante la producción.',
@@ -271,7 +272,7 @@ export function computeDeterministicInsights(
           severity: gs.cv > avgCV * 3 ? 'warn' : 'info',
           title: `Gate ${gs.gateNumber}: alta variabilidad de peso`,
           evidence: [
-            `CV: ${(gs.cv * 100).toFixed(1)}% (promedio: ${(avgCV * 100).toFixed(1)}%)`,
+            `CV: ${dec1((gs.cv * 100))}% (promedio: ${dec1((avgCV * 100))}%)`,
             `Peso promedio: ${gs.avgWeightGrams}g ± ${gs.stdDevWeightGrams}g`,
             `Mismatch calibre: ${gs.mismatchPct}%`,
           ],
@@ -336,9 +337,9 @@ export function computeDeterministicInsights(
         const evidence: string[] = [
           `Velocidad cinta clasificadora: ${mainBelt.speedMps} m/s`,
           `Tasa de producción: ${result.kpis.productionRatePerHour.toFixed(0)} pz/h`,
-          `Separación estimada entre peces: ${spacingCm.toFixed(1)} cm`,
+          `Separación estimada entre peces: ${dec1(spacingCm)} cm`,
           `Largo promedio salmón configurado: ${salmonLengthCm} cm`,
-          `Espacio libre entre peces: ${gapCm.toFixed(1)} cm (${((gapCm / salmonLengthCm) * 100).toFixed(0)}% del largo)`,
+          `Espacio libre entre peces: ${dec1(gapCm)} cm (${((gapCm / salmonLengthCm) * 100).toFixed(0)}% del largo)`,
         ]
         if (tooCloseCause && tooCloseCause.pieces > 0) {
           evidence.push(`Errores "too close/too long" detectados: ${tooCloseCause.pieces.toLocaleString('es-CL')} pz (${tooCloseCause.pctOfTotal}% del total)`)
@@ -349,7 +350,7 @@ export function computeDeterministicInsights(
           title: 'Congestionamiento físico: separación insuficiente entre peces',
           evidence,
           recommendations: [
-            `La separación estimada (${spacingCm.toFixed(1)} cm) es menor al mínimo recomendado (1.4× largo del salmón = ${(salmonLengthCm * 1.4).toFixed(0)} cm).`,
+            `La separación estimada (${dec1(spacingCm)} cm) es menor al mínimo recomendado (1.4× largo del salmón = ${(salmonLengthCm * 1.4).toFixed(0)} cm).`,
             'Reducir la tasa de alimentación de los pockets para aumentar la separación.',
             'Considerar aumentar la velocidad de las cintas de aceleración.',
             ...(ratioToLength < 1.2 ? ['URGENTE: riesgo alto de errores "too close" en cascada — acción inmediata recomendada.'] : []),
@@ -427,9 +428,9 @@ export function computeDeterministicInsights(
           title: `${criticalFlippers.length} flippers con tiempo de reacción ajustado`,
           evidence: criticalFlippers.map(
             (fp) =>
-              `Gate ${fp.gateNumber}: ${fp.distanceM.toFixed(3)} m → ${fp.timeSec.toFixed(2)} s @ ${mainBelt.speedMps} m/s` +
+              `Gate ${fp.gateNumber}: ${fp.distanceM.toFixed(3)} m → ${dec2(fp.timeSec)} s @ ${mainBelt.speedMps} m/s` +
               (mainBelt.speedMps < maxSpeedMps
-                ? ` (${fp.timeSecAtMaxSpeed.toFixed(2)} s a vel. máx. 1.4 m/s)`
+                ? ` (${dec2(fp.timeSecAtMaxSpeed)} s a vel. máx. 1.4 m/s)`
                 : ''),
           ),
           recommendations: [
@@ -464,20 +465,20 @@ export function computeDeterministicInsights(
         insights.push({
           id: nextId(),
           severity: g.utilizationPct >= overloadCritical ? 'critical' : 'warn',
-          title: `Gate ${g.gateNumber} concentra el ${g.utilizationPct.toFixed(1)}% del tráfico`,
+          title: `Gate ${g.gateNumber} concentra el ${dec1(g.utilizationPct)}% del tráfico`,
           evidence: [
-            `Gate ${g.gateNumber}: ${g.pieces.toLocaleString('es-CL')} pz = ${g.utilizationPct.toFixed(1)}% del total clasificado`,
+            `Gate ${g.gateNumber}: ${g.pieces.toLocaleString('es-CL')} pz = ${dec1(g.utilizationPct)}% del total clasificado`,
             `Umbral warn: ${overloadWarn}% · Umbral critical: ${overloadCritical}%`,
-            `Promedio esperado por gate activa: ${avgUtilization.toFixed(1)}%`,
+            `Promedio esperado por gate activa: ${dec1(avgUtilization)}%`,
             `Calibre: ${g.assignedCalibre} / ${g.assignedQuality}`,
             topCandidate !== undefined
-              ? `Gates con baja carga: ${underloaded.map((u) => `Gate ${u.gateNumber} (${u.utilizationPct.toFixed(1)}%)`).join(', ')}`
+              ? `Gates con baja carga: ${underloaded.map((u) => `Gate ${u.gateNumber} (${dec1(u.utilizationPct)}%)`).join(', ')}`
               : 'Todas las gates activas trabajan a nivel elevado.',
           ],
           recommendations: [
             `Asignar ${g.assignedCalibre} / ${g.assignedQuality} a una gate adicional para distribuir la carga.`,
             ...(topCandidate !== undefined
-              ? [`Gate ${topCandidate.gateNumber} tiene capacidad disponible (${topCandidate.utilizationPct.toFixed(1)}% de utilización actual).`]
+              ? [`Gate ${topCandidate.gateNumber} tiene capacidad disponible (${dec1(topCandidate.utilizationPct)}% de utilización actual).`]
               : []),
             'Ir a "Configurar compuertas" → duplicar el calibre en otra gate cercana.',
             'Esto reduce el riesgo de "puerta no preparada" y mejora el throughput.',
@@ -525,7 +526,7 @@ export function computeDeterministicInsights(
       if (hasPneu) {
         const breakdown = computePerGateResponseTime(g1, physicalConfig.pneumaticConfig!)
         tReset = breakdown.totalResponseSec
-        pneumDetail = ` (válvula ${(breakdown.valveSwitchSec * 1000).toFixed(0)}ms + línea ${(breakdown.lineChargeSec * 1000).toFixed(0)}ms + cilindro ${(breakdown.cylinderStrokeSec * 1000).toFixed(0)}ms, P_eff ${breakdown.effectivePressureBar.toFixed(1)} bar)`
+        pneumDetail = ` (válvula ${(breakdown.valveSwitchSec * 1000).toFixed(0)}ms + línea ${(breakdown.lineChargeSec * 1000).toFixed(0)}ms + cilindro ${(breakdown.cylinderStrokeSec * 1000).toFixed(0)}ms, P_eff ${dec1(breakdown.effectivePressureBar)} bar)`
       } else {
         tReset = flatReset
         pneumDetail = ' (valor plano estimado)'
@@ -543,8 +544,8 @@ export function computeDeterministicInsights(
           severity: margin < 0 ? 'warn' : 'info',
           title: `Gate ${g1}→${g2}: timing Z2 muy ajustado entre gates adyacentes`,
           evidence: [
-            `Tiempo disponible entre dis${g1}=${dis1}mm y dis${g2}=${dis2}mm: ${tAvailable.toFixed(2)} s`,
-            `Tiempo requerido (salmón ${physicalConfig.avgSalmonLengthCm}cm + reset ${tReset.toFixed(3)}s${pneumDetail}): ${tRequired.toFixed(2)} s`,
+            `Tiempo disponible entre dis${g1}=${dis1}mm y dis${g2}=${dis2}mm: ${dec2(tAvailable)} s`,
+            `Tiempo requerido (salmón ${physicalConfig.avgSalmonLengthCm}cm + reset ${tReset.toFixed(3)}s${pneumDetail}): ${dec2(tRequired)} s`,
             `Margen: ${margin >= 0 ? '+' : ''}${(margin * 1000).toFixed(0)} ms (umbral: ${(marginThreshold * 1000).toFixed(0)} ms)`,
             ...(doorNotReadyCause && doorNotReadyCause.pieces > 0
               ? [`"Puerta no preparada" en datos: ${doorNotReadyCause.pieces} pz (${doorNotReadyCause.pctOfTotal}%)`]

@@ -40,6 +40,7 @@ import { GateChangeTrigger } from './GateChangeTrigger'
 import type { GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
 import type { GateAssignment } from '@/services/grader/types'
 import type { PlantLineId } from '@/config/plantLines'
+import { dec1 } from '@/utils/formatoNumeros'
 
 /** Días hacia atrás que se piden a Firestore para juntar los turnos. */
 const LOOKBACK_DAYS = 45
@@ -71,7 +72,7 @@ interface Props {
 }
 
 function fmtRatio(r: number): string {
-  return Number.isFinite(r) ? `${r.toFixed(1)}×` : 'sin gate'
+  return Number.isFinite(r) ? `${dec1(r)}×` : 'sin gate'
 }
 
 function shiftDaysBack(dateKey: string, days: number): string {
@@ -276,7 +277,7 @@ export function GatesHistoryHintCard({
                     <div
                       className={cn('h-full rounded-full', st.bar)}
                       style={{ width: `${(f.productionPct / maxPct) * 100}%` }}
-                      title={`${f.productionPct.toFixed(1)}% de la producción`}
+                      title={`${dec1(f.productionPct)}% de la producción`}
                     />
                   </div>
                   <div className="h-2 rounded-full bg-muted-foreground/[0.12] overflow-hidden">
@@ -358,7 +359,7 @@ export function GatesHistoryHintCard({
                     variant="compact"
                     initialGate={m.fromGates[0]}
                     initialCalibre={m.toLabel}
-                    initialReason={`Historial ${history.fromDateKey}→${history.toDateKey}: ${m.toLabel} es el ${fits.find((f) => f.key === m.toKey)?.productionPct.toFixed(1)}% de la producción`}
+                    initialReason={`Historial ${history.fromDateKey}→${history.toDateKey}: ${m.toLabel} es el ${dec1(fits.find((f) => f.key === m.toKey)?.productionPct)}% de la producción`}
                     triggerLabel="Cambiar →"
                     onSaved={onSaved}
                   />
@@ -384,7 +385,7 @@ export function GatesHistoryHintCard({
                 const desc = [
                   `[grader-gates · ${dateKey}]`,
                   ...saturados.map((f) =>
-                    `${f.label}: ${f.productionPct.toFixed(1)}% de la producción con ${f.gates.length === 0 ? 'ninguna gate' : `${f.gates.length} gate${f.gates.length > 1 ? 's' : ''} (${f.gates.map((g) => `G${g}`).join(', ')})`} — ${fmtRatio(f.ratio)}`),
+                    `${f.label}: ${dec1(f.productionPct)}% de la producción con ${f.gates.length === 0 ? 'ninguna gate' : `${f.gates.length} gate${f.gates.length > 1 ? 's' : ''} (${f.gates.map((g) => `G${g}`).join(', ')})`} — ${fmtRatio(f.ratio)}`),
                   '',
                   'Pauta:',
                   ...moves.map((m, i) =>
@@ -403,7 +404,7 @@ export function GatesHistoryHintCard({
               onClick={() => {
                 void copiarTexto([
                   `Gates del Grader — ${dateKey}`,
-                  ...saturados.map((f) => `${f.label} apretado: ${f.productionPct.toFixed(1)}% de la producción, ${f.gates.length} gate${f.gates.length === 1 ? '' : 's'} (${fmtRatio(f.ratio)})`),
+                  ...saturados.map((f) => `${f.label} apretado: ${dec1(f.productionPct)}% de la producción, ${f.gates.length} gate${f.gates.length === 1 ? '' : 's'} (${fmtRatio(f.ratio)})`),
                   ...moves.map((m, i) => `${i + 1}. Mover 1 gate de ${m.fromLabel} → ${m.toLabel} — candidatas ${m.fromGates.map((g) => `G${g}`).join(', ')}`),
                   urlTurnoGates(shiftDocId),
                 ].join('\n')).then(() => {

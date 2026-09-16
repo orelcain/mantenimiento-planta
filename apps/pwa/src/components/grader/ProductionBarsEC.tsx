@@ -21,6 +21,7 @@ import type { UpstreamProductionInterval } from '@/services/shoplogix/types'
 import { useTimelineSyncOptional } from './useTimelineSync'
 import { useChartReadyConnect } from './useEChartsConnect'
 import { fmtTime } from '@/services/grader/graderTimeFormat'
+import { dec1 } from '@/utils/formatoNumeros'
 
 interface Props {
   intervals: UpstreamProductionInterval[]
@@ -200,7 +201,7 @@ export function ProductionBarsEC({ intervals, threshold, windowStart, windowEnd 
         show: true,
         color: '#64748b',
         fontSize: 9,
-        formatter: (value: number) => (value >= 1000 ? `${(value / 1000).toFixed(1)}k` : String(value)),
+        formatter: (value: number) => (value >= 1000 ? `${dec1((value / 1000))}k` : String(value)),
       },
       splitLine: { show: false },
     },

@@ -99,6 +99,14 @@ jobs:
       - name: Audit voseo
         run: node scripts/audit-voseo.mjs --verbose
 
+      # Los números que la gente lee llevan COMA: `toFixed(1)` escribe punto, y
+      # en planta el punto es el separador de MILES. Formateador único:
+      # apps/pwa/src/utils/formatoNumeros.ts (dec1/dec2). Ratchet sobre el mundo
+      # del Análisis de Turno; el punto sigue siendo correcto en anchos CSS,
+      # atributos SVG y redondeos, y esas líneas se marcan `decimal-tecnico`.
+      - name: Audit decimales
+        run: node scripts/audit-decimales.mjs --verbose
+
       - name: Build PWA
         working-directory: apps/pwa
         env:

@@ -8,6 +8,7 @@ import { ArrowRightLeft, TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { GraderSession } from '@/services/grader/types'
 import type { useGraderDashboardAnalytics } from '@/hooks/useGraderDashboardAnalytics'
+import { dec1, dec2 } from '@/utils/formatoNumeros'
 
 type DashboardViews = ReturnType<typeof useGraderDashboardAnalytics>
 
@@ -45,14 +46,14 @@ export function TendenciaShiftComparisonCard({ shiftComparisonView, siblingSessi
           <div className="flex flex-col gap-1 p-3 rounded-card bg-background border">
             <p className="text-caption text-muted-foreground tracking-wide">Punto Cero</p>
             <div className="flex items-baseline gap-1.5">
-              <p className="text-xl font-bold tabular-nums">{cmp.current.p0.toFixed(2)}%</p>
+              <p className="text-xl font-bold tabular-nums">{dec2(cmp.current.p0)}%</p>
               <P0Icon className={cn('h-4 w-4', p0Color)} />
             </div>
             <p className="text-caption text-muted-foreground">
-              {cmp.siblingLabel}: {cmp.sibling.p0.toFixed(2)}%
+              {cmp.siblingLabel}: {dec2(cmp.sibling.p0)}%
             </p>
             <p className={cn('text-caption font-medium tabular-nums', p0Color)}>
-              Δ {cmp.delta.p0 >= 0 ? '+' : ''}{cmp.delta.p0.toFixed(2)} pp
+              Δ {cmp.delta.p0 >= 0 ? '+' : ''}{dec2(cmp.delta.p0)} pp
             </p>
           </div>
           {/* Piezas */}
@@ -77,7 +78,7 @@ export function TendenciaShiftComparisonCard({ shiftComparisonView, siblingSessi
               {cmp.siblingLabel}: {cmp.sibling.avgWeight.toFixed(0)} g
             </p>
             <p className={cn('text-caption font-medium tabular-nums', weightColor)}>
-              Δ {cmp.delta.avgWeight >= 0 ? '+' : ''}{cmp.delta.avgWeight.toFixed(0)} g ({cmp.delta.avgWeightPct >= 0 ? '+' : ''}{cmp.delta.avgWeightPct.toFixed(1)}%)
+              Δ {cmp.delta.avgWeight >= 0 ? '+' : ''}{cmp.delta.avgWeight.toFixed(0)} g ({cmp.delta.avgWeightPct >= 0 ? '+' : ''}{dec1(cmp.delta.avgWeightPct)}%)
             </p>
           </div>
           {/* Calibre dominante */}

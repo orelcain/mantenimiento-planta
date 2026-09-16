@@ -6,6 +6,7 @@ import { BELT_FLOW_ORDER, getBeltLabel, GRADING_BELT_DEFAULT_MPS, Z_BELT_DEFAULT
 import type { GraderBeltId } from '@/services/grader/graderBeltHelpers'
 import type { GraderPhysicalConfig } from '@/services/grader/types'
 import { CalibBadge } from './GatesConfigShared'
+import { dec1, dec2 } from '@/utils/formatoNumeros'
 
 interface CintasTabProps {
   physicalConfig: GraderPhysicalConfig
@@ -113,7 +114,7 @@ export function CintasTab({ physicalConfig, updateBeltLength, updateBeltSpeed, s
 
                 {/* Métricas derivadas */}
                 <div className="flex items-center gap-3 text-caption text-muted-foreground flex-wrap">
-                  <span className="font-mono">Tránsito {transitSec.toFixed(1)}s</span>
+                  <span className="font-mono">Tránsito {dec1(transitSec)}s</span>
                   {belt.widthMeters && (
                     <span className="font-mono">Ancho {(belt.widthMeters * 1000).toFixed(0)}mm</span>
                   )}
@@ -130,7 +131,7 @@ export function CintasTab({ physicalConfig, updateBeltLength, updateBeltSpeed, s
                         'border-red-500/[0.25] text-ink-crit',
                       )}
                     >
-                      ×{ratio.toFixed(2)} vs {getBeltLabel(prevBeltId!)}
+                      ×{dec2(ratio)} vs {getBeltLabel(prevBeltId!)}
                     </Badge>
                   )}
                 </div>

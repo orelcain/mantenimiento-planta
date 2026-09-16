@@ -41,6 +41,7 @@ import { AIOutputPanel } from '@/components/grader/GraderInlinePanels'
 import { listPieceRecords, loadTimelineAggregates, type FirestorePieceRecord } from '@/services/grader/graderDailySummary.service'
 import { GraderTimelineChart } from '@/components/grader/GraderTimelineChart'
 import { p0StatusFromPct, p0StatusColor, p0StatusBgBorderClass, p0StatusHex } from '@/services/grader/graderP0Thresholds'
+import { dec1 } from '@/utils/formatoNumeros'
 
 // Registrar los elementos de Chart.js necesarios (idempotente si ya están)
 ChartJS.register(
@@ -81,7 +82,7 @@ function formatDuration(minutes?: number): string {
 
 function formatWeight(kg?: number): string {
   if (kg == null) return '—'
-  if (kg >= 1000) return `${(kg / 1000).toFixed(1)} t`
+  if (kg >= 1000) return `${dec1((kg / 1000))} t`
   return `${kg.toFixed(0)} kg`
 }
 
@@ -750,7 +751,7 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
                           label: (ctx) => {
                             const value = Number(ctx.parsed.x ?? 0)
                             const total = summary.totalPieces || 1
-                            const pct = ((value / total) * 100).toFixed(1)
+                            const pct = dec1(((value / total) * 100))
                             return `${value.toLocaleString('es-CL')} piezas (${pct}%)`
                           },
                         },
@@ -802,7 +803,7 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
                           label: (ctx) => {
                             const value = ctx.parsed
                             const total = summary.totalPieces || 1
-                            const pct = ((value / total) * 100).toFixed(1)
+                            const pct = dec1(((value / total) * 100))
                             return `${ctx.label}: ${value.toLocaleString('es-CL')} (${pct}%)`
                           },
                         },
@@ -846,7 +847,7 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
                           label: (ctx) => {
                             const value = Number(ctx.parsed.y ?? 0)
                             const total = summary.totalPieces || 1
-                            const pct = ((value / total) * 100).toFixed(1)
+                            const pct = dec1(((value / total) * 100))
                             return `${value.toLocaleString('es-CL')} piezas (${pct}%)`
                           },
                         },

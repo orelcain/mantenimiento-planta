@@ -6,6 +6,7 @@ import { Bar } from 'react-chartjs-2'
 import { getTooltipProps } from '@/services/grader/graderTooltips'
 import { pctCalc } from '@/services/grader/graderDashboardHelpers'
 import type { GraderAnalyticsResult } from '@/services/grader/types'
+import { dec1 } from '@/utils/formatoNumeros'
 
 const errorColorMap: Record<string, string> = {
   'Fuera de rango': 'rgba(239,68,68,0.75)',
@@ -103,7 +104,7 @@ export function PuntoCeroPivoteCard({ analytics }: Props) {
                       label: (ctx) => {
                         const v = ctx.parsed.y
                         if (!v) return ''
-                        const pct = filteredTotal > 0 ? ((v / filteredTotal) * 100).toFixed(1) : '0'
+                        const pct = filteredTotal > 0 ? dec1(((v / filteredTotal) * 100)) : '0'
                         return `${ctx.dataset.label}: ${v.toLocaleString('es-CL')} pz (${pct}%)`
                       },
                     },

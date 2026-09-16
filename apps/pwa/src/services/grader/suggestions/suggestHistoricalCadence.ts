@@ -1,5 +1,6 @@
 import type { GraderDailySummary } from '../types'
 import type { PointZeroSuggestion } from './types'
+import { dec1 } from '@/utils/formatoNumeros'
 
 const MIN_SUMMARIES = 10
 
@@ -49,12 +50,12 @@ export function suggestHistoricalCadence({
     source: 'historical',
     sourceLabel: `Histórico ${withRate.length} turnos`,
     reasoning: `La cadencia usada actualmente (${currentCadence.toFixed(0)} pz/min) difiere un ${(diffPct * 100).toFixed(0)}% del promedio histórico de ${withRate.length} turnos (${avg.toFixed(0)} pz/min). Esto afecta el cálculo del gap libre y el análisis de pockets.`,
-    formula: `avg = Σ(pz/min) / n = ${avg.toFixed(1)} pz/min  |  mediana = ${median.toFixed(1)}  |  p90 = ${p90.toFixed(1)}`,
+    formula: `avg = Σ(pz/min) / n = ${dec1(avg)} pz/min  |  mediana = ${dec1(median)}  |  p90 = ${dec1(p90)}`,
     dataPoints: [
       { label: 'Turnos analizados', value: String(withRate.length) },
-      { label: 'Cadencia promedio', value: `${avg.toFixed(1)} pz/min` },
-      { label: 'Cadencia mediana', value: `${median.toFixed(1)} pz/min` },
-      { label: 'Pico p90', value: `${p90.toFixed(1)} pz/min` },
+      { label: 'Cadencia promedio', value: `${dec1(avg)} pz/min` },
+      { label: 'Cadencia mediana', value: `${dec1(median)} pz/min` },
+      { label: 'Pico p90', value: `${dec1(p90)} pz/min` },
       { label: 'Diferencia vs actual', value: `${(diffPct * 100).toFixed(0)}%` },
     ],
     confidence,

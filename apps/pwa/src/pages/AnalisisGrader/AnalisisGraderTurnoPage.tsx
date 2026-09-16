@@ -97,6 +97,7 @@ import type { GraderShiftDoc } from '@/services/grader/graderShifts.service'
 import type { AIGraderOutput } from '@/services/grader/types'
 import { AnalisisGraderGatesConfigPage } from './AnalisisGraderGatesConfigPage'
 import { syncCubreElTurno } from '@/services/grader/frescuraDelSync'
+import { dec1, dec2 } from '@/utils/formatoNumeros'
 
 /**
  * ¿El dataURL corresponde a un gráfico ya pintado?
@@ -328,7 +329,7 @@ function exportTurnoCsv(
   lines.push([
     esc(shiftLabel),
     dateKey,
-    summary.pointZeroPct.toFixed(2),
+    dec2(summary.pointZeroPct),
     summary.totalPieces,
     summary.pointZeroPieces,
     summary.durationMinutes ?? '',
@@ -363,7 +364,7 @@ function exportTurnoCsv(
     lines.push('=== DISTRIBUCIÓN POR GATE ===')
     lines.push(['Gate', 'Piezas', '%'].join(SEP))
     for (const g of summary.gateDistribution) {
-      lines.push([g.gate, g.pieces, g.pct.toFixed(1)].join(SEP))
+      lines.push([g.gate, g.pieces, dec1(g.pct)].join(SEP))
     }
   }
 
@@ -373,7 +374,7 @@ function exportTurnoCsv(
     lines.push('=== TOP CAUSAS P0 ===')
     lines.push(['Causa', 'Piezas', '%'].join(SEP))
     for (const c of summary.topP0Causes) {
-      lines.push([esc(c.error), c.pieces, c.pct.toFixed(1)].join(SEP))
+      lines.push([esc(c.error), c.pieces, dec1(c.pct)].join(SEP))
     }
   }
 
@@ -2705,7 +2706,7 @@ export function AnalisisGraderTurnoPage() {
                   Turno en curso: <span className="font-medium text-foreground">{midShiftAlert.label}</span>{' '}
                   se lleva el{' '}
                   <span className="tabular-nums font-medium text-ink-crit">
-                    {midShiftAlert.productionPct.toFixed(1)}%
+                    {dec1(midShiftAlert.productionPct)}%
                   </span>{' '}
                   con{' '}
                   <span className="tabular-nums">

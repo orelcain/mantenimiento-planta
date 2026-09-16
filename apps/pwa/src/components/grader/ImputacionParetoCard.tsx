@@ -27,6 +27,7 @@ import { paretoByCategoria, SIN_CAUSAL, type ParetoCategoria } from '@/services/
 import { leavesByCategoria, TOTAL_HOJAS_CURSO } from '@/services/shoplogix/imputacionTaxonomy'
 import { LOSS_BUCKET_META } from '@/services/shoplogix/lossBuckets'
 import type { UpstreamMachineShift } from '@/services/shoplogix/types'
+import { dec1 } from '@/utils/formatoNumeros'
 
 function fmtHm(sec: number): string {
   if (sec <= 0) return '0m'
@@ -121,7 +122,7 @@ export function ImputacionParetoCard({ machines }: { machines: UpstreamMachineSh
             {vacia ? <span className="text-muted-foreground">—</span> : fmtHm(cat.durationSec)}
             {!vacia && (
               <span className="block text-caption text-muted-foreground/60">
-                {((cat.durationSec / pareto.totalSec) * 100).toFixed(1)}%
+                {dec1(((cat.durationSec / pareto.totalSec) * 100))}%
               </span>
             )}
           </span>
@@ -149,7 +150,7 @@ export function ImputacionParetoCard({ machines }: { machines: UpstreamMachineSh
                 <span className="text-caption text-muted-foreground/60 tabular-nums shrink-0">×{c.count}</span>
                 <span className="ml-auto font-mono tabular-nums shrink-0">{fmtHm(c.durationSec)}</span>
                 <span className="font-mono tabular-nums text-muted-foreground/60 w-12 text-right shrink-0 text-caption">
-                  {((c.durationSec / pareto.totalSec) * 100).toFixed(1)}%
+                  {dec1(((c.durationSec / pareto.totalSec) * 100))}%
                 </span>
               </div>
             ))}

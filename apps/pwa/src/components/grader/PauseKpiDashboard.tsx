@@ -36,6 +36,7 @@ import {
 import { summarizeByCategory, SIN_TAG_ID } from '@/services/grader/pauseKpiAnalytics'
 import type { GraderDailySummary, Pause } from '@/services/grader/types'
 import { useIsAdmin, useAuthStore } from '@/store/authStore'
+import { dec1 } from '@/utils/formatoNumeros'
 
 interface PauseKpiDashboardProps {
   summaries: GraderDailySummary[]
@@ -508,7 +509,7 @@ export function PauseKpiDashboard({ summaries }: PauseKpiDashboardProps) {
           />
           <KpiCard
             label="% muerto del turno"
-            value={kpis!.avgDeadPct != null ? `${kpis!.avgDeadPct.toFixed(1)}%` : '—'}
+            value={kpis!.avgDeadPct != null ? `${dec1(kpis!.avgDeadPct)}%` : '—'}
             sub={
               kpis!.avgDeadPct != null
                 ? kpis!.avgDeadPct <= DEAD_TIME_PCT_THRESHOLDS.okBelow

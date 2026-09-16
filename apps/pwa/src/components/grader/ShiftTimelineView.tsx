@@ -69,6 +69,7 @@ import {
 } from '@/services/grader/graderP0Segmentation'
 import { useTimelineSyncOptional } from './useTimelineSync'
 import { useChartReadyConnect } from './useEChartsConnect'
+import { dec1, dec2 } from '@/utils/formatoNumeros'
 
 interface ShiftTimelineViewProps {
   timelineBuckets: TimelineBucket[]
@@ -583,7 +584,7 @@ export function ShiftTimelineView({
     for (const u of shiftDoc?.uploads ?? []) {
       const fila = list.find((x) => x.kind === 'carga' && Date.parse(x.at) === Date.parse(u.at))
       if (!fila) continue
-      fila.sub = `${u.byName} · ${u.snapshot.totalPieces.toLocaleString('es-CL')} pzas · P0 ${u.snapshot.p0Pct.toFixed(1)}%`
+      fila.sub = `${u.byName} · ${u.snapshot.totalPieces.toLocaleString('es-CL')} pzas · P0 ${dec1(u.snapshot.p0Pct)}%`
       fila.p0Pct = u.snapshot.p0Pct
     }
     for (const a of shiftDoc?.actions ?? []) {
@@ -649,7 +650,7 @@ export function ShiftTimelineView({
     const isZoomed = zoomState.start > 1 || zoomState.end < 99
     const p0Pct = summaryP0Pct
     const p0Label = p0Pct != null
-      ? `P0% ${p0Pct.toFixed(2)}%${isZoomed ? ' (turno completo)' : ''}`
+      ? `P0% ${dec2(p0Pct)}%${isZoomed ? ' (turno completo)' : ''}`
       : null
     // Color del P0% en el header del PNG: usa el helper compartido
     // (consistencia con el resto del módulo). Slate gris si no hay P0% aún.
@@ -672,7 +673,7 @@ export function ShiftTimelineView({
         if (t) ultimo = t.n
         filasPng.push({
           tramo: abre && t
-            ? `Tramo ${t.n}${t.snapshotAt ? ` · desde las ${fmtTime(t.snapshotAt)}` : ' · desde el inicio'}${t.p0Pct != null ? ` · P0 ${t.p0Pct.toFixed(1)} %` : ''}${t.delta != null ? ` ${t.delta < 0 ? '▼' : '▲'} ${Math.abs(t.delta).toFixed(1)} pts` : ''}`
+            ? `Tramo ${t.n}${t.snapshotAt ? ` · desde las ${fmtTime(t.snapshotAt)}` : ' · desde el inicio'}${t.p0Pct != null ? ` · P0 ${dec1(t.p0Pct)} %` : ''}${t.delta != null ? ` ${t.delta < 0 ? '▼' : '▲'} ${dec1(Math.abs(t.delta))} pts` : ''}`
             : null,
           hora: fmtTime(cp.at),
           glifo: RIEL_GLIFO[cp.kind],
@@ -881,7 +882,7 @@ export function ShiftTimelineView({
        En Chonchi el turno 1 va de 21:15 a 05:00, así que le pasaba a la
        mayoría de los turnos. */
     const rows = [...hourMap.values()].sort((a, b) => a.primerMs - b.primerMs).map(row => {
-      const p0Pct = row.pieces > 0 ? ((row.p0 / row.pieces) * 100).toFixed(2) : '0,00'
+      const p0Pct = row.pieces > 0 ? dec2(((row.p0 / row.pieces) * 100)) : '0,00'
       const avgG = row.weightCount > 0 ? Math.round((row.weightKgSum / row.weightCount) * 1000) : ''
       const calibre = Object.entries(row.calibres).sort((a, b) => b[1] - a[1])[0]?.[0] ?? ''
       const pauseMin = row.pausesSec > 0 ? Math.round(row.pausesSec / 60) : ''
@@ -1213,7 +1214,7 @@ export function ShiftTimelineView({
           const p0Min = Number(p0Pt?.value) || 0
           const total = productivas + p0Min
           if (total > 0) {
-            const pctMin = ((p0Min / total) * 100).toFixed(1)
+            const pctMin = dec1(((p0Min / total) * 100))
             lines.push(`<span style="color:#10b981">▮</span> Este minuto: <b>${total}</b> pzs (<span style="color:#10b981">${productivas}</span> OK + <span style="color:#94a3b8">${p0Min}</span> P0 = <b>${pctMin}%</b>)`)
             // Desglose por causa para este minuto (sólo si hubo P0)
             if (p0Min > 0) {
@@ -1551,7 +1552,7 @@ export function ShiftTimelineView({
                     setZoomState({ start: seg.startPct, end: seg.endPct })
                     emitZoomRange(seg.startPct, seg.endPct)
                   }}
-                  title={`${seg.label}: P0% ${seg.p0Pct.toFixed(1)}%, ${seg.pieces.toLocaleString('es-CL')} pzas`}
+                  title={`${seg.label}: P0% ${dec1(seg.p0Pct)}%, ${seg.pieces.toLocaleString('es-CL')} pzas`}
                   className={cn(
                     'shrink-0 px-2 py-0.5 font-medium transition-colors border-l border-border/30',
                     activeZoom === segId
@@ -1723,11 +1724,11 @@ export function ShiftTimelineView({
                   Tramo {tramo.n}
                   {tramo.snapshotAt ? ` · desde las ${fmtTime(tramo.snapshotAt)}` : ' · desde el inicio'}
                   {tramo.p0Pct != null
-                    ? <> · P0 <span className="tabular-nums">{tramo.p0Pct.toFixed(1)} %</span></>
+                    ? <> · P0 <span className="tabular-nums">{dec1(tramo.p0Pct)} %</span></>
                     : <> · <span className="tabular-nums">{tramo.piezas.toLocaleString('es-CL')}</span> pz, muy pocas para su P0</>}
                   {tramo.delta != null && tramo.status !== 'insufficient-data' && (
                     <span className="tabular-nums">
-                      {' '}{tramo.delta < 0 ? '▼' : tramo.delta > 0 ? '▲' : '='} {Math.abs(tramo.delta).toFixed(1)} pts
+                      {' '}{tramo.delta < 0 ? '▼' : tramo.delta > 0 ? '▲' : '='} {dec1(Math.abs(tramo.delta))} pts
                     </span>
                   )}
                 </p>
@@ -1759,7 +1760,7 @@ export function ShiftTimelineView({
                       title="Δ P0% respecto a la carga anterior"
                     >
                       {cp.p0Delta > 0 ? '▲' : cp.p0Delta < 0 ? '▼' : '='}{' '}
-                      {cp.p0Delta > 0 ? '+' : ''}{cp.p0Delta.toFixed(2)}%
+                      {cp.p0Delta > 0 ? '+' : ''}{dec2(cp.p0Delta)}%
                     </span>
                   )}
                   {cp.verdict && cp.verdict !== 'insufficient-data' && (

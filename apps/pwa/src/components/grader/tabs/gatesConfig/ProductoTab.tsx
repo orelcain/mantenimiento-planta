@@ -10,6 +10,7 @@ import { labelForField, type ConfigChangeEntry } from '@/services/grader/graderC
 import { SuggestionsPanel } from '@/components/grader/SuggestionsPanel'
 import type { PointZeroSuggestion } from '@/services/grader/suggestions/types'
 import { SPECIES_ALLOMETRY, BeltVisualizer, AutoField, BatchStatsCard, type BatchStats } from './GatesConfigShared'
+import { dec2 } from '@/utils/formatoNumeros'
 
 interface ProductoTabProps {
   physicalConfig: GraderPhysicalConfig
@@ -130,7 +131,7 @@ export function ProductoTab({
               />
               {medianSource === 'excel' && (
                 <Badge className="text-caption bg-emerald-500/[0.15] text-ink-ok px-1.5 py-0">
-                  Excel · {(medianWeightG! / 1000).toFixed(2)} kg
+                  Excel · {dec2((medianWeightG! / 1000))} kg
                 </Badge>
               )}
               {medianSource === 'manual' && (
@@ -222,7 +223,7 @@ export function ProductoTab({
             {verdictText}
           </span>
           <span className="text-caption text-muted-foreground">
-            ratio pez/paso: <span className="font-mono">{lengthToSpacingRatio.toFixed(2)}</span>
+            ratio pez/paso: <span className="font-mono">{dec2(lengthToSpacingRatio)}</span>
             {cadenceSource === 'excel' && <span className="text-emerald-500 ml-1">· cadencia Excel</span>}
             {cadenceSource === 'historical' && <span className="text-amber-500 ml-1">· cadencia histórica</span>}
             {cadenceSource === 'theoretical' && <span className="ml-1">· cadencia teórica</span>}
@@ -415,23 +416,23 @@ export function ProductoTab({
               <InfoTooltip
                 title="Cómo se calcula"
                 text={`1) La cadencia dice cu\u00e1ntos peces pasan por minuto.\n2) Paso total = velocidad \u00d7 tiempo entre peces (centro a centro).\n3) Gap libre = paso total \u2212 largo del pez.\n\nSi el gap es \u2264 0, dos peces se solapan y la fotoc\u00e9lula los ve como uno solo \u2192 marca "fuera de l\u00edmites".`}
-                formula={`tiempo entre peces = 60 / ${cadencePiecesPerMin.toFixed(0)} = ${(60 / cadencePiecesPerMin).toFixed(2)} s\npaso total = ${speedMps.toFixed(2)} m/s \u00d7 ${(60 / cadencePiecesPerMin).toFixed(2)} s = ${spacingM.toFixed(2)} m\ngap libre = ${spacingM.toFixed(2)} \u2212 ${salmonLengthM.toFixed(2)} = ${gapM.toFixed(2)} m\nratio pez/paso = ${salmonLengthM.toFixed(2)} / ${spacingM.toFixed(2)} = ${lengthToSpacingRatio.toFixed(2)}`}
+                formula={`tiempo entre peces = 60 / ${cadencePiecesPerMin.toFixed(0)} = ${dec2((60 / cadencePiecesPerMin))} s\npaso total = ${dec2(speedMps)} m/s \u00d7 ${dec2((60 / cadencePiecesPerMin))} s = ${dec2(spacingM)} m\ngap libre = ${dec2(spacingM)} \u2212 ${dec2(salmonLengthM)} = ${dec2(gapM)} m\nratio pez/paso = ${dec2(salmonLengthM)} / ${dec2(spacingM)} = ${dec2(lengthToSpacingRatio)}`}
                 position="top"
               />
             </p>
             {overlapping && (
               <p className="text-caption text-red-500">
                 El pez ({physicalConfig.avgSalmonLengthCm} cm) es más largo que el paso ({(spacingM * 100).toFixed(0)} cm) → peces se solapan.
-                Con {pocketCountAlt} pockets el gap sube a {Math.max(0, spacingAlt - salmonLengthM).toFixed(2)} m.
+                Con {pocketCountAlt} pockets el gap sube a {dec2(Math.max(0, spacingAlt - salmonLengthM))} m.
               </p>
             )}
             {!overlapping && lengthToSpacingRatio > GAP_THRESHOLDS.ratioWarn && (
               <p className="text-caption text-amber-500">
-                Gap libre estrecho. Con {pocketCountAlt} pockets sube a {Math.max(0, spacingAlt - salmonLengthM).toFixed(2)} m.
+                Gap libre estrecho. Con {pocketCountAlt} pockets sube a {dec2(Math.max(0, spacingAlt - salmonLengthM))} m.
               </p>
             )}
             <p className="text-caption text-muted-foreground">
-              Alternativa {pocketCountAlt} pockets: {cadenceAlt.toFixed(0)} pz/min · gap {Math.max(0, spacingAlt - salmonLengthM).toFixed(2)} m · ratio {(salmonLengthM / spacingAlt).toFixed(2)}
+              Alternativa {pocketCountAlt} pockets: {cadenceAlt.toFixed(0)} pz/min · gap {dec2(Math.max(0, spacingAlt - salmonLengthM))} m · ratio {dec2((salmonLengthM / spacingAlt))}
             </p>
           </div>
 

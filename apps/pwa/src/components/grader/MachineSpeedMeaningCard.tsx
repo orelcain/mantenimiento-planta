@@ -30,6 +30,7 @@ import { buildMachineSpeedSummary, type SpeedWindow } from '@/services/grader/ma
 import { useTimelineSyncOptional } from './useTimelineSync'
 import { fmtTime } from '@/services/grader/graderTimeFormat'
 import type { UpstreamMachineShift } from '@/services/shoplogix/types'
+import { dec1 } from '@/utils/formatoNumeros'
 
 /** Colores por máquina — los MISMOS del gráfico de arriba, en orden. */
 const BAR_COLORS = ['bg-sky-400', 'bg-violet-400', 'bg-emerald-400', 'bg-amber-400']
@@ -204,7 +205,7 @@ export function MachineSpeedMeaningCard({ machines, className }: Props) {
               <div key={r.machineid} className="space-y-1.5">
                 <div className="flex items-baseline gap-2 flex-wrap">
                   <span className="text-sm font-medium">{r.name}</span>
-                  <span className="text-lg font-medium tabular-nums leading-none">{r.ritmoCpm.toFixed(1)}</span>
+                  <span className="text-lg font-medium tabular-nums leading-none">{dec1(r.ritmoCpm)}</span>
                   <span className="text-caption text-muted-foreground">pz/min</span>
                   <span className="text-caption text-muted-foreground tabular-nums">
                     = {fmt(r.ritmoPorHora)} pz/h

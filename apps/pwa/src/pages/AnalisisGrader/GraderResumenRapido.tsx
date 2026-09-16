@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils'
 import { DEFAULT_PHYSICAL_CONFIG } from '@/services/grader/graderAnalytics'
 import { DEFAULT_P0_ALERT_PCT, DEFAULT_P0_CRITICAL_PCT } from '@/services/grader/graderP0Thresholds'
 import type { GraderAnalyticsResult, DeterministicInsight } from '@/services/grader/types'
+import { dec1 } from '@/utils/formatoNumeros'
 
 const BELT_SHORT_NAMES: Record<string, string> = {
   zeta: 'Z-Belt',
@@ -151,7 +152,7 @@ export function GraderResumenRapido({
           <div className="text-center py-1">
             <p className="text-2xl font-semibold tabular-nums text-foreground leading-none">
               {kpis.totalWeightKg >= 1000
-                ? `${(kpis.totalWeightKg / 1000).toFixed(1)} t`
+                ? `${dec1((kpis.totalWeightKg / 1000))} t`
                 : `${kpis.totalWeightKg.toFixed(0)} kg`}
             </p>
             <p className="text-xs text-muted-foreground mt-1">Peso clasificado</p>

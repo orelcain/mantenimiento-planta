@@ -6,6 +6,7 @@ import { DEFAULT_PNEUMATIC_CONFIG, computeLinePressureDrop, computeLineChargeTim
 import type { GraderPhysicalConfig, PneumaticConfig } from '@/services/grader/types'
 import { getTooltipProps } from '@/services/grader/graderTooltips'
 import { CalibBadge } from './GatesConfigShared'
+import { dec1, dec2 } from '@/utils/formatoNumeros'
 
 /** Default para inicializar pneumaticConfig cuando no existe */
 const DEFAULT_PNEUMATIC_INIT: PneumaticConfig = { ...DEFAULT_PNEUMATIC_CONFIG }
@@ -20,7 +21,7 @@ export function NeumaticaTab({ physicalConfig, setPhysicalConfig }: NeumaticaTab
     <div>
       <p className="text-xs text-muted-foreground mb-3">
         Parámetros del sistema neumático para calcular el tiempo de respuesta real de cada flipper.
-        Sin estos datos se usa un valor plano de {(physicalConfig.flipperResetTimeSec ?? 0.45).toFixed(2)}s para todos los gates.
+        Sin estos datos se usa un valor plano de {dec2((physicalConfig.flipperResetTimeSec ?? 0.45))}s para todos los gates.
       </p>
 
       {/* Parámetros del sistema (grid 2×3) */}
@@ -169,7 +170,7 @@ export function NeumaticaTab({ physicalConfig, setPhysicalConfig }: NeumaticaTab
                   <td className={cn('py-1 px-2 text-right tabular-nums font-mono text-xs',
                     pEff >= 5 ? 'text-ink-ok' : pEff >= 3 ? 'text-ink-warn' : 'text-ink-crit',
                   )}>
-                    {pEff.toFixed(1)}
+                    {dec1(pEff)}
                   </td>
                 </tr>
               )

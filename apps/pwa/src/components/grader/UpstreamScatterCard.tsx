@@ -40,6 +40,7 @@ import {
 import { DEFAULT_P0_CRITICAL_PCT } from '@/services/grader/graderP0Thresholds'
 import { fmtTime } from '@/services/grader/graderTimeFormat'
 import { shortMachineName } from '@/services/grader/graderMachineNames'
+import { dec1, dec2 } from '@/utils/formatoNumeros'
 
 interface Props {
   snapshot: UpstreamLineSnapshot | null | undefined
@@ -212,7 +213,7 @@ export function UpstreamScatterCard({
           const xMax = Math.max(...usable.map(p => p.baaderCycles))
           const yMin = slope * xMin + intercept
           const yMax = slope * xMax + intercept
-          const r2Label = r2 >= 0.05 ? ` R²=${r2.toFixed(2)}` : ''
+          const r2Label = r2 >= 0.05 ? ` R²=${dec2(r2)}` : ''
           series.push({
             name: `Tendencia ${s.machineName.replace('Evisceradora ', 'E')}${r2Label}`,
             type: 'line',
@@ -241,7 +242,7 @@ export function UpstreamScatterCard({
             `<b>${fmtTime(tsMs)}</b>`,
             `${params.seriesName}`,
             `Ciclos Baader: <b>${cycles}</b>`,
-            `P0% Grader: <b>${p0pct.toFixed(1)}%</b>`,
+            `P0% Grader: <b>${dec1(p0pct)}%</b>`,
             `Piezas Grader: ${pieces}`,
           ].join('<br/>')
         },
@@ -322,14 +323,14 @@ export function UpstreamScatterCard({
       : slopeMagnitude.direction === 'neg'
       ? {
           icon: <TrendingDown className="w-3 h-3" />,
-          text: `Cada -10 ciclos/5min Baader → +${slopeMagnitude.deltaP0_per_minus10cycles.toFixed(2)} pts P0%`,
+          text: `Cada -10 ciclos/5min Baader → +${dec2(slopeMagnitude.deltaP0_per_minus10cycles)} pts P0%`,
           color: 'text-cat-5-ink',
           tone: `Cuando la línea bajó el ritmo, el P0 subió. Explica el ${pctExplicado} % de la variación de este turno — no vale para otros.`,
         }
       : slopeMagnitude.direction === 'pos'
       ? {
           icon: <TrendingUp className="w-3 h-3" />,
-          text: `Cada -10 ciclos/5min Baader → ${slopeMagnitude.deltaP0_per_minus10cycles.toFixed(2)} pts P0%`,
+          text: `Cada -10 ciclos/5min Baader → ${dec2(slopeMagnitude.deltaP0_per_minus10cycles)} pts P0%`,
           color: 'text-amber-400',
           tone: `P0% sube cuando Baader sube, al revés de lo esperado. Explica el ${pctExplicado} % de la variación — mirar antes de concluir.`,
         }
@@ -363,7 +364,7 @@ export function UpstreamScatterCard({
               <AlertTriangle className="w-3.5 h-3.5" />
               <span className="font-semibold">
                 Zona crítica: {criticalKpi.critical} de {criticalKpi.total} tramos
-                <span className="ml-1 opacity-80">({criticalKpi.pct.toFixed(1)}%)</span>
+                <span className="ml-1 opacity-80">({dec1(criticalKpi.pct)}%)</span>
               </span>
             </div>
           )}

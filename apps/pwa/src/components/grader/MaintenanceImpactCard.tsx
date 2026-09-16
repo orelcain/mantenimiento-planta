@@ -25,6 +25,7 @@ import {
 } from '@/services/grader/graderReliability'
 import { exportMaintenanceImpactPDF } from '@/services/grader/maintenanceImpactPdf'
 import type { MaintenanceWork } from '@/services/grader/maintenanceWork'
+import { dec1 } from '@/utils/formatoNumeros'
 
 interface Props {
   summaries: GraderDailySummary[]
@@ -191,7 +192,7 @@ export function MaintenanceImpactCard({ summaries, periodLabel, rangeLabel, work
               />
               <KpiCard
                 label="Disponibilidad"
-                value={rel!.availabilityPct != null ? `${rel!.availabilityPct.toFixed(1)}%` : '—'}
+                value={rel!.availabilityPct != null ? `${dec1(rel!.availabilityPct)}%` : '—'}
                 sub="atribuible a mantención"
                 icon={<Activity className="w-3.5 h-3.5" />}
                 valueColor={

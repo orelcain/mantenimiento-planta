@@ -35,13 +35,14 @@ import type { GraderDailySummary } from '@/services/grader/types'
 import { p0StatusFromPct, p0StatusColor, p0StatusBorderClass, DEFAULT_P0_CRITICAL_PCT } from '@/services/grader/graderP0Thresholds'
 import { tendenciaDelPeriodo, hayMejorSemana } from '@/services/grader/graderTendenciaPeriodo'
 import { compararFilas, nombreArchivoCsv } from '@/services/grader/graderPeriodoTabla'
+import { dec1, dec2 } from '@/utils/formatoNumeros'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Tooltip, Legend, Filler, zoomPlugin)
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatWeight(kg: number): string {
-  if (kg >= 1000) return `${(kg / 1000).toFixed(1)} t`
+  if (kg >= 1000) return `${dec1((kg / 1000))} t`
   return `${kg.toFixed(0)} kg`
 }
 
@@ -595,8 +596,8 @@ export function GraderPeriodView({ data }: Props) {
             <p className="text-caption font-medium text-muted-foreground tracking-wider">Piezas</p>
             <p className="text-xl font-bold tabular-nums mt-0.5">
               {visibleStats.totalPieces >= 1e6
-                ? `${(visibleStats.totalPieces / 1e6).toFixed(1)}M`
-                : `${(visibleStats.totalPieces / 1e3).toFixed(1)}k`}
+                ? `${dec1((visibleStats.totalPieces / 1e6))}M`
+                : `${dec1((visibleStats.totalPieces / 1e3))}k`}
             </p>
             <p className="text-caption text-muted-foreground mt-0.5">{formatNumber(visibleStats.totalPieces)}</p>
           </CardContent>
@@ -605,7 +606,7 @@ export function GraderPeriodView({ data }: Props) {
           <CardContent className="pt-4 pb-3 text-center">
             <p className="text-caption font-medium text-muted-foreground tracking-wider">P0 piezas</p>
             <p className={cn('text-xl font-bold tabular-nums mt-0.5', p0StatusColor(p0StatusFromPct(visibleStats.p0PctWeighted)))}>
-              {(visibleStats.totalP0Pieces / 1e3).toFixed(1)}k
+              {dec1((visibleStats.totalP0Pieces / 1e3))}k
             </p>
             <p className="text-caption text-muted-foreground mt-0.5">{formatNumber(visibleStats.totalP0Pieces)}</p>
           </CardContent>
@@ -744,8 +745,8 @@ export function GraderPeriodView({ data }: Props) {
                     {Math.abs(insights.diaAvg - insights.nocheAvg) < 0.2
                       ? 'Turnos parejos'
                       : insights.diaAvg < insights.nocheAvg
-                        ? `Día es ${(insights.nocheAvg - insights.diaAvg).toFixed(2)}pp mejor`
-                        : `Noche es ${(insights.diaAvg - insights.nocheAvg).toFixed(2)}pp mejor`}
+                        ? `Día es ${dec2((insights.nocheAvg - insights.diaAvg))}pp mejor`
+                        : `Noche es ${dec2((insights.diaAvg - insights.nocheAvg))}pp mejor`}
                   </p>
                 </div>
               )}

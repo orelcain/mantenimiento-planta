@@ -9,6 +9,7 @@
 
 import { Card, CardContent, Badge } from '@/components/ui'
 import { Package, Award, Boxes, Snowflake } from 'lucide-react'
+import { dec1 } from '@/utils/formatoNumeros'
 
 interface Props {
   lotsInShift?: Array<{ lot: string; pieces: number; pct: number }>
@@ -19,7 +20,7 @@ interface Props {
 
 function formatPct(pieces: number, total: number): string {
   if (total <= 0) return '0%'
-  return `${((pieces / total) * 100).toFixed(1)}%`
+  return `${dec1(((pieces / total) * 100))}%`
 }
 
 function sortedEntries(m?: Record<string, number>): Array<[string, number]> {
@@ -83,7 +84,7 @@ export function ShiftBreakdownsCard({
                       {l.lot}
                     </span>
                     <Badge variant="outline" className="text-caption shrink-0">
-                      {l.pct.toFixed(1)}%
+                      {dec1(l.pct)}%
                     </Badge>
                   </div>
                 ))}

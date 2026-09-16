@@ -43,6 +43,7 @@ import {
   type P0Status,
 } from '@/services/grader/graderP0Thresholds'
 import type { MatrixP0Cause } from '@/services/grader/types'
+import { dec1, dec2 } from '@/utils/formatoNumeros'
 
 interface MinuteDetailDialogProps {
   open: boolean
@@ -358,7 +359,7 @@ export function MinuteDetailDialog({
                     <span className={cn(breakdown.p0 > 0 ? 'text-cat-4-ink' : 'text-muted-foreground')}>
                       {breakdown.p0} P0
                     </span>
-                    <span className="text-muted-foreground"> ({breakdown.p0Pct.toFixed(1)}%)</span>
+                    <span className="text-muted-foreground"> ({dec1(breakdown.p0Pct)}%)</span>
                     {bucket?.dominantCalibre && (
                       <>
                         <span className="text-muted-foreground"> · </span>
@@ -404,7 +405,7 @@ export function MinuteDetailDialog({
                 </span>
                 <div className="flex-1 min-w-0">
                   <div className={cn('font-medium flex items-center gap-1.5 flex-wrap', p0StatusColor(breakdown.p0Status))}>
-                    <span>P0% {breakdown.p0Pct.toFixed(1)}%</span>
+                    <span>P0% {dec1(breakdown.p0Pct)}%</span>
                     <span className="text-caption tracking-wide opacity-70">{p0StatusLabel(breakdown.p0Status)}</span>
                     <span className="text-muted-foreground/60 font-normal">·</span>
                     <span className="font-normal text-foreground">
@@ -581,7 +582,7 @@ export function MinuteDetailDialog({
                             {r.gate === 0 ? <span className="text-cat-4-ink">P0</span> : r.gate}
                           </td>
                           <td className="px-2 py-1 tabular-nums text-right">
-                            {r.weightKg != null ? `${r.weightKg.toFixed(2)} kg` : '—'}
+                            {r.weightKg != null ? `${dec2(r.weightKg)} kg` : '—'}
                           </td>
                           <td className="px-2 py-1 text-muted-foreground">
                             {calibreDiffers ? (

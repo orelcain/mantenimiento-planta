@@ -1,5 +1,6 @@
 import type { GraderPhysicalConfig } from '../types'
 import type { PointZeroSuggestion } from './types'
+import { dec2 } from '@/utils/formatoNumeros'
 
 const STALE_DAYS = 30
 
@@ -30,7 +31,7 @@ export function suggestResetFreshness({
       sourceLabel: 'Medición slow-mo pendiente',
       reasoning: 'El tiempo de reset mecánico del cilindro neumático nunca ha sido medido. Se está usando el valor estimado de 0.45s. Esto puede causar errores en el análisis de timing entre gates adyacentes.',
       dataPoints: [
-        { label: 'Valor actual', value: `${(physicalConfig.flipperMechanicalResetS ?? 0.45).toFixed(2)} s`, detail: 'Estimado (no medido)' },
+        { label: 'Valor actual', value: `${dec2((physicalConfig.flipperMechanicalResetS ?? 0.45))} s`, detail: 'Estimado (no medido)' },
         { label: 'Método de medición', value: 'Slow-mo iPhone 240fps' },
         { label: 'Acceso Z2', value: 'Servicio → Probar salidas [8620]' },
       ],

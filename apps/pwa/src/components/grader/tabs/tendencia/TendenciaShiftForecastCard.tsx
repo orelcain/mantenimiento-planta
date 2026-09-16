@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, Badge } from '@/components/ui
 import { Target, TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { useGraderDashboardAnalytics } from '@/hooks/useGraderDashboardAnalytics'
+import { dec1, dec2 } from '@/utils/formatoNumeros'
 
 type DashboardViews = ReturnType<typeof useGraderDashboardAnalytics>
 
@@ -61,7 +62,7 @@ export function TendenciaShiftForecastCard({
           Proyección de Turno en Curso
         </CardTitle>
         <p className="text-xs text-muted-foreground">
-          {trendForecastView.shiftStartLabel} → {trendForecastView.shiftEndLabel} · Cobertura {trendForecastView.completionPct.toFixed(1)}%
+          {trendForecastView.shiftStartLabel} → {trendForecastView.shiftEndLabel} · Cobertura {dec1(trendForecastView.completionPct)}%
         </p>
       </CardHeader>
       <CardContent>
@@ -88,7 +89,7 @@ export function TendenciaShiftForecastCard({
               </Badge>
             </div>
             <p className={cn('text-2xl font-bold tabular-nums', severityText)}>
-              {trendForecastView.projectedPointZeroPct.toFixed(2)}%
+              {dec2(trendForecastView.projectedPointZeroPct)}%
             </p>
             <p className="text-caption text-muted-foreground">
               {trendForecastView.projectedPointZeroPieces.toLocaleString('es-CL')} piezas proyectadas
@@ -120,8 +121,8 @@ export function TendenciaShiftForecastCard({
               <p className={cn('text-2xl font-bold', trendColor)}>{trendLabel}</p>
             </div>
             <p className="text-caption text-muted-foreground">
-              Δ {shiftProgressView.weightDeltaGrams >= 0 ? '+' : ''}{shiftProgressView.weightDeltaGrams.toFixed(1)} g
-              {' '}({shiftProgressView.weightDeltaPct >= 0 ? '+' : ''}{shiftProgressView.weightDeltaPct.toFixed(2)}%)
+              Δ {shiftProgressView.weightDeltaGrams >= 0 ? '+' : ''}{dec1(shiftProgressView.weightDeltaGrams)} g
+              {' '}({shiftProgressView.weightDeltaPct >= 0 ? '+' : ''}{dec2(shiftProgressView.weightDeltaPct)}%)
             </p>
             <p className="text-caption text-muted-foreground">inicio vs último observado</p>
           </div>

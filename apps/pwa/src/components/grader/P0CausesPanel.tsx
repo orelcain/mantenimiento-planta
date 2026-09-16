@@ -31,6 +31,7 @@ import {
 import { CauseTooltip } from './CauseTooltip'
 import type { MatrixP0Cause, PointZeroClassification } from '@/services/grader/types'
 import type { LucideProps } from 'lucide-react'
+import { dec1, dec2 } from '@/utils/formatoNumeros'
 
 type IconComponent = (props: Pick<LucideProps, 'className'>) => JSX.Element
 
@@ -164,11 +165,11 @@ function CauseRow({ cause, stats, totalP0Pct, expanded, selected, onToggle, onSe
           </div>
           <div className="text-right shrink-0 min-w-[60px] sm:min-w-[68px]">
             <div className="font-mono font-bold text-sm">
-              {pctOfTotal.toFixed(2)}%
+              {dec2(pctOfTotal)}%
               <span className="text-caption font-normal text-muted-foreground ml-0.5">total</span>
             </div>
             <div className="text-caption text-muted-foreground font-mono">
-              {stats.pct.toFixed(1)}% del P0
+              {dec1(stats.pct)}% del P0
             </div>
             <div className="text-xs text-muted-foreground">{stats.pieces.toLocaleString('es-CL')} pzas</div>
           </div>
@@ -187,7 +188,7 @@ function CauseRow({ cause, stats, totalP0Pct, expanded, selected, onToggle, onSe
               {stats.subCauses.map(sc => (
                 <div key={sc.cause} className="flex justify-between text-xs text-muted-foreground">
                   <span>└─ {SUB_CAUSE_LABELS[sc.cause] ?? sc.cause}</span>
-                  <span className="font-mono">{sc.pct.toFixed(1)}% · {sc.pieces.toLocaleString('es-CL')} pzas</span>
+                  <span className="font-mono">{dec1(sc.pct)}% · {sc.pieces.toLocaleString('es-CL')} pzas</span>
                 </div>
               ))}
             </div>
@@ -267,7 +268,7 @@ function UmbrellaCauseRow({
                 al título (antes: «Fuera / de / límites»). */}
             <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 sm:hidden">
               <span className="font-mono font-bold text-sm whitespace-nowrap">
-                {pctOfTotal.toFixed(2)}%
+                {dec2(pctOfTotal)}%
                 <span className="text-caption font-normal text-muted-foreground ml-0.5">total</span>
               </span>
               {/* En 375 px solo las dos cifras que se usan: cuánto del turno y
@@ -285,11 +286,11 @@ function UmbrellaCauseRow({
           </div>
           <div className="hidden sm:block text-right shrink-0 min-w-[68px]">
             <div className="font-mono font-bold text-sm">
-              {pctOfTotal.toFixed(2)}%
+              {dec2(pctOfTotal)}%
               <span className="text-caption font-normal text-muted-foreground ml-0.5">total</span>
             </div>
             <div className="text-caption text-muted-foreground font-mono">
-              {umbrellaStats.pct.toFixed(1)}% del P0
+              {dec1(umbrellaStats.pct)}% del P0
             </div>
             <div className="text-xs text-muted-foreground">{umbrellaStats.pieces.toLocaleString('es-CL')} pzas</div>
           </div>
@@ -378,9 +379,9 @@ function SubCauseRow({
         {isStrict ? `${def.label} (estricto)` : def.label}
       </span>
       <div className="text-right shrink-0 font-mono tabular-nums">
-        <span className="font-semibold">{pctOfTotal.toFixed(2)}%</span>
+        <span className="font-semibold">{dec2(pctOfTotal)}%</span>
         <span className="text-caption font-normal text-muted-foreground ml-0.5">total</span>
-        <span className="text-muted-foreground ml-2">({stats.pct.toFixed(1)}% del P0)</span>
+        <span className="text-muted-foreground ml-2">({dec1(stats.pct)}% del P0)</span>
         <span className="text-muted-foreground ml-2">{stats.pieces.toLocaleString('es-CL')} pzas</span>
       </div>
     </div>
@@ -412,8 +413,8 @@ export function P0CausesPanel({ byMatrixCause, totalP0Pct, unsortedPcs, selected
         <CardTitle className="text-base">¿Por qué hubo P0?</CardTitle>
         <CardDescription>
           {hasCauseData
-            ? `${totalP0Pct.toFixed(1)}% de piezas rechazadas — cada causa suma al total`
-            : `${totalP0Pct.toFixed(1)}% de piezas rechazadas — ${fallbackDescription}`}
+            ? `${dec1(totalP0Pct)}% de piezas rechazadas — cada causa suma al total`
+            : `${dec1(totalP0Pct)}% de piezas rechazadas — ${fallbackDescription}`}
         </CardDescription>
       </CardHeader>
 

@@ -2,6 +2,7 @@ import { Zap, TrendingDown, TrendingUp, Minus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui'
 import type { AggregatedAttribution } from '@/services/grader/graderAttribution'
+import { dec2 } from '@/utils/formatoNumeros'
 
 interface Props {
   attribution: AggregatedAttribution
@@ -65,12 +66,12 @@ export function TopActionsCard({ attribution }: Props) {
                   </div>
                   <span className={cn('text-right font-mono font-medium', valueColor)}>
                     {action.totalDelta >= 0 ? '+' : ''}
-                    {action.totalDelta.toFixed(2)} pp
+                    {dec2(action.totalDelta)} pp
                   </span>
                   <span className="text-right text-muted-foreground">{action.timesApplied}×</span>
                   <span className={cn('text-right font-mono text-caption', valueColor)}>
                     {action.avgDelta >= 0 ? '+' : ''}
-                    {action.avgDelta.toFixed(2)}
+                    {dec2(action.avgDelta)}
                   </span>
                 </div>
               )
@@ -88,7 +89,7 @@ export function TopActionsCard({ attribution }: Props) {
                   )}
                 >
                   {avgImprovementPerAction >= 0 ? '+' : ''}
-                  {avgImprovementPerAction.toFixed(2)} pp
+                  {dec2(avgImprovementPerAction)} pp
                 </span>
               </div>
             )}

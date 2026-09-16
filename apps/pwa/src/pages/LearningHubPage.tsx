@@ -233,7 +233,7 @@ export function LearningHubPage() {
     const cards = mainRef.current.querySelectorAll<HTMLElement>('[data-card]')
     if (cards.length === 0) return
     animate(cards, { opacity: [0, 1], translateY: [14, 0], duration: 480, delay: stagger(45), ease: 'outExpo' })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [])
 
   const heightClass = isAuthenticated ? 'min-h-full' : 'min-h-dvh'

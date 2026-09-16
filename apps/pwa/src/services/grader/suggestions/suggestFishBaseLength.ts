@@ -1,6 +1,7 @@
 import type { GraderPhysicalConfig } from '../types'
 import { getGradingBeltSpeedMps } from '../graderBeltHelpers'
 import type { PointZeroSuggestion } from './types'
+import { dec2 } from '@/utils/formatoNumeros'
 
 const SPECIES_ALLOMETRY = {
   salar: { label: 'Salmón Atlántico (Salar)', a: 0.00977, b: 3.05, fishBaseId: 236 },
@@ -53,10 +54,10 @@ export function suggestFishBaseLength({
     unit: 'cm',
     source: 'fishbase',
     sourceLabel: `FishBase LWR — ${label}`,
-    reasoning: `La relación Largo-Peso oficial de FishBase para ${label} indica que un pez de ${(medianWeightG / 1000).toFixed(2)} kg debería medir aprox. ${suggestedCm} cm. El valor configurado (${currentCm} cm) difiere en ${diff} cm, lo que afecta el cálculo del gap libre y el timing del flipper.`,
+    reasoning: `La relación Largo-Peso oficial de FishBase para ${label} indica que un pez de ${dec2((medianWeightG / 1000))} kg debería medir aprox. ${suggestedCm} cm. El valor configurado (${currentCm} cm) difiere en ${diff} cm, lo que afecta el cálculo del gap libre y el timing del flipper.`,
     formula: `L = (W / a)^(1/b) = (${medianWeightG} / ${a})^(1/${b}) ≈ ${suggestedCm} cm`,
     dataPoints: [
-      { label: 'Peso mediano lote', value: `${medianWeightG.toLocaleString('es-CL')} g`, detail: `${(medianWeightG / 1000).toFixed(2)} kg` },
+      { label: 'Peso mediano lote', value: `${medianWeightG.toLocaleString('es-CL')} g`, detail: `${dec2((medianWeightG / 1000))} kg` },
       { label: 'Especie', value: label },
       { label: 'Coef. a (FishBase)', value: String(a), detail: `FishBase ID ${fishBaseId}` },
       { label: 'Coef. b (FishBase)', value: String(b) },

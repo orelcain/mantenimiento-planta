@@ -119,7 +119,7 @@ describe('deriveSuggestions — context upstream (v2.99.2)', () => {
     const action = out.find(a => a.id === 'scatter-baader-rate')
     expect(action).toBeDefined()
     expect(action!.category).toBe('oficina')
-    expect(action!.description).toContain('+0.40')
+    expect(action!.description).toContain('+0,40')
   })
 
   it('NO agrega "investigar ritmo" cuando direction es flat', () => {

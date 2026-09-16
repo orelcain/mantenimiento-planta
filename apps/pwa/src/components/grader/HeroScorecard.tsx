@@ -24,6 +24,7 @@ import {
   MANUAL_LINE_TOOLTIP,
 } from '@/services/grader/graderManualLine'
 import { ShiftMachinesHalf } from './ShiftMachinesHalf'
+import { dec1, dec2 } from '@/utils/formatoNumeros'
 
 /** Formatea diferencia de tiempo en relativo corto: "hace 58s" / "hace 1h 12m". */
 function fmtSyncRelative(at: Date | null | undefined): string {
@@ -104,10 +105,10 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, upstream
           <div className="mt-2">
             <span
               className={cn('inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-semibold', chip.ring, chip.text)}
-              title={`${summary.pointZeroPieces} piezas rechazadas (gate 0), ${summary.pointZeroPct.toFixed(2)}% del total.`}
+              title={`${summary.pointZeroPieces} piezas rechazadas (gate 0), ${dec2(summary.pointZeroPct)}% del total.`}
             >
               <span className={cn('w-1.5 h-1.5 rounded-full', chip.dot)} />
-              P0 {summary.pointZeroPct.toFixed(1)}% · {summary.pointZeroPieces.toLocaleString('es-CL')} pz rechazadas
+              P0 {dec1(summary.pointZeroPct)}% · {summary.pointZeroPieces.toLocaleString('es-CL')} pz rechazadas
             </span>
           </div>
 
@@ -133,13 +134,13 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, upstream
                   <span className="w-2 h-2 rounded-[2px] bg-primary shrink-0" />
                   <span className="text-muted-foreground">por las Baader</span>
                   <b className="tabular-nums ml-auto">{manualLine.baaderCycles.toLocaleString('es-CL')}</b>
-                  <span className="text-muted-foreground tabular-nums w-12 text-right">{pctBaader.toFixed(1)}%</span>
+                  <span className="text-muted-foreground tabular-nums w-12 text-right">{dec1(pctBaader)}%</span>
                 </div>
                 <div className="flex items-center gap-1.5 cursor-help" title={MANUAL_LINE_TOOLTIP}>
                   <span className="w-2 h-2 rounded-[2px] bg-cat-6-ink shrink-0" />
                   <span className="text-muted-foreground">{MANUAL_LINE_LABEL}</span>
                   <b className="tabular-nums ml-auto">{manualLine.manualPieces.toLocaleString('es-CL')}</b>
-                  <span className="text-muted-foreground tabular-nums w-12 text-right">{manualLine.pctOfGrader.toFixed(1)}%</span>
+                  <span className="text-muted-foreground tabular-nums w-12 text-right">{dec1(manualLine.pctOfGrader)}%</span>
                 </div>
               </div>
             </div>

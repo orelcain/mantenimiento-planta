@@ -15,6 +15,7 @@
 
 import type { GraderDailySummary } from './types'
 import { DEFAULT_P0_ALERT_PCT, DEFAULT_P0_CRITICAL_PCT } from './graderP0Thresholds'
+import { dec2 } from '@/utils/formatoNumeros'
 
 export interface SummaryInsight {
   id: string
@@ -116,10 +117,10 @@ export function computeInsightsFromSummary(
           severity: 'warn',
           title: 'Tendencia ascendente de P0%',
           evidence: [
-            `P0% promedio primeros ${half} turnos analizados: ${avgFirst.toFixed(2)}%`,
-            `P0% promedio últimos ${half} turnos analizados: ${avgLast.toFixed(2)}%`,
+            `P0% promedio primeros ${half} turnos analizados: ${dec2(avgFirst)}%`,
+            `P0% promedio últimos ${half} turnos analizados: ${dec2(avgLast)}%`,
             `Turno actual: ${summary.pointZeroPct}%`,
-            `Incremento detectado: +${delta.toFixed(2)} puntos porcentuales.`,
+            `Incremento detectado: +${dec2(delta)} puntos porcentuales.`,
           ],
           recommendations: [
             'Monitorear el próximo turno con atención.',
