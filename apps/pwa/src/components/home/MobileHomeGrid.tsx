@@ -448,7 +448,7 @@ export function MobileHomeGrid() {
               */
               <ListGroup>
                 {chipTiles.flatMap((tile) => {
-                  const c = COLOR[tile.color]
+                  // (COLOR[tile.color] ya no se usa aqui: el tile movil es neutro.)
                   const Icon = tile.icon
                   const wip = isWip(tile.id, tile.wip)
                   // Tile NEUTRO (systemFill + glifo secundario), no tintado con el
