@@ -489,6 +489,43 @@
   .piel-fade-in, .piel-sheet-in, .piel-pulse { animation: none !important }
 }
 
+/* ── Vidrio de NAVEGACION · Liquid Glass iOS 27 (DESIGN.md §6) ────────────────
+   Para la tab bar flotante y nada mas: el vidrio es cromo de navegacion, nunca
+   contenido. Cuatro capas, en orden de importancia:
+     1. inset superior claro = el specular highlight. ES el efecto: bajarlo
+        aplana el panel al instante.
+     2. inset de 0.5px oscuro = el borde oscurecido que trajo iOS 27.
+     3. base al 82% + blur 24 con saturacion: menos transparente que iOS 26,
+        que es justo lo que Apple corrigio.
+     4. dos sombras externas (contacto + ambiente): con una sola se ve pegado.
+   Valores: aproximacion medida — Apple no publica ninguno. */
+.glass-nav {
+  background-color: rgb(var(--card) / 0.82);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  box-shadow:
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.75),
+    inset 0 0 0 0.5px rgba(0, 0, 0, 0.14),
+    0 1px 2px rgba(0, 0, 0, 0.09),
+    0 9px 22px rgba(0, 0, 0, 0.15);
+}
+.dark .glass-nav {
+  box-shadow:
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.22),
+    inset 0 0 0 0.5px rgba(0, 0, 0, 0.45),
+    0 1px 2px rgba(0, 0, 0, 0.34),
+    0 9px 22px rgba(0, 0, 0, 0.50);
+}
+/* Con transparencia reducida el cromo va solido y conserva el borde (Apple:
+   Reduce Transparency deja "flat, solid backgrounds"). */
+@media (prefers-reduced-transparency: reduce) {
+  .glass-nav {
+    background-color: rgb(var(--card));
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
 /* ── Transparencia reducida (DESIGN.md §6) ────────────────────────────────────
    iOS 27 le dio al usuario un slider de transparencia (Ajustes > Appearance >
    Liquid Glass) y Apple documenta que el material responde a Reduce Transparency.
