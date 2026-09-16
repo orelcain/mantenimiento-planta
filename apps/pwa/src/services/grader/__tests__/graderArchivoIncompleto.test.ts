@@ -5,7 +5,7 @@ describe('avisoDeArchivoIncompleto', () => {
   it('el caso medido: la hoja declara 308.539 filas y no trajo ninguna celda', () => {
     const a = avisoDeArchivoIncompleto('A1:K308539', 0)
     expect(a).toContain('308.539 filas')
-    expect(a).toContain('volvé a exportarlo')
+    expect(a).toContain('vuelve a exportarlo')
   })
 
   it('no dice nada si la hoja trajo celdas', () => {

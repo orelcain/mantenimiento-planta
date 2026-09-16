@@ -2367,7 +2367,7 @@ export async function sendChatMessage(
         })
         const reply = draft.modo === 'vincular'
           ? `✅ **${draft.existenteNombre}** (SAP \`${draft.codigoSAP}\`) quedó vinculado a **${draft.equipoNombre}**.\n\nLo ves en su ficha en el módulo Repuestos.`
-          : `✅ **¡Repuesto creado!**\n\n📦 ${draft.nombre}\n🏷️ Clase: ${draft.clase}${draft.codigoSAP ? `\n🔖 SAP: ${draft.codigoSAP}` : ''}${draft.equipoNombre ? `\n🏭 Vinculado a: ${draft.equipoNombre}` : ''}\n\nYa lo puedes ver en el módulo Repuestos.\n\n💡 Si tienes el código de fabricante a mano, decime "el código de fabricante es ___" y se lo agrego.`
+          : `✅ **¡Repuesto creado!**\n\n📦 ${draft.nombre}\n🏷️ Clase: ${draft.clase}${draft.codigoSAP ? `\n🔖 SAP: ${draft.codigoSAP}` : ''}${draft.equipoNombre ? `\n🏭 Vinculado a: ${draft.equipoNombre}` : ''}\n\nYa lo puedes ver en el módulo Repuestos.\n\n💡 Si tienes el código de fabricante a mano, dime "el código de fabricante es ___" y se lo agrego.`
         return {
           reply,
           context: '',
@@ -2437,7 +2437,7 @@ export async function sendChatMessage(
 
     if (isModify && (pendingAction.type === 'create_repuesto' || pendingAction.type === 'edit_repuesto')) {
       return {
-        reply: '✏️ Mejor decime "no" para descartar este borrador y volvé a describirlo — por ejemplo con el SAP correcto o el equipo exacto.',
+        reply: '✏️ Mejor dime "no" para descartar este borrador y vuelve a describirlo — por ejemplo con el SAP correcto o el equipo exacto.',
         context: '',
         actions: [],
         typoCorrections: [],
@@ -2543,7 +2543,7 @@ export async function sendChatMessage(
     const { draft, missingFields } = await buildRepuestoDraft(userMessage)
     if (missingFields.includes('nombre')) {
       return {
-        reply: '¿Qué material agrego? Decime por ejemplo: **"crea el repuesto sello mecánico 32mm para la bomba X, SAP 3300123456"** (el SAP es opcional).',
+        reply: '¿Qué material agrego? Dime por ejemplo: **"crea el repuesto sello mecánico 32mm para la bomba X, SAP 3300123456"** (el SAP es opcional).',
         context: '',
         actions: [],
         typoCorrections,
@@ -2551,7 +2551,7 @@ export async function sendChatMessage(
     }
     if (missingFields.includes('equipo')) {
       return {
-        reply: `No encontré el equipo "${draft.equipoTexto}" en la jerarquía. Decime el nombre como figura en la app, o seguí sin vincularlo (lo podés hacer después desde la ficha).`,
+        reply: `No encontré el equipo "${draft.equipoTexto}" en la jerarquía. Dime el nombre como figura en la app, o sigue sin vincularlo (lo puedes hacer después desde la ficha).`,
         context: '',
         actions: [],
         typoCorrections,

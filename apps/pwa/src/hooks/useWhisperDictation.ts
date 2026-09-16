@@ -79,7 +79,7 @@ export function useWhisperDictation(
           else setError('No se reconoció voz. Intentá de nuevo.')
         } catch (err) {
           logger.error('Error transcribiendo audio', err instanceof Error ? err : new Error(String(err)))
-          setError('No se pudo transcribir. Revisá tu conexión.')
+          setError('No se pudo transcribir. Revisa tu conexión.')
         } finally {
           setIsTranscribing(false)
         }

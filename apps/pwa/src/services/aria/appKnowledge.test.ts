@@ -19,7 +19,7 @@ describe('appKnowledge — mapa de la app', () => {
 
   it('siempre incluye qué puede responder por chat (aunque el módulo esté en dev)', () => {
     const b = buildAppKnowledgeBlock('tecnico')
-    expect(b).toContain('DATOS QUE PODÉS RESPONDER POR CHAT')
+    expect(b).toContain('DATOS QUE PUEDES RESPONDER POR CHAT')
     expect(b.toLowerCase()).toContain('producción del turno/día')
   })
 

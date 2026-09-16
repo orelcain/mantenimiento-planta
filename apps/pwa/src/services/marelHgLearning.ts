@@ -47,7 +47,7 @@ const MANUAL_DIDACTIC: Record<string, { objetivo?: string; porque?: string; quiz
     objetivo: 'Correr la verificación breve antes de producir —estado RUNNING, vías despejadas, balanza inicializada— para evitar alarmas y paros.',
     porque: 'producir con la balanza sin inicializar o una vía obstruida arranca el turno con alarmas y clasificación mala; unos segundos de chequeo ahorran horas.',
     quiz: [
-      { question: 'La balanza (Weigher) no está inicializada. ¿Qué hacés?', options: ['Producir igual', 'Detener toda la producción hasta que se inicialice', 'Bajar la velocidad', 'Ignorar'], correctIndex: 1, explanation: 'Si la balanza no está lista hay que detener toda la producción hasta que se inicialice.' },
+      { question: 'La balanza (Weigher) no está inicializada. ¿Qué haces?', options: ['Producir igual', 'Detener toda la producción hasta que se inicialice', 'Bajar la velocidad', 'Ignorar'], correctIndex: 1, explanation: 'Si la balanza no está lista hay que detener toda la producción hasta que se inicialice.' },
     ],
   },
   'mhg-manual-pantallas': {
@@ -82,7 +82,7 @@ const MANUAL_DIDACTIC: Record<string, { objetivo?: string; porque?: string; quiz
     objetivo: 'Leer el botón Alarm en sus TRES niveles (rojo = atención inmediata; naranja = solucionar lo antes posible; amarillo = no requiere atención inmediata) y usar el Registro de alarmas antes de actuar.',
     porque: 'actuar sin leer el Registro de alarmas es adivinar; el registro trae el tipo de error, su prioridad y la solución, que es justo lo que acorta la parada.',
     quiz: [
-      { question: 'Salta una alarma. ¿Qué hacés primero?', options: ['Reiniciar el equipo', 'Leer el Registro de alarmas (tipo, prioridad y solución)', 'Bajar la velocidad', 'Llamar al proveedor'], correctIndex: 1, explanation: 'Ante una alarma se lee siempre el Registro de alarmas antes de actuar: trae el tipo de error, su prioridad y la solución.' },
+      { question: 'Salta una alarma. ¿Qué haces primero?', options: ['Reiniciar el equipo', 'Leer el Registro de alarmas (tipo, prioridad y solución)', 'Bajar la velocidad', 'Llamar al proveedor'], correctIndex: 1, explanation: 'Ante una alarma se lee siempre el Registro de alarmas antes de actuar: trae el tipo de error, su prioridad y la solución.' },
       { question: 'El botón Alarm está en ROJO. ¿Qué indica?', options: ['Advertencia menor', 'Error grave que requiere atención inmediata', 'Todo normal', 'Falta papel'], correctIndex: 1, explanation: 'Alarma en rojo = nivel más alto, requiere atención inmediata. Son TRES niveles: naranja es nivel medio (solucionar lo antes posible) y amarillo el más bajo (no requiere atención inmediata) — no van juntos.' },
     ],
   },

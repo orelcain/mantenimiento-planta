@@ -291,7 +291,7 @@ export function QuickInterventionCapture({
             )}
           </CardTitle>
           <p className="text-xs text-muted-foreground">
-            Dictá lo que hiciste o encontraste. Cada registro es evidencia de que Mantención intervino en esta área.
+            Dicta lo que hiciste o encontraste. Cada registro es evidencia de que Mantención intervino en esta área.
           </p>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -350,7 +350,7 @@ export function QuickInterventionCapture({
                 options={equipoOptions}
                 value={selectedEquipoId}
                 onChange={setSelectedEquipoId}
-                placeholder="Área general · escribí para buscar equipo…"
+                placeholder="Área general · escribe para buscar equipo…"
               />
               {loadingEquip && (
                 <p className="text-caption text-muted-foreground flex items-center gap-1">

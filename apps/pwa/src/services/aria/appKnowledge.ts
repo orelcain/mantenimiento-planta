@@ -101,7 +101,7 @@ export function buildAppKnowledgeBlock(role?: string): string {
   // Qué puede responder por chat (data-rich) — SIEMPRE, incluso módulos en dev.
   const consultables = APP_MODULES.filter(m => m.puedesPreguntar)
   if (consultables.length > 0) {
-    lines.push('DATOS QUE PODÉS RESPONDER POR CHAT (aunque el módulo esté en desarrollo, los datos SÍ están disponibles vía tus tools):')
+    lines.push('DATOS QUE PUEDES RESPONDER POR CHAT (aunque el módulo esté en desarrollo, los datos SÍ están disponibles vía tus tools):')
     for (const m of consultables) {
       lines.push(`- ${m.nombre}: ${m.puedesPreguntar}`)
     }
@@ -111,8 +111,8 @@ export function buildAppKnowledgeBlock(role?: string): string {
   lines.push(
     'INSTRUCCIONES: cuando el usuario pregunte "¿qué puede hacer la app?", "¿dónde veo X?", "llévame a…", orientá con el módulo correcto y su ruta. ' +
     (admin
-      ? 'Los módulos "en desarrollo" existen: podés mencionarlos y linkearlos (el admin los ve).'
-      : 'NO listes ni linkees módulos "en desarrollo" a técnicos; si preguntan por uno, decí que está "en desarrollo, pronto" y ofrecé el dato por chat si lo tenés.') +
+      ? 'Los módulos "en desarrollo" existen: puedes mencionarlos y linkearlos (el admin los ve).'
+      : 'NO listes ni linkees módulos "en desarrollo" a técnicos; si preguntan por uno, di que está "en desarrollo, pronto" y ofrece el dato por chat si lo tienes.') +
     ' Nunca inventes módulos ni rutas que no estén en este mapa.',
   )
 

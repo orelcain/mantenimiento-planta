@@ -894,7 +894,7 @@ export function AnalisisGraderWizardPage() {
               <p className="text-footnote text-ink-warn">
                 Lleva más de un minuto y no llegó nada al servidor. Casi siempre es una pestaña con la
                 conexión caída: cerrá <span className="font-medium">todas</span> las pestañas de la app
-                (incluida la del monitor), abrila de nuevo y volvé a guardar. El Excel no se pierde.
+                (incluida la del monitor), ábrela de nuevo y vuelve a guardar. El Excel no se pierde.
               </p>
             </CardContent>
           )}
@@ -906,7 +906,7 @@ export function AnalisisGraderWizardPage() {
             <CheckCircle2 className="h-4 w-4 text-ink-ok shrink-0" />
             <p className="text-sm text-ink-ok font-medium flex-1 min-w-[16rem]">
               Guardado correctamente en <b>{lineConfig.label}</b>
-              {savedShifts.length > 1 ? ' · elegí qué turno abrir, o cargá otro Excel.' : ' · abriendo el turno…'}
+              {savedShifts.length > 1 ? ' · elige qué turno abrir, o carga otro Excel.' : ' · abriendo el turno…'}
             </p>
             {/* Salida directa al detalle de cada turno guardado. La matriz de
                 abajo no siempre lo ofrece: un turno en curso sin celda no se
@@ -936,7 +936,7 @@ export function AnalisisGraderWizardPage() {
               <p className="text-sm text-ink-crit font-medium">No se pudo guardar el turno</p>
               <p className="text-xs text-ink-crit/90 dark:text-ink-crit/80 mt-0.5 break-words">{saveError}</p>
               <p className="text-caption text-ink-crit/70 dark:text-ink-crit/60 mt-1">
-                El Excel sigue cargado en cola — podés volver a presionar "Guardar en Calendario" para reintentar.
+                El Excel sigue cargado en cola — puedes volver a presionar "Guardar en Calendario" para reintentar.
               </p>
             </div>
             <Button

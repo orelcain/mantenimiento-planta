@@ -1908,7 +1908,7 @@ function MeasureOverlay() {
               </button>
             </div>
             <p className="text-[10px] text-gray-600 pt-1">
-              Seguí haciendo clic para sumar segmentos
+              Sigue haciendo clic para sumar segmentos
             </p>
           </div>
         )}

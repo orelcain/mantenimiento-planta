@@ -104,6 +104,6 @@ export function formatearLagunas(lagunas: Laguna[]): string {
     `Preguntas que no pude responder bien (últimas ${lagunas.length}):`,
     ...lineas,
     '',
-    'Si sabés el dato que falta, decímelo con "aprende: ..." y queda para la próxima.',
+    'Si sabes el dato que falta, dímelo con "aprende: ..." y queda para la próxima.',
   ].join('\n')
 }

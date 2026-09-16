@@ -320,7 +320,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
         // La fila se quitaba igual: el aviso decia «no se pudo eliminar» y el
         // archivo desaparecia de la pantalla, asi que quedaba en el servidor
         // sin nada que lo muestre --y volvia al recargar el turno--.
-        setUploadError('No se pudo eliminar el archivo del servidor. Sigue cargado: volvé a intentar.')
+        setUploadError('No se pudo eliminar el archivo del servidor. Sigue cargado: vuelve a intentar.')
         return
       }
     }

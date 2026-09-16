@@ -48,7 +48,7 @@ export function avisoDeRango(sessionDate: string | null | undefined, rango: Rang
   const r = rangoDelArchivo(rango)
   if (!sessionDate || !r) return null
   if (cubreElTurno(sessionDate, rango)) return null
-  return `El archivo cubre del ${r.desde} al ${r.hasta}, y el turno que estás cargando es del ${sessionDate}: no está adentro. Revisá que sea el Excel correcto.`
+  return `El archivo cubre del ${r.desde} al ${r.hasta}, y el turno que estás cargando es del ${sessionDate}: no está adentro. Revisa que sea el Excel correcto.`
 }
 
 /** El rango en dias del archivo, o null si no hay con que juzgar. */

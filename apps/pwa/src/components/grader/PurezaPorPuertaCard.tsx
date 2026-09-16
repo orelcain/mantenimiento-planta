@@ -1117,7 +1117,7 @@ function PiezasDePuerta({ obs, m, piezas, cargando, onCargar, rango, rangos, foc
       </div>
       <p className="text-caption text-muted-foreground">
         Círculo = coincide · rombo = intrusa (color de su dimensión) · anillo ámbar = fuera del rango por peso
-        {fuera > 0 && <> ({fmtPz(fuera)} pz)</>}. Ventana de 90 min: arrastrá o pellizcá para moverla.
+        {fuera > 0 && <> ({fmtPz(fuera)} pz)</>}. Ventana de 90 min: arrastra o pellizca para moverla.
       </p>
     </div>
   )

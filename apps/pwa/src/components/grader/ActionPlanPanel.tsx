@@ -237,7 +237,7 @@ export function ActionPlanPanel({ shiftDocId, suggestions, status, relatedRunboo
         </div>
         <CardDescription>
           {status === 'live'
-            ? 'Acciones sugeridas para el turno en curso — marcá las que ya realizaste'
+            ? 'Acciones sugeridas para el turno en curso — marca las que ya realizaste'
             : 'Resumen de acciones para este turno'}
           {rulesDescriptor && (
             <span className="block mt-1 text-caption text-muted-foreground italic">

@@ -108,7 +108,7 @@ export function ParoEtapaCapture({ plantLineId, areaLabel, onChanged, className 
 
   const handleSave = useCallback(async () => {
     const dur = Number(duracion)
-    if (!etapaFinal) { setError('Elegí o escribí la etapa.'); return }
+    if (!etapaFinal) { setError('Elige o escribe la etapa.'); return }
     if (!Number.isFinite(dur) || dur <= 0) { setError('Indicá la duración del paro (minutos).'); return }
     setSaving(true)
     setError(null)
@@ -150,7 +150,7 @@ export function ParoEtapaCapture({ plantLineId, areaLabel, onChanged, className 
           )}
         </CardTitle>
         <p className="text-xs text-muted-foreground">
-          Registrá cuándo se detuvo una etapa que no mide Shoplogix (bombeo, chiller, cintas, Marel, corte…). Mide la disponibilidad del área.
+          Registra cuándo se detuvo una etapa que no mide Shoplogix (bombeo, chiller, cintas, Marel, corte…). Mide la disponibilidad del área.
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -196,7 +196,7 @@ export function ParoEtapaCapture({ plantLineId, areaLabel, onChanged, className 
         {/* Causa */}
         <div className="space-y-1">
           <label className="text-caption font-medium text-muted-foreground">Causa <span className="text-muted-foreground/60">(opcional)</span></label>
-          <SpeechTextarea value={causa} onChange={(e) => setCausa(e.target.value)} placeholder="Por qué se detuvo (podés dictar)…" rows={2} className="text-sm bg-background" />
+          <SpeechTextarea value={causa} onChange={(e) => setCausa(e.target.value)} placeholder="Por qué se detuvo (puedes dictar)…" rows={2} className="text-sm bg-background" />
         </div>
 
         {error && (

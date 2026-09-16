@@ -541,7 +541,7 @@ export function TiempoDelTurno({
                         ))}
                         {onCausa && gruposImputables.length > 0 && (
                           <p className="mt-1.5 text-[11px] text-muted-foreground/80">
-                            Tocá una causa para ver sus paradas una por una.
+                            Toca una causa para ver sus paradas una por una.
                           </p>
                         )}
                         {/* ⚠ El supuesto va escrito: es la parte discutible del
@@ -758,7 +758,7 @@ export function TiempoDelTurno({
 
           {onCausa && gruposVisibles.length > 0 && (
             <p className="mt-1.5 text-[11px] text-muted-foreground/80">
-              Tocá una causa para ver sus paradas una por una.
+              Toca una causa para ver sus paradas una por una.
             </p>
           )}
         </div>

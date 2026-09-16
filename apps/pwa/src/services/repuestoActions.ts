@@ -369,10 +369,10 @@ export async function buildEditDraft(
 
   const valor = parseCodigoFabricante(texto)
   if (!targetSap) {
-    return { draft: null, error: '¿A qué repuesto le pongo el código de fabricante? Decime el SAP (10 dígitos), o pedímelo justo después de crear/buscar uno ("al mismo").' }
+    return { draft: null, error: '¿A qué repuesto le pongo el código de fabricante? Dime el SAP (10 dígitos), o pedímelo justo después de crear/buscar uno ("al mismo").' }
   }
   if (!valor) {
-    return { draft: null, error: '¿Cuál es el código de fabricante? Decímelo así: "el código de fabricante es 999 0566".' }
+    return { draft: null, error: '¿Cuál es el código de fabricante? Dímelo así: "el código de fabricante es 999 0566".' }
   }
   const existente = await buscarSapEnMaestro(targetSap)
   if (!existente) {
@@ -400,7 +400,7 @@ export function formatRepuestoDraftForDisplay(draft: RepuestoDraft): string {
   lines.push(draft.codigoSAP ? `🔖 **SAP:** \`${draft.codigoSAP}\`` : '🔖 **SAP:** sin código')
   lines.push(draft.equipoNombre ? `🏭 **Equipo:** ${draft.equipoNombre}` : '🏭 **Equipo:** sin vincular (se puede hacer después en la app)')
   if (draft.parecidos?.length) {
-    lines.push(`⚠️ Parecidos en el maestro: ${draft.parecidos.map((p) => `${p.nombre}${p.codigoSAP ? ` (SAP ${p.codigoSAP})` : ''}`).join(' · ')} — si es uno de esos, decime "no" y lo vinculamos en vez de duplicar.`)
+    lines.push(`⚠️ Parecidos en el maestro: ${draft.parecidos.map((p) => `${p.nombre}${p.codigoSAP ? ` (SAP ${p.codigoSAP})` : ''}`).join(' · ')} — si es uno de esos, dime "no" y lo vinculamos en vez de duplicar.`)
   }
   return lines.join('\n')
 }

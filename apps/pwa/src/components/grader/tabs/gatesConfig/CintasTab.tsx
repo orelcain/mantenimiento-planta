@@ -95,7 +95,7 @@ export function CintasTab({ physicalConfig, updateBeltLength, updateBeltSpeed, s
                       <InfoTooltip
                         title="Velocidad base calibrada"
                         text="Velocidad de la superficie medida con tachómetro SKF. Es el parámetro de planta — no el setpoint operacional del turno."
-                        example="Para registrar cambios durante un turno usá 'Ajusté RPM' en el panel del turno en vivo"
+                        example="Para registrar cambios durante un turno usa 'Ajusté RPM' en el panel del turno en vivo"
                         iconSize={10}
                         position="bottom"
                       />

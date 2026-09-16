@@ -39,5 +39,5 @@ export function avisoDeArchivoIncompleto(ref: string | undefined, celdasLeidas: 
   if (celdasLeidas > 0) return null
   const filas = filasDeclaradas(ref)
   if (filas <= 1) return null // hoja vacía de verdad: no hay nada que diagnosticar
-  return `El archivo está incompleto: la hoja declara ${filas.toLocaleString('es-CL')} filas y no se pudo leer ninguna. La exportación desde Matrix se cortó a mitad — volvé a exportarlo, en un rango de días más chico.`
+  return `El archivo está incompleto: la hoja declara ${filas.toLocaleString('es-CL')} filas y no se pudo leer ninguna. La exportación desde Matrix se cortó a mitad — vuelve a exportarlo, en un rango de días más chico.`
 }

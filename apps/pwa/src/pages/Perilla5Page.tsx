@@ -773,7 +773,7 @@ function VistaProtocolo() {
     if (vacios.length > 0) {
       setError(
         `Faltan ${vacios.length} contadores: ${vacios.join(', ')}. `
-        + 'Si el valor real es cero, escribí 0; si no lo tenés, buscalo en el panel antes de guardar.',
+        + 'Si el valor real es cero, escribe 0; si no lo tienes, búscalo en el panel antes de guardar.',
       )
       return
     }
@@ -799,7 +799,7 @@ function VistaProtocolo() {
       setForm({ ...FORM_VACIO })
       setNotas('')
     } catch {
-      setError('No se pudo guardar. Revisá la conexión o tus permisos.')
+      setError('No se pudo guardar. Revisa la conexión o tus permisos.')
     } finally {
       setGuardando(false)
     }
@@ -1380,7 +1380,7 @@ function VistaProtocolo() {
               const marcas: string[] = []
               if (marcasGrafico.reins.includes(idx)) marcas.push('⟳ protocolo reiniciado antes')
               if (marcasGrafico.ints.includes(idx)) marcas.push('| intervención registrada ese día')
-              return [...marcas, 'Tocá el punto para ver la pauta']
+              return [...marcas, 'Toca el punto para ver la pauta']
             },
           },
         },
@@ -1689,7 +1689,7 @@ function VistaProtocolo() {
             <span>
               Series · <strong style={{ color: LC.inkMid }}>
                 {seriesConDatos.filter((s) => !apagadas.has(s.k as string)).length} de {seriesConDatos.length}
-              </strong> en el gráfico · tocá para mostrar u ocultar
+              </strong> en el gráfico · toca para mostrar u ocultar
             </span>
             {apagadas.size > 0 && seriesConDatos.some((s) => {
               const r = ultimaValida ? tasa1000(ultimaValida[s.k], ultimaValida.fish) : null

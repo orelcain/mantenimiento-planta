@@ -164,7 +164,7 @@ export function DxfImportModal({ onClose }: Props) {
             >
               <FileText size={40} className="text-gray-600 group-hover:text-amber-400 transition-colors" />
               <p className="text-sm text-gray-400 group-hover:text-gray-200 text-center">
-                Arrastrá un archivo <span className="text-amber-400 font-semibold">.dxf</span> o hacé clic para buscarlo
+                Arrastra un archivo <span className="text-amber-400 font-semibold">.dxf</span> o haz clic para buscarlo
               </p>
               <p className="text-[11px] text-gray-600">AutoCAD R12 / R2000+ · puede tardar unos segundos en archivos grandes</p>
               <input ref={inputRef} type="file" accept=".dxf" className="hidden" onChange={onFileChange} />

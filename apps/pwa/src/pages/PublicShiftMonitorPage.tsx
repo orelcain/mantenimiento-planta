@@ -668,7 +668,7 @@ function MetroPiezas({ ahora, meta, banda, etiquetaBanda }: {
   )
 }
 
-/** El riel de ritmo: vas a · lo normal · necesitás · techo, sobre una escala. */
+/** El riel de ritmo: vas a · lo normal · necesitas · techo, sobre una escala. */
 function RielRitmo({ vasA, normal, necesitas, techo }: {
   vasA: number | null
   normal: number | null
@@ -693,12 +693,12 @@ function RielRitmo({ vasA, normal, necesitas, techo }: {
         )}
         {typeof necesitas === 'number' && nx != null && (
           <span className="absolute -translate-x-1/2 whitespace-nowrap font-semibold text-foreground" style={{ left: `${nx}%` }}>
-            necesitás {fmtDec(necesitas)}
+            necesitas {fmtDec(necesitas)}
           </span>
         )}
         {necesitas === 'fuera' && (
           <span className="absolute right-0 whitespace-nowrap font-semibold text-ink-warn">
-            necesitás fuera de escala →
+            necesitas fuera de escala →
           </span>
         )}
       </div>
@@ -906,7 +906,7 @@ function EditorCuota({ actual, pesoConocido, onGuardar, conToneladas = true }: {
           Para guardar en toneladas falta{!(Number(toneladas) > 0) ? ' cuántas toneladas' : ''}
           {!(Number(toneladas) > 0) && !(Number(pesoG) > 0) ? ' y' : ''}
           {!(Number(pesoG) > 0) ? ' los gramos por pieza (peso promedio del calibre)' : ''}
-          {' '}— o cambiá a «piezas».
+          {' '}— o cambia a «piezas».
         </span>
       )}
       {actual != null && (
@@ -1176,12 +1176,12 @@ function Sparkbars({
   /*
    * Las referencias del ritmo, ya en la escala del eje. Solo se dibujan si
    * CABEN: con la meta pidiendo 53 pz/min y el mejor tramo en 14,6, la línea
-   * de "necesitás" estiraba el eje al cuádruple y aplastaba el turno entero
+   * de "necesitas" estiraba el eje al cuádruple y aplastaba el turno entero
    * contra el piso. Cuando no cabe, el número se dice en la leyenda en vez de
    * deformar el gráfico.
    */
   const refs = [
-    { cpm: requiredPerMinute ?? 0, label: 'necesitás', clase: 'stroke-amber-600 dark:stroke-amber-400' },
+    { cpm: requiredPerMinute ?? 0, label: 'necesitas', clase: 'stroke-amber-600 dark:stroke-amber-400' },
     /* Decía "promedio de turno" y es la MEDIANA DE LOS TURNOS ANTERIORES: el
        26-08 marcaba 26,8 mientras el turno de hoy promediaba 37,2. Quien mira
        la línea gris creía estar viendo su propio turno. */
@@ -1669,7 +1669,7 @@ function Sparkbars({
           </button>
         ) : (
           <span className="ml-auto text-[10px] text-muted-foreground/80">
-            pellizcá o rodá para acercar
+            pellizca o rueda para acercar
           </span>
         )}
       </div>
@@ -1711,7 +1711,7 @@ function Sparkbars({
         {refsDibujables.map((r) => (
           <span key={r.label} className="inline-flex items-center gap-1">
             <span className={`inline-block h-2 w-3 border-t border-dashed ${
-              r.label === 'necesitás' ? 'border-amber-600 dark:border-amber-400' : 'border-muted-foreground/60'
+              r.label === 'necesitas' ? 'border-amber-600 dark:border-amber-400' : 'border-muted-foreground/60'
             }`} />
             {r.label} <span className="tabular-nums">{fmtDec(r.cpm)}</span>
           </span>
@@ -1719,12 +1719,12 @@ function Sparkbars({
         {/* Fuera de escala: el número se dice, pero no se dibuja — estirar el
             eje hasta él aplastaba el turno entero contra el piso.
             OJO: sobre 2× la escala ni se dice: a 8 min del cierre la leyenda
-            anunciaba «necesitás 598,4 pz/min» — cierto e inútil, se lee como
+            anunciaba «necesitas 598,4 pz/min» — cierto e inútil, se lee como
             pantalla rota (mismo criterio que la tarjeta de la meta). */}
         {refsFuera.map((r) => (
           <span key={r.label} className="inline-flex items-center gap-1">
-            {r.cpm > escala * 2 && r.label === 'necesitás' ? (
-              <>necesitás <span className="text-muted-foreground/70">más de lo que la línea puede — ya no da el tiempo</span></>
+            {r.cpm > escala * 2 && r.label === 'necesitas' ? (
+              <>necesitas <span className="text-muted-foreground/70">más de lo que la línea puede — ya no da el tiempo</span></>
             ) : (
               <>
                 {r.label} <span className="tabular-nums">{fmtDec(r.cpm)}</span> pz/min
@@ -1775,7 +1775,7 @@ function Sparkbars({
  * piezas que faltan, el tiempo que queda y el ritmo necesario de acá al cierre.
  *
  * ⚠ Cuando ese ritmo supera el techo de la línea lo dice sin rodeos. Un
- * "necesitás 61 pz/min" en una línea que da 46 no es una meta, es una cifra que
+ * "necesitas 61 pz/min" en una línea que da 46 no es una meta, es una cifra que
  * hace perder la confianza en la pantalla — y la decisión correcta ahí no es
  * apurar, es replanificar.
  */
@@ -1811,7 +1811,7 @@ function CierreDelTurno({ cierre, muestras, fuente, plantSlug, shiftName, startA
 
   const guardar = async () => {
     const m = /^(\d{1,2}):(\d{2})$/.exec(valor.trim())
-    if (!m) { setError('Usá el formato HH:MM'); return }
+    if (!m) { setError('Usa el formato HH:MM'); return }
     const h = Number(m[1]), min = Number(m[2])
     if (h > 23 || min > 59) { setError('Hora fuera de rango'); return }
     setGuardando(true); setError(null)
@@ -2288,7 +2288,7 @@ function RitmoNecesario({
         <p className="mt-1.5 rounded-lg bg-muted/50 px-2.5 py-1.5 text-[12px] text-muted-foreground">
           Con la máquina a{' '}
           <span className="tabular-nums text-foreground/90">{fmtCpm(llenado.spec.setCpm)} pz/min</span>{llenado.spec.setHz ? <span className="tabular-nums text-muted-foreground/80"> ({llenado.spec.setHz} Hz)</span> : null},
-          venís llenando{' '}
+          vienes llenando{' '}
           <b className="tabular-nums text-foreground/90">
             {comoDeCada100(llenado.actual)} de cada 100
           </b>{' '}
@@ -2379,7 +2379,7 @@ function RitmoNecesario({
           </dd>
         </div>
         <div className="flex items-baseline gap-2">
-          <dt className="w-20 shrink-0 text-muted-foreground">Necesitás</dt>
+          <dt className="w-20 shrink-0 text-muted-foreground">Necesitas</dt>
           <dd className={`tabular-nums font-semibold ${fuera ? 'text-amber-800 dark:text-amber-300' : 'text-sky-800 dark:text-sky-300'}`}>
             {fmtDec(pace.requiredPerMinute)} pz/min
             <span className="ml-1 font-normal text-muted-foreground/80">andando</span>
@@ -2446,7 +2446,7 @@ function RitmoNecesario({
         </p>
       )}
 
-      {/* La referencia histórica: hace que "necesitás 16 pz/min" se pueda
+      {/* La referencia histórica: hace que "necesitas 16 pz/min" se pueda
           juzgar. El objetivo del sensor puede decir 20 y la línea no haber
           pasado nunca de 12,7 — medido en Filete sobre 9 turnos. */}
       {historial?.medianCpm != null && (
@@ -2632,7 +2632,7 @@ function PorHora({ series, paradas, pulse }: {
         {rows.some((r) => r.partial) && (
           <> El <span className="text-amber-700 dark:text-amber-300">*</span> marca una hora
           incompleta — tiene menos piezas porque duró menos, no porque fuera más lenta;
-          para comparar, mirá el ritmo en pz/h.</>
+          para comparar, mira el ritmo en pz/h.</>
         )}
       </p>
     </Bloque>
@@ -3386,7 +3386,7 @@ function CurvasMaquinas({ serie, maquinas, ahoraPorNombre, ahoraAt }: {
             ver todo el turno
           </button>
         ) : (
-          <span>pellizcá o rodá (ctrl+rueda) para acercar</span>
+          <span>pellizca o rueda (ctrl+rueda) para acercar</span>
         )}
       </div>
     </div>
@@ -3638,7 +3638,7 @@ function BarrasMinuto({ datos, cerrado }: { datos: BarrasMinutoDatos; cerrado?: 
             ver todo el turno
           </button>
         ) : (
-          <span className="shrink-0">pellizcá o rodá (ctrl+rueda) para acercar</span>
+          <span className="shrink-0">pellizca o rueda (ctrl+rueda) para acercar</span>
         )}
       </div>
     </div>
@@ -4431,7 +4431,7 @@ export function PublicShiftMonitorPage() {
         setStatus('ok')
       },
       /* Un error del stream NO es un link muerto: con la señal caída en planta
-         se pintaba «pedí uno nuevo a Mantención» sobre un link perfecto. Ver
+         se pintaba «pide uno nuevo a Mantención» sobre un link perfecto. Ver
          `estadoDelLink`. */
       (err) => setStatus(estadoDelLink(err)),
     )
@@ -4445,7 +4445,7 @@ export function PublicShiftMonitorPage() {
    * 11-ago): al navegar, el componente se REMONTA —se ve en las trazas: el ref
    * vuelve a `null` justo después del clic— y con él se perdía la posición, así
    * que la pantalla saltaba de vuelta al turno actual. La URL sobrevive al
-   * remonte, y de paso el turno queda compartible: mandar "mirá el de ayer" pasa
+   * remonte, y de paso el turno queda compartible: mandar "mira el de ayer" pasa
    * a ser copiar el link.
    */
   const [searchParams, setSearchParams] = useSearchParams()
@@ -4942,7 +4942,7 @@ export function PublicShiftMonitorPage() {
    * ⚠⚠ Es la base que hace comparable todo lo demás. Desde que el ritmo
    * necesario descuenta las paradas de convenio, pedirlo sobre tiempo
    * productivo y contrastarlo contra un ritmo de RELOJ mezcla dos medidas: la
-   * pantalla decía "necesitás 39,4 y vas a 9,7" cuando la línea, andando, iba
+   * pantalla decía "necesitas 39,4 y vas a 9,7" cuando la línea, andando, iba
    * a 11,7. Lo vio Orel al toque: "igual le pones 39 pz/min".
    *
    * Medido en los 10 turnos de Filete (14-08): andando la mediana es 11,0 y el
@@ -5732,7 +5732,7 @@ export function PublicShiftMonitorPage() {
         <p className="text-lg font-semibold text-foreground">Sin conexión con los datos</p>
         <p className="max-w-xs text-sm text-muted-foreground">
           El link sigue siendo válido: es la conexión la que no responde. Se reintenta solo;
-          también podés recargar.
+          también puedes recargar.
         </p>
         <button
           type="button"
@@ -6100,7 +6100,7 @@ export function PublicShiftMonitorPage() {
           <div className="hidden items-center justify-end gap-2 lg:flex">
             {tablero.editando && (
               <span className="mr-auto text-[12px] text-muted-foreground">
-                Arrastrá para mover · estirá desde ◢ · ✕ quita la tarjeta
+                Arrastra para mover · estira desde ◢ · ✕ quita la tarjeta
               </span>
             )}
             {/* La puerta al tablero de sala: mismo link, `?pantalla=1` y

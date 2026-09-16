@@ -195,7 +195,7 @@ Devuelve SOLO el JSON, sin markdown, sin texto adicional.`
         {
           campo: 'descripcion',
           pregunta:
-            'No pude interpretar tu descripción. ¿Podés explicarla con más detalle?',
+            'No pude interpretar tu descripción. ¿Puedes explicarla con más detalle?',
           tipo: 'texto',
         },
       ],

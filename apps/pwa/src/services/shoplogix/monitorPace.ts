@@ -8,7 +8,7 @@
  *
  * ── Por qué avisa cuando NO se llega ────────────────────────────────────────
  *
- * Un "necesitás 47 pz/min" en una línea que da 51 como máximo teórico no es una
+ * Un "necesitas 47 pz/min" en una línea que da 51 como máximo teórico no es una
  * meta, es una cifra que hace perder la confianza en la pantalla. Cuando el
  * ritmo requerido supera lo que la línea puede dar, se dice: la cuota no se
  * alcanza y lo honesto es replanificar, no apurar. Ese techo sale de las propias

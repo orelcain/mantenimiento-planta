@@ -176,7 +176,7 @@ export const PLANOS: PlanoCatalogo[] = [
     tipo: 'electrico',
     variante: 'las antiguas',
     unidad: 'hojas',
-    verificacion: { estado: 'por_confirmar', nota: 'mirá el campo Wiring Diagr. de la placa' },
+    verificacion: { estado: 'por_confirmar', nota: 'mira el campo Wiring Diagr. de la placa' },
   },
   {
     slug: 'gea-neum-50520184',

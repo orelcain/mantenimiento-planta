@@ -256,7 +256,7 @@ registerTool({
       return {
         ok: true,
         data: { equipmentText, count: 0 },
-        summary: `No encontré un equipo que coincida con "${equipmentText}". Probá con el nombre completo o código.`,
+        summary: `No encontré un equipo que coincida con "${equipmentText}". Prueba con el nombre completo o código.`,
         label: 'Incidencias por equipo',
       }
     }

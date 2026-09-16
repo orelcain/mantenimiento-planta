@@ -401,9 +401,9 @@ export function P0CausesPanel({ byMatrixCause, totalP0Pct, unsortedPcs, selected
   const sectionSubtitle = isClassificationPlant ? 'como aparece en el HMI' : 'según Excel pieza a pieza'
   const noDataCopy = isClassificationPlant
     ? <>Sin el archivo <strong>Punto Cero</strong> exportado de Matrix no podemos mostrar las causas. Subilo junto al Excel de Pieza a Pieza para el análisis completo.</>
-    : <>Sin causas de rechazo clasificadas para este turno. Verificá que el Excel haya subido correctamente.</>
+    : <>Sin causas de rechazo clasificadas para este turno. Verifica que el Excel haya subido correctamente.</>
   const fallbackDescription = isClassificationPlant
-    ? 'cargá el Excel P0 para ver las causas'
+    ? 'carga el Excel P0 para ver las causas'
     : 'sin desglose de causas disponible'
 
   return (

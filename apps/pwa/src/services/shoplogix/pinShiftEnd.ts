@@ -197,7 +197,7 @@ export async function setShiftQuota(params: {
   // Un dedo de más (150.000 en vez de 15.000) quedaría fijado como meta del
   // turno y descolocaría todos los porcentajes de la pantalla.
   if (params.piezas != null && params.piezas > 200_000) {
-    throw new Error('Esa cuota es demasiado alta: revisá el número.')
+    throw new Error('Esa cuota es demasiado alta: revisa el número.')
   }
 
   const ref = doc(db, COLLECTION, docId)
