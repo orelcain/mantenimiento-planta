@@ -596,16 +596,21 @@ con un script Node local (`writeFileSync` en `utf8`).
    de sesgo 6. El celeste `#d7e5f2` (sesgo 27) de la piel vieja queda hasta que la piel Apple
    sea la predeterminada. ✅ 2026-09-16: la piel Apple es la predeterminada (index.html);
    `?skin=default` vuelve a la anterior para comparar.
-7. **Los 228 `<button>` a mano** con 13 alturas distintas (25–64 px). No es un barrido: chips,
-   flechas e íconos en tablas no van a 44. Dirigirlo pantalla por pantalla con el medidor de
-   `scripts/medir-en-pantalla.md`. Análisis de Turno es el caso extremo: 64 de 67 a mano.
-8. **Migrar los ~95 `text-primary` sobre tinte** a `text-brand-ink`. Caso por caso, porque
-   hay que confirmar que cada tinte sea el del 15 %.
-9. **Migrar los 272 rellenos opacos `bg-red/amber/emerald-*`** a `bg-fill-*`. Caso por caso:
-   un `bg-red-500` puede ser una barra (va a `fill`) o un punto de 8 px (se queda vivo).
-10. **Decidir los `lc-*` del Centro de Aprendizaje**: cumplen AA (tres con más margen que
-    Apple) pero son una familia que no existe en iOS. Migrar gana coherencia y pierde
-    contraste (`lc-warn` 6.54 → 5.28). Depende de si esa sección tiene identidad propia.
+7. ~~Los 228 `<button>` a mano~~ — **cerrado en teléfono 2026-09-16.** Se dirigió con el medidor
+   pantalla por pantalla (Análisis de Turno y período, Bodega, Códigos, Áreas, Bitácora, Home,
+   Aprendizaje, Configuración, identidad): selectores de vistas → `SegmentedControl`, acciones
+   y campos → 44 y cápsula, íconos → `size-11`, filas de despliegue → `min-h-[44px]`. Quedan
+   bajo 44 solo lo exento: chips de filtro (36, cápsula), celdas y enlaces de tabla.
+8. ~~Migrar los ~95 `text-primary` sobre tinte~~ — hecho 2026-09-16: 98 líneas con
+   `bg-primary/<alfa>` y `text-primary` en la misma línea → `text-brand-ink`.
+9. ~~Migrar los 272 rellenos opacos~~ — hecho 2026-09-16 con regla por tipo: barra (h-full,
+   h-1..3 o color en variable de barra) → `bg-fill-*`, badge o botón con texto blanco → tinte
+   15 % + tinta de estado, azul de gráfico → marca. Se quedan puntos de 8 px, tiles de 40 px,
+   badges numéricos y la acción de favorito por deslizamiento. Fuera de alcance: leyendas de
+   mapa, monitores de TV y HMI. 73 líneas son funciones que devuelven color para puntos y
+   quedan vivas a propósito. Auditoría: 1516 → 1421.
+10. ~~Decidir los `lc-*` del Centro de Aprendizaje~~ — cerrado 2026-09-16 con el hub (5e): el hub
+    usa los tokens del sistema; los `--lc-*` siguen solo para el editor admin y los planos.
 11. ~~Decidir si el Grader conserva el toggle sol/luna~~ — **cerrado 2026-09-16: se retiró.**
     Sigue al tema de la app en vivo (`useIsDark`, observa la clase del documento). Para
     presentar en claro se cambia el tema en Configuración, como en cualquier app de iOS.
