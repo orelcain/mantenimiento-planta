@@ -235,7 +235,7 @@ export function LearningHubPage() {
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder="Máquina, simulador o síntoma"
-            aria-label="Buscar en el Centro de Aprendizaje"
+            aria-label="Buscar en el Centro de aprendizaje"
             className="h-11 w-full rounded-full bg-muted pl-10 pr-9 text-body text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
           />
           {query && (

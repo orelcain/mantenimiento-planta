@@ -177,7 +177,7 @@ export function HmiGraderPage() {
             size="sm"
             onClick={handleBack}
             className="h-7 gap-1 text-xs flex-shrink-0"
-            title="Volver al Centro de Aprendizaje"
+            title="Volver al Centro de aprendizaje"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Volver</span>

@@ -419,7 +419,7 @@ export function CentroTecnicoDocumentalPage() {
         <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="text-title1 font-bold">Centro Técnico Documental</h1>
+          <h1 className="text-title1 font-bold">Centro técnico documental</h1>
           <p className="text-footnote text-muted-foreground">Expediente documental por equipo · placa, documentos y criticidad</p>
         </div>
         <div className="relative">

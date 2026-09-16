@@ -218,7 +218,7 @@ export function AnalisisGraderPeriodoPage() {
         <div className="flex items-center gap-3">
           <Button variant="outline" onClick={() => navigate('/analisis-grader')} className="gap-1.5">
             <ArrowLeft className="h-4 w-4" />
-            Análisis de Turno
+            Análisis de turno
           </Button>
           <div>
             <h1 className="text-xl font-bold flex items-center gap-2">

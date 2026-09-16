@@ -198,7 +198,7 @@ export function DashboardPage() {
         </div>
         <Button onClick={() => navigate('/incidents')}>
           <Plus className="h-4 w-4 mr-2" />
-          Nueva Incidencia
+          Nueva incidencia
         </Button>
       </div>
 

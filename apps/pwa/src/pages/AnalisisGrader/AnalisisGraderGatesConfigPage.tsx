@@ -744,7 +744,7 @@ export function AnalisisGraderGatesConfigPage({
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Formato HH:MM. El turno noche puede cruzar medianoche (fin menor que inicio).
-              <span className="block mt-0.5">La cuota objetivo de cada turno se define desde el detalle del turno (Análisis de Turno).</span>
+              <span className="block mt-0.5">La cuota objetivo de cada turno se define desde el detalle del turno (Análisis de turno).</span>
             </p>
             <div className="mt-3 grid gap-2">
               {shiftSchedule.map((shift, idx) => (

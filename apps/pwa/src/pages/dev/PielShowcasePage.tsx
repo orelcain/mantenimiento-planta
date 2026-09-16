@@ -114,7 +114,7 @@ export default function PielShowcasePage() {
 
         <Section title="Escala tipográfica" hint="8 roles, ni uno más. Los datos siempre tabulares.">
           <div className="flex flex-col gap-3 rounded-card bg-card p-5">
-            <p className="text-[2.1rem] font-bold leading-tight tracking-[-0.028em]">Análisis de Turno</p>
+            <p className="text-[2.1rem] font-bold leading-tight tracking-[-0.028em]">Análisis de turno</p>
             <p className="text-[1.25rem] font-semibold tracking-[-0.02em]">Cascada de pérdidas</p>
             <p className="text-[0.94rem] font-semibold">Sensor E825-C sin señal</p>
             <p className="text-[0.94rem]">

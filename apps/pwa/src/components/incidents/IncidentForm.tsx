@@ -456,7 +456,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident, 
         <DialogHeader className="pb-2">
           <DialogTitle className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-warning" />
-            {isEditMode ? 'Editar Incidencia' : 'Reportar Incidencia'}
+            {isEditMode ? 'Editar incidencia' : 'Reportar incidencia'}
           </DialogTitle>
         </DialogHeader>
 
@@ -995,7 +995,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident, 
                 ) : (
                   <>
                     <Upload className="h-4 w-4 mr-2" />
-                    Reportar Incidencia
+                    Reportar incidencia
                   </>
                 )}
               </Button>

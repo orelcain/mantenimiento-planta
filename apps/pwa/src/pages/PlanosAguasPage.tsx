@@ -84,7 +84,7 @@ export function PlanosAguasPage() {
       <iframe
         ref={iframeRef}
         src={iframeSrc}
-        title="Planos de Aguas — Planta Principal"
+        title="Planos de aguas · planta principal"
         className="w-full h-full border-0"
         allow="fullscreen; clipboard-read; clipboard-write"
         sandbox="allow-scripts allow-same-origin allow-popups allow-downloads allow-modals"

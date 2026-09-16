@@ -37,13 +37,13 @@ interface RouteOption {
  * para usuarios no-admin → caerían en Navigate fallido.
  */
 const ROUTE_OPTIONS: readonly RouteOption[] = [
-  { path: '/analisis-grader',    label: 'Análisis de Turno',     description: 'Detalle del turno + Grader + Shoplogix' },
+  { path: '/analisis-grader',    label: 'Análisis de turno',     description: 'Detalle del turno + Grader + Shoplogix' },
   { path: '/dashboard',          label: 'Dashboard (legacy)',    description: 'Panel original de control' },
-  { path: '/calendario-mantencion', label: 'Calendario Mantención', description: 'Programación de tareas preventivas' },
+  { path: '/calendario-mantencion', label: 'Calendario de mantención', description: 'Programación de tareas preventivas' },
   { path: '/bitacora',           label: 'Bitácora de turno',     description: 'Eventos del turno con fotos, para el correo' },
   { path: '/repuestos',          label: 'Repuestos',             description: 'Inventario y bodega' },
-  { path: '/map',                label: 'Visor Planta 3D',       description: 'Mapa interactivo de la planta' },
-  { path: '/aprendizaje',        label: 'Centro de Aprendizaje', description: 'Manuales y guías' },
+  { path: '/map',                label: 'Visor de planta 3D',       description: 'Mapa interactivo de la planta' },
+  { path: '/aprendizaje',        label: 'Centro de aprendizaje', description: 'Manuales y guías' },
 ] as const
 
 export function DefaultRoutePage() {
@@ -93,7 +93,7 @@ export function DefaultRoutePage() {
         <Button variant="ghost" size="sm" asChild className="-ml-1">
           <Link to="/admin" className="gap-1 text-muted-foreground">
             <ArrowLeft className="w-4 h-4" />
-            <span className="text-xs">Panel Admin</span>
+            <span className="text-xs">Panel de administración</span>
           </Link>
         </Button>
       </div>

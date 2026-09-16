@@ -53,7 +53,7 @@ const DEFAULT_GROUPS: Group[] = [
       { id: 'preventivo', name: 'Preventivo', href: '/preventive', groupId: 'planificacion' },
       { id: 'predictivo', name: 'Predictivo', href: '/predictive', groupId: 'planificacion' },
       { id: 'gantt', name: 'Planificador Gantt', href: '/gantt', groupId: 'planificacion' },
-      { id: 'calendario', name: 'Calendario Mantención', href: '/calendario-mantencion', groupId: 'planificacion' },
+      { id: 'calendario', name: 'Calendario de mantención', href: '/calendario-mantencion', groupId: 'planificacion' },
     ],
   },
   {
@@ -62,7 +62,7 @@ const DEFAULT_GROUPS: Group[] = [
       { id: 'equipos', name: 'Equipos', href: '/equipment', groupId: 'equipamiento' },
       { id: 'repuestos', name: 'Repuestos', href: '/repuestos', groupId: 'equipamiento' },
       { id: 'sensores', name: 'Sensores', href: '/sensors', groupId: 'equipamiento' },
-      { id: 'panel-sensores', name: 'Panel Sensores', href: '/sensors/monitor', groupId: 'equipamiento' },
+      { id: 'panel-sensores', name: 'Panel de sensores', href: '/sensors/monitor', groupId: 'equipamiento' },
     ],
   },
   {
@@ -70,8 +70,8 @@ const DEFAULT_GROUPS: Group[] = [
     items: [
       { id: 'mapa', name: 'Visor de Mapas', href: '/map', groupId: 'herramientas' },
       { id: 'visor3d', name: 'Visor 3D', href: '/visor-3d', groupId: 'herramientas' },
-      { id: 'grader', name: 'Análisis de Turno', href: '/analisis-grader', groupId: 'herramientas' },
-      { id: 'clima', name: 'Clima Puerto', href: '/clima-puerto', groupId: 'herramientas' },
+      { id: 'grader', name: 'Análisis de turno', href: '/analisis-grader', groupId: 'herramientas' },
+      { id: 'clima', name: 'Clima del puerto', href: '/clima-puerto', groupId: 'herramientas' },
       { id: 'hmi', name: 'HMI Knuro', href: '/hmi-knuro', groupId: 'herramientas' },
       { id: 'baader', name: 'Baader 200', href: '/baader-200', groupId: 'herramientas' },
     ],
@@ -79,7 +79,7 @@ const DEFAULT_GROUPS: Group[] = [
   {
     id: 'aprendizaje', label: 'Aprendizaje',
     items: [
-      { id: 'hub', name: 'Centro de Aprendizaje', href: '/aprendizaje', groupId: 'aprendizaje' },
+      { id: 'hub', name: 'Centro de aprendizaje', href: '/aprendizaje', groupId: 'aprendizaje' },
     ],
   },
   {
@@ -88,7 +88,7 @@ const DEFAULT_GROUPS: Group[] = [
       // Sidebar minimalista — todo lo admin vive en el hub `/admin` con
       // re-confirmación. Los items individuales (Configuración, Mapas, ETT,
       // etc.) NO aparecen en el sidebar; se accede a ellos desde el Panel.
-      { id: 'panel-admin', name: 'Panel Admin', href: '/admin', groupId: 'admin' },
+      { id: 'panel-admin', name: 'Panel de administración', href: '/admin', groupId: 'admin' },
     ],
   },
 ]

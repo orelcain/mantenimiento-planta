@@ -379,7 +379,7 @@ export function MachineLearningPage() {
     <div className={`dossier ${heightClass} w-full`}>
       <div className="dp-wrap" style={{ paddingBottom: '7rem' }}>
         <button className="dp-back" onClick={() => navigate('/aprendizaje')}>
-          <ArrowLeft className="h-4 w-4" /> Centro de Aprendizaje
+          <ArrowLeft className="h-4 w-4" /> Centro de aprendizaje
         </button>
 
         {/* Portada del documento */}

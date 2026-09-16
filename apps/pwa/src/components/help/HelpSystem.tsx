@@ -123,10 +123,10 @@ const WORKFLOW_STEPS = [
   },
   {
     step: 2,
-    title: 'Reportar Incidencias',
+    title: 'Reportar incidencias',
     description: 'Los usuarios reportan problemas encontrados',
     tasks: [
-      'Ir a Incidencias → Nueva Incidencia',
+      'Ir a Incidencias → Nueva incidencia',
       'Seleccionar la zona afectada',
       'Describir el problema y prioridad',
       'Agregar fotos si es necesario',

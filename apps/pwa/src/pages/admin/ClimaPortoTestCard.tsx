@@ -65,7 +65,7 @@ export function ClimaPortoTestCard() {
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <Bell className="h-4 w-4" />
-          Test de notificación · Clima Puerto
+          Test de notificación · Clima del puerto
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
