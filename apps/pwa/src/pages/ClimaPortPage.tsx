@@ -21,7 +21,7 @@ export function ClimaPortPage() {
     <div className="h-full w-full">
       <iframe
         src={iframeSrc}
-        title="Dashboard Clima Puerto Chonchi"
+        title="Clima del puerto de Chonchi"
         className="w-full h-full border-0"
         allow="fullscreen"
         sandbox="allow-scripts allow-same-origin allow-popups"

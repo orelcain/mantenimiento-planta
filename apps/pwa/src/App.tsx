@@ -778,7 +778,7 @@ export function App() {
             } />
             <Route path="aprendizaje/admin" element={
               <AdminRoute>
-                <RequireReAuth reason="para administrar el Centro de Aprendizaje">
+                <RequireReAuth reason="para administrar el Centro de aprendizaje">
                   <Suspense fallback={<LoadingScreen />}>
                     <LearningAdminPage />
                   </Suspense>
@@ -787,7 +787,7 @@ export function App() {
             } />
             <Route path="aprendizaje/admin/:slug" element={
               <AdminRoute>
-                <RequireReAuth reason="para administrar el Centro de Aprendizaje">
+                <RequireReAuth reason="para administrar el Centro de aprendizaje">
                   <Suspense fallback={<LoadingScreen />}>
                     <LearningAdminMachinePage />
                   </Suspense>

@@ -89,7 +89,7 @@ const navGroups: NavGroup[] = [
       { name: 'Preventivo', href: '/preventive', icon: CalendarClock, module: 'preventivo', inDevelopment: true },
       { name: 'Predictivo', href: '/predictive', icon: Activity, inDevelopment: true },
       { name: 'Planificador Gantt', href: '/gantt', icon: CalendarClock, module: 'gantt', inDevelopment: true },
-      { name: 'Calendario Mantención', href: '/calendario-mantencion', icon: CalendarClock, module: 'calendarioMantencion' },
+      { name: 'Calendario de mantención', href: '/calendario-mantencion', icon: CalendarClock, module: 'calendarioMantencion' },
     ],
   },
   {
@@ -98,17 +98,17 @@ const navGroups: NavGroup[] = [
       { name: 'Equipos', href: '/equipment', icon: Wrench, module: 'equipos', inDevelopment: true },
       { name: 'Repuestos', href: '/repuestos', icon: Package, module: 'repuestos' },
       { name: 'Sensores', href: '/sensors', icon: Cpu, module: 'sensores', inDevelopment: true },
-      { name: 'Panel Sensores', href: '/sensors/monitor', icon: Activity, module: 'sensores', inDevelopment: true },
+      { name: 'Panel de sensores', href: '/sensors/monitor', icon: Activity, module: 'sensores', inDevelopment: true },
     ],
   },
   {
     id: 'herramientas', label: 'Herramientas',
     items: [
-      { name: 'Visor Planta 3D', href: '/map', icon: Building2, module: 'mapa' },
+      { name: 'Visor de planta 3D', href: '/map', icon: Building2, module: 'mapa' },
       { name: 'Visor 3D', href: '/visor-3d', icon: Box },
-      { name: 'Análisis de Turno', href: '/analisis-grader', icon: BarChart3, module: 'analisisGrader' },
-      { name: 'Clima Puerto', href: '/clima-puerto', icon: CloudSun, module: 'climaPuerto' as AppModule },
-      { name: 'Planos de Aguas', href: '/planos-aguas', icon: Droplets, inDevelopment: true },
+      { name: 'Análisis de turno', href: '/analisis-grader', icon: BarChart3, module: 'analisisGrader' },
+      { name: 'Clima del puerto', href: '/clima-puerto', icon: CloudSun, module: 'climaPuerto' as AppModule },
+      { name: 'Planos de aguas', href: '/planos-aguas', icon: Droplets, inDevelopment: true },
       { name: 'HMI Knuro', href: '/hmi-knuro', icon: Cpu },
       { name: 'Baader 200', href: '/baader-200', icon: BookOpen },
     ],
@@ -116,8 +116,8 @@ const navGroups: NavGroup[] = [
   {
     id: 'aprendizaje', label: 'Aprendizaje',
     items: [
-      { name: 'Centro de Aprendizaje', href: '/aprendizaje', icon: GraduationCap },
-      { name: 'Centro Técnico Documental', href: '/centro-tecnico-documental', icon: FolderArchive },
+      { name: 'Centro de aprendizaje', href: '/aprendizaje', icon: GraduationCap },
+      { name: 'Centro técnico documental', href: '/centro-tecnico-documental', icon: FolderArchive },
     ],
   },
   {
@@ -128,7 +128,7 @@ const navGroups: NavGroup[] = [
       // Jerarquías, Mapas, ETT, Visores (Clima/HMI/Baader), Permisos,
       // Credenciales Shoplogix, etc., con re-confirmación de identidad
       // sobre las opciones sensibles.
-      { name: 'Panel Admin', href: '/admin', icon: Shield },
+      { name: 'Panel de administración', href: '/admin', icon: Shield },
     ],
   },
 ]
@@ -1169,9 +1169,11 @@ export function MainLayout() {
               ? 'p-0 w-full max-w-[100vw] overflow-x-hidden pb-24 lg:pb-0'
               : location.pathname === '/'
               ? 'p-0 w-full max-w-[100vw] overflow-x-hidden'
-              // pb-24: la barra flotante ocupa 12 de aire + 60 de barra + safe area;
-              // con pb-20 el ultimo elemento quedaba debajo de la capsula.
-              : 'p-3 lg:p-6 w-full max-w-[100vw] overflow-x-hidden pb-24 [@media(max-height:500px)]:pb-12 lg:pb-6'
+              // pb-44: la barra flotante ocupa 12 de aire + 60 de barra + safe area, y el
+              // botón del chat flota ENCIMA de ella (bottom-24 + 56): con pb-24 el último
+              // botón alineado a la derecha («Guardar cambios») quedaba bajo el chat.
+              // En escritorio el chat baja a bottom-4, así que lg:pb-24 lo despeja.
+              : 'p-3 lg:p-6 w-full max-w-[100vw] overflow-x-hidden pb-44 [@media(max-height:500px)]:pb-12 lg:pb-24'
           } ${
             isReadOnly ? 'pointer-events-none opacity-70' : ''
           }`}
@@ -1235,7 +1237,7 @@ export function MainLayout() {
         <button
           onClick={handleEnableAria}
           className="fixed right-6 z-50 flex items-center gap-2 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-3 text-white shadow-lg hover:from-blue-700 hover:to-purple-700 transition-all hover:scale-105 bottom-24 lg:bottom-6"
-          title="Activar ARIA Asistente"
+          title="Activar el asistente ARIA"
         >
           <Bot className="h-5 w-5" />
           <span className="text-sm font-medium">Activar ARIA</span>

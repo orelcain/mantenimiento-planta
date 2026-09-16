@@ -130,7 +130,7 @@ export function GraderQuickChangePage() {
               className="mt-1 gap-1.5"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
-              Volver a Análisis de Turno
+              Volver a Análisis de turno
             </Button>
           </CardContent>
         </Card>
@@ -267,7 +267,7 @@ export function GraderQuickChangePage() {
               className="mt-1 gap-1.5"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
-              Volver a Análisis de Turno
+              Volver a Análisis de turno
             </Button>
           </CardContent>
         </Card>

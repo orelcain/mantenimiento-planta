@@ -98,7 +98,7 @@ export function MaintenanceImpactCard({ summaries, periodLabel, rangeLabel, work
       await exportMaintenanceImpactPDF(rel, {
         periodLabel: periodLabel || 'Período',
         rangeLabel,
-        lineLabel: 'Análisis de Turno',
+        lineLabel: 'Análisis de turno',
       }, work ?? undefined)
     } finally {
       setExporting(false)

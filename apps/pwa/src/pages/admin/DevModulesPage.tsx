@@ -72,7 +72,7 @@ export function DevModulesPage() {
         <Button variant="ghost" size="sm" asChild className="-ml-1">
           <Link to="/admin" className="gap-1 text-muted-foreground">
             <ArrowLeft className="w-4 h-4" />
-            <span className="text-xs">Panel Admin</span>
+            <span className="text-xs">Panel de administración</span>
           </Link>
         </Button>
       </div>

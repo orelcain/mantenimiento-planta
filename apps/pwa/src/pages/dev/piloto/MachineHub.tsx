@@ -170,7 +170,7 @@ export function MachineHub({ machine, onBack, onNewIncident }: MachineHubProps) 
         {[
           { icon: <FileText className="size-4" />, label: 'Protocolo de mantención' },
           { icon: <Zap className="size-4" />, label: 'Plano eléctrico' },
-          { icon: <GraduationCap className="size-4" />, label: 'Centro de Aprendizaje' },
+          { icon: <GraduationCap className="size-4" />, label: 'Centro de aprendizaje' },
         ].map((it) => (
           <ListCell
             key={it.label}

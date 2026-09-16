@@ -36,26 +36,26 @@ export const APP_MODULES: readonly AppModule[] = [
   { ruta: '/preventive', nombre: 'Preventivo', grupo: 'Planificación', estado: 'desarrollo', descripcion: 'Tareas preventivas con checklist, frecuencia y próximas ejecuciones', puedesPreguntar: 'preventivos vencidos o próximos' },
   { ruta: '/predictive', nombre: 'Predictivo', grupo: 'Planificación', estado: 'desarrollo', descripcion: 'Mantenimiento predictivo (análisis de tendencias para anticipar fallas)' },
   { ruta: '/gantt', nombre: 'Planificador Gantt', grupo: 'Planificación', estado: 'desarrollo', descripcion: 'Planificador Gantt: tareas con fechas, responsables, dependencias y avance', puedesPreguntar: 'tareas atrasadas o próximas del Gantt' },
-  { ruta: '/calendario-mantencion', nombre: 'Calendario Mantención', grupo: 'Planificación', estado: 'produccion', descripcion: 'Calendario de mantención con turnos y técnicos', puedesPreguntar: 'turnos, técnicos, quién trabaja, horas semanales/mensuales' },
+  { ruta: '/calendario-mantencion', nombre: 'Calendario de mantención', grupo: 'Planificación', estado: 'produccion', descripcion: 'Calendario de mantención con turnos y técnicos', puedesPreguntar: 'turnos, técnicos, quién trabaja, horas semanales/mensuales' },
   { ruta: '/bitacora', nombre: 'Bitácora de turno', grupo: 'Principal', estado: 'desarrollo', descripcion: 'Bitácora del turno de Mantención: eventos con fotos antes/después, minutos de parada (MTTR) o ventana en que se intervino sin detener producción, y pendientes; se copia al correo o se exporta a PDF' },
   // ── Equipamiento ──
-  { ruta: '/equipment', nombre: 'Equipos', grupo: 'Equipamiento', estado: 'desarrollo', descripcion: 'Expediente de cada equipo (Centro Técnico Documental): placa, criticidad NFPA 70B, condición, historial y tableros', puedesPreguntar: 'estado, criticidad, condición e historial de un equipo por TAG' },
+  { ruta: '/equipment', nombre: 'Equipos', grupo: 'Equipamiento', estado: 'desarrollo', descripcion: 'Expediente de cada equipo (Centro técnico documental): placa, criticidad NFPA 70B, condición, historial y tableros', puedesPreguntar: 'estado, criticidad, condición e historial de un equipo por TAG' },
   { ruta: '/repuestos', nombre: 'Repuestos', grupo: 'Equipamiento', estado: 'produccion', descripcion: 'Maestro SAP de repuestos e insumos por área, con stock de bodega y manuales. Incluye SOLICITUDES de repuesto a bodega (botón «Solicitudes»: pendiente → aprobada → entregada, y al entregar descuenta stock)', puedesPreguntar: 'repuestos por SAP/nombre, stock, ubicación, valor, repuestos de una máquina, solicitudes de repuesto pendientes o entregadas' },
   { ruta: '/sensors', nombre: 'Sensores', grupo: 'Equipamiento', estado: 'desarrollo', descripcion: 'Sensores IoT de la planta en tiempo real' },
-  { ruta: '/sensors/monitor', nombre: 'Panel Sensores', grupo: 'Equipamiento', estado: 'desarrollo', descripcion: 'Panel de monitoreo continuo de sensores con semáforos' },
+  { ruta: '/sensors/monitor', nombre: 'Panel de sensores', grupo: 'Equipamiento', estado: 'desarrollo', descripcion: 'Panel de monitoreo continuo de sensores con semáforos' },
   // ── Herramientas ──
-  { ruta: '/map', nombre: 'Visor Planta 3D', grupo: 'Herramientas', estado: 'produccion', descripcion: 'Visor de planta: mapa con capas, zonas y marcadores' },
+  { ruta: '/map', nombre: 'Visor de planta 3D', grupo: 'Herramientas', estado: 'produccion', descripcion: 'Visor de planta: mapa con capas, zonas y marcadores' },
   { ruta: '/visor-3d', nombre: 'Visor 3D', grupo: 'Herramientas', estado: 'produccion', descripcion: 'Modelos 3D interactivos (pontón, tobogán, sopladoras Baader)' },
-  { ruta: '/analisis-grader', nombre: 'Análisis de Turno', grupo: 'Herramientas', estado: 'produccion', descripcion: 'Análisis de Turno del Grader: piezas, compuertas, P0, microdetenciones y Lente de Mantención', puedesPreguntar: 'producción del turno/día, piezas por Baader, P0%, MTTR/MTBF, disponibilidad, por qué está detenida, causas de paro, en vivo' },
-  { ruta: '/clima-puerto', nombre: 'Clima Puerto', grupo: 'Herramientas', estado: 'produccion', descripcion: 'Estado del puerto/bahía con pronóstico y alertas automáticas', puedesPreguntar: 'estado del puerto, pronóstico, alertas de bahía' },
-  { ruta: '/planos-aguas', nombre: 'Planos de Aguas', grupo: 'Herramientas', estado: 'desarrollo', descripcion: 'Planos de aguas de la planta' },
+  { ruta: '/analisis-grader', nombre: 'Análisis de turno', grupo: 'Herramientas', estado: 'produccion', descripcion: 'Análisis de turno del Grader: piezas, compuertas, P0, microdetenciones y Lente de Mantención', puedesPreguntar: 'producción del turno/día, piezas por Baader, P0%, MTTR/MTBF, disponibilidad, por qué está detenida, causas de paro, en vivo' },
+  { ruta: '/clima-puerto', nombre: 'Clima del puerto', grupo: 'Herramientas', estado: 'produccion', descripcion: 'Estado del puerto/bahía con pronóstico y alertas automáticas', puedesPreguntar: 'estado del puerto, pronóstico, alertas de bahía' },
+  { ruta: '/planos-aguas', nombre: 'Planos de aguas', grupo: 'Herramientas', estado: 'desarrollo', descripcion: 'Planos de aguas de la planta' },
   { ruta: '/hmi-knuro', nombre: 'HMI Knuro', grupo: 'Herramientas', estado: 'produccion', descripcion: 'HMI del sistema Knuro con presets e histórico' },
   { ruta: '/baader-200', nombre: 'Baader 200', grupo: 'Herramientas', estado: 'produccion', descripcion: 'Guía técnica interactiva de la Baader 200 por secciones' },
   // ── Aprendizaje ──
-  { ruta: '/aprendizaje', nombre: 'Centro de Aprendizaje', grupo: 'Aprendizaje', estado: 'produccion', descripcion: 'Centro de Aprendizaje: cursos de electricidad (NFPA 70E, Rescate/SVB, NFPA 70B) con lecciones y exámenes' },
-  { ruta: '/centro-tecnico-documental', nombre: 'Centro Técnico Documental', grupo: 'Aprendizaje', estado: 'produccion', descripcion: 'Portada del Centro Técnico Documental: KPIs documentales de equipos y export a Excel' },
+  { ruta: '/aprendizaje', nombre: 'Centro de aprendizaje', grupo: 'Aprendizaje', estado: 'produccion', descripcion: 'Centro de aprendizaje: cursos de electricidad (NFPA 70E, Rescate/SVB, NFPA 70B) con lecciones y exámenes' },
+  { ruta: '/centro-tecnico-documental', nombre: 'Centro técnico documental', grupo: 'Aprendizaje', estado: 'produccion', descripcion: 'Portada del Centro técnico documental: KPIs documentales de equipos y export a Excel' },
   // ── Administración ──
-  { ruta: '/admin', nombre: 'Panel Admin', grupo: 'Administración', estado: 'produccion', descripcion: 'Panel de administración (solo administradores)', adminOnly: true },
+  { ruta: '/admin', nombre: 'Panel de administración', grupo: 'Administración', estado: 'produccion', descripcion: 'Panel de administración (solo administradores)', adminOnly: true },
 ] as const
 
 /** ¿El rol es admin? (admin/administrador/supervisor ven módulos en desarrollo). */

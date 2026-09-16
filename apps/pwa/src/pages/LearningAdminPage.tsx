@@ -62,7 +62,7 @@ export function LearningAdminPage() {
         style={{ minHeight: '44px' }}
       >
         <ArrowLeft className="h-4 w-4" />
-        Centro de Aprendizaje
+        Centro de aprendizaje
       </button>
 
       <div className="flex items-center gap-3 mb-2">
@@ -85,7 +85,7 @@ export function LearningAdminPage() {
           <strong className="text-brand-ink">Manual</strong>,{' '}
           <strong className="text-brand-ink">Flujos</strong> y{' '}
           <strong className="text-brand-ink">Diagnóstico</strong> (síntoma → causas → solución).
-          Los diagnósticos alimentan la búsqueda por síntoma del Centro de Aprendizaje.
+          Los diagnósticos alimentan la búsqueda por síntoma del Centro de aprendizaje.
         </p>
       </div>
 

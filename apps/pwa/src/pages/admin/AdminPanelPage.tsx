@@ -145,7 +145,7 @@ const ADMIN_ITEMS: AdminItem[] = [
   {
     to: '/aprendizaje/admin',
     title: 'Editor de aprendizaje',
-    description: 'Contenido del Centro de Aprendizaje',
+    description: 'Contenido del Centro de aprendizaje',
     icon: <GraduationCap className="size-4" />,
     section: 'config',
   },
