@@ -59,9 +59,9 @@ const TIPOS: { id: InterventionTipo; label: string; icon: typeof Wrench }[] = [
 ]
 
 const SEVERIDADES: { id: InterventionSeveridad; label: string; dot: string; active: string }[] = [
-  { id: 'verde', label: 'Cond. 1 · OK', dot: 'bg-emerald-500', active: 'border-emerald-500/[0.25] bg-emerald-500/[0.15] text-ink-ok' },
-  { id: 'amarillo', label: 'Cond. 2 · Atención', dot: 'bg-amber-500', active: 'border-amber-500/[0.25] bg-amber-500/[0.15] text-ink-warn' },
-  { id: 'rojo', label: 'Cond. 3 · Crítico', dot: 'bg-red-500', active: 'border-red-500/[0.25] bg-red-500/[0.15] text-ink-crit' },
+  { id: 'verde', label: 'Cond. 1 · OK', dot: 'bg-emerald-500', active: 'border-transparent bg-emerald-500/[0.15] text-ink-ok' },
+  { id: 'amarillo', label: 'Cond. 2 · Atención', dot: 'bg-amber-500', active: 'border-transparent bg-amber-500/[0.15] text-ink-warn' },
+  { id: 'rojo', label: 'Cond. 3 · Crítico', dot: 'bg-red-500', active: 'border-transparent bg-red-500/[0.15] text-ink-crit' },
 ]
 
 const TIPO_LABEL: Record<string, string> = {
@@ -71,10 +71,10 @@ const TIPO_LABEL: Record<string, string> = {
 const SEV_DOT: Record<string, string> = { verde: 'bg-emerald-500', amarillo: 'bg-amber-500', rojo: 'bg-red-500' }
 
 const RIESGO_STYLE: Record<AreaInsights['riesgo'], { label: string; cls: string }> = {
-  bajo: { label: 'Riesgo bajo', cls: 'border-emerald-500/[0.25] bg-emerald-500/[0.15] text-ink-ok' },
-  medio: { label: 'Riesgo medio', cls: 'border-amber-500/[0.25] bg-amber-500/[0.15] text-ink-warn' },
-  alto: { label: 'Riesgo alto', cls: 'border-cat-4-tint/[0.25] bg-cat-4-tint/[0.15] text-cat-4-ink' },
-  critico: { label: 'Riesgo crítico', cls: 'border-red-500/[0.25] bg-red-500/[0.15] text-ink-crit' },
+  bajo: { label: 'Riesgo bajo', cls: 'border-transparent bg-emerald-500/[0.15] text-ink-ok' },
+  medio: { label: 'Riesgo medio', cls: 'border-transparent bg-amber-500/[0.15] text-ink-warn' },
+  alto: { label: 'Riesgo alto', cls: 'border-transparent bg-cat-4-tint/[0.15] text-cat-4-ink' },
+  critico: { label: 'Riesgo crítico', cls: 'border-transparent bg-red-500/[0.15] text-ink-crit' },
 }
 
 /** Turno best-effort por hora local (las líneas manuales no tienen schedule Grader). */
@@ -309,7 +309,7 @@ export function QuickInterventionCapture({
               type="button" size="sm" variant="outline"
               disabled={!canAnalyze || busy}
               onClick={handleRefine}
-              className="border-primary/[0.25] text-brand-ink hover:bg-primary/[0.15]"
+              className="border-transparent text-brand-ink hover:bg-primary/[0.15]"
               title="Corrige la transcripción de voz (errores fonéticos, muletillas)"
             >
               {refining ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5 mr-1.5" />}
@@ -319,7 +319,7 @@ export function QuickInterventionCapture({
               type="button" size="sm" variant="outline"
               disabled={!canAnalyze || busy}
               onClick={handleSuggest}
-              className="border-primary/30 text-brand-ink hover:bg-primary/10"
+              className="border-transparent text-brand-ink hover:bg-primary/10"
               title="La IA sugiere tipo, condición y un título conciso"
             >
               {suggesting ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5 mr-1.5" />}
@@ -375,7 +375,7 @@ export function QuickInterventionCapture({
                     className={cn(
                       'flex items-center justify-center gap-1.5 px-2 py-2 rounded-ctl border text-xs font-medium transition-colors',
                       active
-                        ? 'border-primary/50 bg-primary/20 text-brand-ink'
+                        ? 'border-transparent bg-primary/20 text-brand-ink'
                         : 'border-border bg-background text-muted-foreground hover:text-foreground hover:bg-muted',
                     )}
                   >
@@ -427,7 +427,7 @@ export function QuickInterventionCapture({
           </div>
 
           {error && (
-            <div className="flex items-start gap-2 text-xs text-ink-crit bg-red-500/[0.15] border border-red-500/[0.25] rounded-ctl px-2.5 py-2">
+            <div className="flex items-start gap-2 text-xs text-ink-crit bg-red-500/[0.15] border border-transparent rounded-ctl px-2.5 py-2">
               <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
               <span className="break-words">{error}</span>
             </div>
@@ -464,7 +464,7 @@ export function QuickInterventionCapture({
         <CardContent className="space-y-3">
           {/* Tira de KPIs */}
           <div className="flex flex-wrap items-center gap-2">
-            <div className="rounded-ctl border border-primary/30 bg-primary/10 px-3 py-1.5">
+            <div className="rounded-ctl border border-transparent bg-primary/10 px-3 py-1.5">
               <span className="text-lg font-bold text-primary tabular-nums">{kpi.totalMes}</span>
               <span className="text-caption text-muted-foreground ml-1.5">este mes</span>
             </div>
@@ -557,7 +557,7 @@ export function QuickInterventionCapture({
                 type="button" size="sm" variant="outline"
                 disabled={analyzing}
                 onClick={handleAnalyzeArea}
-                className="border-primary/30 text-brand-ink hover:bg-primary/10"
+                className="border-transparent text-brand-ink hover:bg-primary/10"
               >
                 {analyzing
                   ? <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />Analizando {entries.length} intervenciones…</>
@@ -565,7 +565,7 @@ export function QuickInterventionCapture({
               </Button>
 
               {insightsError && (
-                <div className="flex items-start gap-2 text-xs text-ink-crit bg-red-500/[0.15] border border-red-500/[0.25] rounded-ctl px-2.5 py-2">
+                <div className="flex items-start gap-2 text-xs text-ink-crit bg-red-500/[0.15] border border-transparent rounded-ctl px-2.5 py-2">
                   <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
                   <span className="break-words">{insightsError}</span>
                 </div>
@@ -626,7 +626,7 @@ export function QuickInterventionCapture({
 
                   {/* Próxima acción preventiva */}
                   {insights.proximaAccion && (
-                    <div className="rounded-ctl border border-primary/30 bg-primary/10 px-2.5 py-2">
+                    <div className="rounded-ctl border border-transparent bg-primary/10 px-2.5 py-2">
                       <p className="text-caption font-medium text-primary flex items-center gap-1.5">
                         <Lightbulb className="h-3.5 w-3.5" /> Próxima acción preventiva (RCM)
                       </p>

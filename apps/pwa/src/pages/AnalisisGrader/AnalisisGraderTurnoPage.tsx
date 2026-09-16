@@ -2083,7 +2083,7 @@ export function AnalisisGraderTurnoPage() {
     <div className="container mx-auto p-3 sm:p-4 space-y-4 max-w-[1760px]">
       {/* M18 — Banner offline */}
       {!isOnline && (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-ctl bg-amber-500/[0.15] border border-amber-500/[0.25] text-ink-warn text-sm">
+        <div className="flex items-center gap-2 px-3 py-2 rounded-ctl bg-amber-500/[0.15] border border-transparent text-ink-warn text-sm">
           <WifiOff className="w-4 h-4 shrink-0" />
           <span>
             Sin conexión — las anotaciones se guardarán localmente y se sincronizarán al reconectarse.
@@ -2193,7 +2193,7 @@ export function AnalisisGraderTurnoPage() {
               variant="outline"
               size="sm"
               onClick={() => setNextPauseOpen(true)}
-              className="gap-1.5 text-ink-warn border-amber-500/[0.25] hover:bg-amber-500/[0.15]"
+              className="gap-1.5 text-ink-warn border-transparent hover:bg-amber-500/[0.15]"
               title={`${untaggedPauses.length} pausas sin clasificar en este turno`}
             >
               <Tag className="w-3.5 h-3.5" />
@@ -2440,7 +2440,7 @@ export function AnalisisGraderTurnoPage() {
               Mobile: texto en línea propia (basis-full) para evitar comprimirse
               en una columna vertical de 1 palabra cuando los botones le roban
               ancho. Desktop: una sola línea con todos los elementos. */}
-          <div className="flex flex-wrap items-center gap-2 px-3 py-2 rounded-ctl bg-primary/[0.15] border border-primary/[0.25] text-brand-ink text-sm">
+          <div className="flex flex-wrap items-center gap-2 px-3 py-2 rounded-ctl bg-primary/[0.15] border border-transparent text-brand-ink text-sm">
             <div className="flex items-center gap-2 basis-full sm:basis-auto sm:flex-1 min-w-0">
               <Activity className="w-4 h-4 shrink-0" />
               <span className="flex-1 min-w-0">
@@ -2466,7 +2466,7 @@ export function AnalisisGraderTurnoPage() {
             <Button
               size="sm"
               variant="outline"
-              className="h-7 text-xs border-primary/[0.25] text-brand-ink hover:bg-primary/[0.15] shrink-0"
+              className="h-7 text-xs border-transparent text-brand-ink hover:bg-primary/[0.15] shrink-0"
               onClick={handleSlxRefresh}
               disabled={slxSyncing}
               title={`Último sync: ${slxBestSyncedAt?.toLocaleTimeString('es-CL') ?? 'nunca'}`}
@@ -2479,7 +2479,7 @@ export function AnalisisGraderTurnoPage() {
               <Button
                 size="sm"
                 variant="outline"
-                className="h-7 text-xs border-primary/[0.25] text-brand-ink hover:bg-primary/[0.15] shrink-0"
+                className="h-7 text-xs border-transparent text-brand-ink hover:bg-primary/[0.15] shrink-0"
                 onClick={() => navigate(wizardUrl)}
               >
                 <Upload className="w-3 h-3 mr-1.5" />
@@ -2602,7 +2602,7 @@ export function AnalisisGraderTurnoPage() {
             </p>
 
             {/* Shoplogix — automático */}
-            <div className="flex items-start gap-3 p-3 rounded-card bg-cat-6-tint/[0.15] border border-cat-6-tint/[0.25] dark:bg-cat-6-tint/[0.15] dark:border-cat-6-tint/[0.25]">
+            <div className="flex items-start gap-3 p-3 rounded-card bg-cat-6-tint/[0.15] border border-transparent dark:bg-cat-6-tint/[0.15] dark:border-transparent">
               <Zap className="w-4 h-4 text-cat-6-ink mt-0.5 shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-cat-6-ink">Shoplogix — {hasGraderData ? 'Evisceradoras Baader 142' : getMachineKind(plantLineCfg.id).long}</p>
@@ -2618,7 +2618,7 @@ export function AnalisisGraderTurnoPage() {
 
             {/* Grader — manual. Filete no pasa por Grader: no se ofrece. */}
             {hasGraderData && (
-            <div className="flex items-start gap-3 p-3 rounded-card bg-primary/[0.15] border border-primary/[0.25]">
+            <div className="flex items-start gap-3 p-3 rounded-card bg-primary/[0.15] border border-transparent">
               <Upload className="w-4 h-4 text-ink-info mt-0.5 shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-primary">Grader Matrix — Informe de turno</p>
@@ -2630,7 +2630,7 @@ export function AnalisisGraderTurnoPage() {
                 <Button
                   size="sm"
                   variant="outline"
-                  className="h-7 text-xs border-primary/[0.25] text-ink-info hover:bg-blue-500/[0.15] shrink-0 mt-0.5"
+                  className="h-7 text-xs border-transparent text-ink-info hover:bg-blue-500/[0.15] shrink-0 mt-0.5"
                   onClick={() => navigate(wizardUrl)}
                 >
                   <Upload className="w-3 h-3 mr-1" />
@@ -2643,7 +2643,7 @@ export function AnalisisGraderTurnoPage() {
             {/* Marel HG (corta-cabeza) — solo Chonchi. Yal no tiene
                 corta-cabeza, los salmones salen evisecerados con cabeza. */}
             {isClassificationPlant && (
-              <div className="flex items-start gap-3 p-3 rounded-card bg-amber-500/[0.15] border border-amber-500/[0.25] dark:bg-amber-500/[0.15] dark:border-amber-500/[0.25]">
+              <div className="flex items-start gap-3 p-3 rounded-card bg-amber-500/[0.15] border border-transparent dark:bg-amber-500/[0.15] dark:border-transparent">
                 <Scale className="w-4 h-4 text-ink-warn mt-0.5 shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-ink-warn">Marel HG — Corta-cabeza</p>
@@ -3355,7 +3355,7 @@ export function AnalisisGraderTurnoPage() {
           las compuertas no — y es lo que se hace al empezar el turno. */}
       {!summary && activeView === 'gates' && isClassificationPlant && (
         <div className="space-y-3">
-          <div className="flex items-start gap-2.5 px-3 py-2.5 rounded-ctl bg-primary/[0.15] border border-primary/[0.25] text-sm">
+          <div className="flex items-start gap-2.5 px-3 py-2.5 rounded-ctl bg-primary/[0.15] border border-transparent text-sm">
             <SlidersHorizontal className="w-4 h-4 shrink-0 mt-0.5 text-primary" />
             <p className="text-muted-foreground flex-1">
               Acá se dejan listas las <span className="font-medium text-foreground">compuertas de este turno</span>:

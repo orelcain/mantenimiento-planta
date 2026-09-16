@@ -106,7 +106,7 @@ export function DefaultRoutePage() {
         </p>
       </div>
 
-      <Card className="border-emerald-500/[0.25] bg-emerald-500/[0.15]">
+      <Card className="border-transparent bg-emerald-500/[0.15]">
         <CardContent className="p-3 flex items-start gap-2 text-xs text-ink-ok">
           <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
           <span>

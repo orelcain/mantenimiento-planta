@@ -829,7 +829,7 @@ function TaskCard({
     <div
       className={cn(
         'flex items-center justify-between p-3 rounded-card border',
-        isOverdue ? 'border-red-500/[0.25] bg-red-500/[0.15]' : 'bg-muted'
+        isOverdue ? 'border-transparent bg-red-500/[0.15]' : 'bg-muted'
       )}
     >
       <div className="flex items-center gap-3">
@@ -1021,7 +1021,7 @@ function TaskDialog({
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {Object.keys(errors).length > 0 && (
-          <div className="bg-red-500/[0.15] border border-red-500/[0.25] text-ink-crit px-4 py-3 rounded-ctl">
+          <div className="bg-red-500/[0.15] border border-transparent text-ink-crit px-4 py-3 rounded-ctl">
             <p className="font-medium">Por favor corrige los siguientes errores:</p>
             <ul className="mt-2 list-disc list-inside text-sm">
               {Object.values(errors).map((error, index) => (
@@ -1322,7 +1322,7 @@ function ExecuteTaskDialog({
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {Object.keys(errors).length > 0 && (
-          <div className="bg-red-500/[0.15] border border-red-500/[0.25] text-ink-crit px-4 py-3 rounded-ctl">
+          <div className="bg-red-500/[0.15] border border-transparent text-ink-crit px-4 py-3 rounded-ctl">
             <p className="font-medium">Por favor corrige los siguientes errores:</p>
             <ul className="mt-2 list-disc list-inside text-sm">
               {Object.values(errors).map((error, index) => (

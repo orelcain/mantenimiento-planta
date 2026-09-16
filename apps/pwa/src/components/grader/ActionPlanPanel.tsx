@@ -42,9 +42,9 @@ const CATEGORY_META: Record<SuggestedAction['category'], {
   color: string
   bg: string
 }> = {
-  terreno: { label: 'Terreno', icon: Wrench, color: 'text-ink-warn', bg: 'bg-amber-500/[0.15] border-amber-500/[0.25]' },
-  oficina: { label: 'Oficina', icon: Monitor, color: 'text-brand-ink', bg: 'bg-primary/[0.15] border-primary/[0.25]' },
-  verificar: { label: 'Verificar', icon: Eye, color: 'text-cat-6-ink', bg: 'bg-cat-6-tint/[0.15] border-cat-6-tint/[0.25]' },
+  terreno: { label: 'Terreno', icon: Wrench, color: 'text-ink-warn', bg: 'bg-amber-500/[0.15] border-transparent' },
+  oficina: { label: 'Oficina', icon: Monitor, color: 'text-brand-ink', bg: 'bg-primary/[0.15] border-transparent' },
+  verificar: { label: 'Verificar', icon: Eye, color: 'text-cat-6-ink', bg: 'bg-cat-6-tint/[0.15] border-transparent' },
 }
 
 const SEVERITY_ICON: Record<SuggestedAction['severity'], typeof AlertTriangle> = {
@@ -131,7 +131,7 @@ function ActionItem({
           {action.actionTrigger && (
             <button
               onClick={handleTrigger}
-              className="mt-2 flex items-center gap-1 text-caption px-2 py-1 rounded-ctl border border-primary/30 bg-primary/5 text-brand-ink hover:bg-primary/10 transition-colors font-medium"
+              className="mt-2 flex items-center gap-1 text-caption px-2 py-1 rounded-ctl border border-transparent bg-primary/5 text-brand-ink hover:bg-primary/10 transition-colors font-medium"
             >
               {action.actionLabel ?? TRIGGER_LABELS[action.actionTrigger]}
               <ArrowRight className="w-3 h-3" />

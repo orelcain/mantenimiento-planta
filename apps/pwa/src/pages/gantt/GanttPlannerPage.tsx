@@ -268,13 +268,13 @@ export function GanttPlannerPage() {
       {/* Summary badges */}
       <div className="flex flex-wrap gap-2 text-xs">
         <Badge variant="outline">{filtered.length} tareas</Badge>
-        <Badge variant="outline" className="bg-emerald-500/[0.15] text-ink-ok border-emerald-500/[0.25]">
+        <Badge variant="outline" className="bg-emerald-500/[0.15] text-ink-ok border-transparent">
           {filtered.filter((t) => t.status === 'completada').length} completadas
         </Badge>
-        <Badge variant="outline" className="bg-amber-500/[0.15] text-ink-warn border-amber-500/[0.25]">
+        <Badge variant="outline" className="bg-amber-500/[0.15] text-ink-warn border-transparent">
           {filtered.filter((t) => t.status === 'en_progreso').length} en progreso
         </Badge>
-        <Badge variant="outline" className="bg-red-500/[0.15] text-ink-crit border-red-500/[0.25]">
+        <Badge variant="outline" className="bg-red-500/[0.15] text-ink-crit border-transparent">
           {cpm.criticalPath.length} ruta crítica
         </Badge>
       </div>

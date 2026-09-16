@@ -123,7 +123,7 @@ export function SolicitarRepuestoModal({ open, onOpenChange, repuesto, options =
           ) : selected ? (
             <div>
               <label className="mb-1 block text-caption tracking-wide text-muted-foreground">Repuesto</label>
-              <div className="flex items-start justify-between gap-2 rounded-card border border-primary/40 bg-primary/5 px-3 py-2">
+              <div className="flex items-start justify-between gap-2 rounded-card border border-transparent bg-primary/5 px-3 py-2">
                 <div className="min-w-0">
                   <div className="truncate text-sm font-medium text-foreground">{selected.textoBreve || '(sin nombre)'}</div>
                   <div className="font-mono text-xs text-muted-foreground">SAP {selected.codigoSAP}</div>

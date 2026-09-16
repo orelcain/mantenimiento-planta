@@ -101,7 +101,7 @@ export function DanfossTab({ physicalConfig, setPhysicalConfig }: DanfossTabProp
         </div>
         {/* Resultado calculado */}
         {computed !== null ? (
-          <div className="bg-primary/5 border border-primary/20 rounded-ctl p-3 text-sm space-y-1">
+          <div className="bg-primary/5 border border-transparent rounded-ctl p-3 text-sm space-y-1">
             <div className="flex items-center gap-3 flex-wrap">
               <span className="text-xs text-muted-foreground">@ {drive.vfdCurrentRpm ?? drive.motorNominalRpm} RPM →</span>
               <span className="font-mono font-semibold text-primary">{computed.toFixed(3)} m/s</span>

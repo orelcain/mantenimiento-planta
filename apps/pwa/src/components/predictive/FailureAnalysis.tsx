@@ -443,7 +443,7 @@ export function FailureAnalysis() {
 
                             {/* Resolución (si existe) */}
                             {selectedIncident.resolucion && (
-                                <div className="bg-green-500/[0.15] border border-emerald-500/[0.25] rounded-card p-4">
+                                <div className="bg-green-500/[0.15] border border-transparent rounded-card p-4">
                                     <h4 className="text-sm font-semibold mb-1 text-ink-ok flex items-center gap-2">
                                         <CheckCircle2 className="h-4 w-4" />
                                         Resolución Aplicada

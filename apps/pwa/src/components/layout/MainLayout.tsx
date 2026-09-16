@@ -921,7 +921,7 @@ export function MainLayout() {
 
         {/* Syncing banner (mobile) */}
         {isOnline && pendingWrites > 0 && (
-          <div className="mx-4 mt-4 lg:mx-6 lg:hidden bg-amber-500/[0.15] border border-amber-500/[0.25] text-ink-warn px-4 py-2 rounded-card flex items-center justify-between gap-3">
+          <div className="mx-4 mt-4 lg:mx-6 lg:hidden bg-amber-500/[0.15] border border-transparent text-ink-warn px-4 py-2 rounded-card flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-sm">
               <RefreshCw className="h-4 w-4 animate-spin" />
               <span>Sincronizando...</span>
@@ -937,7 +937,7 @@ export function MainLayout() {
 
         {/* Offline banner */}
         {!isOnline && (
-          <div className="mx-4 mt-4 lg:mx-6 bg-amber-500/[0.15] border border-amber-500/[0.25] text-ink-warn px-4 py-3 rounded-card flex items-center justify-between gap-3">
+          <div className="mx-4 mt-4 lg:mx-6 bg-amber-500/[0.15] border border-transparent text-ink-warn px-4 py-3 rounded-card flex items-center justify-between gap-3">
             <AlertTriangle className="h-5 w-5" />
             <div>
               <span className="font-medium block">Sin conexion a internet</span>
@@ -1119,7 +1119,7 @@ export function MainLayout() {
 
         {/* Banner de actualización disponible */}
         {hasUpdate && (
-          <div className="mx-4 mt-4 lg:mx-6 bg-primary/[0.15] border border-primary/[0.25] text-ink-info px-4 py-3 rounded-card flex items-center justify-between">
+          <div className="mx-4 mt-4 lg:mx-6 bg-primary/[0.15] border border-transparent text-ink-info px-4 py-3 rounded-card flex items-center justify-between">
             <div className="flex items-center gap-3">
               <RefreshCw className="h-5 w-5" />
               {/*
@@ -1205,7 +1205,7 @@ export function MainLayout() {
 
         {isReadOnly && (
           <div className="fixed inset-0 z-40 flex items-start justify-center pt-24 pointer-events-none">
-            <div className="pointer-events-auto bg-amber-500/[0.15] text-ink-warn px-4 py-3 rounded-card shadow-lg border border-amber-500/[0.25] max-w-md">
+            <div className="pointer-events-auto bg-amber-500/[0.15] text-ink-warn px-4 py-3 rounded-card shadow-lg border border-transparent max-w-md">
               <div className="font-medium">Modo solo lectura</div>
               <div className="text-sm opacity-90">
                 Estas en una seccion critica sin conexion. Conectate para editar o vuelve al inicio.

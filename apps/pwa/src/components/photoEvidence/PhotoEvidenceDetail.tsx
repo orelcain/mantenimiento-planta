@@ -60,22 +60,22 @@ interface PhotoEvidenceDetailProps {
 const STATUS_CONFIG: Record<PhotoEvidenceStatus, { label: string; color: string; icon: React.ElementType }> = {
   pendiente: {
     label: 'Pendiente',
-    color: 'bg-amber-500/[0.15] text-ink-warn border-amber-500/[0.25]',
+    color: 'bg-amber-500/[0.15] text-ink-warn border-transparent',
     icon: Clock,
   },
   en_proceso: {
     label: 'En Proceso',
-    color: 'bg-primary/[0.15] text-ink-info border-primary/[0.25]',
+    color: 'bg-primary/[0.15] text-ink-info border-transparent',
     icon: AlertCircle,
   },
   corregida: {
     label: 'Corregida',
-    color: 'bg-green-500/[0.15] text-ink-ok border-green-500/[0.25]',
+    color: 'bg-green-500/[0.15] text-ink-ok border-transparent',
     icon: CheckCircle,
   },
   verificada: {
     label: 'Verificada',
-    color: 'bg-cat-6-tint/[0.15] text-cat-6-ink border-cat-6-tint/[0.25]',
+    color: 'bg-cat-6-tint/[0.15] text-cat-6-ink border-transparent',
     icon: CheckCircle,
   },
 }
@@ -521,7 +521,7 @@ export function PhotoEvidenceDetail({
                   <div className="mt-3 p-3 rounded-card border border-border bg-muted space-y-3">
                     <div className="grid grid-cols-1 gap-3">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div className="p-3 rounded-card border border-red-500/[0.25] bg-red-500/[0.15]">
+                        <div className="p-3 rounded-card border border-transparent bg-red-500/[0.15]">
                           <PhotoUploader
                             photos={pairBeforePhoto}
                             onPhotosChange={(p) => {
@@ -547,7 +547,7 @@ export function PhotoEvidenceDetail({
                             </Button>
                           </div>
                         </div>
-                        <div className="p-3 rounded-card border border-emerald-500/[0.25] bg-green-500/[0.15]">
+                        <div className="p-3 rounded-card border border-transparent bg-green-500/[0.15]">
                           <PhotoUploader
                             photos={pairAfterPhoto}
                             onPhotosChange={(p) => {

@@ -519,7 +519,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                     </div>
                   </div>
                   {iotData?.source === 'simulated' && (
-                    <Badge variant="outline" className="text-ink-warn border-amber-500/[0.25] bg-amber-500/[0.15]">
+                    <Badge variant="outline" className="text-ink-warn border-transparent bg-amber-500/[0.15]">
                       Dato simulado
                     </Badge>
                   )}
@@ -656,7 +656,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
 
                 {/* Usuario asignado */}
                 {assignedUser ? (
-                  <div className="p-3 bg-primary/10 rounded-card border border-primary/20">
+                  <div className="p-3 bg-primary/10 rounded-card border border-transparent">
                     <div className="flex items-center gap-2 mb-1">
                       <User className="h-4 w-4 text-primary" />
                       <span className="font-medium text-primary">Asignado a:</span>
@@ -962,7 +962,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                 onClick={handleSelfAssign} 
                 disabled={isLoading}
                 variant="secondary"
-                className="w-full sm:w-auto border-primary/20 text-brand-ink hover:bg-primary/10"
+                className="w-full sm:w-auto border-transparent text-brand-ink hover:bg-primary/10"
               >
                 <UserPlus className="mr-2 h-4 w-4" />
                 Asignarme a mí

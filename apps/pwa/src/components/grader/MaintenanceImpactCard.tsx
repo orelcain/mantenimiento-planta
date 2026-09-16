@@ -141,7 +141,7 @@ export function MaintenanceImpactCard({ summaries, periodLabel, rangeLabel, work
             <button
               onClick={handleExport}
               disabled={exporting}
-              className="shrink-0 inline-flex items-center gap-1.5 rounded-ctl border border-cat-4-tint/[0.25] bg-cat-4-tint/[0.15] px-2.5 py-1 text-caption font-medium text-cat-4-ink transition hover:bg-cat-4-tint/[0.15] disabled:opacity-50"
+              className="shrink-0 inline-flex items-center gap-1.5 rounded-ctl border border-transparent bg-cat-4-tint/[0.15] px-2.5 py-1 text-caption font-medium text-cat-4-ink transition hover:bg-cat-4-tint/[0.15] disabled:opacity-50"
               title="Descargar reporte PDF de impacto de mantención"
             >
               {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileDown className="h-3.5 w-3.5" />}
@@ -163,7 +163,7 @@ export function MaintenanceImpactCard({ summaries, periodLabel, rangeLabel, work
         ) : (
           <>
             {/* Frase de demostración */}
-            <div className="rounded-card border border-cat-4-tint/[0.25] bg-cat-4-tint/[0.15] px-3 py-2 text-xs text-foreground/90">
+            <div className="rounded-card border border-transparent bg-cat-4-tint/[0.15] px-3 py-2 text-xs text-foreground/90">
               Mantención atendió <span className="font-semibold text-cat-4-ink">{rel!.eventsCount}</span> paros
               ({rel!.fallasCount} fallas · {rel!.intervencionesCount} intervenciones) por{' '}
               <span className="font-semibold">{fmt(rel!.maintenanceDowntimeSec)}</span> en el período.

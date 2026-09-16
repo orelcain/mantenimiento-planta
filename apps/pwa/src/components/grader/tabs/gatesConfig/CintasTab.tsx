@@ -44,10 +44,10 @@ export function CintasTab({ physicalConfig, updateBeltLength, updateBeltSpeed, s
 
           // Responsabilidad por cinta
           const responsibility: Record<GraderBeltId, { icon: string; role: string; accent: string }> = {
-            zeta:   { icon: '❷', role: 'Elevadora',    accent: 'bg-primary/[0.15] border-primary/[0.25]' },
-            accel1: { icon: '❸', role: 'Aceleración 1', accent: 'bg-amber-500/[0.15] border-amber-500/[0.25]' },
-            accel2: { icon: '❸', role: 'Aceleración 2 [Detection Eye]', accent: 'bg-amber-500/[0.15] border-amber-500/[0.25]' },
-            main:   { icon: '❹', role: 'Clasificadora principal',  accent: 'bg-primary/5 border-primary/40' },
+            zeta:   { icon: '❷', role: 'Elevadora',    accent: 'bg-primary/[0.15] border-transparent' },
+            accel1: { icon: '❸', role: 'Aceleración 1', accent: 'bg-amber-500/[0.15] border-transparent' },
+            accel2: { icon: '❸', role: 'Aceleración 2 [Detection Eye]', accent: 'bg-amber-500/[0.15] border-transparent' },
+            main:   { icon: '❹', role: 'Clasificadora principal',  accent: 'bg-primary/5 border-transparent' },
           }
           const resp = responsibility[beltId]
 
@@ -59,7 +59,7 @@ export function CintasTab({ physicalConfig, updateBeltLength, updateBeltSpeed, s
                     <span className="text-xs opacity-70">{resp.icon}</span>
                     {getBeltLabel(beltId)}
                     {beltId === 'main' && (
-                      <Badge className="text-caption bg-primary/10 text-brand-ink border-primary/30">Principal</Badge>
+                      <Badge className="text-caption bg-primary/10 text-brand-ink border-transparent">Principal</Badge>
                     )}
                   </CardTitle>
                   <CalibBadge status={belt.calibrationStatus} />

@@ -1046,7 +1046,7 @@ ${new Date().toLocaleDateString()} • ${new Date().toLocaleTimeString()}
           <div className="flex flex-col gap-3">
             {/* Badge filtro activo desde jerarquía */}
             {filterSelectedIds.size > 0 && (
-              <div className="flex items-center gap-2 p-3 bg-blue-500/[0.15] border border-blue-500/[0.25] rounded-ctl">
+              <div className="flex items-center gap-2 p-3 bg-blue-500/[0.15] border border-transparent rounded-ctl">
                 <div className="flex-1 text-sm text-ink-info">
                   Mostrando {filterSelectedIds.size} {filterSelectedIds.size === 1 ? 'equipo seleccionado' : 'equipos seleccionados'} desde jerarquía
                 </div>

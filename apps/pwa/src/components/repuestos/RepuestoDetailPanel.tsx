@@ -107,7 +107,7 @@ function ActionBtn({ icon: Icon, label, onClick, danger, contenido }: {
       className={[
         'relative flex flex-col items-center gap-1 rounded-card border bg-card px-2 py-2 text-caption font-medium transition',
         danger
-          ? 'border-border text-ink-crit hover:bg-red-500/[0.15] hover:border-red-500/[0.25]'
+          ? 'border-border text-ink-crit hover:bg-red-500/[0.15] hover:border-transparent'
           : senal && tiene
             ? 'border-primary/[0.35] text-foreground hover:bg-muted'
             : senal
@@ -397,7 +397,7 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, onClose, loadMov
             </Button>
           )
         ) : (
-          <div className="mb-3 rounded-card border border-dashed border-amber-500/[0.25] bg-amber-500/[0.15] px-3 py-2">
+          <div className="mb-3 rounded-card border border-dashed border-transparent bg-amber-500/[0.15] px-3 py-2">
             <p className="text-caption text-muted-foreground">Pieza de despiece sin código SAP — asígnale un SAP para poder solicitarla a bodega.</p>
             {onAssignSap && (
               <Button size="sm" variant="outline" className="mt-2 w-full gap-1.5" onClick={onAssignSap}>
@@ -695,7 +695,7 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, onClose, loadMov
                 </Button>
               </div>
             ) : (
-              <div className="rounded-card border border-primary/40 bg-primary/5 p-2">
+              <div className="rounded-card border border-transparent bg-primary/5 p-2">
                 <div className="mb-1.5 text-caption text-muted-foreground">
                   Antes había <span className="font-bold text-foreground">{item.bodegaId ? item.stockActual : 0}</span>. ¿Cuántas hay ahora? (0 = no había)
                 </div>

@@ -238,7 +238,7 @@ function ActionButtons({ actions, onNavigate }: { actions: ChatAction[]; onNavig
         <button
           key={action.route}
           onClick={() => onNavigate(action.route)}
-          className="inline-flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-ctl border border-primary/30 bg-primary/5 text-brand-ink hover:bg-primary/10 transition-colors"
+          className="inline-flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-ctl border border-transparent bg-primary/5 text-brand-ink hover:bg-primary/10 transition-colors"
         >
           <ExternalLink className="w-3 h-3" />
           {action.label}
@@ -404,7 +404,7 @@ function MessageBubble({
 
           {/* Formulario de corrección (se expande tras thumbs down) */}
           {showCorrection && !feedbackGiven && (
-            <div className="mt-2 p-2 bg-amber-500/[0.15] border border-amber-500/[0.25] rounded-card space-y-1.5">
+            <div className="mt-2 p-2 bg-amber-500/[0.15] border border-transparent rounded-card space-y-1.5">
               <div className="flex items-center gap-1 text-caption font-medium text-ink-warn">
                 <Pencil className="size-3 shrink-0" />
                 ¿Cuál era la respuesta correcta?
@@ -585,7 +585,7 @@ function ContextualSuggestions({ suggestions, onSelect, disabled }: {
           key={i}
           onClick={() => onSelect(s)}
           disabled={disabled}
-          className="text-xs px-3 py-1.5 rounded-full border border-primary/25 bg-primary/5 text-brand-ink hover:bg-primary/15 hover:border-primary/40 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm hover:shadow"
+          className="text-xs px-3 py-1.5 rounded-full border border-transparent bg-primary/5 text-brand-ink hover:bg-primary/15 hover:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm hover:shadow"
         >
           {s}
         </button>
@@ -738,7 +738,7 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
     : technicians
 
   return (
-    <div className="px-3 py-2 border-t border-amber-500/[0.25] bg-amber-500/[0.15] dark:border-amber-500/[0.25]">
+    <div className="px-3 py-2 border-t border-transparent bg-amber-500/[0.15] dark:border-transparent">
       <div className="flex items-center gap-2 mb-1.5">
         <AlertTriangle className="w-4 h-4 text-ink-warn flex-shrink-0" />
         <span className="text-xs text-ink-warn flex-1 font-medium">
@@ -759,7 +759,7 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
       <div className="mb-2">
           <button
             onClick={() => { setShowEquipmentPicker(p => !p); setShowTechPicker(false) }}
-            className="w-full text-left text-xs px-2 py-1.5 rounded-ctl border border-amber-500/[0.25] dark:border-amber-600 bg-amber-500/[0.15] hover:bg-amber-500/[0.15] dark:hover:bg-amber-500/[0.15] transition-colors flex items-center justify-between"
+            className="w-full text-left text-xs px-2 py-1.5 rounded-ctl border border-transparent dark:border-amber-600 bg-amber-500/[0.15] hover:bg-amber-500/[0.15] dark:hover:bg-amber-500/[0.15] transition-colors flex items-center justify-between"
           >
             <span className="truncate">
               <Factory className="inline size-3.5" /> {pendingData?.equipmentName
@@ -824,7 +824,7 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
             currentTechId === userId ? (
               <button
                 onClick={() => { onAssignTechnician('', '') }}
-                className="w-full text-left text-xs px-2 py-1.5 rounded-ctl border border-emerald-500/[0.25] dark:border-green-600 bg-green-500/[0.15] hover:bg-emerald-500/[0.15] dark:hover:bg-green-500/[0.15] transition-colors flex items-center gap-2"
+                className="w-full text-left text-xs px-2 py-1.5 rounded-ctl border border-transparent dark:border-green-600 bg-green-500/[0.15] hover:bg-emerald-500/[0.15] dark:hover:bg-green-500/[0.15] transition-colors flex items-center gap-2"
               >
                 <CheckCircle className="w-3.5 h-3.5 text-ink-ok flex-shrink-0" />
                 <span className="truncate"><HardHat className="inline size-3" /> Asignada a mí — <span className="text-muted-foreground italic">clic para quitar</span></span>
@@ -832,7 +832,7 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
             ) : (
               <button
                 onClick={() => { if (userId && userName) onAssignTechnician(userId, userName) }}
-                className="w-full text-left text-xs px-2 py-1.5 rounded-ctl border border-blue-500/[0.25] dark:border-blue-600 bg-primary/[0.15] hover:bg-blue-500/[0.15] dark:hover:bg-primary/[0.15] transition-colors flex items-center gap-2"
+                className="w-full text-left text-xs px-2 py-1.5 rounded-ctl border border-transparent dark:border-blue-600 bg-primary/[0.15] hover:bg-blue-500/[0.15] dark:hover:bg-primary/[0.15] transition-colors flex items-center gap-2"
               >
                 <span className="inline-flex items-center gap-1"><HardHat className="size-3" /> Autoasignarme esta incidencia</span>
               </button>
@@ -842,7 +842,7 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
             <>
               <button
                 onClick={() => { setShowTechPicker(p => !p); setShowEquipmentPicker(false) }}
-                className="w-full text-left text-xs px-2 py-1.5 rounded-ctl border border-blue-500/[0.25] dark:border-blue-600 bg-primary/[0.15] hover:bg-blue-500/[0.15] dark:hover:bg-primary/[0.15] transition-colors flex items-center justify-between"
+                className="w-full text-left text-xs px-2 py-1.5 rounded-ctl border border-transparent dark:border-blue-600 bg-primary/[0.15] hover:bg-blue-500/[0.15] dark:hover:bg-primary/[0.15] transition-colors flex items-center justify-between"
               >
                 <span className="truncate">
                   <HardHat className="inline size-3" /> {currentTechName

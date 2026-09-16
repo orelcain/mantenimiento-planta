@@ -88,7 +88,7 @@ function CorrectionRow({ correction: c, onDelete, onToggle }: {
   onToggle: (id: string, active: boolean) => void
 }) {
   return (
-    <div className={`flex items-start gap-2 p-2 rounded-ctl border text-xs ${c.active ? 'border-amber-500/[0.25] bg-amber-500/[0.15]' : 'border-border bg-muted opacity-60'}`}>
+    <div className={`flex items-start gap-2 p-2 rounded-ctl border text-xs ${c.active ? 'border-transparent bg-amber-500/[0.15]' : 'border-border bg-muted opacity-60'}`}>
       <div className="flex-1 min-w-0">
         <div className="flex items-start gap-1 text-muted-foreground" title={c.userQuery}>
           <HelpCircle className="mt-0.5 size-2.5 shrink-0" aria-label="Preguntó" />
@@ -340,9 +340,9 @@ export function MissionControlPanel() {
                 key={agent.id}
                 className={`flex items-center gap-3 p-3 rounded-card border transition-all ${
                   agent.status === 'online'
-                    ? 'border-green-500/[0.25] bg-green-500/[0.15]'
+                    ? 'border-transparent bg-green-500/[0.15]'
                     : agent.status === 'rate-limited'
-                    ? 'border-amber-500/[0.25] bg-amber-500/[0.15]'
+                    ? 'border-transparent bg-amber-500/[0.15]'
                     : 'border-border bg-muted'
                 }`}
               >
@@ -655,9 +655,9 @@ export function MissionControlPanel() {
                 <div key={agent.id} className="flex items-center gap-1">
                   <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border ${
                     agent.status === 'online'
-                      ? 'border-green-500/[0.25] bg-green-500/[0.15] text-ink-ok'
+                      ? 'border-transparent bg-green-500/[0.15] text-ink-ok'
                       : agent.status === 'rate-limited'
-                      ? 'border-amber-500/[0.25] bg-amber-500/[0.15] text-ink-warn'
+                      ? 'border-transparent bg-amber-500/[0.15] text-ink-warn'
                       : 'border-border bg-muted text-muted-foreground'
                   }`}>
                     <span>{agent.emoji}</span>

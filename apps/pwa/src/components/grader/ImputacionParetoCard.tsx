@@ -141,7 +141,7 @@ export function ImputacionParetoCard({ machines }: { machines: UpstreamMachineSh
                 <span className="truncate">{c.label}</span>
                 {c.ambigua && (
                   <span
-                    className="shrink-0 text-caption px-1 rounded-ctl bg-amber-500/[0.15] text-ink-warn border border-amber-500/[0.25]"
+                    className="shrink-0 text-caption px-1 rounded-ctl bg-amber-500/[0.15] text-ink-warn border border-transparent"
                     title="Shoplogix manda la causal sin su categoría, y esta hoja existe en Falla Eléctrica y en Falla Mecánica. Para la cascada da igual (ambas son Mantención); para separar eléctrica de mecánica haría falta que la causal llegue prefijada desde Shoplogix."
                   >
                     ¿eléc. o mec.?
@@ -164,7 +164,7 @@ export function ImputacionParetoCard({ machines }: { machines: UpstreamMachineSh
     <div className="mb-4 pb-4 border-b border-border/60">
       <button
         onClick={() => setExpanded((e) => !e)}
-        className="w-full flex items-center gap-2 rounded-ctl border border-primary/[0.25] bg-primary/[0.15] px-3 py-2 hover:bg-primary/[0.15] transition-colors"
+        className="w-full flex items-center gap-2 rounded-ctl border border-transparent bg-primary/[0.15] px-3 py-2 hover:bg-primary/[0.15] transition-colors"
         aria-expanded={expanded}
       >
         {expanded
@@ -226,7 +226,7 @@ export function ImputacionParetoCard({ machines }: { machines: UpstreamMachineSh
               onClick={() => setTreeOpen((v) => !v)}
               className={cn(
                 'text-caption px-2 py-0.5 rounded-ctl border transition-colors inline-flex items-center gap-1',
-                treeOpen ? 'bg-primary/[0.15] text-ink-info border-primary/[0.25]' : 'bg-muted text-muted-foreground border-border hover:bg-accent',
+                treeOpen ? 'bg-primary/[0.15] text-ink-info border-transparent' : 'bg-muted text-muted-foreground border-border hover:bg-accent',
               )}
             >
               <HelpCircle className="w-3 h-3" />

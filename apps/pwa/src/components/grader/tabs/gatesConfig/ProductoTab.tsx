@@ -82,10 +82,10 @@ export function ProductoTab({
     : null
   const salmonPassTimeSec = salmonLengthM / speedMps
   const verdictColor = overlapping
-    ? 'bg-red-500/[0.15] text-ink-crit border-red-500/[0.25]'
+    ? 'bg-red-500/[0.15] text-ink-crit border-transparent'
     : lengthToSpacingRatio > GAP_THRESHOLDS.ratioWarn
-      ? 'bg-amber-500/[0.15] text-ink-warn border-amber-500/[0.25]'
-      : 'bg-emerald-500/[0.15] text-ink-ok border-emerald-500/[0.25]'
+      ? 'bg-amber-500/[0.15] text-ink-warn border-transparent'
+      : 'bg-emerald-500/[0.15] text-ink-ok border-transparent'
   const verdictText = overlapping
     ? 'Solapamiento — peces se pisan'
     : lengthToSpacingRatio > GAP_THRESHOLDS.ratioWarn
@@ -255,7 +255,7 @@ export function ProductoTab({
                     <button
                       type="button"
                       onClick={onOpenZ2Capture}
-                      className="inline-flex items-center gap-1 text-caption border border-primary/[0.25] text-brand-ink rounded-ctl px-1.5 py-0.5 hover:bg-primary/[0.15] transition-colors"
+                      className="inline-flex items-center gap-1 text-caption border border-transparent text-brand-ink rounded-ctl px-1.5 py-0.5 hover:bg-primary/[0.15] transition-colors"
                     >
                       <MonitorSmartphone className="h-3 w-3" />Leer Z2
                     </button>
@@ -354,7 +354,7 @@ export function ProductoTab({
 
           {/* Timing flipper */}
           {minOpenTimeSec != null && (
-            <div className="p-3 rounded-card bg-primary/[0.15] border border-primary/[0.25] space-y-1">
+            <div className="p-3 rounded-card bg-primary/[0.15] border border-transparent space-y-1">
               <p className="font-medium text-primary">Timing flipper calculado</p>
               <p className="text-muted-foreground">
                 Apertura mínima (paleta pasa):{' '}
@@ -374,7 +374,7 @@ export function ProductoTab({
           )}
 
           {/* Análisis pockets */}
-          <div className="p-3 rounded-card bg-primary/[0.15] border border-primary/[0.25] space-y-1">
+          <div className="p-3 rounded-card bg-primary/[0.15] border border-transparent space-y-1">
             <div className="flex items-center gap-1.5 flex-wrap">
               <p className="font-medium text-primary">
                 Análisis pockets ({physicalConfig.pocketCount} activos)

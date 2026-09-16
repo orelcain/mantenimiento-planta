@@ -163,7 +163,7 @@ export function ShoplogixCredentialsPage() {
       </div>
 
       {error && (
-        <Card className="border-cat-5-tint/[0.25] bg-cat-5-tint/[0.15]">
+        <Card className="border-transparent bg-cat-5-tint/[0.15]">
           <CardContent className="flex items-start gap-2 py-3 text-sm text-cat-5-ink">
             <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
             <div>
@@ -310,7 +310,7 @@ export function ShoplogixCredentialsPage() {
             <Button
               variant="outline"
               onClick={() => setDeleteOpen(true)}
-              className="text-cat-5-ink border-cat-5-tint/[0.25] hover:bg-cat-5-tint/[0.15]"
+              className="text-cat-5-ink border-transparent hover:bg-cat-5-tint/[0.15]"
             >
               <Trash2 className="w-4 h-4 mr-2" />
               Eliminar credenciales (volver al modo cookie)

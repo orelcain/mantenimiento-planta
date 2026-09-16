@@ -86,7 +86,7 @@ export function CauseTooltip({ meta }: Props) {
                 className={cn(
                   'text-caption tracking-wider px-1.5 py-0.5 rounded-full border font-medium shrink-0',
                   meta.level === 'official'
-                    ? 'border-primary/40 text-brand-ink bg-primary/5'
+                    ? 'border-transparent text-brand-ink bg-primary/5'
                     : 'border-muted-foreground/30 text-muted-foreground bg-muted',
                 )}
               >

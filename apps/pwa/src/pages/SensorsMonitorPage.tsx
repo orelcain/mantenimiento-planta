@@ -958,7 +958,7 @@ function FocusModal({ device, equipmentById, readingsByEquipment, backfillByEqui
       <div className="flex-1 overflow-auto p-4 space-y-4">
         {/* KPIs row */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="rounded-card border border-cat-4-tint/[0.25] bg-cat-4-tint/[0.15] p-4">
+          <div className="rounded-card border border-transparent bg-cat-4-tint/[0.15] p-4">
             <div className="text-xs text-cat-4-ink flex items-center gap-1.5 mb-1">
               <Thermometer className="h-3.5 w-3.5" />Temperatura
             </div>
@@ -968,7 +968,7 @@ function FocusModal({ device, equipmentById, readingsByEquipment, backfillByEqui
             </div>
             <div className="mt-1 text-caption text-cat-4-ink">{tempThresholdInfo}</div>
           </div>
-          <div className="rounded-card border border-cat-7-tint/[0.25] bg-cat-7-tint/[0.15] p-4">
+          <div className="rounded-card border border-transparent bg-cat-7-tint/[0.15] p-4">
             <div className="text-xs text-cat-7-ink flex items-center gap-1.5 mb-1">
               <Droplets className="h-3.5 w-3.5" />Humedad
             </div>
@@ -990,7 +990,7 @@ function FocusModal({ device, equipmentById, readingsByEquipment, backfillByEqui
 
         {/* Chart – takes remaining space */}
         {backfillStatus?.active && (
-          <div className="rounded-card border border-primary/[0.25] bg-primary/[0.15] px-3 py-2 text-brand-ink flex items-center gap-2 text-sm">
+          <div className="rounded-card border border-transparent bg-primary/[0.15] px-3 py-2 text-brand-ink flex items-center gap-2 text-sm">
             <RefreshCw className="h-4 w-4 animate-spin flex-shrink-0" />
             <span>
               Reenviando datos offline almacenados
@@ -1105,7 +1105,7 @@ function DeviceCard({ device, equipmentById, readingsByEquipment, backfillByEqui
         </div>
 
         <div className="grid grid-cols-2 gap-2">
-          <div className="rounded-card border border-cat-4-tint/[0.25] bg-cat-4-tint/[0.15] p-3">
+          <div className="rounded-card border border-transparent bg-cat-4-tint/[0.15] p-3">
             <div className="text-xs text-cat-4-ink flex items-center gap-1.5 mb-1">
               <Thermometer className="h-3.5 w-3.5" />Temperatura
             </div>
@@ -1115,7 +1115,7 @@ function DeviceCard({ device, equipmentById, readingsByEquipment, backfillByEqui
             </div>
             <div className="mt-1 text-caption text-cat-4-ink">{tempThresholdInfo}</div>
           </div>
-          <div className="rounded-card border border-cat-7-tint/[0.25] bg-cat-7-tint/[0.15] p-3">
+          <div className="rounded-card border border-transparent bg-cat-7-tint/[0.15] p-3">
             <div className="text-xs text-cat-7-ink flex items-center gap-1.5 mb-1">
               <Droplets className="h-3.5 w-3.5" />Humedad
             </div>
@@ -1160,7 +1160,7 @@ function DeviceCard({ device, equipmentById, readingsByEquipment, backfillByEqui
         </div>
 
         {backfillStatus?.active && (
-          <div className="rounded-ctl border border-primary/[0.25] bg-primary/[0.15] p-2 text-brand-ink flex items-center gap-2 text-xs">
+          <div className="rounded-ctl border border-transparent bg-primary/[0.15] p-2 text-brand-ink flex items-center gap-2 text-xs">
             <RefreshCw className="h-3.5 w-3.5 animate-spin flex-shrink-0" />
             <span>
               Reenviando datos offline almacenados
@@ -1171,7 +1171,7 @@ function DeviceCard({ device, equipmentById, readingsByEquipment, backfillByEqui
         )}
 
         {alert !== 'normal' && (
-          <div className="rounded-ctl border border-amber-500/[0.25] bg-amber-500/[0.15] p-2 text-ink-warn flex items-center gap-2">
+          <div className="rounded-ctl border border-transparent bg-amber-500/[0.15] p-2 text-ink-warn flex items-center gap-2">
             <AlertTriangle className="h-4 w-4" />
             Revisar condición anómala y evaluar creación de incidencia.
           </div>

@@ -596,7 +596,7 @@ export function AnalisisGraderGatesConfigPage({
             {shiftDocId && (
               <div className="flex items-center gap-2">
                 {hasShiftThresholdsOverride ? (
-                  <Badge className="text-caption bg-primary/[0.15] text-brand-ink border-primary/[0.25]">Override de este turno</Badge>
+                  <Badge className="text-caption bg-primary/[0.15] text-brand-ink border-transparent">Override de este turno</Badge>
                 ) : (
                   <Badge variant="outline" className="text-caption text-muted-foreground">Global de planta</Badge>
                 )}
@@ -705,7 +705,7 @@ export function AnalisisGraderGatesConfigPage({
                     setSavingShiftThresholds(false)
                   }
                 }}
-                className="text-xs h-7 border-primary/[0.25] text-brand-ink hover:bg-primary/[0.15]"
+                className="text-xs h-7 border-transparent text-brand-ink hover:bg-primary/[0.15]"
               >
                 {savingShiftThresholds && <Loader2 className="w-3 h-3 mr-1.5 animate-spin" />}
                 {hasShiftThresholdsOverride ? 'Actualizar override de este turno' : 'Guardar solo para este turno'}
@@ -775,7 +775,7 @@ export function AnalisisGraderGatesConfigPage({
                     />
                   </div>
                   {shift.quota && shift.quota.value > 0 && (
-                    <span className="text-caption px-1.5 py-0.5 rounded-ctl bg-primary/5 text-brand-ink/80 border border-primary/20 tabular-nums" title="Cuota actual (editable desde el detalle del turno)">
+                    <span className="text-caption px-1.5 py-0.5 rounded-ctl bg-primary/5 text-brand-ink/80 border border-transparent tabular-nums" title="Cuota actual (editable desde el detalle del turno)">
                       Cuota: {shift.quota.value.toLocaleString('es-CL')} {shift.quota.unit === 'kg' ? 'kg' : 'pz'}
                     </span>
                   )}
@@ -783,7 +783,7 @@ export function AnalisisGraderGatesConfigPage({
               ))}
             </div>
             {shiftGapMinutes > 0 && (
-              <div className="mt-3 flex items-start gap-2 rounded-ctl bg-amber-500/[0.15] border border-amber-500/[0.25] px-3 py-2">
+              <div className="mt-3 flex items-start gap-2 rounded-ctl bg-amber-500/[0.15] border border-transparent px-3 py-2">
                 <AlertTriangle className="mt-px h-3 w-3 shrink-0 text-ink-warn" />
                 <p className="text-xs text-ink-warn">
                   Hay <strong>{Math.floor(shiftGapMinutes / 60)}h {shiftGapMinutes % 60}min</strong> sin turno asignado en el día.

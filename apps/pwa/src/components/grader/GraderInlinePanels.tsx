@@ -23,10 +23,10 @@ export function InsightCard({ insight }: { insight: DeterministicInsight }) {
       className={cn(
         'p-3 rounded-card border',
         insight.severity === 'critical'
-          ? 'border-red-500/[0.25] bg-red-500/[0.15]'
+          ? 'border-transparent bg-red-500/[0.15]'
           : insight.severity === 'warn'
-          ? 'border-amber-500/[0.25] bg-amber-500/[0.15]'
-          : 'border-blue-500/[0.25] bg-primary/[0.15]',
+          ? 'border-transparent bg-amber-500/[0.15]'
+          : 'border-transparent bg-primary/[0.15]',
       )}
     >
       <div className="flex items-center gap-2">
@@ -63,7 +63,7 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
   return (
     <div className="space-y-4">
       {/* Resumen compacto en card destacada */}
-      <div className="rounded-card border border-blue-500/[0.25] bg-primary/[0.15] p-3">
+      <div className="rounded-card border border-transparent bg-primary/[0.15] p-3">
         <p className="text-caption font-semibold tracking-wider text-primary mb-1.5">
           Resumen del an&aacute;lisis
         </p>
@@ -137,9 +137,9 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
                 className={cn(
                   'flex items-start gap-3 p-2.5 rounded-card border',
                   a.priority === 'high'
-                    ? 'border-red-500/[0.25] bg-red-500/[0.15]'
+                    ? 'border-transparent bg-red-500/[0.15]'
                     : a.priority === 'medium'
-                    ? 'border-amber-500/[0.25] bg-amber-500/[0.15]'
+                    ? 'border-transparent bg-amber-500/[0.15]'
                     : 'border-muted bg-muted',
                 )}
               >
@@ -172,7 +172,7 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
 
       {/* Qu&eacute; verificar — card prominente con checklist */}
       {output.whatToCheckNext.length > 0 && (
-        <div className="rounded-card border-2 border-emerald-500/[0.25] bg-emerald-500/[0.15] p-3">
+        <div className="rounded-card border-2 border-transparent bg-emerald-500/[0.15] p-3">
           <p className="text-caption font-semibold tracking-wider text-ink-ok mb-2">
             Qu&eacute; verificar ahora
           </p>
@@ -192,7 +192,7 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
 
       {/* Advertencias */}
       {output.disclaimers && output.disclaimers.length > 0 && (
-        <div className="p-2.5 bg-amber-500/[0.15] rounded-card dark:border-amber-500/[0.25]">
+        <div className="p-2.5 bg-amber-500/[0.15] rounded-card dark:border-transparent">
           <p className="text-caption font-semibold tracking-wider text-ink-warn mb-1">Advertencias</p>
           {output.disclaimers.map((d, i) => (
             <p key={i} className="text-caption text-ink-warn">{d}</p>
@@ -235,8 +235,8 @@ export function SwapSuggestionCard({ suggestion }: { suggestion: GateSwapSuggest
   return (
     <div className={cn(
       'p-3 rounded-card border',
-      suggestion.impactScore >= 70 ? 'border-red-500/[0.25] bg-red-500/[0.15]' :
-      suggestion.impactScore >= 40 ? 'border-amber-500/[0.25] bg-amber-500/[0.15]' :
+      suggestion.impactScore >= 70 ? 'border-transparent bg-red-500/[0.15]' :
+      suggestion.impactScore >= 40 ? 'border-transparent bg-amber-500/[0.15]' :
       'border-muted bg-muted',
     )}>
       <div className="flex items-center gap-2 flex-wrap">

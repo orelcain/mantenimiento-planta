@@ -383,12 +383,12 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
               {(summary.hasPieceData === false || summary.hasGate0Data === false) && (
                 <div className="flex gap-1.5 mt-2">
                   {summary.hasPieceData === false && (
-                    <Badge className="text-caption bg-red-500/[0.15] text-ink-crit border-red-500/[0.25]">
+                    <Badge className="text-caption bg-red-500/[0.15] text-ink-crit border-transparent">
                       Falta PIEZA_PIEZA
                     </Badge>
                   )}
                   {summary.hasGate0Data === false && (
-                    <Badge className="text-caption bg-red-500/[0.15] text-ink-crit border-red-500/[0.25]">
+                    <Badge className="text-caption bg-red-500/[0.15] text-ink-crit border-transparent">
                       Falta PUERTA_0
                     </Badge>
                   )}
@@ -694,9 +694,9 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
             {insights.map((ins) => {
               const sev = ins.severity
-              const borderCls = sev === 'critical' ? 'border-red-500/[0.25] bg-red-500/[0.15]'
-                : sev === 'warn' ? 'border-amber-500/[0.25] bg-amber-500/[0.15]'
-                : 'border-primary/[0.25] bg-primary/[0.15]'
+              const borderCls = sev === 'critical' ? 'border-transparent bg-red-500/[0.15]'
+                : sev === 'warn' ? 'border-transparent bg-amber-500/[0.15]'
+                : 'border-transparent bg-primary/[0.15]'
               const icon = sev === 'critical' ? <AlertTriangle className="h-3.5 w-3.5 text-ink-crit shrink-0 mt-0.5" />
                 : sev === 'warn' ? <AlertTriangle className="h-3.5 w-3.5 text-ink-warn shrink-0 mt-0.5" />
                 : <Info className="h-3.5 w-3.5 text-brand-ink shrink-0 mt-0.5" />
@@ -940,7 +940,7 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
             </p>
           )}
           {aiError && (
-            <div className="p-3 rounded-card bg-red-500/[0.15] border border-red-500/[0.25] text-sm">
+            <div className="p-3 rounded-card bg-red-500/[0.15] border border-transparent text-sm">
               <div className="flex items-center gap-2 text-ink-crit">
                 <XCircle className="h-4 w-4" />
                 <span className="font-medium">Error de análisis IA</span>

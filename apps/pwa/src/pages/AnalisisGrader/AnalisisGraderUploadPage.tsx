@@ -498,7 +498,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
           disabled={parsing}
           className={cn(
             'flex items-center gap-1.5 px-3 py-1.5 rounded-ctl border text-sm font-medium transition-colors',
-            'border-primary/[0.25] text-brand-ink hover:bg-primary/[0.15]',
+            'border-transparent text-brand-ink hover:bg-primary/[0.15]',
             parsing && 'opacity-60 cursor-wait',
           )}
         >
@@ -523,7 +523,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
               setError(null)
               if (inputRef.current) inputRef.current.value = ''
             }}
-            className="flex items-center gap-1 px-2 py-1.5 rounded-ctl border border-red-500/[0.25] text-ink-crit text-xs font-medium hover:bg-red-500/[0.15] transition-colors"
+            className="flex items-center gap-1 px-2 py-1.5 rounded-ctl border border-transparent text-ink-crit text-xs font-medium hover:bg-red-500/[0.15] transition-colors"
             title="Cancelar — limpia los archivos en cola"
           >
             <X className="h-3 w-3" />
@@ -579,7 +579,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
               'border-2 border-dashed rounded-card p-5 lg:p-8 text-center cursor-pointer transition-all duration-200 group',
               dragOver
                 ? 'border-primary bg-primary/10 scale-[1.02] shadow-lg shadow-primary/10'
-                : 'border-muted-foreground/20 hover:border-primary/40 hover:bg-primary/10',
+                : 'border-muted-foreground/20 hover:border-transparent hover:bg-primary/10',
             )}
           >
             <div className={cn(
@@ -610,7 +610,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
 
           {/* Turno detectado */}
           {turnoRange && (
-            <div className="flex items-center gap-3 flex-wrap text-xs bg-emerald-500/[0.15] border border-emerald-500/[0.25] rounded-ctl px-3 py-2">
+            <div className="flex items-center gap-3 flex-wrap text-xs bg-emerald-500/[0.15] border border-transparent rounded-ctl px-3 py-2">
               <CheckCircle className="h-3.5 w-3.5 text-ink-ok shrink-0" />
               <span className="font-medium">{turnoRange.date} · {turnoRange.start}–{turnoRange.end}</span>
               <span className="text-muted-foreground">{turnoRange.durationMin} min · {turnoRange.totalPieces.toLocaleString('es-CL')} piezas</span>

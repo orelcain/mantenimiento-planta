@@ -98,17 +98,17 @@ export function GraderResumenRapido({
           }
           <span className="text-sm font-semibold">Resumen del turno</span>
           {criticals.length > 0 && (
-            <Badge className="bg-red-500/[0.15] text-ink-crit border-red-500/[0.25] text-xs font-medium">
+            <Badge className="bg-red-500/[0.15] text-ink-crit border-transparent text-xs font-medium">
               {criticals.length} crítico{criticals.length > 1 ? 's' : ''}
             </Badge>
           )}
           {warns.length > 0 && (
-            <Badge className="bg-amber-500/[0.15] text-ink-warn border-amber-500/[0.25] text-xs font-medium">
+            <Badge className="bg-amber-500/[0.15] text-ink-warn border-transparent text-xs font-medium">
               {warns.length} alerta{warns.length > 1 ? 's' : ''}
             </Badge>
           )}
           {p0Status === 'ok' && insights.length === 0 && (
-            <Badge className="bg-emerald-500/[0.15] text-ink-ok border-emerald-500/[0.25] text-xs">
+            <Badge className="bg-emerald-500/[0.15] text-ink-ok border-transparent text-xs">
               Todo en orden
             </Badge>
           )}
@@ -263,8 +263,8 @@ export function GraderResumenRapido({
               className={cn(
                 'flex items-start gap-2 rounded-ctl px-3 py-2',
                 insight.severity === 'critical'
-                  ? 'bg-red-500/[0.15] border border-red-500/[0.25]'
-                  : 'bg-amber-500/[0.15] border border-amber-500/[0.25]',
+                  ? 'bg-red-500/[0.15] border border-transparent'
+                  : 'bg-amber-500/[0.15] border border-transparent',
               )}
             >
               <AlertTriangle

@@ -903,9 +903,9 @@ export function CalendarioMantencionPage() {
   }, [dayCols, syncCalendarToFirebase, buildLocalPayload])
 
   const syncIndicator = useMemo(() => {
-    if (syncState === 'saving') return { label: 'Guardando…', className: 'bg-amber-500/[0.15] text-ink-warn border-amber-500/[0.25]' }
-    if (syncState === 'synced') return { label: `Sincronizado${lastSyncAt ? ` ${lastSyncAt.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}` : ''}`, className: 'bg-emerald-500/[0.15] text-ink-ok border-emerald-500/[0.25]' }
-    if (syncState === 'error') return { label: `Sin subir${syncErrorText ? `: ${syncErrorText}` : ''}`, className: 'bg-red-500/[0.15] text-ink-crit border-red-500/[0.25]' }
+    if (syncState === 'saving') return { label: 'Guardando…', className: 'bg-amber-500/[0.15] text-ink-warn border-transparent' }
+    if (syncState === 'synced') return { label: `Sincronizado${lastSyncAt ? ` ${lastSyncAt.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}` : ''}`, className: 'bg-emerald-500/[0.15] text-ink-ok border-transparent' }
+    if (syncState === 'error') return { label: `Sin subir${syncErrorText ? `: ${syncErrorText}` : ''}`, className: 'bg-red-500/[0.15] text-ink-crit border-transparent' }
     return { label: 'Sin cambios', className: 'bg-muted text-muted-foreground border-border' }
   }, [lastSyncAt, syncErrorText, syncState])
 
@@ -1571,9 +1571,9 @@ export function CalendarioMantencionPage() {
 
   function turnoBadgeClass(turno: string): string {
     const key = turno.trim().toUpperCase()
-    if (key === 'A') return 'border-cat-7-tint/[0.25] bg-cat-7-tint/[0.15] text-cat-7-ink'
-    if (key === 'B') return 'border-amber-500/[0.25] bg-amber-500/[0.15] text-ink-warn'
-    if (key === 'C') return 'border-cat-6-tint/[0.25] bg-cat-6-tint/[0.15] text-cat-6-ink'
+    if (key === 'A') return 'border-transparent bg-cat-7-tint/[0.15] text-cat-7-ink'
+    if (key === 'B') return 'border-transparent bg-amber-500/[0.15] text-ink-warn'
+    if (key === 'C') return 'border-transparent bg-cat-6-tint/[0.15] text-cat-6-ink'
     return 'border-border bg-muted text-foreground'
   }
 
@@ -2797,12 +2797,12 @@ export function CalendarioMantencionPage() {
                         <td className="px-1.5 py-1 text-center tabular-nums text-muted-foreground">{row.weekFreeDays > 0 ? row.weekFreeDays : <span className="text-muted-foreground">–</span>}</td>
                         {hayAusencias && (<td className="px-1 py-1 text-center">
                           {row.weekVacationDays > 0
-                            ? <span className="inline-block rounded-full border border-primary/[0.25] bg-primary/[0.15] px-1.5 py-[1px] text-caption font-bold tabular-nums text-brand-ink" title={`${dec1(row.weekVacationPaidHours)}h pagadas`}>{row.weekVacationDays}d</span>
+                            ? <span className="inline-block rounded-full border border-transparent bg-primary/[0.15] px-1.5 py-[1px] text-caption font-bold tabular-nums text-brand-ink" title={`${dec1(row.weekVacationPaidHours)}h pagadas`}>{row.weekVacationDays}d</span>
                             : <span className="text-muted-foreground">–</span>}
                         </td>)}
                         {hayAusencias && (<td className="px-1 py-1 text-center">
                           {row.weekHolidayDays > 0
-                            ? <span className="inline-block rounded-full border border-amber-500/[0.25] bg-amber-500/[0.15] px-1.5 py-[1px] text-caption font-bold tabular-nums text-ink-warn" title={`${dec1(row.weekHolidayPaidHours)}h pagadas`}>{row.weekHolidayDays}d</span>
+                            ? <span className="inline-block rounded-full border border-transparent bg-amber-500/[0.15] px-1.5 py-[1px] text-caption font-bold tabular-nums text-ink-warn" title={`${dec1(row.weekHolidayPaidHours)}h pagadas`}>{row.weekHolidayDays}d</span>
                             : <span className="text-muted-foreground">–</span>}
                         </td>)}
                         <td className="border-l-2 border-border/25 px-1.5 py-1 text-right tabular-nums whitespace-nowrap" title={`Trabajo: ${dec1(row.monthWorkedHours)}h · Vac pagadas: ${dec1(row.monthVacationPaidHours)}h · Fer pagados: ${dec1(row.monthHolidayPaidHours)}h · Colación: ${dec1(row.monthBreakHours)}h`}>
@@ -2832,12 +2832,12 @@ export function CalendarioMantencionPage() {
                         <td className="px-1.5 py-1 text-center tabular-nums text-muted-foreground">{row.monthFreeDays > 0 ? row.monthFreeDays : <span className="text-muted-foreground">–</span>}</td>
                         {hayAusencias && (<td className="px-1 py-1 text-center">
                           {row.monthVacationDays > 0
-                            ? <span className="inline-block rounded-full border border-primary/[0.25] bg-primary/[0.15] px-1.5 py-[1px] text-caption font-bold tabular-nums text-brand-ink" title={`${dec1(row.monthVacationPaidHours)}h pagadas`}>{row.monthVacationDays}d</span>
+                            ? <span className="inline-block rounded-full border border-transparent bg-primary/[0.15] px-1.5 py-[1px] text-caption font-bold tabular-nums text-brand-ink" title={`${dec1(row.monthVacationPaidHours)}h pagadas`}>{row.monthVacationDays}d</span>
                             : <span className="text-muted-foreground">–</span>}
                         </td>)}
                         {hayAusencias && (<td className="px-1 py-1 text-center">
                           {row.monthHolidayDays > 0
-                            ? <span className="inline-block rounded-full border border-amber-500/[0.25] bg-amber-500/[0.15] px-1.5 py-[1px] text-caption font-bold tabular-nums text-ink-warn" title={`${dec1(row.monthHolidayPaidHours)}h pagadas`}>{row.monthHolidayDays}d</span>
+                            ? <span className="inline-block rounded-full border border-transparent bg-amber-500/[0.15] px-1.5 py-[1px] text-caption font-bold tabular-nums text-ink-warn" title={`${dec1(row.monthHolidayPaidHours)}h pagadas`}>{row.monthHolidayDays}d</span>
                             : <span className="text-muted-foreground">–</span>}
                         </td>)}
                         <td className="border-l-2 border-border/25 px-1.5 py-1 text-center tabular-nums">

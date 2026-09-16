@@ -383,7 +383,7 @@ export function MinuteDetailDialog({
           <div className="overflow-y-auto flex-1 pr-1 space-y-4">
             {/* Minuto sin rechazos — mensaje positivo cuando todo llegó a destino. */}
             {breakdown.total > 0 && breakdown.p0 === 0 && (
-              <div className="flex items-center gap-2 px-3 py-2 rounded-ctl border border-emerald-500/[0.25] bg-emerald-500/[0.15] text-xs text-ink-ok">
+              <div className="flex items-center gap-2 px-3 py-2 rounded-ctl border border-transparent bg-emerald-500/[0.15] text-xs text-ink-ok">
                 <span className="text-base leading-none">✓</span>
                 <span>Sin rechazos este minuto — las {breakdown.total} piezas llegaron a destino.</span>
               </div>
@@ -394,9 +394,9 @@ export function MinuteDetailDialog({
               <div
                 className={cn(
                   'flex items-start gap-2 px-3 py-2 rounded-ctl border text-xs',
-                  breakdown.p0Status === 'critical' && 'border-cat-5-tint/[0.25] bg-cat-5-tint/[0.15]',
-                  breakdown.p0Status === 'alert'    && 'border-amber-500/[0.25] bg-amber-500/[0.15]',
-                  breakdown.p0Status === 'ok'       && 'border-emerald-500/[0.25] bg-emerald-500/[0.15]',
+                  breakdown.p0Status === 'critical' && 'border-transparent bg-cat-5-tint/[0.15]',
+                  breakdown.p0Status === 'alert'    && 'border-transparent bg-amber-500/[0.15]',
+                  breakdown.p0Status === 'ok'       && 'border-transparent bg-emerald-500/[0.15]',
                 )}
                 title={MATRIX_P0_CAUSES[breakdown.topP0Cause.id].description}
               >
@@ -421,7 +421,7 @@ export function MinuteDetailDialog({
             )}
             {/* Banner de cobertura de data */}
             {breakdown.missingProductiveDetail && (
-              <div className="flex items-start gap-2 px-3 py-2 rounded-ctl border border-amber-500/[0.25] bg-amber-500/[0.15] text-xs text-ink-warn">
+              <div className="flex items-start gap-2 px-3 py-2 rounded-ctl border border-transparent bg-amber-500/[0.15] text-xs text-ink-warn">
                 <Info className="h-4 w-4 shrink-0" />
                 <div className="flex-1">
                   <div className="font-medium">Detalle individual parcial</div>
@@ -448,7 +448,7 @@ export function MinuteDetailDialog({
                       className={cn(
                         'flex items-center gap-2 px-3 py-1.5 rounded-ctl text-sm border',
                         isP0
-                          ? 'border-cat-4-tint/[0.25] bg-cat-4-tint/[0.15]'
+                          ? 'border-transparent bg-cat-4-tint/[0.15]'
                           : 'border-border bg-muted',
                       )}
                     >

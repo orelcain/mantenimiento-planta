@@ -1654,7 +1654,7 @@ export function SensorsPage() {
                   )}
 
                   {!selectedDevice.wifiSsid && !selectedDevice.apSsid && (
-                    <div className="text-xs text-muted-foreground bg-amber-500/[0.15] p-2 rounded-ctl border border-amber-500/[0.25]">
+                    <div className="text-xs text-muted-foreground bg-amber-500/[0.15] p-2 rounded-ctl border border-transparent">
                       <AlertTriangle className="inline size-3.5" /> Este dispositivo no ha reportado información de WiFi aún
                     </div>
                   )}
@@ -1747,7 +1747,7 @@ export function SensorsPage() {
                   
                   {/* Filtros jerárquicos en cascada (padre → hijo) */}
                   {loadingEquipment ? (
-                    <div className="p-4 text-sm bg-primary/[0.15] border border-blue-500/[0.25] rounded-ctl">
+                    <div className="p-4 text-sm bg-primary/[0.15] border border-transparent rounded-ctl">
                       <div className="font-medium text-primary mb-1">
                         <RefreshCw className="inline size-3.5 animate-spin" /> Cargando equipos…
                       </div>
@@ -1756,7 +1756,7 @@ export function SensorsPage() {
                       </div>
                     </div>
                   ) : equipment.length === 0 ? (
-                    <div className="p-4 text-sm bg-amber-500/[0.15] border border-amber-500/[0.25] rounded-ctl">
+                    <div className="p-4 text-sm bg-amber-500/[0.15] border border-transparent rounded-ctl">
                       <div className="font-medium text-ink-warn mb-1">
                         <AlertTriangle className="inline size-3.5" /> No hay equipos disponibles
                       </div>
@@ -2112,7 +2112,7 @@ export function SensorsPage() {
                   {/* Resumen de selección y botones de acción */}
                   <div className="flex flex-col gap-3">
                     {selectedEquipmentId && equipment.find(e => e.id === selectedEquipmentId) && (
-                      <div className="p-3 rounded-ctl bg-primary/10 border border-primary/30">
+                      <div className="p-3 rounded-ctl bg-primary/10 border border-transparent">
                         <div className="text-xs font-medium text-primary mb-1">✓ Equipo seleccionado:</div>
                         <div className="text-sm font-medium">
                           {equipment.find(e => e.id === selectedEquipmentId)?.nombre}
@@ -2148,7 +2148,7 @@ export function SensorsPage() {
                     </div>
 
                     {!selectedEquipmentId && !selectedDevice?.assignedEquipmentId && (
-                      <div className="text-xs text-muted-foreground bg-primary/[0.15] p-2 rounded-ctl border border-blue-500/[0.25]">
+                      <div className="text-xs text-muted-foreground bg-primary/[0.15] p-2 rounded-ctl border border-transparent">
                         <Lightbulb className="inline size-3.5" /> Selecciona un equipo de la lista arriba para asignarlo a este sensor
                       </div>
                     )}
@@ -2162,7 +2162,7 @@ export function SensorsPage() {
                   )}
 
                   {saveOk && (
-                    <div className="text-sm text-ink-ok bg-green-500/[0.15] p-2 rounded-ctl border border-emerald-500/[0.25]">
+                    <div className="text-sm text-ink-ok bg-green-500/[0.15] p-2 rounded-ctl border border-transparent">
                       ✓ {saveOk}
                     </div>
                   )}

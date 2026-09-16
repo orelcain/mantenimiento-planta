@@ -178,7 +178,7 @@ export function HierarchySelector({
 
       {/* Mensaje de validación */}
       {showValidation && !isMinLevelReached && (
-        <div className="flex items-start gap-2 p-3 bg-amber-500/[0.15] border border-amber-500/[0.25] rounded-card">
+        <div className="flex items-start gap-2 p-3 bg-amber-500/[0.15] border border-transparent rounded-card">
           <AlertTriangle className="w-5 h-5 text-ink-warn mt-0.5 flex-shrink-0" />
           <div className="text-sm text-ink-warn">
             Debes seleccionar hasta el nivel <strong>{HIERARCHY_LEVEL_NAMES[minLevel]}</strong> como mínimo para crear la incidencia.
@@ -247,7 +247,7 @@ function LevelSelector({
         <label className="block text-sm font-medium text-muted-foreground mb-1">
           {HIERARCHY_LEVEL_NAMES[nivel]}
         </label>
-        <div className="px-4 py-2.5 bg-blue-500/[0.15] border border-blue-500/[0.25] rounded-card text-ink-info font-medium">
+        <div className="px-4 py-2.5 bg-blue-500/[0.15] border border-transparent rounded-card text-ink-info font-medium">
           ✓ {options[0].label}
         </div>
       </div>

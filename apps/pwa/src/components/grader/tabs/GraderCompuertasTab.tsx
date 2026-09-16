@@ -100,9 +100,9 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                   className={cn(
                     'p-3 rounded-card border flex items-start gap-3',
                     gb.severity === 'critical'
-                      ? 'border-red-500/[0.25] bg-red-500/[0.15]'
+                      ? 'border-transparent bg-red-500/[0.15]'
                       : gb.severity === 'warn'
-                      ? 'border-amber-500/[0.25] bg-amber-500/[0.15]'
+                      ? 'border-transparent bg-amber-500/[0.15]'
                       : 'border-muted bg-muted',
                   )}
                 >

@@ -1825,7 +1825,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
               ) : repEquipoFilter !== 'all' ? (
                 <button
                   onClick={() => { setRepEquipoFilter('all'); setSelectedEquipName('') }}
-                  className="mt-1 inline-flex max-w-full items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-caption font-medium text-brand-ink transition hover:bg-primary/20"
+                  className="mt-1 inline-flex max-w-full items-center gap-1.5 rounded-full border border-transparent bg-primary/10 px-2.5 py-1 text-caption font-medium text-brand-ink transition hover:bg-primary/20"
                   title="Quitar filtro de equipo — ver todos los repuestos del área"
                 >
                   <Cog className="h-3 w-3 shrink-0" /> <span className="truncate">{etiquetaFiltroEquipo}</span> <X className="h-3 w-3 shrink-0 opacity-70" />
@@ -2360,7 +2360,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
 
           <button
             onClick={() => { setCreateTransversal(true); setCreateTargetEquipos(null); setCreateEquipoSel(new Set()); setCreatePicker(false); setCreateEquipoQuery(''); setCreateOpen(true) }}
-            className="flex w-full items-center gap-2 rounded-card border border-primary/40 bg-primary/5 px-3 py-2 text-left transition hover:bg-primary/10"
+            className="flex w-full items-center gap-2 rounded-card border border-transparent bg-primary/5 px-3 py-2 text-left transition hover:bg-primary/10"
           >
             <Boxes className="h-4 w-4 shrink-0 text-primary" />
             <span className="flex min-w-0 flex-col">
@@ -2405,7 +2405,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                   <button
                     key={g.key}
                     onClick={() => setCreateEquipoSel((prev) => { const n = new Set(prev); if (checked) n.delete(g.key); else n.add(g.key); return n })}
-                    className={['flex w-full items-center gap-2 rounded-card border px-3 py-2 text-left text-sm transition', checked ? 'border-primary/50 bg-primary/10' : 'border-border bg-card hover:bg-muted hover:border-primary/40'].join(' ')}
+                    className={['flex w-full items-center gap-2 rounded-card border px-3 py-2 text-left text-sm transition', checked ? 'border-transparent bg-primary/10' : 'border-border bg-card hover:bg-muted hover:border-transparent'].join(' ')}
                   >
                     <span className={['flex h-4 w-4 shrink-0 items-center justify-center rounded-ctl border', checked ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40'].join(' ')}>
                       {checked && <Check className="h-3 w-3" />}
@@ -2571,7 +2571,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                       key={l.name}
                       className={[
                         'flex items-center gap-2 rounded-card border px-3 py-2 text-xs font-medium transition',
-                        inList ? 'border-amber-500/[0.25] bg-amber-500/[0.15] text-ink-warn' : 'border-border bg-card text-foreground',
+                        inList ? 'border-transparent bg-amber-500/[0.15] text-ink-warn' : 'border-border bg-card text-foreground',
                       ].join(' ')}
                     >
                       <button onClick={() => toggleInList(l.name, rk)} className="flex flex-1 items-center gap-2 text-left">

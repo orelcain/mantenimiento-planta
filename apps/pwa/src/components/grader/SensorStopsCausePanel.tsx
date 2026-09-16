@@ -36,10 +36,10 @@ import { shortMachineName } from '@/services/grader/graderMachineNames'
 
 /** Categorías de causa — definen a quién le pertenece el minuto perdido. */
 const CATEGORIAS = [
-  { id: 'mantencion',  label: 'Mantención', icon: Wrench,        cls: 'border-primary/50 bg-primary/15 text-brand-ink' },
-  { id: 'operacion',   label: 'Operación',  icon: Users,         cls: 'border-amber-500/[0.25] bg-amber-500/[0.15] text-ink-warn' },
+  { id: 'mantencion',  label: 'Mantención', icon: Wrench,        cls: 'border-transparent bg-primary/15 text-brand-ink' },
+  { id: 'operacion',   label: 'Operación',  icon: Users,         cls: 'border-transparent bg-amber-500/[0.15] text-ink-warn' },
   { id: 'externo',     label: 'Externo',    icon: CloudOff,      cls: 'border-muted-foreground/[0.10] bg-muted-foreground/[0.10] text-muted-foreground' },
-  { id: 'planificado', label: 'Planificado', icon: CalendarClock, cls: 'border-emerald-500/[0.25] bg-emerald-500/[0.15] text-ink-ok' },
+  { id: 'planificado', label: 'Planificado', icon: CalendarClock, cls: 'border-transparent bg-emerald-500/[0.15] text-ink-ok' },
 ] as const
 
 type Categoria = typeof CATEGORIAS[number]['id']
@@ -272,7 +272,7 @@ export function SensorStopsCausePanel({
             />
           </CardTitle>
           {sinCausa.length > 0 && (
-            <Badge variant="outline" className="text-caption border-amber-500/[0.25] text-ink-warn bg-amber-500/[0.15]">
+            <Badge variant="outline" className="text-caption border-transparent text-ink-warn bg-amber-500/[0.15]">
               {sinCausa.length} sin causa · {Math.round(minutosSinCausa)} min
               {piezasSinCausa > 0 && ` · ≈${piezasSinCausa.toLocaleString('es-CL')} pz`}
             </Badge>
@@ -298,7 +298,7 @@ export function SensorStopsCausePanel({
               key={stop.key}
               className={cn(
                 'rounded-ctl border px-2.5 py-2 text-xs',
-                causaTexto ? 'border-border bg-muted/50' : 'border-amber-500/[0.25] bg-amber-500/[0.06]',
+                causaTexto ? 'border-border bg-muted/50' : 'border-transparent bg-amber-500/[0.06]',
               )}
             >
               <div className="flex items-center gap-2 flex-wrap">
@@ -336,7 +336,7 @@ export function SensorStopsCausePanel({
                 <Button
                   size="sm"
                   variant={causaTexto ? 'ghost' : 'outline'}
-                  className={cn('h-6 px-2 text-caption', !causaTexto && 'border-primary/40 text-brand-ink hover:bg-primary/10')}
+                  className={cn('h-6 px-2 text-caption', !causaTexto && 'border-transparent text-brand-ink hover:bg-primary/10')}
                   onClick={() => (abierto ? setOpenKey(null) : abrir(stop))}
                 >
                   {abierto
