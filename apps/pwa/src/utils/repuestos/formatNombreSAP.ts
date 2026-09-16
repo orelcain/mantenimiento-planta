@@ -251,7 +251,7 @@ export function formatNombreSAP(textoBreve: string | null | undefined): NombreFo
   if (soloParentesis?.[1]) text = soloParentesis[1].trim()
 
   // Regla 3: comillas/apóstrofes sueltos al inicio del texto restante.
-  text = text.replace(/^[\'"`]+\s*/, '')
+  text = text.replace(/^['"`]+\s*/, '')
 
   text = text.replace(/\s+/g, ' ').trim()
 
