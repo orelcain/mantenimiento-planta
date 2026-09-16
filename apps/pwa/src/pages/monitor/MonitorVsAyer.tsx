@@ -188,7 +188,7 @@ export function VsAyerBloque({ r, records, sinConvenio }: {
       {records && (
         // Aire en vez de línea (§38): el espacio separa igual, con menos tinta.
         <div className={r ? 'mt-4' : 'mt-2'}>
-          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+          <p className="text-[10px] text-muted-foreground">
             Contra lo mejor que ya hicimos
             <span className="normal-case tracking-normal"> · {records.muestras} turnos</span>
           </p>

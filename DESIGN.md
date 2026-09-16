@@ -515,7 +515,23 @@ con un script Node local (`writeFileSync` en `utf8`).
 3. ~~Agregar el rol `stat`~~ — hecho 2026-09-15. `text-stat` va siempre con `tabular-nums`.
 4. ~~Implementar `prefers-reduced-transparency`~~ — hecho 2026-09-15 en `index.css`, cubre
    los 84 `backdrop-blur` sin tocar archivos.
-5. **Bajar los 274 `text-[8/9/10px]`** y los ~160 `uppercase` de encabezados.
+5. **Texto diminuto y mayúsculas — estado real medido el 2026-09-16.** Las pantallas de
+   uso diario en el teléfono (home, Incidencias, Calendario, Análisis de Turno, Repuestos)
+   ya están en **0 / 0**. El primitivo `Tag` estaba a 10,88 px y se subió a 11 (671 textos
+   solo en Bodega). Los 281 `text-[8/9/10px]` restantes viven en **editores de mapa y HMI
+   de PC** (`PanelCapasYZonas` 50, `HmiBombeoS2Public` 33, `ShapeEditorDialog` 21…) y el
+   único de teléfono con deuda es `PublicShiftMonitorPage` (16 diminutos + 14 mayúsculas).
+   De las 162 mayúsculas, 109 son el patrón de encabezado iOS 18 (`font-semibold uppercase
+   tracking-wide`): se convierten cambiando clases, sin tocar texto.
+   ⚠️ **Los NOMBRES de repuesto llegan en MAYÚSCULAS desde SAP** ("JUEGO O'RING VITON EN
+   MILIMETROS"): 153 en la pestaña Bodega. Es dato, no CSS, y es lo que da el aspecto de
+   ERP. Corregirlo es un formateador de presentación con protección de siglas (VITON,
+   NFPA, SAP), no una clase — decisión de producto.
+5b. **Bodega (Repuestos) necesita su propio mockup de color**: barra de stock verde sólida
+   en cada tarjeta, borde de estado en el canto de la tarjeta (el anti-patrón de la barra
+   de acento), círculos de KPI con glifo vivo, banda de alertas roja con pills rojas y
+   ámbar, botones de filtro con relleno sólido verde/ámbar/azul. Es la pantalla más ERP de
+   la app y no se arregla a parches.
 6. **Decidir claro frío `#F2F2F7` vs cálido `#EAE7E0`** — abierto desde 2026-08-09.
 7. **Los 228 `<button>` a mano** con 13 alturas distintas (25–64 px). No es un barrido: chips,
    flechas e íconos en tablas no van a 44. Dirigirlo pantalla por pantalla con el medidor de
@@ -528,5 +544,10 @@ con un script Node local (`writeFileSync` en `utf8`).
     Apple) pero son una familia que no existe en iOS. Migrar gana coherencia y pierde
     contraste (`lc-warn` 6.54 → 5.28). Depende de si esa sección tiene identidad propia.
 11. **Decidir si el Grader conserva el toggle sol/luna** o hereda el tema sin atajo.
-12. **`body` sigue en 15 px** en `tailwind.config.js`; el contrato dice 17. Es una ronda con
-    verificación visual propia: mueve todo el texto corrido de la app.
+12. ~~`body` sigue en 15 px~~ — hecho 2026-09-16: `body` 17, `title2` 22, `display` 34,
+    más `subhead` (15) y `callout` (16) nuevos. Verificado en el home a 375 px: 4 de 36
+    títulos de celda saltan de línea (nombres largos de cursos) — iOS envuelve, se acepta.
+13. **Tiles de ícono en el escritorio** (`MobileHomeGrid.tsx` ~línea 296 y el mapa `COLOR`):
+    siguen tintados con el glifo vivo. El móvil ya es neutro. Y el ribbon "en desarrollo"
+    de esa variante está a **6,5 px en mayúsculas** (línea ~274): viola el piso de 11 y la
+    regla de mayúsculas a la vez.

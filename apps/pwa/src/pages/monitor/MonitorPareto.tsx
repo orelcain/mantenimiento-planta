@@ -392,7 +392,7 @@ export function ParetoDeParadas({
         */}
       {serie && serie.serie.length >= 3 && (
         <div className="mt-4">
-          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+          <p className="text-[11px] text-muted-foreground">
             Cómo viene turno a turno
             <span className="normal-case tracking-normal">
               {' '}· % y ≈pz recuperables de cada turno · últimos {serie.serie.length}

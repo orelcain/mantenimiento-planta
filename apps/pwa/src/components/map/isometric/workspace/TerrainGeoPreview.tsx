@@ -1688,7 +1688,7 @@ export function TerrainGeoPreview({
       {/* ── Header + tools ── */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          <p className="text-xs font-semibold text-muted-foreground">
             Vista 3D · Terreno aislado
           </p>
           <p className="text-[11px] text-muted-foreground">

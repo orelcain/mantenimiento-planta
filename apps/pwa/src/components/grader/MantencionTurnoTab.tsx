@@ -47,7 +47,7 @@ const FILL = {
 
 function Cap({ children }: { children: ReactNode }) {
   return (
-    <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
       {children}
     </div>
   )

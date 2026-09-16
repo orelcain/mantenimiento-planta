@@ -93,7 +93,7 @@ export function TerrainEditorModal({
           </div>
 
           <div className="space-y-2">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Herramienta</p>
+            <p className="text-xs font-semibold text-muted-foreground">Herramienta</p>
             <div className="grid grid-cols-5 gap-1.5">
               <Button variant={tool === 'raise' ? 'default' : 'outline'} size="sm" className="h-8 text-[11px]" onClick={() => onToolChange('raise')}>Bulldozer</Button>
               <Button variant={tool === 'lower' ? 'default' : 'outline'} size="sm" className="h-8 text-[11px]" onClick={() => onToolChange('lower')}>Excavadora</Button>
@@ -104,7 +104,7 @@ export function TerrainEditorModal({
           </div>
 
           <div className="space-y-2">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Brocha</p>
+            <p className="text-xs font-semibold text-muted-foreground">Brocha</p>
             <div className="grid grid-cols-5 gap-1.5">
               <Button variant={brushSize === 1 ? 'default' : 'outline'} size="sm" className="h-8 text-xs" onClick={() => onBrushSizeChange(1)}>1×1</Button>
               <Button variant={brushSize === 3 ? 'default' : 'outline'} size="sm" className="h-8 text-xs" onClick={() => onBrushSizeChange(3)}>3×3</Button>
@@ -115,7 +115,7 @@ export function TerrainEditorModal({
           </div>
 
           <div className="space-y-2">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Intensidad</p>
+            <p className="text-xs font-semibold text-muted-foreground">Intensidad</p>
             <div className="grid grid-cols-5 gap-1.5">
               <Button variant={brushStrength === 1 ? 'default' : 'outline'} size="sm" className="h-8 text-xs" onClick={() => onBrushStrengthChange(1)}>1</Button>
               <Button variant={brushStrength === 2 ? 'default' : 'outline'} size="sm" className="h-8 text-xs" onClick={() => onBrushStrengthChange(2)}>2</Button>
@@ -127,7 +127,7 @@ export function TerrainEditorModal({
 
           <div className="space-y-2 rounded-lg border p-3 bg-muted/20">
             <div className="flex items-center justify-between gap-2">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Topes de construcción</p>
+              <p className="text-xs font-semibold text-muted-foreground">Topes de construcción</p>
               <Button variant="outline" size="sm" className="h-7 text-[11px]" onClick={onApplyRecommendedLimits}>
                 Usar -30 / +60
               </Button>
@@ -165,7 +165,7 @@ export function TerrainEditorModal({
 
           {(tool === 'flatten' || tool === 'sample') && (
             <div className="space-y-2 rounded-lg border p-3 bg-muted/20">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Cota de nivelado</p>
+              <p className="text-xs font-semibold text-muted-foreground">Cota de nivelado</p>
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"

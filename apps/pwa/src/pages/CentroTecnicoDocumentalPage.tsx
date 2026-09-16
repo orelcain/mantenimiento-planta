@@ -1760,7 +1760,7 @@ function RecursosRepuestos({ equipment, canEdit, buscarInicial }: { equipment: E
                   aria-expanded={verDespiece}
                   className="flex w-full flex-wrap items-baseline gap-x-2 border-t pt-2 text-left"
                 >
-                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <span className="text-xs font-semibold text-muted-foreground">
                     Despiece sin código · {particion.filasSinCodigo}
                     {filtrando && ` de ${particionTotal.filasSinCodigo}`}
                   </span>

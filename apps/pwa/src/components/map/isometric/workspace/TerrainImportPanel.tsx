@@ -51,7 +51,7 @@ export function TerrainImportPanel({
     <div className="space-y-4 rounded-xl border bg-muted/20 p-4">
       <div className="flex items-center justify-between gap-2">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</p>
+          <p className="text-xs font-semibold text-muted-foreground">{title}</p>
           <p className="mt-1 text-[11px] text-muted-foreground">{description}</p>
         </div>
         <div className="flex items-center gap-2">
@@ -108,7 +108,7 @@ export function TerrainImportPanel({
 
           {(preview || (isImporting && progress) || statusMessage) && (
             <div className="space-y-2 rounded-lg border bg-background/70 p-3">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Previsualizacion</p>
+              <p className="text-[11px] font-semibold text-muted-foreground">Previsualizacion</p>
 
               {preview && (
                 <div className="grid gap-2 text-[11px] text-muted-foreground">

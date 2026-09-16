@@ -208,7 +208,7 @@ function Kpi({
           (es EL rol sancionado en mayúsculas), title1 para el dato — «nunca
           inventar tamaño»: el stat 30/700 no está en la escala del config y el
           rol existente más cercano es title1. */}
-      <div className="flex items-center gap-1.5 text-caption font-semibold uppercase tracking-wide text-muted-foreground">
+      <div className="flex items-center gap-1.5 text-caption font-semibold text-muted-foreground">
         {icon}{label}
       </div>
       <div className="mt-1 flex items-baseline gap-1">
@@ -446,7 +446,7 @@ function EditorPeso({ actual, onGuardar }: {
            («5.200») y tipearlo así es más rápido que «5,2». El storage sigue
            en kg — solo la entrada y la lectura van en g. */
         onClick={() => { setValor(actual != null ? String(Math.round(actual * 1000)) : ''); setAbierto(true); setError(null) }}
-        className="tap-44 ml-1 rounded-full border border-border px-2 py-0.5 text-[10px] hover:bg-muted"
+        className="tap-44 ml-1 rounded-full border border-border px-2 py-0.5 text-caption hover:bg-muted"
       >
         {actual != null ? 'Cambiar peso' : 'Poner peso promedio'}
       </button>
@@ -819,7 +819,7 @@ function EditorCuota({ actual, pesoConocido, onGuardar, conToneladas = true }: {
           setAbierto(true)
           setError(null)
         }}
-        className="tap-44 ml-1 rounded-full border border-border px-2 py-0.5 text-[10px] normal-case tracking-normal hover:bg-muted"
+        className="tap-44 ml-1 rounded-full border border-border px-2 py-0.5 text-caption normal-case tracking-normal hover:bg-muted"
       >
         {actual != null ? 'Cambiar cuota' : 'Poner cuota'}
       </button>
@@ -947,7 +947,7 @@ function EditorSetPoint({ actual, onGuardar }: {
       <button
         type="button"
         onClick={() => { setValor(actual != null ? String(actual) : ''); setAbierto(true); setError(null) }}
-        className="tap-44 rounded-full border border-border px-2 py-0.5 text-[10px] hover:bg-muted"
+        className="tap-44 rounded-full border border-border px-2 py-0.5 text-caption hover:bg-muted"
       >
         Cambiar
       </button>
@@ -967,7 +967,7 @@ function EditorSetPoint({ actual, onGuardar }: {
         type="text"
         value={metodo}
         onChange={(e) => setMetodo(e.target.value)}
-        className="w-52 rounded border border-border bg-background px-1.5 py-0.5 text-[10px]"
+        className="w-52 rounded border border-border bg-background px-1.5 py-0.5 text-caption"
         aria-label="Cómo se midió"
         placeholder="cómo se midió"
       />
@@ -982,14 +982,14 @@ function EditorSetPoint({ actual, onGuardar }: {
           catch { setError('no se pudo guardar') }
           finally { setGuardando(false) }
         }}
-        className="rounded-full bg-sky-600 px-2 py-0.5 text-[10px] font-semibold text-white disabled:opacity-50"
+        className="rounded-full bg-sky-600 px-2 py-0.5 text-caption font-semibold text-white disabled:opacity-50"
       >
         Guardar
       </button>
-      <button type="button" onClick={() => setAbierto(false)} className="text-[10px] text-muted-foreground underline">
+      <button type="button" onClick={() => setAbierto(false)} className="text-caption text-muted-foreground underline">
         cancelar
       </button>
-      {error && <span className="text-[10px] text-red-600 dark:text-red-400">{error}</span>}
+      {error && <span className="text-caption text-red-600 dark:text-red-400">{error}</span>}
     </span>
   )
 }
@@ -1407,7 +1407,7 @@ function Sparkbars({
 
   return (
     <div id="grafico-turno" className="scroll-mt-4 rounded-2xl border border-border bg-card px-4 py-3">
-      <div className="flex items-center justify-between text-[11px] uppercase tracking-wide text-muted-foreground">
+      <div className="flex items-center justify-between text-[11px] text-muted-foreground">
         <span>
           Velocidad de la línea
           <span className="normal-case tracking-normal text-muted-foreground/80"> · tramos de 5 min</span>
@@ -1427,7 +1427,7 @@ function Sparkbars({
         )}
       </div>
 
-      <div className="mt-1 text-[11px] uppercase tracking-wide text-muted-foreground/80">pz/min</div>
+      <div className="mt-1 text-[11px] text-muted-foreground/80">pz/min</div>
 
       {/* ⚠ El eje Y va FUERA del contenedor con scroll y el X adentro: al
           revés, las horas se quedan quietas mientras el gráfico se desplaza y
@@ -1668,7 +1668,7 @@ function Sparkbars({
             ver todo · {fmtDec(zoom)}×
           </button>
         ) : (
-          <span className="ml-auto text-[10px] text-muted-foreground/80">
+          <span className="ml-auto text-caption text-muted-foreground/80">
             pellizca o rueda para acercar
           </span>
         )}
@@ -1849,7 +1849,7 @@ function CierreDelTurno({ cierre, muestras, fuente, plantSlug, shiftName, startA
           <button
             type="button"
             onClick={() => { setValor(fmtWallTime(cierre)); setEditando(true); setError(null) }}
-            className="tap-44 rounded-full border border-border px-2 py-0.5 text-[10px] hover:bg-muted"
+            className="tap-44 rounded-full border border-border px-2 py-0.5 text-caption hover:bg-muted"
           >
             Cambiar
           </button>
@@ -1890,12 +1890,12 @@ function CierreDelTurno({ cierre, muestras, fuente, plantSlug, shiftName, startA
                 catch (e) { setError(e instanceof Error ? e.message : 'No se pudo quitar') }
                 finally { setGuardando(false) }
               }}
-              className="text-[10px] underline underline-offset-2"
+              className="text-caption underline underline-offset-2"
             >
               volver al automático
             </button>
           )}
-          <p className="basis-full text-[10px] text-muted-foreground/80">
+          <p className="basis-full text-caption text-muted-foreground/80">
             Se aplica a todos los turnos «{shiftName}» de esta línea. El monitor tarda
             un ciclo de sync (~5 min) en tomarlo.
           </p>
@@ -2064,7 +2064,7 @@ function RitmoNecesario({
   if (pace.verdict === 'hora-extra') {
     return (
       <div className="mt-2 rounded-xl border border-border bg-muted px-3 py-2">
-        <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
           <Target className="h-3.5 w-3.5" />
           Hora extra · pasado el horario del turno
         </div>
@@ -2162,7 +2162,7 @@ function RitmoNecesario({
           : 'border-border bg-muted'
       }`}
     >
-      <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
         <Target className="h-3.5 w-3.5" />
         {/* Cuál meta, siempre: sin esto no se sabe si el número persigue la
             cuota del turno o lo que el sensor espera, que pueden diferir. */}
@@ -2792,7 +2792,7 @@ function RespuestaMantencion({ m, cerrado, riel, fallaLineaMin, enCurso }: {
 
   return (
     <section className="rounded-card border border-border bg-card p-4">
-      <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
         <Wrench className="h-3 w-3" />
         Mantención · respuesta del turno
       </div>
@@ -3283,7 +3283,7 @@ function CurvasMaquinas({ serie, maquinas, ahoraPorNombre, ahoraAt }: {
         </svg>
         {/* Con fondo: sobre un pico de las curvas el texto era ilegible. */}
         <span
-          className="absolute left-0 top-0 rounded-full px-1 text-[10px] tabular-nums text-muted-foreground/80"
+          className="absolute left-0 top-0 rounded-full px-1 text-caption tabular-nums text-muted-foreground/80"
           style={{ background: 'rgb(var(--card) / 0.8)' }}
         >
           {fmtDec(max)} pz/min
@@ -3367,7 +3367,7 @@ function CurvasMaquinas({ serie, maquinas, ahoraPorNombre, ahoraAt }: {
       {/* El eje X, DENTRO del contenido escalado: horas redondas ubicadas
           por índice de tramo, extremos anclados al borde (centrados, media
           etiqueta queda fuera — gotcha ya pagada). */}
-      <div className="relative mt-0.5 h-4 text-[10px] tabular-nums text-muted-foreground/80">
+      <div className="relative mt-0.5 h-4 text-caption tabular-nums text-muted-foreground/80">
         <span className="absolute left-0">{Number.isFinite(t0) ? horaPlanta(t0) : ''}</span>
         {marcasHora.map((mk) => (
           <span key={mk.label} className="absolute -translate-x-1/2" style={{ left: `${Math.min(92, Math.max(8, mk.x))}%` }}>
@@ -3380,7 +3380,7 @@ function CurvasMaquinas({ serie, maquinas, ahoraPorNombre, ahoraAt }: {
       </div>
       </div>
       </div>
-      <div className="mt-0.5 flex items-center justify-end gap-2 text-[10px] text-muted-foreground/70">
+      <div className="mt-0.5 flex items-center justify-end gap-2 text-caption text-muted-foreground/70">
         {zg.acercado ? (
           <button type="button" onClick={zg.verTodo} className="tap-44 underline decoration-dotted underline-offset-2">
             ver todo el turno
@@ -3792,7 +3792,7 @@ function ReglaDeRitmo({ parte, ahora, ahoraReloj, pedido, turno, setCpm, techoDe
           <BarrasMinuto datos={barras} cerrado={cerrado} />
         ) : serieLinea && serieLinea.length > 1 && seriesMaquinas && seriesMaquinas.length > 1 ? (
           <>
-            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+            <div className="text-[11px] text-muted-foreground">
               Velocidad de cada máquina
             </div>
             {/* Acá se ve QUIÉN bajó la línea y cuándo, no solo cuánto (pedido
@@ -3825,7 +3825,7 @@ function ReglaDeRitmo({ parte, ahora, ahoraReloj, pedido, turno, setCpm, techoDe
   if (parte === 'rango') {
     return (
       <section className="rounded-card border border-border bg-card p-4">
-        <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
           <Gauge className="h-3 w-3" />
           Rango habitual de la línea
         </div>
@@ -3847,7 +3847,7 @@ function ReglaDeRitmo({ parte, ahora, ahoraReloj, pedido, turno, setCpm, techoDe
 
   return (
     <section className="rounded-card border border-border bg-card p-4">
-      <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
         <Gauge className="h-3 w-3" />
         Ritmo de la línea
       </div>
@@ -5948,7 +5948,7 @@ export function PublicShiftMonitorPage() {
               <span className="tabular-nums">
                 {fmtWallTime(inicioReal)}&nbsp;&#8594;&nbsp;{fmtWallTime(live.plannedEnd)}
                 {live.plannedEndSource !== 'fijado' && (
-                  <span className="ml-1 rounded bg-muted px-1 py-px text-[10px] uppercase tracking-wide text-muted-foreground">
+                  <span className="ml-1 rounded bg-muted px-1 py-px text-caption text-muted-foreground">
                     est.
                   </span>
                 )}
@@ -6157,7 +6157,7 @@ export function PublicShiftMonitorPage() {
         {/* Piezas acumuladas — el número que vienen a ver */}
         <TarjetaTablero id="resultado" t={tablero}>
         <section className="rounded-2xl border border-border bg-gradient-to-b from-primary/[0.08] to-transparent px-4 py-4">
-          <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
             <Activity className="h-3 w-3" />
             {/* Cerrado, la tarjeta cambia de pregunta: ya no es «cuántas van»
                 sino «cómo quedó» — todo lo que cuelga de ella habla en pasado. */}
@@ -6398,7 +6398,7 @@ export function PublicShiftMonitorPage() {
                 )
               })()}
               {banda && (
-                <p className="pantalla-oculta mt-1 text-[10.5px] leading-snug text-muted-foreground/80">
+                <p className="pantalla-oculta mt-1 text-caption leading-snug text-muted-foreground/80">
                   La banda gris es lo que esta línea cierra normalmente{' '}
                   (<span className="tabular-nums">{fmtInt(banda.cierres.min)}–{fmtInt(banda.cierres.max)}</span>
                   , últimos {banda.muestras} turnos)
@@ -7087,7 +7087,7 @@ export function PublicShiftMonitorPage() {
         {/* Desglose por máquina — solo aporta cuando la línea tiene más de una */}
         {live.machines.length > 1 && (
           <section className="rounded-2xl border border-border bg-card px-4 py-3">
-            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Por máquina</div>
+            <div className="text-[11px] text-muted-foreground">Por máquina</div>
             <ul className="mt-2 space-y-2">
               {live.machines.map(m => (
                 <li key={m.id} className="flex items-center gap-3 text-sm">

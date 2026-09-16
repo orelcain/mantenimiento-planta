@@ -2336,7 +2336,7 @@ export function MapPage() {
             <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
               <div className="grid flex-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <div className="space-y-1">
-                  <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Mapa actual</div>
+                  <div className="text-[11px] font-semibold text-muted-foreground">Mapa actual</div>
                   <select
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                     value={currentMapId}
@@ -2352,7 +2352,7 @@ export function MapPage() {
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Nombre</div>
+                  <div className="text-[11px] font-semibold text-muted-foreground">Nombre</div>
                   <Input
                     value={mapName}
                     onChange={(e) => {
@@ -2363,7 +2363,7 @@ export function MapPage() {
                   />
                 </div>
                 <div className="space-y-1 md:col-span-2 xl:col-span-1">
-                  <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Descripción</div>
+                  <div className="text-[11px] font-semibold text-muted-foreground">Descripción</div>
                   <Input
                     value={mapDescription}
                     onChange={(e) => {
@@ -2374,7 +2374,7 @@ export function MapPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Ancho base (m)</div>
+                  <div className="text-[11px] font-semibold text-muted-foreground">Ancho base (m)</div>
                   <Input
                     type="number"
                     min={10}
@@ -2387,7 +2387,7 @@ export function MapPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Profundidad base (m)</div>
+                  <div className="text-[11px] font-semibold text-muted-foreground">Profundidad base (m)</div>
                   <Input
                     type="number"
                     min={10}
@@ -2416,7 +2416,7 @@ export function MapPage() {
             </div>
             <div className="grid gap-3 md:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)_auto]">
               <div className="space-y-1">
-                <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Plano base raster (Firebase Mapas)</div>
+                <div className="text-[11px] font-semibold text-muted-foreground">Plano base raster (Firebase Mapas)</div>
                 <select
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   value={selectedBaseLocationId}
@@ -2430,7 +2430,7 @@ export function MapPage() {
                 </select>
               </div>
               <div className="space-y-1">
-                <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <div className="flex items-center justify-between text-[11px] font-semibold text-muted-foreground">
                   <span>Opacidad plano base</span>
                   <span>{Math.round((backgroundMap?.opacity ?? 0.45) * 100)}%</span>
                 </div>
@@ -2471,7 +2471,7 @@ export function MapPage() {
                 </select>
               </div>
               <div className="space-y-1">
-                <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Estilo visual del plano</div>
+                <div className="text-[11px] font-semibold text-muted-foreground">Estilo visual del plano</div>
                 <select
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   value={(backgroundMap?.displayMode ?? 'soft-light') as BackgroundDisplayMode}
@@ -2495,7 +2495,7 @@ export function MapPage() {
               <>
               <div className="grid gap-3 md:grid-cols-5">
                 <div className="space-y-1">
-                  <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Ancho plano (m)</div>
+                  <div className="text-[11px] font-semibold text-muted-foreground">Ancho plano (m)</div>
                   <Input
                     type="number"
                     min={1}
@@ -2508,7 +2508,7 @@ export function MapPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Profundidad plano (m)</div>
+                  <div className="text-[11px] font-semibold text-muted-foreground">Profundidad plano (m)</div>
                   <Input
                     type="number"
                     min={1}
@@ -2521,7 +2521,7 @@ export function MapPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Offset X (m)</div>
+                  <div className="text-[11px] font-semibold text-muted-foreground">Offset X (m)</div>
                   <Input
                     type="number"
                     step={1}
@@ -2533,7 +2533,7 @@ export function MapPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Offset Z (m)</div>
+                  <div className="text-[11px] font-semibold text-muted-foreground">Offset Z (m)</div>
                   <Input
                     type="number"
                     step={1}
@@ -2545,7 +2545,7 @@ export function MapPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Rotación (°)</div>
+                  <div className="text-[11px] font-semibold text-muted-foreground">Rotación (°)</div>
                   <Input
                     type="number"
                     step={1}
