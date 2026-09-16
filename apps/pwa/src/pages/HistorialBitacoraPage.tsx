@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, ClipboardCopy, FileDown, Loader2 } from 'lucide-react'
-import { Button } from '@/components/piel'
+import { Button, Pill } from '@/components/piel'
 import { useToast } from '@/hooks/useToast'
 import { useHistorialBitacora } from '@/hooks/useHistorialBitacora'
 import { BITACORA_PLANTA } from '@/config/bitacora'
@@ -120,14 +120,23 @@ export function HistorialBitacoraVista({ fuente, alAbrirTurno }: { fuente: Fuent
         </p>
         {!cargando && resumen.eventos > 0 && (
           <p className="pt-1 text-footnote text-muted-foreground">
-            {porcentaje(resumen.parteSinDetener)} en ventana (colación, cambio de turno, línea sin producción)
+            {resumen.conImpacto > 0
+              ? `${porcentaje(resumen.parteSinDetener)} en ventana (colación, cambio de turno, línea sin producción)`
+              : 'Ninguno detuvo ni intervino la línea en producción.'}
+            {resumen.turnosSinParada > 0
+              ? ` · ${resumen.turnosSinParada} de ${resumen.turnos} ${resumen.turnos === 1 ? 'turno cerró' : 'turnos cerraron'} sin ninguna parada`
+              : ''}
           </p>
         )}
       </section>
 
-      <section aria-label="Resumen del período" className="grid grid-cols-2 gap-x-4 gap-y-4 rounded-card bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none sm:grid-cols-4">
+      <section aria-label="Resumen del período" className="grid grid-cols-2 gap-x-4 gap-y-4 rounded-card bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none sm:grid-cols-3">
+        {/* Los mismos seis del correo y del PDF: comparar la pantalla con lo
+            pegado en el correo no puede dar de menos (revisión 15-09). */}
+        <Kpi valor={String(resumen.eventos)} etiqueta={resumen.eventos === 1 ? 'evento' : 'eventos'} />
         <Kpi valor={formatoMinutos(resumen.minutosParada)} etiqueta={`de parada (${resumen.conParada})`} tinta={resumen.minutosParada > 0 ? 'text-ink-crit' : undefined} />
         <Kpi valor={resumen.mttrMin == null ? '—' : formatoMinutos(resumen.mttrMin)} etiqueta="MTTR" />
+        <Kpi valor={String(resumen.sinDetener)} etiqueta="sin detener" tinta={resumen.sinDetener > 0 ? 'text-ink-ok' : undefined} />
         <Kpi valor={String(resumen.pendientesCerrados)} etiqueta="pendientes cerrados" tinta={resumen.pendientesCerrados > 0 ? 'text-ink-ok' : undefined} />
         <Kpi valor={String(resumen.pendientesAbiertos)} etiqueta="pendientes abiertos" tinta={resumen.pendientesAbiertos > 0 ? 'text-ink-warn' : undefined} />
       </section>
@@ -164,7 +173,12 @@ export function HistorialBitacoraVista({ fuente, alAbrirTurno }: { fuente: Fuent
                   className='relative flex min-h-[52px] w-full items-center gap-3 px-4 py-2.5 text-left before:absolute before:left-4 before:right-0 before:top-0 before:h-px before:bg-border before:content-[""] first:before:hidden hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary'
                 >
                   <span className="min-w-0 flex-1">
-                    <span className="block text-body font-semibold">{etiquetaCortaTurno(f.turnoId)}</span>
+                    <span className="flex items-center gap-2">
+                      <span className="text-body font-semibold">{etiquetaCortaTurno(f.turnoId)}</span>
+                      {/* Sus números todavía están corriendo: el turno en curso no
+                          se puede leer igual que uno cerrado. */}
+                      {f.enCurso ? <Pill tone="info" dot="pulse">En curso</Pill> : null}
+                    </span>
                     <span className="block text-caption text-muted-foreground">
                       {f.resumen.eventos} {f.resumen.eventos === 1 ? 'evento' : 'eventos'} · {f.resumen.enVentana} sin detener
                       {f.pendientesAbiertos ? ` · ${f.pendientesAbiertos} pendiente${f.pendientesAbiertos === 1 ? '' : 's'}` : ''}
@@ -251,21 +265,29 @@ function TesisConResalte({ resumen }: { resumen: ResumenPeriodo }) {
  */
 function GraficoParadas({ filas }: { filas: readonly FilaTurno[] }) {
   const datos = useMemo(() => [...filas].reverse(), [filas])
-  const max = Math.max(1, ...datos.map((f) => f.resumen.minutosParada))
+  // El máximo REAL para el rótulo; el 1 es solo para no dividir por cero. Antes
+  // el mismo número se mostraba, y una semana sin ninguna parada anunciaba
+  // «máx 1 min», un dato que no existía (revisión 15-09).
+  const maxReal = Math.max(0, ...datos.map((f) => f.resumen.minutosParada))
+  const max = Math.max(1, maxReal)
   if (!datos.length) return null
   return (
     <section aria-label="Minutos de parada por turno" className="rounded-card bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
       <div className="flex items-baseline justify-between">
         <h2 className="text-footnote text-muted-foreground">Minutos de parada por turno</h2>
-        <span className="text-caption tabular-nums text-muted-foreground">máx {formatoMinutos(max)}</span>
+        <span className="text-caption tabular-nums text-muted-foreground">
+          {maxReal > 0 ? `máx ${formatoMinutos(maxReal)}` : 'sin paradas en el período'}
+        </span>
       </div>
-      <div className="mt-2 flex h-24 items-end gap-[3px]">
+      {/* min-w por barra + scroll: con 30 días (hasta 90 turnos) las barras
+          quedaban en menos de 1 px y el gráfico se veía vacío. */}
+      <div className="mt-2 flex h-24 items-end gap-[3px] overflow-x-auto">
         {datos.map((f) => {
           const alto = f.resumen.minutosParada > 0 ? Math.max(4, Math.round((f.resumen.minutosParada / max) * 100)) : 3
           return (
             <div
               key={f.turnoId}
-              className={`min-h-[2px] flex-1 rounded-t-[3px] ${f.resumen.minutosParada > 0 ? 'bg-ink-crit' : 'bg-ink-ok'}`}
+              className={`min-h-[2px] min-w-[5px] flex-1 rounded-t-[3px] ${f.resumen.minutosParada > 0 ? 'bg-ink-crit' : 'bg-ink-ok'}`}
               style={{ height: `${alto}%` }}
               title={`${etiquetaCortaTurno(f.turnoId)}: ${f.resumen.conParada ? formatoMinutos(f.resumen.minutosParada) : 'sin paradas'}`}
             />

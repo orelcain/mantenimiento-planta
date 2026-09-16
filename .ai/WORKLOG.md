@@ -5053,3 +5053,29 @@ Una revision adversaria del codigo de entrega de turno encontro 10 bugs; se arre
 - Ademas: la grilla del Historial tenia **scroll horizontal a 375 px** (hijo de grilla con
   `min-width:auto` estirado a 396 px) — medido y corregido con `min-w-0`.
 - 4 pruebas nuevas (50 en total en bitacora).
+
+## 2026-09-15 · Bitacora ronda 9 · Historial: la tesis no puede insinuar paradas que no hubo
+
+Revision adversaria del modulo Historial (10 hallazgos, 3 ALTA). Arreglados los 10.
+
+- **La tesis mentia por implicatura.** Decia "De N intervenciones, M se hicieron sin detener la
+  linea" con N = TODOS los eventos, incluidos los `no-aplica` (rondas, novedades), asi que un
+  periodo con 2 rondas y 1 ajuste en colacion sugeria 2 paradas inexistentes. Ahora el denominador
+  son las intervenciones SOBRE LA LINEA (`conImpacto` = con-parada + en-ventana) y hay frases
+  propias para "ninguno con impacto en produccion" y "todas con la maquina detenida".
+  `parteSinDetener` usa el mismo denominador.
+- **"max 1 min" con cero paradas**: el 1 era la guarda anti-division-por-cero y se filtraba al
+  rotulo. Ahora se muestra el maximo REAL o "sin paradas en el periodo".
+- **Carrera al cambiar de periodo**: el `.finally` no tenia el guard `vivo`, asi que la respuesta
+  del periodo viejo apagaba "cargando" y en esa ventana Copiar/PDF salian con numeros viejos.
+- Consulta acotada por los dos lados (`<= hasta`, evita el evento "de manana" de un reloj
+  adelantado), `orderBy fechaTurno desc` + `limit(1500)` (si se pasa el tope se pierde lo mas
+  viejo, no lo de ayer) y `setError(null)` al empezar.
+- **Turno EN CURSO marcado** (`FilaTurno.enCurso`): pildora en la lista y "(en curso)" en correo
+  y PDF; sus numeros son parciales.
+- Barras con `min-w-[5px]` + `overflow-x-auto`: con 30 dias (hasta 90 turnos) quedaban invisibles.
+- El PDF recupera el codigo de color (rojo parada / verde sin detener) y la pantalla muestra los
+  SEIS KPI del correo (antes 4).
+- `turnosSinParada` (campo sin uso) ahora se muestra: "7 de 30 turnos cerraron sin ninguna parada".
+- Un evento con `turnoId` corrupto ya no suma al total sin aparecer en ninguna fila.
+- 52 pruebas en services/bitacora (2 nuevas, 2 corregidas al comportamiento correcto).

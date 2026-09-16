@@ -1,8 +1,9 @@
 import { textoSeguroPdf } from '@/utils/pdf/textoSeguroPdf'
-import { etiquetaCortaTurno } from './entregaTurno'
 import { porcentaje, tesisDelPeriodo, type FilaTurno, type ResumenPeriodo } from './historialBitacora'
 import { formatoMinutos } from './turnoMantencion'
-import { tituloHistorial } from './historialCorreo'
+import { etiquetaFilaTurno, tituloHistorial } from './historialCorreo'
+
+type RGB = [number, number, number]
 
 /** PDF del período: la misma información del correo, para adjuntar o imprimir. */
 export async function generarPdfHistorial(r: ResumenPeriodo, filas: readonly FilaTurno[], planta: string): Promise<string> {
@@ -32,22 +33,31 @@ export async function generarPdfHistorial(r: ResumenPeriodo, filas: readonly Fil
   }
   y += 2
 
-  const kpis: Array<[string, string]> = [
-    [String(r.eventos), r.eventos === 1 ? 'evento' : 'eventos'],
-    [formatoMinutos(r.minutosParada), `de parada (${r.conParada})`],
-    [r.mttrMin == null ? '-' : formatoMinutos(r.mttrMin), 'MTTR'],
-    [`${r.sinDetener} · ${porcentaje(r.parteSinDetener)}`, 'sin detener'],
-    [String(r.pendientesCerrados), 'pend. cerrados'],
-    [String(r.pendientesAbiertos), 'pend. abiertos'],
+  const TINTA: RGB = [31, 31, 31]
+  const PARADA: RGB = [176, 42, 55]
+  const VENTANA: RGB = [30, 123, 52]
+  // Mismo código de color que la pantalla y el correo: impreso o archivado, el
+  // PDF tiene que señalar lo mismo (revisión 15-09).
+  const kpis: Array<[string, string, RGB]> = [
+    [String(r.eventos), r.eventos === 1 ? 'evento' : 'eventos', TINTA],
+    [formatoMinutos(r.minutosParada), `de parada (${r.conParada})`, r.minutosParada > 0 ? PARADA : TINTA],
+    [r.mttrMin == null ? '-' : formatoMinutos(r.mttrMin), 'MTTR', TINTA],
+    [
+      r.conImpacto > 0 ? `${r.sinDetener} · ${porcentaje(r.parteSinDetener)}` : String(r.sinDetener),
+      'sin detener',
+      r.sinDetener > 0 ? VENTANA : TINTA,
+    ],
+    [String(r.pendientesCerrados), 'pend. cerrados', r.pendientesCerrados > 0 ? VENTANA : TINTA],
+    [String(r.pendientesAbiertos), 'pend. abiertos', TINTA],
   ]
   const ancho = (W - 2 * M) / kpis.length
   pdf.setDrawColor(227, 227, 227)
-  kpis.forEach(([valor, etiqueta], i) => {
+  kpis.forEach(([valor, etiqueta, color], i) => {
     const x = M + i * ancho
     pdf.rect(x, y, ancho, 15)
     pdf.setFont('helvetica', 'bold')
     pdf.setFontSize(11)
-    pdf.setTextColor(31, 31, 31)
+    pdf.setTextColor(color[0], color[1], color[2])
     pdf.text(t(valor), x + 2.5, y + 6.5)
     pdf.setFont('helvetica', 'normal')
     pdf.setFontSize(7.5)
@@ -61,7 +71,7 @@ export async function generarPdfHistorial(r: ResumenPeriodo, filas: readonly Fil
     startY: y,
     head: [['Turno', 'Eventos', 'Parada', 'Sin detener', 'Pendientes']],
     body: filas.map((f) => [
-      t(etiquetaCortaTurno(f.turnoId)),
+      t(etiquetaFilaTurno(f)),
       String(f.resumen.eventos),
       f.resumen.conParada ? t(formatoMinutos(f.resumen.minutosParada)) : '-',
       String(f.resumen.enVentana),

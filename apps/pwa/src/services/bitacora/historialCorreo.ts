@@ -26,6 +26,11 @@ function kpi(valor: string, etiqueta: string, color = C.tinta): string {
   )
 }
 
+/** "Turno tarde 15-09" o "Turno tarde 15-09 (en curso)" si todavía corre. */
+export function etiquetaFilaTurno(f: FilaTurno): string {
+  return f.enCurso ? `${etiquetaCortaTurno(f.turnoId)} (en curso)` : etiquetaCortaTurno(f.turnoId)
+}
+
 export function historialAHtmlCorreo(r: ResumenPeriodo, filas: readonly FilaTurno[], planta: string): string {
   const cabecera =
     `<div style="font-family:${FUENTE};font-size:20px;font-weight:600;color:${C.tinta};">${escaparHtml(tituloHistorial(r))}</div>` +
@@ -37,7 +42,11 @@ export function historialAHtmlCorreo(r: ResumenPeriodo, filas: readonly FilaTurn
     kpi(String(r.eventos), r.eventos === 1 ? 'evento' : 'eventos') +
     kpi(formatoMinutos(r.minutosParada), `de parada (${r.conParada})`, r.minutosParada > 0 ? C.parada : C.tinta) +
     kpi(r.mttrMin == null ? '—' : formatoMinutos(r.mttrMin), 'MTTR') +
-    kpi(`${r.sinDetener} · ${porcentaje(r.parteSinDetener)}`, 'sin detener producción', r.sinDetener > 0 ? C.ventana : C.tinta) +
+    kpi(
+      r.conImpacto > 0 ? `${r.sinDetener} · ${porcentaje(r.parteSinDetener)}` : String(r.sinDetener),
+      'sin detener producción',
+      r.sinDetener > 0 ? C.ventana : C.tinta,
+    ) +
     kpi(String(r.pendientesCerrados), 'pendientes cerrados', r.pendientesCerrados > 0 ? C.ventana : C.tinta) +
     kpi(String(r.pendientesAbiertos), 'pendientes abiertos') +
     `</tr></table>`
@@ -50,7 +59,7 @@ export function historialAHtmlCorreo(r: ResumenPeriodo, filas: readonly FilaTurn
         .join('')}</tr>` +
       filas
         .map((f) =>
-          `<tr>${celda(etiquetaCortaTurno(f.turnoId))}${celda(String(f.resumen.eventos))}${celda(
+          `<tr>${celda(etiquetaFilaTurno(f))}${celda(String(f.resumen.eventos))}${celda(
             f.resumen.conParada ? formatoMinutos(f.resumen.minutosParada) : '—',
             f.resumen.minutosParada > 0 ? `color:${C.parada};` : '',
           )}${celda(String(f.resumen.enVentana))}${celda(
@@ -83,11 +92,11 @@ export function historialATextoPlano(r: ResumenPeriodo, filas: readonly FilaTurn
     tesisDelPeriodo(r),
     `${r.eventos} eventos · ${formatoMinutos(r.minutosParada)} de parada (${r.conParada}) · MTTR ${
       r.mttrMin == null ? '—' : formatoMinutos(r.mttrMin)
-    } · ${r.sinDetener} sin detener (${porcentaje(r.parteSinDetener)}) · ${r.pendientesCerrados} pendientes cerrados · ${r.pendientesAbiertos} abiertos`,
+    } · ${r.sinDetener} sin detener${r.conImpacto > 0 ? ` (${porcentaje(r.parteSinDetener)})` : ''} · ${r.pendientesCerrados} pendientes cerrados · ${r.pendientesAbiertos} abiertos`,
     filas
       .map(
         (f) =>
-          `${etiquetaCortaTurno(f.turnoId)}: ${f.resumen.eventos} eventos · ${
+          `${etiquetaFilaTurno(f)}: ${f.resumen.eventos} eventos · ${
             f.resumen.conParada ? formatoMinutos(f.resumen.minutosParada) : 'sin paradas'
           } · ${f.resumen.enVentana} sin detener${f.pendientesAbiertos ? ` · ${f.pendientesAbiertos} pendiente(s)` : ''}`,
       )
