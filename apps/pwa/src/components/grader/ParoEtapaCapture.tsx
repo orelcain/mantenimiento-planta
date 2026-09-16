@@ -206,7 +206,12 @@ export function ParoEtapaCapture({ plantLineId, areaLabel, onChanged, className 
         )}
 
         <div className="flex items-center gap-3">
-          <Button type="button" onClick={handleSave} disabled={saving} className="bg-red-600 hover:bg-red-600 text-white">
+          {/* Usaba `bg-red-600 text-white`, que pisa el variant con clases
+              crudas: en la piel Apple ese token es el systemRed vivo y daba
+              2.59:1 con texto blanco. El variant `destructive` existe justo
+              para esto (3.80:1). Ver DESIGN.md §3: el tinte vivo no va en
+              rellenos grandes. */}
+          <Button type="button" variant="destructive" onClick={handleSave} disabled={saving}>
             {saving ? <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" />Guardando…</> : <><CheckCircle2 className="h-4 w-4 mr-1.5" />Registrar paro</>}
           </Button>
           {justSaved && <span className="flex items-center gap-1 text-xs text-emerald-400 font-medium"><CheckCircle2 className="h-3.5 w-3.5" /> Registrado</span>}

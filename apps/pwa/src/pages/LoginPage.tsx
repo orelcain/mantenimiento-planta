@@ -286,14 +286,21 @@ export function LoginPage() {
               )}
             </div>
 
+            {/* La FILA completa es el area tactil, como una celda de iOS: el
+                Switch mide 24px de alto y solo no llega a los 44 que pide la
+                constitucion. El Label tiene htmlFor, asi que tocar cualquier
+                parte de la fila conmuta el switch. */}
             {mode === 'login' && (
-              <div className="flex items-center space-x-2 my-2">
-                <Switch 
-                  id="remember-me" 
-                  checked={rememberMe} 
-                  onCheckedChange={setRememberMe} 
+              <div className="my-2 flex min-h-[44px] items-center gap-3">
+                <Switch
+                  id="remember-me"
+                  checked={rememberMe}
+                  onCheckedChange={setRememberMe}
                 />
-                <Label htmlFor="remember-me" className="text-sm font-normal cursor-pointer">
+                <Label
+                  htmlFor="remember-me"
+                  className="flex min-h-[44px] flex-1 cursor-pointer items-center text-sm font-normal"
+                >
                   Mantener sesión iniciada
                 </Label>
               </div>
@@ -327,9 +334,11 @@ export function LoginPage() {
             <div className="absolute inset-0 flex items-center">
               <span className="w-full border-t" />
             </div>
-            <div className="relative flex justify-center text-xs uppercase">
+            {/* Sin `uppercase`: iOS 26 saco las mayusculas de la interfaz
+                (DESIGN.md §2). Quedan solo en codigos y tags tecnicos. */}
+            <div className="relative flex justify-center text-footnote">
               <span className="bg-background px-2 text-muted-foreground">
-                O continúa con
+                o continúa con
               </span>
             </div>
           </div>
@@ -347,7 +356,7 @@ export function LoginPage() {
                 setMode(mode === 'login' ? 'register' : 'login')
                 setError(null)
               }}
-              className="text-sm text-muted-foreground hover:text-primary transition-colors"
+              className="inline-flex min-h-[44px] items-center justify-center rounded-ctl px-3 text-sm text-muted-foreground transition-colors hover:text-brand-ink"
               disabled={isLoading}
             >
               {mode === 'login'

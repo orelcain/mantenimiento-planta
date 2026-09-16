@@ -165,7 +165,15 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
   const [aiTrendRuns, setAiTrendRuns] = useState<AITrendRun[]>([])
   const [aiError, setAiError] = useState<string | null>(null)
   const [aiRawText, setAiRawText] = useState<string | null>(null)
-  const [reportMode, setReportMode] = useState<'light' | 'dark'>('dark')
+  // Hereda el tema de la app en vez de arrancar siempre en oscuro. Este modulo
+  // tenia su PROPIO interruptor de tema (sol/luna), o sea un tercer modo de color
+  // por encima del claro/oscuro de la app: entrabas en claro y el Grader se veia
+  // oscuro igual. En iOS el tema es del sistema, nunca del modulo.
+  // El toggle se conserva a proposito: sirve para presentar o exportar en claro
+  // desde una sesion oscura. Lo que cambia es el punto de partida.
+  const [reportMode, setReportMode] = useState<'light' | 'dark'>(
+    () => (document.documentElement.classList.contains('dark') ? 'dark' : 'light')
+  )
   const [selectedCauseLabel, setSelectedCauseLabel] = useState<string | null>(null)
   const [timeFilterFrom, setTimeFilterFrom] = useState<string>('')
   const [timeFilterTo, setTimeFilterTo] = useState<string>('')
