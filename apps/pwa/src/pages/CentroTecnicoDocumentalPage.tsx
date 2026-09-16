@@ -1238,7 +1238,8 @@ function SerieCampo({ rows, campo }: { rows: Medicion[]; campo: CampoMedicion })
   const x = (i: number) => (n <= 1 ? W / 2 : P + (i / (n - 1)) * (W - 2 * P))
   const y = (v: number) => (max === min ? H / 2 : H - P - ((v - min) / (max - min)) * (H - 2 * P))
   const lineFor = (ctx: Medicion['contexto']) =>
-    pts.filter((p) => p.ctx === ctx).map((p) => `${dec1(x(p.i))},${dec1(y(p.v))}`).join(' ')
+    // Puntos de una polyline SVG: el separador decimal tiene que ser punto.
+    pts.filter((p) => p.ctx === ctx).map((p) => `${x(p.i).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ') // decimal-tecnico
   const last = pts[pts.length - 1]
   return (
     <div className="flex items-center gap-2 py-1">

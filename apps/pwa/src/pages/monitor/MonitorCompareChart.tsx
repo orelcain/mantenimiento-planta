@@ -27,7 +27,6 @@ import { piecesAt, type CompareResult, type PacePoint } from '@/services/shoplog
 import type { ConePoint } from '@/services/shoplogix/monitorForecast'
 import { COLOR_HOY, COLOR_CUOTA, COLOR_REF, FILL_ARRIBA, FILL_ABAJO } from './monitorColors'
 import { useZoomGesto, type Ventana } from './useZoomGesto'
-import { dec2 } from '@/utils/formatoNumeros'
 
 const nf = new Intl.NumberFormat('es-CL')
 const fmtInt = (n: number) => nf.format(Math.round(n || 0))
@@ -229,7 +228,8 @@ export function MonitorCompareChart({ cmp, cerrado, claveSel, onSel, cone, venta
     curve.length === 0
       ? ''
       : curve
-          .map((p, i) => `${i === 0 ? 'M' : 'L'}${dec2(x(p.minutes))},${dec2(y(p.pieces))}`)
+          // Coordenadas de una ruta SVG: con coma, «12,50,30,20» son CUATRO numeros y la linea cruza el grafico.
+          .map((p, i) => `${i === 0 ? 'M' : 'L'}${x(p.minutes).toFixed(2)},${y(p.pieces).toFixed(2)}`) // decimal-tecnico
           .join(' ')
 
   const areaBrecha = (s: { hoy: PacePoint[]; ref: PacePoint[] }) =>
