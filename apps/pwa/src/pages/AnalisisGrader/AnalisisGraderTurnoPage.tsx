@@ -2083,7 +2083,7 @@ export function AnalisisGraderTurnoPage() {
     <div className="container mx-auto p-3 sm:p-4 space-y-4 max-w-[1760px]">
       {/* M18 — Banner offline */}
       {!isOnline && (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-ctl bg-amber-500/[0.15] border border-amber-500/[0.25] text-amber-400 text-sm">
+        <div className="flex items-center gap-2 px-3 py-2 rounded-ctl bg-amber-500/[0.15] border border-amber-500/[0.25] text-ink-warn text-sm">
           <WifiOff className="w-4 h-4 shrink-0" />
           <span>
             Sin conexión — las anotaciones se guardarán localmente y se sincronizarán al reconectarse.
@@ -2164,7 +2164,7 @@ export function AnalisisGraderTurnoPage() {
                     variant="outline"
                     className={`text-caption px-1.5 py-0 shrink-0 ${
                       shiftWindow.status === 'live'
-                        ? 'border-red-500/[0.25] text-red-400'
+                        ? 'border-red-500/[0.25] text-ink-crit'
                         : shiftWindow.status === 'future'
                           ? 'bg-muted text-foreground border-transparent inline-flex items-center gap-1'
                           : 'border-muted-foreground/30 text-muted-foreground'
@@ -2517,7 +2517,7 @@ export function AnalisisGraderTurnoPage() {
       {activeView !== 'gates' && !loading && !summary && shiftWindow?.status === 'live' && !upstreamLine.snapshot && !upstreamLine.loading && (
         <Card className="border-dashed">
           <CardContent className="p-8 flex flex-col items-center gap-3 text-center">
-            <Activity className="w-8 h-8 text-red-400 animate-pulse" />
+            <Activity className="w-8 h-8 text-ink-crit animate-pulse" />
             <p className="font-medium">Turno en curso — sin datos cargados aún</p>
             {hasGraderData ? (
               <>
@@ -2644,14 +2644,14 @@ export function AnalisisGraderTurnoPage() {
                 corta-cabeza, los salmones salen evisecerados con cabeza. */}
             {isClassificationPlant && (
               <div className="flex items-start gap-3 p-3 rounded-card bg-amber-500/[0.15] border border-amber-500/[0.25] dark:bg-amber-500/[0.15] dark:border-amber-500/[0.25]">
-                <Scale className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+                <Scale className="w-4 h-4 text-ink-warn mt-0.5 shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-ink-warn">Marel HG — Corta-cabeza</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     Ingreso manual de captura de la pantalla Marel. Disponible al cargar el Excel Grader.
                   </p>
                 </div>
-                <Badge variant="outline" className="text-caption border-amber-500/[0.25] text-amber-400 shrink-0 mt-0.5">
+                <Badge variant="outline" className="text-caption border-amber-500/[0.25] text-ink-warn shrink-0 mt-0.5">
                   requiere Grader
                 </Badge>
               </div>
@@ -3196,7 +3196,7 @@ export function AnalisisGraderTurnoPage() {
         && upstreamLine.source === 'firestore' && upstreamLine.snapshot && (
         <div className="rounded-card border border-border bg-muted p-3 space-y-2">
           <div className="flex items-center gap-2">
-            <Radio className="w-4 h-4 text-sky-500" />
+            <Radio className="w-4 h-4 text-brand-ink" />
             <span className="text-sm font-medium">Monitor en vivo (link / QR)</span>
           </div>
           <p className="text-[11px] text-muted-foreground">

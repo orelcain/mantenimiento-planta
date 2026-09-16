@@ -153,7 +153,7 @@ function ConfigChangeRow({ snap, isFirst, verdict }: RowProps) {
       <div className="flex flex-col items-center pt-1" title={isSynthetic ? 'Inferido' : 'Registrado manualmente'}>
         {isSynthetic
           ? <Sparkles className="w-3.5 h-3.5 text-cat-7-ink" />
-          : <Wrench className="w-3.5 h-3.5 text-amber-500" />}
+          : <Wrench className="w-3.5 h-3.5 text-ink-warn" />}
       </div>
 
       {/* Hora */}
@@ -181,7 +181,7 @@ function ConfigChangeRow({ snap, isFirst, verdict }: RowProps) {
           )}
           {undetectedChanges > 0 && (
             <span
-              className="inline-flex items-center gap-1 text-caption px-1.5 py-0.5 rounded-full bg-amber-500/[0.15] text-amber-400 border border-amber-500/[0.25] font-medium"
+              className="inline-flex items-center gap-1 text-caption px-1.5 py-0.5 rounded-full bg-amber-500/[0.15] text-ink-warn border border-amber-500/[0.25] font-medium"
               title={`El sistema detectó ~${undetectedChanges} transiciones de configuración durante el turno que no fueron registradas en tiempo real. Si recuerdas los cambios reales (qué gate, qué hora), registralos manualmente con el botón "Cambiar gate" para que el análisis segmentado los reconozca.`}
             >
               <AlertTriangle className="w-2.5 h-2.5" />
@@ -248,7 +248,7 @@ export function ConfigChangeHistory({ shiftDocId, snapshots, timelineBuckets, on
     <Card>
       <CardHeader className="pb-2 flex flex-row items-center justify-between gap-3 space-y-0">
         <CardTitle className="text-base flex items-center gap-2">
-          <Wrench className="w-4 h-4 text-amber-500" />
+          <Wrench className="w-4 h-4 text-ink-warn" />
           Historial de configuración
           {sorted.length > 0 && (
             <Badge variant="outline" className="text-caption font-normal">

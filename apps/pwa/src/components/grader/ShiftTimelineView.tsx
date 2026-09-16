@@ -1466,7 +1466,7 @@ export function ShiftTimelineView({
           <Clock className="w-4 h-4" />
           Timeline del turno
           {shiftWindow.status === 'live' && (
-            <span className="text-xs font-normal text-red-400 animate-pulse">● en vivo</span>
+            <span className="text-xs font-normal text-ink-crit animate-pulse">● en vivo</span>
           )}
           {coverage && (
             <span

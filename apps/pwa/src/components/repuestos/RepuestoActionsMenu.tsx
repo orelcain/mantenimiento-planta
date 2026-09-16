@@ -68,7 +68,7 @@ export function RepuestoActionsMenu({
 
             {onViewSpecs && (
               <DropdownMenuItem onClick={() => onViewSpecs(repuesto)} className="gap-2 cursor-pointer">
-                <ClipboardList className="h-4 w-4 text-blue-500" />
+                <ClipboardList className="h-4 w-4 text-brand-ink" />
                 <span>Ficha Técnica</span>
               </DropdownMenuItem>
             )}
@@ -85,7 +85,7 @@ export function RepuestoActionsMenu({
 
             {(hasPhotos || hasImagenes) && onViewPhotos && (
               <DropdownMenuItem onClick={() => onViewPhotos(repuesto)} className="gap-2 cursor-pointer">
-                <Image className="h-4 w-4 text-emerald-500" />
+                <Image className="h-4 w-4 text-ink-ok" />
                 <span>Fotos de referencia</span>
                 <span className="ml-auto text-caption text-muted-foreground">
                   {(repuesto.fotosReales?.length || 0) + (repuesto.imagenesManual?.length || 0)}
@@ -105,9 +105,9 @@ export function RepuestoActionsMenu({
 
             {onViewInManual && hasVinculos && (
               <DropdownMenuItem onClick={() => onViewInManual(repuesto)} className="gap-2 cursor-pointer">
-                <Eye className="h-4 w-4 text-green-500" />
+                <Eye className="h-4 w-4 text-ink-ok" />
                 <span>Ver en Manual</span>
-                <span className="ml-auto text-caption text-green-400">✓ ubicado</span>
+                <span className="ml-auto text-caption text-ink-ok">✓ ubicado</span>
               </DropdownMenuItem>
             )}
           </>
@@ -126,7 +126,7 @@ export function RepuestoActionsMenu({
             )}
 
             {onRelocate && (
-              <DropdownMenuItem onClick={() => onRelocate(repuesto)} className="gap-2 cursor-pointer text-amber-400 focus:text-amber-400">
+              <DropdownMenuItem onClick={() => onRelocate(repuesto)} className="gap-2 cursor-pointer text-ink-warn focus:text-ink-warn">
                 <ArrowRightLeft className="h-4 w-4" />
                 <span>Reubicar a otra máquina</span>
               </DropdownMenuItem>

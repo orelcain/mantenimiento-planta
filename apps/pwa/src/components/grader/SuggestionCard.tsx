@@ -10,9 +10,9 @@ const SEVERITY_STYLES = {
 } as const
 
 const CONFIDENCE_LABELS = {
-  high:   { label: 'Alta',   color: 'text-emerald-400' },
-  medium: { label: 'Media',  color: 'text-amber-400'   },
-  low:    { label: 'Baja',   color: 'text-red-400'     },
+  high:   { label: 'Alta',   color: 'text-ink-ok' },
+  medium: { label: 'Media',  color: 'text-ink-warn'   },
+  low:    { label: 'Baja',   color: 'text-ink-crit'     },
 } as const
 
 /** Ícono por fuente de la sugerencia. Componentes, no emojis: el emoji cambia

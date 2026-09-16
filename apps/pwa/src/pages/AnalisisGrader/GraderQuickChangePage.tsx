@@ -116,7 +116,7 @@ export function GraderQuickChangePage() {
       {!isClassificationPlant ? (
         <Card className="border-amber-500/[0.25] bg-amber-500/[0.15]">
           <CardContent className="p-6 flex flex-col items-center gap-3 text-center">
-            <AlertCircle className="w-8 h-8 text-amber-400" />
+            <AlertCircle className="w-8 h-8 text-ink-warn" />
             <p className="font-medium">Cambio de gate no aplica</p>
             <p className="text-sm text-muted-foreground">
               <b>{plantLineCfg.label}</b> es planta de eviscerado simplificado — sus
@@ -140,11 +140,11 @@ export function GraderQuickChangePage() {
           {overrideDisplay ? (
             <Card className="border-amber-500/[0.25] bg-amber-500/[0.15]">
               <CardContent className="p-4 flex items-center gap-3">
-                <History className="w-5 h-5 text-amber-400 shrink-0" />
+                <History className="w-5 h-5 text-ink-warn shrink-0" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-semibold capitalize">Turno {shortShift}</span>
-                    <Badge className="bg-amber-500/[0.15] text-amber-400 border-amber-500/[0.25] text-caption">RETROACTIVO</Badge>
+                    <Badge className="bg-amber-500/[0.15] text-ink-warn border-amber-500/[0.25] text-caption">RETROACTIVO</Badge>
                   </div>
                   <div className="text-xs text-muted-foreground mt-0.5">
                     {overrideDisplay.dateKey}
@@ -163,7 +163,7 @@ export function GraderQuickChangePage() {
           ) : (
             <Card className="border-red-500/[0.25] bg-red-500/[0.15]">
               <CardContent className="p-4 flex items-center gap-3">
-                <Activity className="w-5 h-5 text-red-400 animate-pulse shrink-0" />
+                <Activity className="w-5 h-5 text-ink-crit animate-pulse shrink-0" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-semibold capitalize">Turno {shortShift}</span>

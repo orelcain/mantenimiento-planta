@@ -90,7 +90,7 @@ export function GraderSugerenciasTab({
                 <XCircle className="h-4 w-4" />
                 <span className="font-medium">Error de parseo IA</span>
               </div>
-              <p className="mt-1 text-xs text-red-500">{aiError}</p>
+              <p className="mt-1 text-xs text-ink-crit">{aiError}</p>
               {aiRawText && (
                 <pre className="mt-2 p-2 bg-muted rounded-ctl text-xs overflow-auto max-h-40">
                   {aiRawText}

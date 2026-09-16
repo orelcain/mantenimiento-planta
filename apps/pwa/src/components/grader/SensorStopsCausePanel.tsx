@@ -264,7 +264,7 @@ export function SensorStopsCausePanel({
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <CardTitle className="text-sm flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-amber-500" />
+            <AlertTriangle className="w-4 h-4 text-ink-warn" />
             Causa de los paros
             <InfoTooltip
               text={`El sensor mide cuánto y cuándo paró la máquina, pero no por qué. Cada causa anotada acá convierte minutos perdidos en un pareto por responsable — y las de Mantención quedan además en el historial del equipo.\n\nParos de menos de ${MIN_STOP_MIN} min no se listan (son micro-detenciones: se analizan como conjunto, no una por una).`}

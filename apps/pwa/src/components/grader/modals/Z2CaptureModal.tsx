@@ -223,7 +223,7 @@ export function Z2CaptureModal({ open, onOpenChange, currentValues, onApply }: P
             {saving ? (
               <Loader2 className="w-4 h-4 animate-spin mr-2" />
             ) : savedOk ? (
-              <Check className="w-4 h-4 mr-2 text-green-500" />
+              <Check className="w-4 h-4 mr-2 text-ink-ok" />
             ) : null}
             {savedOk ? 'Guardado' : 'Guardar'}
           </Button>

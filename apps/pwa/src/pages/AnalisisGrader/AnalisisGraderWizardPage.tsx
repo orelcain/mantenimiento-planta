@@ -861,9 +861,9 @@ export function AnalisisGraderWizardPage() {
                   {multiDayCounts && multiDayCounts.replace > 0 && (
                     <>
                       {' · '}
-                      <span className="text-emerald-400 font-medium">{multiDayCounts.new} nuevo{multiDayCounts.new !== 1 ? 's' : ''}</span>
+                      <span className="text-ink-ok font-medium">{multiDayCounts.new} nuevo{multiDayCounts.new !== 1 ? 's' : ''}</span>
                       <span className="text-muted-foreground"> · </span>
-                      <span className="text-amber-400 font-medium">{multiDayCounts.replace} reemplazo{multiDayCounts.replace !== 1 ? 's' : ''}</span>
+                      <span className="text-ink-warn font-medium">{multiDayCounts.replace} reemplazo{multiDayCounts.replace !== 1 ? 's' : ''}</span>
                     </>
                   )}
                 </p>

@@ -183,7 +183,7 @@ export function RepuestoGalleryModal({
             >
               <div className="bg-muted p-3 rounded-full mb-3">
                 {uploading ? (
-                  <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+                  <Loader2 className="w-6 h-6 animate-spin text-brand-ink" />
                 ) : (
                   <Camera className="w-6 h-6 text-muted-foreground" />
                 )}

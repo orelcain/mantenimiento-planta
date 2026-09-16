@@ -362,7 +362,7 @@ function MessageBubble({
                 className="p-0.5 rounded-ctl hover:bg-background/50 transition-colors"
                 title={copied ? 'Copiado' : 'Copiar respuesta'}
               >
-                {copied ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+                {copied ? <Check className="w-3 h-3 text-ink-ok" /> : <Copy className="w-3 h-3" />}
               </button>
             )}
             {/* #3 — Botón TTS: leer en voz alta */}
@@ -392,7 +392,7 @@ function MessageBubble({
                   </button>
                   <button
                     onClick={() => handleFeedback('negative')}
-                    className={`p-0.5 rounded-ctl hover:bg-background/50 transition-colors ${showCorrection ? 'text-amber-500' : ''}`}
+                    className={`p-0.5 rounded-ctl hover:bg-background/50 transition-colors ${showCorrection ? 'text-ink-warn' : ''}`}
                     title="Respuesta incorrecta — corregir"
                   >
                     <ThumbsDown className="w-3 h-3" />
@@ -478,13 +478,13 @@ import { dec1 } from '@/utils/formatoNumeros'
 
 function AgentActivityIndicator({ status }: { status: AgentStatusEvent }) {
   const phaseStyles: Record<string, { color: string; animate: boolean }> = {
-    analyzing: { color: 'text-blue-400', animate: true },
+    analyzing: { color: 'text-brand-ink', animate: true },
     selecting: { color: 'text-cat-6-ink', animate: true },
-    calling: { color: 'text-amber-400', animate: true },
-    streaming: { color: 'text-green-400', animate: true },
+    calling: { color: 'text-ink-warn', animate: true },
+    streaming: { color: 'text-ink-ok', animate: true },
     fallback: { color: 'text-cat-4-ink', animate: true },
-    done: { color: 'text-green-500', animate: false },
-    error: { color: 'text-red-400', animate: false },
+    done: { color: 'text-ink-ok', animate: false },
+    error: { color: 'text-ink-crit', animate: false },
   }
   const style = phaseStyles[status.phase] || { color: 'text-muted-foreground', animate: true }
 
@@ -495,7 +495,7 @@ function AgentActivityIndicator({ status }: { status: AgentStatusEvent }) {
           <Loader2 className={`w-3 h-3 animate-spin ${style.color} shrink-0`} />
         )}
         {!style.animate && status.phase === 'done' && (
-          <span className="text-green-500 shrink-0">✓</span>
+          <span className="text-ink-ok shrink-0">✓</span>
         )}
         {status.agentEmoji && (
           <span className="shrink-0">{status.agentEmoji}</span>
@@ -1406,7 +1406,7 @@ export function ChatBot() {
                     onClick={() => setShowAgentSelector(p => !p)}
                     className={`flex items-center gap-1 px-1.5 py-1 rounded-ctl text-caption transition-colors ${
                       selectedAgent
-                        ? 'bg-primary/[0.15] text-blue-400 hover:bg-primary/[0.15]'
+                        ? 'bg-primary/[0.15] text-brand-ink hover:bg-primary/[0.15]'
                         : 'hover:bg-background text-muted-foreground hover:text-foreground'
                     }`}
                     title={selectedAgent ? `Modelo: ${availableAgents().find(a => a.id === selectedAgent)?.name || selectedAgent}` : 'Seleccionar modelo IA (Auto)'}
@@ -1637,7 +1637,7 @@ export function ChatBot() {
                       }}
                       className="flex flex-1 items-center gap-1.5 px-3 py-2 text-left text-xs"
                     >
-                      {item.isTemplate && <Star className="size-3 shrink-0 text-amber-500" aria-label="Plantilla guardada" />}
+                      {item.isTemplate && <Star className="size-3 shrink-0 text-ink-warn" aria-label="Plantilla guardada" />}
                       <span className="truncate">{item.label}</span>
                     </button>
                     {item.isTemplate && (
@@ -1756,7 +1756,7 @@ export function ChatBot() {
                   }
                 }}
                 disabled={!input.trim() || input.trim().startsWith('/') || isLoading}
-                className="p-2 rounded-card bg-muted text-muted-foreground hover:text-amber-500 hover:bg-muted/80 disabled:opacity-30 transition-colors"
+                className="p-2 rounded-card bg-muted text-muted-foreground hover:text-ink-warn hover:bg-muted/80 disabled:opacity-30 transition-colors"
                 title="Guardar como plantilla"
               >
                 <Star className="w-4 h-4" />

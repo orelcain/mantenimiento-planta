@@ -94,11 +94,11 @@ function CorrectionRow({ correction: c, onDelete, onToggle }: {
           <HelpCircle className="mt-0.5 size-2.5 shrink-0" aria-label="Preguntó" />
           <span className="truncate">"{c.userQuery}"</span>
         </div>
-        <div className="flex items-start gap-1 text-red-400 text-caption" title={c.wrongResponse}>
+        <div className="flex items-start gap-1 text-ink-crit text-caption" title={c.wrongResponse}>
           <X className="mt-0.5 size-2.5 shrink-0" aria-label="Respuesta incorrecta" />
           <span className="truncate">{c.wrongResponse.slice(0, 80)}...</span>
         </div>
-        <div className="flex items-start gap-1 text-green-400 text-caption">
+        <div className="flex items-start gap-1 text-ink-ok text-caption">
           <Check className="mt-0.5 size-2.5 shrink-0" aria-label="Respuesta correcta" />
           <span>{c.correctResponse.slice(0, 120)}</span>
         </div>
@@ -282,7 +282,7 @@ export function MissionControlPanel() {
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Radio className={`h-3 w-3 ${autoRefresh ? 'text-green-500 animate-pulse' : 'text-muted-foreground'}`} />
+            <Radio className={`h-3 w-3 ${autoRefresh ? 'text-ink-ok animate-pulse' : 'text-muted-foreground'}`} />
             <button onClick={() => setAutoRefresh(!autoRefresh)} className="hover:underline">
               {autoRefresh ? 'Live' : 'Paused'}
             </button>
@@ -296,7 +296,7 @@ export function MissionControlPanel() {
       {/* ─── KPIs ─── */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <div className="p-3 bg-muted/50 rounded-card text-center">
-          <div className="text-2xl font-bold text-green-500">{onlineCount}</div>
+          <div className="text-2xl font-bold text-ink-ok">{onlineCount}</div>
           <div className="text-xs text-muted-foreground">Agentes Online</div>
         </div>
         <div className="p-3 bg-muted/50 rounded-card text-center">
@@ -310,13 +310,13 @@ export function MissionControlPanel() {
           <div className="text-xs text-muted-foreground">Tokens Hoy</div>
         </div>
         <div className="p-3 bg-muted/50 rounded-card text-center">
-          <div className={`text-2xl font-bold ${successRate >= 90 ? 'text-green-500' : successRate >= 70 ? 'text-amber-500' : 'text-red-500'}`}>
+          <div className={`text-2xl font-bold ${successRate >= 90 ? 'text-ink-ok' : successRate >= 70 ? 'text-ink-warn' : 'text-ink-crit'}`}>
             {successRate}%
           </div>
           <div className="text-xs text-muted-foreground">Tasa Éxito</div>
         </div>
         <div className="p-3 bg-muted/50 rounded-card text-center col-span-2 md:col-span-1">
-          <div className={`text-2xl font-bold ${totalCostUsd > 0 ? 'text-cat-4-ink' : 'text-green-500'}`}>
+          <div className={`text-2xl font-bold ${totalCostUsd > 0 ? 'text-cat-4-ink' : 'text-ink-ok'}`}>
             ${totalCostUsd < 0.01 && totalCostUsd > 0 ? '<0.01' : dec2(totalCostUsd)}
           </div>
           <div className="text-xs text-muted-foreground">Costo Est. USD</div>
@@ -427,11 +427,11 @@ export function MissionControlPanel() {
                 <div key={log.id} className="flex items-center gap-2 text-xs py-1.5 border-b border-border/30 last:border-0">
                   {/* Status icon */}
                   {log.status === 'success' ? (
-                    <CheckCircle2 className="h-3.5 w-3.5 text-green-500 shrink-0" />
+                    <CheckCircle2 className="h-3.5 w-3.5 text-ink-ok shrink-0" />
                   ) : log.status === 'fallback' ? (
-                    <ArrowRightLeft className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                    <ArrowRightLeft className="h-3.5 w-3.5 text-ink-warn shrink-0" />
                   ) : (
-                    <XCircle className="h-3.5 w-3.5 text-red-500 shrink-0" />
+                    <XCircle className="h-3.5 w-3.5 text-ink-crit shrink-0" />
                   )}
 
                   {/* Time */}
@@ -473,7 +473,7 @@ export function MissionControlPanel() {
 
                   {/* Fallback indicator */}
                   {log.status === 'fallback' && log.fallbackTo && (
-                    <span className="text-amber-500" title={`Fallback a ${log.fallbackTo}`}>
+                    <span className="text-ink-warn" title={`Fallback a ${log.fallbackTo}`}>
                       <ArrowRightLeft className="h-3 w-3" />
                     </span>
                   )}
@@ -510,11 +510,11 @@ export function MissionControlPanel() {
               {/* KPIs de aprendizaje */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                 <div className="p-2 bg-muted/50 rounded-card text-center">
-                  <div className="text-lg font-bold text-blue-500">{learningStats.totalFeedback}</div>
+                  <div className="text-lg font-bold text-brand-ink">{learningStats.totalFeedback}</div>
                   <div className="text-caption text-muted-foreground">Feedback Total</div>
                 </div>
                 <div className="p-2 bg-muted/50 rounded-card text-center">
-                  <div className={`text-lg font-bold ${learningStats.satisfactionRate >= 70 ? 'text-green-500' : learningStats.satisfactionRate >= 40 ? 'text-amber-500' : 'text-red-500'}`}>
+                  <div className={`text-lg font-bold ${learningStats.satisfactionRate >= 70 ? 'text-ink-ok' : learningStats.satisfactionRate >= 40 ? 'text-ink-warn' : 'text-ink-crit'}`}>
                     {learningStats.satisfactionRate}%
                   </div>
                   <div className="text-caption text-muted-foreground">Satisfacción</div>
@@ -524,7 +524,7 @@ export function MissionControlPanel() {
                   <div className="text-caption text-muted-foreground">Conocimientos</div>
                 </div>
                 <div className="p-2 bg-muted/50 rounded-card text-center">
-                  <div className="text-lg font-bold text-amber-500">{learningStats.activeCorrections}</div>
+                  <div className="text-lg font-bold text-ink-warn">{learningStats.activeCorrections}</div>
                   <div className="text-caption text-muted-foreground">Correcciones</div>
                 </div>
               </div>
@@ -569,14 +569,14 @@ export function MissionControlPanel() {
               {/* Desglose de métricas */}
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div className="flex items-center gap-2 p-2 bg-green-500/[0.15] rounded-ctl">
-                  <MessageSquare className="h-3.5 w-3.5 text-green-500" />
+                  <MessageSquare className="h-3.5 w-3.5 text-ink-ok" />
                   <div>
                     <div className="font-medium">{learningStats.positiveFeedback} positivos</div>
                     <div className="text-caption text-muted-foreground">Respuestas marcadas útiles</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 p-2 bg-red-500/[0.15] rounded-ctl">
-                  <AlertTriangle className="h-3.5 w-3.5 text-red-500" />
+                  <AlertTriangle className="h-3.5 w-3.5 text-ink-crit" />
                   <div>
                     <div className="font-medium">{learningStats.negativeFeedback} negativos</div>
                     <div className="text-caption text-muted-foreground">Respuestas marcadas incorrectas</div>

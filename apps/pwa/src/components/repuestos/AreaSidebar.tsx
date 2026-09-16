@@ -127,7 +127,7 @@ function EquipmentRow({
             className={[
               'shrink-0 rounded-ctl p-1 transition',
               // En táctil siempre visible (para poder marcar); en mouse, oculta hasta hover de la fila.
-              isFav ? 'text-amber-400' : 'text-muted-foreground/30 opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 hover:text-amber-400',
+              isFav ? 'text-ink-warn' : 'text-muted-foreground/30 opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 hover:text-ink-warn',
             ].join(' ')}
             title={isFav ? 'Quitar de favoritos' : 'Marcar equipo como favorito'}
             aria-label="Equipo favorito"
@@ -227,7 +227,7 @@ function AreaRow({
             className={[
               '-m-2.5 flex size-11 shrink-0 items-center justify-center rounded-full transition',
               // En táctil siempre visible (para poder marcar); en mouse, oculta hasta hover de la fila.
-              isFav ? 'text-amber-400' : 'text-muted-foreground/30 opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 hover:text-amber-400',
+              isFav ? 'text-ink-warn' : 'text-muted-foreground/30 opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 hover:text-ink-warn',
             ].join(' ')}
             title={isFav ? 'Quitar de áreas favoritas' : 'Marcar área como favorita'}
             aria-label="Área favorita"
@@ -392,7 +392,7 @@ export function AreaSidebar({
           {onToggleFavoritesOnly && (
             <button
               onClick={onToggleFavoritesOnly}
-              className={['-m-1.5 flex size-11 shrink-0 items-center justify-center rounded-full transition', favoritesOnly ? 'text-amber-400' : 'text-muted-foreground hover:text-amber-400'].join(' ')}
+              className={['-m-1.5 flex size-11 shrink-0 items-center justify-center rounded-full transition', favoritesOnly ? 'text-ink-warn' : 'text-muted-foreground hover:text-ink-warn'].join(' ')}
               title={favoritesOnly ? 'Ver todo' : 'Ver solo favoritos (áreas y equipos)'}
               aria-label="Solo favoritos"
             >

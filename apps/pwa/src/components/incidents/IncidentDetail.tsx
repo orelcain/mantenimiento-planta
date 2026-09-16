@@ -55,8 +55,8 @@ const STATUS_CONFIG: Record<IncidentStatus, { label: string; icon: any; color: s
   pendiente: { label: 'Pendiente de validación', icon: Clock, color: 'text-warning' },
   confirmada: { label: 'Confirmada', icon: CheckCircle, color: 'text-primary' },
   rechazada: { label: 'Rechazada', icon: XCircle, color: 'text-destructive' },
-  en_proceso: { label: 'En proceso', icon: AlertTriangle, color: 'text-blue-400' },
-  resuelta: { label: 'Resuelta', icon: CheckCircle, color: 'text-green-500' },
+  en_proceso: { label: 'En proceso', icon: AlertTriangle, color: 'text-brand-ink' },
+  resuelta: { label: 'Resuelta', icon: CheckCircle, color: 'text-ink-ok' },
   cerrada: { label: 'Cerrada', icon: CheckCircle, color: 'text-success' },
 }
 
@@ -519,7 +519,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                     </div>
                   </div>
                   {iotData?.source === 'simulated' && (
-                    <Badge variant="outline" className="text-amber-600 border-amber-500/[0.25] bg-amber-500/[0.15]">
+                    <Badge variant="outline" className="text-ink-warn border-amber-500/[0.25] bg-amber-500/[0.15]">
                       Dato simulado
                     </Badge>
                   )}

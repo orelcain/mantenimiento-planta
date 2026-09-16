@@ -228,7 +228,7 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
       </div>
 
       {error && (
-        <p className="flex flex-wrap items-center gap-2 text-sm text-red-500">
+        <p className="flex flex-wrap items-center gap-2 text-sm text-ink-crit">
           {error}
           {faltantes.length > 0 && (
             <button type="button" onClick={() => setIntento((n) => n + 1)}
@@ -271,7 +271,7 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
               <span className="font-mono text-sm font-bold text-foreground">{p.codigo}</span>
               {p.maquina && <span className="rounded-ctl bg-primary/10 px-1.5 py-0.5 text-caption font-medium text-brand-ink">{p.maquina}</span>}
               <button onClick={() => copiar(p.codigo)} className="rounded-ctl p-0.5 text-muted-foreground hover:text-primary" title="Copiar código">
-                {copiado === p.codigo ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+                {copiado === p.codigo ? <Check className="h-3.5 w-3.5 text-ink-ok" /> : <Copy className="h-3.5 w-3.5" />}
               </button>
               {p.cantidad && <span className="rounded-ctl bg-muted px-1.5 py-0.5 text-caption text-muted-foreground">×{p.cantidad} en el conjunto</span>}
               {/* Estado en el maestro: lo que falta sembrar se ve de un vistazo */}
@@ -313,7 +313,7 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
                     title={`Código ${p.proveedor || 'del distribuidor'} — clic para copiar`}
                   >
                     {p.proveedor || 'Distribuidor'}: {p.codigoProveedor}
-                    {copiado === p.codigoProveedor ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
+                    {copiado === p.codigoProveedor ? <Check className="h-3 w-3 text-ink-ok" /> : <Copy className="h-3 w-3" />}
                   </button>
                 )}
                 {p.codigoSap && (
@@ -323,7 +323,7 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
                     title="Código SAP ya creado para esta pieza — clic para copiar"
                   >
                     SAP: {p.codigoSap}
-                    {copiado === p.codigoSap ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
+                    {copiado === p.codigoSap ? <Check className="h-3 w-3 text-ink-ok" /> : <Copy className="h-3 w-3" />}
                   </button>
                 )}
               </div>

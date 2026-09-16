@@ -96,7 +96,7 @@ export function DefaultRoutePage() {
 
       <div className="space-y-1">
         <h1 className="text-2xl font-semibold flex items-center gap-2">
-          <LayoutDashboard className="w-6 h-6 text-emerald-400" />
+          <LayoutDashboard className="w-6 h-6 text-ink-ok" />
           Página de inicio por defecto
         </h1>
         <p className="text-sm text-muted-foreground">

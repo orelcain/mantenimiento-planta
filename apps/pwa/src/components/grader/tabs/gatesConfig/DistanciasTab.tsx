@@ -112,7 +112,7 @@ export function DistanciasTab({ physicalConfig, setPhysicalConfig, updateFlipper
                     {z2TimeSec != null ? `${dec2(z2TimeSec)} s` : '—'}
                   </p>
                   {deltaMm != null && (
-                    <p className={cn('text-caption font-mono', deltaMm < 0 ? 'text-amber-500' : 'text-muted-foreground')}>
+                    <p className={cn('text-caption font-mono', deltaMm < 0 ? 'text-ink-warn' : 'text-muted-foreground')}>
                       {deltaMm > 0 ? '+' : ''}{deltaMm.toFixed(0)} mm
                     </p>
                   )}

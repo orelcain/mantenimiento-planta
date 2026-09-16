@@ -249,7 +249,7 @@ export function LossCascadeCard({
       id: 'externo' as LossBucket, label: '− Externo', sec: totals.externoSec,
       pct: `${dec1(pctOfTurno(totals.externoSec))}% del turno`,
       pct2: `${dec1(pctOfTecho(totals.externoSec))}% del techo`,
-      bg: 'bg-amber-500/[0.15]', text: 'text-amber-500',
+      bg: 'bg-amber-500/[0.15]', text: 'text-ink-warn',
       ringHover: 'hover:ring-amber-400/40', ringActive: 'ring-1 ring-amber-400/70',
       tip: 'Falta MMPP, cumplimiento de cuota, energía — la máquina disponible pero el proceso no la alimentó. NO es pérdida de Mantención. Click para ver sus eventos.',
     },
@@ -573,7 +573,7 @@ export function LossCascadeCard({
                               )}
                               className={cn(
                                 'text-caption px-1 rounded-ctl bg-muted border transition-colors hover:border-amber-500/[0.25] hover:text-foreground',
-                                active ? 'border-amber-500/[0.25] text-amber-400 bg-amber-500/[0.15]' : 'border-border/60 text-muted-foreground',
+                                active ? 'border-amber-500/[0.25] text-ink-warn bg-amber-500/[0.15]' : 'border-border/60 text-muted-foreground',
                               )}
                               title={`Ver solo los eventos de "${c.label}" en ${mn}`}
                             >

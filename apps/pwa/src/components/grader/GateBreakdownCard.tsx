@@ -371,9 +371,9 @@ export function GateBreakdownCard({
               <div className="w-8 shrink-0 text-right">
                 <span className={cn(
                   'text-xs font-semibold tabular-nums',
-                  status === 'saturado'          && 'text-red-400',
-                  status === 'sobredimensionado' && 'text-amber-400',
-                  status === 'optimo'            && 'text-emerald-400',
+                  status === 'saturado'          && 'text-ink-crit',
+                  status === 'sobredimensionado' && 'text-ink-warn',
+                  status === 'optimo'            && 'text-ink-ok',
                   !status                        && (isTop ? 'text-foreground' : 'text-muted-foreground'),
                 )}>
                   G{row.gate}
@@ -480,17 +480,17 @@ export function GateBreakdownCard({
                           </td>
                           <td className={cn(
                             'px-2 py-1.5 text-right tabular-nums font-semibold',
-                            g.status === 'saturado'          && 'text-red-400',
-                            g.status === 'sobredimensionado' && 'text-amber-400',
-                            g.status === 'optimo'            && 'text-emerald-400',
+                            g.status === 'saturado'          && 'text-ink-crit',
+                            g.status === 'sobredimensionado' && 'text-ink-warn',
+                            g.status === 'optimo'            && 'text-ink-ok',
                           )}>
                             {dec1(g.ratio)}×
                           </td>
                           <td className={cn(
                             'px-2 py-1.5',
-                            g.status === 'saturado'          && 'text-red-400',
-                            g.status === 'sobredimensionado' && 'text-amber-400',
-                            g.status === 'optimo'            && 'text-emerald-400',
+                            g.status === 'saturado'          && 'text-ink-crit',
+                            g.status === 'sobredimensionado' && 'text-ink-warn',
+                            g.status === 'optimo'            && 'text-ink-ok',
                           )}>
                             {g.status === 'saturado'           ? '↑ saturado'
                               : g.status === 'sobredimensionado' ? '↓ sobredim.'
@@ -529,7 +529,7 @@ export function GateBreakdownCard({
                             'shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-caption font-bold mt-0.5',
                             isTop
                               ? 'bg-red-500/[0.15] text-ink-crit'
-                              : 'bg-amber-500/[0.15] text-amber-400',
+                              : 'bg-amber-500/[0.15] text-ink-warn',
                           )}>
                             {i + 1}
                           </span>
@@ -541,7 +541,7 @@ export function GateBreakdownCard({
                               </span>
                               <ArrowRight className={cn(
                                 'w-3 h-3 shrink-0',
-                                isTop ? 'text-red-400' : 'text-amber-400',
+                                isTop ? 'text-ink-crit' : 'text-ink-warn',
                               )} />
                               <span className="text-muted-foreground">
                                 <span className="text-foreground/70">{s.fromLabel}</span>
@@ -567,12 +567,12 @@ export function GateBreakdownCard({
                             <div className="text-caption mt-0.5 tabular-nums">
                               <span className="text-muted-foreground/60">Esperado:</span>{' '}
                               <span className={cn(
-                                s.estimate.improvesDestination ? 'text-emerald-400' : 'text-ink-warn',
+                                s.estimate.improvesDestination ? 'text-ink-ok' : 'text-ink-warn',
                               )}>
                                 {s.toLabel} {dec1(s.estimate.destBeforeRatio)}× → {dec1(s.estimate.destAfterRatio)}×
                               </span>
                               {s.estimate.improvesDestination && (
-                                <span className="text-emerald-400 ml-1">(óptimo ✓)</span>
+                                <span className="text-ink-ok ml-1">(óptimo ✓)</span>
                               )}
                               {!s.estimate.improvesDestination && s.estimate.destAfterStatus === 'saturado' && (
                                 <span className="text-ink-warn ml-1">(sigue saturado — considerar mover 2 gates)</span>

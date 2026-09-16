@@ -9,8 +9,8 @@ import { cn } from '@/lib/utils'
 import type { Runbook, RunbookCategory } from '@/services/grader/graderRunbooks'
 
 const CATEGORY_META: Record<RunbookCategory, { label: string; icon: typeof Wrench; color: string }> = {
-  contrastacion: { label: 'Contrastación', icon: Settings, color: 'text-blue-400' },
-  calibracion:   { label: 'Calibración',   icon: Zap,      color: 'text-amber-400' },
+  contrastacion: { label: 'Contrastación', icon: Settings, color: 'text-brand-ink' },
+  calibracion:   { label: 'Calibración',   icon: Zap,      color: 'text-ink-warn' },
   mantencion:    { label: 'Mantención',    icon: Wrench,   color: 'text-cat-4-ink' },
   limpieza:      { label: 'Limpieza',      icon: Droplets, color: 'text-cat-7-ink' },
   troubleshooting: { label: 'Troubleshooting', icon: BookOpen, color: 'text-cat-6-ink' },
@@ -64,7 +64,7 @@ export function RunbookCard({ runbook, compact = false, defaultExpanded = false,
               {meta.label}
             </Badge>
             {runbook.serviceKey && (
-              <Badge variant="outline" className="text-xs px-1.5 py-0 text-amber-400">
+              <Badge variant="outline" className="text-xs px-1.5 py-0 text-ink-warn">
                 Clave: {runbook.serviceKey}
               </Badge>
             )}
@@ -104,7 +104,7 @@ export function RunbookCard({ runbook, compact = false, defaultExpanded = false,
               <div className="mt-1.5 space-y-0.5">
                 {Object.entries(runbook.formula.variables).map(([k, v]) => (
                   <div key={k} className="text-xs text-muted-foreground">
-                    <span className="font-mono text-amber-400">{k}</span>: {v}
+                    <span className="font-mono text-ink-warn">{k}</span>: {v}
                   </div>
                 ))}
               </div>
@@ -127,7 +127,7 @@ export function RunbookCard({ runbook, compact = false, defaultExpanded = false,
                     <CheckCircle2
                       className={cn(
                         'w-4 h-4 transition-colors',
-                        checkedSteps.has(step.order) ? 'text-emerald-400' : 'text-muted-foreground/40',
+                        checkedSteps.has(step.order) ? 'text-ink-ok' : 'text-muted-foreground/40',
                       )}
                     />
                   </button>
@@ -169,7 +169,7 @@ export function RunbookCard({ runbook, compact = false, defaultExpanded = false,
             </p>
             <ul className="space-y-1">
               {runbook.successCriteria.map((c, i) => (
-                <li key={i} className="flex items-start gap-1.5 text-xs text-emerald-400">
+                <li key={i} className="flex items-start gap-1.5 text-xs text-ink-ok">
                   <span>✓</span>
                   <span>{c}</span>
                 </li>

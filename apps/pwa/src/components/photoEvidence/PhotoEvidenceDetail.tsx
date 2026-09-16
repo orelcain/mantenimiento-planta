@@ -749,7 +749,7 @@ export function PhotoEvidenceDetail({
                       <Button
                         size="sm"
                         variant="outline"
-                        className="border-red-500 text-red-600 hover:bg-red-500/[0.15]"
+                        className="border-red-500 text-ink-crit hover:bg-red-500/[0.15]"
                         onClick={handleDeletePair}
                         disabled={isSaving}
                       >
@@ -802,7 +802,7 @@ export function PhotoEvidenceDetail({
                   <div className="space-y-1">
                     <span className="text-muted-foreground">Corregido</span>
                     <p className="flex items-center gap-1">
-                      <CheckCircle className="w-4 h-4 text-green-500" />
+                      <CheckCircle className="w-4 h-4 text-ink-ok" />
                       {safeFormat(evidence.corregidaAt, "d MMM yyyy, HH:mm")}
                     </p>
                     {evidence.corregidoPor && (
@@ -879,7 +879,7 @@ export function PhotoEvidenceDetail({
 
                 <Button
                   variant="outline"
-                  className="text-red-600 hover:bg-red-500/[0.15]"
+                  className="text-ink-crit hover:bg-red-500/[0.15]"
                   onClick={handleDelete}
                   disabled={isDeleting}
                 >

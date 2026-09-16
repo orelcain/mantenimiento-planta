@@ -100,7 +100,7 @@ export function ShiftBreakdownsCard({
           {/* Calidad */}
           {calidadVisible && (
             <div className="space-y-1.5">
-              <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-400">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-ink-ok">
                 <Award className="w-3.5 h-3.5" />
                 Calidad
               </div>
@@ -120,7 +120,7 @@ export function ShiftBreakdownsCard({
           {/* Producto */}
           {productoVisible && (
             <div className="space-y-1.5">
-              <div className="flex items-center gap-1.5 text-xs font-medium text-amber-400">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-ink-warn">
                 <Boxes className="w-3.5 h-3.5" />
                 Producto
               </div>

@@ -1181,11 +1181,11 @@ function MetricChart({
   return (
     <div>
       {tieneVariacion && (
-        <div className={`mb-1 text-xs ${sobreLimite || bajoLimite ? 'font-medium text-red-600' : ''}`}>
+        <div className={`mb-1 text-xs ${sobreLimite || bajoLimite ? 'font-medium text-ink-crit' : ''}`}>
           <span className="font-medium">
             {fmtNum(first.v)} → {fmtNum(last.v)} {campo.unidad}
           </span>{' '}
-          <span className={delta > 0 ? 'text-amber-600' : delta < 0 ? 'text-emerald-600' : 'text-muted-foreground'}>
+          <span className={delta > 0 ? 'text-ink-warn' : delta < 0 ? 'text-ink-ok' : 'text-muted-foreground'}>
             {delta >= 0 ? '▲' : '▼'}{' '}
             {pct != null ? `${delta >= 0 ? '+' : ''}${pct.toFixed(0)}%` : `${delta >= 0 ? '+' : ''}${fmtNum(delta)} ${campo.unidad}`}
           </span>{' '}
@@ -1500,7 +1500,7 @@ function OtBadge({ ot }: { ot?: OtCount }) {
   return (
     <span
       title={`${ot.abiertas} OT abierta(s)${ot.vencidas > 0 ? ` · ${ot.vencidas} vencida(s)` : ''}`}
-      className={`inline-flex items-center gap-0.5 text-caption font-medium ${danger ? 'text-red-600' : 'text-blue-600'}`}
+      className={`inline-flex items-center gap-0.5 text-caption font-medium ${danger ? 'text-ink-crit' : 'text-brand-ink'}`}
     >
       <Wrench className="h-3 w-3" />
       {ot.abiertas}
@@ -2382,9 +2382,9 @@ function ExpedienteDialog({
                         <div
                           className={`font-medium ${
                             pctVida != null && pctVida >= 100
-                              ? 'text-red-600'
+                              ? 'text-ink-crit'
                               : pctVida != null && pctVida >= 70
-                                ? 'text-amber-600'
+                                ? 'text-ink-warn'
                                 : ''
                           }`}
                         >
@@ -2937,7 +2937,7 @@ function AgendaInspecciones({
         return (
           <Card key={b.key}>
             <CardContent className="p-0">
-              <div className={`px-4 py-2 flex items-center justify-between text-sm font-semibold ${danger ? 'text-red-600' : ''}`}>
+              <div className={`px-4 py-2 flex items-center justify-between text-sm font-semibold ${danger ? 'text-ink-crit' : ''}`}>
                 <span>{b.label}</span>
                 <span className="text-xs text-muted-foreground">{items.length}</span>
               </div>
@@ -2964,7 +2964,7 @@ function AgendaInspecciones({
                         {e.nombre} <span className="text-caption text-muted-foreground font-mono">· {e.codigo}</span>
                       </span>
                       <OtBadge ot={otByEquipo.get(e.id)} />
-                      <span className={`text-xs shrink-0 ${dias !== null ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
+                      <span className={`text-xs shrink-0 ${dias !== null ? 'text-ink-crit font-medium' : 'text-muted-foreground'}`}>
                         {dias !== null ? `vencida ${dias} d` : prox ? new Date(prox).toLocaleDateString() : 'sin fecha'}
                       </span>
                       {danger && (
@@ -3039,7 +3039,7 @@ function CtdEquipoCard({
         </div>
         <div className="flex items-center justify-between text-caption">
           <span className="text-muted-foreground">Ficha</span>
-          <span className={pct < 100 ? 'text-amber-600' : 'text-emerald-600'}>{pct > 0 ? `${pct}%` : '—'}</span>
+          <span className={pct < 100 ? 'text-ink-warn' : 'text-ink-ok'}>{pct > 0 ? `${pct}%` : '—'}</span>
         </div>
       </CardContent>
     </Card>

@@ -933,7 +933,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
   const getCvSignal = useCallback((cv: number) => {
     if (cv >= 20) return { label: 'alta', cls: 'text-ink-crit', bar: 'rgba(239,68,68,0.75)' }
     if (cv >= 12) return { label: 'media-alta', cls: 'text-ink-warn', bar: 'rgba(245,158,11,0.75)' }
-    if (cv >= 8) return { label: 'media', cls: 'text-yellow-500', bar: 'rgba(234,179,8,0.75)' }
+    if (cv >= 8) return { label: 'media', cls: 'text-ink-warn', bar: 'rgba(234,179,8,0.75)' }
     return { label: 'baja', cls: 'text-ink-ok', bar: 'rgba(16,185,129,0.75)' }
   }, [])
 
@@ -1297,9 +1297,9 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
         <Card>
           <CardContent className="pt-4 flex items-center gap-3">
             {trend.direction === 'increasing' ? (
-              <TrendingUp className="h-5 w-5 text-red-500" />
+              <TrendingUp className="h-5 w-5 text-ink-crit" />
             ) : trend.direction === 'decreasing' ? (
-              <TrendingDown className="h-5 w-5 text-green-500" />
+              <TrendingDown className="h-5 w-5 text-ink-ok" />
             ) : (
               <Minus className="h-5 w-5 text-muted-foreground" />
             )}

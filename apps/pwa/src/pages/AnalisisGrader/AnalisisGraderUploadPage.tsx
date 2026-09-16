@@ -431,7 +431,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
                   da 4,4:1 en tema claro, bajo el 4,5 que pide AA para 11 px. */}
               {avisos.length > 0
                 ? <AlertTriangle className="h-3.5 w-3.5 text-ink-warn shrink-0" />
-                : <CheckCircle className="h-3.5 w-3.5 text-green-500 shrink-0" />}
+                : <CheckCircle className="h-3.5 w-3.5 text-ink-ok shrink-0" />}
               <Badge className={cn('text-caption h-4 px-1 shrink-0', KIND_COLORS[f.fileMeta.kind])}>
                 {KIND_LABELS[f.fileMeta.kind]}
               </Badge>
@@ -523,7 +523,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
               setError(null)
               if (inputRef.current) inputRef.current.value = ''
             }}
-            className="flex items-center gap-1 px-2 py-1.5 rounded-ctl border border-red-500/[0.25] text-red-500 text-xs font-medium hover:bg-red-500/[0.15] transition-colors"
+            className="flex items-center gap-1 px-2 py-1.5 rounded-ctl border border-red-500/[0.25] text-ink-crit text-xs font-medium hover:bg-red-500/[0.15] transition-colors"
             title="Cancelar — limpia los archivos en cola"
           >
             <X className="h-3 w-3" />

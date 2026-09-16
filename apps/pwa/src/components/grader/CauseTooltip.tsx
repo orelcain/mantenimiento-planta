@@ -115,7 +115,7 @@ export function CauseTooltip({ meta }: Props) {
             </section>
 
             <section>
-              <p className="font-medium text-caption tracking-wide text-emerald-500 mb-0.5">
+              <p className="font-medium text-caption tracking-wide text-ink-ok mb-0.5">
                 Qué hacer
               </p>
               <p>{meta.actionHint}</p>

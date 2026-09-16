@@ -347,14 +347,14 @@ export function MinuteDetailDialog({
             {loading ? (
               <span className="text-muted-foreground">Cargando piezas…</span>
             ) : error ? (
-              <span className="text-red-400">{error}</span>
+              <span className="text-ink-crit">{error}</span>
             ) : (
               <span>
                 <span className="font-medium text-foreground">{breakdown.total} {breakdown.total === 1 ? 'pieza' : 'piezas'}</span>
                 {breakdown.total > 0 && (
                   <>
                     <span className="text-muted-foreground"> · </span>
-                    <span className="text-emerald-400">{breakdown.total - breakdown.p0} OK</span>
+                    <span className="text-ink-ok">{breakdown.total - breakdown.p0} OK</span>
                     <span className="text-muted-foreground"> + </span>
                     <span className={cn(breakdown.p0 > 0 ? 'text-cat-4-ink' : 'text-muted-foreground')}>
                       {breakdown.p0} P0

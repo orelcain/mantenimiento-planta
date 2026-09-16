@@ -166,17 +166,17 @@ function ThresholdEditor({ deviceId, current, onClose }: {
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <p className="text-caption font-medium text-cat-4-ink flex items-center gap-1"><Thermometer className="h-3 w-3" /> Temperatura (°C)</p>
-          {field('Crít. bajo', 'tempCritLow', 'text-red-400')}
-          {field('Adv. bajo', 'tempWarnLow', 'text-amber-400')}
-          {field('Adv. alto', 'tempWarnHigh', 'text-amber-400')}
-          {field('Crít. alto', 'tempCritHigh', 'text-red-400')}
+          {field('Crít. bajo', 'tempCritLow', 'text-ink-crit')}
+          {field('Adv. bajo', 'tempWarnLow', 'text-ink-warn')}
+          {field('Adv. alto', 'tempWarnHigh', 'text-ink-warn')}
+          {field('Crít. alto', 'tempCritHigh', 'text-ink-crit')}
         </div>
         <div className="space-y-1.5">
           <p className="text-caption font-medium text-cat-7-ink flex items-center gap-1"><Droplets className="h-3 w-3" /> Humedad (%)</p>
-          {field('Crít. bajo', 'humCritLow', 'text-blue-400')}
+          {field('Crít. bajo', 'humCritLow', 'text-brand-ink')}
           {field('Adv. bajo', 'humWarnLow', 'text-cat-7-ink')}
           {field('Adv. alto', 'humWarnHigh', 'text-cat-7-ink')}
-          {field('Crít. alto', 'humCritHigh', 'text-blue-400')}
+          {field('Crít. alto', 'humCritHigh', 'text-brand-ink')}
         </div>
       </div>
       <div className="flex justify-end gap-2">
@@ -641,8 +641,8 @@ function TrendSparkline({
           {alertLevel !== 'normal' && (
             <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-caption font-medium animate-pulse ${
               alertLevel === 'critical'
-                ? 'bg-red-500/[0.15] text-red-400 ring-1 ring-red-500/30'
-                : 'bg-amber-500/[0.15] text-amber-400 ring-1 ring-amber-500/30'
+                ? 'bg-red-500/[0.15] text-ink-crit ring-1 ring-red-500/30'
+                : 'bg-amber-500/[0.15] text-ink-warn ring-1 ring-amber-500/30'
             }`}>
               <AlertTriangle className="h-2.5 w-2.5" />
               {alertLevel === 'critical' ? 'Crítico' : 'Advertencia'}
@@ -919,19 +919,19 @@ function FocusModal({ device, equipmentById, readingsByEquipment, backfillByEqui
               {device.deviceId}
               <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-caption font-medium ${
                 isFresh
-                  ? 'bg-emerald-500/[0.15] text-emerald-500 ring-1 ring-emerald-500/30'
+                  ? 'bg-emerald-500/[0.15] text-ink-ok ring-1 ring-emerald-500/30'
                   : 'bg-muted text-muted-foreground ring-1 ring-border'
               }`}>
                 <span className={`h-1.5 w-1.5 rounded-full ${isFresh ? 'bg-emerald-500 animate-pulse' : 'bg-muted-foreground'}`} />
                 {isFresh ? 'Online' : 'Offline'}
               </span>
               {alert === 'critical' && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-red-500/[0.15] px-2 py-0.5 text-caption font-medium text-red-500 ring-1 ring-red-500/30">
+                <span className="inline-flex items-center gap-1 rounded-full bg-red-500/[0.15] px-2 py-0.5 text-caption font-medium text-ink-crit ring-1 ring-red-500/30">
                   <AlertTriangle className="h-3 w-3" /> Crítico
                 </span>
               )}
               {alert === 'warning' && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/[0.15] px-2 py-0.5 text-caption font-medium text-amber-500 ring-1 ring-amber-500/30">
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/[0.15] px-2 py-0.5 text-caption font-medium text-ink-warn ring-1 ring-amber-500/30">
                   <AlertTriangle className="h-3 w-3" /> Warning
                 </span>
               )}
@@ -1069,19 +1069,19 @@ function DeviceCard({ device, equipmentById, readingsByEquipment, backfillByEqui
           <div className="flex items-center gap-2 flex-wrap justify-end">
             <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${
               isFresh
-                ? 'bg-emerald-500/[0.15] text-emerald-500 ring-1 ring-emerald-500/30'
+                ? 'bg-emerald-500/[0.15] text-ink-ok ring-1 ring-emerald-500/30'
                 : 'bg-muted text-muted-foreground ring-1 ring-border'
             }`}>
               <span className={`h-1.5 w-1.5 rounded-full ${isFresh ? 'bg-emerald-500 animate-pulse' : 'bg-muted-foreground'}`} />
               {isFresh ? 'Online' : 'Offline'}
             </span>
             {alert === 'critical' && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-red-500/[0.15] px-2.5 py-0.5 text-xs font-medium text-red-500 ring-1 ring-red-500/30">
+              <span className="inline-flex items-center gap-1 rounded-full bg-red-500/[0.15] px-2.5 py-0.5 text-xs font-medium text-ink-crit ring-1 ring-red-500/30">
                 <AlertTriangle className="h-3 w-3" /> Crítico
               </span>
             )}
             {alert === 'warning' && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/[0.15] px-2.5 py-0.5 text-xs font-medium text-amber-500 ring-1 ring-amber-500/30">
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/[0.15] px-2.5 py-0.5 text-xs font-medium text-ink-warn ring-1 ring-amber-500/30">
                 <AlertTriangle className="h-3 w-3" /> Warning
               </span>
             )}
@@ -1463,7 +1463,7 @@ export function SensorsMonitorPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs text-muted-foreground mb-1">Online</p>
-                <p className="text-2xl font-bold text-emerald-500">{metrics.online}</p>
+                <p className="text-2xl font-bold text-ink-ok">{metrics.online}</p>
               </div>
               <Activity className="h-8 w-8 text-emerald-500/[0.2]" />
             </div>
@@ -1474,7 +1474,7 @@ export function SensorsMonitorPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs text-muted-foreground mb-1">Warning</p>
-                <p className="text-2xl font-bold text-amber-500">{metrics.warning}</p>
+                <p className="text-2xl font-bold text-ink-warn">{metrics.warning}</p>
               </div>
               <AlertTriangle className="h-8 w-8 text-amber-500/[0.2]" />
             </div>
@@ -1485,7 +1485,7 @@ export function SensorsMonitorPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs text-muted-foreground mb-1">Crítico</p>
-                <p className="text-2xl font-bold text-red-500">{metrics.critical}</p>
+                <p className="text-2xl font-bold text-ink-crit">{metrics.critical}</p>
               </div>
               <AlertTriangle className="h-8 w-8 text-red-500/[0.2]" />
             </div>

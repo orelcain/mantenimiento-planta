@@ -233,7 +233,7 @@ export function PhotoEvidencePage() {
               <p className="text-xs text-muted-foreground">Pendientes</p>
             </div>
             <div className="p-2 bg-green-500/[0.15] rounded-card text-center">
-              <p className="text-2xl font-bold text-green-600">{stats.corregidas}</p>
+              <p className="text-2xl font-bold text-ink-ok">{stats.corregidas}</p>
               <p className="text-xs text-muted-foreground">Corregidas</p>
             </div>
             <div className="p-2 bg-cat-6-tint/[0.15] rounded-card text-center">

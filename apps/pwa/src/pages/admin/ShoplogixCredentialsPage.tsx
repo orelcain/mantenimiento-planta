@@ -183,7 +183,7 @@ export function ShoplogixCredentialsPage() {
           <CardTitle className="text-base flex items-center gap-2">
             Estado actual
             {info?.hasPassword && (
-              <span className="inline-flex items-center gap-1 text-xs font-normal text-emerald-400">
+              <span className="inline-flex items-center gap-1 text-xs font-normal text-ink-ok">
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 Activas
               </span>
@@ -217,7 +217,7 @@ export function ShoplogixCredentialsPage() {
           ) : (
             <div className="text-sm text-muted-foreground space-y-2">
               <div className="flex items-start gap-2">
-                <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+                <AlertTriangle className="w-4 h-4 text-ink-warn mt-0.5 shrink-0" />
                 <div>
                   <div className="font-medium text-ink-warn">Sin credenciales configuradas</div>
                   <div className="text-muted-foreground text-xs mt-1">

@@ -218,7 +218,7 @@ export function ShiftQuotaCard({
     : 'bg-fill-critical'
 
   const verdictTextClass =
-    progressPct >= 100 ? 'text-emerald-400'
+    progressPct >= 100 ? 'text-ink-ok'
     : progressPct >= 90 ? 'text-ink-ok'
     : progressPct >= 50 ? 'text-ink-warn'
     : 'text-ink-crit'
@@ -298,14 +298,14 @@ export function ShiftQuotaCard({
                   Faltan <span className="text-foreground font-medium">{fmt(remaining, quota!.unit)}</span>
                 </span>
               ) : (
-                <span className="text-emerald-400 font-medium">Meta alcanzada</span>
+                <span className="text-ink-ok font-medium">Meta alcanzada</span>
               )}
 
               {projected != null && projectedPct != null && shiftWindow.status === 'live' && (
                 <span
                   className={cn(
                     'flex items-center gap-1 ml-auto cursor-help',
-                    willHit ? 'text-emerald-400' : 'text-amber-400',
+                    willHit ? 'text-ink-ok' : 'text-ink-warn',
                   )}
                   title="Proyección al final del turno asumiendo el ritmo actual."
                 >
@@ -329,7 +329,7 @@ export function ShiftQuotaCard({
                 className="flex items-start gap-2 rounded-ctl bg-amber-500/[0.15] border border-amber-500/[0.25] px-2.5 py-1.5"
                 title="Shoplogix reporta más ciclos en las Baader que piezas pesadas en el Grader. Como todas las piezas deberían pasar por el Grader, la diferencia puede ser: Excel parcial, fallas de registro del Marelec, o pérdidas físicas."
               >
-                <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-px" />
+                <AlertTriangle className="w-3.5 h-3.5 text-ink-warn shrink-0 mt-px" />
                 <div className="text-caption text-ink-warn leading-tight">
                   <span className="font-semibold tabular-nums">
                     {Math.round(discrepancy.missing).toLocaleString('es-CL')} piezas sin confirmar

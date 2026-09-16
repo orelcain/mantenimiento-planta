@@ -1054,12 +1054,12 @@ export function MainLayout() {
                     <span
                       className={
                         entry.status === 'synced'
-                          ? 'text-emerald-600'
+                          ? 'text-ink-ok'
                           : entry.status === 'error'
                             ? 'text-destructive'
                             : entry.status === 'conflict'
                               ? 'text-ink-warn'
-                              : 'text-amber-600'
+                              : 'text-ink-warn'
                       }
                     >
                       {entry.status === 'synced'
@@ -1100,10 +1100,10 @@ export function MainLayout() {
                         <span
                           className={
                             item.status === 'done'
-                              ? 'text-emerald-600'
+                              ? 'text-ink-ok'
                               : item.status === 'error'
                                 ? 'text-destructive'
-                                : 'text-amber-600'
+                                : 'text-ink-warn'
                           }
                         >
                           {item.status}

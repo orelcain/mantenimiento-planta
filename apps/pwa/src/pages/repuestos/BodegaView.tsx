@@ -1065,7 +1065,7 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
               <svg viewBox="0 0 36 36" className="h-full w-full -rotate-90">
                 <circle cx="18" cy="18" r="15.5" fill="none" stroke="currentColor" strokeWidth="3" className="text-muted/30" />
                 <circle cx="18" cy="18" r="15.5" fill="none" stroke="currentColor" strokeWidth="3"
-                  className={coberturaPct >= 80 ? 'text-emerald-500' : coberturaPct >= 50 ? 'text-amber-500' : 'text-red-500'}
+                  className={coberturaPct >= 80 ? 'text-ink-ok' : coberturaPct >= 50 ? 'text-ink-warn' : 'text-ink-crit'}
                   strokeDasharray={`${(coberturaPct / 100) * 97.4} ${97.4 - (coberturaPct / 100) * 97.4}`} strokeLinecap="round" />
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">

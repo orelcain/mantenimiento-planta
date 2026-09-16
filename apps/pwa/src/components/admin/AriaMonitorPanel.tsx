@@ -329,7 +329,7 @@ export function AriaMonitorPanel() {
             <div className="mb-4">
               <div className="flex items-center justify-between text-xs mb-1">
                 <span className="text-muted-foreground">Uso promedio vs límite</span>
-                <span className={usedPercent > 80 ? 'text-amber-500 font-medium' : 'text-muted-foreground'}>
+                <span className={usedPercent > 80 ? 'text-ink-warn font-medium' : 'text-muted-foreground'}>
                   {usedPercent}%
                 </span>
               </div>
@@ -361,7 +361,7 @@ export function AriaMonitorPanel() {
                       <span className="text-muted-foreground">/</span>
                       <span className="text-muted-foreground">{userLimit || '∞'}</span>
                       {pct > 80 && (
-                        <AlertTriangle className="h-3 w-3 text-amber-500" />
+                        <AlertTriangle className="h-3 w-3 text-ink-warn" />
                       )}
                     </div>
                     <div className="w-20 h-1.5 rounded-ctl bg-muted overflow-hidden">

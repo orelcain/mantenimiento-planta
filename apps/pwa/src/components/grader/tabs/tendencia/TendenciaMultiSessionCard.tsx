@@ -82,7 +82,7 @@ export function TendenciaMultiSessionCard({ multiSessionInsightsView }: Props) {
                     )}
                   >
                     <div className="flex items-center gap-2 min-w-0">
-                      {isInCurrent && <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />}
+                      {isInCurrent && <AlertTriangle className="h-3 w-3 text-ink-warn shrink-0" />}
                       <span className="truncate">{re.error}</span>
                     </div>
                     <span className="text-caption text-muted-foreground tabular-nums shrink-0">

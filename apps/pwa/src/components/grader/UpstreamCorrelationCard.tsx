@@ -188,7 +188,7 @@ export function UpstreamCorrelationCard({ pauses, snapshot }: Props) {
 
         {summary.upstreamCaused === 0 && coincidentalCount === 0 ? (
           <div className="text-xs text-muted-foreground py-2 flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+            <CheckCircle2 className="w-4 h-4 text-ink-ok" />
             Ninguno de los {pauses.length} paros correlacionó con eventos upstream. Las Baaders estaban corriendo normal → las causas son internas del Grader.
           </div>
         ) : (

@@ -515,7 +515,7 @@ export function PredictivePage() {
                   {filteredEquipment.length} resultado(s)
                 </div>
                 {filteredEquipment.length === 0 && !loadingEquipment && (
-                  <div className="mt-1 text-xs text-amber-600">
+                  <div className="mt-1 text-xs text-ink-warn">
                     No hay equipos con sensor asociado.
                   </div>
                 )}
@@ -558,7 +558,7 @@ export function PredictivePage() {
               <Switch checked={autoCreate} onCheckedChange={setAutoCreate} disabled={testMode} />
             </div>
             {testMode && (
-              <div className="text-xs text-amber-600">
+              <div className="text-xs text-ink-warn">
                 Modo prueba activo: auto-creación deshabilitada.
               </div>
             )}
@@ -640,7 +640,7 @@ export function PredictivePage() {
                 <div className="text-xs text-destructive">{thresholdsError}</div>
               )}
               {thresholdsOk && (
-                <div className="text-xs text-emerald-600">{thresholdsOk}</div>
+                <div className="text-xs text-ink-ok">{thresholdsOk}</div>
               )}
 
               <div className="grid gap-4 lg:grid-cols-2">
@@ -964,7 +964,7 @@ export function PredictivePage() {
                   <Switch checked={testMode} onCheckedChange={setTestMode} />
                 </div>
                 {testMode && (
-                  <div className="text-xs text-amber-600">
+                  <div className="text-xs text-ink-warn">
                     Usando lecturas simuladas.
                   </div>
                 )}

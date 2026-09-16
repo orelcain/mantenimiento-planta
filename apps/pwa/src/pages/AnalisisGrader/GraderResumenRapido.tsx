@@ -79,9 +79,9 @@ export function GraderResumenRapido({
     p0Status === 'warn'     ? 'bg-amber-500/[0.15]' :
                               'bg-emerald-500/[0.15]'
   const p0Color =
-    p0Status === 'critical' ? 'text-red-500' :
-    p0Status === 'warn'     ? 'text-amber-500' :
-                              'text-emerald-500'
+    p0Status === 'critical' ? 'text-ink-crit' :
+    p0Status === 'warn'     ? 'text-ink-warn' :
+                              'text-ink-ok'
 
   // Calibre dominante para mostrar contexto rápido
   const dominant = kpis.dominantCalibre
@@ -93,7 +93,7 @@ export function GraderResumenRapido({
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
           {p0Status === 'ok'
-            ? <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0" />
+            ? <CheckCircle className="h-4 w-4 text-ink-ok shrink-0" />
             : <AlertTriangle className={cn('h-4 w-4 shrink-0', p0Color)} />
           }
           <span className="text-sm font-semibold">Resumen del turno</span>
@@ -270,7 +270,7 @@ export function GraderResumenRapido({
               <AlertTriangle
                 className={cn(
                   'h-3.5 w-3.5 shrink-0 mt-0.5',
-                  insight.severity === 'critical' ? 'text-red-500' : 'text-amber-500',
+                  insight.severity === 'critical' ? 'text-ink-crit' : 'text-ink-warn',
                 )}
               />
               <div className="flex-1 min-w-0">

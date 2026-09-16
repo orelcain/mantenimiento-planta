@@ -84,8 +84,8 @@ export function ProductoTab({
   const verdictColor = overlapping
     ? 'bg-red-500/[0.15] text-ink-crit border-red-500/[0.25]'
     : lengthToSpacingRatio > GAP_THRESHOLDS.ratioWarn
-      ? 'bg-amber-500/[0.15] text-amber-400 border-amber-500/[0.25]'
-      : 'bg-emerald-500/[0.15] text-emerald-400 border-emerald-500/[0.25]'
+      ? 'bg-amber-500/[0.15] text-ink-warn border-amber-500/[0.25]'
+      : 'bg-emerald-500/[0.15] text-ink-ok border-emerald-500/[0.25]'
   const verdictText = overlapping
     ? 'Solapamiento — peces se pisan'
     : lengthToSpacingRatio > GAP_THRESHOLDS.ratioWarn
@@ -224,8 +224,8 @@ export function ProductoTab({
           </span>
           <span className="text-caption text-muted-foreground">
             ratio pez/paso: <span className="font-mono">{dec2(lengthToSpacingRatio)}</span>
-            {cadenceSource === 'excel' && <span className="text-emerald-500 ml-1">· cadencia Excel</span>}
-            {cadenceSource === 'historical' && <span className="text-amber-500 ml-1">· cadencia histórica</span>}
+            {cadenceSource === 'excel' && <span className="text-ink-ok ml-1">· cadencia Excel</span>}
+            {cadenceSource === 'historical' && <span className="text-ink-warn ml-1">· cadencia histórica</span>}
             {cadenceSource === 'theoretical' && <span className="ml-1">· cadencia teórica</span>}
           </span>
         </div>
@@ -298,7 +298,7 @@ export function ProductoTab({
           {/* Sub-card B: Reset mecánico cilindro */}
           <div className="rounded-card border border-border bg-muted dark:border-muted-foreground/[0.10] dark:bg-muted-foreground/[0.10] p-3 space-y-2">
             <div className="flex items-center gap-1.5 flex-wrap">
-              <p className="text-xs font-semibold text-amber-400">Reset mecánico cilindro</p>
+              <p className="text-xs font-semibold text-ink-warn">Reset mecánico cilindro</p>
               <span className="inline-flex items-center gap-1 rounded-ctl border px-1 py-0.5 text-caption bg-amber-500/[0.15] text-ink-warn whitespace-nowrap"><AlertTriangle className="h-3 w-3" />Estimado</span>
             </div>
             <div>
@@ -385,9 +385,9 @@ export function ProductoTab({
                 example="Turno saludable: 40–55 pz/min promedio · picos 65–70"
                 position="top"
               />
-              {cadenceSource === 'excel' && <span className="text-caption text-emerald-500">· cadencia real del Excel</span>}
+              {cadenceSource === 'excel' && <span className="text-caption text-ink-ok">· cadencia real del Excel</span>}
               {cadenceSource === 'historical' && (
-                <span className="text-caption text-amber-500">
+                <span className="text-caption text-ink-warn">
                   · histórico {historicalMedianG?.dateKey} {historicalMedianG?.shiftId}
                 </span>
               )}
@@ -406,7 +406,7 @@ export function ProductoTab({
               Gap libre entre peces:{' '}
               <span className={cn(
                 'font-mono font-medium',
-                overlapping ? 'text-red-500' : lengthToSpacingRatio > GAP_THRESHOLDS.ratioWarn ? 'text-amber-500' : 'text-emerald-500',
+                overlapping ? 'text-ink-crit' : lengthToSpacingRatio > GAP_THRESHOLDS.ratioWarn ? 'text-ink-warn' : 'text-ink-ok',
               )}>
                 {(gapM * 100).toFixed(0)} cm
               </span>
@@ -421,13 +421,13 @@ export function ProductoTab({
               />
             </p>
             {overlapping && (
-              <p className="text-caption text-red-500">
+              <p className="text-caption text-ink-crit">
                 El pez ({physicalConfig.avgSalmonLengthCm} cm) es más largo que el paso ({(spacingM * 100).toFixed(0)} cm) → peces se solapan.
                 Con {pocketCountAlt} pockets el gap sube a {dec2(Math.max(0, spacingAlt - salmonLengthM))} m.
               </p>
             )}
             {!overlapping && lengthToSpacingRatio > GAP_THRESHOLDS.ratioWarn && (
-              <p className="text-caption text-amber-500">
+              <p className="text-caption text-ink-warn">
                 Gap libre estrecho. Con {pocketCountAlt} pockets sube a {dec2(Math.max(0, spacingAlt - salmonLengthM))} m.
               </p>
             )}

@@ -2786,13 +2786,13 @@ export function CalendarioMantencionPage() {
                             <div className="flex-1 h-[5px] rounded-full bg-muted overflow-hidden">
                               <div className={`h-full rounded-full transition-all ${wOver ? 'bg-fill-critical' : row.deltaWeek > 0 ? 'bg-cat-4-tint' : 'bg-fill-ok'}`} style={{ width: `${pctW}%` }} />
                             </div>
-                            <span className={`shrink-0 inline-block min-w-[38px] rounded-ctl px-1 py-[1px] text-center text-caption tabular-nums font-bold ${wOver ? 'bg-red-500/[0.15] text-red-400' : row.deltaWeek > 0 ? 'bg-cat-4-tint/[0.15] text-cat-4-ink' : 'bg-muted text-muted-foreground'}`}>
+                            <span className={`shrink-0 inline-block min-w-[38px] rounded-ctl px-1 py-[1px] text-center text-caption tabular-nums font-bold ${wOver ? 'bg-red-500/[0.15] text-ink-crit' : row.deltaWeek > 0 ? 'bg-cat-4-tint/[0.15] text-cat-4-ink' : 'bg-muted text-muted-foreground'}`}>
                               {formatDelta(row.deltaWeek)}
                             </span>
                           </div>
                         </td>
                         <td className="px-1.5 py-1 text-center tabular-nums">
-                          <span className={`font-semibold ${row.weekWorkedDays > 0 ? 'text-emerald-400' : 'text-muted-foreground'}`}>{row.weekWorkedDays}</span>
+                          <span className={`font-semibold ${row.weekWorkedDays > 0 ? 'text-ink-ok' : 'text-muted-foreground'}`}>{row.weekWorkedDays}</span>
                         </td>
                         <td className="px-1.5 py-1 text-center tabular-nums text-muted-foreground">{row.weekFreeDays > 0 ? row.weekFreeDays : <span className="text-muted-foreground">–</span>}</td>
                         {hayAusencias && (<td className="px-1 py-1 text-center">
@@ -2815,7 +2815,7 @@ export function CalendarioMantencionPage() {
                             <div className="flex-1 h-[5px] rounded-full bg-muted overflow-hidden">
                               <div className={`h-full rounded-full transition-all ${mOver ? 'bg-fill-critical' : row.deltaMonth > 0 ? 'bg-cat-4-tint' : 'bg-fill-ok'}`} style={{ width: `${pctM}%` }} />
                             </div>
-                            <span className={`shrink-0 inline-block min-w-[38px] rounded-ctl px-1 py-[1px] text-center text-caption tabular-nums font-bold ${mOver ? 'bg-red-500/[0.15] text-red-400' : row.deltaMonth > 0 ? 'bg-cat-4-tint/[0.15] text-cat-4-ink' : 'bg-muted text-muted-foreground'}`}>
+                            <span className={`shrink-0 inline-block min-w-[38px] rounded-ctl px-1 py-[1px] text-center text-caption tabular-nums font-bold ${mOver ? 'bg-red-500/[0.15] text-ink-crit' : row.deltaMonth > 0 ? 'bg-cat-4-tint/[0.15] text-cat-4-ink' : 'bg-muted text-muted-foreground'}`}>
                               {row.mesCompleto ? (
                                 formatDelta(row.deltaMonth)
                               ) : (
@@ -2827,7 +2827,7 @@ export function CalendarioMantencionPage() {
                           </div>
                         </td>
                         <td className="px-1.5 py-1 text-center tabular-nums">
-                          <span className={`font-semibold ${row.monthWorkedDays > 0 ? 'text-emerald-400' : 'text-muted-foreground'}`}>{row.monthWorkedDays}</span>
+                          <span className={`font-semibold ${row.monthWorkedDays > 0 ? 'text-ink-ok' : 'text-muted-foreground'}`}>{row.monthWorkedDays}</span>
                         </td>
                         <td className="px-1.5 py-1 text-center tabular-nums text-muted-foreground">{row.monthFreeDays > 0 ? row.monthFreeDays : <span className="text-muted-foreground">–</span>}</td>
                         {hayAusencias && (<td className="px-1 py-1 text-center">

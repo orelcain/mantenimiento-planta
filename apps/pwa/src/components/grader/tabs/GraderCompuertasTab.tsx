@@ -107,9 +107,9 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                   )}
                 >
                   {gb.severity === 'critical' ? (
-                    <AlertTriangle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
+                    <AlertTriangle className="h-5 w-5 text-ink-crit shrink-0 mt-0.5" />
                   ) : gb.severity === 'warn' ? (
-                    <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+                    <AlertTriangle className="h-5 w-5 text-ink-warn shrink-0 mt-0.5" />
                   ) : (
                     <Info className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
                   )}
@@ -198,7 +198,7 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
         <Card>
           <CardHeader>
             <CardTitle className="text-sm flex items-center gap-2">
-              <BarChart3 className="h-4 w-4 text-blue-500" />
+              <BarChart3 className="h-4 w-4 text-brand-ink" />
               Estadísticas por Compuerta
               <InfoTooltip {...getTooltipProps('gate.stats')} />
             </CardTitle>
@@ -580,7 +580,7 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                       </td>
                       <td className="py-2 px-2 text-center">
                         {o.isMatch ? (
-                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 inline" />
+                          <CheckCircle2 className="h-3.5 w-3.5 text-ink-ok inline" />
                         ) : o.suggestedCalibre != null ? (
                           <XCircle className="h-3.5 w-3.5 text-cat-6-ink inline" />
                         ) : (

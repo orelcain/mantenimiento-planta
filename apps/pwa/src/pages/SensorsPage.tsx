@@ -2460,7 +2460,7 @@ export function SensorsPage() {
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Activity className="h-5 w-5 text-blue-500" />
+                      <Activity className="h-5 w-5 text-brand-ink" />
                       <CardTitle className="text-base">Intervalo de Lectura</CardTitle>
                     </div>
                     {isIntervalExpanded ? (

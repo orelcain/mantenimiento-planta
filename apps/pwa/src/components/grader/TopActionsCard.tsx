@@ -42,9 +42,9 @@ export function TopActionsCard({ attribution }: Props) {
               const worsened = action.totalDelta > 0
               const Icon = improved ? TrendingDown : worsened ? TrendingUp : Minus
               const iconColor = improved
-                ? 'text-emerald-500'
+                ? 'text-ink-ok'
                 : worsened
-                  ? 'text-red-500'
+                  ? 'text-ink-crit'
                   : 'text-muted-foreground'
               const valueColor = improved
                 ? 'text-ink-ok'

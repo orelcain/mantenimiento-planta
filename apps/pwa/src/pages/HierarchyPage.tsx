@@ -764,9 +764,9 @@ export function HierarchyPage() {
 
             {/* Icon */}
             {node.nivel === 1 ? (
-              <Building2 className="h-4 w-4 text-blue-500" />
+              <Building2 className="h-4 w-4 text-brand-ink" />
             ) : hasChildren ? (
-              <FolderOpen className="h-4 w-4 text-amber-500" />
+              <FolderOpen className="h-4 w-4 text-ink-warn" />
             ) : (
               <Folder className="h-4 w-4 text-muted-foreground" />
             )}

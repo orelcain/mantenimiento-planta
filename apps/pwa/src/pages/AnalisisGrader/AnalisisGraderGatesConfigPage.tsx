@@ -596,7 +596,7 @@ export function AnalisisGraderGatesConfigPage({
             {shiftDocId && (
               <div className="flex items-center gap-2">
                 {hasShiftThresholdsOverride ? (
-                  <Badge className="text-caption bg-primary/[0.15] text-blue-400 border-primary/[0.25]">Override de este turno</Badge>
+                  <Badge className="text-caption bg-primary/[0.15] text-brand-ink border-primary/[0.25]">Override de este turno</Badge>
                 ) : (
                   <Badge variant="outline" className="text-caption text-muted-foreground">Global de planta</Badge>
                 )}
@@ -739,7 +739,7 @@ export function AnalisisGraderGatesConfigPage({
             <div className="flex items-center gap-2 mb-1">
               <h3 className="text-xs font-semibold tracking-wider text-muted-foreground">Horarios de turnos</h3>
               {isScheduleDirty && (
-                <span className="text-caption text-amber-400 font-medium">● sin guardar</span>
+                <span className="text-caption text-ink-warn font-medium">● sin guardar</span>
               )}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
@@ -784,7 +784,7 @@ export function AnalisisGraderGatesConfigPage({
             </div>
             {shiftGapMinutes > 0 && (
               <div className="mt-3 flex items-start gap-2 rounded-ctl bg-amber-500/[0.15] border border-amber-500/[0.25] px-3 py-2">
-                <AlertTriangle className="mt-px h-3 w-3 shrink-0 text-amber-400" />
+                <AlertTriangle className="mt-px h-3 w-3 shrink-0 text-ink-warn" />
                 <p className="text-xs text-ink-warn">
                   Hay <strong>{Math.floor(shiftGapMinutes / 60)}h {shiftGapMinutes % 60}min</strong> sin turno asignado en el día.
                   Revisa que los horarios cubran el período operativo completo.
@@ -1051,7 +1051,7 @@ export function AnalisisGraderGatesConfigPage({
             {/* Editor inline del override por turno */}
             {editingShiftRanges && (
               <div className="space-y-2">
-                <p className="text-caption text-blue-400 font-medium">Editando override de este turno — los cambios NO afectan otros turnos</p>
+                <p className="text-caption text-brand-ink font-medium">Editando override de este turno — los cambios NO afectan otros turnos</p>
                 <div className="space-y-1.5">
                   {shiftRangesDraft.map((r, idx) => (
                     <div key={idx} className="grid grid-cols-[1fr_100px_100px_auto] gap-1.5 items-center">

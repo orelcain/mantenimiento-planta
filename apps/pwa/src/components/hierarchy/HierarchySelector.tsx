@@ -120,7 +120,7 @@ export function HierarchySelector({
       {/* Breadcrumb de selección actual */}
       {selections.some(s => s !== null) && (
         <div className="flex items-center gap-2 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-card border border-blue-500/[0.25]">
-          <MapPin className="w-5 h-5 text-blue-600 flex-shrink-0" />
+          <MapPin className="w-5 h-5 text-brand-ink flex-shrink-0" />
           <div className="flex-1 flex items-center gap-2 flex-wrap">
             {breadcrumbLoading ? (
               <span className="text-sm text-ink-info">Cargando ubicación...</span>
@@ -140,12 +140,12 @@ export function HierarchySelector({
 
           {/* Indicador de validación */}
           {isMinLevelReached ? (
-            <div className="flex items-center gap-1 text-green-600">
+            <div className="flex items-center gap-1 text-ink-ok">
               <CheckCircle className="w-5 h-5" />
               <span className="text-xs font-medium">Completo</span>
             </div>
           ) : showValidation ? (
-            <div className="flex items-center gap-1 text-amber-600">
+            <div className="flex items-center gap-1 text-ink-warn">
               <AlertTriangle className="w-5 h-5" />
               <span className="text-xs font-medium">Incompleto</span>
             </div>
@@ -179,7 +179,7 @@ export function HierarchySelector({
       {/* Mensaje de validación */}
       {showValidation && !isMinLevelReached && (
         <div className="flex items-start gap-2 p-3 bg-amber-500/[0.15] border border-amber-500/[0.25] rounded-card">
-          <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+          <AlertTriangle className="w-5 h-5 text-ink-warn mt-0.5 flex-shrink-0" />
           <div className="text-sm text-ink-warn">
             Debes seleccionar hasta el nivel <strong>{HIERARCHY_LEVEL_NAMES[minLevel]}</strong> como mínimo para crear la incidencia.
           </div>
@@ -188,7 +188,7 @@ export function HierarchySelector({
 
       {/* Error externo */}
       {error && (
-        <div className="text-sm text-red-600 flex items-center gap-2">
+        <div className="text-sm text-ink-crit flex items-center gap-2">
           <AlertTriangle className="w-4 h-4" />
           {error}
         </div>
@@ -258,7 +258,7 @@ function LevelSelector({
     <div>
       <label className="block text-sm font-medium text-muted-foreground mb-1.5">
         {HIERARCHY_LEVEL_NAMES[nivel]}
-        {isRequired && <span className="text-red-500 ml-1">*</span>}
+        {isRequired && <span className="text-ink-crit ml-1">*</span>}
       </label>
       <select
         value={value ?? ''}

@@ -107,7 +107,7 @@ function ActionBtn({ icon: Icon, label, onClick, danger, contenido }: {
       className={[
         'relative flex flex-col items-center gap-1 rounded-card border bg-card px-2 py-2 text-caption font-medium transition',
         danger
-          ? 'border-border text-red-500 hover:bg-red-500/[0.15] hover:border-red-500/[0.25]'
+          ? 'border-border text-ink-crit hover:bg-red-500/[0.15] hover:border-red-500/[0.25]'
           : senal && tiene
             ? 'border-primary/[0.35] text-foreground hover:bg-muted'
             : senal
@@ -146,9 +146,9 @@ function Field({ label, value }: { label: string; value: string }) {
 }
 
 const MOV_META: Record<MovimientoBodega['tipo'], { icon: typeof ArrowDownCircle; cls: string; label: string }> = {
-  entrada: { icon: ArrowDownCircle, cls: 'text-emerald-500', label: 'Entrada' },
-  salida: { icon: ArrowUpCircle, cls: 'text-red-500', label: 'Salida' },
-  ajuste: { icon: Settings2, cls: 'text-amber-500', label: 'Ajuste' },
+  entrada: { icon: ArrowDownCircle, cls: 'text-ink-ok', label: 'Entrada' },
+  salida: { icon: ArrowUpCircle, cls: 'text-ink-crit', label: 'Salida' },
+  ajuste: { icon: Settings2, cls: 'text-ink-warn', label: 'Ajuste' },
 }
 
 function fmtDate(d: Date): string {
@@ -308,7 +308,7 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, onClose, loadMov
               onClick={onToggleFavorite}
               /* 44x44 REALES, sin margen negativo: entre este botón y «Cerrar» solo hay 4 px
                  medidos, así que invadir hacia los lados haría que tocar uno active el otro. */
-              className={[AREA_TACTIL, 'rounded-ctl transition', isFavorite ? 'text-amber-400' : 'text-muted-foreground hover:text-amber-400'].join(' ')}
+              className={[AREA_TACTIL, 'rounded-ctl transition', isFavorite ? 'text-ink-warn' : 'text-muted-foreground hover:text-ink-warn'].join(' ')}
               title={isFavorite ? 'Quitar de favoritos' : 'Agregar a favoritos'}
               aria-label="Favorito"
             >
@@ -360,7 +360,7 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, onClose, loadMov
               {/* Era 18×18: el target más chico de la pantalla y la acción que más se usa en
                   planta. Crece hacia afuera — medidos 61 px libres arriba y 13 abajo. */}
               <button onClick={copySap} className={`${AREA_TACTIL_COMPACTA} rounded-ctl text-muted-foreground hover:text-primary`} title="Copiar SAP" aria-label="Copiar código SAP">
-                {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+                {copied ? <Check className="h-3.5 w-3.5 text-ink-ok" /> : <Copy className="h-3.5 w-3.5" />}
               </button>
             </span>
           ) : (
@@ -376,7 +376,7 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, onClose, loadMov
           <div className="mb-3 flex items-center justify-between gap-2 rounded-card border border-border bg-muted px-3 py-2">
             <span className="inline-flex items-center gap-1.5 text-sm font-semibold tabular-nums">
               <span className={['h-2 w-2 shrink-0 rounded-full', item.stockStatus === 'out' ? 'bg-red-500' : item.stockStatus === 'low' ? 'bg-amber-500' : 'bg-emerald-500'].join(' ')} />
-              <span className={item.stockStatus === 'out' ? 'text-red-500' : item.stockStatus === 'low' ? 'text-amber-500' : 'text-emerald-500'}>
+              <span className={item.stockStatus === 'out' ? 'text-ink-crit' : item.stockStatus === 'low' ? 'text-ink-warn' : 'text-ink-ok'}>
                 {item.stockActual} {item.unidad || 'pzas'}
               </span>
               {item.stockStatus === 'out' && <span className="text-caption font-normal text-muted-foreground">sin stock</span>}
@@ -519,7 +519,7 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, onClose, loadMov
           return (
             <div className="border-b border-border/60 py-2">
               <div className="mb-1.5 flex items-center gap-1.5 text-caption tracking-wide text-muted-foreground">
-                <Wrench className="h-3.5 w-3.5 text-emerald-500" />
+                <Wrench className="h-3.5 w-3.5 text-ink-ok" />
                 Repuesto común de
               </div>
               {allSlugs.length > 0 ? (
@@ -663,7 +663,7 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, onClose, loadMov
         <div className="mt-4 grid grid-cols-3 gap-px overflow-hidden rounded-card border border-border bg-border text-center">
           <div className="bg-card px-2 py-3">
             <div className="text-caption tracking-wide text-muted-foreground">Disponible</div>
-            <div className={['text-2xl font-bold tabular-nums', item.stockStatus === 'out' ? 'text-red-500' : item.stockStatus === 'low' ? 'text-amber-500' : 'text-emerald-500'].join(' ')}>
+            <div className={['text-2xl font-bold tabular-nums', item.stockStatus === 'out' ? 'text-ink-crit' : item.stockStatus === 'low' ? 'text-ink-warn' : 'text-ink-ok'].join(' ')}>
               {item.bodegaId ? item.stockActual : '—'}
             </div>
           </div>

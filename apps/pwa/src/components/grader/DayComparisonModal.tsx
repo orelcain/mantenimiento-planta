@@ -69,8 +69,8 @@ function trend(
 }
 
 function TrendIcon({ t }: { t: Trend }) {
-  if (t === 'better') return <TrendingUp className="h-3 w-3 text-emerald-500 inline-block ml-0.5" />
-  if (t === 'worse')  return <TrendingDown className="h-3 w-3 text-red-400 inline-block ml-0.5" />
+  if (t === 'better') return <TrendingUp className="h-3 w-3 text-ink-ok inline-block ml-0.5" />
+  if (t === 'worse')  return <TrendingDown className="h-3 w-3 text-ink-crit inline-block ml-0.5" />
   return <Minus className="h-3 w-3 text-muted-foreground/50 inline-block ml-0.5" />
 }
 
@@ -411,7 +411,7 @@ export function DayComparisonModal({ open, onClose, summaries, dateKey }: DayCom
         {(() => {
           const deltaP0 = dec2((noche.pointZeroPct - dia.pointZeroPct))
           const sign = noche.pointZeroPct > dia.pointZeroPct ? '+' : ''
-          const color = noche.pointZeroPct > dia.pointZeroPct ? 'text-red-500' : 'text-ink-ok'
+          const color = noche.pointZeroPct > dia.pointZeroPct ? 'text-ink-crit' : 'text-ink-ok'
           return (
             <div className="rounded-card bg-muted/50 p-2.5 text-center text-caption text-muted-foreground">
               Noche vs Día: P0{' '}

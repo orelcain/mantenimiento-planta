@@ -170,7 +170,7 @@ export function CargaRapidaModal({ items, saveStock, onClose }: Props) {
                   />
                   <div className="flex justify-center">
                     {isSaving ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                      : isSaved ? <Check className="h-4 w-4 text-emerald-500" />
+                      : isSaved ? <Check className="h-4 w-4 text-ink-ok" />
                       : <span className="h-2 w-2 rounded-full bg-muted-foreground/20" />}
                   </div>
                 </div>

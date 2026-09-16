@@ -54,8 +54,8 @@ const SEVERITY_ICON: Record<SuggestedAction['severity'], typeof AlertTriangle> =
 }
 
 const SEVERITY_COLOR: Record<SuggestedAction['severity'], string> = {
-  critical: 'text-red-400',
-  warning: 'text-amber-400',
+  critical: 'text-ink-crit',
+  warning: 'text-ink-warn',
   recommended: 'text-muted-foreground',
 }
 
@@ -109,7 +109,7 @@ function ActionItem({
           aria-label={checked ? 'Desmarcar' : 'Marcar como hecho'}
         >
           {checked
-            ? <CheckSquare className="w-4 h-4 text-emerald-400" />
+            ? <CheckSquare className="w-4 h-4 text-ink-ok" />
             : <Square className="w-4 h-4" />}
         </button>
 
@@ -121,7 +121,7 @@ function ActionItem({
             </span>
           </div>
           {action.estimatedImpact && (
-            <span className="text-xs text-emerald-400 ml-5">
+            <span className="text-xs text-ink-ok ml-5">
               ≈ {action.estimatedImpact.deltaPct > 0 ? '+' : ''}{action.estimatedImpact.deltaPct}% {action.estimatedImpact.metric}
             </span>
           )}
@@ -230,7 +230,7 @@ export function ActionPlanPanel({ shiftDocId, suggestions, status, relatedRunboo
         <div className="flex items-center justify-between">
           <CardTitle className="text-base">¿Qué hacer?</CardTitle>
           {doneCount > 0 && (
-            <span className="text-xs text-emerald-400 font-medium">
+            <span className="text-xs text-ink-ok font-medium">
               {doneCount}/{suggestions.length} completadas
             </span>
           )}

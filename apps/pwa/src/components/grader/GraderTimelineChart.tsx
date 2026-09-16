@@ -875,11 +875,11 @@ export function GraderTimelineChart({ records, aggregates, shiftId, dateKey }: P
                 {stats.minWeight.toLocaleString('es-CL')}–{stats.maxWeight.toLocaleString('es-CL')}g
               </Badge>
             )}
-            <Badge variant="outline" className={cn('text-caption', stats.p0Count > 0 ? 'text-red-400' : '')}>
+            <Badge variant="outline" className={cn('text-caption', stats.p0Count > 0 ? 'text-ink-crit' : '')}>
               {stats.p0Count.toLocaleString('es-CL')} P0
             </Badge>
             {gaps.length > 0 && (
-              <Badge variant="outline" className="text-caption text-amber-400 gap-0.5">
+              <Badge variant="outline" className="text-caption text-ink-warn gap-0.5">
                 <Coffee className="h-2.5 w-2.5" />{gaps.length} pausa{gaps.length > 1 ? 's' : ''}
               </Badge>
             )}

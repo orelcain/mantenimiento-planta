@@ -299,7 +299,7 @@ export function PreventivePage() {
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-primary/[0.15] rounded-card">
-                <ClipboardCheck className="h-5 w-5 text-blue-500" />
+                <ClipboardCheck className="h-5 w-5 text-brand-ink" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Total Tareas</p>
@@ -312,11 +312,11 @@ export function PreventivePage() {
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-red-500/[0.15] rounded-card">
-                <AlertTriangle className="h-5 w-5 text-red-500" />
+                <AlertTriangle className="h-5 w-5 text-ink-crit" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Vencidas</p>
-                <p className="text-2xl font-bold text-red-500">{stats.overdue}</p>
+                <p className="text-2xl font-bold text-ink-crit">{stats.overdue}</p>
               </div>
             </div>
           </CardContent>
@@ -338,7 +338,7 @@ export function PreventivePage() {
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-green-500/[0.15] rounded-card">
-                <CheckCircle2 className="h-5 w-5 text-green-500" />
+                <CheckCircle2 className="h-5 w-5 text-ink-ok" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Completadas (mes)</p>
@@ -460,7 +460,7 @@ export function PreventivePage() {
                           {day.getDate()}
                         </span>
                         {hasOverdue && (
-                          <AlertTriangle className="h-3 w-3 text-red-500" />
+                          <AlertTriangle className="h-3 w-3 text-ink-crit" />
                         )}
                       </div>
                       <div className="space-y-0.5 overflow-y-auto max-h-16">
@@ -470,7 +470,7 @@ export function PreventivePage() {
                             className={cn(
                               'text-xs px-1 py-0.5 rounded-ctl truncate cursor-pointer transition-all hover:scale-105',
                               task.proximaEjecucion < new Date()
-                                ? 'bg-red-500/[0.15] text-red-500'
+                                ? 'bg-red-500/[0.15] text-ink-crit'
                                 : `${getColorForTechnician(task.asignadoA)}/20 text-white`
                             )}
                             onClick={(e) => {
@@ -539,7 +539,7 @@ export function PreventivePage() {
           {overdueTasks.length > 0 && (
             <Card className="border-red-500/[0.25]">
               <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2 text-red-500">
+                <CardTitle className="text-lg flex items-center gap-2 text-ink-crit">
                   <AlertTriangle className="h-5 w-5" />
                   Tareas Vencidas ({overdueTasks.length})
                 </CardTitle>
@@ -656,7 +656,7 @@ export function PreventivePage() {
                       >
                         <div className="flex items-center gap-3">
                           <div className="p-2 bg-green-500/[0.15] rounded-card">
-                            <CheckCircle2 className="h-4 w-4 text-green-500" />
+                            <CheckCircle2 className="h-4 w-4 text-ink-ok" />
                           </div>
                           <div>
                             <p className="font-medium">{task?.nombre || 'Tarea eliminada'}</p>
@@ -769,7 +769,7 @@ export function PreventivePage() {
                     <Label className="text-xs text-muted-foreground">Próxima ejecución</Label>
                     <p className={cn(
                       'text-sm font-medium',
-                      selectedTaskDetail.proximaEjecucion < new Date() && 'text-red-500'
+                      selectedTaskDetail.proximaEjecucion < new Date() && 'text-ink-crit'
                     )}>
                       {selectedTaskDetail.proximaEjecucion.toLocaleDateString('es-ES')}
                     </p>
@@ -783,7 +783,7 @@ export function PreventivePage() {
                     <div className="space-y-1 text-sm mt-2">
                       {selectedTaskDetail.checklist.map((item) => (
                         <div key={item.id} className="flex items-start gap-2">
-                          <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
+                          <CheckCircle2 className="h-4 w-4 text-ink-ok flex-shrink-0 mt-0.5" />
                           <span>{item.tarea}</span>
                         </div>
                       ))}
@@ -839,7 +839,7 @@ function TaskCard({
             isOverdue ? 'bg-red-500/[0.15]' : 'bg-primary/[0.15]'
           )}
         >
-          <Wrench className={cn('h-4 w-4', isOverdue ? 'text-red-500' : 'text-blue-500')} />
+          <Wrench className={cn('h-4 w-4', isOverdue ? 'text-ink-crit' : 'text-brand-ink')} />
         </div>
         <div>
           <p className="font-medium">{task.nombre}</p>
@@ -860,7 +860,7 @@ function TaskCard({
       </div>
       <div className="flex items-center gap-1">
         <Button variant="ghost" size="icon" onClick={onExecute} title="Ejecutar">
-          <Play className="h-4 w-4 text-green-500" />
+          <Play className="h-4 w-4 text-ink-ok" />
         </Button>
         <Button variant="ghost" size="icon" onClick={onEdit} title="Editar">
           <Edit className="h-4 w-4" />

@@ -37,9 +37,9 @@ import {
 import type { Equipment } from '@/types'
 
 const CONDICION_BADGE: Record<CondicionNFPA, string> = {
-  1: 'border-emerald-500 text-emerald-600',
-  2: 'border-amber-500 text-amber-600',
-  3: 'border-red-500 text-red-600',
+  1: 'border-emerald-500 text-ink-ok',
+  2: 'border-amber-500 text-ink-warn',
+  3: 'border-red-500 text-ink-crit',
 }
 
 function emptyDraft(eq: Equipment): TableroInput {

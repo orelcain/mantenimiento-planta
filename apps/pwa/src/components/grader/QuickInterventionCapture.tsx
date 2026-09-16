@@ -445,7 +445,7 @@ export function QuickInterventionCapture({
                 : <><CheckCircle2 className="h-4 w-4 mr-1.5" />Registrar intervención</>}
             </Button>
             {justSaved && (
-              <span className="flex items-center gap-1 text-xs text-emerald-400 font-medium">
+              <span className="flex items-center gap-1 text-xs text-ink-ok font-medium">
                 <CheckCircle2 className="h-3.5 w-3.5" /> Registrada
               </span>
             )}
@@ -596,7 +596,7 @@ export function QuickInterventionCapture({
                       {insights.patrones.map((p, i) => (
                         <div key={i} className="rounded-ctl border border-border bg-background px-2.5 py-2">
                           <p className="text-xs text-foreground flex items-start gap-1.5">
-                            <span className="text-amber-400 font-semibold tabular-nums shrink-0">×{p.frecuencia}</span>
+                            <span className="text-ink-warn font-semibold tabular-nums shrink-0">×{p.frecuencia}</span>
                             <span className="break-words">{p.descripcion}</span>
                           </p>
                           {p.recomendacion && (

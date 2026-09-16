@@ -19,7 +19,7 @@ export function SuggestionsPanel({ suggestions }: Props) {
     ? `${warnings.length} alerta${warnings.length > 1 ? 's' : ''}`
     : `${suggestions.length} sugerencia${suggestions.length > 1 ? 's' : ''}`
 
-  const headerColor = warnings.length > 0 ? 'text-red-400' : 'text-amber-400'
+  const headerColor = warnings.length > 0 ? 'text-ink-crit' : 'text-ink-warn'
 
   return (
     <div className="space-y-2">
@@ -32,7 +32,7 @@ export function SuggestionsPanel({ suggestions }: Props) {
           'text-caption px-2 py-0.5 rounded-full font-medium',
           warnings.length > 0
             ? 'bg-red-500/[0.15] text-ink-crit'
-            : 'bg-amber-500/[0.15] text-amber-400',
+            : 'bg-amber-500/[0.15] text-ink-warn',
         )}>
           {countLabel}
         </span>

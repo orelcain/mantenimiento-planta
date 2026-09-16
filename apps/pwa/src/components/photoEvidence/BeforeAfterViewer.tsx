@@ -69,7 +69,7 @@ export function BeforeAfterViewer({ before, after, titulo }: BeforeAfterViewerPr
           <div className="grid grid-cols-2 gap-2">
             {/* Antes */}
             <div className="space-y-1">
-              <span className="text-xs font-medium text-red-500 flex items-center gap-1">
+              <span className="text-xs font-medium text-ink-crit flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-red-500"></span>
                 ANTES
               </span>
@@ -101,7 +101,7 @@ export function BeforeAfterViewer({ before, after, titulo }: BeforeAfterViewerPr
 
             {/* Después */}
             <div className="space-y-1">
-              <span className="text-xs font-medium text-green-500 flex items-center gap-1">
+              <span className="text-xs font-medium text-ink-ok flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-green-500"></span>
                 DESPUÉS
               </span>

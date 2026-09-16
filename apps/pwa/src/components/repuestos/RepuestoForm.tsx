@@ -379,11 +379,11 @@ export function RepuestoFormModal({
                   <Label className="text-xs text-muted-foreground">Destino</Label>
                   <div className="flex gap-2">
                     <button type="button" onClick={() => setTarget('own')}
-                      className={`flex-1 px-3 py-2 rounded-card text-xs font-medium border transition-all ${target === 'own' ? 'border-emerald-500/[0.25] bg-emerald-500/[0.15] text-emerald-400' : 'border-border bg-card text-muted-foreground hover:bg-muted/20'}`}>
+                      className={`flex-1 px-3 py-2 rounded-card text-xs font-medium border transition-all ${target === 'own' ? 'border-emerald-500/[0.25] bg-emerald-500/[0.15] text-ink-ok' : 'border-border bg-card text-muted-foreground hover:bg-muted/20'}`}>
                       Propio de {equipmentName || 'este equipo'}
                     </button>
                     <button type="button" onClick={() => setTarget('shared')}
-                      className={`flex-1 px-3 py-2 rounded-card text-xs font-medium border transition-all ${target === 'shared' ? 'border-primary/[0.25] bg-primary/[0.15] text-blue-400' : 'border-border bg-card text-muted-foreground hover:bg-muted/20'}`}>
+                      className={`flex-1 px-3 py-2 rounded-card text-xs font-medium border transition-all ${target === 'shared' ? 'border-primary/[0.25] bg-primary/[0.15] text-brand-ink' : 'border-border bg-card text-muted-foreground hover:bg-muted/20'}`}>
                       Compartido ({machineName || 'máquina'})
                     </button>
                   </div>

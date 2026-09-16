@@ -70,7 +70,7 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
         <ul className="space-y-1">
           {output.summaryBullets.map((b, i) => (
             <li key={i} className="text-sm flex gap-2">
-              <span className="text-blue-500 shrink-0 mt-0.5">&#8226;</span>
+              <span className="text-brand-ink shrink-0 mt-0.5">&#8226;</span>
               <span>{b}</span>
             </li>
           ))}
@@ -116,7 +116,7 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-caption text-amber-500">Sin evidencia num&eacute;rica</p>
+                  <p className="text-caption text-ink-warn">Sin evidencia num&eacute;rica</p>
                 )}
               </div>
             ))}
@@ -217,7 +217,7 @@ export function SwapSuggestionCard({ suggestion }: { suggestion: GateSwapSuggest
     optimization: 'text-cat-6-ink border-cat-6-tint',
     investigate: 'text-ink-info border-blue-500/[0.25]',
     swap: 'text-cat-6-ink border-cat-6-tint',
-    reassign: 'text-blue-600 border-blue-500/[0.25]',
+    reassign: 'text-brand-ink border-blue-500/[0.25]',
     add: 'text-ink-ok border-emerald-500/[0.25]',
   }
   /** Ícono por tipo de sugerencia: componente, no emoji (§17). */

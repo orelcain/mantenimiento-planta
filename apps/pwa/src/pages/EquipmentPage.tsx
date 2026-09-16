@@ -2313,7 +2313,7 @@ function EquipmentDetailDialog({
                                   onDeleteNote(n.id)
                                 }
                               }}
-                              className="h-8 w-8 p-0 text-red-600 hover:text-ink-crit hover:bg-red-500/[0.15]"
+                              className="h-8 w-8 p-0 text-ink-crit hover:text-ink-crit hover:bg-red-500/[0.15]"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
