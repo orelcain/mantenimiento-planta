@@ -1120,14 +1120,14 @@ export function AnalisisGraderTurnoPage() {
     ])
       .then(([s, sd]) => {
         if (!s) {
-          const win = computeShiftTimeWindow(dateKey, shiftLabel, plantSchedule)
-          // Solo un turno ya CERRADO puede faltar en el historial. Uno que
-          // todavía no empezó no se perdió: no ocurrió, y tiene su propia
-          // tarjeta más abajo. (`shiftLabel` ya trae la palabra "Turno".)
-          if (win.status === 'closed') {
-            setError(`${shiftLabel} del ${dateKey} no encontrado en el historial.`)
-          }
-          // Si es live: summary=null + error=null → renderiza empty-state con CTA de upload
+          // Que un turno cerrado no tenga Excel del Grader NO es un error: en la
+          // mayoría de los turnos no se carga, y cuando además no hay datos de
+          // Shoplogix suele ser que la línea no trabajó (un sábado, por
+          // ejemplo). La tarjeta roja «no encontrado en el historial» sonaba a
+          // dato perdido y repetía lo que la tarjeta «Sin datos registrados»
+          // —la de abajo— ya explica con los tres canales de ingreso.
+          // Los errores de verdad (URL inválida, falla al cargar) siguen en rojo.
+          // Si es live: summary=null → empty-state con CTA de upload
         } else {
           setSummary(s)
         }
