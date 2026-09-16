@@ -31,6 +31,7 @@ import { IncidentDetail } from '@/components/incidents/IncidentDetail'
 import type { User, UserRole, Zone } from '@/types'
 import { getUserById } from '@/services/auth'
 import { MobileHomeGrid } from '@/components/home/MobileHomeGrid'
+import { BitacoraTurnoCard } from '@/components/bitacora/BitacoraTurnoCard'
 
 export function DashboardPage() {
   const navigate = useNavigate()
@@ -198,6 +199,12 @@ export function DashboardPage() {
           <Plus className="h-4 w-4 mr-2" />
           Nueva Incidencia
         </Button>
+      </div>
+
+      {/* Bitácora del turno: en el PC es donde se copia al correo de Mantención,
+          así que el acceso tiene que estar en el Inicio y no solo en el menú. */}
+      <div className="max-w-xl">
+        <BitacoraTurnoCard />
       </div>
 
       {/* Alertas críticas */}
