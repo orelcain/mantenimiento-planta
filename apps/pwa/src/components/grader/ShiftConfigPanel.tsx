@@ -22,8 +22,8 @@ type Species = 'coho' | 'salar'
 
 const SPECIES_LABEL: Record<Species, string> = { coho: 'Coho', salar: 'Salar' }
 const SPECIES_CSS: Record<Species, string> = {
-  coho: 'bg-cat-7-tint/[0.15] text-cat-7-ink border-cat-7-tint/[0.25]',
-  salar: 'bg-primary/[0.15] text-brand-ink border-primary/[0.25]',
+  coho: 'bg-cat-7-tint/[0.15] text-cat-7-ink border-transparent',
+  salar: 'bg-primary/[0.15] text-brand-ink border-transparent',
 }
 
 function inferSpecies(breakdown?: Record<string, number>): Species | null {
@@ -153,7 +153,7 @@ export function ShiftConfigPanel({
 
           {/* Cambios mid-turno */}
           {configChangesCount > 0 && (
-            <span className="text-caption px-1.5 py-0.5 rounded-ctl bg-amber-500/[0.15] text-ink-warn border border-amber-500/[0.25]">
+            <span className="text-caption px-1.5 py-0.5 rounded-ctl bg-amber-500/[0.15] text-ink-warn border border-transparent">
               {configChangesCount} cambio{configChangesCount > 1 ? 's' : ''} mid-turno
             </span>
           )}
@@ -172,7 +172,7 @@ export function ShiftConfigPanel({
             <>
               <button
                 onClick={() => setGateModalOpen(true)}
-                className="flex items-center gap-1 text-caption px-2 py-0.5 rounded-ctl border border-primary/30 bg-primary/5 text-brand-ink hover:bg-primary/10 transition-colors"
+                className="flex items-center gap-1 text-caption px-2 py-0.5 rounded-ctl border border-transparent bg-primary/5 text-brand-ink hover:bg-primary/10 transition-colors"
               >
                 <GitBranch className="w-2.5 h-2.5" />
                 Cambié gate

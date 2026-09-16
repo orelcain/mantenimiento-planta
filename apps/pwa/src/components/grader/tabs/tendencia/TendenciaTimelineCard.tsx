@@ -62,7 +62,7 @@ export function TendenciaTimelineCard({ pieceRecords, shiftId, dateKey }: Props)
               </Badge>
             )}
             {gate0Count > 0 && (
-              <Badge variant="outline" className="text-caption text-red-500">
+              <Badge variant="outline" className="text-caption text-ink-crit">
                 {gate0Count.toLocaleString('es-CL')} P0
               </Badge>
             )}

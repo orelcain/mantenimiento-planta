@@ -23,10 +23,10 @@ export function InsightCard({ insight }: { insight: DeterministicInsight }) {
       className={cn(
         'p-3 rounded-card border',
         insight.severity === 'critical'
-          ? 'border-red-500/[0.25] bg-red-500/[0.15]'
+          ? 'border-transparent bg-red-500/[0.15]'
           : insight.severity === 'warn'
-          ? 'border-amber-500/[0.25] bg-amber-500/[0.15]'
-          : 'border-blue-500/[0.25] bg-primary/[0.15]',
+          ? 'border-transparent bg-amber-500/[0.15]'
+          : 'border-transparent bg-primary/[0.15]',
       )}
     >
       <div className="flex items-center gap-2">
@@ -63,14 +63,14 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
   return (
     <div className="space-y-4">
       {/* Resumen compacto en card destacada */}
-      <div className="rounded-card border border-blue-500/[0.25] bg-primary/[0.15] p-3">
+      <div className="rounded-card border border-transparent bg-primary/[0.15] p-3">
         <p className="text-caption font-semibold tracking-wider text-primary mb-1.5">
           Resumen del an&aacute;lisis
         </p>
         <ul className="space-y-1">
           {output.summaryBullets.map((b, i) => (
             <li key={i} className="text-sm flex gap-2">
-              <span className="text-blue-500 shrink-0 mt-0.5">&#8226;</span>
+              <span className="text-brand-ink shrink-0 mt-0.5">&#8226;</span>
               <span>{b}</span>
             </li>
           ))}
@@ -116,7 +116,7 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-caption text-amber-500">Sin evidencia num&eacute;rica</p>
+                  <p className="text-caption text-ink-warn">Sin evidencia num&eacute;rica</p>
                 )}
               </div>
             ))}
@@ -137,9 +137,9 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
                 className={cn(
                   'flex items-start gap-3 p-2.5 rounded-card border',
                   a.priority === 'high'
-                    ? 'border-red-500/[0.25] bg-red-500/[0.15]'
+                    ? 'border-transparent bg-red-500/[0.15]'
                     : a.priority === 'medium'
-                    ? 'border-amber-500/[0.25] bg-amber-500/[0.15]'
+                    ? 'border-transparent bg-amber-500/[0.15]'
                     : 'border-muted bg-muted',
                 )}
               >
@@ -172,7 +172,7 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
 
       {/* Qu&eacute; verificar — card prominente con checklist */}
       {output.whatToCheckNext.length > 0 && (
-        <div className="rounded-card border-2 border-emerald-500/[0.25] bg-emerald-500/[0.15] p-3">
+        <div className="rounded-card border-2 border-transparent bg-emerald-500/[0.15] p-3">
           <p className="text-caption font-semibold tracking-wider text-ink-ok mb-2">
             Qu&eacute; verificar ahora
           </p>
@@ -192,7 +192,7 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
 
       {/* Advertencias */}
       {output.disclaimers && output.disclaimers.length > 0 && (
-        <div className="p-2.5 bg-amber-500/[0.15] rounded-card dark:border-amber-500/[0.25]">
+        <div className="p-2.5 bg-amber-500/[0.15] rounded-card dark:border-transparent">
           <p className="text-caption font-semibold tracking-wider text-ink-warn mb-1">Advertencias</p>
           {output.disclaimers.map((d, i) => (
             <p key={i} className="text-caption text-ink-warn">{d}</p>
@@ -217,7 +217,7 @@ export function SwapSuggestionCard({ suggestion }: { suggestion: GateSwapSuggest
     optimization: 'text-cat-6-ink border-cat-6-tint',
     investigate: 'text-ink-info border-blue-500/[0.25]',
     swap: 'text-cat-6-ink border-cat-6-tint',
-    reassign: 'text-blue-600 border-blue-500/[0.25]',
+    reassign: 'text-brand-ink border-blue-500/[0.25]',
     add: 'text-ink-ok border-emerald-500/[0.25]',
   }
   /** Ícono por tipo de sugerencia: componente, no emoji (§17). */
@@ -235,8 +235,8 @@ export function SwapSuggestionCard({ suggestion }: { suggestion: GateSwapSuggest
   return (
     <div className={cn(
       'p-3 rounded-card border',
-      suggestion.impactScore >= 70 ? 'border-red-500/[0.25] bg-red-500/[0.15]' :
-      suggestion.impactScore >= 40 ? 'border-amber-500/[0.25] bg-amber-500/[0.15]' :
+      suggestion.impactScore >= 70 ? 'border-transparent bg-red-500/[0.15]' :
+      suggestion.impactScore >= 40 ? 'border-transparent bg-amber-500/[0.15]' :
       'border-muted bg-muted',
     )}>
       <div className="flex items-center gap-2 flex-wrap">

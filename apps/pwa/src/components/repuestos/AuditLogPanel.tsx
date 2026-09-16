@@ -33,10 +33,10 @@ interface Props {
 }
 
 const ACTION_CONFIG: Record<AuditAction, { icon: typeof Plus; label: string; color: string }> = {
-  create:   { icon: Plus,           label: 'Creado',     color: 'text-emerald-500' },
-  update:   { icon: Pencil,         label: 'Editado',    color: 'text-blue-500' },
-  delete:   { icon: Trash2,         label: 'Eliminado',  color: 'text-red-500' },
-  restore:  { icon: RotateCcw,      label: 'Restaurado', color: 'text-amber-500' },
+  create:   { icon: Plus,           label: 'Creado',     color: 'text-ink-ok' },
+  update:   { icon: Pencil,         label: 'Editado',    color: 'text-brand-ink' },
+  delete:   { icon: Trash2,         label: 'Eliminado',  color: 'text-ink-crit' },
+  restore:  { icon: RotateCcw,      label: 'Restaurado', color: 'text-ink-warn' },
   relocate: { icon: ArrowRightLeft, label: 'Reubicado',  color: 'text-cat-6-ink' },
 }
 
@@ -84,11 +84,11 @@ function ChangeSummary({ before, after }: { before?: Record<string, unknown>; af
       {changedKeys.slice(0, 3).map(key => (
         <div key={key} className="text-caption text-muted-foreground flex items-center gap-1">
           <span className="font-medium text-foreground/70">{key}:</span>
-          <span className="line-through text-red-400 truncate max-w-[80px]" title={String(before[key] ?? '')}>
+          <span className="line-through text-ink-crit truncate max-w-[80px]" title={String(before[key] ?? '')}>
             {String(before[key] ?? '').slice(0, 30)}
           </span>
           <span className="text-foreground/60">&rarr;</span>
-          <span className="text-emerald-500 truncate max-w-[80px]" title={String(after[key] ?? '')}>
+          <span className="text-ink-ok truncate max-w-[80px]" title={String(after[key] ?? '')}>
             {String(after[key] ?? '').slice(0, 30)}
           </span>
         </div>

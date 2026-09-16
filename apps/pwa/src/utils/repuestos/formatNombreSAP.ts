@@ -78,7 +78,7 @@ const BRAND_TITLE_CASE = new Set([
  */
 const PROPIOS: Record<string, string> = {
   CHONCHI: 'Chonchi', YAL: 'Yal', CASTRO: 'Castro', QUELLON: 'Quellón', DALCAHUE: 'Dalcahue',
-  CHILOE: 'Chiloé', ANCUD: 'Ancud', CALBUCO: 'Calbuco', MONTT: 'Montt', AQUACHILE: 'AquaChile',
+  CHILOE: 'Chiloé', ANCUD: 'Ancud', CALBUCO: 'Calbuco', MONTT: 'Montt', AQUACHILE: 'AquaChile', ANTARFOOD: 'Antarfood',
   MARELEC: 'Marelec', KNURO: 'Knuro', FISHKEN: 'Fishken', JOSMAR: 'Josmar', CARSOE: 'Carsoe',
   CABINPLANT: 'Cabinplant', BITZER: 'Bitzer', MYCOM: 'Mycom', SABROE: 'Sabroe', GRUNDFOS: 'Grundfos',
   WILO: 'Wilo', SCHNEIDER: 'Schneider', ROCKWELL: 'Rockwell', OMRON: 'Omron', ATLAS: 'Atlas',

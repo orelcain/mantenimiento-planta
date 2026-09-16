@@ -81,7 +81,7 @@ export function GraderLotesTab({
       <Card className="relative overflow-visible z-10">
         <CardHeader>
           <CardTitle className="text-sm flex items-center gap-2">
-            <Layers className="h-4 w-4 text-blue-500" />
+            <Layers className="h-4 w-4 text-brand-ink" />
             Análisis por Lote
             <InfoTooltip {...getTooltipProps('lot.analysis')} />
           </CardTitle>

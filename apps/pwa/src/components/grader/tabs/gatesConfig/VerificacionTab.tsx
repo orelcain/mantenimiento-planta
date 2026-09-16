@@ -223,7 +223,7 @@ export function VerificacionTab({ physicalConfig, setPhysicalConfig }: Verificac
               </table>
               {/* Cuando hay tacómetro y VFD: derivar el factor effectiveMpsPerRpm */}
               {belt.vfd?.measuredBeltMps && belt.vfd?.vfdCurrentRpm && (
-                <div className="mt-2 p-2 rounded-ctl bg-green-500/[0.15] border border-green-500/[0.25]">
+                <div className="mt-2 p-2 rounded-ctl bg-green-500/[0.15] border border-transparent">
                   <span className="text-xs text-ink-ok font-medium">
                     Factor calibrado: {(belt.vfd.measuredBeltMps / belt.vfd.vfdCurrentRpm).toFixed(6)} m/(s·RPM)
                   </span>

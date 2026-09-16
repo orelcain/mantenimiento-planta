@@ -239,7 +239,7 @@ export function DashboardPage() {
                   {incident.equipmentId && iotDetails[incident.equipmentId] && (
                     <div className="pl-6 text-xs text-muted-foreground space-y-1">
                       {iotDetails[incident.equipmentId]?.source === 'simulated' && (
-                        <div className="text-caption tracking-wide text-amber-600">Dato simulado</div>
+                        <div className="text-caption tracking-wide text-ink-warn">Dato simulado</div>
                       )}
                       {iotDetails[incident.equipmentId]?.temp && (
                         <div>
@@ -421,7 +421,7 @@ export function DashboardPage() {
                       {incident.equipmentId && iotDetails[incident.equipmentId] && (
                         <div className="mt-1 text-xs text-muted-foreground space-y-0.5">
                           {iotDetails[incident.equipmentId]?.source === 'simulated' && (
-                            <div className="text-caption tracking-wide text-amber-600">Dato simulado</div>
+                            <div className="text-caption tracking-wide text-ink-warn">Dato simulado</div>
                           )}
                           {iotDetails[incident.equipmentId]?.temp && (
                             <div>

@@ -87,9 +87,9 @@ type KpiTone = 'primary' | 'emerald' | 'amber' | 'red'
 
 const KPI_TONE: Record<KpiTone, { text: string; chip: string; ring: string; glow: string }> = {
   primary: { text: 'text-brand-ink',      chip: 'bg-primary/10',      ring: 'ring-primary/20',      glow: 'from-primary/[0.07]' },
-  emerald: { text: 'text-emerald-500',  chip: 'bg-emerald-500/[0.15]',  ring: 'ring-emerald-500/20',  glow: 'from-emerald-500/[0.07]' },
-  amber:   { text: 'text-amber-500',    chip: 'bg-amber-500/[0.15]',    ring: 'ring-amber-500/20',    glow: 'from-amber-500/[0.07]' },
-  red:     { text: 'text-red-500',      chip: 'bg-red-500/[0.15]',      ring: 'ring-red-500/20',      glow: 'from-red-500/[0.07]' },
+  emerald: { text: 'text-ink-ok',  chip: 'bg-emerald-500/[0.15]',  ring: 'ring-emerald-500/20',  glow: 'from-emerald-500/[0.07]' },
+  amber:   { text: 'text-ink-warn',    chip: 'bg-amber-500/[0.15]',    ring: 'ring-amber-500/20',    glow: 'from-amber-500/[0.07]' },
+  red:     { text: 'text-ink-crit',      chip: 'bg-red-500/[0.15]',      ring: 'ring-red-500/20',      glow: 'from-red-500/[0.07]' },
 }
 
 function KpiCard({ value, label, hint, icon: Icon, tone }: {
@@ -1592,7 +1592,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
         <button
           type="button"
           onClick={toggleSidebarCollapse}
-          className="absolute left-0 top-1/2 z-20 hidden h-14 w-6 -translate-y-1/2 items-center justify-center rounded-r-lg border border-l-0 border-border bg-card/80 shadow-md backdrop-blur-sm transition-all duration-200 hover:w-8 hover:bg-muted sm:flex"
+          className="absolute left-0 top-1/2 z-20 hidden h-14 w-6 -translate-y-1/2 items-center justify-center rounded-r-ctl border border-l-0 border-border bg-card/80 shadow-md backdrop-blur-sm transition-all duration-200 hover:w-8 hover:bg-muted sm:flex"
           title="Expandir panel de áreas"
           aria-label="Expandir áreas"
         >
@@ -1722,7 +1722,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                             <span className="tabular-nums text-muted-foreground/60">({list.machineIds.length})</span>
                           </button>
                           {isAdmin && (
-                            <button onClick={() => deleteEquipList(list.name)} title="Eliminar lista" className="rounded-ctl p-0.5 text-muted-foreground/40 hover:text-red-400">
+                            <button onClick={() => deleteEquipList(list.name)} title="Eliminar lista" className="rounded-ctl p-0.5 text-muted-foreground/40 hover:text-ink-crit">
                               <Trash2 className="h-3 w-3" />
                             </button>
                           )}
@@ -1762,7 +1762,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                                   {list.machineNames?.[id] || equipNameMap.get(id) || id}
                                 </button>
                                 {isAdmin && (
-                                  <button onClick={() => removeEquipFromList(list.name, id)} title="Quitar de la lista" className="pl-0.5 pr-1.5 text-muted-foreground/40 transition hover:text-red-400 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100"><X className="h-3 w-3" /></button>
+                                  <button onClick={() => removeEquipFromList(list.name, id)} title="Quitar de la lista" className="pl-0.5 pr-1.5 text-muted-foreground/40 transition hover:text-ink-crit [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100"><X className="h-3 w-3" /></button>
                                 )}
                               </span>
                             )})}
@@ -1825,7 +1825,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
               ) : repEquipoFilter !== 'all' ? (
                 <button
                   onClick={() => { setRepEquipoFilter('all'); setSelectedEquipName('') }}
-                  className="mt-1 inline-flex max-w-full items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-caption font-medium text-brand-ink transition hover:bg-primary/20"
+                  className="mt-1 inline-flex max-w-full items-center gap-1.5 rounded-full border border-transparent bg-primary/10 px-2.5 py-1 text-caption font-medium text-brand-ink transition hover:bg-primary/20"
                   title="Quitar filtro de equipo — ver todos los repuestos del área"
                 >
                   <Cog className="h-3 w-3 shrink-0" /> <span className="truncate">{etiquetaFiltroEquipo}</span> <X className="h-3 w-3 shrink-0 opacity-70" />
@@ -2085,7 +2085,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                                     title="Copiar SAP"
                                     aria-label="Copiar código SAP"
                                   >
-                                    {copiedSapKey === r.rowKey ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+                                    {copiedSapKey === r.rowKey ? <Check className="h-3.5 w-3.5 text-ink-ok" /> : <Copy className="h-3.5 w-3.5" />}
                                   </button>
                                 </span>
                               ) : '-'}
@@ -2144,7 +2144,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                                     aria-label="Copiar código SAP"
                                   >
                                     {r.codigoSAP}
-                                    {copiedSapKey === r.rowKey ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3 opacity-50" />}
+                                    {copiedSapKey === r.rowKey ? <Check className="h-3 w-3 text-ink-ok" /> : <Copy className="h-3 w-3 opacity-50" />}
                                     <span> · </span>
                                   </button>
                                 )}
@@ -2202,7 +2202,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                                    abajo, 47 a cada lado — el área de 44 crece sin tocar la
                                    fila vecina (marcar el favorito de otra pieza sin querer
                                    ya pasó una vez). */
-                                className={[AREA_TACTIL_COMPACTA, 'rounded-ctl transition', favKeys.has(r.rowKey) ? 'text-ink-warn' : 'text-muted-foreground/30 hover:text-amber-400'].join(' ')}
+                                className={[AREA_TACTIL_COMPACTA, 'rounded-ctl transition', favKeys.has(r.rowKey) ? 'text-ink-warn' : 'text-muted-foreground/30 hover:text-ink-warn'].join(' ')}
                                 title={favKeys.has(r.rowKey) ? 'Quitar de favoritos' : 'Agregar a favoritos'}
                                 aria-label="Favorito"
                               >
@@ -2360,7 +2360,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
 
           <button
             onClick={() => { setCreateTransversal(true); setCreateTargetEquipos(null); setCreateEquipoSel(new Set()); setCreatePicker(false); setCreateEquipoQuery(''); setCreateOpen(true) }}
-            className="flex w-full items-center gap-2 rounded-card border border-primary/40 bg-primary/5 px-3 py-2 text-left transition hover:bg-primary/10"
+            className="flex w-full items-center gap-2 rounded-card border border-transparent bg-primary/5 px-3 py-2 text-left transition hover:bg-primary/10"
           >
             <Boxes className="h-4 w-4 shrink-0 text-primary" />
             <span className="flex min-w-0 flex-col">
@@ -2405,7 +2405,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                   <button
                     key={g.key}
                     onClick={() => setCreateEquipoSel((prev) => { const n = new Set(prev); if (checked) n.delete(g.key); else n.add(g.key); return n })}
-                    className={['flex w-full items-center gap-2 rounded-card border px-3 py-2 text-left text-sm transition', checked ? 'border-primary/50 bg-primary/10' : 'border-border bg-card hover:bg-muted hover:border-primary/40'].join(' ')}
+                    className={['flex w-full items-center gap-2 rounded-card border px-3 py-2 text-left text-sm transition', checked ? 'border-transparent bg-primary/10' : 'border-border bg-card hover:bg-muted hover:border-transparent'].join(' ')}
                   >
                     <span className={['flex h-4 w-4 shrink-0 items-center justify-center rounded-ctl border', checked ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40'].join(' ')}>
                       {checked && <Check className="h-3 w-3" />}
@@ -2531,7 +2531,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                   onClick={() => { handleToggleComun(m.slug); setComunPickerOpen(false) }}
                   className="flex w-full items-center gap-2 rounded-card border border-border bg-card px-3 py-2 text-left text-sm transition hover:bg-muted hover:border-primary/40"
                 >
-                  <Wrench className="h-4 w-4 shrink-0 text-emerald-500" />
+                  <Wrench className="h-4 w-4 shrink-0 text-ink-ok" />
                   <span className="min-w-0 flex-1 truncate">{m.name}</span>
                 </button>
               ))
@@ -2571,7 +2571,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                       key={l.name}
                       className={[
                         'flex items-center gap-2 rounded-card border px-3 py-2 text-xs font-medium transition',
-                        inList ? 'border-amber-500/[0.25] bg-amber-500/[0.15] text-amber-500' : 'border-border bg-card text-foreground',
+                        inList ? 'border-transparent bg-amber-500/[0.15] text-ink-warn' : 'border-border bg-card text-foreground',
                       ].join(' ')}
                     >
                       <button onClick={() => toggleInList(l.name, rk)} className="flex flex-1 items-center gap-2 text-left">

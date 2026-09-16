@@ -1181,11 +1181,11 @@ function MetricChart({
   return (
     <div>
       {tieneVariacion && (
-        <div className={`mb-1 text-xs ${sobreLimite || bajoLimite ? 'font-medium text-red-600' : ''}`}>
+        <div className={`mb-1 text-xs ${sobreLimite || bajoLimite ? 'font-medium text-ink-crit' : ''}`}>
           <span className="font-medium">
             {fmtNum(first.v)} → {fmtNum(last.v)} {campo.unidad}
           </span>{' '}
-          <span className={delta > 0 ? 'text-amber-600' : delta < 0 ? 'text-emerald-600' : 'text-muted-foreground'}>
+          <span className={delta > 0 ? 'text-ink-warn' : delta < 0 ? 'text-ink-ok' : 'text-muted-foreground'}>
             {delta >= 0 ? '▲' : '▼'}{' '}
             {pct != null ? `${delta >= 0 ? '+' : ''}${pct.toFixed(0)}%` : `${delta >= 0 ? '+' : ''}${fmtNum(delta)} ${campo.unidad}`}
           </span>{' '}
@@ -1500,7 +1500,7 @@ function OtBadge({ ot }: { ot?: OtCount }) {
   return (
     <span
       title={`${ot.abiertas} OT abierta(s)${ot.vencidas > 0 ? ` · ${ot.vencidas} vencida(s)` : ''}`}
-      className={`inline-flex items-center gap-0.5 text-caption font-medium ${danger ? 'text-red-600' : 'text-blue-600'}`}
+      className={`inline-flex items-center gap-0.5 text-caption font-medium ${danger ? 'text-ink-crit' : 'text-brand-ink'}`}
     >
       <Wrench className="h-3 w-3" />
       {ot.abiertas}
@@ -2262,11 +2262,12 @@ function ExpedienteDialog({
                   onClick={onToggleFavorite}
                   title={isFavorite ? 'Quitar de favoritos' : 'Marcar como favorito'}
                   aria-label={isFavorite ? 'Quitar de favoritos' : 'Marcar como favorito'}
-                  className="shrink-0 p-0.5"
+                  className="-m-2.5 flex size-11 shrink-0 items-center justify-center rounded-full"
                 >
-                  <Star className={`h-4 w-4 ${isFavorite ? 'text-ink-warn fill-current' : 'text-muted-foreground'}`} />
+                  <Star className={`size-5 ${isFavorite ? 'text-ink-warn fill-current' : 'text-muted-foreground'}`} />
                 </button>
-                <h2 className="text-lg font-bold truncate">{equipment.nombre}</h2>
+                {/* Título completo en dos líneas y en formato oración: truncarlo escondía qué equipo es. */}
+                <h2 className="text-title3 font-semibold leading-tight line-clamp-2">{formatNombreSAP(equipment.nombre).nombre || equipment.nombre}</h2>
               </div>
               <div className="text-xs text-muted-foreground font-mono">{equipment.codigo}</div>
               {equipment.nombreComun && <div className="text-sm text-muted-foreground truncate">“{equipment.nombreComun}”</div>}
@@ -2287,28 +2288,39 @@ function ExpedienteDialog({
                 <Badge variant="outline" className={`${est.cls} text-xs`}>{est.label}</Badge>
                 {ubicacion && (
                   <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                    <MapPin className="h-3.5 w-3.5" /> <span className="line-clamp-1">{ubicacion}</span>
+                    <MapPin className="h-3.5 w-3.5" /> <span className="line-clamp-1">{ubicacion.split(/\s*[>·]\s*/).map((seg) => formatNombreSAP(seg).nombre || seg).join(' › ')}</span>
                   </span>
                 )}
               </div>
             </div>
-            <div className="flex items-center gap-1 shrink-0">
-              <Button variant="outline" size="sm" onClick={exportarExpediente} disabled={generandoPdf}>
-                <Download className="h-3.5 w-3.5 mr-1.5" /> {generandoPdf ? 'Armando…' : 'PDF'}
-              </Button>
-              {canEdit && (
-                <Button variant="outline" size="sm" onClick={onEdit}>
-                  <Edit2 className="h-3.5 w-3.5 mr-1.5" /> Editar
-                </Button>
-              )}
-              <button onClick={onClose} aria-label="Cerrar" className="p-1 -m-1 text-muted-foreground hover:text-foreground">
-                <X className="h-5 w-5" />
+            <div className="flex shrink-0 items-center gap-1">
+              {/* Las acciones del expediente viven en «⋯»: en 375 px dos botones con texto
+                  junto al título lo dejaban en una sola palabra. */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button type="button" aria-label="Más acciones" className="flex size-11 items-center justify-center rounded-full bg-muted text-foreground hover:bg-muted-foreground/[0.15] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+                    <MoreHorizontal className="size-5" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-[12rem]">
+                  <DropdownMenuItem className="gap-2 py-2" disabled={generandoPdf} onClick={exportarExpediente}>
+                    <Download className="size-4 text-muted-foreground" />{generandoPdf ? 'Armando el PDF…' : 'Descargar PDF'}
+                  </DropdownMenuItem>
+                  {canEdit && (
+                    <DropdownMenuItem className="gap-2 py-2" onClick={onEdit}>
+                      <Edit2 className="size-4 text-muted-foreground" />Editar equipo
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <button type="button" onClick={onClose} aria-label="Cerrar" className="flex size-11 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground">
+                <X className="size-5" />
               </button>
             </div>
           </div>
 
           <Tabs value={tab} onValueChange={onTabChange}>
-            <TabsList className="flex-wrap h-auto">
+            <TabsList className="w-full">
               <TabsTrigger value="info">Información</TabsTrigger>
               <TabsTrigger value="ficha">Ficha NFPA 70B</TabsTrigger>
               <TabsTrigger value="protocolo">Protocolo</TabsTrigger>
@@ -2382,9 +2394,9 @@ function ExpedienteDialog({
                         <div
                           className={`font-medium ${
                             pctVida != null && pctVida >= 100
-                              ? 'text-red-600'
+                              ? 'text-ink-crit'
                               : pctVida != null && pctVida >= 70
-                                ? 'text-amber-600'
+                                ? 'text-ink-warn'
                                 : ''
                           }`}
                         >
@@ -2937,7 +2949,7 @@ function AgendaInspecciones({
         return (
           <Card key={b.key}>
             <CardContent className="p-0">
-              <div className={`px-4 py-2 flex items-center justify-between text-sm font-semibold ${danger ? 'text-red-600' : ''}`}>
+              <div className={`px-4 py-2 flex items-center justify-between text-sm font-semibold ${danger ? 'text-ink-crit' : ''}`}>
                 <span>{b.label}</span>
                 <span className="text-xs text-muted-foreground">{items.length}</span>
               </div>
@@ -2964,7 +2976,7 @@ function AgendaInspecciones({
                         {e.nombre} <span className="text-caption text-muted-foreground font-mono">· {e.codigo}</span>
                       </span>
                       <OtBadge ot={otByEquipo.get(e.id)} />
-                      <span className={`text-xs shrink-0 ${dias !== null ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
+                      <span className={`text-xs shrink-0 ${dias !== null ? 'text-ink-crit font-medium' : 'text-muted-foreground'}`}>
                         {dias !== null ? `vencida ${dias} d` : prox ? new Date(prox).toLocaleDateString() : 'sin fecha'}
                       </span>
                       {danger && (
@@ -3039,7 +3051,7 @@ function CtdEquipoCard({
         </div>
         <div className="flex items-center justify-between text-caption">
           <span className="text-muted-foreground">Ficha</span>
-          <span className={pct < 100 ? 'text-amber-600' : 'text-emerald-600'}>{pct > 0 ? `${pct}%` : '—'}</span>
+          <span className={pct < 100 ? 'text-ink-warn' : 'text-ink-ok'}>{pct > 0 ? `${pct}%` : '—'}</span>
         </div>
       </CardContent>
     </Card>

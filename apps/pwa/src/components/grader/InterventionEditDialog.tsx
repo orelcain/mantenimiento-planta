@@ -24,9 +24,9 @@ const TIPOS: { id: Tipo; label: string }[] = [
   { id: 'inspeccion', label: 'Inspección' },
 ]
 const SEVS: { id: Sev; label: string; dot: string; active: string }[] = [
-  { id: 'verde', label: 'Cond. 1', dot: 'bg-emerald-500', active: 'border-emerald-500/[0.25] bg-emerald-500/[0.15] text-ink-ok' },
-  { id: 'amarillo', label: 'Cond. 2', dot: 'bg-amber-500', active: 'border-amber-500/[0.25] bg-amber-500/[0.15] text-ink-warn' },
-  { id: 'rojo', label: 'Cond. 3', dot: 'bg-red-500', active: 'border-red-500/[0.25] bg-red-500/[0.15] text-ink-crit' },
+  { id: 'verde', label: 'Cond. 1', dot: 'bg-emerald-500', active: 'border-transparent bg-emerald-500/[0.15] text-ink-ok' },
+  { id: 'amarillo', label: 'Cond. 2', dot: 'bg-amber-500', active: 'border-transparent bg-amber-500/[0.15] text-ink-warn' },
+  { id: 'rojo', label: 'Cond. 3', dot: 'bg-red-500', active: 'border-transparent bg-red-500/[0.15] text-ink-crit' },
 ]
 
 function toLocalInput(d: Date): string {
@@ -140,7 +140,7 @@ export function InterventionEditDialog({
               {TIPOS.map((t) => (
                 <button key={t.id} type="button" onClick={() => setTipo(t.id)}
                   className={cn('px-2 py-2 rounded-ctl border text-xs font-medium transition-colors',
-                    tipo === t.id ? 'border-primary/50 bg-primary/20 text-brand-ink'
+                    tipo === t.id ? 'border-transparent bg-primary/20 text-brand-ink'
                       : 'border-border bg-background text-muted-foreground hover:bg-muted')}>
                   {t.label}
                 </button>
@@ -190,7 +190,7 @@ export function InterventionEditDialog({
           )}
 
           {error && (
-            <div className="flex items-start gap-2 text-xs text-ink-crit bg-red-500/[0.15] border border-red-500/[0.25] rounded-ctl px-2.5 py-2">
+            <div className="flex items-start gap-2 text-xs text-ink-crit bg-red-500/[0.15] border border-transparent rounded-ctl px-2.5 py-2">
               <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
               <span className="break-words">{error}</span>
             </div>

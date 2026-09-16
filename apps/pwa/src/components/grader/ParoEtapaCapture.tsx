@@ -164,14 +164,14 @@ export function ParoEtapaCapture({ plantLineId, areaLabel, onChanged, className 
             {ETAPAS.map((e) => (
               <button key={e} type="button" onClick={() => setEtapaSel(e)}
                 className={cn('h-9 rounded-full px-3.5 text-subhead font-medium transition-colors',
-                  etapaSel === e ? 'border-cat-5-tint/[0.25] bg-cat-5-tint/[0.15] text-cat-5-ink'
+                  etapaSel === e ? 'border-transparent bg-cat-5-tint/[0.15] text-cat-5-ink'
                     : 'bg-muted text-foreground hover:bg-muted-foreground/[0.15]')}>
                 {e}
               </button>
             ))}
             <button type="button" onClick={() => setEtapaSel(OTRA)}
               className={cn('h-9 rounded-full px-3.5 text-subhead font-medium transition-colors',
-                etapaSel === OTRA ? 'border-cat-5-tint/[0.25] bg-cat-5-tint/[0.15] text-cat-5-ink'
+                etapaSel === OTRA ? 'border-transparent bg-cat-5-tint/[0.15] text-cat-5-ink'
                   : 'bg-muted text-foreground hover:bg-muted-foreground/[0.15]')}>
               Otra…
             </button>
@@ -200,7 +200,7 @@ export function ParoEtapaCapture({ plantLineId, areaLabel, onChanged, className 
         </div>
 
         {error && (
-          <div className="flex items-start gap-2 text-xs text-ink-crit bg-red-500/[0.15] border border-red-500/[0.25] rounded-ctl px-2.5 py-2">
+          <div className="flex items-start gap-2 text-xs text-ink-crit bg-red-500/[0.15] border border-transparent rounded-ctl px-2.5 py-2">
             <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" /><span className="break-words">{error}</span>
           </div>
         )}

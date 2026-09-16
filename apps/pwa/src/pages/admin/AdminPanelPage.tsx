@@ -42,7 +42,7 @@ interface AdminItem {
   title: string
   description: string
   icon: ReactNode
-  /** Color tailwind para el ícono (ej: 'text-amber-400') */
+  /** Color tailwind para el ícono (ej: 'text-ink-warn') */
   iconColor: string
   /** Agrupador visual ("Sensibles" requieren re-auth, "Configuración" general). */
   section: 'sensible' | 'config'
@@ -55,7 +55,7 @@ const ADMIN_ITEMS: AdminItem[] = [
     title: 'Credenciales Shoplogix',
     description: 'Auto-login ROPC para sync de Evisceradoras Baader 142. Rota la pass cuando AquaChile la cambie.',
     icon: <Key className="w-5 h-5" />,
-    iconColor: 'text-amber-400',
+    iconColor: 'text-ink-warn',
     section: 'sensible',
   },
   {
@@ -63,7 +63,7 @@ const ADMIN_ITEMS: AdminItem[] = [
     title: 'Permisos por usuario',
     description: 'Define qué módulos puede ver y editar cada usuario, anulando los defaults del rol.',
     icon: <Shield className="w-5 h-5" />,
-    iconColor: 'text-emerald-400',
+    iconColor: 'text-ink-ok',
     section: 'sensible',
   },
   {
@@ -71,7 +71,7 @@ const ADMIN_ITEMS: AdminItem[] = [
     title: 'Mapas y planos',
     description: 'Sube planos DXF, edita capas, gestiona ubicaciones y marcadores de equipos.',
     icon: <MapIcon className="w-5 h-5" />,
-    iconColor: 'text-blue-400',
+    iconColor: 'text-brand-ink',
     section: 'sensible',
   },
   {
@@ -79,7 +79,7 @@ const ADMIN_ITEMS: AdminItem[] = [
     title: 'Editor de terreno',
     description: 'Modelos DEM y configuración del terreno 3D de la planta.',
     icon: <Map className="w-5 h-5" />,
-    iconColor: 'text-blue-400',
+    iconColor: 'text-brand-ink',
     section: 'sensible',
   },
   {
@@ -145,7 +145,7 @@ const ADMIN_ITEMS: AdminItem[] = [
     title: 'Página de inicio por defecto',
     description: 'Define qué módulo se carga al entrar a la app (la home "/"). Por defecto: Análisis de Turno.',
     icon: <LayoutDashboard className="w-5 h-5" />,
-    iconColor: 'text-emerald-400',
+    iconColor: 'text-ink-ok',
     section: 'config',
   },
   {
@@ -184,7 +184,7 @@ export function AdminPanelPage() {
     <div className="container mx-auto p-4 sm:p-6 max-w-3xl space-y-4">
       <div className="space-y-1">
         <h1 className="text-2xl font-semibold flex items-center gap-2">
-          <Shield className="w-6 h-6 text-amber-400" />
+          <Shield className="w-6 h-6 text-ink-warn" />
           Panel de administración
         </h1>
         <p className="text-sm text-muted-foreground">

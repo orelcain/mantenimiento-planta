@@ -160,7 +160,7 @@ export function GraderCoverageBar({
   return (
     <div className="rounded-card border border-border bg-card px-3 py-2 space-y-1.5">
       <div className="flex items-center gap-2 flex-wrap text-caption">
-        <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+        <FileSpreadsheet className="w-3.5 h-3.5 text-ink-ok shrink-0" />
         <span className="font-medium">Cobertura del Excel</span>
         <span className="text-muted-foreground tabular-nums">
           {rango
@@ -168,7 +168,7 @@ export function GraderCoverageBar({
             : 'sin registros en el turno'}
         </span>
         <span className="ml-auto tabular-nums text-muted-foreground">
-          <b className={cn(faltaExcel ? 'text-amber-500' : 'text-emerald-500')}>
+          <b className={cn(faltaExcel ? 'text-ink-warn' : 'text-ink-ok')}>
             {cubiertoPct.toFixed(0)}%
           </b>{' '}
           {usandoProduccion ? 'de lo producido' : 'del turno programado'}

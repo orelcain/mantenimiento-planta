@@ -250,7 +250,7 @@ export function GraderShiftPeriodMatrix({
                           {isBelowMatrixTarget(s, kpi) && (
                             <span
                               aria-hidden
-                              className="absolute top-0 left-0 w-0 h-0 rounded-tl-sm"
+                              className="absolute top-0 left-0 w-0 h-0 rounded-tl-ctl"
                               style={{
                                 borderTop: '11px solid var(--lc-crit)',
                                 borderRight: '11px solid transparent',

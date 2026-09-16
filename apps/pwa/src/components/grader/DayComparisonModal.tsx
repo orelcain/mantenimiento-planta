@@ -69,8 +69,8 @@ function trend(
 }
 
 function TrendIcon({ t }: { t: Trend }) {
-  if (t === 'better') return <TrendingUp className="h-3 w-3 text-emerald-500 inline-block ml-0.5" />
-  if (t === 'worse')  return <TrendingDown className="h-3 w-3 text-red-400 inline-block ml-0.5" />
+  if (t === 'better') return <TrendingUp className="h-3 w-3 text-ink-ok inline-block ml-0.5" />
+  if (t === 'worse')  return <TrendingDown className="h-3 w-3 text-ink-crit inline-block ml-0.5" />
   return <Minus className="h-3 w-3 text-muted-foreground/50 inline-block ml-0.5" />
 }
 
@@ -151,13 +151,13 @@ export function DayComparisonModal({ open, onClose, summaries, dateKey }: DayCom
         {/* Shift headers */}
         <div className="grid grid-cols-[1fr_auto_1fr] gap-2 mb-1">
           <div className="text-right">
-            <Badge variant="outline" className="gap-1 text-ink-warn border-amber-500/[0.25] bg-amber-500/[0.15]">
+            <Badge variant="outline" className="gap-1 text-ink-warn border-transparent bg-amber-500/[0.15]">
               <Sun className="h-3 w-3" /> {dia.shiftId}
             </Badge>
           </div>
           <div className="w-12" /> {/* spacer */}
           <div className="text-left">
-            <Badge variant="outline" className="gap-1 text-cat-3-ink border-cat-3-tint/[0.25] bg-cat-3-tint/[0.15]">
+            <Badge variant="outline" className="gap-1 text-cat-3-ink border-transparent bg-cat-3-tint/[0.15]">
               <Moon className="h-3 w-3" /> {noche.shiftId}
             </Badge>
           </div>
@@ -411,7 +411,7 @@ export function DayComparisonModal({ open, onClose, summaries, dateKey }: DayCom
         {(() => {
           const deltaP0 = dec2((noche.pointZeroPct - dia.pointZeroPct))
           const sign = noche.pointZeroPct > dia.pointZeroPct ? '+' : ''
-          const color = noche.pointZeroPct > dia.pointZeroPct ? 'text-red-500' : 'text-ink-ok'
+          const color = noche.pointZeroPct > dia.pointZeroPct ? 'text-ink-crit' : 'text-ink-ok'
           return (
             <div className="rounded-card bg-muted/50 p-2.5 text-center text-caption text-muted-foreground">
               Noche vs Día: P0{' '}

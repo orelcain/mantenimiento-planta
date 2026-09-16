@@ -651,12 +651,12 @@ export function GraderPeriodView({ data }: Props) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {visibleStats.minP0Day && (
             <Card
-              className="border-emerald-500/[0.25] bg-emerald-500/[0.15] cursor-pointer hover:bg-emerald-500/[0.15] transition-colors"
+              className="border-transparent bg-emerald-500/[0.15] cursor-pointer hover:bg-emerald-500/[0.15] transition-colors"
               onClick={() => navigate(`/analisis-grader/turno/${visibleStats.minP0Day!.dateKey}__${encodeURIComponent('Turno día')}`)}
             >
               <CardContent className="pt-3 pb-3 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
+                  <CheckCircle2 className="h-5 w-5 text-ink-ok shrink-0" />
                   <div>
                     <p className="text-caption tracking-wide text-muted-foreground">Mejor día</p>
                     <p className="text-sm font-semibold">{visibleStats.minP0Day.dateKey}</p>
@@ -670,18 +670,18 @@ export function GraderPeriodView({ data }: Props) {
           )}
           {visibleStats.maxP0Day && (
             <Card
-              className="border-red-500/[0.25] bg-red-500/[0.15] cursor-pointer hover:bg-red-500/[0.15] transition-colors"
+              className="border-transparent bg-red-500/[0.15] cursor-pointer hover:bg-red-500/[0.15] transition-colors"
               onClick={() => navigate(`/analisis-grader/turno/${visibleStats.maxP0Day!.dateKey}__${encodeURIComponent('Turno día')}`)}
             >
               <CardContent className="pt-3 pb-3 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
-                  <AlertTriangle className="h-5 w-5 text-red-500 shrink-0" />
+                  <AlertTriangle className="h-5 w-5 text-ink-crit shrink-0" />
                   <div>
                     <p className="text-caption tracking-wide text-muted-foreground">Peor día</p>
                     <p className="text-sm font-semibold">{visibleStats.maxP0Day.dateKey}</p>
                   </div>
                 </div>
-                <p className="text-2xl font-bold tabular-nums text-red-500">
+                <p className="text-2xl font-bold tabular-nums text-ink-crit">
                   {visibleStats.maxP0Day.p0Pct}%
                 </p>
               </CardContent>
@@ -709,7 +709,7 @@ export function GraderPeriodView({ data }: Props) {
                 <p className={cn(
                   'font-semibold text-sm',
                   insights.tendencia.direccion === 'better' && 'text-ink-ok',
-                  insights.tendencia.direccion === 'worse'  && 'text-red-500',
+                  insights.tendencia.direccion === 'worse'  && 'text-ink-crit',
                   insights.tendencia.direccion === 'stable' && 'text-muted-foreground',
                 )}>
                   {insights.tendencia.direccion === 'better' ? '↓ Mejorando' : insights.tendencia.direccion === 'worse' ? '↑ Empeorando' : '→ Estable'}
@@ -724,7 +724,7 @@ export function GraderPeriodView({ data }: Props) {
               {/* Días críticos */}
               <div className="rounded-card border border-border bg-background px-3 py-2">
                 <p className="text-caption text-muted-foreground tracking-wider mb-1">Días críticos ≥3.5%</p>
-                <p className={cn('font-semibold text-sm', insights.criticalCount > 0 ? 'text-red-500' : 'text-ink-ok')}>
+                <p className={cn('font-semibold text-sm', insights.criticalCount > 0 ? 'text-ink-crit' : 'text-ink-ok')}>
                   {insights.criticalCount} / {insights.totalDays}
                 </p>
                 <p className="text-caption text-muted-foreground mt-0.5">
@@ -737,7 +737,7 @@ export function GraderPeriodView({ data }: Props) {
                 <div className="rounded-card border border-border bg-background px-3 py-2">
                   <p className="text-caption text-muted-foreground tracking-wider mb-1">Día vs Noche (prom.)</p>
                   <p className="font-semibold text-sm">
-                    <span className="text-amber-500">{insights.diaAvg}%</span>
+                    <span className="text-ink-warn">{insights.diaAvg}%</span>
                     <span className="text-muted-foreground mx-1">/</span>
                     <span className="text-cat-3-ink">{insights.nocheAvg}%</span>
                   </p>

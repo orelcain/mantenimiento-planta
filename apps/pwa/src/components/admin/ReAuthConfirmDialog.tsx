@@ -108,7 +108,7 @@ export function ReAuthConfirmDialog({
       <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base">
-            <ShieldAlert className="w-4 h-4 text-amber-400" />
+            <ShieldAlert className="w-4 h-4 text-ink-warn" />
             Confirma tu identidad
           </DialogTitle>
           <DialogDescription className="text-xs">

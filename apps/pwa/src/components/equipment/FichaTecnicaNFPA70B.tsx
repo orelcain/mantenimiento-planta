@@ -28,9 +28,9 @@ import type { ChecklistResultado, Equipment, FichaTecnica, Incident, Maintenance
  */
 
 const CRITICIDAD: Record<Equipment['criticidad'], { nivel: string; label: string; cls: string }> = {
-  alta: { nivel: 'A', label: 'Crítica', cls: 'border-red-500 text-red-600' },
-  media: { nivel: 'B', label: 'Media', cls: 'border-amber-500 text-amber-600' },
-  baja: { nivel: 'C', label: 'Baja', cls: 'border-emerald-500 text-emerald-600' },
+  alta: { nivel: 'A', label: 'Crítica', cls: 'border-red-500 text-ink-crit' },
+  media: { nivel: 'B', label: 'Media', cls: 'border-amber-500 text-ink-warn' },
+  baja: { nivel: 'C', label: 'Baja', cls: 'border-emerald-500 text-ink-ok' },
 }
 
 /** La condición NFPA es un ESTADO: va como punto de color + texto, nunca como
@@ -697,14 +697,14 @@ export function FichaTecnicaNFPA70B({
                               <Input
                                 type="number"
                                 inputMode="decimal"
-                                className={`h-7 w-24 text-xs ${fuera ? 'border-red-500 text-red-600' : ''}`}
+                                className={`h-7 w-24 text-xs ${fuera ? 'border-red-500 text-ink-crit' : ''}`}
                                 placeholder="valor"
                                 value={t.valor ?? ''}
                                 onChange={(e) => setChkItem(i, { valor: e.target.value })}
                               />
                               {m?.unidad && <span className="text-caption text-muted-foreground">{m.unidad}</span>}
                               {m?.rango && (
-                                <span className={`text-caption ${fuera ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
+                                <span className={`text-caption ${fuera ? 'text-ink-crit font-medium' : 'text-muted-foreground'}`}>
                                   ok: {rangoText(m.rango)}
                                   {fuera ? ' · fuera' : ''}
                                 </span>

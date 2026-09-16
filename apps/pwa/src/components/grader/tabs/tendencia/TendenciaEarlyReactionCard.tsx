@@ -79,7 +79,7 @@ export function TendenciaEarlyReactionCard({
     <Card>
       <CardHeader>
         <CardTitle className="text-sm flex items-center gap-2">
-          <TrendingUp className="h-4 w-4 text-emerald-500" />
+          <TrendingUp className="h-4 w-4 text-ink-ok" />
           Reacción temprana (automática + IA)
         </CardTitle>
         <p className="text-xs text-muted-foreground">

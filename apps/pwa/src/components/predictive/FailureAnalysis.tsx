@@ -158,7 +158,7 @@ export function FailureAnalysis() {
                 }}
             >
                 <CardContent className="pt-6 relative z-10">
-                    <div className="text-2xl font-bold text-blue-600 truncate flex items-center gap-2">
+                    <div className="text-2xl font-bold text-brand-ink truncate flex items-center gap-2">
                         {symptomStats.length > 0 && symptomStats[0] ? symptomStats[0][0] : 'N/A'}
                         {symptomStats.length > 0 && <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />}
                     </div>
@@ -169,7 +169,7 @@ export function FailureAnalysis() {
             <Card>
                 <CardContent className="pt-6">
                      {/* Calcula tasa de resolución simple */}
-                    <div className="text-2xl font-bold text-green-600">
+                    <div className="text-2xl font-bold text-ink-ok">
                         {incidents.length > 0 
                             ? Math.round((incidents.filter(i => i.status === 'cerrada' || i.status === 'confirmada').length / incidents.length) * 100)
                             : 0}%
@@ -293,7 +293,7 @@ export function FailureAnalysis() {
                     ))}
                     {incidents.filter(i => i.prioridad === 'critica' || i.prioridad === 'alta').length === 0 && (
                         <p className="text-sm text-muted-foreground text-center py-4">
-                            <CheckCircle2 className="h-4 w-4 inline mr-2 text-green-500" />
+                            <CheckCircle2 className="h-4 w-4 inline mr-2 text-ink-ok" />
                             No hay hallazgos críticos recientes.
                         </p>
                     )}
@@ -400,7 +400,7 @@ export function FailureAnalysis() {
                                     <div className="border rounded-card p-3">
                                         <div className="text-xs text-muted-foreground mb-1">Equipo Afectado</div>
                                         <div className="font-medium flex items-center gap-2">
-                                            <BrainCircuit className="h-4 w-4 text-blue-500" />
+                                            <BrainCircuit className="h-4 w-4 text-brand-ink" />
                                             {selectedIncident.equipmentId}
                                         </div>
                                     </div>
@@ -443,7 +443,7 @@ export function FailureAnalysis() {
 
                             {/* Resolución (si existe) */}
                             {selectedIncident.resolucion && (
-                                <div className="bg-green-500/[0.15] border border-emerald-500/[0.25] rounded-card p-4">
+                                <div className="bg-green-500/[0.15] border border-transparent rounded-card p-4">
                                     <h4 className="text-sm font-semibold mb-1 text-ink-ok flex items-center gap-2">
                                         <CheckCircle2 className="h-4 w-4" />
                                         Resolución Aplicada

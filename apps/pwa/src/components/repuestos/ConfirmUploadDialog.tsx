@@ -70,7 +70,7 @@ export function ConfirmUploadDialog({
         </div>
 
         {/* Destino */}
-        <div className="rounded-card border border-primary/30 bg-primary/5 px-3 py-2.5 text-sm">
+        <div className="rounded-card border border-transparent bg-primary/5 px-3 py-2.5 text-sm">
           <div className="flex items-center gap-2 font-medium text-foreground">
             <Package className="h-4 w-4 shrink-0 text-primary" />
             <span className="truncate">{repuestoName}</span>

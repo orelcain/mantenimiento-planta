@@ -4,15 +4,15 @@ import { ChevronDown, Fish, CalendarDays, BarChart3, Ruler, ClipboardList, Video
 import type { PointZeroSuggestion } from '@/services/grader/suggestions/types'
 
 const SEVERITY_STYLES = {
-  warning:     { border: 'border-red-500/[0.25]',    bg: 'bg-red-500/[0.15]',    badge: 'bg-red-500/[0.15] text-ink-crit',    dot: 'bg-red-400'    },
-  recommended: { border: 'border-amber-500/[0.25]',  bg: 'bg-amber-500/[0.15]',  badge: 'bg-amber-500/[0.15] text-ink-warn', dot: 'bg-amber-400'  },
-  info:        { border: 'border-primary/[0.25]',     bg: 'bg-primary/[0.15]',     badge: 'bg-primary/[0.15] text-brand-ink',    dot: 'bg-ink-info'    },
+  warning:     { border: 'border-transparent',    bg: 'bg-red-500/[0.15]',    badge: 'bg-red-500/[0.15] text-ink-crit',    dot: 'bg-red-400'    },
+  recommended: { border: 'border-transparent',  bg: 'bg-amber-500/[0.15]',  badge: 'bg-amber-500/[0.15] text-ink-warn', dot: 'bg-amber-400'  },
+  info:        { border: 'border-transparent',     bg: 'bg-primary/[0.15]',     badge: 'bg-primary/[0.15] text-brand-ink',    dot: 'bg-ink-info'    },
 } as const
 
 const CONFIDENCE_LABELS = {
-  high:   { label: 'Alta',   color: 'text-emerald-400' },
-  medium: { label: 'Media',  color: 'text-amber-400'   },
-  low:    { label: 'Baja',   color: 'text-red-400'     },
+  high:   { label: 'Alta',   color: 'text-ink-ok' },
+  medium: { label: 'Media',  color: 'text-ink-warn'   },
+  low:    { label: 'Baja',   color: 'text-ink-crit'     },
 } as const
 
 /** Ícono por fuente de la sugerencia. Componentes, no emojis: el emoji cambia

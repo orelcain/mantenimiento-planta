@@ -639,7 +639,7 @@ export function PauseKpiDashboard({ summaries }: PauseKpiDashboardProps) {
               <div className="mt-3 pt-2 border-t border-border/20">
                 <button
                   onClick={() => setAnnotationOpen(o => !o)}
-                  className="flex items-center gap-1.5 text-caption text-ink-warn hover:text-amber-500 transition-colors"
+                  className="flex items-center gap-1.5 text-caption text-ink-warn hover:text-ink-warn transition-colors"
                 >
                   {annotationOpen
                     ? <ChevronUp className="w-3 h-3" />

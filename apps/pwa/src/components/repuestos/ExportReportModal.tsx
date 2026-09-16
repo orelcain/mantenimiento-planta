@@ -363,7 +363,7 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
                                 className="w-full justify-start whitespace-normal px-4 py-3 border bg-background hover:bg-muted/50 data-[state=active]:border-primary data-[state=active]:ring-1 data-[state=active]:ring-primary/20 transition-all shadow-sm rounded-card"
                             >
                                 <div className="flex items-start gap-4">
-                                    <div className="p-2.5 bg-blue-500/[0.15] text-blue-600 rounded-card shrink-0 mt-0.5">
+                                    <div className="p-2.5 bg-blue-500/[0.15] text-brand-ink rounded-card shrink-0 mt-0.5">
                                         <ClipboardList className="h-5 w-5"/>
                                     </div>
                                     <div className="min-w-0 whitespace-normal text-left space-y-1">

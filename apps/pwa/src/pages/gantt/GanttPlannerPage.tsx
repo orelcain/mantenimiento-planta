@@ -268,13 +268,13 @@ export function GanttPlannerPage() {
       {/* Summary badges */}
       <div className="flex flex-wrap gap-2 text-xs">
         <Badge variant="outline">{filtered.length} tareas</Badge>
-        <Badge variant="outline" className="bg-emerald-500/[0.15] text-ink-ok border-emerald-500/[0.25]">
+        <Badge variant="outline" className="bg-emerald-500/[0.15] text-ink-ok border-transparent">
           {filtered.filter((t) => t.status === 'completada').length} completadas
         </Badge>
-        <Badge variant="outline" className="bg-amber-500/[0.15] text-ink-warn border-amber-500/[0.25]">
+        <Badge variant="outline" className="bg-amber-500/[0.15] text-ink-warn border-transparent">
           {filtered.filter((t) => t.status === 'en_progreso').length} en progreso
         </Badge>
-        <Badge variant="outline" className="bg-red-500/[0.15] text-ink-crit border-red-500/[0.25]">
+        <Badge variant="outline" className="bg-red-500/[0.15] text-ink-crit border-transparent">
           {cpm.criticalPath.length} ruta crítica
         </Badge>
       </div>
@@ -318,7 +318,7 @@ export function GanttPlannerPage() {
                     onClick={() => setEditTask(task)}
                   >
                     <div className="flex-1 px-3 truncate flex items-center gap-1.5">
-                      {criticalSet.has(task.id) && <AlertTriangle className="h-3 w-3 text-red-400 shrink-0" />}
+                      {criticalSet.has(task.id) && <AlertTriangle className="h-3 w-3 text-ink-crit shrink-0" />}
                       <span className="truncate font-medium">{task.titulo}</span>
                     </div>
                     <div className="w-24 text-center">
@@ -591,7 +591,7 @@ function TaskDialog({
               <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} disabled={!canEdit} className={dateError ? 'border-red-500' : ''} />
             </div>
           </div>
-          {dateError && <p className="text-xs text-red-500">{dateError}</p>}
+          {dateError && <p className="text-xs text-ink-crit">{dateError}</p>}
           {/* Info */}
           <div className="text-xs text-muted-foreground space-y-0.5">
             {task.responsibleName && <p>Responsable: {task.responsibleName}</p>}

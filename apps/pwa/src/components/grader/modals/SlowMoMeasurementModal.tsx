@@ -174,7 +174,7 @@ export function SlowMoMeasurementModal({
 
           {/* Resultado */}
           {validInputs && (
-            <div className="bg-primary/5 border border-primary/20 rounded-ctl p-2 text-xs space-y-1">
+            <div className="bg-primary/5 border border-transparent rounded-ctl p-2 text-xs space-y-1">
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground font-mono">{nFrames} / {nFps} fps =</span>
                 <span className="font-mono font-semibold text-primary">{seconds.toFixed(3)} s</span>
