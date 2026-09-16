@@ -39,6 +39,7 @@ import { cn } from '@/lib/utils'
 import { cascadeFromStates, classifyLossState, LOSS_BUCKET_META, type LossBucket } from '@/services/shoplogix/lossBuckets'
 import type { UpstreamMachineShift } from '@/services/shoplogix/types'
 import { useTimelineSyncOptional } from './useTimelineSync'
+import { dec1 } from '@/utils/formatoNumeros'
 
 function fmtHm(sec: number): string {
   if (sec <= 0) return '0m'
@@ -246,15 +247,15 @@ export function LossCascadeCard({
   }> = [
     {
       id: 'externo' as LossBucket, label: '− Externo', sec: totals.externoSec,
-      pct: `${pctOfTurno(totals.externoSec).toFixed(1)}% del turno`,
-      pct2: `${pctOfTecho(totals.externoSec).toFixed(1)}% del techo`,
+      pct: `${dec1(pctOfTurno(totals.externoSec))}% del turno`,
+      pct2: `${dec1(pctOfTecho(totals.externoSec))}% del techo`,
       bg: 'bg-amber-500/[0.15]', text: 'text-amber-500',
       ringHover: 'hover:ring-amber-400/40', ringActive: 'ring-1 ring-amber-400/70',
       tip: 'Falta MMPP, cumplimiento de cuota, energía — la máquina disponible pero el proceso no la alimentó. NO es pérdida de Mantención. Click para ver sus eventos.',
     },
     {
       id: 'planificado' as LossBucket, label: '− Planificado', sec: totals.planificadoSec,
-      pct: `${pctOfTurno(totals.planificadoSec).toFixed(1)}% del turno`,
+      pct: `${dec1(pctOfTurno(totals.planificadoSec))}% del turno`,
       pct2: null,
       bg: 'bg-muted-foreground/[0.10]', text: 'text-muted-foreground',
       ringHover: 'hover:ring-border/40', ringActive: 'ring-1 ring-border/70',
@@ -262,16 +263,16 @@ export function LossCascadeCard({
     },
     {
       id: 'mantencion' as LossBucket, label: '− Mantención', sec: totals.mantencionSec,
-      pct: `${pctOfTurno(totals.mantencionSec).toFixed(1)}% del turno`,
-      pct2: `${pctOfTecho(totals.mantencionSec).toFixed(1)}% del techo`,
+      pct: `${dec1(pctOfTurno(totals.mantencionSec))}% del turno`,
+      pct2: `${dec1(pctOfTecho(totals.mantencionSec))}% del techo`,
       bg: 'bg-cat-5-tint/[0.15]', text: 'text-cat-5-ink',
       ringHover: 'hover:ring-cat-5-ink/40', ringActive: 'ring-1 ring-cat-5-ink/70',
       tip: 'Averías, ajustes de mantenimiento, micro detenciones, cintas — el frente que Mantención debe reducir. Click para ver sus eventos.',
     },
     {
       id: 'sin-clasificar' as LossBucket, label: '− Sin clasif.', sec: totals.sinClasificarSec,
-      pct: `${pctOfTurno(totals.sinClasificarSec).toFixed(1)}% del turno`,
-      pct2: `${pctOfTecho(totals.sinClasificarSec).toFixed(1)}% del techo`,
+      pct: `${dec1(pctOfTurno(totals.sinClasificarSec))}% del turno`,
+      pct2: `${dec1(pctOfTecho(totals.sinClasificarSec))}% del techo`,
       bg: 'bg-cat-6-tint/[0.15]', text: 'text-cat-6-ink',
       ringHover: 'hover:ring-cat-6-ink/40', ringActive: 'ring-1 ring-cat-6-ink/70',
       tip: 'Causal desconocida o sin anotar en Shoplogix (ej. LOGICA). Anotarla le asigna dueño. Click para ver sus eventos.',
@@ -350,12 +351,12 @@ export function LossCascadeCard({
               </div>
               <div>
                 <span className="text-muted-foreground">Uso real = procesando ÷ techo = </span>
-                {fmtHm(totals.produccionSec)} ÷ {fmtHm(totals.techoSec)} = <b className="text-emerald-400">{(usoReal * 100).toFixed(1)}%</b>
+                {fmtHm(totals.produccionSec)} ÷ {fmtHm(totals.techoSec)} = <b className="text-emerald-400">{dec1((usoReal * 100))}%</b>
               </div>
               {uptimeClasico != null && (
                 <div>
                   <span className="text-muted-foreground">Uptime clásico = procesando ÷ turno completo = </span>
-                  {fmtHm(totals.produccionSec)} ÷ {fmtHm(turnoSec)} = <b>{uptimeClasico.toFixed(1)}%</b>
+                  {fmtHm(totals.produccionSec)} ÷ {fmtHm(turnoSec)} = <b>{dec1(uptimeClasico)}%</b>
                 </div>
               )}
               <div>
@@ -364,7 +365,7 @@ export function LossCascadeCard({
               </div>
               <div>
                 <span className="text-muted-foreground">Verificación (todo sobre el turno completo): </span>
-                {pctOfTurno(totals.produccionSec).toFixed(1)}% uso real + {pctOfTurno(totals.externoSec).toFixed(1)}% externo + {pctOfTurno(totals.planificadoSec).toFixed(1)}% planificado + {pctOfTurno(totals.mantencionSec).toFixed(1)}% mantención + {pctOfTurno(totals.sinClasificarSec).toFixed(1)}% sin clasif. = <b>{(pctOfTurno(totals.produccionSec) + pctOfTurno(totals.externoSec) + pctOfTurno(totals.planificadoSec) + pctOfTurno(totals.mantencionSec) + pctOfTurno(totals.sinClasificarSec)).toFixed(1)}%</b>
+                {dec1(pctOfTurno(totals.produccionSec))}% uso real + {dec1(pctOfTurno(totals.externoSec))}% externo + {dec1(pctOfTurno(totals.planificadoSec))}% planificado + {dec1(pctOfTurno(totals.mantencionSec))}% mantención + {dec1(pctOfTurno(totals.sinClasificarSec))}% sin clasif. = <b>{dec1((pctOfTurno(totals.produccionSec) + pctOfTurno(totals.externoSec) + pctOfTurno(totals.planificadoSec) + pctOfTurno(totals.mantencionSec) + pctOfTurno(totals.sinClasificarSec)))}%</b>
               </div>
             </div>
           )}
@@ -381,13 +382,13 @@ export function LossCascadeCard({
             <div className="rounded-ctl bg-primary/[0.15] px-2 py-1.5" title="Techo real de máquina = turno − planificado. El denominador honesto: todo este tiempo la máquina PODÍA producir. Es un subtotal (no se suma con las demás celdas).">
               <div className="text-ink-info text-caption uppercase">= Techo máquina</div>
               <div className="font-mono tabular-nums font-semibold">{fmtHm(totals.techoSec)}</div>
-              <div className="text-caption text-muted-foreground/60 tabular-nums">{pctOfTurno(totals.techoSec).toFixed(1)}% del turno · subtotal</div>
+              <div className="text-caption text-muted-foreground/60 tabular-nums">{dec1(pctOfTurno(totals.techoSec))}% del turno · subtotal</div>
             </div>
             <div className="rounded-ctl bg-emerald-500/[0.15] px-2 py-1.5" title="Tiempo efectivamente produciendo (uptime).">
               <div className="text-emerald-400 text-caption uppercase">= Uso real</div>
               <div className="font-mono tabular-nums font-semibold">{fmtHm(totals.produccionSec)}</div>
-              <div className="text-caption text-muted-foreground/60 tabular-nums">{pctOfTurno(totals.produccionSec).toFixed(1)}% del turno</div>
-              <div className="text-caption text-ink-ok tabular-nums">{(usoReal * 100).toFixed(1)}% del techo</div>
+              <div className="text-caption text-muted-foreground/60 tabular-nums">{dec1(pctOfTurno(totals.produccionSec))}% del turno</div>
+              <div className="text-caption text-ink-ok tabular-nums">{dec1((usoReal * 100))}% del techo</div>
             </div>
             {lossCells.map((c) => (
               <button
@@ -467,7 +468,7 @@ export function LossCascadeCard({
                           >
                             {m.piezas.toLocaleString('es-CL')} pz
                             <span className="text-muted-foreground"> · </span>
-                            <span className="font-medium">{m.pzMin.toFixed(1)} pz/min</span>
+                            <span className="font-medium">{dec1(m.pzMin)} pz/min</span>
                           </div>
                         )}
                       </div>
@@ -584,7 +585,7 @@ export function LossCascadeCard({
                       <span className="text-caption text-muted-foreground/60 tabular-nums shrink-0">×{c.count}</span>
                       <span className="ml-auto font-mono tabular-nums shrink-0">{fmtHm(c.sec)}</span>
                       <span className="font-mono tabular-nums text-muted-foreground/60 sm:w-14 text-right shrink-0 text-caption">
-                        {pctOfTecho(c.sec).toFixed(1)}%
+                        {dec1(pctOfTecho(c.sec))}%
                       </span>
                       <span className="font-mono tabular-nums text-muted-foreground sm:w-20 text-right shrink-0">
                         ≈ {c.piezas.toLocaleString('es-CL')} pz
@@ -609,7 +610,7 @@ export function LossCascadeCard({
                     <span className="text-caption text-muted-foreground/60 tabular-nums shrink-0">×{c.count}</span>
                     <span className="ml-auto font-mono tabular-nums shrink-0">{fmtHm(c.sec)}</span>
                     <span className="font-mono tabular-nums text-muted-foreground/60 sm:w-14 text-right shrink-0 text-caption">
-                      {pctOfTurno(c.sec).toFixed(1)}%
+                      {dec1(pctOfTurno(c.sec))}%
                     </span>
                     {/* Columna fantasma para alinear con la fila de arriba; en
                         móvil no existe, si no empuja el wrap una línea de más. */}

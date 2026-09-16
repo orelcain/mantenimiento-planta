@@ -37,6 +37,7 @@ import { useChartReadyConnect } from './useEChartsConnect'
 import { fmtTime } from '@/services/grader/graderTimeFormat'
 import { shortMachineName } from '@/services/grader/graderMachineNames'
 import { useTheme } from '@/hooks/useTheme'
+import { dec1 } from '@/utils/formatoNumeros'
 
 // ── Colores por máquina (sky, violet, emerald) + ámbar para el promedio ──────
 const MACHINE_COLORS = [
@@ -701,7 +702,7 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd, showGap
             .filter(p => p.value?.[1] != null)
             .map(p => {
               const v = p.value[1] as number
-              return `<span style="color:${p.color}">●</span> ${p.seriesName}: <strong>${v.toFixed(1)}</strong> pz/min`
+              return `<span style="color:${p.color}">●</span> ${p.seriesName}: <strong>${dec1(v)}</strong> pz/min`
             })
             .join('<br/>')
           return `<div style="font-size:10px;color:#94a3b8">${time}</div>${rows}`
