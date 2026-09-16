@@ -40,7 +40,6 @@ import { getQuizBest, QUIZ_PASS_PCT } from '@/utils/learningProgress'
 import { LC as C } from '@/data/learningTheme'
 import { normHub, textoBuscable, coincide } from '@/data/learningHubSearch'
 import { MetaText, StatusTag } from '@/components/learning/primitives'
-import { dec1 } from '@/utils/formatoNumeros'
 
 // ── Paleta DARK + AquaChile: ver import { LC as C } arriba (compartida con admin) ──
 
@@ -122,7 +121,7 @@ function BathymetryBackdrop() {
       let d = `M 0 ${baseY}`
       for (let x = 0; x <= W; x += 40) {
         const y = baseY + Math.sin(x / 110 + phase) * amp
-        d += ` L ${x} ${dec1(y)}`
+        d += ` L ${x} ${y.toFixed(1)}` // decimal-tecnico: coordenada de una ruta SVG
       }
       return { d, opacity: 0.10 - i * 0.012 }
     })

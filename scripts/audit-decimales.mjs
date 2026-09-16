@@ -52,7 +52,15 @@ const RX_COMA_DONDE_VA_PUNTO = new RegExp(
   // objeto de estilos: style={{ width: dec1(…) }}
   + '|style=\\{\\{[^}]*dec[12]\\('
   // propiedad CSS en plantilla: width: `${dec1(x)}%`
-  + '|(?:width|height|left|top|right|bottom|transform|inset|gap|padding|margin|lineHeight)\\s*:\\s*`[^`]*\\$\\{dec[12]\\(',
+  + '|(?:width|height|left|top|right|bottom|transform|inset|gap|padding|margin|lineHeight)\\s*:\\s*`[^`]*\\$\\{dec[12]?\\('
+  // Geometría SVG armada como TEXTO (rutas `d` y `points`). Así se rompió el
+  // comparador del monitor: `M${dec2(x)},${dec2(y)}` daba «M12,50,30,20», que el
+  // navegador lee como CUATRO números, y la línea cruzaba el gráfico entero.
+  //   dos coordenadas seguidas:        ${dec1(x)},${dec1(y)}   ·   ${dec1(x)} ${dec1(y)}
+  + '|\\$\\{dec[12]?\\([^`]*?\\)\\}[ ,]\\$\\{dec[12]?\\('
+  //   comando de ruta junto a un dec:  'L'}${dec2(x)}   ·   ` L ${x} ${dec1(y)}`
+  + "|[MLHVCSQTAZ]['\"]?\\}?\\s?\\$\\{dec[12]?\\("
+  + '|[MLHVCSQTAZ] \\$\\{[^}]+\\} \\$\\{dec[12]?\\(',
 )
 
 function* archivos(dir) {
