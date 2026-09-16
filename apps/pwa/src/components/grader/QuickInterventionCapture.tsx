@@ -309,7 +309,7 @@ export function QuickInterventionCapture({
               type="button" size="sm" variant="outline"
               disabled={!canAnalyze || busy}
               onClick={handleRefine}
-              className="border-primary/[0.25] text-primary hover:bg-primary/[0.15]"
+              className="border-primary/[0.25] text-brand-ink hover:bg-primary/[0.15]"
               title="Corrige la transcripción de voz (errores fonéticos, muletillas)"
             >
               {refining ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5 mr-1.5" />}
@@ -319,7 +319,7 @@ export function QuickInterventionCapture({
               type="button" size="sm" variant="outline"
               disabled={!canAnalyze || busy}
               onClick={handleSuggest}
-              className="border-primary/30 text-primary hover:bg-primary/10"
+              className="border-primary/30 text-brand-ink hover:bg-primary/10"
               title="La IA sugiere tipo, condición y un título conciso"
             >
               {suggesting ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5 mr-1.5" />}
@@ -375,7 +375,7 @@ export function QuickInterventionCapture({
                     className={cn(
                       'flex items-center justify-center gap-1.5 px-2 py-2 rounded-ctl border text-xs font-medium transition-colors',
                       active
-                        ? 'border-primary/50 bg-primary/20 text-primary'
+                        ? 'border-primary/50 bg-primary/20 text-brand-ink'
                         : 'border-border bg-background text-muted-foreground hover:text-foreground hover:bg-muted',
                     )}
                   >
@@ -522,7 +522,7 @@ export function QuickInterventionCapture({
                     type="button"
                     onClick={() => setEditingEntry(e)}
                     title="Editar intervención"
-                    className="shrink-0 p-1 rounded-ctl text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                    className="shrink-0 p-1 rounded-ctl text-muted-foreground hover:text-brand-ink hover:bg-primary/10 transition-colors"
                   >
                     <Pencil className="h-3.5 w-3.5" />
                   </button>
@@ -557,7 +557,7 @@ export function QuickInterventionCapture({
                 type="button" size="sm" variant="outline"
                 disabled={analyzing}
                 onClick={handleAnalyzeArea}
-                className="border-primary/30 text-primary hover:bg-primary/10"
+                className="border-primary/30 text-brand-ink hover:bg-primary/10"
               >
                 {analyzing
                   ? <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />Analizando {entries.length} intervenciones…</>

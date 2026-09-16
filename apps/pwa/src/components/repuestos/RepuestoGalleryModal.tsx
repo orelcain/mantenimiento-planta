@@ -269,7 +269,7 @@ export function RepuestoGalleryModal({
             <Button
               onClick={handleSave}
               disabled={saving}
-              className="bg-blue-600 hover:bg-blue-500 text-white"
+              className="bg-primary/[0.12] hover:bg-primary/[0.12] text-brand-ink"
             >
               {saving ? (
                 <>

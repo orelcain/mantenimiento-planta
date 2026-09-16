@@ -195,7 +195,7 @@ function GeneralSettings() {
               variant="outline"
               size="sm"
               onClick={toggleTheme}
-              className="gap-2"
+              className="gap-2 min-h-[44px] rounded-full px-4"
             >
               {isDark ? (
                 <>

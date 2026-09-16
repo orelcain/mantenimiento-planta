@@ -43,7 +43,7 @@ export function Tag({ tone = 'neutral', className, children, ...props }: TagProp
     <span
       className={cn(
         'inline-flex items-center rounded-full px-2 py-0.5',
-        'text-[0.68rem] font-semibold leading-none whitespace-nowrap',
+        'text-caption font-semibold leading-none whitespace-nowrap',
         TONES[tone],
         className,
       )}

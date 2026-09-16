@@ -118,10 +118,10 @@ export function CargaRapida({ maquina, maquinas, diaIdx, onCambiarMaquina }: Car
   }
 
   const chip =
-    'min-h-[44px] min-w-[3rem] rounded-ctl px-3 text-footnote font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary motion-reduce:transition-none'
+    'min-h-[44px] min-w-[3rem] rounded-full px-3 text-footnote font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary motion-reduce:transition-none'
   const campo = 'h-11 rounded-ctl border border-border bg-background px-2.5 text-body text-foreground'
   const accion =
-    'flex min-h-[44px] items-center gap-1.5 rounded-ctl bg-primary px-3.5 text-body font-medium text-primary-foreground disabled:opacity-40'
+    'flex min-h-[44px] items-center gap-1.5 rounded-full bg-primary px-3.5 text-body font-medium text-primary-foreground disabled:opacity-40'
 
   const otras = maquinas.filter((m) => m.id !== maquina.id)
 

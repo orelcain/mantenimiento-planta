@@ -45,7 +45,7 @@ const formatNumber = (value: number) =>
 
 function tipoBadgeClass(tipo: string): string {
   const t = tipo.toUpperCase()
-  if (['RODAMIENTO', 'COJINETE'].includes(t)) return 'bg-primary/[0.15] text-primary'
+  if (['RODAMIENTO', 'COJINETE'].includes(t)) return 'bg-primary/[0.15] text-brand-ink'
   if (['SELLO/JUNTA', 'ANILLO'].includes(t)) return 'bg-green-500/[0.15] text-ink-ok'
   if (['MOTOR', 'BOMBA'].includes(t)) return 'bg-red-500/[0.15] text-ink-crit'
   if (['SENSOR', 'INTERRUPTOR', 'MÓDULO ELÉCT.', 'RELÉ', 'CONTACTOR', 'FUENTE ALIM.', 'TRANSFORMADOR', 'VARIADOR', 'HMI', 'PLC'].includes(t)) return 'bg-cat-6-tint/[0.15] text-cat-6-ink'
@@ -125,7 +125,7 @@ function QuickImagePreview({ url, name, allImages, onClose, onAddPhoto }: {
     <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center" onClick={onClose}>
       <div className="relative max-w-4xl w-full max-h-[90vh] flex flex-col items-center" onClick={e => e.stopPropagation()}>
         {/* Cerrar */}
-        <button onClick={onClose} className="absolute top-2 right-2 z-10 h-8 w-8 rounded-full bg-black/50 flex items-center justify-center text-white hover:bg-red-500 transition-colors">
+        <button onClick={onClose} className="absolute top-2 right-2 z-10 h-8 w-8 rounded-full bg-black/50 flex items-center justify-center text-ink-crit hover:brightness-95/[0.15] transition-colors">
           <X className="h-4 w-4" />
         </button>
 
@@ -313,11 +313,11 @@ export function RepuestosTable({
                   </div>
                   {/* Badges inline */}
                   <div className="flex items-center gap-1 mt-1 flex-wrap">
-                    <span className="text-caption font-mono text-primary bg-primary/[0.15] px-1 py-0 rounded-ctl">{rep.codigoSAP || 'S/C'}</span>
+                    <span className="text-caption font-mono text-brand-ink bg-primary/[0.15] px-1 py-0 rounded-ctl">{rep.codigoSAP || 'S/C'}</span>
                     {rep.codigoFabricante && <span className="text-caption font-mono text-cat-6-ink bg-cat-6-tint/[0.15] px-1 py-0 rounded-ctl">{rep.codigoFabricante}</span>}
                     {rep.tipo && <span className={`text-caption px-1 py-0 rounded-ctl font-semibold uppercase ${tipoBadgeClass(rep.tipo)}`}>{rep.tipo}</span>}
                     {(rep as EquipmentRepuesto).source && (
-                      <span className={`text-caption px-1 py-0 rounded-ctl font-medium ${(rep as EquipmentRepuesto).source === 'own' ? 'bg-emerald-500/[0.15] text-ink-ok' : 'bg-primary/[0.15] text-primary'}`}>
+                      <span className={`text-caption px-1 py-0 rounded-ctl font-medium ${(rep as EquipmentRepuesto).source === 'own' ? 'bg-emerald-500/[0.15] text-ink-ok' : 'bg-primary/[0.15] text-brand-ink'}`}>
                         {(rep as EquipmentRepuesto).source === 'own' ? 'Propio' : 'Comp.'}
                       </span>
                     )}
@@ -402,7 +402,7 @@ export function RepuestosTable({
                           </span>
                         )}
                         {(rep as EquipmentRepuesto).source && (
-                          <span className={`inline-block text-caption px-1 py-0 rounded-ctl font-medium tracking-wide mt-0.5 ml-1 ${(rep as EquipmentRepuesto).source === 'own' ? 'bg-emerald-500/[0.15] text-ink-ok' : 'bg-primary/[0.15] text-primary'}`}>
+                          <span className={`inline-block text-caption px-1 py-0 rounded-ctl font-medium tracking-wide mt-0.5 ml-1 ${(rep as EquipmentRepuesto).source === 'own' ? 'bg-emerald-500/[0.15] text-ink-ok' : 'bg-primary/[0.15] text-brand-ink'}`}>
                             {(rep as EquipmentRepuesto).source === 'own' ? 'Propio' : 'Compartido'}
                           </span>
                         )}

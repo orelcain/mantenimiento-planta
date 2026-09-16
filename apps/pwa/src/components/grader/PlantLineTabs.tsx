@@ -57,7 +57,7 @@ export function PlantLineTabs({ selected, onSelect, className }: PlantLineTabsPr
                 // El 7px es a propósito y NO debe pasar a `rounded-ctl` (10px):
                 // en un control segmentado el radio INTERIOR va menor que el del
                 // contenedor para que las esquinas aniden, que es como lo hace iOS.
-                'flex-1 flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-[7px] transition-all text-center',
+                'flex-1 flex flex-col items-center gap-0.5 px-2 py-1.5 min-h-[44px] rounded-full transition-all text-center',
                 isActive
                   ? 'bg-card shadow-[0_1px_3px_rgba(0,0,0,0.18)]'
                   : soon
@@ -67,7 +67,7 @@ export function PlantLineTabs({ selected, onSelect, className }: PlantLineTabsPr
             >
               <span
                 className={cn(
-                  'text-[0.78rem] font-medium leading-tight',
+                  'text-footnote font-medium leading-tight',
                   isActive && 'font-semibold text-foreground',
                   soon && 'text-muted-foreground/60',
                 )}
@@ -99,12 +99,12 @@ export function PlantLineTabs({ selected, onSelect, className }: PlantLineTabsPr
                   // Píldoras SIN borde: un borde por chip multiplica las líneas
                   // en pantalla y es de lo que más ensucia. El estado se
                   // comunica con relleno, no con contorno.
-                  'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[0.78rem] font-medium transition-colors',
+                  'inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-subhead font-medium transition-colors',
                   isActive
                     ? 'bg-primary text-primary-foreground'
                     : area.comingSoon
                     ? 'bg-muted-foreground/[0.06] text-muted-foreground/45 cursor-not-allowed'
-                    : 'bg-muted-foreground/10 text-muted-foreground hover:text-foreground',
+                    : 'bg-muted text-foreground hover:text-foreground',
                 )}
               >
                 {area.areaLabel}

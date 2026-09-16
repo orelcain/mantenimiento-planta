@@ -290,7 +290,7 @@ export function CargaTrabajo({
           <button
             onClick={agregar}
             disabled={!nuevoNombre.trim()}
-            className="flex h-11 items-center gap-1.5 rounded-ctl bg-primary px-3.5 text-body font-medium text-primary-foreground disabled:opacity-40"
+            className="flex h-11 items-center gap-1.5 rounded-full bg-primary px-3.5 text-body font-medium text-primary-foreground disabled:opacity-40"
           >
             <Plus className="h-4 w-4" />
             Agregar
@@ -365,7 +365,7 @@ function Contador({
   onCambiar: (v: number) => void
 }) {
   const btn =
-    'flex h-9 w-9 shrink-0 items-center justify-center rounded-ctl border border-border text-muted-foreground disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
+    'flex size-11 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
   return (
     <span className="flex items-center gap-2">
       <button

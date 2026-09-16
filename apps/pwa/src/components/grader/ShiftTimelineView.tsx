@@ -1510,7 +1510,7 @@ export function ShiftTimelineView({
             <button
               type="button"
               onClick={onUploadClick}
-              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-ctl border border-primary/[0.25] bg-primary/[0.15] text-primary hover:bg-primary/[0.15] active:bg-primary/[0.15] transition-colors text-caption font-medium"
+              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-ctl border border-primary/[0.25] bg-primary/[0.15] text-brand-ink hover:bg-primary/[0.15] active:bg-primary/[0.15] transition-colors text-caption font-medium"
               title="Cargar otro Excel del Grader para complementar este turno (turnos en curso suben Excel parciales múltiples veces)."
             >
               <Upload className="w-3 h-3" />
@@ -1531,7 +1531,7 @@ export function ShiftTimelineView({
               className={cn(
                 'shrink-0 px-2 py-0.5 font-medium transition-colors',
                 activeZoom === 'turno'
-                  ? 'bg-primary/20 text-primary'
+                  ? 'bg-primary/20 text-brand-ink'
                   : 'text-muted-foreground hover:text-foreground hover:bg-muted/30',
               )}
             >
@@ -1540,9 +1540,9 @@ export function ShiftTimelineView({
             {hourlySegments.map(seg => {
               const segId = `h${seg.hour}`
               const colorClass =
-                seg.p0Pct >= criticalThreshold ? 'text-red-400' :
-                seg.p0Pct >= alertThreshold    ? 'text-amber-400' :
-                seg.pieces > 0                 ? 'text-emerald-400' :
+                seg.p0Pct >= criticalThreshold ? 'text-ink-crit' :
+                seg.p0Pct >= alertThreshold    ? 'text-ink-warn' :
+                seg.pieces > 0                 ? 'text-ink-ok' :
                 'text-muted-foreground'
               return (
                 <button
@@ -1556,7 +1556,7 @@ export function ShiftTimelineView({
                   className={cn(
                     'shrink-0 px-2 py-0.5 font-medium transition-colors border-l border-border/30',
                     activeZoom === segId
-                      ? 'bg-primary/20 text-primary'
+                      ? 'bg-primary/20 text-brand-ink'
                       : `${colorClass} hover:bg-muted/30`,
                   )}
                 >
@@ -1755,7 +1755,7 @@ export function ShiftTimelineView({
                     <span
                       className={cn(
                         'ml-2 tabular-nums text-caption font-medium',
-                        cp.p0Delta > 0 ? 'text-cat-5-ink' : cp.p0Delta < 0 ? 'text-emerald-400' : 'text-muted-foreground',
+                        cp.p0Delta > 0 ? 'text-ink-crit' : cp.p0Delta < 0 ? 'text-ink-ok' : 'text-muted-foreground',
                       )}
                       title="Δ P0% respecto a la carga anterior"
                     >

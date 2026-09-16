@@ -178,10 +178,10 @@ export function BeforeAfterViewer({ before, after, titulo }: BeforeAfterViewerPr
             </div>
 
             {/* Labels */}
-            <div className="absolute top-2 left-2 px-2 py-1 bg-red-500 text-white text-xs font-medium rounded-ctl">
+            <div className="absolute top-2 left-2 px-2 py-1 bg-red-500/[0.15] text-ink-crit text-xs font-medium rounded-ctl">
               ANTES
             </div>
-            <div className="absolute top-2 right-2 px-2 py-1 bg-green-500 text-white text-xs font-medium rounded-ctl">
+            <div className="absolute top-2 right-2 px-2 py-1 bg-green-500/[0.15] text-ink-ok text-xs font-medium rounded-ctl">
               DESPUÉS
             </div>
           </div>
@@ -204,7 +204,7 @@ export function BeforeAfterViewer({ before, after, titulo }: BeforeAfterViewerPr
             />
             <div className={cn(
               "absolute top-4 left-4 px-3 py-1.5 text-white text-sm font-medium rounded-ctl",
-              fullscreenImage === 'before' ? 'bg-red-500' : 'bg-green-500'
+              'bg-muted-foreground text-background'
             )}>
               {fullscreenImage === 'before' ? 'ANTES' : 'DESPUÉS'}
             </div>

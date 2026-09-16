@@ -10,7 +10,7 @@ import { useState, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, Spinner, InfoTooltip } from '@/components/ui'
 import { TrendingUp, AlertTriangle, TrendingDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { Disclosure } from '@/components/piel'
+import { Disclosure, SegmentedControl } from '@/components/piel'
 import { usePlantKPIsForPeriod } from '@/hooks/usePlantKPIs'
 import type { KpiPeriod } from '@/hooks/usePlantKPIs'
 import type { PlantSlug } from '@/services/shoplogix/shoplogixMachines'
@@ -62,38 +62,38 @@ function fmtHours(v: number): string {
 
 function oeeColor(v: number | null): string {
   if (v === null) return 'text-muted-foreground'
-  if (v >= OEE_GOOD) return 'text-emerald-400'
+  if (v >= OEE_GOOD) return 'text-ink-ok'
   if (v >= KPI_CUTOFFS.oee.warnBelow) return 'text-ink-info'
-  if (v >= KPI_CUTOFFS.oee.critBelow) return 'text-amber-400'
-  return 'text-cat-5-ink'
+  if (v >= KPI_CUTOFFS.oee.critBelow) return 'text-ink-warn'
+  return 'text-ink-crit'
 }
 
 function availColor(v: number | null): string {
   if (v === null) return 'text-muted-foreground'
-  if (v >= KPI_CUTOFFS.availability.warnBelow) return 'text-emerald-400'
-  if (v >= KPI_CUTOFFS.availability.critBelow) return 'text-amber-400'
-  return 'text-cat-5-ink'
+  if (v >= KPI_CUTOFFS.availability.warnBelow) return 'text-ink-ok'
+  if (v >= KPI_CUTOFFS.availability.critBelow) return 'text-ink-warn'
+  return 'text-ink-crit'
 }
 
 function perfColor(v: number | null): string {
   if (v === null) return 'text-muted-foreground'
-  if (v >= KPI_CUTOFFS.performance.warnBelow) return 'text-emerald-400'
-  if (v >= KPI_CUTOFFS.performance.critBelow) return 'text-amber-400'
-  return 'text-cat-5-ink'
+  if (v >= KPI_CUTOFFS.performance.warnBelow) return 'text-ink-ok'
+  if (v >= KPI_CUTOFFS.performance.critBelow) return 'text-ink-warn'
+  return 'text-ink-crit'
 }
 
 function mttrColor(min: number): string {
   if (min === 0) return 'text-muted-foreground'
-  if (min <= KPI_CUTOFFS.mttrMin.warnAbove) return 'text-emerald-400'
-  if (min <= KPI_CUTOFFS.mttrMin.critAbove) return 'text-amber-400'
-  return 'text-cat-5-ink'
+  if (min <= KPI_CUTOFFS.mttrMin.warnAbove) return 'text-ink-ok'
+  if (min <= KPI_CUTOFFS.mttrMin.critAbove) return 'text-ink-warn'
+  return 'text-ink-crit'
 }
 
 function mtbfColor(h: number): string {
   if (h === 0)  return 'text-muted-foreground'
-  if (h >= KPI_CUTOFFS.mtbfHours.warnBelow) return 'text-emerald-400'
-  if (h >= KPI_CUTOFFS.mtbfHours.critBelow) return 'text-amber-400'
-  return 'text-cat-5-ink'
+  if (h >= KPI_CUTOFFS.mtbfHours.warnBelow) return 'text-ink-ok'
+  if (h >= KPI_CUTOFFS.mtbfHours.critBelow) return 'text-ink-warn'
+  return 'text-ink-crit'
 }
 
 function barWidth(v: number | null, max = 1): string {
@@ -139,7 +139,11 @@ function KPICard({ label, tooltip, value, valueColor, barValue, barMax = 1, barC
         <div className="text-caption font-medium text-muted-foreground leading-tight truncate">{label}</div>
         <InfoTooltip text={tooltip} iconSize={11} position="top" />
       </div>
-      <div className={cn('text-xl font-bold tabular-nums leading-none', valueColor)}>{value}</div>
+      {/* El numero va en tinta de ETIQUETA, no en el color de estado: a 20 px un
+          rojo vivo es superficie grande y grita (DESIGN.md §3). El estado ya lo
+          lleva la barra de 6 px de abajo, que si es superficie chica. Solo el
+          valor ausente (—, N/A) se apaga. Como Salud o Bolsa en iOS. */}
+      <div className={cn('text-xl font-bold tabular-nums leading-none', valueColor === 'text-muted-foreground' ? valueColor : 'text-foreground')}>{value}</div>
       {barValue !== null && (
         <div className="h-1.5 bg-muted/50 rounded-full overflow-hidden mt-1.5">
           <div className={cn('h-full rounded-full transition-all', barColor ?? 'bg-primary')}
@@ -243,22 +247,13 @@ export function PlantKPIBoard({
           </CardTitle>
 
           {/* Selector Día / Semana / Mes */}
-          <div className="flex gap-0.5 bg-muted rounded-ctl p-0.5">
-            {PERIODS.map(p => (
-              <button
-                key={p.id}
-                onClick={() => setPeriod(p.id)}
-                className={cn(
-                  'px-2 py-0.5 text-caption font-medium rounded-ctl transition-colors',
-                  period === p.id
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground',
-                )}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
+          <SegmentedControl
+            ariaLabel="Período de los indicadores"
+            value={period}
+            onChange={setPeriod}
+            segments={PERIODS.map(p => ({ value: p.id, label: p.label }))}
+            className="w-52 shrink-0"
+          />
         </div>
         {/* Alcance honesto del OEE: es de las evisceradoras, no de toda el área. */}
         <p className="text-caption text-muted-foreground mt-1 leading-tight">{scopeNote}</p>
@@ -272,7 +267,7 @@ export function PlantKPIBoard({
         )}
 
         {error && (
-          <p className="text-xs text-cat-5-ink flex items-center gap-1">
+          <p className="text-xs text-ink-crit flex items-center gap-1">
             <AlertTriangle className="w-3.5 h-3.5" /> {error}
           </p>
         )}
@@ -322,7 +317,7 @@ export function PlantKPIBoard({
                 valueColor={oeeColor(kpis.oee)}
                 barValue={kpis.oee}
                 barColor={kpis.oee !== null
-                  ? (kpis.oee >= OEE_GOOD ? 'bg-emerald-500' : kpis.oee >= KPI_CUTOFFS.oee.warnBelow ? 'bg-blue-500' : kpis.oee >= KPI_CUTOFFS.oee.critBelow ? 'bg-amber-500' : 'bg-red-500')
+                  ? (kpis.oee >= OEE_GOOD ? 'bg-fill-ok' : kpis.oee >= KPI_CUTOFFS.oee.warnBelow ? 'bg-primary' : kpis.oee >= KPI_CUTOFFS.oee.critBelow ? 'bg-fill-warning' : 'bg-fill-critical')
                   : 'bg-muted'}
                 note={kpis.graderOnly ? 'Sin Shoplogix' : kpis.oee === null ? (classifies ? 'Sin Q' : 'A·P solamente') : undefined}
               />
@@ -333,7 +328,7 @@ export function PlantKPIBoard({
                 valueColor={availColor(kpis.availability)}
                 barValue={kpis.availability}
                 barColor={kpis.availability !== null
-                  ? (kpis.availability >= KPI_CUTOFFS.availability.warnBelow ? 'bg-emerald-500' : kpis.availability >= KPI_CUTOFFS.availability.critBelow ? 'bg-amber-500' : 'bg-red-500')
+                  ? (kpis.availability >= KPI_CUTOFFS.availability.warnBelow ? 'bg-fill-ok' : kpis.availability >= KPI_CUTOFFS.availability.critBelow ? 'bg-fill-warning' : 'bg-fill-critical')
                   : undefined}
                 note={kpis.graderOnly ? 'Sin Shoplogix' : undefined}
               />
@@ -344,7 +339,7 @@ export function PlantKPIBoard({
                 valueColor={perfColor(kpis.performance)}
                 barValue={kpis.performance}
                 barColor={kpis.performance !== null
-                  ? (kpis.performance >= KPI_CUTOFFS.performance.warnBelow ? 'bg-emerald-500' : kpis.performance >= KPI_CUTOFFS.performance.critBelow ? 'bg-amber-500' : 'bg-red-500')
+                  ? (kpis.performance >= KPI_CUTOFFS.performance.warnBelow ? 'bg-fill-ok' : kpis.performance >= KPI_CUTOFFS.performance.critBelow ? 'bg-fill-warning' : 'bg-fill-critical')
                   : undefined}
                 note={kpis.graderOnly ? 'Sin Shoplogix' : undefined}
               />
@@ -353,11 +348,11 @@ export function PlantKPIBoard({
                 tooltip={DEFS.quality.desc}
                 value={kpis.quality !== null ? pct(kpis.quality) : 'N/A'}
                 valueColor={kpis.quality !== null
-                  ? (kpis.quality >= KPI_CUTOFFS.quality.warnBelow ? 'text-emerald-400' : kpis.quality >= KPI_CUTOFFS.quality.critBelow ? 'text-amber-400' : 'text-cat-5-ink')
+                  ? (kpis.quality >= KPI_CUTOFFS.quality.warnBelow ? 'text-ink-ok' : kpis.quality >= KPI_CUTOFFS.quality.critBelow ? 'text-ink-warn' : 'text-ink-crit')
                   : 'text-muted-foreground'}
                 barValue={kpis.quality}
                 barColor={kpis.quality !== null
-                  ? (kpis.quality >= KPI_CUTOFFS.quality.warnBelow ? 'bg-emerald-500' : kpis.quality >= KPI_CUTOFFS.quality.critBelow ? 'bg-amber-500' : 'bg-red-500')
+                  ? (kpis.quality >= KPI_CUTOFFS.quality.warnBelow ? 'bg-fill-ok' : kpis.quality >= KPI_CUTOFFS.quality.critBelow ? 'bg-fill-warning' : 'bg-fill-critical')
                   : undefined}
                 note={kpis.quality === null ? (classifies ? 'Sin Grader' : 'No clasifica') : undefined}
               />
@@ -373,7 +368,7 @@ export function PlantKPIBoard({
                 value={fmtMin(kpis.mttrMin)}
                 valueColor={mttrColor(kpis.mttrMin)}
                 barValue={kpis.mttrMin > 0 ? Math.min(1, kpis.mttrMin / 30) : null}
-                barColor={kpis.mttrMin <= KPI_CUTOFFS.mttrMin.warnAbove ? 'bg-emerald-500' : kpis.mttrMin <= KPI_CUTOFFS.mttrMin.critAbove ? 'bg-amber-500' : 'bg-red-500'}
+                barColor={kpis.mttrMin <= KPI_CUTOFFS.mttrMin.warnAbove ? 'bg-fill-ok' : kpis.mttrMin <= KPI_CUTOFFS.mttrMin.critAbove ? 'bg-fill-warning' : 'bg-fill-critical'}
               />
               <KPICard
                 label="MTBF ↑"
@@ -381,7 +376,7 @@ export function PlantKPIBoard({
                 value={fmtHours(kpis.mtbfHours)}
                 valueColor={mtbfColor(kpis.mtbfHours)}
                 barValue={kpis.mtbfHours > 0 ? Math.min(1, kpis.mtbfHours / 4) : null}
-                barColor={kpis.mtbfHours >= KPI_CUTOFFS.mtbfHours.warnBelow ? 'bg-emerald-500' : kpis.mtbfHours >= KPI_CUTOFFS.mtbfHours.critBelow ? 'bg-amber-500' : 'bg-red-500'}
+                barColor={kpis.mtbfHours >= KPI_CUTOFFS.mtbfHours.warnBelow ? 'bg-fill-ok' : kpis.mtbfHours >= KPI_CUTOFFS.mtbfHours.critBelow ? 'bg-fill-warning' : 'bg-fill-critical'}
               />
               <div
                 className="px-1 py-1.5"
@@ -450,7 +445,7 @@ export function PlantKPIBoard({
                   )}
                   title={`${shortMachineName(m.machineName)} — ${machineKind.long}${kpis.machines.length > 1 ? ` N°${idx + 1}` : ''}\nDisponibilidad ${availPctTxt} · Rendimiento ${perfPctTxt} · MTTR ${mttrTxt} · ${m.failureCount} paros${isWorst ? '\nLa que más piezas pierde del grupo' : ''}`}
                 >
-                  {isWorst && <AlertTriangle className="w-2.5 h-2.5 text-amber-400 shrink-0" />}
+                  {isWorst && <AlertTriangle className="w-2.5 h-2.5 text-ink-warn shrink-0" />}
                   <span
                     className="text-muted-foreground w-14 sm:w-32 shrink-0 truncate"
                     title={`${shortMachineName(m.machineName)} — ${machineKind.long}${kpis.machines.length > 1 ? ` N°${idx + 1}` : ''}`}

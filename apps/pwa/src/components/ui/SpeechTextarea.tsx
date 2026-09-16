@@ -135,7 +135,7 @@ const SpeechTextarea = React.forwardRef<HTMLTextAreaElement, SpeechTextareaProps
             variant="ghost"
             size="sm"
             className={cn(
-              "absolute right-2 top-2 h-8 w-8 p-0 rounded-full",
+              "absolute right-2 top-2 size-11 p-0 rounded-full",
               busy
                 ? "text-ink-info"
                 : active

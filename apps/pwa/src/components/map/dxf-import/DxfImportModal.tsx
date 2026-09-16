@@ -210,8 +210,8 @@ export function DxfImportModal({ onClose }: Props) {
                   {selected.size} / {capas.length} capas seleccionadas
                 </span>
                 <div className="flex gap-2">
-                  <button onClick={selectAll}  className="text-[10px] px-2 py-0.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded transition-colors">Todas</button>
-                  <button onClick={selectNone} className="text-[10px] px-2 py-0.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded transition-colors">Ninguna</button>
+                  <button onClick={selectAll}  className="text-caption px-2 py-0.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded transition-colors">Todas</button>
+                  <button onClick={selectNone} className="text-caption px-2 py-0.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded transition-colors">Ninguna</button>
                 </div>
               </div>
 
@@ -231,7 +231,7 @@ export function DxfImportModal({ onClose }: Props) {
                         ? <Eye size={10} className="text-gray-400 shrink-0" />
                         : <EyeOff size={10} className="text-gray-600 shrink-0" />}
                       <span className="text-[11px] flex-1 truncate text-gray-200">{c.name}</span>
-                      <span className="text-[10px] font-mono text-gray-500">{fmtCount(c.entityCount)}</span>
+                      <span className="text-caption font-mono text-gray-500">{fmtCount(c.entityCount)}</span>
                     </button>
                   )
                 })}

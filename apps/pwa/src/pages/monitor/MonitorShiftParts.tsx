@@ -81,7 +81,7 @@ export function Bloque({ id, titulo, extra, defaultAbierto = true, children }: {
         className="tap-44 flex w-full items-center justify-between gap-2 text-left"
         aria-expanded={abierto}
       >
-        <span className="text-[11px] uppercase tracking-wide text-muted-foreground">{titulo}</span>
+        <span className="text-[11px] text-muted-foreground">{titulo}</span>
         <span className="flex items-center gap-2 text-[11px] text-muted-foreground">
           {extra}
           <ChevronDown className={`h-3.5 w-3.5 transition-transform ${abierto ? '' : '-rotate-90'}`} />
@@ -410,7 +410,7 @@ export function TiempoDelTurno({
            * entre lo pintado y el hueco es la cuota de esta hora. Los valores
            * SIEMPRE afuera: el ancho de un segmento no decide su legibilidad.
            */}
-          <p className="text-right text-[11px] uppercase tracking-wide text-muted-foreground/80">
+          <p className="text-right text-[11px] text-muted-foreground/80">
             meta <span className="tabular-nums">{fmtInt(metaOk)} pz</span>
           </p>
           {/* Los segmentos son ATAJOS al mismo detalle que su fila (abajo);
@@ -721,7 +721,7 @@ export function TiempoDelTurno({
           «Programado» — repetirlas acá era la duplicación que acusó Orel. */}
       {!restaVisible && (
         <div className="mt-2">
-          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+          <p className="text-[11px] text-muted-foreground">
             Qué pasó en el turno
             <span className="normal-case tracking-normal">
               {' '}· {fmtDurMin(tb.recoverableMin)} recuperables
@@ -1047,7 +1047,7 @@ function FilaEvento({ c, sel, onCausa, onVentana, onTramo, notas }: {
       {/* La categoría del curso, para que la etiqueta no sea nuestra: si el
           árbol dice que ATASCAMIENTO es MMPP, nadie discute la fila. */}
       {c.categoria && (
-        <p className="px-1 text-[9.5px] uppercase tracking-wide text-muted-foreground/80">
+        <p className="px-1 text-[9.5px] text-muted-foreground/80">
           {c.categoria}
           {c.extension && <span className="ml-1 normal-case tracking-normal">· fuera del curso</span>}
         </p>

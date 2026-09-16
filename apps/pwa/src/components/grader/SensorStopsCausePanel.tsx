@@ -36,7 +36,7 @@ import { shortMachineName } from '@/services/grader/graderMachineNames'
 
 /** Categorías de causa — definen a quién le pertenece el minuto perdido. */
 const CATEGORIAS = [
-  { id: 'mantencion',  label: 'Mantención', icon: Wrench,        cls: 'border-primary/50 bg-primary/15 text-primary' },
+  { id: 'mantencion',  label: 'Mantención', icon: Wrench,        cls: 'border-primary/50 bg-primary/15 text-brand-ink' },
   { id: 'operacion',   label: 'Operación',  icon: Users,         cls: 'border-amber-500/[0.25] bg-amber-500/[0.15] text-ink-warn' },
   { id: 'externo',     label: 'Externo',    icon: CloudOff,      cls: 'border-muted-foreground/[0.10] bg-muted-foreground/[0.10] text-muted-foreground' },
   { id: 'planificado', label: 'Planificado', icon: CalendarClock, cls: 'border-emerald-500/[0.25] bg-emerald-500/[0.15] text-ink-ok' },
@@ -336,7 +336,7 @@ export function SensorStopsCausePanel({
                 <Button
                   size="sm"
                   variant={causaTexto ? 'ghost' : 'outline'}
-                  className={cn('h-6 px-2 text-caption', !causaTexto && 'border-primary/40 text-primary hover:bg-primary/10')}
+                  className={cn('h-6 px-2 text-caption', !causaTexto && 'border-primary/40 text-brand-ink hover:bg-primary/10')}
                   onClick={() => (abierto ? setOpenKey(null) : abrir(stop))}
                 >
                   {abierto
@@ -391,7 +391,7 @@ export function SensorStopsCausePanel({
                   )}
 
                   {error && (
-                    <p className="text-caption text-cat-5-ink">{error}</p>
+                    <p className="text-caption text-ink-crit">{error}</p>
                   )}
 
                   <div className="flex justify-end gap-1.5">

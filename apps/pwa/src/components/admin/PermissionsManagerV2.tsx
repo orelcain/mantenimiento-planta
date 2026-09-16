@@ -351,7 +351,7 @@ function RolePermissionsTab() {
                           onClick={() => handleToggleAction(module.id, action)}
                           className={`flex items-center gap-2 px-3 py-2 rounded-card text-sm transition-colors ${
                             isActive
-                              ? 'bg-primary/20 text-primary border border-primary'
+                              ? 'bg-primary/20 text-brand-ink border border-primary'
                               : 'bg-muted hover:bg-muted/80 border border-transparent'
                           }`}
                         >
@@ -660,7 +660,7 @@ function UserPermissionsTab() {
                                     onClick={() => handleToggleAction(module.id, action)}
                                     className={`flex items-center gap-1 px-2 py-1 rounded-ctl text-xs transition-colors ${
                                       isActive
-                                        ? 'bg-primary/20 text-primary border border-primary'
+                                        ? 'bg-primary/20 text-brand-ink border border-primary'
                                         : 'bg-muted hover:bg-muted/80 border border-transparent'
                                     }`}
                                   >

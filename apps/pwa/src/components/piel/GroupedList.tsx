@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils'
 // `Omit<'title'>`: el atributo HTML nativo solo acepta string y acá el título
 // puede llevar marcado (contadores, Pill). El tooltip nativo no se usa.
 export interface ListGroupProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'title'> {
-  /** Encabezado en mayúsculas sobre el grupo (rol `caption` de §2). */
+  /** Encabezado del grupo: subhead 15 / 600, secundario, formato oración (DESIGN.md §2, iOS 26+). */
   title?: React.ReactNode
   /** Acción a la derecha del encabezado, ej. "Ver todas". */
   action?: React.ReactNode
@@ -33,7 +33,7 @@ export function ListGroup({ title, action, footer, className, children, ...props
               mismo cambio en los encabezados de lista agrupada: "Notificaciones",
               no "NOTIFICACIONES". */}
           {title && (
-            <h3 className="text-caption font-semibold text-muted-foreground">
+            <h3 className="text-subhead font-semibold text-muted-foreground">
               {title}
             </h3>
           )}

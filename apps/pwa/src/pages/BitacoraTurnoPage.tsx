@@ -226,9 +226,9 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
               {esActual ? (
                 <Pill tone="info" dot="pulse">En curso</Pill>
               ) : (
-                <Button variant="plain" size="sm" onClick={irAlActual}>Ir al turno actual</Button>
+                <Button variant="plain" onClick={irAlActual}>Ir al turno actual</Button>
               )}
-              <Button variant="plain" size="sm" onClick={() => navigate('/bitacora/historial')}>
+              <Button variant="plain" onClick={() => navigate('/bitacora/historial')}>
                 <BarChart3 /> Historial
               </Button>
             </span>
@@ -339,7 +339,7 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
       <section aria-label="Técnicos del turno" className="flex flex-col gap-2.5 rounded-card bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
         <div className="flex items-baseline justify-between gap-2">
           <h2 className="text-footnote text-muted-foreground">Técnicos del turno</h2>
-          <Button variant="plain" size="sm" onClick={() => {
+          <Button variant="plain" onClick={() => {
               setBorradorPresentes(presentes.nombres)
               setHojaTecnicos('presentes')
             }}>

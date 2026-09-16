@@ -163,16 +163,16 @@ export function ParoEtapaCapture({ plantLineId, areaLabel, onChanged, className 
                 midio el sensor y va como causa de ese paro, no aca. */}
             {ETAPAS.map((e) => (
               <button key={e} type="button" onClick={() => setEtapaSel(e)}
-                className={cn('px-2.5 py-1 rounded-ctl border text-xs font-medium transition-colors',
+                className={cn('h-9 rounded-full px-3.5 text-subhead font-medium transition-colors',
                   etapaSel === e ? 'border-cat-5-tint/[0.25] bg-cat-5-tint/[0.15] text-cat-5-ink'
-                    : 'border-border bg-background text-muted-foreground hover:bg-muted')}>
+                    : 'bg-muted text-foreground hover:bg-muted-foreground/[0.15]')}>
                 {e}
               </button>
             ))}
             <button type="button" onClick={() => setEtapaSel(OTRA)}
-              className={cn('px-2.5 py-1 rounded-ctl border text-xs font-medium transition-colors',
+              className={cn('h-9 rounded-full px-3.5 text-subhead font-medium transition-colors',
                 etapaSel === OTRA ? 'border-cat-5-tint/[0.25] bg-cat-5-tint/[0.15] text-cat-5-ink'
-                  : 'border-border bg-background text-muted-foreground hover:bg-muted')}>
+                  : 'bg-muted text-foreground hover:bg-muted-foreground/[0.15]')}>
               Otra…
             </button>
           </div>
@@ -206,10 +206,15 @@ export function ParoEtapaCapture({ plantLineId, areaLabel, onChanged, className 
         )}
 
         <div className="flex items-center gap-3">
-          <Button type="button" onClick={handleSave} disabled={saving} className="bg-red-600 hover:bg-red-600 text-white">
+          {/* Usaba `bg-red-500/[0.15] text-ink-crit`, que pisa el variant con clases
+              crudas: en la piel Apple ese token es el systemRed vivo y daba
+              2.59:1 con texto blanco. El variant `destructive` existe justo
+              para esto (3.80:1). Ver DESIGN.md §3: el tinte vivo no va en
+              rellenos grandes. */}
+          <Button type="button" variant="destructive" onClick={handleSave} disabled={saving}>
             {saving ? <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" />Guardando…</> : <><CheckCircle2 className="h-4 w-4 mr-1.5" />Registrar paro</>}
           </Button>
-          {justSaved && <span className="flex items-center gap-1 text-xs text-emerald-400 font-medium"><CheckCircle2 className="h-3.5 w-3.5" /> Registrado</span>}
+          {justSaved && <span className="flex items-center gap-1 text-xs text-ink-ok font-medium"><CheckCircle2 className="h-3.5 w-3.5" /> Registrado</span>}
         </div>
 
         {/* Pareto: qué etapa para más */}
@@ -233,7 +238,7 @@ export function ParoEtapaCapture({ plantLineId, areaLabel, onChanged, className 
                       <span className="tabular-nums text-muted-foreground">{fmtDur(r.min)} · {r.n} paro{r.n !== 1 ? 's' : ''}</span>
                     </div>
                     <div className="h-1.5 bg-muted/40 rounded-full overflow-hidden">
-                      <div className={cn('h-full rounded-full', i === 0 ? 'bg-red-500' : 'bg-cat-5-tint/[0.15]')} style={{ width: `${wpct}%` }} />
+                      <div className={cn('h-full rounded-full', i === 0 ? 'bg-fill-critical' : 'bg-cat-5-tint/[0.15]')} style={{ width: `${wpct}%` }} />
                     </div>
                   </div>
                 )
@@ -252,7 +257,7 @@ export function ParoEtapaCapture({ plantLineId, areaLabel, onChanged, className 
                 <span className="text-foreground/80 min-w-0 flex-1 break-words">{p.causa || '—'}</span>
                 <span className="text-muted-foreground/60 shrink-0 hidden sm:inline">{fmtFecha(p.fecha)}</span>
                 {isAdmin && (
-                  <button type="button" onClick={() => handleDelete(p.id)} title="Eliminar" className="shrink-0 text-muted-foreground/60 hover:text-red-400">
+                  <button type="button" onClick={() => handleDelete(p.id)} title="Eliminar" className="shrink-0 text-muted-foreground/60 hover:text-ink-crit">
                     <Trash2 className="h-3 w-3" />
                   </button>
                 )}

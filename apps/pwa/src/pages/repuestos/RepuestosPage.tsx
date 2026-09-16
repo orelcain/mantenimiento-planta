@@ -16,6 +16,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Package, LayoutGrid, ScanSearch } from 'lucide-react'
 import { BodegaView } from './BodegaView'
+import { SegmentedControl } from '@/components/piel'
 import { RepuestosAreaHub } from './RepuestosAreaHub'
 import { CodigosFabricanteView, type CrearDesdeCatalogo } from './CodigosFabricanteView'
 
@@ -116,34 +117,19 @@ export function RepuestosPage() {
   return (
     <div className="flex flex-col h-full bg-background">
 
-      {/* ── Tab bar ── */}
-      <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm border-b border-border px-3 sm:px-6">
-        <div className="flex items-end gap-0.5 sm:gap-1">
-          {TABS.map(({ id, label, mobileLabel, icon: Icon, badge }) => {
-            const isActive = activeTab === id
-            return (
-              <button
-                key={id}
-                onClick={() => setActiveTab(id)}
-                className={[
-                  'flex items-center gap-1.5 px-3 sm:px-3 py-3 sm:py-2.5 text-xs sm:text-xs font-medium transition-all border-b-2 -mb-px whitespace-nowrap',
-                  isActive
-                    ? 'text-primary border-primary bg-primary/5'
-                    : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted/40',
-                ].join(' ')}
-              >
-                <Icon className="h-4 w-4 sm:h-3.5 sm:w-3.5 shrink-0" />
-                <span className="hidden sm:inline">{label}</span>
-                <span className="sm:hidden">{mobileLabel}</span>
-                {badge && (
-                  <span className="hidden sm:inline text-caption font-bold tracking-wide text-amber-400 bg-amber-500/[0.15] px-1 py-0.5 rounded-ctl">
-                    {badge}
-                  </span>
-                )}
-              </button>
-            )
-          })}
-        </div>
+      {/* ── Selector de vista: control segmentado (iOS), no pestañas con subrayado ── */}
+      <div className="sticky top-0 z-20 bg-background/95 px-3 pb-2 pt-2 backdrop-blur-sm sm:px-6">
+        <SegmentedControl
+          ariaLabel="Vista de Repuestos"
+          value={activeTab}
+          onChange={setActiveTab}
+          className="max-w-xl"
+          segments={TABS.map(({ id, label, mobileLabel, icon: Icon }) => ({
+            value: id,
+            icon: <Icon className="hidden sm:block" />,
+            label: <><span className="hidden sm:inline">{label}</span><span className="sm:hidden">{mobileLabel}</span></>,
+          }))}
+        />
       </div>
 
       {/* ── Contenido — lazy mount + display:hidden (no desmonta) ── */}

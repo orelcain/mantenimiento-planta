@@ -132,7 +132,7 @@ export function TachMeasurementModal({
                 onClick={() => setMethod('linear')}
                 className={cn(
                   'rounded-ctl border text-xs px-2 py-1.5 text-left',
-                  method === 'linear' ? 'border-primary bg-primary/15 text-primary' : 'border-muted hover:bg-muted/30',
+                  method === 'linear' ? 'border-primary bg-primary/15 text-brand-ink' : 'border-muted hover:bg-muted/30',
                 )}
               >
                 <div className="font-medium">Rueda sobre cinta</div>
@@ -144,7 +144,7 @@ export function TachMeasurementModal({
                 disabled={!effectiveMpsPerRpm}
                 className={cn(
                   'rounded-ctl border text-xs px-2 py-1.5 text-left',
-                  method === 'shaft' ? 'border-primary bg-primary/15 text-primary' : 'border-muted hover:bg-muted/30',
+                  method === 'shaft' ? 'border-primary bg-primary/15 text-brand-ink' : 'border-muted hover:bg-muted/30',
                   !effectiveMpsPerRpm && 'opacity-50 cursor-not-allowed',
                 )}
               >

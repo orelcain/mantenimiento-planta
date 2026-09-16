@@ -46,7 +46,7 @@ export function tendenciaImputacion(porTurno: PeriodImputacion['porTurno']): Ten
 const nivel = (pct: number) =>
   pct >= 90 ? { text: 'text-ink-ok', bar: 'bg-emerald-500/[0.15]', label: 'Documentado' }
   : pct >= 60 ? { text: 'text-ink-warn', bar: 'bg-amber-500/[0.15]', label: 'Parcial' }
-  : { text: 'text-cat-5-ink', bar: 'bg-cat-5-tint/[0.15]', label: 'Sin imputar' }
+  : { text: 'text-ink-crit', bar: 'bg-red-500/[0.15]', label: 'Sin imputar' }
 
 export function ImputacionPeriodCard({ imputacion }: { imputacion: PeriodImputacion | null }) {
   if (!imputacion || imputacion.totalSec <= 0) return null
@@ -75,7 +75,7 @@ export function ImputacionPeriodCard({ imputacion }: { imputacion: PeriodImputac
 
         <div className="flex items-center gap-4">
           <div className="shrink-0">
-            <p className={cn('text-lg font-bold leading-none tabular-nums', th.text)}>
+            <p className="text-lg font-bold leading-none tabular-nums text-foreground">
               {pct.toFixed(0)}%
             </p>
             <p className="text-caption text-muted-foreground mt-0.5">con causal</p>
@@ -104,7 +104,7 @@ export function ImputacionPeriodCard({ imputacion }: { imputacion: PeriodImputac
                   <span className={cn(
                     'tabular-nums',
                     tend.dir === 'sube' ? 'text-ink-ok'
-                    : tend.dir === 'baja' ? 'text-cat-5-ink' : '',
+                    : tend.dir === 'baja' ? 'text-ink-crit' : '',
                   )}>
                     {tend.dir === 'sube' ? '▲' : tend.dir === 'baja' ? '▼' : '='}{' '}
                     {tend.dir === 'estable'

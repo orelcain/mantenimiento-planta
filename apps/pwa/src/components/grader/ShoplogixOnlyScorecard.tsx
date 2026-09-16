@@ -109,7 +109,7 @@ export function ShoplogixOnlyScorecard({ snapshot, shiftWindow, shiftLabel, date
           <span className="font-medium text-sm" title={shiftMeta.label}>{shiftMeta.label}</span>
           <span className="text-muted-foreground text-sm">· {dateKey}</span>
           {shiftWindow?.status === 'live' && (
-            <Badge className="bg-red-500 text-white animate-pulse text-xs px-2 py-0">
+            <Badge className="bg-red-500/[0.15] text-ink-crit animate-pulse text-xs px-2 py-0">
               <Activity className="w-3 h-3 mr-1" />EN VIVO
             </Badge>
           )}

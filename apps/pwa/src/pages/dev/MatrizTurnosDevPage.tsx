@@ -122,7 +122,7 @@ export default function MatrizTurnosDevPage() {
         />
 
         <div className="rounded-md border border-border bg-card p-4 text-sm flex flex-col gap-2">
-          <b className="text-xs uppercase tracking-wider font-mono text-muted-foreground">
+          <b className="text-xs font-mono text-muted-foreground">
             Comprobaciones sobre estos datos
           </b>
           <div className="grid gap-1 font-mono text-xs">
@@ -141,7 +141,7 @@ export default function MatrizTurnosDevPage() {
           )}
           {stats && (
             <div className="mt-2 pt-2 border-t border-border font-mono text-xs flex flex-col gap-0.5">
-              <span className="text-muted-foreground uppercase tracking-wider text-[10px]">
+              <span className="text-muted-foreground text-[10px]">
                 Stats del panel mensual (portadas del calendario retirado)
               </span>
               <span>ciclos: <b>{stats.totalCycles.toLocaleString('es-CL')}</b> · uptime prom:{' '}

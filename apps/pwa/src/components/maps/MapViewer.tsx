@@ -409,7 +409,7 @@ export const MapViewer = forwardRef<MapViewerHandle, MapViewerProps>(({
 
       {/* Indicador de modo edición */}
       {editable && (
-        <div className="absolute top-2 left-2 z-10 bg-blue-500 text-white text-xs px-2 py-1 rounded-ctl shadow-md flex items-center gap-1">
+        <div className="absolute top-2 left-2 z-10 bg-primary/[0.12] text-brand-ink text-xs px-2 py-1 rounded-ctl shadow-md flex items-center gap-1">
           <MapPin className="h-3 w-3" />
           Toca para colocar marcador
         </div>

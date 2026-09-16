@@ -551,7 +551,7 @@ function Barras({ titulo, data, esperado, total }: {
   const filas = Object.entries(data).sort((a, b) => b[1] - a[1])
   return (
     <div>
-      <p className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">{titulo}</p>
+      <p className="text-caption font-semibold text-muted-foreground">{titulo}</p>
       <ul className="mt-1.5 space-y-1.5">
         {filas.map(([k, pz]) => {
           const pct = total > 0 ? (pz / total) * 100 : 0
@@ -629,7 +629,7 @@ function PorPeso({ peso }: { peso: PesoPorPuerta }) {
   const fuera = pesoAvisa(peso)
   return (
     <div data-testid="pureza-peso">
-      <p className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">
+      <p className="text-caption font-semibold text-muted-foreground">
         Por peso · rango {peso.rango?.calibre} {peso.rango ? `(${fmtKg(peso.rango.minGrams)} a ${fmtKg(peso.rango.maxGrams)})` : ''}
       </p>
       <ul className="mt-1.5 space-y-1.5">
@@ -703,7 +703,7 @@ function DetalleGate({ mix, entry, cfg, changeBuckets, causas, seteo, onAdoptar,
 
       {mezclaPuerta && !seteo && mezclaPuerta.composicion.length > 0 && (
         <div className="space-y-2">
-          <p className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">Qué llegó a esta puerta</p>
+          <p className="text-caption font-semibold text-muted-foreground">Qué llegó a esta puerta</p>
           <TiraComposicion composicion={mezclaPuerta.composicion} alta />
           <LeyendaComposicion m={mezclaPuerta} />
           {mezclaPuerta.composicion.length === 1 ? (
@@ -760,7 +760,7 @@ function DetalleGate({ mix, entry, cfg, changeBuckets, causas, seteo, onAdoptar,
           con la config de cada bloque). */}
       {!seteo && causas && causas.groups.length > 0 && (
         <div data-testid="pureza-causas">
-          <p className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">¿Por qué cayó acá?</p>
+          <p className="text-caption font-semibold text-muted-foreground">¿Por qué cayó acá?</p>
           <ul className="mt-1.5 space-y-2">
             {causas.groups.map((g) => (
               <li key={`${g.tipo}|${g.value}`} className="text-footnote">
@@ -780,7 +780,7 @@ function DetalleGate({ mix, entry, cfg, changeBuckets, causas, seteo, onAdoptar,
 
       {!seteo && causas && causas.judged > 0 && (
         <div>
-          <p className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">Qué cayó, bloque a bloque</p>
+          <p className="text-caption font-semibold text-muted-foreground">Qué cayó, bloque a bloque</p>
           <div className="mt-1 h-[192px]" data-testid="pureza-apilado">
             <ReactECharts option={buildApilado(mix, causas, isDark)} style={{ height: '100%', width: '100%' }} opts={{ renderer: 'canvas' }} notMerge />
           </div>
@@ -801,7 +801,7 @@ function DetalleGate({ mix, entry, cfg, changeBuckets, causas, seteo, onAdoptar,
 
       {mapa && (!seteo || seteo.noReconocido) && (
         <div>
-          <p className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">Peso, bloque a bloque</p>
+          <p className="text-caption font-semibold text-muted-foreground">Peso, bloque a bloque</p>
           <div className="mt-1"><MapaPesoSvg mapa={mapa} mix={mix} tramos={tramosPeso} /></div>
           {peso && (
             <p className={cn('mt-1 text-footnote', pesoAvisa(peso) ? 'text-ink-warn' : 'text-muted-foreground')} data-testid="pureza-peso-frase">
@@ -1089,7 +1089,7 @@ function PiezasDePuerta({ obs, m, piezas, cargando, onCargar, rango, rangos, foc
   if (!piezas) {
     return (
       <div className="space-y-2" data-testid="pureza-piezas">
-        <p className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">Ver cada pieza</p>
+        <p className="text-caption font-semibold text-muted-foreground">Ver cada pieza</p>
         <p className="text-footnote text-muted-foreground">
           Esta puerta tiene <span className="tabular-nums text-foreground">{fmtPz(m.pieces)}</span> piezas guardadas. Cargarlas son{' '}
           <span className="tabular-nums text-foreground">{fmtPz(m.pieces)} lecturas</span> de Firestore; el turno completo son ~18.000 y por eso se carga de a una puerta.
@@ -1105,7 +1105,7 @@ function PiezasDePuerta({ obs, m, piezas, cargando, onCargar, rango, rangos, foc
   return (
     <div className="space-y-2" data-testid="pureza-piezas">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">Cada pieza</p>
+        <p className="text-caption font-semibold text-muted-foreground">Cada pieza</p>
         <div className="flex rounded-ctl bg-border p-0.5" role="tablist" aria-label="Qué piezas mostrar">
           {([false, true] as const).map((v) => (
             <button key={String(v)} type="button" role="tab" aria-selected={soloIntrusas === v} onClick={() => setSoloIntrusas(v)}

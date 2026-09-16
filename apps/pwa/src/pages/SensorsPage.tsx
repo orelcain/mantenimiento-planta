@@ -293,15 +293,15 @@ export function SensorsPage() {
     const q = getRssiQuality(rssi, online)
     switch (q) {
       case 'Excelente':
-        return 'bg-emerald-500'
+        return 'bg-fill-ok'
       case 'Buena':
-        return 'bg-green-500'
+        return 'bg-fill-ok'
       case 'Regular':
-        return 'bg-amber-500'
+        return 'bg-fill-warning'
       case 'Mala':
-        return 'bg-cat-4-tint'
+        return 'bg-fill-warning'
       default:
-        return 'bg-red-500'
+        return 'bg-fill-critical'
     }
   }
 
@@ -2043,7 +2043,7 @@ export function SensorsPage() {
                       ) : (
                         <>
                           {filteredEquipment.length > 5 && (
-                            <div className="sticky top-0 z-10 p-2 text-xs text-center bg-primary/[0.15] border-b text-primary">
+                            <div className="sticky top-0 z-10 p-2 text-xs text-center bg-primary/[0.15] border-b text-brand-ink">
                               <ChevronsDown className="inline size-3.5" /> Desliza hacia abajo para ver todos los equipos ({filteredEquipment.length})
                             </div>
                           )}
@@ -2394,10 +2394,10 @@ export function SensorsPage() {
                             <div
                               className={`h-full transition-all ${
                                 apPassword.length < 8
-                                  ? 'w-1/3 bg-red-500'
+                                  ? 'w-1/3 bg-fill-critical'
                                   : apPassword.length < 12
-                                    ? 'w-2/3 bg-amber-500'
-                                    : 'w-full bg-green-500'
+                                    ? 'w-2/3 bg-fill-warning'
+                                    : 'w-full bg-fill-ok'
                               }`}
                             />
                           </div>

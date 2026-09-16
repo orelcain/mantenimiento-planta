@@ -823,7 +823,7 @@ export function AnalisisGraderWizardPage() {
               {autosaveState === 'queued' && <>Guardado pendiente</>}
             </Badge>
           )}
-          <Button variant="outline" size="sm" onClick={() => navigate('/analisis-grader/periodo')} className="border-primary/30 text-primary hover:bg-primary/10">
+          <Button variant="outline" onClick={() => navigate('/analisis-grader/periodo')} className="border-primary/30 text-brand-ink hover:bg-primary/10">
             <BarChart3 className="h-4 w-4 mr-1.5" />
             <span className="hidden sm:inline">Análisis </span>período
           </Button>
@@ -881,7 +881,7 @@ export function AnalisisGraderWizardPage() {
               size="sm"
               disabled={savingToCalendar}
               onClick={handleSaveToCalendar}
-              className="bg-blue-500 hover:bg-blue-600 text-white shrink-0 shadow-sm"
+              className="bg-primary/[0.12] hover:bg-primary/[0.12] text-brand-ink shrink-0 shadow-sm"
             >
               {savingToCalendar
                 ? <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />Guardando…</>
@@ -985,7 +985,7 @@ export function AnalisisGraderWizardPage() {
               <button
                 type="button"
                 onClick={() => setUploadPanelExpanded((v) => !v)}
-                className="w-full flex items-center gap-2 px-2.5 py-2 text-caption text-ink-info/90 dark:text-ink-info/80 hover:bg-primary/[0.15] transition-colors rounded-card"
+                className="w-full flex min-h-[44px] items-center gap-2 rounded-full px-4 text-subhead font-medium text-ink-info/90 dark:text-ink-info/80 hover:bg-primary/[0.15] transition-colors"
                 title={uploadPanelExpanded ? 'Ocultar el panel de carga' : 'Mostrar el panel de carga'}
               >
                 <Upload className="h-3 w-3 shrink-0" />
@@ -993,7 +993,7 @@ export function AnalisisGraderWizardPage() {
                   Cargar Excel del Grader · <b className="text-primary">{lineConfig.label}</b>
                 </span>
                 {!uploadPanelExpanded && uploadedFiles.length > 0 && (
-                  <span className="text-caption px-1.5 py-0.5 rounded-ctl bg-primary/[0.15] text-primary font-medium">
+                  <span className="text-caption px-1.5 py-0.5 rounded-ctl bg-primary/[0.15] text-brand-ink font-medium">
                     {uploadedFiles.length} archivo{uploadedFiles.length === 1 ? '' : 's'}
                   </span>
                 )}

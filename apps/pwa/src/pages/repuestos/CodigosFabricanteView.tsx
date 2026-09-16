@@ -203,6 +203,7 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
         {!publico && (
           <ShareInteractiveButton
             className="ml-auto"
+            size="default"
             url={`${window.location.origin}${import.meta.env.BASE_URL}catalogo`}
             title="Códigos de fabricante"
             description="Buscador de los despieces oficiales de las máquinas de planta (solo lectura)."
@@ -268,7 +269,7 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
           <div key={`${p.codigo}-${p.maquina}-${i}`} className="rounded-card border border-border bg-card p-3">
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-mono text-sm font-bold text-foreground">{p.codigo}</span>
-              {p.maquina && <span className="rounded-ctl bg-primary/10 px-1.5 py-0.5 text-caption font-medium text-primary">{p.maquina}</span>}
+              {p.maquina && <span className="rounded-ctl bg-primary/10 px-1.5 py-0.5 text-caption font-medium text-brand-ink">{p.maquina}</span>}
               <button onClick={() => copiar(p.codigo)} className="rounded-ctl p-0.5 text-muted-foreground hover:text-primary" title="Copiar código">
                 {copiado === p.codigo ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
               </button>
@@ -399,7 +400,7 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
                     equipoCodigos: p.equipoCodigos || [],
                     equipoNombre: p.equipoNombre || '',
                   })}
-                  className="inline-flex items-center gap-1 rounded-ctl border border-primary/40 bg-primary/5 px-2 py-1 text-caption font-medium text-primary transition hover:bg-primary/10"
+                  className="inline-flex items-center gap-1 rounded-ctl border border-primary/40 bg-primary/5 px-2 py-1 text-caption font-medium text-brand-ink transition hover:bg-primary/10"
                   title="Crear este repuesto en el maestro, prellenado"
                 >
                   <PackagePlus className="h-3.5 w-3.5" /> Agregar a repuestos

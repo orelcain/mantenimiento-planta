@@ -164,7 +164,7 @@ export function FailureAnalysis() {
                     </div>
                     <p className="text-xs text-muted-foreground">Síntoma Top #1 (Click para ver)</p>
                 </CardContent>
-                <div className="absolute right-0 top-0 h-full w-1 bg-blue-500 transform scale-y-0 group-hover:scale-y-100 transition-transform origin-bottom" />
+                <div className="absolute right-0 top-0 h-full w-1 bg-primary transform scale-y-0 group-hover:scale-y-100 transition-transform origin-bottom" />
             </Card>
             <Card>
                 <CardContent className="pt-6">

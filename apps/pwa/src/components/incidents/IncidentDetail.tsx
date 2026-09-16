@@ -735,7 +735,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                       size="sm"
                       onClick={handleRefineRejection}
                       disabled={isRefiningRejection || !rejectionReason || rejectionReason.length < 5}
-                      className="h-6 px-2 text-xs text-primary hover:text-primary hover:bg-primary/10"
+                      className="h-6 px-2 text-xs text-brand-ink hover:text-brand-ink hover:bg-primary/10"
                     >
                       {isRefiningRejection ? (
                          <>
@@ -789,7 +789,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                       size="sm"
                       onClick={handleRefineResolution}
                       disabled={isRefiningResolution || !resolution || resolution.length < 5}
-                      className="h-6 px-2 text-xs text-primary hover:text-primary hover:bg-primary/10"
+                      className="h-6 px-2 text-xs text-brand-ink hover:text-brand-ink hover:bg-primary/10"
                     >
                       {isRefiningResolution ? (
                          <>
@@ -820,7 +820,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                     Cancelar
                   </Button>
                   <Button
-                    className="bg-green-600 hover:bg-emerald-600"
+                    
                     onClick={handleResolve}
                     disabled={isLoading || !resolution.trim()}
                   >
@@ -843,7 +843,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                       size="sm"
                       onClick={handleRefineResolution}
                       disabled={isRefiningResolution || !resolution || resolution.length < 5}
-                      className="h-6 px-2 text-xs text-primary hover:text-primary hover:bg-primary/10"
+                      className="h-6 px-2 text-xs text-brand-ink hover:text-brand-ink hover:bg-primary/10"
                     >
                       {isRefiningResolution ? (
                          <>
@@ -931,7 +931,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                 <Button 
                   onClick={handleConfirm} 
                   disabled={isLoading}
-                  className="bg-green-600 hover:bg-emerald-600 w-full sm:w-auto"
+                  className="w-full sm:w-auto"
                 >
                   {isLoading ? <Spinner className="mr-2" /> : <CheckCircle className="mr-2 h-4 w-4" />}
                   Confirmar
@@ -962,7 +962,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                 onClick={handleSelfAssign} 
                 disabled={isLoading}
                 variant="secondary"
-                className="w-full sm:w-auto border-primary/20 text-primary hover:bg-primary/10"
+                className="w-full sm:w-auto border-primary/20 text-brand-ink hover:bg-primary/10"
               >
                 <UserPlus className="mr-2 h-4 w-4" />
                 Asignarme a mí
@@ -973,7 +973,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
             {(user?.id === incident.asignadoA || permissions.isAdmin) && incident.status === 'en_proceso' && !showResolveForm && (
               <Button 
                 onClick={() => setShowResolveForm(true)}
-                className="bg-green-600 hover:bg-emerald-600 w-full sm:w-auto"
+                className="w-full sm:w-auto"
               >
                 <CheckCircle className="mr-2 h-4 w-4" />
                 Resolver Incidencia

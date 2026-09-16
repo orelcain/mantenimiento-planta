@@ -67,7 +67,7 @@ function TipoBadge({ tipo }: { tipo: ElementoMapa['tipo'] }) {
   }[tipo]
   if (!cfg) return null
   return (
-    <span className={`text-[8px] px-1.5 py-0.5 rounded ${cfg.bg} ${cfg.text} font-mono font-bold`}>
+    <span className={`text-caption px-1.5 py-0.5 rounded ${cfg.bg} ${cfg.text} font-mono font-bold`}>
       {cfg.label}
     </span>
   )
@@ -84,7 +84,7 @@ function NivelPickerEl({ elId, nivelId, view }: { elId: string; nivelId?: string
   if (niveles.length === 0) return null
   return (
     <div>
-      <label className="text-[9px] uppercase text-gray-500 font-semibold">Nivel / Piso</label>
+      <label className="text-caption font-semibold text-muted-foreground">Nivel / Piso</label>
       <select
         className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-[11px] text-white mt-0.5 focus:border-sky-500/60 focus:outline-none"
         value={nivelId ?? ''}
@@ -313,7 +313,7 @@ export function PanelCapasYZonas() {
           }`}
         >
           Zonas / Equipos {(elementos.length + cotasElementos.length) > 0 && (
-            <span className="ml-1 text-[9px] px-1 py-0.5 bg-amber-900/40 text-amber-300 rounded">
+            <span className="ml-1 text-caption px-1 py-0.5 bg-amber-900/40 text-amber-300 rounded">
               {elementos.length + cotasElementos.length}
             </span>
           )}
@@ -341,7 +341,7 @@ export function PanelCapasYZonas() {
         >
           {editMode ? <Save size={11} /> : <Edit3 size={11} />}
           {editMode ? 'Modo edición activo' : 'Editar'}
-          <span className="ml-auto text-[9px] text-gray-500 font-mono">E</span>
+          <span className="ml-auto text-caption text-gray-500 font-mono">E</span>
         </button>
       </div>
 
@@ -351,7 +351,7 @@ export function PanelCapasYZonas() {
           <div className="p-2">
             {/* Header: titulo + nueva */}
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] uppercase tracking-wider font-semibold text-gray-400">
+              <span className="text-caption font-semibold text-gray-400">
                 Capas {currentView === 'recinto' ? 'Recinto' : 'Planta'}
               </span>
               <button
@@ -361,7 +361,7 @@ export function PanelCapasYZonas() {
                   })
                   setEditingCapaId(id)
                 }}
-                className="text-[9px] px-2 py-0.5 bg-amber-600/80 hover:bg-amber-500 text-gray-900 rounded font-semibold flex items-center gap-0.5"
+                className="text-caption px-2 py-0.5 bg-amber-600/80 hover:bg-amber-500 text-gray-900 rounded font-semibold flex items-center gap-0.5"
                 title="Crear nueva capa"
               >
                 <Plus size={10} /> Nueva
@@ -446,7 +446,7 @@ export function PanelCapasYZonas() {
                           {c.nombre}
                         </button>
                       )}
-                      <span className="text-[9px] text-gray-500 font-mono shrink-0">{count}</span>
+                      <span className="text-caption text-gray-500 font-mono shrink-0">{count}</span>
                     </div>
                   )
                 })}
@@ -459,10 +459,10 @@ export function PanelCapasYZonas() {
                 onClick={() => setDxfImportExpanded((v) => !v)}
                 className="w-full flex items-center justify-between px-1 mb-1 group"
               >
-                <span className="text-[9px] uppercase tracking-wider font-semibold text-gray-500 group-hover:text-gray-300 flex items-center gap-1">
+                <span className="text-caption font-semibold text-gray-500 group-hover:text-gray-300 flex items-center gap-1">
                   <Download size={10} /> Importar desde DXF
                 </span>
-                <span className="text-[9px] text-gray-500">
+                <span className="text-caption text-gray-500">
                   {viewLayers.length} {dxfImportExpanded ? '▲' : '▼'}
                 </span>
               </button>
@@ -472,34 +472,34 @@ export function PanelCapasYZonas() {
                 <div className="mb-3 pb-2 border-b border-gray-800">
                   <div className="flex items-center gap-1.5 px-1 mb-1.5">
                     <Layers size={10} className="text-orange-400" />
-                    <span className="text-[10px] font-bold text-orange-300 uppercase tracking-wider">
+                    <span className="text-caption font-bold text-orange-300">
                       Capas SVG fieles al DXF
                     </span>
                   </div>
-                  <p className="text-[9px] text-gray-500 px-1 mb-1.5 leading-tight">
+                  <p className="text-caption text-gray-500 px-1 mb-1.5 leading-tight">
                     Overlay visual (no editable). 2D + 3D.
                   </p>
                   {/* Botones ver/ocultar todas SVG */}
                   <div className="flex gap-1 px-1 mb-2">
                     <button
                       onClick={() => DXF_INTERIOR_SVG_LAYERS.forEach((c) => setCapaSvgVisible(c.name, true))}
-                      className="flex-1 text-[9px] py-0.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded"
+                      className="flex-1 text-caption py-0.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded"
                     >Ver todas</button>
                     <button
                       onClick={() => DXF_INTERIOR_SVG_LAYERS.forEach((c) => setCapaSvgVisible(c.name, false))}
-                      className="flex-1 text-[9px] py-0.5 bg-red-900/60 hover:bg-red-800/60 text-red-300 rounded"
+                      className="flex-1 text-caption py-0.5 bg-red-900/60 hover:bg-red-800/60 text-red-300 rounded"
                     >Ocultar todas</button>
                   </div>
                   {/* Slider opacidad global */}
                   <div className="flex items-center gap-2 px-1 mb-2">
-                    <span className="text-[9px] text-gray-500">Opacidad</span>
+                    <span className="text-caption text-gray-500">Opacidad</span>
                     <input
                       type="range" min={0} max={1} step={0.05}
                       value={capasSvgOpacity}
                       onChange={(e) => setCapasSvgOpacity(parseFloat(e.target.value))}
                       className="flex-1 accent-orange-500"
                     />
-                    <span className="text-[9px] text-orange-400 font-mono w-6 text-right">
+                    <span className="text-caption text-orange-400 font-mono w-6 text-right">
                       {Math.round(capasSvgOpacity * 100)}%
                     </span>
                   </div>
@@ -514,10 +514,10 @@ export function PanelCapasYZonas() {
                           {vis
                             ? <Eye size={10} className="text-gray-400 shrink-0" />
                             : <EyeOff size={10} className="text-gray-600 shrink-0" />}
-                          <span className={`text-[10px] truncate flex-1 ${vis ? 'text-gray-200' : 'text-gray-600'}`}>
+                          <span className={`text-caption truncate flex-1 ${vis ? 'text-gray-200' : 'text-gray-600'}`}>
                             {c.label}
                           </span>
-                          <span className={`text-[8px] font-mono ${c.sizeKb > 300 ? 'text-amber-500' : 'text-gray-600'}`}>
+                          <span className={`text-caption font-mono ${c.sizeKb > 300 ? 'text-amber-500' : 'text-gray-600'}`}>
                             {c.sizeKb < 10 ? `${c.sizeKb}KB` : `${c.sizeKb}K`}
                           </span>
                         </button>
@@ -542,12 +542,12 @@ export function PanelCapasYZonas() {
                   <div className="flex gap-1 mb-2">
                     <button
                       onClick={() => setAllCapas(true)}
-                      className="flex-1 text-[10px] py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded">
+                      className="flex-1 text-caption py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded">
                       Ver todas
                     </button>
                     <button
                       onClick={() => setAllCapas(false)}
-                      className="flex-1 text-[10px] py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded">
+                      className="flex-1 text-caption py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded">
                       Ocultar todas
                     </button>
                   </div>
@@ -555,7 +555,7 @@ export function PanelCapasYZonas() {
                     if (!capas.length) return null
                     return (
                     <div key={gKey} className="mb-2">
-                      <div className="text-[9px] uppercase tracking-wider text-gray-500 px-1 mb-0.5 font-semibold">
+                      <div className="text-caption text-gray-500 px-1 mb-0.5 font-semibold">
                         {GROUP_LABEL[gKey as DxfLayerConfig['group']]}
                       </div>
                       {capas.map((c) => {
@@ -577,7 +577,7 @@ export function PanelCapasYZonas() {
                                 : <EyeOff size={10} className="text-gray-600 shrink-0" />}
                               <div className="w-2 h-2 rounded-sm border border-gray-700 shrink-0"
                                    style={{ backgroundColor: (visible && !isAbsorbed) ? c.color : 'transparent' }} />
-                              <span className={`text-[10px] truncate ${(visible && !isAbsorbed) ? 'text-gray-200' : 'text-gray-600'}`}>
+                              <span className={`text-caption truncate ${(visible && !isAbsorbed) ? 'text-gray-200' : 'text-gray-600'}`}>
                                 {c.label}
                               </span>
                             </button>
@@ -645,7 +645,7 @@ export function PanelCapasYZonas() {
             <div className="flex flex-wrap gap-1">
               <button
                 onClick={() => setFiltroCat('all')}
-                className={`text-[9px] px-1.5 py-0.5 rounded transition-all ${
+                className={`text-caption px-1.5 py-0.5 rounded transition-all ${
                   filtroCat === 'all' ? 'bg-amber-600/40 text-amber-200' : 'bg-gray-800 text-gray-500 hover:text-gray-300'
                 }`}
               >
@@ -655,7 +655,7 @@ export function PanelCapasYZonas() {
                 <button
                   key={c.value}
                   onClick={() => setFiltroCat(c.value)}
-                  className={`text-[9px] px-1.5 py-0.5 rounded transition-all flex items-center gap-1 ${
+                  className={`text-caption px-1.5 py-0.5 rounded transition-all flex items-center gap-1 ${
                     filtroCat === c.value
                       ? 'bg-amber-600/40 text-amber-200'
                       : 'bg-gray-800 text-gray-500 hover:text-gray-300'
@@ -707,10 +707,10 @@ export function PanelCapasYZonas() {
                   onClick={() => setCotasExpanded((v) => !v)}
                   className="w-full flex items-center justify-between px-1 mb-1 group"
                 >
-                  <span className="text-[9px] uppercase tracking-wider font-semibold text-slate-400 group-hover:text-slate-300">
+                  <span className="text-caption font-semibold text-slate-400 group-hover:text-slate-300">
                     Cotas
                   </span>
-                  <span className="text-[9px] text-slate-500">
+                  <span className="text-caption text-slate-500">
                     {cotasElementos.length} {cotasExpanded ? '▲' : '▼'}
                   </span>
                 </button>
@@ -722,7 +722,7 @@ export function PanelCapasYZonas() {
                       <div key={cat.value} className="mb-1.5">
                         <div className="flex items-center gap-1 px-1 mb-0.5">
                           <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: cat.color }} />
-                          <span className="text-[9px] text-gray-500 font-semibold">{cat.label}</span>
+                          <span className="text-caption text-gray-500 font-semibold">{cat.label}</span>
                         </div>
                         {cotasElementos.filter((c) => c.categoria === cat.value).map((cota) => (
                           <button
@@ -734,10 +734,10 @@ export function PanelCapasYZonas() {
                                 : 'border-transparent hover:bg-gray-800/60'
                             }`}
                           >
-                            <span className="text-[10px] text-slate-300 flex-1 truncate">
+                            <span className="text-caption text-slate-300 flex-1 truncate">
                               {cota.nombre || <span className="italic text-slate-600">(sin etiqueta)</span>}
                             </span>
-                            <span className="text-[10px] font-mono text-slate-400 shrink-0">
+                            <span className="text-caption font-mono text-slate-400 shrink-0">
                               {dec2(((cota.meta?.totalM as number | undefined) ?? 0))} m
                             </span>
                           </button>
@@ -755,10 +755,10 @@ export function PanelCapasYZonas() {
                             : 'border-transparent hover:bg-gray-800/60'
                         }`}
                       >
-                        <span className="text-[10px] text-slate-300 flex-1 truncate">
+                        <span className="text-caption text-slate-300 flex-1 truncate">
                           {cota.nombre || <span className="italic text-slate-600">(sin etiqueta)</span>}
                         </span>
-                        <span className="text-[10px] font-mono text-slate-400 shrink-0">
+                        <span className="text-caption font-mono text-slate-400 shrink-0">
                           {dec2(((cota.meta?.totalM as number | undefined) ?? 0))} m
                         </span>
                       </button>
@@ -772,12 +772,12 @@ export function PanelCapasYZonas() {
             {isMultiSelect && (
               <div className="border-t border-amber-700/60 pt-3 mt-1 flex flex-col gap-2 bg-amber-900/10 -mx-2 px-2 pb-2 rounded-b">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] uppercase tracking-wider font-bold text-amber-300">
+                  <span className="text-caption font-bold text-amber-300">
                     {selectedIds.length} elementos seleccionados
                   </span>
                   <button
                     onClick={() => { setSelectedId(null); clearMultiSelection() }}
-                    className="text-[9px] text-gray-400 hover:text-amber-300"
+                    className="text-caption text-gray-400 hover:text-amber-300"
                     title="Limpiar seleccion"
                   >
                     limpiar
@@ -785,7 +785,7 @@ export function PanelCapasYZonas() {
                 </div>
 
                 <div>
-                  <label className="text-[9px] uppercase text-gray-500 font-semibold">Asignar a capa</label>
+                  <label className="text-caption font-semibold text-muted-foreground">Asignar a capa</label>
                   <select
                     className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-[11px] text-white mt-0.5 focus:border-amber-500/60 focus:outline-none"
                     defaultValue=""
@@ -810,7 +810,7 @@ export function PanelCapasYZonas() {
                 {/* Asignar nivel bulk */}
                 {nivelesBulk.length > 0 && (
                   <div>
-                    <label className="text-[9px] uppercase text-gray-500 font-semibold">Asignar nivel a todos</label>
+                    <label className="text-caption font-semibold text-muted-foreground">Asignar nivel a todos</label>
                     <select
                       className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-[11px] text-white mt-0.5 focus:border-sky-500/60 focus:outline-none"
                       defaultValue=""
@@ -831,7 +831,7 @@ export function PanelCapasYZonas() {
                 )}
 
                 <div>
-                  <label className="text-[9px] uppercase text-gray-500 font-semibold">Cambiar categoria a todos</label>
+                  <label className="text-caption font-semibold text-muted-foreground">Cambiar categoria a todos</label>
                   <select
                     className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-[11px] text-white mt-0.5 focus:border-amber-500/60 focus:outline-none"
                     defaultValue=""
@@ -847,13 +847,13 @@ export function PanelCapasYZonas() {
                 </div>
 
                 <div>
-                  <label className="text-[9px] uppercase text-gray-500 font-semibold">Cambiar estado a todos</label>
+                  <label className="text-caption font-semibold text-muted-foreground">Cambiar estado a todos</label>
                   <div className="flex gap-1 mt-0.5">
                     {ESTADOS.map((s) => (
                       <button
                         key={s.value}
                         onClick={() => updateElementosBulk(selectedIds, { estado: s.value })}
-                        className="flex-1 text-[10px] py-1 rounded border border-gray-700 text-gray-300 hover:text-white transition-all"
+                        className="flex-1 text-caption py-1 rounded border border-gray-700 text-gray-300 hover:text-white transition-all"
                         style={{ borderColor: s.color, color: s.color }}
                       >
                         {s.label}
@@ -891,7 +891,7 @@ export function PanelCapasYZonas() {
                   </div>
                 )}
 
-                <p className="text-[9px] text-gray-500 italic">
+                <p className="text-caption text-gray-500 italic">
                   Tip: Shift+click agrega/quita. Shift+arrastre = seleccion por recuadro.
                 </p>
               </div>
@@ -903,24 +903,24 @@ export function PanelCapasYZonas() {
                 <div className="flex items-center gap-2">
                   <TipoBadge tipo={selectedEl.tipo} />
                   {selectedEl.tipo === 'cota' && typeof selectedEl.meta?.totalM === 'number' && (
-                    <span className="text-[9px] text-slate-300 font-mono font-bold">
+                    <span className="text-caption text-slate-300 font-mono font-bold">
                       {dec2((selectedEl.meta.totalM as number))} m
                     </span>
                   )}
                   {typeof selectedEl.meta?.area_m2 === 'number' && (
-                    <span className="text-[9px] text-gray-400 font-mono">
+                    <span className="text-caption text-gray-400 font-mono">
                       {selectedEl.meta.area_m2} m²
                     </span>
                   )}
                   {selectedEl.radio && (
-                    <span className="text-[9px] text-gray-400 font-mono">
+                    <span className="text-caption text-gray-400 font-mono">
                       r = {selectedEl.radio} m
                     </span>
                   )}
                 </div>
 
                 <div>
-                  <label className="text-[9px] uppercase text-gray-500 font-semibold">
+                  <label className="text-caption font-semibold text-muted-foreground">
                     {selectedEl.tipo === 'cota' ? 'Etiqueta' : 'Nombre'}
                   </label>
                   <input
@@ -934,7 +934,7 @@ export function PanelCapasYZonas() {
                 </div>
 
                 <div>
-                  <label className="text-[9px] uppercase text-gray-500 font-semibold">
+                  <label className="text-caption font-semibold text-muted-foreground">
                     {selectedEl.tipo === 'cota' ? 'Área' : 'Categoría'}
                   </label>
                   <select
@@ -948,7 +948,7 @@ export function PanelCapasYZonas() {
 
                 {selectedEl.tipo !== 'cota' && (
                   <div>
-                    <label className="text-[9px] uppercase text-gray-500 font-semibold">Estado</label>
+                    <label className="text-caption font-semibold text-muted-foreground">Estado</label>
                     <div className="flex gap-1 mt-0.5">
                       {ESTADOS.map((s) => {
                         const active = selectedEl.estado === s.value
@@ -956,7 +956,7 @@ export function PanelCapasYZonas() {
                           <button
                             key={s.value}
                             onClick={() => updateElemento(selectedEl.id, { estado: s.value })}
-                            className={`flex-1 text-[10px] py-1 rounded border transition-all ${
+                            className={`flex-1 text-caption py-1 rounded border transition-all ${
                               active ? 'font-semibold' : 'border-gray-700 text-gray-500 hover:text-gray-300'
                             }`}
                             style={active
@@ -985,7 +985,7 @@ export function PanelCapasYZonas() {
                       setSelectedId(null)
                       setTimeout(() => setSelectedId(id), 50)
                     }}
-                    className="flex-1 flex items-center justify-center gap-1 text-[10px] py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded border border-gray-700 transition-colors"
+                    className="flex-1 flex items-center justify-center gap-1 text-caption py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded border border-gray-700 transition-colors"
                     title="Centrar mapa en este elemento"
                   >
                     <Crosshair size={10} /> Centrar
@@ -1006,7 +1006,7 @@ export function PanelCapasYZonas() {
                       })
                       setSelectedId(newId)
                     }}
-                    className="flex-1 flex items-center justify-center gap-1 text-[10px] py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded border border-gray-700 transition-colors"
+                    className="flex-1 flex items-center justify-center gap-1 text-caption py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded border border-gray-700 transition-colors"
                     title="Duplicar (Ctrl+D)"
                   >
                     <Copy size={10} /> Duplicar
@@ -1040,7 +1040,7 @@ export function PanelCapasYZonas() {
 
             {/* ── Herramientas de anotación ─────────────────────────────── */}
             <div className="border-t border-gray-700/40 pt-2 mt-1">
-              <div className="text-[9px] uppercase tracking-widest text-gray-500 font-semibold mb-1.5 px-1">
+              <div className="text-caption text-gray-500 font-semibold mb-1.5 px-1">
                 Anotar
               </div>
               <button
@@ -1062,7 +1062,7 @@ export function PanelCapasYZonas() {
       </div>
 
       {/* Footer con info */}
-      <div className="px-3 py-1.5 border-t border-gray-700/40 text-[9px] text-gray-500 flex justify-between shrink-0">
+      <div className="px-3 py-1.5 border-t border-gray-700/40 text-caption text-gray-500 flex justify-between shrink-0">
         <span>{elementos.length} elementos · {viewLayers.length} capas</span>
         {editMode && <span className="text-blue-400 font-semibold">EDIT</span>}
       </div>
@@ -1070,7 +1070,7 @@ export function PanelCapasYZonas() {
           hasta migrar a Firestore"), y los DXF importados ni siquiera eso: se
           pierden al recargar. Quien dibuja 40 zonas asume que quedan para el
           equipo — nada en la pantalla decia lo contrario. */}
-      <div className="px-3 pb-1.5 text-[9px] leading-snug text-amber-500/80 shrink-0">
+      <div className="px-3 pb-1.5 text-caption leading-snug text-amber-500/80 shrink-0">
         Lo que dibujes se guarda solo en este navegador: no lo ve nadie más y se
         pierde si limpias los datos del sitio. Los planos DXF importados se
         pierden al recargar.

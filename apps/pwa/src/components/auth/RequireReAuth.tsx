@@ -157,7 +157,6 @@ export function RequireReAuth({ children, reason }: RequireReAuthProps) {
                 <Button
                   type="button"
                   variant="outline"
-                  size="sm"
                   onClick={() => setShowPassword((v) => !v)}
                   disabled={loading}
                 >

@@ -317,9 +317,10 @@
    NUEVA PIEL — Apple HIG
    Normas: docs/NUEVA_PIEL_APPLE_HIG.md · Skill: /nueva-piel-apple
    ---------------------------------------------------------------------------
-   OPT-IN: se activa con <html data-skin="apple"> (localStorage `app-skin`, o
-   ?skin=apple para probar). SIN el atributo la piel actual queda byte-idéntica
-   — este bloque no puede cambiar producción por sí solo.
+   PREDETERMINADA desde 2026-09-16: index.html pone <html data-skin="apple"> salvo
+   que localStorage `app-skin` diga `default` (`?skin=default` para comparar con
+   la piel anterior, `?skin=apple` para volver). Sin el atributo, la piel anterior
+   sigue byte-idéntica: es la vía de retroceso.
 
    Por qué funciona sin tocar 306 .tsx: la app ya consume estos tokens vía
    Tailwind (`bg-background`, `bg-card`, `text-muted-foreground`, `border`…),
@@ -389,6 +390,12 @@
   --tw-emerald-400: 52 199 89;   --tw-emerald-500: 52 199 89;   --tw-emerald-600: 33 125 56;
   --tw-green-400: 52 199 89;     --tw-green-500: 52 199 89;     --tw-green-600: 33 125 56;
   --tw-red-400: 255 59 48;       --tw-red-500: 255 59 48;       --tw-red-600: 196 45 37;
+  /* Tinte destructivo OPACO: el systemRed al 13% ya compuesto sobre la card.
+     Opaco, y no un tinte con alfa, porque un tinte transparente se apoya en lo que
+     haya debajo: sobre card da 4.70:1 y sobre el fondo gris cae a 4.25. Con la
+     base fija cumple siempre, y sobre card se ve identico. Es el patron de iOS:
+     los controles viven sobre una superficie propia, no sobre el fondo pelado. */
+  --destructive-tint: 255 230 228;
   --tw-amber-400: 255 149 0;     --tw-amber-500: 255 149 0;     --tw-amber-600: 158 92 0;
   --tw-blue-400: 46 117 182;     --tw-blue-500: 46 117 182;
 
@@ -403,9 +410,17 @@
 
   --card-edge: 255 255 255;         /* = --card: la tarjeta flota, sin contorno */
 
+  /* Radios de iOS 26/27 (DESIGN.md §4, ADELANTA 3). Apple documenta que las
+     secciones "tienen un radio aumentado para coincidir con la curvatura de
+     los controles"; 14/18 eran la era iOS 7-18. Concentricidad: el radio de un
+     hijo se DERIVA del padre (radio_hijo = radio_padre - padding), por eso
+     ctl se queda en 10: dentro de una tarjeta de 26 con padding 16 da 26-16=10.
+     Y panel sube a 32 para que una tarjeta de 26 quepa anidada sin verse mal.
+     Alcance: rounded-card en 136 archivos, rounded-panel en 4 — todo por token,
+     ningun .tsx cambia. La piel vieja (rem, arriba) no se toca. */
   --r-ctl: 10px;
-  --r-card: 14px;
-  --r-panel: 18px;
+  --r-card: 26px;
+  --r-panel: 32px;
   --card-edge: 44 44 46;            /* = --card oscuro */
 }
 
@@ -445,6 +460,7 @@
   --tw-emerald-400: 48 209 88;   --tw-emerald-500: 48 209 88;   --tw-emerald-600: 48 209 88;
   --tw-green-400: 48 209 88;     --tw-green-500: 48 209 88;     --tw-green-600: 48 209 88;
   --tw-red-400: 255 69 58;       --tw-red-500: 255 69 58;       --tw-red-600: 255 119 111;
+  --destructive-tint: 71 47 48;
   --tw-amber-400: 255 159 10;    --tw-amber-500: 255 159 10;    --tw-amber-600: 255 159 10;
   --tw-blue-400: 90 160 220;     --tw-blue-500: 90 160 220;
 
@@ -472,6 +488,79 @@
 .piel-pulse { animation: piel-pulse 2.2s ease-out infinite }
 @media (prefers-reduced-motion: reduce) {
   .piel-fade-in, .piel-sheet-in, .piel-pulse { animation: none !important }
+}
+
+/* ── Vidrio de NAVEGACION · Liquid Glass iOS 27 (DESIGN.md §6) ────────────────
+   Para la tab bar flotante y nada mas: el vidrio es cromo de navegacion, nunca
+   contenido. Cuatro capas, en orden de importancia:
+     1. inset superior claro = el specular highlight. ES el efecto: bajarlo
+        aplana el panel al instante.
+     2. inset de 0.5px oscuro = el borde oscurecido que trajo iOS 27.
+     3. base al 82% + blur 24 con saturacion: menos transparente que iOS 26,
+        que es justo lo que Apple corrigio.
+     4. dos sombras externas (contacto + ambiente): con una sola se ve pegado.
+   Valores: aproximacion medida — Apple no publica ninguno. */
+.glass-nav {
+  background-color: rgb(var(--card) / 0.82);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  box-shadow:
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.75),
+    inset 0 0 0 0.5px rgba(0, 0, 0, 0.14),
+    0 1px 2px rgba(0, 0, 0, 0.09),
+    0 9px 22px rgba(0, 0, 0, 0.15);
+}
+.dark .glass-nav {
+  box-shadow:
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.22),
+    inset 0 0 0 0.5px rgba(0, 0, 0, 0.45),
+    0 1px 2px rgba(0, 0, 0, 0.34),
+    0 9px 22px rgba(0, 0, 0, 0.50);
+}
+/* Con transparencia reducida el cromo va solido y conserva el borde (Apple:
+   Reduce Transparency deja "flat, solid backgrounds"). */
+@media (prefers-reduced-transparency: reduce) {
+  .glass-nav {
+    background-color: rgb(var(--card));
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+/* ── Transparencia reducida (DESIGN.md §6) ────────────────────────────────────
+   iOS 27 le dio al usuario un slider de transparencia (Ajustes > Appearance >
+   Liquid Glass) y Apple documenta que el material responde a Reduce Transparency.
+   Su contraparte web es esta media query, que la app no respetaba: habia 84
+   `backdrop-blur` y cero respaldo, asi que quien bajaba el slider en su iPhone
+   veia la app ignorandolo.
+
+   Se resuelve aqui y no en 84 archivos porque el patron es uniforme:
+   `bg-<token>/<alpha>` + `backdrop-blur`. Quitar solo el blur seria PEOR que no
+   hacer nada (quedaria un fondo semitransparente sin difuminar, ilegible sobre
+   contenido), asi que el fondo se solidifica en la misma regla.
+
+   NO se tocan los overlays de modal (`bg-black/50` y parientes): ahi la
+   translucidez es la funcion, no la decoracion, y solidificarlos taparia la
+   pantalla entera. */
+@media (prefers-reduced-transparency: reduce) {
+  [class*="backdrop-blur"]:not([class*="backdrop-blur-none"]) {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  /* Solo los elementos que ADEMAS traian blur: son el cromo de navegacion. */
+  [class*="backdrop-blur"][class*="bg-card/"] {
+    background-color: rgb(var(--card)) !important;
+  }
+  [class*="backdrop-blur"][class*="bg-background/"] {
+    background-color: rgb(var(--background)) !important;
+  }
+  [class*="backdrop-blur"][class*="bg-muted/"] {
+    background-color: rgb(var(--muted)) !important;
+  }
+  [class*="backdrop-blur"][class*="bg-popover/"] {
+    background-color: rgb(var(--card)) !important;
+  }
 }
 
 @layer base {
@@ -676,6 +765,9 @@
 }
 
 @layer utilities {
+  /* Fila horizontal de chips: se desplaza, sin barra visible (iOS no la muestra). */
+  .no-scrollbar { scrollbar-width: none; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
   /*
    * ── MODO PANTALLA del monitor público (`?pantalla=1`) ─────────────────────
    *
@@ -885,15 +977,22 @@
 
   /* ─── Modo Día para módulo Grader ──────────────── */
   .grader-light-mode {
-    --grader-bg: #f8fafc;
-    --grader-fg: #0f172a;
-    --grader-card: #ffffff;
-    --grader-card-fg: #1a1a2e;
-    --grader-muted: #f1f5f9;
-    --grader-muted-fg: #475569;
-    --grader-border: #e2e8f0;
-    --grader-popover: #ffffff;
-    --grader-popover-fg: #1a1a2e;
+    /* Migrado a la paleta de iOS el 2026-09-16. Los nueve valores salian de la
+       escala SLATE de Tailwind, que tiene un sesgo azul fuerte: el texto daba
+       sesgo de hue 27 y el secundario 34, contra 2 y 3 de los grises de iOS.
+       Cada color cumplia contraste por separado, pero el modulo se leia como si
+       fuera de otra app. Ahora son los systemGrouped de iOS.
+       El secundario se aclara a proposito (7.58 -> 5.08): el hallazgo anti-fatiga
+       del HIG doc dice que Apple REDUCE la masa de contraste duro, no la sube. */
+    --grader-bg: #F2F2F7;        /* systemGroupedBackground */
+    --grader-fg: #1C1C1E;        /* label */
+    --grader-card: #FFFFFF;      /* secondarySystemGroupedBackground */
+    --grader-card-fg: #1C1C1E;
+    --grader-muted: #E5E5EA;     /* systemGray5 */
+    --grader-muted-fg: #6E6E71;  /* secondaryLabel */
+    --grader-border: #C6C6C8;    /* separator, aplanado */
+    --grader-popover: #FFFFFF;
+    --grader-popover-fg: #1C1C1E;
   }
 
   .grader-light-mode {
@@ -1049,6 +1148,17 @@
   .grader-light-mode .text-green-500 { color: #22c55e !important; }
   .grader-light-mode .text-red-500 { color: #ef4444 !important; }
   .grader-light-mode .text-blue-500 { color: #3b82f6 !important; }
+
+  /* Tarjetas (primitivo Card). Hueco anterior al 2026-09-16: las reglas de este
+     bloque cubrian el patron viejo `rounded-xl` + `border`, pero el primitivo
+     de hoy renderiza `rounded-card border-card-edge bg-card`, que ninguna
+     regla veia. Resultado: pagina clara con las tarjetas del Dashboard oscuras
+     y una fila blanca adentro (la regla de button si disparaba). Se leia roto. */
+  .grader-light-mode [class*="bg-card"] {
+    background-color: var(--grader-card) !important;
+    color: var(--grader-card-fg) !important;
+    border-color: var(--grader-border) !important;
+  }
 
   /* Tooltip popover in light mode */
   .grader-light-mode [class*="bg-popover"] {

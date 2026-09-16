@@ -640,7 +640,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident, 
                   className={cn(
                     'p-2 rounded-card border text-center transition-all flex flex-col items-center justify-center h-20 shadow-sm relative overflow-hidden',
                     formData.prioridad === opt.value 
-                      ? `${opt.color} text-white border-transparent ring-2 ring-offset-1 ring-offset-background`
+                      ? 'bg-primary text-primary-foreground border-transparent ring-2 ring-offset-1 ring-offset-background'
                       : 'bg-card border-muted hover:border-sidebar-accent hover:bg-sidebar-accent/50 text-muted-foreground hover:text-foreground'
                   )}
                 > 
@@ -719,7 +719,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident, 
                 size="sm"
                 onClick={handleRefineDescription}
                 disabled={isRefining || !formData.descripcion || formData.descripcion.length < 5}
-                className="h-6 px-2 text-xs text-primary hover:text-primary hover:bg-primary/10"
+                className="h-6 px-2 text-xs text-brand-ink hover:text-brand-ink hover:bg-primary/10"
               >
                 {isRefining ? (
                   <>
@@ -782,7 +782,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident, 
                               setIsGeneratingSymptoms(false)
                           }
                       }}
-                      className="h-6 px-2 text-primary hover:bg-primary/10"
+                      className="h-6 px-2 text-brand-ink hover:bg-primary/10"
                       title="Proponer variantes de síntomas"
                    >
                        <Sparkles className="h-3 w-3 mr-1" />

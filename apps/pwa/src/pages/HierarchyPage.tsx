@@ -65,6 +65,7 @@ import { getEquipments } from '@/services/equipment'
 import { logger } from '@/lib/logger'
 import { cn } from '@/lib/utils'
 import { contarEquiposPorSubarbol, etiquetaEquipos } from './hierarchy/contarEquipos'
+import { formatNombreSAP } from '@/utils/repuestos/formatNombreSAP'
 
 interface NodeFormData {
   nombre: string
@@ -819,7 +820,7 @@ export function HierarchyPage() {
                 ) : node.creadoEn && (
                   <Badge 
                     variant="default" 
-                    className="text-xs flex items-center gap-1 bg-green-500 hover:bg-green-600"
+                    className="flex items-center gap-1"
                     title={`Expansión agregada - ${new Date(node.creadoEn.toDate()).toLocaleDateString()}`}
                   >
                     <Sparkles className="h-2.5 w-2.5" />
@@ -915,7 +916,7 @@ export function HierarchyPage() {
                         onClick={(e) => e.stopPropagation()}
                       />
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium text-sm truncate">{eq.nombre}</div>
+                        <div className="font-medium text-sm truncate">{formatNombreSAP(eq.nombre).nombre || eq.nombre}</div>
                         <div className="text-xs text-muted-foreground font-mono">{eq.codigo}</div>
                       </div>
                       {eq.photos && eq.photos.length > 0 && (

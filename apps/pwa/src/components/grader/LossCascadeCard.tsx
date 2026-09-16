@@ -51,7 +51,7 @@ function fmtHm(sec: number): string {
 const BUCKET_COLOR: Record<string, string> = {
   'planificado':    'bg-muted-foreground/[0.10]',
   'externo':        'bg-amber-500/[0.15]',
-  'mantencion':     'bg-cat-5-tint/[0.15]',
+  'mantencion':     'bg-red-500/[0.15]',
   'sin-clasificar': 'bg-cat-6-tint/[0.15]',
   'produccion':     'bg-emerald-500/[0.15]',
 }
@@ -265,8 +265,8 @@ export function LossCascadeCard({
       id: 'mantencion' as LossBucket, label: '− Mantención', sec: totals.mantencionSec,
       pct: `${dec1(pctOfTurno(totals.mantencionSec))}% del turno`,
       pct2: `${dec1(pctOfTecho(totals.mantencionSec))}% del techo`,
-      bg: 'bg-cat-5-tint/[0.15]', text: 'text-cat-5-ink',
-      ringHover: 'hover:ring-cat-5-ink/40', ringActive: 'ring-1 ring-cat-5-ink/70',
+      bg: 'bg-red-500/[0.15]', text: 'text-ink-crit',
+      ringHover: 'hover:ring-red-500/40', ringActive: 'ring-1 ring-red-500/70',
       tip: 'Averías, ajustes de mantenimiento, micro detenciones, cintas — el frente que Mantención debe reducir. Click para ver sus eventos.',
     },
     {
@@ -308,7 +308,7 @@ export function LossCascadeCard({
         <span className="text-caption text-muted-foreground hidden sm:inline">¿qué limitó la producción?</span>
         <span className="ml-auto flex items-center gap-3 text-caption tabular-nums">
           <span title="Uso real = tiempo produciendo / techo de máquina (descontada colación y pausas planificadas de personas). Es el uptime honesto — el % de uptime clásico castiga a la máquina por la colación.">
-            Uso real <b className="text-emerald-400 text-sm">{(usoReal * 100).toFixed(0)}%</b>
+            Uso real <b className="text-ink-ok text-sm">{(usoReal * 100).toFixed(0)}%</b>
           </span>
           <span title={`Piezas máximas teóricas del turno = techo de máquina × cadencia real demostrada por cada Baader en este turno.\nReales: ${piezasReales.toLocaleString('es-CL')} · Máx: ${piezasMax.toLocaleString('es-CL')}`}>
             <b>{piezasReales.toLocaleString('es-CL')}</b>
@@ -351,7 +351,7 @@ export function LossCascadeCard({
               </div>
               <div>
                 <span className="text-muted-foreground">Uso real = procesando ÷ techo = </span>
-                {fmtHm(totals.produccionSec)} ÷ {fmtHm(totals.techoSec)} = <b className="text-emerald-400">{dec1((usoReal * 100))}%</b>
+                {fmtHm(totals.produccionSec)} ÷ {fmtHm(totals.techoSec)} = <b className="text-ink-ok">{dec1((usoReal * 100))}%</b>
               </div>
               {uptimeClasico != null && (
                 <div>
@@ -385,7 +385,7 @@ export function LossCascadeCard({
               <div className="text-caption text-muted-foreground/60 tabular-nums">{dec1(pctOfTurno(totals.techoSec))}% del turno · subtotal</div>
             </div>
             <div className="rounded-ctl bg-emerald-500/[0.15] px-2 py-1.5" title="Tiempo efectivamente produciendo (uptime).">
-              <div className="text-emerald-400 text-caption uppercase">= Uso real</div>
+              <div className="text-ink-ok text-caption uppercase">= Uso real</div>
               <div className="font-mono tabular-nums font-semibold">{fmtHm(totals.produccionSec)}</div>
               <div className="text-caption text-muted-foreground/60 tabular-nums">{dec1(pctOfTurno(totals.produccionSec))}% del turno</div>
               <div className="text-caption text-ink-ok tabular-nums">{dec1((usoReal * 100))}% del techo</div>
@@ -425,11 +425,11 @@ export function LossCascadeCard({
             }
             const groupTotalSec = perMachine.reduce((a, m) => a + bucketSecOf(m.cascade), 0)
             const theme = activeBucket == null
-              ? { bar: 'bg-emerald-500/[0.15]', text: 'text-emerald-400' }
+              ? { bar: 'bg-emerald-500/[0.15]', text: 'text-ink-ok' }
               : activeBucket === 'externo'
-              ? { bar: 'bg-amber-500/[0.15]', text: 'text-amber-400' }
+              ? { bar: 'bg-amber-500/[0.15]', text: 'text-ink-warn' }
               : activeBucket === 'mantencion'
-              ? { bar: 'bg-cat-5-tint/[0.15]', text: 'text-cat-5-ink' }
+              ? { bar: 'bg-red-500/[0.15]', text: 'text-ink-crit' }
               : activeBucket === 'sin-clasificar'
               ? { bar: 'bg-cat-6-tint/[0.15]', text: 'text-cat-6-ink' }
               : { bar: 'bg-muted-foreground/[0.10]', text: 'text-muted-foreground' }

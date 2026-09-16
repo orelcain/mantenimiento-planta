@@ -633,7 +633,7 @@ export function MainLayout() {
                 className="flex items-center gap-3 w-full p-2 rounded-card hover:bg-muted transition-colors"
               >
                 <Avatar className="h-8 w-8">
-                  <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                  <AvatarFallback className="bg-primary/10 text-brand-ink text-xs">
                     {userInitials}
                   </AvatarFallback>
                 </Avatar>
@@ -776,7 +776,7 @@ export function MainLayout() {
                     className="flex items-center gap-3 w-full p-2 rounded-card hover:bg-muted transition-colors"
                   >
                     <Avatar className="h-8 w-8">
-                      <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                      <AvatarFallback className="bg-primary/10 text-brand-ink text-xs">
                         {userInitials}
                       </AvatarFallback>
                     </Avatar>
@@ -912,7 +912,7 @@ export function MainLayout() {
               {user?.nombre} {user?.apellido}
             </span>
             <Avatar className="h-8 w-8">
-              <AvatarFallback className="bg-primary/10 text-primary text-xs">
+              <AvatarFallback className="bg-primary/10 text-brand-ink text-xs">
                 {userInitials}
               </AvatarFallback>
             </Avatar>
@@ -1166,10 +1166,12 @@ export function MainLayout() {
             isClimaRoute || isHmiKnuroRoute || isBaader200Route || isMapRoute || isPlanosAguasRoute || isRepuestosRoute
               ? 'h-[calc(100vh-3.5rem-4rem)] lg:h-[calc(100vh-3.5rem)] p-0 overflow-hidden'
               : isAprendizajeRoute
-              ? 'p-0 w-full max-w-[100vw] overflow-x-hidden pb-16 lg:pb-0'
+              ? 'p-0 w-full max-w-[100vw] overflow-x-hidden pb-24 lg:pb-0'
               : location.pathname === '/'
               ? 'p-0 w-full max-w-[100vw] overflow-x-hidden'
-              : 'p-3 lg:p-6 w-full max-w-[100vw] overflow-x-hidden pb-20 [@media(max-height:500px)]:pb-12 lg:pb-6'
+              // pb-24: la barra flotante ocupa 12 de aire + 60 de barra + safe area;
+              // con pb-20 el ultimo elemento quedaba debajo de la capsula.
+              : 'p-3 lg:p-6 w-full max-w-[100vw] overflow-x-hidden pb-24 [@media(max-height:500px)]:pb-12 lg:pb-6'
           } ${
             isReadOnly ? 'pointer-events-none opacity-70' : ''
           }`}
@@ -1246,13 +1248,18 @@ export function MainLayout() {
         className={cn(
           // §36: la translucidez es para el CROMO de navegación — este es su
           // sitio. §38: separador de 1 px casi invisible, no un borde marcado.
-          'lg:hidden fixed bottom-0 inset-x-0 z-40 bg-card/80 backdrop-blur-xl border-t border-border/40',
+          // iOS 26/27: la tab bar FLOTA — capsula, separada de los tres bordes y
+          // despegada del fondo, con el material de vidrio (.glass-nav). La barra
+          // rectangular de borde a borde con border-t era iOS 15. Sin border-t:
+          // el borde lo pone el inset de 0.5px del propio material.
+          'lg:hidden fixed inset-x-3 z-40 rounded-full glass-nav',
           location.pathname === '/' && 'hidden',
         )}
-        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+        // Flota 12px por encima de la safe area (el home indicator), no se apoya en ella.
+        style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}
         aria-label="Navegación principal"
       >
-        <div className="flex items-stretch h-16 [@media(max-height:500px)]:h-10">
+        <div className="flex items-center h-[60px] px-1.5 [@media(max-height:500px)]:h-10">
           {bottomNavItems.map(item => {
             const isActive = item.href === '/'
               ? location.pathname === '/'
@@ -1288,15 +1295,18 @@ export function MainLayout() {
                       onClick={registrarIncidencia}
                       aria-label="Registrar incidencia"
                       className={cn(
-                        'flex size-[3.25rem] -mt-6 items-center justify-center rounded-full',
-                        'bg-primary text-primary-foreground shadow-[0_6px_18px_rgb(var(--brand)/0.45)]',
+                        // DENTRO de la capsula, no elevado por fuera: un boton que
+                        // sobresale de la barra con halo es un FAB de Material, no
+                        // existe en iOS. 46px = 60 de barra - 7 de aire arriba y abajo.
+                        'flex size-[2.875rem] items-center justify-center rounded-full',
+                        'bg-primary text-primary-foreground',
                         'transition-transform duration-200 active:scale-[0.94]',
                         'motion-reduce:transition-none',
                         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-card',
-                        '[@media(max-height:500px)]:size-9 [@media(max-height:500px)]:mt-0',
+                        '[@media(max-height:500px)]:size-8',
                       )}
                     >
-                      <Plus className="size-7 [@media(max-height:500px)]:size-5" />
+                      <Plus className="size-6 [@media(max-height:500px)]:size-4" />
                     </button>
                   </div>
                 )]

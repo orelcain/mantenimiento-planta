@@ -124,7 +124,7 @@ export function AreaTileEditor({
             <Paintbrush className="h-4 w-4 text-primary" />
             {editArea ? 'Editar Área' : 'Nueva Área'}
           </h3>
-          <p className="text-[10px] text-muted-foreground mt-0.5">
+          <p className="text-caption text-muted-foreground mt-0.5">
             {formatElevationLabel(currentFloor)} · Selecciona tiles directamente en el mapa
           </p>
         </div>
@@ -271,7 +271,7 @@ export function AreaTileEditor({
 
         {/* Bounds info */}
         {tileBounds && (
-          <div className="p-2 rounded-lg bg-muted/50 text-[10px] text-muted-foreground space-y-0.5">
+          <div className="p-2 rounded-lg bg-muted/50 text-caption text-muted-foreground space-y-0.5">
             <p>Centro: ({tileBounds.center.x.toFixed(1)}, {tileBounds.center.z.toFixed(1)})m</p>
             <p>Bounding: {tileBounds.size.width}m × {tileBounds.size.depth}m</p>
             <p>Superficie: {paintState.tiles.size}m²</p>

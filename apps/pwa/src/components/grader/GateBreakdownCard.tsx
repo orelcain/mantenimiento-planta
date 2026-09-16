@@ -312,7 +312,7 @@ export function GateBreakdownCard({
               'ml-auto inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-caption font-medium cursor-default',
               diagnosis.color === 'emerald' && 'border-emerald-500/[0.25] bg-emerald-500/[0.15] text-ink-ok',
               diagnosis.color === 'amber'   && 'border-amber-500/[0.25] bg-amber-500/[0.15] text-ink-warn',
-              diagnosis.color === 'blue'    && 'border-primary/[0.25] bg-primary/[0.15] text-primary',
+              diagnosis.color === 'blue'    && 'border-primary/[0.25] bg-primary/[0.15] text-brand-ink',
               diagnosis.color === 'zinc'    && 'border-muted-foreground/[0.10] bg-muted-foreground/[0.10] text-muted-foreground',
             )}
             title={diagnosis.detail}
@@ -627,7 +627,7 @@ export function GateBreakdownCard({
                             ].join('\n')
                             navigate(`/incidents?nueva=1&titulo=${encodeURIComponent(`Gates del Grader: dejar pauta para el próximo turno`)}&desc=${encodeURIComponent(desc)}`)
                           }}
-                          className="inline-flex min-h-[44px] items-center rounded-ctl bg-primary/[0.12] px-4 text-xs font-medium text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                          className="inline-flex min-h-[44px] items-center rounded-ctl bg-primary/[0.12] px-4 text-xs font-medium text-brand-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                         >
                           Registrar incidencia con esto
                         </button>

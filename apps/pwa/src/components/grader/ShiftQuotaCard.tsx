@@ -182,7 +182,7 @@ export function ShiftQuotaCard({
             <span className="text-xs text-muted-foreground">Sin cuota definida para este turno.</span>
             <button
               onClick={() => setEditing(true)}
-              className="ml-auto text-caption px-2 py-0.5 rounded-ctl border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 transition-colors"
+              className="ml-auto text-caption px-2 py-0.5 rounded-ctl border border-primary/30 bg-primary/5 text-brand-ink hover:bg-primary/10 transition-colors"
             >
               Definir cuota
             </button>
@@ -212,10 +212,10 @@ export function ShiftQuotaCard({
   const { current, target, progressPct, remaining, projected, projectedPct, willHit, usingFallback, discrepancy } = view
 
   const barClass =
-    progressPct >= 100 ? 'bg-emerald-500'
-    : progressPct >= 90 ? 'bg-emerald-400'
-    : progressPct >= 50 ? 'bg-amber-400'
-    : 'bg-red-400'
+    progressPct >= 100 ? 'bg-fill-ok'
+    : progressPct >= 90 ? 'bg-fill-ok'
+    : progressPct >= 50 ? 'bg-fill-warning'
+    : 'bg-fill-critical'
 
   const verdictTextClass =
     progressPct >= 100 ? 'text-emerald-400'
@@ -399,7 +399,7 @@ function QuotaEditor({
         <button
           onClick={() => void onSave()}
           disabled={saving || !numValid}
-          className="flex items-center gap-1 text-xs px-3 py-1 rounded-ctl border border-primary/40 bg-primary/10 text-primary hover:bg-primary/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          className="flex items-center gap-1 text-xs px-3 py-1 rounded-ctl border border-primary/40 bg-primary/10 text-brand-ink hover:bg-primary/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {saving && <Loader2 className="w-3 h-3 animate-spin" />}
           Guardar

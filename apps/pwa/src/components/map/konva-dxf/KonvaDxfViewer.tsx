@@ -252,7 +252,7 @@ function PanelCapasKonva({ mapa }: { mapa: MapaImportado }) {
 
       {open && (
         <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-0.5">
-          <div className="text-[9px] text-gray-500 px-1 mb-1 uppercase tracking-wider font-semibold">
+          <div className="text-caption text-gray-500 px-1 mb-1 font-semibold">
             {capas.length} capa{capas.length !== 1 ? 's' : ''}
           </div>
           {capas.map((c) => (
@@ -265,10 +265,10 @@ function PanelCapasKonva({ mapa }: { mapa: MapaImportado }) {
                   ? <Eye size={10} className="text-gray-400 shrink-0" />
                   : <EyeOff size={10} className="text-gray-600 shrink-0" />}
                 <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: c.color }} />
-                <span className={`text-[10px] truncate ${c.visible ? 'text-gray-200' : 'text-gray-600'}`}>
+                <span className={`text-caption truncate ${c.visible ? 'text-gray-200' : 'text-gray-600'}`}>
                   {c.name}
                 </span>
-                <span className="text-[8px] font-mono text-gray-600 shrink-0">{c.polylines.length}</span>
+                <span className="text-caption font-mono text-gray-600 shrink-0">{c.polylines.length}</span>
               </button>
               <button
                 onClick={() => {
@@ -292,7 +292,7 @@ function PanelCapasKonva({ mapa }: { mapa: MapaImportado }) {
             deleteMapa(mapa.id)
             setActivo(null)
           }}
-          className="flex-1 flex items-center justify-center gap-1 text-[9px] py-1 bg-red-900/20 hover:bg-red-900/40 border border-red-800/40 text-red-400 rounded transition-colors"
+          className="flex-1 flex items-center justify-center gap-1 text-caption py-1 bg-red-900/20 hover:bg-red-900/40 border border-red-800/40 text-red-400 rounded transition-colors"
         >
           <Trash2 size={9} /> Eliminar mapa
         </button>
@@ -635,13 +635,13 @@ export function KonvaDxfViewer({ mapa }: Props) {
       {/* Barra inferior — acciones sobre selección */}
       {selectMode && (
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-gray-900/95 border border-gray-700 rounded-lg px-3 py-1.5 z-[500] shadow-xl">
-          <span className="text-[10px] text-gray-400 font-mono">
+          <span className="text-caption text-gray-400 font-mono">
             {selectedIds.size} seleccionada{selectedIds.size === 1 ? '' : 's'}
           </span>
           <button
             onClick={undo}
             disabled={!historyRef.current.length}
-            className="flex items-center gap-1 px-2 py-0.5 text-[10px] bg-gray-800 hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed text-gray-200 rounded transition-colors"
+            className="flex items-center gap-1 px-2 py-0.5 text-caption bg-gray-800 hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed text-gray-200 rounded transition-colors"
             title="Deshacer (Ctrl+Z)"
           >
             <Undo2 size={11} /> Deshacer
@@ -649,7 +649,7 @@ export function KonvaDxfViewer({ mapa }: Props) {
           <button
             onClick={deleteSelected}
             disabled={!selectedIds.size}
-            className="flex items-center gap-1 px-2 py-0.5 text-[10px] bg-red-900/40 hover:bg-red-900/60 disabled:opacity-30 disabled:cursor-not-allowed border border-red-700/40 text-red-300 rounded transition-colors"
+            className="flex items-center gap-1 px-2 py-0.5 text-caption bg-red-900/40 hover:bg-red-900/60 disabled:opacity-30 disabled:cursor-not-allowed border border-red-700/40 text-red-300 rounded transition-colors"
             title="Borrar selección (Del)"
           >
             <Trash2 size={11} /> Borrar
@@ -657,18 +657,18 @@ export function KonvaDxfViewer({ mapa }: Props) {
           {selectedIds.size > 0 && (
             <button
               onClick={() => setSelectedIds(new Set())}
-              className="flex items-center gap-1 px-2 py-0.5 text-[10px] bg-gray-800 hover:bg-gray-700 text-gray-400 rounded transition-colors"
+              className="flex items-center gap-1 px-2 py-0.5 text-caption bg-gray-800 hover:bg-gray-700 text-gray-400 rounded transition-colors"
               title="Deseleccionar (Esc)"
             >
               <XIcon size={11} />
             </button>
           )}
-          <span className="text-[9px] text-gray-500 ml-2">Flechas = mover · Shift ×10 · Ctrl ÷10</span>
+          <span className="text-caption text-gray-500 ml-2">Flechas = mover · Shift ×10 · Ctrl ÷10</span>
         </div>
       )}
 
       {/* Indicador de zoom */}
-      <div className="absolute bottom-3 left-3 text-[10px] text-gray-500 font-mono bg-gray-900/80 px-2 py-0.5 rounded">
+      <div className="absolute bottom-3 left-3 text-caption text-gray-500 font-mono bg-gray-900/80 px-2 py-0.5 rounded">
         zoom {dec2(scale)}×
       </div>
 

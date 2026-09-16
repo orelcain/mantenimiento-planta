@@ -111,6 +111,13 @@ export default {
           DEFAULT: 'rgb(var(--accent) / <alpha-value>)',
           foreground: 'rgb(var(--foreground) / <alpha-value>)',
         },
+        // `destructive` tenía UN solo valor para dos trabajos opuestos, y por eso
+        // ninguno de los dos cumplía (medido 2026-09-15): #bf6c61 como RELLENO
+        // con texto blanco da 3.80:1, y como TEXTO da 3.67:1 sobre card oscuro.
+        // Reprobaba AA en los 76 `bg-destructive` y en los 192 `text-destructive`.
+        // La separación va abajo, en `backgroundColor` y `textColor`: un relleno
+        // no necesita el mismo color que una tinta, igual que `--brand` y
+        // `--brand-ink`. Este bloque queda para `border-destructive` y similares.
         destructive: {
           DEFAULT: '#bf6c61',
           foreground: '#ffffff',
@@ -162,6 +169,52 @@ export default {
         card: 'var(--r-card)',    // tarjeta / grupo de lista
         panel: 'var(--r-panel)',  // contenedor grande, sheet, modal
       },
+      // ── `destructive`: el relleno y la tinta son trabajos distintos ────────
+      // Un RELLENO lleva texto blanco encima, así que tiene que ser oscuro.
+      // Una TINTA va sobre la superficie del tema, así que tiene que contrastar
+      // CONTRA ella — y por eso en oscuro debe ser clara, justo al revés.
+      // Un único valor no puede hacer las dos cosas; el anterior reprobaba AA
+      // en ambas. Medido:
+      //   bg-destructive   #8C4B45 con blanco encima ....... 6.55:1  (era 3.80)
+      //   text-destructive #c42d25 sobre card claro ........ 5.93:1  (era 3.80)
+      //   text-destructive #ff776f sobre card oscuro ....... 5.39:1  (era 3.67)
+      // Las dos tintas NO son nuevas: son los rojo-600 que `check-contrast.mjs`
+      // ya verificaba para los chips. Se reutilizan en vez de inventar un hex.
+      backgroundColor: {
+        // El FONDO destructivo es el rojo vivo del sistema, porque se usa
+        // TINTED (al 13%): `bg-destructive/[0.13]`. Al 13% el systemRed se
+        // insinua como rosa palido, que es exactamente el boton destructivo de
+        // iOS. Puesto opaco se veria chillon, pero el variant nunca lo usa asi.
+        destructive: {
+          DEFAULT: 'rgb(var(--tw-red-500) / <alpha-value>)',
+          foreground: '#ffffff',
+          // El tinte del boton destructivo, YA compuesto sobre la card y opaco.
+          // Con alfa se apoyaba en lo que hubiera debajo: 4.70:1 sobre card pero
+          // 4.25 sobre el fondo gris. Ver la nota en index.css.
+          tint: 'rgb(var(--destructive-tint) / <alpha-value>)',
+        },
+        // ── RELLENOS de estado ────────────────────────────────────────────
+        // Estos tres tokens son para el caso REAL de relleno opaco: barras de
+        // gráfico, segmentos de Gantt, cabeceras de estado. NO para botones.
+        //
+        // Un botón de estado en iOS es TINTED (color al 13% + texto del color),
+        // nunca un bloque de color sólido — ver `variant: destructive` abajo.
+        // Si estás por poner texto blanco sobre un relleno de color, el patrón
+        // casi siempre está mal antes que el color.
+        //
+        // Los valores son los system colors de Apple OSCURECIDOS hasta cumplir
+        // AA con blanco, no hexes libres: misma lógica que ya usaba el §1.4 del
+        // HIG doc cuando el verde accesible de Apple (#248A3D) daba 4.40:1 y se
+        // bajó a #217E38. Medido: critical 6.55 · warning 6.35 · ok 6.36.
+        fill: {
+          critical: '#8C4B45',
+          warning: '#7A5A1E',
+          ok: '#2F6B41',
+        },
+      },
+      textColor: {
+        destructive: 'rgb(var(--tw-red-600) / <alpha-value>)',
+      },
       fontSize: {
         // ── ESCALA TIPOGRÁFICA de la Constitución (§9) ────────────────────────
         // En PX a propósito: el `html` de esta app está al 87.5%, así que los
@@ -169,14 +222,30 @@ export default {
         // El piso de la escala es 11px: por debajo es "texto diminuto", que la
         // §64 prohíbe explícitamente. La app tenía 1.125 usos por debajo (8, 9
         // y 10px) — esa era la causa real de que se viera densa y no Apple.
+        // Piso de 11 px también en PC: la raíz va al 87,5 % y `text-xs` (0.75rem) rendía
+        // 10,5 px, medio punto bajo el mínimo del contrato. En móvil (raíz 16) sigue en 12.
+        xs:        ['max(0.75rem, 11px)', { lineHeight: '1rem' }],
         caption:   ['11px', { lineHeight: '1.35' }],
         footnote:  ['13px', { lineHeight: '1.4' }],
-        body:      ['15px', { lineHeight: '1.45' }],
+        // body 17 (Apple: 17/22). Estaba en 15, que es el SUBHEAD de Apple: toda la app
+        // iba un escalon por debajo de iOS y eso alimentaba la densidad. subhead y
+        // callout se agregan para que el texto secundario pueda bajar sin inventar px.
+        subhead:   ['15px', { lineHeight: '1.33' }],
+        callout:   ['16px', { lineHeight: '1.31' }],
+        body:      ['17px', { lineHeight: '1.3' }],
         headline:  ['17px', { lineHeight: '1.35', fontWeight: '600' }],
         title3:    ['20px', { lineHeight: '1.25', fontWeight: '600' }],
-        title2:    ['23px', { lineHeight: '1.2',  fontWeight: '600' }],
+        title2:    ['22px', { lineHeight: '1.27', fontWeight: '600' }],
         title1:    ['28px', { lineHeight: '1.15', letterSpacing: '-0.02em', fontWeight: '700' }],
-        display:   ['33px', { lineHeight: '1.1',  letterSpacing: '-0.028em', fontWeight: '700' }],
+        display:   ['34px', { lineHeight: '1.2',  letterSpacing: '-0.028em', fontWeight: '700' }],
+        // Rol propio (no existe en la escala de Apple): el NUMERO de un KPI.
+        // Estaba definido en docs/NUEVA_PIEL_APPLE_HIG.md §2 desde el 2026-08-09
+        // pero nunca se agrego aca, asi que cada KPI eligio su tamano a mano.
+        // OJO: Tailwind solo admite lineHeight/letterSpacing/fontWeight en este
+        // objeto, asi que las cifras tabulares NO viajan con el rol —
+        // `text-stat` va SIEMPRE acompanado de `tabular-nums`, o las columnas
+        // bailan al refrescar con datos en vivo.
+        stat:      ['30px', { lineHeight: '1.05', letterSpacing: '-0.03em', fontWeight: '700' }],
       },
       fontFamily: {
         // UI en IBM Plex Sans (tipo de ingeniería con carácter, no Inter genérico)

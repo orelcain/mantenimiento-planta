@@ -1087,7 +1087,7 @@ function StandalonePanel({ modelName, className }: Pick<SopladorasBaader142Inter
                   </div>
                   <div className="mt-4 flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Caudal estimado</p>
+                      <p className="text-[11px] text-muted-foreground">Caudal estimado</p>
                       <p className="text-lg font-semibold">{formatPercent(blower.baseFlow)}</p>
                     </div>
                     <Button variant="outline" size="sm" onClick={(event) => { event.stopPropagation(); handleCycleStatus(blower.id) }}>Cambiar estado</Button>
@@ -1124,9 +1124,9 @@ function StandalonePanel({ modelName, className }: Pick<SopladorasBaader142Inter
                 <p className="text-sm text-muted-foreground">{selectedBlower.zone}</p>
               </div>
               <div className="rounded-xl border bg-muted/20 p-4">
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Estado actual</p>
+                <p className="text-[11px] text-muted-foreground">Estado actual</p>
                 <p className="mt-1 text-lg font-semibold capitalize">{selectedBlower.status}</p>
-                <p className="mt-3 text-[11px] uppercase tracking-wide text-muted-foreground">Caudal</p>
+                <p className="mt-3 text-[11px] text-muted-foreground">Caudal</p>
                 <p className="mt-1 text-lg font-semibold">{formatPercent(selectedBlower.baseFlow)}</p>
               </div>
               <div className="space-y-2 text-sm text-muted-foreground">
@@ -1345,7 +1345,7 @@ function ModelBoundExperience({ modelId, modelName: _modelName, className, model
             {canEditMappings ? (
               <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-background/70 px-2 py-1.5">
                 <div className="space-y-0.5">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Modo enlaces</p>
+                  <p className="text-[10px] font-semibold text-muted-foreground">Modo enlaces</p>
                   <p className="text-[11px] text-muted-foreground">
                     {editMappingsMode
                       ? assignmentTargetId
@@ -1370,7 +1370,7 @@ function ModelBoundExperience({ modelId, modelName: _modelName, className, model
             <div className="grid gap-2 xl:grid-cols-[1fr_1.4fr_0.9fr]">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Sopladoras</p>
+                  <p className="text-[10px] font-semibold text-muted-foreground">Sopladoras</p>
                   <span className="text-[10px] text-muted-foreground">{editMappingsMode ? 'Selecciona para enlazar' : 'ON, REV u OFF'}</span>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
@@ -1395,7 +1395,7 @@ function ModelBoundExperience({ modelId, modelName: _modelName, className, model
 
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Valvulas por linea</p>
+                  <p className="text-[10px] font-semibold text-muted-foreground">Valvulas por linea</p>
                   <span className="text-[10px] text-muted-foreground">{editMappingsMode ? 'Selecciona para enlazar' : 'Manilla real a 90 grados'}</span>
                 </div>
                 <div className="grid gap-1.5 md:grid-cols-2 xl:grid-cols-4">
@@ -1403,7 +1403,7 @@ function ModelBoundExperience({ modelId, modelName: _modelName, className, model
                     <div key={lineId} className="rounded-lg border bg-background/55 p-1.5">
                       <div className="mb-1 flex items-center gap-1.5">
                         <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: getLineColor(lineId) }} />
-                        <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{lineId}</p>
+                        <p className="text-[10px] font-semibold text-muted-foreground">{lineId}</p>
                       </div>
                       <div className="flex flex-wrap gap-1">
                         {valves.filter((valve) => valve.lineId === lineId).map((valve) => {
@@ -1430,7 +1430,7 @@ function ModelBoundExperience({ modelId, modelName: _modelName, className, model
 
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Respaldo S4</p>
+                  <p className="text-[10px] font-semibold text-muted-foreground">Respaldo S4</p>
                   <span className="text-[10px] text-muted-foreground">Reparte caudal</span>
                 </div>
                 <div className="flex flex-wrap gap-1.5">

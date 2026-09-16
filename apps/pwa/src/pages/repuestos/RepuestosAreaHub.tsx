@@ -60,6 +60,7 @@ import { InlineEditName } from '@/components/repuestos/InlineEditName'
 import { CLASE_LABEL, type MaterialClase, type Machine, type Repuesto, type RepuestoFormData, type TechnicalSpecs, type MachineImage } from '@/types/repuestos'
 import { AREA_TACTIL_COMPACTA, AREA_TACTIL_EN_TARJETA } from '@/lib/areaTactil'
 import { useRepuestoFavoritos } from '@/hooks/repuestos/useRepuestoFavoritos'
+import { formatNombreSAP } from '@/utils/repuestos/formatNombreSAP'
 
 // Fase 4 normalización (2026-06): el hub lee/escribe la colección plana `repuestos`
 // (equipos:[nodeIds]). Quedan para Fase 5: reubicar/importar/duplicados/manuales de
@@ -76,16 +77,16 @@ const STORAGE_KEY = 'repuestos-nav-node' // compartido con EquipmentNavigator
 const tipoLabelOf = (tipo?: string): string => (tipo || '').trim() || 'Sin clasificar'
 
 const STOCK_META: Record<StockStatus, { label: string; dot: string; text: string }> = {
-  ok: { label: 'Disponible', dot: 'bg-emerald-500', text: 'text-emerald-500' },
-  low: { label: 'Bajo', dot: 'bg-amber-500', text: 'text-amber-500' },
-  out: { label: 'Sin stock', dot: 'bg-red-500', text: 'text-red-500' },
+  ok: { label: 'Disponible', dot: 'bg-emerald-500', text: 'text-ink-ok' },
+  low: { label: 'Bajo', dot: 'bg-amber-500', text: 'text-ink-warn' },
+  out: { label: 'Sin stock', dot: 'bg-red-500', text: 'text-ink-crit' },
   unset: { label: 'Sin config', dot: 'bg-muted-foreground/40', text: 'text-muted-foreground' },
 }
 
 type KpiTone = 'primary' | 'emerald' | 'amber' | 'red'
 
 const KPI_TONE: Record<KpiTone, { text: string; chip: string; ring: string; glow: string }> = {
-  primary: { text: 'text-primary',      chip: 'bg-primary/10',      ring: 'ring-primary/20',      glow: 'from-primary/[0.07]' },
+  primary: { text: 'text-brand-ink',      chip: 'bg-primary/10',      ring: 'ring-primary/20',      glow: 'from-primary/[0.07]' },
   emerald: { text: 'text-emerald-500',  chip: 'bg-emerald-500/[0.15]',  ring: 'ring-emerald-500/20',  glow: 'from-emerald-500/[0.07]' },
   amber:   { text: 'text-amber-500',    chip: 'bg-amber-500/[0.15]',    ring: 'ring-amber-500/20',    glow: 'from-amber-500/[0.07]' },
   red:     { text: 'text-red-500',      chip: 'bg-red-500/[0.15]',      ring: 'ring-red-500/20',      glow: 'from-red-500/[0.07]' },
@@ -1607,7 +1608,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
         <div className="flex flex-wrap items-center gap-1.5 border-b border-border px-2.5 py-2.5 sm:gap-2 sm:px-4">
           <button
             onClick={() => setSidebarMobileOpen(true)}
-            className="shrink-0 rounded-ctl p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground sm:hidden"
+            className="flex size-11 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground sm:hidden"
             aria-label="Abrir áreas"
           >
             <Menu className="h-5 w-5" />
@@ -1623,16 +1624,16 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                 if (v.trim() && !showingAll) setShowingAll(true)
               }}
               placeholder="Buscar SAP, repuesto, equipo o fabricante…"
-              className="pl-9"
+              className="h-11 pl-9"
             />
           </div>
-          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setSolicitudesOpen(true)}>
+          <Button variant="outline" size="sm" className="h-11 w-11 justify-center gap-1.5 px-0 sm:w-auto sm:px-3" onClick={() => setSolicitudesOpen(true)}>
             <ClipboardList className="h-4 w-4" /> <span className="hidden sm:inline">Solicitudes</span>
             {pendientesCount > 0 && (
               <Badge variant="secondary" className="ml-0.5 tabular-nums">{pendientesCount}</Badge>
             )}
           </Button>
-          <Button size="sm" className="gap-1.5" onClick={() => openSolicitar(null)}>
+          <Button size="sm" className="h-11 gap-1.5" onClick={() => openSolicitar(null)}>
             <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Solicitar repuesto</span><span className="sm:hidden">Solicitar</span>
           </Button>
           {/* Herramientas admin: toolbar en desktop (≥sm) */}
@@ -1644,7 +1645,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                   <button key={t.key} onClick={t.onClick} title={t.label} className="relative rounded-ctl p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
                     <Icon className="h-4 w-4" />
                     {t.badge ? (
-                      <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-caption font-bold text-white tabular-nums">{t.badge}</span>
+                      <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500/[0.15] px-1 text-caption font-bold text-ink-crit tabular-nums">{t.badge}</span>
                     ) : null}
                   </button>
                 )
@@ -1654,10 +1655,10 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
           {/* Herramientas admin: overflow en móvil (<sm) */}
           {isAdmin && (
             <div className="relative sm:hidden">
-              <button onClick={() => setAdminMenuOpen((v) => !v)} title="Herramientas admin" aria-label="Herramientas admin" className="relative rounded-ctl p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
+              <button onClick={() => setAdminMenuOpen((v) => !v)} title="Herramientas admin" aria-label="Herramientas admin" className="relative flex size-11 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground">
                 <MoreVertical className="h-5 w-5" />
                 {trashCount > 0 && (
-                  <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-caption font-bold text-white tabular-nums">{trashCount}</span>
+                  <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500/[0.15] px-1 text-caption font-bold text-ink-crit tabular-nums">{trashCount}</span>
                 )}
               </button>
               {adminMenuOpen && (
@@ -1675,7 +1676,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                           <Icon className="h-4 w-4 text-muted-foreground" />
                           <span className="flex-1">{t.label}</span>
                           {t.badge ? (
-                            <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-caption font-bold text-white tabular-nums">{t.badge}</span>
+                            <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500/[0.15] px-1 text-caption font-bold text-ink-crit tabular-nums">{t.badge}</span>
                           ) : null}
                         </button>
                       )
@@ -1693,7 +1694,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
             <div className="mb-5 rounded-card border border-border bg-muted p-3">
               <button
                 onClick={() => setFavBarOpen((v) => !v)}
-                className="flex w-full items-center gap-1.5 text-caption font-bold tracking-wider text-muted-foreground"
+                className="flex min-h-[44px] w-full items-center gap-1.5 text-caption font-bold tracking-wider text-muted-foreground"
               >
                 <Star className="h-3.5 w-3.5 fill-amber-400 text-ink-warn" /> Favoritos de equipos
                 {equipFavLists.length > 0 && <span className="tabular-nums text-muted-foreground/60">({equipFavTotal})</span>}
@@ -1756,7 +1757,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                                 )}
                                 <button
                                   onClick={() => handleFavEquipClick(id, list.machineNames?.[id] || equipNameMap.get(id))}
-                                  className="px-2.5 py-1 text-caption font-medium text-foreground transition hover:bg-primary/10 hover:text-primary"
+                                  className="px-2.5 py-1 text-caption font-medium text-foreground transition hover:bg-primary/10 hover:text-brand-ink"
                                 >
                                   {list.machineNames?.[id] || equipNameMap.get(id) || id}
                                 </button>
@@ -1824,7 +1825,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
               ) : repEquipoFilter !== 'all' ? (
                 <button
                   onClick={() => { setRepEquipoFilter('all'); setSelectedEquipName('') }}
-                  className="mt-1 inline-flex max-w-full items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-caption font-medium text-primary transition hover:bg-primary/20"
+                  className="mt-1 inline-flex max-w-full items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-caption font-medium text-brand-ink transition hover:bg-primary/20"
                   title="Quitar filtro de equipo — ver todos los repuestos del área"
                 >
                   <Cog className="h-3 w-3 shrink-0" /> <span className="truncate">{etiquetaFiltroEquipo}</span> <X className="h-3 w-3 shrink-0 opacity-70" />
@@ -1854,7 +1855,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
             <Button
               variant={mobileExtrasOpen ? 'default' : 'outline'}
               size="sm"
-              className="shrink-0 gap-1.5"
+              className="h-11 shrink-0 gap-1.5"
               onClick={() => setMobileExtrasOpen((v) => !v)}
             >
               <Settings2 className="h-4 w-4" /> Filtros
@@ -1991,11 +1992,22 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
               </div>
             ) : filteredRep.length === 0 ? (
               <div className="rounded-card border border-dashed border-border py-10 text-center text-sm text-muted-foreground">
-                {!selectedAreaId && !showingAll
-                  ? 'Selecciona un área en la izquierda.'
-                  : areaRepuestos.length === 0
-                    ? 'Esta área no tiene repuestos con código SAP.'
-                    : 'Sin resultados para los filtros aplicados.'}
+                {!selectedAreaId && !showingAll ? (
+                  <>
+                    <p>Selecciona un área.</p>
+                    <button
+                      type="button"
+                      onClick={() => setSidebarMobileOpen(true)}
+                      className="mt-3 inline-flex min-h-[44px] items-center justify-center rounded-full bg-muted px-5 text-subhead font-medium text-foreground sm:hidden"
+                    >
+                      Ver áreas
+                    </button>
+                  </>
+                ) : areaRepuestos.length === 0 ? (
+                  'Esta área no tiene repuestos con código SAP.'
+                ) : (
+                  'Sin resultados para los filtros aplicados.'
+                )}
               </div>
             ) : (
               <div className="overflow-hidden rounded-card border border-border">
@@ -2261,7 +2273,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
         <RepuestoDetailPanel
           item={selectedRep}
           plantaDe={plantaDe}
-          areaName={showingAll ? 'Todas las áreas' : (selectedNode?.nombre ?? '')}
+          areaName={showingAll ? 'Todas las áreas' : (formatNombreSAP(selectedNode?.nombre).nombre || selectedNode?.nombre || '')}
           onClose={() => setSelectedRowKey(null)}
           loadMovimientos={loadMovimientos}
           onSaveLocation={handleSaveLocation}

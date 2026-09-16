@@ -883,7 +883,7 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
               // % del TOTAL de piezas (no del P0)
               const pctOfTotal = summary.totalPieces > 0 ? +((cause.pieces / summary.totalPieces) * 100).toFixed(2) : 0
               const pctOfP0 = cause.pct
-              const barColor = pctOfTotal >= 2 ? 'bg-red-500' : pctOfTotal >= 1 ? 'bg-amber-500' : 'bg-blue-500'
+              const barColor = pctOfTotal >= 2 ? 'bg-fill-critical' : pctOfTotal >= 1 ? 'bg-fill-warning' : 'bg-primary'
               return (
                 <div key={i} className="space-y-1">
                   <div className="flex items-center justify-between text-xs gap-2">

@@ -286,7 +286,7 @@ export function BarcodeScannerModal({
               {/* Resultado detectado */}
               {detected && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/60">
-                  <div className="rounded-card bg-green-500 px-4 py-2 text-sm font-semibold text-white shadow">
+                  <div className="rounded-card bg-green-500/[0.15] px-4 py-2 text-sm font-semibold text-ink-ok shadow">
                     ✓ {detected}
                   </div>
                 </div>

@@ -169,7 +169,7 @@ export function MaintenanceImpactCard({ summaries, periodLabel, rangeLabel, work
               <span className="font-semibold">{fmt(rel!.maintenanceDowntimeSec)}</span> en el período.
               {dir && dir.deltaPct != null && (
                 <> El paro de mantención{' '}
-                  <span className={dir.down ? 'text-emerald-400 font-medium' : 'text-cat-5-ink font-medium'}>
+                  <span className={dir.down ? 'text-ink-ok font-medium' : 'text-ink-crit font-medium'}>
                     {dir.down ? 'bajó' : 'subió'} {Math.abs(dir.deltaPct).toFixed(0)}%
                   </span>{' '}entre la 1ª y la 2ª mitad.
                 </>
@@ -195,11 +195,9 @@ export function MaintenanceImpactCard({ summaries, periodLabel, rangeLabel, work
                 value={rel!.availabilityPct != null ? `${dec1(rel!.availabilityPct)}%` : '—'}
                 sub="atribuible a mantención"
                 icon={<Activity className="w-3.5 h-3.5" />}
-                valueColor={
-                  rel!.availabilityPct == null ? undefined
-                    : rel!.availabilityPct >= 98 ? 'text-emerald-400'
-                    : rel!.availabilityPct >= 95 ? 'text-amber-400' : 'text-cat-5-ink'
-                }
+                // Número grande (text-lg en KpiCard): sin rótulo/punto chico
+                // al lado que sostenga el estado, queda en la tinta de etiqueta.
+                valueColor={rel!.availabilityPct == null ? undefined : 'text-foreground'}
               />
               <KpiCard
                 label="Paro de mantención"
@@ -225,7 +223,7 @@ export function MaintenanceImpactCard({ summaries, periodLabel, rangeLabel, work
             {rel!.trend.length > 0 && (
               <div className="pt-1">
                 <div className="flex items-center gap-1.5 text-caption text-muted-foreground mb-2">
-                  {dir?.down ? <TrendingDown className="w-3.5 h-3.5 text-emerald-400" /> : <TrendingUp className="w-3.5 h-3.5 text-cat-5-ink" />}
+                  {dir?.down ? <TrendingDown className="w-3.5 h-3.5 text-ink-ok" /> : <TrendingUp className="w-3.5 h-3.5 text-ink-crit" />}
                   Tendencia del paro de mantención {rel!.trend[0]?.grouped ? '· por semana' : '· por día'}
                 </div>
                 <div className="space-y-0.5 max-h-44 overflow-y-auto pr-1">

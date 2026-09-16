@@ -162,7 +162,7 @@ export function PhotoEvidenceCard({
                 <Camera className="w-8 h-8 text-muted-foreground" />
               </div>
             )}
-            <div className="absolute top-2 left-2 px-2 py-0.5 bg-red-500 text-white text-caption font-medium rounded-ctl">
+            <div className="absolute top-2 left-2 px-2 py-0.5 bg-red-500/[0.15] text-ink-crit text-caption font-medium rounded-ctl">
               ANTES ({totalBefore})
             </div>
           </div>
@@ -193,7 +193,7 @@ export function PhotoEvidenceCard({
                 )}
               </div>
             )}
-            <div className="absolute top-2 right-2 px-2 py-0.5 bg-green-500 text-white text-caption font-medium rounded-ctl">
+            <div className="absolute top-2 right-2 px-2 py-0.5 bg-green-500/[0.15] text-ink-ok text-caption font-medium rounded-ctl">
               DESPUÉS ({totalAfter})
             </div>
           </div>

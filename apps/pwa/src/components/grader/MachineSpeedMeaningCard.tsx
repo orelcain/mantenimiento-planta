@@ -33,7 +33,7 @@ import type { UpstreamMachineShift } from '@/services/shoplogix/types'
 import { dec1 } from '@/utils/formatoNumeros'
 
 /** Colores por máquina — los MISMOS del gráfico de arriba, en orden. */
-const BAR_COLORS = ['bg-sky-400', 'bg-violet-400', 'bg-emerald-400', 'bg-amber-400']
+const BAR_COLORS = ['bg-cat-1-tint', 'bg-cat-3-tint', 'bg-cat-2-tint', 'bg-cat-4-tint']
 
 /** Cuánto mira hacia atrás el "ritmo actual" de un turno en curso. */
 const VENTANA_ACTUAL_MIN = 30
@@ -255,7 +255,7 @@ export function MachineSpeedMeaningCard({ machines, className }: Props) {
           {s && (
             <div className="flex items-center gap-x-4 gap-y-1 flex-wrap text-caption text-muted-foreground pt-0.5 border-t border-border">
               <span className="flex items-center gap-1.5 pt-2">
-                <span className="w-4 h-2 rounded-full bg-sky-400" /> producido
+                <span className="w-4 h-2 rounded-full bg-primary" /> producido
               </span>
               <span className="flex items-center gap-1.5 sm:pt-2">
                 <span className="w-4 h-2 rounded-full bg-warning" /> perdido por ritmo

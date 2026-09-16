@@ -178,6 +178,29 @@ check('ink sobre fondo', AL.ink, AL.bg, 4.5)
 check('secundario sobre card', AL.sub, AL.card, 4.5)
 check('secundario sobre fondo (peor caso)', AL.sub, AL.bg, 4.5)
 check('marca sobre card', '#2E75B6', AL.card, 4.5)
+check('boton primario CLARO (brand-foreground sobre brand)', '#ffffff', '#2E75B6', 4.5)
+// ⚠ Hallazgo 2026-09-15: el acento PURO (#2E75B6, o sea `text-primary`) sobre el
+// FONDO de la app da 4.34:1 y REPRUEBA. Sobre card pasa justo (4.84), por eso
+// nunca salto. El token correcto para texto de marca fuera de una card ya existe
+// y es `--brand-ink` (#245a8c) → 6.45:1. La app tiene ~365 usos de
+// `text-primary`; los que esten sobre el fondo (no sobre card) deberian ir a
+// brand-ink. Revisar caso por caso — NO es un barrido ciego. Este check vigila
+// el token correcto para que nadie lo pierda.
+check('marca-ink sobre fondo CLARO (texto de marca fuera de card)', '#245a8c', AL.bg, 4.5)
+// `destructive` partido en dos el 2026-09-15: un valor unico no puede servir de
+// relleno (necesita ser oscuro, lleva blanco encima) y de tinta (necesita
+// contrastar contra la superficie, o sea CLARA en oscuro). Con #bf6c61 para todo
+// reprobaba en los 76 `bg-destructive` Y en los 192 `text-destructive`.
+// El boton destructivo es TINTED (patron iOS), no un relleno solido: el tinte
+// sale del systemRed al 13% y el texto es el rojo-600.
+check('boton destructivo TINTED CLARO (rojo-600 sobre tinte 13%)', '#c42d25', composite(AL.card, '#FF3B30', 0.13), 4.5)
+check('text-destructive CLARO (rojo-600 sobre card)', '#c42d25', AL.card, 4.5)
+// Rellenos de estado (backgroundColor.fill.* en tailwind.config.js). Los tres
+// llevan texto blanco y rondan el mismo contraste a proposito: un sistema donde
+// cada relleno pide una tinta distinta se usa mal.
+check('bg-fill-critical + blanco', '#ffffff', '#8C4B45', 4.5)
+check('bg-fill-warning + blanco', '#ffffff', '#7A5A1E', 4.5)
+check('bg-fill-ok + blanco', '#ffffff', '#2F6B41', 4.5)
 check('rojo-600 texto sobre fondo', '#c42d25', AL.bg, 4.5)
 check('verde-600 texto sobre fondo', '#217d38', AL.bg, 4.5)
 check('naranja-600 texto sobre fondo', '#9e5c00', AL.bg, 4.5)
@@ -191,7 +214,17 @@ check('secundario sobre card', AD.sub, AD.card, 4.5)
 check('secundario sobre fondo', AD.sub, AD.bg, 4.5)
 check('marca adaptativa sobre card', '#5AA0DC', AD.card, 4.5)
 check('marca-ink sobre tinte marca 15%', '#71ade1', composite(AD.card, '#5AA0DC', 0.15), 4.5)
+// Hueco detectado el 2026-09-15: el BOTON PRIMARIO (`bg-primary
+// text-primary-foreground`) nunca estuvo vigilado. Hoy pasa en los dos temas
+// porque `--brand-foreground` es blanco en claro y tinta oscura (16 20 26) en
+// oscuro — el acento claro con texto blanco daria 2.80:1. No es un fallo: es
+// una decision correcta que no tenia quien la defendiera. Si alguien mueve el
+// acento y deja el foreground, el boton de accion de la app baja de AA sin que
+// nadie se entere hasta produccion.
+check('boton primario OSCURO (brand-foreground sobre brand)', '#10141a', '#5AA0DC', 4.5)
 check('rojo-600 texto sobre card', '#ff776f', AD.card, 4.5)
+check('text-destructive OSCURO (rojo-600 sobre card)', '#ff776f', AD.card, 4.5)
+check('boton destructivo TINTED OSCURO (rojo-600 sobre tinte 13%)', '#ff776f', composite(AD.card, '#FF453A', 0.13), 4.5)
 check('verde-600 texto sobre card', '#30d158', AD.card, 4.5)
 check('naranja-600 texto sobre card', '#ff9f0a', AD.card, 4.5)
 // Chips/Pill de la piel nueva. REGLA descubierta al medir (2026-08-09): el tinte

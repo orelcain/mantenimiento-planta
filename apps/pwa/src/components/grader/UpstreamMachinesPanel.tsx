@@ -360,7 +360,7 @@ function ShiftAvailabilityBar({
       <div className="flex h-2 w-14 rounded-full overflow-hidden bg-muted/60 shrink-0">
         {upPct    > 0 && <div className="h-full bg-emerald-500/[0.15]" style={{ width: `${upPct}%`    }} />}
         {breakPct > 0 && <div className="h-full bg-amber-500/[0.15]"   style={{ width: `${breakPct}%` }} />}
-        {downPct  > 0 && <div className="h-full bg-cat-5-tint/[0.15]"    style={{ width: `${downPct}%`  }} />}
+        {downPct  > 0 && <div className="h-full bg-red-500/[0.15]"    style={{ width: `${downPct}%`  }} />}
         {setupPct > 0 && <div className="h-full bg-cat-6-tint/[0.15]"  style={{ width: `${setupPct}%` }} />}
       </div>
       <span className="tabular-nums">{fmtPct(shiftRuntime)}</span>
@@ -694,7 +694,7 @@ function LineTimeSummaryBadges({ totals }: { totals: LineTimeTotals }) {
       {totals.downtimeSec > 0 && (
         <Badge
           variant="outline"
-          className="bg-cat-5-tint/[0.15] border-cat-5-tint/[0.25] text-cat-5-ink tabular-nums text-caption px-2 py-0.5 h-5 gap-1"
+          className="bg-red-500/[0.15] border-red-500/[0.25] text-ink-crit tabular-nums text-caption px-2 py-0.5 h-5 gap-1"
           title="Tiempo total de detención/paro (suma de las 3 Baaders)"
         >
           <PauseCircle className="h-3 w-3" />
@@ -755,7 +755,7 @@ function ProductionKpiRow({ kpis }: { kpis: MachineKpis }) {
       </Badge>
       <Badge
         variant="outline"
-        className="bg-cat-5-tint/[0.15] border-cat-5-tint/[0.25] text-cat-5-ink tabular-nums text-caption px-2 py-0.5 h-5"
+        className="bg-red-500/[0.15] border-red-500/[0.25] text-ink-crit tabular-nums text-caption px-2 py-0.5 h-5"
         title="Rojo: piezas en intervalos con ritmo MUY bajo el objetivo (fuera de tolerancia — atención)"
       >
         {fmtInt(kpis.redCycles)} ({fmtPct(kpis.redPct, 0)})
@@ -923,7 +923,7 @@ export function MachineShiftDetail({ shift, expanded, onToggle, windowStart, win
             <Gauge className="w-3 h-3" />
             {dec1(ciclo.realSec)}s/pz
             {ciclo.idealSec != null && ciclo.deltaSec! > 0.05 && (
-              <span className="text-amber-400">(+{dec1(ciclo.deltaSec!)})</span>
+              <span className="text-ink-warn">(+{dec1(ciclo.deltaSec!)})</span>
             )}
           </span>
         )}
@@ -1243,7 +1243,7 @@ export function UpstreamMachinesPanel({
             {dataSource === 'demo' && (
               <Badge
                 variant="outline"
-                className="text-caption px-1.5 py-0 h-4 border-amber-500/[0.25] text-amber-400 bg-amber-500/[0.15]"
+                className="text-caption px-1.5 py-0 h-4 border-amber-500/[0.25] text-ink-warn bg-amber-500/[0.15]"
                 title="Datos sintéticos de demostración — no hay datos reales de Shoplogix para este turno en Firestore"
               >
                 DEMO
@@ -1272,7 +1272,7 @@ export function UpstreamMachinesPanel({
               className={cn(
                 'text-caption px-1.5 py-0.5 rounded-ctl border shrink-0 transition-colors',
                 framedOnProduction
-                  ? 'border-primary/50 bg-primary/15 text-primary hover:bg-primary/25'
+                  ? 'border-primary/50 bg-primary/15 text-brand-ink hover:bg-primary/25'
                   : 'border-border text-muted-foreground hover:text-foreground hover:bg-muted',
               )}
             >
@@ -1314,10 +1314,10 @@ export function UpstreamMachinesPanel({
               </Badge>
             )}
             {loading && <span>Cargando…</span>}
-            {error && <span className="text-cat-5-ink flex items-center gap-1"><AlertCircle className="w-3 h-3" /> Error</span>}
+            {error && <span className="text-ink-crit flex items-center gap-1"><AlertCircle className="w-3 h-3" /> Error</span>}
             {isStale && syncedAt && (
               <span
-                className="text-amber-400 cursor-help"
+                className="text-ink-warn cursor-help"
                 title={
                   `Datos sincronizados hace ${Math.round((Date.now() - syncedAt.getTime()) / 60000)} min. ` +
                   `Umbral: ${SYNC_STALE_MINUTES} min. ` +
@@ -1330,7 +1330,7 @@ export function UpstreamMachinesPanel({
             {slxWindowMismatch && (
               <Badge
                 variant="outline"
-                className="bg-cat-5-tint/[0.15] border-cat-5-tint/[0.25] text-cat-5-ink text-caption px-2 py-0.5 h-5 gap-1 cursor-help"
+                className="bg-red-500/[0.15] border-red-500/[0.25] text-ink-crit text-caption px-2 py-0.5 h-5 gap-1 cursor-help"
                 title={
                   `Datos SLX fuera de ventana: rango real ${fmtTime(slxWindowMismatch.actualStart.getTime())}–${fmtTime(slxWindowMismatch.actualEnd.getTime())} ` +
                   `no coincide con el turno actual. Probable causa: documento Firestore con datos de otro turno. ` +
@@ -1384,7 +1384,7 @@ export function UpstreamMachinesPanel({
             )}
 
             {error && (
-              <div className="text-sm text-cat-5-ink py-4 flex items-center gap-2">
+              <div className="text-sm text-ink-crit py-4 flex items-center gap-2">
                 <AlertCircle className="w-4 h-4" />
                 <span>No se pudo cargar: {error}</span>
               </div>
@@ -1423,7 +1423,7 @@ export function UpstreamMachinesPanel({
                     className={cn(
                       'text-caption px-1.5 py-0.5 rounded-ctl border transition-colors',
                       showRateGap
-                        ? 'border-cat-5-tint/[0.25] bg-cat-5-tint/[0.15] text-cat-5-ink'
+                        ? 'border-red-500/[0.25] bg-red-500/[0.15] text-ink-crit'
                         : 'border-border text-muted-foreground hover:text-foreground hover:bg-muted',
                     )}
                   >
@@ -1432,7 +1432,7 @@ export function UpstreamMachinesPanel({
                   )}
                 </div>
                 {slxWindowMismatch && (
-                  <p className="mb-1 flex items-start gap-1 text-caption text-cat-5-ink">
+                  <p className="mb-1 flex items-start gap-1 text-caption text-ink-crit">
                     <AlertTriangle className="mt-px h-3 w-3 shrink-0" />
                     <span>
                       Datos del rango {fmtTime(slxWindowMismatch.actualStart.getTime())}–{fmtTime(slxWindowMismatch.actualEnd.getTime())} · no coincide con la ventana del turno

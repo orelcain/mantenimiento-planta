@@ -544,7 +544,7 @@ export function MissionControlPanel() {
                       return (
                         <div key={i} className="flex-1 flex flex-col items-center gap-0.5 group relative">
                           <div
-                            className={`w-full rounded-t ${rate >= 70 ? 'bg-green-500' : rate >= 40 ? 'bg-amber-500' : 'bg-red-500'} transition-all`}
+                            className={`w-full rounded-t ${rate >= 70 ? 'bg-fill-ok' : rate >= 40 ? 'bg-fill-warning' : 'bg-fill-critical'} transition-all`}
                             style={{ height: `${height}%`, minHeight: 2 }}
                           />
                           <div className="absolute -top-5 left-1/2 -translate-x-1/2 hidden group-hover:block bg-popover text-popover-foreground text-caption px-1 py-0.5 rounded-ctl shadow whitespace-nowrap z-10">
@@ -594,9 +594,9 @@ export function MissionControlPanel() {
                   <div className="w-full bg-muted rounded-full h-1.5">
                     <div
                       className={`h-1.5 rounded-full transition-all ${
-                        learningStats.avgConfidence >= 70 ? 'bg-green-500'
-                          : learningStats.avgConfidence >= 40 ? 'bg-amber-500'
-                          : 'bg-red-500'
+                        learningStats.avgConfidence >= 70 ? 'bg-fill-ok'
+                          : learningStats.avgConfidence >= 40 ? 'bg-fill-warning'
+                          : 'bg-fill-critical'
                       }`}
                       style={{ width: `${learningStats.avgConfidence}%` }}
                     />

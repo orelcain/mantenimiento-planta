@@ -238,7 +238,7 @@ function ActionButtons({ actions, onNavigate }: { actions: ChatAction[]; onNavig
         <button
           key={action.route}
           onClick={() => onNavigate(action.route)}
-          className="inline-flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-ctl border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 transition-colors"
+          className="inline-flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-ctl border border-primary/30 bg-primary/5 text-brand-ink hover:bg-primary/10 transition-colors"
         >
           <ExternalLink className="w-3 h-3" />
           {action.label}
@@ -420,7 +420,7 @@ function MessageBubble({
               <div className="flex gap-1.5">
                 <button
                   onClick={handleSubmitCorrection}
-                  className="flex-1 text-caption py-1 px-2 rounded-ctl bg-amber-500 text-white hover:bg-amber-600 transition-colors font-medium"
+                  className="flex-1 text-caption py-1 px-2 rounded-ctl bg-amber-500/[0.15] text-ink-warn hover:brightness-95/[0.15] transition-colors font-medium"
                 >
                   {correctionText.trim() ? 'Enviar corrección' : 'Marcar como incorrecto'}
                 </button>
@@ -585,7 +585,7 @@ function ContextualSuggestions({ suggestions, onSelect, disabled }: {
           key={i}
           onClick={() => onSelect(s)}
           disabled={disabled}
-          className="text-xs px-3 py-1.5 rounded-full border border-primary/25 bg-primary/5 text-primary hover:bg-primary/15 hover:border-primary/40 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm hover:shadow"
+          className="text-xs px-3 py-1.5 rounded-full border border-primary/25 bg-primary/5 text-brand-ink hover:bg-primary/15 hover:border-primary/40 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm hover:shadow"
         >
           {s}
         </button>
@@ -749,7 +749,7 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
       <div className="flex gap-1 mb-2">
         {fields.map(f => (
           <div key={f.key} className="flex-1 flex flex-col items-center gap-0.5">
-            <div className={`w-full h-1.5 rounded-full ${f.done ? 'bg-green-500' : 'bg-muted-foreground/[0.10]'}`} />
+            <div className={`w-full h-1.5 rounded-full ${f.done ? 'bg-fill-ok' : 'bg-muted-foreground/[0.10]'}`} />
             <span className={`text-[9px] ${f.done ? 'text-ink-ok' : 'text-muted-foreground'}`}>{f.label}</span>
           </div>
         ))}
@@ -911,14 +911,14 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
       <div className="flex items-center gap-2">
         <button
           onClick={onConfirm}
-          className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-ctl bg-green-600 text-white hover:bg-emerald-600 transition-colors font-medium"
+          className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-ctl bg-green-500/[0.15] text-ink-ok hover:brightness-95/[0.15] transition-colors font-medium"
         >
           <CheckCircle className="w-3 h-3" />
           Confirmar
         </button>
         <button
           onClick={onModify}
-          className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-ctl bg-blue-600 text-white hover:bg-blue-600 transition-colors font-medium"
+          className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-ctl bg-primary/[0.12] text-brand-ink hover:bg-primary/[0.12] transition-colors font-medium"
         >
           <Pencil className="size-3" />
           Modificar
@@ -1426,7 +1426,7 @@ export function ChatBot() {
                       <button
                         onClick={() => { changeAgent(null); setShowAgentSelector(false) }}
                         className={`w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-muted transition-colors ${
-                          !selectedAgent ? 'bg-primary/10 text-primary font-medium' : 'text-foreground'
+                          !selectedAgent ? 'bg-primary/10 text-brand-ink font-medium' : 'text-foreground'
                         }`}
                       >
                         <span className="w-5 text-center"><RefreshCw className="inline size-3.5" /></span>
@@ -1441,7 +1441,7 @@ export function ChatBot() {
                           key={agent.id}
                           onClick={() => { changeAgent(agent.id); setShowAgentSelector(false) }}
                           className={`w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-muted transition-colors ${
-                            selectedAgent === agent.id ? 'bg-primary/10 text-primary font-medium' : 'text-foreground'
+                            selectedAgent === agent.id ? 'bg-primary/10 text-brand-ink font-medium' : 'text-foreground'
                           }`}
                         >
                           <span className="w-5 text-center">{agent.emoji}</span>
@@ -1486,7 +1486,7 @@ export function ChatBot() {
                 onClick={() => setAvatarShow(v => !v)}
                 className={`p-1.5 rounded-ctl transition-colors ${
                   avatarShow
-                    ? 'bg-primary/20 text-primary hover:bg-primary/30'
+                    ? 'bg-primary/20 text-brand-ink hover:bg-primary/30'
                     : 'hover:bg-background text-muted-foreground hover:text-foreground'
                 }`}
                 title={avatarShow ? 'Ocultar avatar de ARIA' : 'Mostrar avatar de ARIA'}
@@ -1498,7 +1498,7 @@ export function ChatBot() {
                 onClick={() => { if (autoSpeak) stopSpeaking(); setAutoSpeak(v => !v) }}
                 className={`p-1.5 rounded-ctl transition-colors ${
                   autoSpeak
-                    ? 'bg-primary/20 text-primary hover:bg-primary/30'
+                    ? 'bg-primary/20 text-brand-ink hover:bg-primary/30'
                     : 'hover:bg-background text-muted-foreground hover:text-foreground'
                 }`}
                 title={autoSpeak ? 'Auto-leer respuestas: ACTIVO — click para silenciar' : 'Auto-leer respuestas en voz alta'}
@@ -1678,7 +1678,7 @@ export function ChatBot() {
                     setShowRecents(prev => !prev)
                     setShowDropdown(prev => !prev)
                   }}
-                  className={`p-2 rounded-card transition-colors ${showRecents ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80'}`}
+                  className={`p-2 rounded-card transition-colors ${showRecents ? 'bg-primary/10 text-brand-ink' : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80'}`}
                   title={showRecents ? 'Ocultar recientes' : 'Búsquedas recientes'}
                 >
                   <ChevronUp className={`w-4 h-4 transition-transform ${showRecents ? '' : 'rotate-180'}`} />
@@ -1781,7 +1781,7 @@ export function ChatBot() {
       {/* Botón flotante — oculto en landscape móvil para no tapar la tabla */}
       <button
         onClick={toggle}
-        className={`fixed bottom-20 lg:bottom-4 right-4 z-[45] w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 landscape-mobile-hidden ${
+        className={`fixed bottom-24 lg:bottom-4 right-4 z-[45] w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 landscape-mobile-hidden ${
           isOpen
             ? 'bg-muted text-muted-foreground hover:bg-muted/80'
             : 'bg-primary text-primary-foreground hover:bg-primary/90'

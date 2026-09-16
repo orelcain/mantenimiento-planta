@@ -469,7 +469,7 @@ export function Wireframe3DView() {
       </div>
 
       {/* ── Info inferior ── */}
-      <div className="absolute bottom-3 left-3 text-[10px] text-[#c8d8f0]/20 font-mono pointer-events-none select-none">
+      <div className="absolute bottom-3 left-3 text-caption text-[#c8d8f0]/20 font-mono pointer-events-none select-none">
         3D Blueprint · {mapView.label} · drag=orbitar · scroll=zoom · botón=rotar
       </div>
     </div>

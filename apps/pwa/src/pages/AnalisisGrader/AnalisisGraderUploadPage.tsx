@@ -60,7 +60,7 @@ const KIND_LABELS: Record<MatrixFileKind, string> = {
 }
 
 const KIND_COLORS: Record<MatrixFileKind, string> = {
-  PIEZA_PIEZA: 'bg-primary/[0.15] text-primary',
+  PIEZA_PIEZA: 'bg-primary/[0.15] text-brand-ink',
   PUERTA_0: 'bg-red-500/[0.15] text-ink-crit',
   PORC_CALIDAD: 'bg-green-500/[0.15] text-ink-ok',
   TOTALES_PRODUCCION: 'bg-cat-6-tint/[0.15] text-cat-6-ink',
@@ -498,7 +498,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
           disabled={parsing}
           className={cn(
             'flex items-center gap-1.5 px-3 py-1.5 rounded-ctl border text-sm font-medium transition-colors',
-            'border-primary/[0.25] text-primary hover:bg-primary/[0.15]',
+            'border-primary/[0.25] text-brand-ink hover:bg-primary/[0.15]',
             parsing && 'opacity-60 cursor-wait',
           )}
         >
@@ -508,7 +508,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
           }
           Cargar Excel
           {files.length > 0 && (
-            <Badge className={cn('text-caption h-4 px-1 ml-0.5', files.length > 0 ? 'bg-primary/[0.15] text-primary' : '')}>
+            <Badge className={cn('text-caption h-4 px-1 ml-0.5', files.length > 0 ? 'bg-primary/[0.15] text-brand-ink' : '')}>
               {files.length}
             </Badge>
           )}

@@ -43,7 +43,7 @@ function Termino({ signo, titulo, detalle, piezas }: {
       <span className={`text-center font-bold tabular-nums ${color}`}>{signo}</span>
       <span className="text-[12px]">
         {titulo}
-        <span className="block text-[10.5px] text-muted-foreground/80">{detalle}</span>
+        <span className="block text-caption text-muted-foreground/80">{detalle}</span>
       </span>
       <span className={`tabular-nums text-[12px] font-semibold ${color}`}>
         {signo === '−' ? '−' : signo === '+' ? '+' : ''}{fmtInt(piezas)} pz
@@ -188,7 +188,7 @@ export function VsAyerBloque({ r, records, sinConvenio }: {
       {records && (
         // Aire en vez de línea (§38): el espacio separa igual, con menos tinta.
         <div className={r ? 'mt-4' : 'mt-2'}>
-          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+          <p className="text-caption text-muted-foreground">
             Contra lo mejor que ya hicimos
             <span className="normal-case tracking-normal"> · {records.muestras} turnos</span>
           </p>
@@ -211,7 +211,7 @@ export function VsAyerBloque({ r, records, sinConvenio }: {
                     </span>
                     <span className="tabular-nums font-semibold">{fmt(c.hoy)}</span>
                   </span>
-                  <span className="block text-[10.5px] text-muted-foreground/80">
+                  <span className="block text-caption text-muted-foreground/80">
                     {c.esNuevo
                       ? `el anterior era ${fmt(c.record)} (${nombreDeDia(c.recordDe)})`
                       : `el récord es ${fmt(c.record)} (${nombreDeDia(c.recordDe)})`}
@@ -223,7 +223,7 @@ export function VsAyerBloque({ r, records, sinConvenio }: {
               )
             })}
           </ul>
-          <p className="mt-1.5 text-[10px] leading-snug text-muted-foreground/80">
+          <p className="mt-1.5 text-caption leading-snug text-muted-foreground/80">
             Récords de lo que el turno controla: la duración y el convenio los pone el calendario.
             El de «más piezas» no compite — era solo el turno más largo.
           </p>

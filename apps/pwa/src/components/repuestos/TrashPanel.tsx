@@ -201,7 +201,7 @@ export function TrashPanel({ open, onOpenChange }: Props) {
                   <div className="flex items-center gap-1 shrink-0">
                     <button
                       onClick={() => { setRestoreTarget(item); setDeleteTarget(null); setClave(''); setClaveError('') }}
-                      className="p-1.5 rounded-ctl hover:bg-primary/10 text-primary transition-colors"
+                      className="p-1.5 rounded-ctl hover:bg-primary/10 text-brand-ink transition-colors"
                       title="Restaurar"
                     >
                       <RotateCcw className="h-3.5 w-3.5" />

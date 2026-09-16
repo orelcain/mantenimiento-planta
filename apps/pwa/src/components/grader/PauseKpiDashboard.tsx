@@ -101,10 +101,11 @@ const DEAD_TIME_PCT_THRESHOLDS = {
   /** > 20% — crítico. */
 } as const
 
-function deadTimePctColor(pct: number): string {
-  if (pct <= DEAD_TIME_PCT_THRESHOLDS.okBelow) return 'text-emerald-400'
-  if (pct <= DEAD_TIME_PCT_THRESHOLDS.warnBelow) return 'text-amber-400'
-  return 'text-cat-5-ink'
+// Número grande (text-lg en KpiCard): el estado ya se explica en el texto del
+// `sub` ("saludable/atención/crítico"), que no admite color propio sin tocar
+// la estructura de KpiCard — el número queda en la tinta de etiqueta.
+function deadTimePctColor(_pct: number): string {
+  return 'text-foreground'
 }
 
 // SIN_TAG_ID y summarizeByCategory viven en services/grader/pauseKpiAnalytics
@@ -261,7 +262,7 @@ function PauseAnnotationPanel({
             <button
               onClick={() => void handleSave(item)}
               disabled={!selections[key] || isSaving}
-              className="shrink-0 px-2 h-6 rounded-ctl text-caption bg-amber-500/[0.15] text-white disabled:opacity-30 hover:bg-amber-500 transition-colors"
+              className="shrink-0 px-2 h-6 rounded-ctl text-caption bg-amber-500/[0.15] text-ink-warn disabled:opacity-30 hover:brightness-95/[0.15] transition-colors"
             >
               {isSaving ? '…' : 'OK'}
             </button>

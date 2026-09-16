@@ -37,7 +37,7 @@ function fmtLead(sec: number): string {
 }
 
 const KIND_STYLE: Record<CorrelationKind, { bg: string; border: string; text: string; icon: typeof AlertTriangle; label: string }> = {
-  upstream_global:      { bg: 'bg-cat-5-tint/[0.15]',    border: 'border-cat-5-tint/[0.25] dark:border-cat-5-tint/[0.25]',    text: 'text-cat-5-ink',    icon: AlertTriangle, label: 'Causa upstream' },
+  upstream_global:      { bg: 'bg-red-500/[0.15]',    border: 'border-red-500/[0.25] dark:border-red-500/[0.25]',    text: 'text-ink-crit',    icon: AlertTriangle, label: 'Causa upstream' },
   upstream_majority:    { bg: 'bg-amber-500/[0.15]',   border: 'border-amber-500/[0.25] dark:border-amber-500/[0.25]',   text: 'text-ink-warn',   icon: AlertTriangle, label: 'Upstream parcial' },
   upstream_single:      { bg: 'bg-muted dark:bg-muted-foreground/[0.10]',   border: 'border-border dark:border-border',      text: 'text-muted-foreground dark:text-muted-foreground',   icon: Info,          label: 'Verificar' },
   // Coincidencia organizacional (colación, reunión) — NO es causal upstream.
@@ -163,7 +163,7 @@ export function UpstreamCorrelationCard({ pauses, snapshot }: Props) {
 
           {summary.upstreamCaused > 0 && (
             <div
-              className="flex items-center gap-1.5 text-xs text-cat-5-ink tabular-nums"
+              className="flex items-center gap-1.5 text-xs text-ink-crit tabular-nums"
               title={`${summary.upstreamCaused} de ${summary.total} paros del Grader correlacionaron con eventos upstream. Tiempo muerto del Grader que coincidió con paros Baader: ${fmtDurationSec(summary.upstreamCausedDurSec)} (${Math.round(upstreamShareOfPauseTime * 100)}% del tiempo muerto del turno).`}
             >
               <Clock className="w-3.5 h-3.5" />
@@ -214,7 +214,7 @@ export function UpstreamCorrelationCard({ pauses, snapshot }: Props) {
                     return (
                       <div
                         key={m.machineid}
-                        className={`flex items-center gap-2 text-caption tabular-nums ${isTop ? 'text-cat-5-ink' : 'text-muted-foreground'}`}
+                        className={`flex items-center gap-2 text-caption tabular-nums ${isTop ? 'text-ink-crit' : 'text-muted-foreground'}`}
                       >
                         {/* 8rem reservaba 128 px para «Baader 3». En la hoja de detalle,
                             que es más angosta que la pestaña, esa holgura empujaba
@@ -227,7 +227,7 @@ export function UpstreamCorrelationCard({ pauses, snapshot }: Props) {
                         {/* Barra visual proporcional al share */}
                         <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden ml-1 max-w-[120px]">
                           <div
-                            className={`h-full rounded-full ${isTop ? 'bg-cat-5-tint' : 'bg-muted-foreground'}`}
+                            className={`h-full rounded-full ${isTop ? 'bg-fill-critical' : 'bg-muted-foreground'}`}
                             style={{ width: `${Math.max(2, Math.min(100, sharePct))}%` }}
                           />
                         </div>

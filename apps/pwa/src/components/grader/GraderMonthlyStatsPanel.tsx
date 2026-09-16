@@ -9,7 +9,6 @@ import { Disclosure } from '@/components/piel'
 import { TrendingDown, TrendingUp, BarChart3, Sun, Moon, Sunset, Sunrise, Clock } from 'lucide-react'
 import type { GraderDailySummary } from '@/services/grader/types'
 import { getCauseLabel } from '@/services/grader/graderMatrixP0Causes'
-import { p0StatusFromPct, p0StatusColor } from '@/services/grader/graderP0Thresholds'
 import { aggregateByShiftDay } from '@/services/grader/graderCalendarAggregation'
 import { getShiftMeta } from '@/services/grader/graderShiftDisplay'
 import { fmt, fmtDec } from '@/lib/format'
@@ -123,7 +122,6 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
       : meta.shortLabel
   }
   const shiftLabel = (s: GraderDailySummary) => shortShiftLabel(s.shiftId)
-  const p0Color    = stats ? p0StatusColor(p0StatusFromPct(stats.p0Avg)) : 'text-muted-foreground'
 
   // Mejor/Peor: preferir Grader (P0%), fallback Shoplogix (uptime)
   const best = stats
@@ -186,7 +184,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
         <Card className={stats ? '' : 'opacity-40'}>
           <CardContent className="pt-2 pb-2 px-3">
             <p className="text-caption text-muted-foreground mb-0.5">P0% promedio</p>
-            <p className={`text-xl font-bold leading-none tabular-nums ${p0Color}`}>
+            <p className="text-xl font-bold leading-none tabular-nums text-foreground">
               {stats ? `${fmtDec(stats.p0Avg, 2)}%` : '—'}
             </p>
             {stats && (
@@ -203,7 +201,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
         <Card className={slxStats ? '' : 'opacity-40'}>
           <CardContent className="pt-2 pb-2 px-3">
             <p className="text-caption text-muted-foreground mb-0.5">Ciclos Baader</p>
-            <p className={`text-xl font-bold leading-none tabular-nums ${slxStats ? 'text-primary' : 'text-muted-foreground'}`}>
+            <p className={`text-xl font-bold leading-none tabular-nums ${slxStats ? 'text-foreground' : 'text-muted-foreground'}`}>
               {slxStats
                 ? (slxStats.totalCycles >= 1000
                     ? `${dec1((slxStats.totalCycles / 1000))}k`
@@ -213,7 +211,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
             {slxStats && (
               <p className={`text-caption mt-0.5 ${
                 slxStats.avgUptimePct >= 70 ? 'text-ink-ok'
-                : slxStats.avgUptimePct >= 40 ? 'text-ink-warn' : 'text-cat-5-ink'
+                : slxStats.avgUptimePct >= 40 ? 'text-ink-warn' : 'text-ink-crit'
               }`}>
                 {slxStats.avgUptimePct.toFixed(0)}% uptime
               </p>
@@ -226,7 +224,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
       <div className="grid grid-cols-2 gap-2">
         {/* Tinte SIN borde: el relleno ya delimita. Sumarle contorno era
             duplicar la línea y es de lo que más carga la pantalla. */}
-        <Card className={`border-0 bg-emerald-500/[0.15] ${!best ? 'opacity-40' : ''}`}>
+        <Card className={`border-0 bg-ink-ok/[0.15] ${!best ? 'opacity-40' : ''}`}>
           <CardContent className="pt-1.5 pb-1.5 px-3">
             <div className="flex items-center gap-1 mb-0.5">
               <TrendingDown className="w-3 h-3 text-emerald-500" />
@@ -234,22 +232,22 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
                 Mejor · {best?.metric ?? '—'}
               </p>
             </div>
-            <p className="text-lg font-bold text-ink-ok leading-none tabular-nums">
+            <p className="text-lg font-bold text-foreground leading-none tabular-nums">
               {best?.value ?? '—'}
             </p>
             {best && <p className="text-caption text-muted-foreground mt-0.5">{best.date}</p>}
           </CardContent>
         </Card>
 
-        <Card className={`border-0 bg-cat-5-tint/[0.15] ${!worst ? 'opacity-40' : ''}`}>
+        <Card className={`border-0 bg-ink-crit/[0.15] ${!worst ? 'opacity-40' : ''}`}>
           <CardContent className="pt-1.5 pb-1.5 px-3">
             <div className="flex items-center gap-1 mb-0.5">
-              <TrendingUp className="w-3 h-3 text-cat-5-ink" />
-              <p className="text-caption text-cat-5-ink font-medium">
+              <TrendingUp className="w-3 h-3 text-ink-crit" />
+              <p className="text-caption text-ink-crit font-medium">
                 Peor · {worst?.metric ?? '—'}
               </p>
             </div>
-            <p className="text-lg font-bold text-cat-5-ink leading-none tabular-nums">
+            <p className="text-lg font-bold text-foreground leading-none tabular-nums">
               {worst?.value ?? '—'}
             </p>
             {worst && <p className="text-caption text-muted-foreground mt-0.5">{worst.date}</p>}

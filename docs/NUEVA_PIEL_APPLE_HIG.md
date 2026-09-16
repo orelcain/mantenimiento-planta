@@ -5,6 +5,11 @@
 > en la sesión de diseño (mockups publicados como artifacts). Todo lo que se construya de la
 > piel nueva se valida contra este documento.
 >
+> **Revisión 2026-09-16 contra iOS 26/27.** Lo compilado el 2026-08-09 era iOS 18. Cambió:
+> `body` 17 (no 15), MAYÚSCULAS fuera de los encabezados, radios 26/32/36 y cápsulas, Pill al
+> 8 % (no 14 %), roles con los nombres reales de `tailwind.config.js`. El destilado operativo
+> con la medición pública detrás de cada valor es `DESIGN.md` en la raíz del repo de la PWA.
+>
 > Mockups de referencia (artifacts, conmutador claro/oscuro):
 > - Estructura (inicio/tab bar/hub): https://claude.ai/code/artifact/34c2745f-411a-47ae-bb46-ed872f2fb605
 > - Sistema completo (tipografía/componentes/sheet/materiales): https://claude.ai/code/artifact/7d6c6aa8-7f68-4b01-adf3-54391ef4ff44
@@ -84,17 +89,12 @@ superficies chicas — puntos de estado, deltas, íconos < 30 px. Para RELLENOS 
 `softenAccentHex()` (decisión Orel 2026-07-19, PRs #240/#248). No se revierte esa
 decisión: se acota a su caso real.
 
-**Regla de la Pill — MEDIDA, no estimada (2026-08-09, revisada el mismo día):**
-`texto = tono 600` sobre `fondo = tono 500 al 15%`. Se llegó ahí midiendo, no a ojo:
+**Regla de la Pill — MEDIDA, no estimada (2026-08-09):** `texto = tono 600` (la variante
+*accesible* de Apple) sobre `fondo = tono 500 al 8%`. Se llegó ahí midiendo, no a ojo:
 
 - el tinte vivo como TEXTO sobre su propio fondo reprueba AA en rojo oscuro (3.51:1);
 - con el tono 600 pero fondo al 14% seguía reprobando el rojo (4.24:1 oscuro / 4.47:1 claro);
-- al 8% cumplían los seis casos, pero **al verlo en pantalla el relleno era casi invisible**
-  en tema claro: pasaba el contraste y fallaba el propósito (agrupar visualmente);
-- se resolvió al revés: fijar el tinte en **15%** —visualmente sólido— y DERIVAR la tinta que
-  cumple AA sobre ese fondo, tono por tono. Los 11 colores (3 semánticos + 8 categóricos)
-  pasan en ambos temas. El azul de marca puro reprueba sobre su propio tinte (3.98:1), así
-  que los chips informativos usan `--brand-ink`, una variante propia.
+- al 8% cumplen los seis casos (crítica/media/ok × claro/oscuro), peor caso 4.57:1.
 
 El 14% que figuraba antes acá era invención propia, no del HIG. Los tres tonos 600
 también se corrigieron contra la medición: el verde accesible de Apple (`#248A3D`) da
@@ -145,24 +145,30 @@ conserve su color entre pantallas y sesiones.
 Fuente: SF Pro en Apple; en la PWA (Windows/Android) la aproximación es
 `-apple-system, "SF Pro Text", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif`.
 
-Escala Dynamic Type de iOS (tamaño Large, el default) → mapeada a 8 roles de la app:
+Escala Dynamic Type de iOS (tamaño Large, el default) → mapeada a 11 roles de la app. Los
+nombres son los de `tailwind.config.js` (`text-<rol>`), corregidos el 2026-09-16:
 
 | Rol PWA | Estilo iOS | Tamaño/peso | Tracking | Uso en la app |
 |---|---|---|---|---|
 | `display` | largeTitle | 34/700 | −0.028em | título de página, UNO por pantalla |
-| `title` | title1 | 28/700 | −0.026em | título de ficha/detalle |
-| `section` | title3 | 20/600 | −0.02em | título de sección dentro de página |
-| `headline` | headline | 15–17/600 | — | título de celda, incidencia |
-| `body` | body/subheadline | 15/400 | — | texto corrido |
-| `footnote` | footnote | 13/400 | — | metadatos, subtítulos de celda |
-| `caption` | caption | 11/600 | +0.05em MAYÚS | encabezados de grupo, ejes |
+| `title1` | title1 | 28/700 | −0.02em | título de ficha/detalle |
+| `title2` | title2 | 22/600 | — | título de sub-vista (p. ej. «Stock ⌄») |
+| `title3` | title3 | 20/600 | — | título de sección dentro de página; cifra de fila |
+| `headline` | headline | 17/600 | — | título de celda, incidencia |
+| `body` | body | **17/400** | — | texto corrido (antes 15: era el subhead de Apple) |
+| `callout` | callout | 16/400 | — | texto de apoyo dentro de tarjetas |
+| `subhead` | subheadline | 15/400 | — | chips, controles, **encabezado de grupo (15/600, secundario)** |
+| `footnote` | footnote | 13/400 | — | metadatos, subtítulos de celda, rótulo de estado |
+| `caption` | caption2 | 11/400 | — | ejes, tags, piso absoluto (nada bajo 11) |
 | `stat` | (propio) | 30/700 tabular | −0.03em | KPIs numéricos |
 
 Reglas duras:
-- **8 roles, ni uno más.** Texto nuevo → rol existente más cercano. Nunca inventar tamaño.
+- **11 roles, ni uno más.** Texto nuevo → rol existente más cercano. Nunca inventar tamaño.
+- **Sin MAYÚSCULAS de interfaz.** iOS 26 las quitó de los encabezados de sección (formato
+  oración, algo más pesado y más grande). Quedan solo en códigos SAP, tags e identificadores.
 - **Todo número que se lee como dato va tabular** (`font-variant-numeric: tabular-nums`) —
   imprescindible con datos en vivo para que las columnas no bailen al refrescar.
-- Títulos grandes con tracking negativo; caption en mayúsculas con tracking positivo.
+- Títulos grandes con tracking negativo; nada de caption en mayúsculas (iOS 26).
 - Jerarquía por PESO y OPACIDAD antes que por tamaño.
 
 ---
@@ -175,9 +181,11 @@ Reglas duras:
 - **Padding interno de tarjeta**: 16 px.
 - **Target táctil mínimo 44×44 px** — regla de oro con guantes en planta. La CELDA COMPLETA
   es clicable, nunca solo el chevron.
-- **Radios (escala única, 4 valores)**: control 10 px · tarjeta/grupo 14–16 px ·
-  contenedor grande/sheet 18–20 px · pill/avatar 999. Se ERRADICA la mezcla actual
-  (rounded/sm/md/lg/xl conviviendo).
+- **Radios (escala única, iOS 26+)**: control/campo/chip cuadrado 10 px · búsqueda 22 ·
+  tarjeta y grupo de lista **26** · sheet/modal **32** · alerta **36** · botón, segmentado,
+  pill y avatar **cápsula** (999). Concentricidad: `radio_hijo = radio_padre − padding`
+  (26 − 16 = 10). Se ERRADICA la mezcla (rounded/sm/md/lg/xl conviviendo). Los 14–16 de
+  la versión anterior eran de la era iOS 7–18.
 - **Sombras**: solo en claro, una sola receta suave (`0 1px 4px rgba(0,0,0,.05)` reposo,
   algo más al hover). En oscuro NO hay sombras: elevación por tono de superficie.
 - Listas estilo **inset grouped**: grupo con fondo continuo y radios, separadores insetados
@@ -211,10 +219,12 @@ Los 5 primitivos a construir ANTES del barrido (todo lo demás se compone de est
 1. **Button** — 4 énfasis: `filled` (acento, MÁXIMO UNO por vista), `tinted` (acento al
    13%), `plain` (texto acento), `destructive` (rojo tinted). 3 tamaños; deshabilitado =
    40% opacidad. Presión: scale(.96–.97).
-2. **GroupedList / Cell** — grupo inset con radios 14–16; celda: ícono cuadrado redondeado
+2. **GroupedList / Cell** — grupo inset con radio 26 y encabezado subhead 15/600 en
+   formato oración; celda: ícono cuadrado redondeado
    28–30 px (color de estado) + título headline + subtítulo footnote + valor tabular derecha
    + chevron `›`. Separadores insetados. Celda completa táctil ≥44 px.
-3. **Pill / StatusChip** — texto tinte + fondo tinte al 14%, radio 999. Reemplaza los ~899
+3. **Pill / StatusChip** — texto tono 600 + fondo tono 500 al **8 %** (la proporción medida
+   en §1.4; el 14 % que decía acá era un error), radio 999. Reemplaza los ~899
    chips translúcidos ad-hoc actuales. Variantes: crítica/media/ok/neutra/en-vivo (con punto
    pulsante).
 4. **Sheet** — modal que sube desde abajo con agarradera, fondo `rgba(0,0,0,.35)` + blur;
@@ -222,8 +232,8 @@ Los 5 primitivos a construir ANTES del barrido (todo lo demás se compone de est
 5. **TabBar** (móvil) + **Toolbar** (escritorio) — translúcidas (ver materiales), con el ＋
    central en móvil.
 
-Secundarios (misma piel, después): Switch iOS, Segmented con pulgar deslizante, Search
-field (`systemFill`, radio 11), Stepper, Toast/alerta entrante, Skeleton, Empty state.
+Secundarios (misma piel, después): Switch iOS, Segmented en cápsula con pulgar deslizante
+(`SegmentedControl`, 44 px), Search field (`systemFill`, cápsula de 44 px, radio 22), Stepper, Toast/alerta entrante, Skeleton, Empty state.
 
 Estados obligatorios de cada componente: default / hover / focus-visible / active /
 disabled / loading / error.

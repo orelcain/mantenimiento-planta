@@ -662,7 +662,7 @@ export function GraderPeriodView({ data }: Props) {
                     <p className="text-sm font-semibold">{visibleStats.minP0Day.dateKey}</p>
                   </div>
                 </div>
-                <p className="text-2xl font-bold tabular-nums text-ink-ok">
+                <p className="text-2xl font-bold tabular-nums text-foreground">
                   {visibleStats.minP0Day.p0Pct}%
                 </p>
               </CardContent>
@@ -789,9 +789,9 @@ export function GraderPeriodView({ data }: Props) {
               <button
                 type="button"
                 onClick={handleResetZoom}
-                className="inline-flex items-center gap-1 rounded-ctl border border-muted-foreground/20 px-2 py-0.5 hover:bg-muted/40 transition-colors"
+                className="inline-flex h-11 items-center gap-1.5 rounded-full border border-muted-foreground/20 px-4 text-subhead font-medium hover:bg-muted/40 transition-colors"
               >
-                <RotateCcw className="h-3 w-3" />
+                <RotateCcw className="h-3.5 w-3.5" />
                 Reset zoom
               </button>
             </div>
@@ -981,9 +981,9 @@ export function GraderPeriodView({ data }: Props) {
             <button
               type="button"
               onClick={() => exportToCSV(sortedShifts, range.label)}
-              className="inline-flex items-center gap-1.5 text-caption text-muted-foreground hover:text-foreground border border-border/50 rounded-ctl px-2 py-1 hover:bg-muted/40 transition-colors shrink-0"
+              className="inline-flex h-11 items-center gap-1.5 text-subhead font-medium text-muted-foreground hover:text-foreground border border-border/50 rounded-full px-4 hover:bg-muted/40 transition-colors shrink-0"
             >
-              <Download className="h-3 w-3" />
+              <Download className="h-3.5 w-3.5" />
               Exportar CSV
             </button>
           </div>
@@ -1076,7 +1076,7 @@ export function GraderPeriodView({ data }: Props) {
                   type="button"
                   onClick={() => setPage(p => Math.max(0, p - 1))}
                   disabled={page === 0}
-                  className="px-2.5 py-1 rounded-ctl text-xs border border-border bg-background hover:bg-muted/50 disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="h-11 rounded-full px-4 text-subhead font-medium border border-border bg-background hover:bg-muted/50 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   ‹ Anterior
                 </button>
@@ -1087,7 +1087,7 @@ export function GraderPeriodView({ data }: Props) {
                   type="button"
                   onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
                   disabled={page >= totalPages - 1}
-                  className="px-2.5 py-1 rounded-ctl text-xs border border-border bg-background hover:bg-muted/50 disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="h-11 rounded-full px-4 text-subhead font-medium border border-border bg-background hover:bg-muted/50 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   Siguiente ›
                 </button>

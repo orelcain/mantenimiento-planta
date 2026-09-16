@@ -79,8 +79,8 @@ function emptyDraft(equipment: Pick<Equipment, 'nombre' | 'tipo'>): EntryDraft {
 }
 
 const CHK_ESTADO: { value: ChecklistResultado['estado']; label: string; on: string }[] = [
-  { value: 'ok', label: '✓', on: 'bg-emerald-500 text-white' },
-  { value: 'obs', label: 'Obs.', on: 'bg-amber-500 text-white' },
+  { value: 'ok', label: '✓', on: 'bg-emerald-500/[0.15] text-ink-ok' },
+  { value: 'obs', label: 'Obs.', on: 'bg-amber-500/[0.15] text-ink-warn' },
   { value: 'na', label: '–', on: 'bg-muted text-foreground' },
 ]
 

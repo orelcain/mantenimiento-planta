@@ -68,16 +68,6 @@ interface TileGroup {
 
 // ─── Paleta de colores ────────────────────────────────────────────────────────
 
-const COLOR: Record<TileColor, { bg: string; border: string; icon: string; label: string }> = {
-  red:     { bg: 'bg-red-500/[0.15]',     border: 'border-red-500/[0.25]',     icon: 'text-red-500',     label: 'text-ink-crit' },
-  blue:    { bg: 'bg-primary/[0.15]',    border: 'border-primary/[0.25]',    icon: 'text-blue-500',    label: 'text-ink-info' },
-  amber:   { bg: 'bg-amber-500/[0.15]',   border: 'border-amber-500/[0.25]',   icon: 'text-amber-500',   label: 'text-ink-warn' },
-  green:   { bg: 'bg-green-500/[0.15]',   border: 'border-green-500/[0.25]',   icon: 'text-green-500',   label: 'text-ink-ok' },
-  purple:  { bg: 'bg-cat-6-tint/[0.15]',  border: 'border-cat-6-tint/[0.25]',  icon: 'text-cat-6-ink',  label: 'text-cat-6-ink' },
-  emerald: { bg: 'bg-emerald-500/[0.15]', border: 'border-emerald-500/[0.25]', icon: 'text-emerald-500', label: 'text-ink-ok' },
-  orange:  { bg: 'bg-cat-4-tint/[0.15]',  border: 'border-cat-4-tint/[0.25]',  icon: 'text-cat-4-ink',  label: 'text-cat-4-ink' },
-  slate:   { bg: 'bg-muted/60',       border: 'border-border',          icon: 'text-muted-foreground',  label: 'text-foreground' },
-}
 
 // ─── Tiles de formación generados desde el catálogo ──────────────────────────
 
@@ -241,87 +231,55 @@ function getGreeting() {
 
 // ─── WIP Ribbon ───────────────────────────────────────────────────────────────
 
-interface WipRibbonProps {
-  variant?: 'chip' | 'cta'
-  /** Admin: callback para iniciar confirmación de liberación */
-  onTap?: (e: React.MouseEvent) => void
-}
-
-function WipRibbon({ variant = 'chip', onTap }: WipRibbonProps) {
-  if (variant === 'cta') {
-    return (
-      <button
-        onClick={onTap}
-        className={cn(
-          'shrink-0 text-caption font-bold tracking-wide px-1.5 py-0.5 rounded-full bg-amber-400 text-ink-warn leading-none',
-          onTap ? 'active:scale-95 cursor-pointer' : 'pointer-events-none',
-        )}
-      >
-        en desarrollo
-      </button>
-    )
-  }
-  // Ribbon diagonal para chips
-  return (
-    <div
-      onClick={onTap}
-      className={cn(
-        'absolute inset-0 overflow-hidden rounded-card z-10',
-        onTap ? 'cursor-pointer' : 'pointer-events-none',
-      )}
-    >
-      <div
-        className="absolute bg-amber-400 text-ink-warn font-bold text-[6.5px] tracking-tight uppercase text-center leading-none py-[3.5px] shadow-sm"
-        style={{ width: '88px', top: '12px', right: '-22px', transform: 'rotate(38deg)' }}
-      >
-        en desarrollo
-      </div>
-    </div>
-  )
-}
-
 // ─── CTA Tile ─────────────────────────────────────────────────────────────────
 
 function CtaTile({ tile, showWip, onRelease }: { tile: Tile; showWip: boolean; onRelease?: () => void }) {
   const [confirming, setConfirming] = useState(false)
-  const c = COLOR[tile.color]
   const Icon = tile.icon
 
+  // DESIGN.md §10: el tile del Home es NEUTRO (igual que el móvil). El color de
+  // estado no vive en un acceso directo; la cinta rotada de 6,5 px pasa a ser
+  // una etiqueta de 11 px en formato oración.
   return (
     <Link
       to={tile.href}
       className={cn(
-        'flex items-center gap-3 px-4 py-3.5 rounded-card border mb-2 overflow-hidden relative',
-        'transition-all active:scale-[0.98] touch-manipulation select-none',
-        c.bg, c.border,
+        'relative mb-2 flex min-h-[44px] items-center gap-3 overflow-hidden rounded-card border border-border bg-card px-4 py-3.5',
+        'transition-all active:scale-[0.98] touch-manipulation select-none hover:bg-accent',
       )}
     >
-      <div className={cn('w-9 h-9 rounded-card flex items-center justify-center shrink-0', c.bg)}>
-        <Icon className={cn('h-5 w-5', c.icon)} />
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className={cn('font-semibold text-sm leading-tight', c.label)}>{tile.label}</p>
-        <p className="text-xs text-muted-foreground mt-0.5">{tile.sublabel}</p>
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-ctl bg-muted-foreground/[0.12]">
+        <Icon className="size-5 text-muted-foreground" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-subhead font-semibold leading-tight text-foreground">{tile.label}</p>
+        {tile.sublabel && <p className="mt-0.5 text-footnote text-muted-foreground">{tile.sublabel}</p>}
       </div>
       {showWip && !confirming && (
-        <WipRibbon
-          variant="cta"
-          onTap={onRelease ? (e) => { e.preventDefault(); setConfirming(true) } : undefined}
-        />
+        <span
+          onClick={onRelease ? (e) => { e.preventDefault(); setConfirming(true) } : undefined}
+          className={cn('shrink-0 rounded-full bg-muted px-2 py-0.5 text-caption font-semibold text-muted-foreground', onRelease && 'cursor-pointer')}
+        >
+          En desarrollo
+        </span>
       )}
       {confirming && (
-        <div className="flex gap-1.5 shrink-0">
+        <div className="flex shrink-0 gap-1.5">
           <button
+            type="button"
+            aria-label="Liberar"
             onClick={(e) => { e.preventDefault(); onRelease?.(); setConfirming(false) }}
-            className="text-caption bg-emerald-500 text-white rounded-card w-7 h-7 flex items-center justify-center active:scale-90 font-bold"
+            className="flex size-9 items-center justify-center rounded-full bg-emerald-500/[0.15] text-ink-ok active:scale-90"
           >✓</button>
           <button
+            type="button"
+            aria-label="Cancelar"
             onClick={(e) => { e.preventDefault(); setConfirming(false) }}
-            className="text-caption bg-muted text-muted-foreground rounded-card w-7 h-7 flex items-center justify-center active:scale-90"
+            className="flex size-9 items-center justify-center rounded-full bg-muted text-muted-foreground active:scale-90"
           >✗</button>
         </div>
       )}
-      {!confirming && <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />}
+      {!confirming && <ChevronRight className="size-4 shrink-0 text-muted-foreground" />}
     </Link>
   )
 }
@@ -396,7 +354,7 @@ export function MobileHomeGrid() {
         {/* Botón Menú — a la izquierda del nombre */}
         <button
           onClick={() => setSidebarOpen(true)}
-          className="w-9 h-9 rounded-card bg-muted flex items-center justify-center shrink-0 active:scale-90 transition-transform touch-manipulation"
+          className="size-11 rounded-full bg-muted flex items-center justify-center shrink-0 active:scale-90 transition-transform touch-manipulation"
           aria-label="Menú"
         >
           <Menu className="h-4 w-4 text-foreground" />
@@ -448,19 +406,25 @@ export function MobileHomeGrid() {
               */
               <ListGroup>
                 {chipTiles.flatMap((tile) => {
-                  const c = COLOR[tile.color]
                   const Icon = tile.icon
                   const wip = isWip(tile.id, tile.wip)
+                  // Tile NEUTRO (systemFill + glifo secundario), no tintado con el
+                  // glifo en el tono 500 vivo: con 12 filas era neon sobre oscuro
+                  // (13 glifos #FF9F0A a saturacion 1.0, mas rojo, verde y purpura).
+                  // DESIGN.md §3: el color no va en el icono de una celda. El mapa
+                  // COLOR sigue vivo para la variante de escritorio (~linea 296).
+                  // Y "En desarrollo" va en Pill neutral, no warning: es un estado,
+                  // no una advertencia — con warning eran 13 textos en amber vivo.
                   return [
                     <ListCell
                       key={tile.id}
                       leading={
-                        <span className={cn('flex size-7 items-center justify-center rounded-ctl', c.bg)}>
-                          <Icon className={cn('size-4', c.icon)} />
+                        <span className="flex size-7 items-center justify-center rounded-ctl bg-muted-foreground/[0.12]">
+                          <Icon className="size-4 text-muted-foreground" />
                         </span>
                       }
                       title={tile.label}
-                      trailing={wip ? <Pill tone="warning">En desarrollo</Pill> : undefined}
+                      trailing={wip ? <Pill tone="neutral">En desarrollo</Pill> : undefined}
                       onClick={() => navigate(tile.href)}
                     />,
                     /* Los hijos van en la MISMA tarjeta que el padre: una card

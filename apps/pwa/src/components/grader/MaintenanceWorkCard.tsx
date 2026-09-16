@@ -56,9 +56,9 @@ export function MaintenanceWorkCard({ work }: { work: MaintenanceWork | null }) 
     work.preventivasCumplidas === 0 && work.preventivasVencidas === 0
 
   const trendIcon = work.proactivoTrend === 'mejor'
-    ? <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+    ? <TrendingUp className="w-3.5 h-3.5 text-ink-ok" />
     : work.proactivoTrend === 'peor'
-      ? <TrendingDown className="w-3.5 h-3.5 text-cat-5-ink" />
+      ? <TrendingDown className="w-3.5 h-3.5 text-ink-crit" />
       : <TrendingUp className="w-3.5 h-3.5" />
 
   return (
@@ -95,35 +95,30 @@ export function MaintenanceWorkCard({ work }: { work: MaintenanceWork | null }) 
                 value={pct(work.causaRaizPct)}
                 sub={`${work.conCausaRaiz} de ${work.correctivasResueltas} · para que no vuelvan`}
                 icon={<Search className="w-3.5 h-3.5" />}
-                valueColor={work.causaRaizPct == null ? undefined
-                  : work.causaRaizPct >= 70 ? 'text-emerald-400'
-                  : work.causaRaizPct >= 40 ? 'text-amber-400' : 'text-cat-5-ink'}
+                // Número grande (text-lg en Kpi): sin rótulo/punto chico
+                // propio al lado, queda en la tinta de etiqueta.
+                valueColor={work.causaRaizPct == null ? undefined : 'text-foreground'}
               />
               <Kpi
                 label="Preventivas cumplidas"
                 value={String(work.preventivasCumplidas)}
                 sub={work.preventivasVencidas > 0 ? `${work.preventivasVencidas} vencidas · ${pct(work.cumplimientoPct)} cumpl.` : `${pct(work.cumplimientoPct)} cumplimiento`}
                 icon={<ShieldCheck className="w-3.5 h-3.5" />}
-                valueColor={work.cumplimientoPct == null ? undefined
-                  : work.cumplimientoPct >= 90 ? 'text-emerald-400'
-                  : work.cumplimientoPct >= 70 ? 'text-amber-400' : 'text-cat-5-ink'}
+                valueColor={work.cumplimientoPct == null ? undefined : 'text-foreground'}
               />
               <Kpi
                 label="Trabajo proactivo"
                 value={pct(work.proactivoPct)}
                 sub={`${work.proactivas} de ${work.totalIncidencias} · ${work.proactivoTrend === 'mejor' ? 'en alza' : work.proactivoTrend === 'peor' ? 'a la baja' : 'madurez TPM'}`}
                 icon={trendIcon}
-                valueColor={work.proactivoPct == null ? undefined
-                  : work.proactivoPct >= 50 ? 'text-emerald-400'
-                  : work.proactivoPct >= 25 ? 'text-amber-400' : 'text-cat-5-ink'}
+                valueColor={work.proactivoPct == null ? undefined : 'text-foreground'}
               />
               <Kpi
                 label="Equipos recurrentes"
                 value={String(work.equiposRecurrentes)}
                 sub="≥2 incidencias · objetivo: bajar"
                 icon={<Repeat className="w-3.5 h-3.5" />}
-                valueColor={work.equiposRecurrentes === 0 ? 'text-emerald-400'
-                  : work.equiposRecurrentes <= 3 ? 'text-amber-400' : 'text-cat-5-ink'}
+                valueColor="text-foreground"
               />
             </div>
 

@@ -135,7 +135,7 @@ export function SlowMoMeasurementModal({
                   onClick={() => setPhase(opt.v)}
                   className={cn(
                     'rounded-ctl border text-caption px-1.5 py-1 text-left',
-                    phase === opt.v ? 'border-primary bg-primary/5 text-primary' : 'border-muted hover:bg-muted/30',
+                    phase === opt.v ? 'border-primary bg-primary/5 text-brand-ink' : 'border-muted hover:bg-muted/30',
                   )}
                 >
                   <div className="font-medium">{opt.label}</div>

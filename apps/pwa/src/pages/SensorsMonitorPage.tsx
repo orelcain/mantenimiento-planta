@@ -793,7 +793,7 @@ function TrendSparkline({
             onClick={() => zoomToLast(val === 'all' ? 'all' : Number(val))}
             className={`h-6 rounded-ctl px-2 text-caption font-medium transition-colors ${
               activeZoom === val
-                ? 'bg-primary/15 text-primary ring-1 ring-primary/30'
+                ? 'bg-primary/15 text-brand-ink ring-1 ring-primary/30'
                 : 'border border-border bg-background text-muted-foreground hover:text-foreground hover:bg-muted'
             }`}
           >
@@ -990,7 +990,7 @@ function FocusModal({ device, equipmentById, readingsByEquipment, backfillByEqui
 
         {/* Chart – takes remaining space */}
         {backfillStatus?.active && (
-          <div className="rounded-card border border-primary/[0.25] bg-primary/[0.15] px-3 py-2 text-primary flex items-center gap-2 text-sm">
+          <div className="rounded-card border border-primary/[0.25] bg-primary/[0.15] px-3 py-2 text-brand-ink flex items-center gap-2 text-sm">
             <RefreshCw className="h-4 w-4 animate-spin flex-shrink-0" />
             <span>
               Reenviando datos offline almacenados
@@ -1160,7 +1160,7 @@ function DeviceCard({ device, equipmentById, readingsByEquipment, backfillByEqui
         </div>
 
         {backfillStatus?.active && (
-          <div className="rounded-ctl border border-primary/[0.25] bg-primary/[0.15] p-2 text-primary flex items-center gap-2 text-xs">
+          <div className="rounded-ctl border border-primary/[0.25] bg-primary/[0.15] p-2 text-brand-ink flex items-center gap-2 text-xs">
             <RefreshCw className="h-3.5 w-3.5 animate-spin flex-shrink-0" />
             <span>
               Reenviando datos offline almacenados

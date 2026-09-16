@@ -123,7 +123,7 @@ export default function PielShowcasePage() {
             <p className="text-[0.8rem] text-muted-foreground">
               Baader 142 N°2 · registrada 10:42 por D. Cortés
             </p>
-            <p className="text-[0.68rem] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
+            <p className="text-caption font-semibold uppercase tracking-[0.05em] text-muted-foreground">
               Máquinas · Turno Día
             </p>
             <p className="text-[1.9rem] font-bold tabular-nums tracking-[-0.03em]">

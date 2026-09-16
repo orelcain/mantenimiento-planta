@@ -255,7 +255,7 @@ export function MonitorCompareChart({ cmp, cerrado, claveSel, onSel, cone, venta
           El rótulo importa: sin él son siete chips sueltos y hay que deducir
           qué hacen. Y es el ÚNICO selector — la tabla "ver los N días uno por
           uno" hacía lo mismo con otra interfaz. */}
-      <div className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+      <div className="mb-1 text-caption text-muted-foreground">
         Comparar contra
       </div>
       <div className="mb-1.5 flex flex-wrap items-center gap-1.5 text-[11px]">
@@ -280,7 +280,7 @@ export function MonitorCompareChart({ cmp, cerrado, claveSel, onSel, cone, venta
       {/* Qué mide el eje. El gráfico dibuja ACUMULADO y a más de uno le pasó
           leerlo como piezas por hora: sin la unidad, dos curvas que suben no
           dicen de qué. */}
-      <div className="mb-0.5 text-[11px] uppercase tracking-wide text-muted-foreground/80">
+      <div className="mb-0.5 text-[11px] text-muted-foreground/80">
         piezas acumuladas
       </div>
 
@@ -410,7 +410,7 @@ export function MonitorCompareChart({ cmp, cerrado, claveSel, onSel, cone, venta
         </div>
       </div>
 
-      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
+      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-caption text-muted-foreground">
         <span className="flex items-center gap-1.5">
           <i className="h-1.5 w-4 rounded-full" style={{ background: COLOR_HOY }} />
           hoy
@@ -442,7 +442,7 @@ export function MonitorCompareChart({ cmp, cerrado, claveSel, onSel, cone, venta
               ver todo · {zoom.toFixed(1).replace('.', ',')}×
             </button>
           ) : (
-            <span className="text-[10px] text-muted-foreground/80">pellizca o rueda para acercar</span>
+            <span className="text-caption text-muted-foreground/80">pellizca o rueda para acercar</span>
           )}
           <button type="button" onClick={() => setAlto((v) => !v)}
             className="tap-44 rounded-full border border-border px-2 py-0.5 hover:bg-muted">
