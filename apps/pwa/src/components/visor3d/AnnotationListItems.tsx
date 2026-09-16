@@ -68,7 +68,7 @@ export function AnnotationListItems({ annotations, onFocus, compact }: Props) {
                 )}
               </div>
               <div className="flex items-center gap-1 shrink-0">
-                <span className={`text-[10px] ${color}`}>
+                <span className={`text-caption ${color}`}>
                   {ann.status === 'resolved'
                     ? 'Resuelta'
                     : (PRIORITY_LABELS[ann.priority] ?? 'Media')}
@@ -112,7 +112,7 @@ export function AnnotationListItems({ annotations, onFocus, compact }: Props) {
                 )}
                 {hasLongDesc && (
                   <button
-                    className="text-[10px] text-primary hover:underline mt-0.5 pl-5 font-medium"
+                    className="text-caption text-primary hover:underline mt-0.5 pl-5 font-medium"
                     onClick={(e) => {
                       e.stopPropagation()
                       setExpandedId(isExpanded ? null : ann.id)

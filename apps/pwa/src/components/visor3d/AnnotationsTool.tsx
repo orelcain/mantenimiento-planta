@@ -249,7 +249,7 @@ function AnnotationPin({
                   )}
                   {needsTruncation(annotation.description) && (
                     <button
-                      className="text-[10px] text-blue-400 hover:text-ink-info mt-0.5 font-medium"
+                      className="text-caption text-blue-400 hover:text-ink-info mt-0.5 font-medium"
                       onClick={(e) => { e.stopPropagation(); setDescExpanded(!descExpanded) }}
                     >
                       {descExpanded ? 'Ver menos' : 'Ver más'}
@@ -301,7 +301,7 @@ function AnnotationPin({
                   Editar anotación
                 </button>
               ) : (
-                <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                <p className="text-caption text-muted-foreground flex items-center gap-1">
                   <MapPin size={9} /> Clic para fijar y ver opciones
                 </p>
               )}

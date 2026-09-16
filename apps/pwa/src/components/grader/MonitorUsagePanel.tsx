@@ -112,7 +112,7 @@ function FilaAparato({
             )}
           />
           {error && (
-            <span className="text-[10px] text-destructive shrink-0">no se pudo guardar</span>
+            <span className="text-caption text-destructive shrink-0">no se pudo guardar</span>
           )}
           <button onClick={guardar} className="text-ink-ok" title="Guardar">
             <Check className="w-3.5 h-3.5" />
@@ -144,14 +144,14 @@ function FilaAparato({
               mira el mismo de siempre. */}
           {fusionados > 1 && (
             <span
-              className="shrink-0 text-[10px] text-muted-foreground/60"
+              className="shrink-0 text-caption text-muted-foreground/60"
               title={`${fusionados} navegadores distintos con el mismo nombre — se cuentan como un solo aparato`}
             >
               ({fusionados} navegadores)
             </span>
           )}
           {esNuevo(firstSeen, linkDesde) && (
-            <Pill tone="info" className="shrink-0 px-1.5 py-0.5 text-[10px]">
+            <Pill tone="info" className="shrink-0 px-1.5 py-0.5 text-caption">
               nuevo
             </Pill>
           )}
@@ -300,13 +300,13 @@ export function MonitorUsagePanel({ stats, token }: { stats: MonitorUsageStats |
               />
             ))}
           </div>
-          <p className="mt-1 text-[10px] text-muted-foreground/50">
+          <p className="mt-1 text-caption text-muted-foreground/50">
             Aperturas por día · últimos {dias.length} días con actividad
           </p>
         </div>
       )}
 
-      <p className="text-[10px] text-muted-foreground/40">
+      <p className="text-caption text-muted-foreground/40">
         Se distinguen <b className="font-medium">navegadores</b>, no personas. El mismo celular puede
         aparecer dos veces si lo abriste desde WhatsApp y desde el navegador:
         <b className="font-medium"> ponles el mismo nombre y se cuentan como uno solo</b>. Los nombres

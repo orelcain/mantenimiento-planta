@@ -149,7 +149,7 @@ export function MapSearchPanel({ nodes, areas, onSelectNode, onSelectArea, onFoc
         >
           <Search className="h-3.5 w-3.5" />
           Buscar equipo o área...
-          <kbd className="ml-2 bg-muted px-1 rounded text-[10px] font-mono">/</kbd>
+          <kbd className="ml-2 bg-muted px-1 rounded text-caption font-mono">/</kbd>
         </button>
       ) : (
         <div className="bg-card/95 backdrop-blur rounded-lg shadow-xl border min-w-[280px] max-w-[360px]">
@@ -174,7 +174,7 @@ export function MapSearchPanel({ nodes, areas, onSelectNode, onSelectArea, onFoc
               onClick={() => { setIsOpen(false); setSearch('') }}
               className="text-muted-foreground hover:text-foreground"
             >
-              <kbd className="bg-muted px-1.5 py-0.5 rounded text-[10px] font-mono">Esc</kbd>
+              <kbd className="bg-muted px-1.5 py-0.5 rounded text-caption font-mono">Esc</kbd>
             </button>
           </div>
 
@@ -205,16 +205,16 @@ export function MapSearchPanel({ nodes, areas, onSelectNode, onSelectArea, onFoc
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-medium truncate">{label}</p>
                     <div className="flex items-center gap-1.5 mt-0.5">
-                      <span className="text-[10px] text-muted-foreground">
+                      <span className="text-caption text-muted-foreground">
                         {isArea ? 'Área' : EQUIPMENT_TYPE_LABELS[result.node!.type]}
                       </span>
                       {result.linkedCode && (
-                        <span className="text-[10px] text-muted-foreground font-mono">
+                        <span className="text-caption text-muted-foreground font-mono">
                           {result.linkedCode}
                         </span>
                       )}
                       {floor !== SEA_LEVEL_ELEVATION && (
-                        <span className="text-[10px] bg-muted px-1 rounded">
+                        <span className="text-caption bg-muted px-1 rounded">
                           <Building2 className="inline h-2.5 w-2.5 mr-0.5" />
                           {formatElevationLabel(floor)}
                         </span>
@@ -229,7 +229,7 @@ export function MapSearchPanel({ nodes, areas, onSelectNode, onSelectArea, onFoc
                 )
               })}
               {results.length > 20 && (
-                <p className="text-center text-[10px] text-muted-foreground py-1">
+                <p className="text-center text-caption text-muted-foreground py-1">
                   +{results.length - 20} más...
                 </p>
               )}
@@ -245,7 +245,7 @@ export function MapSearchPanel({ nodes, areas, onSelectNode, onSelectArea, onFoc
 
           {/* Hint */}
           {search.length < 2 && (
-            <div className="py-4 text-center text-[10px] text-muted-foreground">
+            <div className="py-4 text-center text-caption text-muted-foreground">
               Escribe al menos 2 caracteres para buscar
             </div>
           )}

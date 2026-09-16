@@ -574,6 +574,18 @@ con un script Node local (`writeFileSync` en `utf8`).
    cuatro decisiones. ⚠ Los 20 tokens `--lc-*` SIGUEN en index.css: los usan el editor admin
    de Aprendizaje, los planos, variadores y dos vistas del Grader. Se retiran cuando migren.
 
+5f. **Pantallas de PC (2026-09-16).** Editores y visores (mapa Leaflet, capas y zonas, formas,
+   DXF, isométrico, visor 3D, monitor) son interfaz de la app: sus 190 textos de 8–10 px pasan
+   al piso de 11 px (`text-caption`) y sus encabezados iOS 18 a formato oración. **Excepción
+   documentada:** las HMI que emulan el panel real (`HmiBombeoS2PublicPage`, `HmiKnuroPage`,
+   `HmiKnuroPublicPage`) y las experiencias interactivas sobre el modelo 3D (sopladoras Baader
+   142, plataforma pontón) conservan su tipografía: es fidelidad al equipo, no interfaz. Lo que
+   sí les aplica es el marco alrededor (botones, encabezados de la app).
+   Hallazgo del medidor en PC: con la raíz al 87,5 % `text-xs` (0.75rem) rendía 10,5 px en
+   TODO el escritorio (chips de fecha, pie de la barra lateral, tarjetas del visor 3D). Se
+   resolvió en la escala, no pantalla por pantalla: `xs = max(0.75rem, 11px)` en
+   tailwind.config.js. En móvil (raíz 16) sigue en 12.
+
 6. ~~Decidir claro frío `#F2F2F7` vs cálido `#EAE7E0`~~ — **cerrado 2026-09-16: frío.** Es el
    `systemGroupedBackground` de iOS y la piel Apple ya lo trae; medidos sus grises, ninguno pasa
    de sesgo 6. El celeste `#d7e5f2` (sesgo 27) de la piel vieja queda hasta que la piel Apple

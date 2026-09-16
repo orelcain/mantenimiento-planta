@@ -306,7 +306,7 @@ export function NodePropertiesPanel({
           {node.linkedEntityId ? (
             <div className="space-y-1.5">
               <div className="flex items-center gap-2 p-2 rounded-lg bg-primary/5 border border-primary/20">
-                <Badge variant="secondary" className="text-[10px] shrink-0">
+                <Badge variant="secondary" className="text-caption shrink-0">
                   {node.linkedEntityType === 'equipment' ? 'Equipo' :
                     node.linkedEntityType === 'zone' ? 'Zona' :
                     node.linkedEntityType || 'entity'}
@@ -355,7 +355,7 @@ export function NodePropertiesPanel({
           {node.linkedAreaId ? (
             <div className="space-y-1.5">
               <div className="flex items-center gap-2 p-2 rounded-lg bg-primary/5 border border-primary/20">
-                <Badge variant="secondary" className="text-[10px] shrink-0">Área</Badge>
+                <Badge variant="secondary" className="text-caption shrink-0">Área</Badge>
                 <span className="text-xs font-medium truncate flex-1">{linkedAreaName || node.linkedAreaId}</span>
                 <Button
                   variant="ghost"
@@ -396,7 +396,7 @@ export function NodePropertiesPanel({
 
         {/* ID del nodo */}
         <div className="pt-2 border-t">
-          <span className="text-[10px] text-muted-foreground/50 font-mono break-all">
+          <span className="text-caption text-muted-foreground/50 font-mono break-all">
             ID: {node.id}
           </span>
         </div>

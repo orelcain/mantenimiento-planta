@@ -144,7 +144,7 @@ function NivelSelector({ view }: { view: ViewName }) {
 
               {/* Abrev badge */}
               <span
-                className="px-1 rounded text-[9px] font-bold shrink-0"
+                className="px-1 rounded text-caption font-bold shrink-0"
                 style={{ backgroundColor: n.color + '33', color: n.color }}
               >
                 {n.abrev}
@@ -172,7 +172,7 @@ function NivelSelector({ view }: { view: ViewName }) {
               )}
 
               {/* zBase badge */}
-              <span className="text-[9px] text-gray-600 shrink-0">+{n.zBase}m</span>
+              <span className="text-caption text-gray-600 shrink-0">+{n.zBase}m</span>
 
               {/* Eliminar */}
               <button
@@ -292,7 +292,7 @@ export function MapaPlantaPage() {
               <span className="sm:hidden">MAPA PLANTA</span>
               <span className="hidden sm:inline">MAPA PLANTA ANTARFOOD</span>
             </h1>
-            <p className="hidden sm:block text-[10px] text-gray-500 mt-0.5">
+            <p className="hidden sm:block text-caption text-gray-500 mt-0.5">
               {VIEW_DESC[currentView]}
             </p>
           </div>
@@ -382,7 +382,7 @@ export function MapaPlantaPage() {
               <button
                 key={v}
                 onClick={() => { setMapaImportadoActivo(null); setView(v) }}
-                className={`flex items-center gap-1 text-[10px] sm:text-[11px] px-2 sm:px-3 py-1 rounded-md transition-all ${
+                className={`flex items-center gap-1 text-caption sm:text-[11px] px-2 sm:px-3 py-1 rounded-md transition-all ${
                   active
                     ? 'bg-amber-600/80 text-white shadow-[inset_0_0_6px_rgba(245,158,11,0.3)]'
                     : 'text-gray-400 hover:text-white hover:bg-gray-700/60'
@@ -399,7 +399,7 @@ export function MapaPlantaPage() {
               key={m.id}
               onClick={() => setMapaImportadoActivo(m.id)}
               title={m.nombre}
-              className={`flex items-center gap-1 text-[10px] sm:text-[11px] px-2 sm:px-3 py-1 rounded-md transition-all max-w-[120px] ${
+              className={`flex items-center gap-1 text-caption sm:text-[11px] px-2 sm:px-3 py-1 rounded-md transition-all max-w-[120px] ${
                 mapaImportadoActivoId === m.id
                   ? 'bg-emerald-700/80 text-white'
                   : 'text-gray-400 hover:text-white hover:bg-gray-700/60'
@@ -413,7 +413,7 @@ export function MapaPlantaPage() {
           <button
             onClick={() => setShowDxfImport(true)}
             title="Importar nuevo DXF"
-            className="flex items-center gap-1 text-[10px] sm:text-[11px] px-2 py-1 rounded-md text-gray-500 hover:text-emerald-300 hover:bg-gray-700/60 transition-all"
+            className="flex items-center gap-1 text-caption sm:text-[11px] px-2 py-1 rounded-md text-gray-500 hover:text-emerald-300 hover:bg-gray-700/60 transition-all"
           >
             <Plus size={10} />
             <span className="hidden sm:inline">DXF</span>

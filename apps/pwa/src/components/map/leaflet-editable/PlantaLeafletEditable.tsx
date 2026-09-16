@@ -222,9 +222,9 @@ function GrillaOverlay({ view }: { view: MapView }) {
       <div className="absolute inset-0 pointer-events-none z-[1100]">
         <div className="absolute top-4 left-1/2 -translate-x-1/2 pointer-events-auto bg-slate-900/97 border border-slate-500/60 rounded-xl shadow-2xl px-5 py-3 backdrop-blur-sm text-center">
           <div className="flex items-center gap-3 justify-center mb-1.5">
-            <span className="text-[11px] font-bold text-slate-300 uppercase tracking-widest">Alinear Grilla al Muro</span>
+            <span className="text-[11px] font-bold text-slate-300">Alinear Grilla al Muro</span>
             <button
-              className="text-[10px] text-gray-500 hover:text-red-400 border border-gray-700/50 rounded px-2 py-0.5 transition-colors"
+              className="text-caption text-gray-500 hover:text-red-400 border border-gray-700/50 rounded px-2 py-0.5 transition-colors"
               onClick={() => setAlignGrillaMode(false)}
             >
               Esc · Cancelar
@@ -255,18 +255,18 @@ function GrillaOverlay({ view }: { view: MapView }) {
     return (
       <div className="hidden sm:block absolute bottom-10 left-3 z-[1000] pointer-events-none select-none">
         <div className="bg-gray-900/90 border border-slate-700/40 rounded-lg shadow-lg px-3 py-1.5 flex items-center gap-2 backdrop-blur-sm">
-          <span className="text-[9px] text-slate-500 font-mono">1m × 1m</span>
+          <span className="text-caption text-slate-500 font-mono">1m × 1m</span>
           {grillaAngle !== 0 && (
-            <span className="text-[9px] font-mono text-amber-400/80">{grillaAngle}°</span>
+            <span className="text-caption font-mono text-amber-400/80">{grillaAngle}°</span>
           )}
           <button
-            className="pointer-events-auto text-[9px] text-gray-500 hover:text-amber-400 transition-colors border border-gray-700/50 rounded px-1.5 py-0.5"
+            className="pointer-events-auto text-caption text-gray-500 hover:text-amber-400 transition-colors border border-gray-700/50 rounded px-1.5 py-0.5"
             onClick={() => setEditing(true)}
           >
             Editar ángulo
           </button>
           <button
-            className="pointer-events-auto text-[9px] text-slate-400 hover:text-sky-300 transition-colors border border-slate-700/50 hover:border-sky-600/50 rounded px-1.5 py-0.5"
+            className="pointer-events-auto text-caption text-slate-400 hover:text-sky-300 transition-colors border border-slate-700/50 hover:border-sky-600/50 rounded px-1.5 py-0.5"
             onClick={() => setAlignGrillaMode(true)}
             title="Clic en 2 puntos del muro para alinear la grilla automáticamente"
           >
@@ -285,12 +285,12 @@ function GrillaOverlay({ view }: { view: MapView }) {
     >
       <div className="bg-gray-900/95 border border-slate-700/60 rounded-xl shadow-xl px-4 py-3 w-56 backdrop-blur-sm">
         <div className="flex items-center justify-between mb-2.5">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+          <span className="text-caption font-bold text-slate-400">
             Grilla · {view.label}
           </span>
           <div className="flex items-center gap-2">
             <button
-              className="pointer-events-auto text-[10px] text-gray-600 hover:text-amber-400 transition-colors"
+              className="pointer-events-auto text-caption text-gray-600 hover:text-amber-400 transition-colors"
               onClick={handleReset}
             >
               Reset
@@ -310,7 +310,7 @@ function GrillaOverlay({ view }: { view: MapView }) {
             <button
               key={deg}
               className={[
-                'pointer-events-auto flex-1 text-[9px] py-0.5 rounded border transition-colors',
+                'pointer-events-auto flex-1 text-caption py-0.5 rounded border transition-colors',
                 Math.abs(grillaAngle) === deg || Math.abs(grillaAngle) === 90 - deg
                   ? 'border-amber-600/60 text-amber-400 bg-amber-600/10'
                   : 'border-gray-700/50 text-gray-500 hover:text-white hover:border-gray-500',
@@ -322,7 +322,7 @@ function GrillaOverlay({ view }: { view: MapView }) {
           ))}
         </div>
 
-        <label className="text-[9px] text-gray-500 block mb-1">
+        <label className="text-caption text-gray-500 block mb-1">
           Fino ({grillaAngle}°)
         </label>
         <input
@@ -333,7 +333,7 @@ function GrillaOverlay({ view }: { view: MapView }) {
           className="pointer-events-auto w-full accent-amber-500 mb-1.5"
         />
         <div className="flex items-center gap-2">
-          <span className="text-[9px] text-gray-600">-90°</span>
+          <span className="text-caption text-gray-600">-90°</span>
           <input
             type="number"
             min="-90" max="90" step="0.5"
@@ -341,17 +341,17 @@ function GrillaOverlay({ view }: { view: MapView }) {
             onChange={handleText}
             className="pointer-events-auto flex-1 text-center text-[11px] font-mono bg-gray-800 border border-gray-700 rounded px-1 py-0.5 text-amber-400 focus:outline-none focus:border-amber-600"
           />
-          <span className="text-[9px] text-gray-600">+90°</span>
+          <span className="text-caption text-gray-600">+90°</span>
         </div>
         <button
-          className="pointer-events-auto w-full text-[10px] py-1 mt-2.5 rounded-md bg-sky-900/30 border border-sky-700/40 text-sky-300 hover:bg-sky-800/40 transition-colors"
+          className="pointer-events-auto w-full text-caption py-1 mt-2.5 rounded-md bg-sky-900/30 border border-sky-700/40 text-sky-300 hover:bg-sky-800/40 transition-colors"
           onClick={() => { setAlignGrillaMode(true); setEditing(false) }}
           title="Clic en 2 puntos del muro para computar el ángulo automáticamente"
         >
           ⟂ Alinear grilla al muro
         </button>
         <button
-          className="pointer-events-auto w-full text-[10px] py-1 mt-1.5 rounded-md bg-slate-700/40 border border-slate-600/40 text-slate-300 hover:bg-slate-600/50 transition-colors"
+          className="pointer-events-auto w-full text-caption py-1 mt-1.5 rounded-md bg-slate-700/40 border border-slate-600/40 text-slate-300 hover:bg-slate-600/50 transition-colors"
           onClick={() => setEditing(false)}
         >
           Listo
@@ -1843,12 +1843,12 @@ function MeasureOverlay() {
         {/* Header */}
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-bold text-amber-400 uppercase tracking-widest">
+            <span className="text-caption font-bold text-amber-400">
               Herramienta Medir
             </span>
             {tag && (
               <span className={[
-                'text-[9px] font-bold px-1.5 py-0.5 rounded',
+                'text-caption font-bold px-1.5 py-0.5 rounded',
                 tag === 'H'
                   ? 'bg-sky-900/60 text-sky-300 border border-sky-700/50'
                   : tag === 'V'
@@ -1860,7 +1860,7 @@ function MeasureOverlay() {
             )}
           </div>
           <button
-            className="pointer-events-auto text-[10px] text-gray-500 hover:text-red-400 transition-colors"
+            className="pointer-events-auto text-caption text-gray-500 hover:text-red-400 transition-colors"
             onClick={clearMeasurements}
           >
             Limpiar · Esc
@@ -1899,16 +1899,16 @@ function MeasureOverlay() {
                 onChange={(e) => setCotaNombre(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleGuardarCota()}
                 placeholder="Etiqueta (ej: Ancho paletizado)"
-                className="pointer-events-auto w-full text-[10px] bg-gray-800/80 border border-gray-700/60 rounded px-2 py-1 text-gray-200 placeholder-gray-600 focus:outline-none focus:border-amber-600/60"
+                className="pointer-events-auto w-full text-caption bg-gray-800/80 border border-gray-700/60 rounded px-2 py-1 text-gray-200 placeholder-gray-600 focus:outline-none focus:border-amber-600/60"
               />
               <button
-                className="pointer-events-auto w-full text-[10px] py-1 rounded-md bg-amber-600/20 border border-amber-600/50 text-amber-400 hover:bg-amber-600/35 transition-colors"
+                className="pointer-events-auto w-full text-caption py-1 rounded-md bg-amber-600/20 border border-amber-600/50 text-amber-400 hover:bg-amber-600/35 transition-colors"
                 onClick={handleGuardarCota}
               >
                 Guardar cota
               </button>
             </div>
-            <p className="text-[10px] text-gray-600 pt-1">
+            <p className="text-caption text-gray-600 pt-1">
               Sigue haciendo clic para sumar segmentos
             </p>
           </div>
@@ -1980,10 +1980,10 @@ export function PlantaLeafletEditable() {
       {textPlacementMode && (
         <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1200] pointer-events-none">
           <div className="pointer-events-auto bg-gray-900/97 border border-amber-500/60 rounded-xl shadow-2xl px-4 py-2.5 flex items-center gap-3 backdrop-blur-sm">
-            <span className="text-[11px] font-bold text-amber-300 uppercase tracking-widest">Modo Texto</span>
-            <span className="text-[10px] text-gray-400">Clic en el mapa para colocar · Esc cancela</span>
+            <span className="text-[11px] font-bold text-amber-300">Modo Texto</span>
+            <span className="text-caption text-gray-400">Clic en el mapa para colocar · Esc cancela</span>
             <button
-              className="text-[9px] text-gray-500 hover:text-red-400 border border-gray-700/50 rounded px-2 py-0.5 transition-colors"
+              className="text-caption text-gray-500 hover:text-red-400 border border-gray-700/50 rounded px-2 py-0.5 transition-colors"
               onClick={() => setTextPlacementMode(false)}
             >✕</button>
           </div>

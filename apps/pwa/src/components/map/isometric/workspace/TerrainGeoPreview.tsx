@@ -1713,12 +1713,12 @@ export function TerrainGeoPreview({
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
           {hoverInfo && (
-            <Badge variant="secondary" className="font-mono text-[10px]">
+            <Badge variant="secondary" className="font-mono text-caption">
               {dec1(hoverInfo.elevation)} m s.n.m.
             </Badge>
           )}
           {cornerElevations && cornerElevations.length === 4 && (
-            <Badge variant="outline" className="font-mono text-[10px]">
+            <Badge variant="outline" className="font-mono text-caption">
               P1 {cornerElevations[0]?.toFixed(0)}m · P2 {cornerElevations[1]?.toFixed(0)}m · P3 {cornerElevations[2]?.toFixed(0)}m · P4 {cornerElevations[3]?.toFixed(0)}m
             </Badge>
           )}
@@ -1730,12 +1730,12 @@ export function TerrainGeoPreview({
             Auto-rotar
           </Badge>
           {terrainData && (previewStats?.roadCells || previewStats?.structureCells) ? (
-            <Badge variant="outline" className="font-mono text-[10px]">
+            <Badge variant="outline" className="font-mono text-caption">
               {markupPersistenceState === 'saved' ? 'Marcas guardadas' : 'Marcas locales activas'}
             </Badge>
           ) : null}
           {pendingMarkupStart ? (
-            <Badge variant="outline" className="font-mono text-[10px]">
+            <Badge variant="outline" className="font-mono text-caption">
               Inicio r{pendingMarkupStart.gridR} c{pendingMarkupStart.gridC}
             </Badge>
           ) : null}
@@ -1960,7 +1960,7 @@ export function TerrainGeoPreview({
             <div className="flex items-center gap-3 text-muted-foreground">
               <span className="flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-orange-400" />Caminos {previewStats?.roadCells ?? 0}</span>
               <span className="flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-rose-500" />Estructuras {previewStats?.structureCells ?? 0}</span>
-              <button className="rounded border border-border/60 px-2 py-0.5 text-[10px] text-foreground hover:bg-muted/50" onClick={handleClearAdminMarkup}>
+              <button className="rounded border border-border/60 px-2 py-0.5 text-caption text-foreground hover:bg-muted/50" onClick={handleClearAdminMarkup}>
                 Limpiar marcas
               </button>
             </div>
@@ -1980,7 +1980,7 @@ export function TerrainGeoPreview({
         {showMinimap && terrainData && (
           <div className="absolute bottom-3 right-3 z-20 rounded-xl border bg-card/88 p-2 shadow-lg backdrop-blur">
             <canvas ref={minimapRef} width={136} height={136} className="block rounded border" />
-            <div className="mt-1 flex items-center justify-between text-[10px] text-muted-foreground">
+            <div className="mt-1 flex items-center justify-between text-caption text-muted-foreground">
               <span>Cenital</span>
               <span>{terrainData.minElev.toFixed(0)}–{terrainData.maxElev.toFixed(0)}m</span>
             </div>

@@ -222,6 +222,9 @@ export default {
         // El piso de la escala es 11px: por debajo es "texto diminuto", que la
         // §64 prohíbe explícitamente. La app tenía 1.125 usos por debajo (8, 9
         // y 10px) — esa era la causa real de que se viera densa y no Apple.
+        // Piso de 11 px también en PC: la raíz va al 87,5 % y `text-xs` (0.75rem) rendía
+        // 10,5 px, medio punto bajo el mínimo del contrato. En móvil (raíz 16) sigue en 12.
+        xs:        ['max(0.75rem, 11px)', { lineHeight: '1rem' }],
         caption:   ['11px', { lineHeight: '1.35' }],
         footnote:  ['13px', { lineHeight: '1.4' }],
         // body 17 (Apple: 17/22). Estaba en 15, que es el SUBHEAD de Apple: toda la app

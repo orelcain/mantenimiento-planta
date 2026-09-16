@@ -411,7 +411,7 @@ export function Visor3DPublicPage() {
         <div className="flex items-center gap-2 min-w-0">
           <Box className="h-5 w-5 text-primary shrink-0" />
           <h1 className="text-sm font-bold truncate">{model.name}</h1>
-          <Badge variant="outline" className="text-[10px] uppercase shrink-0">
+          <Badge variant="outline" className="text-caption uppercase shrink-0">
             {model.format}
           </Badge>
         </div>
@@ -524,7 +524,7 @@ export function Visor3DPublicPage() {
             ]).map(({ type, label }) => (
               <button
                 key={type}
-                className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                className={`px-2 py-0.5 rounded text-caption font-medium transition-colors ${
                   measurementType === type
                     ? 'bg-blue-500 text-white'
                     : 'bg-muted/50 text-muted-foreground hover:bg-muted'
@@ -545,13 +545,13 @@ export function Visor3DPublicPage() {
                 {measurementType === 'circumference' && `Clic punto ${pendingPoints.length + 1} de 3`}
                 {measurementType === 'volume' && `Clic punto ${pendingPoints.length + 1} de 4 — ${['esquina origen', 'fin arista largo', 'fin arista ancho', 'fin arista alto'][pendingPoints.length] ?? ''}`}
               </p>
-              <p className="text-[10px] text-muted-foreground">
+              <p className="text-caption text-muted-foreground">
                 <span className="text-green-400">●</span> vértice &nbsp;
                 <span className="text-blue-400">●</span> arista &nbsp;
                 <span className="text-muted-foreground">●</span> superficie
               </p>
             </div>
-            <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+            <div className="flex items-center gap-1 text-caption text-muted-foreground">
               {(['mm', 'cm', 'm'] as DimensionUnit[]).map((u) => (
                 <button
                   key={u}
@@ -566,7 +566,7 @@ export function Visor3DPublicPage() {
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-6 text-[10px] px-2"
+                className="h-6 text-caption px-2"
                 onClick={() => setPendingPoints(pendingPoints.slice(0, -1))}
               >
                 Deshacer
@@ -576,7 +576,7 @@ export function Visor3DPublicPage() {
               <Button
                 variant="default"
                 size="sm"
-                className="h-6 text-[10px] px-2 bg-green-600 hover:bg-green-700"
+                className="h-6 text-caption px-2 bg-green-600 hover:bg-green-700"
                 onClick={handleClosePolygon}
               >
                 Cerrar polígono
@@ -656,7 +656,7 @@ export function Visor3DPublicPage() {
             {/* Cotas */}
             {showDimensions && dimensions.length > 0 && (
               <>
-                <h3 className="text-[10px] font-medium text-muted-foreground mb-1 flex items-center gap-1">
+                <h3 className="text-caption font-medium text-muted-foreground mb-1 flex items-center gap-1">
                   <Ruler className="h-3 w-3" />
                   Mediciones ({dimensions.length})
                 </h3>
@@ -676,14 +676,14 @@ export function Visor3DPublicPage() {
                         title="Clic para enfocar"
                       >
                         <div className="flex items-center gap-2">
-                          <span className="text-[10px]">{typeIcon}</span>
+                          <span className="text-caption">{typeIcon}</span>
                           <span className="font-mono font-medium text-[11px]">
                             {dim.type === 'circumference' && dim.diameter
                               ? `⌀${dec1(dim.diameter)} ${suffix}`
                               : formatMeasurement(dim.value, dim.unit, dim.type)}
                           </span>
                           {dim.label && (
-                            <span className="text-muted-foreground text-[10px]">{dim.label}</span>
+                            <span className="text-muted-foreground text-caption">{dim.label}</span>
                           )}
                         </div>
                         <Button
@@ -707,7 +707,7 @@ export function Visor3DPublicPage() {
                 {showDimensions && dimensions.length > 0 && (
                   <div className="border-t my-1" />
                 )}
-                <h3 className="text-[10px] font-medium text-muted-foreground mb-1 flex items-center gap-1">
+                <h3 className="text-caption font-medium text-muted-foreground mb-1 flex items-center gap-1">
                   <MapPin className="h-3 w-3" />
                   Anotaciones ({annotations.length})
                 </h3>
@@ -720,7 +720,7 @@ export function Visor3DPublicPage() {
 
       {/* Footer branding mínimo */}
       <div className="px-3 py-1 border-t bg-card text-center shrink-0">
-        <p className="text-[10px] text-muted-foreground">
+        <p className="text-caption text-muted-foreground">
           Mantenimiento Industrial — Visor 3D
         </p>
       </div>

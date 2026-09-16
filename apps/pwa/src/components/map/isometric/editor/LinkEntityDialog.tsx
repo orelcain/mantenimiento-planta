@@ -120,7 +120,7 @@ export function LinkEntityDialog({ isOpen, node, onLink, onUnlink, onClose }: Li
             >
               <Icon className="h-4 w-4" />
               {label}
-              <Badge variant="secondary" className="text-[10px] h-4 ml-1">
+              <Badge variant="secondary" className="text-caption h-4 ml-1">
                 {id === 'equipment' ? equipment.filter(e => !e.deleted).length : zones.filter(z => z.activa).length}
               </Badge>
             </button>
@@ -172,14 +172,14 @@ export function LinkEntityDialog({ isOpen, node, onLink, onUnlink, onClose }: Li
                           <span className="text-xs text-muted-foreground font-mono">{eq.codigo}</span>
                           {eq.marca && <span className="text-xs text-muted-foreground">{eq.marca}</span>}
                           {estadoBadge && (
-                            <Badge variant={estadoBadge.variant as 'default'} className="text-[10px] h-4">
+                            <Badge variant={estadoBadge.variant as 'default'} className="text-caption h-4">
                               {estadoBadge.label}
                             </Badge>
                           )}
                         </div>
                       </div>
                       {isCurrentLink && (
-                        <Badge variant="default" className="text-[10px] shrink-0">Vinculado</Badge>
+                        <Badge variant="default" className="text-caption shrink-0">Vinculado</Badge>
                       )}
                     </div>
                   </button>
@@ -220,7 +220,7 @@ export function LinkEntityDialog({ isOpen, node, onLink, onUnlink, onClose }: Li
                         </div>
                       </div>
                       {isCurrentLink && (
-                        <Badge variant="default" className="text-[10px] shrink-0">Vinculado</Badge>
+                        <Badge variant="default" className="text-caption shrink-0">Vinculado</Badge>
                       )}
                     </div>
                   </button>

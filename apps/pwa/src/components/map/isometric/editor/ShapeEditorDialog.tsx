@@ -437,7 +437,7 @@ function DimensionInput({
 }) {
   return (
     <div className="flex items-center gap-2">
-      <span className="text-[10px] text-muted-foreground w-4 shrink-0">{label}</span>
+      <span className="text-caption text-muted-foreground w-4 shrink-0">{label}</span>
       <input
         type="range"
         min={min}
@@ -456,7 +456,7 @@ function DimensionInput({
         onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
         className="w-14 text-xs bg-muted border rounded px-1.5 py-0.5 text-center"
       />
-      <span className="text-[10px] text-muted-foreground">{unit}</span>
+      <span className="text-caption text-muted-foreground">{unit}</span>
     </div>
   )
 }
@@ -945,14 +945,14 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
                         title={label}
                       >
                         <Icon className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-[10px]">{label}</span>
+                        <span className="text-caption">{label}</span>
                       </button>
                     ))}
                   </div>
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                  <p className="text-[10px] text-muted-foreground px-1 mb-1">
+                  <p className="text-caption text-muted-foreground px-1 mb-1">
                     {primitives.length} primitiva{primitives.length !== 1 ? 's' : ''}
                   </p>
                   {primitives.map((prim, i) => (
@@ -972,7 +972,7 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
                       />
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-medium capitalize">{prim.type} #{i + 1}</p>
-                        <p className="text-[10px] text-muted-foreground">
+                        <p className="text-caption text-muted-foreground">
                           {prim.size.x.toFixed(1)}×{prim.size.y.toFixed(1)}×{prim.size.z.toFixed(1)}m
                         </p>
                       </div>
@@ -1010,17 +1010,17 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
 
                 <div className="space-y-1.5 border rounded-lg p-2">
                   <p className="text-xs font-semibold">Selección directa</p>
-                  <div className="rounded border px-2 py-1.5 text-[10px]">
+                  <div className="rounded border px-2 py-1.5 text-caption">
                     Cara activa: <span className="font-semibold uppercase">{activeFace}</span>
                   </div>
 
                   <div>
-                    <p className="text-[10px] text-muted-foreground mb-1">Nivel de detalle de selección</p>
+                    <p className="text-caption text-muted-foreground mb-1">Nivel de detalle de selección</p>
                     <div className="grid grid-cols-3 gap-1">
                       {[2, 4, 6, 8, 12, 16].map((value) => (
                         <button
                           key={value}
-                          className={cn('px-1.5 py-1 rounded border text-[10px]', faceSubdivision === value ? 'border-primary bg-primary/10' : 'hover:bg-muted')}
+                          className={cn('px-1.5 py-1 rounded border text-caption', faceSubdivision === value ? 'border-primary bg-primary/10' : 'hover:bg-muted')}
                           onClick={() => setFaceSubdivision(value)}
                         >
                           {value}×{value}
@@ -1030,15 +1030,15 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
                   </div>
 
                   <div className="grid grid-cols-2 gap-1.5">
-                    <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={selectFullActiveFace}>
+                    <Button variant="outline" size="sm" className="h-7 text-caption" onClick={selectFullActiveFace}>
                       Selec. exterior
                     </Button>
-                    <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={extrudeActiveFace}>
+                    <Button variant="outline" size="sm" className="h-7 text-caption" onClick={extrudeActiveFace}>
                       Extruir selección
                     </Button>
                   </div>
 
-                  <Button variant="outline" size="sm" className="h-7 text-[10px] w-full" onClick={applyCornerRounding}>
+                  <Button variant="outline" size="sm" className="h-7 text-caption w-full" onClick={applyCornerRounding}>
                     Redondear esquinas
                   </Button>
                 </div>
@@ -1052,7 +1052,7 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
                   </Button>
                 </div>
 
-                <div className="rounded border px-2 py-1.5 text-[10px] text-muted-foreground">
+                <div className="rounded border px-2 py-1.5 text-caption text-muted-foreground">
                   Clic en el modelo para seleccionar cara/zona. Usa Shift para acumular y luego extruye o redondea.
                 </div>
               </div>
@@ -1067,8 +1067,8 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
                   <div className="px-3 py-1.5 border-b bg-muted/30 flex items-center justify-between shrink-0">
                     <span className="text-xs font-semibold">Visor 3D voxel</span>
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] text-muted-foreground">{shapeMetrics.width}×{shapeMetrics.height}×{shapeMetrics.depth}m</span>
-                      <Badge variant="secondary" className="text-[10px]">{voxelCells.size} voxel{voxelCells.size !== 1 ? 's' : ''}</Badge>
+                      <span className="text-caption text-muted-foreground">{shapeMetrics.width}×{shapeMetrics.height}×{shapeMetrics.depth}m</span>
+                      <Badge variant="secondary" className="text-caption">{voxelCells.size} voxel{voxelCells.size !== 1 ? 's' : ''}</Badge>
                     </div>
                   </div>
                   <div className="flex-1 min-h-[300px]">
@@ -1089,7 +1089,7 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
                     </Canvas>
                   </div>
                 </div>
-                <div className="shrink-0 text-[10px] text-muted-foreground text-center">
+                <div className="shrink-0 text-caption text-muted-foreground text-center">
                   Cara: <span className="font-semibold uppercase">{activeFace}</span> · Selección: <span className="font-semibold">{voxelSelection.size}</span> voxel{voxelSelection.size !== 1 ? 's' : ''}
                 </div>
               </div>
@@ -1100,8 +1100,8 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
                   <div className="px-3 py-1.5 border-b bg-muted/30 flex items-center justify-between shrink-0">
                     <span className="text-xs font-semibold">Visor 3D en vivo</span>
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] text-muted-foreground hidden sm:inline">Arrastrar: rotar · Rueda: zoom</span>
-                      <Badge variant="secondary" className="text-[10px]">1 cuadro = 1m</Badge>
+                      <span className="text-caption text-muted-foreground hidden sm:inline">Arrastrar: rotar · Rueda: zoom</span>
+                      <Badge variant="secondary" className="text-caption">1 cuadro = 1m</Badge>
                     </div>
                   </div>
                   <div className="flex-1 min-h-[300px]">
@@ -1120,9 +1120,9 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
 
                 {/* Compact info strip */}
                 <div className="shrink-0 flex items-center gap-2 px-1">
-                  <Badge variant="outline" className="capitalize text-[10px]">{selectedPrim.type}</Badge>
+                  <Badge variant="outline" className="capitalize text-caption">{selectedPrim.type}</Badge>
                   <div className="w-3 h-3 rounded-sm border" style={{ backgroundColor: selectedPrim.color }} />
-                  <span className="text-[10px] text-muted-foreground">
+                  <span className="text-caption text-muted-foreground">
                     {shapeMetrics.width}×{shapeMetrics.height}×{shapeMetrics.depth}m · {shapeMetrics.footprint}m²
                   </span>
                 </div>
@@ -1218,7 +1218,7 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
                     <div className="px-3 pb-3 space-y-2">
                       {/* Color palette */}
                       <div>
-                        <p className="text-[10px] text-muted-foreground mb-1">Color</p>
+                        <p className="text-caption text-muted-foreground mb-1">Color</p>
                         <div className="flex flex-wrap gap-1.5">
                           {DEFAULT_COLORS.map((c) => (
                             <button
@@ -1240,7 +1240,7 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
                           />
                         </div>
                       </div>
-                      <div className="rounded border px-2 py-1.5 text-[10px] text-muted-foreground">
+                      <div className="rounded border px-2 py-1.5 text-caption text-muted-foreground">
                         Acabado fijo: mate (sin brillo)
                       </div>
                     </div>

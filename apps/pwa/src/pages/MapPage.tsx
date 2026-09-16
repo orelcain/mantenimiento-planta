@@ -2827,10 +2827,10 @@ export function MapPage() {
                         >
                           Editor de terreno
                         </Button>
-                        <Badge variant="outline" className="text-[10px]">Brocha {terrainBrushSize}×{terrainBrushSize}</Badge>
-                        <Badge variant="outline" className="text-[10px]">Intensidad {terrainBrushStrength}</Badge>
-                        <Badge variant="outline" className="text-[10px]">Topes {clampedTerrainEditableMin} / +{clampedTerrainEditableMax}m</Badge>
-                        <Badge variant="outline" className="text-[10px]">{terrainToolLabel(activeTerrainTool)}</Badge>
+                        <Badge variant="outline" className="text-caption">Brocha {terrainBrushSize}×{terrainBrushSize}</Badge>
+                        <Badge variant="outline" className="text-caption">Intensidad {terrainBrushStrength}</Badge>
+                        <Badge variant="outline" className="text-caption">Topes {clampedTerrainEditableMin} / +{clampedTerrainEditableMax}m</Badge>
+                        <Badge variant="outline" className="text-caption">{terrainToolLabel(activeTerrainTool)}</Badge>
                       </>
                     ) : (
                       <>
@@ -2849,10 +2849,10 @@ export function MapPage() {
                         >
                           Bulldozer
                         </Button>
-                        <Badge variant="outline" className="text-[10px]">
+                        <Badge variant="outline" className="text-caption">
                           {buildMode === 'structures' ? 'Solo edificios' : 'Máquinas y equipos'}
                         </Badge>
-                        <Badge variant="outline" className="text-[10px]">Rotación {addPlacementRotation}° (R)</Badge>
+                        <Badge variant="outline" className="text-caption">Rotación {addPlacementRotation}° (R)</Badge>
                       </>
                     )}
 
@@ -3069,7 +3069,7 @@ export function MapPage() {
             <div className="absolute top-4 left-4 flex flex-col gap-2">
               {terrainDimensionSummary && (
                 <div className="bg-card/90 backdrop-blur rounded-lg shadow-lg border p-2.5 w-[260px]">
-                  <p className="text-[10px] text-muted-foreground font-medium px-1 mb-2">COTA DEL TERRENO</p>
+                  <p className="text-caption text-muted-foreground font-medium px-1 mb-2">COTA DEL TERRENO</p>
                   <div className="grid grid-cols-2 gap-2 text-[11px]">
                     <div className="rounded border bg-background/70 px-2 py-1.5">
                       <div className="text-muted-foreground">Ancho</div>
@@ -3103,7 +3103,7 @@ export function MapPage() {
 
               {/* Floor selector */}
               {FEATURES.floorSelector && <div className="bg-card/90 backdrop-blur rounded-lg shadow-lg border p-1.5">
-                <p className="text-[10px] text-muted-foreground font-medium px-1 mb-1">NIVEL (m)</p>
+                <p className="text-caption text-muted-foreground font-medium px-1 mb-1">NIVEL (m)</p>
                 <div className="flex items-center gap-1 mb-1">
                   <Button
                     variant="ghost"
@@ -3156,7 +3156,7 @@ export function MapPage() {
               {/* Panel auxiliar compacto (modo editor) */}
               {FEATURES.auxPanel && isEditMode && (
                 <div className="bg-card/90 backdrop-blur rounded-lg shadow-lg border p-2 flex flex-col gap-2 w-[260px]">
-                  <p className="text-[10px] text-muted-foreground font-medium px-1">PANELES</p>
+                  <p className="text-caption text-muted-foreground font-medium px-1">PANELES</p>
                   <Button
                     variant="outline"
                     size="sm"
@@ -3185,8 +3185,8 @@ export function MapPage() {
               {FEATURES.elevationRuler && isEditMode && buildMode === 'terrain' && (
                 <div className="bg-card/90 backdrop-blur rounded-lg shadow-lg border p-2 w-[260px]">
                   <div className="flex items-center justify-between mb-1">
-                    <p className="text-[10px] text-muted-foreground font-medium">REGLA DE METROS</p>
-                    <Badge variant="outline" className="text-[10px]">-50m / +200m</Badge>
+                    <p className="text-caption text-muted-foreground font-medium">REGLA DE METROS</p>
+                    <Badge variant="outline" className="text-caption">-50m / +200m</Badge>
                   </div>
                   <div className="relative h-44 rounded border overflow-hidden" style={{ background: terrainRulerGradient }}>
                     <div
@@ -3202,7 +3202,7 @@ export function MapPage() {
                       return (
                         <div key={value} className="absolute left-0 right-0" style={{ bottom: `${pct}%` }}>
                           <div className={cn('border-t', isEditableBound ? 'border-white/90' : 'border-white/45')} />
-                          <span className={cn('absolute right-1 -top-2 text-[10px] font-mono px-1 rounded bg-black/45 text-white', isEditableBound && 'bg-primary/80')}>
+                          <span className={cn('absolute right-1 -top-2 text-caption font-mono px-1 rounded bg-black/45 text-white', isEditableBound && 'bg-primary/80')}>
                             {value > 0 ? `+${value}` : value}m
                           </span>
                         </div>
@@ -3297,7 +3297,7 @@ export function MapPage() {
             ) : null}
 
             {/* Help hint (bottom right) */}
-            {FEATURES.helpHint && <div className="absolute bottom-4 right-4 text-[10px] text-muted-foreground/60 select-none pointer-events-none hidden md:block">
+            {FEATURES.helpHint && <div className="absolute bottom-4 right-4 text-caption text-muted-foreground/60 select-none pointer-events-none hidden md:block">
               {isEditMode
                 ? 'V: seleccionar · M: mover · A: agregar · B: bulldozer · R: rotar preview · Alt+drag: duplicar · Del: eliminar · Ctrl+Z: deshacer'
                 : 'Q/E: rotar · Scroll: zoom · Arrastrar clic izq/Flechas: paneo · R: reset · Click: seleccionar'}

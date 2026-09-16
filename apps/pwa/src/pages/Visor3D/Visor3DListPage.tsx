@@ -283,7 +283,7 @@ export function Visor3DListPage() {
                       </CardTitle>
                       <div className="flex items-center gap-2">
                         {getModelsWithInteractiveExperience([model]).length > 0 && (
-                          <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
+                          <Badge variant="secondary" className="text-caption">
                             Interactivo
                           </Badge>
                         )}
@@ -379,7 +379,7 @@ export function Visor3DListPage() {
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between gap-3">
                       <CardTitle className="text-base">{experience.label}</CardTitle>
-                      <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
+                      <Badge variant="secondary" className="text-caption">
                         {experience.sourceLabel}
                       </Badge>
                     </div>

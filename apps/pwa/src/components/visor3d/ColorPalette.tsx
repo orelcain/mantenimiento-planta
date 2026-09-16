@@ -76,7 +76,7 @@ export function ColorPalette({
             <Paintbrush className="h-4 w-4 text-primary" />
             <span className="text-sm font-medium">Pintar</span>
             {paintedCount > 0 && (
-              <span className="text-[10px] bg-primary/20 text-primary px-1.5 rounded-full">
+              <span className="text-caption bg-primary/20 text-primary px-1.5 rounded-full">
                 {paintedCount}
               </span>
             )}
@@ -117,7 +117,7 @@ export function ColorPalette({
                 className="w-8 h-6 rounded cursor-pointer border border-muted"
               />
               {selectedColor && (
-                <span className="text-[10px] font-mono text-muted-foreground">
+                <span className="text-caption font-mono text-muted-foreground">
                   {selectedColor}
                 </span>
               )}
@@ -147,7 +147,7 @@ export function ColorPalette({
             </div>
 
             {/* Instructions */}
-            <p className="text-[10px] text-muted-foreground leading-tight">
+            <p className="text-caption text-muted-foreground leading-tight">
               {isEraseMode
                 ? 'Haz clic en una pieza para quitar su color'
                 : selectedColor
