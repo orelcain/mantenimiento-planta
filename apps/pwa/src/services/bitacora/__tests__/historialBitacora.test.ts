@@ -51,7 +51,11 @@ describe('historial del período', () => {
     expect(r.minutosParada).toBe(60)
     expect(r.mttrMin).toBe(30)
     expect(r.sinDetener).toBe(2)
-    expect(porcentaje(r.parteSinDetener)).toBe('33%')
+    // El porcentaje se mide contra las intervenciones SOBRE LA LÍNEA (2 paradas
+    // + 2 en ventana), no contra los 6 eventos: los otros 2 no tocaron producción.
+    expect(r.conImpacto).toBe(4)
+    expect(r.sinImpacto).toBe(2)
+    expect(porcentaje(r.parteSinDetener)).toBe('50%')
     expect(r.pendientesCerrados).toBe(1)
     expect(r.pendientesAbiertos).toBe(1)
     expect(r.turnosSinParada).toBe(1) // el turno noche no tuvo paradas
@@ -78,9 +82,42 @@ describe('historial del período', () => {
   })
 
   it('la tesis encabeza lo hecho sin detener, y aguanta el período vacío', () => {
-    expect(tesisDelPeriodo(resumirPeriodo(eventos, 'a', 'b'))).toBe('De 6 intervenciones, 2 se hicieron sin detener la línea.')
+    expect(tesisDelPeriodo(resumirPeriodo(eventos, 'a', 'b'))).toBe('De 4 intervenciones sobre la línea, 2 se hicieron sin detenerla.')
     expect(tesisDelPeriodo(resumirPeriodo([], 'a', 'b'))).toBe('Todavía no hay eventos registrados en este período.')
-    expect(tesisDelPeriodo(resumirPeriodo([ev({})], 'a', 'b'))).toBe('1 intervención registrada en el período.')
+  })
+
+  it('la tesis NUNCA insinúa paradas que no ocurrieron', () => {
+    // Una ronda de inspección y un ajuste en colación: cero paradas. Antes decía
+    // "De 2 intervenciones, 1 se hizo sin detener la línea" y gerencia leía una parada.
+    const sinParadas = [
+      ev({ tipo: 'inspeccion', equipo: 'GRADER MS4/12', impacto: 'no-aplica' }),
+      ev({ tipo: 'ajuste', equipo: 'KNURO N1', impacto: 'en-ventana', ventana: 'Colación HG' }),
+    ]
+    const r = resumirPeriodo(sinParadas, 'a', 'b')
+    expect(r.conImpacto).toBe(1)
+    expect(tesisDelPeriodo(r)).toBe('De 1 intervención sobre la línea, 1 se hizo sin detenerla.')
+
+    // Solo registros sin impacto: no hay nada que comparar y hay que decirlo.
+    expect(tesisDelPeriodo(resumirPeriodo([ev({}), ev({})], 'a', 'b'))).toBe('2 registros en el período, ninguno con impacto en producción.')
+    expect(tesisDelPeriodo(resumirPeriodo([ev({})], 'a', 'b'))).toBe('1 registro en el período, sin impacto en producción.')
+
+    // Todo con la máquina detenida: la frase no puede inventar un logro.
+    const todoParado = [ev({ impacto: 'con-parada', minutosParada: 20 }), ev({ impacto: 'con-parada', minutosParada: 5 })]
+    expect(tesisDelPeriodo(resumirPeriodo(todoParado, 'a', 'b'))).toBe('2 intervenciones sobre la línea, todas con la máquina detenida.')
+  })
+
+  it('marca el turno EN CURSO y no cuenta eventos de turnos imposibles', () => {
+    // 17:30 del 15-09: el turno tarde corre, el día ya cerró.
+    const ahora = new Date(2026, 8, 15, 17, 30)
+    const filas = filasPorTurno(eventos, ahora)
+    expect(filas.find((f) => f.turnoId === '2026-09-15_tarde')?.enCurso).toBe(true)
+    expect(filas.find((f) => f.turnoId === '2026-09-15_dia')?.enCurso).toBe(false)
+    // Un evento con turnoId corrupto no aparece en ninguna fila: tampoco puede
+    // sumar al total, o la lista no cuadra con la tesis.
+    const conBasura = [...eventos, ev({ turnoId: 'basura', impacto: 'con-parada', minutosParada: 99 })]
+    const r = resumirPeriodo(conBasura, 'a', 'b')
+    expect(r.eventos).toBe(6)
+    expect(r.minutosParada).toBe(60)
   })
 
   it('el período incluye HOY (14 días = hoy y los 13 anteriores)', () => {
