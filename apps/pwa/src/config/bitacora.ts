@@ -33,13 +33,22 @@ export const ETIQUETA_BANDA: Record<BandaTurno, string> = {
   noche: 'Turno noche',
 }
 
+/** En el orden de los chips del formulario; `otro` va último y abre un campo de texto. */
 export const TIPOS_EVENTO: ReadonlyArray<{ id: TipoEvento; label: string }> = [
   { id: 'falla', label: 'Falla' },
-  { id: 'ajuste', label: 'Ajuste' },
-  { id: 'inspeccion', label: 'Inspección' },
+  { id: 'correctivo', label: 'Correctivo' },
   { id: 'preventivo', label: 'Preventivo' },
+  { id: 'planificado', label: 'Planificado' },
+  { id: 'inspeccion', label: 'Inspección' },
+  { id: 'ajuste', label: 'Ajuste' },
   { id: 'novedad', label: 'Novedad' },
+  { id: 'otro', label: 'Otro' },
 ]
+
+/** Largo máximo del tipo escrito a mano (igual en firestore.rules). */
+export const MAX_TIPO_OTRO = 40
+/** Largo máximo del título del evento (igual en firestore.rules). */
+export const MAX_TITULO_EVENTO = 120
 
 export const ETIQUETA_TIPO: Record<TipoEvento, string> = Object.fromEntries(
   TIPOS_EVENTO.map((t) => [t.id, t.label]),

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Timestamp } from 'firebase/firestore'
 import { BitacoraTurnoCard } from '@/components/bitacora/BitacoraTurnoCard'
 import { BitacoraTurnoVista } from '@/pages/BitacoraTurnoPage'
 import type { FuenteBitacora } from '@/hooks/useBitacoraTurno'
@@ -96,9 +97,60 @@ function eventosDeEjemplo(turno: TurnoMantencion): EventoBitacora[] {
       minutosParada: null,
       ventana: null,
       pendiente: false,
-      fotos: [{ ...fotoDeEjemplo('Ronda', '#4a5a3a', 900, 1200), etiqueta: 'foto' }],
+      // Cinco fotos: en WhatsApp sale en dos láminas.
+      fotos: (
+        [
+          ['Ronda', '#4a5a3a'],
+          ['Motor', '#3a4a6a'],
+          ['Bomba', '#5a3a4a'],
+          ['Manómetro', '#6a5a3a'],
+          ['Tablero', '#3a5a5a'],
+        ] as const
+      ).map(([t, tono]) => ({ ...fotoDeEjemplo(t, tono, 900, 1200), etiqueta: 'foto' as const })),
       autorNombre: 'mantencion.plantach',
       registradoPor: 'Danilo Cortes',
+    },
+    {
+      // Con título y tipo nuevo (16-09-2026), fotos vertical y horizontal.
+      ...base,
+      id: 'ej-5',
+      tipo: 'correctivo',
+      equipo: 'CASINO',
+      titulo: 'Cambio de tubos fluorescentes',
+      descripcion: 'Cambio de tubos fluorescentes en equipos de iluminación casino',
+      horaInicio: h(1, 7),
+      horaTermino: h(1, 30),
+      impacto: 'no-aplica',
+      minutosParada: null,
+      ventana: null,
+      pendiente: false,
+      fotos: [
+        { ...fotoDeEjemplo('Antes', '#6a5a3a', 900, 1600), etiqueta: 'antes' },
+        { ...fotoDeEjemplo('Después', '#3a5a6a', 1600, 900), etiqueta: 'despues' },
+      ],
+      participantes: ['Danilo Cortes'],
+      autorNombre: 'mantencion.plantach',
+      registradoPor: 'Mauricio Gallardo',
+    },
+    {
+      // «Sin hora» y tipo escrito a mano: se ubica según cuándo se registró.
+      ...base,
+      id: 'ej-6',
+      tipo: 'otro',
+      tipoOtro: 'Mejora',
+      equipo: 'EMPACADORA E-PACK',
+      descripcion: 'FRL Fishken con problemas, no despicha adecuadamente y tiene manómetro roto, se reemplaza preventivamente',
+      horaInicio: '',
+      horaTermino: null,
+      impacto: 'en-ventana',
+      minutosParada: null,
+      ventana: 'Colación empaque',
+      pendiente: false,
+      fotos: [{ ...fotoDeEjemplo('Antes', '#5a4a3a', 900, 1600), etiqueta: 'antes' }],
+      participantes: ['Danilo Cortes'],
+      autorNombre: 'mantencion.plantach',
+      registradoPor: 'Mauricio Gallardo',
+      createdAt: Timestamp.fromMillis(turno.inicio.getTime() + (3 * 60 + 40) * 60_000),
     },
     {
       ...base,

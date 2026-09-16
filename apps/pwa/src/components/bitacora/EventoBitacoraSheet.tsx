@@ -7,6 +7,8 @@ import {
   ETIQUETA_FOTO,
   IMPACTOS,
   MAX_FOTOS_EVENTO,
+  MAX_TIPO_OTRO,
+  MAX_TITULO_EVENTO,
   TIPOS_EVENTO,
   VENTANAS_SUGERIDAS,
 } from '@/config/bitacora'
@@ -42,6 +44,7 @@ import { BuscadorEquipo } from './BuscadorEquipo'
 import type { OpcionEquipo } from '@/services/bitacora/buscarEquipos'
 import { tecnicoRecordado } from './tecnicoRecordado'
 import { formatoMinutos, horaDe, horaSugeridaParaEvento, minutosEntre } from '@/services/bitacora/turnoMantencion'
+import { limpiarTipo, normalizarTipo } from '@/services/bitacora/presentacionEvento'
 
 interface Subida {
   clave: string
@@ -58,6 +61,8 @@ export interface EventoBitacoraSheetProps {
   /** Id reservado para un evento nuevo (sus fotos se suben a esa carpeta). */
   idNuevo: string
   sugerenciasEquipo: string[]
+  /** Tipos escritos a mano en el turno: se sugieren al elegir «Otro». */
+  sugerenciasTipo?: string[]
   /** `deTurno` = presentes del turno (botones rápidos); `todos` = lista de técnicos completa. */
   tecnicos: { deTurno: string[]; todos: string[] }
   /** Equipos y áreas de la jerarquía para el buscador. */
@@ -80,6 +85,7 @@ export interface EventoBitacoraSheetProps {
 }
 
 const CLAVE_RECIENTES = 'bitacora.equiposRecientes.v1'
+const CLAVE_TIPOS = 'bitacora.tiposRecientes.v1'
 const SIN_SENAL = 'Sin señal. Se sube sola cuando vuelva la conexión.'
 /** Fotos que se procesan a la vez (ver `subirEnTanda`). */
 const LOTE_SUBIDA = 2
@@ -96,24 +102,60 @@ function firmaDe(
 
 const HORA_VALIDA = /^\d{2}:\d{2}$/
 
-function leerRecientes(): string[] {
+function leerRecientes(clave = CLAVE_RECIENTES): string[] {
   try {
-    const v = JSON.parse(localStorage.getItem(CLAVE_RECIENTES) ?? '[]')
+    const v = JSON.parse(localStorage.getItem(clave) ?? '[]')
     return Array.isArray(v) ? v.filter((s) => typeof s === 'string') : []
   } catch {
     return []
   }
 }
 
-function recordarEquipo(equipo: string) {
-  const e = equipo.trim()
+function recordar(clave: string, valor: string, cuantos: number) {
+  const e = valor.trim()
   if (!e) return
   try {
-    const lista = [e, ...leerRecientes().filter((x) => x.toLowerCase() !== e.toLowerCase())].slice(0, 12)
-    localStorage.setItem(CLAVE_RECIENTES, JSON.stringify(lista))
+    const lista = [e, ...leerRecientes(clave).filter((x) => x.toLowerCase() !== e.toLowerCase())].slice(0, cuantos)
+    localStorage.setItem(clave, JSON.stringify(lista))
   } catch {
     /* sin almacenamiento local: solo se pierde la sugerencia */
   }
+}
+
+const recordarEquipo = (equipo: string) => recordar(CLAVE_RECIENTES, equipo, 12)
+
+/**
+ * Interruptor de fila completa, estilo iOS (la fila entera es el objetivo
+ * táctil). Lo usan «Sin hora» y «Queda pendiente».
+ */
+function FilaInterruptor({
+  activo,
+  onCambiar,
+  titulo,
+  detalle,
+}: {
+  activo: boolean
+  onCambiar: (v: boolean) => void
+  titulo: string
+  detalle?: string
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={activo}
+      onClick={() => onCambiar(!activo)}
+      className="flex min-h-[44px] w-full items-center justify-between gap-3 rounded-card bg-muted-foreground/10 px-4 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+    >
+      <span className="flex flex-col">
+        <span className="text-body font-semibold">{titulo}</span>
+        {detalle && <span className="text-footnote text-muted-foreground">{detalle}</span>}
+      </span>
+      <span className={`relative h-[31px] w-[51px] shrink-0 rounded-full transition-colors duration-200 motion-reduce:transition-none ${activo ? 'bg-primary' : 'bg-muted-foreground/30'}`}>
+        <span className={`absolute top-[2px] size-[27px] rounded-full bg-white shadow transition-transform duration-200 motion-reduce:transition-none ${activo ? 'translate-x-[22px]' : 'translate-x-[2px]'}`} />
+      </span>
+    </button>
+  )
 }
 
 // Estilo de control iOS: relleno suave, sin borde. 16 px en inputs para que
@@ -145,6 +187,7 @@ export function EventoBitacoraSheet({
   evento,
   idNuevo,
   sugerenciasEquipo,
+  sugerenciasTipo = [],
   tecnicos,
   opcionesEquipo,
   cargandoEquipos,
@@ -164,8 +207,15 @@ export function EventoBitacoraSheet({
   const [participantes, setParticipantes] = useState<string[]>([])
   const [equipoId, setEquipoId] = useState<string | null>(null)
   const [tipo, setTipo] = useState<TipoEvento>('falla')
+  const [tipoOtro, setTipoOtro] = useState('')
   const [equipo, setEquipo] = useState('')
+  const [titulo, setTitulo] = useState('')
   const [descripcion, setDescripcion] = useState('')
+  /**
+   * «Sin hora» (decisión de Orel 16-09-2026). Las horas que había quedan en
+   * pantalla escondidas: si se apaga, vuelven.
+   */
+  const [sinHora, setSinHora] = useState(false)
   const [horaInicio, setHoraInicio] = useState('')
   const [horaTermino, setHoraTermino] = useState('')
   const [impacto, setImpacto] = useState<ImpactoEvento>('no-aplica')
@@ -250,9 +300,13 @@ export function EventoBitacoraSheet({
     // «Resolver pendiente»: el equipo, su vínculo y el tipo vienen del pendiente original.
     setEquipoId(evento?.equipoId ?? pendienteOrigen?.equipoId ?? null)
     setTipo(evento?.tipo ?? pendienteOrigen?.tipo ?? 'falla')
+    setTipoOtro(evento?.tipoOtro ?? pendienteOrigen?.tipoOtro ?? '')
     setEquipo(evento?.equipo ?? pendienteOrigen?.equipo ?? '')
+    setTitulo(evento?.titulo ?? '')
     setDescripcion(evento?.descripcion ?? '')
-    setHoraInicio(evento?.horaInicio ?? horaSugeridaParaEvento(turno))
+    setSinHora(evento ? evento.horaInicio === '' : false)
+    // Un evento sin hora deja lista la hora sugerida por si se apaga «Sin hora».
+    setHoraInicio(evento?.horaInicio || horaSugeridaParaEvento(turno))
     setHoraTermino(evento?.horaTermino ?? '')
     setImpacto(evento?.impacto ?? 'no-aplica')
     setMinutos(evento?.minutosParada != null ? String(evento.minutosParada) : '')
@@ -271,8 +325,10 @@ export function EventoBitacoraSheet({
       ? aFormulario(evento)
       : {
           tipo: pendienteOrigen?.tipo ?? 'falla',
+          tipoOtro: pendienteOrigen?.tipo === 'otro' ? (pendienteOrigen.tipoOtro ?? '') : '',
           equipo: pendienteOrigen?.equipo ?? '',
           equipoId: pendienteOrigen?.equipoId ?? null,
+          titulo: '',
           descripcion: '',
           horaInicio: horaSugeridaParaEvento(turno),
           horaTermino: '',
@@ -300,15 +356,19 @@ export function EventoBitacoraSheet({
     setEliminadoAfuera(false)
   }, [open, evento, turno, pendienteOrigen])
 
-  const duracion = minutosEntre(horaInicio, horaTermino || null)
+  const duracion = sinHora ? null : minutosEntre(horaInicio, horaTermino || null)
+  const horaFaltante = !sinHora && !HORA_VALIDA.test(horaInicio)
 
+  // Lo que se guarda: el texto de «Otro» solo con ese tipo, y sin horas si es «Sin hora».
   const formularioActual = (): CamposFormulario => ({
     tipo,
+    tipoOtro: tipo === 'otro' ? tipoOtro : '',
     equipo,
     equipoId,
+    titulo,
     descripcion,
-    horaInicio,
-    horaTermino,
+    horaInicio: sinHora ? '' : horaInicio,
+    horaTermino: sinHora ? '' : horaTermino,
     impacto,
     minutos,
     ventana,
@@ -318,11 +378,20 @@ export function EventoBitacoraSheet({
 
   const aplicarFormulario = (v: CamposFormulario, previo: CamposFormulario) => {
     if (v.tipo !== previo.tipo) setTipo(v.tipo)
+    if (v.tipoOtro !== previo.tipoOtro && v.tipo === 'otro') setTipoOtro(v.tipoOtro)
     if (v.equipo !== previo.equipo) setEquipo(v.equipo)
     if (v.equipoId !== previo.equipoId) setEquipoId(v.equipoId)
+    if (v.titulo !== previo.titulo) setTitulo(v.titulo)
     if (v.descripcion !== previo.descripcion) setDescripcion(v.descripcion)
-    if (v.horaInicio !== previo.horaInicio) setHoraInicio(v.horaInicio)
-    if (v.horaTermino !== previo.horaTermino) setHoraTermino(v.horaTermino)
+    if (v.horaInicio !== previo.horaInicio || v.horaTermino !== previo.horaTermino) {
+      // '' = el otro puso «Sin hora»: se enciende sin borrar las horas escondidas.
+      if (v.horaInicio === '') setSinHora(true)
+      else {
+        setSinHora(false)
+        setHoraInicio(v.horaInicio)
+        setHoraTermino(v.horaTermino)
+      }
+    }
     if (v.impacto !== previo.impacto) setImpacto(v.impacto)
     if (v.minutos !== previo.minutos) setMinutos(v.minutos)
     if (v.ventana !== previo.ventana) setVentana(v.ventana)
@@ -334,10 +403,12 @@ export function EventoBitacoraSheet({
     const minutosValidos = minutosNum != null && Number.isFinite(minutosNum) && minutosNum >= 0 && minutosNum <= 1440
     return {
       tipo,
+      tipoOtro: tipo === 'otro' ? tipoOtro : null,
       equipo,
+      titulo,
       descripcion,
-      horaInicio,
-      horaTermino: horaTermino || null,
+      horaInicio: sinHora ? '' : horaInicio,
+      horaTermino: sinHora ? null : horaTermino || null,
       impacto,
       minutosParada: minutosValidos ? minutosNum : null,
       ventana: ventana || null,
@@ -377,8 +448,9 @@ export function EventoBitacoraSheet({
    */
   const guardarBorradorAhora = () => {
     if (!autoguarda || eliminadoAfuera) return
-    // Sin hora de inicio la regla rechaza el documento: no se intenta (se avisa arriba).
-    if (!HORA_VALIDA.test(horaInicio)) return
+    // Con la hora a medio escribir la regla rechaza el documento: no se intenta
+    // (se avisa arriba). «Sin hora» sí se guarda.
+    if (horaFaltante) return
     const crear = !existeEnServidor.current
     const datos = armarDatos('borrador', crear)
     if (crear && !tieneContenido(datos)) return
@@ -487,6 +559,11 @@ export function EventoBitacoraSheet({
     const v = { ...local }
     for (const c of conflictos) (v as unknown as Record<string, unknown>)[c] = remoto[c]
     if (conflictos.includes('equipo')) v.equipoId = remoto.equipoId
+    if (conflictos.includes('tipo')) v.tipoOtro = remoto.tipoOtro
+    if (conflictos.includes('horaInicio') || conflictos.includes('horaTermino')) {
+      v.horaInicio = remoto.horaInicio
+      v.horaTermino = remoto.horaTermino
+    }
     aplicarFormulario(v, local)
     setConflictos([])
   }
@@ -499,6 +576,26 @@ export function EventoBitacoraSheet({
       return true
     })
   }, [sugerenciasEquipo, open])
+
+  /** Tipos escritos antes (este turno y este teléfono), sin repetir. */
+  const tiposSugeridos = useMemo(() => {
+    const vistos = new Set<string>()
+    return [...sugerenciasTipo, ...(open ? leerRecientes(CLAVE_TIPOS) : [])]
+      .map(limpiarTipo)
+      .filter((t) => {
+        const k = normalizarTipo(t)
+        if (!k || vistos.has(k)) return false
+        vistos.add(k)
+        return true
+      })
+      .slice(0, 6)
+  }, [sugerenciasTipo, open])
+
+  const cambiarSinHora = (v: boolean) => {
+    setSinHora(v)
+    // Al volver a «con hora» sin nada escrito, se propone la hora de ahora.
+    if (!v && !HORA_VALIDA.test(horaInicio)) setHoraInicio(horaSugeridaParaEvento(turno))
+  }
 
   const subir = async (s: Subida) => {
     if (!navigator.onLine) {
@@ -662,6 +759,14 @@ export function EventoBitacoraSheet({
       setError(esNuevo ? 'Elige quién registra el evento.' : 'Elige quién está editando.')
       return
     }
+    if (tipo === 'otro' && !limpiarTipo(tipoOtro)) {
+      setError('Escribe el tipo o elige uno de la lista.')
+      return
+    }
+    if (horaFaltante) {
+      setError('Falta la hora de inicio. Si no aplica, activa «Sin hora».')
+      return
+    }
     if (!descripcion.trim()) {
       setError('Escribe qué pasó y qué se hizo.')
       return
@@ -701,6 +806,7 @@ export function EventoBitacoraSheet({
     try {
       await onGuardar(eventoId, armarDatos('listo', crear), crear)
       recordarEquipo(equipo)
+      if (tipo === 'otro') recordar(CLAVE_TIPOS, limpiarTipo(tipoOtro), 8)
       // Lo que seguía subiendo ya no entra en este evento (se borra al terminar).
       sesion.current++
       subidasNuevas.current = []
@@ -782,8 +888,8 @@ export function EventoBitacoraSheet({
         {/* Estado del borrador: que se vea que no hay que tocar nada para guardar. */}
         {autoguarda && (
           <p className="-mt-2 flex items-center gap-1.5 text-footnote text-muted-foreground" role="status" aria-live="polite">
-            {!HORA_VALIDA.test(horaInicio) ? (
-              <span className="font-semibold text-ink-warn">Falta la hora de inicio: sin ella no se puede guardar.</span>
+            {horaFaltante ? (
+              <span className="font-semibold text-ink-warn">Falta la hora de inicio: sin ella no se guarda. Si no aplica, activa «Sin hora».</span>
             ) : porGuardar ? (
               <>
                 <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden /> Guardando borrador…
@@ -909,16 +1015,40 @@ export function EventoBitacoraSheet({
           />
         )}
 
-        {/* Tipo — con rótulo propio: sin él se confundía con la fila de nombres de arriba. */}
+        {/* Tipo — con rótulo propio: sin él se confundía con la fila de nombres de
+            arriba. Los 8 a la vista (en filas): deslizando, «Novedad» no se veía. */}
         <div>
           <span className={ETIQUETA_CAMPO}>Tipo</span>
-          <div className="-mx-1 flex gap-2 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="group" aria-label="Tipo de evento">
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Tipo de evento">
             {TIPOS_EVENTO.map((t) => (
               <Chip key={t.id} activo={tipo === t.id} onClick={() => setTipo(t.id)}>
-                {t.label}
+                {t.id === 'otro' ? 'Otro…' : t.label}
               </Chip>
             ))}
           </div>
+          {tipo === 'otro' && (
+            <div className="mt-3 flex flex-col gap-2">
+              <label htmlFor="bitacora-tipo-otro" className="sr-only">Escribe el tipo</label>
+              <input
+                id="bitacora-tipo-otro"
+                maxLength={MAX_TIPO_OTRO}
+                className={CAMPO}
+                value={tipoOtro}
+                onChange={(e) => setTipoOtro(e.target.value)}
+                placeholder="Escribe el tipo: mejora, lubricación…"
+                autoCapitalize="sentences"
+              />
+              {tiposSugeridos.length > 0 && (
+                <div className="flex flex-wrap gap-2" role="group" aria-label="Tipos ya usados">
+                  {tiposSugeridos.map((t) => (
+                    <Chip key={t} activo={normalizarTipo(t) === normalizarTipo(tipoOtro)} onClick={() => setTipoOtro(t)}>
+                      {t}
+                    </Chip>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Equipo y horas */}
@@ -933,17 +1063,43 @@ export function EventoBitacoraSheet({
             cargando={cargandoEquipos}
             recientes={equiposSugeridos}
           />
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label htmlFor="bitacora-inicio" className={ETIQUETA_CAMPO}>Inicio</label>
-              <input id="bitacora-inicio" type="time" className={`${CAMPO} tabular-nums`} value={horaInicio} onChange={(e) => setHoraInicio(e.target.value)} />
-            </div>
-            <div>
-              <label htmlFor="bitacora-termino" className={ETIQUETA_CAMPO}>Término</label>
-              <input id="bitacora-termino" type="time" className={`${CAMPO} tabular-nums`} value={horaTermino} onChange={(e) => setHoraTermino(e.target.value)} />
-            </div>
+          <div>
+            <label htmlFor="bitacora-titulo" className={`${ETIQUETA_CAMPO} flex justify-between gap-2`}>
+              <span>Título</span>
+              <span>Opcional</span>
+            </label>
+            <input
+              id="bitacora-titulo"
+              maxLength={MAX_TITULO_EVENTO}
+              className={CAMPO}
+              value={titulo}
+              onChange={(e) => setTitulo(e.target.value)}
+              placeholder="Ej: Cambio de tubos fluorescentes"
+              autoCapitalize="sentences"
+            />
           </div>
-          {duracion != null && <p className="-mt-1 text-footnote text-muted-foreground">Duración: {formatoMinutos(duracion)}</p>}
+          {/* Como «Todo el día» en el Calendario de iOS: esconde las horas. */}
+          <FilaInterruptor activo={sinHora} onCambiar={cambiarSinHora} titulo="Sin hora" />
+          {sinHora ? (
+            <p className="-mt-1 text-footnote text-muted-foreground">
+              Queda en la línea de tiempo según cuándo se registró.
+              {impacto === 'con-parada' ? ' Anota abajo los minutos de parada: sin hora no se pueden calcular.' : ''}
+            </p>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor="bitacora-inicio" className={ETIQUETA_CAMPO}>Inicio</label>
+                  <input id="bitacora-inicio" type="time" className={`${CAMPO} tabular-nums`} value={horaInicio} onChange={(e) => setHoraInicio(e.target.value)} />
+                </div>
+                <div>
+                  <label htmlFor="bitacora-termino" className={ETIQUETA_CAMPO}>Término</label>
+                  <input id="bitacora-termino" type="time" className={`${CAMPO} tabular-nums`} value={horaTermino} onChange={(e) => setHoraTermino(e.target.value)} />
+                </div>
+              </div>
+              {duracion != null && <p className="-mt-1 text-footnote text-muted-foreground">Duración: {formatoMinutos(duracion)}</p>}
+            </>
+          )}
         </div>
 
         {/* Qué pasó */}
@@ -983,7 +1139,11 @@ export function EventoBitacoraSheet({
                 onChange={(e) => setMinutos(e.target.value)}
                 placeholder={duracion != null ? `${duracion} (la duración del evento)` : 'Ej: 35'}
               />
-              <p className="mt-1.5 text-footnote text-muted-foreground">Cuenta para el MTTR del turno. Si lo dejas vacío se usa la duración.</p>
+              <p className="mt-1.5 text-footnote text-muted-foreground">
+                {sinHora
+                  ? 'Cuenta para el MTTR del turno. Vacío, la parada queda sin duración.'
+                  : 'Cuenta para el MTTR del turno. Si lo dejas vacío se usa la duración.'}
+              </p>
             </div>
           )}
           {impacto === 'en-ventana' && (
@@ -1078,21 +1238,12 @@ export function EventoBitacoraSheet({
         </div>
 
         {/* Pendiente */}
-        <button
-          type="button"
-          role="switch"
-          aria-checked={pendiente}
-          onClick={() => setPendiente((v) => !v)}
-          className="flex min-h-[44px] w-full items-center justify-between gap-3 rounded-card bg-muted-foreground/10 px-4 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-        >
-          <span className="flex flex-col">
-            <span className="text-body font-semibold">Queda pendiente</span>
-            <span className="text-footnote text-muted-foreground">Sale destacado en el correo para el turno siguiente.</span>
-          </span>
-          <span className={`relative h-[31px] w-[51px] shrink-0 rounded-full transition-colors duration-200 motion-reduce:transition-none ${pendiente ? 'bg-primary' : 'bg-muted-foreground/30'}`}>
-            <span className={`absolute top-[2px] size-[27px] rounded-full bg-white shadow transition-transform duration-200 motion-reduce:transition-none ${pendiente ? 'translate-x-[22px]' : 'translate-x-[2px]'}`} />
-          </span>
-        </button>
+        <FilaInterruptor
+          activo={pendiente}
+          onCambiar={setPendiente}
+          titulo="Queda pendiente"
+          detalle="Sale destacado en el correo para el turno siguiente."
+        />
 
         {error && (
           <p role="alert" className="text-footnote font-semibold text-ink-crit">

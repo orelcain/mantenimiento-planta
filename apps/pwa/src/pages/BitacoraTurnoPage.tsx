@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { BarChart3, Check, ChevronLeft, ChevronRight, ClipboardCopy, FileDown, Loader2, MessageSquareText, NotebookPen, Plus } from 'lucide-react'
-import { Button, Pill, Sheet, Tag } from '@/components/piel'
+import { BarChart3, Check, ChevronLeft, ChevronRight, ClipboardCopy, FileDown, Loader2, MessageCircle, MessageSquareText, NotebookPen, Plus } from 'lucide-react'
+import { Button, Pill, SegmentedControl, Sheet, Tag } from '@/components/piel'
+import { PASO_MENSAJE, PasosWhatsapp, VistaPreviaWhatsapp } from '@/components/bitacora/PanelWhatsapp'
+import { compartirEnWhatsapp, puedeCompartirArchivos } from '@/services/bitacora/compartirWhatsapp'
+import { useLaminasWhatsapp } from '@/hooks/useLaminasWhatsapp'
+import { bitacoraATextoWhatsapp, planLaminas } from '@/services/bitacora/bitacoraWhatsapp'
 import { EventoBitacoraFila } from '@/components/bitacora/EventoBitacoraFila'
 import { BarraSincronizacion } from '@/components/bitacora/BarraSincronizacion'
 import { EventoBitacoraSheet } from '@/components/bitacora/EventoBitacoraSheet'
@@ -13,7 +17,8 @@ import { origenDePendiente } from '@/services/bitacora/entregaTurno'
 import { tecnicoRecordado } from '@/components/bitacora/tecnicoRecordado'
 import { useToast } from '@/hooks/useToast'
 import { FUENTE_FIRESTORE, useTurnoMantencionActual, type FuenteBitacora } from '@/hooks/useBitacoraTurno'
-import { BITACORA_PLANTA, ETIQUETA_TIPO } from '@/config/bitacora'
+import { BITACORA_PLANTA } from '@/config/bitacora'
+import { encabezadoEvento, etiquetaTipo, tiposPropiosUsados, tituloDe } from '@/services/bitacora/presentacionEvento'
 import { copiarHtml, copiarTexto } from '@/lib/clipboard'
 import type { EventoBitacora, FotoEvento, TurnoMantencion } from '@/services/bitacora/bitacora.types'
 import { bitacoraAHtmlCorreo, bitacoraATextoPlano, etiquetaParada, etiquetaPendientes, tituloCorreo } from '@/services/bitacora/bitacoraCorreo'
@@ -120,6 +125,14 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
   const [textoObs, setTextoObs] = useState('')
   const [quienObs, setQuienObs] = useState('')
   const [visor, setVisor] = useState<{ fotos: FotoEvento[]; indice: number; titulo: string } | null>(null)
+  /** Columna derecha del PC: la vista previa del correo o el envío por WhatsApp. */
+  const [vistaEnvio, setVistaEnvio] = useState<'correo' | 'whatsapp'>('correo')
+  /** Hoja de WhatsApp del celular. */
+  const [hojaWhatsapp, setHojaWhatsapp] = useState(false)
+  /** Láminas ya copiadas (por clave) y el texto exacto que se copió como mensaje. */
+  const [laminasCopiadas, setLaminasCopiadas] = useState<ReadonlySet<string>>(new Set())
+  const [mensajeCopiado, setMensajeCopiado] = useState<string | null>(null)
+  const [compartiendo, setCompartiendo] = useState(false)
   // Entrega de turno: pendientes abiertos de turnos anteriores.
   const { pendientes: pendientesPrevios, cerrarNoAplica } = fuente.usePendientesAnteriores(turno)
   // Borradores que nadie publicó antes del cambio de turno: solo en el turno EN CURSO.
@@ -179,6 +192,66 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
   )
   const htmlCorreo = useMemo(() => bitacoraAHtmlCorreo(datosCorreo), [datosCorreo])
   const asunto = tituloCorreo(turno)
+
+  // ── WhatsApp (mockup aprobado 16-09-2026): mensaje + una lámina por evento con fotos ──
+  const planWhatsapp = useMemo(() => planLaminas(datosCorreo), [datosCorreo])
+  const textoWhatsapp = useMemo(() => bitacoraATextoWhatsapp(datosCorreo, planWhatsapp), [datosCorreo, planWhatsapp])
+  const laminas = useLaminasWhatsapp(planWhatsapp, vistaEnvio === 'whatsapp' || hojaWhatsapp)
+  // «Copiado» vale para ESE texto: si llega un evento nuevo, el mensaje hay que copiarlo otra vez.
+  const pasosCopiados = useMemo(
+    () => new Set([...laminasCopiadas, ...(mensajeCopiado === textoWhatsapp ? [PASO_MENSAJE] : [])]),
+    [laminasCopiadas, mensajeCopiado, textoWhatsapp],
+  )
+  const marcarCopiado = useCallback(
+    (paso: string) => {
+      if (paso === PASO_MENSAJE) setMensajeCopiado(textoWhatsapp)
+      else setLaminasCopiadas((prev) => new Set([...prev, paso]))
+    },
+    [textoWhatsapp],
+  )
+  useEffect(() => {
+    setLaminasCopiadas(new Set())
+    setMensajeCopiado(null)
+  }, [turno.id])
+  const compartirConMenu = useMemo(() => puedeCompartirArchivos(), [])
+  const avisoBorradores = borradores.length
+    ? ` ${borradores.length === 1 ? '1 evento en redacción no va' : `${borradores.length} eventos en redacción no van`}.`
+    : ''
+
+  const copiarParaWhatsapp = async () => {
+    try {
+      await copiarTexto(textoWhatsapp)
+      setMensajeCopiado(textoWhatsapp)
+      setVistaEnvio('whatsapp')
+      toast({
+        title: 'Mensaje copiado',
+        description: `Pégalo en WhatsApp Web con Ctrl+V. Después copia cada lámina desde la columna de la derecha.${avisoBorradores}`,
+        variant: 'success',
+      })
+    } catch {
+      toast({ title: 'No se pudo copiar', variant: 'destructive' })
+    }
+  }
+
+  const compartir = async () => {
+    setCompartiendo(true)
+    try {
+      const r = await compartirEnWhatsapp(turno, textoWhatsapp, laminas.listas)
+      if (r === 'enviado') {
+        marcarCopiado(PASO_MENSAJE)
+        setLaminasCopiadas(new Set(laminas.listas.map((g) => g.lamina.clave)))
+        setHojaWhatsapp(false)
+      }
+    } catch {
+      toast({
+        title: 'No se pudo abrir el menú de compartir',
+        description: 'El mensaje quedó copiado. Copia las láminas una por una desde esta hoja.',
+        variant: 'destructive',
+      })
+    } finally {
+      setCompartiendo(false)
+    }
+  }
 
   const copiarAsunto = async () => {
     try {
@@ -254,6 +327,8 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
   }
 
   const sugerenciasEquipo = useMemo(() => eventos.map((e) => e.equipo).filter(Boolean), [eventos])
+  // Solo publicados: un borrador guarda el tipo a medio escribir («mejora c»).
+  const sugerenciasTipo = useMemo(() => tiposPropiosUsados(soloListos([...eventos, ...pendientesPrevios])), [eventos, pendientesPrevios])
   const fecha = fechaTurnoLarga(turno)
 
   return (
@@ -311,6 +386,9 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
           <Button variant="tinted" onClick={exportarPdf} disabled={!!trabajando}>
             {trabajando === 'pdf' ? <Loader2 className="animate-spin" /> : <FileDown />} Exportar PDF
           </Button>
+          <Button variant="tinted" onClick={() => void copiarParaWhatsapp()} disabled={!!trabajando}>
+            <MessageCircle /> Copiar para WhatsApp
+          </Button>
           <Button onClick={copiar} disabled={!!trabajando}>
             {trabajando === 'copiar' ? <Loader2 className="animate-spin" /> : <ClipboardCopy />} Copiar para correo
           </Button>
@@ -346,9 +424,10 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
               >
                 <div className="flex flex-wrap items-center gap-1.5">
                   <span className="text-headline leading-tight">{p.equipo?.trim() || 'Sin equipo'}</span>
-                  <Tag>{ETIQUETA_TIPO[p.tipo]}</Tag>
+                  <Tag>{etiquetaTipo(p)}</Tag>
                   <Pill tone="warning">Pendiente</Pill>
                 </div>
+                {tituloDe(p) && <p className="text-body font-semibold">{tituloDe(p)}</p>}
                 <p className="line-clamp-3 whitespace-pre-line text-body">{p.descripcion}</p>
                 <p className="text-footnote text-muted-foreground">{origenDePendiente(p, turno)}</p>
                 <div className="flex flex-wrap gap-2 pt-0.5">
@@ -392,8 +471,9 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
                   <div className="flex flex-wrap items-center gap-1.5">
                     <Pill tone="info">En redacción</Pill>
                     <span className="text-headline leading-tight">{b.equipo?.trim() || 'Sin equipo todavía'}</span>
-                    <Tag>{ETIQUETA_TIPO[b.tipo]}</Tag>
+                    <Tag>{etiquetaTipo(b)}</Tag>
                   </div>
+                  {tituloDe(b) && <p className="text-body font-semibold">{tituloDe(b)}</p>}
                   <p className="line-clamp-3 whitespace-pre-line text-body text-muted-foreground">
                     {b.descripcion?.trim() || 'Sin descripción todavía'}
                   </p>
@@ -516,12 +596,15 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
       </button>
 
       {/* Acciones secundarias de móvil. La principal (Nuevo evento) va fija abajo. */}
-      <div className="grid grid-cols-2 gap-2 md:hidden">
-        <Button variant="tinted" onClick={copiar} disabled={!!trabajando || eventos.length === 0}>
+      <div className="grid grid-cols-3 gap-2 md:hidden">
+        <Button variant="tinted" className="px-2" onClick={copiar} disabled={!!trabajando || eventos.length === 0}>
           {trabajando === 'copiar' ? <Loader2 className="animate-spin" /> : <ClipboardCopy />} Copiar
         </Button>
-        <Button variant="tinted" onClick={exportarPdf} disabled={!!trabajando || eventos.length === 0}>
+        <Button variant="tinted" className="px-2" onClick={exportarPdf} disabled={!!trabajando || eventos.length === 0}>
           {trabajando === 'pdf' ? <Loader2 className="animate-spin" /> : <FileDown />} PDF
+        </Button>
+        <Button variant="tinted" className="px-2" onClick={() => setHojaWhatsapp(true)} disabled={!!trabajando || eventos.length === 0}>
+          <MessageCircle /> WhatsApp
         </Button>
       </div>
 
@@ -565,7 +648,7 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
                   evento={e}
                   abiertoPor={otrosEditando(conectados, e.id, miDispositivoId)}
                   onAbrir={() => setEditor({ evento: e, idNuevo: e.id, turno })}
-                  onVerFoto={(fotos, indice) => setVisor({ fotos, indice, titulo: [e.horaInicio, e.equipo].filter(Boolean).join(' · ') })}
+                  onVerFoto={(fotos, indice) => setVisor({ fotos, indice, titulo: encabezadoEvento(e) })}
                 />
               ))}
             </div>
@@ -573,7 +656,35 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
         </section>
 
         {/* Vista previa del correo (solo PC) */}
-        <section aria-label="Vista previa del correo" className="hidden flex-col md:flex md:sticky md:top-4">
+        <section aria-label="Enviar la bitácora" className="hidden flex-col gap-3 md:flex md:sticky md:top-4">
+          <SegmentedControl
+            ariaLabel="Enviar por correo o por WhatsApp"
+            value={vistaEnvio}
+            onChange={setVistaEnvio}
+            segments={[
+              { value: 'correo', label: 'Correo' },
+              { value: 'whatsapp', label: 'WhatsApp' },
+            ]}
+          />
+          {vistaEnvio === 'whatsapp' ? (
+            <div className="flex flex-col gap-4">
+              <PasosWhatsapp
+                texto={textoWhatsapp}
+                plan={planWhatsapp}
+                listas={laminas.listas}
+                copiados={pasosCopiados}
+                onCopiado={marcarCopiado}
+                hayEventos={soloListos(eventos).length > 0}
+              />
+              {soloListos(eventos).length > 0 && (
+                <div className="flex flex-col gap-2">
+                  <h2 className="px-4 text-caption font-semibold text-muted-foreground">Así queda en el chat</h2>
+                  <VistaPreviaWhatsapp texto={textoWhatsapp} listas={laminas.listas} />
+                </div>
+              )}
+            </div>
+          ) : (
+          <>
           <div className="flex flex-col gap-1 px-4 pb-2">
             <div className="flex items-baseline justify-between gap-2">
               <h2 className="text-caption font-semibold text-muted-foreground">Así queda al pegar en el correo</h2>
@@ -595,6 +706,8 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
           <p className="px-4 pt-2 text-footnote text-muted-foreground">
             Outlook clásico: usa «Copiar para correo». Si en Outlook nuevo o web las fotos no aparecen, usa «Copiar con fotos incrustadas».
           </p>
+          </>
+          )}
         </section>
       </div>
 
@@ -605,6 +718,7 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
         pendienteOrigen={editor?.pendienteOrigen ?? null}
         idNuevo={editor?.idNuevo ?? ''}
         sugerenciasEquipo={sugerenciasEquipo}
+        sugerenciasTipo={sugerenciasTipo}
         tecnicos={tecnicos}
         opcionesEquipo={opcionesEquipo}
         cargandoEquipos={cargandoEquipos}
@@ -615,6 +729,60 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
         otrosEditando={editandoEventoId ? otrosEditando(conectados, editandoEventoId, miDispositivoId) : []}
         onClose={() => setEditor(null)}
       />
+
+      <Sheet
+        open={hojaWhatsapp}
+        onClose={() => setHojaWhatsapp(false)}
+        title="Enviar por WhatsApp"
+        description={
+          compartirConMenu
+            ? `Se abre el menú de compartir con ${
+                planWhatsapp.length === 0 ? 'el mensaje' : `${planWhatsapp.length === 1 ? 'la lámina' : `las ${planWhatsapp.length} láminas`} y el mensaje`
+              }. Elige WhatsApp y el grupo.${avisoBorradores}`
+            : `Copia el mensaje y cada lámina, y pégalos en el chat.${avisoBorradores}`
+        }
+        actions={
+          compartirConMenu ? (
+            <>
+              <Button
+                variant="tinted"
+                onClick={() => {
+                  void copiarTexto(textoWhatsapp).then(() => {
+                    marcarCopiado(PASO_MENSAJE)
+                    toast({ title: 'Mensaje copiado', variant: 'success' })
+                  })
+                }}
+              >
+                Copiar mensaje
+              </Button>
+              <Button onClick={() => void compartir()} disabled={compartiendo || !laminas.completas}>
+                {compartiendo || !laminas.completas ? <Loader2 className="animate-spin" /> : <MessageCircle />}
+                {laminas.completas ? 'Compartir' : 'Preparando…'}
+              </Button>
+            </>
+          ) : (
+            <Button variant="tinted" onClick={() => setHojaWhatsapp(false)}>
+              Cerrar
+            </Button>
+          )
+        }
+      >
+        <div className="-mx-6 flex max-h-[min(62vh,600px)] flex-col gap-4 overflow-y-auto px-6 pb-1">
+          {compartirConMenu ? (
+            <p className="text-footnote text-muted-foreground">Si WhatsApp no pone el mensaje, pégalo en el chat: ya queda copiado.</p>
+          ) : (
+            <PasosWhatsapp
+              texto={textoWhatsapp}
+              plan={planWhatsapp}
+              listas={laminas.listas}
+              copiados={pasosCopiados}
+              onCopiado={marcarCopiado}
+              hayEventos={soloListos(eventos).length > 0}
+            />
+          )}
+          <VistaPreviaWhatsapp texto={textoWhatsapp} listas={laminas.listas} />
+        </div>
+      </Sheet>
 
       <Sheet
         open={editandoObs}

@@ -45,7 +45,19 @@ export interface OrigenPendiente {
   registradoPor: string
 }
 
-export type TipoEvento ='falla' | 'ajuste' | 'inspeccion' | 'preventivo' | 'novedad'
+/**
+ * `otro` = tipo escrito a mano por el técnico (va en `tipoOtro`). Decisión de
+ * Orel 16-09-2026: texto libre, con los ya usados como sugerencia.
+ */
+export type TipoEvento =
+  | 'falla'
+  | 'correctivo'
+  | 'preventivo'
+  | 'planificado'
+  | 'inspeccion'
+  | 'ajuste'
+  | 'novedad'
+  | 'otro'
 
 /**
  * Qué le costó el evento a producción.
@@ -84,12 +96,19 @@ export interface EventoBitacora {
   fechaTurno: string
   banda: BandaTurno
   tipo: TipoEvento
+  /** Solo con `tipo: 'otro'`: el tipo que escribió el técnico ("Mejora"). */
+  tipoOtro?: string | null
   /** Equipo o área, texto libre ("BAADER 142", "Sala de bombas NH₃"). */
   equipo: string
+  /** Título opcional ("Cambio de tubos fluorescentes"), aparte del equipo y la descripción. */
+  titulo?: string | null
   descripcion: string
-  /** `HH:mm`. */
+  /**
+   * `HH:mm`, o `''` = evento SIN HORA (interruptor «Sin hora», 16-09-2026): se
+   * ubica en la línea de tiempo según `createdAt` y no tiene término.
+   */
   horaInicio: string
-  /** `HH:mm`, o null si sigue en curso. */
+  /** `HH:mm`, o null si sigue en curso (siempre null en un evento sin hora). */
   horaTermino: string | null
   impacto: ImpactoEvento
   minutosParada: number | null
@@ -144,7 +163,9 @@ export interface PresenciaBitacora {
 export type EventoBitacoraDatos = Pick<
   EventoBitacora,
   | 'tipo'
+  | 'tipoOtro'
   | 'equipo'
+  | 'titulo'
   | 'descripcion'
   | 'horaInicio'
   | 'horaTermino'

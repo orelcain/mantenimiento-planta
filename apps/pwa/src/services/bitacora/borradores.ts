@@ -29,7 +29,7 @@ export function borradoresAnteriores(eventos: readonly EventoBitacora[], turno: 
     .filter((e) => esBorrador(e) && e.turnoId !== turno.id)
     .map((e) => ({ e, t: turnoDesdeId(e.turnoId) }))
     .filter((x): x is { e: EventoBitacora; t: TurnoMantencion } => Boolean(x.t) && x.t!.inicio < turno.inicio)
-    .sort((a, b) => b.t.inicio.getTime() - a.t.inicio.getTime() || b.e.horaInicio.localeCompare(a.e.horaInicio))
+    .sort((a, b) => b.t.inicio.getTime() - a.t.inicio.getTime() || (b.e.horaInicio ?? '').localeCompare(a.e.horaInicio ?? ''))
     .map((x) => x.e)
 }
 
@@ -37,8 +37,8 @@ export function borradoresAnteriores(eventos: readonly EventoBitacora[], turno: 
  * ¿Hay algo que valga la pena guardar? Abrir la hoja y cerrarla sin escribir
  * no puede dejar un borrador vacío en la bitácora de todos.
  */
-export function tieneContenido(d: { descripcion: string; equipo: string; fotos: readonly unknown[] }): boolean {
-  return d.descripcion.trim().length > 0 || d.equipo.trim().length > 0 || d.fotos.length > 0
+export function tieneContenido(d: { descripcion: string; equipo: string; titulo?: string | null; fotos: readonly unknown[] }): boolean {
+  return d.descripcion.trim().length > 0 || d.equipo.trim().length > 0 || Boolean(d.titulo?.trim()) || d.fotos.length > 0
 }
 
 /**
@@ -47,9 +47,13 @@ export function tieneContenido(d: { descripcion: string; equipo: string; fotos: 
  */
 export interface CamposFormulario {
   tipo: TipoEvento
+  /** El tipo escrito a mano (solo cuenta con `tipo: 'otro'`). */
+  tipoOtro: string
   equipo: string
   equipoId: string | null
+  titulo: string
   descripcion: string
+  /** `''` = «Sin hora» (y entonces `horaTermino` también es `''`). */
   horaInicio: string
   horaTermino: string
   impacto: ImpactoEvento
@@ -62,8 +66,10 @@ export type CampoFormulario = keyof CamposFormulario
 
 export const ETIQUETA_CAMPO: Record<CampoFormulario, string> = {
   tipo: 'el tipo',
+  tipoOtro: 'el tipo',
   equipo: 'el equipo',
   equipoId: 'el equipo',
+  titulo: 'el título',
   descripcion: '«Qué pasó»',
   horaInicio: 'la hora de inicio',
   horaTermino: 'la hora de término',
@@ -75,17 +81,31 @@ export const ETIQUETA_CAMPO: Record<CampoFormulario, string> = {
 
 type EventoFormulario = Pick<
   EventoBitacora,
-  'tipo' | 'equipo' | 'equipoId' | 'descripcion' | 'horaInicio' | 'horaTermino' | 'impacto' | 'minutosParada' | 'ventana' | 'pendiente'
+  | 'tipo'
+  | 'tipoOtro'
+  | 'equipo'
+  | 'equipoId'
+  | 'titulo'
+  | 'descripcion'
+  | 'horaInicio'
+  | 'horaTermino'
+  | 'impacto'
+  | 'minutosParada'
+  | 'ventana'
+  | 'pendiente'
 >
 
 export function aFormulario(e: EventoFormulario): CamposFormulario {
   return {
     tipo: e.tipo,
+    tipoOtro: e.tipoOtro ?? '',
     equipo: e.equipo ?? '',
     equipoId: e.equipoId ?? null,
+    titulo: e.titulo ?? '',
     descripcion: e.descripcion ?? '',
     horaInicio: e.horaInicio ?? '',
-    horaTermino: e.horaTermino ?? '',
+    // Sin hora no hay término: el formulario lo muestra vacío, igual que el servidor.
+    horaTermino: e.horaInicio ? (e.horaTermino ?? '') : '',
     impacto: e.impacto,
     minutos: e.minutosParada != null ? String(e.minutosParada) : '',
     ventana: e.ventana ?? '',
@@ -95,8 +115,10 @@ export function aFormulario(e: EventoFormulario): CamposFormulario {
 
 const CAMPOS: readonly CampoFormulario[] = [
   'tipo',
+  'tipoOtro',
   'equipo',
   'equipoId',
+  'titulo',
   'descripcion',
   'horaInicio',
   'horaTermino',
@@ -150,20 +172,36 @@ export function fusionarFormulario(base: CamposFormulario, local: CamposFormular
   // El vínculo con la jerarquía va con el texto del equipo: si se adoptó el
   // equipo del otro, también su `equipoId`.
   if (valores.equipo === remoto.equipo && local.equipo !== remoto.equipo) valores.equipoId = remoto.equipoId
+  // «Sin hora» es un solo cambio que toca las dos horas: si se adoptó el paso
+  // del otro a «Sin hora» (o de vuelta a con hora), también su término.
+  if (
+    valores.horaInicio === remoto.horaInicio &&
+    local.horaInicio !== remoto.horaInicio &&
+    (remoto.horaInicio === '' || local.horaInicio === '')
+  ) {
+    valores.horaTermino = remoto.horaTermino
+  }
   return {
     valores,
     base: nuevaBase,
-    // «equipo» y «equipoId» son un solo aviso para quien lee.
-    conflictos: conflictos.filter((c) => c !== 'equipoId' || !conflictos.includes('equipo')),
+    // «equipo» y «equipoId» (y el tipo y su texto) son un solo aviso para quien lee.
+    conflictos: conflictos.filter(
+      (c) => !(c === 'equipoId' && conflictos.includes('equipo')) && !(c === 'tipoOtro' && conflictos.includes('tipo')),
+    ),
   }
 }
 
 /** Nombres de los campos del DOCUMENTO que corresponden a cada campo del formulario. */
 const CAMPOS_DOC: Record<CampoFormulario, readonly string[]> = {
-  tipo: ['tipo'],
+  // El tipo y su texto van juntos: `tipoOtro` solo vale con `tipo: 'otro'`.
+  tipo: ['tipo', 'tipoOtro'],
+  tipoOtro: ['tipo', 'tipoOtro'],
   equipo: ['equipo', 'equipoId'],
   equipoId: ['equipo', 'equipoId'],
+  titulo: ['titulo'],
   descripcion: ['descripcion'],
+  // Cada hora por separado: «Sin hora» cambia las dos y así se escriben las dos,
+  // pero cambiar solo el término no debe reescribir un inicio que otro cambió.
   horaInicio: ['horaInicio'],
   horaTermino: ['horaTermino'],
   // Van juntos: los minutos y la ventana se guardan según el impacto.

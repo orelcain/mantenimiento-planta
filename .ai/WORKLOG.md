@@ -5188,3 +5188,39 @@ en nada y nadie lo veía después.
 - Producción sigue en 0 eventos/0 presencia (la pestaña de Orel estaba oculta: no late, por diseño).
 - 79 pruebas en services/bitacora. Verificado en la vitrina: sección, «Continuar» → `?turno=` del
   borrador + «Continuar borrador» sin aviso falso.
+
+## 2026-09-16 · Bitacora ronda 13 · WhatsApp + evento con título, sin hora y tipos propios
+
+Pedido de Orel: copiar la bitácora «como un correo, con fotos» para mandarla por WhatsApp Web, y en el
+evento: poder no poner la hora, un título aparte del equipo y la descripción, y más tipos (correctivo,
+planificado…) además de uno escrito a mano. Mockup aprobado con las 4 recomendaciones:
+https://claude.ai/artifact/BiADNnwFmfGvfe1R2PChEJ
+
+- **WhatsApp = mensaje + una LÁMINA por evento con fotos.** WhatsApp no intercala texto y fotos en un
+  mensaje y WhatsApp Web recibe UNA imagen por Ctrl+V: pegar el HTML del correo pierde las fotos. La
+  lámina (canvas 1080 px, `laminaWhatsapp.ts`) junta fotos completas (sin recortar), hora, equipo,
+  título, impacto, descripción (10 líneas máx.) y técnicos; más de 4 fotos → dos láminas.
+  - PC: botón «Copiar para WhatsApp» (copia el mensaje) + columna derecha con segmentado
+    Correo/WhatsApp: pasos «Copiar mensaje» / «Copiar lámina N» (PNG al portapapeles, Chrome solo
+    acepta `image/png`) y vista previa del chat. Las láminas se generan al abrir la vista, para que
+    el copiado ocurra dentro del toque.
+  - Celular: botón «WhatsApp» → hoja con «Compartir» (Web Share con las láminas + el mensaje; el
+    mensaje queda además en el portapapeles por si WhatsApp no lo toma). Sin soporte de compartir
+    archivos → los mismos pasos del PC.
+  - Mensaje con formato de WhatsApp (`*negrita*`, `_cursiva_`), cada evento dice en qué lámina están
+    sus fotos; un `*`/`_` del texto se cambia por un carácter igual para no romper el formato.
+- **Evento:** `titulo` opcional (el título manda en la fila; el equipo baja a la línea de abajo),
+  interruptor «Sin hora» (`horaInicio: ''`, sin término; se ubica por `createdAt`, leído con
+  `serverTimestamps: 'estimate'`), tipos Falla · Correctivo · Preventivo · Planificado · Inspección ·
+  Ajuste · Novedad · Otro… (`tipo: 'otro'` + `tipoOtro`, sugeridos los ya publicados; al publicar,
+  un «Otro» que coincide con un tipo fijo queda como ese tipo). Presentación común en
+  `presentacionEvento.ts` (fila, correo, PDF, WhatsApp dicen lo mismo).
+- Reglas: 8 tipos, `tipoOtro` ≤ 40, `titulo` ≤ 120, `horaInicio` '' permitido solo sin término.
+  57/57 con `probar-reglas-bitacora.cjs --local` (11 nuevos).
+- Revisión propia: agrupar las dos horas en una escritura pisaba un inicio cambiado por otro equipo →
+  cada hora se escribe por separado; una lámina cancelada a medio dibujar dejaba una URL sin liberar;
+  el tipo a medio escribir de un borrador aparecía como sugerencia → sugerencias solo de publicados.
+- 100 pruebas en services/bitacora (21 nuevas). Verificado en la vitrina (datos de ejemplo): PC
+  claro/oscuro, 375 px, tecleando en «Otro…» y título con autoguardado (el foco no se pierde),
+  «Sin hora», publicar, copiar mensaje y lámina, compartir (con `navigator.share` simulado).
+- **Sin probar todavía:** pegar en WhatsApp Web real y compartir desde un Android real.

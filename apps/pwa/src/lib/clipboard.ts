@@ -57,3 +57,16 @@ export async function copiarHtml(html: string, textoPlano: string): Promise<void
     nodo.remove()
   }
 }
+
+/**
+ * Copia una IMAGEN (PNG) para pegarla con Ctrl+V, por ejemplo en WhatsApp Web.
+ * Chrome solo acepta `image/png` en el portapapeles. Se puede pasar la promesa
+ * del PNG: Safari exige que `write` se llame dentro del toque, aunque la imagen
+ * termine de generarse después.
+ */
+export async function copiarImagen(png: Blob | Promise<Blob>): Promise<void> {
+  if (typeof ClipboardItem === 'undefined' || !navigator.clipboard?.write) {
+    throw new Error('Este navegador no permite copiar imágenes.')
+  }
+  await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })])
+}

@@ -1,7 +1,8 @@
 import { ETIQUETA_FOTO } from '@/config/bitacora'
 import { textoSeguroPdf } from '@/utils/pdf/textoSeguroPdf'
 import { autorVisible, type EventoBitacora, type FotoEvento, type TurnoMantencion } from './bitacora.types'
-import { etiquetaPendientes, horarioEvento, lineaImpacto, lineaPendienteAnterior, lineaTecnicos } from './bitacoraCorreo'
+import { etiquetaPendientes, lineaImpacto, lineaPendienteAnterior, lineaTecnicos } from './bitacoraCorreo'
+import { encabezadoEvento, etiquetaTipo } from './presentacionEvento'
 import { cargarFotoComoJpeg, type ImagenCargada } from './fotosBitacora'
 import { fuePendiente, ordenarEventos, resumirBitacora } from './resumenBitacora'
 import { soloListos } from './borradores'
@@ -155,7 +156,7 @@ export async function generarPdfBitacora({ turno, eventos: todos, tecnicos, plan
     pdf.setFontSize(11)
     color(TINTA)
     y += 4
-    envuelto([horarioEvento(e), e.equipo?.trim()].filter(Boolean).join(' · '), x, ancho, 5)
+    envuelto(encabezadoEvento(e) || etiquetaTipo(e), x, ancho, 5)
     y += 0.5
     pdf.setFont('helvetica', 'normal')
     pdf.setFontSize(9)

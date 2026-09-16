@@ -1,9 +1,13 @@
-import { ETIQUETA_FOTO, ETIQUETA_TIPO } from '@/config/bitacora'
+import { ETIQUETA_FOTO } from '@/config/bitacora'
 import { autorVisible, tecnicosDelEvento, type EventoBitacora, type FotoEvento, type TurnoMantencion } from './bitacora.types'
 import { fuePendiente, minutosParadaDe, ordenarEventos, resumirBitacora } from './resumenBitacora'
 import { soloListos } from './borradores'
 import { etiquetaTurno, fechaTurnoLarga, formatoMinutos, horarioTurno } from './turnoMantencion'
 import { etiquetaCortaTurno } from './entregaTurno'
+import { encabezadoEvento, etiquetaTipo, horarioEvento, tituloDe } from './presentacionEvento'
+
+// Se reexporta: el PDF y las pruebas lo importan desde aquí.
+export { horarioEvento }
 
 /**
  * Convierte la bitácora en el cuerpo de un correo.
@@ -57,7 +61,7 @@ export function escaparHtml(texto: string | null | undefined): string {
 
 const conSaltos = (t: string) => escaparHtml(t.trim()).replace(/\r?\n/g, '<br>')
 
-function capitalizarPrimera(t: string): string {
+export function capitalizarPrimera(t: string): string {
   return t.charAt(0).toUpperCase() + t.slice(1)
 }
 
@@ -65,14 +69,12 @@ export function tituloCorreo(turno: TurnoMantencion): string {
   return `Bitácora de Mantención · ${etiquetaTurno(turno)} ${turno.fecha.split('-').reverse().join('-')}`
 }
 
-/** Horario del evento: "16:20 – 16:55" o "22:30" si sigue abierto. */
-export function horarioEvento(e: Pick<EventoBitacora, 'horaInicio' | 'horaTermino'>): string {
-  return e.horaTermino ? `${e.horaInicio} – ${e.horaTermino}` : e.horaInicio
-}
-
-/** "Falla · Detuvo la máquina 35 min" / "Ajuste · Sin detener: Colación HG". */
-export function lineaImpacto(e: EventoBitacora): string {
-  const partes = [ETIQUETA_TIPO[e.tipo]]
+/**
+ * Lo que el evento le costó (o no) a producción y su historia de pendiente:
+ * "Detuvo la máquina 35 min", "Sin detener: Colación HG", "Cierra pendiente del…".
+ */
+export function partesImpacto(e: EventoBitacora): string[] {
+  const partes: string[] = []
   if (e.impacto === 'con-parada') partes.push(`Detuvo la máquina ${formatoMinutos(minutosParadaDe(e))}`)
   if (e.impacto === 'en-ventana') partes.push(e.ventana?.trim() ? `Sin detener: ${e.ventana.trim()}` : 'Sin detener producción')
   if (e.resuelvePendiente?.turnoId) partes.push(`Cierra pendiente del ${etiquetaCortaTurno(e.resuelvePendiente.turnoId)}`)
@@ -85,7 +87,12 @@ export function lineaImpacto(e: EventoBitacora): string {
         : `Resuelto en ${etiquetaCortaTurno(e.cierre.turnoId)}${e.cierre.porNombre ? ` por ${e.cierre.porNombre}` : ''}`,
     )
   }
-  return partes.join(' · ')
+  return partes
+}
+
+/** "Falla · Detuvo la máquina 35 min" / "Ajuste · Sin detener: Colación HG". */
+export function lineaImpacto(e: EventoBitacora): string {
+  return [etiquetaTipo(e), ...partesImpacto(e)].join(' · ')
 }
 
 /**
@@ -135,7 +142,7 @@ function htmlFotos(fotos: readonly FotoEvento[], fuente: (f: FotoEvento) => stri
 
 function htmlEvento(e: EventoBitacora, fuente: (f: FotoEvento) => string, separador: boolean): string {
   const colorImpacto = e.impacto === 'con-parada' ? C.parada : e.impacto === 'en-ventana' ? C.ventana : C.sec
-  const titulo = [horarioEvento(e), e.equipo?.trim()].filter(Boolean).join(' · ')
+  const titulo = encabezadoEvento(e)
   return (
     `<tr><td style="padding:12px 0;${separador ? `border-top:1px solid ${C.linea};` : ''}font-family:${FUENTE};">` +
     `<div style="font-size:15px;font-weight:600;color:${C.tinta};">${escaparHtml(titulo)}</div>` +
@@ -171,7 +178,7 @@ export function etiquetaPendientes(r: { pendientesDelTurno: number; pendientesRe
 /** "KNURO N1 · Pusher con golpes… · desde Turno día 15-09 (Leandro Igor)". */
 export function lineaPendienteAnterior(e: EventoBitacora): string {
   const texto = (e.descripcion ?? '').trim().replace(/\s+/g, ' ')
-  return [e.equipo?.trim(), texto.length > 140 ? `${texto.slice(0, 137)}…` : texto, `desde ${etiquetaCortaTurno(e.turnoId)} (${autorVisible(e)})`]
+  return [e.equipo?.trim(), tituloDe(e), texto.length > 140 ? `${texto.slice(0, 137)}…` : texto, `desde ${etiquetaCortaTurno(e.turnoId)} (${autorVisible(e)})`]
     .filter(Boolean)
     .join(' · ')
 }
@@ -247,6 +254,16 @@ export function bitacoraAHtmlCorreo({ turno, eventos: todos, tecnicos, planta, o
   return `<div style="max-width:680px;color:${C.tinta};">${encabezado}${tablaKpis}${cuerpo}${bloquePendientes}${bloqueAnteriores}${pie}</div>`
 }
 
+/** "3 eventos · 35 min de parada (1) · MTTR 35 min · 1 sin detener producción · 1 pendiente" (texto plano y WhatsApp). */
+export function lineaResumen(r: ReturnType<typeof resumirBitacora>): string {
+  return (
+    `${r.eventos} ${r.eventos === 1 ? 'evento' : 'eventos'} · ${formatoMinutos(r.minutosParada)} ${etiquetaParada(r)} · ` +
+    `MTTR ${r.mttrMin == null ? '—' : formatoMinutos(r.mttrMin)} · ${r.enVentana} sin detener producción · ` +
+    `${r.pendientesDelTurno} ${etiquetaPendientes(r)}` +
+    (r.pendientesCerrados > 0 ? ` · ${r.pendientesCerrados} ${r.pendientesCerrados === 1 ? 'pendiente cerrado' : 'pendientes cerrados'}` : '')
+  )
+}
+
 /** Versión en texto plano: va junto al HTML en el portapapeles, por si el destino no acepta HTML. */
 export function bitacoraATextoPlano({ turno, eventos: todos, tecnicos, planta, observacion, pendientesAnteriores = [] }: DatosCorreoBitacora): string {
   const eventos = soloListos(todos)
@@ -254,7 +271,7 @@ export function bitacoraATextoPlano({ turno, eventos: todos, tecnicos, planta, o
   const ordenados = ordenarEventos(turno, eventos)
   const linea = (e: EventoBitacora) =>
     [
-      `${horarioEvento(e)}${e.equipo?.trim() ? ` · ${e.equipo.trim()}` : ''}`,
+      encabezadoEvento(e) || etiquetaTipo(e),
       `  ${lineaImpacto(e)}`,
       lineaTecnicos(e) ? `  ${lineaTecnicos(e)}` : '',
       e.descripcion?.trim() ? `  ${e.descripcion.trim().replace(/\r?\n/g, '\n  ')}` : '',
@@ -272,9 +289,7 @@ export function bitacoraATextoPlano({ turno, eventos: todos, tecnicos, planta, o
   ]
     .filter(Boolean)
     .join('\n')
-  const resumen =
-    `${r.eventos} eventos · ${formatoMinutos(r.minutosParada)} ${etiquetaParada(r)} · MTTR ${r.mttrMin == null ? '—' : formatoMinutos(r.mttrMin)} · ${r.enVentana} sin detener producción · ${r.pendientesDelTurno} ${etiquetaPendientes(r)}` +
-    (r.pendientesCerrados > 0 ? ` · ${r.pendientesCerrados} pendientes cerrados` : '')
+  const resumen = lineaResumen(r)
   // Bloques separados por una línea en blanco: pegado en un correo sin formato
   // cada evento se lee aparte.
   return [
