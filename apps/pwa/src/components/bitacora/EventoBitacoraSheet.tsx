@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { AlertTriangle, ImagePlus, Loader2, RotateCw, Trash2, X } from 'lucide-react'
+import { AlertTriangle, Check, ImagePlus, Loader2, RotateCw, Trash2, Users, X } from 'lucide-react'
 import { Button, Sheet } from '@/components/piel'
 import { useToast } from '@/hooks/useToast'
 import {
+  AUTOGUARDADO_MS,
   ETIQUETA_FOTO,
   IMPACTOS,
   MAX_FOTOS_EVENTO,
@@ -15,9 +16,23 @@ import type {
   EventoBitacoraDatos,
   FotoEvento,
   ImpactoEvento,
+  PresenciaBitacora,
   TipoEvento,
   TurnoMantencion,
 } from '@/services/bitacora/bitacora.types'
+import {
+  aFormulario,
+  camposACambiar,
+  ETIQUETA_CAMPO as NOMBRE_CAMPO,
+  fusionarFormulario,
+  mismaLista,
+  tieneContenido,
+  type CampoFormulario,
+  type CamposFormulario,
+} from '@/services/bitacora/borradores'
+import { NOMBRE_DISPOSITIVO } from '@/services/bitacora/presencia'
+import { auth } from '@/services/firebase'
+import { useAuthStore } from '@/store'
 import { autorVisible } from '@/services/bitacora/bitacora.types'
 import { copiaDeOrigen, etiquetaCortaTurno } from '@/services/bitacora/entregaTurno'
 import { borrarFotoOEncolar, subirFotoBitacora } from '@/services/bitacora/fotosBitacora'
@@ -26,7 +41,7 @@ import { SelectorParticipantes } from './SelectorParticipantes'
 import { BuscadorEquipo } from './BuscadorEquipo'
 import type { OpcionEquipo } from '@/services/bitacora/buscarEquipos'
 import { tecnicoRecordado } from './tecnicoRecordado'
-import { formatoMinutos, horaSugeridaParaEvento, minutosEntre } from '@/services/bitacora/turnoMantencion'
+import { formatoMinutos, horaDe, horaSugeridaParaEvento, minutosEntre } from '@/services/bitacora/turnoMantencion'
 
 interface Subida {
   clave: string
@@ -54,6 +69,13 @@ export interface EventoBitacoraSheetProps {
   onBorrar: (evento: EventoBitacora) => Promise<void>
   /** Si viene de «Resolver»: el pendiente de un turno anterior que este evento cierra. */
   pendienteOrigen?: EventoBitacora | null
+  /**
+   * El MISMO evento tal como está ahora en el servidor (cambia en vivo). Con él
+   * se incorporan los cambios de otro equipo mientras la hoja está abierta.
+   */
+  eventoVivo?: EventoBitacora | null
+  /** Otros equipos que tienen este evento abierto ahora. */
+  otrosEditando?: readonly PresenciaBitacora[]
   onClose: () => void
 }
 
@@ -61,6 +83,18 @@ const CLAVE_RECIENTES = 'bitacora.equiposRecientes.v1'
 const SIN_SENAL = 'Sin señal. Se sube sola cuando vuelva la conexión.'
 /** Fotos que se procesan a la vez (ver `subirEnTanda`). */
 const LOTE_SUBIDA = 2
+
+/** Resumen comparable de lo que hay en pantalla: si no cambió, no se guarda de nuevo. */
+function firmaDe(
+  campos: CamposFormulario,
+  quien: string,
+  participantes: readonly string[],
+  fotos: readonly FotoEvento[],
+): string {
+  return JSON.stringify([campos, quien, participantes, fotos.map((f) => f.path)])
+}
+
+const HORA_VALIDA = /^\d{2}:\d{2}$/
 
 function leerRecientes(): string[] {
   try {
@@ -119,6 +153,8 @@ export function EventoBitacoraSheet({
   onBorrar,
   onClose,
   pendienteOrigen = null,
+  eventoVivo = null,
+  otrosEditando = [],
 }: EventoBitacoraSheetProps) {
   const { toast } = useToast()
   const esNuevo = !evento
@@ -159,6 +195,48 @@ export function EventoBitacoraSheet({
   const tecnicosRef = useRef(tecnicos)
   tecnicosRef.current = tecnicos
 
+  // ── Borrador que se guarda solo (mockup aprobado 16-09-2026) ──
+  /** ¿El documento ya existe en la bitácora? (un evento nuevo, recién al primer autoguardado). */
+  const existeEnServidor = useRef(false)
+  /** Lo creó ESTA hoja: mientras sea borrador, «quién registra» se puede cambiar. */
+  const creadoAqui = useRef(false)
+  /** Última versión conocida del servidor, para la fusión campo por campo. */
+  const base = useRef<CamposFormulario | null>(null)
+  /** Fotos que el servidor tiene (para guardar solo los cambios). */
+  const fotosServidor = useRef<FotoEvento[]>([])
+  /** Firma de lo último guardado: si la pantalla no cambió, no se escribe. */
+  const ultimaFirma = useRef('')
+  /** Se vio el documento vivo al menos una vez (para saber si lo borraron afuera). */
+  const vistoVivo = useRef(false)
+  const remotoConflicto = useRef<CamposFormulario | null>(null)
+  const [guardadoEn, setGuardadoEn] = useState<Date | null>(null)
+  const [porGuardar, setPorGuardar] = useState(false)
+  const [conflictos, setConflictos] = useState<CampoFormulario[]>([])
+  const [eliminadoAfuera, setEliminadoAfuera] = useState(false)
+  /** Participantes y autor tal como están en el servidor (para escribir solo lo cambiado). */
+  const participantesBase = useRef<string[]>([])
+  const quienBase = useRef('')
+  /**
+   * Se abrió como borrador (nuevo o sin publicar): se guarda SOLO y «Cerrar»
+   * guarda. Se decide al abrir y no cambia aunque otro lo publique: antes el
+   * mismo botón pasaba de «Cerrar» a «Cancelar» y descartaba lo tecleado
+   * (revisión 16-09).
+   */
+  const [autoguarda, setAutoguarda] = useState(false)
+  const estadoVivo = eventoVivo?.estado ?? evento?.estado
+  const publicadoAfuera = autoguarda && Boolean(eventoVivo) && eventoVivo?.estado !== 'borrador'
+  /** Todavía sin publicar: el botón principal es «Listo». */
+  const modoBorrador = autoguarda && !publicadoAfuera
+  const usuario = useAuthStore((s) => s.user)
+  const actual = eventoVivo ?? evento
+  // Eliminar: quien lo creó o un supervisor (como la regla). Con la cuenta
+  // compartida, todos cuentan como quien lo creó.
+  const puedeEliminar =
+    (!actual && existeEnServidor.current) ||
+    actual?.creadoPor === auth.currentUser?.uid ||
+    usuario?.rol === 'admin' ||
+    usuario?.rol === 'supervisor'
+
   // Cargar el formulario cada vez que se abre (nuevo o edición).
   useEffect(() => {
     if (!open) return
@@ -166,7 +244,8 @@ export function EventoBitacoraSheet({
     // El nombre recordado solo vale si sigue en la lista (pudo corregirse o quitarse).
     const recordado = tecnicoRecordado()
     const lista = tecnicosRef.current.todos
-    setQuien(lista.length === 0 || lista.includes(recordado) ? recordado : '')
+    const quienInicial = lista.length === 0 || lista.includes(recordado) ? recordado : ''
+    setQuien(quienInicial)
     setParticipantes(evento?.participantes ?? [])
     // «Resolver pendiente»: el equipo, su vínculo y el tipo vienen del pendiente original.
     setEquipoId(evento?.equipoId ?? pendienteOrigen?.equipoId ?? null)
@@ -188,9 +267,226 @@ export function EventoBitacoraSheet({
     subidasNuevas.current = []
     quitadas.current = []
     descartadas.current = new Set()
+    const inicial: CamposFormulario = evento
+      ? aFormulario(evento)
+      : {
+          tipo: pendienteOrigen?.tipo ?? 'falla',
+          equipo: pendienteOrigen?.equipo ?? '',
+          equipoId: pendienteOrigen?.equipoId ?? null,
+          descripcion: '',
+          horaInicio: horaSugeridaParaEvento(turno),
+          horaTermino: '',
+          impacto: 'no-aplica',
+          minutos: '',
+          ventana: '',
+          pendiente: false,
+        }
+    existeEnServidor.current = Boolean(evento)
+    creadoAqui.current = false
+    setAutoguarda(!evento || evento.estado === 'borrador')
+    participantesBase.current = evento?.participantes ?? []
+    quienBase.current = quienInicial
+    vistoVivo.current = Boolean(evento)
+    base.current = inicial
+    fotosServidor.current = evento?.fotos ?? []
+    ultimaFirma.current = firmaDe(inicial, quienInicial, evento?.participantes ?? [], evento?.fotos ?? [])
+    remotoConflicto.current = null
+    setGuardadoEn(null)
+    setPorGuardar(false)
+    setConflictos([])
+    setEliminadoAfuera(false)
   }, [open, evento, turno, pendienteOrigen])
 
   const duracion = minutosEntre(horaInicio, horaTermino || null)
+
+  const formularioActual = (): CamposFormulario => ({
+    tipo,
+    equipo,
+    equipoId,
+    descripcion,
+    horaInicio,
+    horaTermino,
+    impacto,
+    minutos,
+    ventana,
+    pendiente,
+  })
+  const firmaActual = firmaDe(formularioActual(), quien, participantes, fotos)
+
+  const aplicarFormulario = (v: CamposFormulario, previo: CamposFormulario) => {
+    if (v.tipo !== previo.tipo) setTipo(v.tipo)
+    if (v.equipo !== previo.equipo) setEquipo(v.equipo)
+    if (v.equipoId !== previo.equipoId) setEquipoId(v.equipoId)
+    if (v.descripcion !== previo.descripcion) setDescripcion(v.descripcion)
+    if (v.horaInicio !== previo.horaInicio) setHoraInicio(v.horaInicio)
+    if (v.horaTermino !== previo.horaTermino) setHoraTermino(v.horaTermino)
+    if (v.impacto !== previo.impacto) setImpacto(v.impacto)
+    if (v.minutos !== previo.minutos) setMinutos(v.minutos)
+    if (v.ventana !== previo.ventana) setVentana(v.ventana)
+    if (v.pendiente !== previo.pendiente) setPendiente(v.pendiente)
+  }
+
+  const armarDatos = (estado: 'borrador' | 'listo', crear: boolean): EventoBitacoraDatos => {
+    const minutosNum = minutos.trim() === '' ? null : Number(minutos)
+    const minutosValidos = minutosNum != null && Number.isFinite(minutosNum) && minutosNum >= 0 && minutosNum <= 1440
+    return {
+      tipo,
+      equipo,
+      descripcion,
+      horaInicio,
+      horaTermino: horaTermino || null,
+      impacto,
+      minutosParada: minutosValidos ? minutosNum : null,
+      ventana: ventana || null,
+      pendiente,
+      fotos,
+      fotosAntes: fotosServidor.current,
+      cierreAntes: (eventoVivo ?? evento)?.cierre ?? null,
+      quien,
+      resuelvePendiente: pendienteOrigen ? copiaDeOrigen(pendienteOrigen) : null,
+      // Quien registra no se repite como participante (pudo quedar marcado antes de elegirlo).
+      participantes: participantes.filter(
+        (p) => p.trim().toLowerCase() !== (esNuevo ? quien : (evento?.registradoPor ?? quien)).trim().toLowerCase(),
+      ),
+      equipoId,
+      estado,
+      // El autor se ajusta solo en un borrador creado aquí y solo si cambió
+      // (la regla no deja tocarlo en uno publicado).
+      fijarAutor: !crear && creadoAqui.current && quien.trim() !== quienBase.current.trim() && estadoVivo === 'borrador',
+      camposCambiados: crear
+        ? undefined
+        : camposACambiar(base.current ?? formularioActual(), formularioActual(), participantesBase.current, participantes),
+    }
+  }
+
+  /** Lo guardado pasa a ser la nueva referencia. */
+  const marcarGuardado = () => {
+    base.current = formularioActual()
+    participantesBase.current = participantes
+    quienBase.current = quien
+    fotosServidor.current = fotos
+    ultimaFirma.current = firmaActual
+  }
+
+  /**
+   * Guarda el borrador tal como está. No espera al servidor (la escritura queda
+   * en el teléfono y se sube sola). Abrir y cerrar sin escribir no crea nada.
+   */
+  const guardarBorradorAhora = () => {
+    if (!autoguarda || eliminadoAfuera) return
+    // Sin hora de inicio la regla rechaza el documento: no se intenta (se avisa arriba).
+    if (!HORA_VALIDA.test(horaInicio)) return
+    const crear = !existeEnServidor.current
+    const datos = armarDatos('borrador', crear)
+    if (crear && !tieneContenido(datos)) return
+    const cambiaronFotos = !mismaLista(
+      fotos.map((f) => f.path),
+      fotosServidor.current.map((f) => f.path),
+    )
+    // Abrir, mirar y cerrar no escribe nada: sin señal, esa escritura vacía
+    // quedaba en cola con una copia vieja del evento (revisión 16-09).
+    if (!crear && !datos.camposCambiados?.length && !cambiaronFotos && !datos.fijarAutor) {
+      ultimaFirma.current = firmaActual
+      setPorGuardar(false)
+      return
+    }
+    void onGuardar(eventoId, datos, crear).catch((e: unknown) => {
+      // Si la creación falló, el documento NO existe: el próximo intento vuelve
+      // a crearlo en vez de actualizar algo que no está (revisión 16-09).
+      if (crear) {
+        existeEnServidor.current = false
+        creadoAqui.current = false
+        ultimaFirma.current = ''
+      }
+      setError(e instanceof Error ? e.message : 'No se pudo guardar el borrador.')
+    })
+    if (crear) creadoAqui.current = true
+    existeEnServidor.current = true
+    marcarGuardado()
+    // Las fotos ya son del borrador: cerrar la hoja NO las borra.
+    subidasNuevas.current = []
+    quitadas.current = []
+    setGuardadoEn(new Date())
+    setPorGuardar(false)
+  }
+  const guardarBorradorRef = useRef(guardarBorradorAhora)
+  guardarBorradorRef.current = guardarBorradorAhora
+
+  // Autoguardado: una pausa sin cambios y se guarda.
+  useEffect(() => {
+    if (!open || !autoguarda) return
+    if (firmaActual === ultimaFirma.current) {
+      setPorGuardar(false)
+      return
+    }
+    setPorGuardar(true)
+    const t = setTimeout(() => guardarBorradorRef.current(), AUTOGUARDADO_MS)
+    return () => clearTimeout(t)
+  }, [firmaActual, open, autoguarda])
+
+  // Lo que llega de OTRO equipo mientras la hoja está abierta se incorpora
+  // campo por campo: si no toqué ese campo, se adopta; si los dos lo cambiamos
+  // distinto, queda lo mío y se avisa (nadie pisa en silencio al otro).
+  useEffect(() => {
+    if (!open) return
+    if (!eventoVivo) {
+      if (vistoVivo.current && existeEnServidor.current) setEliminadoAfuera(true)
+      return
+    }
+    vistoVivo.current = true
+    existeEnServidor.current = true
+    setEliminadoAfuera(false)
+    const previo = base.current
+    if (!previo) return
+    const local = formularioActual()
+    const limpio = firmaActual === ultimaFirma.current
+    const remoto = aFormulario(eventoVivo)
+    const f = fusionarFormulario(previo, local, remoto)
+    base.current = f.base
+    if (f.conflictos.length) {
+      remotoConflicto.current = remoto
+      setConflictos((c) => [...new Set([...c, ...f.conflictos])])
+    }
+    aplicarFormulario(f.valores, local)
+    // Fotos: las que agregó o quitó el otro.
+    const remotas = eventoVivo.fotos ?? []
+    const llegaron = remotas.filter((r) => !fotosServidor.current.some((a) => a.path === r.path))
+    const seFueron = fotosServidor.current.filter((a) => !remotas.some((r) => r.path === a.path))
+    let fotosNuevas = fotos
+    if (llegaron.length || seFueron.length) {
+      fotosNuevas = [
+        ...fotos.filter((p) => !seFueron.some((q) => q.path === p.path)),
+        ...llegaron.filter((n) => !fotos.some((p) => p.path === n.path)),
+      ]
+      setFotos(fotosNuevas)
+    }
+    fotosServidor.current = remotas
+    // Participantes: los del otro se adoptan si yo no toqué la lista.
+    const remotosP = eventoVivo.participantes ?? []
+    let participantesNuevos = participantes
+    if (!mismaLista(remotosP, participantesBase.current)) {
+      if (mismaLista(participantes, participantesBase.current)) {
+        participantesNuevos = remotosP
+        setParticipantes(remotosP)
+      }
+      participantesBase.current = remotosP
+    }
+    // Si no había nada mío sin guardar, lo recién llegado NO es un cambio mío:
+    // no se reescribe lo mismo que el otro acaba de guardar.
+    if (limpio && !f.conflictos.length) ultimaFirma.current = firmaDe(f.valores, quien, participantesNuevos, fotosNuevas)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo cuando cambia el documento vivo
+  }, [eventoVivo, open])
+
+  const usarLaSuya = () => {
+    const remoto = remotoConflicto.current
+    if (!remoto) return
+    const local = formularioActual()
+    const v = { ...local }
+    for (const c of conflictos) (v as unknown as Record<string, unknown>)[c] = remoto[c]
+    if (conflictos.includes('equipo')) v.equipoId = remoto.equipoId
+    aplicarFormulario(v, local)
+    setConflictos([])
+  }
   const equiposSugeridos = useMemo(() => {
     const vistos = new Set<string>()
     return [...sugerenciasEquipo, ...(open ? leerRecientes() : [])].filter((e) => {
@@ -298,14 +594,47 @@ export function EventoBitacoraSheet({
     onClose()
   }
 
+  /** Borrador: cerrar GUARDA (se sigue en otro equipo). Publicado: cancela. */
+  const cerrarHoja = () => {
+    if (!autoguarda) {
+      cancelar()
+      return
+    }
+    // TODAS las que no están guardadas, también las que fallaron por falta de
+    // señal: esos archivos no están en ningún otro lado (revisión 16-09).
+    if (subidas.length > 0 && !confirmarSinFotos) {
+      setConfirmarSinFotos(true)
+      setError(
+        `${subidas.length === 1 ? 'Una foto no se ha subido' : `${subidas.length} fotos no se han subido`}. ` +
+          'Si cierras ahora se pierden: espera la señal o toca Cerrar otra vez.',
+      )
+      return
+    }
+    guardarBorradorAhora()
+    sesion.current++
+    // Lo que no alcanzó a entrar al borrador (nada con contenido) se limpia.
+    subidasNuevas.current.forEach((p) => void borrarFotoOEncolar(p))
+    subidasNuevas.current = []
+    onClose()
+  }
+
+  const autoguardaRef = useRef(autoguarda)
+  autoguardaRef.current = autoguarda
+  const abiertaRef = useRef(open)
+  abiertaRef.current = open
+
   // Irse de la pantalla sin tocar Cancelar ni Guardar (lo llaman por radio y
   // toca otra pestaña) dejaba las fotos ya subidas sin dueño: ningún documento
   // las menciona y nadie las puede encontrar después (revisión 15-09). Se anotan
   // para borrarlas; la cola sobrevive incluso a que se cierre la app.
   useEffect(() => {
     // Lee el ref al DESMONTAR: si el evento se guardó, `guardar` ya lo vació y
-    // aquí no queda nada que borrar.
+    // aquí no queda nada que borrar. Un borrador abierto, en cambio, se GUARDA:
+    // irse de la pantalla no puede perder lo escrito.
     return () => {
+      if (autoguardaRef.current && abiertaRef.current) guardarBorradorRef.current()
+      // Lo que termine de subir después ya no tiene hoja: se borra solo.
+      sesion.current++
       subidasNuevas.current.forEach((p) => void borrarFotoOEncolar(p))
     }
   }, [])
@@ -357,37 +686,17 @@ export function EventoBitacoraSheet({
       setConfirmarSinFotos(true)
       setError(
         `${sinSubir === 1 ? 'Una foto aún no se sube' : `${sinSubir} fotos aún no se suben`}. ` +
-          'Espera o toca Guardar otra vez para guardar sin ellas.',
+          `Espera o toca ${modoBorrador ? 'Listo' : 'Guardar'} otra vez para seguir sin ellas.`,
       )
       return
     }
     setGuardando(true)
+    const publicando = modoBorrador
+    // Si nunca se vio el documento en la bitácora (la creación pudo fallar), se
+    // crea completo en vez de actualizar algo que no existe (revisión 16-09).
+    const crear = !existeEnServidor.current || !vistoVivo.current
     try {
-      await onGuardar(
-        eventoId,
-        {
-          tipo,
-          equipo,
-          descripcion,
-          horaInicio,
-          horaTermino: horaTermino || null,
-          impacto,
-          minutosParada: minutosNum != null && Number.isFinite(minutosNum) ? minutosNum : null,
-          ventana: ventana || null,
-          pendiente,
-          fotos,
-          fotosAntes: evento?.fotos ?? [],
-          cierreAntes: evento?.cierre ?? null,
-          quien,
-          // Quien registra no se repite como participante (pudo quedar marcado antes de elegirlo).
-          resuelvePendiente: pendienteOrigen && esNuevo ? copiaDeOrigen(pendienteOrigen) : null,
-          participantes: participantes.filter(
-            (p) => p.trim().toLowerCase() !== (esNuevo ? quien : (evento?.registradoPor ?? quien)).trim().toLowerCase(),
-          ),
-          equipoId,
-        },
-        esNuevo,
-      )
+      await onGuardar(eventoId, armarDatos('listo', crear), crear)
       recordarEquipo(equipo)
       // Lo que seguía subiendo ya no entra en este evento (se borra al terminar).
       sesion.current++
@@ -395,7 +704,7 @@ export function EventoBitacoraSheet({
       // Las fotos quitadas las borra el hook DESPUÉS del OK del servidor.
       quitadas.current = []
       toast({
-        title: esNuevo ? 'Evento agregado' : 'Evento actualizado',
+        title: publicando ? 'Evento publicado' : esNuevo ? 'Evento agregado' : 'Evento actualizado',
         description: navigator.onLine ? undefined : 'Quedó guardado en el teléfono; se sube cuando haya señal.',
         variant: 'success',
       })
@@ -408,7 +717,12 @@ export function EventoBitacoraSheet({
   }
 
   const borrar = async () => {
-    if (!evento) return
+    const actual = eventoVivo ?? evento
+    if (!actual) {
+      // Borrador que nunca llegó a guardarse: solo se limpian sus fotos.
+      cancelar()
+      return
+    }
     if (!confirmarBorrado) {
       setConfirmarBorrado(true)
       return
@@ -416,8 +730,11 @@ export function EventoBitacoraSheet({
     setGuardando(true)
     try {
       subidasNuevas.current.forEach((p) => void borrarFotoOEncolar(p))
-      await onBorrar(evento)
-      toast({ title: 'Evento borrado' })
+      subidasNuevas.current = []
+      sesion.current++
+      // Con las fotos que tenga AHORA (pudo agregarlas otro equipo).
+      await onBorrar({ ...actual, fotos: [...new Map([...(actual.fotos ?? []), ...fotos].map((f) => [f.path, f])).values()] })
+      toast({ title: modoBorrador ? 'Borrador descartado' : 'Evento borrado' })
       onClose()
     } catch {
       setError('No se pudo borrar. Solo quien lo creó o un supervisor puede borrarlo.')
@@ -430,16 +747,28 @@ export function EventoBitacoraSheet({
   return (
     <Sheet
       open={open}
-      onClose={cancelar}
-      title={pendienteOrigen && esNuevo ? 'Resolver pendiente' : esNuevo ? 'Nuevo evento' : 'Editar evento'}
+      onClose={cerrarHoja}
+      title={
+        pendienteOrigen && esNuevo
+          ? 'Resolver pendiente'
+          : esNuevo
+            ? 'Nuevo evento'
+            : modoBorrador
+              ? 'Continuar borrador'
+              : 'Editar evento'
+      }
       actions={
         <>
-          <Button variant="tinted" onClick={cancelar} disabled={guardando}>
-            Cancelar
+          <Button variant="tinted" onClick={cerrarHoja} disabled={guardando}>
+            {modoBorrador ? 'Cerrar' : 'Cancelar'}
           </Button>
-          <Button onClick={guardar} disabled={guardando}>
+          <Button onClick={guardar} disabled={guardando || eliminadoAfuera}>
             {guardando ? <Loader2 className="animate-spin" /> : null}
-            {subiendo ? 'Subiendo fotos…' : pendienteOrigen && esNuevo ? 'Guardar y cerrar pendiente' : 'Guardar'}
+            {subiendo
+              ? 'Subiendo fotos…'
+              : modoBorrador
+                ? (pendienteOrigen || (eventoVivo ?? evento)?.resuelvePendiente) ? 'Listo y cerrar pendiente' : 'Listo'
+                : 'Guardar'}
           </Button>
         </>
       }
@@ -447,6 +776,98 @@ export function EventoBitacoraSheet({
       {/* `[&>*]:shrink-0`: en un flex vertical con alto acotado, un hijo con
           overflow-x (la fila de tipos) se encoge a 0 px y desaparece. */}
       <div className="-mx-6 flex max-h-[min(68vh,640px)] flex-col gap-5 overflow-y-auto px-6 pb-1 [&>*]:shrink-0">
+        {/* Estado del borrador: que se vea que no hay que tocar nada para guardar. */}
+        {autoguarda && (
+          <p className="-mt-2 flex items-center gap-1.5 text-footnote text-muted-foreground" role="status" aria-live="polite">
+            {!HORA_VALIDA.test(horaInicio) ? (
+              <span className="font-semibold text-ink-warn">Falta la hora de inicio: sin ella no se puede guardar.</span>
+            ) : porGuardar ? (
+              <>
+                <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden /> Guardando borrador…
+              </>
+            ) : guardadoEn ? (
+              <>
+                <Check className="size-3.5 text-ink-ok" aria-hidden />
+                <span>
+                  Borrador guardado · <span className="tabular-nums">{horaDe(guardadoEn)}</span> · el turno lo ve
+                </span>
+              </>
+            ) : existeEnServidor.current ? (
+              'Borrador en la bitácora · lo que cambies se guarda solo'
+            ) : (
+              'Se guarda solo mientras escribes'
+            )}
+          </p>
+        )}
+
+        {otrosEditando.length > 0 && (
+          <div className="flex items-start gap-2.5 rounded-ctl bg-muted-foreground/10 px-3 py-2.5">
+            <Users className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
+            <p className="text-footnote">
+              <span className="font-semibold">
+                {otrosEditando.map((p) => `${p.nombre} (${NOMBRE_DISPOSITIVO[p.dispositivo]})`).join(', ')}
+              </span>{' '}
+              {otrosEditando.length === 1 ? 'también tiene' : 'también tienen'} abierto este evento. Lo que cambie aparece aquí
+              al instante; si los dos cambian lo mismo, se avisa.
+            </p>
+          </div>
+        )}
+
+        {conflictos.length > 0 && (
+          <div role="alert" className="flex flex-col gap-2 rounded-ctl bg-muted-foreground/10 px-3 py-2.5">
+            <p className="text-footnote font-semibold text-ink-warn">
+              Otro equipo cambió {conflictos.map((c) => NOMBRE_CAMPO[c]).join(', ')} mientras tú también lo cambiabas.
+            </p>
+            {conflictos.includes('descripcion') && remotoConflicto.current?.descripcion && (
+              <p className="line-clamp-4 whitespace-pre-line text-footnote text-muted-foreground">
+                Su versión: «{remotoConflicto.current.descripcion}»
+              </p>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <Button variant="tinted" size="sm" onClick={usarLaSuya}>
+                Usar la suya
+              </Button>
+              <Button variant="plain" size="sm" onClick={() => setConflictos([])}>
+                Mantener la mía
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {eliminadoAfuera && (
+          <div role="alert" className="rounded-ctl bg-muted-foreground/10 px-3 py-2.5">
+            <p className="text-footnote font-semibold text-ink-warn">Este evento ya no está en la bitácora.</p>
+            <p className="text-footnote text-muted-foreground">
+              Lo borraron en otro equipo o el servidor no lo aceptó. Lo que tienes en pantalla no se guardó; sus fotos ya no
+              están.
+            </p>
+            <Button
+              variant="tinted"
+              size="sm"
+              className="mt-2"
+              onClick={() => {
+                // Las fotos se borraron junto con el evento: recrearlo con ellas
+                // dejaba enlaces rotos (revisión 16-09).
+                setFotos([])
+                fotosServidor.current = []
+                existeEnServidor.current = false
+                vistoVivo.current = false
+                creadoAqui.current = false
+                setEliminadoAfuera(false)
+                ultimaFirma.current = ''
+              }}
+            >
+              Volver a crearlo con lo que tengo
+            </Button>
+          </div>
+        )}
+
+        {publicadoAfuera && (
+          <p className="rounded-ctl bg-muted-foreground/10 px-3 py-2.5 text-footnote">
+            <span className="font-semibold">Otro equipo ya lo publicó.</span> Lo que cambies se sigue guardando solo.
+          </p>
+        )}
+
         {pendienteOrigen && esNuevo && (
           <div className="rounded-ctl bg-muted-foreground/10 px-3 py-2.5">
             <p className="text-footnote font-semibold text-ink-warn">
@@ -462,14 +883,16 @@ export function EventoBitacoraSheet({
         {tecnicos.todos.length > 0 && (
           <div>
             <SelectorTecnico
-              etiqueta={esNuevo ? 'Quién registra' : 'Quién edita'}
+              etiqueta={esNuevo ? 'Quién registra' : modoBorrador ? 'Quién continúa' : 'Quién edita'}
               deTurno={tecnicos.deTurno}
               todos={tecnicos.todos}
               valor={quien}
               onChange={setQuien}
             />
             {!esNuevo && evento && (
-              <p className="mt-1.5 text-footnote text-muted-foreground">Registró: {autorVisible(evento)}</p>
+              <p className="mt-1.5 text-footnote text-muted-foreground">
+                {modoBorrador ? 'Lo empezó' : 'Registró'}: {autorVisible(evento)}
+              </p>
             )}
           </div>
         )}
@@ -674,9 +1097,26 @@ export function EventoBitacoraSheet({
           </p>
         )}
 
-        {!esNuevo && (
+        {modoBorrador && (
+          <p className="text-footnote text-muted-foreground">
+            Puedes cerrar y seguir en el PC: el borrador queda en la bitácora del turno. No cuenta en los números ni sale en
+            el correo hasta que toques <span className="font-semibold text-foreground">Listo</span>.
+          </p>
+        )}
+
+        {(!esNuevo || existeEnServidor.current) && !puedeEliminar && (
+          <p className="text-footnote text-muted-foreground">
+            {modoBorrador ? 'Descartarlo' : 'Borrarlo'} solo puede quien lo empezó o un supervisor.
+          </p>
+        )}
+        {(!esNuevo || existeEnServidor.current) && puedeEliminar && (
           <Button variant="destructive" onClick={borrar} disabled={guardando} className="self-start">
-            <Trash2 /> {confirmarBorrado ? 'Toca de nuevo para borrar' : 'Borrar evento'}
+            <Trash2 />{' '}
+            {confirmarBorrado
+              ? 'Toca de nuevo para confirmar'
+              : modoBorrador
+                ? 'Descartar borrador'
+                : 'Borrar evento'}
           </Button>
         )}
       </div>

@@ -68,6 +68,15 @@ export interface FotoEvento {
   alto?: number
 }
 
+/**
+ * `borrador` = se está escribiendo: lo ve todo el turno (marcado «En
+ * redacción») pero NO cuenta en los números, el correo, el PDF ni la entrega de
+ * turno hasta que alguien toca «Listo». Sin campo = `listo` (eventos anteriores).
+ */
+export type EstadoEvento = 'borrador' | 'listo'
+
+export type DispositivoBitacora = 'celular' | 'pc'
+
 export interface EventoBitacora {
   id: string
   plantId: string
@@ -108,8 +117,27 @@ export interface EventoBitacora {
   /** En el evento que RESUELVE un pendiente de un turno anterior: de cuál. */
   resuelvePendiente?: OrigenPendiente | null
   actualizadoPorNombre?: string
+  estado?: EstadoEvento
+  /** Desde dónde se hizo el último cambio («desde el celular de Danilo»). */
+  dispositivo?: DispositivoBitacora
   createdAt?: Timestamp | null
   updatedAt?: Timestamp | null
+}
+
+/** Un dispositivo con la bitácora de un turno abierta ahora. */
+export interface PresenciaBitacora {
+  id: string
+  plantId: string
+  turnoId: string
+  dispositivoId: string
+  dispositivo: DispositivoBitacora
+  /** Técnico elegido en ese teléfono o, si no eligió, el nombre de la cuenta. */
+  nombre: string
+  /** Evento que tiene abierto en la hoja (o el id reservado de uno nuevo). */
+  editandoEventoId: string | null
+  /** Último latido, en milisegundos del SERVIDOR. */
+  vistoEnMs: number | null
+  uid: string
 }
 
 /** Lo que el formulario entrega para crear o editar un evento. */
@@ -134,6 +162,18 @@ export type EventoBitacoraDatos = Pick<
   resuelvePendiente?: OrigenPendiente | null
   /** Al editar: el cierre que tenía el evento al abrirlo (para poder reabrirlo). */
   cierreAntes?: CierrePendiente | null
+  /** `borrador` = autoguardado mientras se escribe; `listo` (o ausente) = publicado. */
+  estado?: EstadoEvento
+  /**
+   * Borrador creado por esta misma hoja: «quién registra» todavía se puede
+   * cambiar (se eligió el nombre después de empezar a escribir).
+   */
+  fijarAutor?: boolean
+  /**
+   * Al actualizar: SOLO estos campos del documento se escriben (los que
+   * cambiaron en esta pantalla). Sin el dato, se escriben todos.
+   */
+  camposCambiados?: readonly string[]
   /** Al crear: quién registra. Al editar: quién edita (queda en actualizadoPorNombre). */
   quien: string
 }

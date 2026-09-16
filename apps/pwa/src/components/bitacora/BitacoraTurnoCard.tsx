@@ -4,6 +4,7 @@ import { Plus } from 'lucide-react'
 import { Button, Pill } from '@/components/piel'
 import { useBitacoraTurno, useTurnoMantencionActual } from '@/hooks/useBitacoraTurno'
 import { resumirBitacora } from '@/services/bitacora/resumenBitacora'
+import { esBorrador, soloListos } from '@/services/bitacora/borradores'
 import { etiquetaTurno, formatoMinutos, horarioTurno } from '@/services/bitacora/turnoMantencion'
 
 /**
@@ -26,7 +27,9 @@ export function BitacoraTurnoCard({
   const ver = alVer ?? (() => navigate('/bitacora'))
   const agregar = alAgregar ?? (() => navigate('/bitacora?nuevo=1'))
   const r = useMemo(() => resumirBitacora(eventos), [eventos])
-  const ultimo = eventos[eventos.length - 1]
+  const publicados = useMemo(() => soloListos(eventos), [eventos])
+  const enRedaccion = eventos.filter(esBorrador).length
+  const ultimo = publicados[publicados.length - 1]
 
   return (
     <section className="flex flex-col gap-3 rounded-card bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none" aria-label="Bitácora del turno">
@@ -54,10 +57,16 @@ export function BitacoraTurnoCard({
         </div>
       </div>
 
-      {ultimo && (
+      {(ultimo || enRedaccion > 0) && (
         <p className="truncate text-footnote text-muted-foreground">
-          Último: <span className="text-foreground tabular-nums">{ultimo.horaInicio}</span>
-          {ultimo.equipo ? <span className="text-foreground"> · {ultimo.equipo}</span> : null}
+          {ultimo && (
+            <>
+              Último: <span className="text-foreground tabular-nums">{ultimo.horaInicio}</span>
+              {ultimo.equipo ? <span className="text-foreground"> · {ultimo.equipo}</span> : null}
+            </>
+          )}
+          {ultimo && enRedaccion > 0 ? ' · ' : ''}
+          {enRedaccion > 0 ? `${enRedaccion} en redacción` : ''}
         </p>
       )}
 

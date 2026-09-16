@@ -1,5 +1,6 @@
 import type { EventoBitacora, TipoEvento, TurnoMantencion } from './bitacora.types'
 import { minutosDesdeInicioTurno, minutosEntre } from './turnoMantencion'
+import { soloListos } from './borradores'
 
 /**
  * Números del turno que salen en la cabecera de la bitácora, en el correo y en
@@ -56,7 +57,9 @@ export function fuePendiente(e: Pick<EventoBitacora, 'pendiente' | 'cierre'>): b
   return Boolean(e.pendiente || e.cierre)
 }
 
-export function resumirBitacora(eventos: readonly EventoBitacora[]): ResumenBitacora {
+export function resumirBitacora(todos: readonly EventoBitacora[]): ResumenBitacora {
+  // Un borrador se ve en la lista, pero no es un hecho del turno todavía.
+  const eventos = soloListos(todos)
   const porTipo: Record<TipoEvento, number> = { falla: 0, ajuste: 0, inspeccion: 0, preventivo: 0, novedad: 0 }
   const equipos = new Set<string>()
   let conParada = 0

@@ -1167,7 +1167,12 @@ service cloud.firestore {
           && d.turnoId is string && d.turnoId.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}_(dia|tarde|noche)$')
           && d.tipo in ['falla', 'ajuste', 'inspeccion', 'preventivo', 'novedad']
           && d.equipo is string && d.equipo.size() <= 120
-          && isNonEmptyString(d.descripcion, 1, 3000)
+          // Borrador (se guarda solo mientras se escribe, 16-09-2026): puede ir sin
+          // descripción todavía. Publicado (o sin campo, los de antes): la exige.
+          && d.get('estado', 'listo') in ['borrador', 'listo']
+          && ((d.get('estado', 'listo') == 'borrador' && d.descripcion is string && d.descripcion.size() <= 3000)
+              || isNonEmptyString(d.descripcion, 1, 3000))
+          && (!('dispositivo' in d) || d.dispositivo in ['celular', 'pc'])
           && d.horaInicio is string && d.horaInicio.matches('^[0-9]{2}:[0-9]{2}$')
           && (d.horaTermino == null || (d.horaTermino is string && d.horaTermino.matches('^[0-9]{2}:[0-9]{2}$')))
           && d.impacto in ['no-aplica', 'con-parada', 'en-ventana']
@@ -1191,12 +1196,39 @@ service cloud.firestore {
 
       allow update: if isActiveUser()
         && eventoValido(request.resource.data)
+        // Un evento publicado no vuelve a borrador (un autoguardado atrasado no
+        // puede sacarlo de los números ni del correo).
+        && !(resource.data.get('estado', 'listo') == 'listo' && request.resource.data.get('estado', 'listo') == 'borrador')
+        // Quién lo registró solo se ajusta mientras es borrador.
+        && (resource.data.get('estado', 'listo') == 'borrador'
+            || request.resource.data.get('registradoPor', null) == resource.data.get('registradoPor', null))
         && request.resource.data.creadoPor == resource.data.creadoPor
         && request.resource.data.turnoId == resource.data.turnoId
         && request.resource.data.plantId == resource.data.plantId;
 
       allow delete: if isActiveUser()
         && (resource.data.creadoPor == request.auth.uid || isSupervisor());
+    }
+
+    // Quién tiene la bitácora de un turno abierta ahora: un doc por dispositivo
+    // (`{plantId}_{turnoId}_{dispositivoId}`) con un latido por minuto. La hora la
+    // pone el SERVIDOR (los relojes de los teléfonos de planta no son confiables).
+    match /bitacoraPresencia/{docId} {
+      allow read: if isActiveUser();
+      allow create, update: if isActiveUser()
+        && request.resource.data.keys().hasOnly(['plantId', 'turnoId', 'dispositivoId', 'dispositivo', 'nombre', 'editandoEventoId', 'vistoEn', 'uid'])
+        && request.resource.data.plantId is string && request.resource.data.plantId.size() <= 40
+        && request.resource.data.turnoId is string
+        && request.resource.data.turnoId.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}_(dia|tarde|noche)$')
+        && request.resource.data.dispositivoId is string && request.resource.data.dispositivoId.matches('^[A-Za-z0-9_-]{8,40}$')
+        && docId == request.resource.data.plantId + '_' + request.resource.data.turnoId + '_' + request.resource.data.dispositivoId
+        && request.resource.data.dispositivo in ['celular', 'pc']
+        && request.resource.data.nombre is string && request.resource.data.nombre.size() <= 80
+        && (request.resource.data.editandoEventoId == null
+            || (request.resource.data.editandoEventoId is string && request.resource.data.editandoEventoId.size() <= 60))
+        && request.resource.data.vistoEn == request.time
+        && request.resource.data.uid == request.auth.uid;
+      allow delete: if isActiveUser();
     }
 
     // Datos del turno: un doc por turno `{plantId}_{turnoId}` con la observación

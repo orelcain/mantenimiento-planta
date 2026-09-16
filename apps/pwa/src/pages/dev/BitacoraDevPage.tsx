@@ -5,7 +5,7 @@ import type { FuenteBitacora } from '@/hooks/useBitacoraTurno'
 import { BITACORA_PLANTA } from '@/config/bitacora'
 import type { EventoBitacora, EventoBitacoraDatos, FotoEvento, TurnoMantencion } from '@/services/bitacora/bitacora.types'
 import { ordenarEventos } from '@/services/bitacora/resumenBitacora'
-import { fechaLocal, turnoAdyacente, turnoDesdeId, turnoMantencionEn } from '@/services/bitacora/turnoMantencion'
+import { fechaLocal, horaSugeridaParaEvento, turnoAdyacente, turnoDesdeId, turnoMantencionEn } from '@/services/bitacora/turnoMantencion'
 import { HistorialBitacoraVista } from '@/pages/HistorialBitacoraPage'
 import { fechaDesde, filasPorTurno, resumirPeriodo } from '@/services/bitacora/historialBitacora'
 import { AJUSTES_VACIOS, type AjustesTecnicos } from '@/services/bitacora/listaTecnicos'
@@ -119,6 +119,9 @@ function eventosDeEjemplo(turno: TurnoMantencion): EventoBitacora[] {
   ]
 }
 
+const BORRADOR_EJEMPLO = 'ejemplo-borrador-danilo'
+const NOVEDAD_EJEMPLO = { texto: 'Leandro Igor agregó un evento', en: Date.now() }
+
 // Las fotos de ejemplo se dibujan en canvas: generarlas una vez por turno, no
 // en cada render (si no, cambian de URL y parpadean).
 const cacheEjemplo = new Map<string, EventoBitacora[]>()
@@ -126,7 +129,33 @@ function ejemploDe(turno: TurnoMantencion): EventoBitacora[] {
   if (turno.id !== turnoMantencionEn().id) return []
   let lista = cacheEjemplo.get(turno.id)
   if (!lista) {
-    lista = eventosDeEjemplo(turno)
+    lista = [
+      ...eventosDeEjemplo(turno),
+      // Un borrador de otro técnico, para ver «En redacción» y «Continuar aquí».
+      {
+        id: BORRADOR_EJEMPLO,
+        plantId: BITACORA_PLANTA.id,
+        turnoId: turno.id,
+        fechaTurno: turno.fecha,
+        banda: turno.banda,
+        tipo: 'falla',
+        equipo: 'KNURO N1',
+        equipoId: null,
+        descripcion: 'Pusher con golpes irregulares, se revisa el disco de pul',
+        horaInicio: horaSugeridaParaEvento(turno),
+        horaTermino: null,
+        impacto: 'no-aplica',
+        minutosParada: null,
+        ventana: null,
+        pendiente: false,
+        fotos: [],
+        creadoPor: 'ejemplo',
+        autorNombre: 'mantencion.plantach',
+        registradoPor: 'Danilo Cortes',
+        estado: 'borrador',
+        dispositivo: 'celular',
+      },
+    ]
     cacheEjemplo.set(turno.id, lista)
   }
   return lista
@@ -155,11 +184,12 @@ function useEventosEjemplo(turno: TurnoMantencion) {
             registradoPor: quien,
           }),
           ...resto,
-          ...(esNuevo ? {} : { actualizadoPorNombre: quien }),
+          ...(esNuevo ? {} : datos.fijarAutor ? { registradoPor: quien } : { actualizadoPorNombre: quien }),
         }
-        return { ...prev, [turno.id]: esNuevo ? [...lista, evento] : lista.map((e) => (e.id === id ? evento : e)) }
+        // Un borrador se crea con el primer autoguardado: si no estaba, se agrega.
+        return { ...prev, [turno.id]: esNuevo || !previo ? [...lista, evento] : lista.map((e) => (e.id === id ? evento : e)) }
       })
-      if (esNuevo && datos.resuelvePendiente?.id) {
+      if (esNuevo && datos.resuelvePendiente?.id && datos.estado !== 'borrador') {
         cerradosEjemplo.add(datos.resuelvePendiente.id)
         avisarPendientes()
       }
@@ -180,6 +210,8 @@ function useEventosEjemplo(turno: TurnoMantencion) {
     error: null as string | null,
     sincronizando: false,
     ultimaSync: new Date(),
+    cambiosPorSubir: 0,
+    novedad: NOVEDAD_EJEMPLO,
     nuevoId: () => `nuevo-${Date.now()}`,
     guardar,
     borrar,
@@ -268,6 +300,19 @@ const NODOS_EJEMPLO: NodoJerarquia[] = [
 ]
 const OPCIONES_EJEMPLO = construirOpcionesEquipo(NODOS_EJEMPLO)
 
+/** Tres equipos conectados: este, el celular de Danilo escribiendo y el PC de Mantención. */
+function usePresenciaEjemplo(turno: TurnoMantencion, yo: { nombre: string; editandoEventoId: string | null }) {
+  const presentes = useMemo(
+    () => [
+      { id: 'yo', plantId: BITACORA_PLANTA.id, turnoId: turno.id, dispositivoId: 'yo-ejemplo', dispositivo: 'celular' as const, nombre: yo.nombre || 'Matias Serpa', editandoEventoId: yo.editandoEventoId, vistoEnMs: Date.now(), uid: 'ejemplo' },
+      { id: 'dc', plantId: BITACORA_PLANTA.id, turnoId: turno.id, dispositivoId: 'danilo-ejemplo', dispositivo: 'celular' as const, nombre: 'Danilo Cortes', editandoEventoId: BORRADOR_EJEMPLO, vistoEnMs: Date.now(), uid: 'ejemplo' },
+      { id: 'pc', plantId: BITACORA_PLANTA.id, turnoId: turno.id, dispositivoId: 'pc-ejemplo', dispositivo: 'pc' as const, nombre: 'PC de Mantención', editandoEventoId: null, vistoEnMs: Date.now(), uid: 'ejemplo' },
+    ],
+    [turno.id, yo.nombre, yo.editandoEventoId],
+  )
+  return { presentes, miDispositivoId: 'yo-ejemplo' }
+}
+
 const FUENTE_EJEMPLO: FuenteBitacora = {
   useEventos: useEventosEjemplo,
   useTecnicos: () => ({ deTurno: ['Danilo Cortes', 'Matias Serpa'], todos: PLANILLA }),
@@ -275,6 +320,7 @@ const FUENTE_EJEMPLO: FuenteBitacora = {
   useAjustes: useAjustesEjemplo,
   usePendientesAnteriores: usePendientesEjemplo,
   useOpcionesEquipo: () => ({ opciones: OPCIONES_EJEMPLO, cargando: false }),
+  usePresencia: usePresenciaEjemplo,
   subirFoto: async (_turnoId, _eventoId, archivo, etiqueta) => {
     const url = await new Promise<string>((resolve, reject) => {
       const lector = new FileReader()
