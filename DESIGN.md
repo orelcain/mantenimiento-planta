@@ -558,6 +558,15 @@ con un script Node local (`writeFileSync` en `utf8`).
    sin cápsula (corregidos en el mismo PR) y las dos pantallas grandes (Bodega ✅, CTD ⏳).
    Clima Puerto es un iframe externo: fuera de alcance del contrato.
 
+5e. **Centro de Aprendizaje (hub)** — mockup publicado el 2026-09-16:
+   https://claude.ai/artifact/CanEbkokMz1hesHnNmJync. Hoy: paleta propia `lc-*` por `style=`
+   en línea, héroe con título en degradado y tres métricas dentro de una tarjeta, secciones
+   numeradas «01», tarjetas con banda de color de 72 px. Propuesta: tokens del sistema (se
+   retiran los 20 `--lc-*`), título grande + línea secundaria con las métricas, encabezados
+   en formato oración, filas de lista con el color de máquina solo en el tile de 40 px,
+   evaluación aprobada como único trailing. ⏳ Cuatro decisiones de Orel en el mockup; la
+   primera cierra el pendiente 3 (paleta `lc-*`).
+
 6. **Decidir claro frío `#F2F2F7` vs cálido `#EAE7E0`** — abierto desde 2026-08-09.
 7. **Los 228 `<button>` a mano** con 13 alturas distintas (25–64 px). No es un barrido: chips,
    flechas e íconos en tablas no van a 44. Dirigirlo pantalla por pantalla con el medidor de
