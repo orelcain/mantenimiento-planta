@@ -16,6 +16,7 @@ import type {
   WeightTrendBucket,
 } from '@/services/grader/types'
 import type { useGraderDashboardAnalytics } from '@/hooks/useGraderDashboardAnalytics'
+import { dec1, dec2 } from '@/utils/formatoNumeros'
 
 type DashboardViews = ReturnType<typeof useGraderDashboardAnalytics>
 type CvSignal = { cls: string; label: string; bar: string }
@@ -90,7 +91,7 @@ export function TendenciaWeightCard({
           {trendForecastView && (
             <div className="flex flex-wrap gap-2 mt-2">
               <Badge variant="outline" className="text-caption">
-                Cobertura: {trendForecastView.completionPct.toFixed(1)}% ({trendForecastView.observedBuckets}/{trendForecastView.totalBuckets} intervalos)
+                Cobertura: {dec1(trendForecastView.completionPct)}% ({trendForecastView.observedBuckets}/{trendForecastView.totalBuckets} intervalos)
               </Badge>
               <Badge variant="outline" className="text-caption">
                 Turno: {trendForecastView.shiftStartLabel} → {trendForecastView.shiftEndLabel}
@@ -217,7 +218,7 @@ export function TendenciaWeightCard({
                 )}>
                   <p className="text-caption tracking-wide opacity-80">P0 al cierre</p>
                   <p className="text-lg font-bold tabular-nums leading-none">
-                    {trendForecastView.projectedPointZeroPct.toFixed(2)}%
+                    {dec2(trendForecastView.projectedPointZeroPct)}%
                   </p>
                   <p className="text-caption tabular-nums opacity-90">
                     {trendForecastView.projectedPointZeroPieces.toLocaleString('es-CL')} piezas

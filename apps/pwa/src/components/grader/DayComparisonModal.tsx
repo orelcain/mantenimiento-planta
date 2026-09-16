@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils'
 import { getCauseLabel } from '@/services/grader/graderMatrixP0Causes'
 import type { GraderDailySummary } from '@/services/grader/types'
 import { p0StatusFromPct, p0StatusColor } from '@/services/grader/graderP0Thresholds'
+import { dec1, dec2 } from '@/utils/formatoNumeros'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -35,7 +36,7 @@ function fmtDuration(mins?: number): string {
 
 function fmtWeight(kg?: number): string {
   if (kg == null) return '—'
-  return kg >= 1000 ? `${(kg / 1000).toFixed(1)} t` : `${kg.toFixed(0)} kg`
+  return kg >= 1000 ? `${dec1((kg / 1000))} t` : `${kg.toFixed(0)} kg`
 }
 
 function fmtRate(hist: GraderDailySummary): string {
@@ -383,7 +384,7 @@ export function DayComparisonModal({ open, onClose, summaries, dateKey }: DayCom
                     <div className="text-right tabular-nums">
                       {diaPctTotal != null ? (
                         <span className="font-medium">
-                          {diaPctTotal.toFixed(2)}%
+                          {dec2(diaPctTotal)}%
                           <TrendIcon t={causeP0Trend.day} />
                         </span>
                       ) : <span className="text-muted-foreground/50">—</span>}
@@ -394,7 +395,7 @@ export function DayComparisonModal({ open, onClose, summaries, dateKey }: DayCom
                     <div className="text-left tabular-nums">
                       {nochePctTotal != null ? (
                         <span className="font-medium">
-                          {nochePctTotal.toFixed(2)}%
+                          {dec2(nochePctTotal)}%
                           <TrendIcon t={causeP0Trend.night} />
                         </span>
                       ) : <span className="text-muted-foreground/50">—</span>}
@@ -408,7 +409,7 @@ export function DayComparisonModal({ open, onClose, summaries, dateKey }: DayCom
 
         {/* ── Delta summary ── */}
         {(() => {
-          const deltaP0 = (noche.pointZeroPct - dia.pointZeroPct).toFixed(2)
+          const deltaP0 = dec2((noche.pointZeroPct - dia.pointZeroPct))
           const sign = noche.pointZeroPct > dia.pointZeroPct ? '+' : ''
           const color = noche.pointZeroPct > dia.pointZeroPct ? 'text-red-500' : 'text-ink-ok'
           return (

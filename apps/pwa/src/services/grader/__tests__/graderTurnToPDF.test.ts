@@ -327,7 +327,7 @@ describe('exportTurnToPDF — smoke (M17)', () => {
     )
     const body = (upstreamCall![1] as { body: string[][] }).body
     expect(body[0]).toContain('Evisceradora 1')
-    expect(body[0]).toContain('72.3%')
+    expect(body[0]).toContain('72,3%')
   })
 
   it('no genera sección upstream cuando upstreamSnapshot es null', async () => {

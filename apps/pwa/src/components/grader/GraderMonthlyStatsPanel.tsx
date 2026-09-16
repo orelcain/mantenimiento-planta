@@ -15,6 +15,7 @@ import { getShiftMeta } from '@/services/grader/graderShiftDisplay'
 import { fmt, fmtDec } from '@/lib/format'
 import { fmtSecPanoramic, type SlxMonthlyStats } from '@/services/grader/graderPeriodMonthlyStats'
 import { ImputacionPeriodCard } from './ImputacionPeriodCard'
+import { dec1, dec2 } from '@/utils/formatoNumeros'
 
 const MONTH_NAMES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -205,7 +206,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
             <p className={`text-xl font-bold leading-none tabular-nums ${slxStats ? 'text-primary' : 'text-muted-foreground'}`}>
               {slxStats
                 ? (slxStats.totalCycles >= 1000
-                    ? `${(slxStats.totalCycles / 1000).toFixed(1)}k`
+                    ? `${dec1((slxStats.totalCycles / 1000))}k`
                     : slxStats.totalCycles.toLocaleString('es-CL'))
                 : '—'}
             </p>
@@ -335,7 +336,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
               <div>
                 <p className="text-lg font-bold leading-none tabular-nums text-foreground">
                   {slxStats.unscheduled.cycles >= 1000
-                    ? `${(slxStats.unscheduled.cycles / 1000).toFixed(1)}k`
+                    ? `${dec1((slxStats.unscheduled.cycles / 1000))}k`
                     : slxStats.unscheduled.cycles.toLocaleString('es-CL')}
                 </p>
                 <p className="text-caption text-muted-foreground mt-0.5">ciclos</p>
@@ -391,7 +392,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
                     {getCauseLabel(error)}
                   </span>
                   <span className="text-caption tabular-nums text-muted-foreground shrink-0">
-                    {pieces.toLocaleString('es-CL')} pz · <span className="font-semibold text-foreground">{pct.toFixed(2)}%</span>
+                    {pieces.toLocaleString('es-CL')} pz · <span className="font-semibold text-foreground">{dec2(pct)}%</span>
                   </span>
                 </div>
                 <div className="h-1 bg-muted/50 rounded-full overflow-hidden">

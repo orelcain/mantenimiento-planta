@@ -65,6 +65,7 @@ import {
   classifyRecordToMatrix,
   computePointZeroClassification,
 } from './graderAnalyticsClassifier'
+import { dec1 } from '@/utils/formatoNumeros'
 
 export { classifyRecordToMatrix }
 
@@ -768,11 +769,11 @@ export function computeAnalytics(
           gateNumber: gs.gateNumber,
           currentCalibre: gs.assignedCalibre,
           suggestedCalibre: gs.assignedCalibre, // no sugiere cambio, solo investigación
-          reason: `Gate ${gs.gateNumber} tiene variabilidad de peso anormalmente alta (CV=${(gs.cv * 100).toFixed(1)}%). `
+          reason: `Gate ${gs.gateNumber} tiene variabilidad de peso anormalmente alta (CV=${dec1((gs.cv * 100))}%). `
             + `Puede estar recibiendo piezas de calibres mixtos o tener un problema mecánico.`,
           impactScore: round(Math.min(60, gs.cv * 150)),
           evidence: [
-            `CV: ${(gs.cv * 100).toFixed(1)}% (promedio global: ${(globalAvgCV * 100).toFixed(1)}%)`,
+            `CV: ${dec1((gs.cv * 100))}% (promedio global: ${dec1((globalAvgCV * 100))}%)`,
             `StdDev: ${gs.stdDevWeightGrams}g, Avg: ${gs.avgWeightGrams}g`,
             `Acción: verificar sensores y calibración de este gate`,
           ],

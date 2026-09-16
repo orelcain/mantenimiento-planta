@@ -2,6 +2,7 @@ import { AlertTriangle, Check, HelpCircle } from 'lucide-react'
 import { Badge, Input, Label, Switch } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import type { CalibrationStatus } from '@/services/grader/types'
+import { dec1, dec2 } from '@/utils/formatoNumeros'
 
 /**
  * Coeficientes alométricos Length-Weight Relationship (LWR): W(g) = a × L(cm)^b
@@ -89,7 +90,7 @@ export function BeltVisualizer({
     <div className="mt-3 p-3 rounded-card bg-muted-foreground/[0.10] border border-muted-foreground/[0.10]">
       <div className="flex items-center justify-between mb-2 text-caption text-muted-foreground">
         <span className="font-medium text-ink-info">Diagrama de distancias (escala real)</span>
-        <span>cinta <span className="font-mono text-foreground">{speedMps.toFixed(2)} m/s</span> · tiempo entre peces <span className="font-mono text-foreground">{secondsBetweenFish.toFixed(2)} s</span></span>
+        <span>cinta <span className="font-mono text-foreground">{dec2(speedMps)} m/s</span> · tiempo entre peces <span className="font-mono text-foreground">{dec2(secondsBetweenFish)} s</span></span>
       </div>
       <svg width="100%" viewBox={`0 0 ${svgW} ${svgH}`} preserveAspectRatio="xMidYMid meet" style={{ display: 'block' }}>
         <defs>
@@ -250,11 +251,11 @@ export function BatchStatsCard({ stats }: { stats: BatchStats | null }) {
       </div>
       <div className="text-center">
         <p className="text-muted-foreground">p10 / med / p90 kg</p>
-        <p className="font-mono font-medium">{stats.p10.toFixed(2)} · {stats.p50.toFixed(2)} · {stats.p90.toFixed(2)}</p>
+        <p className="font-mono font-medium">{dec2(stats.p10)} · {dec2(stats.p50)} · {dec2(stats.p90)}</p>
       </div>
       <div className="text-center">
         <p className="text-muted-foreground">CV%</p>
-        <p className="font-mono font-medium">{stats.cv.toFixed(1)}%</p>
+        <p className="font-mono font-medium">{dec1(stats.cv)}%</p>
       </div>
       <div className="text-center">
         <p className="text-muted-foreground">Calibre dominante</p>
@@ -263,7 +264,7 @@ export function BatchStatsCard({ stats }: { stats: BatchStats | null }) {
       {stats.throughputPzPerMin != null && (
         <div className="text-center">
           <p className="text-muted-foreground">Throughput</p>
-          <p className="font-mono font-medium">{stats.throughputPzPerMin.toFixed(1)} pz/min</p>
+          <p className="font-mono font-medium">{dec1(stats.throughputPzPerMin)} pz/min</p>
         </div>
       )}
       {stats.windowMinutes != null && (

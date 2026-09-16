@@ -18,6 +18,7 @@ import { getPlantLineConfig, getMachineKind, type PlantLineId } from '@/config/p
 import type { GraderDailySummary } from '@/services/grader/types'
 import { KPI_CUTOFFS, OEE_GOOD } from '@/services/grader/kpiThresholds'
 import { shortMachineName } from '@/services/grader/graderMachineNames'
+import { dec1 } from '@/utils/formatoNumeros'
 
 interface Props {
   plantSlug: PlantSlug
@@ -45,13 +46,13 @@ function pct(v: number | null, decimals = 1): string {
 function fmtMin(v: number): string {
   if (!Number.isFinite(v) || v === 0) return '—'
   if (v < 1) return `${Math.round(v * 60)} seg`
-  return `${v.toFixed(1)} min`
+  return `${dec1(v)} min`
 }
 
 function fmtHours(v: number): string {
   if (!Number.isFinite(v) || v === 0) return '—'
   if (v < 1) return `${Math.round(v * 60)} min`
-  return `${v.toFixed(1)} h`
+  return `${dec1(v)} h`
 }
 
 // ── Colores ───────────────────────────────────────────────────────────────────
@@ -97,6 +98,7 @@ function mtbfColor(h: number): string {
 
 function barWidth(v: number | null, max = 1): string {
   if (v === null || !Number.isFinite(v)) return '0%'
+  // decimal-tecnico: es un ancho CSS, el separador TIENE que ser punto.
   return `${Math.min(100, Math.max(0, (v / max) * 100)).toFixed(1)}%`
 }
 
@@ -484,9 +486,9 @@ export function PlantKPIBoard({
                   {m.shoplogixTargetCpm !== null && (
                     <span
                       className="ml-auto text-muted-foreground/50 tabular-nums hidden sm:inline"
-                      title={`Target nominal: ${m.shoplogixTargetCpm.toFixed(1)} piezas/min\nVelocidad de referencia configurada en Shoplogix para esta máquina. Driver del cálculo de Rendimiento (P).`}
+                      title={`Target nominal: ${dec1(m.shoplogixTargetCpm)} piezas/min\nVelocidad de referencia configurada en Shoplogix para esta máquina. Driver del cálculo de Rendimiento (P).`}
                     >
-                      {m.shoplogixTargetCpm.toFixed(1)} pz/min
+                      {dec1(m.shoplogixTargetCpm)} pz/min
                     </span>
                   )}
                 </div>

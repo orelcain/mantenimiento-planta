@@ -38,6 +38,7 @@ import {
   p0StatusColor,
 } from '@/services/grader/graderP0Thresholds'
 import { computePauseP0Context } from './pauseAnnotationHelpers'
+import { dec1 } from '@/utils/formatoNumeros'
 
 interface PauseAnnotationDialogProps {
   open: boolean
@@ -372,7 +373,7 @@ export function PauseAnnotationDialog({
                   <span className="text-muted-foreground">P0% antes</span>
                   {p0Context.beforePct !== null ? (
                     <span className={cn('font-medium tabular-nums', p0StatusColor(p0StatusFromPct(p0Context.beforePct, thresholds)))}>
-                      {p0Context.beforePct.toFixed(1)}%
+                      {dec1(p0Context.beforePct)}%
                     </span>
                   ) : (
                     <span className="text-muted-foreground/60 italic">sin datos</span>
@@ -380,7 +381,7 @@ export function PauseAnnotationDialog({
                   <span className="text-muted-foreground">→ durante</span>
                   {p0Context.duringPct !== null ? (
                     <span className={cn('font-medium tabular-nums', p0StatusColor(p0StatusFromPct(p0Context.duringPct, thresholds)))}>
-                      {p0Context.duringPct.toFixed(1)}%
+                      {dec1(p0Context.duringPct)}%
                     </span>
                   ) : (
                     <span className="text-muted-foreground/60 italic">sin piezas</span>

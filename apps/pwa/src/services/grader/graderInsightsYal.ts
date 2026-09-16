@@ -20,6 +20,7 @@
 import type { PointZeroClassification } from './types'
 import type { SuggestedAction } from './actionPlanSuggestions'
 import type { UpstreamLineSnapshot } from '@/services/shoplogix/types'
+import { dec2 } from '@/utils/formatoNumeros'
 
 /**
  * Throughput target para Planta Yal (eviscerado puro, descabezado opcional):
@@ -61,7 +62,7 @@ export function deriveYalSuggestions(ctx: YalSuggestionContext): SuggestedAction
       id: 'yal-p0-critical',
       category: 'verificar',
       title: 'P0 crítico — escalar con supervisor',
-      description: `Rechazo ${ctx.p0Pct.toFixed(2)}% supera umbral crítico (${YAL_P0_CRITICAL_PCT}%). Investigar causa raíz: revisar lotes en proceso, velocidad de línea y estado de Baader.`,
+      description: `Rechazo ${dec2(ctx.p0Pct)}% supera umbral crítico (${YAL_P0_CRITICAL_PCT}%). Investigar causa raíz: revisar lotes en proceso, velocidad de línea y estado de Baader.`,
       severity: 'critical',
     })
   } else if (ctx.p0Pct >= YAL_P0_WARN_PCT) {
@@ -69,7 +70,7 @@ export function deriveYalSuggestions(ctx: YalSuggestionContext): SuggestedAction
       id: 'yal-p0-elevated',
       category: 'verificar',
       title: 'Punto Cero sobre el típico',
-      description: `Rechazo ${ctx.p0Pct.toFixed(2)}% supera el típico de Yal (${YAL_P0_WARN_PCT}%). Revisar las causas dominantes abajo y validar que el lote actual cumpla peso mínimo.`,
+      description: `Rechazo ${dec2(ctx.p0Pct)}% supera el típico de Yal (${YAL_P0_WARN_PCT}%). Revisar las causas dominantes abajo y validar que el lote actual cumpla peso mínimo.`,
       severity: 'warning',
     })
   }
@@ -86,7 +87,7 @@ export function deriveYalSuggestions(ctx: YalSuggestionContext): SuggestedAction
       id: 'yal-low-weight',
       category: 'terreno',
       title: 'Rechazos por peso bajo elevados',
-      description: `${lowWeight.pieces.toLocaleString('es-CL')} piezas (${lowWeightPctTotal.toFixed(2)}% del total) bajo el peso mínimo. Verificar tamaño de cosecha de los lotes en proceso. Posible mezcla con peces juveniles o subdimensionados.`,
+      description: `${lowWeight.pieces.toLocaleString('es-CL')} piezas (${dec2(lowWeightPctTotal)}% del total) bajo el peso mínimo. Verificar tamaño de cosecha de los lotes en proceso. Posible mezcla con peces juveniles o subdimensionados.`,
       severity: lowWeightPctTotal >= YAL_LOW_WEIGHT_PCT_TOTAL_WARN * 3 ? 'critical' : 'warning',
       estimatedImpact: { metric: 'P0%', deltaPct: -Math.min(lowWeightPctTotal, 1) },
     })
@@ -111,7 +112,7 @@ export function deriveYalSuggestions(ctx: YalSuggestionContext): SuggestedAction
       id: 'yal-too-close',
       category: 'terreno',
       title: 'Productos muy próximos en banda',
-      description: `${tooClose.pieces.toLocaleString('es-CL')} piezas (${tooClosePctTotal.toFixed(2)}%) llegaron demasiado próximas al sensor — el Marelec no las pudo pesar individualmente. Bajar cadencia de entrada al transportador o aumentar la separación entre productos en la cinta de alimentación.`,
+      description: `${tooClose.pieces.toLocaleString('es-CL')} piezas (${dec2(tooClosePctTotal)}%) llegaron demasiado próximas al sensor — el Marelec no las pudo pesar individualmente. Bajar cadencia de entrada al transportador o aumentar la separación entre productos en la cinta de alimentación.`,
       severity: tooClosePctTotal >= YAL_TOO_CLOSE_PCT_TOTAL_WARN * 3 ? 'critical' : 'warning',
       estimatedImpact: { metric: 'P0%', deltaPct: -Math.min(tooClosePctTotal, 1) },
     })
@@ -175,7 +176,7 @@ export function deriveYalSuggestions(ctx: YalSuggestionContext): SuggestedAction
       id: 'yal-healthy',
       category: 'verificar',
       title: 'Turno dentro de parámetros',
-      description: `P0 ${ctx.p0Pct.toFixed(2)}% por debajo del umbral típico (${YAL_P0_WARN_PCT}%). Sin desvíos significativos en peso, proximidad ni throughput. Mantener monitoreo y validar al cierre.`,
+      description: `P0 ${dec2(ctx.p0Pct)}% por debajo del umbral típico (${YAL_P0_WARN_PCT}%). Sin desvíos significativos en peso, proximidad ni throughput. Mantener monitoreo y validar al cierre.`,
       severity: 'recommended',
     })
   }

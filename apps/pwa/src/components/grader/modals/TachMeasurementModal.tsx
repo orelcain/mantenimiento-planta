@@ -24,6 +24,7 @@ import type { GraderBeltId } from '@/services/grader/graderBeltHelpers'
 import { getBeltLabel } from '@/services/grader/graderBeltHelpers'
 import type { GraderPhysicalConfig } from '@/services/grader/types'
 import { logger } from '@/lib/logger'
+import { dec1 } from '@/utils/formatoNumeros'
 
 interface Props {
   open: boolean
@@ -218,7 +219,7 @@ export function TachMeasurementModal({
                     'border-red-500/[0.25] text-ink-crit',
                   )}
                 >
-                  {delta >= 0 ? '+' : ''}{delta.toFixed(3)} m/s ({deltaPct >= 0 ? '+' : ''}{deltaPct.toFixed(1)}%)
+                  {delta >= 0 ? '+' : ''}{delta.toFixed(3)} m/s ({deltaPct >= 0 ? '+' : ''}{dec1(deltaPct)}%)
                 </Badge>
               </div>
             </div>

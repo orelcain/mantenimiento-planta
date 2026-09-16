@@ -29,6 +29,7 @@ import {
 } from '@/services/grader/graderGateAssignment'
 import { qualityColorHex } from '@/services/grader/graderQualityColors'
 import { GateChangeTrigger } from './GateChangeTrigger'
+import { dec1 } from '@/utils/formatoNumeros'
 
 interface GateRow {
   gate: number
@@ -156,7 +157,7 @@ function computeAssignmentAnalysis(
     diagnosis = {
       label: 'Asignación subóptima',
       color: 'amber',
-      detail: `${topSat.label} saturado (${topSat.ratio.toFixed(1)}×) · ${topSobre.label} sobredimensionado (${topSobre.ratio.toFixed(1)}×)`,
+      detail: `${topSat.label} saturado (${dec1(topSat.ratio)}×) · ${topSobre.label} sobredimensionado (${dec1(topSobre.ratio)}×)`,
     }
   } else if (saturados.length > 0) {
     diagnosis = {
@@ -406,7 +407,7 @@ export function GateBreakdownCard({
                 <span className={cn(isTop ? 'text-foreground font-medium' : 'text-muted-foreground')}>
                   {row.pieces.toLocaleString('es-CL')}
                 </span>
-                <span className="text-muted-foreground/60 ml-1">{row.pct.toFixed(1)}%</span>
+                <span className="text-muted-foreground/60 ml-1">{dec1(row.pct)}%</span>
               </div>
             </div>
           )
@@ -429,7 +430,7 @@ export function GateBreakdownCard({
               </div>
               <div className="w-28 shrink-0 text-right text-xs tabular-nums">
                 <span className="text-cat-4-ink font-medium">{pointZeroPieces.toLocaleString('es-CL')}</span>
-                <span className="text-muted-foreground/60 ml-1">{pointZeroPct.toFixed(1)}%</span>
+                <span className="text-muted-foreground/60 ml-1">{dec1(pointZeroPct)}%</span>
               </div>
             </div>
           </>
@@ -475,7 +476,7 @@ export function GateBreakdownCard({
                             {g.gates.map(n => `G${n}`).join(' ')}
                           </td>
                           <td className="px-2 py-1.5 text-right tabular-nums">
-                            {g.productionPct.toFixed(1)}%
+                            {dec1(g.productionPct)}%
                           </td>
                           <td className={cn(
                             'px-2 py-1.5 text-right tabular-nums font-semibold',
@@ -483,7 +484,7 @@ export function GateBreakdownCard({
                             g.status === 'sobredimensionado' && 'text-amber-400',
                             g.status === 'optimo'            && 'text-emerald-400',
                           )}>
-                            {g.ratio.toFixed(1)}×
+                            {dec1(g.ratio)}×
                           </td>
                           <td className={cn(
                             'px-2 py-1.5',
@@ -559,8 +560,8 @@ export function GateBreakdownCard({
                               </span>
                             </div>
                             <div className="text-muted-foreground mt-0.5">
-                              G{s.fromGate} clasificó {s.fromPieces.toLocaleString('es-CL')} pzas ({s.fromPct.toFixed(1)}%)
-                              {' · '}destino saturado a {s.satRatio.toFixed(1)}×
+                              G{s.fromGate} clasificó {s.fromPieces.toLocaleString('es-CL')} pzas ({dec1(s.fromPct)}%)
+                              {' · '}destino saturado a {dec1(s.satRatio)}×
                             </div>
                             {/* Estimación post-reasignación — info útil concreta */}
                             <div className="text-caption mt-0.5 tabular-nums">
@@ -568,7 +569,7 @@ export function GateBreakdownCard({
                               <span className={cn(
                                 s.estimate.improvesDestination ? 'text-emerald-400' : 'text-ink-warn',
                               )}>
-                                {s.toLabel} {s.estimate.destBeforeRatio.toFixed(1)}× → {s.estimate.destAfterRatio.toFixed(1)}×
+                                {s.toLabel} {dec1(s.estimate.destBeforeRatio)}× → {dec1(s.estimate.destAfterRatio)}×
                               </span>
                               {s.estimate.improvesDestination && (
                                 <span className="text-emerald-400 ml-1">(óptimo ✓)</span>
@@ -620,7 +621,7 @@ export function GateBreakdownCard({
                               '',
                               'Sugerencias para el próximo turno:',
                               ...suggestions.slice(0, 3).map((s, i) =>
-                                `${i + 1}. G${s.fromGate} ${s.fromLabel} → ${s.toLabel} (esperado ${s.estimate.destBeforeRatio.toFixed(1)}× → ${s.estimate.destAfterRatio.toFixed(1)}×)`),
+                                `${i + 1}. G${s.fromGate} ${s.fromLabel} → ${s.toLabel} (esperado ${dec1(s.estimate.destBeforeRatio)}× → ${dec1(s.estimate.destAfterRatio)}×)`),
                               '',
                               urlTurnoGates(shiftDocId),
                             ].join('\n')
@@ -637,7 +638,7 @@ export function GateBreakdownCard({
                               `Gates del Grader — cierre ${shiftDocId}`,
                               diagnosis.detail ?? diagnosis.label,
                               ...suggestions.slice(0, 3).map((s, i) =>
-                                `${i + 1}. G${s.fromGate} ${s.fromLabel} → ${s.toLabel} — esperado ${s.estimate.destBeforeRatio.toFixed(1)}× → ${s.estimate.destAfterRatio.toFixed(1)}×`),
+                                `${i + 1}. G${s.fromGate} ${s.fromLabel} → ${s.toLabel} — esperado ${dec1(s.estimate.destBeforeRatio)}× → ${dec1(s.estimate.destAfterRatio)}×`),
                               urlTurnoGates(shiftDocId),
                             ].join('\n')).then(() => {
                               setCopiado(true)

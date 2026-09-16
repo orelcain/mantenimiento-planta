@@ -63,6 +63,7 @@ import { slxStateColor } from '@/services/shoplogix/shoplogixColors'
 import { logger } from '@/lib/logger'
 import { softenAccentHex } from '@/lib/softenColor'
 import { syncCubreElTurno } from '@/services/grader/frescuraDelSync'
+import { dec1 } from '@/utils/formatoNumeros'
 
 interface Props {
   snapshot: UpstreamLineSnapshot | null | undefined
@@ -914,15 +915,15 @@ export function MachineShiftDetail({ shift, expanded, onToggle, windowStart, win
             className="flex items-center gap-1"
             title={
               ciclo.idealSec != null
-                ? `Ciclo real ${ciclo.realSec.toFixed(1)}s/pescado · ideal ${ciclo.idealSec.toFixed(1)}s · ` +
-                  `${ciclo.deltaSec! >= 0 ? '+' : ''}${ciclo.deltaSec!.toFixed(1)}s (${ciclo.deltaSec! > 0.05 ? 'más lento' : 'en ritmo'})`
-                : `Ciclo real ${ciclo.realSec.toFixed(1)}s por pescado`
+                ? `Ciclo real ${dec1(ciclo.realSec)}s/pescado · ideal ${dec1(ciclo.idealSec)}s · ` +
+                  `${ciclo.deltaSec! >= 0 ? '+' : ''}${dec1(ciclo.deltaSec!)}s (${ciclo.deltaSec! > 0.05 ? 'más lento' : 'en ritmo'})`
+                : `Ciclo real ${dec1(ciclo.realSec)}s por pescado`
             }
           >
             <Gauge className="w-3 h-3" />
-            {ciclo.realSec.toFixed(1)}s/pz
+            {dec1(ciclo.realSec)}s/pz
             {ciclo.idealSec != null && ciclo.deltaSec! > 0.05 && (
-              <span className="text-amber-400">(+{ciclo.deltaSec!.toFixed(1)})</span>
+              <span className="text-amber-400">(+{dec1(ciclo.deltaSec!)})</span>
             )}
           </span>
         )}

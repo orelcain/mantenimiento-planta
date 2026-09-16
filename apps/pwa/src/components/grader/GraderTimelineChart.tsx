@@ -25,6 +25,7 @@ import { cn } from '@/lib/utils'
 import type { FirestorePieceRecord } from '@/services/grader/graderDailySummary.service'
 import type { TimelineBucket } from '@/services/grader/types'
 import { minDe, maxDe } from '@/services/grader/minMaxSeguro'
+import { dec1 } from '@/utils/formatoNumeros'
 
 // ── Paleta ──────────────────────────────────────────────────────────────────
 
@@ -491,7 +492,7 @@ export function GraderTimelineChart({ records, aggregates, shiftId, dateKey }: P
     return {
       count: visible.length,
       avg: Math.round(sum / visible.length),
-      spanHours: ((visEnd - visStart) / 3_600_000).toFixed(1),
+      spanHours: dec1(((visEnd - visStart) / 3_600_000)),
     }
   }, [weightSeries, zoomRange])
 

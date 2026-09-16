@@ -18,6 +18,7 @@ import type { GraderDailySummary } from './types'
 import type { AIGraderInput, AIGraderOutput } from './types'
 import type { ShiftActionEntry } from './graderShifts.service'
 import { analyzeGrader } from '@/services/ai/aiProvider'
+import { dec2 } from '@/utils/formatoNumeros'
 
 export interface SummaryAIContext {
   /** Acciones aplicadas en el turno (con outcome si fue evaluado) */
@@ -70,6 +71,7 @@ export function buildAIInputFromSummary(
       gateNumber:     g.gate,
       pieces:         g.pieces,
       cv:             0,   // no disponible desde summary
+      // decimal-tecnico: se redondea un NUMERO, no se formatea texto.
       utilizationPct: totalGatePieces > 0 ? Number(((g.pieces / totalGatePieces) * 100).toFixed(1)) : 0,
       mismatchPct:    0,   // no disponible desde summary
     }))
@@ -102,7 +104,7 @@ export function buildAIInputFromSummary(
       `Acciones aplicadas en el turno: ${ctx.actions.length}` +
         (evaluated.length > 0
           ? `. Evaluadas: ${evaluated
-              .map((a) => `${a.field} (Δ ${(a.outcome!.p0AfterPct - a.outcome!.p0BeforePct).toFixed(2)} pp)`)
+              .map((a) => `${a.field} (Δ ${dec2((a.outcome!.p0AfterPct - a.outcome!.p0BeforePct))} pp)`)
               .join(', ')}`
           : ''),
     )
@@ -110,7 +112,7 @@ export function buildAIInputFromSummary(
   if (ctx?.benchmarkDelta !== undefined) {
     const sign = ctx.benchmarkDelta >= 0 ? '+' : ''
     notes.push(
-      `Comparativa vs. temporada 2025-2026: ${sign}${ctx.benchmarkDelta.toFixed(2)} pp ` +
+      `Comparativa vs. temporada 2025-2026: ${sign}${dec2(ctx.benchmarkDelta)} pp ` +
         `(${ctx.benchmarkDelta < 0 ? 'mejor' : ctx.benchmarkDelta > 0 ? 'peor' : 'igual'} que el histórico)`,
     )
   }

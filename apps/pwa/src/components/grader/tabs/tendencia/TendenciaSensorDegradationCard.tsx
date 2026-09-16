@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, Badge } from '@/components/ui
 import { AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { useGraderDashboardAnalytics } from '@/hooks/useGraderDashboardAnalytics'
+import { dec1 } from '@/utils/formatoNumeros'
 
 type DashboardViews = ReturnType<typeof useGraderDashboardAnalytics>
 
@@ -56,7 +57,7 @@ export function TendenciaSensorDegradationCard({ sensorDegradationView }: Props)
                     <p className="text-xs font-medium truncate">{deg.error}</p>
                   </div>
                   <p className="text-caption text-muted-foreground mt-1">
-                    Crecimiento {deg.growthRatio.toFixed(1)}× entre inicio y fin del turno
+                    Crecimiento {dec1(deg.growthRatio)}× entre inicio y fin del turno
                     · {deg.total.toLocaleString('es-CL')} piezas P0 acumuladas
                   </p>
                 </div>

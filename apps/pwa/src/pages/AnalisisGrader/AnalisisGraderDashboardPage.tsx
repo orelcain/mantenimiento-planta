@@ -81,6 +81,7 @@ import type {
   AIGraderOutput,
   GraderSession,
 } from '@/services/grader/types'
+import { dec1, dec2 } from '@/utils/formatoNumeros'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, ArcElement, Title, Tooltip, Legend, TimeScale, Filler)
 
@@ -648,7 +649,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
     if (analytics.gateAdvancedStats.length > 0) {
       const gsRows = [
         ['Gate', 'Piezas', 'Peso (kg)', 'Prom. (g)', 'σ (g)', 'CV', 'Utiliz. %', 'Calibre Asignado', 'Mismatch %'],
-        ...analytics.gateAdvancedStats.map(g => [g.gateNumber, g.pieces, g.weightKg, g.avgWeightGrams, g.stdDevWeightGrams, (g.cv * 100).toFixed(1) + '%', g.utilizationPct.toFixed(1), g.assignedCalibre, g.mismatchPct.toFixed(1) + '%']),
+        ...analytics.gateAdvancedStats.map(g => [g.gateNumber, g.pieces, g.weightKg, g.avgWeightGrams, g.stdDevWeightGrams, dec1((g.cv * 100)) + '%', dec1(g.utilizationPct), g.assignedCalibre, dec1(g.mismatchPct) + '%']),
       ]
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(gsRows), 'Stats Gates')
     }
@@ -1085,7 +1086,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
       .map((action) => ({
         ...action,
         urgency,
-        text: `${prefix}: ${action.text} (proyección cierre P0 ${trendForecastView.projectedPointZeroPct.toFixed(2)}%, umbral ${warnThreshold.toFixed(2)}%, crítico ${criticalThreshold.toFixed(2)}%).`,
+        text: `${prefix}: ${action.text} (proyección cierre P0 ${dec2(trendForecastView.projectedPointZeroPct)}%, umbral ${dec2(warnThreshold)}%, crítico ${dec2(criticalThreshold)}%).`,
       }))
   }, [directGateActions, getPointZeroSeverity, pointZeroCriticalThreshold, pointZeroWarnThreshold, trendForecastView])
 

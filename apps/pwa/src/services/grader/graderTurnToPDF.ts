@@ -22,6 +22,7 @@ import type { UpstreamLineSnapshot } from '../shoplogix/types'
 import { fmtTime as fmtHHMM, fmtDurationSec as fmtDur } from './graderTimeFormat'
 import { pauseTierLabel } from './graderPauseTiers'
 import { DEFAULT_P0_ALERT_PCT, DEFAULT_P0_CRITICAL_PCT } from './graderP0Thresholds'
+import { dec1 } from '@/utils/formatoNumeros'
 
 // Mínimo de autoTable para typing (acceso a lastAutoTable.finalY)
 interface AutoTableDoc {
@@ -276,7 +277,7 @@ export async function exportTurnToPDF(params: {
 
     const upstreamRows = upstreamSnapshot.machines.map((m) => {
       const bd = m.shiftRuntimeBreakdown
-      const uptimePct = `${(m.shiftRuntime * 100).toFixed(1)}%`
+      const uptimePct = `${dec1((m.shiftRuntime * 100))}%`
       return [
         m.machineName,
         uptimePct,

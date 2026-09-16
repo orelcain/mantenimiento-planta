@@ -12,6 +12,7 @@
 import type { MaintenanceReliability } from './graderReliability'
 import { formatReliabilityDuration as fmt } from './graderReliability'
 import { maintenanceWorkHeadline, type MaintenanceWork } from './maintenanceWork'
+import { dec1 } from '@/utils/formatoNumeros'
 
 interface AutoTableDoc {
   lastAutoTable: { finalY: number }
@@ -75,7 +76,7 @@ export async function exportMaintenanceImpactPDF(
   y += 17
 
   // ── Tabla de KPIs de confiabilidad ──
-  const availTxt = rel.availabilityPct != null ? `${rel.availabilityPct.toFixed(1)} %` : '—'
+  const availTxt = rel.availabilityPct != null ? `${dec1(rel.availabilityPct)} %` : '—'
   const shareTxt = rel.maintenanceShareOfDeadPct != null ? `${rel.maintenanceShareOfDeadPct.toFixed(0)} %` : '—'
   autoTable(doc, {
     startY: y,

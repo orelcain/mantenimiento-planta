@@ -21,6 +21,7 @@ import { Target, TrendingUp, CheckCircle2, Pencil, X, Loader2, AlertTriangle, Ra
 import { cn } from '@/lib/utils'
 import type { GraderDailySummary, ShiftQuota } from '@/services/grader/types'
 import type { ShiftTimeWindow } from '@/services/grader/graderShiftStatus'
+import { dec1 } from '@/utils/formatoNumeros'
 
 /** Umbral de discrepancia Shoplogix vs Grader antes de levantar bandera. */
 const DISCREPANCY_PCT_THRESHOLD = 5
@@ -277,7 +278,7 @@ export function ShiftQuotaCard({
           <>
             <div className="flex items-baseline gap-2 flex-wrap">
               <span className={cn('text-3xl font-bold tabular-nums leading-none', verdictTextClass)}>
-                {progressPct.toFixed(1)}%
+                {dec1(progressPct)}%
               </span>
               <span className="text-xs text-muted-foreground tabular-nums">
                 {fmt(current, quota!.unit)} de {fmt(target, quota!.unit)}
@@ -334,7 +335,7 @@ export function ShiftQuotaCard({
                     {Math.round(discrepancy.missing).toLocaleString('es-CL')} piezas sin confirmar
                   </span>
                   <span className="text-ink-warn"> · </span>
-                  <span className="tabular-nums">{discrepancy.pct.toFixed(1)}% delta</span>
+                  <span className="tabular-nums">{dec1(discrepancy.pct)}% delta</span>
                   <span className="block text-ink-warn mt-0.5">
                     Shoplogix: {discrepancy.shopTotal.toLocaleString('es-CL')} ciclos · Grader: {Math.round(current).toLocaleString('es-CL')} pz
                   </span>

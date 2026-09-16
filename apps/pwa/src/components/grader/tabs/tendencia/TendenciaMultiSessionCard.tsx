@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui'
 import { Brain, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { useGraderDashboardAnalytics } from '@/hooks/useGraderDashboardAnalytics'
+import { dec2 } from '@/utils/formatoNumeros'
 
 type DashboardViews = ReturnType<typeof useGraderDashboardAnalytics>
 
@@ -41,10 +42,10 @@ export function TendenciaMultiSessionCard({ multiSessionInsightsView }: Props) {
           <div className={cn('p-2.5 rounded-ctl border', p0BgClass)}>
             <p className="text-caption tracking-wide text-muted-foreground">P0 vs promedio</p>
             <p className={cn('text-lg font-bold tabular-nums', p0Color)}>
-              {m.deltaP0 >= 0 ? '+' : ''}{m.deltaP0.toFixed(2)} pp
+              {m.deltaP0 >= 0 ? '+' : ''}{dec2(m.deltaP0)} pp
             </p>
             <p className="text-caption text-muted-foreground">
-              hist. {m.avgP0.toFixed(2)}% · posición {percentileLabel}
+              hist. {dec2(m.avgP0)}% · posición {percentileLabel}
             </p>
           </div>
           <div className="p-2.5 rounded-ctl border bg-muted/20">

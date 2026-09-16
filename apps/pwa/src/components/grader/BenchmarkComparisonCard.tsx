@@ -5,6 +5,7 @@ import { MATRIX_P0_CAUSES } from '@/services/grader/graderMatrixP0Causes'
 import type { MatrixP0Cause } from '@/services/grader/types'
 import type { PeriodAggregate } from '@/services/grader/graderPeriodAggregate'
 import type { SeasonBenchmark, BenchmarkComparison } from '@/services/grader/graderBenchmarks'
+import { dec1, dec2 } from '@/utils/formatoNumeros'
 
 interface Props {
   period: PeriodAggregate
@@ -78,10 +79,10 @@ export function BenchmarkComparisonCard({ period, benchmark, comparison }: Props
             <p className="text-xs text-muted-foreground">
               {'P0% período: '}
               <span className="font-mono font-medium">
-                {period.stats.p0PctWeighted.toFixed(2)}%
+                {dec2(period.stats.p0PctWeighted)}%
               </span>
               {'  ·  base temporada: '}
-              <span className="font-mono font-medium">{benchmark.p0Pct.toFixed(2)}%</span>
+              <span className="font-mono font-medium">{dec2(benchmark.p0Pct)}%</span>
               {'  '}
               <span
                 className={cn(
@@ -93,7 +94,7 @@ export function BenchmarkComparisonCard({ period, benchmark, comparison }: Props
                       : 'text-muted-foreground',
                 )}
               >
-                ({overallDelta >= 0 ? '+' : ''}{overallDelta.toFixed(2)} pp)
+                ({overallDelta >= 0 ? '+' : ''}{dec2(overallDelta)} pp)
               </span>
             </p>
           </div>
@@ -120,7 +121,7 @@ export function BenchmarkComparisonCard({ period, benchmark, comparison }: Props
                     style={{ width: `${Math.min(periodPct, 100)}%` }}
                   />
                 </div>
-                <span className="w-10 text-right font-mono">{periodPct.toFixed(1)}%</span>
+                <span className="w-10 text-right font-mono">{dec1(periodPct)}%</span>
                 <span
                   className={cn(
                     'w-16 text-right font-mono',
@@ -132,7 +133,7 @@ export function BenchmarkComparisonCard({ period, benchmark, comparison }: Props
                   )}
                 >
                   {delta >= 0 ? '+' : ''}
-                  {delta.toFixed(1)} pp
+                  {dec1(delta)} pp
                 </span>
               </div>
             )

@@ -8,7 +8,19 @@
  *
  * `dec1` es para mostrar. Para calcular, seguir usando el número.
  */
-export function dec1(n: number): string {
-  if (!Number.isFinite(n)) return '—'
+export function dec1(n: number | null | undefined): string {
+  if (n == null || !Number.isFinite(n)) return '—'
   return n.toLocaleString('es-CL', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+}
+
+/**
+ * Dos decimales, para porcentajes finos (P0%) y montos.
+ *
+ * Acepta null/undefined y devuelve «—» porque medio módulo llama con datos que
+ * pueden faltar (`m.targetCpm?.toFixed(2)`): así el que formatea no tiene que
+ * repetir el guard en cada llamada.
+ */
+export function dec2(n: number | null | undefined): string {
+  if (n == null || !Number.isFinite(n)) return '—'
+  return n.toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }

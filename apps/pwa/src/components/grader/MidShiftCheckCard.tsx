@@ -27,6 +27,7 @@ import { fmtDurationMin, fmtTime } from '@/services/grader/graderTimeFormat'
 import { GateChangeTrigger } from './GateChangeTrigger'
 import type { GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
 import type { GateAssignment, GraderDailySummary } from '@/services/grader/types'
+import { dec1 } from '@/utils/formatoNumeros'
 
 /** A partir de acá el Excel describe un turno que ya cambió. */
 const EXCEL_VIEJO_MIN = 90
@@ -121,7 +122,7 @@ export function MidShiftCheckCard({
                 <span key={f.key}>
                   {i > 0 && ' · '}
                   <span className="font-medium text-foreground">{f.label}</span> se lleva el{' '}
-                  <span className="tabular-nums font-medium text-ink-crit">{f.productionPct.toFixed(1)}%</span>
+                  <span className="tabular-nums font-medium text-ink-crit">{dec1(f.productionPct)}%</span>
                   {' con '}
                   <span className="tabular-nums">
                     {f.gates.length === 0 ? 'ninguna gate' : `${f.gates.length} gate${f.gates.length > 1 ? 's' : ''}`}
@@ -160,8 +161,8 @@ export function MidShiftCheckCard({
                   <div className="text-muted-foreground mt-0.5 tabular-nums">
                     Candidatas: {m.fromGates.map((g) => `G${g}`).join(', ')}
                     {' · '}
-                    {m.toLabel} pasa de {m.beforeRatio.toFixed(1)}× a{' '}
-                    {Number.isFinite(m.afterRatio) ? `${m.afterRatio.toFixed(1)}×` : '—'}
+                    {m.toLabel} pasa de {dec1(m.beforeRatio)}× a{' '}
+                    {Number.isFinite(m.afterRatio) ? `${dec1(m.afterRatio)}×` : '—'}
                     {m.afterStatus === 'optimo' && <span className="text-ink-ok"> (equilibrado)</span>}
                     {m.afterStatus === 'saturado' && <span className="text-ink-warn"> (sigue apretado)</span>}
                   </div>
@@ -173,7 +174,7 @@ export function MidShiftCheckCard({
                   variant="compact"
                   initialGate={m.fromGates[0]}
                   initialCalibre={m.toLabel}
-                  initialReason={`Corte de control: ${m.toLabel} se lleva el ${check.fits.find((f) => f.key === m.toKey)?.productionPct.toFixed(1)}% de lo que va del turno`}
+                  initialReason={`Corte de control: ${m.toLabel} se lleva el ${dec1(check.fits.find((f) => f.key === m.toKey)?.productionPct)}% de lo que va del turno`}
                   triggerLabel="Cambiar →"
                   onSaved={onSaved}
                 />
@@ -200,7 +201,7 @@ export function MidShiftCheckCard({
                 const desc = [
                   `[grader-gates · corte ${shiftDocId}]`,
                   ...saturated.map((f) =>
-                    `${f.label}: ${f.productionPct.toFixed(1)}% de lo que va con ${f.gates.length === 0 ? 'ninguna gate' : `${f.gates.length} gate${f.gates.length > 1 ? 's' : ''}`}`),
+                    `${f.label}: ${dec1(f.productionPct)}% de lo que va con ${f.gates.length === 0 ? 'ninguna gate' : `${f.gates.length} gate${f.gates.length > 1 ? 's' : ''}`}`),
                   ...(estPiecesOnSaturated != null ? [`≈${estPiecesOnSaturated.toLocaleString('es-CL')} piezas de ese calibre aún por pasar`] : []),
                   '',
                   'Pauta:',
@@ -220,7 +221,7 @@ export function MidShiftCheckCard({
               onClick={() => {
                 void copiarTexto([
                   `Corte de control — ${shiftDocId} (quedan ${fmtDurationMin(check.remainingMin)})`,
-                  ...saturated.map((f) => `${f.label} apretado: ${f.productionPct.toFixed(1)}% de lo que va, ${f.gates.length} gate${f.gates.length === 1 ? '' : 's'}`),
+                  ...saturated.map((f) => `${f.label} apretado: ${dec1(f.productionPct)}% de lo que va, ${f.gates.length} gate${f.gates.length === 1 ? '' : 's'}`),
                   ...moves.map((m, i) => `${i + 1}. Mover 1 gate de ${m.fromLabel} → ${m.toLabel} — candidatas ${m.fromGates.map((g) => `G${g}`).join(', ')}`),
                   urlTurnoGates(shiftDocId),
                 ].join('\n')).then(() => {

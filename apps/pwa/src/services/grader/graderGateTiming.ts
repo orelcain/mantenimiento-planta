@@ -28,6 +28,7 @@ import type {
 } from './types'
 import { getGradingBelt } from './graderBeltHelpers'
 import { TIMING_THRESHOLDS } from './graderThresholds'
+import { dec1, dec2 } from '@/utils/formatoNumeros'
 
 // ── Tipos públicos ──────────────────────────────────────────────────────────
 
@@ -366,16 +367,16 @@ export function computeGateTimingSignals(
       const active = assignedGate?.active ?? true
 
       const hintParts = [
-        `${fp.distanceFromSensorMeters.toFixed(2)} m @ ${beltSpeedMps.toFixed(2)} m/s`,
-        `${tAvailable.toFixed(2)}s disponibles − ${tRequired.toFixed(2)}s requeridos`,
-        `margen ${margin >= 0 ? '+' : ''}${margin.toFixed(2)}s`,
+        `${dec2(fp.distanceFromSensorMeters)} m @ ${dec2(beltSpeedMps)} m/s`,
+        `${dec2(tAvailable)}s disponibles − ${dec2(tRequired)}s requeridos`,
+        `margen ${margin >= 0 ? '+' : ''}${dec2(margin)}s`,
       ]
       if (breakdown) {
         hintParts.push(
           `neumático: válvula ${(breakdown.valveSwitchSec * 1000).toFixed(0)}ms + `
           + `línea ${(breakdown.lineChargeSec * 1000).toFixed(0)}ms + `
           + `cilindro ${(breakdown.cylinderStrokeSec * 1000).toFixed(0)}ms`
-          + ` (P_eff ${breakdown.effectivePressureBar.toFixed(1)} bar)`,
+          + ` (P_eff ${dec1(breakdown.effectivePressureBar)} bar)`,
         )
       }
       if (!active) hintParts.push('gate inactiva')
@@ -488,7 +489,7 @@ export function computeOptimalGateAssignment(
       } else if (isMatch) {
         reason = `coincide con asignación actual (${sg.timingScore}/100 timing)`
       } else {
-        reason = `alto timing (${sg.timingScore}/100) → reasignar a ${suggestedCalibre}${sug?.demandPct ? ` (${sug.demandPct.toFixed(1)}% demanda)` : ''}`
+        reason = `alto timing (${sg.timingScore}/100) → reasignar a ${suggestedCalibre}${sug?.demandPct ? ` (${dec1(sug.demandPct)}% demanda)` : ''}`
       }
       return {
         gateNumber: sg.gateNumber,

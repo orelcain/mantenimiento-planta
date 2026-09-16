@@ -12,6 +12,7 @@
 import type { MatrixP0Cause } from '@/services/grader/types'
 import type { MachineImpact } from '@/services/shoplogix/shoplogixCorrelation'
 import { shortMachineName } from './graderMachineNames'
+import { dec1, dec2 } from '@/utils/formatoNumeros'
 
 // ── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -82,7 +83,7 @@ export function deriveSuggestions(
       id: 'p0-critical-general',
       category: 'verificar',
       title: 'P0 crítico — revisar con supervisor',
-      description: `Rechazo ${p0Pct.toFixed(1)}% supera umbral crítico (4%). Escalar para decisión de detención o ajuste urgente.`,
+      description: `Rechazo ${dec1(p0Pct)}% supera umbral crítico (4%). Escalar para decisión de detención o ajuste urgente.`,
       severity: 'critical',
     })
   }
@@ -173,7 +174,7 @@ export function deriveSuggestions(
       id: 'general-verify',
       category: 'verificar',
       title: 'Monitorear evolución en próximos 30 min',
-      description: `P0 en ${p0Pct.toFixed(1)}% (zona warning). Verificar si la tendencia es ascendente antes de intervenir.`,
+      description: `P0 en ${dec1(p0Pct)}% (zona warning). Verificar si la tendencia es ascendente antes de intervenir.`,
       severity: 'recommended',
     })
   }
@@ -209,7 +210,7 @@ export function deriveSuggestions(
       id: 'scatter-baader-rate',
       category: 'oficina',
       title: 'Investigar caídas de ritmo en las Baader',
-      description: `Detectada correlación operacional: cada -10 ciclos/5min de las Baaders → +${context.scatterSlope.deltaP0_per_minus10cycles.toFixed(2)} puntos P0% del Grader. Indica que la calidad del corte en evisceración impacta la clasificación. Verificar materia prima, dotación de operadores y mantenciones programadas en esa línea.`,
+      description: `Detectada correlación operacional: cada -10 ciclos/5min de las Baaders → +${dec2(context.scatterSlope.deltaP0_per_minus10cycles)} puntos P0% del Grader. Indica que la calidad del corte en evisceración impacta la clasificación. Verificar materia prima, dotación de operadores y mantenciones programadas en esa línea.`,
       severity: 'warning',
     })
   }

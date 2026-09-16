@@ -29,6 +29,7 @@ import {
 import type { GateConfigSnapshot, ConfigDiff } from '@/services/grader/graderConfigSnapshot.service'
 import type { TimelineBucket } from '@/services/grader/types'
 import { fmtTime } from '@/services/grader/graderTimeFormat'
+import { dec2 } from '@/utils/formatoNumeros'
 
 interface Props {
   shiftDocId: string
@@ -103,12 +104,12 @@ function VerdictBadge({ v }: { v: SegmentVerdict }) {
   return (
     <div
       className={cn('inline-flex items-center gap-1.5 text-caption rounded-ctl px-2 py-1 mt-1 border', visualByStatus.bg, visualByStatus.border)}
-      title={`Antes ${v.beforePct.toFixed(2)}% → Después ${v.afterPct.toFixed(2)}% (${v.afterPieces.toLocaleString('es-CL')} piezas en ${v.afterMinutes} min)`}
+      title={`Antes ${dec2(v.beforePct)}% → Después ${dec2(v.afterPct)}% (${v.afterPieces.toLocaleString('es-CL')} piezas en ${v.afterMinutes} min)`}
     >
       <visualByStatus.Icon className={cn('w-3 h-3', color)} />
       <span className={cn('font-medium', color)}>{label}</span>
       <span className={color}>
-        {sign}{v.delta.toFixed(2)}pts
+        {sign}{dec2(v.delta)}pts
       </span>
       <span className="text-muted-foreground">
         en {v.afterMinutes} min · {v.afterPieces.toLocaleString('es-CL')} pzas

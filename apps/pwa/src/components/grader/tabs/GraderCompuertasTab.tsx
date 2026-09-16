@@ -25,6 +25,7 @@ import type {
   GraderAnalysisConfig,
 } from '@/services/grader/types'
 import type { TimingThresholdOverrides } from '@/services/grader/graderGateTiming'
+import { dec1, dec2 } from '@/utils/formatoNumeros'
 
 interface Props {
   analytics: GraderAnalyticsResult
@@ -259,10 +260,10 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                           gs.cv > 0.2 && 'text-ink-crit',
                           gs.cv > 0.15 && gs.cv <= 0.2 && 'text-ink-warn',
                         )}>
-                          {(gs.cv * 100).toFixed(1)}%
+                          {dec1((gs.cv * 100))}%
                         </span>
                       </td>
-                      <td className="py-2 px-2 text-right">{gs.utilizationPct.toFixed(1)}%</td>
+                      <td className="py-2 px-2 text-right">{dec1(gs.utilizationPct)}%</td>
                       <td className="py-2 px-2">
                         <Badge variant="outline" className="text-caption">
                           {gs.assignedCalibre}
@@ -274,7 +275,7 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                           gs.mismatchPct > 30 && 'text-ink-crit',
                           gs.mismatchPct > 15 && gs.mismatchPct <= 30 && 'text-ink-warn',
                         )}>
-                          {gs.mismatchPct.toFixed(1)}%
+                          {dec1(gs.mismatchPct)}%
                         </span>
                       </td>
                     </tr>
@@ -400,7 +401,7 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
             <p className="text-xs text-muted-foreground">
               {timingSignals[0]?.pneumaticBreakdown
                 ? 'Modelo neumático real: t_válvula + t_carga_línea + t_cilindro por gate. Presión y timing varían por longitud de línea.'
-                : `Tiempo disponible (dist / vel) vs requerido (salmón ${physicalConfig?.avgSalmonLengthCm ?? '—'}cm + reset ${(physicalConfig?.flipperResetTimeSec ?? 0.45).toFixed(2)}s plano). Configurar neumática para desglose per-gate.`
+                : `Tiempo disponible (dist / vel) vs requerido (salmón ${physicalConfig?.avgSalmonLengthCm ?? '—'}cm + reset ${dec2((physicalConfig?.flipperResetTimeSec ?? 0.45))}s plano). Configurar neumática para desglose per-gate.`
               }
             </p>
           </CardHeader>
@@ -463,17 +464,17 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                     return (
                       <tr key={t.gateNumber} className={cn('border-b hover:bg-muted/30', bg)} title={t.hint}>
                         <td className="py-2 px-2 font-medium">Gate {t.gateNumber}</td>
-                        <td className="py-2 px-2 text-right tabular-nums">{t.distanceMeters.toFixed(2)}</td>
-                        <td className="py-2 px-2 text-right tabular-nums">{t.tAvailableSec.toFixed(2)}s</td>
+                        <td className="py-2 px-2 text-right tabular-nums">{dec2(t.distanceMeters)}</td>
+                        <td className="py-2 px-2 text-right tabular-nums">{dec2(t.tAvailableSec)}s</td>
                         {pb && (
                           <>
                             <td className="py-2 px-2 text-right tabular-nums text-muted-foreground">{(pb.valveSwitchSec * 1000).toFixed(0)}ms</td>
                             <td className="py-2 px-2 text-right tabular-nums text-muted-foreground">{(pb.lineChargeSec * 1000).toFixed(0)}ms</td>
                             <td className="py-2 px-2 text-right tabular-nums text-muted-foreground">{(pb.cylinderStrokeSec * 1000).toFixed(0)}ms</td>
-                            <td className={cn('py-2 px-2 text-right tabular-nums', pEffColor)}>{pb.effectivePressureBar.toFixed(1)}</td>
+                            <td className={cn('py-2 px-2 text-right tabular-nums', pEffColor)}>{dec1(pb.effectivePressureBar)}</td>
                           </>
                         )}
-                        <td className="py-2 px-2 text-right tabular-nums text-muted-foreground">{t.tRequiredSec.toFixed(2)}s</td>
+                        <td className="py-2 px-2 text-right tabular-nums text-muted-foreground">{dec2(t.tRequiredSec)}s</td>
                         <td className={cn('py-2 px-2 text-right tabular-nums font-semibold', color)}>
                           {t.marginSec >= 0 ? '+' : ''}{(t.marginSec * 1000).toFixed(0)}ms
                         </td>
@@ -489,7 +490,7 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
               </table>
             </div>
             <div className="flex items-center gap-4 mt-3 text-caption text-muted-foreground flex-wrap">
-              <span>Sorting Belt: {timingSignals[0]?.beltSpeedMps.toFixed(2)} m/s</span>
+              <span>Sorting Belt: {dec2(timingSignals[0]?.beltSpeedMps)} m/s</span>
               {timingSignals[0]?.pneumaticBreakdown ? (
                 <>
                   <span>·</span>
@@ -502,7 +503,7 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
               ) : (
                 <>
                   <span>·</span>
-                  <span>Reset plano: {(physicalConfig?.flipperResetTimeSec ?? 0.45).toFixed(2)}s</span>
+                  <span>Reset plano: {dec2((physicalConfig?.flipperResetTimeSec ?? 0.45))}s</span>
                   <span>·</span>
                   <span className="italic text-ink-warn">Configurar neumática en "Configurar compuertas" para desglose per-gate.</span>
                 </>

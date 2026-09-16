@@ -20,6 +20,7 @@ import { getShiftMeta } from '@/services/grader/graderShiftDisplay'
 import { fmtTime } from '@/services/grader/graderTimeFormat'
 import { ShiftMachinesHalf } from './ShiftMachinesHalf'
 import { textoPuerta0 } from '@/services/grader/textoPuerta0'
+import { dec1 } from '@/utils/formatoNumeros'
 
 /** Colores del reparto de ciclos entre máquinas — categóricos, no semánticos:
  *  codifican QUÉ máquina, no si está bien o mal. */
@@ -183,7 +184,7 @@ export function ShoplogixOnlyScorecard({ snapshot, shiftWindow, shiftLabel, date
                     <span className="text-muted-foreground truncate">{shortMachineName(m.machineName) || `Máquina ${i + 1}`}</span>
                     <b className="tabular-nums ml-auto">{m.totalCycles.toLocaleString('es-CL')}</b>
                     <span className="text-muted-foreground tabular-nums w-12 text-right">
-                      {((m.totalCycles / totalCycles) * 100).toFixed(1)}%
+                      {dec1(((m.totalCycles / totalCycles) * 100))}%
                     </span>
                   </div>
                 ))}
@@ -198,8 +199,8 @@ export function ShoplogixOnlyScorecard({ snapshot, shiftWindow, shiftLabel, date
                 <InfoTooltip
                   text={`Ritmo de producción sobre ${
                     snapshot.lineWindowSource === 'effective'
-                      ? `la ventana REAL de operación (de la primera a la última pieza, ${snapshot.lineWindowHours.toFixed(1)} h)`
-                      : `la ventana del turno (${snapshot.lineWindowHours.toFixed(1)} h)`
+                      ? `la ventana REAL de operación (de la primera a la última pieza, ${dec1(snapshot.lineWindowHours)} h)`
+                      : `la ventana del turno (${dec1(snapshot.lineWindowHours)} h)`
                   }.`}
                   iconSize={10} position="top"
                 />

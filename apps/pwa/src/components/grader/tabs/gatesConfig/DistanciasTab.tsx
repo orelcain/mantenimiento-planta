@@ -4,6 +4,7 @@ import { Camera } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getGradingBelt, GRADING_BELT_DEFAULT_MPS } from '@/services/grader/graderBeltHelpers'
 import type { GraderPhysicalConfig } from '@/services/grader/types'
+import { dec2 } from '@/utils/formatoNumeros'
 
 interface DistanciasTabProps {
   physicalConfig: GraderPhysicalConfig
@@ -83,7 +84,7 @@ export function DistanciasTab({ physicalConfig, setPhysicalConfig, updateFlipper
                   <span className="text-caption text-muted-foreground">m</span>
                 </div>
                 <p className="text-caption font-mono text-muted-foreground">
-                  {physTimeSec.toFixed(2)} s reacción
+                  {dec2(physTimeSec)} s reacción
                 </p>
               </div>
 
@@ -108,7 +109,7 @@ export function DistanciasTab({ physicalConfig, setPhysicalConfig, updateFlipper
                 </div>
                 <div className="flex items-center justify-between">
                   <p className="text-caption font-mono text-muted-foreground">
-                    {z2TimeSec != null ? `${z2TimeSec.toFixed(2)} s` : '—'}
+                    {z2TimeSec != null ? `${dec2(z2TimeSec)} s` : '—'}
                   </p>
                   {deltaMm != null && (
                     <p className={cn('text-caption font-mono', deltaMm < 0 ? 'text-amber-500' : 'text-muted-foreground')}>

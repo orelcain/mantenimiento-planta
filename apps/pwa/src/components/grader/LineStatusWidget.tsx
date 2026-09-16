@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils'
 import { fmtTime } from '@/services/grader/graderTimeFormat'
 import { verdictFromP0Pct } from '@/services/grader/graderThresholds'
 import type { GraderDailySummary } from '@/services/grader/types'
+import { dec1 } from '@/utils/formatoNumeros'
 
 const P0_COLOR: Record<ReturnType<typeof verdictFromP0Pct>, string> = {
   ok:       'text-emerald-400',
@@ -79,7 +80,7 @@ export function LineStatusWidget({
           {p0Pct !== null ? (
             <>
               <span className={cn('text-lg font-bold tabular-nums leading-tight', P0_COLOR[verdict])}>
-                {p0Pct.toFixed(1)}%
+                {dec1(p0Pct)}%
               </span>
               <span className="text-caption text-muted-foreground/50">P0 del turno</span>
             </>

@@ -1,6 +1,7 @@
 import type { GraderPhysicalConfig } from '../types'
 import { getGradingBeltSpeedMps } from '../graderBeltHelpers'
 import type { PointZeroSuggestion } from './types'
+import { dec2 } from '@/utils/formatoNumeros'
 
 interface Params {
   physicalConfig: GraderPhysicalConfig
@@ -41,9 +42,9 @@ export function suggestPocketCount({
       unit: 'pockets',
       source: 'batch',
       sourceLabel: `Análisis de flujo — ${cadenceSource}`,
-      reasoning: `Con ${currentCount} pockets activos y la cadencia actual (${cadencePiecesPerMin.toFixed(0)} pz/min), los peces se solapan en la cinta (ratio ${lengthToSpacingRatio.toFixed(2)} ≥ 1.0). Reducir a ${suggested} pockets baja la cadencia y crea un gap libre de ~${(gapAlt * 100).toFixed(0)} cm.`,
+      reasoning: `Con ${currentCount} pockets activos y la cadencia actual (${cadencePiecesPerMin.toFixed(0)} pz/min), los peces se solapan en la cinta (ratio ${dec2(lengthToSpacingRatio)} ≥ 1.0). Reducir a ${suggested} pockets baja la cadencia y crea un gap libre de ~${(gapAlt * 100).toFixed(0)} cm.`,
       dataPoints: [
-        { label: 'Ratio pez/paso actual', value: lengthToSpacingRatio.toFixed(2), detail: '≥ 1.0 = solapamiento' },
+        { label: 'Ratio pez/paso actual', value: dec2(lengthToSpacingRatio), detail: '≥ 1.0 = solapamiento' },
         { label: 'Cadencia actual', value: `${cadencePiecesPerMin.toFixed(0)} pz/min`, detail: cadenceSource },
         { label: `Gap libre con ${suggested} pockets`, value: `${(gapAlt * 100).toFixed(0)} cm` },
         { label: `Cadencia con ${suggested} pockets`, value: `${cadenceAlt.toFixed(0)} pz/min` },
@@ -72,9 +73,9 @@ export function suggestPocketCount({
       unit: 'pockets',
       source: 'batch',
       sourceLabel: `Análisis de flujo — ${cadenceSource}`,
-      reasoning: `El pez ocupa el ${(lengthToSpacingRatio * 100).toFixed(0)}% del paso entre peces consecutivos (ratio ${lengthToSpacingRatio.toFixed(2)}). El margen operativo es estrecho: cualquier variación en velocidad o cadencia puede provocar solapamientos. Con ${suggested} pockets el gap libre sube a ~${(gapAlt * 100).toFixed(0)} cm.`,
+      reasoning: `El pez ocupa el ${(lengthToSpacingRatio * 100).toFixed(0)}% del paso entre peces consecutivos (ratio ${dec2(lengthToSpacingRatio)}). El margen operativo es estrecho: cualquier variación en velocidad o cadencia puede provocar solapamientos. Con ${suggested} pockets el gap libre sube a ~${(gapAlt * 100).toFixed(0)} cm.`,
       dataPoints: [
-        { label: 'Ratio pez/paso', value: lengthToSpacingRatio.toFixed(2), detail: '> 0.7 = margen estrecho' },
+        { label: 'Ratio pez/paso', value: dec2(lengthToSpacingRatio), detail: '> 0.7 = margen estrecho' },
         { label: `Gap con ${suggested} pockets`, value: `${(gapAlt * 100).toFixed(0)} cm` },
       ],
       confidence: cadenceSource === 'excel' ? 'high' : 'medium',
