@@ -3,6 +3,7 @@ import { storage } from '@/services/firebase'
 import { processImageForUpload } from '@/utils/images/processImage'
 import { generateId } from '@/lib/utils'
 import type { EtiquetaFoto, FotoEvento } from './bitacora.types'
+import { encolarBorrado, purgarBorradosPendientes, quitarBorrado } from './borradosPendientes'
 
 /**
  * Fotos de la bitácora.
@@ -76,9 +77,30 @@ export async function subirFotoBitacora(
 export async function borrarFotoBitacora(path: string): Promise<void> {
   try {
     await deleteObject(storageRef(storage, path))
+    quitarBorrado(path)
   } catch (e) {
     if ((e as { code?: string })?.code !== 'storage/object-not-found') throw e
+    quitarBorrado(path)
   }
+}
+
+/**
+ * Borra una foto que YA no tiene dueño (un borrador cancelado, una foto quitada
+ * al editar). Si falla —sin señal, que es lo normal en planta— queda anotada
+ * para reintentarlo: si no, el archivo se queda pagándose para siempre sin que
+ * ningún documento lo mencione.
+ */
+export async function borrarFotoOEncolar(path: string): Promise<void> {
+  try {
+    await borrarFotoBitacora(path)
+  } catch {
+    encolarBorrado(path)
+  }
+}
+
+/** Vacía la cola de borrados pendientes (al abrir la bitácora y al volver la señal). */
+export function purgarFotosPendientes(): Promise<{ borradas: number; pendientes: number }> {
+  return purgarBorradosPendientes((path) => borrarFotoBitacora(path))
 }
 
 export interface ImagenCargada {
