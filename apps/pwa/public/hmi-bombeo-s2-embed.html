@@ -735,7 +735,7 @@
     } else if (action.startsWith('tbd-')) {
       // Pendientes de definir lógica física (Descarga Manual TkA/TkB)
       console.warn('[hmi] Acción pendiente de definir:', action,
-        '— pasame qué debería hacer y la implemento.');
+        '— pásame qué debería hacer y la implemento.');
       el.classList.add('tbd-flash');
       setTimeout(() => el.classList.remove('tbd-flash'), 280);
     }
@@ -1172,7 +1172,7 @@
       else if (info.kind === 'g-translate' && info.innerTexts && (e.key === '+' || e.key === '-' || e.key === '=' || e.key === 'z' || e.key === 'Z')) {
         // +/- y Z afectan SÓLO el texto del VALOR (el que tiene data-key, ej: text.cargaA).
         // Los labels estáticos ("Carga", "Desc.") quedan intactos.
-        // Si querés que afecte a TODOS los textos del readout: Shift+T como modificador (opcional).
+        // Si quieres que afecte a TODOS los textos del readout: Shift+T como modificador (opcional).
         const targets = info.innerTexts.filter(t => t.el.hasAttribute('data-key'));
         // Fallback: si no hay ningún texto con data-key (caso readout de 1 solo texto sin key),
         // tocamos todos los textos del grupo.
@@ -1520,7 +1520,7 @@
         renderList();
       }
       clearSelectedPipe();
-      editOutput.placeholder = '🗑 Eliminado: ' + label + ' — usá "📦 Copiar BLOQUE pipes" o "📋 Copiar SVG" para persistir el cambio al HTML';
+      editOutput.placeholder = '🗑 Eliminado: ' + label + ' — usa "📦 Copiar BLOQUE pipes" o "📋 Copiar SVG" para persistir el cambio al HTML';
     }
 
     document.getElementById('btn-delete-selected').addEventListener('click', deleteSelectedElement);

@@ -332,7 +332,7 @@ td.num{font-family:var(--mono);text-align:right;white-space:nowrap}
 #fv-canvas{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform;line-height:0}
 #fv-canvas img{display:block;max-width:none;background:#fff;border-radius:3px;user-select:none;-webkit-user-drag:none}
 #fv-stage.adding{cursor:crosshair}
-#fv-stage.adding::after{content:"Tocá el punto exacto de la figura";position:absolute;left:50%;top:12px;
+#fv-stage.adding::after{content:"Toca el punto exacto de la figura";position:absolute;left:50%;top:12px;
   transform:translateX(-50%);background:var(--warn);color:#fff;font-family:var(--mono);font-size:12px;
   padding:7px 12px;border-radius:20px;pointer-events:none;white-space:nowrap;max-width:92%}
 /* pins sobre la figura */
@@ -484,7 +484,7 @@ Position</div></div>
 
   <h3>Qué hace</h3>
   <p>Abre <strong>todos los grifos esféricos</strong> de los tubos de aspiración de las herramientas (aspirador, excavador A y excavador B). Al seguir girando la perilla hacia las posiciones de servicio, los grifos se cierran de nuevo.</p>
-  <p>Es la posición obligatoria para la limpieza diaria y la limpieza básica semanal: con los grifos abiertos podés meter agua por las aberturas de aspiración y lavar por dentro las válvulas y la tubería.</p>
+  <p>Es la posición obligatoria para la limpieza diaria y la limpieza básica semanal: con los grifos abiertos puedes meter agua por las aberturas de aspiración y lavar por dentro las válvulas y la tubería.</p>
 
   <h3>Uso como diagnóstico</h3>
   <p>Poca gente la usa así, pero es un test funcional gratis de las tres válvulas magnéticas de los grifos esféricos:</p>
@@ -498,7 +498,7 @@ Position</div></div>
   </table>
 
   <div class="flag warn"><b>Chequeo de 30 segundos</b>
-  Con la máquina en limpieza y la bomba de vacío andando, poné la mano cerca de cada abertura de aspiración. Las tres tienen que tirar parejo. Si una tira notoriamente menos, ya sabés dónde mirar antes de que aparezcan cortes malos.</div>
+  Con la máquina en limpieza y la bomba de vacío andando, pon la mano cerca de cada abertura de aspiración. Las tres tienen que tirar parejo. Si una tira notoriamente menos, ya sabes dónde mirar antes de que aparezcan cortes malos.</div>
 
   <h3>Secuencia de limpieza de la cadena</h3>
   <ol class="steps">
@@ -512,7 +512,7 @@ Position</div></div>
   </ol>
 
   <h3>Chequeo de punto cero con la máquina en limpieza</h3>
-  <p>Con la máquina detenida en posición de limpieza podés verificar de un vistazo que cada herramienta esté donde corresponde. Este es el recorrido, en el orden en que pasa el pescado:</p>
+  <p>Con la máquina detenida en posición de limpieza puedes verificar de un vistazo que cada herramienta esté donde corresponde. Este es el recorrido, en el orden en que pasa el pescado:</p>
   <div class="figrow">
     <figure data-fig="dib-17"><img loading="lazy" decoding="async" alt="Ajuste del carro"><figcaption>dib. 17 · Carro hasta la chapaleta de entrada · 400 mm</figcaption></figure>
     <figure data-fig="dib-15"><img loading="lazy" decoding="async" alt="Medidor de longitud"><figcaption>dib. 15 · Medidor de longitud · 400±2 · 80 · 250 mm</figcaption></figure>
@@ -523,7 +523,7 @@ Position</div></div>
     <figure data-fig="dib-63"><img loading="lazy" decoding="async" alt="Expulsador"><figcaption>dib. 63 · Expulsador / extractor · ≈2 mm</figcaption></figure>
     <figure data-fig="dib-33"><img loading="lazy" decoding="async" alt="Válvulas neumáticas"><figcaption>dib. 33 · Válvulas Y y regulador 4 bar</figcaption></figure>
   </div>
-  <p class="scrollhint">Deslizá la fila para ver las 8 · tocá una figura para ampliarla y anotarla.</p>
+  <p class="scrollhint">Desliza la fila para ver las 8 · toca una figura para ampliarla y anotarla.</p>
 
   <div class="flag danger"><b>Después de limpiar, engrasar siempre</b>
   El engrase expulsa el agua que entró a los cojinetes. Saltárselo es la vía rápida a marcha dura en las bielas — y la marcha dura es la causa madre de la mitad de los códigos E8xx.</div>
@@ -557,14 +557,14 @@ through switch 4</div></div>
   </ol>
 
   <div class="flag warn"><b>Las tasas /1000Fi no aparecen antes de los 1000 pescados</b>
-  Si ves los totales pero no la segunda línea, es porque la máquina no ha superado los 1000 pescados desde el último reseteo. Podés calcular la tasa a mano: <code>total ÷ ∑FI-TODAY × 1000</code>.</div>
+  Si ves los totales pero no la segunda línea, es porque la máquina no ha superado los 1000 pescados desde el último reseteo. Puedes calcular la tasa a mano: <code>total ÷ ∑FI-TODAY × 1000</code>.</div>
 
   <h3>Los 13 contadores, uno por uno</h3>
   <table>
     <thead><tr><th>Pantalla</th><th>Qué cuenta</th><th>Qué te dice en la práctica</th></tr></thead>
     <tbody>
       <tr><td class="num">∑ FISH</td><td>Pescados elaborados, histórico</td><td>El denominador de todo. Sin este número ninguna otra cifra significa algo.</td></tr>
-      <tr><td class="num">∑ FI-TODAY</td><td>Pescados desde el último reseteo del protocolo</td><td>El conteo del turno. <strong>Usá este en vez de resetear</strong>.</td></tr>
+      <tr><td class="num">∑ FI-TODAY</td><td>Pescados desde el último reseteo del protocolo</td><td>El conteo del turno. <strong>Usa este en vez de resetear</strong>.</td></tr>
       <tr><td class="num">∑ STOPS</td><td>Fallas de máquina que hicieron parar</td><td>Paradas duras. Es lo que el operador siente como "se cayó otra vez".</td></tr>
       <tr><td class="num">∑ STOP-C</td><td>Fallas que el computador corrigió sin parar</td><td>El indicador adelantado. Sube semanas antes que ∑STOPS.</td></tr>
       <tr><td class="num">∑ TAIL CLIP</td><td>Fallas de abrazadera que pararon la máquina</td><td>El pescado no fue recogido ni con la segunda abrazadera.</td></tr>
@@ -583,7 +583,7 @@ through switch 4</div></div>
   El manual se contradice: en la tabla <code>E 8 N X</code> dice que el dígito 1 es la cuchilla y el 2 el centraje. El display de la máquina dice <code>CENTERING SM1</code> y <code>SLIT KNIFE SM2</code>. <strong>Manda el display.</strong> Los dígitos 3, 4 y 5 coinciden en ambas tablas.</div>
 
   <h3>La firma física del kit</h3>
-  <p>Si dudás de si una máquina tiene Upgrade Kit, además del display podés buscar estas piezas:</p>
+  <p>Si dudas de si una máquina tiene Upgrade Kit, además del display puedes buscar estas piezas:</p>
   <div class="figrow">
     <figure data-fig="dib-65"><img loading="lazy" decoding="async" alt="Caja de conexión del kit"><figcaption>dib. 65 · Caja de conexión: 2 LEDs por enchufe + LED 24 V</figcaption></figure>
     <figure data-fig="dib-35"><img loading="lazy" decoding="async" alt="Transmisor de rotación"><figcaption>dib. 35 (= dib. 64) · Transmisor de rotación sobre el motor</figcaption></figure>
@@ -600,7 +600,7 @@ through switch 4</div></div>
   </ol>
 
   <h3 id="interp">Interpretador de protocolo</h3>
-  <p>Cargá los números que leíste en el panel y te devuelve las tasas y el diagnóstico ordenado por prioridad.</p>
+  <p>Carga los números que leíste en el panel y te devuelve las tasas y el diagnóstico ordenado por prioridad.</p>
 
   <div class="card">
     <div class="grid-in">
@@ -674,16 +674,16 @@ through switch 4</div></div>
   </ol>
 
   <div class="flag warn"><b>Detalle que confunde</b>
-  Si arrancaste la máquina con <code>trout</code> y después pasás a Test 12, el pescado de muestra se elabora con el <strong>programa de trucha</strong>, no de salmón. Si querés probar el programa que usás en producción, arrancá desde <code>salmon</code>.</div>
+  Si arrancaste la máquina con <code>trout</code> y después pasas a Test 12, el pescado de muestra se elabora con el <strong>programa de trucha</strong>, no de salmón. Si quieres probar el programa que usás en producción, arrancá desde <code>salmon</code>.</div>
 
   <div class="flag"><b>Señal automática</b>
-  Si una de las herramientas funciona mal durante el test, la máquina <strong>hace marcha de referencia sola</strong>. Que la veas referenciar en medio del test ya es un hallazgo: anotá cuál herramienta estaba en movimiento en ese momento.</div>
+  Si una de las herramientas funciona mal durante el test, la máquina <strong>hace marcha de referencia sola</strong>. Que la veas referenciar en medio del test ya es un hallazgo: anota cuál herramienta estaba en movimiento en ese momento.</div>
 
   <h3>Cuándo usarlo</h3>
   <ul>
-    <li><strong>Después de cualquier intervención</strong> en una herramienta, antes de meter pescado. Si algo quedó mal ajustado, preferís descubrirlo acá.</li>
+    <li><strong>Después de cualquier intervención</strong> en una herramienta, antes de meter pescado. Si algo quedó mal ajustado, prefieres descubrirlo acá.</li>
     <li><strong>Al inicio del turno</strong> si la máquina estuvo parada el fin de semana. Detecta grifos pegados, cilindros duros y mangueras que perdieron presión.</li>
-    <li><strong>Cuando el protocolo señala un motor</strong> y querés ver el síntoma con tus ojos: corré Test 12 y mirá esa herramienta específica en cámara lenta bajando la velocidad con la perilla 4.</li>
+    <li><strong>Cuando el protocolo señala un motor</strong> y quieres ver el síntoma con tus ojos: corré Test 12 y mira esa herramienta específica en cámara lenta bajando la velocidad con la perilla 4.</li>
   </ul>
 
   <h3>Qué mirar mientras corre</h3>
@@ -732,7 +732,7 @@ through switch 4</div></div>
       <tr><td>Cadena</td><td>En marcha</td><td>Detenida</td></tr>
       <tr><td>Sirve para ver</td><td>El ciclo completo, sincronismo, extractor</td><td>El movimiento fino de una herramienta</td></tr>
       <tr><td>Riesgo</td><td>Bajo</td><td>Obliga a cortar el interruptor principal después</td></tr>
-      <tr><td>Cuándo</td><td>Chequeo general, post-intervención</td><td>Cuando ya sabés qué herramienta mirar</td></tr>
+      <tr><td>Cuándo</td><td>Chequeo general, post-intervención</td><td>Cuando ya sabes qué herramienta mirar</td></tr>
     </tbody>
   </table>
   <p>En la práctica: <strong>Test 12 para buscar, Test 13 para confirmar.</strong></p>
@@ -819,7 +819,7 @@ Stepmotors & Kit</div></div>
 
   <h3>La secuencia del pulsador I</h3>
   <table>
-    <thead><tr><th>Pulsación</th><th>El motor va a</th><th>Qué mirás ahí</th></tr></thead>
+    <thead><tr><th>Pulsación</th><th>El motor va a</th><th>Qué miras ahí</th></tr></thead>
     <tbody>
       <tr><td class="num">1ª</td><td>CERO</td><td>Posición más alta. Todas las herramientas parten de acá.</td></tr>
       <tr><td class="num">2ª</td><td>MÁXIMO</td><td>Distancia <strong>más grande</strong> entre la herramienta y la cadena. Se controla el tope.</td></tr>
@@ -830,7 +830,7 @@ Stepmotors & Kit</div></div>
   </table>
 
   <h3>Test rápido sin herramientas · 5 minutos</h3>
-  <p>Recorré los cinco motores mirando y escuchando. No necesitás medir nada para detectar lo grueso:</p>
+  <p>Recorré los cinco motores mirando y escuchando. No necesitas medir nada para detectar lo grueso:</p>
   <ul>
     <li>¿Alguno llega a destino con <strong>tirones</strong> o se detiene antes? Correa floja o marcha dura.</li>
     <li>¿Se oye <strong>golpe metálico</strong> al llegar al tope? Tornillo corrido o contratuerca suelta.</li>
@@ -1042,9 +1042,9 @@ Fishcounter</div></div>
   <ol class="steps">
     <li>Anotar <code>∑ FISH</code> al inicio de cada turno en el checklist.</li>
     <li>Si el valor de hoy es <strong>menor</strong> que el del turno anterior, alguien reseteó.</li>
-    <li>Como el registro va por turno, sabés cuál fue.</li>
+    <li>Como el registro va por turno, sabes cuál fue.</li>
   </ol>
-  <p>Sin tocar un cable y sin bloquear nada, tenés trazabilidad completa.</p>
+  <p>Sin tocar un cable y sin bloquear nada, tienes trazabilidad completa.</p>
 
   <h3>Si alguna vez hay que resetear de verdad</h3>
   <ul>
@@ -1268,7 +1268,7 @@ E 803         62 %</div></div>
     <span>Cadena de transporte · 5 carros × 11 prismas</span>
     <span>Bielas: lado del pescado dib. 21–24 · caja de accionamiento dib. 25–29</span>
   </div>
-  <p class="mapnote">Los códigos <code>dib. N</code> son los números de figura del manual de instrucciones 1420000804. Tocá cualquier referencia subrayada para ver la figura.</p>
+  <p class="mapnote">Los códigos <code>dib. N</code> son los números de figura del manual de instrucciones 1420000804. Toca cualquier referencia subrayada para ver la figura.</p>
 
   <div class="flag"><b>Por qué el orden importa para diagnosticar</b>
   Todo lo que está aguas arriba condiciona lo de aguas abajo. Una medición de altura corrida (estación 2) hace que las cinco herramientas calculen mal su recorrido. Un centraje abierto de más (SM1) hace que el puntero se asiente lateralmente. Por eso, ante un defecto de corte, se revisa <strong>en el orden de las estaciones</strong>, de la 1 a la 8, nunca al revés.</div>
@@ -1296,9 +1296,9 @@ E 803         62 %</div></div>
   </table>
 
   <h3>Galería de figuras del manual</h3>
-  <p>Todas las figuras del manual 1420000804 más las referencias de planta. Tocá una para abrirla.</p>
-  <div class="flag"><b>Qué podés hacer con una figura abierta</b>
-  <strong>Pellizcá</strong> para acercar y arrastrá para moverte; <strong>doble toque</strong> acerca al punto y otro doble toque vuelve a encuadrar.
+  <p>Todas las figuras del manual 1420000804 más las referencias de planta. Toca una para abrirla.</p>
+  <div class="flag"><b>Qué puedes hacer con una figura abierta</b>
+  <strong>Pellizcá</strong> para acercar y arrastra para moverte; <strong>doble toque</strong> acerca al punto y otro doble toque vuelve a encuadrar.
   Con <strong>+ Nota</strong> tocás el punto exacto del dibujo y dejás una <em>nota</em> (texto que se lee al tocar el número),
   una <em>cota</em> (la medida queda escrita sobre el dibujo) o una <em>foto</em> del punto real de la máquina.
   Las figuras que ya tienen anotaciones se marcan con borde naranja. Abierta desde la app, lo que anotás
@@ -1336,11 +1336,11 @@ E 803         62 %</div></div>
   <div class="pos-head">
     <div class="pos-num">Referencia</div>
     <h2>Códigos</h2>
-    <div class="sub">Buscá por código, herramienta o síntoma</div>
+    <div class="sub">Busca por código, herramienta o síntoma</div>
   </div>
 
   <input id="codeq" type="search" placeholder="Ej: 824 · excavador · aspirador · cero" autocomplete="off">
-  <p style="font-size:13px;color:var(--ink-soft);margin-top:8px">Escribí para filtrar. Vacío muestra todos.</p>
+  <p style="font-size:13px;color:var(--ink-soft);margin-top:8px">Escribe para filtrar. Vacío muestra todos.</p>
 
   <div class="modewrap">
     <span class="mlbl">Nivel de detalle</span>
@@ -1414,11 +1414,11 @@ E 803         62 %</div></div>
   </table>
 
   <h3>Del síntoma a la solución</h3>
-  <p>Tocá el síntoma que reporta el operador. Cada uno abre las causas en el orden en que conviene revisarlas, la solución con sus medidas, y dónde está la pieza en el manual.</p>
+  <p>Toca el síntoma que reporta el operador. Cada uno abre las causas en el orden en que conviene revisarlas, la solución con sus medidas, y dónde está la pieza en el manual.</p>
   <div id="symptoms"></div>
 
   <div class="flag danger"><b>Antes de culpar a la máquina</b>
-  El manual lo dice sin rodeos: <em>los pescados en estado de rigidez cadavérica son causa de un gran número de fallos</em>. Si los contadores están sanos y el corte igual sale mal, revisá la materia prima antes de desarmar nada.</div>
+  El manual lo dice sin rodeos: <em>los pescados en estado de rigidez cadavérica son causa de un gran número de fallos</em>. Si los contadores están sanos y el corte igual sale mal, revisa la materia prima antes de desarmar nada.</div>
 </section>
 
 <footer>
@@ -1545,7 +1545,7 @@ function diagnose(){
   const out=document.getElementById('verdict');
   out.innerHTML='';
   if(f<=0){
-    out.innerHTML='<div class="vr warn"><h5>Falta ∑ FISH</h5><p>Sin el número de pescados no se puede calcular ninguna tasa. Cargá <code>∑ FISH</code> o <code>∑ FI-TODAY</code> y volvé a diagnosticar.</p></div>';
+    out.innerHTML='<div class="vr warn"><h5>Falta ∑ FISH</h5><p>Sin el número de pescados no se puede calcular ninguna tasa. Carga <code>∑ FISH</code> o <code>∑ FI-TODAY</code> y vuelve a diagnosticar.</p></div>';
     return;
   }
   const res=[];
@@ -1617,7 +1617,7 @@ function diagnose(){
   if(totalC>0){
     pano+= domShare>=50
       ? '<p><strong>Problema localizado.</strong> '+dom.n+' concentra el '+domShare+'% de las correcciones. La causa es de esa herramienta, no de la máquina: correa, inductivo, biela, buje o cilindro.</p>'
-      : '<p><strong>Correcciones repartidas.</strong> Ninguna herramienta domina, así que buscá causa común: presión de aire bajo 4 bar, prismas de la clase equivocada, cadena con depresiones, o pescado en rigor.</p>';
+      : '<p><strong>Correcciones repartidas.</strong> Ninguna herramienta domina, así que busca causa común: presión de aire bajo 4 bar, prismas de la clase equivocada, cadena con depresiones, o pescado en rigor.</p>';
   }
   if(rsc>0 && rs>0 && rsc>rs*5){
     pano+='<p>Las correcciones superan ampliamente a las paradas: la máquina está compensando desgaste en silencio. Este es el momento de intervenir, no cuando empiece a parar.</p>';
@@ -1660,7 +1660,7 @@ const SYM=[
  loc:'Palpador de medición: dib. 18 · Ajuste de altura: párrafo 12.4 · Codificador B13: dib. 43'},
 
 {z:'Puntero',t:'El puntero entra con anterioridad',
- cnt:'No tiene contador propio. Si además hay descentrado, mirá <b>∑ANUS-I</b> vs <b>∑ANUS-O</b>.',
+ cnt:'No tiene contador propio. Si además hay descentrado, mira <b>∑ANUS-I</b> vs <b>∑ANUS-O</b>.',
  causas:['Posición de la perilla 2 incorrecta.',
  'El puntero no gira o es de marcha dura.',
  'Mangueras de aire comprimido defectuosas o suministro de aire deficiente.',
@@ -1835,7 +1835,7 @@ const SYM=[
 
 {z:'Esófago',t:'El esófago queda demasiado largo',
  cnt:'Sin contador. Es neumático y de vacío, no de motor paso a paso.',
- first:'Empezá por la limpieza: perilla 5 → 🚿 y comprobá que los tres grifos esféricos abran y tiren parejo.',
+ first:'Empieza por la limpieza: perilla 5 → 🚿 y comprobá que los tres grifos esféricos abran y tiren parejo.',
  causas:['Hoja de membrana del aspirador embotada o mal afilada.',
  'Guillotina de marcha dura, embotada o dañada.',
  'Dispositivo de guía de la guillotina desgastado.',
@@ -1869,7 +1869,7 @@ const SYM=[
  loc:'Abrazadera: dib. 12 pos. 1 · Tope de colas: dib. 14 · Tabla de muelles párrafo 19'},
 
 {z:'General',t:'Cortes malos en todo el lote, sin falla eléctrica',
- cnt:'Mirá el <b>programa</b> antes que cualquier contador: perilla 5 → posición 7.',
+ cnt:'Mira el <b>programa</b> antes que cualquier contador: perilla 5 → posición 7.',
  first:'El error más caro y más barato de arreglar: pasar salmón con la orden trout. El pescado queda en posición demasiado baja y todo el lote sale mal.',
  causas:['Programa equivocado para la clase de pescado que está entrando.',
  'Prismas de otra clase montados en la cadena.',
@@ -1892,7 +1892,7 @@ if(sbox){
     d.innerHTML='<button type="button" aria-expanded="false"><span class="zone">'+x.z+'</span>'+x.t+'</button>'+
       '<div class="body">'+
       '<div class="counters">Contadores: '+x.cnt+'</div>'+
-      (x.first?'<div class="first"><b>Empezá por acá</b>'+x.first+'</div>':'')+
+      (x.first?'<div class="first"><b>Empieza por acá</b>'+x.first+'</div>':'')+
       '<h6>Causas, en orden de revisión</h6><ol>'+x.causas.map(c=>'<li>'+c+'</li>').join('')+'</ol>'+
       '<h6>Solución</h6><ol>'+x.sol.map(c=>'<li>'+c+'</li>').join('')+'</ol>'+
       '<div class="loc">Dónde está: '+x.loc+'</div>'+
@@ -1913,7 +1913,7 @@ const TOOLDATA={
  1:{ind:'B1',trans:'B21',
     biela:'Biela en caja de accionamiento <strong>256 ± 2 mm</strong>. Barras a <strong>6 mm</strong>, muelle <strong>65 mm</strong> entre ojales.',
     fig:'dib. 20 y 25 · párrafo 12.5',
-    donde:'La herramienta (dos barras redondas) está al inicio del campo de trabajo, antes del puntero. Su motor, el inductivo B1 y la biela están DENTRO de la caja de accionamiento: parate en el lado trasero de la máquina (opuesto a la entrada del pescado) y abrí la puerta de la caja.',
+    donde:'La herramienta (dos barras redondas) está al inicio del campo de trabajo, antes del puntero. Su motor, el inductivo B1 y la biela están DENTRO de la caja de accionamiento: parate en el lado trasero de la máquina (opuesto a la entrada del pescado) y abre la puerta de la caja.',
     figs:['dib-20','dib-25','dib-30','foto-aj-centrador']},
  2:{ind:'B2',trans:'B22',
     biela:'Biela en caja <strong>230 ± 1 mm</strong>. Trayecto de giro â‰ˆ30° con el protector de cuchilla horizontal. No tocar la biela del lado del pescado para corregir el puntero.',
@@ -1964,8 +1964,8 @@ function solSM(d,extra){
 
 const FAM=[
  {base:800,m:'no encuentra su posición cero',proto:false,
-  extra:d=>[{t:'Empezá por el sensor: inductivo de cero defectuoso o distancia demasiado grande.',k:true,
-   w:'Es la causa nº1 según el manual (§12.8). El motor da vueltas buscando un cero que su ojo no ve. Mirá el sensor antes de desarmar mecánica.'}]},
+  extra:d=>[{t:'Empieza por el sensor: inductivo de cero defectuoso o distancia demasiado grande.',k:true,
+   w:'Es la causa nº1 según el manual (§12.8). El motor da vueltas buscando un cero que su ojo no ve. Mira el sensor antes de desarmar mecánica.'}]},
  {base:810,m:'marcha de prueba defectuosa',proto:false,
   extra:d=>[{t:'Repetir el test: Test 12 (perilla 5 → 2) o Test 13 (→ 3).',k:true,
    w:'La marcha de prueba aísla la falla sin pescado. Si el error repite en la misma herramienta, es de esa herramienta; si cambia de lugar, sospechá aire, presión o control.'}]},
@@ -2054,7 +2054,7 @@ CODES=CODES.concat([
   sol:[{t:'<strong>Desconectar el interruptor principal mínimo 5 segundos</strong> y volver a energizar. Es el único remedio del manual.',k:true,
    w:'La familia E9xx es el propio computador colgado: no hay nada que ajustar en la máquina. El corte largo descarga la lógica y la deja partir de cero.'},
   {t:'Síntomas asociados que confirman esta familia: movimiento incontrolado de herramientas, pescado conducido al canalón sin elaborar, excavador que penetra en la abrazadera, display que no responde a la perilla 5.',k:true,
-   w:'Si ves cualquiera de estos, dejá de buscar en sensores y correas: es el control, no la mecánica.'},
+   w:'Si ves cualquiera de estos, deja de buscar en sensores y correas: es el control, no la mecánica.'},
   {t:'Si se repite seguido: revisar la refrigeración del A3C (agua fluyendo, válvula Y14).',k:true,
    w:'El sobrecalentamiento es la causa típica de cuelgues repetidos — el A3C se refrigera por agua y sobre 50 °C la máquina se desconecta con las herramientas cayendo solas.'},
   {t:'Si persiste con refrigeración sana, la placa del A3C requiere servicio Baader.',
@@ -2128,7 +2128,7 @@ function drawCodes(q){
   const hits=CODES.filter(x=>!s||(x.c+' '+x.m+' '+(x.t||'')).toLowerCase().includes(s));
   cbox.innerHTML='';
   if(!hits.length){
-    cbox.innerHTML='<div class="hit"><div class="m">Sin resultados. Probá con el número del código (824), el nombre de la herramienta (excavador), o una palabra del síntoma (cero, tope, correa).</div></div>';
+    cbox.innerHTML='<div class="hit"><div class="m">Sin resultados. Prueba con el número del código (824), el nombre de la herramienta (excavador), o una palabra del síntoma (cero, tope, correa).</div></div>';
     return;
   }
   hits.forEach(x=>{
@@ -2472,7 +2472,7 @@ function mostrarTip(ev,n){
   if(window.matchMedia('(hover:none)').matches)return;
   const t=n.tipo==='cota'?'Cota':(n.tipo==='foto'?'Foto':'Nota');
   tip.innerHTML='<b>'+t+(n.autor?' · '+escapeHtml(n.autor):'')+'</b>'+escapeHtml(n.texto||'(sin texto)')+
-    (n.foto?'<br><em style="color:#9CC4E4">Tocá para ver la foto</em>':'');
+    (n.foto?'<br><em style="color:#9CC4E4">Toca para ver la foto</em>':'');
   tip.classList.add('on');
   const r=ev.currentTarget.getBoundingClientRect();
   tip.style.left=Math.min(window.innerWidth-300,Math.max(8,r.left))+'px';
@@ -2539,7 +2539,7 @@ function verFotoNota(dataUri){
   if(!dataUri)return;
   fotoPrevia={key:view.key,scale:view.scale,tx:view.tx,ty:view.ty};
   cerrarSheet();
-  document.getElementById('fv-t').textContent='Foto de la nota — tocá ✕ para volver a la figura';
+  document.getElementById('fv-t').textContent='Foto de la nota — toca ✕ para volver a la figura';
   pinbox.innerHTML='';
   cargarImagen(dataUri,()=>{});
   document.getElementById('fv-add').style.display='none';
@@ -2563,7 +2563,7 @@ function editarNota(key,id,pos){
       '<option value="cota">Cota — la medida se ve sobre el dibujo</option>'+
       '<option value="foto">Foto — imagen del punto real</option>'+
     '</select>'+
-    '<label for="n-txt">Texto <span style="text-transform:none;letter-spacing:0">(en una cota, poné solo la medida: «0,8 mm»)</span></label>'+
+    '<label for="n-txt">Texto <span style="text-transform:none;letter-spacing:0">(en una cota, pon solo la medida: «0,8 mm»)</span></label>'+
     '<textarea id="n-txt" rows="3" maxlength="600"></textarea>'+
     '<label for="n-autor">Quién anota</label>'+
     '<input type="text" id="n-autor" maxlength="40" placeholder="Tu nombre">'+
@@ -2593,7 +2593,7 @@ function editarNota(key,id,pos){
   const bSave=sheet.querySelector('[data-a=save]');
   bSave.onclick=async()=>{
     const v=txt.value.trim();
-    if(!v&&!fotoData){ alert('Escribí un texto o adjuntá una foto.'); return; }
+    if(!v&&!fotoData){ alert('Escribe un texto o adjuntá una foto.'); return; }
 
     if(COMPARTIDO){
       bSave.disabled=true; bSave.textContent='Guardando…';
@@ -2618,10 +2618,10 @@ function editarNota(key,id,pos){
 }
 
 function msgError(code){
-  if(code==='sin-sesion')return 'Para dejar una nota compartida tenés que iniciar sesión en la app.';
-  if(code==='timeout')return 'La app no respondió. Revisá la conexión y probá de nuevo.';
+  if(code==='sin-sesion')return 'Para dejar una nota compartida tienes que iniciar sesión en la app.';
+  if(code==='timeout')return 'La app no respondió. Revisa la conexión y prueba de nuevo.';
   if(code==='permission-denied')return 'Tu usuario no tiene permiso para esto.';
-  return 'No se pudo guardar. Revisá la conexión y probá de nuevo.';
+  return 'No se pudo guardar. Revisa la conexión y prueba de nuevo.';
 }
 
 /* Las fotos del celular pesan 3-6 MB: sin comprimir, dos llenan el almacenamiento. */
@@ -2654,11 +2654,11 @@ function abrirMenuNotas(){
     '<div class="meta">'+n+' en esta figura · '+t+' en total</div>'+
     (COMPARTIDO&&YO
       ? '<div class="flag ok" style="margin:0 0 10px"><b>Compartidas con el equipo</b>'+
-        'Lo que anotás lo ve el resto de Mantención en su propia sesión. Podés corregir '+
+        'Lo que anotás lo ve el resto de Mantención en su propia sesión. Puedes corregir '+
         'o borrar tus notas; las de otros quedan como están.</div>'
       : (EMBEBIDO
         ? '<div class="flag warn" style="margin:0 0 10px"><b>Falta iniciar sesión</b>'+
-          'Estás viendo las notas del equipo, pero para dejar la tuya tenés que iniciar '+
+          'Estás viendo las notas del equipo, pero para dejar la tuya tienes que iniciar '+
           'sesión en la app.</div>'
         : '<div class="flag" style="margin:0 0 10px"><b>Solo en este teléfono</b>'+
           'Estás usando el manual suelto. Abrilo desde la app (Aprendizaje → Perilla 5) '+
@@ -3092,7 +3092,7 @@ if(EMBEBIDO){ try{ parent.postMessage({__p5:true,type:'hello'},'*'); }catch(e){}
       '<div class="b"><i>0</i><span style="background:radial-gradient(circle at 35% 28%,#ff7a5c,#c0170b 65%)"></span></div>' +
       '<div class="b"><i>I</i><span style="background:radial-gradient(circle at 35% 28%,#5ee98a,#0a8f3c 65%)"></span></div>' +
     '</div>' +
-    '<div class="s142-hint">girá la 5 (marcas) y la 4 (contadores) · tocá la PANTALLA para ir al detalle</div>';
+    '<div class="s142-hint">girá la 5 (marcas) y la 4 (contadores) · toca la PANTALLA para ir al detalle</div>';
   nav.parentNode.insertBefore(panel, nav);
 
   // marcas del anillo (posicionadas en % del knob grande)
