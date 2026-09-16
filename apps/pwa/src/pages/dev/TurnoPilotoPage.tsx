@@ -322,7 +322,7 @@ export default function TurnoPilotoPage() {
               <section className="overflow-hidden rounded-card border border-red-500/35 bg-card">
                 <header className="flex items-center gap-2 bg-red-500/[0.15] px-4 py-2.5">
                   <AlertTriangle className="size-3.5 text-red-600" />
-                  <span className="text-[0.68rem] font-bold uppercase tracking-[0.06em] text-red-600">
+                  <span className="text-caption font-bold uppercase tracking-[0.06em] text-red-600">
                     Requiere atención
                   </span>
                   <span className="ml-auto text-[0.85rem] font-semibold tabular-nums text-red-600">
@@ -388,7 +388,7 @@ export default function TurnoPilotoPage() {
             {/* ── Cascada de pérdidas ──────────────────────────────────── */}
             {cascadeTotal > 0 && (
               <section className="rounded-card bg-card px-4 py-4">
-                <h2 className="mb-3 text-[0.68rem] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
+                <h2 className="mb-3 text-caption font-semibold uppercase tracking-[0.05em] text-muted-foreground">
                   Cascada de pérdidas · {fmtMin(cascadeTotal)}
                 </h2>
                 <div className="flex h-5 gap-[2px] overflow-hidden rounded-full">

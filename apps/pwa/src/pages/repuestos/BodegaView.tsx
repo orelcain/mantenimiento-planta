@@ -561,8 +561,8 @@ function InventarioTab({ bodega, user }: { bodega: ReturnType<typeof useBodega>;
                   <span>{s.createdAt.toLocaleDateString('es-CL')}</span>
                 </div>
               </div>
-              {s.estado === 'en_curso' && <span className="text-caption px-2 py-0.5 rounded-full bg-amber-500/[0.15] text-ink-warn font-semibold uppercase shrink-0">En curso</span>}
-              {s.estado === 'finalizado' && <span className="text-caption px-2 py-0.5 rounded-full bg-emerald-500/[0.15] text-ink-ok font-semibold uppercase shrink-0">Finalizado</span>}
+              {s.estado === 'en_curso' && <span className="text-caption px-2 py-0.5 rounded-full bg-amber-500/[0.15] text-ink-warn font-semibold shrink-0">En curso</span>}
+              {s.estado === 'finalizado' && <span className="text-caption px-2 py-0.5 rounded-full bg-emerald-500/[0.15] text-ink-ok font-semibold shrink-0">Finalizado</span>}
               <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
             </button>
           ))}
@@ -656,17 +656,17 @@ function ConteoList({ conteos, isFinalizado, onConteo }: {
                   <span className="text-caption font-mono text-primary">{c.codigoSAP}</span>
                 </div>
                 <div className="text-center shrink-0 w-16">
-                  <p className="text-caption text-muted-foreground uppercase">Sistema</p>
+                  <p className="text-caption text-muted-foreground">Sistema</p>
                   <p className="text-sm font-bold text-foreground tabular-nums">{c.stockSistema}</p>
                 </div>
                 {c.stockFisico !== null ? (
                   <>
                     <div className="text-center shrink-0 w-16">
-                      <p className="text-caption text-muted-foreground uppercase">Físico</p>
+                      <p className="text-caption text-muted-foreground">Físico</p>
                       <p className="text-sm font-bold text-foreground tabular-nums">{c.stockFisico}</p>
                     </div>
                     <div className="text-center shrink-0 w-16">
-                      <p className="text-caption text-muted-foreground uppercase">Dif.</p>
+                      <p className="text-caption text-muted-foreground">Dif.</p>
                       <p className={`text-sm font-bold tabular-nums ${c.diferencia > 0 ? 'text-ink-ok' : c.diferencia < 0 ? 'text-ink-crit' : 'text-muted-foreground'}`}>
                         {c.diferencia > 0 ? '+' : ''}{c.diferencia}
                       </p>
@@ -1478,8 +1478,8 @@ function BodegaRow({ item, onEdit, onMovimiento, onHistorial, onToggleWatch, onO
             <div className="flex items-baseline gap-1.5 min-w-0">
               <span className={`text-2xl font-bold leading-none tabular-nums ${stockColor}`}>{item.stockActual}</span>
               <span className="text-caption text-muted-foreground">{item.unidad}</span>
-              {isSin && <span className="text-caption font-semibold uppercase text-ink-crit">sin stock</span>}
-              {isBajo && <span className="text-caption font-semibold uppercase text-ink-warn">bajo mín</span>}
+              {isSin && <span className="text-caption font-semibold text-ink-crit">sin stock</span>}
+              {isBajo && <span className="text-caption font-semibold text-ink-warn">bajo mín</span>}
               {!isSin && !isBajo && item.stockMinimo > 0 && (
                 <span className="text-caption text-muted-foreground">mín {item.stockMinimo}</span>
               )}
@@ -1699,7 +1699,7 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
             <div className={`rounded-card border p-3 ${reorder.necesitaPedir ? 'border-red-500/[0.25] bg-red-500/[0.15]' : 'border-border'}`}>
               <p className="text-caption text-muted-foreground tracking-wide mb-2 flex items-center gap-1">
                 <ShoppingCart className="h-3 w-3" /> Reposición
-                {reorder.necesitaPedir && <span className="ml-auto text-caption px-1.5 py-0.5 rounded-ctl bg-red-500/[0.15] text-ink-crit font-bold uppercase">Pedir ahora</span>}
+                {reorder.necesitaPedir && <span className="ml-auto text-caption px-1.5 py-0.5 rounded-ctl bg-red-500/[0.15] text-ink-crit font-bold">Pedir ahora</span>}
               </p>
               <div className="grid grid-cols-3 gap-2">
                 <div className="text-center">
