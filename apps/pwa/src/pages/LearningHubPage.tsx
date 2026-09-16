@@ -254,7 +254,7 @@ export function LearningHubPage() {
             <button
               onClick={() => navigate('/aprendizaje/admin')}
               title="Administrar contenido — pedirá confirmar identidad"
-              className="absolute top-4 right-5 sm:top-5 sm:right-8 z-10 flex items-center gap-1.5 rounded-card px-2.5 py-1.5 text-caption font-semibold tracking-wide outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8] transition-colors active:scale-95"
+              className="absolute top-4 right-5 sm:top-5 sm:right-8 z-10 inline-flex min-h-[44px] items-center gap-1.5 rounded-full px-4 text-caption font-semibold tracking-wide outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8] transition-colors active:scale-95"
               style={{ background: C.surface, border: `1px solid ${C.borderHi}`, color: C.aquaLight }}
             >
               <Lock className="h-3.5 w-3.5" />
@@ -658,7 +658,7 @@ function MachineCard({
         onClick={onToggleFav}
         aria-label={isFav ? `Quitar ${machine.name} de favoritos` : `Agregar ${machine.name} a favoritos`}
         aria-pressed={isFav}
-        className="absolute top-3 right-2.5 p-1.5 rounded-ctl outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8] transition-transform hover:scale-110 active:scale-95"
+        className="absolute top-3 right-2.5 -m-2 flex size-11 items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8] transition-transform hover:scale-110 active:scale-95"
       >
         <Star className="h-4 w-4" style={{ color: isFav ? C.star : C.inkGhost, fill: isFav ? C.star : 'none' }} />
       </button>

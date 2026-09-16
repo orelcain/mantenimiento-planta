@@ -33,27 +33,32 @@ export function SegmentedControl<T extends string>({ value, onChange, segments, 
     <div
       role="tablist"
       aria-label={ariaLabel}
-      className={cn('flex h-11 w-full rounded-full bg-muted p-0.5', className)}
+      className={cn('flex h-11 w-full rounded-full bg-muted', className)}
     >
       {segments.map(s => {
         const on = s.value === value
         return (
+          // El <button> mide los 44 px completos (área táctil); la pastilla
+          // visual es el <span> interior de 40, concéntrica con la pista.
           <button
             key={s.value}
             type="button"
             role="tab"
             aria-selected={on}
             onClick={() => onChange(s.value)}
-            className={cn(
-              'flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-full px-2 text-subhead transition-[background-color,box-shadow] duration-150',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40',
-              on
-                ? 'bg-card font-semibold text-foreground shadow-[0_1px_3px_rgba(0,0,0,0.12)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.4)]'
-                : 'font-medium text-foreground/80 hover:text-foreground',
-            )}
+            className="flex h-11 min-w-0 flex-1 rounded-full p-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40"
           >
-            {s.icon && <span className="shrink-0 [&>svg]:size-4">{s.icon}</span>}
-            <span className="truncate">{s.label}</span>
+            <span
+              className={cn(
+                'flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-full px-2 text-subhead transition-[background-color,box-shadow] duration-150',
+                on
+                  ? 'bg-card font-semibold text-foreground shadow-[0_1px_3px_rgba(0,0,0,0.12)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.4)]'
+                  : 'font-medium text-foreground/80 hover:text-foreground',
+              )}
+            >
+              {s.icon && <span className="shrink-0 [&>svg]:size-4">{s.icon}</span>}
+              <span className="truncate">{s.label}</span>
+            </span>
           </button>
         )
       })}

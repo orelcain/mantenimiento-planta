@@ -1991,11 +1991,22 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
               </div>
             ) : filteredRep.length === 0 ? (
               <div className="rounded-card border border-dashed border-border py-10 text-center text-sm text-muted-foreground">
-                {!selectedAreaId && !showingAll
-                  ? 'Selecciona un área en la izquierda.'
-                  : areaRepuestos.length === 0
-                    ? 'Esta área no tiene repuestos con código SAP.'
-                    : 'Sin resultados para los filtros aplicados.'}
+                {!selectedAreaId && !showingAll ? (
+                  <>
+                    <p>Selecciona un área.</p>
+                    <button
+                      type="button"
+                      onClick={() => setSidebarMobileOpen(true)}
+                      className="mt-3 inline-flex min-h-[44px] items-center justify-center rounded-full bg-muted px-5 text-subhead font-medium text-foreground sm:hidden"
+                    >
+                      Ver áreas
+                    </button>
+                  </>
+                ) : areaRepuestos.length === 0 ? (
+                  'Esta área no tiene repuestos con código SAP.'
+                ) : (
+                  'Sin resultados para los filtros aplicados.'
+                )}
               </div>
             ) : (
               <div className="overflow-hidden rounded-card border border-border">

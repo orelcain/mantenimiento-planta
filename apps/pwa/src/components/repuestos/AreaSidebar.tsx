@@ -391,7 +391,7 @@ export function AreaSidebar({
           {onToggleFavoritesOnly && (
             <button
               onClick={onToggleFavoritesOnly}
-              className={['rounded-ctl p-1 transition', favoritesOnly ? 'text-amber-400' : 'text-muted-foreground hover:text-amber-400'].join(' ')}
+              className={['-m-1.5 flex size-11 shrink-0 items-center justify-center rounded-full transition', favoritesOnly ? 'text-amber-400' : 'text-muted-foreground hover:text-amber-400'].join(' ')}
               title={favoritesOnly ? 'Ver todo' : 'Ver solo favoritos (áreas y equipos)'}
               aria-label="Solo favoritos"
             >
@@ -399,16 +399,16 @@ export function AreaSidebar({
             </button>
           )}
           {onCollapseAll && (
-            <button onClick={onCollapseAll} className="rounded-ctl p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground" title="Contraer todas las ramas" aria-label="Contraer todo">
+            <button onClick={onCollapseAll} className="-m-1.5 flex size-11 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground" title="Contraer todas las ramas" aria-label="Contraer todo">
               <ChevronsDownUp className="h-4 w-4" />
             </button>
           )}
           {onToggleCollapse && (
-            <button onClick={onToggleCollapse} className="hidden rounded-ctl p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground sm:block" title="Contraer panel de áreas" aria-label="Contraer áreas">
+            <button onClick={onToggleCollapse} className="hidden -m-1.5 flex size-11 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground sm:block" title="Contraer panel de áreas" aria-label="Contraer áreas">
               <ChevronsLeft className="h-4 w-4" />
             </button>
           )}
-          <button onClick={onMobileClose} className="rounded-ctl p-1 text-muted-foreground hover:bg-muted hover:text-foreground sm:hidden" aria-label="Cerrar áreas">
+          <button onClick={onMobileClose} className="-m-1.5 flex size-11 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground sm:hidden" aria-label="Cerrar áreas">
             <X className="h-4 w-4" />
           </button>
         </div>
