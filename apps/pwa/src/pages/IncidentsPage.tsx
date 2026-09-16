@@ -274,7 +274,7 @@ export function IncidentsPage() {
               type="button"
               onClick={() => setActiveFilter(f.id)}
               className={[
-                'flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-[0.8rem] font-medium',
+                'flex shrink-0 items-center gap-1.5 h-9 rounded-full px-3.5 text-subhead font-medium font-medium',
                 'transition-colors duration-150 motion-reduce:transition-none',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
                 activo
