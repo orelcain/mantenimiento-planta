@@ -16,11 +16,10 @@
 2. `ARIA_MANTENIMIENTO_PLANTA\docs\NUEVA_PIEL_APPLE_HIG.md` (OneDrive) — tokens medidos.
 3. Este archivo — destilado operativo.
 
-⚠️ **Excepción vigente (2026-09-15).** Los docs 1 y 2 se compilaron el 2026-08-09 contra el
-HIG de **iOS 18**. Desde entonces se verificó que iOS 26/27 cambió radios, tamaño de body y
-el tratamiento de los encabezados. En **los tres puntos marcados como ⚠️ADELANTA** más abajo,
-este archivo está más al día y manda; el resto sigue la cadena normal. Actualizar los docs
-canónicos es tarea pendiente de Orel — hasta entonces esta excepción queda escrita acá.
+✅ **Excepción levantada el 2026-09-16.** Los docs 1 y 2 se compilaron el 2026-08-09 contra
+el HIG de iOS 18; ese día se actualizaron con los tres ⚠️ADELANTA (radios, body 17,
+mayúsculas), la Pill al 8 % y los nombres reales de los roles. La cadena vuelve a ser
+normal: los ⚠️ADELANTA quedan como registro de por qué cambió cada valor.
 
 Para cambios visuales no triviales, además: mockup primero (`/mockup-antes-de-construir`).
 
@@ -517,10 +516,10 @@ con un script Node local (`writeFileSync` en `utf8`).
    oración, «algo más pesado» y «tamaño aumentado». El estilo Dynamic Type que cumple las tres
    es subheadline 15 semibold. Vive en `ListGroup` (`text-subhead font-semibold
    text-muted-foreground`); los encabezados hechos a mano migran caso por caso.
-2. **Actualizar los docs canónicos de OneDrive** con los tres ⚠️ADELANTA (radios, body 17,
-   mayúsculas), más dos correcciones ya detectadas: el §5.3 del HIG doc dice Pill al 14 % cuando
-   su propio §1.4 demuestra 8 %; y los nombres de roles del §2 no coinciden con
-   `tailwind.config.js`.
+2. ~~Actualizar los docs canónicos de OneDrive~~ — hecho 2026-09-16: Constitución (radios,
+   tipografía, mayúsculas) y HIG (nota de revisión, tabla de 11 roles con los nombres de
+   `tailwind.config.js`, radios 26/32/36 y cápsulas, GroupedList 26, Pill 8 %, búsqueda 22 y
+   segmentado cápsula). La copia `docs/NUEVA_PIEL_APPLE_HIG.md` del repo se sincronizó.
 3. ~~Agregar el rol `stat`~~ — hecho 2026-09-15. `text-stat` va siempre con `tabular-nums`.
 4. ~~Implementar `prefers-reduced-transparency`~~ — hecho 2026-09-15 en `index.css`, cubre
    los 84 `backdrop-blur` sin tocar archivos.
