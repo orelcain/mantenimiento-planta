@@ -5224,3 +5224,42 @@ https://claude.ai/artifact/BiADNnwFmfGvfe1R2PChEJ
   claro/oscuro, 375 px, tecleando en «Otro…» y título con autoguardado (el foco no se pierde),
   «Sin hora», publicar, copiar mensaje y lámina, compartir (con `navigator.share` simulado).
 - **Sin probar todavía:** pegar en WhatsApp Web real y compartir desde un Android real.
+
+## 2026-09-16 · Bitacora ronda 14 · Pase de bitácora (QR + PIN personal)
+
+Pedido de Orel: un QR para que los técnicos entren fácil a la bitácora y agreguen/editen eventos, con
+acceso SOLO a la bitácora. Mockup y decisiones: https://claude.ai/artifact/4e6aS7naozKBQLzmdqB7of
+(v2). Decidió: pase de bitácora + nombre de la lista de habilitados + PIN personal de 4 dígitos
+(lo asigna un supervisor; 5 fallos → 15 min); QR por 30 días, «Renovar» mantiene el mismo QR; los
+teléfonos que ya entraron siguen hasta «Quitar» o hasta que se le quite/reinicie el PIN al técnico.
+
+- **Función `paseBitacora`** (callable, `functions/paseBitacora.js`, sin triggers ni crons, costo fijo
+  cero; maxInstances 3). Públicas: `info` (técnicos con PIN) y `entrar` (valida token + PIN en
+  transacción, crea una cuenta `pase_…` por teléfono con claims `{pase_bitacora, plantId, nombre}`
+  vía `setCustomUserClaims` + custom token, y `bitacoraDispositivos/{uid}`). Supervisor: `generar`,
+  `renovar`, `asignarPin` (devuelve el PIN una vez; guarda scrypt + sal), `quitarPin`,
+  `quitarDispositivo` (desactiva + `updateUser disabled` + `revokeRefreshTokens`). El teléfono:
+  `salir`. 15 fallos sin acierto bloquean hasta reiniciar el PIN (10.000 PIN posibles).
+- **Reglas — el límite está en un punto central:** `isAuthenticated()` es falso para un token con
+  `pase_bitacora`, así que el pase queda fuera de TODA la app (incl. las ~80 lecturas
+  `isNotAnonymous()` y el create de `users`). Solo entra por `paseBitacoraActivo()` (get de su
+  dispositivo) a bitacoraEventos/Presencia/Turnos, lee bitacoraConfig, hierarchy y calendario, y
+  firma con SU nombre (`registradoPor`/presencia == claim). `bitacoraPines` no la lee nadie.
+  Storage: `sesionApp()` reemplaza los 38 `request.auth != null`; el pase solo en `bitacora/`
+  (el cross-service sigue roto en prod: allí basta el claim; al quitarlo, <1 h).
+  90/90 Firestore (`probar-reglas-bitacora.cjs --local`, 33 nuevos; el helper `auth()` ahora acepta
+  claims) y 14/14 Storage (`scripts/probar-reglas-storage-pase.cjs`, nuevo).
+- **App:** `App.tsx` reconoce el claim ANTES de buscar `users/{uid}` (si no, cerraba la sesión) y
+  monta otro árbol de rutas: `PaseBitacoraLayout` (sin MainLayout ni sus listeners de incidencias y
+  equipos) con Turno/Historial y «Salir»; todo lo demás redirige a /bitacora. El watchdog de 24 h no
+  corre para el pase. `/pase-bitacora#p=…&t=…` (el token va en el `#`; el 404.html lo conserva) =
+  nombre → PIN (campo `readOnly` al enviar: `disabled` le quitaba el foco y cerraba el teclado).
+  En la bitácora el pase firma fijo (sin selector), no edita la lista de técnicos, y si un
+  supervisor lo quita el teléfono cierra sesión con aviso (escucha su propio dispositivo).
+  Supervisores: botón «Acceso QR» → hoja con QR (imprimir por iframe, renovar, copiar, generar otro
+  con doble toque), técnicos con PIN/bloqueos (asignar, reiniciar, quitar) y teléfonos (quitar).
+- Vitrina `/dev/pase-bitacora` (API de mentira, PIN 4729) y `?vista=modo`. 9 pruebas de la función,
+  5 del cliente. Verificado a 375 px y PC: PIN malo/correcto tecleando, asignar y reiniciar PIN con
+  confirmación, modo bitácora sin «Acceso QR».
+- **Sin probar todavía:** el flujo real (necesita la función desplegada y que Orel genere el QR y
+  asigne PIN a los técnicos).

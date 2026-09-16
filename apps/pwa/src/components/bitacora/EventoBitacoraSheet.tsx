@@ -63,6 +63,8 @@ export interface EventoBitacoraSheetProps {
   sugerenciasEquipo: string[]
   /** Tipos escritos a mano en el turno: se sugieren al elegir «Otro». */
   sugerenciasTipo?: string[]
+  /** Teléfono con pase de bitácora: registra siempre su técnico, sin elegir. */
+  autorFijo?: string | null
   /** `deTurno` = presentes del turno (botones rápidos); `todos` = lista de técnicos completa. */
   tecnicos: { deTurno: string[]; todos: string[] }
   /** Equipos y áreas de la jerarquía para el buscador. */
@@ -188,6 +190,7 @@ export function EventoBitacoraSheet({
   idNuevo,
   sugerenciasEquipo,
   sugerenciasTipo = [],
+  autorFijo = null,
   tecnicos,
   opcionesEquipo,
   cargandoEquipos,
@@ -294,7 +297,7 @@ export function EventoBitacoraSheet({
     // El nombre recordado solo vale si sigue en la lista (pudo corregirse o quitarse).
     const recordado = tecnicoRecordado()
     const lista = tecnicosRef.current.todos
-    const quienInicial = lista.length === 0 || lista.includes(recordado) ? recordado : ''
+    const quienInicial = autorFijo ?? (lista.length === 0 || lista.includes(recordado) ? recordado : '')
     setQuien(quienInicial)
     setParticipantes(evento?.participantes ?? [])
     // «Resolver pendiente»: el equipo, su vínculo y el tipo vienen del pendiente original.
@@ -354,7 +357,7 @@ export function EventoBitacoraSheet({
     setPorGuardar(false)
     setConflictos([])
     setEliminadoAfuera(false)
-  }, [open, evento, turno, pendienteOrigen])
+  }, [open, evento, turno, pendienteOrigen, autorFijo])
 
   const duracion = sinHora ? null : minutosEntre(horaInicio, horaTermino || null)
   const horaFaltante = !sinHora && !HORA_VALIDA.test(horaInicio)
@@ -988,8 +991,15 @@ export function EventoBitacoraSheet({
           </div>
         )}
 
-        {/* Quién: con la cuenta compartida de Mantención es el único dato de autoría. */}
-        {tecnicos.todos.length > 0 && (
+        {/* Quién: con la cuenta compartida de Mantención es el único dato de autoría.
+            Con pase de bitácora es el dueño del pase, sin elegir. */}
+        {autorFijo && (
+          <p className="text-footnote text-muted-foreground">
+            {esNuevo ? 'Registra' : 'Edita'}: <span className="font-semibold text-foreground">{autorFijo}</span>
+            {!esNuevo && evento && autorVisible(evento) !== autorFijo ? ` · lo registró ${autorVisible(evento)}` : ''}
+          </p>
+        )}
+        {tecnicos.todos.length > 0 && !autorFijo && (
           <div>
             <SelectorTecnico
               etiqueta={esNuevo ? 'Quién registra' : modoBorrador ? 'Quién continúa' : 'Quién edita'}

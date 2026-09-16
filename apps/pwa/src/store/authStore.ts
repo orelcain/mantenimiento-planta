@@ -80,7 +80,10 @@ export const useAuthStore = create<AuthState>()(
  */
 export function startSessionWatchdog(): () => void {
   const expireIfInactive = () => {
-    const { isAuthenticated, lastActivity, logout } = useAuthStore.getState()
+    const { isAuthenticated, lastActivity, logout, user } = useAuthStore.getState()
+    // El pase de bitácora no vence por inactividad: lo quita un supervisor. Si
+    // venciera, el técnico caería en el login, donde no tiene contraseña.
+    if (user?.paseBitacora) return
     if (
       isAuthenticated &&
       lastActivity !== null &&

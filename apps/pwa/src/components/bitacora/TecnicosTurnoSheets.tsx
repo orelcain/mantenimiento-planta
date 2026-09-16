@@ -41,7 +41,8 @@ export function TecnicosDelTurnoSheet({
   marcados: string[]
   onMarcados: (marcados: string[]) => void
   onGuardar: (presentes: string[]) => void
-  onAbrirLista: () => void
+  /** Sin ella no se ofrece editar la lista (el pase de bitácora solo la lee). */
+  onAbrirLista?: () => void
   onClose: () => void
 }) {
   const [busqueda, setBusqueda] = useState('')
@@ -96,9 +97,11 @@ export function TecnicosDelTurnoSheet({
         <div>
           <div className="mb-1.5 flex items-baseline justify-between gap-2">
             <span className="text-footnote text-muted-foreground">Marca a los que están en el turno</span>
-            <Button variant="plain" size="sm" onClick={onAbrirLista}>
-              Lista de técnicos
-            </Button>
+            {onAbrirLista && (
+              <Button variant="plain" size="sm" onClick={onAbrirLista}>
+                Lista de técnicos
+              </Button>
+            )}
           </div>
           <div className="overflow-hidden rounded-card bg-muted-foreground/10">
             {visibles.map((t) => {

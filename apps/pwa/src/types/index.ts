@@ -20,6 +20,11 @@ export interface User {
   photoURL?: string
   authProvider?: 'email' | 'google' // Proveedor de autenticación
   permissionsOverride?: import('./permissions').UserPermissionsOverride // Override de permisos
+  /**
+   * Teléfono que entró con el PASE DE BITÁCORA (QR + PIN): no tiene documento
+   * en `users` y solo ve la bitácora. `nombre` es el técnico dueño del teléfono.
+   */
+  paseBitacora?: { plantId: string; nombre: string }
 }
 
 // Tipo de zona

@@ -1,6 +1,8 @@
 import { useEffect, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useSearchParams } from 'react-router-dom'
 import { onAuthChange, getUserByIdConTokenFresco, signOut as signOutService } from '@/services/auth'
+import { paseDeSesion, usuarioDePase } from '@/services/bitacora/paseBitacora'
+import { PaseBitacoraLayout } from '@/components/layout/PaseBitacoraLayout'
 import { useAuthStore, usePermissionsStore, startSessionWatchdog } from '@/store'
 import { logger } from '@/lib/logger'
 import { LoadingScreen } from '@/components/ui'
@@ -32,6 +34,8 @@ const LoginPage = lazyWithReload(() => import('@/pages/LoginPage').then((mod) =>
 const MatrizTurnosDevPage = lazyWithReload(() => import('@/pages/dev/MatrizTurnosDevPage'))
 const PurezaPuertaDevPage = lazyWithReload(() => import('@/pages/dev/PurezaPuertaDevPage'))
 const BitacoraDevPage = lazyWithReload(() => import('@/pages/dev/BitacoraDevPage').then((mod) => ({ default: mod.BitacoraDevPage })))
+const PaseBitacoraDevPage = lazyWithReload(() => import('@/pages/dev/PaseBitacoraDevPage').then((mod) => ({ default: mod.PaseBitacoraDevPage })))
+const PaseBitacoraPage = lazyWithReload(() => import('@/pages/PaseBitacoraPage').then((mod) => ({ default: mod.PaseBitacoraPage })))
 /** Banco de pruebas del resumen ejecutivo — solo montado en dev (ver Routes). */
 const ResumenTurnoDevPage = lazyWithReload(() => import('@/pages/dev/ResumenTurnoDevPage'))
 const ResumenPeriodoDevPage = lazyWithReload(() => import('@/pages/dev/ResumenPeriodoDevPage'))
@@ -193,6 +197,7 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 
 export function App() {
   const { setUser, setLoading } = useAuthStore()
+  const esPaseBitacora = useAuthStore((s) => Boolean(s.user?.paseBitacora))
   const { loadPermissions, clearPermissions } = usePermissionsStore()
 
   // Escuchar cambios en la autenticación
@@ -200,6 +205,14 @@ export function App() {
     const unsubscribe = onAuthChange(async (firebaseUser) => {
       if (firebaseUser) {
         try {
+          // Teléfono con pase de bitácora: no tiene perfil en `users` (a
+          // propósito) y no carga permisos: solo ve la bitácora.
+          const pase = await paseDeSesion(firebaseUser)
+          if (pase) {
+            clearPermissions()
+            setUser(usuarioDePase(firebaseUser.uid, pase))
+            return
+          }
           const user = await getUserByIdConTokenFresco(firebaseUser)
           if (!user) {
             logger.warn('Usuario Auth sin perfil en Firestore; cerrando sesión', { uid: firebaseUser.uid })
@@ -257,7 +270,20 @@ export function App() {
           <Toaster />
           <ErrorBoundary>
             <Suspense fallback={<LoadingScreen />}>
+            {esPaseBitacora ? (
+              // Pase de bitácora: nada fuera de la bitácora (las reglas tampoco lo dejan).
+              <Routes>
+                <Route path="/pase-bitacora" element={<PaseBitacoraPage />} />
+                <Route element={<PaseBitacoraLayout />}>
+                  <Route path="/bitacora" element={<BitacoraTurnoPage />} />
+                  <Route path="/bitacora/historial" element={<HistorialBitacoraPage />} />
+                </Route>
+                <Route path="*" element={<Navigate to="/bitacora" replace />} />
+              </Routes>
+            ) : (
             <Routes>
+              {/* Entrada con el QR de la bitácora (sin sesión). */}
+              <Route path="/pase-bitacora" element={<PaseBitacoraPage />} />
               {/* Banco de pruebas de la Matriz de turnos — SOLO en dev.
                   Vite elimina la rama entera del bundle de producción. */}
               {import.meta.env.DEV && (
@@ -296,6 +322,16 @@ export function App() {
                   element={
                     <Suspense fallback={<LoadingScreen />}>
                       <PurezaPuertaDevPage />
+                    </Suspense>
+                  }
+                />
+              )}
+              {import.meta.env.DEV && (
+                <Route
+                  path="/dev/pase-bitacora"
+                  element={
+                    <Suspense fallback={<LoadingScreen />}>
+                      <PaseBitacoraDevPage />
                     </Suspense>
                   }
                 />
@@ -919,6 +955,7 @@ export function App() {
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
+            )}
             </Suspense>
           </ErrorBoundary>
         </BrowserRouter>

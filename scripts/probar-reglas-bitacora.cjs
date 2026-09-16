@@ -14,7 +14,11 @@ const usuario = (activo, rol) => [
   { function: 'exists', args: [{ anyValue: {} }], result: { value: true } },
   { function: 'get', args: [{ anyValue: {} }], result: { value: { data: { activo, rol } } } },
 ]
-const auth = (uid) => ({ uid, token: { firebase: { sign_in_provider: 'google.com' } } })
+// `claims` = claims de un custom token (p. ej. el pase de bitácora, que entra con 'custom').
+const auth = (uid, claims) => ({
+  uid,
+  token: { firebase: { sign_in_provider: claims ? 'custom' : 'google.com' }, ...(claims ?? {}) },
+})
 const ruta = (col, id) => `/databases/(default)/documents/${col}/${id}`
 
 const evento = (extra = {}) => ({
@@ -91,6 +95,54 @@ const CASOS_EVENTO_FLEXIBLE = [
   ['Editar un evento para dejarlo sin hora', 'ALLOW', { method: 'update', uid: 'tecnico2', col: 'bitacoraEventos', data: evento({ horaInicio: '', horaTermino: null, actualizadoPorNombre: 'Otro' }), previo: evento() }, usuario(true, 'tecnico')],
 ]
 
+// Pase de bitácora (16-09): teléfono con QR + PIN, sin documento en `users`.
+// El único `get()` que llega a evaluarse es el de su bitacoraDispositivos
+// (isAuthenticated() lo deja fuera antes de leer `users`).
+const PASE = { pase_bitacora: true, plantId: 'chonchi', nombre: 'Leandro Igor' }
+const dispositivo = (activo) => [
+  { function: 'get', args: [{ anyValue: {} }], result: { value: { data: { activo, plantId: 'chonchi', nombre: 'Leandro Igor' } } } },
+  { function: 'exists', args: [{ anyValue: {} }], result: { value: false } },
+]
+const delPase = (extra = {}) => evento({ creadoPor: 'pase_1', registradoPor: 'Leandro Igor', ...extra })
+const conPase = (c) => ({ uid: 'pase_1', claims: PASE, ...c })
+const PRES_PASE = 'chonchi_2026-09-16_tarde_disp-pase-0001'
+const presenciaPase = (nombre) => ({ plantId: 'chonchi', turnoId: '2026-09-16_tarde', dispositivoId: 'disp-pase-0001', dispositivo: 'celular', nombre, editandoEventoId: null, vistoEn: '__AHORA__', uid: 'pase_1' })
+const CASOS_PASE = [
+  ['Pase CREA un evento firmado con su nombre', 'ALLOW', conPase({ method: 'create', col: 'bitacoraEventos', data: delPase() }), dispositivo(true)],
+  ['Pase crea un evento a nombre de OTRO técnico', 'DENY', conPase({ method: 'create', col: 'bitacoraEventos', data: delPase({ registradoPor: 'Danilo Cortes' }) }), dispositivo(true)],
+  ['Pase crea un evento de OTRA planta', 'DENY', conPase({ method: 'create', col: 'bitacoraEventos', data: delPase({ plantId: 'yal' }) }), dispositivo(true)],
+  ['Pase QUITADO por el supervisor crea un evento', 'DENY', conPase({ method: 'create', col: 'bitacoraEventos', data: delPase() }), dispositivo(false)],
+  ['Pase lee un evento', 'ALLOW', conPase({ method: 'get', col: 'bitacoraEventos', previo: evento() }), dispositivo(true)],
+  ['Pase quitado lee un evento', 'DENY', conPase({ method: 'get', col: 'bitacoraEventos', previo: evento() }), dispositivo(false)],
+  ['Pase edita un evento ajeno sin tocar el autor', 'ALLOW', conPase({ method: 'update', col: 'bitacoraEventos', data: evento({ descripcion: 'Corregido', actualizadoPorNombre: 'Leandro Igor' }), previo: evento() }), dispositivo(true)],
+  ['Pase cambia el autor de un BORRADOR ajeno', 'DENY', conPase({ method: 'update', col: 'bitacoraEventos', data: evento({ estado: 'borrador', registradoPor: 'Leandro Igor' }), previo: evento({ estado: 'borrador', registradoPor: 'Danilo Cortes' }) }), dispositivo(true)],
+  ['Pase borra un evento PROPIO', 'ALLOW', conPase({ method: 'delete', col: 'bitacoraEventos', previo: delPase() }), dispositivo(true)],
+  ['Pase borra un evento AJENO', 'DENY', conPase({ method: 'delete', col: 'bitacoraEventos', previo: evento() }), dispositivo(true)],
+  ['Pase marca presencia con su nombre', 'ALLOW', conPase({ method: 'create', col: 'bitacoraPresencia', id: PRES_PASE, data: presenciaPase('Leandro Igor') }), dispositivo(true)],
+  ['Pase marca presencia con OTRO nombre', 'DENY', conPase({ method: 'create', col: 'bitacoraPresencia', id: PRES_PASE, data: presenciaPase('Danilo Cortes') }), dispositivo(true)],
+  ['Pase ajusta los técnicos del turno', 'ALLOW', conPase({ method: 'create', col: 'bitacoraTurnos', id: 'chonchi_2026-09-15_tarde', data: { plantId: 'chonchi', turnoId: '2026-09-15_tarde', presentes: ['Leandro Igor'], actualizadoPor: 'pase_1' } }), dispositivo(true)],
+  ['Pase LEE la lista de técnicos', 'ALLOW', conPase({ method: 'get', col: 'bitacoraConfig', id: 'chonchi', previo: { agregados: [], ocultos: [], renombres: {} } }), dispositivo(true)],
+  ['Pase CAMBIA la lista de técnicos', 'DENY', conPase({ method: 'create', col: 'bitacoraConfig', id: 'chonchi', data: { agregados: ['Intruso'], ocultos: [], renombres: {}, actualizadoPor: 'pase_1' } }), dispositivo(true)],
+  ['Pase lee la jerarquía (buscador de equipos)', 'ALLOW', conPase({ method: 'get', col: 'hierarchy', id: 'n1', previo: { nombre: 'BAADER 142' } }), dispositivo(true)],
+  ['Pase escribe en la jerarquía', 'DENY', conPase({ method: 'update', col: 'hierarchy', id: 'n1', data: { nombre: 'X' }, previo: { nombre: 'BAADER 142' } }), dispositivo(true)],
+  ['Pase lee el calendario de turnos', 'ALLOW', conPase({ method: 'get', col: 'calendario_mantencion_state', id: 'current', previo: { x: 1 } }), dispositivo(true)],
+  ['Pase lee INCIDENCIAS (fuera de la bitácora)', 'DENY', conPase({ method: 'get', col: 'incidents', id: 'i1', previo: { titulo: 'x' } }), dispositivo(true)],
+  ['Pase lee USUARIOS', 'DENY', conPase({ method: 'get', col: 'users', id: 'orel', previo: { rol: 'admin' } }), dispositivo(true)],
+  ['Pase se crea un perfil de técnico ACTIVO', 'DENY', conPase({ method: 'create', col: 'users', id: 'pase_1', data: { nombre: 'Leandro', apellido: 'Igor', email: 'x@y.cl', rol: 'tecnico', activo: true } }), dispositivo(true)],
+  ['Pase lee el catálogo de repuestos', 'DENY', conPase({ method: 'get', col: 'repuestos', id: 'r1', previo: { nombre: 'x' } }), dispositivo(true)],
+  ['Pase deja un registro de error (errorLogs)', 'DENY', conPase({ method: 'create', col: 'errorLogs', id: 'e1', data: { message: 'x' } }), dispositivo(true)],
+  ['Pase lee el QR del pase', 'DENY', conPase({ method: 'get', col: 'bitacoraPases', id: 'chonchi', previo: { token: 'secreto' } }), dispositivo(true)],
+  ['Pase lee los PIN', 'DENY', conPase({ method: 'get', col: 'bitacoraPines', id: 'chonchi__x', previo: { huella: 'x' } }), dispositivo(true)],
+  ['Pase lee SU dispositivo', 'ALLOW', conPase({ method: 'get', col: 'bitacoraDispositivos', id: 'pase_1', previo: { activo: true } }), dispositivo(true)],
+  ['Pase lee el dispositivo de OTRO', 'DENY', conPase({ method: 'get', col: 'bitacoraDispositivos', id: 'pase_2', previo: { activo: true } }), dispositivo(true)],
+  ['Pase se reactiva su dispositivo', 'DENY', conPase({ method: 'update', col: 'bitacoraDispositivos', id: 'pase_1', data: { activo: true }, previo: { activo: false } }), dispositivo(false)],
+  ['Supervisor lee el QR del pase', 'ALLOW', { method: 'get', uid: 'jefe', col: 'bitacoraPases', id: 'chonchi', previo: { token: 'secreto' } }, usuario(true, 'supervisor')],
+  ['Técnico (cuenta compartida) lee el QR del pase', 'DENY', { method: 'get', uid: 'tecnico1', col: 'bitacoraPases', id: 'chonchi', previo: { token: 'secreto' } }, usuario(true, 'tecnico')],
+  ['Admin lee los PIN', 'DENY', { method: 'get', uid: 'jefe', col: 'bitacoraPines', id: 'chonchi__x', previo: { huella: 'x' } }, usuario(true, 'admin')],
+  ['Admin escribe el pase desde la app', 'DENY', { method: 'update', uid: 'jefe', col: 'bitacoraPases', id: 'chonchi', data: { token: 'nuevo' }, previo: { token: 'x' } }, usuario(true, 'admin')],
+  ['Supervisor lista los teléfonos', 'ALLOW', { method: 'get', uid: 'jefe', col: 'bitacoraDispositivos', id: 'pase_1', previo: { activo: true } }, usuario(true, 'supervisor')],
+]
+
 // Bitácora cooperativa (16-09): borradores que se guardan solos + presencia.
 const PRES_ID = 'chonchi_2026-09-16_tarde_disp-celular-01'
 const presencia = (extra = {}) => ({
@@ -158,11 +210,12 @@ const CASOS_COOPERATIVA = [
   if (contenido.includes("'resuelvePendiente' in d")) casos.push(...CASOS_ENTREGA)
   if (contenido.includes('/bitacoraPresencia/')) casos.push(...CASOS_COOPERATIVA)
   if (contenido.includes("'tipoOtro' in d")) casos.push(...CASOS_EVENTO_FLEXIBLE)
+  if (contenido.includes('function tienePaseBitacora')) casos.push(...CASOS_PASE)
 
   const testCases = casos.map(([, expectation, c, mocks]) => {
     const id = c.id ?? 'evento1'
     const ahora = new Date().toISOString()
-    const req = { auth: auth(c.uid), path: ruta(c.col, id), method: c.method, time: ahora }
+    const req = { auth: auth(c.uid, c.claims), path: ruta(c.col, id), method: c.method, time: ahora }
     // `__AHORA__` = la hora de ESTA petición (lo que pone serverTimestamp()).
     const conHora = (d) => (d && d.vistoEn === '__AHORA__' ? { ...d, vistoEn: ahora } : d)
     if (c.data) req.resource = { __name__: ruta(c.col, id), id, data: conHora(c.data) }
