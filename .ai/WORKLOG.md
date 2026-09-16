@@ -5079,3 +5079,28 @@ Revision adversaria del modulo Historial (10 hallazgos, 3 ALTA). Arreglados los 
 - `turnosSinParada` (campo sin uso) ahora se muestra: "7 de 30 turnos cerraron sin ninguna parada".
 - Un evento con `turnoId` corrupto ya no suma al total sin aparecer en ninguna fila.
 - 52 pruebas en services/bitacora (2 nuevas, 2 corregidas al comportamiento correcto).
+
+## 2026-09-15 · Bitacora ronda 10 · Fotos: nada se pierde y nada queda huerfano
+
+Revision adversaria del camino de FOTOS y del copiado al correo (7 hallazgos, 3 ALTA).
+
+- **Cola de borrados pendientes** (`services/bitacora/borradosPendientes.ts`, en localStorage).
+  Todo borrado de limpieza era `catch(() => undefined)`: con la senal de planta cayendose, cada
+  falla dejaba en Storage una foto que NINGUN documento menciona — imposible de encontrar despues
+  y pagandose para siempre. Ahora `borrarFotoOEncolar` anota lo que falla y `purgarFotosPendientes`
+  vacia la cola al abrir la bitacora y cada vez que vuelve la senal.
+- **Limpieza al desmontar**: irse de la pantalla sin tocar Cancelar ni Guardar (lo llaman por radio
+  y toca otra pestana) dejaba huerfanas las fotos ya subidas. El cleanup lee `subidasNuevas.current`
+  al desmontar; si el evento se guardo, `guardar` ya lo vacio y no borra nada.
+- **Subida de a DOS** (`LOTE_SUBIDA`): `createImageBitmap` decodifica la foto ORIGINAL (12 MP ~ 36 MB
+  de pixeles) antes de achicarla; ocho a la vez recargaban la pestana en un celular de gama media y
+  se perdia el formulario entero.
+- **Boton «Quitar» en una subida en curso o fallida**: antes, un HEIC que nunca iba a subir obligaba
+  a cancelar el evento entero. Las descartadas se anotan (`descartadas`) y si llegan a terminar se
+  borran solas de Storage.
+- El correo ya no inventa un 4:3 cuando faltan las dimensiones (una foto vertical salia estirada).
+- 55 pruebas en services/bitacora (3 nuevas de la cola, con almacen falso).
+
+**Anotado, no arreglable:** la URL de descarga de Storage lleva un token que ignora las reglas, asi
+que cualquiera que reciba o reenvie el correo ve esas fotos sin autenticarse. Es inherente a mandar
+fotos por correo; las reglas de Storage NO son la proteccion de esas URLs.

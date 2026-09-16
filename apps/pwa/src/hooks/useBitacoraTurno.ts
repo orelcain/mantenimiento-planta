@@ -24,7 +24,7 @@ import type { EventoBitacora, EventoBitacoraDatos, FotoEvento, TurnoMantencion }
 import { ordenarEventos } from '@/services/bitacora/resumenBitacora'
 import { tecnicosDelCalendario, tecnicosDeTurno, type CalendarioDoc } from '@/services/bitacora/tecnicosDeTurno'
 import { turnoMantencionEn } from '@/services/bitacora/turnoMantencion'
-import { borrarFotoBitacora, type subirFotoBitacora } from '@/services/bitacora/fotosBitacora'
+import { borrarFotoOEncolar, type subirFotoBitacora } from '@/services/bitacora/fotosBitacora'
 
 /**
  * Cierra el pendiente que un evento nuevo acaba de resolver.
@@ -269,7 +269,7 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
           .commit()
           // Las quitadas se borran de Storage recién con el OK del servidor: si la
           // regla rechaza la edición, el evento vuelve con sus fotos intactas.
-          .then(() => Promise.allSettled(quitadas.map((f) => borrarFotoBitacora(f.path))))
+          .then(() => Promise.allSettled(quitadas.map((f) => borrarFotoOEncolar(f.path))))
           .catch(avisarRechazo)
       }
     },
@@ -283,7 +283,7 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
     // Las fotos se borran de Storage recién cuando el servidor ACEPTA el borrado:
     // si la regla lo rechaza (no es el autor ni supervisor), el evento vuelve con
     // sus fotos sanas en vez de con enlaces rotos (revisión 15-09).
-    const borrarFotos = () => Promise.allSettled((evento.fotos ?? []).map((f) => borrarFotoBitacora(f.path)))
+    const borrarFotos = () => Promise.allSettled((evento.fotos ?? []).map((f) => borrarFotoOEncolar(f.path)))
     if (evento.resuelvePendiente?.id) {
       // Borrar el evento que cerraba un pendiente lo vuelve a abrir, pero no en
       // un lote: si el pendiente ya no existía, el lote fallaba y el evento

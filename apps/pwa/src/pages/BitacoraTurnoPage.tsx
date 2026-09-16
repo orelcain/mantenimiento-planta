@@ -16,7 +16,7 @@ import { BITACORA_PLANTA, ETIQUETA_TIPO } from '@/config/bitacora'
 import { copiarHtml, copiarTexto } from '@/lib/clipboard'
 import type { EventoBitacora, FotoEvento, TurnoMantencion } from '@/services/bitacora/bitacora.types'
 import { bitacoraAHtmlCorreo, bitacoraATextoPlano, etiquetaParada, etiquetaPendientes, tituloCorreo } from '@/services/bitacora/bitacoraCorreo'
-import { cargarFotoComoJpeg } from '@/services/bitacora/fotosBitacora'
+import { cargarFotoComoJpeg, purgarFotosPendientes } from '@/services/bitacora/fotosBitacora'
 import { resumirBitacora } from '@/services/bitacora/resumenBitacora'
 import {
   etiquetaTurno,
@@ -94,6 +94,16 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
   const [quienNoAplica, setQuienNoAplica] = useState('')
 
   const abrirNuevo = useCallback(() => setEditor({ evento: null, idNuevo: nuevoId(), turno }), [nuevoId, turno])
+
+  // Fotos que quedaron sin dueño y no se pudieron borrar (la señal de planta se
+  // cae a cada rato): se reintenta al abrir la bitácora y cuando vuelve la red.
+  // Si no, cada falla dejaba un archivo pagándose para siempre.
+  useEffect(() => {
+    void purgarFotosPendientes()
+    const alVolver = () => void purgarFotosPendientes()
+    window.addEventListener('online', alVolver)
+    return () => window.removeEventListener('online', alVolver)
+  }, [])
 
   // `?nuevo=1` (desde la tarjeta del Inicio) abre el editor UNA vez y se quita
   // de la URL. Un solo efecto es dueño de ese parámetro.

@@ -20,7 +20,7 @@ import type {
 } from '@/services/bitacora/bitacora.types'
 import { autorVisible } from '@/services/bitacora/bitacora.types'
 import { copiaDeOrigen, etiquetaCortaTurno } from '@/services/bitacora/entregaTurno'
-import { borrarFotoBitacora, subirFotoBitacora } from '@/services/bitacora/fotosBitacora'
+import { borrarFotoOEncolar, subirFotoBitacora } from '@/services/bitacora/fotosBitacora'
 import { SelectorTecnico } from './SelectorTecnico'
 import { SelectorParticipantes } from './SelectorParticipantes'
 import { BuscadorEquipo } from './BuscadorEquipo'
@@ -59,6 +59,8 @@ export interface EventoBitacoraSheetProps {
 
 const CLAVE_RECIENTES = 'bitacora.equiposRecientes.v1'
 const SIN_SENAL = 'Sin señal. Se sube sola cuando vuelva la conexión.'
+/** Fotos que se procesan a la vez (ver `subirEnTanda`). */
+const LOTE_SUBIDA = 2
 
 function leerRecientes(): string[] {
   try {
@@ -152,6 +154,8 @@ export function EventoBitacoraSheet({
    * quedar huérfana o, peor, colarse en el siguiente evento que se abra.
    */
   const sesion = useRef(0)
+  /** Subidas que el técnico quitó mientras iban en camino (ver `descartarSubida`). */
+  const descartadas = useRef<Set<string>>(new Set())
   const tecnicosRef = useRef(tecnicos)
   tecnicosRef.current = tecnicos
 
@@ -183,6 +187,7 @@ export function EventoBitacoraSheet({
     setError(null)
     subidasNuevas.current = []
     quitadas.current = []
+    descartadas.current = new Set()
   }, [open, evento, turno, pendienteOrigen])
 
   const duracion = minutosEntre(horaInicio, horaTermino || null)
@@ -207,22 +212,31 @@ export function EventoBitacoraSheet({
     const miSesion = sesion.current
     try {
       const foto = await subirFoto(turno.id, eventoId, s.archivo, s.etiqueta)
-      if (miSesion !== sesion.current) {
-        // Se canceló o se guardó sin esperarla mientras subía.
-        void borrarFotoBitacora(foto.path).catch(() => undefined)
+      if (miSesion !== sesion.current || descartadas.current.has(s.clave)) {
+        // Se canceló, se guardó sin esperarla, o el técnico la quitó mientras subía.
+        void borrarFotoOEncolar(foto.path)
         return
       }
       subidasNuevas.current.push(foto.path)
       setFotos((prev) => [...prev, foto])
       setSubidas((prev) => prev.filter((x) => x.clave !== s.clave))
     } catch (e) {
-      if (miSesion !== sesion.current) return
+      if (miSesion !== sesion.current || descartadas.current.has(s.clave)) return
       const mensaje = (e as { code?: string })?.code === 'storage/unauthorized'
         ? 'Sin permiso para subir (faltan reglas de Storage).'
         : e instanceof Error && e.message.startsWith('Formato')
           ? e.message
           : 'No se pudo subir. Revisa la señal y reintenta.'
       setSubidas((prev) => prev.map((x) => (x.clave === s.clave ? { ...x, error: mensaje } : x)))
+    }
+  }
+
+  /** Sube la tanda de a `LOTE_SUBIDA` para no decodificar todo a la vez. */
+  const subirEnTanda = async (tanda: readonly Subida[]) => {
+    const miSesion = sesion.current
+    for (let i = 0; i < tanda.length; i += LOTE_SUBIDA) {
+      if (miSesion !== sesion.current) return
+      await Promise.all(tanda.slice(i, i + LOTE_SUBIDA).map((s) => subir(s)))
     }
   }
 
@@ -249,15 +263,27 @@ export function EventoBitacoraSheet({
     // otra vez» de una foto anterior servía de permiso para guardar sin ESTA,
     // en silencio (revisión 15-09).
     setConfirmarSinFotos(false)
-    nuevas.forEach((s) => void subir(s))
+    // De a DOS: `createImageBitmap` decodifica la foto ORIGINAL (12 MP ≈ 36 MB
+    // de píxeles) antes de achicarla. Ocho a la vez recargaban la pestaña en un
+    // celular de gama media y se perdía el formulario entero (revisión 15-09).
+    void subirEnTanda(nuevas)
     if (inputRef.current) inputRef.current.value = ''
+  }
+
+  /**
+   * Saca de la hoja una foto que todavía sube o que no va a subir nunca. Si
+   * llega a terminar igual, `sesion` ya no calza y se borra sola de Storage.
+   */
+  const descartarSubida = (clave: string) => {
+    descartadas.current.add(clave)
+    setSubidas((prev) => prev.filter((x) => x.clave !== clave))
   }
 
   const quitarFoto = (foto: FotoEvento) => {
     setFotos((prev) => prev.filter((f) => f.path !== foto.path))
     if (subidasNuevas.current.includes(foto.path)) {
       subidasNuevas.current = subidasNuevas.current.filter((p) => p !== foto.path)
-      void borrarFotoBitacora(foto.path).catch(() => undefined)
+      void borrarFotoOEncolar(foto.path)
     } else {
       quitadas.current.push(foto.path)
     }
@@ -267,10 +293,22 @@ export function EventoBitacoraSheet({
     // Lo subido en esta edición y no guardado no debe quedar huérfano; lo que
     // todavía está subiendo se borra solo al terminar (cambia la sesión).
     sesion.current++
-    subidasNuevas.current.forEach((p) => void borrarFotoBitacora(p).catch(() => undefined))
+    subidasNuevas.current.forEach((p) => void borrarFotoOEncolar(p))
     subidasNuevas.current = []
     onClose()
   }
+
+  // Irse de la pantalla sin tocar Cancelar ni Guardar (lo llaman por radio y
+  // toca otra pestaña) dejaba las fotos ya subidas sin dueño: ningún documento
+  // las menciona y nadie las puede encontrar después (revisión 15-09). Se anotan
+  // para borrarlas; la cola sobrevive incluso a que se cierre la app.
+  useEffect(() => {
+    // Lee el ref al DESMONTAR: si el evento se guardó, `guardar` ya lo vació y
+    // aquí no queda nada que borrar.
+    return () => {
+      subidasNuevas.current.forEach((p) => void borrarFotoOEncolar(p))
+    }
+  }, [])
 
   // Al volver la señal, reintentar solas las fotos que fallaron.
   const subidasRef = useRef(subidas)
@@ -377,7 +415,7 @@ export function EventoBitacoraSheet({
     }
     setGuardando(true)
     try {
-      subidasNuevas.current.forEach((p) => void borrarFotoBitacora(p).catch(() => undefined))
+      subidasNuevas.current.forEach((p) => void borrarFotoOEncolar(p))
       await onBorrar(evento)
       toast({ title: 'Evento borrado' })
       onClose()
@@ -579,14 +617,25 @@ export function EventoBitacoraSheet({
                     <>
                       <AlertTriangle className="size-5 text-ink-warn" aria-hidden />
                       <span className="text-caption text-muted-foreground">{s.error}</span>
-                      <button type="button" onClick={() => void subir(s)} className="inline-flex min-h-[32px] items-center gap-1 text-footnote font-semibold text-primary">
-                        <RotateCw className="size-3.5" /> Reintentar
-                      </button>
+                      <span className="flex items-center gap-2">
+                        <button type="button" onClick={() => void subir(s)} className="inline-flex min-h-[32px] items-center gap-1 text-footnote font-semibold text-primary">
+                          <RotateCw className="size-3.5" /> Reintentar
+                        </button>
+                        {/* Sin esto, una foto que nunca va a subir (un HEIC, por
+                            ejemplo) obligaba a cancelar el evento entero para
+                            sacarla y se perdía todo lo escrito (revisión 15-09). */}
+                        <button type="button" onClick={() => descartarSubida(s.clave)} className="inline-flex min-h-[32px] items-center gap-1 text-footnote font-semibold text-muted-foreground">
+                          <X className="size-3.5" /> Quitar
+                        </button>
+                      </span>
                     </>
                   ) : (
                     <>
                       <Loader2 className="size-5 animate-spin text-muted-foreground" aria-hidden />
                       <span className="text-caption text-muted-foreground">Subiendo {ETIQUETA_FOTO[s.etiqueta].toLowerCase()}…</span>
+                      <button type="button" onClick={() => descartarSubida(s.clave)} className="inline-flex min-h-[32px] items-center gap-1 text-footnote font-semibold text-muted-foreground">
+                        <X className="size-3.5" /> Quitar
+                      </button>
                     </>
                   )}
                 </div>

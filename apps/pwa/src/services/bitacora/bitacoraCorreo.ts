@@ -96,12 +96,18 @@ export function lineaTecnicos(e: EventoBitacora): string {
   return `Técnicos: ${tecnicosDelEvento(e).join(', ')}`
 }
 
-function dimensionesFoto(f: FotoEvento): { w: number; h: number } {
+/**
+ * Alto proporcional para reservar el espacio en el correo. Si la foto no trae
+ * dimensiones (hoy no pasa: no se sube una foto que el navegador no pudo medir)
+ * se manda SIN alto: inventar un 4:3 estiraba una foto vertical, que es la que
+ * más sale de un celular.
+ */
+function dimensionesFoto(f: FotoEvento): { w: number; h: number | null } {
   if (f.ancho && f.alto && f.ancho > 0) {
     const w = Math.min(ANCHO_FOTO, f.ancho)
     return { w, h: Math.round((f.alto * w) / f.ancho) }
   }
-  return { w: ANCHO_FOTO, h: Math.round((ANCHO_FOTO * 3) / 4) }
+  return { w: ANCHO_FOTO, h: null }
 }
 
 function htmlFotos(fotos: readonly FotoEvento[], fuente: (f: FotoEvento) => string): string {
@@ -115,8 +121,8 @@ function htmlFotos(fotos: readonly FotoEvento[], fuente: (f: FotoEvento) => stri
       const { w, h } = dimensionesFoto(f)
       return (
         `<td style="padding:8px 8px 0 0;vertical-align:top;">` +
-        `<img src="${escaparHtml(fuente(f))}" width="${w}" height="${h}" alt="${escaparHtml(ETIQUETA_FOTO[f.etiqueta])}" ` +
-        `style="display:block;width:${w}px;height:${h}px;border:0;border-radius:4px;">` +
+        `<img src="${escaparHtml(fuente(f))}" width="${w}"${h == null ? '' : ` height="${h}"`} alt="${escaparHtml(ETIQUETA_FOTO[f.etiqueta])}" ` +
+        `style="display:block;width:${w}px;${h == null ? '' : `height:${h}px;`}border:0;border-radius:4px;">` +
         `<div style="font-family:${FUENTE};font-size:12px;color:${C.sec};padding-top:2px;">${escaparHtml(ETIQUETA_FOTO[f.etiqueta])}</div>` +
         `</td>`
       )
