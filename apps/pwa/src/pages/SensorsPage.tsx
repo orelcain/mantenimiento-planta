@@ -17,6 +17,7 @@ import { TelemetryChart, type ChartType } from '@/components/telemetry/Telemetry
 import { TelemetryExportDialog } from '@/components/telemetry/TelemetryExportDialog'
 import { useTelemetryHistory, type TimeRange } from '@/hooks/useTelemetryHistory'
 import { logger } from '@/lib/logger'
+import { formatNombreSAP } from '@/utils/repuestos/formatNombreSAP'
 
 function normalizeTs(ts: number | undefined): number | null {
   if (typeof ts !== 'number' || !Number.isFinite(ts)) return null
@@ -945,7 +946,7 @@ export function SensorsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-sm text-muted-foreground">Online</div>
-                  <div className="text-2xl font-bold text-ink-ok">
+                  <div className="text-2xl font-bold text-foreground">
                     {devices.filter((d) => isDeviceFresh(d, panelNowMs)).length}
                   </div>
                 </div>
@@ -958,7 +959,7 @@ export function SensorsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-sm text-muted-foreground">Asignados</div>
-                  <div className="text-2xl font-bold text-primary">
+                  <div className="text-2xl font-bold text-foreground">
                     {devices.filter(d => d.assignedEquipmentId).length}
                   </div>
                 </div>
@@ -1012,7 +1013,6 @@ export function SensorsPage() {
                         <Button
                           type="button"
                           variant="outline"
-                          size="sm"
                           onClick={requestDevice}
                           className="gap-2 shrink-0"
                           title="Detectar dispositivo conectado por USB"
@@ -1131,7 +1131,6 @@ export function SensorsPage() {
                             <Button
                               type="button"
                               variant="ghost"
-                              size="sm"
                               onClick={(e) => {
                                 e.stopPropagation()
                                 handleDeleteDevice(d.deviceId)
@@ -1186,10 +1185,17 @@ export function SensorsPage() {
                     <div className="space-y-2 pb-3 border-b">
                       <div className="text-sm font-medium">Equipo asociado</div>
                       <div className="text-xs">
-                        <div className="font-medium">{assignedEquipment.nombre}</div>
+                        <div className="font-medium">{formatNombreSAP(assignedEquipment.nombre).nombre || assignedEquipment.nombre}</div>
                         <div className="text-muted-foreground">{assignedEquipment.codigo}</div>
                         {assignedEquipment.hierarchyPath && (
-                          <div className="text-muted-foreground mt-1">{assignedEquipment.hierarchyPath}</div>
+                          <div className="text-muted-foreground mt-1">
+                            {assignedEquipment.hierarchyPath
+                              .split('>')
+                              .map((seg) => seg.trim())
+                              .filter(Boolean)
+                              .map((seg) => formatNombreSAP(seg).nombre || seg)
+                              .join(' > ')}
+                          </div>
                         )}
                       </div>
                     </div>
@@ -1408,7 +1414,7 @@ export function SensorsPage() {
                             <span className="font-mono text-sm font-medium">{selectedDevice.wifiSsid}</span>
                             <button
                               onClick={() => copyToClipboard(selectedDevice.wifiSsid || '', 'ssid')}
-                              className="p-1 hover:bg-white/50 dark:hover:bg-black/20 rounded-ctl transition-colors"
+                              className="flex size-11 items-center justify-center rounded-full hover:bg-white/50 dark:hover:bg-black/20 transition-colors"
                               title="Copiar SSID"
                             >
                               {copiedField === 'ssid' ? (
@@ -1428,7 +1434,7 @@ export function SensorsPage() {
                               </span>
                               <button
                                 onClick={() => setShowApPassword(!showApPassword)}
-                                className="p-1 hover:bg-white/50 dark:hover:bg-black/20 rounded-ctl transition-colors"
+                                className="flex size-11 items-center justify-center rounded-full hover:bg-white/50 dark:hover:bg-black/20 transition-colors"
                                 title={showApPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                               >
                                 {showApPassword ? (
@@ -1439,7 +1445,7 @@ export function SensorsPage() {
                               </button>
                               <button
                                 onClick={() => copyToClipboard(selectedDevice.wifiPassword || '', 'password')}
-                                className="p-1 hover:bg-white/50 dark:hover:bg-black/20 rounded-ctl transition-colors"
+                                className="flex size-11 items-center justify-center rounded-full hover:bg-white/50 dark:hover:bg-black/20 transition-colors"
                                 title="Copiar contraseña"
                               >
                                 {copiedField === 'password' ? (
@@ -1498,7 +1504,7 @@ export function SensorsPage() {
                         </div>
                         <Button
                           variant="ghost"
-                          size="sm"
+                         
                           onClick={handleWifiScan}
                           disabled={scanningWifi}
                           className="gap-1"
@@ -1593,7 +1599,7 @@ export function SensorsPage() {
                             <span className="font-mono text-sm font-medium">{selectedDevice.apSsid}</span>
                             <button
                               onClick={() => copyToClipboard(selectedDevice.apSsid || '', 'ssid')}
-                              className="p-1 hover:bg-white/50 dark:hover:bg-black/20 rounded-ctl transition-colors"
+                              className="flex size-11 items-center justify-center rounded-full hover:bg-white/50 dark:hover:bg-black/20 transition-colors"
                               title="Copiar SSID"
                             >
                               {copiedField === 'ssid' ? (
@@ -1613,7 +1619,7 @@ export function SensorsPage() {
                               </span>
                               <button
                                 onClick={() => setShowApPassword(!showApPassword)}
-                                className="p-1 hover:bg-white/50 dark:hover:bg-black/20 rounded-ctl transition-colors"
+                                className="flex size-11 items-center justify-center rounded-full hover:bg-white/50 dark:hover:bg-black/20 transition-colors"
                                 title={showApPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                               >
                                 {showApPassword ? (
@@ -1624,7 +1630,7 @@ export function SensorsPage() {
                               </button>
                               <button
                                 onClick={() => copyToClipboard(selectedDevice.apPassword || '', 'password')}
-                                className="p-1 hover:bg-white/50 dark:hover:bg-black/20 rounded-ctl transition-colors"
+                                className="flex size-11 items-center justify-center rounded-full hover:bg-white/50 dark:hover:bg-black/20 transition-colors"
                                 title="Copiar contraseña"
                               >
                                 {copiedField === 'password' ? (
@@ -1644,7 +1650,7 @@ export function SensorsPage() {
                             href={`http://${selectedDevice.apIp}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-xs text-primary hover:underline flex items-center gap-1"
+                            className="inline-flex min-h-[44px] items-center gap-1 text-xs text-primary hover:underline"
                           >
                             <Globe className="inline size-3.5" /> Abrir panel local
                           </a>
@@ -1667,7 +1673,7 @@ export function SensorsPage() {
                   <button
                     type="button"
                     onClick={() => setIsPairingExpanded(!isPairingExpanded)}
-                    className="w-full"
+                    className="min-h-[44px] w-full"
                   >
                     <CardTitle className="flex items-center justify-between">
                       <span className="flex items-center gap-2">
@@ -1736,9 +1742,8 @@ export function SensorsPage() {
                       <Button
                         type="button"
                         variant="ghost"
-                        size="sm"
                         onClick={() => setSelectedEquipmentId('')}
-                        className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                        className="text-muted-foreground hover:text-foreground"
                       >
                         Cambiar equipo
                       </Button>
@@ -2177,7 +2182,7 @@ export function SensorsPage() {
                   <button
                     type="button"
                     onClick={() => setIsWifiApExpanded(!isWifiApExpanded)}
-                    className="w-full"
+                    className="min-h-[44px] w-full"
                   >
                     <CardTitle className="flex items-center justify-between">
                       <span className="flex items-center gap-2">
@@ -2211,7 +2216,7 @@ export function SensorsPage() {
                           <span className="font-mono text-sm font-medium">{selectedDevice.apSsid}</span>
                           <button
                             onClick={() => copyToClipboard(selectedDevice.apSsid || '', 'ssid')}
-                            className="p-1 hover:bg-white/50 dark:hover:bg-black/20 rounded-ctl transition-colors"
+                            className="flex size-11 items-center justify-center rounded-full hover:bg-white/50 dark:hover:bg-black/20 transition-colors"
                             title="Copiar SSID"
                           >
                             {copiedField === 'ssid' ? (
@@ -2231,7 +2236,7 @@ export function SensorsPage() {
                             </span>
                             <button
                               onClick={() => setShowApPassword(!showApPassword)}
-                              className="p-1 hover:bg-white/50 dark:hover:bg-black/20 rounded-ctl transition-colors"
+                              className="flex size-11 items-center justify-center rounded-full hover:bg-white/50 dark:hover:bg-black/20 transition-colors"
                               title={showApPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                             >
                               {showApPassword ? (
@@ -2242,7 +2247,7 @@ export function SensorsPage() {
                             </button>
                             <button
                               onClick={() => copyToClipboard(selectedDevice.apPassword || '', 'password')}
-                              className="p-1 hover:bg-white/50 dark:hover:bg-black/20 rounded-ctl transition-colors"
+                              className="flex size-11 items-center justify-center rounded-full hover:bg-white/50 dark:hover:bg-black/20 transition-colors"
                               title="Copiar contraseña"
                             >
                               {copiedField === 'password' ? (
@@ -2274,7 +2279,7 @@ export function SensorsPage() {
                           <span className="font-mono text-sm font-medium">{otaHostLabel || '--'}</span>
                           <button
                             onClick={() => copyToClipboard(otaHostLabel || '', 'otaHost')}
-                            className="p-1 hover:bg-white/50 dark:hover:bg-black/20 rounded-ctl transition-colors"
+                            className="flex size-11 items-center justify-center rounded-full hover:bg-white/50 dark:hover:bg-black/20 transition-colors"
                             title="Copiar hostname"
                           >
                             {copiedField === 'otaHost' ? (
@@ -2306,7 +2311,7 @@ export function SensorsPage() {
                             <span className="font-mono text-sm font-medium">{otaPassword}</span>
                             <button
                               onClick={() => copyToClipboard(otaPassword, 'otaPassword')}
-                              className="p-1 hover:bg-white/50 dark:hover:bg-black/20 rounded-ctl transition-colors"
+                              className="flex size-11 items-center justify-center rounded-full hover:bg-white/50 dark:hover:bg-black/20 transition-colors"
                               title="Copiar contraseña OTA"
                             >
                               {copiedField === 'otaPassword' ? (

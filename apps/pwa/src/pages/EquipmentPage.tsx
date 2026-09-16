@@ -1010,7 +1010,7 @@ ${new Date().toLocaleDateString()} • ${new Date().toLocaleTimeString()}
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-2xl font-bold text-success">{stats.operativos}</div>
+                <div className="text-2xl font-bold text-foreground">{stats.operativos}</div>
                 <div className="text-sm text-muted-foreground">Operativos</div>
               </div>
               <CheckCircle2 className="h-8 w-8 text-success" />
@@ -1021,7 +1021,7 @@ ${new Date().toLocaleDateString()} • ${new Date().toLocaleTimeString()}
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-2xl font-bold text-warning">{stats.enMantenimiento}</div>
+                <div className="text-2xl font-bold text-foreground">{stats.enMantenimiento}</div>
                 <div className="text-sm text-muted-foreground">En Mantenimiento</div>
               </div>
               <Settings className="h-8 w-8 text-warning" />
@@ -1032,7 +1032,7 @@ ${new Date().toLocaleDateString()} • ${new Date().toLocaleTimeString()}
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-2xl font-bold text-destructive">{stats.fueraServicio}</div>
+                <div className="text-2xl font-bold text-foreground">{stats.fueraServicio}</div>
                 <div className="text-sm text-muted-foreground">Fuera de Servicio</div>
               </div>
               <XCircle className="h-8 w-8 text-destructive" />
@@ -1107,10 +1107,10 @@ ${new Date().toLocaleDateString()} • ${new Date().toLocaleTimeString()}
             </div>
 
             <div className="flex items-center gap-2 flex-wrap">
-              <Button variant="outline" size="sm" onClick={selectAllCurrentPage} disabled={paginatedEquipment.length === 0}>
+              <Button variant="outline" onClick={selectAllCurrentPage} disabled={paginatedEquipment.length === 0}>
                 Seleccionar página
               </Button>
-              <Button variant="outline" size="sm" onClick={clearSelection} disabled={selectedIds.size === 0}>
+              <Button variant="outline" onClick={clearSelection} disabled={selectedIds.size === 0}>
                 Limpiar selección
               </Button>
               {selectedIds.size > 0 && <Badge variant="secondary">{selectedIds.size} seleccionados</Badge>}
@@ -1267,7 +1267,6 @@ ${new Date().toLocaleDateString()} • ${new Date().toLocaleTimeString()}
                         <Button
                           key={page}
                           variant={currentPage === page ? 'default' : 'outline'}
-                          size="sm"
                           onClick={() => setCurrentPage(page)}
                           className="w-10"
                         >
@@ -1718,10 +1717,10 @@ function EquipmentCard({
   const headerClassName = compact ? 'p-3 pb-2' : 'p-3.5 pb-2.5'
   const contentClassName = compact ? 'p-3 pt-0 space-y-2' : 'p-3.5 pt-0 space-y-2.5'
   const statusIconSizeClassName = compact ? 'h-4 w-4' : 'h-5 w-5'
-  const favButtonClassName = compact ? 'h-7 w-7' : 'h-8 w-8'
+  const favButtonClassName = 'size-11 sm:size-9'
   const favIconSizeClassName = compact ? 'h-3.5 w-3.5' : 'h-4 w-4'
   const smallTextClassName = compact ? 'text-caption' : 'text-xs'
-  const actionButtonClassName = compact ? 'h-6 text-caption' : 'h-7 text-xs'
+  const actionButtonClassName = compact ? 'h-11 sm:h-9 text-caption' : 'h-11 sm:h-9 text-xs'
 
   if (viewMode === 'list') {
     return (
@@ -1803,7 +1802,7 @@ function EquipmentCard({
     <Card className="cursor-pointer hover:shadow-lg hover:border-primary/50 transition-all group" onClick={onOpenDetail}>
       <CardHeader className={headerClassName}>
         <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2">
+          <div className="flex min-h-[44px] items-center gap-2">
             <Checkbox
               checked={selected}
               onCheckedChange={() => onToggleSelected()}
@@ -1812,7 +1811,7 @@ function EquipmentCard({
             />
             <div className="flex-1 min-w-0">
               <CardTitle className={`${titleClassName} mb-1`}>
-                {equipment.nombre}
+                {formatNombreSAP(equipment.nombre).nombre || equipment.nombre}
               </CardTitle>
               <div className="flex items-center gap-2">
                 <Badge variant="secondary" className={codeBadgeClassName}>

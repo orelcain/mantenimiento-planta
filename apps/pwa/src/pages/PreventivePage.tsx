@@ -316,7 +316,7 @@ export function PreventivePage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Vencidas</p>
-                <p className="text-2xl font-bold text-ink-crit">{stats.overdue}</p>
+                <p className="text-2xl font-bold text-foreground">{stats.overdue}</p>
               </div>
             </div>
           </CardContent>
