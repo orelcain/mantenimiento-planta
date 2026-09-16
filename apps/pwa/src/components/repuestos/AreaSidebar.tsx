@@ -104,14 +104,14 @@ function EquipmentRow({
         {hasChildren ? (
           <button
             onClick={(e) => { e.stopPropagation(); setExpanded((v) => !v) }}
-            className="-ml-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-ctl hover:bg-muted"
+            className="-my-2.5 -ml-2.5 flex size-11 shrink-0 items-center justify-center rounded-full hover:bg-muted"
             aria-label={expanded ? 'Colapsar sub-equipos' : 'Expandir sub-equipos'}
           >
             <ChevronRight className={['h-4 w-4 transition-transform', expanded ? 'rotate-90' : ''].join(' ')} />
           </button>
         ) : (
           <span className="-ml-1 flex h-6 w-6 shrink-0 items-center justify-center">
-            <Cog className={['h-3.5 w-3.5', selected ? 'text-primary' : 'text-cat-7-ink/60'].join(' ')} />
+            <Cog className={['h-3.5 w-3.5', selected ? 'text-primary' : 'text-muted-foreground/60'].join(' ')} />
           </span>
         )}
         <div className="min-w-0 flex-1">
@@ -192,7 +192,7 @@ function AreaRow({
         {hasChildren ? (
           <button
             onClick={(e) => { e.stopPropagation(); onToggleNode(node.id) }}
-            className="-ml-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-ctl hover:bg-muted"
+            className="-m-2.5 flex size-11 shrink-0 items-center justify-center rounded-full hover:bg-muted"
             aria-label={isOpen ? 'Colapsar' : 'Expandir'}
           >
             {node.isLoading
@@ -212,10 +212,10 @@ function AreaRow({
           <div className="truncate text-caption leading-tight text-muted-foreground">
             <span className="tabular-nums">{eqCount} equipos</span>
             {repCount > 0 && (
-              <span className="tabular-nums text-emerald-500"> · {repCount} rep</span>
+              <span className="tabular-nums text-muted-foreground"> · {repCount} rep</span>
             )}
             {assetCount > 0 && (
-              <span className="tabular-nums text-cat-7-ink"> · {assetCount} M/B</span>
+              <span className="tabular-nums text-muted-foreground"> · {assetCount} M/B</span>
             )}
           </div>
         </div>
@@ -224,7 +224,7 @@ function AreaRow({
           <button
             onClick={(e) => { e.stopPropagation(); onToggleAreaFav(node.id) }}
             className={[
-              'shrink-0 rounded-ctl p-1 transition',
+              '-m-2.5 flex size-11 shrink-0 items-center justify-center rounded-full transition',
               // En táctil siempre visible (para poder marcar); en mouse, oculta hasta hover de la fila.
               isFav ? 'text-amber-400' : 'text-muted-foreground/30 opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 hover:text-amber-400',
             ].join(' ')}
@@ -422,7 +422,7 @@ export function AreaSidebar({
               value={equipSearch}
               onChange={(e) => setEquipSearch(e.target.value)}
               placeholder="Buscar equipo en toda la planta…"
-              className="h-8 w-full rounded-ctl border border-input bg-background pl-8 pr-7 text-xs text-foreground outline-none transition-colors focus:border-primary/50"
+              className="h-11 w-full rounded-ctl border border-input bg-background pl-8 pr-7 text-subhead text-foreground outline-none transition-colors focus:border-primary/50"
             />
             {equipSearch && (
               <button
@@ -462,7 +462,7 @@ export function AreaSidebar({
                     ].join(' ')}
                     title={eq.nombre}
                   >
-                    <Cog className={['h-3.5 w-3.5 shrink-0', isSel ? 'text-primary' : 'text-cat-7-ink/70'].join(' ')} />
+                    <Cog className={['h-3.5 w-3.5 shrink-0', isSel ? 'text-primary' : 'text-muted-foreground/70'].join(' ')} />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-caption leading-tight">{eq.alias || eq.nombre}</span>
                       {eq.codigo && (
@@ -507,7 +507,7 @@ export function AreaSidebar({
       <button
         onClick={handleShowAll}
         className={[
-          'flex items-center justify-center gap-2 border-t border-border px-3 py-2.5 text-xs font-medium transition-colors',
+          'flex min-h-[44px] items-center justify-center gap-2 rounded-full border-t border-border px-3 py-2.5 text-xs font-medium transition-colors',
           showingAll ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
         ].join(' ')}
       >

@@ -1607,7 +1607,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
         <div className="flex flex-wrap items-center gap-1.5 border-b border-border px-2.5 py-2.5 sm:gap-2 sm:px-4">
           <button
             onClick={() => setSidebarMobileOpen(true)}
-            className="shrink-0 rounded-ctl p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground sm:hidden"
+            className="flex size-11 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground sm:hidden"
             aria-label="Abrir áreas"
           >
             <Menu className="h-5 w-5" />
@@ -1623,16 +1623,16 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                 if (v.trim() && !showingAll) setShowingAll(true)
               }}
               placeholder="Buscar SAP, repuesto, equipo o fabricante…"
-              className="pl-9"
+              className="h-11 pl-9"
             />
           </div>
-          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setSolicitudesOpen(true)}>
+          <Button variant="outline" size="sm" className="h-11 w-11 justify-center gap-1.5 px-0 sm:w-auto sm:px-3" onClick={() => setSolicitudesOpen(true)}>
             <ClipboardList className="h-4 w-4" /> <span className="hidden sm:inline">Solicitudes</span>
             {pendientesCount > 0 && (
               <Badge variant="secondary" className="ml-0.5 tabular-nums">{pendientesCount}</Badge>
             )}
           </Button>
-          <Button size="sm" className="gap-1.5" onClick={() => openSolicitar(null)}>
+          <Button size="sm" className="h-11 gap-1.5" onClick={() => openSolicitar(null)}>
             <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Solicitar repuesto</span><span className="sm:hidden">Solicitar</span>
           </Button>
           {/* Herramientas admin: toolbar en desktop (≥sm) */}
@@ -1654,7 +1654,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
           {/* Herramientas admin: overflow en móvil (<sm) */}
           {isAdmin && (
             <div className="relative sm:hidden">
-              <button onClick={() => setAdminMenuOpen((v) => !v)} title="Herramientas admin" aria-label="Herramientas admin" className="relative rounded-ctl p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
+              <button onClick={() => setAdminMenuOpen((v) => !v)} title="Herramientas admin" aria-label="Herramientas admin" className="relative flex size-11 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground">
                 <MoreVertical className="h-5 w-5" />
                 {trashCount > 0 && (
                   <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-caption font-bold text-white tabular-nums">{trashCount}</span>
@@ -1693,7 +1693,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
             <div className="mb-5 rounded-card border border-border bg-muted p-3">
               <button
                 onClick={() => setFavBarOpen((v) => !v)}
-                className="flex w-full items-center gap-1.5 text-caption font-bold tracking-wider text-muted-foreground"
+                className="flex min-h-[44px] w-full items-center gap-1.5 text-caption font-bold tracking-wider text-muted-foreground"
               >
                 <Star className="h-3.5 w-3.5 fill-amber-400 text-ink-warn" /> Favoritos de equipos
                 {equipFavLists.length > 0 && <span className="tabular-nums text-muted-foreground/60">({equipFavTotal})</span>}
@@ -1854,7 +1854,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
             <Button
               variant={mobileExtrasOpen ? 'default' : 'outline'}
               size="sm"
-              className="shrink-0 gap-1.5"
+              className="h-11 shrink-0 gap-1.5"
               onClick={() => setMobileExtrasOpen((v) => !v)}
             >
               <Settings2 className="h-4 w-4" /> Filtros
