@@ -6,6 +6,7 @@ import { useBitacoraTurno, useTurnoMantencionActual } from '@/hooks/useBitacoraT
 import { resumirBitacora } from '@/services/bitacora/resumenBitacora'
 import { esBorrador, soloListos } from '@/services/bitacora/borradores'
 import { etiquetaTurno, formatoMinutos, horarioTurno } from '@/services/bitacora/turnoMantencion'
+import { tieneHora } from '@/services/bitacora/presentacionEvento'
 
 /**
  * Acceso inmediato a la bitácora del turno que está corriendo: lo primero del
@@ -61,8 +62,14 @@ export function BitacoraTurnoCard({
         <p className="truncate text-footnote text-muted-foreground">
           {ultimo && (
             <>
-              Último: <span className="text-foreground tabular-nums">{ultimo.horaInicio}</span>
-              {ultimo.equipo ? <span className="text-foreground"> · {ultimo.equipo}</span> : null}
+              Último:{' '}
+              {tieneHora(ultimo) && <span className="text-foreground tabular-nums">{ultimo.horaInicio}</span>}
+              {ultimo.equipo ? (
+                <span className="text-foreground">
+                  {tieneHora(ultimo) ? ' · ' : ''}
+                  {ultimo.equipo}
+                </span>
+              ) : null}
             </>
           )}
           {ultimo && enRedaccion > 0 ? ' · ' : ''}

@@ -103,6 +103,20 @@ export function purgarFotosPendientes(): Promise<{ borradas: number; pendientes:
   return purgarBorradosPendientes((path) => borrarFotoBitacora(path))
 }
 
+/**
+ * Carga una foto para dibujarla en un canvas sin contaminarlo (`crossOrigin`).
+ * Si el servidor no autoriza el origen, falla aquí y no al exportar el canvas.
+ */
+export function cargarImagen(url: string): Promise<HTMLImageElement> {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const el = new Image()
+    el.crossOrigin = 'anonymous'
+    el.onload = () => resolve(el)
+    el.onerror = () => reject(new Error('No se pudo cargar la foto.'))
+    el.src = url
+  })
+}
+
 export interface ImagenCargada {
   dataUrl: string
   ancho: number
@@ -120,13 +134,7 @@ export interface ImagenCargada {
  * `crossOrigin='anonymous'` el canvas no queda contaminado y `toDataURL` sirve.
  */
 export async function cargarFotoComoJpeg(url: string, anchoMax: number, calidad = 0.8): Promise<ImagenCargada> {
-  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-    const el = new Image()
-    el.crossOrigin = 'anonymous'
-    el.onload = () => resolve(el)
-    el.onerror = () => reject(new Error('No se pudo cargar la foto.'))
-    el.src = url
-  })
+  const img = await cargarImagen(url)
   const escala = Math.min(1, anchoMax / img.naturalWidth)
   const ancho = Math.max(1, Math.round(img.naturalWidth * escala))
   const alto = Math.max(1, Math.round(img.naturalHeight * escala))

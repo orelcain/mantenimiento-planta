@@ -1165,7 +1165,10 @@ service cloud.firestore {
         return isValidDocSize()
           && d.plantId is string
           && d.turnoId is string && d.turnoId.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}_(dia|tarde|noche)$')
-          && d.tipo in ['falla', 'ajuste', 'inspeccion', 'preventivo', 'novedad']
+          && d.tipo in ['falla', 'correctivo', 'preventivo', 'planificado', 'inspeccion', 'ajuste', 'novedad', 'otro']
+          // Tipo escrito a mano (con tipo 'otro') y título opcional (16-09-2026).
+          && (!('tipoOtro' in d) || d.tipoOtro == null || (d.tipoOtro is string && d.tipoOtro.size() <= 40))
+          && (!('titulo' in d) || d.titulo == null || (d.titulo is string && d.titulo.size() <= 120))
           && d.equipo is string && d.equipo.size() <= 120
           // Borrador (se guarda solo mientras se escribe, 16-09-2026): puede ir sin
           // descripción todavía. Publicado (o sin campo, los de antes): la exige.
@@ -1173,8 +1176,9 @@ service cloud.firestore {
           && ((d.get('estado', 'listo') == 'borrador' && d.descripcion is string && d.descripcion.size() <= 3000)
               || isNonEmptyString(d.descripcion, 1, 3000))
           && (!('dispositivo' in d) || d.dispositivo in ['celular', 'pc'])
-          && d.horaInicio is string && d.horaInicio.matches('^[0-9]{2}:[0-9]{2}$')
-          && (d.horaTermino == null || (d.horaTermino is string && d.horaTermino.matches('^[0-9]{2}:[0-9]{2}$')))
+          // horaInicio '' = «Sin hora» (16-09-2026): entonces no hay término.
+          && d.horaInicio is string && (d.horaInicio == '' || d.horaInicio.matches('^[0-9]{2}:[0-9]{2}$'))
+          && (d.horaTermino == null || (d.horaInicio != '' && d.horaTermino is string && d.horaTermino.matches('^[0-9]{2}:[0-9]{2}$')))
           && d.impacto in ['no-aplica', 'con-parada', 'en-ventana']
           && (d.minutosParada == null || (d.minutosParada is number && d.minutosParada >= 0 && d.minutosParada <= 1440))
           && (d.ventana == null || (d.ventana is string && d.ventana.size() <= 120))

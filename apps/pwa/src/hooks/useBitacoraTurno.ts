@@ -20,7 +20,8 @@ import { auth, db } from '@/services/firebase'
 import { useAuthStore } from '@/store'
 import { toast } from '@/hooks/useToast'
 import { useAjustesTecnicos, useOpcionesEquipo } from '@/hooks/useListasBitacora'
-import { BITACORA_COLECCION, BITACORA_PLANTA, BITACORA_TURNOS_COLECCION, MAX_FOTOS_EVENTO } from '@/config/bitacora'
+import { BITACORA_COLECCION, BITACORA_PLANTA, BITACORA_TURNOS_COLECCION, MAX_FOTOS_EVENTO, MAX_TIPO_OTRO, MAX_TITULO_EVENTO } from '@/config/bitacora'
+import { resolverTipo } from '@/services/bitacora/presentacionEvento'
 import type { EventoBitacora, EventoBitacoraDatos, FotoEvento, TurnoMantencion } from '@/services/bitacora/bitacora.types'
 import { ordenarEventos } from '@/services/bitacora/resumenBitacora'
 import { tecnicosDelCalendario, tecnicosDeTurno, type CalendarioDoc } from '@/services/bitacora/tecnicosDeTurno'
@@ -145,7 +146,7 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
       q,
       { includeMetadataChanges: true },
       (snap) => {
-        const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as EventoBitacora)
+        const docs = snap.docs.map((d) => ({ id: d.id, ...d.data({ serverTimestamps: 'estimate' }) }) as EventoBitacora)
         if (sincronizadoUnaVez) {
           for (const c of snap.docChanges()) {
             // Con cambios pendientes = lo escribió ESTE equipo: no es novedad.
@@ -209,7 +210,14 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
       const descripcion = limpiar(datos.descripcion)
       // Un borrador se guarda como vaya: la descripción se exige al publicar.
       if (!descripcion.trim() && !esBorradorAhora) throw new Error('Escribe qué pasó.')
-      if (!/^\d{2}:\d{2}$/.test(datos.horaInicio)) throw new Error('Falta la hora de inicio.')
+      // `''` = «Sin hora» (decisión de Orel 16-09-2026): entonces no hay término.
+      const sinHora = datos.horaInicio === ''
+      if (!sinHora && !/^\d{2}:\d{2}$/.test(datos.horaInicio)) throw new Error('Falta la hora de inicio.')
+      // Al publicar, un «Otro» que coincide con un tipo fijo queda como ese tipo.
+      const { tipo, tipoOtro } = esBorradorAhora
+        ? { tipo: datos.tipo, tipoOtro: datos.tipo === 'otro' ? (datos.tipoOtro ?? '').slice(0, MAX_TIPO_OTRO) || null : null }
+        : resolverTipo(datos.tipo, datos.tipoOtro)
+      if (!esBorradorAhora && tipo === 'otro' && !tipoOtro) throw new Error('Escribe el tipo o elige uno de la lista.')
       const fotos: FotoEvento[] = datos.fotos.map((f) => ({
         url: f.url,
         path: f.path,
@@ -218,11 +226,13 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
         ...(f.alto ? { alto: f.alto } : {}),
       }))
       const cuerpo = {
-        tipo: datos.tipo,
+        tipo,
+        tipoOtro,
         equipo: limpiar(datos.equipo),
+        titulo: limpiar(datos.titulo ?? '').slice(0, MAX_TITULO_EVENTO) || null,
         descripcion,
         horaInicio: datos.horaInicio,
-        horaTermino: datos.horaTermino || null,
+        horaTermino: sinHora ? null : datos.horaTermino || null,
         impacto: datos.impacto,
         minutosParada: datos.impacto === 'con-parada' && datos.minutosParada != null ? Math.max(0, Math.round(datos.minutosParada)) : null,
         ventana: datos.impacto === 'en-ventana' ? (datos.ventana ? limpiar(datos.ventana) : '') || null : null,

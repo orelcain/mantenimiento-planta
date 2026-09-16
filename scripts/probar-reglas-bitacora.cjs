@@ -76,6 +76,21 @@ const CASOS_ENTREGA = [
   ['Cierre que no es un mapa', 'DENY', { method: 'update', uid: 'tecnico2', col: 'bitacoraEventos', data: evento({ pendiente: false, cierre: 'resuelto' }), previo: evento() }, usuario(true, 'tecnico')],
 ]
 
+// Evento con título, «Sin hora» y tipos nuevos (16-09, mockup WhatsApp + evento).
+const CASOS_EVENTO_FLEXIBLE = [
+  ['Evento SIN HORA (inicio vacío, sin término)', 'ALLOW', { method: 'create', uid: 'tecnico1', col: 'bitacoraEventos', data: evento({ horaInicio: '', horaTermino: null, impacto: 'con-parada', minutosParada: 20 }) }, usuario(true, 'tecnico')],
+  ['Sin hora pero CON término', 'DENY', { method: 'create', uid: 'tecnico1', col: 'bitacoraEventos', data: evento({ horaInicio: '', horaTermino: '16:55' }) }, usuario(true, 'tecnico')],
+  ['Hora de inicio mal escrita', 'DENY', { method: 'create', uid: 'tecnico1', col: 'bitacoraEventos', data: evento({ horaInicio: '4:20pm' }) }, usuario(true, 'tecnico')],
+  ['Tipo nuevo Correctivo con título', 'ALLOW', { method: 'create', uid: 'tecnico1', col: 'bitacoraEventos', data: evento({ tipo: 'correctivo', titulo: 'Cambio de tubos fluorescentes' }) }, usuario(true, 'tecnico')],
+  ['Tipo nuevo Planificado', 'ALLOW', { method: 'create', uid: 'tecnico1', col: 'bitacoraEventos', data: evento({ tipo: 'planificado', titulo: null }) }, usuario(true, 'tecnico')],
+  ['Tipo «Otro» escrito a mano', 'ALLOW', { method: 'create', uid: 'tecnico1', col: 'bitacoraEventos', data: evento({ tipo: 'otro', tipoOtro: 'Mejora' }) }, usuario(true, 'tecnico')],
+  ['Tipo que no existe', 'DENY', { method: 'create', uid: 'tecnico1', col: 'bitacoraEventos', data: evento({ tipo: 'mejora' }) }, usuario(true, 'tecnico')],
+  ['Tipo propio de 41 caracteres', 'DENY', { method: 'create', uid: 'tecnico1', col: 'bitacoraEventos', data: evento({ tipo: 'otro', tipoOtro: 'x'.repeat(41) }) }, usuario(true, 'tecnico')],
+  ['Título de 121 caracteres', 'DENY', { method: 'create', uid: 'tecnico1', col: 'bitacoraEventos', data: evento({ titulo: 'x'.repeat(121) }) }, usuario(true, 'tecnico')],
+  ['Título que no es texto', 'DENY', { method: 'create', uid: 'tecnico1', col: 'bitacoraEventos', data: evento({ titulo: 42 }) }, usuario(true, 'tecnico')],
+  ['Editar un evento para dejarlo sin hora', 'ALLOW', { method: 'update', uid: 'tecnico2', col: 'bitacoraEventos', data: evento({ horaInicio: '', horaTermino: null, actualizadoPorNombre: 'Otro' }), previo: evento() }, usuario(true, 'tecnico')],
+]
+
 // Bitácora cooperativa (16-09): borradores que se guardan solos + presencia.
 const PRES_ID = 'chonchi_2026-09-16_tarde_disp-celular-01'
 const presencia = (extra = {}) => ({
@@ -142,6 +157,7 @@ const CASOS_COOPERATIVA = [
   if (contenido.includes('/bitacoraConfig/')) casos.push(...CASOS_TECNICOS)
   if (contenido.includes("'resuelvePendiente' in d")) casos.push(...CASOS_ENTREGA)
   if (contenido.includes('/bitacoraPresencia/')) casos.push(...CASOS_COOPERATIVA)
+  if (contenido.includes("'tipoOtro' in d")) casos.push(...CASOS_EVENTO_FLEXIBLE)
 
   const testCases = casos.map(([, expectation, c, mocks]) => {
     const id = c.id ?? 'evento1'

@@ -1,6 +1,7 @@
-import type { EventoBitacora, TipoEvento, TurnoMantencion } from './bitacora.types'
-import { minutosDesdeInicioTurno, minutosEntre } from './turnoMantencion'
+import type { EventoBitacora, TurnoMantencion } from './bitacora.types'
+import { minutosEntre } from './turnoMantencion'
 import { soloListos } from './borradores'
+import { claveTipo, minutosEnTurno } from './presentacionEvento'
 
 /**
  * Números del turno que salen en la cabecera de la bitácora, en el correo y en
@@ -36,7 +37,8 @@ export interface ResumenBitacora {
   equipos: number
   /** Minutos de intervención registrados (inicio → término). */
   minutosIntervencion: number
-  porTipo: Record<TipoEvento, number>
+  /** Por tipo: el id del tipo fijo (`falla`) o `otro:<tipo propio normalizado>`. */
+  porTipo: Record<string, number>
 }
 
 const normalizarEquipo = (s: string) =>
@@ -60,7 +62,7 @@ export function fuePendiente(e: Pick<EventoBitacora, 'pendiente' | 'cierre'>): b
 export function resumirBitacora(todos: readonly EventoBitacora[]): ResumenBitacora {
   // Un borrador se ve en la lista, pero no es un hecho del turno todavía.
   const eventos = soloListos(todos)
-  const porTipo: Record<TipoEvento, number> = { falla: 0, ajuste: 0, inspeccion: 0, preventivo: 0, novedad: 0 }
+  const porTipo: Record<string, number> = {}
   const equipos = new Set<string>()
   let conParada = 0
   let paradasSinDuracion = 0
@@ -74,7 +76,8 @@ export function resumirBitacora(todos: readonly EventoBitacora[]): ResumenBitaco
   let minutosIntervencion = 0
 
   for (const e of eventos) {
-    porTipo[e.tipo] = (porTipo[e.tipo] ?? 0) + 1
+    const tipo = claveTipo(e)
+    porTipo[tipo] = (porTipo[tipo] ?? 0) + 1
     if (e.equipo?.trim()) equipos.add(normalizarEquipo(e.equipo))
     if (e.pendiente) pendientes++
     else if (e.cierre) pendientesResueltosDespues++
@@ -108,12 +111,13 @@ export function resumirBitacora(todos: readonly EventoBitacora[]): ResumenBitaco
   }
 }
 
-/** Orden cronológico dentro del turno (la tarde que cruza 00:00 queda al final). */
-export function ordenarEventos<T extends Pick<EventoBitacora, 'horaInicio'>>(
-  turno: Pick<TurnoMantencion, 'banda'>,
+/**
+ * Orden cronológico dentro del turno (la tarde que cruza 00:00 queda al final).
+ * Los eventos sin hora se ubican según cuándo se registraron.
+ */
+export function ordenarEventos<T extends Pick<EventoBitacora, 'horaInicio'> & { createdAt?: unknown }>(
+  turno: Pick<TurnoMantencion, 'banda'> & { inicio?: Date },
   eventos: readonly T[],
 ): T[] {
-  return [...eventos].sort(
-    (a, b) => minutosDesdeInicioTurno(turno, a.horaInicio) - minutosDesdeInicioTurno(turno, b.horaInicio),
-  )
+  return [...eventos].sort((a, b) => minutosEnTurno(turno, a) - minutosEnTurno(turno, b))
 }

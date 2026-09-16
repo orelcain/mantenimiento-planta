@@ -1,11 +1,12 @@
 import { Camera } from 'lucide-react'
 import { Button, Pill, Tag } from '@/components/piel'
-import { ETIQUETA_FOTO, ETIQUETA_TIPO } from '@/config/bitacora'
+import { ETIQUETA_FOTO } from '@/config/bitacora'
 import { autorVisible, tecnicosDelEvento, type EventoBitacora, type FotoEvento, type PresenciaBitacora } from '@/services/bitacora/bitacora.types'
 import { NOMBRE_DISPOSITIVO } from '@/services/bitacora/presencia'
 import { minutosParadaDe } from '@/services/bitacora/resumenBitacora'
 import { formatoMinutos } from '@/services/bitacora/turnoMantencion'
 import { etiquetaCortaTurno } from '@/services/bitacora/entregaTurno'
+import { etiquetaTipo, tieneHora, tituloDe } from '@/services/bitacora/presentacionEvento'
 
 /**
  * Un evento en la línea de tiempo del turno (opción A del mockup, aprobada).
@@ -34,6 +35,10 @@ export function EventoBitacoraFila({
   const orden = { antes: 0, despues: 1, foto: 2 } as const
   const fotos = [...(evento.fotos ?? [])].sort((a, b) => orden[a.etiqueta] - orden[b.etiqueta])
   const esAntesDespues = fotos.some((f) => f.etiqueta === 'antes') && fotos.some((f) => f.etiqueta === 'despues')
+  const conHora = tieneHora(evento)
+  const titulo = tituloDe(evento)
+  const nombreEquipo = evento.equipo?.trim() || (borrador ? 'Sin equipo todavía' : 'Sin equipo')
+  const sinEquipo = borrador && !evento.equipo?.trim()
 
   return (
     <div
@@ -53,23 +58,40 @@ export function EventoBitacoraFila({
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary',
       ].join(' ')}
     >
-      <div className="tabular-nums leading-tight">
-        <div className="text-body font-semibold">{evento.horaInicio}</div>
-        {/* Sin término = sigue abierto; la columna es angosta, basta el guion. */}
-        <div className="text-footnote text-muted-foreground" title={evento.horaTermino ? undefined : 'Sin hora de término'}>{evento.horaTermino ?? '—'}</div>
-      </div>
+      {conHora ? (
+        <div className="tabular-nums leading-tight">
+          <div className="text-body font-semibold">{evento.horaInicio}</div>
+          {/* Sin término = sigue abierto; la columna es angosta, basta el guion. */}
+          <div className="text-footnote text-muted-foreground" title={evento.horaTermino ? undefined : 'Sin hora de término'}>{evento.horaTermino ?? '—'}</div>
+        </div>
+      ) : (
+        // Registrado con «Sin hora»: la fila va donde se registró.
+        <div className="pt-0.5 text-footnote text-muted-foreground">Sin hora</div>
+      )}
 
       <div className="flex min-w-0 flex-col gap-1.5">
         <div className="flex flex-wrap items-center gap-1.5">
           {/* Un borrador se VE (es cooperación en vivo) pero se distingue al tiro:
               no cuenta en los números ni sale en el correo hasta «Listo». */}
           {borrador && <Pill tone="info" dot={abiertoPor.length ? 'pulse' : undefined}>En redacción</Pill>}
-          <span className={`text-headline leading-tight ${borrador && !evento.equipo?.trim() ? 'text-muted-foreground' : ''}`}>
-            {evento.equipo?.trim() || (borrador ? 'Sin equipo todavía' : 'Sin equipo')}
-          </span>
-          <Tag>{ETIQUETA_TIPO[evento.tipo]}</Tag>
+          {/* Con título, el título manda y el equipo pasa a la línea de abajo
+              (como remitente y asunto en Mail); sin título, queda como antes. */}
+          {titulo ? (
+            <span className="text-headline leading-tight">{titulo}</span>
+          ) : (
+            <>
+              <span className={`text-headline leading-tight ${sinEquipo ? 'text-muted-foreground' : ''}`}>{nombreEquipo}</span>
+              <Tag>{etiquetaTipo(evento)}</Tag>
+            </>
+          )}
           {evento.pendiente && <Pill tone="warning">Pendiente</Pill>}
         </div>
+        {titulo && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className={`text-footnote ${sinEquipo ? 'text-muted-foreground' : 'text-foreground'}`}>{nombreEquipo}</span>
+            <Tag>{etiquetaTipo(evento)}</Tag>
+          </div>
+        )}
 
         {evento.impacto === 'con-parada' && (
           <span className="text-footnote font-semibold text-ink-crit">Detuvo la máquina {formatoMinutos(parada)}</span>
