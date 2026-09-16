@@ -93,8 +93,8 @@ export function CargaRapidaModal({ items, saveStock, onClose }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-2 sm:p-4" onClick={onClose}>
-      <div className="flex max-h-[92vh] w-full max-w-3xl flex-col rounded-card border border-border bg-card shadow-xl" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-2 sm:p-4 max-sm:items-end max-sm:p-0" onClick={onClose}>
+      <div className="flex max-h-[92vh] w-full max-w-3xl flex-col rounded-card border border-border bg-card shadow-xl max-sm:w-full max-sm:max-w-none max-sm:rounded-b-none max-sm:rounded-t-panel max-sm:max-h-[92dvh] max-sm:overflow-y-auto max-sm:pb-[max(1.5rem,env(safe-area-inset-bottom))]" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border px-5 py-3">
           <div className="flex items-center gap-2">

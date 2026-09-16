@@ -3108,10 +3108,10 @@ export function CalendarioMantencionPage() {
       {/* Editor de horario de una celda (doble clic sobre ella) */}
       {celdaEditada && (
         <div
-          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 px-6"
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 px-6 max-sm:items-end max-sm:p-0"
           onClick={() => setCeldaEditada(null)}
         >
-          <div className="w-full max-w-xs rounded-card border border-border bg-card p-4" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-xs rounded-card border border-border bg-card p-4 max-sm:w-full max-sm:max-w-none max-sm:rounded-b-none max-sm:rounded-t-panel max-sm:max-h-[92dvh] max-sm:overflow-y-auto max-sm:pb-[max(1.5rem,env(safe-area-inset-bottom))]" onClick={(e) => e.stopPropagation()}>
             <p className="text-footnote font-semibold text-foreground">Horario de este día</p>
             <p className="mt-0.5 text-caption text-muted-foreground">
               {techRows.find((t) => t.r === celdaEditada.r)?.name ?? ''} · {dayLabelByCol(celdaEditada.c)}
