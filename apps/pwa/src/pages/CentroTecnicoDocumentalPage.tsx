@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   AlertTriangle,
+  ArrowUpDown,
   BookOpen,
   CalendarDays,
   Check,
@@ -12,14 +13,17 @@ import {
   DollarSign,
   Download,
   Edit2,
-  FolderArchive,
+  FileDown,
   Image as ImageIcon,
   MapPin,
+  MoreHorizontal,
   Pencil,
   Plus,
   QrCode,
+  SlidersHorizontal,
   Star,
   Trash2,
+  Upload,
   User,
   Wrench,
   X,
@@ -30,6 +34,9 @@ import { QRCodeSVG } from 'qrcode.react'
 import ReactECharts from 'echarts-for-react'
 import * as XLSX from 'xlsx'
 import { Badge, Button, Card, CardContent, Input, Tabs, TabsContent, TabsList, TabsTrigger, Textarea } from '@/components/ui'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { Button as PielButton, ListCell, ListGroup, SegmentedControl, Sheet, SwipeRow } from '@/components/piel'
+import { formatNombreSAP } from '@/utils/repuestos/formatNombreSAP'
 import { addEquipmentPhoto, removeEquipmentPhoto } from '@/services/equipment'
 import { getIncidents } from '@/services/incidents'
 import { getMaintenanceLog } from '@/services/maintenanceLog'
@@ -86,6 +93,14 @@ import { FAMILIA_LABEL, checklistDe, familiaDe, medicionesDe } from '@/lib/nfpa7
 import type { CampoMedicion } from '@/lib/nfpa70b'
 import type { Equipment, Incident, MaintenanceLogEntry, Medicion, WorkOrder } from '@/types'
 import { dec, dec1 } from '@/utils/formatoNumeros'
+
+/** Las cuatro opciones de orden del listado; comparten etiqueta entre el botón «Ordenar» y su menú. */
+const ORDEN_OPTS: { value: OrdenCampo; label: string }[] = [
+  { value: 'criticidad', label: 'Criticidad' },
+  { value: 'ficha', label: 'Ficha (menos completa)' },
+  { value: 'area', label: 'Sección y línea' },
+  { value: 'nombre', label: 'Nombre' },
+]
 
 /**
  * Centro Técnico Documental — portada / panel del programa (EMP · NFPA 70B).
@@ -165,7 +180,7 @@ export function CentroTecnicoDocumentalPage() {
   const [importingPlaca, setImportingPlaca] = useState(false)
   const placaInputRef = useRef<HTMLInputElement>(null)
   const [editingPhoto, setEditingPhoto] = useState<string | null>(null)
-  const [datosMenu, setDatosMenu] = useState(false)
+  const [filtrosOpen, setFiltrosOpen] = useState(false)
 
   const detailEquipment = useMemo(
     () => (detailId ? equipos.find((e) => e.id === detailId) ?? null : null),
@@ -379,6 +394,11 @@ export function CentroTecnicoDocumentalPage() {
     }
   }
 
+  const ordenLabel = ORDEN_OPTS.find((o) => o.value === orden)?.label ?? 'Criticidad'
+  const filtrosCount = [estadoFiltro !== 'all', seccionFiltro !== 'all', lineaFiltro !== 'all', tipoFiltro !== 'all', familiaFiltro !== 'all'].filter(
+    Boolean,
+  ).length
+
   return (
     <div className="relative flex h-full bg-background">
       {/* Izquierda: jerarquía del equipo seleccionado (desktop) */}
@@ -397,12 +417,10 @@ export function CentroTecnicoDocumentalPage() {
       */}
       <main className="min-w-0 flex-1 overflow-y-auto lg:sticky lg:top-0 lg:max-h-screen">
         <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-4">
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="text-xl font-bold flex items-center gap-2">
-            <FolderArchive className="h-5 w-5" /> Centro Técnico Documental
-          </h1>
-          <p className="text-sm text-muted-foreground">Expediente documental por equipo · placa, documentos y criticidad</p>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-title1 font-bold">Centro Técnico Documental</h1>
+          <p className="text-footnote text-muted-foreground">Expediente documental por equipo · placa, documentos y criticidad</p>
         </div>
         <div className="relative">
           <input
@@ -412,218 +430,257 @@ export function CentroTecnicoDocumentalPage() {
             className="hidden"
             onChange={(e) => handleImportPlaca(e.target.files?.[0] ?? null)}
           />
-          <Button variant="outline" size="sm" onClick={() => setDatosMenu((v) => !v)} disabled={loading}>
-            <Download className="h-3.5 w-3.5 mr-1.5" /> Datos <ChevronDown className="h-3.5 w-3.5 ml-1" />
-          </Button>
-          {datosMenu && (
-            <>
-              <div className="fixed inset-0 z-10" onClick={() => setDatosMenu(false)} />
-              <div className="absolute right-0 mt-1 z-20 w-56 rounded-ctl border bg-background shadow-md p-1 text-sm">
-                <button
-                  className="w-full text-left px-3 py-1.5 rounded-ctl hover:bg-muted/60 disabled:opacity-50"
-                  onClick={() => {
-                    setDatosMenu(false)
-                    exportarExcel()
-                  }}
-                  disabled={visibles.length === 0}
-                >
-                  Exportar listado (Excel)
-                </button>
-                {canEditEquipment && (
-                  <>
-                    <button
-                      className="w-full text-left px-3 py-1.5 rounded-ctl hover:bg-muted/60"
-                      onClick={() => {
-                        setDatosMenu(false)
-                        descargarPlantillaPlaca(equipos)
-                      }}
-                    >
-                      Descargar plantilla de placa
-                    </button>
-                    <button
-                      className="w-full text-left px-3 py-1.5 rounded-ctl hover:bg-muted/60 disabled:opacity-50"
-                      onClick={() => {
-                        setDatosMenu(false)
-                        placaInputRef.current?.click()
-                      }}
-                      disabled={importingPlaca}
-                    >
-                      {importingPlaca ? 'Importando…' : 'Importar placa (Excel)'}
-                    </button>
-                  </>
-                )}
-              </div>
-            </>
-          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                aria-label="Más acciones"
+                disabled={loading}
+                className="flex size-11 shrink-0 items-center justify-center rounded-full bg-muted text-foreground hover:bg-muted-foreground/[0.15] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50"
+              >
+                <MoreHorizontal className="size-5" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-[14rem]">
+              <DropdownMenuItem className="gap-2 py-2" onClick={exportarExcel} disabled={visibles.length === 0}>
+                <Download className="size-4 text-muted-foreground" />Exportar listado (Excel)
+              </DropdownMenuItem>
+              <DropdownMenuItem className="gap-2 py-2" onClick={copiarCodigos} disabled={visibles.length === 0}>
+                <Copy className="size-4 text-muted-foreground" />Copiar códigos
+              </DropdownMenuItem>
+              {canEditEquipment && (
+                <>
+                  <DropdownMenuItem className="gap-2 py-2" onClick={() => descargarPlantillaPlaca(equipos)}>
+                    <FileDown className="size-4 text-muted-foreground" />Descargar plantilla de placa
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="gap-2 py-2" onClick={() => placaInputRef.current?.click()} disabled={importingPlaca}>
+                    <Upload className="size-4 text-muted-foreground" />{importingPlaca ? 'Importando…' : 'Importar placa (Excel)'}
+                  </DropdownMenuItem>
+                </>
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="gap-2 py-2" onClick={() => setCompact((v) => !v)}>
+                <SlidersHorizontal className="size-4 text-muted-foreground" />{compact ? 'Vista normal' : 'Vista compacta'}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
-      {/* KPIs = filtros rápidos (click para filtrar) */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+      {/* Filtros rápidos como chips (patrón Bodega): el activo va en tinte de
+          marca; el estado nunca es un relleno de color. */}
+      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 no-scrollbar sm:mx-0 sm:flex-wrap sm:px-0">
         {kpiFiltros.map((k) => {
           const active = filtro === k.key
           return (
             <button
               key={k.key}
+              type="button"
+              aria-pressed={active}
               onClick={() => setFiltro(k.key)}
               title={`Filtrar: ${k.label}`}
-              className={`rounded-card border p-3 text-center transition-colors ${
-                active ? 'border-primary ring-1 ring-primary bg-primary/20' : 'border-border bg-card hover:bg-muted'
-              }`}
+              className={cn(
+                'inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full px-4 text-subhead font-medium transition-colors',
+                active ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground hover:bg-muted-foreground/[0.15]',
+              )}
             >
-              <div className={`text-2xl font-extrabold leading-none ${k.cls ?? ''}`}>{k.n}</div>
-              <div className="text-caption text-muted-foreground mt-1 truncate">{k.label}</div>
+              {k.key === 'incompleta' && <span className="size-2 rounded-full bg-amber-500" aria-hidden />}
+              {k.key === 'favoritos' && <Star className="size-3.5" />}
+              {k.label}
+              <span className={cn('text-footnote font-semibold tabular-nums', active ? 'text-primary-foreground/80' : 'text-muted-foreground')}>
+                {k.n}
+              </span>
             </button>
           )
         })}
       </div>
 
       {/* Búsqueda */}
-      <Input
-        placeholder="Buscar equipo por nombre o código…"
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        className="max-w-sm"
-      />
-
-      {/* Vista · Estado · Sección · Línea · Tipo · Orden · Densidad */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="inline-flex rounded-ctl border overflow-hidden mr-1">
-          <button
-            onClick={() => setVista('lista')}
-            className={`text-xs px-3 py-1.5 ${vista === 'lista' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground'}`}
-          >
-            Lista
+      <div className="relative w-full sm:max-w-md">
+        <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+        <input
+          type="search"
+          placeholder="Nombre o código"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          className="h-11 w-full rounded-full bg-muted pl-10 pr-9 text-body text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+        />
+        {q && (
+          <button type="button" onClick={() => setQ('')} aria-label="Borrar búsqueda" className="absolute right-1 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-muted-foreground/[0.12]">
+            <X className="size-4" />
           </button>
-          <button
-            onClick={() => setVista('tarjetas')}
-            className={`text-xs px-3 py-1.5 border-l ${vista === 'tarjetas' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground'}`}
-          >
-            Tarjetas
-          </button>
-        </div>
-        <label className="text-caption tracking-wide text-muted-foreground">Estado</label>
-        <select
-          value={estadoFiltro}
-          onChange={(e) => setEstadoFiltro(e.target.value as EstadoFiltro)}
-          className="text-xs border rounded-ctl px-2 py-1.5 bg-background"
-          aria-label="Filtrar por estado"
-        >
-          {estadoChips.map((c) => (
-            <option key={c.key} value={c.key}>
-              {c.label}
-            </option>
-          ))}
-        </select>
-        <label className="text-caption tracking-wide text-muted-foreground">Sección</label>
-        <select
-          value={seccionFiltro}
-          onChange={(e) => setSeccionFiltro(e.target.value)}
-          className="text-xs border rounded-ctl px-2 py-1.5 bg-background max-w-[200px]"
-          aria-label="Filtrar por sección"
-        >
-          <option value="all">Todas ({secciones.length})</option>
-          {secciones.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
-
-        <label className="text-caption tracking-wide text-muted-foreground">Línea</label>
-        <select
-          value={lineaFiltro}
-          onChange={(e) => setLineaFiltro(e.target.value)}
-          className="text-xs border rounded-ctl px-2 py-1.5 bg-background max-w-[200px] disabled:opacity-50"
-          aria-label="Filtrar por línea"
-          disabled={lineas.length === 0}
-        >
-          <option value="all">Todas ({lineas.length})</option>
-          {lineas.map((l) => (
-            <option key={l} value={l}>
-              {l}
-            </option>
-          ))}
-        </select>
-
-        <label className="text-caption tracking-wide text-muted-foreground">Tipo</label>
-        <select
-          value={tipoFiltro}
-          onChange={(e) => setTipoFiltro(e.target.value)}
-          className="text-xs border rounded-ctl px-2 py-1.5 bg-background max-w-[180px] disabled:opacity-50"
-          aria-label="Filtrar por tipo"
-          disabled={tipos.length === 0}
-        >
-          <option value="all">{tipos.length === 0 ? 'Sin tipos aún' : `Todos (${tipos.length})`}</option>
-          {tipos.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
-
-        <label className="text-caption tracking-wide text-muted-foreground">Familia</label>
-        <select
-          value={familiaFiltro}
-          onChange={(e) => setFamiliaFiltro(e.target.value as typeof familiaFiltro)}
-          className="text-xs border rounded-ctl px-2 py-1.5 bg-background max-w-[200px]"
-          aria-label="Filtrar por familia eléctrica (NFPA 70B)"
-          title="Familia eléctrica NFPA 70B (máquina rotativa incluye motores, motorreductores, mototambores y bombas)"
-        >
-          <option value="all">Todas ({familias.length})</option>
-          {familias.map((f) => (
-            <option key={f.key} value={f.key}>
-              {FAMILIA_LABEL[f.key]} ({f.n})
-            </option>
-          ))}
-        </select>
-
-        <label className="ml-2 text-caption tracking-wide text-muted-foreground">Ordenar</label>
-        <select
-          value={orden}
-          onChange={(e) => setOrden(e.target.value as OrdenCampo)}
-          className="text-xs border rounded-ctl px-2 py-1.5 bg-background"
-          aria-label="Ordenar por"
-        >
-          <option value="criticidad">Criticidad</option>
-          <option value="ficha">Ficha (menos completa)</option>
-          <option value="area">Sección y línea</option>
-          <option value="nombre">Nombre</option>
-        </select>
-
-        <Button variant={compact ? 'default' : 'outline'} size="sm" className="ml-auto" onClick={() => setCompact((v) => !v)}>
-          {compact ? 'Vista normal' : 'Vista compacta'}
-        </Button>
+        )}
       </div>
 
-      {/* Conteo + limpiar filtros */}
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-xs text-muted-foreground">
-          {loading
-            ? 'Cargando…'
-            : visibles.length === 0
-              ? 'Sin resultados'
-              : `Mostrando ${(pageSafe - 1) * ITEMS_PER_PAGE + 1}–${Math.min(pageSafe * ITEMS_PER_PAGE, visibles.length)} de ${visibles.length}${
-                  visibles.length !== kpis.total ? ` (${kpis.total} en total)` : ''
-                }`}
-        </span>
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={copiarCodigos}
-            disabled={loading || visibles.length === 0}
-            title="Copiar los códigos del set filtrado"
-          >
-            <Copy className="h-3.5 w-3.5 mr-1.5" /> Copiar códigos
-          </Button>
-          {filtrosActivos && (
-            <Button variant="ghost" size="sm" onClick={limpiarFiltros}>
-              Limpiar filtros
-            </Button>
+      {/* Filtros (hoja) · Ordenar (menú) */}
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setFiltrosOpen(true)}
+          className="inline-flex h-11 items-center gap-1.5 rounded-full bg-muted px-4 text-subhead font-medium text-foreground hover:bg-muted-foreground/[0.15]"
+        >
+          <SlidersHorizontal className="size-4" />Filtros
+          {filtrosCount > 0 && (
+            <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-primary px-1 text-caption font-semibold text-primary-foreground">
+              {filtrosCount}
+            </span>
           )}
-        </div>
+        </button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className="inline-flex h-11 items-center gap-1.5 rounded-full bg-muted px-4 text-subhead font-medium text-foreground hover:bg-muted-foreground/[0.15]"
+            >
+              <ArrowUpDown className="size-4" />Ordenar · {ordenLabel}
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="min-w-[13rem]">
+            {ORDEN_OPTS.map((o) => (
+              <DropdownMenuItem key={o.value} className={cn('gap-2 py-2', orden === o.value && 'font-semibold')} onClick={() => setOrden(o.value)}>
+                {o.label}
+                {orden === o.value && <Check className="ml-auto size-4" />}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
+
+      <Sheet
+        open={filtrosOpen}
+        onClose={() => setFiltrosOpen(false)}
+        title="Filtros"
+        actions={<PielButton onClick={() => setFiltrosOpen(false)}>Listo</PielButton>}
+      >
+        <SegmentedControl
+          ariaLabel="Vista del listado"
+          value={vista === 'tarjetas' ? 'tarjetas' : 'lista'}
+          onChange={(v) => setVista(v)}
+          segments={[
+            { value: 'lista' as const, label: 'Lista' },
+            { value: 'tarjetas' as const, label: 'Tarjetas' },
+          ]}
+          className="mb-4"
+        />
+        <ListGroup>
+          <ListCell
+            title="Estado"
+            trailing={
+              <select
+                value={estadoFiltro}
+                onChange={(e) => setEstadoFiltro(e.target.value as EstadoFiltro)}
+                className="h-11 w-[10.5rem] max-w-[56vw] truncate appearance-none bg-transparent pr-5 text-right text-body text-muted-foreground focus:outline-none"
+                aria-label="Filtrar por estado"
+              >
+                {estadoChips.map((c) => (
+                  <option key={c.key} value={c.key}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            }
+          />
+          <ListCell
+            title="Sección"
+            trailing={
+              <select
+                value={seccionFiltro}
+                onChange={(e) => setSeccionFiltro(e.target.value)}
+                className="h-11 w-[10.5rem] max-w-[56vw] truncate appearance-none bg-transparent pr-5 text-right text-body text-muted-foreground focus:outline-none"
+                aria-label="Filtrar por sección"
+              >
+                <option value="all">Todas ({secciones.length})</option>
+                {secciones.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            }
+          />
+          <ListCell
+            title="Línea"
+            trailing={
+              <select
+                value={lineaFiltro}
+                onChange={(e) => setLineaFiltro(e.target.value)}
+                className="h-11 w-[10.5rem] max-w-[56vw] truncate appearance-none bg-transparent pr-5 text-right text-body text-muted-foreground focus:outline-none disabled:opacity-50"
+                aria-label="Filtrar por línea"
+                disabled={lineas.length === 0}
+              >
+                <option value="all">Todas ({lineas.length})</option>
+                {lineas.map((l) => (
+                  <option key={l} value={l}>
+                    {l}
+                  </option>
+                ))}
+              </select>
+            }
+          />
+          <ListCell
+            title="Tipo"
+            trailing={
+              <select
+                value={tipoFiltro}
+                onChange={(e) => setTipoFiltro(e.target.value)}
+                className="h-11 w-[10.5rem] max-w-[56vw] truncate appearance-none bg-transparent pr-5 text-right text-body text-muted-foreground focus:outline-none disabled:opacity-50"
+                aria-label="Filtrar por tipo"
+                disabled={tipos.length === 0}
+              >
+                <option value="all">{tipos.length === 0 ? 'Sin tipos aún' : `Todos (${tipos.length})`}</option>
+                {tipos.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            }
+          />
+          <ListCell
+            title="Familia NFPA 70B"
+            trailing={
+              <select
+                value={familiaFiltro}
+                onChange={(e) => setFamiliaFiltro(e.target.value as typeof familiaFiltro)}
+                className="h-11 w-[10.5rem] max-w-[56vw] truncate appearance-none bg-transparent pr-5 text-right text-body text-muted-foreground focus:outline-none"
+                aria-label="Filtrar por familia eléctrica (NFPA 70B)"
+                title="Familia eléctrica NFPA 70B (máquina rotativa incluye motores, motorreductores, mototambores y bombas)"
+              >
+                <option value="all">Todas ({familias.length})</option>
+                {familias.map((f) => (
+                  <option key={f.key} value={f.key}>
+                    {FAMILIA_LABEL[f.key]} ({f.n})
+                  </option>
+                ))}
+              </select>
+            }
+          />
+        </ListGroup>
+        <ListGroup className="mt-4">
+          <ListCell
+            title="Ordenar por"
+            trailing={
+              <select
+                value={orden}
+                onChange={(e) => setOrden(e.target.value as OrdenCampo)}
+                className="h-11 w-[10.5rem] max-w-[56vw] truncate appearance-none bg-transparent pr-5 text-right text-body text-muted-foreground focus:outline-none"
+                aria-label="Ordenar por"
+              >
+                {ORDEN_OPTS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            }
+          />
+        </ListGroup>
+        {filtrosActivos && (
+          <ListGroup className="mt-4">
+            <ListCell title={<span className="font-medium text-brand-ink">Limpiar filtros</span>} chevron={false} onClick={limpiarFiltros} />
+          </ListGroup>
+        )}
+      </Sheet>
 
       {/* Agenda de inspecciones (vista agenda) */}
       {vista === 'agenda' && (
@@ -652,37 +709,36 @@ export function CentroTecnicoDocumentalPage() {
           </div>
         ))}
 
-      {/* Tabla (vista lista) */}
-      {vista === 'lista' && (
-        <Card>
-        <CardContent className="p-0">
-          {loading ? (
-            <p className="p-4 text-sm text-muted-foreground italic">Cargando equipos…</p>
-          ) : visibles.length === 0 ? (
-            <p className="p-4 text-sm text-muted-foreground italic">No hay equipos para este filtro.</p>
-          ) : (
-            <div className="divide-y">
-              {paginated.map((e) => (
-                <CtdEquipoRow
-                  key={e.id}
-                  equipment={e}
-                  ot={otByEquipo.get(e.id)}
-                  compact={compact}
-                  selected={detailId === e.id}
-                  isFavorite={favorites.has(e.id)}
-                  onToggleFavorite={() => toggleFavorite(e.id)}
-                  onOpen={(tab) => openExpediente(e.id, tab)}
-                />
-              ))}
-            </div>
-          )}
-        </CardContent>
-        </Card>
-      )}
+      {/* Lista agrupada (vista lista) */}
+      {vista === 'lista' &&
+        (loading ? (
+          <p className="px-4 py-6 text-body text-muted-foreground">Cargando equipos…</p>
+        ) : visibles.length === 0 ? (
+          <p className="px-4 py-6 text-body text-muted-foreground">No hay equipos para este filtro.</p>
+        ) : (
+          <ListGroup
+            title={`Mostrando ${(pageSafe - 1) * ITEMS_PER_PAGE + 1}–${Math.min(pageSafe * ITEMS_PER_PAGE, visibles.length)} de ${visibles.length}${
+              visibles.length !== kpis.total ? ` (${kpis.total} en total)` : ''
+            }`}
+          >
+            {paginated.map((e) => (
+              <CtdEquipoRow
+                key={e.id}
+                equipment={e}
+                ot={otByEquipo.get(e.id)}
+                compact={compact}
+                selected={detailId === e.id}
+                isFavorite={favorites.has(e.id)}
+                onToggleFavorite={() => toggleFavorite(e.id)}
+                onOpen={(tab) => openExpediente(e.id, tab)}
+              />
+            ))}
+          </ListGroup>
+        ))}
 
       {vista !== 'agenda' && !loading && totalPages > 1 && (
         <div className="flex items-center justify-center gap-3">
-          <Button variant="outline" size="sm" disabled={pageSafe <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+          <Button variant="outline" disabled={pageSafe <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
             Anterior
           </Button>
           <span className="text-xs text-muted-foreground">
@@ -690,7 +746,6 @@ export function CentroTecnicoDocumentalPage() {
           </span>
           <Button
             variant="outline"
-            size="sm"
             disabled={pageSafe >= totalPages}
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
           >
@@ -699,7 +754,7 @@ export function CentroTecnicoDocumentalPage() {
         </div>
       )}
 
-      <p className="text-caption text-muted-foreground">
+      <p className="text-footnote text-muted-foreground">
         El expediente (Información, Ficha NFPA 70B, Tablero, Fotos, Notas, QR) se abre a la derecha, sin salir del CTD. “Ficha
         %” = completitud de la placa. Favoritos y notas se comparten con la página de Equipos.
       </p>
@@ -3009,110 +3064,63 @@ function CtdEquipoRow({
 }) {
   const crit = criticidadParaMostrar(e)
   const est = ESTADO[e.estado]
-  const cond = e.fichaTecnica?.condicion
   const pct = completitud(e)
   const foto = e.photos?.[0]
+  /*
+    Hay seis KNURO y seis EVISCERADORA BAADER 142 que se llaman IGUAL en las
+    dos plantas: sin la ubicación no se sabía cuál era cuál sin abrir el
+    equipo, salvo que uno se supiera los códigos SAP de memoria. El dato ya
+    estaba en `hierarchyPath`; ver services/equipos/ubicacionCorta.ts. Llega
+    en MAYÚSCULAS («PLANTA CHONCHI · EMPAQUE»): se formatea segmento a
+    segmento, no como una frase, para no romper el separador.
+  */
   const ubicacion = ubicacionCorta(e.hierarchyPath)
+  const ubicacionFmt = ubicacion
+    ? ubicacion
+        .split(' · ')
+        .map((seg) => formatNombreSAP(seg).nombre || seg)
+        .join(' · ')
+    : null
+  const otTexto = ot && ot.abiertas > 0 ? `${ot.abiertas} OT` : null
+  const fichaTexto = pct >= 100 ? null : pct > 0 ? `Ficha ${pct} %` : 'Sin ficha'
+  const subtitle = [e.codigo, ubicacionFmt, otTexto, fichaTexto].filter(Boolean).join(' · ')
+  const estadoCls = e.estado === 'operativo' ? 'text-muted-foreground' : e.estado === 'en_mantenimiento' ? 'text-ink-warn' : 'text-ink-crit'
 
   return (
-    <div
-      className={`flex items-center gap-3 px-3 cursor-pointer border-l-2 ${compact ? 'py-1.5' : 'py-3'} ${selected ? 'border-primary bg-primary/20' : 'border-transparent hover:bg-muted/40'}`}
-      onClick={() => onOpen('info')}
+    <SwipeRow
+      trailing={[
+        { label: 'QR', icon: <QrCode className="size-5" />, tone: 'neutral', onClick: () => onOpen('qr') },
+        { label: 'Tablero', icon: <Zap className="size-5" />, tone: 'brand', onClick: () => onOpen('tablero') },
+      ]}
+      leading={{ label: isFavorite ? 'Quitar' : 'Favorito', icon: <Star className={cn('size-5', isFavorite && 'fill-current')} />, onClick: onToggleFavorite }}
     >
-      <button
-        onClick={(ev) => {
-          ev.stopPropagation()
-          onToggleFavorite()
-        }}
-        title={isFavorite ? 'Quitar de favoritos' : 'Marcar como favorito'}
-        aria-label={isFavorite ? 'Quitar de favoritos' : 'Marcar como favorito'}
-        className="shrink-0 p-1 -m-1"
-      >
-        <Star className={`h-4 w-4 ${isFavorite ? 'text-ink-warn fill-current' : 'text-muted-foreground'}`} />
-      </button>
-
-      <div className={`shrink-0 overflow-hidden rounded-ctl bg-muted flex items-center justify-center ${compact ? 'h-8 w-8' : 'h-10 w-10'}`}>
-        {foto ? (
-          <img src={foto} alt="" className="h-full w-full object-cover" loading="lazy" />
-        ) : (
-          <ImageIcon className="h-4 w-4 text-muted-foreground" />
-        )}
-      </div>
-
-      <div className="flex-1 min-w-0">
-        <div className="text-xs font-medium truncate">{e.nombre}</div>
-        {/*
-          Hay seis KNURO y seis EVISCERADORA BAADER 142 que se llaman IGUAL en
-          las dos plantas: sin la ubicación no se sabía cuál era cuál sin abrir
-          el equipo, salvo que uno se supiera los códigos SAP de memoria. El dato
-          ya estaba en `hierarchyPath`; ver services/equipos/ubicacionCorta.ts.
-        */}
-        <div className="text-caption text-muted-foreground truncate">
-          <span className="font-mono">{e.codigo}</span>
-          {ubicacion && <span> · {ubicacion}</span>}
-        </div>
-        {e.nombreComun && <div className="text-caption text-muted-foreground truncate">“{e.nombreComun}”</div>}
-        <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs md:hidden">
-          <Badge variant="outline" className={`${crit.cls}`} title={crit.title}>{crit.nivel}</Badge>
-          {cond ? <CondDot cond={cond} /> : null}
-          <Badge variant="outline" className={`${est.cls}`}>{est.label}</Badge>
-          <OtBadge ot={ot} />
-          <button
-            className={pct < 100 ? 'text-amber-600 underline decoration-dotted' : 'text-emerald-600'}
-            title={pct < 100 ? 'Completar ficha' : 'Ficha completa'}
-            onClick={(ev) => {
-              ev.stopPropagation()
-              onOpen('ficha')
-            }}
-          >
-            {pct > 0 ? `${pct}%` : 'Completar ficha'}
-          </button>
-        </div>
-      </div>
-
-      <div className="hidden md:flex items-center gap-3 shrink-0 text-sm">
-        <Badge variant="outline" className={`${crit.cls} text-xs`} title={crit.title}>{crit.nivel}</Badge>
-        <span className="w-6 text-center">{cond ? <CondDot cond={cond} /> : <span className="text-muted-foreground">—</span>}</span>
-        <Badge variant="outline" className={`${est.cls} text-xs`}>{est.label}</Badge>
-        <span className="w-12 text-right"><OtBadge ot={ot} /></span>
-        <button
-          className={`w-16 text-right ${pct < 100 ? 'text-amber-600 underline decoration-dotted underline-offset-2' : 'text-emerald-600'}`}
-          title={pct < 100 ? 'Completar ficha (placa eléctrica)' : 'Ficha completa'}
-          onClick={(ev) => {
-            ev.stopPropagation()
-            onOpen('ficha')
-          }}
-        >
-          {pct > 0 ? `${pct}%` : 'Completar'}
-        </button>
-      </div>
-
-      <div className="flex items-center gap-0.5 shrink-0">
-        <Button
-          variant="ghost"
-          size="sm"
-          title="Abrir Tablero del equipo"
-          aria-label="Abrir Tablero del equipo"
-          onClick={(ev) => {
-            ev.stopPropagation()
-            onOpen('tablero')
-          }}
-        >
-          <Zap className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          title="Ver código QR"
-          aria-label="Ver código QR"
-          onClick={(ev) => {
-            ev.stopPropagation()
-            onOpen('qr')
-          }}
-        >
-          <QrCode className="h-4 w-4" />
-        </Button>
-      </div>
-    </div>
+      <ListCell
+        className={cn('bg-card', selected && 'bg-accent', compact && 'py-1.5')}
+        leading={
+          foto
+            ? <img src={foto} alt="" loading="lazy" className="size-10 rounded-ctl object-cover" />
+            : <span className="flex size-10 items-center justify-center rounded-ctl bg-muted text-muted-foreground"><ImageIcon className="size-5" /></span>
+        }
+        title={
+          <span className="font-normal">
+            {isFavorite && <Star className="mr-1 inline size-3.5 fill-current align-[-1px] text-ink-warn" aria-label="Favorito" />}
+            {formatNombreSAP(e.nombre).nombre || e.nombre}
+          </span>
+        }
+        subtitle={subtitle}
+        trailing={
+          <span className="flex flex-col items-end gap-0.5">
+            <span
+              className={cn('flex size-[26px] items-center justify-center rounded-full text-footnote font-semibold', crit.nivel === 'A' ? 'bg-foreground text-background' : 'bg-muted text-foreground')}
+              title={crit.title}
+            >
+              {crit.nivel}
+            </span>
+            <span className={cn('text-footnote font-medium', estadoCls)}>{est.label}</span>
+          </span>
+        }
+        onClick={() => onOpen('info')}
+      />
+    </SwipeRow>
   )
 }
