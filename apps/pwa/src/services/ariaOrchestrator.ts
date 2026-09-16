@@ -21,6 +21,7 @@ import {
   isAgentAvailable,
   getAgentsConfig,
 } from './aiAgents'
+import { dec1 } from '@/utils/formatoNumeros'
 
 // ═══════════════════════════════════════════════════════════════════════
 // TIPOS
@@ -310,7 +311,7 @@ export async function orchestrateStream(
         agentId,
         agentName: agent?.name,
         agentEmoji: agent?.emoji,
-        message: `${agent?.emoji || ''} ${agent?.name || agentId} completó en ${result.latencyMs > 1000 ? (result.latencyMs / 1000).toFixed(1) + 's' : result.latencyMs + 'ms'}`,
+        message: `${agent?.emoji || ''} ${agent?.name || agentId} completó en ${result.latencyMs > 1000 ? dec1((result.latencyMs / 1000)) + 's' : result.latencyMs + 'ms'}`,
       })
 
       const logEntry2: Parameters<typeof addMissionLog>[0] = {

@@ -4,6 +4,7 @@ import { Button, Pill, ListGroup, ListCell, CellIcon } from '@/components/piel'
 import { cadenceCpm } from '@/services/grader/plantKpiCompute'
 import { classifyLossState, LOSS_BUCKET_META } from '@/services/shoplogix/lossBuckets'
 import type { UpstreamMachineShift } from '@/services/shoplogix/types'
+import { dec1 } from '@/utils/formatoNumeros'
 
 /**
  * LA MÁQUINA COMO HUB (docs §4) — la pieza central de la reestructuración.
@@ -107,7 +108,7 @@ export function MachineHub({ machine, onBack, onNewIncident }: MachineHubProps) 
       {/* Cifras REALES del turno para este equipo. */}
       <section className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-card bg-card px-4 py-4 sm:grid-cols-4">
         {[
-          { l: 'Cadencia', v: cpm > 0 ? `${cpm.toFixed(1)} pz/min` : '—' },
+          { l: 'Cadencia', v: cpm > 0 ? `${dec1(cpm)} pz/min` : '—' },
           { l: 'Ciclos', v: fmtInt(machine.totalCycles) },
           { l: 'Produciendo', v: fmtMin(bd?.uptimeSec) },
           { l: 'Detención', v: fmtMin(bd?.downtimeSec) },

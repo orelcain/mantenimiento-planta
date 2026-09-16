@@ -1,5 +1,6 @@
 import type { SensorReading, SensorSummaryNode } from '@/services/sensorsRtdb'
 import type { PredictiveThresholds } from '@/types'
+import { dec1, dec2 } from '@/utils/formatoNumeros'
 
 export type PredictiveRiskLevel = 'bajo' | 'medio' | 'alto' | 'critico'
 
@@ -100,38 +101,38 @@ export function predictFailureRisk(params: {
   if (typeof temp === 'number' && Number.isFinite(temp)) {
     if (temp <= thresholds.tempCritLow || temp >= thresholds.tempCritHigh) {
       risk = 'critico'
-      indicators.push(`Temperatura crítica (${temp.toFixed(1)}°C)`) 
+      indicators.push(`Temperatura crítica (${dec1(temp)}°C)`) 
     } else if (temp <= thresholds.tempWarnLow || temp >= thresholds.tempWarnHigh) {
       risk = 'alto'
-      indicators.push(`Temperatura en advertencia (${temp.toFixed(1)}°C)`) 
+      indicators.push(`Temperatura en advertencia (${dec1(temp)}°C)`) 
     }
   }
 
   if (typeof hum === 'number' && Number.isFinite(hum)) {
     if (hum <= thresholds.humCritLow || hum >= thresholds.humCritHigh) {
       risk = 'critico'
-      indicators.push(`Humedad crítica (${hum.toFixed(1)}%)`)
+      indicators.push(`Humedad crítica (${dec1(hum)}%)`)
     } else if (hum <= thresholds.humWarnLow || hum >= thresholds.humWarnHigh) {
       risk = risk === 'critico' ? 'critico' : 'alto'
-      indicators.push(`Humedad en advertencia (${hum.toFixed(1)}%)`)
+      indicators.push(`Humedad en advertencia (${dec1(hum)}%)`)
     }
   }
 
   // Tendencia peligrosa (sube rápido)
   if (tempSlope >= thresholds.tempSlopeCrit) {
     risk = risk === 'critico' ? 'critico' : 'alto'
-    indicators.push(`Temperatura subiendo rápido (+${tempSlope.toFixed(2)} °C/min)`) 
+    indicators.push(`Temperatura subiendo rápido (+${dec2(tempSlope)} °C/min)`) 
   } else if (tempSlope >= thresholds.tempSlopeWarn) {
     risk = risk === 'critico' || risk === 'alto' ? risk : 'medio'
-    indicators.push(`Temperatura con tendencia al alza (+${tempSlope.toFixed(2)} °C/min)`) 
+    indicators.push(`Temperatura con tendencia al alza (+${dec2(tempSlope)} °C/min)`) 
   }
 
   if (humSlope >= thresholds.humSlopeCrit) {
     risk = risk === 'critico' ? 'critico' : 'alto'
-    indicators.push(`Humedad subiendo rápido (+${humSlope.toFixed(2)} %/min)`) 
+    indicators.push(`Humedad subiendo rápido (+${dec2(humSlope)} %/min)`) 
   } else if (humSlope >= thresholds.humSlopeWarn) {
     risk = risk === 'critico' || risk === 'alto' ? risk : 'medio'
-    indicators.push(`Humedad con tendencia al alza (+${humSlope.toFixed(2)} %/min)`) 
+    indicators.push(`Humedad con tendencia al alza (+${dec2(humSlope)} %/min)`) 
   }
 
   // Fuente simulada baja confianza

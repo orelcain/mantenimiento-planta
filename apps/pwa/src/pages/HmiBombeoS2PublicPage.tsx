@@ -14,6 +14,7 @@
 import { useRef, useState, useEffect, useMemo, useCallback } from 'react'
 import { BookOpen, QrCode, X, Copy, Check, Maximize, Minimize, GitCompare, Play, Pause, SkipBack, SkipForward, Rewind, Paintbrush, Eraser, Camera, Download, Trash2 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
+import { dec2 } from '@/utils/formatoNumeros'
 
 const SNAPSHOTS_LS_KEY = 'hmi-yal-snapshots-v1'
 
@@ -147,7 +148,7 @@ const FRAME_DT = 1 / VIDEO_FPS
 function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60)
   const s = seconds - m * 60
-  return `${m}:${s.toFixed(2).padStart(5, '0')}`
+  return `${m}:${dec2(s).padStart(5, '0')}`
 }
 
 type DiffCategory = 'Válvulas' | 'Equipos' | 'LEDs' | 'Readouts' | 'Overrides'
@@ -331,7 +332,7 @@ export function HmiBombeoS2PublicPage() {
         // Pausar video y pre-fill nombre con el timestamp
         const t = videoRef.current?.currentTime || 0
         videoRef.current?.pause()
-        setCaptureName(`State_${t.toFixed(2)}s`)
+        setCaptureName(`State_${dec2(t)}s`)
         setCaptureDialogOpen(true)
       }
     }
@@ -850,7 +851,7 @@ export function HmiBombeoS2PublicPage() {
             </div>
             <div className="text-[10px] text-blue-400 font-mono mb-3 border-b border-cyan-900 pb-2">
               t={formatTime(diffPair[0].videoTimestamp)} → t={formatTime(diffPair[1].videoTimestamp)}
-              <span className="ml-2 text-cyan-500">(Δ={(diffPair[1].videoTimestamp - diffPair[0].videoTimestamp).toFixed(2)}s)</span>
+              <span className="ml-2 text-cyan-500">(Δ={dec2((diffPair[1].videoTimestamp - diffPair[0].videoTimestamp))}s)</span>
             </div>
             {(() => {
               const diff = diffSnapshots(diffPair[0], diffPair[1])

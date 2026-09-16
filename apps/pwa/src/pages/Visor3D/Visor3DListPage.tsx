@@ -48,11 +48,12 @@ import { formatDate } from '@/lib/utils'
 import { ModelUploader } from '@/components/visor3d/ModelUploader'
 import { STANDALONE_INTERACTIVE_EXPERIENCES, getModelsWithInteractiveExperience } from '@/components/visor3d/interactive/experienceRegistry'
 import type { Model3D } from '@/types/models3d'
+import { dec1 } from '@/utils/formatoNumeros'
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  if (bytes < 1024 * 1024) return `${dec1((bytes / 1024))} KB`
+  return `${dec1((bytes / (1024 * 1024)))} MB`
 }
 
 export function Visor3DListPage() {

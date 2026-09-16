@@ -16,6 +16,7 @@ import { getEquipments, updateEquipment } from '@/services/equipment'
 import type { Equipment, PredictiveThresholds } from '@/types'
 import { DEFAULT_PREDICTIVE_THRESHOLDS } from '@/lib/predictive/predictor'
 import { FailureAnalysis } from '@/components/predictive/FailureAnalysis'
+import { dec1, dec2 } from '@/utils/formatoNumeros'
 
 function normalizeTs(ts: number | undefined): number | null {
   if (typeof ts !== 'number' || !Number.isFinite(ts)) return null
@@ -646,7 +647,7 @@ export function PredictivePage() {
                 <div className="rounded-ctl border p-3 space-y-3">
                   <div className="text-sm font-medium">Temperatura (°C)</div>
                   <div className="space-y-2">
-                    <Label>Advertencia baja: {thresholds.tempWarnLow.toFixed(1)}°C</Label>
+                    <Label>Advertencia baja: {dec1(thresholds.tempWarnLow)}°C</Label>
                     <div className="flex items-center gap-2">
                       <Slider
                         value={[thresholds.tempWarnLow]}
@@ -668,7 +669,7 @@ export function PredictivePage() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label>Advertencia alta: {thresholds.tempWarnHigh.toFixed(1)}°C</Label>
+                    <Label>Advertencia alta: {dec1(thresholds.tempWarnHigh)}°C</Label>
                     <div className="flex items-center gap-2">
                       <Slider
                         value={[thresholds.tempWarnHigh]}
@@ -690,7 +691,7 @@ export function PredictivePage() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label>Crítico bajo: {thresholds.tempCritLow.toFixed(1)}°C</Label>
+                    <Label>Crítico bajo: {dec1(thresholds.tempCritLow)}°C</Label>
                     <div className="flex items-center gap-2">
                       <Slider
                         value={[thresholds.tempCritLow]}
@@ -712,7 +713,7 @@ export function PredictivePage() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label>Crítico alto: {thresholds.tempCritHigh.toFixed(1)}°C</Label>
+                    <Label>Crítico alto: {dec1(thresholds.tempCritHigh)}°C</Label>
                     <div className="flex items-center gap-2">
                       <Slider
                         value={[thresholds.tempCritHigh]}
@@ -738,7 +739,7 @@ export function PredictivePage() {
                 <div className="rounded-ctl border p-3 space-y-3">
                   <div className="text-sm font-medium">Humedad (%)</div>
                   <div className="space-y-2">
-                    <Label>Advertencia baja: {thresholds.humWarnLow.toFixed(1)}%</Label>
+                    <Label>Advertencia baja: {dec1(thresholds.humWarnLow)}%</Label>
                     <div className="flex items-center gap-2">
                       <Slider
                         value={[thresholds.humWarnLow]}
@@ -760,7 +761,7 @@ export function PredictivePage() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label>Advertencia alta: {thresholds.humWarnHigh.toFixed(1)}%</Label>
+                    <Label>Advertencia alta: {dec1(thresholds.humWarnHigh)}%</Label>
                     <div className="flex items-center gap-2">
                       <Slider
                         value={[thresholds.humWarnHigh]}
@@ -782,7 +783,7 @@ export function PredictivePage() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label>Crítico bajo: {thresholds.humCritLow.toFixed(1)}%</Label>
+                    <Label>Crítico bajo: {dec1(thresholds.humCritLow)}%</Label>
                     <div className="flex items-center gap-2">
                       <Slider
                         value={[thresholds.humCritLow]}
@@ -804,7 +805,7 @@ export function PredictivePage() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label>Crítico alto: {thresholds.humCritHigh.toFixed(1)}%</Label>
+                    <Label>Crítico alto: {dec1(thresholds.humCritHigh)}%</Label>
                     <div className="flex items-center gap-2">
                       <Slider
                         value={[thresholds.humCritHigh]}
@@ -832,7 +833,7 @@ export function PredictivePage() {
                 <div className="rounded-ctl border p-3 space-y-3">
                   <div className="text-sm font-medium">Tendencia temperatura (°C/min)</div>
                   <div className="space-y-2">
-                    <Label>Advertencia: {thresholds.tempSlopeWarn.toFixed(2)}</Label>
+                    <Label>Advertencia: {dec2(thresholds.tempSlopeWarn)}</Label>
                     <div className="flex items-center gap-2">
                       <Slider
                         value={[thresholds.tempSlopeWarn]}
@@ -854,7 +855,7 @@ export function PredictivePage() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label>Crítica: {thresholds.tempSlopeCrit.toFixed(2)}</Label>
+                    <Label>Crítica: {dec2(thresholds.tempSlopeCrit)}</Label>
                     <div className="flex items-center gap-2">
                       <Slider
                         value={[thresholds.tempSlopeCrit]}
@@ -880,7 +881,7 @@ export function PredictivePage() {
                 <div className="rounded-ctl border p-3 space-y-3">
                   <div className="text-sm font-medium">Tendencia humedad (%/min)</div>
                   <div className="space-y-2">
-                    <Label>Advertencia: {thresholds.humSlopeWarn.toFixed(2)}</Label>
+                    <Label>Advertencia: {dec2(thresholds.humSlopeWarn)}</Label>
                     <div className="flex items-center gap-2">
                       <Slider
                         value={[thresholds.humSlopeWarn]}
@@ -902,7 +903,7 @@ export function PredictivePage() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label>Crítica: {thresholds.humSlopeCrit.toFixed(2)}</Label>
+                    <Label>Crítica: {dec2(thresholds.humSlopeCrit)}</Label>
                     <div className="flex items-center gap-2">
                       <Slider
                         value={[thresholds.humSlopeCrit]}
@@ -969,7 +970,7 @@ export function PredictivePage() {
                 )}
                 <div className="grid gap-4 lg:grid-cols-2">
                   <div className="space-y-2">
-                    <Label>Temperatura simulada: {testTemp.toFixed(1)}°C</Label>
+                    <Label>Temperatura simulada: {dec1(testTemp)}°C</Label>
                     <div className="flex items-center gap-2">
                       <Slider
                         value={[testTemp]}
@@ -991,7 +992,7 @@ export function PredictivePage() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label>Humedad simulada: {testHum.toFixed(1)}%</Label>
+                    <Label>Humedad simulada: {dec1(testHum)}%</Label>
                     <div className="flex items-center gap-2">
                       <Slider
                         value={[testHum]}
@@ -1013,7 +1014,7 @@ export function PredictivePage() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label>Subida temp (°C/min): {testTempSlope.toFixed(2)}</Label>
+                    <Label>Subida temp (°C/min): {dec2(testTempSlope)}</Label>
                     <div className="flex items-center gap-2">
                       <Slider
                         value={[testTempSlope]}
@@ -1035,7 +1036,7 @@ export function PredictivePage() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label>Subida hum (%/min): {testHumSlope.toFixed(2)}</Label>
+                    <Label>Subida hum (%/min): {dec2(testHumSlope)}</Label>
                     <div className="flex items-center gap-2">
                       <Slider
                         value={[testHumSlope]}
@@ -1095,7 +1096,7 @@ export function PredictivePage() {
                     <div className="text-xs text-muted-foreground">Temperatura</div>
                     <div className="text-xl font-semibold">
                       {typeof lastReading?.temperature === 'number' && Number.isFinite(lastReading.temperature)
-                        ? `${lastReading.temperature.toFixed(1)} °C`
+                        ? `${dec1(lastReading.temperature)} °C`
                         : '—'}
                     </div>
                     <div className="text-xs text-muted-foreground">
@@ -1106,7 +1107,7 @@ export function PredictivePage() {
                     <div className="text-xs text-muted-foreground">Humedad</div>
                     <div className="text-xl font-semibold">
                       {typeof lastReading?.humidity === 'number' && Number.isFinite(lastReading.humidity)
-                        ? `${lastReading.humidity.toFixed(1)} %`
+                        ? `${dec1(lastReading.humidity)} %`
                         : '—'}
                     </div>
                     <div className="text-xs text-muted-foreground">
@@ -1227,7 +1228,7 @@ export function PredictivePage() {
                         />
                         <div className="mt-1 text-xs text-muted-foreground">
                           Último: {typeof lastReading?.temperature === 'number' && Number.isFinite(lastReading.temperature)
-                            ? `${lastReading.temperature.toFixed(1)} °C`
+                            ? `${dec1(lastReading.temperature)} °C`
                             : '—'}
                         </div>
                       </div>
@@ -1239,7 +1240,7 @@ export function PredictivePage() {
                         />
                         <div className="mt-1 text-xs text-muted-foreground">
                           Último: {typeof lastReading?.humidity === 'number' && Number.isFinite(lastReading.humidity)
-                            ? `${lastReading.humidity.toFixed(1)} %`
+                            ? `${dec1(lastReading.humidity)} %`
                             : '—'}
                         </div>
                       </div>
@@ -1257,7 +1258,7 @@ export function PredictivePage() {
                           <div key={r.timestamp} className="flex items-center justify-between p-2 rounded-ctl border">
                             <div className="text-sm">
                               <div className="font-medium">
-                                {r.temperature.toFixed(1)}°C · {r.humidity.toFixed(1)}%
+                                {dec1(r.temperature)}°C · {dec1(r.humidity)}%
                               </div>
                               <div className="text-xs text-muted-foreground">
                                 {formatRelativeTime(new Date(normalizeTs(r.timestamp) ?? r.timestamp))} · {r.source ?? '—'}

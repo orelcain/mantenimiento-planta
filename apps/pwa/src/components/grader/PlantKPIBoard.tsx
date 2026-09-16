@@ -18,7 +18,7 @@ import { getPlantLineConfig, getMachineKind, type PlantLineId } from '@/config/p
 import type { GraderDailySummary } from '@/services/grader/types'
 import { KPI_CUTOFFS, OEE_GOOD } from '@/services/grader/kpiThresholds'
 import { shortMachineName } from '@/services/grader/graderMachineNames'
-import { dec1 } from '@/utils/formatoNumeros'
+import { dec, dec1 } from '@/utils/formatoNumeros'
 
 interface Props {
   plantSlug: PlantSlug
@@ -40,7 +40,7 @@ interface Props {
 
 function pct(v: number | null, decimals = 1): string {
   if (v === null || !Number.isFinite(v)) return '—'
-  return `${(v * 100).toFixed(decimals)}%`
+  return `${dec(v * 100, decimals)}%`
 }
 
 function fmtMin(v: number): string {

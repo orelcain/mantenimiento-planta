@@ -32,6 +32,7 @@ import { getAllUsers } from '@/services/auth'
 import { useAuthStore } from '@/store/authStore'
 import { useToast } from '@/hooks/useToast'
 import type { User } from '@/types'
+import { dec2 } from '@/utils/formatoNumeros'
 
 export function AriaMonitorPanel() {
   const { user: currentUser } = useAuthStore()
@@ -250,7 +251,7 @@ export function AriaMonitorPanel() {
                 >
                   {ARIA_VOICE_OPTIONS.map((o) => (
                     <option key={o.uri} value={o.uri}>
-                      {o.label} · {o.rate.toFixed(2)}x
+                      {o.label} · {dec2(o.rate)}x
                     </option>
                   ))}
                 </select>
@@ -261,7 +262,7 @@ export function AriaMonitorPanel() {
               </div>
               <div>
                 <label className="text-sm text-muted-foreground block mb-1">
-                  Velocidad: {(config.speechRate ?? 1.0).toFixed(2)}x
+                  Velocidad: {dec2((config.speechRate ?? 1.0))}x
                 </label>
                 <input
                   type="range"

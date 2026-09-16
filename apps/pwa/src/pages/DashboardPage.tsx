@@ -32,6 +32,7 @@ import type { User, UserRole, Zone } from '@/types'
 import { getUserById } from '@/services/auth'
 import { MobileHomeGrid } from '@/components/home/MobileHomeGrid'
 import { BitacoraTurnoCard } from '@/components/bitacora/BitacoraTurnoCard'
+import { dec1 } from '@/utils/formatoNumeros'
 
 export function DashboardPage() {
   const navigate = useNavigate()
@@ -242,16 +243,16 @@ export function DashboardPage() {
                       )}
                       {iotDetails[incident.equipmentId]?.temp && (
                         <div>
-                          Temp: {iotDetails[incident.equipmentId]!.temp!.current.toFixed(1)}{iotDetails[incident.equipmentId]!.temp!.unit} 
-                          (prom {iotDetails[incident.equipmentId]!.temp!.avg.toFixed(1)}{iotDetails[incident.equipmentId]!.temp!.unit}, 
+                          Temp: {dec1(iotDetails[incident.equipmentId]!.temp!.current)}{iotDetails[incident.equipmentId]!.temp!.unit} 
+                          (prom {dec1(iotDetails[incident.equipmentId]!.temp!.avg)}{iotDetails[incident.equipmentId]!.temp!.unit}, 
                           warn {DEFAULT_PREDICTIVE_THRESHOLDS.tempWarnLow}-{DEFAULT_PREDICTIVE_THRESHOLDS.tempWarnHigh}, 
                           crit {DEFAULT_PREDICTIVE_THRESHOLDS.tempCritLow}-{DEFAULT_PREDICTIVE_THRESHOLDS.tempCritHigh})
                         </div>
                       )}
                       {iotDetails[incident.equipmentId]?.hum && (
                         <div>
-                          Hum: {iotDetails[incident.equipmentId]!.hum!.current.toFixed(1)}{iotDetails[incident.equipmentId]!.hum!.unit} 
-                          (prom {iotDetails[incident.equipmentId]!.hum!.avg.toFixed(1)}{iotDetails[incident.equipmentId]!.hum!.unit}, 
+                          Hum: {dec1(iotDetails[incident.equipmentId]!.hum!.current)}{iotDetails[incident.equipmentId]!.hum!.unit} 
+                          (prom {dec1(iotDetails[incident.equipmentId]!.hum!.avg)}{iotDetails[incident.equipmentId]!.hum!.unit}, 
                           warn {DEFAULT_PREDICTIVE_THRESHOLDS.humWarnLow}-{DEFAULT_PREDICTIVE_THRESHOLDS.humWarnHigh}, 
                           crit {DEFAULT_PREDICTIVE_THRESHOLDS.humCritLow}-{DEFAULT_PREDICTIVE_THRESHOLDS.humCritHigh})
                         </div>
@@ -424,14 +425,14 @@ export function DashboardPage() {
                           )}
                           {iotDetails[incident.equipmentId]?.temp && (
                             <div>
-                              Temp: {iotDetails[incident.equipmentId]!.temp!.current.toFixed(1)}{iotDetails[incident.equipmentId]!.temp!.unit} 
-                              (prom {iotDetails[incident.equipmentId]!.temp!.avg.toFixed(1)}{iotDetails[incident.equipmentId]!.temp!.unit})
+                              Temp: {dec1(iotDetails[incident.equipmentId]!.temp!.current)}{iotDetails[incident.equipmentId]!.temp!.unit} 
+                              (prom {dec1(iotDetails[incident.equipmentId]!.temp!.avg)}{iotDetails[incident.equipmentId]!.temp!.unit})
                             </div>
                           )}
                           {iotDetails[incident.equipmentId]?.hum && (
                             <div>
-                              Hum: {iotDetails[incident.equipmentId]!.hum!.current.toFixed(1)}{iotDetails[incident.equipmentId]!.hum!.unit} 
-                              (prom {iotDetails[incident.equipmentId]!.hum!.avg.toFixed(1)}{iotDetails[incident.equipmentId]!.hum!.unit})
+                              Hum: {dec1(iotDetails[incident.equipmentId]!.hum!.current)}{iotDetails[incident.equipmentId]!.hum!.unit} 
+                              (prom {dec1(iotDetails[incident.equipmentId]!.hum!.avg)}{iotDetails[incident.equipmentId]!.hum!.unit})
                             </div>
                           )}
                         </div>

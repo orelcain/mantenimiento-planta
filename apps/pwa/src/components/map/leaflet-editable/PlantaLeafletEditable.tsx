@@ -27,6 +27,7 @@ import {
   type DxfSvgLayerConfig,
 } from '@/data/dxfLayers'
 import { useMapaLeafletStore, type ElementoMapa, type PolygonCoords } from '@/store/useMapaLeafletStore'
+import { dec1, dec2 } from '@/utils/formatoNumeros'
 
 // Timestamp del último box-select completado — usado para suprimir el click nativo
 // que Leaflet dispara inmediatamente después del mouseup final del drag.
@@ -400,7 +401,7 @@ function angleTag(deg: number): string {
   const a = ((deg % 180) + 180) % 180
   if (a <= 3 || a >= 177) return 'H'
   if (Math.abs(a - 90) <= 3) return 'V'
-  return `${deg.toFixed(1)}°`
+  return `${dec1(deg)}°`
 }
 
 // ─── Tema blueprint: mismo estilo que Wireframe3DView ────────────────────────
@@ -575,7 +576,7 @@ function DrawAreaTooltip() {
       const points = Array.isArray(coords[0]) ? coords[0] : coords
       if (points.length < 2) { el.style.display = 'none'; return }
       const area = polygonArea(points as L.LatLng[])
-      el.textContent = points.length >= 3 ? `${area.toFixed(1)} m²` : `${points.length} pts`
+      el.textContent = points.length >= 3 ? `${dec1(area)} m²` : `${points.length} pts`
       el.style.display = 'block'
     }
     const onMouseMove = (e: L.LeafletMouseEvent) => {
@@ -1268,7 +1269,7 @@ function MeasureTool({ view }: { view: MapView }) {
           const lbl = L.marker(mid, {
             icon: L.divIcon({
               className: 'measure-label-container',
-              html: `<span class="measure-label">${dist.toFixed(2)} m${tag === 'H' || tag === 'V' ? ` · ${tag}` : ''}</span>`,
+              html: `<span class="measure-label">${dec2(dist)} m${tag === 'H' || tag === 'V' ? ` · ${tag}` : ''}</span>`,
               iconSize:   [110, 22],
               iconAnchor: [55, 11],
             }),
@@ -1393,7 +1394,7 @@ function CapaCotas({ view }: { view: MapView }) {
       const latlngs   = meta.points.map((p) => L.latLng(p[0], p[1]))
       const layers: L.Layer[] = []
       const totalM    = (meta.totalM as number | undefined) ?? 0
-      const measLabel = `${totalM.toFixed(2)} m`
+      const measLabel = `${dec2(totalM)} m`
       // Muestra "Etiqueta · 3.74 m" o solo "3.74 m" si no hay etiqueta
       const displayLabel = cota.nombre && cota.nombre !== measLabel
         ? `${cota.nombre} · ${measLabel}`
@@ -1882,13 +1883,13 @@ function MeasureOverlay() {
             {measureSegments.map((d, i) => (
               <div key={i} className="flex justify-between items-center text-xs gap-6">
                 <span className="text-gray-500">Seg {i + 1}</span>
-                <span className="font-mono font-bold text-amber-400">{d.toFixed(2)} m</span>
+                <span className="font-mono font-bold text-amber-400">{dec2(d)} m</span>
               </div>
             ))}
             {measureSegments.length > 1 && (
               <div className="flex justify-between items-center text-xs gap-6 border-t border-gray-700/60 pt-1.5 mt-1">
                 <span className="text-gray-300 font-semibold">Total</span>
-                <span className="font-mono font-bold text-white">{total.toFixed(2)} m</span>
+                <span className="font-mono font-bold text-white">{dec2(total)} m</span>
               </div>
             )}
             <div className="flex flex-col gap-1 mt-2 pt-1.5 border-t border-gray-800">

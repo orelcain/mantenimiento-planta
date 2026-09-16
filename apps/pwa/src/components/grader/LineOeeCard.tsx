@@ -25,6 +25,7 @@ import { lineMachinesLabel } from '@/services/shoplogix/shoplogixMachines'
 import type { PlantSlug } from '@/services/shoplogix/shoplogixMachines'
 import type { GraderDailySummary } from '@/services/grader/types'
 import type { ParoEtapa } from '@/types'
+import { dec } from '@/utils/formatoNumeros'
 
 interface LineOeeCardProps {
   plantLineId: string
@@ -39,7 +40,7 @@ interface LineOeeCardProps {
 
 function pct(v: number | null, d = 0): string {
   if (v === null || !Number.isFinite(v)) return '—'
-  return `${(v * 100).toFixed(d)}%`
+  return `${dec(v * 100, d)}%`
 }
 function fmtDur(min: number): string {
   if (!Number.isFinite(min) || min <= 0) return '0 min'

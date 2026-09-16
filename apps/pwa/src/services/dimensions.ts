@@ -21,6 +21,7 @@ import { db } from './firebase'
 import { generateId } from '@/lib/utils'
 import { logger } from '@/lib/logger'
 import type { Dimension3D, CreateDimensionData, DimensionUnit, Point3D, MeasurementType } from '@/types/models3d'
+import { dec1, dec2 } from '@/utils/formatoNumeros'
 
 const PARENT_COLLECTION = 'models3d'
 const SUB_COLLECTION = 'dimensions'
@@ -244,8 +245,8 @@ export function calculateOrientedBoxVolume(
 export function formatMeasurement(value: number, unit: DimensionUnit, type: MeasurementType): string {
   const suffix = type === 'area' ? `${unit}²` : type === 'volume' ? `${unit}³` : unit
   if (value >= 1000) return `${value.toFixed(0)} ${suffix}`
-  if (value >= 10) return `${value.toFixed(1)} ${suffix}`
-  if (value >= 1) return `${value.toFixed(2)} ${suffix}`
+  if (value >= 10) return `${dec1(value)} ${suffix}`
+  if (value >= 1) return `${dec2(value)} ${suffix}`
   return `${value.toFixed(3)} ${suffix}`
 }
 

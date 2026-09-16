@@ -112,6 +112,7 @@ import { useAreaEditorFlow } from '@/components/map/isometric/editor/useAreaEdit
 import { CompassWidget } from '@/components/map/isometric/CompassWidget'
 import { Minimap } from '@/components/map/isometric/Minimap'
 import { MapStatsPanel } from '@/components/map/isometric/MapStatsPanel'
+import { dec1, dec2 } from '@/utils/formatoNumeros'
 
 const ELEVATION_OPTIONS = ELEVATION_PRESET_LEVELS.map((level) => ({
   floor: level,
@@ -707,7 +708,7 @@ export function MapPage() {
     lightness += Math.abs(bounded) % 2 === 0 ? 4 : -3
     lightness = Math.max(22, Math.min(72, lightness))
 
-    return `hsl(${hue.toFixed(1)}, ${saturation.toFixed(1)}%, ${lightness.toFixed(1)}%)`
+    return `hsl(${dec1(hue)}, ${dec1(saturation)}%, ${dec1(lightness)}%)`
   }, [])
 
   const terrainRulerGradient = useMemo(() => {
@@ -715,7 +716,7 @@ export function MapPage() {
     const range = MAX_TERRAIN_ELEVATION - MIN_TERRAIN_ELEVATION
     for (let meter = MIN_TERRAIN_ELEVATION; meter <= MAX_TERRAIN_ELEVATION; meter += 1) {
       const pct = ((meter - MIN_TERRAIN_ELEVATION) / range) * 100
-      steps.push(`${elevationColorForMeter(meter)} ${pct.toFixed(2)}%`)
+      steps.push(`${elevationColorForMeter(meter)} ${dec2(pct)}%`)
     }
     return `linear-gradient(to top, ${steps.join(', ')})`
   }, [elevationColorForMeter])
@@ -2599,8 +2600,8 @@ export function MapPage() {
                     <Badge variant="outline">Densidad: {backgroundMapMetrics?.densityLabel ?? 'N/D'}</Badge>
                   </div>
                   <div>Raster: {backgroundMap.imageWidthPx ?? 'N/D'} × {backgroundMap.imageHeightPx ?? 'N/D'} px</div>
-                  <div>Escala X: {backgroundMapMetrics?.pixelsPerMeterX ? `${backgroundMapMetrics.pixelsPerMeterX.toFixed(2)} px/m` : 'Sin dato'}</div>
-                  <div>Escala Z: {backgroundMapMetrics?.pixelsPerMeterZ ? `${backgroundMapMetrics.pixelsPerMeterZ.toFixed(2)} px/m` : 'Sin dato'}</div>
+                  <div>Escala X: {backgroundMapMetrics?.pixelsPerMeterX ? `${dec2(backgroundMapMetrics.pixelsPerMeterX)} px/m` : 'Sin dato'}</div>
+                  <div>Escala Z: {backgroundMapMetrics?.pixelsPerMeterZ ? `${dec2(backgroundMapMetrics.pixelsPerMeterZ)} px/m` : 'Sin dato'}</div>
                   <div className="text-muted-foreground">
                     Referencia práctica: sobre 3 px/m ya sirve para layout operativo; sobre 8 px/m queda cómodo para alineación fina.
                   </div>
@@ -2947,7 +2948,7 @@ export function MapPage() {
                 <div className="bg-card/90 backdrop-blur rounded-md border px-3 py-1 text-[11px] flex items-center gap-3 shadow">
                   {hoveredTerrainElevation !== null && (
                     <span className="font-mono text-foreground">
-                      Cota {hoveredTerrainElevation > 0 ? `+${hoveredTerrainElevation.toFixed(1)}` : hoveredTerrainElevation.toFixed(1)}m
+                      Cota {hoveredTerrainElevation > 0 ? `+${dec1(hoveredTerrainElevation)}` : dec1(hoveredTerrainElevation)}m
                     </span>
                   )}
                   {terrainHoverPosition && (
@@ -3053,7 +3054,7 @@ export function MapPage() {
                     const dx = b.x - a.x
                     const dz = b.z - a.z
                     const dist = Math.sqrt(dx * dx + dz * dz)
-                    return `${dist.toFixed(1)} m`
+                    return `${dec1(dist)} m`
                   })()}
                   <button
                     className="ml-1 opacity-70 hover:opacity-100"

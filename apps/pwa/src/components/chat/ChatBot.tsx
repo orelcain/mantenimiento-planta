@@ -474,6 +474,7 @@ function LoadingIndicator() {
 
 // ─── Indicador de actividad de agente IA ─────────────────────────────
 import type { AgentStatusEvent } from '@/services/ariaOrchestrator'
+import { dec1 } from '@/utils/formatoNumeros'
 
 function AgentActivityIndicator({ status }: { status: AgentStatusEvent }) {
   const phaseStyles: Record<string, { color: string; animate: boolean }> = {
@@ -520,7 +521,7 @@ function AgentBadge({ agentInfo }: { agentInfo: NonNullable<import('@/services/c
       <span>{agentInfo.agentEmoji}</span>
       <span>{agentInfo.agentName}</span>
       <span>·</span>
-      <span>{agentInfo.latencyMs > 1000 ? `${(agentInfo.latencyMs / 1000).toFixed(1)}s` : `${agentInfo.latencyMs}ms`}</span>
+      <span>{agentInfo.latencyMs > 1000 ? `${dec1((agentInfo.latencyMs / 1000))}s` : `${agentInfo.latencyMs}ms`}</span>
       {agentInfo.taskType && (
         <>
           <span>·</span>

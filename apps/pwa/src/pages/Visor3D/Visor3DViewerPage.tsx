@@ -69,6 +69,7 @@ import { ImageLightbox } from '@/components/ui/ImageLightbox'
 import type { Model3D, MaterialOverride, Annotation3D, AnnotationStatus, AnnotationPriority } from '@/types/models3d'
 import type { Dimension3D, DimensionUnit, Point3D, MeasurementType } from '@/types/models3d'
 import { getUnitSuffix } from '@/types/models3d'
+import { dec1 } from '@/utils/formatoNumeros'
 
 export function Visor3DViewerPage() {
   const { modelId } = useParams<{ modelId: string }>()
@@ -1018,7 +1019,7 @@ export function Visor3DViewerPage() {
                           <span className="text-sm">{typeIcon}</span>
                           <span className="font-mono font-medium">
                             {dim.type === 'circumference' && dim.diameter
-                              ? `⌀${dim.diameter.toFixed(1)} ${suffix}`
+                              ? `⌀${dec1(dim.diameter)} ${suffix}`
                               : formatMeasurement(dim.value, dim.unit, dim.type)}
                           </span>
                           {dim.label && (

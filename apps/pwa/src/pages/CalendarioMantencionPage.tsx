@@ -14,6 +14,7 @@ import { getCurrentUser } from '../services/auth'
 import { logger } from '@/lib/logger'
 import { semanaDeApertura } from './calendario/semanaDeApertura'
 import { RuedaVentanas } from '@/components/calendario/RuedaVentanas'
+import { dec1 } from '@/utils/formatoNumeros'
 
 
 type DayCol = {
@@ -340,7 +341,7 @@ function weekNumberLabel(date: Date | null): string {
 
 function formatDelta(delta: number): string {
   if (Math.abs(delta) < 0.001) return '0.0'
-  return `${delta > 0 ? '+' : ''}${delta.toFixed(1)}`
+  return `${delta > 0 ? '+' : ''}${dec1(delta)}`
 }
 
 function metaLeftFiltered(index: number, visibleIndices: number[], widths: number[] = META_COL_WIDTHS): number {
@@ -2043,7 +2044,7 @@ export function CalendarioMantencionPage() {
         total += workedHoursForShift(d.c === celdaEditada.c ? nuevo : (tech.shifts[d.c] || ''))
       })
       if (total > expectedWeekBase + 0.01) {
-        avisos.push(`Esa semana quedaría en ${total.toFixed(1)} h: ${(total - expectedWeekBase).toFixed(1)} h sobre el tope de ${expectedWeekBase.toFixed(0)}.`)
+        avisos.push(`Esa semana quedaría en ${dec1(total)} h: ${dec1((total - expectedWeekBase))} h sobre el tope de ${expectedWeekBase.toFixed(0)}.`)
       }
     }
     return avisos
@@ -2275,7 +2276,7 @@ export function CalendarioMantencionPage() {
                       <td className={sobreTope
                         ? 'pr-1 text-right text-caption font-bold text-ink-warn'
                         : 'pr-1 text-right text-caption font-bold text-foreground'}>
-                        {semana > 0 ? semana.toFixed(1) : ''}
+                        {semana > 0 ? dec1(semana) : ''}
                       </td>
                     </tr>
                   )
@@ -2393,7 +2394,7 @@ export function CalendarioMantencionPage() {
                             <span className="shrink-0 text-caption tabular-nums text-ink-warn">{horarioCorto(turno)}</span>
                           )}
                           <span className="shrink-0 text-caption tabular-nums text-muted-foreground">
-                            {semana > 0 ? `${semana.toFixed(1)} h` : ''}
+                            {semana > 0 ? `${dec1(semana)} h` : ''}
                           </span>
                         </button>
                       )
@@ -2765,18 +2766,18 @@ export function CalendarioMantencionPage() {
                             <span className="truncate font-medium text-foreground" title={row.tech.name}>{row.tech.name}</span>
                           </div>
                         </td>
-                        <td className="border-l border-border/15 px-1.5 py-1 text-right tabular-nums whitespace-nowrap" title={`Trabajo: ${row.weekWorkedHours.toFixed(1)}h · Vac pagadas: ${row.weekVacationPaidHours.toFixed(1)}h · Fer pagados: ${row.weekHolidayPaidHours.toFixed(1)}h · Colación: ${row.weekBreakHours.toFixed(1)}h`}>
+                        <td className="border-l border-border/15 px-1.5 py-1 text-right tabular-nums whitespace-nowrap" title={`Trabajo: ${dec1(row.weekWorkedHours)}h · Vac pagadas: ${dec1(row.weekVacationPaidHours)}h · Fer pagados: ${dec1(row.weekHolidayPaidHours)}h · Colación: ${dec1(row.weekBreakHours)}h`}>
                           <span className={row.weekHours > expectedWeekBase + 0.01 ? 'font-bold text-ink-warn' : 'font-medium text-foreground'}>
-                            {row.weekHours.toFixed(1)}
+                            {dec1(row.weekHours)}
                           </span>
                           <span className="text-muted-foreground mx-0.5">/</span>
-                          <span className="text-muted-foreground">{row.weekExpected.toFixed(1)}</span>
+                          <span className="text-muted-foreground">{dec1(row.weekExpected)}</span>
                           {row.weekHours > expectedWeekBase + 0.01 && (
                             <span
                               className="ml-1 text-caption font-semibold text-ink-warn"
-                              title={`Sobre el tope legal de ${expectedWeekBase.toFixed(0)} h: ${(row.weekHours - expectedWeekBase).toFixed(1)} h extraordinarias`}
+                              title={`Sobre el tope legal de ${expectedWeekBase.toFixed(0)} h: ${dec1((row.weekHours - expectedWeekBase))} h extraordinarias`}
                             >
-                              +{(row.weekHours - expectedWeekBase).toFixed(1)} extra
+                              +{dec1((row.weekHours - expectedWeekBase))} extra
                             </span>
                           )}
                         </td>
@@ -2796,18 +2797,18 @@ export function CalendarioMantencionPage() {
                         <td className="px-1.5 py-1 text-center tabular-nums text-muted-foreground">{row.weekFreeDays > 0 ? row.weekFreeDays : <span className="text-muted-foreground">–</span>}</td>
                         {hayAusencias && (<td className="px-1 py-1 text-center">
                           {row.weekVacationDays > 0
-                            ? <span className="inline-block rounded-full border border-primary/[0.25] bg-primary/[0.15] px-1.5 py-[1px] text-caption font-bold tabular-nums text-primary" title={`${row.weekVacationPaidHours.toFixed(1)}h pagadas`}>{row.weekVacationDays}d</span>
+                            ? <span className="inline-block rounded-full border border-primary/[0.25] bg-primary/[0.15] px-1.5 py-[1px] text-caption font-bold tabular-nums text-primary" title={`${dec1(row.weekVacationPaidHours)}h pagadas`}>{row.weekVacationDays}d</span>
                             : <span className="text-muted-foreground">–</span>}
                         </td>)}
                         {hayAusencias && (<td className="px-1 py-1 text-center">
                           {row.weekHolidayDays > 0
-                            ? <span className="inline-block rounded-full border border-amber-500/[0.25] bg-amber-500/[0.15] px-1.5 py-[1px] text-caption font-bold tabular-nums text-ink-warn" title={`${row.weekHolidayPaidHours.toFixed(1)}h pagadas`}>{row.weekHolidayDays}d</span>
+                            ? <span className="inline-block rounded-full border border-amber-500/[0.25] bg-amber-500/[0.15] px-1.5 py-[1px] text-caption font-bold tabular-nums text-ink-warn" title={`${dec1(row.weekHolidayPaidHours)}h pagadas`}>{row.weekHolidayDays}d</span>
                             : <span className="text-muted-foreground">–</span>}
                         </td>)}
-                        <td className="border-l-2 border-border/25 px-1.5 py-1 text-right tabular-nums whitespace-nowrap" title={`Trabajo: ${row.monthWorkedHours.toFixed(1)}h · Vac pagadas: ${row.monthVacationPaidHours.toFixed(1)}h · Fer pagados: ${row.monthHolidayPaidHours.toFixed(1)}h · Colación: ${row.monthBreakHours.toFixed(1)}h`}>
-                          <span className="text-foreground font-medium">{row.monthHours.toFixed(1)}</span>
+                        <td className="border-l-2 border-border/25 px-1.5 py-1 text-right tabular-nums whitespace-nowrap" title={`Trabajo: ${dec1(row.monthWorkedHours)}h · Vac pagadas: ${dec1(row.monthVacationPaidHours)}h · Fer pagados: ${dec1(row.monthHolidayPaidHours)}h · Colación: ${dec1(row.monthBreakHours)}h`}>
+                          <span className="text-foreground font-medium">{dec1(row.monthHours)}</span>
                           <span className="text-muted-foreground mx-0.5">/</span>
-                          <span className="text-muted-foreground">{row.monthExpected.toFixed(1)}</span>
+                          <span className="text-muted-foreground">{dec1(row.monthExpected)}</span>
                         </td>
                         <td className="px-1 py-1" style={{ minWidth: 90 }}>
                           <div className="flex items-center gap-1">
@@ -2831,12 +2832,12 @@ export function CalendarioMantencionPage() {
                         <td className="px-1.5 py-1 text-center tabular-nums text-muted-foreground">{row.monthFreeDays > 0 ? row.monthFreeDays : <span className="text-muted-foreground">–</span>}</td>
                         {hayAusencias && (<td className="px-1 py-1 text-center">
                           {row.monthVacationDays > 0
-                            ? <span className="inline-block rounded-full border border-primary/[0.25] bg-primary/[0.15] px-1.5 py-[1px] text-caption font-bold tabular-nums text-primary" title={`${row.monthVacationPaidHours.toFixed(1)}h pagadas`}>{row.monthVacationDays}d</span>
+                            ? <span className="inline-block rounded-full border border-primary/[0.25] bg-primary/[0.15] px-1.5 py-[1px] text-caption font-bold tabular-nums text-primary" title={`${dec1(row.monthVacationPaidHours)}h pagadas`}>{row.monthVacationDays}d</span>
                             : <span className="text-muted-foreground">–</span>}
                         </td>)}
                         {hayAusencias && (<td className="px-1 py-1 text-center">
                           {row.monthHolidayDays > 0
-                            ? <span className="inline-block rounded-full border border-amber-500/[0.25] bg-amber-500/[0.15] px-1.5 py-[1px] text-caption font-bold tabular-nums text-ink-warn" title={`${row.monthHolidayPaidHours.toFixed(1)}h pagadas`}>{row.monthHolidayDays}d</span>
+                            ? <span className="inline-block rounded-full border border-amber-500/[0.25] bg-amber-500/[0.15] px-1.5 py-[1px] text-caption font-bold tabular-nums text-ink-warn" title={`${dec1(row.monthHolidayPaidHours)}h pagadas`}>{row.monthHolidayDays}d</span>
                             : <span className="text-muted-foreground">–</span>}
                         </td>)}
                         <td className="border-l-2 border-border/25 px-1.5 py-1 text-center tabular-nums">
@@ -3024,9 +3025,9 @@ export function CalendarioMantencionPage() {
                           <td
                             className={`border px-0.5 py-1 text-center text-caption font-semibold tabular-nums !bg-card ${sobreTope ? 'text-ink-warn' : 'text-muted-foreground'}`}
                             style={{ minWidth: '46px', maxWidth: '46px' }}
-                            title={`${tech.name} · semana ${weekNumberLabel(d.dateObj)}: ${(wkHours ?? 0).toFixed(1)} h trabajadas · objetivo ${expectedWeekBase.toFixed(1)} h${sobreTope ? ` · ${((wkHours ?? 0) - expectedWeekBase).toFixed(1)} h por sobre el tope` : ''}`}
+                            title={`${tech.name} · semana ${weekNumberLabel(d.dateObj)}: ${dec1((wkHours ?? 0))} h trabajadas · objetivo ${dec1(expectedWeekBase)} h${sobreTope ? ` · ${dec1(((wkHours ?? 0) - expectedWeekBase))} h por sobre el tope` : ''}`}
                           >
-                            {(wkHours ?? 0) > 0 ? (wkHours ?? 0).toFixed(1) : ''}
+                            {(wkHours ?? 0) > 0 ? dec1((wkHours ?? 0)) : ''}
                           </td>
                         ) : null}
                         <td
@@ -3165,7 +3166,7 @@ export function CalendarioMantencionPage() {
             <p className="mt-2 text-caption text-muted-foreground tabular-nums">
               {horasDelEditor === null
                 ? 'Horario incompleto'
-                : `${horasDelEditor.toFixed(1)} h netas, descontando ${hoursConfig.breakHours} h de colación.`}
+                : `${dec1(horasDelEditor)} h netas, descontando ${hoursConfig.breakHours} h de colación.`}
             </p>
             {avisosDelEditor.length > 0 && (
               <ul className="mt-2 flex flex-col gap-1">

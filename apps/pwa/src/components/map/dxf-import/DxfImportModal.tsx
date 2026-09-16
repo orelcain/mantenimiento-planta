@@ -8,6 +8,7 @@ import { useCallback, useRef, useState } from 'react'
 import { X, Upload, FileText, Eye, EyeOff, Check, AlertTriangle, Loader } from 'lucide-react'
 import { parseDxfKonva, type CapaKonva } from '../konva-dxf/parseDxfKonva'
 import { useMapaLeafletStore, type MapaImportado, type CapaImportada } from '@/store/useMapaLeafletStore'
+import { dec1 } from '@/utils/formatoNumeros'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -16,7 +17,7 @@ function makeId() {
 }
 
 function fmtCount(n: number): string {
-  return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n)
+  return n >= 1000 ? `${dec1((n / 1000))}k` : String(n)
 }
 
 // ── Componente ───────────────────────────────────────────────────────────────

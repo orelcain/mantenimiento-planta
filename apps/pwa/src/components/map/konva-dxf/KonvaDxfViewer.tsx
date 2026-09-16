@@ -29,6 +29,7 @@ import {
   MousePointer2, Hand, Undo2, X as XIcon,
 } from 'lucide-react'
 import { useMapaLeafletStore, type MapaImportado, type CapaImportada } from '@/store/useMapaLeafletStore'
+import { dec2 } from '@/utils/formatoNumeros'
 
 const BG = '#0a0e14'
 const SELECTED_STROKE = '#f59e0b'
@@ -668,7 +669,7 @@ export function KonvaDxfViewer({ mapa }: Props) {
 
       {/* Indicador de zoom */}
       <div className="absolute bottom-3 left-3 text-[10px] text-gray-500 font-mono bg-gray-900/80 px-2 py-0.5 rounded">
-        zoom {scale.toFixed(2)}×
+        zoom {dec2(scale)}×
       </div>
 
       <PanelCapasKonva mapa={mapa} />

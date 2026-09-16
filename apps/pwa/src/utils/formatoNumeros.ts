@@ -24,3 +24,12 @@ export function dec2(n: number | null | undefined): string {
   if (n == null || !Number.isFinite(n)) return '—'
   return n.toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
+
+/**
+ * Decimales variables, para los helpers que ya reciben cuántos quieren
+ * (`pct(v, 0)`), donde `dec1`/`dec2` no sirven.
+ */
+export function dec(n: number | null | undefined, decimales: number): string {
+  if (n == null || !Number.isFinite(n)) return '—'
+  return n.toLocaleString('es-CL', { minimumFractionDigits: decimales, maximumFractionDigits: decimales })
+}

@@ -25,6 +25,7 @@ import {
   OhlcElement
 } from 'chartjs-chart-financial'
 import type { TelemetryDataPoint } from '../../hooks/useTelemetryHistory'
+import { dec1 } from '@/utils/formatoNumeros'
 
 // Registrar componentes de Chart.js + plugin zoom
 ChartJS.register(
@@ -670,7 +671,7 @@ export function TelemetryChart({ data, type, height = 300 }: TelemetryChartProps
               callbacks: {
                 label: (ctx: any) => {
                   const r = ctx.raw
-                  return `O:${r.o.toFixed(1)} H:${r.h.toFixed(1)} L:${r.l.toFixed(1)} C:${r.c.toFixed(1)} °C`
+                  return `O:${dec1(r.o)} H:${dec1(r.h)} L:${dec1(r.l)} C:${dec1(r.c)} °C`
                 }
               }
             }
@@ -776,24 +777,24 @@ export function TelemetryChart({ data, type, height = 300 }: TelemetryChartProps
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
           <div className="rounded-ctl border p-2 bg-card/40">
             <div className="text-caption text-muted-foreground">Temperatura actual</div>
-            <div className="text-sm font-semibold">{visibleSummary.temp.latest.toFixed(1)} °C</div>
+            <div className="text-sm font-semibold">{dec1(visibleSummary.temp.latest)} °C</div>
           </div>
           <div className="rounded-ctl border p-2 bg-card/40">
             <div className="text-caption text-muted-foreground">Humedad actual</div>
-            <div className="text-sm font-semibold">{visibleSummary.hum.latest.toFixed(1)} %</div>
+            <div className="text-sm font-semibold">{dec1(visibleSummary.hum.latest)} %</div>
           </div>
           <div className="rounded-ctl border p-2 bg-card/40">
             <div className="text-caption text-muted-foreground">Temp prom. / min-max</div>
             <div className="text-sm font-semibold">
-              {visibleSummary.temp.avg.toFixed(1)}
-              <span className="text-xs text-muted-foreground"> °C · {visibleSummary.temp.min.toFixed(1)}-{visibleSummary.temp.max.toFixed(1)}</span>
+              {dec1(visibleSummary.temp.avg)}
+              <span className="text-xs text-muted-foreground"> °C · {dec1(visibleSummary.temp.min)}-{dec1(visibleSummary.temp.max)}</span>
             </div>
           </div>
           <div className="rounded-ctl border p-2 bg-card/40">
             <div className="text-caption text-muted-foreground">Hum prom. / min-max</div>
             <div className="text-sm font-semibold">
-              {visibleSummary.hum.avg.toFixed(1)}
-              <span className="text-xs text-muted-foreground"> % · {visibleSummary.hum.min.toFixed(1)}-{visibleSummary.hum.max.toFixed(1)}</span>
+              {dec1(visibleSummary.hum.avg)}
+              <span className="text-xs text-muted-foreground"> % · {dec1(visibleSummary.hum.min)}-{dec1(visibleSummary.hum.max)}</span>
             </div>
           </div>
           <div className="rounded-ctl border p-2 bg-card/40">
@@ -844,8 +845,8 @@ export function TelemetryChart({ data, type, height = 300 }: TelemetryChartProps
               {recentReadings.map((reading, index) => (
                 <tr key={`${reading.timestamp.getTime()}-${index}`} className="border-b last:border-b-0 hover:bg-muted/20">
                   <td className="py-1.5 px-2 text-muted-foreground">{reading.timestamp.toLocaleString('es-CL')}</td>
-                  <td className="py-1.5 px-2 text-right font-medium">{reading.temperatura.toFixed(1)} °C</td>
-                  <td className="py-1.5 px-2 text-right font-medium">{reading.humedad.toFixed(1)} %</td>
+                  <td className="py-1.5 px-2 text-right font-medium">{dec1(reading.temperatura)} °C</td>
+                  <td className="py-1.5 px-2 text-right font-medium">{dec1(reading.humedad)} %</td>
                 </tr>
               ))}
             </tbody>

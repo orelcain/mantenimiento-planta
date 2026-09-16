@@ -10,6 +10,7 @@ import type { Equipment } from '@/types'
 import ReactECharts from 'echarts-for-react'
 import type { EChartsOption } from 'echarts'
 import { logger } from '@/lib/logger'
+import { dec1 } from '@/utils/formatoNumeros'
 
 function formatDateTime(timestamp?: number): string {
   if (!timestamp || !Number.isFinite(timestamp)) return '—'
@@ -96,20 +97,20 @@ function getThresholdDistanceLabel(value: number | undefined, warnLow: number, w
   if (value === undefined || !Number.isFinite(value)) return 'Margen a umbral: —'
 
   if (value < warnLow) {
-    return `Umbral bajo superado por ${(warnLow - value).toFixed(1)} ${unit}`
+    return `Umbral bajo superado por ${dec1((warnLow - value))} ${unit}`
   }
 
   if (value > warnHigh) {
-    return `Umbral alto superado por ${(value - warnHigh).toFixed(1)} ${unit}`
+    return `Umbral alto superado por ${dec1((value - warnHigh))} ${unit}`
   }
 
   const toLow = value - warnLow
   const toHigh = warnHigh - value
   if (toHigh <= toLow) {
-    return `Faltan ${toHigh.toFixed(1)} ${unit} para umbral alto`
+    return `Faltan ${dec1(toHigh)} ${unit} para umbral alto`
   }
 
-  return `Faltan ${toLow.toFixed(1)} ${unit} para umbral bajo`
+  return `Faltan ${dec1(toLow)} ${unit} para umbral bajo`
 }
 
 /* ── Editor de umbrales (solo admin) ── */
