@@ -1,4 +1,5 @@
-import type { EventoBitacora, ImpactoEvento, TipoEvento } from './bitacora.types'
+import type { EventoBitacora, ImpactoEvento, TipoEvento, TurnoMantencion } from './bitacora.types'
+import { turnoDesdeId } from './turnoMantencion'
 
 /**
  * Borradores y edición entre varios (mockup aprobado 16-09-2026).
@@ -15,6 +16,21 @@ export function esBorrador(e: Pick<EventoBitacora, 'estado'>): boolean {
 /** Los eventos publicados. TODO número, correo, PDF o entrega de turno parte de aquí. */
 export function soloListos<T extends Pick<EventoBitacora, 'estado'>>(eventos: readonly T[]): T[] {
   return eventos.filter((e) => !esBorrador(e))
+}
+
+/**
+ * Borradores que quedaron sin publicar en turnos ANTERIORES, del más reciente
+ * al más antiguo. Un borrador no cuenta en nada hasta que alguien lo publica:
+ * si el turno cerró con uno a medio escribir, el turno siguiente tiene que
+ * verlo o se pierde para siempre (revisión 16-09).
+ */
+export function borradoresAnteriores(eventos: readonly EventoBitacora[], turno: Pick<TurnoMantencion, 'id' | 'inicio'>): EventoBitacora[] {
+  return eventos
+    .filter((e) => esBorrador(e) && e.turnoId !== turno.id)
+    .map((e) => ({ e, t: turnoDesdeId(e.turnoId) }))
+    .filter((x): x is { e: EventoBitacora; t: TurnoMantencion } => Boolean(x.t) && x.t!.inicio < turno.inicio)
+    .sort((a, b) => b.t.inicio.getTime() - a.t.inicio.getTime() || b.e.horaInicio.localeCompare(a.e.horaInicio))
+    .map((x) => x.e)
 }
 
 /**

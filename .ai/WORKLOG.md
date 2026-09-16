@@ -5171,3 +5171,20 @@ Revisión adversaria: 5 ALTA de pérdida de datos. Arreglados todos antes de mer
 - 78 pruebas en services/bitacora. Verificado tecleando: el espacio final sobrevive al autoguardado,
   sin conflicto falso.
 - Pendiente anotado: un borrador abandonado al cambiar de turno no se avisa en el turno siguiente.
+
+## 2026-09-16 · Bitacora ronda 12 · Borradores que quedaron del turno anterior
+
+Pendiente anotado en la ronda 11: un borrador que nadie publicó antes del cambio de turno no contaba
+en nada y nadie lo veía después.
+
+- `borradoresAnteriores` (puro, 1 prueba) + `useBorradoresAnteriores` (igualdad `plantId` +
+  `estado`, sin índice compuesto). En el turno EN CURSO aparece «Quedaron sin publicar · N» debajo de
+  «Vienen de turnos anteriores», con origen («Turno noche 16-09 · 00:00 · Leandro Igor»), aviso de que
+  no cuenta ni salió en el correo, «Continuar» (abre el borrador en SU turno, donde se publica) y
+  «Descartar» con doble toque (solo autor o supervisor).
+- Al continuar un borrador de otro turno, la lista de ese turno tarda en cargar: la hoja mostraba
+  un instante «Este evento ya no está en la bitácora». Ahora «visto» se marca recién cuando el
+  documento llega, y «Listo» solo crea si el documento lo creó esta misma hoja.
+- Producción sigue en 0 eventos/0 presencia (la pestaña de Orel estaba oculta: no late, por diseño).
+- 79 pruebas en services/bitacora. Verificado en la vitrina: sección, «Continuar» → `?turno=` del
+  borrador + «Continuar borrador» sin aviso falso.
