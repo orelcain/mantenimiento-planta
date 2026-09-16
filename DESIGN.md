@@ -70,6 +70,7 @@ una acción?* Si no, se elimina.
 | callout | 16 / 21 | Regular | Semibold |
 | subhead | 15 / 20 | Regular | Semibold |
 | footnote | 13 / 18 | Regular | Semibold |
+| **encabezado de grupo** | **15 / 20** | **Semibold** | — | secundario, formato oración; `ListGroup` [MEDIDO iOS 26] |
 | caption1 | 12 / 16 | Regular | Medium |
 | caption2 | 11 / 13 | Regular | Semibold |
 
@@ -510,8 +511,12 @@ con un script Node local (`writeFileSync` en `utf8`).
 
 ## 13 · Pendientes
 
-1. **Calibrar el encabezado de grupo** contra una captura real de Ajustes en iOS 27. Es el
-   único valor de este contrato que nadie publica. Propuesta provisoria: 16 px / 600.
+1. ~~Calibrar el encabezado de grupo~~ — **cerrado 2026-09-16: 15 px / 600, tinta secundaria,
+   formato oración** [MEDIDO]. Nadie publica el número; las descripciones públicas de iOS 26
+   coinciden en tres cosas frente al footnote 13 regular en mayúsculas de iOS 18: formato
+   oración, «algo más pesado» y «tamaño aumentado». El estilo Dynamic Type que cumple las tres
+   es subheadline 15 semibold. Vive en `ListGroup` (`text-subhead font-semibold
+   text-muted-foreground`); los encabezados hechos a mano migran caso por caso.
 2. **Actualizar los docs canónicos de OneDrive** con los tres ⚠️ADELANTA (radios, body 17,
    mayúsculas), más dos correcciones ya detectadas: el §5.3 del HIG doc dice Pill al 14 % cuando
    su propio §1.4 demuestra 8 %; y los nombres de roles del §2 no coinciden con
