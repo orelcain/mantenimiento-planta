@@ -577,7 +577,8 @@ con un script Node local (`writeFileSync` en `utf8`).
 6. ~~Decidir claro frío `#F2F2F7` vs cálido `#EAE7E0`~~ — **cerrado 2026-09-16: frío.** Es el
    `systemGroupedBackground` de iOS y la piel Apple ya lo trae; medidos sus grises, ninguno pasa
    de sesgo 6. El celeste `#d7e5f2` (sesgo 27) de la piel vieja queda hasta que la piel Apple
-   sea la predeterminada (decisión de despliegue, no de diseño).
+   sea la predeterminada. ✅ 2026-09-16: la piel Apple es la predeterminada (index.html);
+   `?skin=default` vuelve a la anterior para comparar.
 7. **Los 228 `<button>` a mano** con 13 alturas distintas (25–64 px). No es un barrido: chips,
    flechas e íconos en tablas no van a 44. Dirigirlo pantalla por pantalla con el medidor de
    `scripts/medir-en-pantalla.md`. Análisis de Turno es el caso extremo: 64 de 67 a mano.

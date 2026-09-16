@@ -317,9 +317,10 @@
    NUEVA PIEL — Apple HIG
    Normas: docs/NUEVA_PIEL_APPLE_HIG.md · Skill: /nueva-piel-apple
    ---------------------------------------------------------------------------
-   OPT-IN: se activa con <html data-skin="apple"> (localStorage `app-skin`, o
-   ?skin=apple para probar). SIN el atributo la piel actual queda byte-idéntica
-   — este bloque no puede cambiar producción por sí solo.
+   PREDETERMINADA desde 2026-09-16: index.html pone <html data-skin="apple"> salvo
+   que localStorage `app-skin` diga `default` (`?skin=default` para comparar con
+   la piel anterior, `?skin=apple` para volver). Sin el atributo, la piel anterior
+   sigue byte-idéntica: es la vía de retroceso.
 
    Por qué funciona sin tocar 306 .tsx: la app ya consume estos tokens vía
    Tailwind (`bg-background`, `bg-card`, `text-muted-foreground`, `border`…),

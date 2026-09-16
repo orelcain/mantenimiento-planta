@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <meta name="theme-color" content="#0d1722" />
+    <meta name="theme-color" content="#1c1c1e" />
     <meta name="description" content="Sistema de gestión de mantenimiento industrial y levantamiento de incidencias" />
     <!-- CSP conservador: el sitio canónico es GitHub Pages, que NO soporta headers HTTP
          custom (los de firebase.json solo aplican al hosting secundario, casi sin uso —
@@ -58,12 +58,13 @@
         if (theme === 'dark') {
           document.documentElement.classList.add('dark');
         }
-        // NUEVA PIEL (docs/NUEVA_PIEL_APPLE_HIG.md): opt-in por ?skin=apple (queda
-        // recordado) o localStorage `app-skin`. Sin esto, piel actual intacta.
+        // PIEL APPLE PREDETERMINADA desde 2026-09-16 (DESIGN.md, vara iOS 27).
+        // `?skin=default` (queda recordado en localStorage `app-skin`) vuelve a la
+        // piel anterior para comparar; `?skin=apple` la restablece.
         var qs = new URLSearchParams(location.search).get('skin');
         if (qs) localStorage.setItem('app-skin', qs);
-        var skin = localStorage.getItem('app-skin');
-        if (skin && skin !== 'default') {
+        var skin = localStorage.getItem('app-skin') || 'apple';
+        if (skin !== 'default') {
           document.documentElement.setAttribute('data-skin', skin);
         }
         // theme-color del chrome móvil acorde al tema, antes de que cargue React
