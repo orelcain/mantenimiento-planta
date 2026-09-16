@@ -8688,6 +8688,44 @@ exports.recordatorioProtocoloBaader142 = onSchedule(
 
 const publicMonitorMod = require('./publicMonitor')
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Pase de la Bitácora (QR + PIN personal, 16-09-2026) — lógica en paseBitacora.js
+// Sin triggers ni crons: solo corre cuando un técnico escanea el QR o un
+// supervisor administra el pase. Costo fijo cero.
+// ─────────────────────────────────────────────────────────────────────────────
+const paseBitacoraMod = require('./paseBitacora')
+
+exports.paseBitacora = onCall(
+  { region: 'us-central1', memory: '256MiB', cpu: 0.25, concurrency: 1, maxInstances: 3, timeoutSeconds: 30 },
+  async (request) => {
+    const deps = {
+      db,
+      auth: getAuth(),
+      ahoraMs: () => Date.now(),
+      error: (code, msg) => new HttpsError(code, msg),
+    }
+    const accion = String(request.data?.accion ?? '')
+    // Públicas: las usa quien escanea el QR (todavía sin sesión).
+    if (accion === 'info') return paseBitacoraMod.info(deps, request.data)
+    if (accion === 'entrar') {
+      const r = await paseBitacoraMod.entrar(deps, request.data)
+      logger.info('[paseBitacora] teléfono habilitado', { plantId: r.plantId, nombre: r.nombre })
+      return r
+    }
+    if (accion === 'salir') {
+      if (request.auth?.token?.pase_bitacora !== true) throw new HttpsError('permission-denied', 'Solo para teléfonos con pase')
+      return paseBitacoraMod.salir(deps, request.auth.uid)
+    }
+    const fn = paseBitacoraMod.ACCIONES_SUPERVISOR[accion]
+    if (!fn) throw new HttpsError('invalid-argument', 'Acción desconocida')
+    const { uid, user } = await _assertSupervisorCaller(request)
+    const nombre = [user.nombre, user.apellido].filter(Boolean).join(' ')
+    const r = await fn(deps, request.data, { uid, nombre })
+    logger.info('[paseBitacora] acción de supervisor', { accion, uid, tecnico: request.data?.nombre ?? null })
+    return r
+  },
+)
+
 /** Duraciones ofrecidas al generar el link (horas). 720 = 30 dias, para el
  *  link de linea que se pega en la pared y no se regenera. */
 const MONITOR_TTL_CHOICES = [12, 24, 72, 168, 720]

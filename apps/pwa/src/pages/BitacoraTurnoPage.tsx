@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { BarChart3, Check, ChevronLeft, ChevronRight, ClipboardCopy, FileDown, Loader2, MessageCircle, MessageSquareText, NotebookPen, Plus } from 'lucide-react'
+import { BarChart3, Check, ChevronLeft, ChevronRight, ClipboardCopy, FileDown, Loader2, MessageCircle, MessageSquareText, NotebookPen, Plus, QrCode } from 'lucide-react'
 import { Button, Pill, SegmentedControl, Sheet, Tag } from '@/components/piel'
 import { PASO_MENSAJE, PasosWhatsapp, VistaPreviaWhatsapp } from '@/components/bitacora/PanelWhatsapp'
 import { compartirEnWhatsapp, puedeCompartirArchivos } from '@/services/bitacora/compartirWhatsapp'
 import { useLaminasWhatsapp } from '@/hooks/useLaminasWhatsapp'
+import { AccesoQrSheet } from '@/components/bitacora/AccesoQrSheet'
+import { FUENTE_ACCESO_QR, type FuenteAccesoQr } from '@/hooks/useAccesoQrBitacora'
+import { apiPaseReal, type ApiPase } from '@/services/bitacora/paseBitacora'
 import { bitacoraATextoWhatsapp, planLaminas } from '@/services/bitacora/bitacoraWhatsapp'
 import { EventoBitacoraFila } from '@/components/bitacora/EventoBitacoraFila'
 import { BarraSincronizacion } from '@/components/bitacora/BarraSincronizacion'
@@ -21,6 +24,7 @@ import { BITACORA_PLANTA } from '@/config/bitacora'
 import { encabezadoEvento, etiquetaTipo, tiposPropiosUsados, tituloDe } from '@/services/bitacora/presentacionEvento'
 import { copiarHtml, copiarTexto } from '@/lib/clipboard'
 import type { EventoBitacora, FotoEvento, TurnoMantencion } from '@/services/bitacora/bitacora.types'
+import type { User } from '@/types'
 import { bitacoraAHtmlCorreo, bitacoraATextoPlano, etiquetaParada, etiquetaPendientes, tituloCorreo } from '@/services/bitacora/bitacoraCorreo'
 import { cargarFotoComoJpeg, purgarFotosPendientes } from '@/services/bitacora/fotosBitacora'
 import { resumirBitacora } from '@/services/bitacora/resumenBitacora'
@@ -51,7 +55,19 @@ export function BitacoraTurnoPage() {
   return <BitacoraTurnoVista fuente={FUENTE_FIRESTORE} />
 }
 
-export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
+export function BitacoraTurnoVista({
+  fuente,
+  fuenteQr = FUENTE_ACCESO_QR,
+  apiPase = apiPaseReal,
+  usuarioSimulado,
+}: {
+  fuente: FuenteBitacora
+  /** La vitrina los reemplaza por datos de ejemplo. */
+  fuenteQr?: FuenteAccesoQr
+  apiPase?: ApiPase
+  /** Solo la vitrina: ver la página como otro usuario (p. ej. un pase) sin tocar la sesión. */
+  usuarioSimulado?: User | null
+}) {
   const { toast } = useToast()
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
@@ -98,17 +114,28 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
   const enLista = useMemo(() => [...soloListos(eventos), ...borradores], [eventos, borradores])
 
   // Presencia: quién tiene esta bitácora abierta y qué evento está escribiendo.
-  const usuario = useAuthStore((s) => s.user)
+  const usuarioSesion = useAuthStore((s) => s.user)
+  const usuario = usuarioSimulado === undefined ? usuarioSesion : usuarioSimulado
+  /**
+   * Teléfono con pase de bitácora (QR + PIN): el técnico es el dueño del pase,
+   * sin elegir de la lista. Las reglas exigen firmar con ese nombre.
+   */
+  const autorFijo = usuario?.paseBitacora?.nombre ?? null
+  const esSupervisor = usuario?.rol === 'admin' || usuario?.rol === 'supervisor'
+  const [hojaQr, setHojaQr] = useState(false)
+  const accesoQr = fuenteQr.useAccesoQr(BITACORA_PLANTA.id, hojaQr && esSupervisor)
   const editandoEventoId = editor ? (editor.evento?.id ?? editor.idNuevo) : null
   // Cuenta personal → su nombre; compartida → «PC de Mantención» en el PC y el
   // técnico elegido en el celular (el último elegido en un PC que usan todos
   // no es quien está sentado ahora).
-  const nombreEnPresencia = nombrePresencia({
-    correo: auth.currentUser?.email ?? usuario?.email,
-    nombreCuenta: [usuario?.nombre?.split(' ')[0], usuario?.apellido?.split(' ')[0]].filter(Boolean).join(' '),
-    recordado: tecnicoRecordado(),
-    dispositivo: dispositivoActual(),
-  })
+  const nombreEnPresencia =
+    autorFijo ??
+    nombrePresencia({
+      correo: auth.currentUser?.email ?? usuario?.email,
+      nombreCuenta: [usuario?.nombre?.split(' ')[0], usuario?.apellido?.split(' ')[0]].filter(Boolean).join(' '),
+      recordado: tecnicoRecordado(),
+      dispositivo: dispositivoActual(),
+    })
   const { presentes: conectados, miDispositivoId } = fuente.usePresencia(turno, { nombre: nombreEnPresencia, editandoEventoId })
   // Color estable por técnico: su posición en la lista (no un hash del nombre).
   const tonoDe = useCallback(
@@ -348,6 +375,11 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
               <Button variant="plain" onClick={() => navigate('/bitacora/historial')}>
                 <BarChart3 /> Historial
               </Button>
+              {esSupervisor && (
+                <Button variant="plain" onClick={() => setHojaQr(true)} aria-label="Acceso por QR">
+                  <QrCode /> <span className="hidden sm:inline">Acceso QR</span>
+                </Button>
+              )}
             </span>
           </div>
           {/* Navegación de turnos: una sola fila que no se parte (las flechas
@@ -439,7 +471,7 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
                     onClick={() => {
                       setNoAplica(p)
                       setMotivoNoAplica('')
-                      setQuienNoAplica(nombreRecordadoValido())
+                      setQuienNoAplica(autorFijo ?? nombreRecordadoValido())
                     }}
                   >
                     Ya no aplica
@@ -575,7 +607,7 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
         type="button"
         onClick={() => {
           setTextoObs(observacion.texto)
-          setQuienObs(nombreRecordadoValido())
+          setQuienObs(autorFijo ?? nombreRecordadoValido())
           setEditandoObs(true)
         }}
         className="flex min-h-[44px] w-full items-start gap-3 rounded-card bg-card px-4 py-3 text-left shadow-[0_1px_4px_rgba(0,0,0,0.05)] transition-colors duration-150 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary motion-reduce:transition-none dark:shadow-none"
@@ -719,6 +751,7 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
         idNuevo={editor?.idNuevo ?? ''}
         sugerenciasEquipo={sugerenciasEquipo}
         sugerenciasTipo={sugerenciasTipo}
+        autorFijo={autorFijo}
         tecnicos={tecnicos}
         opcionesEquipo={opcionesEquipo}
         cargandoEquipos={cargandoEquipos}
@@ -813,7 +846,7 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
           </>
         }
       >
-        {tecnicos.todos.length > 0 && (
+        {tecnicos.todos.length > 0 && !autorFijo && (
           <div className="mb-4">
             <SelectorTecnico etiqueta="Quién escribe" deTurno={tecnicos.deTurno} todos={tecnicos.todos} valor={quienObs} onChange={setQuienObs} />
           </div>
@@ -864,7 +897,7 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
         }
       >
         <div className="flex flex-col gap-4">
-          {tecnicos.todos.length > 0 && (
+          {tecnicos.todos.length > 0 && !autorFijo && (
             <SelectorTecnico etiqueta="Quién lo cierra" deTurno={tecnicos.deTurno} todos={tecnicos.todos} valor={quienNoAplica} onChange={setQuienNoAplica} />
           )}
           <div>
@@ -883,6 +916,21 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
         </div>
       </Sheet>
 
+      {esSupervisor && (
+        <AccesoQrSheet
+          open={hojaQr}
+          onClose={() => setHojaQr(false)}
+          plantId={BITACORA_PLANTA.id}
+          plantaNombre={BITACORA_PLANTA.nombre}
+          tecnicos={listaTecnicos.map((t) => t.nombre)}
+          estado={accesoQr.estado}
+          dispositivos={accesoQr.dispositivos}
+          cargando={accesoQr.cargando}
+          error={accesoQr.error}
+          api={apiPase}
+        />
+      )}
+
       <TecnicosDelTurnoSheet
         open={hojaTecnicos === 'presentes'}
         lista={listaTecnicos}
@@ -895,7 +943,8 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
           )
           toast({ title: 'Técnicos del turno guardados', variant: 'success' })
         }}
-        onAbrirLista={() => setHojaTecnicos('lista')}
+        // Un pase no cambia la lista de técnicos (solo la lee).
+        onAbrirLista={autorFijo ? undefined : () => setHojaTecnicos('lista')}
         onClose={() => setHojaTecnicos(null)}
       />
       <ListaTecnicosSheet

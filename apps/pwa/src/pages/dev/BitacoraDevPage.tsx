@@ -397,7 +397,9 @@ function usePresenciaEjemplo(turno: TurnoMantencion, yo: { nombre: string; edita
   return { presentes, miDispositivoId: 'yo-ejemplo' }
 }
 
-const FUENTE_EJEMPLO: FuenteBitacora = {
+// Exportada para la vitrina del pase (solo desarrollo): la recarga en caliente no importa aquí.
+// eslint-disable-next-line react-refresh/only-export-components
+export const FUENTE_EJEMPLO: FuenteBitacora = {
   useEventos: useEventosEjemplo,
   useTecnicos: () => ({ deTurno: ['Danilo Cortes', 'Matias Serpa'], todos: PLANILLA }),
   useObservacion: useObservacionEjemplo,

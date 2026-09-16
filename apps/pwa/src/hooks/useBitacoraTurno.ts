@@ -188,6 +188,8 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
   eventosRef.current = crudos
 
   const nombreAutor = useCallback(() => {
+    // Pase de bitácora: el nombre completo del técnico dueño del teléfono.
+    if (user?.paseBitacora) return user.paseBitacora.nombre
     const nombre = [user?.nombre?.split(' ')[0], user?.apellido?.split(' ')[0]].filter(Boolean).join(' ')
     return nombre || auth.currentUser?.displayName || auth.currentUser?.email || 'Sin nombre'
   }, [user])
@@ -551,6 +553,7 @@ export function useObservacionTurno(turno: TurnoMantencion) {
       const u = auth.currentUser
       if (!u) throw new Error('Hay que iniciar sesión para escribir en la bitácora.')
       const nombre =
+        user?.paseBitacora?.nombre ||
         quien.trim() ||
         [user?.nombre?.split(' ')[0], user?.apellido?.split(' ')[0]].filter(Boolean).join(' ') ||
         u.displayName ||

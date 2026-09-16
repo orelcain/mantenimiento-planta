@@ -1,17 +1,28 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
+    // Teléfono con PASE DE BITÁCORA (QR + PIN, 16-09-2026): no es una sesión de
+    // la app. Solo entra a bitacora/ (ver abajo). Aquí no se puede consultar su
+    // documento de dispositivo (el cross-service deniega en prod, ver /models3d):
+    // si un supervisor lo quita, la función deshabilita la cuenta y su token
+    // deja de servir en menos de una hora.
+    function tienePaseBitacora() {
+      return request.auth != null && request.auth.token.get('pase_bitacora', false) == true;
+    }
+    function sesionApp() {
+      return request.auth != null && !tienePaseBitacora();
+    }
     // Rol del usuario (cross-service: lee el doc de Firestore del caller).
     // Solo se usa donde el path es explícitamente admin-only (ver /maps/).
     function isAdmin() {
-      return request.auth != null
+      return sesionApp()
         && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.rol == 'admin';
     }
     // Lectura SOLO autenticados NO anónimos (la Mini App de Telegram usa
     // custom token de mintTelegramAuthToken; anónimos cerrados 2026-07-05).
     // Excepciones públicas deliberadas más abajo: models3d, baader200-images.
     match /{allPaths=**} {
-      allow read: if request.auth != null
+      allow read: if sesionApp()
         && request.auth.token.firebase.sign_in_provider != 'anonymous';
     }
 
@@ -20,10 +31,10 @@ service firebase.storage {
     // del downloadURL guardado en Firestore (planosAguas/main.photos).
     // {allPaths=**} para cubrir la subcarpeta por bajada: planosAguas/{id}/{k}.jpg
     match /planosAguas/{allPaths=**} {
-      allow write: if request.auth != null
+      allow write: if sesionApp()
         && request.resource.size < 5 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
-      allow delete: if request.auth != null;
+      allow delete: if sesionApp();
     }
 
     // Hojas de planos eléctricos servidas desde Storage (los que no caben en
@@ -37,19 +48,19 @@ service firebase.storage {
     // Fotos colgadas sobre el plano eléctrico: el automático real, la bornera,
     // cómo quedó el cableado. Mismo límite que planosAguas.
     match /planosElectricos/{allPaths=**} {
-      allow write: if request.auth != null
+      allow write: if sesionApp()
         && request.resource.size < 5 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
-      allow delete: if request.auth != null;
+      allow delete: if sesionApp();
     }
 
     // Fotos que el técnico cuelga sobre una figura del manual de la BAADER 142
     // (módulo Perilla 5). Mismo límite y forma que planosAguas/planosElectricos.
     match /baader142Notas/{allPaths=**} {
-      allow write: if request.auth != null
+      allow write: if sesionApp()
         && request.resource.size < 5 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
-      allow delete: if request.auth != null;
+      allow delete: if sesionApp();
     }
 
     // Fotos de incidencias (max 10MB, solo imágenes)
@@ -59,10 +70,10 @@ service firebase.storage {
     // machines/.../repuestos y planosAguas: sesión no anónima. No se puede
     // exigir isAdmin(): ver la nota en /models3d (el cross-service deniega).
     match /incidents/{incidentId}/{fileName} {
-      allow write: if request.auth != null
+      allow write: if sesionApp()
         && request.resource.size < 10 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
-      allow delete: if request.auth != null
+      allow delete: if sesionApp()
         && request.auth.token.firebase.sign_in_provider != 'anonymous';
     }
     
@@ -72,54 +83,56 @@ service firebase.storage {
     // cancelar un evento nuevo se limpian las fotos ya subidas. No se puede
     // exigir isAdmin(): ver la nota en /models3d (el cross-service deniega).
     match /bitacora/{turnoId}/{eventoId}/{fileName} {
-      allow write: if request.auth != null
-        && request.auth.token.firebase.sign_in_provider != 'anonymous'
+      // El pase de bitácora sube, ve (getDownloadURL) y limpia sus fotos aquí.
+      allow read: if tienePaseBitacora();
+      allow write: if ((sesionApp() && request.auth.token.firebase.sign_in_provider != 'anonymous')
+            || tienePaseBitacora())
         && request.resource.size < 10 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
-      allow delete: if request.auth != null
-        && request.auth.token.firebase.sign_in_provider != 'anonymous';
+      allow delete: if (sesionApp() && request.auth.token.firebase.sign_in_provider != 'anonymous')
+        || tienePaseBitacora();
     }
 
     // Fotos de evidencias fotográficas (before/after)
     match /evidence/{evidenceId}/{type}/{fileName} {
-      allow write: if request.auth != null
+      allow write: if sesionApp()
         && request.resource.size < 10 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
     }
     
     // Fotos de equipos
     match /equipment/{equipmentId}/{fileName} {
-      allow write: if request.auth != null
+      allow write: if sesionApp()
         && request.resource.size < 10 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
     }
     
     // Repuestos en maquinas
     match /machines/{machineId}/repuestos/{repuestoId}/{type}/{fileName} {
-      allow create, update: if request.auth != null
+      allow create, update: if sesionApp()
         && request.resource.size < 10 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
-      allow delete: if request.auth != null;
+      allow delete: if sesionApp();
     }
 
     // Manuales PDF de máquinas (max 50MB)
     match /machines/{machineId}/manuales/{fileName} {
-      allow write: if request.auth != null
+      allow write: if sesionApp()
         && request.resource.size < 50 * 1024 * 1024
         && request.resource.contentType.matches('application/pdf');
-      allow delete: if request.auth != null;
+      allow delete: if sesionApp();
     }
 
     // Infografías de máquinas
     match /machines/{machineId}/infografias/{fileName} {
-      allow write: if request.auth != null
+      allow write: if sesionApp()
         && request.resource.size < 20 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
     }
 
     // Repuestos legacy (Baader 200)
     match /repuestos/{repuestoId}/{type}/{fileName} {
-      allow write: if request.auth != null
+      allow write: if sesionApp()
         && request.resource.size < 10 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
     }
@@ -128,23 +141,23 @@ service firebase.storage {
     // repuestos/{machineId}/{repuestoId}/fotos/{fileName} — 4 segmentos, no lo
     // cubre la regla legacy de arriba (3 segmentos) ni /machines/...
     match /repuestos/{machineId}/{repuestoId}/{type}/{fileName} {
-      allow create, update: if request.auth != null
+      allow create, update: if sesionApp()
         && request.resource.size < 10 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
-      allow delete: if request.auth != null;
+      allow delete: if sesionApp();
     }
 
     // Fotos de ítems de bodega (uploadBodegaPhoto): bodega/{codigoSAP}/fotos/{fileName}
     match /bodega/{codigoSAP}/{type}/{fileName} {
-      allow create, update: if request.auth != null
+      allow create, update: if sesionApp()
         && request.resource.size < 10 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
-      allow delete: if request.auth != null;
+      allow delete: if sesionApp();
     }
 
     // Fotos de usuarios
     match /users/{userId}/{fileName} {
-      allow write: if request.auth != null && request.auth.uid == userId
+      allow write: if sesionApp() && request.auth.uid == userId
         && request.resource.size < 5 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
     }
@@ -161,31 +174,31 @@ service firebase.storage {
 
     // Uploads Grader (Excel)
     match /graderUploads/{uploadId}/{fileName} {
-      allow create, update: if request.auth != null
+      allow create, update: if sesionApp()
         && request.resource.size < 50 * 1024 * 1024
         && (request.resource.contentType.matches('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
             || request.resource.contentType.matches('application/vnd.ms-excel')
             || request.resource.contentType.matches('text/csv'));
-      allow read, delete: if request.auth != null;
+      allow read, delete: if sesionApp();
     }
     
     // Fotos de inspecciones (items de inspección)
     match /inspections/{inspectionId}/{itemId}/{fileName} {
-      allow write: if request.auth != null
+      allow write: if sesionApp()
         && request.resource.size < 10 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
     }
 
     // Fotos de comentarios Gantt
     match /gantt/{taskId}/comments/{commentDraftId}/{fileName} {
-      allow write: if request.auth != null
+      allow write: if sesionApp()
         && request.resource.size < 10 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
     }
     
     // Firmas digitales
     match /incidents/{incidentId}/signatures/{fileName} {
-      allow write: if request.auth != null
+      allow write: if sesionApp()
         && request.resource.size < 5 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
     }
@@ -226,42 +239,42 @@ service firebase.storage {
     // Ruta real: models3d/{modelId}/annotations/{annotationId}/{photoId}.{ext}
     match /models3d/{modelId}/annotations/{allPaths=**} {
       allow read: if true;
-      allow write: if request.auth != null
+      allow write: if sesionApp()
         && request.resource.size < 10 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
-      allow delete: if request.auth != null;
+      allow delete: if sesionApp();
     }
 
     // El archivo del modelo. Ruta real: models3d/{modelId}/{fileName}
-    // `request.auth != null` y NO `isAdmin()` — ver la nota de arriba.
+    // `sesionApp()` y NO `isAdmin()` — ver la nota de arriba.
     match /models3d/{modelId}/{fileName} {
       allow read: if true;
-      allow write: if request.auth != null
+      allow write: if sesionApp()
         && request.resource.size < 50 * 1024 * 1024
         && (request.resource.contentType.matches('model/.*')
             || request.resource.contentType.matches('application/octet-stream'));
       // Lo usan deleteModel3D y el rollback de uploadModel3D cuando el doc no se
       // pudo crear (services/models3d.ts). Si esto pidiera isAdmin(), el rollback
       // fallaría y volvería a dejar el huérfano que este PR vino a evitar.
-      allow delete: if request.auth != null;
+      allow delete: if sesionApp();
     }
 
     // Imágenes Baader 200 — Manual de Ajustes (lectura pública, subida autenticados, max 10MB)
     match /baader200-images/{fileName} {
       allow read: if true;
-      allow write: if request.auth != null
+      allow write: if sesionApp()
         && request.resource.size < 10 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
     }
 
     // Manuales técnicos — planta/área/equipo/repuesto (F4 2026-05-04)
     match /manuales/{ownerType}/{ownerId}/{fileName} {
-      allow write: if request.auth != null
+      allow write: if sesionApp()
         && request.resource.size < 50 * 1024 * 1024
         && (request.resource.contentType.matches('application/pdf')
             || request.resource.contentType.matches('image/.*')
             || request.resource.contentType.matches('video/.*'));
-      allow delete: if request.auth != null;
+      allow delete: if sesionApp();
     }
   }
 }

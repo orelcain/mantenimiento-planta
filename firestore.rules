@@ -7,8 +7,28 @@ service cloud.firestore {
     // FUNCIONES HELPER
     // ============================================
     
+    // Teléfono con PASE DE BITÁCORA (QR + PIN personal, 16-09-2026): cuenta
+    // creada por la función `paseBitacora` con el claim `pase_bitacora`. NO es
+    // una sesión de la app: no pasa `isAuthenticated()` (ni nada que dependa de
+    // ella) y solo entra a la bitácora por `paseBitacora*()`, más abajo.
+    function tienePaseBitacora() {
+      return request.auth != null && request.auth.token.get('pase_bitacora', false) == true;
+    }
+
     function isAuthenticated() {
-      return request.auth != null;
+      return request.auth != null && !tienePaseBitacora();
+    }
+
+    // El teléfono del pase sigue habilitado (un supervisor no lo quitó ni
+    // reinició el PIN de su técnico).
+    function paseBitacoraActivo() {
+      return tienePaseBitacora()
+        && get(/databases/$(database)/documents/bitacoraDispositivos/$(request.auth.uid)).data.get('activo', false) == true;
+    }
+
+    // Escritura con pase: solo en SU planta y firmando con SU nombre.
+    function paseBitacoraEscribe(plantId) {
+      return paseBitacoraActivo() && request.auth.token.get('plantId', '') == plantId;
     }
 
     // Usuario autenticado NO anónimo (email/password, custom token de la Mini
@@ -375,7 +395,8 @@ service cloud.firestore {
     // JERARQUÍAS ORGANIZACIONALES (8 niveles)
     // ============================================
     match /hierarchy/{nodeId} {
-      allow read: if isCatalogReader();
+      // El pase de bitácora lee la jerarquía para el buscador de equipos.
+      allow read: if isCatalogReader() || paseBitacoraActivo();
       allow create: if isAdmin()
         && request.resource.data.nombre is string
         && request.resource.data.nombre.size() >= 2
@@ -1192,13 +1213,18 @@ service cloud.firestore {
           && (!('resuelvePendiente' in d) || d.resuelvePendiente == null || d.resuelvePendiente is map);
       }
 
-      allow read: if isActiveUser();
+      allow read: if isActiveUser() || paseBitacoraActivo();
 
-      allow create: if isActiveUser()
+      allow create: if (isActiveUser()
+            || (paseBitacoraEscribe(request.resource.data.plantId)
+                && request.resource.data.get('registradoPor', '') == request.auth.token.nombre))
         && eventoValido(request.resource.data)
         && request.resource.data.creadoPor == request.auth.uid;
 
-      allow update: if isActiveUser()
+      allow update: if (isActiveUser()
+            || (paseBitacoraEscribe(resource.data.plantId)
+                // Un pase no reasigna el autor de un evento (ni siquiera de un borrador ajeno).
+                && request.resource.data.get('registradoPor', null) == resource.data.get('registradoPor', null)))
         && eventoValido(request.resource.data)
         // Un evento publicado no vuelve a borrador (un autoguardado atrasado no
         // puede sacarlo de los números ni del correo).
@@ -1210,16 +1236,18 @@ service cloud.firestore {
         && request.resource.data.turnoId == resource.data.turnoId
         && request.resource.data.plantId == resource.data.plantId;
 
-      allow delete: if isActiveUser()
-        && (resource.data.creadoPor == request.auth.uid || isSupervisor());
+      allow delete: if (isActiveUser() && (resource.data.creadoPor == request.auth.uid || isSupervisor()))
+        || (paseBitacoraActivo() && resource.data.creadoPor == request.auth.uid);
     }
 
     // Quién tiene la bitácora de un turno abierta ahora: un doc por dispositivo
     // (`{plantId}_{turnoId}_{dispositivoId}`) con un latido por minuto. La hora la
     // pone el SERVIDOR (los relojes de los teléfonos de planta no son confiables).
     match /bitacoraPresencia/{docId} {
-      allow read: if isActiveUser();
-      allow create, update: if isActiveUser()
+      allow read: if isActiveUser() || paseBitacoraActivo();
+      allow create, update: if (isActiveUser()
+            || (paseBitacoraEscribe(request.resource.data.plantId)
+                && request.resource.data.nombre == request.auth.token.nombre))
         && request.resource.data.keys().hasOnly(['plantId', 'turnoId', 'dispositivoId', 'dispositivo', 'nombre', 'editandoEventoId', 'vistoEn', 'uid'])
         && request.resource.data.plantId is string && request.resource.data.plantId.size() <= 40
         && request.resource.data.turnoId is string
@@ -1232,15 +1260,15 @@ service cloud.firestore {
             || (request.resource.data.editandoEventoId is string && request.resource.data.editandoEventoId.size() <= 60))
         && request.resource.data.vistoEn == request.time
         && request.resource.data.uid == request.auth.uid;
-      allow delete: if isActiveUser();
+      allow delete: if isActiveUser() || (paseBitacoraActivo() && resource.data.uid == request.auth.uid);
     }
 
     // Datos del turno: un doc por turno `{plantId}_{turnoId}` con la observación
     // general y los técnicos presentes (ajustados a mano sobre el calendario).
     // Ambos opcionales: se escriben por separado con merge.
     match /bitacoraTurnos/{turnoDocId} {
-      allow read: if isActiveUser();
-      allow create, update: if isActiveUser()
+      allow read: if isActiveUser() || paseBitacoraActivo();
+      allow create, update: if (isActiveUser() || paseBitacoraEscribe(request.resource.data.plantId))
         && isValidDocSize()
         && request.resource.data.plantId is string
         && request.resource.data.turnoId is string
@@ -1254,10 +1282,25 @@ service cloud.firestore {
       allow delete: if isSupervisor();
     }
 
+    // Pase de bitácora (QR + PIN personal, 16-09-2026). Solo escribe la función
+    // `paseBitacora` (Admin SDK). El supervisor ve el QR, quién tiene PIN y los
+    // bloqueos; los PIN (huella + sal) no los lee NADIE desde la app.
+    match /bitacoraPases/{plantId} {
+      allow read: if isSupervisor();
+      allow write: if false;
+    }
+    match /bitacoraPines/{pinId} {
+      allow read, write: if false;
+    }
+    match /bitacoraDispositivos/{uid} {
+      allow read: if isSupervisor() || (tienePaseBitacora() && request.auth.uid == uid);
+      allow write: if false;
+    }
+
     // Lista de técnicos de la bitácora: ajustes sobre la planilla del calendario
     // (agregados, ocultos, renombres). Un doc por planta. El calendario no se toca.
     match /bitacoraConfig/{plantId} {
-      allow read: if isActiveUser();
+      allow read: if isActiveUser() || paseBitacoraActivo();
       allow create, update: if isActiveUser()
         && isValidDocSize()
         && request.resource.data.agregados is list && request.resource.data.agregados.size() <= 60
@@ -1756,7 +1799,8 @@ service cloud.firestore {
     // GANTT - Planificación de mantenimiento
     // ============================================
     match /calendario_mantencion_state/{docId} {
-      allow read: if isNotAnonymous();
+      // El pase de bitácora lo lee para sugerir los técnicos del turno.
+      allow read: if isNotAnonymous() || paseBitacoraActivo();
       allow create, update: if isTechnician();
       allow delete: if isAdmin();
     }
