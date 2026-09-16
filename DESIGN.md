@@ -531,11 +531,17 @@ con un script Node local (`writeFileSync` en `utf8`).
    MILIMETROS"): 153 en la pestaña Bodega. Es dato, no CSS, y es lo que da el aspecto de
    ERP. Corregirlo es un formateador de presentación con protección de siglas (VITON,
    NFPA, SAP), no una clase — decisión de producto.
-5b. **Bodega (Repuestos) necesita su propio mockup de color**: barra de stock verde sólida
-   en cada tarjeta, borde de estado en el canto de la tarjeta (el anti-patrón de la barra
-   de acento), círculos de KPI con glifo vivo, banda de alertas roja con pills rojas y
-   ámbar, botones de filtro con relleno sólido verde/ámbar/azul. Es la pantalla más ERP de
-   la app y no se arregla a parches.
+5b. **Bodega (Repuestos)** — mockup publicado el 2026-09-16:
+   https://claude.ai/artifact/VYgqKho8xrCyR6zGQnuTPL (375 px, claro y oscuro, datos reales).
+   Diagnóstico: seis tiles de KPI con círculo de color, botones de acción con relleno
+   verde/ámbar/azul, banda roja de alertas con pills, canto de estado + fondo teñido + barra
+   verde en cada tarjeta, tres botones por tarjeta, scroll anidado de 60 vh y nombres SAP en
+   mayúsculas. Respuesta iOS 27: chips de filtro (activo en marca, punto de 8 px como estado),
+   celda de alertas con tile rojo y badge numérico (patrón Ajustes), lista agrupada radio 26
+   con cifra en `text-foreground` y estado en rótulo de 13 px, acciones por deslizamiento,
+   segmentado de 3 vías arriba y sub-vista desde el título, formateador de nombres SAP.
+   ⏳ Cuatro decisiones de Orel en el mockup (deslizar vs «⋯», barra fuera de la lista,
+   búsqueda arriba, sub-vistas desde el título). No construir hasta que las cierre.
 6. **Decidir claro frío `#F2F2F7` vs cálido `#EAE7E0`** — abierto desde 2026-08-09.
 7. **Los 228 `<button>` a mano** con 13 alturas distintas (25–64 px). No es un barrido: chips,
    flechas e íconos en tablas no van a 44. Dirigirlo pantalla por pantalla con el medidor de
