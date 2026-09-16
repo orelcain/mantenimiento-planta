@@ -17,7 +17,9 @@ import {
   Edit,
   Wand2,
   Map,
+  MoreHorizontal,
 } from 'lucide-react'
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
 import {
   Dialog,
   DialogContent,
@@ -42,7 +44,7 @@ import { getTechnicians, getUserById } from '@/services/auth'
 import { refineText, isAIConfigured } from '@/services/ai'
 import { useToast } from '@/hooks/useToast'
 import type { Incident, IncidentStatus, IncidentPriority, User as UserType } from '@/types'
-import { formatDate } from '@/lib/utils'
+import { cn, formatDate } from '@/lib/utils'
 import { fetchLastSensorReadings, fetchSensorSummaryOnce } from '@/services/sensorsRtdb'
 import { DEFAULT_PREDICTIVE_THRESHOLDS } from '@/lib/predictive/predictor'
 import { getMapVersionById, getMapLocationById } from '@/services/maps'
@@ -104,7 +106,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
     hum?: { current: number; avg: number; unit?: string }
     source?: string
   } | null>(null)
-  
+
   // Estados para visualización del mapa
   const [mapVersion, setMapVersion] = useState<MapVersion | null>(null)
   const [mapLocation, setMapLocation] = useState<MapLocation | null>(null)
@@ -186,7 +188,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
         setMapLocation(null)
         return
       }
-      
+
       setMapLoading(true)
       try {
         const [versionData, locationData] = await Promise.all([
@@ -201,7 +203,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
         setMapLoading(false)
       }
     }
-    
+
     loadMapData()
   }, [incident.mapVersionId, incident.mapLocationId])
 
@@ -351,10 +353,10 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
     if (!resolution.trim()) return
     // Validación de longitud mínima (coincide con firestore.rules)
     if (resolution.trim().length < 3) {
-      toast({ 
-        variant: 'destructive', 
-        title: 'Resolución muy corta', 
-        description: 'Por favor detalla la solución (mínimo 3 caracteres).' 
+      toast({
+        variant: 'destructive',
+        title: 'Resolución muy corta',
+        description: 'Por favor detalla la solución (mínimo 3 caracteres).'
       })
       return
     }
@@ -416,7 +418,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
 
   const handleRefineRejection = async () => {
     if (!rejectionReason || rejectionReason.length < 5) return
-    
+
     if (!isAIConfigured()) {
       toast({ variant: "destructive", title: "Error", description: "Falta API Key de IA" })
       return
@@ -424,7 +426,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
 
     setIsRefiningRejection(true)
     toast({ description: "Mejorando redacción..." })
-    
+
     try {
       const refined = await refineText(rejectionReason)
       setRejectionReason(refined)
@@ -438,7 +440,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
 
   const handleRefineResolution = async () => {
     if (!resolution || resolution.length < 5) return
-    
+
     if (!isAIConfigured()) {
       toast({ variant: "destructive", title: "Error", description: "Falta API Key de IA" })
       return
@@ -446,7 +448,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
 
     setIsRefiningResolution(true)
     toast({ description: "Mejorando redacción..." })
-    
+
     try {
       const refined = await refineText(resolution)
       setResolution(refined)
@@ -458,28 +460,61 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
     }
   }
 
+  // Acciones secundarias del menú «⋯» y principales del pie (DESIGN.md: una acción
+  // principal visible; el resto en el menú, nunca seis botones apilados en el teléfono).
+  const canSelfAssign = user?.id === incident.reportadoPor && ['pendiente', 'confirmada'].includes(incident.status) && !incident.asignadoA
+  const canEdit = (user?.id === incident.reportadoPor) || permissions.isAdmin
+  const hasPrimaryActions =
+    (canValidate && incident.status === 'pendiente') ||
+    (permissions.canAssignIncident && incident.status === 'confirmada' && !incident.asignadoA) ||
+    ((user?.id === incident.asignadoA || permissions.isAdmin) && incident.status === 'en_proceso' && !showResolveForm) ||
+    (permissions.canValidateIncident && incident.status === 'resuelta')
+
   return (
     <>
       <Dialog open onOpenChange={onClose}>
-        <DialogContent className="max-w-4xl w-[98vw] md:w-full max-h-[92vh] p-0 gap-0 overflow-hidden flex flex-col rounded-card">
-          <DialogHeader className="p-4 border-b shrink-0 bg-card z-10 sticky top-0">
-            <div className="flex items-start justify-between">
-              <div className="space-y-1">
-                <DialogTitle className="text-xl line-clamp-1">{incident.titulo}</DialogTitle>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Clock className="h-4 w-4" />
-                  {formatDate(incident.createdAt)}
+        <DialogContent className={cn(
+          "max-w-4xl md:w-full max-h-[92vh] p-0 gap-0 overflow-hidden flex flex-col rounded-card",
+          // Teléfono: la hoja la da el primitivo DialogContent; aquí solo el alto fijo para que el pie quede abajo.
+          "max-sm:h-[92dvh]",
+        )}>
+          <DialogHeader className="p-4 pr-14 border-b shrink-0 bg-card z-10 sticky top-0 text-left">
+            <div className="flex items-start gap-2">
+              <div className="min-w-0 flex-1 space-y-1.5">
+                {/* Título completo en dos líneas: truncarlo a una escondía lo que la incidencia ES. */}
+                <DialogTitle className="text-title3 leading-tight line-clamp-2">{incident.titulo}</DialogTitle>
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-footnote text-muted-foreground">
+                  <span className="inline-flex items-center gap-1"><Clock className="size-3.5" />{formatDate(incident.createdAt)}</span>
+                  <Badge className={priorityConfig.className}>{priorityConfig.label}</Badge>
+                  <Badge variant="outline" className={statusConfig.color}>
+                    <StatusIcon className="h-3 w-3 mr-1" />
+                    {statusConfig.label}
+                  </Badge>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Badge className={priorityConfig.className}>
-                  {priorityConfig.label}
-                </Badge>
-                <Badge variant="outline" className={statusConfig.color}>
-                  <StatusIcon className="h-3 w-3 mr-1" />
-                  {statusConfig.label}
-                </Badge>
-              </div>
+              {(canSelfAssign || canEdit || permissions.canDeleteIncident) && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button type="button" aria-label="Más acciones" className="flex size-11 shrink-0 items-center justify-center rounded-full bg-muted text-foreground hover:bg-muted-foreground/[0.15] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+                      <MoreHorizontal className="size-5" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="min-w-[12rem]">
+                    {canSelfAssign && (
+                      <DropdownMenuItem className="gap-2 py-2" disabled={isLoading} onClick={handleSelfAssign}><UserPlus className="size-4 text-muted-foreground" />Asignarme a mí</DropdownMenuItem>
+                    )}
+                    {canEdit && (
+                      <DropdownMenuItem className="gap-2 py-2" disabled={isLoading} onClick={() => setShowEditForm(true)}><Edit className="size-4 text-muted-foreground" />Editar</DropdownMenuItem>
+                    )}
+                    {permissions.canDeleteIncident && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem className="gap-2 py-2 text-destructive focus:text-destructive" disabled={isLoading} onClick={handleDelete}><Trash2 className="size-4" />Eliminar</DropdownMenuItem>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
             </div>
           </DialogHeader>
 
@@ -820,7 +855,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                     Cancelar
                   </Button>
                   <Button
-                    
+
                     onClick={handleResolve}
                     disabled={isLoading || !resolution.trim()}
                   >
@@ -924,20 +959,21 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
 
 
 
+          {hasPrimaryActions && (
           <DialogFooter className="p-4 border-t bg-card shrink-0 gap-2 sm:gap-2 flex-col sm:flex-row">
             {/* Acciones de Validación */}
             {canValidate && incident.status === 'pendiente' && (
               <>
-                <Button 
-                  onClick={handleConfirm} 
+                <Button
+                  onClick={handleConfirm}
                   disabled={isLoading}
                   className="w-full sm:w-auto"
                 >
                   {isLoading ? <Spinner className="mr-2" /> : <CheckCircle className="mr-2 h-4 w-4" />}
                   Confirmar
                 </Button>
-                <Button 
-                  onClick={() => setShowRejectForm(true)} 
+                <Button
+                  onClick={() => setShowRejectForm(true)}
                   variant="destructive"
                   disabled={isLoading}
                   className="w-full sm:w-auto"
@@ -956,22 +992,9 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
               </Button>
             )}
 
-            {/* Auto-asignación para el creador (pendiente o confirmada sin asignar) */}
-            {user?.id === incident.reportadoPor && ['pendiente', 'confirmada'].includes(incident.status) && !incident.asignadoA && (
-              <Button 
-                onClick={handleSelfAssign} 
-                disabled={isLoading}
-                variant="secondary"
-                className="w-full sm:w-auto border-transparent text-brand-ink hover:bg-primary/10"
-              >
-                <UserPlus className="mr-2 h-4 w-4" />
-                Asignarme a mí
-              </Button>
-            )}
-
             {/* Resolver (Técnico) - se oculta cuando el formulario está abierto */}
             {(user?.id === incident.asignadoA || permissions.isAdmin) && incident.status === 'en_proceso' && !showResolveForm && (
-              <Button 
+              <Button
                 onClick={() => setShowResolveForm(true)}
                 className="w-full sm:w-auto"
               >
@@ -982,7 +1005,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
 
             {/* Cierre Definitivo (Validación Supervisor) */}
             {permissions.canValidateIncident && incident.status === 'resuelta' && (
-              <Button 
+              <Button
                 onClick={() => setShowCloseForm(true)}
                 className="bg-success hover:bg-success/90 w-full sm:w-auto"
               >
@@ -991,40 +1014,8 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
               </Button>
             )}
 
-            {/* Botón de editar (Creator o Admin) */}
-            {((user?.id === incident.reportadoPor) || permissions.isAdmin) && (
-              <Button
-                variant="outline"
-                onClick={() => setShowEditForm(true)}
-                disabled={isLoading}
-                className="w-full sm:w-auto"
-              >
-                <Edit className="h-4 w-4 mr-2" />
-                Editar
-              </Button>
-            )}
-
-            {/* Botón de eliminar (solo Admin) */}
-            {permissions.canDeleteIncident && (
-              <Button
-                variant="destructive"
-                onClick={handleDelete}
-                disabled={isLoading}
-                className="w-full sm:w-auto"
-              >
-                {isLoading ? <Spinner size="sm" /> : (
-                  <>
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Eliminar
-                  </>
-                )}
-              </Button>
-            )}
-
-            <Button variant="outline" onClick={onClose} className="w-full sm:w-auto">
-              Cerrar
-            </Button>
           </DialogFooter>
+          )}
         </DialogContent>
       </Dialog>
 
