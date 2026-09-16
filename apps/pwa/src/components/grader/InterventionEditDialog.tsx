@@ -161,7 +161,7 @@ export function InterventionEditDialog({
               ))}
             </div>
             <p className="text-caption text-muted-foreground leading-relaxed">
-              Estado en que queda u observás el equipo (vale para cualquier tipo · criterio basado en NFPA 70B):
+              Estado en que queda u observas el equipo (vale para cualquier tipo · criterio basado en NFPA 70B):
               {' '}<CondLeyenda detalle={{ 1: 'como nuevo', 2: 'con desvíos, requiere seguimiento', 3: 'acción correctiva inmediata / fuera de servicio' }} />.
             </p>
           </div>

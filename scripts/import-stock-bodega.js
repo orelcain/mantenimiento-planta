@@ -73,7 +73,7 @@ function rowsOf(wb, sheet) { return XLSX.utils.sheet_to_json(wb.Sheets[sheet], {
   console.log('  con stock>0:', conStock, '| con ubicación:', conUbic);
   console.log('  bodega antes:', bodSnap.size, 'docs');
 
-  if (!WRITE) { console.log('\nDRY-RUN: no se escribió nada. Corré con --write para aplicar.'); process.exit(0); }
+  if (!WRITE) { console.log('\nDRY-RUN: no se escribió nada. Ejecuta con --write para aplicar.'); process.exit(0); }
 
   let done = 0;
   const batchSize = 400;

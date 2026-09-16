@@ -69,7 +69,7 @@
 <header>
   <span class="badge">DXF v2</span>
   <h1>Aligner DXF · marcar 3-6 puntos correspondientes</h1>
-  <span class="hint">Rueda=zoom · Click der=pan · Click izq=marca punto activo · Teclas 1-6=cambia activo. Marcá las MISMAS esquinas en los 2 paneles (mín 3 pares).</span>
+  <span class="hint">Rueda=zoom · Click der=pan · Click izq=marca punto activo · Teclas 1-6=cambia activo. Marca las MISMAS esquinas en los 2 paneles (mín 3 pares).</span>
   <div class="actions">
     <button id="btnFit">Fit ambos</button>
     <button id="btnSync" class="primary">Sync zoom: ON</button>
@@ -456,7 +456,7 @@ async function main(){
 document.getElementById('btnFit').onclick=()=>{state.panes.dxf.fit();state.panes.recinto.fit();};
 document.getElementById('btnSync').onclick=()=>{state.syncZoom=!state.syncZoom;document.getElementById('btnSync').textContent='Sync zoom: '+(state.syncZoom?'ON':'OFF');document.getElementById('btnSync').className=state.syncZoom?'primary':'';};
 document.getElementById('btnClear').onclick=()=>{state.points=Array.from({length:MAX_PTS},()=>({dxf:null,recinto:null}));state.active=1;document.getElementById('activeIdx').textContent='1';renderMarkers('dxf');renderMarkers('recinto');renderTable();solveAndRender();};
-document.getElementById('btnCopy').onclick=async()=>{try{await navigator.clipboard.writeText(document.getElementById('jsonOut').value);const s=document.getElementById('okStrip');s.classList.add('show');setTimeout(()=>s.classList.remove('show'),1500);}catch(e){alert('No se pudo copiar. Seleccioná el JSON manualmente.');}};
+document.getElementById('btnCopy').onclick=async()=>{try{await navigator.clipboard.writeText(document.getElementById('jsonOut').value);const s=document.getElementById('okStrip');s.classList.add('show');setTimeout(()=>s.classList.remove('show'),1500);}catch(e){alert('No se pudo copiar. Selecciona el JSON manualmente.');}};
 document.getElementById('layAll').onclick=()=>setLayersVisible(()=>true);
 document.getElementById('layNone').onclick=()=>setLayersVisible(()=>false);
 document.getElementById('layMurosOnly').onclick=()=>setLayersVisible(l=>['MURO','023_MUROS_2','CIMENTACION','PLANTA'].includes(l));

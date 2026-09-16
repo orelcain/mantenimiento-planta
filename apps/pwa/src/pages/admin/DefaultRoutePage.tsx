@@ -72,7 +72,7 @@ export function DefaultRoutePage() {
     } catch (err) {
       toast({
         title: 'Error al guardar',
-        description: err instanceof Error ? err.message : 'Intentá de nuevo.',
+        description: err instanceof Error ? err.message : 'Intenta de nuevo.',
         variant: 'destructive',
       })
     } finally {

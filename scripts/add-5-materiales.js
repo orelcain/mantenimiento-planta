@@ -61,7 +61,7 @@ const MATERIALES = [
   }
 
   console.log(`\nResumen: crear ${crearRep} en maestro, ${crearBod} en bodega; saltar ${saltar}.`);
-  if (!WRITE) { console.log('DRY-RUN: nada escrito. Corré con --write para aplicar.'); process.exit(0); }
+  if (!WRITE) { console.log('DRY-RUN: nada escrito. Ejecuta con --write para aplicar.'); process.exit(0); }
 
   const batch = db.batch();
   for (const op of ops) batch.set(op.ref, op.data, { merge: false });

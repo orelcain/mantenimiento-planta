@@ -376,7 +376,7 @@ export function ETTPage() {
                 No hay ETTs todavía
               </h3>
               <p className="text-sm text-gray-500 mb-4">
-                Creá tu primera Especificación Técnica
+                Crea tu primera Especificación Técnica
               </p>
               <Button onClick={handleOpenNew}>
                 <Sparkles className="h-4 w-4 mr-2" />

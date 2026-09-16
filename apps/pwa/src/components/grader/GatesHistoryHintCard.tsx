@@ -58,7 +58,7 @@ interface Props {
   /**
    * ¿El turno está EN VIVO?
    *
-   * El consejo ("mové una gate del 2-4 al 8-10") es para lo que viene. En un
+   * El consejo ("mueve una gate del 2-4 al 8-10") es para lo que viene. En un
    * turno cerrado el botón igual guardaba el cambio... con la hora del CLIC
    * (`at: new Date()`), o sea un cambio de configuración fechado días después
    * de que el turno terminó, y el timeline lo usa para clasificar "las piezas
@@ -218,7 +218,7 @@ export function GatesHistoryHintCard({
             <History className="w-4 h-4 text-muted-foreground" />
             ¿Esta config aguanta lo que suele venir?
             <InfoTooltip
-              text={`Compara las gates asignadas con el reparto real de calibres de los ${history.shiftIds.length} turnos anteriores (${history.fromDateKey} → ${history.toDateKey}, ${history.totalPieces.toLocaleString('es-CL')} piezas), ponderado por producción.\n\nNo filtra por lote: los resúmenes de turno casi nunca traen el lote. Si el período no representa lo que está entrando hoy, ignorá la sugerencia.`}
+              text={`Compara las gates asignadas con el reparto real de calibres de los ${history.shiftIds.length} turnos anteriores (${history.fromDateKey} → ${history.toDateKey}, ${history.totalPieces.toLocaleString('es-CL')} piezas), ponderado por producción.\n\nNo filtra por lote: los resúmenes de turno casi nunca traen el lote. Si el período no representa lo que está entrando hoy, ignora la sugerencia.`}
             />
           </CardTitle>
           {saturados.length > 0 ? (

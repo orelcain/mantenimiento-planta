@@ -2795,7 +2795,7 @@ export function AnalisisGraderTurnoPage() {
               que sale del Excel del Grader, junto.
 
               ⚠ El timeline vive acá y NO en una pestaña aparte: `selectedCauses`
-              une las dos cosas —tocás una causa en el panel y el timeline marca
+              une las dos cosas —tocas una causa en el panel y el timeline marca
               cuándo ocurrieron esos P0—. Separarlas dejaba el efecto en otra
               pestaña, o sea la interacción muerta (lo detectó Orel el 11-ago,
               apenas se publicó la separación). Causas arriba, timeline abajo. */}
@@ -2884,7 +2884,7 @@ export function AnalisisGraderTurnoPage() {
           )}
           {activeView === 'gates' && isClassificationPlant && !gateMixDerivado && !summary.gateMix && summary.hasPieceData && (
             <p className="text-footnote text-muted-foreground px-1">
-              Este turno se guardó antes de la pureza por puerta. Recargá su Excel pieza a pieza para verla.
+              Este turno se guardó antes de la pureza por puerta. Recarga su Excel pieza a pieza para verla.
             </p>
           )}
 

@@ -130,7 +130,7 @@ export async function buildSituationalSnapshot(force = false): Promise<Situation
     } else if (count === 0) {
       graderToday = {
         hasData: false,
-        text: 'Excel del Grader sin subir aún (turno en curso). OJO: NO digas que "no hay datos" — para el turno EN CURSO hay datos VIVOS de Shoplogix; consultá la producción/KPIs del turno actual antes de responder.',
+        text: 'Excel del Grader sin subir aún (turno en curso). OJO: NO digas que "no hay datos" — para el turno EN CURSO hay datos VIVOS de Shoplogix; consulta la producción/KPIs del turno actual antes de responder.',
       }
     } else {
       const totalPieces = safeNumber(data.totalPieces)

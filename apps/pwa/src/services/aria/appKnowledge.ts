@@ -86,7 +86,7 @@ export function buildAppKnowledgeBlock(role?: string): string {
   }
 
   const lines: string[] = [
-    '🗺️ MAPA DE LA APP (qué módulos existen y qué hace cada uno — sos la MAESTRA de esta app, conocela al derecho y al revés):',
+    '🗺️ MAPA DE LA APP (qué módulos existen y qué hace cada uno — eres la MAESTRA de esta app, conócela al derecho y al revés):',
     '',
   ]
   for (const [grupo, mods] of porGrupo) {
@@ -109,7 +109,7 @@ export function buildAppKnowledgeBlock(role?: string): string {
   }
 
   lines.push(
-    'INSTRUCCIONES: cuando el usuario pregunte "¿qué puede hacer la app?", "¿dónde veo X?", "llévame a…", orientá con el módulo correcto y su ruta. ' +
+    'INSTRUCCIONES: cuando el usuario pregunte "¿qué puede hacer la app?", "¿dónde veo X?", "llévame a…", orienta con el módulo correcto y su ruta. ' +
     (admin
       ? 'Los módulos "en desarrollo" existen: puedes mencionarlos y linkearlos (el admin los ve).'
       : 'NO listes ni linkees módulos "en desarrollo" a técnicos; si preguntan por uno, di que está "en desarrollo, pronto" y ofrece el dato por chat si lo tienes.') +

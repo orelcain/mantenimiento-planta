@@ -1145,7 +1145,7 @@ async function init(){
         console.log('[standalone] activado con token de instalación, uid=', uid)
       } catch(err){
         console.error('[standalone] token install falló', err)
-        setLoadingError('Token de instalación inválido o expirado. Vuelve al bot Telegram con red y generá uno nuevo desde "📲 Instalar PWA".')
+        setLoadingError('Token de instalación inválido o expirado. Vuelve al bot Telegram con red y genera uno nuevo desde "📲 Instalar PWA".')
         return
       }
     }
@@ -1259,7 +1259,7 @@ async function init(){
     firstName = data.firstName || tgApp?.initDataUnsafe?.user?.first_name || ''
 
     if (!isAuthorized) {
-      setLoadingError('Tu grupo de Telegram no está autorizado. Contactá al administrador.')
+      setLoadingError('Tu grupo de Telegram no está autorizado. Contacta al administrador.')
       return
     }
     // Persistir sesión para que el próximo cold-start sin red funcione
@@ -1310,9 +1310,9 @@ function showStandaloneActivationUI(){
       <p style="font-size:13px;color:var(--hint);line-height:1.5;margin-bottom:20px">
         1) Abre el bot <b>@antarfood_mant_bot</b> en Telegram<br>
         2) Tap el botón <b>📲 Instalar PWA</b><br>
-        3) Pegá acá el código que se copió:
+        3) Pega acá el código que se copió:
       </p>
-      <textarea id="activation-token-input" rows="4" placeholder="Pegá tu token acá…"
+      <textarea id="activation-token-input" rows="4" placeholder="Pega tu token acá…"
         style="width:100%;box-sizing:border-box;padding:10px;border-radius:8px;
         border:1.5px solid var(--border);background:var(--card);color:var(--text);
         font-family:monospace;font-size:11px;outline:none;resize:vertical"></textarea>
@@ -1331,7 +1331,7 @@ async function activateStandaloneFromToken(){
   const btn = document.getElementById('activation-btn')
   const status = document.getElementById('activation-status')
   const raw = (inp?.value || '').trim()
-  if (!raw){ if (status) status.textContent = '⚠️ Pegá el token primero'; return }
+  if (!raw){ if (status) status.textContent = '⚠️ Pega el token primero'; return }
   if (btn){ btn.disabled = true; btn.textContent = 'Activando…' }
   if (status) status.textContent = ''
   try {
@@ -2999,7 +2999,7 @@ async function openInsumoFavListsSheet(codigoSAP){
 
   const content = document.getElementById('sheet-content')
   if (lists.length === 0){
-    content.innerHTML = `<div class="sheet-empty">Aún no tienes listas de insumos.<br>Creá la primera abajo.</div>`
+    content.innerHTML = `<div class="sheet-empty">Aún no tienes listas de insumos.<br>Crea la primera abajo.</div>`
   } else {
     content.innerHTML = lists.map(l => {
       const isIn = isManageMode ? false : isInsumoInList(l, codigoSAP)
@@ -3285,7 +3285,7 @@ async function showOfflineDiagnostic(){
         }
         lines.push(`⚙️ SW: ${reg.active ? '🟢 activo' : '🟡 ' + JSON.stringify(states)}`)
         lines.push(`   scope: ${reg.scope}`)
-        lines.push(`   controller: ${navigator.serviceWorker.controller ? 'sí' : 'NO (recargá página)'}`)
+        lines.push(`   controller: ${navigator.serviceWorker.controller ? 'sí' : 'NO (recarga página)'}`)
       } else {
         lines.push(`⚙️ SW: 🔴 NO REGISTRADO — la app no abrirá offline`)
       }
@@ -3523,9 +3523,9 @@ async function copyPwaInstallUrl(){
       '   • Ve a: orelcain.github.io/mantenimiento-planta/mant.html?standalone=1\n' +
       '   • Tap Compartir → Agregar a pantalla de inicio\n\n' +
       '2) Tap el ícono Antarfood Mant en tu home\n' +
-      '3) Pegá el token copiado en el campo que aparece\n' +
+      '3) Pega el token copiado en el campo que aparece\n' +
       '4) Tap Activar\n\n' +
-      '⏰ Token válido ~1h. Si expira, generá otro.'
+      '⏰ Token válido ~1h. Si expira, genera otro.'
 
     if (navigator.clipboard?.writeText){
       navigator.clipboard.writeText(data.token).then(() => {
@@ -3568,8 +3568,8 @@ async function copyPreviewUrl(){
     if (navigator.clipboard?.writeText) {
       navigator.clipboard.writeText(url).then(() => {
         tgApp?.HapticFeedback?.notificationOccurred('success')
-        tgApp?.showAlert?.('URL copiada al portapapeles.\n\nÁbrela en el navegador de tu PC para ver la preview con tus datos reales. Válida ~1h; si expira, generá otra.')
-      }).catch(() => tgApp?.showAlert?.(`Copiá esta URL:\n${url}`))
+        tgApp?.showAlert?.('URL copiada al portapapeles.\n\nÁbrela en el navegador de tu PC para ver la preview con tus datos reales. Válida ~1h; si expira, genera otra.')
+      }).catch(() => tgApp?.showAlert?.(`Copia esta URL:\n${url}`))
     } else {
       tgApp?.showAlert?.(`Tu URL de preview:\n${url}`)
     }
@@ -4290,7 +4290,7 @@ function renderHomeMyLists(){
         ${canAdmin ? `<button onclick="createMachineListEmpty()" style="background:none;border:none;color:var(--accent);font-size:22px;line-height:1;cursor:pointer;padding:0 4px" title="Nueva lista">＋</button>` : ''}
       </div>
       ${!hasRepFavs ? `<div class="notice" style="border-left-color:var(--accent)">
-        💡 <b>Tip:</b> creá una lista y luego agrega equipos desde la jerarquía.
+        💡 <b>Tip:</b> crea una lista y luego agrega equipos desde la jerarquía.
       </div>` : ''}`
     return
   }
@@ -4808,7 +4808,7 @@ function renderHierSearchBody(){
         <div class="cell-chevron">›</div>
       </div>`
     }).join('')}
-    ${matches.length > 50 ? `<div style="padding:10px 16px;font-size:11px;color:var(--hint);text-align:center">+${matches.length-50} más — refiná la búsqueda</div>` : ''}
+    ${matches.length > 50 ? `<div style="padding:10px 16px;font-size:11px;color:var(--hint);text-align:center">+${matches.length-50} más — refina la búsqueda</div>` : ''}
   </div>`
 }
 
@@ -5537,7 +5537,7 @@ async function openMachine(machineId, opts = {}){
 function renderMachineManuales(machineId){
   const el = document.getElementById('machine-manuales')
   if (!el) return
-  // Si el cache global no está, dispará carga lazy y vuelvé a renderizar
+  // Si el cache global no está, dispara carga lazy y vuelve a renderizar
   if (!__manualesCache){
     el.innerHTML = ''
     loadManuales().then(() => {
@@ -6810,7 +6810,7 @@ async function openFavListsSheet(machineId, repuestoId){
   title.textContent = 'Guardar en lista'
 
   if (lists.length === 0){
-    content.innerHTML = `<div class="sheet-empty">Aún no tienes listas para este equipo.<br>Creá la primera abajo.</div>`
+    content.innerHTML = `<div class="sheet-empty">Aún no tienes listas para este equipo.<br>Crea la primera abajo.</div>`
   } else {
     content.innerHTML = lists.map(l => {
       const set = new Set(l.repuestoIds)
@@ -7053,7 +7053,7 @@ function closeInputModal(){
 const EDIT_FIELDS = [
   // [key, label, type, opts]
   ['textoBreve',         'Nombre',                'text',     { required: true }],
-  ['codigoSAP',          'Código SAP',            'text',     { code: true, hint: 'Clave externa — cuidá los typos' }],
+  ['codigoSAP',          'Código SAP',            'text',     { code: true, hint: 'Clave externa — cuida los typos' }],
   ['codigoFabricante',   'Código fabricante',     'text',     { code: true }],
   ['alias',              'Alias',                 'text',     {}],
   ['nombreManual',       'Nombre del manual',     'text',     {}],
@@ -7793,7 +7793,7 @@ async function renderHierarchyTab(){
   } catch(err){
     console.error('hierarchy load failed', err)
     const msg = err?.code === 'failed-precondition'
-      ? 'Falta un índice en Firestore. Avisá a un admin.'
+      ? 'Falta un índice en Firestore. Avisa a un admin.'
       : (err?.message || 'No se pudo cargar la jerarquía. Revisa tu conexión.')
     el.innerHTML = `
       <div style="padding:32px 20px;text-align:center">
@@ -7992,7 +7992,7 @@ function openHierAddToListSheet(nodeId, isEquip){
       </div>`
   }).join('')
 
-  content.innerHTML = (lists.length ? listsHtml : '<div class="sheet-empty">Aún no tienes listas de equipos. Creá la primera.</div>') + `
+  content.innerHTML = (lists.length ? listsHtml : '<div class="sheet-empty">Aún no tienes listas de equipos. Crea la primera.</div>') + `
     <div class="sheet-new" onclick="hierCreateListAndAdd()">
       <span style="font-size:20px">＋</span> Nueva lista de equipos
     </div>`
@@ -8438,7 +8438,7 @@ function renderNodePickerList(){
     html += `<div class="sheet-empty">Sin resultados${q?` para "${escHtml(q)}"`:''}</div>`
   } else if (nodes.length > 100){
     html += `<div style="padding:10px 16px;font-size:11px;color:var(--hint);text-align:center">
-      Mostrando 100 de ${nodes.length} — refiná la búsqueda</div>`
+      Mostrando 100 de ${nodes.length} — refina la búsqueda</div>`
   }
   listEl.innerHTML = html
 }

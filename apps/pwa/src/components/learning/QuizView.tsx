@@ -41,9 +41,9 @@ export function QuizView({ questions, machineSlug }: { questions: QuizQuestion[]
     const pct = Math.round((score / total) * 100)
     const passed = pct >= 70
     const message = passed
-      ? 'Muy bien — dominás el módulo.'
+      ? 'Muy bien — dominas el módulo.'
       : pct >= 50
-        ? 'Vas bien, repasá los puntos que fallaste.'
+        ? 'Vas bien, repasa los puntos que fallaste.'
         : 'Conviene repasar las lecciones antes de la prueba.'
     const ringColor = passed ? 'var(--dp-ok)' : 'var(--dp-warn)'
     const circumference = 2 * Math.PI * 34

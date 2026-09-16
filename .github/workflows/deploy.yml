@@ -91,6 +91,14 @@ jobs:
       - name: Audit piel
         run: node scripts/audit-piel.mjs --verbose
 
+      # Guardián de idioma: la app escribe en español neutro, nunca en voseo.
+      # El 15-09-2026 hubo que barrer 487 apariciones («Tocá un turno», «podés
+      # recargar», «Sos ARIA») repartidas por la interfaz, el bot y los prompts
+      # de ARIA. A diferencia de los otros dos, este NO es ratchet: la línea
+      # base es cero. Excepción por línea con el comentario `voseo-ok`.
+      - name: Audit voseo
+        run: node scripts/audit-voseo.mjs --verbose
+
       - name: Build PWA
         working-directory: apps/pwa
         env:

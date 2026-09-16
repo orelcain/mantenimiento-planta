@@ -95,7 +95,7 @@ export interface PaceToTarget {
     /** true si ese ritmo entra en el techo de la línea (o si no hay techo). */
     feasible: boolean
     /** true si además entra en el ritmo que la línea VIENE trayendo: "con la
-        hora extra bastaría el ritmo que ya traés" es otra conversación. */
+        hora extra bastaría el ritmo que ya traes" es otra conversación. */
     realistic: boolean
     /** Minutos totales disponibles con la hora extra. */
     remainingMin: number

@@ -109,7 +109,7 @@ export function ParoEtapaCapture({ plantLineId, areaLabel, onChanged, className 
   const handleSave = useCallback(async () => {
     const dur = Number(duracion)
     if (!etapaFinal) { setError('Elige o escribe la etapa.'); return }
-    if (!Number.isFinite(dur) || dur <= 0) { setError('Indicá la duración del paro (minutos).'); return }
+    if (!Number.isFinite(dur) || dur <= 0) { setError('Indica la duración del paro (minutos).'); return }
     setSaving(true)
     setError(null)
     try {

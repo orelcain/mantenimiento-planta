@@ -4,7 +4,7 @@
  * Mapa interactivo del recinto Antarfood:
  *  • Capas reales del DXF como base (lectura)
  *  • Editor Geoman: polígonos, círculos, marcadores
- *  • Snap a grilla 0.5m, tooltip con área en m² mientras dibujás
+ *  • Snap a grilla 0.5m, tooltip con área en m² mientras dibujas
  *  • Click en elemento → se selecciona en panel
  *  • Hover con halo
  *  • Atajos: Esc cancela, Del borra, Ctrl+D duplica

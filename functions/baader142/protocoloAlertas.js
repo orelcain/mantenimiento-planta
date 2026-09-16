@@ -181,7 +181,7 @@ function componerAlerta(ev) {
   for (const a of ev.alertas) {
     if (a.tipo === 'falla-dura') {
       l.push(`🔴 <b>${a.herramienta} ${a.sm}</b> — ${a.paradas} parada${a.paradas === 1 ? '' : 's'} sin correcciones previas`)
-      l.push(`   No es desgaste: apuntá al inductivo ${a.ind}, su cable o un bloqueo.`)
+      l.push(`   No es desgaste: apunta al inductivo ${a.ind}, su cable o un bloqueo.`)
     } else if (a.tipo === 'umbral') {
       const cab = a.nivel === 'critico' ? '🔴 CRÍTICO' : '🟠 Intervenir'
       l.push(`${cab} · <b>${a.herramienta} ${a.sm}</b>: <b>${a.tasa}</b> correcciones /1000`)

@@ -191,7 +191,7 @@ export function QuickInterventionCapture({
         areaLabel ?? plantLineId,
       )
       if (res) setInsights(res)
-      else setInsightsError('No se pudo generar el análisis. Intentá de nuevo.')
+      else setInsightsError('No se pudo generar el análisis. Intenta de nuevo.')
     } catch (err) {
       setInsightsError(err instanceof Error ? err.message : 'Error al analizar.')
     } finally {
@@ -410,7 +410,7 @@ export function QuickInterventionCapture({
               })}
             </div>
             <p className="text-caption text-muted-foreground leading-relaxed">
-              Estado en que queda u observás el equipo (vale para cualquier tipo · criterio basado en NFPA 70B):
+              Estado en que queda u observas el equipo (vale para cualquier tipo · criterio basado en NFPA 70B):
               {' '}<CondLeyenda detalle={{ 1: 'como nuevo, sin alertas', 2: 'con desvíos, requiere seguimiento', 3: 'acción correctiva inmediata / fuera de servicio' }} />.
             </p>
           </div>
@@ -418,7 +418,7 @@ export function QuickInterventionCapture({
           {/* Trazabilidad SAP (opcional) */}
           <div className="space-y-1.5">
             <label className="text-caption font-medium text-muted-foreground flex items-center gap-1">
-              <FileText className="h-3 w-3" /> SAP <span className="text-muted-foreground/60">(opcional — si lo dejás vacío queda "SAP pendiente")</span>
+              <FileText className="h-3 w-3" /> SAP <span className="text-muted-foreground/60">(opcional — si lo dejas vacío queda "SAP pendiente")</span>
             </label>
             <div className="grid grid-cols-2 gap-2">
               <Input value={sapAviso} onChange={(e) => setSapAviso(e.target.value)} placeholder="N° Aviso" className="text-sm bg-background" inputMode="numeric" />
@@ -549,7 +549,7 @@ export function QuickInterventionCapture({
           {!canRunAreaAnalysis ? (
             <p className="text-xs text-muted-foreground py-2 text-center">
               El análisis se activa con <b>{MIN_AREA_INTERVENTIONS}+</b> intervenciones registradas en esta área
-              {entries.length > 0 && ` (llevás ${entries.length})`}.
+              {entries.length > 0 && ` (llevas ${entries.length})`}.
             </p>
           ) : (
             <>
