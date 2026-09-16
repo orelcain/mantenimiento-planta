@@ -15,6 +15,7 @@ import {
   writeBatch,
 } from 'firebase/firestore'
 import { pendientesAnteriores } from '@/services/bitacora/entregaTurno'
+import { borradoresAnteriores } from '@/services/bitacora/borradores'
 import { auth, db } from '@/services/firebase'
 import { useAuthStore } from '@/store'
 import { toast } from '@/hooks/useToast'
@@ -431,6 +432,30 @@ export function usePendientesAnteriores(turno: TurnoMantencion) {
   return { pendientes, cerrarNoAplica }
 }
 
+/**
+ * Borradores sin publicar de turnos anteriores, en vivo. Consulta por igualdad
+ * (`plantId` + `estado`): sin índice compuesto y con pocos documentos, porque
+ * cada borrador sale de la consulta al publicarse o descartarse.
+ */
+export function useBorradoresAnteriores(turno: TurnoMantencion): EventoBitacora[] {
+  const [crudos, setCrudos] = useState<EventoBitacora[]>([])
+  useEffect(() => {
+    const q = query(
+      collection(db, BITACORA_COLECCION),
+      where('plantId', '==', BITACORA_PLANTA.id),
+      where('estado', '==', 'borrador'),
+    )
+    return onSnapshot(
+      q,
+      (snap) => setCrudos(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as EventoBitacora)),
+      () => {
+        // Sin permiso o sin red: es un aviso extra, la bitácora sigue.
+      },
+    )
+  }, [])
+  return useMemo(() => borradoresAnteriores(crudos, turno), [crudos, turno])
+}
+
 /** El turno en curso, que cambia solo al pasar las 00, 08 y 16 h. */
 export function useTurnoMantencionActual(): TurnoMantencion {
   const [turno, setTurno] = useState(() => turnoMantencionEn())
@@ -574,6 +599,7 @@ export interface FuenteBitacora {
   usePendientesAnteriores: (turno: TurnoMantencion) => ReturnType<typeof usePendientesAnteriores>
   useOpcionesEquipo: (activo: boolean) => ReturnType<typeof useOpcionesEquipo>
   usePresencia: typeof usePresenciaBitacora
+  useBorradoresAnteriores: (turno: TurnoMantencion) => EventoBitacora[]
   /** Reemplaza la subida a Storage. */
   subirFoto?: typeof subirFotoBitacora
 }
@@ -586,4 +612,5 @@ export const FUENTE_FIRESTORE: FuenteBitacora = {
   usePendientesAnteriores,
   useOpcionesEquipo,
   usePresencia: usePresenciaBitacora,
+  useBorradoresAnteriores,
 }
