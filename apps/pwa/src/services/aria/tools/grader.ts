@@ -819,7 +819,7 @@ registerTool({
   name: 'shift.kpis',
   category: 'shift',
   description:
-    'KPIs de eficiencia y confiabilidad del último turno con actividad: OEE, disponibilidad, rendimiento, calidad, MTTR, MTBF, averías macro y micro-detenciones. Mismos números que el board Análisis de Turno. Por defecto Planta Principal (Chonchi); detecta Yal.',
+    'KPIs de eficiencia y confiabilidad del último turno con actividad: OEE, disponibilidad, rendimiento, calidad, MTTR, MTBF, averías macro y micro-detenciones. Mismos números que el board Análisis de turno. Por defecto Planta Principal (Chonchi); detecta Yal.',
   params: [
     {
       name: 'plantSlug',
@@ -883,7 +883,7 @@ registerTool({
   name: 'shift.live',
   category: 'shift',
   description:
-    'Producción EN VIVO del turno en curso desde Shoplogix — lo MISMO que muestra el board Análisis de Turno: piezas/ciclos totales y por cada máquina Baader, velocidad (pz/min), % del objetivo, uptime por máquina, disponibilidad de línea, máquinas produciendo y micro-detenciones. Detecta planta (yal/chonchi). Úsalo para "cuántas piezas llevan", "velocidad de las baader", "cómo va la producción ahora", "en vivo/tiempo real".',
+    'Producción EN VIVO del turno en curso desde Shoplogix — lo MISMO que muestra el board Análisis de turno: piezas/ciclos totales y por cada máquina Baader, velocidad (pz/min), % del objetivo, uptime por máquina, disponibilidad de línea, máquinas produciendo y micro-detenciones. Detecta planta (yal/chonchi). Úsalo para "cuántas piezas llevan", "velocidad de las baader", "cómo va la producción ahora", "en vivo/tiempo real".',
   params: [
     {
       name: 'plantSlug',
@@ -1049,7 +1049,7 @@ registerTool({
   name: 'shift.stops',
   category: 'shift',
   description:
-    'Detenciones y confiabilidad desde Shoplogix, cuadra con el board Análisis de Turno: estado ACTUAL de cada Baader (produciendo o detenida y POR QUÉ), averías macro, MTTR, micro-detenciones, el LISTADO de cada detención individual (hora + duración + causa), y el Pareto de causas de parada (energía, atascamiento, ajuste mantención, colación, o "falta de MMPP" si Shoplogix la etiqueta). Por defecto el turno EN CURSO; con fecha (ayer/anoche/una fecha) consulta un turno PASADO. Detecta planta (yal/chonchi). Úsalo para "por qué está detenida/parada la línea", "qué fallas/averías han tenido", "cuánto duró cada detención", "MTTR/confiabilidad", "motivo de las paradas", "cuánto tiempo detenida", "detenciones de ayer/del turno del día".',
+    'Detenciones y confiabilidad desde Shoplogix, cuadra con el board Análisis de turno: estado ACTUAL de cada Baader (produciendo o detenida y POR QUÉ), averías macro, MTTR, micro-detenciones, el LISTADO de cada detención individual (hora + duración + causa), y el Pareto de causas de parada (energía, atascamiento, ajuste mantención, colación, o "falta de MMPP" si Shoplogix la etiqueta). Por defecto el turno EN CURSO; con fecha (ayer/anoche/una fecha) consulta un turno PASADO. Detecta planta (yal/chonchi). Úsalo para "por qué está detenida/parada la línea", "qué fallas/averías han tenido", "cuánto duró cada detención", "MTTR/confiabilidad", "motivo de las paradas", "cuánto tiempo detenida", "detenciones de ayer/del turno del día".',
   params: [
     { name: 'plantSlug', type: 'string', enum: ['chonchi', 'yal', 'filete'], required: false, default: 'chonchi', description: 'Planta' },
     { name: 'date', type: 'date', required: false, description: 'Fecha YYYY-MM-DD del turno a consultar (default: turno en curso/hoy)' },

@@ -642,6 +642,14 @@ con un script Node local (`writeFileSync` en `utf8`).
     pista cápsula de `Tabs` (ocho pestañas en una línea, caben desde 1024 px); Mission Control
     lleva las cifras neutras con el estado en un punto, los agentes como celdas con punto y
     sin emoji, y la cadena de respaldo en fichas neutras. `CardTitle` pasó de 24 px con
-    interletrado apretado a Título 3. Los nombres de módulo del menú («Análisis de Turno»,
-    «Centro de Aprendizaje») se dejaron como están: cambiarlos es una decisión de toda la app.
-    Las páginas bajo `/admin/*` piden contraseña: se verificaron por código, no en pantalla.
+    interletrado apretado a Título 3. Las páginas bajo `/admin/*` piden contraseña: se
+    verificaron por código, no en pantalla.
+15. ~~Nombres de módulo en Title Case~~ — hecho 2026-09-16 (ronda 4, por decisión de Orel).
+    Formato oración en el menú, el home, los títulos, los listados de administración, los
+    permisos y lo que ARIA dice de la app: «Análisis de turno», «Centro de aprendizaje»,
+    «Centro técnico documental», «Calendario de mantención», «Clima del puerto», «Visor de
+    planta 3D», «Panel de administración». Se mantienen con mayúscula solo los nombres propios
+    (Baader 200, HMI Knuro, Gantt, ARIA). No se tocó el nombre por defecto que el editor de
+    mapas guarda en Firestore ni `functions/` (Telegram no los usa). El contenido principal
+    ahora deja libre el botón flotante del chat (`pb-44`, `lg:pb-24`): antes tapaba el último
+    botón alineado a la derecha.

@@ -1953,7 +1953,7 @@ export function VariadoresPage() {
             className={`inline-flex w-fit items-center gap-2 rounded-ctl text-[14px] font-medium ${FOCO}`}
             style={{ color: C.aquaBright }}
           >
-            <ArrowLeft className="h-4 w-4" /> Centro de Aprendizaje
+            <ArrowLeft className="h-4 w-4" /> Centro de aprendizaje
           </button>
           <h1
             className="m-0 text-[clamp(1.55rem,4vw,2.1rem)] font-semibold leading-tight tracking-[-0.021em]"

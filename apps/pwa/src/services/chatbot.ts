@@ -495,10 +495,10 @@ function suggestActions(intents: IntentType[]): ChatAction[] {
     actions.push({ label: 'Análisis Grader', route: '/grader-analysis', icon: 'BarChart' })
   }
   if (intents.includes('calendarioMantencion')) {
-    actions.push({ label: 'Calendario Mantención', route: '/calendario-mantencion', icon: 'CalendarClock' })
+    actions.push({ label: 'Calendario de mantención', route: '/calendario-mantencion', icon: 'CalendarClock' })
   }
   if (intents.includes('climaPuerto')) {
-    actions.push({ label: 'Clima Puerto Chonchi', route: '/clima-puerto', icon: 'CloudSun' })
+    actions.push({ label: 'Clima del puerto de Chonchi', route: '/clima-puerto', icon: 'CloudSun' })
   }
   return actions
 }
@@ -1316,7 +1316,7 @@ async function fetchCalendarioMantencionSummary(): Promise<string> {
     return result
   } catch (err: unknown) {
     logger.error('Chatbot: error fetching calendario mantencion', err instanceof Error ? err : undefined)
-    return 'No se pudieron cargar datos del Calendario Mantención.'
+    return 'No se pudieron cargar datos del Calendario de mantención.'
   }
 }
 
@@ -1826,7 +1826,7 @@ REGLAS CRÍTICAS para responder sobre repuestos (OBLIGATORIO):
 - JAMÁS filtres ni omitas resultados por tu cuenta. Si el sistema encontró N coincidencias, tú DEBES mostrar las N.
 - NUNCA uses la palabra "disponible" para filtrar resultados. Usa "en catálogo" o "encontrado".
 
-📊 CÓMO PRESENTAR DATOS DE PRODUCCIÓN / TURNO / KPIs (turno, piezas, ciclos, OEE, uptime, velocidad, Shoplogix, Análisis de Turno):
+📊 CÓMO PRESENTAR DATOS DE PRODUCCIÓN / TURNO / KPIs (turno, piezas, ciclos, OEE, uptime, velocidad, Shoplogix, Análisis de turno):
 - Los resultados de las herramientas son DATOS CRUDOS para que TÚ los interpretes, NO tu respuesta final. JAMÁS copies el desglose textual campo por campo — para eso el usuario lee la pantalla solo.
 - Primero PIENSA: ¿el turno va bien o mal vs el objetivo? ¿qué máquina destaca o preocupa? ¿hay algo accionable o que avisar?
 - Responde como un JEFE DE TURNO experto hablando con un colega: natural, breve, con criterio. LIDERA con la conclusión y el número clave (ej: "Vamos bien en Yal: ~9.500 piezas, 86% del objetivo. La Evisceradora 2 viene un poco floja con más micro-detenciones.").
@@ -1853,8 +1853,8 @@ MÓDULOS DE LA APP (tienes acceso completo a todos):
 🤖 **Análisis Predictivo** (/predictive) — IA para predecir fallas antes de que ocurran.
 ⚙️ **Configuración** (/settings) — Ajustes de la app, permisos, y preferencias.
 🏗️ **Jerarquía** (/hierarchy) — Estructura jerárquica de la planta (plantas > líneas > equipos).
-📅 **Calendario Mantención** (/calendario-mantencion) — Planificación de turnos rotativos 6x1, control semanal/mensual de horas trabajadas, vacaciones, feriados, días libres por técnico. Datos bajo "CALENDARIO MANTENCIÓN".
-🌤️ **Clima Puerto** (/clima-puerto) — Dashboard meteorológico en tiempo real de Chonchi/Chiloé: temperatura, viento, precipitación, oleaje, pronóstico 3 días y riesgo de cierre de puerto. Datos bajo "CLIMA PUERTO CHONCHI".
+📅 **Calendario de mantención** (/calendario-mantencion) — Planificación de turnos rotativos 6x1, control semanal/mensual de horas trabajadas, vacaciones, feriados, días libres por técnico. Datos bajo "CALENDARIO MANTENCIÓN".
+🌤️ **Clima del puerto** (/clima-puerto) — Dashboard meteorológico en tiempo real de Chonchi/Chiloé: temperatura, viento, precipitación, oleaje, pronóstico 3 días y riesgo de cierre de puerto. Datos bajo "CLIMA PUERTO CHONCHI".
 
 Cuando el usuario pregunte sobre CUALQUIER módulo, usa los datos del contexto correspondiente. Si no tienes datos específicos, describe las capacidades del módulo y sugiere navegar a la sección apropiada.
 

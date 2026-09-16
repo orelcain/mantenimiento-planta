@@ -1962,7 +1962,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                   size="sm"
                   className="gap-1.5"
                   onClick={() => setRepComunOnly((v) => !v)}
-                  title="Mostrar solo los repuestos comunes / más usados de la máquina (lista curada compartida, la misma del Centro de Aprendizaje)"
+                  title="Mostrar solo los repuestos comunes / más usados de la máquina (lista curada compartida, la misma del Centro de aprendizaje)"
                 >
                   <Wrench className="h-4 w-4" /> Comunes
                   <span className="tabular-nums opacity-70">({comunesEnScope})</span>
@@ -2508,7 +2508,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="text-base">Marcar como común de…</DialogTitle>
-            <DialogDescription>Elige la máquina para la que este repuesto es común / más usado. Aparecerá en su lista del Centro de Aprendizaje y con el badge «común» acá.</DialogDescription>
+            <DialogDescription>Elige la máquina para la que este repuesto es común / más usado. Aparecerá en su lista del Centro de aprendizaje y con el badge «común» acá.</DialogDescription>
           </DialogHeader>
           <Input value={comunQuery} onChange={(e) => setComunQuery(e.target.value)} placeholder="Buscar máquina…" autoFocus />
           <div className="mt-2 max-h-[50vh] space-y-1 overflow-y-auto">

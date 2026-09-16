@@ -201,7 +201,7 @@ export const MODULES_CONFIG: ModuleConfig[] = [
   },
   {
     id: 'fotoevidencia',
-    nombre: 'Foto Evidencia',
+    nombre: 'Foto-evidencia',
     descripcion: 'Registro fotográfico de activos',
     icono: 'Camera',
     accionesDisponibles: ['ver', 'crear', 'eliminar', 'exportar'],
@@ -252,7 +252,7 @@ export const MODULES_CONFIG: ModuleConfig[] = [
   },
   {
     id: 'analisisGrader',
-    nombre: 'Análisis de Turno',
+    nombre: 'Análisis de turno',
     descripcion: 'Análisis de turno: Grader + Baaders + correlación cross-equipo',
     icono: 'BarChart3',
     accionesDisponibles: ['ver', 'crear', 'editar', 'exportar', 'configurar'],
@@ -266,21 +266,21 @@ export const MODULES_CONFIG: ModuleConfig[] = [
   },
   {
     id: 'calendarioMantencion',
-    nombre: 'Calendario Mantención',
+    nombre: 'Calendario de mantención',
     descripcion: 'Planificación y control de turnos rotativos de mantención',
     icono: 'CalendarClock',
     accionesDisponibles: ['ver', 'crear', 'editar', 'asignar', 'exportar', 'configurar'],
   },
   {
     id: 'aria',
-    nombre: 'ARIA Asistente',
+    nombre: 'Asistente ARIA',
     descripcion: 'Asistente de IA para reportes, consultas e incidencias',
     icono: 'Bot',
     accionesDisponibles: ['ver', 'configurar'],
   },
   {
     id: 'climaPuerto',
-    nombre: 'Clima Puerto',
+    nombre: 'Clima del puerto',
     descripcion: 'Dashboard meteorológico y predicción de cierre del Puerto de Chonchi',
     icono: 'CloudSun',
     accionesDisponibles: ['ver', 'configurar'],

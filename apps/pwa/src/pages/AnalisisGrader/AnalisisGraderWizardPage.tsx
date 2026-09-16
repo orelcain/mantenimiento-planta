@@ -791,7 +791,7 @@ export function AnalisisGraderWizardPage() {
         <div className="flex min-w-0 flex-wrap items-center gap-4">
           <div className="min-w-0">
             <h1 className="text-[1.9rem] font-bold leading-none tracking-[-0.028em] lg:text-[2.15rem]">
-              Análisis de Turno
+              Análisis de turno
             </h1>
             <p className="mt-2 text-[0.85rem] text-muted-foreground">
               {lineConfig.hasGraderData

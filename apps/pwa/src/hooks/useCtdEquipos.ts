@@ -56,7 +56,7 @@ export function useCtdEquipos(favorites: Set<string>) {
         if (alive) setEquipment(rows)
       })
       .catch((err) =>
-        logger.error('Error cargando equipos (Centro Técnico Documental)', err instanceof Error ? err : new Error(String(err))),
+        logger.error('Error cargando equipos (Centro técnico documental)', err instanceof Error ? err : new Error(String(err))),
       )
       .finally(() => {
         if (alive) setLoading(false)

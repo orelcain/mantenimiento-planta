@@ -112,8 +112,8 @@ const GROUPS: Record<UserRole, TileGroup[]> = {
     {
       label: 'Trabajo en planta',
       tiles: [
-        { id: 'incidents', label: 'Nueva Incidencia',  sublabel: 'Levantar problema',   icon: AlertTriangle, href: '/incidents',      color: 'red',   cta: true },
-        { id: 'repuestos', label: 'Repuestos',          sublabel: 'Piezas & manuales',  icon: Package,       href: '/repuestos',      color: 'blue'  },
+        { id: 'incidents', label: 'Nueva incidencia',  sublabel: 'Levantar problema',   icon: AlertTriangle, href: '/incidents',      color: 'red',   cta: true },
+        { id: 'repuestos', label: 'Repuestos',          sublabel: 'Piezas y manuales',  icon: Package,       href: '/repuestos',      color: 'blue'  },
         { id: 'equipos',   label: 'Equipos',            sublabel: 'Ficha técnica',      icon: Wrench,        href: '/equipment',      color: 'slate' },
         { id: 'prevntv',   label: 'Preventivo',         sublabel: 'Mis tareas',         icon: CalendarClock, href: '/preventive',     color: 'amber',  wip: true },
         { id: 'evidencia', label: 'Foto-evidencia',     sublabel: 'Registrar imagen',   icon: Camera,        href: '/photo-evidence', color: 'slate' },
@@ -126,21 +126,21 @@ const GROUPS: Record<UserRole, TileGroup[]> = {
     {
       label: 'Seguimiento',
       tiles: [
-        { id: 'incidents', label: 'Incidencias',   sublabel: 'Revisar & validar',  icon: AlertTriangle, href: '/incidents',       color: 'red'    },
-        { id: 'grader',    label: 'Análisis de Turno', sublabel: 'Rendimiento',      icon: BarChart3,     href: '/analisis-grader', color: 'blue', children: LINEAS_ANALISIS },
+        { id: 'incidents', label: 'Incidencias',   sublabel: 'Revisar y validar',  icon: AlertTriangle, href: '/incidents',       color: 'red'    },
+        { id: 'grader',    label: 'Análisis de turno', sublabel: 'Rendimiento',      icon: BarChart3,     href: '/analisis-grader', color: 'blue', children: LINEAS_ANALISIS },
         { id: 'inspecc',   label: 'Inspecciones',  sublabel: 'Rondas',             icon: Route,         href: '/inspections',     color: 'amber',  wip: true },
         { id: 'prevntv',   label: 'Preventivo',    sublabel: 'Plan mantención',    icon: CalendarClock, href: '/preventive',      color: 'amber',  wip: true },
         { id: 'sensores',  label: 'Sensores',      sublabel: 'Monitor real',       icon: Activity,      href: '/sensors/monitor', color: 'green',  wip: true },
-        { id: 'ctd',       label: 'Centro Téc. Documental', sublabel: 'Programa EMP · NFPA 70B', icon: ClipboardList, href: '/centro-tecnico-documental', color: 'purple' },
+        { id: 'ctd',       label: 'Centro téc. documental', sublabel: 'Programa EMP · NFPA 70B', icon: ClipboardList, href: '/centro-tecnico-documental', color: 'purple' },
       ],
     },
     {
       label: 'Recursos',
       tiles: [
-        { id: 'repuestos', label: 'Repuestos',     sublabel: 'Stock & manuales',   icon: Package,       href: '/repuestos',       color: 'blue'    },
+        { id: 'repuestos', label: 'Repuestos',     sublabel: 'Stock y manuales',   icon: Package,       href: '/repuestos',       color: 'blue'    },
         { id: 'equipos',   label: 'Equipos',       sublabel: 'Ficha técnica',      icon: Wrench,        href: '/equipment',       color: 'slate'   },
-        { id: 'mapa',      label: 'Mapa Planta',   sublabel: 'Vista de zonas',     icon: Map,           href: '/map',             color: 'emerald' },
-        { id: 'clima',     label: 'Clima Puerto',  sublabel: 'Condiciones',        icon: CloudSun,      href: '/clima-puerto',    color: 'slate'   },
+        { id: 'mapa',      label: 'Mapa de planta',   sublabel: 'Vista de zonas',     icon: Map,           href: '/map',             color: 'emerald' },
+        { id: 'clima',     label: 'Clima del puerto',  sublabel: 'Condiciones',        icon: CloudSun,      href: '/clima-puerto',    color: 'slate'   },
       ],
     },
     { label: 'Formación', tiles: FORMACION_TILES },
@@ -151,7 +151,7 @@ const GROUPS: Record<UserRole, TileGroup[]> = {
       label: 'Operaciones',
       tiles: [
         { id: 'incidents', label: 'Incidencias',     sublabel: 'Ver todas',         icon: AlertTriangle, href: '/incidents',       color: 'red'   },
-        { id: 'repuestos', label: 'Repuestos',        sublabel: 'Piezas & manuales', icon: Package,       href: '/repuestos',       color: 'blue'  },
+        { id: 'repuestos', label: 'Repuestos',        sublabel: 'Piezas y manuales', icon: Package,       href: '/repuestos',       color: 'blue'  },
         { id: 'equipos',   label: 'Equipos',          sublabel: 'Ficha técnica',     icon: Wrench,        href: '/equipment',       color: 'slate' },
         { id: 'evidencia', label: 'Foto-evidencia',   sublabel: 'Foto-registros',    icon: Camera,        href: '/photo-evidence',  color: 'slate' },
       ],
@@ -165,12 +165,12 @@ const GROUPS: Record<UserRole, TileGroup[]> = {
       ],
     },
     {
-      label: 'Análisis & monitoreo',
+      label: 'Análisis y monitoreo',
       tiles: [
-        { id: 'grader',   label: 'Análisis de Turno', sublabel: '',                icon: BarChart3, href: '/analisis-grader', color: 'blue', children: LINEAS_ANALISIS },
+        { id: 'grader',   label: 'Análisis de turno', sublabel: '',                icon: BarChart3, href: '/analisis-grader', color: 'blue', children: LINEAS_ANALISIS },
         { id: 'sensores', label: 'Sensores',       sublabel: 'Tiempo real',        icon: Activity,  href: '/sensors/monitor', color: 'green',  wip: true },
-        { id: 'mapa',     label: 'Mapa Planta',   sublabel: 'Zonas',              icon: Map,       href: '/map',             color: 'emerald' },
-        { id: 'clima',    label: 'Clima Puerto',  sublabel: 'Condiciones',        icon: CloudSun,  href: '/clima-puerto',    color: 'slate'   },
+        { id: 'mapa',     label: 'Mapa de planta',   sublabel: 'Zonas',              icon: Map,       href: '/map',             color: 'emerald' },
+        { id: 'clima',    label: 'Clima del puerto',  sublabel: 'Condiciones',        icon: CloudSun,  href: '/clima-puerto',    color: 'slate'   },
       ],
     },
     {
@@ -189,7 +189,7 @@ const GROUPS: Record<UserRole, TileGroup[]> = {
       tiles: [
         { id: 'ett',      label: 'ETT',           sublabel: 'Evaluaciones',   icon: FileText,  href: '/admin/ett',    color: 'purple'  },
         { id: 'jerarq',   label: 'Jerarquías',    sublabel: 'Estructura SAP', icon: FolderTree, href: '/hierarchy',   color: 'slate'   },
-        { id: 'mapas',    label: 'Editor Mapas',  sublabel: 'Zonas & áreas',  icon: MapPin,    href: '/admin/maps',   color: 'emerald' },
+        { id: 'mapas',    label: 'Editor de mapas',  sublabel: 'Zonas y áreas',  icon: MapPin,    href: '/admin/maps',   color: 'emerald' },
         { id: 'settings', label: 'Configuración', sublabel: 'Permisos',       icon: Settings,  href: '/settings',    color: 'slate'   },
       ],
     },
@@ -199,7 +199,7 @@ const GROUPS: Record<UserRole, TileGroup[]> = {
     {
       label: 'Reportar',
       tiles: [
-        { id: 'incidents', label: 'Reportar Incidencia', sublabel: 'Levantar problema', icon: AlertTriangle, href: '/incidents',      color: 'red',   cta: true },
+        { id: 'incidents', label: 'Reportar incidencia', sublabel: 'Levantar problema', icon: AlertTriangle, href: '/incidents',      color: 'red',   cta: true },
         { id: 'evidencia', label: 'Foto-evidencia',       sublabel: 'Registrar imagen',  icon: Camera,       href: '/photo-evidence', color: 'slate' },
         { id: 'equipos',   label: 'Equipos',              sublabel: 'Ficha de máquina',  icon: Wrench,       href: '/equipment',      color: 'slate' },
       ],
@@ -207,8 +207,8 @@ const GROUPS: Record<UserRole, TileGroup[]> = {
     {
       label: 'Consultar',
       tiles: [
-        { id: 'repuestos', label: 'Repuestos',    sublabel: 'Piezas & manuales', icon: Package,  href: '/repuestos',    color: 'blue'  },
-        { id: 'clima',     label: 'Clima Puerto', sublabel: 'Condiciones',       icon: CloudSun, href: '/clima-puerto', color: 'slate' },
+        { id: 'repuestos', label: 'Repuestos',    sublabel: 'Piezas y manuales', icon: Package,  href: '/repuestos',    color: 'blue'  },
+        { id: 'clima',     label: 'Clima del puerto', sublabel: 'Condiciones',       icon: CloudSun, href: '/clima-puerto', color: 'slate' },
       ],
     },
     { label: 'Formación', tiles: FORMACION_TILES },

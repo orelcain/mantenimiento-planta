@@ -297,7 +297,7 @@ export function generarReporteEquipo(
     doc.setFontSize(7)
     doc.setTextColor(150)
     doc.text(
-      textoSeguroPdf(`Generado ${fecha} · Centro Técnico Documental · pág. ${p}/${pages}`),
+      textoSeguroPdf(`Generado ${fecha} · Centro técnico documental · pág. ${p}/${pages}`),
       MARGEN,
       290,
     )

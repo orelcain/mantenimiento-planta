@@ -1359,7 +1359,7 @@ export function UpstreamMachinesPanel({
                     ? `${correlationSummary.upstreamCaused} de ${correlationSummary.total} paros del Grader coinciden con paros upstream`
                     : `${snapshot.machines.length} máquinas — sincronizado al Grader`
                   void exportCombinedTimelinePng(timelineSync.connectGroupId, {
-                    title: `Análisis de Turno · ${snapshot.dateKey} · ${snapshot.shiftId}`,
+                    title: `Análisis de turno · ${snapshot.dateKey} · ${snapshot.shiftId}`,
                     subtitle,
                     filenameSuffix: `${snapshot.dateKey}_${snapshot.shiftId.replace(/\s+/g, '_').toLowerCase()}`,
                   }).catch((err) => logger.error('Export combinado falló', err instanceof Error ? err : new Error(String(err))))

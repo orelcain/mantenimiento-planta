@@ -2865,7 +2865,7 @@ export function CalendarioMantencionPage() {
 
       {vistaModulo === 'turnos' && !isMobile && <section className="min-h-0 flex-1 rounded-card border bg-card p-2">
         <div className="mb-1 flex items-center justify-between gap-2">
-          <div className="text-sm font-semibold">Calendario Mantención</div>
+          <div className="text-sm font-semibold">Calendario de mantención</div>
           <div className="flex items-center gap-1">
             <button
               className="h-7 rounded-ctl border px-2 text-xs"
