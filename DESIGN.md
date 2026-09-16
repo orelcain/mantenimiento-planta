@@ -564,8 +564,9 @@ con un script Node local (`writeFileSync` en `utf8`).
    numeradas «01», tarjetas con banda de color de 72 px. Propuesta: tokens del sistema (se
    retiran los 20 `--lc-*`), título grande + línea secundaria con las métricas, encabezados
    en formato oración, filas de lista con el color de máquina solo en el tile de 40 px,
-   evaluación aprobada como único trailing. ⏳ Cuatro decisiones de Orel en el mockup; la
-   primera cierra el pendiente 3 (paleta `lc-*`).
+   evaluación aprobada como único trailing. ✅ Construido el 2026-09-16 (PR #1055) con las
+   cuatro decisiones. ⚠ Los 20 tokens `--lc-*` SIGUEN en index.css: los usan el editor admin
+   de Aprendizaje, los planos, variadores y dos vistas del Grader. Se retiran cuando migren.
 
 6. **Decidir claro frío `#F2F2F7` vs cálido `#EAE7E0`** — abierto desde 2026-08-09.
 7. **Los 228 `<button>` a mano** con 13 alturas distintas (25–64 px). No es un barrido: chips,
