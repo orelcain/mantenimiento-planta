@@ -1,6 +1,7 @@
 import { ETIQUETA_FOTO, ETIQUETA_TIPO } from '@/config/bitacora'
 import { autorVisible, tecnicosDelEvento, type EventoBitacora, type FotoEvento, type TurnoMantencion } from './bitacora.types'
 import { fuePendiente, minutosParadaDe, ordenarEventos, resumirBitacora } from './resumenBitacora'
+import { soloListos } from './borradores'
 import { etiquetaTurno, fechaTurnoLarga, formatoMinutos, horarioTurno } from './turnoMantencion'
 import { etiquetaCortaTurno } from './entregaTurno'
 
@@ -175,7 +176,8 @@ export function lineaPendienteAnterior(e: EventoBitacora): string {
     .join(' · ')
 }
 
-export function bitacoraAHtmlCorreo({ turno, eventos, tecnicos, planta, observacion, pendientesAnteriores = [], fuenteFoto }: DatosCorreoBitacora): string {
+export function bitacoraAHtmlCorreo({ turno, eventos: todos, tecnicos, planta, observacion, pendientesAnteriores = [], fuenteFoto }: DatosCorreoBitacora): string {
+  const eventos = soloListos(todos)
   const fuente = fuenteFoto ?? ((f: FotoEvento) => f.url)
   const ordenados = ordenarEventos(turno, eventos)
   const r = resumirBitacora(eventos)
@@ -246,7 +248,8 @@ export function bitacoraAHtmlCorreo({ turno, eventos, tecnicos, planta, observac
 }
 
 /** Versión en texto plano: va junto al HTML en el portapapeles, por si el destino no acepta HTML. */
-export function bitacoraATextoPlano({ turno, eventos, tecnicos, planta, observacion, pendientesAnteriores = [] }: DatosCorreoBitacora): string {
+export function bitacoraATextoPlano({ turno, eventos: todos, tecnicos, planta, observacion, pendientesAnteriores = [] }: DatosCorreoBitacora): string {
+  const eventos = soloListos(todos)
   const r = resumirBitacora(eventos)
   const ordenados = ordenarEventos(turno, eventos)
   const linea = (e: EventoBitacora) =>

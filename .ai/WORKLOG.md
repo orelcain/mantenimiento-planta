@@ -5104,3 +5104,70 @@ Revision adversaria del camino de FOTOS y del copiado al correo (7 hallazgos, 3 
 **Anotado, no arreglable:** la URL de descarga de Storage lleva un token que ignora las reglas, asi
 que cualquiera que reciba o reenvie el correo ve esas fotos sin autenticarse. Es inherente a mandar
 fotos por correo; las reglas de Storage NO son la proteccion de esas URLs.
+
+
+## 2026-09-16 · Bitacora ronda 11 · Bitacora cooperativa (borrador autoguardado + presencia)
+
+Pedido de Orel: iniciar la bitacora en celular o PC, que se guarde sola, que se sincronice entre
+equipos, que indique que esta sincronizada, y que varios la llenen a la vez. Mockup aprobado:
+https://claude.ai/artifact/19kjxjdMAPVPjUknLtZQW2 . Decisiones de Orel: el borrador lo ve TODO el
+turno; eliminar = quien lo creo + supervisores (como antes).
+
+- **Borrador que se guarda solo** (`estado: 'borrador' | 'listo'`, sin campo = listo). La hoja
+  guarda tras 1,5 s sin teclear (`AUTOGUARDADO_MS`); abrir y cerrar sin escribir no crea nada
+  (`tieneContenido`). «Cerrar» GUARDA; «Listo» publica; «Descartar borrador» borra doc + fotos.
+  Irse de la pantalla tambien guarda (cleanup de desmontaje). Un borrador NO cuenta en ningun
+  numero, correo, PDF, historial ni entrega de turno (`soloListos` en cada consumidor) y un
+  borrador que venia de «Resolver» cierra el pendiente recien al publicarse.
+- **Fusion campo por campo en vivo** (`fusionarFormulario`, 7 pruebas): lo que cambia otro equipo
+  mientras la hoja esta abierta se adopta si yo no toque ese campo; si los dos cambiamos distinto,
+  queda lo mio y se AVISA con «Usar la suya / Mantener la mia». Asi «empezar en el celular y seguir
+  en el PC» funciona aunque la hoja siga abierta en el celular. Fotos que agrega o quita el otro se
+  incorporan. Avisos si el evento lo borraron o lo publicaron en otro equipo.
+- **Presencia** (`bitacoraPresencia/{plantId}_{turnoId}_{dispositivoId}`, latido por minuto solo
+  con la pestana a la vista): quien tiene la bitacora abierta y que evento escribe. La vigencia se
+  mide con la hora del SERVIDOR (desfase estimado con el latido propio): los relojes de los
+  telefonos de planta no son confiables. Menos de 1.500 escrituras por turno con tres equipos.
+- **Barra de sincronizacion** (`BarraSincronizacion`): Sincronizado / Guardando / Sin senal (con
+  cuantos cambios quedaron en el telefono) + «Leandro agrego un evento» cuando llega algo de otro
+  equipo + avatares de conectados (lista abierta en PC, desplegable en celular).
+- Filas: «En redaccion», «X lo esta escribiendo», «Continuar en este equipo» (PC), y «X lo tiene
+  abierto» en eventos publicados. Tarjeta del Inicio: «1 en redaccion».
+- Reglas: borrador puede ir sin descripcion; publicado la exige; `estado` y `dispositivo` con
+  valores cerrados; presencia con `hasOnly`, id que calza, `vistoEn == request.time` y
+  `uid == auth.uid`. **41/41 casos** con `probar-reglas-bitacora.cjs --local` (14 nuevos).
+- 74 pruebas en services/bitacora (18 nuevas). Verificado en el navegador TECLEANDO: el foco no se
+  pierde, «Guardando borrador…» → «Borrador guardado · 14:20 · el turno lo ve», cerrar deja el
+  borrador en la lista, continuar el de otro muestra el aviso de presencia, «Listo» lo publica y
+  el resumen pasa de 4 a 5 eventos.
+
+### Ronda 11b · revisión adversaria de la cooperativa (antes del merge)
+
+Revisión adversaria: 5 ALTA de pérdida de datos. Arreglados todos antes de mergear.
+
+- **Se escribe SOLO lo que cambió** (`camposACambiar`, 4 pruebas). Cada autoguardado mandaba el
+  documento entero: uno atrasado en la cola de un teléfono sin señal devolvía a su valor viejo lo que
+  otro equipo cambió, y la fusión del otro lado lo adoptaba sin avisar.
+- **Un evento publicado no vuelve a borrador**: el autoguardado nunca manda `estado` y la regla lo
+  prohíbe (un autoguardado atrasado lo sacaba de números, correo y entrega de turno sin que nadie lo notara).
+- **Abrir, mirar y cerrar no escribe** (antes dejaba en cola una copia vieja del evento).
+- **Un borrador no se recorta** (el espacio que se estaba tecleando desaparecía bajo el cursor).
+- **«Cerrar» avisa también por las fotos que fallaron por falta de señal** (se perdían sin aviso).
+- Autoguardado decidido al ABRIR: si otro publica, lo tecleado sigue guardándose (antes el mismo
+  botón pasaba a «Cancelar» y lo descartaba). Creación fallida → se vuelve a crear, no se actualiza
+  un documento inexistente; «Listo» crea si nunca se vio el documento. Sin hora de inicio no se
+  intenta guardar y se avisa.
+- Participantes entran en la fusión. Descartar un borrador de «Resolver» no reabre el pendiente.
+  «Volver a crearlo» sin las fotos borradas. Eliminar se muestra solo a quien puede (autor/supervisor).
+- Regla: `registradoPor` solo cambia mientras es borrador. 46/46 casos contra la API (5 nuevos).
+- Presencia: desfase solo con el latido PROPIO recién confirmado (uno viejo en caché daba horas de
+  desfase y todos figuraban conectados); un id por PESTAÑA; sin actividad en 15 min deja de latir.
+- **Nombre en «conectados»** (pregunta de Orel: «¿por qué dice Matias Serpa en PC?»): salía del último
+  técnico elegido en ese navegador. Ahora: cuenta personal → su nombre; cuenta compartida → «PC de
+  Mantención» en el PC y el técnico elegido en el celular (`nombreEnPresencia`).
+- **Técnicos del turno parten VACÍOS** (pedido de Orel: el calendario a veces no refleja el turno
+  real): cada uno se agrega a mano; el calendario queda como «El calendario sugiere: …» y como
+  etiqueta dentro de la hoja, sin marcar a nadie (`sugeridosPorCalendario`).
+- 78 pruebas en services/bitacora. Verificado tecleando: el espacio final sobrevive al autoguardado,
+  sin conflicto falso.
+- Pendiente anotado: un borrador abandonado al cambiar de turno no se avisa en el turno siguiente.

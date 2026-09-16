@@ -6,6 +6,7 @@ import {
   quitarTecnico,
   renombrarTecnico,
   tecnicosPresentes,
+  sugeridosPorCalendario,
 } from '../listaTecnicos'
 import { buscarEquipos, construirOpcionesEquipo, type NodoJerarquia } from '../buscarEquipos'
 
@@ -45,10 +46,13 @@ describe('lista maestra de técnicos', () => {
     expect(construirListaTecnicos(PLANILLA, agregarTecnico(a, 'jose chodil')).some((t) => t.nombre === 'Jose Chodil')).toBe(true)
   })
 
-  it('presentes: lo ajustado a mano manda; si no, el calendario traducido por los renombres', () => {
+  it('presentes: SOLO lo marcado a mano; el calendario únicamente sugiere (16-09)', () => {
     const a = quitarTecnico(renombrarTecnico(AJUSTES_VACIOS, 'Lucas Adrade', 'Lucas Andrade'), { clave: 'Matias Serpa', nombre: 'Matias Serpa', origen: 'calendario' })
     const lista = construirListaTecnicos(PLANILLA, a)
-    expect(tecnicosPresentes(null, ['Lucas Adrade', 'Matias Serpa'], lista)).toEqual({ nombres: ['Lucas Andrade'], ajustado: false })
+    // El calendario no está siempre al día: sin marcar, no hay nadie presente.
+    expect(tecnicosPresentes(null, ['Lucas Adrade', 'Matias Serpa'], lista)).toEqual({ nombres: [], ajustado: false })
+    // Como sugerencia, traducido por los renombres y sin los quitados.
+    expect(sugeridosPorCalendario(['Lucas Adrade', 'Matias Serpa'], lista)).toEqual(['Lucas Andrade'])
     expect(tecnicosPresentes(['Danilo Cortes'], ['Lucas Adrade'], lista)).toEqual({ nombres: ['Danilo Cortes'], ajustado: true })
     // Presentes guardados ANTES de corregir un nombre muestran el corregido; quien salió de la lista se conserva.
     expect(tecnicosPresentes(['Lucas Adrade', 'Matias Serpa', 'Ex Técnico'], [], lista).nombres).toEqual(['Lucas Andrade', 'Matias Serpa', 'Ex Técnico'])

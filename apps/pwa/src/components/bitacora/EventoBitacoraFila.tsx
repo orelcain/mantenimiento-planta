@@ -1,7 +1,8 @@
 import { Camera } from 'lucide-react'
-import { Pill, Tag } from '@/components/piel'
+import { Button, Pill, Tag } from '@/components/piel'
 import { ETIQUETA_FOTO, ETIQUETA_TIPO } from '@/config/bitacora'
-import { autorVisible, tecnicosDelEvento, type EventoBitacora, type FotoEvento } from '@/services/bitacora/bitacora.types'
+import { autorVisible, tecnicosDelEvento, type EventoBitacora, type FotoEvento, type PresenciaBitacora } from '@/services/bitacora/bitacora.types'
+import { NOMBRE_DISPOSITIVO } from '@/services/bitacora/presencia'
 import { minutosParadaDe } from '@/services/bitacora/resumenBitacora'
 import { formatoMinutos } from '@/services/bitacora/turnoMantencion'
 import { etiquetaCortaTurno } from '@/services/bitacora/entregaTurno'
@@ -18,12 +19,17 @@ export function EventoBitacoraFila({
   evento,
   onAbrir,
   onVerFoto,
+  abiertoPor = [],
 }: {
   evento: EventoBitacora
   onAbrir: () => void
   /** Tocar una miniatura abre la foto en grande (no el editor). */
   onVerFoto?: (fotos: FotoEvento[], indice: number) => void
+  /** Otros equipos que tienen este evento abierto ahora mismo. */
+  abiertoPor?: readonly PresenciaBitacora[]
 }) {
+  const borrador = evento.estado === 'borrador'
+  const quienesAbren = abiertoPor.map((p) => `${p.nombre} (${NOMBRE_DISPOSITIVO[p.dispositivo]})`).join(', ')
   const parada = minutosParadaDe(evento)
   const orden = { antes: 0, despues: 1, foto: 2 } as const
   const fotos = [...(evento.fotos ?? [])].sort((a, b) => orden[a.etiqueta] - orden[b.etiqueta])
@@ -55,7 +61,12 @@ export function EventoBitacoraFila({
 
       <div className="flex min-w-0 flex-col gap-1.5">
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-headline leading-tight">{evento.equipo?.trim() || 'Sin equipo'}</span>
+          {/* Un borrador se VE (es cooperación en vivo) pero se distingue al tiro:
+              no cuenta en los números ni sale en el correo hasta «Listo». */}
+          {borrador && <Pill tone="info" dot={abiertoPor.length ? 'pulse' : undefined}>En redacción</Pill>}
+          <span className={`text-headline leading-tight ${borrador && !evento.equipo?.trim() ? 'text-muted-foreground' : ''}`}>
+            {evento.equipo?.trim() || (borrador ? 'Sin equipo todavía' : 'Sin equipo')}
+          </span>
           <Tag>{ETIQUETA_TIPO[evento.tipo]}</Tag>
           {evento.pendiente && <Pill tone="warning">Pendiente</Pill>}
         </div>
@@ -73,7 +84,11 @@ export function EventoBitacoraFila({
           <span className="text-footnote font-semibold text-ink-ok">Cierra pendiente del {etiquetaCortaTurno(evento.resuelvePendiente.turnoId)}</span>
         )}
 
-        <p className="line-clamp-3 whitespace-pre-line text-body">{evento.descripcion}</p>
+        {evento.descripcion?.trim() ? (
+          <p className={`line-clamp-3 whitespace-pre-line text-body ${borrador ? 'text-muted-foreground' : ''}`}>{evento.descripcion}</p>
+        ) : borrador ? (
+          <p className="text-body text-muted-foreground">Sin descripción todavía</p>
+        ) : null}
 
         {/* En el pendiente original (visto en su propio turno): dónde y cómo se cerró. */}
         {evento.cierre && (
@@ -120,12 +135,35 @@ export function EventoBitacoraFila({
           </div>
         )}
 
-        <span className="text-caption text-muted-foreground">
-          {tecnicosDelEvento(evento).join(', ')}
-          {evento.actualizadoPorNombre && evento.actualizadoPorNombre !== autorVisible(evento)
-            ? ` · editado por ${evento.actualizadoPorNombre}`
-            : ''}
-        </span>
+        {borrador ? (
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-footnote text-muted-foreground">
+              {abiertoPor.length
+                ? `${quienesAbren} ${abiertoPor.length === 1 ? 'lo está escribiendo' : 'lo están escribiendo'}`
+                : `Borrador de ${autorVisible(evento)} · sin publicar`}
+            </span>
+            {/* En el PC se ve el botón; en el celular toda la fila abre el borrador. */}
+            <Button
+              variant="tinted"
+              size="sm"
+              className="hidden md:inline-flex"
+              onClick={(e) => {
+                e.stopPropagation()
+                onAbrir()
+              }}
+            >
+              Continuar en este equipo
+            </Button>
+          </div>
+        ) : (
+          <span className="text-caption text-muted-foreground">
+            {tecnicosDelEvento(evento).join(', ')}
+            {evento.actualizadoPorNombre && evento.actualizadoPorNombre !== autorVisible(evento)
+              ? ` · editado por ${evento.actualizadoPorNombre}`
+              : ''}
+            {abiertoPor.length ? ` · ${quienesAbren} lo tiene abierto` : ''}
+          </span>
+        )}
       </div>
     </div>
   )

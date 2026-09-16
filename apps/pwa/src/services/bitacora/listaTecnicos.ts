@@ -102,6 +102,15 @@ export function tecnicosPresentes(
     const nombres = guardados.map((g) => porClave.get(claveNombre(g)) ?? porNombre.get(claveNombre(g)) ?? g)
     return { nombres: [...new Set(nombres)], ajustado: true }
   }
-  const nombres = deTurnoCalendario.map((n) => porClave.get(claveNombre(n))).filter((n): n is string => Boolean(n))
-  return { nombres, ajustado: false }
+  // Sin marcar a mano, NADIE está presente (decisión de Orel, 16-09-2026): el
+  // calendario a veces no refleja la realidad del turno, así que solo sugiere
+  // (ver `sugeridosPorCalendario`) y cada técnico se agrega a mano.
+  void deTurnoCalendario
+  return { nombres: [], ajustado: false }
+}
+
+/** Los que el calendario pone de turno, con los nombres ya corregidos de la lista. Solo sugerencia. */
+export function sugeridosPorCalendario(deTurnoCalendario: readonly string[], lista: readonly TecnicoDeLista[]): string[] {
+  const porClave = new Map(lista.map((t) => [claveNombre(t.clave), t.nombre]))
+  return deTurnoCalendario.map((n) => porClave.get(claveNombre(n))).filter((n): n is string => Boolean(n))
 }

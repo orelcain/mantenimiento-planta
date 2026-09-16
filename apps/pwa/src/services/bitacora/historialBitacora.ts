@@ -2,6 +2,7 @@ import type { EventoBitacora, TurnoMantencion } from './bitacora.types'
 import { autorVisible } from './bitacora.types'
 import { minutosParadaDe, resumirBitacora, type ResumenBitacora } from './resumenBitacora'
 import { fechaLocal, turnoDesdeId } from './turnoMantencion'
+import { soloListos } from './borradores'
 
 /**
  * Historial: lo que suman los turnos ya registrados (mockup aprobado 15-09-2026).
@@ -72,7 +73,7 @@ export function fechaDesde(dias: number, hoy: Date = new Date()): string {
 /** Un renglón por turno CON eventos, del más reciente al más antiguo. */
 export function filasPorTurno(eventos: readonly EventoBitacora[], ahora: Date = new Date()): FilaTurno[] {
   const porTurno = new Map<string, EventoBitacora[]>()
-  for (const e of eventos) {
+  for (const e of soloListos(eventos)) {
     if (!e.turnoId) continue
     porTurno.set(e.turnoId, [...(porTurno.get(e.turnoId) ?? []), e])
   }
@@ -93,7 +94,7 @@ export function resumirPeriodo(eventos: readonly EventoBitacora[], desde: string
   const filas = filasPorTurno(eventos)
   // Los mismos eventos que las filas: uno con `turnoId` corrupto no puede sumar
   // al total y no aparecer en ningún turno de la lista (revisión 15-09).
-  const validos = eventos.filter((e) => e.turnoId && turnoDesdeId(e.turnoId))
+  const validos = soloListos(eventos).filter((e) => e.turnoId && turnoDesdeId(e.turnoId))
   const total = resumirBitacora(validos)
 
   const porEquipo = new Map<string, { equipo: string; minutos: number; paradas: number }>()
