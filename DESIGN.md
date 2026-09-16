@@ -256,7 +256,7 @@ defecto"*. Nuestros 10–16 px eran de la era iOS 7–18.
 | Grupo de lista / tarjeta | 10–16 | **26** |
 | Botón | 10 | **cápsula** (`999px`) |
 | Campo de búsqueda | 11 | **22** |
-| Segmented | 9 | **16** fuera, cápsula dentro |
+| Segmented | 9 | **cápsula** fuera y dentro (iOS 26+; hasta iOS 18 era 16) |
 | Sheet / modal | 18–20 | **32** |
 | Alerta | 14 | **36** |
 | Pill / avatar | 999 | 999 |
@@ -540,8 +540,10 @@ con un script Node local (`writeFileSync` en `utf8`).
    celda de alertas con tile rojo y badge numérico (patrón Ajustes), lista agrupada radio 26
    con cifra en `text-foreground` y estado en rótulo de 13 px, acciones por deslizamiento,
    segmentado de 3 vías arriba y sub-vista desde el título, formateador de nombres SAP.
-   ⏳ Cuatro decisiones de Orel en el mockup (deslizar vs «⋯», barra fuera de la lista,
-   búsqueda arriba, sub-vistas desde el título). No construir hasta que las cierre.
+   ✅ Construido el 2026-09-16 en el PR #1055 con las cuatro decisiones tal como las proponía
+   el mockup. Primitivos nuevos en la piel: `SegmentedControl` (cápsula, 44 px) y `SwipeRow`
+   (deslizar en táctil, hover en PC). `formatNombreSAP` en `utils/repuestos` con 22 tests.
+   Pendiente de Orel: probar el deslizamiento con guantes en el teléfono de pruebas.
 6. **Decidir claro frío `#F2F2F7` vs cálido `#EAE7E0`** — abierto desde 2026-08-09.
 7. **Los 228 `<button>` a mano** con 13 alturas distintas (25–64 px). No es un barrido: chips,
    flechas e íconos en tablas no van a 44. Dirigirlo pantalla por pantalla con el medidor de

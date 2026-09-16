@@ -764,6 +764,9 @@
 }
 
 @layer utilities {
+  /* Fila horizontal de chips: se desplaza, sin barra visible (iOS no la muestra). */
+  .no-scrollbar { scrollbar-width: none; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
   /*
    * ── MODO PANTALLA del monitor público (`?pantalla=1`) ─────────────────────
    *
