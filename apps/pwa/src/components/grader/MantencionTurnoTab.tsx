@@ -395,7 +395,7 @@ export function MantencionTurnoTab({ kpis, loading, plantSlug, shiftId, dateKey 
               titular y repetirlos acá era el mismo número dos veces en pantalla. */}
           <div className="mt-2 flex items-end justify-between gap-2">
             <div>
-              <div className="text-display tabular-nums text-ink-crit">
+              <div className="text-display tabular-nums text-foreground">
                 ≈ {fmtInt(pzFalla)}<span className="text-[15px] font-semibold"> pz</span>
               </div>
               <div className="text-footnote text-muted-foreground">

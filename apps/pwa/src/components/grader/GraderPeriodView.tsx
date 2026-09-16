@@ -662,7 +662,7 @@ export function GraderPeriodView({ data }: Props) {
                     <p className="text-sm font-semibold">{visibleStats.minP0Day.dateKey}</p>
                   </div>
                 </div>
-                <p className="text-2xl font-bold tabular-nums text-ink-ok">
+                <p className="text-2xl font-bold tabular-nums text-foreground">
                   {visibleStats.minP0Day.p0Pct}%
                 </p>
               </CardContent>

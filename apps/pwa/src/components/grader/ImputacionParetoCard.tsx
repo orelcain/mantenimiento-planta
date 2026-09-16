@@ -52,7 +52,7 @@ const BUCKET_BG: Record<string, string> = {
 const COVERAGE_THEME = (pct: number) =>
   pct >= 90 ? { text: 'text-ink-ok', bar: 'bg-emerald-500/[0.15]', label: 'Documentado' }
   : pct >= 60 ? { text: 'text-ink-warn', bar: 'bg-amber-500/[0.15]', label: 'Parcial' }
-  : { text: 'text-cat-5-ink', bar: 'bg-cat-5-tint/[0.15]', label: 'Sin imputar' }
+  : { text: 'text-ink-crit', bar: 'bg-red-500/[0.15]', label: 'Sin imputar' }
 
 export function ImputacionParetoCard({ machines }: { machines: UpstreamMachineShift[] }) {
   const [expanded, setExpanded] = useState(true)

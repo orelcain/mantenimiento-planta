@@ -213,7 +213,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
             {slxStats && (
               <p className={`text-caption mt-0.5 ${
                 slxStats.avgUptimePct >= 70 ? 'text-ink-ok'
-                : slxStats.avgUptimePct >= 40 ? 'text-ink-warn' : 'text-cat-5-ink'
+                : slxStats.avgUptimePct >= 40 ? 'text-ink-warn' : 'text-ink-crit'
               }`}>
                 {slxStats.avgUptimePct.toFixed(0)}% uptime
               </p>
@@ -244,12 +244,12 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
         <Card className={`border-0 bg-cat-5-tint/[0.15] ${!worst ? 'opacity-40' : ''}`}>
           <CardContent className="pt-1.5 pb-1.5 px-3">
             <div className="flex items-center gap-1 mb-0.5">
-              <TrendingUp className="w-3 h-3 text-cat-5-ink" />
-              <p className="text-caption text-cat-5-ink font-medium">
+              <TrendingUp className="w-3 h-3 text-ink-crit" />
+              <p className="text-caption text-ink-crit font-medium">
                 Peor · {worst?.metric ?? '—'}
               </p>
             </div>
-            <p className="text-lg font-bold text-cat-5-ink leading-none tabular-nums">
+            <p className="text-lg font-bold text-foreground leading-none tabular-nums">
               {worst?.value ?? '—'}
             </p>
             {worst && <p className="text-caption text-muted-foreground mt-0.5">{worst.date}</p>}
