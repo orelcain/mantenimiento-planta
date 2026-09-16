@@ -286,7 +286,10 @@ export function EventoBitacoraSheet({
     setAutoguarda(!evento || evento.estado === 'borrador')
     participantesBase.current = evento?.participantes ?? []
     quienBase.current = quienInicial
-    vistoVivo.current = Boolean(evento)
+    // Recién se da por «visto» cuando llega del servidor: al continuar un
+    // borrador de OTRO turno, esa lista tarda un instante en cargar y no puede
+    // leerse como «lo borraron» (revisión 16-09).
+    vistoVivo.current = false
     base.current = inicial
     fotosServidor.current = evento?.fotos ?? []
     ultimaFirma.current = firmaDe(inicial, quienInicial, evento?.participantes ?? [], evento?.fotos ?? [])
@@ -694,7 +697,7 @@ export function EventoBitacoraSheet({
     const publicando = modoBorrador
     // Si nunca se vio el documento en la bitácora (la creación pudo fallar), se
     // crea completo en vez de actualizar algo que no existe (revisión 16-09).
-    const crear = !existeEnServidor.current || !vistoVivo.current
+    const crear = !existeEnServidor.current || (creadoAqui.current && !vistoVivo.current)
     try {
       await onGuardar(eventoId, armarDatos('listo', crear), crear)
       recordarEquipo(equipo)

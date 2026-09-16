@@ -300,6 +300,38 @@ const NODOS_EJEMPLO: NodoJerarquia[] = [
 ]
 const OPCIONES_EJEMPLO = construirOpcionesEquipo(NODOS_EJEMPLO)
 
+/** Un borrador que Leandro dejó sin publicar en el turno anterior. */
+function useBorradoresEjemplo(turno: TurnoMantencion): EventoBitacora[] {
+  return useMemo(() => {
+    if (turno.id !== turnoMantencionEn().id) return []
+    const anterior = turnoAdyacente(turno, -1)
+    return [
+      {
+        id: 'ejemplo-borrador-anterior',
+        plantId: BITACORA_PLANTA.id,
+        turnoId: anterior.id,
+        fechaTurno: anterior.fecha,
+        banda: anterior.banda,
+        tipo: 'ajuste',
+        equipo: 'GRADER MS4/12',
+        equipoId: null,
+        descripcion: 'Se tensó la correa de la salida 7; falta anotar',
+        horaInicio: horaSugeridaParaEvento(anterior),
+        horaTermino: null,
+        impacto: 'en-ventana',
+        minutosParada: null,
+        ventana: 'Colación HG',
+        pendiente: false,
+        fotos: [],
+        creadoPor: 'ejemplo',
+        autorNombre: 'mantencion.plantach',
+        registradoPor: 'Leandro Igor',
+        estado: 'borrador',
+      },
+    ]
+  }, [turno])
+}
+
 /** Tres equipos conectados: este, el celular de Danilo escribiendo y el PC de Mantención. */
 function usePresenciaEjemplo(turno: TurnoMantencion, yo: { nombre: string; editandoEventoId: string | null }) {
   const presentes = useMemo(
@@ -321,6 +353,7 @@ const FUENTE_EJEMPLO: FuenteBitacora = {
   usePendientesAnteriores: usePendientesEjemplo,
   useOpcionesEquipo: () => ({ opciones: OPCIONES_EJEMPLO, cargando: false }),
   usePresencia: usePresenciaEjemplo,
+  useBorradoresAnteriores: useBorradoresEjemplo,
   subirFoto: async (_turnoId, _eventoId, archivo, etiqueta) => {
     const url = await new Promise<string>((resolve, reject) => {
       const lector = new FileReader()

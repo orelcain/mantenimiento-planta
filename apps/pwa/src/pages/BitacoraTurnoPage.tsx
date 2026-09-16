@@ -122,6 +122,9 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
   const [visor, setVisor] = useState<{ fotos: FotoEvento[]; indice: number; titulo: string } | null>(null)
   // Entrega de turno: pendientes abiertos de turnos anteriores.
   const { pendientes: pendientesPrevios, cerrarNoAplica } = fuente.usePendientesAnteriores(turno)
+  // Borradores que nadie publicó antes del cambio de turno: solo en el turno EN CURSO.
+  const borradoresPrevios = fuente.useBorradoresAnteriores(turno)
+  const [descartandoId, setDescartandoId] = useState<string | null>(null)
   const [noAplica, setNoAplica] = useState<EventoBitacora | null>(null)
   const [motivoNoAplica, setMotivoNoAplica] = useState('')
   const [quienNoAplica, setQuienNoAplica] = useState('')
@@ -365,6 +368,74 @@ export function BitacoraTurnoVista({ fuente }: { fuente: FuenteBitacora }) {
                 </div>
               </div>
             ))}
+          </div>
+        </section>
+      )}
+
+      {/* Borradores que quedaron sin publicar: no cuentan en nada hasta que
+          alguien los publica, así que el turno que llega tiene que verlos. */}
+      {esActual && borradoresPrevios.length > 0 && (
+        <section aria-label="Borradores sin publicar de turnos anteriores" className="flex flex-col">
+          <h2 className="px-4 pb-2 text-footnote text-muted-foreground">
+            <span className="font-semibold text-foreground">Quedaron sin publicar</span> · {borradoresPrevios.length}
+          </h2>
+          <div className="overflow-hidden rounded-card bg-card shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
+            {borradoresPrevios.map((b) => {
+              const puede =
+                b.creadoPor === auth.currentUser?.uid || usuario?.rol === 'admin' || usuario?.rol === 'supervisor'
+              const confirmando = descartandoId === b.id
+              return (
+                <div
+                  key={b.id}
+                  className='relative flex flex-col gap-1.5 px-4 py-3 before:absolute before:left-4 before:right-0 before:top-0 before:h-px before:bg-border before:content-[""] first:before:hidden'
+                >
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <Pill tone="info">En redacción</Pill>
+                    <span className="text-headline leading-tight">{b.equipo?.trim() || 'Sin equipo todavía'}</span>
+                    <Tag>{ETIQUETA_TIPO[b.tipo]}</Tag>
+                  </div>
+                  <p className="line-clamp-3 whitespace-pre-line text-body text-muted-foreground">
+                    {b.descripcion?.trim() || 'Sin descripción todavía'}
+                  </p>
+                  <p className="text-footnote text-muted-foreground">{origenDePendiente(b, turno)}</p>
+                  <p className="text-footnote text-muted-foreground">
+                    No cuenta en los números ni salió en el correo de su turno. Publícalo en su turno o descártalo.
+                  </p>
+                  <div className="flex flex-wrap gap-2 pt-0.5">
+                    <Button
+                      variant="tinted"
+                      onClick={() => {
+                        const destino = turnoDesdeId(b.turnoId)
+                        if (!destino) return
+                        // Se abre en SU turno: ahí vive y ahí se publica.
+                        const p = new URLSearchParams(params)
+                        p.set('turno', destino.id)
+                        setParams(p)
+                        setEditor({ evento: b, idNuevo: b.id, turno: destino })
+                      }}
+                    >
+                      Continuar
+                    </Button>
+                    {puede && (
+                      <Button
+                        variant={confirmando ? 'destructive' : 'plain'}
+                        onClick={() => {
+                          if (!confirmando) {
+                            setDescartandoId(b.id)
+                            return
+                          }
+                          setDescartandoId(null)
+                          void borrar(b)
+                          toast({ title: 'Borrador descartado' })
+                        }}
+                      >
+                        {confirmando ? 'Toca de nuevo para descartar' : 'Descartar'}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </section>
       )}

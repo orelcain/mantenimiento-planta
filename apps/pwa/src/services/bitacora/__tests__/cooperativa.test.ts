@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { EventoBitacora, PresenciaBitacora } from '../bitacora.types'
-import { aFormulario, camposACambiar, esBorrador, fusionarFormulario, soloListos, tieneContenido, type CamposFormulario } from '../borradores'
+import { aFormulario, borradoresAnteriores, camposACambiar, esBorrador, fusionarFormulario, soloListos, tieneContenido, type CamposFormulario } from '../borradores'
 import { desfaseServidor, estadoSincronizacion, haceCuanto, iniciales, otrosEditando, presentesVigentes } from '../presencia'
 import { resumirBitacora } from '../resumenBitacora'
 import { pendientesAnteriores } from '../entregaTurno'
@@ -78,6 +78,21 @@ describe('borradores: se ven, pero no cuentan', () => {
     expect(tieneContenido({ descripcion: '  ', equipo: '', fotos: [] })).toBe(false)
     expect(tieneContenido({ descripcion: '', equipo: 'KNURO N1', fotos: [] })).toBe(true)
     expect(tieneContenido({ descripcion: '', equipo: '', fotos: [{}] })).toBe(true)
+  })
+})
+
+describe('borradores que quedaron del turno anterior', () => {
+  it('se ven en el turno siguiente, del más reciente al más antiguo; los del turno actual y los publicados no', () => {
+    const actual = turnoDesdeId('2026-09-17_noche')!
+    const lista = [
+      ev({ id: 'viejo', estado: 'borrador', turnoId: '2026-09-16_dia', horaInicio: '09:00' }),
+      ev({ id: 'reciente', estado: 'borrador', turnoId: '2026-09-16_tarde', horaInicio: '22:30' }),
+      ev({ id: 'de-ahora', estado: 'borrador', turnoId: '2026-09-17_noche' }),
+      ev({ id: 'publicado', turnoId: '2026-09-16_tarde' }),
+      ev({ id: 'futuro', estado: 'borrador', turnoId: '2026-09-17_dia' }),
+      ev({ id: 'roto', estado: 'borrador', turnoId: 'basura' }),
+    ]
+    expect(borradoresAnteriores(lista, actual).map((e) => e.id)).toEqual(['reciente', 'viejo'])
   })
 })
 
