@@ -224,7 +224,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
       <div className="grid grid-cols-2 gap-2">
         {/* Tinte SIN borde: el relleno ya delimita. Sumarle contorno era
             duplicar la línea y es de lo que más carga la pantalla. */}
-        <Card className={`border-0 bg-emerald-500/[0.15] ${!best ? 'opacity-40' : ''}`}>
+        <Card className={`border-0 bg-ink-ok/[0.15] ${!best ? 'opacity-40' : ''}`}>
           <CardContent className="pt-1.5 pb-1.5 px-3">
             <div className="flex items-center gap-1 mb-0.5">
               <TrendingDown className="w-3 h-3 text-emerald-500" />
@@ -239,7 +239,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
           </CardContent>
         </Card>
 
-        <Card className={`border-0 bg-red-500/[0.15] ${!worst ? 'opacity-40' : ''}`}>
+        <Card className={`border-0 bg-ink-crit/[0.15] ${!worst ? 'opacity-40' : ''}`}>
           <CardContent className="pt-1.5 pb-1.5 px-3">
             <div className="flex items-center gap-1 mb-0.5">
               <TrendingUp className="w-3 h-3 text-ink-crit" />
