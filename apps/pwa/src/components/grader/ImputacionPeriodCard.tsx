@@ -75,7 +75,7 @@ export function ImputacionPeriodCard({ imputacion }: { imputacion: PeriodImputac
 
         <div className="flex items-center gap-4">
           <div className="shrink-0">
-            <p className={cn('text-lg font-bold leading-none tabular-nums', th.text)}>
+            <p className="text-lg font-bold leading-none tabular-nums text-foreground">
               {pct.toFixed(0)}%
             </p>
             <p className="text-caption text-muted-foreground mt-0.5">con causal</p>
