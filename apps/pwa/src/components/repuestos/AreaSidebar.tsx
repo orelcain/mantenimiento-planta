@@ -11,6 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronRight, ChevronsLeft, ChevronsDownUp, Layers, Loader2, List, X, Star, Cog, Search } from 'lucide-react'
 import { useHierarchyAreaTree, type AreaTreeNode, type EquipmentLeaf } from '@/hooks/useHierarchyAreaTree'
 import { useGlobalEquipmentSearch, type GlobalEquipmentResult } from '@/hooks/useGlobalEquipmentSearch'
+import { formatNombreSAP } from '@/utils/repuestos/formatNombreSAP'
 
 /** Un equipo (hoja) es favorito si su clave (linkedMachineId || nodeId) está en el set. */
 function isLeafFav(leaf: EquipmentLeaf, equipFavKeys?: Set<string>): boolean {
@@ -206,7 +207,7 @@ function AreaRow({
         )}
 
         <div className="min-w-0 flex-1">
-          <div className="truncate text-footnote font-medium leading-tight">{node.nombre}</div>
+          <div className="truncate text-footnote font-medium leading-tight">{formatNombreSAP(node.nombre).nombre || node.nombre}</div>
           {/* Meta en una sola línea (trunca si no entra). Orden por relevancia en Repuestos:
               equipos · rep · M/B → al truncar se corta primero el M/B (menos crítico). */}
           <div className="truncate text-caption leading-tight text-muted-foreground">

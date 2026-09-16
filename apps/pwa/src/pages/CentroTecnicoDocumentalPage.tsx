@@ -592,7 +592,7 @@ export function CentroTecnicoDocumentalPage() {
                 <option value="all">Todas ({secciones.length})</option>
                 {secciones.map((s) => (
                   <option key={s} value={s}>
-                    {s}
+                    {formatNombreSAP(s).nombre || s}
                   </option>
                 ))}
               </select>
@@ -611,7 +611,7 @@ export function CentroTecnicoDocumentalPage() {
                 <option value="all">Todas ({lineas.length})</option>
                 {lineas.map((l) => (
                   <option key={l} value={l}>
-                    {l}
+                    {formatNombreSAP(l).nombre || l}
                   </option>
                 ))}
               </select>

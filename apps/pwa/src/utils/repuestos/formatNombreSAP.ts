@@ -24,8 +24,10 @@
  *   8. Abreviaturas con barra P/ (para), C/ (con), S/ (sin) van en minúscula
  *      completas: P/COMPRESOR → p/compresor.
  *   9. O'RING → O'ring. Palabras con punto (REP.) solo bajan de caja.
- *  10. Espacios múltiples se colapsan. No se agregan acentos (sin
- *      diccionario en esta versión).
+ *  10. Espacios múltiples se colapsan. Las tildes salen de un diccionario
+ *      cerrado de vocabulario de planta (ACENTOS) y los nombres propios de
+ *      lugares y fabricantes de otro (PROPIOS): lo que no está ahí baja de
+ *      caja sin tilde, honesto antes que inventado.
  *
  * La función es idempotente: aplicarla sobre su propio resultado devuelve
  * el mismo `nombre` (las `etiquetas` sí pueden quedar vacías la segunda vez,
@@ -69,10 +71,79 @@ const BRAND_TITLE_CASE = new Set([
   'YAMAHA',
 ])
 
+/**
+ * Nombres propios que SAP entrega en mayúsculas: lugares de la empresa y
+ * fabricantes que no están en la lista de marcas. Clave sin tilde (como llega),
+ * valor como se escribe. Solo se aplica al token completo.
+ */
+const PROPIOS: Record<string, string> = {
+  CHONCHI: 'Chonchi', YAL: 'Yal', CASTRO: 'Castro', QUELLON: 'Quellón', DALCAHUE: 'Dalcahue',
+  CHILOE: 'Chiloé', ANCUD: 'Ancud', CALBUCO: 'Calbuco', MONTT: 'Montt', AQUACHILE: 'AquaChile',
+  MARELEC: 'Marelec', KNURO: 'Knuro', FISHKEN: 'Fishken', JOSMAR: 'Josmar', CARSOE: 'Carsoe',
+  CABINPLANT: 'Cabinplant', BITZER: 'Bitzer', MYCOM: 'Mycom', SABROE: 'Sabroe', GRUNDFOS: 'Grundfos',
+  WILO: 'Wilo', SCHNEIDER: 'Schneider', ROCKWELL: 'Rockwell', OMRON: 'Omron', ATLAS: 'Atlas',
+  COPCO: 'Copco', SANDVIK: 'Sandvik', ZEBRA: 'Zebra', HONEYWELL: 'Honeywell', ENDRESS: 'Endress',
+  HAUSER: 'Hauser', PEPPERL: 'Pepperl', FUCHS: 'Fuchs', BOSCH: 'Bosch', REXROTH: 'Rexroth',
+  PARKER: 'Parker', NORGREN: 'Norgren', LENZE: 'Lenze', NORD: 'Nord', SEW: 'SEW', BONFIGLIOLI: 'Bonfiglioli',
+}
+
+/**
+ * Vocabulario de planta con tilde. SAP llega sin tildes; sin esta tabla «VACIO»
+ * salía «vacio». Clave sin tilde, valor en minúscula con tilde (la primera letra
+ * del nombre se sube al final). Solo tokens completos, sin dígitos.
+ */
+const ACENTOS: Record<string, string> = {
+  VACIO: 'vacío', LIQUIDO: 'líquido', LIQUIDOS: 'líquidos', SEPARACION: 'separación', ESTACION: 'estación',
+  SUBESTACION: 'subestación', MANTENCION: 'mantención', DECLORACION: 'decloración', ECUALIZACION: 'ecualización',
+  EQUALIZACION: 'ecualización', FRIGORIFICO: 'frigorífico', ANTECAMARA: 'antecámara', CAMARA: 'cámara',
+  CAMARAS: 'cámaras', MAQUINA: 'máquina', MAQUINAS: 'máquinas', TUNEL: 'túnel', TUNELES: 'túneles',
+  AUTOMATICO: 'automático', AUTOMATICA: 'automática', ADUCCION: 'aducción', DINAMICA: 'dinámica',
+  DINAMICO: 'dinámico', POLIMERO: 'polímero', ELECTRICO: 'eléctrico', ELECTRICA: 'eléctrica',
+  ELECTRICOS: 'eléctricos', HIDRAULICO: 'hidráulico', HIDRAULICA: 'hidráulica', NEUMATICO: 'neumático',
+  NEUMATICA: 'neumática', VALVULA: 'válvula', VALVULAS: 'válvulas', TERMICO: 'térmico', TERMICA: 'térmica',
+  COMPRESION: 'compresión', PRESION: 'presión', REFRIGERACION: 'refrigeración', VENTILACION: 'ventilación',
+  ILUMINACION: 'iluminación', MECANICO: 'mecánico', MECANICA: 'mecánica', BATERIA: 'batería',
+  BATERIAS: 'baterías', CALEFACCION: 'calefacción', MEDICION: 'medición', PRODUCCION: 'producción',
+  HIGIENIZACION: 'higienización', AGITACION: 'agitación', DOSIFICACION: 'dosificación',
+  CIRCULACION: 'circulación', RECIRCULACION: 'recirculación', ANDEN: 'andén', CAMION: 'camión',
+  LAMINA: 'lámina', OXIGENO: 'oxígeno', NITROGENO: 'nitrógeno', CALIBRACION: 'calibración',
+  INSPECCION: 'inspección', SECCION: 'sección', LINEA: 'línea', LINEAS: 'líneas', AREA: 'área',
+  AREAS: 'áreas', CATEGORIA: 'categoría', BASICO: 'básico', QUIMICO: 'químico', QUIMICA: 'química',
+  ELECTRONICO: 'electrónico', ELECTRONICA: 'electrónica', PLASTICO: 'plástico', PLASTICA: 'plástica',
+  CERAMICO: 'cerámico', ESTATICO: 'estático', ESTATICA: 'estática', DESCRIPCION: 'descripción',
+  CODIGO: 'código', RAPIDO: 'rápido', RAPIDA: 'rápida', UNION: 'unión', CONEXION: 'conexión',
+  SUCCION: 'succión', EXTRACCION: 'extracción', ELEVACION: 'elevación', INYECCION: 'inyección',
+  PROTECCION: 'protección', DIRECCION: 'dirección', LUBRICACION: 'lubricación', TENSION: 'tensión',
+  TRANSMISION: 'transmisión', ROTACION: 'rotación', FIJACION: 'fijación', SUJECION: 'sujeción',
+  ALIMENTACION: 'alimentación', EVACUACION: 'evacuación', DISTRIBUCION: 'distribución',
+  GENERACION: 'generación', REGULACION: 'regulación', AISLACION: 'aislación', REPARACION: 'reparación',
+  INSTALACION: 'instalación', OPERACION: 'operación', VISCOSIDAD: 'viscosidad', TERMOSTATICO: 'termostático',
+  TERMOSTATICA: 'termostática', MAGNETICO: 'magnético', MAGNETICA: 'magnética', CILINDRICO: 'cilíndrico',
+  CILINDRICA: 'cilíndrica', CONICO: 'cónico', CONICA: 'cónica', RIGIDO: 'rígido', RIGIDA: 'rígida',
+  ESTANDAR: 'estándar', ESFERICO: 'esférico', ESFERICA: 'esférica', ELASTICO: 'elástico', ELASTICA: 'elástica',
+  MULTIPLE: 'múltiple', PANTALON: 'pantalón', TAPON: 'tapón', TAPONES: 'tapones', BOTON: 'botón',
+  BOTONES: 'botones', PISTON: 'pistón', PISTONES: 'pistones', EMBOLO: 'émbolo', ROTULA: 'rótula',
+  ANGULO: 'ángulo', PLASMA: 'plasma', HELICE: 'hélice', TERMINO: 'término', ACIDO: 'ácido',
+  OFICINA: 'oficina', SANITARIO: 'sanitario', AGUA: 'agua', AGUAS: 'aguas',
+}
+
 /** Siglas/marcas que se protegen (quedan en mayúscula, salvo BRAND_TITLE_CASE). */
 const ACRONYMS = new Set([
   'PTC',
   'SAP',
+  'DAF',
+  'RILES',
+  'CCM',
+  'UPS',
+  'NFPA',
+  'IQF',
+  'CIP',
+  'OT',
+  'PPM',
+  'TDS',
+  'ORP',
+  'CH',
+  'MYPRO',
   'NTC',
   'PLC',
   'HMI',
@@ -167,9 +238,10 @@ function processToken(token: string): string {
     return fixed.toLowerCase()
   }
 
-  // Regla 8: P/, C/, S/ -> minúscula completa.
+  // Regla 8: P/, C/, S/ -> minúscula completa (con tilde si la palabra la lleva).
   if (P_C_S_PREFIX_RE.test(token)) {
-    return token.toLowerCase()
+    const [pref, word = ''] = token.split('/')
+    return `${(pref ?? '').toLowerCase()}/${ACENTOS[word.toUpperCase()] ?? word.toLowerCase()}`
   }
 
   // Regla 7: número pegado a una unidad -> separar y aplicar casing de tabla.
@@ -188,16 +260,26 @@ function processToken(token: string): string {
     // Sigue teniendo un dígito: cae a la protección genérica más abajo.
   }
 
-  // Regla 6/7: token completo = unidad o sigla/marca reconocida (sin número pegado).
+  // Regla 6/7: token completo = unidad, sigla/marca, nombre propio o palabra con
+  // tilde (sin número pegado). Admite un paréntesis de apertura: «(DAF)».
   {
-    const { core, trailing } = splitTrailingPunct(token)
-    if (/^[A-Za-zÀ-ÿ]+$/.test(core)) {
+    const m = token.match(/^(\(?)([A-Za-zÀ-ÿ]+)([).,;:]*)$/)
+    const lead = m?.[1] ?? ''
+    const core = m?.[2] ?? ''
+    const trailing = m?.[3] ?? ''
+    if (m) {
       const upperCore = core.toUpperCase()
       if (UNIT_MAP[upperCore]) {
-        return `${UNIT_MAP[upperCore]}${trailing}`
+        return `${lead}${UNIT_MAP[upperCore]}${trailing}`
       }
       if (ACRONYMS.has(upperCore)) {
-        return `${acronymCase(core)}${trailing}`
+        return `${lead}${acronymCase(core)}${trailing}`
+      }
+      if (PROPIOS[upperCore]) {
+        return `${lead}${PROPIOS[upperCore]}${trailing}`
+      }
+      if (ACENTOS[upperCore]) {
+        return `${lead}${ACENTOS[upperCore]}${trailing}`
       }
     }
   }

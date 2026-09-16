@@ -69,6 +69,7 @@ import { usePermissions } from '@/hooks/usePermissions'
 import { PhotoAnnotationEditor } from '@/components/PhotoAnnotationEditor'
 import { TelemetryChart } from '@/components/equipment/TelemetryChart'
 import type { Equipment, Incident } from '@/types'
+import { formatNombreSAP } from '@/utils/repuestos/formatNombreSAP'
 
 const ITEMS_PER_PAGE = 12
 
@@ -1732,7 +1733,7 @@ function EquipmentCard({
             <div className="flex-1 min-w-0 cursor-pointer" onClick={onOpenDetail}>
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <div className={compact ? 'text-sm font-semibold truncate' : 'font-semibold truncate'}>{equipment.nombre}</div>
+                  <div className={compact ? 'text-sm font-semibold truncate' : 'font-semibold truncate'}>{formatNombreSAP(equipment.nombre).nombre || equipment.nombre}</div>
                   <div
                     className={
                       compact
@@ -1976,7 +1977,7 @@ function EquipmentDetailDialog({
         <DialogHeader>
           {/* pr-[32px]: la estrella quedaba bajo la X del diálogo (su esquina recibía el toque de cerrar). */}
           <DialogTitle className="flex items-center justify-between gap-2 pr-[32px]">
-            <span className="truncate">{equipment.nombre}</span>
+            <span className="truncate">{formatNombreSAP(equipment.nombre).nombre || equipment.nombre}</span>
             <Button
               variant="ghost"
               size="icon"

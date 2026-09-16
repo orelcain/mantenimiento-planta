@@ -10,6 +10,25 @@ describe('formatNombreSAP', () => {
     expect(formatNombreSAP('(NO USAR)')).toEqual({ nombre: '', etiquetas: ['No usar'] })
   })
 
+  it('nombres propios, tildes de planta y siglas de área', () => {
+    const casos: [string, string][] = [
+      ['PLANTA CHONCHI', 'Planta Chonchi'],
+      ['SUB ESTACION YAL', 'Sub estación Yal'],
+      ['PATIO Y SERVICIOS EXTERIORES', 'Patio y servicios exteriores'],
+      ['BOMBA VACIO ANILLO LIQUIDO N1', 'Bomba vacío anillo líquido N1'],
+      ['SIST SEPARACION POR AIRE DISUELTO (DAF)', 'Sist separación por aire disuelto (DAF)'],
+      ['PLANTA RILES', 'Planta RILES'],
+      ['EVISCERADORA BAADER 142 N3', 'Evisceradora Baader 142 N3'],
+      ['BALANZA DINAMICA MARELEC', 'Balanza dinámica Marelec'],
+      ['SALA DE MAQUINAS', 'Sala de máquinas'],
+      ['CAJA 8', 'Caja 8'],
+    ]
+    for (const [entrada, esperado] of casos) {
+      expect(formatNombreSAP(entrada).nombre).toBe(esperado)
+      expect(formatNombreSAP(esperado).nombre).toBe(esperado)
+    }
+  })
+
   it('vacío y null devuelven nombre vacío sin etiquetas', () => {
     expect(formatNombreSAP('')).toEqual({ nombre: '', etiquetas: [] })
     expect(formatNombreSAP(null)).toEqual({ nombre: '', etiquetas: [] })
@@ -49,14 +68,14 @@ describe('formatNombreSAP', () => {
   it('pulgada (3/8") se conserva, código con guiones y letras se protege', () => {
     const r = formatNombreSAP('"SELLO MECANICO SEAL 1 3/8" CA-NIR-VI 2')
     expect(r).toEqual({
-      nombre: 'Sello mecanico seal 1 3/8" CA-NIR-VI 2',
+      nombre: 'Sello mecánico seal 1 3/8" CA-NIR-VI 2',
       etiquetas: [],
     })
   })
 
   it('prefijo (NO USAR) se extrae a etiquetas', () => {
     const r = formatNombreSAP('(NO USAR) BORNE P/BATERIA')
-    expect(r).toEqual({ nombre: 'Borne p/bateria', etiquetas: ['No usar'] })
+    expect(r).toEqual({ nombre: 'Borne p/batería', etiquetas: ['No usar'] })
   })
 
   it('unidad ya separada (1000 W) se conserva en mayúscula', () => {
@@ -83,7 +102,7 @@ describe('formatNombreSAP', () => {
   it('marca con inicial mayúscula (Festo) + número pegado a sigla (24VDC)', () => {
     const r = formatNombreSAP('VALVULA SOLENOIDE FESTO 24VDC')
     expect(r).toEqual({
-      nombre: 'Valvula solenoide Festo 24 VDC',
+      nombre: 'Válvula solenoide Festo 24 VDC',
       etiquetas: [],
     })
   })

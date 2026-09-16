@@ -1509,7 +1509,7 @@ function BodegaRow({ item, onEdit, onMovimiento, onToggleWatch, onOpenDrawer }: 
 
   const meta = [
     item.codigoSAP,
-    item.ubicacionBodega,
+    item.ubicacionBodega && (formatNombreSAP(item.ubicacionBodega).nombre || item.ubicacionBodega),
     item.equipos.length > 0 && `${item.equipos.length} ${item.equipos.length === 1 ? 'equipo' : 'equipos'}`,
     item.tipo && item.tipo.toUpperCase() !== 'OTROS' && formatNombreSAP(item.tipo).nombre,
     valorTotal > 0 && `$${valorTotal.toLocaleString('es-CL', { maximumFractionDigits: 0 })}`,
