@@ -77,7 +77,7 @@ export function EquipmentHeaderPhoto({ equipmentId }: { equipmentId: string }) {
       {lightbox && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90" onClick={() => setLightbox(null)}>
           <div className="relative flex max-h-[90vh] w-full max-w-4xl flex-col items-center" onClick={(e) => e.stopPropagation()}>
-            <button onClick={() => setLightbox(null)} className="absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white transition-colors hover:bg-red-500">
+            <button onClick={() => setLightbox(null)} className="absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-ink-crit transition-colors hover:brightness-95/[0.15]">
               <X className="h-4 w-4" />
             </button>
 

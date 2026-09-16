@@ -705,7 +705,7 @@ export function AnalisisGraderGatesConfigPage({
                     setSavingShiftThresholds(false)
                   }
                 }}
-                className="text-xs h-7 border-primary/[0.25] text-primary hover:bg-primary/[0.15]"
+                className="text-xs h-7 border-primary/[0.25] text-brand-ink hover:bg-primary/[0.15]"
               >
                 {savingShiftThresholds && <Loader2 className="w-3 h-3 mr-1.5 animate-spin" />}
                 {hasShiftThresholdsOverride ? 'Actualizar override de este turno' : 'Guardar solo para este turno'}
@@ -775,7 +775,7 @@ export function AnalisisGraderGatesConfigPage({
                     />
                   </div>
                   {shift.quota && shift.quota.value > 0 && (
-                    <span className="text-caption px-1.5 py-0.5 rounded-ctl bg-primary/5 text-primary/80 border border-primary/20 tabular-nums" title="Cuota actual (editable desde el detalle del turno)">
+                    <span className="text-caption px-1.5 py-0.5 rounded-ctl bg-primary/5 text-brand-ink/80 border border-primary/20 tabular-nums" title="Cuota actual (editable desde el detalle del turno)">
                       Cuota: {shift.quota.value.toLocaleString('es-CL')} {shift.quota.unit === 'kg' ? 'kg' : 'pz'}
                     </span>
                   )}
@@ -995,7 +995,7 @@ export function AnalisisGraderGatesConfigPage({
             {!tabbed && <ChevronDown className={`h-4 w-4 transition-transform ${showWeightRanges ? '' : '-rotate-90'}`} />}
             Rangos de Peso por Calibre
             {hasShiftOverride && (
-              <Badge className="text-caption bg-primary/[0.15] text-primary">
+              <Badge className="text-caption bg-primary/[0.15] text-brand-ink">
                 Override de este turno
               </Badge>
             )}

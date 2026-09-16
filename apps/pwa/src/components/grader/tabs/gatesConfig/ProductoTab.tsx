@@ -135,7 +135,7 @@ export function ProductoTab({
                 </Badge>
               )}
               {medianSource === 'manual' && (
-                <Badge className="text-caption bg-primary/[0.15] text-primary px-1.5 py-0">
+                <Badge className="text-caption bg-primary/[0.15] text-brand-ink px-1.5 py-0">
                   Manual
                 </Badge>
               )}
@@ -255,7 +255,7 @@ export function ProductoTab({
                     <button
                       type="button"
                       onClick={onOpenZ2Capture}
-                      className="inline-flex items-center gap-1 text-caption border border-primary/[0.25] text-primary rounded-ctl px-1.5 py-0.5 hover:bg-primary/[0.15] transition-colors"
+                      className="inline-flex items-center gap-1 text-caption border border-primary/[0.25] text-brand-ink rounded-ctl px-1.5 py-0.5 hover:bg-primary/[0.15] transition-colors"
                     >
                       <MonitorSmartphone className="h-3 w-3" />Leer Z2
                     </button>

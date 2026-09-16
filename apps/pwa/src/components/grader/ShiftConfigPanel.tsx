@@ -23,7 +23,7 @@ type Species = 'coho' | 'salar'
 const SPECIES_LABEL: Record<Species, string> = { coho: 'Coho', salar: 'Salar' }
 const SPECIES_CSS: Record<Species, string> = {
   coho: 'bg-cat-7-tint/[0.15] text-cat-7-ink border-cat-7-tint/[0.25]',
-  salar: 'bg-primary/[0.15] text-primary border-primary/[0.25]',
+  salar: 'bg-primary/[0.15] text-brand-ink border-primary/[0.25]',
 }
 
 function inferSpecies(breakdown?: Record<string, number>): Species | null {
@@ -172,7 +172,7 @@ export function ShiftConfigPanel({
             <>
               <button
                 onClick={() => setGateModalOpen(true)}
-                className="flex items-center gap-1 text-caption px-2 py-0.5 rounded-ctl border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 transition-colors"
+                className="flex items-center gap-1 text-caption px-2 py-0.5 rounded-ctl border border-primary/30 bg-primary/5 text-brand-ink hover:bg-primary/10 transition-colors"
               >
                 <GitBranch className="w-2.5 h-2.5" />
                 Cambié gate

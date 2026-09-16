@@ -105,6 +105,7 @@ export function SwipeRow({ children, trailing = [], leading, className }: SwipeR
           aria-hidden
           className={cn(
             'absolute inset-y-0 left-0 flex items-center justify-start pl-5 transition-colors',
+            // Acción de deslizamiento: relleno sólido, como el amarillo de "favorito" en Correo.
             dx > LEADING_THRESHOLD ? 'bg-amber-400 text-white' : 'bg-muted text-muted-foreground',
           )}
           style={{ width: Math.max(0, dx) }}

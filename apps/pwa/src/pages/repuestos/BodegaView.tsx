@@ -1052,9 +1052,9 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
           </div>
           {stats.conStock > 0 && (
             <div className="h-3 rounded-full overflow-hidden flex bg-muted">
-              {okCount > 0 && <div className="bg-emerald-500 h-full transition-all" style={{ width: `${(okCount / stats.conStock) * 100}%` }} />}
-              {stats.bajoStock > 0 && <div className="bg-amber-500 h-full transition-all" style={{ width: `${(stats.bajoStock / stats.conStock) * 100}%` }} />}
-              {stats.sinStock > 0 && <div className="bg-red-500 h-full transition-all" style={{ width: `${(stats.sinStock / stats.conStock) * 100}%` }} />}
+              {okCount > 0 && <div className="bg-fill-ok h-full transition-all" style={{ width: `${(okCount / stats.conStock) * 100}%` }} />}
+              {stats.bajoStock > 0 && <div className="bg-fill-warning h-full transition-all" style={{ width: `${(stats.bajoStock / stats.conStock) * 100}%` }} />}
+              {stats.sinStock > 0 && <div className="bg-fill-critical h-full transition-all" style={{ width: `${(stats.sinStock / stats.conStock) * 100}%` }} />}
             </div>
           )}
         </div>
@@ -1315,7 +1315,7 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
                         <div className="flex items-center gap-2">
                           <div className="flex-1 h-2.5 bg-muted rounded-full overflow-hidden">
                             <div
-                              className={`h-full rounded-full transition-all ${row.pct >= 50 ? 'bg-emerald-500' : row.pct >= 20 ? 'bg-amber-500' : 'bg-red-500'}`}
+                              className={`h-full rounded-full transition-all ${row.pct >= 50 ? 'bg-fill-ok' : row.pct >= 20 ? 'bg-fill-warning' : 'bg-fill-critical'}`}
                               style={{ width: `${Math.min(row.pct, 100)}%` }}
                             />
                           </div>
@@ -1405,7 +1405,7 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
                         <div className="flex items-center gap-2">
                           <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
                             <div
-                              className={`h-full rounded-full transition-all ${row.pct >= 50 ? 'bg-emerald-500' : row.pct >= 20 ? 'bg-amber-500' : 'bg-red-500'}`}
+                              className={`h-full rounded-full transition-all ${row.pct >= 50 ? 'bg-fill-ok' : row.pct >= 20 ? 'bg-fill-warning' : 'bg-fill-critical'}`}
                               style={{ width: `${Math.min(row.pct, 100)}%` }}
                             />
                           </div>

@@ -313,7 +313,7 @@ function CtaTile({ tile, showWip, onRelease }: { tile: Tile; showWip: boolean; o
         <div className="flex gap-1.5 shrink-0">
           <button
             onClick={(e) => { e.preventDefault(); onRelease?.(); setConfirming(false) }}
-            className="text-caption bg-emerald-500 text-white rounded-card w-7 h-7 flex items-center justify-center active:scale-90 font-bold"
+            className="text-caption bg-emerald-500/[0.15] text-ink-ok rounded-card w-7 h-7 flex items-center justify-center active:scale-90 font-bold"
           >✓</button>
           <button
             onClick={(e) => { e.preventDefault(); setConfirming(false) }}

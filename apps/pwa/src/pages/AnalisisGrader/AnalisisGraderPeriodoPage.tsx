@@ -10,6 +10,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, Navigate } from 'react-router-dom'
 import { Card, CardContent, Button } from '@/components/ui'
+import { SegmentedControl } from '@/components/piel'
 import { ArrowLeft, BarChart3, Loader2, AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Circle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { usePermissionsStore } from '@/store'
@@ -215,7 +216,7 @@ export function AnalisisGraderPeriodoPage() {
       {/* ── Header ──────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" onClick={() => navigate('/analisis-grader')} className="gap-1.5">
+          <Button variant="outline" onClick={() => navigate('/analisis-grader')} className="gap-1.5">
             <ArrowLeft className="h-4 w-4" />
             Análisis de Turno
           </Button>
@@ -253,7 +254,7 @@ export function AnalisisGraderPeriodoPage() {
               size="sm"
               onClick={handleMigrate}
               disabled={migrating}
-              className="bg-amber-600 hover:bg-amber-600 text-white shrink-0"
+              className="bg-amber-500/[0.15] hover:brightness-95/[0.15] text-ink-warn shrink-0"
             >
               {migrating
                 ? <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />Migrando…</>
@@ -285,26 +286,18 @@ export function AnalisisGraderPeriodoPage() {
       <Card>
         <CardContent className="pt-4 pb-4 space-y-3">
           <div className="flex items-center gap-2 flex-wrap">
-            {PRESET_ORDER.map((p) => (
-              <button
-                key={p.key}
-                type="button"
-                onClick={() => handlePresetClick(p.key)}
-                className={cn(
-                  'px-3 py-1.5 rounded-ctl text-xs font-medium border transition-colors',
-                  activePreset === p.key
-                    ? 'bg-primary text-primary-foreground border-primary'
-                    : 'bg-background border-border hover:bg-muted/50',
-                )}
-              >
-                {p.label}
-              </button>
-            ))}
+            <SegmentedControl<PeriodPresetKey>
+              ariaLabel="Rango del período"
+              value={activePreset}
+              onChange={(key) => { if (key !== 'custom') handlePresetClick(key) }}
+              segments={PRESET_ORDER.map((p) => ({ value: p.key, label: p.label }))}
+              className="w-auto max-w-sm shrink-0"
+            />
             <button
               type="button"
               onClick={() => setCustomOpen((o) => !o)}
               className={cn(
-                'px-3 py-1.5 rounded-ctl text-xs font-medium border transition-colors',
+                'h-11 rounded-full px-4 text-subhead font-medium border transition-colors',
                 activePreset === 'custom'
                   ? 'bg-primary text-primary-foreground border-primary'
                   : 'bg-background border-border hover:bg-muted/50',
@@ -326,7 +319,7 @@ export function AnalisisGraderPeriodoPage() {
               <button
                 type="button"
                 onClick={() => activePreset === 'week' ? handleWeekStep(-1) : handleMonthStep(-1)}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-ctl text-xs font-medium border border-border bg-background hover:bg-muted/50 transition-colors"
+                className="inline-flex h-11 items-center gap-1 rounded-full px-4 text-subhead font-medium border border-border bg-background hover:bg-muted/50 transition-colors"
                 title={activePreset === 'week' ? 'Semana anterior' : 'Mes anterior'}
               >
                 <ChevronLeft className="h-3.5 w-3.5" />
@@ -336,7 +329,7 @@ export function AnalisisGraderPeriodoPage() {
                 type="button"
                 onClick={() => activePreset === 'week' ? handleWeekStep(0 - weekOffset) : handleMonthStep(0 - monthOffset)}
                 disabled={(activePreset === 'week' && weekOffset === 0) || (activePreset === 'month' && monthOffset === 0)}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-ctl text-xs font-medium border border-border bg-background hover:bg-muted/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="inline-flex h-11 items-center gap-1 rounded-full px-4 text-subhead font-medium border border-border bg-background hover:bg-muted/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 title={activePreset === 'week' ? 'Volver a semana actual' : 'Volver al mes actual'}
               >
                 <Circle className="h-3 w-3" />
@@ -346,7 +339,7 @@ export function AnalisisGraderPeriodoPage() {
                 type="button"
                 onClick={() => activePreset === 'week' ? handleWeekStep(1) : handleMonthStep(1)}
                 disabled={(activePreset === 'week' && weekOffset >= 0) || (activePreset === 'month' && monthOffset >= 0)}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-ctl text-xs font-medium border border-border bg-background hover:bg-muted/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="inline-flex h-11 items-center gap-1 rounded-full px-4 text-subhead font-medium border border-border bg-background hover:bg-muted/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 title={activePreset === 'week' ? 'Semana siguiente' : 'Mes siguiente'}
               >
                 Siguiente
@@ -378,7 +371,7 @@ export function AnalisisGraderPeriodoPage() {
                 onChange={(e) => setCustomEnd(e.target.value)}
                 className="border rounded-ctl px-2 py-1 text-xs bg-background [color-scheme:dark]"
               />
-              <Button size="sm" onClick={handleApplyCustom} disabled={!customStart || !customEnd || customStart > customEnd}>
+              <Button onClick={handleApplyCustom} disabled={!customStart || !customEnd || customStart > customEnd}>
                 Aplicar
               </Button>
             </div>

@@ -262,7 +262,7 @@ function PauseAnnotationPanel({
             <button
               onClick={() => void handleSave(item)}
               disabled={!selections[key] || isSaving}
-              className="shrink-0 px-2 h-6 rounded-ctl text-caption bg-amber-500/[0.15] text-white disabled:opacity-30 hover:bg-amber-500 transition-colors"
+              className="shrink-0 px-2 h-6 rounded-ctl text-caption bg-amber-500/[0.15] text-ink-warn disabled:opacity-30 hover:brightness-95/[0.15] transition-colors"
             >
               {isSaving ? '…' : 'OK'}
             </button>

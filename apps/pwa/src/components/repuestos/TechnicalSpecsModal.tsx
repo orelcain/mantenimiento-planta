@@ -374,7 +374,7 @@ export function TechnicalSpecsModal({
               {readOnly ? 'Cerrar' : 'Cancelar'}
             </Button>
             {!readOnly && (
-              <Button onClick={handleSave} disabled={saving} className="bg-blue-600 hover:bg-blue-500 text-white">
+              <Button onClick={handleSave} disabled={saving} className="bg-primary/[0.12] hover:bg-primary/[0.12] text-brand-ink">
                 {saving ? (
                   <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Guardando...</>
                 ) : (

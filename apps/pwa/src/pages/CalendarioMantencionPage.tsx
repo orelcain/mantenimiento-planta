@@ -2784,7 +2784,7 @@ export function CalendarioMantencionPage() {
                         <td className="px-1 py-1" style={{ minWidth: 90 }}>
                           <div className="flex items-center gap-1">
                             <div className="flex-1 h-[5px] rounded-full bg-muted overflow-hidden">
-                              <div className={`h-full rounded-full transition-all ${wOver ? 'bg-red-500' : row.deltaWeek > 0 ? 'bg-cat-4-tint' : 'bg-emerald-500'}`} style={{ width: `${pctW}%` }} />
+                              <div className={`h-full rounded-full transition-all ${wOver ? 'bg-fill-critical' : row.deltaWeek > 0 ? 'bg-cat-4-tint' : 'bg-fill-ok'}`} style={{ width: `${pctW}%` }} />
                             </div>
                             <span className={`shrink-0 inline-block min-w-[38px] rounded-ctl px-1 py-[1px] text-center text-caption tabular-nums font-bold ${wOver ? 'bg-red-500/[0.15] text-red-400' : row.deltaWeek > 0 ? 'bg-cat-4-tint/[0.15] text-cat-4-ink' : 'bg-muted text-muted-foreground'}`}>
                               {formatDelta(row.deltaWeek)}
@@ -2813,7 +2813,7 @@ export function CalendarioMantencionPage() {
                         <td className="px-1 py-1" style={{ minWidth: 90 }}>
                           <div className="flex items-center gap-1">
                             <div className="flex-1 h-[5px] rounded-full bg-muted overflow-hidden">
-                              <div className={`h-full rounded-full transition-all ${mOver ? 'bg-red-500' : row.deltaMonth > 0 ? 'bg-cat-4-tint' : 'bg-emerald-500'}`} style={{ width: `${pctM}%` }} />
+                              <div className={`h-full rounded-full transition-all ${mOver ? 'bg-fill-critical' : row.deltaMonth > 0 ? 'bg-cat-4-tint' : 'bg-fill-ok'}`} style={{ width: `${pctM}%` }} />
                             </div>
                             <span className={`shrink-0 inline-block min-w-[38px] rounded-ctl px-1 py-[1px] text-center text-caption tabular-nums font-bold ${mOver ? 'bg-red-500/[0.15] text-red-400' : row.deltaMonth > 0 ? 'bg-cat-4-tint/[0.15] text-cat-4-ink' : 'bg-muted text-muted-foreground'}`}>
                               {row.mesCompleto ? (

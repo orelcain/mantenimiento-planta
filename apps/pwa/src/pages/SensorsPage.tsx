@@ -2394,7 +2394,7 @@ export function SensorsPage() {
                             <div
                               className={`h-full transition-all ${
                                 apPassword.length < 8
-                                  ? 'w-1/3 bg-red-500'
+                                  ? 'w-1/3 bg-fill-critical'
                                   : apPassword.length < 12
                                     ? 'w-2/3 bg-amber-500'
                                     : 'w-full bg-green-500'

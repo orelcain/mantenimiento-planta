@@ -264,7 +264,7 @@ function TablaEditor({
     <div className="py-2 overflow-x-auto">
       <table className="border-collapse border border-blue-200">
         <thead>
-          <tr className="bg-blue-900 text-white">
+          <tr className="bg-primary/[0.12] text-brand-ink">
             {bloque.columnas.map((col, idx) => (
               <th key={idx} className="border border-blue-300 px-3 py-2 relative group/col">
                 <ETTInlineText
@@ -277,7 +277,7 @@ function TablaEditor({
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="absolute -top-2 -right-2 h-5 w-5 p-0 bg-red-600 text-white rounded-full opacity-0 group-hover/col:opacity-100"
+                    className="absolute -top-2 -right-2 h-5 w-5 p-0 bg-red-500/[0.15] text-ink-crit rounded-full opacity-0 group-hover/col:opacity-100"
                     onClick={() => removeColumna(idx)}
                   >
                     <X className="h-3 w-3" />

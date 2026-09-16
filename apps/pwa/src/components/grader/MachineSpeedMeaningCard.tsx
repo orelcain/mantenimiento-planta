@@ -255,7 +255,7 @@ export function MachineSpeedMeaningCard({ machines, className }: Props) {
           {s && (
             <div className="flex items-center gap-x-4 gap-y-1 flex-wrap text-caption text-muted-foreground pt-0.5 border-t border-border">
               <span className="flex items-center gap-1.5 pt-2">
-                <span className="w-4 h-2 rounded-full bg-sky-400" /> producido
+                <span className="w-4 h-2 rounded-full bg-primary" /> producido
               </span>
               <span className="flex items-center gap-1.5 sm:pt-2">
                 <span className="w-4 h-2 rounded-full bg-warning" /> perdido por ritmo

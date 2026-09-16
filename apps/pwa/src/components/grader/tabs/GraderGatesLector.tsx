@@ -186,7 +186,7 @@ export function GraderGatesLector({ analytics, gates, timingSignals, etiquetaPer
           onClick={() => void copiarResumen()}
           className={cn(
             'inline-flex min-h-[44px] items-center gap-1.5 rounded-ctl px-4 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
-            copiado ? 'bg-ink-ok/10 text-ink-ok' : 'bg-primary/10 text-primary',
+            copiado ? 'bg-ink-ok/10 text-ink-ok' : 'bg-primary/10 text-brand-ink',
           )}
           aria-live="polite"
         >

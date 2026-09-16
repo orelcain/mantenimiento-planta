@@ -236,7 +236,7 @@ function TurnoViewTabs({
             {TURNO_VIEW_LABEL[view]}
             {!motivo && !!badge && (
               <span className={`text-caption tabular-nums px-1.5 rounded-full ${
-                isActive ? 'bg-primary/20 text-primary' : 'bg-muted-foreground/15'
+                isActive ? 'bg-primary/20 text-brand-ink' : 'bg-muted-foreground/15'
               }`}>
                 {badge}
               </span>
@@ -2440,7 +2440,7 @@ export function AnalisisGraderTurnoPage() {
               Mobile: texto en línea propia (basis-full) para evitar comprimirse
               en una columna vertical de 1 palabra cuando los botones le roban
               ancho. Desktop: una sola línea con todos los elementos. */}
-          <div className="flex flex-wrap items-center gap-2 px-3 py-2 rounded-ctl bg-primary/[0.15] border border-primary/[0.25] text-primary text-sm">
+          <div className="flex flex-wrap items-center gap-2 px-3 py-2 rounded-ctl bg-primary/[0.15] border border-primary/[0.25] text-brand-ink text-sm">
             <div className="flex items-center gap-2 basis-full sm:basis-auto sm:flex-1 min-w-0">
               <Activity className="w-4 h-4 shrink-0" />
               <span className="flex-1 min-w-0">
@@ -2466,7 +2466,7 @@ export function AnalisisGraderTurnoPage() {
             <Button
               size="sm"
               variant="outline"
-              className="h-7 text-xs border-primary/[0.25] text-primary hover:bg-primary/[0.15] shrink-0"
+              className="h-7 text-xs border-primary/[0.25] text-brand-ink hover:bg-primary/[0.15] shrink-0"
               onClick={handleSlxRefresh}
               disabled={slxSyncing}
               title={`Último sync: ${slxBestSyncedAt?.toLocaleTimeString('es-CL') ?? 'nunca'}`}
@@ -2479,7 +2479,7 @@ export function AnalisisGraderTurnoPage() {
               <Button
                 size="sm"
                 variant="outline"
-                className="h-7 text-xs border-primary/[0.25] text-primary hover:bg-primary/[0.15] shrink-0"
+                className="h-7 text-xs border-primary/[0.25] text-brand-ink hover:bg-primary/[0.15] shrink-0"
                 onClick={() => navigate(wizardUrl)}
               >
                 <Upload className="w-3 h-3 mr-1.5" />
@@ -3136,7 +3136,7 @@ export function AnalisisGraderTurnoPage() {
                     </code>
                     <button
                       onClick={handleCopy}
-                      className="shrink-0 flex items-center gap-1 rounded-ctl bg-amber-500/[0.15] hover:bg-amber-500 text-white text-caption px-2 py-1 transition-colors"
+                      className="shrink-0 flex items-center gap-1 rounded-ctl bg-amber-500/[0.15] hover:brightness-95/[0.15] text-ink-warn text-caption px-2 py-1 transition-colors"
                       title="Copiar link"
                     >
                       {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
@@ -3270,7 +3270,7 @@ export function AnalisisGraderTurnoPage() {
                       setTimeout(() => setMonitorCopied(false), 2000)
                     })
                   }}
-                  className="shrink-0 flex items-center gap-1 rounded bg-sky-600 hover:bg-sky-500 text-white text-[11px] px-2 py-1 transition-colors"
+                  className="shrink-0 flex items-center gap-1 rounded bg-primary/[0.12] hover:bg-primary/[0.12] text-brand-ink text-[11px] px-2 py-1 transition-colors"
                   title="Copiar link"
                 >
                   {monitorCopied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}

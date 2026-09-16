@@ -420,7 +420,7 @@ function MessageBubble({
               <div className="flex gap-1.5">
                 <button
                   onClick={handleSubmitCorrection}
-                  className="flex-1 text-caption py-1 px-2 rounded-ctl bg-amber-500 text-white hover:bg-amber-600 transition-colors font-medium"
+                  className="flex-1 text-caption py-1 px-2 rounded-ctl bg-amber-500/[0.15] text-ink-warn hover:brightness-95/[0.15] transition-colors font-medium"
                 >
                   {correctionText.trim() ? 'Enviar corrección' : 'Marcar como incorrecto'}
                 </button>
@@ -749,7 +749,7 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
       <div className="flex gap-1 mb-2">
         {fields.map(f => (
           <div key={f.key} className="flex-1 flex flex-col items-center gap-0.5">
-            <div className={`w-full h-1.5 rounded-full ${f.done ? 'bg-green-500' : 'bg-muted-foreground/[0.10]'}`} />
+            <div className={`w-full h-1.5 rounded-full ${f.done ? 'bg-fill-ok' : 'bg-muted-foreground/[0.10]'}`} />
             <span className={`text-[9px] ${f.done ? 'text-ink-ok' : 'text-muted-foreground'}`}>{f.label}</span>
           </div>
         ))}
@@ -911,14 +911,14 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
       <div className="flex items-center gap-2">
         <button
           onClick={onConfirm}
-          className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-ctl bg-green-600 text-white hover:bg-emerald-600 transition-colors font-medium"
+          className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-ctl bg-green-500/[0.15] text-ink-ok hover:brightness-95/[0.15] transition-colors font-medium"
         >
           <CheckCircle className="w-3 h-3" />
           Confirmar
         </button>
         <button
           onClick={onModify}
-          className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-ctl bg-blue-600 text-white hover:bg-blue-600 transition-colors font-medium"
+          className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-ctl bg-primary/[0.12] text-brand-ink hover:bg-primary/[0.12] transition-colors font-medium"
         >
           <Pencil className="size-3" />
           Modificar

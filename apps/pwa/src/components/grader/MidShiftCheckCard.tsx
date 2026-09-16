@@ -212,7 +212,7 @@ export function MidShiftCheckCard({
                 ].join('\n')
                 navigate(`/incidents?nueva=1&titulo=${encodeURIComponent(`Repartir el ${saturated[0]!.label} en los gates (corte de control)`)}&desc=${encodeURIComponent(desc)}`)
               }}
-              className="inline-flex min-h-[44px] items-center rounded-ctl bg-primary/[0.12] px-4 text-xs font-medium text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              className="inline-flex min-h-[44px] items-center rounded-ctl bg-primary/[0.12] px-4 text-xs font-medium text-brand-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             >
               Registrar incidencia con esto
             </button>

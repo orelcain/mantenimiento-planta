@@ -47,14 +47,14 @@ const VERDICT_CONFIG = {
 }
 
 const DOT_COLOR: Record<string, string> = {
-  red: 'bg-red-500',
+  red: 'bg-fill-critical',
   orange: 'bg-cat-4-tint',
   purple: 'bg-cat-6-tint',
   cyan: 'bg-cat-7-tint',
-  emerald: 'bg-emerald-500',
-  amber: 'bg-amber-500',
-  brown: 'bg-amber-600',
-  blue: 'bg-blue-500',
+  emerald: 'bg-fill-ok',
+  amber: 'bg-fill-warning',
+  brown: 'bg-fill-warning',
+  blue: 'bg-primary',
   zinc: 'bg-muted-foreground',
 }
 

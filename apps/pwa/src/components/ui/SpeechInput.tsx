@@ -113,7 +113,7 @@ const SpeechInput = React.forwardRef<HTMLInputElement, SpeechInputProps>(
             variant="ghost"
             size="sm"
             className={cn(
-              "absolute right-2 top-1 h-8 w-8 p-0 rounded-full",
+              "absolute right-0 top-0 size-11 p-0 rounded-full",
               isListening 
                 ? "bg-red-500/[0.15] text-red-600 hover:bg-red-500/[0.15] hover:text-ink-crit animate-pulse" 
                 : "text-muted-foreground hover:text-foreground"

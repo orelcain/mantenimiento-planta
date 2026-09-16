@@ -6,7 +6,7 @@ import type { PointZeroSuggestion } from '@/services/grader/suggestions/types'
 const SEVERITY_STYLES = {
   warning:     { border: 'border-red-500/[0.25]',    bg: 'bg-red-500/[0.15]',    badge: 'bg-red-500/[0.15] text-ink-crit',    dot: 'bg-red-400'    },
   recommended: { border: 'border-amber-500/[0.25]',  bg: 'bg-amber-500/[0.15]',  badge: 'bg-amber-500/[0.15] text-ink-warn', dot: 'bg-amber-400'  },
-  info:        { border: 'border-primary/[0.25]',     bg: 'bg-primary/[0.15]',     badge: 'bg-primary/[0.15] text-primary',    dot: 'bg-ink-info'    },
+  info:        { border: 'border-primary/[0.25]',     bg: 'bg-primary/[0.15]',     badge: 'bg-primary/[0.15] text-brand-ink',    dot: 'bg-ink-info'    },
 } as const
 
 const CONFIDENCE_LABELS = {
@@ -115,7 +115,7 @@ export function SuggestionCard({ suggestion: s }: Props) {
               <button
                 type="button"
                 onClick={s.applyFn}
-                className="px-3 py-1.5 rounded-ctl bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs transition-colors"
+                className="px-3 py-1.5 rounded-ctl bg-emerald-500/[0.15] hover:brightness-95/[0.15] text-ink-ok font-medium text-xs transition-colors"
               >
                 Aplicar
               </button>

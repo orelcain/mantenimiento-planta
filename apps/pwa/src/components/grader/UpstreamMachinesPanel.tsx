@@ -1272,7 +1272,7 @@ export function UpstreamMachinesPanel({
               className={cn(
                 'text-caption px-1.5 py-0.5 rounded-ctl border shrink-0 transition-colors',
                 framedOnProduction
-                  ? 'border-primary/50 bg-primary/15 text-primary hover:bg-primary/25'
+                  ? 'border-primary/50 bg-primary/15 text-brand-ink hover:bg-primary/25'
                   : 'border-border text-muted-foreground hover:text-foreground hover:bg-muted',
               )}
             >

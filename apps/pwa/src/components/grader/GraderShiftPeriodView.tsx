@@ -14,6 +14,7 @@ import { GraderShiftPeriodMatrix } from '@/components/grader/GraderShiftPeriodMa
 import type { PeriodShift } from '@/services/grader/graderShiftPeriod'
 import { DEFAULT_MATRIX_KPI, type MatrixKpi } from '@/services/grader/graderShiftMatrixKpi'
 import { kpisDeMatriz } from '@/services/grader/graderShiftMatrixKpi'
+import { SegmentedControl } from '@/components/piel'
 
 export interface GraderShiftPeriodViewProps {
   shifts: readonly PeriodShift[]
@@ -96,7 +97,7 @@ export function GraderShiftPeriodView({
             <button
               type="button" aria-label="Mes anterior"
               onClick={() => onMonthChange(new Date(month.getFullYear(), month.getMonth() - 1, 1))}
-              className="h-8 w-8 inline-flex items-center justify-center rounded-ctl border border-border
+              className="size-11 inline-flex items-center justify-center rounded-full border border-border
                          text-muted-foreground hover:bg-accent transition-colors
                          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
@@ -108,7 +109,7 @@ export function GraderShiftPeriodView({
             <button
               type="button" aria-label="Mes siguiente"
               onClick={() => onMonthChange(new Date(month.getFullYear(), month.getMonth() + 1, 1))}
-              className="h-8 w-8 inline-flex items-center justify-center rounded-ctl border border-border
+              className="size-11 inline-flex items-center justify-center rounded-full border border-border
                          text-muted-foreground hover:bg-accent transition-colors
                          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
@@ -117,7 +118,7 @@ export function GraderShiftPeriodView({
             <button
               type="button"
               onClick={() => { const n = new Date(); onMonthChange(new Date(n.getFullYear(), n.getMonth(), 1)) }}
-              className="px-2 py-1 text-[11px] rounded-ctl border border-border text-muted-foreground
+              className="h-11 rounded-full px-4 text-subhead font-medium border border-border text-muted-foreground
                          hover:bg-accent transition-colors ml-0.5
                          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
@@ -126,25 +127,13 @@ export function GraderShiftPeriodView({
           </div>
         )}
 
-        <div className="inline-flex rounded-ctl border border-border overflow-hidden" role="group" aria-label="Indicador">
-          {kpisDisponibles.map(k => (
-            <button
-              key={k.id}
-              type="button"
-              onClick={() => setKpi(k.id)}
-              aria-pressed={kpiVigente === k.id}
-              className={cn(
-                'px-2.5 py-1.5 text-xs font-mono border-0 transition-colors',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:z-10',
-                kpiVigente === k.id
-                  ? 'bg-primary text-primary-foreground font-semibold'
-                  : 'bg-card text-muted-foreground hover:bg-accent',
-              )}
-            >
-              {k.label}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          ariaLabel="Indicador de la matriz"
+          value={kpiVigente}
+          onChange={setKpi}
+          segments={kpisDisponibles.map(k => ({ value: k.id, label: k.label }))}
+          className="w-auto max-w-xs shrink-0"
+        />
 
         {/* Con residuo sin turno el chip filtra; sin residuo (todo ya atribuido)
             queda informativo — el dato operacional "cuánto se produjo fuera de
@@ -188,7 +177,7 @@ export function GraderShiftPeriodView({
               onClick={() => onExport('png')}
               disabled={exporting !== null || shifts.length === 0}
               title="Descargar el comparativo del mes como imagen (PNG)"
-              className="h-8 w-8 inline-flex items-center justify-center rounded-ctl border border-border
+              className="size-11 inline-flex items-center justify-center rounded-full border border-border
                          text-muted-foreground hover:bg-accent transition-colors disabled:opacity-40
                          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
@@ -201,7 +190,7 @@ export function GraderShiftPeriodView({
               onClick={() => onExport('pdf')}
               disabled={exporting !== null || shifts.length === 0}
               title="Descargar el comparativo del mes como PDF"
-              className="h-8 w-8 inline-flex items-center justify-center rounded-ctl border border-border
+              className="size-11 inline-flex items-center justify-center rounded-full border border-border
                          text-muted-foreground hover:bg-accent transition-colors disabled:opacity-40
                          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >

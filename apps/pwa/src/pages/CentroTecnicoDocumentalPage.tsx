@@ -2398,7 +2398,7 @@ function ExpedienteDialog({
                     {pctVida != null && (
                       <div className="mt-2 h-2 rounded-full bg-muted overflow-hidden">
                         <div
-                          className={`h-full ${pctVida >= 100 ? 'bg-red-500' : pctVida >= 70 ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                          className={`h-full ${pctVida >= 100 ? 'bg-fill-critical' : pctVida >= 70 ? 'bg-fill-warning' : 'bg-fill-ok'}`}
                           style={{ width: `${Math.min(100, pctVida)}%` }}
                         />
                       </div>

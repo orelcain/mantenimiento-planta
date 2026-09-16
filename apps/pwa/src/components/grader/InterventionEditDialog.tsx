@@ -140,7 +140,7 @@ export function InterventionEditDialog({
               {TIPOS.map((t) => (
                 <button key={t.id} type="button" onClick={() => setTipo(t.id)}
                   className={cn('px-2 py-2 rounded-ctl border text-xs font-medium transition-colors',
-                    tipo === t.id ? 'border-primary/50 bg-primary/20 text-primary'
+                    tipo === t.id ? 'border-primary/50 bg-primary/20 text-brand-ink'
                       : 'border-border bg-background text-muted-foreground hover:bg-muted')}>
                   {t.label}
                 </button>

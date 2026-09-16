@@ -1510,7 +1510,7 @@ export function ShiftTimelineView({
             <button
               type="button"
               onClick={onUploadClick}
-              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-ctl border border-primary/[0.25] bg-primary/[0.15] text-primary hover:bg-primary/[0.15] active:bg-primary/[0.15] transition-colors text-caption font-medium"
+              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-ctl border border-primary/[0.25] bg-primary/[0.15] text-brand-ink hover:bg-primary/[0.15] active:bg-primary/[0.15] transition-colors text-caption font-medium"
               title="Cargar otro Excel del Grader para complementar este turno (turnos en curso suben Excel parciales múltiples veces)."
             >
               <Upload className="w-3 h-3" />
@@ -1531,7 +1531,7 @@ export function ShiftTimelineView({
               className={cn(
                 'shrink-0 px-2 py-0.5 font-medium transition-colors',
                 activeZoom === 'turno'
-                  ? 'bg-primary/20 text-primary'
+                  ? 'bg-primary/20 text-brand-ink'
                   : 'text-muted-foreground hover:text-foreground hover:bg-muted/30',
               )}
             >
@@ -1556,7 +1556,7 @@ export function ShiftTimelineView({
                   className={cn(
                     'shrink-0 px-2 py-0.5 font-medium transition-colors border-l border-border/30',
                     activeZoom === segId
-                      ? 'bg-primary/20 text-primary'
+                      ? 'bg-primary/20 text-brand-ink'
                       : `${colorClass} hover:bg-muted/30`,
                   )}
                 >

@@ -1645,7 +1645,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                   <button key={t.key} onClick={t.onClick} title={t.label} className="relative rounded-ctl p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
                     <Icon className="h-4 w-4" />
                     {t.badge ? (
-                      <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-caption font-bold text-white tabular-nums">{t.badge}</span>
+                      <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500/[0.15] px-1 text-caption font-bold text-ink-crit tabular-nums">{t.badge}</span>
                     ) : null}
                   </button>
                 )
@@ -1658,7 +1658,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
               <button onClick={() => setAdminMenuOpen((v) => !v)} title="Herramientas admin" aria-label="Herramientas admin" className="relative flex size-11 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground">
                 <MoreVertical className="h-5 w-5" />
                 {trashCount > 0 && (
-                  <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-caption font-bold text-white tabular-nums">{trashCount}</span>
+                  <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500/[0.15] px-1 text-caption font-bold text-ink-crit tabular-nums">{trashCount}</span>
                 )}
               </button>
               {adminMenuOpen && (
@@ -1676,7 +1676,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                           <Icon className="h-4 w-4 text-muted-foreground" />
                           <span className="flex-1">{t.label}</span>
                           {t.badge ? (
-                            <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-caption font-bold text-white tabular-nums">{t.badge}</span>
+                            <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500/[0.15] px-1 text-caption font-bold text-ink-crit tabular-nums">{t.badge}</span>
                           ) : null}
                         </button>
                       )

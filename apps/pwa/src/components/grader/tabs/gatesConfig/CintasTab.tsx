@@ -59,7 +59,7 @@ export function CintasTab({ physicalConfig, updateBeltLength, updateBeltSpeed, s
                     <span className="text-xs opacity-70">{resp.icon}</span>
                     {getBeltLabel(beltId)}
                     {beltId === 'main' && (
-                      <Badge className="text-caption bg-primary/10 text-primary border-primary/30">Principal</Badge>
+                      <Badge className="text-caption bg-primary/10 text-brand-ink border-primary/30">Principal</Badge>
                     )}
                   </CardTitle>
                   <CalibBadge status={belt.calibrationStatus} />
