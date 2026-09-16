@@ -14,6 +14,10 @@ import {
 import { Card, Badge } from '@/components/ui'
 import type { PhotoEvidence, PhotoEvidenceStatus } from '@/types'
 import { cn } from '@/lib/utils'
+import { formatNombreSAP } from '@/utils/repuestos/formatNombreSAP'
+
+/** «CHONCHI > PLANTA CHONCHI > EMPAQUE» → «Chonchi › Planta Chonchi › Empaque» (solo presentación). */
+const formatRuta = (ruta: string) => ruta.split(/\s*>\s*/).map(seg => formatNombreSAP(seg).nombre || seg).join(' › ')
 
 interface PhotoEvidenceCardProps {
   evidence: PhotoEvidence
@@ -128,7 +132,7 @@ export function PhotoEvidenceCard({
           {evidence.hierarchyPath && (
             <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
               <MapPin className="w-3 h-3" />
-              {evidence.hierarchyPath}
+              {formatRuta(evidence.hierarchyPath)}
             </p>
           )}
           <div className="flex items-center gap-2 mt-1">
@@ -162,8 +166,8 @@ export function PhotoEvidenceCard({
                 <Camera className="w-8 h-8 text-muted-foreground" />
               </div>
             )}
-            <div className="absolute top-2 left-2 px-2 py-0.5 bg-red-500/[0.15] text-ink-crit text-caption font-medium rounded-ctl">
-              ANTES ({totalBefore})
+            <div className="absolute top-2 left-2 rounded-full bg-card/80 px-2 py-0.5 text-caption font-medium text-foreground backdrop-blur-sm">
+              Antes ({totalBefore})
             </div>
           </div>
 
@@ -193,8 +197,8 @@ export function PhotoEvidenceCard({
                 )}
               </div>
             )}
-            <div className="absolute top-2 right-2 px-2 py-0.5 bg-green-500/[0.15] text-ink-ok text-caption font-medium rounded-ctl">
-              DESPUÉS ({totalAfter})
+            <div className="absolute top-2 right-2 rounded-full bg-card/80 px-2 py-0.5 text-caption font-medium text-foreground backdrop-blur-sm">
+              Después ({totalAfter})
             </div>
           </div>
         </div>
@@ -224,7 +228,7 @@ export function PhotoEvidenceCard({
           {evidence.hierarchyPath && (
             <span className="flex items-center gap-1">
               <MapPin className="w-3 h-3" />
-              <span className="truncate max-w-[150px]">{evidence.hierarchyPath}</span>
+              <span className="truncate max-w-[150px]">{formatRuta(evidence.hierarchyPath)}</span>
             </span>
           )}
           <span className="flex items-center gap-1">
