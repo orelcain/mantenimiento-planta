@@ -224,12 +224,17 @@ export default {
         // y 10px) — esa era la causa real de que se viera densa y no Apple.
         caption:   ['11px', { lineHeight: '1.35' }],
         footnote:  ['13px', { lineHeight: '1.4' }],
-        body:      ['15px', { lineHeight: '1.45' }],
+        // body 17 (Apple: 17/22). Estaba en 15, que es el SUBHEAD de Apple: toda la app
+        // iba un escalon por debajo de iOS y eso alimentaba la densidad. subhead y
+        // callout se agregan para que el texto secundario pueda bajar sin inventar px.
+        subhead:   ['15px', { lineHeight: '1.33' }],
+        callout:   ['16px', { lineHeight: '1.31' }],
+        body:      ['17px', { lineHeight: '1.3' }],
         headline:  ['17px', { lineHeight: '1.35', fontWeight: '600' }],
         title3:    ['20px', { lineHeight: '1.25', fontWeight: '600' }],
-        title2:    ['23px', { lineHeight: '1.2',  fontWeight: '600' }],
+        title2:    ['22px', { lineHeight: '1.27', fontWeight: '600' }],
         title1:    ['28px', { lineHeight: '1.15', letterSpacing: '-0.02em', fontWeight: '700' }],
-        display:   ['33px', { lineHeight: '1.1',  letterSpacing: '-0.028em', fontWeight: '700' }],
+        display:   ['34px', { lineHeight: '1.2',  letterSpacing: '-0.028em', fontWeight: '700' }],
         // Rol propio (no existe en la escala de Apple): el NUMERO de un KPI.
         // Estaba definido en docs/NUEVA_PIEL_APPLE_HIG.md §2 desde el 2026-08-09
         // pero nunca se agrego aca, asi que cada KPI eligio su tamano a mano.

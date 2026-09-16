@@ -451,16 +451,23 @@ export function MobileHomeGrid() {
                   const c = COLOR[tile.color]
                   const Icon = tile.icon
                   const wip = isWip(tile.id, tile.wip)
+                  // Tile NEUTRO (systemFill + glifo secundario), no tintado con el
+                  // glifo en el tono 500 vivo: con 12 filas era neon sobre oscuro
+                  // (13 glifos #FF9F0A a saturacion 1.0, mas rojo, verde y purpura).
+                  // DESIGN.md §3: el color no va en el icono de una celda. El mapa
+                  // COLOR sigue vivo para la variante de escritorio (~linea 296).
+                  // Y "En desarrollo" va en Pill neutral, no warning: es un estado,
+                  // no una advertencia — con warning eran 13 textos en amber vivo.
                   return [
                     <ListCell
                       key={tile.id}
                       leading={
-                        <span className={cn('flex size-7 items-center justify-center rounded-ctl', c.bg)}>
-                          <Icon className={cn('size-4', c.icon)} />
+                        <span className="flex size-7 items-center justify-center rounded-ctl bg-muted-foreground/[0.12]">
+                          <Icon className="size-4 text-muted-foreground" />
                         </span>
                       }
                       title={tile.label}
-                      trailing={wip ? <Pill tone="warning">En desarrollo</Pill> : undefined}
+                      trailing={wip ? <Pill tone="neutral">En desarrollo</Pill> : undefined}
                       onClick={() => navigate(tile.href)}
                     />,
                     /* Los hijos van en la MISMA tarjeta que el padre: una card
