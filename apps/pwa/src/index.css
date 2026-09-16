@@ -409,9 +409,17 @@
 
   --card-edge: 255 255 255;         /* = --card: la tarjeta flota, sin contorno */
 
+  /* Radios de iOS 26/27 (DESIGN.md §4, ADELANTA 3). Apple documenta que las
+     secciones "tienen un radio aumentado para coincidir con la curvatura de
+     los controles"; 14/18 eran la era iOS 7-18. Concentricidad: el radio de un
+     hijo se DERIVA del padre (radio_hijo = radio_padre - padding), por eso
+     ctl se queda en 10: dentro de una tarjeta de 26 con padding 16 da 26-16=10.
+     Y panel sube a 32 para que una tarjeta de 26 quepa anidada sin verse mal.
+     Alcance: rounded-card en 136 archivos, rounded-panel en 4 — todo por token,
+     ningun .tsx cambia. La piel vieja (rem, arriba) no se toca. */
   --r-ctl: 10px;
-  --r-card: 14px;
-  --r-panel: 18px;
+  --r-card: 26px;
+  --r-panel: 32px;
   --card-edge: 44 44 46;            /* = --card oscuro */
 }
 
