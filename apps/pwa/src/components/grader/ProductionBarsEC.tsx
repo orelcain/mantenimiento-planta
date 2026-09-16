@@ -21,7 +21,7 @@ import type { UpstreamProductionInterval } from '@/services/shoplogix/types'
 import { useTimelineSyncOptional } from './useTimelineSync'
 import { useChartReadyConnect } from './useEChartsConnect'
 import { fmtTime } from '@/services/grader/graderTimeFormat'
-import { dec1 } from '@/utils/formatoNumeros'
+import { dec, dec1 } from '@/utils/formatoNumeros'
 
 interface Props {
   intervals: UpstreamProductionInterval[]
@@ -40,7 +40,7 @@ const COLOR_MAP: Record<UpstreamProductionInterval['color'], string> = {
 
 function fmtPct(x: number, decimals = 1): string {
   if (!isFinite(x)) return '—'
-  return `${(x * 100).toFixed(decimals)}%`
+  return `${dec(x * 100, decimals)}%`
 }
 
 export function ProductionBarsEC({ intervals, threshold, windowStart, windowEnd }: Props) {

@@ -36,7 +36,7 @@ import type { GateAssignment, CalibreWeightRange } from '@/services/grader/types
 import type { P0SinPuerta } from '@/services/grader/graderGate0Store'
 import { CAUSA_ORDER, normalizarCalibre, tramosDeCalibre, dimensionIntrusa, bloqueDe, parseWallClock, type CausaTipo, type GateCauses, type GateCauseGroup, type SeteoMaquina, type PesoPorPuerta, type SolapeDeRango, type CambioDePrograma, type MezclaPuerta, type MapaPeso, type DimensionMezcla, type GateObservations, type ComposicionCombo, type TramoCalibre } from '@/services/grader/graderGateObservations'
 import type { FirestorePieceRecord } from '@/services/grader/graderDailySummary.service'
-import { dec1, dec2 } from '@/utils/formatoNumeros'
+import { dec1 } from '@/utils/formatoNumeros'
 
 // ⚠ Nunca combinar estas clases de color con text-caption/text-title3 dentro
 // de cn(): tailwind-merge no conoce la escala tipográfica propia, toma
@@ -984,7 +984,9 @@ function MapaPesoSvg({ mapa, mix, tramos }: { mapa: MapaPeso; mix: GateMix; tram
       ))}
       {celdas.map(({ r, c, n }) => (
         <rect key={`${r}-${c}`} x={(L + c * cw).toFixed(1)} y={(TOP + r * ch).toFixed(1)} width={Math.max(0.5, cw - 0.6).toFixed(1)} height={Math.max(0.5, ch - 0.6).toFixed(1)} rx="1.5"
-          fill="rgb(var(--brand))" opacity={dec2((0.14 + 0.78 * Math.pow(n / max, 0.72)))} />
+          fill="rgb(var(--brand))"
+          /* decimal-tecnico: `opacity` es atributo SVG; con coma el navegador lo ignora y pinta opaco. */
+          opacity={(0.14 + 0.78 * Math.pow(n / max, 0.72)).toFixed(2)} />
       ))}
       {ticks.map((g) => (
         <text key={g} x={L - 5} y={(y(g) + 3.5).toFixed(1)} textAnchor="end" fontSize="11" fill="currentColor" className="tabular-nums">{dec1((g / 1000))}</text>

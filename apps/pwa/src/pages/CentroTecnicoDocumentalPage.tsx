@@ -85,6 +85,7 @@ import type { Bucket, EstadoFiltro, OrdenCampo, OtCount } from '@/lib/ctd'
 import { FAMILIA_LABEL, checklistDe, familiaDe, medicionesDe } from '@/lib/nfpa70b'
 import type { CampoMedicion } from '@/lib/nfpa70b'
 import type { Equipment, Incident, MaintenanceLogEntry, Medicion, WorkOrder } from '@/types'
+import { dec, dec1 } from '@/utils/formatoNumeros'
 
 /**
  * Centro Técnico Documental — portada / panel del programa (EMP · NFPA 70B).
@@ -920,7 +921,7 @@ function emptyMedicionDraft(): MedicionDraft {
 const CTX_COLOR: Record<Medicion['contexto'], string> = { proceso: '#2563eb', reposo: '#94a3b8' }
 
 function fmtNum(v: number): string {
-  return Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(1)
+  return Math.abs(v) >= 100 ? v.toFixed(0) : dec1(v)
 }
 
 /** Evento de intervención de mantenimiento para marcar sobre la tendencia. */
@@ -989,7 +990,7 @@ function MetricChart({
   const pct = first.v !== 0 ? (delta / Math.abs(first.v)) * 100 : null
   const dias = (last.t - first.t) / 86_400_000
   const meses = dias / 30.44
-  const periodo = meses < 1.5 ? `${Math.round(dias)} días` : `${meses.toFixed(meses < 6 ? 1 : 0)} meses`
+  const periodo = meses < 1.5 ? `${Math.round(dias)} días` : `${dec(meses, meses < 6 ? 1 : 0)} meses`
   const sobreLimite = umbral?.max != null && last.v > umbral.max
   const bajoLimite = umbral?.min != null && last.v < umbral.min
 
@@ -1182,7 +1183,7 @@ function SerieCampo({ rows, campo }: { rows: Medicion[]; campo: CampoMedicion })
   const x = (i: number) => (n <= 1 ? W / 2 : P + (i / (n - 1)) * (W - 2 * P))
   const y = (v: number) => (max === min ? H / 2 : H - P - ((v - min) / (max - min)) * (H - 2 * P))
   const lineFor = (ctx: Medicion['contexto']) =>
-    pts.filter((p) => p.ctx === ctx).map((p) => `${x(p.i).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ')
+    pts.filter((p) => p.ctx === ctx).map((p) => `${dec1(x(p.i))},${dec1(y(p.v))}`).join(' ')
   const last = pts[pts.length - 1]
   return (
     <div className="flex items-center gap-2 py-1">
@@ -2314,7 +2315,7 @@ function ExpedienteDialog({
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                       <div>
                         <div className="text-muted-foreground text-xs">Antigüedad</div>
-                        <div className="font-medium">{edad != null ? `${edad.toFixed(1)} años` : '—'}</div>
+                        <div className="font-medium">{edad != null ? `${dec1(edad)} años` : '—'}</div>
                       </div>
                       <div>
                         <div className="text-muted-foreground text-xs">Vida útil</div>
@@ -2372,7 +2373,7 @@ function ExpedienteDialog({
                       </div>
                       <div>
                         <div className="text-muted-foreground text-xs">MTTR</div>
-                        <div className="font-medium">{rel.mttrHoras != null ? `${rel.mttrHoras.toFixed(1)} h` : '—'}</div>
+                        <div className="font-medium">{rel.mttrHoras != null ? `${dec1(rel.mttrHoras)} h` : '—'}</div>
                       </div>
                       <div>
                         <div className="text-muted-foreground text-xs">MTBF</div>
@@ -2380,7 +2381,7 @@ function ExpedienteDialog({
                       </div>
                       <div>
                         <div className="text-muted-foreground text-xs">Disponibilidad</div>
-                        <div className="font-medium">{rel.disponibilidad != null ? `${rel.disponibilidad.toFixed(1)}%` : '—'}</div>
+                        <div className="font-medium">{rel.disponibilidad != null ? `${dec1(rel.disponibilidad)}%` : '—'}</div>
                       </div>
                     </div>
                   </CardContent>

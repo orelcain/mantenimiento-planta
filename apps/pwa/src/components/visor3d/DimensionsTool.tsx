@@ -14,6 +14,7 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { Dimension3D, Point3D, MeasurementType } from '@/types/models3d'
 import { getUnitSuffix } from '@/types/models3d'
+import { dec1, dec2 } from '@/utils/formatoNumeros'
 
 interface DimensionsToolProps {
   dimensions: Dimension3D[]
@@ -46,8 +47,8 @@ function DistanceLine({ dim }: { dim: Dimension3D }) {
   )
 
   const text = dim.label
-    ? `${dim.label}: ${dim.value.toFixed(1)} ${dim.unit}`
-    : `${dim.value.toFixed(1)} ${dim.unit}`
+    ? `${dim.label}: ${dec1(dim.value)} ${dim.unit}`
+    : `${dec1(dim.value)} ${dim.unit}`
 
   return (
     <group userData={{ isDimensionHelper: true }}>
@@ -100,8 +101,8 @@ function AreaPolygon({ dim }: { dim: Dimension3D }) {
 
   const suffix = getUnitSuffix(dim.unit, 'area')
   const text = dim.label
-    ? `${dim.label}: ${dim.value.toFixed(1)} ${suffix}`
-    : `${dim.value.toFixed(1)} ${suffix}`
+    ? `${dim.label}: ${dec1(dim.value)} ${suffix}`
+    : `${dec1(dim.value)} ${suffix}`
 
   return (
     <group userData={{ isDimensionHelper: true }}>
@@ -330,8 +331,8 @@ function VolumeBox({ dim }: { dim: Dimension3D }) {
 
   const suffix = getUnitSuffix(dim.unit, 'volume')
   const text = dim.label
-    ? `${dim.label}: ${dim.value.toFixed(2)} ${suffix}`
-    : `${dim.value.toFixed(2)} ${suffix}`
+    ? `${dim.label}: ${dec2(dim.value)} ${suffix}`
+    : `${dec2(dim.value)} ${suffix}`
 
   return (
     <group userData={{ isDimensionHelper: true }}>

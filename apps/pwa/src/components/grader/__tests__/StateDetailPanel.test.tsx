@@ -157,12 +157,12 @@ describe('StateDetailPanel', () => {
     expect(onClose).toHaveBeenCalledOnce()
   })
 
-  it('% del turno se calcula correctamente (180 s / 36000 s = 0.5%)', () => {
+  it('% del turno se calcula correctamente (180 s / 36000 s = 0,5%)', () => {
     const state = mkState({ durationSec: 180 })
     const shift = mkShift([state])
     // shiftStart=12:00 shiftEnd=22:00 → 36000 s
     render(<StateDetailPanel state={state} shift={shift} onClose={vi.fn()} />)
 
-    expect(screen.getByText('0.5%')).toBeTruthy()
+    expect(screen.getByText('0,5%')).toBeTruthy()
   })
 })

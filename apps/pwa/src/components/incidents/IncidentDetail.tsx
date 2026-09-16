@@ -49,6 +49,7 @@ import { getMapVersionById, getMapLocationById } from '@/services/maps'
 import { MapViewer } from '@/components/maps'
 import type { MapVersion, MapLocation } from '@/types/maps'
 import { IncidentForm } from './IncidentForm'
+import { dec1 } from '@/utils/formatoNumeros'
 
 const STATUS_CONFIG: Record<IncidentStatus, { label: string; icon: any; color: string }> = {
   pendiente: { label: 'Pendiente de validación', icon: Clock, color: 'text-warning' },
@@ -546,10 +547,10 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                       {iotData.temp ? (
                         <>
                           <div className="text-lg font-semibold">
-                            {iotData.temp.current.toFixed(1)}{iotData.temp.unit ?? '°C'}
+                            {dec1(iotData.temp.current)}{iotData.temp.unit ?? '°C'}
                           </div>
                           <div className="text-xs text-muted-foreground leading-snug">
-                            Prom {iotData.temp.avg.toFixed(1)}{iotData.temp.unit ?? '°C'} · Warn {DEFAULT_PREDICTIVE_THRESHOLDS.tempWarnLow}-{DEFAULT_PREDICTIVE_THRESHOLDS.tempWarnHigh} · Crit {DEFAULT_PREDICTIVE_THRESHOLDS.tempCritLow}-{DEFAULT_PREDICTIVE_THRESHOLDS.tempCritHigh}
+                            Prom {dec1(iotData.temp.avg)}{iotData.temp.unit ?? '°C'} · Warn {DEFAULT_PREDICTIVE_THRESHOLDS.tempWarnLow}-{DEFAULT_PREDICTIVE_THRESHOLDS.tempWarnHigh} · Crit {DEFAULT_PREDICTIVE_THRESHOLDS.tempCritLow}-{DEFAULT_PREDICTIVE_THRESHOLDS.tempCritHigh}
                           </div>
                         </>
                       ) : (
@@ -565,10 +566,10 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                       {iotData.hum ? (
                         <>
                           <div className="text-lg font-semibold">
-                            {iotData.hum.current.toFixed(1)}{iotData.hum.unit ?? '%'}
+                            {dec1(iotData.hum.current)}{iotData.hum.unit ?? '%'}
                           </div>
                           <div className="text-xs text-muted-foreground leading-snug">
-                            Prom {iotData.hum.avg.toFixed(1)}{iotData.hum.unit ?? '%'} · Warn {DEFAULT_PREDICTIVE_THRESHOLDS.humWarnLow}-{DEFAULT_PREDICTIVE_THRESHOLDS.humWarnHigh} · Crit {DEFAULT_PREDICTIVE_THRESHOLDS.humCritLow}-{DEFAULT_PREDICTIVE_THRESHOLDS.humCritHigh}
+                            Prom {dec1(iotData.hum.avg)}{iotData.hum.unit ?? '%'} · Warn {DEFAULT_PREDICTIVE_THRESHOLDS.humWarnLow}-{DEFAULT_PREDICTIVE_THRESHOLDS.humWarnHigh} · Crit {DEFAULT_PREDICTIVE_THRESHOLDS.humCritLow}-{DEFAULT_PREDICTIVE_THRESHOLDS.humCritHigh}
                           </div>
                         </>
                       ) : (

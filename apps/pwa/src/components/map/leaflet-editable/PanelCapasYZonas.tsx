@@ -12,6 +12,7 @@ import { MAP_VIEWS, type DxfLayerConfig, DXF_INTERIOR_SVG_LAYERS } from '@/data/
 import { useMapaLeafletStore, type ZonaCategoria, type ZonaEstado, type ElementoMapa, type PolygonCoords, type Nivel } from '@/store/useMapaLeafletStore'
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { logger } from '@/lib/logger'
+import { dec2 } from '@/utils/formatoNumeros'
 
 // ─── Tipos mínimos GeoJSON para absorción DXF ────────────────────────────────
 type GJCoord = readonly number[]
@@ -737,7 +738,7 @@ export function PanelCapasYZonas() {
                               {cota.nombre || <span className="italic text-slate-600">(sin etiqueta)</span>}
                             </span>
                             <span className="text-[10px] font-mono text-slate-400 shrink-0">
-                              {((cota.meta?.totalM as number | undefined) ?? 0).toFixed(2)} m
+                              {dec2(((cota.meta?.totalM as number | undefined) ?? 0))} m
                             </span>
                           </button>
                         ))}
@@ -758,7 +759,7 @@ export function PanelCapasYZonas() {
                           {cota.nombre || <span className="italic text-slate-600">(sin etiqueta)</span>}
                         </span>
                         <span className="text-[10px] font-mono text-slate-400 shrink-0">
-                          {((cota.meta?.totalM as number | undefined) ?? 0).toFixed(2)} m
+                          {dec2(((cota.meta?.totalM as number | undefined) ?? 0))} m
                         </span>
                       </button>
                     ))}
@@ -903,7 +904,7 @@ export function PanelCapasYZonas() {
                   <TipoBadge tipo={selectedEl.tipo} />
                   {selectedEl.tipo === 'cota' && typeof selectedEl.meta?.totalM === 'number' && (
                     <span className="text-[9px] text-slate-300 font-mono font-bold">
-                      {(selectedEl.meta.totalM as number).toFixed(2)} m
+                      {dec2((selectedEl.meta.totalM as number))} m
                     </span>
                   )}
                   {typeof selectedEl.meta?.area_m2 === 'number' && (

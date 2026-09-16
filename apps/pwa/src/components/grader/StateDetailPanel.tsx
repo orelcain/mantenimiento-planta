@@ -23,11 +23,12 @@ import { X, Clock, Activity, AlertCircle, Pause, Wrench, MessageSquare } from 'l
 import type { UpstreamMachineShift, UpstreamMachineState, UpstreamShiftComment } from '@/services/shoplogix/types'
 import { fmtTimeWithSec, fmtDurationSec } from '@/services/grader/graderTimeFormat'
 import { softenAccentHex } from '@/lib/softenColor'
+import { dec } from '@/utils/formatoNumeros'
 
 // ── Helpers de formato ────────────────────────────────────────────────────────
 
 function fmtPct(frac: number, decimals = 1): string {
-  return `${(frac * 100).toFixed(decimals)}%`
+  return `${dec(frac * 100, decimals)}%`
 }
 
 /** Icono según el tipo de estado. */

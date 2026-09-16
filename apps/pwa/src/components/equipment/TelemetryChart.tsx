@@ -19,6 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle, Select, SelectContent, Select
 import { fetchSensorHistory, type SensorReading } from '@/services/sensorsRtdb'
 import { Loader2 } from 'lucide-react'
 import { logger } from '@/lib/logger'
+import { dec1 } from '@/utils/formatoNumeros'
 
 ChartJS.register(
   CategoryScale,
@@ -216,24 +217,24 @@ export function TelemetryChart({ equipmentId }: TelemetryChartProps) {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-3">
             <div className="rounded-ctl border p-2 bg-muted">
               <div className="text-caption text-muted-foreground">Temperatura actual</div>
-              <div className="text-sm font-semibold">{visibleStats.temp.latest.toFixed(1)} °C</div>
+              <div className="text-sm font-semibold">{dec1(visibleStats.temp.latest)} °C</div>
             </div>
             <div className="rounded-ctl border p-2 bg-muted">
               <div className="text-caption text-muted-foreground">Humedad actual</div>
-              <div className="text-sm font-semibold">{visibleStats.hum.latest.toFixed(1)} %</div>
+              <div className="text-sm font-semibold">{dec1(visibleStats.hum.latest)} %</div>
             </div>
             <div className="rounded-ctl border p-2 bg-muted">
               <div className="text-caption text-muted-foreground">Temp promedio / min-max</div>
               <div className="text-sm font-semibold">
-                {visibleStats.temp.avg.toFixed(1)} °C
-                <span className="text-xs text-muted-foreground"> · {visibleStats.temp.min.toFixed(1)}-{visibleStats.temp.max.toFixed(1)}</span>
+                {dec1(visibleStats.temp.avg)} °C
+                <span className="text-xs text-muted-foreground"> · {dec1(visibleStats.temp.min)}-{dec1(visibleStats.temp.max)}</span>
               </div>
             </div>
             <div className="rounded-ctl border p-2 bg-muted">
               <div className="text-caption text-muted-foreground">Hum promedio / min-max</div>
               <div className="text-sm font-semibold">
-                {visibleStats.hum.avg.toFixed(1)} %
-                <span className="text-xs text-muted-foreground"> · {visibleStats.hum.min.toFixed(1)}-{visibleStats.hum.max.toFixed(1)}</span>
+                {dec1(visibleStats.hum.avg)} %
+                <span className="text-xs text-muted-foreground"> · {dec1(visibleStats.hum.min)}-{dec1(visibleStats.hum.max)}</span>
               </div>
             </div>
             <div className="col-span-2 lg:col-span-4 text-caption text-muted-foreground">

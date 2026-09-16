@@ -12,6 +12,7 @@ import { ShiftTimelineView } from '@/components/grader/ShiftTimelineView'
 import { computeShiftTimeWindow } from '@/services/grader/graderShiftStatus'
 import { DEFAULT_SHIFT_SCHEDULE } from '@/services/grader/graderShiftSchedule'
 import type { GraderPublicTokenDoc } from '@/services/grader/graderPublicToken.service'
+import { dec2 } from '@/utils/formatoNumeros'
 
 function fmtSec(sec: number): string {
   const h = Math.floor(sec / 3600)
@@ -128,7 +129,7 @@ export function GraderPublicTokenPage() {
         <div className="flex flex-wrap gap-3 justify-center sm:justify-start">
           <KpiChip
             label="P0%"
-            value={<span className={p0Color}>{p0Pct.toFixed(2)}%</span>}
+            value={<span className={p0Color}>{dec2(p0Pct)}%</span>}
             icon={<Activity className="w-3 h-3" />}
           />
           <KpiChip

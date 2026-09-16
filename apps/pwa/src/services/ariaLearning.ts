@@ -14,6 +14,7 @@ import {
 } from 'firebase/firestore'
 import { db } from './firebase'
 import { logger } from '@/lib/logger'
+import { dec1 } from '@/utils/formatoNumeros'
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -548,7 +549,7 @@ export async function buildLearningContext(
       for (const p of relevantPatterns) {
         let line = `  • ${p.equipmentName}: "${p.problemType}" — ${p.occurrences} veces`
         if (p.commonSolution) line += ` | Solución habitual: ${p.commonSolution}`
-        if (p.avgResolutionHours) line += ` | Tiempo promedio: ${p.avgResolutionHours.toFixed(1)}h`
+        if (p.avgResolutionHours) line += ` | Tiempo promedio: ${dec1(p.avgResolutionHours)}h`
         if (p.relatedSpares?.length) line += ` | Repuestos típicos: ${p.relatedSpares.join(', ')}`
         lines.push(line)
       }

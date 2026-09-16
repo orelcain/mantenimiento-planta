@@ -22,6 +22,7 @@ import type { ShoplogixShiftParent } from '@/services/shoplogix/shoplogixShift.s
 import type { GraderDailySummary } from '@/services/grader/types'
 import fixture from '@/services/grader/__tests__/fixtures/shiftPeriod.real.json'
 import { cn } from '@/lib/utils'
+import { dec1 } from '@/utils/formatoNumeros'
 
 type FixtureKey = 'yal_2026_07' | 'chonchi_2026_07'
 
@@ -144,7 +145,7 @@ export default function MatrizTurnosDevPage() {
                 Stats del panel mensual (portadas del calendario retirado)
               </span>
               <span>ciclos: <b>{stats.totalCycles.toLocaleString('es-CL')}</b> · uptime prom:{' '}
-                <b>{stats.avgUptimePct.toFixed(1)}%</b> · turnos: <b>{stats.turnosWithData}</b>{' '}
+                <b>{dec1(stats.avgUptimePct)}%</b> · turnos: <b>{stats.turnosWithData}</b>{' '}
                 (D {stats.dayShiftsWithData} / N {stats.nightShiftsWithData}) · días: <b>{stats.daysWithData}</b></span>
               <span>mejor: <b>{stats.bestShift?.shiftId} {stats.bestShift?.dateKey}</b>{' '}
                 ({stats.bestShift?.uptimePct.toFixed(0)}%) · peor: <b>{stats.worstShift?.shiftId} {stats.worstShift?.dateKey}</b>{' '}

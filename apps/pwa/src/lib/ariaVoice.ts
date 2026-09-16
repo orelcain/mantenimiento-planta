@@ -9,6 +9,7 @@
  */
 import { getAriaConfig } from '@/services/ariaThinkingTracker'
 import { normalizeForSpeech, plainForSpeech, splitForTTS } from '@/lib/speechNormalize'
+import { dec2 } from '@/utils/formatoNumeros'
 
 export interface VoicePref {
   voiceURI?: string
@@ -401,7 +402,7 @@ export function speakWith(text: string, voiceURI: string | undefined, rate: numb
     // (mayor = más rápida) sea coherente con el navegador.
     const lengthScale = Math.max(0.5, Math.min(2, 1 / r))
     const piper = httpGetFetcher(
-      (s) => `${PIPER_SERVER}/tts?text=${encodeURIComponent(s)}&voice=${encodeURIComponent(voice)}&rate=${lengthScale.toFixed(2)}`,
+      (s) => `${PIPER_SERVER}/tts?text=${encodeURIComponent(s)}&voice=${encodeURIComponent(voice)}&rate=${dec2(lengthScale)}`,
     )
     void playChunks(sentences, piper, wrapped, () => wrapped.onerror?.())
     return

@@ -12,6 +12,7 @@ import { aggregateShifts, cadenceCpm } from '@/services/grader/plantKpiCompute'
 import { cascadeFromStates } from '@/services/shoplogix/lossBuckets'
 import type { GraderDailySummary } from '@/services/grader/types'
 import type { UpstreamMachineShift } from '@/services/shoplogix/types'
+import { dec1 } from '@/utils/formatoNumeros'
 
 /**
  * PANTALLA PILOTO de la nueva piel: Análisis de Turno con DATOS REALES.
@@ -210,7 +211,7 @@ export default function TurnoPilotoPage() {
           }
           title={m.machineName}
           subtitle={now.label}
-          value={cpm > 0 ? `${cpm.toFixed(1)} pz/min` : '—'}
+          value={cpm > 0 ? `${dec1(cpm)} pz/min` : '—'}
           valueSub={fmtInt(m.totalCycles)}
           onClick={() => openMachine(m)}
         />
@@ -372,7 +373,7 @@ export default function TurnoPilotoPage() {
                     ? { l: 'Disponib.', v: kpis?.availability != null ? `${(kpis.availability * 100).toFixed(0)}%` : '—' }
                     : { l: 'Rendim.', v: kpis?.performance != null ? `${(kpis.performance * 100).toFixed(0)}%` : '—' },
                   { l: 'MTTR', v: kpis?.mttrMin ? `${Math.round(kpis.mttrMin)} min` : '—' },
-                  { l: 'MTBF', v: kpis?.mtbfHours ? `${kpis.mtbfHours.toFixed(1)} h` : '—' },
+                  { l: 'MTBF', v: kpis?.mtbfHours ? `${dec1(kpis.mtbfHours)} h` : '—' },
                 ].map((k) => (
                   <div key={k.l}>
                     <p className="text-[0.62rem] font-semibold uppercase tracking-[0.06em] text-muted-foreground">

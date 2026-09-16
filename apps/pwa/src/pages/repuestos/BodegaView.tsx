@@ -40,6 +40,7 @@ import type { Machine } from '@/types/repuestos'
 import { useAuthStore } from '@/store/authStore'
 import { useToast } from '@/hooks/useToast'
 import { ImageLightbox } from '@/components/ui/ImageLightbox'
+import { dec1, dec2 } from '@/utils/formatoNumeros'
 
 type BodegaTab = 'stock' | 'inventarios' | 'movimientos' | 'estadisticas'
 type StockFilter = 'todos' | 'configurados' | 'bajo' | 'sin' | 'sinConfig' | 'favoritos'
@@ -1067,7 +1068,7 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
           ) : (
             <div className="p-4 space-y-3">
               <div className="rounded-card border border-border bg-primary/[0.15] p-3 text-center">
-                <p className="text-xl font-bold text-primary tabular-nums">{rotacionData.avgRotacion.toFixed(2)}</p>
+                <p className="text-xl font-bold text-primary tabular-nums">{dec2(rotacionData.avgRotacion)}</p>
                 <p className="text-caption text-muted-foreground">Rotación promedio</p>
               </div>
               {rotacionData.itemRotacion.filter(r => r.salidas > 0).length > 0 && (
@@ -1079,7 +1080,7 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
                     <div key={r.item.codigoSAP} className="px-3 py-1.5 flex items-center gap-2">
                       <span className="text-xs text-foreground truncate flex-1">{r.item.textoBreve}</span>
                       <span className="text-xs font-bold text-muted-foreground tabular-nums w-14 text-center">{r.salidas}</span>
-                      <span className="text-xs font-bold text-primary tabular-nums w-14 text-right">{r.rotacion.toFixed(1)}</span>
+                      <span className="text-xs font-bold text-primary tabular-nums w-14 text-right">{dec1(r.rotacion)}</span>
                     </div>
                   ))}
                 </div>
@@ -1706,7 +1707,7 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
                   <p className="text-caption text-muted-foreground">Pto. reorden</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-lg font-bold text-primary tabular-nums">{reorder.consumoDiario.toFixed(1)}</p>
+                  <p className="text-lg font-bold text-primary tabular-nums">{dec1(reorder.consumoDiario)}</p>
                   <p className="text-caption text-muted-foreground">Consumo/día</p>
                 </div>
                 <div className="text-center">

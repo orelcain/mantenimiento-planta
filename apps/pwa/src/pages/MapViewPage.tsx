@@ -53,6 +53,7 @@ import type {
   Inspection,
   InspectionItem
 } from '@/types/maps'
+import { dec1 } from '@/utils/formatoNumeros'
 
 // Marcador extendido con info para visualización
 interface ExtendedMarker {
@@ -607,7 +608,7 @@ export function MapViewPage() {
               )}
               
               <div className="text-xs text-muted-foreground">
-                Posición: ({(selectedMarker.position.x * 100).toFixed(1)}%, {(selectedMarker.position.y * 100).toFixed(1)}%)
+                Posición: ({dec1((selectedMarker.position.x * 100))}%, {dec1((selectedMarker.position.y * 100))}%)
               </div>
             </div>
           )}

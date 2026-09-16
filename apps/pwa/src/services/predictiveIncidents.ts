@@ -16,6 +16,7 @@ import type {
 } from '@/types'
 import type { PredictiveResult } from '@/lib/predictive/predictor'
 import type { SensorReading } from './sensorsRtdb'
+import { dec1 } from '@/utils/formatoNumeros'
 
 const COLLECTION = 'incidents'
 
@@ -76,7 +77,7 @@ export async function ensurePredictiveIncident(params: {
     ? new Date(params.lastReading.timestamp < 1e12 ? params.lastReading.timestamp * 1000 : params.lastReading.timestamp)
     : null
   const readingText = params.lastReading
-    ? `Última lectura: ${params.lastReading.temperature.toFixed(1)}°C, ${params.lastReading.humidity.toFixed(1)}% (fuente: ${params.lastReading.source ?? '—'})`
+    ? `Última lectura: ${dec1(params.lastReading.temperature)}°C, ${dec1(params.lastReading.humidity)}% (fuente: ${params.lastReading.source ?? '—'})`
       + (readingTs ? ` · tomada el ${readingTs.toLocaleString('es-CL')}` : '')
     : 'Sin lectura reciente disponible.'
 

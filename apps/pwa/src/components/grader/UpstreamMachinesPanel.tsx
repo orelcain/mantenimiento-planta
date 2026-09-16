@@ -63,7 +63,7 @@ import { slxStateColor } from '@/services/shoplogix/shoplogixColors'
 import { logger } from '@/lib/logger'
 import { softenAccentHex } from '@/lib/softenColor'
 import { syncCubreElTurno } from '@/services/grader/frescuraDelSync'
-import { dec1 } from '@/utils/formatoNumeros'
+import { dec, dec1 } from '@/utils/formatoNumeros'
 
 interface Props {
   snapshot: UpstreamLineSnapshot | null | undefined
@@ -142,7 +142,7 @@ const PLOT_RIGHT_PAD_PX = 24
 
 function fmtPct(x: number, decimals = 1): string {
   if (!isFinite(x)) return '—'
-  return `${(x * 100).toFixed(decimals)}%`
+  return `${dec(x * 100, decimals)}%`
 }
 
 function fmtInt(n: number): string {

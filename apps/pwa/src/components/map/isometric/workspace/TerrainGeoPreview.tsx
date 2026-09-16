@@ -15,6 +15,7 @@ import {
   type TerrainImportPreview,
 } from '@/lib/terrainImport'
 import type { TerrainAdminMarkup } from '@/types/isometricMap'
+import { dec1 } from '@/utils/formatoNumeros'
 
 /* ── Types ─────────────────────────────────────────────────────── */
 
@@ -1713,7 +1714,7 @@ export function TerrainGeoPreview({
         <div className="flex flex-wrap items-center gap-1.5">
           {hoverInfo && (
             <Badge variant="secondary" className="font-mono text-[10px]">
-              {hoverInfo.elevation.toFixed(1)} m s.n.m.
+              {dec1(hoverInfo.elevation)} m s.n.m.
             </Badge>
           )}
           {cornerElevations && cornerElevations.length === 4 && (
@@ -1788,7 +1789,7 @@ export function TerrainGeoPreview({
       {/* ── Sliders ── */}
       <div className="flex flex-wrap items-center gap-4 text-[11px] text-muted-foreground">
         <label className="flex items-center gap-2">
-          <span className="whitespace-nowrap">Exageración ×{exaggeration.toFixed(1)}</span>
+          <span className="whitespace-nowrap">Exageración ×{dec1(exaggeration)}</span>
           <input
             type="range" min="0.5" max="5" step="0.25"
             value={exaggeration}
@@ -1808,7 +1809,7 @@ export function TerrainGeoPreview({
         {brushTool !== 'none' && brushTool !== 'line-road' && brushTool !== 'box-structure' && (
           <>
             <label className="flex items-center gap-2">
-              <span className="whitespace-nowrap">Radio {brushRadius.toFixed(1)}</span>
+              <span className="whitespace-nowrap">Radio {dec1(brushRadius)}</span>
               <input
                 type="range" min="0.5" max="20" step="0.5"
                 value={brushRadius}
@@ -1818,7 +1819,7 @@ export function TerrainGeoPreview({
             </label>
             {brushTool !== 'mark-road' && brushTool !== 'mark-structure' && brushTool !== 'erase-mark' ? (
             <label className="flex items-center gap-2">
-              <span className="whitespace-nowrap">Fuerza {brushStrength.toFixed(1)}</span>
+              <span className="whitespace-nowrap">Fuerza {dec1(brushStrength)}</span>
               <input
                 type="range" min="0.5" max="10" step="0.5"
                 value={brushStrength}
@@ -1933,11 +1934,11 @@ export function TerrainGeoPreview({
               <span>Grilla</span>
               <span className="text-foreground">{terrainData.cols}×{terrainData.rows}</span>
               <span>Elevación</span>
-              <span className="text-foreground">{terrainData.minElev.toFixed(1)}m — {terrainData.maxElev.toFixed(1)}m</span>
+              <span className="text-foreground">{dec1(terrainData.minElev)}m — {dec1(terrainData.maxElev)}m</span>
               <span>Relieve</span>
-              <span className="text-foreground">{previewStats.relief.toFixed(1)}m</span>
+              <span className="text-foreground">{dec1(previewStats.relief)}m</span>
               <span>Media</span>
-              <span className="text-foreground">{previewStats.meanElevation.toFixed(1)}m</span>
+              <span className="text-foreground">{dec1(previewStats.meanElevation)}m</span>
               <span>Terreno útil</span>
               <span className="text-foreground">{previewStats.coveredCells} celdas</span>
               <span>Agua</span>
@@ -1969,7 +1970,7 @@ export function TerrainGeoPreview({
         {showGeoCoords && hoverInfo && hoverGeo && (
           <div className="absolute top-3 left-1/2 z-20 -translate-x-1/2 rounded-md border bg-card/88 px-3 py-1.5 text-[11px] shadow backdrop-blur">
             <div className="flex items-center gap-3 font-mono text-foreground">
-              <span>{hoverInfo.elevation.toFixed(1)} m</span>
+              <span>{dec1(hoverInfo.elevation)} m</span>
               <span className="text-muted-foreground">r{hoverInfo.gridR} c{hoverInfo.gridC}</span>
               <span>{hoverGeo.lat.toFixed(6)}°, {hoverGeo.lon.toFixed(6)}°</span>
             </div>
@@ -1990,9 +1991,9 @@ export function TerrainGeoPreview({
           <div className="absolute bottom-3 left-1/2 z-20 -translate-x-1/2 rounded-md border bg-card/88 px-3 py-2 text-[11px] shadow-lg backdrop-blur">
             {measurement ? (
               <div className="flex items-center gap-3">
-                <span className="font-medium text-foreground">Planta {measurement.planar.toFixed(1)} m</span>
-                <span className="text-muted-foreground">3D {measurement.spatial.toFixed(1)} m</span>
-                <span className="text-muted-foreground">Δh {measurement.dy.toFixed(1)} m</span>
+                <span className="font-medium text-foreground">Planta {dec1(measurement.planar)} m</span>
+                <span className="text-muted-foreground">3D {dec1(measurement.spatial)} m</span>
+                <span className="text-muted-foreground">Δh {dec1(measurement.dy)} m</span>
                 <button className="opacity-70 hover:opacity-100" onClick={() => setMeasureMarkers([])}>
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -2021,7 +2022,7 @@ export function TerrainGeoPreview({
         </div>
         <div className="rounded-md border bg-muted/30 p-2">
           {terrainData
-            ? `Malla ${GRID}×${GRID} · elevación ${terrainData.minElev.toFixed(1)} – ${terrainData.maxElev.toFixed(1)} m · DEM zoom ${DEM_Z} · textura zoom ${TILE_Z}`
+            ? `Malla ${GRID}×${GRID} · elevación ${dec1(terrainData.minElev)} – ${dec1(terrainData.maxElev)} m · DEM zoom ${DEM_Z} · textura zoom ${TILE_Z}`
             : 'Esperando datos de terreno…'}
         </div>
       </div>

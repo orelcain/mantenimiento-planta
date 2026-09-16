@@ -65,6 +65,7 @@ import { getInteractiveExperienceForModel } from '@/components/visor3d/interacti
 import { ImageLightbox } from '@/components/ui/ImageLightbox'
 import type { Model3D, MaterialOverride, Annotation3D, Dimension3D, DimensionUnit, Point3D, MeasurementType } from '@/types/models3d'
 import { getUnitSuffix } from '@/types/models3d'
+import { dec1 } from '@/utils/formatoNumeros'
 
 /** ID anónimo para vista pública */
 const PUBLIC_USER_ID = 'public-viewer'
@@ -678,7 +679,7 @@ export function Visor3DPublicPage() {
                           <span className="text-[10px]">{typeIcon}</span>
                           <span className="font-mono font-medium text-[11px]">
                             {dim.type === 'circumference' && dim.diameter
-                              ? `⌀${dim.diameter.toFixed(1)} ${suffix}`
+                              ? `⌀${dec1(dim.diameter)} ${suffix}`
                               : formatMeasurement(dim.value, dim.unit, dim.type)}
                           </span>
                           {dim.label && (

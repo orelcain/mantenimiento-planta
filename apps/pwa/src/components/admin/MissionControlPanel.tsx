@@ -66,6 +66,7 @@ import {
 } from '@/services/ariaLearning'
 import { useAuthStore } from '@/store/authStore'
 import { useToast } from '@/hooks/useToast'
+import { dec1, dec2 } from '@/utils/formatoNumeros'
 
 // ═══════════════════════════════════════════════════════════════════════
 // STATUS HELPERS
@@ -316,7 +317,7 @@ export function MissionControlPanel() {
         </div>
         <div className="p-3 bg-muted/50 rounded-card text-center col-span-2 md:col-span-1">
           <div className={`text-2xl font-bold ${totalCostUsd > 0 ? 'text-cat-4-ink' : 'text-green-500'}`}>
-            ${totalCostUsd < 0.01 && totalCostUsd > 0 ? '<0.01' : totalCostUsd.toFixed(2)}
+            ${totalCostUsd < 0.01 && totalCostUsd > 0 ? '<0.01' : dec2(totalCostUsd)}
           </div>
           <div className="text-xs text-muted-foreground">Costo Est. USD</div>
         </div>
@@ -455,7 +456,7 @@ export function MissionControlPanel() {
                   <div className="flex items-center gap-2 shrink-0">
                     <span className="flex items-center gap-0.5 text-muted-foreground">
                       <Clock className="h-3 w-3" />
-                      {log.latencyMs > 1000 ? `${(log.latencyMs / 1000).toFixed(1)}s` : `${log.latencyMs}ms`}
+                      {log.latencyMs > 1000 ? `${dec1((log.latencyMs / 1000))}s` : `${log.latencyMs}ms`}
                     </span>
                     {log.tokens > 0 && (
                       <span className="flex items-center gap-0.5 text-muted-foreground">
