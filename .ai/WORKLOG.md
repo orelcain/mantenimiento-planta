@@ -5286,3 +5286,22 @@ los repuestos del equipo, con cantidad (1 por defecto).
   96/96 (`probar-reglas-bitacora.cjs --local`, 6 nuevos + el caso del pase cambiado a ALLOW).
 - 113 pruebas en services/bitacora (13 nuevas). Verificado en la vitrina a 375 px tecleando: código
   del maestro, código desconocido, búsqueda «pern» → 2 pernos reales, guardar → fila y correo.
+
+## 2026-09-17 · Bitacora ronda 16 · Fishken/E-PACK y vinculos desde STOCK ALMACENES (datos)
+
+Orel intento anotar el FRL de la E-PACK y la bitacora dijo «no tiene repuestos con codigo SAP».
+- **Causa:** la hoja «Fishken» del Excel maestro se migro al nodo hijo CINTA FISHKEN (s/c), no a
+  EMPACADORA E-PACK (720004590, alias FISHKEN). Bitacora, CTD y Repuestos buscan por el equipo
+  exacto. Ademas el maestro Excel esta desactualizado: 8 de 11 «sin SAP» si tienen codigo en
+  `STOCK ALMACENES.xlsx` (hoja Clasificacion, sub-familia FISHKEN), y FK-005 apunta a un SAP que
+  es otra pieza (3100061329 tarjeta; el cable AXT100-DS25 es 3300061329).
+- **Datos corregidos por script** (respaldo de los 127 docs en
+  `OneDrive\ANTARFOOD\_BACKUP_MEMORIA_CLAUDE\2026-09-17\repuestos-fishken-clasif-backup.json`,
+  escritura de a uno): 20 repuestos → E-PACK (el motor de la cinta se queda en CINTA FISHKEN);
+  5 fichas sin SAP fusionadas en su ficha con SAP (`fusionadoDe`) y borradas; 107 materiales de
+  Clasificacion vinculados con el patron ya usado por su maquina (Baader 142 → 6 evisceradoras 58,
+  Marelec → Static Grader 28, Garibaldi → 3 enzunchadoras 19, Baader 200 2). Decision de Orel:
+  MULTIVAC (50) y WITT (23) NO se vinculan. Resultado: E-PACK 17 (13 con SAP); sin equipo
+  3.022 → 2.910. `areaIds` se recalculo ([nodeId, ...path]): no lo mantiene ninguna funcion.
+- Codigo: la lista de repuestos por equipo de la bitacora vence a los 5 min (antes vivia toda la
+  sesion y un vinculo nuevo desde el CTD no aparecia).

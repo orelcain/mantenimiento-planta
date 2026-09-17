@@ -7,7 +7,13 @@ import { desdeDocumento, type FuenteRepuestos, type RepuestoDelCatalogo } from '
  * guarda por sesión: la BAADER 142 N2 tiene 1.803 documentos (unos 2 MB) y
  * volver a pedirlos en cada búsqueda los pagaría de nuevo.
  */
-const cacheEquipos = new Map<string, Promise<RepuestoDelCatalogo[]>>()
+const cacheEquipos = new Map<string, { promesa: Promise<RepuestoDelCatalogo[]>; en: number }>()
+/**
+ * Vigencia de la lista: un repuesto recién vinculado al equipo (desde el Centro
+ * Documental o Repuestos) tardaba hasta cerrar la pestaña en aparecer aquí, y
+ * el aviso «no tiene repuestos con código SAP» mentía (visto el 17-09-2026).
+ */
+const VIGENCIA_MS = 5 * 60_000
 
 export const fuenteRepuestosFirestore: FuenteRepuestos = {
   async porCodigo(codigo) {
@@ -22,7 +28,8 @@ export const fuenteRepuestosFirestore: FuenteRepuestos = {
     return d ? desdeDocumento(d.id, d.data()) : null
   },
   delEquipo(equipoId) {
-    let promesa = cacheEquipos.get(equipoId)
+    const guardada = cacheEquipos.get(equipoId)
+    let promesa = guardada && Date.now() - guardada.en < VIGENCIA_MS ? guardada.promesa : undefined
     if (!promesa) {
       promesa = getDocs(query(collection(db, 'repuestos'), where('equipos', 'array-contains', equipoId)))
         .then((snap) =>
@@ -36,7 +43,7 @@ export const fuenteRepuestosFirestore: FuenteRepuestos = {
           cacheEquipos.delete(equipoId)
           throw e
         })
-      cacheEquipos.set(equipoId, promesa)
+      cacheEquipos.set(equipoId, { promesa, en: Date.now() })
     }
     return promesa
   },
