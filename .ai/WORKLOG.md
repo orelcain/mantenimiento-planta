@@ -5306,6 +5306,17 @@ Orel intento anotar el FRL de la E-PACK y la bitacora dijo «no tiene repuestos 
 - Codigo: la lista de repuestos por equipo de la bitacora vence a los 5 min (antes vivia toda la
   sesion y un vinculo nuevo desde el CTD no aparecia).
 
+## 2026-09-17 · Bitacora ronda 20 · Pulido iOS 27, segunda pasada (sin mockup: causas claras)
+
+Recorrido de lo que no entro en la ronda 19: crear evento, hoja de tecnicos, observacion, entrada del
+pase, editor en PC e Historial en PC. Tres hallazgos, todos con la causa a la vista:
+- La cabecera del TURNO ACTUAL seguia cortando el QR: pildora «En curso» (95 px) + Historial + QR = 428
+  px en 375. La pildora pasa al mismo lugar que «Hoy ›» (junto al nombre del turno); la cabecera
+  queda con titulo + Historial + QR en los dos casos (Historial 182–299, QR 303–359).
+- «Salir» del pase (36 px) y «Lista de tecnicos» en la hoja de tecnicos (36 px) → 44 px (Button sin `sm`).
+- Sin hallazgos: editor de creacion (26 controles, 0 bajo 44), observacion, entrada del pase y PIN,
+  modo bitacora del pase (0 overflow), editor en PC (dos columnas parejas), Historial en PC.
+
 ## 2026-09-17 · Bitacora ronda 19 · Pulido iOS 27 medido en produccion (375 px)
 
 Recorrido con la sesion real (localhost:5189, turno tarde 16-09) y los medidores de DESIGN.md §11:
