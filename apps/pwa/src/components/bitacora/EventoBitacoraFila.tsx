@@ -19,6 +19,8 @@ import { codigoEquipoDe, etiquetaTipo, nombreRepuesto, normalizarRepuestos, tien
  */
 export function EventoBitacoraFila({
   evento,
+  numero,
+  enPendientes = false,
   onAbrir,
   onVerFoto,
   abiertoPor = [],
@@ -28,6 +30,10 @@ export function EventoBitacoraFila({
   desplazamiento = null,
 }: {
   evento: EventoBitacora
+  /** El mismo número del evento en WhatsApp, correo y PDF (un borrador no lleva). */
+  numero?: number
+  /** Va en «Pendiente para el turno siguiente»: la sección ya lo dice, sin la etiqueta. */
+  enPendientes?: boolean
   onAbrir: () => void
   /** Tocar una miniatura abre la foto en grande (no el editor). */
   onVerFoto?: (fotos: FotoEvento[], indice: number) => void
@@ -81,16 +87,30 @@ export function EventoBitacoraFila({
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary',
       ].join(' ')}
     >
-      {conHora ? (
-        <div className="tabular-nums leading-tight">
-          <div className="text-body font-semibold">{evento.horaInicio}</div>
-          {/* Sin término = sigue abierto; la columna es angosta, basta el guion. */}
-          <div className="text-footnote text-muted-foreground" title={evento.horaTermino ? undefined : 'Sin hora de término'}>{evento.horaTermino ?? '—'}</div>
-        </div>
-      ) : (
-        // Registrado con «Sin hora»: la fila va donde se registró.
-        <div className="pt-0.5 text-footnote text-muted-foreground">Sin hora</div>
-      )}
+      <div className="flex flex-col items-start gap-1.5">
+        {numero != null && (
+          <span
+            aria-label={`Evento ${numero}`}
+            // Tintado, no relleno: el ámbar sólido cambia de tono entre pieles
+            // y el texto encima perdía contraste en una de ellas.
+            className={`flex size-[22px] items-center justify-center rounded-full text-caption font-bold tabular-nums ${
+              enPendientes ? 'bg-ink-warn/15 text-ink-warn' : 'bg-muted-foreground/15 text-foreground'
+            }`}
+          >
+            {numero}
+          </span>
+        )}
+        {conHora ? (
+          <div className="tabular-nums leading-tight">
+            <div className="text-body font-semibold">{evento.horaInicio}</div>
+            {/* Sin término = sigue abierto; la columna es angosta, basta el guion. */}
+            <div className="text-footnote text-muted-foreground" title={evento.horaTermino ? undefined : 'Sin hora de término'}>{evento.horaTermino ?? '—'}</div>
+          </div>
+        ) : (
+          // Registrado con «Sin hora»: la fila va donde se registró.
+          <div className="pt-0.5 text-footnote text-muted-foreground">Sin hora</div>
+        )}
+      </div>
 
       <div className="flex min-w-0 flex-col gap-1.5">
         <div className="flex flex-wrap items-center gap-1.5">
@@ -108,7 +128,7 @@ export function EventoBitacoraFila({
               <Tag>{etiquetaTipo(evento)}</Tag>
             </>
           )}
-          {evento.pendiente && <Pill tone="warning">Pendiente</Pill>}
+          {evento.pendiente && !enPendientes && <Pill tone="warning">Pendiente</Pill>}
         </div>
         {titulo && (
           <div className="flex flex-wrap items-center gap-1.5">
@@ -137,23 +157,36 @@ export function EventoBitacoraFila({
           <p className="text-body text-muted-foreground">Sin descripción todavía</p>
         ) : null}
 
-        {/* Como en WhatsApp, correo e Historial: nombre común primero (o el del
-            maestro), código después, cantidad siempre (17-09). */}
+        {/* En lista, como en WhatsApp, el correo y el PDF (ronda 28, 17-09):
+            cantidad, nombre común (o el del maestro) y debajo el código y el
+            nombre SAP, que es por el que busca bodega. */}
         {repuestos.length > 0 && (
-          <p className="text-footnote text-muted-foreground">
-            Repuestos:{' '}
-            {repuestos.map((r, i) => {
-              const nombre = (r.nombreComun ?? '').trim() || nombreRepuesto(r)
-              return (
-                <span key={r.codigoSAP}>
-                  {i > 0 ? ' · ' : ''}
-                  {nombre ? <span className="font-semibold text-foreground">{nombre} </span> : ''}
-                  <span className={`tabular-nums ${nombre ? '' : 'font-semibold text-foreground'}`}>{r.codigoSAP}</span>
-                  {` ×${r.cantidad}`}
-                </span>
-              )
-            })}
-          </p>
+          <div className="flex flex-col gap-1">
+            <span className="text-footnote text-muted-foreground">Repuestos usados</span>
+            <ul className="flex flex-col rounded-ctl bg-muted-foreground/10">
+              {repuestos.map((r) => {
+                const comun = (r.nombreComun ?? '').trim()
+                const sap = nombreRepuesto(r)
+                return (
+                  <li
+                    key={r.codigoSAP}
+                    className="grid grid-cols-[2.25rem_minmax(0,1fr)] gap-2 px-3 py-2 border-t border-border first:border-t-0"
+                  >
+                    <span className="text-subhead font-semibold tabular-nums">×{r.cantidad}</span>
+                    <span className="min-w-0">
+                      <span className="block text-subhead font-semibold">{comun || sap || r.codigoSAP}</span>
+                      {(comun || sap) && (
+                        <span className="block text-footnote text-muted-foreground">
+                          <span className="tabular-nums">{r.codigoSAP}</span>
+                          {comun && sap ? ` · ${sap}` : ''}
+                        </span>
+                      )}
+                    </span>
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
         )}
 
         {/* En el pendiente original (visto en su propio turno): dónde y cómo se cerró. */}

@@ -4,7 +4,7 @@ import { tecnicosDelEvento, type EventoBitacora, type FotoEvento, type TurnoMant
 import { etiquetaParada, etiquetaPendientes, lineaPendienteAnterior, partesImpacto, repuestosDistintos } from './bitacoraCorreo'
 import { codigoEquipoDe, etiquetaTipo, horarioEvento, nombreRepuesto, normalizarRepuestos, tituloDe } from './presentacionEvento'
 import { cargarFotoComoJpeg, type ImagenCargada } from './fotosBitacora'
-import { fuePendiente, ordenarEventos, resumirBitacora } from './resumenBitacora'
+import { gruposDelTurno, resumirBitacora } from './resumenBitacora'
 import { soloListos } from './borradores'
 import { etiquetaTurno, fechaTurnoLarga, formatoMinutos, horarioTurno } from './turnoMantencion'
 
@@ -396,9 +396,7 @@ export async function generarPdfBitacora({ turno, eventos: todos, tecnicos, plan
     y += 3
   }
 
-  const ordenados = ordenarEventos(turno, eventos)
-  const hechos = ordenados.filter((e) => !fuePendiente(e))
-  const pendientes = ordenados.filter(fuePendiente)
+  const { hechos, pendientes } = gruposDelTurno(turno, eventos)
 
   if (!eventos.length) {
     pdf.setFontSize(10)

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { EventoBitacora } from '../bitacora.types'
 import { turnoDesdeId } from '../turnoMantencion'
-import { ordenarEventos } from '../resumenBitacora'
+import { gruposDelTurno, ordenarEventos } from '../resumenBitacora'
 import { lineaRepuestos, minutosEnTurno, nombreConComun, normalizarRepuestos, opcionesUbicacion, posicionAlMover, posicionEnIndice, textoRepuesto } from '../presentacionEvento'
 import { buscarRepuestos, conNombreComunAlFrente, desdeIndice } from '../repuestosBitacora'
 import { aFormulario, camposACambiar } from '../borradores'
@@ -28,6 +28,24 @@ const ev = (p: Partial<EventoBitacora>): EventoBitacora => ({
   ...p,
 })
 const registrado = (h: number) => ({ toMillis: () => turno.inicio.getTime() + h * 3_600_000 }) as never
+
+describe('lo hecho y lo pendiente: un solo orden para todos', () => {
+  it('numera igual en la pantalla, WhatsApp, el correo y el PDF; el borrador no cuenta', () => {
+    const uno = ev({ id: 'uno', horaInicio: '17:00', horaTermino: '17:20' })
+    // Un pendiente A MEDIO TURNO: en la lista iría entre los demás, pero se
+    // entrega al final, así que numera después de todo lo hecho.
+    const pend = ev({ id: 'pend', horaInicio: '18:00', horaTermino: null, pendiente: true })
+    const dos = ev({ id: 'dos', horaInicio: '19:00', horaTermino: '19:30' })
+    // Uno que otro turno cerró después: también estuvo pendiente.
+    const cerrado = ev({ id: 'cerrado', horaInicio: '17:30', horaTermino: null, cierre: { turnoId: '2026-09-17_dia', tipo: 'resuelto', porNombre: 'Leandro Igor' } })
+    const borrador = ev({ id: 'borrador', horaInicio: '17:10', horaTermino: null, estado: 'borrador' })
+    const { hechos, pendientes } = gruposDelTurno(turno, [dos, borrador, pend, cerrado, uno])
+    expect(hechos.map((e) => e.id)).toEqual(['uno', 'dos'])
+    expect(pendientes.map((e) => e.id)).toEqual(['cerrado', 'pend'])
+    const numeros = [...hechos, ...pendientes].map((e, i) => `${i + 1}. ${e.id}`)
+    expect(numeros).toEqual(['1. uno', '2. dos', '3. cerrado', '4. pend'])
+  })
+})
 
 describe('eventos sin hora: ubicación a mano', () => {
   const casino = ev({ id: 'casino', horaInicio: '18:07', horaTermino: '18:30' })
