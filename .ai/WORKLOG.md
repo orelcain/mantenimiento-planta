@@ -1,10 +1,640 @@
-> **Compactado el 2026-08-18.** Se colapsó la narración PR-por-PR de las entradas del
-> **2026-08-01 al 2026-08-10** en la sección «Historial resumido · 2026-08-01 → 2026-08-10» del
-> final, conservando ÍNTEGROS los gotchas, las causas raíz, las decisiones con su porqué y las
-> cifras medidas. **Las entradas del 2026-08-11 en adelante quedaron intactas.** El detalle
-> completo de lo colapsado vive en git (`git log -p .ai/WORKLOG.md` y los commits de cada PR).
-> Respaldo del archivo previo (223.820 B) en:
-> `C:\Users\orelc\AppData\Local\Temp\claude\C--Users-orelc-OneDrive-ANTARFOOD\5ad9a95f-9b15-492a-a04c-1ceb7a6cc3ca\scratchpad\WORKLOG-backup-2026-08-18.md`
+# WORKLOG — bitácora de agentes (append-only)
+
+Una entrada por bloque de trabajo. La más reciente arriba. Formato:
+
+```
+## YYYY-MM-DD · <agente> · <tarea>
+- Hecho: ...
+- Archivos: ...
+- Verificación: tsc/eslint/preview ...
+- Estado: HECHO | EN REVISIÓN | PENDIENTE
+- Sigue: ...
+```
+
+> **Compactado el 2026-09-17** (tercera vez; las anteriores fueron el 2026-07-30 y el 2026-08-18).
+> - **Enteras, arriba y la más nueva primero:** las entradas del 2026-09-15 en adelante.
+> - **Resumidas por tema** (gotchas, causas raíz, decisiones con su porqué, cifras y pendientes):
+>   2026-09-01 → 09-12 y 2026-08-11 → 08-26 (esta vez), 2026-08-01 → 08-10 y lo anterior (antes).
+> - Respaldo del archivo previo (377 KB) en `.ai/backups/WORKLOG-2026-09-17-pre-compactacion.md`;
+>   el detalle entrada por entrada vive en git (`git log -p .ai/WORKLOG.md`).
+>
+> **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
+> ~150 KB, compactar lo más viejo del mismo modo.
+
+## 2026-09-17 · Compactación del WORKLOG (377 KB → 150 KB)
+
+Pedido de Orel. El archivo había pasado de ~150 KB (377 KB) y además estaba desordenado: las entradas
+del 15 al 17-09 se habían ido agregando AL FINAL (después de los resúmenes) y el título con la
+plantilla había quedado enterrado a mitad del archivo.
+- Enteras y arriba, la más nueva primero: las 22 entradas del 2026-09-15 al 17-09.
+- Resumidas por tema: 2026-09-01 → 09-12 (141 KB → 24 KB, 13 temas) y 2026-08-11 → 08-26
+  (128 KB → 22 KB, 19 temas). Se revisó que cada PR de la fuente siga citado (faltaban #908 y #538;
+  agregados) y que los ⚠ sobrevivan (57 → 47 y 59 → 47: los perdidos eran avisos de tamaño del
+  propio archivo y repeticiones).
+- Sin tocar: los resúmenes del 2026-08-01 → 08-10 y anteriores, y «Pendientes que vienen de atrás».
+- Respaldo completo en `.ai/backups/WORKLOG-2026-09-17-pre-compactacion.md`.
+- ⚠ Para el próximo agente: la entrada nueva va ARRIBA, bajo la nota de compactación.
+
+## 2026-09-17 · Bitacora ronda 24 · Cambiar el turno de un evento
+
+Orel resolvió el pendiente del bandejón (línea manual HG, tarde 16-09) tocando «Resolver» el 17-09
+por la mañana: la soldadura de Matías Serpa con Leandro Igor quedó en el turno DÍA 17-09 y el
+pendiente decía «Resuelto en día 17-09». La soldadura fue en el turno NOCHE 17-09 (decisión de Orel).
+- **Datos corregidos a mano** (admin SDK, respaldo en el scratchpad de la sesión): evento
+  `lcDOGQ1BvCV6qkrGRHLN` → `2026-09-17_noche`; `cierre.turnoId` del pendiente `b9Sy6sTIdHIbRm2iAiks`
+  → `2026-09-17_noche`. Borrado el borrador vacío `Y1lfBCr0EbtoDvOnshFj` (TOLDO PORTERIA, noche 17-09)
+  que dejó una verificación de la ronda 21 al abrir «Resolver» con la sesión real.
+  ⚠ Verificar «Resolver» SOLO en la vitrina: el autoguardado crea el borrador en prod.
+- **Fila «Turno»** en el editor (nuevo, editar y resolver): `<select>` nativo con los últimos 7 días
+  (`turnosElegibles`, 21 turnos, nunca futuro, nunca antes del turno del pendiente que cierra) y
+  nombres cortos («Noche 17-09 · del pendiente»). Nota debajo cuando cambia. Se aplica SOLO al
+  publicar o guardar (el autoguardado no mueve un borrador: si no, el editor lo daba por borrado).
+  La hora tiene que calzar con el turno nuevo (`horaCalzaEnTurno`, ±1 h de holgura).
+- Hook: `datos.turnoId` → crea en ese turno o escribe `turnoId`, `fechaTurno`, `banda` y
+  `posicionMin: null`; el cierre del pendiente usa el turno destino; si el evento ya estaba publicado
+  y cerraba un pendiente, `reubicarCierre` actualiza `cierre.turnoId` (solo si el cierre es suyo).
+- Página: toast «Evento movido al turno noche 17-09 · Ver». Vitrina: mueve entre turnos de ejemplo.
+- **Regla**: `turnoId` ya no es inmutable: `turnoMovible` exige id = fecha + banda y un turno entre hace
+  10 días y mañana (`timestamp.date(int…)`). 111/111 en local (5 casos nuevos, fechas relativas a hoy).
+- Verificado en la vitrina a 375 px: error de hora, mover con toast y «Ver», opciones de «Resolver».
+
+## 2026-09-17 · Bitacora ronda 23 · iOS 27 (2/2): deslizar, Deshacer, arrastrar, visor con gestos y vibracion
+
+Segunda mitad del mockup https://claude.ai/artifact/8b4xbwjvMUzUeJJgkAJn27 (C, H, D, G, I). La 1/2 es #1072.
+- C: la fila del evento va dentro de `SwipeRow`: Editar · Pendiente/Quitar pendiente · Borrar
+  (Descartar en borradores; Borrar solo autor o supervisor). `marcarPendiente` en el hook escribe solo
+  `pendiente` (+ `cierre: null` al reabrir, + `actualizadoPorNombre`). La fila lleva `bg-card` (las
+  acciones quedan debajo) y el separador pasa al contenedor exterior (`first:` dejaba de servir).
+- H: borrar ya no pide «toca de nuevo»: el evento se esconde (`ocultos`, tampoco cuenta en los numeros),
+  toast «Evento borrado · Deshacer» (5 s) y el borrado real (fotos incluidas) corre al vencer el plazo,
+  al salir de la pantalla o en `pagehide`. El editor usa el mismo camino.
+- D: el evento sin hora lleva un asa ≡ (pointer events + `setPointerCapture`, `touch-none`); linea
+  azul donde queda; `posicionEnIndice` (nuevo, con test) da la `posicionMin` entre los vecinos. Teclado:
+  flechas en el asa (reusa `posicionAlMover`).
+  ⚠ El destino se calcula con la Y del `pointerup` y la ref se adelanta al render: con eventos
+  seguidos, el estado aun no tenia el destino al soltar. ⚠ Cambiar el contenedor al empezar a
+  arrastrar remontaba el asa y se perdia la captura: `SwipeRow` siempre, con `trailing=[]`.
+- G: visor: deslizar cambia de foto (60 px), bajar cierra (110 px, el fondo se aclara), doble toque
+  ×2, pellizco hasta ×4, arrastrar con zoom; puntos abajo; flechas solo con `hover:hover`.
+- I: `services/bitacora/vibrar.ts` (15 ms; error = 20·80·20) al publicar, cerrar pendiente, marcar
+  pendiente, soltar, mover y borrar; en errores de escritura del hook.
+- ⚠ Para probar gestos por script: esperar ~40 ms entre `touchmove` (SwipeRow lee `dx` del render).
+- Verificado en la vitrina a 375 px (claro/oscuro) y PC con mouse real; vitest 2790, eslint 30/30,
+  audits ok, build ok.
+
+## 2026-09-17 · Bitacora ronda 22 · iOS 27 (1/2): resumen sin color, una capa abajo, Compartir y barra compacta
+
+Mockup aprobado (8 cambios, todos): https://claude.ai/artifact/8b4xbwjvMUzUeJJgkAJn27. Este PR lleva A, B, E, F.
+- A: cifras de KPI en tinta normal y el estado en un punto de 8 px junto al rotulo (turno, tarjeta
+  del Inicio, Historial). DESIGN.md §10 lo pedia; `Stat`/`Kpi` cambian `tinta` por `punto`.
+- B: sin la barra fija «Nuevo evento». El «+» central de la barra de pestanas, dentro de `/bitacora*`,
+  abre «Nuevo evento» (`services/bitacora/pedirNuevoEvento.ts`: en el turno emite
+  `bitacora:nuevo-evento` y conserva el turno mirado; desde el historial navega a `?nuevo=1`). En el
+  resto de la app sigue «Registrar incidencia». El pase suma su «+» al centro (Turno · + · Historial).
+  Rotulo «Nuevo evento» sobre el «+» las 3 primeras veces por telefono (`bitacora.rotuloMas.v1`).
+  El boton del chat vuelve a `bottom-24` en todas partes (se revierte lo de la ronda 19).
+- E: telefono: Historial, Compartir y QR como iconos en una capsula `glass-nav`; «Compartir» abre
+  `CompartirTurnoSheet` (correo, WhatsApp →hoja existente, PDF). Se quito la fila Copiar · PDF · WhatsApp.
+  PC sin cambios.
+- F: barra compacta fija (IntersectionObserver sobre la cabecera) con «Turno tarde 16-09 · horario ·
+  N eventos» y la capsula; en el pase baja 52 px (su cabecera).
+- Verificado a 375 px (turno, historial, Inicio, pase) y PC; vitest ok, eslint 30/30, audits ok, build ok.
+
+## 2026-09-17 · Bitacora ronda 21 · Tercera pasada: converge (1 hallazgo)
+
+Medido: tarjeta de la bitacora en el Inicio, visor de fotos, «Resolver pendiente», «Ya no aplica»
+(0 objetivos bajo 44, 0 overflow). Unico hallazgo: el fondo del visor de fotos al 92 % dejaba ver los
+botones de la pagina detras de la foto → opaco (Fotos de iOS). Dos rondas seguidas casi sin hallazgos:
+el pulido visual de la bitacora queda cerrado; lo que sigue es de uso en planta o de fondo.
+
+## 2026-09-17 · Bitacora ronda 20 · Pulido iOS 27, segunda pasada (sin mockup: causas claras)
+
+Recorrido de lo que no entro en la ronda 19: crear evento, hoja de tecnicos, observacion, entrada del
+pase, editor en PC e Historial en PC. Tres hallazgos, todos con la causa a la vista:
+- La cabecera del TURNO ACTUAL seguia cortando el QR: pildora «En curso» (95 px) + Historial + QR = 428
+  px en 375. La pildora pasa al mismo lugar que «Hoy ›» (junto al nombre del turno); la cabecera
+  queda con titulo + Historial + QR en los dos casos (Historial 182–299, QR 303–359).
+- «Salir» del pase (36 px) y «Lista de tecnicos» en la hoja de tecnicos (36 px) → 44 px (Button sin `sm`).
+- Sin hallazgos: editor de creacion (26 controles, 0 bajo 44), observacion, entrada del pase y PIN,
+  modo bitacora del pase (0 overflow), editor en PC (dos columnas parejas), Historial en PC.
+
+## 2026-09-17 · Bitacora ronda 19 · Pulido iOS 27 medido en produccion (375 px)
+
+Recorrido con la sesion real (localhost:5189, turno tarde 16-09) y los medidores de DESIGN.md §11:
+0 diminutos, 0 mayusculas, 0 objetivos bajo 44 en turno e Historial; 1 en el editor (16 px). El resto
+era composicion. Mockup (7 puntos, todos aprobados): https://claude.ai/artifact/E9CwvzvPwZ8qsW6EKJYeWc
+1. Cabecera: «Ir al turno actual» + Historial + QR median 478 px en 375 («Histo…»). Ahora es un chip
+   tinted «Hoy ›» junto al nombre del turno (solo cuando no es el actual). Historial 182–299, QR 303–359.
+2. El FAB del chat (bottom-24, z-45) pisaba «Nuevo evento» y la fila Copiar·PDF·WhatsApp: en
+   `/bitacora` sube a `bottom-[8.75rem]` (`useLocation` en ChatBot; el chat abierto ya iba a 9rem).
+3. `BarraSincronizacion`: sin nada que decir (Sincronizado, sin novedad, nadie mas) es una LINEA de
+   13 px en el telefono («● Todo al dia · hace 4 s · Danilo Cortes en el celular ˅»); tocarla abre la
+   tarjeta; en PC la tarjeta sigue entera (`hidden md:flex`).
+4. Fila del evento: «Repuestos: Filtro FRL 3300135877 ×1» (nombre comun o del maestro, codigo,
+   cantidad siempre), igual que WhatsApp/correo/Historial.
+5. Editor: al editar, «Editas como Danilo Cortes · Cambiar» (o «Continuas como» en borrador) en vez de
+   los chips de «Quien edita»; «Cambiar» los despliega. Al crear no cambia.
+6. Repuestos: «Editar nombre comun» en su propia linea de 44 px; placeholder «Buscar por codigo o nombre».
+7. Acceso QR: acciones en grilla 2×2 (Generar otro QR en plain, confirmable); cada tecnico en UNA fila
+   de 52 px con «Asignar PIN» / «PIN ˅» a la derecha (despliega Reiniciar / Quitar). `botonConfirmable`
+   pasa a 44 px (tambien «Quitar» en telefonos).
+- Verificado en 375 px claro y oscuro y en PC; vitest 2789, eslint 30/30 (sin nuevos), audit-piel ok.
+- ⚠ Medidor: `[...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='Nuevo evento')`
+  agarra primero el boton de PC (display:none, rect 0): filtrar por altura > 0 antes de comparar.
+
+## 2026-09-17 · Bitacora ronda 18b · Repuestos en lista al enviar + «Repuestos usados» en el Historial
+
+Mockup aprobado (las dos recomendadas): https://claude.ai/artifact/NgKHSJLgSFcyEgSv61Wd5F
+- **Al enviar (WhatsApp, correo, texto plano, PDF, lamina):** `lineasRepuestos()` = rotulo «Repuestos
+  usados:» + un renglon por repuesto «• 3300135877 · Filtro FRL (Filtro 1/2 purga…) ×1» (la cantidad
+  va SIEMPRE; `renglonRepuesto`). Correo: `<ul>` de verdad y 18 px entre eventos (era 12). PDF: rotulo
+  en negrita y viñeta DIBUJADA (`pdf.circle`: la Helvetica estandar no trae «•»). Lamina: hasta 5
+  lineas. WhatsApp: `SEPARADOR_EVENTOS` («──────────») entre evento y evento; con uno solo no sale.
+  `lineaRepuestos()` (una linea) sigue viva para la clave de la lamina y la fila.
+- **Historial:** `ResumenPeriodo.repuestos` (`RepuestoDelPeriodo`: codigo, nombre, nombre comun,
+  unidades, eventos, equipos con numero, ultimo turno; solo eventos `listo`) y `unidadesRepuestos`.
+  Pantalla: bloque «Repuestos usados» entre «Equipos que mas pararon» y «Quien registro» (8 a la vista,
+  «Ver todos (N)»), y DOS KPIs mas (repuestos usados · unidades): la grilla pasa a 2×4 / 4×2. Correo
+  (8 KPIs + lista), texto plano («REPUESTOS USADOS») y PDF (8 KPIs + lista) con los mismos numeros.
+- Vitrina: los eventos con parada del historial de ejemplo llevan repuestos reales del maestro.
+- Verificado: 120 pruebas en services/bitacora (2 nuevas, 1 ajustada), vitest 2789, eslint 30/30,
+  audits ok, build ok; vitrina en PC y 375 px (claro y oscuro). Fuera de alcance, visto de paso: en la
+  vitrina a 375 px la cabecera «En curso / Historial» de `BitacoraTurnoVista` desborda a 432 px
+  (scroll horizontal); no lo toque.
+
+## 2026-09-17 · Bitacora ronda 18a · Corregir quien registro un evento publicado
+
+Orel: «no deja modificar el tecnico que edito ni el que participo». Diagnostico en la vitrina:
+los participantes SI se guardaban (fila «Mauricio, Danilo» → «Mauricio, Danilo, Leandro»); lo
+bloqueado era **quien lo registro** en un evento publicado: el editor lo mostraba como texto fijo
+(«Registro: X») y la regla del 16-09 solo dejaba cambiarlo en borrador.
+- Editor: en un evento publicado aparece «Quien lo registro» (`SelectorTecnico` con `recordar={false}`
+  y `vacio="Elige al tecnico"`: elegir a otro NO pisa «mi nombre» en el telefono). `DatosEvento.registradoPor`
+  viaja solo si cambio (clave condicional: un `undefined` pisaba el autor en la vitrina). Quien corrige
+  queda en `actualizadoPorNombre`. El pase QR tambien lo ve («Edita: Leandro Igor» + selector). Un
+  borrador ajeno sigue con «Lo empezo: X» (ahi el autor se ajusta con «Quien continua»).
+- Regla: cae «solo se ajusta mientras es borrador». El pase puede corregir `registradoPor` SOLO si
+  `actualizadoPorNombre == token.nombre` (deja su firma). 106/106 en local (2 casos nuevos, 1 invertido).
+- Sin mockup: es el mismo selector que ya existia. Verificado en la vitrina (PC y 375 px) y en el modo
+  pase. Pendiente de esta ronda (mockup https://claude.ai/artifact/NgKHSJLgSFcyEgSv61Wd5F): historial
+  de repuestos usados y repuestos en lista + separador entre eventos en WhatsApp/correo/PDF.
+
+## 2026-09-17 · Bitacora ronda 17 · Editor ancho en PC, buscador de repuestos con dos alcances, nombre comun y orden de los sin hora
+
+Pedidos de Orel tras probar los repuestos en la E-PACK. Mockup (3 decisiones, todas las recomendadas):
+https://claude.ai/artifact/MtKR1Po46t5N3jdePikyrN
+- **Editor en PC:** `Sheet size="wide"` (60rem) y el formulario en dos columnas desde `md` (que paso /
+  repuestos, impacto, fotos, pendiente). En el telefono, una columna como antes.
+- **Buscador de repuestos:** un campo + `SegmentedControl` «En este equipo · Todos» (solo con equipo
+  elegido; sin equipo busca en todos). Busca por codigo, nombre SAP y **nombre comun**; un codigo
+  completo aparece aunque no sea del equipo (se ofrece «no esta vinculado a este equipo»). «Todos»
+  usa el **indice liviano `repuestosIndice/sap`** (`m: {sap: [nombre, comun]}`, 3.790 entradas,
+  ~179 KB, bajado una vez por sesion) construido con `scripts/normalizacion/construir-indice-repuestos.cjs`
+  y mantenido por la funcion `onRepuestoEscritoIndice` (trigger sobre `repuestos/{id}`, escribe solo
+  la entrada que cambio y sale temprano si no cambio nombre/comun/SAP; logica pura en
+  `functions/repuestosIndice.js`, 3 tests). Cada resultado y cada elegido muestra ubicacion y stock
+  de `bodega/{sap}` (una lectura por codigo, maximo 10). Por que el codigo «no salia arriba»: el
+  campo viejo solo actuaba con Enter/Agregar; ahora los resultados salen mientras se escribe.
+- **Nombre comun:** se ve en resultados y elegidos (comun en negrita, SAP debajo) y se edita en
+  linea; se guarda en `repuestos/{sap}.nombresComunes` (al frente, sin duplicar: `conNombreComunAlFrente`),
+  el mismo campo de Repuestos. El evento copia `nombreComun`; correo/WhatsApp/lamina dicen
+  «3300135877 Filtro FRL (Filtro 1/2 purga…)». El pase QR lo ve pero no lo edita (regla).
+- **Eventos sin hora:** `posicionMin` (minutos desde el inicio del turno, fraccionario; solo sin
+  hora, regla lo exige). Flechas ▲▼ en la fila (`posicionAlMover`: pasa al otro lado del vecino,
+  entre el y el siguiente) y en el editor chips «Ubicacion en el turno» (`opcionesUbicacion`: al
+  inicio / despues de cada evento con hora / al final). `mover()` en el hook escribe solo ese campo.
+- Reglas: `posicionMin` (-1440..2880, solo con hora vacia), `repuestosIndice` lectura (app y pase),
+  `bodega` lectura tambien para el pase. 104/104 (`probar-reglas-bitacora.cjs --local`, 8 nuevos).
+- 119 pruebas en services/bitacora (6 nuevas). Verificado en la vitrina: PC dos columnas (840 px en
+  el panel), buscar «filtro» en Todos → agregar → «＋ nombre comun» → «Filtro FRL» propagado a los
+  resultados; celular una columna; flechas mueven el evento sin hora hasta el inicio y el chip «Al
+  inicio» queda marcado.
+
+## 2026-09-17 · Bitacora ronda 16 · Fishken/E-PACK y vinculos desde STOCK ALMACENES (datos)
+
+Orel intento anotar el FRL de la E-PACK y la bitacora dijo «no tiene repuestos con codigo SAP».
+- **Causa:** la hoja «Fishken» del Excel maestro se migro al nodo hijo CINTA FISHKEN (s/c), no a
+  EMPACADORA E-PACK (720004590, alias FISHKEN). Bitacora, CTD y Repuestos buscan por el equipo
+  exacto. Ademas el maestro Excel esta desactualizado: 8 de 11 «sin SAP» si tienen codigo en
+  `STOCK ALMACENES.xlsx` (hoja Clasificacion, sub-familia FISHKEN), y FK-005 apunta a un SAP que
+  es otra pieza (3100061329 tarjeta; el cable AXT100-DS25 es 3300061329).
+- **Datos corregidos por script** (respaldo de los 127 docs en
+  `OneDrive\ANTARFOOD\_BACKUP_MEMORIA_CLAUDE\2026-09-17\repuestos-fishken-clasif-backup.json`,
+  escritura de a uno): 20 repuestos → E-PACK (el motor de la cinta se queda en CINTA FISHKEN);
+  5 fichas sin SAP fusionadas en su ficha con SAP (`fusionadoDe`) y borradas; 107 materiales de
+  Clasificacion vinculados con el patron ya usado por su maquina (Baader 142 → 6 evisceradoras 58,
+  Marelec → Static Grader 28, Garibaldi → 3 enzunchadoras 19, Baader 200 2). Decision de Orel:
+  MULTIVAC (50) y WITT (23) NO se vinculan. Resultado: E-PACK 17 (13 con SAP); sin equipo
+  3.022 → 2.910. `areaIds` se recalculo ([nodeId, ...path]): no lo mantiene ninguna funcion.
+- Codigo: la lista de repuestos por equipo de la bitacora vence a los 5 min (antes vivia toda la
+  sesion y un vinculo nuevo desde el CTD no aparecia).
+
+## 2026-09-16 · Bitacora ronda 15 · Repuestos usados y número del equipo
+
+Pedido de Orel tras probar el QR con un técnico: incluir (opcional) los códigos SAP de repuestos
+usados en el evento y mostrar el número del equipo elegido. Mockup:
+https://claude.ai/artifact/UEk6L3pijTCp8dodhcxjfe — eligió código SAP + búsqueda por nombre dentro de
+los repuestos del equipo, con cantidad (1 por defecto).
+
+- **Número del equipo:** `equipoCodigo` se copia del `codigo` del nodo al elegirlo en el buscador
+  (equipo → 720004447; área → ubicación técnica AQ-IN-CHO-EXTE-CASI). Va con el equipo en la fusión
+  y en la escritura (`CAMPOS_DOC`); un evento anterior lo completa al abrirse. Se ve en el editor
+  («Planta · Área · N° de equipo»), la fila, el correo/PDF/WhatsApp («EQUIPO (720004447)») y la
+  lámina («N° 720004447»).
+- **Repuestos usados:** `repuestos: [{codigoSAP, nombre, cantidad}]` (≤ 20, nombre copiado del
+  maestro). Por código: `getDoc(repuestos/{código})` (el id ES el SAP; si no, query por
+  `codigoSAP`) — un código que no está queda solo con el código. Por nombre: solo con equipo
+  elegido, `leer … where equipos array-contains` UNA vez por sesión (BAADER 142 N2: 1.803 docs,
+  ~2 MB, 476 con SAP). NO se carga el maestro entero (7.673 lecturas por apertura: techo de costos).
+  Nombres con `formatNombreSAP`. En el formulario se comparan como JSON normalizado.
+- Reglas: `equipoCodigo` ≤ 40, `repuestos` lista ≤ 20; el pase de bitácora ahora LEE `repuestos`.
+  96/96 (`probar-reglas-bitacora.cjs --local`, 6 nuevos + el caso del pase cambiado a ALLOW).
+- 113 pruebas en services/bitacora (13 nuevas). Verificado en la vitrina a 375 px tecleando: código
+  del maestro, código desconocido, búsqueda «pern» → 2 pernos reales, guardar → fila y correo.
+
+## 2026-09-16 · Bitacora ronda 14 · Pase de bitácora (QR + PIN personal)
+
+Pedido de Orel: un QR para que los técnicos entren fácil a la bitácora y agreguen/editen eventos, con
+acceso SOLO a la bitácora. Mockup y decisiones: https://claude.ai/artifact/4e6aS7naozKBQLzmdqB7of
+(v2). Decidió: pase de bitácora + nombre de la lista de habilitados + PIN personal de 4 dígitos
+(lo asigna un supervisor; 5 fallos → 15 min); QR por 30 días, «Renovar» mantiene el mismo QR; los
+teléfonos que ya entraron siguen hasta «Quitar» o hasta que se le quite/reinicie el PIN al técnico.
+
+- **Función `paseBitacora`** (callable, `functions/paseBitacora.js`, sin triggers ni crons, costo fijo
+  cero; maxInstances 3). Públicas: `info` (técnicos con PIN) y `entrar` (valida token + PIN en
+  transacción, crea una cuenta `pase_…` por teléfono con claims `{pase_bitacora, plantId, nombre}`
+  vía `setCustomUserClaims` + custom token, y `bitacoraDispositivos/{uid}`). Supervisor: `generar`,
+  `renovar`, `asignarPin` (devuelve el PIN una vez; guarda scrypt + sal), `quitarPin`,
+  `quitarDispositivo` (desactiva + `updateUser disabled` + `revokeRefreshTokens`). El teléfono:
+  `salir`. 15 fallos sin acierto bloquean hasta reiniciar el PIN (10.000 PIN posibles).
+- **Reglas — el límite está en un punto central:** `isAuthenticated()` es falso para un token con
+  `pase_bitacora`, así que el pase queda fuera de TODA la app (incl. las ~80 lecturas
+  `isNotAnonymous()` y el create de `users`). Solo entra por `paseBitacoraActivo()` (get de su
+  dispositivo) a bitacoraEventos/Presencia/Turnos, lee bitacoraConfig, hierarchy y calendario, y
+  firma con SU nombre (`registradoPor`/presencia == claim). `bitacoraPines` no la lee nadie.
+  Storage: `sesionApp()` reemplaza los 38 `request.auth != null`; el pase solo en `bitacora/`
+  (el cross-service sigue roto en prod: allí basta el claim; al quitarlo, <1 h).
+  90/90 Firestore (`probar-reglas-bitacora.cjs --local`, 33 nuevos; el helper `auth()` ahora acepta
+  claims) y 14/14 Storage (`scripts/probar-reglas-storage-pase.cjs`, nuevo).
+- **App:** `App.tsx` reconoce el claim ANTES de buscar `users/{uid}` (si no, cerraba la sesión) y
+  monta otro árbol de rutas: `PaseBitacoraLayout` (sin MainLayout ni sus listeners de incidencias y
+  equipos) con Turno/Historial y «Salir»; todo lo demás redirige a /bitacora. El watchdog de 24 h no
+  corre para el pase. `/pase-bitacora#p=…&t=…` (el token va en el `#`; el 404.html lo conserva) =
+  nombre → PIN (campo `readOnly` al enviar: `disabled` le quitaba el foco y cerraba el teclado).
+  En la bitácora el pase firma fijo (sin selector), no edita la lista de técnicos, y si un
+  supervisor lo quita el teléfono cierra sesión con aviso (escucha su propio dispositivo).
+  Supervisores: botón «Acceso QR» → hoja con QR (imprimir por iframe, renovar, copiar, generar otro
+  con doble toque), técnicos con PIN/bloqueos (asignar, reiniciar, quitar) y teléfonos (quitar).
+- Vitrina `/dev/pase-bitacora` (API de mentira, PIN 4729) y `?vista=modo`. 9 pruebas de la función,
+  5 del cliente. Verificado a 375 px y PC: PIN malo/correcto tecleando, asignar y reiniciar PIN con
+  confirmación, modo bitácora sin «Acceso QR».
+- **Sin probar todavía:** el flujo real (necesita la función desplegada y que Orel genere el QR y
+  asigne PIN a los técnicos).
+
+## 2026-09-16 · Bitacora ronda 13 · WhatsApp + evento con título, sin hora y tipos propios
+
+Pedido de Orel: copiar la bitácora «como un correo, con fotos» para mandarla por WhatsApp Web, y en el
+evento: poder no poner la hora, un título aparte del equipo y la descripción, y más tipos (correctivo,
+planificado…) además de uno escrito a mano. Mockup aprobado con las 4 recomendaciones:
+https://claude.ai/artifact/BiADNnwFmfGvfe1R2PChEJ
+
+- **WhatsApp = mensaje + una LÁMINA por evento con fotos.** WhatsApp no intercala texto y fotos en un
+  mensaje y WhatsApp Web recibe UNA imagen por Ctrl+V: pegar el HTML del correo pierde las fotos. La
+  lámina (canvas 1080 px, `laminaWhatsapp.ts`) junta fotos completas (sin recortar), hora, equipo,
+  título, impacto, descripción (10 líneas máx.) y técnicos; más de 4 fotos → dos láminas.
+  - PC: botón «Copiar para WhatsApp» (copia el mensaje) + columna derecha con segmentado
+    Correo/WhatsApp: pasos «Copiar mensaje» / «Copiar lámina N» (PNG al portapapeles, Chrome solo
+    acepta `image/png`) y vista previa del chat. Las láminas se generan al abrir la vista, para que
+    el copiado ocurra dentro del toque.
+  - Celular: botón «WhatsApp» → hoja con «Compartir» (Web Share con las láminas + el mensaje; el
+    mensaje queda además en el portapapeles por si WhatsApp no lo toma). Sin soporte de compartir
+    archivos → los mismos pasos del PC.
+  - Mensaje con formato de WhatsApp (`*negrita*`, `_cursiva_`), cada evento dice en qué lámina están
+    sus fotos; un `*`/`_` del texto se cambia por un carácter igual para no romper el formato.
+- **Evento:** `titulo` opcional (el título manda en la fila; el equipo baja a la línea de abajo),
+  interruptor «Sin hora» (`horaInicio: ''`, sin término; se ubica por `createdAt`, leído con
+  `serverTimestamps: 'estimate'`), tipos Falla · Correctivo · Preventivo · Planificado · Inspección ·
+  Ajuste · Novedad · Otro… (`tipo: 'otro'` + `tipoOtro`, sugeridos los ya publicados; al publicar,
+  un «Otro» que coincide con un tipo fijo queda como ese tipo). Presentación común en
+  `presentacionEvento.ts` (fila, correo, PDF, WhatsApp dicen lo mismo).
+- Reglas: 8 tipos, `tipoOtro` ≤ 40, `titulo` ≤ 120, `horaInicio` '' permitido solo sin término.
+  57/57 con `probar-reglas-bitacora.cjs --local` (11 nuevos).
+- Revisión propia: agrupar las dos horas en una escritura pisaba un inicio cambiado por otro equipo →
+  cada hora se escribe por separado; una lámina cancelada a medio dibujar dejaba una URL sin liberar;
+  el tipo a medio escribir de un borrador aparecía como sugerencia → sugerencias solo de publicados.
+- 100 pruebas en services/bitacora (21 nuevas). Verificado en la vitrina (datos de ejemplo): PC
+  claro/oscuro, 375 px, tecleando en «Otro…» y título con autoguardado (el foco no se pierde),
+  «Sin hora», publicar, copiar mensaje y lámina, compartir (con `navigator.share` simulado).
+- **Sin probar todavía:** pegar en WhatsApp Web real y compartir desde un Android real.
+
+## 2026-09-16 · Bitacora ronda 12 · Borradores que quedaron del turno anterior
+
+Pendiente anotado en la ronda 11: un borrador que nadie publicó antes del cambio de turno no contaba
+en nada y nadie lo veía después.
+
+- `borradoresAnteriores` (puro, 1 prueba) + `useBorradoresAnteriores` (igualdad `plantId` +
+  `estado`, sin índice compuesto). En el turno EN CURSO aparece «Quedaron sin publicar · N» debajo de
+  «Vienen de turnos anteriores», con origen («Turno noche 16-09 · 00:00 · Leandro Igor»), aviso de que
+  no cuenta ni salió en el correo, «Continuar» (abre el borrador en SU turno, donde se publica) y
+  «Descartar» con doble toque (solo autor o supervisor).
+- Al continuar un borrador de otro turno, la lista de ese turno tarda en cargar: la hoja mostraba
+  un instante «Este evento ya no está en la bitácora». Ahora «visto» se marca recién cuando el
+  documento llega, y «Listo» solo crea si el documento lo creó esta misma hoja.
+- Producción sigue en 0 eventos/0 presencia (la pestaña de Orel estaba oculta: no late, por diseño).
+- 79 pruebas en services/bitacora. Verificado en la vitrina: sección, «Continuar» → `?turno=` del
+  borrador + «Continuar borrador» sin aviso falso.
+
+## 2026-09-16 · Bitacora ronda 11 · Bitacora cooperativa (borrador autoguardado + presencia)
+
+Pedido de Orel: iniciar la bitacora en celular o PC, que se guarde sola, que se sincronice entre
+equipos, que indique que esta sincronizada, y que varios la llenen a la vez. Mockup aprobado:
+https://claude.ai/artifact/19kjxjdMAPVPjUknLtZQW2 . Decisiones de Orel: el borrador lo ve TODO el
+turno; eliminar = quien lo creo + supervisores (como antes).
+
+- **Borrador que se guarda solo** (`estado: 'borrador' | 'listo'`, sin campo = listo). La hoja
+  guarda tras 1,5 s sin teclear (`AUTOGUARDADO_MS`); abrir y cerrar sin escribir no crea nada
+  (`tieneContenido`). «Cerrar» GUARDA; «Listo» publica; «Descartar borrador» borra doc + fotos.
+  Irse de la pantalla tambien guarda (cleanup de desmontaje). Un borrador NO cuenta en ningun
+  numero, correo, PDF, historial ni entrega de turno (`soloListos` en cada consumidor) y un
+  borrador que venia de «Resolver» cierra el pendiente recien al publicarse.
+- **Fusion campo por campo en vivo** (`fusionarFormulario`, 7 pruebas): lo que cambia otro equipo
+  mientras la hoja esta abierta se adopta si yo no toque ese campo; si los dos cambiamos distinto,
+  queda lo mio y se AVISA con «Usar la suya / Mantener la mia». Asi «empezar en el celular y seguir
+  en el PC» funciona aunque la hoja siga abierta en el celular. Fotos que agrega o quita el otro se
+  incorporan. Avisos si el evento lo borraron o lo publicaron en otro equipo.
+- **Presencia** (`bitacoraPresencia/{plantId}_{turnoId}_{dispositivoId}`, latido por minuto solo
+  con la pestana a la vista): quien tiene la bitacora abierta y que evento escribe. La vigencia se
+  mide con la hora del SERVIDOR (desfase estimado con el latido propio): los relojes de los
+  telefonos de planta no son confiables. Menos de 1.500 escrituras por turno con tres equipos.
+- **Barra de sincronizacion** (`BarraSincronizacion`): Sincronizado / Guardando / Sin senal (con
+  cuantos cambios quedaron en el telefono) + «Leandro agrego un evento» cuando llega algo de otro
+  equipo + avatares de conectados (lista abierta en PC, desplegable en celular).
+- Filas: «En redaccion», «X lo esta escribiendo», «Continuar en este equipo» (PC), y «X lo tiene
+  abierto» en eventos publicados. Tarjeta del Inicio: «1 en redaccion».
+- Reglas: borrador puede ir sin descripcion; publicado la exige; `estado` y `dispositivo` con
+  valores cerrados; presencia con `hasOnly`, id que calza, `vistoEn == request.time` y
+  `uid == auth.uid`. **41/41 casos** con `probar-reglas-bitacora.cjs --local` (14 nuevos).
+- 74 pruebas en services/bitacora (18 nuevas). Verificado en el navegador TECLEANDO: el foco no se
+  pierde, «Guardando borrador…» → «Borrador guardado · 14:20 · el turno lo ve», cerrar deja el
+  borrador en la lista, continuar el de otro muestra el aviso de presencia, «Listo» lo publica y
+  el resumen pasa de 4 a 5 eventos.
+
+### Ronda 11b · revisión adversaria de la cooperativa (antes del merge)
+
+Revisión adversaria: 5 ALTA de pérdida de datos. Arreglados todos antes de mergear.
+
+- **Se escribe SOLO lo que cambió** (`camposACambiar`, 4 pruebas). Cada autoguardado mandaba el
+  documento entero: uno atrasado en la cola de un teléfono sin señal devolvía a su valor viejo lo que
+  otro equipo cambió, y la fusión del otro lado lo adoptaba sin avisar.
+- **Un evento publicado no vuelve a borrador**: el autoguardado nunca manda `estado` y la regla lo
+  prohíbe (un autoguardado atrasado lo sacaba de números, correo y entrega de turno sin que nadie lo notara).
+- **Abrir, mirar y cerrar no escribe** (antes dejaba en cola una copia vieja del evento).
+- **Un borrador no se recorta** (el espacio que se estaba tecleando desaparecía bajo el cursor).
+- **«Cerrar» avisa también por las fotos que fallaron por falta de señal** (se perdían sin aviso).
+- Autoguardado decidido al ABRIR: si otro publica, lo tecleado sigue guardándose (antes el mismo
+  botón pasaba a «Cancelar» y lo descartaba). Creación fallida → se vuelve a crear, no se actualiza
+  un documento inexistente; «Listo» crea si nunca se vio el documento. Sin hora de inicio no se
+  intenta guardar y se avisa.
+- Participantes entran en la fusión. Descartar un borrador de «Resolver» no reabre el pendiente.
+  «Volver a crearlo» sin las fotos borradas. Eliminar se muestra solo a quien puede (autor/supervisor).
+- Regla: `registradoPor` solo cambia mientras es borrador. 46/46 casos contra la API (5 nuevos).
+- Presencia: desfase solo con el latido PROPIO recién confirmado (uno viejo en caché daba horas de
+  desfase y todos figuraban conectados); un id por PESTAÑA; sin actividad en 15 min deja de latir.
+- **Nombre en «conectados»** (pregunta de Orel: «¿por qué dice Matias Serpa en PC?»): salía del último
+  técnico elegido en ese navegador. Ahora: cuenta personal → su nombre; cuenta compartida → «PC de
+  Mantención» en el PC y el técnico elegido en el celular (`nombreEnPresencia`).
+- **Técnicos del turno parten VACÍOS** (pedido de Orel: el calendario a veces no refleja el turno
+  real): cada uno se agrega a mano; el calendario queda como «El calendario sugiere: …» y como
+  etiqueta dentro de la hoja, sin marcar a nadie (`sugeridosPorCalendario`).
+- 78 pruebas en services/bitacora. Verificado tecleando: el espacio final sobrevive al autoguardado,
+  sin conflicto falso.
+- Pendiente anotado: un borrador abandonado al cambiar de turno no se avisa en el turno siguiente.
+
+## 2026-09-15 · Bitacora ronda 10 · Fotos: nada se pierde y nada queda huerfano
+
+Revision adversaria del camino de FOTOS y del copiado al correo (7 hallazgos, 3 ALTA).
+
+- **Cola de borrados pendientes** (`services/bitacora/borradosPendientes.ts`, en localStorage).
+  Todo borrado de limpieza era `catch(() => undefined)`: con la senal de planta cayendose, cada
+  falla dejaba en Storage una foto que NINGUN documento menciona — imposible de encontrar despues
+  y pagandose para siempre. Ahora `borrarFotoOEncolar` anota lo que falla y `purgarFotosPendientes`
+  vacia la cola al abrir la bitacora y cada vez que vuelve la senal.
+- **Limpieza al desmontar**: irse de la pantalla sin tocar Cancelar ni Guardar (lo llaman por radio
+  y toca otra pestana) dejaba huerfanas las fotos ya subidas. El cleanup lee `subidasNuevas.current`
+  al desmontar; si el evento se guardo, `guardar` ya lo vacio y no borra nada.
+- **Subida de a DOS** (`LOTE_SUBIDA`): `createImageBitmap` decodifica la foto ORIGINAL (12 MP ~ 36 MB
+  de pixeles) antes de achicarla; ocho a la vez recargaban la pestana en un celular de gama media y
+  se perdia el formulario entero.
+- **Boton «Quitar» en una subida en curso o fallida**: antes, un HEIC que nunca iba a subir obligaba
+  a cancelar el evento entero. Las descartadas se anotan (`descartadas`) y si llegan a terminar se
+  borran solas de Storage.
+- El correo ya no inventa un 4:3 cuando faltan las dimensiones (una foto vertical salia estirada).
+- 55 pruebas en services/bitacora (3 nuevas de la cola, con almacen falso).
+
+**Anotado, no arreglable:** la URL de descarga de Storage lleva un token que ignora las reglas, asi
+que cualquiera que reciba o reenvie el correo ve esas fotos sin autenticarse. Es inherente a mandar
+fotos por correo; las reglas de Storage NO son la proteccion de esas URLs.
+
+## 2026-09-15 · Bitacora ronda 9 · Historial: la tesis no puede insinuar paradas que no hubo
+
+Revision adversaria del modulo Historial (10 hallazgos, 3 ALTA). Arreglados los 10.
+
+- **La tesis mentia por implicatura.** Decia "De N intervenciones, M se hicieron sin detener la
+  linea" con N = TODOS los eventos, incluidos los `no-aplica` (rondas, novedades), asi que un
+  periodo con 2 rondas y 1 ajuste en colacion sugeria 2 paradas inexistentes. Ahora el denominador
+  son las intervenciones SOBRE LA LINEA (`conImpacto` = con-parada + en-ventana) y hay frases
+  propias para "ninguno con impacto en produccion" y "todas con la maquina detenida".
+  `parteSinDetener` usa el mismo denominador.
+- **"max 1 min" con cero paradas**: el 1 era la guarda anti-division-por-cero y se filtraba al
+  rotulo. Ahora se muestra el maximo REAL o "sin paradas en el periodo".
+- **Carrera al cambiar de periodo**: el `.finally` no tenia el guard `vivo`, asi que la respuesta
+  del periodo viejo apagaba "cargando" y en esa ventana Copiar/PDF salian con numeros viejos.
+- Consulta acotada por los dos lados (`<= hasta`, evita el evento "de manana" de un reloj
+  adelantado), `orderBy fechaTurno desc` + `limit(1500)` (si se pasa el tope se pierde lo mas
+  viejo, no lo de ayer) y `setError(null)` al empezar.
+- **Turno EN CURSO marcado** (`FilaTurno.enCurso`): pildora en la lista y "(en curso)" en correo
+  y PDF; sus numeros son parciales.
+- Barras con `min-w-[5px]` + `overflow-x-auto`: con 30 dias (hasta 90 turnos) quedaban invisibles.
+- El PDF recupera el codigo de color (rojo parada / verde sin detener) y la pantalla muestra los
+  SEIS KPI del correo (antes 4).
+- `turnosSinParada` (campo sin uso) ahora se muestra: "7 de 30 turnos cerraron sin ninguna parada".
+- Un evento con `turnoId` corrupto ya no suma al total sin aparecer en ninguna fila.
+- 52 pruebas en services/bitacora (2 nuevas, 2 corregidas al comportamiento correcto).
+
+## 2026-09-15 · Bitacora ronda 8 · Robustez de la entrega de turno (revision adversaria)
+
+Una revision adversaria del codigo de entrega de turno encontro 10 bugs; se arreglaron los 10.
+
+- **El lote ya no puede perder el evento.** `update()` lleva precondicion de existencia: si el
+  pendiente original ya no estaba, el lote fallaba ENTERO y el evento recien escrito (con sus
+  fotos) se perdia con un aviso que hablaba de senal. Ahora el evento se escribe primero y el
+  cierre del pendiente va aparte (`cerrarPendienteResuelto`), con aviso propio.
+- **Borrar ya no deja el evento atrapado**: el borrado tambien se separo del reabrir. Antes, si el
+  pendiente original no existia, el evento quedaba IMPOSIBLE de borrar y el aviso culpaba a los
+  permisos.
+- **No se reabre un pendiente que otro evento ya resolvio** (`reabrirPendiente` compara
+  `cierre.eventoId`), y **"Ya no aplica" no pisa un cierre "resuelto"**.
+- **Reabrir un pendiente cerrado borra el cierre** (`cierreAntes`): antes la fila decia
+  "Pendiente" y "Resuelto en..." a la vez y la entrega de turno no lo volvia a mostrar nunca.
+- **El tope de 8 fotos se calcula contra el estado vivo del servidor**, no contra lo que vio este
+  telefono: dos que agregaban a la vez dejaban el evento en 10 fotos y la regla congelaba toda
+  edicion posterior.
+- **La bitacora archivada ya no cambia sola**: `pendientesDelTurno` cuenta tambien los pendientes
+  que un turno POSTERIOR cerro, asi que reexportar un turno viejo sigue coincidiendo con el correo
+  que se envio; el KPI dice "3 pendientes (2 ya cerrados)" y el evento muestra "Resuelto en Turno
+  noche 16-09 por ...". Los "pendientes anteriores" solo salen en el turno EN CURSO.
+- **Pantalla, correo y PDF dicen lo mismo**: la pantalla suma "(2, 1 sin duracion)" y el PDF suma
+  el KPI de pendientes cerrados; `pendientesCerrados` cuenta pendientes distintos, no eventos.
+- **Corte del orden a 16 h** del inicio del turno (antes 20 h): el minuto en que el orden salta
+  queda a 8 h de cualquier hora real.
+- **Mensaje honesto en la validacion de 12 h** (antes afirmaba que el termino iba antes del inicio)
+  y **"guardar sin las fotos que faltan" se vuelve a pedir por cada foto nueva**.
+- Ademas: la grilla del Historial tenia **scroll horizontal a 375 px** (hijo de grilla con
+  `min-width:auto` estirado a 396 px) — medido y corregido con `min-w-0`.
+- 4 pruebas nuevas (50 en total en bitacora).
+
+## 2026-09-15 · Bitacora ronda 7 · Historial del periodo (7/14/30 dias)
+
+- `services/bitacora/historialBitacora.ts` + tests (6): `filasPorTurno`, `resumirPeriodo`
+  (turnos, eventos, sin detener, MTTR, pendientes cerrados/abiertos, equipos top-5,
+  quien registro) y `tesisDelPeriodo` — la frase que demuestra el aporte de Mantencion.
+- `historialCorreo.ts` (HTML + texto plano) y `historialPdf.ts` (jsPDF + autoTable).
+- `hooks/useHistorialBitacora.ts`: un solo `getDocs` con rango sobre `fechaTurno` y filtro
+  de `plantId` en memoria (evita indice compuesto).
+- `pages/HistorialBitacoraPage.tsx`: chips de periodo, tesis resaltada, KPIs, grafico de
+  barras CSS (rojo = con parada, verde = turno sin paradas), lista de turnos que abre la
+  bitacora de ese turno por query param, equipos top y quien registro. Ruta
+  `bitacora/historial` + boton "Historial" en la cabecera. Vitrina en `/dev/bitacora`.
+- Barras con `bg-ink-crit`/`bg-ink-ok` (tokens): la deuda de piel BAJO 1 (baseline al dia).
+- Verificado a 375 px en el preview 5189: tesis, KPIs, grafico, 30 turnos, equipos y
+  "Quien registro" renderizan; sin errores nuevos en consola.
+
+## 2026-09-15 · Bitácora de turno de Mantención (módulo nuevo, PR abierto)
+
+Pedido de Orel: una bitácora por turno que se llena en el celular (texto + fotos antes/después),
+se ve actualizada en el PC y desde el PC se copia al correo de Mantención o se exporta a PDF.
+Ruta `/bitacora` + tarjeta arriba del Inicio móvil + entrada en el menú lateral.
+Mockup aprobado: https://claude.ai/artifact/JYnbiYBeKLujwRgpYYCcQY (opción A, línea de tiempo).
+
+Decisiones de Orel (15-09): turno de **Mantención por reloj** (día 08-16, tarde 16-00, noche 00-08,
+no Shoplogix) · bitácora **compartida** del turno (cada evento firmado) · cada evento lleva
+**minutos de parada (MTTR)** o, si se intervino sin detener, **en qué ventana** (colación HG,
+colación empaque…) · Outlook "varía" → dos formas de copiar.
+
+- Datos: colección plana `bitacoraEventos` (`plantId`, `turnoId` = `YYYY-MM-DD_banda`), fotos en
+  Storage `bitacora/{turnoId}/{eventoId}/{archivo}`. Reglas nuevas en `firestore.rules` y
+  `storage.rules` (se despliegan al mergear). Costo: 1 onSnapshot por turno abierto + 1 lectura del
+  calendario cada 5 min; despreciable frente al techo de CLP 20.000.
+- Lógica pura con 20 tests en `services/bitacora/` (turno, resumen/MTTR, técnicos del calendario
+  real, HTML del correo). Los técnicos de turno salen de `calendario_mantencion_state/current`.
+- Correo: HTML con estilos en línea + `<table>` + `<img width height>` (lo único que respeta
+  Outlook clásico al pegar). «Copiar con fotos incrustadas» (base64) para Outlook nuevo/web.
+- Vitrina `/dev/bitacora` (solo DEV) con datos de ejemplo: verificado ahí a 375 px y en PC, ambos
+  temas, crear/editar/guardar, copiar (portapapeles con HTML + texto) y PDF (2 págs, fotos).
+
+⚠ Gotchas encontrados (cada uno costó una vuelta):
+- **CORS del bucket autoriza SOLO `https://orelcain.github.io`**, no localhost: en local el PDF y la
+  copia incrustada no pueden leer fotos reales de Storage (en prod sí). Medido con curl + Origin.
+- **La CSP (`connect-src`) no admite `data:`** → `fetch(dataUrl)` falla. Fotos a canvas con `<img>`
+  y dataURL→Blob a mano.
+- **`processImageForUpload` devuelve un WebP chico TAL CUAL aunque se pida `preferWebP:false`**
+  (idempotencia). Outlook clásico y jsPDF no aceptan WebP → se re-codifica en `fotosBitacora.ts`.
+- **Flex vertical con alto acotado + hijo `overflow-x-auto` = hijo de 0 px** (la fila de tipos
+  desaparecía en el Sheet). Fix: `[&>*]:shrink-0`.
+- jsPDF: «NH₃» salía «NH» (el saneo cp1252 descarta subíndices) → `normalize('NFKC')` antes.
+- Con el editor abierto el turno se CONGELA: si el reloj cruza las 16:00 a mitad de escribir, el
+  formulario se reseteaba y el evento caía en el turno siguiente.
+
+Pendiente: prueba real de Orel en el celular (fotos de cámara) y pegado en SU Outlook; ver si
+«Copiar para correo» basta o hace falta la variante incrustada.
+
+### 2026-09-15 · Bitácora · ronda de pulido 1 (mismo PR #1021)
+
+- **Guardar sin señal**: `await setDoc` se resuelve recién con el ACK del servidor → sin señal
+  «Guardar» giraba para siempre. Ahora no se espera (la app ya usa `persistentLocalCache`: la
+  escritura queda en el teléfono y el onSnapshot la muestra con «Guardando…»); si el servidor la
+  rechaza, toast. Igual para borrar y para la observación.
+- **Fotos sin señal**: aviso inmediato («se sube sola cuando vuelva la conexión») en vez de la
+  ruedita de 10 min de Storage; reintento automático con el evento `online`; guardar con fotos sin
+  subir pide un segundo toque (nunca se pierde una foto en silencio).
+- **Observación general del turno** (estaba en el mockup aprobado y faltaba): doc
+  `bitacoraTurnos/{plantId}_{turnoId}` + regla; sale en correo, texto plano y PDF.
+- **Copiar asunto** en la vista previa del PC (el portapapeles lleva solo el cuerpo).
+- **Fotos en grande**: tocar una miniatura abre un visor a pantalla completa (flechas/teclado/Esc).
+- **«Nuevo evento» fijo** sobre la barra de pestañas en el celular.
+- **Vista previa del correo escalada**: se dibuja a su ancho real (720 px) y se aplica `zoom` para
+  caber en la columna; antes la 2ª foto quedaba cortada (la columna mide distinto con/sin menú).
+- Verificado en `/dev/bitacora` (5189): observación, visor, dock 52 px, flujo offline completo
+  simulando `navigator.onLine`, correo sin scroll horizontal. 21 tests, lint 28/30, audit-piel OK.
+
+### 2026-09-15 · Bitácora · PR #1021 en producción + «Quién registra»
+
+- **#1021 mergeado** (`9b10975`) y verificado en prod: `version.json` con el sha, chunks
+  `BitacoraTurnoPage` / `BitacoraTurnoCard` / `useBitacoraTurno` publicados, reglas de Firestore y
+  Storage publicadas 21:29 UTC con los `match` nuevos (API firebaserules, no el estado del workflow).
+- **`scripts/probar-reglas-bitacora.cjs`**: prueba el ruleset PUBLICADO con `projects:test`
+  (16 casos ALLOW/DENY con usuarios simulados, no escribe datos). 16/16.
+- **Decisión de Orel**: no hay cuentas por técnico; usan la **cuenta compartida de Mantención**
+  (`mantencion.plantach…`, activa) y **cada uno elige su nombre de la planilla del calendario**.
+  → selector «Quién registra» (técnicos de turno primero + «Otro técnico» con la planilla completa),
+  recordado por teléfono en localStorage. Se guarda `registradoPor` al crear y
+  `actualizadoPorNombre` al editar (registradoPor no se pisa). Lista, correo y PDF muestran el
+  técnico elegido (`autorVisible`), nunca el nombre de la cuenta. También en la observación.
+- Sin cambios de reglas (campo extra permitido). 23 tests.
+
+### 2026-09-15 · Bitácora · técnicos del turno, participantes, lista maestra y buscador de equipos
+
+Pedido de Orel (las tres opciones + buscador), mockup aprobado «tal cual»:
+https://claude.ai/artifact/Ubsj3WqTs5EZ8agfUkf7bc
+
+- **Técnicos del turno**: fila en la página + hoja con buscador para marcar quién está de verdad.
+  Se guarda por turno en `bitacoraTurnos.presentes` (merge con la observación); sin ajuste manda el
+  calendario. Da los botones rápidos del editor y el «Técnicos de turno» del correo.
+- **Varios técnicos por evento**: «También participaron» (toggles + «Otro») → `participantes[]`.
+  Correo/PDF: línea «Técnicos: …» solo si hubo participantes.
+- **Lista maestra**: `bitacoraConfig/{plantId}` = ajustes sobre la planilla del calendario
+  (agregados / ocultos / renombres). Quitar a alguien del calendario lo OCULTA; el calendario no se
+  toca. Presentes guardados se traducen con los renombres vigentes.
+- **Buscador de equipos**: jerarquía completa (702 nodos, 1 carga cada 30 min, se filtra en el
+  teléfono), sin tildes, por palabras en cualquier orden, nombre/alias/código, con PLANTA y ÁREA
+  (hay equipos con el mismo nombre en Chonchi y Yal), resaltado, teclado, texto libre permitido.
+  Guarda `equipoId` del nodo (para contar paradas por máquina después).
+- Reglas: `bitacoraConfig` nueva, `bitacoraTurnos` con observación/presentes opcionales, eventos con
+  `participantes` (≤12) y `equipoId`. `scripts/probar-reglas-bitacora.cjs --local` prueba el archivo
+  ANTES de publicar: 23/23.
+- ⚠ Gotcha: la hoja de presentes reiniciaba lo marcado en cada re-render (dependía de un array que
+  se recrea) → cargar solo al abrir, vía ref.
+- 33 tests de bitácora, verificado en `/dev/bitacora` a 375 px.
+
+### 2026-09-15 · Bitácora · entrega de turno + 12 hallazgos de revisión adversaria
+
+**Entrega de turno** (mockup aprobado «tal cual»: https://claude.ai/artifact/VXnx3kC7rPNVf7F8kdB9Vf):
+los pendientes abiertos de turnos anteriores aparecen arriba de la bitácora del turno que llega
+(turno de origen, técnico, «hace N turnos»). «Resolver» abre el editor precargado y en UN lote crea
+el evento (`resuelvePendiente`) y cierra el original (`pendiente:false`, `cierre`). «Ya no aplica»
+cierra con motivo sin contar como resuelto. Borrar el evento que resolvía reabre el pendiente.
+Correo/PDF: KPI «pendientes cerrados», «Cierra pendiente del Turno …» y recuadro «Sigue pendiente de
+turnos anteriores». Consulta por igualdad `plantId + pendiente==true` (sin índice compuesto).
+
+**Revisión adversaria** (subagente, 12 hallazgos, todos corregidos):
+1. ⚠⚠ ALTA — **el primitivo `Sheet` devolvía el foco al disparador en CADA tecla** (efecto con
+   `onClose` inline en dependencias) → en el celular el teclado se cerraba letra a letra. Afecta a
+   TODA la app que use `Sheet` con `onClose` inline. Fix: `onClose` en ref. Probado A/B tecleando de
+   verdad: sin fix el foco termina en `DIV/dialog`, con fix queda en el campo.
+2. Editar pisaba fotos agregadas desde otro teléfono → fotos como `arrayUnion/arrayRemove` en lote.
+3. Topes de las reglas sin topes en el formulario → maxLength/max + validación.
+4. Guardar bloqueado hasta 10 min con señal mala → se puede guardar sin las fotos que suben (2º toque).
+5/3b. Fotos borradas de Storage ANTES del OK del servidor → se borran en `.then` del commit.
+6. PDF cortaba líneas largas → `splitTextToSize`.
+7. Término < inicio (typo) daba paradas de ~24 h → validación >12 h; orden de eventos previos al inicio.
+8. Nombre recordado que ya no existe se guardaba igual → solo si sigue en la lista.
+9. Foto que termina de subir tras cancelar se colaba en otro evento → «sesión» del formulario.
+10. Marcas de técnicos se perdían al ir y volver de la lista → borrador controlado en la página.
+11. Spinner eterno del buscador → `setCargando(false)` siempre.
+12. Parada sin duración no contaba → cuenta, fuera del MTTR, «(N, M sin duración)».
+
+Reglas 27/27 `--local`. 40 tests de bitácora. ⚠ Lección: mis pruebas llenaban campos por script y
+NO podían ver el bug del foco; en formularios hay que TECLEAR (`computer type`) en la verificación.
 
 ## 2026-09-15 · Fuera `maplibre-gl`: las 2 alertas críticas de Dependabot eran una dependencia muerta (chore/quitar-maplibre)
 
@@ -49,4191 +679,307 @@ mes/año), 454/454 en todas**. Receta del preload: si otro test depende del relo
 
 CI: `node --test shoplogix/__tests__/*.test.js __tests__/*.test.js` (glob: los nuevos entran solos).
 
-## 2026-09-12 · El dedupe de Puerta 0 fallaba por el calibre (PR #977)
-
-Lo que faltaba medir de #973/#975. `dedupeGate0Records` tenia el mismo problema **pero por otro
-campo**. El mismo rechazo del `2025-07-08 22:14:01`, en los dos archivos:
-
-```
-recorte: { ts, pieces: 1, weightKg: 6.88, error: "No leido por fotocelula",
-           quality: "Premium", calibre: "Other" }
-mes:     { ts, pieces: 1, weightKg: 6.88, error: "No leido por fotocelula",
-           quality: "Premium", weightPerPieceGrams: 6880, lot, shift }
-```
-
-El recorte trae `calibre` y el Excel del mes no: con `calibre` en la clave, la ventana del turno
-quedaba con **838 registros de Puerta 0 en vez de 419**. **No es `error`**, que coincide entre las
-dos fuentes — ese se queda: es la causa del rechazo y lo que distingue dos rechazos del mismo
-instante. Costo de sacar `calibre`: **cero** (26.878 unicos con y sin el).
-
-### ⚠ Lo que medi y NO era un problema
-
-El recorte de Puerta 0 trae **cada registro exactamente dos veces** (838 = 2x419, los 413 timestamps
-repetidos con registros identicos). Parecia un segundo foco de inflado, pero **el dedupe si colapsa
-esos**, asi que los 335 turnos generados desde recortes tienen el Puerta 0 correcto. **No hubo que
-regenerar nada.**
-
-### Nota de metodo
-
-La primera medicion dio «P0 del mes: 0 registros» — porque le pase a `parseFile` un nombre de
-archivo inventado, y `detectFileKind` **usa el nombre**. ⚠ Al medir con archivos reales, pasar
-siempre el `path.basename` real.
-
-## 2026-09-12 · Revision: la lista de repuestos por equipo
-
-**Se despliega bien.** Verificado en pantalla a 1920 (CTD → equipo → pestaña **Recursos** →
-«Repuestos del equipo»), en los dos extremos: con datos, y «Sin repuestos vinculados.» cuando el
-equipo no tiene. La UI no es el problema.
-
-**Los datos si.** Medido contra Firestore:
-
-- **458 de 511 nodos hoja no tienen ni un repuesto**; solo 53 tienen lista.
-- Las **seis Baader 142** (N1/N2/N3 de las dos plantas) tienen **1.803-1.804 cada una**, y el BOM
-  real son **476 lineas**. Que las seis tengan el mismo numero delata vinculo masivo, no despiece:
-  **99,9 %** de esos repuestos estan vinculados a 6 o mas equipos.
-- De esos 1.804: **73,6 % sin codigo SAP** y **707 filas sobran** por nombre repetido (211 nombres
-  distintos) — «soporte» x58, «tornillo hexagonal» x38, «arandela» x18. En 184 de esos grupos
-  **ninguno** tiene SAP, asi que nada los distingue.
-
-En pantalla se lee «Abrazadera de manguera» cuatro veces seguidas, sin codigo. Se despliega, pero no
-sirve para buscar.
-
-⚠ **Gotcha de medicion:** los nodos de `hierarchy` tienen `tipoNodo`, **no** `tipo`. Filtrar por
-`tipo` devuelve 0 equipos y parece que no existe ninguno.
-
-Queda a decision de Orel: reemplazar el vinculo masivo por el BOM real y consolidar los duplicados
-sin SAP. No se toco ningun dato.
-## 2026-09-12 · Rehechos los 12 turnos que quedaron al doble (PR #975) · APLICADO EN PROD
-
-## ⚠⚠ El script de carga tenia SU PROPIA copia de la clave del dedupe
-
-`scripts/load-missing-shifts.js` es JS plano, no usa el `src/` del PWA: repetia la clave del dedupe
-con `lot` adentro. **El fix #973 no lo alcanzaba.**
-
-**Regla:** al arreglar una regla de negocio, grepear si hay copias en `scripts/`. Una regla
-duplicada se arregla una vez y sigue rota en la otra copia.
-
-## Alcance, acotado por una huella
-
-Solo pudieron doblarse los resumenes que nombran **a la vez** el Excel del mes y un recorte
-`_pp.xlsx`. Son **12**, todos de julio 2025, todos escritos por ese script, **todos con factor
-exactamente 2.000**:
-
-```
-  2025-07-01__Turno noche    8434 → 4217 pz · P0  7,40 % → 14,80 %
-  2025-07-08__Turno noche   11228 → 5614 pz · P0  3,73 % →  7,46 %
-  2025-07-14__Turno dia     13286 → 6643 pz · P0  9,16 % → 18,32 %
-  (y 9 mas, todos factor 2.000)
-```
-
-⚠ **El KPI de Puerta 0 estaba a la MITAD** en esos turnos: el porcentaje se calcula contra el total
-inflado. **Julio 2025 se veia mejor de lo que fue.**
-
-Los otros 335 resumenes del script usan solo los dos recortes y estaban bien. Los 50 que escribio la
-app **no se tocan**: calcula campos que este pipeline no produce y pisarlos seria destruirlos.
-
-## 📏 Como rehacer datos historicos sin romper nada
-
-1. **Acotar por una huella verificable**, no por fecha ni por corazonada.
-2. **Reusar el mismo pipeline que los escribio**: `rehacer-turnos-inflados.js` hace `require` de
-   `load-missing-shifts.js`, que se envolvio en `if (require.main === module)` para que no corra su
-   main al importarlo. Asi el doc regenerado tiene exactamente la misma forma que el resto.
-3. **Dry-run por defecto**, respaldo JSON de cada doc antes de escribir, escritura **de a uno**.
-4. **Validar con un segundo camino independiente**: los valores nuevos coincidieron con los que dio
-   el pipeline del PWA sobre el Excel del mes, medidos en otra ronda (4.217 · 5.265 · 5.614 · 7.101 ·
-   6.791 · 5.256).
-5. **Verificar despues, con sumas internas**: `totalWeightKg` a la mitad exacta (54.009,08 →
-   27.004,54), `gateDistribution` y `qualityDistribution` suman 5.195 = 5.614 − 419, `hourlyBuckets`
-   suma 5.614, y `avgWeightGrams` **igual** (5.198): es un promedio, si cambiaba era señal de que algo
-   andaba mal.
-
-Resultado: 12/12 verificados contra Firestore y **cero** resumenes con la huella del doble.
-## 2026-09-12 · El mismo turno contado dos veces porque un archivo no traia el lote (PR #973)
-
-**Cerrado** el pendiente del doble de piezas, que venia midiendo desde #966 y no habia podido
-atribuir en dos rondas.
-
-## ⚠⚠ La causa
-
-En produccion **756 de los 791 uploads son recortes por turno** (`2025-07-08_turno_noche_pp.xlsx`,
-generados por un script), y varios resumenes nombran en `sourceFileNames` **el Excel del mes Y el
-recorte del mismo turno**.
-
-Baje el recorte de Storage y lo compare con el Excel del mes. Traen **los mismos 5.614 registros**,
-pero el recorte **no trae `lot`, `product`, `conservation` ni `shift`**:
-
-```
-recorte[0]:   { ts, gate: 9, pieces: 1, weightKg: 4.37, quality: "Premium", calibre: "Other" }
-mes mismo ts: { ts, gate: 9, pieces: 1, weightKg: 4.37, quality: "Premium", calibre: "Other",
-                lot: "720250351", product: "DESTINO FILETE", conservation: "FRESCO", shift: "A" }
-campos que DIFIEREN: lot, product, conservation, shift
-```
-
-`dedupePieceRecords` tenia `lot` en la clave, asi que las dos copias eran **claves distintas**:
-
-```
-merge mes+recorte en la ventana del turno: 11228
-tras dedupe:                               11228   << NO COLAPSA
-```
-
-11.228 = 2 x 5.614, que es **exactamente** lo que tiene guardado el resumen de ese turno.
-
-## El fix, y por que no cuesta nada
-
-Clave nueva: `ts | gate | pieces | quality | calibre | weightKg`. Medido sobre los **5.374.920
-registros reales** de los 30 Excel de pieza a pieza de la temporada: la clave vieja y la nueva
-detectan **exactamente los mismos 555 duplicados**, en todos los archivos. Cero registros extra
-colapsados.
-
-La identidad de una pieza es *cuando paso, por que puerta, cuanto peso y con que calidad y calibre*;
-el lote y el destino son contexto. Al colapsar se conserva **la copia mas completa**, para no perder
-el lote si uno de los dos archivos lo trae.
-
-**Regla:** una clave de identidad no puede incluir campos que una fuente valida puede no traer. El
-mismo dato exportado de dos formas distintas sigue siendo el mismo dato.
-
-## 🔍 El metodo que lo cerro
-
-Bajar de **Storage** el archivo que nombra `sourceFileNames` y **comparar campo por campo** contra el
-archivo local, sobre el mismo `ts`. Tres rondas de hipotesis caidas antes (turnos gemelos,
-subcoleccion, archivos solapados, dedupe roto, tamaño) y la diferencia salto sola en cuanto compare
-los dos registros.
-
-## Alcance — lo que NO hace
-
-- **No toca `dedupeGate0Records`**, que tiene `error` en su clave y podria sufrir lo mismo. No lo
-  medi, asi que no lo cambio.
-- **No corrige los resumenes ya guardados al doble.** Evita que vuelva a pasar; los historicos siguen
-  inflados y hay que decidir aparte si se regeneran.
-
-## Verificacion
-
-4 tests con los campos reales de las dos copias, incluido el orden de aparicion y que no colapse
-piezas que si son distintas. Confirmados devolviendo `lot` a la clave: fallan con `expected
-[ { …(10) }, { …(6) } ] to have a length of 1 but got 2`.
-
-`tsc` · `eslint` · `audit-piel` · `audit-graficos` · **2365 tests**. Verificado en el bundle
-publicado (`buildSha 481273e`): la clave minificada sale sin `lot`.
-## 2026-09-12 · Dos Excel de la temporada estan truncados (PR #969)
-
-Venia persiguiendo el pendiente de #966 —resumenes de julio con el DOBLE de piezas que el Excel— y
-el camino llevo a otra parte.
-
-## ⚠⚠ Un XLSX cortado a la mitad se lee vacio, y SheetJS no avisa
-
-Parseados **los 40 Excel del Grader** de la temporada 2025-26. Dos pieza a pieza de ~8,6 MB dan
-**cero registros**:
-
-```
-Pieza pieza Grader STATICGRADER1 (20251110_000000 - 20251120_000000).xlsx
-Pieza pieza Grader STATICGRADER1 (20251120_000000 - 20251130_000000).xlsx
-```
-
-Su `xl/worksheets/sheet1.xml` **corta a media celda** en la fila ~204.100 de las 308.539 que declara
-el `<dimension>`, sin cerrar `</sheetData>` ni `</worksheet>`: la exportacion desde Matrix se corto.
-**SheetJS no lanza error** — devuelve la hoja con el rango declarado y cero celdas.
-
-El aviso que salia era «No se encontro fila de cabecera valida», que manda a revisar las columnas de
-un archivo cuyas columnas estan perfectas. Ahora dice que el archivo esta incompleto, cuantas filas
-declara y que hacer.
-
-Y el remedio ya estaba a la vista: **los mismos dias salen bien en dos archivos de 5 dias**
-(`20251110-20251115` y `20251115-20251120`), en la misma carpeta. Orel lo habia resuelto a mano sin
-saber por que fallaba.
-
-## 🔍 Como diagnosticar un XLSX que se lee vacio
-
-`unzip -l archivo.xlsx` para ver el tamaño de `xl/worksheets/sheet1.xml`, y
-`unzip -p archivo.xlsx xl/worksheets/sheet1.xml | tail -c 200` para ver **si cierra los tags**. Un
-truncado termina a media celda. En SheetJS la huella es `!ref` con un rango grande y
-`Object.keys(ws)` sin ninguna celda.
-
-## ⚠ Lo que medi y NO era: tres hipotesis caidas
-
-- **Archivos con rangos solapados que se suman:** hay tres exportes que cubren los mismos dias de
-  noviembre, pero el que parecia el duplicado **es uno de los truncados** — aporta cero.
-- **`dedupePieceRecords` que no colapsa:** si colapsa. En el dia del solape quito exactamente los 3
-  duplicados internos y nada mas. Mi primera lectura marco «NO COLAPSA» comparando el dedupe contra
-  el archivo **sin** dedupear: **la vara estaba mal planteada, no el codigo**.
-- **El tamaño del archivo:** el `sheet1.xml` mas grande de la temporada tiene **135 MB** y parsea sus
-  277.841 registros sin problema, contra los 93 MB de los truncados. El limite no es el tamaño.
-
-El **doble de piezas** sigue sin causa confirmada y sigue anotado como pendiente.
-
-## Verificacion
-
-3 tests del modulo puro (`graderArchivoIncompleto`) y 2 de integracion contra los archivos reales,
-que se saltan si no estan en disco. Confirmados desactivando el aviso: falla con `expected 'No se
-encontro fila de cabecera valid…' to contain 'El archivo esta incompleto'`.
-
-`tsc` · `eslint` · `audit-piel` · `audit-graficos` · **2358 tests**. Verificado en el bundle
-publicado (`buildSha cd074a5`).
-## 2026-09-12 · 37 de los 54 turnos detectados no tenian ni una pieza (PR #966)
-
-Primera ronda sobre **el turno con los datos del Excel ya cargados** (Planta Principal ·
-Eviscerado). El angulo: el turno recien cargado y el turno guardado son dos caminos al mismo numero.
-
-## 📏 El metodo: reproducir el pipeline del Wizard en un test
-
-`parseFile` → `mergeParsedData` → `dedupePieceRecords`/`dedupeGate0Records` →
-`segmentByDayAndShift` → `computeShiftSummary`, sobre los Excel reales, y comparar contra
-`graderDailySummaries` de produccion. **No escribe nada.** De ahi salio todo lo de abajo.
-
-## ⚠⚠ Los dos Excel del mismo mes no cubren el mismo rango
-
-| archivo | rango real |
-|---|---|
-| pieza a pieza | `2025-07-01` → **`2025-07-14`** |
-| Puerta 0 | `2025-07-01` → **`2025-07-30`** |
-
-Cargar los dos —el uso normal— produce **54 turnos, de los cuales 37 no tienen ninguna pieza**: los
-dias que solo alcanza el Puerta 0. El **69 %**.
-
-La barra del Wizard decia «Archivo multi-dia detectado · 54 turnos», listaba los tres primeros con
-«…+51» y ofrecia **Guardar en Calendario** sin distinguirlos. Guardarlos no es inocuo: un turno sin
-piezas se escribe con `merge` y queda con causas de Puerta 0 sobre los KPIs que hubiera de antes.
-
-⚠ **`isP0Only` no cubre el caso**: mira `parsedData.pieceRecords.length === 0`, o sea el archivo
-ENTERO, y con un pieza a pieza cargado siempre es `false`. **Un contador global no responde una
-pregunta por segmento.**
-
-## ⚠ Lo que medi y NO era: el doble de piezas en produccion
-
-Comparando recien-cargado contra guardado aparecieron **7 de 13 dias con exactamente el doble**
-(4.217 vs 8.434 · 5.614 vs 11.228 · 7.101 vs 14.202) **con los Puerta 0 identicos**. Persegui dos
-hipotesis y **ninguna se sostuvo**:
-
-- *el mismo turno guardado dos veces con dos nombres de turno* (la coleccion tiene dos vocabularios):
-  **0 pares** de turnos distintos con identicas piezas, sobre 242 dias;
-- *pieceRecords duplicados en la subcoleccion*: esta **vacia** para ese turno.
-
-Lo que si se ve: esos resumenes tienen en `sourceFileNames` el Excel del mes **mas un recorte del
-mismo turno** (`2025-07-08_turno_noche_pp.xlsx`) y un `updatedAt` de un backfill de 2026-08-05. No es
-atribuible al flujo vivo con lo medido, asi que **no se acuso**: queda como pendiente anotado.
-
-## ⚠ El preview `pwa-5184` sirve el REPO PRINCIPAL, no el worktree
-
-El `launch.json` que lee el tool es el del **directorio de la sesion** (`ANTARFOOD/.claude/`), no el
-del worktree ni el del repo. Para servir un worktree hay que agregar la entrada ahi, y como `cwd`
-debe ser relativo al proyecto, el unico camino es un `.cmd` en el scratchpad que haga `cd /d` — que
-es exactamente lo que hace `pwa-5184`.
-
-Y ⚠ **en un puerto nuevo no hay sesion**: otro origen, otro storage. La app queda en el login y al
-Wizard no se llega. Por eso el render de la barra **no se verifico a ojo** y se declaro: queda
-verificado por lectura (unico `return`, dentro de `{multiDayInfo && !savedToCalendar && (…)}`, al
-lado de `p0CoverageWarning`, sin ramas intermedias) y por el bundle publicado.
-
-## Verificacion
-
-`avisoDeTurnosSinPiezas` como modulo puro (4 tests) y **un test de integracion que fija la medicion**:
-54 turnos, 37 sin piezas, rangos 07-14 / 07-30, con la misma expresion que usa `multiDayInfo`. Se
-salta si los Excel no estan en disco. `tsc` · `eslint` · `audit-piel` · `audit-graficos` · **2333
-tests**. Verificado en el bundle publicado (`buildSha 05d1314`).
-
-Nota de proceso: el PR necesito rebase dos veces — hay otros carriles mergeando en paralelo, y tras
-un rebase `gh pr checks` muestra el run VIEJO hasta que arranca el nuevo.
-## 2026-09-12 · Quitar el archivo dejaba el turno sin resumen (PR #962)
-
-Cuarta y ultima ronda del flujo de carga: `handleRemoveFile`.
-
-## ⚠⚠ No se podia deshacer... y la invalidacion no hacia falta
-
-`handleRemoveFile` borra el upload de Firestore y Storage, pero **el resumen que la carga habia
-invalidado no vuelve**: `deleteDailySummary` hace `deleteDoc`. Cargabas el Excel, te arrepentias, lo
-quitabas, y el turno quedaba sin resumen. Medido en produccion: **3 de 243 dias** con Excel cargado
-no tienen resumen.
-
-Como restaurar no es posible, la pregunta pasa a ser otra: **para que se invalidaba al cargar?**
-
-- `saveDailySummaryBatch` hace `batch.set(ref, ...)` **SIN merge** para un upload con pieza a pieza:
-  **sobrescribe el documento entero al guardar**. El borrado previo no aportaba nada ahi.
-- Para un P0 suelto usa `merge` a proposito, con el comentario «preserva los KPIs del PP si ya
-  existen» — que es **exactamente lo que el borrado previo destruia**.
-- Nadie documento por que se borraba: entro en un commit `chore: lint y mejoras grader`.
-
-Asi que la invalidacion al cargar sobraba, y su unico efecto observable era el daño. Se quito.
-
-**Regla que deja esto:** antes de compensar un efecto destructivo, preguntarse si el efecto hacia
-falta. Dos rondas —#956 le puso un aviso, #960 lo acoto a los turnos que el archivo contiene—
-estuvieron amortiguando un borrado que sobraba entero.
-
-## ⚠ Y la fila se iba aunque el servidor fallara
-
-```ts
-try { await deleteGraderUpload(upload); setUploads(...) }
-catch { setUploadError("No se pudo eliminar el archivo del servidor.") }
-updateFiles((prev) => prev.filter(...))   // <- corria igual
-```
-
-El `updateFiles` estaba **fuera del try**: si el servidor no podia borrarlo, el aviso decia «no se
-pudo eliminar» y la fila se quitaba lo mismo. El archivo seguia en el servidor sin nada que lo
-mostrara, y volvia al recargar el turno. Ahora se queda en pantalla y el aviso lo dice.
-
-## Lo que medi y NO era
-
-La hipotesis mas fuerte leyendo el codigo: como el guardado P0-only hace `merge` para preservar los
-KPIs del pieza a pieza, y el borrado al cargar los destruye, deberia haber resumenes con causas de
-Puerta 0 y sin piezas. **No hay ninguno: 0 de 410.** Cargar un P0 suelto sobre un turno ya guardado
-no se usa en la practica: siempre se cargan los dos juntos. El cambio lo arregla igual, pero no era
-lo que estaba rompiendo.
-
-## Verificacion
-
-4 tests montando la pagina como la monta el Wizard. Confirmados volviendo atras los dos cambios:
-fallan con `expected "vi.fn()" to not be called at all, but actually been called 1 times` y
-`Unable to find an element with the text: /Sigue cargado/`.
-
-`tsc` · `eslint` · `audit-piel` · `audit-graficos` · **2302 tests**. Verificado en el bundle
-publicado (`buildSha c589a38`): el chunk del Wizard ya no referencia `graderDailySummaries`.
-
-**Con esto el flujo de carga del Excel queda recorrido entero**: avisos del parser (#956), la rama
-que nadie montaba (#957), el borrado del resumen (#960 y #962) y el merge PP+P0 (medido, sin
-defectos propios).
-## 2026-09-12 · Cargar el Excel equivocado borraba el resumen bueno del turno (PR #960)
-
-Tercera ronda sobre el flujo de carga: el **borrado del resumen** y el **merge PP+P0**.
-
-## ⚠⚠ El borrado corria antes de saber si el archivo contenia el turno
-
-Al aceptar un `PIEZA_PIEZA` o `PUERTA_0`, `handleFiles` llamaba a `deleteDailySummary` para
-invalidar el resumen del turno. Lo hacia **siempre** y **una vez por archivo**. #956 agrego el aviso
-en pantalla, pero el borrado ocurria igual, antes del aviso.
-
-**Lo que lo hace alcanzable sin equivocarse de mes:** los dos Excel de un mismo mes **no cubren el
-mismo rango**. Medido sobre los reales de julio 2025:
-
-| archivo | rango real |
-|---|---|
-| pieza a pieza | `2025-07-01` → **`2025-07-14`** |
-| Puerta 0 | `2025-07-01` → **`2025-07-30`** |
-
-16 dias de diferencia. Eligiendo el turno del **2025-07-20** y cargando los dos:
-
-```
-2025-07-08  piezas=4704  rechazos=459    <- turno cubierto, todo bien
-2025-07-20  piezas=0     rechazos=0      <- y el resumen ya estaba borrado, dos veces
-   aviso PP: El archivo cubre del 2025-07-01 al 2025-07-14 ... no esta adentro.
-   aviso P0: (ninguno)
-```
-
-Ahora la invalidacion se decide por archivo con `cubreElTurno()` y se ejecuta **una sola vez por
-turno** al final de la tanda: ningun archivo lo contiene → no se borra nada; PP+P0 del mismo turno →
-una llamada, no dos; el PP no lo cubre pero el P0 si → se borra, hay datos nuevos. Sin fechas con
-que juzgar se borra, como antes: no se bloquea por una duda, solo cuando **consta** que el turno no
-esta en el archivo. `cubreElTurno` vive en `graderAvisosDeCarga.ts` y `avisoDeRango` la usa: una
-sola definicion de «el archivo contiene este turno».
-
-## Lo que medi del merge y NO era
-
-- **Orden de los archivos:** `mergeParsedData([pp, p0])` y `[p0, pp]` dan identico (67.271 piezas,
-  26.878 rechazos). No depende del orden.
-- **Mismo archivo dos veces:** el merge SI duplica (67.271 → 134.542 piezas), pero el Wizard pasa
-  `dedupePieceRecords` y `dedupeGate0Records` antes de segmentar. Cubierto aguas abajo.
-- **Solo P0 sin pieza a pieza:** 0 piezas y 26.878 rechazos, pero el Wizard ya lo detecta con
-  `isP0Only`. Cubierto.
-
-Los tres parecian defectos leyendo el merge aislado. Mirar al consumidor antes de acusar.
-
-## 📍 Como medir el parser sin tocar produccion
-
-Un test temporal en `services/grader/__tests__/` que llame a `parseFile` + `mergeParsedData` sobre
-los Excel reales (resolviendo `USERPROFILE`, como el test de integracion que ya existe). **Parsear
-es local**: no escribe en Firestore ni en Storage, a diferencia de cargar por la UI.
-
-⚠ vitest **no muestra los `console.log`** del test: acumular en un array y `fs.writeFileSync` al
-final.
-
-## Verificacion
-
-9 tests: 5 del modulo puro con los rangos medidos de los archivos reales, 4 del flujo montando la
-pagina como la monta el Wizard (`compact`) y disparando la carga con `fireEvent.change` sobre el
-input. Confirmados volviendo al borrado incondicional: fallan con `expected "vi.fn()" to not be
-called at all, but actually been called 1 times` y `expected 1 times, but got 2 times`.
-
-`tsc` · `eslint` · `audit-piel` · `audit-graficos` · **2302 tests**. Verificado en el bundle
-publicado (`buildSha 43a21f2`).
-## 2026-09-12 · La carga del Excel mostraba un contador y escondia todo lo demas (PR #957)
-
-Segunda ronda sobre el flujo de carga. Empezo midiendo y **cerro tres hipotesis en negativo**
-antes de encontrar el defecto mirando la pantalla.
-
-## ⚠⚠ El Wizard monta la pagina SIEMPRE con `compact`, y esa rama cortaba antes de todo
-
-`AnalisisGraderUploadPage` tiene dos ramas de render. Grep de quien la importa: **un solo montaje**,
-en `AnalisisGraderWizardPage.tsx`, y con `compact`. Esa rama devuelve la fila del boton y **corta
-antes de la lista de archivos**.
-
-Asi que cargar un Excel se veia, en pantalla, como un boton «Cargar Excel» con un contador. No se
-veia el nombre del archivo, ni los avisos del parser (`fileMeta.warnings` — los que agrego #956, que
-**nunca llegaron a dibujarse**), ni «Sin Puerta 0: el desglose sera inferido», ni el error de parseo,
-ni el de subida a Storage.
-
-Es el patron de #946 y #956 un escalon mas arriba: ahi el dato no tenia consumidor; **aca el
-consumidor existia y estaba en la rama muerta**. El propio archivo tenia el comentario que lo decia
-(«el Wizard es el unico que monta esta pagina y siempre con `compact`») y no lo lei como advertencia.
-
-Ahora la evidencia del archivo vive una sola vez (`listaDeArchivos`, `avisoSinPuerta0`,
-`mensajesDeError`) y la usan las dos ramas.
-
-## ⚠ `lineId` fuera de las dependencias de `handleFiles`
-
-Lo delataba un warning de eslint pre-existente. `lineId` sale de `searchParams`, pero el callback
-memoizado se quedaba con el del render anterior: tras cambiar de linea, la carga guardaba el upload
-—y llamaba a `deleteDailySummary`— sobre la **linea equivocada**.
-
-## Lo que medi y NO era
-
-Contra los 791 uploads y 410 resumenes de produccion:
-
-- `currentTurnoShift` arranca en el literal `Turno noche`, asi que `if (!currentTurnoShift)` nunca
-  dispara. Parecia explicar archivos de un turno repartidos en dos shiftIds — **no lo explica**: de
-  243 dias, los 2 que mezclan vocabulario son cargas dobles con los pares consistentes, y el 62 % de
-  dias con mas de un shiftId son simplemente dia y noche.
-- Turnos con Excel aceptado y sin resumen (la huella del borrado prematuro): **3 de 243**, los tres
-  con un solo archivo.
-- Uploads sin `downloadURL`, que `handleLoadTurno` saltea en silencio: **0 de 791**.
-
-**Por que la base no sirve para esto:** `graderUploads` esta dominada por un backfill masivo —una
-sola tanda de 700+ archivos cargados en segundos—, asi que agrupar por `createdAt` no separa
-sesiones reales de usuario. Y ⚠ en esa coleccion `createdAt` es **string ISO, no Timestamp**: un
-`.toDate?.()` devolvio 0 tandas y casi lo tomo por resultado en vez de por bug del medidor.
-
-## Verificacion
-
-4 tests que montan la pagina **como la monta el Wizard** (`compact`, con `initialFiles`).
-Confirmados quitando el render: fallan con `Unable to find an element with the text:
-pieza-pieza-julio.xlsx`. `tsc` · `eslint` · `audit-piel` (bajo: 1582 → 1574 colores crudos, baseline
-actualizado) · `audit-graficos` · 2293 tests. Ancho medido del panel del Wizard a 1920: la fila tiene
-**909 px**. Verificado en el bundle publicado (`buildSha c2d59c7`): la rama compacta es el
-`space-y-2` que envuelve la fila del boton.
-
-⚠ **El render con un Excel de verdad sigue sin verificarse a ojo**, por lo declarado en #956:
-cargar un Excel escribe en Firestore y Storage y borra el resumen del turno.
-## 2026-09-11 · El parser avisaba sobre el Excel y nadie lo mostraba (PR #956)
-
-Primera ronda sobre el **flujo de carga del Excel del Grader** (Planta Principal · Eviscerado).
-Todas las rondas anteriores miraron turnos con el Excel **ya cargado**; el acto de cargarlo no se
-había recorrido nunca.
-
-## ⚠️⚠️ `fileMeta.warnings` se escribía y no se mostraba en ninguna parte
-
-Grep sobre todo `src/`: `parseFile` llena `fileMeta.warnings`, el propio Upload le agrega uno más
-(«Tipo X detectado — solo se requiere Pieza-Pieza y Puerta 0») y **no hay un solo lugar que los
-lea**. La fila de cada archivo cargado pinta un **tilde verde**, el badge de tipo, el nombre y
-«N reg». Nada más.
-
-Medido parseando los Excel **reales** de la temporada 2025-26 (los mismos que usa el test de
-integración): **2 de 3 archivos traen avisos**, y uno de ellos es el que explica una pregunta
-recurrente —por qué la app y el Matrix nunca dan el mismo número—:
-
-- `1075 registros sin pieza ("No aplicable"): el Matrix los cuenta como registros, la app no como piezas.`
-- `Se encontraron 7586 registros Gate 0 en archivo pieza-pieza.`
-
-Es el mismo patrón del estado `future` sin consumidor (#946): **un dato generado que nadie
-consume**. Ahora los avisos van bajo la fila del archivo, y **el tilde verde pasa a triángulo**
-cuando hay alguno: antes decía «todo bien» sobre un archivo que traía advertencias.
-
-## ⚠️ Y un aviso que faltaba: el archivo que no cubre el turno
-
-`handleFiles` calcula `inferredDate` del archivo pero **solo lo usa como fallback**:
-
-```js
-const sessionDate = currentTurnoDate || inferredDate   // nunca los compara
-```
-
-Los Excel del Grader cubren **rangos largos** —medido: el de julio va del **2025-07-01 al
-2025-07-14** y el de agosto del **2025-08-25 al 2025-08-30**, 55 días de distancia— y el usuario
-elige un turno dentro de ese rango. Si carga el archivo del mes equivocado, el turno elegido no
-está en el archivo y **nadie avisa**.
-
-Y no queda en un resumen vacío: al aceptar un `PIEZA_PIEZA` o `PUERTA_0` el flujo llama a
-`deleteDailySummary(sessionDate, shiftId, lineId)` **antes de saber si el archivo contiene ese
-turno**. Sin aviso, el resumen bueno se pierde en silencio. Ahora se avisa cuando el turno de la
-sesión cae fuera del rango del archivo.
-
-## Verificación — y lo que NO se pudo verificar
-
-La lógica está en `services/grader/graderAvisosDeCarga.ts` (módulo puro) con **8 tests** cuyos
-rangos son los medidos de los archivos reales; confirmados silenciando el aviso: fallan con el
-síntoma («expected null not to be null»). Estilo verificado a 1920 en los dos temas.
-
-⚠️ **El render con un archivo de verdad NO se verificó, a propósito.** Cargar un Excel escribe en
-Firestore y Storage y **borra el resumen del turno** — justo el efecto que este PR viene a
-advertir—, y las fechas que infieren los archivos disponibles (julio y agosto 2025) tienen
-resúmenes reales en producción. Queda para probar cargando un Excel a mano.
-
-**Nota de contraste (segunda vez):** el texto del aviso en `text-ink-warn` sobre `bg-muted` da
-**4,4:1 en tema claro**, bajo el 4,5 que pide AA para 11 px — el mismo caso que `text-primary`
-en #947. El color quedó **solo en el ícono** y el texto en `text-foreground`: 10,7:1 claro /
-14:1 oscuro, y de paso el color deja de ser el único canal.
-
-**Dato de mapa:** los Excel reales viven en
-`OneDrive/ANTARFOOD/⚙️ EQUIPOS PLANTA/⚙️ GRADER/temporada 2025-2026/{pieza a pieza,punto 0}/<mes>/`
-y el test de integración los lee desde ahí resolviendo el HOME.
-## 2026-09-11 · La tabla del período ordenaba por el nombre del turno, no por el reloj (PR #955)
-
-Los dos bloques que quedaban sin revisar en Periodo: la tabla «Turnos del período» (470 px) y
-«Comparativa por Turno» (172 px).
-
-## ⚠️ El orden de la tabla contradecía al reloj
-
-El sort comparaba la columna elegida y, **sin desempate**, dejaba los turnos del mismo día en el
-orden en que vinieran del array. Y en Chonchi **los nombres de turno no siguen el reloj**:
-«Turno 1» es la NOCHE (~21:15), «Turno 2» la mañana (~07:15) y «Turno 1 Lunes» arranca a las
-00:00.
-
-El 2026-08-17 es el único día del período con sus tres turnos, y se leía así:
-
-| | orden |
-|---|---|
-| mostraba | 1 (21:19) · 1 Lunes (00:12) · 2 (10:17) |
-| real | 1 Lunes (00:12) · 2 (10:17) · 1 (21:19) |
-
-También el 13-08 salía «1 · 2» cuando el 2 (mañana) ocurrió antes. Los `startAt` verificados en
-Firestore: **los 14 resúmenes recientes lo traen**, así que hay instante real para ordenar.
-
-Es la misma trampa del CSV del turno (#942): **ordenar por la etiqueta —ahí el reloj, acá el
-nombre— en vez de por el instante.** Ahora el desempate va por `startAt` y sigue la dirección
-elegida: con fechas descendentes, dentro del día también se ve primero el más reciente.
-
-## ⚠️ El CSV se llamaba `grader--ltimo-mes.csv`
-
-El slug era `rangeLabel.replace(/[^a-zA-Z0-9-]/g, '-')`, que convierte **cada** carácter no ASCII
-en un guion: «Último mes» perdía la «Ú» y dejaba el guion doble. Ahora los acentos se pliegan a su
-letra base antes de limpiar → **`grader-ultimo-mes.csv`**.
-
-Solo se ve **mirando el archivo que baja**, no la pantalla — como los cinco defectos de las
-exportaciones del turno (#941–#944).
-
-⚠️ **Al plegar acentos, no dejar el rango de marcas combinantes como regex literal.** Escrito
-`/[\u0300-\u036f]/`, el archivo termina guardando los caracteres combinantes de verdad:
-invisibles en el editor y fáciles de romper al copiar (ya pasó con los catálogos BAADER). Acá se
-filtra por código de punto, que se lee sin ambigüedad.
-
-## «Comparativa por Turno»: revisada, sin hallazgo
-
-«Turno 1 Lunes» aparece con **1 turno** junto a otros de 5, con el mismo borde y número de
-semáforo. Se miró con cuidado y **no es un defecto**: el porcentaje está calculado sobre 15.438
-piezas —base más que suficiente— y la tarjeta **escribe su base** («1 turno», piezas y P0 pz).
-Lo que no hay es comparación implícita ni ranking. Se deja como está.
-
-## Verificación
-
-En pantalla: el 17-08 pasa a «1 Lunes · 2 · 1» y el 13-08 a «2 · 1»; el archivo baja como
-`grader-ultimo-mes.csv`. Lógica en `services/grader/graderPeriodoTabla.ts` (módulo puro) con
-**8 tests**, confirmados anulando el desempate: fallan con el orden viejo exacto. `tsc` ·
-`eslint` (27 warnings = las de `main`) · `audit-piel` · `audit-graficos` · **2.281 tests**.
-
-⚠️ **Se repitió la trampa de los backticks**: un comentario con `` `GraderDailySummary` `` pasado
-por `node -e` dentro de bash se ejecutó como sustitución de comando y quedó vacío en el archivo.
-Para texto con backticks o `${}`, SIEMPRE un script `.mjs` escrito con Write.
-## 2026-09-11 · La tendencia del período comparaba dos ventanas que se pisan (PR #954)
-
-Desglose de «Período analizado» (1.848 px de los 3.146 de la página), que nunca se había mirado.
-El defecto no estaba en el layout sino en lo que la página **afirma**.
-
-## ⚠️⚠️ «Tendencia período» se calculaba con ventanas solapadas
-
-```js
-const firstAvg = avg(dailyP0Series.slice(0, 7).map(d => d.p0Pct))
-const lastAvg  = avg(dailyP0Series.slice(-7).map(d => d.p0Pct))
-```
-
-Con **menos de 14 días** esas dos ventanas **comparten días**:
-
-| días del período | comparten |
-|---|---|
-| 7 | 7 de 7 (100 %) — la ventana contra sí misma, delta 0 |
-| 8 | 6 de 7 (86 %) |
-| 10 | 4 de 7 (57 %) |
-| 12 | 2 de 7 (29 %) |
-| 14+ | 0 |
-
-Y no es un caso de borde: la temporada 2026-27 arrancó con **7 días de datos en agosto y 4 en
-septiembre**, así que **el período por defecto de la página son 8 días (86 % de solape)** y el
-«último trimestre» **12 (29 %)**. Justo cuando más se mira el panel, al arrancar la temporada.
-
-**El otro extremo es igual de malo.** Con «Temporada» (228 días), la tendencia se decidía con
-**14 días de 228** —los 7 primeros y los 7 últimos—, o sea tirando el **94 %** de los datos.
-
-Ahora se comparan las **dos mitades del período**, que nunca se solapan, y el pie dice **sobre
-cuántos días** se calculó cada promedio. Medido en pantalla, antes → después:
-
-| Período | Antes | Ahora |
-|---|---|---|
-| 8 días (defecto) | inicio 3.29 % → fin 3.15 % (**−0.14pp**) | primeros 4 días 3.15 % → últimos 4 3.25 % (**+0.11pp**) |
-| 12 días (trimestre) | inicio 3.87 % → fin 3.15 % (−0.71pp) | primeros 6 días 3.95 % → últimos 6 3.24 % (−0.7pp) |
-| 228 días (temporada) | 7 contra 7 días | primeros 114 días 4.91 % → últimos 114 3.70 % (−1.21pp) |
-
-⚠️ **Con 8 días el signo se daba vuelta**: el cálculo viejo decía −0,14 pp (bajando) y el nuevo
-da +0,11 pp (subiendo). La etiqueta «Estable» coincidía por casualidad, no porque midiera bien.
-
-## Y «Mejor semana» elegía entre dos candidatas casi idénticas
-
-El loop de ventanas de 7 días con un período de 8 solo tiene **dos posiciones posibles, y
-comparten 6 días**. Decir «la mejor semana» ahí se lee como una elección entre muchas. Ahora
-exige **≥ 14 días** (`hayMejorSemana`): desaparece en los períodos de 8 y 12, y vuelve con
-«Temporada», donde sí significa algo.
-
-**Regla, otra vez la misma de #936 y #940:** antes de publicar una conclusión derivada, mirar
-sobre qué base se calculó — y si esa base se pisa consigo misma, no hay comparación.
-
-## Verificación
-
-Los tres períodos revisados en pantalla (8, 12 y 228 días), ambos temas. La lógica salió a
-`services/grader/graderTendenciaPeriodo.ts` (módulo puro, como `graderPurezaNivel`) con **6
-tests**, confirmados volviendo al `slice(0,7)`/`slice(-7)`: fallan con el síntoma real
-(`expected 3.29 to be 5` — el promedio diluido por el solape). `tsc` · `eslint` (27 warnings =
-las de `main`) · `audit-piel` · `audit-graficos` · **2.273 tests**.
-## 2026-09-11 · Wizard y Dashboard salieron limpios; el aplastado estaba en Periodo (PR #953)
-
-Las tres pantallas del módulo que recibieron el tope de 1.760 px en #951 pero nunca se
-recorrieron a ese ancho.
-
-## Wizard y Dashboard: medí y no había nada
-
-A 1920 el wizard mide **1.760 × 1.780 px**, **cero desbordes horizontales** y **ningún canvas**
-aplastado. Su parte superior **ya venía en dos columnas** (873 + 873: «Planta Principal» con los
-KPIs a la izquierda, «Resumen del mes» a la derecha) y la matriz de turnos del mes usa el ancho
-completo con celdas de 51 px para los 30 días. El tope nuevo (venía de 1.869 px) **no apretó
-nada**: era lo que había que verificar y quedó verificado.
-
-Aclaración de mapa que conviene anotar: **`AnalisisGraderDashboardPage` no es una ruta.** Se
-monta DENTRO del wizard (`AnalisisGraderWizardPage.tsx:1069`), así que lo que se ve como
-«dashboard» —Indicadores de Rendimiento, Resumen del mes, Turnos del período, OEE del área,
-Paros de etapa— ya estaba cubierto al medir el wizard. Su `max-w-[1760px]` queda redundante con
-el del wizard, pero es inocuo (mismo valor).
-
-## ⚠️ Periodo: el tercer gráfico aplastado
-
-`/analisis-grader/periodo` mide 3.062 px y es la página más larga del módulo. Su serie
-«Tendencia P0% diaria» estaba en **1.689 × 280 px, ratio 6:1**.
-
-La causa es distinta de las dos anteriores y por eso vale registrarla: no era una fórmula mal
-calibrada (#950) ni un alto fijo en JS (#952), sino **una clase Tailwind que topa en un
-breakpoint**: `h-64 lg:h-80`. `lg` es 1024 px — de ahí en adelante el alto **no vuelve a crecer**
-mientras el ancho sí, así que cuanto más grande el monitor, más achatada la serie.
-
-Ahora `h-64 lg:h-80 min-[1700px]:h-[26rem]` → **1.689 × 364 (4,6:1)**.
-
-**Los otros dos charts del archivo NO se tocaron**: viven en media columna, miden 816 px de ancho
-y ya dan 3,6:1. El criterio es la relación de aspecto, no el alto en sí.
-
-**Tres causas distintas para el mismo síntoma**, ya vistas en tres rondas seguidas:
-1. fórmula que depende de la leyenda y no del ancho (#950),
-2. alto fijo en JS sin relación con el ancho (#952),
-3. clase responsive que topa en `lg` (este PR).
-Al auditar un gráfico en PC conviene preguntarse **de dónde sale su alto**, no solo medirlo.
-
-## Verificación
-
-| | 375 | 1440 | 1920 |
-|---|---|---|---|
-| Tendencia P0 (Periodo) | 278 × 256 | 1.318 × 280 | **1.689 × 364** |
-
-1440 y el teléfono quedan **idénticos** (el breakpoint es 1700). `tsc` · `eslint` (27 warnings =
-las de `main`) · `audit-piel` · `audit-graficos` · **2.267 tests**.
-
-**Sin test unitario, a propósito:** el cambio es una clase CSS, no lógica — no hay función que
-testear. Se verificó en el navegador en los tres anchos.
-
-⚠️ **Trampa de esta ronda:** un comentario JSX `{/* … */}` **no puede ir dentro de un ternario**
-(`cond ? ( … ) : ( … )`). El parche lo insertó ahí y rompió el build con cuatro errores de
-sintaxis a la vez; va sobre el `<CardContent>`, fuera de la expresión.
-## 2026-09-11 · Calidad y Mantención con el ancho nuevo (PR #952)
-
-Cierra la vista PC del detalle del turno: las dos pestañas que habían quedado en una sola
-columna después de #951.
-
-## Mantención · 1.471 → 1.117 px
-
-A 1920 sus cuatro secciones se apilaban a 1.732 px de ancho para contenidos que no lo piden:
-reparto y tendencia son listas de 3 máquinas y el evento es una ficha. Medido: reparto 325 px ·
-evento 140 · tendencia 355.
-
-El reparto se hizo **por SECUENCIA** —los primeros a la izquierda, el resto a la derecha— para
-que el orden de lectura del teléfono no cambie: **[reparto + evento + avisos] | [tendencia]**,
-495 contra 355 px. Además queda coherente con el significado: a la izquierda lo de ESTE turno,
-a la derecha el histórico.
-
-⚠️ **Al envolver hijos en columnas, mirar qué queda en cada una.** El primer intento dejó el
-aviso «Target sospechoso» (que en este turno no aparece, pero existe) en la columna del
-histórico, junto a la tendencia: un aviso del turno mezclado con la serie de 30 turnos. Se ve
-solo leyendo el JSX resultante, no el diff.
-
-## Calidad · el timeline tenía alto FIJO
-
-`style={{ height: scatterAxisShow ? 360 : 320 }}` — sin relación con el ancho. Con el contenedor
-del turno en 1.760 px (#951) el timeline pasó a 1.689 px de ancho: **ratio 5,3:1** para barras
-minuto a minuto de las 8 h con su riel de eventos encima. Ahora **1.689 × 380 (4,4:1)**.
-
-A diferencia del gráfico de tasa, acá el piso **no** es 108 sino el alto que ya tenía: a 278 px
-de ancho la división da 66 y a 1.223 px da 291, los dos bajo el piso, así que **el teléfono y
-1440 px quedan exactamente igual (320 px)** y solo crece en monitores anchos.
-
-Calidad sube de 1.355 a 1.415 px: son los 60 px que gana el gráfico. Acá el premio es
-legibilidad, no scroll — y conviene decirlo así.
-
-## Verificación
-
-| | 375 | 1440 | 1920 |
-|---|---|---|---|
-| Timeline de Calidad | 278 × 320 | 1.318 × 320 | **1.689 × 380** |
-| Mantención | apilada · 3.0k | apilada · 1.471 | **carriles · 1.117** |
-
-Los dos temas, sin desbordes horizontales a 1920. `tsc` · `eslint` (27 warnings = las de `main`)
-· `audit-piel` · `audit-graficos` · **2.267 tests**. Los 3 nuevos fallan con el síntoma real al
-devolver el piso fijo (`expected 320 to be greater than 320`).
-
-**Estado de la vista PC del turno (1920):** Resumen ~900 · Gates 1.017 · ¿Qué hacer? 1.234 ·
-Mantención 1.117 · Calidad 1.415 · Línea 1.751. Ninguna pasa de dos pantallas y cuatro entran
-en una.
-## 2026-09-11 · Abrir un turno encogía la página 590 px (PR #951)
-
-Segunda ronda de vista PC. El punto de partida era «sobra aire en monitores anchos», pero al
-medir apareció la causa real: **la página del turno se encoge respecto de la pantalla desde la
-que se entra**.
-
-| Viewport | Contenido del turno | Aire | % |
-|---|---|---|---|
-| 1440 | 1.138 px | 7 px | 1 % |
-| 1920 | **1.280 px** | **631 px** | **33 %** |
-| 2560 | **1.280 px** | **1.271 px** | **50 %** |
-
-**El listado (`AnalisisGraderWizardPage`, sin tope) mide 1.869 px a 1920 y el detalle 1.280:
-abrir un turno angostaba la página 590 px.** No era un criterio de legibilidad aplicado con
-coherencia — era una inconsistencia dentro del mismo módulo.
-
-Mockup con las tres opciones a 1440/1920/2560 y sus descartes:
-https://claude.ai/code/artifact/469e337c-ba0f-4201-b4ef-7199933bd03c — Orel eligió la recomendada
-(**C · Carriles**).
-
-### Por qué NO era «estirar todo»
-
-Medido antes de decidir: los párrafos de Línea **ya caben en una sola línea a 1.223 px**, con
-hasta **157 caracteres**. Estirarlos a 1.900 px los empeora (lo cómodo son 45-75). El ancho lo
-aprovecha **un solo bloque**: el gráfico de tasa, que es una serie de las 8 h del turno con 3
-Baader — ahí cada píxel es resolución temporal.
-
-Otro dato que acotó la decisión: **quitar el `max-w-screen-xl` no da ancho libre**. El proyecto
-no personaliza `container` ni `screens`, así que el `container` de Tailwind ya topa en 1536 —
-sacarlo habría dejado 375 px de aire a 1920 y un salto de 333 px.
-
-### Lo construido
-
-**Un solo ancho de módulo: `max-w-[1760px]`** en Wizard, Turno, Dashboard y Periodo.
-`AnalisisGraderConfigPage` se queda en 1.280: es un formulario. El salto listado→detalle pasa de
-590 px a ~109.
-
-**Carriles en la pestaña Línea** (`UpstreamMachinesPanel`): el gráfico de tasa queda a ancho
-completo **fuera** de la grilla, y debajo `grid min-[1700px]:grid-cols-5` reparte la cascada
-(`col-span-3`) junto a la imputación (`col-span-2`). `items-start` es obligatorio: sin él las dos
-columnas se estiran a la más alta y la corta queda con fondo vacío.
-
-| Ancho | Contenido | Columnas | Gráfico | Scroll de Línea |
-|---|---|---|---|---|
-| 375 | — | apiladas | 294 × 138 (**idéntico**) | 3.182 |
-| 1440 | 1.332 | apiladas | 1.332 × 332 (4:1) | 2.131 |
-| 1920 | **1.760** | 1.016 + 673 | 1.703 × 395 (4,3:1) | **1.751** (era 2.089) |
-| 2560 | 1.760 | 1.016 + 673 | 1.703 × 395 | 1.751 |
-
-### ⚠️ Ensanchar la página volvió a achatar el gráfico
-
-Efecto secundario del propio cambio, y es la trampa a recordar: al llevar el contenedor a 1.760
-px el gráfico pasó a 1.703 px de ancho, pero **el techo `ALTO_MAX_PLOT = 280` que se puso ayer
-(#950) estaba calibrado para 1.223 px** → ratio **5,8:1**, el mismo achatamiento que ese PR
-existía para evitar. Techo subido a **380** → 4,3:1.
-
-**Regla: un tope de alto calibrado para un ancho deja de servir cuando se cambia ese ancho.** Al
-ensanchar un contenedor hay que volver a medir los gráficos que contiene.
-
-### Verificación
-
-Breakpoint probado por los dos lados: **1699 px apiladas · 1701 px lado a lado** (950 + 629).
-La advertencia del mockup sobre el `resize()` de ECharts **no aplica**: el único canvas está
-fuera de la grilla y sigue a su contenedor sin desfase (1.591 → 1.593 px, desfase 0). Sin texto
-truncado en la columna angosta a 1701 px. Ambos temas. `tsc` · `eslint` (27 warnings = las de
-`main`) · `audit-piel` · `audit-graficos` · **2.264 tests**.
-## 2026-09-11 · En PC el gráfico del turno era MÁS CHICO que en el teléfono (PR #950)
-
-Primera ronda sobre la **vista de escritorio** (pedido de Orel: el móvil queda como está). Turno
-con Excel del Grader cargado, medido a 1440 × 900. Inventario de alto: Resumen 900 · Gates 1.017
-· Calidad 1.355 · ¿Qué hacer? 1.234 · Mantención 1.471 · Línea 1.933. Todo entra en 1-2
-pantallas; el contenido usa **1.138 px de 1.440** (`max-w-screen-xl`).
-
-**⚠️⚠️ El gráfico de tasa de producción se ACHICA al ensanchar la pantalla.**
-
-| | ancho | alto | ratio |
-|---|---|---|---|
-| Teléfono 375 | 294 px | **138 px** | 2,1:1 |
-| PC 1440 | 1.109 px | **123 px** | **9:1** |
-
-La causa: `const chartHeight = 108 + legendRowCount * 15`. El alto salía **solo** de cuántas
-filas ocupaba la leyenda. En un celular la leyenda va en 2-3 filas y el gráfico crecía; en PC,
-donde entra en una sola, quedaba en el mínimo. Ocho horas de turno y tres máquinas aplastadas en
-123 px, en una pantalla de 900 donde la pestaña usa 1.933 px de scroll.
-
-Ahora el alto sale del ancho disponible con una relación de aspecto legible (~4:1) entre un piso
-y un techo: **PC 279 px (ratio 4:1)**, tablet 177, y el **teléfono exactamente igual, 138 px**,
-porque a 294 px de ancho la división da 70 y gana el piso de 108. La fórmula vive en
-`services/grader/graderRateChartLayout.ts` — módulo aparte por el mismo motivo que
-`graderPurezaNivel`: testearla y no romper el fast-refresh de la tarjeta (eslint lo avisa con
-`react-refresh/only-export-components`, y el proyecto ya había resuelto eso antes).
-
-**Regla:** un gráfico cuyo alto depende de la leyenda se encoge cuando la pantalla crece. Al
-revisar un chart, medir su **relación de aspecto en los dos extremos de ancho**, no solo si
-«entra».
-
-## ⚠️ Tres runbooks distintos mostraban el mismo texto
-
-En «¿Qué hacer?», la ruta del HMI de cada runbook (`z2Path`) vivía en un `max-w-[240px]` fijo
-con `truncate`. **`z2Path` no aparece en ningún otro lugar del componente** —ni al expandir la
-tarjeta, ni en un `title`—, así que lo cortado no se podía recuperar de ninguna forma.
-
-De los **6 runbooks, 3 se cortan, y los 3 en el mismo punto**: «MENU → Servicio → Cambiar
-parámetr…», aunque lleven a lugares distintos del HMI:
-
-- `MENU → Servicio → Cambiar parámetros → 8620 → Static Grader → ZBelt → Pocket [1-4] → fsWc`
-- `MENU → Servicio → Cambiar parámetros → 8620 → Eye sync`
-- `MENU → Servicio → Cambiar parámetros → 8620`
-
-Tres tarjetas indistinguibles, y la ruta es **la instrucción**: dice dónde tocar en la máquina.
-Desde `sm` toma su propia línea y se lee entera (557 px de los 629 que tenía libres la caja); en
-el teléfono sigue truncada pero ahora el `title` la muestra.
-
-**Verificado** a 1440, 768 y 375 px: el gráfico da 295/177/138 px y la ruta se lee completa en PC.
-`tsc` · `eslint` (0 errores, 27 warnings = las de main) · `audit-piel` · `audit-graficos` ·
-**2.263 tests**. Los 6 nuevos fallan con el síntoma real al volver a la fórmula vieja
-(`expected 123 to be 279`).
-
-**Trampa de la vista PC:** `computer{action:"zoom"}` con región **no está soportado** en el
-Browser pane (devuelve la captura entera), y un screenshot de 1440 vuelve escalado a 800×500,
-ilegible. Para auditar escritorio conviene **medir por geometría** —`scrollWidth > clientWidth`,
-relación ancho/alto de cada `canvas`— y usar la captura solo para ver la estructura.
-## 2026-09-10 · Línea tenía tres cifras de «piezas perdidas» que no coinciden (PR #949)
-
-Sigue la simplificación con la vara de Calidad. Desglose de Línea a 375 px (3.790 px):
-encabezado y KPIs 252 · **Tasa de producción 1.018** (gráfico 232 + «¿Qué significa ese ritmo?»
-**786**) · **Cascada del turno 1.152** (uso por máquina 252 · perdidas por causal 236 · pausas
-planificadas 150) · **Imputación 473** · veredicto de origen 198.
-
-**⚠️⚠️ Tres cifras de «piezas perdidas» en la misma pestaña, con tres varas distintas y sin
-nombrar ninguna.** Medido en pantalla sobre 7 turnos:
-
-| Turno | «dejó N en el camino» | «bajo el máximo teórico» | «pérdida neta» |
-|---|---|---|---|
-| 2026-09-07 | 1.341 | 727 | 0 |
-| 2026-09-08 | 863 | 481 | 0 |
-| 2026-08-17 T1 | 2.774 | 2.615 | 1.142 |
-| 2026-08-13 T2 | 2.188 | 1.387 | 0 |
-| **2026-08-03 T2** | **374** | **2.647** | 0 |
-| 2026-08-11 T2 | 1.492 | 1.424 | 0 |
-| 2026-07-31 T1 | 2.817 | 3.282 | 2.508 |
-
-**7 de 7 turnos difieren**, con hasta **7× de diferencia** (03-08: 374 contra 2.647, y encima
-en dirección opuesta al resto). Y en **5 de 7** la pestaña remata con «pérdida neta 0» debajo
-de un bloque que anuncia entre 374 y 2.188 piezas perdidas.
-
-Cada una es correcta en su propia definición: la primera mide contra la **cadencia de la línea**
-(mediana de las máquinas que produjeron), la segunda contra el **máximo teórico de cada máquina**
-(`piezasMax − piezasReales` del techo), la tercera descuenta lo que rescató la línea manual.
-Juntas, sin sujeto, la pestaña se contradice sola. Ahora cada cifra nombra su vara en la misma
-frase —mismo remedio que el chip «Línea 68 % del target oficial» (#942)—:
-
-- «**Contra la cadencia de la línea** dejó 1.341 piezas en el camino: 86 por ir bajo ritmo y
-  1.255 por estar detenidas.»
-- «Piezas perdidas por causal · 727 pz bajo el **máximo teórico de cada máquina**»
-- «→ **neta de máquina** 0»
-
-**Regla:** cuando dos bloques de la misma pantalla publican la misma magnitud con distinta vara,
-no alcanza con que el tooltip lo explique — la vara va en la frase. Se caza leyendo la pantalla
-de corrido, no bloque por bloque.
-
-## Y la simplificación: 3.790 → 3.147 px (−17 %)
-
-`MachineSpeedMeaningCard` arrancaba con `useState(true)`: 786 px desplegados en cada carga para
-explicar un gráfico de 232, y sin recordar el estado. Ahora arranca plegado **con la conclusión
-fuera del plegado**: cerrarlo dejaba la tarjeta en un título sin dato, que es el error opuesto
-al que veníamos arreglando. Mismo patrón que el veredicto de origen (#947) y la puerta de Gates
-(#948): el titular se lee sin tocar nada, el detalle se abre si se busca.
-
-Al abrirlo vuelve todo (desglose por máquina, leyenda, aviso de objetivos distintos, «Ctrl +
-rueda»). Verificado a 375 px en los dos temas (titular a 9,2:1 en claro) y sobre los dos turnos
-extremos de la tabla.
-
-**Lo que NO se tocó:** la línea «6.005 pz · 16.4 pz/min» de «Uso real por máquina» repite lo que
-ya dice el bloque de ritmo, pero tiene una decisión deliberada documentada encima («sin esto,
-dos máquinas con el mismo % de uso se veían iguales aunque una produjera el triple») y ahí
-contrasta con el % de uso, que el otro bloque no tiene.
-
-**Trampa de medición, otra vez:** el `resize_window` se pierde al navegar. Hay que incluirlo
-DENTRO del mismo `browser_batch` que navega, y confirmar `window.innerWidth` en cada medición
-(dos veces en esta ronda salieron números de escritorio disfrazados de teléfono).
-## 2026-09-10 · Gates abría el detalle de una puerta que ella misma muestra pura (PR #948)
-
-**⚠️⚠️ Antes que nada, una corrección de MEDICIÓN.** La ronda anterior registró «Gates 5.551 px»
-y ese número era mío: `disclosure:turno.gates.masAnalisis` estaba en 1 en el navegador que midió,
-porque yo había abierto ese plegable en una sesión previa. Con los `disclosure:*` en su valor
-por defecto, Gates mide **3.305 px** — que es lo que ya decía la memoria de Gates (3.310).
-Inventario corregido a 375 px: Resumen 1.346 · Calidad 1.904 · Mantención 2.258 · **Gates 3.305**
-· **Línea 3.790**. La más pesada es Línea, no Gates.
-
-**Regla:** el alto de una pantalla depende del `localStorage` del navegador que mide. Antes de
-inventariar, borrar las claves `disclosure:*` y recargar — y confirmar el viewport con
-`window.innerWidth`, porque un `resize_window` olvidado da números de escritorio que parecen de
-teléfono (pasó también en esta ronda: 1.987 px que eran desktop).
-
-## Tres hipótesis medidas y descartadas
-
-Antes de tocar Gates se probaron tres sospechas contra los datos reales (38 turnos con
-`meta/gateMix`, 456 puertas con piezas). **Las tres se cayeron:**
-
-1. *«El % de pureza se calcula sin mirar el tamaño de la muestra»* — cierto en el código
-   (`nivelDePureza` no tiene piso), pero **solo 24 de 456 puertas tienen < 30 pz y las 24 están
-   en verde**: ninguna se pinta roja o amarilla por muestra chica. Un piso habría ocultado 24
-   «100 %» legítimos sin arreglar nada.
-2. *«Una puerta verde puede esconder mezcla física por peso»* — el dato existe: **26 de 162
-   puertas verdes tienen ≥ 25 % de piezas fuera de rango y 20 superan el 50 %, todas 10-12 lb**.
-   Pero la tarjeta **ya lo explica** en su propio bloque «Programas de calibre solapados en el
-   Z2», con las cifras del turno. Está resuelto; lo que queda es el pendiente de Orel sobre el
-   piso del 10-12.
-3. *«La grilla de 12 puertas ocupa 2.476 px»* — falso: la grilla es de 3 columnas y mide **556 px**.
-
-## ⚠️⚠️ Lo que sí había: la selección congelada en el primer render
-
-`const [seleccion, setSeleccion] = useState<number | null>(peor)` toma el valor inicial **una
-sola vez**, y en ese primer render `mezcla` todavía no llegó. Sin `mezcla`, `pctDe` cae a
-`purityPct` —la pureza CRUDA del gateMix, que juzga la conservación contra el seteo en vez de
-contra la dominante del bloque—. En el turno **2026-09-07** eso daba **53,5 % para G10** y abría
-su detalle; cuando llegaba `mezcla` la misma puerta pasaba a **97 %** en la grilla, pero el
-detalle ya estaba abierto. **La pantalla destacaba una puerta que ella misma mostraba como pura**,
-y gastaba 1.288 px (el 39 % de la pestaña) en hacerlo.
-
-Peor todavía: en **2026-09-08** abría **G12 (95 %)** cuando la que tenía el problema era **G10
-con 83 %**. Elegía mal la puerta, no solo el momento.
-
-Ahora la selección sigue a `peor` mientras el usuario no haya tocado ninguna puerta (`useRef`
-+ `useEffect`); en cuanto toca una, manda él, y cerrarla no la reabre.
-
-**Regla que sale de acá:** `useState(valorDerivado)` con un derivado que depende de datos
-asíncronos es un valor congelado, no un default. Se ve abriendo la misma pantalla y comparando
-lo que destaca contra lo que muestra al lado.
-
-## Y la decisión de producto (Orel, 10-09)
-
-El detalle abría en dos casos: puerta mezclada de verdad, **o** puerta con «seteo distinto» (un
-aviso de configuración que la grilla ya marca). Orel eligió que abra **solo con mezcla real**.
-La regla salió del componente a `puertaQueAbreSola` en `graderPurezaNivel.ts`, que es módulo puro
-y testeable — mismo motivo por el que en su día se separó `nivelDePureza`.
-
-Medido en pantalla a 375 px: **2026-09-07 pasa de 3.305 a 2.001 px (−39 %)** y no abre nada
-(sus 12 puertas están ≥ 95 %); **2026-09-08 abre G10**, la peor real. 6 tests nuevos, confirmados
-rompiendo el umbral a propósito (`expected 3 to be null`).
-## 2026-09-10 · 1.018 px para decir que no vino de la línea (PR #947)
-
-Ronda de pulido con la vara que puso Orel: **Calidad es la pestaña que mejor informa**, y se
-trata de simplificar el resto hacia ahí. Inventario a 375 px sobre 2026-09-07 T1, medido por
-bloque con `getBoundingClientRect`:
-
-| Pestaña | Alto | Bloques de contenido |
-|---|---|---|
-| Resumen | 1.346 px | 1 |
-| **Calidad** | **1.904 px** | **3** (causas 352 · timeline 1.006 · IA 62) |
-| Gates | 5.551 px | 4 (pureza 2.621 · config 84 · impacto 53 · más análisis 2.294) |
-| Línea | 4.762 px | 4 (35 · tasa+cascada+imputación 3.075 · correlación 736 · scatter 417) |
-| Mantención | 2.258 px | 1 |
-
-Gates y Línea son **2,9× y 2,5×** Calidad. Lo que hace buena a Calidad es la forma: una
-pregunta, un gráfico con su lista, un remate. Tres bloques.
-
-**Lo simplificado esta ronda:** las dos tarjetas de correlación de Línea, que contestan la
-MISMA pregunta —¿lo que le pasó al Grader vino de la línea?— con dos evidencias distintas
-(paros y ritmo) y que ya estaban medidas en #937: la de paros señala algo en **6 de 40**
-turnos y la de ritmo alcanza R² ≥ 0,10 en **11 de 28**. El pendiente estaba decidido desde
-esa ronda con mockup y sin construir.
-
-Ahora hay un veredicto en prosa (`OrigenDelTurnoCard` + `origenDelTurno.ts`) y el detalle
-completo —tabla de paros y nube— en una hoja sobre `dialog.tsx`, como `MinuteDetailDialog`.
-Medido antes y después en los mismos turnos:
-
-- **17-08 T1** (sin solape, el caso mayoritario): 601 + 417 = **1.018 px → 157 px** (−85 %).
-  Pestaña Línea 4.575 → 3.673 px.
-- **07-09 T1** (con solape): 736 + 417 = **1.153 px → 198 px** (−83 %). Pestaña 4.762 → 3.790.
-
-El caso mayoritario ya no es un vacío sino una frase: «Las causas son internas del Grader»,
-que además es la evidencia de que Mantención está mirando donde corresponde.
-
-**⚠️⚠️ El veredicto se emitía con el snapshot a medio llegar.** Apareció solo porque el mismo
-turno se abrió dos veces: el 17-08 decía «Las causas son internas del Grader» en una carga y
-«30 min vinieron de la línea, casi todos de Evisceradora 3» en la siguiente. `useUpstreamLineSnapshot`
-emite más de una vez y con `machines` todavía vacío la correlación da **cero por falta de**
-**datos**, no por ausencia de causa — y de las dos lecturas la falsa es justo la que
-tranquiliza. Ahora la tarjeta calla mientras `loading` o si el snapshot no trae máquinas.
-**Regla:** antes de convertir un cálculo en una afirmación categórica, mirar si sus insumos
-pueden llegar incompletos; con la tarjeta vieja el mismo bug existía pero se leía como una
-lista corta, no como un veredicto.
-
-**⚠️ El mockup afirmaba algo que el código no hace.** Decía que la tarjeta de paros «se oculta
-entera» sin correlación (lo dice el docblock de `UpstreamCorrelationCard`, que quedó viejo).
-El código solo se calla si falta el snapshot o no hay paros: el mensaje existía, pero al pie,
-en gris, después del encabezado y el KPI. Verificado antes de repetirlo en el PR.
-
-**Dos defectos que solo se ven mirando la pantalla:**
-
-- La tarjeta decía «Ninguno de los 2 paros coincidió con las Baader» y en el renglón siguiente
-  «2 paros coinciden con paros programados de Baader». Las dos afirmaciones eran ciertas y
-  juntas se leían como un error. Ahora va en una sola frase: «ninguno coincidió con una parada
-  **imprevista** de las Baader (los 2 cayeron en colación o reunión, que no es causa)».
-- Dentro de la hoja, los porcentajes del «Impacto por máquina» quedaban **cortados por el
-  borde**: la fila pedía 278 px y tenía 245. La causa era un `min-w-[8rem]` que reservaba
-  128 px para «Baader 3». Una tarjeta que entra en la pestaña no entra necesariamente en un
-  diálogo: el diálogo es más angosto que la página que la contenía.
-- El botón de detalle en `text-primary` daba **4,2:1** en tema claro, bajo AA para 14 px.
-  Con `text-brand-ink`: 6,3 claro / 6,6 oscuro.
-
-Verificado a 375 px en los dos temas sobre las cuatro ramas del veredicto con turnos reales:
-interno (17-08 antes del fix de carga), ritmo por encima del umbral (08-09), solape repartido
-(07-09) y una máquina concentrando (17-08). `tsc` · `eslint` (0 errores) · `audit-piel` ·
-`audit-graficos` · **2.251 tests**, y los 8 nuevos confirmados rompiendo el umbral de
-concentración a propósito.
-
-**Lo que NO se hizo:** dentro de la hoja siguen las dos tarjetas enteras, con sus dos títulos.
-El mockup pedía además fundir los duplicados de adentro (dos desgloses por máquina, cuatro
-capas de prosa sobre el scatter). Se dejó para otra ronda: el 83 % del ahorro está en sacarlas
-de la vista en reposo, y reescribirlas hubiera puesto en riesgo el trabajo de #937.
-## 2026-09-10 · El turno que todavía no empieza decía CERRADO (PR #946)
-
-Ronda de pulido sobre lo único grande del Análisis de Turno que nunca se había mirado: el
-**turno en vivo**. Todo lo anterior (#934–#945) se revisó sobre turnos cerrados. El defecto
-apareció a los tres minutos de recorrido, antes de que el turno arrancara.
-
-**⚠️⚠️ `graderShiftStatus` calcula tres estados y la UI solo consumía uno.** El tipo es
-`live | closed | future` y `future` se calcula en las tres ramas de `computeShiftTimeWindow`,
-pero **grep sobre todo `src/` no encontró ni un consumidor**: cada pantalla pregunta
-`status === 'live'` y todo lo demás cae en el trato de turno cerrado. Un turno que todavía no
-ocurrió mostraba, a la vez: el badge **CERRADO**, un banner rojo **«Turno Turno 1 del
-2026-09-10 no encontrado en el historial»** (con la palabra duplicada, porque `shiftLabel` ya
-trae «Turno») y la tarjeta **«Sin datos registrados para este turno»** con los tres canales de
-carga. Tres maneras distintas de anunciar la pérdida de datos que nunca existieron.
-
-**Medido en producción esta noche, no en un turno de prueba.** A las **21:15:18**, con el
-Turno 1 ya arrancado según Shoplogix, la pantalla decía CERRADO. El doc del turno
-(`shoplogix/chonchi/shifts/2026-09-10_Turno 1`) **apareció recién a las 21:21:41 — 6 min 41 s**
-después del arranque real, y hasta ese momento la página no tiene los bounds reales y cae al
-horario configurado en la app. Ese horario quedó desfasado del que reporta Shoplogix:
-**Turno 1 configurado 21:30 contra 21:15 real en 28 de 51 turnos** (desfase mediano 15 min) y
-**Turno 2 configurado 09:00 contra 07:15 real en 33 de 64** (105 min). O sea que la ventana
-CERRADO no es un borde teórico: cae justo sobre los primeros minutos de producción. Y fuera de
-esa ventana el estado es alcanzable todo el día — la grilla «Turnos del período» deja abrir el
-turno de hoy que aún no empezó, y las flechas ‹ › navegan a los adyacentes.
-
-**Lo que hay ahora** (mockup de la directora, opción A de tres:
-https://claude.ai/code/artifact/7324adba-28e2-4e59-8e8b-65d3fcec0851):
-
-- Badge **Programado** con reloj. Los tres estados se separan por FORMA —relleno contra
-  contorno— para que el tercero no compita con EN VIVO, que es el único que pide atención.
-  Contraste medido 14:1 en oscuro y equivalente en claro.
-- Tarjeta con la hora de arranque en grande, «Este turno todavía no empieza», la espera
-  («Empieza en 11 h 30 min») y un solo botón. Los tres canales de carga pasan a un `<details>`
-  cerrado: con el turno programado no hay nada que cargar y «Cargar Excel» pedía el informe de
-  cierre de un turno que no ocurrió.
-- El banner rojo y la tarjeta de canales quedan solo para `closed`, que es el único estado en
-  que un turno puede de verdad faltar en el historial.
-- El auto-refresh de 60 s ahora corre también con el turno programado: mantiene viva la cuenta
-  regresiva y hace que la pantalla pase sola a EN VIVO a la hora de arranque, sin recargar.
-
-**La cuenta regresiva se muestra solo dentro de las 24 h.** Con el turno de mañana decía
-«Empieza en 24 h 7 min», y navegando la grilla del mes habría llegado a «718 h 12 min». La
-fecha ya está en el encabezado.
-
-**⚠️ El botón prometía más de lo que la pantalla permite.** Decía «Dejar las compuertas
-listas», pero `ShiftConfigPanel` recibe `allowEdit={status === 'live'}`: en un turno que no
-empezó el panel es de SOLO LECTURA — sin «Cambié gate» ni edición de especie. Se verificó
-clickeándolo, no leyendo el código. Lo que esa pestaña sí ofrece es el contraste contra los
-turnos anteriores («mové una gate del 4-6 al Other»), que es con lo que se decide la
-configuración antes del arranque, así que el botón dice **«Revisar las compuertas»**.
-**No se extendió `allowEdit` a `future` a propósito:** el botón «Cambié gate» guarda con
-`at: new Date()` —la hora del CLIC— y el timeline usa esa marca para clasificar «las piezas
-posteriores» (razón documentada en `GatesHistoryHintCard`). Qué significa esa marca antes de
-que el turno exista no está medido, y la skill de pulido dice no tocar lo que no se pudo
-verificar.
-
-El botón quedó en **40 px** de alto (el `Button` por defecto de la app con `html{font-size:85%}`
-a ≤640 px), no 36 como salía con `size="sm"`. Sigue bajo los 44 px táctiles, pero igualarlo al
-resto es consistencia; subirlo es una decisión del design system, no de esta ronda.
-
-**Campo nuevo:** `ShiftTimeWindow.startsInMin` (null salvo en `future`). Existía el problema de
-que antes del arranque `elapsedMin` se satura en 0 y `progressPct`/`remainingMin` son null —
-exactamente igual que un turno cerrado: no había con qué distinguirlos. Tres tests nuevos, y se
-confirmó que fallan con el síntoma real (`expected undefined to be 30`) revirtiendo el fix.
-
-Verificado a 375 px en los dos temas, sobre los tres estados: programado (turno de mañana),
-en vivo (el Turno 1 de esta noche, ya con la ventana real 21:15–05:00 de Shoplogix) y cerrado
-(06-09, que sigue mostrando el banner y los tres canales, ahora sin el «Turno Turno 1»).
-
-**Fuera de alcance, anotado:** el mismo `future` sin consumidor probablemente afecta a la grilla
-«Turnos del período», que pinta el turno futuro igual que uno cerrado — no se revisó. Y
-`audit-piel` viene reportando −8 clases crudas contra su baseline **desde antes de esta rama**
-(verificado corriéndolo sobre `origin/main` limpio): alguien bajó la deuda sin actualizar el
-baseline.
-## 2026-09-10 · El monitor público decía «Planned Downtime» y «3 fallas … toda en Li 1» (PR #945)
-
-Ronda de pulido sobre la superficie que nunca se había revisado: el monitor público
-(`/monitor/:token`), que es el link que se comparte y la pantalla de la TV de planta. Recorrido
-con un token ya existente y **sin sesión**, borrando el auth del navegador.
-
-**⚠️ «Planned Downtime», en inglés, en la píldora del estado.** La causa de un paro la escribe
-el operador en Shoplogix y ya viene en español; este estado lo pone el sistema. Medido sobre
-los datos: de los **42 motivos distintos, exactamente uno está en inglés** —«Planned Downtime»,
-**301 apariciones**—, y aparece justo cuando la línea está en parada programada o cerró el
-turno, que es cuando más se mira la TV. `motivoEnEspanol` traduce los estados del sistema
-(dejando intacto lo que escribe el operador) y el monitor lo usa.
-
-**«3 fallas técnicas en el turno, toda en Li 1».** El singular concordaba con el número de
-MÁQUINAS con falla (una), no con el de fallas (tres). Ahora concuerda con las fallas.
-
-**Un falso positivo que verifiqué en vez de reportar:** en la pantalla aparecía un botón
-«Cambiar cuota», y una página pública con un control de escritura sería grave. Lo revisé:
-`onGuardarCuota` está detrás de `esAdminMonitor && esActual`, y al abrir el monitor sin sesión
-el botón no está. La protección funciona.
-
-**Otra comprobación:** al borrar el auth y recargar, la ruta redirigió a `/login` — pero
-navegando directo a la URL sin sesión el monitor carga perfecto. Era un estado transitorio del
-borrado, no un problema del link compartido.
-
-## 2026-09-10 · El PDF del turno escribía «21:28 ! 05:21» (PR #944)
-
-En la ronda anterior di el PDF por revisado sin haberlo abierto. Lo abrí: 3 páginas, contenido
-correcto y ya con el arreglo de #943 («Las 3 máquinas fueron parejas»). Pero una cadena salía
-mal.
-
-**⚠️ La ventana del turno se leía «21:28 ! 05:21 · 7 h 53».** La hoja escribe
-`${hhmm(start)} → ${hhmm(end)}`, y las fuentes estándar del PDF (Helvetica, WinAnsiEncoding) no
-tienen el glifo `→`. jsPDF, al no encontrarlo, pasa **toda la cadena** a UTF-16 y el visor la
-dibuja con el carácter equivocado. Medido sobre el PDF real del 07-09: de **169 cadenas, solo
-esa** se rompía, y solo por la flecha — los acentos y el punto medio están en WinAnsi y salen
-bien.
-
-`textoParaPdf` reemplaza los caracteres sin glifo (flechas, ▲ ▼, ≈ ≥ ≤, comillas tipográficas,
-guiones largos, puntos suspensivos) y `conTextoSeguro` envuelve el documento para que **todo lo
-que se dibuje pase por ahí**, en vez de confiar en recordarlo en cada `doc.text(...)` — que es
-justo lo que se olvida. Verificado sobre el archivo generado: de 1 cadena rota a 0, y la ventana
-ahora dice «21:28 - 05:21 · 7 h 53».
-
-Tests: 4 casos, incluido que el envoltorio sanea también `splitTextToSize` y las listas de
-líneas, no solo la primera llamada.
-
-Con esto quedan revisadas de verdad las tres exportaciones del encabezado (CSV, PNG ejecutivo,
-PDF) más el PNG y el CSV del timeline.
-
-## 2026-09-10 · La hoja ejecutiva acusaba a la máquina equivocada en 65 de 144 turnos (PR #943)
-
-Ronda de pulido sobre las exportaciones que quedaban: el CSV del encabezado (correcto: nombre
-con fecha, secciones, pausas en orden), el resumen ejecutivo en PNG y el PDF.
-
-**⚠️⚠️ La hoja ejecutiva señalaba culpable por posición en una lista.** La frase de causa
-tomaba `machines[machines.length - 1]`, y como `buildMachineRows` ordena por ciclos
-DESCENDENTE, eso era la máquina con MENOS producción — no la de peor ritmo, que es justamente
-el número que la frase cita. Medido sobre los 144 turnos con dos o más máquinas y datos:
-
-| | |
-|---|---|
-| Señalaban bien | 79 |
-| **Señalaban a otra máquina** | **65** |
-| De esas, señalaban justo a la MEJOR | 11 |
-
-En el turno del 07-09 la hoja decía «Eviscerador 3 es la que más arrastra, con 80 % de su
-objetivo», con la tabla de arriba mostrando 78 % / 78 % / 80 %: acusaba a la única que había
-andado mejor, y el propio número la exculpaba. Es la hoja que se comparte con gerencia.
-
-Ahora `buildCause` elige por peor ritmo y, **cuando las máquinas van parejas (menos de 5 puntos
-entre la peor y la mejor), no acusa a ninguna**: dice «Las 3 máquinas fueron parejas (entre
-78 % y 80 % de su objetivo): la pérdida no viene de una en particular». Es el mismo criterio
-que ya usaba el diagnóstico de `PlantKPIBoard`, que no señala cuando la diferencia con la mejor
-es marginal — el patrón correcto ya existía en el proyecto, solo que esta hoja no lo usaba.
-
-Tests: 5 casos de `buildCause` (peor ritmo y no la última, parejas sin acusar, umbral justo,
-máquina detenida por encima del ritmo, sin datos no inventa culpable). Simulado el bug original
-(`orden[orden.length - 1]`), dos tests fallan con el síntoma real.
-
-## 2026-09-10 · El CSV del turno salía desordenado y sin nombre; el chip del target no decía de quién hablaba (PR #942)
-
-Ronda de pulido sobre las dos pestañas que nunca había recorrido a fondo, Resumen y
-¿Qué hacer?, más el otro botón de exportación.
-
-**⚠️ El CSV partía en dos los turnos de noche.** Las filas se ordenaban con
-`hourLabel.localeCompare`, o sea alfabéticamente por reloj: el archivo del 07-09 salía
-`00, 01, 02, 03, 04, 21, 22, 23`, con las tres primeras horas del turno al final, como si
-fueran posteriores a las 04. En Chonchi el turno 1 va de 21:15 a 05:00, así que le pasaba a la
-mayoría de los turnos, y quien graficara ese archivo obtenía una secuencia que no ocurrió.
-Ahora cada fila guarda el instante de su primer bucket y el orden es el del turno.
-
-**El archivo se llamaba `resumen-turno.csv` a secas**, el mismo problema que tenía el PNG
-(#941) y por la misma causa: `shiftDoc` solo existe si alguien registró una acción o una carga.
-Tres turnos descargados quedaban indistinguibles. Ahora sale
-`resumen-2026-09-07__Turno 1.csv`.
-
-**El chip decía «68 % del target oficial» sin decir de quién.** En la misma pantalla, la
-tarjeta de cuota dice «119,0 % · Meta alcanzada»: a simple vista parecen contradecirse. Son dos
-cosas distintas —el chip mide las máquinas de la LÍNEA contra el target del sensor, la cuota
-mide el GRADER contra la meta de la app—, y la única aclaración vivía en un tooltip. Ahora dice
-«Línea 68 % del target oficial».
-
-Los tres se ven solo usando la app como se usa: bajando el archivo y mirando la pantalla
-completa. Ninguno rompe un test.
-
-## 2026-09-10 · El PNG del turno vuelve a explicarse solo (PR #941)
-
-Ronda de pulido. Lo primero que revisé fue mi propio trabajo: el riel (#939) sacó los rótulos
-del gráfico y los puso en la lista HTML, pero **el PNG compone cabecera + chart y nada más**.
-Desde ese cambio el PNG que se comparte en una reunión salía con «◈» y «▮» sueltos, sin una
-palabra que los explicara. La directora lo había advertido en el mockup; lo confirmé leyendo
-`downloadPNG` y generando el archivo.
-
-**El pie del PNG** repite ahora lo que la app muestra bajo el gráfico: la franja de umbrales y
-ritmo, y la lista de eventos agrupada por tramo de compuertas con su P0 (hasta 12 eventos, con
-un «+N eventos más en la app» si sobran). Verificado sobre el PNG real, no sobre el código:
-interceptando la descarga y mirando la imagen. Pasa de 556×671 a 556×895 px.
-
-**⚠️ La cabecera decía «Turno · Fecha desconocida».** No era del riel: `shiftDoc` solo existe
-cuando alguien registró una acción o una carga, y sin él la cabecera no tenía de dónde sacar la
-fecha ni el turno. Una evidencia sin fechar no sirve para una reunión. El `summaryId`
-(«2026-09-07__Turno 1») siempre está y trae los dos datos; ahora la cabecera dice «GRADER Z2 ·
-Turno 1 · lunes, 7 de septiembre de 2026».
-
-**El contador de la píldora salía girado.** Con `formatter: '◈ 3'` y `lineHeight`, ECharts
-partía la píldora en dos renglones y el número quedaba de costado. Sin espacio y sin
-`lineHeight` entra en una línea.
-
-Los tres se ven solo mirando el archivo exportado: ninguno rompe un test ni da error en
-consola.
-
-## 2026-09-10 · La lista del timeline se agrupa por tramo de configuración (PR #940)
-
-Lo que quedaba del mockup de anotaciones: que la lista deje de ser una bitácora y sea el
-argumento de la reunión. Ahora cada bloque de eventos va bajo el tramo de compuertas en el que
-ocurrió, con el P0 de ese tramo y su diferencia contra el anterior.
-
-Tres cosas salieron mal en el camino y las tres eran reales:
-
-**1. El mapa de veredictos se indexa por `id`, no por `at`.** `computeSegmentVerdicts` hace
-`result.set(snap.id, …)`; yo buscaba por la hora. Los encabezados salían sin P0 ni delta, o sea
-sin lo único que los justifica.
-
-**2. Dos criterios distintos para «cambio manual».** La lista tomaba
-`configSnapshots.slice(1)` y los tramos `!synthetic`. Con eso el snapshot que abría el segundo
-tramo no llegaba a la lista y el encabezado desaparecía: se leía «Tramo 1» y después «Tramo 3»,
-con un salto que además hacía incomprensible el delta. Ahora ambos usan `!synthetic`.
-
-**3. ⚠️ Un tramo de 6 piezas afirmaba «P0 33,3 % ▼ 31,5 pts».** El 07-09 hubo dos cambios de
-compuertas con un minuto de diferencia; el tramo entre ambos tenía 6 piezas y su P0 salía como
-si fuera comparable, arrastrando un delta de 31,5 puntos al tramo siguiente. `TRAMO_MIN_PIEZAS`
-(30, el mismo piso que ya usa `computeSegmentVerdicts` para emitir veredicto): bajo eso el
-encabezado dice «6 pz, muy pocas para su P0» y **el tramo siguiente tampoco puede compararse
-contra él**. En el turno real quedan «Tramo 3 · P0 1,8 %» sin delta y «Tramo 4 · P0 4,8 %
-▲ 3,0 pts».
-
-**El blanco táctil de 44 px sobre los marcadores no se hizo, y por una razón:** probado con un
-`rect` transparente de 30×44 en el markLine, ECharts lo pinta igual en el extremo inferior y
-tapaba las horas del eje. El blanco táctil de cada evento es su fila en la lista, que ya mide
-más de 44 px y además centra el gráfico al tocarla.
-
-Sobre el mockup: los encabezados van en capitalización normal («Tramo 2 · desde las 02:30») y
-no en versalitas como proponía, por §10 de la constitución.
-
-Tests: 6 casos de `tramosDeConfig` y `tramoDe` — el primer tramo toma el «antes» del primer
-cambio, los sintéticos no abren tramo, un cambio anterior al inicio tampoco, cada evento cae en
-su tramo, el último queda abierto, y el tramo sin piezas no dice su P0 ni sirve de referencia.
-
-## 2026-09-10 · El timeline pasa a un riel de eventos: cero texto sobre el gráfico (PR #939)
-
-Orel aprobó el mockup de la capa de anotaciones. Mockup con las tres opciones y la traza de la
-regla: https://claude.ai/code/artifact/45db560e-7507-4aec-b548-4eb4c9ddfe65
-
-**Por qué no alcanzaba acomodar rótulos.** A 375 px el área de dibujo mide 278 px para un turno
-de ~8 h: 0,58 px por minuto. Una etiqueta de 40 px ocupa **68 minutos de eje**, y el peor grupo
-tiene 4 eventos en 25 minutos. Medido sobre lo que el gráfico realmente dibuja (descartando los
-258 snapshots de configuración que caen fuera de la ventana de producción): en los turnos con
-datos completos, **julio 2026 en adelante, 7 de 16 tenían al menos un choque**, con 4,2
-anotaciones de media; en los turnos viejos y pobres era el 1-2 %. Cuanto más completo el turno,
-más choca.
-
-**La solución: el lienzo dice cuándo y de qué tipo, la lista dice qué pasó.**
-
-- `agruparEventosRiel` agrupa en píxeles de marcador, no en minutos, así que **no puede haber
-  solape por construcción** y el umbral se afloja solo en pantallas anchas. Primero fusiona los
-  eventos del MISMO MINUTO —63 de 122 turnos guardan varias configuraciones dentro del mismo
-  minuto, y en 61 de 66 grupos con seteos distintos: es un acto del operador guardado varias
-  veces—, y después absorbe por distancia sin mover el marcador ya abierto.
-- El riel son `markLine` con una píldora arriba: glifo del tipo y, si agrupa, cuántos trae.
-  Va dentro del canvas a propósito, porque el PNG se exporta desde ahí.
-- **Salen del lienzo 15-17 rótulos y quedan cero**: «▶ Inicio», «◀ Fin», los dos umbrales de
-  P0, «típico N» y «máx 10min N», «Cfg», «L ####», «↑», «⚙» y el texto de las bandas de pausa.
-  Las líneas punteadas se quedan; lo que se va es el texto.
-- Las líneas de carga, acción, configuración y lote se eliminaron: el riel dibuja una vertical
-  por marcador y esas cuatro repetían la misma. De paso desaparece un bug viejo — ECharts
-  imprimía su `name` («Upload 01:02», «Acción 02:10») encima del gráfico.
-- ⚠️ Los bordes de pausa no definían `label`, y sin él ECharts dibuja el valor del eje: eran
-  ellos los que escribían horas sueltas superpuestas sobre el turno.
-- La lista «Eventos del turno» pasa de llevar solo cargas y acciones a llevar los cinco tipos,
-  con el mismo glifo y color que el riel, y muestra hasta 8 filas antes de plegar.
-- Los umbrales y el ritmo vuelven como una línea de texto al pie del gráfico: son constantes de
-  todo el turno y no necesitan estar ancladas a un minuto.
-
-En 2026-09-07 T1 el gráfico pasa de un amasijo de horas y rótulos a dos píldoras; la tarjeta
-crece de 569 a 816 px porque ahora la lista existe y se lee.
-
-Tests: 6 casos de `agruparEventosRiel` (mismo minuto, sin solape sobre el turno peor, anclaje
-al primer evento, glifo por prioridad, umbral que se afloja con el ancho, vacío). Roto el
-agrupado espacial, el test falla con el síntoma: 5,79 px entre marcadores en vez de 30.
-
-Pendiente del mockup, sobre una base que ya funciona: agrupar la lista por tramo de
-configuración con su veredicto («cambié las compuertas a las 02:33 y el P0 bajó de 14,2 a
-9,4 %»), y el blanco táctil de 44 px sobre cada marcador.
-
-## 2026-09-10 · Calidad: la causa del P0 se leía «Fuera / de / límites» y el lote tapaba el timeline (PR #938)
-
-Orel: «potenciemos la pestaña calidad que tiene el detalle en el timeline de todo lo que pasa».
-Antes de agregar nada, la recorrí a 375 px sobre 2026-09-07 T1 (1.448 px: causas 335 · timeline
-569 · IA 61) y lo primero que se ve estaba roto.
-
-**1. La tarjeta que responde la pregunta del turno era ilegible en el teléfono.** La fila del
-paraguas metía en una sola línea horizontal el nombre, el chip, la descripción, la barra Y las
-tres cifras con `min-w-[68px]`: al centro le quedaban unos 100 px y «Fuera de límites» salía
-partido en tres renglones, con la descripción cortada en «Peso fuer…». Desde `sm` nada cambia;
-en 375 px las cifras pasan a su propio renglón bajo el nombre, y quedan las dos que se usan
-—cuánto del turno y cuántas piezas—; el reparto dentro del P0 sigue en el desglose y en la
-vista ancha. El nombre entra en una línea y la descripción se lee entera. 335 → 351 px.
-
-**2. El número de lote tapaba el gráfico.** La etiqueta del cambio de lote imprimía los 9
-dígitos completos, que ECharts dibujaba en vertical sobre las barras, y encima coincidía con la
-banda de pausa del mismo evento («Cambio N min»): dos rótulos en el mismo minuto. Ahora dice
-«L» y los últimos 4 dígitos, va abajo en vez de arriba, y solo se dibuja si pasaron 25 min
-desde la etiqueta anterior — la línea punteada sigue en todos los cambios, y el número completo
-sigue en el tooltip.
-
-**3.** Los rótulos «Inicio», «Fin» y «Cfg» estaban en 9 px, bajo el piso de 11 de la
-constitución.
-
-Lo que NO toqué y por qué: «Total unsorted pcs (Matrix)» se ve en inglés pero es el nombre
-literal del campo en el HMI Matrix — el operador lo lee así en la máquina.
-
-Queda abierto: en la franja donde caen juntos un cambio de config, dos cambios de lote y sus
-pausas, las anotaciones del timeline siguen apilándose («01:02:10» sobre «Cambio 12min» sobre
-«Cfg»). Es un rediseño de la capa de anotaciones, no un ajuste de etiqueta: merece su ronda con
-mockup.
-
-## 2026-09-10 · Las dos correlaciones de Línea: el scatter no mostraba nada y la tabla cortaba el texto (PR #937)
-
-Orel: «sigamos con las dos correlaciones de línea». Antes de tocar el layout medí cuántas
-veces cada una dice algo: la de paros señala algo en **6 de 40 turnos**; la del ritmo alcanza
-R² ≥ 0,10 en 11 de 28. Pero al mirarlas de verdad a 375 px apareció algo peor que el espacio
-que ocupan.
-
-**1. El scatter dibujaba puntos que sus propias estadísticas descartan, y por eso no se veía
-nada.** `usableScatterPoints` filtra los buckets de menos de 5 piezas para la regresión, la
-mediana y la zona crítica — pero el gráfico dibujaba `s.points` entero. Esos buckets de 1-2
-piezas llegan al 100 % de P0 y estiraban el eje Y hasta ahí, aplastando contra el piso la nube
-real, que vive entre 0 y 6 %. Medido: **en 256 de 377 turnos había buckets que estiraban el
-eje**. Ahora el gráfico dibuja solo los usables y el eje se corta con `scatterYMax` en el
-percentil 98 (nunca por debajo del triple del umbral crítico), avisando cuántos puntos quedan
-fuera — recortar sin decirlo sería esconder los peores tramos. En 2026-09-08 T1 el eje pasa de
-100 % a 16 % y la nube por fin se lee.
-
-**2. En tema claro los puntos eran casi invisibles.** Los colores estaban fijos en el tono
-oscuro (emerald-400 / blue-400 / amber-400 al 85 %) y la grilla y los ejes en `#1e293b` /
-`#64748b`. Ahora hay una paleta por tema (los mismos matices dos pasos más oscuros para el
-claro) y ejes, grilla y tooltip salen del mismo juego que usa la tarjeta de pureza.
-
-**3. La leyenda se comía el gráfico.** Seis entradas (3 máquinas + 3 tendencias) a 9 px en un
-grid que reservaba 30 px: se dibujaban encima de los puntos y del eje X. Ahora son tres, con
-nombre corto y a 11 px, con 46 px reservados. De paso, los `fontSize` 8 y 9 de las opciones de
-ECharts suben a 11, el piso de la constitución.
-
-**4. El chip decía «min» y contaba tramos.** «Zona crítica: 31 de 243 min» eran 243 puntos, y
-cada punto es un intervalo de 5 min de UNA máquina: con 3 Baader, 96 intervalos cada una dan
-288. Se leía como que el turno había durado 243 minutos. Ahora dice «tramos» y el tooltip lo
-explica.
-
-**5. La tabla de paros cortaba la única frase que dice qué pasó.** En una fila de 375 px la
-hipótesis quedaba en «Coi…» entre la duración y la confianza. Va en su propia línea y completa;
-y el texto del caso «programado» se acortó porque repetía entero el encabezado de la tarjeta.
-
-También se fue la fila de R² por máquina: decía lo mismo que el veredicto de arriba repartido
-por serie, y con los nombres largos ocupaba dos líneas.
-
-Las dos tarjetas pasan de 645 a 709 px en 2026-09-08 T1. Es más alto y está bien: antes esos
-645 px no mostraban ni el texto ni los datos.
-
-Mockup de la fusión de ambas tarjetas (opción C, veredicto + hoja):
-https://claude.ai/code/artifact/df42faa3-6466-49eb-9309-45f73324c9f8 — queda para la próxima,
-con el diseño ya decidido.
-
-## 2026-09-10 · Lo que sobra y lo que se repite: dos afirmaciones sin sustento y tres bloques con el mismo número (PR #936)
-
-Orel: «veamos qué partes están de más y qué partes están duplicadas… simplificar para a
-simple vista tener claro». Inventario de las 6 pestañas a 375 px sobre 2026-09-07 T1
-(Resumen 1.346 · Calidad 1.448 · Gates 3.310 con el plegado cerrado · Línea 4.574 ·
-Mantención 2.411 · ¿Qué hacer? 1.843). Lo que salió no fue solo relleno: dos tarjetas
-afirmaban cosas que sus propios números no sostienen.
-
-**1. «Correlación Baader → P0%» afirmaba causalidad ignorando el R².**
-`scatterSlopeMagnitude` decidía la frase solo por el signo de la pendiente. Medido sobre los
-38 turnos: la tarjeta **afirmaba una dirección en 25 de 28 turnos con datos, y en 14 de ellos
-el R² máximo no llegaba a 0,10**. El mayor R² de todo el histórico es 0,22, y la dirección se
-daba vuelta entre turnos (17 «más línea, menos P0» contra 8 al revés), que es justo lo que
-hace el ruido. La frase era «Confirma que ritmo upstream impacta calidad» con R² 0,00-0,02.
-Ahora el helper devuelve `r2Max` y `explica` (piso `SCATTER_R2_MIN` = 0,10): bajo el piso dice
-«Sin relación visible en este turno · el ritmo de la línea explica el 2 % de la variación del
-P0» y **no muestra la pendiente**, que sale de puntos sin correlación. Sobre el piso describe
-sin la palabra «confirma» y acota el alcance: «Explica el 17 % de la variación de este turno
-— no vale para otros».
-
-**2. «Recomendación: priorizar mantención en la máquina con mayor overlap»** salía con 5 min
-repartidos 36 % / 34 % / 30 % entre las tres Baader: elegir por ruido. Ahora solo aparece si
-una máquina concentra ≥ 50 % del solape; si no, dice que se reparte parejo y que no hay a
-quién priorizar.
-
-**3. Mantención decía el mismo número tres veces.** Los 5 min de falla estaban en el titular y
-otra vez como cifra grande de «Lo que costó»; el MTTR de 1,8 min en el titular y como cifra
-grande de «Nuestra respuesta»; y las máquinas sanas en la frase del titular, en las píldoras y
-en «N de M máquinas sin una sola falla». Ahora cada bloque tiene UNA cifra propia: minutos
-(titular), MTTR (respuesta), piezas (costo, que antes iba en letra chica y es lo único que
-entiende Producción). El mensaje de «la disponibilidad que no se nota» queda una sola vez,
-junto a las píldoras que lo respaldan. 806 → 653 px, pestaña 2.411 → 2.258.
-
-Tests: 3 casos nuevos de `scatterSlopeMagnitude` (bajo el piso no afirma, en el piso sí,
-`r2Max` toma el mayor y no el promedio). Forzado `explica: true`, el test falla con el síntoma
-real. Verificado en el preview a 375 px en ambos temas, con un turno bajo el piso (07-09, R²
-0,02) y otro encima (08-09, R² 0,17).
-
-## 2026-09-10 · Mapa de peso: banda por tramo de calibre y texto que no escala (PR #935)
-
-Orel, mirando el mapa de la G10 en el PC: «¿de qué nos sirve esto?». Sirve para separar
-seteo del Z2 de pesaje del Grader —un bloque limpio de 5,0-5,5 kg es cambio de programa; un
-desparramo alrededor del límite sería la balanza— pero dos cosas le restaban.
-
-**1. La banda mentía cuando el calibre cambia a mitad de turno.** `derivePesoPorPuerta`
-sobrescribe `p.rango` en cada bloque, así que el mapa encuadraba TODO el turno con el rango
-del último bloque juzgado. Medido sobre los 38 turnos: 4 puertas de 456 cambian de calibre y
-en ellas **454 piezas quedaban bajo la banda equivocada** (la peor, G10 del 07-09: 321 de
-2.308; también G4 07-09, G12 08-09 y G1 03-08). Ahora `tramosDeCalibre` devuelve un tramo por
-calibre asignado y el mapa dibuja una banda por tramo. Un bloque sin piezas no parte la banda
-(la G10 tenía un hueco y salían tres bandas con «8-10 lb» escrito dos veces); un bloque con
-piezas y sin referencia sí corta; el tramo se recorta al primer y último bloque con piezas.
-Con un solo tramo todo queda igual que antes, etiqueta a la derecha incluida. La frase de
-abajo deja de nombrar un solo calibre cuando hay varios.
-
-**2. En el PC se veía gigante.** El SVG tenía viewBox de 343 estirado al 100 %: en 1.130 px
-todo se multiplicaba por 3,3 y el «5.5» salía a 32 px, con el mapa ocupando 563 px de alto.
-Ahora se dibuja a escala 1:1 sobre el ancho real medido (ResizeObserver), con alto 176 bajo
-520 px y 240 encima. El texto queda en 11 px reales siempre —antes en móvil salía a 7 px, por
-debajo del piso de la constitución— y el ancho de más se gasta en celdas anchas y en más
-etiquetas de hora: **de 4 a 16 horas visibles** en 1.280 px. El «kg» pasó arriba de la columna
-de valores: a 11 px se pisaba con el tick superior.
-
-Tests: 5 casos nuevos de `tramosDeCalibre` (uno por cada trampa: cambio a mitad, hueco sin
-producción, cola vacía, tramo vacío, calibre desconocido). Roto a propósito el agrupado por
-calibre, el test falla con el síntoma real («expected [ { desde: 0, hasta: 3 } ] to have a
-length of 2»).
-
-Verificado en el preview a 375 y a 1.280 px, en tema oscuro y claro, sobre la G10 del 07-09
-(dos tramos) y la G5 del mismo turno (banda única sin cambios).
-
-## 2026-09-09 · Línea sin los Gantts por máquina; el detalle se abre en Mantención (PR #934)
-
-Punto 5 de la revisión del 09-09, decidido por Orel («OK tu recomendación»): Línea mostraba
-un Gantt por Baader y Mantención una barra de reparto por Baader — las mismas tres máquinas
-en dos pestañas. Cuando hay que demostrar el trabajo de Mantención, la pestaña que se muestra
-es Mantención, así que la evidencia por máquina queda ahí.
-
-Medido a 375 px sobre 2026-09-08 T1, antes → después:
-
-- **Línea**: 5.103 → 4.096 px. El panel de la línea pasa de 3.938 a 2.932: se van las tres
-  filas por máquina (348 px cada una) y queda un enlace de una línea que abre Mantención.
-  Siguen la tasa pz/min, la cascada, la imputación, la correlación y el scatter.
-- **Mantención**: la barra de reparto de cada máquina ahora es un botón (44 px) que abre el
-  detalle de esa máquina: Gantt con paros (clic en un tramo → detalle), barras de 5 min,
-  KPIs verde/amarillo/rojo y la tabla de eventos con el comentario del operador. Cerrado no
-  cambia la altura de la pestaña (2.355 → 2.411 px); abierto en Ev 1 suma 667 px.
-- La insignia «Atención» por micro-paros anómalos, que solo vivía en la fila de Línea, pasa
-  a la barra de reparto como pill «micro-paros» (mismo detector, `detectMicroAnomalies`).
-
-Código: `MachineRow` deja de existir; su cuerpo es `MachineShiftDetail` (exportado desde
-`UpstreamMachinesPanel.tsx`) y lo monta `MantencionTurnoTab`. El panel pierde el estado de
-filas expandidas y el aislamiento por máquina de la cascada ya no oculta nada (solo resalta
-en el chart de tasa; la pista de texto se ajustó). El PNG combinado captura Grader + tasa.
-
-Sin mockup previo: cambio sustractivo en Línea y reutilización del componente existente en
-Mantención, verificado en el preview (enlace → pestaña, barra → detalle con 2 canvases).
-
-## 2026-09-09 · Gates: menos avisos iguales, menos vistas repetidas del mismo tiempo (PR #933)
-
-Orel: «¿en qué más podemos afinar o simplificar?». Medido a 375 px sobre el turno cerrado
-2026-09-08 T1: Gates 5.905 px (tarjeta de pureza 3.189, detalle de una puerta 1.752). Cuatro
-cosas sobraban o se repetían:
-
-1. **La píldora era una frase de seis avisos** con el mismo peso («1 con mezcla · 411 pz
-   intrusas · 2 en atención · 3 con peso fuera de rango · programas solapados en el Z2 · 1
-   cambio de programa sin registrar»). Ahora muestra UN aviso, el más grave (cambio sin
-   registrar > mezcla > atención > seteo ≠ máquina > no reconocido > peso), y el resto va en
-   una nota «También: …». El solape del Z2 sale de la píldora: es fijo mientras la máquina siga
-   así y ya tiene su bloque.
-2. **Tres vistas del mismo tiempo en el detalle**: apilado por causa, tira «Pureza cada 30 min»
-   y mapa de peso. La tira era un subconjunto del apilado → se va; su frase «cae desde las
-   HH:MM» (y la nota del bloque con cambio de gate) queda bajo el apilado. La tabla «Por peso»
-   repetía el mapa → solo aparece si el turno no tiene mapa (sin `weightByBucket`); bajo el
-   mapa va la frase del % fuera de rango.
-3. **Historial de configuración** (291 px a la vista) → dentro de «Más análisis de gates»; la
-   config compacta de arriba ya marca los cambios del turno.
-4. **Dos editores de compuertas en la misma pestaña** → el completo («Las 12 compuertas de
-   este turno», plegado) se va de Gates; quedan el panel compacto con «Cambiar gate» y
-   Configuración del Grader para rangos y umbrales.
-
-Sin mockup previo: cambios sustractivos y un orden de prioridad, verificados en el preview.
-
-## 2026-09-09 · El Excel de Puerta 0 cubre menos que el pieza a pieza: P0 mentía (PR #932)
-
-Segunda carga parcial del 2026-09-08 T1 (05:37Z): el pieza a pieza llega a las 02:37 con
-12.610 pz y **211 rechazos gate=0**, pero el Excel de Puerta 0 se exportó solo hasta las 23:57
-con **116**. `mergeParsedData` tomaba el P0 entero como fuente de los rechazos → el resumen
-decía **P0 0,92 % · 116 pz** (real sobre lo cargado: 1,67 % · 211) y 95 rechazos de después de
-las 00:00 desaparecían del panel de causas, de la capa del timeline y de «Rechazos sin puerta».
-
-- `mergeParsedData`: los gate=0 del pieza a pieza que quedan FUERA de la ventana [min, max] del
-  Excel de Puerta 0 se agregan con la causa inferida por peso (`inferGate0FromPieceRecords`);
-  los de adentro ya vienen en el P0. Aviso en `fileMeta.warnings` del P0 y en
-  `inferred.p0CoverageWarning` («El Excel de Puerta 0 cubre 21:35–23:57 y el pieza a pieza
-  21:28–02:37: 95 rechazos fuera de esa ventana… Exportar los dos archivos con el mismo rango»).
-- Wizard: el aviso se muestra en el banner de guardado (antes las `warnings` por archivo solo
-  se guardaban en `graderUploads`, nadie las veía).
-- 2 tests (`graderExcelParser.p0Cobertura.test.ts`).
-
-Vale al recargar: el turno cargado sigue con 116 hasta la próxima carga (pedirle a Orel que
-exporte P0 y pieza a pieza con el mismo rango, o recargar los dos).
-
-## 2026-09-09 · Se retira la dispersión P0 aparte: la capa por causa del timeline la reemplaza (PR #931)
-
-Pedido de Orel tras ver funcionar la capa por causa (#930): «retira la dispersión P0, dejemos
-solo el timeline». `PieceScatterChart` (dispersión segundo a segundo de piezas P0, colapsada
-por defecto) decía lo mismo que el timeline con una causa marcada, pero sin el contexto de
-pausas, lotes y config. Se elimina el componente (único uso: la vista Calidad de la página del
-turno) y su import. Sin cambios en datos ni en el resto de la vista.
-
-## 2026-09-09 · Timeline + dispersión P0: la unificación ya existía y estaba ciega (PR #930)
-
-Pregunta de Orel con el Excel parcial del turno en curso: «¿el timeline y la dispersión P0 se
-pueden unificar o dicen cosas distintas? ¿seleccionar la causa y mostrarla en el timeline?».
-Dicen cosas distintas y complementarias —el timeline es el pulso P0 % minuto a minuto con
-pausas, lotes y cambios de config; la dispersión es cada pieza con su peso y su causa— y **la
-unificación ya estaba construida**: al marcar una causa en el panel de P0 el timeline superpone
-un punto por pieza con el peso en el eje derecho. Nadie la había visto funcionar porque:
-
-1. El timeline recibía las piezas gate=0 del pieza a pieza, SIN causa (mismo defecto que #929
-   en la dispersión) → ninguna pieza calzaba con la causa elegida. → `gate0Pieces={p0Fuente}`.
-2. `classifyPiece` comparaba `snapshot.at` (hora real) con `piece.ts` (hora de pared) sin
-   convertir (trampa §13) y clasificaba con `CALIBRE_WEIGHT_RANGES` en vez de los rangos de la
-   línea. → `realIsoToWallClockMs` + prop `ranges` (la página pasa `rangosVigentes`).
-3. Marcar el paraguas «Fuera de límites» seleccionaba solo el estricto (piezas sin peso) →
-   «0 pzas con peso». → `onToggleFamily`: el paraguas marca/desmarca su familia (estricto + 5
-   derivadas) y aparece marcado solo cuando la familia entera lo está.
-
-Verificado en el turno 2026-09-08 T1 (parcial): «Fuera de calibre» → «44 pzas con peso» y en el
-timeline se ven las dos nubes sin puerta (< 1 kg y 5,5–6 kg). La dispersión aparte sigue,
-plegada; si Orel prefiere, se puede retirar.
-
-## 2026-09-09 · Ronda 10 con la carga parcial del 08-09 T1: P0 con causa, rechazos sin puerta, hora real (PR #929)
-
-Orel cargó a las 23:38 el pieza a pieza + Puerta 0 del turno en curso (2026-09-08 Turno 1,
-21:28→23:37, 6.283 pz, P0 96 = 1,53 %). Lo que funcionó solo: snapshot inicial desde el
-último seteo conocido (#918), G12 leída como 12-UP por el parser (#925), conservación por
-pieza (#926), tarjeta EN VIVO; tres puertas «seteo ≠ máquina» (G2, G4, G12: hoy el Z2 las
-tiene distintas a anoche) adoptadas desde el botón en 3 puertas → el snapshot inicial se
-reescribió en su lugar y la coincidencia quedó 6.188 / 6.188 (100 %). Lo que estaba mal:
-
-1. **La dispersión P0 decía «95 Otro»**: leía las piezas gate=0 del pieza a pieza, que NO
-   traen el texto de la causa; el input de Puerta 0 guardado (`meta/gate0`, el que usó la
-   clasificación) sí lo trae. → la página carga `loadGate0Records` y lo usa para la
-   dispersión y para el desfase de config (`p0Fuente = gate0Input ?? gate0Pieces`). Ahora:
-   «50 Fuera límites · 46 Sin fotocélula».
-2. **37 de los 96 P0 pesaban 0,34–0,90 kg**: la app los clasifica «fuera de calibre» porque
-   ninguna puerta tiene 0-2 lb, pero nadie lo decía. → `p0SinPuerta(records, timeline,
-   ranges)` (puro, 3 tests; una puerta «Other» cuenta como puerta) + bloque «Rechazos sin
-   puerta» en la tarjeta de pureza. Encontró además **7 pz de 12-UP (5,5–6,1 kg) sin
-   puerta** porque hoy la G12 va en 4-6 Industrial. Es decisión de seteo, no falla.
-3. **«piezas hasta las 00:00»** con datos hasta las 23:37: usaba el fin del último bloque de
-   30 min. → `hastaIso = summary.endAt`.
-
-Pendiente Orel/Z2 (sigue): G11 71 % más liviano que 4,99 kg (el 10-12 del Z2 arranca en ~4,5).
-
-## 2026-09-09 · «Adoptar seteo» en turno cerrado reescribe todos los snapshots (PR #928)
-
-Pedido de Orel tras adoptar G1 y G12 del 2026-09-07 T1 por script: «arregla el botón adoptar
-para turnos cerrados». El botón hacía lo mismo en vivo y cerrado: snapshot inicial corregido si
-nadie tocó nada, o un snapshot NUEVO «ahora». En un turno cerrado ese «ahora» rige solo desde
-ahora y el turno entero sigue juzgado con el seteo viejo (la G12 seguía «seteo ≠ máquina» tras
-adoptar). Medido con el script: reescribir la puerta en los 4 snapshots llevó la coincidencia de
-98,9 % a 99,9 %.
-
-- `graderAdoptarSeteo.ts` (puro, 3 tests): `puertasAdoptadas(base, nuevas)` y
-  `reescribirEnTodos(snapshots, adoptadas)` — solo las puertas que cambian, en TODOS los
-  snapshots, sin tocar las demás puertas ni los cambios registrados a mano.
-- `adoptarSeteoMaquina(..., { turnoCerrado, baseGates })`: cerrado → reescribe todos (el motivo
-  queda en el último snapshot); en vivo → como antes. La página pasa
-  `turnoCerrado: shiftWindow?.status !== 'live'` desde los dos botones (una puerta / N puertas).
-
-## 2026-09-09 · Ronda 9: mezcla en los tres ejes, vista pieza a pieza y poda de la pestaña Gates (PR #927)
-
-Pedido de Orel: «que sea claro la mezcla de calibres en las gates, por calidad, por lo
-que sea… que se pueda ver bien en el gráfico cada pieza… revisá lo que ya está de más:
-enfoquémonos en analizar problemas en la Grader, gates con mezcla o P0».
-
-**Mockup primero** (directora creativa, artifact 1669d095): encontró que la pureza era
-CIEGA a la conservación —la G8 marcaba 100 % con 2.032 CONGELADO + 1.537 FRESCO por el
-mismo tobogán— y que `weightByBucket` (bins de 100 g × 30 min) ya estaba guardado y no
-se dibujaba en ninguna parte. Opción A (grilla física de 12, número redefinido, tira de
-composición) con el titular de C.
-
-**Lo construido.**
-- `deriveMezcla` (módulo, 4 tests): % de piezas que coinciden en calibre, calidad Y
-  conservación. Calibre y calidad contra el seteo del bloque; la dimensión que el seteo
-  no fija (conservación) contra la **dominante de ese bloque de 30 min**: así un cambio
-  de lote fresco→congelado a las 02:00 no es mezcla, dos conservaciones en el mismo
-  bloque sí. Regla decidida acá, no en el mockup (que proponía la dominante del turno y
-  habría puesto a la G8 en 57 %). Medido: G8 100 → 95 %, G9 100 → 99 %, G10 99 → 97 %;
-  titular «coinciden en los tres ejes 16.513 / 16.778 (98,4 %)». La pureza guardada no
-  se toca.
-- Mosaico: número = mezcla en tres ejes, línea 1 = combinación dominante («8-10 ·
-  Premium · congelado»), línea 2 = el peor intruso con su dimensión («5 % fresco», visible
-  desde 2 % aunque la puerta siga en verde), tira de composición de 6 px. Tonos por
-  dimensión medidos contra `index.css`: calibre cat-6, calidad cat-3, conservación cat-7,
-  no reconocido cat-5 (cat-4 en oscuro es byte-idéntico a `--ink-warn`, reservado al peso).
-- Detalle: «Qué llegó a esta puerta» (tira de 22 px + leyenda con Tag por dimensión),
-  «Peso, bloque a bloque» (`mapaPesoDePuerta`, SVG con la banda del rango, **0 lecturas**)
-  y «Ver cada pieza» (nivel 2): dice cuántas lecturas cuesta ANTES del botón, carga solo
-  esa puerta (`listGatePieceRecords`), scatter ECharts hora × peso con círculo = coincide,
-  rombo = intrusa (tono de su dimensión), anillo ámbar = fuera de rango, banda del rango,
-  línea del cambio de programa, ventana inicial de 90 min y segmentado «Todas / Solo
-  intrusas». Las piezas se juzgan con la MISMA regla por bloque (`referencias`).
-- **Poda de Gates** (medido: 5.615 → 2.648 px a 375 px): fuera el banner explicativo;
-  `GateChangeImpactCard` (P0 ±10 min por cambio) se queda a la vista porque es análisis
-  de P0; `GateBreakdownCard`, `GateEvolutionChart` y la comparación histórica (cerrado
-  el turno) van a un `Disclosure` plegado «Más análisis de gates»; el editor completo de
-  las 12 compuertas arranca plegado (ya hay un panel compacto arriba).
-- Wizard: si «Guardar en Calendario» pasa de 60 s sin terminar, aviso con el remedio
-  (cerrar TODAS las pestañas de la app y reintentar). Hoy Orel lo vio girando para
-  siempre en el navegador del PC sin que llegara una escritura al servidor.
-
-Sin tocar: la advertencia preexistente «Cannot update a component while rendering»
-de `AnalisisGraderGatesConfigPage` (aparecía antes de esta ronda).
-
-## 2026-09-08 · Recarga del Excel: las piezas se ACTUALIZAN, no se duplican + conservación guardada (PR #926)
-
-Al pedirle a Orel que recargara el Excel de anoche para que la G12 saliera 12-UP, leí
-el camino de escritura y encontré que no habría servido: `savePieceRecordsBatch` deduplica
-por `dedupeKey`, que lleva calibre y calidad → la misma pieza con etiqueta nueva es "otra"
-pieza y se AGREGA. La G12 habría quedado con 159 docs "Other" + 159 "12-UP lb", y los
-P0 y cualquier vista pieza a pieza contarían doble.
-
-- `pieceIdentityKey` (ts · gate · piezas · peso · lote, SIN etiquetas) y
-  `planPieceRecordWrites` (puro, testeado): agregar las nuevas, **actualizar en su doc**
-  las que cambiaron calibre/calidad/conservación/producto/error, saltar el resto.
-  `savePieceRecordsBatch` lo usa (lee los existentes con id; escribe solo lo que cambió).
-- `FirestorePieceRecord` guarda `conservation` y `product` (el wizard no los mandaba; la
-  vista pieza a pieza los necesita para mostrar FRESCO/CONGELADO).
-- `listGatePieceRecords(summaryId, gate)`: piezas de UNA puerta bajo demanda (4–3.600
-  lecturas, nunca las ~18.000 del turno). Base de la vista pieza a pieza que viene.
-
-⚠ Dato de hoy: Orel guardó dos veces desde el wizard y **ninguna escritura llegó a
-Firestore** (sin cargas, borradores, resúmenes ni errores de cliente desde las 09:40Z;
-usuario admin activo). Pendiente ver qué muestra el wizard bajo «Guardar en Calendario».
-
-## 2026-09-08 · Ronda 8 de pureza por puerta: medir los 37 turnos, programa 12+ y piso de piezas (PR #925)
-
-Ronda hecha al revés de las anteriores: primero medir sobre PROD lo que la tarjeta
-derivaría en los 37 turnos con `meta/gateMix` (script `medir-cambios.js` del scratchpad,
-mismo TS compilado con esbuild), después tocar código. Lo que salió, por gravedad:
-
-1. **Cambios de programa de 9–45 piezas** en febrero (G1/G3/G5/G8 «a las 04:00»): el
-   barrido de fin de turno, no un cambio del Z2. Los reales tenían 238, 525 y 1.987 pz.
-   → `CAMBIO_MIN_PIEZAS = 100`. Cambios detectados en los 37 turnos: 4 → 2 (ambos reales).
-2. **Etiquetas "10" y "12" de febrero** (guardadas crudas): "10" pesa 4,6–6,3 kg (10 y más)
-   y "12" 5,5–7,2 kg (12 y más). La app las trataba como calibres desconocidos → solapes
-   falsos de 900–1.800 g y un «cambio» 8-10→12. Peor: el parser ACTUAL mapea "12-UP" al
-   10-12 y "12" a `Other` — por eso la G12 de hoy (5,9–6,8 kg, 159 pz) sale «calibre no
-   reconocido». → calibre canónico **`12-UP lb`** (`CALIBRE_12_UP`, el mismo nombre que
-   Orel puso en los rangos): parser (`normalizeCalibre`, ahora exportado) y lectura
-   (`normalizarCalibre`) mapean "12", "12-UP", "12+", "N≥12-UP" → 12-UP lb; "10", "10-UP"
-   → 10-12 lb. Solapes en los 37 turnos: 9 → 7; los que quedan de febrero son reales de
-   esa temporada (programas del Z2 con nombre y rango desajustados: un "4-6 Industrial"
-   recibiendo 2,8–3,6 kg).
-3. **Espacio final en el nombre del calibre** (`"12-UP lb "`, escrito a mano en el modal
-   de rangos): no coincidía con ninguna etiqueta. → `trim()` al guardar (modal) y al leer
-   (`getModuleRanges`); el doc de prod corregido por script.
-
-⚠ La G12 de hoy sigue «Other» porque los `pieceRecords` ya se guardaron normalizados
-(el parser pierde la etiqueta cruda): se corrige recargando el Excel del turno. Con eso
-se confirma además que la etiqueta real del programa 12+ es "12" (hoy es inferencia
-desde febrero + los pesos).
-
-Sin cambios de UI. tsc/eslint/audit-piel OK; vitest grader 984/984 (tests nuevos:
-parser 12+/10+, normalizador de febrero, piso de piezas del cambio).
-
-## 2026-09-08 · Ronda 7 de pureza por puerta: cambios de programa del Z2 dentro del turno (PR #923)
-
-Pedido de Orel: revisar de nuevo el turno completo `2026-09-07 Turno 1` (21:15→05:45,
-17.844 pz) después de corregir los rangos de peso (8-10 3665–4990 · 10-12 4990–5498 ·
-12-UP 5498–7000).
-
-**Lo que mostraba el turno.** G10 15 % «mezclada» con 85 % de 8-10 lb, G4 4 %, y el
-aviso de solape decía «10-12 desde 3,7 kg: 1200 g». Nada de eso era mezcla: la máquina
-cambió el programa de la G10 a 8-10 · Premium a las 23:30 (99,1 % de 1.987 pz desde
-entonces) y el de la G4 a 6-8 · Premium a las 03:30 (100 % de 525 pz), y nadie lo
-registró en la app. El solape se calculaba con el programa dominante de TODO el turno
-(G10 sin dominante ≥ 90 % → caía al seteo de la app, que estaba mal).
-
-**Lo que cambió.**
-- `detectCambiosDePrograma`: por puerta, bloque de 30 min con programa ≥ 90 % distinto
-  al asignado que se mantiene en la mayoría de los bloques siguientes, y con bloques que
-  SÍ coincidían antes (si nunca coincidió es «seteo ≠ máquina», otro aviso). La tarjeta
-  lo explica y ofrece **«Registrar cambio desde las HH:MM»** (supervisor/admin).
-- `saveConfigSnapshotAt`: snapshot con el `at` de la hora de planta (nueva
-  `wallClockMsToRealIso`, inversa de la conversión real→pared) y DOS cuidados que
-  costaron una ronda cada uno: (1) el cambio se **propaga a los snapshots posteriores**
-  que no tocaron esa puerta (el inicial de las 23:38 «guardado ahora» pisaba a G10
-  desde las 00:00); (2) si el cambio queda ANTES de todos los snapshots, deja una
-  **línea base** un minuto antes con la config previa (antes del primero rige
-  `gatesUsed`, que es la config MÁS RECIENTE, y G4 se juzgaba como 6-8 a las 21:15).
-- `configTimelineFromSnapshots`: antes del primer snapshot, si ese primero es el
-  inicial (sin cambios) rige él y no `gatesUsed`.
-- Solape por el programa de CADA bloque (`programaDeBloque`); sin dominante en el
-  bloque no se atribuye a nadie, jamás al seteo de la app.
-- `rangesFingerprint` en el summary (lo escriben el segmentador y el recálculo): si
-  los rangos vigentes difieren, la página recalcula las causas P0 una vez. Con los
-  rangos nuevos dieron casi igual (365/288/245 vs 367/286/245).
-- Registrar un cambio recalcula P0 y `gatesUsed` con la línea de tiempo nueva de
-  forma explícita: el efecto de desfase solo dispara cuando cambiarían las causas, y
-  dejaba `gatesUsed` con la config vieja.
-
-**Resultado medido en el turno real** (preview con los cambios registrados desde la UI):
-coincidencia 84,3 % → **98,9 %** (16.766 / 16.946 pz), G10 15 % → 99 %, G4 4 % → 100 %,
-solape correcto («8-10 hasta 4,9 kg y 10-12 desde 4,5 kg: 400 g en común»).
-
-**Quedan para Orel/Z2:** G11 49 % más liviano que 4,99 kg (el programa 10-12 del Z2 recibe
-desde ~4,5 kg: decidir el límite en el Z2 o en la app), G12 «calibre no reconocido»
-(159 pz, la etiqueta exacta del programa 12+), G1 seteo Grado vs máquina Industrial
-(4 pz, un clic en «Adoptar»).
-
-## 2026-09-08 · `deleteFile` y `deleteMapImage` al mismo patrón (PR #924)
-
-Los dos que #922 dejó fuera. Ambos pasan a `deleteStorageObjectByUrl`, con lo
-que propagan y toleran solo `object-not-found`. El test se renombra a
-`storage.delete.test.ts` y usa `describe.each` sobre las CUATRO funciones:
-16 casos, la garantía vale para todas y para la próxima que se agregue.
-
-Lo que destapó hacerlo: **`deleteMapImage` nunca funcionó**. Comprobado con
-token real de admin contra las reglas vivas el 08-09: subida 403 y borrado
-403 en `maps/`. Dos causas que se suman:
-  1. La app sube a `maps/{fileName}` (2 segmentos, `uploadMapImage` y
-     `uploadFloorPlan`) y la única regla es `match /maps/{locationId}/{fileName}`
-     (3 segmentos) → no matchea NINGUNA regla. **Mismo desajuste de segmentos
-     que PR #894**, en otra ruta.
-  2. Aunque matcheara: esa regla no tiene `allow delete` y su `allow write`
-     usa `isAdmin()`, que en Storage deniega siempre (rol IAM faltante, ver la
-     nota de /models3d).
-El `logger.error` se lo tragaba, así que el botón "Eliminar plano" parecía
-funcionar y el archivo seguía en el bucket. El caller de `PolygonZoneEditor`
-ya tenía `try/catch` con `alert`, pero NUNCA llegaba a correr; ahora corre y
-el alert muestra la causa real en vez de un genérico.
-
-**No se tocó la regla de `/maps`**: arreglarla implica decidir quién puede
-subir y borrar planos de planta (el `isAdmin()` de Storage no sirve), y eso
-es decisión de Orel, no un efecto colateral de un fix de manejo de errores.
-Queda como pendiente explícito, junto con la subida de mapas, que está rota
-por la misma causa.
-
-## 2026-09-08 · Borrado de fotos con error visible + delete en incidents/ (PR #922)
-
-Cierra los dos pendientes de #919. `deleteRepuestoFoto` y `deleteBodegaPhoto`
-tragaban cualquier error con `logger.error`: el caller quitaba la URL de
-Firestore y el archivo quedaba huérfano en el bucket sin aviso (el mismo
-patrón mudo que escondió el `storage/unauthorized` de la subida en #894).
-Ahora un helper común `deleteStorageObjectByUrl` propaga; solo
-`storage/object-not-found` se tolera con warn, porque si el archivo ya no
-existe la referencia en Firestore es basura y quitarla es lo correcto. El
-modal de fotos de repuesto y el drawer de bodega muestran toast si falla.
-4 tests en `storage.deleteFoto.test.ts`. En `storage.rules`,
-`incidents/{id}/{file}` no tenía delete (403 hasta con admin): se agrega
-para sesión no anónima, mismo criterio que `machines/.../repuestos`.
-
-Regla general que sale de #894, #919 y #922: **todo `try` alrededor de una
-llamada a Storage lleva `catch` que avise (toast) o propague; un
-`logger.error` solo no es manejo, es esconder el fallo.** Quedan con el
-patrón viejo, fuera de alcance: `deleteFile` (sin callers) y
-`deleteMapImage` en `services/storage.ts`.
-
-## 2026-09-08 · Fotos de repuestos sin equipo (PR #919)
-
-Pedido de Orel: "no me deja cargar imágenes a los repuestos". Segunda causa
-distinta a la de #894 (que fue la regla de Storage). Esta vez las reglas
-estaban bien: se probaron las reglas VIVAS con un token real del admin
-(custom token → `signInWithCustomToken` con header `Referer` del dominio,
-porque la API key tiene restricción de referer → POST al bucket) y los tres
-paths de repuestos/bodega dieron 200. La causa era el cliente:
-`RepuestoPhotosModal` exigía `machineId` para habilitar "Agregar foto", y en
-el modelo plano **3.025 de 7.673 repuestos (39 %) tienen `equipos: []`**
-(fila "Transversal"/"Sin equipo") → el admin veía "Sin fotos reales" sin
-botón ni aviso. Fix: `canEdit` sin `machineId`; sin equipo el path usa el
-marcador `repuestos/sin-equipo/{repuestoId}/fotos/`, que cumple la regla de
-4 segmentos existente (storage.rules no cambia). Verificado en local con
-sesión real en el repuesto 3300101237 y contraste con uno con equipo; fotos
-de prueba borradas de Storage y de `fotosReales`. Deploy confirmado:
-`version.json` publicado con `buildSha 1f1d09c`.
-
-Gotchas: `web.app` NO es producción (build detenido en el 31-08); prod es
-`orelcain.github.io/mantenimiento-planta/version.json`. El preview
-`pwa-5184` sirve el checkout que diga `dev5184.cmd` (hoy `D:\a\wt-r6`), no
-el repo principal. Pendiente (sin PR): `deleteRepuestoFoto` y
-`deleteBodegaPhoto` tragan el error de borrado con `logger.error`, y
-`incidents/{id}/{file}` no tiene regla de delete (el objeto queda huérfano).
-
-## 2026-09-07 · Análisis de Turno: "Ver turno" en el turno en curso + pureza por puerta (PRs #905, #906, #907)
-
-Pedido de Orel: al cargar el Excel del Grader el botón "Ver turno" no salía
-para el turno en curso, y en el detalle no había forma rápida de saber si en
-la puerta 6 caía mezclado por calibre o calidad. Tres PRs, uno por paso.
-
-**#905 · el botón.** "Ver turno →" vive en `GraderShiftPeriodMatrix` y solo
-sale al fijar una celda. Tras "Guardar en Calendario" con más de un segmento
-el wizard no navega y la matriz no se recargaba: `useGraderShiftPeriod`
-exponía `refresh` y nadie lo llamaba. El turno en curso, sin summary y con
-menos de 50 ciclos de Shoplogix, se descarta como ruido en `buildPeriodShifts`
-→ sin celda → sin botón. Fix: prop `refreshKey` en el container + botones
-"Ver turno dd/mm · turno" en el banner verde del wizard. Diagnóstico por
-código, no reproducido en navegador (exige sesión y un Excel real):
-**pendiente probarlo con la próxima carga de un turno en curso**. Gotcha: el
-primer CI cayó por `audit-piel` (dos clases `border-emerald-500/40` /
-`hover:bg-emerald-500/10` suman chips translúcidos sobre la línea base);
-correr `node scripts/audit-piel.mjs` desde la RAÍZ antes de pushear UI.
-
-**#906 · el dato.** `gateMix` en `GraderDailySummary`, calculado en
-`computeShiftSummary` con las piezas y la config de gates ya en memoria (0
-lecturas extra, ~2 KB/turno, solo con gates activas → Yal no lo paga). Por
-puerta: pureza = piezas con el calibre Y la calidad asignados ÷ piezas de la
-puerta, desglose por calibre y por calidad, intruso principal y pureza en
-bloques de 30 min alineados al reloj. `assignedCalibre = 'Other'` = cualquier
-calibre; pieza sin dato = no coincide. Antes el cruce puerta × calibre solo
-existía en el dashboard de la sesión de carga y nunca comparaba la calidad.
-Gotcha: un ts ISO sin sufijo Z lo toma `Date.parse` como hora LOCAL del
-navegador; el módulo lo parsea como UTC (`parseWallClock`), igual que la
-convención Z-as-wall-clock del parser. 10 tests. Los turnos ya guardados no
-tienen el campo hasta recargar su Excel (la pestaña Gates lo avisa).
-
-**#907 · la vista.** `PurezaPorPuertaCard` primero en la pestaña Gates:
-semáforo de 12 puertas (≥95 pura · 85–95 atención · <85 mezclada; el 85 es el
-15 % de mezcla con el que ya avisaba `GraderGatesLector`), ficha de la
-puerta con barras y franja de 30 min ("cae desde las 10:30; antes iba en
-96 %"), y acciones registrar incidencia / copiar resumen. Solo tokens y
-primitivos de la piel (Pill, Button tinted/plain). Banco `/dev/pureza-puerta`
-(solo DEV) para mirarla sin sesión; verificada a 375 px en claro/oscuro y
-piel Apple. Gotcha: `cn()` (tailwind-merge) DESCARTA `text-caption` /
-`text-title3` si en la misma llamada va un `text-ink-*` — toma el tamaño
-como color y gana el último; esos pares van en template string.
-
-## 2026-09-08 · Primera carga parcial real con todo en prod + el wizard arranca con el último seteo conocido (PR #918)
-
-**Carga parcial del turno en curso (02:39, 2026-09-07 Turno 1, 21:15→05:45)**,
-revisada en Firestore y en la app con la sesión de Orel. Funcionó todo lo
-de #905–#917: summary (5.835 pz + 59 no aplicables, P0 199 = 3,41 %),
-snapshot inicial, registros P0, `meta/gateMix` v2 con bins de 100 g, la celda
-del turno vivo en la matriz del wizard (26.889 ciclos, "termina otro día") y
-la tarjeta EN VIVO con "piezas hasta las 00:00".
-
-**Hueco confirmado en vivo**: el snapshot inicial salió del BORRADOR del
-wizard: 8 de 12 puertas "seteo ≠ máquina" y 74 piezas de P0 "fuera de
-calidad" que no existían. Se corrigió con "Adoptar seteo de la máquina en 8
-puertas" (todas al 100 %, P0 recalculado solo). Fix: `graderSeteoInicial.ts`
-(`pickUltimoSeteo` + `elegirSeteoInicial`): al guardar un turno SIN snapshot,
-el wizard usa el último `gatesUsed` de la línea (21 días; la página lo
-mantiene al día con snapshots y adopciones) salvo que el usuario haya tocado
-las gates en esa sesión; la razón del snapshot lo dice ("último seteo
-conocido de la línea"). 3 tests (793 del módulo). Sin prueba end-to-end:
-se verá en la próxima carga.
-
-**Dato del Z2 que salió de esta carga**: G10 y G11 (10-12) tienen 73–78 %
-de piezas de 4,6–5,0 kg → el 10-12 del Z2 EMPIEZA en 4,59 kg, no en 5,0;
-con el 8-10 hasta 5,0 (Orel) los dos programas se solapan. La app no puede
-tener los dos límites: decidir en el Z2 y espejarlo en Configuración del
-Grader. G12 sigue recibiendo piezas con etiqueta que la app no reconoce
-(programa 12+): ver su nombre en el Z2 y sumarlo a `normalizeCalibre`.
-
-## 2026-09-07 · Ronda de pulido 5 · seteo inferido, solape por programa, etiquetas crudas (PR #917)
-
-Recorrido de lo que nadie miró: un turno de febrero, uno de agosto con el
-seteo del borrador, y el camino "Registrar incidencia".
-
-1. **"Todas puras" con las 12 puertas "sin asignación"** (2026-02-25 T1 y
-   otros 22 turnos sin `gatesUsed`): mentía. `inferirSeteoFaltante`: la
-   puerta sin asignación en ningún bloque toma como asignación lo que el Z2
-   le etiqueta (programa dominante ≥ 90 %, `programaDominante`), la tarjeta
-   la marca "· inferido" y ofrece "Guardar seteo inferido" (mismo
-   `adoptarSeteoMaquina`, partiendo de 12 puertas inactivas). Sin ninguna
-   puerta juzgada la pill dice "Sin seteo guardado", en neutro.
-2. **Solape falso en agosto**: con el seteo del borrador, el aviso decía que
-   6-8 y 4-6 compartían 1.800 g. `detectSolapesDeRango` agrupa ahora por el
-   PROGRAMA que el Z2 etiqueta (dominante de la puerta), no por el seteo de
-   la app: en 2026-08-17 T2 ya no hay aviso; en hoy sigue el real (8-10 y
-   10-12, 300 g).
-3. **"Registrar incidencia con esto"** no aparecía con solo peso fuera o
-   solape (lo más accionable): ahora sí, y el resumen incluye el solape.
-4. **Etiquetas crudas de Excel viejos** ("2 - 4 LB", "HG 6-8") guardadas en
-   `pieceRecords` de febrero: no calzaban con los calibres de la app (sin
-   rango, "calibre lejano", programa distinto). `normalizarCalibre` en
-   `splitCombo`: se normaliza al LEER, así los 37 docs backfilleados sirven
-   sin reescribir.
-
-3 tests nuevos (790 del módulo). Verificado en el preview con sesión sobre
-2026-02-25 T1 (12 inferidas, pesos juzgados), 2026-08-17 T2 (sin solape
-falso) y hoy (incidencia visible, solape real).
-
-## 2026-09-07 · Ronda de pulido 4 · rangos alineados con el Z2, solape de programas y P0 con rangos configurados (PR #916)
-
-**Rangos alineados.** Orel confirmó que el 8-10 del Z2 llega a 5 kg. Se editó
-desde el apartado de la app (modal "Rangos calibre", sesión de Orel en el
-preview): 8-10 = 3.665–5.000 g y 10-12 = 5.000–5.900 g en
-`graderModuleConfigs/global.customWeightRanges`. La G9 pasó de 6,5 % fuera a
-97 % dentro. Bug de paso: el editor no regeneraba la etiqueta ("8-10 lb
-(3665–4581 g)" seguía en todas las pantallas) → `handleSave` la reconstruye
-si era automática.
-
-**Hallazgo (el de más valor de las 4 rondas).** Percentiles de peso por
-ETIQUETA en 3 turnos: el 11-08 y el 02-09 el Z2 cortaba limpio en 4,58/4,59 kg
-(8-10 max 4.580, 10-12 min 4.590). Hoy las puertas 8-10 reciben hasta 4,98 kg
-(p95 4.770) y las 10-12 SIGUEN recibiendo desde 4,59 kg: **los dos programas
-del Z2 se solapan ~400 g** y el pescado de 4,6–5,0 kg cae en cualquiera. Eso es
-lo que G10/G11 muestran como 28 % fuera con los rangos nuevos, y NO es error de
-la app: es el Z2. `detectSolapesDeRango(obs, timeline)` lo detecta desde el
-histograma de peso por calibre asignado (percentiles 2–98, ≥30 pz, ≥200 g) y
-la tarjeta lo dice: "Las puertas 8-10 lb reciben hasta 4,9 kg y las 10-12 lb
-desde 4,6 kg: 300 g en común (376 pz en 8-10, 47 pz en 10-12). Revisar los
-límites de los dos programas en el Z2." Verificado con el turno de hoy.
-
-**P0 con los rangos configurados.** `classifyRecordToMatrix` recibía las
-constantes (8-10 hasta 4.581) en computeShiftSummary, classifyGate0Records,
-recomputeShiftP0Causes y detectConfigDrift: una pieza de 4,8 kg en P0 era
-"fuera de calibre" aunque la app tuviera el 8-10 hasta 5.000. Ahora todos
-reciben `ranges` (wizard: customWeightRanges de la línea; página:
-override del turno → línea → constantes). Y "fuera por peso" exige ≥30 piezas
-con peso: con 6 pz, 1 pescado ya era 17 %. 4 tests nuevos (787 del módulo).
-
-## 2026-09-07 · Ronda de pulido 3 · bins de 100 g, medición de los 37 turnos y adopción en bloque (PR #915)
-
-**Bins de 100 g.** `GATE_OBS_WEIGHT_BIN_G = 100` y cada doc guarda su ancho
-(`weightBinGrams`; ausente = 250, docs viejos siguen valiendo);
-`derivePesoPorPuerta` usa el del doc. Re-backfill de los 37 turnos: 612 KB en
-total (1,5× los 395 KB de 250 g, máximo 20,7 KB por turno), no las 2,5×
-estimadas. Con 100 g la G8 y la G9 de hoy pasan de "al límite" a **10 % y
-15 % fuera por peso**, exactamente lo que dio la primera medición por bandas.
-
-**Medición de los 37 turnos con el módulo real** (esbuild sobre el TS,
-solo lectura). Tres cosas: (1) el "al límite" del ~10 % es inherente
-(piezas a ±100 g del corte, el rango 8-10 mide 916 g): pasó a tono neutro
-con la explicación "normal cerca del corte". (2) **9 turnos de agosto
-(13-08 → 18-08) tienen `gatesUsed` del borrador del wizard en 8 a 10
-puertas** y 0 snapshots: su "fuera por peso" daba 34–50 % porque juzgaba
-contra el rango equivocado. Fix: las puertas con seteo distinto no se juzgan
-por peso (ni baldosa ni conteo del resumen) y la tarjeta ofrece **"Adoptar
-seteo de la máquina en N puertas"** de una vez (`onAdoptarSeteoTodas`,
-mismo `adoptarSeteoMaquina`). Probado en el turno de HOY en prod: G4 → 8-10
-Industrial y G10 → 10-12 Premium, todas al 100 %, resumen "1 con calibre no
-reconocido · 2 con peso fuera de rango", coinciden 5.347/5.385 (99,3 %).
-Los 9 de agosto quedan a un toque cada uno (Orel decide si adoptar).
-(3) 23 turnos (febrero + 31-07) tienen `gatesUsed` vacío: la tarjeta muestra
-"sin asignación" en todas; inferir el seteo desde la etiqueta dominante es
-posible pero son de la temporada pasada — no se hizo.
-
-Regla que dejó la ronda: **la observación (piezas, peso) se guarda una vez;
-todo juicio (pureza, seteo, peso fuera) se deriva con la config vigente**,
-así corregir un seteo corrige el pasado sin releer nada. 2 tests nuevos
-(784 del módulo).
-
-## 2026-09-07 · Ronda de pulido 2 · mezcla FÍSICA por peso + backfill de 37 turnos (PR #914)
-
-**Peso en la observación.** `computeGateObservations` guarda ahora, por
-puerta y bloque, un histograma de peso en bins de 250 g (`weightByBucket`,
-clave = límite inferior en gramos), sin depender de ningún rango.
-`derivePesoPorPuerta(obs, timeline, ranges)` lo juzga contra el rango del
-calibre ASIGNADO en cada bloque, con los rangos vigentes de la app (override
-del turno → `customWeightRanges` de la línea → constantes): dentro / al
-límite (bin que cruza un borde: no se puede decir de qué lado cae) / fuera
-más pesado / fuera más liviano, con los kilos observados. La tarjeta lo
-muestra como "N % fuera por peso" en la baldosa (desde 5 %), en el resumen y
-en la ficha ("Por peso · rango 8-10 lb (3,7 a 4,6 kg)"), con la pregunta
-honesta: o el rango del Z2 es más ancho que el de la app, o es mezcla real.
-Con el turno de HOY (datos reales): G9 71,4 % dentro · 22,1 % al límite ·
-6,5 % fuera (4,8–5,0 kg). Trampa: el bin de 250 g es grueso en el borde
-(4.500–4.750 cruza el 4.581 del 8-10): ese 22 % "al límite" es la resolución,
-no la máquina. Bins de 100 g costarían ~2,5× el doc; decidir con Orel.
-
-**Etiqueta Other dominante = calibre no reconocido.** Hoy G12 (seteo
-10-12 lb) recibe 38 pz de 5,5 kg etiquetadas "Other" (12+ lb / fuera de
-rango): salía como "mezclada". Ahora `seteoDistinto` la marca
-`noReconocido` → baldosa y ficha "calibre no reconocido", sin botón de
-adoptar, y el peso sí se juzga.
-
-**Backfill.** Con OK de Orel, `meta/gateMix` se escribió en los **37 turnos
-con piezas guardadas** (febrero + agosto + septiembre; 21 turnos de febrero
-con `hasPieceData` no tienen `pieceRecords` y se saltaron), 395 KB en total
-(2,4–14,8 KB por turno). El script compila el módulo TS real con esbuild
-(`node_modules/.pnpm/esbuild@0.25.12`) en vez de portarlo a JS; vive en el
-scratchpad de la sesión (`backfill-gatemix.js`) y se corre copiado a
-`scripts/_x.tmp.js` desde la raíz del repo principal (clave del Admin SDK).
-Verificado en el preview con sesión sobre el turno de hoy: 2 puertas con
-seteo ≠ máquina (G4, G10), 1 con calibre no reconocido (G12), 4 con peso
-fuera de rango. 5 tests nuevos (783 del módulo).
-
-## 2026-09-07 · Ronda de pulido 1 · pureza por puerta: "seteo ≠ máquina" no es mezcla (PR #913)
-
-Medido sobre las PIEZAS REALES de Firestore (Admin SDK, solo lectura), no
-sobre fixtures. Dos turnos: 2026-08-11 Turno 2 (13.366 pz, turno completo) y
-2026-09-07 Turno 1 Lunes (5.576 pz, cargado a mitad de turno a las 02:37).
-
-**Hallazgo 1 (miente al usuario).** La columna Calibre/Calidad del Excel es
-la DECISIÓN de la máquina: por construcción coincide con lo que la máquina
-tiene seteado. El 11-ago la pureza da 100 % en las 12 puertas; el 07-09 da
-**0 % en 5 de 11 puertas** (G3, G4, G5, G7 por calibre; G2, G6, G9, G10, G12
-por calidad) porque el seteo de la app (borrador del wizard, pre-#909) no
-coincide con la máquina: no hay pescado mezclado, hay un seteo desactualizado,
-y la tarjeta las llamaría "mezcladas". Fix: `deriveGateMix` detecta por
-puerta la combinación dominante de la etiqueta (≥ 90 % de las piezas
-juzgadas) distinta a la asignada → `seteoDistinto`; la tarjeta la muestra
-como "seteo ≠ máquina" (tinta info, no roja), no la cuenta como mezclada, y
-ofrece **"Adoptar seteo de la máquina"** (supervisor/admin): corrige el
-snapshot INICIAL en su lugar si no hubo cambios a mano (`adoptarSeteoMaquina`)
-o agrega uno nuevo si los hubo, y actualiza `gatesUsed`. En causales, la
-combinación dominante sale como `seteo_distinto` con a qué gate iba según la
-app. La etiqueta "Other" del Excel (12+ lb / fuera de rango) ya no es un
-"calibre lejano": es `calibre_no_reconocido` (hoy G12: 38 pz "Other" de
-5,5 kg con seteo 10-12 lb).
-
-**Hallazgo 2 (para la ronda 2).** La mezcla FÍSICA se mide por PESO contra
-el rango del gate, no por la etiqueta: hoy G8 y G9 tienen **10,2 % y 15,6 %**
-de piezas de 4,6–4,9 kg etiquetadas 8-10 lb, sobre el techo 8-10 de la app
-(4.581 g). O el rango 8-10 del Z2 llega más arriba que el de la app, o es
-mezcla real: hay que preguntarle a Orel y medirlo con histograma de peso por
-bloque (bins de 250 g, sin depender de la config) en la observación.
-
-**Hallazgo 3.** Ningún turno histórico tiene `meta/gateMix` (13 turnos con
-piezas desde agosto): la tarjeta queda escondida tras "recargá el Excel".
-Backfill por script (piezas ya guardadas) pendiente de OK de Orel: es
-escritura en prod.
-
-4 tests nuevos (778 del módulo); banco a 375 px en claro y oscuro.
-
-## 2026-09-07 · Causas de P0 con la config vigente a la hora de cada pieza (PR #912)
-
-Cierra el hueco 2 del análisis «¿reacciona el sistema a lo seteado en los
-gates?»: el recálculo de causas de Puerta 0 usaba UNA config (el último
-snapshot) para todo el turno, así que un cambio de gate a las 10:18
-reclasificaba la mañana como si la config nueva hubiera regido desde las
-07:15. Ahora `classifyGate0Records` acepta una `ConfigTimeline` (la misma de
-gateMix v2) y juzga cada pieza con la config vigente a SU hora; con un array
-sigue funcionando como antes (mismo camino para ambos). `recomputeShiftP0Causes`
-recibe la línea de tiempo y, aparte, la config VIGENTE para dejarla en
-`gatesUsed` (así `detectConfigDrift` cierra el desfase y no entra en loop).
-El wizard lee TODOS los snapshots del turno (`listSnapshots`, misma lectura
-que antes) y pasa `configAt` a `computeShiftSummary`, que clasifica cada
-pieza P0 con la config de su hora al guardar. La clave anti-reintento del
-recálculo automático incluye los ids de snapshots: un cambio registrado
-hacia atrás también dispara el recálculo.
-
-Límite conocido: `detectConfigDrift` compara la config vigente contra
-`gatesUsed` con una sola config; un snapshot insertado hacia atrás con la
-misma config vigente no marca desfase (sí recalcula si el desfase ya estaba).
-2 tests nuevos (774 del módulo).
-
-## 2026-09-07 · «¿Por qué cayó acá?»: causales por puerta con el seteo de las gates (PR #911)
-
-Objetivo de Orel: cargar el Excel en cualquier momento del turno y ver al
-toque, por puerta, qué cayó que no debía, por qué causal y cuándo. Sobre
-gateMix v2 (#910), `classifyGateCauses` agrupa lo que no coincide usando la
-config vigente en cada bloque: **calibre vecino** (un rango de distancia →
-peso al límite: rangos o balanza), **calibre lejano** (dos o más → si debía ir
-a una gate ANTERIOR, "vino de más atrás: G2 no la tomó, puerta no abrió o
-saturada"; si a una POSTERIOR, "cayó antes de llegar: disparo anticipado o
-rango del Z2 distinto al seteo"), **calidad distinta** (venía marcada así en
-el ingreso), **conservación distinta** (solo si la gate la tiene asignada; la
-conservación entra a la clave de observación solo cuando el Excel la trae, así
-las claves viejas no cambian), **sin dato** y **otros**. Cada causal dice a qué
-gate(s) debía ir según el seteo y en qué bloques se concentra (o si es pareja
-todo el turno). En la ficha de la puerta: lista de causales, gráfico apilado
-por bloque (coincide + cada causal, colores por tema) y "piezas hasta las
-HH:MM" en el encabezado para leer una carga a mitad de turno. El resumen que
-se copia o va a la incidencia incluye las 3 causales principales.
-
-Prioridad de causal cuando falla más de una cosa: calibre manda sobre calidad
-y esta sobre conservación (una pieza 6-8 Grado en una gate 4-6 Premium cuenta
-como calibre). De paso, `GateEvolutionChart` ancla las marcas de cambio de
-config al minuto de pared correcto (`realIsoToWallClockMs`): caían 3–4 h
-corridas. 4 tests nuevos (772 del módulo); verificado en el banco a 375 px en
-claro y oscuro.
-
-## 2026-09-07 · gateMix v2: guardar lo observado por bloque y derivar la pureza con la config de cada hora (PR #910)
-
-Cierra los huecos 2 y 3 del análisis anterior para la pureza por puerta. v1
-(#906) guardaba el JUICIO (pureza calculada con una config al guardar el
-Excel): cambiar una gate lo dejaba viejo. v2 guarda la OBSERVACIÓN: por puerta
-y bloque de 30 min, cuántas piezas cayeron de cada `calibre|calidad`
-(`computeGateObservations`), en `meta/gateMix` del turno (~12 KB medidos, por
-eso NO en el doc del summary que la matriz lee por mes). La tarjeta deriva en
-pantalla (`deriveGateMix`) juzgando cada bloque con la config vigente en ese
-momento (`configTimelineFromSnapshots`: último snapshot ≤ inicio del bloque;
-antes del primero rige `gatesUsed`). Cambiar una gate no escribe nada y se
-refleja al instante, también hacia atrás. Topes: 40 bloques y 8 combinaciones
-por bloque (resto en `Otros`). El bloque que contiene un cambio se marca en
-la franja y no cuenta para "cae desde". Ejemplo medido y decisiones:
-https://claude.ai/code/artifact/6ce46b2e-b52f-420a-8785-5d30941437a0
-
-Gotcha cerrado: los snapshots guardan hora REAL UTC y las piezas hora de
-pared marcada como Z → `realIsoToWallClockMs` convierte con
-`America/Santiago` (Intl) antes de comparar. ⚠ `GateEvolutionChart` sigue
-poniendo `snap.at` crudo en el eje wall-clock de sus markLines (queda
-desplazado 3–4 h): fuera de alcance, pendiente. v1 se sigue escribiendo como
-fallback para turnos sin `meta/gateMix`. 11 tests nuevos, 768 del módulo.
-
-## 2026-09-07 · ¿El sistema reacciona a lo seteado en los gates? Hueco 1: el wizard clasificaba con su borrador (PR #909)
-
-Pregunta de Orel tras ver el panel de pureza. Respuesta verificada en código:
-**a medias**. Las causas de P0 sí se clasifican con las gates y el detalle del
-turno recalcula solo cuando el último snapshot difiere de `gatesUsed` (con
-input P0 guardado). Pero (1) el wizard clasificaba con SU borrador (default +
-localStorage/autosave), sin mirar los snapshots del turno ni la config por
-línea; (2) el recálculo usa una sola config para todo el turno (la versión por
-hora, `getGatesAtTs`, vive en el reclasificador FASE 26 y nadie la llama);
-(3) `gateMix` se calcula una vez al guardar y el recálculo no lo toca.
-
-Este PR cierra el (1): al guardar, para cada turno se lee su último snapshot
-(`getLatestSnapshot`) y esa config alimenta `computeShiftSummary` (causas P0 +
-gateMix). Si el turno no tenía snapshot, las gates del wizard se registran
-como snapshot inicial ("Config inicial al cargar el Excel"), así el detalle
-muestra la config vigente y no hay desfase contra nada. Solo en plantas que
-clasifican. Sin verificación end-to-end (exige subir un Excel real); tsc y
-eslint limpios. Siguiente: persistir en `gateMix` lo observado por bloque
-(puerta × calibre × calidad) y derivar la pureza con la config vigente a cada
-hora, lo que cierra (2) y (3) para la pureza sin releer piezas.
-
-También hoy: PR #908 — chips y líneas seleccionadas en "Evolución de gates"
-(relleno sólido del color del gate, nombre al final de la línea, cromo por
-tema).
-
-## 2026-09-06 · Fix: el listener de permisos ya no queda muerto tras un permission-denied (PR #903)
-
-Segunda mitad del caso del 05-09: `subscribeToUserPermissions` (onSnapshot
-sobre `users/{uid}`) caía a permisos por defecto en el primer error y NO se
-re-suscribía, así que un token vencido en pestaña dormida dejaba al usuario
-con menos módulos hasta recargar. Ahora, ante `permission-denied` con el
-mismo uid en `auth.currentUser`, refresca con `getIdToken(true)` y
-re-suscribe UNA vez; el `Unsubscribe` devuelto corta la suscripción activa
-(sea la primera o la re-suscrita) y una cancelación durante el refresco
-evita re-suscribir. Otro error, un segundo rechazo, o un uid distinto caen al
-fallback como antes. 6 tests nuevos cubren los seis caminos; tsc/eslint
-limpios, suite de servicios en verde. Mismo patrón que PR #902.
-
-## 2026-09-05 · Fix: "Error de autenticación: permission-denied" al entrar (PR #902)
-
-`mantencion.plantach@aquachile.com` autenticaba bien y la app rechazaba la
-lectura de su perfil `users/{uid}`. Diagnóstico contra producción, en orden
-barato→caro: cuenta activa y sin revocación; reglas vivas idénticas al repo
-(`securityRules().getFirestoreRuleset()` + `diff --strip-trailing-cr`); la
-regla probada con la identidad exacta vía `firebaserules :test` → PERMITE;
-`errorLogs` filtrado por `timestamp` mostró la firma: la pestaña del login y
-la TV del monitor (`?pantalla=1`) del mismo PC (Edge 152) fallaron el MISMO
-segundo a las 16:10 → token compartido vencido en pestañas dormidas; el login
-fresco de las 17:11 reutilizó la conexión Firestore con la credencial vieja.
-Gotchas: el `createTime` del servidor vs el `timestamp` del cliente delata
-pestañas congeladas (desfase de 36 s a 53 min); un token SIN claim `firebase`
-hace que `isNotAnonymous()` falle con error, no con false. Fix:
-`getUserByIdConTokenFresco` reintenta UNA vez con `getIdToken(true)` en los
-tres caminos post-auth (signIn, Google, listener de App.tsx). 5 tests nuevos,
-1559 tests de servicios en verde. Remedio inmediato en el PC: cerrar TODAS
-las pestañas de la app (incluida la TV) y volver a entrar. Pendiente aparte:
-`subscribeToUserPermissions` sigue quedando muerto tras un permission-denied.
-
-## 2026-09-02 · Fix: dos crons muriendo por OOM sin que nadie lo viera (PR #900)
-
-Auditoría de los 11 jobs de Cloud Scheduler (docs/COSTOS_GCP.md, sin huérfanos):
-`shoplogixTokenRefresh` no arrancaba (bundle 133MiB > límite 128MiB) — el
-refresh del token ROPC nunca corrió, parte del "ROPC en backoff" permanente;
-subido a 256MiB. `purgeSensorReadings` moría por OOM a 256MiB porque carga
-TODO `sensors/` de RTDB con `once('value')` — al fallar, el árbol crece a
-diario y agrava el OOM (espiral); subido a 512MiB para destrabar, con la
-deuda de refactorizar a recorrido por equipo anotada en COSTOS_GCP.md.
-Evidencia: logs de Cloud Run del 01-09 ("Memory limit ... exceeded"). CI
-"build" verde, mergeado (squash --admin) a `7fea9678`, deploy automático de
-Functions y PWA confirmados OK. Pendiente: verificar en terreno que ambas
-funciones dejan de reportar OOM tras el próximo ciclo (purga corre 03:00).
-
-⚠️ **Este archivo sigue subiendo (~184 KB)** — compactar el historial viejo
-en la próxima sesión que toque el WORKLOG.
-
-## 2026-09-02 · Fix: sync y pulso pagaban vCPU completa por esperar red (PR #898)
-
-Tercera pata de la fuga de costos de agosto (tras #895 lecturas y #896 jitter).
-Cloud Run factura vCPU **asignada** × tiempo de instancia, no CPU usada:
-`shoplogixSyncWakeup` (cada 5 min, 24/7) y `shoplogixPulseWakeup` (cada 1 min
-en turno) son ~95% espera de red y pagaban 4× por esperar con la vCPU completa
-por defecto. Se fijó `cpu: 0.25` + `concurrency: 1` (obligatorio con cpu<1) en
-ambas. El cómputo real tolera ir más lento con margen enorme (sync: ciclos
-~60-90 s vs timeout 420 s). Verificado: `node --check` limpio, CI "build"
-verde, mergeado a `31742685...`, deploy automático de Functions y PWA
-confirmados OK (`gh run list`). Ahorro estimado ~CLP 3-4.000/mes. Pendiente:
-confirmar en Cloud Billing la baja en el próximo ciclo.
-
-⚠️ **Este archivo sigue subiendo (~183 KB)** — compactar el historial viejo
-en la próxima sesión que toque el WORKLOG (ver nota del 2026-08-18 abajo).
-
-## 2026-09-02 · Fix: el sleep del jitter de sync era CPU facturado 24/7 (PR #896)
-
-Segunda pata de la fuga de costos de agosto (la primera se cerró en #895): el
-jitter anti-bot inicial de `shoplogixSyncWakeup` dormía 0-120 s DENTRO de la
-función, cada 5 min, 24/7 — y Cloud Run cobra el CPU también mientras la
-función duerme, ~4,8 h de CPU/día pagadas por un `setTimeout` (~CLP 9.000/mes).
-Se bajó a 0-20 s (0-10 s con re-sync de días extra); la variación contra los
-boundaries `:00`/`:05` del scheduler se conserva y el espaciado anti-bot real
-entre requests (`pauseBetweenMachines`, 1,5-3,5 s) no se tocó. Verificado:
-`node --check` limpio, sin cambios de lógica de datos, CI "build" verde,
-mergeado a `aef322e3`, deploy automático de Functions y PWA confirmados OK
-(`gh run list`). Pendiente: confirmar en Cloud Billing la baja de CPU en el
-próximo ciclo.
-
-⚠️ **Este archivo sigue sobre ~180 KB** — compactar el historial viejo cuando
-se retome el WORKLOG (ver nota del 2026-08-18 más abajo).
-
-## 2026-09-01 · Fix: monitor público barría la colección de turnos en cada refresco (PR #895)
-
-Factura GCP de agosto: **CLP 71.013** (5x lo normal), 64% eran 114M lecturas
-Firestore del backend del monitor público (7 `listDocuments()` de la colección
-completa de turnos × hasta 12 `buildMonitorLive` por patch × ~2 patches/min).
-Firestore reads Santiago CLP 45.247, Cloud Run CPU CLP 20.593.
-
-Fix: (1) `loadShiftIndex()` lee la lista de turnos UNA vez por evento con
-query acotada a 45 días por rango de `documentId`; (2) debounce del trigger
-con `parentSinCambioReal`; (3) el pulso de 1 min sale temprano si todos los
-monitores tienen `live.shiftClosed`; (4) turnos descartados por piso de
-piezas quedan anotados y no se reconstruyen más; (5) `docs/COSTOS_GCP.md`
-con causa y protocolo de vigilancia. Verificado: 447/449 tests locales
-(2 fallas preexistentes en main, sensibles a fecha), CI "build" verde,
-mergeado a `fbeddd2e`. Deploy automático de Functions y PWA confirmados OK.
-Pendiente: confirmar en Cloud Billing que las lecturas bajan en el próximo
-ciclo de facturación.
-
-⚠️ **Este archivo pasó de ~150 KB** (181 KB al momento de esta entrada) —
-conviene compactar el historial viejo como se hizo el 2026-08-18.
-
-## 2026-08-26 · Fix: `pnpm-lock.yaml` llevaba semanas desincronizado y nada lo delataba (PR #823)
-
-El PR #643 agregó `jspdf`/`jspdf-autotable` a `functions/package.json` y
-regeneró `functions/package-lock.json` (el que usa el deploy), pero **no** el
-`pnpm-lock.yaml` de la raíz — y `functions` es parte del workspace pnpm.
-`pnpm install --frozen-lockfile` moría con `ERR_PNPM_OUTDATED_LOCKFILE`.
-
-✅ **No hubo bug en producción**, y conviene decirlo porque la primera lectura
-asusta: `deploy-functions.yml` instala con `npm ci` desde el package-lock de
-`functions/`, que sí tenía las dos dependencias. `turnoDefensaPdf.js` nunca
-estuvo roto. Esto era higiene de reproducibilidad.
-
-🔑 **Por qué el CI nunca lo vio: `--frozen-lockfile` es el DEFAULT de pnpm en
-CI, y los tres workflows que usan pnpm lo desactivan explícito** (`deploy.yml`,
-`deploy-miniapps.yml`, `daily-sync.yml`; puesto en 2025-12 por otro motivo,
-mucho antes de este desfase). O sea: la protección existía por defecto y se
-había apagado a mano, así que el lock dejó de cumplir su función sin que nada
-se pusiera rojo. **Un guardarraíl desactivado no avisa que está desactivado.**
-
-📌 **Regenerar un lock con OTRA versión de pnpm reescribe el archivo entero.**
-Se usó la que fija `packageManager` (10.33.0) y `--lockfile-only`: 15 líneas
-añadidas, 0 eliminadas, ninguna versión existente alterada.
-
-Verificación con la prueba que importa (que el fix pueda distinguirse de no
-hacer nada): `--frozen-lockfile` **falla** en main y **pasa** con el cambio —
-comprobado también sobre `origin/main` ya mergeado. Además: install real OK,
-`require('jspdf')` + `require('jspdf-autotable')` + `shoplogix/turnoDefensaPdf.js`
-cargan desde `functions/`, y build de la PWA OK.
-
-⚠️ **Pendiente propuesto, NO hecho** (cambia el comportamiento de los deploys,
-es decisión de Orel): con el lock ya sincronizado, los tres
-`--no-frozen-lockfile` podrían volver a estrictos para que el CI detecte el
-próximo desfase en vez de tragárselo.
-
-## 2026-08-26 · Fix: la tinta de marca `--brand-ink` reprobaba AA en oscuro Y en claro (PR #820)
-
-El bloque `.dark` de la piel ACTUAL nunca redefinió `--brand-ink` y heredaba
-el valor claro de `:root` (#2a6aa6): **2,75:1** sobre el card oscuro (#16242f)
-y **2,40:1** sobre el tinte de Pill (`bg-primary/[0.15]`). Afectaba los 31 usos
-de `text-brand-ink` — chip «hoy» del monitor público, links «ver ›» del
-monitor, Pill `info`, admin del Centro de Aprendizaje. Corregido a **#71ade1**
-(el mismo valor que ya usaba la piel Apple oscura): 6,60:1 y 5,66:1.
-
-🔑 **El hallazgo real vino de instrumentar el check, no del bug reportado.** Al
-agregar el par a `check-contrast.mjs` apareció que el valor CLARO tampoco
-pasaba: el #2a6aa6 se había derivado contra el card BLANCO de la piel Apple,
-pero en la piel actual el card es azulado (#e9f0f8) y el tinte puede apoyarse
-en el fondo de la app (#d7e5f2), que es más oscuro → **3,71:1 en el peor caso**.
-Es exactamente la lección ya pagada con las tintas categóricas: *el peor fondo
-no es la tarjeta, es el fondo de la app*. Ahora `:root` usa el **primary-700
-(#245a8c)**, que ya existía en el sistema: 4,72:1 en el peor caso y 6,27:1
-sobre card. La piel Apple clara hereda el valor y su par sube de 4,50 a 5,91:1.
-
-📌 **Un token heredado entre pieles necesita un par por PIEL, no uno global.**
-`--brand-ink` se definió pensando en un solo fondo; sirve a dos pieles × dos
-temas = 4 fondos distintos. Los 4 pares quedaron vigilados en
-`scripts/check-contrast.mjs` (98 pares en total, única falla la pre-existente
-conocida `border/background` oscuro).
-
-Verificación: `tsc` limpio · `eslint --max-warnings 30` → 0 errores / 28
-warnings · `audit-piel` OK (baseline −1, ya venía de main) · en preview, valor
-COMPUTADO de `--brand-ink` en las 4 combinaciones tema×piel y color RENDERIZADO
-de la Pill `info` en `/dev/piel?fixture=1` (claro `rgb(36,90,140)`, oscuro
-`rgb(113,173,225)`). Sin screenshot: el panel de browser no componía frames en
-esta sesión — la evidencia es por valores computados sobre elementos reales.
-
-⚠️ **Fuera de alcance, detectado al levantar el worktree**: `pnpm install` en un
-árbol limpio modifica `pnpm-lock.yaml` (agrega `jspdf`/`jspdf-autotable` a un
-importer). Hay un `package.json` en main cuyo lockfile quedó desactualizado.
-No se tocó en este PR.
-
-## 2026-08-23 · Feat: plano de partes BAADER 142 (254 figuras) + puente eléctrico→pieza (PR #699)
-
-Noveno plano del Centro de Aprendizaje: catálogo de piezas de fábrica
-1420000821 ed. 2006 (254 figuras, 3.664 filas) navegable en modo
-`despiece` (assets en Firebase Storage, `planos/baader-142-despiece/`),
-con ficha de pieza y puente bidireccional B14↔pieza física en los planos
-eléctricos 888/860 (`partes.json` nuevo + bloque "Pieza física" +
-telemetría `planoUsos`). Verificado: tsc/eslint limpios, 8/8 checks de
-navegador, auditoría de datos OK (254 hojas, 2.527 posiciones ancladas,
-14 sensores B mapeados en 888 y 860, assets HTTP 200 en Storage).
-**Pendiente:** el OCR fino por teselas sigue corriendo — al terminar se
-re-suben los JSON de hojas con más anclas y se bumpea `vAssets`
-(micro-PR data-only, sin código).
-
-⚠️ Este archivo pasa los 173 KB — compactar en la próxima sesión que lo toque.
-
-## 2026-08-18 · Feat: botón «actualizar ahora» + cronómetro de la próxima lectura del pulso (PR #641)
-
-Pedido de Orel para no depender solo del ciclo automático: se agregó el
-endpoint HTTP `publicMonitorRefrescar` (lee el contador vivo, 1 request
-~1 s — no dispara el sync completo del día) y en el monitor público el
-bloque del pulso ahora muestra cuántas piezas marca Shoplogix, a qué hora
-las leyó, cuánto falta para la próxima lectura útil (2 min, no 1) y el
-botón. Throttle de 20 s es del servidor (no del navegador); si el pulso
-ya es fresco responde 200 con `yaFresco: true`. Se eliminó la duplicación
-del sync que repetía el mismo dato viejo cada 5 min. Merge commit
-`82325f92` en main (squash, PR #641). Deploy de Cloud Functions en
-success — log confirma `functions[publicMonitorRefrescar(us-central1)]
-Successful create operation` y `Deploy complete!` sin errores. Deploy PWA
-en success, `version.json` sirve `buildSha: 82325f9` (coincide con el
-merge commit). 1522 tests verdes antes del merge.
-**Pendiente de verificación humana:** el endpoint y el bloque con
-acumulado > 0 en producción con un turno vivo (el turno de la noche había
-cerrado a las 05:00 mientras se construía esto).
-
-⚠️ Este archivo pasa los 172 KB — compactar en la próxima sesión que lo toque.
-
-## 2026-08-18 · Fix: el ritmo del pulso se mide sobre la ventana, no entre lecturas consecutivas (PR #639)
-
-Las primeras lecturas reales en producción destaparon que el contador de
-Shoplogix se refresca cada 2 minutos aunque se pregunte cada 1: el ritmo
-calculado entre lecturas consecutivas alternaba 23, 0, 19, 0 pz/min — el
-0 no era la línea parada, era el número sin cambiar todavía. Se cambió el
-cálculo a ventana de las últimas 5 lecturas (piezas ganadas entre la más
-vieja y la más nueva / minutos entre ellas); con esa misma serie da 10,5
-pz/min real. 11 tests en verde, incluido uno con la serie exacta de
-producción para que no se vuelva a romper. Merge commit `f69ca42c` en
-main (squash, PR #639). Deploy de Cloud Functions en success. Verificado
-en logs (`functions:log --only shoplogixPulseWakeup`): `[pulse][filete]
-N pz` corriendo cada minuto sin error nuevo; el único error en logs sigue
-siendo el ROPC de `yal` en backoff (conocido, ajeno a este cambio).
-
-⚠️ Este archivo pasó los 170 KB — corresponde compactar de nuevo pronto.
-
-## 2026-08-18 · Fix: `shoplogixPulseWakeup` reventaba en cada corrida por `admin.firestore()` sin definir (PR #637)
-
-El scheduler del pulso (PR #635) desplegó con éxito pero fallaba una vez por
-minuto con `Error: admin is not defined`: `functions/index.js` importa
-`firebase-admin/firestore` por piezas (`getFirestore`, `FieldValue`,
-`FieldPath`) y no tiene `admin` en scope, y la función nueva llamaba
-`admin.firestore()`. Síntoma único: el campo `pulse` nunca aparecía en el
-monitor. Lección: «deploy con éxito» no significa que la función corra —
-hay que mirar los logs de la primera ejecución. Se agregaron 2 tests que
-verifican que las piezas de scope existen y que `leerPulso` devuelve
-`null` sin reventar si Shoplogix falla (9 tests del pulso en verde).
-Merge commit `e9ede075` en main (squash). Deploy de Cloud Functions en
-success. Verificado en logs (`functions:log --only shoplogixPulseWakeup`):
-`[pulse][filete] N pz` en cada corrida, sin ningún `admin is not defined`.
-Nota aparte, no corregida acá: hay un error de auth ROPC en backoff para
-`yal` en los mismos logs (ya conocido, fuera de alcance de este fix).
-
-## 2026-08-18 · Monitor: la marca de la regla es la velocidad que exige la meta, y el pulso lee el contador vivo cada minuto (PR #635)
-
-Dos cambios. (1) La marca de la regla de ritmo deja de ser el set point y
-pasa a ser el ritmo requerido para cumplir la meta del turno, convertido a
-base «andando» con el uptime real (14,2 pz/min de reloj con 82 % de uptime
-= 17,4 andando); con menos de 15 min producidos no se extrapola. Verificado
-con turno real: relleno 40 % vs marca 96,5 %, estado pasó de «va lento» a
-«muy por debajo». (2) Nuevo scheduler `shoplogixPulseWakeup` (cada 1 min)
-que lee el acumulado instantáneo de Shoplogix (mismo endpoint del
-whiteboard) sin tocar los buckets de 5 min ni el sync completo; con dos
-lecturas seguidas publica el ritmo instantáneo. No reemplaza al sync (los
-buckets siguen siendo la fuente de curva/paradas/historial); descarta
-acumulados que bajan entre lecturas (cambio de turno) y solo escribe en
-monitores vigentes no expirados. Falta la UI del pulso (cronómetro +
-refrescar) para el próximo PR. 1522 tests verdes (7 nuevos del pulso en
-backend), tsc/eslint limpios, `audit-piel.mjs` sin crecer deuda. Merge
-commit `d1c55dfe` en main (squash), deploy confirmado en GitHub Pages
-(`buildSha: d1c55df`) y deploy de Cloud Functions en success (creó
-`shoplogixPulseWakeup(us-central1)` sin error).
-
-## 2026-08-18 · Monitor: el ritmo dice en qué base está, y las tres cifras de la regla usan la misma (PR #633)
-
-Orel, mirando la tarjeta con la línea andando: «¿este ritmo es de producción
-o de reloj? pongamos cuál es para no confundir». La barra comparaba tres
-cifras con dos denominadores: el número grande (piezas de los últimos 15 min
-÷ 15 min) era **de reloj**, pero la marca del turno (`totalPieces /
-producingMin`) y el techo (set point) eran **andando** — el relleno
-subestimaba siempre porque el techo estaba en otra base, y la marca del
-turno quedaba a la derecha del relleno por construcción, no porque la línea
-fuera más lenta. Fix: el número grande pasa a ser el ritmo andando de los
-últimos 15 min (descuenta tramos parados, contados por tramo igual que la
-curva) y lleva su base escrita («pz/min andando»); el de reloj no se
-esconde, aparece como línea aparte cuando difiere. Test que fija la
-diferencia: con un paro en medio de la ventana, la misma serie da 12
-andando contra 8 de reloj. Con el turno noche produciendo en vivo la
-tarjeta pasó de «7,5 pz/min» a «9,6 pz/min andando», marca del turno 12,0 y
-techo 18 — todo en la misma escala. 1518 tests verdes en 106 archivos,
-tsc/eslint limpios, `audit-piel.mjs` sin crecer deuda. Merge commit
-`acc75170` en main (squash), deploy confirmado en GitHub Pages (`buildSha:
-acc7517`).
-
-## 2026-08-17 · Monitor: el nombre del turno dejó de significar lo mismo — la comparación la elige la persona (PR #628)
-
-Revierte el criterio del PR #626 de ayer mismo: filtrar el comparador por
-nombre de turno resultó exactamente al revés de lo que sirve, porque Filete
-movió su turno grande de «Turno Dia» a «Turno Noche L» (00:20–07:51, 4.398
-pz) y dejó un «Turno Dia» residual de 4 h y 604 pz el 17-ago. Filtrando por
-nombre, al turno chico se le ponía la vara del grande y al grande no le
-quedaba nada con qué compararse. Fix: se ofrecen todos los turnos como
-chips (etiquetados «vie 14 dia», «hoy noche l», mismo nombre primero) y la
-persona elige contra cuál comparar; la frase del rango declara su muestra
-(«los 5 turnos iguales anteriores fueron de…») y avisa cuando son de otro
-horario. Se conserva el filtro por nombre en banda/récords/vsAyer/Pareto,
-donde la comparación sigue siendo automática. Verificado con datos reales
-(desde el turno de día ahora se puede comparar contra el nocturno). 1514
-tests verdes (2 nuevos, caso Filete), tsc/eslint limpios, `audit-piel.mjs`
-sin crecer deuda. Merge commit `f033e738` en main (squash), deploy
-confirmado en GitHub Pages (`buildSha: f033e73`).
-
-## 2026-08-17 · Monitor: comparar mismo turno con mismo turno, ahora que Filete tiene día y noche (PR #626)
-
-Shoplogix normalizó los turnos de Filete: de «Turno Dia» único pasó a «Turno
-Dia» + «Turno Noche L» (00:20→08:00, 4.398 pz). Con eso, tres partes del
-monitor mezclaban diurno y nocturno sin avisarlo: el gráfico comparador
-tomaba los 6 turnos anteriores por fecha sin mirar el nombre (filtro en la
-página, no en `buildDayComparison`, porque Yal compara sus 3 turnos del
-mismo día a propósito); la etiqueta solo distinguía turno cuando compartían
-`dateKey` (el nocturno tiene su propio día y no se notaba); el techo de
-ritmo salía de `forecastHistory` sin filtrar (que además el backend publica
-solo para el turno vigente); y la banda de «rango normal» sumaba
-`shiftStats` como tercera fuente porque es la única que trae todos los
-nombres (si no, el turno no vigente se quedaba con <5 muestras y la banda
-desaparecía). Verificado con datos reales: el comparador del diurno lista
-solo diurnos (vie 14 a lun 10), el nocturno del 17 ya no se cuela. 1512
-tests verdes (1 nuevo, caso Filete), tsc/eslint limpios, `audit-piel.mjs`
-sin crecer deuda. Merge commit `bfccc182` en main (squash), deploy
-confirmado en GitHub Pages (`buildSha: bfccc18`).
-
-## 2026-08-17 · Monitor: una sola regla de ritmo en vez de seis cifras sueltas (PR #624)
-
-Convivían 6 cifras de ritmo (acumulado del turno, de reloj, pz/h, últimos
-30 min, «N pz/min ahora» dentro del gráfico, media de 15) sin jerarquía, y a
-veces discrepaban entre sí (tarjeta 4,6 vs gráfico 2,1 en el mismo instante).
-El bug era de parentesco: la media móvil se calculaba dentro del componente
-del gráfico. Fix: nuevo `monitorRitmo.ts` como única fuente de la media
-móvil; una sola tarjeta con el ritmo de ahora como protagonista, mostrado
-como regla (relleno = ritmo, marca = promedio del turno, borde = techo de la
-máquina) en vez de aritmética mental; estado también en palabra («va
-lento»/«a ritmo»/«casi parada»), no solo color. Salieron de pantalla: tarjeta
-«Últimos N min», delta «▼ por debajo del ritmo del turno» (ahora es la
-distancia visual en la regla), el «N pz/min ahora» duplicado del gráfico, y
-el pz/h de reloj (sigue en hora-por-hora y exportaciones). Verificado con
-turno real: de 6 cifras a 1; 1511 tests verdes (12 nuevos), tsc/eslint
-limpios, `audit-piel.mjs` sin crecer deuda. Revisado a 375 px en ambos temas.
-Merge commit `73ed94d0` en main (squash), deploy confirmado en GitHub Pages
-(`buildSha: 73ed94d`).
-
-⚠️ Este archivo pasó los ~150 KB de referencia (216 KB) — conviene
-compactar entradas viejas en la próxima sesión de mantenimiento.
-
-## 2026-08-17 · Monitor: ejes legibles, sin doble estado en turno cerrado, ritmo con periodo claro (PR #622)
-
-Los ejes de los dos gráficos y del detalle de paradas estaban a 9 px, bajo el
-piso de 11 de la Constitución (§9/§64): subidos los 7 usos, verificado sin
-solapes entre etiquetas del eje X. Con el turno cerrado la cabecera mostraba
-la píldora de estado en vivo junto a «Turno cerrado» (dos estados a la vez, y
-a 375 px empujaba la fecha a una tercera línea); la píldora ahora solo
-aparece con el turno en curso. El «ritmo andando» (`totalPieces /
-producingMin`, promedio acumulado de todo el turno) decía «cuando la línea
-produce», que se lee como velocidad actual y contradecía al gráfico de abajo
-(caso real: número 12,37→12,33→12,16 mientras el gráfico iba de 0 a 17
-pz/min); ahora dice «promedio del turno, cuando produce». 1499 tests verdes,
-tsc limpio, `audit-piel.mjs` sin crecer la deuda. Merge commit `ad53ad3c` en
-main (squash), deploy en verificación en GitHub Pages.
-
-## 2026-08-17 · Monitor: 44 px de área táctil y el chip activo legible (PR #620)
-
-Auditoría del monitor público con Filete en vivo a 375 px: 19 de 19 controles
-bajo 44 px (cabeceras plegables 17 px, chips de comparación 21, «agrandar»/
-«Cambiar» 20, flechas Anterior/Siguiente 30, botón de tema 26×26), y el chip
-SELECCIONADO era el texto menos legible de la pantalla (2,81:1 oscuro / 3,81:1
-claro vs 8,1:1 de los no seleccionados) por `text-brand-ink` sobre
-`bg-primary/[0.13]`, mismo azul en texto y fondo. Fix: nueva utilidad `.tap-44`
-en `index.css` (`::after` transparente 44×44 fuera de layout, no engorda el
-control) aplicada a los 20 controles; `text-brand-ink` → `text-foreground` en
-los 7 lugares con el patrón del chip activo. Verificado: 0 controles bajo
-44 px, contraste 2,81→10,64 (oscuro) y 3,81→13,64 (claro), sin robo de clic
-entre chips (`elementFromPoint`), sin scroll horizontal a 375 px. 1499 tests
-verdes, tsc/eslint limpios. Merge commit `5575b838` en main, deploy confirmado
-en GitHub Pages (`buildSha: 5575b83`).
-
-## 2026-08-17 · Monitor: sin hora de cierre no se inventa una cuota (PR #618)
-
-Auditoría visual con Filete en vivo: a las 02:45 (turno produciendo hacía
-2h21) la pantalla decía «Van 1.829 de las 5.000 que tocaban a las 02:45» y
-titulaba «−3.171 vs cuota», imputando deuda por tiempo que aún no había
-pasado. Dos causas: `ventanaTurnoMin` caía a `windowMin` (minutos
-transcurridos, no duración del turno) cuando faltaba `plannedEnd`; y el
-cierre estimado del PR #616 se restaba contra `scheduledStart`, que en un
-turno sin definir cae 24h atrás, estirando la ventana a ~26h y diluyendo la
-cuota casi a cero. Fix: la ventana se mide desde el arranque real de
-producción hasta el cierre estimado (455 min, no 26h), y sin cierre conocido
-no se dibuja cuota (`0` en vez de fallback engañoso), igual regla que ya usa
-«para llegar a la meta». Verificado con turno real: titular pasó de
-«−3.171 vs cuota» a «2.022 pz · 494 arriba de vie 14». 1499 tests verdes,
-tsc/eslint limpios. Merge commit `3740eb21` en main, deploy confirmado en
-GitHub Pages (`buildSha: 3740eb2`).
-
-## 2026-08-17 · Monitor: el turno arranca donde arranca la producción, cierre estimado por duración (PR #616)
-
-Filete cambia el horario del turno noche de un día para otro (hoy 00:00→08:00,
-mañana 21:00→05:00) y Shoplogix aún no lo tiene definido (`Unscheduled`), así
-que un cierre aprendido «por hora» no sirve. Dos cambios: (1) el arranque del
-turno ya no es el primer pico de piezas — si tras el primer tramo con
-producción hay un hueco >60 min, el inicio es el bloque siguiente (evita que
-piezas sueltas de prueba de máquina, ej. 3 pz a las 21:45, corran el inicio
-real de 00:20 y hundan «tiempo produciendo»; las piezas siguen contando en el
-total). (2) nuevo `inferShiftEndFromDuration()` en el backend: sin cierre
-fijado/aprendido/configurado, suma la duración mediana de los turnos de la
-línea (11 turnos, 449-461 min, mediana 452) al arranque productivo — al final
-de la cascada, después de cualquier horario real. También corrige
-«Producción real desde…», que usaba `effectiveStart` del backend y no
-coincidía con la cabecera.
-
-Verificado con turno real: cabecera pasó de `21:45–02:51` a `00:20–02:51`,
-«hora por hora» quedó en 3 filas todas con producción. 1499 tests verdes en
-cliente (105 archivos, 4 casos nuevos), 2 tests nuevos en backend
-(`inferShiftEndFromDuration`); tsc/eslint limpios. `functions/publicMonitor.test.js`
-(node --test) da 35/37, los 2 fallos son preexistentes en main. Merge commit
-`5b952ed` en main, deploy confirmado en GitHub Pages (`buildSha: 5b952ed`) y
-`Deploy Firebase Functions` en success.
-
-⚠️ Pendiente: definir el turno nocturno de Filete en Shoplogix — mientras no
-exista sigue entrando como `Unscheduled`, fuera del Pareto y del historial.
-
-⚠️ Este archivo pasó los ~150 KB recomendados (ahora ~216 KB) — compactar
-entradas antiguas en la próxima sesión de mantenimiento.
-
-## 2026-08-17 · Monitor: la cabecera anuncia el arranque real del turno (PR #614)
-
-Último cabo suelto del #612: el resto de la pantalla ya contaba desde la
-primera pieza pero la cabecera seguía mostrando el horario declarado
-(`06:00–02:17` vs `21:45–02:23` en el resto). Cabecera ahora usa
-`serieDelTurno[0].t` (respaldo: declarado si aún no hay piezas), en ambos
-estados (vivo/cerrado). El declarado no se pierde: el aviso de abajo lo
-nombra junto al tiempo sin actividad no dibujado. 1495 tests verdes,
-tsc/eslint limpios. Merge commit `d09d71f` en main, deploy confirmado en
-GitHub Pages (`buildSha: d09d71f`).
-
-⚠️ Este archivo sigue sobre los ~150 KB recomendados (ahora ~214 KB) —
-compactar entradas antiguas en la próxima sesión de mantenimiento.
-
-## 2026-08-17 · Monitor: el turno empieza en la primera pieza, no en el primer tramo sincronizado (PR #612)
-
-Reemplaza el auto-zoom del PR #610 (lo causaba desalineado): `monitorHourly.ts`
-y `monitorCompare.ts` decían en comentarios «arranca en la primera pieza» pero
-tomaban el primer tramo sincronizado. Con Filete `Unscheduled` (ventana desde
-06:00) la serie arrancaba 09:45 y la primera pieza 21:45 → «hora por hora»
-mostraba 12 filas en cero y el comparador quedaba corrido 12 h (ningún día de
-referencia «llegaba a la altura» del turno). Nuevo `desdePrimeraPieza()` en
-`monitorActividad.ts` (recorta solo por delante, conserva la cola vacía),
-usado en `buildHourlyRows`, `cumulativeFromStart`, los 6 usos de
-`live.series[0].t` en `PublicShiftMonitorPage.tsx` y el rótulo de
-`MonitorShiftParts.tsx`. También corrige el bloque «¿se llega a la meta?»:
-mensaje distinto para turno `Unscheduled` (nunca cierra 2 turnos con ese
-nombre) y el botón «Fijar cierre» ya no queda inalcanzable en ese estado.
-
-Verificado con turno real de Filete de madrugada: hora por hora de 16 filas
-(12 en cero) a 5; comparador ahora compara («6 días anteriores de 2.074 a
-2.668»); 1495 tests verdes (105 archivos); tsc/eslint limpios. Merge commit
-`d2711130` en main, deploy confirmado en GitHub Pages (`buildSha: d271113`).
-
-⚠️ Este archivo sigue sobre los ~150 KB recomendados (ahora ~213 KB) —
-compactar entradas antiguas en la próxima sesión de mantenimiento.
-
-## 2026-08-17 · Monitor: los gráficos parten donde la línea arrancó, no donde dice el turno (PR #610)
-
-Filete de noche llega sin turno definido (`Unscheduled`), y la ventana
-por defecto va de 06:00 a ahora: de madrugada eso daba 16 h de eje
-para 1 h de producción. Nuevo `monitorActividad.ts` con
-`ventanaDeActividad()`: encuentra el primer/último tramo con piezas y
-lo propone como encuadre inicial de ambos gráficos (reusa la ventana
-de `useZoomGesto`, sin estado nuevo); aviso en pantalla de qué se
-recortó y por qué, solo si el recorte supera 45 min. No comprime
-huecos interiores ni esconde picos aislados.
-
-Verificado con el turno real de Filete en vivo (eje `09:20–01:20` →
-`21:35–01:30`); 1488 tests verdes (105 archivos, 10 nuevos del
-helper); tsc/eslint limpios. Merge commit `61cbbf3c` en main, deploy
-confirmado en GitHub Pages (`buildSha: 61cbbf3`).
-
-⚠️ Este archivo sigue sobre los ~150 KB recomendados (ahora ~212 KB) —
-compactar entradas antiguas en la próxima sesión de mantenimiento.
-
-## 2026-08-17 · Fix: los targets táctiles de piel/ miden 44 px de verdad, no 37 (PR #608)
-
-`min-h-11`/`h-11` no rendía 44 px: `index.css` baja el root al 87,5%
-(85% en móvil), o sea 1 rem ≈ 13,6 px, así que `2.75rem` daba 37 px.
-Salió a la luz arreglando el botón «Recargar» del banner (PR #606).
-Se pasan a píxeles literales cuatro primitivos de `components/piel/`:
-`GroupedList.tsx` (`ListCell`, 23 apariciones en 6 archivos — el de
-mayor alcance), `Button.tsx` (tamaño `md`, el default), `Disclosure.tsx`
-(variante `section`) y `TabBar.tsx`, cada uno con comentario para que
-no se revierta a `min-h-11`. Sin tocar: `Button` `sm`, `Disclosure`
-`inline` (documentados como exentos o zona gris), ni nada fuera de
-`components/piel/`.
-
-Verificado: 1478 tests verdes (104 archivos, línea base), tsc/eslint
-limpios, audit-piel sin crecer deuda; medido en navegador a 375 px
-(celdas 44 px, tabs 44,2 px, antes 37). Merge commit `9f90208b` en
-main, deploy confirmado en GitHub Pages (`buildSha: 9f90208`).
-
-⚠️ Este archivo sigue sobre los ~150 KB recomendados (~210 KB) —
-compactar entradas antiguas en la próxima sesión de mantenimiento.
-
-## 2026-08-16 · Accesos por línea en Análisis de Turno + banner sin versión (PR #606)
-
-«Grader» pasa a «Análisis de Turno» en home móvil (admin y supervisor),
-alineado con el sidebar; la tarjeta gana 3 accesos directos por línea
-(`Principal · Eviscerado`, `Principal · Filete`, `Yal · Eviscerado`)
-derivados de `PLANT_LINES.filter(shoplogixEnabled)`, con `ListCell
-variant="child"`. El banner de actualización deja de mostrar el semver
-(«4.2.0») y muestra hora de la nueva versión + tiempo desactualizado
-(`formatDesfase`/`formatHora` en `buildInfo.ts`); botón «Recargar» pasa
-de 31 px a 44 px de alto.
-
-Verificado: 1478 tests verdes (104 archivos, 11 nuevos), tsc/eslint
-limpios, audit-piel OK; 375 px con sesión real de admin. Merge commit
-`2b496dda` en main, deploy confirmado en GitHub Pages
-(`buildSha: 2b496dd`).
-
-⚠️ Este archivo pasó los ~150 KB recomendados (209 KB) — conviene
-compactar entradas antiguas en la próxima sesión de mantenimiento.
-
-## 2026-08-16 · Fuera la mediana punteada del Pareto; filas con piezas y % (PR #604)
-
-Orel: la línea punteada de la tira «Cómo viene turno a turno» ensuciaba
-el gráfico más de lo que informaba. Se quita la punteada; su valor pasa
-al encabezado en las dos unidades («mediana 11,9% · ≈640 pz», con
-`banda.medianaPiezas` calculado sobre su propia serie ordenada, no
-aplicando el % mediano al turno promedio). Las filas del ranking ahora
-muestran piezas y % (`≈2.460 pz 35,4%`, un solo denominador que suma
-100% vía `repartir100()` por mayor resto sobre todas las filas). Los
-minutos bajan a la línea de metadatos.
-
-Verificado: 438 tests verdes (32 en el archivo), tsc/eslint limpios,
-audit-piel OK; suma de % de filas = 100,0 exacto en las 4 ventanas (5,
-10, 15, todos) medido en navegador con datos reales; 375 px. Merge
-commit `617c5922` en main, deploy confirmado en GitHub Pages
-(`buildSha: 617c592`).
-
-## 2026-08-16 · Fix: la tendencia del Pareto pierde el color (PR #602)
-
-`bg-ink-warn` tenía dos sentidos en el mismo bloque: en las filas del
-ranking «pérdida de Mantención» (`DUENO_UI`), en la tira «Cómo viene
-turno a turno» «peor que la mediana». Las 10 barras quedan en un solo
-gris neutro (`bg-muted-foreground/[0.45]`); la mediana punteada sube de
-`/[0.5]` a `/[0.75]` como única señal de comparación. El ámbar queda
-con un solo significado en todo el bloque.
-
-Verificado: 438 tests verdes, tsc/eslint limpios, audit-piel OK; 375 px
-en ambos temas. Merge commit `77f72b8c` en main, deploy confirmado en
-GitHub Pages (`buildSha: 77f72b8`).
-
-## 2026-08-16 · Tendencia del Pareto muestra % y ≈pz de cada turno (PR #600)
-
-La tira «Cómo viene turno a turno» era lo único del bloque de Pareto que
-seguía hablando solo en minutos/%. Ahora cada barra muestra su % arriba y
-sus ≈pz debajo (`fmtPzCorto` abrevia sobre mil a `1,1k`), con el cpm andando
-del turno que usa el ranking. El `≈` se declara una sola vez en el
-encabezado en vez de repetirse por columna (desbordaba a 375 px); la tira
-sube de 104 a 120 px de alto.
-
-Verificado: 438 tests verdes, tsc/eslint limpios, audit-piel OK; medido en
-navegador a 375 px con los turnos reales (0 columnas desbordadas, antes 1)
-en ambos temas. Merge commit `684a5d5e` en main, deploy confirmado en
-GitHub Pages (`orelcain.github.io/mantenimiento-planta/version.json`
-→ `buildSha: 684a5d5`).
-
-## 2026-08-16 · Pareto "Qué se repite" valorizado en piezas (PR #598)
-
-El bloque de causas repetidas del monitor público de Filete pasa de hablar
-en minutos a hablar en PIEZAS (opción 2 del mockup aprobado por Orel):
-`buildPareto` valoriza cada causa al cpm andando de SU PROPIO turno
-(`total/producingMin`), no al promedio de la muestra — reordena ranking y
-corte 80/20 por piezas reales. Héroe en centena + equivalencia en turnos,
-filas en decena con barra proporcional a piezas, frase de dueños y caja de
-cierre también en piezas, panel "cómo se calcula" con el rango real de cpm
-de la muestra (9,1–12,4 pz/min en los 11 turnos actuales).
-
-Verificado: 438 tests verdes, tsc/eslint limpios, audit-piel OK, y en
-navegador contra el monitor real de Filete (:5189, 11 turnos) — héroe
-≈7.800 pz ≈ 2 turnos, dueños suman exacto el héroe, ambos temas a 375 px.
-Merge commit `52b9459a` en main.
-
-## 2026-08-15 · La rejilla del desglose recortaba la cola del turno (fix #562)
-
-Perseguir un descuadre chico —la fila decía «Micro 23×» y `stopEvents` traía
-28— destapó un bug grande: la rejilla del `timeBreakdown` se dimensionaba con
-los minutos de OPERACIÓN (huecos >30 min descontados, correcto para la
-cadencia) pero se indexa por hora REAL. Con la colación de 43 min del 14-08,
-la rejilla terminaba a las 14:35 y el turno corrió hasta las 15:25: los
-últimos 50 minutos no existían para el desglose.
-
-Lo que estaba mal por esto: el ritmo andando del 14-08 decía 13,5 (real ~11,6
-— las piezas de la cola contaban y sus minutos produciendo no; el «récord» de
-ese día era un artefacto); una Detencion de 6 min a las 15:24 no salía en
-ninguna fila; y **el 13-08 tenía una falla de máquina invisible en la cola**
-(CUCHILLERIA DORSAL 15 min·3×) — el «✓ ninguna parada por falla de máquina»
-pudo haber sido falso otros días.
-
-Fix: rejilla por lapso real (`effectiveStart→effectiveEnd`); `windowMin` pasa
-a ser ese lapso — la MISMA medida que el «de turno» del comparador, ahora
-comparten palabra a propósito. `windowHours`/cadencia pz-h no cambian.
-`resumirParaForecast` publica `tbv: 2` y la caché de `forecastHistory`
-invalida lo medido con la vara vieja: mezclar las dos haría récords y bandas
-incomparables. El detalle de causas además funde eventos pegados (≤10 s, la
-celda de la rejilla) en EPISODIOS, con test del caso real de las 14:44.
-
-Verificado reconstruyendo el 13 y el 14 de agosto con el código nuevo;
-1.412 tests, tsc limpio, eslint 28/30, audit-graficos 0.
-
-## 2026-08-15 · Monitor listo para el turno noche (set point con fuente + estados honestos + watchdog)
-
-Regla de Orel: **Shoplogix manda** — cero horarios hardcodeados (se descartó
-cargar la entrada del turno noche en la config), y el nombre del turno no se
-asume: el verificador diario ganó el chequeo de NOMBRE NUEVO (avisa por
-Telegram con el nombre exacto; `scripts/.turnos-vistos.json` se puebla solo y
-está gitignoreado — estado por máquina, no del repo).
-
-**Set point con fuente.** `graderModuleConfigs.monitorSetPoint` →
-`loadPlannedShift` → payload `live.setPoint` → leyenda del gráfico con ⓘ
-(fecha+método) y editor inline para supervisores (patrón del «Cambiar» del
-cierre; `setMonitorSetPoint` en `pinShiftEnd.ts` guarda historial de cambios).
-⚠ El set point se resuelve ANTES de buscar la entrada de horario en la config:
-la primera noche —sin entrada— no pierde también la referencia de máquina.
-Sembrado el valor real: 18 pz/min, cronómetro en mano, 15-08, Orel. El máximo
-funcional (21) no se edita: sale del manual. `llenadoDeSilletas` acepta
-`setCpmOverride` y NO hereda el Hz viejo.
-
-**Primera noche honesta.** Sin historia del mismo nombre el monitor se
-degrada BIEN (no inventa referencias) pero se degradaba MUDO. Ahora: «Para
-llegar a la meta» sin horario explica y dice cuándo se activa (2 turnos);
-aviso agrupado con el plan (ayer 2º · pronóstico 4º · banda/récords 5º); la
-tarjeta de ritmo sin banda ofrece el set point como única referencia
-demostrable. Los avisos usan señales que el payload YA trae.
-
-**Verificado:** 1.411 tests, tsc limpio, eslint 28/30, audit-graficos 0, y el
-monitor en navegador con el turno real (vivo del 15 + cerrado del 14 vía
-«Anterior») sin regresiones. Los estados de primera noche quedan cubiertos
-por condiciones simples verificadas en código — se verán en vivo la primera
-noche real.
-
-## 2026-08-15 · Deuda de gráficos saldada + guardia de CI
-
-Los 9 fixes del inventario contra las guías de visualización (destilado en
-ANTARFOOD/_GUIAS/_DESTILADO_VISUALIZACION.md), implementados por el
-implementador-patrón y revisados en el diff: ejes de barras a cero, calibres
-en orden físico (comparador compartido `utils/calibres.ts` + 4 tests — el bug
-estaba DUPLICADO en Pivote y en el timeline del Grader), compuertas con dos
-ejes rotulados, eje de ProductionBarsEC con números, leyenda del timeline sin
-series técnicas (`_target`/`_shadow`), tooltip del pie con %, y el recorte
-p95 declarado en pantalla. El fix 6 (GraderPeriodView) no se tocó: ya cumplía
-con leyenda HTML propia.
-
-**Guardia nueva: `scripts/audit-graficos.mjs` en CI** (deploy.yml, tras el
-lint). Línea base POR ARCHIVO con la justificación de cada excepción al lado;
-falla solo con deuda nueva. En su primera corrida ya cazó 8 `.sort()` pelados
-que el grep manual no vio — 2 eran el bug de calibres duplicado; los otros 6
-eran legítimos (claves de fecha, listas nominales) y quedaron en la base.
-
-Pendiente visual (no bloqueante): leyenda nueva del GraderTimelineChart en
-pantallas angostas, y los dos ejes de compuertas en ambos temas.
-
-## 2026-08-15 · Monitor público · la capa de contexto (guías de visualización)
-
-**Qué cambió.** Aplicación de las guías de Kevin Cáceres (destiladas en
-`ANTARFOOD/_GUIAS/_DESTILADO_VISUALIZACION.md`) al monitor: cada tarjeta grande
-contesta sola «¿esto está bien?». Tres piezas, todas de la guía numero-contexto:
-
-1. **Ritmo andando con sparkline + banda normal**: miniatura de los últimos
-   turnos con el rango normal de fondo (mín-máx de los turnos VÁLIDOS
-   anteriores) y la lectura escrita («▲ arriba de su rango normal (10,3–13,2)»).
-2. **«Últimos 30 min» con referencia**: contra el ritmo del propio turno, con
-   umbrales anchos (▲ ≥110%, ▼ ≤75%) para que el ruido de un tramo no titile.
-3. **La meta como bullet**: banda de cierres habituales detrás de la barra. Con
-   los datos reales destapó el hallazgo del día: la meta (5.000) está POR ENCIMA
-   de todo lo que la línea cerró en su historia (3.168–4.915) — el 78% no es
-   «el turno falló», es «la meta no la alcanzó nadie todavía».
-
-**Archivos.** `monitorVsAyer.ts` (+`bandaNormal`, 4 tests),
-`PublicShiftMonitorPage.tsx` (Kpi con `spark`/`lectura`, `Chispa`, bullet).
-
-**Decisiones y trampas:**
-
-- ⚠⚠ **BUG cazado en la verificación: el turno visto se colaba en su propia
-  banda.** Los memos usaban `data.dateKey` (turno VIGENTE) pero `live` es el
-  turno que se MIRA — al navegar con «Anterior» al 14-08 desde el 15, el filtro
-  `< hoy` dejaba pasar al propio 14 y la banda decía «en su rango normal
-  (10,3–13,5)»: el techo era él mismo y el récord desaparecía. Es la violación
-  exacta del «fijado a priori» de la guía. Fix: `vista.dateKey`.
-  **Regla general: en el monitor, todo lo que dependa de "hoy" usa `vista`, no
-  `data`** — data es el doc, vista es lo que está en pantalla.
-- **La banda se fija a priori** (solo turnos anteriores, nunca el de hoy — hay
-  test que lo clava) y **con <5 turnos válidos no hay banda**: al arrancar el
-  turno noche, esas tarjetas quedan sin contexto hasta juntar historia.
-- El sparkline va en su PROPIA fila: al lado del valor desbordaba la tarjeta a
-  390 px (las KPI van de a dos, ~160 px cada una; el mockup era de 250).
-- Banda `fill-muted` era invisible sobre la tarjeta oscura → `fill-muted-foreground/20`.
-- **El deploy automático de functions del PR #555 ya repobló `forecastHistory`**:
-  los récords pasaron de 7 a 10 turnos y el «84% (vie 7)» torcido de la caché
-  vieja quedó en 82% (sáb 8) recalculado fresco. La fusión history/forecastHistory
-  funcionó como estaba prevista.
-
-**Verificado:** 1.405 tests, tsc limpio, eslint 28/30, y el monitor leído en el
-navegador con el turno real del 14-08 (navegado con «Anterior» desde el vivo del
-15) a 390 px en claro y oscuro.
-
-## 2026-08-14 · Monitor público · ritmo con denominador + «Qué cambió contra ayer» + récords
-
-**Qué cambió.** Tres piezas: (1) la tarjeta de ritmo ahora manda el ANDANDO
-(13,5 = piezas ÷ min produciendo) con el de reloj como segunda línea y su
-denominador escrito; (2) bloque nuevo «Qué cambió contra ayer»: la diferencia
-de piezas contra el último turno del mismo nombre, repartida entre duración /
-convenio / paradas / velocidad, con la suma cuadrando y el residuo visible;
-(3) «Contra lo mejor que ya hicimos»: récords POR COMPONENTE (ritmo, paradas,
-% andando) — no «el mejor turno», que por piezas era solo el más largo.
-
-**El hallazgo que lo motivó (Orel):** la pantalla decía 9,7 «promedio del
-turno» arriba y 13,5 abajo. Los dos eran ciertos (405 min de reloj vs 291
-andando) pero el de reloj daba 9,7 IGUAL el 13 y el 14 — el día que la línea
-fue la más rápida de los últimos 8 turnos e hizo 788 pz menos solo por tiempo.
-La descomposición: −1.001 duración, −213 convenio, +88 paradas, +276 ritmo,
-+63 residuo = −788 ✓.
-
-**Archivos.** `services/shoplogix/monitorVsAyer.ts` (nuevo, 11 tests),
-`pages/monitor/MonitorVsAyer.tsx` (nuevo), `functions/publicMonitor.js`
-(forecastHistory ahora publica windowMin/plannedMin/recoverableMin),
-`publicShiftMonitor.service.ts`, `PublicShiftMonitorPage.tsx` (Kpi + memos).
-
-**Decisiones y trampas:**
-
-- ⚠⚠ **El `history` cacheado del espejo trae números de la metodología VIEJA**:
-  para el 07-08 dice 397 min produciendo y reconstruirlo fresco da 351 (84% vs
-  75% andando). Un récord calculado con otras reglas es una vara torcida. Por
-  eso manda `forecastHistory` (que el fix de functions reconstruye una vez con
-  el código vigente) y `history` queda de relleno hasta que el backend repueble.
-  **Hasta ese deploy el bloque muestra el récord viejo de 84%** — se corrige
-  solo con el merge (functions se despliega automático) + el próximo sync.
-- **El bloque solo aparece con el turno CERRADO**: a mitad de turno el término
-  «duración» compararía una ventana a medio crecer y todo daría en contra. En
-  vivo esa pregunta la contesta el comparador.
-- **Récords solo de lo que el turno controla** (ritmo, paradas, % andando); la
-  brecha se traduce a piezas solo en paradas — convertir también el % andando
-  contaría dos veces lo mismo. Mínimo 3 turnos válidos o no hay récords.
-- **Turnos rotos no comparan**: 12 de 23 en Firestore vienen sin piezas o sin
-  desglose. `vsAyer` los salta y busca el anterior válido; si no hay, no hay
-  bloque. Con residuo > 35% el bloque dice «datos incompletos» y no reparte.
-- Identidad de la descomposición: Δpz = r₀·Δandando + Δr·andando₁, con
-  Δandando = Δventana − Δconvenio − Δparadas − Δotros (otros → residuo).
-- El término de ritmo dio 276 y no 282: el redondeo de 12,52 a 12,5 en la
-  estimación de cabeza. Los tests fijan los valores EXACTOS del turno real.
-
-**Verificado:** 1.401 tests, tsc limpio, eslint 28/30, bloque y tarjeta leídos
-en el navegador con el turno real del 14-08 en claro y oscuro.
-
-## 2026-08-14 · Monitor público · un solo apartado, con los tipos del CURSO
-
-**Qué cambió.** «Por qué no llegamos» pasó a «Qué pasó en el turno»: un solo
-apartado con los eventos agrupados por **dueño de la pérdida** —Mantención,
-Externo, Sin imputar, Programado— cada causa con su categoría oficial y con sus
-paradas adentro, a un toque.
-
-**De dónde salen los tipos.** Del árbol OFICIAL (`imputacionTaxonomy.ts`, la
-«Capacitación de Imputación de Fallas V12»), no de nuestro criterio. Orel lo
-preguntó —«¿los tipos los estás tomando del curso?»— y la respuesta era NO: yo
-había inventado «flujo de línea». Cruzadas las 21 causas reales de Filete contra
-el árbol: **14 matchean, 7 no**.
-
-**Por qué importa la separación.** «Evitable» ≠ «de Mantención». El 14-08 los
-662 pz evitables fueron 410 externos (operación, agua, MMPP) y 252 sin imputar,
-y **cero de máquina** — y el bloque ahora lo dice con esas palabras. Sin eso, la
-cifra se lee como si Mantención hubiera fallado.
-
-**Extensión del árbol (decisión de Orel).** El curso se escribió para la Baader
-142 de Yal; Filete tiene una 200 y sus cuchillerías caían en «sin imputar»: 140
-min de fallas mecánicas invisibles en 12 turnos. Se agregaron 5 hojas marcadas
-`extension: 'filete-baader200'` (CUCHILLERIA DORSAL / RASCADOR / PUNZON, una
-genérica de cuchillería, y GEA). **No cuentan como del curso**: `TOTAL_HOJAS_CURSO`
-sigue diciendo 46 y el árbol dibujable no las muestra.
-
-**Archivos.** `services/shoplogix/monitorEventos.ts` (nuevo, +9 tests),
-`imputacionTaxonomy.ts` (+6 tests), `pages/monitor/notasOperador.ts` (nuevo,
-+5 tests), `MonitorShiftParts.tsx`, `PublicShiftMonitorPage.tsx`.
-
-**Decisiones y trampas:**
-
-- ⚠ **Dos números para lo mismo, otra vez.** La fila decía «23×» (de
-  `timeBreakdown`) y el detalle contaba 28 eventos (de `stopEvents`). El resumen
-  ahora se calcula con el `count` de la fila; la lista de abajo son ejemplos.
-  **Queda pendiente entender por qué difieren** — 5 eventos de diferencia en el
-  mismo turno.
-- **Tocar una causa ya NO salta al gráfico**: saltaba y dejaba fuera de pantalla
-  el detalle recién abierto. Se marca igual en la serie, y el salto es un botón
-  explícito («ver en el gráfico») dentro del detalle.
-- **Las microparadas no se listan**: 23 filas de 12 s tapan las cuatro paradas
-  que costaron piezas. Se resumen («23 paradas de 26 s en promedio») + las 3 más
-  largas. Es la cronología de la opción B sin su ruido.
-- **Se rescataron los comentarios de turno completo** (`notasDelTurno`): los que
-  Shoplogix marca 07:45→15:30 no cuelgan de ninguna parada y se descartaban en
-  silencio. El 07-08 uno era «Se abren guías de bronce baader 200» — una falla
-  mecánica que no leía nadie.
-- **`notasPorCausa` y `notasDelTurno` se mudaron a `notasOperador.ts`**: son
-  datos, no componentes, y el archivo de componentes ya llevaba 3 warnings de
-  `react-refresh`. El repo bajó de 30 (el límite exacto de CI) a 28.
-- ⚠ **Lo que sigue sin poderse hacer**: el Pareto eléctrica vs mecánica del
-  curso. Shoplogix aplana el árbol y «MOTORES» vive en las dos categorías.
-
-**Verificado:** 1.390 tests, tsc limpio, eslint 28/30, y los dos turnos reales
-en el navegador a 390 px en claro y oscuro — el 14-08 (sin fallas de máquina) y
-el 07-08 (Mantención 11 min / 115 pz por PERNOS/RESORTES, con su nota de turno
-completo recuperada).
-
-## 2026-08-14 · Monitor público · fuera dos bloques (bitácora y diagnóstico)
-
-Orel los sacó mirando la pantalla: **«Comentarios del operador»** repetía lo que
-ya sale en las filas de causa, y **«Dónde se gana en esta línea»** «no aporta
-datos certeros». Borrados junto con su código muerto: `MonitorDiagnostico.tsx`,
-`services/shoplogix/monitorDiagnostico.ts` y sus tests, el componente
-`BitacoraOperador` y el memo `diagnostico` de la página.
-
-⚠ **Lo que se pierde, medido antes de borrar** (8 turnos de Filete): 4
-anotaciones vivían SOLO en la bitácora — las de causas que no tienen fila
-(«Bajada de Información», DETENCION PROGRAMADA, 12-08), las de más de 2 h de
-duración («retraso ingreso personal», 07-08), una mecánica sin fila propia («Se
-abren guías de bronce baader 200», 07-08) y las que pasan el tope de 2 notas por
-causa que aplica `notasPorCausa` (13-08 y 14-08). Si algún día falta contexto
-del piso, el tope de 2 y el filtro de causas son los dos lugares donde mirar.
-
-## 2026-08-14 · Monitor público · cada parada al ritmo que la línea traía
-
-**Qué cambió.** Las piezas que costó cada detención ya no se calculan con el
-promedio del turno, sino con el ritmo que la línea traía JUSTO ANTES de esa
-parada (mediana de los tramos limpios de los 30 min previos).
-
-**Por qué.** Lo vio Orel mirando el turno de Filete del 14-08: el bloque decía
-13,5 pz/min, pero antes del corte de agua la línea venía a 12,1, con tramos de
-8,5 y 10,9. Valorizar todo al promedio SOBREESTIMA lo que se le imputa a
-Mantención — "se perdieron X piezas por esa detención" es exactamente la frase
-que después se usa para echar culpas, y tiene que aguantar que la revisen.
-
-**Cuánto cambia (turno real 14-08, verificado con `buildMonitorLive`):**
-
-| causa | min | al promedio | al ritmo real |
-|---|---|---|---|
-| FALLA OPERACIONAL | 14 | 189 | 183 |
-| Micro Detencion | 10 | 148 | 135 |
-| AGUA | 11 | 146 | 131 |
-| ACUMULACION | 9 | 125 | 117 |
-| ATASCAMIENTO | 8 | 111 | 96 |
-| **total** | **52** | **719** | **662** (−8%) |
-
-El reparto de la brecha pasó de 65/35 a 61/39.
-
-**Archivos.** `services/shoplogix/monitorPerdidas.ts` (nuevo, + 9 tests),
-`pages/monitor/MonitorShiftParts.tsx`, `pages/PublicShiftMonitorPage.tsx`.
-
-**Decisiones y trampas:**
-
-- **Ventana de 30 min hacia atrás, con mediana.** Un solo tramo de 5 min es
-  ruido (el previo al agua marcaba 8,5); la ventana da 12,1. Solo hacia atrás:
-  lo de después ya está contaminado por el arranque post-parada.
-- **El ritmo de un tramo se mide sobre su tiempo ANDANDO**, no sobre los 5 min:
-  un tramo con 2 min parado produce menos sin ser más lento.
-- ⚠ **Los tramos con parada NO entran en la referencia**, y **los que están en
-  cero sin parada registrada tampoco** (rampa del arranque). Un test lo pilló:
-  el tramo 0 metía un ritmo de 0 y una parada habría costado 0 piezas —
-  subestimar es el error opuesto y también miente.
-- ⚠ **El titular se suma de las mismas filas de abajo.** Calcularlo aparte
-  (recoverableMin x promedio) daba un número que no cuadraba con su detalle.
-  Excepción: los minutos recuperables que todavía no tienen fila —la parada EN
-  CURSO— van al promedio, o el titular se queda corto justo con la línea parada.
-- Las filas se ordenan por lo que COSTARON, no por minutos: la más larga ya no
-  es siempre la más cara (Micro Detencion, 10 min, cuesta más que AGUA, 11).
-- 4 de los 40 eventos (los del arranque) no tienen 30 min hacia atrás y usan el
-  promedio; `sinLocal` lo reporta.
-
-**Verificado:** 1.383 tests, tsc limpio, eslint 29/30 warnings (ninguna nueva),
-y el bloque leído en el navegador con el turno real del 14-08 a 390 px en tema
-claro y oscuro.
-
-# WORKLOG — bitácora de agentes (append-only)
-
-Una entrada por bloque de trabajo. La más reciente arriba. Formato:
-
-```
-## YYYY-MM-DD · <agente> · <tarea>
-- Hecho: ...
-- Archivos: ...
-- Verificación: tsc/eslint/preview ...
-- Estado: HECHO | EN REVISIÓN | PENDIENTE
-- Sigue: ...
-```
-
-## 2026-08-14 - claude - El gráfico de velocidad: alto, ejes, series a elección y zoom por gesto
-
-- Pedido de Orel mirando la pantalla: *"que se vea mejor, quizás más grande, que se noten mejor las
-  líneas de velocidad frente a las barras, poder seleccionar ver una u otra, zoom in/zoom out y
-  paneo en vez de botones 1×/2×/4×/8×, y que los dos ejes muestren información"*. Mockup con los 96
-  tramos reales del turno: https://claude.ai/code/artifact/115ffa5f-c34e-4ddf-a00f-0899e80cf153
-- **Eje Y, que no existía.** La altura de una barra no se traducía a ningún número: había que
-  tocarla. Peor: el gráfico se autoescalaba al máximo del turno, así que **cada turno se dibujaba
-  contra sí mismo y todos parecían igual de llenos**. Ahora la escala llega hasta la velocidad de la
-  MÁQUINA (18 pz/min de la Baader 200, redondeado a múltiplo de 5) y **el hueco entre la curva y esa
-  línea es, dibujado, el llenado de silletas que falta**. Una sola unidad para barras y línea:
-  pz/min (las barras son las piezas del tramo ÷ 5). Dos ejes para el mismo dato es la receta clásica
-  para leer mal un gráfico.
-- **Alto de 80 → 170 px** (en px explícitos: el root corre al 85% y los rem encogen).
-- **Peso invertido**: barras al 35% de opacidad, línea de la media de 15 min al doble de grosor y
-  con su propio tono. Antes competían —mismo azul, línea de 1 px— y la tendencia se perdía.
-- **Chips `ambas / solo barras / solo línea`**, con la elección recordada en localStorage: el
-  monitor se refresca solo cada 30 s y sin memoria habría que reelegir cada vez.
-- **Zoom por gesto** en lugar de los botones: pellizco de dos dedos, ctrl/⌘+rueda (que es como llega
-  el pellizco del trackpad), arrastre con el mouse para panear —en el celular ya paneaba solo, es el
-  scroll nativo— y doble clic para volver. Queda el botón **"ver todo · N×"**: un zoom sin salida
-  visible es peor que ninguno.
-- ⚠⚠ Los listeners de `wheel` y `touchmove` van **nativos con `passive: false`**. React los registra
-  como pasivos y ahí `preventDefault()` no hace nada: la rueda seguiría desplazando la página y el
-  pellizco haría zoom del navegador entero por encima del gráfico.
-- ⚠⚠ **El pellizco tenía que cortar la propagación del touch**: la página entera escucha swipe para
-  cambiar de turno con un umbral de 60 px, y un pellizco mueve los dedos mucho más que eso —
-  acercarse al detalle habría abierto el turno anterior. Lo mismo con el arrastre de un dedo cuando
-  el gráfico está acercado.
-- ⚠ Sin modificador la rueda NO hace zoom: secuestrar el scroll de un bloque de 170 px hace que la
-  pantalla se sienta rota al bajar por la página.
-- El zoom conserva el punto que se está mirando: se guarda la razón del contenido bajo el puntero y
-  se reposiciona el scroll en `useLayoutEffect`, después de que el ancho cambió.
-- Archivos: PublicShiftMonitorPage.tsx (Sparkbars).
-- Verificación: tsc limpio, 1.369 tests. En el navegador, claro y oscuro, con el turno de Filete:
-  eje 0-20 con la línea de 18 dibujada, alto 170 px medido, ctrl+rueda llevando de 333 a 416 px de
-  contenido con el scroll anclado en el punto del cursor (63 px, el valor exacto que predice la
-  fórmula), los tres chips cambiando las series (97 rects / 1 polyline → 1 / 1 → 97 / 0) y la
-  elección persistida.
-- Estado: EN REVISIÓN (PR nuevo)
-- Sigue: el pellizco de dos dedos no se pudo probar sin un dispositivo táctil — mirarlo en el
-  celular. Y con el turno cerrado no se ve la referencia "necesitás" en el gráfico.
+---
+
+# Historial resumido · 2026-09-01 → 2026-09-12
+
+> Compactado el 2026-09-17 desde ~141 KB de entradas PR por PR. El detalle completo vive en git
+> (`git log -p .ai/WORKLOG.md`) y en el respaldo `.ai/backups/WORKLOG-2026-09-17-pre-compactacion.md`.
+
+## Fuga de costos GCP de agosto (PR #895–#900, 09-01 → 09-02)
+- Agosto: **CLP 71.013** (5x lo normal). 64 % = 114M lecturas Firestore del monitor público: 7 `listDocuments()` de toda la colección de turnos × hasta 12 `buildMonitorLive` por patch × ~2 patches/min. Firestore reads CLP 45.247, Cloud Run CPU CLP 20.593.
+- #895: `loadShiftIndex()` lee los turnos UNA vez por evento (45 días por rango de `documentId`); debounce con `parentSinCambioReal`; el pulso de 1 min sale temprano si todos los monitores tienen `live.shiftClosed`; los turnos bajo el piso de piezas no se reconstruyen. Protocolo en `docs/COSTOS_GCP.md`.
+- #896: ⚠ Cloud Run cobra la CPU mientras la función duerme. El jitter de `shoplogixSyncWakeup` (0-120 s, cada 5 min, 24/7) costaba ~4,8 h CPU/día (~CLP 9.000/mes) → 0-20 s (0-10 s con re-sync). `pauseBetweenMachines` intacto.
+- #898: ⚠ se factura vCPU **asignada**, no usada. Sync y `shoplogixPulseWakeup` (~95 % espera de red) → `cpu: 0.25` + `concurrency: 1` (obligatorio con cpu<1). Ahorro ~CLP 3-4.000/mes.
+- #900 (auditoría de los 11 jobs): `shoplogixTokenRefresh` nunca arrancó (bundle 133 MiB > 128 MiB; parte del «ROPC en backoff») → 256 MiB. `purgeSensorReadings` moría por OOM: carga todo `sensors/` con `once('value')` y al fallar el árbol crece (espiral) → 512 MiB; deuda: recorrer por equipo.
+- Pendiente: confirmar en Cloud Billing la baja de lecturas y CPU; verificar que ambas funciones dejan de dar OOM (purga a las 03:00).
+
+## Auth: permission-denied al entrar (PR #902–#903, 09-05 → 09-06)
+- `mantencion.plantach@aquachile.com` autenticaba y no podía leer `users/{uid}`. Reglas vivas = repo (`getFirestoreRuleset()` + `diff --strip-trailing-cr`) y `firebaserules :test` PERMITE.
+- Causa (vía `errorLogs`): login y TV del monitor (`?pantalla=1`) del mismo PC fallaron el MISMO segundo → token compartido vencido en pestañas dormidas; el login fresco reutilizó la conexión con la credencial vieja.
+- ⚠ `createTime` del servidor contra `timestamp` del cliente delata pestañas congeladas (36 s a 53 min).
+- ⚠ Un token SIN claim `firebase` hace que `isNotAnonymous()` falle con error, no con false.
+- #902: `getUserByIdConTokenFresco` reintenta UNA vez con `getIdToken(true)` en signIn, Google y el listener de `App.tsx`. Remedio en el PC: cerrar TODAS las pestañas (incluida la TV).
+- #903: `subscribeToUserPermissions` quedaba muerto tras el primer error. Ahora, con el mismo uid, refresca y re-suscribe UNA vez; otro error, segundo rechazo o uid distinto → fallback.
+
+## Storage: fotos y borrados mudos (PR #919, #922, #924, 09-08)
+- #919: reglas vivas OK (token de admin vía `signInWithCustomToken` con header `Referer`, la API key restringe referer). Causa en el cliente: `RepuestoPhotosModal` exigía `machineId` y **3.025 de 7.673 repuestos (39 %)** tienen `equipos: []`. Sin equipo el path es `repuestos/sin-equipo/{repuestoId}/fotos/` (cumple la regla de 4 segmentos).
+- ⚠ `web.app` NO es producción (build detenido el 31-08); prod = `orelcain.github.io/mantenimiento-planta/version.json`.
+- ⚠ `pwa-5184` sirve el checkout que diga `dev5184.cmd` (ese día `D:\a\wt-r6`).
+- #922: `deleteRepuestoFoto`/`deleteBodegaPhoto` tragaban el error → archivos huérfanos. Helper `deleteStorageObjectByUrl` propaga; solo tolera `storage/object-not-found`. Toast en modal y drawer. `incidents/{id}/{file}` ganó `allow delete` para sesión no anónima.
+- Regla: **todo `try` sobre Storage lleva `catch` que avise o propague; `logger.error` solo es esconder el fallo.**
+- #924: `deleteFile` y `deleteMapImage` al mismo helper (`storage.delete.test.ts` con `describe.each`). ⚠ **`deleteMapImage` nunca funcionó**: la app usa `maps/{fileName}` (2 segmentos) y la regla es `maps/{locationId}/{fileName}` (3) — mismo desajuste que #894; además sin `allow delete` y con `isAdmin()`, que en Storage deniega siempre (falta rol IAM).
+- Pendiente (Orel): regla de `/maps` (quién sube y borra planos); la subida de mapas está rota por la misma causa.
+
+## Pureza por puerta: base y rondas 1-5 (PR #905–#917, 09-07)
+- #905: «Ver turno» faltaba en el turno en curso: `useGraderShiftPeriod.refresh` nadie lo llamaba y `buildPeriodShifts` descarta turnos con <50 ciclos. Fix: `refreshKey` + botones en el banner del wizard. Pendiente: probarlo con la próxima carga de un turno en curso.
+- ⚠ CI cayó por `audit-piel`: correr `node scripts/audit-piel.mjs` desde la RAÍZ antes de pushear UI.
+- #906: `gateMix` en `GraderDailySummary` desde `computeShiftSummary` (0 lecturas, ~2 KB, solo con gates activas → Yal no paga). `assignedCalibre = 'Other'` = cualquiera. ⚠ ISO sin `Z` lo toma `Date.parse` como hora LOCAL → `parseWallClock`.
+- #907: `PurezaPorPuertaCard` (≥95 pura · 85–95 atención · <85 mezclada). Banco `/dev/pureza-puerta`. ⚠ `cn()` DESCARTA `text-caption`/`text-title3` junto a `text-ink-*` (toma el tamaño como color): van en template string.
+- #909: el wizard clasificaba con SU borrador; ahora usa `getLatestSnapshot` o registra el borrador como snapshot inicial. (`getGatesAtTs` del reclasificador FASE 26 no lo llama nadie.)
+- #910 gateMix v2: se guarda la OBSERVACIÓN (`computeGateObservations`) en `meta/gateMix` (~12 KB, fuera del summary que la matriz lee por mes); `deriveGateMix` juzga con `configTimelineFromSnapshots`. Topes 40 bloques / 8 combinaciones. v1 queda de fallback. ⚠ Snapshots en hora REAL UTC y piezas en hora de pared con Z → `realIsoToWallClockMs` (`America/Santiago`).
+- #911: `classifyGateCauses` (calibre vecino/lejano, calidad, conservación, sin dato, otros; prioridad calibre > calidad > conservación). `GateEvolutionChart` caía 3-4 h corrido → corregido.
+- #912: `classifyGate0Records` acepta `ConfigTimeline` (config de la hora de cada pieza); `recomputeShiftP0Causes` deja la vigente en `gatesUsed` para que `detectConfigDrift` no entre en loop. Límite: un snapshot insertado hacia atrás con la misma config vigente no marca desfase.
+- Ronda 1 (#913): la columna Calibre/Calidad del Excel es la DECISIÓN de la máquina. El 07-09 daba **0 % en 5 de 11 puertas** por seteo desactualizado, no mezcla → `seteoDistinto` (dominante ≥ 90 %) + «Adoptar seteo de la máquina» (`adoptarSeteoMaquina`). «Other» = `calibre_no_reconocido`.
+- Ronda 2 (#914): histograma de peso `weightByBucket`; `derivePesoPorPuerta` con rangos override del turno → línea → constantes. ⚠ Con bins de 250 g el «al límite» es resolución. Backfill (OK de Orel) de `meta/gateMix` en **37 turnos**, 395 KB; 21 de febrero sin `pieceRecords`. Script: esbuild (`node_modules/.pnpm/esbuild@0.25.12`) sobre el TS real, corrido como `scripts/_x.tmp.js` desde la raíz del repo principal.
+- Ronda 3 (#915): `GATE_OBS_WEIGHT_BIN_G = 100`, `weightBinGrams` (ausente = 250). Re-backfill 612 KB (1,5×, no 2,5×; máx. 20,7 KB). **9 turnos de agosto (13-08 → 18-08)** tienen `gatesUsed` del borrador → no se juzgan por peso + «Adoptar en N puertas» (`onAdoptarSeteoTodas`). 23 turnos con `gatesUsed` vacío.
+  - Regla: **la observación se guarda una vez; todo juicio se deriva con la config vigente.**
+  - Pendiente (Orel): adoptar el seteo en esos 9 turnos de agosto.
+- Ronda 4 (#916): 8-10 = 3.665–5.000 g y 10-12 = 5.000–5.900 g en `graderModuleConfigs/global.customWeightRanges`; el editor no regeneraba la etiqueta → `handleSave`. Hallazgo: los programas 8-10 y 10-12 del Z2 se solapan ~400 g (el 11-08 y 02-09 cortaba limpio en 4,58/4,59 kg) → `detectSolapesDeRango` (p2–p98, ≥30 pz, ≥200 g). `classifyRecordToMatrix` usaba constantes en cuatro lugares; ahora todos reciben `ranges`. «Fuera por peso» exige ≥30 pz.
+- Ronda 5 (#917): «Todas puras» con 12 puertas sin asignación mentía → `inferirSeteoFaltante` («· inferido»). Solapes agrupados por el programa del Z2. `normalizarCalibre` en `splitCombo` normaliza etiquetas crudas («2 - 4 LB», «HG 6-8») al LEER.
+- #908: chips y líneas seleccionadas en «Evolución de gates» (relleno sólido del color del gate, nombre al final de la línea, cromo por tema).
+
+## Pureza: cargas parciales, cambios de programa, 12-UP (PR #918, #923, #925–#929, 09-08 → 09-09)
+- #918, primera carga parcial real: el snapshot inicial salió del BORRADOR (8 de 12 «seteo ≠ máquina», 74 P0 falsos). `graderSeteoInicial.ts` (`pickUltimoSeteo`, `elegirSeteoInicial`): sin snapshot usa el último `gatesUsed` de la línea (21 días) salvo que el usuario tocara las gates.
+- #923 ronda 7: la «mezcla» de G10 (15 %) y G4 (4 %) eran cambios de programa no registrados. `detectCambiosDePrograma` + «Registrar cambio desde las HH:MM» (`saveConfigSnapshotAt`, `wallClockMsToRealIso`).
+  - ⚠ Propagar el cambio a los snapshots posteriores que no tocaron esa puerta; si cae antes de todos, dejar línea base un minuto antes (antes del primero rige `gatesUsed`, la config MÁS RECIENTE).
+  - `rangesFingerprint` en el summary: si los rangos difieren, se recalcula P0 una vez. Coincidencia 84,3 % → **98,9 %**.
+- #925 ronda 8 (medir los 37 turnos primero, `medir-cambios.js`): `CAMBIO_MIN_PIEZAS = 100` (los de 9–45 pz eran el barrido de fin de turno). ⚠ El parser mapeaba «12-UP» al 10-12 y «12» a `Other` → calibre canónico **`12-UP lb`** (`CALIBRE_12_UP`); «12», «12-UP», «12+», «N≥12-UP» → 12-UP; «10», «10-UP» → 10-12. ⚠ Espacio final `"12-UP lb "` → `trim()` en modal y `getModuleRanges`.
+- #926: ⚠ `savePieceRecordsBatch` deduplicaba con calibre/calidad en la clave: recargar habría DUPLICADO piezas. `pieceIdentityKey` (ts · gate · piezas · peso · lote) + `planPieceRecordWrites` (agrega, actualiza en su doc, salta). Se guardan `conservation` y `product`. `listGatePieceRecords` (4–3.600 lecturas, nunca ~18.000). ⚠ Dos guardados de Orel no llegaron a Firestore.
+- #927 ronda 9: la pureza era ciega a la conservación (G8 100 % con 2.032 congelado + 1.537 fresco). `deriveMezcla`: conservación contra la dominante del **bloque de 30 min** (la del turno habría dado G8 57 %). Titular 98,4 %. ⚠ cat-4 en oscuro es byte-idéntico a `--ink-warn` (reservado al peso). «Ver cada pieza» dice su costo en lecturas antes del botón. Poda de Gates 5.615 → 2.648 px. Wizard: aviso si «Guardar en Calendario» pasa de 60 s (cerrar TODAS las pestañas). Sin tocar: warning «Cannot update a component while rendering» de `AnalisisGraderGatesConfigPage`.
+- #928: en turno cerrado «Adoptar» reescribe la puerta en TODOS los snapshots (`graderAdoptarSeteo.ts`; `turnoCerrado: status !== 'live'`). 98,9 → 99,9 %.
+- #929 ronda 10: la dispersión decía «95 Otro» porque los gate=0 del pieza a pieza no traen causa → `loadGate0Records` (`p0Fuente = gate0Input ?? gate0Pieces`). 37 de 96 P0 de 0,34–0,90 kg sin puerta → `p0SinPuerta` + bloque «Rechazos sin puerta». «hasta las 00:00» → `hastaIso = summary.endAt`.
+- Pendiente (Orel/Z2): G11 71 % más liviano que 4,99 kg (el 10-12 del Z2 arranca en ~4,5): decidir el límite en el Z2 o en la app y espejarlo en Configuración del Grader.
+
+## Timeline de Calidad y fuentes del P0 (PR #930–#932, #938–#940, 09-09 → 09-10)
+- #930: la capa por causa existía y estaba ciega: gate=0 sin causa (→ `p0Fuente`); ⚠ `classifyPiece` comparaba hora real con hora de pared y usaba `CALIBRE_WEIGHT_RANGES`; el paraguas marcaba solo el estricto (→ `onToggleFamily`). #931: se elimina `PieceScatterChart` (pedido de Orel).
+- #932: ⚠ el P0 del 08-09 T1 cubría hasta 23:57 (116) y el pieza a pieza hasta 02:37 (211): el resumen decía **0,92 %** (real 1,67 %). `mergeParsedData` agrega los gate=0 fuera de la ventana del P0 con causa inferida (`inferGate0FromPieceRecords`) + `p0CoverageWarning` en el banner. Pedir a Orel exportar ambos con el mismo rango.
+- #938: a 375 px «Fuera de límites» se partía en tres renglones; el lote (9 dígitos) se dibujaba vertical → «L» + 4 dígitos cada ≥25 min; rótulos de 9 px. «Total unsorted pcs (Matrix)» queda en inglés (nombre del HMI).
+- #939 riel de eventos (mockup aprobado): a 375 px, 0,58 px/min; 7 de 16 turnos completos tenían choques. `agruparEventosRiel` agrupa en píxeles y fusiona el mismo minuto (63 de 122 turnos). Salen 15-17 rótulos del lienzo; el riel va en el canvas porque el PNG sale de ahí. ⚠ Los bordes de pausa sin `label` dibujaban el valor del eje.
+- #940 lista por tramo de configuración: ⚠ `computeSegmentVerdicts` indexa por `snap.id`, no por `at`; ⚠ lista y tramos deben usar el mismo criterio (`!synthetic`); ⚠ un tramo de 6 pz afirmaba «▼ 31,5 pts» → `TRAMO_MIN_PIEZAS` = 30. Sin blanco táctil de 44 px en marcadores (un `rect` tapaba el eje). Sin versalitas (§10).
+
+## Simplificación de pestañas del turno (PR #933–#937, #947–#949, 09-09 → 09-10)
+- #933 Gates: la píldora muestra UN aviso por prioridad (cambio sin registrar > mezcla > atención > seteo ≠ máquina > no reconocido > peso); fuera la tira de 30 min, el editor completo y el historial (a «Más análisis»).
+- #934 (Orel): Línea sin Gantts (5.103 → 4.096 px); el detalle por máquina es `MachineShiftDetail` dentro de `MantencionTurnoTab` (antes `MachineRow`).
+- #935: ⚠ `derivePesoPorPuerta` sobrescribe `p.rango` por bloque: **454 piezas** bajo la banda equivocada en 4 puertas → `tramosDeCalibre`, una banda por tramo. SVG 1:1 con ResizeObserver (antes «5.5» a 32 px en PC y texto a 7 px en móvil).
+- #936: la correlación Baader → P0 afirmaba dirección en 25 de 28 turnos, 14 con R² < 0,10 (máx. histórico 0,22) → `r2Max`, `explica`, `SCATTER_R2_MIN` = 0,10. «Priorizar la máquina» solo si una concentra ≥ 50 %. Mantención con una cifra por bloque (806 → 653 px).
+- #937: ⚠ el scatter dibujaba buckets de <5 pz que las estadísticas descartan y estiraban el eje al 100 % (256 de 377 turnos) → solo usables + `scatterYMax` al p98 con aviso. Paleta por tema; leyenda 6 → 3; «min» → «tramos». Paros señalan algo en **6 de 40**; ritmo R² ≥ 0,10 en **11 de 28**.
+- #947 (vara de Orel: Calidad informa mejor): veredicto `OrigenDelTurnoCard` + `origenDelTurno.ts`, detalle en hoja. 1.018 → 157 px.
+  - ⚠⚠ `useUpstreamLineSnapshot` emite más de una vez; con `machines` vacío el veredicto decía «causas internas». Calla mientras `loading` o sin máquinas.
+  - ⚠ Docblock viejo en `UpstreamCorrelationCard`. ⚠ Un diálogo es más angosto que la página (`min-w-[8rem]` cortaba). `text-primary` 4,2:1 → `text-brand-ink`.
+  - Pendiente: fundir los duplicados dentro de la hoja.
+- #948: ⚠⚠ «Gates 5.551 px» era un `disclosure:*` abierto en el navegador (real 3.305). Antes de inventariar: borrar `disclosure:*` y confirmar `window.innerWidth`. ⚠⚠ `useState(peor)` congelado antes de llegar `mezcla`: abría G10 con 53,5 % crudo (luego 97 %) o G12 en vez de G10 → sigue a `peor` hasta que el usuario toca. Decisión de Orel: abre solo con mezcla real (`puertaQueAbreSola`). 3.305 → 2.001 px.
+- #949: ⚠⚠ tres cifras de «piezas perdidas» con tres varas (cadencia de línea, máximo teórico, neta); difieren en 7 de 7 turnos, hasta 7× (374 contra 2.647). La vara va en la frase. `MachineSpeedMeaningCard` plegada con la conclusión afuera; Línea 3.790 → 3.147 px. ⚠ `resize_window` se pierde al navegar: va en el mismo `browser_batch`.
+
+## Exportaciones del turno (PR #941–#944, 09-10)
+- #941: tras #939 el PNG salía con «◈»/«▮» sin explicar → pie con umbrales y eventos por tramo. ⚠ «Fecha desconocida»: `shiftDoc` solo existe si hubo acción o carga; usar `summaryId`. `formatter: '◈ 3'` con `lineHeight` giraba el contador.
+- #942: ⚠ CSV ordenado con `hourLabel.localeCompare` (noche `00…04, 21…23`) → por instante. Nombre `resumen-<summaryId>.csv`. Chip «Línea 68 % del target oficial».
+- #943: ⚠⚠ la hoja ejecutiva acusaba `machines[length-1]` (menos ciclos): **65 de 144** turnos a otra máquina, 11 a la MEJOR. `buildCause` por peor ritmo; con <5 puntos de diferencia no acusa (criterio de `PlantKPIBoard`).
+- #944: ⚠ Helvetica/WinAnsi no tiene `→` y jsPDF pasa TODA la cadena a UTF-16 («21:28 ! 05:21»). `textoParaPdf` + `conTextoSeguro` (envuelve también `splitTextToSize`).
+- Estos defectos solo se ven mirando el archivo exportado.
+
+## Monitor público y turno programado (PR #945–#946, 09-10)
+- #945: de 42 motivos solo «Planned Downtime» (301 apariciones) en inglés → `motivoEnEspanol`. Concordancia con fallas, no con máquinas. «Cambiar cuota» está detrás de `esAdminMonitor && esActual` (sin sesión no aparece).
+- #946: ⚠⚠ `graderShiftStatus` calcula `future` y nadie lo consumía: un turno por empezar decía CERRADO + banner rojo «Turno Turno 1… no encontrado».
+  - En prod el doc `shoplogix/chonchi/shifts/2026-09-10_Turno 1` apareció 6 min 41 s después del arranque. Horario configurado desfasado: Turno 1 21:30 contra 21:15 real en 28 de 51 (mediana 15 min); Turno 2 09:00 contra 07:15 en 33 de 64 (105 min).
+  - Badge «Programado», cuenta regresiva (solo <24 h), canales en `<details>`, auto-refresh también en programado. Campo `ShiftTimeWindow.startsInMin`.
+  - ⚠ `allowEdit={status === 'live'}`: no se extendió a `future` porque «Cambié gate» guarda `at: new Date()`. Botón de 40 px (`html{font-size:85%}`).
+  - Pendiente: la grilla «Turnos del período» probablemente pinta el futuro como cerrado. `audit-piel` da −8 contra su baseline desde `origin/main`.
+
+## Vista PC (PR #950–#953, 09-11)
+- #950 (Orel: el móvil no se toca): ⚠⚠ `chartHeight = 108 + legendRowCount * 15` achicaba el gráfico en PC (1.109×123, 9:1). `graderRateChartLayout.ts` (~4:1, piso 108; módulo aparte por `react-refresh/only-export-components`). ⚠ `z2Path` truncado en `max-w-[240px]` sin otro lugar donde leerlo: 3 de 6 runbooks idénticos. ⚠ `zoom` con región no funciona en el Browser pane: medir por geometría.
+- #951: abrir un turno angostaba 590 px (listado 1.869, detalle 1.280). Orel eligió **C · Carriles** (artifact 469e337c). `max-w-[1760px]` en Wizard, Turno, Dashboard y Periodo (Config queda en 1.280). ⚠ `container` de Tailwind topa en 1536. Línea: `grid min-[1700px]:grid-cols-5` con `items-start` obligatorio; 2.089 → 1.751 px. ⚠ `ALTO_MAX_PLOT = 280` calibrado para 1.223 px daba 5,8:1 → 380. Regla: al cambiar un ancho, volver a medir los gráficos.
+- #952: Mantención en dos columnas por secuencia, 1.471 → 1.117 px. ⚠ Revisar qué hijo queda en cada columna. Timeline de Calidad tenía alto fijo → 1.689 × 380.
+- #953: Wizard y Dashboard limpios; `AnalisisGraderDashboardPage` no es ruta (se monta en `AnalisisGraderWizardPage.tsx:1069`). Periodo: `h-64 lg:h-80` topaba en `lg` → `min-[1700px]:h-[26rem]`. ⚠ Un comentario JSX no puede ir dentro de un ternario.
+- Tres causas del mismo achatamiento: alto ligado a la leyenda, alto fijo en JS, clase que topa en `lg`.
+
+## Página Periodo (PR #954–#955, 09-11)
+- #954: ⚠⚠ la tendencia comparaba `slice(0,7)` con `slice(-7)`, solapados con <14 días (8 días: 86 %). La temporada 2026-27 arrancó con 7 días en agosto y 4 en septiembre: el período por defecto son 8 días y el trimestre 12. Con 228 días tiraba el 94 %. Ahora compara mitades; ⚠ con 8 días el signo se daba vuelta (−0,14 → +0,11 pp). «Mejor semana» exige ≥14 días. `graderTendenciaPeriodo.ts`.
+- #955: ⚠ la tabla no desempataba y en Chonchi los nombres no siguen el reloj («Turno 1» noche ~21:15, «Turno 2» mañana ~07:15, «Turno 1 Lunes» desde 00:00) → desempate por `startAt` (`graderPeriodoTabla.ts`). CSV `grader--ltimo-mes.csv` → `grader-ultimo-mes.csv`. ⚠ No dejar `/[\u0300-\u036f]/` literal (guarda combinantes invisibles). ⚠ Backticks por `node -e` en bash se ejecutan: usar un `.mjs` escrito con Write.
+
+## Flujo de carga del Excel del Grader (PR #956–#969, 09-11 → 09-12)
+- #956: ⚠⚠ `fileMeta.warnings` se escribía y nadie lo leía; tilde verde sobre archivos con avisos (2 de 3). Aviso si el turno cae fuera del rango del archivo. `graderAvisosDeCarga.ts`. ⚠ `text-ink-warn` sobre `bg-muted` = 4,4:1 en claro. Excel reales: `OneDrive/ANTARFOOD/⚙️ EQUIPOS PLANTA/⚙️ GRADER/temporada 2025-2026/{pieza a pieza,punto 0}/<mes>/`.
+- #957: ⚠⚠ el Wizard monta `AnalisisGraderUploadPage` SIEMPRE con `compact`, y esa rama cortaba antes de la lista: nunca se vieron nombres, avisos ni errores. ⚠ `lineId` fuera de las dependencias de `handleFiles`: guardaba y borraba en la línea equivocada. ⚠ `graderUploads` está dominada por un backfill (700+ en segundos) y su `createdAt` es **string ISO**, no Timestamp.
+- #960: ⚠⚠ `deleteDailySummary` corría siempre, una vez por archivo, antes de saber si el archivo contenía el turno. Julio 2025: pieza a pieza 07-01 → **07-14**, Puerta 0 → **07-30**. Ahora `cubreElTurno()` y un borrado por turno. Merge PP+P0 medido sin defectos (orden indiferente; duplicados los quita el dedupe del Wizard). ⚠ vitest no muestra `console.log`: escribir a archivo.
+- #962: ⚠⚠ la invalidación sobraba: `saveDailySummaryBatch` sobrescribe con pieza a pieza y hace `merge` con P0 suelto para preservar KPIs que el borrado destruía (entró en `chore: lint y mejoras grader`). Se quitó. Quitar el archivo dejaba el turno sin resumen (3 de 243 días). ⚠ `updateFiles` fuera del `try` quitaba la fila aunque el servidor fallara. Regla: antes de compensar un efecto destructivo, preguntar si hacía falta.
+- #966: método = reproducir el pipeline del Wizard en un test sin escribir. ⚠⚠ Cargar los dos Excel de julio da **54 turnos, 37 sin piezas** (69 %) → `avisoDeTurnosSinPiezas`. ⚠ `isP0Only` mira el archivo entero. ⚠ `pwa-5184` lo define el `launch.json` de `ANTARFOOD/.claude/`; para un worktree, `.cmd` con `cd /d`; un puerto nuevo no tiene sesión. ⚠ Tras un rebase, `gh pr checks` muestra el run VIEJO.
+- #969: ⚠⚠ dos pieza a pieza de noviembre (`20251110-20251120`, `20251120-20251130`) dan cero registros: `sheet1.xml` corta en la fila ~204.100 de 308.539 y **SheetJS no avisa** → `graderArchivoIncompleto`. Remedio: dos archivos de 5 días. Diagnóstico: `unzip -p … xl/worksheets/sheet1.xml | tail -c 200`. No era el tamaño (135 MB parsea bien).
+
+## Doble conteo de piezas en julio 2025 (PR #973–#977, 09-12)
+- #973: **756 de 791 uploads** son recortes por turno (`*_pp.xlsx`) sin `lot`, `product`, `conservation` ni `shift`; `dedupePieceRecords` tenía `lot` en la clave → 11.228 = 2 × 5.614. Clave nueva `ts | gate | pieces | quality | calibre | weightKg` (conserva la copia más completa); sobre **5.374.920 registros** detecta los mismos 555 duplicados. Método: bajar de Storage el archivo de `sourceFileNames` y comparar campo por campo.
+  - Regla: una clave de identidad no puede incluir campos que una fuente válida puede no traer.
+- #975 (APLICADO EN PROD): ⚠⚠ `scripts/load-missing-shifts.js` tenía su propia copia de la clave. Regla: grepear copias en `scripts/`. **12 resúmenes** de julio 2025 con factor exacto 2.000 regenerados con `rehacer-turnos-inflados.js` (`require` del script, envuelto en `if (require.main === module)`); dry-run, respaldo JSON, de a uno, sumas internas (`avgWeightGrams` igual, 5.198). ⚠ El P0 de esos turnos estaba a la MITAD: julio 2025 se veía mejor. Los 335 del script y los 50 de la app no se tocaron.
+- #977: `dedupeGate0Records` fallaba por `calibre` (838 en vez de 419); `error` se queda. Nada que regenerar. ⚠ `detectFileKind` usa el nombre: medir con el `path.basename` real.
+
+## Revisión: repuestos por equipo (sin PR, 09-12)
+- La UI funciona; los datos no. **458 de 511 nodos hoja sin repuestos.**
+- Las **seis Baader 142** tienen 1.803-1.804 cada una contra un BOM real de **476 líneas**; 99,9 % vinculado a 6 o más equipos. **73,6 % sin SAP** y **707 filas sobran** por nombre repetido.
+- ⚠ Los nodos de `hierarchy` usan `tipoNodo`, no `tipo`.
+- Pendiente (Orel): reemplazar el vínculo masivo por el BOM real y consolidar duplicados sin SAP.
 
 ---
 
-## 2026-08-14 - claude - Velocidad × llenado de silletas: el límite no es la máquina
-
-- Orel explicó el mecanismo de la **Baader 200 de Filete**: 5 silletas que pasan a velocidad fija
-  (máximo funcional 22 pz/min, se opera por debajo, p.ej. 18), y el operador pone una pieza por
-  silleta — o no: cansancio, un salmón que sacar, atochamiento aguas abajo (decorado, pimponeo).
-  Su punto, textual: *"no sirve poner velocidades irreales sobre eso ya que no se logrará"* y
-  *"no es un problema de máquina sino de abastecimiento o de atascamiento, pero no de velocidad"*.
-  ⚠ **Las silletas son de la Baader 200. Las Baader 142 son otras máquinas** — la config va por
-  MODELO y las 142 no tienen entrada, así que el bloque no aparece para ellas.
-- **Los datos confirman el modelo.** 614 tramos de 5 min con producción en los últimos 7 turnos de
-  Filete: máximo observado **16,6 pz/min** (92% de 18), p99 15,6, p95 14,0, mediana 10,2.
-  **NINGÚN tramo llegó al 90% de llenado**; solo el 3% pasó el 80%. Andando, el ritmo es 11,6 hoy y
-  11,0 de mediana → **se llenan 61-64 de cada 100 silletas**. De los 18 pz/min que la máquina
-  ofrece, ~6,5 se pierden en silletas vacías MIENTRAS la máquina anda.
-- `monitorMaquina.ts`: spec por modelo (silletas, setCpm, maxCpm) + `llenadoDeSilletas`. La
-  pantalla dice: *"Con la máquina a 18 pz/min, venís llenando 64 de cada 100 silletas · para la
-  meta harían falta 69"* y abajo, chico: *"No es velocidad de máquina: es cuántas silletas van con
-  pieza"*. Cuando lo que falta no entra ni con todo lleno: *"No entra ni con las 5 silletas llenas:
-  faltan N pz y el máximo de la máquina son 22 pz/min"* — antes decía "Pide 224 pz/min".
-- ⚠ `imposible` se mide contra el **máximo funcional** (22), no contra el set point (18): subir la
-  velocidad es una decisión posible; llenar más del 100% de las silletas, no.
-- ⚠⚠ **El set point NO viaja en los datos** (Shoplogix manda piezas y estados, no velocidad
-  configurada). Vive en `SPECS` hasta que haya config por línea, y por eso **la pantalla siempre lo
-  dice**: si el 18 está mal, el número está a la vista para que alguien en planta lo desmienta. Un
-  supuesto escondido sería mucho peor.
-- Archivos: monitorMaquina.ts (+10 tests), PublicShiftMonitorPage.tsx.
-- Verificación: tsc limpio, 1.365 tests. En vivo, rama de HORA EXTRA: *"Con la máquina a 18 pz/min,
-  van 64 de cada 100 silletas con pieza"*. ⚠ La línea con el llenado NECESARIO ("harían falta 69")
-  no se pudo ver en pantalla: el turno ya había pasado su horario cuando quedó lista. Queda cubierta
-  por test y hay que mirarla mañana con el turno en su ventana normal.
-- Estado: EN REVISIÓN (PR #552)
-- Sigue: confirmar con Orel si 18/22 son fijos para la Baader 200 de Filete o cambian por producto
-  o calibre; si cambian, mover `SPECS` a config por línea.
-
-## 2026-08-14 - claude - Tarjeta "Ahora" unificada: una sola respuesta a "¿llegamos?"
-
-- Cierra el último punto del mockup de arquitectura. La respuesta a "¿vamos a llegar?" estaba
-  repartida en tres tarjetas: la meta (veredicto + proyección al horario), el pronóstico (cierre
-  estimado, tres bloques abajo) y el comparador (contra ayer, otro bloque más). Ahora la tarjeta de
-  arriba lo dice completo en cuatro líneas: veredicto, cierre al horario, cierre si el turno se
-  estira, y el día anterior a la misma altura con su diferencia.
-- El resto —ritmo requerido, techo, "lo normal", hora extra y de dónde sale la hora de cierre—
-  pasa a un **"ver qué hace falta"**; cerrado deja una línea con lo único que se mira de reojo
-  ("Faltan 1.120 pz · quedan 5 min"). Eran doce líneas siempre abiertas arriba de todo.
-- `PronosticoCierre` queda plegado: su titular ya está en la tarjeta y con el bloque cerrado el
-  número se sigue viendo en la cabecera. Adentro queda lo auditable (banda, método, cuántos turnos
-  llegaron desde esta altura).
-- ⚠ **Un requerido MUY por encima del techo no se dice como número.** Visto a las 15:25 con 6 min
-  de turno: *"Pide 186,7 pz/min y la línea, andando, va a 11,6"*. Es cierto y es inútil — se lee
-  como que la pantalla se rompió. Desde 2× el mejor turno: *"Ya no da el tiempo: faltan 1.120 pz y
-  quedan 5 min"*. El número exacto sigue en el detalle.
-- ⚠ Al plegar `PronosticoCierre` los 11 tests de su bloque empezaron a fallar por leer un cuerpo
-  que ya no se renderiza. Se abren por el BOTÓN (`aria-expanded="false"`), como lo haría alguien en
-  planta, en vez de tocar el `localStorage` que usa `Bloque`.
-- Archivos: PublicShiftMonitorPage.tsx, MonitorShiftParts.tsx, PronosticoCierre.test.tsx.
-- Verificación: tsc limpio, 1.355 tests. En vivo, claro y oscuro, con el turno de Filete a punto de
-  cerrar. La pantalla quedó en **1.420 px** contra los 2.766 px del inicio del día: **−49%**.
-- Estado: EN REVISIÓN (PR #552)
-
-## 2026-08-14 - claude - Menos ruido en el monitor: 4 preguntas, un gráfico, y el Pareto de paradas
-
-- Orel: "siento que aún tenemos mucho ruido para ser un monitor que necesita entregar información
-  rápido... por qué la velocidad, se detuvo por algo, por qué, e ir analizando turno a turno si se
-  repiten los patrones de detenciones para encontrar causa raíz". Mockup con el inventario real de
-  la pantalla (11 bloques, 2.766 px ≈ 4 pantallas de celular) mostrando que **tres bloques
-  contestaban "¿llegamos?"**, **cuatro "¿va rápido?"** —dos de ellos dibujando la MISMA serie de 5
-  min— y que **"¿se repite?" no existía**.
-- **Pareto de paradas (`monitorPareto.ts` + `MonitorPareto.tsx`)**. Sale del historial que ya viaja
-  en el doc: cero lecturas extra. Dos decisiones que lo hacen útil:
-  · **Dos ejes.** Ordenado solo por minutos, `ACUMULACION` entra cuarta con 45 min y ocurrió en 2
-    de 7 turnos: un incidente disfrazado de causa crónica. Cada fila lleva en cuántos turnos
-    aparece, y las que no llegan a la mitad de la muestra se dibujan en gris.
-  · **Agrupado por equipo.** Shoplogix etiqueta `Equipo/Parte`; las tres causas de la Baader
-    (cuchillería dorsal, rascador, pernos/resortes) sueltas no pasan de 47 min y ninguna llama la
-    atención, juntas son el 22% y el 2º lugar del Pareto. Regla genérica (lo que va antes de la
-    primera barra), sin mapa que mantener, sirve igual en Yal.
-  Corte estándar del 80% acumulado. Con 7 turnos de Filete: Micro Detencion 2 h 14 (35%, 7/7, 304
-  paradas), Baader 200 1 h 26 (22%, 4/7), ATASCAMIENTO 58 min (15%, 6/7), ACUMULACION 45 min (12%,
-  2/7) → **4 causas = 84%**.
-- **El comentario del operador, pegado a su causa** (`notasPorCausa`). "FALLA OPERACIONAL 14 min" y
-  «Ajuste erroneo de operador nuevo» estaban en bloques distintos separados por dos pantallas.
-- **UN solo gráfico de la serie de 5 min.** "Velocidad de la línea" y "Piezas por tramo" dibujaban
-  lo mismo (uno en pz/min, otro en piezas). Se fusionaron en el de tramos —el que sabe ubicar las
-  detenciones y tiene zoom 8×— con la media móvil de 15 min encima y las referencias de ritmo
-  convertidas a piezas/tramo. **`VelocidadDeLinea` borrado (247 líneas).**
-  ⚠ Las referencias solo se dibujan si CABEN (≤1,3× el máximo): con la meta pidiendo 53 pz/min y el
-  mejor tramo en 14,6, la línea estiraba la escala al cuádruple y aplastaba el turno contra el
-  piso. Fuera de escala, el número se dice en la leyenda.
-- **Comparador de días y Hora por hora quedan plegados por defecto.** No se borra nada: la
-  respuesta corta viaja en el `extra` del bloque cerrado y `Bloque` recuerda la elección.
-- **Resultado medido: 2.766 px → 1.726 px, −38%** (de ~4 pantallas de celular a ~2,5).
-- Archivos: monitorPareto.ts (+test con los 6 turnos reales como fixture), MonitorPareto.tsx,
-  MonitorShiftParts.tsx, PublicShiftMonitorPage.tsx.
-- Verificación: tsc limpio, 1.355 tests. En vivo con el turno de Filete, claro y oscuro: Pareto con
-  sus 4 filas y el corte del 84%, comentarios bajo FALLA OPERACIONAL y AGUA, gráfico único con la
-  media de 15 min y "necesitás 53,0 pz/min (fuera del gráfico)".
-- Estado: EN REVISIÓN (PR nuevo, encima de #551)
-- Sigue: (a) la tarjeta "Ahora" del mockup —una sola respuesta a "¿llegamos?"— todavía son dos
-  tarjetas (meta y cierre estimado); (b) con el turno por terminar el requerido se dispara ("60,2
-  pz/min · 4,6× el mejor turno"): por encima de ~2× el techo conviene decirlo en palabras en vez
-  de un número.
-
-## 2026-08-14 - claude - El ritmo se mide ANDANDO: una sola base para toda la tarjeta
-
-- Orel, viendo la tarjeta con el descuento de convenio ya puesto: "pero igual le pones 39 pz/min...
-  me imagino que se está contando el tiempo de colación como detención en tiempo perdido; la
-  colación es tiempo en el que no se puede producir pero es normal no producir". Tenía razón, y
-  el problema era MÍO: al pasar el requerido a tiempo productivo dejé el resto en tiempo de reloj.
-  La pantalla decía "Necesitás 39,4 y vas a 9,7" cuando la línea, andando, iba a 11,7 — y hasta
-  anunciaba un récord falso ("por encima del mejor turno reciente, 9,7") comparando andando contra
-  reloj. `monitorPace.js` documentaba esa invariante y la rompí sin verla.
-- ⚠⚠ REGLA: **un ritmo requerido sobre tiempo productivo SOLO se puede comparar contra ritmos
-  productivos.** Medido en los 10 turnos de Filete: andando la mediana es 11,0 pz/min y el mejor
-  turno 13,2; de reloj, 8,1 y 9,7. La diferencia entre las dos medidas ES el tiempo parado.
-- Hecho: `ritmoAndando` (piezas ÷ minutos de uptime) sale de `forecastHistory` —`total` y
-  `producingMin` ya viajan— y de `live.uptimeSec` para hoy. Alimenta `currentPerHour`,
-  `maxPerHour` (techo) y las referencias "lo normal / mejor turno". `recentPerHour` va en null: el
-  de los últimos 30 min es de reloj y durante una colación cae a cero. Las filas dicen "andando", y
-  cuando el requerido pasa el techo se agrega "· 1,8× el mejor turno" en vez de un número desnudo.
-- Y el KPI **"Tiempo produciendo" ya no mete la colación en el denominador**: va sobre el tiempo
-  DISPONIBLE (ventana − planificado). Hoy 68% → 84% con los mismos 4 h 08. Castigar a la línea por
-  una parada de convenio era exactamente lo que Orel señalaba.
-- La leyenda del gráfico de velocidad pasó de "lo normal" a "promedio de turno": esa mediana es de
-  reloj y con la tarjeta hablando de andando, dos números distintos con la misma etiqueta se leen
-  como un error.
-- Efecto de lectura, que es lo que importa: la pantalla ya no dice "la línea va lenta" (9,7 vs 8,1)
-  sino **la línea anda a 11,8, por encima de la mediana de 11,0; lo que falta es tiempo**. Eso es
-  el argumento de Mantención, no el de producción.
-- Archivos: PublicShiftMonitorPage.tsx, MonitorShiftParts.tsx.
-- Verificación: tsc limpio, 1.342 tests. En vivo (14:10, Filete, claro y oscuro): "Pide 23,4 pz/min
-  y la línea, andando, va a 11,8", "Necesitás 23,4 andando · 1,8× el mejor turno", techo 13,2,
-  "Andando, lo normal 11,0 · mejor turno 13,2", "Tiempo produciendo 84% · sin contar convenio".
-- Estado: EN REVISIÓN (PR #551)
-
-## 2026-08-14 - claude - La colación entra en el ritmo necesario (pregunta de Orel en vivo)
-
-- Pregunta de Orel mirando el turno: "veo que no estamos considerando la colación en los
-  cálculos, ¿o sí?". No se estaba. La cuota se aplana en las paradas de convenio desde #493 y
-  el pronóstico las hereda del historial, pero el RITMO NECESARIO se repartía sobre tiempo de
-  reloj: a las 12:50 pedía 13,1 pz/min para 2.089 pz en 2 h 40, con ~55 min de colación
-  adentro de esa ventana.
-- Hecho: `computePaceToTarget` recibe `pendingBreakMin` y calcula sobre `workMin` = reloj menos
-  convenio por delante — el ritmo necesario, la proyección al cierre y la hora extra (que ahora
-  agrega una hora de LÍNEA ANDANDO, no de reloj). Piso de 5 min para no dividir por ~0. La
-  tarjeta lo dice: "Queda 1 h 43 · 53 min produciendo" + "Descontando 50 min de paradas de
-  convenio que faltan".
-- ⚠⚠ Dos cosas que hacían que la colación EN CURSO no contara, y que solo se ven con un turno
-  vivo (las dos aparecieron mirando la pantalla a las 13:41 y 13:44):
-  1. `mergeBreaks` pronosticaba las de días anteriores por `fromMin > currentMinute`: la
-     colación dejaba de contar apenas el turno pasaba su hora de arranque, o sea justo cuando
-     está ocurriendo. Ahora por `toMin > currentMinute`.
-  2. Una parada EN CURSO no está en `stopEvents` —Shoplogix publica intervalos cerrados— y la
-     que sí está llega con los minutos que LLEVA, no con los que va a durar. Se arma desde
-     `currentReason`/`currentSinceAt` (causa de convenio si lo es hoy o lo fue antes) y
-     `extendOngoingBreaks` la estira a la mediana de esa misma parada en los turnos anteriores.
-     Sin esto el descuento era de 6 min con 50 por delante.
-- Además: `breaksTurno` es ahora UNA sola fuente para las cuatro cosas que dependen de las
-  paradas (curva de cuota, fondo de los gráficos, ritmo necesario, aviso de la próxima).
-  `breakMinutesBetween` y `extendOngoingBreaks` viven en `monitorCompare` para poder probarlas.
-- Archivos: monitorPace.ts, monitorCompare.ts, PublicShiftMonitorPage.tsx, +tests en
-  monitorPace.test.ts y monitorCompare.test.ts.
-- Verificación: tsc limpio, 1.342 tests. En vivo con la colación ocurriendo (13:46, Filete):
-  "Queda 1 h 43 min · 53 min produciendo", "Necesitás 39,4 pz/min", cierre al horario 3.430 pz
-  (69%) — antes decía 19,3 pz/min repartiendo sobre el reloj. Banda de convenio del gráfico de
-  tramos correcta (x=84,9% ancho 13,7% = 13:35 al último tramo).
-- Estado: EN REVISIÓN (PR #551)
-- Sigue: turno NOCHE de Filete la otra semana. El monitor de línea ya sigue al turno vigente
-  (Yal es el caso probado), pero para "Turno Noche" nuevo: `inferShiftEndFromHistory` exige 2
-  turnos con producción, así que las 2 primeras noches el cierre sale de la config — si no hay
-  config cargada, `pace` devuelve null y la tarjeta "Para llegar a la meta" no aparece.
-  Conviene fijar el horario del turno noche ANTES del primero. Pronóstico y diagnóstico piden
-  4 turnos del mismo nombre (MIN_SAMPLES), y la colación de la noche no se pronostica hasta
-  tener 1-2 noches de historial.
-
-## 2026-08-14 - claude - Un solo cierre con su horizonte, fondo de convenio y aviso de colación
-
-- Hecho: (1) La pantalla daba DOS cierres que se contradecían. A las 12:50, en el turno vivo de
-  Filete: la tarjeta de la meta decía "No se alcanza… cierra en 4.501 pz (90%)" y el pronóstico
-  "5.011 pz — la meta entra". No era un error de cuenta: son dos horizontes y ninguno lo decía.
-  `pace` proyecta a `plannedEnd` (15:30, 460 min) y el pronóstico a la mediana de lo que
-  DURARON los turnos anteriores (8 h 45). La diferencia es la hora extra que esta línea hace
-  casi todos los días: el 13-08 produjo 505 pz después de las 15:30, el 12-08 311 y el 11-08
-  413. Ahora cada número lleva su hora escrita y el bloque del pronóstico agrega "Si corta a
-  las 15:30 del horario serían N pz". `ForecastResult` expone `horizonMin`. (2) Fondo gris de
-  las paradas de convenio en "Piezas por tramo": el pendiente del 13-08. (3) El aviso de la
-  próxima parada de convenio ya no se apaga con la primera parada planificada.
-- Por qué salían 23 bandas (lo que quedó sin explicar el 13-08): `stopEvents` trae TODAS las
-  detenciones (56 el 13-08, 28 el 14-08) y su campo `r` es un ÍNDICE a `stopReasons`, no el
-  nombre. La fuente correcta es `comparacion.breaks` (`plannedBreaks()` filtra por las causas
-  de `timeBreakdown.planned`), la misma que ya usan el comparador y la curva de velocidad: 3
-  eventos el 13-08 y 2 el 14-08. Con el piso de 15 min queda UNA banda, la colación. Se dibuja
-  solo el pasado: `breaks` incluye el pronóstico de las que faltan y una banda futura quedaría
-  clavada contra el borde derecho, sobre producción real.
-- También: el aviso de la próxima parada se contaba desde `scheduledStart` y `plannedBreaks`
-  cuenta desde el PRIMER TRAMO CON DATO — salía 5 min tarde. Y "Con 1 hora extra… la meta
-  entra" pasó a "alcanzaría, pero apurando": chocaba con el "no entra" del pronóstico a la
-  misma hora.
-- Archivos: monitorForecast.ts, MonitorShiftParts.tsx, PublicShiftMonitorPage.tsx,
-  __tests__/PronosticoCierre.test.tsx, __tests__/TiempoDelTurno.test.tsx (nuevo).
-- Verificación: tsc limpio; 1.327 tests (97 archivos). Navegador a 390 px, claro y oscuro:
-  turno VIVO de Filete —los dos bloques dicen 4.105 pz hasta las 15:30 y 4.386 al cierre
-  típico— y turno del 13-08 —UNA banda gris en x=52,5% ancho 6,8% = 12:50-13:30, la colación,
-  alineada con la del gráfico de velocidad—.
-- Estado: EN REVISIÓN (PR abierto)
-- Sigue: el aviso con `plannedMin > 0` quedó cubierto por test pero no visto en pantalla (a las
-  13:20 ya no había próxima parada por delante); mirarlo en un turno temprano.
-
-## 2026-08-14 - claude - Tres roles de color en vez de siete, y el desenlace junto (PR pendiente de merge)
-
-- Hecho: `monitorColors.ts` era 7 hex crudos de Tailwind; 6 muertos y los 2 usados (hoy/cuota)
-  daban 1,9:1 sobre `--card` en claro (WCAG pide 3:1 para un trazo). Reemplazado por 3 roles
-  con nombre (hoy/cuota/referencia) por OKLCH del hue de marca, variables `--mon-*` por tema.
-  Además: tarjeta de cuota muestra rango de días comparables en vez de repetir el mismo
-  número 3 veces; chip "Planificado 0 min" se oculta; "Comparado con otros días" sube junto
-  a "Cierre estimado".
-- Archivos: index.css, monitorColors.ts, MonitorCompareChart.tsx, MonitorShiftParts.tsx,
-  PublicShiftMonitorPage.tsx, monitorCompare.ts (+test).
-- Gotchas: (a) los colores van por `style={{ stroke }}`, no por atributo `stroke=` — los
-  atributos de presentación SVG no resuelven `var()`; (b) los hex de gráficos NO pasan por
-  `tailwind.config.js`, hay que medirles el contraste a mano en LOS DOS temas.
-- Verificación: tsc limpio, 290 tests, navegador a 390px en claro/oscuro sobre turno vivo.
-- Estado: EN REVISIÓN (PR abierto, merge lo decide Orel)
-- Sigue: nada de código. Nota: este archivo pasó ~166 KB, sigue pendiente compactar.
-
----
-
-## 2026-08-14 - claude - La curva de la cuota se reparte sobre el turno completo (#548)
-
-- Hecho: visto en vivo con el turno de Filete en curso a las 11:25, `timeBreakdown.windowMin`
-  son los minutos de operación HASTA AHORA (215), no la duración del turno (465). Repartir
-  5.000 piezas sobre 215 min hacía que la línea de la cuota trepara hasta la meta en la hora 4
-  y siguiera plana, el área roja se comiera el gráfico y "dónde se abrió la brecha" marcara el
-  turno entero en un solo tramo. Ahora la ventana sale de scheduledStart→plannedEnd y el
-  convenio descontado es el PREVISTO (breaks, no `plannedMin` que a media mañana es 0). Con
-  el turno cerrado no se veía: transcurrido = duración ahí.
-- Archivos: apps/pwa/src/pages/PublicShiftMonitorPage.tsx
-- Verificación: tsc/eslint limpios, vitest 288/288, verificado en vivo contra el turno de
-  Filete en curso (preview :5175): la diferencia contra cuota pasó de −2.995 a −929, y la
-  brecha de un tramo de 3,5 h a dos tramos concretos de 40-65 min. Deploy a GitHub Pages en
-  success.
-- Estado: HECHO
-- Sigue: nada. Nota: este archivo pasó los ~165 KB — sigue pendiente compactar.
-
----
-
-## 2026-08-14 - claude - "1 de 10 turnos" no es que la meta entre — tres grados (#546)
-
-- Hecho: visto en vivo con el turno de Filete a media mañana, el pronóstico decía "La meta
-  de 5.000 entra: 1 de 10 turnos la superaron desde acá" mientras la tarjeta del ritmo, dos
-  bloques arriba, decía "No se alcanza con el tiempo que queda" — ambas correctas pero
-  leídas juntas como contradicción. El umbral era `hitsTarget > 0`; ahora hay tres grados:
-  ninguno → "no entra", menos de un tercio → "es difícil: solo N de M lo superó", un tercio
-  o más → "entra".
-- Archivos: apps/pwa/src/pages/monitor/MonitorShiftParts.tsx, .../__tests__/PronosticoCierre.test.tsx
-- Verificación: tsc limpio, vitest 20/20 en src/pages/monitor, verificado en vivo en preview
-  (:5175) contra el turno de Filete en curso. Deploy a GitHub Pages en success.
-- Estado: HECHO
-- Sigue: nada. Nota: este archivo pasó 163 KB — sigue pendiente compactar (cortar narración
-  PR-por-PR vieja, conservar gotchas).
-
----
-
-## 2026-08-14 - claude - Gráfico de tramos ocultaba dos horas de turno, y la curva mentía (#544)
-
-- Hecho: 2 fixes medidos sobre el turno del 13-08 en Filete. (1) "Piezas por tramo de 5 min"
-  tenía un piso de ancho de barra (`max(0.5, W/n - gap)`) que con 118 tramos dejaba las
-  últimas 15 barras fuera del viewBox (borde en x=129 vs 100) — casi dos horas de producción
-  invisibles. Ahora el paso es `W / n`, barra al 70%. (2) La curva de velocidad cortaba la
-  cola de ceros del final (turno terminado ≠ turno cayéndose) y la escala pasa a marcas
-  redondas cada 5 en vez de máximo/mitad ilegibles.
-- Archivos: apps/pwa/src/pages/monitor/MonitorShiftParts.tsx, apps/pwa/src/pages/PublicShiftMonitorPage.tsx
-- Verificación: 96 → 118 barras visibles, escala 20/15/10/5, verificado en pantalla contra
-  el monitor real de Filete con el dev server reiniciado (preview :5175). tsc, eslint y
-  vitest 286/286 limpios. Deploy a GitHub Pages en success (run 31764396081).
-- Estado: HECHO
-- Sigue: nada pendiente de este fix. Este archivo pasó ~160 KB — sigue pendiente compactar
-  (cortar narración PR-por-PR vieja, conservar gotchas).
-
----
-
-## 2026-08-14 - claude - HOTFIX: monitor dejó de refrescarse — Firestore rechaza arrays anidados (#542)
-
-- Hecho: el #540 mandaba la curva de `forecastHistory` como pares `[m, p]`; Firestore no
-  admite arrays dentro de arrays y el write del patch fallaba ENTERO ("Property array
-  contains an invalid nested entity"). El doc público quedó congelado ~40 min (ni
-  `forecastHistory` ni `live` se actualizaban). Fix: la curva ahora son objetos `{m, p}`.
-- Lección: el #540 se había probado COMPUTANDO el resumen contra datos reales, nunca
-  ESCRIBIÉNDOLO. Un cálculo correcto que Firestore rechaza al guardar es indistinguible de
-  uno roto — la verificación tiene que incluir el write real, no solo el cómputo.
-- Archivos: functions/publicMonitor.js, apps/pwa/src/services/shoplogix/publicShiftMonitor.service.ts,
-  apps/pwa/src/pages/PublicShiftMonitorPage.tsx
-- Verificación: tsc/eslint/vitest 286/286 limpios; write real a Firestore (9 turnos de
-  Filete) antes de mergear. Post-deploy: logs de Cloud Functions confirman que
-  `onShoplogixShiftWrittenPublicMonitor` pasó de error en cada invocación a "refrescados"
-  sin error tras el rollout; `live.updatedAt` de Filete y Yal avanzó y `forecastHistory`
-  quedó poblado con curvas `{m,p}`.
-- Estado: HECHO
-- Sigue: nada pendiente de este fix. Nota: este archivo pasó ~160 KB — conviene compactar
-  (cortar narración PR-por-PR vieja, conservar gotchas).
-
----
-
-## 2026-08-13 - claude - Historial del MISMO turno para pronosticar el cierre (#540)
-
-- Hecho: el doc del monitor público ahora publica también `forecastHistory` — hasta 10
-  turnos DEL MISMO nombre (no los 6 cronológicos de `history`), resumidos a 5 KB. El
-  pronóstico y el diagnóstico lo usan con fallback a `history` para docs viejos.
-- Archivos: functions/publicMonitor.js, apps/pwa/src/services/shoplogix/publicShiftMonitor.service.ts,
-  apps/pwa/src/pages/PublicShiftMonitorPage.tsx
-- Verificación: tsc/eslint/vitest 286/286 limpios; probado contra Firestore real con Filete
-  (9 turnos útiles, descarta un turno basura del 1-ago de 180 pz en 16 min, 5 KB). CI y
-  ambos deploys (hosting + functions) en success.
-- Estado: HECHO
-- Sigue: verificación humana del pronóstico/diagnóstico con forecastHistory en pantalla.
-
----
-
-## 2026-08-13 - claude - "Donde se gana en esta línea": velocidad o tiempo andando (#538)
-
-- Hecho: bloque nuevo en el monitor que dice, por línea, cuál de los dos factores del total
-  (tiempo andando x velocidad) manda: en Filete varía más la velocidad, en Yal el tiempo
-  andando. Usa DISPERSIÓN sobre los últimos 6 turnos, no correlación (con 6 turnos un
-  coeficiente es ruido); micro-detenciones se parean con piezas solo si en esa muestra la
-  relación va en el sentido correcto, si no se muestra solo el rango.
-- Archivos: monitorDiagnostico.ts, MonitorDiagnostico.tsx, PublicShiftMonitorPage.tsx, +tests
-  (16 nuevos).
-- Verificación: vitest 286/286, tsc y eslint limpios. Verificado en pantalla contra el monitor
-  real de Filete. Deploy en success.
-- Estado: HECHO
-- Sigue: nada pendiente conocido.
-
----
-
-## 2026-08-13 - claude - El gráfico prolonga la curva en un cono de proyección (#536)
-
-- Hecho: dibujo del pronóstico del #534 sobre `MonitorCompareChart`: banda que nace en la punta
-  de la curva de hoy y llega hasta el cierre, con mediana punteada; si la cuota queda por encima
-  de todo el cono se ve sin leer un número. Número y dibujo salen de la MISMA función `proyectar`
-  (evitado el "dos verdades en pantalla"); el cierre entra siempre en el cono aunque no caiga en
-  el paso de 15 min.
-- Archivos: monitorForecast.ts (tipo `ConePoint` + `cone`), MonitorCompareChart.tsx,
-  MonitorShiftParts.tsx, PublicShiftMonitorPage.tsx, +tests (7 nuevos, 4 de render).
-- Verificación: vitest 270/270, tsc y eslint limpios. Deploy en success.
-- Estado: HECHO
-- Sigue: ver en pantalla con turno vivo con muestra (mañana en Filete, mismo pendiente que #534).
-
----
-
-## 2026-08-13 - claude - Pronóstico del cierre auto-calibrado, con su error medido (#534)
-
-- Hecho: motor `monitorForecast.ts` que predice el cierre del turno desde el minuto 240 usando
-  el history que ya viaja en el doc (cero lecturas extra). El método (proporcional/aditivo/ritmo)
-  no se elige a mano: se mide por backtesting leave-one-out contra los turnos comparables
-  (mismo nombre, cerrados) y se queda con el de menor error; ese error viaja con el pronóstico.
-  Backtesting sobre 34 turnos reales: Filete acierta mejor con proporcional (5,2% vs 11,3% del
-  ritmo actual), Yal con aditivo (8,8%, proporcional erra 12-24%) — la causa es física (Filete:
-  total explicado por velocidad; Yal: por tiempo andando + paradas). Por encima de 15% de error
-  el bloque se calla.
-- Archivos: apps/pwa/src/services/shoplogix/monitorForecast.ts (+test),
-  apps/pwa/src/pages/monitor/MonitorShiftParts.tsx, apps/pwa/src/pages/PublicShiftMonitorPage.tsx
-  (+test de render).
-- Verificación: vitest 263/263 (17 nuevos, con datos reales de Shoplogix como fixture: estima
-  4.257 contra un cierre real de 4.294). tsc y eslint limpios. Deploy en success.
-- Estado: HECHO
-- Sigue: pendiente ver el bloque en pantalla con un turno vivo (requiere >=4 turnos comparables
-  del mismo nombre; Yal solo trae 2 "Turno 2" — se verá mañana en Filete). Siguiente paso
-  previsto: publicar historial del mismo turno desde el backend para que Yal también alcance
-  muestra. Nota: WORKLOG.md pasó los ~150 KB — conviene compactarlo.
-
----
-
-## 2026-08-13 - claude - No exponer el contador vivo del monitor cuando quedó en cero (#531)
-
-- Hecho: los turnos que ya pasaron su cierre quedaron con `officialLive.totalCycles: 0`
-  del bug corregido en #529 (el rollup devolvía la plantilla del día siguiente y se
-  guardaba su cero antes del guard). El guard nuevo evita que se vuelva a pisar, pero
-  el payload seguía publicando ese 0 congelado. Ahora `shoplogixLive` se expone solo
-  con `totalCycles > 0`; si no, `null`.
-- Archivos: functions/publicMonitor.js
-- Verificación: `buildMonitorLive` contra el turno real de Filete de hoy: `live` pasa de
-  `{totalCycles: 0}` a `null`, resto intacto (4.707 total, 4.202 dentro, 505 fuera).
-  Solo backend, sin UI que verificar. Deploy de Firebase Functions y PWA en success.
-- Estado: HECHO
-- Sigue: nada pendiente.
-
----
-
-## 2026-08-13 - claude - La hora extra se ve desde el primer minuto, y sigue guiando (#529)
-
-- Hecho: "fuera del horario" se decidia por el DOC de origen del tramo, no por su hora real,
-  y con la linea pasada de las 15:30 los tramos quedaban del lado "dentro del turno" hasta
-  que Shoplogix cortaba (chip aparecia tarde, sin doble conteo real). Ahora la hora real
-  manda, en union con el rescate de Unscheduled. `officialLive` ahora se escribe dentro del
-  guard `isOfficialScheduleSane` (ya no se pisa con 0 cuando Shoplogix devuelve la plantilla
-  del dia siguiente). Verdict nuevo 'hora-extra' en la tarjeta de ritmo: sin ventana que
-  medir pero con cuanto falta y cuanto tardaria al ritmo actual.
-- Archivos: functions/publicMonitor.js, functions/shoplogix/sync.js,
-  apps/pwa/src/services/shoplogix/monitorPace.ts (+tests),
-  apps/pwa/src/pages/PublicShiftMonitorPage.tsx
-- Verificación: vitest shoplogix 246/246, tsc y eslint limpios; backend probado contra datos
-  reales de Filete (turno de hoy con hora extra: 0 → 136 pz fuera, 15:30-15:44; turno de ayer
-  con el mismo total 4.486, sin doble conteo); tarjeta de hora extra verificada en preview
-  contra el turno vivo.
-- Estado: HECHO. Merge squash a main `b0c2c748` (#529). Deploy hosting y Functions ambos
-  success.
-- Sigue: verificación humana en producción durante una hora extra real.
-
----
-
-## 2026-08-13 - claude - Monitor muestra el contador VIVO de la pantalla de planta (#526)
-
-- Hecho: el rollup que el sync ya consulta cada ciclo (mismo endpoint que el whiteboard en
-  vivo) trae el acumulado real del turno en el estado Produciendo. El sync lo guarda como
-  `officialLive` dentro del write del padre que ya existia (cero escrituras/requests extra).
-  El monitor lo muestra junto al corte de datos: "datos hasta las 14:25 · Shoplogix marcaba
-  3.850 a las 14:52". Pedido de Orel: "necesito que se sincronice Shoplogix con el monitor".
-- Archivos: functions/shoplogix/sync.js, functions/publicMonitor.js,
-  apps/pwa/src/services/shoplogix/publicShiftMonitor.service.ts,
-  apps/pwa/src/pages/PublicShiftMonitorPage.tsx
-- Verificación: tsc/eslint limpios; functions cargan sin error; extracción validada DOS
-  veces contra el endpoint real cuadrando con la pantalla de planta (3.850=3.850 a las
-  14:52; 3.932 a las 15:15). Degradación sin el campo verificada en preview (queda como hoy).
-- Estado: HECHO. Merge squash a main `d33d4505`. Deploy hosting y Functions ambos success.
-- Sigue: E2E con `officialLive` poblado por un turno vivo real (Yal esta noche / Filete manana).
-
----
-
-## 2026-08-13 - claude - Tope de apuro: pedir mas de +30% del ritmo real es "no se alcanza" (#525)
-
-- Hecho: segunda vuelta del veredicto (Orel) — "se alcanza pero con 36 pz/min" en una linea
-  que viene a 10 seguia siendo irreal. Por encima de +30% del ritmo real el veredicto es
-  NO SE ALCANZA aunque no haya techo historico de por medio; "solo apurando" queda acotado
-  al rango 1,05x-1,3x. La hora extra tambien respeta el tope.
-- Archivos: apps/pwa/src/services/shoplogix/monitorPace.ts (+tests, 28 recalibrados),
-  apps/pwa/src/pages/PublicShiftMonitorPage.tsx
-- Verificación: vitest monitorPace 28/28, tsc y eslint limpios; preview :5189 contra el
-  turno VIVO de Filete (pide 40,1 pz/min, viene a 9,9 → No se alcanza).
-- Estado: HECHO. Merge squash a main `7f8253db`.
-- Sigue: nada pendiente de este cambio.
-
----
-
-## 2026-08-13 - claude - El veredicto distingue "se alcanza" de "solo apurando" (#521)
-
-- Hecho: "se alcanza pidiendo 26 pz/min" en una linea que viene a 10 comparaba contra el
-  techo HISTORICO, no contra el ritmo real del turno. Verdict nuevo 'exigente': cabe bajo
-  el techo pero pide mas que el mayor entre el promedio del turno y la ultima media hora
-  (margen 5%). La hora extra se ofrece desde ese escalon; si baja al ritmo que la linea YA
-  trae, la pantalla lo dice ("bastaria con X"). Tres titulares: "se alcanza al ritmo que
-  traes" / "se alcanza, pero solo apurando" / "no se alcanza".
-- Archivos: apps/pwa/src/services/shoplogix/monitorPace.ts (+tests, 28→32),
-  apps/pwa/src/pages/PublicShiftMonitorPage.tsx
-- Verificación: vitest shoplogix 244/244; tsc y eslint limpios; preview :5189 contra el
-  turno VIVO de Filete, caso real (pide 26,8 pz/min, va a 9,8).
-- Estado: HECHO. Merge squash a main `e8499bfe`.
-- Sigue: nada pendiente de este cambio.
-
----
-
-## 2026-08-13 - claude - "Datos hasta las HH:MM" junto a las piezas del turno vivo (#519)
-
-- Hecho: el monitor es un espejo que copia Shoplogix cada ~5 min; sin el corte, la
-  diferencia de un ciclo de sync (63 pz, ~6 min a 10,9 pz/min) parecia descuadre de
-  conteo. Se muestra el FIN del ultimo tramo con dato (t + 5 min), no lastSyncAt. Solo
-  con turno vivo.
-- Archivos: apps/pwa/src/pages/PublicShiftMonitorPage.tsx
-- Verificación: preview :5175 contra turno VIVO de Filete (390px, "3.488 piezas · datos
-  hasta las 14:25"); tsc y eslint limpios.
-- Estado: HECHO. Merge squash a main `7501ddae`.
-- Sigue: nada pendiente de este cambio.
-
----
-
-## 2026-08-13 - claude - Curva de velocidad: horas reales, zoom y paneo (#517)
-
-- Hecho: eje de la curva pasa de "h+1" a horas reales del reloj (08:00, 09:00...); zoom
-  1x/2x/4x con paneo y recentrado en el final (mismo mecanismo del comparador); bloque
-  movido ARRIBA de "Piezas por tramo de 5 min".
-- Archivos: apps/pwa/src/pages/monitor/MonitorShiftParts.tsx, PublicShiftMonitorPage.tsx
-- Verificación: preview :5175 contra turno VIVO de Filete (390px); tsc y eslint limpios.
-- Estado: HECHO
-- Sigue: nada pendiente de este cambio.
-
----
-
-## 2026-08-13 - claude - Curva de velocidad de linea (pz/min) a lo largo del turno (#515)
-
-- Hecho: el KPI "Ultimos 30 min" da la velocidad de AHORA; nueva curva da la historia del
-  turno (rampa, baches, crucero). Cruda de 5 min (tenue, piso del dato de Shoplogix) + media
-  movil de 15 min (protagonista); 2 lineas de referencia punteadas ("necesitas" y "lo normal")
-  y bandas de convenio de fondo para que la colacion no parezca falla. Bloque plegable entre
-  el grafico de tramos y "A donde se va el tiempo".
-- Archivos: `pages/monitor/MonitorShiftParts.tsx` (componente `VelocidadDeLinea`),
-  `pages/PublicShiftMonitorPage.tsx`.
-- Verificación: preview contra el turno VIVO de Filete (8,5 pz/min, necesitas 12,7, lo normal
-  7,5), 390px sin overflow. tsc y eslint limpios. Diseño elegido por Orel en mockup.
-- Estado: HECHO. Merge squash a main `386d0a6f`.
-
----
-
-## 2026-08-13 - claude - Bitacora del turno: todos los comentarios del operador (#513)
-
-- Hecho: los comentarios del operador (unico texto en castellano que sube del piso) solo se leian
-  si coincidian con un tramo de brecha. Bloque plegado "Comentarios del operador" bajo Hora por
-  hora: hora + causa (salta al grafico) + texto; fusiona tramos contiguos del mismo comentario
-  (el sensor lo corta al cambiar de estado) y descarta los que cubren horas enteras (regla de 2 h
-  de las brechas). Si no hay comentarios, el bloque no aparece.
-- Archivos: `pages/monitor/MonitorShiftParts.tsx` (componente `BitacoraOperador`),
-  `pages/PublicShiftMonitorPage.tsx`.
-- Verificación: preview contra el monitor real de Filete (fusion incluida), 390px sin overflow,
-  claro y oscuro. tsc y eslint limpios.
-- Estado: HECHO. Merge squash a main `5a48a793`.
-
----
-
-## 2026-08-13 - claude - Boton para abrir el monitor en vivo sin pasar por compartir (#511)
-
-- Hecho: generar link/QR es para COMPARTIR; para mirar el monitor uno mismo faltaba un boton de
-  un click. `handleAbrirMonitor` reusa el token de linea via `createPublicShiftMonitor`
-  (invariante: no crea token nuevo, solo extiende vigencia) y abre `/monitor/{token}` en pestana
-  nueva; la pestana se abre ANTES del await para que el bloqueador de popups no la mate.
-- Archivos: `pages/AnalisisGrader/AnalisisGraderTurnoPage.tsx`.
-- Verificación: tsc y eslint limpios (1 warning preexistente ajeno). Pendiente de verificación
-  humana: el click con sesion de supervisor (no probado en navegador, sin login).
-- Estado: HECHO. Merge squash a main `14564470`.
-
----
-
-## 2026-08-13 - claude - Fix: la brecha se calcula contra la MISMA referencia que el grafico (#509)
-
-- Hecho: el v3 (#505) dejo el grafico comparando contra la referencia del chip pero la lista
-  "Donde se abrio la brecha" seguia clavada al mejor dia: dos rivales distintos a 20 px de
-  distancia. La referencia elegida ahora vive en ComparadorDias y alimenta a ambos (grafico y
-  BrechaDelDia recibe `contra` por prop); el titulo la sigue ("con la cuota" / "con lun 10").
-- Archivos: `pages/monitor/MonitorCompareChart.tsx`, `pages/monitor/MonitorShiftParts.tsx`.
-- Verificación: preview contra el monitor real de Filete con los tres chips (cuota, lun 10, mar
-  11); tsc, eslint y vitest de monitorCompare (51/51) limpios.
-- Estado: HECHO. Merge squash a main `f9089e91`.
-
----
-
-## 2026-08-13 - claude - Compactacion del WORKLOG (195 KB -> ~146 KB)
-
-- Hecho: segunda compactacion del historial (la primera fue el 2026-07-30). Las entradas del 2026-07-19 al 2026-07-30 (~57 KB de narracion PR-por-PR, todo mergeado) se condensaron en 3 bloques tematicos dentro de "Historial resumido", conservando gotchas, decisiones y pendientes. Agosto queda intacto (proyecto monitor activo). Respaldo completo pre-compactacion en `.ai/backups/WORKLOG-2026-08-13-pre-compactacion.md`; el detalle entrada por entrada vive en git.
-- Archivos: `.ai/WORKLOG.md`, `.ai/backups/WORKLOG-2026-08-13-pre-compactacion.md` (nuevo).
-- Verificacion: tamano final bajo el techo de ~150 KB; estructura de encabezados intacta.
-- Estado: HECHO.
-- Sigue: proxima compactacion cuando vuelva a acercarse a 190 KB (cortar por fecha, conservar gotchas, respaldar antes).
-
----
-
-## 2026-08-13 - claude - Monitor ronda 2: pie sin alarma nocturna, estado por maquina y record (#507)
-
-- Hecho: con el turno cerrado el pie dice "Turno cerrado - ultimo dato de las HH:MM" en tono
-  neutro (antes alarmaba de noche con "la sincronizacion puede estar detenida"; la alerta ambar
-  queda solo con turno vivo). "Por maquina" ahora dice el estado de AHORA ("· produciendo" o
-  "parada · causa (hace X)") usando currentReason/currentSinceAt, sin puntos con turno cerrado.
-  Linea de record bajo "Vas a" cuando el ritmo de hoy supera al mejor turno reciente.
-- Archivos: `PublicShiftMonitorPage.tsx`.
-- Verificación: tsc y eslint limpios; preview contra Filete cerrado (pie neutro, sin puntos rojos)
-  y turno vivo de Yal (record real: 44,9 vs 41,8 pz/min). Rama "parada · causa" por maquina no
-  se pudo ver en vivo (las 3 Baader producian) — replica el patron ya probado del "Ahora mismo".
-- Estado: HECHO. Merge squash a main `371310d6`.
-
----
-
-## 2026-08-13 - claude - Comparador v3: hoy contra UNA referencia con la brecha pintada (#505)
-
-- Hecho: el modo diferencia dibujaba hasta 6 deltas contra el cero y la cuota "caia" aunque el
-  turno fuera bien. Ahora hoy y la referencia elegida por chip (cuota o un dia anterior) SUBEN
-  las dos, con la brecha sombreada (rojo abajo, verde arriba, cruce interpolado) y la cuota
-  aplanandose en las paradas de convenio. El dia que mas llevaba a esta altura lleva "· mejor"
-  en su chip. La tabla de dias queda solo informativa (la seleccion vive en los chips).
-- Archivos: `pages/monitor/MonitorCompareChart.tsx` (reescrito), `pages/monitor/MonitorShiftParts.tsx`.
-- Verificación: tsc, eslint y vitest de monitorCompare (51/51) limpios; preview contra el turno
-  real de Filete (cuota y mar 11), 390px, claro y oscuro.
-- Estado: HECHO. Merge squash a main `d0338c51`.
-
----
-
-## 2026-08-12 - claude - Sin "Ahora mismo" con turno cerrado y produccion real en el veredicto (#503)
-
-- Hecho: con el turno cerrado, el bloque "Ahora mismo — Linea detenida" pintaba alarmante una
-  noche normal (esperable tras el cierre); ahora solo aparece con el turno en curso. Ademas el
-  veredicto del comparador dice cuanto de la altura del turno fue produccion real, ej. "Se
-  lograron 4.486 pz en 8 h 20 de turno, de las que 5 h 40 fueron de produccion real" (solo cuando
-  produccion < altura del turno).
-- Archivos: `PublicShiftMonitorPage.tsx`, `pages/monitor/MonitorShiftParts.tsx`.
-- Verificación: tsc y eslint limpios; preview contra Filete cerrado y turno vivo de Yal.
-- Estado: HECHO. Merge squash a main `2764cd5e`.
-
----
-
-## 2026-08-12 - claude - La cabecera del turno vivo mostraba el ultimo sync, no el cierre previsto (#501)
-
-- Hecho: en el monitor publico, con el turno en curso la cabecera mostraba el ultimo intervalo
-  sincronizado como hora de termino ("15:00-21:52" con la linea aun produciendo); ahora muestra
-  el cierre previsto ("15:00 -> 23:57") con marca "est." (sin marca si esta fijado a mano). Turno
-  cerrado sigue mostrando el rango real. De paso, "A donde se va el tiempo" pasa a decir "de
-  operacion" en vez de "de turno" para no repetir la palabra que usa el comparador de tiempo corrido.
-- Archivos: `PublicShiftMonitorPage.tsx`, `pages/monitor/MonitorShiftParts.tsx`.
-- Verificación: tsc y eslint limpios; preview contra turno vivo de Yal y Filete cerrado, 390px,
-  ambos temas.
-- Estado: HECHO.
-
----
-
-## 2026-08-12 - claude - El header de movil montaba los botones sobre el titulo (#478)
-
-Orel, con captura: *"mira se ven todos montados los botones ojo con el orden en el modo movil"*.
-
-- **No era truncado feo, era DESBORDE.** El header sticky es UNA fila: titulo en `flex-1 min-w-0`
-  y acciones en `shrink-0`. Los 7 botones ocupan ~290 de los 351 px utiles, asi que al titulo le
-  quedaban ~60 — y como sus etiquetas (turno, horario) tambien son `shrink-0`, **no se recortaban:
-  se salian del contenedor**, y los botones, que se pintan despues, quedaban ENCIMA.
-  ⚠ Patron transferible: `min-w-0` en el contenedor no alcanza si los hijos son `shrink-0`. O se
-  les saca el `shrink-0`, o el contenedor lleva `overflow-hidden`, o se cambia el layout.
-- **Arreglo**: en movil dos filas (`basis-full sm:basis-auto` en los dos grupos) — arriba QUE TURNO
-  estas mirando, abajo QUE PODES HACER con el, pegado al borde derecho. Dentro de la 2a fila:
-  primero las acciones sobre ESTE turno (clasificar, compartir, exportar) y al final
-  Anterior/Siguiente, que es irse a otro. `overflow-hidden` en el grupo del titulo como cinturon.
-- **Desktop no cambia**: los dos grupos siguen en una fila de 46 px (medido antes y despues).
-- Archivos: `pages/AnalisisGrader/AnalisisGraderTurnoPage.tsx` (solo clases).
-- Verificacion en prod (`buildSha` = `02f1637`), 375px, claro y oscuro: **0 elementos fuera del
-  header** medidos con `getBoundingClientRect` sobre TODOS sus descendientes, y sin scroll
-  horizontal (`scrollWidth === clientWidth === 375`). Caso peor probado inyectando por DOM un
-  titulo largo ("Turno 1 Lunes — Madrugada extendida") mas un badge extra: sigue sin desbordar.
-  ⚠ Medir el desborde con el DOM y no a ojo fue lo que dio la certeza: a ojo "se ve bien" no
-  distingue entre recortado y tapado.
-  tsc 0, eslint 0 nuevos, 1.162 tests OK.
-- Estado: HECHO.
-
-## 2026-08-12 - claude - Corte de control a mitad de turno + las 12 compuertas directas (#476)
-
-Orel: *"dale con el corte de control a mitad de turno y en gates debemos poder setear directo las
-12 gates ... sin ir a la configuracion de grader"*.
-
-- **Corte de control** (`MidShiftCheckCard` + `graderMidShiftCheck.ts`): con el turno EN CURSO y un
-  Excel cargado —aunque cubra un tramo— dice qué calibre viene apretado, cuántas piezas de ese
-  calibre quedan al ritmo medido, y qué gate mover. Si el Excel quedó viejo (>90 min) eso se dice
-  PRIMERO: todo lo demás describe un turno de hace horas. El Resumen lleva un aviso de una línea
-  que abre Gates — la tarjeta vive donde se actúa, pero enterrada ahí Control de Producción no la ve.
-  Reusa `compareGatesVsHistory`/`suggestGateMoves` de #474 a propósito: los umbrales tienen que ser
-  los mismos en las tres vistas (post-turno, pre-turno, mitad de turno). NO promete "piezas mejor
-  clasificadas" — a dónde caen las que desbordan no lo dice el Excel.
-- **Las 12 compuertas directas**: la tabla ya estaba en Gates pero detrás de un acordeón cerrado Y
-  una sub-pestaña. Ahora abre por defecto y en "12 Gates" (prop `defaultTab`).
-
-### ⚠ Dos cosas para no repetir
-
-1. **CORRECCIÓN a #474.** Ahí escribí que "la mayoría de los turnos no tiene `configHistory`, la
-   config vive en plantillas". **Es falso.** Lo medí con `collection('graderShifts').get()`, que
-   devuelve 2 turnos — y en Firestore **una subcolección puede vivir bajo un documento padre que NO
-   existe**, así que esa consulta no la ve. Con `collectionGroup('configHistory')` son **386
-   turnos**. Regla general: para contar subcolecciones usar `collectionGroup`, nunca
-   `collection(padre).get()`. El fallback a plantilla sigue siendo necesario (un turno nuevo empieza
-   sin snapshot) pero por esa razón, no por la que escribí.
-2. **Snapshots fantasma de "0 cambios".** El editor de gates publica con debounce apenas monta —es
-   "esto es lo que muestro", no "el usuario cambió algo"— y `saveConfigSnapshot` NO puede
-   distinguirlo: sin snapshot previo el diff es `[]` por construcción, así que su guarda de "sin
-   cambios" no aplica y escribe igual. Al abrir el panel por defecto, CADA visita a Gates dejaba un
-   snapshot firmado por quien pasó. Cortado con una huella de la última emisión (la primera tras
-   montar nunca se guarda). En prod hay **125 de 659** snapshots así, de antes.
-   ⚠ Dos de esos 125 los generé YO en esta sesión antes de detectarlo: `2026-08-11__Turno 2`
-   (2026-08-12T00:49Z) y `2026-08-07__Turno día` (2026-08-12T00:01Z). No los borré —borrar datos
-   de producción es decisión de Orel—; quedan anotados acá.
-
-- Archivos: `services/grader/graderMidShiftCheck.ts` (nuevo, puro),
-  `components/grader/MidShiftCheckCard.tsx` (nuevo), `AnalisisGraderGatesConfigPage.tsx`
-  (prop `defaultTab`), `AnalisisGraderTurnoPage.tsx`, `GateChangeModal.tsx`,
-  `GatesHistoryHintCard.tsx` (comentarios corregidos).
-- Verificación: 15 tests nuevos sobre el reparto REAL del `2026-08-11 Turno 2`. En el navegador,
-  forzando el turno a "en curso": estima ≈5.907 piezas por pasar y ≈3.484 del calibre apretado, y
-  los dos movimientos llevan el ratio de 2,4× a 1,4×. El aviso del Resumen abre Gates. Con el turno
-  cerrado no aparece ninguno. Pruebas revertidas. Confirmado que ya no se escriben snapshots al
-  abrir Gates. Claro, oscuro y 375px. tsc 0, eslint 0 nuevos, 1.162 tests OK.
-- Estado: HECHO (`3899d2a` en prod).
-- Sigue: el camino C de la propuesta — aviso por Telegram al detectar saturación, que ahora sí
-  tiene de dónde salir (reusa el canal de los briefs de turno).
-
-## 2026-08-11 - claude - Gates: setear sin Excel, imputaciones a "¿Que hacer?", aviso por historial (#473, #474)
-
-Orel: *"dale con las dos y pensemos como podriamos ayudar a control de produccion a corregir los
-gates segun lo q vaya pasando por la grader"*.
-
-### #473 - dos mudanzas
-- **Gates ya no exige el Excel**. Estaba DESHABILITADA sin el archivo: configurar las compuertas,
-  que es trabajo de ANTES del turno, pedia el Excel que recien existe al CERRARLO. Los 4 campos
-  que pedia Orel (calibre, calidad, conservacion, producto) YA existian, tapados detras de eso.
-- **Las imputaciones se mudaron de "Linea" a "¿Que hacer?"** y suman al badge. Eran lo unico de
-  Linea donde el tecnico ESCRIBE, enterrado bajo tres graficos. "¿Que hacer?" tambien se habilita
-  sin Excel si hay datos del sensor: Filete y Eviscerado llegan con el turno entero sin causa.
-- ⚠ El panel se monta SIEMPRE y se oculta por CSS: es el quien carga las anotaciones y publica el
-  pendiente, asi que con render condicional el badge marcaria 0 hasta entrar a la pestaña.
-
-### #474 - "¿Esta config aguanta lo que suele venir?"
-Analisis de saturacion corrido al ANTES: compara las gates asignadas contra el reparto de
-calibres de los turnos anteriores. Acusa el caso REAL de Chonchi: el 8-10 lb es el 55% de la
-produccion y la config le deja 3 de 12 gates (2,2x), mientras el 2-4 lb tiene 2 gates para el 1,3%.
-
-**Tres cosas que sin mirar los datos reales habrian salido mal** (valen para cualquier feature
-que agregue turnos historicos):
-1. **El calibre viene SIN NORMALIZAR de Matrix**: "8-10 lb" en agosto y "8 - 10 LB" el 3 de
-   agosto. Agrupando por el string crudo el historico ve 10 calibres en vez de 5 y TODOS los
-   porcentajes salen mal. Normalizar con `calibreKey()` (lowercase + sin espacios).
-2. **La config de gates NO vive en el turno**: la mayoria de los turnos no tiene `configHistory`
-   — se guarda como PLANTILLA (`graderGatesTemplates`) y se reusa. Leyendo solo el snapshot, la
-   tarjeta no aparecia nunca. Regla de fallback: "Plantilla 1" o la primera, igual que el editor.
-3. **`GateChangeModal` tenia el mismo agujero**: sin snapshot abria con el selector de gates y
-   NINGUN campo abajo. Arreglado en la raiz -> ademas revive el boton "Cambiar gate" del
-   historial, que estaba muerto justo en los turnos donde todavia se podia cambiar algo.
-
-Decisiones de criterio: compara por CALIBRE y no por calibre x calidad (`calibreDistribution`
-guarda solo el calibre); NO filtra por lote (`lotsInShift` esta vacio en 36 de 37 turnos reales)
-y por eso DICE que turnos y fechas miro; nunca deja un calibre en 0 gates aunque el ratio lo
-justifique; deshace un movimiento que satura al donante; excluye el propio turno del historico.
-
-- Archivos: `services/grader/graderCalibreHistory.ts` (nuevo, puro),
-  `components/grader/GatesHistoryHintCard.tsx` (nuevo),
-  `components/grader/modals/GateChangeModal.tsx`, `pages/AnalisisGrader/AnalisisGraderTurnoPage.tsx`.
-- Verificacion: 22 tests nuevos sobre los NUMEROS REALES de produccion (6 turnos de Chonchi + la
-  plantilla vigente), no datos inventados. En prod (`buildSha` = `fd67a19`) la tarjeta acusa el
-  8-10 lb y el modal abre pre-rellenado. En Yal no aparece. No se registro ningun cambio de gate:
-  eso es decision de Orel. Claro, oscuro y 375px. tsc 0, eslint 0 nuevos, 1.147 tests OK.
-- Estado: HECHO (#473 en `8cb1427`, #474 en `fd67a19`).
-- Sigue: los otros dos caminos de la propuesta, sin construir — (B) corte de control a mitad de
-  turno con Excel parcial (la app YA entiende cobertura parcial), y (C) aviso por Telegram al
-  detectar saturacion, que depende de B. Propuesta visual completa:
-  https://claude.ai/code/artifact/046435ab-b88f-4f0c-9c8a-eef62b0302d9
-
-## 2026-08-11 - claude - Resumen a ancho completo y Calidad+Timeline juntas (#471)
-
-Orel, mirando el resultado de #469: *"el resumen deberia ocupar toda la pagina verdad no estar
-recortado"* y *"calidad y timeline deberian estar en la misma pestaña para al seleccionar la
-calidad las muestre en el timeline"*. Las dos observaciones eran correctas — dos regresiones
-que introdujo #467/#469.
-
-- **El Resumen se veia recortado**: al mudar "¿Que hacer?" a su pestaña quedo vivo el grid de 3
-  columnas. El contenido seguia en `col-span-2` y la tercera columna quedaba VACIA → media
-  pantalla de aire al lado de la tarjeta. Ahora es una sola columna a ancho completo (medido:
-  1189 de 1189 px utiles).
-- **Calidad y Timeline vuelven a ser UNA pestaña**. ⚠ La leccion, para no repetirla: `selectedCauses`
-  es estado COMPARTIDO entre `P0CausesPanel` y `ShiftTimelineView`. Separar dos bloques que
-  comparten estado no los separa: mata la interaccion, porque el efecto queda en una pestaña
-  que no estas mirando. **Antes de mover un bloque a otra pestaña, revisar que estado comparte
-  con lo que deja atras.** Queda comentado en el JSX de la vista `calidad`.
-- **Efecto lateral que casi se escapa**: `handleExportPdf` saltaba a `setActiveView('timeline')`
-  para montar el grafico. Con la pestaña borrada el PDF habria salido SIN grafico y en silencio
-  (el codigo ya tiene un `logger.warn` para ese caso, no un error). Ahora salta a `calidad`.
-- Archivos: `apps/pwa/src/pages/AnalisisGrader/AnalisisGraderTurnoPage.tsx` (unico).
-- Verificacion: turno `2026-08-03__Turno 1` con Excel del Grader, local contra Firestore de prod.
-  Pestañas = `Resumen · Calidad · Gates · Linea · ¿Que hacer?`. Al marcar "Fuera de limites" el
-  timeline muestra `Fuera de limites 347 · 347 pzas con peso` con el scatter pintado. Claro,
-  oscuro y 375px. tsc 0, 1.125 tests OK. Desplegado y confirmado: `buildSha` = `70374cd`.
-- Estado: HECHO.
-- Sigue: dos preguntas de Orel sin construir todavia — (a) setear gates: el editor YA existe
-  (`ShiftConfigPanel` → `GateChangeModal`, con calidad/calibre/conservacion/producto), pero solo
-  aparece si `configSnapshots.length > 0` y con el turno `live`; el hueco real es el turno SIN
-  config, que es justo cuando querrias setearla. (b) separar "Linea": son 4 tarjetas y una de
-  ellas (`SensorStopsCausePanel`, las imputaciones) es CARGA DE DATOS mezclada con analisis.
-- Pendiente menor visto de paso (no tocado, fuera de alcance): a 375px en `P0CausesPanel` el
-  chip `paraguas · 6 sub` se superpone con `89.7% del P0`.
-
-## 2026-08-11 - claude - Pestaña "Calidad" y herramientas fuera del Resumen (#469)
-
-Orel: *"si datos grader deberiamos tambien tener en las pestañas lo ordenado o no? como la linea"*.
-
-- **El diagnostico**: "Linea" se lee ordenada porque contiene UNA sola cosa (todo Shoplogix junto).
-  El Resumen mezclaba TRES: el titular del turno, el analisis del Grader (P0, calibres, calidad,
-  lotes) y herramientas (compartir, QR, IA).
-- **Regla del modulo, ya explicita en el codigo**: una pestaña = una pregunta.
-    resumen ¿como fue? · calidad ¿por que se rechazo? · timeline ¿cuando paso? ·
-    gates ¿como estaban las compuertas? · linea ¿como estuvieron las maquinas? · accion ¿que hago?
-- **Calidad** es el espejo de Linea: se lleva `P0CausesPanel`, `ShiftBreakdownsCard` y el analisis
-  IA. Sin Excel queda deshabilitada con su motivo, como Timeline y Gates.
-- **Las herramientas salen de las pestañas**: compartir turno y link/QR del monitor se abren con un
-  boton en la barra superior (junto a exportar). ⚠ Los paneles siguen renderizandose abajo —estan
-  en ramas distintas del JSX y unificarlos en un modal movia ~150 lineas—, asi que el toggle hace
-  **scrollIntoView**: un panel que aparece fuera de la vista se lee como un boton que no responde
-  (lo mismo que paso en #467 con las pestañas debajo del contenido).
-- El aviso de config desalineada se QUEDA en el Resumen: afecta a como leer todo el turno.
-- Verificacion: en el navegador con datos de prod — 6 pestañas; el Resumen ya no trae
-  P0/compartir/monitor/IA; Calidad muestra las causas; el boton despliega las herramientas desde
-  cualquier pestaña. 1.125 tests, tsc limpio. Bundle `94f045e`.
-- Estado: HECHO — mergeado y desplegado.
-
----
-
-## 2026-08-11 - claude - Pestañas siempre presentes + "¿Que hacer?" como pestaña (#467)
-
-Orel: *"deberiamos establecer un estandar"* y *"veamos como ocultar o agregarlo como una pestaña
-mas el que hacer"*. Cierra el estandar que empezo la tarjeta de #465.
-
-- ⚠⚠ **Las pestañas vivian DENTRO de `{summary && shiftWindow && (...)}`**: un turno sin Excel no
-  mostraba ninguna. Dos navegaciones distintas para la misma pantalla, y sin forma de saber que
-  esas vistas existen. **Tercera aparicion del mismo patron hoy** (#438 la tarjeta invisible en
-  Filete, #455 la navegacion): envolver estructura en el gate de un dato la hace desaparecer.
-- Ahora la barra va fuera del gate y ANTES del contenido. Las vistas que necesitan Excel salen
-  DESHABILITADAS con el motivo (`title`): Timeline/Gates "Necesita el Excel del Grader"; ¿Que
-  hacer? "Las acciones se calculan con el Excel". Resumen y Linea quedan usables — sin Excel las
-  dos muestran el estado de las maquinas, asi que en vez de dejar Linea muerta se la deja abrir.
-- **"¿Que hacer?" pasa de tercera columna permanente a pestaña propia**: gana ancho para leerse y
-  el Resumen recupera el ancho completo. El tab lleva el CONTADOR de acciones para que no se
-  pierda de vista (sin eso, mover el panel a una pestaña lo volveria invisible).
-- ⚠ Los modales del panel se quedan montados en el Resumen: `handleActionTrigger` puede
-  dispararlos desde cualquier vista.
-- ⚠ Al mover el bloque quedo DESPUES del contenido en el JSX y las pestañas aparecian debajo de la
-  tarjeta. Se veia solo mirando: el DOM las tenia y el test de existencia pasaba igual.
-- Verificacion: en pantalla con datos de prod — con Excel 5 pestañas y "¿Que hacer? 5"; sin Excel
-  la misma barra con 3 en gris. 1.125 tests, tsc limpio. Bundle `9139cdf`, confirmado en prod.
-- Estado: HECHO — mergeado y desplegado.
-
----
-
-## 2026-08-11 - claude - La tarjeta de turno se agrupa por PREGUNTA, no por fuente (#465)
-
-Orel: *"el de grader esta todo como desordenado, no se como explicarlo"*. Rediseño elegido por el
-en un mockup de 3 opciones (opcion B, "Dos preguntas"); la directora-creativa lo produjo con los
-dos estados lado a lado y medicion de contraste.
-
-- **El diagnostico**: la tarjeta agrupaba por PROCEDENCIA (columnas "Shoplogix" y "Grader") — 12
-  numeros ordenados por algo que no sirve para decidir. Y los dos estados eran disenos distintos,
-  asi que cargar el Excel se sentia cambiar de pantalla.
-- Ahora: izquierda *cuanto salio*, derecha *donde estuvo la limitacion*. La mitad derecha es el
-  MISMO componente en ambos estados (`ShiftMachinesHalf`) — es lo que da el parentesco.
-- Jerarquia: el numero grande pasa a ser el del turno (13.366 pz; antes el `text-5xl` se lo llevaba
-  el P0 2,3%). El uptime sube al nivel de la produccion: es el argumento de Mantencion. La
-  composicion Baader vs linea manual sube del pie (explica por que piezas ≠ ciclos).
-- Fuera: fondo tintado de toda la tarjeta y borde de 2 px de color (el estado va en el chip),
-  encabezados por fuente (al pie como procedencia), ciclos/hr suelto y "maq. con datos".
-- ⚠ Los tokens `--ink-*` YA EXISTIAN (derivados contra el peor fondo, con variante oscura). Empece
-  a crear `--ok-ink/--warn-ink/--bad-ink` y lo revertí al encontrarlos: habria sido la misma regla
-  en dos lugares (el error de #453). **Buscar el token antes de crearlo.**
-- ⚠ La barra de uptime usa el color del UPTIME, no el del veredicto combinado: con 82% de uptime y
-  ritmo bajo salia ambar con el numero verde al lado. Se detecto MIRANDO la pantalla.
-- Verificacion: en pantalla con datos de prod — oscuro, claro y 375 px, en los dos estados (11-ago
-  con Grader / 10-ago solo Shoplogix). 1.125 tests, tsc y eslint limpios. Bundle `31547dc`.
-- Estado: HECHO — mergeado y desplegado.
-- Sigue: **estandarizar las pestañas** (Resumen/Timeline/Gates/Linea aparecen y desaparecen segun
-  haya Excel; deberian estar SIEMPRE, con las que dependen del Excel deshabilitadas y el motivo).
-  Es la otra mitad del "estandar" que pidio Orel.
-
----
-
-## 2026-08-11 - claude - El chip decia "Turno dia" para un turno llamado "Turno 2" (#463)
-
-Orel: *"el mismo turno se ve de dos formas... el de grader esta todo como desordenado"*.
-
-- **Cadena del bug** (el "desorden" tenia una causa de datos, no solo estetica):
-  1. El chip de turno vigente cae a un FALLBACK por schedule cuando ningun doc de Shoplogix
-     contiene la hora actual.
-  2. Ese fallback filtraba por una lista fija elegida con `isClassificationPlant` — que mide OTRA
-     cosa — y para Chonchi daba `['Turno dia','Turno noche']`: nombres que la planta DEJO DE EMITIR
-     en 2026-05 y que sobreviven en el schedule solo como ventanas anchas para Excels viejos.
-  3. "Turno dia" es 07:00-19:00 → a las 16:00, con el Turno 2 real ya cerrado (07:15-15:00), el chip
-     anunciaba "En curso · Turno dia".
-  4. Al tocarlo iba a `2026-08-11__Turno dia`: la MISMA jornada sin el Excel (guardado bajo
-     "Turno 2"), con el cartel "Solo Shoplogix · Sin Excel del Grader" ofreciendo cargar uno ya
-     cargado.
-- Fix: `bySpecificity()` — el fallback recorre el schedule ordenado por ventana MAS CORTA primero.
-  A las 16:00 gana "Turno 2" (8h15) sobre "Turno dia" (12h). Sin listas de nombres que mantener.
-- ⚠⚠ **Tercera vez en el dia que `isClassificationPlant` decide algo que no le corresponde** (#455
-  la navegacion, #463 el nombre del turno). Si aparece en un `if`, sospechar: solo significa "esta
-  linea clasifica por calibre/calidad".
-- Verificacion: 1.125 tests (4 nuevos con el schedule real de Chonchi, comparando el antes/despues
-  a las 16:00) + navegador. Bundle `71d48e1`.
-- Estado: HECHO — mergeado y desplegado.
-- Sigue: **rediseño de la tarjeta de turno**. Orel eligio la opcion B del mockup ("Dos preguntas":
-  izquierda cuanto salio, derecha donde estuvo la limitacion; la mitad derecha IGUAL con o sin
-  Grader). Mockup: `scratchpad/tarjeta-resumen-turno.html` + artifact. Incluye estandarizar las
-  pestañas (que existan siempre, deshabilitadas con el motivo cuando falta el Excel) y la
-  correccion de contraste de los semanticos en tema claro (miden 2,7-3,1:1 como texto).
-
----
-
-## 2026-08-11 - claude - La linea de "No aplicable" estaba en la tarjeta equivocada (#461)
-
-Orel abrio el turno del 11-ago y la linea que agregue en #459 NO estaba.
-
-- Causa: la puse en `GraderTurnoDetailView` ("Piezas totales"), pero la vista de turno CON Grader
-  pinta el `HeroScorecard` — el bloque "13.366 piezas · Marelec". Dos tarjetas distintas para el
-  mismo dato, y elegi la que esa vista no muestra.
-- ⚠⚠ La leccion, otra vez la misma: **di por bueno #459 sin mirar la pantalla**. tsc, 1.121 tests y
-  el deploy en verde, y el cambio publicado donde nadie lo veia. Es el mismo patron de #438 (la
-  tarjeta invisible en Filete). Cuando el entregable es algo que se VE, no esta hecho hasta verlo.
-- Ahora sale bajo el total: "+ 163 no aplicables · Matrix: 13.529", con el detalle en el tooltip.
-- Verificado EN PRODUCCION con screenshot (bundle `7773690`, con la sesion de Orel en el navegador).
-- Estado: HECHO — mergeado y desplegado.
-
----
-
-## 2026-08-11 - claude - Los registros "No aplicable" del Grader (#459)
-
-Orel cargo el Excel del 11-ago y no le cuadraba: el Matrix decia *"se han recuperado 13.529
-registros"* y la app mostraba 13.366 piezas.
-
-- **Diagnostico**: las 163 de diferencia son filas con `Cantidad de piezas` en 0 y `Peso de las
-  piezas` en "No aplicable" — eventos que el grader registra SIN pieza detras. El parser las
-  descartaba en silencio (`if (pieces <= 0) continue`), asi que la diferencia parecia produccion
-  perdida. **El letrero del Matrix cuenta REGISTROS; la app cuenta PIEZAS.**
-    13.529 registros = 13.366 piezas + 163 no aplicables
-- Hecho: se separan en `notApplicableRecords` **con su timestamp** (no entran a `pieceRecords`:
-  valen 0 piezas y los arrastrarian a cada calculo), se **reparten por turno** con la misma regla
-  que las piezas, el summary guarda el conteo y la tarjeta "Piezas totales" lo muestra con el
-  numero del Matrix al lado. El wizard avisa al cargar.
-- Verificacion: 1.121 tests (7 nuevos — 4 del parser con la cabecera REAL de Chonchi, incluido uno
-  que comprueba que piezas + no aplicables reconstruye el numero del letrero). Bundle `ac1b96e`.
-  El doc del turno ya cargado se completo a mano con los 163 para que cuadre sin recargar el Excel.
-- ⚠ Como se consiguio el dato: los Excel llegaron por correo y **el conector M365 trunca a 200.000
-  caracteres** (del pieza-a-pieza solo llego el 17,6%). Sirvio igual porque el patron aparece en
-  cualquier tramo, pero para contar el total hay que bajar el archivo. Un SUBAGENTE hizo esa lectura
-  para no gastar el contexto principal — patron a repetir con adjuntos grandes.
-- ⚠ Cabecera real del pieza-a-pieza de Chonchi (distinta del P0):
-  `Fecha | Hora | Peso de las piezas | Cantidad de piezas | Lote | Gate | Calidad | Conservacion |
-  Calibre | Producto | Turno`. El parser mapea por NOMBRE, no por posicion, asi que no le afecta.
-- Estado: HECHO — mergeado y desplegado.
-- Sigue: **Orel confirma en pantalla** que la tarjeta muestra "+163 no aplicables (Matrix: 13.529)";
-  no se pudo ver en el navegador de pruebas.
-
----
-
-## 2026-08-11 - claude - Fuera el bucket Unscheduled del carrusel de turnos (#457)
-
-Pedido de Orel tras ver que en Filete el "turno anterior" que ofrecian las flechas era el bucket.
-
-- `Unscheduled` NO es un turno: es donde Shoplogix deja lo que cae fuera de las ventanas
-  configuradas. Desde #451/#453 esa produccion se atribuye al turno CONTIGUO, asi que ofrecerlo como
-  destino llevaba a una pantalla con piezas que YA estan contadas en el turno de al lado.
-- Se conserva UNA excepcion: si es el que se esta mirando (si no, la vista abierta no se encontraria
-  en la cadena y las flechas saldrian de posicion).
-- Lo que quede sin atribuir (un dia entero sin turnos configurados) se sigue viendo en la MATRIZ,
-  que es donde el bloque suelto SIRVE: es la señal de que falta configurar ese turno en Shoplogix.
-- Verificacion (local, datos de prod): filete 10-ago Anterior pasa de "mismo dia · Unscheduled" a
-  "2026-08-08 · Turno Dia" (el 09 es domingo sin proceso); eviscerado sin cambios. Bundle `1b77b44`.
-- ⚠ Leer los botones por su `title`, no por `innerText`: el texto va con `hidden md:inline` y en
-  pantalla angosta el boton no tiene texto.
-- Estado: HECHO — mergeado y desplegado.
-
----
-
-## 2026-08-11 - claude - Anterior/Siguiente no funcionaban en Filete ni Eviscerado (#455)
-
-Orel: *"los botones de anterior y siguiente (turno) no funcionan en filete ni eviscerado; debo poder
-cambiar de turno tanto en el de monitoreo como en el analisis de turno"*.
-
-- **Causa en Analisis de Turno** (verificada leyendo `disabled`/`title`, sin depender de clics): los
-  dos botones estaban DESHABILITADOS. `setAdjacentShifts(idx === -1 ? {prev:null,next:null} : ...)`
-  anulaba la navegacion entera si el turno abierto no figuraba en la cadena. Y no figuraba:
-  · EVISCERADO — la cadena solo consultaba Shoplogix con `isClassificationPlant === false`, que mide
-    OTRA cosa (si la linea clasifica por calibre/calidad). Eviscerado SI clasifica → navegaba solo
-    entre dias con Excel del Grader, y los 5 Excel que hay ni tienen `plantLineId`. Cadena vacia.
-    Ahora usa `shoplogixEnabled`, que es justo "esta linea tiene datos de Shoplogix".
-  · FILETE — basta que la etiqueta de la URL no calce exacto con la de Shoplogix ("Turno dia" del
-    Grader vs "Turno Dia"). Ahora, si el turno abierto no esta en la cadena, **se lo INYECTA** en su
-    lugar cronologico: no ubicarse a uno mismo no es motivo para encerrar al usuario en un turno.
-- **Monitor publico**: el turno mirado pasa de `useState`+refs a la URL (`?turno=<shiftDocId>`) y el
-  indice se DERIVA. Desaparece el efecto que restauraba la posicion y peleaba con la navegacion; la
-  eleccion sobrevive a recargas y el turno queda **compartible**.
-- Verificado (local, datos de prod): filete Anterior "mismo dia · Unscheduled" / Siguiente
-  "2026-08-11 · Turno Dia"; eviscerado Anterior "mismo dia · Turno 2" / Siguiente "2026-08-11 ·
-  Turno 2" — antes los cuatro deshabilitados. Monitor con `?turno=2026-08-10_Turno Dia` abre ese
-  turno (4.915 pz). Bundle publicado `b1cbea4`.
-- ⚠⚠ **GOTCHA DE VERIFICACION que costo una hora**: la pestaña de prueba corre en SEGUNDO PLANO y
-  React difiere el flush de los updates. Sintoma engañoso: la URL cambia, `console.log` del handler
-  aparece, y la vista NO se actualiza — parece un bug de la app y es del entorno. Se detecta porque
-  al RECARGAR con el estado en la URL sí se ve. Verificar por `disabled`/`title`/atributos (que se
-  leen del DOM ya renderizado) en vez de por el efecto de un clic.
-- Estado: HECHO — mergeado y desplegado.
-- Sigue: **Orel confirma en uso real** el sintoma "toco el boton y no pasa nada" del monitor, que no
-  se pudo reproducir de forma fiable. Menor: en Filete el turno "anterior" que ofrece es el bucket
-  `Unscheduled`; ahora que su produccion se atribuye al turno, quiza convenga sacarlo del carrusel.
-
----
-
-## 2026-08-11 - claude - La matriz alineada con la regla de continuidad (#453)
-
-Orel: *"alinea la matriz tambien con la regla nueva"*. Con esto las CUATRO superficies (monitor
-publico, brief de Telegram, vista de turno y matriz) deciden igual de quien es un bloque fuera de
-horario.
-
-- Hecho: la matriz atribuye por BLOQUE y reusa `esColaDeEsteTurno`. `MAX_ADJACENCY_MIN` (Infinity)
-  ELIMINADO — la distancia la fija `MAX_CONTINUIDAD_MS`, una sola constante compartida. Los
-  candidatos pasan a ser los turnos del mismo dia Y los ADYACENTES (la continuidad cruza medianoche:
-  las 23:30 son el arranque del turno de las 00:00, no la cola de uno que cerro a las 15:00); con eso
-  sobra la rama especial de "dia sin turnos".
-- ⚠⚠ Dos correcciones al umbral que salieron de tests reales que iban a romperse:
-  1. **ENCADENAR los tramos antes de decidir**: la produccion real viene con huecos. Yal 10-jul son
-     2.296 pz a las 14:05, 14:40 y 15:00 antes de un turno de las 15:15; tramo a tramo, la primera
-     quedaba a 65 min y se perdia entera.
-  2. **60 -> 90 min**: con 1 h ese mismo bloque quedaba fuera POR CINCO MINUTOS. Lo que la regla debe
-     excluir esta a otra escala (14 h el caso Chonchi, 10 h el 02-ago). Se cambio en los DOS lados.
-- ⚠ Cambio de comportamiento: un dia SIN turnos configurados ya no se cuelga del turno de otro dia
-  (Chonchi 02-ago, 293 cic a 10 h) — el bloque queda VISIBLE. Revierte en parte la decision del
-  03-ago pero solo para lo de FUERA: lo que cae DENTRO de una ventana se sigue atribuyendo.
-- ⚠ El test del caso Yal 03-ago fijaba un escenario RECORTADO (un solo turno 00:06-07:18). Contra
-  Firestore ese dia hubo 3 turnos y la produccion de 08:00-12:12 cae DENTRO del Turno 1: no se
-  afecta. Se reescribio el test con los turnos reales.
-- Verificacion: 219 tests functions + 23 matriz, tsc/eslint limpios. **Impacto medido sobre agosto
-  completo contra Firestore: 0 piezas dejan de atribuirse** (chonchi 4.258, yal 3.395, filete 2.661
-  siguen igual) — no mueve totales, corrige a QUIEN se asignan. Bundle publicado `dc288c3`.
-- Estado: HECHO — mergeado y desplegado.
-- Sigue: nada de esta feature. Queda de la sesion anterior ver un cierre de turno REAL de Filete
-  (que el brief espere la cola y anuncie el total completo).
-
----
-
-## 2026-08-11 - claude - La cola fuera de horario se la llevaba cualquier turno del dia (#451)
-
-Orel lo vio en Eviscerado: *"para el turno noche de ayer conto unos minutos de las 7 y tanto am y
-despues de las 9 y tanto de la noche... los mostro en el grafico tambien y conto piezas demas"*.
-
-- Causa: para decidir si un tramo del `Unscheduled` era la cola del turno bastaba con que NO cayera
-  dentro de la ventana de NINGUN turno. Como esos bloques no caen en ninguna, **cualquier turno del
-  dia se los quedaba**. El turno noche (21:15→05:00) sumaba 1.317 pz ajenas —1.048 de las 07:15,
-  cola del turno que cerro a esa hora, y 269 de las 17:00— y mostraba **13.487 en vez de 12.170**.
-  La barra de las 7 AM en el grafico venia de `operacionReal`, que extiende la ventana con esos
-  rangos y corre haya Grader o no (por eso se veia en Eviscerado, que no usa el scorecard).
-- Regla nueva de Orel: la cola cuenta **solo si es continua al turno**, no piezas de horas despues.
-  CONTINUIDAD (≤1 h) + CERCANIA (ningun otro turno mas cerca). Un tramo va a UN turno, nunca a dos
-  ni a ninguno: el empate se desempata a favor del que ya CERRO en vez de descartarse.
-- ⚠ La distancia se mide del **BORDE del tramo**, no de cada intervalo suelto: un bloque 07:00→07:30
-  antes de un turno de las 08:00 esta a 30 min, no a 60. Medirlo mal descartaba arranques
-  anticipados legitimos — lo destapo el test que los fija (habria sido una regresion silenciosa).
-- Archivos: `functions/publicMonitor.js` (monitor + brief) y `apps/pwa/src/hooks/useShiftOutsidePieces.ts`
-  (que ademas ni miraba los otros turnos) + `graderUnscheduledLoad.loadDayShiftWindows` (1 lectura).
-- Verificacion: 219 tests functions + 23 front (7 nuevos). Contra Firestore REAL del 10-ago:
-  noche 12.170+0, Turno 1 Lunes 9.543+689 (07:25-07:50), Turno 2 9.902+56 (17:10-17:20),
-  Filete 4.410+505 (sin cambios). En pantalla (local, datos de prod): 12.170, rango 21:15–05:00,
-  operacion real 21:30–04:50, sin rastro de las 7 AM.
-- Estado: HECHO — mergeado (`d114da2`) y desplegado.
-- Sigue: **decision de Orel** — la MATRIZ quedo con la regla vieja (`MAX_ADJACENCY_MIN = Infinity`,
-  decision suya del 03-ago). Alinearla moveria solo 65 pz en todo agosto, pero choca con el caso
-  Yal 03-ago de los 1.835 cic que el decidio atribuir. No se toco por eso.
-
----
-
-## 2026-08-11 - claude - Avisos de turno de Filete por Telegram + el brief anunciaba menos piezas (#449)
-
-Orel pregunto si se podian mandar los avisos por WhatsApp. Respuesta: se puede, pero el costo es
-el TRAMITE con Meta (cuenta business verificada, numero dedicado que se quema, plantillas
-pre-aprobadas, opt-in por persona, cobro por mensaje) — 1-2 semanas casi sin programar. Eligio
-encender Telegram, que da lo mismo hoy y gratis.
-
-**El hallazgo**: encender el canal NO bastaba. `componerBriefFinTurno` ya existia y estaba
-configurado para Filete (umbral 200 pz), pero:
-
-- se disparaba con el horario oficial (15:30 + 10 min) **con la linea todavia produciendo**;
-- sumaba **solo el doc del turno**. Evidencia dura: el brief de hoy ya salio por push a las 15:40
-  anunciando **4.338 piezas** cuando la jornada termino en **4.915** — 12% menos.
-
-- Hecho:
-  - `sumarColaAMaquinas` (publicMonitor.js): suma la cola fuera de horario a cada maquina y
-    devuelve el desglose. Reusa `loadOutsideShiftProduction` con su dedupe por (maquina, timestamp).
-  - El brief **espera a que la linea deje de producir**; tope de 2 h por si el sensor queda colgado.
-  - Mensaje: desglose "4.410 dentro del horario + 505 despues (15:40-16:30)" y horario hasta la
-    ultima pieza real (decia "hasta 15:30" con produccion hasta las 16:30).
-  - ⚠ `endBriefSnapshot` guarda el total SIN cola: `checkShiftReconciliation` lo compara contra el
-    doc padre y habria avisado una "correccion Shoplogix" falsa de -505 **cada dia**.
-  - ⚠ `resumenParos` ignora states de duracion CERO y repetidos: eran **27 de 85** "micro" — Telegram
-    decia 85 y el monitor 58 **del mismo turno**. Misma clase de bug que el listado vs el grafico
-    de #447: dos superficies contando distinto el mismo dato.
-  - Config `notificationConfig/filete`: telegram ON (dest `bot` = DM del admin, igual que chonchi y
-    yal), inicio + fin ON, **paros y primera pieza OFF** (Filete pidio el avance, no el ruido).
-- Archivos: `functions/publicMonitor.js`, `functions/shoplogix/turnoBrief.js`, `functions/index.js`,
-  + 2 archivos de test.
-- Verificacion: 220 tests en verde (211 + 9 nuevos). **Dry-run con los datos reales de Filete del
-  10-ago** (sin enviar nada): 4.915 pz, horario 07:45→16:30, 58 micro — coincide con el monitor
-  publico. Sin cola el mensaje queda byte a byte igual (Chonchi/Yal no cambian, con test).
-  Funcion desplegada y ACTIVE (revision 00044, updateTime 02:34).
-- Estado: HECHO — mergeado (`da650be`) y desplegado; canal encendido.
-- Sigue: **falta ver un turno real** — el proximo cierre de Filete es la primera prueba de fuego
-  (que el brief espere la cola y anuncie el total completo). Si Orel quiere que llegue al GRUPO y
-  no a su DM, es cambiar `telegramDest` a `grupo` desde el panel admin.
+# Historial resumido · 2026-08-11 → 2026-08-26
+
+> Compactado el 2026-09-17 desde ~128 KB de entradas PR por PR. El detalle completo vive en git
+> (`git log -p .ai/WORKLOG.md`) y en el respaldo `.ai/backups/WORKLOG-2026-09-17-pre-compactacion.md`.
+
+## Cola fuera de horario, brief de Filete y navegación de turnos (PR #449–#457, 11-ago)
+- #449: WhatsApp descartado por el trámite con Meta (1-2 semanas); Orel eligió Telegram. El brief de fin (`componerBriefFinTurno`) salía al horario oficial con la línea produciendo y sumaba solo el doc del turno: anunció 4.338 pz de una jornada de 4.915 (−12%).
+- Fix: `sumarColaAMaquinas` (publicMonitor.js, reusa `loadOutsideShiftProduction` con dedupe máquina+timestamp); el brief espera que la línea pare (tope 2 h) y desglosa «4.410 dentro + 505 después (15:40-16:30)».
+- ⚠ `endBriefSnapshot` guarda el total SIN cola: `checkShiftReconciliation` lo compara con el doc padre y avisaría una corrección falsa de −505 cada día.
+- ⚠ `resumenParos` ignora states de duración cero y repetidos (27 de 85 «micro»: Telegram 85 vs monitor 58).
+- `notificationConfig/filete`: telegram ON, dest `bot` (DM admin), inicio+fin ON, paros y primera pieza OFF. Al grupo: `telegramDest` = `grupo`.
+- #451: cualquier turno del día se quedaba con la cola `Unscheduled`. Noche 10-ago (21:15→05:00) sumaba 1.317 pz ajenas: 13.487 en vez de 12.170. Regla de Orel: la cola cuenta solo si es CONTINUA (continuidad + cercanía; un tramo va a un solo turno; empate al que ya cerró). Archivos: `functions/publicMonitor.js`, `hooks/useShiftOutsidePieces.ts`, `graderUnscheduledLoad.loadDayShiftWindows`.
+- ⚠ La distancia se mide desde el BORDE del tramo, no por intervalo suelto.
+- #453: la matriz usa la misma regla (`esColaDeEsteTurno`); `MAX_ADJACENCY_MIN` eliminado, manda `MAX_CONTINUIDAD_MS`; candidatos incluyen días adyacentes (cruza medianoche). Las 4 superficies deciden igual.
+- ⚠⚠ ENCADENAR tramos antes de decidir (Yal 10-jul: 2.296 pz con huecos antes de un turno de 15:15; tramo a tramo se perdían).
+- ⚠⚠ Umbral 60 → 90 min, en los DOS lados (con 60 ese bloque quedaba fuera por 5 min; lo que se excluye está a 10-14 h).
+- ⚠ Un día SIN turnos ya no se cuelga de otro día (Chonchi 02-ago, 293 cic): el bloque queda visible. Revierte en parte la decisión del 03-ago, solo para lo de fuera.
+- Impacto en agosto: 0 piezas dejan de atribuirse (chonchi 4.258, yal 3.395, filete 2.661); cambia a quién.
+- #455: Anterior/Siguiente deshabilitados si el turno no estaba en la cadena. Eviscerado usaba `isClassificationPlant === false` → ahora `shoplogixEnabled`; Filete no calzaba la etiqueta («Turno dia»/«Turno Dia») → el turno abierto se inyecta en su lugar. Monitor: turno en la URL (`?turno=<shiftDocId>`), compartible.
+- ⚠⚠ Pestaña de prueba en segundo plano: React difiere el flush; la URL cambia y la vista no. Verificar por `disabled`/`title` o recargando con estado en la URL (costó una hora).
+- Pendiente: Orel confirma en uso real «toco el botón y no pasa nada» del monitor.
+- #457: fuera el bucket `Unscheduled` del carrusel (salvo si es el que se mira); lo no atribuido se ve en la MATRIZ.
+- ⚠ Leer botones por `title`, no `innerText` (`hidden md:inline`).
+
+## Grader: «No aplicable», tarjeta de turno y pestañas (PR #459–#471, 11-ago)
+- #459: Matrix 13.529 registros vs app 13.366 piezas. 163 filas con cantidad 0 y peso «No aplicable» se descartaban. **Matrix cuenta REGISTROS; la app PIEZAS.** Van a `notApplicableRecords` (no a `pieceRecords`), repartidas por turno; el doc ya cargado se completó a mano.
+- ⚠ El conector M365 trunca adjuntos a 200.000 caracteres (llegó el 17,6%); bajar el archivo con un subagente.
+- ⚠ Cabecera pieza-a-pieza Chonchi: `Fecha | Hora | Peso de las piezas | Cantidad de piezas | Lote | Gate | Calidad | Conservacion | Calibre | Producto | Turno` (el parser mapea por nombre).
+- #461: ⚠⚠ #459 se dio por bueno sin mirar: la línea quedó en `GraderTurnoDetailView` y la vista pinta `HeroScorecard`. Lo que se VE no está hecho hasta verlo.
+- #463: el chip decía «Turno dia» para «Turno 2»: el fallback filtraba con `isClassificationPlant` y daba nombres que Chonchi dejó de emitir en 2026-05. Fix `bySpecificity()` (ventana más corta primero).
+- ⚠⚠ `isClassificationPlant` solo significa «clasifica por calibre/calidad»; sospechar si decide otra cosa.
+- #465 (opción B elegida por Orel): tarjeta por PREGUNTA (cuánto salió / dónde estuvo la limitación), mitad derecha común (`ShiftMachinesHalf`); número grande = piezas; uptime al nivel de producción.
+- ⚠ Los tokens `--ink-*` ya existían: buscar el token antes de crearlo. ⚠ La barra de uptime usa el color del uptime, no del veredicto.
+- #467: ⚠⚠ las pestañas vivían dentro de `{summary && shiftWindow && ...}` y sin Excel desaparecían (tercer caso del patrón «gate de dato esconde estructura»). Ahora siempre visibles; las que piden Excel, deshabilitadas con motivo. «¿Qué hacer?» es pestaña con contador.
+- ⚠ Modales del panel montados en Resumen (`handleActionTrigger`). ⚠ Las pestañas quedaron debajo del contenido y el test pasaba: solo se vio mirando.
+- #469: una pestaña = una pregunta (resumen/calidad/timeline/gates/línea/acción). Calidad lleva `P0CausesPanel`, `ShiftBreakdownsCard` e IA; compartir y QR a un botón superior con `scrollIntoView`.
+- #471: Resumen a ancho completo; Calidad y Timeline juntas otra vez.
+- ⚠ `selectedCauses` es estado compartido entre `P0CausesPanel` y `ShiftTimelineView`: revisar estado compartido antes de mover un bloque de pestaña.
+- ⚠ `handleExportPdf` saltaba a `timeline` para montar el gráfico; ahora a `calidad` (si no, PDF sin gráfico y en silencio).
+- Pendiente menor: a 375 px en `P0CausesPanel` el chip `paraguas · 6 sub` se superpone con `89.7% del P0`.
+
+## Gates: sin Excel, saturación y corte a mitad de turno (PR #473–#476, 11–12 ago)
+- #473: Gates usable sin Excel; imputaciones de «Línea» a «¿Qué hacer?» (suman al badge).
+- ⚠ El panel se monta siempre y se oculta por CSS: carga las anotaciones y publica el pendiente.
+- #474: compara gates contra el reparto histórico de calibres. Chonchi: 8-10 lb = 55% con 3 de 12 gates (2,2x); 2-4 lb con 2 gates para el 1,3%. Archivos `services/grader/graderCalibreHistory.ts`, `GatesHistoryHintCard.tsx`.
+- ⚠ Calibre sin normalizar en Matrix («8-10 lb» vs «8 - 10 LB»): `calibreKey()`.
+- Fallback a plantilla `graderGatesTemplates`; `GateChangeModal` sin snapshot abría vacío (arreglado). Compara por calibre; no filtra por lote (`lotsInShift` vacío en 36 de 37); nunca deja un calibre en 0 gates. Ningún cambio de gate registrado (decisión de Orel).
+- #476: `MidShiftCheckCard` + `graderMidShiftCheck.ts`, con Excel parcial; si el Excel tiene >90 min lo dice primero; reusa `compareGatesVsHistory`/`suggestGateMoves`. Caso real: ratio 2,4× → 1,4×. Las 12 gates abren por defecto (`defaultTab`).
+- ⚠⚠ Corrección a #474: `collection('graderShifts').get()` ve 2 turnos (subcolecciones bajo padres inexistentes); `collectionGroup('configHistory')` ve **386**. Contar subcolecciones siempre con `collectionGroup`.
+- ⚠⚠ Snapshots fantasma de «0 cambios»: el editor publica al montar y `saveConfigSnapshot` no lo distingue. Cortado con huella de la última emisión. En prod hay 125 de 659; dos del agente (`2026-08-11__Turno 2` 2026-08-12T00:49Z, `2026-08-07__Turno día` 2026-08-12T00:01Z), sin borrar (decisión de Orel).
+- Pendiente: aviso por Telegram al detectar saturación (camino C). Propuesta: https://claude.ai/code/artifact/046435ab-b88f-4f0c-9c8a-eef62b0302d9
+
+## Header móvil de Análisis de Turno (PR #478, 12-ago)
+- Los botones tapaban el título: sus etiquetas `shrink-0` desbordaban. Fix: dos filas en móvil (`basis-full sm:basis-auto`); desktop igual.
+- ⚠ `min-w-0` no alcanza si los hijos son `shrink-0`. ⚠ Medir desborde con `getBoundingClientRect`, no a ojo.
+
+## Monitor público: espejo, contador vivo y hora extra (PR #501–#531, 12–13 ago)
+- #501: cabecera en vivo con cierre previsto («est.»). #503: «Ahora mismo» solo en turno en curso; veredicto dice cuánto fue producción real. #507: pie neutro con turno cerrado; estado por máquina (`currentReason`/`currentSinceAt`); línea de récord.
+- #511: `handleAbrirMonitor` reusa el token de línea; la pestaña se abre ANTES del await (bloqueador de popups). Pendiente: probar con sesión de supervisor.
+- #519: «datos hasta las HH:MM» = fin del último tramo (t + 5 min), no `lastSyncAt`.
+- #526: `officialLive` = acumulado real del rollup (endpoint del whiteboard), dentro del write del padre (cero writes extra). Cuadró con planta (3.850 = 3.850).
+- #529: «fuera de horario» por hora real, no por doc de origen; `officialLive` dentro del guard `isOfficialScheduleSane` (Shoplogix devolvía la plantilla del día siguiente y lo pisaba con 0). Verdict `hora-extra`. Pendiente: verlo en una hora extra real.
+- #531: `shoplogixLive` solo con `totalCycles > 0`.
+
+## Monitor: comparador y veredicto (PR #505–#525, 13-ago)
+- #505: hoy contra UNA referencia por chip, brecha sombreada, cuota aplanada en convenio, chip «· mejor». #509: la referencia vive en `ComparadorDias` y alimenta también `BrechaDelDia`.
+- #515/#517: curva de velocidad (luego fusionada en #552). #513: bitácora del operador (luego eliminada).
+- #521: verdict `exigente` (bajo el techo pero sobre el mayor entre promedio y última media hora, margen 5%).
+- #525 (Orel): sobre +30% del ritmo real es «no se alcanza»; «solo apurando» = 1,05x-1,3x.
+
+## Monitor: pronóstico e historial del mismo turno (PR #534–#546, 13–14 ago)
+- #534 `monitorForecast.ts`: desde el minuto 240; método por backtesting leave-one-out. 34 turnos: Filete proporcional (5,2% vs 11,3%), Yal aditivo (8,8%; proporcional 12-24%). Causa física: Filete = velocidad; Yal = tiempo andando + paradas. Con error >15% se calla.
+- #536: cono de proyección; número y dibujo de la misma `proyectar`.
+- #540: `forecastHistory` = hasta 10 turnos del mismo nombre, 5 KB, fallback a `history`.
+- #542 ⚠⚠ Firestore no admite arrays anidados: pares `[m, p]` hicieron fallar el write ENTERO y el doc quedó congelado ~40 min. Ahora `{m, p}`. Verificar con el write real, no solo el cómputo.
+- #544: el piso de ancho de barra dejaba 15 de 118 barras fuera del viewBox (~2 h). Paso `W / n`.
+- #546: tres grados de «la meta entra» (ninguno / menos de un tercio / un tercio o más).
+- #538 «Dónde se gana en esta línea»: por línea, qué factor del total manda (tiempo andando × velocidad), medido por DISPERSIÓN de los últimos 6 turnos y no por correlación (con 6 turnos un coeficiente es ruido). En Filete manda la velocidad; en Yal, el tiempo andando. Más tarde Orel pidió quitar el bloque (ver «Fuera … Dónde se gana»).
+
+## Monitor: colación y ritmo andando (PR #548–#551, 14-ago)
+- #548: `timeBreakdown.windowMin` son minutos HASTA AHORA, no la duración; la cuota trepaba en la hora 4. Ventana `scheduledStart→plannedEnd`, convenio previsto (`breaks`). −2.995 → −929.
+- Colores: `monitorColors.ts` pasó de 7 hex (1,9:1) a 3 roles OKLCH con `--mon-*`.
+- ⚠ En SVG, colores por `style={{ stroke }}` (el atributo no resuelve `var()`). ⚠ Los hex de gráficos no pasan por `tailwind.config.js`: medir contraste en ambos temas.
+- Dos cierres contradictorios: `pace` proyecta a `plannedEnd`, el pronóstico a la duración mediana (8 h 45); la diferencia es la hora extra habitual (505/311/413 pz). Cada número lleva su hora; `ForecastResult.horizonMin`.
+- ⚠ `stopEvents` trae todas las detenciones y su `r` es un ÍNDICE a `stopReasons`. Paradas de convenio desde `comparacion.breaks` (`plannedBreaks()`).
+- ⚠ El aviso de próxima parada contaba desde `scheduledStart` y `plannedBreaks` desde el primer tramo con dato (5 min tarde).
+- #551: `computePaceToTarget` con `pendingBreakMin` → `workMin` (piso 5 min).
+- ⚠⚠ `mergeBreaks` usaba `fromMin > currentMinute`: la colación dejaba de contar mientras ocurría → `toMin > currentMinute`.
+- ⚠⚠ La parada EN CURSO no está en `stopEvents`: se arma desde `currentReason`/`currentSinceAt` y `extendOngoingBreaks` la estira a la mediana histórica.
+- `breaksTurno` = fuente única; `breakMinutesBetween` y `extendOngoingBreaks` en `monitorCompare`.
+- ⚠⚠ REGLA (Orel): un ritmo requerido sobre tiempo productivo solo se compara con ritmos productivos. Filete: andando mediana 11,0 / mejor 13,2; reloj 8,1 / 9,7. `ritmoAndando` desde `forecastHistory` y `live.uptimeSec`; `recentPerHour` null. «Tiempo produciendo» sobre tiempo disponible: 68% → 84%. Lectura: la línea anda sobre la mediana; lo que falta es tiempo.
+
+## Monitor: menos ruido, Pareto, silletas y gráfico (PR #552, 14-ago)
+- Inventario: 11 bloques, 2.766 px; tres respondían «¿llegamos?», cuatro «¿va rápido?», nadie «¿se repite?».
+- Pareto (`monitorPareto.ts`): dos ejes (minutos y en cuántos turnos; bajo la mitad en gris) y agrupado por equipo (antes de la primera barra de `Equipo/Parte`). Filete 7 turnos: 4 causas = 84% (Micro Detencion 35%, Baader 200 22%, ATASCAMIENTO 15%, ACUMULACION 12% en 2/7).
+- Un solo gráfico de 5 min (`VelocidadDeLinea` borrado). ⚠ Referencias solo si caben (≤1,3× el máximo).
+- Tarjeta «Ahora» unificada; 2.766 → 1.420 px (−49%). ⚠ Desde 2× el mejor turno el requerido se dice en palabras. ⚠ Tests de `PronosticoCierre` abren por el botón (`aria-expanded`), no por `localStorage`.
+- Silletas (Orel): Baader 200 de Filete, 5 silletas, máx. funcional 22 pz/min, se opera a 18; el límite es abastecimiento/atascamiento, no velocidad. 614 tramos: máx. 16,6, p95 14,0, mediana 10,2; ninguno al 90% de llenado; se llenan 61-64 de cada 100.
+- ⚠ Las 142 no tienen silletas: `SPECS` por MODELO en `monitorMaquina.ts`. ⚠ `imposible` contra el máximo (22), no el set point. ⚠⚠ El set point no viaja en los datos: la pantalla siempre lo muestra.
+- Pendiente: ver «harían falta N» en pantalla; confirmar si 18/22 cambian por producto o calibre.
+- Gráfico: eje Y hasta la velocidad de la máquina (antes autoescalaba); alto 80 → 170 px en px; chips de series en localStorage; zoom por gesto con «ver todo · N×». Mockup: https://claude.ai/code/artifact/115ffa5f-c34e-4ddf-a00f-0899e80cf153
+- ⚠⚠ `wheel`/`touchmove` nativos con `passive: false` (React los registra pasivos). ⚠⚠ El pellizco corta la propagación (swipe de cambio de turno, umbral 60 px). ⚠ Sin modificador la rueda no hace zoom.
+- Pendiente: probar el pellizco en un celular.
+
+## Monitor: pérdidas, dueños, contra ayer y contexto (14–15 ago)
+- `monitorPerdidas.ts`: cada parada se valoriza al ritmo previo (mediana de tramos limpios de 30 min, sobre tiempo andando). 14-08: 719 → 662 pz (−8%).
+- ⚠ Excluir de la referencia tramos con parada y en cero sin parada. ⚠ El titular se suma de las filas; la parada en curso va al promedio. `sinLocal` reporta los eventos del arranque.
+- Fuera «Comentarios del operador» y «Dónde se gana» (Orel). ⚠ Se pierden anotaciones de causas sin fila, de >2 h, mecánicas sin fila y las que pasan el tope de 2 de `notasPorCausa`.
+- «Qué pasó en el turno»: por dueño (Mantención/Externo/Sin imputar/Programado) con el árbol OFICIAL (`imputacionTaxonomy.ts`, curso V12); 14 de 21 causas matchean. «Evitable» ≠ «de Mantención» (14-08: 410 externos + 252 sin imputar, cero de máquina).
+- Extensión (Orel): 5 hojas `extension: 'filete-baader200'`; 140 min de fallas caían en «sin imputar». `TOTAL_HOJAS_CURSO` sigue en 46. Notas a `notasOperador.ts` (eslint 30 → 28).
+- ⚠ No se puede el Pareto eléctrica vs mecánica: Shoplogix aplana el árbol.
+- `monitorVsAyer.ts`: Δpz en duración/convenio/paradas/velocidad + residuo (14-08: −1.001, −213, +88, +276, +63 = −788). Solo con turno cerrado; récords por componente con mínimo 3 turnos; 12 de 23 turnos sin datos se saltan; residuo >35% → «datos incompletos».
+- ⚠⚠ `history` cacheado usa metodología vieja (07-08: 397 vs 351 min); manda `forecastHistory`.
+- Capa de contexto (guías en `ANTARFOOD/_GUIAS/_DESTILADO_VISUALIZACION.md`): banda normal, umbrales ▲110%/▼75%, meta como bullet. La meta 5.000 supera todo lo cerrado (3.168–4.915).
+- ⚠⚠ En el monitor, lo que dependa de «hoy» usa `vista`, no `data` (el turno visto se colaba en su propia banda). Con <5 turnos válidos no hay banda.
+
+## Monitor: turno noche, set point, rejilla y guardia de gráficos (PR #562, 15-ago)
+- Regla de Orel: Shoplogix manda, cero horarios hardcodeados. El verificador diario avisa por Telegram un nombre de turno nuevo (`scripts/.turnos-vistos.json`, gitignoreado).
+- Set point: `graderModuleConfigs.monitorSetPoint` → `live.setPoint`, editable (`setMonitorSetPoint` en `pinShiftEnd.ts`). Sembrado 18 pz/min (Orel, 15-08); el máximo 21 sale del manual.
+- ⚠ El set point se resuelve ANTES de buscar la entrada de horario.
+- #562: la rejilla de `timeBreakdown` se dimensionaba con minutos de operación y se indexaba por hora real: el 14-08 perdía 50 min de cola. El ritmo 13,5 era ~11,6 (récord falso) y el 13-08 escondía una falla (CUCHILLERIA DORSAL 15 min·3×).
+- Fix: rejilla `effectiveStart→effectiveEnd`; `tbv: 2` invalida la caché de `forecastHistory`; eventos a ≤10 s se funden en episodios.
+- 9 fixes de gráficos contra las guías (calibres con `utils/calibres.ts`, bug duplicado en Pivote y timeline). `scripts/audit-graficos.mjs` en CI con línea base por archivo; cazó 8 `.sort()` pelados.
+- Pendiente: leyenda de `GraderTimelineChart` angosta y ejes de compuertas en ambos temas.
+
+## Monitor: Pareto en piezas (PR #598–#604, 16-ago)
+- #598: `buildPareto` valoriza cada causa al cpm andando de su turno (rango 9,1–12,4). #600: tira con % y ≈pz (`fmtPzCorto`). #602: un solo significado para el ámbar. #604 (Orel): sin mediana punteada; filas suman 100% con `repartir100()`.
+
+## Piel: targets táctiles y home móvil (PR #606–#608, 16–17 ago)
+- #606: «Análisis de Turno» en home con 3 accesos por línea; banner sin semver (`formatDesfase`/`formatHora`).
+- #608: ⚠ `min-h-11` da 37 px (root al 87,5%/85%). Px literales en `components/piel/` (`GroupedList`, `Button md`, `Disclosure section`, `TabBar`).
+
+## Monitor: Filete nocturno sin turno (PR #610–#618, 17-ago)
+- #612 (reemplaza #610): el turno empieza en la primera pieza, `desdePrimeraPieza()` en `monitorActividad.ts`; antes 12 filas en cero y comparador corrido 12 h. #614: la cabecera también.
+- #616: con hueco >60 min tras el primer tramo, el inicio es el bloque siguiente (3 pz de prueba a las 21:45). `inferShiftEndFromDuration()`: sin cierre conocido, arranque + duración mediana (452 min), al final de la cascada.
+- ⚠ `functions/publicMonitor.test.js` da 35/37; los 2 fallos son preexistentes.
+- Pendiente: definir el turno nocturno de Filete en Shoplogix (como `Unscheduled` queda fuera del Pareto y el historial).
+- #618: sin `plannedEnd` la ventana caía a `windowMin` y se restaba contra `scheduledStart` (24 h atrás): «−3.171 vs cuota» falso. Sin cierre, cuota `0`.
+
+## Monitor: regla de ritmo y pulso (PR #620–#641, 17–18 ago)
+- #620: `.tap-44` (`::after` 44×44) en 20 controles; chip activo a `text-foreground` (2,81 → 10,64). #622: ejes 9 → 11 px (Constitución §9/§64).
+- #624: 6 cifras de ritmo → una regla; `monitorRitmo.ts` es la única fuente de la media móvil.
+- #626 revertido por #628: filtrar por nombre falló (Filete pasó a «Turno Noche L», 00:20–07:51, y dejó un «Turno Dia» de 4 h). Ahora la persona elige el turno por chip; el filtro por nombre sigue en banda/récords/vsAyer/Pareto. `buildDayComparison` no filtra (Yal compara sus 3 turnos).
+- #633 (Orel): las tres cifras de la regla en base andando, con la base escrita.
+- #635: la marca = ritmo requerido en base andando (sin extrapolar con <15 min). Scheduler `shoplogixPulseWakeup` (1 min) lee el acumulado vivo sin tocar buckets ni sync.
+- #637: ⚠ `functions/index.js` no tiene `admin` en scope (`getFirestore`, `FieldValue`, `FieldPath` sueltos). Deploy OK ≠ función corriendo: revisar logs de la primera ejecución.
+- #639: ⚠ Shoplogix refresca el contador cada 2 min: ritmo sobre las últimas 5 lecturas (serie real de test).
+- #641: endpoint `publicMonitorRefrescar` (~1 s, throttle 20 s en servidor, `yaFresco: true`) y botón con cuenta regresiva.
+- Pendiente: verificar el endpoint y el bloque con acumulado > 0 en un turno vivo.
+- Conocido y ajeno: error ROPC de `yal` en backoff.
+
+## Plano de partes BAADER 142 (PR #699, 23-ago)
+- Catálogo 1420000821 (254 figuras, 3.664 filas) en modo `despiece` (`planos/baader-142-despiece/`), con puente B14↔pieza en los eléctricos 888/860 (`partes.json`, telemetría `planoUsos`). 2.527 posiciones, 14 sensores B.
+- Pendiente: al terminar el OCR por teselas, re-subir los JSON y bumpear `vAssets` (PR solo de datos).
+
+## Ventanas de intervención (PR #789, 26-ago)
+- Pestaña en `/calendario-mantencion` (en prod, `buildSha 285e0bf`). Dos capas por tramo de 5 min; ocupante `X` = higiene en colación (choque estructural con Mantención).
+- `ruedaCarga`: capacidad = `min(máquinas disponibles, dotación)`, no el producto.
+- ⚠ `ruedaProgramacion`: el veredicto sale del ENCAJE, no de la suma (13,7 h contra 107 h «cabía» y solo entraban 5 de 10 ejecuciones).
+- Link `/rueda/:token` (30 días). Reglas `rueda_ventanas_state` y `ruedaVentanasPublicTokens`.
+- ⚠ Los horarios cargados son una BASE DE EJEMPLO.
+
+## `--brand-ink` y lockfile de pnpm (PR #820–#823, 26-ago)
+- #820: `--brand-ink` oscuro heredaba #2a6aa6 (2,75:1) → #71ade1 (6,60:1). El claro tampoco pasaba (3,71:1 sobre #d7e5f2) → primary-700 #245a8c (4,72:1).
+- ⚠ El peor fondo es el de la app, no la tarjeta. ⚠ Un token heredado entre pieles necesita un par por piel (4 pares en `scripts/check-contrast.mjs`).
+- #823: `pnpm-lock.yaml` desincronizado desde #643 (`jspdf`); sin bug en prod (`deploy-functions.yml` usa `npm ci`).
+- ⚠ `deploy.yml`, `deploy-miniapps.yml` y `daily-sync.yml` desactivan `--frozen-lockfile`: un guardarraíl apagado no avisa. ⚠ Regenerar con la pnpm de `packageManager` (10.33.0) y `--lockfile-only`.
+- Pendiente (Orel): volver los tres workflows a `--frozen-lockfile`.
+
+## Mantenimiento del WORKLOG (13-ago)
+- Segunda compactación: 195 → ~146 KB; respaldo `.ai/backups/WORKLOG-2026-08-13-pre-compactacion.md`. Luego volvió a ~216 KB.
 
 ---
 
@@ -4851,632 +1597,3 @@ Estos seguían abiertos cuando se compactó el historial (2026-07-30):
   quedó restringida.
 - Opcional: botones Confirmar/Cancelar dedicados para repuestos en el chat ARIA de la PWA (hoy es
   solo texto plano) + soporte de fotos.
-
-## 2026-08-26 · Ventanas de intervención (PR #789, en producción)
-
-Módulo nuevo en `/calendario-mantencion` → pestaña «Ventanas de intervención». Responde
-tres preguntas encadenadas: dónde puede entrar Mantención, dónde choca, y si alcanza el
-tiempo. Desplegado y verificado en producción (`buildSha 285e0bf`) abriendo la ruta pública.
-
-- **Dos capas por tramo de 5 min** (quién ocupa el equipo / dónde entra Mantención). Con una
-  sola capa, «intervenir mientras higiene lava» se guarda como simple bloqueo y se pierde el
-  dato que hay que mostrar: las horas con agua encima.
-- **Ocupante `X` (higiene en colación)**: en esta planta higiene entra durante la colación de
-  producción. Es el único hueco sin línea corriendo, así que higiene y mantención se lo
-  disputan — el choque es estructural, no accidental.
-- **Rueda para pintar, franja para mostrar**: un arco se juzga por ángulo y seis máquinas
-  serían seis relojes sueltos.
-- **`ruedaCarga`**: capacidad vs carga en horas-hombre. Capacidad de un tramo =
-  `min(máquinas disponibles, dotación)`, NO el producto.
-- **`ruedaProgramacion`**: encaja cada ejecución en día y hora, arrastrables. ⚠ El veredicto
-  sale del ENCAJE, no de la suma: con dotación 1 los totales decían «cabe» (13,7 h contra
-  107 h) y solo se ubicaban 5 de 10 ejecuciones.
-- Link público `/rueda/:token` (snapshot, 30 días, expiración validada en reglas).
-- 113 tests. Reglas `rueda_ventanas_state` y `ruedaVentanasPublicTokens` desplegadas.
-
-⚠ Los horarios cargados son una BASE DE EJEMPLO, no el horario real de planta.
-
-
-## 2026-09-15 · Bitácora de turno de Mantención (módulo nuevo, PR abierto)
-
-Pedido de Orel: una bitácora por turno que se llena en el celular (texto + fotos antes/después),
-se ve actualizada en el PC y desde el PC se copia al correo de Mantención o se exporta a PDF.
-Ruta `/bitacora` + tarjeta arriba del Inicio móvil + entrada en el menú lateral.
-Mockup aprobado: https://claude.ai/artifact/JYnbiYBeKLujwRgpYYCcQY (opción A, línea de tiempo).
-
-Decisiones de Orel (15-09): turno de **Mantención por reloj** (día 08-16, tarde 16-00, noche 00-08,
-no Shoplogix) · bitácora **compartida** del turno (cada evento firmado) · cada evento lleva
-**minutos de parada (MTTR)** o, si se intervino sin detener, **en qué ventana** (colación HG,
-colación empaque…) · Outlook "varía" → dos formas de copiar.
-
-- Datos: colección plana `bitacoraEventos` (`plantId`, `turnoId` = `YYYY-MM-DD_banda`), fotos en
-  Storage `bitacora/{turnoId}/{eventoId}/{archivo}`. Reglas nuevas en `firestore.rules` y
-  `storage.rules` (se despliegan al mergear). Costo: 1 onSnapshot por turno abierto + 1 lectura del
-  calendario cada 5 min; despreciable frente al techo de CLP 20.000.
-- Lógica pura con 20 tests en `services/bitacora/` (turno, resumen/MTTR, técnicos del calendario
-  real, HTML del correo). Los técnicos de turno salen de `calendario_mantencion_state/current`.
-- Correo: HTML con estilos en línea + `<table>` + `<img width height>` (lo único que respeta
-  Outlook clásico al pegar). «Copiar con fotos incrustadas» (base64) para Outlook nuevo/web.
-- Vitrina `/dev/bitacora` (solo DEV) con datos de ejemplo: verificado ahí a 375 px y en PC, ambos
-  temas, crear/editar/guardar, copiar (portapapeles con HTML + texto) y PDF (2 págs, fotos).
-
-⚠ Gotchas encontrados (cada uno costó una vuelta):
-- **CORS del bucket autoriza SOLO `https://orelcain.github.io`**, no localhost: en local el PDF y la
-  copia incrustada no pueden leer fotos reales de Storage (en prod sí). Medido con curl + Origin.
-- **La CSP (`connect-src`) no admite `data:`** → `fetch(dataUrl)` falla. Fotos a canvas con `<img>`
-  y dataURL→Blob a mano.
-- **`processImageForUpload` devuelve un WebP chico TAL CUAL aunque se pida `preferWebP:false`**
-  (idempotencia). Outlook clásico y jsPDF no aceptan WebP → se re-codifica en `fotosBitacora.ts`.
-- **Flex vertical con alto acotado + hijo `overflow-x-auto` = hijo de 0 px** (la fila de tipos
-  desaparecía en el Sheet). Fix: `[&>*]:shrink-0`.
-- jsPDF: «NH₃» salía «NH» (el saneo cp1252 descarta subíndices) → `normalize('NFKC')` antes.
-- Con el editor abierto el turno se CONGELA: si el reloj cruza las 16:00 a mitad de escribir, el
-  formulario se reseteaba y el evento caía en el turno siguiente.
-
-Pendiente: prueba real de Orel en el celular (fotos de cámara) y pegado en SU Outlook; ver si
-«Copiar para correo» basta o hace falta la variante incrustada.
-
-### 2026-09-15 · Bitácora · ronda de pulido 1 (mismo PR #1021)
-
-- **Guardar sin señal**: `await setDoc` se resuelve recién con el ACK del servidor → sin señal
-  «Guardar» giraba para siempre. Ahora no se espera (la app ya usa `persistentLocalCache`: la
-  escritura queda en el teléfono y el onSnapshot la muestra con «Guardando…»); si el servidor la
-  rechaza, toast. Igual para borrar y para la observación.
-- **Fotos sin señal**: aviso inmediato («se sube sola cuando vuelva la conexión») en vez de la
-  ruedita de 10 min de Storage; reintento automático con el evento `online`; guardar con fotos sin
-  subir pide un segundo toque (nunca se pierde una foto en silencio).
-- **Observación general del turno** (estaba en el mockup aprobado y faltaba): doc
-  `bitacoraTurnos/{plantId}_{turnoId}` + regla; sale en correo, texto plano y PDF.
-- **Copiar asunto** en la vista previa del PC (el portapapeles lleva solo el cuerpo).
-- **Fotos en grande**: tocar una miniatura abre un visor a pantalla completa (flechas/teclado/Esc).
-- **«Nuevo evento» fijo** sobre la barra de pestañas en el celular.
-- **Vista previa del correo escalada**: se dibuja a su ancho real (720 px) y se aplica `zoom` para
-  caber en la columna; antes la 2ª foto quedaba cortada (la columna mide distinto con/sin menú).
-- Verificado en `/dev/bitacora` (5189): observación, visor, dock 52 px, flujo offline completo
-  simulando `navigator.onLine`, correo sin scroll horizontal. 21 tests, lint 28/30, audit-piel OK.
-
-### 2026-09-15 · Bitácora · PR #1021 en producción + «Quién registra»
-
-- **#1021 mergeado** (`9b10975`) y verificado en prod: `version.json` con el sha, chunks
-  `BitacoraTurnoPage` / `BitacoraTurnoCard` / `useBitacoraTurno` publicados, reglas de Firestore y
-  Storage publicadas 21:29 UTC con los `match` nuevos (API firebaserules, no el estado del workflow).
-- **`scripts/probar-reglas-bitacora.cjs`**: prueba el ruleset PUBLICADO con `projects:test`
-  (16 casos ALLOW/DENY con usuarios simulados, no escribe datos). 16/16.
-- **Decisión de Orel**: no hay cuentas por técnico; usan la **cuenta compartida de Mantención**
-  (`mantencion.plantach…`, activa) y **cada uno elige su nombre de la planilla del calendario**.
-  → selector «Quién registra» (técnicos de turno primero + «Otro técnico» con la planilla completa),
-  recordado por teléfono en localStorage. Se guarda `registradoPor` al crear y
-  `actualizadoPorNombre` al editar (registradoPor no se pisa). Lista, correo y PDF muestran el
-  técnico elegido (`autorVisible`), nunca el nombre de la cuenta. También en la observación.
-- Sin cambios de reglas (campo extra permitido). 23 tests.
-
-### 2026-09-15 · Bitácora · técnicos del turno, participantes, lista maestra y buscador de equipos
-
-Pedido de Orel (las tres opciones + buscador), mockup aprobado «tal cual»:
-https://claude.ai/artifact/Ubsj3WqTs5EZ8agfUkf7bc
-
-- **Técnicos del turno**: fila en la página + hoja con buscador para marcar quién está de verdad.
-  Se guarda por turno en `bitacoraTurnos.presentes` (merge con la observación); sin ajuste manda el
-  calendario. Da los botones rápidos del editor y el «Técnicos de turno» del correo.
-- **Varios técnicos por evento**: «También participaron» (toggles + «Otro») → `participantes[]`.
-  Correo/PDF: línea «Técnicos: …» solo si hubo participantes.
-- **Lista maestra**: `bitacoraConfig/{plantId}` = ajustes sobre la planilla del calendario
-  (agregados / ocultos / renombres). Quitar a alguien del calendario lo OCULTA; el calendario no se
-  toca. Presentes guardados se traducen con los renombres vigentes.
-- **Buscador de equipos**: jerarquía completa (702 nodos, 1 carga cada 30 min, se filtra en el
-  teléfono), sin tildes, por palabras en cualquier orden, nombre/alias/código, con PLANTA y ÁREA
-  (hay equipos con el mismo nombre en Chonchi y Yal), resaltado, teclado, texto libre permitido.
-  Guarda `equipoId` del nodo (para contar paradas por máquina después).
-- Reglas: `bitacoraConfig` nueva, `bitacoraTurnos` con observación/presentes opcionales, eventos con
-  `participantes` (≤12) y `equipoId`. `scripts/probar-reglas-bitacora.cjs --local` prueba el archivo
-  ANTES de publicar: 23/23.
-- ⚠ Gotcha: la hoja de presentes reiniciaba lo marcado en cada re-render (dependía de un array que
-  se recrea) → cargar solo al abrir, vía ref.
-- 33 tests de bitácora, verificado en `/dev/bitacora` a 375 px.
-
-### 2026-09-15 · Bitácora · entrega de turno + 12 hallazgos de revisión adversaria
-
-**Entrega de turno** (mockup aprobado «tal cual»: https://claude.ai/artifact/VXnx3kC7rPNVf7F8kdB9Vf):
-los pendientes abiertos de turnos anteriores aparecen arriba de la bitácora del turno que llega
-(turno de origen, técnico, «hace N turnos»). «Resolver» abre el editor precargado y en UN lote crea
-el evento (`resuelvePendiente`) y cierra el original (`pendiente:false`, `cierre`). «Ya no aplica»
-cierra con motivo sin contar como resuelto. Borrar el evento que resolvía reabre el pendiente.
-Correo/PDF: KPI «pendientes cerrados», «Cierra pendiente del Turno …» y recuadro «Sigue pendiente de
-turnos anteriores». Consulta por igualdad `plantId + pendiente==true` (sin índice compuesto).
-
-**Revisión adversaria** (subagente, 12 hallazgos, todos corregidos):
-1. ⚠⚠ ALTA — **el primitivo `Sheet` devolvía el foco al disparador en CADA tecla** (efecto con
-   `onClose` inline en dependencias) → en el celular el teclado se cerraba letra a letra. Afecta a
-   TODA la app que use `Sheet` con `onClose` inline. Fix: `onClose` en ref. Probado A/B tecleando de
-   verdad: sin fix el foco termina en `DIV/dialog`, con fix queda en el campo.
-2. Editar pisaba fotos agregadas desde otro teléfono → fotos como `arrayUnion/arrayRemove` en lote.
-3. Topes de las reglas sin topes en el formulario → maxLength/max + validación.
-4. Guardar bloqueado hasta 10 min con señal mala → se puede guardar sin las fotos que suben (2º toque).
-5/3b. Fotos borradas de Storage ANTES del OK del servidor → se borran en `.then` del commit.
-6. PDF cortaba líneas largas → `splitTextToSize`.
-7. Término < inicio (typo) daba paradas de ~24 h → validación >12 h; orden de eventos previos al inicio.
-8. Nombre recordado que ya no existe se guardaba igual → solo si sigue en la lista.
-9. Foto que termina de subir tras cancelar se colaba en otro evento → «sesión» del formulario.
-10. Marcas de técnicos se perdían al ir y volver de la lista → borrador controlado en la página.
-11. Spinner eterno del buscador → `setCargando(false)` siempre.
-12. Parada sin duración no contaba → cuenta, fuera del MTTR, «(N, M sin duración)».
-
-Reglas 27/27 `--local`. 40 tests de bitácora. ⚠ Lección: mis pruebas llenaban campos por script y
-NO podían ver el bug del foco; en formularios hay que TECLEAR (`computer type`) en la verificación.
-
-
-## 2026-09-15 · Bitacora ronda 7 · Historial del periodo (7/14/30 dias)
-
-- `services/bitacora/historialBitacora.ts` + tests (6): `filasPorTurno`, `resumirPeriodo`
-  (turnos, eventos, sin detener, MTTR, pendientes cerrados/abiertos, equipos top-5,
-  quien registro) y `tesisDelPeriodo` — la frase que demuestra el aporte de Mantencion.
-- `historialCorreo.ts` (HTML + texto plano) y `historialPdf.ts` (jsPDF + autoTable).
-- `hooks/useHistorialBitacora.ts`: un solo `getDocs` con rango sobre `fechaTurno` y filtro
-  de `plantId` en memoria (evita indice compuesto).
-- `pages/HistorialBitacoraPage.tsx`: chips de periodo, tesis resaltada, KPIs, grafico de
-  barras CSS (rojo = con parada, verde = turno sin paradas), lista de turnos que abre la
-  bitacora de ese turno por query param, equipos top y quien registro. Ruta
-  `bitacora/historial` + boton "Historial" en la cabecera. Vitrina en `/dev/bitacora`.
-- Barras con `bg-ink-crit`/`bg-ink-ok` (tokens): la deuda de piel BAJO 1 (baseline al dia).
-- Verificado a 375 px en el preview 5189: tesis, KPIs, grafico, 30 turnos, equipos y
-  "Quien registro" renderizan; sin errores nuevos en consola.
-
-
-## 2026-09-15 · Bitacora ronda 8 · Robustez de la entrega de turno (revision adversaria)
-
-Una revision adversaria del codigo de entrega de turno encontro 10 bugs; se arreglaron los 10.
-
-- **El lote ya no puede perder el evento.** `update()` lleva precondicion de existencia: si el
-  pendiente original ya no estaba, el lote fallaba ENTERO y el evento recien escrito (con sus
-  fotos) se perdia con un aviso que hablaba de senal. Ahora el evento se escribe primero y el
-  cierre del pendiente va aparte (`cerrarPendienteResuelto`), con aviso propio.
-- **Borrar ya no deja el evento atrapado**: el borrado tambien se separo del reabrir. Antes, si el
-  pendiente original no existia, el evento quedaba IMPOSIBLE de borrar y el aviso culpaba a los
-  permisos.
-- **No se reabre un pendiente que otro evento ya resolvio** (`reabrirPendiente` compara
-  `cierre.eventoId`), y **"Ya no aplica" no pisa un cierre "resuelto"**.
-- **Reabrir un pendiente cerrado borra el cierre** (`cierreAntes`): antes la fila decia
-  "Pendiente" y "Resuelto en..." a la vez y la entrega de turno no lo volvia a mostrar nunca.
-- **El tope de 8 fotos se calcula contra el estado vivo del servidor**, no contra lo que vio este
-  telefono: dos que agregaban a la vez dejaban el evento en 10 fotos y la regla congelaba toda
-  edicion posterior.
-- **La bitacora archivada ya no cambia sola**: `pendientesDelTurno` cuenta tambien los pendientes
-  que un turno POSTERIOR cerro, asi que reexportar un turno viejo sigue coincidiendo con el correo
-  que se envio; el KPI dice "3 pendientes (2 ya cerrados)" y el evento muestra "Resuelto en Turno
-  noche 16-09 por ...". Los "pendientes anteriores" solo salen en el turno EN CURSO.
-- **Pantalla, correo y PDF dicen lo mismo**: la pantalla suma "(2, 1 sin duracion)" y el PDF suma
-  el KPI de pendientes cerrados; `pendientesCerrados` cuenta pendientes distintos, no eventos.
-- **Corte del orden a 16 h** del inicio del turno (antes 20 h): el minuto en que el orden salta
-  queda a 8 h de cualquier hora real.
-- **Mensaje honesto en la validacion de 12 h** (antes afirmaba que el termino iba antes del inicio)
-  y **"guardar sin las fotos que faltan" se vuelve a pedir por cada foto nueva**.
-- Ademas: la grilla del Historial tenia **scroll horizontal a 375 px** (hijo de grilla con
-  `min-width:auto` estirado a 396 px) — medido y corregido con `min-w-0`.
-- 4 pruebas nuevas (50 en total en bitacora).
-
-## 2026-09-15 · Bitacora ronda 9 · Historial: la tesis no puede insinuar paradas que no hubo
-
-Revision adversaria del modulo Historial (10 hallazgos, 3 ALTA). Arreglados los 10.
-
-- **La tesis mentia por implicatura.** Decia "De N intervenciones, M se hicieron sin detener la
-  linea" con N = TODOS los eventos, incluidos los `no-aplica` (rondas, novedades), asi que un
-  periodo con 2 rondas y 1 ajuste en colacion sugeria 2 paradas inexistentes. Ahora el denominador
-  son las intervenciones SOBRE LA LINEA (`conImpacto` = con-parada + en-ventana) y hay frases
-  propias para "ninguno con impacto en produccion" y "todas con la maquina detenida".
-  `parteSinDetener` usa el mismo denominador.
-- **"max 1 min" con cero paradas**: el 1 era la guarda anti-division-por-cero y se filtraba al
-  rotulo. Ahora se muestra el maximo REAL o "sin paradas en el periodo".
-- **Carrera al cambiar de periodo**: el `.finally` no tenia el guard `vivo`, asi que la respuesta
-  del periodo viejo apagaba "cargando" y en esa ventana Copiar/PDF salian con numeros viejos.
-- Consulta acotada por los dos lados (`<= hasta`, evita el evento "de manana" de un reloj
-  adelantado), `orderBy fechaTurno desc` + `limit(1500)` (si se pasa el tope se pierde lo mas
-  viejo, no lo de ayer) y `setError(null)` al empezar.
-- **Turno EN CURSO marcado** (`FilaTurno.enCurso`): pildora en la lista y "(en curso)" en correo
-  y PDF; sus numeros son parciales.
-- Barras con `min-w-[5px]` + `overflow-x-auto`: con 30 dias (hasta 90 turnos) quedaban invisibles.
-- El PDF recupera el codigo de color (rojo parada / verde sin detener) y la pantalla muestra los
-  SEIS KPI del correo (antes 4).
-- `turnosSinParada` (campo sin uso) ahora se muestra: "7 de 30 turnos cerraron sin ninguna parada".
-- Un evento con `turnoId` corrupto ya no suma al total sin aparecer en ninguna fila.
-- 52 pruebas en services/bitacora (2 nuevas, 2 corregidas al comportamiento correcto).
-
-## 2026-09-15 · Bitacora ronda 10 · Fotos: nada se pierde y nada queda huerfano
-
-Revision adversaria del camino de FOTOS y del copiado al correo (7 hallazgos, 3 ALTA).
-
-- **Cola de borrados pendientes** (`services/bitacora/borradosPendientes.ts`, en localStorage).
-  Todo borrado de limpieza era `catch(() => undefined)`: con la senal de planta cayendose, cada
-  falla dejaba en Storage una foto que NINGUN documento menciona — imposible de encontrar despues
-  y pagandose para siempre. Ahora `borrarFotoOEncolar` anota lo que falla y `purgarFotosPendientes`
-  vacia la cola al abrir la bitacora y cada vez que vuelve la senal.
-- **Limpieza al desmontar**: irse de la pantalla sin tocar Cancelar ni Guardar (lo llaman por radio
-  y toca otra pestana) dejaba huerfanas las fotos ya subidas. El cleanup lee `subidasNuevas.current`
-  al desmontar; si el evento se guardo, `guardar` ya lo vacio y no borra nada.
-- **Subida de a DOS** (`LOTE_SUBIDA`): `createImageBitmap` decodifica la foto ORIGINAL (12 MP ~ 36 MB
-  de pixeles) antes de achicarla; ocho a la vez recargaban la pestana en un celular de gama media y
-  se perdia el formulario entero.
-- **Boton «Quitar» en una subida en curso o fallida**: antes, un HEIC que nunca iba a subir obligaba
-  a cancelar el evento entero. Las descartadas se anotan (`descartadas`) y si llegan a terminar se
-  borran solas de Storage.
-- El correo ya no inventa un 4:3 cuando faltan las dimensiones (una foto vertical salia estirada).
-- 55 pruebas en services/bitacora (3 nuevas de la cola, con almacen falso).
-
-**Anotado, no arreglable:** la URL de descarga de Storage lleva un token que ignora las reglas, asi
-que cualquiera que reciba o reenvie el correo ve esas fotos sin autenticarse. Es inherente a mandar
-fotos por correo; las reglas de Storage NO son la proteccion de esas URLs.
-
-
-## 2026-09-16 · Bitacora ronda 11 · Bitacora cooperativa (borrador autoguardado + presencia)
-
-Pedido de Orel: iniciar la bitacora en celular o PC, que se guarde sola, que se sincronice entre
-equipos, que indique que esta sincronizada, y que varios la llenen a la vez. Mockup aprobado:
-https://claude.ai/artifact/19kjxjdMAPVPjUknLtZQW2 . Decisiones de Orel: el borrador lo ve TODO el
-turno; eliminar = quien lo creo + supervisores (como antes).
-
-- **Borrador que se guarda solo** (`estado: 'borrador' | 'listo'`, sin campo = listo). La hoja
-  guarda tras 1,5 s sin teclear (`AUTOGUARDADO_MS`); abrir y cerrar sin escribir no crea nada
-  (`tieneContenido`). «Cerrar» GUARDA; «Listo» publica; «Descartar borrador» borra doc + fotos.
-  Irse de la pantalla tambien guarda (cleanup de desmontaje). Un borrador NO cuenta en ningun
-  numero, correo, PDF, historial ni entrega de turno (`soloListos` en cada consumidor) y un
-  borrador que venia de «Resolver» cierra el pendiente recien al publicarse.
-- **Fusion campo por campo en vivo** (`fusionarFormulario`, 7 pruebas): lo que cambia otro equipo
-  mientras la hoja esta abierta se adopta si yo no toque ese campo; si los dos cambiamos distinto,
-  queda lo mio y se AVISA con «Usar la suya / Mantener la mia». Asi «empezar en el celular y seguir
-  en el PC» funciona aunque la hoja siga abierta en el celular. Fotos que agrega o quita el otro se
-  incorporan. Avisos si el evento lo borraron o lo publicaron en otro equipo.
-- **Presencia** (`bitacoraPresencia/{plantId}_{turnoId}_{dispositivoId}`, latido por minuto solo
-  con la pestana a la vista): quien tiene la bitacora abierta y que evento escribe. La vigencia se
-  mide con la hora del SERVIDOR (desfase estimado con el latido propio): los relojes de los
-  telefonos de planta no son confiables. Menos de 1.500 escrituras por turno con tres equipos.
-- **Barra de sincronizacion** (`BarraSincronizacion`): Sincronizado / Guardando / Sin senal (con
-  cuantos cambios quedaron en el telefono) + «Leandro agrego un evento» cuando llega algo de otro
-  equipo + avatares de conectados (lista abierta en PC, desplegable en celular).
-- Filas: «En redaccion», «X lo esta escribiendo», «Continuar en este equipo» (PC), y «X lo tiene
-  abierto» en eventos publicados. Tarjeta del Inicio: «1 en redaccion».
-- Reglas: borrador puede ir sin descripcion; publicado la exige; `estado` y `dispositivo` con
-  valores cerrados; presencia con `hasOnly`, id que calza, `vistoEn == request.time` y
-  `uid == auth.uid`. **41/41 casos** con `probar-reglas-bitacora.cjs --local` (14 nuevos).
-- 74 pruebas en services/bitacora (18 nuevas). Verificado en el navegador TECLEANDO: el foco no se
-  pierde, «Guardando borrador…» → «Borrador guardado · 14:20 · el turno lo ve», cerrar deja el
-  borrador en la lista, continuar el de otro muestra el aviso de presencia, «Listo» lo publica y
-  el resumen pasa de 4 a 5 eventos.
-
-### Ronda 11b · revisión adversaria de la cooperativa (antes del merge)
-
-Revisión adversaria: 5 ALTA de pérdida de datos. Arreglados todos antes de mergear.
-
-- **Se escribe SOLO lo que cambió** (`camposACambiar`, 4 pruebas). Cada autoguardado mandaba el
-  documento entero: uno atrasado en la cola de un teléfono sin señal devolvía a su valor viejo lo que
-  otro equipo cambió, y la fusión del otro lado lo adoptaba sin avisar.
-- **Un evento publicado no vuelve a borrador**: el autoguardado nunca manda `estado` y la regla lo
-  prohíbe (un autoguardado atrasado lo sacaba de números, correo y entrega de turno sin que nadie lo notara).
-- **Abrir, mirar y cerrar no escribe** (antes dejaba en cola una copia vieja del evento).
-- **Un borrador no se recorta** (el espacio que se estaba tecleando desaparecía bajo el cursor).
-- **«Cerrar» avisa también por las fotos que fallaron por falta de señal** (se perdían sin aviso).
-- Autoguardado decidido al ABRIR: si otro publica, lo tecleado sigue guardándose (antes el mismo
-  botón pasaba a «Cancelar» y lo descartaba). Creación fallida → se vuelve a crear, no se actualiza
-  un documento inexistente; «Listo» crea si nunca se vio el documento. Sin hora de inicio no se
-  intenta guardar y se avisa.
-- Participantes entran en la fusión. Descartar un borrador de «Resolver» no reabre el pendiente.
-  «Volver a crearlo» sin las fotos borradas. Eliminar se muestra solo a quien puede (autor/supervisor).
-- Regla: `registradoPor` solo cambia mientras es borrador. 46/46 casos contra la API (5 nuevos).
-- Presencia: desfase solo con el latido PROPIO recién confirmado (uno viejo en caché daba horas de
-  desfase y todos figuraban conectados); un id por PESTAÑA; sin actividad en 15 min deja de latir.
-- **Nombre en «conectados»** (pregunta de Orel: «¿por qué dice Matias Serpa en PC?»): salía del último
-  técnico elegido en ese navegador. Ahora: cuenta personal → su nombre; cuenta compartida → «PC de
-  Mantención» en el PC y el técnico elegido en el celular (`nombreEnPresencia`).
-- **Técnicos del turno parten VACÍOS** (pedido de Orel: el calendario a veces no refleja el turno
-  real): cada uno se agrega a mano; el calendario queda como «El calendario sugiere: …» y como
-  etiqueta dentro de la hoja, sin marcar a nadie (`sugeridosPorCalendario`).
-- 78 pruebas en services/bitacora. Verificado tecleando: el espacio final sobrevive al autoguardado,
-  sin conflicto falso.
-- Pendiente anotado: un borrador abandonado al cambiar de turno no se avisa en el turno siguiente.
-
-## 2026-09-16 · Bitacora ronda 12 · Borradores que quedaron del turno anterior
-
-Pendiente anotado en la ronda 11: un borrador que nadie publicó antes del cambio de turno no contaba
-en nada y nadie lo veía después.
-
-- `borradoresAnteriores` (puro, 1 prueba) + `useBorradoresAnteriores` (igualdad `plantId` +
-  `estado`, sin índice compuesto). En el turno EN CURSO aparece «Quedaron sin publicar · N» debajo de
-  «Vienen de turnos anteriores», con origen («Turno noche 16-09 · 00:00 · Leandro Igor»), aviso de que
-  no cuenta ni salió en el correo, «Continuar» (abre el borrador en SU turno, donde se publica) y
-  «Descartar» con doble toque (solo autor o supervisor).
-- Al continuar un borrador de otro turno, la lista de ese turno tarda en cargar: la hoja mostraba
-  un instante «Este evento ya no está en la bitácora». Ahora «visto» se marca recién cuando el
-  documento llega, y «Listo» solo crea si el documento lo creó esta misma hoja.
-- Producción sigue en 0 eventos/0 presencia (la pestaña de Orel estaba oculta: no late, por diseño).
-- 79 pruebas en services/bitacora. Verificado en la vitrina: sección, «Continuar» → `?turno=` del
-  borrador + «Continuar borrador» sin aviso falso.
-
-## 2026-09-16 · Bitacora ronda 13 · WhatsApp + evento con título, sin hora y tipos propios
-
-Pedido de Orel: copiar la bitácora «como un correo, con fotos» para mandarla por WhatsApp Web, y en el
-evento: poder no poner la hora, un título aparte del equipo y la descripción, y más tipos (correctivo,
-planificado…) además de uno escrito a mano. Mockup aprobado con las 4 recomendaciones:
-https://claude.ai/artifact/BiADNnwFmfGvfe1R2PChEJ
-
-- **WhatsApp = mensaje + una LÁMINA por evento con fotos.** WhatsApp no intercala texto y fotos en un
-  mensaje y WhatsApp Web recibe UNA imagen por Ctrl+V: pegar el HTML del correo pierde las fotos. La
-  lámina (canvas 1080 px, `laminaWhatsapp.ts`) junta fotos completas (sin recortar), hora, equipo,
-  título, impacto, descripción (10 líneas máx.) y técnicos; más de 4 fotos → dos láminas.
-  - PC: botón «Copiar para WhatsApp» (copia el mensaje) + columna derecha con segmentado
-    Correo/WhatsApp: pasos «Copiar mensaje» / «Copiar lámina N» (PNG al portapapeles, Chrome solo
-    acepta `image/png`) y vista previa del chat. Las láminas se generan al abrir la vista, para que
-    el copiado ocurra dentro del toque.
-  - Celular: botón «WhatsApp» → hoja con «Compartir» (Web Share con las láminas + el mensaje; el
-    mensaje queda además en el portapapeles por si WhatsApp no lo toma). Sin soporte de compartir
-    archivos → los mismos pasos del PC.
-  - Mensaje con formato de WhatsApp (`*negrita*`, `_cursiva_`), cada evento dice en qué lámina están
-    sus fotos; un `*`/`_` del texto se cambia por un carácter igual para no romper el formato.
-- **Evento:** `titulo` opcional (el título manda en la fila; el equipo baja a la línea de abajo),
-  interruptor «Sin hora» (`horaInicio: ''`, sin término; se ubica por `createdAt`, leído con
-  `serverTimestamps: 'estimate'`), tipos Falla · Correctivo · Preventivo · Planificado · Inspección ·
-  Ajuste · Novedad · Otro… (`tipo: 'otro'` + `tipoOtro`, sugeridos los ya publicados; al publicar,
-  un «Otro» que coincide con un tipo fijo queda como ese tipo). Presentación común en
-  `presentacionEvento.ts` (fila, correo, PDF, WhatsApp dicen lo mismo).
-- Reglas: 8 tipos, `tipoOtro` ≤ 40, `titulo` ≤ 120, `horaInicio` '' permitido solo sin término.
-  57/57 con `probar-reglas-bitacora.cjs --local` (11 nuevos).
-- Revisión propia: agrupar las dos horas en una escritura pisaba un inicio cambiado por otro equipo →
-  cada hora se escribe por separado; una lámina cancelada a medio dibujar dejaba una URL sin liberar;
-  el tipo a medio escribir de un borrador aparecía como sugerencia → sugerencias solo de publicados.
-- 100 pruebas en services/bitacora (21 nuevas). Verificado en la vitrina (datos de ejemplo): PC
-  claro/oscuro, 375 px, tecleando en «Otro…» y título con autoguardado (el foco no se pierde),
-  «Sin hora», publicar, copiar mensaje y lámina, compartir (con `navigator.share` simulado).
-- **Sin probar todavía:** pegar en WhatsApp Web real y compartir desde un Android real.
-
-## 2026-09-16 · Bitacora ronda 14 · Pase de bitácora (QR + PIN personal)
-
-Pedido de Orel: un QR para que los técnicos entren fácil a la bitácora y agreguen/editen eventos, con
-acceso SOLO a la bitácora. Mockup y decisiones: https://claude.ai/artifact/4e6aS7naozKBQLzmdqB7of
-(v2). Decidió: pase de bitácora + nombre de la lista de habilitados + PIN personal de 4 dígitos
-(lo asigna un supervisor; 5 fallos → 15 min); QR por 30 días, «Renovar» mantiene el mismo QR; los
-teléfonos que ya entraron siguen hasta «Quitar» o hasta que se le quite/reinicie el PIN al técnico.
-
-- **Función `paseBitacora`** (callable, `functions/paseBitacora.js`, sin triggers ni crons, costo fijo
-  cero; maxInstances 3). Públicas: `info` (técnicos con PIN) y `entrar` (valida token + PIN en
-  transacción, crea una cuenta `pase_…` por teléfono con claims `{pase_bitacora, plantId, nombre}`
-  vía `setCustomUserClaims` + custom token, y `bitacoraDispositivos/{uid}`). Supervisor: `generar`,
-  `renovar`, `asignarPin` (devuelve el PIN una vez; guarda scrypt + sal), `quitarPin`,
-  `quitarDispositivo` (desactiva + `updateUser disabled` + `revokeRefreshTokens`). El teléfono:
-  `salir`. 15 fallos sin acierto bloquean hasta reiniciar el PIN (10.000 PIN posibles).
-- **Reglas — el límite está en un punto central:** `isAuthenticated()` es falso para un token con
-  `pase_bitacora`, así que el pase queda fuera de TODA la app (incl. las ~80 lecturas
-  `isNotAnonymous()` y el create de `users`). Solo entra por `paseBitacoraActivo()` (get de su
-  dispositivo) a bitacoraEventos/Presencia/Turnos, lee bitacoraConfig, hierarchy y calendario, y
-  firma con SU nombre (`registradoPor`/presencia == claim). `bitacoraPines` no la lee nadie.
-  Storage: `sesionApp()` reemplaza los 38 `request.auth != null`; el pase solo en `bitacora/`
-  (el cross-service sigue roto en prod: allí basta el claim; al quitarlo, <1 h).
-  90/90 Firestore (`probar-reglas-bitacora.cjs --local`, 33 nuevos; el helper `auth()` ahora acepta
-  claims) y 14/14 Storage (`scripts/probar-reglas-storage-pase.cjs`, nuevo).
-- **App:** `App.tsx` reconoce el claim ANTES de buscar `users/{uid}` (si no, cerraba la sesión) y
-  monta otro árbol de rutas: `PaseBitacoraLayout` (sin MainLayout ni sus listeners de incidencias y
-  equipos) con Turno/Historial y «Salir»; todo lo demás redirige a /bitacora. El watchdog de 24 h no
-  corre para el pase. `/pase-bitacora#p=…&t=…` (el token va en el `#`; el 404.html lo conserva) =
-  nombre → PIN (campo `readOnly` al enviar: `disabled` le quitaba el foco y cerraba el teclado).
-  En la bitácora el pase firma fijo (sin selector), no edita la lista de técnicos, y si un
-  supervisor lo quita el teléfono cierra sesión con aviso (escucha su propio dispositivo).
-  Supervisores: botón «Acceso QR» → hoja con QR (imprimir por iframe, renovar, copiar, generar otro
-  con doble toque), técnicos con PIN/bloqueos (asignar, reiniciar, quitar) y teléfonos (quitar).
-- Vitrina `/dev/pase-bitacora` (API de mentira, PIN 4729) y `?vista=modo`. 9 pruebas de la función,
-  5 del cliente. Verificado a 375 px y PC: PIN malo/correcto tecleando, asignar y reiniciar PIN con
-  confirmación, modo bitácora sin «Acceso QR».
-- **Sin probar todavía:** el flujo real (necesita la función desplegada y que Orel genere el QR y
-  asigne PIN a los técnicos).
-
-## 2026-09-16 · Bitacora ronda 15 · Repuestos usados y número del equipo
-
-Pedido de Orel tras probar el QR con un técnico: incluir (opcional) los códigos SAP de repuestos
-usados en el evento y mostrar el número del equipo elegido. Mockup:
-https://claude.ai/artifact/UEk6L3pijTCp8dodhcxjfe — eligió código SAP + búsqueda por nombre dentro de
-los repuestos del equipo, con cantidad (1 por defecto).
-
-- **Número del equipo:** `equipoCodigo` se copia del `codigo` del nodo al elegirlo en el buscador
-  (equipo → 720004447; área → ubicación técnica AQ-IN-CHO-EXTE-CASI). Va con el equipo en la fusión
-  y en la escritura (`CAMPOS_DOC`); un evento anterior lo completa al abrirse. Se ve en el editor
-  («Planta · Área · N° de equipo»), la fila, el correo/PDF/WhatsApp («EQUIPO (720004447)») y la
-  lámina («N° 720004447»).
-- **Repuestos usados:** `repuestos: [{codigoSAP, nombre, cantidad}]` (≤ 20, nombre copiado del
-  maestro). Por código: `getDoc(repuestos/{código})` (el id ES el SAP; si no, query por
-  `codigoSAP`) — un código que no está queda solo con el código. Por nombre: solo con equipo
-  elegido, `leer … where equipos array-contains` UNA vez por sesión (BAADER 142 N2: 1.803 docs,
-  ~2 MB, 476 con SAP). NO se carga el maestro entero (7.673 lecturas por apertura: techo de costos).
-  Nombres con `formatNombreSAP`. En el formulario se comparan como JSON normalizado.
-- Reglas: `equipoCodigo` ≤ 40, `repuestos` lista ≤ 20; el pase de bitácora ahora LEE `repuestos`.
-  96/96 (`probar-reglas-bitacora.cjs --local`, 6 nuevos + el caso del pase cambiado a ALLOW).
-- 113 pruebas en services/bitacora (13 nuevas). Verificado en la vitrina a 375 px tecleando: código
-  del maestro, código desconocido, búsqueda «pern» → 2 pernos reales, guardar → fila y correo.
-
-## 2026-09-17 · Bitacora ronda 16 · Fishken/E-PACK y vinculos desde STOCK ALMACENES (datos)
-
-Orel intento anotar el FRL de la E-PACK y la bitacora dijo «no tiene repuestos con codigo SAP».
-- **Causa:** la hoja «Fishken» del Excel maestro se migro al nodo hijo CINTA FISHKEN (s/c), no a
-  EMPACADORA E-PACK (720004590, alias FISHKEN). Bitacora, CTD y Repuestos buscan por el equipo
-  exacto. Ademas el maestro Excel esta desactualizado: 8 de 11 «sin SAP» si tienen codigo en
-  `STOCK ALMACENES.xlsx` (hoja Clasificacion, sub-familia FISHKEN), y FK-005 apunta a un SAP que
-  es otra pieza (3100061329 tarjeta; el cable AXT100-DS25 es 3300061329).
-- **Datos corregidos por script** (respaldo de los 127 docs en
-  `OneDrive\ANTARFOOD\_BACKUP_MEMORIA_CLAUDE\2026-09-17\repuestos-fishken-clasif-backup.json`,
-  escritura de a uno): 20 repuestos → E-PACK (el motor de la cinta se queda en CINTA FISHKEN);
-  5 fichas sin SAP fusionadas en su ficha con SAP (`fusionadoDe`) y borradas; 107 materiales de
-  Clasificacion vinculados con el patron ya usado por su maquina (Baader 142 → 6 evisceradoras 58,
-  Marelec → Static Grader 28, Garibaldi → 3 enzunchadoras 19, Baader 200 2). Decision de Orel:
-  MULTIVAC (50) y WITT (23) NO se vinculan. Resultado: E-PACK 17 (13 con SAP); sin equipo
-  3.022 → 2.910. `areaIds` se recalculo ([nodeId, ...path]): no lo mantiene ninguna funcion.
-- Codigo: la lista de repuestos por equipo de la bitacora vence a los 5 min (antes vivia toda la
-  sesion y un vinculo nuevo desde el CTD no aparecia).
-
-## 2026-09-17 · Bitacora ronda 24 · Cambiar el turno de un evento
-
-Orel resolvió el pendiente del bandejón (línea manual HG, tarde 16-09) tocando «Resolver» el 17-09
-por la mañana: la soldadura de Matías Serpa con Leandro Igor quedó en el turno DÍA 17-09 y el
-pendiente decía «Resuelto en día 17-09». La soldadura fue en el turno NOCHE 17-09 (decisión de Orel).
-- **Datos corregidos a mano** (admin SDK, respaldo en el scratchpad de la sesión): evento
-  `lcDOGQ1BvCV6qkrGRHLN` → `2026-09-17_noche`; `cierre.turnoId` del pendiente `b9Sy6sTIdHIbRm2iAiks`
-  → `2026-09-17_noche`. Borrado el borrador vacío `Y1lfBCr0EbtoDvOnshFj` (TOLDO PORTERIA, noche 17-09)
-  que dejó una verificación de la ronda 21 al abrir «Resolver» con la sesión real.
-  ⚠ Verificar «Resolver» SOLO en la vitrina: el autoguardado crea el borrador en prod.
-- **Fila «Turno»** en el editor (nuevo, editar y resolver): `<select>` nativo con los últimos 7 días
-  (`turnosElegibles`, 21 turnos, nunca futuro, nunca antes del turno del pendiente que cierra) y
-  nombres cortos («Noche 17-09 · del pendiente»). Nota debajo cuando cambia. Se aplica SOLO al
-  publicar o guardar (el autoguardado no mueve un borrador: si no, el editor lo daba por borrado).
-  La hora tiene que calzar con el turno nuevo (`horaCalzaEnTurno`, ±1 h de holgura).
-- Hook: `datos.turnoId` → crea en ese turno o escribe `turnoId`, `fechaTurno`, `banda` y
-  `posicionMin: null`; el cierre del pendiente usa el turno destino; si el evento ya estaba publicado
-  y cerraba un pendiente, `reubicarCierre` actualiza `cierre.turnoId` (solo si el cierre es suyo).
-- Página: toast «Evento movido al turno noche 17-09 · Ver». Vitrina: mueve entre turnos de ejemplo.
-- **Regla**: `turnoId` ya no es inmutable: `turnoMovible` exige id = fecha + banda y un turno entre hace
-  10 días y mañana (`timestamp.date(int…)`). 111/111 en local (5 casos nuevos, fechas relativas a hoy).
-- Verificado en la vitrina a 375 px: error de hora, mover con toast y «Ver», opciones de «Resolver».
-
-## 2026-09-17 · Bitacora ronda 23 · iOS 27 (2/2): deslizar, Deshacer, arrastrar, visor con gestos y vibracion
-
-Segunda mitad del mockup https://claude.ai/artifact/8b4xbwjvMUzUeJJgkAJn27 (C, H, D, G, I). La 1/2 es #1072.
-- C: la fila del evento va dentro de `SwipeRow`: Editar · Pendiente/Quitar pendiente · Borrar
-  (Descartar en borradores; Borrar solo autor o supervisor). `marcarPendiente` en el hook escribe solo
-  `pendiente` (+ `cierre: null` al reabrir, + `actualizadoPorNombre`). La fila lleva `bg-card` (las
-  acciones quedan debajo) y el separador pasa al contenedor exterior (`first:` dejaba de servir).
-- H: borrar ya no pide «toca de nuevo»: el evento se esconde (`ocultos`, tampoco cuenta en los numeros),
-  toast «Evento borrado · Deshacer» (5 s) y el borrado real (fotos incluidas) corre al vencer el plazo,
-  al salir de la pantalla o en `pagehide`. El editor usa el mismo camino.
-- D: el evento sin hora lleva un asa ≡ (pointer events + `setPointerCapture`, `touch-none`); linea
-  azul donde queda; `posicionEnIndice` (nuevo, con test) da la `posicionMin` entre los vecinos. Teclado:
-  flechas en el asa (reusa `posicionAlMover`).
-  ⚠ El destino se calcula con la Y del `pointerup` y la ref se adelanta al render: con eventos
-  seguidos, el estado aun no tenia el destino al soltar. ⚠ Cambiar el contenedor al empezar a
-  arrastrar remontaba el asa y se perdia la captura: `SwipeRow` siempre, con `trailing=[]`.
-- G: visor: deslizar cambia de foto (60 px), bajar cierra (110 px, el fondo se aclara), doble toque
-  ×2, pellizco hasta ×4, arrastrar con zoom; puntos abajo; flechas solo con `hover:hover`.
-- I: `services/bitacora/vibrar.ts` (15 ms; error = 20·80·20) al publicar, cerrar pendiente, marcar
-  pendiente, soltar, mover y borrar; en errores de escritura del hook.
-- ⚠ Para probar gestos por script: esperar ~40 ms entre `touchmove` (SwipeRow lee `dx` del render).
-- Verificado en la vitrina a 375 px (claro/oscuro) y PC con mouse real; vitest 2790, eslint 30/30,
-  audits ok, build ok.
-
-## 2026-09-17 · Bitacora ronda 22 · iOS 27 (1/2): resumen sin color, una capa abajo, Compartir y barra compacta
-
-Mockup aprobado (8 cambios, todos): https://claude.ai/artifact/8b4xbwjvMUzUeJJgkAJn27. Este PR lleva A, B, E, F.
-- A: cifras de KPI en tinta normal y el estado en un punto de 8 px junto al rotulo (turno, tarjeta
-  del Inicio, Historial). DESIGN.md §10 lo pedia; `Stat`/`Kpi` cambian `tinta` por `punto`.
-- B: sin la barra fija «Nuevo evento». El «+» central de la barra de pestanas, dentro de `/bitacora*`,
-  abre «Nuevo evento» (`services/bitacora/pedirNuevoEvento.ts`: en el turno emite
-  `bitacora:nuevo-evento` y conserva el turno mirado; desde el historial navega a `?nuevo=1`). En el
-  resto de la app sigue «Registrar incidencia». El pase suma su «+» al centro (Turno · + · Historial).
-  Rotulo «Nuevo evento» sobre el «+» las 3 primeras veces por telefono (`bitacora.rotuloMas.v1`).
-  El boton del chat vuelve a `bottom-24` en todas partes (se revierte lo de la ronda 19).
-- E: telefono: Historial, Compartir y QR como iconos en una capsula `glass-nav`; «Compartir» abre
-  `CompartirTurnoSheet` (correo, WhatsApp →hoja existente, PDF). Se quito la fila Copiar · PDF · WhatsApp.
-  PC sin cambios.
-- F: barra compacta fija (IntersectionObserver sobre la cabecera) con «Turno tarde 16-09 · horario ·
-  N eventos» y la capsula; en el pase baja 52 px (su cabecera).
-- Verificado a 375 px (turno, historial, Inicio, pase) y PC; vitest ok, eslint 30/30, audits ok, build ok.
-
-## 2026-09-17 · Bitacora ronda 21 · Tercera pasada: converge (1 hallazgo)
-
-Medido: tarjeta de la bitacora en el Inicio, visor de fotos, «Resolver pendiente», «Ya no aplica»
-(0 objetivos bajo 44, 0 overflow). Unico hallazgo: el fondo del visor de fotos al 92 % dejaba ver los
-botones de la pagina detras de la foto → opaco (Fotos de iOS). Dos rondas seguidas casi sin hallazgos:
-el pulido visual de la bitacora queda cerrado; lo que sigue es de uso en planta o de fondo.
-
-## 2026-09-17 · Bitacora ronda 20 · Pulido iOS 27, segunda pasada (sin mockup: causas claras)
-
-Recorrido de lo que no entro en la ronda 19: crear evento, hoja de tecnicos, observacion, entrada del
-pase, editor en PC e Historial en PC. Tres hallazgos, todos con la causa a la vista:
-- La cabecera del TURNO ACTUAL seguia cortando el QR: pildora «En curso» (95 px) + Historial + QR = 428
-  px en 375. La pildora pasa al mismo lugar que «Hoy ›» (junto al nombre del turno); la cabecera
-  queda con titulo + Historial + QR en los dos casos (Historial 182–299, QR 303–359).
-- «Salir» del pase (36 px) y «Lista de tecnicos» en la hoja de tecnicos (36 px) → 44 px (Button sin `sm`).
-- Sin hallazgos: editor de creacion (26 controles, 0 bajo 44), observacion, entrada del pase y PIN,
-  modo bitacora del pase (0 overflow), editor en PC (dos columnas parejas), Historial en PC.
-
-## 2026-09-17 · Bitacora ronda 19 · Pulido iOS 27 medido en produccion (375 px)
-
-Recorrido con la sesion real (localhost:5189, turno tarde 16-09) y los medidores de DESIGN.md §11:
-0 diminutos, 0 mayusculas, 0 objetivos bajo 44 en turno e Historial; 1 en el editor (16 px). El resto
-era composicion. Mockup (7 puntos, todos aprobados): https://claude.ai/artifact/E9CwvzvPwZ8qsW6EKJYeWc
-1. Cabecera: «Ir al turno actual» + Historial + QR median 478 px en 375 («Histo…»). Ahora es un chip
-   tinted «Hoy ›» junto al nombre del turno (solo cuando no es el actual). Historial 182–299, QR 303–359.
-2. El FAB del chat (bottom-24, z-45) pisaba «Nuevo evento» y la fila Copiar·PDF·WhatsApp: en
-   `/bitacora` sube a `bottom-[8.75rem]` (`useLocation` en ChatBot; el chat abierto ya iba a 9rem).
-3. `BarraSincronizacion`: sin nada que decir (Sincronizado, sin novedad, nadie mas) es una LINEA de
-   13 px en el telefono («● Todo al dia · hace 4 s · Danilo Cortes en el celular ˅»); tocarla abre la
-   tarjeta; en PC la tarjeta sigue entera (`hidden md:flex`).
-4. Fila del evento: «Repuestos: Filtro FRL 3300135877 ×1» (nombre comun o del maestro, codigo,
-   cantidad siempre), igual que WhatsApp/correo/Historial.
-5. Editor: al editar, «Editas como Danilo Cortes · Cambiar» (o «Continuas como» en borrador) en vez de
-   los chips de «Quien edita»; «Cambiar» los despliega. Al crear no cambia.
-6. Repuestos: «Editar nombre comun» en su propia linea de 44 px; placeholder «Buscar por codigo o nombre».
-7. Acceso QR: acciones en grilla 2×2 (Generar otro QR en plain, confirmable); cada tecnico en UNA fila
-   de 52 px con «Asignar PIN» / «PIN ˅» a la derecha (despliega Reiniciar / Quitar). `botonConfirmable`
-   pasa a 44 px (tambien «Quitar» en telefonos).
-- Verificado en 375 px claro y oscuro y en PC; vitest 2789, eslint 30/30 (sin nuevos), audit-piel ok.
-- ⚠ Medidor: `[...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='Nuevo evento')`
-  agarra primero el boton de PC (display:none, rect 0): filtrar por altura > 0 antes de comparar.
-
-## 2026-09-17 · Bitacora ronda 18b · Repuestos en lista al enviar + «Repuestos usados» en el Historial
-
-Mockup aprobado (las dos recomendadas): https://claude.ai/artifact/NgKHSJLgSFcyEgSv61Wd5F
-- **Al enviar (WhatsApp, correo, texto plano, PDF, lamina):** `lineasRepuestos()` = rotulo «Repuestos
-  usados:» + un renglon por repuesto «• 3300135877 · Filtro FRL (Filtro 1/2 purga…) ×1» (la cantidad
-  va SIEMPRE; `renglonRepuesto`). Correo: `<ul>` de verdad y 18 px entre eventos (era 12). PDF: rotulo
-  en negrita y viñeta DIBUJADA (`pdf.circle`: la Helvetica estandar no trae «•»). Lamina: hasta 5
-  lineas. WhatsApp: `SEPARADOR_EVENTOS` («──────────») entre evento y evento; con uno solo no sale.
-  `lineaRepuestos()` (una linea) sigue viva para la clave de la lamina y la fila.
-- **Historial:** `ResumenPeriodo.repuestos` (`RepuestoDelPeriodo`: codigo, nombre, nombre comun,
-  unidades, eventos, equipos con numero, ultimo turno; solo eventos `listo`) y `unidadesRepuestos`.
-  Pantalla: bloque «Repuestos usados» entre «Equipos que mas pararon» y «Quien registro» (8 a la vista,
-  «Ver todos (N)»), y DOS KPIs mas (repuestos usados · unidades): la grilla pasa a 2×4 / 4×2. Correo
-  (8 KPIs + lista), texto plano («REPUESTOS USADOS») y PDF (8 KPIs + lista) con los mismos numeros.
-- Vitrina: los eventos con parada del historial de ejemplo llevan repuestos reales del maestro.
-- Verificado: 120 pruebas en services/bitacora (2 nuevas, 1 ajustada), vitest 2789, eslint 30/30,
-  audits ok, build ok; vitrina en PC y 375 px (claro y oscuro). Fuera de alcance, visto de paso: en la
-  vitrina a 375 px la cabecera «En curso / Historial» de `BitacoraTurnoVista` desborda a 432 px
-  (scroll horizontal); no lo toque.
-
-## 2026-09-17 · Bitacora ronda 18a · Corregir quien registro un evento publicado
-
-Orel: «no deja modificar el tecnico que edito ni el que participo». Diagnostico en la vitrina:
-los participantes SI se guardaban (fila «Mauricio, Danilo» → «Mauricio, Danilo, Leandro»); lo
-bloqueado era **quien lo registro** en un evento publicado: el editor lo mostraba como texto fijo
-(«Registro: X») y la regla del 16-09 solo dejaba cambiarlo en borrador.
-- Editor: en un evento publicado aparece «Quien lo registro» (`SelectorTecnico` con `recordar={false}`
-  y `vacio="Elige al tecnico"`: elegir a otro NO pisa «mi nombre» en el telefono). `DatosEvento.registradoPor`
-  viaja solo si cambio (clave condicional: un `undefined` pisaba el autor en la vitrina). Quien corrige
-  queda en `actualizadoPorNombre`. El pase QR tambien lo ve («Edita: Leandro Igor» + selector). Un
-  borrador ajeno sigue con «Lo empezo: X» (ahi el autor se ajusta con «Quien continua»).
-- Regla: cae «solo se ajusta mientras es borrador». El pase puede corregir `registradoPor` SOLO si
-  `actualizadoPorNombre == token.nombre` (deja su firma). 106/106 en local (2 casos nuevos, 1 invertido).
-- Sin mockup: es el mismo selector que ya existia. Verificado en la vitrina (PC y 375 px) y en el modo
-  pase. Pendiente de esta ronda (mockup https://claude.ai/artifact/NgKHSJLgSFcyEgSv61Wd5F): historial
-  de repuestos usados y repuestos en lista + separador entre eventos en WhatsApp/correo/PDF.
-
-## 2026-09-17 · Bitacora ronda 17 · Editor ancho en PC, buscador de repuestos con dos alcances, nombre comun y orden de los sin hora
-
-Pedidos de Orel tras probar los repuestos en la E-PACK. Mockup (3 decisiones, todas las recomendadas):
-https://claude.ai/artifact/MtKR1Po46t5N3jdePikyrN
-- **Editor en PC:** `Sheet size="wide"` (60rem) y el formulario en dos columnas desde `md` (que paso /
-  repuestos, impacto, fotos, pendiente). En el telefono, una columna como antes.
-- **Buscador de repuestos:** un campo + `SegmentedControl` «En este equipo · Todos» (solo con equipo
-  elegido; sin equipo busca en todos). Busca por codigo, nombre SAP y **nombre comun**; un codigo
-  completo aparece aunque no sea del equipo (se ofrece «no esta vinculado a este equipo»). «Todos»
-  usa el **indice liviano `repuestosIndice/sap`** (`m: {sap: [nombre, comun]}`, 3.790 entradas,
-  ~179 KB, bajado una vez por sesion) construido con `scripts/normalizacion/construir-indice-repuestos.cjs`
-  y mantenido por la funcion `onRepuestoEscritoIndice` (trigger sobre `repuestos/{id}`, escribe solo
-  la entrada que cambio y sale temprano si no cambio nombre/comun/SAP; logica pura en
-  `functions/repuestosIndice.js`, 3 tests). Cada resultado y cada elegido muestra ubicacion y stock
-  de `bodega/{sap}` (una lectura por codigo, maximo 10). Por que el codigo «no salia arriba»: el
-  campo viejo solo actuaba con Enter/Agregar; ahora los resultados salen mientras se escribe.
-- **Nombre comun:** se ve en resultados y elegidos (comun en negrita, SAP debajo) y se edita en
-  linea; se guarda en `repuestos/{sap}.nombresComunes` (al frente, sin duplicar: `conNombreComunAlFrente`),
-  el mismo campo de Repuestos. El evento copia `nombreComun`; correo/WhatsApp/lamina dicen
-  «3300135877 Filtro FRL (Filtro 1/2 purga…)». El pase QR lo ve pero no lo edita (regla).
-- **Eventos sin hora:** `posicionMin` (minutos desde el inicio del turno, fraccionario; solo sin
-  hora, regla lo exige). Flechas ▲▼ en la fila (`posicionAlMover`: pasa al otro lado del vecino,
-  entre el y el siguiente) y en el editor chips «Ubicacion en el turno» (`opcionesUbicacion`: al
-  inicio / despues de cada evento con hora / al final). `mover()` en el hook escribe solo ese campo.
-- Reglas: `posicionMin` (-1440..2880, solo con hora vacia), `repuestosIndice` lectura (app y pase),
-  `bodega` lectura tambien para el pase. 104/104 (`probar-reglas-bitacora.cjs --local`, 8 nuevos).
-- 119 pruebas en services/bitacora (6 nuevas). Verificado en la vitrina: PC dos columnas (840 px en
-  el panel), buscar «filtro» en Todos → agregar → «＋ nombre comun» → «Filtro FRL» propagado a los
-  resultados; celular una columna; flechas mueven el evento sin hora hasta el inicio y el chip «Al
-  inicio» queda marcado.
