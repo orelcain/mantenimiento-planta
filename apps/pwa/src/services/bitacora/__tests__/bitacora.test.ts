@@ -7,6 +7,8 @@ import {
   turnoAdyacente,
   turnoDesdeId,
   turnoMantencionEn,
+  turnosElegibles,
+  horaCalzaEnTurno,
 } from '../turnoMantencion'
 import { fuePendiente, minutosParadaDe, ordenarEventos, resumirBitacora } from '../resumenBitacora'
 import { minutosDesdeInicioTurno } from '../turnoMantencion'
@@ -293,5 +295,36 @@ describe('correo de la bitácora', () => {
 
   it('un turno sin eventos lo dice', () => {
     expect(bitacoraAHtmlCorreo({ ...base, eventos: [] })).toContain('Sin eventos registrados en el turno.')
+  })
+})
+
+describe('mover un evento de turno (17-09-2026)', () => {
+  const actual = turnoDesdeId('2026-09-17_dia')!
+
+  it('ofrece el actual y los 7 días anteriores, nunca uno futuro', () => {
+    const lista = turnosElegibles(actual)
+    expect(lista).toHaveLength(21)
+    expect(lista[0]?.id).toBe('2026-09-17_dia')
+    expect(lista[1]?.id).toBe('2026-09-17_noche')
+    expect(lista[2]?.id).toBe('2026-09-16_tarde')
+    expect(lista[lista.length - 1]?.id).toBe('2026-09-10_tarde')
+  })
+
+  it('al resolver, no ofrece turnos anteriores al del pendiente', () => {
+    expect(turnosElegibles(actual, 7, '2026-09-16_tarde').map((t) => t.id)).toEqual([
+      '2026-09-17_dia',
+      '2026-09-17_noche',
+      '2026-09-16_tarde',
+    ])
+    expect(turnosElegibles(actual, 7, 'basura')).toHaveLength(21)
+  })
+
+  it('la hora tiene que ser del turno, con una hora de holgura', () => {
+    const noche = turnoDesdeId('2026-09-17_noche')!
+    expect(horaCalzaEnTurno(noche, '03:15')).toBe(true)
+    expect(horaCalzaEnTurno(noche, '23:30')).toBe(true)
+    expect(horaCalzaEnTurno(noche, '08:40')).toBe(true)
+    expect(horaCalzaEnTurno(noche, '09:30')).toBe(false)
+    expect(horaCalzaEnTurno(noche, '15:00')).toBe(false)
   })
 })

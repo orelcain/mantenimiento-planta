@@ -324,6 +324,13 @@ export function BitacoraTurnoVista({
     else p.set('turno', destino.id)
     setParams(p)
   }
+  const verTurno = (id: string) => {
+    const p = new URLSearchParams(params)
+    if (id === turnoActual.id) p.delete('turno')
+    else p.set('turno', id)
+    setParams(p)
+  }
+
   const irAlActual = () => {
     const p = new URLSearchParams(params)
     p.delete('turno')
@@ -1004,7 +1011,23 @@ export function BitacoraTurnoVista({
         cargandoEquipos={cargandoEquipos}
         subirFoto={fuente.subirFoto}
         fuenteRepuestos={fuente.repuestos}
-        onGuardar={guardar}
+        onGuardar={async (id, datos, nuevo) => {
+          await guardar(id, datos, nuevo)
+          // Quedó en otro turno (se registró en el equivocado): se dice dónde, con «Ver».
+          const destino = datos.turnoId
+          if (destino && editor && destino !== editor.turno.id && datos.estado !== 'borrador') {
+            toast({
+              title: `Evento movido al ${etiquetaCortaTurno(destino).toLowerCase()}`,
+              description: datos.resuelvePendiente || editor.evento?.resuelvePendiente ? 'El pendiente queda resuelto en ese turno.' : undefined,
+              variant: 'success',
+              action: (
+                <ToastAction altText="Ver ese turno" onClick={() => verTurno(destino)}>
+                  Ver
+                </ToastAction>
+              ),
+            })
+          }
+        }}
         onBorrar={borrarConDeshacer}
         eventoVivo={editandoEventoId ? (eventos.find((e) => e.id === editandoEventoId) ?? null) : null}
         otrosEditando={editandoEventoId ? otrosEditando(conectados, editandoEventoId, miDispositivoId) : []}

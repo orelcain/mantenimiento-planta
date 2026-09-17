@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { AlertTriangle, Check, ImagePlus, Loader2, RotateCw, Trash2, Users, X } from 'lucide-react'
 import { Button, Sheet } from '@/components/piel'
 import { useToast } from '@/hooks/useToast'
@@ -44,7 +44,18 @@ import { SelectorParticipantes } from './SelectorParticipantes'
 import { BuscadorEquipo } from './BuscadorEquipo'
 import type { OpcionEquipo } from '@/services/bitacora/buscarEquipos'
 import { tecnicoRecordado } from './tecnicoRecordado'
-import { formatoMinutos, horaDe, horaSugeridaParaEvento, minutosEntre } from '@/services/bitacora/turnoMantencion'
+import {
+  DIAS_PARA_MOVER,
+  formatoMinutos,
+  horaCalzaEnTurno,
+  horaDe,
+  horarioTurno,
+  horaSugeridaParaEvento,
+  minutosEntre,
+  turnoDesdeId,
+  turnoMantencionEn,
+  turnosElegibles,
+} from '@/services/bitacora/turnoMantencion'
 import { etiquetaCodigoEquipo, limpiarTipo, normalizarRepuestos, normalizarTipo, opcionesUbicacion } from '@/services/bitacora/presentacionEvento'
 import { vibrar } from '@/services/bitacora/vibrar'
 import { RepuestosUsados } from './RepuestosUsados'
@@ -114,6 +125,12 @@ function firmaDe(
 }
 
 const HORA_VALIDA = /^\d{2}:\d{2}$/
+
+/** «Día 17-09»: el nombre del turno sin la palabra «Turno» (la fila ya la dice). */
+function nombreTurnoCorto(id: string): string {
+  const s = etiquetaCortaTurno(id).replace(/^Turno\s+/i, '')
+  return s.charAt(0).toUpperCase() + s.slice(1)
+}
 
 function leerRecientes(clave = CLAVE_RECIENTES): string[] {
   try {
@@ -221,6 +238,9 @@ export function EventoBitacoraSheet({
   const eventoId = evento?.id ?? idNuevo
 
   const [quien, setQuien] = useState('')
+  /** Turno donde queda el evento (se puede corregir si se registró en otro, 17-09). */
+  const [turnoDestino, setTurnoDestino] = useState('')
+  const campoId = useId()
   /** Al editar, «quién edita» va plegado en una línea; «Cambiar» muestra los chips (17-09). */
   const [cambiarQuien, setCambiarQuien] = useState(false)
   /** Quién lo registró, editable en un evento ya publicado (se eligió mal o lo cargó otro). */
@@ -306,6 +326,14 @@ export function EventoBitacoraSheet({
    * borrador propio lo ajusta con «Quién continúa», así que ahí no hace falta.
    */
   const autorEditable = !esNuevo && !modoBorrador
+  // Turnos que se pueden elegir: el reloj de AHORA (no el del turno que se mira).
+  const turnoEnCurso = useMemo(() => turnoMantencionEn(), [open]) // eslint-disable-line react-hooks/exhaustive-deps
+  const origenPendienteId = pendienteOrigen?.turnoId ?? evento?.resuelvePendiente?.turnoId ?? null
+  const opcionesTurno = useMemo(() => {
+    const lista = turnosElegibles(turnoEnCurso, DIAS_PARA_MOVER, origenPendienteId)
+    // El turno propio siempre está, aunque sea más viejo que la ventana.
+    return lista.some((t) => t.id === turno.id) ? lista : [turno, ...lista]
+  }, [turnoEnCurso, origenPendienteId, turno])
   const registradoEnServidor = (eventoVivo ?? evento)?.registradoPor ?? ''
   /** El autor que vale para no repetirlo como participante. */
   const quienRegistro = esNuevo ? quien : autorEditable && registrador.trim() ? registrador.trim() : registradoEnServidor || quien
@@ -328,6 +356,7 @@ export function EventoBitacoraSheet({
     const lista = tecnicosRef.current.todos
     const quienInicial = autorFijo ?? (lista.length === 0 || lista.includes(recordado) ? recordado : '')
     setQuien(quienInicial)
+    setTurnoDestino(evento?.turnoId ?? turno.id)
     setCambiarQuien(false)
     setRegistrador(evento?.registradoPor ?? '')
     setParticipantes(evento?.participantes ?? [])
@@ -470,6 +499,8 @@ export function EventoBitacoraSheet({
       participantes: participantes.filter((p) => p.trim().toLowerCase() !== quienRegistro.trim().toLowerCase()),
       equipoId,
       estado,
+      // Turno elegido (el hook lo aplica solo al publicar o guardar).
+      ...(turnoDestino && turnoDestino !== turno.id ? { turnoId: turnoDestino } : {}),
       // Corrección de quién lo registró: solo si se eligió a alguien distinto
       // (la clave no va si no cambió: un `undefined` pisaba el autor en la vitrina).
       ...(!crear && autorEditable && registrador.trim() && registrador.trim() !== registradoEnServidor ? { registradoPor: registrador.trim() } : {}),
@@ -830,6 +861,14 @@ export function EventoBitacoraSheet({
       setError('Escribe qué pasó y qué se hizo.')
       return
     }
+    const destino = turnoDesdeId(turnoDestino)
+    if (destino && destino.id !== turno.id && !sinHora && HORA_VALIDA.test(horaInicio) && !horaCalzaEnTurno(destino, horaInicio)) {
+      setError(
+        `Las ${horaInicio} no son del ${etiquetaCortaTurno(destino.id).toLowerCase()} (${horarioTurno(destino)}). ` +
+          'Corrige la hora o activa «Sin hora».',
+      )
+      return
+    }
     // Un término "antes" del inicio suele ser un typo (10:30 → 10:15) y daba
     // paradas de casi 24 h. Cruzar la medianoche real no pasa de unas horas.
     if (duracion != null && duracion > 12 * 60) {
@@ -859,6 +898,7 @@ export function EventoBitacoraSheet({
     }
     setGuardando(true)
     const publicando = modoBorrador
+    const moverA = destino && destino.id !== turno.id ? destino.id : null
     // Si nunca se vio el documento en la bitácora (la creación pudo fallar), se
     // crea completo en vez de actualizar algo que no existe (revisión 16-09).
     const crear = !existeEnServidor.current || (creadoAqui.current && !vistoVivo.current)
@@ -872,7 +912,8 @@ export function EventoBitacoraSheet({
       subidasNuevas.current = []
       // Las fotos quitadas las borra el hook DESPUÉS del OK del servidor.
       quitadas.current = []
-      toast({
+      // Si cambió de turno, la bitácora avisa dónde quedó (con «Ver»).
+      if (!moverA) toast({
         title: publicando ? 'Evento publicado' : esNuevo ? 'Evento agregado' : 'Evento actualizado',
         description: navigator.onLine ? undefined : 'Quedó guardado en el teléfono; se sube cuando haya señal.',
         variant: 'success',
@@ -1085,6 +1126,36 @@ export function EventoBitacoraSheet({
             )}
           </div>
         )}
+        {/* Turno donde queda el evento: se corrige si se registró en otro
+            (p. ej. «Resolver» tocado al día siguiente). Últimos 7 días, nunca
+            uno futuro ni anterior al pendiente que cierra (17-09). */}
+        <div>
+          <label htmlFor={`${campoId}-turno`} className="flex min-h-[44px] items-center justify-between gap-3 rounded-ctl bg-muted-foreground/10 pl-3 pr-1">
+            <span className="text-body">Turno</span>
+            <select
+              id={`${campoId}-turno`}
+              value={turnoDestino}
+              onChange={(e) => setTurnoDestino(e.target.value)}
+              className="min-h-[44px] min-w-0 max-w-[70%] cursor-pointer truncate rounded-ctl bg-transparent px-2 text-right text-[16px] font-semibold text-primary outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              {opcionesTurno.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {nombreTurnoCorto(t.id)}
+                  {t.id === turnoEnCurso.id ? ' · en curso' : ''}
+                  {t.id === origenPendienteId ? ' · del pendiente' : ''}
+                </option>
+              ))}
+            </select>
+          </label>
+          {turnoDestino !== turno.id && (
+            <p className="mt-1.5 text-footnote text-muted-foreground">
+              Al {modoBorrador || esNuevo ? 'publicar' : 'guardar'}, el evento pasa al {etiquetaCortaTurno(turnoDestino).toLowerCase()}
+              {turnoDesdeId(turnoDestino) ? ` (${horarioTurno(turnoDesdeId(turnoDestino)!)})` : ''}
+              {origenPendienteId ? ' y el pendiente queda resuelto ahí' : ''}.
+            </p>
+          )}
+        </div>
+
         {/* Publicado: quién lo registró se corrige aquí (también desde el pase);
             quien corrige queda como «editado por». No se recuerda como «mi nombre». */}
         {autorEditable && tecnicos.todos.length > 0 && (

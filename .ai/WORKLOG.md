@@ -5306,6 +5306,29 @@ Orel intento anotar el FRL de la E-PACK y la bitacora dijo «no tiene repuestos 
 - Codigo: la lista de repuestos por equipo de la bitacora vence a los 5 min (antes vivia toda la
   sesion y un vinculo nuevo desde el CTD no aparecia).
 
+## 2026-09-17 · Bitacora ronda 24 · Cambiar el turno de un evento
+
+Orel resolvió el pendiente del bandejón (línea manual HG, tarde 16-09) tocando «Resolver» el 17-09
+por la mañana: la soldadura de Matías Serpa con Leandro Igor quedó en el turno DÍA 17-09 y el
+pendiente decía «Resuelto en día 17-09». La soldadura fue en el turno NOCHE 17-09 (decisión de Orel).
+- **Datos corregidos a mano** (admin SDK, respaldo en el scratchpad de la sesión): evento
+  `lcDOGQ1BvCV6qkrGRHLN` → `2026-09-17_noche`; `cierre.turnoId` del pendiente `b9Sy6sTIdHIbRm2iAiks`
+  → `2026-09-17_noche`. Borrado el borrador vacío `Y1lfBCr0EbtoDvOnshFj` (TOLDO PORTERIA, noche 17-09)
+  que dejó una verificación de la ronda 21 al abrir «Resolver» con la sesión real.
+  ⚠ Verificar «Resolver» SOLO en la vitrina: el autoguardado crea el borrador en prod.
+- **Fila «Turno»** en el editor (nuevo, editar y resolver): `<select>` nativo con los últimos 7 días
+  (`turnosElegibles`, 21 turnos, nunca futuro, nunca antes del turno del pendiente que cierra) y
+  nombres cortos («Noche 17-09 · del pendiente»). Nota debajo cuando cambia. Se aplica SOLO al
+  publicar o guardar (el autoguardado no mueve un borrador: si no, el editor lo daba por borrado).
+  La hora tiene que calzar con el turno nuevo (`horaCalzaEnTurno`, ±1 h de holgura).
+- Hook: `datos.turnoId` → crea en ese turno o escribe `turnoId`, `fechaTurno`, `banda` y
+  `posicionMin: null`; el cierre del pendiente usa el turno destino; si el evento ya estaba publicado
+  y cerraba un pendiente, `reubicarCierre` actualiza `cierre.turnoId` (solo si el cierre es suyo).
+- Página: toast «Evento movido al turno noche 17-09 · Ver». Vitrina: mueve entre turnos de ejemplo.
+- **Regla**: `turnoId` ya no es inmutable: `turnoMovible` exige id = fecha + banda y un turno entre hace
+  10 días y mañana (`timestamp.date(int…)`). 111/111 en local (5 casos nuevos, fechas relativas a hoy).
+- Verificado en la vitrina a 375 px: error de hora, mover con toast y «Ver», opciones de «Resolver».
+
 ## 2026-09-17 · Bitacora ronda 23 · iOS 27 (2/2): deslizar, Deshacer, arrastrar, visor con gestos y vibracion
 
 Segunda mitad del mockup https://claude.ai/artifact/8b4xbwjvMUzUeJJgkAJn27 (C, H, D, G, I). La 1/2 es #1072.
