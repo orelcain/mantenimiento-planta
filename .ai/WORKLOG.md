@@ -21,6 +21,24 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-17 · Bitacora ronda 29 · La planilla «Recoleccion MTTR» arriba del correo, en vivo y como Excel
+- Pedido de Orel: Mantención pega arriba del correo del turno una tabla de Excel («MTBF - MTTR»: Fecha · Máquina · Falla · Duración Falla (Min) · Observaciones) y abajo va el detalle. Debía verse IGUAL al Excel, no con diseño propio.
+- Hecho:
+  - `recoleccionMttr.ts`: las filas desde la bitácora (título o primera frase como «Falla»; «35min» o «0»; la fecha «17-sept-2026 jue» solo en la primera fila del día, como la llenan), el HTML con el aspecto exacto del archivo y el `.xlsx` real.
+  - Correo del turno y del período: la tabla ARRIBA, el detalle debajo. PDF del turno y del período: la misma tabla arriba (`recoleccionMttrPdf.ts`, jspdf-autotable).
+  - Pantalla del turno: el bloque «Recolección MTTR · así va arriba del correo» justo arriba de los eventos, llenándose en vivo, con «Bajar Excel». También en la hoja Compartir del teléfono y en los botones de PC.
+  - El Excel: `public/plantillas/recoleccion-mttr.xlsx` es una plantilla con la tabla «Captura» (TableStyleMedium2), sus estilos y el logo; en el navegador `fflate` abre el zip, reemplaza la fila 4 por las filas reales y ajusta el rango de la tabla. Validado con openpyxl: fecha como serie con formato, número, tabla e imagen intactos.
+- Formato leído del archivo original (`Recoleccion MTTR dia 09-08-2025.xlsx`, que Orel dejó en OneDrive y luego desapareció de ahí): banda B1:E1 `#00557F` Calibri 16 blanca, 42 pt; A1 `#F2F2F2` con el logo (PNG de 257×192 con aire: se recorta a la franja 64–124 y se muestra a 120×28); encabezados `#00557F` blancos; bandas blanco / `#D9E1F2` EMPEZANDO por la primera fila de datos; A–D centradas, E izquierda; anchos 146/184/317/171/929 px.
+- Gotchas:
+  - El logo salía estirado: el PNG trae aire arriba y abajo; hay que recortar, no escalar.
+  - La tabla a 100% de ancho en el teléfono aplastaba Observaciones a 0: `[&_table]:min-w-[760px]` con `overflow-x-auto`.
+  - En el Excel de Chile el `dd/mmm/yyyy ddd` se ve con guiones («17-sept-2026 jue»), por eso el HTML usa guiones.
+  - `recoleccionMttr` NO importa `escaparHtml` de `bitacoraCorreo` (ciclo): tiene el suyo.
+  - MTTR = promedio por parada (25 min en 2 paradas → 13 min); Orel lo confundió con el total. Es correcto.
+- Archivos: `recoleccionMttr.ts`, `recoleccionMttrPdf.ts`, `logoRecoleccion.ts`, `public/plantillas/recoleccion-mttr.xlsx`, `bitacoraCorreo.ts`, `bitacoraPdf.ts`, `historialCorreo.ts`, `historialPdf.ts`, `BitacoraTurnoPage.tsx`, `HistorialBitacoraPage.tsx`, `CompartirTurnoSheet.tsx`, test nuevo `recoleccionMttr.test.ts`.
+- Verificación: tsc 0; eslint 30 (sin cambio); vitest 2.804 OK; audit-piel/voseo/decimales OK; vitrina a 1100 y 375 px; PDF rasterizado; xlsx abierto con openpyxl.
+- Estado: HECHO (pendiente: Orel manda el correo real y abre el Excel en su Outlook).
+
 ## 2026-09-17 · Bitacora ronda 28 · La pantalla del turno se alinea con lo que se envía
 - Hecho (opciones C y E del mockup https://claude.ai/artifact/BcLAK48eg3NSdU6yNUcs4U):
   - C: la lista del turno se parte en «Eventos del turno N» y «Pendiente para el turno siguiente N» (punto ámbar), y cada evento lleva el MISMO número que en WhatsApp, el correo y el PDF. Los borradores van al final de la primera sección, sin número.

@@ -271,8 +271,10 @@ describe('correo de la bitácora', () => {
     const html = bitacoraAHtmlCorreo({ ...base, eventos })
     expect(html).toContain('Detuvo la máquina 35 min')
     expect(html).toContain('Sin detener: Colación HG')
-    expect(html.indexOf('Pendiente para el turno siguiente')).toBeGreaterThan(html.indexOf('Grader MS4/12'))
-    expect(html.indexOf('Enzunchadora')).toBeGreaterThan(html.indexOf('Pendiente para el turno siguiente'))
+    // El orden se mira en el detalle: la planilla MTTR de arriba ya nombra a todos.
+    const detalle = html.slice(html.indexOf('Eventos del turno'))
+    expect(detalle.indexOf('Pendiente para el turno siguiente')).toBeGreaterThan(detalle.indexOf('Grader MS4/12'))
+    expect(detalle.indexOf('Enzunchadora')).toBeGreaterThan(detalle.indexOf('Pendiente para el turno siguiente'))
     const texto = bitacoraATextoPlano({ ...base, eventos })
     expect(texto).toContain('3 eventos · 35 min de parada (1) · MTTR 35 min · 1 sin detener producción · 1 pendiente')
     expect(texto).toContain('Técnicos de turno: Danilo Cortes')

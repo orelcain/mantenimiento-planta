@@ -1,6 +1,7 @@
 import { ETIQUETA_FOTO } from '@/config/bitacora'
 import { autorVisible, tecnicosDelEvento, type EventoBitacora, type FotoEvento, type TurnoMantencion } from './bitacora.types'
 import { fuePendiente, gruposDelTurno, minutosParadaDe, ordenarEventos, resumirBitacora } from './resumenBitacora'
+import { filasRecoleccion, htmlRecoleccionMttr, textoRecoleccionMttr } from './recoleccionMttr'
 import { soloListos } from './borradores'
 import { etiquetaTurno, fechaTurnoLarga, formatoMinutos, horarioTurno } from './turnoMantencion'
 import { etiquetaCortaTurno } from './entregaTurno'
@@ -349,7 +350,10 @@ export function bitacoraAHtmlCorreo({ turno, eventos: todos, tecnicos, planta, o
     `<div style="font-family:${FUENTE};font-size:11px;color:${C.sec};padding-top:16px;">` +
     `Generado con la app de Mantención · ${escaparHtml(etiquetaTurno(turno))} ${escaparHtml(turno.fecha.split('-').reverse().join('-'))}</div>`
 
-  return `<div style="max-width:680px;color:${C.tinta};">${encabezado}${tablaKpis}${bloqueObservacion}${cuerpo}${bloqueAnteriores}${pie}</div>`
+  // La planilla «Recoleccion MTTR» va ARRIBA, como la pegan hoy desde Excel; el
+  // detalle de la bitácora sigue debajo (pedido de Orel, 17-09-2026).
+  const recoleccion = eventos.length ? `${htmlRecoleccionMttr(filasRecoleccion(turno, eventos))}<div style="height:14px;line-height:14px;">&nbsp;</div>` : ''
+  return `${recoleccion}<div style="max-width:680px;color:${C.tinta};">${encabezado}${tablaKpis}${bloqueObservacion}${cuerpo}${bloqueAnteriores}${pie}</div>`
 }
 
 /** "3 eventos · 35 min de parada (1) · MTTR 35 min · 1 sin detener producción · 1 pendiente" (texto plano y WhatsApp). */
@@ -391,7 +395,9 @@ export function bitacoraATextoPlano({ turno, eventos: todos, tecnicos, planta, o
   const resumen = lineaResumen(r)
   // Bloques separados por una línea en blanco: pegado en un correo sin formato
   // cada evento se lee aparte.
+  const recoleccion = eventos.length ? [textoRecoleccionMttr(filasRecoleccion(turno, eventos)), ''] : []
   return [
+    ...recoleccion,
     cabecera,
     resumen,
     ...(observacion?.trim() ? [`Observaciones del turno: ${observacion.trim()}`] : []),

@@ -2,11 +2,14 @@ import { textoSeguroPdf } from '@/utils/pdf/textoSeguroPdf'
 import { lineaRepuestoDelPeriodo, porcentaje, tesisDelPeriodo, type FilaTurno, type ResumenPeriodo } from './historialBitacora'
 import { formatoMinutos } from './turnoMantencion'
 import { etiquetaFilaTurno, tituloHistorial } from './historialCorreo'
+import type { EventoBitacora } from './bitacora.types'
+import { filasRecoleccionPeriodo } from './recoleccionMttr'
+import { dibujarRecoleccionMttr } from './recoleccionMttrPdf'
 
 type RGB = [number, number, number]
 
 /** PDF del período: la misma información del correo, para adjuntar o imprimir. */
-export async function generarPdfHistorial(r: ResumenPeriodo, filas: readonly FilaTurno[], planta: string): Promise<string> {
+export async function generarPdfHistorial(r: ResumenPeriodo, filas: readonly FilaTurno[], planta: string, eventos: readonly EventoBitacora[] = []): Promise<string> {
   const [{ jsPDF }, autoTable] = await Promise.all([import('jspdf'), import('jspdf-autotable')])
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   // NFKC + saneo cp1252: sin esto un "NH₃" deja el renglón en blanco.
@@ -14,6 +17,9 @@ export async function generarPdfHistorial(r: ResumenPeriodo, filas: readonly Fil
   const W = pdf.internal.pageSize.getWidth()
   const M = 15
   let y = M
+
+  // La planilla «Recoleccion MTTR» del período, arriba (17-09-2026).
+  if (eventos.length) y = await dibujarRecoleccionMttr(pdf, filasRecoleccionPeriodo(eventos), M, y, W - 2 * M, t)
 
   pdf.setFont('helvetica', 'bold')
   pdf.setFontSize(16)

@@ -5,6 +5,8 @@ import { etiquetaParada, etiquetaPendientes, lineaPendienteAnterior, partesImpac
 import { codigoEquipoDe, etiquetaTipo, horarioEvento, nombreRepuesto, normalizarRepuestos, tituloDe } from './presentacionEvento'
 import { cargarFotoComoJpeg, type ImagenCargada } from './fotosBitacora'
 import { gruposDelTurno, resumirBitacora } from './resumenBitacora'
+import { filasRecoleccion } from './recoleccionMttr'
+import { dibujarRecoleccionMttr } from './recoleccionMttrPdf'
 import { soloListos } from './borradores'
 import { etiquetaTurno, fechaTurnoLarga, formatoMinutos, horarioTurno } from './turnoMantencion'
 
@@ -106,6 +108,9 @@ export async function generarPdfBitacora({ turno, eventos: todos, tecnicos, plan
     pdf.setLineWidth(0.2)
     y += 2
   }
+
+  // ── La planilla «Recoleccion MTTR» arriba, como en el correo (17-09-2026) ──
+  if (eventos.length) y = await dibujarRecoleccionMttr(pdf, filasRecoleccion(turno, eventos), M, y, ANCHO, t)
 
   // ── Encabezado (mockup aprobado 17-09-2026) ──
   pdf.setFont('helvetica', 'bold')

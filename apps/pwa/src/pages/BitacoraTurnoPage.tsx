@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { BarChart3, Check, ChevronLeft, ChevronRight, Clock, ClipboardCopy, FileDown, Loader2, MessageCircle, MessageSquareText, NotebookPen, Pencil, Plus, QrCode, Share, Trash2 } from 'lucide-react'
+import { BarChart3, Check, ChevronLeft, ChevronRight, Clock, ClipboardCopy, FileDown, FileSpreadsheet, Loader2, MessageCircle, MessageSquareText, NotebookPen, Pencil, Plus, QrCode, Share, Trash2 } from 'lucide-react'
 import { Button, Pill, SegmentedControl, Sheet, Tag, type SwipeAction } from '@/components/piel'
 import { ToastAction } from '@/components/ui/toast'
 import { vibrar } from '@/services/bitacora/vibrar'
@@ -32,6 +32,7 @@ import type { User } from '@/types'
 import { bitacoraAHtmlCorreo, bitacoraATextoPlano, etiquetaParada, etiquetaPendientes, tituloCorreo } from '@/services/bitacora/bitacoraCorreo'
 import { cargarFotoComoJpeg, purgarFotosPendientes } from '@/services/bitacora/fotosBitacora'
 import { fuePendiente, gruposDelTurno, resumirBitacora } from '@/services/bitacora/resumenBitacora'
+import { filasRecoleccion, generarExcelRecoleccion, htmlRecoleccionMttr, nombreExcelRecoleccion } from '@/services/bitacora/recoleccionMttr'
 import { esBorrador, soloListos } from '@/services/bitacora/borradores'
 import { nombreEnPresencia as nombrePresencia, otrosEditando } from '@/services/bitacora/presencia'
 import { dispositivoActual } from '@/services/bitacora/dispositivo'
@@ -194,7 +195,7 @@ export function BitacoraTurnoVista({
   )
   const hayEventoConId = useCallback((id: string) => eventos.some((e) => e.id === id), [eventos])
 
-  const [trabajando, setTrabajando] = useState<null | 'copiar' | 'copiar-incrustadas' | 'pdf'>(null)
+  const [trabajando, setTrabajando] = useState<null | 'copiar' | 'copiar-incrustadas' | 'pdf' | 'excel'>(null)
   const [editandoObs, setEditandoObs] = useState(false)
   const [textoObs, setTextoObs] = useState('')
   const [quienObs, setQuienObs] = useState('')
@@ -361,6 +362,9 @@ export function BitacoraTurnoVista({
     [turno, eventos, presentes.nombres, observacion.texto, pendientesPrevios, esActual],
   )
   const htmlCorreo = useMemo(() => bitacoraAHtmlCorreo(datosCorreo), [datosCorreo])
+  // La planilla «Recoleccion MTTR» que va arriba del correo, llenándose en vivo (17-09-2026).
+  const filasMttr = useMemo(() => filasRecoleccion(turno, eventos), [turno, eventos])
+  const htmlMttr = useMemo(() => htmlRecoleccionMttr(filasMttr), [filasMttr])
   const asunto = tituloCorreo(turno)
 
   // ── WhatsApp (mockup aprobado 16-09-2026): mensaje + una lámina por evento con fotos ──
@@ -507,6 +511,18 @@ export function BitacoraTurnoVista({
       })
     } catch {
       toast({ title: 'No se pudo generar el PDF', variant: 'destructive' })
+    } finally {
+      setTrabajando(null)
+    }
+  }
+
+  const bajarExcel = async () => {
+    setTrabajando('excel')
+    try {
+      await generarExcelRecoleccion(filasMttr, nombreExcelRecoleccion(turno))
+      toast({ title: 'Excel descargado', description: 'La planilla «Recoleccion MTTR» con los eventos del turno.', variant: 'success' })
+    } catch {
+      toast({ title: 'No se pudo generar el Excel', variant: 'destructive' })
     } finally {
       setTrabajando(null)
     }
@@ -733,6 +749,9 @@ export function BitacoraTurnoVista({
           <Button variant="tinted" onClick={exportarPdf} disabled={!!trabajando}>
             {trabajando === 'pdf' ? <Loader2 className="animate-spin" /> : <FileDown />} Exportar PDF
           </Button>
+          <Button variant="tinted" onClick={() => void bajarExcel()} disabled={!!trabajando || r.eventos === 0}>
+            {trabajando === 'excel' ? <Loader2 className="animate-spin" /> : <FileSpreadsheet />} Bajar Excel MTTR
+          </Button>
           <Button variant="tinted" onClick={() => void copiarParaWhatsapp()} disabled={!!trabajando}>
             <MessageCircle /> Copiar para WhatsApp
           </Button>
@@ -945,6 +964,26 @@ export function BitacoraTurnoVista({
       {/* Copiar, PDF y WhatsApp viven en «Compartir» (ícono de la cabecera) y
           «Nuevo evento» en el «+» de la barra de pestañas (mockup iOS 27, 17-09). */}
 
+      {/* La planilla «Recoleccion MTTR» tal como va ARRIBA del correo, llenándose con
+          cada evento publicado: se ve en tiempo real cómo quedará (Orel, 17-09-2026). */}
+      {!cargando && r.eventos > 0 && (
+        <section aria-label="Recolección MTTR" className="flex flex-col gap-2">
+          <div className="flex items-center justify-between gap-2 px-4">
+            <h2 className="text-caption font-semibold text-muted-foreground">Recolección MTTR · así va arriba del correo</h2>
+            <Button variant="plain" size="sm" onClick={() => void bajarExcel()} disabled={!!trabajando}>
+              {trabajando === 'excel' ? <Loader2 className="animate-spin" /> : <FileSpreadsheet />} Bajar Excel
+            </Button>
+          </div>
+          {/* Fondo blanco fijo a propósito: es la planilla, no una superficie de la app. */}
+          <div
+            // En el teléfono la planilla no se aprieta: conserva su ancho y se desplaza de lado.
+            className="overflow-x-auto rounded-card p-2 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none [&_table]:min-w-[760px]"
+            style={{ background: '#FFFFFF' }}
+            dangerouslySetInnerHTML={{ __html: htmlMttr }}
+          />
+        </section>
+      )}
+
       <div className="grid items-start gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
         {/* Línea de tiempo */}
         <section aria-label="Eventos del turno" className="flex flex-col gap-5">
@@ -1106,6 +1145,10 @@ export function BitacoraTurnoVista({
         onPdf={() => {
           setHojaCompartir(false)
           void exportarPdf()
+        }}
+        onExcel={() => {
+          setHojaCompartir(false)
+          void bajarExcel()
         }}
       />
 
