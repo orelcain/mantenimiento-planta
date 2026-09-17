@@ -152,7 +152,8 @@ export function dibujarLamina(l: LaminaWhatsapp, imagenes: ReadonlyMap<string, I
   }
 
   // ── Contenido ──
-  const derechaCabecera = l.total > 1 ? `${l.numero} de ${l.total}` : ''
+  // «Evento 2 · lámina 2 de 6»: el número del evento en el mensaje y la posición de la lámina.
+  const derechaCabecera = [`Evento ${l.numeroEvento}`, l.total > 1 ? `lámina ${l.numero} de ${l.total}` : ''].filter(Boolean).join(' · ')
   const principal = e.equipo?.trim() || etiquetaTipo(e)
   const lineasTitulo = recortarLineas(medirCon(F.titulo), partirLineas(medirCon(F.titulo), principal, UTIL), 2, UTIL)
   const titulo = tituloDe(e)

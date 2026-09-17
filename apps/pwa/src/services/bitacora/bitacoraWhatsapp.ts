@@ -1,16 +1,25 @@
-import { autorVisible, type EventoBitacora, type FotoEvento, type TurnoMantencion } from './bitacora.types'
+import { autorVisible, tecnicosDelEvento, type EventoBitacora, type FotoEvento, type TurnoMantencion } from './bitacora.types'
 import { soloListos } from './borradores'
 import { fuePendiente, ordenarEventos, resumirBitacora } from './resumenBitacora'
-import { etiquetaTurno, fechaTurnoLarga, horarioTurno } from './turnoMantencion'
+import { etiquetaTurno, fechaTurnoLarga, formatoMinutos, horarioTurno } from './turnoMantencion'
 import {
   capitalizarPrimera,
+  etiquetaParada,
+  etiquetaPendientes,
   lineaImpacto,
   lineaPendienteAnterior,
-  lineaResumen,
-  lineaTecnicos,
   type DatosCorreoBitacora,
 } from './bitacoraCorreo'
-import { codigoEquipoDe, encabezadoEvento, etiquetaTipo, lineaRepuestos, lineasRepuestos } from './presentacionEvento'
+import {
+  codigoEquipoDe,
+  encabezadoEvento,
+  etiquetaTipo,
+  lineaRepuestos,
+  nombreRepuesto,
+  normalizarRepuestos,
+  tieneHora,
+  tituloDe,
+} from './presentacionEvento'
 
 /**
  * Entre evento y evento del mensaje (17-09): con solo una línea en blanco, dos
@@ -45,6 +54,8 @@ export interface LaminaWhatsapp {
   partes: number
   /** Va en el bloque «Pendiente para el turno siguiente». */
   pendiente: boolean
+  /** El número del evento en el mensaje («2. EMPACADORA…»): la lámina lo repite. */
+  numeroEvento: number
   /** "Turno tarde 16-09" y la planta, para la cabecera y el pie. */
   turnoCorto: string
   planta: string
@@ -71,7 +82,8 @@ export function turnoCorto(turno: TurnoMantencion): string {
 export function planLaminas({ turno, eventos, planta }: Pick<DatosCorreoBitacora, 'turno' | 'eventos' | 'planta'>): LaminaWhatsapp[] {
   const piezas: Array<Omit<LaminaWhatsapp, 'clave' | 'numero' | 'total'>> = []
   const corto = turnoCorto(turno)
-  for (const evento of eventosDelMensaje(turno, eventos)) {
+  const delMensaje = eventosDelMensaje(turno, eventos)
+  for (const [indice, evento] of delMensaje.entries()) {
     const fotos = fotosOrdenadas(evento.fotos ?? [])
     const partes = Math.ceil(fotos.length / FOTOS_POR_LAMINA)
     for (let i = 0; i < partes; i++) {
@@ -81,6 +93,7 @@ export function planLaminas({ turno, eventos, planta }: Pick<DatosCorreoBitacora
         parte: i + 1,
         partes,
         pendiente: fuePendiente(evento),
+        numeroEvento: indice + 1,
         turnoCorto: corto,
         planta,
       })
@@ -99,10 +112,11 @@ export function planLaminas({ turno, eventos, planta }: Pick<DatosCorreoBitacora
       p.parte,
       p.partes,
       p.pendiente,
+      p.numeroEvento,
       encabezadoEvento(p.evento),
       lineaImpacto(p.evento),
       p.evento.descripcion ?? '',
-      lineaTecnicos(p.evento),
+      tecnicosDelEvento(p.evento).join(', '),
       autorVisible(p.evento),
       codigoEquipoDe(p.evento),
       lineaRepuestos(p.evento),
@@ -132,55 +146,111 @@ export function nombreArchivoLamina(turno: TurnoMantencion, lamina: Pick<LaminaW
 }
 
 /**
- * El mensaje de WhatsApp: lo mismo que el correo, en texto con el formato de
- * WhatsApp (`*negrita*`, `_cursiva_`, listas con guion). Cada evento con fotos
- * dice en qué lámina están.
+ * Código, hora o número en `monoespaciado`: además de verse ordenado, evita que
+ * el teléfono lo convierta en enlace (horas subrayadas, números largos como
+ * teléfono). Una comilla invertida dentro lo cortaría: se cambia por una igual.
+ */
+function codigo(texto: string): string {
+  const limpio = texto.trim().replace(/`/g, 'ˋ')
+  return limpio ? `\`${limpio}\`` : ''
+}
+
+/** Números de 8 o más dígitos del texto del técnico, en monoespaciado (no quedan como teléfono). */
+export function protegerNumeros(texto: string): string {
+  return texto.replace(/(^|[^\w`])(\d{8,})(?=$|[^\w`])/g, (_, antes: string, n: string) => `${antes}\`${n}\``)
+}
+
+/** "18:07–18:30" o "18:07" (sin hora: vacío). */
+function horaCorta(e: EventoBitacora): string {
+  if (!tieneHora(e)) return ''
+  return e.horaTermino ? `${e.horaInicio}–${e.horaTermino}` : e.horaInicio
+}
+
+/**
+ * El mensaje de WhatsApp (formato A2, mockup aprobado por Orel 17-09-2026):
+ * secciones en mayúscula y negrita (WhatsApp no tiene tamaños de letra),
+ * resumen en viñetas, eventos numerados con lo que escribió el técnico en una
+ * cita, horas y códigos en monoespaciado y una línea divisoria con aire entre
+ * evento y evento. Cada evento con fotos dice en qué lámina están.
  */
 export function bitacoraATextoWhatsapp(datos: DatosCorreoBitacora, laminas: readonly LaminaWhatsapp[] = planLaminas(datos)): string {
   const { turno, eventos: todos, tecnicos, planta, observacion, pendientesAnteriores = [] } = datos
   const eventos = soloListos(todos)
   const r = resumirBitacora(eventos)
-  const autores = [...new Set(eventos.map(autorVisible).filter(Boolean))]
   const ordenados = eventosDelMensaje(turno, eventos)
   const hechos = ordenados.filter((e) => !fuePendiente(e))
   const pendientes = ordenados.filter(fuePendiente)
+  const numeroDe = new Map(ordenados.map((e, i) => [e.id, i + 1]))
 
   const numeros = new Map<string, number[]>()
   for (const l of laminas) numeros.set(l.evento.id, [...(numeros.get(l.evento.id) ?? []), l.numero])
 
-  const bloque = (e: EventoBitacora) =>
-    [
-      marcar(encabezadoEvento(e) || etiquetaTipo(e), '*'),
+  const bloque = (e: EventoBitacora) => {
+    const equipo = e.equipo?.trim() ?? ''
+    const titulo = tituloDe(e)
+    const principal = equipo || titulo || etiquetaTipo(e)
+    const hora = horaCorta(e)
+    const cod = codigoEquipoDe(e)
+    const descripcion = (e.descripcion ?? '')
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .map((l) => `> ${protegerNumeros(l)}`)
+    const repuestos = normalizarRepuestos(e.repuestos)
+    const tecnicosEvento = tecnicosDelEvento(e)
+    return [
+      `${marcar(`${numeroDe.get(e.id) ?? ''}. ${principal}`, '*')}${hora ? ` · ${codigo(hora)}` : ''}`,
+      equipo && titulo ? marcar(titulo, '*') : '',
       marcar(lineaImpacto(e), '_'),
-      e.descripcion?.trim() ?? '',
-      lineaTecnicos(e),
-      ...lineasRepuestos(e),
+      cod ? `${/^\d+$/.test(cod) ? 'N° de equipo' : 'Ubicación técnica'} ${codigo(cod)}` : '',
+      ...descripcion,
+      ...(repuestos.length
+        ? ['Repuestos usados:', ...repuestos.map((x) => `- ${codigo(x.codigoSAP)} ${(x.nombreComun ?? '').trim() || nombreRepuesto(x) || ''} ×${x.cantidad}`.trimEnd())]
+        : []),
+      tecnicosEvento.length ? `Técnicos: ${tecnicosEvento.join(', ')}` : '',
       e.fotos?.length
-        ? `Fotos: ${e.fotos.length}${numeros.has(e.id) ? ` (${referenciaLaminas(numeros.get(e.id) ?? [])})` : ''}`
+        ? `Fotos: ${e.fotos.length}${numeros.has(e.id) ? ` · ${referenciaLaminas(numeros.get(e.id) ?? [])}` : ''}`
         : '',
     ]
       .filter(Boolean)
       .join('\n')
+  }
+  const entreEventos = `\n\n${SEPARADOR_EVENTOS}\n\n`
 
   const cabecera = [
-    marcar(`Bitácora de Mantención · ${etiquetaTurno(turno)}`, '*'),
-    `${capitalizarPrimera(fechaTurnoLarga(turno))} · ${horarioTurno(turno).replace('–', 'a')} · ${planta}`,
-    tecnicos.length ? `Técnicos de turno: ${tecnicos.join(', ')}` : '',
-    autores.length ? `Registrado por: ${autores.join(', ')}` : '',
+    marcar('BITÁCORA DE MANTENCIÓN', '*'),
+    marcar(`${etiquetaTurno(turno)} · ${capitalizarPrimera(fechaTurnoLarga(turno))}`, '*'),
+    `${codigo(horarioTurno(turno).replace(/\s*–\s*/, '–'))} · ${planta}`,
+    tecnicos.length ? `Técnicos: ${tecnicos.join(', ')}` : '',
   ]
     .filter(Boolean)
     .join('\n')
 
-  return [
-    cabecera,
-    eventos.length ? `${marcar('Resumen:', '*')} ${lineaResumen(r)}` : 'Sin eventos registrados en el turno.',
-    ...(observacion?.trim() ? [`${marcar('Observaciones del turno:', '_')} ${observacion.trim()}`] : []),
-    ...(hechos.length ? [hechos.map(bloque).join(`\n${SEPARADOR_EVENTOS}\n`)] : []),
-    ...(pendientes.length ? [marcar('Pendiente para el turno siguiente', '*'), pendientes.map(bloque).join(`\n${SEPARADOR_EVENTOS}\n`)] : []),
-    ...(pendientesAnteriores.length
-      ? [
-          [marcar('Sigue pendiente de turnos anteriores', '*'), ...pendientesAnteriores.map((e) => `- ${lineaPendienteAnterior(e)}`)].join('\n'),
-        ]
+  const resumen = [
+    marcar('RESUMEN', '*'),
+    `- ${r.eventos} ${r.eventos === 1 ? 'evento' : 'eventos'}`,
+    `- ${formatoMinutos(r.minutosParada)} ${etiquetaParada(r)}${r.mttrMin != null ? ` · MTTR ${formatoMinutos(r.mttrMin)}` : ''}`,
+    `- ${r.enVentana} sin detener producción`,
+    `- ${r.pendientesDelTurno} ${etiquetaPendientes(r)}`,
+    ...(r.pendientesCerrados > 0
+      ? [`- ${r.pendientesCerrados} ${r.pendientesCerrados === 1 ? 'pendiente cerrado' : 'pendientes cerrados'}`]
       : []),
-  ].join('\n\n')
+  ].join('\n')
+
+  const partes: string[] = [cabecera]
+  if (!eventos.length) partes.push('Sin eventos registrados en el turno.')
+  else partes.push(resumen)
+  if (observacion?.trim()) {
+    partes.push([marcar('OBSERVACIONES DEL TURNO', '*'), ...observacion.trim().split(/\r?\n/).filter((l) => l.trim()).map((l) => `> ${l.trim()}`)].join('\n'))
+  }
+  if (hechos.length) partes.push(`${marcar('EVENTOS DEL TURNO', '*')}\n\n${hechos.map(bloque).join(entreEventos)}`)
+  if (pendientes.length) {
+    if (hechos.length) partes.push(SEPARADOR_EVENTOS)
+    partes.push(`${marcar('PENDIENTE PARA EL TURNO SIGUIENTE', '*')}\n\n${pendientes.map(bloque).join(entreEventos)}`)
+  }
+  if (pendientesAnteriores.length) {
+    if (ordenados.length) partes.push(SEPARADOR_EVENTOS)
+    partes.push([marcar('SIGUE PENDIENTE DE TURNOS ANTERIORES', '*'), ...pendientesAnteriores.map((e) => `- ${protegerNumeros(lineaPendienteAnterior(e))}`)].join('\n'))
+  }
+  return partes.join('\n\n')
 }

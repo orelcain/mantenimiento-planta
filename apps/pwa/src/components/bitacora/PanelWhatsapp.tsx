@@ -4,7 +4,7 @@ import { Button, ListCell, ListGroup } from '@/components/piel'
 import { useToast } from '@/hooks/useToast'
 import { copiarImagen, copiarTexto } from '@/lib/clipboard'
 import type { LaminaGenerada } from '@/hooks/useLaminasWhatsapp'
-import type { LaminaWhatsapp } from '@/services/bitacora/bitacoraWhatsapp'
+import { SEPARADOR_EVENTOS, type LaminaWhatsapp } from '@/services/bitacora/bitacoraWhatsapp'
 
 /**
  * Envío de la bitácora por WhatsApp (mockup aprobado 16-09-2026): el mensaje y
@@ -34,11 +34,32 @@ const equipoLamina = (l: LaminaWhatsapp) => l.evento.equipo?.trim() || 'Sin equi
 
 /** `*negrita*` y `_cursiva_` de WhatsApp, para la vista previa. */
 function conFormato(linea: string): ReactNode[] {
-  return linea.split(/(\*[^*\n]+\*|_[^_\n]+_)/g).map((trozo, i) => {
+  return linea.split(/(`[^`\n]+`|\*[^*\n]+\*|_[^_\n]+_)/g).map((trozo, i) => {
+    if (/^`[^`\n]+`$/.test(trozo))
+      return (
+        <code key={i} className="rounded-[5px] bg-muted-foreground/15 px-1 font-mono text-[0.95em]">
+          {trozo.slice(1, -1)}
+        </code>
+      )
     if (/^\*[^*\n]+\*$/.test(trozo)) return <strong key={i} className="font-semibold">{trozo.slice(1, -1)}</strong>
     if (/^_[^_\n]+_$/.test(trozo)) return <em key={i}>{trozo.slice(1, -1)}</em>
     return <Fragment key={i}>{trozo}</Fragment>
   })
+}
+
+/** Una línea del mensaje como la dibuja WhatsApp: cita, viñeta, divisoria o texto. */
+function LineaWhatsapp({ linea }: { linea: string }) {
+  if (linea.startsWith('> '))
+    return <p className="whitespace-pre-wrap break-words border-l-[3px] border-ink-ok/60 bg-muted-foreground/[0.06] py-0.5 pl-2">{conFormato(linea.slice(2))}</p>
+  if (linea.startsWith('- '))
+    return (
+      <p className="whitespace-pre-wrap break-words pl-4 -indent-3">
+        <span aria-hidden>• </span>
+        {conFormato(linea.slice(2))}
+      </p>
+    )
+  if (linea === SEPARADOR_EVENTOS) return <p className="text-muted-foreground">{linea}</p>
+  return <p className="min-h-[1em] whitespace-pre-wrap break-words">{conFormato(linea)}</p>
 }
 
 export interface PasosWhatsappProps {
@@ -166,9 +187,7 @@ export function VistaPreviaWhatsapp({ texto, listas }: { texto: string; listas: 
     <div className="flex flex-col items-end gap-2 rounded-card bg-muted-foreground/10 p-4">
       <div className="max-w-[92%] rounded-[22px] bg-card px-4 py-3 text-footnote shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
         {texto.split('\n').map((linea, i) => (
-          <p key={i} className="min-h-[1em] whitespace-pre-wrap break-words">
-            {conFormato(linea)}
-          </p>
+          <LineaWhatsapp key={i} linea={linea} />
         ))}
       </div>
       {listas.map((g) => (

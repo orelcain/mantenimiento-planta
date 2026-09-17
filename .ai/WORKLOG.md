@@ -21,6 +21,35 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-17 · Bitacora ronda 25 · Año en los turnos + mensaje de WhatsApp en secciones (A2)
+
+**Año.** Los ids ya traen el año (`2026-09-16_tarde`): el dato estaba a salvo. Faltaba en lo que se
+muestra. `etiquetaCortaTurno(id, anioActual)` agrega `-AAAA` solo si el turno no es del año en curso
+(como Fotos/Mail de iOS): «Turno noche 29-12-2026» visto en 2027. El título del Historial (se
+archiva) lo lleva siempre: `rangoDelPeriodo` → «04-09 al 17-09-2026» o «28-12-2026 al 10-01-2027».
+⚠ Las pruebas que leen etiquetas cortas fijan el reloj en 2026 (`vi.useFakeTimers({ toFake: ['Date'] })`
+en entregaTurno, bitacora y whatsappYEvento): si no, fallaban al cambiar de año.
+
+**WhatsApp (mockup https://claude.ai/artifact/HKW8nyZAjk6ijNN3bNzHhm, Orel eligió A2).** Orel lo
+envió al grupo y no se leía estructurado; en su iPhone las horas salían subrayadas y «10000202885»
+como enlace de teléfono.
+- Secciones en mayúscula y negrita (WhatsApp no tiene tamaños): BITÁCORA DE MANTENCIÓN, RESUMEN (en
+  viñetas `- `; MTTR solo si hay paradas), OBSERVACIONES (cita), EVENTOS DEL TURNO, PENDIENTE PARA EL
+  TURNO SIGUIENTE, SIGUE PENDIENTE DE TURNOS ANTERIORES.
+- Eventos numerados en todo el mensaje (`*2. EMPACADORA E-PACK* · \`20:00–20:20\``), título en su
+  propia línea, `_tipo · impacto_`, «N° de equipo \`…\`», lo que escribió el técnico como cita (`> `),
+  repuestos `- \`sap\` nombre común ×n`, «Técnicos:» SIEMPRE (la cabecera ya no dice «Registrado
+  por»), «Fotos: 3 · lámina 1».
+- Separación A2: línea en blanco + `──────────` + línea en blanco entre eventos y antes de cada sección
+  de pendientes (la divisoria sobrevive si WhatsApp junta líneas vacías).
+- Horas, códigos y números de 8+ dígitos del técnico en `monoespaciado` (`protegerNumeros`) para que
+  el teléfono no los convierta en enlaces. ⚠ Falta confirmarlo en el iPhone de Orel.
+- La lámina dice «Evento 2 · lámina 2 de 5» (`numeroEvento` en `LaminaWhatsapp` y en su clave).
+- La vista previa del PC dibuja citas, viñetas, monoespaciado y la divisoria (`LineaWhatsapp`).
+- El correo y el PDF no cambian.
+- Verificado: vista previa con el turno real del 16-09 y láminas en la vitrina; vitest 2796, eslint
+  30/30, audits ok, build ok.
+
 ## 2026-09-17 · Compactación del WORKLOG (377 KB → 150 KB)
 
 Pedido de Orel. El archivo había pasado de ~150 KB (377 KB) y además estaba desordenado: las entradas

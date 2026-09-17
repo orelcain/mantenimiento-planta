@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { EventoBitacora } from '../bitacora.types'
 import {
   formatoMinutos,
@@ -14,6 +14,16 @@ import { fuePendiente, minutosParadaDe, ordenarEventos, resumirBitacora } from '
 import { minutosDesdeInicioTurno } from '../turnoMantencion'
 import { bandaDeCelda, nombreCorto, normalizarFechaCalendario, tecnicosDelCalendario, tecnicosDeTurno } from '../tecnicosDeTurno'
 import { bitacoraAHtmlCorreo, bitacoraATextoPlano, escaparHtml } from '../bitacoraCorreo'
+
+// Las etiquetas cortas muestran el año solo si no es el actual: el reloj de
+// estas pruebas queda en 2026 para que no cambien al pasar de año.
+beforeAll(() => {
+  vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-09-17T12:00:00') })
+})
+afterAll(() => {
+  vi.useRealTimers()
+})
+
 
 const ev = (p: Partial<EventoBitacora>): EventoBitacora => ({
   id: p.id ?? 'e1',
