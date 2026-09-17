@@ -45,7 +45,7 @@ import { BuscadorEquipo } from './BuscadorEquipo'
 import type { OpcionEquipo } from '@/services/bitacora/buscarEquipos'
 import { tecnicoRecordado } from './tecnicoRecordado'
 import { formatoMinutos, horaDe, horaSugeridaParaEvento, minutosEntre } from '@/services/bitacora/turnoMantencion'
-import { etiquetaCodigoEquipo, limpiarTipo, normalizarRepuestos, normalizarTipo } from '@/services/bitacora/presentacionEvento'
+import { etiquetaCodigoEquipo, limpiarTipo, normalizarRepuestos, normalizarTipo, opcionesUbicacion } from '@/services/bitacora/presentacionEvento'
 import { RepuestosUsados } from './RepuestosUsados'
 import type { FuenteRepuestos } from '@/services/bitacora/repuestosBitacora'
 import { fuenteRepuestosFirestore } from '@/services/bitacora/repuestosFirestore'
@@ -71,6 +71,10 @@ export interface EventoBitacoraSheetProps {
   autorFijo?: string | null
   /** De dónde salen los repuestos (la vitrina usa uno de ejemplo). */
   fuenteRepuestos?: FuenteRepuestos
+  /** El pase de bitácora no escribe en el maestro de repuestos (nombre común). */
+  puedeEditarMaestro?: boolean
+  /** Los eventos del turno (ordenados), para ubicar uno sin hora entre ellos. */
+  eventosDelTurno?: readonly EventoBitacora[]
   /** `deTurno` = presentes del turno (botones rápidos); `todos` = lista de técnicos completa. */
   tecnicos: { deTurno: string[]; todos: string[] }
   /** Equipos y áreas de la jerarquía para el buscador. */
@@ -198,6 +202,8 @@ export function EventoBitacoraSheet({
   sugerenciasTipo = [],
   autorFijo = null,
   fuenteRepuestos = fuenteRepuestosFirestore,
+  puedeEditarMaestro = true,
+  eventosDelTurno = [],
   tecnicos,
   opcionesEquipo,
   cargandoEquipos,
@@ -228,6 +234,8 @@ export function EventoBitacoraSheet({
    * pantalla escondidas: si se apaga, vuelven.
    */
   const [sinHora, setSinHora] = useState(false)
+  /** Solo sin hora: minutos desde el inicio del turno ('' = donde se registró). */
+  const [posicion, setPosicion] = useState('')
   const [horaInicio, setHoraInicio] = useState('')
   const [horaTermino, setHoraTermino] = useState('')
   const [impacto, setImpacto] = useState<ImpactoEvento>('no-aplica')
@@ -319,6 +327,7 @@ export function EventoBitacoraSheet({
     setTitulo(evento?.titulo ?? '')
     setDescripcion(evento?.descripcion ?? '')
     setSinHora(evento ? evento.horaInicio === '' : false)
+    setPosicion(evento && evento.horaInicio === '' && typeof evento.posicionMin === 'number' ? String(evento.posicionMin) : '')
     // Un evento sin hora deja lista la hora sugerida por si se apaga «Sin hora».
     setHoraInicio(evento?.horaInicio || horaSugeridaParaEvento(turno))
     setHoraTermino(evento?.horaTermino ?? '')
@@ -348,6 +357,7 @@ export function EventoBitacoraSheet({
           descripcion: '',
           horaInicio: horaSugeridaParaEvento(turno),
           horaTermino: '',
+          posicion: '',
           impacto: 'no-aplica',
           minutos: '',
           ventana: '',
@@ -387,6 +397,7 @@ export function EventoBitacoraSheet({
     descripcion,
     horaInicio: sinHora ? '' : horaInicio,
     horaTermino: sinHora ? '' : horaTermino,
+    posicion: sinHora ? posicion : '',
     impacto,
     minutos,
     ventana,
@@ -403,6 +414,7 @@ export function EventoBitacoraSheet({
     if (v.repuestos !== previo.repuestos) setRepuestos(normalizarRepuestos(JSON.parse(v.repuestos) as RepuestoUsado[]))
     if (v.titulo !== previo.titulo) setTitulo(v.titulo)
     if (v.descripcion !== previo.descripcion) setDescripcion(v.descripcion)
+    if (v.posicion !== previo.posicion) setPosicion(v.posicion)
     if (v.horaInicio !== previo.horaInicio || v.horaTermino !== previo.horaTermino) {
       // '' = el otro puso «Sin hora»: se enciende sin borrar las horas escondidas.
       if (v.horaInicio === '') setSinHora(true)
@@ -431,6 +443,7 @@ export function EventoBitacoraSheet({
       descripcion,
       horaInicio: sinHora ? '' : horaInicio,
       horaTermino: sinHora ? null : horaTermino || null,
+      posicionMin: sinHora && posicion !== '' && Number.isFinite(Number(posicion)) ? Number(posicion) : null,
       impacto,
       minutosParada: minutosValidos ? minutosNum : null,
       ventana: ventana || null,
@@ -889,6 +902,7 @@ export function EventoBitacoraSheet({
     <Sheet
       open={open}
       onClose={cerrarHoja}
+      size="wide"
       title={
         pendienteOrigen && esNuevo
           ? 'Resolver pendiente'
@@ -1020,6 +1034,8 @@ export function EventoBitacoraSheet({
           </div>
         )}
 
+        <div className="grid gap-5 md:grid-cols-2 md:gap-x-7">
+        <div className="flex min-w-0 flex-col gap-5">
         {/* Quién: con la cuenta compartida de Mantención es el único dato de autoría.
             Con pase de bitácora es el dueño del pase, sin elegir. */}
         {autorFijo && (
@@ -1126,10 +1142,23 @@ export function EventoBitacoraSheet({
           {/* Como «Todo el día» en el Calendario de iOS: esconde las horas. */}
           <FilaInterruptor activo={sinHora} onCambiar={cambiarSinHora} titulo="Sin hora" />
           {sinHora ? (
-            <p className="-mt-1 text-footnote text-muted-foreground">
-              Queda en la línea de tiempo según cuándo se registró.
-              {impacto === 'con-parada' ? ' Anota abajo los minutos de parada: sin hora no se pueden calcular.' : ''}
-            </p>
+            <div className="-mt-1 flex flex-col gap-2">
+              <span className={ETIQUETA_CAMPO}>Ubicación en el turno</span>
+              <div className="flex flex-wrap gap-2" role="group" aria-label="Ubicación en el turno">
+                <Chip activo={posicion === ''} onClick={() => setPosicion('')}>
+                  Donde se registró
+                </Chip>
+                {opcionesUbicacion(turno, eventosDelTurno, eventoId).map((o) => (
+                  <Chip key={o.etiqueta} activo={posicion !== '' && Number(posicion) === o.posicion} onClick={() => setPosicion(String(o.posicion))}>
+                    {o.etiqueta}
+                  </Chip>
+                ))}
+              </div>
+              <p className="text-footnote text-muted-foreground">
+                También se mueve con las flechas de la lista.
+                {impacto === 'con-parada' ? ' Anota abajo los minutos de parada: sin hora no se pueden calcular.' : ''}
+              </p>
+            </div>
           ) : (
             <>
               <div className="grid grid-cols-2 gap-3">
@@ -1160,7 +1189,9 @@ export function EventoBitacoraSheet({
           />
         </div>
 
-        <RepuestosUsados valor={repuestos} onChange={setRepuestos} equipoId={equipoId} fuente={fuenteRepuestos} />
+        </div>
+        <div className="flex min-w-0 flex-col gap-5">
+        <RepuestosUsados valor={repuestos} onChange={setRepuestos} equipoId={equipoId} fuente={fuenteRepuestos} puedeEditarMaestro={puedeEditarMaestro} />
 
         {/* Impacto en producción */}
         <div>
@@ -1291,6 +1322,9 @@ export function EventoBitacoraSheet({
           titulo="Queda pendiente"
           detalle="Sale destacado en el correo para el turno siguiente."
         />
+
+        </div>
+        </div>
 
         {error && (
           <p role="alert" className="text-footnote font-semibold text-ink-crit">

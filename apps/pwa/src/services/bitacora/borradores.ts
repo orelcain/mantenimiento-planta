@@ -61,6 +61,8 @@ export interface CamposFormulario {
   /** `''` = «Sin hora» (y entonces `horaTermino` también es `''`). */
   horaInicio: string
   horaTermino: string
+  /** Solo sin hora: minutos desde el inicio del turno donde se ubicó ('' = donde se registró). */
+  posicion: string
   impacto: ImpactoEvento
   minutos: string
   ventana: string
@@ -80,6 +82,7 @@ export const ETIQUETA_CAMPO: Record<CampoFormulario, string> = {
   descripcion: '«Qué pasó»',
   horaInicio: 'la hora de inicio',
   horaTermino: 'la hora de término',
+  posicion: 'la ubicación en el turno',
   impacto: 'el impacto',
   minutos: 'los minutos de parada',
   ventana: 'la ventana',
@@ -98,6 +101,7 @@ type EventoFormulario = Pick<
   | 'descripcion'
   | 'horaInicio'
   | 'horaTermino'
+  | 'posicionMin'
   | 'impacto'
   | 'minutosParada'
   | 'ventana'
@@ -117,6 +121,7 @@ export function aFormulario(e: EventoFormulario): CamposFormulario {
     horaInicio: e.horaInicio ?? '',
     // Sin hora no hay término: el formulario lo muestra vacío, igual que el servidor.
     horaTermino: e.horaInicio ? (e.horaTermino ?? '') : '',
+    posicion: !e.horaInicio && typeof e.posicionMin === 'number' ? String(e.posicionMin) : '',
     impacto: e.impacto,
     minutos: e.minutosParada != null ? String(e.minutosParada) : '',
     ventana: e.ventana ?? '',
@@ -135,6 +140,7 @@ const CAMPOS: readonly CampoFormulario[] = [
   'descripcion',
   'horaInicio',
   'horaTermino',
+  'posicion',
   'impacto',
   'minutos',
   'ventana',
@@ -225,6 +231,7 @@ const CAMPOS_DOC: Record<CampoFormulario, readonly string[]> = {
   // pero cambiar solo el término no debe reescribir un inicio que otro cambió.
   horaInicio: ['horaInicio'],
   horaTermino: ['horaTermino'],
+  posicion: ['posicionMin'],
   // Van juntos: los minutos y la ventana se guardan según el impacto.
   impacto: ['impacto', 'minutosParada', 'ventana'],
   minutos: ['impacto', 'minutosParada', 'ventana'],

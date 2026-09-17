@@ -8693,6 +8693,33 @@ const publicMonitorMod = require('./publicMonitor')
 // Sin triggers ni crons: solo corre cuando un técnico escanea el QR o un
 // supervisor administra el pase. Costo fijo cero.
 // ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Índice liviano del maestro de repuestos (bitácora, 17-09-2026): un doc con
+// [nombre, nombre común] por SAP. Escribe SOLO la entrada que cambió y sale
+// temprano si el cambio no la toca (fotos, stock, equipos…): regla de costos.
+// ─────────────────────────────────────────────────────────────────────────────
+const repuestosIndiceMod = require('./repuestosIndice')
+
+exports.onRepuestoEscritoIndice = onDocumentWritten(
+  { document: 'repuestos/{id}', region: 'us-central1', memory: '256MiB', cpu: 0.25, concurrency: 1, maxInstances: 2 },
+  async (event) => {
+    const antes = event.data?.before?.exists ? event.data.before.data() : null
+    const despues = event.data?.after?.exists ? event.data.after.data() : null
+    const cambios = repuestosIndiceMod.cambiosIndice(antes, despues)
+    if (!cambios) return
+    const ref = db.collection(repuestosIndiceMod.COLECCION).doc(repuestosIndiceMod.DOC)
+    const update = { actualizadoEn: FieldValue.serverTimestamp() }
+    for (const [ruta, valor] of Object.entries(cambios)) {
+      update[new FieldPath(...ruta.split('.'))] = valor === 'BORRAR' ? FieldValue.delete() : valor
+    }
+    // Sin el doc (nunca se construyó) no se crea uno a medias: lo arma el script de carga.
+    await ref.update(update).catch((e) => {
+      if (e?.code !== 5) throw e // 5 = NOT_FOUND
+      logger.warn('[repuestosIndice] el índice no existe todavía; correr construir-indice-repuestos.cjs')
+    })
+  },
+)
+
 const paseBitacoraMod = require('./paseBitacora')
 
 exports.paseBitacora = onCall(

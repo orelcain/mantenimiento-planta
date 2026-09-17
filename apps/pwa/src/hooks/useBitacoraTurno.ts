@@ -239,6 +239,8 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
         descripcion,
         horaInicio: datos.horaInicio,
         horaTermino: sinHora ? null : datos.horaTermino || null,
+        // Solo un evento sin hora se ubica a mano; con hora manda el reloj.
+        posicionMin: sinHora && typeof datos.posicionMin === 'number' && Number.isFinite(datos.posicionMin) ? datos.posicionMin : null,
         impacto: datos.impacto,
         minutosParada: datos.impacto === 'con-parada' && datos.minutosParada != null ? Math.max(0, Math.round(datos.minutosParada)) : null,
         ventana: datos.impacto === 'en-ventana' ? (datos.ventana ? limpiar(datos.ventana) : '') || null : null,
@@ -388,7 +390,14 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
     }
   }, [])
 
-  return { eventos, cargando, error, sincronizando, ultimaSync, cambiosPorSubir, novedad, nuevoId, guardar, borrar }
+  /** Mueve un evento SIN HORA dentro del turno (flechas ▲▼). Sin await: queda en el teléfono si no hay señal. */
+  const mover = useCallback((id: string, posicionMin: number) => {
+    void updateDoc(doc(db, BITACORA_COLECCION, id), { posicionMin, updatedAt: serverTimestamp() }).catch(() =>
+      toast({ title: 'No se pudo mover el evento', description: 'Vuelve a intentarlo cuando haya señal.', variant: 'destructive' }),
+    )
+  }, [])
+
+  return { eventos, cargando, error, sincronizando, ultimaSync, cambiosPorSubir, novedad, nuevoId, guardar, borrar, mover }
 }
 
 /**

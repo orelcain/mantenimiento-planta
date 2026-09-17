@@ -102,6 +102,12 @@ const CASOS_REPUESTOS = [
   ['Evento con 21 repuestos', 'DENY', { method: 'create', uid: 'tecnico1', col: 'bitacoraEventos', data: evento({ repuestos: Array(21).fill(REPUESTO) }) }, usuario(true, 'tecnico')],
   ['Repuestos que no son lista', 'DENY', { method: 'create', uid: 'tecnico1', col: 'bitacoraEventos', data: evento({ repuestos: '3300011612' }) }, usuario(true, 'tecnico')],
   ['Número de equipo de 41 caracteres', 'DENY', { method: 'create', uid: 'tecnico1', col: 'bitacoraEventos', data: evento({ equipoCodigo: 'x'.repeat(41) }) }, usuario(true, 'tecnico')],
+  // Ubicación a mano de un evento sin hora + índice del maestro (17-09).
+  ['Evento SIN hora ubicado a mano (posicionMin)', 'ALLOW', { method: 'create', uid: 'tecnico1', col: 'bitacoraEventos', data: evento({ horaInicio: '', horaTermino: null, posicionMin: 126.5 }) }, usuario(true, 'tecnico')],
+  ['Evento CON hora y posicionMin', 'DENY', { method: 'create', uid: 'tecnico1', col: 'bitacoraEventos', data: evento({ posicionMin: 10 }) }, usuario(true, 'tecnico')],
+  ['posicionMin fuera de rango', 'DENY', { method: 'create', uid: 'tecnico1', col: 'bitacoraEventos', data: evento({ horaInicio: '', horaTermino: null, posicionMin: 99999 }) }, usuario(true, 'tecnico')],
+  ['Técnico lee el índice de repuestos', 'ALLOW', { method: 'get', uid: 'tecnico1', col: 'repuestosIndice', id: 'sap', previo: { m: {} } }, usuario(true, 'tecnico')],
+  ['Técnico escribe el índice de repuestos', 'DENY', { method: 'update', uid: 'tecnico1', col: 'repuestosIndice', id: 'sap', data: { m: {} }, previo: { m: {} } }, usuario(true, 'tecnico')],
 ]
 
 // Pase de bitácora (16-09): teléfono con QR + PIN, sin documento en `users`.
@@ -145,6 +151,9 @@ const CASOS_PASE = [
   ['Pase deja un registro de error (errorLogs)', 'DENY', conPase({ method: 'create', col: 'errorLogs', id: 'e1', data: { message: 'x' } }), dispositivo(true)],
   ['Pase lee el QR del pase', 'DENY', conPase({ method: 'get', col: 'bitacoraPases', id: 'chonchi', previo: { token: 'secreto' } }), dispositivo(true)],
   ['Pase lee los PIN', 'DENY', conPase({ method: 'get', col: 'bitacoraPines', id: 'chonchi__x', previo: { huella: 'x' } }), dispositivo(true)],
+  ['Pase lee el índice de repuestos', 'ALLOW', conPase({ method: 'get', col: 'repuestosIndice', id: 'sap', previo: { m: {} } }), dispositivo(true)],
+  ['Pase lee bodega (ubicación y stock)', 'ALLOW', conPase({ method: 'get', col: 'bodega', id: '3300135877', previo: { stockActual: 0 } }), dispositivo(true)],
+  ['Pase escribe el nombre común en el maestro', 'DENY', conPase({ method: 'update', col: 'repuestos', id: '3300135877', data: { codigoSAP: '3300135877', nombresComunes: ['x'] }, previo: { codigoSAP: '3300135877' } }), dispositivo(true)],
   ['Pase lee SU dispositivo', 'ALLOW', conPase({ method: 'get', col: 'bitacoraDispositivos', id: 'pase_1', previo: { activo: true } }), dispositivo(true)],
   ['Pase lee el dispositivo de OTRO', 'DENY', conPase({ method: 'get', col: 'bitacoraDispositivos', id: 'pase_2', previo: { activo: true } }), dispositivo(true)],
   ['Pase se reactiva su dispositivo', 'DENY', conPase({ method: 'update', col: 'bitacoraDispositivos', id: 'pase_1', data: { activo: true }, previo: { activo: false } }), dispositivo(false)],

@@ -11,7 +11,7 @@ import { HistorialBitacoraVista } from '@/pages/HistorialBitacoraPage'
 import { fechaDesde, filasPorTurno, resumirPeriodo } from '@/services/bitacora/historialBitacora'
 import { AJUSTES_VACIOS, type AjustesTecnicos } from '@/services/bitacora/listaTecnicos'
 import { construirOpcionesEquipo, type NodoJerarquia } from '@/services/bitacora/buscarEquipos'
-import type { FuenteRepuestos, RepuestoDelCatalogo } from '@/services/bitacora/repuestosBitacora'
+import type { DatoBodega, FuenteRepuestos, RepuestoDelCatalogo } from '@/services/bitacora/repuestosBitacora'
 
 /**
  * Vitrina de la Bitácora con DATOS DE EJEMPLO — solo desarrollo (la ruta va
@@ -275,6 +275,8 @@ function useEventosEjemplo(turno: TurnoMantencion) {
     nuevoId: () => `nuevo-${Date.now()}`,
     guardar,
     borrar,
+    mover: (id: string, posicionMin: number) =>
+      setPorTurno((prev) => ({ ...prev, [turno.id]: (prev[turno.id] ?? ejemploDe(turno)).map((e) => (e.id === id ? { ...e, posicionMin } : e)) })),
   }
 }
 
@@ -362,21 +364,41 @@ const OPCIONES_EJEMPLO = construirOpcionesEquipo(NODOS_EJEMPLO)
 
 // Repuestos REALES del maestro asociados a la BAADER 142 N2 (sin leer la base).
 const REPUESTOS_EJEMPLO: RepuestoDelCatalogo[] = [
-  { codigoSAP: '3300005482', nombre: 'PRESOSTATO 10773', ubicacion: 'C-11' },
-  { codigoSAP: '3300011612', nombre: 'SOPORTE SECCION 519437', ubicacion: 'C-6' },
-  { codigoSAP: '3300011623', nombre: 'CHAPA DIRECTRIZ 519167', ubicacion: 'C-6' },
-  { codigoSAP: '3300011654', nombre: 'ANILLO 31000251', ubicacion: 'C-7' },
-  { codigoSAP: '3300012355', nombre: 'PERNO 1420301019', ubicacion: 'C-1' },
-  { codigoSAP: '3300012357', nombre: 'PERNO 1420301017', ubicacion: 'C-1' },
+  { codigoSAP: '3300005482', nombre: 'PRESOSTATO 10773', nombreComun: '', ubicacion: 'C-11' },
+  { codigoSAP: '3300011612', nombre: 'SOPORTE SECCION 519437', nombreComun: '', ubicacion: 'C-6' },
+  { codigoSAP: '3300011623', nombre: 'CHAPA DIRECTRIZ 519167', nombreComun: '', ubicacion: 'C-6' },
+  { codigoSAP: '3300011654', nombre: 'ANILLO 31000251', nombreComun: '', ubicacion: 'C-7' },
+  { codigoSAP: '3300012355', nombre: 'PERNO 1420301019', nombreComun: '', ubicacion: 'C-1' },
+  { codigoSAP: '3300012357', nombre: 'PERNO 1420301017', nombreComun: '', ubicacion: 'C-1' },
 ]
+// Materiales de OTROS equipos (reales del maestro), para probar «Todos». El nombre común es de ejemplo.
+const REPUESTOS_TODOS: RepuestoDelCatalogo[] = [
+  ...REPUESTOS_EJEMPLO,
+  { codigoSAP: '3300135877', nombre: 'FILTRO 1/2  PURGA N.A AFF40-04D-D 295734', nombreComun: '', ubicacion: '' },
+  { codigoSAP: '3300011872', nombre: 'CORREA 37750006', nombreComun: 'Correa cuchilla circular', ubicacion: '' },
+  { codigoSAP: '3300011875', nombre: 'ABRAZADERA 38010160', nombreComun: 'Resorte carros (abrazadera/mordaza)', ubicacion: '' },
+]
+const BODEGA_EJEMPLO: Record<string, DatoBodega> = {
+  '3300135877': { ubicacion: 'B-7-2', stock: 0, unidad: 'pzas' },
+  '3300011612': { ubicacion: 'C-6', stock: 4, unidad: 'un' },
+}
 const REPUESTOS_FALSOS: FuenteRepuestos = {
   porCodigo: async (codigo) => {
     await new Promise((r) => setTimeout(r, 300))
-    return REPUESTOS_EJEMPLO.find((r) => r.codigoSAP === codigo) ?? null
+    return REPUESTOS_TODOS.find((r) => r.codigoSAP === codigo) ?? null
   },
   delEquipo: async (equipoId) => {
     await new Promise((r) => setTimeout(r, 500))
     return equipoId.startsWith('e') ? REPUESTOS_EJEMPLO : []
+  },
+  todos: async () => {
+    await new Promise((r) => setTimeout(r, 400))
+    return REPUESTOS_TODOS
+  },
+  bodegaDe: async (codigos) => new Map(codigos.filter((c) => BODEGA_EJEMPLO[c]).map((c) => [c, BODEGA_EJEMPLO[c] as DatoBodega])),
+  guardarNombreComun: async (codigo, nombre) => {
+    await new Promise((r) => setTimeout(r, 300))
+    for (const lista of [REPUESTOS_EJEMPLO, REPUESTOS_TODOS]) for (const r of lista) if (r.codigoSAP === codigo) r.nombreComun = nombre
   },
 }
 

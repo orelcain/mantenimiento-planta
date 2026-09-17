@@ -1039,8 +1039,16 @@ service cloud.firestore {
     }
 
     // Bodega de repuestos — stock overlay por código SAP
+    // Índice liviano del maestro para la bitácora (un doc, lo mantiene la función
+    // `onRepuestoEscritoIndice`). Lo lee cualquier sesión de la app y el pase de bitácora.
+    match /repuestosIndice/{docId} {
+      allow read: if isNotAnonymous() || paseBitacoraActivo();
+      allow write: if false;
+    }
+
     match /bodega/{codigoSAP} {
-      allow read: if isNotAnonymous();
+      // El pase de bitácora ve ubicación y stock al elegir un repuesto.
+      allow read: if isNotAnonymous() || paseBitacoraActivo();
       allow create: if isTechnician() && isValidBodega();
       allow update: if isTechnician();
       allow delete: if isAdmin();
@@ -1211,6 +1219,8 @@ service cloud.firestore {
           // Número del equipo elegido y repuestos usados (opcionales, 16-09-2026).
           && (!('equipoCodigo' in d) || d.equipoCodigo == null || (d.equipoCodigo is string && d.equipoCodigo.size() <= 40))
           && (!('repuestos' in d) || (d.repuestos is list && d.repuestos.size() <= 20))
+          // Ubicación a mano de un evento SIN hora en la línea de tiempo (minutos desde el inicio del turno).
+          && (!('posicionMin' in d) || d.posicionMin == null || (d.horaInicio == '' && d.posicionMin is number && d.posicionMin >= -1440 && d.posicionMin <= 2880))
           // Entrega de turno: cierre del pendiente (en el original) y de cuál viene (en el que lo resuelve).
           && (!('cierre' in d) || d.cierre == null || d.cierre is map)
           && (!('resuelvePendiente' in d) || d.resuelvePendiente == null || d.resuelvePendiente is map);
