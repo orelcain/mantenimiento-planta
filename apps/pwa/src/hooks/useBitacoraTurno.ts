@@ -294,7 +294,8 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
           void setDoc(ref, nuevo).catch(avisarRechazo)
         }
       } else {
-        // Al editar NO se toca registradoPor: quien edita queda aparte.
+        // Al editar, quien edita queda aparte (`actualizadoPorNombre`); el autor
+        // solo cambia si se corrigió a propósito (`datos.registradoPor`).
         // Las fotos van como CAMBIOS (arrayUnion/arrayRemove) y no como la lista
         // entera: si otro teléfono agregó la foto «Después» mientras este editaba
         // un texto, reescribir `fotos` completo la borraba (revisión 15-09).
@@ -335,7 +336,7 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
         const cambiaPendiente = !soloEstos || soloEstos.includes('pendiente')
         // Nada que escribir (abrir, mirar y cerrar): no se escribe. Si no, cada
         // «Cerrar» sin señal dejaba en cola una copia vieja del evento.
-        if (esBorradorAhora && !Object.keys(campos).length && !agregadas.length && !quitadas.length && !datos.fijarAutor) return
+        if (esBorradorAhora && !Object.keys(campos).length && !agregadas.length && !quitadas.length && !datos.fijarAutor && !datos.registradoPor) return
         const lote = writeBatch(db)
         lote.update(ref, {
           ...campos,
@@ -349,8 +350,11 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
           // turno —que filtra por `!cierre`— nunca lo volvía a mostrar.
           ...(cambiaPendiente && datos.pendiente && datos.cierreAntes ? { cierre: null } : {}),
           // Un borrador propio todavía puede cambiar de autor; uno ajeno o
-          // publicado deja constancia de quién lo tocó.
-          ...(datos.fijarAutor ? { registradoPor: quien } : { actualizadoPorNombre: quien }),
+          // publicado deja constancia de quién lo tocó, y si además se corrigió
+          // quién lo registró, van los dos.
+          ...(datos.fijarAutor
+            ? { registradoPor: quien }
+            : { actualizadoPorNombre: quien, ...(datos.registradoPor ? { registradoPor: datos.registradoPor } : {}) }),
           updatedAt: serverTimestamp(),
         })
         if (agregadas.length) lote.update(ref, { fotos: arrayUnion(...agregadas) })

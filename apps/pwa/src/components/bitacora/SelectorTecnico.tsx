@@ -16,12 +16,18 @@ export function SelectorTecnico({
   todos,
   valor,
   onChange,
+  recordar = true,
+  vacio = 'Elige tu nombre',
 }: {
   etiqueta: string
   deTurno: string[]
   todos: string[]
   valor: string
   onChange: (nombre: string) => void
+  /** `false` cuando se elige a OTRO (quién registró): no es «mi nombre» y no se recuerda en el teléfono. */
+  recordar?: boolean
+  /** Texto de la opción vacía de la lista. */
+  vacio?: string
 }) {
   const id = useId()
   const resto = todos.filter((n) => !deTurno.includes(n))
@@ -39,7 +45,7 @@ export function SelectorTecnico({
 
   const elegir = (nombre: string) => {
     onChange(nombre)
-    recordarTecnico(nombre)
+    if (recordar) recordarTecnico(nombre)
   }
 
   return (
@@ -67,7 +73,7 @@ export function SelectorTecnico({
           className="mt-2 h-[44px] w-full rounded-ctl border-0 bg-muted-foreground/10 px-3 text-[16px] text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
           <option value="" disabled>
-            Elige tu nombre
+            {vacio}
           </option>
           {todos.map((n) => (
             <option key={n} value={n}>
