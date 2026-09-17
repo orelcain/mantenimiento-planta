@@ -4,7 +4,7 @@ import { fuePendiente, minutosParadaDe, ordenarEventos, resumirBitacora } from '
 import { soloListos } from './borradores'
 import { etiquetaTurno, fechaTurnoLarga, formatoMinutos, horarioTurno } from './turnoMantencion'
 import { etiquetaCortaTurno } from './entregaTurno'
-import { encabezadoEvento, etiquetaTipo, horarioEvento, lineaRepuestos, tituloDe } from './presentacionEvento'
+import { encabezadoEvento, etiquetaTipo, horarioEvento, lineasRepuestos, normalizarRepuestos, renglonRepuesto, tituloDe } from './presentacionEvento'
 
 // Se reexporta: el PDF y las pruebas lo importan desde aquí.
 export { horarioEvento }
@@ -144,13 +144,18 @@ function htmlEvento(e: EventoBitacora, fuente: (f: FotoEvento) => string, separa
   const colorImpacto = e.impacto === 'con-parada' ? C.parada : e.impacto === 'en-ventana' ? C.ventana : C.sec
   const titulo = encabezadoEvento(e)
   return (
-    `<tr><td style="padding:12px 0;${separador ? `border-top:1px solid ${C.linea};` : ''}font-family:${FUENTE};">` +
+    // 18 px arriba y abajo (era 12): con los repuestos en lista, cada evento
+    // necesita leerse aparte del anterior (17-09).
+    `<tr><td style="padding:18px 0;${separador ? `border-top:1px solid ${C.linea};` : ''}font-family:${FUENTE};">` +
     `<div style="font-size:15px;font-weight:600;color:${C.tinta};">${escaparHtml(titulo)}</div>` +
     `<div style="font-size:13px;color:${colorImpacto};padding-top:2px;">${escaparHtml(lineaImpacto(e))}</div>` +
     (lineaTecnicos(e) ? `<div style="font-size:13px;color:${C.sec};">${escaparHtml(lineaTecnicos(e))}</div>` : '') +
     (e.descripcion?.trim() ? `<div style="font-size:14px;color:${C.tinta};padding-top:4px;">${conSaltos(e.descripcion)}</div>` : '') +
-    (lineaRepuestos(e)
-      ? `<div style="font-size:13px;color:${C.tinta};padding-top:4px;">${escaparHtml(lineaRepuestos(e)).replace(/^Repuestos:/, '<span style="font-weight:600;">Repuestos:</span>')}</div>`
+    (lineasRepuestos(e).length
+      ? `<div style="font-size:13px;color:${C.tinta};padding-top:6px;"><span style="font-weight:600;">Repuestos usados</span>` +
+        `<ul style="margin:2px 0 0;padding-left:18px;">${normalizarRepuestos(e.repuestos)
+          .map((r) => `<li style="padding:1px 0;">${escaparHtml(renglonRepuesto(r))}</li>`)
+          .join('')}</ul></div>`
       : '') +
     htmlFotos(e.fotos ?? [], fuente) +
     `</td></tr>`
@@ -278,7 +283,7 @@ export function bitacoraATextoPlano({ turno, eventos: todos, tecnicos, planta, o
       `  ${lineaImpacto(e)}`,
       lineaTecnicos(e) ? `  ${lineaTecnicos(e)}` : '',
       e.descripcion?.trim() ? `  ${e.descripcion.trim().replace(/\r?\n/g, '\n  ')}` : '',
-      lineaRepuestos(e) ? `  ${lineaRepuestos(e)}` : '',
+      ...lineasRepuestos(e).map((l) => `  ${l}`),
       e.fotos?.length ? `  Fotos: ${e.fotos.length}` : '',
     ]
       .filter(Boolean)

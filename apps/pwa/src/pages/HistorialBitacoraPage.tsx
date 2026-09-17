@@ -7,7 +7,7 @@ import { useHistorialBitacora } from '@/hooks/useHistorialBitacora'
 import { BITACORA_PLANTA } from '@/config/bitacora'
 import { copiarHtml } from '@/lib/clipboard'
 import { historialAHtmlCorreo, historialATextoPlano } from '@/services/bitacora/historialCorreo'
-import { porcentaje, tesisDelPeriodo, type FilaTurno, type ResumenPeriodo } from '@/services/bitacora/historialBitacora'
+import { detalleRepuesto, porcentaje, tesisDelPeriodo, tituloRepuesto, type FilaTurno, type ResumenPeriodo } from '@/services/bitacora/historialBitacora'
 import { etiquetaCortaTurno } from '@/services/bitacora/entregaTurno'
 import { formatoMinutos } from '@/services/bitacora/turnoMantencion'
 
@@ -20,6 +20,8 @@ import { formatoMinutos } from '@/services/bitacora/turnoMantencion'
  */
 
 const PERIODOS = [7, 14, 30] as const
+/** Repuestos a la vista antes de «Ver todos». */
+const MAX_REPUESTOS = 8
 
 export interface FuenteHistorial {
   useHistorial: (dias: number) => ReturnType<typeof useHistorialBitacora>
@@ -37,6 +39,7 @@ export function HistorialBitacoraVista({ fuente, alAbrirTurno }: { fuente: Fuent
   const [dias, setDias] = useState<number>(14)
   const { filas, resumen, cargando, error } = fuente.useHistorial(dias)
   const [trabajando, setTrabajando] = useState<null | 'copiar' | 'pdf'>(null)
+  const [verTodosRepuestos, setVerTodosRepuestos] = useState(false)
   const abrirTurno = alAbrirTurno ?? ((turnoId: string) => navigate(`/bitacora?turno=${turnoId}`))
 
   const copiar = async () => {
@@ -130,8 +133,8 @@ export function HistorialBitacoraVista({ fuente, alAbrirTurno }: { fuente: Fuent
         )}
       </section>
 
-      <section aria-label="Resumen del período" className="grid grid-cols-2 gap-x-4 gap-y-4 rounded-card bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none sm:grid-cols-3">
-        {/* Los mismos seis del correo y del PDF: comparar la pantalla con lo
+      <section aria-label="Resumen del período" className="grid grid-cols-2 gap-x-4 gap-y-4 rounded-card bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none sm:grid-cols-4">
+        {/* Los mismos ocho del correo y del PDF: comparar la pantalla con lo
             pegado en el correo no puede dar de menos (revisión 15-09). */}
         <Kpi valor={String(resumen.eventos)} etiqueta={resumen.eventos === 1 ? 'evento' : 'eventos'} />
         <Kpi valor={formatoMinutos(resumen.minutosParada)} etiqueta={`de parada (${resumen.conParada})`} tinta={resumen.minutosParada > 0 ? 'text-ink-crit' : undefined} />
@@ -139,6 +142,8 @@ export function HistorialBitacoraVista({ fuente, alAbrirTurno }: { fuente: Fuent
         <Kpi valor={String(resumen.sinDetener)} etiqueta="sin detener" tinta={resumen.sinDetener > 0 ? 'text-ink-ok' : undefined} />
         <Kpi valor={String(resumen.pendientesCerrados)} etiqueta="pendientes cerrados" tinta={resumen.pendientesCerrados > 0 ? 'text-ink-ok' : undefined} />
         <Kpi valor={String(resumen.pendientesAbiertos)} etiqueta="pendientes abiertos" tinta={resumen.pendientesAbiertos > 0 ? 'text-ink-warn' : undefined} />
+        <Kpi valor={String(resumen.repuestos.length)} etiqueta={resumen.repuestos.length === 1 ? 'repuesto usado' : 'repuestos usados'} />
+        <Kpi valor={String(resumen.unidadesRepuestos)} etiqueta="unidades" />
       </section>
 
       {/* Acciones de móvil (en PC van en el encabezado). */}
@@ -217,6 +222,46 @@ export function HistorialBitacoraVista({ fuente, alAbrirTurno }: { fuente: Fuent
                 ))
               )}
             </div>
+          </section>
+
+          {/* Repuestos usados (mockup aprobado 17-09): lista por repuesto, de más
+              a menos unidades; el equipo va en la misma fila. */}
+          <section aria-label="Repuestos usados" className="flex min-w-0 flex-col">
+            <h2 className="px-4 pb-2 text-caption font-semibold text-muted-foreground">Repuestos usados</h2>
+            <div className="overflow-hidden rounded-card bg-card shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
+              {resumen.repuestos.length === 0 ? (
+                <p className="p-4 text-footnote text-muted-foreground">Ningún repuesto registrado en el período.</p>
+              ) : (
+                (verTodosRepuestos ? resumen.repuestos : resumen.repuestos.slice(0, MAX_REPUESTOS)).map((r) => (
+                  <div
+                    key={r.codigoSAP}
+                    className='relative grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 px-4 py-3 before:absolute before:left-4 before:right-0 before:top-0 before:h-px before:bg-border before:content-[""] first:before:hidden'
+                  >
+                    <span className="min-w-0 truncate text-body font-semibold">{tituloRepuesto(r)}</span>
+                    <span className="text-right text-body font-semibold tabular-nums">
+                      {r.unidades}
+                      <span className="block text-caption font-normal text-muted-foreground">
+                        {r.eventos} {r.eventos === 1 ? 'evento' : 'eventos'}
+                      </span>
+                    </span>
+                    <span className="col-span-2 truncate text-caption tabular-nums text-muted-foreground">{detalleRepuesto(r)}</span>
+                    <span className="col-span-2 text-caption text-muted-foreground">
+                      {[...r.equipos, r.ultimoTurnoId ? etiquetaCortaTurno(r.ultimoTurnoId) : ''].filter(Boolean).join(' · ')}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+            {resumen.repuestos.length > MAX_REPUESTOS && (
+              <button
+                type="button"
+                className="min-h-[44px] px-4 text-left text-footnote font-semibold text-primary"
+                onClick={() => setVerTodosRepuestos((v) => !v)}
+              >
+                {verTodosRepuestos ? 'Ver menos' : `Ver todos (${resumen.repuestos.length})`}
+              </button>
+            )}
+            <p className="px-4 pt-2 text-caption text-muted-foreground">Unidades por código SAP, de mayor a menor: lo que Mantención sacó de bodega para la línea.</p>
           </section>
 
           {resumen.porTecnico.length > 0 && (

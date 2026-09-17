@@ -5306,6 +5306,26 @@ Orel intento anotar el FRL de la E-PACK y la bitacora dijo «no tiene repuestos 
 - Codigo: la lista de repuestos por equipo de la bitacora vence a los 5 min (antes vivia toda la
   sesion y un vinculo nuevo desde el CTD no aparecia).
 
+## 2026-09-17 · Bitacora ronda 18b · Repuestos en lista al enviar + «Repuestos usados» en el Historial
+
+Mockup aprobado (las dos recomendadas): https://claude.ai/artifact/NgKHSJLgSFcyEgSv61Wd5F
+- **Al enviar (WhatsApp, correo, texto plano, PDF, lamina):** `lineasRepuestos()` = rotulo «Repuestos
+  usados:» + un renglon por repuesto «• 3300135877 · Filtro FRL (Filtro 1/2 purga…) ×1» (la cantidad
+  va SIEMPRE; `renglonRepuesto`). Correo: `<ul>` de verdad y 18 px entre eventos (era 12). PDF: rotulo
+  en negrita y viñeta DIBUJADA (`pdf.circle`: la Helvetica estandar no trae «•»). Lamina: hasta 5
+  lineas. WhatsApp: `SEPARADOR_EVENTOS` («──────────») entre evento y evento; con uno solo no sale.
+  `lineaRepuestos()` (una linea) sigue viva para la clave de la lamina y la fila.
+- **Historial:** `ResumenPeriodo.repuestos` (`RepuestoDelPeriodo`: codigo, nombre, nombre comun,
+  unidades, eventos, equipos con numero, ultimo turno; solo eventos `listo`) y `unidadesRepuestos`.
+  Pantalla: bloque «Repuestos usados» entre «Equipos que mas pararon» y «Quien registro» (8 a la vista,
+  «Ver todos (N)»), y DOS KPIs mas (repuestos usados · unidades): la grilla pasa a 2×4 / 4×2. Correo
+  (8 KPIs + lista), texto plano («REPUESTOS USADOS») y PDF (8 KPIs + lista) con los mismos numeros.
+- Vitrina: los eventos con parada del historial de ejemplo llevan repuestos reales del maestro.
+- Verificado: 120 pruebas en services/bitacora (2 nuevas, 1 ajustada), vitest 2789, eslint 30/30,
+  audits ok, build ok; vitrina en PC y 375 px (claro y oscuro). Fuera de alcance, visto de paso: en la
+  vitrina a 375 px la cabecera «En curso / Historial» de `BitacoraTurnoVista` desborda a 432 px
+  (scroll horizontal); no lo toque.
+
 ## 2026-09-17 · Bitacora ronda 18a · Corregir quien registro un evento publicado
 
 Orel: «no deja modificar el tecnico que edito ni el que participo». Diagnostico en la vitrina:

@@ -214,6 +214,21 @@ export function lineaRepuestos(e: Pick<EventoBitacora, 'repuestos'>): string {
   return lista.length ? `Repuestos: ${lista.map(textoRepuesto).join(' · ')}` : ''
 }
 
+/** "3300135877 · Filtro FRL (Filtro 1/2 purga…) ×1": un renglón de la lista (la cantidad va siempre). */
+export function renglonRepuesto(r: RepuestoUsado): string {
+  return `${[r.codigoSAP, nombreConComun(r)].filter(Boolean).join(' · ')} ×${r.cantidad}`
+}
+
+/**
+ * Los repuestos como LISTA para WhatsApp, correo, PDF y lámina (17-09-2026):
+ * rótulo y un renglón por repuesto. En una sola línea corrida no se veía
+ * dónde terminaba uno y empezaba el otro.
+ */
+export function lineasRepuestos(e: Pick<EventoBitacora, 'repuestos'>): string[] {
+  const lista = normalizarRepuestos(e.repuestos)
+  return lista.length ? ['Repuestos usados:', ...lista.map((r) => `• ${renglonRepuesto(r)}`)] : []
+}
+
 function aMilisegundos(v: unknown): number | null {
   if (v == null) return null
   if (v instanceof Date) return v.getTime()

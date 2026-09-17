@@ -2,7 +2,7 @@ import { ETIQUETA_FOTO } from '@/config/bitacora'
 import { textoSeguroPdf } from '@/utils/pdf/textoSeguroPdf'
 import { autorVisible, type EventoBitacora, type FotoEvento, type TurnoMantencion } from './bitacora.types'
 import { etiquetaPendientes, lineaImpacto, lineaPendienteAnterior, lineaTecnicos } from './bitacoraCorreo'
-import { encabezadoEvento, etiquetaTipo, lineaRepuestos } from './presentacionEvento'
+import { encabezadoEvento, etiquetaTipo, lineasRepuestos } from './presentacionEvento'
 import { cargarFotoComoJpeg, type ImagenCargada } from './fotosBitacora'
 import { fuePendiente, ordenarEventos, resumirBitacora } from './resumenBitacora'
 import { soloListos } from './borradores'
@@ -176,11 +176,26 @@ export async function generarPdfBitacora({ turno, eventos: todos, tecnicos, plan
         y += 4.6
       }
     }
-    if (lineaRepuestos(e)) {
+    const lineasRep = lineasRepuestos(e)
+    if (lineasRep.length) {
       pdf.setFontSize(9)
-      color(SEC)
-      saltoSiHaceFalta(5)
-      envuelto(lineaRepuestos(e), x, ancho, 4.4)
+      y += 0.6
+      lineasRep.forEach((l, i) => {
+        saltoSiHaceFalta(5)
+        if (i === 0) {
+          pdf.setFont('helvetica', 'bold')
+          color(TINTA)
+          envuelto(l.replace(/:$/, ''), x, ancho, 4.4)
+          return
+        }
+        // La viñeta se dibuja (la fuente estándar del PDF no trae «•»).
+        pdf.setFont('helvetica', 'normal')
+        color(SEC)
+        pdf.setFillColor(SEC[0], SEC[1], SEC[2])
+        pdf.circle(x + 1.2, y - 1.3, 0.55, 'F')
+        envuelto(l.replace(/^• /, ''), x + 4, ancho - 4, 4.4)
+      })
+      pdf.setFont('helvetica', 'normal')
     }
 
     const orden = { antes: 0, despues: 1, foto: 2 } as const

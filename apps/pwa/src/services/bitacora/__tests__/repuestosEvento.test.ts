@@ -2,13 +2,14 @@ import { describe, expect, it } from 'vitest'
 import type { EventoBitacora } from '../bitacora.types'
 import { turnoDesdeId } from '../turnoMantencion'
 import { bitacoraAHtmlCorreo, bitacoraATextoPlano } from '../bitacoraCorreo'
-import { bitacoraATextoWhatsapp, planLaminas } from '../bitacoraWhatsapp'
+import { SEPARADOR_EVENTOS, bitacoraATextoWhatsapp, planLaminas } from '../bitacoraWhatsapp'
 import { aFormulario, camposACambiar, fusionarFormulario } from '../borradores'
 import {
   codigoEquipoDe,
   encabezadoEvento,
   etiquetaCodigoEquipo,
   lineaRepuestos,
+  lineasRepuestos,
   nombreRepuesto,
   normalizarRepuestos,
 } from '../presentacionEvento'
@@ -94,11 +95,19 @@ describe('repuestos usados', () => {
   it('sale en el correo, el texto plano, WhatsApp y la clave de la lámina', () => {
     const html = bitacoraAHtmlCorreo(datos([ev()]))
     expect(html).toContain('EVISCERADORA BAADER 142 N2 (720004447)')
-    expect(html).toContain('<span style="font-weight:600;">Repuestos:</span> 3300011612')
-    expect(bitacoraATextoPlano(datos([ev()]))).toContain(`  ${lineaRepuestos(ev())}`)
+    // En lista (17-09): rótulo y un renglón por repuesto, con la cantidad siempre.
+    expect(html).toContain('<span style="font-weight:600;">Repuestos usados</span><ul')
+    expect(html).toMatch(/<li[^>]*>3300011612 · [^<]* ×1<\/li><li[^>]*>3300011654 · [^<]* ×2<\/li>/)
+    expect(bitacoraATextoPlano(datos([ev()]))).toContain('  Repuestos usados:\n  • 3300011612 · ')
     const wa = bitacoraATextoWhatsapp(datos([ev()]))
     expect(wa).toContain('*21:15 – 21:30 · EVISCERADORA BAADER 142 N2 (720004447) · Reaprete pernos base expulsador*')
-    expect(wa).toContain(lineaRepuestos(ev()))
+    expect(wa).toContain('Repuestos usados:\n• 3300011612 · ')
+    expect(wa).toMatch(/\n• 3300011654 · .* ×2(\n|$)/)
+    expect(lineasRepuestos(ev({ repuestos: [] }))).toEqual([])
+    // Dos eventos: separador visible entre ellos, en WhatsApp y en el texto plano no (ahí basta la línea en blanco).
+    const dos = datos([ev(), ev({ id: 'otro', horaInicio: '22:00', horaTermino: '22:10', repuestos: [] })])
+    expect(bitacoraATextoWhatsapp(dos)).toContain(`\n${SEPARADOR_EVENTOS}\n*22:00`)
+    expect(bitacoraATextoWhatsapp(datos([ev()]))).not.toContain(SEPARADOR_EVENTOS)
     const conFoto = (p: Partial<EventoBitacora>) =>
       planLaminas(datos([ev({ fotos: [{ url: 'u', path: 'p', etiqueta: 'antes' }], ...p })]))[0]?.clave
     expect(conFoto({})).not.toBe(conFoto({ repuestos: [] }))

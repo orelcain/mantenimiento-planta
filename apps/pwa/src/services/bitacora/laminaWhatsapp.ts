@@ -3,7 +3,7 @@ import { tecnicosDelEvento } from './bitacora.types'
 import { partesImpacto } from './bitacoraCorreo'
 import type { LaminaWhatsapp } from './bitacoraWhatsapp'
 import { cargarImagen } from './fotosBitacora'
-import { codigoEquipoDe, etiquetaTipo, horarioEvento, lineaRepuestos, tituloDe } from './presentacionEvento'
+import { codigoEquipoDe, etiquetaTipo, horarioEvento, lineasRepuestos, tituloDe } from './presentacionEvento'
 
 /**
  * Dibuja una LÁMINA de WhatsApp: una imagen de 1080 px de ancho con las fotos
@@ -176,9 +176,10 @@ export function dibujarLamina(l: LaminaWhatsapp, imagenes: ReadonlyMap<string, I
   const lineasDesc = descripcion
     ? recortarLineas(medirCon(F.descripcion), partirLineas(medirCon(F.descripcion), descripcion, UTIL), MAX_LINEAS_DESCRIPCION, UTIL)
     : []
-  // Repuestos en la primera lámina del evento, bajo la descripción (hasta 4 líneas).
-  const repuestos = l.parte === 1 ? lineaRepuestos(e) : ''
-  const lineasRep = repuestos ? recortarLineas(medirCon(F.repuestos), partirLineas(medirCon(F.repuestos), repuestos, UTIL), 4, UTIL) : []
+  // Repuestos en la primera lámina del evento, bajo la descripción: rótulo y
+  // un renglón por repuesto (hasta 5 líneas).
+  const lineasRep =
+    l.parte === 1 ? recortarLineas(medirCon(F.repuestos), partirLineas(medirCon(F.repuestos), lineasRepuestos(e).join('\n'), UTIL), 5, UTIL) : []
   const anchoPlanta = medirCon(F.pie)(l.planta)
   const anchoPie = UTIL - anchoPlanta - 24
   const lineasPie = recortarLineas(medirCon(F.pie), partirLineas(medirCon(F.pie), tecnicosDelEvento(e).join(' · '), anchoPie), 2, anchoPie)
