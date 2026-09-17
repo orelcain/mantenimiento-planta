@@ -54,7 +54,8 @@ export function VisorFotosBitacora({
       aria-modal="true"
       aria-label={`Foto ${i + 1} de ${total}`}
       className="fixed inset-0 z-[120] flex flex-col piel-fade-in motion-reduce:animate-none"
-      style={{ background: 'rgba(0,0,0,0.92)' }}
+      // Opaco, como Fotos de iOS: al 92 % se transparentaban los botones de la página (ronda 21).
+      style={{ background: 'rgb(0,0,0)' }}
       onClick={onClose}
     >
       <div className="flex items-center justify-between gap-3 px-2 pt-[max(8px,env(safe-area-inset-top))] text-white" onClick={(e) => e.stopPropagation()}>

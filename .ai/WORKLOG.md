@@ -5306,6 +5306,13 @@ Orel intento anotar el FRL de la E-PACK y la bitacora dijo «no tiene repuestos 
 - Codigo: la lista de repuestos por equipo de la bitacora vence a los 5 min (antes vivia toda la
   sesion y un vinculo nuevo desde el CTD no aparecia).
 
+## 2026-09-17 · Bitacora ronda 21 · Tercera pasada: converge (1 hallazgo)
+
+Medido: tarjeta de la bitacora en el Inicio, visor de fotos, «Resolver pendiente», «Ya no aplica»
+(0 objetivos bajo 44, 0 overflow). Unico hallazgo: el fondo del visor de fotos al 92 % dejaba ver los
+botones de la pagina detras de la foto → opaco (Fotos de iOS). Dos rondas seguidas casi sin hallazgos:
+el pulido visual de la bitacora queda cerrado; lo que sigue es de uso en planta o de fondo.
+
 ## 2026-09-17 · Bitacora ronda 20 · Pulido iOS 27, segunda pasada (sin mockup: causas claras)
 
 Recorrido de lo que no entro en la ronda 19: crear evento, hoja de tecnicos, observacion, entrada del
