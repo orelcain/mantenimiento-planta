@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { BarChart3, Check, ChevronLeft, ChevronRight, ClipboardCopy, FileDown, Loader2, MessageCircle, MessageSquareText, NotebookPen, Plus, QrCode } from 'lucide-react'
+import { BarChart3, Check, ChevronLeft, ChevronRight, ClipboardCopy, FileDown, Loader2, MessageCircle, MessageSquareText, NotebookPen, Plus, QrCode, Share } from 'lucide-react'
 import { Button, Pill, SegmentedControl, Sheet, Tag } from '@/components/piel'
 import { PASO_MENSAJE, PasosWhatsapp, VistaPreviaWhatsapp } from '@/components/bitacora/PanelWhatsapp'
 import { compartirEnWhatsapp, puedeCompartirArchivos } from '@/services/bitacora/compartirWhatsapp'
 import { useLaminasWhatsapp } from '@/hooks/useLaminasWhatsapp'
 import { AccesoQrSheet } from '@/components/bitacora/AccesoQrSheet'
+import { CompartirTurnoSheet } from '@/components/bitacora/CompartirTurnoSheet'
+import { EVENTO_NUEVO_EVENTO } from '@/services/bitacora/pedirNuevoEvento'
 import { FUENTE_ACCESO_QR, type FuenteAccesoQr } from '@/hooks/useAccesoQrBitacora'
 import { apiPaseReal, type ApiPase } from '@/services/bitacora/paseBitacora'
 import { bitacoraATextoWhatsapp, planLaminas } from '@/services/bitacora/bitacoraWhatsapp'
@@ -16,7 +18,7 @@ import { VisorFotosBitacora } from '@/components/bitacora/VisorFotosBitacora'
 import { SelectorTecnico } from '@/components/bitacora/SelectorTecnico'
 import { ListaTecnicosSheet, TecnicosDelTurnoSheet } from '@/components/bitacora/TecnicosTurnoSheets'
 import { construirListaTecnicos, sugeridosPorCalendario, tecnicosPresentes } from '@/services/bitacora/listaTecnicos'
-import { origenDePendiente } from '@/services/bitacora/entregaTurno'
+import { etiquetaCortaTurno, origenDePendiente } from '@/services/bitacora/entregaTurno'
 import { tecnicoRecordado } from '@/components/bitacora/tecnicoRecordado'
 import { useToast } from '@/hooks/useToast'
 import { FUENTE_FIRESTORE, useTurnoMantencionActual, type FuenteBitacora } from '@/hooks/useBitacoraTurno'
@@ -108,6 +110,7 @@ export function BitacoraTurnoVista({
     return tecnicos.todos.length === 0 || tecnicos.todos.includes(recordado) ? recordado : ''
   }
   const r = useMemo(() => resumirBitacora(eventos), [eventos])
+  const fotosPublicadas = useMemo(() => soloListos(eventos).reduce((n, e) => n + (e.fotos?.length ?? 0), 0), [eventos])
   // Publicados primero (en orden del turno) y los borradores al final: se ven,
   // pero todavía no son un hecho del turno.
   const borradores = useMemo(() => eventos.filter(esBorrador), [eventos])
@@ -156,6 +159,10 @@ export function BitacoraTurnoVista({
   const [vistaEnvio, setVistaEnvio] = useState<'correo' | 'whatsapp'>('correo')
   /** Hoja de WhatsApp del celular. */
   const [hojaWhatsapp, setHojaWhatsapp] = useState(false)
+  const [hojaCompartir, setHojaCompartir] = useState(false)
+  /** El título grande salió de la pantalla: se muestra la barra compacta (iOS 27). */
+  const [compacta, setCompacta] = useState(false)
+  const cabeceraRef = useRef<HTMLElement>(null)
   /** Láminas ya copiadas (por clave) y el texto exacto que se copió como mensaje. */
   const [laminasCopiadas, setLaminasCopiadas] = useState<ReadonlySet<string>>(new Set())
   const [mensajeCopiado, setMensajeCopiado] = useState<string | null>(null)
@@ -179,6 +186,22 @@ export function BitacoraTurnoVista({
     const alVolver = () => void purgarFotosPendientes()
     window.addEventListener('online', alVolver)
     return () => window.removeEventListener('online', alVolver)
+  }, [])
+
+  // El «+» de la barra de pestañas abre «Nuevo evento» aquí (17-09).
+  useEffect(() => {
+    const abrir = () => abrirNuevo()
+    window.addEventListener(EVENTO_NUEVO_EVENTO, abrir)
+    return () => window.removeEventListener(EVENTO_NUEVO_EVENTO, abrir)
+  }, [abrirNuevo])
+
+  // Barra compacta: aparece cuando el título grande deja de verse.
+  useEffect(() => {
+    const el = cabeceraRef.current
+    if (!el || typeof IntersectionObserver === 'undefined') return
+    const obs = new IntersectionObserver((entradas) => setCompacta(entradas[0] ? !entradas[0].isIntersecting : false), { threshold: 0 })
+    obs.observe(el)
+    return () => obs.disconnect()
   }, [])
 
   // `?nuevo=1` (desde la tarjeta del Inicio) abre el editor UNA vez y se quita
@@ -359,16 +382,47 @@ export function BitacoraTurnoVista({
   const fecha = fechaTurnoLarga(turno)
 
   return (
-    // pb-28 en móvil: el botón fijo «Nuevo evento» no debe tapar el último evento.
-    <div className="flex flex-col gap-5 pb-28 md:pb-8">
+    // «Nuevo evento» ya no va en una barra fija: lo abre el «+» de la barra de
+    // pestañas, cuyo espacio reserva el marco de la app.
+    <div className="flex flex-col gap-5 pb-8">
+      {/* Barra compacta del teléfono: el turno a la vista al bajar (iOS 27). */}
+      <div
+        aria-hidden={!compacta}
+        className={`fixed inset-x-0 z-30 flex items-center gap-2 bg-background/80 py-1.5 pl-4 pr-2 shadow-[inset_0_-0.5px_0_rgb(var(--border))] backdrop-blur-xl transition-[opacity,transform] duration-200 motion-reduce:transition-none md:hidden ${
+          compacta ? 'translate-y-0 opacity-100' : 'pointer-events-none -translate-y-2 opacity-0'
+        }`}
+        style={{ top: `calc(env(safe-area-inset-top, 0px) + ${autorFijo ? 52 : 0}px)` }}
+      >
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-headline leading-tight">{etiquetaCortaTurno(turno.id)}</p>
+          <p className="truncate text-footnote text-muted-foreground">
+            {horarioTurno(turno)} · {r.eventos} {r.eventos === 1 ? 'evento' : 'eventos'}
+          </p>
+        </div>
+        <AccionesCabecera
+          alHistorial={() => navigate('/bitacora/historial')}
+          alCompartir={() => setHojaCompartir(true)}
+          alQr={esSupervisor ? () => setHojaQr(true) : undefined}
+          enfocable={compacta}
+        />
+      </div>
+
       {/* Encabezado: título grande (uno por pantalla) + navegación de turnos */}
-      <header className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3 px-1">
+      <header ref={cabeceraRef} className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3 px-1">
         <div className="min-w-0 flex-1 md:flex-none">
           <div className="flex items-center justify-between gap-3">
             <h1 className="text-display">Bitácora</h1>
-            <span className="flex items-center gap-1">
-              {/* «En curso» y «Hoy ›» viven junto al nombre del turno: aquí, con
-                  Historial y el QR, la fila medía 428–478 px en 375 y se cortaba (17-09). */}
+            {/* Teléfono: una cápsula de vidrio con los íconos (iOS 27 agrupa la
+                toolbar así). «En curso» y «Hoy ›» viven junto al nombre del turno. */}
+            <span className="md:hidden">
+              <AccionesCabecera
+                alHistorial={() => navigate('/bitacora/historial')}
+                alCompartir={() => setHojaCompartir(true)}
+                alQr={esSupervisor ? () => setHojaQr(true) : undefined}
+                enfocable
+              />
+            </span>
+            <span className="hidden items-center gap-1 md:flex">
               <Button variant="plain" onClick={() => navigate('/bitacora/historial')}>
                 <BarChart3 /> Historial
               </Button>
@@ -597,16 +651,16 @@ export function BitacoraTurnoVista({
           // La pantalla decía solo «de parada» mientras el correo y el PDF
           // avisaban «1 sin duración»: el dato faltante se veía recién al pegar.
           etiqueta={`${etiquetaParada(r)}${r.mttrMin != null ? ` · MTTR ${formatoMinutos(r.mttrMin)}` : ''}`}
-          tinta={r.minutosParada > 0 ? 'text-ink-crit' : undefined}
+          punto={r.minutosParada > 0 ? 'crit' : undefined}
         />
-        <Stat valor={String(r.enVentana)} etiqueta="sin detener producción" tinta={r.enVentana > 0 ? 'text-ink-ok' : undefined} />
+        <Stat valor={String(r.enVentana)} etiqueta="sin detener producción" punto={r.enVentana > 0 ? 'ok' : undefined} />
         <Stat
           valor={String(r.pendientesDelTurno)}
           etiqueta={etiquetaPendientes(r)}
-          tinta={r.pendientes > 0 ? 'text-ink-warn' : undefined}
+          punto={r.pendientes > 0 ? 'warn' : undefined}
         />
         {r.pendientesCerrados > 0 ? (
-          <Stat valor={String(r.pendientesCerrados)} etiqueta={r.pendientesCerrados === 1 ? 'pendiente cerrado' : 'pendientes cerrados'} tinta="text-ink-ok" />
+          <Stat valor={String(r.pendientesCerrados)} etiqueta={r.pendientesCerrados === 1 ? 'pendiente cerrado' : 'pendientes cerrados'} punto="ok" />
         ) : null}
       </section>
 
@@ -635,29 +689,8 @@ export function BitacoraTurnoVista({
         <ChevronRight className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
       </button>
 
-      {/* Acciones secundarias de móvil. La principal (Nuevo evento) va fija abajo. */}
-      <div className="grid grid-cols-3 gap-2 md:hidden">
-        <Button variant="tinted" className="px-2" onClick={copiar} disabled={!!trabajando || eventos.length === 0}>
-          {trabajando === 'copiar' ? <Loader2 className="animate-spin" /> : <ClipboardCopy />} Copiar
-        </Button>
-        <Button variant="tinted" className="px-2" onClick={exportarPdf} disabled={!!trabajando || eventos.length === 0}>
-          {trabajando === 'pdf' ? <Loader2 className="animate-spin" /> : <FileDown />} PDF
-        </Button>
-        <Button variant="tinted" className="px-2" onClick={() => setHojaWhatsapp(true)} disabled={!!trabajando || eventos.length === 0}>
-          <MessageCircle /> WhatsApp
-        </Button>
-      </div>
-
-      {/* «Nuevo evento» siempre a mano en el celular: justo sobre la barra de
-          pestañas (h-16 = 4rem; 2.5rem cuando el teléfono está acostado), así no
-          hay que volver arriba con 10 eventos cargados. */}
-      <div
-        className="fixed inset-x-0 z-30 bg-background/80 px-4 pb-3 pt-2 backdrop-blur-xl md:hidden bottom-[calc(4rem+env(safe-area-inset-bottom))] [@media(max-height:500px)]:bottom-[calc(2.5rem+env(safe-area-inset-bottom))]"
-      >
-        <Button size="block" onClick={abrirNuevo}>
-          <Plus /> Nuevo evento
-        </Button>
-      </div>
+      {/* Copiar, PDF y WhatsApp viven en «Compartir» (ícono de la cabecera) y
+          «Nuevo evento» en el «+» de la barra de pestañas (mockup iOS 27, 17-09). */}
 
       <div className="grid items-start gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
         {/* Línea de tiempo */}
@@ -780,6 +813,26 @@ export function BitacoraTurnoVista({
         eventoVivo={editandoEventoId ? (eventos.find((e) => e.id === editandoEventoId) ?? null) : null}
         otrosEditando={editandoEventoId ? otrosEditando(conectados, editandoEventoId, miDispositivoId) : []}
         onClose={() => setEditor(null)}
+      />
+
+      <CompartirTurnoSheet
+        open={hojaCompartir}
+        onClose={() => setHojaCompartir(false)}
+        resumen={`${etiquetaCortaTurno(turno.id)} · ${r.eventos} ${r.eventos === 1 ? 'evento' : 'eventos'} · ${fotosPublicadas} ${fotosPublicadas === 1 ? 'foto' : 'fotos'}`}
+        trabajando={trabajando}
+        sinEventos={r.eventos === 0}
+        onCorreo={() => {
+          setHojaCompartir(false)
+          void copiar()
+        }}
+        onWhatsapp={() => {
+          setHojaCompartir(false)
+          setHojaWhatsapp(true)
+        }}
+        onPdf={() => {
+          setHojaCompartir(false)
+          void exportarPdf()
+        }}
       />
 
       <Sheet
@@ -986,11 +1039,53 @@ export function BitacoraTurnoVista({
   )
 }
 
-function Stat({ valor, etiqueta, tinta }: { valor: string; etiqueta: string; tinta?: string }) {
+const PUNTO = { ok: 'bg-ink-ok', warn: 'bg-ink-warn', crit: 'bg-ink-crit' } as const
+
+/**
+ * Cifra en tinta normal; el estado va en un punto de 8 px junto al rótulo
+ * (DESIGN.md §10: un número grande en color convierte la tarjeta en semáforo).
+ */
+function Stat({ valor, etiqueta, punto }: { valor: string; etiqueta: string; punto?: keyof typeof PUNTO }) {
   return (
     <div className="min-w-0">
-      <span className={`block text-title2 tabular-nums leading-tight ${tinta ?? ''}`}>{valor}</span>
-      <span className="block text-footnote text-muted-foreground">{etiqueta}</span>
+      <span className="block text-title2 tabular-nums leading-tight">{valor}</span>
+      <span className="block text-footnote text-muted-foreground">
+        {punto && <span className={`mr-1.5 inline-block size-2 rounded-full align-middle ${PUNTO[punto]}`} aria-hidden />}
+        {etiqueta}
+      </span>
+    </div>
+  )
+}
+
+/** Historial, Compartir y QR como íconos en una cápsula de vidrio (teléfono). */
+function AccionesCabecera({
+  alHistorial,
+  alCompartir,
+  alQr,
+  enfocable,
+}: {
+  alHistorial: () => void
+  alCompartir: () => void
+  alQr?: () => void
+  /** La barra compacta escondida no debe recibir el foco del teclado. */
+  enfocable: boolean
+}) {
+  const clase =
+    'flex size-[44px] items-center justify-center rounded-full text-primary transition-transform duration-150 active:scale-[0.94] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary motion-reduce:transition-none [&>svg]:size-5'
+  const tab = enfocable ? undefined : -1
+  return (
+    <div role="group" aria-label="Acciones de la bitácora" className="glass-nav flex shrink-0 items-center rounded-full">
+      <button type="button" className={clase} onClick={alHistorial} aria-label="Historial" tabIndex={tab}>
+        <BarChart3 />
+      </button>
+      <button type="button" className={clase} onClick={alCompartir} aria-label="Compartir el turno" tabIndex={tab}>
+        <Share />
+      </button>
+      {alQr && (
+        <button type="button" className={clase} onClick={alQr} aria-label="Acceso por QR" tabIndex={tab}>
+          <QrCode />
+        </button>
+      )}
     </div>
   )
 }

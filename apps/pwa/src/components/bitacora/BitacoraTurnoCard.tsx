@@ -49,12 +49,18 @@ export function BitacoraTurnoCard({
           <span className="text-footnote text-muted-foreground">{r.eventos === 1 ? 'evento' : 'eventos'}</span>
         </div>
         <div>
-          <span className={`block text-headline leading-tight tabular-nums ${r.minutosParada > 0 ? 'text-ink-crit' : ''}`}>{cargando ? '–' : formatoMinutos(r.minutosParada)}</span>
-          <span className="text-footnote text-muted-foreground">de parada</span>
+          <span className="block text-headline leading-tight tabular-nums">{cargando ? '–' : formatoMinutos(r.minutosParada)}</span>
+          <span className="text-footnote text-muted-foreground">
+            {r.minutosParada > 0 && <span className="mr-1.5 inline-block size-2 rounded-full bg-ink-crit align-middle" aria-hidden />}
+            de parada
+          </span>
         </div>
         <div>
-          <span className={`block text-headline leading-tight tabular-nums ${r.pendientes > 0 ? 'text-ink-warn' : ''}`}>{cargando ? '–' : r.pendientes}</span>
-          <span className="text-footnote text-muted-foreground">{r.pendientes === 1 ? 'pendiente' : 'pendientes'}</span>
+          <span className="block text-headline leading-tight tabular-nums">{cargando ? '–' : r.pendientes}</span>
+          <span className="text-footnote text-muted-foreground">
+            {r.pendientes > 0 && <span className="mr-1.5 inline-block size-2 rounded-full bg-ink-warn align-middle" aria-hidden />}
+            {r.pendientes === 1 ? 'pendiente' : 'pendientes'}
+          </span>
         </div>
       </div>
 

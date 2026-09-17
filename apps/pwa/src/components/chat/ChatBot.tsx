@@ -4,7 +4,7 @@
  * confirmación inline, auto-asignación y tamaño ampliado
  */
 import { useState, useRef, useEffect, useCallback, type KeyboardEvent, type ChangeEvent, type MouseEvent as ReactMouseEvent } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { RefreshCw, Wrench, Factory, HardHat, KeyRound, ClipboardList, Clock, Zap, MessageCircle, X, Send, Trash2, Loader2, Bot, User, Mic, MicOff, ExternalLink, AlertTriangle, CheckCircle, XCircle, Camera, GripVertical, ThumbsUp, ThumbsDown, Copy, Check, Database, Volume2, VolumeX, RotateCcw, Star, ChevronUp, ChevronDown, Brain, Cpu, Headphones, Eye, EyeOff, Pencil } from 'lucide-react'
 import DOMPurify from 'dompurify'
 import { useChatBot } from '@/hooks/useChatBot'
@@ -1095,9 +1095,6 @@ export function ChatBot() {
     }
   }, [isLoading, messages, startListening, autoSpeak])
 
-  const { pathname } = useLocation()
-
-  const sobreBarraBitacora = pathname === '/bitacora' || pathname.startsWith('/bitacora?')
 
 
   const toggleConvo = () => {
@@ -1783,12 +1780,10 @@ export function ChatBot() {
         </div>
       )}
 
-      {/* Botón flotante — oculto en landscape móvil para no tapar la tabla.
-          En la bitácora sube: a bottom-24 pisaba el extremo de «Nuevo evento»
-          (barra fija a 4rem + 64 px) y la fila Copiar · PDF · WhatsApp (17-09). */}
+      {/* Botón flotante — oculto en landscape móvil para no tapar la tabla */}
       <button
         onClick={toggle}
-        className={`fixed ${sobreBarraBitacora ? 'bottom-[8.75rem]' : 'bottom-24'} lg:bottom-4 right-4 z-[45] w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 landscape-mobile-hidden ${
+        className={`fixed bottom-24 lg:bottom-4 right-4 z-[45] w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 landscape-mobile-hidden ${
           isOpen
             ? 'bg-muted text-muted-foreground hover:bg-muted/80'
             : 'bg-primary text-primary-foreground hover:bg-primary/90'

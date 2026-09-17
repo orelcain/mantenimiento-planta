@@ -1,6 +1,6 @@
 import { Suspense, useEffect, useState } from 'react'
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { BarChart3, LogOut, NotebookPen } from 'lucide-react'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { BarChart3, LogOut, NotebookPen, Plus } from 'lucide-react'
 import { Button, Sheet } from '@/components/piel'
 import { LoadingScreen } from '@/components/ui'
 import { useAuthStore } from '@/store'
@@ -8,6 +8,8 @@ import { useToast } from '@/hooks/useToast'
 import { apiPaseReal, mensajeDeError } from '@/services/bitacora/paseBitacora'
 import { BITACORA_PLANTA } from '@/config/bitacora'
 import { cn } from '@/lib/utils'
+import { pedirNuevoEvento } from '@/services/bitacora/pedirNuevoEvento'
+import { RotuloNuevoEvento } from '@/components/bitacora/RotuloNuevoEvento'
 
 /**
  * Marco de la app para un teléfono con PASE DE BITÁCORA (QR + PIN): solo la
@@ -15,7 +17,7 @@ import { cn } from '@/lib/utils'
  * globales del MainLayout (incidencias, equipos…), que el pase no puede leer.
  *
  * La barra de abajo repite la geometría de la del MainLayout (60 px, flota a
- * 12 px): el botón fijo «Nuevo evento» de la bitácora cuenta con ella.
+ * 12 px) y, como ella, lleva al centro el «+» que abre «Nuevo evento».
  */
 const PESTANAS = [
   { to: '/bitacora', nombre: 'Turno', icono: NotebookPen, exacta: true },
@@ -69,6 +71,7 @@ export function PaseBitacoraLayout() {
 /** El marco sin el router (la vitrina lo usa con la bitácora de ejemplo). */
 export function MarcoPaseBitacora({ nombre, ruta, children }: { nombre: string; ruta: string; children: React.ReactNode }) {
   const { toast } = useToast()
+  const navigate = useNavigate()
   const [confirmarSalida, setConfirmarSalida] = useState(false)
   const [saliendo, setSaliendo] = useState(false)
 
@@ -106,9 +109,9 @@ export function MarcoPaseBitacora({ nombre, ruta, children }: { nombre: string; 
         aria-label="Bitácora"
       >
         <div className="flex h-[60px] items-center px-1.5 [@media(max-height:500px)]:h-10">
-          {PESTANAS.map((p) => {
+          {PESTANAS.map((p, i) => {
             const activa = p.exacta ? ruta === p.to : ruta.startsWith(p.to)
-            return (
+            const pestana = (
               <NavLink
                 key={p.to}
                 to={p.to}
@@ -122,6 +125,21 @@ export function MarcoPaseBitacora({ nombre, ruta, children }: { nombre: string; 
                 <span className="[@media(max-height:500px)]:hidden">{p.nombre}</span>
               </NavLink>
             )
+            if (i !== 0) return pestana
+            return [
+              pestana,
+              <div key="nuevo" className="relative flex flex-1 justify-center">
+                <RotuloNuevoEvento activo />
+                <button
+                  type="button"
+                  onClick={() => pedirNuevoEvento(ruta, navigate)}
+                  aria-label="Nuevo evento"
+                  className="flex size-[2.875rem] items-center justify-center rounded-full bg-primary text-primary-foreground transition-transform duration-200 active:scale-[0.94] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-card motion-reduce:transition-none [@media(max-height:500px)]:size-8"
+                >
+                  <Plus className="size-6 [@media(max-height:500px)]:size-4" />
+                </button>
+              </div>,
+            ]
           })}
         </div>
       </nav>
