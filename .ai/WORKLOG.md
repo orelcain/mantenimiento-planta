@@ -21,6 +21,24 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-17 · Bitacora ronda 26 · WhatsApp cortaba el mensaje en el 4.º evento
+
+Orel compartió el turno tarde 16-09 (8 eventos) con el formato A2 y el texto llegó hasta «4. BALANZA
+PESAJE MAREL · 21:00 / *Cinta infeed marel» (con el asterisco de negrita sin cerrar).
+- **Causa:** al compartir imágenes + texto, WhatsApp pone el texto como PIE DE FOTO, que se corta en
+  ~1.024 caracteres. El formato A2 tiene más líneas y llega antes al límite (el mensaje de ese turno
+  mide ~1.900).
+- **Fix:** si hay láminas y el mensaje pasa de 1.000 caracteres (`envioEnDosPasos`), la hoja envía en
+  DOS pasos, cada uno con su toque (el navegador no deja abrir el menú de compartir dos veces sin un
+  gesto): «1 · Enviar el mensaje» (`compartirMensaje`, solo texto, llega entero) y «2 · Enviar las N
+  láminas» (`compartirLaminas`, solo archivos). Mensaje corto: igual que antes, todo junto.
+- ⚠ **El monoespaciado NO evita los enlaces del iPhone:** en la captura de Orel los números de 8+
+  dígitos siguen en verde (teléfono) y las horas subrayadas. Se deja el monoespaciado porque ordena;
+  lo único que lo evitaría es insertar caracteres invisibles (descartado: se copiarían a SAP).
+- Verificado en la vitrina a 375 px con `navigator.share` simulado: paso 1 = texto de 1.866
+  caracteres sin archivos; paso 2 = 5 archivos sin texto; la hoja se cierra. vitest ok, eslint 30/30,
+  audits ok, build ok.
+
 ## 2026-09-17 · Bitacora ronda 25 · Año en los turnos + mensaje de WhatsApp en secciones (A2)
 
 **Año.** Los ids ya traen el año (`2026-09-16_tarde`): el dato estaba a salvo. Faltaba en lo que se

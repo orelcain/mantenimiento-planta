@@ -5,7 +5,7 @@ import { Button, Pill, SegmentedControl, Sheet, Tag, type SwipeAction } from '@/
 import { ToastAction } from '@/components/ui/toast'
 import { vibrar } from '@/services/bitacora/vibrar'
 import { PASO_MENSAJE, PasosWhatsapp, VistaPreviaWhatsapp } from '@/components/bitacora/PanelWhatsapp'
-import { compartirEnWhatsapp, puedeCompartirArchivos } from '@/services/bitacora/compartirWhatsapp'
+import { compartirEnWhatsapp, compartirLaminas, compartirMensaje, envioEnDosPasos, puedeCompartirArchivos } from '@/services/bitacora/compartirWhatsapp'
 import { useLaminasWhatsapp } from '@/hooks/useLaminasWhatsapp'
 import { AccesoQrSheet } from '@/components/bitacora/AccesoQrSheet'
 import { CompartirTurnoSheet } from '@/components/bitacora/CompartirTurnoSheet'
@@ -203,6 +203,8 @@ export function BitacoraTurnoVista({
   const [laminasCopiadas, setLaminasCopiadas] = useState<ReadonlySet<string>>(new Set())
   const [mensajeCopiado, setMensajeCopiado] = useState<string | null>(null)
   const [compartiendo, setCompartiendo] = useState(false)
+  /** Envío en dos pasos (mensaje largo): ya salió el mensaje, faltan las láminas. */
+  const [mensajeEnviado, setMensajeEnviado] = useState(false)
   // Entrega de turno: pendientes abiertos de turnos anteriores.
   const { pendientes: pendientesPrevios, cerrarNoAplica } = fuente.usePendientesAnteriores(turno)
   // Borradores que nadie publicó antes del cambio de turno: solo en el turno EN CURSO.
@@ -393,11 +395,27 @@ export function BitacoraTurnoVista({
     }
   }
 
+  const dosPasos = envioEnDosPasos(textoWhatsapp, planWhatsapp.length)
+  // Cada vez que se abre la hoja (u otro turno), el envío parte del paso 1.
+  useEffect(() => {
+    if (hojaWhatsapp) setMensajeEnviado(false)
+  }, [hojaWhatsapp, turno.id])
+
   const compartir = async () => {
     setCompartiendo(true)
     try {
-      const r = await compartirEnWhatsapp(turno, textoWhatsapp, laminas.listas)
+      // Mensaje largo: primero el texto solo (llega entero); con otro toque, las láminas.
+      if (dosPasos && !mensajeEnviado) {
+        const r = await compartirMensaje(textoWhatsapp)
+        if (r === 'enviado') {
+          marcarCopiado(PASO_MENSAJE)
+          setMensajeEnviado(true)
+        }
+        return
+      }
+      const r = dosPasos ? await compartirLaminas(turno, laminas.listas) : await compartirEnWhatsapp(turno, textoWhatsapp, laminas.listas)
       if (r === 'enviado') {
+        setMensajeEnviado(false)
         marcarCopiado(PASO_MENSAJE)
         setLaminasCopiadas(new Set(laminas.listas.map((g) => g.lamina.clave)))
         setHojaWhatsapp(false)
@@ -1059,11 +1077,15 @@ export function BitacoraTurnoVista({
         onClose={() => setHojaWhatsapp(false)}
         title="Enviar por WhatsApp"
         description={
-          compartirConMenu
-            ? `Se abre el menú de compartir con ${
-                planWhatsapp.length === 0 ? 'el mensaje' : `${planWhatsapp.length === 1 ? 'la lámina' : `las ${planWhatsapp.length} láminas`} y el mensaje`
-              }. Elige WhatsApp y el grupo.${avisoBorradores}`
-            : `Copia el mensaje y cada lámina, y pégalos en el chat.${avisoBorradores}`
+          !compartirConMenu
+            ? `Copia el mensaje y cada lámina, y pégalos en el chat.${avisoBorradores}`
+            : dosPasos
+              ? `Va en dos pasos al mismo chat: primero el mensaje y después ${
+                  planWhatsapp.length === 1 ? 'la lámina' : `las ${planWhatsapp.length} láminas`
+                }. Junto a las fotos, WhatsApp corta el texto en unos 1.000 caracteres.${avisoBorradores}`
+              : `Se abre el menú de compartir con ${
+                  planWhatsapp.length === 0 ? 'el mensaje' : `${planWhatsapp.length === 1 ? 'la lámina' : `las ${planWhatsapp.length} láminas`} y el mensaje`
+                }. Elige WhatsApp y el grupo.${avisoBorradores}`
         }
         actions={
           compartirConMenu ? (
@@ -1079,9 +1101,17 @@ export function BitacoraTurnoVista({
               >
                 Copiar mensaje
               </Button>
-              <Button onClick={() => void compartir()} disabled={compartiendo || !laminas.completas}>
-                {compartiendo || !laminas.completas ? <Loader2 className="animate-spin" /> : <MessageCircle />}
-                {laminas.completas ? 'Compartir' : 'Preparando…'}
+              <Button onClick={() => void compartir()} disabled={compartiendo || (!(dosPasos && !mensajeEnviado) && !laminas.completas)}>
+                {compartiendo || (!(dosPasos && !mensajeEnviado) && !laminas.completas) ? <Loader2 className="animate-spin" /> : <MessageCircle />}
+                {!dosPasos
+                  ? laminas.completas
+                    ? 'Compartir'
+                    : 'Preparando…'
+                  : !mensajeEnviado
+                    ? '1 · Enviar el mensaje'
+                    : laminas.completas
+                      ? `2 · Enviar ${planWhatsapp.length === 1 ? 'la lámina' : `las ${planWhatsapp.length} láminas`}`
+                      : 'Preparando…'}
               </Button>
             </>
           ) : (
@@ -1093,7 +1123,11 @@ export function BitacoraTurnoVista({
       >
         <div className="-mx-6 flex max-h-[min(62vh,600px)] flex-col gap-4 overflow-y-auto px-6 pb-1">
           {compartirConMenu ? (
-            <p className="text-footnote text-muted-foreground">Si WhatsApp no pone el mensaje, pégalo en el chat: ya queda copiado.</p>
+            <p className="text-footnote text-muted-foreground">
+              {dosPasos && mensajeEnviado
+                ? 'Mensaje enviado. Ahora las láminas, al mismo chat.'
+                : 'Si WhatsApp no pone el mensaje, pégalo en el chat: ya queda copiado.'}
+            </p>
           ) : (
             <PasosWhatsapp
               texto={textoWhatsapp}

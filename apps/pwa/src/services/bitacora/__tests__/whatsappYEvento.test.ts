@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { EventoBitacora, FotoEvento } from '../bitacora.types'
 import { turnoDesdeId } from '../turnoMantencion'
+import { LIMITE_PIE_FOTO, envioEnDosPasos } from '../compartirWhatsapp'
 import { ordenarEventos, resumirBitacora } from '../resumenBitacora'
 import { bitacoraAHtmlCorreo, bitacoraATextoPlano, lineaImpacto } from '../bitacoraCorreo'
 import { aFormulario, camposACambiar, fusionarFormulario, tieneContenido } from '../borradores'
@@ -308,5 +309,14 @@ describe('lámina: texto y fotos', () => {
     }
     expect(cajasFotos(4, 952).cajas[3]).toMatchObject({ x: 486, w: 466 })
     expect(cajasFotos(0).alto).toBe(0)
+  })
+})
+
+describe('compartir por WhatsApp en dos pasos (17-09-2026)', () => {
+  it('con láminas y un mensaje más largo que un pie de foto, el mensaje va aparte', () => {
+    expect(envioEnDosPasos('x'.repeat(LIMITE_PIE_FOTO), 3)).toBe(false)
+    expect(envioEnDosPasos('x'.repeat(LIMITE_PIE_FOTO + 1), 3)).toBe(true)
+    // Sin láminas no hay pie de foto que se corte.
+    expect(envioEnDosPasos('x'.repeat(5000), 0)).toBe(false)
   })
 })
