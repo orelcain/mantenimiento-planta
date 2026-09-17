@@ -1,4 +1,4 @@
-import { ClipboardCopy, FileDown, Loader2, MessageCircle } from 'lucide-react'
+import { ClipboardCopy, FileDown, FileSpreadsheet, Loader2, MessageCircle } from 'lucide-react'
 import { Button, ListCell, ListGroup, Sheet } from '@/components/piel'
 
 /**
@@ -15,6 +15,7 @@ export function CompartirTurnoSheet({
   onCorreo,
   onWhatsapp,
   onPdf,
+  onExcel,
 }: {
   open: boolean
   onClose: () => void
@@ -25,6 +26,8 @@ export function CompartirTurnoSheet({
   onCorreo: () => void
   onWhatsapp: () => void
   onPdf: () => void
+  /** La planilla «Recoleccion MTTR» del turno, llena, como archivo .xlsx para adjuntar. */
+  onExcel: () => void
 }) {
   const icono = (children: React.ReactNode) => (
     <span className="flex size-[30px] items-center justify-center rounded-ctl bg-muted-foreground/10 text-muted-foreground [&>svg]:size-4">{children}</span>
@@ -68,6 +71,14 @@ export function CompartirTurnoSheet({
             chevron={false}
             subtitle="Para imprimir o archivar"
             onClick={ocupado ? undefined : onPdf}
+            aria-disabled={ocupado}
+          />
+          <ListCell
+            leading={icono(trabajando === 'excel' ? <Loader2 className="animate-spin" /> : <FileSpreadsheet />)}
+            title="Bajar Excel MTTR"
+            chevron={false}
+            subtitle="La planilla «Recoleccion MTTR» ya llena, para adjuntar"
+            onClick={ocupado ? undefined : onExcel}
             aria-disabled={ocupado}
           />
         </ListGroup>

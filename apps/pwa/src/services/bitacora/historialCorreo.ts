@@ -1,3 +1,5 @@
+import type { EventoBitacora } from './bitacora.types'
+import { filasRecoleccionPeriodo, htmlRecoleccionMttr } from './recoleccionMttr'
 import { escaparHtml } from './bitacoraCorreo'
 import { etiquetaCortaTurno } from './entregaTurno'
 import { formatoMinutos } from './turnoMantencion'
@@ -42,7 +44,9 @@ export function etiquetaFilaTurno(f: FilaTurno): string {
   return f.enCurso ? `${etiquetaCortaTurno(f.turnoId)} (en curso)` : etiquetaCortaTurno(f.turnoId)
 }
 
-export function historialAHtmlCorreo(r: ResumenPeriodo, filas: readonly FilaTurno[], planta: string): string {
+export function historialAHtmlCorreo(r: ResumenPeriodo, filas: readonly FilaTurno[], planta: string, eventos: readonly EventoBitacora[] = []): string {
+  // La planilla «Recoleccion MTTR» del período arriba, como en el correo del turno (17-09-2026).
+  const recoleccion = eventos.length ? `${htmlRecoleccionMttr(filasRecoleccionPeriodo(eventos))}<div style="height:14px;line-height:14px;">&nbsp;</div>` : ''
   const cabecera =
     `<div style="font-family:${FUENTE};font-size:20px;font-weight:600;color:${C.tinta};">${escaparHtml(tituloHistorial(r))}</div>` +
     `<div style="font-family:${FUENTE};font-size:13px;color:${C.sec};padding-top:2px;">${r.turnos} turnos registrados · ${escaparHtml(planta)}</div>` +
@@ -103,7 +107,7 @@ export function historialAHtmlCorreo(r: ResumenPeriodo, filas: readonly FilaTurn
     : ''
 
   const pie = `<div style="font-family:${FUENTE};font-size:11px;color:${C.sec};padding-top:16px;">Generado con la app de Mantención.</div>`
-  return `<div style="max-width:680px;color:${C.tinta};">${cabecera}${kpis}${tabla}${equipos}${repuestos}${pie}</div>`
+  return `${recoleccion}<div style="max-width:680px;color:${C.tinta};">${cabecera}${kpis}${tabla}${equipos}${repuestos}${pie}</div>`
 }
 
 export function historialATextoPlano(r: ResumenPeriodo, filas: readonly FilaTurno[], planta: string): string {

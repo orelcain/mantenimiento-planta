@@ -55,6 +55,7 @@
     "dxf-parser": "^1.1.2",
     "echarts": "^6.1.0",
     "echarts-for-react": "^3.0.6",
+    "fflate": "0.8.2",
     "firebase": "^11.1.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.0.0",

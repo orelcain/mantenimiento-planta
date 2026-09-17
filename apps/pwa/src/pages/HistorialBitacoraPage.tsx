@@ -37,7 +37,7 @@ export function HistorialBitacoraVista({ fuente, alAbrirTurno }: { fuente: Fuent
   const { toast } = useToast()
   const navigate = useNavigate()
   const [dias, setDias] = useState<number>(14)
-  const { filas, resumen, cargando, error } = fuente.useHistorial(dias)
+  const { eventos, filas, resumen, cargando, error } = fuente.useHistorial(dias)
   const [trabajando, setTrabajando] = useState<null | 'copiar' | 'pdf'>(null)
   const [verTodosRepuestos, setVerTodosRepuestos] = useState(false)
   const abrirTurno = alAbrirTurno ?? ((turnoId: string) => navigate(`/bitacora?turno=${turnoId}`))
@@ -46,7 +46,7 @@ export function HistorialBitacoraVista({ fuente, alAbrirTurno }: { fuente: Fuent
     setTrabajando('copiar')
     try {
       await copiarHtml(
-        historialAHtmlCorreo(resumen, filas, BITACORA_PLANTA.nombre),
+        historialAHtmlCorreo(resumen, filas, BITACORA_PLANTA.nombre, eventos),
         historialATextoPlano(resumen, filas, BITACORA_PLANTA.nombre),
       )
       toast({ title: 'Resumen copiado', description: 'Pégalo en el correo con Ctrl+V.', variant: 'success' })
@@ -61,7 +61,7 @@ export function HistorialBitacoraVista({ fuente, alAbrirTurno }: { fuente: Fuent
     setTrabajando('pdf')
     try {
       const { generarPdfHistorial } = await import('@/services/bitacora/historialPdf')
-      await generarPdfHistorial(resumen, filas, BITACORA_PLANTA.nombre)
+      await generarPdfHistorial(resumen, filas, BITACORA_PLANTA.nombre, eventos)
       toast({ title: 'PDF descargado', variant: 'success' })
     } catch {
       toast({ title: 'No se pudo generar el PDF', variant: 'destructive' })
