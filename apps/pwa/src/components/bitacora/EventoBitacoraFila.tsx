@@ -81,7 +81,8 @@ export function EventoBitacoraFila({
       }}
       className={[
         // Fondo propio: al deslizar, las acciones quedan DEBAJO de la fila.
-        'relative grid min-h-[44px] cursor-pointer gap-3 bg-card px-4 py-3',
+        // En PC la fila va más compacta: la columna del correo necesita el ancho (17-09).
+        'relative grid min-h-[44px] cursor-pointer gap-3 bg-card px-4 py-3 md:py-2.5',
         conAsa ? 'grid-cols-[3.25rem_minmax(0,1fr)_auto]' : 'grid-cols-[3.25rem_minmax(0,1fr)]',
         'transition-colors duration-150 hover:bg-accent active:bg-accent motion-reduce:transition-none',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary',
@@ -120,10 +121,10 @@ export function EventoBitacoraFila({
           {/* Con título, el título manda y el equipo pasa a la línea de abajo
               (como remitente y asunto en Mail); sin título, queda como antes. */}
           {titulo ? (
-            <span className="text-headline leading-tight">{titulo}</span>
+            <span className="text-headline leading-tight md:text-subhead">{titulo}</span>
           ) : (
             <>
-              <span className={`text-headline leading-tight ${sinEquipo ? 'text-muted-foreground' : ''}`}>{nombreEquipo}</span>
+              <span className={`text-headline leading-tight md:text-subhead ${sinEquipo ? 'text-muted-foreground' : ''}`}>{nombreEquipo}</span>
               {codigo && <span className="text-footnote tabular-nums text-muted-foreground">{codigo}</span>}
               <Tag>{etiquetaTipo(evento)}</Tag>
             </>
@@ -152,7 +153,7 @@ export function EventoBitacoraFila({
         )}
 
         {evento.descripcion?.trim() ? (
-          <p className={`line-clamp-3 whitespace-pre-line text-body ${borrador ? 'text-muted-foreground' : ''}`}>{evento.descripcion}</p>
+          <p className={`line-clamp-3 whitespace-pre-line text-body md:text-subhead ${borrador ? 'text-muted-foreground' : ''}`}>{evento.descripcion}</p>
         ) : borrador ? (
           <p className="text-body text-muted-foreground">Sin descripción todavía</p>
         ) : null}
@@ -172,9 +173,9 @@ export function EventoBitacoraFila({
                     key={r.codigoSAP}
                     className="grid grid-cols-[2.25rem_minmax(0,1fr)] gap-2 px-3 py-2 border-t border-border first:border-t-0"
                   >
-                    <span className="text-subhead font-semibold tabular-nums">×{r.cantidad}</span>
+                    <span className="text-subhead font-semibold md:text-footnote tabular-nums">×{r.cantidad}</span>
                     <span className="min-w-0">
-                      <span className="block text-subhead font-semibold">{comun || sap || r.codigoSAP}</span>
+                      <span className="block text-subhead font-semibold md:text-footnote">{comun || sap || r.codigoSAP}</span>
                       {(comun || sap) && (
                         <span className="block text-footnote text-muted-foreground">
                           <span className="tabular-nums">{r.codigoSAP}</span>

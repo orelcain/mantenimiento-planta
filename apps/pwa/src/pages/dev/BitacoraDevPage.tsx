@@ -559,7 +559,7 @@ export function BitacoraDevPage() {
       <div role="note" className="mb-4 rounded-ctl bg-destructive px-4 py-2 text-footnote font-semibold text-destructive-foreground">
         Vitrina de desarrollo · datos de ejemplo, no se guarda nada
       </div>
-      <div className="mx-auto flex max-w-6xl flex-col gap-8">
+      <div className="mx-auto flex max-w-7xl flex-col gap-8">
         <div className="md:max-w-sm">
           <BitacoraTurnoCard useEventos={useEventosEjemplo} alAgregar={() => undefined} alVer={() => undefined} />
         </div>

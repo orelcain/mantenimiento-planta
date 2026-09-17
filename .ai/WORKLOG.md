@@ -21,6 +21,13 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-17 · Bitacora ronda 30 · Vista PC: más ancho para el correo, eventos compactos
+- Pedido de Orel: en PC la planilla MTTR se veía apretada en la vista previa del correo; dar más espacio a esa columna y achicar letra y espacio de los eventos de la izquierda.
+- Hecho: la grilla pasa de 1fr/1,05fr a 2fr/3fr; la fila del evento en `md:` usa `text-subhead` (título, equipo y descripción), `text-footnote` en los repuestos y `py-2.5`; la vitrina de desarrollo sube a `max-w-7xl`.
+- Causa raíz de lo «comprimido»: `ANCHO_CORREO` era 720 (el cuerpo de 680 + márgenes). La planilla MTTR va al 100 % del mensaje, y en el Outlook del PC el panel de lectura mide ~1000 px, así que la vista previa la dibujaba a la mitad del ancho real y luego la escalaba. Ahora el correo se arma a 1000 px (el detalle de la bitácora sigue en sus 680) y se escala a la columna: a 1500 px de ventana, columna de 662 px, zoom 0,66, Observaciones legible.
+- Verificación: tsc 0; eslint 30; vitest OK; audit-piel/voseo/decimales OK; build OK; vitrina a 1500 px.
+- Estado: HECHO.
+
 ## 2026-09-17 · Bitacora ronda 29 · La planilla «Recoleccion MTTR» arriba del correo, en vivo y como Excel
 - Pedido de Orel: Mantención pega arriba del correo del turno una tabla de Excel («MTBF - MTTR»: Fecha · Máquina · Falla · Duración Falla (Min) · Observaciones) y abajo va el detalle. Debía verse IGUAL al Excel, no con diseño propio.
 - Hecho:
