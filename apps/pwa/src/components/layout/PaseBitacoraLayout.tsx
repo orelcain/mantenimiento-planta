@@ -91,7 +91,7 @@ export function MarcoPaseBitacora({ nombre, ruta, children }: { nombre: string; 
         <p className="min-w-0 truncate text-footnote text-muted-foreground">
           {BITACORA_PLANTA.nombre} · <span className="font-semibold text-foreground">{nombre}</span>
         </p>
-        <Button variant="plain" size="sm" className="shrink-0" onClick={() => setConfirmarSalida(true)}>
+        <Button variant="plain" className="-mr-3 shrink-0" onClick={() => setConfirmarSalida(true)}>
           <LogOut /> Salir
         </Button>
       </header>

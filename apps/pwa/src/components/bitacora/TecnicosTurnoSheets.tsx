@@ -95,10 +95,10 @@ export function TecnicosDelTurnoSheet({
           />
         </div>
         <div>
-          <div className="mb-1.5 flex items-baseline justify-between gap-2">
+          <div className="mb-1.5 flex items-center justify-between gap-2">
             <span className="text-footnote text-muted-foreground">Marca a los que están en el turno</span>
             {onAbrirLista && (
-              <Button variant="plain" size="sm" onClick={onAbrirLista}>
+              <Button variant="plain" className="-my-2 -mr-3 shrink-0" onClick={onAbrirLista}>
                 Lista de técnicos
               </Button>
             )}
