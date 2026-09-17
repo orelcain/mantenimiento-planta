@@ -5306,6 +5306,23 @@ Orel intento anotar el FRL de la E-PACK y la bitacora dijo «no tiene repuestos 
 - Codigo: la lista de repuestos por equipo de la bitacora vence a los 5 min (antes vivia toda la
   sesion y un vinculo nuevo desde el CTD no aparecia).
 
+## 2026-09-17 · Bitacora ronda 18a · Corregir quien registro un evento publicado
+
+Orel: «no deja modificar el tecnico que edito ni el que participo». Diagnostico en la vitrina:
+los participantes SI se guardaban (fila «Mauricio, Danilo» → «Mauricio, Danilo, Leandro»); lo
+bloqueado era **quien lo registro** en un evento publicado: el editor lo mostraba como texto fijo
+(«Registro: X») y la regla del 16-09 solo dejaba cambiarlo en borrador.
+- Editor: en un evento publicado aparece «Quien lo registro» (`SelectorTecnico` con `recordar={false}`
+  y `vacio="Elige al tecnico"`: elegir a otro NO pisa «mi nombre» en el telefono). `DatosEvento.registradoPor`
+  viaja solo si cambio (clave condicional: un `undefined` pisaba el autor en la vitrina). Quien corrige
+  queda en `actualizadoPorNombre`. El pase QR tambien lo ve («Edita: Leandro Igor» + selector). Un
+  borrador ajeno sigue con «Lo empezo: X» (ahi el autor se ajusta con «Quien continua»).
+- Regla: cae «solo se ajusta mientras es borrador». El pase puede corregir `registradoPor` SOLO si
+  `actualizadoPorNombre == token.nombre` (deja su firma). 106/106 en local (2 casos nuevos, 1 invertido).
+- Sin mockup: es el mismo selector que ya existia. Verificado en la vitrina (PC y 375 px) y en el modo
+  pase. Pendiente de esta ronda (mockup https://claude.ai/artifact/NgKHSJLgSFcyEgSv61Wd5F): historial
+  de repuestos usados y repuestos en lista + separador entre eventos en WhatsApp/correo/PDF.
+
 ## 2026-09-17 · Bitacora ronda 17 · Editor ancho en PC, buscador de repuestos con dos alcances, nombre comun y orden de los sin hora
 
 Pedidos de Orel tras probar los repuestos en la E-PACK. Mockup (3 decisiones, todas las recomendadas):

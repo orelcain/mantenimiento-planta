@@ -244,7 +244,11 @@ function useEventosEjemplo(turno: TurnoMantencion) {
             registradoPor: quien,
           }),
           ...resto,
-          ...(esNuevo ? {} : datos.fijarAutor ? { registradoPor: quien } : { actualizadoPorNombre: quien }),
+          ...(esNuevo
+            ? {}
+            : datos.fijarAutor
+              ? { registradoPor: quien }
+              : { actualizadoPorNombre: quien, ...(datos.registradoPor ? { registradoPor: datos.registradoPor } : {}) }),
         }
         // Un borrador se crea con el primer autoguardado: si no estaba, se agrega.
         return { ...prev, [turno.id]: esNuevo || !previo ? [...lista, evento] : lista.map((e) => (e.id === id ? evento : e)) }

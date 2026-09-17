@@ -219,6 +219,12 @@ export type EventoBitacoraDatos = Pick<
    */
   fijarAutor?: boolean
   /**
+   * Al editar un evento ya publicado: corregir quién lo registró (se eligió
+   * mal, o lo cargó otro desde el PC). Quien corrige queda en
+   * `actualizadoPorNombre` (17-09-2026).
+   */
+  registradoPor?: string
+  /**
    * Al actualizar: SOLO estos campos del documento se escriben (los que
    * cambiaron en esta pantalla). Sin el dato, se escriben todos.
    */

@@ -220,6 +220,8 @@ export function EventoBitacoraSheet({
   const eventoId = evento?.id ?? idNuevo
 
   const [quien, setQuien] = useState('')
+  /** Quién lo registró, editable en un evento ya publicado (se eligió mal o lo cargó otro). */
+  const [registrador, setRegistrador] = useState('')
   const [participantes, setParticipantes] = useState<string[]>([])
   const [equipoId, setEquipoId] = useState<string | null>(null)
   const [equipoCodigo, setEquipoCodigo] = useState('')
@@ -297,6 +299,14 @@ export function EventoBitacoraSheet({
   const publicadoAfuera = autoguarda && Boolean(eventoVivo) && eventoVivo?.estado !== 'borrador'
   /** Todavía sin publicar: el botón principal es «Listo». */
   const modoBorrador = autoguarda && !publicadoAfuera
+  /**
+   * En un evento publicado, «quién lo registró» se puede corregir (17-09): un
+   * borrador propio lo ajusta con «Quién continúa», así que ahí no hace falta.
+   */
+  const autorEditable = !esNuevo && !modoBorrador
+  const registradoEnServidor = (eventoVivo ?? evento)?.registradoPor ?? ''
+  /** El autor que vale para no repetirlo como participante. */
+  const quienRegistro = esNuevo ? quien : autorEditable && registrador.trim() ? registrador.trim() : registradoEnServidor || quien
   const usuario = useAuthStore((s) => s.user)
   const actual = eventoVivo ?? evento
   // Eliminar: quien lo creó o un supervisor (como la regla). Con la cuenta
@@ -316,6 +326,7 @@ export function EventoBitacoraSheet({
     const lista = tecnicosRef.current.todos
     const quienInicial = autorFijo ?? (lista.length === 0 || lista.includes(recordado) ? recordado : '')
     setQuien(quienInicial)
+    setRegistrador(evento?.registradoPor ?? '')
     setParticipantes(evento?.participantes ?? [])
     // «Resolver pendiente»: el equipo, su vínculo y el tipo vienen del pendiente original.
     setEquipoId(evento?.equipoId ?? pendienteOrigen?.equipoId ?? null)
@@ -454,11 +465,12 @@ export function EventoBitacoraSheet({
       quien,
       resuelvePendiente: pendienteOrigen ? copiaDeOrigen(pendienteOrigen) : null,
       // Quien registra no se repite como participante (pudo quedar marcado antes de elegirlo).
-      participantes: participantes.filter(
-        (p) => p.trim().toLowerCase() !== (esNuevo ? quien : (evento?.registradoPor ?? quien)).trim().toLowerCase(),
-      ),
+      participantes: participantes.filter((p) => p.trim().toLowerCase() !== quienRegistro.trim().toLowerCase()),
       equipoId,
       estado,
+      // Corrección de quién lo registró: solo si se eligió a alguien distinto
+      // (la clave no va si no cambió: un `undefined` pisaba el autor en la vitrina).
+      ...(!crear && autorEditable && registrador.trim() && registrador.trim() !== registradoEnServidor ? { registradoPor: registrador.trim() } : {}),
       // El autor se ajusta solo en un borrador creado aquí y solo si cambió
       // (la regla no deja tocarlo en uno publicado).
       fijarAutor: !crear && creadoAqui.current && quien.trim() !== quienBase.current.trim() && estadoVivo === 'borrador',
@@ -495,7 +507,7 @@ export function EventoBitacoraSheet({
     )
     // Abrir, mirar y cerrar no escribe nada: sin señal, esa escritura vacía
     // quedaba en cola con una copia vieja del evento (revisión 16-09).
-    if (!crear && !datos.camposCambiados?.length && !cambiaronFotos && !datos.fijarAutor) {
+    if (!crear && !datos.camposCambiados?.length && !cambiaronFotos && !datos.fijarAutor && !datos.registradoPor) {
       ultimaFirma.current = firmaActual
       setPorGuardar(false)
       return
@@ -1041,7 +1053,7 @@ export function EventoBitacoraSheet({
         {autorFijo && (
           <p className="text-footnote text-muted-foreground">
             {esNuevo ? 'Registra' : 'Edita'}: <span className="font-semibold text-foreground">{autorFijo}</span>
-            {!esNuevo && evento && autorVisible(evento) !== autorFijo ? ` · lo registró ${autorVisible(evento)}` : ''}
+            {!esNuevo && !autorEditable && evento && autorVisible(evento) !== autorFijo ? ` · lo empezó ${autorVisible(evento)}` : ''}
           </p>
         )}
         {tecnicos.todos.length > 0 && !autorFijo && (
@@ -1053,10 +1065,26 @@ export function EventoBitacoraSheet({
               valor={quien}
               onChange={setQuien}
             />
-            {!esNuevo && evento && (
-              <p className="mt-1.5 text-footnote text-muted-foreground">
-                {modoBorrador ? 'Lo empezó' : 'Registró'}: {autorVisible(evento)}
-              </p>
+            {!esNuevo && !autorEditable && evento && (
+              <p className="mt-1.5 text-footnote text-muted-foreground">Lo empezó: {autorVisible(evento)}</p>
+            )}
+          </div>
+        )}
+        {/* Publicado: quién lo registró se corrige aquí (también desde el pase);
+            quien corrige queda como «editado por». No se recuerda como «mi nombre». */}
+        {autorEditable && tecnicos.todos.length > 0 && (
+          <div>
+            <SelectorTecnico
+              etiqueta="Quién lo registró"
+              deTurno={tecnicos.deTurno}
+              todos={tecnicos.todos}
+              valor={registrador}
+              onChange={setRegistrador}
+              recordar={false}
+              vacio="Elige al técnico"
+            />
+            {evento && registrador && !tecnicos.todos.includes(registrador) && (
+              <p className="mt-1.5 text-footnote text-muted-foreground">Hoy figura: {autorVisible(evento)}</p>
             )}
           </div>
         )}
@@ -1064,7 +1092,7 @@ export function EventoBitacoraSheet({
           <SelectorParticipantes
             presentes={tecnicos.deTurno}
             todos={tecnicos.todos}
-            excluir={esNuevo ? quien : (evento?.registradoPor ?? quien)}
+            excluir={quienRegistro}
             valor={participantes}
             onChange={setParticipantes}
           />
