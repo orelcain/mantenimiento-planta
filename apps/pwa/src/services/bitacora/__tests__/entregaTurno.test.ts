@@ -1,9 +1,19 @@
-import { describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { EventoBitacora } from '../bitacora.types'
 import { copiaDeOrigen, etiquetaCortaTurno, origenDePendiente, pendientesAnteriores, turnosEntre } from '../entregaTurno'
 import { resumirBitacora } from '../resumenBitacora'
 import { bitacoraAHtmlCorreo, bitacoraATextoPlano, lineaImpacto } from '../bitacoraCorreo'
 import { turnoDesdeId } from '../turnoMantencion'
+
+// Las etiquetas cortas muestran el año solo si no es el actual: el reloj de
+// estas pruebas queda en 2026 para que no cambien al pasar de año.
+beforeAll(() => {
+  vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-09-17T12:00:00') })
+})
+afterAll(() => {
+  vi.useRealTimers()
+})
+
 
 const ev = (p: Partial<EventoBitacora>): EventoBitacora => ({
   id: 'x',
@@ -51,6 +61,8 @@ describe('hallazgos de la revisión adversaria (15-09)', () => {
 describe('entrega de turno', () => {
   it('etiqueta corta y distancia en turnos (cruza medianoche)', () => {
     expect(etiquetaCortaTurno('2026-09-15_tarde')).toBe('Turno tarde 15-09')
+    expect(etiquetaCortaTurno('2026-12-29_noche', 2027)).toBe('Turno noche 29-12-2026')
+    expect(etiquetaCortaTurno('2027-01-02_dia', 2027)).toBe('Turno día 02-01')
     expect(turnosEntre('2026-09-15_tarde', noche16)).toBe(1)
     expect(turnosEntre('2026-09-15_dia', noche16)).toBe(2)
     expect(turnosEntre('basura', noche16)).toBe(0)

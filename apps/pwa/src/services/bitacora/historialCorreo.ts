@@ -13,9 +13,20 @@ const FUENTE = "'Segoe UI', Calibri, Arial, sans-serif"
 const C = { tinta: '#1F1F1F', sec: '#5F6368', linea: '#E3E3E3', parada: '#B3261E', ventana: '#1E7B34' }
 
 const fechaCorta = (f: string) => f.split('-').slice(1).reverse().join('-')
+const fechaConAnio = (f: string) => f.split('-').reverse().join('-')
+
+/**
+ * "04-09 al 17-09-2026": el resumen se archiva, así que el año va siempre; una
+ * sola vez si el período cae en un mismo año, en las dos fechas si lo cruza.
+ */
+export function rangoDelPeriodo(desde: string, hasta: string): string {
+  return desde.slice(0, 4) === hasta.slice(0, 4)
+    ? `${fechaCorta(desde)} al ${fechaConAnio(hasta)}`
+    : `${fechaConAnio(desde)} al ${fechaConAnio(hasta)}`
+}
 
 export function tituloHistorial(r: ResumenPeriodo): string {
-  return `Bitácora de Mantención · Resumen ${fechaCorta(r.desde)} al ${fechaCorta(r.hasta)}`
+  return `Bitácora de Mantención · Resumen ${rangoDelPeriodo(r.desde, r.hasta)}`
 }
 
 function kpi(valor: string, etiqueta: string, color = C.tinta): string {

@@ -100,13 +100,14 @@ describe('repuestos usados', () => {
     expect(html).toMatch(/<li[^>]*>3300011612 · [^<]* ×1<\/li><li[^>]*>3300011654 · [^<]* ×2<\/li>/)
     expect(bitacoraATextoPlano(datos([ev()]))).toContain('  Repuestos usados:\n  • 3300011612 · ')
     const wa = bitacoraATextoWhatsapp(datos([ev()]))
-    expect(wa).toContain('*21:15 – 21:30 · EVISCERADORA BAADER 142 N2 (720004447) · Reaprete pernos base expulsador*')
-    expect(wa).toContain('Repuestos usados:\n• 3300011612 · ')
-    expect(wa).toMatch(/\n• 3300011654 · .* ×2(\n|$)/)
+    expect(wa).toContain('*1. EVISCERADORA BAADER 142 N2* · `21:15–21:30`\n*Reaprete pernos base expulsador*')
+    expect(wa).toContain('N° de equipo `720004447`')
+    // En WhatsApp, el nombre común (o el del maestro) sin el nombre SAP largo; el código en monoespaciado.
+    expect(wa).toContain('Repuestos usados:\n- `3300011612` Soporte sección 519437 ×1\n- `3300011654` Anillo 31000251 ×2')
     expect(lineasRepuestos(ev({ repuestos: [] }))).toEqual([])
-    // Dos eventos: separador visible entre ellos, en WhatsApp y en el texto plano no (ahí basta la línea en blanco).
+    // Dos eventos: divisoria con una línea en blanco a cada lado (formato A2).
     const dos = datos([ev(), ev({ id: 'otro', horaInicio: '22:00', horaTermino: '22:10', repuestos: [] })])
-    expect(bitacoraATextoWhatsapp(dos)).toContain(`\n${SEPARADOR_EVENTOS}\n*22:00`)
+    expect(bitacoraATextoWhatsapp(dos)).toContain(`\n\n${SEPARADOR_EVENTOS}\n\n*2. EVISCERADORA BAADER 142 N2* · \`22:00–22:10\``)
     expect(bitacoraATextoWhatsapp(datos([ev()]))).not.toContain(SEPARADOR_EVENTOS)
     const conFoto = (p: Partial<EventoBitacora>) =>
       planLaminas(datos([ev({ fotos: [{ url: 'u', path: 'p', etiqueta: 'antes' }], ...p })]))[0]?.clave

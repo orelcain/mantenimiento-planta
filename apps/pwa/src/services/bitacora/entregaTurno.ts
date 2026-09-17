@@ -10,12 +10,15 @@ import { etiquetaTurno, turnoDesdeId } from './turnoMantencion'
  * cerrado cuando otro turno lo resuelve. Así los números de cada turno no cambian.
  */
 
-/** "Turno tarde 15-09". */
-export function etiquetaCortaTurno(turnoId: string): string {
+/**
+ * "Turno tarde 15-09"; de otro año, "Turno tarde 29-12-2026" (como las fechas de
+ * Fotos y Mail en iOS: el año solo cuando no es el actual, 17-09-2026).
+ */
+export function etiquetaCortaTurno(turnoId: string, anioActual: number = new Date().getFullYear()): string {
   const t = turnoDesdeId(turnoId)
   if (!t) return turnoId
-  const [, mes, dia] = t.fecha.split('-')
-  return `${etiquetaTurno(t)} ${dia}-${mes}`
+  const [anio, mes, dia] = t.fecha.split('-')
+  return `${etiquetaTurno(t)} ${dia}-${mes}${Number(anio) === anioActual ? '' : `-${anio}`}`
 }
 
 /** Cuántos turnos (bloques de 8 h) hay entre el turno de origen y el actual. */

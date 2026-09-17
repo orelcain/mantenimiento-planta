@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { EventoBitacora, FotoEvento } from '../bitacora.types'
 import { turnoDesdeId } from '../turnoMantencion'
 import { ordenarEventos, resumirBitacora } from '../resumenBitacora'
@@ -15,8 +15,18 @@ import {
   tieneHora,
   tiposPropiosUsados,
 } from '../presentacionEvento'
-import { bitacoraATextoWhatsapp, nombreArchivoLamina, planLaminas, referenciaLaminas } from '../bitacoraWhatsapp'
+import { bitacoraATextoWhatsapp, nombreArchivoLamina, planLaminas, protegerNumeros, referenciaLaminas } from '../bitacoraWhatsapp'
 import { cajasFotos, partirLineas, recortarLineas } from '../laminaWhatsapp'
+
+// Las etiquetas cortas muestran el año solo si no es el actual: el reloj de
+// estas pruebas queda en 2026 para que no cambien al pasar de año.
+beforeAll(() => {
+  vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-09-17T12:00:00') })
+})
+afterAll(() => {
+  vi.useRealTimers()
+})
+
 
 const turno = turnoDesdeId('2026-09-16_tarde')!
 
@@ -197,7 +207,7 @@ describe('WhatsApp: mensaje + láminas', () => {
     ])
     expect(referenciaLaminas([2, 3])).toBe('láminas 2 y 3')
     expect(referenciaLaminas([1])).toBe('lámina 1')
-    expect(bitacoraATextoWhatsapp(datos([muchas, borrador]))).toContain('Fotos: 5 (láminas 1 y 2)')
+    expect(bitacoraATextoWhatsapp(datos([muchas, borrador]))).toContain('Fotos: 5 · láminas 1 y 2')
   })
 
   it('la clave de la lámina cambia si cambia algo que se dibuja', () => {
@@ -208,27 +218,64 @@ describe('WhatsApp: mensaje + láminas', () => {
     expect(a).toBe(c)
   })
 
-  it('el mensaje lleva el formato de WhatsApp y dice en qué lámina están las fotos', () => {
+  it('el mensaje va en secciones, con los eventos numerados y separados (formato A2, 17-09)', () => {
     const texto = bitacoraATextoWhatsapp(datos([epack, sinFotos, casino]))
-    expect(texto.startsWith('*Bitácora de Mantención · Turno tarde*\nMiércoles 16-09-2026 · 16:00 a 00:00 · Planta Chonchi')).toBe(true)
-    expect(texto).toContain('*Resumen:* 3 eventos · 0 min de parada · MTTR — · 1 sin detener producción · 0 pendientes')
-    expect(texto).toContain('*18:07 – 18:30 · CASINO*\n_Falla_\nCambio de tubos fluorescentes en equipos de iluminación casino\nTécnicos: Mauricio Gallardo, Danilo Cortes\nFotos: 2 (lámina 1)')
-    expect(texto).toContain('*20:00 – 20:20 · EMPACADORA E-PACK*\n_Preventivo · Sin detener: Colación empaque_')
-    expect(texto).toContain('*17:00 · Sala de bombas*')
+    expect(texto.startsWith('*BITÁCORA DE MANTENCIÓN*\n*Turno tarde · Miércoles 16-09-2026*\n`16:00–00:00` · Planta Chonchi')).toBe(true)
+    expect(texto).toContain('*RESUMEN*\n- 3 eventos\n- 0 min de parada\n- 1 sin detener producción\n- 0 pendientes')
+    // Sin paradas no hay MTTR que mostrar.
+    expect(texto).not.toContain('MTTR')
+    expect(texto).toContain(
+      '*2. CASINO* · `18:07–18:30`\n_Falla_\n> Cambio de tubos fluorescentes en equipos de iluminación casino\nTécnicos: Mauricio Gallardo, Danilo Cortes\nFotos: 2 · lámina 1',
+    )
+    expect(texto).toContain('*3. EMPACADORA E-PACK* · `20:00–20:20`\n_Preventivo · Sin detener: Colación empaque_')
+    // Con un solo técnico también se dice quién fue (la cabecera ya no trae «Registrado por»).
+    expect(texto).toContain('*1. Sala de bombas* · `17:00`')
+    expect(texto).toContain('> Cambio de tubos fluorescentes en equipos de iluminación casino\nTécnicos: Mauricio Gallardo\n\n──────────\n\n*2. CASINO*')
     // Orden del turno: 17:00, 18:07, 20:00.
     expect(texto.indexOf('Sala de bombas')).toBeLessThan(texto.indexOf('CASINO'))
     expect(texto.indexOf('CASINO')).toBeLessThan(texto.indexOf('E-PACK'))
+    expect(texto.endsWith('Fotos: 1 · lámina 2')).toBe(true)
   })
 
-  it('pendientes al final; un * o _ del equipo no rompe la negrita', () => {
+  it('pendientes al final tras una divisoria, con la numeración seguida; un * o _ del equipo no rompe la negrita', () => {
     const texto = bitacoraATextoWhatsapp(datos([ev({ id: 'p', equipo: 'BOMBA_1 *A*', pendiente: true }), casino]))
-    expect(texto).toContain('*Pendiente para el turno siguiente*\n\n*18:07 – 18:30 · BOMBA‗1 ∗A∗*')
-    expect(texto.indexOf('Pendiente para el turno siguiente')).toBeGreaterThan(texto.indexOf('Fotos: 2'))
+    expect(texto).toContain('Fotos: 2 · lámina 1\n\n──────────\n\n*PENDIENTE PARA EL TURNO SIGUIENTE*\n\n*2. BOMBA‗1 ∗A∗* · `18:07–18:30`')
+    expect(texto).toContain('*RESUMEN*\n- 2 eventos\n- 0 min de parada\n- 0 sin detener producción\n- 1 pendiente')
+  })
+
+  it('título, N° de equipo, varias líneas y números largos del técnico, sin hora', () => {
+    const texto = bitacoraATextoWhatsapp(
+      datos([
+        ev({
+          id: 't',
+          equipo: 'EVISCERADORA BAADER 142 N2',
+          equipoId: 'n2',
+          equipoCodigo: '720004447',
+          titulo: 'Reaprete pernos',
+          horaInicio: '',
+          horaTermino: null,
+          descripcion: 'Pernos sueltos\n\nSe cambian: 10000202885 y 3 golillas',
+        }),
+      ]),
+    )
+    expect(texto).toContain(
+      '*1. EVISCERADORA BAADER 142 N2*\n*Reaprete pernos*\n_Falla_\nN° de equipo `720004447`\n> Pernos sueltos\n> Se cambian: `10000202885` y 3 golillas',
+    )
+    expect(protegerNumeros('OT 1234567 y 12345678, `99999999` ya va')).toBe('OT 1234567 y `12345678`, `99999999` ya va')
   })
 
   it('sin eventos lo dice, y el singular sale bien', () => {
     expect(bitacoraATextoWhatsapp(datos([]))).toContain('Sin eventos registrados en el turno.')
-    expect(bitacoraATextoWhatsapp(datos([sinFotos]))).toContain('*Resumen:* 1 evento ·')
+    expect(bitacoraATextoWhatsapp(datos([]))).not.toContain('RESUMEN')
+    expect(bitacoraATextoWhatsapp(datos([sinFotos]))).toContain('*RESUMEN*\n- 1 evento\n')
+  })
+
+  it('la lámina lleva el número del evento en el mensaje', () => {
+    const plan = planLaminas(datos([epack, sinFotos, casino]))
+    expect(plan.map((l) => [l.evento.id, l.numero, l.numeroEvento])).toEqual([
+      ['casino', 1, 2],
+      ['epack', 2, 3],
+    ])
   })
 
   it('nombre de archivo de la lámina', () => {

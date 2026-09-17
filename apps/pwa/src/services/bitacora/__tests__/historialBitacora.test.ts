@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { rangoDelPeriodo } from '../historialCorreo'
 import type { EventoBitacora } from '../bitacora.types'
 import { detalleRepuesto, fechaDesde, filasPorTurno, lineaRepuestoDelPeriodo, porcentaje, resumirPeriodo, tesisDelPeriodo, tituloRepuesto } from '../historialBitacora'
 import { resumirBitacora } from '../resumenBitacora'
@@ -154,5 +155,12 @@ describe('historial del período', () => {
     expect(fechaDesde(14, new Date(2026, 8, 15))).toBe('2026-09-02')
     expect(fechaDesde(1, new Date(2026, 8, 15))).toBe('2026-09-15')
     expect(fechaDesde(30, new Date(2026, 0, 5))).toBe('2025-12-07')
+  })
+})
+
+describe('el año en el título del resumen (17-09-2026)', () => {
+  it('va siempre; una sola vez dentro del mismo año, en las dos fechas si lo cruza', () => {
+    expect(rangoDelPeriodo('2026-09-04', '2026-09-17')).toBe('04-09 al 17-09-2026')
+    expect(rangoDelPeriodo('2026-12-28', '2027-01-10')).toBe('28-12-2026 al 10-01-2027')
   })
 })
