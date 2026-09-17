@@ -15,7 +15,7 @@ import {
   encabezadoEvento,
   etiquetaTipo,
   lineaRepuestos,
-  nombreRepuesto,
+  nombreConComun,
   normalizarRepuestos,
   tieneHora,
   tituloDe,
@@ -205,7 +205,8 @@ export function bitacoraATextoWhatsapp(datos: DatosCorreoBitacora, laminas: read
       cod ? `${/^\d+$/.test(cod) ? 'N° de equipo' : 'Ubicación técnica'} ${codigo(cod)}` : '',
       ...descripcion,
       ...(repuestos.length
-        ? ['Repuestos usados:', ...repuestos.map((x) => `- ${codigo(x.codigoSAP)} ${(x.nombreComun ?? '').trim() || nombreRepuesto(x) || ''} ×${x.cantidad}`.trimEnd())]
+        ? // Nombre común y, entre paréntesis, el del maestro SAP (pedido de Orel 17-09: bodega busca por ese).
+          ['Repuestos usados:', ...repuestos.map((x) => `- ${codigo(x.codigoSAP)} ${nombreConComun(x)} ×${x.cantidad}`.replace(/\s+×/, ' ×'))]
         : []),
       tecnicosEvento.length ? `Técnicos: ${tecnicosEvento.join(', ')}` : '',
       e.fotos?.length

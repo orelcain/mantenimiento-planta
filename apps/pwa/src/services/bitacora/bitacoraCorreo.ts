@@ -4,7 +4,16 @@ import { fuePendiente, minutosParadaDe, ordenarEventos, resumirBitacora } from '
 import { soloListos } from './borradores'
 import { etiquetaTurno, fechaTurnoLarga, formatoMinutos, horarioTurno } from './turnoMantencion'
 import { etiquetaCortaTurno } from './entregaTurno'
-import { encabezadoEvento, etiquetaTipo, horarioEvento, lineasRepuestos, normalizarRepuestos, renglonRepuesto, tituloDe } from './presentacionEvento'
+import {
+  codigoEquipoDe,
+  encabezadoEvento,
+  etiquetaTipo,
+  horarioEvento,
+  lineasRepuestos,
+  nombreRepuesto,
+  normalizarRepuestos,
+  tituloDe,
+} from './presentacionEvento'
 
 // Se reexporta: el PDF y las pruebas lo importan desde aquí.
 export { horarioEvento }
@@ -47,6 +56,12 @@ const C = {
   ventana: '#1E7B34',
   pendFondo: '#FFF4E5',
   pendBorde: '#E8900C',
+  marca: '#2E75B6',
+  citaFondo: '#F4F5F7',
+  citaBarra: '#BDC1C6',
+  okFondo: '#E6F4EA',
+  critFondo: '#FCE8E6',
+  neutroFondo: '#F1F3F4',
 }
 const FUENTE = "'Segoe UI', Calibri, Arial, sans-serif"
 
@@ -140,33 +155,110 @@ function htmlFotos(fotos: readonly FotoEvento[], fuente: (f: FotoEvento) => stri
   return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">${filas.join('')}</table>`
 }
 
-function htmlEvento(e: EventoBitacora, fuente: (f: FotoEvento) => string, separador: boolean): string {
-  const colorImpacto = e.impacto === 'con-parada' ? C.parada : e.impacto === 'en-ventana' ? C.ventana : C.sec
-  const titulo = encabezadoEvento(e)
+/** Una etiqueta de color por cada parte del impacto (parada, ventana, pendiente). */
+function htmlChips(e: EventoBitacora): string {
+  const partes = partesImpacto(e)
+  if (!partes.length) return ''
+  const estilo = (texto: string) => {
+    if (texto.startsWith('Detuvo')) return [C.critFondo, C.parada]
+    if (texto.startsWith('Sin detener') || texto.startsWith('Cierra pendiente') || texto.startsWith('Resuelto')) return [C.okFondo, C.ventana]
+    return [C.neutroFondo, C.sec]
+  }
   return (
-    // 18 px arriba y abajo (era 12): con los repuestos en lista, cada evento
-    // necesita leerse aparte del anterior (17-09).
-    `<tr><td style="padding:18px 0;${separador ? `border-top:1px solid ${C.linea};` : ''}font-family:${FUENTE};">` +
-    `<div style="font-size:15px;font-weight:600;color:${C.tinta};">${escaparHtml(titulo)}</div>` +
-    `<div style="font-size:13px;color:${colorImpacto};padding-top:2px;">${escaparHtml(lineaImpacto(e))}</div>` +
-    (lineaTecnicos(e) ? `<div style="font-size:13px;color:${C.sec};">${escaparHtml(lineaTecnicos(e))}</div>` : '') +
-    (e.descripcion?.trim() ? `<div style="font-size:14px;color:${C.tinta};padding-top:4px;">${conSaltos(e.descripcion)}</div>` : '') +
-    (lineasRepuestos(e).length
-      ? `<div style="font-size:13px;color:${C.tinta};padding-top:6px;"><span style="font-weight:600;">Repuestos usados</span>` +
-        `<ul style="margin:2px 0 0;padding-left:18px;">${normalizarRepuestos(e.repuestos)
-          .map((r) => `<li style="padding:1px 0;">${escaparHtml(renglonRepuesto(r))}</li>`)
-          .join('')}</ul></div>`
+    `<div style="padding-top:5px;">` +
+    partes
+      .map((t) => {
+        const [fondo, tinta] = estilo(t)
+        return `<span style="display:inline-block;background:${fondo};color:${tinta};font-size:12px;font-weight:600;border-radius:10px;padding:1px 8px;margin:0 4px 2px 0;">${escaparHtml(t)}</span>`
+      })
+      .join('') +
+    `</div>`
+  )
+}
+
+/** Repuestos como tabla chica: código · nombre común + nombre SAP · cantidad. */
+function htmlRepuestos(e: EventoBitacora): string {
+  const lista = normalizarRepuestos(e.repuestos)
+  if (!lista.length) return ''
+  // Anchos fijos en código y cantidad: sin ellos Outlook repartía la tabla por igual.
+  const th = (t: string, alinear = 'left', ancho = '') =>
+    `<th${ancho ? ` width="${ancho}"` : ''} style="${ancho ? `width:${ancho}px;` : ''}text-align:${alinear};white-space:nowrap;font-weight:600;color:${C.sec};font-size:11.5px;padding:3px 6px;border-bottom:1px solid ${C.linea};">${t}</th>`
+  const filas = lista
+    .map((r) => {
+      const comun = (r.nombreComun ?? '').trim()
+      const sap = nombreRepuesto(r)
+      const nombre = comun
+        ? `<b>${escaparHtml(comun)}</b>${sap ? `<br><span style="color:${C.sec};">${escaparHtml(sap)}</span>` : ''}`
+        : escaparHtml(sap)
+      return (
+        `<tr><td style="padding:4px 6px;border-bottom:1px solid ${C.linea};white-space:nowrap;vertical-align:top;">${escaparHtml(r.codigoSAP)}</td>` +
+        `<td style="padding:4px 6px;border-bottom:1px solid ${C.linea};vertical-align:top;">${nombre}</td>` +
+        `<td style="padding:4px 6px;border-bottom:1px solid ${C.linea};text-align:right;vertical-align:top;">${r.cantidad}</td></tr>`
+      )
+    })
+    .join('')
+  return (
+    `<div style="font-size:12.5px;font-weight:600;color:${C.tinta};padding-top:8px;">Repuestos usados</div>` +
+    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;width:100%;font-family:${FUENTE};font-size:12.5px;color:${C.tinta};">` +
+    `<tr>${th('Código SAP', 'left', '96')}${th('Repuesto')}${th('Cant.', 'right', '48')}</tr>${filas}</table>`
+  )
+}
+
+/**
+ * Un evento del correo (mockup aprobado 17-09-2026): número en círculo (el
+ * mismo del mensaje de WhatsApp), equipo y hora en una línea, tipo y N° de
+ * equipo debajo, el impacto en etiquetas, lo que escribió el técnico en un
+ * recuadro, repuestos en tabla, técnicos y fotos.
+ */
+function htmlEvento(e: EventoBitacora, numero: number, fuente: (f: FotoEvento) => string, pendiente: boolean): string {
+  const equipo = e.equipo?.trim() ?? ''
+  const titulo = tituloDe(e)
+  const principal = equipo || titulo || etiquetaTipo(e)
+  const hora = horarioEvento(e)
+  const cod = codigoEquipoDe(e)
+  const meta = [etiquetaTipo(e), cod ? `${/^\d+$/.test(cod) ? 'N° de equipo' : 'Ubicación técnica'} ${cod}` : ''].filter(Boolean).join(' · ')
+  const tecnicos = tecnicosDelEvento(e)
+  return (
+    `<tr><td style="padding:16px 0;border-bottom:1px solid ${C.linea};font-family:${FUENTE};">` +
+    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;width:100%;"><tr>` +
+    `<td width="36" style="width:36px;vertical-align:top;padding-top:1px;">` +
+    `<div style="width:26px;height:26px;line-height:26px;border-radius:13px;background:${pendiente ? C.pendBorde : C.tinta};color:#FFFFFF;font-family:${FUENTE};font-size:13px;font-weight:700;text-align:center;">${numero}</div></td>` +
+    `<td style="vertical-align:top;font-family:${FUENTE};color:${C.tinta};">` +
+    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;width:100%;"><tr>` +
+    `<td style="font-family:${FUENTE};font-size:16px;font-weight:600;color:${C.tinta};">${escaparHtml(principal)}</td>` +
+    (hora
+      ? `<td style="font-family:${FUENTE};font-size:13px;font-weight:600;color:${C.tinta};text-align:right;white-space:nowrap;vertical-align:top;padding-left:12px;">${escaparHtml(hora)}</td>`
       : '') +
+    `</tr></table>` +
+    (equipo && titulo ? `<div style="font-size:14px;font-weight:600;">${escaparHtml(titulo)}</div>` : '') +
+    `<div style="font-size:12.5px;color:${C.sec};padding-top:1px;">${escaparHtml(meta)}</div>` +
+    htmlChips(e) +
+    (e.descripcion?.trim()
+      ? `<div style="background:${C.citaFondo};border-left:3px solid ${C.citaBarra};padding:6px 10px;margin-top:8px;font-size:14px;">${conSaltos(e.descripcion)}</div>`
+      : '') +
+    htmlRepuestos(e) +
+    (tecnicos.length ? `<div style="font-size:12.5px;color:${C.sec};padding-top:8px;">Técnicos: ${escaparHtml(tecnicos.join(', '))}</div>` : '') +
     htmlFotos(e.fotos ?? [], fuente) +
+    `</td></tr></table>` +
     `</td></tr>`
   )
 }
 
-function htmlKpi(valor: string, etiqueta: string, color = C.tinta): string {
+/** Título de sección: «EVENTOS DEL TURNO 6» con una raya debajo (ámbar en los pendientes). */
+function htmlSeccion(titulo: string, cantidad: number | null, color: string): string {
+  return (
+    `<div style="font-family:${FUENTE};font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:${C.tinta};` +
+    `margin-top:20px;padding-bottom:6px;border-bottom:2px solid ${color};">${escaparHtml(titulo)}` +
+    (cantidad != null ? ` <span style="color:${C.sec};font-weight:600;">${cantidad}</span>` : '') +
+    `</div>`
+  )
+}
+
+function htmlKpi(valor: string, etiqueta: string, punto?: string): string {
   return (
     `<td style="padding:8px 12px;border:1px solid ${C.linea};vertical-align:top;font-family:${FUENTE};">` +
-    `<div style="font-size:18px;font-weight:600;color:${color};white-space:nowrap;">${escaparHtml(valor)}</div>` +
-    `<div style="font-size:12px;color:${C.sec};">${escaparHtml(etiqueta)}</div></td>`
+    `<div style="font-size:18px;font-weight:600;color:${C.tinta};white-space:nowrap;">${escaparHtml(valor)}</div>` +
+    `<div style="font-size:12px;color:${C.sec};">${punto ? `<span style="color:${punto};">●</span> ` : ''}${escaparHtml(etiqueta)}</div></td>`
   )
 }
 
@@ -191,6 +283,11 @@ export function lineaPendienteAnterior(e: EventoBitacora): string {
     .join(' · ')
 }
 
+/** Cuántos repuestos distintos (por código SAP) se usaron en los eventos. */
+export function repuestosDistintos(eventos: readonly EventoBitacora[]): number {
+  return new Set(eventos.flatMap((e) => normalizarRepuestos(e.repuestos).map((r) => r.codigoSAP))).size
+}
+
 export function bitacoraAHtmlCorreo({ turno, eventos: todos, tecnicos, planta, observacion, pendientesAnteriores = [], fuenteFoto }: DatosCorreoBitacora): string {
   const eventos = soloListos(todos)
   const fuente = fuenteFoto ?? ((f: FotoEvento) => f.url)
@@ -198,68 +295,63 @@ export function bitacoraAHtmlCorreo({ turno, eventos: todos, tecnicos, planta, o
   const r = resumirBitacora(eventos)
   const hechos = ordenados.filter((e) => !fuePendiente(e))
   const pendientes = ordenados.filter(fuePendiente)
-  const autores = [...new Set(eventos.map(autorVisible).filter(Boolean))]
+  const repuestos = repuestosDistintos(eventos)
 
   const kpis = [
     htmlKpi(String(r.eventos), r.eventos === 1 ? 'evento' : 'eventos'),
-    htmlKpi(formatoMinutos(r.minutosParada), etiquetaParada(r), r.conParada > 0 ? C.parada : C.tinta),
-    htmlKpi(r.mttrMin == null ? '—' : formatoMinutos(r.mttrMin), 'MTTR'),
-    htmlKpi(String(r.enVentana), 'sin detener producción', r.enVentana > 0 ? C.ventana : C.tinta),
-    htmlKpi(String(r.pendientesDelTurno), etiquetaPendientes(r)),
+    htmlKpi(formatoMinutos(r.minutosParada), etiquetaParada(r), r.conParada > 0 ? C.parada : undefined),
+    // MTTR solo con paradas: sin ellas era un «—» que no decía nada.
+    r.mttrMin != null ? htmlKpi(formatoMinutos(r.mttrMin), 'MTTR') : '',
+    htmlKpi(String(r.enVentana), 'sin detener producción', r.enVentana > 0 ? C.ventana : undefined),
+    htmlKpi(String(r.pendientesDelTurno), etiquetaPendientes(r), r.pendientes > 0 ? C.pendBorde : undefined),
     // Solo si hubo: es el número que demuestra la entrega de turno.
     r.pendientesCerrados > 0
       ? htmlKpi(String(r.pendientesCerrados), r.pendientesCerrados === 1 ? 'pendiente cerrado' : 'pendientes cerrados', C.ventana)
       : '',
+    repuestos > 0 ? htmlKpi(String(repuestos), repuestos === 1 ? 'repuesto usado' : 'repuestos usados') : '',
   ].join('')
 
   const encabezado =
-    `<div style="font-family:${FUENTE};font-size:20px;font-weight:600;color:${C.tinta};">Bitácora de Mantención · ${escaparHtml(etiquetaTurno(turno))}</div>` +
+    `<div style="font-family:${FUENTE};font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:${C.marca};">` +
+    `Bitácora de Mantención · ${escaparHtml(planta)}</div>` +
+    `<div style="font-family:${FUENTE};font-size:21px;font-weight:600;color:${C.tinta};padding-top:2px;">` +
+    `${escaparHtml(etiquetaTurno(turno))} · ${escaparHtml(capitalizarPrimera(fechaTurnoLarga(turno)))}</div>` +
     `<div style="font-family:${FUENTE};font-size:13px;color:${C.sec};padding-top:2px;">` +
-    `${escaparHtml(capitalizarPrimera(fechaTurnoLarga(turno)))} · ${escaparHtml(horarioTurno(turno).replace('–', 'a'))} · ${escaparHtml(planta)}</div>` +
-    (tecnicos.length
-      ? `<div style="font-family:${FUENTE};font-size:13px;color:${C.sec};">Técnicos de turno: ${escaparHtml(tecnicos.join(', '))}</div>`
-      : '') +
-    (autores.length
-      ? `<div style="font-family:${FUENTE};font-size:13px;color:${C.sec};">Registrado por: ${escaparHtml(autores.join(', '))}</div>`
-      : '')
+    `${escaparHtml(horarioTurno(turno).replace('–', 'a'))}${tecnicos.length ? ` · Técnicos de turno: ${escaparHtml(tecnicos.join(', '))}` : ''}</div>`
 
-  const tablaKpis =
-    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin:12px 0 4px;"><tr>${kpis}</tr></table>` +
-    (observacion?.trim()
-      ? `<div style="font-family:${FUENTE};font-size:14px;color:${C.tinta};padding:8px 0 4px;">` +
-        `<span style="font-weight:600;">Observaciones del turno: </span>${conSaltos(observacion)}</div>`
-      : '')
-
-  const cuerpo = hechos.length
-    ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;width:100%;margin-top:8px;">${hechos
-        .map((e, i) => htmlEvento(e, fuente, i > 0))
-        .join('')}</table>`
-    : eventos.length
-      ? ''
-      : `<p style="font-family:${FUENTE};font-size:14px;color:${C.sec};">Sin eventos registrados en el turno.</p>`
-
-  const bloquePendientes = pendientes.length
-    ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;width:100%;margin-top:12px;">` +
-      `<tr><td style="background:${C.pendFondo};border-left:3px solid ${C.pendBorde};padding:10px 12px;font-family:${FUENTE};">` +
-      `<div style="font-size:15px;font-weight:600;color:${C.tinta};">Pendiente para el turno siguiente</div>` +
-      `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;width:100%;">${pendientes
-        .map((e, i) => htmlEvento(e, fuente, i > 0))
-        .join('')}</table></td></tr></table>`
+  const tablaKpis = eventos.length
+    ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin:12px 0 4px;"><tr>${kpis}</tr></table>`
     : ''
+
+  const bloqueObservacion = observacion?.trim()
+    ? htmlSeccion('Observaciones del turno', null, C.tinta) +
+      `<div style="font-family:${FUENTE};background:${C.citaFondo};border-left:3px solid ${C.citaBarra};padding:6px 10px;margin-top:8px;font-size:14px;color:${C.tinta};">${conSaltos(observacion)}</div>`
+    : ''
+
+  const tablaEventos = (lista: readonly EventoBitacora[], desde: number, pendiente: boolean) =>
+    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;width:100%;">${lista
+      .map((e, i) => htmlEvento(e, desde + i, fuente, pendiente))
+      .join('')}</table>`
+
+  const cuerpo = !eventos.length
+    ? `<p style="font-family:${FUENTE};font-size:14px;color:${C.sec};">Sin eventos registrados en el turno.</p>`
+    : (hechos.length ? htmlSeccion('Eventos del turno', hechos.length, C.tinta) + tablaEventos(hechos, 1, false) : '') +
+      (pendientes.length
+        ? htmlSeccion('Pendiente para el turno siguiente', pendientes.length, C.pendBorde) + tablaEventos(pendientes, hechos.length + 1, true)
+        : '')
 
   const bloqueAnteriores = pendientesAnteriores.length
-    ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;width:100%;margin-top:12px;">` +
-      `<tr><td style="background:${C.pendFondo};border-left:3px solid ${C.pendBorde};padding:10px 12px;font-family:${FUENTE};">` +
-      `<div style="font-size:15px;font-weight:600;color:${C.tinta};">Sigue pendiente de turnos anteriores</div>` +
-      pendientesAnteriores
-        .map((e) => `<div style="font-size:13px;color:${C.tinta};padding-top:4px;">${escaparHtml(lineaPendienteAnterior(e))}</div>`)
-        .join('') +
-      `</td></tr></table>`
+    ? htmlSeccion('Sigue pendiente de turnos anteriores', pendientesAnteriores.length, C.pendBorde) +
+      `<ul style="font-family:${FUENTE};font-size:13px;color:${C.tinta};margin:8px 0 0;padding-left:18px;">` +
+      pendientesAnteriores.map((e) => `<li style="padding:2px 0;">${escaparHtml(lineaPendienteAnterior(e))}</li>`).join('') +
+      `</ul>`
     : ''
 
-  const pie = `<div style="font-family:${FUENTE};font-size:11px;color:${C.sec};padding-top:16px;">Generado con la app de Mantención.</div>`
+  const pie =
+    `<div style="font-family:${FUENTE};font-size:11px;color:${C.sec};padding-top:16px;">` +
+    `Generado con la app de Mantención · ${escaparHtml(etiquetaTurno(turno))} ${escaparHtml(turno.fecha.split('-').reverse().join('-'))}</div>`
 
-  return `<div style="max-width:680px;color:${C.tinta};">${encabezado}${tablaKpis}${cuerpo}${bloquePendientes}${bloqueAnteriores}${pie}</div>`
+  return `<div style="max-width:680px;color:${C.tinta};">${encabezado}${tablaKpis}${bloqueObservacion}${cuerpo}${bloqueAnteriores}${pie}</div>`
 }
 
 /** "3 eventos · 35 min de parada (1) · MTTR 35 min · 1 sin detener producción · 1 pendiente" (texto plano y WhatsApp). */

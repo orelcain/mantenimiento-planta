@@ -94,15 +94,22 @@ describe('repuestos usados', () => {
 
   it('sale en el correo, el texto plano, WhatsApp y la clave de la lámina', () => {
     const html = bitacoraAHtmlCorreo(datos([ev()]))
-    expect(html).toContain('EVISCERADORA BAADER 142 N2 (720004447)')
-    // En lista (17-09): rótulo y un renglón por repuesto, con la cantidad siempre.
-    expect(html).toContain('<span style="font-weight:600;">Repuestos usados</span><ul')
-    expect(html).toMatch(/<li[^>]*>3300011612 · [^<]* ×1<\/li><li[^>]*>3300011654 · [^<]* ×2<\/li>/)
+    // Correo 17-09: equipo arriba, N° de equipo en la línea de abajo y repuestos en tabla.
+    expect(html).toContain('>EVISCERADORA BAADER 142 N2</td>')
+    expect(html).toContain('Falla · N° de equipo 720004447')
+    expect(html).toContain('Repuestos usados</div><table')
+    expect(html).toMatch(/>3300011612<\/td><td[^>]*>Soporte sección 519437<\/td><td[^>]*>1<\/td>/)
+    expect(html).toMatch(/>3300011654<\/td><td[^>]*>Anillo 31000251<\/td><td[^>]*>2<\/td>/)
+    const conComun = bitacoraAHtmlCorreo(datos([ev({ repuestos: [{ codigoSAP: '3300135877', nombre: 'FILTRO 1/2 PURGA', nombreComun: 'Filtro FRL', cantidad: 1 }] })]))
+    expect(conComun).toMatch(/<b>Filtro FRL<\/b><br><span[^>]*>Filtro 1\/2 purga<\/span>/)
     expect(bitacoraATextoPlano(datos([ev()]))).toContain('  Repuestos usados:\n  • 3300011612 · ')
     const wa = bitacoraATextoWhatsapp(datos([ev()]))
     expect(wa).toContain('*1. EVISCERADORA BAADER 142 N2* · `21:15–21:30`\n*Reaprete pernos base expulsador*')
     expect(wa).toContain('N° de equipo `720004447`')
-    // En WhatsApp, el nombre común (o el del maestro) sin el nombre SAP largo; el código en monoespaciado.
+    // En WhatsApp: código en monoespaciado y el nombre del maestro (con el común delante si lo hay).
+    expect(bitacoraATextoWhatsapp(datos([ev({ repuestos: [{ codigoSAP: '3300135877', nombre: 'FILTRO 1/2 PURGA', nombreComun: 'Filtro FRL', cantidad: 1 }] })]))).toContain(
+      '- `3300135877` Filtro FRL (Filtro 1/2 purga) ×1',
+    )
     expect(wa).toContain('Repuestos usados:\n- `3300011612` Soporte sección 519437 ×1\n- `3300011654` Anillo 31000251 ×2')
     expect(lineasRepuestos(ev({ repuestos: [] }))).toEqual([])
     // Dos eventos: divisoria con una línea en blanco a cada lado (formato A2).
