@@ -1,5 +1,6 @@
 import type { EventoBitacora, ImpactoEvento, TipoEvento, TurnoMantencion } from './bitacora.types'
 import { turnoDesdeId } from './turnoMantencion'
+import { normalizarRepuestos } from './presentacionEvento'
 
 /**
  * Borradores y edición entre varios (mockup aprobado 16-09-2026).
@@ -51,7 +52,11 @@ export interface CamposFormulario {
   tipoOtro: string
   equipo: string
   equipoId: string | null
+  /** Número del equipo elegido ('' si es texto libre). Va con el equipo. */
+  equipoCodigo: string
   titulo: string
+  /** Repuestos usados, como JSON normalizado (para comparar sin falsos cambios). */
+  repuestos: string
   descripcion: string
   /** `''` = «Sin hora» (y entonces `horaTermino` también es `''`). */
   horaInicio: string
@@ -69,7 +74,9 @@ export const ETIQUETA_CAMPO: Record<CampoFormulario, string> = {
   tipoOtro: 'el tipo',
   equipo: 'el equipo',
   equipoId: 'el equipo',
+  equipoCodigo: 'el equipo',
   titulo: 'el título',
+  repuestos: 'los repuestos',
   descripcion: '«Qué pasó»',
   horaInicio: 'la hora de inicio',
   horaTermino: 'la hora de término',
@@ -85,6 +92,8 @@ type EventoFormulario = Pick<
   | 'tipoOtro'
   | 'equipo'
   | 'equipoId'
+  | 'equipoCodigo'
+  | 'repuestos'
   | 'titulo'
   | 'descripcion'
   | 'horaInicio'
@@ -101,7 +110,9 @@ export function aFormulario(e: EventoFormulario): CamposFormulario {
     tipoOtro: e.tipoOtro ?? '',
     equipo: e.equipo ?? '',
     equipoId: e.equipoId ?? null,
+    equipoCodigo: e.equipoId ? (e.equipoCodigo ?? '') : '',
     titulo: e.titulo ?? '',
+    repuestos: JSON.stringify(normalizarRepuestos(e.repuestos)),
     descripcion: e.descripcion ?? '',
     horaInicio: e.horaInicio ?? '',
     // Sin hora no hay término: el formulario lo muestra vacío, igual que el servidor.
@@ -118,7 +129,9 @@ const CAMPOS: readonly CampoFormulario[] = [
   'tipoOtro',
   'equipo',
   'equipoId',
+  'equipoCodigo',
   'titulo',
+  'repuestos',
   'descripcion',
   'horaInicio',
   'horaTermino',
@@ -171,7 +184,10 @@ export function fusionarFormulario(base: CamposFormulario, local: CamposFormular
   }
   // El vínculo con la jerarquía va con el texto del equipo: si se adoptó el
   // equipo del otro, también su `equipoId`.
-  if (valores.equipo === remoto.equipo && local.equipo !== remoto.equipo) valores.equipoId = remoto.equipoId
+  if (valores.equipo === remoto.equipo && local.equipo !== remoto.equipo) {
+    valores.equipoId = remoto.equipoId
+    valores.equipoCodigo = remoto.equipoCodigo
+  }
   // «Sin hora» es un solo cambio que toca las dos horas: si se adoptó el paso
   // del otro a «Sin hora» (o de vuelta a con hora), también su término.
   if (
@@ -186,7 +202,10 @@ export function fusionarFormulario(base: CamposFormulario, local: CamposFormular
     base: nuevaBase,
     // «equipo» y «equipoId» (y el tipo y su texto) son un solo aviso para quien lee.
     conflictos: conflictos.filter(
-      (c) => !(c === 'equipoId' && conflictos.includes('equipo')) && !(c === 'tipoOtro' && conflictos.includes('tipo')),
+      (c) =>
+        !((c === 'equipoId' || c === 'equipoCodigo') && conflictos.includes('equipo')) &&
+        !(c === 'equipoCodigo' && conflictos.includes('equipoId')) &&
+        !(c === 'tipoOtro' && conflictos.includes('tipo')),
     ),
   }
 }
@@ -196,9 +215,11 @@ const CAMPOS_DOC: Record<CampoFormulario, readonly string[]> = {
   // El tipo y su texto van juntos: `tipoOtro` solo vale con `tipo: 'otro'`.
   tipo: ['tipo', 'tipoOtro'],
   tipoOtro: ['tipo', 'tipoOtro'],
-  equipo: ['equipo', 'equipoId'],
-  equipoId: ['equipo', 'equipoId'],
+  equipo: ['equipo', 'equipoId', 'equipoCodigo'],
+  equipoId: ['equipo', 'equipoId', 'equipoCodigo'],
+  equipoCodigo: ['equipo', 'equipoId', 'equipoCodigo'],
   titulo: ['titulo'],
+  repuestos: ['repuestos'],
   descripcion: ['descripcion'],
   // Cada hora por separado: «Sin hora» cambia las dos y así se escriben las dos,
   // pero cambiar solo el término no debe reescribir un inicio que otro cambió.

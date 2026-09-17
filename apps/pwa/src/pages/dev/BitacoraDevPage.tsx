@@ -11,6 +11,7 @@ import { HistorialBitacoraVista } from '@/pages/HistorialBitacoraPage'
 import { fechaDesde, filasPorTurno, resumirPeriodo } from '@/services/bitacora/historialBitacora'
 import { AJUSTES_VACIOS, type AjustesTecnicos } from '@/services/bitacora/listaTecnicos'
 import { construirOpcionesEquipo, type NodoJerarquia } from '@/services/bitacora/buscarEquipos'
+import type { FuenteRepuestos, RepuestoDelCatalogo } from '@/services/bitacora/repuestosBitacora'
 
 /**
  * Vitrina de la Bitácora con DATOS DE EJEMPLO — solo desarrollo (la ruta va
@@ -54,7 +55,14 @@ function eventosDeEjemplo(turno: TurnoMantencion): EventoBitacora[] {
       ...base,
       id: 'ej-1',
       tipo: 'falla',
-      equipo: 'BAADER 142',
+      equipo: 'EVISCERADORA BAADER 142 N3',
+      equipoId: 'e2',
+      equipoCodigo: '720004412',
+      // Repuestos reales del maestro de la BAADER 142 (de ejemplo en este evento).
+      repuestos: [
+        { codigoSAP: '3300011612', nombre: 'SOPORTE SECCION 519437', cantidad: 1 },
+        { codigoSAP: '3300011654', nombre: 'ANILLO 31000251', cantidad: 2 },
+      ],
       descripcion: 'Detención por E777. Muelle de tracción del carro cortado; se cambia y se prueba en vacío.',
       horaInicio: h(0, 20),
       horaTermino: h(0, 55),
@@ -352,6 +360,26 @@ const NODOS_EJEMPLO: NodoJerarquia[] = [
 ]
 const OPCIONES_EJEMPLO = construirOpcionesEquipo(NODOS_EJEMPLO)
 
+// Repuestos REALES del maestro asociados a la BAADER 142 N2 (sin leer la base).
+const REPUESTOS_EJEMPLO: RepuestoDelCatalogo[] = [
+  { codigoSAP: '3300005482', nombre: 'PRESOSTATO 10773', ubicacion: 'C-11' },
+  { codigoSAP: '3300011612', nombre: 'SOPORTE SECCION 519437', ubicacion: 'C-6' },
+  { codigoSAP: '3300011623', nombre: 'CHAPA DIRECTRIZ 519167', ubicacion: 'C-6' },
+  { codigoSAP: '3300011654', nombre: 'ANILLO 31000251', ubicacion: 'C-7' },
+  { codigoSAP: '3300012355', nombre: 'PERNO 1420301019', ubicacion: 'C-1' },
+  { codigoSAP: '3300012357', nombre: 'PERNO 1420301017', ubicacion: 'C-1' },
+]
+const REPUESTOS_FALSOS: FuenteRepuestos = {
+  porCodigo: async (codigo) => {
+    await new Promise((r) => setTimeout(r, 300))
+    return REPUESTOS_EJEMPLO.find((r) => r.codigoSAP === codigo) ?? null
+  },
+  delEquipo: async (equipoId) => {
+    await new Promise((r) => setTimeout(r, 500))
+    return equipoId.startsWith('e') ? REPUESTOS_EJEMPLO : []
+  },
+}
+
 /** Un borrador que Leandro dejó sin publicar en el turno anterior. */
 function useBorradoresEjemplo(turno: TurnoMantencion): EventoBitacora[] {
   return useMemo(() => {
@@ -408,6 +436,7 @@ export const FUENTE_EJEMPLO: FuenteBitacora = {
   useOpcionesEquipo: () => ({ opciones: OPCIONES_EJEMPLO, cargando: false }),
   usePresencia: usePresenciaEjemplo,
   useBorradoresAnteriores: useBorradoresEjemplo,
+  repuestos: REPUESTOS_FALSOS,
   subirFoto: async (_turnoId, _eventoId, archivo, etiqueta) => {
     const url = await new Promise<string>((resolve, reject) => {
       const lector = new FileReader()

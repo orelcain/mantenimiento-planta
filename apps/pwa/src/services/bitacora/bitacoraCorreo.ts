@@ -4,7 +4,7 @@ import { fuePendiente, minutosParadaDe, ordenarEventos, resumirBitacora } from '
 import { soloListos } from './borradores'
 import { etiquetaTurno, fechaTurnoLarga, formatoMinutos, horarioTurno } from './turnoMantencion'
 import { etiquetaCortaTurno } from './entregaTurno'
-import { encabezadoEvento, etiquetaTipo, horarioEvento, tituloDe } from './presentacionEvento'
+import { encabezadoEvento, etiquetaTipo, horarioEvento, lineaRepuestos, tituloDe } from './presentacionEvento'
 
 // Se reexporta: el PDF y las pruebas lo importan desde aquí.
 export { horarioEvento }
@@ -149,6 +149,9 @@ function htmlEvento(e: EventoBitacora, fuente: (f: FotoEvento) => string, separa
     `<div style="font-size:13px;color:${colorImpacto};padding-top:2px;">${escaparHtml(lineaImpacto(e))}</div>` +
     (lineaTecnicos(e) ? `<div style="font-size:13px;color:${C.sec};">${escaparHtml(lineaTecnicos(e))}</div>` : '') +
     (e.descripcion?.trim() ? `<div style="font-size:14px;color:${C.tinta};padding-top:4px;">${conSaltos(e.descripcion)}</div>` : '') +
+    (lineaRepuestos(e)
+      ? `<div style="font-size:13px;color:${C.tinta};padding-top:4px;">${escaparHtml(lineaRepuestos(e)).replace(/^Repuestos:/, '<span style="font-weight:600;">Repuestos:</span>')}</div>`
+      : '') +
     htmlFotos(e.fotos ?? [], fuente) +
     `</td></tr>`
   )
@@ -275,6 +278,7 @@ export function bitacoraATextoPlano({ turno, eventos: todos, tecnicos, planta, o
       `  ${lineaImpacto(e)}`,
       lineaTecnicos(e) ? `  ${lineaTecnicos(e)}` : '',
       e.descripcion?.trim() ? `  ${e.descripcion.trim().replace(/\r?\n/g, '\n  ')}` : '',
+      lineaRepuestos(e) ? `  ${lineaRepuestos(e)}` : '',
       e.fotos?.length ? `  Fotos: ${e.fotos.length}` : '',
     ]
       .filter(Boolean)

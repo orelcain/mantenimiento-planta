@@ -756,6 +756,7 @@ export function BitacoraTurnoVista({
         opcionesEquipo={opcionesEquipo}
         cargandoEquipos={cargandoEquipos}
         subirFoto={fuente.subirFoto}
+        fuenteRepuestos={fuente.repuestos}
         onGuardar={guardar}
         onBorrar={borrar}
         eventoVivo={editandoEventoId ? (eventos.find((e) => e.id === editandoEventoId) ?? null) : null}
