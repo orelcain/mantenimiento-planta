@@ -1,5 +1,6 @@
-import { Camera, ChevronDown, ChevronUp } from 'lucide-react'
-import { Button, Pill, Tag } from '@/components/piel'
+import type { PointerEvent as ReactPointerEvent } from 'react'
+import { Camera, Menu } from 'lucide-react'
+import { Button, Pill, SwipeRow, Tag, type SwipeAction } from '@/components/piel'
 import { ETIQUETA_FOTO } from '@/config/bitacora'
 import { autorVisible, tecnicosDelEvento, type EventoBitacora, type FotoEvento, type PresenciaBitacora } from '@/services/bitacora/bitacora.types'
 import { NOMBRE_DISPOSITIVO } from '@/services/bitacora/presencia'
@@ -22,6 +23,9 @@ export function EventoBitacoraFila({
   onVerFoto,
   abiertoPor = [],
   onMover,
+  acciones,
+  asa,
+  desplazamiento = null,
 }: {
   evento: EventoBitacora
   onAbrir: () => void
@@ -29,8 +33,18 @@ export function EventoBitacoraFila({
   onVerFoto?: (fotos: FotoEvento[], indice: number) => void
   /** Otros equipos que tienen este evento abierto ahora mismo. */
   abiertoPor?: readonly PresenciaBitacora[]
-  /** Solo en un evento SIN HORA: moverlo un lugar entre los demás (▲ = -1, ▼ = +1). */
+  /** Solo en un evento SIN HORA: moverlo un lugar (teclado en el asa: ↑ = -1, ↓ = +1). */
   onMover?: (direccion: -1 | 1) => void
+  /** Acciones al deslizar a la izquierda (Editar, Pendiente, Borrar). */
+  acciones?: SwipeAction[]
+  /** Solo en un evento SIN HORA: el asa ≡ para arrastrarlo entre los demás. */
+  asa?: {
+    onPointerDown: (e: ReactPointerEvent<HTMLButtonElement>) => void
+    onPointerMove: (e: ReactPointerEvent<HTMLButtonElement>) => void
+    onPointerUp: (e: ReactPointerEvent<HTMLButtonElement>) => void
+  }
+  /** Mientras se arrastra: cuánto se desplazó (px). null = quieto. */
+  desplazamiento?: number | null
 }) {
   const borrador = evento.estado === 'borrador'
   const quienesAbren = abiertoPor.map((p) => `${p.nombre} (${NOMBRE_DISPOSITIVO[p.dispositivo]})`).join(', ')
@@ -45,7 +59,10 @@ export function EventoBitacoraFila({
   const codigo = codigoEquipoDe(evento)
   const repuestos = normalizarRepuestos(evento.repuestos)
 
-  return (
+  const arrastrando = desplazamiento != null
+  const conAsa = !conHora && Boolean(onMover || asa)
+
+  const fila = (
     <div
       role="button"
       tabIndex={0}
@@ -57,9 +74,9 @@ export function EventoBitacoraFila({
         }
       }}
       className={[
-        'relative grid min-h-[44px] cursor-pointer gap-3 px-4 py-3',
-        !conHora && onMover ? 'grid-cols-[3.25rem_minmax(0,1fr)_auto]' : 'grid-cols-[3.25rem_minmax(0,1fr)]',
-        'before:absolute before:left-[5rem] before:right-0 before:top-0 before:h-px before:bg-border before:content-[""] first:before:hidden',
+        // Fondo propio: al deslizar, las acciones quedan DEBAJO de la fila.
+        'relative grid min-h-[44px] cursor-pointer gap-3 bg-card px-4 py-3',
+        conAsa ? 'grid-cols-[3.25rem_minmax(0,1fr)_auto]' : 'grid-cols-[3.25rem_minmax(0,1fr)]',
         'transition-colors duration-150 hover:bg-accent active:bg-accent motion-reduce:transition-none',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary',
       ].join(' ')}
@@ -214,27 +231,49 @@ export function EventoBitacoraFila({
           </span>
         )}
       </div>
-      {!conHora && onMover && (
-        // Mover entre los demás eventos del turno (los con hora quedan por reloj).
-        <div className="flex flex-col self-start" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+      {conAsa && (
+        // Asa para arrastrarlo entre los demás (los con hora quedan por reloj).
+        // Con teclado: flechas arriba y abajo (mockup iOS 27, 17-09).
+        <div className="flex self-center" onClick={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}>
           <button
             type="button"
-            onClick={() => onMover(-1)}
-            aria-label="Mover antes"
-            className="flex size-11 items-center justify-center rounded-full text-primary hover:bg-muted-foreground/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            aria-label="Reordenar: arrastra, o usa las flechas arriba y abajo"
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                e.preventDefault()
+                e.stopPropagation()
+                onMover?.(e.key === 'ArrowUp' ? -1 : 1)
+              } else e.stopPropagation()
+            }}
+            onPointerDown={asa?.onPointerDown}
+            onPointerMove={asa?.onPointerMove}
+            onPointerUp={asa?.onPointerUp}
+            onPointerCancel={asa?.onPointerUp}
+            className={`-mr-2 flex size-11 touch-none items-center justify-center rounded-full text-muted-foreground hover:bg-muted-foreground/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+              arrastrando ? 'cursor-grabbing' : 'cursor-grab'
+            }`}
           >
-            <ChevronUp className="size-5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => onMover(1)}
-            aria-label="Mover después"
-            className="flex size-11 items-center justify-center rounded-full text-primary hover:bg-muted-foreground/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-          >
-            <ChevronDown className="size-5" />
+            <Menu className="size-5" />
           </button>
         </div>
       )}
+    </div>
+  )
+
+  return (
+    <div
+      data-evento-id={evento.id}
+      className={[
+        'relative before:absolute before:left-[5rem] before:right-0 before:top-0 before:z-[1] before:h-px before:bg-border before:content-[""] first:before:hidden',
+        arrastrando ? 'z-20 rounded-[18px] shadow-[0_12px_28px_rgba(0,0,0,0.25)] before:hidden' : '',
+      ].join(' ')}
+      style={arrastrando ? { transform: `translateY(${desplazamiento}px) scale(1.02)` } : undefined}
+    >
+      {/* Siempre el mismo contenedor: cambiarlo al empezar a arrastrar volvía a
+          montar el asa y el dedo perdía el evento. */}
+      <SwipeRow trailing={arrastrando ? [] : (acciones ?? [])} className={arrastrando ? 'rounded-[18px]' : undefined}>
+        {fila}
+      </SwipeRow>
     </div>
   )
 }

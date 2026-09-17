@@ -281,6 +281,13 @@ function useEventosEjemplo(turno: TurnoMantencion) {
     borrar,
     mover: (id: string, posicionMin: number) =>
       setPorTurno((prev) => ({ ...prev, [turno.id]: (prev[turno.id] ?? ejemploDe(turno)).map((e) => (e.id === id ? { ...e, posicionMin } : e)) })),
+    marcarPendiente: (evento: EventoBitacora, pendiente: boolean, quien: string) =>
+      setPorTurno((prev) => ({
+        ...prev,
+        [turno.id]: (prev[turno.id] ?? ejemploDe(turno)).map((e) =>
+          e.id === evento.id ? { ...e, pendiente, ...(pendiente ? { cierre: null } : {}), ...(quien ? { actualizadoPorNombre: quien } : {}) } : e,
+        ),
+      })),
   }
 }
 

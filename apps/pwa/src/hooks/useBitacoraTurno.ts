@@ -15,6 +15,7 @@ import {
   writeBatch,
 } from 'firebase/firestore'
 import { pendientesAnteriores } from '@/services/bitacora/entregaTurno'
+import { VIBRA_ERROR, vibrar } from '@/services/bitacora/vibrar'
 import { borradoresAnteriores } from '@/services/bitacora/borradores'
 import { auth, db } from '@/services/firebase'
 import { useAuthStore } from '@/store'
@@ -262,6 +263,7 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
         // puede llenar la pantalla de avisos iguales.
         if (esBorradorAhora && Date.now() - ultimoAvisoBorrador.current < 30_000) return
         if (esBorradorAhora) ultimoAvisoBorrador.current = Date.now()
+        vibrar(VIBRA_ERROR)
         toast({
           title: 'El evento no se guardó en el servidor',
           description: (e as { code?: string })?.code === 'permission-denied'
@@ -401,7 +403,25 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
     )
   }, [])
 
-  return { eventos, cargando, error, sincronizando, ultimaSync, cambiosPorSubir, novedad, nuevoId, guardar, borrar, mover }
+  /**
+   * Marcar o quitar «Pendiente» desde el deslizamiento de la fila (17-09). Solo
+   * ese campo (y quién lo tocó): reabrir un pendiente cerrado borra su cierre,
+   * como en el editor.
+   */
+  const marcarPendiente = useCallback((evento: EventoBitacora, pendiente: boolean, quien: string) => {
+    const nombre = quien.trim()
+    void updateDoc(doc(db, BITACORA_COLECCION, evento.id), {
+      pendiente,
+      ...(pendiente && evento.cierre ? { cierre: null } : {}),
+      ...(nombre ? { actualizadoPorNombre: nombre } : {}),
+      updatedAt: serverTimestamp(),
+    }).catch(() => {
+      vibrar(VIBRA_ERROR)
+      toast({ title: 'No se pudo cambiar el pendiente', description: 'Vuelve a intentarlo cuando haya señal.', variant: 'destructive' })
+    })
+  }, [])
+
+  return { eventos, cargando, error, sincronizando, ultimaSync, cambiosPorSubir, novedad, nuevoId, guardar, borrar, mover, marcarPendiente }
 }
 
 /**

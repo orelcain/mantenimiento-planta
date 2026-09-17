@@ -46,6 +46,7 @@ import type { OpcionEquipo } from '@/services/bitacora/buscarEquipos'
 import { tecnicoRecordado } from './tecnicoRecordado'
 import { formatoMinutos, horaDe, horaSugeridaParaEvento, minutosEntre } from '@/services/bitacora/turnoMantencion'
 import { etiquetaCodigoEquipo, limpiarTipo, normalizarRepuestos, normalizarTipo, opcionesUbicacion } from '@/services/bitacora/presentacionEvento'
+import { vibrar } from '@/services/bitacora/vibrar'
 import { RepuestosUsados } from './RepuestosUsados'
 import type { FuenteRepuestos } from '@/services/bitacora/repuestosBitacora'
 import { fuenteRepuestosFirestore } from '@/services/bitacora/repuestosFirestore'
@@ -249,7 +250,6 @@ export function EventoBitacoraSheet({
   const [fotos, setFotos] = useState<FotoEvento[]>([])
   const [subidas, setSubidas] = useState<Subida[]>([])
   const [guardando, setGuardando] = useState(false)
-  const [confirmarBorrado, setConfirmarBorrado] = useState(false)
   const [confirmarSinFotos, setConfirmarSinFotos] = useState(false)
   const [error, setError] = useState<string | null>(null)
   /** Fotos subidas en ESTA edición: si se cancela, se borran de Storage. */
@@ -352,7 +352,6 @@ export function EventoBitacoraSheet({
     setFotos(evento?.fotos ?? [])
     setSubidas([])
     setGuardando(false)
-    setConfirmarBorrado(false)
     setConfirmarSinFotos(false)
     setError(null)
     subidasNuevas.current = []
@@ -865,6 +864,7 @@ export function EventoBitacoraSheet({
     const crear = !existeEnServidor.current || (creadoAqui.current && !vistoVivo.current)
     try {
       await onGuardar(eventoId, armarDatos('listo', crear), crear)
+      vibrar()
       recordarEquipo(equipo)
       if (tipo === 'otro') recordar(CLAVE_TIPOS, limpiarTipo(tipoOtro), 8)
       // Lo que seguía subiendo ya no entra en este evento (se borra al terminar).
@@ -892,10 +892,8 @@ export function EventoBitacoraSheet({
       cancelar()
       return
     }
-    if (!confirmarBorrado) {
-      setConfirmarBorrado(true)
-      return
-    }
+    // Sin «toca de nuevo para confirmar»: la bitácora ofrece «Deshacer»
+    // durante unos segundos (mockup iOS 27, 17-09).
     setGuardando(true)
     try {
       subidasNuevas.current.forEach((p) => void borrarFotoOEncolar(p))
@@ -903,7 +901,6 @@ export function EventoBitacoraSheet({
       sesion.current++
       // Con las fotos que tenga AHORA (pudo agregarlas otro equipo).
       await onBorrar({ ...actual, fotos: [...new Map([...(actual.fotos ?? []), ...fotos].map((f) => [f.path, f])).values()] })
-      toast({ title: modoBorrador ? 'Borrador descartado' : 'Evento borrado' })
       onClose()
     } catch {
       setError('No se pudo borrar. Solo quien lo creó o un supervisor puede borrarlo.')
@@ -1393,11 +1390,7 @@ export function EventoBitacoraSheet({
         {(!esNuevo || existeEnServidor.current) && puedeEliminar && (
           <Button variant="destructive" onClick={borrar} disabled={guardando} className="self-start">
             <Trash2 />{' '}
-            {confirmarBorrado
-              ? 'Toca de nuevo para confirmar'
-              : modoBorrador
-                ? 'Descartar borrador'
-                : 'Borrar evento'}
+            {modoBorrador ? 'Descartar borrador' : 'Borrar evento'}
           </Button>
         )}
       </div>
