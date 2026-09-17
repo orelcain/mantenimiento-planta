@@ -220,6 +220,8 @@ export function EventoBitacoraSheet({
   const eventoId = evento?.id ?? idNuevo
 
   const [quien, setQuien] = useState('')
+  /** Al editar, «quién edita» va plegado en una línea; «Cambiar» muestra los chips (17-09). */
+  const [cambiarQuien, setCambiarQuien] = useState(false)
   /** Quién lo registró, editable en un evento ya publicado (se eligió mal o lo cargó otro). */
   const [registrador, setRegistrador] = useState('')
   const [participantes, setParticipantes] = useState<string[]>([])
@@ -326,6 +328,7 @@ export function EventoBitacoraSheet({
     const lista = tecnicosRef.current.todos
     const quienInicial = autorFijo ?? (lista.length === 0 || lista.includes(recordado) ? recordado : '')
     setQuien(quienInicial)
+    setCambiarQuien(false)
     setRegistrador(evento?.registradoPor ?? '')
     setParticipantes(evento?.participantes ?? [])
     // «Resolver pendiente»: el equipo, su vínculo y el tipo vienen del pendiente original.
@@ -1058,13 +1061,28 @@ export function EventoBitacoraSheet({
         )}
         {tecnicos.todos.length > 0 && !autorFijo && (
           <div>
-            <SelectorTecnico
-              etiqueta={esNuevo ? 'Quién registra' : modoBorrador ? 'Quién continúa' : 'Quién edita'}
-              deTurno={tecnicos.deTurno}
-              todos={tecnicos.todos}
-              valor={quien}
-              onChange={setQuien}
-            />
+            {/* Al editar, el nombre recordado casi nunca cambia: una línea en vez
+                de tres chips. Al crear, elegir quién registra es lo primero. */}
+            {!esNuevo && quien && tecnicos.todos.includes(quien) && !cambiarQuien ? (
+              <p className="flex min-h-[44px] flex-wrap items-center gap-x-1 text-footnote text-muted-foreground">
+                {modoBorrador ? 'Continúas como' : 'Editas como'} <span className="font-semibold text-foreground">{quien}</span> ·
+                <button
+                  type="button"
+                  className="min-h-[44px] font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  onClick={() => setCambiarQuien(true)}
+                >
+                  Cambiar
+                </button>
+              </p>
+            ) : (
+              <SelectorTecnico
+                etiqueta={esNuevo ? 'Quién registra' : modoBorrador ? 'Quién continúa' : 'Quién edita'}
+                deTurno={tecnicos.deTurno}
+                todos={tecnicos.todos}
+                valor={quien}
+                onChange={setQuien}
+              />
+            )}
             {!esNuevo && !autorEditable && evento && (
               <p className="mt-1.5 text-footnote text-muted-foreground">Lo empezó: {autorVisible(evento)}</p>
             )}

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
-import { Check, KeyRound, Loader2, Printer, Smartphone } from 'lucide-react'
+import { ChevronDown, Check, KeyRound, Loader2, Printer, Smartphone } from 'lucide-react'
 import { Button, ListCell, ListGroup, Pill, Sheet } from '@/components/piel'
 import { useToast } from '@/hooks/useToast'
 import { copiarTexto } from '@/lib/clipboard'
@@ -36,6 +36,8 @@ export function AccesoQrSheet({ open, onClose, plantId, plantaNombre, tecnicos, 
   const { toast } = useToast()
   const [ocupado, setOcupado] = useState<string | null>(null)
   const [confirmar, setConfirmar] = useState<Confirmacion | null>(null)
+  /** Técnico con PIN cuyas acciones (reiniciar / quitar) están desplegadas. */
+  const [desplegado, setDesplegado] = useState<string | null>(null)
   const [pinNuevo, setPinNuevo] = useState<{ nombre: string; pin: string; quitados: number } | null>(null)
   const qrRef = useRef<HTMLDivElement>(null)
   const avisoPinRef = useRef<HTMLDivElement>(null)
@@ -96,7 +98,6 @@ export function AccesoQrSheet({ open, onClose, plantId, plantaNombre, tecnicos, 
     return (
       <Button
         variant={pidiendo ? 'destructive' : variante}
-        size="sm"
         className="shrink-0"
         disabled={Boolean(ocupado)}
         onClick={() => (pidiendo ? accion() : setConfirmar(c))}
@@ -170,37 +171,38 @@ export function AccesoQrSheet({ open, onClose, plantId, plantaNombre, tecnicos, 
                     ? `Sirve para teléfonos nuevos hasta el ${fechaCorta(estado?.venceEnMs ?? 0)}. «Renovar» mantiene el mismo QR.`
                     : 'Ya no deja entrar teléfonos nuevos; los que entraron siguen dentro. «Renovar» lo reactiva sin reimprimirlo.'}
                 </p>
-                <div className="flex flex-wrap gap-2">
-                  <Button variant="tinted" size="sm" onClick={imprimir}>
+                {/* Cuatro acciones en dos filas parejas (17-09): sueltas se
+                    repartían 2 + 1 + 1. «Generar otro» va plain: invalida el QR impreso. */}
+                <div className="grid w-full grid-cols-2 gap-2">
+                  <Button variant="tinted" onClick={imprimir}>
                     <Printer /> Imprimir
                   </Button>
-                  <Button variant="tinted" size="sm" disabled={Boolean(ocupado)} onClick={() => void ejecutar('renovar', () => api.renovar(plantId))}>
+                  <Button variant="tinted" disabled={Boolean(ocupado)} onClick={() => void ejecutar('renovar', () => api.renovar(plantId))}>
                     {ocupado === 'renovar' ? <Loader2 className="animate-spin" /> : null} Renovar 30 días
                   </Button>
                   <Button
-                    variant="plain"
-                    size="sm"
+                    variant="tinted"
                     onClick={() =>
                       void copiarTexto(url).then(() => toast({ title: 'Enlace copiado', description: 'Sirve igual que el QR: compártelo solo con Mantención.', variant: 'success' }))
                     }
                   >
                     Copiar enlace
                   </Button>
+                  {botonConfirmable(
+                    { tipo: 'generar' },
+                    'generar',
+                    'Generar otro QR',
+                    'Confirmar: el QR actual deja de servir',
+                    () => void ejecutar('generar', () => api.generar(plantId)),
+                  )}
                 </div>
               </div>
             </div>
           )}
-          {url &&
-            botonConfirmable(
-              { tipo: 'generar' },
-              'generar',
-              'Generar otro QR',
-              'Confirmar: el QR actual deja de servir',
-              () => void ejecutar('generar', () => api.generar(plantId)),
-            )}
         </section>
 
-        {/* Técnicos: el estado y las acciones en dos líneas, para que a 375 px no se corte el estado. */}
+        {/* Técnicos: una fila por técnico con la acción a la derecha (17-09); con
+            PIN, «PIN» despliega reiniciar / quitar debajo. */}
         <ListGroup
           title={`Técnicos habilitados · ${filas.filter((n) => conPin.has(normalizar(n))).length} de ${filas.length}`}
           footer="El PIN se muestra una sola vez: la app guarda solo su huella. Quitarle o reiniciar el PIN a un técnico saca también a sus teléfonos."
@@ -210,18 +212,19 @@ export function AccesoQrSheet({ open, onClose, plantId, plantaNombre, tecnicos, 
             const bloqueo = bloqueoDe(nombre)
             const minutos = bloqueo?.hastaMs ? Math.max(1, Math.ceil((bloqueo.hastaMs - ahora) / 60000)) : 0
             const subtitulo = !tiene
-              ? 'Sin PIN: no puede entrar con el QR'
+              ? 'Sin PIN'
               : bloqueo?.total
                 ? 'Bloqueado por intentos: reinicia su PIN'
                 : bloqueo && minutos > 0 && (bloqueo.hastaMs ?? 0) > ahora
                   ? `Bloqueado ${minutos} min por intentos fallidos`
                   : `PIN asignado${telefonosDe(nombre) ? ` · ${telefonosDe(nombre)} ${telefonosDe(nombre) === 1 ? 'teléfono' : 'teléfonos'}` : ''}`
+            const abierto = desplegado === nombre
             return (
               <div
                 key={nombre}
-                className='relative flex flex-col gap-1 px-4 py-2.5 before:absolute before:left-[58px] before:right-0 before:top-0 before:h-px before:bg-border before:content-[""] first:before:hidden'
+                className='relative flex flex-col px-4 py-1 before:absolute before:left-[58px] before:right-0 before:top-0 before:h-px before:bg-border before:content-[""] first:before:hidden'
               >
-                <div className="flex items-center gap-3">
+                <div className="flex min-h-[52px] items-center gap-3">
                   <span className="flex size-[30px] shrink-0 items-center justify-center rounded-ctl bg-muted-foreground/10 text-muted-foreground">
                     <KeyRound className="size-4" aria-hidden />
                   </span>
@@ -229,25 +232,36 @@ export function AccesoQrSheet({ open, onClose, plantId, plantaNombre, tecnicos, 
                     <p className="text-body leading-tight">{nombre}</p>
                     <p className={`text-footnote ${bloqueo ? 'font-semibold text-ink-warn' : 'text-muted-foreground'}`}>{subtitulo}</p>
                   </div>
-                </div>
-                <div className="flex flex-wrap justify-end gap-1 pl-[42px]">
                   {!tiene ? (
-                    <Button variant="tinted" size="sm" disabled={Boolean(ocupado)} onClick={() => void asignar(nombre)}>
+                    <Button variant="plain" className="-mr-3 shrink-0" disabled={Boolean(ocupado)} onClick={() => void asignar(nombre)}>
                       {ocupado === `pin:${nombre}` ? <Loader2 className="animate-spin" /> : null} Asignar PIN
                     </Button>
                   ) : (
-                    <>
-                      {botonConfirmable({ tipo: 'reiniciar', nombre }, `pin:${nombre}`, 'Reiniciar PIN', 'Confirmar: el PIN actual deja de servir', () => void asignar(nombre))}
-                      {botonConfirmable(
-                        { tipo: 'quitar-pin', nombre },
-                        `quitar:${nombre}`,
-                        'Quitar PIN',
-                        'Confirmar: sin PIN no entra',
-                        () => void ejecutar(`quitar:${nombre}`, async () => void (await api.quitarPin(plantId, nombre))),
-                      )}
-                    </>
+                    <Button
+                      variant="plain"
+                      className="-mr-3 shrink-0"
+                      aria-expanded={abierto}
+                      onClick={() => {
+                        setConfirmar(null)
+                        setDesplegado(abierto ? null : nombre)
+                      }}
+                    >
+                      PIN <ChevronDown className={`transition-transform duration-150 motion-reduce:transition-none ${abierto ? 'rotate-180' : ''}`} />
+                    </Button>
                   )}
                 </div>
+                {tiene && abierto && (
+                  <div className="flex flex-wrap justify-end gap-1 pb-2 pl-[42px]">
+                    {botonConfirmable({ tipo: 'reiniciar', nombre }, `pin:${nombre}`, 'Reiniciar PIN', 'Confirmar: el PIN actual deja de servir', () => void asignar(nombre))}
+                    {botonConfirmable(
+                      { tipo: 'quitar-pin', nombre },
+                      `quitar:${nombre}`,
+                      'Quitar PIN',
+                      'Confirmar: sin PIN no entra',
+                      () => void ejecutar(`quitar:${nombre}`, async () => void (await api.quitarPin(plantId, nombre))),
+                    )}
+                  </div>
+                )}
               </div>
             )
           })}

@@ -232,15 +232,17 @@ export function RepuestosUsados({
                   <p className="text-footnote leading-tight text-muted-foreground">
                     <span className="tabular-nums text-foreground">{r.codigoSAP}</span>
                     {textoBodega(bodega.get(r.codigoSAP)) ? ` · ${textoBodega(bodega.get(r.codigoSAP))}` : ''}
-                    {puedeEditarMaestro && sap && !editando && (
-                      <>
-                        {' · '}
-                        <button type="button" className="font-semibold text-primary underline-offset-2 hover:underline" onClick={() => abrirEdicionComun(r)}>
-                          {comun ? 'Editar nombre común' : '＋ nombre común'}
-                        </button>
-                      </>
-                    )}
                   </p>
+                  {/* En su propia línea de 44 px: como enlace en línea medía 16 px (17-09). */}
+                  {puedeEditarMaestro && sap && !editando && (
+                    <button
+                      type="button"
+                      className="-mb-2 flex min-h-[44px] items-center text-footnote font-semibold text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      onClick={() => abrirEdicionComun(r)}
+                    >
+                      {comun ? 'Editar nombre común' : '＋ nombre común'}
+                    </button>
+                  )}
                   {editando && (
                     <div className="mt-2 flex flex-col gap-2">
                       <label htmlFor={`${id}-comun`} className="sr-only">
@@ -309,7 +311,7 @@ export function RepuestosUsados({
             autoComplete="off"
             className={`${CAMPO} pl-9`}
             value={consulta}
-            placeholder={alcance === 'equipo' ? 'Código, nombre o nombre común (en este equipo)' : 'Código, nombre o nombre común (todos)'}
+            placeholder="Buscar por código o nombre"
             onFocus={() => cargar(alcance)}
             onChange={(e) => {
               setConsulta(e.target.value)

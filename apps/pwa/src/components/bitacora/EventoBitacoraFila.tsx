@@ -120,17 +120,22 @@ export function EventoBitacoraFila({
           <p className="text-body text-muted-foreground">Sin descripción todavía</p>
         ) : null}
 
+        {/* Como en WhatsApp, correo e Historial: nombre común primero (o el del
+            maestro), código después, cantidad siempre (17-09). */}
         {repuestos.length > 0 && (
           <p className="text-footnote text-muted-foreground">
             Repuestos:{' '}
-            {repuestos.map((r, i) => (
-              <span key={r.codigoSAP}>
-                {i > 0 ? ' · ' : ''}
-                <span className="font-semibold tabular-nums text-foreground">{r.codigoSAP}</span>
-                {nombreRepuesto(r) ? ` ${nombreRepuesto(r)}` : ''}
-                {r.cantidad > 1 ? ` ×${r.cantidad}` : ''}
-              </span>
-            ))}
+            {repuestos.map((r, i) => {
+              const nombre = (r.nombreComun ?? '').trim() || nombreRepuesto(r)
+              return (
+                <span key={r.codigoSAP}>
+                  {i > 0 ? ' · ' : ''}
+                  {nombre ? <span className="font-semibold text-foreground">{nombre} </span> : ''}
+                  <span className={`tabular-nums ${nombre ? '' : 'font-semibold text-foreground'}`}>{r.codigoSAP}</span>
+                  {` ×${r.cantidad}`}
+                </span>
+              )
+            })}
           </p>
         )}
 
