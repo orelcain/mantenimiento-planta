@@ -54,11 +54,16 @@ describe('planilla «Recoleccion MTTR» llenada desde la bitácora', () => {
     expect(conTitulo).toMatchObject({ maquina: 'DESPLAZADOR AUTOMATICO 1', falla: 'Cable de parada de emergencia', duracion: '35min', minutos: 35 })
     expect(conTitulo!.observaciones).toContain('Repuestos: 3300011612 Soporte sección 519437 ×1.')
     expect(sinTitulo!.falla).toBe('Se encontró cable de señal que va a parada de emergencia en mal estado')
+    // Sin título, «Falla» ya lleva la primera frase: Observaciones sigue con el resto.
+    expect(sinTitulo!.observaciones).toBe('Se realiza reconexión de equipo.')
     expect(sinTitulo!.duracion).toBe('20min')
-    expect(sinParada).toMatchObject({ duracion: '0', minutos: 0 })
-    expect(sinParada!.observaciones).toBe('Se recalibra la celda. Sin detener: Colación HG.')
+    expect(sinParada).toMatchObject({ duracion: '0', minutos: 0, falla: 'Se recalibra la celda' })
+    expect(sinParada!.observaciones).toBe('Sin detener: Colación HG.')
     // El pendiente va al final, como en el correo, y lo dice.
-    expect(pendiente!.observaciones).toBe('Motor con ruido. Queda pendiente para el turno siguiente.')
+    expect(pendiente).toMatchObject({ falla: 'Motor con ruido', observaciones: 'Queda pendiente para el turno siguiente.' })
+    // Si la descripción repite el título, Observaciones no la repite (celular apretado).
+    const [igual] = filasRecoleccion(turno, [ev({ titulo: 'Desmonte y montaje cintas filete', descripcion: 'Desmonte y montaje cintas filete.', impacto: 'no-aplica', minutosParada: null })])
+    expect(igual).toMatchObject({ falla: 'Desmonte y montaje cintas filete', observaciones: '' })
   })
 
   it('el HTML tiene el aspecto de la planilla: banda azul, encabezados azules, bandas blanco y celeste', () => {

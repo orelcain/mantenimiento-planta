@@ -21,6 +21,17 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-17 · Bitacora ronda 31 · La planilla MTTR en el correo visto desde el celular
+- Problema (foto de Orel, iOS Mail): la tabla se adaptaba al ancho del teléfono y quedaba apretada: Observaciones con ~150 px, filas altísimas, «EMPACADORA» montada sobre la columna vecina, y la descripción repetida en Falla y Observaciones.
+- Límite: no hay forma fiable de mandar reglas «solo celular» desde un correo pegado en Outlook (Word pisa los `<style>` y las media queries). Lo que sí se controla es cómo se reparte el poco ancho.
+- Hecho en `recoleccionMttr.ts`:
+  - Columnas en PROPORCIÓN (`table-layout:fixed`, 14/16/21/9/40 %) en vez de píxeles; en PC (~960 px) quedan cerca de la planilla.
+  - La banda azul con el logo va en su propia tabla: con `table-layout:fixed` la primera fila manda los anchos y la celda del logo (146 px) pisaba a la columna Fecha.
+  - `overflow-wrap:anywhere` en las celdas: las palabras largas se partan en vez de montarse.
+  - Sin repetir texto: sin título, «Falla» lleva la primera frase y Observaciones el resto (`primeraFrase`); con título igual a la descripción, Observaciones no la repite. La fecha ya no es `nowrap` (en el celular se parte en 2 líneas).
+- Verificación: muestra del correo a 390 px (Observaciones 114 px, sin montajes) y a 1000 px; tsc 0; vitest OK; build y auditorías OK.
+- Estado: HECHO. En el teléfono seguirá siendo una tabla de 5 columnas apretada: para leer en el celular está el mensaje de WhatsApp.
+
 ## 2026-09-17 · Bitacora ronda 30 · Vista PC: más ancho para el correo, eventos compactos
 - Pedido de Orel: en PC la planilla MTTR se veía apretada en la vista previa del correo; dar más espacio a esa columna y achicar letra y espacio de los eventos de la izquierda.
 - Hecho: la grilla pasa de 1fr/1,05fr a 2fr/3fr; la fila del evento en `md:` usa `text-subhead` (título, equipo y descripción), `text-footnote` en los repuestos y `py-2.5`; la vitrina de desarrollo sube a `max-w-7xl`.
