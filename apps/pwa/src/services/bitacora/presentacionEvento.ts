@@ -181,6 +181,31 @@ export function posicionAlMover(
 }
 
 /**
+ * Dónde queda un evento SIN HORA al soltarlo arrastrado (17-09-2026). `destino`
+ * es la posición en la lista SIN el evento arrastrado (0 = antes del primero).
+ * Devuelve la nueva `posicionMin`, o null si no cambia de lugar.
+ */
+export function posicionEnIndice(
+  turno: Pick<TurnoMantencion, 'banda'> & { inicio?: Date },
+  ordenados: readonly (Pick<EventoBitacora, 'id' | 'horaInicio' | 'posicionMin'> & { createdAt?: unknown })[],
+  id: string,
+  destino: number,
+): number | null {
+  const i = ordenados.findIndex((e) => e.id === id)
+  if (i < 0) return null
+  const resto = ordenados.filter((e) => e.id !== id)
+  const k = Math.max(0, Math.min(resto.length, Math.round(destino)))
+  if (k === i) return null
+  const claves = resto.map((e) => minutosEnTurno(turno, e))
+  const antes = k > 0 ? claves[k - 1] : undefined
+  const despues = k < claves.length ? claves[k] : undefined
+  if (antes == null && despues == null) return null
+  if (antes == null) return (despues as number) - 1
+  if (despues == null) return antes + 1
+  return antes === despues ? antes : (antes + despues) / 2
+}
+
+/**
  * Las opciones de «Ubicación en el turno» del editor de un evento sin hora: al
  * inicio, después de cada evento con hora, al final. `posicion` es lo que se guarda.
  */

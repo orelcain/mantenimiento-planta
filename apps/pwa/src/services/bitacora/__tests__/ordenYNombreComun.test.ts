@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { EventoBitacora } from '../bitacora.types'
 import { turnoDesdeId } from '../turnoMantencion'
 import { ordenarEventos } from '../resumenBitacora'
-import { lineaRepuestos, minutosEnTurno, nombreConComun, normalizarRepuestos, opcionesUbicacion, posicionAlMover, textoRepuesto } from '../presentacionEvento'
+import { lineaRepuestos, minutosEnTurno, nombreConComun, normalizarRepuestos, opcionesUbicacion, posicionAlMover, posicionEnIndice, textoRepuesto } from '../presentacionEvento'
 import { buscarRepuestos, conNombreComunAlFrente, desdeIndice } from '../repuestosBitacora'
 import { aFormulario, camposACambiar } from '../borradores'
 
@@ -53,6 +53,18 @@ describe('eventos sin hora: ubicación a mano', () => {
     expect(posicionAlMover(turno, ordenarEventos(turno, [casino, epack, { ...cintas, posicionMin: arriba2 }]), 'cintas', -1)).toBeNull()
     expect(posicionAlMover(turno, orden, 'cintas', 1)).toBeNull()
     expect(posicionAlMover(turno, orden, 'nadie', 1)).toBeNull()
+  })
+
+  it('arrastrado: queda entre los vecinos del lugar donde se suelta; en su lugar, no cambia', () => {
+    const orden = ordenarEventos(turno, [casino, epack, cintas]) // casino 127, epack 240, cintas 300
+    expect(posicionEnIndice(turno, orden, 'cintas', 0)).toBe(126)
+    expect(posicionEnIndice(turno, orden, 'cintas', 1)).toBe((127 + 240) / 2)
+    expect(posicionEnIndice(turno, orden, 'cintas', 2)).toBeNull()
+    expect(posicionEnIndice(turno, orden, 'cintas', 99)).toBeNull()
+    const arriba = ordenarEventos(turno, [casino, epack, { ...cintas, posicionMin: 126 }])
+    expect(posicionEnIndice(turno, arriba, 'cintas', 2)).toBe(241)
+    expect(posicionEnIndice(turno, [cintas], 'cintas', 0)).toBeNull()
+    expect(posicionEnIndice(turno, orden, 'nadie', 0)).toBeNull()
   })
 
   it('el editor ofrece inicio, después de cada evento con hora y final; sin eventos con hora, nada', () => {

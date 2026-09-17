@@ -5306,6 +5306,30 @@ Orel intento anotar el FRL de la E-PACK y la bitacora dijo «no tiene repuestos 
 - Codigo: la lista de repuestos por equipo de la bitacora vence a los 5 min (antes vivia toda la
   sesion y un vinculo nuevo desde el CTD no aparecia).
 
+## 2026-09-17 · Bitacora ronda 23 · iOS 27 (2/2): deslizar, Deshacer, arrastrar, visor con gestos y vibracion
+
+Segunda mitad del mockup https://claude.ai/artifact/8b4xbwjvMUzUeJJgkAJn27 (C, H, D, G, I). La 1/2 es #1072.
+- C: la fila del evento va dentro de `SwipeRow`: Editar · Pendiente/Quitar pendiente · Borrar
+  (Descartar en borradores; Borrar solo autor o supervisor). `marcarPendiente` en el hook escribe solo
+  `pendiente` (+ `cierre: null` al reabrir, + `actualizadoPorNombre`). La fila lleva `bg-card` (las
+  acciones quedan debajo) y el separador pasa al contenedor exterior (`first:` dejaba de servir).
+- H: borrar ya no pide «toca de nuevo»: el evento se esconde (`ocultos`, tampoco cuenta en los numeros),
+  toast «Evento borrado · Deshacer» (5 s) y el borrado real (fotos incluidas) corre al vencer el plazo,
+  al salir de la pantalla o en `pagehide`. El editor usa el mismo camino.
+- D: el evento sin hora lleva un asa ≡ (pointer events + `setPointerCapture`, `touch-none`); linea
+  azul donde queda; `posicionEnIndice` (nuevo, con test) da la `posicionMin` entre los vecinos. Teclado:
+  flechas en el asa (reusa `posicionAlMover`).
+  ⚠ El destino se calcula con la Y del `pointerup` y la ref se adelanta al render: con eventos
+  seguidos, el estado aun no tenia el destino al soltar. ⚠ Cambiar el contenedor al empezar a
+  arrastrar remontaba el asa y se perdia la captura: `SwipeRow` siempre, con `trailing=[]`.
+- G: visor: deslizar cambia de foto (60 px), bajar cierra (110 px, el fondo se aclara), doble toque
+  ×2, pellizco hasta ×4, arrastrar con zoom; puntos abajo; flechas solo con `hover:hover`.
+- I: `services/bitacora/vibrar.ts` (15 ms; error = 20·80·20) al publicar, cerrar pendiente, marcar
+  pendiente, soltar, mover y borrar; en errores de escritura del hook.
+- ⚠ Para probar gestos por script: esperar ~40 ms entre `touchmove` (SwipeRow lee `dx` del render).
+- Verificado en la vitrina a 375 px (claro/oscuro) y PC con mouse real; vitest 2790, eslint 30/30,
+  audits ok, build ok.
+
 ## 2026-09-17 · Bitacora ronda 22 · iOS 27 (1/2): resumen sin color, una capa abajo, Compartir y barra compacta
 
 Mockup aprobado (8 cambios, todos): https://claude.ai/artifact/8b4xbwjvMUzUeJJgkAJn27. Este PR lleva A, B, E, F.

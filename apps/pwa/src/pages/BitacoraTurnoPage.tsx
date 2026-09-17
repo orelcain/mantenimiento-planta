@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { BarChart3, Check, ChevronLeft, ChevronRight, ClipboardCopy, FileDown, Loader2, MessageCircle, MessageSquareText, NotebookPen, Plus, QrCode, Share } from 'lucide-react'
-import { Button, Pill, SegmentedControl, Sheet, Tag } from '@/components/piel'
+import { BarChart3, Check, ChevronLeft, ChevronRight, Clock, ClipboardCopy, FileDown, Loader2, MessageCircle, MessageSquareText, NotebookPen, Pencil, Plus, QrCode, Share, Trash2 } from 'lucide-react'
+import { Button, Pill, SegmentedControl, Sheet, Tag, type SwipeAction } from '@/components/piel'
+import { ToastAction } from '@/components/ui/toast'
+import { vibrar } from '@/services/bitacora/vibrar'
 import { PASO_MENSAJE, PasosWhatsapp, VistaPreviaWhatsapp } from '@/components/bitacora/PanelWhatsapp'
 import { compartirEnWhatsapp, puedeCompartirArchivos } from '@/services/bitacora/compartirWhatsapp'
 import { useLaminasWhatsapp } from '@/hooks/useLaminasWhatsapp'
@@ -23,7 +25,7 @@ import { tecnicoRecordado } from '@/components/bitacora/tecnicoRecordado'
 import { useToast } from '@/hooks/useToast'
 import { FUENTE_FIRESTORE, useTurnoMantencionActual, type FuenteBitacora } from '@/hooks/useBitacoraTurno'
 import { BITACORA_PLANTA } from '@/config/bitacora'
-import { encabezadoEvento, etiquetaTipo, posicionAlMover, tieneHora, tiposPropiosUsados, tituloDe } from '@/services/bitacora/presentacionEvento'
+import { encabezadoEvento, etiquetaTipo, posicionAlMover, posicionEnIndice, tieneHora, tiposPropiosUsados, tituloDe } from '@/services/bitacora/presentacionEvento'
 import { copiarHtml, copiarTexto } from '@/lib/clipboard'
 import type { EventoBitacora, FotoEvento, TurnoMantencion } from '@/services/bitacora/bitacora.types'
 import type { User } from '@/types'
@@ -85,7 +87,25 @@ export function BitacoraTurnoVista({
   const turno = editor?.turno ?? turnoNavegado
   const esActual = turno.id === turnoActual.id
 
-  const { eventos, cargando, error, ultimaSync, cambiosPorSubir, novedad, nuevoId, guardar, borrar, mover } = fuente.useEventos(turno)
+  // Eventos borrados que esperan el plazo de «Deshacer»: no se ven ni cuentan.
+  const [ocultos, setOcultos] = useState<ReadonlySet<string>>(() => new Set())
+  const {
+    eventos: eventosServidor,
+    cargando,
+    error,
+    ultimaSync,
+    cambiosPorSubir,
+    novedad,
+    nuevoId,
+    guardar,
+    borrar,
+    mover,
+    marcarPendiente,
+  } = fuente.useEventos(turno)
+  const eventos = useMemo(
+    () => (ocultos.size ? eventosServidor.filter((e) => !ocultos.has(e.id)) : eventosServidor),
+    [eventosServidor, ocultos],
+  )
   const calendario = fuente.useTecnicos(turno)
   const { observacion, guardarObservacion, guardarPresentes } = fuente.useObservacion(turno)
   const { ajustes, guardarAjustes } = fuente.useAjustes()
@@ -114,7 +134,23 @@ export function BitacoraTurnoVista({
   // Publicados primero (en orden del turno) y los borradores al final: se ven,
   // pero todavía no son un hecho del turno.
   const borradores = useMemo(() => eventos.filter(esBorrador), [eventos])
-  const enLista = useMemo(() => [...soloListos(eventos), ...borradores], [eventos, borradores])
+  const listos = useMemo(() => soloListos(eventos), [eventos])
+  const enLista = useMemo(() => [...listos, ...borradores], [listos, borradores])
+
+  // ── Arrastrar un evento sin hora entre los demás (mockup iOS 27, 17-09) ──
+  const listaRef = useRef<HTMLDivElement>(null)
+  const [arrastre, setArrastre] = useState<{
+    id: string
+    y0: number
+    dy: number
+    /** Centro de la fila al empezar, relativo a la lista. */
+    centro: number
+    origen: number
+    otros: { top: number; bottom: number }[]
+    destino: number
+  } | null>(null)
+  const arrastreRef = useRef(arrastre)
+  arrastreRef.current = arrastre
 
   // Presencia: quién tiene esta bitácora abierta y qué evento está escribiendo.
   const usuarioSesion = useAuthStore((s) => s.user)
@@ -177,6 +213,73 @@ export function BitacoraTurnoVista({
   const [quienNoAplica, setQuienNoAplica] = useState('')
 
   const abrirNuevo = useCallback(() => setEditor({ evento: null, idNuevo: nuevoId(), turno }), [nuevoId, turno])
+
+  // ── Borrar con «Deshacer» (mockup iOS 27, 17-09) ──
+  // El evento se esconde y el borrado de verdad (fotos incluidas) ocurre al
+  // terminar el plazo, o antes si se sale de la pantalla.
+  const porBorrar = useRef(new Map<string, { evento: EventoBitacora; timer: ReturnType<typeof setTimeout> }>())
+  const borrarRef = useRef(borrar)
+  borrarRef.current = borrar
+  const quitarOculto = useCallback(
+    (id: string) =>
+      setOcultos((s) => {
+        if (!s.has(id)) return s
+        const n = new Set(s)
+        n.delete(id)
+        return n
+      }),
+    [],
+  )
+  const ejecutarBorrado = useCallback(
+    (id: string) => {
+      const p = porBorrar.current.get(id)
+      if (!p) return
+      clearTimeout(p.timer)
+      porBorrar.current.delete(id)
+      void borrarRef.current(p.evento)
+      quitarOculto(id)
+    },
+    [quitarOculto],
+  )
+  const deshacerBorrado = useCallback(
+    (id: string) => {
+      const p = porBorrar.current.get(id)
+      if (!p) return
+      clearTimeout(p.timer)
+      porBorrar.current.delete(id)
+      quitarOculto(id)
+    },
+    [quitarOculto],
+  )
+  const borrarConDeshacer = useCallback(
+    async (evento: EventoBitacora) => {
+      vibrar()
+      setEditor(null)
+      setOcultos((s) => new Set(s).add(evento.id))
+      const timer = setTimeout(() => ejecutarBorrado(evento.id), PLAZO_DESHACER_MS)
+      porBorrar.current.set(evento.id, { evento, timer })
+      toast({
+        title: esBorrador(evento) ? 'Borrador descartado' : 'Evento borrado',
+        description: tituloDe(evento) || evento.equipo?.trim() || undefined,
+        duration: PLAZO_DESHACER_MS,
+        action: (
+          <ToastAction altText="Deshacer el borrado" onClick={() => deshacerBorrado(evento.id)}>
+            Deshacer
+          </ToastAction>
+        ),
+      })
+    },
+    [ejecutarBorrado, deshacerBorrado, toast],
+  )
+  useEffect(() => {
+    const pendientes = porBorrar.current
+    const vaciar = () => [...pendientes.keys()].forEach(ejecutarBorrado)
+    window.addEventListener('pagehide', vaciar)
+    return () => {
+      window.removeEventListener('pagehide', vaciar)
+      vaciar()
+    }
+  }, [ejecutarBorrado])
 
   // Fotos que quedaron sin dueño y no se pudieron borrar (la señal de planta se
   // cae a cada rato): se reintenta al abrir la bitácora y cuando vuelve la red.
@@ -375,6 +478,81 @@ export function BitacoraTurnoVista({
       setTrabajando(null)
     }
   }
+
+  const puedeBorrarEvento = (e: EventoBitacora) => e.creadoPor === auth.currentUser?.uid || esSupervisor
+
+  /** Deslizar a la izquierda sobre un evento: Editar, Pendiente, Borrar. */
+  const accionesDe = (e: EventoBitacora): SwipeAction[] => {
+    const editar: SwipeAction = { label: 'Editar', icon: <Pencil />, tone: 'brand', onClick: () => setEditor({ evento: e, idNuevo: e.id, turno }) }
+    const quitar: SwipeAction[] = puedeBorrarEvento(e)
+      ? [{ label: esBorrador(e) ? 'Descartar' : 'Borrar', icon: <Trash2 />, tone: 'destructive', onClick: () => void borrarConDeshacer(e) }]
+      : []
+    if (esBorrador(e)) return [editar, ...quitar]
+    const pendiente: SwipeAction = {
+      label: e.pendiente ? 'Quitar pendiente' : 'Pendiente',
+      icon: <Clock />,
+      tone: 'neutral',
+      onClick: () => {
+        marcarPendiente(e, !e.pendiente, autorFijo ?? nombreRecordadoValido())
+        vibrar()
+      },
+    }
+    return [editar, pendiente, ...quitar]
+  }
+
+  /** Cuántas filas quedan por encima del centro de la fila arrastrada. */
+  const destinoDe = (a: NonNullable<typeof arrastre>, y: number) => {
+    const centro = a.centro + (y - a.y0)
+    return a.otros.filter((o) => (o.top + o.bottom) / 2 < centro).length
+  }
+
+  /** El asa ≡ de un evento sin hora: tomarla y soltarla en otro lugar. */
+  const asaDe = (e: EventoBitacora) => ({
+    onPointerDown: (ev: ReactPointerEvent<HTMLButtonElement>) => {
+      if (ev.button !== 0) return
+      const cont = listaRef.current
+      if (!cont) return
+      const base = cont.getBoundingClientRect().top
+      const filas = [...cont.querySelectorAll<HTMLElement>('[data-evento-id]')]
+      const rect = (id: string) => filas.find((f) => f.dataset.eventoId === id)?.getBoundingClientRect()
+      const propio = rect(e.id)
+      if (!propio) return
+      const otros = listos
+        .filter((x) => x.id !== e.id)
+        .map((x) => rect(x.id))
+        .filter((r): r is DOMRect => Boolean(r))
+        .map((r) => ({ top: r.top - base, bottom: r.bottom - base }))
+      ev.preventDefault()
+      try {
+        ev.currentTarget.setPointerCapture(ev.pointerId)
+      } catch {
+        /* sin captura el arrastre sigue mientras el puntero esté sobre el asa */
+      }
+      const origen = listos.findIndex((x) => x.id === e.id)
+      const inicio = { id: e.id, y0: ev.clientY, dy: 0, centro: (propio.top + propio.bottom) / 2 - base, origen, otros, destino: origen }
+      arrastreRef.current = inicio
+      setArrastre(inicio)
+    },
+    onPointerMove: (ev: ReactPointerEvent<HTMLButtonElement>) => {
+      const a = arrastreRef.current
+      if (!a || a.id !== e.id) return
+      const siguiente = { ...a, dy: ev.clientY - a.y0, destino: destinoDe(a, ev.clientY) }
+      // La referencia se adelanta al render: un «soltar» inmediato ya ve el destino.
+      arrastreRef.current = siguiente
+      setArrastre(siguiente)
+    },
+    onPointerUp: (ev: ReactPointerEvent<HTMLButtonElement>) => {
+      const a = arrastreRef.current
+      if (!a || a.id !== e.id) return
+      arrastreRef.current = null
+      setArrastre(null)
+      const p = posicionEnIndice(turno, listos, e.id, destinoDe(a, ev.clientY))
+      if (p != null) {
+        mover(e.id, p)
+        vibrar()
+      }
+    },
+  })
 
   const sugerenciasEquipo = useMemo(() => eventos.map((e) => e.equipo).filter(Boolean), [eventos])
   // Solo publicados: un borrador guarda el tipo a medio escribir («mejora c»).
@@ -714,7 +892,19 @@ export function BitacoraTurnoVista({
               </Button>
             </div>
           ) : (
-            <div className="overflow-hidden rounded-card bg-card shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
+            <div ref={listaRef} className="relative overflow-hidden rounded-card bg-card shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
+              {arrastre && arrastre.destino !== arrastre.origen && (
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-x-4 z-30 h-1 -translate-y-1/2 rounded-full bg-primary"
+                  style={{
+                    top:
+                      arrastre.destino === 0
+                        ? (arrastre.otros[0]?.top ?? 0)
+                        : (arrastre.otros[arrastre.destino - 1]?.bottom ?? 0),
+                  }}
+                />
+              )}
               {enLista.map((e) => (
                 <EventoBitacoraFila
                   key={e.id}
@@ -727,9 +917,15 @@ export function BitacoraTurnoVista({
                       ? undefined
                       : (direccion) => {
                           const p = posicionAlMover(turno, eventos, e.id, direccion)
-                          if (p != null) mover(e.id, p)
+                          if (p != null) {
+                            mover(e.id, p)
+                            vibrar()
+                          }
                         }
                   }
+                  acciones={accionesDe(e)}
+                  asa={tieneHora(e) || esBorrador(e) ? undefined : asaDe(e)}
+                  desplazamiento={arrastre?.id === e.id ? arrastre.dy : null}
                 />
               ))}
             </div>
@@ -809,7 +1005,7 @@ export function BitacoraTurnoVista({
         subirFoto={fuente.subirFoto}
         fuenteRepuestos={fuente.repuestos}
         onGuardar={guardar}
-        onBorrar={borrar}
+        onBorrar={borrarConDeshacer}
         eventoVivo={editandoEventoId ? (eventos.find((e) => e.id === editandoEventoId) ?? null) : null}
         otrosEditando={editandoEventoId ? otrosEditando(conectados, editandoEventoId, miDispositivoId) : []}
         onClose={() => setEditor(null)}
@@ -957,6 +1153,7 @@ export function BitacoraTurnoVista({
                 }
                 void cerrarNoAplica(noAplica, motivoNoAplica, quienNoAplica)
                   .then(() => {
+                    vibrar()
                     toast({ title: 'Pendiente cerrado', description: 'No cuenta como resuelto por Mantención.' })
                     setNoAplica(null)
                   })
@@ -1040,6 +1237,9 @@ export function BitacoraTurnoVista({
 }
 
 const PUNTO = { ok: 'bg-ink-ok', warn: 'bg-ink-warn', crit: 'bg-ink-crit' } as const
+
+/** Cuánto dura «Deshacer» después de borrar un evento. */
+const PLAZO_DESHACER_MS = 5000
 
 /**
  * Cifra en tinta normal; el estado va en un punto de 8 px junto al rótulo
