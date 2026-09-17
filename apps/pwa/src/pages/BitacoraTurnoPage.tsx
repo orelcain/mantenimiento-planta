@@ -984,7 +984,9 @@ export function BitacoraTurnoVista({
         </section>
       )}
 
-      <div className="grid items-start gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
+      {/* En PC la vista previa del correo lleva la planilla MTTR a lo ancho: se le da
+          más columna (3/5) y los eventos van compactos a la izquierda (Orel, 17-09). */}
+      <div className="grid items-start gap-5 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
         {/* Línea de tiempo */}
         <section aria-label="Eventos del turno" className="flex flex-col gap-5">
           {cargando ? (
@@ -1433,8 +1435,13 @@ function AccionesCabecera({
  * tiene que ser lo mismo que ve Outlook. Sin scripts: `sandbox` sin
  * `allow-scripts`; `allow-same-origin` solo para medir la altura.
  */
-/** Ancho con que se arma el correo (680 px de cuerpo + 20 px de margen por lado). */
-const ANCHO_CORREO = 720
+/**
+ * Ancho con que se arma el correo: el del panel de lectura de Outlook en el PC
+ * (960 px de cuerpo + 20 px de margen por lado). La planilla MTTR va a lo ancho
+ * y el detalle de la bitácora se queda en sus 680 px; a 720 la planilla se veía
+ * apretada y no como llega a Outlook (revisión 17-09).
+ */
+const ANCHO_CORREO = 1000
 
 function VistaPreviaCorreo({ html }: { html: string }) {
   const ref = useRef<HTMLIFrameElement>(null)
