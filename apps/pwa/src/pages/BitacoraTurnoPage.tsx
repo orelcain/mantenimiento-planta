@@ -21,7 +21,7 @@ import { tecnicoRecordado } from '@/components/bitacora/tecnicoRecordado'
 import { useToast } from '@/hooks/useToast'
 import { FUENTE_FIRESTORE, useTurnoMantencionActual, type FuenteBitacora } from '@/hooks/useBitacoraTurno'
 import { BITACORA_PLANTA } from '@/config/bitacora'
-import { encabezadoEvento, etiquetaTipo, tiposPropiosUsados, tituloDe } from '@/services/bitacora/presentacionEvento'
+import { encabezadoEvento, etiquetaTipo, posicionAlMover, tieneHora, tiposPropiosUsados, tituloDe } from '@/services/bitacora/presentacionEvento'
 import { copiarHtml, copiarTexto } from '@/lib/clipboard'
 import type { EventoBitacora, FotoEvento, TurnoMantencion } from '@/services/bitacora/bitacora.types'
 import type { User } from '@/types'
@@ -83,7 +83,7 @@ export function BitacoraTurnoVista({
   const turno = editor?.turno ?? turnoNavegado
   const esActual = turno.id === turnoActual.id
 
-  const { eventos, cargando, error, ultimaSync, cambiosPorSubir, novedad, nuevoId, guardar, borrar } = fuente.useEventos(turno)
+  const { eventos, cargando, error, ultimaSync, cambiosPorSubir, novedad, nuevoId, guardar, borrar, mover } = fuente.useEventos(turno)
   const calendario = fuente.useTecnicos(turno)
   const { observacion, guardarObservacion, guardarPresentes } = fuente.useObservacion(turno)
   const { ajustes, guardarAjustes } = fuente.useAjustes()
@@ -681,6 +681,14 @@ export function BitacoraTurnoVista({
                   abiertoPor={otrosEditando(conectados, e.id, miDispositivoId)}
                   onAbrir={() => setEditor({ evento: e, idNuevo: e.id, turno })}
                   onVerFoto={(fotos, indice) => setVisor({ fotos, indice, titulo: encabezadoEvento(e) })}
+                  onMover={
+                    tieneHora(e)
+                      ? undefined
+                      : (direccion) => {
+                          const p = posicionAlMover(turno, eventos, e.id, direccion)
+                          if (p != null) mover(e.id, p)
+                        }
+                  }
                 />
               ))}
             </div>
@@ -752,6 +760,8 @@ export function BitacoraTurnoVista({
         sugerenciasEquipo={sugerenciasEquipo}
         sugerenciasTipo={sugerenciasTipo}
         autorFijo={autorFijo}
+        puedeEditarMaestro={!autorFijo}
+        eventosDelTurno={eventos}
         tecnicos={tecnicos}
         opcionesEquipo={opcionesEquipo}
         cargandoEquipos={cargandoEquipos}

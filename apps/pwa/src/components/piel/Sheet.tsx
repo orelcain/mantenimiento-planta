@@ -20,10 +20,15 @@ export interface SheetProps {
   description?: React.ReactNode
   /** Fila de acciones al pie (normalmente dos <Button>). */
   actions?: React.ReactNode
+  /**
+   * `wide` = el doble de ancho en pantallas grandes (60rem), para formularios
+   * largos que en el PC caben en dos columnas. En el teléfono no cambia nada.
+   */
+  size?: 'default' | 'wide'
   children?: React.ReactNode
 }
 
-export function Sheet({ open, onClose, title, description, actions, children }: SheetProps) {
+export function Sheet({ open, onClose, title, description, actions, size = 'default', children }: SheetProps) {
   const panelRef = React.useRef<HTMLDivElement>(null)
   const returnFocusRef = React.useRef<HTMLElement | null>(null)
   // onClose en una ref: casi todos los que usan el Sheet le pasan una función
@@ -65,7 +70,8 @@ export function Sheet({ open, onClose, title, description, actions, children }: 
         aria-modal="true"
         tabIndex={-1}
         className={cn(
-          'relative w-full max-w-[30rem] rounded-t-panel bg-card px-6 pb-8 pt-2.5',
+          'relative w-full rounded-t-panel bg-card px-6 pb-8 pt-2.5',
+          size === 'wide' ? 'max-w-[60rem]' : 'max-w-[30rem]',
           'shadow-[0_-10px_50px_rgba(0,0,0,0.3)] outline-none',
           'piel-sheet-in motion-reduce:animate-none',
         )}

@@ -115,7 +115,7 @@ export function resumirBitacora(todos: readonly EventoBitacora[]): ResumenBitaco
  * Orden cronológico dentro del turno (la tarde que cruza 00:00 queda al final).
  * Los eventos sin hora se ubican según cuándo se registraron.
  */
-export function ordenarEventos<T extends Pick<EventoBitacora, 'horaInicio'> & { createdAt?: unknown }>(
+export function ordenarEventos<T extends Pick<EventoBitacora, 'horaInicio'> & { createdAt?: unknown; posicionMin?: number | null }>(
   turno: Pick<TurnoMantencion, 'banda'> & { inicio?: Date },
   eventos: readonly T[],
 ): T[] {

@@ -130,7 +130,10 @@ export function normalizarRepuestos(lista: readonly Partial<RepuestoUsado>[] | n
     const cantidad = Math.min(MAX_CANTIDAD_REPUESTO, Math.max(1, Math.round(Number(r?.cantidad) || 1)))
     const previo = porCodigo.get(codigoSAP)
     if (previo) previo.cantidad = Math.min(MAX_CANTIDAD_REPUESTO, previo.cantidad + cantidad)
-    else porCodigo.set(codigoSAP, { codigoSAP, nombre: String(r?.nombre ?? '').trim().slice(0, 120), cantidad })
+    else {
+      const comun = String(r?.nombreComun ?? '').trim().slice(0, 80)
+      porCodigo.set(codigoSAP, { codigoSAP, nombre: String(r?.nombre ?? '').trim().slice(0, 120), ...(comun ? { nombreComun: comun } : {}), cantidad })
+    }
   }
   return [...porCodigo.values()].slice(0, MAX_REPUESTOS_EVENTO)
 }
@@ -140,9 +143,69 @@ export function nombreRepuesto(r: Pick<RepuestoUsado, 'nombre'>): string {
   return formatNombreSAP(r.nombre).nombre || r.nombre
 }
 
-/** "3300011612 Soporte sección 519437 ×2" (sin nombre: solo el código). */
+/** "Filtro FRL (Filtro 1/2 purga N.A AFF40-04D-D 295734)": el nombre común primero; sin común, el del maestro. */
+export function nombreConComun(r: Pick<RepuestoUsado, 'nombre' | 'nombreComun'>): string {
+  const comun = (r.nombreComun ?? '').trim()
+  const sap = nombreRepuesto(r)
+  if (comun && sap) return `${comun} (${sap})`
+  return comun || sap
+}
+
+/** "3300135877 Filtro FRL (Filtro 1/2 purga…) ×2" (sin nombre: solo el código). */
 export function textoRepuesto(r: RepuestoUsado): string {
-  return [r.codigoSAP, nombreRepuesto(r), r.cantidad > 1 ? `×${r.cantidad}` : ''].filter(Boolean).join(' ')
+  return [r.codigoSAP, nombreConComun(r), r.cantidad > 1 ? `×${r.cantidad}` : ''].filter(Boolean).join(' ')
+}
+
+/**
+ * Dónde queda un evento SIN HORA al moverlo un lugar (▲ = -1, ▼ = +1) entre los
+ * demás eventos del turno, ya ordenados. Devuelve la nueva `posicionMin`, o null
+ * si no se puede mover más en esa dirección.
+ */
+export function posicionAlMover(
+  turno: Pick<TurnoMantencion, 'banda'> & { inicio?: Date },
+  ordenados: readonly (Pick<EventoBitacora, 'id' | 'horaInicio' | 'posicionMin'> & { createdAt?: unknown })[],
+  id: string,
+  direccion: -1 | 1,
+): number | null {
+  const i = ordenados.findIndex((e) => e.id === id)
+  if (i < 0) return null
+  const claves = ordenados.map((e) => minutosEnTurno(turno, e))
+  const vecino = i + direccion
+  if (vecino < 0 || vecino >= ordenados.length) return null
+  const k1 = claves[vecino] ?? 0
+  // Pasa al otro lado del vecino: entre él y el siguiente en esa dirección.
+  const masAlla = claves[vecino + direccion]
+  if (masAlla == null || !Number.isFinite(masAlla)) return k1 + direccion
+  if (masAlla === k1) return k1 + direccion * 0.5
+  return (k1 + masAlla) / 2
+}
+
+/**
+ * Las opciones de «Ubicación en el turno» del editor de un evento sin hora: al
+ * inicio, después de cada evento con hora, al final. `posicion` es lo que se guarda.
+ */
+export function opcionesUbicacion(
+  turno: Pick<TurnoMantencion, 'banda'> & { inicio?: Date },
+  eventos: readonly (Pick<EventoBitacora, 'id' | 'horaInicio' | 'horaTermino' | 'equipo' | 'titulo' | 'posicionMin'> & { createdAt?: unknown })[],
+  excluirId: string,
+): { etiqueta: string; posicion: number }[] {
+  const conHora = eventos.filter((e) => e.id !== excluirId && tieneHora(e))
+  const ordenados = [...conHora].sort((a, b) => minutosEnTurno(turno, a) - minutosEnTurno(turno, b))
+  if (!ordenados.length) return []
+  const claves = ordenados.map((e) => minutosEnTurno(turno, e))
+  const primero = claves[0] ?? 0
+  const ultimo = claves[claves.length - 1] ?? 0
+  const salida = [{ etiqueta: 'Al inicio', posicion: primero - 1 }]
+  ordenados.forEach((e, i) => {
+    const k = claves[i] ?? 0
+    const siguiente = claves[i + 1]
+    const posicion = siguiente == null ? k + 1 : siguiente === k ? k + 0.5 : (k + siguiente) / 2
+    salida.push({ etiqueta: `Después de ${e.horaInicio} ${e.equipo?.trim() || tituloDe(e) || ''}`.trim(), posicion })
+  })
+  // «Al final» es la última «Después de…»; se nombra aparte para que se entienda.
+  const final = salida[salida.length - 1]
+  if (final) final.etiqueta = 'Al final'
+  return salida.length > 1 ? salida : [salida[0] as { etiqueta: string; posicion: number }, { etiqueta: 'Al final', posicion: ultimo + 1 }]
 }
 
 /** "Repuestos: 3300011612 Soporte sección 519437 · 3300011654 Anillo 31000251 ×2" ('' si no hay). */
@@ -166,9 +229,11 @@ function aMilisegundos(v: unknown): number | null {
  */
 export function minutosEnTurno(
   turno: Pick<TurnoMantencion, 'banda'> & { inicio?: Date },
-  e: Pick<EventoBitacora, 'horaInicio'> & { createdAt?: unknown },
+  e: Pick<EventoBitacora, 'horaInicio'> & { createdAt?: unknown; posicionMin?: number | null },
 ): number {
   if (tieneHora(e)) return minutosDesdeInicioTurno(turno, e.horaInicio)
+  // Sin hora y movido a mano: donde lo dejaron.
+  if (typeof e.posicionMin === 'number' && Number.isFinite(e.posicionMin)) return e.posicionMin
   const ms = aMilisegundos(e.createdAt)
   if (ms == null || !turno.inicio) return Number.MAX_SAFE_INTEGER
   return Math.round((ms - turno.inicio.getTime()) / 60_000)

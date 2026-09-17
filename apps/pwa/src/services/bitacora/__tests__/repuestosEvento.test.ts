@@ -129,10 +129,10 @@ describe('repuestos usados', () => {
 
 describe('buscar repuestos del equipo', () => {
   const lista = [
-    { codigoSAP: '3300012355', nombre: 'PERNO 1420301019', ubicacion: 'C-1' },
-    { codigoSAP: '3300011612', nombre: 'SOPORTE SECCION 519437', ubicacion: 'C-6' },
-    { codigoSAP: '3300074757', nombre: 'TORNILLO PARA PERNO', ubicacion: 'C-8' },
-    { codigoSAP: '3300005482', nombre: 'PRESOSTATO 10773', ubicacion: 'C-11' },
+    { codigoSAP: '3300012355', nombre: 'PERNO 1420301019', nombreComun: '', ubicacion: 'C-1' },
+    { codigoSAP: '3300011612', nombre: 'SOPORTE SECCION 519437', nombreComun: '', ubicacion: 'C-6' },
+    { codigoSAP: '3300074757', nombre: 'TORNILLO PARA PERNO', nombreComun: '', ubicacion: 'C-8' },
+    { codigoSAP: '3300005482', nombre: 'PRESOSTATO 10773', nombreComun: '', ubicacion: 'C-11' },
   ]
 
   it('por palabras, sin tildes, primero lo que empieza con lo escrito', () => {
@@ -151,6 +151,7 @@ describe('buscar repuestos del equipo', () => {
     expect(desdeDocumento('3300011612', { codigoSAP: '3300011612', textoBreve: 'SOPORTE', ubicacionEnPlanta: 'C-6' })).toEqual({
       codigoSAP: '3300011612',
       nombre: 'SOPORTE',
+      nombreComun: '',
       ubicacion: 'C-6',
     })
   })

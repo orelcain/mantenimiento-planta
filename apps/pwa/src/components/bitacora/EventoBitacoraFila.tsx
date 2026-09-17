@@ -1,4 +1,4 @@
-import { Camera } from 'lucide-react'
+import { Camera, ChevronDown, ChevronUp } from 'lucide-react'
 import { Button, Pill, Tag } from '@/components/piel'
 import { ETIQUETA_FOTO } from '@/config/bitacora'
 import { autorVisible, tecnicosDelEvento, type EventoBitacora, type FotoEvento, type PresenciaBitacora } from '@/services/bitacora/bitacora.types'
@@ -21,6 +21,7 @@ export function EventoBitacoraFila({
   onAbrir,
   onVerFoto,
   abiertoPor = [],
+  onMover,
 }: {
   evento: EventoBitacora
   onAbrir: () => void
@@ -28,6 +29,8 @@ export function EventoBitacoraFila({
   onVerFoto?: (fotos: FotoEvento[], indice: number) => void
   /** Otros equipos que tienen este evento abierto ahora mismo. */
   abiertoPor?: readonly PresenciaBitacora[]
+  /** Solo en un evento SIN HORA: moverlo un lugar entre los demás (▲ = -1, ▼ = +1). */
+  onMover?: (direccion: -1 | 1) => void
 }) {
   const borrador = evento.estado === 'borrador'
   const quienesAbren = abiertoPor.map((p) => `${p.nombre} (${NOMBRE_DISPOSITIVO[p.dispositivo]})`).join(', ')
@@ -54,7 +57,8 @@ export function EventoBitacoraFila({
         }
       }}
       className={[
-        'relative grid min-h-[44px] cursor-pointer grid-cols-[3.25rem_minmax(0,1fr)] gap-3 px-4 py-3',
+        'relative grid min-h-[44px] cursor-pointer gap-3 px-4 py-3',
+        !conHora && onMover ? 'grid-cols-[3.25rem_minmax(0,1fr)_auto]' : 'grid-cols-[3.25rem_minmax(0,1fr)]',
         'before:absolute before:left-[5rem] before:right-0 before:top-0 before:h-px before:bg-border before:content-[""] first:before:hidden',
         'transition-colors duration-150 hover:bg-accent active:bg-accent motion-reduce:transition-none',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary',
@@ -176,7 +180,7 @@ export function EventoBitacoraFila({
         )}
 
         {borrador ? (
-          <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 ">
             <span className="text-footnote text-muted-foreground">
               {abiertoPor.length
                 ? `${quienesAbren} ${abiertoPor.length === 1 ? 'lo está escribiendo' : 'lo están escribiendo'}`
@@ -205,6 +209,27 @@ export function EventoBitacoraFila({
           </span>
         )}
       </div>
+      {!conHora && onMover && (
+        // Mover entre los demás eventos del turno (los con hora quedan por reloj).
+        <div className="flex flex-col self-start" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+          <button
+            type="button"
+            onClick={() => onMover(-1)}
+            aria-label="Mover antes"
+            className="flex size-11 items-center justify-center rounded-full text-primary hover:bg-muted-foreground/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            <ChevronUp className="size-5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => onMover(1)}
+            aria-label="Mover después"
+            className="flex size-11 items-center justify-center rounded-full text-primary hover:bg-muted-foreground/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            <ChevronDown className="size-5" />
+          </button>
+        </div>
+      )}
     </div>
   )
 }

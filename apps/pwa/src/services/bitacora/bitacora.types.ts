@@ -78,6 +78,8 @@ export interface RepuestoUsado {
   codigoSAP: string
   /** Nombre del maestro al momento de agregarlo ('' si el código no estaba). */
   nombre: string
+  /** Nombre común (el primero de `nombresComunes` del maestro), copiado al agregar o al editarlo. */
+  nombreComun?: string
   cantidad: number
 }
 
@@ -121,6 +123,11 @@ export interface EventoBitacora {
   horaInicio: string
   /** `HH:mm`, o null si sigue en curso (siempre null en un evento sin hora). */
   horaTermino: string | null
+  /**
+   * Solo en un evento SIN HORA: dónde va en la línea de tiempo, en minutos desde
+   * el inicio del turno (puede ser fraccionario). Sin él, va donde se registró.
+   */
+  posicionMin?: number | null
   impacto: ImpactoEvento
   minutosParada: number | null
   ventana: string | null
@@ -189,6 +196,7 @@ export type EventoBitacoraDatos = Pick<
   | 'descripcion'
   | 'horaInicio'
   | 'horaTermino'
+  | 'posicionMin'
   | 'impacto'
   | 'minutosParada'
   | 'ventana'

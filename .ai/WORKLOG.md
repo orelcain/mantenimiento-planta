@@ -5305,3 +5305,34 @@ Orel intento anotar el FRL de la E-PACK y la bitacora dijo «no tiene repuestos 
   3.022 → 2.910. `areaIds` se recalculo ([nodeId, ...path]): no lo mantiene ninguna funcion.
 - Codigo: la lista de repuestos por equipo de la bitacora vence a los 5 min (antes vivia toda la
   sesion y un vinculo nuevo desde el CTD no aparecia).
+
+## 2026-09-17 · Bitacora ronda 17 · Editor ancho en PC, buscador de repuestos con dos alcances, nombre comun y orden de los sin hora
+
+Pedidos de Orel tras probar los repuestos en la E-PACK. Mockup (3 decisiones, todas las recomendadas):
+https://claude.ai/artifact/MtKR1Po46t5N3jdePikyrN
+- **Editor en PC:** `Sheet size="wide"` (60rem) y el formulario en dos columnas desde `md` (que paso /
+  repuestos, impacto, fotos, pendiente). En el telefono, una columna como antes.
+- **Buscador de repuestos:** un campo + `SegmentedControl` «En este equipo · Todos» (solo con equipo
+  elegido; sin equipo busca en todos). Busca por codigo, nombre SAP y **nombre comun**; un codigo
+  completo aparece aunque no sea del equipo (se ofrece «no esta vinculado a este equipo»). «Todos»
+  usa el **indice liviano `repuestosIndice/sap`** (`m: {sap: [nombre, comun]}`, 3.790 entradas,
+  ~179 KB, bajado una vez por sesion) construido con `scripts/normalizacion/construir-indice-repuestos.cjs`
+  y mantenido por la funcion `onRepuestoEscritoIndice` (trigger sobre `repuestos/{id}`, escribe solo
+  la entrada que cambio y sale temprano si no cambio nombre/comun/SAP; logica pura en
+  `functions/repuestosIndice.js`, 3 tests). Cada resultado y cada elegido muestra ubicacion y stock
+  de `bodega/{sap}` (una lectura por codigo, maximo 10). Por que el codigo «no salia arriba»: el
+  campo viejo solo actuaba con Enter/Agregar; ahora los resultados salen mientras se escribe.
+- **Nombre comun:** se ve en resultados y elegidos (comun en negrita, SAP debajo) y se edita en
+  linea; se guarda en `repuestos/{sap}.nombresComunes` (al frente, sin duplicar: `conNombreComunAlFrente`),
+  el mismo campo de Repuestos. El evento copia `nombreComun`; correo/WhatsApp/lamina dicen
+  «3300135877 Filtro FRL (Filtro 1/2 purga…)». El pase QR lo ve pero no lo edita (regla).
+- **Eventos sin hora:** `posicionMin` (minutos desde el inicio del turno, fraccionario; solo sin
+  hora, regla lo exige). Flechas ▲▼ en la fila (`posicionAlMover`: pasa al otro lado del vecino,
+  entre el y el siguiente) y en el editor chips «Ubicacion en el turno» (`opcionesUbicacion`: al
+  inicio / despues de cada evento con hora / al final). `mover()` en el hook escribe solo ese campo.
+- Reglas: `posicionMin` (-1440..2880, solo con hora vacia), `repuestosIndice` lectura (app y pase),
+  `bodega` lectura tambien para el pase. 104/104 (`probar-reglas-bitacora.cjs --local`, 8 nuevos).
+- 119 pruebas en services/bitacora (6 nuevas). Verificado en la vitrina: PC dos columnas (840 px en
+  el panel), buscar «filtro» en Todos → agregar → «＋ nombre comun» → «Filtro FRL» propagado a los
+  resultados; celular una columna; flechas mueven el evento sin hora hasta el inicio y el chip «Al
+  inicio» queda marcado.
