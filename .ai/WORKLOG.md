@@ -21,6 +21,18 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-17 · Bitacora ronda 28 · La pantalla del turno se alinea con lo que se envía
+- Hecho (opciones C y E del mockup https://claude.ai/artifact/BcLAK48eg3NSdU6yNUcs4U):
+  - C: la lista del turno se parte en «Eventos del turno N» y «Pendiente para el turno siguiente N» (punto ámbar), y cada evento lleva el MISMO número que en WhatsApp, el correo y el PDF. Los borradores van al final de la primera sección, sin número.
+  - E: los repuestos del evento pasan de una línea corrida a una lista: cantidad, nombre común (o el del maestro) y debajo el código SAP con el nombre SAP.
+- Un solo origen del orden: `gruposDelTurno(turno, eventos)` en `resumenBitacora.ts` (ordena, saca borradores y separa por `fuePendiente`). Lo usan la pantalla, WhatsApp, el correo y el PDF; antes cada uno repetía el filtro.
+- Arrastre: cada grupo tiene su propia lista y su propio contenedor (`listaRef` / `listaPendientesRef`); mover con el asa o con las flechas se calcula dentro del grupo. Verificado en la vitrina: el evento «Sin hora» sube un lugar y la numeración se recalcula sola.
+- Gotcha: el círculo del pendiente NO va relleno de ámbar. `--ink-warn` cambia de tono entre pieles (una lo tiene en 172 150 110) y el texto encima perdía contraste; va tintado (`bg-ink-warn/15 text-ink-warn`), como las píldoras.
+- Archivos: `resumenBitacora.ts`, `BitacoraTurnoPage.tsx`, `EventoBitacoraFila.tsx`, `bitacoraWhatsapp.ts`, `bitacoraCorreo.ts`, `bitacoraPdf.ts`, `ordenYNombreComun.test.ts`.
+- Verificación: tsc 0; eslint 30 (sin cambio); vitest 2.798 OK; audit-piel/voseo/decimales OK; build OK; vitrina a 375 px.
+- Estado: HECHO (pendiente: Orel lo prueba en el turno real).
+- Sigue: quedaron sin construir A (resumen con MTTR y repuestos como números propios) y B+D (marcar de un toque a los técnicos sugeridos, «N° 720004412»).
+
 ## 2026-09-17 · Bitacora ronda 27 · Correo y PDF con el formato nuevo + nombre SAP en WhatsApp
 - Hecho: WhatsApp ahora muestra en cada repuesto el nombre común y, entre paréntesis, el nombre del maestro SAP (bodega busca por ese). El correo y el PDF se rehicieron según el mockup aprobado (https://claude.ai/artifact/LWeL9CmkwfowfNkxHc77HW):
   - Cabecera: «Bitácora de Mantención · planta», luego «Turno tarde · Miércoles 16-09-2026» y el horario con los técnicos de turno. Se quitó «Registrado por», porque ahora cada evento dice sus técnicos.

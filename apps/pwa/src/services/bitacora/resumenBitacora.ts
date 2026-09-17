@@ -59,6 +59,19 @@ export function fuePendiente(e: Pick<EventoBitacora, 'pendiente' | 'cierre'>): b
   return Boolean(e.pendiente || e.cierre)
 }
 
+/**
+ * Los eventos PUBLICADOS en dos grupos, cada uno en orden del turno: lo hecho y
+ * lo que queda pendiente para el turno siguiente. Es el orden y la numeración
+ * de WhatsApp, correo, PDF y la pantalla: «el evento 3» es el mismo en todos.
+ */
+export function gruposDelTurno<T extends EventoBitacora>(
+  turno: Pick<TurnoMantencion, 'banda'> & { inicio?: Date },
+  eventos: readonly T[],
+): { hechos: T[]; pendientes: T[] } {
+  const ordenados = ordenarEventos(turno, soloListos(eventos))
+  return { hechos: ordenados.filter((e) => !fuePendiente(e)), pendientes: ordenados.filter(fuePendiente) }
+}
+
 export function resumirBitacora(todos: readonly EventoBitacora[]): ResumenBitacora {
   // Un borrador se ve en la lista, pero no es un hecho del turno todavía.
   const eventos = soloListos(todos)

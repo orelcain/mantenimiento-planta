@@ -1,6 +1,6 @@
 import { ETIQUETA_FOTO } from '@/config/bitacora'
 import { autorVisible, tecnicosDelEvento, type EventoBitacora, type FotoEvento, type TurnoMantencion } from './bitacora.types'
-import { fuePendiente, minutosParadaDe, ordenarEventos, resumirBitacora } from './resumenBitacora'
+import { fuePendiente, gruposDelTurno, minutosParadaDe, ordenarEventos, resumirBitacora } from './resumenBitacora'
 import { soloListos } from './borradores'
 import { etiquetaTurno, fechaTurnoLarga, formatoMinutos, horarioTurno } from './turnoMantencion'
 import { etiquetaCortaTurno } from './entregaTurno'
@@ -291,10 +291,8 @@ export function repuestosDistintos(eventos: readonly EventoBitacora[]): number {
 export function bitacoraAHtmlCorreo({ turno, eventos: todos, tecnicos, planta, observacion, pendientesAnteriores = [], fuenteFoto }: DatosCorreoBitacora): string {
   const eventos = soloListos(todos)
   const fuente = fuenteFoto ?? ((f: FotoEvento) => f.url)
-  const ordenados = ordenarEventos(turno, eventos)
   const r = resumirBitacora(eventos)
-  const hechos = ordenados.filter((e) => !fuePendiente(e))
-  const pendientes = ordenados.filter(fuePendiente)
+  const { hechos, pendientes } = gruposDelTurno(turno, eventos)
   const repuestos = repuestosDistintos(eventos)
 
   const kpis = [

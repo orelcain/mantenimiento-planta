@@ -1,6 +1,6 @@
 import { autorVisible, tecnicosDelEvento, type EventoBitacora, type FotoEvento, type TurnoMantencion } from './bitacora.types'
 import { soloListos } from './borradores'
-import { fuePendiente, ordenarEventos, resumirBitacora } from './resumenBitacora'
+import { fuePendiente, gruposDelTurno, resumirBitacora } from './resumenBitacora'
 import { etiquetaTurno, fechaTurnoLarga, formatoMinutos, horarioTurno } from './turnoMantencion'
 import {
   capitalizarPrimera,
@@ -70,8 +70,8 @@ export function fotosOrdenadas(fotos: readonly FotoEvento[]): FotoEvento[] {
 
 /** Los eventos publicados en el orden del mensaje: lo hecho y después lo pendiente. */
 function eventosDelMensaje(turno: TurnoMantencion, eventos: readonly EventoBitacora[]): EventoBitacora[] {
-  const ordenados = ordenarEventos(turno, soloListos(eventos))
-  return [...ordenados.filter((e) => !fuePendiente(e)), ...ordenados.filter(fuePendiente)]
+  const { hechos, pendientes } = gruposDelTurno(turno, eventos)
+  return [...hechos, ...pendientes]
 }
 
 export function turnoCorto(turno: TurnoMantencion): string {

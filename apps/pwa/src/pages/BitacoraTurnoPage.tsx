@@ -31,7 +31,7 @@ import type { EventoBitacora, FotoEvento, TurnoMantencion } from '@/services/bit
 import type { User } from '@/types'
 import { bitacoraAHtmlCorreo, bitacoraATextoPlano, etiquetaParada, etiquetaPendientes, tituloCorreo } from '@/services/bitacora/bitacoraCorreo'
 import { cargarFotoComoJpeg, purgarFotosPendientes } from '@/services/bitacora/fotosBitacora'
-import { resumirBitacora } from '@/services/bitacora/resumenBitacora'
+import { fuePendiente, gruposDelTurno, resumirBitacora } from '@/services/bitacora/resumenBitacora'
 import { esBorrador, soloListos } from '@/services/bitacora/borradores'
 import { nombreEnPresencia as nombrePresencia, otrosEditando } from '@/services/bitacora/presencia'
 import { dispositivoActual } from '@/services/bitacora/dispositivo'
@@ -131,14 +131,22 @@ export function BitacoraTurnoVista({
   }
   const r = useMemo(() => resumirBitacora(eventos), [eventos])
   const fotosPublicadas = useMemo(() => soloListos(eventos).reduce((n, e) => n + (e.fotos?.length ?? 0), 0), [eventos])
-  // Publicados primero (en orden del turno) y los borradores al final: se ven,
-  // pero todavía no son un hecho del turno.
+  // Como en WhatsApp y el correo (ronda 28, 17-09): lo hecho numerado desde 1,
+  // los borradores al final sin número (aún no son un hecho del turno) y lo
+  // pendiente en su propia sección, con la numeración que sigue.
   const borradores = useMemo(() => eventos.filter(esBorrador), [eventos])
-  const listos = useMemo(() => soloListos(eventos), [eventos])
-  const enLista = useMemo(() => [...listos, ...borradores], [listos, borradores])
+  const grupos = useMemo(() => gruposDelTurno(turno, eventos), [turno, eventos])
+  const numeroDe = useMemo(() => {
+    const m = new Map<string, number>()
+    ;[...grupos.hechos, ...grupos.pendientes].forEach((e, i) => m.set(e.id, i + 1))
+    return m
+  }, [grupos])
+  /** El grupo donde vive un evento publicado: ahí se mueve y se arrastra. */
+  const grupoDe = (e: EventoBitacora) => (fuePendiente(e) ? grupos.pendientes : grupos.hechos)
 
   // ── Arrastrar un evento sin hora entre los demás (mockup iOS 27, 17-09) ──
   const listaRef = useRef<HTMLDivElement>(null)
+  const listaPendientesRef = useRef<HTMLDivElement>(null)
   const [arrastre, setArrastre] = useState<{
     id: string
     y0: number
@@ -506,6 +514,47 @@ export function BitacoraTurnoVista({
 
   const puedeBorrarEvento = (e: EventoBitacora) => e.creadoPor === auth.currentUser?.uid || esSupervisor
 
+  /** La raya azul donde caería el evento arrastrado (solo en la lista de su grupo). */
+  const indicadorArrastre = (enPendientes: boolean) => {
+    if (!arrastre || arrastre.destino === arrastre.origen) return null
+    if (grupos.pendientes.some((x) => x.id === arrastre.id) !== enPendientes) return null
+    return (
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-4 z-30 h-1 -translate-y-1/2 rounded-full bg-primary"
+        style={{
+          top: arrastre.destino === 0 ? (arrastre.otros[0]?.top ?? 0) : (arrastre.otros[arrastre.destino - 1]?.bottom ?? 0),
+        }}
+      />
+    )
+  }
+
+  const filaDe = (e: EventoBitacora) => (
+    <EventoBitacoraFila
+      key={e.id}
+      evento={e}
+      numero={numeroDe.get(e.id)}
+      enPendientes={!esBorrador(e) && fuePendiente(e)}
+      abiertoPor={otrosEditando(conectados, e.id, miDispositivoId)}
+      onAbrir={() => setEditor({ evento: e, idNuevo: e.id, turno })}
+      onVerFoto={(fotos, indice) => setVisor({ fotos, indice, titulo: encabezadoEvento(e) })}
+      onMover={
+        tieneHora(e) || esBorrador(e)
+          ? undefined
+          : (direccion) => {
+              const p = posicionAlMover(turno, grupoDe(e), e.id, direccion)
+              if (p != null) {
+                mover(e.id, p)
+                vibrar()
+              }
+            }
+      }
+      acciones={accionesDe(e)}
+      asa={tieneHora(e) || esBorrador(e) ? undefined : asaDe(e)}
+      desplazamiento={arrastre?.id === e.id ? arrastre.dy : null}
+    />
+  )
+
   /** Deslizar a la izquierda sobre un evento: Editar, Pendiente, Borrar. */
   const accionesDe = (e: EventoBitacora): SwipeAction[] => {
     const editar: SwipeAction = { label: 'Editar', icon: <Pencil />, tone: 'brand', onClick: () => setEditor({ evento: e, idNuevo: e.id, turno }) }
@@ -535,14 +584,15 @@ export function BitacoraTurnoVista({
   const asaDe = (e: EventoBitacora) => ({
     onPointerDown: (ev: ReactPointerEvent<HTMLButtonElement>) => {
       if (ev.button !== 0) return
-      const cont = listaRef.current
+      const grupo = grupoDe(e)
+      const cont = fuePendiente(e) ? listaPendientesRef.current : listaRef.current
       if (!cont) return
       const base = cont.getBoundingClientRect().top
       const filas = [...cont.querySelectorAll<HTMLElement>('[data-evento-id]')]
       const rect = (id: string) => filas.find((f) => f.dataset.eventoId === id)?.getBoundingClientRect()
       const propio = rect(e.id)
       if (!propio) return
-      const otros = listos
+      const otros = grupo
         .filter((x) => x.id !== e.id)
         .map((x) => rect(x.id))
         .filter((r): r is DOMRect => Boolean(r))
@@ -553,7 +603,7 @@ export function BitacoraTurnoVista({
       } catch {
         /* sin captura el arrastre sigue mientras el puntero esté sobre el asa */
       }
-      const origen = listos.findIndex((x) => x.id === e.id)
+      const origen = grupo.findIndex((x) => x.id === e.id)
       const inicio = { id: e.id, y0: ev.clientY, dy: 0, centro: (propio.top + propio.bottom) / 2 - base, origen, otros, destino: origen }
       arrastreRef.current = inicio
       setArrastre(inicio)
@@ -571,7 +621,7 @@ export function BitacoraTurnoVista({
       if (!a || a.id !== e.id) return
       arrastreRef.current = null
       setArrastre(null)
-      const p = posicionEnIndice(turno, listos, e.id, destinoDe(a, ev.clientY))
+      const p = posicionEnIndice(turno, grupoDe(e), e.id, destinoDe(a, ev.clientY))
       if (p != null) {
         mover(e.id, p)
         vibrar()
@@ -897,8 +947,7 @@ export function BitacoraTurnoVista({
 
       <div className="grid items-start gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
         {/* Línea de tiempo */}
-        <section aria-label="Eventos del turno" className="flex flex-col">
-          <h2 className="px-4 pb-2 text-caption font-semibold text-muted-foreground">Eventos</h2>
+        <section aria-label="Eventos del turno" className="flex flex-col gap-5">
           {cargando ? (
             <div className="flex flex-col gap-2 rounded-card bg-card p-4">
               {[0, 1, 2].map((i) => (
@@ -917,43 +966,31 @@ export function BitacoraTurnoVista({
               </Button>
             </div>
           ) : (
-            <div ref={listaRef} className="relative overflow-hidden rounded-card bg-card shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
-              {arrastre && arrastre.destino !== arrastre.origen && (
-                <div
-                  aria-hidden
-                  className="pointer-events-none absolute inset-x-4 z-30 h-1 -translate-y-1/2 rounded-full bg-primary"
-                  style={{
-                    top:
-                      arrastre.destino === 0
-                        ? (arrastre.otros[0]?.top ?? 0)
-                        : (arrastre.otros[arrastre.destino - 1]?.bottom ?? 0),
-                  }}
-                />
+            <>
+              {(grupos.hechos.length > 0 || borradores.length > 0) && (
+                <div className="flex flex-col">
+                  <h2 className="px-4 pb-2 text-caption font-semibold text-muted-foreground">
+                    Eventos del turno{grupos.hechos.length > 0 && <span className="font-normal tabular-nums"> · {grupos.hechos.length}</span>}
+                  </h2>
+                  <div ref={listaRef} className="relative overflow-hidden rounded-card bg-card shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
+                    {indicadorArrastre(false)}
+                    {[...grupos.hechos, ...borradores].map(filaDe)}
+                  </div>
+                </div>
               )}
-              {enLista.map((e) => (
-                <EventoBitacoraFila
-                  key={e.id}
-                  evento={e}
-                  abiertoPor={otrosEditando(conectados, e.id, miDispositivoId)}
-                  onAbrir={() => setEditor({ evento: e, idNuevo: e.id, turno })}
-                  onVerFoto={(fotos, indice) => setVisor({ fotos, indice, titulo: encabezadoEvento(e) })}
-                  onMover={
-                    tieneHora(e)
-                      ? undefined
-                      : (direccion) => {
-                          const p = posicionAlMover(turno, eventos, e.id, direccion)
-                          if (p != null) {
-                            mover(e.id, p)
-                            vibrar()
-                          }
-                        }
-                  }
-                  acciones={accionesDe(e)}
-                  asa={tieneHora(e) || esBorrador(e) ? undefined : asaDe(e)}
-                  desplazamiento={arrastre?.id === e.id ? arrastre.dy : null}
-                />
-              ))}
-            </div>
+              {grupos.pendientes.length > 0 && (
+                <div className="flex flex-col">
+                  <h2 className="flex items-center gap-1.5 px-4 pb-2 text-caption font-semibold text-muted-foreground">
+                    <span className="size-2 shrink-0 rounded-full bg-ink-warn" aria-hidden />
+                    Pendiente para el turno siguiente<span className="font-normal tabular-nums"> · {grupos.pendientes.length}</span>
+                  </h2>
+                  <div ref={listaPendientesRef} className="relative overflow-hidden rounded-card bg-card shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
+                    {indicadorArrastre(true)}
+                    {grupos.pendientes.map(filaDe)}
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </section>
 
