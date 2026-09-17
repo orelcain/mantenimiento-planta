@@ -506,6 +506,13 @@ function useHistorialEjemplo(dias: number) {
           impacto: 'con-parada',
           minutosParada: 10 + ((i * 7) % 45),
           registradoPor: quien,
+          // Repuestos de ejemplo (códigos reales del maestro) para el bloque «Repuestos usados».
+          repuestos:
+            i % 3 === 0
+              ? [{ codigoSAP: '3300011872', nombre: 'CORREA 37750006', nombreComun: 'Correa cuchilla circular', cantidad: 2 }]
+              : i % 3 === 1
+                ? [{ codigoSAP: '3300135877', nombre: 'FILTRO 1/2  PURGA N.A AFF40-04D-D 295734', nombreComun: 'Filtro FRL', cantidad: 1 }]
+                : [{ codigoSAP: '3300011619', nombre: 'CUCHILLO 94011760', cantidad: 1 }],
         })
       }
       lista.push({

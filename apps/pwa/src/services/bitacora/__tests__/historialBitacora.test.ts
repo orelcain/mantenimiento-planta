@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { EventoBitacora } from '../bitacora.types'
-import { fechaDesde, filasPorTurno, porcentaje, resumirPeriodo, tesisDelPeriodo } from '../historialBitacora'
+import { detalleRepuesto, fechaDesde, filasPorTurno, lineaRepuestoDelPeriodo, porcentaje, resumirPeriodo, tesisDelPeriodo, tituloRepuesto } from '../historialBitacora'
 import { resumirBitacora } from '../resumenBitacora'
 
 const ev = (p: Partial<EventoBitacora>): EventoBitacora => ({
@@ -70,6 +70,36 @@ describe('historial del período', () => {
       ['KNURO N1', 25, 1],
     ])
     expect(porcentaje(r.equipos[0]!.parte)).toBe('58%')
+  })
+
+  it('suma los repuestos usados por código: unidades, eventos, equipos y último turno (17-09)', () => {
+    const filtro = { codigoSAP: '3300135877', nombre: 'FILTRO 1/2  PURGA N.A AFF40-04D-D 295734', nombreComun: 'Filtro FRL', cantidad: 1 }
+    const correa = { codigoSAP: '3300011872', nombre: 'CORREA 37750006', cantidad: 2 }
+    const r = resumirPeriodo(
+      [
+        ev({ turnoId: '2026-09-16_tarde', equipo: 'EMPACADORA E-PACK', equipoId: 'epack', equipoCodigo: '720004590', repuestos: [filtro] }),
+        ev({ turnoId: '2026-09-15_dia', equipo: 'CINTAS FILETE', repuestos: [correa, { ...filtro, nombreComun: undefined, cantidad: 2 }] }),
+        // Un borrador no suma; el mismo código en otro evento sí.
+        ev({ turnoId: '2026-09-15_dia', estado: 'borrador', repuestos: [{ ...correa, cantidad: 9 }] }),
+      ],
+      '2026-09-10',
+      '2026-09-16',
+    )
+    expect(r.repuestos.map((x) => [x.codigoSAP, x.unidades, x.eventos])).toEqual([
+      ['3300135877', 3, 2],
+      ['3300011872', 2, 1],
+    ])
+    expect(r.unidadesRepuestos).toBe(5)
+    const [filtroP, correaP] = r.repuestos as [typeof r.repuestos[number], typeof r.repuestos[number]]
+    expect(filtroP.nombreComun).toBe('Filtro FRL')
+    expect(filtroP.equipos).toEqual(['EMPACADORA E-PACK (720004590)', 'CINTAS FILETE'])
+    expect(filtroP.ultimoTurnoId).toBe('2026-09-16_tarde')
+    expect(tituloRepuesto(filtroP)).toBe('Filtro FRL')
+    expect(detalleRepuesto(filtroP)).toMatch(/^3300135877 · Filtro 1\/2/)
+    expect(tituloRepuesto(correaP)).toBe('Correa 37750006')
+    expect(detalleRepuesto(correaP)).toBe('3300011872')
+    expect(lineaRepuestoDelPeriodo(filtroP)).toMatch(/^3300135877 · Filtro FRL \(Filtro 1\/2 .*\) · ×3 · 2 eventos · EMPACADORA E-PACK \(720004590\), CINTAS FILETE$/)
+    expect(resumirPeriodo([], '2026-09-10', '2026-09-16').repuestos).toEqual([])
   })
 
   it('cuenta quién registró, con el técnico y no la cuenta compartida', () => {

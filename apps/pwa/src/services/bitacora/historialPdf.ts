@@ -1,5 +1,5 @@
 import { textoSeguroPdf } from '@/utils/pdf/textoSeguroPdf'
-import { porcentaje, tesisDelPeriodo, type FilaTurno, type ResumenPeriodo } from './historialBitacora'
+import { lineaRepuestoDelPeriodo, porcentaje, tesisDelPeriodo, type FilaTurno, type ResumenPeriodo } from './historialBitacora'
 import { formatoMinutos } from './turnoMantencion'
 import { etiquetaFilaTurno, tituloHistorial } from './historialCorreo'
 
@@ -49,6 +49,8 @@ export async function generarPdfHistorial(r: ResumenPeriodo, filas: readonly Fil
     ],
     [String(r.pendientesCerrados), 'pend. cerrados', r.pendientesCerrados > 0 ? VENTANA : TINTA],
     [String(r.pendientesAbiertos), 'pend. abiertos', TINTA],
+    [String(r.repuestos.length), r.repuestos.length === 1 ? 'repuesto usado' : 'repuestos usados', TINTA],
+    [String(r.unidadesRepuestos), 'unidades', TINTA],
   ]
   const ancho = (W - 2 * M) / kpis.length
   pdf.setDrawColor(227, 227, 227)
@@ -95,6 +97,31 @@ export async function generarPdfHistorial(r: ResumenPeriodo, filas: readonly Fil
     for (const e of r.equipos) {
       const linea = `${e.equipo} · ${formatoMinutos(e.minutos)} en ${e.paradas} ${e.paradas === 1 ? 'parada' : 'paradas'} · ${porcentaje(e.parte)} del total`
       for (const l of pdf.splitTextToSize(t(linea), W - 2 * M) as string[]) {
+        if (yy > pdf.internal.pageSize.getHeight() - M) {
+          pdf.addPage()
+          yy = M
+        }
+        pdf.text(l, M, yy)
+        yy += 5
+      }
+    }
+  }
+
+  if (r.repuestos.length) {
+    yy += 4
+    if (yy > pdf.internal.pageSize.getHeight() - M - 12) {
+      pdf.addPage()
+      yy = M
+    }
+    pdf.setFont('helvetica', 'bold')
+    pdf.setFontSize(12)
+    pdf.setTextColor(31, 31, 31)
+    pdf.text(t('Repuestos usados'), M, yy)
+    yy += 6
+    pdf.setFont('helvetica', 'normal')
+    pdf.setFontSize(10)
+    for (const x of r.repuestos) {
+      for (const l of pdf.splitTextToSize(t(`- ${lineaRepuestoDelPeriodo(x)}`), W - 2 * M) as string[]) {
         if (yy > pdf.internal.pageSize.getHeight() - M) {
           pdf.addPage()
           yy = M

@@ -10,7 +10,13 @@ import {
   lineaTecnicos,
   type DatosCorreoBitacora,
 } from './bitacoraCorreo'
-import { codigoEquipoDe, encabezadoEvento, etiquetaTipo, lineaRepuestos } from './presentacionEvento'
+import { codigoEquipoDe, encabezadoEvento, etiquetaTipo, lineaRepuestos, lineasRepuestos } from './presentacionEvento'
+
+/**
+ * Entre evento y evento del mensaje (17-09): con solo una línea en blanco, dos
+ * eventos seguidos se leían como uno en la pantalla del teléfono.
+ */
+export const SEPARADOR_EVENTOS = '──────────'
 
 /**
  * La bitácora para WhatsApp (decisión de Orel 16-09-2026): un MENSAJE con todo
@@ -148,7 +154,7 @@ export function bitacoraATextoWhatsapp(datos: DatosCorreoBitacora, laminas: read
       marcar(lineaImpacto(e), '_'),
       e.descripcion?.trim() ?? '',
       lineaTecnicos(e),
-      lineaRepuestos(e),
+      ...lineasRepuestos(e),
       e.fotos?.length
         ? `Fotos: ${e.fotos.length}${numeros.has(e.id) ? ` (${referenciaLaminas(numeros.get(e.id) ?? [])})` : ''}`
         : '',
@@ -169,8 +175,8 @@ export function bitacoraATextoWhatsapp(datos: DatosCorreoBitacora, laminas: read
     cabecera,
     eventos.length ? `${marcar('Resumen:', '*')} ${lineaResumen(r)}` : 'Sin eventos registrados en el turno.',
     ...(observacion?.trim() ? [`${marcar('Observaciones del turno:', '_')} ${observacion.trim()}`] : []),
-    ...hechos.map(bloque),
-    ...(pendientes.length ? [marcar('Pendiente para el turno siguiente', '*'), ...pendientes.map(bloque)] : []),
+    ...(hechos.length ? [hechos.map(bloque).join(`\n${SEPARADOR_EVENTOS}\n`)] : []),
+    ...(pendientes.length ? [marcar('Pendiente para el turno siguiente', '*'), pendientes.map(bloque).join(`\n${SEPARADOR_EVENTOS}\n`)] : []),
     ...(pendientesAnteriores.length
       ? [
           [marcar('Sigue pendiente de turnos anteriores', '*'), ...pendientesAnteriores.map((e) => `- ${lineaPendienteAnterior(e)}`)].join('\n'),

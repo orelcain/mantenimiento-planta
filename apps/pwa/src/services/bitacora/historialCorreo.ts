@@ -1,7 +1,7 @@
 import { escaparHtml } from './bitacoraCorreo'
 import { etiquetaCortaTurno } from './entregaTurno'
 import { formatoMinutos } from './turnoMantencion'
-import { porcentaje, tesisDelPeriodo, type FilaTurno, type ResumenPeriodo } from './historialBitacora'
+import { lineaRepuestoDelPeriodo, porcentaje, tesisDelPeriodo, type FilaTurno, type ResumenPeriodo } from './historialBitacora'
 
 /**
  * Resumen del período para pegar en el correo (informe semanal a jefatura).
@@ -49,6 +49,8 @@ export function historialAHtmlCorreo(r: ResumenPeriodo, filas: readonly FilaTurn
     ) +
     kpi(String(r.pendientesCerrados), 'pendientes cerrados', r.pendientesCerrados > 0 ? C.ventana : C.tinta) +
     kpi(String(r.pendientesAbiertos), 'pendientes abiertos') +
+    kpi(String(r.repuestos.length), r.repuestos.length === 1 ? 'repuesto usado' : 'repuestos usados') +
+    kpi(String(r.unidadesRepuestos), 'unidades') +
     `</tr></table>`
 
   const celda = (t: string, extra = '') => `<td style="border:1px solid ${C.linea};padding:6px 10px;font-size:13px;${extra}">${escaparHtml(t)}</td>`
@@ -82,8 +84,15 @@ export function historialAHtmlCorreo(r: ResumenPeriodo, filas: readonly FilaTurn
         .join('')
     : ''
 
+  const repuestos = r.repuestos.length
+    ? `<div style="font-family:${FUENTE};font-size:15px;font-weight:600;color:${C.tinta};padding-top:14px;">Repuestos usados</div>` +
+      `<ul style="font-family:${FUENTE};font-size:13px;color:${C.tinta};margin:4px 0 0;padding-left:18px;">` +
+      r.repuestos.map((x) => `<li style="padding:2px 0;">${escaparHtml(lineaRepuestoDelPeriodo(x))}</li>`).join('') +
+      `</ul>`
+    : ''
+
   const pie = `<div style="font-family:${FUENTE};font-size:11px;color:${C.sec};padding-top:16px;">Generado con la app de Mantención.</div>`
-  return `<div style="max-width:680px;color:${C.tinta};">${cabecera}${kpis}${tabla}${equipos}${pie}</div>`
+  return `<div style="max-width:680px;color:${C.tinta};">${cabecera}${kpis}${tabla}${equipos}${repuestos}${pie}</div>`
 }
 
 export function historialATextoPlano(r: ResumenPeriodo, filas: readonly FilaTurno[], planta: string): string {
@@ -92,7 +101,9 @@ export function historialATextoPlano(r: ResumenPeriodo, filas: readonly FilaTurn
     tesisDelPeriodo(r),
     `${r.eventos} eventos · ${formatoMinutos(r.minutosParada)} de parada (${r.conParada}) · MTTR ${
       r.mttrMin == null ? '—' : formatoMinutos(r.mttrMin)
-    } · ${r.sinDetener} sin detener${r.conImpacto > 0 ? ` (${porcentaje(r.parteSinDetener)})` : ''} · ${r.pendientesCerrados} pendientes cerrados · ${r.pendientesAbiertos} abiertos`,
+    } · ${r.sinDetener} sin detener${r.conImpacto > 0 ? ` (${porcentaje(r.parteSinDetener)})` : ''} · ${r.pendientesCerrados} pendientes cerrados · ${r.pendientesAbiertos} abiertos · ${
+      r.repuestos.length
+    } repuestos usados (${r.unidadesRepuestos} unidades)`,
     filas
       .map(
         (f) =>
@@ -104,6 +115,7 @@ export function historialATextoPlano(r: ResumenPeriodo, filas: readonly FilaTurn
     r.equipos.length
       ? ['EQUIPOS QUE MÁS PARARON', ...r.equipos.map((e) => `- ${e.equipo}: ${formatoMinutos(e.minutos)} en ${e.paradas} (${porcentaje(e.parte)})`)].join('\n')
       : '',
+    r.repuestos.length ? ['REPUESTOS USADOS', ...r.repuestos.map((x) => `- ${lineaRepuestoDelPeriodo(x)}`)].join('\n') : '',
   ]
     .filter(Boolean)
     .join('\n\n')
