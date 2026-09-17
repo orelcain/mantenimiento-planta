@@ -27,7 +27,7 @@ import { normalizarRepuestos, resolverTipo } from '@/services/bitacora/presentac
 import type { EventoBitacora, EventoBitacoraDatos, FotoEvento, TurnoMantencion } from '@/services/bitacora/bitacora.types'
 import { ordenarEventos } from '@/services/bitacora/resumenBitacora'
 import { tecnicosDelCalendario, tecnicosDeTurno, type CalendarioDoc } from '@/services/bitacora/tecnicosDeTurno'
-import { turnoMantencionEn } from '@/services/bitacora/turnoMantencion'
+import { turnoMantencionEn, turnoDesdeId } from '@/services/bitacora/turnoMantencion'
 import { borrarFotoOEncolar, type subirFotoBitacora } from '@/services/bitacora/fotosBitacora'
 import { autorVisible } from '@/services/bitacora/bitacora.types'
 import { dispositivoActual } from '@/services/bitacora/dispositivo'
@@ -45,6 +45,26 @@ import { usePresenciaBitacora } from '@/hooks/usePresenciaBitacora'
  * Además NO pisa un cierre ajeno: si otro turno ya lo cerró, lo dice en vez de
  * sobrescribirlo.
  */
+/**
+ * Un evento que ya cerró un pendiente cambió de turno: el pendiente original
+ * pasa a decir «Resuelto en» el turno nuevo. Solo si el cierre es de ESE evento.
+ */
+async function reubicarCierre(pendienteId: string, eventoId: string, turnoId: string): Promise<void> {
+  const ref = doc(db, BITACORA_COLECCION, pendienteId)
+  try {
+    const snap = await getDoc(ref)
+    const cierre = snap.exists() ? (snap.data().cierre as { eventoId?: string } | null | undefined) : null
+    if (cierre?.eventoId !== eventoId) return
+    await updateDoc(ref, { 'cierre.turnoId': turnoId, updatedAt: serverTimestamp() })
+  } catch {
+    toast({
+      title: 'El evento se movió, pero el pendiente no se actualizó',
+      description: 'Vuelve a guardar el evento cuando haya señal.',
+      variant: 'destructive',
+    })
+  }
+}
+
 async function cerrarPendienteResuelto(
   pendienteId: string,
   eventoId: string,
@@ -273,14 +293,20 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
         })
       }
       const quien = datos.quien.trim() || nombreAutor()
+      // Turno de destino: el que se mira, o el que se eligió en el editor (solo al
+      // publicar o guardar; el autoguardado nunca mueve un borrador).
+      const elegido = !esBorradorAhora && datos.turnoId ? turnoDesdeId(datos.turnoId) : null
+      const destino = elegido ?? turno
+      const mueve = destino.id !== turno.id
       if (esNuevo) {
         const nuevo = {
           ...cuerpo,
+          ...(mueve ? { posicionMin: null } : {}),
           registradoPor: quien,
           plantId: BITACORA_PLANTA.id,
-          turnoId: turno.id,
-          fechaTurno: turno.fecha,
-          banda: turno.banda,
+          turnoId: destino.id,
+          fechaTurno: destino.fecha,
+          banda: destino.banda,
           creadoPor: u.uid,
           autorNombre: nombreAutor(),
           createdAt: serverTimestamp(),
@@ -291,7 +317,7 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
           // cierre del pendiente, que puede fallar sin arrastrarlo (ver
           // `cerrarPendienteResuelto`). Un borrador todavía no cierra nada.
           void setDoc(ref, { ...nuevo, resuelvePendiente: datos.resuelvePendiente }).catch(avisarRechazo)
-          if (!esBorradorAhora) void cerrarPendienteResuelto(datos.resuelvePendiente.id, id, turno.id, quien)
+          if (!esBorradorAhora) void cerrarPendienteResuelto(datos.resuelvePendiente.id, id, destino.id, quien)
         } else {
           void setDoc(ref, nuevo).catch(avisarRechazo)
         }
@@ -311,7 +337,10 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
         // Se PUBLICA un borrador que venía de «Resolver»: recién ahora se cierra
         // el pendiente original.
         if (!esBorradorAhora && vivo?.estado === 'borrador' && vivo.resuelvePendiente?.id) {
-          void cerrarPendienteResuelto(vivo.resuelvePendiente.id, id, turno.id, quien)
+          void cerrarPendienteResuelto(vivo.resuelvePendiente.id, id, destino.id, quien)
+        } else if (mueve && vivo?.estado !== 'borrador' && vivo?.resuelvePendiente?.id) {
+          // Ya publicado y cerraba un pendiente: el pendiente dice dónde se resolvió.
+          void reubicarCierre(vivo.resuelvePendiente.id, id, destino.id)
         }
         const quitadas = antes.filter((a) => !fotos.some((f) => f.path === a.path))
         const cupo = Math.max(0, MAX_FOTOS_EVENTO - vivas.length + quitadas.length)
@@ -339,9 +368,13 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
         // Nada que escribir (abrir, mirar y cerrar): no se escribe. Si no, cada
         // «Cerrar» sin señal dejaba en cola una copia vieja del evento.
         if (esBorradorAhora && !Object.keys(campos).length && !agregadas.length && !quitadas.length && !datos.fijarAutor && !datos.registradoPor) return
+        // Cambio de turno: el turno completo (id, fecha y banda) y sin la
+        // ubicación a mano, que se medía desde el inicio del turno anterior.
+        const cambioDeTurno = mueve ? { turnoId: destino.id, fechaTurno: destino.fecha, banda: destino.banda, posicionMin: null } : {}
         const lote = writeBatch(db)
         lote.update(ref, {
           ...campos,
+          ...cambioDeTurno,
           dispositivo,
           // `estado` solo se escribe al PUBLICAR. Un autoguardado nunca manda
           // «borrador»: si llegaba tarde, despublicaba un evento que otro ya

@@ -110,6 +110,20 @@ const CASOS_REPUESTOS = [
   ['Técnico escribe el índice de repuestos', 'DENY', { method: 'update', uid: 'tecnico1', col: 'repuestosIndice', id: 'sap', data: { m: {} }, previo: { m: {} } }, usuario(true, 'tecnico')],
 ]
 
+// Mover un evento de turno (17-09). Fechas relativas a HOY: el caso no envejece.
+const fechaHace = (dias) => {
+  const d = new Date(Date.now() - dias * 86_400_000)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+const enTurno = (fecha, banda, extra = {}) => evento({ turnoId: `${fecha}_${banda}`, fechaTurno: fecha, banda, ...extra })
+const CASOS_MOVER_TURNO = [
+  ['Mover un evento a un turno de ayer (id, fecha y banda juntos)', 'ALLOW', { method: 'update', uid: 'tecnico1', col: 'bitacoraEventos', data: enTurno(fechaHace(1), 'noche', { actualizadoPorNombre: 'Danilo Cortes' }), previo: enTurno(fechaHace(0), 'dia') }, usuario(true, 'tecnico')],
+  ['Mover cambiando solo el id (fecha y banda viejas)', 'DENY', { method: 'update', uid: 'tecnico1', col: 'bitacoraEventos', data: evento({ turnoId: `${fechaHace(1)}_noche`, fechaTurno: fechaHace(0), banda: 'dia' }), previo: enTurno(fechaHace(0), 'dia') }, usuario(true, 'tecnico')],
+  ['Mover a un turno de hace 20 días', 'DENY', { method: 'update', uid: 'tecnico1', col: 'bitacoraEventos', data: enTurno(fechaHace(20), 'tarde'), previo: enTurno(fechaHace(0), 'dia') }, usuario(true, 'tecnico')],
+  ['Mover a un turno de pasado mañana', 'DENY', { method: 'update', uid: 'tecnico1', col: 'bitacoraEventos', data: enTurno(fechaHace(-2), 'dia'), previo: enTurno(fechaHace(0), 'dia') }, usuario(true, 'tecnico')],
+  ['Mover de turno y de planta a la vez', 'DENY', { method: 'update', uid: 'tecnico1', col: 'bitacoraEventos', data: enTurno(fechaHace(1), 'noche', { plantId: 'yal' }), previo: enTurno(fechaHace(0), 'dia') }, usuario(true, 'tecnico')],
+]
+
 // Pase de bitácora (16-09): teléfono con QR + PIN, sin documento en `users`.
 // El único `get()` que llega a evaluarse es el de su bitacoraDispositivos
 // (isAuthenticated() lo deja fuera antes de leer `users`).
@@ -235,6 +249,7 @@ const CASOS_COOPERATIVA = [
   if (contenido.includes("'tipoOtro' in d")) casos.push(...CASOS_EVENTO_FLEXIBLE)
   if (contenido.includes('function tienePaseBitacora')) casos.push(...CASOS_PASE)
   if (contenido.includes("'equipoCodigo' in d")) casos.push(...CASOS_REPUESTOS)
+  if (contenido.includes('function turnoMovible')) casos.push(...CASOS_MOVER_TURNO)
 
   const testCases = casos.map(([, expectation, c, mocks]) => {
     const id = c.id ?? 'evento1'

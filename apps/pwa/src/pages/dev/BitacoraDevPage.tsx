@@ -250,6 +250,16 @@ function useEventosEjemplo(turno: TurnoMantencion) {
               ? { registradoPor: quien }
               : { actualizadoPorNombre: quien, ...(datos.registradoPor ? { registradoPor: datos.registradoPor } : {}) }),
         }
+        // Cambio de turno (solo al publicar o guardar, como en el hook).
+        const destino = datos.estado !== 'borrador' && datos.turnoId ? turnoDesdeId(datos.turnoId) : null
+        if (destino && destino.id !== turno.id) {
+          const movido = { ...evento, turnoId: destino.id, fechaTurno: destino.fecha, banda: destino.banda, posicionMin: null }
+          return {
+            ...prev,
+            [turno.id]: lista.filter((e) => e.id !== id),
+            [destino.id]: [...(prev[destino.id] ?? ejemploDe(destino)).filter((e) => e.id !== id), movido],
+          }
+        }
         // Un borrador se crea con el primer autoguardado: si no estaba, se agrega.
         return { ...prev, [turno.id]: esNuevo || !previo ? [...lista, evento] : lista.map((e) => (e.id === id ? evento : e)) }
       })

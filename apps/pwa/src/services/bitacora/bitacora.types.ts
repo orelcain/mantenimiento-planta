@@ -225,6 +225,11 @@ export type EventoBitacoraDatos = Pick<
    */
   registradoPor?: string
   /**
+   * Turno donde debe quedar el evento, si no es el que se está mirando (se
+   * registró en el turno equivocado). Se aplica al publicar o guardar.
+   */
+  turnoId?: string
+  /**
    * Al actualizar: SOLO estos campos del documento se escriben (los que
    * cambiaron en esta pantalla). Sin el dato, se escriben todos.
    */

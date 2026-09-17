@@ -1190,6 +1190,18 @@ service cloud.firestore {
     // eventos del turno (decisión de Orel, 15-09-2026); cada uno queda firmado
     // con `creadoPor` inmutable. Borrar: el autor o un supervisor.
     match /bitacoraEventos/{eventoId} {
+      // Un evento que cambia de turno: id, fecha y banda coinciden, y el turno
+      // cae entre hace 10 días y mañana (la app ofrece los últimos 7 días).
+      function turnoMovible(d) {
+        let partes = d.turnoId.split('_');
+        let f = partes[0].split('-');
+        let dia = timestamp.date(int(f[0]), int(f[1]), int(f[2]));
+        return d.get('fechaTurno', '') == partes[0]
+          && d.get('banda', '') == partes[1]
+          && dia > request.time - duration.value(10, 'd')
+          && dia < request.time + duration.value(1, 'd');
+      }
+
       function eventoValido(d) {
         return isValidDocSize()
           && d.plantId is string
@@ -1248,7 +1260,9 @@ service cloud.firestore {
         // (17-09: se elegía mal o lo cargaba otro desde el PC); el rastro queda
         // en actualizadoPorNombre.
         && request.resource.data.creadoPor == resource.data.creadoPor
-        && request.resource.data.turnoId == resource.data.turnoId
+        // El turno se puede corregir (17-09: «Resolver» tocado al día siguiente),
+        // pero entero y a uno reciente: ver turnoMovible.
+        && (request.resource.data.turnoId == resource.data.turnoId || turnoMovible(request.resource.data))
         && request.resource.data.plantId == resource.data.plantId;
 
       allow delete: if (isActiveUser() && (resource.data.creadoPor == request.auth.uid || isSupervisor()))

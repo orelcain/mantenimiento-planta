@@ -53,6 +53,39 @@ export function turnoDesdeId(id: string | null | undefined): TurnoMantencion | n
   return turno.id === id ? turno : null
 }
 
+/** Cuántos días hacia atrás se puede mover un evento de turno (17-09-2026). */
+export const DIAS_PARA_MOVER = 7
+
+/**
+ * Los turnos que se pueden elegir para un evento: el actual y los de los
+ * últimos `dias` días, del más nuevo al más viejo. Nunca uno futuro, y nunca
+ * uno anterior a `desdeId` (el turno del pendiente que el evento cierra).
+ */
+export function turnosElegibles(
+  actual: TurnoMantencion,
+  dias: number = DIAS_PARA_MOVER,
+  desdeId?: string | null,
+): TurnoMantencion[] {
+  const desde = desdeId ? turnoDesdeId(desdeId) : null
+  const salida: TurnoMantencion[] = []
+  let t = actual
+  for (let i = 0; i < dias * 3; i++) {
+    if (desde && t.inicio.getTime() < desde.inicio.getTime()) break
+    salida.push(t)
+    t = turnoAdyacente(t, -1)
+  }
+  return salida
+}
+
+/**
+ * ¿Una hora `HH:mm` puede ser de este turno? Con una hora de holgura a cada
+ * lado (se registra un poco antes o se termina un poco después del cambio).
+ */
+export function horaCalzaEnTurno(turno: Pick<TurnoMantencion, 'banda'>, hhmm: string): boolean {
+  const m = minutosDesdeInicioTurno(turno, hhmm)
+  return m >= -60 && m <= 9 * 60
+}
+
 /** Turno anterior (`-1`) o siguiente (`+1`). */
 export function turnoAdyacente(turno: TurnoMantencion, paso: -1 | 1): TurnoMantencion {
   const i = turno.inicio
