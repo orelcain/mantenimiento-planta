@@ -95,6 +95,15 @@ const CASOS_EVENTO_FLEXIBLE = [
   ['Editar un evento para dejarlo sin hora', 'ALLOW', { method: 'update', uid: 'tecnico2', col: 'bitacoraEventos', data: evento({ horaInicio: '', horaTermino: null, actualizadoPorNombre: 'Otro' }), previo: evento() }, usuario(true, 'tecnico')],
 ]
 
+// Repuestos usados y número del equipo (16-09).
+const REPUESTO = { codigoSAP: '3300011612', nombre: 'SOPORTE SECCION 519437', cantidad: 1 }
+const CASOS_REPUESTOS = [
+  ['Evento con repuestos y número de equipo', 'ALLOW', { method: 'create', uid: 'tecnico1', col: 'bitacoraEventos', data: evento({ equipoId: 'kRbjM6jI0bD60l5ABNPD', equipoCodigo: '720004447', repuestos: [REPUESTO, { ...REPUESTO, codigoSAP: '3300011654', cantidad: 2 }] }) }, usuario(true, 'tecnico')],
+  ['Evento con 21 repuestos', 'DENY', { method: 'create', uid: 'tecnico1', col: 'bitacoraEventos', data: evento({ repuestos: Array(21).fill(REPUESTO) }) }, usuario(true, 'tecnico')],
+  ['Repuestos que no son lista', 'DENY', { method: 'create', uid: 'tecnico1', col: 'bitacoraEventos', data: evento({ repuestos: '3300011612' }) }, usuario(true, 'tecnico')],
+  ['Número de equipo de 41 caracteres', 'DENY', { method: 'create', uid: 'tecnico1', col: 'bitacoraEventos', data: evento({ equipoCodigo: 'x'.repeat(41) }) }, usuario(true, 'tecnico')],
+]
+
 // Pase de bitácora (16-09): teléfono con QR + PIN, sin documento en `users`.
 // El único `get()` que llega a evaluarse es el de su bitacoraDispositivos
 // (isAuthenticated() lo deja fuera antes de leer `users`).
@@ -129,7 +138,10 @@ const CASOS_PASE = [
   ['Pase lee INCIDENCIAS (fuera de la bitácora)', 'DENY', conPase({ method: 'get', col: 'incidents', id: 'i1', previo: { titulo: 'x' } }), dispositivo(true)],
   ['Pase lee USUARIOS', 'DENY', conPase({ method: 'get', col: 'users', id: 'orel', previo: { rol: 'admin' } }), dispositivo(true)],
   ['Pase se crea un perfil de técnico ACTIVO', 'DENY', conPase({ method: 'create', col: 'users', id: 'pase_1', data: { nombre: 'Leandro', apellido: 'Igor', email: 'x@y.cl', rol: 'tecnico', activo: true } }), dispositivo(true)],
-  ['Pase lee el catálogo de repuestos', 'DENY', conPase({ method: 'get', col: 'repuestos', id: 'r1', previo: { nombre: 'x' } }), dispositivo(true)],
+  // Desde el 16-09 el pase busca repuestos para el evento (solo lectura del maestro).
+  ['Pase lee el maestro de repuestos', 'ALLOW', conPase({ method: 'get', col: 'repuestos', id: '3300011612', previo: { codigoSAP: '3300011612' } }), dispositivo(true)],
+  ['Pase quitado lee el maestro de repuestos', 'DENY', conPase({ method: 'get', col: 'repuestos', id: '3300011612', previo: { codigoSAP: '3300011612' } }), dispositivo(false)],
+  ['Pase escribe en el maestro de repuestos', 'DENY', conPase({ method: 'update', col: 'repuestos', id: '3300011612', data: { codigoSAP: '3300011612', textoBreve: 'X' }, previo: { codigoSAP: '3300011612' } }), dispositivo(true)],
   ['Pase deja un registro de error (errorLogs)', 'DENY', conPase({ method: 'create', col: 'errorLogs', id: 'e1', data: { message: 'x' } }), dispositivo(true)],
   ['Pase lee el QR del pase', 'DENY', conPase({ method: 'get', col: 'bitacoraPases', id: 'chonchi', previo: { token: 'secreto' } }), dispositivo(true)],
   ['Pase lee los PIN', 'DENY', conPase({ method: 'get', col: 'bitacoraPines', id: 'chonchi__x', previo: { huella: 'x' } }), dispositivo(true)],
@@ -211,6 +223,7 @@ const CASOS_COOPERATIVA = [
   if (contenido.includes('/bitacoraPresencia/')) casos.push(...CASOS_COOPERATIVA)
   if (contenido.includes("'tipoOtro' in d")) casos.push(...CASOS_EVENTO_FLEXIBLE)
   if (contenido.includes('function tienePaseBitacora')) casos.push(...CASOS_PASE)
+  if (contenido.includes("'equipoCodigo' in d")) casos.push(...CASOS_REPUESTOS)
 
   const testCases = casos.map(([, expectation, c, mocks]) => {
     const id = c.id ?? 'evento1'

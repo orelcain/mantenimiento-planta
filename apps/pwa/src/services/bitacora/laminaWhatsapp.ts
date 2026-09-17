@@ -3,7 +3,7 @@ import { tecnicosDelEvento } from './bitacora.types'
 import { partesImpacto } from './bitacoraCorreo'
 import type { LaminaWhatsapp } from './bitacoraWhatsapp'
 import { cargarImagen } from './fotosBitacora'
-import { etiquetaTipo, horarioEvento, tituloDe } from './presentacionEvento'
+import { codigoEquipoDe, etiquetaTipo, horarioEvento, lineaRepuestos, tituloDe } from './presentacionEvento'
 
 /**
  * Dibuja una LÁMINA de WhatsApp: una imagen de 1080 px de ancho con las fotos
@@ -148,6 +148,7 @@ export function dibujarLamina(l: LaminaWhatsapp, imagenes: ReadonlyMap<string, I
     descripcion: fuente(400, 38),
     pie: fuente(400, 28),
     rotulo: fuente(600, 30),
+    repuestos: fuente(400, 32),
   }
 
   // ── Contenido ──
@@ -156,7 +157,13 @@ export function dibujarLamina(l: LaminaWhatsapp, imagenes: ReadonlyMap<string, I
   const lineasTitulo = recortarLineas(medirCon(F.titulo), partirLineas(medirCon(F.titulo), principal, UTIL), 2, UTIL)
   const titulo = tituloDe(e)
   const lineasSub = titulo ? recortarLineas(medirCon(F.subtitulo), partirLineas(medirCon(F.subtitulo), titulo, UTIL), 2, UTIL) : []
-  const meta = [horarioEvento(e), e.equipo?.trim() ? etiquetaTipo(e) : '', l.partes > 1 ? `fotos ${l.parte} de ${l.partes}` : '']
+  const codigo = codigoEquipoDe(e)
+  const meta = [
+    horarioEvento(e),
+    e.equipo?.trim() ? etiquetaTipo(e) : '',
+    codigo ? (/^\d+$/.test(codigo) ? `N° ${codigo}` : codigo) : '',
+    l.partes > 1 ? `fotos ${l.parte} de ${l.partes}` : '',
+  ]
     .filter(Boolean)
     .join(' · ')
   const lineasMeta = meta ? partirLineas(medirCon(F.meta), meta, UTIL) : []
@@ -169,6 +176,9 @@ export function dibujarLamina(l: LaminaWhatsapp, imagenes: ReadonlyMap<string, I
   const lineasDesc = descripcion
     ? recortarLineas(medirCon(F.descripcion), partirLineas(medirCon(F.descripcion), descripcion, UTIL), MAX_LINEAS_DESCRIPCION, UTIL)
     : []
+  // Repuestos en la primera lámina del evento, bajo la descripción (hasta 4 líneas).
+  const repuestos = l.parte === 1 ? lineaRepuestos(e) : ''
+  const lineasRep = repuestos ? recortarLineas(medirCon(F.repuestos), partirLineas(medirCon(F.repuestos), repuestos, UTIL), 4, UTIL) : []
   const anchoPlanta = medirCon(F.pie)(l.planta)
   const anchoPie = UTIL - anchoPlanta - 24
   const lineasPie = recortarLineas(medirCon(F.pie), partirLineas(medirCon(F.pie), tecnicosDelEvento(e).join(' · '), anchoPie), 2, anchoPie)
@@ -181,6 +191,7 @@ export function dibujarLamina(l: LaminaWhatsapp, imagenes: ReadonlyMap<string, I
   alto += 14 + lineasMeta.length * 44 + lineasImpacto.length * 44 + (avisoPendiente ? 44 : 0)
   if (cajas.length) alto += 32 + altoFotos
   if (lineasDesc.length) alto += 32 + lineasDesc.length * 52
+  if (lineasRep.length) alto += 20 + lineasRep.length * 44
   alto += 40 + Math.max(1, lineasPie.length) * 36 + MARGEN - 8
 
   canvas.height = Math.ceil(alto)
@@ -264,6 +275,13 @@ export function dibujarLamina(l: LaminaWhatsapp, imagenes: ReadonlyMap<string, I
     for (const linea of lineasDesc) {
       texto(linea, MARGEN, y, F.descripcion, C.tinta)
       y += 52
+    }
+  }
+  if (lineasRep.length) {
+    y += 20
+    for (const linea of lineasRep) {
+      texto(linea, MARGEN, y, F.repuestos, C.sec)
+      y += 44
     }
   }
 

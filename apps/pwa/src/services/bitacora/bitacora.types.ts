@@ -70,6 +70,17 @@ export type ImpactoEvento = 'no-aplica' | 'con-parada' | 'en-ventana'
 
 export type EtiquetaFoto = 'antes' | 'despues' | 'foto'
 
+/**
+ * Repuesto usado en un evento (opcional, 16-09-2026). El nombre se copia del
+ * maestro al agregarlo: el correo y WhatsApp no vuelven a leer el catálogo.
+ */
+export interface RepuestoUsado {
+  codigoSAP: string
+  /** Nombre del maestro al momento de agregarlo ('' si el código no estaba). */
+  nombre: string
+  cantidad: number
+}
+
 export interface FotoEvento {
   url: string
   /** Ruta en Storage, para poder borrarla. */
@@ -129,6 +140,13 @@ export interface EventoBitacora {
   /** Nodo de `hierarchy` si el equipo se eligió del buscador (null = texto libre). */
   equipoId?: string | null
   /**
+   * Número SAP del equipo (o ubicación técnica de un área) al elegirlo del
+   * buscador. Se copia para que el correo y WhatsApp lo muestren sin leer la jerarquía.
+   */
+  equipoCodigo?: string | null
+  /** Repuestos usados (opcional). */
+  repuestos?: RepuestoUsado[]
+  /**
    * En un PENDIENTE: cómo y dónde se cerró. `resuelto` = otro evento lo resolvió
    * (cuenta como cerrado por Mantención); `no-aplica` = se descartó con motivo.
    */
@@ -165,6 +183,8 @@ export type EventoBitacoraDatos = Pick<
   | 'tipo'
   | 'tipoOtro'
   | 'equipo'
+  | 'equipoCodigo'
+  | 'repuestos'
   | 'titulo'
   | 'descripcion'
   | 'horaInicio'

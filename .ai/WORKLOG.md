@@ -5263,3 +5263,26 @@ teléfonos que ya entraron siguen hasta «Quitar» o hasta que se le quite/reini
   confirmación, modo bitácora sin «Acceso QR».
 - **Sin probar todavía:** el flujo real (necesita la función desplegada y que Orel genere el QR y
   asigne PIN a los técnicos).
+
+## 2026-09-16 · Bitacora ronda 15 · Repuestos usados y número del equipo
+
+Pedido de Orel tras probar el QR con un técnico: incluir (opcional) los códigos SAP de repuestos
+usados en el evento y mostrar el número del equipo elegido. Mockup:
+https://claude.ai/artifact/UEk6L3pijTCp8dodhcxjfe — eligió código SAP + búsqueda por nombre dentro de
+los repuestos del equipo, con cantidad (1 por defecto).
+
+- **Número del equipo:** `equipoCodigo` se copia del `codigo` del nodo al elegirlo en el buscador
+  (equipo → 720004447; área → ubicación técnica AQ-IN-CHO-EXTE-CASI). Va con el equipo en la fusión
+  y en la escritura (`CAMPOS_DOC`); un evento anterior lo completa al abrirse. Se ve en el editor
+  («Planta · Área · N° de equipo»), la fila, el correo/PDF/WhatsApp («EQUIPO (720004447)») y la
+  lámina («N° 720004447»).
+- **Repuestos usados:** `repuestos: [{codigoSAP, nombre, cantidad}]` (≤ 20, nombre copiado del
+  maestro). Por código: `getDoc(repuestos/{código})` (el id ES el SAP; si no, query por
+  `codigoSAP`) — un código que no está queda solo con el código. Por nombre: solo con equipo
+  elegido, `leer … where equipos array-contains` UNA vez por sesión (BAADER 142 N2: 1.803 docs,
+  ~2 MB, 476 con SAP). NO se carga el maestro entero (7.673 lecturas por apertura: techo de costos).
+  Nombres con `formatNombreSAP`. En el formulario se comparan como JSON normalizado.
+- Reglas: `equipoCodigo` ≤ 40, `repuestos` lista ≤ 20; el pase de bitácora ahora LEE `repuestos`.
+  96/96 (`probar-reglas-bitacora.cjs --local`, 6 nuevos + el caso del pase cambiado a ALLOW).
+- 113 pruebas en services/bitacora (13 nuevas). Verificado en la vitrina a 375 px tecleando: código
+  del maestro, código desconocido, búsqueda «pern» → 2 pernos reales, guardar → fila y correo.

@@ -19,6 +19,7 @@ import type {
   FotoEvento,
   ImpactoEvento,
   PresenciaBitacora,
+  RepuestoUsado,
   TipoEvento,
   TurnoMantencion,
 } from '@/services/bitacora/bitacora.types'
@@ -44,7 +45,10 @@ import { BuscadorEquipo } from './BuscadorEquipo'
 import type { OpcionEquipo } from '@/services/bitacora/buscarEquipos'
 import { tecnicoRecordado } from './tecnicoRecordado'
 import { formatoMinutos, horaDe, horaSugeridaParaEvento, minutosEntre } from '@/services/bitacora/turnoMantencion'
-import { limpiarTipo, normalizarTipo } from '@/services/bitacora/presentacionEvento'
+import { etiquetaCodigoEquipo, limpiarTipo, normalizarRepuestos, normalizarTipo } from '@/services/bitacora/presentacionEvento'
+import { RepuestosUsados } from './RepuestosUsados'
+import type { FuenteRepuestos } from '@/services/bitacora/repuestosBitacora'
+import { fuenteRepuestosFirestore } from '@/services/bitacora/repuestosFirestore'
 
 interface Subida {
   clave: string
@@ -65,6 +69,8 @@ export interface EventoBitacoraSheetProps {
   sugerenciasTipo?: string[]
   /** Teléfono con pase de bitácora: registra siempre su técnico, sin elegir. */
   autorFijo?: string | null
+  /** De dónde salen los repuestos (la vitrina usa uno de ejemplo). */
+  fuenteRepuestos?: FuenteRepuestos
   /** `deTurno` = presentes del turno (botones rápidos); `todos` = lista de técnicos completa. */
   tecnicos: { deTurno: string[]; todos: string[] }
   /** Equipos y áreas de la jerarquía para el buscador. */
@@ -191,6 +197,7 @@ export function EventoBitacoraSheet({
   sugerenciasEquipo,
   sugerenciasTipo = [],
   autorFijo = null,
+  fuenteRepuestos = fuenteRepuestosFirestore,
   tecnicos,
   opcionesEquipo,
   cargandoEquipos,
@@ -209,6 +216,8 @@ export function EventoBitacoraSheet({
   const [quien, setQuien] = useState('')
   const [participantes, setParticipantes] = useState<string[]>([])
   const [equipoId, setEquipoId] = useState<string | null>(null)
+  const [equipoCodigo, setEquipoCodigo] = useState('')
+  const [repuestos, setRepuestos] = useState<RepuestoUsado[]>([])
   const [tipo, setTipo] = useState<TipoEvento>('falla')
   const [tipoOtro, setTipoOtro] = useState('')
   const [equipo, setEquipo] = useState('')
@@ -302,6 +311,8 @@ export function EventoBitacoraSheet({
     setParticipantes(evento?.participantes ?? [])
     // «Resolver pendiente»: el equipo, su vínculo y el tipo vienen del pendiente original.
     setEquipoId(evento?.equipoId ?? pendienteOrigen?.equipoId ?? null)
+    setEquipoCodigo(evento?.equipoCodigo ?? pendienteOrigen?.equipoCodigo ?? '')
+    setRepuestos(normalizarRepuestos(evento?.repuestos))
     setTipo(evento?.tipo ?? pendienteOrigen?.tipo ?? 'falla')
     setTipoOtro(evento?.tipoOtro ?? pendienteOrigen?.tipoOtro ?? '')
     setEquipo(evento?.equipo ?? pendienteOrigen?.equipo ?? '')
@@ -331,7 +342,9 @@ export function EventoBitacoraSheet({
           tipoOtro: pendienteOrigen?.tipo === 'otro' ? (pendienteOrigen.tipoOtro ?? '') : '',
           equipo: pendienteOrigen?.equipo ?? '',
           equipoId: pendienteOrigen?.equipoId ?? null,
+          equipoCodigo: pendienteOrigen?.equipoId ? (pendienteOrigen.equipoCodigo ?? '') : '',
           titulo: '',
+          repuestos: '[]',
           descripcion: '',
           horaInicio: horaSugeridaParaEvento(turno),
           horaTermino: '',
@@ -368,7 +381,9 @@ export function EventoBitacoraSheet({
     tipoOtro: tipo === 'otro' ? tipoOtro : '',
     equipo,
     equipoId,
+    equipoCodigo: equipoId ? equipoCodigo : '',
     titulo,
+    repuestos: JSON.stringify(normalizarRepuestos(repuestos)),
     descripcion,
     horaInicio: sinHora ? '' : horaInicio,
     horaTermino: sinHora ? '' : horaTermino,
@@ -384,6 +399,8 @@ export function EventoBitacoraSheet({
     if (v.tipoOtro !== previo.tipoOtro && v.tipo === 'otro') setTipoOtro(v.tipoOtro)
     if (v.equipo !== previo.equipo) setEquipo(v.equipo)
     if (v.equipoId !== previo.equipoId) setEquipoId(v.equipoId)
+    if (v.equipoCodigo !== previo.equipoCodigo) setEquipoCodigo(v.equipoCodigo)
+    if (v.repuestos !== previo.repuestos) setRepuestos(normalizarRepuestos(JSON.parse(v.repuestos) as RepuestoUsado[]))
     if (v.titulo !== previo.titulo) setTitulo(v.titulo)
     if (v.descripcion !== previo.descripcion) setDescripcion(v.descripcion)
     if (v.horaInicio !== previo.horaInicio || v.horaTermino !== previo.horaTermino) {
@@ -408,6 +425,8 @@ export function EventoBitacoraSheet({
       tipo,
       tipoOtro: tipo === 'otro' ? tipoOtro : null,
       equipo,
+      equipoCodigo: equipoId ? equipoCodigo : null,
+      repuestos: normalizarRepuestos(repuestos),
       titulo,
       descripcion,
       horaInicio: sinHora ? '' : horaInicio,
@@ -561,7 +580,10 @@ export function EventoBitacoraSheet({
     const local = formularioActual()
     const v = { ...local }
     for (const c of conflictos) (v as unknown as Record<string, unknown>)[c] = remoto[c]
-    if (conflictos.includes('equipo')) v.equipoId = remoto.equipoId
+    if (conflictos.includes('equipo')) {
+      v.equipoId = remoto.equipoId
+      v.equipoCodigo = remoto.equipoCodigo
+    }
     if (conflictos.includes('tipo')) v.tipoOtro = remoto.tipoOtro
     if (conflictos.includes('horaInicio') || conflictos.includes('horaTermino')) {
       v.horaInicio = remoto.horaInicio
@@ -593,6 +615,13 @@ export function EventoBitacoraSheet({
       })
       .slice(0, 6)
   }, [sugerenciasTipo, open])
+
+  // Equipo elegido del buscador: su número (planta y área también, para el rótulo).
+  const opcionElegida = equipoId ? (opcionesEquipo.find((o) => o.id === equipoId) ?? null) : null
+  // Un evento anterior a este cambio no guardó el número: se completa al cargar la jerarquía.
+  useEffect(() => {
+    if (open && opcionElegida?.codigo && !equipoCodigo) setEquipoCodigo(opcionElegida.codigo)
+  }, [open, opcionElegida, equipoCodigo])
 
   const cambiarSinHora = (v: boolean) => {
     setSinHora(v)
@@ -1068,11 +1097,17 @@ export function EventoBitacoraSheet({
             onChange={(texto, id) => {
               setEquipo(texto)
               setEquipoId(id)
+              setEquipoCodigo(id ? (opcionesEquipo.find((o) => o.id === id)?.codigo ?? '') : '')
             }}
             opciones={opcionesEquipo}
             cargando={cargandoEquipos}
             recientes={equiposSugeridos}
           />
+          {equipoId && (opcionElegida || equipoCodigo) && (
+            <p className="-mt-1.5 text-footnote text-muted-foreground">
+              {[opcionElegida?.planta, opcionElegida?.area, etiquetaCodigoEquipo(equipoCodigo)].filter(Boolean).join(' · ')}
+            </p>
+          )}
           <div>
             <label htmlFor="bitacora-titulo" className={`${ETIQUETA_CAMPO} flex justify-between gap-2`}>
               <span>Título</span>
@@ -1124,6 +1159,8 @@ export function EventoBitacoraSheet({
             placeholder="Detención por E777. Muelle de tracción del carro cortado; se cambia y se prueba en vacío."
           />
         </div>
+
+        <RepuestosUsados valor={repuestos} onChange={setRepuestos} equipoId={equipoId} fuente={fuenteRepuestos} />
 
         {/* Impacto en producción */}
         <div>

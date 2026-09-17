@@ -1,5 +1,6 @@
-import { ETIQUETA_TIPO, MAX_TIPO_OTRO, TIPOS_EVENTO } from '@/config/bitacora'
-import type { EventoBitacora, TipoEvento, TurnoMantencion } from './bitacora.types'
+import { ETIQUETA_TIPO, MAX_CANTIDAD_REPUESTO, MAX_REPUESTOS_EVENTO, MAX_TIPO_OTRO, TIPOS_EVENTO } from '@/config/bitacora'
+import { formatNombreSAP } from '@/utils/repuestos/formatNombreSAP'
+import type { EventoBitacora, RepuestoUsado, TipoEvento, TurnoMantencion } from './bitacora.types'
 import { minutosDesdeInicioTurno } from './turnoMantencion'
 
 /**
@@ -88,12 +89,66 @@ export function horarioEvento(e: Pick<EventoBitacora, 'horaInicio' | 'horaTermin
   return e.horaTermino ? `${e.horaInicio} – ${e.horaTermino}` : e.horaInicio
 }
 
+/** El número del equipo (o la ubicación técnica de un área), solo si se eligió del buscador. */
+export function codigoEquipoDe(e: Pick<EventoBitacora, 'equipoId' | 'equipoCodigo'>): string {
+  return e.equipoId ? (e.equipoCodigo ?? '').trim() : ''
+}
+
+/** «N° de equipo 720004447» o «Ubicación técnica AQ-IN-CHO-EXTE-CASI». */
+export function etiquetaCodigoEquipo(codigo: string): string {
+  const c = codigo.trim()
+  if (!c) return ''
+  return /^\d+$/.test(c) ? `N° de equipo ${c}` : `Ubicación técnica ${c}`
+}
+
+/** "EVISCERADORA BAADER 142 N2 (720004447)"; sin número, el equipo tal cual. */
+export function equipoConCodigo(e: Pick<EventoBitacora, 'equipo' | 'equipoId' | 'equipoCodigo'>): string {
+  const equipo = e.equipo?.trim() ?? ''
+  const codigo = codigoEquipoDe(e)
+  return equipo && codigo ? `${equipo} (${codigo})` : equipo
+}
+
 /**
  * La línea que encabeza el evento en el correo, el PDF y WhatsApp:
  * "18:07 – 18:30 · CASINO · Cambio de tubos". Sin hora, parte por el equipo.
  */
-export function encabezadoEvento(e: Pick<EventoBitacora, 'horaInicio' | 'horaTermino' | 'equipo' | 'titulo'>): string {
-  return [horarioEvento(e), e.equipo?.trim(), tituloDe(e)].filter(Boolean).join(' · ')
+export function encabezadoEvento(
+  e: Pick<EventoBitacora, 'horaInicio' | 'horaTermino' | 'equipo' | 'titulo'> & Partial<Pick<EventoBitacora, 'equipoId' | 'equipoCodigo'>>,
+): string {
+  return [horarioEvento(e), equipoConCodigo(e), tituloDe(e)].filter(Boolean).join(' · ')
+}
+
+/**
+ * Repuestos válidos y sin repetir (el mismo código suma cantidades), en el
+ * orden en que se agregaron. Lo usa el guardado y la comparación entre equipos.
+ */
+export function normalizarRepuestos(lista: readonly Partial<RepuestoUsado>[] | null | undefined): RepuestoUsado[] {
+  const porCodigo = new Map<string, RepuestoUsado>()
+  for (const r of lista ?? []) {
+    const codigoSAP = String(r?.codigoSAP ?? '').trim()
+    if (!/^[0-9A-Za-z-]{3,20}$/.test(codigoSAP)) continue
+    const cantidad = Math.min(MAX_CANTIDAD_REPUESTO, Math.max(1, Math.round(Number(r?.cantidad) || 1)))
+    const previo = porCodigo.get(codigoSAP)
+    if (previo) previo.cantidad = Math.min(MAX_CANTIDAD_REPUESTO, previo.cantidad + cantidad)
+    else porCodigo.set(codigoSAP, { codigoSAP, nombre: String(r?.nombre ?? '').trim().slice(0, 120), cantidad })
+  }
+  return [...porCodigo.values()].slice(0, MAX_REPUESTOS_EVENTO)
+}
+
+/** Nombre legible del repuesto (los del maestro vienen en MAYÚSCULAS de SAP). */
+export function nombreRepuesto(r: Pick<RepuestoUsado, 'nombre'>): string {
+  return formatNombreSAP(r.nombre).nombre || r.nombre
+}
+
+/** "3300011612 Soporte sección 519437 ×2" (sin nombre: solo el código). */
+export function textoRepuesto(r: RepuestoUsado): string {
+  return [r.codigoSAP, nombreRepuesto(r), r.cantidad > 1 ? `×${r.cantidad}` : ''].filter(Boolean).join(' ')
+}
+
+/** "Repuestos: 3300011612 Soporte sección 519437 · 3300011654 Anillo 31000251 ×2" ('' si no hay). */
+export function lineaRepuestos(e: Pick<EventoBitacora, 'repuestos'>): string {
+  const lista = normalizarRepuestos(e.repuestos)
+  return lista.length ? `Repuestos: ${lista.map(textoRepuesto).join(' · ')}` : ''
 }
 
 function aMilisegundos(v: unknown): number | null {

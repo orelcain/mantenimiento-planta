@@ -21,7 +21,8 @@ import { useAuthStore } from '@/store'
 import { toast } from '@/hooks/useToast'
 import { useAjustesTecnicos, useOpcionesEquipo } from '@/hooks/useListasBitacora'
 import { BITACORA_COLECCION, BITACORA_PLANTA, BITACORA_TURNOS_COLECCION, MAX_FOTOS_EVENTO, MAX_TIPO_OTRO, MAX_TITULO_EVENTO } from '@/config/bitacora'
-import { resolverTipo } from '@/services/bitacora/presentacionEvento'
+import type { FuenteRepuestos } from '@/services/bitacora/repuestosBitacora'
+import { normalizarRepuestos, resolverTipo } from '@/services/bitacora/presentacionEvento'
 import type { EventoBitacora, EventoBitacoraDatos, FotoEvento, TurnoMantencion } from '@/services/bitacora/bitacora.types'
 import { ordenarEventos } from '@/services/bitacora/resumenBitacora'
 import { tecnicosDelCalendario, tecnicosDeTurno, type CalendarioDoc } from '@/services/bitacora/tecnicosDeTurno'
@@ -232,6 +233,9 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
         tipoOtro,
         equipo: limpiar(datos.equipo),
         titulo: limpiar(datos.titulo ?? '').slice(0, MAX_TITULO_EVENTO) || null,
+        // El número solo vale con un equipo elegido del buscador.
+        equipoCodigo: datos.equipoId ? (datos.equipoCodigo ?? '').trim().slice(0, 40) || null : null,
+        repuestos: normalizarRepuestos(datos.repuestos),
         descripcion,
         horaInicio: datos.horaInicio,
         horaTermino: sinHora ? null : datos.horaTermino || null,
@@ -615,6 +619,8 @@ export interface FuenteBitacora {
   useBorradoresAnteriores: (turno: TurnoMantencion) => EventoBitacora[]
   /** Reemplaza la subida a Storage. */
   subirFoto?: typeof subirFotoBitacora
+  /** Reemplaza las lecturas del maestro de repuestos. */
+  repuestos?: FuenteRepuestos
 }
 
 export const FUENTE_FIRESTORE: FuenteBitacora = {

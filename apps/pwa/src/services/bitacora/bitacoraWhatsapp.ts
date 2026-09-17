@@ -10,7 +10,7 @@ import {
   lineaTecnicos,
   type DatosCorreoBitacora,
 } from './bitacoraCorreo'
-import { encabezadoEvento, etiquetaTipo } from './presentacionEvento'
+import { codigoEquipoDe, encabezadoEvento, etiquetaTipo, lineaRepuestos } from './presentacionEvento'
 
 /**
  * La bitácora para WhatsApp (decisión de Orel 16-09-2026): un MENSAJE con todo
@@ -98,6 +98,8 @@ export function planLaminas({ turno, eventos, planta }: Pick<DatosCorreoBitacora
       p.evento.descripcion ?? '',
       lineaTecnicos(p.evento),
       autorVisible(p.evento),
+      codigoEquipoDe(p.evento),
+      lineaRepuestos(p.evento),
       p.fotos.map((f) => [f.path, f.etiqueta]),
     ]),
   }))
@@ -146,6 +148,7 @@ export function bitacoraATextoWhatsapp(datos: DatosCorreoBitacora, laminas: read
       marcar(lineaImpacto(e), '_'),
       e.descripcion?.trim() ?? '',
       lineaTecnicos(e),
+      lineaRepuestos(e),
       e.fotos?.length
         ? `Fotos: ${e.fotos.length}${numeros.has(e.id) ? ` (${referenciaLaminas(numeros.get(e.id) ?? [])})` : ''}`
         : '',

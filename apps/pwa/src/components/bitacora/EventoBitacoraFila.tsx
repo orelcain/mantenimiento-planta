@@ -6,7 +6,7 @@ import { NOMBRE_DISPOSITIVO } from '@/services/bitacora/presencia'
 import { minutosParadaDe } from '@/services/bitacora/resumenBitacora'
 import { formatoMinutos } from '@/services/bitacora/turnoMantencion'
 import { etiquetaCortaTurno } from '@/services/bitacora/entregaTurno'
-import { etiquetaTipo, tieneHora, tituloDe } from '@/services/bitacora/presentacionEvento'
+import { codigoEquipoDe, etiquetaTipo, nombreRepuesto, normalizarRepuestos, tieneHora, tituloDe } from '@/services/bitacora/presentacionEvento'
 
 /**
  * Un evento en la línea de tiempo del turno (opción A del mockup, aprobada).
@@ -39,6 +39,8 @@ export function EventoBitacoraFila({
   const titulo = tituloDe(evento)
   const nombreEquipo = evento.equipo?.trim() || (borrador ? 'Sin equipo todavía' : 'Sin equipo')
   const sinEquipo = borrador && !evento.equipo?.trim()
+  const codigo = codigoEquipoDe(evento)
+  const repuestos = normalizarRepuestos(evento.repuestos)
 
   return (
     <div
@@ -81,6 +83,7 @@ export function EventoBitacoraFila({
           ) : (
             <>
               <span className={`text-headline leading-tight ${sinEquipo ? 'text-muted-foreground' : ''}`}>{nombreEquipo}</span>
+              {codigo && <span className="text-footnote tabular-nums text-muted-foreground">{codigo}</span>}
               <Tag>{etiquetaTipo(evento)}</Tag>
             </>
           )}
@@ -89,6 +92,7 @@ export function EventoBitacoraFila({
         {titulo && (
           <div className="flex flex-wrap items-center gap-1.5">
             <span className={`text-footnote ${sinEquipo ? 'text-muted-foreground' : 'text-foreground'}`}>{nombreEquipo}</span>
+            {codigo && <span className="text-footnote tabular-nums text-muted-foreground">{codigo}</span>}
             <Tag>{etiquetaTipo(evento)}</Tag>
           </div>
         )}
@@ -111,6 +115,20 @@ export function EventoBitacoraFila({
         ) : borrador ? (
           <p className="text-body text-muted-foreground">Sin descripción todavía</p>
         ) : null}
+
+        {repuestos.length > 0 && (
+          <p className="text-footnote text-muted-foreground">
+            Repuestos:{' '}
+            {repuestos.map((r, i) => (
+              <span key={r.codigoSAP}>
+                {i > 0 ? ' · ' : ''}
+                <span className="font-semibold tabular-nums text-foreground">{r.codigoSAP}</span>
+                {nombreRepuesto(r) ? ` ${nombreRepuesto(r)}` : ''}
+                {r.cantidad > 1 ? ` ×${r.cantidad}` : ''}
+              </span>
+            ))}
+          </p>
+        )}
 
         {/* En el pendiente original (visto en su propio turno): dónde y cómo se cerró. */}
         {evento.cierre && (

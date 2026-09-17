@@ -49,6 +49,10 @@ export const TIPOS_EVENTO: ReadonlyArray<{ id: TipoEvento; label: string }> = [
 export const MAX_TIPO_OTRO = 40
 /** Largo máximo del título del evento (igual en firestore.rules). */
 export const MAX_TITULO_EVENTO = 120
+/** Repuestos distintos por evento (igual en firestore.rules). */
+export const MAX_REPUESTOS_EVENTO = 20
+/** Cantidad máxima de un mismo repuesto en un evento. */
+export const MAX_CANTIDAD_REPUESTO = 999
 
 export const ETIQUETA_TIPO: Record<TipoEvento, string> = Object.fromEntries(
   TIPOS_EVENTO.map((t) => [t.id, t.label]),
