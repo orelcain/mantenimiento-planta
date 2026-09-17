@@ -36,17 +36,35 @@ export function fechaRecoleccion(fechaIso: string): string {
   return `${String(d).padStart(2, '0')}-${MESES[m - 1]}-${a} ${DIAS[fecha.getDay()]}`
 }
 
+/** La descripción partida en su primera frase (hasta la primera coma o punto) y el resto. */
+function primeraFrase(descripcion: string): { frase: string; resto: string } {
+  const texto = descripcion.trim()
+  const corte = texto.search(/(?<=[.;:,])\s|\n/)
+  const frase = (corte < 0 ? texto : texto.slice(0, corte)).trim().replace(/[.;:,]$/, '')
+  const resto = (corte < 0 ? '' : texto.slice(corte)).trim().replace(/\s*\n+\s*/g, ' ')
+  return { frase, resto: resto ? resto.charAt(0).toUpperCase() + resto.slice(1) : '' }
+}
+
 /** «Falla» de la planilla: el título del evento; sin título, la primera frase de lo que escribió el técnico. */
 function fallaDe(e: EventoBitacora): string {
   const titulo = tituloDe(e)
   if (titulo) return titulo
-  // Hasta la primera coma o punto: la planilla lleva la falla en pocas palabras.
-  const primera = (e.descripcion ?? '').trim().split(/(?<=[.;:,])\s|\n/)[0]?.trim().replace(/[.;:,]$/, '') ?? ''
-  return primera ? (primera.length > 70 ? `${primera.slice(0, 67).trimEnd()}…` : primera) : etiquetaTipo(e)
+  // La planilla lleva la falla en pocas palabras.
+  const { frase } = primeraFrase(e.descripcion ?? '')
+  return frase ? (frase.length > 70 ? `${frase.slice(0, 67).trimEnd()}…` : frase) : etiquetaTipo(e)
 }
 
 function observacionesDe(e: EventoBitacora): string {
-  const partes = [(e.descripcion ?? '').trim().replace(/\s*\n+\s*/g, ' ')]
+  const descripcion = (e.descripcion ?? '').trim().replace(/\s*\n+\s*/g, ' ')
+  // Sin repetir lo que ya dice «Falla»: en el celular cada palabra de más alarga
+  // la fila (revisión 17-09). Sin título, «Falla» ya lleva la primera frase y aquí
+  // va el resto; con título igual a la descripción, aquí no va nada.
+  const texto = tituloDe(e)
+    ? descripcion.replace(/[.;:,]$/, '').toLowerCase() === tituloDe(e).toLowerCase()
+      ? ''
+      : descripcion
+    : primeraFrase(e.descripcion ?? '').resto
+  const partes = [texto]
   const repuestos = normalizarRepuestos(e.repuestos)
   if (repuestos.length) partes.push(`Repuestos: ${repuestos.map((r) => `${r.codigoSAP} ${nombreConComun(r)} ×${r.cantidad}`.replace(/\s+×/, ' ×')).join('; ')}.`)
   if (e.impacto === 'en-ventana') partes.push(e.ventana?.trim() ? `Sin detener: ${e.ventana.trim()}.` : 'Sin detener producción.')
@@ -105,25 +123,33 @@ const CAL = "Calibri,'Segoe UI',sans-serif"
 const AZUL = '#00557F'
 const BANDA = '#D9E1F2'
 const GRIS = '#F2F2F2'
-const ANCHOS = { fecha: 112, maquina: 132, falla: 214, duracion: 96 }
+// En proporción y no en píxeles: en el celular el correo se adapta al ancho de la
+// pantalla y los anchos fijos dejaban a Observaciones sin espacio (revisión 17-09).
+// En PC (≈960 px) dan 115/154/211/96/384 px, cerca de la planilla.
+const ANCHOS = { fecha: 14, maquina: 16, falla: 21, duracion: 9 }
 
 export function htmlRecoleccionMttr(filas: readonly FilaRecoleccion[], opciones: { logo?: string } = {}): string {
   const logo = opciones.logo ?? LOGO_RECOLECCION_DATA_URI
   const th = (t: string, ancho?: number) =>
-    `<th${ancho ? ` width="${ancho}"` : ''} style="${ancho ? `width:${ancho}px;` : ''}background:${AZUL};color:#FFFFFF;font-family:${CAL};font-size:10pt;font-weight:bold;text-align:center;vertical-align:bottom;padding:3px 4px;">${t}</th>`
+    `<th${ancho ? ` width="${ancho}%"` : ''} style="${ancho ? `width:${ancho}%;` : ''}background:${AZUL};color:#FFFFFF;font-family:${CAL};font-size:10pt;font-weight:bold;text-align:center;vertical-align:bottom;padding:3px 4px;">${t}</th>`
   const td = (t: string, i: number, izq = false, nowrap = false) =>
     // TableStyleMedium2 pinta la PRIMERA fila de datos y luego alterna.
-    `<td style="background:${i % 2 ? '#FFFFFF' : BANDA};color:#000000;font-family:${CAL};font-size:10pt;text-align:${izq ? 'left' : 'center'};vertical-align:bottom;padding:3px 4px;${nowrap ? 'white-space:nowrap;' : ''}">${escaparHtml(t)}</td>`
+    // `overflow-wrap:anywhere`: en el celular una palabra larga («EMPACADORA») se
+    // montaba sobre la columna vecina en vez de partirse.
+    `<td style="background:${i % 2 ? '#FFFFFF' : BANDA};color:#000000;font-family:${CAL};font-size:10pt;text-align:${izq ? 'left' : 'center'};vertical-align:bottom;padding:3px 4px;overflow-wrap:anywhere;word-break:break-word;${nowrap ? 'white-space:nowrap;' : ''}">${escaparHtml(t)}</td>`
   const cuerpo = filas.length
     ? filas
-        .map((f, i) => `<tr>${td(f.fecha, i, false, true)}${td(f.maquina, i)}${td(f.falla, i)}${td(f.duracion, i, false, true)}${td(f.observaciones, i, true)}</tr>`)
+        .map((f, i) => `<tr>${td(f.fecha, i)}${td(f.maquina, i)}${td(f.falla, i)}${td(f.duracion, i, false, true)}${td(f.observaciones, i, true)}</tr>`)
         .join('')
     : `<tr>${td('', 0, false, true)}${td('', 0)}${td('', 0)}${td('', 0)}${td('', 0, true)}</tr>`
   return (
+    // La banda va en su propia tabla: con `table-layout:fixed` la primera fila fija
+    // los anchos, y la celda del logo (146 px) no debe mandar sobre la columna Fecha.
     `<table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;width:100%;font-family:${CAL};">` +
     `<tr><td width="146" style="width:146px;height:56px;background:${GRIS};padding:0 0 0 13px;vertical-align:middle;">` +
     `<img src="${logo}" width="120" height="28" alt="" style="display:block;width:120px;height:28px;"></td>` +
-    `<td colspan="4" style="background:${AZUL};color:#FFFFFF;font-family:${CAL};font-size:16pt;font-weight:bold;height:56px;padding:0 8px;vertical-align:middle;">MTBF - MTTR</td></tr>` +
+    `<td style="background:${AZUL};color:#FFFFFF;font-family:${CAL};font-size:16pt;font-weight:bold;height:56px;padding:0 8px;vertical-align:middle;">MTBF - MTTR</td></tr></table>` +
+    `<table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;table-layout:fixed;width:100%;font-family:${CAL};">` +
     `<tr>${th('Fecha', ANCHOS.fecha)}${th('Máquina', ANCHOS.maquina)}${th('Falla', ANCHOS.falla)}${th('Duración Falla (Min)', ANCHOS.duracion)}${th('Observaciones')}</tr>` +
     cuerpo +
     `</table>`
