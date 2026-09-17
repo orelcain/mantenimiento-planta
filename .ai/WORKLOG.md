@@ -5306,6 +5306,30 @@ Orel intento anotar el FRL de la E-PACK y la bitacora dijo «no tiene repuestos 
 - Codigo: la lista de repuestos por equipo de la bitacora vence a los 5 min (antes vivia toda la
   sesion y un vinculo nuevo desde el CTD no aparecia).
 
+## 2026-09-17 · Bitacora ronda 19 · Pulido iOS 27 medido en produccion (375 px)
+
+Recorrido con la sesion real (localhost:5189, turno tarde 16-09) y los medidores de DESIGN.md §11:
+0 diminutos, 0 mayusculas, 0 objetivos bajo 44 en turno e Historial; 1 en el editor (16 px). El resto
+era composicion. Mockup (7 puntos, todos aprobados): https://claude.ai/artifact/E9CwvzvPwZ8qsW6EKJYeWc
+1. Cabecera: «Ir al turno actual» + Historial + QR median 478 px en 375 («Histo…»). Ahora es un chip
+   tinted «Hoy ›» junto al nombre del turno (solo cuando no es el actual). Historial 182–299, QR 303–359.
+2. El FAB del chat (bottom-24, z-45) pisaba «Nuevo evento» y la fila Copiar·PDF·WhatsApp: en
+   `/bitacora` sube a `bottom-[8.75rem]` (`useLocation` en ChatBot; el chat abierto ya iba a 9rem).
+3. `BarraSincronizacion`: sin nada que decir (Sincronizado, sin novedad, nadie mas) es una LINEA de
+   13 px en el telefono («● Todo al dia · hace 4 s · Danilo Cortes en el celular ˅»); tocarla abre la
+   tarjeta; en PC la tarjeta sigue entera (`hidden md:flex`).
+4. Fila del evento: «Repuestos: Filtro FRL 3300135877 ×1» (nombre comun o del maestro, codigo,
+   cantidad siempre), igual que WhatsApp/correo/Historial.
+5. Editor: al editar, «Editas como Danilo Cortes · Cambiar» (o «Continuas como» en borrador) en vez de
+   los chips de «Quien edita»; «Cambiar» los despliega. Al crear no cambia.
+6. Repuestos: «Editar nombre comun» en su propia linea de 44 px; placeholder «Buscar por codigo o nombre».
+7. Acceso QR: acciones en grilla 2×2 (Generar otro QR en plain, confirmable); cada tecnico en UNA fila
+   de 52 px con «Asignar PIN» / «PIN ˅» a la derecha (despliega Reiniciar / Quitar). `botonConfirmable`
+   pasa a 44 px (tambien «Quitar» en telefonos).
+- Verificado en 375 px claro y oscuro y en PC; vitest 2789, eslint 30/30 (sin nuevos), audit-piel ok.
+- ⚠ Medidor: `[...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='Nuevo evento')`
+  agarra primero el boton de PC (display:none, rect 0): filtrar por altura > 0 antes de comparar.
+
 ## 2026-09-17 · Bitacora ronda 18b · Repuestos en lista al enviar + «Repuestos usados» en el Historial
 
 Mockup aprobado (las dos recomendadas): https://claude.ai/artifact/NgKHSJLgSFcyEgSv61Wd5F

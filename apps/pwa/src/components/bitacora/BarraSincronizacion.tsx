@@ -94,11 +94,34 @@ export function BarraSincronizacion({
         ? null
         : "bg-ink-ok";
   const otros = presentes.filter((p) => p.dispositivoId !== miDispositivoId);
+  const yo = presentes.find((p) => p.dispositivoId === miDispositivoId);
+  // Sin nada que decir (al día, nadie más, sin novedad) la barra es una LÍNEA
+  // de estado en el teléfono, no una tarjeta (17-09): el estado no es
+  // contenido. Tocarla abre la tarjeta con el detalle; en PC va siempre entera.
+  const tranquila = titulo === "Sincronizado" && !novedadVigente && otros.length === 0;
+  const modoLinea = tranquila && !abierta;
 
   return (
+    <>
+    {modoLinea && (
+      <button
+        type="button"
+        onClick={() => setAbierta(true)}
+        aria-expanded={false}
+        aria-label="Estado de sincronización: ver detalle"
+        className="flex min-h-[44px] w-full items-center gap-2 rounded-full px-4 text-footnote text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary md:hidden"
+      >
+        <span className="size-2 shrink-0 rounded-full bg-ink-ok" aria-hidden />
+        <span className="min-w-0 truncate">
+          {detalle}
+          {yo?.nombre.trim() ? ` · ${yo.nombre} en el ${NOMBRE_DISPOSITIVO[yo.dispositivo]}` : ""}
+        </span>
+        <ChevronDown className="ml-auto size-4 shrink-0" aria-hidden />
+      </button>
+    )}
     <section
       aria-label="Sincronización"
-      className="flex flex-col gap-2 rounded-card bg-card px-4 py-3 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none"
+      className={`${modoLinea ? "hidden md:flex" : "flex"} flex-col gap-2 rounded-card bg-card px-4 py-3 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none`}
     >
       <div className="flex min-h-[44px] items-center justify-between gap-3">
         <div
@@ -190,6 +213,7 @@ export function BarraSincronizacion({
         </ul>
       )}
     </section>
+    </>
   );
 }
 

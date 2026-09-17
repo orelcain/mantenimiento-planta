@@ -367,10 +367,10 @@ export function BitacoraTurnoVista({
           <div className="flex items-center justify-between gap-3">
             <h1 className="text-display">Bitácora</h1>
             <span className="flex items-center gap-1">
-              {esActual ? (
+              {/* «Ir al turno actual» vive junto al turno (chip «Hoy»): con tres
+                  botones aquí la fila medía 478 px en 375 y se cortaba (17-09). */}
+              {esActual && (
                 <Pill tone="info" dot="pulse">En curso</Pill>
-              ) : (
-                <Button variant="plain" onClick={irAlActual}>Ir al turno actual</Button>
               )}
               <Button variant="plain" onClick={() => navigate('/bitacora/historial')}>
                 <BarChart3 /> Historial
@@ -394,9 +394,16 @@ export function BitacoraTurnoVista({
               <ChevronLeft className="size-5" />
             </button>
             <div className="min-w-0 flex-1 md:flex-none">
-              <p className="text-headline leading-tight">
-                {etiquetaTurno(turno)} <span className="whitespace-nowrap font-normal text-muted-foreground">{horarioTurno(turno)}</span>
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="min-w-0 text-headline leading-tight">
+                  {etiquetaTurno(turno)} <span className="whitespace-nowrap font-normal text-muted-foreground">{horarioTurno(turno)}</span>
+                </p>
+                {!esActual && (
+                  <Button variant="tinted" size="sm" className="shrink-0" onClick={irAlActual}>
+                    Hoy <ChevronRight />
+                  </Button>
+                )}
+              </div>
               <p className="truncate text-footnote text-muted-foreground first-letter:uppercase">{fecha} · {BITACORA_PLANTA.nombre}</p>
             </div>
             <button
