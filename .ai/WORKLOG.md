@@ -5306,6 +5306,24 @@ Orel intento anotar el FRL de la E-PACK y la bitacora dijo «no tiene repuestos 
 - Codigo: la lista de repuestos por equipo de la bitacora vence a los 5 min (antes vivia toda la
   sesion y un vinculo nuevo desde el CTD no aparecia).
 
+## 2026-09-17 · Bitacora ronda 22 · iOS 27 (1/2): resumen sin color, una capa abajo, Compartir y barra compacta
+
+Mockup aprobado (8 cambios, todos): https://claude.ai/artifact/8b4xbwjvMUzUeJJgkAJn27. Este PR lleva A, B, E, F.
+- A: cifras de KPI en tinta normal y el estado en un punto de 8 px junto al rotulo (turno, tarjeta
+  del Inicio, Historial). DESIGN.md §10 lo pedia; `Stat`/`Kpi` cambian `tinta` por `punto`.
+- B: sin la barra fija «Nuevo evento». El «+» central de la barra de pestanas, dentro de `/bitacora*`,
+  abre «Nuevo evento» (`services/bitacora/pedirNuevoEvento.ts`: en el turno emite
+  `bitacora:nuevo-evento` y conserva el turno mirado; desde el historial navega a `?nuevo=1`). En el
+  resto de la app sigue «Registrar incidencia». El pase suma su «+» al centro (Turno · + · Historial).
+  Rotulo «Nuevo evento» sobre el «+» las 3 primeras veces por telefono (`bitacora.rotuloMas.v1`).
+  El boton del chat vuelve a `bottom-24` en todas partes (se revierte lo de la ronda 19).
+- E: telefono: Historial, Compartir y QR como iconos en una capsula `glass-nav`; «Compartir» abre
+  `CompartirTurnoSheet` (correo, WhatsApp →hoja existente, PDF). Se quito la fila Copiar · PDF · WhatsApp.
+  PC sin cambios.
+- F: barra compacta fija (IntersectionObserver sobre la cabecera) con «Turno tarde 16-09 · horario ·
+  N eventos» y la capsula; en el pase baja 52 px (su cabecera).
+- Verificado a 375 px (turno, historial, Inicio, pase) y PC; vitest ok, eslint 30/30, audits ok, build ok.
+
 ## 2026-09-17 · Bitacora ronda 21 · Tercera pasada: converge (1 hallazgo)
 
 Medido: tarjeta de la bitacora en el Inicio, visor de fotos, «Resolver pendiente», «Ya no aplica»

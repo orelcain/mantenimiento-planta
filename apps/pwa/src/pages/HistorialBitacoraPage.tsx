@@ -137,11 +137,11 @@ export function HistorialBitacoraVista({ fuente, alAbrirTurno }: { fuente: Fuent
         {/* Los mismos ocho del correo y del PDF: comparar la pantalla con lo
             pegado en el correo no puede dar de menos (revisión 15-09). */}
         <Kpi valor={String(resumen.eventos)} etiqueta={resumen.eventos === 1 ? 'evento' : 'eventos'} />
-        <Kpi valor={formatoMinutos(resumen.minutosParada)} etiqueta={`de parada (${resumen.conParada})`} tinta={resumen.minutosParada > 0 ? 'text-ink-crit' : undefined} />
+        <Kpi valor={formatoMinutos(resumen.minutosParada)} etiqueta={`de parada (${resumen.conParada})`} punto={resumen.minutosParada > 0 ? 'crit' : undefined} />
         <Kpi valor={resumen.mttrMin == null ? '—' : formatoMinutos(resumen.mttrMin)} etiqueta="MTTR" />
-        <Kpi valor={String(resumen.sinDetener)} etiqueta="sin detener" tinta={resumen.sinDetener > 0 ? 'text-ink-ok' : undefined} />
-        <Kpi valor={String(resumen.pendientesCerrados)} etiqueta="pendientes cerrados" tinta={resumen.pendientesCerrados > 0 ? 'text-ink-ok' : undefined} />
-        <Kpi valor={String(resumen.pendientesAbiertos)} etiqueta="pendientes abiertos" tinta={resumen.pendientesAbiertos > 0 ? 'text-ink-warn' : undefined} />
+        <Kpi valor={String(resumen.sinDetener)} etiqueta="sin detener" punto={resumen.sinDetener > 0 ? 'ok' : undefined} />
+        <Kpi valor={String(resumen.pendientesCerrados)} etiqueta="pendientes cerrados" punto={resumen.pendientesCerrados > 0 ? 'ok' : undefined} />
+        <Kpi valor={String(resumen.pendientesAbiertos)} etiqueta="pendientes abiertos" punto={resumen.pendientesAbiertos > 0 ? 'warn' : undefined} />
         <Kpi valor={String(resumen.repuestos.length)} etiqueta={resumen.repuestos.length === 1 ? 'repuesto usado' : 'repuestos usados'} />
         <Kpi valor={String(resumen.unidadesRepuestos)} etiqueta="unidades" />
       </section>
@@ -348,11 +348,17 @@ function GraficoParadas({ filas }: { filas: readonly FilaTurno[] }) {
   )
 }
 
-function Kpi({ valor, etiqueta, tinta }: { valor: string; etiqueta: string; tinta?: string }) {
+const PUNTO = { ok: 'bg-ink-ok', warn: 'bg-ink-warn', crit: 'bg-ink-crit' } as const
+
+/** Cifra en tinta normal; el estado, en un punto junto al rótulo (DESIGN.md §10). */
+function Kpi({ valor, etiqueta, punto }: { valor: string; etiqueta: string; punto?: keyof typeof PUNTO }) {
   return (
     <div className="min-w-0">
-      <span className={`block text-title2 tabular-nums leading-tight ${tinta ?? ''}`}>{valor}</span>
-      <span className="block text-footnote text-muted-foreground">{etiqueta}</span>
+      <span className="block text-title2 tabular-nums leading-tight">{valor}</span>
+      <span className="block text-footnote text-muted-foreground">
+        {punto && <span className={`mr-1.5 inline-block size-2 rounded-full align-middle ${PUNTO[punto]}`} aria-hidden />}
+        {etiqueta}
+      </span>
     </div>
   )
 }

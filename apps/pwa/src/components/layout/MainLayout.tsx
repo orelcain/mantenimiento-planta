@@ -41,6 +41,8 @@ import { getEquipments } from '@/services/equipment'
 import { subscribeToIncidents } from '@/services/incidents'
 import { signOut } from '@/services/auth'
 import { cn } from '@/lib/utils'
+import { enBitacora, pedirNuevoEvento } from '@/services/bitacora/pedirNuevoEvento'
+import { RotuloNuevoEvento } from '@/components/bitacora/RotuloNuevoEvento'
 import { HelpButton, HelpModal, WelcomeModal } from '@/components/help'
 import { APP_VERSION } from '@/constants/version'
 import { formatBuildLabel, formatBuildDateShort, formatUpdatedLabel, formatDesfase, formatHora } from '@/constants/buildInfo'
@@ -475,6 +477,9 @@ export function MainLayout() {
    * cede ante la tarea principal) hecho geometría.
    */
   const registrarIncidencia = () => navigate('/incidents?nueva=1')
+  // En la bitácora el «+» crea un evento del turno (mockup iOS 27, 17-09).
+  const masEnBitacora = enBitacora(location.pathname)
+  const accionMas = masEnBitacora ? () => pedirNuevoEvento(location.pathname, navigate) : registrarIncidencia
   const bottomNavItems = [...fixedTabs]
     .filter(item => !item.module || canSee(item.module))
     // Respetar la misma visibilidad que el sidebar: si el href está oculto
@@ -1291,11 +1296,12 @@ export function MainLayout() {
             // una acción de creación dominante.
             idx === 1
               ? [el, (
-                  <div key="registrar" className="flex flex-1 justify-center">
+                  <div key="registrar" className="relative flex flex-1 justify-center">
+                    <RotuloNuevoEvento activo={masEnBitacora} />
                     <button
                       type="button"
-                      onClick={registrarIncidencia}
-                      aria-label="Registrar incidencia"
+                      onClick={accionMas}
+                      aria-label={masEnBitacora ? 'Nuevo evento' : 'Registrar incidencia'}
                       className={cn(
                         // DENTRO de la capsula, no elevado por fuera: un boton que
                         // sobresale de la barra con halo es un FAB de Material, no
