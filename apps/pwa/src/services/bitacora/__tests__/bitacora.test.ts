@@ -280,27 +280,34 @@ describe('correo de la bitácora', () => {
 
   it('incluye la observación general escapada y con saltos de línea', () => {
     const html = bitacoraAHtmlCorreo({ ...base, eventos: [ev({})], observacion: 'Planta sin agua caliente <2 h>\nSe avisó a jefatura' })
-    expect(html).toContain('Observaciones del turno: </span>Planta sin agua caliente &lt;2 h&gt;<br>Se avisó a jefatura')
+    // Título de sección y el texto en recuadro, escapado y con saltos (correo 17-09).
+    expect(html).toContain('Observaciones del turno</div>')
+    expect(html).toContain('Planta sin agua caliente &lt;2 h&gt;<br>Se avisó a jefatura</div>')
     expect(bitacoraAHtmlCorreo({ ...base, eventos: [ev({})], observacion: '   ' })).not.toContain('Observaciones del turno')
     expect(bitacoraATextoPlano({ ...base, eventos: [ev({})], observacion: 'Sin novedad' })).toContain('Observaciones del turno: Sin novedad')
   })
 
-  it('«Registrado por» usa el técnico elegido, no la cuenta compartida', () => {
+  it('cada evento dice sus técnicos con el nombre elegido, nunca la cuenta compartida', () => {
     const eventos = [
       ev({ id: 'a', autorNombre: 'mantencion.plantach', registradoPor: 'Matias Serpa' }),
       ev({ id: 'b', autorNombre: 'mantencion.plantach', registradoPor: 'Danilo Cortes', horaInicio: '18:00' }),
       ev({ id: 'c', autorNombre: 'Leandro Igor', registradoPor: null, horaInicio: '19:00' }),
     ]
     const html = bitacoraAHtmlCorreo({ ...base, eventos })
-    expect(html).toContain('Registrado por: Matias Serpa, Danilo Cortes, Leandro Igor')
+    expect(html).toContain('Técnicos: Matias Serpa<')
+    expect(html).toContain('Técnicos: Danilo Cortes<')
+    expect(html).toContain('Técnicos: Leandro Igor<')
     expect(html).not.toContain('mantencion.plantach')
+    // La cabecera ya no repite «Registrado por»: lo dice cada evento.
+    expect(html).not.toContain('Registrado por')
   })
 
-  it('con participantes, el evento lista a todos sus técnicos sin repetir; sin ellos no agrega ruido', () => {
+  it('con participantes, el evento lista a todos sus técnicos sin repetir', () => {
     const conEquipo = ev({ registradoPor: 'Danilo Cortes', participantes: ['Lucas Adrade', 'danilo cortes', ' '] })
     expect(bitacoraAHtmlCorreo({ ...base, eventos: [conEquipo] })).toContain('Técnicos: Danilo Cortes, Lucas Adrade')
     expect(bitacoraATextoPlano({ ...base, eventos: [conEquipo] })).toContain('  Técnicos: Danilo Cortes, Lucas Adrade')
-    expect(bitacoraAHtmlCorreo({ ...base, eventos: [ev({ registradoPor: 'Danilo Cortes', participantes: [] })] })).not.toContain('Técnicos: ')
+    // En el correo, con un solo técnico también se dice quién fue (ya no hay «Registrado por» arriba).
+    expect(bitacoraAHtmlCorreo({ ...base, eventos: [ev({ registradoPor: 'Danilo Cortes', participantes: [] })] })).toContain('Técnicos: Danilo Cortes<')
   })
 
   it('un turno sin eventos lo dice', () => {

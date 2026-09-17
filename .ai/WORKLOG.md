@@ -21,6 +21,20 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-17 · Bitacora ronda 27 · Correo y PDF con el formato nuevo + nombre SAP en WhatsApp
+- Hecho: WhatsApp ahora muestra en cada repuesto el nombre común y, entre paréntesis, el nombre del maestro SAP (bodega busca por ese). El correo y el PDF se rehicieron según el mockup aprobado (https://claude.ai/artifact/LWeL9CmkwfowfNkxHc77HW):
+  - Cabecera: «Bitácora de Mantención · planta», luego «Turno tarde · Miércoles 16-09-2026» y el horario con los técnicos de turno. Se quitó «Registrado por», porque ahora cada evento dice sus técnicos.
+  - KPI: cifras en tinta neutra con un punto de color. MTTR solo si hubo paradas. Se agregó el KPI «repuestos usados» (códigos SAP distintos).
+  - Secciones «Eventos del turno N» y «Pendiente para el turno siguiente N» (raya ámbar). Los eventos van numerados en círculo, con la misma numeración de WhatsApp.
+  - Cada evento lleva: equipo y hora en una línea, el título, «Tipo · N° de equipo», etiquetas de impacto de color, el texto del técnico en un recuadro con barra, repuestos en tabla (Código SAP | común en negrita + nombre SAP | Cant.) y los técnicos.
+- Gotchas:
+  - jsPDF: medir `getTextWidth` con la negrita puesta, o el texto siguiente se monta.
+  - Correo: sin anchos fijos, la columna del código ocupaba media tabla; se fijaron 96/48 px.
+  - Para mirar el PDF sin navegador: mockear `jspdf` en un test temporal (el `save` es propiedad de la instancia, `spyOn` al prototipo falla) y rasterizar con PyMuPDF.
+- Archivos: `bitacoraCorreo.ts`, `bitacoraPdf.ts`, `bitacoraWhatsapp.ts`, 3 tests.
+- Verificación: tsc 0; eslint 30 (sin cambio); vitest 2.797 OK; audit-piel/voseo/decimales OK; build OK. Correo y PDF de muestra revisados a 720 px y A4.
+- Estado: HECHO (pendiente: Orel prueba el envío real desde el iPhone/PC).
+
 ## 2026-09-17 · Bitacora ronda 26 · WhatsApp cortaba el mensaje en el 4.º evento
 
 Orel compartió el turno tarde 16-09 (8 eventos) con el formato A2 y el texto llegó hasta «4. BALANZA
