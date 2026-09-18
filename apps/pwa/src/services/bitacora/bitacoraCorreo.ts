@@ -219,18 +219,16 @@ function htmlEvento(e: EventoBitacora, numero: number, fuente: (f: FotoEvento) =
   const cod = codigoEquipoDe(e)
   const meta = [etiquetaTipo(e), cod ? `${/^\d+$/.test(cod) ? 'N° de equipo' : 'Ubicación técnica'} ${cod}` : ''].filter(Boolean).join(' · ')
   const tecnicos = tecnicosDelEvento(e)
+  // Una sola fila de TRES celdas (número · contenido · hora), sin tablas anidadas:
+  // Word (el motor de Outlook) no respeta el 100 % de una tabla dentro de una
+  // celda, y al pegar la hora caía donde terminaba el texto y cada evento se
+  // corría más a la derecha que el anterior (foto de Orel, 17-09).
+  const celda = `vertical-align:top;padding:16px 0;border-bottom:1px solid ${C.linea};font-family:${FUENTE};color:${C.tinta};`
   return (
-    `<tr><td style="padding:16px 0;border-bottom:1px solid ${C.linea};font-family:${FUENTE};">` +
-    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;width:100%;"><tr>` +
-    `<td width="36" style="width:36px;vertical-align:top;padding-top:1px;">` +
+    `<tr><td width="36" style="width:36px;${celda}padding-top:17px;">` +
     `<div style="width:26px;height:26px;line-height:26px;border-radius:13px;background:${pendiente ? C.pendBorde : C.tinta};color:#FFFFFF;font-family:${FUENTE};font-size:13px;font-weight:700;text-align:center;">${numero}</div></td>` +
-    `<td style="vertical-align:top;font-family:${FUENTE};color:${C.tinta};">` +
-    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;width:100%;"><tr>` +
-    `<td style="font-family:${FUENTE};font-size:16px;font-weight:600;color:${C.tinta};">${escaparHtml(principal)}</td>` +
-    (hora
-      ? `<td style="font-family:${FUENTE};font-size:13px;font-weight:600;color:${C.tinta};text-align:right;white-space:nowrap;vertical-align:top;padding-left:12px;">${escaparHtml(hora)}</td>`
-      : '') +
-    `</tr></table>` +
+    `<td style="${celda}">` +
+    `<div style="font-size:16px;font-weight:600;">${escaparHtml(principal)}</div>` +
     (equipo && titulo ? `<div style="font-size:14px;font-weight:600;">${escaparHtml(titulo)}</div>` : '') +
     `<div style="font-size:12.5px;color:${C.sec};padding-top:1px;">${escaparHtml(meta)}</div>` +
     htmlChips(e) +
@@ -240,8 +238,9 @@ function htmlEvento(e: EventoBitacora, numero: number, fuente: (f: FotoEvento) =
     htmlRepuestos(e) +
     (tecnicos.length ? `<div style="font-size:12.5px;color:${C.sec};padding-top:8px;">Técnicos: ${escaparHtml(tecnicos.join(', '))}</div>` : '') +
     htmlFotos(e.fotos ?? [], fuente) +
-    `</td></tr></table>` +
-    `</td></tr>`
+    `</td>` +
+    `<td width="96" style="width:96px;${celda}padding-left:12px;padding-top:18px;text-align:right;white-space:nowrap;font-size:13px;font-weight:600;">${escaparHtml(hora)}</td>` +
+    `</tr>`
   )
 }
 
