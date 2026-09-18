@@ -121,12 +121,17 @@ export function EventoBitacoraFila({
           <span className={`text-headline leading-tight ${!titulo && sinEquipo ? 'text-muted-foreground' : ''}`}>{titulo || nombreEquipo}</span>
           {evento.pendiente && !enPendientes && <Pill tone="warning">Pendiente</Pill>}
         </div>
-        {/* Nivel 2: una sola línea secundaria. El impacto va como punto + texto,
-            no como renglón rojo aparte: seis palabras no necesitan tres canales. */}
+        {/* Nivel 2: qué es (tipo · equipo · N°). */}
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-footnote text-muted-foreground">
           <Tag>{etiquetaTipo(evento)}</Tag>
           {titulo && <span className={sinEquipo ? '' : 'text-foreground'}>{nombreEquipo}</span>}
-          {codigo && <span className="tabular-nums">{codigo}</span>}
+          {codigo && <span className="tabular-nums">{/^\d+$/.test(codigo) ? `N° ${codigo}` : codigo}</span>}
+        </div>
+        {/* Nivel 3: qué costó, SIEMPRE en su propia línea (ronda 40, 18-09): en una
+            columna angosta el impacto saltaba de línea en unas filas y en otras no,
+            y el ojo no sabía dónde buscarlo. Punto + texto, no un renglón rojo. */}
+        {(evento.impacto === 'con-parada' || evento.impacto === 'en-ventana' || evento.resuelvePendiente?.turnoId) && (
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-footnote text-muted-foreground">
           {evento.impacto === 'con-parada' && (
             <span className="inline-flex items-center gap-1.5 font-semibold text-ink-crit">
               <span className="size-2 rounded-full bg-ink-crit" aria-hidden />
@@ -146,6 +151,7 @@ export function EventoBitacoraFila({
             </span>
           )}
         </div>
+        )}
 
         {/* Lo que escribió el técnico, en tinta secundaria: en PC dos líneas (el
             texto entero está en el editor y en el correo); en el teléfono, tres. */}
@@ -214,13 +220,13 @@ export function EventoBitacoraFila({
                   aria-label={`Ver foto ${ETIQUETA_FOTO[f.etiqueta]}`}
                   className="flex flex-col items-start rounded-ctl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 >
+                  {/* Tira de 48 px sin rótulo (ronda 40): el rótulo va en el visor al abrirla. */}
                   <img
                     src={f.url}
                     alt=""
                     loading="lazy"
-                    className="size-16 rounded-ctl bg-muted-foreground/10 object-cover"
+                    className="size-12 rounded-ctl bg-muted-foreground/10 object-cover"
                   />
-                  <span className="pt-0.5 text-caption text-muted-foreground">{ETIQUETA_FOTO[f.etiqueta]}</span>
                 </button>
               </div>
             ))}
