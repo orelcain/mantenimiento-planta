@@ -5,7 +5,6 @@ import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import type { PresenciaBitacora } from "@/services/bitacora/bitacora.types";
 import {
   estadoSincronizacion,
-  haceCuanto,
   iniciales,
   NOMBRE_DISPOSITIVO,
 } from "@/services/bitacora/presencia";
@@ -101,15 +100,14 @@ export function BarraSincronizacion({
       ? `${cambiosPorSubir} ${cambiosPorSubir === 1 ? "cambio guardado" : "cambios guardados"} en este ${dondeEstoy} · se suben solos`
       : "Puedes seguir registrando: se sube solo al volver la señal";
   } else if (estado === "guardando") {
-    titulo = "Guardando…";
-    detalle = `${cambiosPorSubir} ${cambiosPorSubir === 1 ? "cambio" : "cambios"} en camino`;
+    // HIG «Progress indicators»: nada de «Guardando…» genérico; se dice qué falta.
+    titulo = "Enviando";
+    detalle = `${cambiosPorSubir} ${cambiosPorSubir === 1 ? "cambio por enviar" : "cambios por enviar"}`;
   } else {
-    titulo = "Sincronizado";
-    detalle =
-      novedadVigente ??
-      (ultimaSync
-        ? `Todo al día · ${haceCuanto(ultimaSync.getTime(), ahora, horaDe(ultimaSync))}`
-        : "Todo al día");
+    // HIG «Feedback», como Mail: el estado dice cuándo fue la última
+    // actualización, en pasivo, sin pedir nada.
+    titulo = "Al día";
+    detalle = novedadVigente ?? (ultimaSync ? `Actualizado ${horaDe(ultimaSync)}` : "Actualizado");
   }
 
   const punto =
@@ -123,7 +121,7 @@ export function BarraSincronizacion({
   // Sin nada que decir (al día, nadie más, sin novedad) la barra es una LÍNEA
   // de estado en el teléfono, no una tarjeta (17-09): el estado no es
   // contenido. Tocarla abre la tarjeta con el detalle; en PC va siempre entera.
-  const tranquila = titulo === "Sincronizado" && !novedadVigente && otros.length === 0;
+  const tranquila = titulo === "Al día" && !novedadVigente && otros.length === 0;
   const modoLinea = tranquila && !abierta;
 
   const lista = (
@@ -164,7 +162,7 @@ export function BarraSincronizacion({
             <Loader2 className="size-4 shrink-0 animate-spin text-primary motion-reduce:animate-none" aria-hidden />
           )}
           <span className={`min-w-0 truncate ${error || estado === "sin-senal" ? "font-semibold text-ink-warn" : ""}`} role="status" aria-live="polite">
-            {titulo === "Sincronizado" ? detalle.replace(/^Todo al día/, "Al día") : `${titulo} · ${detalle}`}
+            {titulo === "Al día" ? detalle : `${titulo} · ${detalle}`}
           </span>
           {presentes.length > 0 && (
             <span className="flex items-center pl-1">

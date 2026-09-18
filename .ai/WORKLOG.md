@@ -21,6 +21,16 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-18 · Bitacora ronda 42 · HIG etapa 1: avisos silenciosos, sincronización pasiva, editor más rápido
+- Orel eligió las 15 mejoras; se van por etapas. Etapa 1 = reglas 1, 2, 5, 6, 7 y 15 del destilado (`docs\hig\HIG_DESTILADO.md`).
+- Hecho:
+  - Feedback: se quitan los toasts de éxito que repetían lo que ya se ve («Evento publicado/agregado/actualizado», «Observación guardada», «Técnicos del turno guardados»). Quedan los de error, los del portapapeles/PDF/Excel (el resultado no se ve en pantalla), «Evento movido al…» (la fila desaparece de este turno) y los avisos con matiz del pendiente.
+  - Sincronización pasiva como Mail (`BarraSincronizacion`): «Al día · Actualizado 14:32»; con cambios en cola «Enviando · 2 cambios por enviar»; ya no dice «Sincronizado · Todo al día · hace 2 min» ni «Guardando…».
+  - Editor (`EventoBitacoraSheet`): «Guardar» deshabilitado hasta que estén quién · tipo · hora (o «Sin hora») · qué pasó (`faltaObligatorio`, la misma lista que valida `guardar`); el botón dice «Guardando…» mientras guarda; Enter en los campos de hora y minutos guarda (no en el buscador ni en los chips, que usan Enter para elegir); horas de 5 en 5 (`step={300}`); el término se valida al salir del campo (más de 12 h → aviso al momento).
+  - Los valores por defecto (hora sugerida, técnico recordado, turno vigente) ya existían: sin cambio.
+- Verificación: tsc 0; eslint 30; vitest 2.808 OK; build y auditorías OK; vitrina real.
+- Estado: HECHO. Siguen: etapa 2 (action sheet al cerrar con cambios; borrar sin alerta en todos los caminos) y etapa 3 (buscador, «⋯», evento nuevo de otro técnico, arrastre, hoja elevada, Reduce Motion, progreso de fotos).
+
 ## 2026-09-18 · Ronda 41 · El HIG de Apple aprendido en local (y 15 mejoras candidatas)
 - Orel: «cada revisión del HIG nos come ~200 k tokens; deberíamos aprender». Hecho: base LOCAL en `ARIA_MANTENIMIENTO_PLANTA\docs\hig\` — `HIG_DESTILADO.md` (~10 KB, reglas por página con cita) + `paginas\<slug>.md` (31 páginas, 307 KB, solo grep). Skill `/hig-apple`. La web de Apple es una SPA: las páginas se bajan del endpoint JSON `developer.apple.com/tutorials/data/design/human-interface-guidelines/<slug>.json`.
 - Revisión de 23 páginas nuevas (color, dark-mode, typography, buttons, menus, pickers, segmented-controls, feedback, loading, progress-indicators, motion, searching, entering-data, sf-symbols, sheets, action-sheets, alerts, modality, accessibility, gestures, drag-and-drop, designing-for-ios, notifications). Mejoras candidatas con cita, por impacto:
