@@ -252,6 +252,15 @@ self.addEventListener('fetch', (event) => {
   if (!isSameOrigin && !isStorage) return
   if (!HEAVY_ASSET_RE.test(url.pathname)) return
 
+  // Un <img> cross-origin sin `crossorigin` pide en modo `no-cors`: la respuesta
+  // es OPACA, así que `res.ok` es false y NUNCA se puede cachear. Interceptarla
+  // no aporta nada y sí quita: cualquier hipo de red hacía fallar el
+  // `respondWith` y la miniatura quedaba rota para siempre (un <img> no
+  // reintenta), mientras la misma foto abierta en el visor cargaba bien.
+  // Pasa de largo: el navegador la resuelve y la guarda en su caché HTTP.
+  // (Bitácora: fotos de otros técnicos con ícono roto, 18-09-2026.)
+  if (request.mode === 'no-cors' && !isSameOrigin) return
+
   event.respondWith(
     caches.open(CACHE_NAME).then(async (cache) => {
       const cached = await cache.match(request)
@@ -264,11 +273,16 @@ self.addEventListener('fetch', (event) => {
         )
         return cached
       }
-      const response = await fetch(request)
-      if (response && response.ok) {
-        cache.put(request, response.clone())
+      // Sin red: que el fallo sea del navegador, no una promesa rechazada del SW.
+      try {
+        const response = await fetch(request)
+        if (response && response.ok) {
+          cache.put(request, response.clone())
+        }
+        return response
+      } catch {
+        return Response.error()
       }
-      return response
     })
   )
 })
