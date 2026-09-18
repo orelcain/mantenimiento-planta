@@ -21,6 +21,12 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-18 · Bitacora ronda 37 · PC: sincronización en el encabezado y columnas 1 : 2 : 3 (16:9)
+- Pedido de Orel (anotado sobre el turno real 17-09 tarde): la barra «Sincronizado» al hueco del encabezado entre el turno y las acciones; las tres columnas en proporción 1/6 · 2/6 · 3/6 para que llenen una pantalla 16:9.
+- Hecho en `BitacoraTurnoPage.tsx`: `BarraSincronizacion` dentro del `<header>` (`md:flex-1 md:self-center`; en el teléfono `order-last w-full`, o sea debajo, como antes); grilla `xl:grid-cols-[minmax(240px,1fr)_minmax(0,2fr)_minmax(0,3fr)]`; la columna del correo fija con `max-h-[calc(100vh-2rem)] overflow-y-auto` para que el correo entero quepa en la pantalla y se desplace solo. La vitrina real deja de tener `max-w-7xl`.
+- Verificación en `/dev/bitacora-real` a 1920×1080 oscuro: columnas 303 / 607 / 910 px, sincronización dentro del header (100 px de alto), vista previa del correo a zoom 0,91 con desplazamiento propio. tsc 0; eslint 30; vitest OK; build y auditorías OK.
+- Estado: HECHO.
+
 ## 2026-09-18 · Bitacora ronda 36 · Vitrina con un turno REAL (`/dev/bitacora-real`)
 - Pedido de Orel: pulir mirando un turno real en local, no los datos inventados de la vitrina, sin tocar producción.
 - Hecho:

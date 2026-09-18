@@ -667,9 +667,8 @@ export function BitacoraRealDevPage() {
           : 'Falta el archivo: corre  node scripts/exportar-turno-real.cjs 2026-09-17_dia  y recarga'}
       </div>
       {estado === 'listo' && REAL && params.get('turno') && (
-        <div className="mx-auto max-w-7xl">
-          <BitacoraTurnoVista fuente={FUENTE_REAL} />
-        </div>
+        // Sin tope de ancho: la vista de PC se juzga en una pantalla 16:9 completa.
+        <BitacoraTurnoVista fuente={FUENTE_REAL} />
       )}
     </div>
   )
