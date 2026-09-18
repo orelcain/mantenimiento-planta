@@ -91,6 +91,14 @@ export interface FotoEvento {
   /** Dimensiones reales: el correo y el PDF las necesitan para no deformar. */
   ancho?: number
   alto?: number
+  /**
+   * Miniatura de 320 px para la LISTA. La original pesa ~300 KB y en la fila se
+   * pinta a 48 px: un turno con 13 fotos bajaba 3,4 MB por 4G solo para los
+   * cuadraditos, y en iPhone se veían rotas (18-09-2026). Puede faltar en fotos
+   * subidas antes de eso: entonces la lista cae a `url`.
+   */
+  thumbUrl?: string
+  thumbPath?: string
 }
 
 /**
