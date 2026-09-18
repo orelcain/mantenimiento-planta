@@ -34,9 +34,12 @@
 const fs = require('fs')
 const path = require('path')
 
+/** El clon donde viven las credenciales (gitignored: no estan en los worktrees). */
+const CLON_PRINCIPAL = 'D:\\a\\APP leventamiento de insidencias en planta'
+
 const REPO = fs.existsSync(path.join(__dirname, '..', 'package.json'))
   ? path.join(__dirname, '..')
-  : 'D:\\a\\APP leventamiento de insidencias en planta'
+  : CLON_PRINCIPAL
 
 let admin
 try {
@@ -56,9 +59,14 @@ const SALTO_GB = 1.5
 /** Lo que de verdad cuesta menos. El resto (STANDARD, y su nombre viejo REGIONAL) es tarifa llena. */
 const CLASES_FRIAS = ['NEARLINE', 'COLDLINE', 'ARCHIVE']
 
+/**
+ * Los reportes se escriben FUERA del repo (son datos de cada corrida, no
+ * codigo) y en su propia subcarpeta: al lado vive la copia de respaldo del
+ * script que usa la tarea programada, y mezclarlos ensucia las dos cosas.
+ */
 const DIR_REPORTES = process.env.VIGIA_ALMACENAMIENTO_REPORTES
   || path.join(process.env.USERPROFILE || process.env.HOME || REPO,
-    'OneDrive', 'ANTARFOOD', '_HERRAMIENTAS', 'vigia-almacenamiento')
+    'OneDrive', 'ANTARFOOD', '_HERRAMIENTAS', 'vigia-almacenamiento', 'reportes')
 const ESTADO = path.join(DIR_REPORTES, 'ultima-medicion.json')
 
 const hallazgos = []
@@ -68,9 +76,19 @@ const GB = (bytes) => bytes / 1024 ** 3
 const gb = (bytes) => `${GB(bytes).toFixed(2)} GB`
 const mb = (bytes) => `${(bytes / 1024 ** 2).toFixed(1)} MB`
 
+/**
+ * `functions/.env` esta gitignored: existe en el clon principal, NO en los
+ * worktrees. Sin esta busqueda, correr el vigia desde un worktree no avisaba
+ * por Telegram y el error se leia igual que "todo bien" (18-09-2026).
+ */
 function env(nombre) {
-  const m = fs.readFileSync(`${REPO}/functions/.env`, 'utf8').match(new RegExp(`^${nombre}=(.+)$`, 'm'))
-  return m ? m[1].trim() : null
+  for (const base of [REPO, CLON_PRINCIPAL]) {
+    const archivo = path.join(base, 'functions', '.env')
+    if (!fs.existsSync(archivo)) continue
+    const m = fs.readFileSync(archivo, 'utf8').match(new RegExp(`^${nombre}=(.+)$`, 'm'))
+    if (m) return m[1].trim()
+  }
+  return null
 }
 
 /** Aviso por Telegram — SOLO cuando hay algo que mirar (un "todo bien" mensual es ruido). */
@@ -97,8 +115,13 @@ async function main() {
     return 0
   }
 
+  // Misma historia que el .env: la credencial vive en el clon principal.
+  const credencial = [REPO, CLON_PRINCIPAL]
+    .map((b) => path.join(b, 'serviceAccountKey.json'))
+    .find((f) => fs.existsSync(f))
+  if (!credencial) throw new Error('No se encontro serviceAccountKey.json')
   admin.initializeApp({
-    credential: admin.credential.cert(require(path.join(REPO, 'serviceAccountKey.json'))),
+    credential: admin.credential.cert(require(credencial)),
     storageBucket: BUCKET,
   })
   const bucket = admin.storage().bucket()

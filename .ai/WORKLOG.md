@@ -21,6 +21,15 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-18 · Vigia de almacenamiento: lanzador con respaldo y tarea probada de punta a punta
+- Se dejo el vigia funcionando como el verificador de turno, no a medias:
+  - **Lanzador fuera del repo**: `_HERRAMIENTASigia-almacenamientoigia-almacenamiento.cmd` ejecuta el script DEL REPO y, si el working tree esta en una rama que no lo tiene, cae a una copia de respaldo que vive junto a el. Sin ese respaldo la vigilancia se cae EN SILENCIO, que se lee igual que «todo bien». La tarea programada apunta a ese lanzador (no al `.cmd` del repo, que queda como referencia).
+  - Los reportes pasaron a la subcarpeta `reportes/`, al lado de la copia de respaldo pero sin mezclarse.
+- ⚠ GOTCHA que habria dejado el aviso mudo: `functions/.env` y `serviceAccountKey.json` estan gitignored — **existen en el clon principal, NO en los worktrees**. Corriendo el vigia desde `D:\wt-bitacora` fallaba con ENOENT y el error se leia igual que «todo bien». Ahora `env()` y la credencial se buscan en REPO y, si no estan, en el clon principal.
+- ⚠ Al escribir el literal de la ruta por script quedo `'D:\APP...'` con UNA barra: en JS `` no es escape y la ruta se convertia en `D:aAPP...`. Se resolvio reusando la constante `CLON_PRINCIPAL` que ya estaba bien escrita, en vez de duplicar el literal.
+- Verificado de punta a punta: `schtasks /run` lanzo la tarea, que cayo al respaldo (el clon principal esta en la rama `diseno/vara-ios27-r4`, sin el script) y dejo el reporte con la comparacion contra la corrida anterior; `--probar-aviso` llego a Telegram desde la copia suelta Y desde el worktree.
+- Proxima ejecucion automatica: 01-10-2026 09:30.
+
 ## 2026-09-18 · Almacenamiento: plan de escalada (medido, no supuesto)
 - Orel preguntó cómo manejar el crecimiento de fotos para no gastar más. Se MIDIÓ el bucket entero antes de proponer nada, y el resultado dio vuelta la premisa: **2,19 GB en 2.696 objetos, y las fotos de la bitácora son el 0,2% (4,8 MB)**. El 73% son 836 Excel del Grader de ~1,9 MB (`graderUploads/`), que se suben, se procesan a Firestore y NUNCA se vuelven a leer: el `storagePath` solo se usa para borrarlos.
 - Números: bucket Standard regional en us-central1 (US$ 0,020/GB-mes) y Firebase no cobra los primeros 5 GB ni el primer GB diario de descarga → hoy se paga **cero**. Creciendo ~4,3 GB/año se cruzan los 5 GB a mediados de 2027; en 2029, con ~15 GB, serían ~CLP 190/mes. El almacenamiento NO es la amenaza frente al techo de CLP 20.000.
