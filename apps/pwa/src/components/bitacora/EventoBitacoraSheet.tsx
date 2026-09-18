@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
 import { AlertTriangle, Check, ImagePlus, Loader2, RotateCw, Trash2, Users, X } from 'lucide-react'
-import { Button, Sheet } from '@/components/piel'
+import { ActionSheet, Button, Sheet } from '@/components/piel'
 import { useToast } from '@/hooks/useToast'
 import {
   AUTOGUARDADO_MS,
@@ -271,6 +271,8 @@ export function EventoBitacoraSheet({
   const [subidas, setSubidas] = useState<Subida[]>([])
   const [guardando, setGuardando] = useState(false)
   const [confirmarSinFotos, setConfirmarSinFotos] = useState(false)
+  /** Cerrar un evento PUBLICADO con cambios sin guardar pide confirmación (HIG «Sheets»). */
+  const [confirmarDescarte, setConfirmarDescarte] = useState(false)
   const [error, setError] = useState<string | null>(null)
   /** Fotos subidas en ESTA edición: si se cancela, se borran de Storage. */
   const subidasNuevas = useRef<string[]>([])
@@ -787,6 +789,13 @@ export function EventoBitacoraSheet({
   /** Borrador: cerrar GUARDA (se sigue en otro equipo). Publicado: cancela. */
   const cerrarHoja = () => {
     if (!autoguarda) {
+      // HIG «Sheets»: un evento publicado NO se autoguarda, así que cerrar con
+      // cambios los pierde. Con guantes, un roce en el fondo o un Escape bastan:
+      // antes de descartar, se pregunta (revisión 18-09-2026).
+      if (firmaActual !== ultimaFirma.current) {
+        setConfirmarDescarte(true)
+        return
+      }
       cancelar()
       return
     }
@@ -1488,6 +1497,18 @@ export function EventoBitacoraSheet({
           </Button>
         )}
       </div>
+      <ActionSheet
+        open={confirmarDescarte}
+        title="¿Descartar los cambios?"
+        description="Lo que escribiste en este evento no se guardó. El evento queda como estaba."
+        confirmLabel="Descartar cambios"
+        onConfirm={() => {
+          setConfirmarDescarte(false)
+          cancelar()
+        }}
+        cancelLabel="Seguir editando"
+        onCancel={() => setConfirmarDescarte(false)}
+      />
     </Sheet>
   )
 }

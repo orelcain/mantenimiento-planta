@@ -21,6 +21,7 @@ export {
   type ListCellProps,
 } from './GroupedList'
 export { Sheet, type SheetProps } from './Sheet'
+export { ActionSheet, type ActionSheetProps } from './ActionSheet'
 export { Disclosure, type DisclosureProps } from './Disclosure'
 export { StatRing, type StatRingProps } from './StatRing'
 export { TabBar, type TabBarProps, type TabItem } from './TabBar'
