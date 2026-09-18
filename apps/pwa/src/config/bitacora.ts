@@ -38,16 +38,17 @@ export const ETIQUETA_BANDA: Record<BandaTurno, string> = {
  * El tipo responde UNA cosa: qué se hizo. Lo que pasó lo dice el impacto, y la
  * falla se deduce de los dos (ver `esFalla`).
  *
- * «Rutinario» y «Montaje» entraron porque eran lo que más se hacía y no estaba:
- * los técnicos escribieron «Rutinario» a mano 3 veces en 4 turnos (lubricación
- * del Knuro, retiro de cintas para higiene, desmonte y montaje), mientras que
- * «Planificado» y «Ajuste» no los usó nadie (18-09-2026).
+ * «Rutinario» entró porque era lo que más se hacía y no estaba: los técnicos lo
+ * escribieron a mano 3 veces en 4 turnos (lubricación del Knuro, retiro de
+ * cintas para higiene, desmonte y montaje), mientras que «Planificado» y
+ * «Ajuste» no los usó nadie (18-09-2026). Cubre también el montaje y desmontaje
+ * de cintas: son la misma naturaleza de trabajo, y dos chips sinónimos hacen
+ * dudar en vez de ayudar.
  */
 export const TIPOS_EVENTO: ReadonlyArray<{ id: TipoEvento; label: string }> = [
   { id: 'correctivo', label: 'Correctivo' },
   { id: 'rutinario', label: 'Rutinario' },
   { id: 'preventivo', label: 'Preventivo' },
-  { id: 'montaje', label: 'Montaje/desmontaje' },
   { id: 'inspeccion', label: 'Inspección' },
   { id: 'ajuste', label: 'Ajuste' },
   { id: 'novedad', label: 'Novedad' },
@@ -61,6 +62,10 @@ export const TIPOS_EVENTO: ReadonlyArray<{ id: TipoEvento; label: string }> = [
 const TIPOS_LEGADO: ReadonlyArray<{ id: TipoEvento; label: string }> = [
   { id: 'falla', label: 'Falla' },
   { id: 'planificado', label: 'Planificado' },
+  // Duró unas horas: el montaje y desmontaje de cintas para higiene ES trabajo
+  // rutinario, y tener las dos opciones lado a lado obligaba a elegir entre
+  // sinónimos — justo el problema que esta ronda vino a sacar (Orel, 18-09).
+  { id: 'montaje', label: 'Montaje/desmontaje' },
 ]
 
 /** Largo máximo del tipo escrito a mano (igual en firestore.rules). */

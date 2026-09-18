@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { EventoBitacora } from '../bitacora.types'
 import { turnoDesdeId } from '../turnoMantencion'
 import { gruposDelTurno, ordenarEventos } from '../resumenBitacora'
-import { lineaRepuestos, minutosEnTurno, nombreConComun, normalizarRepuestos, opcionesUbicacion, posicionAlMover, posicionEnIndice, textoRepuesto } from '../presentacionEvento'
+import { lineaRepuestos, minutosEnTurno, nombreConComun, normalizarRepuestos, posicionAlMover, posicionEnIndice, textoRepuesto } from '../presentacionEvento'
 import { buscarRepuestos, conNombreComunAlFrente, desdeIndice } from '../repuestosBitacora'
 import { aFormulario, camposACambiar } from '../borradores'
 
@@ -83,13 +83,6 @@ describe('eventos sin hora: ubicación a mano', () => {
     expect(posicionEnIndice(turno, arriba, 'cintas', 2)).toBe(241)
     expect(posicionEnIndice(turno, [cintas], 'cintas', 0)).toBeNull()
     expect(posicionEnIndice(turno, orden, 'nadie', 0)).toBeNull()
-  })
-
-  it('el editor ofrece inicio, después de cada evento con hora y final; sin eventos con hora, nada', () => {
-    const op = opcionesUbicacion(turno, [casino, epack, cintas], 'cintas')
-    expect(op.map((o) => o.etiqueta)).toEqual(['Al inicio', 'Después de 18:07 CASINO', 'Al final'])
-    expect(op.map((o) => o.posicion)).toEqual([126, (127 + 240) / 2, 241])
-    expect(opcionesUbicacion(turno, [cintas], 'cintas')).toEqual([])
   })
 
   it('el formulario guarda la posición solo sin hora y la escribe aparte', () => {

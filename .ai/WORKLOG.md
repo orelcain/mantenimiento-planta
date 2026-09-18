@@ -21,6 +21,16 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-18 · Bitacora ronda 50 · Menos opciones: fuera «Montaje/desmontaje» y fuera «Ubicacion en el turno»
+- Dos observaciones de Orel sobre lo recien construido, las dos correctas:
+  1. **«Montaje/desmontaje» ES rutinario**, y tenerlos lado a lado obligaba a elegir entre SINONIMOS — justo el problema que la ronda 49 vino a sacar. Se fusiona en **«Rutinario»**, que ahora cubre lubricacion, limpieza y el armado/desarmado de cintas para higiene. `montaje` pasa a `TIPOS_LEGADO` (vivio unas horas; 0 eventos lo usaron, comprobado en Firestore). La lista queda en 7: Correctivo · Rutinario · Preventivo · Inspeccion · Ajuste · Novedad · Otro.
+  2. **«Ubicacion en el turno» sobraba**: listaba un chip por cada evento con hora del turno —seis o mas, casi 300 px de alto— para algo que se hace arrastrando la fila. Medido: **1 de 22 eventos** tenia `posicionMin`. Se quita el bloque del editor; se quitan tambien `opcionesUbicacion()` (su unico consumidor) y la prop `eventosDelTurno` del Sheet.
+- ⚠ Lo que NO se quito: el estado `posicion` del formulario y `posicionMin` en Firestore. El arrastre y las flechas los siguen escribiendo, y **editar un evento sin hora no le borra su lugar** — que era el riesgo real de sacar el selector. Verificado en la vitrina: se arrastro un evento, se abrio y se guardo sin tocar nada, y la lista quedo IDENTICA.
+- Con «Sin hora» activo el editor ya no muestra nada ahi, salvo el aviso de los minutos cuando el impacto es «Detuvo la maquina» (sin hora no se pueden calcular).
+- Verificado tambien: la lista de tipos muestra los 7 sin «Montaje/desmontaje», y el bloque de ubicacion no existe en el DOM.
+- tsc 0; eslint 30; vitest 2.811 (se retiro el test de `opcionesUbicacion`, que ya no existe); auditorias OK; build OK.
+- Estado: HECHO.
+
 ## 2026-09-18 · Bitacora ronda 49 · EL TIPO dice que se hizo; la FALLA se deduce
 - Sigue la ronda 48, con lo que Orel habia planteado: «falla y correctiva vendria siendo parte de la misma accion o no?». Medido sobre los mismos 22 eventos reales: **9 marcados «Falla», y 4 de esos describen otra cosa** («Cambio de tubos fluorescentes» en el casino, «Se montan cintas filete», «Se retiraron cintas para higiene», «Se corrige teflon guia, se tensa la cinta»). Ademas los tecnicos **escribieron «Rutinario» a mano 3 veces** (lubricacion del Knuro, retiro de cintas para higiene, desmonte y montaje) mientras que **«Planificado» y «Ajuste» no los uso nadie**.
 - CAUSA: el tipo mezclaba dos ejes. **«Falla» es QUE PASO; «correctivo/preventivo/inspeccion» es QUE SE HIZO.** Con una sola lista habia que elegir uno y se perdia el otro — y «Falla», ademas preseleccionada, se volvio el cajon de sastre.

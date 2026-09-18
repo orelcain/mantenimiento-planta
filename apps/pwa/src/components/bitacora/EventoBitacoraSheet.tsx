@@ -57,7 +57,7 @@ import {
   turnoMantencionEn,
   turnosElegibles,
 } from '@/services/bitacora/turnoMantencion'
-import { etiquetaCodigoEquipo, limpiarTipo, normalizarRepuestos, normalizarTipo, opcionesUbicacion } from '@/services/bitacora/presentacionEvento'
+import { etiquetaCodigoEquipo, limpiarTipo, normalizarRepuestos, normalizarTipo } from '@/services/bitacora/presentacionEvento'
 import { vibrar } from '@/services/bitacora/vibrar'
 import { RepuestosUsados } from './RepuestosUsados'
 import type { FuenteRepuestos } from '@/services/bitacora/repuestosBitacora'
@@ -86,8 +86,6 @@ export interface EventoBitacoraSheetProps {
   fuenteRepuestos?: FuenteRepuestos
   /** El pase de bitácora no escribe en el maestro de repuestos (nombre común). */
   puedeEditarMaestro?: boolean
-  /** Los eventos del turno (ordenados), para ubicar uno sin hora entre ellos. */
-  eventosDelTurno?: readonly EventoBitacora[]
   /** `deTurno` = presentes del turno (botones rápidos); `todos` = lista de técnicos completa. */
   tecnicos: { deTurno: string[]; todos: string[] }
   /** Equipos y áreas de la jerarquía para el buscador. */
@@ -225,7 +223,6 @@ export function EventoBitacoraSheet({
   autorFijo = null,
   fuenteRepuestos = fuenteRepuestosFirestore,
   puedeEditarMaestro = true,
-  eventosDelTurno = [],
   tecnicos,
   opcionesEquipo,
   cargandoEquipos,
@@ -1343,23 +1340,16 @@ export function EventoBitacoraSheet({
           {/* Como «Todo el día» en el Calendario de iOS: esconde las horas. */}
           <FilaInterruptor activo={sinHora} onCambiar={cambiarSinHora} titulo="Sin hora" />
           {sinHora ? (
-            <div className="-mt-1 flex flex-col gap-2">
-              <span className={ETIQUETA_CAMPO}>Ubicación en el turno</span>
-              <div className="flex flex-wrap gap-2" role="group" aria-label="Ubicación en el turno">
-                <Chip activo={posicion === ''} onClick={() => setPosicion('')}>
-                  Donde se registró
-                </Chip>
-                {opcionesUbicacion(turno, eventosDelTurno, eventoId).map((o) => (
-                  <Chip key={o.etiqueta} activo={posicion !== '' && Number(posicion) === o.posicion} onClick={() => setPosicion(String(o.posicion))}>
-                    {o.etiqueta}
-                  </Chip>
-                ))}
-              </div>
-              <p className="text-footnote text-muted-foreground">
-                También se mueve con las flechas de la lista.
-                {impacto === 'con-parada' ? ' Anota abajo los minutos de parada: sin hora no se pueden calcular.' : ''}
+            // El evento sin hora se ubica ARRASTRÁNDOLO en la lista, que es como
+            // se hace en la práctica: el selector de «Ubicación en el turno»
+            // listaba un chip por evento del turno —seis o más— y lo usó 1 de 22
+            // eventos reales. Se quitó el 18-09-2026; `posicionMin` la sigue
+            // escribiendo el arrastre y editar un evento no la pierde.
+            impacto === 'con-parada' ? (
+              <p className="-mt-1 text-footnote text-muted-foreground">
+                Anota abajo los minutos de parada: sin hora no se pueden calcular.
               </p>
-            </div>
+            ) : null
           ) : (
             <>
               <div className="grid grid-cols-2 gap-3">
