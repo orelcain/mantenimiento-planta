@@ -4,6 +4,7 @@ import { formatoMinutos } from './turnoMantencion'
 import { etiquetaFilaTurno, tituloHistorial } from './historialCorreo'
 import type { EventoBitacora } from './bitacora.types'
 import { filasRecoleccionPeriodo } from './recoleccionMttr'
+import { explicacionMtbfMttrPeriodo } from './mtbf'
 import { dibujarRecoleccionMttr } from './recoleccionMttrPdf'
 
 type RGB = [number, number, number]
@@ -19,7 +20,17 @@ export async function generarPdfHistorial(r: ResumenPeriodo, filas: readonly Fil
   let y = M
 
   // La planilla «Recoleccion MTTR» del período, arriba (17-09-2026).
-  if (eventos.length) y = await dibujarRecoleccionMttr(pdf, filasRecoleccionPeriodo(eventos), M, y, W - 2 * M, t)
+  if (eventos.length) {
+    y = await dibujarRecoleccionMttr(pdf, filasRecoleccionPeriodo(eventos), M, y, W - 2 * M, t) - 4
+    pdf.setFont('helvetica', 'normal')
+    pdf.setFontSize(8)
+    pdf.setTextColor(95, 99, 104)
+    for (const l of pdf.splitTextToSize(t(explicacionMtbfMttrPeriodo(r.minutosTurnos, r.turnos, r)), W - 2 * M) as string[]) {
+      pdf.text(l, M, y)
+      y += 3.8
+    }
+    y += 4
+  }
 
   pdf.setFont('helvetica', 'bold')
   pdf.setFontSize(16)
@@ -48,6 +59,7 @@ export async function generarPdfHistorial(r: ResumenPeriodo, filas: readonly Fil
     [String(r.eventos), r.eventos === 1 ? 'evento' : 'eventos', TINTA],
     [formatoMinutos(r.minutosParada), `de parada (${r.conParada})`, r.minutosParada > 0 ? PARADA : TINTA],
     [r.mttrMin == null ? '-' : formatoMinutos(r.mttrMin), 'MTTR', TINTA],
+    [r.mtbfMin == null ? '-' : formatoMinutos(r.mtbfMin), 'MTBF', TINTA],
     [
       r.conImpacto > 0 ? `${r.sinDetener} · ${porcentaje(r.parteSinDetener)}` : String(r.sinDetener),
       'sin detener',
@@ -101,7 +113,9 @@ export async function generarPdfHistorial(r: ResumenPeriodo, filas: readonly Fil
     pdf.setFont('helvetica', 'normal')
     pdf.setFontSize(10)
     for (const e of r.equipos) {
-      const linea = `${e.equipo} · ${formatoMinutos(e.minutos)} en ${e.paradas} ${e.paradas === 1 ? 'parada' : 'paradas'} · ${porcentaje(e.parte)} del total`
+      const linea = `${e.equipo} · ${formatoMinutos(e.minutos)} en ${e.paradas} ${e.paradas === 1 ? 'parada' : 'paradas'} · ${porcentaje(e.parte)} del total${
+        e.mtbfMin == null ? '' : ` · MTBF ${formatoMinutos(e.mtbfMin)}`
+      }`
       for (const l of pdf.splitTextToSize(t(linea), W - 2 * M) as string[]) {
         if (yy > pdf.internal.pageSize.getHeight() - M) {
           pdf.addPage()

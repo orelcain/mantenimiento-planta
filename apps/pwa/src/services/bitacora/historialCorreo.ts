@@ -1,5 +1,6 @@
 import type { EventoBitacora } from './bitacora.types'
 import { filasRecoleccionPeriodo, htmlRecoleccionMttr } from './recoleccionMttr'
+import { explicacionMtbfMttrPeriodo } from './mtbf'
 import { escaparHtml } from './bitacoraCorreo'
 import { etiquetaCortaTurno } from './entregaTurno'
 import { formatoMinutos } from './turnoMantencion'
@@ -46,7 +47,11 @@ export function etiquetaFilaTurno(f: FilaTurno): string {
 
 export function historialAHtmlCorreo(r: ResumenPeriodo, filas: readonly FilaTurno[], planta: string, eventos: readonly EventoBitacora[] = []): string {
   // La planilla «Recoleccion MTTR» del período arriba, como en el correo del turno (17-09-2026).
-  const recoleccion = eventos.length ? `${htmlRecoleccionMttr(filasRecoleccionPeriodo(eventos))}<div style="height:14px;line-height:14px;">&nbsp;</div>` : ''
+  const recoleccion = eventos.length
+    ? `${htmlRecoleccionMttr(filasRecoleccionPeriodo(eventos))}` +
+      `<div style="font-family:${FUENTE};font-size:12.5px;color:${C.sec};padding-top:6px;">${escaparHtml(explicacionMtbfMttrPeriodo(r.minutosTurnos, r.turnos, r))}</div>` +
+      `<div style="height:14px;line-height:14px;">&nbsp;</div>`
+    : ''
   const cabecera =
     `<div style="font-family:${FUENTE};font-size:20px;font-weight:600;color:${C.tinta};">${escaparHtml(tituloHistorial(r))}</div>` +
     `<div style="font-family:${FUENTE};font-size:13px;color:${C.sec};padding-top:2px;">${r.turnos} turnos registrados · ${escaparHtml(planta)}</div>` +
@@ -57,6 +62,7 @@ export function historialAHtmlCorreo(r: ResumenPeriodo, filas: readonly FilaTurn
     kpi(String(r.eventos), r.eventos === 1 ? 'evento' : 'eventos') +
     kpi(formatoMinutos(r.minutosParada), `de parada (${r.conParada})`, r.minutosParada > 0 ? C.parada : C.tinta) +
     kpi(r.mttrMin == null ? '—' : formatoMinutos(r.mttrMin), 'MTTR') +
+    kpi(r.mtbfMin == null ? '—' : formatoMinutos(r.mtbfMin), 'MTBF') +
     kpi(
       r.conImpacto > 0 ? `${r.sinDetener} · ${porcentaje(r.parteSinDetener)}` : String(r.sinDetener),
       'sin detener producción',
@@ -94,7 +100,9 @@ export function historialAHtmlCorreo(r: ResumenPeriodo, filas: readonly FilaTurn
           (e) =>
             `<div style="font-family:${FUENTE};font-size:13px;color:${C.tinta};padding-top:3px;">${escaparHtml(e.equipo)} · ${escaparHtml(
               formatoMinutos(e.minutos),
-            )} en ${e.paradas} ${e.paradas === 1 ? 'parada' : 'paradas'} · ${porcentaje(e.parte)} del total</div>`,
+            )} en ${e.paradas} ${e.paradas === 1 ? 'parada' : 'paradas'} · ${porcentaje(e.parte)} del total${
+              e.mtbfMin == null ? '' : ` · MTBF ${escaparHtml(formatoMinutos(e.mtbfMin))}`
+            }</div>`,
         )
         .join('')
     : ''
@@ -116,7 +124,7 @@ export function historialATextoPlano(r: ResumenPeriodo, filas: readonly FilaTurn
     tesisDelPeriodo(r),
     `${r.eventos} eventos · ${formatoMinutos(r.minutosParada)} de parada (${r.conParada}) · MTTR ${
       r.mttrMin == null ? '—' : formatoMinutos(r.mttrMin)
-    } · ${r.sinDetener} sin detener${r.conImpacto > 0 ? ` (${porcentaje(r.parteSinDetener)})` : ''} · ${r.pendientesCerrados} pendientes cerrados · ${r.pendientesAbiertos} abiertos · ${
+    } · MTBF ${r.mtbfMin == null ? '—' : formatoMinutos(r.mtbfMin)} · ${r.sinDetener} sin detener${r.conImpacto > 0 ? ` (${porcentaje(r.parteSinDetener)})` : ''} · ${r.pendientesCerrados} pendientes cerrados · ${r.pendientesAbiertos} abiertos · ${
       r.repuestos.length
     } repuestos usados (${r.unidadesRepuestos} unidades)`,
     filas

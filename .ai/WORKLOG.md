@@ -21,6 +21,15 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-18 · Bitacora ronda 34 · MTBF y MTTR con definición y cálculo a la vista
+- Pregunta de Orel: la banda de la planilla dice «MTBF - MTTR» pero solo se calculaba MTTR. Se acordó: la banda no se toca (fidelidad al Excel); debajo de la tabla va UNA línea con las dos siglas, su definición entre paréntesis y el cálculo con los números del turno; en el histórico, MTBF del período y por máquina.
+- Base del MTBF (decisión de Orel): horas del turno − 1,5 h sin producción (colación 1 h + reunión de inicio + ejercicios compensatorios) − paradas registradas, ÷ fallas con parada. `MINUTOS_SIN_PRODUCCION_POR_TURNO = 90` en `mtbf.ts`. Es el MTBF de la PLANTA con lo que registran los técnicos, aproximado y dicho así; el riguroso por máquina con tiempo de producción real de Shoplogix ya existe en Análisis de Turno (`kpisMantencionTurno`, backend `kpisMantencion.js`).
+- Descartado: descontar las ventanas de la rueda máquina por máquina (los eventos no siempre traen máquina de la rueda) y usar el tiempo de producción de Shoplogix (solo línea Grader y sus turnos no calzan con los de Mantención).
+- Hecho: `mtbf.ts` (`minutosDelTurno`, `mtbf`, `explicacionMtbfMttr`, `explicacionMtbfMttrPeriodo`); la línea bajo la planilla en correo (HTML y texto), PDF y bloque en vivo; histórico con `mtbfMin` y `minutosTurnos` en `ResumenPeriodo`, `mtbfMin` por equipo, KPI MTBF en pantalla/correo/PDF y «· MTBF 27 h 16 min» en «Equipos que más pararon».
+- Gotcha: `formatoMinutos` rellena con cero («3 h 03 min»); la prueba se escribió con «3 h 3 min» y falló.
+- Verificación: vitrina (línea bajo el bloque y MTBF por máquina en el histórico); tsc 0; vitest OK; build y auditorías OK.
+- Estado: HECHO.
+
 ## 2026-09-17 · Bitacora ronda 33 · Las horas corridas al pegar el correo en Outlook
 - Foto de Orel (Outlook de escritorio, mensaje nuevo, pegado): la hora de cada evento caía en una posición distinta (21:05 al borde, 22:25 al medio) y cada evento quedaba más sangrado que el anterior.
 - Causa: tablas ANIDADAS. Cada evento iba en `<table>` dentro de un `<td>` de otra tabla, y el encabezado (equipo + hora) en una tercera. Word, el motor de Outlook, no respeta `width:100%` en una tabla anidada: la del encabezado se encogía al contenido (la hora quedaba pegada al texto) y cada nivel sumaba sangría.

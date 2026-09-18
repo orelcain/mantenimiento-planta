@@ -2,6 +2,7 @@ import { ETIQUETA_FOTO } from '@/config/bitacora'
 import { autorVisible, tecnicosDelEvento, type EventoBitacora, type FotoEvento, type TurnoMantencion } from './bitacora.types'
 import { fuePendiente, gruposDelTurno, minutosParadaDe, ordenarEventos, resumirBitacora } from './resumenBitacora'
 import { filasRecoleccion, htmlRecoleccionMttr, textoRecoleccionMttr } from './recoleccionMttr'
+import { explicacionMtbfMttr } from './mtbf'
 import { soloListos } from './borradores'
 import { etiquetaTurno, fechaTurnoLarga, formatoMinutos, horarioTurno } from './turnoMantencion'
 import { etiquetaCortaTurno } from './entregaTurno'
@@ -351,7 +352,12 @@ export function bitacoraAHtmlCorreo({ turno, eventos: todos, tecnicos, planta, o
 
   // La planilla «Recoleccion MTTR» va ARRIBA, como la pegan hoy desde Excel; el
   // detalle de la bitácora sigue debajo (pedido de Orel, 17-09-2026).
-  const recoleccion = eventos.length ? `${htmlRecoleccionMttr(filasRecoleccion(turno, eventos))}<div style="height:14px;line-height:14px;">&nbsp;</div>` : ''
+  // Bajo la planilla, las dos siglas con su definición y su cálculo (Orel, 18-09).
+  const recoleccion = eventos.length
+    ? `${htmlRecoleccionMttr(filasRecoleccion(turno, eventos))}` +
+      `<div style="font-family:${FUENTE};font-size:12.5px;color:${C.sec};padding-top:6px;">${escaparHtml(explicacionMtbfMttr(turno, r))}</div>` +
+      `<div style="height:14px;line-height:14px;">&nbsp;</div>`
+    : ''
   return `${recoleccion}<div style="max-width:680px;color:${C.tinta};">${encabezado}${tablaKpis}${bloqueObservacion}${cuerpo}${bloqueAnteriores}${pie}</div>`
 }
 
@@ -394,7 +400,7 @@ export function bitacoraATextoPlano({ turno, eventos: todos, tecnicos, planta, o
   const resumen = lineaResumen(r)
   // Bloques separados por una línea en blanco: pegado en un correo sin formato
   // cada evento se lee aparte.
-  const recoleccion = eventos.length ? [textoRecoleccionMttr(filasRecoleccion(turno, eventos)), ''] : []
+  const recoleccion = eventos.length ? [textoRecoleccionMttr(filasRecoleccion(turno, eventos)), explicacionMtbfMttr(turno, r), ''] : []
   return [
     ...recoleccion,
     cabecera,

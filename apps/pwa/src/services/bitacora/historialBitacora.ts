@@ -1,3 +1,4 @@
+import { minutosDelTurno, mtbf } from './mtbf'
 import type { EventoBitacora, TurnoMantencion } from './bitacora.types'
 import { autorVisible } from './bitacora.types'
 import { minutosParadaDe, resumirBitacora, type ResumenBitacora } from './resumenBitacora'
@@ -33,6 +34,8 @@ export interface EquipoDelPeriodo {
   paradas: number
   /** Parte del total de minutos parados del período (0-1). */
   parte: number
+  /** Tiempo promedio operando entre sus fallas, sobre las horas de turno del período. */
+  mtbfMin: number | null
 }
 
 /** Un repuesto (código SAP) sumado en el período (mockup aprobado 17-09-2026). */
@@ -70,6 +73,9 @@ export interface ResumenPeriodo {
   minutosParada: number
   conParada: number
   mttrMin: number | null
+  /** Horas de turno del período (suma de los turnos con eventos) y el MTBF sobre ellas. */
+  minutosTurnos: number
+  mtbfMin: number | null
   pendientesCerrados: number
   pendientesAbiertos: number
   turnosSinParada: number
@@ -126,9 +132,15 @@ export function resumirPeriodo(eventos: readonly EventoBitacora[], desde: string
     actual.paradas += 1
     porEquipo.set(k, actual)
   }
+  // Horas de turno del período: la base del MTBF (aproximada: no descuenta la colación de cada máquina).
+  const minutosTurnos = filas.reduce((n, f) => n + minutosDelTurno(f.turno), 0)
   const equipos = [...porEquipo.values()]
     .sort((a, b) => b.minutos - a.minutos || b.paradas - a.paradas)
-    .map((x) => ({ ...x, parte: total.minutosParada > 0 ? x.minutos / total.minutosParada : 0 }))
+    .map((x) => ({
+      ...x,
+      parte: total.minutosParada > 0 ? x.minutos / total.minutosParada : 0,
+      mtbfMin: mtbf(minutosTurnos, x.minutos, x.paradas, filas.length),
+    }))
 
   const porTecnico = new Map<string, number>()
   for (const e of validos) {
@@ -180,6 +192,8 @@ export function resumirPeriodo(eventos: readonly EventoBitacora[], desde: string
     minutosParada: total.minutosParada,
     conParada: total.conParada,
     mttrMin: total.mttrMin,
+    minutosTurnos,
+    mtbfMin: mtbf(minutosTurnos, total.minutosParada, total.conParada, filas.length),
     pendientesCerrados: total.pendientesCerrados,
     // Lo que sigue abierto HOY de lo registrado en el período.
     pendientesAbiertos: validos.filter((e) => e.pendiente && !e.cierre).length,
