@@ -1240,8 +1240,10 @@ export function EventoBitacoraSheet({
           )}
           <div>
             <label htmlFor="bitacora-titulo" className={`${ETIQUETA_CAMPO} flex justify-between gap-2`}>
-              <span>Título</span>
-              <span>Opcional</span>
+              {/* Los rótulos son los de la planilla «Recoleccion MTTR» (Máquina · Falla ·
+                  Observaciones) para que nadie tenga que traducir (Orel, 17-09). */}
+              <span>Falla</span>
+              <span>Opcional · en pocas palabras</span>
             </label>
             <input
               id="bitacora-titulo"
@@ -1292,7 +1294,7 @@ export function EventoBitacoraSheet({
 
         {/* Qué pasó */}
         <div>
-          <label htmlFor="bitacora-descripcion" className={ETIQUETA_CAMPO}>Qué pasó y qué se hizo</label>
+          <label htmlFor="bitacora-descripcion" className={ETIQUETA_CAMPO}>Observaciones · qué pasó y qué se hizo</label>
           <textarea
             id="bitacora-descripcion"
             maxLength={3000}
