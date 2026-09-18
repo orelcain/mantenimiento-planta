@@ -58,10 +58,28 @@ export const ETIQUETA_TIPO: Record<TipoEvento, string> = Object.fromEntries(
   TIPOS_EVENTO.map((t) => [t.id, t.label]),
 ) as Record<TipoEvento, string>
 
-export const IMPACTOS: ReadonlyArray<{ id: ImpactoEvento; label: string }> = [
-  { id: 'no-aplica', label: 'No aplica' },
-  { id: 'con-parada', label: 'Detuvo la máquina' },
-  { id: 'en-ventana', label: 'Sin detener' },
+/**
+ * Las cuatro respuestas a «¿Cómo afectó al proceso?», de mayor a menor costo.
+ * El `detalle` va bajo la etiqueta: con tres chips sin explicación, todos
+ * terminaban en «No aplica» (medido sobre 4 turnos reales, 18-09-2026).
+ */
+export const IMPACTOS: ReadonlyArray<{ id: ImpactoEvento; label: string; detalle: string }> = [
+  { id: 'con-parada', label: 'Detuvo la máquina', detalle: 'Hubo que parar para intervenir' },
+  { id: 'afecta-sin-detener', label: 'Afectó sin detener', detalle: 'Siguió produciendo, pero con contingencia' },
+  { id: 'en-ventana', label: 'Sin costo, en una ventana', detalle: 'Colación, cambio de turno' },
+  { id: 'no-aplica', label: 'Fuera del proceso', detalle: 'Casino, portería, patio' },
+]
+
+/**
+ * Atajos de contingencia; el campo acepta cualquier texto. CORTOS a propósito:
+ * con la frase entera cada chip ocupaba una fila a 375 px y el bloque crecía
+ * 130 px. El ejemplo largo ya va en el placeholder del campo.
+ */
+export const CONTINGENCIAS_SUGERIDAS = [
+  'Cabezas a mano',
+  'Media velocidad',
+  'Una sola línea',
+  'Manual mientras tanto',
 ]
 
 /**

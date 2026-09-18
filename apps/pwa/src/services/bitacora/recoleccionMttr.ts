@@ -67,6 +67,9 @@ function observacionesDe(e: EventoBitacora): string {
   const partes = [texto]
   const repuestos = normalizarRepuestos(e.repuestos)
   if (repuestos.length) partes.push(`Repuestos: ${repuestos.map((r) => `${r.codigoSAP} ${nombreConComun(r)} ×${r.cantidad}`.replace(/\s+×/, ' ×')).join('; ')}.`)
+  if (e.impacto === 'afecta-sin-detener') {
+    partes.push(e.contingencia?.trim() ? `Afectó sin detener: ${e.contingencia.trim()}.` : 'Afectó sin detener la producción.')
+  }
   if (e.impacto === 'en-ventana') partes.push(e.ventana?.trim() ? `Sin detener: ${e.ventana.trim()}.` : 'Sin detener producción.')
   if (e.pendiente) partes.push('Queda pendiente para el turno siguiente.')
   return partes.filter(Boolean).join(' ')

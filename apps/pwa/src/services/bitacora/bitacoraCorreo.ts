@@ -56,6 +56,8 @@ const C = {
   linea: '#E3E3E3',
   parada: '#B3261E',
   ventana: '#1E7B34',
+  /** Afectó sin detener: ni el rojo de la parada ni el verde del «sin costo». */
+  afectado: '#8A5A00',
   pendFondo: '#FFF4E5',
   pendBorde: '#E8900C',
   marca: '#2E75B6',
@@ -93,6 +95,9 @@ export function tituloCorreo(turno: TurnoMantencion): string {
 export function partesImpacto(e: EventoBitacora): string[] {
   const partes: string[] = []
   if (e.impacto === 'con-parada') partes.push(`Detuvo la máquina ${formatoMinutos(minutosParadaDe(e))}`)
+  if (e.impacto === 'afecta-sin-detener') {
+    partes.push(e.contingencia?.trim() ? `Afectó sin detener: ${e.contingencia.trim()}` : 'Afectó sin detener')
+  }
   if (e.impacto === 'en-ventana') partes.push(e.ventana?.trim() ? `Sin detener: ${e.ventana.trim()}` : 'Sin detener producción')
   if (e.resuelvePendiente?.turnoId) partes.push(`Cierra pendiente del ${etiquetaCortaTurno(e.resuelvePendiente.turnoId)}`)
   // Un pendiente que otro turno ya cerró: sin esto, al reexportar una bitácora
@@ -301,6 +306,9 @@ export function bitacoraAHtmlCorreo({ turno, eventos: todos, tecnicos, planta, o
     htmlKpi(formatoMinutos(r.minutosParada), etiquetaParada(r), r.conParada > 0 ? C.parada : undefined),
     // MTTR solo con paradas: sin ellas era un «—» que no decía nada.
     r.mttrMin != null ? htmlKpi(formatoMinutos(r.mttrMin), 'MTTR') : '',
+    // Solo si hubo: es la evidencia de que el proceso no se detuvo porque
+    // alguien lo sostuvo (la tolva de riles con las cabezas a mano).
+    r.afectados > 0 ? htmlKpi(String(r.afectados), r.afectados === 1 ? 'siguió gracias a Mantención' : 'siguieron gracias a Mantención', C.afectado) : '',
     htmlKpi(String(r.enVentana), 'sin detener producción', r.enVentana > 0 ? C.ventana : undefined),
     htmlKpi(String(r.pendientesDelTurno), etiquetaPendientes(r), r.pendientes > 0 ? C.pendBorde : undefined),
     // Solo si hubo: es el número que demuestra la entrega de turno.
@@ -366,6 +374,7 @@ export function lineaResumen(r: ReturnType<typeof resumirBitacora>): string {
   return (
     `${r.eventos} ${r.eventos === 1 ? 'evento' : 'eventos'} · ${formatoMinutos(r.minutosParada)} ${etiquetaParada(r)} · ` +
     `MTTR ${r.mttrMin == null ? '—' : formatoMinutos(r.mttrMin)} · ${r.enVentana} sin detener producción · ` +
+    (r.afectados > 0 ? `${r.afectados} siguieron gracias a Mantención · ` : '') +
     `${r.pendientesDelTurno} ${etiquetaPendientes(r)}` +
     (r.pendientesCerrados > 0 ? ` · ${r.pendientesCerrados} ${r.pendientesCerrados === 1 ? 'pendiente cerrado' : 'pendientes cerrados'}` : '')
   )

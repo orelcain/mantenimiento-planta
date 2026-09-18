@@ -165,8 +165,13 @@ describe('solo se escribe lo que cambió (revisión 16-09)', () => {
     expect(cambios).not.toContain('horaTermino')
   })
 
-  it('impacto, minutos y ventana van juntos; equipo con su vínculo', () => {
-    expect(camposACambiar(form(), form({ minutos: '12' }), [], []).sort()).toEqual(['impacto', 'minutosParada', 'ventana'])
+  it('impacto, minutos, ventana y contingencia van juntos; equipo con su vínculo', () => {
+    expect(camposACambiar(form(), form({ minutos: '12' }), [], []).sort()).toEqual([
+      'contingencia',
+      'impacto',
+      'minutosParada',
+      'ventana',
+    ])
     expect(camposACambiar(form(), form({ equipo: 'GRADER MS4/12' }), [], []).sort()).toEqual(['equipo', 'equipoCodigo', 'equipoId'])
   })
 

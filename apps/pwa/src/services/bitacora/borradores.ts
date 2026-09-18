@@ -66,6 +66,8 @@ export interface CamposFormulario {
   impacto: ImpactoEvento
   minutos: string
   ventana: string
+  /** Solo con «afectó sin detener»: qué se hizo para que el proceso siguiera. */
+  contingencia: string
   pendiente: boolean
 }
 
@@ -86,6 +88,7 @@ export const ETIQUETA_CAMPO: Record<CampoFormulario, string> = {
   posicion: 'la ubicación en el turno',
   impacto: 'el impacto',
   minutos: 'los minutos de parada',
+  contingencia: 'la contingencia',
   ventana: 'la ventana',
   pendiente: '«Queda pendiente»',
 }
@@ -106,6 +109,7 @@ type EventoFormulario = Pick<
   | 'impacto'
   | 'minutosParada'
   | 'ventana'
+  | 'contingencia'
   | 'pendiente'
 >
 
@@ -126,6 +130,7 @@ export function aFormulario(e: EventoFormulario): CamposFormulario {
     impacto: e.impacto,
     minutos: e.minutosParada != null ? String(e.minutosParada) : '',
     ventana: e.ventana ?? '',
+    contingencia: e.contingencia ?? '',
     pendiente: Boolean(e.pendiente),
   }
 }
@@ -145,6 +150,7 @@ const CAMPOS: readonly CampoFormulario[] = [
   'impacto',
   'minutos',
   'ventana',
+  'contingencia',
   'pendiente',
 ]
 
@@ -233,10 +239,11 @@ const CAMPOS_DOC: Record<CampoFormulario, readonly string[]> = {
   horaInicio: ['horaInicio'],
   horaTermino: ['horaTermino'],
   posicion: ['posicionMin'],
-  // Van juntos: los minutos y la ventana se guardan según el impacto.
-  impacto: ['impacto', 'minutosParada', 'ventana'],
-  minutos: ['impacto', 'minutosParada', 'ventana'],
-  ventana: ['impacto', 'minutosParada', 'ventana'],
+  // Van juntos: los minutos, la ventana y la contingencia se guardan según el impacto.
+  impacto: ['impacto', 'minutosParada', 'ventana', 'contingencia'],
+  minutos: ['impacto', 'minutosParada', 'ventana', 'contingencia'],
+  ventana: ['impacto', 'minutosParada', 'ventana', 'contingencia'],
+  contingencia: ['impacto', 'minutosParada', 'ventana', 'contingencia'],
   pendiente: ['pendiente'],
 }
 
