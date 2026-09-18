@@ -33,6 +33,7 @@ import { bitacoraAHtmlCorreo, bitacoraATextoPlano, etiquetaParada, etiquetaPendi
 import { cargarFotoComoJpeg, purgarFotosPendientes } from '@/services/bitacora/fotosBitacora'
 import { fuePendiente, gruposDelTurno, resumirBitacora } from '@/services/bitacora/resumenBitacora'
 import { filasRecoleccion, generarExcelRecoleccion, htmlRecoleccionMttr, nombreExcelRecoleccion } from '@/services/bitacora/recoleccionMttr'
+import { explicacionMtbfMttr } from '@/services/bitacora/mtbf'
 import { esBorrador, soloListos } from '@/services/bitacora/borradores'
 import { nombreEnPresencia as nombrePresencia, otrosEditando } from '@/services/bitacora/presencia'
 import { dispositivoActual } from '@/services/bitacora/dispositivo'
@@ -981,6 +982,8 @@ export function BitacoraTurnoVista({
             style={{ background: '#FFFFFF' }}
             dangerouslySetInnerHTML={{ __html: htmlMttr }}
           />
+          {/* Las siglas de la planilla con su definición y su cálculo (Orel, 18-09). */}
+          <p className="px-4 text-footnote text-muted-foreground">{explicacionMtbfMttr(turno, r)}</p>
         </section>
       )}
 

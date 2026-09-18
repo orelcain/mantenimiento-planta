@@ -139,6 +139,7 @@ export function HistorialBitacoraVista({ fuente, alAbrirTurno }: { fuente: Fuent
         <Kpi valor={String(resumen.eventos)} etiqueta={resumen.eventos === 1 ? 'evento' : 'eventos'} />
         <Kpi valor={formatoMinutos(resumen.minutosParada)} etiqueta={`de parada (${resumen.conParada})`} punto={resumen.minutosParada > 0 ? 'crit' : undefined} />
         <Kpi valor={resumen.mttrMin == null ? '—' : formatoMinutos(resumen.mttrMin)} etiqueta="MTTR" />
+        <Kpi valor={resumen.mtbfMin == null ? '—' : formatoMinutos(resumen.mtbfMin)} etiqueta="MTBF" />
         <Kpi valor={String(resumen.sinDetener)} etiqueta="sin detener" punto={resumen.sinDetener > 0 ? 'ok' : undefined} />
         <Kpi valor={String(resumen.pendientesCerrados)} etiqueta="pendientes cerrados" punto={resumen.pendientesCerrados > 0 ? 'ok' : undefined} />
         <Kpi valor={String(resumen.pendientesAbiertos)} etiqueta="pendientes abiertos" punto={resumen.pendientesAbiertos > 0 ? 'warn' : undefined} />
@@ -217,6 +218,7 @@ export function HistorialBitacoraVista({ fuente, alAbrirTurno }: { fuente: Fuent
                     </div>
                     <span className="text-caption text-muted-foreground">
                       {e.paradas} {e.paradas === 1 ? 'parada' : 'paradas'} · {porcentaje(e.parte)} del total
+                      {e.mtbfMin == null ? '' : ` · MTBF ${formatoMinutos(e.mtbfMin)}`}
                     </span>
                   </div>
                 ))
