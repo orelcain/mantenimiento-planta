@@ -8,6 +8,7 @@ import { minutosParadaDe } from '@/services/bitacora/resumenBitacora'
 import { formatoMinutos } from '@/services/bitacora/turnoMantencion'
 import { etiquetaCortaTurno } from '@/services/bitacora/entregaTurno'
 import { codigoEquipoDe, etiquetaTipo, nombreRepuesto, normalizarRepuestos, tieneHora, tituloDe } from '@/services/bitacora/presentacionEvento'
+import { nombreEquipoLegible } from '@/services/bitacora/nombreEquipo'
 
 /**
  * Un evento en la línea de tiempo del turno (opción A del mockup, aprobada).
@@ -59,8 +60,10 @@ export function EventoBitacoraFila({
   const fotos = [...(evento.fotos ?? [])].sort((a, b) => orden[a.etiqueta] - orden[b.etiqueta])
   const esAntesDespues = fotos.some((f) => f.etiqueta === 'antes') && fotos.some((f) => f.etiqueta === 'despues')
   const conHora = tieneHora(evento)
-  const titulo = tituloDe(evento)
-  const nombreEquipo = evento.equipo?.trim() || (borrador ? 'Sin equipo todavía' : 'Sin equipo')
+  // En frase, no en MAYÚSCULAS (mockup «Dos niveles», 18-09-2026): vale para el
+  // equipo (viene así de SAP) y para un título que el técnico escribió a gritos.
+  const titulo = nombreEquipoLegible(tituloDe(evento))
+  const nombreEquipo = nombreEquipoLegible(evento.equipo) || (borrador ? 'Sin equipo todavía' : 'Sin equipo')
   const sinEquipo = borrador && !evento.equipo?.trim()
   const codigo = codigoEquipoDe(evento)
   const repuestos = normalizarRepuestos(evento.repuestos)
@@ -88,74 +91,68 @@ export function EventoBitacoraFila({
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary',
       ].join(' ')}
     >
-      <div className="flex flex-col items-start gap-1.5">
+      {/* Columna de secuencia (mockup «Dos niveles», 18-09-2026): el N.° del
+          evento en texto chico, la hora de inicio en subhead y el término debajo.
+          La hora ya no pesa más que el equipo: ordena, no protagoniza. */}
+      <div className="flex flex-col items-start gap-1 pt-0.5">
         {numero != null && (
-          <span
-            aria-label={`Evento ${numero}`}
-            // Tintado, no relleno: el ámbar sólido cambia de tono entre pieles
-            // y el texto encima perdía contraste en una de ellas.
-            className={`flex size-[22px] items-center justify-center rounded-full text-caption font-bold tabular-nums ${
-              enPendientes ? 'bg-ink-warn/15 text-ink-warn' : 'bg-muted-foreground/15 text-foreground'
-            }`}
-          >
+          <span aria-label={`Evento ${numero}`} className={`text-caption font-semibold tabular-nums ${enPendientes ? 'text-ink-warn' : 'text-muted-foreground'}`}>
             {numero}
           </span>
         )}
         {conHora ? (
           <div className="tabular-nums leading-tight">
-            <div className="text-body font-semibold">{evento.horaInicio}</div>
+            <div className="text-subhead font-semibold">{evento.horaInicio}</div>
             {/* Sin término = sigue abierto; la columna es angosta, basta el guion. */}
             <div className="text-footnote text-muted-foreground" title={evento.horaTermino ? undefined : 'Sin hora de término'}>{evento.horaTermino ?? '—'}</div>
           </div>
         ) : (
           // Registrado con «Sin hora»: la fila va donde se registró.
-          <div className="pt-0.5 text-footnote text-muted-foreground">Sin hora</div>
+          <div className="text-footnote italic text-muted-foreground">Sin hora</div>
         )}
       </div>
 
-      <div className="flex min-w-0 flex-col gap-1.5">
-        <div className="flex flex-wrap items-center gap-1.5">
+      <div className="flex min-w-0 flex-col gap-1">
+        {/* Nivel 1: el título del evento (o el equipo, si no hay título). */}
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           {/* Un borrador se VE (es cooperación en vivo) pero se distingue al tiro:
               no cuenta en los números ni sale en el correo hasta «Listo». */}
           {borrador && <Pill tone="info" dot={abiertoPor.length ? 'pulse' : undefined}>En redacción</Pill>}
-          {/* Con título, el título manda y el equipo pasa a la línea de abajo
-              (como remitente y asunto en Mail); sin título, queda como antes. */}
-          {titulo ? (
-            <span className="text-headline leading-tight md:text-subhead">{titulo}</span>
-          ) : (
-            <>
-              <span className={`text-headline leading-tight md:text-subhead ${sinEquipo ? 'text-muted-foreground' : ''}`}>{nombreEquipo}</span>
-              {codigo && <span className="text-footnote tabular-nums text-muted-foreground">{codigo}</span>}
-              <Tag>{etiquetaTipo(evento)}</Tag>
-            </>
-          )}
+          <span className={`text-headline leading-tight ${!titulo && sinEquipo ? 'text-muted-foreground' : ''}`}>{titulo || nombreEquipo}</span>
           {evento.pendiente && !enPendientes && <Pill tone="warning">Pendiente</Pill>}
         </div>
-        {titulo && (
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className={`text-footnote ${sinEquipo ? 'text-muted-foreground' : 'text-foreground'}`}>{nombreEquipo}</span>
-            {codigo && <span className="text-footnote tabular-nums text-muted-foreground">{codigo}</span>}
-            <Tag>{etiquetaTipo(evento)}</Tag>
-          </div>
-        )}
+        {/* Nivel 2: una sola línea secundaria. El impacto va como punto + texto,
+            no como renglón rojo aparte: seis palabras no necesitan tres canales. */}
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-footnote text-muted-foreground">
+          <Tag>{etiquetaTipo(evento)}</Tag>
+          {titulo && <span className={sinEquipo ? '' : 'text-foreground'}>{nombreEquipo}</span>}
+          {codigo && <span className="tabular-nums">{codigo}</span>}
+          {evento.impacto === 'con-parada' && (
+            <span className="inline-flex items-center gap-1.5 font-semibold text-ink-crit">
+              <span className="size-2 rounded-full bg-ink-crit" aria-hidden />
+              Detuvo la máquina {formatoMinutos(parada)}
+            </span>
+          )}
+          {evento.impacto === 'en-ventana' && (
+            <span className="inline-flex items-center gap-1.5 font-semibold text-ink-ok">
+              <span className="size-2 rounded-full bg-ink-ok" aria-hidden />
+              Sin detener{evento.ventana?.trim() ? `: ${evento.ventana.trim()}` : ' producción'}
+            </span>
+          )}
+          {evento.resuelvePendiente?.turnoId && (
+            <span className="inline-flex items-center gap-1.5 font-semibold text-ink-ok">
+              <span className="size-2 rounded-full bg-ink-ok" aria-hidden />
+              Cierra pendiente del {etiquetaCortaTurno(evento.resuelvePendiente.turnoId)}
+            </span>
+          )}
+        </div>
 
-        {evento.impacto === 'con-parada' && (
-          <span className="text-footnote font-semibold text-ink-crit">Detuvo la máquina {formatoMinutos(parada)}</span>
-        )}
-        {evento.impacto === 'en-ventana' && (
-          <span className="text-footnote font-semibold text-ink-ok">
-            Sin detener{evento.ventana?.trim() ? `: ${evento.ventana.trim()}` : ' producción'}
-          </span>
-        )}
-
-        {evento.resuelvePendiente?.turnoId && (
-          <span className="text-footnote font-semibold text-ink-ok">Cierra pendiente del {etiquetaCortaTurno(evento.resuelvePendiente.turnoId)}</span>
-        )}
-
+        {/* Lo que escribió el técnico, en tinta secundaria: en PC dos líneas (el
+            texto entero está en el editor y en el correo); en el teléfono, tres. */}
         {evento.descripcion?.trim() ? (
-          <p className={`line-clamp-3 whitespace-pre-line text-body md:text-subhead ${borrador ? 'text-muted-foreground' : ''}`}>{evento.descripcion}</p>
+          <p className="line-clamp-3 whitespace-pre-line text-body text-muted-foreground md:line-clamp-2 md:text-subhead">{evento.descripcion}</p>
         ) : borrador ? (
-          <p className="text-body text-muted-foreground">Sin descripción todavía</p>
+          <p className="text-body italic text-muted-foreground">Sin descripción todavía</p>
         ) : null}
 
         {/* En lista, como en WhatsApp, el correo y el PDF (ronda 28, 17-09):
@@ -256,7 +253,7 @@ export function EventoBitacoraFila({
             </Button>
           </div>
         ) : (
-          <span className="text-caption text-muted-foreground">
+          <span className="text-caption italic text-muted-foreground">
             {tecnicosDelEvento(evento).join(', ')}
             {evento.actualizadoPorNombre && evento.actualizadoPorNombre !== autorVisible(evento)
               ? ` · editado por ${evento.actualizadoPorNombre}`

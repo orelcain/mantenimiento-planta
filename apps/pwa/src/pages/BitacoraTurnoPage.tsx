@@ -663,8 +663,11 @@ export function BitacoraTurnoVista({
       </div>
 
       {/* Encabezado: título grande (uno por pantalla) + navegación de turnos */}
-      <header ref={cabeceraRef} className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3 px-1 md:items-center">
-        <div className="min-w-0 flex-1 md:flex-none">
+      {/* Encabezado en DOS EJES (mockup aprobado 18-09-2026; HIG «Layout» y
+          «Toolbars»): arriba el título y las acciones; abajo el turno y, a su
+          lado, el estado de sincronización como una línea, no como tarjeta. */}
+      <header ref={cabeceraRef} className="flex flex-col gap-1 px-1">
+        <div className="min-w-0">
           <div className="flex items-center justify-between gap-3">
             <h1 className="text-display">Bitácora</h1>
             {/* Teléfono: una cápsula de vidrio con los íconos (iOS 27 agrupa la
@@ -677,10 +680,32 @@ export function BitacoraTurnoVista({
                 enfocable
               />
             </span>
+            {/* Acciones de PC (HIG «Toolbars»): una sola acción rellena y el resto en
+                UNA cápsula de vidrio compartida (DESIGN.md §7). PDF, Excel, WhatsApp y
+                correo viven en «Compartir», como en el teléfono. */}
+            <div className="hidden items-center gap-3 md:flex">
+              <div role="group" aria-label="Acciones de la bitácora" className="glass-nav flex items-center gap-0.5 rounded-full p-1">
+                <Button variant="plain" onClick={() => navigate('/bitacora/historial')}>
+                  <BarChart3 /> Historial
+                </Button>
+                {esSupervisor && (
+                  <Button variant="plain" onClick={() => setHojaQr(true)}>
+                    <QrCode /> Acceso QR
+                  </Button>
+                )}
+                <Button variant="plain" onClick={() => setHojaCompartir(true)} disabled={!!trabajando}>
+                  {trabajando ? <Loader2 className="animate-spin" /> : <Share />} Compartir <ChevronDown />
+                </Button>
+              </div>
+              <Button onClick={abrirNuevo}>
+                <Plus /> Nuevo evento
+              </Button>
+            </div>
           </div>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
           {/* Navegación de turnos: una sola fila que no se parte (las flechas
               quedan siempre a los lados del turno, también a 375 px). */}
-          <div className="-ml-3 mt-1 flex items-center gap-1">
+          <div className="-ml-3 mt-1 flex min-w-0 flex-1 items-center gap-1 md:flex-none">
             <button
               type="button"
               onClick={() => irATurno(-1)}
@@ -715,45 +740,25 @@ export function BitacoraTurnoVista({
               <ChevronRight className="size-5" />
             </button>
           </div>
-        </div>
 
-        {/* Estado de sincronización y quién está conectado: nunca se esconde
-            (mockup aprobado 16-09-2026). En PC va en el hueco del encabezado, entre el
-            turno y las acciones (Orel, 18-09); en el teléfono, debajo, a lo ancho. */}
-        <div className="order-last w-full md:order-none md:w-auto md:min-w-0 md:flex-1 md:self-center">
-          <BarraSincronizacion
-            cargando={cargando}
-            error={error}
-            ultimaSync={ultimaSync}
-            cambiosPorSubir={cambiosPorSubir}
-            novedad={novedad}
-            presentes={conectados}
-            miDispositivoId={miDispositivoId}
-            editandoPorEvento={hayEventoConId}
-            tonoDe={tonoDe}
-          />
-        </div>
-
-        {/* Acciones de PC (mockup A aprobado, 18-09-2026; HIG «Toolbars»): una sola
-            acción rellena y el resto en UNA cápsula de vidrio compartida (DESIGN.md §7).
-            PDF, Excel, WhatsApp y correo viven en «Compartir», como en el teléfono. */}
-        <div className="hidden items-center gap-3 md:flex">
-          <div role="group" aria-label="Acciones de la bitácora" className="glass-nav flex items-center gap-0.5 rounded-full p-1">
-            <Button variant="plain" onClick={() => navigate('/bitacora/historial')}>
-              <BarChart3 /> Historial
-            </Button>
-            {esSupervisor && (
-              <Button variant="plain" onClick={() => setHojaQr(true)}>
-                <QrCode /> Acceso QR
-              </Button>
-            )}
-            <Button variant="plain" onClick={() => setHojaCompartir(true)} disabled={!!trabajando}>
-              {trabajando ? <Loader2 className="animate-spin" /> : <Share />} Compartir <ChevronDown />
-            </Button>
+          {/* Estado de sincronización y quién está conectado: nunca se esconde
+              (mockup aprobado 16-09-2026). En PC es una línea junto al turno, con el
+              detalle en un panel al tocarla; en el teléfono, debajo, a lo ancho. */}
+          <div className="w-full md:w-auto md:min-w-0 md:flex-1">
+            <BarraSincronizacion
+              cargando={cargando}
+              error={error}
+              ultimaSync={ultimaSync}
+              cambiosPorSubir={cambiosPorSubir}
+              novedad={novedad}
+              presentes={conectados}
+              miDispositivoId={miDispositivoId}
+              editandoPorEvento={hayEventoConId}
+              tonoDe={tonoDe}
+              compacta
+            />
           </div>
-          <Button onClick={abrirNuevo}>
-            <Plus /> Nuevo evento
-          </Button>
+          </div>
         </div>
       </header>
 

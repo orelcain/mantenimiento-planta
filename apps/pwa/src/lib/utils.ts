@@ -1,6 +1,20 @@
 import { clsx, type ClassValue } from 'clsx'
-import { twMerge } from 'tailwind-merge'
+import { extendTailwindMerge } from 'tailwind-merge'
 import { logger } from '@/lib/logger'
+
+/**
+ * tailwind-merge no conoce nuestra escala tipográfica (`text-caption`,
+ * `text-footnote`…): tomaba `text-caption` por un COLOR y lo descartaba al
+ * fusionarlo con `text-muted-foreground`. Así, el primitivo `Tag` se pintaba a
+ * 14 px en vez de 11 en toda la app (medido 18-09-2026). Se le declara la escala.
+ */
+const twMerge = extendTailwindMerge({
+  extend: {
+    classGroups: {
+      'font-size': [{ text: ['xs', 'caption', 'footnote', 'subhead', 'callout', 'body', 'headline', 'title3', 'title2', 'title1', 'display'] }],
+    },
+  },
+})
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
