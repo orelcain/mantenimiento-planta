@@ -663,7 +663,7 @@ export function BitacoraTurnoVista({
       </div>
 
       {/* Encabezado: título grande (uno por pantalla) + navegación de turnos */}
-      <header ref={cabeceraRef} className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3 px-1">
+      <header ref={cabeceraRef} className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3 px-1 md:items-center">
         <div className="min-w-0 flex-1 md:flex-none">
           <div className="flex items-center justify-between gap-3">
             <h1 className="text-display">Bitácora</h1>
@@ -717,6 +717,23 @@ export function BitacoraTurnoVista({
           </div>
         </div>
 
+        {/* Estado de sincronización y quién está conectado: nunca se esconde
+            (mockup aprobado 16-09-2026). En PC va en el hueco del encabezado, entre el
+            turno y las acciones (Orel, 18-09); en el teléfono, debajo, a lo ancho. */}
+        <div className="order-last w-full md:order-none md:w-auto md:min-w-0 md:flex-1 md:self-center">
+          <BarraSincronizacion
+            cargando={cargando}
+            error={error}
+            ultimaSync={ultimaSync}
+            cambiosPorSubir={cambiosPorSubir}
+            novedad={novedad}
+            presentes={conectados}
+            miDispositivoId={miDispositivoId}
+            editandoPorEvento={hayEventoConId}
+            tonoDe={tonoDe}
+          />
+        </div>
+
         {/* Acciones de PC (mockup A aprobado, 18-09-2026; HIG «Toolbars»): una sola
             acción rellena y el resto en UNA cápsula de vidrio compartida (DESIGN.md §7).
             PDF, Excel, WhatsApp y correo viven en «Compartir», como en el teléfono. */}
@@ -740,20 +757,6 @@ export function BitacoraTurnoVista({
         </div>
       </header>
 
-      {/* Estado de sincronización y quién está conectado: nunca se esconde
-          (mockup aprobado 16-09-2026). */}
-      <BarraSincronizacion
-        cargando={cargando}
-        error={error}
-        ultimaSync={ultimaSync}
-        cambiosPorSubir={cambiosPorSubir}
-        novedad={novedad}
-        presentes={conectados}
-        miDispositivoId={miDispositivoId}
-        editandoPorEvento={hayEventoConId}
-        tonoDe={tonoDe}
-      />
-
       {/* Escritorio de turno (mockup A, 18-09-2026; HIG «Split views»): en PC, tres
           columnas — contexto (300 px) · eventos · vista previa del correo (380 px,
           fija); entre 768 y 1280 px, dos (contexto y eventos apilados, correo a la
@@ -764,7 +767,8 @@ export function BitacoraTurnoVista({
           // estiraba la única columna del teléfono y la página se desplazaba de lado.
           'grid grid-cols-[minmax(0,1fr)] items-start gap-5 [&>*]:min-w-0',
           "md:grid-cols-[minmax(0,1fr)_380px] md:[grid-template-areas:'contexto_envio'_'entrega_envio'_'centro_envio']",
-          "xl:grid-cols-[300px_minmax(0,1fr)_380px] xl:grid-rows-[auto_1fr] xl:[grid-template-areas:'contexto_entrega_envio'_'contexto_centro_envio']",
+          // Proporción 1 : 2 : 3 (Orel, 18-09): llena una pantalla 16:9 y el correo se ve grande.
+          "xl:grid-cols-[minmax(240px,1fr)_minmax(0,2fr)_minmax(0,3fr)] xl:grid-rows-[auto_1fr] xl:[grid-template-areas:'contexto_entrega_envio'_'contexto_centro_envio']",
         ].join(' ')}
       >
       {/* Entrega de turno: lo primero que ve el turno que llega (mockup aprobado). */}
@@ -1035,7 +1039,8 @@ export function BitacoraTurnoVista({
         </section>
 
         {/* Vista previa del correo (solo PC) */}
-        <section aria-label="Enviar la bitácora" className="hidden flex-col gap-3 md:flex md:sticky md:top-4 md:[grid-area:envio]">
+        {/* Fija y con su propio desplazamiento: el correo entero cabe en la pantalla 16:9. */}
+        <section aria-label="Enviar la bitácora" className="hidden flex-col gap-3 md:flex md:sticky md:top-4 md:max-h-[calc(100vh-2rem)] md:overflow-y-auto md:[grid-area:envio]">
           <SegmentedControl
             ariaLabel="Enviar por correo o por WhatsApp"
             value={vistaEnvio}
