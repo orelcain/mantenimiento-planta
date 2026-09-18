@@ -16,8 +16,16 @@ import { encolarBorrado, purgarBorradosPendientes, quitarBorrado } from './borra
  * Ruta: `bitacora/{turnoId}/{eventoId}/{archivo}` — 3 segmentos después de
  * `bitacora`, igual que el `match` de storage.rules (contar segmentos: un path
  * que no calza con ninguna regla falla con `storage/unauthorized`).
+ *
+ * LOS 1600 px NO SE TOCAN: la resolución es lo que deja distinguir un detalle
+ * (un número de serie, una grieta), y eso es el valor de la foto. Lo que bajó
+ * el 18-09-2026 es la CALIDAD de compresión, de 0.82 a 0.75: medido sobre fotos
+ * reales del turno, una foto pasa de ~330 KB a ~230 KB (−30%) y al mirar los
+ * mismos píxeles al 200% se pierde grano, no bordes ni relieve. Importa menos
+ * por el almacenamiento (centavos) que por la SUBIDA: en planta se sube por 4G
+ * con mala señal, y 100 KB menos por foto se notan en el teléfono del técnico.
  */
-const OPCIONES = { maxWidth: 1600, maxHeight: 1600, quality: 0.82, targetBytes: 350 * 1024, preferWebP: false }
+const OPCIONES = { maxWidth: 1600, maxHeight: 1600, quality: 0.75, targetBytes: 250 * 1024, preferWebP: false }
 
 /**
  * Miniatura para la LISTA. La foto buena pesa ~300 KB y en la fila se pinta a
