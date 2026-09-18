@@ -448,7 +448,12 @@
 .piel-sheet-in { animation: piel-sheet-in .5s cubic-bezier(.32, .72, 0, 1) both }
 .piel-pulse { animation: piel-pulse 2.2s ease-out infinite }
 @media (prefers-reduced-motion: reduce) {
-  .piel-fade-in, .piel-sheet-in, .piel-pulse { animation: none !important }
+  /* HIG «Accessibility»: los desplazamientos en x/y/z se REEMPLAZAN por un
+     fundido, no se quitan del todo — si no, una hoja aparece de golpe y no se
+     entiende de dónde salió. El latido sí se apaga: no comunica nada nuevo. */
+  .piel-sheet-in { animation: piel-fade-in .2s ease-out both !important }
+  .piel-fade-in { animation: piel-fade-in .2s ease-out both !important }
+  .piel-pulse { animation: none !important }
 }
 
 /* ── Vidrio de NAVEGACION · Liquid Glass iOS 27 (DESIGN.md §6) ────────────────

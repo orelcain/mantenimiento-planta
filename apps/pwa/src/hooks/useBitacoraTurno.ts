@@ -430,7 +430,9 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
   }, [])
 
   /** Mueve un evento SIN HORA dentro del turno (flechas ▲▼). Sin await: queda en el teléfono si no hay señal. */
-  const mover = useCallback((id: string, posicionMin: number) => {
+  // `null` devuelve el evento a su lugar por hora de registro: es lo que usa
+  // «Deshacer» después de arrastrar (HIG «Drag and drop»).
+  const mover = useCallback((id: string, posicionMin: number | null) => {
     void updateDoc(doc(db, BITACORA_COLECCION, id), { posicionMin, updatedAt: serverTimestamp() }).catch(() =>
       toast({ title: 'No se pudo mover el evento', description: 'Vuelve a intentarlo cuando haya señal.', variant: 'destructive' }),
     )

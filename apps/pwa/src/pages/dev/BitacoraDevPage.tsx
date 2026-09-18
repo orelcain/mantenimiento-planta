@@ -291,7 +291,7 @@ function useEventosEjemplo(turno: TurnoMantencion, inicialDe: (t: TurnoMantencio
     nuevoId: () => `nuevo-${Date.now()}`,
     guardar,
     borrar,
-    mover: (id: string, posicionMin: number) =>
+    mover: (id: string, posicionMin: number | null) =>
       setPorTurno((prev) => ({ ...prev, [turno.id]: (prev[turno.id] ?? inicialDe(turno)).map((e) => (e.id === id ? { ...e, posicionMin } : e)) })),
     marcarPendiente: (evento: EventoBitacora, pendiente: boolean, quien: string) =>
       setPorTurno((prev) => ({

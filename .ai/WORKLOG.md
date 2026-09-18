@@ -21,6 +21,17 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-18 · Bitacora ronda 45 · HIG etapa 3a: deshacer el arrastre, Reduce Motion, buscador y progreso
+- Cuarta tanda de las 15 mejoras sacadas del HIG local (`ARIA_MANTENIMIENTO_PLANTA/docs/hig/`). Cuatro reglas:
+  - **«Drag and drop» · deshacer**: al soltar una fila reordenada sale un toast «Evento movido» con **Deshacer** (mismo patrón que el borrado). Para eso `mover(id, posicionMin)` ahora acepta `null`, que devuelve el evento a su lugar por hora de registro; antes solo aceptaba un número y no había forma de volver atrás. Se guarda la `posicionMin` PREVIA antes de mover.
+  - **«Drag and drop» · la copia en la mano**: la fila levantada va con `opacity-70`, para que se lea como una copia y no como la fila misma.
+  - **«Accessibility» · Reduce Motion**: los desplazamientos en x/y/z se REEMPLAZAN por un fundido de 200 ms, no se apagan. Antes `animation: none` hacía que una hoja apareciera de golpe, sin decir de dónde salió. El latido (`piel-pulse`) sí se apaga: no comunica nada nuevo.
+  - **«Searching» + «Progress indicators»**: el buscador de equipo dice por qué campos busca («Buscar equipo, área o código SAP») y el botón de guardar dice cuántas fotos van («Subiendo 2 de 3…») en vez de «Subiendo fotos…».
+- OJO con el placeholder: el primer intento decía «Buscar equipo · Planta Chonchi» y era FALSO — `construirOpcionesEquipo` arma la lista con la jerarquía de las DOS plantas (por eso cada sugerencia muestra su planta). Nombrar una planta en el placeholder habría hecho creer que la otra no está.
+- Verificación en `/dev/bitacora-real` (turno real 2026-09-16 tarde, 8 eventos): arrastrando el evento 5 con PointerEvents reales, la fila queda translúcida, el orden pasa a 5↔6, sale el toast, y **Deshacer** deja la lista idéntica a como estaba (comparado el orden completo antes/después, no a ojo).
+- tsc 0; eslint 30 (baseline de main); vitest 2.808 OK; auditorías piel/voseo/decimales/contraste sin deuda nueva; build OK.
+- Estado: HECHO. Queda la etapa 3b: evento nuevo de otro técnico que entra con marca «Nuevo», y verificar la elevación de la hoja del editor en oscuro. DESCARTADA con fundamento la regla del «⋯» en la fila: tocar la fila ya abre el editor, que tiene «Queda pendiente» y «Borrar evento».
+
 ## 2026-09-18 · Bitacora ronda 44 · BUG: miniaturas de fotos de OTROS técnicos con ícono roto
 - Síntoma (Orel, iPhone): en la lista, las fotos subidas desde ese mismo teléfono se ven; las de otros dispositivos o de otros colegas salen con el ícono roto, PERO al tocarlas el visor las muestra bien.
 - Descartado con datos, no con teoría: se exportó el turno real 2026-09-16_tarde (14 fotos) y TODAS las URL son iguales en forma (mismo bucket `firebasestorage.googleapis.com`, `alt=media`, con `token`, 239 caracteres). No hay data URIs ni URLs locales: el problema no es lo guardado ni los permisos.

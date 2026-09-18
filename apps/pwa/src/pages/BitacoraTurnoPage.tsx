@@ -626,8 +626,21 @@ export function BitacoraTurnoVista({
       setArrastre(null)
       const p = posicionEnIndice(turno, grupoDe(e), e.id, destinoDe(a, ev.clientY))
       if (p != null) {
+        // HIG «Drag and drop»: un arrastre se tiene que poder deshacer. `null`
+        // devuelve el evento a su lugar por hora de registro.
+        const previa = typeof e.posicionMin === 'number' ? e.posicionMin : null
         mover(e.id, p)
         vibrar()
+        toast({
+          title: 'Evento movido',
+          description: tituloDe(e) || e.equipo?.trim() || undefined,
+          duration: PLAZO_DESHACER_MS,
+          action: (
+            <ToastAction altText="Deshacer el movimiento" onClick={() => mover(e.id, previa)}>
+              Deshacer
+            </ToastAction>
+          ),
+        })
       }
     },
   })

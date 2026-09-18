@@ -104,7 +104,9 @@ export function BuscadorEquipo({
           autoComplete="off"
           maxLength={120}
           value={texto}
-          placeholder="Escribe: baader, grader, túnel…"
+          // HIG «Searching»: el placeholder dice POR QUÉ campos se puede buscar.
+          // Nombrar la planta sería falso: la jerarquía trae las dos.
+          placeholder="Buscar equipo, área o código SAP"
           onFocus={() => setAbierto(true)}
           onBlur={() => setAbierto(false)}
           onChange={(e) => {
