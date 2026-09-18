@@ -21,6 +21,14 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-17 · Bitacora ronda 33 · Las horas corridas al pegar el correo en Outlook
+- Foto de Orel (Outlook de escritorio, mensaje nuevo, pegado): la hora de cada evento caía en una posición distinta (21:05 al borde, 22:25 al medio) y cada evento quedaba más sangrado que el anterior.
+- Causa: tablas ANIDADAS. Cada evento iba en `<table>` dentro de un `<td>` de otra tabla, y el encabezado (equipo + hora) en una tercera. Word, el motor de Outlook, no respeta `width:100%` en una tabla anidada: la del encabezado se encogía al contenido (la hora quedaba pegada al texto) y cada nivel sumaba sangría.
+- Fix en `htmlEvento` (`bitacoraCorreo.ts`): una sola fila de TRES celdas directas en la tabla de eventos: número (36 px) · contenido · hora (96 px, derecha, `nowrap`). Cero tablas anidadas en la fila del evento (la de repuestos sigue dentro del contenido, un nivel, como la de fotos que ya funcionaba).
+- Regla para el correo: NUNCA una tabla `width:100%` dentro de una celda para alinear algo a la derecha; usar una celda más en la misma fila.
+- Verificación: muestra a 1000 px con las 4 horas alineadas al mismo borde y los 4 números al mismo margen; tsc 0; eslint 30; vitest 2.804 OK; build y auditorías OK. Falta la prueba real de Orel pegando en Outlook (no se puede correr Word aquí).
+- Estado: HECHO.
+
 ## 2026-09-17 · Bitacora ronda 32 · El formulario habla como la planilla
 - Pedido de Orel: que los rótulos del evento coincidan con las columnas del Excel («Título» confundía: en la planilla eso es «Falla»).
 - Hecho: «Equipo o área» → «Máquina o área» (`BuscadorEquipo`), «Título» → «Falla · Opcional · en pocas palabras», «Qué pasó y qué se hizo» → «Observaciones · qué pasó y qué se hizo» (`EventoBitacoraSheet`); los avisos de conflicto de borradores dicen «la máquina», «la falla», «Observaciones» (`borradores.ts`). Los campos del modelo no cambian (`equipo`, `titulo`, `descripcion`).

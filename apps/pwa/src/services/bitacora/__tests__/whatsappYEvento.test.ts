@@ -138,8 +138,7 @@ describe('título y «Sin hora»', () => {
     const e = ev({ horaInicio: '', horaTermino: null, titulo: 'Cambio de tubos' })
     // Correo 17-09: el equipo arriba (sin hora, sin columna de hora) y el título debajo.
     const html = bitacoraAHtmlCorreo(datos([e]))
-    expect(html).toContain('>CASINO</td></tr></table>')
-    expect(html).toContain('>Cambio de tubos</div>')
+    expect(html).toContain('>CASINO</div><div style="font-size:14px;font-weight:600;">Cambio de tubos</div>')
     expect(html).not.toContain('> · ')
     const plano = bitacoraATextoPlano(datos([e]))
     expect(plano).toContain('\nCASINO · Cambio de tubos\n')
