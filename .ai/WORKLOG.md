@@ -21,6 +21,17 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-18 · Bitacora ronda 47 · MINIATURAS DE VERDAD (la causa real de las fotos rotas)
+- Orel volvió a reportar las miniaturas con el ícono roto DESPUÉS del arreglo de la ronda 44 (service worker + reintentos), y en las capturas salían rotas TODAS las de un evento, no solo las de otros técnicos.
+- Se midió en vez de teorizar otra vez: las 13 fotos del turno 16-09 pesan **3.444 KB**, y toda la bitácora suma **4.625 KB en 18 fotos**. La lista bajaba la foto ENTERA (1600 px, ~300 KB) para pintar un cuadrado de 48 px. Por 4G en planta, con 13 descargas en paralelo, es plata y es tiempo — y en iPhone además son ~100 MB de bitmap decodificado, que es justo cuando WebKit deja la imagen rota. El visor pide UNA sola: por eso siempre abría bien. La teoría del SW de la ronda 44 era plausible pero NO era la causa de fondo.
+- Arreglo en dos partes:
+  1. **Al subir** (`fotosBitacora.ts`): además de la foto se sube `t_<id>.jpg` de 320 px (~20 KB) y la foto guarda `thumbUrl`/`thumbPath`. Es un EXTRA con su propio try/catch: si falla, la foto igual queda subida y la lista cae a la original. El borrado arrastra la miniatura DERIVANDO el nombre (`miniaturaDe()`), así que ningún llamador de `borrarFotoOEncolar` cambió. Las reglas de Storage no se tocaron: el `match` acepta cualquier `fileName` en esa ruta.
+  2. **Las 18 fotos viejas**: `scripts/backfill-miniaturas-bitacora.js` (dry-run por defecto, `--write` para aplicar). Necesita `npm i --no-save sharp` — sharp NO es dependencia del repo. ⚠ Al subir por admin SDK hay que escribir el `firebaseStorageDownloadTokens` a mano: sin ese token la URL `alt=media` no sirve (el bucket no es público).
+- Resultado medido: **4.625 KB → 328 KB** (−93%). Las 18 URLs nuevas responden 200. En la vitrina con el turno real: 14/14 miniaturas cargadas, todas desde `t_`, `naturalWidth` 320.
+- El visor, el correo y el PDF siguen usando la ORIGINAL (`foto.url`): la miniatura es solo para la lista.
+- tsc 0; eslint 30; vitest 2.808 OK; auditorías OK; build OK.
+- Estado: HECHO. El backfill YA se corrió contra prod (solo agrega campos, no toca ni borra las originales).
+
 ## 2026-09-18 · Bitacora ronda 46 · HIG etapa 3b (cierra la serie): marca «Nuevo» en su lugar
 - Última tanda de las 15 mejoras del HIG local. Dos reglas y una verificación:
   - **«Live-updating content» · marca en su lugar**: un evento que entra SOLO desde otro teléfono con la bitácora abierta se marca con una pill **«Nuevo»** en su propia fila, en vez de anunciarse solo con el texto de la barra de sincronización («Leandro agregó un evento»), que decía QUÉ pasó pero no DÓNDE. `useBitacoraTurno` expone `recienLlegados` (Set de ids) y `marcarVisto(id)`: se marca en el `added` y en el `modified` que publica un borrador ajeno, y la marca se apaga al abrir el evento o a los 90 s (`MARCA_NUEVO_MS`). Un borrador NO lleva la pill: ya se anuncia con «En redacción», y dos pills seguidas ensucian la fila.

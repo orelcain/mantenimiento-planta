@@ -227,7 +227,7 @@ export function EventoBitacoraFila({
                   className="flex flex-col items-start rounded-ctl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 >
                   {/* Tira de 48 px sin rótulo (ronda 40): el rótulo va en el visor al abrirla. */}
-                  <Miniatura url={f.url} />
+                  <Miniatura foto={f} />
                 </button>
               </div>
             ))}
@@ -327,8 +327,14 @@ export function EventoBitacoraFila({
  * dos veces —espaciado, y con un parámetro distinto para saltarse una respuesta
  * fallida guardada en caché— y, si aun así no carga, se muestra un recuadro que
  * dice que se puede abrir igual: el botón que la envuelve abre el visor.
+ *
+ * Pero la causa de fondo era el PESO: se bajaba la foto entera (~300 KB) para
+ * pintar 48 px. Un turno de 13 fotos = 3,4 MB por 4G (medido el 18-09-2026).
+ * Desde esa fecha cada foto trae su `thumbUrl` de 320 px (~20 KB); las de antes
+ * no la tienen y caen a la original.
  */
-function Miniatura({ url }: { url: string }) {
+function Miniatura({ foto }: { foto: FotoEvento }) {
+  const url = foto.thumbUrl ?? foto.url
   const [intento, setIntento] = useState(0)
   const [falló, setFalló] = useState(false)
   useEffect(() => {
