@@ -21,6 +21,17 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-18 · Bitacora ronda 35 · Vista PC «Escritorio de turno» (iOS 27, split de tres columnas)
+- Pedido de Orel: reordenar y redistribuir la vista de PC en oscuro copiando iOS 27, con las páginas de Apple Developer como referencia FIJA (HIG: materials, toolbars, split-views, sidebars, designing-for-ipados, layout). Mockup de la directora creativa (ANTES + 3 opciones): https://claude.ai/artifact/WX1RRmGwPwFTFbXzLPSogK — Orel eligió A.
+- Hecho en `BitacoraTurnoPage.tsx`:
+  - Toolbar de PC: UN solo botón relleno («Nuevo evento») y una cápsula `glass-nav` con Historial · Acceso QR · «Compartir ⌄» (abre la misma hoja del teléfono: correo, WhatsApp, PDF, Excel). Se fueron los cinco botones tinted y `copiarParaWhatsapp` (en PC, «WhatsApp» cambia la columna de la derecha a esa pestaña).
+  - Grilla con `grid-template-areas`: ≥1280 px tres columnas 300 / 1fr / 380 (contexto · [entrega + eventos] · envío fijo); 768–1280 dos (contexto y entrega/eventos apilados, envío a la derecha); teléfono una sola con `order-*` para conservar el orden de siempre (entrega primero).
+  - Contexto: técnicos, resumen y observación en la columna angosta; `Stat` pasa a fila (rótulo · cifra tabular a la derecha) a ≥1280; la línea MTBF/MTTR va bajo el resumen en PC.
+  - La planilla en vivo queda `md:hidden`: en PC se veía DOS veces (bloque + vista previa); en el teléfono sigue arriba de los eventos.
+- Gotchas: `grid-template-areas` en Tailwind con `[grid-template-areas:'a_b'_'c_d']` (guiones bajos = espacios); varios hijos no pueden compartir un área (se superponen), por eso la barra de sincronización queda fuera de la grilla, a lo ancho.
+- Verificación: tsc 0; eslint 30; vitest OK; build y auditorías OK; vitrina a 1440 (300/405/380), 1000 (dos columnas) y 375 (orden del teléfono intacto, planilla visible, toolbar PC oculta).
+- Estado: HECHO. Sigue: scroll edge effect bajo la toolbar (la barra del marco ya es sticky; no se apiló otra) y el tema claro a 1440 revisado por Orel.
+
 ## 2026-09-18 · Bitacora ronda 34 · MTBF y MTTR con definición y cálculo a la vista
 - Pregunta de Orel: la banda de la planilla dice «MTBF - MTTR» pero solo se calculaba MTTR. Se acordó: la banda no se toca (fidelidad al Excel); debajo de la tabla va UNA línea con las dos siglas, su definición entre paréntesis y el cálculo con los números del turno; en el histórico, MTBF del período y por máquina.
 - Base del MTBF (decisión de Orel): horas del turno − 1,5 h sin producción (colación 1 h + reunión de inicio + ejercicios compensatorios) − paradas registradas, ÷ fallas con parada. `MINUTOS_SIN_PRODUCCION_POR_TURNO = 90` en `mtbf.ts`. Es el MTBF de la PLANTA con lo que registran los técnicos, aproximado y dicho así; el riguroso por máquina con tiempo de producción real de Shoplogix ya existe en Análisis de Turno (`kpisMantencionTurno`, backend `kpisMantencion.js`).

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { BarChart3, Check, ChevronLeft, ChevronRight, Clock, ClipboardCopy, FileDown, FileSpreadsheet, Loader2, MessageCircle, MessageSquareText, NotebookPen, Pencil, Plus, QrCode, Share, Trash2 } from 'lucide-react'
+import { BarChart3, Check, ChevronDown, ChevronLeft, ChevronRight, Clock, FileSpreadsheet, Loader2, MessageCircle, MessageSquareText, NotebookPen, Pencil, Plus, QrCode, Share, Trash2 } from 'lucide-react'
 import { Button, Pill, SegmentedControl, Sheet, Tag, type SwipeAction } from '@/components/piel'
 import { ToastAction } from '@/components/ui/toast'
 import { vibrar } from '@/services/bitacora/vibrar'
@@ -393,21 +393,6 @@ export function BitacoraTurnoVista({
     ? ` ${borradores.length === 1 ? '1 evento en redacción no va' : `${borradores.length} eventos en redacción no van`}.`
     : ''
 
-  const copiarParaWhatsapp = async () => {
-    try {
-      await copiarTexto(textoWhatsapp)
-      setMensajeCopiado(textoWhatsapp)
-      setVistaEnvio('whatsapp')
-      toast({
-        title: 'Mensaje copiado',
-        description: `Pégalo en WhatsApp Web con Ctrl+V. Después copia cada lámina desde la columna de la derecha.${avisoBorradores}`,
-        variant: 'success',
-      })
-    } catch {
-      toast({ title: 'No se pudo copiar', variant: 'destructive' })
-    }
-  }
-
   const dosPasos = envioEnDosPasos(textoWhatsapp, planWhatsapp.length)
   // Cada vez que se abre la hoja (u otro turno), el envío parte del paso 1.
   useEffect(() => {
@@ -692,16 +677,6 @@ export function BitacoraTurnoVista({
                 enfocable
               />
             </span>
-            <span className="hidden items-center gap-1 md:flex">
-              <Button variant="plain" onClick={() => navigate('/bitacora/historial')}>
-                <BarChart3 /> Historial
-              </Button>
-              {esSupervisor && (
-                <Button variant="plain" onClick={() => setHojaQr(true)} aria-label="Acceso por QR">
-                  <QrCode /> <span className="hidden sm:inline">Acceso QR</span>
-                </Button>
-              )}
-            </span>
           </div>
           {/* Navegación de turnos: una sola fila que no se parte (las flechas
               quedan siempre a los lados del turno, también a 375 px). */}
@@ -742,22 +717,25 @@ export function BitacoraTurnoVista({
           </div>
         </div>
 
-        {/* Acciones de PC: aquí la principal es copiar al correo. */}
-        <div className="hidden flex-wrap gap-2 md:flex">
-          <Button variant="tinted" onClick={abrirNuevo}>
+        {/* Acciones de PC (mockup A aprobado, 18-09-2026; HIG «Toolbars»): una sola
+            acción rellena y el resto en UNA cápsula de vidrio compartida (DESIGN.md §7).
+            PDF, Excel, WhatsApp y correo viven en «Compartir», como en el teléfono. */}
+        <div className="hidden items-center gap-3 md:flex">
+          <div role="group" aria-label="Acciones de la bitácora" className="glass-nav flex items-center gap-0.5 rounded-full p-1">
+            <Button variant="plain" onClick={() => navigate('/bitacora/historial')}>
+              <BarChart3 /> Historial
+            </Button>
+            {esSupervisor && (
+              <Button variant="plain" onClick={() => setHojaQr(true)}>
+                <QrCode /> Acceso QR
+              </Button>
+            )}
+            <Button variant="plain" onClick={() => setHojaCompartir(true)} disabled={!!trabajando}>
+              {trabajando ? <Loader2 className="animate-spin" /> : <Share />} Compartir <ChevronDown />
+            </Button>
+          </div>
+          <Button onClick={abrirNuevo}>
             <Plus /> Nuevo evento
-          </Button>
-          <Button variant="tinted" onClick={exportarPdf} disabled={!!trabajando}>
-            {trabajando === 'pdf' ? <Loader2 className="animate-spin" /> : <FileDown />} Exportar PDF
-          </Button>
-          <Button variant="tinted" onClick={() => void bajarExcel()} disabled={!!trabajando || r.eventos === 0}>
-            {trabajando === 'excel' ? <Loader2 className="animate-spin" /> : <FileSpreadsheet />} Bajar Excel MTTR
-          </Button>
-          <Button variant="tinted" onClick={() => void copiarParaWhatsapp()} disabled={!!trabajando}>
-            <MessageCircle /> Copiar para WhatsApp
-          </Button>
-          <Button onClick={copiar} disabled={!!trabajando}>
-            {trabajando === 'copiar' ? <Loader2 className="animate-spin" /> : <ClipboardCopy />} Copiar para correo
           </Button>
         </div>
       </header>
@@ -776,8 +754,21 @@ export function BitacoraTurnoVista({
         tonoDe={tonoDe}
       />
 
-      {/* Técnicos del turno: quién está de verdad (mockup aprobado, pieza 1). */}
+      {/* Escritorio de turno (mockup A, 18-09-2026; HIG «Split views»): en PC, tres
+          columnas — contexto (300 px) · eventos · vista previa del correo (380 px,
+          fija); entre 768 y 1280 px, dos (contexto y eventos apilados, correo a la
+          derecha); en el teléfono, una sola, con la entrega de turno primero. */}
+      <div
+        className={[
+          // `minmax(0,…)` y `min-w-0` en los hijos: sin eso la planilla de 760 px
+          // estiraba la única columna del teléfono y la página se desplazaba de lado.
+          'grid grid-cols-[minmax(0,1fr)] items-start gap-5 [&>*]:min-w-0',
+          "md:grid-cols-[minmax(0,1fr)_380px] md:[grid-template-areas:'contexto_envio'_'entrega_envio'_'centro_envio']",
+          "xl:grid-cols-[300px_minmax(0,1fr)_380px] xl:grid-rows-[auto_1fr] xl:[grid-template-areas:'contexto_entrega_envio'_'contexto_centro_envio']",
+        ].join(' ')}
+      >
       {/* Entrega de turno: lo primero que ve el turno que llega (mockup aprobado). */}
+      <div className="order-1 flex flex-col gap-5 empty:hidden md:order-none md:[grid-area:entrega]">
       {pendientesPrevios.length > 0 && (
         <section aria-label="Pendientes de turnos anteriores" className="flex flex-col">
           <h2 className="px-4 pb-2 text-footnote text-muted-foreground">
@@ -886,7 +877,11 @@ export function BitacoraTurnoVista({
           </div>
         </section>
       )}
+      </div>
 
+      {/* Contexto del turno: técnicos, resumen, observación (y en el teléfono, la planilla). */}
+      <div className="order-2 flex flex-col gap-5 md:order-none md:[grid-area:contexto]">
+      {/* Técnicos del turno: quién está de verdad (mockup aprobado, pieza 1). */}
       <section aria-label="Técnicos del turno" className="flex flex-col gap-2.5 rounded-card bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
         <div className="flex items-baseline justify-between gap-2">
           <h2 className="text-footnote text-muted-foreground">Técnicos del turno</h2>
@@ -917,7 +912,7 @@ export function BitacoraTurnoVista({
       </section>
 
       {/* Resumen del turno: los números que demuestran el trabajo */}
-      <section aria-label="Resumen del turno" className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-card bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none sm:grid-cols-4">
+      <section aria-label="Resumen del turno" className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-card bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none sm:grid-cols-4 xl:grid-cols-1 xl:gap-y-2.5">
         <Stat valor={String(r.eventos)} etiqueta={r.eventos === 1 ? 'evento' : 'eventos'} />
         <Stat
           valor={formatoMinutos(r.minutosParada)}
@@ -935,6 +930,8 @@ export function BitacoraTurnoVista({
         {r.pendientesCerrados > 0 ? (
           <Stat valor={String(r.pendientesCerrados)} etiqueta={r.pendientesCerrados === 1 ? 'pendiente cerrado' : 'pendientes cerrados'} punto="ok" />
         ) : null}
+        {/* En PC la planilla no se repite fuera del correo: la línea de MTBF/MTTR va aquí. */}
+        {r.eventos > 0 && <p className="hidden text-footnote text-muted-foreground sm:col-span-4 md:block xl:col-span-1 xl:border-t xl:border-border xl:pt-2.5">{explicacionMtbfMttr(turno, r)}</p>}
       </section>
 
       {/* Observación general del turno (del mockup aprobado). */}
@@ -968,7 +965,7 @@ export function BitacoraTurnoVista({
       {/* La planilla «Recoleccion MTTR» tal como va ARRIBA del correo, llenándose con
           cada evento publicado: se ve en tiempo real cómo quedará (Orel, 17-09-2026). */}
       {!cargando && r.eventos > 0 && (
-        <section aria-label="Recolección MTTR" className="flex flex-col gap-2">
+        <section aria-label="Recolección MTTR" className="flex flex-col gap-2 md:hidden">
           <div className="flex items-center justify-between gap-2 px-4">
             <h2 className="text-caption font-semibold text-muted-foreground">Recolección MTTR · así va arriba del correo</h2>
             <Button variant="plain" size="sm" onClick={() => void bajarExcel()} disabled={!!trabajando}>
@@ -987,11 +984,10 @@ export function BitacoraTurnoVista({
         </section>
       )}
 
-      {/* En PC la vista previa del correo lleva la planilla MTTR a lo ancho: se le da
-          más columna (3/5) y los eventos van compactos a la izquierda (Orel, 17-09). */}
-      <div className="grid items-start gap-5 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+      </div>
+
         {/* Línea de tiempo */}
-        <section aria-label="Eventos del turno" className="flex flex-col gap-5">
+        <section aria-label="Eventos del turno" className="order-3 flex flex-col gap-5 md:order-none md:[grid-area:centro]">
           {cargando ? (
             <div className="flex flex-col gap-2 rounded-card bg-card p-4">
               {[0, 1, 2].map((i) => (
@@ -1039,7 +1035,7 @@ export function BitacoraTurnoVista({
         </section>
 
         {/* Vista previa del correo (solo PC) */}
-        <section aria-label="Enviar la bitácora" className="hidden flex-col gap-3 md:flex md:sticky md:top-4">
+        <section aria-label="Enviar la bitácora" className="hidden flex-col gap-3 md:flex md:sticky md:top-4 md:[grid-area:envio]">
           <SegmentedControl
             ariaLabel="Enviar por correo o por WhatsApp"
             value={vistaEnvio}
@@ -1145,7 +1141,9 @@ export function BitacoraTurnoVista({
         }}
         onWhatsapp={() => {
           setHojaCompartir(false)
-          setHojaWhatsapp(true)
+          // En PC la vista de WhatsApp vive en la columna de la derecha (mockup A).
+          if (window.matchMedia('(min-width: 768px)').matches) setVistaEnvio('whatsapp')
+          else setHojaWhatsapp(true)
         }}
         onPdf={() => {
           setHojaCompartir(false)
@@ -1389,8 +1387,10 @@ const PLAZO_DESHACER_MS = 5000
  */
 function Stat({ valor, etiqueta, punto }: { valor: string; etiqueta: string; punto?: keyof typeof PUNTO }) {
   return (
-    <div className="min-w-0">
-      <span className="block text-title2 tabular-nums leading-tight">{valor}</span>
+    // A ≥1280 px vive en la columna de contexto de 300 px: rótulo a la izquierda
+    // y cifra tabular a la derecha, como una celda de Ajustes (mockup A, 18-09).
+    <div className="min-w-0 xl:flex xl:flex-row-reverse xl:items-baseline xl:justify-between xl:gap-3">
+      <span className="block text-title2 tabular-nums leading-tight xl:text-headline">{valor}</span>
       <span className="block text-footnote text-muted-foreground">
         {punto && <span className={`mr-1.5 inline-block size-2 rounded-full align-middle ${PUNTO[punto]}`} aria-hidden />}
         {etiqueta}
