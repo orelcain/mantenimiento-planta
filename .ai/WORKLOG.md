@@ -21,6 +21,14 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-18 · Bitacora ronda 43 · HIG etapa 2: confirmar antes de descartar (primitivo ActionSheet)
+- Reglas 3 y 4 del destilado. La 4 (borrar sin alerta, con Deshacer) YA estaba: `borrarConDeshacer` con toast de 5 s y `ToastAction`, sin `confirm()` en ningún camino. Se verificó, no se tocó.
+- La 3 sí faltaba: un evento PUBLICADO no se autoguarda, así que cerrar la hoja con cambios (Cancelar, Escape o tocar el fondo) los perdía en silencio. Con guantes es un roce.
+- Hecho: primitivo `ActionSheet` (`components/piel/ActionSheet.tsx`, exportado en el índice): destructivo ARRIBA y en rojo tintado, salida segura abajo y separada, botones de 52 px, `role="alertdialog"`. Va SOBRE el `Sheet` del editor con `z-[120]`, y el Escape se intercepta en fase de CAPTURA con `stopPropagation` — si no, el mismo Escape cerraba también la hoja de abajo y se perdía justo lo que se quería confirmar.
+- En `EventoBitacoraSheet`: `cerrarHoja` compara `firmaActual` con `ultimaFirma.current` (la firma ya existía para el autoguardado) y, si hay cambios sin guardar en un evento publicado, abre la confirmación en vez de cerrar. Un borrador sigue guardando al cerrar (no hay pérdida posible).
+- Verificación en la vitrina real: con cambios, Escape → confirmación y el editor sigue abierto detrás; «Seguir editando» conserva el texto; «Descartar cambios» cierra y la fila queda como estaba; sin cambios, Escape cierra directo. En 375 px, botones de 52 px a 12 px del borde inferior. tsc 0; eslint 30; vitest OK; build y auditorías OK.
+- Estado: HECHO. Sigue la etapa 3 (reglas 8–14).
+
 ## 2026-09-18 · Bitacora ronda 42 · HIG etapa 1: avisos silenciosos, sincronización pasiva, editor más rápido
 - Orel eligió las 15 mejoras; se van por etapas. Etapa 1 = reglas 1, 2, 5, 6, 7 y 15 del destilado (`docs\hig\HIG_DESTILADO.md`).
 - Hecho:
