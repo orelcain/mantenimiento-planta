@@ -227,6 +227,15 @@ function useEventosEjemplo(turno: TurnoMantencion, inicialDe: (t: TurnoMantencio
   const [porTurno, setPorTurno] = useState<Record<string, EventoBitacora[]>>({})
   const crudos = porTurno[turno.id] ?? inicialDe(turno)
   const eventos = useMemo(() => ordenarEventos(turno, crudos), [turno, crudos])
+  // El aviso de la vitrina dice que «Leandro Igor agregó un evento»: se marca el
+  // último de la lista para ver la marca «Nuevo» en su lugar.
+  const [vistos, setVistos] = useState<ReadonlySet<string>>(new Set())
+  const ultimoId = eventos[eventos.length - 1]?.id
+  const recienLlegados = useMemo(
+    () => new Set(ultimoId && !vistos.has(ultimoId) ? [ultimoId] : []) as ReadonlySet<string>,
+    [ultimoId, vistos],
+  )
+  const marcarVisto = useCallback((id: string) => setVistos((s) => new Set(s).add(id)), [])
 
   const guardar = useCallback(
     async (id: string, datos: EventoBitacoraDatos, esNuevo: boolean) => {
@@ -288,6 +297,8 @@ function useEventosEjemplo(turno: TurnoMantencion, inicialDe: (t: TurnoMantencio
     ultimaSync: new Date(),
     cambiosPorSubir: 0,
     novedad: NOVEDAD_EJEMPLO,
+    recienLlegados,
+    marcarVisto,
     nuevoId: () => `nuevo-${Date.now()}`,
     guardar,
     borrar,

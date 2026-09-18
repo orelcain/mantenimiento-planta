@@ -29,6 +29,7 @@ export function EventoBitacoraFila({
   acciones,
   asa,
   desplazamiento = null,
+  nuevo = false,
 }: {
   evento: EventoBitacora
   /** El mismo número del evento en WhatsApp, correo y PDF (un borrador no lleva). */
@@ -52,6 +53,8 @@ export function EventoBitacoraFila({
   }
   /** Mientras se arrastra: cuánto se desplazó (px). null = quieto. */
   desplazamiento?: number | null
+  /** Entró solo, de otro equipo, con la bitácora abierta (HIG «Live-updating content»). */
+  nuevo?: boolean
 }) {
   const borrador = evento.estado === 'borrador'
   const quienesAbren = abiertoPor.map((p) => `${p.nombre} (${NOMBRE_DISPOSITIVO[p.dispositivo]})`).join(', ')
@@ -118,6 +121,9 @@ export function EventoBitacoraFila({
           {/* Un borrador se VE (es cooperación en vivo) pero se distingue al tiro:
               no cuenta en los números ni sale en el correo hasta «Listo». */}
           {borrador && <Pill tone="info" dot={abiertoPor.length ? 'pulse' : undefined}>En redacción</Pill>}
+          {/* HIG «Live-updating content»: lo que llegó solo se marca EN SU LUGAR
+              (un borrador ya se anuncia con «En redacción», no lleva dos pills). */}
+          {nuevo && !borrador && <Pill tone="info" dot>Nuevo</Pill>}
           <span className={`text-headline leading-tight ${!titulo && sinEquipo ? 'text-muted-foreground' : ''}`}>{titulo || nombreEquipo}</span>
           {evento.pendiente && !enPendientes && <Pill tone="warning">Pendiente</Pill>}
         </div>

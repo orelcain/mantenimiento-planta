@@ -33,6 +33,9 @@ import { autorVisible } from '@/services/bitacora/bitacora.types'
 import { dispositivoActual } from '@/services/bitacora/dispositivo'
 import { usePresenciaBitacora } from '@/hooks/usePresenciaBitacora'
 
+/** Cuánto dura la marca «Nuevo» de un evento que entró solo, si nadie lo abre. */
+const MARCA_NUEVO_MS = 90_000
+
 /**
  * Cierra el pendiente que un evento nuevo acaba de resolver.
  *
@@ -148,6 +151,21 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
   const [cambiosPorSubir, setCambiosPorSubir] = useState(0)
   /** Lo último que llegó de OTRO equipo («Leandro agregó un evento»). */
   const [novedad, setNovedad] = useState<{ texto: string; en: number } | null>(null)
+  /**
+   * Eventos que ENTRARON SOLOS mientras la bitácora estaba abierta (HIG «Live-
+   * updating content»): el contenido nuevo se marca en su lugar, no se anuncia
+   * con un cartel que tape lo demás. La marca dura `MARCA_NUEVO_MS` o hasta que
+   * se abre el evento.
+   */
+  const [recienLlegados, setRecienLlegados] = useState<ReadonlySet<string>>(new Set())
+  const marcarVisto = useCallback((id: string) => {
+    setRecienLlegados((s) => {
+      if (!s.has(id)) return s
+      const n = new Set(s)
+      n.delete(id)
+      return n
+    })
+  }, [])
   const user = useAuthStore((s) => s.user)
   const turnoId = turno.id
 
@@ -155,6 +173,12 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
     setCargando(true)
     setCrudos([])
     setNovedad(null)
+    setRecienLlegados(new Set())
+    const relojes: ReturnType<typeof setTimeout>[] = []
+    const marcar = (id: string) => {
+      setRecienLlegados((s) => new Set(s).add(id))
+      relojes.push(setTimeout(() => marcarVisto(id), MARCA_NUEVO_MS))
+    }
     // Lo que ya estaba al abrir no es «novedad»: se empieza a avisar recién
     // después de la primera respuesta del SERVIDOR (la de caché no cuenta).
     let sincronizadoUnaVez = false
@@ -177,8 +201,10 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
             const quien = autorVisible(e) || 'Alguien'
             if (c.type === 'added') {
               setNovedad({ texto: e.estado === 'borrador' ? `${quien} empezó un evento` : `${quien} agregó un evento`, en: Date.now() })
+              marcar(c.doc.id)
             } else if (c.type === 'modified' && estadoPrevio.get(e.id) === 'borrador' && e.estado !== 'borrador') {
               setNovedad({ texto: `${e.actualizadoPorNombre || quien} publicó un evento`, en: Date.now() })
+              marcar(c.doc.id)
             }
           }
         }
@@ -200,8 +226,11 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
         setCargando(false)
       },
     )
-    return off
-  }, [turnoId])
+    return () => {
+      for (const r of relojes) clearTimeout(r)
+      off()
+    }
+  }, [turnoId, marcarVisto])
 
   const eventos = useMemo(() => ordenarEventos(turno, crudos), [turno, crudos])
   // Para leer el estado vivo dentro de `guardar` sin recrear el callback (lo que
@@ -456,7 +485,7 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
     })
   }, [])
 
-  return { eventos, cargando, error, sincronizando, ultimaSync, cambiosPorSubir, novedad, nuevoId, guardar, borrar, mover, marcarPendiente }
+  return { eventos, cargando, error, sincronizando, ultimaSync, cambiosPorSubir, novedad, recienLlegados, marcarVisto, nuevoId, guardar, borrar, mover, marcarPendiente }
 }
 
 /**
