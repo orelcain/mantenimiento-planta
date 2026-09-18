@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Timestamp } from 'firebase/firestore'
 import { BitacoraTurnoCard } from '@/components/bitacora/BitacoraTurnoCard'
 import { BitacoraTurnoVista } from '@/pages/BitacoraTurnoPage'
@@ -6,6 +7,7 @@ import type { FuenteBitacora } from '@/hooks/useBitacoraTurno'
 import { BITACORA_PLANTA } from '@/config/bitacora'
 import type { EventoBitacora, EventoBitacoraDatos, FotoEvento, TurnoMantencion } from '@/services/bitacora/bitacora.types'
 import { ordenarEventos } from '@/services/bitacora/resumenBitacora'
+import { borradoresAnteriores } from '@/services/bitacora/borradores'
 import { fechaLocal, horaSugeridaParaEvento, turnoAdyacente, turnoDesdeId, turnoMantencionEn } from '@/services/bitacora/turnoMantencion'
 import { HistorialBitacoraVista } from '@/pages/HistorialBitacoraPage'
 import { fechaDesde, filasPorTurno, resumirPeriodo } from '@/services/bitacora/historialBitacora'
@@ -221,15 +223,15 @@ function ejemploDe(turno: TurnoMantencion): EventoBitacora[] {
   return lista
 }
 
-function useEventosEjemplo(turno: TurnoMantencion) {
+function useEventosEjemplo(turno: TurnoMantencion, inicialDe: (t: TurnoMantencion) => EventoBitacora[] = ejemploDe) {
   const [porTurno, setPorTurno] = useState<Record<string, EventoBitacora[]>>({})
-  const crudos = porTurno[turno.id] ?? ejemploDe(turno)
+  const crudos = porTurno[turno.id] ?? inicialDe(turno)
   const eventos = useMemo(() => ordenarEventos(turno, crudos), [turno, crudos])
 
   const guardar = useCallback(
     async (id: string, datos: EventoBitacoraDatos, esNuevo: boolean) => {
       setPorTurno((prev) => {
-        const lista = prev[turno.id] ?? ejemploDe(turno)
+        const lista = prev[turno.id] ?? inicialDe(turno)
         const previo = lista.find((e) => e.id === id)
         const { quien, ...resto } = datos
         const evento: EventoBitacora = {
@@ -257,7 +259,7 @@ function useEventosEjemplo(turno: TurnoMantencion) {
           return {
             ...prev,
             [turno.id]: lista.filter((e) => e.id !== id),
-            [destino.id]: [...(prev[destino.id] ?? ejemploDe(destino)).filter((e) => e.id !== id), movido],
+            [destino.id]: [...(prev[destino.id] ?? inicialDe(destino)).filter((e) => e.id !== id), movido],
           }
         }
         // Un borrador se crea con el primer autoguardado: si no estaba, se agrega.
@@ -268,7 +270,7 @@ function useEventosEjemplo(turno: TurnoMantencion) {
         avisarPendientes()
       }
     },
-    [turno],
+    [inicialDe, turno],
   )
 
   const borrar = useCallback(
@@ -290,11 +292,11 @@ function useEventosEjemplo(turno: TurnoMantencion) {
     guardar,
     borrar,
     mover: (id: string, posicionMin: number) =>
-      setPorTurno((prev) => ({ ...prev, [turno.id]: (prev[turno.id] ?? ejemploDe(turno)).map((e) => (e.id === id ? { ...e, posicionMin } : e)) })),
+      setPorTurno((prev) => ({ ...prev, [turno.id]: (prev[turno.id] ?? inicialDe(turno)).map((e) => (e.id === id ? { ...e, posicionMin } : e)) })),
     marcarPendiente: (evento: EventoBitacora, pendiente: boolean, quien: string) =>
       setPorTurno((prev) => ({
         ...prev,
-        [turno.id]: (prev[turno.id] ?? ejemploDe(turno)).map((e) =>
+        [turno.id]: (prev[turno.id] ?? inicialDe(turno)).map((e) =>
           e.id === evento.id ? { ...e, pendiente, ...(pendiente ? { cierre: null } : {}), ...(quien ? { actualizadoPorNombre: quien } : {}) } : e,
         ),
       })),
@@ -567,6 +569,108 @@ export function BitacoraDevPage() {
         <hr className="border-border" />
         <HistorialBitacoraVista fuente={{ useHistorial: useHistorialEjemplo }} alAbrirTurno={() => undefined} />
       </div>
+    </div>
+  )
+}
+
+// ── Vitrina con un turno REAL (pedido de Orel, 18-09-2026) ───────────────────
+// `scripts/exportar-turno-real.cjs` deja en `public/dev/turno-real.json` (ignorado
+// por git) los eventos, pendientes, borradores y el doc del turno tal como están
+// en producción. Aquí se muestran con la misma mecánica de la vitrina: lo que se
+// edite queda en memoria y nada vuelve a Firestore.
+interface TurnoReal {
+  exportadoEn: string
+  turnoId: string
+  eventos: EventoBitacora[]
+  pendientes: EventoBitacora[]
+  borradores: EventoBitacora[]
+  turno: { observacion?: string; presentes?: string[]; actualizadoPorNombre?: string } | null
+}
+
+/** Los `{ _ms }` del export vuelven a ser Timestamps (el orden por `createdAt` los necesita). */
+function revivir(valor: unknown): unknown {
+  if (Array.isArray(valor)) return valor.map(revivir)
+  if (valor && typeof valor === 'object') {
+    const o = valor as Record<string, unknown>
+    if (typeof o._ms === 'number' && Object.keys(o).length === 1) return Timestamp.fromMillis(o._ms)
+    return Object.fromEntries(Object.entries(o).map(([k, v]) => [k, revivir(v)]))
+  }
+  return valor
+}
+
+let REAL: TurnoReal | null = null
+const cerradosReales = new Set<string>()
+
+const eventosRealesDe = (turno: TurnoMantencion): EventoBitacora[] => (REAL && REAL.turnoId === turno.id ? REAL.eventos : [])
+
+function usePendientesReales(turno: TurnoMantencion) {
+  const [, forzar] = useState(0)
+  const pendientes = (REAL?.pendientes ?? []).filter(
+    (e) => !cerradosReales.has(e.id) && e.turnoId !== turno.id && (turnoDesdeId(e.turnoId)?.inicio ?? turno.inicio) < turno.inicio,
+  )
+  return {
+    pendientes,
+    cerrarNoAplica: async (p: EventoBitacora) => {
+      cerradosReales.add(p.id)
+      forzar((n) => n + 1)
+    },
+  }
+}
+
+function useObservacionReal() {
+  const [obs, setObs] = useState({
+    texto: REAL?.turno?.observacion ?? '',
+    actualizadoPorNombre: REAL?.turno?.actualizadoPorNombre ?? null,
+    presentes: REAL?.turno?.presentes ?? null,
+  })
+  return {
+    observacion: obs,
+    guardarObservacion: async (t: string, quien: string) => setObs((o) => ({ ...o, texto: t.trim(), actualizadoPorNombre: quien || null })),
+    guardarPresentes: async (presentes: string[]) => setObs((o) => ({ ...o, presentes })),
+  }
+}
+
+const FUENTE_REAL: FuenteBitacora = {
+  ...FUENTE_EJEMPLO,
+  useEventos: (turno) => useEventosEjemplo(turno, eventosRealesDe),
+  useTecnicos: () => ({ deTurno: REAL?.turno?.presentes ?? [], todos: PLANILLA }),
+  useObservacion: useObservacionReal,
+  usePendientesAnteriores: usePendientesReales,
+  useBorradoresAnteriores: (turno) => borradoresAnteriores(REAL?.borradores ?? [], turno),
+}
+
+export function BitacoraRealDevPage() {
+  const [estado, setEstado] = useState<'cargando' | 'listo' | 'sin-archivo'>('cargando')
+  const [params] = useSearchParams()
+  const navigate = useNavigate()
+  useEffect(() => {
+    fetch(`${import.meta.env.BASE_URL}dev/turno-real.json`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((json) => {
+        REAL = revivir(json) as TurnoReal
+        cerradosReales.clear()
+        setEstado('listo')
+      })
+      .catch(() => setEstado('sin-archivo'))
+  }, [])
+  // La vista lee el turno de `?turno=`: sin él, el del archivo.
+  useEffect(() => {
+    if (estado === 'listo' && REAL && !params.get('turno')) navigate(`?turno=${REAL.turnoId}`, { replace: true })
+  }, [estado, params, navigate])
+
+  if (estado === 'cargando') return null
+  return (
+    <div className="min-h-screen bg-background px-4 pb-10 pt-4 text-foreground md:px-8">
+      <div role="note" className="mb-4 rounded-ctl bg-destructive px-4 py-2 text-footnote font-semibold text-destructive-foreground">
+        {estado === 'listo' && REAL
+          ? `Vitrina con un turno REAL (${REAL.turnoId}, exportado ${new Date(REAL.exportadoEn).toLocaleString('es-CL')}) · solo lectura local, nada se guarda`
+          : 'Falta el archivo: corre  node scripts/exportar-turno-real.cjs 2026-09-17_dia  y recarga'}
+      </div>
+      {estado === 'listo' && REAL && params.get('turno') && (
+        <div className="mx-auto max-w-7xl">
+          <BitacoraTurnoVista fuente={FUENTE_REAL} />
+        </div>
+      )}
     </div>
   )
 }
