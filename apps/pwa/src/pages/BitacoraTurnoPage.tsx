@@ -1198,7 +1198,6 @@ export function BitacoraTurnoVista({
         sugerenciasTipo={sugerenciasTipo}
         autorFijo={autorFijo}
         puedeEditarMaestro={!autorFijo}
-        eventosDelTurno={eventos}
         tecnicos={tecnicos}
         opcionesEquipo={opcionesEquipo}
         cargandoEquipos={cargandoEquipos}

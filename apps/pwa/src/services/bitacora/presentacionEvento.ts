@@ -215,33 +215,6 @@ export function posicionEnIndice(
   return antes === despues ? antes : (antes + despues) / 2
 }
 
-/**
- * Las opciones de «Ubicación en el turno» del editor de un evento sin hora: al
- * inicio, después de cada evento con hora, al final. `posicion` es lo que se guarda.
- */
-export function opcionesUbicacion(
-  turno: Pick<TurnoMantencion, 'banda'> & { inicio?: Date },
-  eventos: readonly (Pick<EventoBitacora, 'id' | 'horaInicio' | 'horaTermino' | 'equipo' | 'titulo' | 'posicionMin'> & { createdAt?: unknown })[],
-  excluirId: string,
-): { etiqueta: string; posicion: number }[] {
-  const conHora = eventos.filter((e) => e.id !== excluirId && tieneHora(e))
-  const ordenados = [...conHora].sort((a, b) => minutosEnTurno(turno, a) - minutosEnTurno(turno, b))
-  if (!ordenados.length) return []
-  const claves = ordenados.map((e) => minutosEnTurno(turno, e))
-  const primero = claves[0] ?? 0
-  const ultimo = claves[claves.length - 1] ?? 0
-  const salida = [{ etiqueta: 'Al inicio', posicion: primero - 1 }]
-  ordenados.forEach((e, i) => {
-    const k = claves[i] ?? 0
-    const siguiente = claves[i + 1]
-    const posicion = siguiente == null ? k + 1 : siguiente === k ? k + 0.5 : (k + siguiente) / 2
-    salida.push({ etiqueta: `Después de ${e.horaInicio} ${e.equipo?.trim() || tituloDe(e) || ''}`.trim(), posicion })
-  })
-  // «Al final» es la última «Después de…»; se nombra aparte para que se entienda.
-  const final = salida[salida.length - 1]
-  if (final) final.etiqueta = 'Al final'
-  return salida.length > 1 ? salida : [salida[0] as { etiqueta: string; posicion: number }, { etiqueta: 'Al final', posicion: ultimo + 1 }]
-}
 
 /** "Repuestos: 3300011612 Soporte sección 519437 · 3300011654 Anillo 31000251 ×2" ('' si no hay). */
 export function lineaRepuestos(e: Pick<EventoBitacora, 'repuestos'>): string {
