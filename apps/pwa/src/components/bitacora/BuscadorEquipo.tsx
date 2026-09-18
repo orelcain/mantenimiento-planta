@@ -91,7 +91,7 @@ export function BuscadorEquipo({
   return (
     <div>
       <label htmlFor={`${id}-input`} className="mb-1.5 block text-footnote text-muted-foreground">
-        Equipo o área
+        Máquina o área
       </label>
       <div className="relative">
         <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />

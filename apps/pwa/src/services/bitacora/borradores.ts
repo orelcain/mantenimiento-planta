@@ -74,12 +74,13 @@ export type CampoFormulario = keyof CamposFormulario
 export const ETIQUETA_CAMPO: Record<CampoFormulario, string> = {
   tipo: 'el tipo',
   tipoOtro: 'el tipo',
-  equipo: 'el equipo',
-  equipoId: 'el equipo',
-  equipoCodigo: 'el equipo',
-  titulo: 'el título',
+  // Con los nombres de la planilla «Recoleccion MTTR», igual que el formulario (17-09).
+  equipo: 'la máquina',
+  equipoId: 'la máquina',
+  equipoCodigo: 'la máquina',
+  titulo: 'la falla',
   repuestos: 'los repuestos',
-  descripcion: '«Qué pasó»',
+  descripcion: '«Observaciones»',
   horaInicio: 'la hora de inicio',
   horaTermino: 'la hora de término',
   posicion: 'la ubicación en el turno',

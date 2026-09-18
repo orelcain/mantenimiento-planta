@@ -21,6 +21,13 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-17 · Bitacora ronda 32 · El formulario habla como la planilla
+- Pedido de Orel: que los rótulos del evento coincidan con las columnas del Excel («Título» confundía: en la planilla eso es «Falla»).
+- Hecho: «Equipo o área» → «Máquina o área» (`BuscadorEquipo`), «Título» → «Falla · Opcional · en pocas palabras», «Qué pasó y qué se hizo» → «Observaciones · qué pasó y qué se hizo» (`EventoBitacoraSheet`); los avisos de conflicto de borradores dicen «la máquina», «la falla», «Observaciones» (`borradores.ts`). Los campos del modelo no cambian (`equipo`, `titulo`, `descripcion`).
+- Ojo: «Falla» también es un TIPO de evento (chip). Se aceptó igual porque así se llama la columna de la planilla; si confunde en un preventivo, la alternativa es «Falla / trabajo».
+- Verificación: tsc 0; eslint 30; vitest 2.804 OK; audit-voseo y audit-piel OK; vitrina a 375 px con el editor abierto: los tres rótulos nuevos.
+- Estado: HECHO.
+
 ## 2026-09-17 · Bitacora ronda 31 · La planilla MTTR en el correo visto desde el celular
 - Problema (foto de Orel, iOS Mail): la tabla se adaptaba al ancho del teléfono y quedaba apretada: Observaciones con ~150 px, filas altísimas, «EMPACADORA» montada sobre la columna vecina, y la descripción repetida en Falla y Observaciones.
 - Límite: no hay forma fiable de mandar reglas «solo celular» desde un correo pegado en Outlook (Word pisa los `<style>` y las media queries). Lo que sí se controla es cómo se reparte el poco ancho.
