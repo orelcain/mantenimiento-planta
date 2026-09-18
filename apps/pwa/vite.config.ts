@@ -1,6 +1,32 @@
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
+import fs from 'fs'
+
+/**
+ * Solo en `vite dev`: sirve el turno real exportado por
+ * `scripts/exportar-turno-real.cjs` desde `dev-data/` (fuera de `public/`, así
+ * jamás entra al build ni a GitHub Pages: son datos de la planta).
+ */
+function turnoRealLocal(): Plugin {
+  return {
+    name: 'turno-real-local',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (!(req.url ?? '').split('?')[0].endsWith('/dev/turno-real.json')) return next()
+        const archivo = path.resolve(__dirname, 'dev-data/turno-real.json')
+        if (!fs.existsSync(archivo)) {
+          res.statusCode = 404
+          return res.end('Falta dev-data/turno-real.json: corre node scripts/exportar-turno-real.cjs <turno>')
+        }
+        res.setHeader('Content-Type', 'application/json; charset=utf-8')
+        res.setHeader('Cache-Control', 'no-store')
+        fs.createReadStream(archivo).pipe(res)
+      })
+    },
+  }
+}
 import { execSync } from 'child_process'
 
 /**
@@ -37,6 +63,7 @@ export default defineConfig({
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
   },
   plugins: [
+    turnoRealLocal(),
     react(),
     // VitePWA eliminado - usamos manifest.json y sw.js manuales en public/
   ],

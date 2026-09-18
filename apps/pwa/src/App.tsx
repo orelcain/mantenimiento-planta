@@ -34,6 +34,7 @@ const LoginPage = lazyWithReload(() => import('@/pages/LoginPage').then((mod) =>
 const MatrizTurnosDevPage = lazyWithReload(() => import('@/pages/dev/MatrizTurnosDevPage'))
 const PurezaPuertaDevPage = lazyWithReload(() => import('@/pages/dev/PurezaPuertaDevPage'))
 const BitacoraDevPage = lazyWithReload(() => import('@/pages/dev/BitacoraDevPage').then((mod) => ({ default: mod.BitacoraDevPage })))
+const BitacoraRealDevPage = lazyWithReload(() => import('@/pages/dev/BitacoraDevPage').then((mod) => ({ default: mod.BitacoraRealDevPage })))
 const PaseBitacoraDevPage = lazyWithReload(() => import('@/pages/dev/PaseBitacoraDevPage').then((mod) => ({ default: mod.PaseBitacoraDevPage })))
 const PaseBitacoraPage = lazyWithReload(() => import('@/pages/PaseBitacoraPage').then((mod) => ({ default: mod.PaseBitacoraPage })))
 /** Banco de pruebas del resumen ejecutivo — solo montado en dev (ver Routes). */
@@ -342,6 +343,16 @@ export function App() {
                   element={
                     <Suspense fallback={<LoadingScreen />}>
                       <BitacoraDevPage />
+                    </Suspense>
+                  }
+                />
+              )}
+              {import.meta.env.DEV && (
+                <Route
+                  path="/dev/bitacora-real"
+                  element={
+                    <Suspense fallback={<LoadingScreen />}>
+                      <BitacoraRealDevPage />
                     </Suspense>
                   }
                 />

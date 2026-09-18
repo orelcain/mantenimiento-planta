@@ -109,3 +109,6 @@ scripts/.turnos-vistos.json
 
 # Respaldos de scripts de mantenimiento de datos (no van al repo)
 .respaldos/
+
+# Turno real exportado para la vitrina local (datos de la planta: nunca al repo)
+apps/pwa/dev-data/

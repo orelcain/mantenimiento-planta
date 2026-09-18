@@ -21,6 +21,16 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-18 · Bitacora ronda 36 · Vitrina con un turno REAL (`/dev/bitacora-real`)
+- Pedido de Orel: pulir mirando un turno real en local, no los datos inventados de la vitrina, sin tocar producción.
+- Hecho:
+  - `scripts/exportar-turno-real.cjs <turnoId>`: con el service account lee (solo lectura) los eventos del turno, los pendientes abiertos, los borradores y el doc del turno (observación, presentes) y escribe `apps/pwa/dev-data/turno-real.json`. Los Timestamps van como `{ _ms }`.
+  - ⚠ Primero se dejó en `public/dev/` y el build lo copió a `dist/`: se habría PUBLICADO en GitHub Pages con datos de la planta. Quedó en `dev-data/` (fuera de `public/`, ignorado por git) y un plugin de Vite `turnoRealLocal` (`apply: 'serve'`) lo sirve en `/dev/turno-real.json` solo en desarrollo. Verificado: `dist/` sin el archivo.
+  - `BitacoraRealDevPage` en `BitacoraDevPage.tsx`, ruta `/dev/bitacora-real` (solo `import.meta.env.DEV`): carga el JSON, revive los Timestamps, pone `?turno=` del archivo y monta `BitacoraTurnoVista` con `FUENTE_REAL` = la fuente de ejemplo con eventos/pendientes/borradores/observación/presentes reales. Lo que se edite queda en memoria.
+  - `useEventosEjemplo(turno, inicialDe = ejemploDe)`: el hook de la vitrina acepta de dónde salen los datos iniciales (5 llamadas internas pasan a `inicialDe`).
+- Verificación: `node scripts/exportar-turno-real.cjs 2026-09-17_dia` → 6 eventos, 1 pendiente, presentes Jose Chodil; la vitrina real a 1440 px en oscuro muestra los 6 con la grilla de tres columnas. tsc 0; eslint 30; vitest OK; build OK (el JSON NO queda en `dist/`); auditorías OK.
+- Estado: HECHO. Uso: exportar el turno que se quiera mirar y abrir `/dev/bitacora-real`.
+
 ## 2026-09-18 · Bitacora ronda 35 · Vista PC «Escritorio de turno» (iOS 27, split de tres columnas)
 - Pedido de Orel: reordenar y redistribuir la vista de PC en oscuro copiando iOS 27, con las páginas de Apple Developer como referencia FIJA (HIG: materials, toolbars, split-views, sidebars, designing-for-ipados, layout). Mockup de la directora creativa (ANTES + 3 opciones): https://claude.ai/artifact/WX1RRmGwPwFTFbXzLPSogK — Orel eligió A.
 - Hecho en `BitacoraTurnoPage.tsx`:
