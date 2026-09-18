@@ -136,12 +136,18 @@ export function EventoBitacoraFila({
         {/* Nivel 3: qué costó, SIEMPRE en su propia línea (ronda 40, 18-09): en una
             columna angosta el impacto saltaba de línea en unas filas y en otras no,
             y el ojo no sabía dónde buscarlo. Punto + texto, no un renglón rojo. */}
-        {(evento.impacto === 'con-parada' || evento.impacto === 'en-ventana' || evento.resuelvePendiente?.turnoId) && (
+        {(evento.impacto === 'con-parada' || evento.impacto === 'afecta-sin-detener' || evento.impacto === 'en-ventana' || evento.resuelvePendiente?.turnoId) && (
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-footnote text-muted-foreground">
           {evento.impacto === 'con-parada' && (
             <span className="inline-flex items-center gap-1.5 font-semibold text-ink-crit">
               <span className="size-2 rounded-full bg-ink-crit" aria-hidden />
               Detuvo la máquina {formatoMinutos(parada)}
+            </span>
+          )}
+          {evento.impacto === 'afecta-sin-detener' && (
+            <span className="inline-flex items-center gap-1.5 font-semibold text-ink-warn">
+              <span className="size-2 rounded-full bg-ink-warn" aria-hidden />
+              Afectó sin detener{evento.contingencia?.trim() ? `: ${evento.contingencia.trim()}` : ''}
             </span>
           )}
           {evento.impacto === 'en-ventana' && (

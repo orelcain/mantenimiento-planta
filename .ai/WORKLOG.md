@@ -21,6 +21,21 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-18 · Bitacora ronda 48 · EL IMPACTO: la bitacora no capturaba lo que la justifica
+- Se midieron los 22 eventos publicados de 4 turnos REALES (16 y 17-09, Chonchi): **19 de 22 decian «No aplica»**, los 2 «con parada» estaban **sin minutos**, y **17 de 22 sin hora de termino**. Resultado: el turno reportaba **0 min de parada, MTTR «—» y MTBF «—»**. Cuatro turnos de trabajo real y cero evidencia cuantificable, que es lo contrario de la meta de la app.
+- CAUSA, dos decisiones nuestras: (1) `impacto` arrancaba en `'no-aplica'` — una respuesta de fabrica que nadie cambia; (2) `minutosParadaDe` cae a `minutosEntre(horaInicio, horaTermino)`, y sin termino la parada vale cero.
+- Orel aporto el criterio de planta que faltaba: **no todo lo que se atiende influye en el proceso** (una hidrolavadora no), pero **hay un escalon intermedio que la app no sabia registrar**: la goma de la tolva de riles no detiene nada y sin embargo las cabezas y visceras dejan de salir, y alguien las retira A MANO mientras se corrige. Antes ese caso solo se podia registrar mintiendo.
+- Lo que se construyo (mockup aprobado antes: https://claude.ai/artifact/NxqTrFu1wGRT6mjo7CUb1R):
+  - `ImpactoEvento` suma **`afecta-sin-detener`**, con campo `contingencia` (120 chars). Las 4 respuestas van APILADAS, una por fila, con su ejemplo debajo («Casino, porteria, patio»): con tres chips en linea y sin explicacion, todos terminaban en «No aplica».
+  - **Ninguna respuesta viene marcada** (`impacto: ImpactoEvento | null`) y es **obligatoria para publicar**, igual que la descripcion. Un borrador a medio escribir sigue guardandose (cae a `no-aplica`).
+  - Boton **«Termino ahora · HH:MM»** cuando falta el termino: un toque pone la hora y los minutos se calculan solos. El rotulo se refresca cada 30 s (si se queda quieto, miente).
+  - Atajos de contingencia CORTOS («Cabezas a mano», «Media velocidad»…) + placeholder `Ejemplo: se retiran cabezas a mano` — Orel pidio que el ejemplo se vea Y que se note que se puede escribir. Con las frases largas cada chip ocupaba una fila a 375 px.
+- **Decision de KPI (Orel): el escalon nuevo NO suma minutos de parada.** El MTTR sigue siendo tiempo de reparacion de lo que detuvo, para que cuadre con Shoplogix; el resumen gana la cifra **«Siguio gracias a Mantencion»**, que aparece solo si hubo. Va tambien al correo (KPI + linea del evento) y a la planilla MTTR (observacion; duracion 0 porque no detuvo). En WhatsApp tiene color propio (ambar `#8A5A00`): ni el rojo de la parada ni el verde del «sin costo».
+- Verificado en `/dev/bitacora-real` con el turno real: las 4 opciones sin marcar y «Listo» deshabilitado con el aviso «obligatorio»; al elegir «Afecto sin detener» aparece la contingencia con su ejemplo; «Termino ahora · 19:41» puso 19:41; al guardar, el resumen mostro «Siguio gracias a Mantencion 1» con la parada todavia en 0 min, y el correo (leido desde el iframe) trajo el KPI, la linea del evento y la fila del Excel con duracion 0.
+- tsc 0; eslint 30; vitest **2.811** (3 casos nuevos); auditorias piel/voseo/decimales/contraste sin deuda nueva; build OK.
+- Estado: HECHO. **Los eventos viejos NO se migran**: su «no aplica» es dato historico real.
+- Abierto, anotado por Orel y NO tocado aqui: `falla` y `correctivo` son dos ejes distintos (que paso vs que se hizo) y hoy compiten en la misma lista, asi que al elegir uno se pierde el otro. Tocarlo afecta correo, PDF, Excel e historial: ronda aparte.
+
 ## 2026-09-18 · Vigia de almacenamiento: lanzador con respaldo y tarea probada de punta a punta
 - Se dejo el vigia funcionando como el verificador de turno, no a medias:
   - **Lanzador fuera del repo**: `_HERRAMIENTAS\vigia-almacenamiento\vigia-almacenamiento.cmd` ejecuta el script DEL REPO y, si el working tree esta en una rama que no lo tiene, cae a una copia de respaldo que vive junto a el. Sin ese respaldo la vigilancia se cae EN SILENCIO, que se lee igual que «todo bien». La tarea programada apunta a ese lanzador (no al `.cmd` del repo, que queda como referencia).

@@ -32,6 +32,8 @@ const C = {
   linea: '#E5E5EA',
   parada: '#B3261E',
   ventana: '#1E7B34',
+  /** Afectó sin detener: ni el rojo de la parada ni el verde de «sin costo». */
+  afectado: '#8A5A00',
   pendiente: '#8A5300',
 }
 
@@ -170,7 +172,11 @@ export function dibujarLamina(l: LaminaWhatsapp, imagenes: ReadonlyMap<string, I
   const lineasMeta = meta ? partirLineas(medirCon(F.meta), meta, UTIL) : []
   const impacto = partesImpacto(e).join(' · ')
   const lineasImpacto = impacto ? recortarLineas(medirCon(F.impacto), partirLineas(medirCon(F.impacto), impacto, UTIL), 3, UTIL) : []
-  const colorImpacto = e.impacto === 'con-parada' ? C.parada : e.impacto === 'en-ventana' ? C.ventana : C.sec
+  const colorImpacto =
+    e.impacto === 'con-parada' ? C.parada
+    : e.impacto === 'afecta-sin-detener' ? C.afectado
+    : e.impacto === 'en-ventana' ? C.ventana
+    : C.sec
   const avisoPendiente = e.pendiente ? 'Pendiente para el turno siguiente' : ''
   // La descripción va en la primera lámina del evento; las siguientes son solo fotos.
   const descripcion = l.parte === 1 ? (e.descripcion ?? '').trim() : ''

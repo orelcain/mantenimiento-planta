@@ -1,10 +1,11 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
-import { AlertTriangle, Check, ImagePlus, Loader2, RotateCw, Trash2, Users, X } from 'lucide-react'
+import { AlertTriangle, Check, Clock3, ImagePlus, Loader2, RotateCw, Trash2, Users, X } from 'lucide-react'
 import { ActionSheet, Button, Sheet } from '@/components/piel'
 import { useToast } from '@/hooks/useToast'
 import {
   AUTOGUARDADO_MS,
   ETIQUETA_FOTO,
+  CONTINGENCIAS_SUGERIDAS,
   IMPACTOS,
   MAX_FOTOS_EVENTO,
   MAX_TIPO_OTRO,
@@ -194,6 +195,9 @@ const CAMPO =
   'h-[44px] w-full rounded-ctl border-0 bg-muted-foreground/10 px-3 text-[16px] text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary'
 const ETIQUETA_CAMPO = 'mb-1.5 block text-footnote text-muted-foreground'
 
+/** «21:30» de un Date, en hora local: es la hora que el técnico ve en el reloj. */
+const horaHHMM = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+
 function Chip({ activo, onClick, children }: { activo: boolean; onClick: () => void; children: ReactNode }) {
   return (
     <button
@@ -263,7 +267,20 @@ export function EventoBitacoraSheet({
   const [posicion, setPosicion] = useState('')
   const [horaInicio, setHoraInicio] = useState('')
   const [horaTermino, setHoraTermino] = useState('')
-  const [impacto, setImpacto] = useState<ImpactoEvento>('no-aplica')
+  /**
+   * `null` = todavía nadie contestó. Arrancaba en 'no-aplica' y esa respuesta
+   * de fábrica se quedaba: 19 de 22 eventos reales decían que el evento no
+   * afectó al proceso, incluida una Baader 142 en falla (18-09-2026).
+   */
+  const [impacto, setImpacto] = useState<ImpactoEvento | null>(null)
+  const [contingencia, setContingencia] = useState('')
+  const [horaDeAhora, setHoraDeAhora] = useState(() => horaHHMM(new Date()))
+  useEffect(() => {
+    // El rótulo del botón dice la hora que va a poner: si se queda quieto,
+    // miente. Se refresca cada 30 s, que alcanza para un campo de 5 minutos.
+    const t = setInterval(() => setHoraDeAhora(horaHHMM(new Date())), 30_000)
+    return () => clearInterval(t)
+  }, [])
   const [minutos, setMinutos] = useState('')
   const [ventana, setVentana] = useState('')
   const [pendiente, setPendiente] = useState(false)
@@ -376,7 +393,9 @@ export function EventoBitacoraSheet({
     // Un evento sin hora deja lista la hora sugerida por si se apaga «Sin hora».
     setHoraInicio(evento?.horaInicio || horaSugeridaParaEvento(turno))
     setHoraTermino(evento?.horaTermino ?? '')
-    setImpacto(evento?.impacto ?? 'no-aplica')
+    // Un evento que ya existe conserva lo suyo; uno nuevo nace sin responder.
+    setImpacto(evento?.impacto ?? null)
+    setContingencia(evento?.contingencia ?? '')
     setMinutos(evento?.minutosParada != null ? String(evento.minutosParada) : '')
     setVentana(evento?.ventana ?? '')
     setPendiente(evento?.pendiente ?? false)
@@ -399,6 +418,7 @@ export function EventoBitacoraSheet({
           titulo: '',
           repuestos: '[]',
           descripcion: '',
+          contingencia: '',
           horaInicio: horaSugeridaParaEvento(turno),
           horaTermino: '',
           posicion: '',
@@ -442,9 +462,10 @@ export function EventoBitacoraSheet({
     horaInicio: sinHora ? '' : horaInicio,
     horaTermino: sinHora ? '' : horaTermino,
     posicion: sinHora ? posicion : '',
-    impacto,
+    impacto: impacto ?? 'no-aplica',
     minutos,
     ventana,
+    contingencia,
     pendiente,
   })
   const firmaActual = firmaDe(formularioActual(), quien, participantes, fotos)
@@ -488,9 +509,12 @@ export function EventoBitacoraSheet({
       horaInicio: sinHora ? '' : horaInicio,
       horaTermino: sinHora ? null : horaTermino || null,
       posicionMin: sinHora && posicion !== '' && Number.isFinite(Number(posicion)) ? Number(posicion) : null,
-      impacto,
+      // A esta altura la validación ya exigió una respuesta; un borrador a medio
+      // escribir sí puede no tenerla y se guarda como «fuera del proceso».
+      impacto: impacto ?? 'no-aplica',
       minutosParada: minutosValidos ? minutosNum : null,
       ventana: ventana || null,
+      contingencia: impacto === 'afecta-sin-detener' ? contingencia.trim() || null : null,
       pendiente,
       fotos,
       fotosAntes: fotosServidor.current,
@@ -888,6 +912,10 @@ export function EventoBitacoraSheet({
       )
       return
     }
+    if (impacto == null) {
+      setError('Falta decir cómo afectó al proceso. Si no tiene que ver con la producción, marca «Fuera del proceso».')
+      return
+    }
     const minutosNum = minutos.trim() === '' ? null : Number(minutos)
     if (impacto === 'con-parada' && minutosNum != null && (!Number.isFinite(minutosNum) || minutosNum < 0 || minutosNum > 1440)) {
       setError('Los minutos de parada deben estar entre 0 y 1440.')
@@ -961,7 +989,13 @@ export function EventoBitacoraSheet({
   // HIG «Entering data»: el botón se habilita recién con lo obligatorio (quién,
   // tipo, hora o «Sin hora», qué pasó). Lo mismo que valida `guardar`.
   const faltaObligatorio =
-    (tecnicos.todos.length > 0 && !quien.trim()) || (tipo === 'otro' && !limpiarTipo(tipoOtro)) || horaFaltante || !descripcion.trim()
+    (tecnicos.todos.length > 0 && !quien.trim()) ||
+    (tipo === 'otro' && !limpiarTipo(tipoOtro)) ||
+    horaFaltante ||
+    !descripcion.trim() ||
+    // Sin esta respuesta el turno no puede demostrar nada: el evento sale con
+    // 0 min de parada y el MTTR queda en «—» (18-09-2026).
+    impacto == null
   // HIG «Buttons»: en una hoja, Return activa el botón primario. Solo en los
   // campos simples (hora, minutos): el buscador y los chips usan Enter para elegir.
   const enterGuarda = (e: ReactKeyboardEvent<HTMLInputElement>) => {
@@ -1321,6 +1355,19 @@ export function EventoBitacoraSheet({
                   <input id="bitacora-termino" type="time" step={300} className={`${CAMPO} tabular-nums`} value={horaTermino} onChange={(e) => setHoraTermino(e.target.value)} onBlur={validarTermino} onKeyDown={enterGuarda} />
                 </div>
               </div>
+              {/* Sin término no hay minutos de parada: 17 de 22 eventos reales se
+                  guardaron sin él (18-09-2026). Un toque lo cierra con la hora
+                  de ahora, que es la que corresponde al salir de la máquina. */}
+              {!horaTermino && (
+                <button
+                  type="button"
+                  onClick={() => setHoraTermino(horaHHMM(new Date()))}
+                  className="-mt-1 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-full border border-primary/60 bg-primary/10 px-4 text-footnote font-semibold text-brand-ink transition-colors hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  <Clock3 className="size-4" aria-hidden />
+                  Terminó ahora · {horaDeAhora}
+                </button>
+              )}
               {duracion != null && <p className="-mt-1 text-footnote text-muted-foreground">Duración: {formatoMinutos(duracion)}</p>}
             </>
           )}
@@ -1345,13 +1392,35 @@ export function EventoBitacoraSheet({
 
         {/* Impacto en producción */}
         <div>
-          <span className={ETIQUETA_CAMPO}>¿Afectó a producción?</span>
-          <div className="flex flex-wrap gap-2" role="group" aria-label="Impacto en producción">
-            {IMPACTOS.map((i) => (
-              <Chip key={i.id} activo={impacto === i.id} onClick={() => setImpacto(i.id)}>
-                {i.label}
-              </Chip>
-            ))}
+          <span className={ETIQUETA_CAMPO}>
+            ¿Cómo afectó al proceso?
+            {impacto == null && <span className="ml-1.5 font-normal text-ink-warn">obligatorio</span>}
+          </span>
+          {/* Una respuesta por fila, con su ejemplo debajo. Con tres chips en
+              línea y sin explicación, 19 de 22 eventos reales terminaban en
+              «No aplica» — incluida una Baader 142 en falla (18-09-2026). */}
+          <div className="flex flex-col gap-2" role="group" aria-label="Impacto en el proceso">
+            {IMPACTOS.map((i) => {
+              const activo = impacto === i.id
+              return (
+                <button
+                  key={i.id}
+                  type="button"
+                  aria-pressed={activo}
+                  onClick={() => setImpacto(i.id)}
+                  className={[
+                    'flex min-h-[56px] flex-col justify-center gap-0.5 rounded-card px-4 py-2.5 text-left transition-colors',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+                    activo ? 'bg-primary text-primary-foreground' : 'bg-muted-foreground/10 text-foreground',
+                  ].join(' ')}
+                >
+                  <span className="text-subhead font-semibold leading-tight">{i.label}</span>
+                  <span className={`text-footnote leading-tight ${activo ? 'opacity-80' : 'text-muted-foreground'}`}>
+                    {i.detalle}
+                  </span>
+                </button>
+              )
+            })}
           </div>
           {impacto === 'con-parada' && (
             <div className="mt-3">
@@ -1371,6 +1440,31 @@ export function EventoBitacoraSheet({
                 {sinHora
                   ? 'Cuenta para el MTTR del turno. Vacío, la parada queda sin duración.'
                   : 'Cuenta para el MTTR del turno. Si lo dejas vacío se usa la duración.'}
+              </p>
+            </div>
+          )}
+          {impacto === 'afecta-sin-detener' && (
+            <div className="mt-3">
+              <label htmlFor="bitacora-contingencia" className={ETIQUETA_CAMPO}>¿Qué se hizo para que siguiera?</label>
+              <div className="mb-2 flex flex-wrap gap-2">
+                {CONTINGENCIAS_SUGERIDAS.map((c) => (
+                  <Chip key={c} activo={contingencia === c} onClick={() => setContingencia(c)}>
+                    {c}
+                  </Chip>
+                ))}
+              </div>
+              <input
+                id="bitacora-contingencia"
+                maxLength={120}
+                className={CAMPO}
+                value={contingencia}
+                onChange={(e) => setContingencia(e.target.value)}
+                // El ejemplo va en el placeholder: dice qué escribir Y que se
+                // puede escribir (pedido de Orel, 18-09-2026).
+                placeholder="Ejemplo: se retiran cabezas a mano"
+              />
+              <p className="mt-1.5 text-footnote text-muted-foreground">
+                No suma minutos de parada. Queda registrado que el proceso siguió gracias a Mantención.
               </p>
             </div>
           )}

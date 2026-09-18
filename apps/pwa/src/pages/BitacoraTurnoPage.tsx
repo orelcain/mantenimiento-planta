@@ -989,6 +989,13 @@ export function BitacoraTurnoVista({
               )}
               value={cifra(formatoMinutos(r.minutosParada))}
             />
+            {/* Solo si hubo: una fila en cero todos los turnos se vuelve invisible. */}
+            {r.afectados > 0 && (
+              <ListCell
+                title={rotulo('Siguió gracias a Mantención', 'warn')}
+                value={cifra(String(r.afectados))}
+              />
+            )}
             <ListCell title={rotulo('Sin detener producción', r.enVentana > 0 ? 'ok' : undefined)} value={cifra(String(r.enVentana))} />
             <ListCell
               title={rotulo(

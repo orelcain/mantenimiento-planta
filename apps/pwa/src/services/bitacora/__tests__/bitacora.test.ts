@@ -46,6 +46,37 @@ const ev = (p: Partial<EventoBitacora>): EventoBitacora => ({
   ...p,
 })
 
+describe('«afectó sin detener» (18-09-2026)', () => {
+  it('se cuenta aparte y NO toca la parada ni el MTTR', () => {
+    const r = resumirBitacora([
+      ev({ id: 'a', impacto: 'con-parada', horaInicio: '10:00', horaTermino: '10:20' }),
+      ev({ id: 'b', impacto: 'afecta-sin-detener', contingencia: 'Se retiran cabezas a mano', horaInicio: '11:00', horaTermino: '11:40' }),
+      ev({ id: 'c', impacto: 'afecta-sin-detener', horaInicio: '12:00', horaTermino: '12:10' }),
+    ])
+    expect(r.afectados).toBe(2)
+    expect(r.conParada).toBe(1)
+    // Los 40 y los 10 minutos del evento afectado NO entran: la máquina no paró,
+    // y el MTTR tiene que seguir cuadrando con Shoplogix.
+    expect(r.minutosParada).toBe(20)
+    expect(r.mttrMin).toBe(20)
+  })
+
+  it('un evento afectado no tiene minutos de parada aunque dure', () => {
+    expect(minutosParadaDe({ impacto: 'afecta-sin-detener', minutosParada: null, horaInicio: '11:00', horaTermino: '11:40' })).toBeNull()
+  })
+
+  it('el correo lo nombra con su contingencia', () => {
+    const html = bitacoraAHtmlCorreo({
+      turno: turnoDesdeId('2026-09-17_tarde')!,
+      eventos: [ev({ id: 'b', equipo: 'TOLVA DE RILES', impacto: 'afecta-sin-detener', contingencia: 'Se retiran cabezas a mano' })],
+      tecnicos: [],
+      planta: 'Planta Chonchi',
+    })
+    expect(html).toContain('Afectó sin detener: Se retiran cabezas a mano')
+    expect(html).toContain('siguió gracias a Mantención')
+  })
+})
+
 describe('la bitácora archivada no cambia sola (revisión 15-09)', () => {
   const cierre = { tipo: 'resuelto' as const, turnoId: '2026-09-16_noche', porNombre: 'Lucas Adrade', eventoId: 'e9', motivo: null }
 

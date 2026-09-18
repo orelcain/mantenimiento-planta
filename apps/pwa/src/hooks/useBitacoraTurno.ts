@@ -294,6 +294,11 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
         impacto: datos.impacto,
         minutosParada: datos.impacto === 'con-parada' && datos.minutosParada != null ? Math.max(0, Math.round(datos.minutosParada)) : null,
         ventana: datos.impacto === 'en-ventana' ? (datos.ventana ? limpiar(datos.ventana) : '') || null : null,
+        // Firestore de esta app NO tiene `ignoreUndefinedProperties`: siempre null, nunca undefined.
+        contingencia:
+          datos.impacto === 'afecta-sin-detener'
+            ? (datos.contingencia ? limpiar(datos.contingencia).slice(0, 120) : '') || null
+            : null,
         pendiente: datos.pendiente,
         fotos,
         participantes: [...new Set(datos.participantes.map((p) => p.trim()).filter(Boolean))].slice(0, 12),

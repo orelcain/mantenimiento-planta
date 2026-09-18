@@ -20,6 +20,13 @@ export interface ResumenBitacora {
   mttrMin: number | null
   /** Intervenciones hechas sin detener producción (en una ventana). */
   enVentana: number
+  /**
+   * Eventos que afectaron al proceso SIN detener la máquina (la tolva de riles
+   * que deja de llevarse las cabezas, y alguien las retira a mano). No suman
+   * minutos de parada a propósito: son la evidencia de que el proceso siguió
+   * gracias a Mantención, y el MTTR tiene que seguir cuadrando con Shoplogix.
+   */
+  afectados: number
   /** Pendientes de este turno que siguen abiertos HOY. */
   pendientes: number
   /**
@@ -86,6 +93,7 @@ export function resumirBitacora(todos: readonly EventoBitacora[]): ResumenBitaco
   // Por ID: si dos teléfonos resolvieron el MISMO pendiente casi a la vez, son
   // dos eventos pero UN pendiente cerrado (revisión 15-09).
   const cerrados = new Set<string>()
+  let afectados = 0
   let minutosIntervencion = 0
 
   for (const e of eventos) {
@@ -96,6 +104,10 @@ export function resumirBitacora(todos: readonly EventoBitacora[]): ResumenBitaco
     else if (e.cierre) pendientesResueltosDespues++
     if (e.resuelvePendiente?.id) cerrados.add(e.resuelvePendiente.id)
     if (e.impacto === 'en-ventana') enVentana++
+    // Afectó sin detener: NO suma minutos de parada (el MTTR tiene que seguir
+    // cuadrando con Shoplogix), pero se cuenta — es la evidencia de que el
+    // proceso siguió gracias a Mantención (criterio de Orel, 18-09-2026).
+    if (e.impacto === 'afecta-sin-detener') afectados++
     if (e.impacto === 'con-parada') {
       conParada++
       const parada = minutosParadaDe(e)
@@ -114,6 +126,7 @@ export function resumirBitacora(todos: readonly EventoBitacora[]): ResumenBitaco
     minutosParada,
     mttrMin: conParada - paradasSinDuracion > 0 ? minutosParada / (conParada - paradasSinDuracion) : null,
     enVentana,
+    afectados,
     pendientes,
     pendientesDelTurno: pendientes + pendientesResueltosDespues,
     pendientesResueltosDespues,

@@ -66,7 +66,19 @@ export type TipoEvento =
  *   (colación, cambio de turno, aseo…).
  * - `no-aplica`: rondas, novedades, lo que no toca producción.
  */
-export type ImpactoEvento = 'no-aplica' | 'con-parada' | 'en-ventana'
+/**
+ * Cómo afectó el evento al PROCESO, no a la máquina sola.
+ *
+ * `afecta-sin-detener` se agregó el 18-09-2026 con el criterio de planta: la
+ * goma de la tolva de riles no detiene nada, pero las cabezas y vísceras dejan
+ * de salir y hay que retirarlas a mano mientras se corrige. Antes ese caso solo
+ * podía registrarse mintiendo: o «detuvo» (falso) o «no aplica» (falso también),
+ * y se elegía lo segundo — de 22 eventos reales, 19 decían «no aplica».
+ *
+ * NO suma minutos de parada: el MTTR sigue siendo tiempo de reparación de lo
+ * que sí detuvo, para que cuadre con Shoplogix. Se cuenta aparte.
+ */
+export type ImpactoEvento = 'no-aplica' | 'con-parada' | 'afecta-sin-detener' | 'en-ventana'
 
 export type EtiquetaFoto = 'antes' | 'despues' | 'foto'
 
@@ -139,6 +151,8 @@ export interface EventoBitacora {
   impacto: ImpactoEvento
   minutosParada: number | null
   ventana: string | null
+  /** Solo con `afecta-sin-detener`: qué se hizo para que el proceso siguiera. */
+  contingencia?: string | null
   /** Queda para el turno siguiente: sale destacado en el correo. */
   pendiente: boolean
   fotos: FotoEvento[]
@@ -208,6 +222,7 @@ export type EventoBitacoraDatos = Pick<
   | 'impacto'
   | 'minutosParada'
   | 'ventana'
+  | 'contingencia'
   | 'pendiente'
   | 'fotos'
 > & {
