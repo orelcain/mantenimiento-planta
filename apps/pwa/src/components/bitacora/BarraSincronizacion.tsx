@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Loader2, Monitor, Smartphone } from "lucide-react";
 import { Tag, type TagTone } from "@/components/piel";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
@@ -33,6 +33,7 @@ export function BarraSincronizacion({
   miDispositivoId,
   editandoPorEvento,
   tonoDe,
+  compacta = false,
 }: {
   cargando: boolean;
   error: string | null;
@@ -44,10 +45,34 @@ export function BarraSincronizacion({
   /** Para decir «escribiendo» en quien tiene un evento abierto. */
   editandoPorEvento?: (eventoId: string) => boolean;
   tonoDe: (nombre: string) => TagTone;
+  /**
+   * PC (mockup «Dos ejes», 18-09-2026): una LÍNEA (punto · estado · avatares)
+   * junto al turno, y la lista de conectados en un panel al tocarla. El estado
+   * describe el contenido, no es una acción: no va en tarjeta ni en la toolbar.
+   */
+  compacta?: boolean;
 }) {
   const enLinea = useOnlineStatus();
   const [ahora, setAhora] = useState(() => Date.now());
   const [abierta, setAbierta] = useState(false);
+  const [panel, setPanel] = useState(false);
+  const raiz = useRef<HTMLDivElement>(null);
+  // El panel se cierra al tocar fuera o con Escape.
+  useEffect(() => {
+    if (!panel) return;
+    const fuera = (e: MouseEvent) => {
+      if (!raiz.current?.contains(e.target as Node)) setPanel(false);
+    };
+    const tecla = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setPanel(false);
+    };
+    document.addEventListener("mousedown", fuera);
+    document.addEventListener("keydown", tecla);
+    return () => {
+      document.removeEventListener("mousedown", fuera);
+      document.removeEventListener("keydown", tecla);
+    };
+  }, [panel]);
   useEffect(() => {
     const t = setInterval(() => setAhora(Date.now()), 5_000);
     return () => clearInterval(t);
@@ -101,8 +126,65 @@ export function BarraSincronizacion({
   const tranquila = titulo === "Sincronizado" && !novedadVigente && otros.length === 0;
   const modoLinea = tranquila && !abierta;
 
+  const lista = (
+    <ul className="flex flex-col gap-1.5" aria-label="Conectados ahora">
+      {presentes.map((p) => {
+        const soyYo = p.dispositivoId === miDispositivoId;
+        const escribiendo = Boolean(p.editandoEventoId && editandoPorEvento?.(p.editandoEventoId));
+        return (
+          <li key={p.dispositivoId} className="flex min-h-[28px] items-center gap-2 text-footnote">
+            <Avatar p={p} tono={tonoDe(p.nombre)} chico />
+            <span className="font-semibold">{p.nombre}</span>
+            <span className="text-muted-foreground">
+              · {NOMBRE_DISPOSITIVO[p.dispositivo]}
+              {soyYo ? " · este equipo" : ""}
+              {!soyYo && escribiendo ? " · escribiendo" : ""}
+            </span>
+          </li>
+        );
+      })}
+      {otros.length === 0 && <li className="text-footnote italic text-muted-foreground">Nadie más tiene la bitácora abierta ahora.</li>}
+    </ul>
+  );
+
   return (
     <>
+    {compacta && (
+      <div ref={raiz} className="relative hidden md:block">
+        <button
+          type="button"
+          onClick={() => setPanel((v) => !v)}
+          aria-expanded={panel}
+          aria-label={`${titulo}: ${detalle}. ${presentes.length} ${presentes.length === 1 ? "conectado" : "conectados"}`}
+          className="flex h-11 items-center gap-2.5 rounded-full px-3 text-footnote text-muted-foreground transition-colors duration-150 hover:bg-muted-foreground/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary motion-reduce:transition-none"
+        >
+          {punto ? (
+            <span className={`size-2 shrink-0 rounded-full ${punto}`} aria-hidden />
+          ) : (
+            <Loader2 className="size-4 shrink-0 animate-spin text-primary motion-reduce:animate-none" aria-hidden />
+          )}
+          <span className={`min-w-0 truncate ${error || estado === "sin-senal" ? "font-semibold text-ink-warn" : ""}`} role="status" aria-live="polite">
+            {titulo === "Sincronizado" ? detalle.replace(/^Todo al día/, "Al día") : `${titulo} · ${detalle}`}
+          </span>
+          {presentes.length > 0 && (
+            <span className="flex items-center pl-1">
+              {presentes.slice(0, 4).map((p, i) => (
+                <Avatar key={p.dispositivoId} p={p} tono={tonoDe(p.nombre)} chico className={i > 0 ? "-ml-2" : ""} />
+              ))}
+              <span className="pl-1.5 tabular-nums">{presentes.length}</span>
+            </span>
+          )}
+          <ChevronDown className={`size-4 shrink-0 transition-transform duration-150 motion-reduce:transition-none ${panel ? "rotate-180" : ""}`} aria-hidden />
+        </button>
+        {panel && (
+          <div className="glass-nav absolute left-0 top-full z-40 mt-2 w-[340px] rounded-[26px] p-4">
+            <p className="pb-2 text-footnote font-semibold">{titulo}</p>
+            <p className="pb-3 text-footnote text-muted-foreground">{detalle}</p>
+            {lista}
+          </div>
+        )}
+      </div>
+    )}
     {modoLinea && (
       <button
         type="button"
@@ -121,7 +203,7 @@ export function BarraSincronizacion({
     )}
     <section
       aria-label="Sincronización"
-      className={`${modoLinea ? "hidden md:flex" : "flex"} flex-col gap-2 rounded-card bg-card px-4 py-3 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none`}
+      className={`${modoLinea ? "hidden" : "flex"} ${compacta ? "md:hidden" : modoLinea ? "md:flex" : ""} flex-col gap-2 rounded-card bg-card px-4 py-3 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none`}
     >
       <div className="flex min-h-[44px] items-center justify-between gap-3">
         <div

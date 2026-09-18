@@ -21,6 +21,16 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-18 · Bitacora ronda 38 · Encabezado en dos ejes, fila «Dos niveles», Tag a 11 px, nombres legibles
+- Pedido de Orel: «el apartado superior no entra bien; el cuadro de sincronización no queda bien; la lista está sucia, letras muy normales o grandes; usemos itálica». Mockup con el turno real y medidas en vivo (directora creativa, HIG Typography / Lists and tables / Labels / Layout / Toolbars): https://claude.ai/artifact/FTyigNTAZGVedczqtVVo7q — Orel eligió todo.
+- Hecho:
+  - Encabezado «Dos ejes» (`BitacoraTurnoPage.tsx`): fila 1 = título + toolbar de PC; fila 2 = navegación del turno + estado de sincronización como LÍNEA (`BarraSincronizacion compacta`: punto · «Al día · hace 2 min» · avatares · N; el detalle de conectados en un panel `glass-nav rounded-[26px]` al tocarla, se cierra con clic fuera o Escape). El teléfono no cambia.
+  - Fila «Dos niveles» (`EventoBitacoraFila.tsx`): número en `caption` (ya no círculo), hora en `subhead` (15) y término en `footnote`; título en `headline` (17); UNA línea secundaria `footnote` con Tag del tipo · equipo · N° · impacto como punto + texto (`bg-ink-crit`/`bg-ink-ok`, tokens, no `bg-red-500`); descripción en tinta secundaria, `md:line-clamp-2` (3 en el teléfono); técnicos y «Sin hora» en itálica. Filas de 118–122 px (antes 103–170).
+  - Bug real arreglado en `lib/utils.ts`: `tailwind-merge` no conocía la escala tipográfica y tomaba `text-caption` por un color, así que `Tag` se pintaba a 14 px en TODA la app. `extendTailwindMerge` con el grupo `font-size` de la escala. Medido después: 11 px.
+  - `nombreEquipo.ts`: `nombreEquipoLegible` pasa las MAYÚSCULAS de SAP a frase con `formatNombreSAP` + siglas de planta (GEA, HG, FRL, AK300, TP-6000, E-PACK, RILES…) y marcas (Baader, Marel, Knuro, Marelec, Fishken); respeta lo escrito a mano. Se aplica al equipo y al título en la fila; los envíos (correo, Excel, WhatsApp) siguen con el nombre crudo.
+- Verificación: `/dev/bitacora-real` a 1920 oscuro (encabezado 104 px en dos ejes, Tag 11 px, filas 118–122) y 375 (sin cambios, ancho 375); tsc 0; eslint 30; vitest OK con `nombreEquipo.test.ts`; build y auditorías OK.
+- Estado: HECHO.
+
 ## 2026-09-18 · Bitacora ronda 37 · PC: sincronización en el encabezado y columnas 1 : 2 : 3 (16:9)
 - Pedido de Orel (anotado sobre el turno real 17-09 tarde): la barra «Sincronizado» al hueco del encabezado entre el turno y las acciones; las tres columnas en proporción 1/6 · 2/6 · 3/6 para que llenen una pantalla 16:9.
 - Hecho en `BitacoraTurnoPage.tsx`: `BarraSincronizacion` dentro del `<header>` (`md:flex-1 md:self-center`; en el teléfono `order-last w-full`, o sea debajo, como antes); grilla `xl:grid-cols-[minmax(240px,1fr)_minmax(0,2fr)_minmax(0,3fr)]`; la columna del correo fija con `max-h-[calc(100vh-2rem)] overflow-y-auto` para que el correo entero quepa en la pantalla y se desplace solo. La vitrina real deja de tener `max-w-7xl`.
