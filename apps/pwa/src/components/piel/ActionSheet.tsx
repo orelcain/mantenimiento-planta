@@ -61,7 +61,7 @@ export function ActionSheet({ open, title, description, confirmLabel, onConfirm,
 
   return createPortal(
     <div className="fixed inset-0 z-[120] flex items-end justify-center p-3">
-      <div className="absolute inset-0 bg-black/35 piel-fade-in motion-reduce:animate-none" onClick={onCancel} aria-hidden />
+      <div className="absolute inset-0 bg-black/35 piel-fade-in" onClick={onCancel} aria-hidden />
       <div
         ref={panelRef}
         role="alertdialog"
@@ -70,7 +70,7 @@ export function ActionSheet({ open, title, description, confirmLabel, onConfirm,
         tabIndex={-1}
         className={cn(
           'relative flex w-full max-w-[30rem] flex-col gap-2 outline-none',
-          'piel-sheet-in motion-reduce:animate-none',
+          'piel-sheet-in',
         )}
       >
         <div className="rounded-[26px] bg-card p-4 text-center">

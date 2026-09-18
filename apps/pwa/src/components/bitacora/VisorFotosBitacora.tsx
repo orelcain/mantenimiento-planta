@@ -148,7 +148,7 @@ export function VisorFotosBitacora({
       role="dialog"
       aria-modal="true"
       aria-label={`Foto ${i + 1} de ${total}`}
-      className="fixed inset-0 z-[120] flex flex-col piel-fade-in motion-reduce:animate-none"
+      className="fixed inset-0 z-[120] flex flex-col piel-fade-in"
       // Opaco, como Fotos de iOS: al 92 % se transparentaban los botones de la página (ronda 21).
       style={{ background: `rgba(0,0,0,${opacidadFondo})` }}
       onClick={onClose}

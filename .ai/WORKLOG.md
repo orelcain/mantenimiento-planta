@@ -21,6 +21,15 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-18 · Bitacora ronda 46 · HIG etapa 3b (cierra la serie): marca «Nuevo» en su lugar
+- Última tanda de las 15 mejoras del HIG local. Dos reglas y una verificación:
+  - **«Live-updating content» · marca en su lugar**: un evento que entra SOLO desde otro teléfono con la bitácora abierta se marca con una pill **«Nuevo»** en su propia fila, en vez de anunciarse solo con el texto de la barra de sincronización («Leandro agregó un evento»), que decía QUÉ pasó pero no DÓNDE. `useBitacoraTurno` expone `recienLlegados` (Set de ids) y `marcarVisto(id)`: se marca en el `added` y en el `modified` que publica un borrador ajeno, y la marca se apaga al abrir el evento o a los 90 s (`MARCA_NUEVO_MS`). Un borrador NO lleva la pill: ya se anuncia con «En redacción», y dos pills seguidas ensucian la fila.
+  - **Reduce Motion, una sola fuente**: se quitó `motion-reduce:animate-none` de los cuatro lugares que lo pegaban junto a `piel-sheet-in`/`piel-fade-in` (Sheet, ActionSheet, VisorFotos, RotuloNuevoEvento). Contradecía el fundido de la ronda 45 — que gana por `!important`, pero dejarlo hacía creer lo contrario al leer el código. Los `animate-spin`/`animate-pulse` conservan el suyo: ahí sí corresponde apagar.
+  - **Verificado, no cambiado**: la hoja del editor en oscuro YA cumple la elevación por tono del HIG — medido en pantalla, hoja `rgb(44,44,46)` sobre página `rgb(28,28,30)` (#2C2C2E sobre #1C1C1E).
+- Verificación en `/dev/bitacora-real`: la pill «Nuevo» sale en el evento 8 (la vitrina marca el último, coherente con su aviso de ejemplo), y al abrir ese evento la marca desaparece (1 → 0 pills, contado en el DOM).
+- tsc 0; eslint 30; vitest 2.808 OK; auditorías OK; build OK.
+- Estado: HECHO. Con esto quedan aplicadas las 15 reglas del HIG en 4 etapas (rondas 42, 43, 45 y 46). DESCARTADA con fundamento la del «⋯» en la fila: tocar la fila ya abre el editor, que tiene «Queda pendiente» y «Borrar evento».
+
 ## 2026-09-18 · Bitacora ronda 45 · HIG etapa 3a: deshacer el arrastre, Reduce Motion, buscador y progreso
 - Cuarta tanda de las 15 mejoras sacadas del HIG local (`ARIA_MANTENIMIENTO_PLANTA/docs/hig/`). Cuatro reglas:
   - **«Drag and drop» · deshacer**: al soltar una fila reordenada sale un toast «Evento movido» con **Deshacer** (mismo patrón que el borrado). Para eso `mover(id, posicionMin)` ahora acepta `null`, que devuelve el evento a su lugar por hora de registro; antes solo aceptaba un número y no había forma de volver atrás. Se guarda la `posicionMin` PREVIA antes de mover.

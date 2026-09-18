@@ -18,7 +18,7 @@ export function RotuloNuevoEvento({ activo }: { activo: boolean }) {
   return (
     <span
       aria-hidden
-      className="pointer-events-none absolute bottom-full left-1/2 mb-3 -translate-x-1/2 whitespace-nowrap rounded-full bg-card px-3 py-1.5 text-footnote font-semibold text-foreground shadow-[0_2px_10px_rgba(0,0,0,0.15)] piel-fade-in motion-reduce:animate-none"
+      className="pointer-events-none absolute bottom-full left-1/2 mb-3 -translate-x-1/2 whitespace-nowrap rounded-full bg-card px-3 py-1.5 text-footnote font-semibold text-foreground shadow-[0_2px_10px_rgba(0,0,0,0.15)] piel-fade-in"
     >
       Nuevo evento
     </span>

@@ -60,7 +60,7 @@ export function Sheet({ open, onClose, title, description, actions, size = 'defa
   return createPortal(
     <div className="fixed inset-0 z-[100] flex items-end justify-center">
       <div
-        className="absolute inset-0 bg-black/35 piel-fade-in motion-reduce:animate-none"
+        className="absolute inset-0 bg-black/35 piel-fade-in"
         onClick={onClose}
         aria-hidden
       />
@@ -73,7 +73,7 @@ export function Sheet({ open, onClose, title, description, actions, size = 'defa
           'relative w-full rounded-t-panel bg-card px-6 pb-8 pt-2.5',
           size === 'wide' ? 'max-w-[60rem]' : 'max-w-[30rem]',
           'shadow-[0_-10px_50px_rgba(0,0,0,0.3)] outline-none',
-          'piel-sheet-in motion-reduce:animate-none',
+          'piel-sheet-in',
         )}
       >
         {/* Agarradera: señal de "esto se arrastra/cierra", no decoración. */}

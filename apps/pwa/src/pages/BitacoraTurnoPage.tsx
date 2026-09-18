@@ -99,6 +99,8 @@ export function BitacoraTurnoVista({
     ultimaSync,
     cambiosPorSubir,
     novedad,
+    recienLlegados,
+    marcarVisto,
     nuevoId,
     guardar,
     borrar,
@@ -539,7 +541,11 @@ export function BitacoraTurnoVista({
       numero={numeroDe.get(e.id)}
       enPendientes={!esBorrador(e) && fuePendiente(e)}
       abiertoPor={otrosEditando(conectados, e.id, miDispositivoId)}
-      onAbrir={() => setEditor({ evento: e, idNuevo: e.id, turno })}
+      nuevo={recienLlegados.has(e.id)}
+      onAbrir={() => {
+        marcarVisto(e.id)
+        setEditor({ evento: e, idNuevo: e.id, turno })
+      }}
       onVerFoto={(fotos, indice) => setVisor({ fotos, indice, titulo: encabezadoEvento(e) })}
       onMover={
         tieneHora(e) || esBorrador(e)
