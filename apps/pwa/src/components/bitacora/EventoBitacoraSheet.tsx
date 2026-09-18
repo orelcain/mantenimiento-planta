@@ -954,6 +954,10 @@ export function EventoBitacoraSheet({
   }
 
   const subiendo = subidas.some((s) => !s.error)
+  // HIG «Progress indicators»: decir cuántas van, no un «cargando» sin número.
+  const enCola = subidas.filter((s) => !s.error).length
+  const totalLote = fotos.length + enCola
+  const rotuloSubiendo = enCola > 1 ? `Subiendo ${fotos.length + 1} de ${totalLote}…` : 'Subiendo la foto…' 
   // HIG «Entering data»: el botón se habilita recién con lo obligatorio (quién,
   // tipo, hora o «Sin hora», qué pasó). Lo mismo que valida `guardar`.
   const faltaObligatorio =
@@ -1002,7 +1006,7 @@ export function EventoBitacoraSheet({
             {guardando
               ? 'Guardando…'
               : subiendo
-              ? 'Subiendo fotos…'
+              ? rotuloSubiendo
               : modoBorrador
                 ? (pendienteOrigen || (eventoVivo ?? evento)?.resuelvePendiente) ? 'Listo y cerrar pendiente' : 'Listo'
                 : 'Guardar'}

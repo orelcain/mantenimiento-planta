@@ -297,7 +297,9 @@ export function EventoBitacoraFila({
       data-evento-id={evento.id}
       className={[
         'relative before:absolute before:left-[5rem] before:right-0 before:top-0 before:z-[1] before:h-px before:bg-border before:content-[""] first:before:hidden',
-        arrastrando ? 'z-20 rounded-[18px] shadow-[0_12px_28px_rgba(0,0,0,0.25)] before:hidden' : '',
+        // HIG «Drag and drop»: lo que se arrastra va translúcido, para que se vea
+        // como una copia en la mano y no como la fila misma (ronda 45, 18-09).
+        arrastrando ? 'z-20 rounded-[18px] opacity-70 shadow-[0_12px_28px_rgba(0,0,0,0.25)] before:hidden' : '',
       ].join(' ')}
       style={arrastrando ? { transform: `translateY(${desplazamiento}px) scale(1.02)` } : undefined}
     >
