@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
 import { AlertTriangle, Check, ImagePlus, Loader2, RotateCw, Trash2, Users, X } from 'lucide-react'
 import { Button, Sheet } from '@/components/piel'
 import { useToast } from '@/hooks/useToast'
@@ -897,8 +897,6 @@ export function EventoBitacoraSheet({
       return
     }
     setGuardando(true)
-    const publicando = modoBorrador
-    const moverA = destino && destino.id !== turno.id ? destino.id : null
     // Si nunca se vio el documento en la bitácora (la creación pudo fallar), se
     // crea completo en vez de actualizar algo que no existe (revisión 16-09).
     const crear = !existeEnServidor.current || (creadoAqui.current && !vistoVivo.current)
@@ -912,12 +910,9 @@ export function EventoBitacoraSheet({
       subidasNuevas.current = []
       // Las fotos quitadas las borra el hook DESPUÉS del OK del servidor.
       quitadas.current = []
-      // Si cambió de turno, la bitácora avisa dónde quedó (con «Ver»).
-      if (!moverA) toast({
-        title: publicando ? 'Evento publicado' : esNuevo ? 'Evento agregado' : 'Evento actualizado',
-        description: navigator.onLine ? undefined : 'Quedó guardado en el teléfono; se sube cuando haya señal.',
-        variant: 'success',
-      })
+      // HIG «Feedback»: guardar bien no avisa (la fila entra en la lista y la
+      // línea de sincronización dice si quedó algo por enviar). Si cambió de
+      // turno, la bitácora sí avisa dónde quedó (con «Ver»).
       onClose()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo guardar. Reintenta.')
@@ -950,6 +945,29 @@ export function EventoBitacoraSheet({
   }
 
   const subiendo = subidas.some((s) => !s.error)
+  // HIG «Entering data»: el botón se habilita recién con lo obligatorio (quién,
+  // tipo, hora o «Sin hora», qué pasó). Lo mismo que valida `guardar`.
+  const faltaObligatorio =
+    (tecnicos.todos.length > 0 && !quien.trim()) || (tipo === 'otro' && !limpiarTipo(tipoOtro)) || horaFaltante || !descripcion.trim()
+  // HIG «Buttons»: en una hoja, Return activa el botón primario. Solo en los
+  // campos simples (hora, minutos): el buscador y los chips usan Enter para elegir.
+  const enterGuarda = (e: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && !guardando && !faltaObligatorio) {
+      e.preventDefault()
+      void guardar()
+    }
+  }
+  // HIG «Entering data»: validar al salir del campo, no recién al guardar.
+  const validarTermino = () => {
+    if (duracion != null && duracion > 12 * 60) {
+      setError(
+        `De ${horaInicio} a ${horaTermino} son ${Math.floor(duracion / 60)} h. Si el término está bien, registra hasta el fin del turno ` +
+          'y abre otro evento en el turno siguiente; si no, corrige la hora.',
+      )
+    } else if (error?.startsWith('De ')) {
+      setError(null)
+    }
+  }
 
   return (
     <Sheet
@@ -970,9 +988,11 @@ export function EventoBitacoraSheet({
           <Button variant="tinted" onClick={cerrarHoja} disabled={guardando}>
             {modoBorrador ? 'Cerrar' : 'Cancelar'}
           </Button>
-          <Button onClick={guardar} disabled={guardando || eliminadoAfuera}>
+          <Button onClick={guardar} disabled={guardando || eliminadoAfuera || faltaObligatorio}>
             {guardando ? <Loader2 className="animate-spin" /> : null}
-            {subiendo
+            {guardando
+              ? 'Guardando…'
+              : subiendo
               ? 'Subiendo fotos…'
               : modoBorrador
                 ? (pendienteOrigen || (eventoVivo ?? evento)?.resuelvePendiente) ? 'Listo y cerrar pendiente' : 'Listo'
@@ -1280,11 +1300,12 @@ export function EventoBitacoraSheet({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label htmlFor="bitacora-inicio" className={ETIQUETA_CAMPO}>Inicio</label>
-                  <input id="bitacora-inicio" type="time" className={`${CAMPO} tabular-nums`} value={horaInicio} onChange={(e) => setHoraInicio(e.target.value)} />
+                  {/* HIG «Pickers»: minutos de 5 en 5, que con guantes se acierta. */}
+                  <input id="bitacora-inicio" type="time" step={300} className={`${CAMPO} tabular-nums`} value={horaInicio} onChange={(e) => setHoraInicio(e.target.value)} onKeyDown={enterGuarda} />
                 </div>
                 <div>
                   <label htmlFor="bitacora-termino" className={ETIQUETA_CAMPO}>Término</label>
-                  <input id="bitacora-termino" type="time" className={`${CAMPO} tabular-nums`} value={horaTermino} onChange={(e) => setHoraTermino(e.target.value)} />
+                  <input id="bitacora-termino" type="time" step={300} className={`${CAMPO} tabular-nums`} value={horaTermino} onChange={(e) => setHoraTermino(e.target.value)} onBlur={validarTermino} onKeyDown={enterGuarda} />
                 </div>
               </div>
               {duracion != null && <p className="-mt-1 text-footnote text-muted-foreground">Duración: {formatoMinutos(duracion)}</p>}

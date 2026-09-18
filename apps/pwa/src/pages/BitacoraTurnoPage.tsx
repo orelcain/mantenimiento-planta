@@ -1297,10 +1297,8 @@ export function BitacoraTurnoVista({
                   return
                 }
                 void guardarObservacion(textoObs, quienObs)
-                  .then(() => {
-                    toast({ title: 'Observación guardada', variant: 'success' })
-                    setEditandoObs(false)
-                  })
+                  // HIG «Feedback»: la observación aparece en su fila; no hace falta avisar.
+                  .then(() => setEditandoObs(false))
                   .catch((e: unknown) => toast({ title: e instanceof Error ? e.message : 'No se pudo guardar', variant: 'destructive' }))
               }}
             >
@@ -1402,10 +1400,10 @@ export function BitacoraTurnoVista({
         marcados={borradorPresentes}
         onMarcados={setBorradorPresentes}
         onGuardar={(nombres) => {
+          // HIG «Feedback»: los técnicos quedan a la vista en su lista; solo se avisa si falla.
           void guardarPresentes(nombres).catch((e: unknown) =>
             toast({ title: e instanceof Error ? e.message : 'No se pudo guardar', variant: 'destructive' }),
           )
-          toast({ title: 'Técnicos del turno guardados', variant: 'success' })
         }}
         // Un pase no cambia la lista de técnicos (solo la lee).
         onAbrirLista={autorFijo ? undefined : () => setHojaTecnicos('lista')}
