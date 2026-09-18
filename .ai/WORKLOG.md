@@ -21,6 +21,22 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-18 · Bitacora ronda 49 · EL TIPO dice que se hizo; la FALLA se deduce
+- Sigue la ronda 48, con lo que Orel habia planteado: «falla y correctiva vendria siendo parte de la misma accion o no?». Medido sobre los mismos 22 eventos reales: **9 marcados «Falla», y 4 de esos describen otra cosa** («Cambio de tubos fluorescentes» en el casino, «Se montan cintas filete», «Se retiraron cintas para higiene», «Se corrige teflon guia, se tensa la cinta»). Ademas los tecnicos **escribieron «Rutinario» a mano 3 veces** (lubricacion del Knuro, retiro de cintas para higiene, desmonte y montaje) mientras que **«Planificado» y «Ajuste» no los uso nadie**.
+- CAUSA: el tipo mezclaba dos ejes. **«Falla» es QUE PASO; «correctivo/preventivo/inspeccion» es QUE SE HIZO.** Con una sola lista habia que elegir uno y se perdia el otro — y «Falla», ademas preseleccionada, se volvio el cajon de sastre.
+- Como quedo (mockup aprobado, 2 artboards nuevos en https://claude.ai/artifact/NxqTrFu1wGRT6mjo7CUb1R):
+  - El rotulo del campo pasa a **«¿Que se hizo?»** y la lista es: Correctivo · **Rutinario** · Preventivo · **Montaje/desmontaje** · Inspeccion · Ajuste · Novedad · Otro. **«Falla» y «Planificado» salen de la lista** pero siguen en el tipo `TipoEvento` y en `ETIQUETA_TIPO` (via `TIPOS_LEGADO`): sin eso, el historial se quedaba sin nombre.
+  - **Ningun tipo viene marcado** y elegirlo es obligatorio, igual que el impacto: la preseleccion en 'falla' es parte de por que 9 de 22 decian falla.
+  - **`esFalla(e)` en `resumenBitacora.ts`**: `(impacto detuvo o afecto) && (tipo correctivo o el legado falla)`. No hay campo nuevo ni un toque mas — sale de las dos respuestas que el tecnico ya da.
+- **MTTR y MTBF corregidos** (los numeros CAMBIAN respecto a lo que se mostro antes, avisar al presentar):
+  - `mtbf()` divide por **fallas**, no por paradas: un preventivo que detiene la maquina descuenta tiempo operando —no produjo— pero **no es un fallo entre el que medir**.
+  - MTTR = `minutosFalla / (fallasConParada − fallasSinDuracion)`. ⚠ El primer intento dividia por TODAS las fallas e incluia las que afectaron **sin detener**, que no aportan minutos: el MTTR daba 6,67 min donde correspondian 20. Lo cazo un test.
+  - El resumen suma `fallas`, `fallasConParada`, `fallasSinDuracion` y `minutosFalla`; la fila «Parada» ahora dice «2 paradas» (no «2 fallas») y aparece una fila **«Fallas · MTTR»** propia.
+- ⚠ GOTCHA: `FIJO_POR_NOMBRE` (el mapa que evita que escribir «Preventivo» en «Otro…» cree un tipo propio duplicado) se armaba desde `TIPOS_EVENTO`. Al sacar «Falla» de esa lista, escribir «Falla» a mano empezaba a crear un tipo propio nuevo. Ahora se arma desde `ETIQUETA_TIPO`, que incluye los legado.
+- Verificado en `/dev/bitacora-real`: la lista nueva sin «Falla» ni «Planificado» y sin marcar; un **correctivo con parada de 18 min** dejo «Parada · 1 parada 18 min» y «Fallas · MTTR 18 min · 1»; despues un **preventivo con parada de 20 min** subio la parada a «2 paradas 38 min» y **dejo las fallas en 1**, con el MTTR intacto. El correo trajo «18 min de parada por falla ÷ 1 falla» y el Excel mostro los tipos legado («Falla») junto a los nuevos.
+- tsc 0; eslint 30; vitest **2.812**; auditorias OK; build OK.
+- Estado: HECHO. Los eventos viejos NO se migran.
+
 ## 2026-09-18 · Bitacora ronda 48 · EL IMPACTO: la bitacora no capturaba lo que la justifica
 - Se midieron los 22 eventos publicados de 4 turnos REALES (16 y 17-09, Chonchi): **19 de 22 decian «No aplica»**, los 2 «con parada» estaban **sin minutos**, y **17 de 22 sin hora de termino**. Resultado: el turno reportaba **0 min de parada, MTTR «—» y MTBF «—»**. Cuatro turnos de trabajo real y cero evidencia cuantificable, que es lo contrario de la meta de la app.
 - CAUSA, dos decisiones nuestras: (1) `impacto` arrancaba en `'no-aplica'` — una respuesta de fabrica que nadie cambia; (2) `minutosParadaDe` cae a `minutosEntre(horaInicio, horaTermino)`, y sin termino la parada vale cero.

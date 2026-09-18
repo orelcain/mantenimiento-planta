@@ -1,7 +1,7 @@
 import { minutosDelTurno, mtbf } from './mtbf'
 import type { EventoBitacora, TurnoMantencion } from './bitacora.types'
 import { autorVisible } from './bitacora.types'
-import { minutosParadaDe, resumirBitacora, type ResumenBitacora } from './resumenBitacora'
+import { esFalla, minutosParadaDe, resumirBitacora, type ResumenBitacora } from './resumenBitacora'
 import { fechaLocal, turnoDesdeId } from './turnoMantencion'
 import { soloListos } from './borradores'
 import { equipoConCodigo, nombreConComun, nombreRepuesto, normalizarRepuestos } from './presentacionEvento'
@@ -32,6 +32,8 @@ export interface EquipoDelPeriodo {
   equipo: string
   minutos: number
   paradas: number
+  /** De esas paradas, cuántas fueron una falla (ver `esFalla`): es el divisor del MTBF. */
+  fallas: number
   /** Parte del total de minutos parados del período (0-1). */
   parte: number
   /** Tiempo promedio operando entre sus fallas, sobre las horas de turno del período. */
@@ -72,6 +74,10 @@ export interface ResumenPeriodo {
   parteSinDetener: number
   minutosParada: number
   conParada: number
+  /** Eventos que fueron una falla en el período (correctivo que afectó al proceso). */
+  fallas: number
+  /** Minutos de parada que corresponden a fallas, no a paradas programadas. */
+  minutosFalla: number
   mttrMin: number | null
   /** Horas de turno del período (suma de los turnos con eventos) y el MTBF sobre ellas. */
   minutosTurnos: number
@@ -122,14 +128,15 @@ export function resumirPeriodo(eventos: readonly EventoBitacora[], desde: string
   const validos = soloListos(eventos).filter((e) => e.turnoId && turnoDesdeId(e.turnoId))
   const total = resumirBitacora(validos)
 
-  const porEquipo = new Map<string, { equipo: string; minutos: number; paradas: number }>()
+  const porEquipo = new Map<string, { equipo: string; minutos: number; paradas: number; fallas: number }>()
   for (const e of validos) {
     const parada = minutosParadaDe(e)
     if (parada == null || !e.equipo?.trim()) continue
     const k = normalizarEquipo(e.equipo)
-    const actual = porEquipo.get(k) ?? { equipo: e.equipo.trim(), minutos: 0, paradas: 0 }
+    const actual = porEquipo.get(k) ?? { equipo: e.equipo.trim(), minutos: 0, paradas: 0, fallas: 0 }
     actual.minutos += parada
     actual.paradas += 1
+    if (esFalla(e)) actual.fallas += 1
     porEquipo.set(k, actual)
   }
   // Horas de turno del período: la base del MTBF (aproximada: no descuenta la colación de cada máquina).
@@ -139,7 +146,8 @@ export function resumirPeriodo(eventos: readonly EventoBitacora[], desde: string
     .map((x) => ({
       ...x,
       parte: total.minutosParada > 0 ? x.minutos / total.minutosParada : 0,
-      mtbfMin: mtbf(minutosTurnos, x.minutos, x.paradas, filas.length),
+      // Entre FALLAS: una parada programada no es un fallo entre el que medir.
+      mtbfMin: mtbf(minutosTurnos, x.minutos, x.fallas, filas.length),
     }))
 
   const porTecnico = new Map<string, number>()
@@ -191,9 +199,11 @@ export function resumirPeriodo(eventos: readonly EventoBitacora[], desde: string
     parteSinDetener: total.conParada + total.enVentana > 0 ? total.enVentana / (total.conParada + total.enVentana) : 0,
     minutosParada: total.minutosParada,
     conParada: total.conParada,
+    fallas: total.fallas,
+    minutosFalla: total.minutosFalla,
     mttrMin: total.mttrMin,
     minutosTurnos,
-    mtbfMin: mtbf(minutosTurnos, total.minutosParada, total.conParada, filas.length),
+    mtbfMin: mtbf(minutosTurnos, total.minutosParada, total.fallas, filas.length),
     pendientesCerrados: total.pendientesCerrados,
     // Lo que sigue abierto HOY de lo registrado en el período.
     pendientesAbiertos: validos.filter((e) => e.pendiente && !e.cierre).length,

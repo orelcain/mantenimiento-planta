@@ -31,13 +31,19 @@ export function minutosOperando(minutosTurno: number, minutosParada: number, tur
   return Math.max(0, minutosTurno - MINUTOS_SIN_PRODUCCION_POR_TURNO * turnos - minutosParada)
 }
 
-/** MTBF en minutos, o null sin fallas con parada (no existe, no es cero). */
-export function mtbf(minutosTurno: number, minutosParada: number, conParada: number, turnos = 1): number | null {
-  return conParada > 0 ? minutosOperando(minutosTurno, minutosParada, turnos) / conParada : null
+/**
+ * MTBF en minutos, o null sin fallas (no existe, no es cero).
+ *
+ * El divisor son las FALLAS, no las paradas: una parada programada para un
+ * preventivo descuenta tiempo operando —la máquina no produjo— pero no es un
+ * fallo entre el que medir (corregido el 18-09-2026, ver `esFalla`).
+ */
+export function mtbf(minutosTurno: number, minutosParada: number, fallas: number, turnos = 1): number | null {
+  return fallas > 0 ? minutosOperando(minutosTurno, minutosParada, turnos) / fallas : null
 }
 
-export function mtbfDelTurno(turno: Pick<TurnoMantencion, 'inicio' | 'fin'>, r: { minutosParada: number; conParada: number }): number | null {
-  return mtbf(minutosDelTurno(turno), r.minutosParada, r.conParada)
+export function mtbfDelTurno(turno: Pick<TurnoMantencion, 'inicio' | 'fin'>, r: { minutosParada: number; fallas: number }): number | null {
+  return mtbf(minutosDelTurno(turno), r.minutosParada, r.fallas)
 }
 
 const fallas = (n: number) => `${n} ${n === 1 ? 'falla' : 'fallas'}`
@@ -46,33 +52,40 @@ const fallas = (n: number) => `${n} ${n === 1 ? 'falla' : 'fallas'}`
  * La línea que va bajo la planilla: cada sigla con su definición entre
  * paréntesis y el cálculo con los números del turno. Sin paradas, lo dice.
  */
-export function explicacionMtbfMttr(turno: Pick<TurnoMantencion, 'inicio' | 'fin'>, r: { minutosParada: number; conParada: number; mttrMin: number | null }): string {
-  if (r.conParada === 0) return 'MTTR y MTBF: sin fallas con parada en el turno, no aplican.'
+export function explicacionMtbfMttr(
+  turno: Pick<TurnoMantencion, 'inicio' | 'fin'>,
+  r: { minutosParada: number; minutosFalla: number; fallas: number; mttrMin: number | null },
+): string {
+  if (r.fallas === 0) return 'MTTR y MTBF: sin fallas en el turno, no aplican.'
   const minutosTurno = minutosDelTurno(turno)
   const operando = minutosOperando(minutosTurno, r.minutosParada)
-  const valorMtbf = mtbf(minutosTurno, r.minutosParada, r.conParada)
+  const valorMtbf = mtbf(minutosTurno, r.minutosParada, r.fallas)
   const mttr =
     r.mttrMin == null
-      ? `MTTR — (tiempo promedio en reparar cada falla: ${r.conParada === 1 ? 'la falla no tiene' : `las ${r.conParada} fallas no tienen`} duración todavía).`
-      : `MTTR ${formatoMinutos(r.mttrMin)} (tiempo promedio en reparar cada falla: ${formatoMinutos(r.minutosParada)} de parada ÷ ${fallas(r.conParada)}).`
+      ? `MTTR — (tiempo promedio en reparar cada falla: ${r.fallas === 1 ? 'la falla no tiene' : `las ${r.fallas} fallas no tienen`} duración todavía).`
+      : `MTTR ${formatoMinutos(r.mttrMin)} (tiempo promedio en reparar cada falla: ${formatoMinutos(r.minutosFalla)} de parada por falla ÷ ${fallas(r.fallas)}).`
   const base =
     `${formatoMinutos(minutosTurno)} de turno − ${formatoMinutos(MINUTOS_SIN_PRODUCCION_POR_TURNO)} sin producción (colación, reunión, ejercicios) − ` +
     `${formatoMinutos(r.minutosParada)} de parada = ${formatoMinutos(operando)}`
-  return `${mttr} MTBF ${valorMtbf == null ? '—' : formatoMinutos(valorMtbf)} (tiempo promedio operando entre fallas: ${base} ÷ ${r.conParada}).`
+  return `${mttr} MTBF ${valorMtbf == null ? '—' : formatoMinutos(valorMtbf)} (tiempo promedio operando entre fallas: ${base} ÷ ${r.fallas}).`
 }
 
 /** La misma línea para un período: N turnos, sumando sus horas. */
-export function explicacionMtbfMttrPeriodo(minutosTurnos: number, turnos: number, r: { minutosParada: number; conParada: number; mttrMin: number | null }): string {
-  if (r.conParada === 0) return 'MTTR y MTBF: sin fallas con parada en el período, no aplican.'
+export function explicacionMtbfMttrPeriodo(
+  minutosTurnos: number,
+  turnos: number,
+  r: { minutosParada: number; minutosFalla: number; fallas: number; mttrMin: number | null },
+): string {
+  if (r.fallas === 0) return 'MTTR y MTBF: sin fallas en el período, no aplican.'
   const operando = minutosOperando(minutosTurnos, r.minutosParada, turnos)
-  const valorMtbf = mtbf(minutosTurnos, r.minutosParada, r.conParada, turnos)
+  const valorMtbf = mtbf(minutosTurnos, r.minutosParada, r.fallas, turnos)
   const mttr =
     r.mttrMin == null
       ? 'MTTR — (las fallas no tienen duración).'
-      : `MTTR ${formatoMinutos(r.mttrMin)} (tiempo promedio en reparar cada falla: ${formatoMinutos(r.minutosParada)} de parada ÷ ${fallas(r.conParada)}).`
+      : `MTTR ${formatoMinutos(r.mttrMin)} (tiempo promedio en reparar cada falla: ${formatoMinutos(r.minutosFalla)} de parada por falla ÷ ${fallas(r.fallas)}).`
   return (
     `${mttr} MTBF ${valorMtbf == null ? '—' : formatoMinutos(valorMtbf)} (tiempo promedio operando entre fallas: ` +
     `${formatoMinutos(minutosTurnos)} en ${turnos} turnos − ${formatoMinutos(MINUTOS_SIN_PRODUCCION_POR_TURNO * turnos)} sin producción − ` +
-    `${formatoMinutos(r.minutosParada)} de parada = ${formatoMinutos(operando)} ÷ ${r.conParada}). Aproximado: las horas del turno, no el tiempo real de cada máquina.`
+    `${formatoMinutos(r.minutosParada)} de parada = ${formatoMinutos(operando)} ÷ ${r.fallas}). Aproximado: las horas del turno, no el tiempo real de cada máquina.`
   )
 }

@@ -50,10 +50,21 @@ export interface OrigenPendiente {
  * Orel 16-09-2026: texto libre, con los ya usados como sugerencia.
  */
 export type TipoEvento =
+  /**
+   * LEGADO. Hasta el 18-09-2026 el tipo mezclaba dos ejes: «falla» es QUÉ PASÓ
+   * y «correctivo/preventivo/inspección» es QUÉ SE HIZO. Con una sola lista
+   * había que elegir uno y se perdía el otro, y «Falla» —además preseleccionada—
+   * terminó de cajón de sastre: de 22 eventos reales, 9 decían falla y 4 de
+   * esos describían un montaje de cintas o un cambio de tubos. Ya no se ofrece;
+   * los eventos que la tienen guardada la conservan.
+   */
   | 'falla'
-  | 'correctivo'
-  | 'preventivo'
+  /** Igual que `falla`: se ofrecía, nadie lo usó, y «Preventivo» ya lo cubre. */
   | 'planificado'
+  | 'correctivo'
+  | 'rutinario'
+  | 'preventivo'
+  | 'montaje'
   | 'inspeccion'
   | 'ajuste'
   | 'novedad'

@@ -1,4 +1,4 @@
-import { ETIQUETA_TIPO, MAX_CANTIDAD_REPUESTO, MAX_REPUESTOS_EVENTO, MAX_TIPO_OTRO, TIPOS_EVENTO } from '@/config/bitacora'
+import { ETIQUETA_TIPO, MAX_CANTIDAD_REPUESTO, MAX_REPUESTOS_EVENTO, MAX_TIPO_OTRO } from '@/config/bitacora'
 import { formatNombreSAP } from '@/utils/repuestos/formatNombreSAP'
 import type { EventoBitacora, RepuestoUsado, TipoEvento, TurnoMantencion } from './bitacora.types'
 import { minutosDesdeInicioTurno } from './turnoMantencion'
@@ -28,7 +28,17 @@ export function limpiarTipo(t: string | null | undefined): string {
   return limpio.charAt(0).toUpperCase() + limpio.slice(1)
 }
 
-const FIJO_POR_NOMBRE = new Map(TIPOS_EVENTO.filter((t) => t.id !== 'otro').map((t) => [normalizarTipo(t.label), t.id]))
+/**
+ * Nombres que YA son un tipo, para que escribirlos en «Otro…» no cree un tipo
+ * propio duplicado. Incluye los legado («Falla», «Planificado»): ya no se
+ * ofrecen, pero escribir «Falla» a mano tiene que seguir guardando ese tipo en
+ * vez de inventar uno nuevo con el mismo nombre (18-09-2026).
+ */
+const FIJO_POR_NOMBRE = new Map(
+  (Object.entries(ETIQUETA_TIPO) as Array<[TipoEvento, string]>)
+    .filter(([id]) => id !== 'otro')
+    .map(([id, label]) => [normalizarTipo(label), id]),
+)
 
 /**
  * El tipo que se guarda al publicar. Si alguien eligió «Otro» y escribió un tipo
