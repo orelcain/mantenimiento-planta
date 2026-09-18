@@ -21,6 +21,12 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-18 · Bitacora ronda 40 · Eventos: ritmo de la fila, encabezados iguales, «N°», fotos en tira
+- Sobre el turno real a ~1500 px (columna de eventos de 369 px) la línea de metadatos se partía en un lugar distinto en cada fila. Orel aprobó las cuatro propuestas.
+- Hecho: en `EventoBitacoraFila.tsx` la línea 2 queda tipo · equipo · «N° 720012855» (prefijo solo si es numérico; una ubicación técnica va tal cual) y el impacto (parada / ventana / cierra pendiente) va SIEMPRE en su propia línea 3; las fotos pasan a una tira de 48 px sin rótulo bajo cada miniatura (el rótulo vive en el visor; el «→» antes/después se conserva). En `BitacoraTurnoPage.tsx` los encabezados de sección de la columna central («Eventos del turno · 6», «Pendiente para el turno siguiente», «Vienen de turnos anteriores», «Quedaron sin publicar») pasan al mismo `text-subhead font-semibold text-muted-foreground` de los `ListGroup` de la columna izquierda.
+- Verificación: `/dev/bitacora-real` a 1500 px; tsc 0; eslint 30; vitest OK; build y auditorías OK.
+- Estado: HECHO.
+
 ## 2026-09-18 · Bitacora ronda 39 · Columna de contexto como listas agrupadas (Ajustes)
 - Pedido de Orel sobre el turno real: la columna de 240 px partía «25 min» y el párrafo del MTBF era un muro. Mockup propio (ANTES + A listas agrupadas + B tarjetas arregladas): https://claude.ai/artifact/K121WPBa1RaHVFEFrgff9x — Orel: «A con los tamaños de B» (rótulos footnote, cifras headline).
 - Hecho en `BitacoraTurnoPage.tsx` con los primitivos `ListGroup`/`ListCell` (HIG «Lists and tables»): Técnicos = filas con avatar de iniciales (`Tag` redondo) + «presente», pie en itálica con lo que decía el calendario; Resumen = filas rótulo · cifra tabular con el punto de estado dentro del rótulo (no en `leading`, para que el separador insetado no cambie), «Parada · 2 fallas», «Pendientes · 1 cerrado», MTTR y MTBF con subtítulo («25 min de parada ÷ 2 fallas», «6 h 05 min operando ÷ 2 fallas») y la base del cálculo como pie del grupo; Observación = una fila con chevron. Columna mínima 300 px. `Stat` eliminado.

@@ -781,8 +781,8 @@ export function BitacoraTurnoVista({
       <div className="order-1 flex flex-col gap-5 empty:hidden md:order-none md:[grid-area:entrega]">
       {pendientesPrevios.length > 0 && (
         <section aria-label="Pendientes de turnos anteriores" className="flex flex-col">
-          <h2 className="px-4 pb-2 text-footnote text-muted-foreground">
-            <span className="font-semibold text-foreground">Vienen de turnos anteriores</span> · {pendientesPrevios.length}
+          <h2 className="px-4 pb-2 text-subhead font-semibold text-muted-foreground">
+            Vienen de turnos anteriores<span className="font-normal tabular-nums"> · {pendientesPrevios.length}</span>
           </h2>
           <div className="overflow-hidden rounded-card bg-card shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
             {pendientesPrevios.map((p) => (
@@ -823,8 +823,8 @@ export function BitacoraTurnoVista({
           alguien los publica, así que el turno que llega tiene que verlos. */}
       {esActual && borradoresPrevios.length > 0 && (
         <section aria-label="Borradores sin publicar de turnos anteriores" className="flex flex-col">
-          <h2 className="px-4 pb-2 text-footnote text-muted-foreground">
-            <span className="font-semibold text-foreground">Quedaron sin publicar</span> · {borradoresPrevios.length}
+          <h2 className="px-4 pb-2 text-subhead font-semibold text-muted-foreground">
+            Quedaron sin publicar<span className="font-normal tabular-nums"> · {borradoresPrevios.length}</span>
           </h2>
           <div className="overflow-hidden rounded-card bg-card shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
             {borradoresPrevios.map((b) => {
@@ -1063,7 +1063,7 @@ export function BitacoraTurnoVista({
             <>
               {(grupos.hechos.length > 0 || borradores.length > 0) && (
                 <div className="flex flex-col">
-                  <h2 className="px-4 pb-2 text-caption font-semibold text-muted-foreground">
+                  <h2 className="px-4 pb-2 text-subhead font-semibold text-muted-foreground">
                     Eventos del turno{grupos.hechos.length > 0 && <span className="font-normal tabular-nums"> · {grupos.hechos.length}</span>}
                   </h2>
                   <div ref={listaRef} className="relative overflow-hidden rounded-card bg-card shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
@@ -1074,7 +1074,7 @@ export function BitacoraTurnoVista({
               )}
               {grupos.pendientes.length > 0 && (
                 <div className="flex flex-col">
-                  <h2 className="flex items-center gap-1.5 px-4 pb-2 text-caption font-semibold text-muted-foreground">
+                  <h2 className="flex items-center gap-1.5 px-4 pb-2 text-subhead font-semibold text-muted-foreground">
                     <span className="size-2 shrink-0 rounded-full bg-ink-warn" aria-hidden />
                     Pendiente para el turno siguiente<span className="font-normal tabular-nums"> · {grupos.pendientes.length}</span>
                   </h2>
