@@ -21,6 +21,14 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-18 · Bitacora ronda 39 · Columna de contexto como listas agrupadas (Ajustes)
+- Pedido de Orel sobre el turno real: la columna de 240 px partía «25 min» y el párrafo del MTBF era un muro. Mockup propio (ANTES + A listas agrupadas + B tarjetas arregladas): https://claude.ai/artifact/K121WPBa1RaHVFEFrgff9x — Orel: «A con los tamaños de B» (rótulos footnote, cifras headline).
+- Hecho en `BitacoraTurnoPage.tsx` con los primitivos `ListGroup`/`ListCell` (HIG «Lists and tables»): Técnicos = filas con avatar de iniciales (`Tag` redondo) + «presente», pie en itálica con lo que decía el calendario; Resumen = filas rótulo · cifra tabular con el punto de estado dentro del rótulo (no en `leading`, para que el separador insetado no cambie), «Parada · 2 fallas», «Pendientes · 1 cerrado», MTTR y MTBF con subtítulo («25 min de parada ÷ 2 fallas», «6 h 05 min operando ÷ 2 fallas») y la base del cálculo como pie del grupo; Observación = una fila con chevron. Columna mínima 300 px. `Stat` eliminado.
+- Gotcha (repetido): un heredoc de bash con `
+` dentro de un string de Python rompe el script; escribir los scripts con Write/Edit, no por consola.
+- Verificación: `/dev/bitacora-real` a 1920 oscuro (columna 303 px; textos: «Parada · 2 fallas | 25 min», «MTBF | 6 h 05 min operando ÷ 2 fallas | 3 h 03 min») y 375; tsc 0; eslint 30; vitest OK; build y auditorías OK.
+- Estado: HECHO.
+
 ## 2026-09-18 · Bitacora ronda 38 · Encabezado en dos ejes, fila «Dos niveles», Tag a 11 px, nombres legibles
 - Pedido de Orel: «el apartado superior no entra bien; el cuadro de sincronización no queda bien; la lista está sucia, letras muy normales o grandes; usemos itálica». Mockup con el turno real y medidas en vivo (directora creativa, HIG Typography / Lists and tables / Labels / Layout / Toolbars): https://claude.ai/artifact/FTyigNTAZGVedczqtVVo7q — Orel eligió todo.
 - Hecho:

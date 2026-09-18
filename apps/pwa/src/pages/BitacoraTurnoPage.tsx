@@ -1,7 +1,8 @@
+import type { ReactNode } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { BarChart3, Check, ChevronDown, ChevronLeft, ChevronRight, Clock, FileSpreadsheet, Loader2, MessageCircle, MessageSquareText, NotebookPen, Pencil, Plus, QrCode, Share, Trash2 } from 'lucide-react'
-import { Button, Pill, SegmentedControl, Sheet, Tag, type SwipeAction } from '@/components/piel'
+import { BarChart3, Check, ChevronDown, ChevronLeft, ChevronRight, Clock, FileSpreadsheet, Loader2, MessageCircle, NotebookPen, Pencil, Plus, QrCode, Share, Trash2 } from 'lucide-react'
+import { Button, ListCell, ListGroup, Pill, SegmentedControl, Sheet, Tag, type SwipeAction } from '@/components/piel'
 import { ToastAction } from '@/components/ui/toast'
 import { vibrar } from '@/services/bitacora/vibrar'
 import { PASO_MENSAJE, PasosWhatsapp, VistaPreviaWhatsapp } from '@/components/bitacora/PanelWhatsapp'
@@ -29,13 +30,13 @@ import { encabezadoEvento, etiquetaTipo, posicionAlMover, posicionEnIndice, tien
 import { copiarHtml, copiarTexto } from '@/lib/clipboard'
 import type { EventoBitacora, FotoEvento, TurnoMantencion } from '@/services/bitacora/bitacora.types'
 import type { User } from '@/types'
-import { bitacoraAHtmlCorreo, bitacoraATextoPlano, etiquetaParada, etiquetaPendientes, tituloCorreo } from '@/services/bitacora/bitacoraCorreo'
+import { bitacoraAHtmlCorreo, bitacoraATextoPlano, tituloCorreo } from '@/services/bitacora/bitacoraCorreo'
 import { cargarFotoComoJpeg, purgarFotosPendientes } from '@/services/bitacora/fotosBitacora'
 import { fuePendiente, gruposDelTurno, resumirBitacora } from '@/services/bitacora/resumenBitacora'
 import { filasRecoleccion, generarExcelRecoleccion, htmlRecoleccionMttr, nombreExcelRecoleccion } from '@/services/bitacora/recoleccionMttr'
-import { explicacionMtbfMttr } from '@/services/bitacora/mtbf'
+import { MINUTOS_SIN_PRODUCCION_POR_TURNO, explicacionMtbfMttr, minutosDelTurno, minutosOperando, mtbfDelTurno } from '@/services/bitacora/mtbf'
 import { esBorrador, soloListos } from '@/services/bitacora/borradores'
-import { nombreEnPresencia as nombrePresencia, otrosEditando } from '@/services/bitacora/presencia'
+import { iniciales, nombreEnPresencia as nombrePresencia, otrosEditando } from '@/services/bitacora/presencia'
 import { dispositivoActual } from '@/services/bitacora/dispositivo'
 import { auth } from '@/services/firebase'
 import { useAuthStore } from '@/store'
@@ -773,7 +774,7 @@ export function BitacoraTurnoVista({
           'grid grid-cols-[minmax(0,1fr)] items-start gap-5 [&>*]:min-w-0',
           "md:grid-cols-[minmax(0,1fr)_380px] md:[grid-template-areas:'contexto_envio'_'entrega_envio'_'centro_envio']",
           // Proporción 1 : 2 : 3 (Orel, 18-09): llena una pantalla 16:9 y el correo se ve grande.
-          "xl:grid-cols-[minmax(240px,1fr)_minmax(0,2fr)_minmax(0,3fr)] xl:grid-rows-[auto_1fr] xl:[grid-template-areas:'contexto_entrega_envio'_'contexto_centro_envio']",
+          "xl:grid-cols-[minmax(300px,1fr)_minmax(0,2fr)_minmax(0,3fr)] xl:grid-rows-[auto_1fr] xl:[grid-template-areas:'contexto_entrega_envio'_'contexto_centro_envio']",
         ].join(' ')}
       >
       {/* Entrega de turno: lo primero que ve el turno que llega (mockup aprobado). */}
@@ -891,82 +892,126 @@ export function BitacoraTurnoVista({
       {/* Contexto del turno: técnicos, resumen, observación (y en el teléfono, la planilla). */}
       <div className="order-2 flex flex-col gap-5 md:order-none md:[grid-area:contexto]">
       {/* Técnicos del turno: quién está de verdad (mockup aprobado, pieza 1). */}
-      <section aria-label="Técnicos del turno" className="flex flex-col gap-2.5 rounded-card bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
-        <div className="flex items-baseline justify-between gap-2">
-          <h2 className="text-footnote text-muted-foreground">Técnicos del turno</h2>
-          <Button variant="plain" onClick={() => {
+      {/* Columna de contexto como listas agrupadas (mockup A aprobado 18-09-2026;
+          HIG «Lists and tables»): encabezado secundario, filas rótulo · valor
+          tabular, notas al pie en caption. Rótulos en footnote y cifras en
+          headline, como pidió Orel (los tamaños de la opción B). */}
+      <ListGroup
+        aria-label="Técnicos del turno"
+        title="Técnicos del turno"
+        action={
+          <Button
+            variant="plain"
+            size="sm"
+            onClick={() => {
               setBorradorPresentes(presentes.nombres)
               setHojaTecnicos('presentes')
-            }}>
+            }}
+          >
             {presentes.nombres.length ? 'Editar' : 'Agregar'}
           </Button>
-        </div>
-        {presentes.nombres.length > 0 ? (
-          <div className="flex flex-wrap gap-2">
-            {presentes.nombres.map((n) => (
-              <span key={n} className="inline-flex min-h-[32px] items-center rounded-full bg-primary/[0.13] px-3 text-footnote font-semibold text-brand-ink">
-                {n}
-              </span>
-            ))}
-          </div>
-        ) : (
-          <p className="text-body text-muted-foreground">Nadie marcado todavía. Toca «Agregar» y marca quién está en el turno.</p>
-        )}
-        {/* El calendario no siempre refleja el turno real: solo sugiere, no marca. */}
-        {deTurnoCalendario.length > 0 && (
-          <p className="text-footnote text-muted-foreground">
-            {presentes.ajustado ? 'El calendario decía' : 'El calendario sugiere'}: {deTurnoCalendario.join(', ')}
-          </p>
-        )}
-      </section>
-
-      {/* Resumen del turno: los números que demuestran el trabajo */}
-      <section aria-label="Resumen del turno" className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-card bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none sm:grid-cols-4 xl:grid-cols-1 xl:gap-y-2.5">
-        <Stat valor={String(r.eventos)} etiqueta={r.eventos === 1 ? 'evento' : 'eventos'} />
-        <Stat
-          valor={formatoMinutos(r.minutosParada)}
-          // La pantalla decía solo «de parada» mientras el correo y el PDF
-          // avisaban «1 sin duración»: el dato faltante se veía recién al pegar.
-          etiqueta={`${etiquetaParada(r)}${r.mttrMin != null ? ` · MTTR ${formatoMinutos(r.mttrMin)}` : ''}`}
-          punto={r.minutosParada > 0 ? 'crit' : undefined}
-        />
-        <Stat valor={String(r.enVentana)} etiqueta="sin detener producción" punto={r.enVentana > 0 ? 'ok' : undefined} />
-        <Stat
-          valor={String(r.pendientesDelTurno)}
-          etiqueta={etiquetaPendientes(r)}
-          punto={r.pendientes > 0 ? 'warn' : undefined}
-        />
-        {r.pendientesCerrados > 0 ? (
-          <Stat valor={String(r.pendientesCerrados)} etiqueta={r.pendientesCerrados === 1 ? 'pendiente cerrado' : 'pendientes cerrados'} punto="ok" />
-        ) : null}
-        {/* En PC la planilla no se repite fuera del correo: la línea de MTBF/MTTR va aquí. */}
-        {r.eventos > 0 && <p className="hidden text-footnote text-muted-foreground sm:col-span-4 md:block xl:col-span-1 xl:border-t xl:border-border xl:pt-2.5">{explicacionMtbfMttr(turno, r)}</p>}
-      </section>
-
-      {/* Observación general del turno (del mockup aprobado). */}
-      <button
-        type="button"
-        onClick={() => {
-          setTextoObs(observacion.texto)
-          setQuienObs(autorFijo ?? nombreRecordadoValido())
-          setEditandoObs(true)
-        }}
-        className="flex min-h-[44px] w-full items-start gap-3 rounded-card bg-card px-4 py-3 text-left shadow-[0_1px_4px_rgba(0,0,0,0.05)] transition-colors duration-150 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary motion-reduce:transition-none dark:shadow-none"
+        }
+        footer={
+          // El calendario no siempre refleja el turno real: solo sugiere, no marca.
+          deTurnoCalendario.length > 0 ? (
+            <span className="italic">
+              {presentes.ajustado ? 'El calendario decía' : 'El calendario sugiere'}: {deTurnoCalendario.join(', ')}
+            </span>
+          ) : undefined
+        }
       >
-        <MessageSquareText className="mt-0.5 size-5 shrink-0 text-muted-foreground" aria-hidden />
-        <span className="min-w-0 flex-1">
-          <span className="block text-footnote text-muted-foreground">Observación general del turno</span>
-          {observacion.texto ? (
-            <span className="line-clamp-4 block whitespace-pre-line text-body">{observacion.texto}</span>
-          ) : (
-            <span className="block text-body text-muted-foreground">Agregar una nota: estado de la planta, entrega de turno…</span>
-          )}
-          {observacion.texto && observacion.actualizadoPorNombre && (
-            <span className="block pt-0.5 text-caption text-muted-foreground">{observacion.actualizadoPorNombre}</span>
-          )}
-        </span>
-        <ChevronRight className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
-      </button>
+        {presentes.nombres.length > 0 ? (
+          presentes.nombres.map((n) => (
+            <ListCell
+              key={n}
+              leading={
+                <Tag tone={tonoDe(n)} className="size-7 justify-center rounded-full p-0" aria-hidden>
+                  <span className="text-caption font-semibold">{iniciales(n)}</span>
+                </Tag>
+              }
+              title={<span className="text-subhead font-normal">{n}</span>}
+              value={<span className="text-footnote font-normal text-muted-foreground">presente</span>}
+            />
+          ))
+        ) : (
+          <ListCell title={<span className="text-subhead font-normal italic text-muted-foreground">Nadie marcado todavía. Toca «Agregar».</span>} />
+        )}
+      </ListGroup>
+
+      {/* Resumen del turno: los números que demuestran el trabajo. */}
+      {(() => {
+        const rotulo = (texto: ReactNode, punto?: 'ok' | 'warn' | 'crit') => (
+          <span className="inline-flex items-center gap-2 text-footnote font-normal text-muted-foreground">
+            {punto && <span className={`size-2 shrink-0 rounded-full ${PUNTO[punto]}`} aria-hidden />}
+            {texto}
+          </span>
+        )
+        const cifra = (texto: string) => <span className="text-headline">{texto}</span>
+        const fallas = `${r.conParada} ${r.conParada === 1 ? 'falla' : 'fallas'}`
+        const operando = minutosOperando(minutosDelTurno(turno), r.minutosParada)
+        const mtbf = mtbfDelTurno(turno, r)
+        return (
+          <ListGroup
+            aria-label="Resumen del turno"
+            title="Resumen del turno"
+            footer={
+              r.conParada > 0
+                ? `Operando = ${formatoMinutos(minutosDelTurno(turno))} de turno − ${formatoMinutos(MINUTOS_SIN_PRODUCCION_POR_TURNO)} sin producción (colación, reunión, ejercicios) − paradas.`
+                : 'Sin fallas con parada en el turno: MTTR y MTBF no aplican.'
+            }
+          >
+            <ListCell title={rotulo('Eventos')} value={cifra(String(r.eventos))} />
+            <ListCell
+              title={rotulo(
+                <>
+                  Parada{r.conParada > 0 && <span className="text-muted-foreground/70"> · {fallas}{r.paradasSinDuracion > 0 ? `, ${r.paradasSinDuracion} sin duración` : ''}</span>}
+                </>,
+                r.minutosParada > 0 ? 'crit' : undefined,
+              )}
+              value={cifra(formatoMinutos(r.minutosParada))}
+            />
+            <ListCell title={rotulo('Sin detener producción', r.enVentana > 0 ? 'ok' : undefined)} value={cifra(String(r.enVentana))} />
+            <ListCell
+              title={rotulo(
+                <>
+                  Pendientes{r.pendientesCerrados > 0 && <span className="text-muted-foreground/70"> · {r.pendientesCerrados} {r.pendientesCerrados === 1 ? 'cerrado' : 'cerrados'}</span>}
+                </>,
+                r.pendientes > 0 ? 'warn' : r.pendientesCerrados > 0 ? 'ok' : undefined,
+              )}
+              value={cifra(String(r.pendientesDelTurno))}
+            />
+            <ListCell
+              title={rotulo('MTTR')}
+              subtitle={r.mttrMin != null ? `${formatoMinutos(r.minutosParada)} de parada ÷ ${fallas}` : 'tiempo promedio en reparar cada falla'}
+              value={cifra(r.mttrMin == null ? '—' : formatoMinutos(r.mttrMin))}
+            />
+            <ListCell
+              title={rotulo('MTBF')}
+              subtitle={mtbf != null ? `${formatoMinutos(operando)} operando ÷ ${fallas}` : 'tiempo promedio operando entre fallas'}
+              value={cifra(mtbf == null ? '—' : formatoMinutos(mtbf))}
+            />
+          </ListGroup>
+        )
+      })()}
+
+      {/* Observación general del turno (del mockup aprobado): una fila con chevron. */}
+      <ListGroup aria-label="Observación general del turno" title="Observación general">
+        <ListCell
+          onClick={() => {
+            setTextoObs(observacion.texto)
+            setQuienObs(autorFijo ?? nombreRecordadoValido())
+            setEditandoObs(true)
+          }}
+          title={
+            observacion.texto ? (
+              <span className="line-clamp-3 whitespace-pre-line text-subhead font-normal">{observacion.texto}</span>
+            ) : (
+              <span className="text-subhead font-normal italic text-muted-foreground">Agregar una nota: estado de la planta, entrega de turno…</span>
+            )
+          }
+          subtitle={observacion.texto && observacion.actualizadoPorNombre ? <span className="italic">{observacion.actualizadoPorNombre}</span> : undefined}
+        />
+      </ListGroup>
 
       {/* Copiar, PDF y WhatsApp viven en «Compartir» (ícono de la cabecera) y
           «Nuevo evento» en el «+» de la barra de pestañas (mockup iOS 27, 17-09). */}
@@ -1390,24 +1435,6 @@ const PUNTO = { ok: 'bg-ink-ok', warn: 'bg-ink-warn', crit: 'bg-ink-crit' } as c
 
 /** Cuánto dura «Deshacer» después de borrar un evento. */
 const PLAZO_DESHACER_MS = 5000
-
-/**
- * Cifra en tinta normal; el estado va en un punto de 8 px junto al rótulo
- * (DESIGN.md §10: un número grande en color convierte la tarjeta en semáforo).
- */
-function Stat({ valor, etiqueta, punto }: { valor: string; etiqueta: string; punto?: keyof typeof PUNTO }) {
-  return (
-    // A ≥1280 px vive en la columna de contexto de 300 px: rótulo a la izquierda
-    // y cifra tabular a la derecha, como una celda de Ajustes (mockup A, 18-09).
-    <div className="min-w-0 xl:flex xl:flex-row-reverse xl:items-baseline xl:justify-between xl:gap-3">
-      <span className="block text-title2 tabular-nums leading-tight xl:text-headline">{valor}</span>
-      <span className="block text-footnote text-muted-foreground">
-        {punto && <span className={`mr-1.5 inline-block size-2 rounded-full align-middle ${PUNTO[punto]}`} aria-hidden />}
-        {etiqueta}
-      </span>
-    </div>
-  )
-}
 
 /** Historial, Compartir y QR como íconos en una cápsula de vidrio (teléfono). */
 function AccionesCabecera({
