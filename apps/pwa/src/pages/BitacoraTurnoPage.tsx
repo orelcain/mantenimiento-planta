@@ -966,7 +966,10 @@ export function BitacoraTurnoVista({
           </span>
         )
         const cifra = (texto: string) => <span className="text-headline">{texto}</span>
-        const fallas = `${r.conParada} ${r.conParada === 1 ? 'falla' : 'fallas'}`
+        // Paradas y fallas ya NO son lo mismo: una parada programada para un
+        // preventivo detiene la máquina y no es una falla (18-09-2026).
+        const paradas = `${r.conParada} ${r.conParada === 1 ? 'parada' : 'paradas'}`
+        const fallas = `${r.fallas} ${r.fallas === 1 ? 'falla' : 'fallas'}`
         const operando = minutosOperando(minutosDelTurno(turno), r.minutosParada)
         const mtbf = mtbfDelTurno(turno, r)
         return (
@@ -974,21 +977,35 @@ export function BitacoraTurnoVista({
             aria-label="Resumen del turno"
             title="Resumen del turno"
             footer={
-              r.conParada > 0
+              // El pie explica el MTBF, así que se muestra cuando hay FALLAS: con
+              // solo paradas programadas no hay nada que explicar.
+              r.fallas > 0
                 ? `Operando = ${formatoMinutos(minutosDelTurno(turno))} de turno − ${formatoMinutos(MINUTOS_SIN_PRODUCCION_POR_TURNO)} sin producción (colación, reunión, ejercicios) − paradas.`
-                : 'Sin fallas con parada en el turno: MTTR y MTBF no aplican.'
+                : 'Sin fallas en el turno: MTTR y MTBF no aplican.'
             }
           >
             <ListCell title={rotulo('Eventos')} value={cifra(String(r.eventos))} />
             <ListCell
               title={rotulo(
                 <>
-                  Parada{r.conParada > 0 && <span className="text-muted-foreground/70"> · {fallas}{r.paradasSinDuracion > 0 ? `, ${r.paradasSinDuracion} sin duración` : ''}</span>}
+                  Parada{r.conParada > 0 && <span className="text-muted-foreground/70"> · {paradas}{r.paradasSinDuracion > 0 ? `, ${r.paradasSinDuracion} sin duración` : ''}</span>}
                 </>,
                 r.minutosParada > 0 ? 'crit' : undefined,
               )}
               value={cifra(formatoMinutos(r.minutosParada))}
             />
+            {/* La falla NO se pregunta: es un correctivo que afectó al proceso. */}
+            {r.fallas > 0 && (
+              <ListCell
+                title={rotulo(
+                  <>
+                    Fallas<span className="text-muted-foreground/70"> · MTTR {r.mttrMin == null ? '—' : formatoMinutos(r.mttrMin)}</span>
+                  </>,
+                  'crit',
+                )}
+                value={cifra(String(r.fallas))}
+              />
+            )}
             {/* Solo si hubo: una fila en cero todos los turnos se vuelve invisible. */}
             {r.afectados > 0 && (
               <ListCell
@@ -1008,7 +1025,7 @@ export function BitacoraTurnoVista({
             />
             <ListCell
               title={rotulo('MTTR')}
-              subtitle={r.mttrMin != null ? `${formatoMinutos(r.minutosParada)} de parada ÷ ${fallas}` : 'tiempo promedio en reparar cada falla'}
+              subtitle={r.mttrMin != null ? `${formatoMinutos(r.minutosFalla)} de parada por falla ÷ ${fallas}` : 'tiempo promedio en reparar cada falla'}
               value={cifra(r.mttrMin == null ? '—' : formatoMinutos(r.mttrMin))}
             />
             <ListCell

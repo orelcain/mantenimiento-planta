@@ -48,11 +48,14 @@ describe('hallazgos de la revisión adversaria (15-09)', () => {
   })
 
   it('#12 una parada sin duración cuenta como parada pero no entra al MTTR', () => {
+    // Correctivos: desde el 18-09-2026 la falla se deduce del tipo + el impacto,
+    // y el MTTR solo promedia fallas (una parada programada no lo es).
     const r = resumirBitacora([
-      ev({ id: 'a', pendiente: false, impacto: 'con-parada', minutosParada: 30, horaInicio: '16:00', horaTermino: '16:30' }),
-      ev({ id: 'b', pendiente: false, impacto: 'con-parada', minutosParada: null, horaTermino: null }),
+      ev({ id: 'a', tipo: 'correctivo', pendiente: false, impacto: 'con-parada', minutosParada: 30, horaInicio: '16:00', horaTermino: '16:30' }),
+      ev({ id: 'b', tipo: 'correctivo', pendiente: false, impacto: 'con-parada', minutosParada: null, horaTermino: null }),
     ])
     expect([r.conParada, r.paradasSinDuracion, r.minutosParada, r.mttrMin]).toEqual([2, 1, 30, 30])
+    expect([r.fallas, r.fallasSinDuracion, r.minutosFalla]).toEqual([2, 1, 30])
     const html = bitacoraAHtmlCorreo({ turno: noche16, eventos: [ev({ pendiente: false, impacto: 'con-parada', minutosParada: null, horaTermino: null })], tecnicos: [], planta: 'P' })
     expect(html).toContain('de parada (1, 1 sin duración)')
   })

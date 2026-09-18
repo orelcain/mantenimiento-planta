@@ -253,7 +253,12 @@ export function EventoBitacoraSheet({
   const [equipoId, setEquipoId] = useState<string | null>(null)
   const [equipoCodigo, setEquipoCodigo] = useState('')
   const [repuestos, setRepuestos] = useState<RepuestoUsado[]>([])
-  const [tipo, setTipo] = useState<TipoEvento>('falla')
+  /**
+   * `null` = sin elegir. Arrancaba en 'falla' y esa preselección explica por qué
+   * 9 de 22 eventos reales decían falla — 4 de ellos describiendo un montaje de
+   * cintas o un cambio de tubos (18-09-2026).
+   */
+  const [tipo, setTipo] = useState<TipoEvento | null>(null)
   const [tipoOtro, setTipoOtro] = useState('')
   const [equipo, setEquipo] = useState('')
   const [titulo, setTitulo] = useState('')
@@ -383,7 +388,7 @@ export function EventoBitacoraSheet({
     setEquipoId(evento?.equipoId ?? pendienteOrigen?.equipoId ?? null)
     setEquipoCodigo(evento?.equipoCodigo ?? pendienteOrigen?.equipoCodigo ?? '')
     setRepuestos(normalizarRepuestos(evento?.repuestos))
-    setTipo(evento?.tipo ?? pendienteOrigen?.tipo ?? 'falla')
+    setTipo(evento?.tipo ?? pendienteOrigen?.tipo ?? null)
     setTipoOtro(evento?.tipoOtro ?? pendienteOrigen?.tipoOtro ?? '')
     setEquipo(evento?.equipo ?? pendienteOrigen?.equipo ?? '')
     setTitulo(evento?.titulo ?? '')
@@ -410,7 +415,7 @@ export function EventoBitacoraSheet({
     const inicial: CamposFormulario = evento
       ? aFormulario(evento)
       : {
-          tipo: pendienteOrigen?.tipo ?? 'falla',
+          tipo: pendienteOrigen?.tipo ?? 'correctivo',
           tipoOtro: pendienteOrigen?.tipo === 'otro' ? (pendienteOrigen.tipoOtro ?? '') : '',
           equipo: pendienteOrigen?.equipo ?? '',
           equipoId: pendienteOrigen?.equipoId ?? null,
@@ -451,7 +456,9 @@ export function EventoBitacoraSheet({
 
   // Lo que se guarda: el texto de «Otro» solo con ese tipo, y sin horas si es «Sin hora».
   const formularioActual = (): CamposFormulario => ({
-    tipo,
+    // Un borrador a medio escribir puede no tener tipo todavía; se guarda como
+    // «otro» vacío y la validación lo exige al publicar.
+    tipo: tipo ?? 'otro',
     tipoOtro: tipo === 'otro' ? tipoOtro : '',
     equipo,
     equipoId,
@@ -499,7 +506,7 @@ export function EventoBitacoraSheet({
     const minutosNum = minutos.trim() === '' ? null : Number(minutos)
     const minutosValidos = minutosNum != null && Number.isFinite(minutosNum) && minutosNum >= 0 && minutosNum <= 1440
     return {
-      tipo,
+      tipo: tipo ?? 'otro',
       tipoOtro: tipo === 'otro' ? tipoOtro : null,
       equipo,
       equipoCodigo: equipoId ? equipoCodigo : null,
@@ -912,6 +919,10 @@ export function EventoBitacoraSheet({
       )
       return
     }
+    if (tipo == null) {
+      setError('Falta decir qué se hizo.')
+      return
+    }
     if (impacto == null) {
       setError('Falta decir cómo afectó al proceso. Si no tiene que ver con la producción, marca «Fuera del proceso».')
       return
@@ -990,6 +1001,7 @@ export function EventoBitacoraSheet({
   // tipo, hora o «Sin hora», qué pasó). Lo mismo que valida `guardar`.
   const faltaObligatorio =
     (tecnicos.todos.length > 0 && !quien.trim()) ||
+    tipo == null ||
     (tipo === 'otro' && !limpiarTipo(tipoOtro)) ||
     horaFaltante ||
     !descripcion.trim() ||
@@ -1254,7 +1266,13 @@ export function EventoBitacoraSheet({
         {/* Tipo — con rótulo propio: sin él se confundía con la fila de nombres de
             arriba. Los 8 a la vista (en filas): deslizando, «Novedad» no se veía. */}
         <div>
-          <span className={ETIQUETA_CAMPO}>Tipo</span>
+          {/* «Tipo» respondía a dos preguntas a la vez (qué pasó y qué se hizo) y
+              había que elegir una: el rótulo ahora dice cuál de las dos. Lo que
+              pasó lo cuenta el impacto, y la falla sale de los dos (18-09-2026). */}
+          <span className={ETIQUETA_CAMPO}>
+            ¿Qué se hizo?
+            {tipo == null && <span className="ml-1.5 text-ink-warn">obligatorio</span>}
+          </span>
           <div className="flex flex-wrap gap-2" role="group" aria-label="Tipo de evento">
             {TIPOS_EVENTO.map((t) => (
               <Chip key={t.id} activo={tipo === t.id} onClick={() => setTipo(t.id)}>

@@ -16,7 +16,15 @@ export interface ResumenBitacora {
   paradasSinDuracion: number
   /** Suma de minutos de parada de esos eventos. */
   minutosParada: number
-  /** Tiempo medio de reparación: minutos de parada / eventos con parada. */
+  /** Eventos que fueron una falla (ver `esFalla`): correctivo que afectó al proceso. */
+  fallas: number
+  /** De esas fallas, cuántas detuvieron la máquina (las demás la afectaron sin detenerla). */
+  fallasConParada: number
+  /** Fallas que detuvieron la máquina pero todavía no tienen duración. */
+  fallasSinDuracion: number
+  /** Minutos de parada que corresponden a fallas (no a paradas programadas). */
+  minutosFalla: number
+  /** Tiempo medio de reparación: minutos de parada por falla / fallas con duración. */
   mttrMin: number | null
   /** Intervenciones hechas sin detener producción (en una ventana). */
   enVentana: number
@@ -52,6 +60,22 @@ const normalizarEquipo = (s: string) =>
   s.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase().replace(/\s+/g, ' ')
 
 /** Minutos de parada de un evento: los declarados o, si faltan, su duración. */
+/**
+ * ¿Este evento fue una FALLA? No se pregunta: se deduce de lo que el técnico ya
+ * contestó (decisión de Orel, 18-09-2026).
+ *
+ *   correctivo + (detuvo la máquina o la afectó) = falla → cuenta para MTTR/MTBF
+ *   preventivo que detuvo la máquina             = parada PROGRAMADA, no falla
+ *
+ * Antes «falla» era un tipo más de la lista y competía con «correctivo»: había
+ * que elegir uno y se perdía el otro. Los eventos viejos que lo tienen guardado
+ * siguen contando como falla si afectaron al proceso.
+ */
+export function esFalla(e: Pick<EventoBitacora, 'tipo' | 'impacto'>): boolean {
+  const afecto = e.impacto === 'con-parada' || e.impacto === 'afecta-sin-detener'
+  return afecto && (e.tipo === 'correctivo' || e.tipo === 'falla')
+}
+
 export function minutosParadaDe(e: Pick<EventoBitacora, 'impacto' | 'minutosParada' | 'horaInicio' | 'horaTermino'>): number | null {
   if (e.impacto !== 'con-parada') return null
   if (e.minutosParada != null && Number.isFinite(e.minutosParada)) return Math.max(0, e.minutosParada)
@@ -94,6 +118,10 @@ export function resumirBitacora(todos: readonly EventoBitacora[]): ResumenBitaco
   // dos eventos pero UN pendiente cerrado (revisión 15-09).
   const cerrados = new Set<string>()
   let afectados = 0
+  let fallas = 0
+  let fallasConParada = 0
+  let fallasSinDuracion = 0
+  let minutosFalla = 0
   let minutosIntervencion = 0
 
   for (const e of eventos) {
@@ -108,6 +136,17 @@ export function resumirBitacora(todos: readonly EventoBitacora[]): ResumenBitaco
     // cuadrando con Shoplogix), pero se cuenta — es la evidencia de que el
     // proceso siguió gracias a Mantención (criterio de Orel, 18-09-2026).
     if (e.impacto === 'afecta-sin-detener') afectados++
+    if (esFalla(e)) {
+      fallas++
+      // Solo las fallas alimentan MTTR/MTBF: una parada programada para un
+      // preventivo no es una falla, aunque la máquina haya estado detenida.
+      if (e.impacto === 'con-parada') {
+        fallasConParada++
+        const m = minutosParadaDe(e)
+        if (m == null) fallasSinDuracion++
+        else minutosFalla += m
+      }
+    }
     if (e.impacto === 'con-parada') {
       conParada++
       const parada = minutosParadaDe(e)
@@ -124,7 +163,15 @@ export function resumirBitacora(todos: readonly EventoBitacora[]): ResumenBitaco
     conParada,
     paradasSinDuracion,
     minutosParada,
-    mttrMin: conParada - paradasSinDuracion > 0 ? minutosParada / (conParada - paradasSinDuracion) : null,
+    fallas,
+    fallasConParada,
+    fallasSinDuracion,
+    minutosFalla,
+    // MTTR = tiempo promedio en reparar una falla QUE DETUVO. Antes dividía
+    // todos los minutos de parada entre todas las paradas, programadas
+    // incluidas; y una falla que no detuvo no aporta minutos, así que tampoco
+    // puede estar en el divisor.
+    mttrMin: fallasConParada - fallasSinDuracion > 0 ? minutosFalla / (fallasConParada - fallasSinDuracion) : null,
     enVentana,
     afectados,
     pendientes,

@@ -34,15 +34,33 @@ export const ETIQUETA_BANDA: Record<BandaTurno, string> = {
 }
 
 /** En el orden de los chips del formulario; `otro` va último y abre un campo de texto. */
+/**
+ * El tipo responde UNA cosa: qué se hizo. Lo que pasó lo dice el impacto, y la
+ * falla se deduce de los dos (ver `esFalla`).
+ *
+ * «Rutinario» y «Montaje» entraron porque eran lo que más se hacía y no estaba:
+ * los técnicos escribieron «Rutinario» a mano 3 veces en 4 turnos (lubricación
+ * del Knuro, retiro de cintas para higiene, desmonte y montaje), mientras que
+ * «Planificado» y «Ajuste» no los usó nadie (18-09-2026).
+ */
 export const TIPOS_EVENTO: ReadonlyArray<{ id: TipoEvento; label: string }> = [
-  { id: 'falla', label: 'Falla' },
   { id: 'correctivo', label: 'Correctivo' },
+  { id: 'rutinario', label: 'Rutinario' },
   { id: 'preventivo', label: 'Preventivo' },
-  { id: 'planificado', label: 'Planificado' },
+  { id: 'montaje', label: 'Montaje/desmontaje' },
   { id: 'inspeccion', label: 'Inspección' },
   { id: 'ajuste', label: 'Ajuste' },
   { id: 'novedad', label: 'Novedad' },
   { id: 'otro', label: 'Otro' },
+]
+
+/**
+ * Tipos que ya NO se ofrecen pero siguen guardados en eventos viejos: su
+ * etiqueta tiene que existir o el histórico queda sin nombre.
+ */
+const TIPOS_LEGADO: ReadonlyArray<{ id: TipoEvento; label: string }> = [
+  { id: 'falla', label: 'Falla' },
+  { id: 'planificado', label: 'Planificado' },
 ]
 
 /** Largo máximo del tipo escrito a mano (igual en firestore.rules). */
@@ -55,7 +73,7 @@ export const MAX_REPUESTOS_EVENTO = 20
 export const MAX_CANTIDAD_REPUESTO = 999
 
 export const ETIQUETA_TIPO: Record<TipoEvento, string> = Object.fromEntries(
-  TIPOS_EVENTO.map((t) => [t.id, t.label]),
+  [...TIPOS_EVENTO, ...TIPOS_LEGADO].map((t) => [t.id, t.label]),
 ) as Record<TipoEvento, string>
 
 /**
