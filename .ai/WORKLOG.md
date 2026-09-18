@@ -21,6 +21,27 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-18 · Ronda 41 · El HIG de Apple aprendido en local (y 15 mejoras candidatas)
+- Orel: «cada revisión del HIG nos come ~200 k tokens; deberíamos aprender». Hecho: base LOCAL en `ARIA_MANTENIMIENTO_PLANTA\docs\hig\` — `HIG_DESTILADO.md` (~10 KB, reglas por página con cita) + `paginas\<slug>.md` (31 páginas, 307 KB, solo grep). Skill `/hig-apple`. La web de Apple es una SPA: las páginas se bajan del endpoint JSON `developer.apple.com/tutorials/data/design/human-interface-guidelines/<slug>.json`.
+- Revisión de 23 páginas nuevas (color, dark-mode, typography, buttons, menus, pickers, segmented-controls, feedback, loading, progress-indicators, motion, searching, entering-data, sf-symbols, sheets, action-sheets, alerts, modality, accessibility, gestures, drag-and-drop, designing-for-ios, notifications). Mejoras candidatas con cita, por impacto:
+  1. Guardar sin toast «Guardado»; avisar solo al fallar (feedback). Chico.
+  2. Sincronización como estado pasivo tipo Mail («Actualizado 14:32 · 2 por enviar»), sin «Sincronizando…» (feedback, progress-indicators). Chico.
+  3. Cerrar el editor con cambios → action sheet «Descartar cambios» arriba en rojo (sheets, action-sheets). Medio.
+  4. Borrar sin alerta, con Deshacer 5 s; nunca «OK» (alerts). Medio — la bitácora ya tiene Deshacer al borrar: revisar que no quede alerta en ningún camino.
+  5. «Guardar» habilitado solo con lo obligatorio; validar hora fin < inicio al salir del campo (entering-data). Chico.
+  6. Valores por defecto: hora = ahora redondeada, técnico = quien está, turno = vigente (entering-data). Chico.
+  7. El botón primario muestra la espera en sí mismo («Guardando…») y responde a Enter en PC (buttons). Chico.
+  8. Buscador de equipo: placeholder con alcance («Buscar equipo · Chonchi») y recientes antes de escribir (searching). Medio.
+  9. Botón «⋯» en la fila con las mismas acciones que el deslizamiento; íconos en todos los ítems o en ninguno (accessibility, gestures, menus). Medio.
+  10. Evento nuevo de otro técnico: se inserta con marca «Nuevo» + badge en el contador, sin toast (notifications). Medio.
+  11. Arrastre: imagen al 70 %, destino resaltado solo cuando acepta, Deshacer al soltar (drag-and-drop). Medio.
+  12. Hoja del editor en oscuro con fondo ELEVADO (#2C2C2E / #3A3A3C) (dark-mode). Chico.
+  13. Reduce Motion: la hoja aparece por fundido; no animar el blur (accessibility). Chico.
+  14. Subida de fotos con progreso determinado «Foto 2 de 3» y Cancelar (progress-indicators). Chico.
+  15. Horas de 5 en 5 y teclado numérico en N° y cantidad (pickers, entering-data). Chico.
+- Descartado con motivo: detent medio (el editor es de redacción), title-case (inglés), apariencia por módulo (DESIGN §6b), háptica (Safari iOS), pull-to-refresh, arrastre multi-ítem, refracción real del vidrio.
+- Estado: base de conocimiento HECHA; mejoras pendientes de que Orel elija.
+
 ## 2026-09-18 · Bitacora ronda 40 · Eventos: ritmo de la fila, encabezados iguales, «N°», fotos en tira
 - Sobre el turno real a ~1500 px (columna de eventos de 369 px) la línea de metadatos se partía en un lugar distinto en cada fila. Orel aprobó las cuatro propuestas.
 - Hecho: en `EventoBitacoraFila.tsx` la línea 2 queda tipo · equipo · «N° 720012855» (prefijo solo si es numérico; una ubicación técnica va tal cual) y el impacto (parada / ventana / cierra pendiente) va SIEMPRE en su propia línea 3; las fotos pasan a una tira de 48 px sin rótulo bajo cada miniatura (el rótulo vive en el visor; el «→» antes/después se conserva). En `BitacoraTurnoPage.tsx` los encabezados de sección de la columna central («Eventos del turno · 6», «Pendiente para el turno siguiente», «Vienen de turnos anteriores», «Quedaron sin publicar») pasan al mismo `text-subhead font-semibold text-muted-foreground` de los `ListGroup` de la columna izquierda.
