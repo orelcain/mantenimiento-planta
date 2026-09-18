@@ -21,6 +21,16 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-18 · Bitacora ronda 44 · BUG: miniaturas de fotos de OTROS técnicos con ícono roto
+- Síntoma (Orel, iPhone): en la lista, las fotos subidas desde ese mismo teléfono se ven; las de otros dispositivos o de otros colegas salen con el ícono roto, PERO al tocarlas el visor las muestra bien.
+- Descartado con datos, no con teoría: se exportó el turno real 2026-09-16_tarde (14 fotos) y TODAS las URL son iguales en forma (mismo bucket `firebasestorage.googleapis.com`, `alt=media`, con `token`, 239 caracteres). No hay data URIs ni URLs locales: el problema no es lo guardado ni los permisos.
+- CAUSA: el service worker (`public/firebase-messaging-sw.js`, branch «heavy assets») intercepta las imágenes de Storage. Un `<img>` cross-origin sin `crossorigin` pide en modo `no-cors`, así que la respuesta es OPACA y `res.ok` es false: nunca se puede cachear, o sea que interceptarla no aporta nada. Y sí quita: si el `fetch` del SW rechaza (red de planta, o iOS cortando por exceso de conexiones paralelas — 14 miniaturas a la vez), el `respondWith` queda rechazado y la miniatura queda ROTA para siempre, porque un `<img>` no reintenta. El visor, que pide UNA sola, cargaba bien. Las propias se ven porque ya estaban en la caché HTTP del navegador que las subió.
+- Arreglo, dos frentes:
+  1. SW: `if (request.mode === 'no-cors' && !isSameOrigin) return` — esas peticiones pasan de largo y las resuelve el navegador (que además las guarda en su caché HTTP). Y el `fetch` del branch queda en try/catch devolviendo `Response.error()` en vez de rechazar la promesa.
+  2. App: `Miniatura` en `EventoBitacoraFila` reintenta hasta 2 veces (400 ms y 800 ms) con `&r=N` para no reusar una respuesta fallida; si aun así falla, muestra un recuadro con ícono y «Toca para ver la foto» — el botón sigue abriendo el visor, donde la foto sí carga. Se agrega `decoding="async"`.
+- Verificación: vitrina real con las 14 fotos, 0 rotas; simulando errores, la miniatura pasa a `&r=1`, `&r=2` y termina en el recuadro, que sigue abriendo el visor. tsc 0; eslint 30; vitest 2.808 OK; build OK (el SW corregido queda en `dist/`).
+- Estado: HECHO. ATENCION: el SW viejo sigue vivo hasta que cada teléfono lo actualice (una recarga con red).
+
 ## 2026-09-18 · Bitacora ronda 43 · HIG etapa 2: confirmar antes de descartar (primitivo ActionSheet)
 - Reglas 3 y 4 del destilado. La 4 (borrar sin alerta, con Deshacer) YA estaba: `borrarConDeshacer` con toast de 5 s y `ToastAction`, sin `confirm()` en ningún camino. Se verificó, no se tocó.
 - La 3 sí faltaba: un evento PUBLICADO no se autoguarda, así que cerrar la hoja con cambios (Cancelar, Escape o tocar el fondo) los perdía en silencio. Con guantes es un roce.

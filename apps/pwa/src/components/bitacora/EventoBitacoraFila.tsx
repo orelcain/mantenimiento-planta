@@ -1,5 +1,5 @@
-import type { PointerEvent as ReactPointerEvent } from 'react'
-import { Camera, Menu } from 'lucide-react'
+import { useEffect, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { Camera, ImageOff, Menu } from 'lucide-react'
 import { Button, Pill, SwipeRow, Tag, type SwipeAction } from '@/components/piel'
 import { ETIQUETA_FOTO } from '@/config/bitacora'
 import { autorVisible, tecnicosDelEvento, type EventoBitacora, type FotoEvento, type PresenciaBitacora } from '@/services/bitacora/bitacora.types'
@@ -221,12 +221,7 @@ export function EventoBitacoraFila({
                   className="flex flex-col items-start rounded-ctl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 >
                   {/* Tira de 48 px sin rótulo (ronda 40): el rótulo va en el visor al abrirla. */}
-                  <img
-                    src={f.url}
-                    alt=""
-                    loading="lazy"
-                    className="size-12 rounded-ctl bg-muted-foreground/10 object-cover"
-                  />
+                  <Miniatura url={f.url} />
                 </button>
               </div>
             ))}
@@ -312,5 +307,52 @@ export function EventoBitacoraFila({
         {fila}
       </SwipeRow>
     </div>
+  )
+}
+
+/**
+ * Miniatura de 48 px que sobrevive a la señal de planta.
+ *
+ * Un `<img>` que falla NO reintenta nunca: con la red de la planta, las fotos
+ * de otros técnicos quedaban con el ícono roto para siempre, aunque la misma
+ * foto abriera bien en el visor (encontrado el 18-09-2026). Aquí se reintenta
+ * dos veces —espaciado, y con un parámetro distinto para saltarse una respuesta
+ * fallida guardada en caché— y, si aun así no carga, se muestra un recuadro que
+ * dice que se puede abrir igual: el botón que la envuelve abre el visor.
+ */
+function Miniatura({ url }: { url: string }) {
+  const [intento, setIntento] = useState(0)
+  const [falló, setFalló] = useState(false)
+  useEffect(() => {
+    setIntento(0)
+    setFalló(false)
+  }, [url])
+  if (falló) {
+    return (
+      <span
+        className="flex size-12 items-center justify-center rounded-ctl bg-muted-foreground/10 text-muted-foreground"
+        title="La miniatura no cargó. Toca para ver la foto."
+      >
+        <ImageOff className="size-4" aria-hidden />
+      </span>
+    )
+  }
+  return (
+    <img
+      // El reintento cambia la URL para no reusar una respuesta fallida.
+      src={intento === 0 ? url : `${url}&r=${intento}`}
+      alt=""
+      loading="lazy"
+      decoding="async"
+      className="size-12 rounded-ctl bg-muted-foreground/10 object-cover"
+      onError={() => {
+        if (intento >= 2) {
+          setFalló(true)
+          return
+        }
+        const espera = 400 * (intento + 1)
+        setTimeout(() => setIntento((n) => n + 1), espera)
+      }}
+    />
   )
 }
