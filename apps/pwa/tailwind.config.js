@@ -216,6 +216,10 @@ export default {
         destructive: 'rgb(var(--tw-red-600) / <alpha-value>)',
       },
       fontSize: {
+        // ×`--escala-texto` (19-09-2026): con 1 (por defecto) todo mide lo mismo que antes;
+        // la bitácora la sube según el tamaño de letra del teléfono (useTamanoLetraBitacora).
+        // Campo de texto: 16 px como piso (bajo 16 el iPhone hace zoom solo al tocarlo).
+        campo:     ['calc(16px * var(--escala-texto, 1))'],
         // ── ESCALA TIPOGRÁFICA de la Constitución (§9) ────────────────────────
         // En PX a propósito: el `html` de esta app está al 87.5%, así que los
         // `rem` no dan los tamaños que la norma pide.
@@ -224,20 +228,20 @@ export default {
         // y 10px) — esa era la causa real de que se viera densa y no Apple.
         // Piso de 11 px también en PC: la raíz va al 87,5 % y `text-xs` (0.75rem) rendía
         // 10,5 px, medio punto bajo el mínimo del contrato. En móvil (raíz 16) sigue en 12.
-        xs:        ['max(0.75rem, 11px)', { lineHeight: '1rem' }],
-        caption:   ['11px', { lineHeight: '1.35' }],
-        footnote:  ['13px', { lineHeight: '1.4' }],
+        xs:        ['calc(max(0.75rem, 11px) * var(--escala-texto, 1))', { lineHeight: '1rem' }],
+        caption:   ['calc(11px * var(--escala-texto, 1))', { lineHeight: '1.35' }],
+        footnote:  ['calc(13px * var(--escala-texto, 1))', { lineHeight: '1.4' }],
         // body 17 (Apple: 17/22). Estaba en 15, que es el SUBHEAD de Apple: toda la app
         // iba un escalon por debajo de iOS y eso alimentaba la densidad. subhead y
         // callout se agregan para que el texto secundario pueda bajar sin inventar px.
-        subhead:   ['15px', { lineHeight: '1.33' }],
-        callout:   ['16px', { lineHeight: '1.31' }],
-        body:      ['17px', { lineHeight: '1.3' }],
-        headline:  ['17px', { lineHeight: '1.35', fontWeight: '600' }],
-        title3:    ['20px', { lineHeight: '1.25', fontWeight: '600' }],
-        title2:    ['22px', { lineHeight: '1.27', fontWeight: '600' }],
-        title1:    ['28px', { lineHeight: '1.15', letterSpacing: '-0.02em', fontWeight: '700' }],
-        display:   ['34px', { lineHeight: '1.2',  letterSpacing: '-0.028em', fontWeight: '700' }],
+        subhead:   ['calc(15px * var(--escala-texto, 1))', { lineHeight: '1.33' }],
+        callout:   ['calc(16px * var(--escala-texto, 1))', { lineHeight: '1.31' }],
+        body:      ['calc(17px * var(--escala-texto, 1))', { lineHeight: '1.3' }],
+        headline:  ['calc(17px * var(--escala-texto, 1))', { lineHeight: '1.35', fontWeight: '600' }],
+        title3:    ['calc(20px * var(--escala-texto, 1))', { lineHeight: '1.25', fontWeight: '600' }],
+        title2:    ['calc(22px * var(--escala-texto, 1))', { lineHeight: '1.27', fontWeight: '600' }],
+        title1:    ['calc(28px * var(--escala-texto, 1))', { lineHeight: '1.15', letterSpacing: '-0.02em', fontWeight: '700' }],
+        display:   ['calc(34px * var(--escala-texto, 1))', { lineHeight: '1.2',  letterSpacing: '-0.028em', fontWeight: '700' }],
         // Rol propio (no existe en la escala de Apple): el NUMERO de un KPI.
         // Estaba definido en docs/NUEVA_PIEL_APPLE_HIG.md §2 desde el 2026-08-09
         // pero nunca se agrego aca, asi que cada KPI eligio su tamano a mano.
@@ -245,7 +249,7 @@ export default {
         // objeto, asi que las cifras tabulares NO viajan con el rol —
         // `text-stat` va SIEMPRE acompanado de `tabular-nums`, o las columnas
         // bailan al refrescar con datos en vivo.
-        stat:      ['30px', { lineHeight: '1.05', letterSpacing: '-0.03em', fontWeight: '700' }],
+        stat:      ['calc(30px * var(--escala-texto, 1))', { lineHeight: '1.05', letterSpacing: '-0.03em', fontWeight: '700' }],
       },
       fontFamily: {
         // UI en IBM Plex Sans (tipo de ingeniería con carácter, no Inter genérico)

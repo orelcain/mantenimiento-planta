@@ -30,7 +30,7 @@ import { formatNombreSAP } from '@/utils/repuestos/formatNombreSAP'
  */
 
 const CAMPO =
-  'h-[44px] w-full rounded-ctl border-0 bg-muted-foreground/10 px-3 text-[16px] text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary'
+  'h-[44px] w-full rounded-ctl border-0 bg-muted-foreground/10 px-3 text-campo text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary'
 const ETIQUETA = 'mb-1.5 flex justify-between gap-2 text-footnote text-muted-foreground'
 const BOTON_PASO =
   'flex size-11 items-center justify-center rounded-full text-primary transition-colors hover:bg-muted-foreground/10 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
@@ -239,7 +239,7 @@ export function RepuestosUsados({
   }
 
   const segmentos = [
-    { value: 'equipo' as const, label: listaEquipoActual ? `En este equipo · ${listaEquipoActual.length}` : 'En este equipo' },
+    { value: 'equipo' as const, label: listaEquipoActual ? `Este equipo · ${listaEquipoActual.length}` : 'Este equipo' },
     { value: 'todos' as const, label: listaTodos ? `Todos · ${listaTodos.length}` : 'Todos' },
   ]
   // Con la estrella y sin texto, la línea «Ninguno de tus N favoritos…» ya lo dice: sin lista vacía debajo.
@@ -253,7 +253,7 @@ export function RepuestosUsados({
     if (nuevo) cargar(alcance)
   }
   // HIG «Segmented controls»: «dónde buscar» y «qué mostrar» son dos preguntas;
-  // la estrella va aparte de las pestañas para que se combinen (19-09-2026).
+  // la estrella va aparte de las pestañas (junto al buscador) para que se combinen.
   const estrella = favoritos ? (
     <button
       type="button"
@@ -388,14 +388,10 @@ export function RepuestosUsados({
       )}
 
       <div className="flex flex-col gap-2">
-        {equipoId && (
-          <div className="flex items-center gap-2">
-            <div className="min-w-0 flex-1">
-              <SegmentedControl ariaLabel="Dónde buscar el repuesto" value={alcance} onChange={cambiarAlcance} segments={segmentos} />
-            </div>
-            {estrella}
-          </div>
-        )}
+        {/* Las pestañas a todo el ancho y la estrella junto al buscador: con la letra
+            grande del teléfono, pestañas + estrella en una fila cortaban «En este eq…»
+            (capturas reales al 135 %, 19-09-2026). */}
+        {equipoId && <SegmentedControl ariaLabel="Dónde buscar el repuesto" value={alcance} onChange={cambiarAlcance} segments={segmentos} />}
         <div className="flex items-center gap-2">
           <div className="relative min-w-0 flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
@@ -408,7 +404,7 @@ export function RepuestosUsados({
               autoComplete="off"
               className={`${CAMPO} pl-9 pr-9`}
               value={consulta}
-              placeholder={verFavoritos ? 'Buscar en tus favoritos' : 'Buscar por código o nombre'}
+              placeholder={verFavoritos ? 'En tus favoritos' : 'Código o nombre'}
               // HIG «Virtual keyboards»: acá Enter agrega el primer resultado.
               enterKeyHint="search"
               onFocus={() => cargar(alcance)}
@@ -441,7 +437,7 @@ export function RepuestosUsados({
               </button>
             )}
           </div>
-          {!equipoId && estrella}
+          {estrella}
         </div>
         {verFavoritos && lista && (
           <p className="text-footnote text-muted-foreground" role="status">

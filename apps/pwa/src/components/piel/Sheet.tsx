@@ -143,9 +143,9 @@ export function Sheet({ open, onClose, title, description, actions, size = 'defa
         />
         {/* Agarradera: señal de "esto se arrastra/cierra", no decoración. */}
         <div className="mx-auto mb-3.5 h-[5px] w-9 rounded-full bg-muted-foreground/40" aria-hidden />
-        {title && <h2 className="text-[1.1rem] font-semibold tracking-[-0.015em]">{title}</h2>}
+        {title && <h2 className="text-[length:calc(1.1rem*var(--escala-texto,1))] font-semibold tracking-[-0.015em]">{title}</h2>}
         {description && (
-          <p className="mt-1 text-[0.83rem] leading-snug text-muted-foreground">{description}</p>
+          <p className="mt-1 text-[length:calc(0.83rem*var(--escala-texto,1))] leading-snug text-muted-foreground">{description}</p>
         )}
         {children && <div className="mt-4">{children}</div>}
         {actions && <div className="mt-5 flex gap-2.5 [&>*]:flex-1">{actions}</div>}

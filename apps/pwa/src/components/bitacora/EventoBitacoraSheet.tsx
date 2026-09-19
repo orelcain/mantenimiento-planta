@@ -198,7 +198,7 @@ function FilaInterruptor({
 // Estilo de control iOS: relleno suave, sin borde. 16 px en inputs para que
 // iOS no haga zoom al enfocar.
 const CAMPO =
-  'h-[44px] w-full rounded-ctl border-0 bg-muted-foreground/10 px-3 text-[16px] text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary'
+  'h-[44px] w-full rounded-ctl border-0 bg-muted-foreground/10 px-3 text-campo text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary'
 const ETIQUETA_CAMPO = 'mb-1.5 block text-footnote text-muted-foreground'
 
 function Chip({ activo, onClick, children }: { activo: boolean; onClick: () => void; children: ReactNode }) {
@@ -1284,7 +1284,7 @@ export function EventoBitacoraSheet({
               id={`${campoId}-turno`}
               value={turnoDestino}
               onChange={(e) => setTurnoDestino(e.target.value)}
-              className="min-h-[44px] min-w-0 max-w-[70%] cursor-pointer truncate rounded-ctl bg-transparent px-2 text-right text-[16px] font-semibold text-primary outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              className="min-h-[44px] min-w-0 max-w-[70%] cursor-pointer truncate rounded-ctl bg-transparent px-2 text-right text-campo font-semibold text-primary outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               {opcionesTurno.map((t) => (
                 <option key={t.id} value={t.id}>
@@ -1502,7 +1502,7 @@ export function EventoBitacoraSheet({
           <textarea
             id="bitacora-descripcion"
             maxLength={3000}
-            className="min-h-[112px] w-full resize-y rounded-ctl border-0 bg-muted-foreground/10 px-3 py-2.5 text-[16px] leading-snug text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary"
+            className="min-h-[112px] w-full resize-y rounded-ctl border-0 bg-muted-foreground/10 px-3 py-2.5 text-campo leading-snug text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary"
             value={descripcion}
             onChange={(e) => setDescripcion(e.target.value)}
             placeholder="Detención por E777. Muelle de tracción del carro cortado; se cambia y se prueba en vacío."

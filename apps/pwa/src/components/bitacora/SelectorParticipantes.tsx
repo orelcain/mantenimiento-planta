@@ -70,7 +70,7 @@ export function SelectorParticipantes({
             setAgregando(false)
           }}
           onBlur={() => setAgregando(false)}
-          className="mt-2 h-[44px] w-full rounded-ctl border-0 bg-muted-foreground/10 px-3 text-[16px] text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          className="mt-2 h-[44px] w-full rounded-ctl border-0 bg-muted-foreground/10 px-3 text-campo text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
           <option value="" disabled>
             Elige quién participó
