@@ -21,6 +21,19 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-19 · Admin · Editor de líneas: uniones con dos clics y punto de llegada real
+
+- Orel: «lo intento y no hacen nada». Causas: (1) #1122 dejó el punto izquierdo como adorno y la
+  tarjeta solo recibía la flecha mientras se ARRASTRA → unir con dos clics (clic en el punto de
+  salida, clic en el destino) quedó muerto; (2) el agarre de `28/zoom` llegaba a 88 unidades a
+  zoom bajo, tapaba media tarjeta y a las vecinas.
+- Ahora: el punto izquierdo vuelve a ser un punto de llegada real (el de las flechas guardadas);
+  la tarjeta entera recibe también durante la unión con clics (`connectionClickStartHandle`); el
+  agarre tiene tope de 36 unidades; `onConnect` guarda la flecha sin ids de punto.
+- Verificado con movimiento de mano (15 pasos): arrastrar al punto y dos clics crean la flecha; la
+  tarjeta se sigue arrastrando. ⚠ El arrastre del panel del navegador manda casi sin pasos
+  intermedios y no sirve para probar uniones: simular con `MouseEvent` y pausas.
+
 ## 2026-09-19 · Admin · Editor de líneas: mover un contenedor entero por su título
 
 - La franja del título (48 px, la misma del margen superior) es el asa: arrastrarla mueve el
