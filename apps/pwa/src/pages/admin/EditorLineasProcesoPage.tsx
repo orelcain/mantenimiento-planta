@@ -71,7 +71,7 @@ const MIME = 'application/x-equipo'
 const GRILLA: [number, number] = [16, 16]
 const APOYO = 'rgb(var(--cat-6-ink))'
 
-type DatosMaquina = { nombre: string; peso: number | null; linea: string | null; contenedor: string | null; componentes: number; otraPlanta?: string; manual?: boolean; ciclo?: boolean }
+type DatosMaquina = { nombre: string; peso: number | null; linea: string | null; contenedor: string | null; componentes: number; otraPlanta?: string; manual?: boolean; ciclo?: boolean; ramas: number }
 type DatosServicio = { nombre: string; abastece: string[]; recibe: string[] }
 type DatosEntrada = { linea: string }
 type DatosZona = { nombre: string; w: number; h: number; apoyo: boolean; resaltada: boolean; onMover?: (ev: ReactPointerEvent) => void }
@@ -85,7 +85,12 @@ function tonoPeso(peso: number | null): 'serie' | 'paralelo' | 'fuera' {
   if (peso == null || peso === 0) return 'fuera'
   return Math.abs(peso - 1) < 1e-9 ? 'serie' : 'paralelo'
 }
-const BORDE = { serie: 'border-ink-crit', paralelo: 'border-ink-warn', fuera: 'border-dashed border-muted-foreground/50' } as const
+/**
+ * La cuota NO se pinta con los colores de estado (verde/ámbar/rojo): en el resto de la app
+ * esos tres significan «bien / ojo / crítico», y una BAADER sana al 33,3 % se leía como
+ * máquina en falla (HIG color: «avoid using the same color to mean different things»).
+ * La cuota se lee por LARGO: un chip con la cifra y una barra al pie de la tarjeta.
+ */
 const TINTA = { serie: 'text-ink-crit', paralelo: 'text-ink-warn', fuera: 'text-muted-foreground' } as const
 /**
  * Puntos de unión fáciles de acertar (Orel, 19-09-2026: «no funcionan bien las uniones»).
@@ -145,21 +150,43 @@ function PuntosUnion({ claro }: { claro?: boolean }) {
 const SELECCION = 'ring-4 ring-primary/35'
 
 function NodoMaquina({ data, selected }: NodeProps<Node<DatosMaquina>>) {
-  const tono = tonoPeso(data.peso)
+  const conFlujo = data.peso != null && data.peso > 0 && !data.ciclo && !data.otraPlanta
+  const cifra = data.otraPlanta ? `de ${data.otraPlanta}` : data.ciclo ? 'en círculo' : data.peso == null ? '0 %' : formatoPeso(data.peso)
+  const chip = data.ciclo
+    ? 'bg-ink-warn/15 text-ink-warn'
+    : conFlujo
+      ? 'bg-[rgb(var(--brand)/0.14)] text-[rgb(var(--brand-ink))]'
+      : 'bg-muted-foreground/12 text-muted-foreground'
   return (
     <div
-      style={{ width: NODO.ancho }}
-      className={`rounded-card border-2 bg-card px-3 py-2 shadow-[0_1px_4px_rgba(0,0,0,0.12)] ${BORDE[tono]} ${selected ? SELECCION : ''} ${tono === 'fuera' ? 'opacity-85' : ''}`}
+      style={{ width: NODO.ancho, height: NODO.alto }}
+      className={`relative flex flex-col justify-center gap-1 overflow-hidden rounded-ctl border bg-card px-2.5 py-2 shadow-[0_1px_2px_rgb(0_0_0/0.07)] ${
+        conFlujo ? 'border-border' : 'border-dashed border-muted-foreground/55'
+      } ${selected ? SELECCION : ''}`}
     >
-      <p className="break-words text-[12px] font-semibold leading-tight">{data.nombre}</p>
-      <p className={`text-[17px] font-bold tabular-nums leading-snug ${TINTA[tono]}`}>
-        {data.otraPlanta ? `de ${data.otraPlanta}` : data.ciclo ? 'en círculo' : data.peso == null ? '0 %' : formatoPeso(data.peso)}
+      <p className="line-clamp-2 text-[11.5px] font-semibold leading-tight tracking-[-0.005em]">{data.nombre}</p>
+      <p className="flex items-center gap-1.5 truncate text-[10px] leading-tight text-muted-foreground">
+        <span className={`shrink-0 rounded-full px-1.5 py-px text-[11.5px] font-bold tabular-nums leading-tight ${chip}`}>{cifra}</span>
+        <span className="truncate">
+          {data.otraPlanta
+            ? 'no cuenta en esta planta'
+            : data.ciclo
+              ? 'flecha de vuelta'
+              : data.linea
+                ? data.ramas > 1
+                  ? `1 de ${data.ramas} · ${data.linea}`
+                  : data.linea
+                : `fuera de la línea${data.contenedor ? ` · ${data.contenedor}` : ''}`}
+          {data.componentes ? ` · +${data.componentes} comp.` : ''}
+          {data.manual ? ' · manual' : ''}
+        </span>
       </p>
-      <p className="text-[10.5px] leading-tight text-muted-foreground">
-        {data.otraPlanta ? 'no cuenta en esta planta' : data.ciclo ? 'hay una flecha de vuelta' : data.linea ? `de ${data.linea}` : `fuera de la línea${data.contenedor ? ` · ${data.contenedor}` : ''}`}
-        {data.componentes ? ` · +${data.componentes} comp.` : ''}
-        {data.manual ? ' · manual' : ''}
-      </p>
+      {/* La cuota como LONGITUD, al pie de la tarjeta: se compara sin leer la cifra. */}
+      {conFlujo && (
+        <span aria-hidden className="absolute inset-x-0 bottom-0 h-[3px] bg-foreground/10">
+          <span className="block h-full bg-[rgb(var(--brand))]" style={{ width: `${Math.round((data.peso ?? 0) * 100)}%` }} />
+        </span>
+      )}
       <PuntosUnion />
     </div>
   )
@@ -218,7 +245,25 @@ function NodoZona({ data }: NodeProps<Node<DatosZona>>) {
   )
 }
 
-const TIPOS = { maquina: NodoMaquina, servicio: NodoServicio, entrada: NodoEntrada, zona: NodoZona }
+/** Encuadre de un grupo en paralelo: se deriva del grafo, no se guarda. */
+type DatosParalelo = { w: number; h: number; etiqueta: string }
+function NodoParalelo({ data }: NodeProps<Node<DatosParalelo>>) {
+  return (
+    <div
+      style={{ width: data.w, height: data.h, borderColor: 'rgb(var(--brand) / 0.55)', background: 'rgb(var(--brand) / 0.07)' }}
+      className="rounded-[18px] border border-dashed"
+    >
+      <span className="absolute -top-3 left-4 rounded-full bg-[rgb(var(--brand)/0.14)] px-2 py-0.5 text-[10.5px] font-semibold text-[rgb(var(--brand-ink))]">{data.etiqueta}</span>
+    </div>
+  )
+}
+
+/** Barra donde el flujo se abre en ramas (convención de los P&ID: cabezal común). */
+function NodoReparto({ data }: NodeProps<Node<{ h: number }>>) {
+  return <div style={{ width: 6, height: data.h, background: 'rgb(var(--brand))' }} className="rounded-full" />
+}
+
+const TIPOS = { maquina: NodoMaquina, servicio: NodoServicio, entrada: NodoEntrada, zona: NodoZona, paralelo: NodoParalelo, reparto: NodoReparto }
 
 const aNodos = (g: GrafoLineas): Node[] => [
   ...g.lineas.map((l) => ({
@@ -230,7 +275,7 @@ const aNodos = (g: GrafoLineas): Node[] => [
     selectable: false,
     deletable: false,
     focusable: false,
-    zIndex: -1,
+    zIndex: -2,
   })),
   ...g.nodos.map((n) => ({
     id: n.id,
@@ -383,6 +428,65 @@ function Editor() {
   const contenedorDe = useMemo(() => new Map(grafo.nodos.map((n) => [n.id, zonaDeNodo(lineas, n)])), [grafo, lineas])
 
   const yaUnidos = useMemo(() => new Set(origenUnir ? edges.filter((e) => e.source === origenUnir).map((e) => e.target) : []), [edges, origenUnir])
+  // Ramas por equipo (de cuántas salidas del mismo padre es una) y flujo que lleva cada flecha:
+  // el GROSOR de la flecha es el flujo, así se ve dónde reparte la línea sin leer un número.
+  const reparto = useMemo(() => {
+    const salidas = new Map<string, number>()
+    for (const e of edges) if (!servicios.has(e.source) && !servicios.has(e.target)) salidas.set(e.source, (salidas.get(e.source) ?? 0) + 1)
+    const ramas = new Map<string, number>()
+    for (const e of edges) if (!servicios.has(e.source) && !servicios.has(e.target)) ramas.set(e.target, Math.max(ramas.get(e.target) ?? 1, salidas.get(e.source) ?? 1))
+    return { salidas, ramas }
+  }, [edges, servicios])
+  const flujoDeFlecha = useCallback(
+    (e: Edge) => {
+      const desde = esEntrada(e.source) ? 1 : (pesos.get(e.source)?.peso ?? 0)
+      return desde / Math.max(1, reparto.salidas.get(e.source) ?? 1)
+    },
+    [pesos, reparto],
+  )
+
+  /**
+   * Grupos en paralelo: un equipo del que salen 2+ flechas a equipos que se reparten el
+   * flujo por igual. Se dibuja la barra donde se abre y un encuadre con «Paralelo · N ramas».
+   * Todo se deriva del grafo: no agrega datos al modelo ni se guarda.
+   */
+  const nodosParalelo = useMemo(() => {
+    const porOrigen = new Map<string, string[]>()
+    for (const e of edges) {
+      if (servicios.has(e.source) || servicios.has(e.target)) continue
+      porOrigen.set(e.source, [...(porOrigen.get(e.source) ?? []), e.target])
+    }
+    const caja = new Map(nodes.filter((n) => n.type !== 'zona').map((n) => [n.id, n.position]))
+    const out: Node[] = []
+    for (const [origen, destinos] of porOrigen) {
+      if (destinos.length < 2) continue
+      const cajas = destinos.map((d) => caja.get(d)).filter((p): p is { x: number; y: number } => !!p)
+      if (cajas.length !== destinos.length) continue
+      const cuotas = destinos.map((d) => pesos.get(d)?.peso ?? 0)
+      if (cuotas.some((c) => c <= 0) || Math.max(...cuotas) - Math.min(...cuotas) > 1e-6) continue
+      const x1 = Math.min(...cajas.map((c) => c.x))
+      const y1 = Math.min(...cajas.map((c) => c.y))
+      const x2 = Math.max(...cajas.map((c) => c.x)) + NODO.ancho
+      const y2 = Math.max(...cajas.map((c) => c.y)) + NODO.alto
+      out.push({
+        id: `paralelo:${origen}`,
+        type: 'paralelo',
+        position: { x: x1 - 14, y: y1 - 14 },
+        data: { w: x2 - x1 + 28, h: y2 - y1 + 28, etiqueta: `Paralelo · ${destinos.length} ramas · ${formatoPeso(cuotas[0] ?? 0)} c/u` },
+        draggable: false,
+        selectable: false,
+        deletable: false,
+        focusable: false,
+        zIndex: -1,
+      })
+      const p = caja.get(origen)
+      const alto = Math.max(24, y2 - y1 - NODO.alto)
+      // A media distancia entre el equipo que reparte y el grupo: ahí se abre el flujo.
+      if (p) out.push({ id: `reparto:${origen}`, type: 'reparto', position: { x: Math.max(p.x + NODO.ancho + 12, (p.x + NODO.ancho + x1) / 2 - 3), y: y1 + NODO.alto / 2 - 3 }, data: { h: alto }, draggable: false, selectable: false, deletable: false, focusable: false, zIndex: -1 })
+    }
+    return out
+  }, [edges, nodes, pesos, servicios])
+
   const vista = useMemo(
     () =>
       nodes.map((n): Node => {
@@ -418,6 +522,7 @@ function Editor() {
           contenedor: cont ? (nombreLinea.get(cont) ?? null) : null,
           manual: esManual(n.id),
           ciclo: p?.ciclo,
+          ramas: reparto.ramas.get(n.id) ?? 1,
         }
         return {
           ...n,
@@ -427,20 +532,26 @@ function Editor() {
           data,
         }
       }),
-    [nodes, indice, pesos, servicios, relaciones, nombreLinea, zonaResaltada, deOtraPlanta, nombreDe, limites, contenedorDe, editable, origenUnir, yaUnidos],
+    [nodes, indice, pesos, servicios, relaciones, nombreLinea, zonaResaltada, deOtraPlanta, nombreDe, limites, contenedorDe, editable, origenUnir, yaUnidos, reparto],
   )
+
+  const conParalelos = useMemo(() => [...vista, ...nodosParalelo], [vista, nodosParalelo])
 
   const vistaAristas = useMemo(
     () =>
       edges.map((e): Edge => {
         const apoyo = servicios.has(e.source) || servicios.has(e.target)
         const entre = !apoyo && esEntrada(e.target)
+        const f = flujoDeFlecha(e)
+        const grosor = f >= 0.99 ? 2.5 : f >= 0.45 ? 1.8 : f >= 0.2 ? 1.4 : 1.2
+        const opacidad = f >= 0.99 ? 1 : f >= 0.45 ? 0.9 : 0.8
         const color = apoyo ? APOYO : entre ? 'rgb(var(--muted-foreground))' : 'rgb(var(--brand))'
         return {
           ...e,
           type: 'default',
           ariaLabel: `Flecha de ${nombreDe(e.source)} a ${nombreDe(e.target)}`,
-          markerEnd: { type: MarkerType.ArrowClosed, width: 20, height: 20, color },
+          // Punta chica: a 20 px pesaba más que la línea y tapaba el borde de la tarjeta.
+          markerEnd: { type: MarkerType.ArrowClosed, width: 7, height: 6, color },
           ...(apoyo
             ? {
                 label: servicios.has(e.source) ? 'abastece' : 'recibe',
@@ -456,10 +567,10 @@ function Editor() {
             ? { stroke: color, strokeWidth: 2, strokeDasharray: '2 6', strokeLinecap: 'round', vectorEffect: 'non-scaling-stroke' }
             : entre
               ? { stroke: color, strokeWidth: 2, strokeDasharray: '6 5', vectorEffect: 'non-scaling-stroke' }
-              : { stroke: color, strokeWidth: 2.5, vectorEffect: 'non-scaling-stroke' },
+              : { stroke: color, strokeWidth: grosor, strokeOpacity: opacidad, vectorEffect: 'non-scaling-stroke' },
         }
       }),
-    [edges, servicios, nombreDe],
+    [edges, servicios, nombreDe, flujoDeFlecha],
   )
 
   const sucio = !cargando && JSON.stringify(grafo) !== guardado
@@ -1008,7 +1119,7 @@ function Editor() {
             </div>
           ) : (
             <ReactFlow
-              nodes={vista}
+              nodes={conParalelos}
               edges={vistaAristas}
               nodeTypes={TIPOS}
               onNodesChange={editable ? onNodesChange : undefined}
