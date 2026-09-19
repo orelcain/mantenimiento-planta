@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Background,
@@ -72,7 +72,7 @@ const APOYO = 'rgb(var(--cat-6-ink))'
 type DatosMaquina = { nombre: string; peso: number | null; linea: string | null; contenedor: string | null; componentes: number; otraPlanta?: string; manual?: boolean }
 type DatosServicio = { nombre: string; abastece: string[]; recibe: string[] }
 type DatosEntrada = { linea: string }
-type DatosZona = { nombre: string; w: number; h: number; apoyo: boolean; resaltada: boolean }
+type DatosZona = { nombre: string; w: number; h: number; apoyo: boolean; resaltada: boolean; onMover?: (ev: ReactPointerEvent) => void }
 type Instantanea = { nodes: Node[]; edges: Edge[] }
 /** Pertenencia y nombre (manuales) que viajan en `data` de los nodos base. */
 type DatosBase = { zona?: string; nombre?: string }
@@ -181,9 +181,19 @@ function NodoZona({ data }: NodeProps<Node<DatosZona>>) {
         data.resaltada ? 'bg-primary/10 ring-2 ring-primary' : 'bg-card/45'
       }`}
     >
-      <span className="absolute left-4 top-3 text-headline" style={{ color: data.apoyo ? APOYO : undefined }}>
-        <span className={data.apoyo ? '' : 'text-muted-foreground'}>{data.nombre}</span>
-      </span>
+      {/* Franja del título = asa: arrastra el contenedor con todo lo que tiene (Orel, 19-09-2026).
+          Es la única parte que se agarra: el resto de la caja sigue desplazando el lienzo. */}
+      <div
+        onPointerDown={data.onMover}
+        // React Flow deja los nodos no seleccionables sin eventos de puntero: la franja los recupera.
+        style={data.onMover ? { pointerEvents: 'all' } : undefined}
+        title={data.onMover ? 'Arrastra el título para mover el contenedor con todo lo que tiene' : undefined}
+        className={`nodrag nopan absolute inset-x-0 top-0 flex h-[48px] items-center rounded-t-panel px-4 ${data.onMover ? 'cursor-grab hover:bg-muted-foreground/10 active:cursor-grabbing' : ''}`}
+      >
+        <span className="text-headline" style={{ color: data.apoyo ? APOYO : undefined }}>
+          <span className={data.apoyo ? '' : 'text-muted-foreground'}>{data.nombre}</span>
+        </span>
+      </div>
     </div>
   )
 }
@@ -213,9 +223,14 @@ const aNodos = (g: GrafoLineas): Node[] => [
 const aAristas = (g: GrafoLineas): Edge[] => g.aristas.map(([a, b]) => ({ id: `${a}->${b}`, source: a, target: b }))
 
 function alGrafo(lineas: LineaProceso[], nodes: Node[], edges: Edge[]): GrafoLineas {
+  // La esquina de cada contenedor vive en su nodo del lienzo: así mover la caja entra en deshacer.
+  const esquina = new Map(nodes.filter((n) => n.type === 'zona').map((n) => [n.id.slice('zona:'.length), n.position]))
   return {
     version: 1,
-    lineas,
+    lineas: lineas.map((l) => {
+      const p = esquina.get(l.id)
+      return p && (p.x !== l.zona.x || p.y !== l.zona.y) ? { ...l, zona: { ...l.zona, x: Math.round(p.x), y: Math.round(p.y) } } : l
+    }),
     nodos: nodes
       .filter((n) => n.type !== 'zona')
       .map((n) => {
@@ -233,7 +248,9 @@ function Editor() {
   const { toast } = useToast()
   const usuario = useAuthStore((s) => s.user)
   const { tree, loading: cargandoArbol } = useHierarchyTree()
-  const { screenToFlowPosition, fitView } = useReactFlow()
+  const { screenToFlowPosition, fitView, getZoom } = useReactFlow()
+  // Mover un contenedor entero por su título (se define más abajo, cuando ya existe la pertenencia).
+  const moverZona = useRef<(zonaId: string, ev: ReactPointerEvent) => void>(() => undefined)
   const lienzo = useRef<HTMLDivElement>(null)
   // Espacio de trabajo (Orel, 19-09-2026): pantalla completa y lista de equipos plegable.
   const [amplio, setAmplio] = useState(false)
@@ -346,7 +363,11 @@ function Editor() {
       nodes.map((n): Node => {
         if (n.type === 'zona') {
           const l = limites.get(n.id.slice('zona:'.length))
-          return { ...n, position: l ? { x: l.x, y: l.y } : n.position, data: { ...n.data, ...(l ? { w: l.w, h: l.h } : {}), resaltada: n.id === zonaResaltada } }
+          return {
+            ...n,
+            position: l ? { x: l.x, y: l.y } : n.position,
+            data: { ...n.data, ...(l ? { w: l.w, h: l.h } : {}), resaltada: n.id === zonaResaltada, ...(editable ? { onMover: (ev: ReactPointerEvent) => moverZona.current(n.id, ev) } : {}) },
+          }
         }
         if (n.type === 'entrada') return { ...n, ariaLabel: nombreDe(n.id), data: { linea: nombreLinea.get(lineaDeEntrada(n.id)) ?? lineaDeEntrada(n.id) } }
         const e = indice.get(n.id)
@@ -377,7 +398,7 @@ function Editor() {
           data,
         }
       }),
-    [nodes, indice, pesos, servicios, relaciones, nombreLinea, zonaResaltada, deOtraPlanta, nombreDe, limites, contenedorDe],
+    [nodes, indice, pesos, servicios, relaciones, nombreLinea, zonaResaltada, deOtraPlanta, nombreDe, limites, contenedorDe, editable],
   )
 
   const vistaAristas = useMemo(
@@ -591,6 +612,40 @@ function Editor() {
     return zonaDeNodo(lineas, { id: n.id, x: n.position.x, y: n.position.y, zona: d.zona })
   }
 
+  // Mover la caja entera: el contenedor y TODO lo que le pertenece se desplazan juntos, a
+  // pasos de la grilla. Deshacer lo devuelve de una vez (se registra al primer movimiento).
+  moverZona.current = (zonaId: string, ev: ReactPointerEvent) => {
+    if (!editable || ev.button !== 0) return
+    ev.stopPropagation()
+    ev.preventDefault()
+    const lineaId = zonaId.slice('zona:'.length)
+    const inicio = new Map<string, { x: number; y: number }>()
+    for (const n of nodes) if (n.id === zonaId || (n.type !== 'zona' && contenedorDeNodo(n) === lineaId)) inicio.set(n.id, n.position)
+    const zoom = getZoom()
+    const x0 = ev.clientX
+    const y0 = ev.clientY
+    let movido = false
+    const mover = (e: PointerEvent) => {
+      const dx = Math.round((e.clientX - x0) / zoom / GRILLA[0]) * GRILLA[0]
+      const dy = Math.round((e.clientY - y0) / zoom / GRILLA[1]) * GRILLA[1]
+      if (!movido && !dx && !dy) return
+      if (!movido) registrar()
+      movido = true
+      setNodes((ns) => ns.map((n) => {
+        const p = inicio.get(n.id)
+        return p ? { ...n, position: { x: p.x + dx, y: p.y + dy } } : n
+      }))
+    }
+    const soltar = () => {
+      window.removeEventListener('pointermove', mover)
+      window.removeEventListener('pointerup', soltar)
+      window.removeEventListener('pointercancel', soltar)
+    }
+    window.addEventListener('pointermove', mover)
+    window.addEventListener('pointerup', soltar)
+    window.addEventListener('pointercancel', soltar)
+  }
+
   // Al soltar sobre OTRO contenedor: ¿salir de uno y entrar al otro? Cancelar lo devuelve.
   const alSoltarNodos = (movidos: Node[]) => {
     setZonaResaltada(null)
@@ -684,6 +739,13 @@ function Editor() {
       const g = { ...grafo, lineas: conLimites }
       await guardarLineas(PLANTA, g, usuario ? `${usuario.nombre} ${usuario.apellido}`.trim() : 'Admin')
       setLineas(conLimites)
+      // Los nodos de contenedor quedan en la esquina guardada (alGrafo la lee de ahí).
+      setNodes((ns) =>
+        ns.map((n) => {
+          const z = n.type === 'zona' ? conLimites.find((l) => `zona:${l.id}` === n.id)?.zona : undefined
+          return z ? { ...n, position: { x: z.x, y: z.y } } : n
+        }),
+      )
       setGuardado(JSON.stringify(g))
       setMeta(`Guardado por ${usuario?.nombre ?? 'admin'} · recién`)
     } catch {

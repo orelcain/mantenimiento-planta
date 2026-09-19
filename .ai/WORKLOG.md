@@ -21,6 +21,21 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-19 · Admin · Editor de líneas: mover un contenedor entero por su título
+
+- La franja del título (48 px, la misma del margen superior) es el asa: arrastrarla mueve el
+  contenedor y TODO lo que le pertenece, a pasos de la grilla. El resto de la caja sigue
+  desplazando el lienzo.
+- La esquina de cada contenedor vive ahora en su nodo del lienzo (`alGrafo` la lee de ahí) → mover
+  la caja entra en deshacer de una vez; al guardar, los nodos de contenedor quedan en la esquina
+  guardada.
+- ⚠ Trampas pagadas: (1) un nodo arrastrable recibe la clase `nopan` → la caja entera habría
+  bloqueado el desplazamiento; por eso el asa es manual (eventos de puntero), no `draggable`.
+  (2) React Flow deja `pointer-events: none` a los nodos no seleccionables → la franja necesita
+  `pointerEvents: 'all'` o el clic cae al lienzo.
+- Verificado: Acopio, su entrada y el tablero se mueven el mismo delta; Eviscerado no; Ctrl+Z vuelve
+  exacto al estado guardado.
+
 ## 2026-09-19 · Admin · Editor de líneas: uniones fáciles de acertar
 
 - Causa medida: a 37 % de zoom (el encuadre inicial) cada punto de unión medía **4 px** en pantalla
