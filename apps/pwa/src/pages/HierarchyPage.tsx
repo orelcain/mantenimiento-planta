@@ -95,7 +95,7 @@ export function HierarchyPage() {
   const location = useLocation()
   const navigate = useNavigate()
   const user = useAuthStore(state => state.user)
-  const { tree, loading, refresh, hasUpdates } = useHierarchyTree({ includeInactive: true })
+  const { tree, loading, refresh, hasUpdates } = useHierarchyTree({ includeInactive: true, vigilarCambios: true })
   const { createNode, updateNode, deleteNode, reorderNode } = useHierarchyMutations()
 
   // Vista local del árbol para reordenamiento optimista
