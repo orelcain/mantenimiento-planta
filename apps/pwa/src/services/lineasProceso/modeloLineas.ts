@@ -33,7 +33,18 @@ export interface NodoGrafo {
   id: string
   x: number
   y: number
+  /**
+   * Contenedor (zona) al que PERTENECE — explícito, no por dónde está dibujado (Orel,
+   * 19-09-2026: el contenedor crece con sus equipos; entrar o salir se confirma).
+   * Sin el campo (guardados antiguos) se deduce por la posición; `''` = sin contenedor.
+   */
+  zona?: string
+  /** Solo los elementos MANUALES (`manual:…`, creados en el editor, que no están en el árbol). */
+  nombre?: string
 }
+
+export const PREFIJO_MANUAL = 'manual:'
+export const esManual = (id: string) => id.startsWith(PREFIJO_MANUAL)
 
 export interface GrafoLineas {
   version: 1
@@ -45,6 +56,10 @@ export interface GrafoLineas {
 
 /** Tamaño de la tarjeta de un equipo en el lienzo (px): para saber en qué zona cae su centro. */
 export const NODO = { ancho: 176, alto: 62 }
+/** Tamaño de la píldora «Entrada …». */
+export const ENTRADA = { ancho: 124, alto: 44 }
+/** Aire entre el contenedor y sus equipos (arriba deja lugar para el título). */
+export const MARGEN_ZONA = { lado: 24, arriba: 48, abajo: 24 }
 
 export const PREFIJO_ENTRADA = 'in:'
 export const esEntrada = (id: string) => id.startsWith(PREFIJO_ENTRADA)
@@ -114,14 +129,48 @@ export function formatoPeso(p: number): string {
   return `${Number.isInteger(v) ? v : v.toLocaleString('es-CL')} %`
 }
 
-/** Los equipos que están en una zona de servicios de apoyo (por el centro de su tarjeta). */
+/** El contenedor al que pertenece un nodo: el explícito, el de su entrada, o el que tiene debajo. */
+export function zonaDeNodo(lineas: readonly LineaProceso[], n: NodoGrafo): string | undefined {
+  if (esEntrada(n.id)) return lineaDeEntrada(n.id)
+  if (n.zona === '') return undefined
+  if (n.zona && lineas.some((l) => l.id === n.zona)) return n.zona
+  return lineaEnPunto(lineas, n.x + NODO.ancho / 2, n.y + NODO.alto / 2)?.id
+}
+
+/**
+ * Límites de cada contenedor: su tamaño guardado AMPLIADO para que entren todos sus
+ * equipos, hacia cualquier lado (si un equipo se empuja arriba o a la izquierda, el
+ * contenedor lo sigue).
+ */
+export function limitesDeZonas(g: Pick<GrafoLineas, 'lineas' | 'nodos'>): Map<string, LineaProceso['zona']> {
+  const out = new Map<string, LineaProceso['zona']>()
+  for (const l of g.lineas) {
+    let x1 = l.zona.x
+    let y1 = l.zona.y
+    let x2 = l.zona.x + l.zona.w
+    let y2 = l.zona.y + l.zona.h
+    for (const n of g.nodos) {
+      if (zonaDeNodo(g.lineas, n) !== l.id) continue
+      const t = esEntrada(n.id) ? ENTRADA : NODO
+      x1 = Math.min(x1, n.x - MARGEN_ZONA.lado)
+      y1 = Math.min(y1, n.y - MARGEN_ZONA.arriba)
+      x2 = Math.max(x2, n.x + t.ancho + MARGEN_ZONA.lado)
+      y2 = Math.max(y2, n.y + t.alto + MARGEN_ZONA.abajo)
+    }
+    out.set(l.id, { x: x1, y: y1, w: x2 - x1, h: y2 - y1 })
+  }
+  return out
+}
+
+/** Los equipos que PERTENECEN a una zona de servicios de apoyo. */
 export function serviciosDe(g: Pick<GrafoLineas, 'lineas' | 'nodos'>): Set<string> {
-  const apoyo = g.lineas.filter((l) => l.tipo === 'apoyo')
+  const apoyo = new Set(g.lineas.filter((l) => l.tipo === 'apoyo').map((l) => l.id))
   const out = new Set<string>()
-  if (!apoyo.length) return out
+  if (!apoyo.size) return out
   for (const n of g.nodos) {
     if (esEntrada(n.id)) continue
-    if (lineaEnPunto(apoyo, n.x + NODO.ancho / 2, n.y + NODO.alto / 2)) out.add(n.id)
+    const z = zonaDeNodo(g.lineas, n)
+    if (z && apoyo.has(z)) out.add(n.id)
   }
   return out
 }

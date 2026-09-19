@@ -22,26 +22,29 @@ import {
   type NodeProps,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { ChevronLeft, Expand, Loader2, Maximize2, Minimize2, PanelLeftClose, PanelLeftOpen, Redo2, RotateCcw, Search, Undo2, X } from 'lucide-react'
-import { Button } from '@/components/piel'
+import { ChevronDown, ChevronLeft, ChevronRight, Expand, Loader2, Maximize2, Minimize2, PanelLeftClose, PanelLeftOpen, Plus, Redo2, RotateCcw, Search, Undo2, X } from 'lucide-react'
+import { Button, Sheet } from '@/components/piel'
 import { ToastAction } from '@/components/ui/toast'
 import { useHierarchyTree } from '@/hooks/useHierarchy'
 import { useAuthStore } from '@/store'
 import { useToast } from '@/hooks/useToast'
 import {
   NODO,
+  PREFIJO_MANUAL,
   esEntrada,
+  esManual,
   formatoPeso,
+  limitesDeZonas,
   lineaDeEntrada,
-  lineaEnPunto,
   pesosPorLinea,
   relacionesDeServicios,
   serviciosDe,
+  zonaDeNodo,
   type GrafoLineas,
   type LineaProceso,
 } from '@/services/lineasProceso/modeloLineas'
 import { DE_OTRA_PLANTA, propuestaChonchi } from '@/services/lineasProceso/propuestaChonchi'
-import { RAICES_CHONCHI, guardarLineas, indiceEquipos, leerLineas, seccionesDeProceso } from '@/services/lineasProceso/lineasProceso.service'
+import { RAIZ_SITIO_CHONCHI, guardarLineas, indiceArbol, leerLineas } from '@/services/lineasProceso/lineasProceso.service'
 
 /**
  * Editor de líneas de proceso (panel admin, 19-09-2026; mockups aprobados
@@ -64,11 +67,15 @@ const MIME = 'application/x-equipo'
 const GRILLA: [number, number] = [16, 16]
 const APOYO = 'rgb(var(--cat-6-ink))'
 
-type DatosMaquina = { nombre: string; peso: number | null; linea: string | null; zona: string | null; componentes: number; otraPlanta?: string }
+type DatosMaquina = { nombre: string; peso: number | null; linea: string | null; contenedor: string | null; componentes: number; otraPlanta?: string; manual?: boolean }
 type DatosServicio = { nombre: string; abastece: string[]; recibe: string[] }
 type DatosEntrada = { linea: string }
 type DatosZona = { nombre: string; w: number; h: number; apoyo: boolean; resaltada: boolean }
 type Instantanea = { nodes: Node[]; edges: Edge[] }
+/** Pertenencia y nombre (manuales) que viajan en `data` de los nodos base. */
+type DatosBase = { zona?: string; nombre?: string }
+/** Una confirmación pendiente: entrar, salir o cambiar de contenedor (Orel, 19-09-2026). */
+type Pedido = { titulo: string; detalle: string; confirmar: string; hacer: () => void; cancelar?: () => void }
 
 function tonoPeso(peso: number | null): 'serie' | 'paralelo' | 'fuera' {
   if (peso == null || peso === 0) return 'fuera'
@@ -92,8 +99,9 @@ function NodoMaquina({ data, selected }: NodeProps<Node<DatosMaquina>>) {
         {data.otraPlanta ? `de ${data.otraPlanta}` : data.peso == null ? '0 %' : formatoPeso(data.peso)}
       </p>
       <p className="text-[10.5px] leading-tight text-muted-foreground">
-        {data.otraPlanta ? 'no cuenta en esta planta' : data.linea ? `de ${data.linea}` : `fuera de la línea${data.zona ? ` · ${data.zona}` : ''}`}
+        {data.otraPlanta ? 'no cuenta en esta planta' : data.linea ? `de ${data.linea}` : `fuera de la línea${data.contenedor ? ` · ${data.contenedor}` : ''}`}
         {data.componentes ? ` · +${data.componentes} comp.` : ''}
+        {data.manual ? ' · manual' : ''}
       </p>
       <Handle type="source" position={Position.Right} className={PUNTO} />
     </div>
@@ -163,7 +171,7 @@ const aNodos = (g: GrafoLineas): Node[] => [
     id: n.id,
     type: esEntrada(n.id) ? 'entrada' : 'maquina',
     position: { x: n.x, y: n.y },
-    data: {},
+    data: { ...(n.zona !== undefined ? { zona: n.zona } : {}), ...(n.nombre ? { nombre: n.nombre } : {}) } satisfies DatosBase,
     deletable: !esEntrada(n.id),
   })),
 ]
@@ -173,7 +181,12 @@ function alGrafo(lineas: LineaProceso[], nodes: Node[], edges: Edge[]): GrafoLin
   return {
     version: 1,
     lineas,
-    nodos: nodes.filter((n) => n.type !== 'zona').map((n) => ({ id: n.id, x: Math.round(n.position.x), y: Math.round(n.position.y) })),
+    nodos: nodes
+      .filter((n) => n.type !== 'zona')
+      .map((n) => {
+        const d = n.data as DatosBase
+        return { id: n.id, x: Math.round(n.position.x), y: Math.round(n.position.y), ...(d.zona !== undefined ? { zona: d.zona } : {}), ...(d.nombre ? { nombre: d.nombre } : {}) }
+      }),
     aristas: edges.map((e) => [e.source, e.target] as [string, string]),
   }
 }
@@ -200,6 +213,9 @@ function Editor() {
   const [guardando, setGuardando] = useState(false)
   const [consulta, setConsulta] = useState('')
   const [zonaResaltada, setZonaResaltada] = useState<string | null>(null)
+  const [pedido, setPedido] = useState<Pedido | null>(null)
+  const [abiertos, setAbiertos] = useState<Set<string>>(() => new Set())
+  const [manual, setManual] = useState<{ nombre: string; zona: string } | null>(null)
   const [oscuro, setOscuro] = useState(() => typeof document !== 'undefined' && document.documentElement.classList.contains('dark'))
   const [editable, setEditable] = useState(() => typeof window === 'undefined' || window.matchMedia('(min-width: 768px) and (pointer: fine)').matches)
   // Deshacer / rehacer: instantáneas antes de cada cambio que importa (HIG «Undo and redo»).
@@ -222,13 +238,14 @@ function Editor() {
     }
   }, [])
 
-  const secciones = useMemo(() => seccionesDeProceso(tree, RAICES_CHONCHI, DE_OTRA_PLANTA), [tree])
-  const indice = useMemo(() => indiceEquipos(tree, secciones), [tree, secciones])
+  // La lista es el árbol COMPLETO del sitio (Orel: «todos los elementos de la jerarquía,
+  // no solo los que tienen código»): Planta Chonchi, Planta Yal, Acopio, Exteriores.
+  const { raiz, indice } = useMemo(() => indiceArbol(tree, RAIZ_SITIO_CHONCHI), [tree])
   const deOtraPlanta = useMemo(() => {
     const m = new Map<string, string>()
-    for (const s of secciones) for (const e of s.equipos) if (e.otraPlanta) m.set(e.id, e.otraPlanta)
+    for (const [id, e] of indice) if (DE_OTRA_PLANTA[e.nombre]) m.set(id, DE_OTRA_PLANTA[e.nombre]!)
     return m
-  }, [secciones])
+  }, [indice])
 
   const cargarGrafo = useCallback((g: GrafoLineas) => {
     setLineas(g.lineas)
@@ -238,7 +255,8 @@ function Editor() {
 
   const propuesta = useCallback(() => {
     const porNombre = new Map<string, string>()
-    for (const [id, e] of indice) if (!porNombre.has(e.nombre.toUpperCase())) porNombre.set(e.nombre.toUpperCase(), id)
+    // Los nombres se repiten entre plantas (KNURO N1 hay en Chonchi y en Yal): la propuesta es de Chonchi.
+    for (const [id, e] of indice) if (!e.ruta.includes('PLANTA YAL') && !porNombre.has(e.nombre.toUpperCase())) porNombre.set(e.nombre.toUpperCase(), id)
     return propuestaChonchi((n) => porNombre.get(n.trim().toUpperCase()))
   }, [indice])
 
@@ -274,34 +292,48 @@ function Editor() {
   const servicios = useMemo(() => serviciosDe(grafo), [grafo])
   const relaciones = useMemo(() => relacionesDeServicios(grafo, pesos), [grafo, pesos])
   const nombreLinea = useMemo(() => new Map(lineas.map((l) => [l.id, l.nombre])), [lineas])
+  const nombresManuales = useMemo(() => new Map(grafo.nodos.filter((n) => esManual(n.id)).map((n) => [n.id, n.nombre ?? 'Elemento manual'])), [grafo])
   const nombreDe = useCallback(
-    (id: string) => (esEntrada(id) ? `Entrada ${nombreLinea.get(lineaDeEntrada(id)) ?? ''}` : (indice.get(id)?.nombre ?? 'Equipo que ya no está en el árbol')),
-    [indice, nombreLinea],
+    (id: string) =>
+      esEntrada(id)
+        ? `Entrada ${nombreLinea.get(lineaDeEntrada(id)) ?? ''}`
+        : esManual(id)
+          ? (nombresManuales.get(id) ?? 'Elemento manual')
+          : (indice.get(id)?.nombre ?? 'Equipo que ya no está en el árbol'),
+    [indice, nombreLinea, nombresManuales],
   )
+  // Contenedores: pertenencia explícita y límites que crecen con sus equipos.
+  const limites = useMemo(() => limitesDeZonas(grafo), [grafo])
+  const contenedorDe = useMemo(() => new Map(grafo.nodos.map((n) => [n.id, zonaDeNodo(lineas, n)])), [grafo, lineas])
 
   const vista = useMemo(
     () =>
       nodes.map((n): Node => {
-        if (n.type === 'zona') return { ...n, data: { ...n.data, resaltada: n.id === zonaResaltada } }
+        if (n.type === 'zona') {
+          const l = limites.get(n.id.slice('zona:'.length))
+          return { ...n, position: l ? { x: l.x, y: l.y } : n.position, data: { ...n.data, ...(l ? { w: l.w, h: l.h } : {}), resaltada: n.id === zonaResaltada } }
+        }
         if (n.type === 'entrada') return { ...n, ariaLabel: nombreDe(n.id), data: { linea: nombreLinea.get(lineaDeEntrada(n.id)) ?? lineaDeEntrada(n.id) } }
         const e = indice.get(n.id)
         if (servicios.has(n.id)) {
           const r = relaciones.get(n.id)
           const data: DatosServicio = {
-            nombre: e?.nombre ?? 'Equipo que ya no está en el árbol',
+            nombre: nombreDe(n.id),
             abastece: (r?.abastece ?? []).map((l) => nombreLinea.get(l) ?? l),
             recibe: (r?.recibe ?? []).map((l) => nombreLinea.get(l) ?? l),
           }
           return { ...n, type: 'servicio', ariaLabel: `${data.nombre}, servicio de apoyo`, data }
         }
         const p = pesos.get(n.id)
+        const cont = contenedorDe.get(n.id)
         const data: DatosMaquina = {
-          nombre: e?.nombre ?? 'Equipo que ya no está en el árbol',
+          nombre: nombreDe(n.id),
           componentes: e ? e.hijos.length : 0,
           otraPlanta: deOtraPlanta.get(n.id),
           peso: p?.peso ?? null,
           linea: p ? (nombreLinea.get(p.lineaId) ?? null) : null,
-          zona: lineaEnPunto(lineas, n.position.x + NODO.ancho / 2, n.position.y + NODO.alto / 2)?.nombre ?? null,
+          contenedor: cont ? (nombreLinea.get(cont) ?? null) : null,
+          manual: esManual(n.id),
         }
         return {
           ...n,
@@ -310,7 +342,7 @@ function Editor() {
           data,
         }
       }),
-    [nodes, indice, pesos, servicios, relaciones, nombreLinea, lineas, zonaResaltada, deOtraPlanta, nombreDe],
+    [nodes, indice, pesos, servicios, relaciones, nombreLinea, zonaResaltada, deOtraPlanta, nombreDe, limites, contenedorDe],
   )
 
   const vistaAristas = useMemo(
@@ -462,8 +494,20 @@ function Editor() {
     [avisoQuitado, nombreDe],
   )
 
-  // Zona bajo un punto del lienzo: se resalta solo mientras se arrastra encima (HIG «Drag and drop»).
-  const zonaEn = useCallback((x: number, y: number) => lineaEnPunto(lineas, x, y), [lineas])
+  // Contenedor bajo un punto (el más chico, si se solapan), sin contar uno. Se resalta solo
+  // mientras se arrastra encima (HIG «Drag and drop»).
+  const zonaEn = useCallback(
+    (x: number, y: number, excluir?: string) => {
+      let mejor: { l: LineaProceso; area: number } | undefined
+      for (const l of lineas) {
+        if (l.id === excluir) continue
+        const z = limites.get(l.id) ?? l.zona
+        if (x >= z.x && x < z.x + z.w && y >= z.y && y < z.y + z.h && (!mejor || z.w * z.h < mejor.area)) mejor = { l, area: z.w * z.h }
+      }
+      return mejor?.l
+    },
+    [lineas, limites],
+  )
   const alArrastrarEncima = (ev: DragEvent) => {
     ev.preventDefault()
     const p = screenToFlowPosition({ x: ev.clientX, y: ev.clientY })
@@ -471,14 +515,25 @@ function Editor() {
     setZonaResaltada(z ? `zona:${z.id}` : null)
   }
 
-  const agregar = useCallback(
-    (id: string, x: number, y: number) => {
-      if (enLienzo.has(id)) return
+  // Entrar a un contenedor se confirma (Orel: «solicitar el ingreso o salida… cada vez»).
+  const agregar = (id: string, x: number, y: number, datos: DatosBase = {}) => {
+    if (enLienzo.has(id)) return
+    const poner = (zona: string) => {
       registrar()
-      setNodes((ns) => [...ns, { id, type: 'maquina', position: { x: x - NODO.ancho / 2, y: y - NODO.alto / 2 }, data: {} }])
-    },
-    [enLienzo, registrar],
-  )
+      setNodes((ns) => [...ns, { id, type: 'maquina', position: { x: x - NODO.ancho / 2, y: y - NODO.alto / 2 }, data: { ...datos, zona } satisfies DatosBase }])
+    }
+    const z = zonaEn(x, y)
+    if (!z) {
+      poner('')
+      return
+    }
+    setPedido({
+      titulo: `¿Agregar ${datos.nombre ?? nombreDe(id)} a ${z.nombre}?`,
+      detalle: 'Pasa a ser parte de ese contenedor: si lo mueves, el contenedor crece con él.',
+      confirmar: 'Agregar',
+      hacer: () => poner(z.id),
+    })
+  }
   const alSoltar = (ev: DragEvent) => {
     ev.preventDefault()
     setZonaResaltada(null)
@@ -487,11 +542,74 @@ function Editor() {
     const p = screenToFlowPosition({ x: ev.clientX, y: ev.clientY })
     agregar(id, p.x, p.y)
   }
-  const alTocar = (id: string) => {
+  const centroVista = () => {
     const r = lienzo.current?.getBoundingClientRect()
-    if (!r) return
-    const p = screenToFlowPosition({ x: r.left + r.width / 2, y: r.top + r.height / 2 })
+    return r ? screenToFlowPosition({ x: r.left + r.width / 2, y: r.top + r.height / 2 }) : { x: 0, y: 0 }
+  }
+  const alTocar = (id: string) => {
+    const p = centroVista()
     agregar(id, p.x, p.y)
+  }
+  // La pertenencia se lee SIEMPRE del estado: los nodos de React Flow traen los datos de la vista.
+  const contenedorDeNodo = (n: Node) => {
+    const d = (nodes.find((x) => x.id === n.id)?.data ?? {}) as DatosBase
+    return zonaDeNodo(lineas, { id: n.id, x: n.position.x, y: n.position.y, zona: d.zona })
+  }
+
+  // Al soltar sobre OTRO contenedor: ¿salir de uno y entrar al otro? Cancelar lo devuelve.
+  const alSoltarNodos = (movidos: Node[]) => {
+    setZonaResaltada(null)
+    const candidatos = movidos.filter((m) => m.type !== 'zona' && !esEntrada(m.id))
+    const primero = candidatos[0]
+    if (!primero) return
+    const origen = contenedorDeNodo(primero)
+    const destino = zonaEn(primero.position.x + NODO.ancho / 2, primero.position.y + NODO.alto / 2, origen)
+    if (!destino) return
+    const ids = new Set(candidatos.map((m) => m.id))
+    const quien = ids.size === 1 ? nombreDe(primero.id) : `${ids.size} equipos`
+    setPedido({
+      titulo: `¿Mover ${quien} ${origen ? `de ${nombreLinea.get(origen) ?? origen} ` : ''}a ${destino.nombre}?`,
+      detalle: origen ? `Sale de ${nombreLinea.get(origen) ?? origen} y entra a ${destino.nombre}.` : `Entra a ${destino.nombre}.`,
+      confirmar: 'Mover',
+      hacer: () => setNodes((ns) => ns.map((x) => (ids.has(x.id) ? { ...x, data: { ...(x.data as DatosBase), zona: destino.id } } : x))),
+      cancelar: () => deshacer(),
+    })
+  }
+
+  // Cambiar de contenedor desde el inspector: el equipo se lleva adentro del nuevo, o afuera del actual.
+  const cambiarContenedor = (n: Node, destino: string) => {
+    const origen = contenedorDeNodo(n)
+    if ((origen ?? '') === destino) return
+    // Al sacarlo queda ARRIBA de todos los contenedores (al costado caería encima del vecino).
+    const lim = destino ? limites.get(destino) : undefined
+    const techo = Math.min(...[...limites.values()].map((z) => z.y))
+    const pos = lim ? { x: lim.x + 24, y: lim.y + lim.h } : destino ? n.position : { x: n.position.x, y: techo - NODO.alto - 32 }
+    setPedido({
+      titulo: destino
+        ? `¿Mover ${nombreDe(n.id)} a ${nombreLinea.get(destino) ?? destino}?`
+        : `¿Sacar ${nombreDe(n.id)} de ${nombreLinea.get(origen ?? '') ?? 'su contenedor'}?`,
+      detalle: destino ? 'Queda dentro del nuevo contenedor; revisa sus flechas.' : 'Queda fuera de todo contenedor, al costado.',
+      confirmar: destino ? 'Mover' : 'Sacar',
+      hacer: () => {
+        registrar()
+        setNodes((ns) => ns.map((x) => (x.id === n.id ? { ...x, position: pos, data: { ...(x.data as DatosBase), zona: destino } } : x)))
+      },
+    })
+  }
+
+  // Elemento manual: algo que no está en el árbol, creado aquí (Orel, 19-09-2026).
+  const crearManual = () => {
+    if (!manual?.nombre.trim()) return
+    const id = `${PREFIJO_MANUAL}${Date.now().toString(36)}`
+    const lim = manual.zona ? limites.get(manual.zona) : undefined
+    // Debajo de lo que ya tiene: el contenedor crece para recibirlo, sin encimarlo.
+    const p = lim ? { x: lim.x + 24 + NODO.ancho / 2, y: lim.y + lim.h + NODO.alto / 2 } : centroVista()
+    registrar()
+    setNodes((ns) => [
+      ...ns,
+      { id, type: 'maquina', position: { x: p.x - NODO.ancho / 2, y: p.y - NODO.alto / 2 }, data: { zona: manual.zona, nombre: manual.nombre.trim().replace(/\s+/g, ' ') } satisfies DatosBase },
+    ])
+    setManual(null)
   }
 
   // Desplegar: los componentes directos del equipo quedan debajo, sin unir, para armarlos.
@@ -505,7 +623,7 @@ function Editor() {
         id: h.id,
         type: 'maquina',
         position: { x: n.position.x + (i % 3) * (NODO.ancho + 16), y: n.position.y + NODO.alto + 40 + Math.floor(i / 3) * (NODO.alto + 24) },
-        data: {},
+        data: { zona: contenedorDeNodo(n) ?? '' } satisfies DatosBase,
         selected: true,
       })),
     ])
@@ -527,8 +645,11 @@ function Editor() {
   const guardar = async () => {
     setGuardando(true)
     try {
-      await guardarLineas(PLANTA, grafo, usuario ? `${usuario.nombre} ${usuario.apellido}`.trim() : 'Admin')
-      setGuardado(JSON.stringify(grafo))
+      const conLimites = lineas.map((l) => ({ ...l, zona: limites.get(l.id) ?? l.zona }))
+      const g = { ...grafo, lineas: conLimites }
+      await guardarLineas(PLANTA, g, usuario ? `${usuario.nombre} ${usuario.apellido}`.trim() : 'Admin')
+      setLineas(conLimites)
+      setGuardado(JSON.stringify(g))
       setMeta(`Guardado por ${usuario?.nombre ?? 'admin'} · recién`)
     } catch {
       toast({ title: 'No se pudo guardar', description: 'Revisa la conexión o tus permisos de administrador.', variant: 'destructive' })
@@ -548,7 +669,6 @@ function Editor() {
     [lineas, pesos],
   )
 
-  const q = consulta.trim().toLowerCase()
   const inspector = editable && (seleccionado || flechaSeleccionada)
 
   return (
@@ -614,57 +734,62 @@ function Editor() {
 
       <div className="flex min-h-0 flex-1">
         {editable && conLista && (
-          <aside aria-label="Equipos" className="flex w-[280px] shrink-0 flex-col gap-2 overflow-y-auto border-r border-border bg-card p-3">
+          <aside aria-label="Jerarquía de equipos" className="flex w-[300px] shrink-0 flex-col gap-2 overflow-y-auto border-r border-border bg-card p-3">
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
               <input
                 value={consulta}
                 onChange={(e) => setConsulta(e.target.value)}
-                placeholder="Equipo o código"
-                aria-label="Buscar equipo o código"
+                placeholder="Equipo, área o código"
+                aria-label="Buscar en la jerarquía"
                 className="h-[44px] w-full rounded-ctl bg-muted-foreground/10 pl-9 pr-3 text-campo outline-none focus-visible:ring-2 focus-visible:ring-primary"
               />
             </div>
+            <Button variant="tinted" onClick={() => setManual({ nombre: '', zona: '' })}>
+              <Plus /> Elemento manual
+            </Button>
             <p className="text-caption text-muted-foreground">
-              Arrastra un equipo al lienzo (o tócalo). Para unir, arrastra desde el punto azul de la derecha hasta otro equipo. Mayús + arrastre selecciona varios. Supr quita · Ctrl+Z
-              deshace.
+              Toda la jerarquía, con o sin código. Arrastra al lienzo (o toca). Para unir, arrastra desde el punto azul. Mayús + arrastre selecciona varios. Supr quita · Ctrl+Z deshace.
             </p>
-            {secciones.map((s) => {
-              const lista = s.equipos.filter((e) => !q || e.nombre.toLowerCase().includes(q) || e.codigo.includes(q))
-              if (!lista.length) return null
-              const fuera = lista.filter((e) => !enLienzo.has(e.id)).length
-              const esServicio = s.nombre.startsWith('Servicios')
-              return (
-                <details key={s.nombre} open={Boolean(q)} className="border-t border-border pt-1 first:border-t-0">
-                  <summary className="flex min-h-[36px] cursor-pointer items-center justify-between text-footnote font-semibold text-muted-foreground">
-                    <span style={esServicio ? { color: APOYO } : undefined}>{s.nombre}</span>
-                    <span className="font-normal tabular-nums">{fuera} fuera</span>
-                  </summary>
-                  <div className="flex flex-wrap gap-1.5 pb-2">
-                    {lista.map((e) => {
-                      const puesto = enLienzo.has(e.id)
-                      return (
-                        <button
-                          key={e.id}
-                          type="button"
-                          draggable={!puesto}
-                          disabled={puesto}
-                          onDragStart={(ev) => ev.dataTransfer.setData(MIME, e.id)}
-                          onDragEnd={() => setZonaResaltada(null)}
-                          onClick={() => alTocar(e.id)}
-                          title={`${e.nombre}${e.codigo ? ` · ${e.codigo}` : ''}${e.otraPlanta ? ` · abastece a ${e.otraPlanta}` : ''}`}
-                          className="max-w-full cursor-grab rounded-ctl bg-muted-foreground/10 px-2 py-1.5 text-left text-[11.5px] leading-tight disabled:cursor-default disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                        >
-                          {e.nombre}
-                          {e.conjunto ? ' (conjunto)' : ''}
-                          {e.otraPlanta ? <span className="font-semibold text-ink-warn"> · de {e.otraPlanta}</span> : null}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </details>
-              )
-            })}
+            {consulta.trim() ? (
+              <ul className="flex flex-col" aria-label="Resultados">
+                {[...indice.entries()]
+                  .filter(([, e]) => {
+                    const t = consulta.trim().toLowerCase()
+                    return e.nombre.toLowerCase().includes(t) || e.codigo.toLowerCase().includes(t)
+                  })
+                  .slice(0, 80)
+                  .map(([id, e]) => (
+                    <li key={id}>
+                      <FilaEquipo id={id} nombre={e.nombre} codigo={e.codigo} area={e.area} ruta={e.ruta.join(' › ')} puesto={enLienzo.has(id)} otraPlanta={deOtraPlanta.get(id)} onTocar={alTocar} onDragEnd={() => setZonaResaltada(null)} />
+                    </li>
+                  ))}
+              </ul>
+            ) : (
+              <ul className="flex flex-col" aria-label="Jerarquía">
+                {(raiz?.children ?? []).map((h) => (
+                  <RamaArbol
+                    key={h.id}
+                    id={h.id}
+                    nivel={0}
+                    indice={indice}
+                    abiertos={abiertos}
+                    onAlternar={(id) =>
+                      setAbiertos((a) => {
+                        const b = new Set(a)
+                        if (b.has(id)) b.delete(id)
+                        else b.add(id)
+                        return b
+                      })
+                    }
+                    enLienzo={enLienzo}
+                    deOtraPlanta={deOtraPlanta}
+                    onTocar={alTocar}
+                    onDragEnd={() => setZonaResaltada(null)}
+                  />
+                ))}
+              </ul>
+            )}
           </aside>
         )}
 
@@ -696,10 +821,10 @@ function Editor() {
               onDelete={onDelete}
               onNodeDragStart={() => registrar()}
               onNodeDrag={(_, n) => {
-                const z = zonaEn(n.position.x + NODO.ancho / 2, n.position.y + NODO.alto / 2)
+                const z = esEntrada(n.id) ? undefined : zonaEn(n.position.x + NODO.ancho / 2, n.position.y + NODO.alto / 2, contenedorDeNodo(n))
                 setZonaResaltada(z ? `zona:${z.id}` : null)
               }}
-              onNodeDragStop={() => setZonaResaltada(null)}
+              onNodeDragStop={(_, n, movidos) => alSoltarNodos(movidos.length ? movidos : [n])}
               isValidConnection={esValida}
               nodesDraggable={editable}
               nodesConnectable={editable}
@@ -805,6 +930,10 @@ function Editor() {
                 lineaNombre={(id) => nombreLinea.get(id) ?? id}
                 servicio={servicios.has(seleccionado.id) ? relaciones.get(seleccionado.id) : undefined}
                 otraPlanta={deOtraPlanta.get(seleccionado.id)}
+                manual={esManual(seleccionado.id)}
+                contenedor={contenedorDeNodo(seleccionado) ?? ''}
+                contenedores={lineas.map((l) => ({ id: l.id, nombre: l.nombre }))}
+                onCambiarContenedor={(z) => cambiarContenedor(seleccionado, z)}
                 onDesplegar={() => desplegar(seleccionado)}
                 onQuitar={quitarSeleccion}
               />
@@ -830,6 +959,90 @@ function Editor() {
           </aside>
         )}
       </div>
+
+      {/* Entrar, salir o cambiar de contenedor: siempre se pregunta. Cancelar lo devuelve. */}
+      <Sheet
+        open={!!pedido}
+        onClose={() => {
+          pedido?.cancelar?.()
+          setPedido(null)
+        }}
+        title={pedido?.titulo}
+        description={pedido?.detalle}
+        actions={
+          <>
+            <Button
+              variant="tinted"
+              onClick={() => {
+                pedido?.cancelar?.()
+                setPedido(null)
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                pedido?.hacer()
+                setPedido(null)
+              }}
+            >
+              {pedido?.confirmar}
+            </Button>
+          </>
+        }
+      />
+
+      {/* Elemento manual: lo que no está en el árbol (un estanque, una cinta sin código…). */}
+      <Sheet
+        open={!!manual}
+        onClose={() => setManual(null)}
+        title="Nuevo elemento manual"
+        description="Para lo que no está en la jerarquía. Queda guardado en las líneas, marcado como manual."
+        actions={
+          <>
+            <Button variant="tinted" onClick={() => setManual(null)}>
+              Cancelar
+            </Button>
+            <Button onClick={crearManual} disabled={!manual?.nombre.trim()}>
+              Crear
+            </Button>
+          </>
+        }
+      >
+        {manual && (
+          <div className="flex flex-col gap-3">
+            <label className="flex flex-col gap-1">
+              <span className="text-footnote text-muted-foreground">Nombre</span>
+              <input
+                autoFocus
+                value={manual.nombre}
+                maxLength={80}
+                onChange={(e) => setManual({ ...manual, nombre: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') crearManual()
+                }}
+                placeholder="Ej.: Estanque de transferencia AM"
+                className="h-[44px] w-full rounded-ctl bg-muted-foreground/10 px-3 text-campo outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-footnote text-muted-foreground">Contenedor</span>
+              <select
+                value={manual.zona}
+                onChange={(e) => setManual({ ...manual, zona: e.target.value })}
+                className="h-[44px] w-full cursor-pointer rounded-ctl bg-muted-foreground/10 px-3 text-campo outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                <option value="">Ninguno</option>
+                {lineas.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.nombre}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        )}
+      </Sheet>
     </div>
   )
 }
@@ -845,6 +1058,10 @@ function FichaNodo({
   lineaNombre,
   servicio,
   otraPlanta,
+  manual,
+  contenedor,
+  contenedores,
+  onCambiarContenedor,
   onDesplegar,
   onQuitar,
 }: {
@@ -858,6 +1075,10 @@ function FichaNodo({
   lineaNombre: (id: string) => string
   servicio?: { abastece: string[]; recibe: string[] }
   otraPlanta?: string
+  manual?: boolean
+  contenedor: string
+  contenedores: { id: string; nombre: string }[]
+  onCambiarContenedor: (zona: string) => void
   onDesplegar: () => void
   onQuitar: () => void
 }) {
@@ -874,8 +1095,24 @@ function FichaNodo({
     <>
       <h2 className="text-headline">{nombre}</h2>
       <p className="text-footnote text-muted-foreground">
-        {[codigo, padre ? `componente de ${padre}` : ''].filter(Boolean).join(' · ') || 'Sin código'}
+        {manual ? 'Elemento manual · no está en el árbol' : [codigo, padre ? `componente de ${padre}` : ''].filter(Boolean).join(' · ') || 'Sin código'}
       </p>
+      {/* Contenedor: cambiarlo se confirma (entra al nuevo, o queda afuera, al costado). */}
+      <label className="flex min-h-[44px] items-center justify-between gap-2 rounded-ctl bg-muted-foreground/10 pl-3 pr-1">
+        <span className="text-footnote">Contenedor</span>
+        <select
+          value={contenedor}
+          onChange={(e) => onCambiarContenedor(e.target.value)}
+          className="min-h-[44px] min-w-0 max-w-[65%] cursor-pointer truncate rounded-ctl bg-transparent px-2 text-right text-footnote font-semibold text-primary outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          <option value="">Ninguno</option>
+          {contenedores.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.nombre}
+            </option>
+          ))}
+        </select>
+      </label>
       {otraPlanta ? (
         <p className="rounded-ctl bg-ink-warn/10 px-3 py-2 text-footnote">Abastece a la planta {otraPlanta}: no cuenta en las líneas de Chonchi.</p>
       ) : servicio ? (
@@ -922,6 +1159,113 @@ function FichaNodo({
         Quitar del lienzo
       </Button>
     </>
+  )
+}
+
+function FilaEquipo({
+  id,
+  nombre,
+  codigo,
+  area,
+  ruta,
+  puesto,
+  otraPlanta,
+  onTocar,
+  onDragEnd,
+}: {
+  id: string
+  nombre: string
+  codigo: string
+  area: boolean
+  ruta?: string
+  puesto: boolean
+  otraPlanta?: string
+  onTocar: (id: string) => void
+  onDragEnd: () => void
+}) {
+  return (
+    <button
+      type="button"
+      draggable={!puesto}
+      disabled={puesto}
+      onDragStart={(ev) => ev.dataTransfer.setData(MIME, id)}
+      onDragEnd={onDragEnd}
+      onClick={() => onTocar(id)}
+      title={`${nombre}${codigo ? ` · ${codigo}` : ''}${puesto ? ' · ya está en el lienzo' : ''}`}
+      className="flex min-h-[36px] w-full min-w-0 cursor-grab flex-col justify-center rounded-ctl px-2 py-1 text-left hover:bg-muted-foreground/10 disabled:cursor-default disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+    >
+      <span className={`break-words text-[12px] leading-tight ${area ? 'font-semibold' : ''}`}>
+        {nombre}
+        {otraPlanta ? <span className="font-semibold text-ink-warn"> · de {otraPlanta}</span> : null}
+      </span>
+      {(codigo || ruta) && <span className="truncate text-[10.5px] text-muted-foreground">{[codigo, ruta].filter(Boolean).join(' · ')}</span>}
+    </button>
+  )
+}
+
+function RamaArbol({
+  id,
+  nivel,
+  indice,
+  abiertos,
+  onAlternar,
+  enLienzo,
+  deOtraPlanta,
+  onTocar,
+  onDragEnd,
+}: {
+  id: string
+  nivel: number
+  indice: Map<string, { nombre: string; codigo: string; area: boolean; hijos: { id: string; nombre: string }[] }>
+  abiertos: Set<string>
+  onAlternar: (id: string) => void
+  enLienzo: Set<string>
+  deOtraPlanta: Map<string, string>
+  onTocar: (id: string) => void
+  onDragEnd: () => void
+}) {
+  const e = indice.get(id)
+  if (!e) return null
+  const abierto = abiertos.has(id)
+  return (
+    <li>
+      <div className="flex items-start" style={{ paddingLeft: nivel * 12 }}>
+        {e.hijos.length ? (
+          <button
+            type="button"
+            onClick={() => onAlternar(id)}
+            aria-expanded={abierto}
+            aria-label={`${abierto ? 'Contraer' : 'Desplegar'} ${e.nombre}`}
+            className="flex size-9 shrink-0 items-center justify-center rounded-ctl text-muted-foreground hover:bg-muted-foreground/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            {abierto ? <ChevronDown className="size-4" aria-hidden /> : <ChevronRight className="size-4" aria-hidden />}
+          </button>
+        ) : (
+          <span className="size-9 shrink-0" aria-hidden />
+        )}
+        <div className="min-w-0 flex-1">
+          <FilaEquipo id={id} nombre={e.nombre} codigo={e.codigo} area={e.area} puesto={enLienzo.has(id)} otraPlanta={deOtraPlanta.get(id)} onTocar={onTocar} onDragEnd={onDragEnd} />
+        </div>
+      </div>
+      {abierto && e.hijos.length > 0 && (
+        <ul>
+          {e.hijos.map((h) => (
+            <RamaArbol
+              key={h.id}
+              id={h.id}
+              nivel={nivel + 1}
+              indice={indice}
+              abiertos={abiertos}
+              onAlternar={onAlternar}
+              enLienzo={enLienzo}
+              deOtraPlanta={deOtraPlanta}
+              onTocar={onTocar}
+              onDragEnd={onDragEnd}
+            />
+          ))}
+        </ul>
+      )}
+    </li>
   )
 }
 

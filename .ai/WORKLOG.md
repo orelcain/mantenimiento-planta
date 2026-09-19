@@ -21,6 +21,23 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-19 · Admin · Editor de líneas: contenedores que crecen, árbol completo y elementos manuales
+
+- **Contenedores**: la pertenencia a una zona es explícita (`NodoGrafo.zona`; `''` = sin contenedor;
+  sin campo = por posición, para guardados viejos). `limitesDeZonas` amplía cada caja hacia
+  cualquier lado para que quepan sus equipos. Entrar, salir o cambiar de contenedor SIEMPRE se
+  confirma (hoja «¿Mover X de A a B?»; Cancelar devuelve el arrastre con deshacer). Al guardar,
+  las zonas quedan con el tamaño al que crecieron.
+- **Lista = árbol completo** desde `aq-in-cho` (`indiceArbol`), desplegable, con áreas y nodos sin
+  código; el buscador encuentra también áreas y muestra la ruta. Ahí aparece «Estanque de
+  transferencia AM» (Patio y servicios exteriores).
+- **Elementos manuales** (`manual:<id>`, con `nombre` en el doc): hoja con nombre + contenedor; el
+  inspector los marca «no está en el árbol». El inspector trae además el selector de contenedor.
+- ⚠ Trampa pagada: los nodos que entrega React Flow en `onNodeDragStop` traen los `data` de la
+  VISTA, no los del estado → la pertenencia se lee siempre del estado (`contenedorDeNodo`).
+- Verificado en `/dev/lineas-proceso` (sin guardar): agregar con confirmación, crecer hacia arriba
+  sin preguntar, mover Eviscerado→Acopio confirmado y cancelado, sacar, crear manual.
+
 ## 2026-09-19 · Admin · Editor de líneas: pantalla completa y lista plegable
 - Orel: «¿cómo hacer el espacio de trabajo más amplio? ¿pantalla completa?». Botón «Pantalla completa»: el editor pasa a una capa `fixed inset-0` (tapa la barra lateral de la app) y pide `requestFullscreen` del DOCUMENTO — ⚠ NO del contenedor: los avisos con «Deshacer» viven en un portal del body y quedarían ocultos. Esc sale (`fullscreenchange` sincroniza). Botón para ocultar/mostrar la lista de equipos. Al ampliar, reencuadra.
 - Propuesta: zonas de Acopio/Eviscerado a 720 de alto y servicios más abajo — el «TABLERO CONTROL SISTEMA N1» quedaba encima del título de «Servicios de apoyo» (visto en la captura de Orel).
