@@ -21,6 +21,17 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-19 · Bitacora ronda 51 · El equipo escrito a mano que no queda vinculado
+- Hipotesis de la ronda anterior: «las maquinas del proceso que se escriben a mano habria que vincularlas al buscar». **MEDIDA Y DESCARTADA**: se cruzaron los 12 eventos sin `equipoId` contra los **702 nodos** de `hierarchy` y **NINGUNO coincide** (0 exactos, 0 ambiguos, 12 sin nodo). El problema no es que el buscador no encuentre: es que se escribe OTRA COSA.
+  - «KNURO» a secas → el arbol tiene KNURO N1, N2 y N3 (falta el numero).
+  - «CINTAS FILETE», «CINTAS HG», «CINTAS FILETE Y HG», «Linea manual HG» → conjuntos de trabajo que el arbol no modela.
+  - «TOLDO PORTERIA», «HIDROLAVADORA LAVADO CARRO», «ENCHUFE TRIFASICO TRANSPALTA» → cosas reales que probablemente NO deban estar en el arbol de equipos de produccion.
+- Construido (decision de Orel): **aviso de «no quedo vinculado»**. Cuando el campo pierde el foco, el texto tiene 2+ caracteres, NO quedo atado a un nodo y hay parecidos, sale una caja ambar: «"KNURO" no quedo vinculado a un equipo. ¿Es alguno de estos?» con los 3 mejores (nombre + codigo SAP) y la salida «Si no es ninguno, sigue: se guarda el texto tal cual». No bloquea nada.
+- ⚠ Al verificar: el aviso **no aparece con `el.blur()` por script** (en el panel del navegador el foco programatico no se comporta como el real) y eso hizo creer que no funcionaba. Con clicks de verdad —`triple_click` en el campo, escribir, click en otro rotulo— aparece. Para probar foco/blur en esta app, **usar interaccion real, no JS**.
+- Verificado en `/dev/bitacora-real`: escribiendo «BAADER» y saliendo del campo aparecen EVISCERADORA BAADER 142 N2 (720004411), N3 (720004412) y TABLERO ELECTRICO N1 (720004413); al tocar la primera, el campo queda con el nombre completo, el aviso desaparece y sale la linea «Planta Yal · Eviscerado · N° de equipo 720004411».
+- tsc 0; eslint 30; vitest 2.811; auditorias OK; build OK.
+- Estado: HECHO. **PENDIENTE de Orel**: a que area padre cuelgan «CINTAS FILETE», «CINTAS HG» y «LINEA MANUAL HG» para crearlos como area en `hierarchy`. El arbol de PROCESO de Planta Chonchi tiene INGRESO MATERIA PRIMA · SISTEMA VACIO · SACRIFICIO · EVISCERADO · EMPARRILLADO · FILETE · SELLADO · EMPAQUE · ARMADO DE CAJAS · LAVADO BANDEJAS Y CARROS · TUNELES · OFICINAS — no hay un area llamada «HG» (podria ser EVISCERADO, pero eso lo confirma planta, no se asume).
+
 ## 2026-09-18 · Bitacora ronda 50 · Menos opciones: fuera «Montaje/desmontaje» y fuera «Ubicacion en el turno»
 - Dos observaciones de Orel sobre lo recien construido, las dos correctas:
   1. **«Montaje/desmontaje» ES rutinario**, y tenerlos lado a lado obligaba a elegir entre SINONIMOS — justo el problema que la ronda 49 vino a sacar. Se fusiona en **«Rutinario»**, que ahora cubre lubricacion, limpieza y el armado/desarmado de cintas para higiene. `montaje` pasa a `TIPOS_LEGADO` (vivio unas horas; 0 eventos lo usaron, comprobado en Firestore). La lista queda en 7: Correctivo · Rutinario · Preventivo · Inspeccion · Ajuste · Novedad · Otro.

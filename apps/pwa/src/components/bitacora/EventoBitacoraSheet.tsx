@@ -1314,6 +1314,7 @@ export function EventoBitacoraSheet({
             opciones={opcionesEquipo}
             cargando={cargandoEquipos}
             recientes={equiposSugeridos}
+            vinculado={Boolean(equipoId)}
           />
           {equipoId && (opcionElegida || equipoCodigo) && (
             <p className="-mt-1.5 text-footnote text-muted-foreground">
