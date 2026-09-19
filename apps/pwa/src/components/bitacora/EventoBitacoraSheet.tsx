@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
-import { AlertTriangle, Check, Clock3, ImagePlus, Loader2, RotateCw, Trash2, Users, X } from 'lucide-react'
+import { AlertTriangle, Check, ChevronRight, Clock3, ImagePlus, Loader2, RotateCw, Trash2, Users, X } from 'lucide-react'
 import { ActionSheet, Button, Sheet } from '@/components/piel'
 import { useToast } from '@/hooks/useToast'
 import {
@@ -250,7 +250,8 @@ export function EventoBitacoraSheet({
   const [turnoDestino, setTurnoDestino] = useState('')
   const campoId = useId()
   /** Al editar, «quién edita» va plegado en una línea; «Cambiar» muestra los chips (17-09). */
-  const [cambiarQuien, setCambiarQuien] = useState(false)
+  /** Fila abierta de la tarjeta de «quién»: lo que falta viene abierto al abrir la hoja. */
+  const [abierta, setAbierta] = useState<'tecnico' | 'participantes' | null>(null)
   /** Quién lo registró, editable en un evento ya publicado (se eligió mal o lo cargó otro). */
   const [registrador, setRegistrador] = useState('')
   const [participantes, setParticipantes] = useState<string[]>([])
@@ -387,7 +388,8 @@ export function EventoBitacoraSheet({
     const quienInicial = autorFijo ?? (lista.length === 0 || lista.includes(recordado) ? recordado : '')
     setQuien(quienInicial)
     setTurnoDestino(evento?.turnoId ?? turno.id)
-    setCambiarQuien(false)
+    // El técnico que falta viene abierto (nuevo o borrador sin nombre); al editar uno publicado, cerrado.
+    setAbierta(!autorFijo && lista.length > 0 && !quienInicial && (!evento || evento.estado === 'borrador') ? 'tecnico' : null)
     setRegistrador(evento?.registradoPor ?? '')
     setParticipantes(evento?.participantes ?? [])
     // «Resolver pendiente»: el equipo, su vínculo y el tipo vienen del pendiente original.
@@ -543,7 +545,7 @@ export function EventoBitacoraSheet({
       fotos,
       fotosAntes: fotosServidor.current,
       cierreAntes: (eventoVivo ?? evento)?.cierre ?? null,
-      quien,
+      quien: autorEditable ? quien.trim() || registrador.trim() || registradoEnServidor : quien,
       resuelvePendiente: pendienteOrigen ? copiaDeOrigen(pendienteOrigen) : null,
       // Quien registra no se repite como participante (pudo quedar marcado antes de elegirlo).
       participantes: participantes.filter((p) => p.trim().toLowerCase() !== quienRegistro.trim().toLowerCase()),
@@ -934,8 +936,9 @@ export function EventoBitacoraSheet({
     setError(null)
     // Con la cuenta compartida, sin esto no se sabría quién registró. Si el
     // calendario no cargó (sin lista), se guarda con el nombre de la cuenta.
-    if (tecnicos.todos.length > 0 && !quien.trim()) {
-      setError(esNuevo ? 'Elige quién registra el evento.' : 'Elige quién está editando.')
+    if (tecnicos.todos.length > 0 && !autorEditable && !quien.trim()) {
+      setError('Elige el técnico.')
+      setAbierta('tecnico')
       return
     }
     if (tipo === 'otro' && !limpiarTipo(tipoOtro)) {
@@ -1051,11 +1054,29 @@ export function EventoBitacoraSheet({
   // Un botón desactivado no dice POR QUÉ: con guantes se lee como que la app se
   // colgó. `faltantes` nombra cada campo y se muestra junto a Guardar, sin
   // esperar a que se intente tocar el botón (19-09-2026).
-  // El mismo nombre que muestra el campo: decía «Quién lo registró» (otro campo, ya
-  // lleno) cuando faltaba «Quién edita» — visto en capturas reales, 19-09-2026.
-  const etiquetaQuien = esNuevo ? 'Quién registra' : modoBorrador ? 'Quién continúa' : 'Quién edita'
+  // «Técnico»: en uno publicado es el autor (se corrige aquí); en uno nuevo o en un
+  // borrador, quien lo escribe. El «editado por» de uno publicado sale del nombre
+  // recordado en este teléfono, sin otra pregunta (19-09-2026).
+  const valorTecnico = autorEditable ? registrador || registradoEnServidor : quien
+  const filaQuien = (cual: 'tecnico' | 'participantes', rotulo: string, valor: string, falta: boolean) => (
+    <button
+      type="button"
+      aria-expanded={abierta === cual}
+      onClick={() => setAbierta(abierta === cual ? null : cual)}
+      className="relative flex min-h-[44px] w-full items-center gap-3 pl-3 pr-2 text-left before:absolute before:left-3 before:right-0 before:top-0 before:h-px before:bg-muted-foreground/25 before:content-[''] first:before:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
+    >
+      <span className="flex-1 text-body">{rotulo}</span>
+      <span className={`min-w-0 max-w-[62%] truncate text-right text-body ${falta ? 'font-semibold text-ink-warn' : 'text-muted-foreground'}`}>
+        {falta ? 'Elige quién' : valor}
+      </span>
+      <ChevronRight
+        className={`size-4 shrink-0 text-muted-foreground transition-transform duration-150 motion-reduce:transition-none ${abierta === cual ? 'rotate-90' : ''}`}
+        aria-hidden
+      />
+    </button>
+  )
   const faltantes = [
-    tecnicos.todos.length > 0 && !quien.trim() ? etiquetaQuien : null,
+    tecnicos.todos.length > 0 && !autorEditable && !quien.trim() ? 'Técnico' : null,
     tipo == null ? 'Qué se hizo' : tipo === 'otro' && !limpiarTipo(tipoOtro) ? 'el tipo «Otro»' : null,
     horaFaltante ? 'Inicio' : null,
     !descripcion.trim() ? 'Qué pasó' : null,
@@ -1239,101 +1260,94 @@ export function EventoBitacoraSheet({
 
         <div className="grid gap-5 md:grid-cols-2 md:gap-x-7">
         <div className="flex min-w-0 flex-col gap-5">
-        {/* Quién: con la cuenta compartida de Mantención es el único dato de autoría.
-            Con pase de bitácora es el dueño del pase, sin elegir. */}
-        {autorFijo && (
-          <p className="text-footnote text-muted-foreground">
-            {esNuevo ? 'Registra' : 'Edita'}: <span className="font-semibold text-foreground">{autorFijo}</span>
-            {!esNuevo && !autorEditable && evento && autorVisible(evento) !== autorFijo ? ` · lo empezó ${autorVisible(evento)}` : ''}
-          </p>
-        )}
-        {tecnicos.todos.length > 0 && !autorFijo && (
-          <div>
-            {/* Al editar, el nombre recordado casi nunca cambia: una línea en vez
-                de tres chips. Al crear, elegir quién registra es lo primero. */}
-            {!esNuevo && quien && tecnicos.todos.includes(quien) && !cambiarQuien ? (
-              <p className="flex min-h-[44px] flex-wrap items-center gap-x-1 text-footnote text-muted-foreground">
-                {modoBorrador ? 'Continúas como' : 'Editas como'} <span className="font-semibold text-foreground">{quien}</span> ·
-                <button
-                  type="button"
-                  className="min-h-[44px] font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                  onClick={() => setCambiarQuien(true)}
-                >
-                  Cambiar
-                </button>
-              </p>
-            ) : (
-              <SelectorTecnico
-                etiqueta={etiquetaQuien}
-                deTurno={tecnicos.deTurno}
-                todos={tecnicos.todos}
-                valor={quien}
-                onChange={setQuien}
-                obligatorio={tecnicos.todos.length > 0}
-              />
-            )}
-            {!esNuevo && !autorEditable && evento && (
-              <p className="mt-1.5 text-footnote text-muted-foreground">Lo empezó: {autorVisible(evento)}</p>
+        {/* Quién y dónde, en UNA tarjeta de filas (mockup aprobado 19-09-2026, como el
+            editor de eventos del Calendario de iOS): cada fila dice su valor y se abre
+            en su lugar; lo que falta viene abierto. «Quién edita» y «Quién lo registró»
+            eran dos preguntas para el mismo técnico (Orel): queda una, «Técnico» — el
+            autor. Si corrige otro, el «editado por» se toma del nombre que recuerda
+            este teléfono, sin preguntar. */}
+        <div className="flex flex-col gap-1.5">
+          <div className="overflow-hidden rounded-ctl bg-muted-foreground/10">
+            {autorFijo ? (
+              <div className="flex min-h-[44px] items-center gap-3 px-3">
+                <span className="flex-1 text-body">Técnico</span>
+                <span className="text-body text-muted-foreground">{autorFijo}</span>
+              </div>
+            ) : tecnicos.todos.length > 0 ? (
+              <>
+                {filaQuien('tecnico', 'Técnico', valorTecnico || (esNuevo || modoBorrador ? '' : autorVisible(evento!)), !valorTecnico && (esNuevo || modoBorrador))}
+                {abierta === 'tecnico' && (
+                  <div className="px-3 pb-3">
+                    <SelectorTecnico
+                      etiqueta="Técnico"
+                      sinEtiqueta
+                      deTurno={tecnicos.deTurno}
+                      todos={tecnicos.todos}
+                      valor={valorTecnico}
+                      onChange={(n) => {
+                        if (autorEditable) setRegistrador(n)
+                        else setQuien(n)
+                        setAbierta(null)
+                      }}
+                      recordar={!autorEditable}
+                      vacio="Elige al técnico"
+                    />
+                  </div>
+                )}
+              </>
+            ) : null}
+            <label
+              htmlFor={`${campoId}-turno`}
+              className="relative flex min-h-[44px] items-center justify-between gap-3 pl-3 pr-1 before:absolute before:left-3 before:right-0 before:top-0 before:h-px before:bg-muted-foreground/25 before:content-[''] first:before:hidden"
+            >
+              <span className="text-body">Turno</span>
+              <select
+                id={`${campoId}-turno`}
+                value={turnoDestino}
+                onChange={(e) => setTurnoDestino(e.target.value)}
+                className="min-h-[44px] min-w-0 max-w-[70%] cursor-pointer truncate rounded-ctl bg-transparent px-2 text-right text-campo font-semibold text-primary outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                {opcionesTurno.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {nombreTurnoCorto(t.id)}
+                    {t.id === turnoEnCurso.id ? ' · en curso' : ''}
+                    {t.id === origenPendienteId ? ' · del pendiente' : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {tecnicos.todos.length > 0 && (
+              <>
+                {filaQuien('participantes', 'Participaron', participantes.length ? participantes.join(', ') : 'Nadie', false)}
+                {abierta === 'participantes' && (
+                  <div className="px-3 pb-3">
+                    <SelectorParticipantes
+                      sinEtiqueta
+                      presentes={tecnicos.deTurno}
+                      todos={tecnicos.todos}
+                      excluir={quienRegistro}
+                      valor={participantes}
+                      onChange={setParticipantes}
+                    />
+                  </div>
+                )}
+              </>
             )}
           </div>
-        )}
-        {/* Turno donde queda el evento: se corrige si se registró en otro
-            (p. ej. «Resolver» tocado al día siguiente). Últimos 7 días, nunca
-            uno futuro ni anterior al pendiente que cierra (17-09). */}
-        <div>
-          <label htmlFor={`${campoId}-turno`} className="flex min-h-[44px] items-center justify-between gap-3 rounded-ctl bg-muted-foreground/10 pl-3 pr-1">
-            <span className="text-body">Turno</span>
-            <select
-              id={`${campoId}-turno`}
-              value={turnoDestino}
-              onChange={(e) => setTurnoDestino(e.target.value)}
-              className="min-h-[44px] min-w-0 max-w-[70%] cursor-pointer truncate rounded-ctl bg-transparent px-2 text-right text-campo font-semibold text-primary outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            >
-              {opcionesTurno.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {nombreTurnoCorto(t.id)}
-                  {t.id === turnoEnCurso.id ? ' · en curso' : ''}
-                  {t.id === origenPendienteId ? ' · del pendiente' : ''}
-                </option>
-              ))}
-            </select>
-          </label>
+          {modoBorrador && evento && autorVisible(evento) !== quien && (
+            <p className="px-3 text-footnote text-muted-foreground">Lo empezó: {autorVisible(evento)}</p>
+          )}
+          {autorEditable && evento && registrador && registrador !== registradoEnServidor && (
+            <p className="px-3 text-footnote text-muted-foreground">Hoy figura: {autorVisible(evento)}. Al guardar queda {registrador}.</p>
+          )}
           {turnoDestino !== turno.id && (
-            <p className="mt-1.5 text-footnote text-muted-foreground">
+            <p className="px-3 text-footnote text-muted-foreground">
               Al {modoBorrador || esNuevo ? 'publicar' : 'guardar'}, el evento pasa al {etiquetaCortaTurno(turnoDestino).toLowerCase()}
               {turnoDesdeId(turnoDestino) ? ` (${horarioTurno(turnoDesdeId(turnoDestino)!)})` : ''}
               {origenPendienteId ? ' y el pendiente queda resuelto ahí' : ''}.
             </p>
           )}
         </div>
-
-        {/* Publicado: quién lo registró se corrige aquí (también desde el pase);
-            quien corrige queda como «editado por». No se recuerda como «mi nombre». */}
-        {autorEditable && tecnicos.todos.length > 0 && (
-          <div>
-            <SelectorTecnico
-              etiqueta="Quién lo registró"
-              deTurno={tecnicos.deTurno}
-              todos={tecnicos.todos}
-              valor={registrador}
-              onChange={setRegistrador}
-              recordar={false}
-              vacio="Elige al técnico"
-            />
-            {evento && registrador && !tecnicos.todos.includes(registrador) && (
-              <p className="mt-1.5 text-footnote text-muted-foreground">Hoy figura: {autorVisible(evento)}</p>
-            )}
-          </div>
-        )}
-        {tecnicos.todos.length > 0 && (
-          <SelectorParticipantes
-            presentes={tecnicos.deTurno}
-            todos={tecnicos.todos}
-            excluir={quienRegistro}
-            valor={participantes}
-            onChange={setParticipantes}
-          />
-        )}
 
         {/* Tipo — con rótulo propio: sin él se confundía con la fila de nombres de
             arriba. Los 8 a la vista (en filas): deslizando, «Novedad» no se veía. */}

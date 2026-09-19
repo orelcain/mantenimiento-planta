@@ -21,6 +21,14 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-19 · Bitacora ronda 63 · Los «quién» del editor en una tarjeta; «Técnico» único
+- Mockup interactivo aprobado (https://claude.ai/artifact/CCdca8MYyE3uTx6nCmoMZm). Antes de «¿Qué se hizo?» había 4 bloques (quién edita, turno, quién lo registró, participaron) → UNA tarjeta de filas de 44 px (Técnico › · Turno ⌄ · Participaron ›), como el editor del Calendario de iOS. Tocar una fila abre sus chips EN SU LUGAR (sin hoja sobre hoja); lo que falta viene abierto al abrir la hoja y elegir lo cierra.
+- **Orel: «el que edita y el que registra deberían ser el mismo técnico».** En datos eran dos (`registradoPor` = autor; `actualizadoPorNombre` = «editado por»). Queda UNA pregunta, «Técnico»: nuevo/borrador = quien lo escribe (`quien`); publicado = el AUTOR (se corrige ahí → `registradoPor`). El «editado por» de un publicado se toma SIN PREGUNTAR del nombre recordado del teléfono (o el autor si no hay) — se conserva la traza. Ya no es obligatorio elegir «quién edita» para guardar una corrección.
+- `SelectorTecnico` y `SelectorParticipantes` ganan `sinEtiqueta` (rótulo solo para lector de pantalla dentro de la fila). Separadores `bg-muted-foreground/25`: `bg-border` no se veía sobre el relleno en oscuro.
+- Verificado con Playwright (`bitacora-editor-quien.mjs`, claro y oscuro): publicado → «Técnico: Jose Chodil» cerrado y nada falta; nuevo → «Técnico: Elige quién» abierto, «Falta completar: Técnico, …»; al elegir Jose Chodil la fila se cierra y sale del aviso.
+- tsc 0 · eslint 30 · vitest 2.839 · auditorías OK · build OK.
+- Estado: HECHO.
+
 ## 2026-09-19 · Bitacora ronda 62 · Pasada visual con capturas reales (Playwright)
 - Recorrido completo con `C:\Users\orelc\dev\capturas\bitacora-recorrido.mjs` (teléfono 375 y PC 1.440, claro y oscuro, hojas Compartir/editor, Inicio, Historial). Informe con capturas y propuesta simulada sobre la página real: https://claude.ai/artifact/ENcag4myAbpNgUa2oaGQjb — aprobado.
 - **Error (mío, lote 2):** «Falta completar: Quién lo registró» salía con ese campo LLENO; lo vacío era «Quién edita». El aviso usa ahora la misma etiqueta que el campo (`etiquetaQuien`: registra / continúa / edita).
