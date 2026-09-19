@@ -21,6 +21,20 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-19 · Admin · Editor de líneas: piel de diagrama (opción 1 del mockup, con curvas)
+
+- Mockup previo (agente directora-creativa): https://claude.ai/artifact/UEaHRAFsQRUkpY3bVFNkos. Orel
+  eligió la opción 1 «barra de reparto», pero RECHAZÓ el ruteo ortogonal: «debe verse fluido» → se
+  mantienen las curvas bezier (`type: 'default'`), no `smoothstep`.
+- Tarjeta 188×68, `rounded-ctl`, borde 1px (punteado si está fuera de línea), chip de cuota tabular
+  en tinte de marca y BARRA de cuota de 3 px al pie: la cuota se lee por largo. Se retira el borde
+  verde/ámbar/rojo por peso (esos colores significan estado en el resto de la app: una BAADER sana
+  al 33,3 % parecía en falla). Subtexto «1 de 3 · Eviscerado».
+- Flechas: el GROSOR es el flujo (2,5 / 1,8 / 1,4 px según 100 % / 50 % / 33 %), punta 7×6 (era
+  20×20, pesaba más que la línea).
+- Grupos en paralelo derivados del grafo (no se guardan): barra de reparto (P&ID, cabezal común) y
+  encuadre punteado con píldora «Paralelo · N ramas · X % c/u». Zonas bajan a `zIndex -2`.
+
 ## 2026-09-19 · Admin · Editor de líneas: un círculo de flechas dejaba todo en 0 % sin decirlo
 
 - En las líneas GUARDADAS de Chonchi, Acopio entero marcaba 0 %: hay una flecha de vuelta

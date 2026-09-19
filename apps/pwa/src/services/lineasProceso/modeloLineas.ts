@@ -55,7 +55,7 @@ export interface GrafoLineas {
 }
 
 /** Tamaño de la tarjeta de un equipo en el lienzo (px): para saber en qué zona cae su centro. */
-export const NODO = { ancho: 176, alto: 62 }
+export const NODO = { ancho: 188, alto: 68 }
 /** Tamaño de la píldora «Entrada …». */
 export const ENTRADA = { ancho: 124, alto: 44 }
 /** Aire entre el contenedor y sus equipos (arriba deja lugar para el título). */
