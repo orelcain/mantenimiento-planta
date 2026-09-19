@@ -114,6 +114,7 @@ export function BitacoraTurnoVista({
   const calendario = fuente.useTecnicos(turno)
   const { observacion, guardarObservacion, guardarPresentes } = fuente.useObservacion(turno)
   const { ajustes, guardarAjustes } = fuente.useAjustes()
+  const favoritosRepuestos = fuente.useFavoritosRepuestos()
   // Lista de técnicos = planilla del calendario + ajustes; presentes = ajuste del
   // turno o, si nadie lo tocó, lo que dice el calendario.
   const listaTecnicos = useMemo(() => construirListaTecnicos(calendario.todos, ajustes), [calendario.todos, ajustes])
@@ -1211,6 +1212,8 @@ export function BitacoraTurnoVista({
         cargandoEquipos={cargandoEquipos}
         subirFoto={fuente.subirFoto}
         fuenteRepuestos={fuente.repuestos}
+        // El pase es de la planta, no de una persona: «Mis favoritos» no aplica.
+        favoritosRepuestos={autorFijo ? null : favoritosRepuestos}
         onGuardar={async (id, datos, nuevo) => {
           await guardar(id, datos, nuevo)
           // Quedó en otro turno (se registró en el equivocado): se dice dónde, con «Ver».

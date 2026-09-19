@@ -21,6 +21,22 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-19 · Bitacora ronda 60 · Estrella de favoritos en el buscador de repuestos
+- Idea de Orel, mockup aprobado (https://claude.ai/artifact/Te53eSjF2PLXmgidb4Q4oE, con sus favoritos reales: 3 de sus 8 están en la lista de materiales de KNURO N1, 159 repuestos).
+- Estrella de 44 px junto a «En este equipo / Todos» (sin equipo, junto al buscador): «Solo mis favoritos» se COMBINA con el alcance → favoritos de este equipo o todos, visibles SIN escribir; el buscador filtra dentro. Línea «3 de tus 8 favoritos están en este equipo» / «Tus 8 favoritos, de todos los equipos». Con la estrella apagada, los favoritos van primero (`buscarRepuestos(…, primero)`, ANTES de cortar en 8) y cada resultado tiene su estrella para marcar/desmarcar.
+- Son los MISMOS «Mis favoritos» de Repuestos y del Centro Técnico (`useRepuestoFavoritos`, `user_preferences.repuestoFavs`, clave = código SAP): cero datos nuevos. Entra por la fuente de la bitácora (`FuenteBitacora.useFavoritosRepuestos`), así la vitrina usa favoritos en memoria y NO toca los reales. El pase de bitácora no ve la estrella (es de la planta, no de una persona).
+- Descartado: «Favoritos» como tercera pestaña (pierde «mis favoritos de ESTE equipo»; HIG: un segmentado = opciones de una misma clase).
+- Desvío del mockup: en «Todos» no se dice en qué equipos está cada favorito — el índice liviano del maestro no trae `equipos`; costaría una lectura por favorito.
+- Verificado en `/dev/bitacora-real` (375 px, oscuro y claro): estrella encendida en «Todos» lista los 3 favoritos de ejemplo sin escribir; desmarcar uno lo saca y el conteo baja a 2; buscar «an» con la estrella apagada lo encuentra con su estrella vacía; equipo sin materiales → «Ninguno de tus 3 favoritos está en este equipo. Prueba en «Todos».» (sin una segunda lista vacía debajo, se quitó). Tokens: estrella `--ink-warn` (#985800 claro / #FF9F0A oscuro).
+- Tests: `favoritosRepuestos.test.ts` (6, con los materiales reales de KNURO N1). tsc 0 · eslint 30 · vitest 2.833 · auditorías OK · build OK.
+- Estado: HECHO.
+
+## 2026-09-19 · Bitacora ronda 59 · Lote 3 del HIG (PR #1111, `339e16e`)
+- Cierra #5/#6/#7/#10/#11 del informe de la ronda 56: fotos por arrastrar o Ctrl+V (listener en `document`, porque el pegado va al campo con foco; solo actúa si trae imágenes); «×» de 44 px en los buscadores de equipo/repuestos/técnicos + `enterKeyHint`; cantidad de repuesto escribible 1–999 (vacío o 0 vuelve al valor anterior); `Sheet` se cierra deslizando desde la agarradera (>120 px o 25%; pasa por `onClose`, pide confirmar igual); el gráfico del historial dice su resultado en el título y las barras son `<button aria-pressed>`.
+- ⚠ La animación `.piel-sheet-in` (fill `both`) le gana al `transform` en línea: el panel no seguía al dedo hasta apagarla al empezar el arrastre.
+- ⚠ Dos campos del editor comparten el aria-label «Borrar búsqueda» (equipo y repuestos): al probar por script, elegir el correcto.
+- Queda del informe solo #12 (zoom/Dynamic Type, decisión de Orel). Esta entrada se commitea con la ronda 60.
+
 ## 2026-09-19 · Bitacora ronda 58 · Lote 2 del HIG: la hora y Guardar dicen la verdad
 - Mockup aprobado por Orel (https://claude.ai/artifact/BWv4YtX3oTPL4pWhKdFqdP, opciones A + B juntas). Aplica los dos hallazgos que más importan para la calidad del dato del MTTR, del informe de 12 de la ronda 56.
 - **#1 — la hora de Inicio ya no se rellena sola cuando el turno ya cerró.** `horaSugeridaParaEvento` seguía devolviendo el INICIO DEL TURNO (p. ej. 08:00) para un evento nuevo cuyo turno ya terminó — un valor con forma de hora real que nadie escribió y que nunca se marcaba «obligatorio» porque nunca quedaba vacío. Nueva `horaInicioNuevoEvento()` (junto a `turnoEnCurso()`, ambas en `turnoMantencion.ts`): vacío si el turno no está corriendo, «ahora» si sí. Solo afecta la semilla de un evento NUEVO (`!evento`); un evento existente conserva lo que tenga guardado. El campo se marca «obligatorio» (mismo patrón que Tipo e Impacto) y debajo aparece «Ese turno ya terminó: escribe la hora en que empezó de verdad.», calculado sobre el turno ELEGIDO en el selector (`turnoDestino`), igual que ya hacen «Terminó ahora»/«¿Cuánto duró?».
