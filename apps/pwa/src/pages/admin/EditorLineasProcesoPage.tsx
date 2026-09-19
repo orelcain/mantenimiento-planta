@@ -25,7 +25,7 @@ import {
   type NodeProps,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { Boxes, ChevronDown, ChevronLeft, ChevronRight, Expand, Loader2, Maximize2, Minimize2, PanelLeftClose, PanelLeftOpen, Plus, Redo2, RotateCcw, Search, Spline, Undo2, X } from 'lucide-react'
+import { Boxes, ChevronDown, Droplets, ChevronLeft, ChevronRight, Expand, Loader2, Maximize2, Minimize2, PanelLeftClose, PanelLeftOpen, Plus, Redo2, RotateCcw, Search, Spline, Undo2, X } from 'lucide-react'
 import { Button, Sheet } from '@/components/piel'
 import { ToastAction } from '@/components/ui/toast'
 import { useHierarchyTree } from '@/hooks/useHierarchy'
@@ -346,6 +346,9 @@ function Editor() {
   // Modo «Agrupar»: tocar los equipos que trabajan en paralelo, sin depender de teclas
   // (Ctrl/Mayús + clic no es descubrible, y Orel ya entendió el modo «Unir»).
   const [modoGrupo, setModoGrupo] = useState<string[] | null>(null)
+  // Las punteadas de los servicios cruzan todo el lienzo: se pueden esconder para mirar la
+  // línea en limpio (es solo visual: los pesos no cambian).
+  const [verApoyo, setVerApoyo] = useState(true)
   const [nodes, setNodes] = useState<Node[]>([])
   const [edges, setEdges] = useState<Edge[]>([])
   const [guardado, setGuardado] = useState<string>('')
@@ -595,7 +598,14 @@ function Editor() {
     [nodes, indice, pesos, servicios, relaciones, nombreLinea, zonaResaltada, deOtraPlanta, nombreDe, limites, contenedorDe, editable, origenUnir, yaUnidos, reparto, modoGrupo],
   )
 
-  const conParalelos = useMemo(() => [...vista, ...nodosParalelo], [vista, nodosParalelo])
+  const conParalelos = useMemo(
+    () =>
+      verApoyo
+        ? [...vista, ...nodosParalelo]
+        : // Sin servicios, su contenedor queda vacío: también se esconde.
+          [...vista.filter((n) => n.type !== 'servicio' && !(n.type === 'zona' && (n.data as DatosZona).apoyo)), ...nodosParalelo],
+    [vista, nodosParalelo, verApoyo],
+  )
 
   const vistaAristas = useMemo(
     () =>
@@ -1078,6 +1088,18 @@ function Editor() {
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
+              onClick={() => setVerApoyo((v) => !v)}
+              aria-pressed={verApoyo}
+              title={verApoyo ? 'Esconder los servicios de apoyo' : 'Mostrar los servicios de apoyo'}
+              className={`flex min-h-[44px] items-center gap-1.5 rounded-full px-3 text-footnote font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary [&>svg]:size-4 ${
+                verApoyo ? 'text-primary hover:bg-muted-foreground/10' : 'bg-muted-foreground/15 text-muted-foreground'
+              }`}
+            >
+              <Droplets aria-hidden />
+              {verApoyo ? 'Servicios' : 'Servicios ocultos'}
+            </button>
+            <button
+              type="button"
               onClick={() => {
                 setModoGrupo((v) => (v ? null : []))
                 setModoUnir(false)
@@ -1090,7 +1112,7 @@ function Editor() {
               }`}
             >
               <Boxes aria-hidden />
-              {modoGrupo ? 'Salir de agrupar' : 'Agrupar en paralelo'}
+              {modoGrupo ? 'Salir de agrupar' : 'Agrupar'}
             </button>
             <button
               type="button"
@@ -1106,7 +1128,7 @@ function Editor() {
               }`}
             >
               <Spline aria-hidden />
-              {modoUnir ? 'Salir de unir' : 'Unir equipos'}
+              {modoUnir ? 'Salir de unir' : 'Unir'}
             </button>
             <button
               type="button"
@@ -1126,7 +1148,7 @@ function Editor() {
               className="flex min-h-[44px] items-center gap-1.5 rounded-full px-3 text-footnote font-semibold text-primary hover:bg-muted-foreground/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary [&>svg]:size-4"
             >
               {amplio ? <Minimize2 aria-hidden /> : <Maximize2 aria-hidden />}
-              {amplio ? 'Salir' : 'Pantalla completa'}
+              {amplio ? 'Salir de pantalla completa' : 'Pantalla completa'}
             </button>
             <button type="button" className="flex size-11 items-center justify-center rounded-full text-primary hover:bg-muted-foreground/10 disabled:opacity-35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary [&>svg]:size-5" onClick={deshacer} disabled={!pilaDeshacer.current.length} aria-label="Deshacer (Ctrl+Z)" title="Deshacer (Ctrl+Z)">
               <Undo2 aria-hidden />
@@ -1228,7 +1250,7 @@ function Editor() {
           ) : (
             <ReactFlow
               nodes={conParalelos}
-              edges={vistaAristas}
+              edges={verApoyo ? vistaAristas : vistaAristas.filter((e) => !servicios.has(e.source) && !servicios.has(e.target))}
               nodeTypes={TIPOS}
               onNodesChange={editable ? onNodesChange : undefined}
               onEdgesChange={editable ? onEdgesChange : undefined}
@@ -1325,24 +1347,32 @@ function Editor() {
                   if (n.type === 'zona') return (n.data as DatosZona).apoyo ? 'rgb(var(--cat-6-ink) / 0.12)' : 'rgb(var(--muted-foreground) / 0.12)'
                   if (n.type === 'entrada') return 'rgb(var(--brand))'
                   if (n.type === 'servicio') return APOYO
-                  const t = tonoPeso((n.data as DatosMaquina).peso)
-                  return t === 'serie' ? 'rgb(var(--ink-crit))' : t === 'paralelo' ? 'rgb(var(--ink-warn))' : 'rgb(var(--muted-foreground) / 0.5)'
+                  // El mapa sigue la misma regla que el lienzo: el tinte de marca es flujo, el gris es fuera de línea.
+                  const p = (n.data as DatosMaquina).peso
+                  return p ? `rgb(var(--brand) / ${0.45 + 0.55 * p})` : 'rgb(var(--muted-foreground) / 0.5)'
                 }}
               />
               <Panel position="top-left" className="!m-3 flex flex-wrap gap-x-4 gap-y-1 rounded-ctl bg-card/90 px-3 py-2 text-caption shadow-[0_1px_4px_rgba(0,0,0,0.08)] backdrop-blur">
-                <span>
-                  <b className="text-ink-crit">100 %</b> todo el flujo pasa (en serie)
+                <span className="flex items-center gap-1.5">
+                  <svg width="26" height="8" aria-hidden className="shrink-0">
+                    <line x1="0" y1="4" x2="26" y2="4" stroke="rgb(var(--brand))" strokeWidth="2.5" />
+                  </svg>
+                  <b>100 %</b> en serie: todo el flujo pasa
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <svg width="26" height="8" aria-hidden className="shrink-0">
+                    <line x1="0" y1="4" x2="26" y2="4" stroke="rgb(var(--brand))" strokeWidth="1.4" strokeOpacity="0.8" />
+                  </svg>
+                  <b>1/N</b> en paralelo: más fina, menos flujo
                 </span>
                 <span>
-                  <b className="text-ink-warn">1/N</b> una de N ramas (en paralelo)
-                </span>
-                <span>
-                  <b className="text-muted-foreground">0 %</b> suelta: fuera de la línea
+                  <b className="text-muted-foreground">0 %</b> borde punteado: fuera de la línea
                 </span>
                 <span>
                   <b style={{ color: APOYO }}>indirecto</b> servicio de apoyo
                 </span>
                 <span className="text-muted-foreground">– – entre líneas</span>
+                <span className="rounded-full bg-[rgb(var(--brand)/0.14)] px-2 text-[rgb(var(--brand-ink))]">grupo en paralelo</span>
               </Panel>
               {!inspector && (
                 <Panel position="top-right" className="!m-3 hidden rounded-ctl bg-card/90 px-3 py-2 text-caption shadow-[0_1px_4px_rgba(0,0,0,0.08)] backdrop-blur lg:block">
