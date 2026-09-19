@@ -18,7 +18,8 @@ export function SelectorTecnico({
   onChange,
   recordar = true,
   vacio = 'Elige tu nombre',
-  obligatorio = false,
+  obligatorio,
+  sinEtiqueta = false,
 }: {
   etiqueta: string
   deTurno: string[]
@@ -31,6 +32,8 @@ export function SelectorTecnico({
   vacio?: string
   /** Marca «obligatorio» junto al rótulo (mismo patrón que Tipo e Impacto) mientras no hay elección. */
   obligatorio?: boolean
+  /** Dentro de una fila que ya dice el rótulo: se deja solo para lectores de pantalla. */
+  sinEtiqueta?: boolean
 }) {
   const id = useId()
   const resto = todos.filter((n) => !deTurno.includes(n))
@@ -53,7 +56,7 @@ export function SelectorTecnico({
 
   return (
     <div>
-      <span id={`${id}-label`} className="mb-1.5 block text-footnote text-muted-foreground">
+      <span id={`${id}-label`} className={sinEtiqueta ? 'sr-only' : 'mb-1.5 block text-footnote text-muted-foreground'}>
         {etiqueta}
         {obligatorio && !valor && <span className="ml-1.5 text-ink-warn">obligatorio</span>}
       </span>
