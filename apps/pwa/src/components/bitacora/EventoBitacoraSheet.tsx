@@ -51,12 +51,14 @@ import {
   formatoMinutos,
   horaCalzaEnTurno,
   horaDe,
+  horaInicioNuevoEvento,
   horaMasMinutos,
   horarioTurno,
   horaSugeridaParaEvento,
   minutosEntre,
   terminoAhora,
   TOPE_TERMINO_AHORA_MIN,
+  turnoEnCurso as estaEnCurso,
   turnoDesdeId,
   turnoMantencionEn,
   turnosElegibles,
@@ -395,7 +397,10 @@ export function EventoBitacoraSheet({
     setSinHora(evento ? evento.horaInicio === '' : false)
     setPosicion(evento && evento.horaInicio === '' && typeof evento.posicionMin === 'number' ? String(evento.posicionMin) : '')
     // Un evento sin hora deja lista la hora sugerida por si se apaga «Sin hora».
-    setHoraInicio(evento?.horaInicio || horaSugeridaParaEvento(turno))
+    // `!evento` en vez de `esNuevo` (aunque sean lo mismo): así el linter de
+    // hooks ve la dependencia real (`evento`, ya en el arreglo) y no pide una
+    // extra por un valor derivado.
+    setHoraInicio(evento?.horaInicio || (!evento ? horaInicioNuevoEvento(turno) : horaSugeridaParaEvento(turno)))
     setHoraTermino(evento?.horaTermino ?? '')
     // Un evento que ya existe conserva lo suyo; uno nuevo nace sin responder.
     setImpacto(evento?.impacto ?? null)
@@ -423,7 +428,7 @@ export function EventoBitacoraSheet({
           repuestos: '[]',
           descripcion: '',
           contingencia: '',
-          horaInicio: horaSugeridaParaEvento(turno),
+          horaInicio: horaInicioNuevoEvento(turno),
           horaTermino: '',
           posicion: '',
           impacto: 'no-aplica',
@@ -457,6 +462,9 @@ export function EventoBitacoraSheet({
   const cargaTardia =
     !terminoSugerido.disponible && (terminoSugerido.motivo === 'turno-terminado' || terminoSugerido.motivo === 'pasa-el-tope')
   const horaFaltante = !sinHora && !HORA_VALIDA.test(horaInicio)
+  // Mismo turno que decide «Terminó ahora» / «¿Cuánto duró?»: el elegido en el
+  // selector, y si no hay ninguno, el que se está mirando.
+  const turnoInicioCerrado = !estaEnCurso(turnoDesdeId(turnoDestino) ?? turno, ahora)
 
   // Lo que se guarda: el texto de «Otro» solo con ese tipo, y sin horas si es «Sin hora».
   const formularioActual = (): CamposFormulario => ({
@@ -1003,15 +1011,19 @@ export function EventoBitacoraSheet({
   const rotuloSubiendo = enCola > 1 ? `Subiendo ${fotos.length + 1} de ${totalLote}…` : 'Subiendo la foto…' 
   // HIG «Entering data»: el botón se habilita recién con lo obligatorio (quién,
   // tipo, hora o «Sin hora», qué pasó). Lo mismo que valida `guardar`.
-  const faltaObligatorio =
-    (tecnicos.todos.length > 0 && !quien.trim()) ||
-    tipo == null ||
-    (tipo === 'otro' && !limpiarTipo(tipoOtro)) ||
-    horaFaltante ||
-    !descripcion.trim() ||
+  // Un botón desactivado no dice POR QUÉ: con guantes se lee como que la app se
+  // colgó. `faltantes` nombra cada campo y se muestra junto a Guardar, sin
+  // esperar a que se intente tocar el botón (19-09-2026).
+  const faltantes = [
+    tecnicos.todos.length > 0 && !quien.trim() ? 'Quién lo registró' : null,
+    tipo == null ? 'Qué se hizo' : tipo === 'otro' && !limpiarTipo(tipoOtro) ? 'el tipo «Otro»' : null,
+    horaFaltante ? 'Inicio' : null,
+    !descripcion.trim() ? 'Qué pasó' : null,
     // Sin esta respuesta el turno no puede demostrar nada: el evento sale con
     // 0 min de parada y el MTTR queda en «—» (18-09-2026).
-    impacto == null
+    impacto == null ? 'Impacto' : null,
+  ].filter((x): x is string => x != null)
+  const faltaObligatorio = faltantes.length > 0
   // HIG «Buttons»: en una hoja, Return activa el botón primario. Solo en los
   // campos simples (hora, minutos): el buscador y los chips usan Enter para elegir.
   const enterGuarda = (e: ReactKeyboardEvent<HTMLInputElement>) => {
@@ -1057,21 +1069,26 @@ export function EventoBitacoraSheet({
               : 'Editar evento'
       }
       actions={
-        <>
-          <Button variant="tinted" onClick={cerrarHoja} disabled={guardando}>
-            {modoBorrador ? 'Cerrar' : 'Cancelar'}
-          </Button>
-          <Button onClick={guardar} disabled={guardando || eliminadoAfuera || faltaObligatorio}>
-            {guardando ? <Loader2 className="animate-spin" /> : null}
-            {guardando
-              ? 'Guardando…'
-              : subiendo
-              ? rotuloSubiendo
-              : modoBorrador
-                ? (pendienteOrigen || (eventoVivo ?? evento)?.resuelvePendiente) ? 'Listo y cerrar pendiente' : 'Listo'
-                : 'Guardar'}
-          </Button>
-        </>
+        <div className="flex w-full flex-col gap-2.5">
+          {faltaObligatorio && !guardando && (
+            <p className="text-footnote font-semibold text-ink-warn">Falta completar: {faltantes.join(', ')}</p>
+          )}
+          <div className="flex gap-2.5 [&>*]:flex-1">
+            <Button variant="tinted" onClick={cerrarHoja} disabled={guardando}>
+              {modoBorrador ? 'Cerrar' : 'Cancelar'}
+            </Button>
+            <Button onClick={guardar} disabled={guardando || eliminadoAfuera || faltaObligatorio}>
+              {guardando ? <Loader2 className="animate-spin" /> : null}
+              {guardando
+                ? 'Guardando…'
+                : subiendo
+                ? rotuloSubiendo
+                : modoBorrador
+                  ? (pendienteOrigen || (eventoVivo ?? evento)?.resuelvePendiente) ? 'Listo y cerrar pendiente' : 'Listo'
+                  : 'Guardar'}
+            </Button>
+          </div>
+        </div>
       }
     >
       {/* `[&>*]:shrink-0`: en un flex vertical con alto acotado, un hijo con
@@ -1212,6 +1229,7 @@ export function EventoBitacoraSheet({
                 todos={tecnicos.todos}
                 valor={quien}
                 onChange={setQuien}
+                obligatorio={tecnicos.todos.length > 0}
               />
             )}
             {!esNuevo && !autorEditable && evento && (
@@ -1372,7 +1390,10 @@ export function EventoBitacoraSheet({
             <>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="bitacora-inicio" className={ETIQUETA_CAMPO}>Inicio</label>
+                  <label htmlFor="bitacora-inicio" className={ETIQUETA_CAMPO}>
+                    Inicio
+                    {horaFaltante && <span className="ml-1.5 text-ink-warn">obligatorio</span>}
+                  </label>
                   {/* HIG «Pickers»: minutos de 5 en 5, que con guantes se acierta. */}
                   <input id="bitacora-inicio" type="time" step={300} className={`${CAMPO} tabular-nums`} value={horaInicio} onChange={(e) => setHoraInicio(e.target.value)} onKeyDown={enterGuarda} />
                 </div>
@@ -1381,6 +1402,12 @@ export function EventoBitacoraSheet({
                   <input id="bitacora-termino" type="time" step={300} className={`${CAMPO} tabular-nums`} value={horaTermino} onChange={(e) => setHoraTermino(e.target.value)} onBlur={validarTermino} onKeyDown={enterGuarda} />
                 </div>
               </div>
+              {/* El «08:00» de un turno cerrado se leía como un dato real y nadie lo
+                  revisaba (medido 19-09-2026: 27% de los eventos se carga así). Ahora
+                  el campo nace vacío y esto explica por qué. */}
+              {horaFaltante && turnoInicioCerrado && (
+                <p className="-mt-1 text-footnote text-muted-foreground">Ese turno ya terminó: escribe la hora en que empezó de verdad.</p>
+              )}
               {/* Sin término no hay minutos de parada: 17 de 22 eventos reales se
                   guardaron sin él (18-09-2026). Un toque lo cierra con la hora
                   de ahora, que es la que corresponde al salir de la máquina —
@@ -1431,7 +1458,10 @@ export function EventoBitacoraSheet({
 
         {/* Qué pasó */}
         <div>
-          <label htmlFor="bitacora-descripcion" className={ETIQUETA_CAMPO}>Observaciones · qué pasó y qué se hizo</label>
+          <label htmlFor="bitacora-descripcion" className={ETIQUETA_CAMPO}>
+            Observaciones · qué pasó y qué se hizo
+            {!descripcion.trim() && <span className="ml-1.5 text-ink-warn">obligatorio</span>}
+          </label>
           <textarea
             id="bitacora-descripcion"
             maxLength={3000}
