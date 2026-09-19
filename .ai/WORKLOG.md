@@ -21,6 +21,12 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-19 · Admin · Editor de líneas: pantalla completa y lista plegable
+- Orel: «¿cómo hacer el espacio de trabajo más amplio? ¿pantalla completa?». Botón «Pantalla completa»: el editor pasa a una capa `fixed inset-0` (tapa la barra lateral de la app) y pide `requestFullscreen` del DOCUMENTO — ⚠ NO del contenedor: los avisos con «Deshacer» viven en un portal del body y quedarían ocultos. Esc sale (`fullscreenchange` sincroniza). Botón para ocultar/mostrar la lista de equipos. Al ampliar, reencuadra.
+- Propuesta: zonas de Acopio/Eviscerado a 720 de alto y servicios más abajo — el «TABLERO CONTROL SISTEMA N1» quedaba encima del título de «Servicios de apoyo» (visto en la captura de Orel).
+- Verificado: sin solape (tablero termina en y=598, servicios empiezan en 620); capa fija activa; con la lista oculta el lienzo pasa de 1.073 a 1.353 px. (El panel de navegador de pruebas bloquea la pantalla completa real; en Chrome funciona.)
+- Estado: HECHO.
+
 ## 2026-09-19 · Admin · Editor de líneas: Acopio por componentes, servicios de apoyo y HIG
 - Mockup aprobado: https://claude.ai/artifact/Xe7TNVjgcX3zHcjTz7hYYe. Datos de Orel: «Acopio tiene equipos individuales en línea»; «Sistema 1 es de Chonchi, Sistema 2 de Yal»; caseta agua mar, estanques y RILES «influyen indirectamente, hay que tenerlos».
 - ⚠ **El Sistema de bombeo N2 NO se movió en el árbol**: ACOPIO (`aq-in-cho-acop`) cuelga del SITIO, al lado de PLANTA CHONCHI y PLANTA YAL (compartido), y su ubicación técnica es la de SAP. Se marca en el editor (`DE_OTRA_PLANTA`: «de Yal», no cuenta en Chonchi; fuera de la propuesta).

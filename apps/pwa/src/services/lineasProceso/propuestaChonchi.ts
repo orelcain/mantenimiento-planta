@@ -10,12 +10,12 @@ import { PREFIJO_ENTRADA } from './modeloLineas'
  * Empaque, con Filete como rama; debajo, los servicios de apoyo.
  */
 export const LINEAS_CHONCHI: LineaProceso[] = [
-  { id: 'acopio', nombre: 'Acopio', zona: { x: 0, y: 0, w: 800, h: 640 } },
-  { id: 'eviscerado', nombre: 'Eviscerado', zona: { x: 820, y: 0, w: 1800, h: 640 } },
+  { id: 'acopio', nombre: 'Acopio', zona: { x: 0, y: 0, w: 800, h: 720 } },
+  { id: 'eviscerado', nombre: 'Eviscerado', zona: { x: 820, y: 0, w: 1800, h: 720 } },
   { id: 'emparrillado', nombre: 'Emparrillado', zona: { x: 2640, y: 0, w: 440, h: 310 } },
   { id: 'empaque', nombre: 'Empaque', zona: { x: 3100, y: 0, w: 1330, h: 310 } },
-  { id: 'filete', nombre: 'Filete', zona: { x: 2640, y: 330, w: 1330, h: 310 } },
-  { id: 'apoyo', nombre: 'Servicios de apoyo · influyen indirectamente', tipo: 'apoyo', zona: { x: 0, y: 670, w: 4430, h: 300 } },
+  { id: 'filete', nombre: 'Filete', zona: { x: 2640, y: 330, w: 1330, h: 390 } },
+  { id: 'apoyo', nombre: 'Servicios de apoyo · influyen indirectamente', tipo: 'apoyo', zona: { x: 0, y: 750, w: 4430, h: 300 } },
 ]
 
 /**
@@ -54,7 +54,7 @@ export function propuestaChonchi(idPorNombre: (nombre: string) => string | undef
   cadena(ia, ducto)
   abanico(ducto, bv, descarga)
   ;['ESTANQUE BOMBEO A SISTEMA 1', 'ESTANQUE BOMBEO B SISTEMA 1', 'BOMBA FLUJO SISTEMA N1', 'COMPRESOR AIRE N1', 'CONJUNTO VALVULAS SISTEMA N1', 'HIDROFORO SISTEMA N1', 'TABLERO CONTROL SISTEMA N1'].forEach(
-    (n, i) => pon(n, X(0, i % 3), 470 + Math.floor(i / 3) * 80),
+    (n, i) => pon(n, X(0, i % 3), 440 + Math.floor(i / 3) * 84),
   )
 
   const e0 = 820
@@ -104,12 +104,12 @@ export function propuestaChonchi(idPorNombre: (nombre: string) => string | undef
   cadena(iff, vb, b200, sb, cf, cp)
 
   // Servicios de apoyo: abastecen (servicio → línea) o reciben (línea → servicio).
-  const am = [pon('BOMBA AGUA MAR 1', X(0, 0), 740), pon('BOMBA AGUA MAR 2', X(0, 0), 840)]
+  const am = [pon('BOMBA AGUA MAR 1', X(0, 0), 830), pon('BOMBA AGUA MAR 2', X(0, 0), 930)]
   am.forEach((b) => une(b, ia))
-  const agua = [pon('ESTANQUE AGUA DULCE 1', X(e0, 0), 740), pon('ESTANQUE AGUA DULCE 2', X(e0, 0), 840), pon('ESTANQUE AGUA MAR', X(e0, 1), 740)]
+  const agua = [pon('ESTANQUE AGUA DULCE 1', X(e0, 0), 830), pon('ESTANQUE AGUA DULCE 2', X(e0, 0), 930), pon('ESTANQUE AGUA MAR', X(e0, 1), 830)]
   agua.forEach((a) => une(a, ie))
   const riles = ['BOMBA VACIO ANILLO LIQ TOLVA VISCERA N1', 'BOMBA VACIO ANILLO LIQ TOLVA VISCERA N2', 'BOMBA VACIO ANILLO LIQ TOLVA VISCERA N3'].map((n, i) =>
-    pon(n, X(e0, 5) + (i - 1) * 205, 800),
+    pon(n, X(e0, 5) + (i - 1) * 205, 880),
   )
   riles.forEach((r) => une(cts, r))
 
