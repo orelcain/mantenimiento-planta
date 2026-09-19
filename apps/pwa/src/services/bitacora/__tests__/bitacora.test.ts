@@ -9,6 +9,8 @@ import {
   turnoMantencionEn,
   turnosElegibles,
   horaCalzaEnTurno,
+  terminoAhora,
+  TOPE_TERMINO_AHORA_MIN,
 } from '../turnoMantencion'
 import { fuePendiente, minutosParadaDe, ordenarEventos, resumirBitacora } from '../resumenBitacora'
 import { minutosDesdeInicioTurno } from '../turnoMantencion'
@@ -376,5 +378,50 @@ describe('mover un evento de turno (17-09-2026)', () => {
     expect(horaCalzaEnTurno(noche, '08:40')).toBe(true)
     expect(horaCalzaEnTurno(noche, '09:30')).toBe(false)
     expect(horaCalzaEnTurno(noche, '15:00')).toBe(false)
+  })
+})
+
+describe('«Terminó ahora» solo cuando es verdad (18-09-2026)', () => {
+  // Los casos son eventos reales de Chonchi; `ahora` es la hora en que se cargaron.
+  const a = (dia: number, h: number, m: number) => new Date(2026, 8, dia, h, m, 0, 0)
+
+  it('en vivo: el turno está corriendo y da la duración', () => {
+    expect(terminoAhora('2026-09-16_tarde', '21:15', a(16, 21, 30))).toEqual({ disponible: true, hora: '21:30', minutos: 15 })
+    expect(terminoAhora('2026-09-17_tarde', '22:25', a(17, 23, 22))).toEqual({ disponible: true, hora: '23:22', minutos: 57 })
+  })
+
+  it('más de 2 horas desde el inicio ya no es el término (Retiro cintas, 16:45 cargado 23:28)', () => {
+    expect(terminoAhora('2026-09-17_tarde', '16:45', a(17, 23, 28))).toEqual({ disponible: false, motivo: 'pasa-el-tope' })
+    expect(TOPE_TERMINO_AHORA_MIN).toBe(120)
+    expect(terminoAhora('2026-09-17_tarde', '21:00', a(17, 23, 0))).toMatchObject({ disponible: true, minutos: 120 })
+    expect(terminoAhora('2026-09-17_tarde', '21:00', a(17, 23, 1))).toEqual({ disponible: false, motivo: 'pasa-el-tope' })
+  })
+
+  it('turno ya cerrado: la TOLVA del día, cargada a las 18:55, no se cierra con la hora de carga', () => {
+    expect(terminoAhora('2026-09-17_dia', '11:00', a(17, 18, 55))).toEqual({ disponible: false, motivo: 'turno-terminado' })
+  })
+
+  it('otro día: 21:56 → 22:06 daría 10 min creíbles con dos días de diferencia', () => {
+    expect(terminoAhora('2026-09-16_tarde', '21:56', a(18, 22, 6))).toEqual({ disponible: false, motivo: 'turno-terminado' })
+  })
+
+  it('un inicio que todavía no llega NO da la vuelta por medianoche', () => {
+    // minutosEntre('21:56', '21:53') vale 1437: sin el signo, diría «pasa el tope».
+    expect(terminoAhora('2026-09-16_tarde', '21:56', a(16, 21, 53))).toEqual({ disponible: false, motivo: 'aun-no-empieza' })
+    // Evento recién creado: el inicio sugerido es la hora actual.
+    expect(terminoAhora('2026-09-16_tarde', '21:53', a(16, 21, 53))).toEqual({ disponible: false, motivo: 'aun-no-empieza' })
+  })
+
+  it('lo que termina pasado el cambio de turno vale, con una hora de holgura', () => {
+    expect(terminoAhora('2026-09-17_tarde', '23:55', a(18, 0, 20))).toEqual({ disponible: true, hora: '00:20', minutos: 25 })
+    expect(terminoAhora('2026-09-17_tarde', '23:55', a(18, 1, 1))).toEqual({ disponible: false, motivo: 'turno-terminado' })
+    // Noche: un inicio un poco antes de medianoche es de ESTE turno.
+    expect(terminoAhora('2026-09-17_noche', '23:55', a(17, 0, 10))).toEqual({ disponible: true, hora: '00:10', minutos: 15 })
+  })
+
+  it('sin inicio, turno futuro o id inválido: no se ofrece', () => {
+    expect(terminoAhora('2026-09-17_tarde', '', a(17, 22, 0))).toEqual({ disponible: false, motivo: 'sin-inicio' })
+    expect(terminoAhora('2026-09-18_dia', '09:00', a(17, 22, 0))).toEqual({ disponible: false, motivo: 'otro-turno' })
+    expect(terminoAhora('basura', '09:00', a(17, 22, 0))).toEqual({ disponible: false, motivo: 'otro-turno' })
   })
 })
