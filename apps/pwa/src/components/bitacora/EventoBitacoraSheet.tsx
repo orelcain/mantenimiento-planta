@@ -63,7 +63,7 @@ import {
   turnoMantencionEn,
   turnosElegibles,
 } from '@/services/bitacora/turnoMantencion'
-import { etiquetaCodigoEquipo, limpiarTipo, normalizarRepuestos, normalizarTipo } from '@/services/bitacora/presentacionEvento'
+import { etiquetaCodigoEquipo, etiquetaTipo, limpiarTipo, normalizarRepuestos, normalizarTipo } from '@/services/bitacora/presentacionEvento'
 import { vibrar } from '@/services/bitacora/vibrar'
 import { RepuestosUsados } from './RepuestosUsados'
 import type { FavoritosRepuestos, FuenteRepuestos } from '@/services/bitacora/repuestosBitacora'
@@ -1051,8 +1051,11 @@ export function EventoBitacoraSheet({
   // Un botón desactivado no dice POR QUÉ: con guantes se lee como que la app se
   // colgó. `faltantes` nombra cada campo y se muestra junto a Guardar, sin
   // esperar a que se intente tocar el botón (19-09-2026).
+  // El mismo nombre que muestra el campo: decía «Quién lo registró» (otro campo, ya
+  // lleno) cuando faltaba «Quién edita» — visto en capturas reales, 19-09-2026.
+  const etiquetaQuien = esNuevo ? 'Quién registra' : modoBorrador ? 'Quién continúa' : 'Quién edita'
   const faltantes = [
-    tecnicos.todos.length > 0 && !quien.trim() ? 'Quién lo registró' : null,
+    tecnicos.todos.length > 0 && !quien.trim() ? etiquetaQuien : null,
     tipo == null ? 'Qué se hizo' : tipo === 'otro' && !limpiarTipo(tipoOtro) ? 'el tipo «Otro»' : null,
     horaFaltante ? 'Inicio' : null,
     !descripcion.trim() ? 'Qué pasó' : null,
@@ -1261,7 +1264,7 @@ export function EventoBitacoraSheet({
               </p>
             ) : (
               <SelectorTecnico
-                etiqueta={esNuevo ? 'Quién registra' : modoBorrador ? 'Quién continúa' : 'Quién edita'}
+                etiqueta={etiquetaQuien}
                 deTurno={tecnicos.deTurno}
                 todos={tecnicos.todos}
                 valor={quien}
@@ -1348,6 +1351,14 @@ export function EventoBitacoraSheet({
                 {t.id === 'otro' ? 'Otro…' : t.label}
               </Chip>
             ))}
+            {/* Un evento guardado con un tipo que ya no se ofrece («Falla», antes del
+                18-09) se abría sin ningún chip marcado: parecía faltar el dato. Se
+                muestra marcado; tocar otro lo cambia (pasada visual 19-09-2026). */}
+            {tipo != null && !TIPOS_EVENTO.some((t) => t.id === tipo) && (
+              <Chip activo onClick={() => undefined}>
+                {etiquetaTipo({ tipo, tipoOtro: null })} (anterior)
+              </Chip>
+            )}
           </div>
           {tipo === 'otro' && (
             <div className="mt-3 flex flex-col gap-2">
