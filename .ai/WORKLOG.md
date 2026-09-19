@@ -21,6 +21,21 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-19 · Admin · ⚠ LAS FLECHAS DEL EDITOR NUNCA SE VIERON: `--primary` no existe
+
+- Orel: «pero las flechas no se ven». Causa REAL: el color era `rgb(var(--primary))` y en esta app
+  la variable se llama **`--brand`** (`--primary` no está definida). Valor inválido → el navegador
+  calcula `stroke: none` → la flecha existe, se puede seleccionar y borrar, pero es invisible. Solo
+  se veían las de servicios (`--cat-6-ink`) y las de «entre líneas» (`--muted-foreground`).
+  Mismo error en `MantencionTurnoTab.tsx` (contorno del día de hoy), corregido también.
+- `vector-effect: non-scaling-stroke` en las flechas: a 32 % de zoom una línea de 2,5 px se veía de
+  0,8 px. Punta de flecha 16 → 20.
+- Aviso cuando la unión se rechaza (`onConnectEnd`) y en el modo unir: «X e Y ya estaban unidos» /
+  «Ya hay una flecha al revés». Rechazar en silencio se siente como que el editor no funciona.
+  En modo unir, los equipos ya unidos al origen se atenúan.
+- ⚠ Para verificar un color de token: leer `getComputedStyle` del elemento, no el atributo `style`.
+  El atributo decía `stroke: rgb(var(--primary))` y parecía correcto.
+
 ## 2026-09-19 · Admin · Editor de líneas: modo «Unir equipos»
 
 - Orel: «sigo sin entender cómo poner las líneas de un elemento a otro». El problema real no era
