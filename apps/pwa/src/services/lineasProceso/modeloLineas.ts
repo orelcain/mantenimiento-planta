@@ -54,6 +54,38 @@ export interface GrafoLineas {
   aristas: [string, string][]
   /** Grupos en paralelo marcados a mano (los evidentes se deducen del grafo). */
   grupos?: GrupoParalelo[]
+  /** Puntos por los que se hace pasar una flecha, para acomodarla a mano. */
+  curvas?: CurvaFlecha[]
+}
+
+/**
+ * Una flecha acomodada a mano: pasa por estos puntos, en orden, con curva suave
+ * (Orel, 19-09-2026: «ordenar las líneas como si fueran cuerdas»).
+ */
+export interface CurvaFlecha {
+  a: string
+  b: string
+  puntos: { x: number; y: number }[]
+}
+
+/**
+ * Camino suave que pasa por todos los puntos (Catmull-Rom convertido a Bézier): curvas
+ * redondas, nunca ángulos rectos, que es lo que Orel pidió del diagrama.
+ */
+export function caminoSuave(puntos: readonly { x: number; y: number }[]): string {
+  if (puntos.length < 2) return ''
+  const p = puntos
+  let d = `M${p[0]!.x},${p[0]!.y}`
+  for (let i = 0; i < p.length - 1; i++) {
+    const p0 = p[i - 1] ?? p[i]!
+    const p1 = p[i]!
+    const p2 = p[i + 1]!
+    const p3 = p[i + 2] ?? p2
+    const c1 = { x: p1.x + (p2.x - p0.x) / 6, y: p1.y + (p2.y - p0.y) / 6 }
+    const c2 = { x: p2.x - (p3.x - p1.x) / 6, y: p2.y - (p3.y - p1.y) / 6 }
+    d += ` C${c1.x},${c1.y} ${c2.x},${c2.y} ${p2.x},${p2.y}`
+  }
+  return d
 }
 
 /**
