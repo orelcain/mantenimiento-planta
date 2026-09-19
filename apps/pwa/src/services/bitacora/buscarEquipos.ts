@@ -86,18 +86,24 @@ export function construirOpcionesEquipo(nodos: readonly NodoJerarquia[]): Opcion
 export function buscarEquipos(
   opciones: readonly OpcionEquipo[],
   texto: string,
-  { max = 8, usados = [] as readonly string[] } = {},
+  { max = 8, usados = [] as readonly string[], planta = '' } = {},
 ): OpcionEquipo[] {
   const q = normalizar(texto)
   if (q.length < 2) return []
   const terminos = q.split(' ')
   const usadosSet = new Set(usados.map(normalizar))
+  const plantaNorm = normalizar(planta)
   const puntaje = (o: OpcionEquipo) => {
     const nombre = normalizar(o.nombre)
     let p = 0
     if (nombre.startsWith(q)) p += 100
     else if (terminos.every((t) => nombre.split(' ').some((w) => w.startsWith(t)))) p += 50
     if (usadosSet.has(nombre)) p += 30
+    // La planta de la bitácora manda: hay 3 BAADER 142 y 3 KNURO en Chonchi y
+    // otras tantas en Yal, y buscando «BAADER» salía primero la de Yal en una
+    // bitácora de Chonchi (18-09-2026). Pesa más que «es un equipo» pero menos
+    // que el nombre, para no tapar una coincidencia exacta de la otra planta.
+    if (plantaNorm && normalizar(o.planta) === plantaNorm) p += 20
     if (o.tipo === 'equipo') p += 5
     return p
   }

@@ -87,6 +87,15 @@ describe('buscador de equipos sobre la jerarquía', () => {
     expect(ids).not.toContain('inactivo')
   })
 
+  it('la planta de la bitácora va primero: hay 3 BAADER 142 en Chonchi y 3 en Yal', () => {
+    const ids = (planta: string) => buscarEquipos(opciones, 'tablero baader', { max: 5, planta }).map((o) => o.id)
+    // Mismo nombre, misma puntuación por texto: decide la planta.
+    expect(ids('Planta Chonchi')[0]).toBe('tab142n1')
+    expect(ids('Planta Yal')[0]).toBe('tab142n3')
+    // Sin planta, el desempate sigue siendo alfabético (comportamiento anterior).
+    expect(ids('')[0]).toBe('tab142n1')
+  })
+
   it('un conjunto de trabajo es un ÁREA dentro de un área, y se ofrece como tal', () => {
     // «CINTAS HG» no es una máquina con código SAP: es lo que se monta y
     // desmonta como una unidad. Como área entra al buscador y se puede vincular.
