@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   Background,
   Controls,
+  EdgeLabelRenderer,
   Handle,
   MarkerType,
   MiniMap,
@@ -11,6 +12,7 @@ import {
   ReactFlow,
   ReactFlowProvider,
   addEdge,
+  getBezierPath,
   applyEdgeChanges,
   applyNodeChanges,
   useConnection,
@@ -19,6 +21,7 @@ import {
   type Connection,
   type Edge,
   type EdgeChange,
+  type EdgeProps,
   type FinalConnectionState,
   type Node,
   type NodeChange,
@@ -34,6 +37,7 @@ import { useToast } from '@/hooks/useToast'
 import {
   NODO,
   PREFIJO_MANUAL,
+  caminoSuave,
   esEntrada,
   esManual,
   formatoPeso,
@@ -45,6 +49,7 @@ import {
   serviciosDe,
   zonaDeNodo,
   type GrafoLineas,
+  type CurvaFlecha,
   type GrupoParalelo,
   type LineaProceso,
   type PesoEnLinea,
@@ -282,6 +287,95 @@ function NodoReparto({ data }: NodeProps<Node<{ h: number }>>) {
 
 const TIPOS = { maquina: NodoMaquina, servicio: NodoServicio, entrada: NodoEntrada, zona: NodoZona, paralelo: NodoParalelo, reparto: NodoReparto }
 
+/** Lo que la flecha necesita para dibujarse y para dejarse acomodar. */
+type DatosFlecha = { puntos: { x: number; y: number }[]; editable: boolean; onPuntos: (p: { x: number; y: number }[]) => void }
+
+/**
+ * Flecha que pasa por los puntos que uno le ponga, con curva suave (Orel pidió «ordenar las
+ * líneas como si fueran cuerdas», nunca ángulos rectos). Sin puntos es la curva de siempre.
+ * Seleccionada: arrastrar su cuerpo agrega un punto y lo mueve; doble clic en un punto lo quita.
+ */
+function FlechaCurva({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, markerEnd, style, label, labelStyle, labelBgStyle, data }: EdgeProps) {
+  const { screenToFlowPosition } = useReactFlow()
+  // `selected` no llega por props en esta versión: se lee del estado de React Flow.
+  const selected = useStore((st) => !!st.edgeLookup.get(id)?.selected)
+  const d = data as DatosFlecha
+  const puntos = d?.puntos ?? []
+  const [bezier, mx, my] = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition })
+  const camino = puntos.length ? caminoSuave([{ x: sourceX, y: sourceY }, ...puntos, { x: targetX, y: targetY }]) : bezier
+
+  // `base` es la lista de puntos vigente: al crear uno y arrastrarlo enseguida, el cierre
+  // todavía tenía la lista anterior y el punto nuevo se borraba al primer movimiento.
+  const arrastrar = (indice: number, ev: ReactPointerEvent, base: { x: number; y: number }[]) => {
+    if (!d?.editable) return
+    ev.stopPropagation()
+    ev.preventDefault()
+    const mover = (e: PointerEvent) => {
+      const p = screenToFlowPosition({ x: e.clientX, y: e.clientY })
+      d.onPuntos(base.map((q, i) => (i === indice ? { x: Math.round(p.x), y: Math.round(p.y) } : q)))
+    }
+    const soltar = () => {
+      window.removeEventListener('pointermove', mover)
+      window.removeEventListener('pointerup', soltar)
+    }
+    window.addEventListener('pointermove', mover)
+    window.addEventListener('pointerup', soltar)
+  }
+
+  // Al tomar el cuerpo de la flecha se crea un punto en el tramo más cercano y se arrastra.
+  const tomarCuerpo = (ev: ReactPointerEvent) => {
+    if (!d?.editable || !selected) return
+    const p = screenToFlowPosition({ x: ev.clientX, y: ev.clientY })
+    const tramos = [{ x: sourceX, y: sourceY }, ...puntos, { x: targetX, y: targetY }]
+    let mejor = 0
+    let dist = Infinity
+    for (let i = 0; i < tramos.length - 1; i++) {
+      const a = tramos[i]!
+      const b = tramos[i + 1]!
+      const c = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
+      const dd = (c.x - p.x) ** 2 + (c.y - p.y) ** 2
+      if (dd < dist) {
+        dist = dd
+        mejor = i
+      }
+    }
+    const nuevos = [...puntos.slice(0, mejor), { x: Math.round(p.x), y: Math.round(p.y) }, ...puntos.slice(mejor)]
+    d.onPuntos(nuevos)
+    arrastrar(mejor, ev, nuevos)
+  }
+
+  return (
+    <>
+      <path id={id} className="react-flow__edge-path" d={camino} markerEnd={markerEnd} style={style} />
+      <path className="react-flow__edge-interaction" d={camino} fill="none" strokeWidth={20} stroke="transparent" onPointerDown={tomarCuerpo} />
+      {label ? (
+        <EdgeLabelRenderer>
+          <div style={{ transform: `translate(-50%, -50%) translate(${mx}px, ${my}px)`, ...labelBgStyle }} className="pointer-events-none absolute rounded-ctl px-1 py-px">
+            <span style={labelStyle}>{label}</span>
+          </div>
+        </EdgeLabelRenderer>
+      ) : null}
+      {selected && d?.editable && (
+        <EdgeLabelRenderer>
+          {puntos.map((p, i) => (
+            <div
+              key={i}
+              role="presentation"
+              onPointerDown={(ev) => arrastrar(i, ev, puntos)}
+              onDoubleClick={() => d.onPuntos(puntos.filter((_, j) => j !== i))}
+              title="Arrastra para acomodar · doble clic para quitarlo"
+              style={{ transform: `translate(-50%, -50%) translate(${p.x}px, ${p.y}px)`, pointerEvents: 'all' }}
+              className="nodrag nopan absolute size-3 cursor-grab rounded-full border-2 border-card bg-[rgb(var(--brand))] shadow-[0_1px_3px_rgba(0,0,0,0.3)] active:cursor-grabbing"
+            />
+          ))}
+        </EdgeLabelRenderer>
+      )}
+    </>
+  )
+}
+
+const TIPOS_FLECHA = { curva: FlechaCurva }
+
 const aNodos = (g: GrafoLineas): Node[] => [
   ...g.lineas.map((l) => ({
     id: `zona:${l.id}`,
@@ -304,7 +398,7 @@ const aNodos = (g: GrafoLineas): Node[] => [
 ]
 const aAristas = (g: GrafoLineas): Edge[] => g.aristas.map(([a, b]) => ({ id: `${a}->${b}`, source: a, target: b }))
 
-function alGrafo(lineas: LineaProceso[], nodes: Node[], edges: Edge[], grupos: GrupoParalelo[] = []): GrafoLineas {
+function alGrafo(lineas: LineaProceso[], nodes: Node[], edges: Edge[], grupos: GrupoParalelo[] = [], curvas: CurvaFlecha[] = []): GrafoLineas {
   // La esquina de cada contenedor vive en su nodo del lienzo: así mover la caja entra en deshacer.
   const esquina = new Map(nodes.filter((n) => n.type === 'zona').map((n) => [n.id.slice('zona:'.length), n.position]))
   return {
@@ -322,6 +416,8 @@ function alGrafo(lineas: LineaProceso[], nodes: Node[], edges: Edge[], grupos: G
     aristas: edges.map((e) => [e.source, e.target] as [string, string]),
     // Un grupo con menos de dos miembros en el lienzo ya no es un grupo.
     grupos: grupos.map((g) => ({ ...g, miembros: g.miembros.filter((m) => nodes.some((n) => n.id === m)) })).filter((g) => g.miembros.length > 1),
+    // Una curva sin su flecha ya no sirve.
+    curvas: curvas.filter((c) => c.puntos.length > 0 && edges.some((e) => e.source === c.a && e.target === c.b)),
   }
 }
 
@@ -342,6 +438,7 @@ function Editor() {
 
   const [lineas, setLineas] = useState<LineaProceso[]>([])
   const [grupos, setGrupos] = useState<GrupoParalelo[]>([])
+  const [curvas, setCurvas] = useState<CurvaFlecha[]>([])
   const [grupoSel, setGrupoSel] = useState<string | null>(null)
   // Modo «Agrupar»: tocar los equipos que trabajan en paralelo, sin depender de teclas
   // (Ctrl/Mayús + clic no es descubrible, y Orel ya entendió el modo «Unir»).
@@ -398,6 +495,7 @@ function Editor() {
   const cargarGrafo = useCallback((g: GrafoLineas) => {
     setLineas(g.lineas)
     setGrupos(g.grupos ?? [])
+    setCurvas(g.curvas ?? [])
     setNodes(aNodos(g))
     setEdges(aAristas(g))
   }, [])
@@ -418,7 +516,7 @@ function Editor() {
         if (!vivo) return
         const base = g ?? propuesta()
         cargarGrafo(base)
-        setGuardado(g ? JSON.stringify(alGrafo(base.lineas, aNodos(base), aAristas(base), base.grupos ?? [])) : '')
+        setGuardado(g ? JSON.stringify(alGrafo(base.lineas, aNodos(base), aAristas(base), base.grupos ?? [], base.curvas ?? [])) : '')
         setMeta(g?.actualizadoPor ? `Guardado por ${g.actualizadoPor}${g.actualizadoEn ? ` · ${g.actualizadoEn.toDate().toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' })}` : ''}` : 'Propuesta sin guardar')
       })
       .catch(() => {
@@ -436,7 +534,7 @@ function Editor() {
   }, [cargandoArbol, indice, propuesta, cargarGrafo, toast])
 
   // Pesos calculados con las flechas, en cada cambio.
-  const grafo = useMemo(() => alGrafo(lineas, nodes, edges, grupos), [lineas, nodes, edges, grupos])
+  const grafo = useMemo(() => alGrafo(lineas, nodes, edges, grupos, curvas), [lineas, nodes, edges, grupos, curvas])
   const pesos = useMemo(() => pesosPorLinea(grafo), [grafo])
   const servicios = useMemo(() => serviciosDe(grafo), [grafo])
   const relaciones = useMemo(() => relacionesDeServicios(grafo, pesos), [grafo, pesos])
@@ -607,6 +705,14 @@ function Editor() {
     [vista, nodosParalelo, verApoyo],
   )
 
+  // Acomodar una flecha: sus puntos se guardan con las líneas.
+  const ponerPuntos = useCallback((a: string, b: string, puntos: { x: number; y: number }[]) => {
+    setCurvas((cs) => {
+      const resto = cs.filter((c) => !(c.a === a && c.b === b))
+      return puntos.length ? [...resto, { a, b, puntos }] : resto
+    })
+  }, [])
+
   const vistaAristas = useMemo(
     () =>
       edges.map((e): Edge => {
@@ -618,7 +724,12 @@ function Editor() {
         const color = apoyo ? APOYO : entre ? 'rgb(var(--muted-foreground))' : 'rgb(var(--brand))'
         return {
           ...e,
-          type: 'default',
+          type: 'curva',
+          data: {
+            puntos: curvas.find((c) => c.a === e.source && c.b === e.target)?.puntos ?? [],
+            editable,
+            onPuntos: (p: { x: number; y: number }[]) => ponerPuntos(e.source, e.target, p),
+          } satisfies DatosFlecha,
           ariaLabel: `Flecha de ${nombreDe(e.source)} a ${nombreDe(e.target)}`,
           // Punta chica: a 20 px pesaba más que la línea y tapaba el borde de la tarjeta.
           markerEnd: { type: MarkerType.ArrowClosed, width: 7, height: 6, color },
@@ -640,7 +751,7 @@ function Editor() {
               : { stroke: color, strokeWidth: grosor, strokeOpacity: opacidad, vectorEffect: 'non-scaling-stroke' },
         }
       }),
-    [edges, servicios, nombreDe, flujoDeFlecha],
+    [edges, servicios, nombreDe, flujoDeFlecha, curvas, editable, ponerPuntos],
   )
 
   const sucio = !cargando && JSON.stringify(grafo) !== guardado
@@ -1252,6 +1363,7 @@ function Editor() {
               nodes={conParalelos}
               edges={verApoyo ? vistaAristas : vistaAristas.filter((e) => !servicios.has(e.source) && !servicios.has(e.target))}
               nodeTypes={TIPOS}
+              edgeTypes={TIPOS_FLECHA}
               onNodesChange={editable ? onNodesChange : undefined}
               onEdgesChange={editable ? onEdgesChange : undefined}
               onConnect={editable ? onConnect : undefined}
@@ -1493,6 +1605,9 @@ function Editor() {
                       : esEntrada(flechaSeleccionada.target)
                         ? 'Une dos líneas: lo que sale de una entra a la otra.'
                         : 'Flujo del producto dentro de la línea.'}
+                </p>
+                <p className="rounded-ctl bg-muted-foreground/10 p-2 text-footnote text-muted-foreground">
+                  Para acomodarla: arrastra la línea y se dobla por donde la lleves. Doble clic en un punto para quitarlo.
                 </p>
                 <Button variant="tinted" className="text-ink-crit" onClick={quitarSeleccion}>
                   Quitar la flecha

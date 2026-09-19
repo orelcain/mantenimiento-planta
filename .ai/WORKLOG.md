@@ -21,6 +21,21 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-19 · Admin · Editor de líneas: flechas que se acomodan «como cuerdas»
+
+- Idea de Orel (Inkscape/draw.io): arrastrar la línea la dobla por donde uno la lleve. `CurvaFlecha`
+  (a, b, puntos) se guarda con las líneas; `caminoSuave()` (Catmull-Rom → Bézier) pasa por los
+  puntos SIN ángulos rectos. Doble clic en un punto lo quita.
+- ⚠⚠ Dos trampas que costaron una hora:
+  1. **Caché de Vite podrida**: tras `preview_stop`/`preview_start` el lienzo dejó de dibujar TODAS
+     las aristas (0 en el DOM, 43 en estado) con el código de main, sin ningún error en consola.
+     Se arregla con `rm -rf apps/pwa/node_modules/.vite` y reiniciar. Antes de culpar al código:
+     comprobar contra main.
+  2. **`selected` NO llega por props** a un componente de arista propio en @xyflow/react 12: se lee
+     con `useStore((st) => !!st.edgeLookup.get(id)?.selected)`.
+- Y un error propio: al crear un punto y arrastrarlo en el mismo gesto, el cierre tenía la lista
+  ANTERIOR y el punto nuevo se borraba al primer movimiento → el arrastre recibe la lista vigente.
+
 ## 2026-09-19 · Admin · Editor de líneas: leyenda al día y servicios que se pueden esconder
 
 - La leyenda y el minimapa todavía codificaban el peso con los colores de estado: ahora muestran
