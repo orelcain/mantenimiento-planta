@@ -22,7 +22,7 @@ import {
   type NodeProps,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { ChevronLeft, Expand, Loader2, Redo2, RotateCcw, Search, Undo2, X } from 'lucide-react'
+import { ChevronLeft, Expand, Loader2, Maximize2, Minimize2, PanelLeftClose, PanelLeftOpen, Redo2, RotateCcw, Search, Undo2, X } from 'lucide-react'
 import { Button } from '@/components/piel'
 import { ToastAction } from '@/components/ui/toast'
 import { useHierarchyTree } from '@/hooks/useHierarchy'
@@ -187,6 +187,9 @@ function Editor() {
   const { tree, loading: cargandoArbol } = useHierarchyTree()
   const { screenToFlowPosition, fitView } = useReactFlow()
   const lienzo = useRef<HTMLDivElement>(null)
+  // Espacio de trabajo (Orel, 19-09-2026): pantalla completa y lista de equipos plegable.
+  const [amplio, setAmplio] = useState(false)
+  const [conLista, setConLista] = useState(true)
 
   const [lineas, setLineas] = useState<LineaProceso[]>([])
   const [nodes, setNodes] = useState<Node[]>([])
@@ -394,6 +397,32 @@ function Editor() {
     window.addEventListener('beforeunload', aviso)
     return () => window.removeEventListener('beforeunload', aviso)
   }, [sucio])
+  // Pantalla completa: el editor tapa la app (capa fija) y, si el navegador lo permite, se
+  // pide pantalla completa del DOCUMENTO — no del contenedor: los avisos con «Deshacer»
+  // viven en un portal del body y quedarían ocultos. Esc sale y se sincroniza.
+  const alternarAmplio = useCallback(() => {
+    if (amplio) {
+      setAmplio(false)
+      if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined)
+      return
+    }
+    setAmplio(true)
+    void document.documentElement.requestFullscreen?.().catch(() => undefined)
+  }, [amplio])
+  useEffect(() => {
+    const cambio = () => {
+      if (!document.fullscreenElement) setAmplio(false)
+    }
+    document.addEventListener('fullscreenchange', cambio)
+    return () => document.removeEventListener('fullscreenchange', cambio)
+  }, [])
+  useEffect(() => {
+    if (!amplio) return
+    // Al cambiar de tamaño, que el lienzo reencuadre lo que se estaba viendo.
+    const t = window.setTimeout(() => void fitView({ padding: 0.06, nodes: [{ id: 'zona:acopio' }, { id: 'zona:eviscerado' }], duration: 250 }), 120)
+    return () => window.clearTimeout(t)
+  }, [amplio, fitView])
+
   const volver = () => {
     if (sucio && !window.confirm('Hay cambios sin guardar en las líneas. ¿Salir igual y perderlos?')) return
     navigate('/admin')
@@ -523,7 +552,7 @@ function Editor() {
   const inspector = editable && (seleccionado || flechaSeleccionada)
 
   return (
-    <div className="flex h-[calc(100dvh-4rem)] min-h-[520px] flex-col md:h-[calc(100dvh-1rem)]">
+    <div className={amplio ? 'fixed inset-0 z-[60] flex h-dvh flex-col bg-background' : 'flex h-[calc(100dvh-4rem)] min-h-[520px] flex-col md:h-[calc(100dvh-1rem)]'}>
       <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border px-4 py-3">
         <button
           type="button"
@@ -540,6 +569,26 @@ function Editor() {
         </div>
         {editable && (
           <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setConLista((v) => !v)}
+              aria-pressed={conLista}
+              aria-label={conLista ? 'Ocultar la lista de equipos' : 'Mostrar la lista de equipos'}
+              title={conLista ? 'Ocultar la lista de equipos' : 'Mostrar la lista de equipos'}
+              className="flex size-11 items-center justify-center rounded-full text-primary hover:bg-muted-foreground/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary [&>svg]:size-5"
+            >
+              {conLista ? <PanelLeftClose aria-hidden /> : <PanelLeftOpen aria-hidden />}
+            </button>
+            <button
+              type="button"
+              onClick={alternarAmplio}
+              aria-pressed={amplio}
+              title={amplio ? 'Salir de pantalla completa (Esc)' : 'Pantalla completa'}
+              className="flex min-h-[44px] items-center gap-1.5 rounded-full px-3 text-footnote font-semibold text-primary hover:bg-muted-foreground/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary [&>svg]:size-4"
+            >
+              {amplio ? <Minimize2 aria-hidden /> : <Maximize2 aria-hidden />}
+              {amplio ? 'Salir' : 'Pantalla completa'}
+            </button>
             <button type="button" className="flex size-11 items-center justify-center rounded-full text-primary hover:bg-muted-foreground/10 disabled:opacity-35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary [&>svg]:size-5" onClick={deshacer} disabled={!pilaDeshacer.current.length} aria-label="Deshacer (Ctrl+Z)" title="Deshacer (Ctrl+Z)">
               <Undo2 aria-hidden />
             </button>
@@ -564,7 +613,7 @@ function Editor() {
       </header>
 
       <div className="flex min-h-0 flex-1">
-        {editable && (
+        {editable && conLista && (
           <aside aria-label="Equipos" className="flex w-[280px] shrink-0 flex-col gap-2 overflow-y-auto border-r border-border bg-card p-3">
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
