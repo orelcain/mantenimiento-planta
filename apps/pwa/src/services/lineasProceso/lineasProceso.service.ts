@@ -26,6 +26,7 @@ export async function leerLineas(plantId: string): Promise<GrafoGuardado | null>
     nodos: d.nodos,
     // Firestore no guarda arreglos de arreglos: las flechas van como {a, b}.
     aristas: (d.aristas ?? []).map((x) => [x.a, x.b] as [string, string]),
+    grupos: Array.isArray(d.grupos) ? d.grupos : [],
     actualizadoPor: d.actualizadoPor,
     actualizadoEn: d.actualizadoEn,
   }
@@ -44,6 +45,7 @@ export async function guardarLineas(plantId: string, g: GrafoLineas, quien: stri
       ...(n.nombre ? { nombre: n.nombre } : {}),
     })),
     aristas: g.aristas.map(([a, b]) => ({ a, b })),
+    grupos: (g.grupos ?? []).map((gr) => ({ id: gr.id, miembros: gr.miembros, ...(gr.nombre ? { nombre: gr.nombre } : {}) })),
     actualizadoPor: quien,
     actualizadoEn: serverTimestamp(),
   })

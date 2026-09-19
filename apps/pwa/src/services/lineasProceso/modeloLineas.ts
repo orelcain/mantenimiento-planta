@@ -52,6 +52,20 @@ export interface GrafoLineas {
   nodos: NodoGrafo[]
   /** [origen, destino]. */
   aristas: [string, string][]
+  /** Grupos en paralelo marcados a mano (los evidentes se deducen del grafo). */
+  grupos?: GrupoParalelo[]
+}
+
+/**
+ * Un grupo en paralelo hecho a mano: sirve donde el reparto no se deduce solo (ramas con
+ * cuotas distintas, equipos que no cuelgan del mismo padre) o donde Orel quiere dejarlo
+ * dicho explícitamente en otra área (19-09-2026).
+ */
+export interface GrupoParalelo {
+  id: string
+  miembros: string[]
+  /** Nombre propio; si falta, se rotula «Paralelo · N ramas». */
+  nombre?: string
 }
 
 /** Tamaño de la tarjeta de un equipo en el lienzo (px): para saber en qué zona cae su centro. */
@@ -167,6 +181,18 @@ export function limitesDeZonas(g: Pick<GrafoLineas, 'lineas' | 'nodos'>): Map<st
     out.set(l.id, { x: x1, y: y1, w: x2 - x1, h: y2 - y1 })
   }
   return out
+}
+
+/** Caja que envuelve a un conjunto de equipos del lienzo, con aire alrededor. */
+export function limitesDeGrupo(nodos: readonly NodoGrafo[], miembros: readonly string[], aire = 14): { x: number; y: number; w: number; h: number } | undefined {
+  const cajas = nodos.filter((n) => miembros.includes(n.id))
+  if (cajas.length < 2) return undefined
+  const t = (n: NodoGrafo) => (esEntrada(n.id) ? ENTRADA : NODO)
+  const x1 = Math.min(...cajas.map((c) => c.x))
+  const y1 = Math.min(...cajas.map((c) => c.y))
+  const x2 = Math.max(...cajas.map((c) => c.x + t(c).ancho))
+  const y2 = Math.max(...cajas.map((c) => c.y + t(c).alto))
+  return { x: x1 - aire, y: y1 - aire, w: x2 - x1 + aire * 2, h: y2 - y1 + aire * 2 }
 }
 
 /** Los equipos que PERTENECEN a una zona de servicios de apoyo. */
