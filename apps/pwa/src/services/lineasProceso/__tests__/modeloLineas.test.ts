@@ -88,6 +88,25 @@ describe('servicios de apoyo (influyen indirectamente)', () => {
   })
 })
 
+describe('círculos de flechas', () => {
+  it('marca `ciclo` y deja en 0 a los que quedan atrapados, sin tocar al resto', () => {
+    // in:evis → a → b → c, y c vuelve a b: b y c quedan en el círculo.
+    const p = pesosPorLinea({
+      lineas: L,
+      nodos: [{ id: 'in:evis', x: 0, y: 0 }, { id: 'a', x: 0, y: 0 }, { id: 'b', x: 0, y: 0 }, { id: 'c', x: 0, y: 0 }],
+      aristas: [
+        ['in:evis', 'a'],
+        ['a', 'b'],
+        ['b', 'c'],
+        ['c', 'b'],
+      ],
+    })
+    expect(p.get('a')).toEqual({ lineaId: 'evis', peso: 1 })
+    expect(p.get('b')).toEqual({ lineaId: 'evis', peso: 0, ciclo: true })
+    expect(p.get('c')).toEqual({ lineaId: 'evis', peso: 0, ciclo: true })
+  })
+})
+
 describe('contenedores: pertenencia explícita y límites que siguen a sus equipos', () => {
   it('la pertenencia manda sobre la posición', () => {
     expect(zonaDeNodo(L, { id: 'b', x: 10, y: 10, zona: 'emp' })).toBe('emp')
