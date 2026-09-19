@@ -21,6 +21,19 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-19 · Bitacora ronda 64 · Historial: referencias en cada cifra y preguntas claras
+- Pasada visual del Historial con capturas reales (https://claude.ai/artifact/2tFtM99z5QCR9HPQimSfV6) — antes solo se había mirado el título del gráfico.
+- **Reglas de Orel (memoria `feedback_reglas_analisis_datos`):** «30 h de detención sin referencia no dice nada» → toda cifra dice contra qué se compara y si es bueno o malo; «los datos responden preguntas claras y precisas».
+- Cifras en dos preguntas: **¿Cuánto paró la línea?** (parada con `% del tiempo de producción`, fallas, MTTR «tiempo medio en reparar», MTBF «tiempo medio entre fallas») y **¿Cómo trabajó Mantención?** (eventos, sin detener con %, pendientes abiertos·cerrados, repuestos·unidades). Entran las FALLAS (base del MTTR); se va la casilla huérfana.
+- **¿Mejoramos?** `useHistorialBitacora` lee el período elegido y el ANTERIOR del mismo largo en la MISMA consulta (desde 2×días); `compararPeriodos` da «▲/▼ antes X» verde/rojo según sea MEJOR o PEOR para la planta. ⚠ Solo si el anterior tiene ≥60 % de los turnos del actual (la bitácora parte el 15-09): si no, lo dice en texto. Parada y fallas se comparan como TASA (por tiempo / por turno); <5 % = «igual».
+- **¿Es normal?** Línea punteada del promedio por turno en el gráfico; «máx» pasa al subtítulo (partía el título en el teléfono).
+- Teléfono: equipos → repuestos → quién → turnos (con `contents` en la columna derecha y `order-*`; el PC sigue en dos columnas). Turnos: 6 + «Ver los N turnos». Nombres de equipo completos (se perdía el «N3»). Repuestos «20 un.». Secciones con preguntas: «¿Qué equipos pararon más?», «¿Qué repuestos salieron de bodega?», «¿Quién está registrando?», «¿Cómo fue cada turno?».
+- Correo y PDF del historial llevan el mismo % del tiempo de producción. `porcentajeFino` usa `dec1` (audit-decimales).
+- Verificado con Playwright (`bitacora-historial.mjs`, teléfono y PC, claro y oscuro); vitrina ampliada a 90 turnos para que el período anterior esté completo y se vea la comparación.
+- tsc 0 · eslint 30 · vitest 2.848 (9 nuevos: `referenciasHistorial.test.ts`) · auditorías piel/voseo/decimales/graficos OK · build OK.
+- Pendiente (guías): banda de rango normal fijada A PRIORI cuando haya ~12 períodos estables.
+- Estado: HECHO.
+
 ## 2026-09-19 · Bitacora ronda 63 · Los «quién» del editor en una tarjeta; «Técnico» único
 - Mockup interactivo aprobado (https://claude.ai/artifact/CCdca8MYyE3uTx6nCmoMZm). Antes de «¿Qué se hizo?» había 4 bloques (quién edita, turno, quién lo registró, participaron) → UNA tarjeta de filas de 44 px (Técnico › · Turno ⌄ · Participaron ›), como el editor del Calendario de iOS. Tocar una fila abre sus chips EN SU LUGAR (sin hoja sobre hoja); lo que falta viene abierto al abrir la hoja y elegir lo cierra.
 - **Orel: «el que edita y el que registra deberían ser el mismo técnico».** En datos eran dos (`registradoPor` = autor; `actualizadoPorNombre` = «editado por»). Queda UNA pregunta, «Técnico»: nuevo/borrador = quien lo escribe (`quien`); publicado = el AUTOR (se corrige ahí → `registradoPor`). El «editado por» de un publicado se toma SIN PREGUNTAR del nombre recordado del teléfono (o el autor si no hay) — se conserva la traza. Ya no es obligatorio elegir «quién edita» para guardar una corrección.
