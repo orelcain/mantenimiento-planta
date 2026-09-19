@@ -188,6 +188,14 @@ export function minutosEntre(inicio: string, termino: string | null | undefined)
   return (mb - ma + 1440) % 1440
 }
 
+/** `HH:mm` más `minutos`, dando la vuelta por medianoche (23:50 + 20 = 00:10). Null si la hora no es válida. */
+export function horaMasMinutos(hhmm: string, minutos: number): string | null {
+  const m = hhmm.match(/^(\d{1,2}):(\d{2})$/)
+  if (!m) return null
+  const total = (((Number(m[1]) * 60 + Number(m[2]) + Math.round(minutos)) % 1440) + 1440) % 1440
+  return `${pad(Math.floor(total / 60))}:${pad(total % 60)}`
+}
+
 /** "35 min", "1 h 05 min", "2 h". */
 export function formatoMinutos(min: number | null | undefined): string {
   if (min == null || !Number.isFinite(min)) return '—'
