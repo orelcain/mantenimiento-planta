@@ -1020,6 +1020,15 @@ export function EventoBitacoraSheet({
       void guardar()
     }
   }
+  // HIG «Keyboards»: en el PC, Cmd/Ctrl+Enter guarda desde CUALQUIER campo (incluido
+  // el textarea, donde Enter solo es normal para bajar de línea). Quien carga la
+  // bitácora al cierre del turno suele encadenar varios eventos seguidos desde ahí.
+  const cmdEnterGuarda = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !guardando && !faltaObligatorio) {
+      e.preventDefault()
+      void guardar()
+    }
+  }
   // HIG «Entering data»: validar al salir del campo, no recién al guardar.
   const validarTermino = () => {
     if (duracion != null && duracion > 12 * 60) {
@@ -1036,6 +1045,7 @@ export function EventoBitacoraSheet({
     <Sheet
       open={open}
       onClose={cerrarHoja}
+      onKeyDown={cmdEnterGuarda}
       size="wide"
       title={
         pendienteOrigen && esNuevo
@@ -1551,7 +1561,14 @@ export function EventoBitacoraSheet({
             <div className="mb-3 grid grid-cols-3 gap-2">
               {fotos.map((f) => (
                 <figure key={f.path} className="relative m-0">
-                  <img src={f.url} alt={ETIQUETA_FOTO[f.etiqueta]} className="aspect-square w-full rounded-ctl bg-muted-foreground/10 object-cover" />
+                  {/* Ronda 47: la miniatura de 320 px, no la original de 1.600 px — este
+                      grid ya la pinta a ~110 px, y bajar la foto entera se paga en la red
+                      de planta por cada foto del editor, otra vez. */}
+                  <img
+                    src={f.thumbUrl ?? f.url}
+                    alt={ETIQUETA_FOTO[f.etiqueta]}
+                    className="aspect-square w-full rounded-ctl bg-muted-foreground/10 object-cover"
+                  />
                   <figcaption className="pt-1 text-caption text-muted-foreground">{ETIQUETA_FOTO[f.etiqueta]}</figcaption>
                   <button
                     type="button"
@@ -1571,14 +1588,16 @@ export function EventoBitacoraSheet({
                     <>
                       <AlertTriangle className="size-5 text-ink-warn" aria-hidden />
                       <span className="text-caption text-muted-foreground">{s.error}</span>
-                      <span className="flex items-center gap-2">
-                        <button type="button" onClick={() => void subir(s)} className="inline-flex min-h-[32px] items-center gap-1 text-footnote font-semibold text-primary">
+                      {/* min-h-44: piso táctil del HIG (accessibility); con guantes, «Reintentar»
+                          es el botón que más se toca justo cuando la red de planta ya falló. */}
+                      <span className="flex items-center gap-3">
+                        <button type="button" onClick={() => void subir(s)} className="inline-flex min-h-[44px] items-center gap-1 text-footnote font-semibold text-primary">
                           <RotateCw className="size-3.5" /> Reintentar
                         </button>
                         {/* Sin esto, una foto que nunca va a subir (un HEIC, por
                             ejemplo) obligaba a cancelar el evento entero para
                             sacarla y se perdía todo lo escrito (revisión 15-09). */}
-                        <button type="button" onClick={() => descartarSubida(s.clave)} className="inline-flex min-h-[32px] items-center gap-1 text-footnote font-semibold text-muted-foreground">
+                        <button type="button" onClick={() => descartarSubida(s.clave)} className="inline-flex min-h-[44px] items-center gap-1 text-footnote font-semibold text-muted-foreground">
                           <X className="size-3.5" /> Quitar
                         </button>
                       </span>
@@ -1587,7 +1606,7 @@ export function EventoBitacoraSheet({
                     <>
                       <Loader2 className="size-5 animate-spin text-muted-foreground" aria-hidden />
                       <span className="text-caption text-muted-foreground">Subiendo {ETIQUETA_FOTO[s.etiqueta].toLowerCase()}…</span>
-                      <button type="button" onClick={() => descartarSubida(s.clave)} className="inline-flex min-h-[32px] items-center gap-1 text-footnote font-semibold text-muted-foreground">
+                      <button type="button" onClick={() => descartarSubida(s.clave)} className="inline-flex min-h-[44px] items-center gap-1 text-footnote font-semibold text-muted-foreground">
                         <X className="size-3.5" /> Quitar
                       </button>
                     </>

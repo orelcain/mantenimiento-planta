@@ -1,5 +1,6 @@
 import type { EventoBitacora, TurnoMantencion } from './bitacora.types'
 import { soloListos } from './borradores'
+import { compartirOBajarArchivo } from './compartirArchivo'
 import { LOGO_RECOLECCION_DATA_URI } from './logoRecoleccion'
 import { etiquetaTipo, nombreConComun, normalizarRepuestos, tituloDe } from './presentacionEvento'
 import { gruposDelTurno, minutosParadaDe } from './resumenBitacora'
@@ -205,7 +206,7 @@ export function filasAXml(filas: readonly FilaRecoleccion[]): string {
     .join('')
 }
 
-export async function generarExcelRecoleccion(filas: readonly FilaRecoleccion[], nombre: string): Promise<void> {
+export async function generarExcelRecoleccion(filas: readonly FilaRecoleccion[], nombre: string): Promise<'compartido' | 'descargado' | 'cancelado'> {
   const { unzipSync, zipSync, strFromU8, strToU8 } = await import('fflate')
   const respuesta = await fetch(`${import.meta.env.BASE_URL}plantillas/recoleccion-mttr.xlsx`)
   if (!respuesta.ok) throw new Error('No se pudo cargar la plantilla del Excel')
@@ -220,13 +221,9 @@ export async function generarExcelRecoleccion(filas: readonly FilaRecoleccion[],
     .replace(/<dimension ref="[^"]*"/, `<dimension ref="A1:E${ultima}"`)
   const tabla = strFromU8(tablaOriginal).replace(/ref="A3:E\d+"/g, `ref="A3:E${ultima}"`)
   const salida = zipSync({ ...archivos, 'xl/worksheets/sheet1.xml': strToU8(hoja), 'xl/tables/table1.xml': strToU8(tabla) })
-  const blob = new Blob([salida as BlobPart], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = nombre
-  a.click()
-  setTimeout(() => URL.revokeObjectURL(url), 10_000)
+  const tipo = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  const blob = new Blob([salida as BlobPart], { type: tipo })
+  return compartirOBajarArchivo(blob, nombre, tipo)
 }
 
 /** «Recoleccion MTTR Turno dia 17-09-2026.xlsx», con el nombre que usan ellos. */

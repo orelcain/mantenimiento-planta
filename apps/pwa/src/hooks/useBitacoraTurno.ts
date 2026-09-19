@@ -32,9 +32,28 @@ import { borrarFotoOEncolar, type subirFotoBitacora } from '@/services/bitacora/
 import { autorVisible } from '@/services/bitacora/bitacora.types'
 import { dispositivoActual } from '@/services/bitacora/dispositivo'
 import { usePresenciaBitacora } from '@/hooks/usePresenciaBitacora'
+import { logger } from '@/lib/logger'
 
 /** Cuánto dura la marca «Nuevo» de un evento que entró solo, si nadie lo abre. */
 const MARCA_NUEVO_MS = 90_000
+
+/**
+ * WEB_PWA_APPLE (Safari borra los datos del sitio menos usado cuando falta espacio):
+ * sin `persist()`, los cambios pendientes que quedan en IndexedDB con mala señal en
+ * planta pueden desaparecer antes de sincronizar. Se pide una sola vez por sesión;
+ * el navegador decide solo (no hay diálogo que el técnico deba contestar).
+ */
+let pedidoPersistencia = false
+function pedirAlmacenamientoPersistente() {
+  if (pedidoPersistencia || typeof navigator === 'undefined' || !navigator.storage?.persist) return
+  pedidoPersistencia = true
+  void navigator.storage
+    .persist()
+    .then((concedido) => {
+      if (!concedido) logger.warn('Almacenamiento persistente no concedido: los cambios sin sincronizar podrían borrarse con poco espacio')
+    })
+    .catch(() => {})
+}
 
 /**
  * Cierra el pendiente que un evento nuevo acaba de resolver.
@@ -168,6 +187,10 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
   }, [])
   const user = useAuthStore((s) => s.user)
   const turnoId = turno.id
+
+  useEffect(() => {
+    pedirAlmacenamientoPersistente()
+  }, [])
 
   useEffect(() => {
     setCargando(true)
