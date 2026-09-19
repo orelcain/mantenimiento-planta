@@ -21,6 +21,17 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-19 · Bitacora ronda 61 · Zoom y tamaño de letra (#12 del HIG, cierra el informe)
+- Mockup con CAPTURAS REALES al 100/124/135 % (https://claude.ai/artifact/4WKVax3ncz8BuVwzhEkdpA), aprobado.
+- **Zoom con dos dedos en toda la app**: el viewport tenía `maximum-scale=1, user-scalable=no` desde el release inicial (nadie lo decidió). Los campos miden ≥16 px, así que iOS no hace zoom solo al tocarlos.
+- **Letra que sigue al teléfono, solo en la bitácora**: la escala de tailwind (`fontSize`) ahora es `px × var(--escala-texto, 1)` — con 1 la app mide EXACTAMENTE lo mismo (medido: título 17 px). `useTamanoLetraBitacora` pone la variable en `<html>` (las hojas son portales) mientras la bitácora está abierta y la QUITA al salir (medido). iPhone: «Como el iPhone» lee `font: -apple-system-body` (Dynamic Type para web). Android/PC: selector propio «Tamaño de letra · Normal / Grande (118 %) / Muy grande (135 %)» al final de la lista, en `localStorage`. Tope 135 % = lo revisado con capturas; más allá, el zoom.
+- `text-[16px]` de los campos de la bitácora → `text-campo` (16 px × escala). `Button` y el título/descripción de `Sheet` (piel) pasan a `calc(rem × escala)`: con 1, idénticos en los ~10 usos.
+- Buscador de repuestos: pestañas a todo el ancho («Este equipo»), estrella junto al buscador, ayuda «Código o nombre» — al 135 % se cortaban «En este eq…» y «…código o nomb».
+- **Playwright instalado** (`playwright-core` 1.63 en `C:\Users\orelc\dev\capturas`, usa el Edge del sistema, sin descargar navegadores). Scripts: `bitacora-letra.mjs` (simula por CSS), `bitacora-letra-real.mjs` (usa el selector real, mide y captura). ⚠ `waitUntil: 'networkidle'` nunca llega con Vite (HMR): esperar un texto de la página.
+- Verificado con Playwright a 375 px, claro y oscuro, en los 3 tamaños: título 17 → 20,06 → 22,95 px; ancho de página 375 (sin desborde); variable ausente fuera de la bitácora.
+- tsc 0 · eslint 30 · vitest 2.839 (6 nuevos: `tamanoLetra.test.ts`) · auditorías OK · build OK.
+- Estado: HECHO. Informe de 12 hallazgos de la ronda 56 CERRADO.
+
 ## 2026-09-19 · Bitacora ronda 60 · Estrella de favoritos en el buscador de repuestos
 - Idea de Orel, mockup aprobado (https://claude.ai/artifact/Te53eSjF2PLXmgidb4Q4oE, con sus favoritos reales: 3 de sus 8 están en la lista de materiales de KNURO N1, 159 repuestos).
 - Estrella de 44 px junto a «En este equipo / Todos» (sin equipo, junto al buscador): «Solo mis favoritos» se COMBINA con el alcance → favoritos de este equipo o todos, visibles SIN escribir; el buscador filtra dentro. Línea «3 de tus 8 favoritos están en este equipo» / «Tus 8 favoritos, de todos los equipos». Con la estrella apagada, los favoritos van primero (`buscarRepuestos(…, primero)`, ANTES de cortar en 8) y cada resultado tiene su estrella para marcar/desmarcar.

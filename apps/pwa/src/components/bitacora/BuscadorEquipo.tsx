@@ -141,7 +141,7 @@ export function BuscadorEquipo({
               setAbierto(false)
             }
           }}
-          className="h-[44px] w-full rounded-ctl border-0 bg-muted-foreground/10 pl-9 pr-9 text-[16px] text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary"
+          className="h-[44px] w-full rounded-ctl border-0 bg-muted-foreground/10 pl-9 pr-9 text-campo text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary"
         />
         {cargando && <Loader2 className="absolute right-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted-foreground" aria-label="Cargando equipos" />}
         {/* HIG «Search fields»: borrar sin cinco toques de backspace; deja el

@@ -21,6 +21,8 @@ import { VisorFotosBitacora } from '@/components/bitacora/VisorFotosBitacora'
 import { SelectorTecnico } from '@/components/bitacora/SelectorTecnico'
 import { ListaTecnicosSheet, TecnicosDelTurnoSheet } from '@/components/bitacora/TecnicosTurnoSheets'
 import { construirListaTecnicos, sugeridosPorCalendario, tecnicosPresentes } from '@/services/bitacora/listaTecnicos'
+import { OPCIONES_TAMANO, esTamanoLetra } from '@/services/bitacora/tamanoLetra'
+import { useTamanoLetraBitacora } from '@/hooks/useTamanoLetraBitacora'
 import { etiquetaCortaTurno, origenDePendiente } from '@/services/bitacora/entregaTurno'
 import { tecnicoRecordado } from '@/components/bitacora/tecnicoRecordado'
 import { useToast } from '@/hooks/useToast'
@@ -115,6 +117,7 @@ export function BitacoraTurnoVista({
   const { observacion, guardarObservacion, guardarPresentes } = fuente.useObservacion(turno)
   const { ajustes, guardarAjustes } = fuente.useAjustes()
   const favoritosRepuestos = fuente.useFavoritosRepuestos()
+  const letra = useTamanoLetraBitacora()
   // Lista de técnicos = planilla del calendario + ajustes; presentes = ajuste del
   // turno o, si nadie lo tocó, lo que dice el calendario.
   const listaTecnicos = useMemo(() => construirListaTecnicos(calendario.todos, ajustes), [calendario.todos, ajustes])
@@ -1138,6 +1141,31 @@ export function BitacoraTurnoVista({
               )}
             </>
           )}
+          {/* HIG «Typography»: la letra sigue el tamaño del teléfono. En iPhone lo lee
+              solo; en Android se elige aquí (19-09-2026, capturas al 100/124/135 %). */}
+          <div className="flex flex-col gap-1.5">
+            <label className="flex min-h-[44px] flex-wrap items-center justify-between gap-x-3 rounded-card bg-card pl-4 pr-2 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
+              <span className="text-body">Tamaño de letra</span>
+              <select
+                value={letra.tamano}
+                onChange={(e) => {
+                  if (esTamanoLetra(e.target.value)) letra.cambiar(e.target.value)
+                }}
+                className="ml-auto min-h-[44px] cursor-pointer rounded-ctl bg-transparent px-2 text-right text-campo font-semibold text-primary outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                {OPCIONES_TAMANO.filter((o) => o.value !== 'telefono' || letra.hayTelefono).map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p className="px-4 text-footnote text-muted-foreground">
+              {letra.tamano === 'telefono'
+                ? 'Sigue el tamaño del texto de Ajustes del iPhone.'
+                : 'Solo en este teléfono. También se puede ampliar con dos dedos.'}
+            </p>
+          </div>
         </section>
 
         {/* Vista previa del correo (solo PC) */}
@@ -1372,7 +1400,7 @@ export function BitacoraTurnoVista({
           onChange={(e) => setTextoObs(e.target.value)}
           maxLength={3000}
           placeholder="Planta operando normal. Queda pendiente el motor de tensado de la enzunchadora…"
-          className="min-h-[160px] w-full resize-y rounded-ctl border-0 bg-muted-foreground/10 px-3 py-2.5 text-[16px] leading-snug text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary"
+          className="min-h-[160px] w-full resize-y rounded-ctl border-0 bg-muted-foreground/10 px-3 py-2.5 text-campo leading-snug text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary"
         />
       </Sheet>
 
@@ -1425,7 +1453,7 @@ export function BitacoraTurnoVista({
               onChange={(e) => setMotivoNoAplica(e.target.value)}
               maxLength={300}
               placeholder="Se resolvió solo, estaba duplicado, se cambió el equipo…"
-              className="min-h-[88px] w-full resize-y rounded-ctl border-0 bg-muted-foreground/10 px-3 py-2.5 text-[16px] leading-snug text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary"
+              className="min-h-[88px] w-full resize-y rounded-ctl border-0 bg-muted-foreground/10 px-3 py-2.5 text-campo leading-snug text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary"
             />
           </div>
         </div>

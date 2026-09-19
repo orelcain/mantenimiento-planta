@@ -95,7 +95,7 @@ export function TecnicosDelTurnoSheet({
             autoComplete="off"
             // HIG «Virtual keyboards»: acá Enter no envía nada, solo filtra.
             enterKeyHint="search"
-            className="h-[44px] w-full rounded-ctl border-0 bg-muted-foreground/10 pl-9 pr-9 text-[16px] text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary"
+            className="h-[44px] w-full rounded-ctl border-0 bg-muted-foreground/10 pl-9 pr-9 text-campo text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary"
           />
           {/* HIG «Search fields»: borrar sin cinco toques de backspace; el foco
               se queda en el campo para seguir buscando (19-09-2026). */}
@@ -200,7 +200,7 @@ export function ListaTecnicosSheet({
             placeholder="Nombre del técnico nuevo"
             autoComplete="off"
             maxLength={60}
-            className="h-[44px] min-w-0 flex-1 rounded-ctl border-0 bg-muted-foreground/10 px-3 text-[16px] text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary"
+            className="h-[44px] min-w-0 flex-1 rounded-ctl border-0 bg-muted-foreground/10 px-3 text-campo text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary"
           />
           <Button type="submit" variant="tinted" disabled={!nuevo.trim()}>
             Agregar
@@ -226,7 +226,7 @@ export function ListaTecnicosSheet({
                   value={editando.texto}
                   onChange={(e) => setEditando({ clave: t.clave, texto: e.target.value })}
                   maxLength={60}
-                  className="h-[40px] min-w-0 flex-1 rounded-ctl border-0 bg-card px-3 text-[16px] text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  className="h-[40px] min-w-0 flex-1 rounded-ctl border-0 bg-card px-3 text-campo text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 />
                 <Button type="submit" size="sm" disabled={!editando.texto.trim()}>
                   Listo
