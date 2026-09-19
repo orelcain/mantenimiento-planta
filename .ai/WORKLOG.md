@@ -21,6 +21,20 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-19 · Admin · Editor de líneas: grupos en paralelo a mano
+
+- Orel: «el elemento paralelo debe poder editarse y crearse manualmente, por si hay más elementos
+  en paralelo en otras áreas». `GrafoLineas.grupos: GrupoParalelo[]` (id, miembros, nombre) se
+  guarda en `lineasProceso/{planta}`; la regla no valida campos extra, no hubo que tocarla.
+- Modo «Agrupar en paralelo» en la barra (mismo patrón que «Unir equipos»): se tocan los equipos,
+  el aviso del lienzo lleva el botón «Agrupar». ⚠ NO depender de Ctrl/Mayús + clic: la
+  multiselección de React Flow no se disparó ni con `shift` ni con `ctrl` desde el panel, y además
+  no es descubrible.
+- El encuadre manual es de línea sólida (el deducido, punteado); se edita tocando SU PÍLDORA:
+  nombre, sacar miembros y deshacer el grupo. ⚠ El encuadre vive bajo las tarjetas (`zIndex -1`) y
+  un clic en el medio no le llega — por eso el asa es la píldora, con `pointerEvents:'all'`.
+- Los grupos deducidos se omiten cuando sus miembros ya están en un grupo hecho a mano.
+
 ## 2026-09-19 · Admin · Editor de líneas: piel de diagrama (opción 1 del mockup, con curvas)
 
 - Mockup previo (agente directora-creativa): https://claude.ai/artifact/UEaHRAFsQRUkpY3bVFNkos. Orel

@@ -25,7 +25,7 @@ import {
   type NodeProps,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { ChevronDown, ChevronLeft, ChevronRight, Expand, Loader2, Maximize2, Minimize2, PanelLeftClose, PanelLeftOpen, Plus, Redo2, RotateCcw, Search, Spline, Undo2, X } from 'lucide-react'
+import { Boxes, ChevronDown, ChevronLeft, ChevronRight, Expand, Loader2, Maximize2, Minimize2, PanelLeftClose, PanelLeftOpen, Plus, Redo2, RotateCcw, Search, Spline, Undo2, X } from 'lucide-react'
 import { Button, Sheet } from '@/components/piel'
 import { ToastAction } from '@/components/ui/toast'
 import { useHierarchyTree } from '@/hooks/useHierarchy'
@@ -37,6 +37,7 @@ import {
   esEntrada,
   esManual,
   formatoPeso,
+  limitesDeGrupo,
   limitesDeZonas,
   lineaDeEntrada,
   pesosPorLinea,
@@ -44,6 +45,7 @@ import {
   serviciosDe,
   zonaDeNodo,
   type GrafoLineas,
+  type GrupoParalelo,
   type LineaProceso,
   type PesoEnLinea,
 } from '@/services/lineasProceso/modeloLineas'
@@ -246,14 +248,29 @@ function NodoZona({ data }: NodeProps<Node<DatosZona>>) {
 }
 
 /** Encuadre de un grupo en paralelo: se deriva del grafo, no se guarda. */
-type DatosParalelo = { w: number; h: number; etiqueta: string }
+type DatosParalelo = { w: number; h: number; etiqueta: string; manual?: boolean; activo?: boolean; onEditar?: () => void }
 function NodoParalelo({ data }: NodeProps<Node<DatosParalelo>>) {
   return (
     <div
       style={{ width: data.w, height: data.h, borderColor: 'rgb(var(--brand) / 0.55)', background: 'rgb(var(--brand) / 0.07)' }}
-      className="rounded-[18px] border border-dashed"
+      className={`rounded-[18px] border ${data.manual ? 'border-solid' : 'border-dashed'} ${data.activo ? 'ring-4 ring-primary/35' : ''}`}
     >
-      <span className="absolute -top-3 left-4 rounded-full bg-[rgb(var(--brand)/0.14)] px-2 py-0.5 text-[10.5px] font-semibold text-[rgb(var(--brand-ink))]">{data.etiqueta}</span>
+      {/* La píldora es el asa del grupo: se toca para editarlo (el encuadre queda bajo las
+          tarjetas, así que un clic en el medio no siempre le llega). */}
+      <button
+        type="button"
+        disabled={!data.onEditar}
+        onPointerDown={(ev) => {
+          if (!data.onEditar) return
+          ev.stopPropagation()
+          data.onEditar()
+        }}
+        style={{ pointerEvents: 'all' }}
+        title={data.manual ? 'Grupo marcado a mano: tócalo para editarlo' : 'Se dedujo de las flechas'}
+        className="nodrag nopan absolute -top-3 left-4 rounded-full bg-[rgb(var(--brand)/0.14)] px-2 py-0.5 text-[10.5px] font-semibold text-[rgb(var(--brand-ink))] disabled:cursor-default"
+      >
+        {data.etiqueta}
+      </button>
     </div>
   )
 }
@@ -287,7 +304,7 @@ const aNodos = (g: GrafoLineas): Node[] => [
 ]
 const aAristas = (g: GrafoLineas): Edge[] => g.aristas.map(([a, b]) => ({ id: `${a}->${b}`, source: a, target: b }))
 
-function alGrafo(lineas: LineaProceso[], nodes: Node[], edges: Edge[]): GrafoLineas {
+function alGrafo(lineas: LineaProceso[], nodes: Node[], edges: Edge[], grupos: GrupoParalelo[] = []): GrafoLineas {
   // La esquina de cada contenedor vive en su nodo del lienzo: así mover la caja entra en deshacer.
   const esquina = new Map(nodes.filter((n) => n.type === 'zona').map((n) => [n.id.slice('zona:'.length), n.position]))
   return {
@@ -303,6 +320,8 @@ function alGrafo(lineas: LineaProceso[], nodes: Node[], edges: Edge[]): GrafoLin
         return { id: n.id, x: Math.round(n.position.x), y: Math.round(n.position.y), ...(d.zona !== undefined ? { zona: d.zona } : {}), ...(d.nombre ? { nombre: d.nombre } : {}) }
       }),
     aristas: edges.map((e) => [e.source, e.target] as [string, string]),
+    // Un grupo con menos de dos miembros en el lienzo ya no es un grupo.
+    grupos: grupos.map((g) => ({ ...g, miembros: g.miembros.filter((m) => nodes.some((n) => n.id === m)) })).filter((g) => g.miembros.length > 1),
   }
 }
 
@@ -322,6 +341,11 @@ function Editor() {
   const [conLista, setConLista] = useState(true)
 
   const [lineas, setLineas] = useState<LineaProceso[]>([])
+  const [grupos, setGrupos] = useState<GrupoParalelo[]>([])
+  const [grupoSel, setGrupoSel] = useState<string | null>(null)
+  // Modo «Agrupar»: tocar los equipos que trabajan en paralelo, sin depender de teclas
+  // (Ctrl/Mayús + clic no es descubrible, y Orel ya entendió el modo «Unir»).
+  const [modoGrupo, setModoGrupo] = useState<string[] | null>(null)
   const [nodes, setNodes] = useState<Node[]>([])
   const [edges, setEdges] = useState<Edge[]>([])
   const [guardado, setGuardado] = useState<string>('')
@@ -370,6 +394,7 @@ function Editor() {
 
   const cargarGrafo = useCallback((g: GrafoLineas) => {
     setLineas(g.lineas)
+    setGrupos(g.grupos ?? [])
     setNodes(aNodos(g))
     setEdges(aAristas(g))
   }, [])
@@ -390,7 +415,7 @@ function Editor() {
         if (!vivo) return
         const base = g ?? propuesta()
         cargarGrafo(base)
-        setGuardado(g ? JSON.stringify(alGrafo(base.lineas, aNodos(base), aAristas(base))) : '')
+        setGuardado(g ? JSON.stringify(alGrafo(base.lineas, aNodos(base), aAristas(base), base.grupos ?? [])) : '')
         setMeta(g?.actualizadoPor ? `Guardado por ${g.actualizadoPor}${g.actualizadoEn ? ` · ${g.actualizadoEn.toDate().toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' })}` : ''}` : 'Propuesta sin guardar')
       })
       .catch(() => {
@@ -408,7 +433,7 @@ function Editor() {
   }, [cargandoArbol, indice, propuesta, cargarGrafo, toast])
 
   // Pesos calculados con las flechas, en cada cambio.
-  const grafo = useMemo(() => alGrafo(lineas, nodes, edges), [lineas, nodes, edges])
+  const grafo = useMemo(() => alGrafo(lineas, nodes, edges, grupos), [lineas, nodes, edges, grupos])
   const pesos = useMemo(() => pesosPorLinea(grafo), [grafo])
   const servicios = useMemo(() => serviciosDe(grafo), [grafo])
   const relaciones = useMemo(() => relacionesDeServicios(grafo, pesos), [grafo, pesos])
@@ -445,12 +470,8 @@ function Editor() {
     [pesos, reparto],
   )
 
-  /**
-   * Grupos en paralelo: un equipo del que salen 2+ flechas a equipos que se reparten el
-   * flujo por igual. Se dibuja la barra donde se abre y un encuadre con «Paralelo · N ramas».
-   * Todo se deriva del grafo: no agrega datos al modelo ni se guarda.
-   */
-  const nodosParalelo = useMemo(() => {
+  // 2) Los evidentes, deducidos del grafo: un equipo del que salen 2+ flechas a ramas parejas.
+  const auto = useCallback((excluir: Set<string>) => {
     const porOrigen = new Map<string, string[]>()
     for (const e of edges) {
       if (servicios.has(e.source) || servicios.has(e.target)) continue
@@ -459,7 +480,7 @@ function Editor() {
     const caja = new Map(nodes.filter((n) => n.type !== 'zona').map((n) => [n.id, n.position]))
     const out: Node[] = []
     for (const [origen, destinos] of porOrigen) {
-      if (destinos.length < 2) continue
+      if (destinos.length < 2 || destinos.some((d) => excluir.has(d))) continue
       const cajas = destinos.map((d) => caja.get(d)).filter((p): p is { x: number; y: number } => !!p)
       if (cajas.length !== destinos.length) continue
       const cuotas = destinos.map((d) => pesos.get(d)?.peso ?? 0)
@@ -487,11 +508,50 @@ function Editor() {
     return out
   }, [edges, nodes, pesos, servicios])
 
+  /**
+   * Grupos en paralelo: un equipo del que salen 2+ flechas a equipos que se reparten el
+   * flujo por igual. Se dibuja la barra donde se abre y un encuadre con «Paralelo · N ramas».
+   * Todo se deriva del grafo: no agrega datos al modelo ni se guarda.
+   */
+  const nodosParalelo = useMemo(() => {
+    const out: Node[] = []
+    const yaEnGrupo = new Set<string>()
+    // 1) Los marcados a mano: mandan sobre lo deducido.
+    for (const gr of grupos) {
+      const caja = limitesDeGrupo(grafo.nodos, gr.miembros)
+      if (!caja) continue
+      gr.miembros.forEach((m) => yaEnGrupo.add(m))
+      const cuotas = gr.miembros.map((m) => pesos.get(m)?.peso ?? 0)
+      const parejo = cuotas.length > 0 && cuotas.every((c) => c > 0) && Math.max(...cuotas) - Math.min(...cuotas) < 1e-6
+      out.push({
+        id: `grupo:${gr.id}`,
+        type: 'paralelo',
+        position: { x: caja.x, y: caja.y },
+        data: {
+          w: caja.w,
+          h: caja.h,
+          manual: true,
+          activo: grupoSel === gr.id,
+          onEditar: () => setGrupoSel(gr.id),
+          etiqueta: gr.nombre ? `${gr.nombre} · ${gr.miembros.length} ramas` : `Paralelo · ${gr.miembros.length} ramas${parejo ? ` · ${formatoPeso(cuotas[0] ?? 0)} c/u` : ''}`,
+        },
+        draggable: false,
+        // Seleccionable para poder tocarlo y editarlo; sin `draggable` el lienzo se sigue desplazando.
+        selectable: true,
+        deletable: false,
+        focusable: false,
+        zIndex: -1,
+      })
+    }
+    return [...out, ...auto(yaEnGrupo)]
+  }, [grupos, grafo, pesos, grupoSel, auto])
+
   const vista = useMemo(
     () =>
       nodes.map((n): Node => {
         // En modo unir: el origen con anillo y, atenuados, los que YA están unidos a él.
-        const marca = n.id === origenUnir ? 'rounded-card ring-4 ring-primary' : yaUnidos.has(n.id) ? 'opacity-40' : undefined
+        const marca =
+          n.id === origenUnir || modoGrupo?.includes(n.id) ? 'rounded-ctl ring-4 ring-primary' : yaUnidos.has(n.id) ? 'opacity-40' : undefined
         if (n.type === 'zona') {
           const l = limites.get(n.id.slice('zona:'.length))
           return {
@@ -532,7 +592,7 @@ function Editor() {
           data,
         }
       }),
-    [nodes, indice, pesos, servicios, relaciones, nombreLinea, zonaResaltada, deOtraPlanta, nombreDe, limites, contenedorDe, editable, origenUnir, yaUnidos, reparto],
+    [nodes, indice, pesos, servicios, relaciones, nombreLinea, zonaResaltada, deOtraPlanta, nombreDe, limites, contenedorDe, editable, origenUnir, yaUnidos, reparto, modoGrupo],
   )
 
   const conParalelos = useMemo(() => [...vista, ...nodosParalelo], [vista, nodosParalelo])
@@ -575,7 +635,9 @@ function Editor() {
 
   const sucio = !cargando && JSON.stringify(grafo) !== guardado
   const enLienzo = useMemo(() => new Set(nodes.map((n) => n.id)), [nodes])
-  const seleccionado = nodes.find((n) => n.selected && n.type !== 'zona')
+  const seleccionados = nodes.filter((n) => n.selected && n.type !== 'zona' && !esEntrada(n.id))
+  const seleccionado = seleccionados.length === 1 ? seleccionados[0] : undefined
+  const grupoActivo = grupos.find((g) => g.id === grupoSel)
   const flechaSeleccionada = !seleccionado ? edges.find((e) => e.selected) : undefined
 
   // ── Deshacer / rehacer ──
@@ -691,6 +753,14 @@ function Editor() {
     [origenUnir, edges, registrar, toast, nombreDe],
   )
   useEffect(() => {
+    if (!modoGrupo) return
+    const tecla = (ev: KeyboardEvent) => {
+      if (ev.key === 'Escape') setModoGrupo(null)
+    }
+    window.addEventListener('keydown', tecla)
+    return () => window.removeEventListener('keydown', tecla)
+  }, [modoGrupo])
+  useEffect(() => {
     if (!modoUnir) return
     const tecla = (ev: KeyboardEvent) => {
       if (ev.key !== 'Escape') return
@@ -723,6 +793,27 @@ function Editor() {
     },
     [edges, nombreDe],
   )
+
+  // Grupos en paralelo a mano: crear desde la selección, sacar miembros, deshacer.
+  const agruparEnParalelo = useCallback(
+    (miembros: string[]) => {
+      if (miembros.length < 2) return
+      const id = `g${Date.now().toString(36)}`
+      // Un equipo pertenece a un solo grupo: sale de los anteriores.
+      setGrupos((gs) => [...gs.map((g) => ({ ...g, miembros: g.miembros.filter((m) => !miembros.includes(m)) })).filter((g) => g.miembros.length > 1), { id, miembros }])
+      setNodes((ns) => ns.map((n) => ({ ...n, selected: false })))
+      setGrupoSel(id)
+      toast({ title: `Grupo en paralelo de ${miembros.length} equipos` })
+    },
+    [toast],
+  )
+  const quitarDelGrupo = useCallback((id: string, miembro: string) => {
+    setGrupos((gs) => gs.map((g) => (g.id === id ? { ...g, miembros: g.miembros.filter((m) => m !== miembro) } : g)).filter((g) => g.miembros.length > 1))
+  }, [])
+  const deshacerGrupo = useCallback((id: string) => {
+    setGrupos((gs) => gs.filter((g) => g.id !== id))
+    setGrupoSel(null)
+  }, [])
 
   const esValida = useCallback((c: Connection | Edge) => c.source !== c.target && !edges.some((e) => e.source === c.source && e.target === c.target), [edges])
 
@@ -965,7 +1056,7 @@ function Editor() {
     [lineas, pesos],
   )
 
-  const inspector = editable && (seleccionado || flechaSeleccionada)
+  const inspector = editable && (seleccionado || flechaSeleccionada || seleccionados.length > 1 || grupoActivo)
 
   return (
     <div className={amplio ? 'fixed inset-0 z-[60] flex h-dvh flex-col bg-background' : 'flex h-[calc(100dvh-4rem)] min-h-[520px] flex-col md:h-[calc(100dvh-1rem)]'}>
@@ -988,7 +1079,24 @@ function Editor() {
             <button
               type="button"
               onClick={() => {
+                setModoGrupo((v) => (v ? null : []))
+                setModoUnir(false)
+                setOrigenUnir(null)
+              }}
+              aria-pressed={!!modoGrupo}
+              title="Marcar equipos que trabajan en paralelo"
+              className={`flex min-h-[44px] items-center gap-1.5 rounded-full px-3 text-footnote font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary [&>svg]:size-4 ${
+                modoGrupo ? 'bg-primary text-primary-foreground' : 'text-primary hover:bg-muted-foreground/10'
+              }`}
+            >
+              <Boxes aria-hidden />
+              {modoGrupo ? 'Salir de agrupar' : 'Agrupar en paralelo'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
                 setModoUnir((v) => !v)
+                setModoGrupo(null)
                 setOrigenUnir(null)
               }}
               aria-pressed={modoUnir}
@@ -1131,7 +1239,17 @@ function Editor() {
                 return true
               }}
               onDelete={onDelete}
-              onNodeClick={modoUnir ? (_, n) => (n.type === 'zona' ? undefined : tocarParaUnir(n.id)) : undefined}
+              onNodeClick={(_, n) => {
+                if (modoGrupo && n.type !== 'zona' && n.type !== 'paralelo' && !esEntrada(n.id)) {
+                  setModoGrupo((ids) => (ids ?? []).includes(n.id) ? (ids ?? []).filter((x) => x !== n.id) : [...(ids ?? []), n.id])
+                  return
+                }
+                if (n.type === 'paralelo') {
+                  setGrupoSel(n.id.startsWith('grupo:') ? n.id.slice('grupo:'.length) : null)
+                  return
+                }
+                if (modoUnir && n.type !== 'zona') tocarParaUnir(n.id)
+              }}
               onPaneClick={modoUnir ? () => setOrigenUnir(null) : undefined}
               onNodeDragStart={() => registrar()}
               onNodeDrag={(_, n) => {
@@ -1140,7 +1258,7 @@ function Editor() {
               }}
               onNodeDragStop={(_, n, movidos) => alSoltarNodos(movidos.length ? movidos : [n])}
               isValidConnection={esValida}
-              nodesDraggable={editable && !modoUnir}
+              nodesDraggable={editable && !modoUnir && !modoGrupo}
               nodesConnectable={editable}
               elementsSelectable={editable}
               deleteKeyCode={editable ? ['Backspace', 'Delete'] : null}
@@ -1155,6 +1273,28 @@ function Editor() {
               className="bg-background"
             >
               <Background gap={GRILLA[0]} size={1.1} color="rgb(var(--muted-foreground) / 0.22)" />
+              {modoGrupo && (
+                <Panel position="top-center" className="!mt-[76px]">
+                  <div className="flex min-h-[44px] items-center gap-3 rounded-full bg-primary px-4 text-footnote font-semibold text-primary-foreground shadow-[0_2px_8px_rgba(0,0,0,0.25)]">
+                    <Boxes className="size-4" aria-hidden />
+                    <span className="whitespace-nowrap">
+                      {modoGrupo.length < 2 ? 'Toca los equipos que trabajan en paralelo' : `${modoGrupo.length} equipos elegidos`}
+                      <span className="font-normal opacity-80"> · Esc para salir</span>
+                    </span>
+                    <button
+                      type="button"
+                      disabled={modoGrupo.length < 2}
+                      onClick={() => {
+                        agruparEnParalelo(modoGrupo)
+                        setModoGrupo(null)
+                      }}
+                      className="min-h-[36px] rounded-full bg-primary-foreground px-3 text-footnote font-semibold text-primary disabled:opacity-40"
+                    >
+                      Agrupar
+                    </button>
+                  </div>
+                </Panel>
+              )}
               {modoUnir && (
                 <Panel position="top-center" className="!mt-[76px]">
                   <p className="flex min-h-[44px] items-center gap-2 whitespace-nowrap rounded-full bg-primary px-4 text-footnote font-semibold text-primary-foreground shadow-[0_2px_8px_rgba(0,0,0,0.25)]">
@@ -1228,12 +1368,15 @@ function Editor() {
         {inspector && (
           <aside aria-label="Inspector" className="flex w-[300px] shrink-0 flex-col gap-3 overflow-y-auto border-l border-border bg-card p-4">
             <div className="flex items-start justify-between gap-2">
-              <p className="text-footnote text-muted-foreground">{flechaSeleccionada ? 'Flecha seleccionada' : 'Seleccionado'}</p>
+              <p className="text-footnote text-muted-foreground">
+                {flechaSeleccionada ? 'Flecha seleccionada' : grupoActivo && !seleccionados.length ? 'Grupo en paralelo' : seleccionados.length > 1 ? `${seleccionados.length} equipos seleccionados` : 'Seleccionado'}
+              </p>
               <button
                 type="button"
                 onClick={() => {
                   setNodes((ns) => ns.map((x) => ({ ...x, selected: false })))
                   setEdges((es) => es.map((x) => ({ ...x, selected: false })))
+                  setGrupoSel(null)
                 }}
                 aria-label="Cerrar el inspector"
                 className="-mr-2 -mt-2 flex size-11 items-center justify-center rounded-full text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
@@ -1241,7 +1384,53 @@ function Editor() {
                 <X className="size-4" />
               </button>
             </div>
-            {seleccionado ? (
+            {seleccionados.length > 1 ? (
+              // Varios equipos elegidos: marcarlos como un grupo en paralelo, a mano.
+              <div className="flex flex-col gap-3">
+                <p className="text-footnote text-muted-foreground">
+                  Márcalos como un grupo en paralelo para dejar dicho que se reparten el trabajo. Sirve en cualquier área, aunque el reparto no se deduzca de las flechas.
+                </p>
+                <ul className="flex flex-col gap-1">
+                  {seleccionados.map((n) => (
+                    <li key={n.id} className="truncate text-footnote">
+                      {nombreDe(n.id)}
+                    </li>
+                  ))}
+                </ul>
+                <Button onClick={() => agruparEnParalelo(seleccionados.map((n) => n.id))}>Agrupar en paralelo</Button>
+              </div>
+            ) : grupoActivo ? (
+              <div className="flex flex-col gap-3">
+                <label className="flex flex-col gap-1">
+                  <span className="text-footnote text-muted-foreground">Nombre del grupo</span>
+                  <input
+                    value={grupoActivo.nombre ?? ''}
+                    maxLength={60}
+                    placeholder="Paralelo"
+                    onChange={(e) => setGrupos((gs) => gs.map((g) => (g.id === grupoActivo.id ? { ...g, nombre: e.target.value.trimStart() } : g)))}
+                    className="h-[44px] w-full rounded-ctl bg-muted-foreground/10 px-3 text-campo outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  />
+                </label>
+                <ul className="flex flex-col gap-1">
+                  {grupoActivo.miembros.map((m) => (
+                    <li key={m} className="flex min-h-[36px] items-center justify-between gap-2">
+                      <span className="truncate text-footnote">{nombreDe(m)}</span>
+                      <button
+                        type="button"
+                        onClick={() => quitarDelGrupo(grupoActivo.id, m)}
+                        aria-label={`Sacar ${nombreDe(m)} del grupo`}
+                        className="flex size-9 shrink-0 items-center justify-center rounded-full text-ink-crit hover:bg-muted-foreground/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      >
+                        <X className="size-4" aria-hidden />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <Button variant="tinted" className="text-ink-crit" onClick={() => deshacerGrupo(grupoActivo.id)}>
+                  Deshacer el grupo
+                </Button>
+              </div>
+            ) : seleccionado ? (
               <FichaNodo
                 nodo={seleccionado}
                 nombre={nombreDe(seleccionado.id)}
