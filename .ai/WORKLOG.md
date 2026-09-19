@@ -21,6 +21,19 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-19 · Admin · Editor de líneas de proceso (grafo)
+- Idea de Orel: «tiempo reloj no es tiempo máquina» (1 de 3 Baader = 33 % de Eviscerado) → establecer qué máquinas forman cada línea y cómo influyen; «como esos programas donde arrastras y unes con líneas». Prototipos: columnas (DuwE9Y9tRKiBsf5ZyQp692) → grafo (https://claude.ai/artifact/G4KbK1RAYafiJXabWQGFNf), aprobado para el panel admin.
+- Nueva herramienta `/admin/lineas-proceso` (AdminRoute + RequireReAuth, fila «Líneas de proceso» en el panel). React Flow (`@xyflow/react` 12.11, MIT; agregado con **pnpm** — ⚠ `npm install` falla en este repo por el `prepare` de react-zoom-pan-pinch) en un chunk perezoso (66 KB gz).
+- Modelo `services/lineasProceso/modeloLineas.ts`: nodos = equipos de `hierarchy` + «Entrada» por línea; flechas = flujo. `pesosPorLinea`: el flujo entra al 100 % y se reparte en partes iguales en cada bifurcación (3 Baader → 33,3 %; al juntarse vuelve a 100 %); lo no conectado = fuera (0 %); la entrada de otra línea corta el cálculo; un ciclo no inventa flujo. 8 tests.
+- `propuestaChonchi.ts`: propuesta deducida del árbol (Acopio → Eviscerado → Emparrillado → Empaque; Filete como rama), buscada por NOMBRE; las dudas (Sellado, Cintas/Línea manual HG…) quedan fuera para que Orel decida. `seccionesDeProceso`: primer nivel de Acopio y de cada sección de Proceso (conjuntos de nivel 5 incluidos); ⚠ Knuro cuelga de su Baader en el árbol → «+N comp.».
+- Firestore `lineasProceso/{plantId}` (flechas como `{a,b}`: Firestore no guarda arreglos de arreglos). Regla: lectura `isActiveUser() || paseBitacoraActivo()`, escritura `isAdmin()` con version 1 y topes (20 líneas, 400 nodos, 800 flechas). `probar-reglas-bitacora.cjs --local`: 117/117 (6 casos nuevos).
+- Editor: lista de equipos por sección con búsqueda (arrastrar o tocar), nodos con peso en color (rojo 100 %, ámbar rama, punteado fuera), zonas por línea, flechas entre líneas punteadas, minimapa, «Planta completa», resumen por línea, «Cambios sin guardar» / Guardar / Volver a la propuesta. Teléfono (o `pointer: coarse`): SOLO LECTURA. Si la lectura falla, muestra la propuesta con aviso (antes: lienzo vacío).
+- ⚠ React Flow oculta los nodos hasta medirlos: en una pestaña de fondo del panel de navegador no aparecen (`visibility:hidden`) — traer la pestaña al frente para verificar.
+- Ruta de desarrollo `/dev/lineas-proceso` (solo DEV) para verificar sin el paso de contraseña. Verificado con la sesión real: 39 nodos, 34 flechas, Baader 33,3 %, bombeo 50 %; agregar (clic), unir (arrastre real del mouse → 4 ramas = 25 %), quitar (Supr) y solo lectura a 375 px. Nada se guardó.
+- tsc 0 · eslint 30 · vitest 2.870 · auditorías OK · build OK.
+- Siguiente: Orel arma las líneas y guarda → conectar el historial (paradas × peso de su línea) y la base de tiempo de Shoplogix por línea.
+- Estado: HECHO.
+
 ## 2026-09-19 · Bitacora ronda 65 · Historial: un gráfico por PREGUNTA
 - Orel: «el gráfico no explica nada; hay que establecer qué preguntas son importantes para que los gráficos las respondan a simple vista». Catálogo aprobado (sin la 6, pendientes viejos): https://claude.ai/artifact/M3eDjf8oHto5U3wp7j3tTa
 - Se va el gráfico de barras por turno (respondía «¿cuántos minutos paró cada turno?», nadie lo pregunta; 30 barras = «reja», antipatrón de las guías) y la sección «Equipos que más pararon» (la reemplaza el Pareto). Entran 5 paneles: pregunta en gris · RESPUESTA como título (calculada con los mismos datos que se dibujan) · referencia dibujada:
