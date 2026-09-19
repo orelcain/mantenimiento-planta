@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Check, Pencil, Search, Trash2 } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Check, Pencil, Search, Trash2, X } from 'lucide-react'
 import { Button, Sheet, Tag } from '@/components/piel'
 import {
   agregarTecnico,
@@ -46,6 +46,7 @@ export function TecnicosDelTurnoSheet({
   onClose: () => void
 }) {
   const [busqueda, setBusqueda] = useState('')
+  const inputBusquedaRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (open) setBusqueda('')
@@ -86,13 +87,31 @@ export function TecnicosDelTurnoSheet({
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
           <label htmlFor="bitacora-buscar-tecnico" className="sr-only">Buscar técnico</label>
           <input
+            ref={inputBusquedaRef}
             id="bitacora-buscar-tecnico"
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
             placeholder="Buscar técnico…"
             autoComplete="off"
-            className="h-[44px] w-full rounded-ctl border-0 bg-muted-foreground/10 pl-9 pr-3 text-[16px] text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary"
+            // HIG «Virtual keyboards»: acá Enter no envía nada, solo filtra.
+            enterKeyHint="search"
+            className="h-[44px] w-full rounded-ctl border-0 bg-muted-foreground/10 pl-9 pr-9 text-[16px] text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary"
           />
+          {/* HIG «Search fields»: borrar sin cinco toques de backspace; el foco
+              se queda en el campo para seguir buscando (19-09-2026). */}
+          {busqueda.length > 0 && (
+            <button
+              type="button"
+              aria-label="Borrar búsqueda"
+              onClick={() => {
+                setBusqueda('')
+                inputBusquedaRef.current?.focus()
+              }}
+              className="absolute right-0 top-0 flex h-[44px] w-[44px] items-center justify-center text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              <X className="size-4" />
+            </button>
+          )}
         </div>
         <div>
           <div className="mb-1.5 flex items-center justify-between gap-2">

@@ -7,7 +7,15 @@ import { useHistorialBitacora } from '@/hooks/useHistorialBitacora'
 import { BITACORA_PLANTA } from '@/config/bitacora'
 import { copiarHtml } from '@/lib/clipboard'
 import { historialAHtmlCorreo, historialATextoPlano } from '@/services/bitacora/historialCorreo'
-import { detalleRepuesto, porcentaje, tesisDelPeriodo, tituloRepuesto, type FilaTurno, type ResumenPeriodo } from '@/services/bitacora/historialBitacora'
+import {
+  detalleRepuesto,
+  porcentaje,
+  resumenGraficoParadas,
+  tesisDelPeriodo,
+  tituloRepuesto,
+  type FilaTurno,
+  type ResumenPeriodo,
+} from '@/services/bitacora/historialBitacora'
 import { etiquetaCortaTurno } from '@/services/bitacora/entregaTurno'
 import { formatoMinutos } from '@/services/bitacora/turnoMantencion'
 
@@ -317,11 +325,19 @@ function GraficoParadas({ filas }: { filas: readonly FilaTurno[] }) {
   // «máx 1 min», un dato que no existía (revisión 15-09).
   const maxReal = Math.max(0, ...datos.map((f) => f.resumen.minutosParada))
   const max = Math.max(1, maxReal)
+  // HIG «Charts»: el título dice el HALLAZGO, no el nombre del eje — calculado
+  // con los mismos datos que dibujan las barras (19-09-2026).
+  const { titulo } = useMemo(() => resumenGraficoParadas(datos), [datos])
+  const [seleccionado, setSeleccionado] = useState<string | null>(null)
+  const turnoSeleccionado = seleccionado ? datos.find((f) => f.turnoId === seleccionado) : null
   if (!datos.length) return null
   return (
-    <section aria-label="Minutos de parada por turno" className="rounded-card bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
+    <section role="group" aria-label={titulo} className="rounded-card bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
       <div className="flex items-baseline justify-between">
-        <h2 className="text-footnote text-muted-foreground">Minutos de parada por turno</h2>
+        <div>
+          <h2 className="text-footnote font-semibold text-foreground">{titulo}</h2>
+          <p className="text-caption text-muted-foreground">Minutos de parada por turno</p>
+        </div>
         <span className="text-caption tabular-nums text-muted-foreground">
           {maxReal > 0 ? `máx ${formatoMinutos(maxReal)}` : 'sin paradas en el período'}
         </span>
@@ -331,13 +347,27 @@ function GraficoParadas({ filas }: { filas: readonly FilaTurno[] }) {
       <div className="mt-2 flex h-24 items-end gap-[3px] overflow-x-auto">
         {datos.map((f) => {
           const alto = f.resumen.minutosParada > 0 ? Math.max(4, Math.round((f.resumen.minutosParada / max) * 100)) : 3
+          const etiquetaMinutos = f.resumen.conParada ? formatoMinutos(f.resumen.minutosParada) : 'sin paradas'
+          const activo = seleccionado === f.turnoId
           return (
-            <div
+            // El ancho visual de la barra no cambia: el área táctil crece en
+            // ALTO (flex items-end + h-full), no en ancho, para no desalinear
+            // las barras vecinas (HIG «Charts», 19-09-2026).
+            <button
               key={f.turnoId}
-              className={`min-h-[2px] min-w-[5px] flex-1 rounded-t-[3px] ${f.resumen.minutosParada > 0 ? 'bg-ink-crit' : 'bg-ink-ok'}`}
-              style={{ height: `${alto}%` }}
-              title={`${etiquetaCortaTurno(f.turnoId)}: ${f.resumen.conParada ? formatoMinutos(f.resumen.minutosParada) : 'sin paradas'}`}
-            />
+              type="button"
+              aria-pressed={activo}
+              aria-label={`${etiquetaCortaTurno(f.turnoId)}: ${f.resumen.conParada ? `${etiquetaMinutos} de parada` : 'sin paradas'}`}
+              title={`${etiquetaCortaTurno(f.turnoId)}: ${etiquetaMinutos}`}
+              onClick={() => setSeleccionado((prev) => (prev === f.turnoId ? null : f.turnoId))}
+              className="flex min-w-[5px] flex-1 items-end self-stretch focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              <span
+                className={`min-h-[2px] w-full rounded-t-[3px] ${f.resumen.minutosParada > 0 ? 'bg-ink-crit' : 'bg-ink-ok'} ${activo ? 'ring-2 ring-primary' : ''}`}
+                style={{ height: `${alto}%` }}
+                aria-hidden
+              />
+            </button>
           )
         })}
       </div>
@@ -346,6 +376,12 @@ function GraficoParadas({ filas }: { filas: readonly FilaTurno[] }) {
         <span>verde: turno sin paradas</span>
         <span>{datos[datos.length - 1] ? etiquetaCortaTurno(datos[datos.length - 1]!.turnoId).replace('Turno ', '') : ''}</span>
       </div>
+      {turnoSeleccionado && (
+        <p className="pt-2 text-footnote text-foreground">
+          {etiquetaCortaTurno(turnoSeleccionado.turnoId)}:{' '}
+          {turnoSeleccionado.resumen.conParada ? formatoMinutos(turnoSeleccionado.resumen.minutosParada) : 'sin paradas'}
+        </p>
+      )}
     </section>
   )
 }

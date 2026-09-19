@@ -2,7 +2,7 @@ import { minutosDelTurno, mtbf } from './mtbf'
 import type { EventoBitacora, TurnoMantencion } from './bitacora.types'
 import { autorVisible } from './bitacora.types'
 import { esFalla, minutosParadaDe, resumirBitacora, type ResumenBitacora } from './resumenBitacora'
-import { fechaLocal, turnoDesdeId } from './turnoMantencion'
+import { fechaLocal, formatoMinutos, turnoDesdeId } from './turnoMantencion'
 import { soloListos } from './borradores'
 import { equipoConCodigo, nombreConComun, nombreRepuesto, normalizarRepuestos } from './presentacionEvento'
 
@@ -259,4 +259,17 @@ export function tesisDelPeriodo(r: ResumenPeriodo): string {
 
 export function porcentaje(parte: number): string {
   return `${Math.round(parte * 100)}%`
+}
+
+/**
+ * El título del gráfico de paradas dice el hallazgo, no la etiqueta del eje
+ * (HIG «Charts», 19-09-2026): "3 de 12 turnos con parada · 45 min en total",
+ * o "Sin paradas en los 12 turnos" cuando ninguno tuvo.
+ */
+export function resumenGraficoParadas(filas: readonly Pick<FilaTurno, 'resumen'>[]): { titulo: string; total: number } {
+  const total = filas.length
+  const conParada = filas.filter((f) => f.resumen.conParada > 0).length
+  const minutos = filas.reduce((acc, f) => acc + f.resumen.minutosParada, 0)
+  const titulo = conParada > 0 ? `${conParada} de ${total} ${total === 1 ? 'turno' : 'turnos'} con parada · ${formatoMinutos(minutos)} en total` : `Sin paradas en ${total === 1 ? 'el turno' : `los ${total} turnos`}`
+  return { titulo, total }
 }
