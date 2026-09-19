@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
-import { Loader2, Minus, Plus, Search, X } from 'lucide-react'
+import { Loader2, Minus, Plus, Search, Star, X } from 'lucide-react'
 import { Button, SegmentedControl } from '@/components/piel'
 import { MAX_CANTIDAD_REPUESTO, MAX_REPUESTOS_EVENTO } from '@/config/bitacora'
 import type { RepuestoUsado } from '@/services/bitacora/bitacora.types'
@@ -7,9 +7,11 @@ import { clampCantidadRepuesto, nombreRepuesto, normalizarRepuestos } from '@/se
 import {
   buscarRepuestos,
   esCodigoSap,
+  favoritosDeLista,
   limpiarCodigo,
   type AlcanceBusqueda,
   type DatoBodega,
+  type FavoritosRepuestos,
   type FuenteRepuestos,
   type RepuestoDelCatalogo,
 } from '@/services/bitacora/repuestosBitacora'
@@ -20,6 +22,11 @@ import { formatNombreSAP } from '@/utils/repuestos/formatNombreSAP'
  * buscador con dos alcances («En este equipo» y «Todos»), resultados con nombre
  * común, nombre SAP, código y bodega, y el nombre común editable desde aquí
  * (se guarda en la ficha del repuesto, el mismo campo que usa Repuestos).
+ *
+ * Estrella de favoritos (mockup aprobado 19-09-2026): «Solo mis favoritos» se
+ * combina con el alcance — los favoritos de ESTE equipo o todos — y se ven sin
+ * escribir. Con la estrella apagada, los favoritos van primero y cada resultado
+ * tiene su estrella. Son los mismos de Repuestos y del Centro Técnico.
  */
 
 const CAMPO =
@@ -46,6 +53,7 @@ export function RepuestosUsados({
   equipoId,
   fuente,
   puedeEditarMaestro = true,
+  favoritos = null,
 }: {
   valor: readonly RepuestoUsado[]
   onChange: (repuestos: RepuestoUsado[]) => void
@@ -54,10 +62,13 @@ export function RepuestosUsados({
   fuente: FuenteRepuestos
   /** El pase de bitácora ve el nombre común pero no escribe en el maestro. */
   puedeEditarMaestro?: boolean
+  /** Sin favoritos (el pase) no hay estrella. */
+  favoritos?: FavoritosRepuestos | null
 }) {
   const id = useId()
   const [consulta, setConsulta] = useState('')
   const [alcance, setAlcance] = useState<AlcanceBusqueda>(equipoId ? 'equipo' : 'todos')
+  const [soloFavoritos, setSoloFavoritos] = useState(false)
   const [listaEquipo, setListaEquipo] = useState<{ equipoId: string; items: RepuestoDelCatalogo[] } | null>(null)
   const [listaTodos, setListaTodos] = useState<RepuestoDelCatalogo[] | null>(null)
   const [cargando, setCargando] = useState<AlcanceBusqueda | null>(null)
@@ -83,16 +94,21 @@ export function RepuestosUsados({
   const lista = alcance === 'equipo' ? listaEquipoActual : listaTodos
   const codigoEscrito = limpiarCodigo(consulta)
   const esCodigo = esCodigoSap(codigoEscrito)
+  const claves = favoritos?.claves
+  const verFavoritos = soloFavoritos && Boolean(claves)
   const resultados = useMemo(() => {
     if (!lista) return []
-    const r = buscarRepuestos(lista, consulta)
+    if (verFavoritos && claves) return favoritosDeLista(lista, claves, consulta)
+    const r = buscarRepuestos(lista, consulta, 8, claves)
     // Un código completo escrito: ese primero, aunque no empiece igual.
     if (esCodigo) {
       const exacto = lista.find((x) => x.codigoSAP === codigoEscrito)
       if (exacto) return [exacto, ...r.filter((x) => x.codigoSAP !== codigoEscrito)]
     }
     return r
-  }, [lista, consulta, esCodigo, codigoEscrito])
+  }, [lista, consulta, esCodigo, codigoEscrito, verFavoritos, claves])
+  /** Cuántos de los favoritos están en la lista a la vista (para «3 de tus 8…»). */
+  const favoritosEnLista = useMemo(() => (lista && claves ? favoritosDeLista(lista, claves, '').length : 0), [lista, claves])
 
   const cargar = (cual: AlcanceBusqueda) => {
     if (cual === 'equipo') {
@@ -125,7 +141,7 @@ export function RepuestosUsados({
   // Un código completo que no está en el equipo se busca en el maestro y se ofrece igual.
   useEffect(() => {
     setFueraDelEquipo(null)
-    if (alcance !== 'equipo' || !esCodigo || !lista || lista.some((x) => x.codigoSAP === codigoEscrito)) return
+    if (verFavoritos || alcance !== 'equipo' || !esCodigo || !lista || lista.some((x) => x.codigoSAP === codigoEscrito)) return
     let vivo = true
     setBuscandoCodigo(true)
     fuente
@@ -136,7 +152,7 @@ export function RepuestosUsados({
     return () => {
       vivo = false
     }
-  }, [alcance, esCodigo, codigoEscrito, lista, fuente])
+  }, [alcance, esCodigo, codigoEscrito, lista, fuente, verFavoritos])
 
   // Bodega (ubicación y stock) de lo elegido y de los resultados a la vista: una lectura por código, una vez.
   const codigosAVer = [...valor.map((r) => r.codigoSAP), ...resultados.map((r) => r.codigoSAP), ...(fueraDelEquipo ? [fueraDelEquipo.codigoSAP] : [])]
@@ -226,7 +242,32 @@ export function RepuestosUsados({
     { value: 'equipo' as const, label: listaEquipoActual ? `En este equipo · ${listaEquipoActual.length}` : 'En este equipo' },
     { value: 'todos' as const, label: listaTodos ? `Todos · ${listaTodos.length}` : 'Todos' },
   ]
-  const mostrarResultados = consulta.trim().length >= 2 && (lista !== null || fueraDelEquipo)
+  // Con la estrella y sin texto, la línea «Ninguno de tus N favoritos…» ya lo dice: sin lista vacía debajo.
+  const mostrarResultados = (verFavoritos && lista !== null && (resultados.length > 0 || consulta.trim().length >= 2)) || (consulta.trim().length >= 2 && (lista !== null || fueraDelEquipo))
+  const totalFavoritos = claves?.size ?? 0
+
+  const alternarSoloFavoritos = () => {
+    const nuevo = !soloFavoritos
+    setSoloFavoritos(nuevo)
+    setFueraDelEquipo(null)
+    if (nuevo) cargar(alcance)
+  }
+  // HIG «Segmented controls»: «dónde buscar» y «qué mostrar» son dos preguntas;
+  // la estrella va aparte de las pestañas para que se combinen (19-09-2026).
+  const estrella = favoritos ? (
+    <button
+      type="button"
+      aria-pressed={soloFavoritos}
+      aria-label="Solo mis favoritos"
+      title="Solo mis favoritos"
+      onClick={alternarSoloFavoritos}
+      className={`flex size-11 shrink-0 items-center justify-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+        soloFavoritos ? 'bg-ink-warn/15 text-ink-warn' : 'bg-muted text-muted-foreground'
+      }`}
+    >
+      <Star className="size-5" fill={soloFavoritos ? 'currentColor' : 'none'} aria-hidden />
+    </button>
+  ) : null
 
   return (
     <div className="flex flex-col gap-3">
@@ -347,51 +388,86 @@ export function RepuestosUsados({
       )}
 
       <div className="flex flex-col gap-2">
-        {equipoId && <SegmentedControl ariaLabel="Dónde buscar el repuesto" value={alcance} onChange={cambiarAlcance} segments={segmentos} />}
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
-          <label htmlFor={`${id}-buscar`} className="sr-only">
-            Buscar repuesto por código, nombre o nombre común
-          </label>
-          <input
-            ref={inputBuscarRef}
-            id={`${id}-buscar`}
-            autoComplete="off"
-            className={`${CAMPO} pl-9 pr-9`}
-            value={consulta}
-            placeholder="Buscar por código o nombre"
-            // HIG «Virtual keyboards»: acá Enter agrega el primer resultado.
-            enterKeyHint="search"
-            onFocus={() => cargar(alcance)}
-            onChange={(e) => {
-              setConsulta(e.target.value)
-              setAviso(null)
-              cargar(alcance)
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault()
-                alEnter()
-              }
-            }}
-          />
-          {/* HIG «Search fields»: borrar sin cinco toques de backspace; el foco
-              se queda en el campo para seguir buscando (19-09-2026). */}
-          {consulta.length > 0 && (
-            <button
-              type="button"
-              aria-label="Borrar búsqueda"
-              onClick={() => {
-                setConsulta('')
+        {equipoId && (
+          <div className="flex items-center gap-2">
+            <div className="min-w-0 flex-1">
+              <SegmentedControl ariaLabel="Dónde buscar el repuesto" value={alcance} onChange={cambiarAlcance} segments={segmentos} />
+            </div>
+            {estrella}
+          </div>
+        )}
+        <div className="flex items-center gap-2">
+          <div className="relative min-w-0 flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+            <label htmlFor={`${id}-buscar`} className="sr-only">
+              Buscar repuesto por código, nombre o nombre común
+            </label>
+            <input
+              ref={inputBuscarRef}
+              id={`${id}-buscar`}
+              autoComplete="off"
+              className={`${CAMPO} pl-9 pr-9`}
+              value={consulta}
+              placeholder={verFavoritos ? 'Buscar en tus favoritos' : 'Buscar por código o nombre'}
+              // HIG «Virtual keyboards»: acá Enter agrega el primer resultado.
+              enterKeyHint="search"
+              onFocus={() => cargar(alcance)}
+              onChange={(e) => {
+                setConsulta(e.target.value)
                 setAviso(null)
-                inputBuscarRef.current?.focus()
+                cargar(alcance)
               }}
-              className="absolute right-0 top-0 flex h-[44px] w-[44px] items-center justify-center text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            >
-              <X className="size-4" />
-            </button>
-          )}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  alEnter()
+                }
+              }}
+            />
+            {/* HIG «Search fields»: borrar sin cinco toques de backspace; el foco
+                se queda en el campo para seguir buscando (19-09-2026). */}
+            {consulta.length > 0 && (
+              <button
+                type="button"
+                aria-label="Borrar búsqueda"
+                onClick={() => {
+                  setConsulta('')
+                  setAviso(null)
+                  inputBuscarRef.current?.focus()
+                }}
+                className="absolute right-0 top-0 flex h-[44px] w-[44px] items-center justify-center text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                <X className="size-4" />
+              </button>
+            )}
+          </div>
+          {!equipoId && estrella}
         </div>
+        {verFavoritos && lista && (
+          <p className="text-footnote text-muted-foreground" role="status">
+            {totalFavoritos === 0 ? (
+              'Aún no tienes favoritos: márcalos con la estrella de cada resultado.'
+            ) : alcance === 'equipo' ? (
+              favoritosEnLista > 0 ? (
+                <>
+                  <span className="font-semibold text-ink-warn">
+                    {favoritosEnLista} de tus {totalFavoritos} favoritos
+                  </span>{' '}
+                  {favoritosEnLista === 1 ? 'está' : 'están'} en este equipo
+                </>
+              ) : (
+                `Ninguno de tus ${totalFavoritos} favoritos está en este equipo. Prueba en «Todos».`
+              )
+            ) : (
+              <>
+                <span className="font-semibold text-ink-warn">
+                  {favoritosEnLista === 1 ? 'Tu favorito' : `Tus ${favoritosEnLista} favoritos`}
+                </span>
+                , de todos los equipos
+              </>
+            )}
+          </p>
+        )}
         {cargando && (
           <p className="flex items-center gap-1.5 text-footnote text-muted-foreground">
             <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden />
@@ -407,7 +483,9 @@ export function RepuestosUsados({
           <ul className="overflow-hidden rounded-ctl bg-muted-foreground/10" aria-label="Repuestos encontrados">
             {resultados.length === 0 && !fueraDelEquipo ? (
               <li className="px-3 py-2.5 text-footnote text-muted-foreground">
-                {buscandoCodigo
+                {verFavoritos
+                  ? 'Ningún favorito coincide.'
+                  : buscandoCodigo
                   ? 'Buscando el código en el maestro…'
                   : alcance === 'equipo'
                     ? lista?.length === 0
@@ -441,6 +519,21 @@ export function RepuestosUsados({
                         {esExterno ? ' · no está vinculado a este equipo' : ''}
                       </p>
                     </div>
+                    {favoritos && (
+                      <button
+                        type="button"
+                        aria-pressed={favoritos.claves.has(r.codigoSAP)}
+                        aria-label={
+                          favoritos.claves.has(r.codigoSAP) ? `Quitar ${r.codigoSAP} de favoritos` : `Marcar ${r.codigoSAP} como favorito`
+                        }
+                        onClick={() => favoritos.alternar(r.codigoSAP)}
+                        className={`flex size-11 shrink-0 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                          favoritos.claves.has(r.codigoSAP) ? 'text-ink-warn' : 'text-muted-foreground'
+                        }`}
+                      >
+                        <Star className="size-5" fill={favoritos.claves.has(r.codigoSAP) ? 'currentColor' : 'none'} aria-hidden />
+                      </button>
+                    )}
                     <Button variant="plain" size="sm" className="shrink-0" onClick={() => agregar(r)}>
                       {ya ? 'Uno más' : 'Agregar'}
                     </Button>

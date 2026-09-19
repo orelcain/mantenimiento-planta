@@ -22,7 +22,8 @@ import { useAuthStore } from '@/store'
 import { toast } from '@/hooks/useToast'
 import { useAjustesTecnicos, useOpcionesEquipo } from '@/hooks/useListasBitacora'
 import { BITACORA_COLECCION, BITACORA_PLANTA, BITACORA_TURNOS_COLECCION, MAX_FOTOS_EVENTO, MAX_TIPO_OTRO, MAX_TITULO_EVENTO } from '@/config/bitacora'
-import type { FuenteRepuestos } from '@/services/bitacora/repuestosBitacora'
+import type { FavoritosRepuestos, FuenteRepuestos } from '@/services/bitacora/repuestosBitacora'
+import { useRepuestoFavoritos } from '@/hooks/repuestos/useRepuestoFavoritos'
 import { normalizarRepuestos, resolverTipo } from '@/services/bitacora/presentacionEvento'
 import type { EventoBitacora, EventoBitacoraDatos, FotoEvento, TurnoMantencion } from '@/services/bitacora/bitacora.types'
 import { ordenarEventos } from '@/services/bitacora/resumenBitacora'
@@ -746,6 +747,15 @@ export interface FuenteBitacora {
   subirFoto?: typeof subirFotoBitacora
   /** Reemplaza las lecturas del maestro de repuestos. */
   repuestos?: FuenteRepuestos
+  /** Los favoritos de repuestos del usuario (la estrella del buscador). */
+  useFavoritosRepuestos: () => FavoritosRepuestos
+}
+
+/** Los mismos «Mis favoritos» de Repuestos y del Centro Técnico: marcar aquí se ve allá. */
+function useFavoritosRepuestosFirestore(): FavoritosRepuestos {
+  const uid = useAuthStore((s) => s.user?.id)
+  const { favKeys, toggleFav } = useRepuestoFavoritos(uid)
+  return useMemo(() => ({ claves: favKeys, alternar: toggleFav }), [favKeys, toggleFav])
 }
 
 export const FUENTE_FIRESTORE: FuenteBitacora = {
@@ -757,4 +767,5 @@ export const FUENTE_FIRESTORE: FuenteBitacora = {
   useOpcionesEquipo,
   usePresencia: usePresenciaBitacora,
   useBorradoresAnteriores,
+  useFavoritosRepuestos: useFavoritosRepuestosFirestore,
 }

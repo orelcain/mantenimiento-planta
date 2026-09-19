@@ -66,7 +66,7 @@ import {
 import { etiquetaCodigoEquipo, limpiarTipo, normalizarRepuestos, normalizarTipo } from '@/services/bitacora/presentacionEvento'
 import { vibrar } from '@/services/bitacora/vibrar'
 import { RepuestosUsados } from './RepuestosUsados'
-import type { FuenteRepuestos } from '@/services/bitacora/repuestosBitacora'
+import type { FavoritosRepuestos, FuenteRepuestos } from '@/services/bitacora/repuestosBitacora'
 import { fuenteRepuestosFirestore } from '@/services/bitacora/repuestosFirestore'
 
 interface Subida {
@@ -90,6 +90,8 @@ export interface EventoBitacoraSheetProps {
   autorFijo?: string | null
   /** De dónde salen los repuestos (la vitrina usa uno de ejemplo). */
   fuenteRepuestos?: FuenteRepuestos
+  /** Estrella de favoritos en el buscador de repuestos; `null` la oculta (el pase). */
+  favoritosRepuestos?: FavoritosRepuestos | null
   /** El pase de bitácora no escribe en el maestro de repuestos (nombre común). */
   puedeEditarMaestro?: boolean
   /** `deTurno` = presentes del turno (botones rápidos); `todos` = lista de técnicos completa. */
@@ -226,6 +228,7 @@ export function EventoBitacoraSheet({
   sugerenciasTipo = [],
   autorFijo = null,
   fuenteRepuestos = fuenteRepuestosFirestore,
+  favoritosRepuestos = null,
   puedeEditarMaestro = true,
   tecnicos,
   opcionesEquipo,
@@ -1508,7 +1511,7 @@ export function EventoBitacoraSheet({
 
         </div>
         <div className="flex min-w-0 flex-col gap-5">
-        <RepuestosUsados valor={repuestos} onChange={setRepuestos} equipoId={equipoId} fuente={fuenteRepuestos} puedeEditarMaestro={puedeEditarMaestro} />
+        <RepuestosUsados valor={repuestos} onChange={setRepuestos} equipoId={equipoId} fuente={fuenteRepuestos} puedeEditarMaestro={puedeEditarMaestro} favoritos={favoritosRepuestos} />
 
         {/* Impacto en producción */}
         <div>
