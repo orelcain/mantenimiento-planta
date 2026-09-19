@@ -921,7 +921,10 @@ export function BitacoraTurnoVista({
       </div>
 
       {/* Contexto del turno: técnicos, resumen, observación (y en el teléfono, la planilla). */}
-      <div className="order-2 flex flex-col gap-5 md:order-none md:[grid-area:contexto]">
+      {/* Teléfono: pendientes anteriores (1) → eventos (2) → este contexto (3). Los eventos
+          quedaban a tres pantallas (pasada visual 19-09-2026, HIG «Layout»: lo importante
+          arriba). El PC no cambia: va en columnas por `grid-area`. */}
+      <div className="order-3 flex flex-col gap-5 md:order-none md:[grid-area:contexto]">
       {/* Técnicos del turno: quién está de verdad (mockup aprobado, pieza 1). */}
       {/* Columna de contexto como listas agrupadas (mockup A aprobado 18-09-2026;
           HIG «Lists and tables»): encabezado secundario, filas rótulo · valor
@@ -944,7 +947,8 @@ export function BitacoraTurnoVista({
         }
         footer={
           // El calendario no siempre refleja el turno real: solo sugiere, no marca.
-          deTurnoCalendario.length > 0 ? (
+          // Si dice lo mismo que los presentes, la línea sobra (pasada visual 19-09).
+          deTurnoCalendario.length > 0 && [...deTurnoCalendario].sort().join('|') !== [...presentes.nombres].sort().join('|') ? (
             <span className="italic">
               {presentes.ajustado ? 'El calendario decía' : 'El calendario sugiere'}: {deTurnoCalendario.join(', ')}
             </span>
@@ -984,8 +988,43 @@ export function BitacoraTurnoVista({
         const fallas = `${r.fallas} ${r.fallas === 1 ? 'falla' : 'fallas'}`
         const operando = minutosOperando(minutosDelTurno(turno), r.minutosParada)
         const mtbf = mtbfDelTurno(turno, r)
+        // Teléfono: las cifras en grilla de 3 (como la tarjeta de Inicio). La lista de 7
+        // filas altas ocupaba una pantalla entera y explicaba el MTTR tres veces; la
+        // explicación queda una sola vez, bajo la planilla MTTR (pasada visual 19-09).
+        const celdas: { id: string; rotulo: string; valor: string; punto?: 'ok' | 'warn' | 'crit' }[] = [
+          { id: 'eventos', rotulo: 'eventos', valor: String(r.eventos) },
+          { id: 'parada', rotulo: r.conParada > 0 ? `de parada · ${paradas}` : 'de parada', valor: formatoMinutos(r.minutosParada), punto: r.minutosParada > 0 ? 'crit' : undefined },
+          ...(r.fallas > 0 ? [{ id: 'fallas', rotulo: r.fallas === 1 ? 'falla' : 'fallas', valor: String(r.fallas), punto: 'crit' as const }] : []),
+          ...(r.afectados > 0 ? [{ id: 'afectados', rotulo: 'siguió gracias a Mantención', valor: String(r.afectados), punto: 'warn' as const }] : []),
+          { id: 'ventana', rotulo: 'sin detener producción', valor: String(r.enVentana), punto: r.enVentana > 0 ? 'ok' : undefined },
+          {
+            id: 'pendientes',
+            rotulo: r.pendientesCerrados > 0 ? `pendientes · ${r.pendientesCerrados} ${r.pendientesCerrados === 1 ? 'cerrado' : 'cerrados'}` : 'pendientes',
+            valor: String(r.pendientesDelTurno),
+            punto: r.pendientes > 0 ? 'warn' : r.pendientesCerrados > 0 ? 'ok' : undefined,
+          },
+          { id: 'mttr', rotulo: 'MTTR', valor: r.mttrMin == null ? '—' : formatoMinutos(r.mttrMin) },
+          { id: 'mtbf', rotulo: 'MTBF', valor: mtbf == null ? '—' : formatoMinutos(mtbf) },
+        ]
         return (
+          <>
+          <section aria-label="Resumen del turno" className="flex flex-col md:hidden">
+            <h3 className="px-4 pb-2 text-subhead font-semibold text-muted-foreground">Resumen del turno</h3>
+            <dl className="grid grid-cols-3 gap-x-3 gap-y-4 rounded-card bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
+              {celdas.map((c) => (
+                <div key={c.id} className="flex min-w-0 flex-col-reverse gap-0.5">
+                  <dt className="flex items-start gap-1.5 text-footnote leading-tight text-muted-foreground">
+                    {c.punto && <span className={`mt-[0.3em] size-2 shrink-0 rounded-full ${PUNTO[c.punto]}`} aria-hidden />}
+                    <span className="min-w-0">{c.rotulo}</span>
+                  </dt>
+                  <dd className="text-headline tabular-nums">{c.valor}</dd>
+                </div>
+              ))}
+            </dl>
+            {r.fallas === 0 && <p className="px-4 pt-2 text-footnote text-muted-foreground">Sin fallas en el turno: MTTR y MTBF no aplican.</p>}
+          </section>
           <ListGroup
+            className="hidden md:flex"
             aria-label="Resumen del turno"
             title="Resumen del turno"
             footer={
@@ -1046,6 +1085,7 @@ export function BitacoraTurnoVista({
               value={cifra(mtbf == null ? '—' : formatoMinutos(mtbf))}
             />
           </ListGroup>
+          </>
         )
       })()}
 
@@ -1093,10 +1133,36 @@ export function BitacoraTurnoVista({
         </section>
       )}
 
+      {/* HIG «Typography»: la letra sigue el tamaño del teléfono. En iPhone lo lee
+          solo; en Android se elige aquí (19-09-2026, capturas al 100/124/135 %). */}
+      <div className="flex flex-col gap-1.5">
+        <label className="flex min-h-[44px] flex-wrap items-center justify-between gap-x-3 rounded-card bg-card pl-4 pr-2 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
+          <span className="text-body">Tamaño de letra</span>
+          <select
+            value={letra.tamano}
+            onChange={(e) => {
+              if (esTamanoLetra(e.target.value)) letra.cambiar(e.target.value)
+            }}
+            className="ml-auto min-h-[44px] cursor-pointer rounded-ctl bg-transparent px-2 text-right text-campo font-semibold text-primary outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            {OPCIONES_TAMANO.filter((o) => o.value !== 'telefono' || letra.hayTelefono).map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <p className="px-4 text-footnote text-muted-foreground">
+          {letra.tamano === 'telefono'
+            ? 'Sigue el tamaño del texto de Ajustes del iPhone.'
+            : 'Solo en este teléfono. También se puede ampliar con dos dedos.'}
+        </p>
+      </div>
+
       </div>
 
         {/* Línea de tiempo */}
-        <section aria-label="Eventos del turno" className="order-3 flex flex-col gap-5 md:order-none md:[grid-area:centro]">
+        <section aria-label="Eventos del turno" className="order-2 flex flex-col gap-5 md:order-none md:[grid-area:centro]">
           {cargando ? (
             <div className="flex flex-col gap-2 rounded-card bg-card p-4">
               {[0, 1, 2].map((i) => (
@@ -1141,31 +1207,6 @@ export function BitacoraTurnoVista({
               )}
             </>
           )}
-          {/* HIG «Typography»: la letra sigue el tamaño del teléfono. En iPhone lo lee
-              solo; en Android se elige aquí (19-09-2026, capturas al 100/124/135 %). */}
-          <div className="flex flex-col gap-1.5">
-            <label className="flex min-h-[44px] flex-wrap items-center justify-between gap-x-3 rounded-card bg-card pl-4 pr-2 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
-              <span className="text-body">Tamaño de letra</span>
-              <select
-                value={letra.tamano}
-                onChange={(e) => {
-                  if (esTamanoLetra(e.target.value)) letra.cambiar(e.target.value)
-                }}
-                className="ml-auto min-h-[44px] cursor-pointer rounded-ctl bg-transparent px-2 text-right text-campo font-semibold text-primary outline-none focus-visible:ring-2 focus-visible:ring-primary"
-              >
-                {OPCIONES_TAMANO.filter((o) => o.value !== 'telefono' || letra.hayTelefono).map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <p className="px-4 text-footnote text-muted-foreground">
-              {letra.tamano === 'telefono'
-                ? 'Sigue el tamaño del texto de Ajustes del iPhone.'
-                : 'Solo en este teléfono. También se puede ampliar con dos dedos.'}
-            </p>
-          </div>
         </section>
 
         {/* Vista previa del correo (solo PC) */}

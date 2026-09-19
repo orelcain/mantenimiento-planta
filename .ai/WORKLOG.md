@@ -21,6 +21,17 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-19 · Bitacora ronda 62 · Pasada visual con capturas reales (Playwright)
+- Recorrido completo con `C:\Users\orelc\dev\capturas\bitacora-recorrido.mjs` (teléfono 375 y PC 1.440, claro y oscuro, hojas Compartir/editor, Inicio, Historial). Informe con capturas y propuesta simulada sobre la página real: https://claude.ai/artifact/ENcag4myAbpNgUa2oaGQjb — aprobado.
+- **Error (mío, lote 2):** «Falta completar: Quién lo registró» salía con ese campo LLENO; lo vacío era «Quién edita». El aviso usa ahora la misma etiqueta que el campo (`etiquetaQuien`: registra / continúa / edita).
+- **Orden en el teléfono:** pendientes anteriores → EVENTOS → contexto (antes los eventos quedaban a 3 pantallas, detrás de técnicos + resumen + observación + planilla). Solo cambian las clases `order-*`; el PC va por `grid-area` y no cambia (verificado en captura).
+- **Resumen compacto en el teléfono:** grilla de 3 (`<dl>`, cifra arriba, rótulo con punto abajo) en vez de 7 filas altas; la explicación del MTTR/MTBF queda una sola vez (bajo la planilla MTTR). En el PC sigue la lista (`ListGroup className="hidden md:flex"`).
+- **Tipo anterior:** un evento guardado con un tipo que ya no se ofrece («Falla», antes del 18-09) se abría sin chip marcado → ahora «Falla (anterior)» marcado; tocar otro lo cambia.
+- «El calendario decía: …» solo cuando difiere de los presentes; iniciales de los conectados sin taparse (superposición 8 → 4 px); «Tamaño de letra» al final de la columna de contexto (quedaba entre eventos y técnicos).
+- Verificado en capturas nuevas (teléfono y PC, ambos temas) + `bitacora-letra-real.mjs` al 135 % (sin desborde). tsc 0 · eslint 30 · vitest 2.839 · auditorías OK · build OK.
+- Queda como idea (con mockup propio): resumir en una fila los 4 bloques de «quién» del editor.
+- Estado: HECHO.
+
 ## 2026-09-19 · Bitacora ronda 61 · Zoom y tamaño de letra (#12 del HIG, cierra el informe)
 - Mockup con CAPTURAS REALES al 100/124/135 % (https://claude.ai/artifact/4WKVax3ncz8BuVwzhEkdpA), aprobado.
 - **Zoom con dos dedos en toda la app**: el viewport tenía `maximum-scale=1, user-scalable=no` desde el release inicial (nadie lo decidió). Los campos miden ≥16 px, así que iOS no hace zoom solo al tocarlos.

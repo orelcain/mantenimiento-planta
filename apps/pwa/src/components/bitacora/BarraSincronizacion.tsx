@@ -167,7 +167,7 @@ export function BarraSincronizacion({
           {presentes.length > 0 && (
             <span className="flex items-center pl-1">
               {presentes.slice(0, 4).map((p, i) => (
-                <Avatar key={p.dispositivoId} p={p} tono={tonoDe(p.nombre)} chico className={i > 0 ? "-ml-2" : ""} />
+                <Avatar key={p.dispositivoId} p={p} tono={tonoDe(p.nombre)} chico className={i > 0 ? "-ml-1" : ""} />
               ))}
               <span className="pl-1.5 tabular-nums">{presentes.length}</span>
             </span>
@@ -245,7 +245,7 @@ export function BarraSincronizacion({
                   key={p.dispositivoId}
                   p={p}
                   tono={tonoDe(p.nombre)}
-                  className={i > 0 ? "-ml-2" : ""}
+                  className={i > 0 ? "-ml-1" : ""}
                 />
               ))}
             </span>
