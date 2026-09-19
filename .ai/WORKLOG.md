@@ -21,6 +21,17 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-19 · Bitacora ronda 55 · «¿Cuánto duró?» para lo que se carga tarde
+- Orel confirmó la opción C del canvas: la carga a fin de turno es la norma (ronda 54: 6 de 15 eventos con hora se registraron más de 2 h después), así que se diseña para ella.
+- Hecho: cuando «Terminó ahora» no aplica porque el turno del evento ya terminó o empezó hace más de 2 h (`terminoAhora` → `turno-terminado` / `pasa-el-tope`), el editor muestra «¿Cuánto duró?» con 5 · 10 · 15 · 20 · 30 · 45 · 60 min (`DURACIONES_SUGERIDAS_MIN` en `config/bitacora.ts`). Un toque pone el término = inicio + N (`horaMasMinutos`, cruza medianoche). Reemplaza la línea «escribe la hora en que terminó» de la ronda 54.
+- Los chips SIGUEN a la vista con el término puesto y marcan el que coincide con la duración, para poder corregir la elección (y un evento viejo ya completo muestra el suyo marcado, o ninguno si duró 23 min).
+- `Chip` gana `min-w-[44px]`: un chip de un dígito («5») medía menos de 44 px de ancho. Los demás chips del editor ya eran más anchos, no cambian.
+- Accesible: grupo con `aria-labelledby` al rótulo; el motivo («Ese turno ya terminó.») y la unidad («5 minutos») van en `sr-only`.
+- Verificado en `/dev/bitacora-real` a 375 px con clic real: evento del 16-09 → 7 chips de 44 px (6 + «60 min» en la segunda fila, como el mockup), sin botón; toque en «20» → término 22:16, chip marcado, «Duración: 20 min»; el mismo evento movido al turno en curso → vuelve «Terminó ahora · 22:33 · 37 min» y los chips desaparecen. Claro y oscuro; sin desborde.
+- Test: `horaMasMinutos` (11:00+20, 23:50+20→00:10, hora inválida) y la invariante del chip marcado: `minutosEntre(inicio, horaMasMinutos(inicio, n)) === n` para todas las duraciones, también desde 23:55.
+- tsc 0; eslint 30; vitest 2.821; auditorías OK; build OK.
+- Estado: HECHO.
+
 ## 2026-09-19 · Bitacora ronda 54 · «Terminó ahora» solo cuando es verdad
 - Medido antes de tocar (22 eventos reales): 20 los cargó una sola persona; de 15 con hora de inicio, 7 se registraron dentro de la media hora y **6 más de 2 h después**; 6 se crearon con su turno ya terminado (el día 17-09 entero a las 18:55; en la tarde 17-09, 6 eventos entre las 23:17 y las 23:35). El botón de la ronda 48 salía SIEMPRE que faltaba el término, y con esa forma de cargar «ahora» es la hora de carga, no el término: la TOLVA GENERAL RILES (11:00, parada real de 20 min, cargada 18:55) habría quedado en 7 h 55 min y el MTTR del turno pasaba de 12,5 min a 4 h. Todavía no se había usado: 0 eventos nuevos desde el deploy.
 - Mockup con 4 casos reales en el canvas de la tanda (fila «Terminó ahora solo cuando es verdad»); Orel eligió la opción A.

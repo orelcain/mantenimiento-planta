@@ -6,6 +6,7 @@ import {
   AUTOGUARDADO_MS,
   ETIQUETA_FOTO,
   CONTINGENCIAS_SUGERIDAS,
+  DURACIONES_SUGERIDAS_MIN,
   IMPACTOS,
   MAX_FOTOS_EVENTO,
   MAX_TIPO_OTRO,
@@ -50,6 +51,7 @@ import {
   formatoMinutos,
   horaCalzaEnTurno,
   horaDe,
+  horaMasMinutos,
   horarioTurno,
   horaSugeridaParaEvento,
   minutosEntre,
@@ -202,7 +204,8 @@ function Chip({ activo, onClick, children }: { activo: boolean; onClick: () => v
       onClick={onClick}
       aria-pressed={activo}
       className={[
-        'min-h-[44px] shrink-0 rounded-full px-4 text-footnote font-semibold transition-colors duration-150 motion-reduce:transition-none',
+        // min-w: un chip de un dígito («5») quedaba bajo los 44 px de ancho.
+        'min-h-[44px] min-w-[44px] shrink-0 rounded-full px-4 text-footnote font-semibold transition-colors duration-150 motion-reduce:transition-none',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
         activo ? 'bg-primary text-primary-foreground' : 'bg-muted-foreground/10 text-foreground hover:bg-muted-foreground/15',
       ].join(' ')}
@@ -450,6 +453,9 @@ export function EventoBitacoraSheet({
   const duracion = sinHora ? null : minutosEntre(horaInicio, horaTermino || null)
   /** «Terminó ahora» solo mientras corre el turno del evento y sin pasar de 2 h (18-09-2026). */
   const terminoSugerido = terminoAhora(turnoDestino || turno.id, horaInicio, ahora)
+  /** Se está cargando tarde: en vez de «Terminó ahora», «¿Cuánto duró?». */
+  const cargaTardia =
+    !terminoSugerido.disponible && (terminoSugerido.motivo === 'turno-terminado' || terminoSugerido.motivo === 'pasa-el-tope')
   const horaFaltante = !sinHora && !HORA_VALIDA.test(horaInicio)
 
   // Lo que se guarda: el texto de «Otro» solo con ese tipo, y sin horas si es «Sin hora».
@@ -1383,12 +1389,30 @@ export function EventoBitacoraSheet({
                   </span>
                 </button>
               )}
-              {!horaTermino && !terminoSugerido.disponible && (terminoSugerido.motivo === 'turno-terminado' || terminoSugerido.motivo === 'pasa-el-tope') && (
-                <p className="-mt-1 text-footnote text-muted-foreground">
-                  {terminoSugerido.motivo === 'turno-terminado'
-                    ? 'Ese turno ya terminó: escribe la hora en que terminó.'
-                    : `Empezó hace más de ${TOPE_TERMINO_AHORA_MIN / 60} horas: escribe la hora en que terminó.`}
-                </p>
+              {/* Cargando tarde, «ahora» ya no es el término: un toque en la
+                  duración lo calcula desde el inicio. Sigue a la vista con el
+                  término puesto, para poder corregir la elección. */}
+              {cargaTardia && (
+                <div className="-mt-1">
+                  <p id="bitacora-cuanto-duro" className={ETIQUETA_CAMPO}>
+                    ¿Cuánto duró?
+                    <span className="sr-only">
+                      {terminoSugerido.motivo === 'turno-terminado'
+                        ? ' Ese turno ya terminó.'
+                        : ` Empezó hace más de ${TOPE_TERMINO_AHORA_MIN / 60} horas.`}
+                    </span>
+                  </p>
+                  <div role="group" aria-labelledby="bitacora-cuanto-duro" className="flex flex-wrap gap-2">
+                    {DURACIONES_SUGERIDAS_MIN.map((n, i) => (
+                      <Chip key={n} activo={duracion === n} onClick={() => setHoraTermino(horaMasMinutos(horaInicio, n) ?? '')}>
+                        <span className="tabular-nums">
+                          {n}
+                          {i === DURACIONES_SUGERIDAS_MIN.length - 1 ? ' min' : <span className="sr-only"> minutos</span>}
+                        </span>
+                      </Chip>
+                    ))}
+                  </div>
+                </div>
               )}
               {duracion != null && <p className="-mt-1 text-footnote text-muted-foreground">Duración: {formatoMinutos(duracion)}</p>}
             </>

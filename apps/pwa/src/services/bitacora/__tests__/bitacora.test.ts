@@ -11,7 +11,9 @@ import {
   horaCalzaEnTurno,
   terminoAhora,
   TOPE_TERMINO_AHORA_MIN,
+  horaMasMinutos,
 } from '../turnoMantencion'
+import { DURACIONES_SUGERIDAS_MIN } from '../../../config/bitacora'
 import { fuePendiente, minutosParadaDe, ordenarEventos, resumirBitacora } from '../resumenBitacora'
 import { minutosDesdeInicioTurno } from '../turnoMantencion'
 import { bandaDeCelda, nombreCorto, normalizarFechaCalendario, tecnicosDelCalendario, tecnicosDeTurno } from '../tecnicosDeTurno'
@@ -417,6 +419,17 @@ describe('«Terminó ahora» solo cuando es verdad (18-09-2026)', () => {
     expect(terminoAhora('2026-09-17_tarde', '23:55', a(18, 1, 1))).toEqual({ disponible: false, motivo: 'turno-terminado' })
     // Noche: un inicio un poco antes de medianoche es de ESTE turno.
     expect(terminoAhora('2026-09-17_noche', '23:55', a(17, 0, 10))).toEqual({ disponible: true, hora: '00:10', minutos: 15 })
+  })
+
+  it('«¿Cuánto duró?» pone el término desde el inicio, también cruzando medianoche', () => {
+    expect(horaMasMinutos('11:00', 20)).toBe('11:20')
+    expect(horaMasMinutos('23:50', 20)).toBe('00:10')
+    expect(horaMasMinutos('9:05', 60)).toBe('10:05')
+    expect(horaMasMinutos('', 5)).toBeNull()
+    // Invariante del chip marcado: la duración que se lee de vuelta es la elegida.
+    for (const inicio of ['10:00', '23:55', '00:00']) {
+      for (const n of DURACIONES_SUGERIDAS_MIN) expect(minutosEntre(inicio, horaMasMinutos(inicio, n))).toBe(n)
+    }
   })
 
   it('sin inicio, turno futuro o id inválido: no se ofrece', () => {
