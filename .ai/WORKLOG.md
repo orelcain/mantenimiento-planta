@@ -21,6 +21,17 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-19 · Admin · Editor de líneas: leyenda al día y servicios que se pueden esconder
+
+- La leyenda y el minimapa todavía codificaban el peso con los colores de estado: ahora muestran
+  MUESTRAS DE LÍNEA (gruesa = 100 %, fina = 1/N), el borde punteado para «fuera de la línea» y la
+  píldora del grupo en paralelo. El minimapa tiñe por flujo con `--brand`.
+- Botón «Servicios»: esconde las tarjetas y las punteadas de apoyo (y su contenedor, que quedaba
+  vacío) para mirar la línea en limpio. Es solo visual: los pesos no cambian. 62→54 nodos,
+  43→40 flechas en los datos guardados.
+- Textos de los botones acortados: con seis, la barra envolvía el título.
+- Verificado en tema oscuro Y claro.
+
 ## 2026-09-19 · Admin · Editor de líneas: grupos en paralelo a mano
 
 - Orel: «el elemento paralelo debe poder editarse y crearse manualmente, por si hay más elementos
