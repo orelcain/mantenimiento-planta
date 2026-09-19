@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import { rangoDelPeriodo } from '../historialCorreo'
 import type { EventoBitacora } from '../bitacora.types'
-import { detalleRepuesto, fechaDesde, filasPorTurno, lineaRepuestoDelPeriodo, porcentaje, resumirPeriodo, tesisDelPeriodo, tituloRepuesto } from '../historialBitacora'
+import {
+  detalleRepuesto,
+  fechaDesde,
+  filasPorTurno,
+  lineaRepuestoDelPeriodo,
+  porcentaje,
+  resumenGraficoParadas,
+  resumirPeriodo,
+  tesisDelPeriodo,
+  tituloRepuesto,
+} from '../historialBitacora'
 import { resumirBitacora } from '../resumenBitacora'
 
 const ev = (p: Partial<EventoBitacora>): EventoBitacora => ({
@@ -42,6 +52,14 @@ describe('historial del período', () => {
     expect(filas[0]?.resumen.eventos).toBe(3)
     expect(filas[0]?.pendientesAbiertos).toBe(1)
     expect(filasPorTurno([ev({ turnoId: 'basura' })])).toEqual([])
+  })
+
+  it('el título del gráfico de paradas dice el hallazgo, con los mismos datos que las barras', () => {
+    const filas = filasPorTurno(eventos)
+    expect(resumenGraficoParadas(filas)).toEqual({ titulo: '2 de 3 turnos con parada · 1 h en total', total: 3 })
+    const sinParadas = filas.map((f) => ({ ...f, resumen: { ...f.resumen, conParada: 0, minutosParada: 0 } }))
+    expect(resumenGraficoParadas(sinParadas)).toEqual({ titulo: 'Sin paradas en los 3 turnos', total: 3 })
+    expect(resumenGraficoParadas([sinParadas[0]!])).toEqual({ titulo: 'Sin paradas en el turno', total: 1 })
   })
 
   it('los totales del período coinciden con sumar los turnos (una sola definición)', () => {

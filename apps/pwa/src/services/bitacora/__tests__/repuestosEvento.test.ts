@@ -5,6 +5,7 @@ import { bitacoraAHtmlCorreo, bitacoraATextoPlano } from '../bitacoraCorreo'
 import { SEPARADOR_EVENTOS, bitacoraATextoWhatsapp, planLaminas } from '../bitacoraWhatsapp'
 import { aFormulario, camposACambiar, fusionarFormulario } from '../borradores'
 import {
+  clampCantidadRepuesto,
   codigoEquipoDe,
   encabezadoEvento,
   etiquetaCodigoEquipo,
@@ -60,6 +61,18 @@ describe('número del equipo', () => {
     expect(etiquetaCodigoEquipo('720004447')).toBe('N° de equipo 720004447')
     expect(etiquetaCodigoEquipo('AQ-IN-CHO-EXTE-CASI')).toBe('Ubicación técnica AQ-IN-CHO-EXTE-CASI')
     expect(etiquetaCodigoEquipo('  ')).toBe('')
+  })
+})
+
+describe('cantidad de repuesto escribible', () => {
+  it('entero entre 1 y 999; vacío, 0 o algo no numérico vuelve al respaldo (no borra el repuesto)', () => {
+    expect(clampCantidadRepuesto('7', 1)).toBe(7)
+    expect(clampCantidadRepuesto('7.6', 1)).toBe(8)
+    expect(clampCantidadRepuesto('', 3)).toBe(3)
+    expect(clampCantidadRepuesto('0', 3)).toBe(3)
+    expect(clampCantidadRepuesto('-5', 3)).toBe(3)
+    expect(clampCantidadRepuesto('abc', 3)).toBe(3)
+    expect(clampCantidadRepuesto('5000', 3)).toBe(999)
   })
 })
 

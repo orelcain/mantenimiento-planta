@@ -36,6 +36,8 @@ export interface SheetProps {
 export function Sheet({ open, onClose, title, description, actions, size = 'default', children, onKeyDown }: SheetProps) {
   const panelRef = React.useRef<HTMLDivElement>(null)
   const returnFocusRef = React.useRef<HTMLElement | null>(null)
+  /** Arrastre hacia abajo para cerrar (HIG «Sheets», 19-09-2026): posición inicial del dedo y alto del panel. */
+  const arrastreRef = React.useRef<{ y0: number; altura: number } | null>(null)
   // onClose en una ref: casi todos los que usan el Sheet le pasan una función
   // nueva en cada render. Con `onClose` en las dependencias, CADA tecla re-corría
   // el efecto: devolvía el foco al disparador y luego al panel → en el celular el
@@ -60,6 +62,52 @@ export function Sheet({ open, onClose, title, description, actions, size = 'defa
     }
   }, [open])
 
+  /**
+   * Mueve el panel con el dedo (`translateY`, solo hacia abajo). Manipula el
+   * DOM directo en vez de estado de React: en un pointermove por frame, un
+   * re-render de todo el Sheet en cada uno se sentía a los saltos.
+   */
+  const iniciarArrastre = (e: React.PointerEvent<HTMLDivElement>) => {
+    const panel = panelRef.current
+    if (!panel) return
+    arrastreRef.current = { y0: e.clientY, altura: panel.offsetHeight }
+    // `.piel-sheet-in` anima con `both`: al terminar deja `transform: none`
+    // fijado, y una animación le gana al estilo en línea → el panel no seguía
+    // al dedo. La entrada ya se vio; se apaga para que mande el arrastre.
+    panel.style.animation = 'none'
+    panel.style.transition = 'none'
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }
+  const moverArrastre = (e: React.PointerEvent<HTMLDivElement>) => {
+    const panel = panelRef.current
+    const a = arrastreRef.current
+    if (!panel || !a) return
+    panel.style.transform = `translateY(${Math.max(0, e.clientY - a.y0)}px)`
+  }
+  /** Suelta: más de 120 px (o 25% del alto) cierra; si no, el panel vuelve a 0. */
+  const soltarArrastre = (e: React.PointerEvent<HTMLDivElement>) => {
+    const panel = panelRef.current
+    const a = arrastreRef.current
+    arrastreRef.current = null
+    if (!panel || !a) return
+    const dy = Math.max(0, e.clientY - a.y0)
+    const cierra = dy > 120 || dy > a.altura * 0.25
+    // Con prefers-reduced-motion: sin transición de vuelta (salta a 0).
+    const reducido = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    panel.style.transition = reducido ? 'none' : 'transform 180ms ease-out'
+    panel.style.transform = 'translateY(0px)'
+    // onClose puede NO cerrar (pide confirmar cambios): el panel ya volvió a
+    // su lugar arriba, cierre o no.
+    if (cierra) onCloseRef.current()
+  }
+  const cancelarArrastre = () => {
+    const panel = panelRef.current
+    arrastreRef.current = null
+    if (!panel) return
+    panel.style.transition = 'none'
+    panel.style.transform = 'translateY(0px)'
+  }
+
   if (!open) return null
 
   return createPortal(
@@ -82,6 +130,17 @@ export function Sheet({ open, onClose, title, description, actions, size = 'defa
           'piel-sheet-in',
         )}
       >
+        {/* Zona de arrastre: agarradera + título, con área táctil generosa
+            (44 px) aunque la agarradera se vea igual. Invisible: Escape y los
+            botones son la vía accesible, esto es puro gesto. */}
+        <div
+          aria-hidden
+          onPointerDown={iniciarArrastre}
+          onPointerMove={moverArrastre}
+          onPointerUp={soltarArrastre}
+          onPointerCancel={cancelarArrastre}
+          className="absolute inset-x-0 top-0 h-[44px] touch-none select-none"
+        />
         {/* Agarradera: señal de "esto se arrastra/cierra", no decoración. */}
         <div className="mx-auto mb-3.5 h-[5px] w-9 rounded-full bg-muted-foreground/40" aria-hidden />
         {title && <h2 className="text-[1.1rem] font-semibold tracking-[-0.015em]">{title}</h2>}

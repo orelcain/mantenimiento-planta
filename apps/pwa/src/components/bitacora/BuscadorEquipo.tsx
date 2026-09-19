@@ -1,5 +1,5 @@
-import { useId, useMemo, useState, type ReactNode } from 'react'
-import { Loader2, Search } from 'lucide-react'
+import { useId, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Loader2, Search, X } from 'lucide-react'
 import { buscarEquipos, type OpcionEquipo } from '@/services/bitacora/buscarEquipos'
 import { BITACORA_PLANTA } from '@/config/bitacora'
 
@@ -73,6 +73,7 @@ export function BuscadorEquipo({
   const id = useId()
   const [abierto, setAbierto] = useState(false)
   const [activo, setActivo] = useState(0)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   const resultados = useMemo(
     () => buscarEquipos(opciones, texto, { max: 8, usados: recientes, planta: BITACORA_PLANTA.nombre }),
@@ -103,6 +104,7 @@ export function BuscadorEquipo({
       <div className="relative">
         <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
         <input
+          ref={inputRef}
           id={`${id}-input`}
           role="combobox"
           aria-expanded={items.length > 0}
@@ -114,6 +116,8 @@ export function BuscadorEquipo({
           // HIG «Searching»: el placeholder dice POR QUÉ campos se puede buscar.
           // Nombrar la planta sería falso: la jerarquía trae las dos.
           placeholder="Buscar equipo, área o código SAP"
+          // HIG «Virtual keyboards»: acá Enter ELIGE una sugerencia, no busca.
+          enterKeyHint="done"
           onFocus={() => setAbierto(true)}
           onBlur={() => setAbierto(false)}
           onChange={(e) => {
@@ -140,6 +144,23 @@ export function BuscadorEquipo({
           className="h-[44px] w-full rounded-ctl border-0 bg-muted-foreground/10 pl-9 pr-9 text-[16px] text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary"
         />
         {cargando && <Loader2 className="absolute right-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted-foreground" aria-label="Cargando equipos" />}
+        {/* HIG «Search fields»: borrar sin cinco toques de backspace; deja el
+            foco en el campo para seguir escribiendo o cerrar el teclado (19-09-2026). */}
+        {!cargando && texto.length > 0 && (
+          <button
+            type="button"
+            aria-label="Borrar búsqueda"
+            onClick={() => {
+              // Mismo camino que borrar a mano: onChange con equipoId null,
+              // así un equipo vinculado no queda «pegado» al texto vacío.
+              onChange('', null)
+              inputRef.current?.focus()
+            }}
+            className="absolute right-0 top-0 flex h-[44px] w-[44px] items-center justify-center text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            <X className="size-4" />
+          </button>
+        )}
       </div>
 
       {items.length > 0 && (

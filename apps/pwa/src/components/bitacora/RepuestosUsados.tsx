@@ -3,7 +3,7 @@ import { Loader2, Minus, Plus, Search, X } from 'lucide-react'
 import { Button, SegmentedControl } from '@/components/piel'
 import { MAX_CANTIDAD_REPUESTO, MAX_REPUESTOS_EVENTO } from '@/config/bitacora'
 import type { RepuestoUsado } from '@/services/bitacora/bitacora.types'
-import { nombreRepuesto, normalizarRepuestos } from '@/services/bitacora/presentacionEvento'
+import { clampCantidadRepuesto, nombreRepuesto, normalizarRepuestos } from '@/services/bitacora/presentacionEvento'
 import {
   buscarRepuestos,
   esCodigoSap,
@@ -67,8 +67,11 @@ export function RepuestosUsados({
   const [bodega, setBodega] = useState<Map<string, DatoBodega>>(new Map())
   const [aviso, setAviso] = useState<string | null>(null)
   const [edicionComun, setEdicionComun] = useState<{ codigo: string; texto: string } | null>(null)
+  /** Lo que se está escribiendo en el campo de cantidad, libre hasta soltar el foco. */
+  const [borradorCantidad, setBorradorCantidad] = useState<Record<string, string>>({})
   const [guardandoComun, setGuardandoComun] = useState(false)
   const inputComunRef = useRef<HTMLInputElement>(null)
+  const inputBuscarRef = useRef<HTMLInputElement>(null)
   const pedidosBodega = useRef<Set<string>>(new Set())
 
   // Sin equipo no hay «En este equipo».
@@ -175,7 +178,23 @@ export function RepuestosUsados({
   }
 
   const cambiarCantidad = (codigoSAP: string, delta: number) =>
-    onChange(valor.map((r) => (r.codigoSAP === codigoSAP ? { ...r, cantidad: Math.min(MAX_CANTIDAD_REPUESTO, Math.max(1, r.cantidad + delta)) } : r)))
+    onChange(valor.map((r) => (r.codigoSAP === codigoSAP ? { ...r, cantidad: clampCantidadRepuesto(r.cantidad + delta, r.cantidad) } : r)))
+
+  /** Al salir del campo o con Enter: entero 1–MAX, o vuelve al valor anterior (no borra el repuesto). */
+  const aplicarCantidadEscrita = (codigoSAP: string) => {
+    const texto = borradorCantidad[codigoSAP]
+    if (texto !== undefined) {
+      const actual = valor.find((r) => r.codigoSAP === codigoSAP)
+      if (actual) {
+        const nueva = clampCantidadRepuesto(texto, actual.cantidad)
+        if (nueva !== actual.cantidad) onChange(valor.map((r) => (r.codigoSAP === codigoSAP ? { ...r, cantidad: nueva } : r)))
+      }
+    }
+    setBorradorCantidad((prev) => {
+      const { [codigoSAP]: _quitado, ...resto } = prev
+      return resto
+    })
+  }
 
   const abrirEdicionComun = (r: RepuestoUsado) => {
     setEdicionComun({ codigo: r.codigoSAP, texto: r.nombreComun ?? '' })
@@ -278,17 +297,45 @@ export function RepuestosUsados({
                   )}
                 </div>
                 {!editando && (
-                  <div className="flex shrink-0 items-center" role="group" aria-label={`Cantidad de ${r.codigoSAP}`}>
-                    <button type="button" className={BOTON_PASO} onClick={() => cambiarCantidad(r.codigoSAP, -1)} disabled={r.cantidad <= 1} aria-label="Uno menos">
-                      <Minus className="size-4" />
-                    </button>
-                    <span className="min-w-[2ch] text-center text-body font-semibold tabular-nums" aria-live="polite">
-                      {r.cantidad}
-                    </span>
-                    <button type="button" className={BOTON_PASO} onClick={() => cambiarCantidad(r.codigoSAP, 1)} aria-label="Uno más">
-                      <Plus className="size-4" />
-                    </button>
-                    <button type="button" className={BOTON_PASO} onClick={() => onChange(valor.filter((x) => x.codigoSAP !== r.codigoSAP))} aria-label={`Quitar ${r.codigoSAP}`}>
+                  <div className="flex shrink-0 items-center">
+                    <div className="flex items-center" role="group" aria-label={`Cantidad de ${r.codigoSAP}`}>
+                      <button type="button" className={BOTON_PASO} onClick={() => cambiarCantidad(r.codigoSAP, -1)} disabled={r.cantidad <= 1} aria-label="Uno menos">
+                        <Minus className="size-4" />
+                      </button>
+                      {/* HIG «Steppers»: la cantidad también se escribe, para no
+                          gastar 40 toques en subir de 1 a 40 (19-09-2026). */}
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        maxLength={String(MAX_CANTIDAD_REPUESTO).length}
+                        aria-label={`Cantidad de ${comun || sap || r.codigoSAP}`}
+                        value={borradorCantidad[r.codigoSAP] ?? String(r.cantidad)}
+                        onChange={(e) => {
+                          const solo = e.target.value.replace(/[^0-9]/g, '')
+                          setBorradorCantidad((prev) => ({ ...prev, [r.codigoSAP]: solo }))
+                        }}
+                        onBlur={() => aplicarCantidadEscrita(r.codigoSAP)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            e.currentTarget.blur()
+                          }
+                        }}
+                        className="size-11 rounded-ctl bg-transparent text-center text-body font-semibold tabular-nums text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      />
+                      <button type="button" className={BOTON_PASO} onClick={() => cambiarCantidad(r.codigoSAP, 1)} aria-label="Uno más">
+                        <Plus className="size-4" />
+                      </button>
+                    </div>
+                    {/* Separada de la cantidad: pegada a «+» se quitaba el
+                        repuesto por error al querer sumar (19-09-2026). */}
+                    <button
+                      type="button"
+                      className={`${BOTON_PASO} ml-2`}
+                      onClick={() => onChange(valor.filter((x) => x.codigoSAP !== r.codigoSAP))}
+                      aria-label={`Quitar ${r.codigoSAP}`}
+                    >
                       <X className="size-4 text-muted-foreground" />
                     </button>
                   </div>
@@ -307,11 +354,14 @@ export function RepuestosUsados({
             Buscar repuesto por código, nombre o nombre común
           </label>
           <input
+            ref={inputBuscarRef}
             id={`${id}-buscar`}
             autoComplete="off"
-            className={`${CAMPO} pl-9`}
+            className={`${CAMPO} pl-9 pr-9`}
             value={consulta}
             placeholder="Buscar por código o nombre"
+            // HIG «Virtual keyboards»: acá Enter agrega el primer resultado.
+            enterKeyHint="search"
             onFocus={() => cargar(alcance)}
             onChange={(e) => {
               setConsulta(e.target.value)
@@ -325,6 +375,22 @@ export function RepuestosUsados({
               }
             }}
           />
+          {/* HIG «Search fields»: borrar sin cinco toques de backspace; el foco
+              se queda en el campo para seguir buscando (19-09-2026). */}
+          {consulta.length > 0 && (
+            <button
+              type="button"
+              aria-label="Borrar búsqueda"
+              onClick={() => {
+                setConsulta('')
+                setAviso(null)
+                inputBuscarRef.current?.focus()
+              }}
+              className="absolute right-0 top-0 flex h-[44px] w-[44px] items-center justify-center text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              <X className="size-4" />
+            </button>
+          )}
         </div>
         {cargando && (
           <p className="flex items-center gap-1.5 text-footnote text-muted-foreground">

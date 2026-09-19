@@ -294,6 +294,8 @@ export function EventoBitacoraSheet({
   const [subidas, setSubidas] = useState<Subida[]>([])
   const [guardando, setGuardando] = useState(false)
   const [confirmarSinFotos, setConfirmarSinFotos] = useState(false)
+  /** Foto(s) encima del bloque de Fotos, listas para soltar (HIG «Drag and drop»). */
+  const [arrastrandoFoto, setArrastrandoFoto] = useState(false)
   /** Cerrar un evento PUBLICADO con cambios sin guardar pide confirmación (HIG «Sheets»). */
   const [confirmarDescarte, setConfirmarDescarte] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -776,7 +778,21 @@ export function EventoBitacoraSheet({
     inputRef.current?.click()
   }
 
-  const alElegir = (lista: FileList | null) => {
+  /**
+   * Fotos sueltas o pegadas (HIG «Drag and drop» / «Entering data», 19-09-2026):
+   * en el PC, arrastrar desde el explorador o pegar del portapapeles es más
+   * rápido que ir a elegir archivo. Van con etiqueta «Foto» (la genérica): el
+   * técnico la cambia después si corresponde («Antes»/«Después» solo tienen
+   * sentido al elegirlas a propósito).
+   */
+  const alSoltarOPegar = (archivos: readonly File[]) => {
+    const imagenes = archivos.filter((a) => a.type.startsWith('image/'))
+    if (!imagenes.length) return
+    etiquetaPendiente.current = 'foto'
+    alElegir(imagenes)
+  }
+
+  const alElegir = (lista: FileList | readonly File[] | null) => {
     if (!lista?.length) return
     const libres = MAX_FOTOS_EVENTO - fotos.length - subidas.length
     const archivos = Array.from(lista).slice(0, Math.max(0, libres))
@@ -800,6 +816,24 @@ export function EventoBitacoraSheet({
     void subirEnTanda(nuevas)
     if (inputRef.current) inputRef.current.value = ''
   }
+
+  // Ctrl+V con una imagen, desde CUALQUIER lugar de la hoja abierta: el evento
+  // `paste` llega al elemento con foco (un campo, o la hoja misma), casi nunca al
+  // bloque de Fotos, así que se escucha en el documento. Solo actúa si el
+  // portapapeles trae imágenes: pegar texto en un campo sigue igual.
+  const alSoltarOPegarRef = useRef(alSoltarOPegar)
+  alSoltarOPegarRef.current = alSoltarOPegar
+  useEffect(() => {
+    if (!open) return
+    const alPegar = (e: ClipboardEvent) => {
+      const archivos = Array.from(e.clipboardData?.files ?? [])
+      if (!archivos.some((a) => a.type.startsWith('image/'))) return
+      e.preventDefault()
+      alSoltarOPegarRef.current(archivos)
+    }
+    document.addEventListener('paste', alPegar)
+    return () => document.removeEventListener('paste', alPegar)
+  }, [open])
 
   /**
    * Saca de la hoja una foto que todavía sube o que no va a subir nunca. Si
@@ -1577,8 +1611,26 @@ export function EventoBitacoraSheet({
         </div>
 
         {/* Fotos */}
-        <div>
+        <div
+          onDragOver={(e) => {
+            // Sin preventDefault el navegador no deja soltar (HIG «Drag and drop»).
+            e.preventDefault()
+            setArrastrandoFoto(true)
+          }}
+          onDragLeave={(e) => {
+            // `dragleave` también salta al pasar sobre un hijo del bloque: sin
+            // este filtro el borde punteado parpadea mientras se arrastra.
+            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setArrastrandoFoto(false)
+          }}
+          onDrop={(e) => {
+            e.preventDefault()
+            setArrastrandoFoto(false)
+            alSoltarOPegar(Array.from(e.dataTransfer.files))
+          }}
+          className={arrastrandoFoto ? 'rounded-ctl border-2 border-dashed border-primary/60' : 'border-2 border-dashed border-transparent'}
+        >
           <span className={ETIQUETA_CAMPO}>Fotos</span>
+          {arrastrandoFoto && <p className="mb-1.5 text-footnote text-muted-foreground">Suelta las fotos aquí</p>}
           <input
             ref={inputRef}
             type="file"
