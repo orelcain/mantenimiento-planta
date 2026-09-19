@@ -1,6 +1,7 @@
 import { useId, useMemo, useState, type ReactNode } from 'react'
 import { Loader2, Search } from 'lucide-react'
 import { buscarEquipos, type OpcionEquipo } from '@/services/bitacora/buscarEquipos'
+import { BITACORA_PLANTA } from '@/config/bitacora'
 
 /**
  * Campo «Equipo o área» con sugerencias MIENTRAS SE ESCRIBE desde la jerarquía
@@ -73,7 +74,10 @@ export function BuscadorEquipo({
   const [abierto, setAbierto] = useState(false)
   const [activo, setActivo] = useState(0)
 
-  const resultados = useMemo(() => buscarEquipos(opciones, texto, { max: 8, usados: recientes }), [opciones, texto, recientes])
+  const resultados = useMemo(
+    () => buscarEquipos(opciones, texto, { max: 8, usados: recientes, planta: BITACORA_PLANTA.nombre }),
+    [opciones, texto, recientes],
+  )
   const q = texto.trim()
   const coincideExacto = resultados.some((o) => plano(o.nombre) === plano(q))
   const mostrarRecientes = abierto && q.length < 2 && recientes.length > 0
@@ -160,8 +164,12 @@ export function BuscadorEquipo({
               {it.tipo === 'opcion' ? (
                 <>
                   <span className="text-body font-semibold leading-tight">{resaltar(it.o.nombre, q)}</span>
+                  {/* La PLANTA primero y destacada: hay 3 BAADER 142 y 3 KNURO
+                      en Chonchi y otras tantas en Yal, y en gris claro entre el
+                      área y el código no se leía cuál era cuál (Orel, 18-09). */}
                   <span className="text-caption text-muted-foreground">
-                    {[it.o.planta, it.o.area, it.o.tipo === 'area' ? 'Área' : it.o.codigo].filter(Boolean).join(' · ')}
+                    <span className="font-semibold text-foreground/80">{it.o.planta}</span>
+                    {[it.o.area, it.o.tipo === 'area' ? 'Área' : it.o.codigo].filter(Boolean).map((t) => ` · ${t}`).join('')}
                   </span>
                 </>
               ) : it.tipo === 'reciente' ? (
@@ -196,10 +204,14 @@ export function BuscadorEquipo({
                 key={o.id}
                 type="button"
                 onClick={() => onChange(o.nombre, o.id)}
-                className="min-h-[44px] rounded-full bg-muted-foreground/10 px-4 text-footnote font-semibold text-foreground transition-colors hover:bg-muted-foreground/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                className="flex min-h-[48px] flex-col justify-center rounded-card bg-muted-foreground/10 px-4 py-1.5 text-left text-footnote font-semibold text-foreground transition-colors hover:bg-muted-foreground/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               >
-                {o.nombre}
-                {o.codigo ? <span className="ml-1.5 font-normal text-muted-foreground tabular-nums">{o.codigo}</span> : null}
+                <span className="flex flex-col items-start leading-tight">
+                  <span>{o.nombre}</span>
+                  <span className="font-normal text-caption text-muted-foreground">
+                    {[o.planta, o.tipo === 'area' ? 'Área' : o.codigo].filter(Boolean).join(' · ')}
+                  </span>
+                </span>
               </button>
             ))}
           </div>

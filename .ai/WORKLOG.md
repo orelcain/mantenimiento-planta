@@ -21,6 +21,19 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-19 · Bitacora ronda 53 · La PLANTA visible y primero en el buscador
+- Orel: «tanto baader 142 como knuro tenemos 3 para Chonchi y 3 para Yal, debemos poder distinguirlas en el buscador». La lista principal YA mostraba la planta, pero:
+  1. **La caja de «no quedó vinculado» (ronda 51) NO la mostraba**: solo nombre + código SAP. Un técnico de Chonchi podía vincular la Baader de Yal sin enterarse. Defecto de lo recién construido.
+  2. **El orden ignoraba la planta**: buscando «BAADER» en una bitácora de Chonchi, el primer resultado era el de YAL (se vio en la verificación de la ronda 51 y no se le dio importancia).
+- Arreglado:
+  - `buscarEquipos(..., { planta })` suma **+20** a los de la planta de la bitácora. Pesa más que «es un equipo» (+5) y menos que empezar por el texto buscado (+100), para no tapar una coincidencia exacta de la otra planta. Lo pasa `BuscadorEquipo` con `BITACORA_PLANTA.nombre`.
+  - En la caja de sugerencias, cada opción va en DOS líneas: nombre arriba, «Planta Chonchi · 720004415» abajo en `text-caption`.
+  - En la lista principal, la planta va primero y en `font-semibold text-foreground/80`: entre el área y el código, en gris claro, no se leía cuál era cuál.
+- Verificado a 375 px con clicks reales: «KNURO» ofrece «KNURO N1 · Planta Chonchi · 720004415» y «KNURO N1 · Planta Yal · 720004416», Chonchi primero, sin desborde horizontal. Con «BAADER», la N3 de Chonchi pasó a encabezar.
+- Test nuevo: mismo nombre en las dos plantas, `buscarEquipos` con planta Chonchi devuelve el de Chonchi primero y con Yal el de Yal; sin planta, el desempate sigue siendo alfabético (comportamiento anterior intacto).
+- tsc 0; eslint 30; vitest 2.813; auditorias OK; build OK.
+- Estado: HECHO.
+
 ## 2026-09-19 · Bitacora ronda 52 · Las tres areas que faltaban en el arbol
 - Orel confirmo lo que faltaba para cerrar la ronda 51: **HG es EVISCERADO** y Filete es FILETE. No se asumio — el arbol de PROCESO de Chonchi no tiene ningun area llamada «HG».
 - Creadas en `hierarchy` (ya en produccion, `scripts/crear-areas-conjuntos-bitacora.js --write`):
