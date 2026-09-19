@@ -13,7 +13,9 @@ import {
   addEdge,
   applyEdgeChanges,
   applyNodeChanges,
+  useConnection,
   useReactFlow,
+  useStore,
   type Connection,
   type Edge,
   type EdgeChange,
@@ -83,7 +85,43 @@ function tonoPeso(peso: number | null): 'serie' | 'paralelo' | 'fuera' {
 }
 const BORDE = { serie: 'border-ink-crit', paralelo: 'border-ink-warn', fuera: 'border-dashed border-muted-foreground/50' } as const
 const TINTA = { serie: 'text-ink-crit', paralelo: 'text-ink-warn', fuera: 'text-muted-foreground' } as const
-const PUNTO = '!size-3.5 !border-2 !border-card !bg-primary'
+/**
+ * Puntos de unión fáciles de acertar (Orel, 19-09-2026: «no funcionan bien las uniones»).
+ * A 37 % de zoom un punto de 14 px mide 4 px en pantalla. Por eso:
+ * - el punto de SALIDA tiene un área de agarre de ≥ 28 px en pantalla a cualquier zoom
+ *   (el punto visible sigue chico);
+ * - mientras se arrastra una flecha, TODA la tarjeta recibe la unión (no hay que
+ *   acertarle al punto de llegada). Fuera de ese momento el área no intercepta nada y la
+ *   tarjeta se arrastra normal.
+ */
+function PuntosUnion({ claro }: { claro?: boolean }) {
+  const zoom = useStore((st) => st.transform[2])
+  const uniendo = useConnection((c) => c.inProgress)
+  const agarre = Math.max(14, 28 / zoom)
+  const punto = claro ? 'size-3.5 border-2 border-primary bg-primary-foreground' : 'size-3.5 border-2 border-card bg-primary'
+  return (
+    <>
+      <Handle
+        type="target"
+        position={Position.Left}
+        isConnectableStart={false}
+        className="!absolute !inset-0 !size-full !translate-x-0 !translate-y-0 !transform-none !rounded-card !border-0 !bg-transparent"
+        style={{ pointerEvents: uniendo ? 'all' : 'none' }}
+      />
+      {/* Solo marca visual del lado de llegada. */}
+      <span aria-hidden className={`pointer-events-none absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full ${punto} ${uniendo ? 'ring-4 ring-primary/30' : ''}`} />
+      <Handle
+        type="source"
+        position={Position.Right}
+        title="Arrastra para unir"
+        className="!flex !items-center !justify-center !rounded-full !border-0 !bg-transparent"
+        style={{ width: agarre, height: agarre }}
+      >
+        <span aria-hidden className={`pointer-events-none rounded-full ${punto}`} />
+      </Handle>
+    </>
+  )
+}
 const SELECCION = 'ring-4 ring-primary/35'
 
 function NodoMaquina({ data, selected }: NodeProps<Node<DatosMaquina>>) {
@@ -93,7 +131,6 @@ function NodoMaquina({ data, selected }: NodeProps<Node<DatosMaquina>>) {
       style={{ width: NODO.ancho }}
       className={`rounded-card border-2 bg-card px-3 py-2 shadow-[0_1px_4px_rgba(0,0,0,0.12)] ${BORDE[tono]} ${selected ? SELECCION : ''} ${tono === 'fuera' ? 'opacity-85' : ''}`}
     >
-      <Handle type="target" position={Position.Left} className={PUNTO} />
       <p className="break-words text-[12px] font-semibold leading-tight">{data.nombre}</p>
       <p className={`text-[17px] font-bold tabular-nums leading-snug ${TINTA[tono]}`}>
         {data.otraPlanta ? `de ${data.otraPlanta}` : data.peso == null ? '0 %' : formatoPeso(data.peso)}
@@ -103,7 +140,7 @@ function NodoMaquina({ data, selected }: NodeProps<Node<DatosMaquina>>) {
         {data.componentes ? ` · +${data.componentes} comp.` : ''}
         {data.manual ? ' · manual' : ''}
       </p>
-      <Handle type="source" position={Position.Right} className={PUNTO} />
+      <PuntosUnion />
     </div>
   )
 }
@@ -117,13 +154,12 @@ function NodoServicio({ data, selected }: NodeProps<Node<DatosServicio>>) {
       style={{ width: NODO.ancho, borderColor: APOYO }}
       className={`rounded-card border-2 border-dashed bg-card px-3 py-2 shadow-[0_1px_4px_rgba(0,0,0,0.12)] ${selected ? SELECCION : ''}`}
     >
-      <Handle type="target" position={Position.Left} className={PUNTO} />
       <p className="break-words text-[12px] font-semibold leading-tight">{data.nombre}</p>
       <p className="text-[12px] font-bold leading-snug" style={{ color: APOYO }}>
         indirecto
       </p>
       <p className="text-[10.5px] leading-tight text-muted-foreground">{texto || 'sin unir: une con una flecha a la línea que abastece'}</p>
-      <Handle type="source" position={Position.Right} className={PUNTO} />
+      <PuntosUnion />
     </div>
   )
 }
@@ -131,9 +167,8 @@ function NodoServicio({ data, selected }: NodeProps<Node<DatosServicio>>) {
 function NodoEntrada({ data, selected }: NodeProps<Node<DatosEntrada>>) {
   return (
     <div className={`flex min-h-[44px] w-[124px] items-center rounded-full bg-primary px-4 text-[12px] font-semibold text-primary-foreground shadow-[0_1px_4px_rgba(0,0,0,0.15)] ${selected ? SELECCION : ''}`}>
-      <Handle type="target" position={Position.Left} className="!size-3 !border-2 !border-primary !bg-primary-foreground" />
       Entrada {data.linea}
-      <Handle type="source" position={Position.Right} className="!size-3.5 !border-2 !border-primary !bg-primary-foreground" />
+      <PuntosUnion claro />
     </div>
   )
 }

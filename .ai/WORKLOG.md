@@ -21,6 +21,18 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-19 · Admin · Editor de líneas: uniones fáciles de acertar
+
+- Causa medida: a 37 % de zoom (el encuadre inicial) cada punto de unión medía **4 px** en pantalla
+  y había que soltar la flecha justo sobre el punto de llegada.
+- `PuntosUnion`: el punto de salida tiene área de agarre ≥ 28 px en pantalla a cualquier zoom
+  (`28 / zoom`, punto visible igual de chico); mientras se arrastra una flecha, TODA la tarjeta es
+  el punto de llegada (handle `target` a tamaño completo, `pointer-events` solo con
+  `useConnection().inProgress`, así no bloquea arrastrar la tarjeta). React Flow prioriza el handle
+  bajo el cursor (`elementFromPoint`), por eso funciona.
+- Verificado: soltar en el centro de una tarjeta crea la flecha (43→44) y la tarjeta se sigue
+  arrastrando.
+
 ## 2026-09-19 · Admin · Editor de líneas: contenedores que crecen, árbol completo y elementos manuales
 
 - **Contenedores**: la pertenencia a una zona es explícita (`NodoGrafo.zona`; `''` = sin contenedor;
