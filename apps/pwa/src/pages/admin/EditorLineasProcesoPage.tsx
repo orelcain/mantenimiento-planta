@@ -19,6 +19,7 @@ import {
   type Connection,
   type Edge,
   type EdgeChange,
+  type FinalConnectionState,
   type Node,
   type NodeChange,
   type NodeProps,
@@ -380,10 +381,12 @@ function Editor() {
   const limites = useMemo(() => limitesDeZonas(grafo), [grafo])
   const contenedorDe = useMemo(() => new Map(grafo.nodos.map((n) => [n.id, zonaDeNodo(lineas, n)])), [grafo, lineas])
 
+  const yaUnidos = useMemo(() => new Set(origenUnir ? edges.filter((e) => e.source === origenUnir).map((e) => e.target) : []), [edges, origenUnir])
   const vista = useMemo(
     () =>
       nodes.map((n): Node => {
-        const marca = n.id === origenUnir ? 'rounded-card ring-4 ring-primary' : undefined
+        // En modo unir: el origen con anillo y, atenuados, los que YA están unidos a él.
+        const marca = n.id === origenUnir ? 'rounded-card ring-4 ring-primary' : yaUnidos.has(n.id) ? 'opacity-40' : undefined
         if (n.type === 'zona') {
           const l = limites.get(n.id.slice('zona:'.length))
           return {
@@ -422,7 +425,7 @@ function Editor() {
           data,
         }
       }),
-    [nodes, indice, pesos, servicios, relaciones, nombreLinea, zonaResaltada, deOtraPlanta, nombreDe, limites, contenedorDe, editable, origenUnir],
+    [nodes, indice, pesos, servicios, relaciones, nombreLinea, zonaResaltada, deOtraPlanta, nombreDe, limites, contenedorDe, editable, origenUnir, yaUnidos],
   )
 
   const vistaAristas = useMemo(
@@ -430,12 +433,12 @@ function Editor() {
       edges.map((e): Edge => {
         const apoyo = servicios.has(e.source) || servicios.has(e.target)
         const entre = !apoyo && esEntrada(e.target)
-        const color = apoyo ? APOYO : entre ? 'rgb(var(--muted-foreground))' : 'rgb(var(--primary))'
+        const color = apoyo ? APOYO : entre ? 'rgb(var(--muted-foreground))' : 'rgb(var(--brand))'
         return {
           ...e,
           type: 'default',
           ariaLabel: `Flecha de ${nombreDe(e.source)} a ${nombreDe(e.target)}`,
-          markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16, color },
+          markerEnd: { type: MarkerType.ArrowClosed, width: 20, height: 20, color },
           ...(apoyo
             ? {
                 label: servicios.has(e.source) ? 'abastece' : 'recibe',
@@ -445,11 +448,13 @@ function Editor() {
                 labelBgBorderRadius: 6,
               }
             : {}),
+          // `non-scaling-stroke`: el trazo mantiene su grosor en pantalla aunque el lienzo se
+          // aleje (a 32 % una línea de 2,5 px se veía de 0,8 px).
           style: apoyo
-            ? { stroke: color, strokeWidth: 2, strokeDasharray: '2 6', strokeLinecap: 'round' }
+            ? { stroke: color, strokeWidth: 2, strokeDasharray: '2 6', strokeLinecap: 'round', vectorEffect: 'non-scaling-stroke' }
             : entre
-              ? { stroke: color, strokeWidth: 2, strokeDasharray: '6 5' }
-              : { stroke: color, strokeWidth: 2.5 },
+              ? { stroke: color, strokeWidth: 2, strokeDasharray: '6 5', vectorEffect: 'non-scaling-stroke' }
+              : { stroke: color, strokeWidth: 2.5, vectorEffect: 'non-scaling-stroke' },
         }
       }),
     [edges, servicios, nombreDe],
@@ -562,8 +567,7 @@ function Editor() {
         return
       }
       if (edges.some((e) => e.source === origenUnir && e.target === id)) {
-        toast({ title: 'Esos dos ya están unidos' })
-        setOrigenUnir(null)
+        toast({ title: `${nombreDe(origenUnir)} y ${nombreDe(id)} ya estaban unidos` })
         return
       }
       registrar()
@@ -571,7 +575,7 @@ function Editor() {
       // Encadenar: el destino queda listo para ser el origen del siguiente tramo.
       setOrigenUnir(id)
     },
-    [origenUnir, edges, registrar, toast],
+    [origenUnir, edges, registrar, toast, nombreDe],
   )
   useEffect(() => {
     if (!modoUnir) return
@@ -583,6 +587,20 @@ function Editor() {
     window.addEventListener('keydown', tecla)
     return () => window.removeEventListener('keydown', tecla)
   }, [modoUnir, origenUnir])
+
+  // Si la unión se rechaza, hay que DECIRLO: rechazar en silencio se siente como «no funciona»
+  // (Orel, 19-09-2026: las dos bombas que intentaba unir ya estaban unidas al ducto).
+  const alTerminarUnion = useCallback(
+    (_ev: MouseEvent | TouchEvent, estado: FinalConnectionState) => {
+      const de = estado.fromNode?.id
+      const a = estado.toNode?.id
+      if (estado.isValid || !de || !a) return
+      if (de === a) return
+      if (edges.some((e) => e.source === de && e.target === a)) toast({ title: `${nombreDe(de)} y ${nombreDe(a)} ya estaban unidos` })
+      else if (edges.some((e) => e.source === a && e.target === de)) toast({ title: `Ya hay una flecha al revés: ${nombreDe(a)} → ${nombreDe(de)}` })
+    },
+    [edges, toast, nombreDe],
+  )
 
   const esValida = useCallback((c: Connection | Edge) => c.source !== c.target && !edges.some((e) => e.source === c.source && e.target === c.target), [edges])
 
@@ -985,6 +1003,7 @@ function Editor() {
               onNodesChange={editable ? onNodesChange : undefined}
               onEdgesChange={editable ? onEdgesChange : undefined}
               onConnect={editable ? onConnect : undefined}
+              onConnectEnd={editable ? alTerminarUnion : undefined}
               onBeforeDelete={async () => {
                 registrar()
                 return true
@@ -1042,7 +1061,7 @@ function Editor() {
                 maskColor="rgb(var(--background) / 0.6)"
                 nodeColor={(n) => {
                   if (n.type === 'zona') return (n.data as DatosZona).apoyo ? 'rgb(var(--cat-6-ink) / 0.12)' : 'rgb(var(--muted-foreground) / 0.12)'
-                  if (n.type === 'entrada') return 'rgb(var(--primary))'
+                  if (n.type === 'entrada') return 'rgb(var(--brand))'
                   if (n.type === 'servicio') return APOYO
                   const t = tonoPeso((n.data as DatosMaquina).peso)
                   return t === 'serie' ? 'rgb(var(--ink-crit))' : t === 'paralelo' ? 'rgb(var(--ink-warn))' : 'rgb(var(--muted-foreground) / 0.5)'
