@@ -21,6 +21,14 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-19 · Admin · Editor de líneas: un círculo de flechas dejaba todo en 0 % sin decirlo
+
+- En las líneas GUARDADAS de Chonchi, Acopio entero marcaba 0 %: hay una flecha de vuelta
+  (`BOMBA VACIO ANILLO LIQUIDO N2 → DUCTO SUCCION PECES SISTEMA N1`) que arma un círculo, y
+  `pesosPorLinea` (Kahn) deja sin flujo a los nodos atrapados — correcto, pero mudo.
+- `PesoEnLinea.ciclo`: la tarjeta dice «en círculo · hay una flecha de vuelta» en vez de un 0 %
+  sin explicación, y el inspector nombra la flecha sobrante para quitarla. Test nuevo del caso.
+
 ## 2026-09-19 · Admin · ⚠ LAS FLECHAS DEL EDITOR NUNCA SE VIERON: `--primary` no existe
 
 - Orel: «pero las flechas no se ven». Causa REAL: el color era `rgb(var(--primary))` y en esta app

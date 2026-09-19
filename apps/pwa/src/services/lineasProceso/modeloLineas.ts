@@ -69,6 +69,12 @@ export interface PesoEnLinea {
   lineaId: string
   /** Parte del flujo de su línea que pasa por la máquina (0–1). */
   peso: number
+  /**
+   * La máquina está dentro de un CÍRCULO de flechas (A → B → A): el flujo no se puede
+   * repartir y queda en 0. Hay que decirlo, si no el 0 % parece un error del editor
+   * (Orel, 19-09-2026: Acopio entero marcaba 0 % por una flecha de vuelta).
+   */
+  ciclo?: boolean
 }
 
 /**
@@ -117,7 +123,8 @@ export function pesosPorLinea(g: Pick<GrafoLineas, 'lineas' | 'nodos' | 'aristas
     }
     for (const n of alcanzables) {
       if (n === ini || res.has(n)) continue
-      res.set(n, { lineaId: l.id, peso: pendientes.get(n) ? 0 : Math.min(1, flujo.get(n) ?? 0) })
+      const atascado = !!pendientes.get(n)
+      res.set(n, { lineaId: l.id, peso: atascado ? 0 : Math.min(1, flujo.get(n) ?? 0), ...(atascado ? { ciclo: true } : {}) })
     }
   }
   return res

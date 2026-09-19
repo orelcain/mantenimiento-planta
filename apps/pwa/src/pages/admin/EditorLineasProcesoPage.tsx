@@ -45,6 +45,7 @@ import {
   zonaDeNodo,
   type GrafoLineas,
   type LineaProceso,
+  type PesoEnLinea,
 } from '@/services/lineasProceso/modeloLineas'
 import { DE_OTRA_PLANTA, propuestaChonchi } from '@/services/lineasProceso/propuestaChonchi'
 import { RAIZ_SITIO_CHONCHI, guardarLineas, indiceArbol, leerLineas } from '@/services/lineasProceso/lineasProceso.service'
@@ -70,7 +71,7 @@ const MIME = 'application/x-equipo'
 const GRILLA: [number, number] = [16, 16]
 const APOYO = 'rgb(var(--cat-6-ink))'
 
-type DatosMaquina = { nombre: string; peso: number | null; linea: string | null; contenedor: string | null; componentes: number; otraPlanta?: string; manual?: boolean }
+type DatosMaquina = { nombre: string; peso: number | null; linea: string | null; contenedor: string | null; componentes: number; otraPlanta?: string; manual?: boolean; ciclo?: boolean }
 type DatosServicio = { nombre: string; abastece: string[]; recibe: string[] }
 type DatosEntrada = { linea: string }
 type DatosZona = { nombre: string; w: number; h: number; apoyo: boolean; resaltada: boolean; onMover?: (ev: ReactPointerEvent) => void }
@@ -152,10 +153,10 @@ function NodoMaquina({ data, selected }: NodeProps<Node<DatosMaquina>>) {
     >
       <p className="break-words text-[12px] font-semibold leading-tight">{data.nombre}</p>
       <p className={`text-[17px] font-bold tabular-nums leading-snug ${TINTA[tono]}`}>
-        {data.otraPlanta ? `de ${data.otraPlanta}` : data.peso == null ? '0 %' : formatoPeso(data.peso)}
+        {data.otraPlanta ? `de ${data.otraPlanta}` : data.ciclo ? 'en círculo' : data.peso == null ? '0 %' : formatoPeso(data.peso)}
       </p>
       <p className="text-[10.5px] leading-tight text-muted-foreground">
-        {data.otraPlanta ? 'no cuenta en esta planta' : data.linea ? `de ${data.linea}` : `fuera de la línea${data.contenedor ? ` · ${data.contenedor}` : ''}`}
+        {data.otraPlanta ? 'no cuenta en esta planta' : data.ciclo ? 'hay una flecha de vuelta' : data.linea ? `de ${data.linea}` : `fuera de la línea${data.contenedor ? ` · ${data.contenedor}` : ''}`}
         {data.componentes ? ` · +${data.componentes} comp.` : ''}
         {data.manual ? ' · manual' : ''}
       </p>
@@ -416,6 +417,7 @@ function Editor() {
           linea: p ? (nombreLinea.get(p.lineaId) ?? null) : null,
           contenedor: cont ? (nombreLinea.get(cont) ?? null) : null,
           manual: esManual(n.id),
+          ciclo: p?.ciclo,
         }
         return {
           ...n,
@@ -600,6 +602,15 @@ function Editor() {
       else if (edges.some((e) => e.source === a && e.target === de)) toast({ title: `Ya hay una flecha al revés: ${nombreDe(a)} → ${nombreDe(de)}` })
     },
     [edges, toast, nombreDe],
+  )
+
+  // La flecha de vuelta que arma el círculo (A → B y B → A), para poder nombrarla.
+  const vueltaDe = useCallback(
+    (id: string) => {
+      const e = edges.find((x) => x.target === id && edges.some((y) => y.source === id && y.target === x.source))
+      return e ? `${nombreDe(e.source)} → ${nombreDe(e.target)}` : undefined
+    },
+    [edges, nombreDe],
   )
 
   const esValida = useCallback((c: Connection | Edge) => c.source !== c.target && !edges.some((e) => e.source === c.source && e.target === c.target), [edges])
@@ -938,7 +949,7 @@ function Editor() {
               <Plus /> Elemento manual
             </Button>
             <p className="text-caption text-muted-foreground">
-              Toda la jerarquía, con o sin código. Arrastra al lienzo (o toca). Para unir, arrastra desde el punto azul. Mayús + arrastre selecciona varios. Supr quita · Ctrl+Z deshace.
+              Toda la jerarquía, con o sin código. Arrastra al lienzo (o toca). Para unir dos equipos, usa «Unir equipos» arriba: tocas uno y después el que sigue. Mayús + arrastre selecciona varios. Supr quita · Ctrl+Z deshace.
             </p>
             {consulta.trim() ? (
               <ul className="flex flex-col" aria-label="Resultados">
@@ -1128,6 +1139,7 @@ function Editor() {
                 hijos={indice.get(seleccionado.id)?.hijos ?? []}
                 enLienzo={enLienzo}
                 peso={pesos.get(seleccionado.id)}
+                vuelta={vueltaDe(seleccionado.id)}
                 lineaNombre={(id) => nombreLinea.get(id) ?? id}
                 servicio={servicios.has(seleccionado.id) ? relaciones.get(seleccionado.id) : undefined}
                 otraPlanta={deOtraPlanta.get(seleccionado.id)}
@@ -1256,6 +1268,7 @@ function FichaNodo({
   hijos,
   enLienzo,
   peso,
+  vuelta,
   lineaNombre,
   servicio,
   otraPlanta,
@@ -1267,12 +1280,13 @@ function FichaNodo({
   onQuitar,
 }: {
   nodo: Node
+  vuelta?: string
   nombre: string
   codigo: string
   padre?: string
   hijos: { id: string; nombre: string }[]
   enLienzo: Set<string>
-  peso?: { lineaId: string; peso: number }
+  peso?: PesoEnLinea
   lineaNombre: (id: string) => string
   servicio?: { abastece: string[]; recibe: string[] }
   otraPlanta?: string
@@ -1326,6 +1340,14 @@ function FichaNodo({
             {servicio.recibe.length ? `Recibe de ${servicio.recibe.map(lineaNombre).join(', ')}. ` : ''}
             {!servicio.abastece.length && !servicio.recibe.length ? 'Sin unir: una flecha hacia una línea dice que la abastece; desde una línea, que recibe de ella. ' : ''}
             Si falla, la línea sigue un rato: influye, pero no suma % de parada.
+          </p>
+        </div>
+      ) : peso?.ciclo ? (
+        <div className="flex flex-col gap-2">
+          <p className="text-title3 text-ink-warn">En un círculo de flechas</p>
+          <p className="text-footnote text-muted-foreground">
+            El flujo vuelve sobre sí mismo, así que no se puede repartir y este equipo queda sin porcentaje.
+            {vuelta ? ` Sobra la flecha de vuelta: ${vuelta}.` : ''} Selecciónala en el lienzo y quítala.
           </p>
         </div>
       ) : peso ? (
