@@ -1326,6 +1326,20 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Líneas de proceso de la planta como grafo (editor del panel admin, 19-09-2026):
+    // qué máquinas forman cada línea y cómo fluye el producto. La leen el editor y
+    // el historial de la bitácora (para pesar las paradas por línea); solo admin la edita.
+    match /lineasProceso/{plantId} {
+      allow read: if isActiveUser() || paseBitacoraActivo();
+      allow create, update: if isAdmin()
+        && isValidDocSize()
+        && request.resource.data.version == 1
+        && request.resource.data.lineas is list && request.resource.data.lineas.size() <= 20
+        && request.resource.data.nodos is list && request.resource.data.nodos.size() <= 400
+        && request.resource.data.aristas is list && request.resource.data.aristas.size() <= 800;
+      allow delete: if isAdmin();
+    }
+
     // Lista de técnicos de la bitácora: ajustes sobre la planilla del calendario
     // (agregados, ocultos, renombres). Un doc por planta. El calendario no se toca.
     match /bitacoraConfig/{plantId} {

@@ -74,6 +74,7 @@ const PermissionsPage = lazyWithReload(() => import('@/pages/admin/PermissionsPa
 const ShoplogixCredentialsPage = lazyWithReload(() => import('@/pages/admin/ShoplogixCredentialsPage').then((mod) => ({ default: mod.ShoplogixCredentialsPage })))
 const AdminPanelPage = lazyWithReload(() => import('@/pages/admin/AdminPanelPage').then((mod) => ({ default: mod.AdminPanelPage })))
 const MachineCapacityPage = lazyWithReload(() => import('@/pages/admin/MachineCapacityPage').then((mod) => ({ default: mod.MachineCapacityPage })))
+const EditorLineasProcesoPage = lazyWithReload(() => import('@/pages/admin/EditorLineasProcesoPage'))
 const ShoplogixNotificationsConfigPage = lazyWithReload(() => import('@/pages/admin/ShoplogixNotificationsConfigPage').then((mod) => ({ default: mod.ShoplogixNotificationsConfigPage })))
 const TelegramSyncPage = lazyWithReload(() => import('@/pages/admin/TelegramSyncPage').then((mod) => ({ default: mod.TelegramSyncPage })))
 const PowerBIExportPage = lazyWithReload(() => import('@/pages/admin/PowerBIExportPage').then((mod) => ({ default: mod.PowerBIExportPage })))
@@ -343,6 +344,18 @@ export function App() {
                   element={
                     <Suspense fallback={<LoadingScreen />}>
                       <BitacoraDevPage />
+                    </Suspense>
+                  }
+                />
+              )}
+              {/* Solo desarrollo: el editor de líneas sin el paso de contraseña del panel
+                  admin, para verificarlo en local (lee Firestore con la sesión abierta). */}
+              {import.meta.env.DEV && (
+                <Route
+                  path="/dev/lineas-proceso"
+                  element={
+                    <Suspense fallback={<LoadingScreen />}>
+                      <EditorLineasProcesoPage />
                     </Suspense>
                   }
                 />
@@ -810,6 +823,15 @@ export function App() {
                 <RequireReAuth reason="antes de configurar la velocidad nameplate de las Baaders">
                   <Suspense fallback={<LoadingScreen />}>
                     <MachineCapacityPage />
+                  </Suspense>
+                </RequireReAuth>
+              </AdminRoute>
+            } />
+            <Route path="admin/lineas-proceso" element={
+              <AdminRoute>
+                <RequireReAuth reason="antes de editar las líneas de proceso">
+                  <Suspense fallback={<LoadingScreen />}>
+                    <EditorLineasProcesoPage />
                   </Suspense>
                 </RequireReAuth>
               </AdminRoute>

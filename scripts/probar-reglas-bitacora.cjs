@@ -72,6 +72,24 @@ const CASOS_TECNICOS = [
   ['Usuario inactivo ajusta la lista maestra', 'DENY', { method: 'create', uid: 'tecnico1', col: 'bitacoraConfig', id: 'chonchi', data: { agregados: [], ocultos: [], renombres: {}, actualizadoPor: 'tecnico1' } }, usuario(false, 'tecnico')],
 ]
 
+// Líneas de proceso (editor del panel admin, 19-09-2026): solo admin escribe; el grafo tiene tope.
+const grafoLineas = (extra = {}) => ({
+  version: 1,
+  lineas: [{ id: 'eviscerado', nombre: 'Eviscerado', zona: { x: 0, y: 0, w: 100, h: 100 } }],
+  nodos: [{ id: 'in:eviscerado', x: 0, y: 0 }, { id: 'baader1', x: 10, y: 0 }],
+  aristas: [{ a: 'in:eviscerado', b: 'baader1' }],
+  actualizadoPor: 'Danilo Cortes',
+  ...extra,
+})
+const CASOS_LINEAS = [
+  ['Admin guarda las líneas de proceso', 'ALLOW', { method: 'create', uid: 'jefe', col: 'lineasProceso', id: 'chonchi', data: grafoLineas() }, usuario(true, 'admin')],
+  ['Técnico guarda las líneas de proceso', 'DENY', { method: 'create', uid: 'tecnico1', col: 'lineasProceso', id: 'chonchi', data: grafoLineas() }, usuario(true, 'tecnico')],
+  ['Líneas con otra versión del formato', 'DENY', { method: 'create', uid: 'jefe', col: 'lineasProceso', id: 'chonchi', data: grafoLineas({ version: 2 }) }, usuario(true, 'admin')],
+  ['Líneas con 401 nodos', 'DENY', { method: 'create', uid: 'jefe', col: 'lineasProceso', id: 'chonchi', data: grafoLineas({ nodos: Array(401).fill({ id: 'x', x: 0, y: 0 }) }) }, usuario(true, 'admin')],
+  ['Técnico activo lee las líneas', 'ALLOW', { method: 'get', uid: 'tecnico1', col: 'lineasProceso', id: 'chonchi', previo: grafoLineas() }, usuario(true, 'tecnico')],
+  ['Usuario inactivo lee las líneas', 'DENY', { method: 'get', uid: 'tecnico1', col: 'lineasProceso', id: 'chonchi', previo: grafoLineas() }, usuario(false, 'tecnico')],
+]
+
 // Entrega de turno (pendientes que pasan al turno siguiente).
 const CASOS_ENTREGA = [
   ['Otro técnico CIERRA un pendiente de un turno anterior', 'ALLOW', { method: 'update', uid: 'tecnico2', col: 'bitacoraEventos', data: evento({ pendiente: false, cierre: { tipo: 'resuelto', turnoId: '2026-09-16_noche', porNombre: 'Diego Cardenas', eventoId: 'r1', motivo: null } }), previo: evento({ pendiente: true }) }, usuario(true, 'tecnico')],
@@ -250,6 +268,7 @@ const CASOS_COOPERATIVA = [
   if (contenido.includes('function tienePaseBitacora')) casos.push(...CASOS_PASE)
   if (contenido.includes("'equipoCodigo' in d")) casos.push(...CASOS_REPUESTOS)
   if (contenido.includes('function turnoMovible')) casos.push(...CASOS_MOVER_TURNO)
+  if (contenido.includes('/lineasProceso/')) casos.push(...CASOS_LINEAS)
 
   const testCases = casos.map(([, expectation, c, mocks]) => {
     const id = c.id ?? 'evento1'

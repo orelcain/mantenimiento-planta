@@ -28,6 +28,7 @@ import {
   LayoutDashboard,
   Send,
   BarChart3,
+  Workflow,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 
@@ -82,6 +83,13 @@ const ADMIN_ITEMS: AdminItem[] = [
     title: 'Barra lateral',
     description: 'Orden y visibilidad de los módulos del menú lateral',
     icon: <Layers className="size-4" />,
+    section: 'sensible',
+  },
+  {
+    to: '/admin/lineas-proceso',
+    title: 'Líneas de proceso',
+    description: 'Qué máquinas forman cada línea y cuánto pesa cada una: se unen con flechas',
+    icon: <Workflow className="size-4" />,
     section: 'sensible',
   },
   {
