@@ -35,7 +35,14 @@ export async function guardarLineas(plantId: string, g: GrafoLineas, quien: stri
   await setDoc(doc(db, COLECCION_LINEAS, plantId), {
     version: 1,
     lineas: g.lineas,
-    nodos: g.nodos.map((n) => ({ id: n.id, x: Math.round(n.x), y: Math.round(n.y) })),
+    // Sin `undefined`: esta app no activa `ignoreUndefinedProperties` y Firestore los rechaza.
+    nodos: g.nodos.map((n) => ({
+      id: n.id,
+      x: Math.round(n.x),
+      y: Math.round(n.y),
+      ...(n.zona !== undefined ? { zona: n.zona } : {}),
+      ...(n.nombre ? { nombre: n.nombre } : {}),
+    })),
     aristas: g.aristas.map(([a, b]) => ({ a, b })),
     actualizadoPor: quien,
     actualizadoEn: serverTimestamp(),
@@ -121,6 +128,39 @@ export function seccionesDeProceso(
   }
   return out
 }
+
+export interface NodoArbol {
+  nombre: string
+  codigo: string
+  area: boolean
+  /** Nombre del padre (para decir «componente de …»). */
+  padre?: string
+  /** Ruta de nombres desde la raíz del sitio (para mostrar dónde está al buscar). */
+  ruta: string[]
+  hijos: { id: string; nombre: string }[]
+}
+
+/** Índice de TODO el árbol bajo una raíz (áreas y equipos, con o sin código): la lista del editor. */
+export function indiceArbol(arbol: readonly HierarchyNodeWithChildren[], raizId: string): { raiz?: HierarchyNodeWithChildren; indice: Map<string, NodoArbol> } {
+  const indice = new Map<string, NodoArbol>()
+  const raiz = buscar(arbol, raizId)
+  const recorrer = (n: HierarchyNodeWithChildren, ruta: string[], padre?: string) => {
+    indice.set(n.id, {
+      nombre: n.nombre.trim(),
+      codigo: n.codigo ?? '',
+      area: esArea(n),
+      padre,
+      ruta,
+      hijos: n.children.map((h) => ({ id: h.id, nombre: h.nombre.trim() })),
+    })
+    for (const h of n.children) recorrer(h, [...ruta, n.nombre.trim()], n.nombre.trim())
+  }
+  if (raiz) for (const h of raiz.children) recorrer(h, [])
+  return { raiz, indice }
+}
+
+/** Raíz del sitio Chonchi en `hierarchy` (Planta Chonchi, Planta Yal, Acopio, Exteriores). */
+export const RAIZ_SITIO_CHONCHI = 'aq-in-cho'
 
 /** Nombre, código y padre de TODO equipo bajo las secciones (también los componentes): para dibujarlos. */
 export function indiceEquipos(arbol: readonly HierarchyNodeWithChildren[], secciones: readonly Seccion[]): Map<string, { nombre: string; codigo: string; padre?: string; hijos: { id: string; nombre: string }[] }> {

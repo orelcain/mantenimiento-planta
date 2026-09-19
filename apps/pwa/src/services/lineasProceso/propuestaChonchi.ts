@@ -1,5 +1,5 @@
 import type { GrafoLineas, LineaProceso, NodoGrafo } from './modeloLineas'
-import { PREFIJO_ENTRADA } from './modeloLineas'
+import { PREFIJO_ENTRADA, zonaDeNodo } from './modeloLineas'
 
 /**
  * Propuesta inicial de Chonchi, deducida del árbol (19-09-2026): se usa cuando
@@ -113,5 +113,5 @@ export function propuestaChonchi(idPorNombre: (nombre: string) => string | undef
   )
   riles.forEach((r) => une(cts, r))
 
-  return { version: 1, lineas: LINEAS_CHONCHI, nodos, aristas }
+  return { version: 1, lineas: LINEAS_CHONCHI, nodos: nodos.map((n) => ({ ...n, zona: zonaDeNodo(LINEAS_CHONCHI, n) })), aristas }
 }

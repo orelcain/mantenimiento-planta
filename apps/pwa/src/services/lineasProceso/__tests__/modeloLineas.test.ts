@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatoPeso, lineaEnPunto, pesosPorLinea, relacionesDeServicios, serviciosDe, type GrafoLineas } from '../modeloLineas'
+import { MARGEN_ZONA, NODO, formatoPeso, limitesDeZonas, lineaEnPunto, pesosPorLinea, relacionesDeServicios, serviciosDe, zonaDeNodo, type GrafoLineas } from '../modeloLineas'
 import { LINEAS_CHONCHI, propuestaChonchi } from '../propuestaChonchi'
 
 const L = [
@@ -85,6 +85,33 @@ describe('servicios de apoyo (influyen indirectamente)', () => {
     const r = relacionesDeServicios(g, pesosPorLinea(g))
     expect(r.get('agua')).toEqual({ abastece: ['evis'], recibe: [] })
     expect(r.get('riles')).toEqual({ abastece: [], recibe: ['evis'] })
+  })
+})
+
+describe('contenedores: pertenencia explícita y límites que siguen a sus equipos', () => {
+  it('la pertenencia manda sobre la posición', () => {
+    expect(zonaDeNodo(L, { id: 'b', x: 10, y: 10, zona: 'emp' })).toBe('emp')
+    expect(zonaDeNodo(L, { id: 'b', x: 10, y: 10 })).toBe('evis') // sin campo: por posición
+    expect(zonaDeNodo(L, { id: 'in:emp', x: 10, y: 10 })).toBe('emp') // una entrada es de su línea
+    expect(zonaDeNodo(L, { id: 'b', x: 10, y: 10, zona: '' })).toBeUndefined() // sacado del contenedor, aunque esté encima
+  })
+
+  it('empujar un equipo arriba y a la izquierda amplía su contenedor hacia ese lado', () => {
+    const lim = limitesDeZonas({ lineas: L, nodos: [{ id: 'b', x: -100, y: -80, zona: 'evis' }] })
+    expect(lim.get('evis')).toEqual({ x: -100 - MARGEN_ZONA.lado, y: -80 - MARGEN_ZONA.arriba, w: 1000 + 100 + MARGEN_ZONA.lado, h: 500 + 80 + MARGEN_ZONA.arriba })
+    // El otro contenedor no cambia.
+    expect(lim.get('emp')).toEqual(L[1]!.zona)
+  })
+
+  it('y hacia la derecha o abajo, aunque el equipo esté encima del contenedor vecino', () => {
+    const lim = limitesDeZonas({ lineas: L, nodos: [{ id: 'b', x: 1500, y: 600, zona: 'evis' }] })
+    expect(lim.get('evis')!.w).toBe(1500 + NODO.ancho + MARGEN_ZONA.lado)
+    expect(lim.get('evis')!.h).toBe(600 + NODO.alto + MARGEN_ZONA.abajo)
+  })
+
+  it('un servicio es servicio por pertenencia, aunque se haya movido fuera de la zona', () => {
+    const LA = [...L, { id: 'apoyo', nombre: 'S', tipo: 'apoyo' as const, zona: { x: 0, y: 600, w: 100, h: 100 } }]
+    expect([...serviciosDe({ lineas: LA, nodos: [{ id: 'agua', x: 5000, y: 5000, zona: 'apoyo' }] })]).toEqual(['agua'])
   })
 })
 
