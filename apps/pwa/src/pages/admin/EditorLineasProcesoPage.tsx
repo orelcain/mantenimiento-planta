@@ -96,20 +96,35 @@ const TINTA = { serie: 'text-ink-crit', paralelo: 'text-ink-warn', fuera: 'text-
  */
 function PuntosUnion({ claro }: { claro?: boolean }) {
   const zoom = useStore((st) => st.transform[2])
-  const uniendo = useConnection((c) => c.inProgress)
-  const agarre = Math.max(14, 28 / zoom)
+  // Unir arrastrando O con dos clics (clic en el punto de salida, clic en el destino).
+  const arrastrando = useConnection((c) => c.inProgress)
+  const conClic = useStore((st) => !!st.connectionClickStartHandle)
+  const uniendo = arrastrando || conClic
+  // Tope de 36 unidades: a zoom bajo el agarre no debe tapar media tarjeta ni a las vecinas
+  // (se robaba los clics para arrastrar la tarjeta).
+  const agarre = Math.min(36, Math.max(14, 28 / zoom))
   const punto = claro ? 'size-3.5 border-2 border-primary bg-primary-foreground' : 'size-3.5 border-2 border-card bg-primary'
   return (
     <>
+      {/* Toda la tarjeta recibe la unión mientras se une (id propio: el punto izquierdo es el de siempre). */}
       <Handle
         type="target"
+        id="toda"
         position={Position.Left}
         isConnectableStart={false}
         className="!absolute !inset-0 !size-full !translate-x-0 !translate-y-0 !transform-none !rounded-card !border-0 !bg-transparent"
         style={{ pointerEvents: uniendo ? 'all' : 'none' }}
       />
-      {/* Solo marca visual del lado de llegada. */}
-      <span aria-hidden className={`pointer-events-none absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full ${punto} ${uniendo ? 'ring-4 ring-primary/30' : ''}`} />
+      {/* Punto de llegada real (el que usan las flechas guardadas): también se le puede soltar o hacer clic. */}
+      <Handle
+        type="target"
+        position={Position.Left}
+        isConnectableStart={false}
+        className="!flex !items-center !justify-center !rounded-full !border-0 !bg-transparent"
+        style={{ width: agarre, height: agarre }}
+      >
+        <span aria-hidden className={`pointer-events-none rounded-full ${punto} ${uniendo ? 'ring-4 ring-primary/30' : ''}`} />
+      </Handle>
       <Handle
         type="source"
         position={Position.Right}
@@ -521,7 +536,8 @@ function Editor() {
   const onConnect = useCallback(
     (c: Connection) => {
       registrar()
-      setEdges((es) => addEdge({ ...c, id: `${c.source}->${c.target}` }, es))
+      // Sin ids de punto: las flechas se guardan solo como origen → destino.
+      setEdges((es) => addEdge({ source: c.source, target: c.target, sourceHandle: null, targetHandle: null, id: `${c.source}->${c.target}` }, es))
     },
     [registrar],
   )
