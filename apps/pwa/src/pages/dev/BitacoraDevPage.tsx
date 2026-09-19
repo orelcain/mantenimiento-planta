@@ -519,13 +519,13 @@ export const FUENTE_EJEMPLO: FuenteBitacora = {
   },
 }
 
-/** Historial de ejemplo: 10 turnos hacia atrás con paradas, ventanas y pendientes. */
+/** Historial de ejemplo: turnos hacia atrás (período elegido + el anterior) con paradas, ventanas y pendientes. */
 function useHistorialEjemplo(dias: number) {
   const eventos = useMemo(() => {
     const actual = turnoMantencionEn()
     const lista: EventoBitacora[] = []
     let t = actual
-    for (let i = 0; i < Math.min(30, dias * 3); i++) {
+    for (let i = 0; i < Math.min(90, dias * 6); i++) {
       const base = {
         plantId: BITACORA_PLANTA.id,
         turnoId: t.id,
@@ -576,9 +576,13 @@ function useHistorialEjemplo(dias: number) {
     }
     return lista
   }, [dias])
-  const filas = useMemo(() => filasPorTurno(eventos), [eventos])
-  const resumen = useMemo(() => resumirPeriodo(eventos, fechaDesde(dias), fechaLocal(new Date())), [eventos, dias])
-  return { eventos, filas, resumen, cargando: false, error: null as string | null }
+  const desde = fechaDesde(dias)
+  const actuales = useMemo(() => eventos.filter((e) => e.fechaTurno >= desde), [eventos, desde])
+  const anteriores = useMemo(() => eventos.filter((e) => e.fechaTurno < desde), [eventos, desde])
+  const filas = useMemo(() => filasPorTurno(actuales), [actuales])
+  const resumen = useMemo(() => resumirPeriodo(actuales, desde, fechaLocal(new Date())), [actuales, desde])
+  const resumenAnterior = useMemo(() => (anteriores.length ? resumirPeriodo(anteriores, fechaDesde(dias * 2), desde) : null), [anteriores, dias, desde])
+  return { eventos: actuales, filas, resumen, resumenAnterior, cargando: false, error: null as string | null }
 }
 
 export function BitacoraDevPage() {
