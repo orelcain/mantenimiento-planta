@@ -21,6 +21,16 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-19 · Bitacora ronda 57 · Lote 1 del HIG: sin cambio visible
+- Regla nueva de Orel: cada cambio en la PWA se revisa contra el HIG local (`[[feedback_revisar_hig_cada_cambio]]`). Primera revisión completa de la bitácora (agente, 12 hallazgos, ronda 56 en memoria) — este PR aplica los 5 que no cambian lo que se ve.
+- `navigator.storage.persist()` al abrir la bitácora, una vez por sesión (`useBitacoraTurno.ts`): sin esto, Safari puede borrar los cambios pendientes de IndexedDB con poca señal en planta.
+- Cmd/Ctrl+Enter guarda desde CUALQUIER campo del editor, incluido el textarea de Observaciones (antes solo funcionaba en los campos de hora). `Sheet` (piel) gana un `onKeyDown` opcional que no afecta a los otros 9 usos porque no lo pasan.
+- PDF y Excel MTTR: en el celular abren `navigator.share` (Outlook, WhatsApp) en vez de descargar directo — la planilla MTTR es el entregable que prueba el aporte de Mantención y quedaba en Descargas. Nuevo `services/bitacora/compartirArchivo.ts` (mismo patrón que `compartirWhatsapp.ts`); cae a la descarga de siempre en PC o si el navegador no admite compartir archivos.
+- «Reintentar»/«Quitar» de una foto que no subió: 32 px → 44 px (piso táctil del HIG y de DESIGN.md §3).
+- El editor pinta la MINIATURA de la foto (320 px), no la original de 1.600 px: se le había escapado a la ronda 47, que sí corrigió la lista.
+- Verificado: Ctrl+Enter llega al handler con `key: "Enter"` y `ctrlKey: true` (probado con un listener directo en el diálogo); la miniatura del editor mide 320×427 en vez de la original. tsc 0; eslint 30 (bajó de 31 con `logger.warn` en vez de `console.warn`); vitest 2.821; auditorías OK; build OK.
+- Estado: HECHO. Quedan del informe de 12: #1 (hora de inicio), #2 (Guardar sin decir qué falta) — mockup antes; #5, #6, #7, #10, #11 — sin mockup pero cambian lo que se ve; #12 (zoom/Dynamic Type) — decisión de Orel.
+
 ## 2026-09-19 · Bitacora ronda 56 · Medición turno a turno lista para el primer turno real
 - Estado medido: la bitácora sigue con los mismos 22 eventos; el 18-09 **no hubo producción** (Fiestas Patrias: los tres turnos de Shoplogix de ese día tienen `effectiveStart: null`, igual que el noche del 17). La falta de eventos es esperable, no una falla. La prueba de Orel con un turno real queda para cuando vuelva la producción.
 - `scripts/medir-bitacora.cjs [desde] [hasta]` (solo lectura): por turno, eventos y borradores, término cargado sobre eventos con hora, mediana del desfase inicio→creación, cuántos se registraron >2 h después, cuántos con el turno ya cerrado y paradas con minutos; más la distribución de impacto y tipo. Hora de Chile con su desfase real por fecha (Intl, America/Santiago), no un -3 fijo.

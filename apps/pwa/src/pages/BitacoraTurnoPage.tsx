@@ -492,9 +492,10 @@ export function BitacoraTurnoVista({
     setTrabajando('pdf')
     try {
       const { generarPdfBitacora } = await import('@/services/bitacora/bitacoraPdf')
-      const { fotosFallidas } = await generarPdfBitacora(datosCorreo)
+      const { fotosFallidas, via } = await generarPdfBitacora(datosCorreo)
+      if (via === 'cancelado') return
       toast({
-        title: 'PDF descargado',
+        title: via === 'compartido' ? 'PDF listo para enviar' : 'PDF descargado',
         description: fotosFallidas ? `${fotosFallidas} foto(s) no se pudieron incluir.` : undefined,
         variant: fotosFallidas ? 'default' : 'success',
       })
@@ -508,8 +509,15 @@ export function BitacoraTurnoVista({
   const bajarExcel = async () => {
     setTrabajando('excel')
     try {
-      await generarExcelRecoleccion(filasMttr, nombreExcelRecoleccion(turno))
-      toast({ title: 'Excel descargado', description: 'La planilla «Recoleccion MTTR» con los eventos del turno.', variant: 'success' })
+      // HIG «Activity views»: en el celular abre la hoja de compartir (Outlook,
+      // WhatsApp), no una descarga que hay que ir a buscar a la carpeta Descargas.
+      const via = await generarExcelRecoleccion(filasMttr, nombreExcelRecoleccion(turno))
+      if (via === 'cancelado') return
+      toast({
+        title: via === 'compartido' ? 'Excel listo para enviar' : 'Excel descargado',
+        description: 'La planilla «Recoleccion MTTR» con los eventos del turno.',
+        variant: 'success',
+      })
     } catch {
       toast({ title: 'No se pudo generar el Excel', variant: 'destructive' })
     } finally {

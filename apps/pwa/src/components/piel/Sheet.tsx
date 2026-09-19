@@ -26,9 +26,14 @@ export interface SheetProps {
    */
   size?: 'default' | 'wide'
   children?: React.ReactNode
+  /**
+   * Opcional: captura teclas en cualquier campo del panel (por ejemplo Cmd/Ctrl+Enter
+   * para guardar sin soltar el teclado). No afecta a un Sheet que no lo pase.
+   */
+  onKeyDown?: (e: React.KeyboardEvent<HTMLDivElement>) => void
 }
 
-export function Sheet({ open, onClose, title, description, actions, size = 'default', children }: SheetProps) {
+export function Sheet({ open, onClose, title, description, actions, size = 'default', children, onKeyDown }: SheetProps) {
   const panelRef = React.useRef<HTMLDivElement>(null)
   const returnFocusRef = React.useRef<HTMLElement | null>(null)
   // onClose en una ref: casi todos los que usan el Sheet le pasan una función
@@ -69,6 +74,7 @@ export function Sheet({ open, onClose, title, description, actions, size = 'defa
         role="dialog"
         aria-modal="true"
         tabIndex={-1}
+        onKeyDown={onKeyDown}
         className={cn(
           'relative w-full rounded-t-panel bg-card px-6 pb-8 pt-2.5',
           size === 'wide' ? 'max-w-[60rem]' : 'max-w-[30rem]',
