@@ -21,6 +21,13 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-19 · Bitacora ronda 56 · Medición turno a turno lista para el primer turno real
+- Estado medido: la bitácora sigue con los mismos 22 eventos; el 18-09 **no hubo producción** (Fiestas Patrias: los tres turnos de Shoplogix de ese día tienen `effectiveStart: null`, igual que el noche del 17). La falta de eventos es esperable, no una falla. La prueba de Orel con un turno real queda para cuando vuelva la producción.
+- `scripts/medir-bitacora.cjs [desde] [hasta]` (solo lectura): por turno, eventos y borradores, término cargado sobre eventos con hora, mediana del desfase inicio→creación, cuántos se registraron >2 h después, cuántos con el turno ya cerrado y paradas con minutos; más la distribución de impacto y tipo. Hora de Chile con su desfase real por fecha (Intl, America/Santiago), no un -3 fijo.
+- Validado contra la medición a mano del 18-09 sobre 16→17-09: 5/15 con término, 6 registrados >2 h después, 6 con el turno cerrado, mediana 31 min. Coincide cifra por cifra.
+- ⚠ Para listar los turnos de `shoplogix/chonchi/shifts` sin índice: `listDocuments()` + `getAll()`. Un `orderBy(documentId(), 'desc')` pide un índice compuesto de collectionGroup en producción: no crearlo solo para mirar.
+- Estado: HECHO. Sigue: correrlo después del primer turno real (lunes 21-09 si hay producción) y comparar contra la línea base de arriba.
+
 ## 2026-09-19 · Bitacora ronda 55 · «¿Cuánto duró?» para lo que se carga tarde
 - Orel confirmó la opción C del canvas: la carga a fin de turno es la norma (ronda 54: 6 de 15 eventos con hora se registraron más de 2 h después), así que se diseña para ella.
 - Hecho: cuando «Terminó ahora» no aplica porque el turno del evento ya terminó o empezó hace más de 2 h (`terminoAhora` → `turno-terminado` / `pasa-el-tope`), el editor muestra «¿Cuánto duró?» con 5 · 10 · 15 · 20 · 30 · 45 · 60 min (`DURACIONES_SUGERIDAS_MIN` en `config/bitacora.ts`). Un toque pone el término = inicio + N (`horaMasMinutos`, cruza medianoche). Reemplaza la línea «escribe la hora en que terminó» de la ronda 54.
