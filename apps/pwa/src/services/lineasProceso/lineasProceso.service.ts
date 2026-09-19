@@ -50,6 +50,10 @@ export interface EquipoDeSeccion {
   conjunto: boolean
   /** Cuántos componentes cuelgan de él en el árbol (pesan lo mismo que él). */
   componentes: number
+  /** Sus componentes directos (para «Desplegar componentes»). */
+  hijos: { id: string; nombre: string }[]
+  /** Si abastece a otra planta del sitio (p. ej. «Yal»): no cuenta en esta. */
+  otraPlanta?: string
 }
 
 export interface Seccion {
@@ -70,12 +74,14 @@ function buscar(nodos: readonly HierarchyNodeWithChildren[], id: string): Hierar
   return undefined
 }
 
-const aEquipo = (n: HierarchyNodeWithChildren): EquipoDeSeccion => ({
+const aEquipo = (n: HierarchyNodeWithChildren, otraPlanta?: Record<string, string>): EquipoDeSeccion => ({
   id: n.id,
   nombre: n.nombre.trim(),
   codigo: n.codigo ?? '',
   conjunto: esArea(n),
   componentes: contar(n),
+  hijos: n.children.map((h) => ({ id: h.id, nombre: h.nombre.trim() })),
+  otraPlanta: otraPlanta?.[n.nombre.trim()],
 })
 
 /**
@@ -83,14 +89,19 @@ const aEquipo = (n: HierarchyNodeWithChildren): EquipoDeSeccion => ({
  * y sus áreas) y cada sección de Proceso (sus equipos directos y sus conjuntos).
  * Solo el primer nivel: los componentes siguen a su equipo.
  */
-export function seccionesDeProceso(arbol: readonly HierarchyNodeWithChildren[], raices: { acopio: string; proceso: string }): Seccion[] {
+export function seccionesDeProceso(
+  arbol: readonly HierarchyNodeWithChildren[],
+  raices: { acopio: string; proceso: string; servicios?: readonly string[] },
+  otraPlanta?: Record<string, string>,
+): Seccion[] {
   const out: Seccion[] = []
+  const eq = (n: HierarchyNodeWithChildren) => aEquipo(n, otraPlanta)
   const acopio = buscar(arbol, raices.acopio)
   if (acopio) {
     const sueltos = acopio.children.filter((n) => !esArea(n))
-    if (sueltos.length) out.push({ nombre: 'Acopio', equipos: sueltos.map(aEquipo) })
+    if (sueltos.length) out.push({ nombre: 'Acopio', equipos: sueltos.map(eq) })
     for (const a of acopio.children.filter(esArea)) {
-      if (a.children.length) out.push({ nombre: `Acopio · ${titulo(a.nombre)}`, equipos: a.children.map(aEquipo) })
+      if (a.children.length) out.push({ nombre: `Acopio · ${titulo(a.nombre)}`, equipos: a.children.map(eq) })
     }
   }
   const proceso = buscar(arbol, raices.proceso)
@@ -100,11 +111,44 @@ export function seccionesDeProceso(arbol: readonly HierarchyNodeWithChildren[], 
         out.push({ nombre: 'Proceso', equipos: [aEquipo(s)] })
         continue
       }
-      if (s.children.length) out.push({ nombre: titulo(s.nombre), equipos: s.children.map(aEquipo) })
+      if (s.children.length) out.push({ nombre: titulo(s.nombre), equipos: s.children.map(eq) })
     }
+  }
+  // Servicios de apoyo: no detienen la línea directo, pero influyen (Orel, 19-09-2026).
+  for (const id of raices.servicios ?? []) {
+    const a = buscar(arbol, id)
+    if (a?.children.length) out.push({ nombre: `Servicios · ${titulo(a.nombre)}`, equipos: a.children.map(eq) })
+  }
+  return out
+}
+
+/** Nombre, código y padre de TODO equipo bajo las secciones (también los componentes): para dibujarlos. */
+export function indiceEquipos(arbol: readonly HierarchyNodeWithChildren[], secciones: readonly Seccion[]): Map<string, { nombre: string; codigo: string; padre?: string; hijos: { id: string; nombre: string }[] }> {
+  const out = new Map<string, { nombre: string; codigo: string; padre?: string; hijos: { id: string; nombre: string }[] }>()
+  const recorrer = (n: HierarchyNodeWithChildren, padre?: string) => {
+    out.set(n.id, { nombre: n.nombre.trim(), codigo: n.codigo ?? '', padre, hijos: n.children.map((h) => ({ id: h.id, nombre: h.nombre.trim() })) })
+    for (const h of n.children) recorrer(h, n.nombre.trim())
+  }
+  for (const s of secciones) for (const e of s.equipos) {
+    const n = buscar(arbol, e.id)
+    if (n) recorrer(n)
   }
   return out
 }
 
 /** Raíces del árbol de Chonchi (ids de `hierarchy`). */
-export const RAICES_CHONCHI = { acopio: 'aq-in-cho-acop', proceso: 'aq-in-cho-pcho-proc' }
+export const RAICES_CHONCHI = {
+  acopio: 'aq-in-cho-acop',
+  proceso: 'aq-in-cho-pcho-proc',
+  // Agua, RILES, frío, vapor y energía: influyen en el proceso sin estar en la línea.
+  servicios: [
+    'aq-in-cho-exte-alag', // Almacenamiento aguas
+    'aq-in-cho-exte-estr', // Estanque de transferencia AM
+    'aq-in-cho-exte-pozo', // Pozos profundos
+    'aq-in-cho-exte-pril', // Planta RILES
+    'aq-in-cho-pcho-exte-smaq', // Sala de máquinas
+    'aq-in-cho-pcho-exte-scal', // Sala de caldera
+    'aq-in-cho-pcho-exte-sfre', // Sala de freón
+    'aq-in-cho-pcho-exte-scbo', // Subestación planta principal
+  ],
+}
