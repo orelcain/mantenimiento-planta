@@ -93,7 +93,7 @@ export interface ResumenPeriodo {
   unidadesRepuestos: number
 }
 
-const normalizarEquipo = (s: string) =>
+export const normalizarEquipo = (s: string) =>
   s.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase().replace(/\s+/g, ' ')
 
 /** `YYYY-MM-DD` de hace `dias` días (incluye hoy). */
