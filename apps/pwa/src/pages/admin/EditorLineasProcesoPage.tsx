@@ -24,7 +24,7 @@ import {
   type NodeProps,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { ChevronDown, ChevronLeft, ChevronRight, Expand, Loader2, Maximize2, Minimize2, PanelLeftClose, PanelLeftOpen, Plus, Redo2, RotateCcw, Search, Undo2, X } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronRight, Expand, Loader2, Maximize2, Minimize2, PanelLeftClose, PanelLeftOpen, Plus, Redo2, RotateCcw, Search, Spline, Undo2, X } from 'lucide-react'
 import { Button, Sheet } from '@/components/piel'
 import { ToastAction } from '@/components/ui/toast'
 import { useHierarchyTree } from '@/hooks/useHierarchy'
@@ -103,7 +103,10 @@ function PuntosUnion({ claro }: { claro?: boolean }) {
   // Tope de 36 unidades: a zoom bajo el agarre no debe tapar media tarjeta ni a las vecinas
   // (se robaba los clics para arrastrar la tarjeta).
   const agarre = Math.min(36, Math.max(14, 28 / zoom))
-  const punto = claro ? 'size-3.5 border-2 border-primary bg-primary-foreground' : 'size-3.5 border-2 border-card bg-primary'
+  // El punto VISIBLE también crece al alejar el lienzo: a 33 % uno de 14 px se veía de 4 px y
+  // Orel no encontraba de dónde agarrar (19-09-2026).
+  const visible = Math.min(30, Math.max(12, 16 / zoom))
+  const punto = claro ? 'border-2 border-primary bg-primary-foreground' : 'border-2 border-card bg-primary'
   return (
     <>
       {/* Toda la tarjeta recibe la unión mientras se une (id propio: el punto izquierdo es el de siempre). */}
@@ -123,16 +126,16 @@ function PuntosUnion({ claro }: { claro?: boolean }) {
         className="!flex !items-center !justify-center !rounded-full !border-0 !bg-transparent"
         style={{ width: agarre, height: agarre }}
       >
-        <span aria-hidden className={`pointer-events-none rounded-full ${punto} ${uniendo ? 'ring-4 ring-primary/30' : ''}`} />
+        <span aria-hidden style={{ width: visible, height: visible }} className={`pointer-events-none rounded-full ${punto} ${uniendo ? 'ring-4 ring-primary/30' : ''}`} />
       </Handle>
       <Handle
         type="source"
         position={Position.Right}
-        title="Arrastra para unir"
+        title="Arrastra desde aquí para unir"
         className="!flex !items-center !justify-center !rounded-full !border-0 !bg-transparent"
         style={{ width: agarre, height: agarre }}
       >
-        <span aria-hidden className={`pointer-events-none rounded-full ${punto}`} />
+        <span aria-hidden style={{ width: visible, height: visible }} className={`pointer-events-none rounded-full ${punto}`} />
       </Handle>
     </>
   )
@@ -280,6 +283,10 @@ function Editor() {
   const [guardando, setGuardando] = useState(false)
   const [consulta, setConsulta] = useState('')
   const [zonaResaltada, setZonaResaltada] = useState<string | null>(null)
+  // Modo «Unir»: se toca el equipo de origen y después el de destino, sin apuntarle a los
+  // puntos (Orel, 19-09-2026: «sigo sin entender cómo poner las líneas de un elemento a otro»).
+  const [modoUnir, setModoUnir] = useState(false)
+  const [origenUnir, setOrigenUnir] = useState<string | null>(null)
   const [pedido, setPedido] = useState<Pedido | null>(null)
   const [abiertos, setAbiertos] = useState<Set<string>>(() => new Set())
   const [manual, setManual] = useState<{ nombre: string; zona: string } | null>(null)
@@ -376,6 +383,7 @@ function Editor() {
   const vista = useMemo(
     () =>
       nodes.map((n): Node => {
+        const marca = n.id === origenUnir ? 'rounded-card ring-4 ring-primary' : undefined
         if (n.type === 'zona') {
           const l = limites.get(n.id.slice('zona:'.length))
           return {
@@ -384,7 +392,7 @@ function Editor() {
             data: { ...n.data, ...(l ? { w: l.w, h: l.h } : {}), resaltada: n.id === zonaResaltada, ...(editable ? { onMover: (ev: ReactPointerEvent) => moverZona.current(n.id, ev) } : {}) },
           }
         }
-        if (n.type === 'entrada') return { ...n, ariaLabel: nombreDe(n.id), data: { linea: nombreLinea.get(lineaDeEntrada(n.id)) ?? lineaDeEntrada(n.id) } }
+        if (n.type === 'entrada') return { ...n, className: marca, ariaLabel: nombreDe(n.id), data: { linea: nombreLinea.get(lineaDeEntrada(n.id)) ?? lineaDeEntrada(n.id) } }
         const e = indice.get(n.id)
         if (servicios.has(n.id)) {
           const r = relaciones.get(n.id)
@@ -393,7 +401,7 @@ function Editor() {
             abastece: (r?.abastece ?? []).map((l) => nombreLinea.get(l) ?? l),
             recibe: (r?.recibe ?? []).map((l) => nombreLinea.get(l) ?? l),
           }
-          return { ...n, type: 'servicio', ariaLabel: `${data.nombre}, servicio de apoyo`, data }
+          return { ...n, type: 'servicio', className: marca, ariaLabel: `${data.nombre}, servicio de apoyo`, data }
         }
         const p = pesos.get(n.id)
         const cont = contenedorDe.get(n.id)
@@ -409,11 +417,12 @@ function Editor() {
         return {
           ...n,
           type: 'maquina',
+          className: marca,
           ariaLabel: `${data.nombre}, ${data.linea ? `${formatoPeso(data.peso ?? 0)} de ${data.linea}` : 'fuera de la línea'}`,
           data,
         }
       }),
-    [nodes, indice, pesos, servicios, relaciones, nombreLinea, zonaResaltada, deOtraPlanta, nombreDe, limites, contenedorDe, editable],
+    [nodes, indice, pesos, servicios, relaciones, nombreLinea, zonaResaltada, deOtraPlanta, nombreDe, limites, contenedorDe, editable, origenUnir],
   )
 
   const vistaAristas = useMemo(
@@ -541,6 +550,40 @@ function Editor() {
     },
     [registrar],
   )
+  // Unir tocando: primer toque = origen, segundo = destino.
+  const tocarParaUnir = useCallback(
+    (id: string) => {
+      if (!origenUnir) {
+        setOrigenUnir(id)
+        return
+      }
+      if (id === origenUnir) {
+        setOrigenUnir(null)
+        return
+      }
+      if (edges.some((e) => e.source === origenUnir && e.target === id)) {
+        toast({ title: 'Esos dos ya están unidos' })
+        setOrigenUnir(null)
+        return
+      }
+      registrar()
+      setEdges((es) => addEdge({ source: origenUnir, target: id, id: `${origenUnir}->${id}` }, es))
+      // Encadenar: el destino queda listo para ser el origen del siguiente tramo.
+      setOrigenUnir(id)
+    },
+    [origenUnir, edges, registrar, toast],
+  )
+  useEffect(() => {
+    if (!modoUnir) return
+    const tecla = (ev: KeyboardEvent) => {
+      if (ev.key !== 'Escape') return
+      if (origenUnir) setOrigenUnir(null)
+      else setModoUnir(false)
+    }
+    window.addEventListener('keydown', tecla)
+    return () => window.removeEventListener('keydown', tecla)
+  }, [modoUnir, origenUnir])
+
   const esValida = useCallback((c: Connection | Edge) => c.source !== c.target && !edges.some((e) => e.source === c.source && e.target === c.target), [edges])
 
   const avisoQuitado = useCallback(
@@ -804,6 +847,21 @@ function Editor() {
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
+              onClick={() => {
+                setModoUnir((v) => !v)
+                setOrigenUnir(null)
+              }}
+              aria-pressed={modoUnir}
+              title="Unir equipos tocando uno y después el otro"
+              className={`flex min-h-[44px] items-center gap-1.5 rounded-full px-3 text-footnote font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary [&>svg]:size-4 ${
+                modoUnir ? 'bg-primary text-primary-foreground' : 'text-primary hover:bg-muted-foreground/10'
+              }`}
+            >
+              <Spline aria-hidden />
+              {modoUnir ? 'Salir de unir' : 'Unir equipos'}
+            </button>
+            <button
+              type="button"
               onClick={() => setConLista((v) => !v)}
               aria-pressed={conLista}
               aria-label={conLista ? 'Ocultar la lista de equipos' : 'Mostrar la lista de equipos'}
@@ -932,6 +990,8 @@ function Editor() {
                 return true
               }}
               onDelete={onDelete}
+              onNodeClick={modoUnir ? (_, n) => (n.type === 'zona' ? undefined : tocarParaUnir(n.id)) : undefined}
+              onPaneClick={modoUnir ? () => setOrigenUnir(null) : undefined}
               onNodeDragStart={() => registrar()}
               onNodeDrag={(_, n) => {
                 const z = esEntrada(n.id) ? undefined : zonaEn(n.position.x + NODO.ancho / 2, n.position.y + NODO.alto / 2, contenedorDeNodo(n))
@@ -939,7 +999,7 @@ function Editor() {
               }}
               onNodeDragStop={(_, n, movidos) => alSoltarNodos(movidos.length ? movidos : [n])}
               isValidConnection={esValida}
-              nodesDraggable={editable}
+              nodesDraggable={editable && !modoUnir}
               nodesConnectable={editable}
               elementsSelectable={editable}
               deleteKeyCode={editable ? ['Backspace', 'Delete'] : null}
@@ -954,6 +1014,15 @@ function Editor() {
               className="bg-background"
             >
               <Background gap={GRILLA[0]} size={1.1} color="rgb(var(--muted-foreground) / 0.22)" />
+              {modoUnir && (
+                <Panel position="top-center" className="!mt-[76px]">
+                  <p className="flex min-h-[44px] items-center gap-2 whitespace-nowrap rounded-full bg-primary px-4 text-footnote font-semibold text-primary-foreground shadow-[0_2px_8px_rgba(0,0,0,0.25)]">
+                    <Spline className="size-4" aria-hidden />
+                    {origenUnir ? `Desde ${nombreDe(origenUnir)}: toca el equipo que sigue` : 'Toca el equipo donde empieza la flecha'}
+                    <span className="font-normal opacity-80">· Esc para {origenUnir ? 'soltarlo' : 'salir'}</span>
+                  </p>
+                </Panel>
+              )}
               <Controls showInteractive={false} showFitView={false} position="bottom-right" />
               <Panel position="bottom-right" className="!mb-[118px] !mr-[15px]">
                 <button

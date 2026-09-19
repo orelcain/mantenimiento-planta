@@ -21,6 +21,17 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-19 · Admin · Editor de líneas: modo «Unir equipos»
+
+- Orel: «sigo sin entender cómo poner las líneas de un elemento a otro». El problema real no era
+  el acierto sino la VISIBILIDAD: a 33 % de zoom el punto visible medía 4 px.
+- Botón «Unir equipos» en la barra: se toca el equipo de origen (queda con anillo), después el que
+  sigue, y la flecha se crea; el destino pasa a ser el origen del siguiente tramo (encadenar).
+  Aviso fijo en el lienzo con el paso actual, Esc suelta el origen o sale, clic en vacío suelta.
+  Con el modo activo las tarjetas no se arrastran (`nodesDraggable=false`), así el toque no mueve.
+- El punto VISIBLE también se escala con el zoom (12-30 unidades), no solo el área de agarre.
+- ⚠ El aviso va a `top-center` con `mt-[76px]`: arriba está la leyenda y lo tapaba.
+
 ## 2026-09-19 · Admin · Editor de líneas: uniones con dos clics y punto de llegada real
 
 - Orel: «lo intento y no hacen nada». Causas: (1) #1122 dejó el punto izquierdo como adorno y la
