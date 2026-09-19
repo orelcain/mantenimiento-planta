@@ -21,6 +21,18 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-19 · Bitacora ronda 52 · Las tres areas que faltaban en el arbol
+- Orel confirmo lo que faltaba para cerrar la ronda 51: **HG es EVISCERADO** y Filete es FILETE. No se asumio — el arbol de PROCESO de Chonchi no tiene ningun area llamada «HG».
+- Creadas en `hierarchy` (ya en produccion, `scripts/crear-areas-conjuntos-bitacora.js --write`):
+  - `aq-in-cho-pcho-proc-file-cint` · **CINTAS FILETE** → FILETE
+  - `aq-in-cho-pcho-proc-evis-cint` · **CINTAS HG** → EVISCERADO
+  - `aq-in-cho-pcho-proc-evis-lman` · **LINEA MANUAL HG** → EVISCERADO
+- Son las **primeras areas de NIVEL 5** del arbol: hasta ahora los hijos de un area de proceso eran siempre equipos. Van con `tipoNodo: 'area'` EXPLICITO (⚠ `useHierarchy.createNode` NO escribe ese campo, y sin el un nodo se lee como equipo) y `isBaseStructure: false`, igual que cualquier nodo creado desde la app.
+- ⚠ El script calculaba `orden` desde el snapshot inicial, asi que los DOS nodos nuevos bajo EVISCERADO quedaban empatados en 19. Se arreglo con un contador en memoria por padre (19 y 20).
+- Verificado con un test sobre la logica real (`construirOpcionesEquipo` + `buscarEquipos`): un area colgando de otra area sale con `tipo: 'area'`, planta «Planta Chonchi», area «Eviscerado», y el buscador la encuentra por «cintas hg».
+- tsc 0; eslint 30; vitest 2.812; auditorias OK.
+- Estado: HECHO. Los 12 eventos viejos con esos nombres NO se re-vinculan: son dato historico, y desde ahora el buscador ofrece el area al escribir.
+
 ## 2026-09-19 · Bitacora ronda 51 · El equipo escrito a mano que no queda vinculado
 - Hipotesis de la ronda anterior: «las maquinas del proceso que se escriben a mano habria que vincularlas al buscar». **MEDIDA Y DESCARTADA**: se cruzaron los 12 eventos sin `equipoId` contra los **702 nodos** de `hierarchy` y **NINGUNO coincide** (0 exactos, 0 ambiguos, 12 sin nodo). El problema no es que el buscador no encuentre: es que se escribe OTRA COSA.
   - «KNURO» a secas → el arbol tiene KNURO N1, N2 y N3 (falta el numero).
