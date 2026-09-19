@@ -21,6 +21,17 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-19 · Jerarquía · el aviso «hay datos nuevos» nunca funcionó (y gastaba en todas las pantallas)
+
+- `useHierarchyTree` sondeaba cada 30 s en TODA pantalla que usa el árbol (editor de líneas, CTD,
+  repuestos…), aunque solo `HierarchyPage` lee `hasUpdates`. Y la consulta fallaba siempre:
+  `where('activo','==',true)` + rango en `actualizadoEn` + `orderBy` exige un índice compuesto que
+  no está en `firestore.indexes.json` → `failed-precondition` cada 30 s desde que existe.
+- Arreglo sin índice nuevo (regla de costos): la consulta queda con UN solo campo de rango y
+  `limit(1)` —basta saber si hay algo nuevo—, el sondeo se prende con `vigilarCambios: true` (solo
+  la página de Jerarquía) y pasa a 2 minutos.
+- Verificado en el navegador: tras dos ciclos completos no vuelve a aparecer el error.
+
 ## 2026-09-19 · Admin · Editor de líneas: flechas que se acomodan «como cuerdas»
 
 - Idea de Orel (Inkscape/draw.io): arrastrar la línea la dobla por donde uno la lleve. `CurvaFlecha`
