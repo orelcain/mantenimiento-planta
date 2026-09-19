@@ -21,6 +21,18 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-19 · Bitacora ronda 54 · «Terminó ahora» solo cuando es verdad
+- Medido antes de tocar (22 eventos reales): 20 los cargó una sola persona; de 15 con hora de inicio, 7 se registraron dentro de la media hora y **6 más de 2 h después**; 6 se crearon con su turno ya terminado (el día 17-09 entero a las 18:55; en la tarde 17-09, 6 eventos entre las 23:17 y las 23:35). El botón de la ronda 48 salía SIEMPRE que faltaba el término, y con esa forma de cargar «ahora» es la hora de carga, no el término: la TOLVA GENERAL RILES (11:00, parada real de 20 min, cargada 18:55) habría quedado en 7 h 55 min y el MTTR del turno pasaba de 12,5 min a 4 h. Todavía no se había usado: 0 eventos nuevos desde el deploy.
+- Mockup con 4 casos reales en el canvas de la tanda (fila «Terminó ahora solo cuando es verdad»); Orel eligió la opción A.
+- Hecho: `terminoAhora(turnoId, horaInicio, ahora)` en `turnoMantencion.ts`. El botón sale solo si el turno del evento está corriendo (con la hora de holgura de `horaCalzaEnTurno`, para lo que termina pasado el cambio) y la duración va de 1 a 120 min (`TOPE_TERMINO_AHORA_MIN`). El rótulo dice la duración: «Terminó ahora · 22:17 · 21 min». Fuera de eso, una línea: «Ese turno ya terminó…» o «Empezó hace más de 2 horas…».
+- ⚠ La diferencia va CON SIGNO respecto del inicio del turno: `minutosEntre` da la vuelta por medianoche, y un inicio que todavía no llega (21:56 abierto a las 21:53, pasó en los datos reales) daba 1.437 min → «pasa el tope» en vez de nada.
+- ⚠ Un tope de horas solo no bastaba: un evento del 16-09 abierto el 18-09 a las 22:06 ofrecía 10 min creíbles. Eso lo ataja la condición del turno.
+- Verificado en `/dev/bitacora-real` a 375 px con clics reales: el evento del 16-09 queda sin botón y con el aviso; movido al turno en curso, «Terminó ahora · 22:17 · 21 min»; inicio 20:00 → aviso de las 2 horas; inicio 22:00 y un toque → término 22:18 y «Duración: 18 min». Claro y oscuro. Consola limpia en una pestaña nueva.
+- Tests: 7 casos con los eventos reales; mutación comprobada (quitar la holgura o aceptar 0 min los hace fallar).
+- tsc 0; eslint 30; vitest 2.820; auditorías OK; build OK.
+- ⚠ Corrección a la ronda 48: «0 min de parada en los cuatro turnos» no es exacto. El día 17-09 sumaba 25 min: sus 2 «con parada» tienen `minutosParada` null pero inicio y término (10:00–10:05 y 11:00–11:20), y `minutosParadaDe` los calcula de ahí. Los otros 3 turnos sí estaban en 0.
+- Estado: HECHO. Sigue (decisión de Orel): si la carga a fin de turno es la norma, diseñar para ella — opción C del mockup, «¿Cuánto duró?» con duraciones de un toque.
+
 ## 2026-09-19 · Bitacora ronda 53 · La PLANTA visible y primero en el buscador
 - Orel: «tanto baader 142 como knuro tenemos 3 para Chonchi y 3 para Yal, debemos poder distinguirlas en el buscador». La lista principal YA mostraba la planta, pero:
   1. **La caja de «no quedó vinculado» (ronda 51) NO la mostraba**: solo nombre + código SAP. Un técnico de Chonchi podía vincular la Baader de Yal sin enterarse. Defecto de lo recién construido.

@@ -86,6 +86,43 @@ export function horaCalzaEnTurno(turno: Pick<TurnoMantencion, 'banda'>, hhmm: st
   return m >= -60 && m <= 9 * 60
 }
 
+/** Más que esto, «Terminó ahora» ya no es el término: es la hora en que se está cargando. */
+export const TOPE_TERMINO_AHORA_MIN = 120
+
+/**
+ * ¿Se puede ofrecer «Terminó ahora» para un evento de `turnoId` que empezó a
+ * `horaInicio`? Solo si el turno del evento está corriendo (con la misma hora
+ * de holgura de `horaCalzaEnTurno`, para lo que termina pasado el cambio) y la
+ * duración que resultaría va de 1 minuto a `TOPE_TERMINO_AHORA_MIN`.
+ *
+ * Medido el 18-09-2026: de 15 eventos con hora, 6 se cargaron más de 2 h después
+ * de empezar y 6 después de terminado su turno. Con el botón a la vista siempre,
+ * la TOLVA GENERAL RILES (11:00, cargada 18:55) habría quedado con 7 h 55 min de
+ * parada donde hubo 20.
+ *
+ * La diferencia va CON SIGNO respecto del inicio del turno: `minutosEntre` da la
+ * vuelta por medianoche, y un inicio que todavía no llega (21:56 abierto a las
+ * 21:53) saldría como 1.437 minutos en vez de «aún no empieza».
+ */
+export function terminoAhora(
+  turnoId: string,
+  horaInicio: string,
+  ahora: Date = new Date(),
+):
+  | { disponible: true; hora: string; minutos: number }
+  | { disponible: false; motivo: 'sin-inicio' | 'otro-turno' | 'turno-terminado' | 'aun-no-empieza' | 'pasa-el-tope' } {
+  const turno = turnoDesdeId(turnoId)
+  if (!turno) return { disponible: false, motivo: 'otro-turno' }
+  if (!/^\d{1,2}:\d{2}$/.test(horaInicio)) return { disponible: false, motivo: 'sin-inicio' }
+  const desdeInicioTurno = Math.floor((ahora.getTime() - turno.inicio.getTime()) / 60_000)
+  if (desdeInicioTurno < 0) return { disponible: false, motivo: 'otro-turno' }
+  if (ahora.getTime() > turno.fin.getTime() + 60 * 60_000) return { disponible: false, motivo: 'turno-terminado' }
+  const minutos = desdeInicioTurno - minutosDesdeInicioTurno(turno, horaInicio)
+  if (minutos <= 0) return { disponible: false, motivo: 'aun-no-empieza' }
+  if (minutos > TOPE_TERMINO_AHORA_MIN) return { disponible: false, motivo: 'pasa-el-tope' }
+  return { disponible: true, hora: horaDe(ahora), minutos }
+}
+
 /** Turno anterior (`-1`) o siguiente (`+1`). */
 export function turnoAdyacente(turno: TurnoMantencion, paso: -1 | 1): TurnoMantencion {
   const i = turno.inicio

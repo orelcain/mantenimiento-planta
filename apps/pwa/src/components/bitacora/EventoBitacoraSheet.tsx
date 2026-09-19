@@ -53,6 +53,8 @@ import {
   horarioTurno,
   horaSugeridaParaEvento,
   minutosEntre,
+  terminoAhora,
+  TOPE_TERMINO_AHORA_MIN,
   turnoDesdeId,
   turnoMantencionEn,
   turnosElegibles,
@@ -193,9 +195,6 @@ const CAMPO =
   'h-[44px] w-full rounded-ctl border-0 bg-muted-foreground/10 px-3 text-[16px] text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary'
 const ETIQUETA_CAMPO = 'mb-1.5 block text-footnote text-muted-foreground'
 
-/** «21:30» de un Date, en hora local: es la hora que el técnico ve en el reloj. */
-const horaHHMM = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-
 function Chip({ activo, onClick, children }: { activo: boolean; onClick: () => void; children: ReactNode }) {
   return (
     <button
@@ -276,11 +275,11 @@ export function EventoBitacoraSheet({
    */
   const [impacto, setImpacto] = useState<ImpactoEvento | null>(null)
   const [contingencia, setContingencia] = useState('')
-  const [horaDeAhora, setHoraDeAhora] = useState(() => horaHHMM(new Date()))
+  const [ahora, setAhora] = useState(() => new Date())
   useEffect(() => {
-    // El rótulo del botón dice la hora que va a poner: si se queda quieto,
-    // miente. Se refresca cada 30 s, que alcanza para un campo de 5 minutos.
-    const t = setInterval(() => setHoraDeAhora(horaHHMM(new Date())), 30_000)
+    // El rótulo de «Terminó ahora» dice la hora y la duración que va a poner:
+    // si se queda quieto, miente. Cada 30 s alcanza para un campo de 5 minutos.
+    const t = setInterval(() => setAhora(new Date()), 30_000)
     return () => clearInterval(t)
   }, [])
   const [minutos, setMinutos] = useState('')
@@ -449,6 +448,8 @@ export function EventoBitacoraSheet({
   }, [open, evento, turno, pendienteOrigen, autorFijo])
 
   const duracion = sinHora ? null : minutosEntre(horaInicio, horaTermino || null)
+  /** «Terminó ahora» solo mientras corre el turno del evento y sin pasar de 2 h (18-09-2026). */
+  const terminoSugerido = terminoAhora(turnoDestino || turno.id, horaInicio, ahora)
   const horaFaltante = !sinHora && !HORA_VALIDA.test(horaInicio)
 
   // Lo que se guarda: el texto de «Otro» solo con ese tipo, y sin horas si es «Sin hora».
@@ -1366,16 +1367,28 @@ export function EventoBitacoraSheet({
               </div>
               {/* Sin término no hay minutos de parada: 17 de 22 eventos reales se
                   guardaron sin él (18-09-2026). Un toque lo cierra con la hora
-                  de ahora, que es la que corresponde al salir de la máquina. */}
-              {!horaTermino && (
+                  de ahora, que es la que corresponde al salir de la máquina —
+                  pero solo mientras el turno corre: 6 de 15 eventos se cargaron
+                  más de 2 h después, y ahí «ahora» es la hora de carga, no el
+                  término. El rótulo dice la duración para que se vea antes. */}
+              {!horaTermino && terminoSugerido.disponible && (
                 <button
                   type="button"
-                  onClick={() => setHoraTermino(horaHHMM(new Date()))}
+                  onClick={() => setHoraTermino(terminoSugerido.hora)}
                   className="-mt-1 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-full border border-primary/60 bg-primary/10 px-4 text-footnote font-semibold text-brand-ink transition-colors hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 >
                   <Clock3 className="size-4" aria-hidden />
-                  Terminó ahora · {horaDeAhora}
+                  <span>
+                    Terminó ahora · {terminoSugerido.hora} · <span className="tabular-nums">{formatoMinutos(terminoSugerido.minutos)}</span>
+                  </span>
                 </button>
+              )}
+              {!horaTermino && !terminoSugerido.disponible && (terminoSugerido.motivo === 'turno-terminado' || terminoSugerido.motivo === 'pasa-el-tope') && (
+                <p className="-mt-1 text-footnote text-muted-foreground">
+                  {terminoSugerido.motivo === 'turno-terminado'
+                    ? 'Ese turno ya terminó: escribe la hora en que terminó.'
+                    : `Empezó hace más de ${TOPE_TERMINO_AHORA_MIN / 60} horas: escribe la hora en que terminó.`}
+                </p>
               )}
               {duracion != null && <p className="-mt-1 text-footnote text-muted-foreground">Duración: {formatoMinutos(duracion)}</p>}
             </>
