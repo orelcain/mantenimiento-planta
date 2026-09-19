@@ -57,6 +57,7 @@ export function BuscadorEquipo({
   opciones,
   cargando,
   recientes,
+  vinculado = false,
 }: {
   texto: string
   /** `equipoId` null = texto libre (o se desvinculó al seguir escribiendo). */
@@ -65,6 +66,8 @@ export function BuscadorEquipo({
   cargando: boolean
   /** Equipos ya usados (en este turno o en este teléfono): van arriba y se ofrecen al enfocar. */
   recientes: readonly string[]
+  /** ¿El texto quedó atado a un equipo de la jerarquía? Si no, se avisa. */
+  vinculado?: boolean
 }) {
   const id = useId()
   const [abierto, setAbierto] = useState(false)
@@ -175,6 +178,33 @@ export function BuscadorEquipo({
       )}
       {abierto && q.length >= 2 && !cargando && opciones.length === 0 && (
         <p className="mt-1.5 text-footnote text-muted-foreground">Sin conexión a la lista de equipos: se guarda lo que escribas.</p>
+      )}
+
+      {/* El texto se guarda igual, pero sin vincular el evento no entra al
+          historial de esa máquina. Pasó con «KNURO», que existe como N1, N2 y
+          N3: de 12 eventos escritos a mano, ninguno quedó atado (18-09-2026).
+          Se avisa cuando la lista está cerrada —ya se dejó de escribir— y hay
+          equipos parecidos que elegir. */}
+      {!abierto && !vinculado && q.length >= 2 && resultados.length > 0 && (
+        <div className="mt-2 flex flex-col gap-2 rounded-card bg-ink-warn/10 p-3">
+          <p className="text-footnote text-foreground">
+            «{q}» no quedó vinculado a un equipo. {resultados.length === 1 ? '¿Es este?' : '¿Es alguno de estos?'}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {resultados.slice(0, 3).map((o) => (
+              <button
+                key={o.id}
+                type="button"
+                onClick={() => onChange(o.nombre, o.id)}
+                className="min-h-[44px] rounded-full bg-muted-foreground/10 px-4 text-footnote font-semibold text-foreground transition-colors hover:bg-muted-foreground/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                {o.nombre}
+                {o.codigo ? <span className="ml-1.5 font-normal text-muted-foreground tabular-nums">{o.codigo}</span> : null}
+              </button>
+            ))}
+          </div>
+          <p className="text-caption text-muted-foreground">Si no es ninguno, sigue: se guarda el texto tal cual.</p>
+        </div>
       )}
     </div>
   )
