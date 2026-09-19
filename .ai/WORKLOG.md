@@ -21,6 +21,20 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-19 · Bitacora ronda 65 · Historial: un gráfico por PREGUNTA
+- Orel: «el gráfico no explica nada; hay que establecer qué preguntas son importantes para que los gráficos las respondan a simple vista». Catálogo aprobado (sin la 6, pendientes viejos): https://claude.ai/artifact/M3eDjf8oHto5U3wp7j3tTa
+- Se va el gráfico de barras por turno (respondía «¿cuántos minutos paró cada turno?», nadie lo pregunta; 30 barras = «reja», antipatrón de las guías) y la sección «Equipos que más pararon» (la reemplaza el Pareto). Entran 5 paneles: pregunta en gris · RESPUESTA como título (calculada con los mismos datos que se dibujan) · referencia dibujada:
+  1. ¿La línea está parando más o menos? → línea del % del tiempo de producción parado por día (≤14 días) o semana, promedio punteado; «Parando menos: de X a Y» solo si el cambio entre mitades ≥10 % y hay ≥4 puntos. ⚠ El día con el turno EN CURSO se dibuja hueco («hoy, en curso») y NO cuenta para promedio ni tendencia (se leía como caída falsa).
+  2. ¿Dónde se concentra la parada? → Pareto: barras ordenadas con % ACUMULADO; en rojo los que juntos llegan al 70 %; «Otros» nunca es prioridad.
+  3. ¿Mantención interviene sin detener la línea? → barras apiladas, «sin detener» abajo (base común).
+  4. ¿Cuánto tardamos en reparar? → un punto por falla + mediana («la mitad en X o menos; 8 de cada 10 en Y o menos»); con <5 fallas las nombra una por una. El promedio se dice en la referencia (lo suben las largas).
+  5. ¿Qué falla se está repitiendo? → lista de equipos con 2+ fallas (va PRIMERO: pide acción).
+- Lógica pura en `services/bitacora/preguntasHistorial.ts` (14 tests en `preguntasHistorial.test.ts`); gráficos SVG en `components/bitacora/GraficosHistorial.tsx` con tokens `rgb(var(--ink-crit))` etc.
+- Verificado con Playwright (`bitacora-historial.mjs`, teléfono y PC, claro y oscuro).
+- tsc 0 · eslint 30 · vitest 2.862 · auditorías piel/voseo/decimales/graficos OK · build OK.
+- Siguiente (lote aparte): base del % desde los turnos PROGRAMADOS de Shoplogix (informe del agente: `shoplogix/{chonchi|filete}/shifts`, reparto por solape con los turnos de Mantención, horas guardadas como UTC, excluir `Unscheduled`; decidir turnos con 0 ciclos y si se suma Filete).
+- Estado: HECHO.
+
 ## 2026-09-19 · Bitacora ronda 64 · Historial: referencias en cada cifra y preguntas claras
 - Pasada visual del Historial con capturas reales (https://claude.ai/artifact/2tFtM99z5QCR9HPQimSfV6) — antes solo se había mirado el título del gráfico.
 - **Reglas de Orel (memoria `feedback_reglas_analisis_datos`):** «30 h de detención sin referencia no dice nada» → toda cifra dice contra qué se compara y si es bueno o malo; «los datos responden preguntas claras y precisas».

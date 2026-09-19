@@ -13,15 +13,32 @@ import {
   parteParada,
   porcentaje,
   porcentajeFino,
-  promedioParadaPorTurno,
-  resumenGraficoParadas,
   tesisDelPeriodo,
   tituloRepuesto,
-  type FilaTurno,
   type ResumenPeriodo,
   type Tendencia,
 } from '@/services/bitacora/historialBitacora'
 import { MINUTOS_SIN_PRODUCCION_POR_TURNO } from '@/services/bitacora/mtbf'
+import {
+  agrupacionPara,
+  duracionesFallas,
+  fallasRepetidas,
+  paretoEquipos,
+  respuestaIntervenciones,
+  respuestaReparacion,
+  respuestaRepetidas,
+  respuestaTendencia,
+  serieIntervenciones,
+  serieParada,
+} from '@/services/bitacora/preguntasHistorial'
+import {
+  GraficoIntervenciones,
+  GraficoPareto,
+  GraficoReparacion,
+  GraficoTendencia,
+  ListaRepetidas,
+  PanelPregunta,
+} from '@/components/bitacora/GraficosHistorial'
 import { etiquetaCortaTurno } from '@/services/bitacora/entregaTurno'
 import { formatoMinutos } from '@/services/bitacora/turnoMantencion'
 
@@ -63,6 +80,18 @@ export function HistorialBitacoraVista({ fuente, alAbrirTurno }: { fuente: Fuent
   const comparacion = useMemo(() => compararPeriodos(resumen, resumenAnterior ?? null), [resumen, resumenAnterior])
   const pParada = parteParada(resumen)
   const horasProduccionTurno = formatoMinutos(480 - MINUTOS_SIN_PRODUCCION_POR_TURNO)
+  // Las cinco preguntas del Historial (mockup aprobado 19-09-2026): cada gráfico
+  // tiene su respuesta calculada con los mismos datos que dibuja.
+  const agrupar = agrupacionPara(dias)
+  const porParada = useMemo(() => serieParada(filas, agrupar), [filas, agrupar])
+  const tendencia = useMemo(() => respuestaTendencia(porParada), [porParada])
+  const pareto = useMemo(() => paretoEquipos(resumen), [resumen])
+  const porIntervencion = useMemo(() => serieIntervenciones(filas, agrupar), [filas, agrupar])
+  const intervenciones = useMemo(() => respuestaIntervenciones(porIntervencion), [porIntervencion])
+  const duraciones = useMemo(() => duracionesFallas(eventos), [eventos])
+  const reparacion = useMemo(() => respuestaReparacion(duraciones), [duraciones])
+  const repetidas = useMemo(() => fallasRepetidas(eventos), [eventos])
+  const unidadSerie = agrupar === 'dia' ? 'día' : 'semana'
   const abrirTurno = alAbrirTurno ?? ((turnoId: string) => navigate(`/bitacora?turno=${turnoId}`))
 
   const copiar = async () => {
@@ -213,7 +242,57 @@ export function HistorialBitacoraVista({ fuente, alAbrirTurno }: { fuente: Fuent
         </Button>
       </div>
 
-      <GraficoParadas filas={filas} />
+      {!cargando && resumen.eventos > 0 && (
+        <>
+          {/* 5 va primero: es la que pide acción (alerta temprana). */}
+          <PanelPregunta
+            pregunta="¿Qué falla se está repitiendo?"
+            respuesta={respuestaRepetidas(repetidas, dias)}
+            referencia="Equipos con 2 o más fallas en el período, el más repetido primero: actuar antes de la próxima."
+          >
+            <ListaRepetidas lista={repetidas} dias={dias} />
+          </PanelPregunta>
+          <div className="grid items-start gap-5 md:grid-cols-2">
+            <PanelPregunta
+              pregunta="¿La línea está parando más o menos?"
+              respuesta={tendencia.titulo}
+              referencia={`% del tiempo de producción parado, por ${unidadSerie} · línea punteada: promedio del período (${porcentajeFino(tendencia.promedio)}). Bajo la línea, mejor que lo habitual.`}
+            >
+              <GraficoTendencia serie={porParada} promedio={tendencia.promedio} />
+            </PanelPregunta>
+            <PanelPregunta
+              pregunta="¿Dónde se concentra la parada?"
+              respuesta={pareto.titulo}
+              referencia="Parada por equipo, de mayor a menor · el % es ACUMULADO: en rojo, los que juntos suman el 70 %, donde conviene atacar primero."
+            >
+              <GraficoPareto barras={pareto.barras} />
+            </PanelPregunta>
+            <PanelPregunta
+              pregunta="¿Mantención interviene sin detener la línea?"
+              respuesta={intervenciones.titulo}
+              referencia={
+                <>
+                  Intervenciones por {unidadSerie} · <span className="font-semibold text-ink-ok">verde: sin detener</span> (abajo) ·{' '}
+                  <span className="font-semibold text-ink-crit">rojo: con parada</span>
+                </>
+              }
+            >
+              <GraficoIntervenciones serie={porIntervencion} />
+            </PanelPregunta>
+            <PanelPregunta
+              pregunta="¿Cuánto tardamos en reparar?"
+              respuesta={reparacion.titulo}
+              referencia={
+                duraciones.length >= 5 && reparacion.promedio != null
+                  ? `Cada punto es una falla · la raya: la mitad de las fallas a cada lado (mediana). El promedio da ${formatoMinutos(Math.round(reparacion.promedio))}: lo suben las fallas largas de la derecha, que son las que hay que mirar.`
+                  : 'Cada punto es una falla con su duración.'
+              }
+            >
+              {duraciones.length > 0 && <GraficoReparacion duraciones={duraciones} mediana={reparacion.mediana} p80={reparacion.p80} />}
+            </PanelPregunta>
+          </div>
+        </>
+      )}
 
       {/* Teléfono: equipos → repuestos → turnos → quién (lo que dice DÓNDE actuar,
           arriba; antes estaba detrás de 30 turnos). PC: dos columnas como antes. */}
@@ -268,31 +347,6 @@ export function HistorialBitacoraVista({ fuente, alAbrirTurno }: { fuente: Fuent
         </section>
 
         <div className="contents md:flex md:min-w-0 md:flex-col md:gap-5">
-          <section aria-label="Equipos que más pararon" className="order-1 flex min-w-0 flex-col md:order-none">
-            <h2 className="px-4 pb-2 text-caption font-semibold text-muted-foreground">¿Qué equipos pararon más?</h2>
-            <div className="flex flex-col gap-3 rounded-card bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
-              {resumen.equipos.length === 0 ? (
-                <p className="text-footnote text-muted-foreground">Ninguna parada registrada en el período.</p>
-              ) : (
-                resumen.equipos.map((e) => (
-                  <div key={e.equipo} className="flex flex-col gap-1">
-                    <div className="flex items-baseline justify-between gap-3">
-                      {/* Completo, en dos líneas si hace falta: cortado se perdía el «N3» que dice CUÁL máquina. */}
-                      <span className="min-w-0 break-words text-body font-semibold">{e.equipo}</span>
-                      <span className="shrink-0 text-footnote font-semibold tabular-nums text-ink-crit">{formatoMinutos(e.minutos)}</span>
-                    </div>
-                    <div className="h-1.5 overflow-hidden rounded-full bg-muted-foreground/15">
-                      <div className="h-full rounded-full bg-ink-crit" style={{ width: `${Math.max(3, Math.round(e.parte * 100))}%` }} />
-                    </div>
-                    <span className="text-caption text-muted-foreground">
-                      {e.paradas} {e.paradas === 1 ? 'parada' : 'paradas'} · {porcentaje(e.parte)} del total
-                      {e.mtbfMin == null ? '' : ` · MTBF ${formatoMinutos(e.mtbfMin)}`}
-                    </span>
-                  </div>
-                ))
-              )}
-            </div>
-          </section>
 
           {/* Repuestos usados (mockup aprobado 17-09): lista por repuesto, de más
               a menos unidades; el equipo va en la misma fila. */}
@@ -370,98 +424,6 @@ function TesisConResalte({ resumen }: { resumen: ResumenPeriodo }) {
       <span className="font-semibold text-ink-ok">{marca}</span>
       {despues}
     </>
-  )
-}
-
-/**
- * Minutos de parada por turno, del más antiguo al más nuevo. Barras en CSS: son
- * pocas y el dato es una comparación simple; los turnos SIN paradas van en verde
- * porque un turno limpio también es resultado.
- */
-function GraficoParadas({ filas }: { filas: readonly FilaTurno[] }) {
-  const datos = useMemo(() => [...filas].reverse(), [filas])
-  // El máximo REAL para el rótulo; el 1 es solo para no dividir por cero. Antes
-  // el mismo número se mostraba, y una semana sin ninguna parada anunciaba
-  // «máx 1 min», un dato que no existía (revisión 15-09).
-  const maxReal = Math.max(0, ...datos.map((f) => f.resumen.minutosParada))
-  const max = Math.max(1, maxReal)
-  // HIG «Charts»: el título dice el HALLAZGO, no el nombre del eje — calculado
-  // con los mismos datos que dibujan las barras (19-09-2026).
-  const { titulo } = useMemo(() => resumenGraficoParadas(datos), [datos])
-  // ¿Esto es normal? El promedio del propio período, como línea (_GUIAS: referencia
-  // «promedio propio»). Cuenta los turnos sin parada.
-  const promedio = useMemo(() => promedioParadaPorTurno(datos), [datos])
-  const [seleccionado, setSeleccionado] = useState<string | null>(null)
-  const turnoSeleccionado = seleccionado ? datos.find((f) => f.turnoId === seleccionado) : null
-  if (!datos.length) return null
-  return (
-    <section role="group" aria-label={titulo} className="rounded-card bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
-      {/* «máx» iba en una columna a la derecha y partía el título en el teléfono. */}
-      <h2 className="text-footnote font-semibold text-foreground">{titulo}</h2>
-      <p className="text-caption text-muted-foreground">
-        Minutos de parada por turno
-        {maxReal > 0 ? (
-          <>
-            {' · '}
-            <span className="whitespace-nowrap">
-              <span aria-hidden className="mr-1 inline-block w-3 border-t-2 border-dashed border-foreground/60 align-middle" />
-              promedio {formatoMinutos(Math.round(promedio))}
-            </span>
-            {' · '}
-            <span className="whitespace-nowrap">máx {formatoMinutos(maxReal)}</span>
-          </>
-        ) : (
-          ' · sin paradas en el período'
-        )}
-      </p>
-      {/* min-w por barra + scroll: con 30 días (hasta 90 turnos) las barras
-          quedaban en menos de 1 px y el gráfico se veía vacío. */}
-      <div className="relative mt-2 flex h-24 items-end gap-[3px] overflow-x-auto">
-        {maxReal > 0 && (
-          <span
-            aria-hidden
-            className="pointer-events-none absolute inset-x-0 z-10 border-t-2 border-dashed border-foreground/60"
-            style={{ bottom: `${Math.min(100, (promedio / max) * 100)}%` }}
-          />
-        )}
-        {datos.map((f) => {
-          const alto = f.resumen.minutosParada > 0 ? Math.max(4, Math.round((f.resumen.minutosParada / max) * 100)) : 3
-          const etiquetaMinutos = f.resumen.conParada ? formatoMinutos(f.resumen.minutosParada) : 'sin paradas'
-          const activo = seleccionado === f.turnoId
-          return (
-            // El ancho visual de la barra no cambia: el área táctil crece en
-            // ALTO (flex items-end + h-full), no en ancho, para no desalinear
-            // las barras vecinas (HIG «Charts», 19-09-2026).
-            <button
-              key={f.turnoId}
-              type="button"
-              aria-pressed={activo}
-              aria-label={`${etiquetaCortaTurno(f.turnoId)}: ${f.resumen.conParada ? `${etiquetaMinutos} de parada` : 'sin paradas'}`}
-              title={`${etiquetaCortaTurno(f.turnoId)}: ${etiquetaMinutos}`}
-              onClick={() => setSeleccionado((prev) => (prev === f.turnoId ? null : f.turnoId))}
-              className="flex min-w-[5px] flex-1 items-end self-stretch focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            >
-              <span
-                className={`min-h-[2px] w-full rounded-t-[3px] ${f.resumen.minutosParada > 0 ? 'bg-ink-crit' : 'bg-ink-ok'} ${activo ? 'ring-2 ring-primary' : ''}`}
-                style={{ height: `${alto}%` }}
-                aria-hidden
-              />
-            </button>
-          )
-        })}
-      </div>
-      <div className="flex items-baseline justify-between pt-1 text-caption text-muted-foreground">
-        <span>{datos[0] ? etiquetaCortaTurno(datos[0].turnoId).replace('Turno ', '') : ''}</span>
-        <span>verde: turno sin paradas</span>
-        <span>{datos[datos.length - 1] ? etiquetaCortaTurno(datos[datos.length - 1]!.turnoId).replace('Turno ', '') : ''}</span>
-      </div>
-      {turnoSeleccionado && (
-        <p className="pt-2 text-footnote text-foreground">
-          {etiquetaCortaTurno(turnoSeleccionado.turnoId)}:{' '}
-          {turnoSeleccionado.resumen.conParada ? formatoMinutos(turnoSeleccionado.resumen.minutosParada) : 'sin paradas'}
-        </p>
-      )}
-    </section>
   )
 }
 
