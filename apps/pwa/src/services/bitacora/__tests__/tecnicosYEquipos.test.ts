@@ -74,6 +74,9 @@ describe('buscador de equipos sobre la jerarquía', () => {
     { id: 'tab142n3', nombre: 'TABLERO ELECTRICO BAADER 142 N3', tipoNodo: 'equipo', path: ['aq-in-cho', 'pyal', 'evis-yal'] },
     { id: 'bomba', nombre: 'BOMBA FLUJO NH3 N2', codigo: '720004607', tipoNodo: 'equipo', path: ['aq-in-cho', 'pcho'] },
     { id: 'inactivo', nombre: 'BAADER 142 VIEJA', tipoNodo: 'equipo', activo: false, path: ['aq-in-cho', 'pcho'] },
+    // Conjuntos de trabajo creados el 18-09-2026: un ÁREA colgando de otra área
+    // de proceso, que hasta entonces solo tenía equipos debajo.
+    { id: 'cintas-hg', nombre: 'CINTAS HG', codigo: 'AQ-IN-CHO-PCHO-PROC-EVIS-CINT', tipoNodo: 'area', path: ['aq-in-cho', 'pcho', 'evis'] },
   ]
   const opciones = construirOpcionesEquipo(nodos)
 
@@ -82,6 +85,15 @@ describe('buscador de equipos sobre la jerarquía', () => {
     expect(ids).not.toContain('aq-in-cho')
     expect(ids).not.toContain('pcho')
     expect(ids).not.toContain('inactivo')
+  })
+
+  it('un conjunto de trabajo es un ÁREA dentro de un área, y se ofrece como tal', () => {
+    // «CINTAS HG» no es una máquina con código SAP: es lo que se monta y
+    // desmonta como una unidad. Como área entra al buscador y se puede vincular.
+    const c = opciones.find((o) => o.id === 'cintas-hg')!
+    expect(c.tipo).toBe('area')
+    expect([c.planta, c.area]).toEqual(['Planta Chonchi', 'Eviscerado'])
+    expect(buscarEquipos(opciones, 'cintas hg', { max: 5, usados: [] }).map((o) => o.id)).toContain('cintas-hg')
   })
 
   it('cada opción dice planta y área para distinguir Chonchi de Yal', () => {
