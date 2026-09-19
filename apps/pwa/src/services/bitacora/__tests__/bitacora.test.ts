@@ -12,6 +12,8 @@ import {
   terminoAhora,
   TOPE_TERMINO_AHORA_MIN,
   horaMasMinutos,
+  horaInicioNuevoEvento,
+  turnoEnCurso,
 } from '../turnoMantencion'
 import { DURACIONES_SUGERIDAS_MIN } from '../../../config/bitacora'
 import { fuePendiente, minutosParadaDe, ordenarEventos, resumirBitacora } from '../resumenBitacora'
@@ -436,5 +438,32 @@ describe('«Terminó ahora» solo cuando es verdad (18-09-2026)', () => {
     expect(terminoAhora('2026-09-17_tarde', '', a(17, 22, 0))).toEqual({ disponible: false, motivo: 'sin-inicio' })
     expect(terminoAhora('2026-09-18_dia', '09:00', a(17, 22, 0))).toEqual({ disponible: false, motivo: 'otro-turno' })
     expect(terminoAhora('basura', '09:00', a(17, 22, 0))).toEqual({ disponible: false, motivo: 'otro-turno' })
+  })
+})
+
+describe('la hora de Inicio de un evento NUEVO no se rellena con un dato falso (19-09-2026)', () => {
+  const dia17 = turnoDesdeId('2026-09-17_dia')!
+  const a = (dia: number, h: number, m: number) => new Date(2026, 8, dia, h, m, 0, 0)
+
+  it('turnoEnCurso: dentro de la ventana, ni antes ni después', () => {
+    expect(turnoEnCurso(dia17, a(17, 8, 0))).toBe(true)
+    expect(turnoEnCurso(dia17, a(17, 15, 59))).toBe(true)
+    expect(turnoEnCurso(dia17, a(17, 16, 0))).toBe(false)
+    expect(turnoEnCurso(dia17, a(17, 7, 59))).toBe(false)
+  })
+
+  it('turno en curso: se sugiere la hora de ahora, igual que antes', () => {
+    expect(horaInicioNuevoEvento(dia17, a(17, 11, 0))).toBe('11:00')
+  })
+
+  it('turno YA CERRADO: queda vacío, no el inicio del turno (antes daba «08:00»)', () => {
+    // Caso real: TOLVA GENERAL RILES, cargada a las 18:55 con el turno de día
+    // (08:00-16:00) ya terminado. Antes del fix, esto habría calculado una
+    // parada de 3 h 20 min en vez de los 20 min reales.
+    expect(horaInicioNuevoEvento(dia17, a(17, 18, 55))).toBe('')
+  })
+
+  it('turno todavía no empieza: también vacío (no adelanta su propio inicio)', () => {
+    expect(horaInicioNuevoEvento(dia17, a(17, 6, 0))).toBe('')
   })
 })
