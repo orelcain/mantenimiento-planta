@@ -21,6 +21,16 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-19 · Admin · Editor de líneas: Acopio por componentes, servicios de apoyo y HIG
+- Mockup aprobado: https://claude.ai/artifact/Xe7TNVjgcX3zHcjTz7hYYe. Datos de Orel: «Acopio tiene equipos individuales en línea»; «Sistema 1 es de Chonchi, Sistema 2 de Yal»; caseta agua mar, estanques y RILES «influyen indirectamente, hay que tenerlos».
+- ⚠ **El Sistema de bombeo N2 NO se movió en el árbol**: ACOPIO (`aq-in-cho-acop`) cuelga del SITIO, al lado de PLANTA CHONCHI y PLANTA YAL (compartido), y su ubicación técnica es la de SAP. Se marca en el editor (`DE_OTRA_PLANTA`: «de Yal», no cuenta en Chonchi; fuera de la propuesta).
+- **Acopio por componentes**: la propuesta despliega el Sistema N1 (ducto succión → bombas vacío N1/N2 en paralelo → ducto descarga; el resto de sus componentes a mano, sin unir). Inspector → «Desplegar componentes» para cualquier equipo con hijos. `indiceEquipos` nombra también a los componentes.
+- **Servicios de apoyo**: zona `tipo: 'apoyo'` (violeta `--cat-6-ink`, punteada) con secciones del árbol (Almacenamiento aguas, Estanque de transferencia AM, Pozos profundos, Planta RILES, Sala de máquinas, Caldera, Freón, Subestación) + Caseta agua mar. Flechas «abastece» (servicio → línea) / «recibe» (línea → servicio; las bombas de vacío de la tolva de vísceras están en RILES). `pesosPorLinea` IGNORA esas flechas (no reparten flujo: el efecto no es proporcional); `relacionesDeServicios` dice qué líneas toca cada uno.
+- **HIG**: inspector de la selección (peso, «si se detiene 30 min = N min de línea», componentes, acciones; flechas explicadas), deshacer/rehacer (Ctrl+Z / Ctrl+Mayús+Z, botones, aviso «Se quitó… · Deshacer»), aviso al salir con cambios, grilla de 16 px, zona de destino resaltada solo mientras se arrastra encima, `ariaLabel` en nodos y flechas.
+- Verificado con la sesión real (sin guardar): 57 nodos / 44 flechas; ducto 100 %, bombas de vacío 50 %; estanque «abastece a Eviscerado», RILES «recibe de Eviscerado»; N2 «de Yal»; inspector; Supr → N1 sube a 100 % + aviso con Deshacer; Ctrl+Z restaura (44 flechas, 50 %); desplegar agrega el componente.
+- 11 tests del modelo (3 nuevos de servicios). tsc 0 · eslint 30 · vitest 2.873 · auditorías OK · build OK (chunk 70,5 KB gz).
+- Estado: HECHO.
+
 ## 2026-09-19 · Admin · Editor de líneas de proceso (grafo)
 - Idea de Orel: «tiempo reloj no es tiempo máquina» (1 de 3 Baader = 33 % de Eviscerado) → establecer qué máquinas forman cada línea y cómo influyen; «como esos programas donde arrastras y unes con líneas». Prototipos: columnas (DuwE9Y9tRKiBsf5ZyQp692) → grafo (https://claude.ai/artifact/G4KbK1RAYafiJXabWQGFNf), aprobado para el panel admin.
 - Nueva herramienta `/admin/lineas-proceso` (AdminRoute + RequireReAuth, fila «Líneas de proceso» en el panel). React Flow (`@xyflow/react` 12.11, MIT; agregado con **pnpm** — ⚠ `npm install` falla en este repo por el `prepare` de react-zoom-pan-pinch) en un chunk perezoso (66 KB gz).

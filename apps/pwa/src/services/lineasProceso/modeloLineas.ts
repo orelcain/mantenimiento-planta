@@ -11,11 +11,19 @@
  * entrada de OTRA línea marca la cadena entre líneas y ahí se corta el cálculo.
  *
  * Supuesto declarado: las ramas en paralelo tienen la misma capacidad.
+ *
+ * SERVICIOS DE APOYO (Orel, 19-09-2026): Caseta agua mar, estanques de agua, Planta
+ * RILES, sala de máquinas… no detienen la línea directo pero influyen. Viven en una
+ * zona de tipo `apoyo`; sus flechas son «abastece a» (servicio → línea) o «recibe de»
+ * (línea → servicio) y NO entran al cálculo de pesos: si RILES falla, la línea sigue
+ * un rato y el efecto no es proporcional (mezclarlo falsearía los pesos).
  */
 
 export interface LineaProceso {
   id: string
   nombre: string
+  /** `apoyo` = zona de servicios que influyen indirectamente (sin entrada ni pesos). */
+  tipo?: 'linea' | 'apoyo'
   /** Zona del lienzo (px del lienzo): solo dibujo. */
   zona: { x: number; y: number; w: number; h: number }
 }
@@ -35,6 +43,9 @@ export interface GrafoLineas {
   aristas: [string, string][]
 }
 
+/** Tamaño de la tarjeta de un equipo en el lienzo (px): para saber en qué zona cae su centro. */
+export const NODO = { ancho: 176, alto: 62 }
+
 export const PREFIJO_ENTRADA = 'in:'
 export const esEntrada = (id: string) => id.startsWith(PREFIJO_ENTRADA)
 export const lineaDeEntrada = (id: string) => id.slice(PREFIJO_ENTRADA.length)
@@ -51,15 +62,18 @@ export interface PesoEnLinea {
  */
 export function pesosPorLinea(g: Pick<GrafoLineas, 'lineas' | 'nodos' | 'aristas'>): Map<string, PesoEnLinea> {
   const existe = new Set(g.nodos.map((n) => n.id))
+  const servicios = serviciosDe(g)
   const salidas = new Map<string, string[]>()
   for (const [a, b] of g.aristas) {
-    if (!existe.has(a) || !existe.has(b) || a === b) continue
+    // Las flechas de los servicios de apoyo son indirectas: no reparten flujo.
+    if (!existe.has(a) || !existe.has(b) || a === b || servicios.has(a) || servicios.has(b)) continue
     const lista = salidas.get(a) ?? []
     if (!lista.includes(b)) lista.push(b)
     salidas.set(a, lista)
   }
   const res = new Map<string, PesoEnLinea>()
   for (const l of g.lineas) {
+    if (l.tipo === 'apoyo') continue
     const ini = PREFIJO_ENTRADA + l.id
     if (!existe.has(ini)) continue
     // Lo alcanzable desde la entrada, sin cruzar a la entrada de otra línea.
@@ -98,6 +112,48 @@ export function pesosPorLinea(g: Pick<GrafoLineas, 'lineas' | 'nodos' | 'aristas
 export function formatoPeso(p: number): string {
   const v = Math.round(p * 1000) / 10
   return `${Number.isInteger(v) ? v : v.toLocaleString('es-CL')} %`
+}
+
+/** Los equipos que están en una zona de servicios de apoyo (por el centro de su tarjeta). */
+export function serviciosDe(g: Pick<GrafoLineas, 'lineas' | 'nodos'>): Set<string> {
+  const apoyo = g.lineas.filter((l) => l.tipo === 'apoyo')
+  const out = new Set<string>()
+  if (!apoyo.length) return out
+  for (const n of g.nodos) {
+    if (esEntrada(n.id)) continue
+    if (lineaEnPunto(apoyo, n.x + NODO.ancho / 2, n.y + NODO.alto / 2)) out.add(n.id)
+  }
+  return out
+}
+
+export interface RelacionServicio {
+  /** Líneas a las que abastece (flecha servicio → línea). */
+  abastece: string[]
+  /** Líneas de las que recibe (flecha línea → servicio), p. ej. RILES recibe vísceras de Eviscerado. */
+  recibe: string[]
+}
+
+/** Qué líneas toca cada servicio de apoyo, según sus flechas (lineaId, sin repetir). */
+export function relacionesDeServicios(g: Pick<GrafoLineas, 'lineas' | 'nodos' | 'aristas'>, pesos: Map<string, PesoEnLinea>): Map<string, RelacionServicio> {
+  const servicios = serviciosDe(g)
+  const lineaDe = (id: string) => (esEntrada(id) ? lineaDeEntrada(id) : pesos.get(id)?.lineaId)
+  const out = new Map<string, RelacionServicio>()
+  const de = (id: string) => {
+    const r = out.get(id) ?? { abastece: [], recibe: [] }
+    out.set(id, r)
+    return r
+  }
+  for (const s of servicios) de(s)
+  for (const [a, b] of g.aristas) {
+    if (servicios.has(a) && !servicios.has(b)) {
+      const l = lineaDe(b)
+      if (l && !de(a).abastece.includes(l)) de(a).abastece.push(l)
+    } else if (servicios.has(b) && !servicios.has(a)) {
+      const l = lineaDe(a)
+      if (l && !de(b).recibe.includes(l)) de(b).recibe.push(l)
+    }
+  }
+  return out
 }
 
 /** La línea en cuya zona cae un punto (para decir «fuera de la línea · Eviscerado»). */
