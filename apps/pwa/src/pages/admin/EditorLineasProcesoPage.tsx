@@ -587,6 +587,110 @@ function MenuContextual({ menu, onCerrar }: { menu: MenuCtx; onCerrar: () => voi
   )
 }
 
+/**
+ * Buscador que aparece donde se soltó una flecha en el vacío (patrón «Add Node on Edge
+ * Drop» de React Flow, que es el *append* de bpmn-js): se elige el equipo y queda creado
+ * Y unido de una. Antes eran cuatro pasos: buscarlo en la lista, arrastrarlo, confirmar el
+ * contenedor y recién ahí unirlo.
+ */
+function BuscadorSuelto({
+  x,
+  y,
+  desde,
+  zona,
+  opciones,
+  onElegir,
+  onManual,
+  onCerrar,
+}: {
+  x: number
+  y: number
+  desde: string
+  zona?: string
+  opciones: { id: string; nombre: string; codigo: string; ruta: string }[]
+  onElegir: (id: string) => void
+  onManual: () => void
+  onCerrar: () => void
+}) {
+  const caja = useRef<HTMLDivElement>(null)
+  const [consulta, setConsulta] = useState('')
+  const [pos, setPos] = useState({ x, y })
+  useEffect(() => {
+    const el = caja.current
+    if (!el) return
+    const r = el.getBoundingClientRect()
+    setPos({ x: Math.max(8, Math.min(x, window.innerWidth - r.width - 8)), y: Math.max(8, Math.min(y, window.innerHeight - r.height - 8)) })
+    el.querySelector('input')?.focus()
+  }, [x, y])
+  useEffect(() => {
+    const fuera = (ev: PointerEvent) => {
+      if (!caja.current?.contains(ev.target as globalThis.Node | null)) onCerrar()
+    }
+    const tecla = (ev: KeyboardEvent) => {
+      if (ev.key === 'Escape') {
+        ev.stopPropagation()
+        onCerrar()
+      }
+    }
+    window.addEventListener('pointerdown', fuera, true)
+    window.addEventListener('keydown', tecla, true)
+    return () => {
+      window.removeEventListener('pointerdown', fuera, true)
+      window.removeEventListener('keydown', tecla, true)
+    }
+  }, [onCerrar])
+  const t = consulta.trim().toLowerCase()
+  const lista = (t ? opciones.filter((o) => o.nombre.toLowerCase().includes(t) || o.codigo.toLowerCase().includes(t)) : opciones).slice(0, 40)
+  return (
+    <div
+      ref={caja}
+      style={{ left: pos.x, top: pos.y }}
+      className="fixed z-[80] flex max-h-[380px] w-[330px] flex-col rounded-ctl border border-border bg-card shadow-[0_8px_28px_rgba(0,0,0,0.28)]"
+    >
+      <div className="border-b border-border p-2">
+        <p className="px-1 pb-1.5 text-caption text-muted-foreground">
+          Sigue de <b className="font-semibold text-foreground">{desde}</b>
+          {zona ? ` · entra a ${zona}` : ' · fuera de todo contenedor'}
+        </p>
+        <input
+          value={consulta}
+          onChange={(e) => setConsulta(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && lista[0]) onElegir(lista[0].id)
+          }}
+          placeholder="¿Qué equipo sigue?"
+          aria-label="Buscar el equipo que sigue"
+          className="h-[40px] w-full rounded-ctl bg-muted-foreground/10 px-3 text-campo outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        />
+      </div>
+      <ul className="min-h-0 flex-1 overflow-y-auto py-1">
+        {lista.map((o) => (
+          <li key={o.id}>
+            <button
+              type="button"
+              onClick={() => onElegir(o.id)}
+              className="flex w-full flex-col items-start px-3 py-1.5 text-left hover:bg-muted-foreground/10 focus-visible:bg-muted-foreground/10 focus-visible:outline-none"
+            >
+              <span className="w-full truncate text-footnote">{o.nombre}</span>
+              <span className="w-full truncate text-caption text-muted-foreground">{[o.codigo, o.ruta].filter(Boolean).join(' · ')}</span>
+            </button>
+          </li>
+        ))}
+        {!lista.length && <li className="px-3 py-2 text-footnote text-muted-foreground">Nada con ese nombre. Puede que ya esté en el lienzo.</li>}
+      </ul>
+      <div className="border-t border-border p-1">
+        <button
+          type="button"
+          onClick={onManual}
+          className="flex min-h-[36px] w-full items-center px-3 text-left text-footnote text-primary hover:bg-muted-foreground/10 focus-visible:outline-none"
+        >
+          Crear un elemento manual aquí…
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function Editor() {
   const navigate = useNavigate()
   const { toast } = useToast()
@@ -627,10 +731,14 @@ function Editor() {
   const [origenUnir, setOrigenUnir] = useState<string | null>(null)
   const [pedido, setPedido] = useState<Pedido | null>(null)
   const [abiertos, setAbiertos] = useState<Set<string>>(() => new Set())
-  const [manual, setManual] = useState<{ nombre: string; zona: string } | null>(null)
+  const [manual, setManual] = useState<{ nombre: string; zona: string; de?: string; flow?: { x: number; y: number } } | null>(null)
   // Contenedor elegido (las zonas no son seleccionables de React Flow: se tocan por su título).
   const [zonaSel, setZonaSel] = useState<string | null>(null)
   const [nuevaLinea, setNuevaLinea] = useState<{ nombre: string; tipo: 'linea' | 'apoyo' } | null>(null)
+  // Flecha soltada en el vacío: se pregunta qué equipo sigue y se crea unido.
+  const [siguiente, setSiguiente] = useState<{ de: string; x: number; y: number; flow: { x: number; y: number }; zona: string } | null>(null)
+  // Flecha propuesta al acercar un equipo suelto a otro: se pinta punteada y se confirma al soltar.
+  const [cercania, setCercania] = useState<{ source: string; target: string } | null>(null)
   const [menu, setMenu] = useState<MenuCtx | null>(null)
   // Renombrar: UNA entrada de deshacer por tanda de tecleo, no una por letra.
   const renombrando = useRef<string | null>(null)
@@ -932,6 +1040,27 @@ function Editor() {
     [edges, servicios, nombreDe, flujoDeFlecha, curvas, editable, ponerPuntos],
   )
 
+  // La flecha propuesta se dibuja pero NO está en `edges`: si estuviera, el editor diría
+  // «cambios sin guardar» por pasar al lado de un equipo, y se podría guardar sin querer.
+  const conPropuesta = useMemo(() => {
+    const base = verApoyo ? vistaAristas : vistaAristas.filter((e) => !servicios.has(e.source) && !servicios.has(e.target))
+    if (!cercania) return base
+    return [
+      ...base,
+      {
+        id: 'propuesta',
+        source: cercania.source,
+        target: cercania.target,
+        type: 'curva',
+        data: { puntos: [], editable: false, onPuntos: () => undefined } satisfies DatosFlecha,
+        selectable: false,
+        focusable: false,
+        style: { stroke: 'rgb(var(--brand))', strokeWidth: 2, strokeDasharray: '4 4', strokeOpacity: 0.75, vectorEffect: 'non-scaling-stroke' },
+        markerEnd: { type: MarkerType.ArrowClosed, width: 7, height: 6, color: 'rgb(var(--brand))' },
+      } satisfies Edge,
+    ]
+  }, [vistaAristas, verApoyo, servicios, cercania])
+
   const sucio = !cargando && JSON.stringify(grafo) !== guardado
   const enLienzo = useMemo(() => new Set(nodes.map((n) => n.id)), [nodes])
   const seleccionados = nodes.filter((n) => n.selected && n.type !== 'zona' && !esEntrada(n.id))
@@ -1031,6 +1160,20 @@ function Editor() {
     },
     [registrar],
   )
+  // Contenedor bajo un punto (el más chico, si se solapan), sin contar uno. Se resalta solo
+  // mientras se arrastra encima (HIG «Drag and drop»).
+  const zonaEn = useCallback(
+    (x: number, y: number, excluir?: string) => {
+      let mejor: { l: LineaProceso; area: number } | undefined
+      for (const l of lineas) {
+        if (l.id === excluir) continue
+        const z = limites.get(l.id) ?? l.zona
+        if (x >= z.x && x < z.x + z.w && y >= z.y && y < z.y + z.h && (!mejor || z.w * z.h < mejor.area)) mejor = { l, area: z.w * z.h }
+      }
+      return mejor?.l
+    },
+    [lineas, limites],
+  )
   // Solo las flechas de flujo: las de los servicios de apoyo no reparten, así que ni
   // arman círculos ni se puentean al sacar un equipo del medio.
   const aristasFlujo = useMemo(
@@ -1113,13 +1256,20 @@ function Editor() {
     (_ev: MouseEvent | TouchEvent, estado: FinalConnectionState) => {
       const de = estado.fromNode?.id
       const a = estado.toNode?.id
+      // Soltada en el vacío: se pregunta qué equipo sigue y queda creado Y unido
+      // (patrón «Add Node on Edge Drop»). Es la forma de armar la línea de corrido.
+      if (!a && de && 'clientX' in _ev) {
+        const p = screenToFlowPosition({ x: _ev.clientX, y: _ev.clientY })
+        setSiguiente({ de, x: _ev.clientX, y: _ev.clientY, flow: p, zona: zonaEn(p.x, p.y)?.id ?? '' })
+        return
+      }
       if (estado.isValid || !de || !a) return
       if (de === a) return
       if (edges.some((e) => e.source === de && e.target === a)) toast({ title: `${nombreDe(de)} y ${nombreDe(a)} ya estaban unidos` })
       else if (edges.some((e) => e.source === a && e.target === de)) toast({ title: `Ya hay una flecha al revés: ${nombreDe(a)} → ${nombreDe(de)}` })
       else if (cierraCiclo(aristasFlujo, de, a)) avisoCiclo(de, a)
     },
-    [edges, toast, nombreDe, aristasFlujo, avisoCiclo],
+    [edges, toast, nombreDe, aristasFlujo, avisoCiclo, screenToFlowPosition, zonaEn],
   )
 
   // La flecha de vuelta que arma el círculo (A → B y B → A), para poder nombrarla.
@@ -1219,20 +1369,6 @@ function Editor() {
     [avisoQuitado, nombreDe, aplicarPuentes, servicios],
   )
 
-  // Contenedor bajo un punto (el más chico, si se solapan), sin contar uno. Se resalta solo
-  // mientras se arrastra encima (HIG «Drag and drop»).
-  const zonaEn = useCallback(
-    (x: number, y: number, excluir?: string) => {
-      let mejor: { l: LineaProceso; area: number } | undefined
-      for (const l of lineas) {
-        if (l.id === excluir) continue
-        const z = limites.get(l.id) ?? l.zona
-        if (x >= z.x && x < z.x + z.w && y >= z.y && y < z.y + z.h && (!mejor || z.w * z.h < mejor.area)) mejor = { l, area: z.w * z.h }
-      }
-      return mejor?.l
-    },
-    [lineas, limites],
-  )
   const alArrastrarEncima = (ev: DragEvent) => {
     ev.preventDefault()
     const p = screenToFlowPosition({ x: ev.clientX, y: ev.clientY })
@@ -1561,18 +1697,84 @@ function Editor() {
     })
   }
 
+  /**
+   * Lo que se puede poner después de una flecha soltada en el vacío: todo el árbol menos
+   * lo que ya está en el lienzo (ponerlo dos veces rompería el reparto del flujo).
+   */
+  const opcionesSiguiente = useMemo(
+    () =>
+      [...indice.entries()]
+        .filter(([id]) => !enLienzo.has(id))
+        .map(([id, e]) => ({ id, nombre: e.nombre, codigo: e.codigo, ruta: e.ruta.join(' › ') })),
+    [indice, enLienzo],
+  )
+  const crearSiguiente = (id: string) => {
+    if (!siguiente) return
+    registrar()
+    setNodes((ns) => [
+      ...ns,
+      {
+        id,
+        type: 'maquina',
+        position: { x: Math.round(siguiente.flow.x - NODO.ancho / 2), y: Math.round(siguiente.flow.y - NODO.alto / 2) },
+        data: { zona: siguiente.zona } satisfies DatosBase,
+      },
+    ])
+    setEdges((es) => addEdge({ source: siguiente.de, target: id, id: `${siguiente.de}->${id}` }, es))
+    setSiguiente(null)
+    toast({
+      title: `${nombreDe(siguiente.de)} → ${nombreDe(id)}`,
+      description: siguiente.zona ? `Quedó dentro de ${nombreLinea.get(siguiente.zona) ?? siguiente.zona}.` : 'Quedó fuera de todo contenedor.',
+    })
+  }
+
+  /**
+   * Acercar un equipo a otro propone la flecha (patrón «Proximity Connect» de React Flow):
+   * se pinta punteada mientras se arrastra y se hace de verdad al soltar.
+   *
+   * Solo se propone cuando el equipo que se mueve NO tiene ninguna flecha todavía — o sea,
+   * recién lo pusiste y lo estás metiendo en la cadena. Acomodar equipos ya conectados es lo
+   * que más se hace en este editor, y ahí una flecha sola sería un estorbo.
+   */
+  const proponerCercania = (movido: Node) => {
+    if (movido.type === 'zona' || movido.type === 'paralelo' || esEntrada(movido.id)) return null
+    if (edges.some((e) => e.source === movido.id || e.target === movido.id)) return null
+    const cx = movido.position.x + NODO.ancho / 2
+    const cy = movido.position.y + NODO.alto / 2
+    let mejor: { id: string; x: number; d: number } | undefined
+    for (const n of nodes) {
+      if (n.id === movido.id || n.type === 'zona' || n.type === 'paralelo') continue
+      const t = esEntrada(n.id) ? ENTRADA : NODO
+      const ox = n.position.x + t.ancho / 2
+      const oy = n.position.y + t.alto / 2
+      // Alineados a la misma altura: el flujo se dibuja de izquierda a derecha.
+      if (Math.abs(oy - cy) > 46) continue
+      const d = Math.abs(ox - cx)
+      if (d > 230 || d < 40) continue
+      if (!mejor || d < mejor.d) mejor = { id: n.id, x: ox, d }
+    }
+    if (!mejor) return null
+    const par = mejor.x < cx ? { source: mejor.id, target: movido.id } : { source: movido.id, target: mejor.id }
+    if (esEntrada(par.target)) return null
+    if (edges.some((e) => e.source === par.source && e.target === par.target)) return null
+    if (cierraCiclo(aristasFlujo, par.source, par.target)) return null
+    return par
+  }
+
   // Elemento manual: algo que no está en el árbol, creado aquí (Orel, 19-09-2026).
   const crearManual = () => {
     if (!manual?.nombre.trim()) return
     const id = `${PREFIJO_MANUAL}${Date.now().toString(36)}`
     const lim = manual.zona ? limites.get(manual.zona) : undefined
-    // Debajo de lo que ya tiene: el contenedor crece para recibirlo, sin encimarlo.
-    const p = lim ? { x: lim.x + 24 + NODO.ancho / 2, y: lim.y + lim.h + NODO.alto / 2 } : centroVista()
+    // Si nació de una flecha soltada, va justo ahí; si no, debajo de lo que el contenedor
+    // ya tiene, que así crece para recibirlo sin encimarlo.
+    const p = manual.flow ?? (lim ? { x: lim.x + 24 + NODO.ancho / 2, y: lim.y + lim.h + NODO.alto / 2 } : centroVista())
     registrar()
     setNodes((ns) => [
       ...ns,
-      { id, type: 'maquina', position: { x: p.x - NODO.ancho / 2, y: p.y - NODO.alto / 2 }, data: { zona: manual.zona, nombre: manual.nombre.trim().replace(/\s+/g, ' ') } satisfies DatosBase },
+      { id, type: 'maquina', position: { x: Math.round(p.x - NODO.ancho / 2), y: Math.round(p.y - NODO.alto / 2) }, data: { zona: manual.zona, nombre: manual.nombre.trim().replace(/\s+/g, ' ') } satisfies DatosBase },
     ])
+    if (manual.de) setEdges((es) => addEdge({ source: manual.de!, target: id, id: `${manual.de}->${id}` }, es))
     setManual(null)
   }
 
@@ -1940,7 +2142,7 @@ function Editor() {
           ) : (
             <ReactFlow
               nodes={conParalelos}
-              edges={verApoyo ? vistaAristas : vistaAristas.filter((e) => !servicios.has(e.source) && !servicios.has(e.target))}
+              edges={conPropuesta}
               nodeTypes={TIPOS}
               edgeTypes={TIPOS_FLECHA}
               onNodesChange={editable ? onNodesChange : undefined}
@@ -1982,11 +2184,29 @@ function Editor() {
               onEdgeContextMenu={editable ? (ev, e) => abrirMenu(ev, itemsFlecha(e)) : undefined}
               onSelectionContextMenu={editable ? (ev, ns) => abrirMenu(ev, itemsVarios(ns)) : undefined}
               onNodeDragStart={() => registrar()}
-              onNodeDrag={(_, n) => {
+              onNodeDrag={(_, n, movidos) => {
                 const z = esEntrada(n.id) ? undefined : zonaEn(n.position.x + NODO.ancho / 2, n.position.y + NODO.alto / 2, contenedorDeNodo(n))
                 setZonaResaltada(z ? `zona:${z.id}` : null)
+                setCercania(movidos.length > 1 ? null : proponerCercania(n))
               }}
-              onNodeDragStop={(_, n, movidos) => alSoltarNodos(movidos.length ? movidos : [n])}
+              onNodeDragStop={(_, n, movidos) => {
+                if (cercania) {
+                  registrar()
+                  const { source, target } = cercania
+                  setEdges((es) => addEdge({ source, target, id: `${source}->${target}` }, es))
+                  toast({
+                    title: `${nombreDe(source)} → ${nombreDe(target)}`,
+                    description: 'Quedaron unidos por quedar al lado.',
+                    action: (
+                      <ToastAction altText="Deshacer" onClick={deshacer}>
+                        Deshacer
+                      </ToastAction>
+                    ),
+                  })
+                  setCercania(null)
+                }
+                alSoltarNodos(movidos.length ? movidos : [n])
+              }}
               isValidConnection={esValida}
               nodesDraggable={editable && !modoUnir && !modoGrupo}
               nodesConnectable={editable}
@@ -2232,6 +2452,22 @@ function Editor() {
       </div>
 
       {menu && <MenuContextual menu={menu} onCerrar={() => setMenu(null)} />}
+
+      {siguiente && (
+        <BuscadorSuelto
+          x={siguiente.x}
+          y={siguiente.y}
+          desde={nombreDe(siguiente.de)}
+          zona={siguiente.zona ? (nombreLinea.get(siguiente.zona) ?? siguiente.zona) : undefined}
+          opciones={opcionesSiguiente}
+          onElegir={crearSiguiente}
+          onManual={() => {
+            setManual({ nombre: '', zona: siguiente.zona, de: siguiente.de, flow: siguiente.flow })
+            setSiguiente(null)
+          }}
+          onCerrar={() => setSiguiente(null)}
+        />
+      )}
 
       {/* Entrar, salir o cambiar de contenedor: siempre se pregunta. Cancelar lo devuelve. */}
       <Sheet
