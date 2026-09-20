@@ -66,6 +66,8 @@ export function escucharInspeccion(
         iniciadaEn: d.iniciadaEn ?? '',
         iniciadaPorNombre: d.iniciadaPorNombre ?? '',
         resultados: d.resultados ?? {},
+        notas: d.notas ?? {},
+        marcas: d.marcas ?? {},
         liberacion: d.liberacion ?? null,
         actualizadoEn: d.actualizadoEn ?? null,
       })
@@ -85,7 +87,12 @@ export async function iniciarInspeccion(base: Omit<Inspeccion, 'id' | 'resultado
   )
 }
 
-/** Marca un punto de la pauta. `null` lo deja otra vez sin revisar. */
+/**
+ * Marca un punto de la pauta. `null` lo deja otra vez sin revisar.
+ *
+ * Guarda también CUÁNDO se marcó: siete marcas repartidas en media hora son un recorrido,
+ * siete en el mismo minuto son una firma de un tirón. No se le pide nada al técnico.
+ */
 export async function marcarCriterio(
   plantId: string,
   turnoId: string,
@@ -94,8 +101,21 @@ export async function marcarCriterio(
 ): Promise<void> {
   await setDoc(
     doc(db, COLECCION_INSPECCIONES, idDeInspeccion(plantId, turnoId)),
-    // Campo anidado por ruta: no reescribe los demás resultados.
-    { resultados: { [criterioId]: resultado }, actualizadoEn: serverTimestamp() },
+    // Campo anidado: el merge de Firestore no pisa los demás resultados.
+    {
+      resultados: { [criterioId]: resultado },
+      marcas: { [criterioId]: resultado ? new Date().toISOString() : null },
+      actualizadoEn: serverTimestamp(),
+    },
+    { merge: true },
+  )
+}
+
+/** «Conforme, pero…»: lo menor que no amerita abrir una desviación. Vacío la borra. */
+export async function anotarCriterio(plantId: string, turnoId: string, criterioId: string, nota: string): Promise<void> {
+  await setDoc(
+    doc(db, COLECCION_INSPECCIONES, idDeInspeccion(plantId, turnoId)),
+    { notas: { [criterioId]: nota.trim().slice(0, 300) || null }, actualizadoEn: serverTimestamp() },
     { merge: true },
   )
 }

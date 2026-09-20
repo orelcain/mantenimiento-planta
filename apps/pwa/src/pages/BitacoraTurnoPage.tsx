@@ -30,7 +30,8 @@ import { FUENTE_FIRESTORE, useTurnoMantencionActual, type FuenteBitacora } from 
 import { BITACORA_PLANTA } from '@/config/bitacora'
 import { PanelInspeccion } from '@/components/bitacora/PanelInspeccion'
 import { useInspeccion } from '@/hooks/useInspeccion'
-import { iniciarInspeccion, liberarPlanta, marcarCriterio } from '@/services/inspecciones/inspecciones.service'
+import { anotarCriterio, iniciarInspeccion, liberarPlanta, marcarCriterio } from '@/services/inspecciones/inspecciones.service'
+import { TEXTO_LIBERACION, frasePorLiberacion } from '@/services/inspecciones/modeloInspeccion'
 import { encabezadoEvento, etiquetaTipo, posicionAlMover, posicionEnIndice, tieneHora, tiposPropiosUsados, tituloDe } from '@/services/bitacora/presentacionEvento'
 import { copiarHtml, copiarTexto } from '@/lib/clipboard'
 import type { EnlaceInspeccion, EventoBitacora, FotoEvento, TurnoMantencion } from '@/services/bitacora/bitacora.types'
@@ -263,6 +264,36 @@ export function BitacoraTurnoVista({
     },
     [toast],
   )
+
+  /**
+   * §9 del procedimiento: «Informar al supervisor». No se inventa un canal — es el mismo
+   * `navigator.share` con que ya sale la bitácora, y el texto se arma con lo que quedó
+   * registrado, no con lo que alguien recuerde.
+   */
+  const avisarDeLaLiberacion = useCallback(async () => {
+    const l = inspeccion?.liberacion
+    if (!l) return
+    const lineas = [
+      `*${pauta.nombre}*`,
+      `${BITACORA_PLANTA.nombre} · ${etiquetaCortaTurno(turno.id)} · ${turno.fecha}`,
+      '',
+      `*${TEXTO_LIBERACION[l.estado].titulo}* — ${frasePorLiberacion(l.estado, resumenInsp)}`,
+      `${resumenInsp.revisados} de ${resumenInsp.total} puntos revisados${resumenInsp.minutosDeRecorrido != null ? ` en ${resumenInsp.minutosDeRecorrido} min` : ''}.`,
+    ]
+    if (resumenInsp.pendientesCriticos > 0) {
+      lineas.push(`⚠ ${resumenInsp.pendientesCriticos} desviación(es) abierta(s) que detienen una línea.`)
+    }
+    const abiertas = desviaciones.filter((d) => d.pendiente && !d.cierre)
+    if (abiertas.length) {
+      lineas.push('', '*Queda abierto:*', ...abiertas.map((d) => `• ${d.equipo || 'Sin equipo'} — ${d.descripcion}`))
+    }
+    lineas.push('', `Liberada ${new Date(l.en).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })} · ${l.porNombre}`)
+    try {
+      await compartirMensaje(lineas.join('\n'))
+    } catch {
+      toast({ title: 'No se pudo compartir', description: 'Copia el texto a mano desde la pantalla.', variant: 'destructive' })
+    }
+  }, [inspeccion?.liberacion, pauta.nombre, turno, resumenInsp, desviaciones, toast])
 
   const iniciarLaInspeccion = useCallback(
     () =>
@@ -880,6 +911,8 @@ export function BitacoraTurnoVista({
             onMarcar={(criterioId, resultado) =>
               void conAviso(() => marcarCriterio(BITACORA_PLANTA.id, turno.id, criterioId, resultado))
             }
+            onAnotar={(criterioId, nota) => void conAviso(() => anotarCriterio(BITACORA_PLANTA.id, turno.id, criterioId, nota))}
+            onAvisarSupervisor={() => void avisarDeLaLiberacion()}
             onNuevaDesviacion={(criterioId) =>
               inspeccion && setEditor({ evento: null, idNuevo: nuevoId(), turno, desdeInspeccion: { id: inspeccion.id, criterioId } })
             }
