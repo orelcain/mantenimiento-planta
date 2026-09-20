@@ -30,7 +30,7 @@ import {
   type NodeProps,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { Boxes, ChevronDown, Crosshair, Droplets, ChevronLeft, ChevronRight, Expand, HelpCircle, Loader2, Maximize2, Minimize2, Minus, PanelLeftClose, PanelLeftOpen, Plus, Redo2, RotateCcw, Search, Split, Spline, Trash2, Undo2, X } from 'lucide-react'
+import { Boxes, ChevronDown, Crosshair, Droplets, ChevronLeft, ChevronRight, Expand, HelpCircle, Loader2, Maximize2, Minimize2, Minus, PanelLeftClose, PanelLeftOpen, Plus, Redo2, RotateCcw, Search, Split, Spline, Stethoscope, Trash2, Undo2, X } from 'lucide-react'
 import { Button, Sheet } from '@/components/piel'
 import { ToastAction } from '@/components/ui/toast'
 import { useHierarchyTree } from '@/hooks/useHierarchy'
@@ -52,6 +52,8 @@ import {
   PREFIJO_GRUPO,
   formatoPeso,
   idDeContenedor,
+  revisionDeLineas,
+  type HallazgoRevision,
   parteDe,
   repartoDisparejo,
   limitesDeGrupo,
@@ -439,6 +441,65 @@ function ItemsLeyenda() {
       <span className="text-muted-foreground">– – entre líneas</span>
       <span className="rounded-full bg-[rgb(var(--brand)/0.14)] px-2 text-[rgb(var(--brand-ink))]">grupo en paralelo</span>
     </>
+  )
+}
+
+/**
+ * Un grupo del panel de revisión. Los grupos VACÍOS también se muestran, con su explicación:
+ * esconder la categoría esconde qué se está vigilando, y el día que aparezca uno nadie sabría
+ * qué significa (HIG «Tab bars»: explicar el vacío en vez de esconderlo).
+ */
+function GrupoRevision({
+  titulo,
+  porque,
+  vacio,
+  items,
+  grave,
+  nombreDe,
+  nombreLinea,
+  onIr,
+}: {
+  titulo: string
+  porque: string
+  vacio: string
+  items: HallazgoRevision[]
+  grave?: boolean
+  nombreDe: (id: string) => string
+  nombreLinea: Map<string, string>
+  onIr: (id: string) => void
+}) {
+  return (
+    <section className="flex flex-col gap-1.5">
+      <div className="flex items-baseline justify-between gap-2">
+        <h3 className="text-subhead font-semibold">{titulo}</h3>
+        <span
+          className={`rounded-full px-2 text-caption font-semibold tabular-nums ${
+            !items.length ? 'bg-muted-foreground/12 text-muted-foreground' : grave ? 'bg-ink-crit/15 text-ink-crit' : 'bg-ink-warn/15 text-ink-warn'
+          }`}
+        >
+          {items.length}
+        </span>
+      </div>
+      <p className="text-caption leading-snug text-muted-foreground">{items.length ? porque : vacio}</p>
+      {items.length > 0 && (
+        <ul className="flex flex-col gap-1">
+          {items.map((h) => (
+            <li key={h.id}>
+              <button
+                type="button"
+                onClick={() => onIr(h.id)}
+                className="flex min-h-[44px] w-full items-center justify-between gap-3 rounded-ctl bg-muted-foreground/10 px-3 text-left hover:bg-muted-foreground/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                <span className="min-w-0 flex-1 truncate text-footnote">{nombreDe(h.id)}</span>
+                <span className="shrink-0 text-caption tabular-nums text-muted-foreground">
+                  {formatoPeso(h.peso)} · {nombreLinea.get(h.lineaId) ?? 'sin contenedor'}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   )
 }
 
@@ -851,6 +912,7 @@ function Editor() {
   const [compacto, setCompacto] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches)
   const [lineaVista, setLineaVista] = useState<string | null>(null)
   const [verLeyenda, setVerLeyenda] = useState(false)
+  const [verRevision, setVerRevision] = useState(false)
   const eligioLinea = useRef(false)
   // Deshacer / rehacer: instantáneas antes de cada cambio que importa (HIG «Undo and redo»).
   const pilaDeshacer = useRef<Instantanea[]>([])
@@ -933,6 +995,22 @@ function Editor() {
   const servicios = useMemo(() => serviciosDe(grafo), [grafo])
   const relaciones = useMemo(() => relacionesDeServicios(grafo, pesos), [grafo, pesos])
   const nombreLinea = useMemo(() => new Map(lineas.map((l) => [l.id, l.nombre])), [lineas])
+  /**
+   * Qué le falta al diagrama. La pregunta que contesta no es «¿está lindo?» sino **¿qué falla
+   * de la bitácora no vamos a poder cobrarle a una línea?** (Orel, 20-09-2026).
+   */
+  const revision = useMemo(() => revisionDeLineas(grafo, pesos), [grafo, pesos])
+  const pendientes = useMemo(() => {
+    // Un equipo puede estar en dos grupos (manual Y fuera de la línea): se cuenta una vez.
+    const ids = new Set<string>()
+    const porLinea = new Map<string, number>()
+    for (const h of [...revision.fueraDeLinea, ...revision.enCirculo, ...revision.sinSap]) {
+      if (ids.has(h.id)) continue
+      ids.add(h.id)
+      porLinea.set(h.lineaId, (porLinea.get(h.lineaId) ?? 0) + 1)
+    }
+    return { total: ids.size, porLinea }
+  }, [revision])
   /** A qué grupo marcado a mano pertenece cada equipo: la tarjeta y el menú lo dicen. */
   const grupoDe = useMemo(() => {
     const m = new Map<string, GrupoParalelo>()
@@ -1335,18 +1413,47 @@ function Editor() {
    * carrera contra este encuadre.
    */
   const encuadrar = useCallback(
-    (id: string | null, duration = 260) => {
-      const z = id ? limites.get(id) : null
+    (id: string | null, duration = 260): boolean => {
       const caja = lienzo.current?.getBoundingClientRect()
-      if (!z || !caja?.height) {
+      if (!caja?.height || !lineas.length) return false
+      if (!id) {
         void fitView({ padding: 0.06, duration })
-        return
+        return true
       }
+      // Sin la caja del contenedor todavía no se puede: que reintente el efecto. Caer acá a
+      // «toda la planta» dejaba el lienzo al 15 % justo en la carga, que es lo que veníamos
+      // de arreglar.
+      const z = limites.get(id)
+      if (!z?.h) return false
       // El alto manda (la línea es larga, no alta) y nunca se baja de lo legible.
       const zoom = Math.min(1, Math.max(ZOOM_LEGIBLE, (caja.height - 48) / z.h))
       void setViewport({ zoom, x: 20 - z.x * zoom, y: caja.height / 2 - (z.y + z.h / 2) * zoom }, { duration })
+      return true
     },
-    [fitView, limites, setViewport],
+    [fitView, limites, lineas.length, setViewport],
+  )
+
+  /**
+   * Desde el panel de revisión al equipo: se centra y se deja elegido.
+   *
+   * ⚠ Igual que `encuadrar`: se calcula a mano en vez de `fitView({ nodes })`, que en este
+   * grafo no aterriza porque los nodos no siempre llegan medidos.
+   */
+  const irAlEquipo = useCallback(
+    (id: string) => {
+      setVerRevision(false)
+      setZonaSel(null)
+      setNodes((ns) => ns.map((n) => (n.selected === (n.id === id) ? n : { ...n, selected: n.id === id })))
+      const n = grafo.nodos.find((x) => x.id === id)
+      const caja = lienzo.current?.getBoundingClientRect()
+      if (!n || !caja?.height) return
+      const t = esEntrada(n.id) ? ENTRADA : NODO
+      setViewport(
+        { zoom: 1, x: caja.width / 2 - (n.x + t.ancho / 2), y: caja.height / 2 - (n.y + t.alto / 2) },
+        { duration: 320 },
+      )
+    },
+    [grafo, setViewport],
   )
 
   // La primera línea de proceso es la que se abre en celular.
@@ -1356,11 +1463,21 @@ function Editor() {
     setLineaVista(lineas.find((l) => l.tipo !== 'apoyo')?.id ?? null)
   }, [lineas])
 
-  // Al cambiar de chip —o al pasar a celular— el lienzo va a esa línea.
+  // Al cambiar de chip —o al pasar a celular— el lienzo va a esa línea, reintentando por
+  // cuadro hasta que el contenedor tenga caja.
   useEffect(() => {
     if (!compacto || cargando) return
-    const t = window.setTimeout(() => encuadrar(lineaVista), 120)
-    return () => window.clearTimeout(t)
+    let vivo = true
+    let intentos = 0
+    const probar = () => {
+      if (!vivo) return
+      if (encuadrar(lineaVista) || (intentos += 1) > 60) return
+      requestAnimationFrame(probar)
+    }
+    requestAnimationFrame(probar)
+    return () => {
+      vivo = false
+    }
   }, [compacto, cargando, lineaVista, encuadrar])
 
   const volver = () => {
@@ -2412,6 +2529,20 @@ function Editor() {
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
+              onClick={() => setVerRevision(true)}
+              title="Qué le falta a este diagrama"
+              className={`flex min-h-[44px] items-center gap-1.5 rounded-full px-3 text-footnote font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary [&>svg]:size-4 ${
+                pendientes.total ? 'text-ink-warn hover:bg-ink-warn/10' : 'text-primary hover:bg-muted-foreground/10'
+              }`}
+            >
+              <Stethoscope aria-hidden />
+              Revisión
+              {pendientes.total > 0 && (
+                <span className="rounded-full bg-ink-warn/15 px-1.5 tabular-nums">{pendientes.total}</span>
+              )}
+            </button>
+            <button
+              type="button"
               onClick={() => setVerApoyo((v) => !v)}
               aria-pressed={verApoyo}
               title={verApoyo ? 'Esconder los servicios de apoyo' : 'Mostrar los servicios de apoyo'}
@@ -2504,13 +2635,33 @@ function Editor() {
                 >
                   {l?.tipo === 'apoyo' ? <Droplets aria-hidden /> : null}
                   {l ? l.nombre : 'Toda la planta'}
+                  {!!id && !!pendientes.porLinea.get(id) && (
+                    <span
+                      aria-label={`${pendientes.porLinea.get(id)} por revisar`}
+                      className={`size-1.5 rounded-full ${activo ? 'bg-primary-foreground' : 'bg-ink-warn'}`}
+                    />
+                  )}
                 </button>
               )
             })}
           </div>
-          <p className="shrink-0 border-b border-border px-4 py-1.5 text-caption tabular-nums text-muted-foreground" role="status">
-            {cifrasVista}
-          </p>
+          <div className="flex shrink-0 items-center gap-3 border-b border-border py-1.5 pl-4 pr-2">
+            <p className="min-w-0 flex-1 truncate text-caption tabular-nums text-muted-foreground">
+              {cifrasVista}
+            </p>
+            {/* Sin un tercer botón flotante sobre el lienzo: la propia cifra es la puerta.
+                El número es el del DIAGRAMA, no el de la línea, porque eso es lo que abre;
+                lo de cada línea lo dice el punto de su chip. */}
+            {pendientes.total > 0 && (
+              <button
+                type="button"
+                onClick={() => setVerRevision(true)}
+                className="flex min-h-[32px] shrink-0 items-center gap-1 rounded-full bg-ink-warn/12 px-2.5 text-caption font-semibold tabular-nums text-ink-warn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                Revisión · {pendientes.total}
+              </button>
+            )}
+          </div>
         </>
       )}
 
@@ -3025,6 +3176,50 @@ function Editor() {
             </ul>
           </div>
         )}
+      </Sheet>
+
+      {/* Qué le falta al diagrama, desde «¿qué falla no vamos a poder cobrar?». */}
+      <Sheet
+        open={verRevision}
+        onClose={() => setVerRevision(false)}
+        title="Qué le falta a este diagrama"
+        description="Cada cosa de acá es una falla de la bitácora que no le vamos a poder cobrar a ninguna línea."
+      >
+        <div className="flex flex-col gap-5">
+          <GrupoRevision
+            titulo="Fuera de la línea"
+            porque="Están dibujados, pero no les llega el flujo desde ninguna entrada: su parada vale 0 minutos de línea."
+            vacio="Ninguno: a todos los equipos les llega el flujo."
+            items={revision.fueraDeLinea}
+            grave
+            nombreDe={nombreDe}
+            nombreLinea={nombreLinea}
+            onIr={irAlEquipo}
+          />
+          <GrupoRevision
+            titulo="Sin código SAP"
+            porque="Existen solo en el diagrama. La bitácora liga por código de equipo, así que una falla en ellos no se puede anotar contra nada."
+            vacio="Ninguno: todos los equipos del diagrama existen en la jerarquía."
+            items={revision.sinSap}
+            nombreDe={nombreDe}
+            nombreLinea={nombreLinea}
+            onIr={irAlEquipo}
+          />
+          <GrupoRevision
+            titulo="En círculo"
+            porque="Un círculo de flechas deja sin cuota a todo lo que viene después."
+            vacio="Ninguno."
+            items={revision.enCirculo}
+            grave
+            nombreDe={nombreDe}
+            nombreLinea={nombreLinea}
+            onIr={irAlEquipo}
+          />
+          <p className="border-t border-border pt-3 text-caption tabular-nums text-muted-foreground">
+            {revision.equipos} equipos · {revision.conFlujo} con flujo ·{' '}
+            {lineas.filter((l) => l.tipo !== 'apoyo').length} líneas
+          </p>
+        </div>
       </Sheet>
 
       {/* Qué significa cada trazo: en celular no cabe fijo sobre el lienzo. */}
