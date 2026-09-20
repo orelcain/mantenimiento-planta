@@ -192,6 +192,12 @@ function PuntosUnion({ claro }: { claro?: boolean }) {
       >
         <span aria-hidden style={{ width: visible, height: visible }} className={`pointer-events-none rounded-full ${punto}`} />
       </Handle>
+      {/* Puntos de HABILITACIÓN, arriba y abajo. Convención IDEF0: lo que entra por abajo de
+          una caja es lo que la hace posible (las bombas de vacío bajo la succión), y lo que
+          sale por arriba es lo que uno habilita. No se ven ni se agarran: los usan solo las
+          flechas «habilita», para que la posición diga el significado sin leer la etiqueta. */}
+      <Handle type="source" id="arriba" position={Position.Top} isConnectableStart={false} className="!size-0 !min-h-0 !min-w-0 !border-0 !bg-transparent !opacity-0" />
+      <Handle type="target" id="abajo" position={Position.Bottom} isConnectableStart={false} className="!size-0 !min-h-0 !min-w-0 !border-0 !bg-transparent !opacity-0" />
     </>
   )
 }
@@ -1090,6 +1096,7 @@ function Editor() {
         return {
           ...e,
           type: 'curva',
+          ...(habilita ? { sourceHandle: 'arriba', targetHandle: 'abajo' } : {}),
           data: {
             puntos: curvas.find((c) => c.a === e.source && c.b === e.target)?.puntos ?? [],
             editable,
