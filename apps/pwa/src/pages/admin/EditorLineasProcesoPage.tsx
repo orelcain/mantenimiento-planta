@@ -387,7 +387,7 @@ function NodoParalelo({ data }: NodeProps<Node<DatosParalelo>>) {
         }}
         style={{ pointerEvents: 'all' }}
         title={data.manual ? 'Grupo marcado a mano: tócalo para editarlo o usa el clic derecho' : 'No es un grupo: se dedujo de las flechas'}
-        className={`nodrag nopan absolute -top-3 left-4 flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-semibold disabled:cursor-default ${
+        className={`nodrag nopan absolute -top-3 left-4 flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[10.5px] font-semibold disabled:cursor-default ${
           data.manual ? 'bg-[rgb(var(--brand)/0.2)] text-[rgb(var(--brand-ink))] ring-1 ring-[rgb(var(--brand)/0.5)]' : 'bg-card text-muted-foreground ring-1 ring-border'
         }`}
       >
