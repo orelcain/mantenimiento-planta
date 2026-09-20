@@ -1,0 +1,228 @@
+/**
+ * Inspección de planta post-aseo / detención prolongada (procedimiento de Mantención,
+ * traído por Orel el 20-09-2026).
+ *
+ * Cada domingo, después del aseo semanal, Mantención recorre una pauta y le entrega la planta
+ * a Producción. Hoy eso ocurre y no queda en ninguna parte: ni qué se revisó, ni qué se
+ * encontró, ni que hubo que **correr a arreglarlo** para que el proceso partiera a la hora.
+ * Eso último es el trabajo que nadie cuenta.
+ *
+ * ⚠ El procedimiento dice que la planta no se libera con desviaciones críticas pendientes, pero
+ * Orel fue explícito: «en la realidad en ese momento tenemos que correr a solucionar para que el
+ * proceso arranque igual». Una app que bloquee algo que en terreno igual ocurre solo enseña a
+ * saltársela. Por eso acá NO hay portón: hay tres formas honestas de liberar y el estado se
+ * DEDUCE de lo encontrado, no lo marca nadie (ver `resumenDeInspeccion`).
+ *
+ * Una desviación NO es un registro nuevo: es un evento de bitácora con `tipo: 'inspeccion'`.
+ * Así suma al MTTR, arrastra pendientes al turno siguiente y sale en el informe, sin un
+ * registro paralelo que nadie cruza.
+ */
+
+/** Lo que se marca en cada punto de la pauta. */
+export type ResultadoCriterio = 'conforme' | 'no-conforme'
+
+export interface CriterioPauta {
+  id: string
+  titulo: string
+  /** El texto del procedimiento: guía del técnico, plegada bajo el criterio. */
+  ayuda: string
+}
+
+export interface PautaInspeccion {
+  id: string
+  nombre: string
+  /**
+   * Sube cada vez que se edita la pauta. Cada inspección guarda con cuál se hizo, así que
+   * cambiarla no reescribe la historia.
+   */
+  version: number
+  criterios: CriterioPauta[]
+}
+
+export type EstadoLiberacion = 'conforme' | 'corregida' | 'con-pendientes' | 'no-liberada'
+
+export interface Liberacion {
+  estado: EstadoLiberacion
+  /** ISO. */
+  en: string
+  porNombre: string
+  nota?: string
+}
+
+export interface Inspeccion {
+  id: string
+  plantId: string
+  turnoId: string
+  fechaTurno: string
+  banda: string
+  pautaId: string
+  pautaVersion: number
+  /** ISO. */
+  iniciadaEn: string
+  iniciadaPorNombre: string
+  resultados: Record<string, ResultadoCriterio>
+  liberacion?: Liberacion | null
+}
+
+/**
+ * Lo mínimo que el modelo necesita saber de una desviación. Se pasan MINUTOS DESDE EL INICIO
+ * DEL TURNO (el `posicionMin` del evento) y no `HH:mm`: los turnos cruzan la medianoche y
+ * restar horas de reloj daba negativo.
+ */
+export interface DesviacionDeInspeccion {
+  id: string
+  criterioId: string
+  pendiente: boolean
+  desdeMin: number | null
+  hastaMin: number | null
+}
+
+export interface ResumenInspeccion {
+  total: number
+  revisados: number
+  conformes: number
+  noConformes: number
+  desviaciones: number
+  pendientes: number
+  /** Qué corresponde marcar según lo encontrado. `null` = todavía falta revisar puntos. */
+  sugerido: EstadoLiberacion | null
+  /**
+   * La CORRIDA: de la primera desviación a la última cerrada. Es el trabajo que hoy no queda
+   * registrado en ninguna parte. `null` si no hubo ninguna cerrada.
+   */
+  minutosDeCorrida: number | null
+}
+
+/**
+ * Los 7 puntos del criterio de liberación del procedimiento (§10), con la guía de las
+ * secciones 3 a 7 resumida bajo cada uno.
+ *
+ * Vive acá como respaldo: la pauta de verdad se guarda en Firestore y se edita (Orel: «déjala
+ * en Firestore por si acaso, uno nunca sabe en mantención»). Si el documento no existe todavía,
+ * se usa esta.
+ */
+export const PAUTA_POST_ASEO: PautaInspeccion = {
+  id: 'post-aseo',
+  nombre: 'Inspección post-aseo / detención prolongada',
+  version: 1,
+  criterios: [
+    {
+      id: 'mecanico',
+      titulo: 'Equipos mecánicos',
+      ayuda:
+        'Alineación y centrado de las cintas. Motorreductor: fijaciones, lubricación y fugas. Estructura y soportes. Rodamientos, ejes, poleas y rodillos. Pernos y uniones. Sin objetos atrapados que interfieran con el movimiento.',
+    },
+    {
+      id: 'electrico',
+      titulo: 'Sistema eléctrico',
+      ayuda:
+        'Motores, cajas, tableros, botoneras y conexiones accesibles. Sin agua ni humedad en componentes eléctricos. Tapas, protecciones y guardas instaladas. Sin alarmas ni indicaciones anormales en el control.',
+    },
+    {
+      id: 'neumatico',
+      titulo: 'Sistema neumático',
+      ayuda:
+        'Mangueras, conexiones, racores, cilindros y válvulas. Presión de trabajo. Sin fugas de aire. Cilindros y actuadores funcionando. Mangueras bien sujetas y sin daños.',
+    },
+    {
+      id: 'seguridad',
+      titulo: 'Paradas de emergencia y protecciones',
+      ayuda:
+        'Funcionamiento de las paradas de emergencia. Sensores, interruptores de seguridad y dispositivos de protección del equipo. Guardas y protecciones en su lugar.',
+    },
+    {
+      id: 'operacional',
+      titulo: 'Prueba operacional',
+      ayuda:
+        'Marcha en vacío de los equipos principales. Sentido de giro de los motores. Desplazamiento de las cintas. Sistemas neumáticos. Sin alarmas ni fallas en el control. ⚠ Prohibido intervenir, limpiar o ajustar con el equipo en movimiento: toda intervención con riesgo va con bloqueo y etiquetado (LOTO).',
+    },
+    {
+      id: 'anomalias',
+      titulo: 'Sin fugas, ruidos ni vibraciones anormales',
+      ayuda: 'Durante la prueba: fugas, ruidos, vibraciones, golpes, calentamientos o movimientos anormales.',
+    },
+    {
+      id: 'despejado',
+      titulo: 'Sin herramientas ni objetos extraños',
+      ayuda:
+        'Sin herramientas, materiales, repuestos, piezas sueltas ni elementos de limpieza sobre los equipos. Sin acumulaciones de agua, residuos o químicos. Pisos, pasillos y accesos despejados. Tapas y protecciones desmontadas durante el aseo, reinstaladas.',
+    },
+  ],
+}
+
+/** El criterio de la pauta, o `undefined` si la pauta cambió y ese punto ya no existe. */
+export function criterioDe(pauta: PautaInspeccion, id: string): CriterioPauta | undefined {
+  return pauta.criterios.find((c) => c.id === id)
+}
+
+/**
+ * Cuenta lo hecho y DEDUCE qué corresponde marcar en la liberación.
+ *
+ * - sin desviaciones → `conforme`
+ * - con desviaciones, todas cerradas → `corregida` (se corrió y se alcanzó)
+ * - queda alguna abierta → `con-pendientes` (el procedimiento admite «corregidas **o
+ *   controladas**»)
+ *
+ * `no-liberada` nunca se sugiere: es la excepción y la marca una persona a mano.
+ */
+export function resumenDeInspeccion(
+  pauta: PautaInspeccion,
+  inspeccion: Pick<Inspeccion, 'resultados'>,
+  desviaciones: readonly DesviacionDeInspeccion[],
+): ResumenInspeccion {
+  let conformes = 0
+  let noConformes = 0
+  for (const c of pauta.criterios) {
+    const r = inspeccion.resultados[c.id]
+    if (r === 'conforme') conformes += 1
+    else if (r === 'no-conforme') noConformes += 1
+  }
+  const revisados = conformes + noConformes
+  const pendientes = desviaciones.filter((d) => d.pendiente).length
+
+  const inicios = desviaciones.map((d) => d.desdeMin).filter((m): m is number => m != null)
+  const cierres = desviaciones.filter((d) => !d.pendiente).map((d) => d.hastaMin).filter((m): m is number => m != null)
+  const minutosDeCorrida =
+    inicios.length && cierres.length ? Math.max(0, Math.max(...cierres) - Math.min(...inicios)) : null
+
+  const sugerido: EstadoLiberacion | null =
+    revisados < pauta.criterios.length ? null : !desviaciones.length ? 'conforme' : pendientes ? 'con-pendientes' : 'corregida'
+
+  return {
+    total: pauta.criterios.length,
+    revisados,
+    conformes,
+    noConformes,
+    desviaciones: desviaciones.length,
+    pendientes,
+    sugerido,
+    minutosDeCorrida,
+  }
+}
+
+/** Cómo se llama cada estado al presentarlo, y qué significa. */
+export const TEXTO_LIBERACION: Record<EstadoLiberacion, { titulo: string; detalle: string }> = {
+  conforme: { titulo: 'Conforme', detalle: 'Sin desviaciones.' },
+  corregida: {
+    titulo: 'Corregida antes del arranque',
+    detalle: 'Se encontró algo y se resolvió antes de entregar la planta.',
+  },
+  'con-pendientes': {
+    titulo: 'Con pendientes controlados',
+    detalle: 'Queda algo abierto, sin riesgo para operar. Pasa al turno siguiente.',
+  },
+  'no-liberada': { titulo: 'No liberada', detalle: 'La planta no arranca. Excepción.' },
+}
+
+/** La frase de la liberación, con la corrida cuando la hubo. */
+export function frasePorLiberacion(estado: EstadoLiberacion, r: ResumenInspeccion): string {
+  if (estado === 'conforme') return `${r.total} de ${r.total} conformes.`
+  if (estado === 'corregida') {
+    const cuanto = r.minutosDeCorrida != null ? ` en ${r.minutosDeCorrida} min` : ''
+    return `${r.desviaciones} ${r.desviaciones === 1 ? 'desviación resuelta' : 'desviaciones resueltas'}${cuanto} antes del arranque.`
+  }
+  if (estado === 'con-pendientes') {
+    return `${r.pendientes} de ${r.desviaciones} ${r.pendientes === 1 ? 'desviación queda abierta' : 'desviaciones quedan abiertas'}, controladas.`
+  }
+  return `${r.pendientes} ${r.pendientes === 1 ? 'desviación impide' : 'desviaciones impiden'} entregar la planta.`
+}

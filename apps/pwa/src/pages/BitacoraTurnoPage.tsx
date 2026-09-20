@@ -28,9 +28,12 @@ import { tecnicoRecordado } from '@/components/bitacora/tecnicoRecordado'
 import { useToast } from '@/hooks/useToast'
 import { FUENTE_FIRESTORE, useTurnoMantencionActual, type FuenteBitacora } from '@/hooks/useBitacoraTurno'
 import { BITACORA_PLANTA } from '@/config/bitacora'
+import { PanelInspeccion } from '@/components/bitacora/PanelInspeccion'
+import { useInspeccion } from '@/hooks/useInspeccion'
+import { iniciarInspeccion, liberarPlanta, marcarCriterio } from '@/services/inspecciones/inspecciones.service'
 import { encabezadoEvento, etiquetaTipo, posicionAlMover, posicionEnIndice, tieneHora, tiposPropiosUsados, tituloDe } from '@/services/bitacora/presentacionEvento'
 import { copiarHtml, copiarTexto } from '@/lib/clipboard'
-import type { EventoBitacora, FotoEvento, TurnoMantencion } from '@/services/bitacora/bitacora.types'
+import type { EnlaceInspeccion, EventoBitacora, FotoEvento, TurnoMantencion } from '@/services/bitacora/bitacora.types'
 import type { User } from '@/types'
 import { bitacoraAHtmlCorreo, bitacoraATextoPlano, tituloCorreo } from '@/services/bitacora/bitacoraCorreo'
 import { cargarFotoComoJpeg, purgarFotosPendientes } from '@/services/bitacora/fotosBitacora'
@@ -82,7 +85,9 @@ export function BitacoraTurnoVista({
   const navigate = useNavigate()
   const turnoActual = useTurnoMantencionActual()
   const turnoParam = params.get('turno')
-  const [editor, setEditor] = useState<{ evento: EventoBitacora | null; idNuevo: string; turno: TurnoMantencion; pendienteOrigen?: EventoBitacora | null } | null>(null)
+  const [editor, setEditor] = useState<{ evento: EventoBitacora | null; idNuevo: string; turno: TurnoMantencion; pendienteOrigen?: EventoBitacora | null; desdeInspeccion?: EnlaceInspeccion } | null>(null)
+  // Pestaña: el turno o la inspección de planta (Orel, 20-09-2026).
+  const [vista, setVista] = useState<'turno' | 'inspeccion'>(() => (params.get('vista') === 'inspeccion' ? 'inspeccion' : 'turno'))
   // La jerarquía (702 nodos) se carga recién al abrir el editor, y queda en caché.
   const { opciones: opcionesEquipo, cargando: cargandoEquipos } = fuente.useOpcionesEquipo(Boolean(editor))
   const turnoNavegado = useMemo(() => turnoDesdeId(turnoParam) ?? turnoActual, [turnoParam, turnoActual])
@@ -232,6 +237,49 @@ export function BitacoraTurnoVista({
   const [quienNoAplica, setQuienNoAplica] = useState('')
 
   const abrirNuevo = useCallback(() => setEditor({ evento: null, idNuevo: nuevoId(), turno }), [nuevoId, turno])
+
+  // ── Inspección de planta post-aseo ──
+  const { pauta, inspeccion, desviaciones, resumen: resumenInsp } = useInspeccion(BITACORA_PLANTA.id, turno.id, eventos)
+  const [inspTrabajando, setInspTrabajando] = useState(false)
+  /** El nombre con que se firma: el mismo que la bitácora usa para el autor. */
+  const firmante = autorFijo || [usuario?.nombre, usuario?.apellido].filter(Boolean).join(' ').trim() || usuario?.email || 'Mantención'
+
+  const conAviso = useCallback(
+    async (hacer: () => Promise<void>) => {
+      setInspTrabajando(true)
+      try {
+        await hacer()
+      } catch (e) {
+        // «Revisa la conexión» manda por el camino equivocado cuando en realidad faltan permisos.
+        const sinPermiso = (e as { code?: string })?.code === 'permission-denied'
+        toast({
+          title: 'No se pudo guardar la inspección',
+          description: sinPermiso ? 'Tu cuenta no puede escribir la inspección de este turno.' : 'Revisa la conexión e inténtalo de nuevo.',
+          variant: 'destructive',
+        })
+      } finally {
+        setInspTrabajando(false)
+      }
+    },
+    [toast],
+  )
+
+  const iniciarLaInspeccion = useCallback(
+    () =>
+      void conAviso(() =>
+        iniciarInspeccion({
+          plantId: BITACORA_PLANTA.id,
+          turnoId: turno.id,
+          fechaTurno: turno.fecha,
+          banda: turno.banda,
+          pautaId: pauta.id,
+          pautaVersion: pauta.version,
+          iniciadaEn: new Date().toISOString(),
+          iniciadaPorNombre: firmante,
+        }),
+      ),
+    [conAviso, turno, pauta, firmante],
+  )
 
   // ── Borrar con «Deshacer» (mockup iOS 27, 17-09) ──
   // El evento se esconde y el borrado de verdad (fotos incluidas) ocurre al
@@ -794,6 +842,58 @@ export function BitacoraTurnoVista({
         </div>
       </header>
 
+      {/* Dos pestañas: lo que pasó en el turno y la pauta de inspección de planta. El nombre
+          completo del procedimiento no cabe en una cápsula de 375 px, así que va de título
+          adentro (Orel pidió que dijera «inspección post aseo / detención prolongada»). */}
+      <SegmentedControl
+        className="px-1"
+        ariaLabel="Qué se está viendo de este turno"
+        value={vista}
+        onChange={(v) => {
+          setVista(v)
+          setParams(
+            (p) => {
+              const n = new URLSearchParams(p)
+              if (v === 'inspeccion') n.set('vista', 'inspeccion')
+              else n.delete('vista')
+              return n
+            },
+            { replace: true },
+          )
+        }}
+        segments={[
+          { value: 'turno', label: 'Turno' },
+          { value: 'inspeccion', label: 'Inspección post-aseo' },
+        ]}
+      />
+
+      {vista === 'inspeccion' ? (
+        <div className="px-1">
+          <PanelInspeccion
+            pauta={pauta}
+            inspeccion={inspeccion}
+            desviaciones={desviaciones}
+            resumen={resumenInsp}
+            editable={esActual}
+            trabajando={inspTrabajando}
+            onIniciar={iniciarLaInspeccion}
+            onMarcar={(criterioId, resultado) =>
+              void conAviso(() => marcarCriterio(BITACORA_PLANTA.id, turno.id, criterioId, resultado))
+            }
+            onNuevaDesviacion={(criterioId) =>
+              inspeccion && setEditor({ evento: null, idNuevo: nuevoId(), turno, desdeInspeccion: { id: inspeccion.id, criterioId } })
+            }
+            onAbrirEvento={(e) => setEditor({ evento: e, idNuevo: '', turno })}
+            onLiberar={(estado) =>
+              void conAviso(() =>
+                liberarPlanta(BITACORA_PLANTA.id, turno.id, { estado, en: new Date().toISOString(), porNombre: firmante }),
+              )
+            }
+            onDeshacerLiberacion={() => void conAviso(() => liberarPlanta(BITACORA_PLANTA.id, turno.id, null))}
+          />
+        </div>
+      ) : (
+      <>
       {/* Escritorio de turno (mockup A, 18-09-2026; HIG «Split views»): en PC, tres
           columnas — contexto (300 px) · eventos · vista previa del correo (380 px,
           fija); entre 768 y 1280 px, dos (contexto y eventos apilados, correo a la
@@ -1265,6 +1365,8 @@ export function BitacoraTurnoVista({
           )}
         </section>
       </div>
+      </>
+      )}
 
       <EventoBitacoraSheet
         open={!!editor}
@@ -1284,7 +1386,9 @@ export function BitacoraTurnoVista({
         // El pase es de la planta, no de una persona: «Mis favoritos» no aplica.
         favoritosRepuestos={autorFijo ? null : favoritosRepuestos}
         onGuardar={async (id, datos, nuevo) => {
-          await guardar(id, datos, nuevo)
+          // La desviación es un evento normal; lo único que la distingue es de qué punto de
+          // la pauta salió. Se inyecta acá para no tocar el formulario de eventos.
+          await guardar(id, editor?.desdeInspeccion ? { ...datos, inspeccion: editor.desdeInspeccion } : datos, nuevo)
           // Quedó en otro turno (se registró en el equivocado): se dice dónde, con «Ver».
           const destino = datos.turnoId
           if (destino && editor && destino !== editor.turno.id && datos.estado !== 'borrador') {

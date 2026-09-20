@@ -327,6 +327,8 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
         fotos,
         participantes: [...new Set(datos.participantes.map((p) => p.trim()).filter(Boolean))].slice(0, 12),
         equipoId: datos.equipoId || null,
+        // De qué inspección de planta y de qué punto de su pauta salió esta desviación.
+        inspeccion: datos.inspeccion ? { id: datos.inspeccion.id, criterioId: datos.inspeccion.criterioId } : null,
         estado,
         dispositivo: dispositivoActual(),
       }
