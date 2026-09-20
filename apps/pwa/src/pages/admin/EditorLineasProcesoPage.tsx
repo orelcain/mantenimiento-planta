@@ -41,6 +41,7 @@ import {
   PREFIJO_MANUAL,
   cajaNueva,
   caminoSuave,
+  cierraCiclo,
   esEntrada,
   esManual,
   formatoPeso,
@@ -49,6 +50,7 @@ import {
   limitesDeZonas,
   lineaDeEntrada,
   pesosPorLinea,
+  puentesAlQuitar,
   relacionesDeServicios,
   serviciosDe,
   zonaDeNodo,
@@ -954,6 +956,37 @@ function Editor() {
     },
     [registrar],
   )
+  // Solo las flechas de flujo: las de los servicios de apoyo no reparten, así que ni
+  // arman círculos ni se puentean al sacar un equipo del medio.
+  const aristasFlujo = useMemo(
+    () => edges.filter((e) => !servicios.has(e.source) && !servicios.has(e.target)).map((e) => [e.source, e.target] as [string, string]),
+    [edges, servicios],
+  )
+  const avisoCiclo = useCallback(
+    (de: string, a: string) =>
+      toast({
+        title: 'Esa flecha cerraría un círculo',
+        description: `${nombreDe(a)} ya llega hasta ${nombreDe(de)}. En un círculo el flujo no se puede repartir y los equipos quedan sin porcentaje.`,
+      }),
+    [toast, nombreDe],
+  )
+  /**
+   * Al sacar equipos del medio, el flujo se vuelve a unir solo: A → B → C queda A → C
+   * (patrón «Delete Middle Node» de React Flow). Si no, todo lo de aguas abajo caía a 0 %.
+   */
+  const aplicarPuentes = useCallback(
+    (aristas: [string, string][], quitados: string[]) => {
+      const puentes = puentesAlQuitar(aristas, quitados)
+      if (!puentes.length) return 0
+      setEdges((es) => [
+        ...es,
+        ...puentes.filter(([a, b]) => !es.some((e) => e.source === a && e.target === b)).map(([a, b]) => ({ id: `${a}->${b}`, source: a, target: b })),
+      ])
+      return puentes.length
+    },
+    [],
+  )
+
   // Unir tocando: primer toque = origen, segundo = destino.
   const tocarParaUnir = useCallback(
     (id: string) => {
@@ -969,12 +1002,16 @@ function Editor() {
         toast({ title: `${nombreDe(origenUnir)} y ${nombreDe(id)} ya estaban unidos` })
         return
       }
+      if (cierraCiclo(aristasFlujo, origenUnir, id)) {
+        avisoCiclo(origenUnir, id)
+        return
+      }
       registrar()
       setEdges((es) => addEdge({ source: origenUnir, target: id, id: `${origenUnir}->${id}` }, es))
       // Encadenar: el destino queda listo para ser el origen del siguiente tramo.
       setOrigenUnir(id)
     },
-    [origenUnir, edges, registrar, toast, nombreDe],
+    [origenUnir, edges, registrar, toast, nombreDe, aristasFlujo, avisoCiclo],
   )
   useEffect(() => {
     if (!modoGrupo) return
@@ -1005,8 +1042,9 @@ function Editor() {
       if (de === a) return
       if (edges.some((e) => e.source === de && e.target === a)) toast({ title: `${nombreDe(de)} y ${nombreDe(a)} ya estaban unidos` })
       else if (edges.some((e) => e.source === a && e.target === de)) toast({ title: `Ya hay una flecha al revés: ${nombreDe(a)} → ${nombreDe(de)}` })
+      else if (cierraCiclo(aristasFlujo, de, a)) avisoCiclo(de, a)
     },
-    [edges, toast, nombreDe],
+    [edges, toast, nombreDe, aristasFlujo, avisoCiclo],
   )
 
   // La flecha de vuelta que arma el círculo (A → B y B → A), para poder nombrarla.
@@ -1039,7 +1077,16 @@ function Editor() {
     setGrupoSel(null)
   }, [])
 
-  const esValida = useCallback((c: Connection | Edge) => c.source !== c.target && !edges.some((e) => e.source === c.source && e.target === c.target), [edges])
+  /**
+   * No se deja cerrar un círculo (patrón «Preventing Cycles» de React Flow). En un círculo el
+   * flujo no se puede repartir y los equipos quedan sin porcentaje: más vale no dejar armarlo
+   * que avisarlo después (a Orel le pasó con Acopio y con el CHILLER).
+   */
+  const esValida = useCallback(
+    (c: Connection | Edge) =>
+      c.source !== c.target && !edges.some((e) => e.source === c.source && e.target === c.target) && !cierraCiclo(aristasFlujo, c.source, c.target),
+    [edges, aristasFlujo],
+  )
 
   const avisoQuitado = useCallback(
     (texto: string) =>
@@ -1056,12 +1103,18 @@ function Editor() {
   const onDelete = useCallback(
     ({ nodes: ns, edges: es }: { nodes: Node[]; edges: Edge[] }) => {
       const quitados = ns.filter((n) => n.type !== 'zona')
-      if (quitados.length === 1) avisoQuitado(`Se quitó ${nombreDe(quitados[0]!.id)}`)
-      else if (quitados.length > 1) avisoQuitado(`Se quitaron ${quitados.length} equipos`)
+      // Las flechas que tocaban a los quitados vienen en `es`: con eso alcanza para puentear.
+      const puentes = aplicarPuentes(
+        es.filter((e) => !servicios.has(e.source) && !servicios.has(e.target)).map((e) => [e.source, e.target] as [string, string]),
+        quitados.map((n) => n.id),
+      )
+      const cola = puentes ? ' · el flujo se volvió a unir' : ''
+      if (quitados.length === 1) avisoQuitado(`Se quitó ${nombreDe(quitados[0]!.id)}${cola}`)
+      else if (quitados.length > 1) avisoQuitado(`Se quitaron ${quitados.length} equipos${cola}`)
       else if (es.length === 1) avisoQuitado(`Se quitó la flecha ${nombreDe(es[0]!.source)} → ${nombreDe(es[0]!.target)}`)
       else if (es.length > 1) avisoQuitado(`Se quitaron ${es.length} flechas`)
     },
-    [avisoQuitado, nombreDe],
+    [avisoQuitado, nombreDe, aplicarPuentes, servicios],
   )
 
   // Contenedor bajo un punto (el más chico, si se solapan), sin contar uno. Se resalta solo
@@ -1440,7 +1493,9 @@ function Editor() {
     setNodes((ns) => ns.filter((x) => !fuera.has(x.id)))
     setEdges((es) => es.filter((e) => !fuera.has(e.source) && !fuera.has(e.target)))
     setGrupos((gs) => gs.map((g) => ({ ...g, miembros: g.miembros.filter((m) => !fuera.has(m)) })).filter((g) => g.miembros.length > 1))
-    avisoQuitado(reales.length === 1 ? `Se quitó ${nombreDe(reales[0]!)}` : `Se quitaron ${reales.length} equipos`)
+    const puentes = aplicarPuentes(aristasFlujo, reales)
+    const quien = reales.length === 1 ? `Se quitó ${nombreDe(reales[0]!)}` : `Se quitaron ${reales.length} equipos`
+    avisoQuitado(puentes ? `${quien} · el flujo se volvió a unir` : quien)
   }
   const quitarFlecha = (e: Edge) => {
     registrar()
