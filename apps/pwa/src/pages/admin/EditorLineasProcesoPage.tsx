@@ -7,6 +7,7 @@ import {
   Handle,
   MarkerType,
   MiniMap,
+  NodeToolbar,
   Panel,
   Position,
   ReactFlow,
@@ -84,8 +85,10 @@ const MIME = 'application/x-equipo'
 const GRILLA: [number, number] = [16, 16]
 const APOYO = 'rgb(var(--cat-6-ink))'
 
-type DatosMaquina = { nombre: string; peso: number | null; linea: string | null; contenedor: string | null; componentes: number; otraPlanta?: string; manual?: boolean; ciclo?: boolean; ramas: number }
-type DatosServicio = { nombre: string; abastece: string[]; recibe: string[] }
+/** Lo que la barrita flotante puede hacer sobre lo que está elegido. */
+type AccionesRapidas = { unirDesde: (id: string) => void; quitar: (id: string) => void }
+type DatosMaquina = { acciones?: AccionesRapidas; soloUno?: boolean; nombre: string; peso: number | null; linea: string | null; contenedor: string | null; componentes: number; otraPlanta?: string; manual?: boolean; ciclo?: boolean; ramas: number }
+type DatosServicio = { acciones?: AccionesRapidas; soloUno?: boolean; nombre: string; abastece: string[]; recibe: string[] }
 type DatosEntrada = { linea: string }
 type DatosZona = { nombre: string; w: number; h: number; apoyo: boolean; resaltada: boolean; onMover?: (ev: ReactPointerEvent) => void; onMenu?: (ev: ReactMouseEvent) => void }
 type Instantanea = { nodes: Node[]; edges: Edge[]; lineas: LineaProceso[] }
@@ -180,7 +183,41 @@ function PuntosUnion({ claro }: { claro?: boolean }) {
 }
 const SELECCION = 'ring-4 ring-primary/35'
 
-function NodoMaquina({ data, selected }: NodeProps<Node<DatosMaquina>>) {
+/**
+ * Barrita flotante sobre lo elegido (patrón «Node Toolbar» de React Flow, que es el
+ * *context pad* de bpmn-js): las dos acciones de siempre a un toque, sin buscar en el
+ * menú ni en el inspector. Aparece solo cuando hay UNO elegido, para no llenar la
+ * pantalla de barritas al seleccionar varios. Con dedo es el único camino: no hay
+ * clic derecho.
+ */
+function BarritaNodo({ id, data, selected }: { id: string; data: { acciones?: AccionesRapidas; soloUno?: boolean }; selected?: boolean }) {
+  if (!data.acciones) return null
+  return (
+    <NodeToolbar isVisible={!!selected && data.soloUno !== false} position={Position.Top} offset={10}>
+      <div className="flex items-center gap-0.5 rounded-full border border-border bg-card p-1 shadow-[0_2px_10px_rgba(0,0,0,0.22)]">
+        <button
+          type="button"
+          onClick={() => data.acciones?.unirDesde(id)}
+          title="Unir desde aquí"
+          className="flex h-8 items-center gap-1 rounded-full px-2.5 text-caption font-semibold text-primary hover:bg-muted-foreground/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          <Spline className="size-3.5" aria-hidden /> Unir
+        </button>
+        <button
+          type="button"
+          onClick={() => data.acciones?.quitar(id)}
+          aria-label="Quitar del lienzo"
+          title="Quitar del lienzo"
+          className="flex size-8 items-center justify-center rounded-full text-ink-crit hover:bg-muted-foreground/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          <Trash2 className="size-3.5" aria-hidden />
+        </button>
+      </div>
+    </NodeToolbar>
+  )
+}
+
+function NodoMaquina({ id, data, selected }: NodeProps<Node<DatosMaquina>>) {
   const conFlujo = data.peso != null && data.peso > 0 && !data.ciclo && !data.otraPlanta
   const cifra = data.otraPlanta ? `de ${data.otraPlanta}` : data.ciclo ? 'en círculo' : data.peso == null ? '0 %' : formatoPeso(data.peso)
   const chip = data.ciclo
@@ -189,6 +226,8 @@ function NodoMaquina({ data, selected }: NodeProps<Node<DatosMaquina>>) {
       ? 'bg-[rgb(var(--brand)/0.14)] text-[rgb(var(--brand-ink))]'
       : 'bg-muted-foreground/12 text-muted-foreground'
   return (
+    <>
+      <BarritaNodo id={id} data={data} selected={selected} />
     <div
       style={{ width: NODO.ancho, height: NODO.alto }}
       className={`relative flex flex-col justify-center gap-1 overflow-hidden rounded-ctl border bg-card px-2.5 py-2 shadow-[0_1px_2px_rgb(0_0_0/0.07)] ${
@@ -220,14 +259,17 @@ function NodoMaquina({ data, selected }: NodeProps<Node<DatosMaquina>>) {
       )}
       <PuntosUnion />
     </div>
+    </>
   )
 }
 
-function NodoServicio({ data, selected }: NodeProps<Node<DatosServicio>>) {
+function NodoServicio({ id, data, selected }: NodeProps<Node<DatosServicio>>) {
   const texto = [data.abastece.length ? `abastece a ${data.abastece.join(', ')}` : '', data.recibe.length ? `recibe de ${data.recibe.join(', ')}` : '']
     .filter(Boolean)
     .join(' · ')
   return (
+    <>
+      <BarritaNodo id={id} data={data} selected={selected} />
     <div
       style={{ width: NODO.ancho, borderColor: APOYO }}
       className={`rounded-card border-2 border-dashed bg-card px-3 py-2 shadow-[0_1px_4px_rgba(0,0,0,0.12)] ${selected ? SELECCION : ''}`}
@@ -239,6 +281,7 @@ function NodoServicio({ data, selected }: NodeProps<Node<DatosServicio>>) {
       <p className="text-[10.5px] leading-tight text-muted-foreground">{texto || 'sin unir: une con una flecha a la línea que abastece'}</p>
       <PuntosUnion />
     </div>
+    </>
   )
 }
 
@@ -313,7 +356,7 @@ function NodoReparto({ data }: NodeProps<Node<{ h: number }>>) {
 const TIPOS = { maquina: NodoMaquina, servicio: NodoServicio, entrada: NodoEntrada, zona: NodoZona, paralelo: NodoParalelo, reparto: NodoReparto }
 
 /** Lo que la flecha necesita para dibujarse y para dejarse acomodar. */
-type DatosFlecha = { puntos: { x: number; y: number }[]; editable: boolean; onPuntos: (p: { x: number; y: number }[]) => void }
+type DatosFlecha = { puntos: { x: number; y: number }[]; editable: boolean; onPuntos: (p: { x: number; y: number }[]) => void; acciones?: { quitar: () => void; enderezar: () => void } }
 
 /**
  * Flecha que pasa por los puntos que uno le ponga, con curva suave (Orel pidió «ordenar las
@@ -380,8 +423,33 @@ function FlechaCurva({ id, sourceX, sourceY, targetX, targetY, sourcePosition, t
           </div>
         </EdgeLabelRenderer>
       ) : null}
-      {selected && d?.editable && (
+      {selected && d?.editable && d.acciones && (
         <EdgeLabelRenderer>
+          {/* Barrita de la flecha (patrón «Edge Toolbar» de React Flow): quitarla o
+              devolverla a su curva, sin ir al menú. */}
+          <div
+            style={{ transform: `translate(-50%, -50%) translate(${puntos.length ? puntos[Math.floor(puntos.length / 2)]!.x : mx}px, ${(puntos.length ? puntos[Math.floor(puntos.length / 2)]!.y : my) - 24}px)`, pointerEvents: 'all' }}
+            className="nodrag nopan absolute flex items-center gap-0.5 rounded-full border border-border bg-card p-1 shadow-[0_2px_10px_rgba(0,0,0,0.22)]"
+          >
+            <button
+              type="button"
+              onClick={() => d.acciones?.enderezar()}
+              disabled={!puntos.length}
+              title="Devolverla a su curva"
+              className="flex h-7 items-center rounded-full px-2 text-caption font-semibold text-primary hover:bg-muted-foreground/10 disabled:opacity-35 disabled:hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              Enderezar
+            </button>
+            <button
+              type="button"
+              onClick={() => d.acciones?.quitar()}
+              aria-label="Quitar la flecha"
+              title="Quitar la flecha"
+              className="flex size-7 items-center justify-center rounded-full text-ink-crit hover:bg-muted-foreground/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              <Trash2 className="size-3.5" aria-hidden />
+            </button>
+          </div>
           {puntos.map((p, i) => (
             <div
               key={i}
@@ -528,6 +596,8 @@ function Editor() {
   // Mover un contenedor entero por su título (se define más abajo, cuando ya existe la pertenencia).
   const moverZona = useRef<(zonaId: string, ev: ReactPointerEvent) => void>(() => undefined)
   const menuZona = useRef<(lineaId: string, ev: ReactMouseEvent) => void>(() => undefined)
+  const acciones = useRef<AccionesRapidas>({ unirDesde: () => undefined, quitar: () => undefined })
+  const accionesFlecha = useRef<{ quitar: (e: Edge) => void; enderezar: (e: Edge) => void }>({ quitar: () => undefined, enderezar: () => undefined })
   const lienzo = useRef<HTMLDivElement>(null)
   // Espacio de trabajo (Orel, 19-09-2026): pantalla completa y lista de equipos plegable.
   const [amplio, setAmplio] = useState(false)
@@ -750,8 +820,10 @@ function Editor() {
     return [...out, ...auto(yaEnGrupo)]
   }, [grupos, grafo, pesos, grupoSel, auto])
 
-  const vista = useMemo(
-    () =>
+  const vista = useMemo(() => {
+    // Con varios elegidos no se pintan varias barritas: ahí manda el inspector.
+    const unoSolo = nodes.filter((n) => n.selected && n.type !== 'zona' && n.type !== 'paralelo' && !esEntrada(n.id)).length === 1
+    return (
       nodes.map((n): Node => {
         // En modo unir: el origen con anillo y, atenuados, los que YA están unidos a él.
         const marca =
@@ -769,6 +841,7 @@ function Editor() {
         if (servicios.has(n.id)) {
           const r = relaciones.get(n.id)
           const data: DatosServicio = {
+            ...(editable ? { acciones: acciones.current, soloUno: unoSolo } : {}),
             nombre: nombreDe(n.id),
             abastece: (r?.abastece ?? []).map((l) => nombreLinea.get(l) ?? l),
             recibe: (r?.recibe ?? []).map((l) => nombreLinea.get(l) ?? l),
@@ -778,6 +851,7 @@ function Editor() {
         const p = pesos.get(n.id)
         const cont = contenedorDe.get(n.id)
         const data: DatosMaquina = {
+          ...(editable ? { acciones: acciones.current, soloUno: unoSolo } : {}),
           nombre: nombreDe(n.id),
           componentes: e ? e.hijos.length : 0,
           otraPlanta: deOtraPlanta.get(n.id),
@@ -795,9 +869,9 @@ function Editor() {
           ariaLabel: `${data.nombre}, ${data.linea ? `${formatoPeso(data.peso ?? 0)} de ${data.linea}` : 'fuera de la línea'}`,
           data,
         }
-      }),
-    [nodes, indice, pesos, servicios, relaciones, nombreLinea, zonaResaltada, deOtraPlanta, nombreDe, limites, contenedorDe, editable, origenUnir, yaUnidos, reparto, modoGrupo],
-  )
+      })
+    )
+  }, [nodes, indice, pesos, servicios, relaciones, nombreLinea, zonaResaltada, deOtraPlanta, nombreDe, limites, contenedorDe, editable, origenUnir, yaUnidos, reparto, modoGrupo])
 
   const conParalelos = useMemo(
     () =>
@@ -832,6 +906,7 @@ function Editor() {
             puntos: curvas.find((c) => c.a === e.source && c.b === e.target)?.puntos ?? [],
             editable,
             onPuntos: (p: { x: number; y: number }[]) => ponerPuntos(e.source, e.target, p),
+            ...(editable ? { acciones: { quitar: () => accionesFlecha.current.quitar(e), enderezar: () => accionesFlecha.current.enderezar(e) } } : {}),
           } satisfies DatosFlecha,
           ariaLabel: `Flecha de ${nombreDe(e.source)} a ${nombreDe(e.target)}`,
           // Punta chica: a 20 px pesaba más que la línea y tapaba el borde de la tarjeta.
@@ -1088,6 +1163,33 @@ function Editor() {
     [edges, aristasFlujo],
   )
 
+  /**
+   * Mover la punta de una flecha a otro equipo en vez de borrarla y rehacerla (patrón
+   * «Reconnect Edge» de React Flow). Pasa por las mismas reglas que una flecha nueva; el
+   * círculo se mide SIN la flecha vieja, que justamente se está yendo.
+   */
+  const onReconnect = useCallback(
+    (vieja: Edge, c: Connection) => {
+      if (!c.source || !c.target || (c.source === vieja.source && c.target === vieja.target)) return
+      const sinVieja = aristasFlujo.filter(([a, b]) => !(a === vieja.source && b === vieja.target))
+      if (c.source === c.target) return
+      if (edges.some((e) => e.id !== vieja.id && e.source === c.source && e.target === c.target)) {
+        toast({ title: `${nombreDe(c.source)} y ${nombreDe(c.target)} ya estaban unidos` })
+        return
+      }
+      if (cierraCiclo(sinVieja, c.source, c.target)) {
+        avisoCiclo(c.source, c.target)
+        return
+      }
+      registrar()
+      setEdges((es) => [...es.filter((e) => e.id !== vieja.id), { id: `${c.source}->${c.target}`, source: c.source, target: c.target }])
+      // La curva hecha a mano era para el tramo viejo: con otro destino ya no sirve.
+      setCurvas((cs) => cs.filter((x) => !(x.a === vieja.source && x.b === vieja.target)))
+      toast({ title: `Ahora va ${nombreDe(c.source)} → ${nombreDe(c.target)}` })
+    },
+    [aristasFlujo, edges, toast, nombreDe, avisoCiclo, registrar],
+  )
+
   const avisoQuitado = useCallback(
     (texto: string) =>
       toast({
@@ -1181,6 +1283,14 @@ function Editor() {
 
   // Mover la caja entera: el contenedor y TODO lo que le pertenece se desplazan juntos, a
   // pasos de la grilla. Deshacer lo devuelve de una vez (se registra al primer movimiento).
+  acciones.current.unirDesde = (id: string) => {
+    setModoGrupo(null)
+    setModoUnir(true)
+    setOrigenUnir(id)
+  }
+  acciones.current.quitar = (id: string) => quitarDelLienzo([id])
+  accionesFlecha.current.quitar = (e: Edge) => quitarFlecha(e)
+  accionesFlecha.current.enderezar = (e: Edge) => enderezarFlecha(e)
   menuZona.current = (lineaId: string, ev: ReactMouseEvent) => abrirMenu(ev, itemsContenedor(lineaId))
   moverZona.current = (zonaId: string, ev: ReactPointerEvent) => {
     if (!editable || ev.button !== 0) return
@@ -1836,6 +1946,7 @@ function Editor() {
               onNodesChange={editable ? onNodesChange : undefined}
               onEdgesChange={editable ? onEdgesChange : undefined}
               onConnect={editable ? onConnect : undefined}
+              onReconnect={editable ? onReconnect : undefined}
               onConnectEnd={editable ? alTerminarUnion : undefined}
               onBeforeDelete={async () => {
                 registrar()
