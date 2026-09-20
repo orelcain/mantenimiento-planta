@@ -186,6 +186,97 @@ export function puentesAlQuitar(aristas: readonly (readonly [string, string])[],
   return out
 }
 
+/** Dónde queda cada equipo después de acomodar. */
+export interface Acomodo {
+  id: string
+  x: number
+  y: number
+}
+
+/** Aire entre capas y entre ramas al acomodar. */
+export const ACOMODO = { entreCapas: 72, entreRamas: 28, sueltos: 56 }
+
+/**
+ * Acomoda los equipos de un contenedor de izquierda a derecha siguiendo el flujo: cada uno
+ * va una capa más a la derecha que el que lo alimenta (capa = el camino MÁS LARGO desde la
+ * entrada, así nada queda a la izquierda de quien lo alimenta) y las ramas de una misma capa
+ * se apilan en el orden en que ya estaban, para que el dibujo no dé un salto.
+ *
+ * Lo que no cuelga del flujo —y lo que quedó en un círculo— va en una fila aparte, abajo.
+ * No toca contenedores ni flechas: solo devuelve posiciones.
+ */
+export function acomodarEnCapas(
+  g: Pick<GrafoLineas, 'lineas' | 'nodos' | 'aristas'>,
+  lineaId: string,
+  medidas: { nodo: typeof NODO; entrada: typeof ENTRADA; margen: typeof MARGEN_ZONA } = { nodo: NODO, entrada: ENTRADA, margen: MARGEN_ZONA },
+): Acomodo[] {
+  const linea = g.lineas.find((l) => l.id === lineaId)
+  if (!linea) return []
+  const dentro = g.nodos.filter((n) => zonaDeNodo(g.lineas, n) === lineaId)
+  if (!dentro.length) return []
+  const ids = new Set(dentro.map((n) => n.id))
+  const salidas = new Map<string, string[]>()
+  const entran = new Map<string, number>()
+  for (const [a, b] of g.aristas) {
+    if (!ids.has(a) || !ids.has(b) || a === b) continue
+    const lista = salidas.get(a) ?? []
+    if (lista.includes(b)) continue
+    lista.push(b)
+    salidas.set(a, lista)
+    entran.set(b, (entran.get(b) ?? 0) + 1)
+  }
+  // Capa por camino más largo (Kahn). Lo que queda atascado está en un círculo.
+  const capa = new Map<string, number>()
+  const pendientes = new Map(dentro.map((n) => [n.id, entran.get(n.id) ?? 0]))
+  const cola = dentro.filter((n) => !(entran.get(n.id) ?? 0)).map((n) => n.id)
+  for (const id of cola) capa.set(id, 0)
+  while (cola.length) {
+    const n = cola.shift()!
+    for (const s of salidas.get(n) ?? []) {
+      capa.set(s, Math.max(capa.get(s) ?? 0, (capa.get(n) ?? 0) + 1))
+      const p = (pendientes.get(s) ?? 1) - 1
+      pendientes.set(s, p)
+      if (p === 0) cola.push(s)
+    }
+  }
+  const conCapa = dentro.filter((n) => capa.has(n.id) && (salidas.has(n.id) || (entran.get(n.id) ?? 0) > 0))
+  const sueltos = dentro.filter((n) => !conCapa.includes(n))
+  const porCapa = new Map<number, NodoGrafo[]>()
+  for (const n of conCapa) {
+    const c = capa.get(n.id) ?? 0
+    porCapa.set(c, [...(porCapa.get(c) ?? []), n])
+  }
+  const x0 = linea.zona.x + medidas.margen.lado
+  const y0 = linea.zona.y + medidas.margen.arriba
+  const out: Acomodo[] = []
+  let abajo = y0
+  for (const [c, lista] of [...porCapa.entries()].sort((a, b) => a[0] - b[0])) {
+    // Se respeta el orden de arriba a abajo que ya tenían: acomodar no debe barajar.
+    const ordenada = [...lista].sort((a, b) => a.y - b.y)
+    ordenada.forEach((n, i) => {
+      const alto = esEntrada(n.id) ? medidas.entrada.alto : medidas.nodo.alto
+      const ancho = esEntrada(n.id) ? medidas.entrada.ancho : medidas.nodo.ancho
+      out.push({
+        id: n.id,
+        x: Math.round(x0 + c * (medidas.nodo.ancho + ACOMODO.entreCapas) + (medidas.nodo.ancho - ancho) / 2),
+        y: Math.round(y0 + i * (medidas.nodo.alto + ACOMODO.entreRamas) + (medidas.nodo.alto - alto) / 2),
+      })
+    })
+    abajo = Math.max(abajo, y0 + ordenada.length * (medidas.nodo.alto + ACOMODO.entreRamas))
+  }
+  // Los que no cuelgan del flujo: en filas abajo, sin mezclarse con la cadena.
+  sueltos
+    .sort((a, b) => a.y - b.y || a.x - b.x)
+    .forEach((n, i) => {
+      out.push({
+        id: n.id,
+        x: Math.round(x0 + (i % 5) * (medidas.nodo.ancho + ACOMODO.entreRamas)),
+        y: Math.round(abajo + ACOMODO.sueltos + Math.floor(i / 5) * (medidas.nodo.alto + ACOMODO.entreRamas)),
+      })
+    })
+  return out
+}
+
 /** Tamaño de la tarjeta de un equipo en el lienzo (px): para saber en qué zona cae su centro. */
 export const NODO = { ancho: 188, alto: 68 }
 /** Tamaño de la píldora «Entrada …». */

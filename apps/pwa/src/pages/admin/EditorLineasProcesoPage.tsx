@@ -7,6 +7,7 @@ import {
   Handle,
   MarkerType,
   MiniMap,
+  NodeResizer,
   NodeToolbar,
   Panel,
   Position,
@@ -41,6 +42,7 @@ import {
   PREFIJO_ENTRADA,
   PREFIJO_MANUAL,
   cajaNueva,
+  acomodarEnCapas,
   caminoSuave,
   cierraCiclo,
   esEntrada,
@@ -90,7 +92,17 @@ type AccionesRapidas = { unirDesde: (id: string) => void; quitar: (id: string) =
 type DatosMaquina = { acciones?: AccionesRapidas; soloUno?: boolean; nombre: string; peso: number | null; linea: string | null; contenedor: string | null; componentes: number; otraPlanta?: string; manual?: boolean; ciclo?: boolean; ramas: number }
 type DatosServicio = { acciones?: AccionesRapidas; soloUno?: boolean; nombre: string; abastece: string[]; recibe: string[] }
 type DatosEntrada = { linea: string }
-type DatosZona = { nombre: string; w: number; h: number; apoyo: boolean; resaltada: boolean; onMover?: (ev: ReactPointerEvent) => void; onMenu?: (ev: ReactMouseEvent) => void }
+type DatosZona = {
+  nombre: string
+  w: number
+  h: number
+  apoyo: boolean
+  resaltada: boolean
+  elegida?: boolean
+  onMover?: (ev: ReactPointerEvent) => void
+  onMenu?: (ev: ReactMouseEvent) => void
+  onTamano?: (caja: { x: number; y: number; w: number; h: number }, empezando?: boolean) => void
+}
 type Instantanea = { nodes: Node[]; edges: Edge[]; lineas: LineaProceso[] }
 /** Pertenencia y nombre (manuales) que viajan en `data` de los nodos base. */
 type DatosBase = { zona?: string; nombre?: string }
@@ -302,6 +314,21 @@ function NodoZona({ data }: NodeProps<Node<DatosZona>>) {
         data.resaltada ? 'bg-primary/10 ring-2 ring-primary' : 'bg-card/45'
       }`}
     >
+      {/* Estirar el contenedor a mano (patrón «Node Resizer» de React Flow). Solo con el
+          contenedor elegido, para no llenar el lienzo de tiradores. No se puede achicar
+          por debajo de lo que tiene adentro: la caja igual crece para contener sus equipos. */}
+      {data.onTamano && data.elegida && (
+        <div style={{ pointerEvents: 'all' }}>
+          <NodeResizer
+            minWidth={240}
+            minHeight={140}
+            lineClassName="!border-primary"
+            handleClassName="!size-2.5 !rounded-[3px] !border-2 !border-card !bg-primary"
+            onResizeStart={(_, pa) => data.onTamano?.({ x: pa.x, y: pa.y, w: pa.width, h: pa.height }, true)}
+            onResize={(_, pa) => data.onTamano?.({ x: pa.x, y: pa.y, w: pa.width, h: pa.height })}
+          />
+        </div>
+      )}
       {/* Franja del título = asa: arrastra el contenedor con todo lo que tiene (Orel, 19-09-2026).
           Es la única parte que se agarra: el resto de la caja sigue desplazando el lienzo. */}
       <div
@@ -700,6 +727,7 @@ function Editor() {
   // Mover un contenedor entero por su título (se define más abajo, cuando ya existe la pertenencia).
   const moverZona = useRef<(zonaId: string, ev: ReactPointerEvent) => void>(() => undefined)
   const menuZona = useRef<(lineaId: string, ev: ReactMouseEvent) => void>(() => undefined)
+  const tamanoZona = useRef<(lineaId: string, caja: { x: number; y: number; w: number; h: number }, empezando?: boolean) => void>(() => undefined)
   const acciones = useRef<AccionesRapidas>({ unirDesde: () => undefined, quitar: () => undefined })
   const accionesFlecha = useRef<{ quitar: (e: Edge) => void; enderezar: (e: Edge) => void }>({ quitar: () => undefined, enderezar: () => undefined })
   const lienzo = useRef<HTMLDivElement>(null)
@@ -941,7 +969,19 @@ function Editor() {
           return {
             ...n,
             position: l ? { x: l.x, y: l.y } : n.position,
-            data: { ...n.data, ...(l ? { w: l.w, h: l.h } : {}), resaltada: n.id === zonaResaltada, ...(editable ? { onMover: (ev: ReactPointerEvent) => moverZona.current(n.id, ev), onMenu: (ev: ReactMouseEvent) => menuZona.current(n.id.slice('zona:'.length), ev) } : {}) },
+            data: {
+              ...n.data,
+              ...(l ? { w: l.w, h: l.h } : {}),
+              resaltada: n.id === zonaResaltada,
+              elegida: n.id === `zona:${zonaSel}`,
+              ...(editable
+                ? {
+                    onMover: (ev: ReactPointerEvent) => moverZona.current(n.id, ev),
+                    onMenu: (ev: ReactMouseEvent) => menuZona.current(n.id.slice('zona:'.length), ev),
+                    onTamano: (caja: { x: number; y: number; w: number; h: number }, empezando?: boolean) => tamanoZona.current(n.id.slice('zona:'.length), caja, empezando),
+                  }
+                : {}),
+            },
           }
         }
         if (n.type === 'entrada') return { ...n, className: marca, ariaLabel: nombreDe(n.id), data: { linea: nombreLinea.get(lineaDeEntrada(n.id)) ?? lineaDeEntrada(n.id) } }
@@ -979,7 +1019,7 @@ function Editor() {
         }
       })
     )
-  }, [nodes, indice, pesos, servicios, relaciones, nombreLinea, zonaResaltada, deOtraPlanta, nombreDe, limites, contenedorDe, editable, origenUnir, yaUnidos, reparto, modoGrupo])
+  }, [nodes, indice, pesos, servicios, relaciones, nombreLinea, zonaResaltada, deOtraPlanta, nombreDe, limites, contenedorDe, editable, origenUnir, yaUnidos, reparto, modoGrupo, zonaSel])
 
   const conParalelos = useMemo(
     () =>
@@ -1427,6 +1467,14 @@ function Editor() {
   acciones.current.quitar = (id: string) => quitarDelLienzo([id])
   accionesFlecha.current.quitar = (e: Edge) => quitarFlecha(e)
   accionesFlecha.current.enderezar = (e: Edge) => enderezarFlecha(e)
+  tamanoZona.current = (lineaId: string, caja: { x: number; y: number; w: number; h: number }, empezando?: boolean) => {
+    if (empezando) {
+      registrar()
+      return
+    }
+    setLineas((ls) => ls.map((l) => (l.id === lineaId ? { ...l, zona: { x: Math.round(caja.x), y: Math.round(caja.y), w: Math.round(caja.w), h: Math.round(caja.h) } } : l)))
+    setNodes((ns) => ns.map((n) => (n.id === `zona:${lineaId}` ? { ...n, position: { x: Math.round(caja.x), y: Math.round(caja.y) } } : n)))
+  }
   menuZona.current = (lineaId: string, ev: ReactMouseEvent) => abrirMenu(ev, itemsContenedor(lineaId))
   moverZona.current = (zonaId: string, ev: ReactPointerEvent) => {
     if (!editable || ev.button !== 0) return
@@ -1761,6 +1809,51 @@ function Editor() {
     return par
   }
 
+  /**
+   * Acomoda los equipos por el flujo, de izquierda a derecha. Solo mueve: no toca flechas ni
+   * contenedores, y se deshace con Ctrl+Z como cualquier movida.
+   */
+  const acomodar = (lineaId?: string) => {
+    const objetivos = lineaId ? [lineaId] : lineas.map((l) => l.id)
+    const movidos = objetivos.flatMap((id) => acomodarEnCapas(grafo, id))
+    if (!movidos.length) return
+    registrar()
+    const pos = new Map(movidos.map((m) => [m.id, m]))
+    setNodes((ns) => ns.map((n) => (pos.has(n.id) ? { ...n, position: { x: pos.get(n.id)!.x, y: pos.get(n.id)!.y } } : n)))
+    toast({
+      title: lineaId ? `${nombreLinea.get(lineaId) ?? lineaId} acomodado` : 'Planta acomodada',
+      description: `${movidos.length} equipos ordenados por el flujo, de izquierda a derecha.`,
+      action: (
+        <ToastAction altText="Deshacer" onClick={deshacer}>
+          Deshacer
+        </ToastAction>
+      ),
+    })
+  }
+
+  /**
+   * El diagrama como PNG, para pegarlo en el informe de turno o en una exposición: es una
+   * de las pocas cosas que muestran de una lo que Mantención sostiene. `html2canvas` ya
+   * estaba en la app (los PDF lo usan) y se carga aparte para no engordar el lienzo.
+   */
+  const exportarImagen = async () => {
+    const el = lienzo.current?.querySelector('.react-flow') as HTMLElement | null
+    if (!el) return
+    await fitView({ padding: 0.04 })
+    await new Promise((r) => window.setTimeout(r, 300))
+    try {
+      const { default: html2canvas } = await import('html2canvas')
+      const lona = await html2canvas(el, { backgroundColor: getComputedStyle(document.body).backgroundColor || '#ffffff', scale: 2, logging: false, useCORS: true })
+      const a = document.createElement('a')
+      a.download = `lineas-proceso-${PLANTA}-${new Date().toISOString().slice(0, 10)}.png`
+      a.href = lona.toDataURL('image/png')
+      a.click()
+      toast({ title: 'Imagen descargada', description: 'Para pegarla en el informe de turno o en una exposición.' })
+    } catch {
+      toast({ title: 'No se pudo generar la imagen', description: 'Vuelve a intentarlo; si insiste, avísame.' })
+    }
+  }
+
   // Elemento manual: algo que no está en el árbol, creado aquí (Orel, 19-09-2026).
   const crearManual = () => {
     if (!manual?.nombre.trim()) return
@@ -1853,6 +1946,9 @@ function Editor() {
         },
       },
       { tipo: 'accion', texto: 'Ver la planta completa', hacer: () => void fitView({ padding: 0.06, duration: 250 }) },
+      { tipo: 'separador' },
+      { tipo: 'accion', texto: 'Acomodar toda la planta', hacer: () => acomodar() },
+      { tipo: 'accion', texto: 'Exportar como imagen', hacer: () => void exportarImagen() },
     ]
   }
   const itemsEquipo = (n: Node): ItemMenu[] => {
@@ -1937,6 +2033,7 @@ function Editor() {
     return [
       { tipo: 'accion', texto: 'Renombrar…', hacer: () => setZonaSel(l.id) },
       { tipo: 'accion', texto: apoyo ? 'Pasar a línea de proceso' : 'Pasar a servicio de apoyo', hacer: () => cambiarTipoLinea(l, apoyo ? 'linea' : 'apoyo') },
+      { tipo: 'accion', texto: dentro ? `Acomodar sus ${dentro} equipos` : 'Sin equipos que acomodar', deshabilitado: !dentro, hacer: () => acomodar(l.id) },
       { tipo: 'accion', texto: dentro ? `Sacar los ${dentro} equipos` : 'Sin equipos que sacar', deshabilitado: !dentro, hacer: () => sacarEquipos(l) },
       { tipo: 'separador' },
       { tipo: 'accion', texto: apoyo ? 'Eliminar la zona…' : 'Eliminar la línea…', destructivo: true, hacer: () => pedirBorrarLinea(l) },
