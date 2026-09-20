@@ -128,6 +128,64 @@ export function cajaNueva(cajas: Iterable<LineaProceso['zona']>, w = 560, h = 36
   }
 }
 
+/**
+ * ¿Una flecha `a → b` cerraría un círculo? (`b` ya llega hasta `a`). El reparto del flujo
+ * necesita que el grafo no tenga vueltas: en un círculo no se puede repartir y los equipos
+ * quedan sin porcentaje (`PesoEnLinea.ciclo`). Mejor no dejar armarlo que avisar después.
+ */
+export function cierraCiclo(aristas: readonly (readonly [string, string])[], a: string, b: string): boolean {
+  if (a === b) return true
+  const salidas = new Map<string, string[]>()
+  for (const [x, y] of aristas) salidas.set(x, [...(salidas.get(x) ?? []), y])
+  const visto = new Set<string>()
+  const pila = [b]
+  while (pila.length) {
+    const n = pila.pop()!
+    if (n === a) return true
+    if (visto.has(n)) continue
+    visto.add(n)
+    for (const s of salidas.get(n) ?? []) pila.push(s)
+  }
+  return false
+}
+
+/**
+ * Flechas que hay que agregar al sacar equipos del medio para que el flujo no quede cortado:
+ * en `A → B → C`, si se va B, queda `A → C` (patrón «Delete Middle Node» de React Flow).
+ * Cruza varios seguidos, no repite lo que ya existe y no arma círculos.
+ */
+export function puentesAlQuitar(aristas: readonly (readonly [string, string])[], quitados: readonly string[]): [string, string][] {
+  const fuera = new Set(quitados)
+  const salidas = new Map<string, string[]>()
+  for (const [x, y] of aristas) salidas.set(x, [...(salidas.get(x) ?? []), y])
+  const existe = new Set(aristas.map(([x, y]) => `${x}->${y}`))
+  const quedan = aristas.filter(([x, y]) => !fuera.has(x) && !fuera.has(y)) as [string, string][]
+  const out: [string, string][] = []
+  const puesto = new Set<string>()
+  for (const [a, b] of aristas) {
+    if (fuera.has(a) || !fuera.has(b)) continue
+    const visto = new Set<string>()
+    const pila = [b]
+    while (pila.length) {
+      const n = pila.pop()!
+      if (visto.has(n)) continue
+      visto.add(n)
+      for (const s of salidas.get(n) ?? []) {
+        if (fuera.has(s)) {
+          pila.push(s)
+          continue
+        }
+        const llave = `${a}->${s}`
+        if (s === a || existe.has(llave) || puesto.has(llave)) continue
+        if (cierraCiclo([...quedan, ...out], a, s)) continue
+        puesto.add(llave)
+        out.push([a, s])
+      }
+    }
+  }
+  return out
+}
+
 /** Tamaño de la tarjeta de un equipo en el lienzo (px): para saber en qué zona cae su centro. */
 export const NODO = { ancho: 188, alto: 68 }
 /** Tamaño de la píldora «Entrada …». */
