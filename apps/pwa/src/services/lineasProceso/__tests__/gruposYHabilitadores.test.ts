@@ -152,3 +152,72 @@ describe('grupo dentro del camino del producto', () => {
     expect(p.get('estanqueB')?.peso).toBe(1)
   })
 })
+
+/**
+ * El caso que lo pidió (Orel, 20-09-2026): de la cinta azul salen las 3 Baader 142 y la línea
+ * manual HG. Una Baader hace ~5.500 piezas por turno; la manual, ~2.750. El 1/N diría 25 % a
+ * cada una, y eso mete un error de 3,6 puntos en las tres máquinas más críticas de la planta.
+ */
+describe('cuota por rama', () => {
+  const cintaAzul = (cuotas?: { a: string; b: string; parte: number }[]): GrafoLineas => ({
+    version: 1,
+    lineas: [{ id: 'evis', nombre: 'Eviscerado', zona: { x: 0, y: 0, w: 2000, h: 900 } }],
+    nodos: [
+      { id: 'in:evis', x: 0, y: 0, zona: 'evis' },
+      { id: 'azul', x: 200, y: 0, zona: 'evis' },
+      { id: 'b1', x: 400, y: 0, zona: 'evis' },
+      { id: 'b2', x: 400, y: 100, zona: 'evis' },
+      { id: 'b3', x: 400, y: 200, zona: 'evis' },
+      { id: 'hg', x: 400, y: 300, zona: 'evis' },
+    ],
+    aristas: [
+      ['in:evis', 'azul'],
+      ['azul', 'b1'],
+      ['azul', 'b2'],
+      ['azul', 'b3'],
+      ['azul', 'hg'],
+    ],
+    ...(cuotas ? { cuotas } : {}),
+  })
+
+  it('sin cuotas reparte parejo, como siempre', () => {
+    const p = pesosPorLinea(cintaAzul())
+    expect(p.get('b1')?.peso).toBeCloseTo(0.25, 5)
+    expect(p.get('hg')?.peso).toBeCloseTo(0.25, 5)
+  })
+
+  it('con las piezas por turno, cada Baader se lleva 28,6 % y la manual 14 %', () => {
+    const p = pesosPorLinea(
+      cintaAzul([
+        { a: 'azul', b: 'b1', parte: 5500 },
+        { a: 'azul', b: 'b2', parte: 5500 },
+        { a: 'azul', b: 'b3', parte: 5500 },
+        { a: 'azul', b: 'hg', parte: 2750 },
+      ]),
+    )
+    expect(p.get('b1')?.peso).toBeCloseTo(5500 / 19250, 5)
+    expect(p.get('hg')?.peso).toBeCloseTo(2750 / 19250, 5)
+    // Y la suma sigue siendo el 100 % del tramo.
+    const total = ['b1', 'b2', 'b3', 'hg'].reduce((a, id) => a + (p.get(id)?.peso ?? 0), 0)
+    expect(total).toBeCloseTo(1, 5)
+  })
+
+  it('una rama sin cuota vale 1 y no rompe el reparto', () => {
+    const p = pesosPorLinea(cintaAzul([{ a: 'azul', b: 'b1', parte: 3 }]))
+    // b1 se lleva 3 de 6 (3 + 1 + 1 + 1); las otras, 1 de 6.
+    expect(p.get('b1')?.peso).toBeCloseTo(0.5, 5)
+    expect(p.get('hg')?.peso).toBeCloseTo(1 / 6, 5)
+  })
+
+  it('una cuota inservible (0, negativa o NaN) se trata como 1', () => {
+    const p = pesosPorLinea(
+      cintaAzul([
+        { a: 'azul', b: 'b1', parte: 0 },
+        { a: 'azul', b: 'b2', parte: -5 },
+        { a: 'azul', b: 'b3', parte: Number.NaN },
+      ]),
+    )
+    expect(p.get('b1')?.peso).toBeCloseTo(0.25, 5)
+    expect(p.get('hg')?.peso).toBeCloseTo(0.25, 5)
+  })
+})

@@ -63,6 +63,23 @@ export interface GrafoLineas {
    * (el producto pasa) y un servicio de apoyo (influye, sin peso).
    */
   habilitan?: [string, string][]
+  /**
+   * Cuánto se lleva cada rama en su bifurcación (Orel, 20-09-2026). Sin esto el flujo se parte
+   * en partes IGUALES, y eso es falso apenas las ramas rinden distinto: de la cinta azul salen
+   * las 3 Baader 142 (~5.500 piezas por turno cada una) y la línea manual HG (~2.750), o sea
+   * 28,6 % · 28,6 % · 28,6 % · 14 %, no 25 % cada una.
+   *
+   * `parte` es un peso RELATIVO, no un porcentaje: se puede escribir directamente las piezas
+   * por turno y el reparto sale solo. Las ramas sin cuota valen 1.
+   */
+  cuotas?: CuotaRama[]
+}
+
+/** Lo que se lleva una rama de su bifurcación, en peso relativo. */
+export interface CuotaRama {
+  a: string
+  b: string
+  parte: number
 }
 
 /**
@@ -430,8 +447,21 @@ export interface PesoEnLinea {
  * se necesitan todas— y los HABILITADORES, que no reciben flujo pero se llevan la cuota de
  * lo que hacen posible.
  */
+/** El peso relativo de una rama; 1 si no se le puso ninguno (o si el número no sirve). */
+export function parteDe(cuotas: readonly CuotaRama[] | undefined, a: string, b: string): number {
+  const c = cuotas?.find((x) => x.a === a && x.b === b)
+  return c && Number.isFinite(c.parte) && c.parte > 0 ? c.parte : 1
+}
+
+/** ¿Esta bifurcación reparte disparejo? Sirve para rotular solo donde importa. */
+export function repartoDisparejo(cuotas: readonly CuotaRama[] | undefined, a: string, hijos: readonly string[]): boolean {
+  if (!cuotas?.length || hijos.length < 2) return false
+  const partes = hijos.map((h) => parteDe(cuotas, a, h))
+  return Math.max(...partes) - Math.min(...partes) > 1e-6
+}
+
 export function pesosPorLinea(
-  g: Pick<GrafoLineas, 'lineas' | 'nodos' | 'aristas'> & Partial<Pick<GrafoLineas, 'grupos' | 'habilitan'>>,
+  g: Pick<GrafoLineas, 'lineas' | 'nodos' | 'aristas'> & Partial<Pick<GrafoLineas, 'grupos' | 'habilitan' | 'cuotas'>>,
 ): Map<string, PesoEnLinea> {
   const grupos = g.grupos ?? []
   const porId = new Map(grupos.map((x) => [PREFIJO_GRUPO + x.id, x]))
@@ -468,8 +498,11 @@ export function pesosPorLinea(
     while (cola.length) {
       const n = cola.shift()!
       const hijos = (salidas.get(n) ?? []).filter((s) => alcanzables.has(s))
-      for (const h of hijos) {
-        flujo.set(h, (flujo.get(h) ?? 0) + (flujo.get(n) ?? 0) / hijos.length)
+      // Reparto por cuota: sin cuotas todas valen 1 y queda el 1/N de siempre.
+      const partes = hijos.map((h) => parteDe(g.cuotas, n, h))
+      const suma = partes.reduce((a, b) => a + b, 0) || hijos.length
+      for (const [i, h] of hijos.entries()) {
+        flujo.set(h, (flujo.get(h) ?? 0) + ((flujo.get(n) ?? 0) * (partes[i] ?? 1)) / suma)
         const p = (pendientes.get(h) ?? 1) - 1
         pendientes.set(h, p)
         if (p === 0) cola.push(h)
