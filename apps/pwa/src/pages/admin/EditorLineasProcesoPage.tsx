@@ -28,19 +28,23 @@ import {
   type NodeProps,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { Boxes, ChevronDown, Droplets, ChevronLeft, ChevronRight, Expand, Loader2, Maximize2, Minimize2, PanelLeftClose, PanelLeftOpen, Plus, Redo2, RotateCcw, Search, Spline, Undo2, X } from 'lucide-react'
+import { Boxes, ChevronDown, Droplets, ChevronLeft, ChevronRight, Expand, Loader2, Maximize2, Minimize2, PanelLeftClose, PanelLeftOpen, Plus, Redo2, RotateCcw, Search, Spline, Trash2, Undo2, X } from 'lucide-react'
 import { Button, Sheet } from '@/components/piel'
 import { ToastAction } from '@/components/ui/toast'
 import { useHierarchyTree } from '@/hooks/useHierarchy'
 import { useAuthStore } from '@/store'
 import { useToast } from '@/hooks/useToast'
 import {
+  ENTRADA,
   NODO,
+  PREFIJO_ENTRADA,
   PREFIJO_MANUAL,
+  cajaNueva,
   caminoSuave,
   esEntrada,
   esManual,
   formatoPeso,
+  idDeContenedor,
   limitesDeGrupo,
   limitesDeZonas,
   lineaDeEntrada,
@@ -82,11 +86,21 @@ type DatosMaquina = { nombre: string; peso: number | null; linea: string | null;
 type DatosServicio = { nombre: string; abastece: string[]; recibe: string[] }
 type DatosEntrada = { linea: string }
 type DatosZona = { nombre: string; w: number; h: number; apoyo: boolean; resaltada: boolean; onMover?: (ev: ReactPointerEvent) => void }
-type Instantanea = { nodes: Node[]; edges: Edge[] }
+type Instantanea = { nodes: Node[]; edges: Edge[]; lineas: LineaProceso[] }
 /** Pertenencia y nombre (manuales) que viajan en `data` de los nodos base. */
 type DatosBase = { zona?: string; nombre?: string }
 /** Una confirmación pendiente: entrar, salir o cambiar de contenedor (Orel, 19-09-2026). */
-type Pedido = { titulo: string; detalle: string; confirmar: string; hacer: () => void; cancelar?: () => void }
+type Pedido = {
+  titulo: string
+  detalle: string
+  confirmar: string
+  hacer: () => void
+  cancelar?: () => void
+  /** Segunda salida de la misma pregunta (p. ej. borrar el contenedor CON sus equipos). */
+  alterno?: { texto: string; hacer: () => void }
+  /** Pinta la confirmación como destructiva (HIG «Alerts»: el borrado se ve rojo). */
+  destructivo?: boolean
+}
 
 function tonoPeso(peso: number | null): 'serie' | 'paralelo' | 'fuera' {
   if (peso == null || peso === 0) return 'fuera'
@@ -461,14 +475,19 @@ function Editor() {
   const [pedido, setPedido] = useState<Pedido | null>(null)
   const [abiertos, setAbiertos] = useState<Set<string>>(() => new Set())
   const [manual, setManual] = useState<{ nombre: string; zona: string } | null>(null)
+  // Contenedor elegido (las zonas no son seleccionables de React Flow: se tocan por su título).
+  const [zonaSel, setZonaSel] = useState<string | null>(null)
+  const [nuevaLinea, setNuevaLinea] = useState<{ nombre: string; tipo: 'linea' | 'apoyo' } | null>(null)
+  // Renombrar: UNA entrada de deshacer por tanda de tecleo, no una por letra.
+  const renombrando = useRef<string | null>(null)
   const [oscuro, setOscuro] = useState(() => typeof document !== 'undefined' && document.documentElement.classList.contains('dark'))
   const [editable, setEditable] = useState(() => typeof window === 'undefined' || window.matchMedia('(min-width: 768px) and (pointer: fine)').matches)
   // Deshacer / rehacer: instantáneas antes de cada cambio que importa (HIG «Undo and redo»).
   const pilaDeshacer = useRef<Instantanea[]>([])
   const pilaRehacer = useRef<Instantanea[]>([])
   const [, setVersionPilas] = useState(0)
-  const actual = useRef<Instantanea>({ nodes: [], edges: [] })
-  actual.current = { nodes, edges }
+  const actual = useRef<Instantanea>({ nodes: [], edges: [], lineas: [] })
+  actual.current = { nodes, edges, lineas }
 
   useEffect(() => {
     const raiz = document.documentElement
@@ -773,6 +792,7 @@ function Editor() {
     pilaRehacer.current.push(actual.current)
     setNodes(previa.nodes)
     setEdges(previa.edges)
+    setLineas(previa.lineas)
     setVersionPilas((v) => v + 1)
   }, [])
   const rehacer = useCallback(() => {
@@ -781,6 +801,7 @@ function Editor() {
     pilaDeshacer.current.push(actual.current)
     setNodes(siguiente.nodes)
     setEdges(siguiente.edges)
+    setLineas(siguiente.lineas)
     setVersionPilas((v) => v + 1)
   }, [])
   useEffect(() => {
@@ -1051,6 +1072,13 @@ function Editor() {
       window.removeEventListener('pointermove', mover)
       window.removeEventListener('pointerup', soltar)
       window.removeEventListener('pointercancel', soltar)
+      // Tocar el título sin arrastrarlo = elegir el contenedor (abre su ficha).
+      if (!movido) {
+        setNodes((ns) => ns.map((x) => ({ ...x, selected: false })))
+        setEdges((es) => es.map((x) => ({ ...x, selected: false })))
+        setGrupoSel(null)
+        setZonaSel(lineaId)
+      }
     }
     window.addEventListener('pointermove', mover)
     window.addEventListener('pointerup', soltar)
@@ -1095,6 +1123,195 @@ function Editor() {
         registrar()
         setNodes((ns) => ns.map((x) => (x.id === n.id ? { ...x, position: pos, data: { ...(x.data as DatosBase), zona: destino } } : x)))
       },
+    })
+  }
+
+
+  // --- Contenedores: crearlos, renombrarlos y borrarlos desde el editor (Orel, 19-09-2026:
+  // «aún no tenemos total autonomía para crear las líneas, editarlas y eliminar lo que estorbe»).
+  // El contenedor vive en DOS lados: `lineas` (nombre, tipo, caja) y su nodo `zona:<id>` del
+  // lienzo (lo que se dibuja). Todo cambio toca los dos, o el lienzo queda mintiendo.
+  const lineaSel = useMemo(() => lineas.find((l) => l.id === zonaSel), [lineas, zonaSel])
+  useEffect(() => {
+    renombrando.current = null
+  }, [zonaSel])
+  const equiposDeZona = (id: string) => nodes.filter((n) => n.type !== 'zona' && !esEntrada(n.id) && contenedorDeNodo(n) === id)
+
+  const nodoZona = (l: LineaProceso): Node => ({
+    id: `zona:${l.id}`,
+    type: 'zona',
+    position: { x: l.zona.x, y: l.zona.y },
+    data: { nombre: l.nombre, w: l.zona.w, h: l.zona.h, apoyo: l.tipo === 'apoyo', resaltada: false },
+    draggable: false,
+    selectable: false,
+    deletable: false,
+    focusable: false,
+    zIndex: -2,
+  })
+
+  const crearLinea = () => {
+    const nombre = nuevaLinea?.nombre.trim().replace(/\s+/g, ' ')
+    if (!nuevaLinea || !nombre) return
+    const id = idDeContenedor(nombre, lineas.map((l) => l.id))
+    const zona = cajaNueva(limites.values())
+    const l: LineaProceso = { id, nombre, ...(nuevaLinea.tipo === 'apoyo' ? { tipo: 'apoyo' as const } : {}), zona }
+    registrar()
+    setLineas((ls) => [...ls, l])
+    setNodes((ns) => [
+      nodoZona(l),
+      ...ns,
+      ...(nuevaLinea.tipo === 'apoyo'
+        ? []
+        : [
+            {
+              id: PREFIJO_ENTRADA + id,
+              type: 'entrada',
+              position: { x: zona.x + 24, y: Math.round(zona.y + zona.h / 2 - ENTRADA.alto / 2) },
+              data: {} as DatosBase,
+              deletable: false,
+            },
+          ]),
+    ])
+    setNuevaLinea(null)
+    setZonaSel(id)
+    toast({
+      title: `${nombre} creada`,
+      description:
+        nuevaLinea.tipo === 'apoyo'
+          ? 'Arrastra adentro los equipos que abastecen a las líneas.'
+          : 'Arrastra adentro sus equipos y únelos desde la entrada.',
+    })
+  }
+
+  /** Cambia el contenedor en `lineas` y en su nodo del lienzo, que es lo que se ve. */
+  const editarLinea = (id: string, cambios: { nombre?: string; tipo?: 'linea' | 'apoyo' }) => {
+    setLineas((ls) =>
+      ls.map((l) => {
+        if (l.id !== id) return l
+        const sig: LineaProceso = { ...l, ...(cambios.nombre !== undefined ? { nombre: cambios.nombre } : {}) }
+        if (cambios.tipo === 'apoyo') sig.tipo = 'apoyo'
+        else if (cambios.tipo === 'linea') delete sig.tipo
+        return sig
+      }),
+    )
+    setNodes((ns) =>
+      ns.map((n) =>
+        n.id === `zona:${id}`
+          ? {
+              ...n,
+              data: {
+                ...(n.data as DatosZona),
+                ...(cambios.nombre !== undefined ? { nombre: cambios.nombre } : {}),
+                ...(cambios.tipo !== undefined ? { apoyo: cambios.tipo === 'apoyo' } : {}),
+              },
+            }
+          : n,
+      ),
+    )
+  }
+
+  // Línea ↔ servicio de apoyo: lo que cambia de verdad es la ENTRADA. Un servicio no tiene
+  // entrada (no reparte flujo), así que pasar a apoyo la quita y volver a línea la repone.
+  const cambiarTipoLinea = (l: LineaProceso, tipo: 'linea' | 'apoyo') => {
+    if ((l.tipo ?? 'linea') === tipo) return
+    const entrada = PREFIJO_ENTRADA + l.id
+    setPedido({
+      titulo: tipo === 'apoyo' ? `¿${l.nombre} pasa a servicio de apoyo?` : `¿${l.nombre} pasa a línea de proceso?`,
+      detalle:
+        tipo === 'apoyo'
+          ? 'Se quita su entrada y sus equipos dejan de tener % de parada: sus flechas pasan a ser «abastece a» / «recibe de».'
+          : 'Se le pone una entrada al 100 %. Únela con el primer equipo para que el flujo se reparta.',
+      confirmar: 'Cambiar',
+      hacer: () => {
+        registrar()
+        editarLinea(l.id, { tipo })
+        if (tipo === 'apoyo') {
+          setNodes((ns) => ns.filter((n) => n.id !== entrada))
+          setEdges((es) => es.filter((e) => e.source !== entrada && e.target !== entrada))
+        } else {
+          const z = limites.get(l.id) ?? l.zona
+          setNodes((ns) =>
+            ns.some((n) => n.id === entrada)
+              ? ns
+              : [
+                  ...ns,
+                  {
+                    id: entrada,
+                    type: 'entrada',
+                    position: { x: z.x + 24, y: Math.round(z.y + z.h / 2 - ENTRADA.alto / 2) },
+                    data: {} as DatosBase,
+                    deletable: false,
+                  },
+                ],
+          )
+        }
+      },
+    })
+  }
+
+  /** Deja los equipos del contenedor afuera, en filas arriba de su caja (no los borra). */
+  const sacarEquipos = (l: LineaProceso) => {
+    const dentro = equiposDeZona(l.id)
+    if (!dentro.length) return
+    const z = limites.get(l.id) ?? l.zona
+    const porFila = 6
+    const filas = Math.ceil(dentro.length / porFila)
+    const pos = new Map(
+      dentro.map((n, i) => [
+        n.id,
+        {
+          x: Math.round(z.x + (i % porFila) * (NODO.ancho + 24)),
+          y: Math.round(z.y - 48 - (filas - Math.floor(i / porFila)) * (NODO.alto + 24)),
+        },
+      ]),
+    )
+    setPedido({
+      titulo: `¿Sacar ${dentro.length === 1 ? 'el equipo' : `los ${dentro.length} equipos`} de ${l.nombre}?`,
+      detalle: 'Quedan en el lienzo, arriba del contenedor, sin pertenecer a ninguno. Sus flechas no se tocan.',
+      confirmar: 'Sacar',
+      hacer: () => {
+        registrar()
+        setNodes((ns) => ns.map((n) => (pos.has(n.id) ? { ...n, position: pos.get(n.id)!, data: { ...(n.data as DatosBase), zona: '' } } : n)))
+      },
+    })
+  }
+
+  const borrarLinea = (l: LineaProceso, conEquipos: boolean) => {
+    const dentro = equiposDeZona(l.id).map((n) => n.id)
+    const fuera = new Set(conEquipos ? [...dentro, PREFIJO_ENTRADA + l.id] : [PREFIJO_ENTRADA + l.id])
+    registrar()
+    setLineas((ls) => ls.filter((x) => x.id !== l.id))
+    setNodes((ns) =>
+      ns
+        .filter((n) => n.id !== `zona:${l.id}` && !fuera.has(n.id))
+        .map((n) => ((n.data as DatosBase).zona === l.id ? { ...n, data: { ...(n.data as DatosBase), zona: '' } } : n)),
+    )
+    setEdges((es) => es.filter((e) => !fuera.has(e.source) && !fuera.has(e.target)))
+    setGrupos((gs) => gs.map((g) => ({ ...g, miembros: g.miembros.filter((m) => !fuera.has(m)) })).filter((g) => g.miembros.length > 1))
+    setZonaSel(null)
+    avisoQuitado(conEquipos && dentro.length ? `Se eliminó ${l.nombre} con sus ${dentro.length} equipos` : `Se eliminó ${l.nombre}`)
+  }
+
+  const pedirBorrarLinea = (l: LineaProceso) => {
+    const dentro = equiposDeZona(l.id).length
+    if (!dentro) {
+      setPedido({
+        titulo: `¿Eliminar ${l.nombre}?`,
+        detalle: 'Está vacía. Se borra el contenedor y su entrada.',
+        confirmar: 'Eliminar',
+        destructivo: true,
+        hacer: () => borrarLinea(l, false),
+      })
+      return
+    }
+    setPedido({
+      titulo: `¿Eliminar ${l.nombre}?`,
+      detalle: `Tiene ${dentro} ${dentro === 1 ? 'equipo' : 'equipos'} y su entrada. Elige qué pasa con ellos.`,
+      // Rojo lleno solo para lo que borra equipos: el emparejado «Solo el contenedor» es el
+      // camino seguro y va como primario normal (HIG «Alerts»: el rojo marca lo irreversible).
+      confirmar: 'Solo el contenedor',
+      hacer: () => borrarLinea(l, false),
+      alterno: { texto: dentro === 1 ? 'Con su equipo' : `Con sus ${dentro} equipos`, hacer: () => borrarLinea(l, true) },
     })
   }
 
@@ -1177,7 +1394,7 @@ function Editor() {
     [lineas, pesos],
   )
 
-  const inspector = editable && (seleccionado || flechaSeleccionada || seleccionados.length > 1 || grupoActivo)
+  const inspector = editable && (seleccionado || flechaSeleccionada || seleccionados.length > 1 || grupoActivo || lineaSel)
 
   return (
     <div className={amplio ? 'fixed inset-0 z-[60] flex h-dvh flex-col bg-background' : 'flex h-[calc(100dvh-4rem)] min-h-[520px] flex-col md:h-[calc(100dvh-1rem)]'}>
@@ -1240,6 +1457,15 @@ function Editor() {
             >
               <Spline aria-hidden />
               {modoUnir ? 'Salir de unir' : 'Unir'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setNuevaLinea({ nombre: '', tipo: 'linea' })}
+              title="Crear una línea de proceso o una zona de servicios"
+              className="flex min-h-[44px] items-center gap-1.5 rounded-full px-3 text-footnote font-semibold text-primary hover:bg-muted-foreground/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary [&>svg]:size-4"
+            >
+              <Plus aria-hidden />
+              Nueva línea
             </button>
             <button
               type="button"
@@ -1374,6 +1600,7 @@ function Editor() {
               }}
               onDelete={onDelete}
               onNodeClick={(_, n) => {
+                setZonaSel(null)
                 if (modoGrupo && n.type !== 'zona' && n.type !== 'paralelo' && !esEntrada(n.id)) {
                   setModoGrupo((ids) => (ids ?? []).includes(n.id) ? (ids ?? []).filter((x) => x !== n.id) : [...(ids ?? []), n.id])
                   return
@@ -1384,7 +1611,10 @@ function Editor() {
                 }
                 if (modoUnir && n.type !== 'zona') tocarParaUnir(n.id)
               }}
-              onPaneClick={modoUnir ? () => setOrigenUnir(null) : undefined}
+              onPaneClick={() => {
+                setZonaSel(null)
+                if (modoUnir) setOrigenUnir(null)
+              }}
               onNodeDragStart={() => registrar()}
               onNodeDrag={(_, n) => {
                 const z = esEntrada(n.id) ? undefined : zonaEn(n.position.x + NODO.ancho / 2, n.position.y + NODO.alto / 2, contenedorDeNodo(n))
@@ -1511,7 +1741,7 @@ function Editor() {
           <aside aria-label="Inspector" className="flex w-[300px] shrink-0 flex-col gap-3 overflow-y-auto border-l border-border bg-card p-4">
             <div className="flex items-start justify-between gap-2">
               <p className="text-footnote text-muted-foreground">
-                {flechaSeleccionada ? 'Flecha seleccionada' : grupoActivo && !seleccionados.length ? 'Grupo en paralelo' : seleccionados.length > 1 ? `${seleccionados.length} equipos seleccionados` : 'Seleccionado'}
+                {flechaSeleccionada ? 'Flecha seleccionada' : grupoActivo && !seleccionados.length ? 'Grupo en paralelo' : seleccionados.length > 1 ? `${seleccionados.length} equipos seleccionados` : lineaSel && !seleccionado ? 'Contenedor' : 'Seleccionado'}
               </p>
               <button
                 type="button"
@@ -1519,6 +1749,7 @@ function Editor() {
                   setNodes((ns) => ns.map((x) => ({ ...x, selected: false })))
                   setEdges((es) => es.map((x) => ({ ...x, selected: false })))
                   setGrupoSel(null)
+                  setZonaSel(null)
                 }}
                 aria-label="Cerrar el inspector"
                 className="-mr-2 -mt-2 flex size-11 items-center justify-center rounded-full text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
@@ -1613,6 +1844,22 @@ function Editor() {
                   Quitar la flecha
                 </Button>
               </>
+            ) : lineaSel ? (
+              <FichaContenedor
+                linea={lineaSel}
+                equipos={equiposDeZona(lineaSel.id).length}
+                entrada={nodes.some((n) => n.id === PREFIJO_ENTRADA + lineaSel.id)}
+                onNombre={(v) => {
+                  if (renombrando.current !== lineaSel.id) {
+                    registrar()
+                    renombrando.current = lineaSel.id
+                  }
+                  editarLinea(lineaSel.id, { nombre: v })
+                }}
+                onTipo={(t) => cambiarTipoLinea(lineaSel, t)}
+                onSacar={() => sacarEquipos(lineaSel)}
+                onEliminar={() => pedirBorrarLinea(lineaSel)}
+              />
             ) : null}
           </aside>
         )}
@@ -1638,7 +1885,20 @@ function Editor() {
             >
               Cancelar
             </Button>
+            {pedido?.alterno && (
+              <Button
+                variant="tinted"
+                className="text-ink-crit"
+                onClick={() => {
+                  pedido.alterno?.hacer()
+                  setPedido(null)
+                }}
+              >
+                {pedido.alterno.texto}
+              </Button>
+            )}
             <Button
+              className={pedido?.destructivo ? 'bg-ink-crit text-white' : undefined}
               onClick={() => {
                 pedido?.hacer()
                 setPedido(null)
@@ -1649,6 +1909,59 @@ function Editor() {
           </>
         }
       />
+
+      {/* Nueva línea de proceso o zona de servicios: nace vacía, a la derecha de todo. */}
+      <Sheet
+        open={!!nuevaLinea}
+        onClose={() => setNuevaLinea(null)}
+        title="Nueva línea"
+        description="Un contenedor vacío al final del dibujo. Después le arrastras sus equipos adentro."
+        actions={
+          <>
+            <Button variant="tinted" onClick={() => setNuevaLinea(null)}>
+              Cancelar
+            </Button>
+            <Button onClick={crearLinea} disabled={!nuevaLinea?.nombre.trim()}>
+              Crear
+            </Button>
+          </>
+        }
+      >
+        {nuevaLinea && (
+          <div className="flex flex-col gap-3">
+            <label className="flex flex-col gap-1">
+              <span className="text-footnote text-muted-foreground">Nombre</span>
+              <input
+                autoFocus
+                value={nuevaLinea.nombre}
+                maxLength={60}
+                onChange={(e) => setNuevaLinea({ ...nuevaLinea, nombre: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') crearLinea()
+                }}
+                placeholder="Ej.: Empaque secundario"
+                className="h-[44px] w-full rounded-ctl bg-muted-foreground/10 px-3 text-campo outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-footnote text-muted-foreground">Tipo</span>
+              <select
+                value={nuevaLinea.tipo}
+                onChange={(e) => setNuevaLinea({ ...nuevaLinea, tipo: e.target.value as 'linea' | 'apoyo' })}
+                className="h-[44px] w-full cursor-pointer rounded-ctl bg-muted-foreground/10 px-3 text-campo outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                <option value="linea">Línea de proceso · reparte el flujo</option>
+                <option value="apoyo">Servicio de apoyo · influye sin repartir</option>
+              </select>
+            </label>
+            <p className="text-caption text-muted-foreground">
+              {nuevaLinea.tipo === 'apoyo'
+                ? 'Sus equipos no llevan % de parada: sus flechas dicen «abastece a» o «recibe de».'
+                : 'Nace con su entrada al 100 %. Únela con el primer equipo para que el flujo se reparta.'}
+            </p>
+          </div>
+        )}
+      </Sheet>
 
       {/* Elemento manual: lo que no está en el árbol (un estanque, una cinta sin código…). */}
       <Sheet
@@ -1701,6 +2014,66 @@ function Editor() {
           </div>
         )}
       </Sheet>
+    </div>
+  )
+}
+
+/**
+ * Ficha del contenedor: nombre, tipo y las dos salidas para «eliminar lo que estorba»
+ * (sacar los equipos, o borrar la línea entera). Orel, 19-09-2026.
+ */
+function FichaContenedor({
+  linea,
+  equipos,
+  entrada,
+  onNombre,
+  onTipo,
+  onSacar,
+  onEliminar,
+}: {
+  linea: LineaProceso
+  equipos: number
+  entrada: boolean
+  onNombre: (v: string) => void
+  onTipo: (t: 'linea' | 'apoyo') => void
+  onSacar: () => void
+  onEliminar: () => void
+}) {
+  const apoyo = linea.tipo === 'apoyo'
+  return (
+    <div className="flex flex-col gap-3">
+      <label className="flex flex-col gap-1">
+        <span className="text-footnote text-muted-foreground">Nombre</span>
+        <input
+          value={linea.nombre}
+          maxLength={60}
+          onChange={(e) => onNombre(e.target.value.trimStart())}
+          className="h-[44px] w-full rounded-ctl bg-muted-foreground/10 px-3 text-campo outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        />
+      </label>
+      <label className="flex flex-col gap-1">
+        <span className="text-footnote text-muted-foreground">Tipo</span>
+        <select
+          value={apoyo ? 'apoyo' : 'linea'}
+          onChange={(e) => onTipo(e.target.value as 'linea' | 'apoyo')}
+          className="h-[44px] w-full cursor-pointer rounded-ctl bg-muted-foreground/10 px-3 text-campo outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          <option value="linea">Línea de proceso</option>
+          <option value="apoyo">Servicio de apoyo</option>
+        </select>
+      </label>
+      <p className="text-footnote text-muted-foreground">
+        {equipos === 0 ? 'Sin equipos adentro' : equipos === 1 ? '1 equipo adentro' : `${equipos} equipos adentro`}
+        {apoyo ? ' · influye sin repartir flujo' : entrada ? ' · entrada al 100 %' : ' · le falta la entrada'}
+      </p>
+      <div className="flex flex-col gap-2 border-t border-border pt-3">
+        <Button variant="tinted" onClick={onSacar} disabled={!equipos}>
+          Sacar los equipos
+        </Button>
+        <Button variant="tinted" className="text-ink-crit" onClick={onEliminar}>
+          <Trash2 /> Eliminar {apoyo ? 'la zona' : 'la línea'}
+        </Button>
+      </div>
     </div>
   )
 }
