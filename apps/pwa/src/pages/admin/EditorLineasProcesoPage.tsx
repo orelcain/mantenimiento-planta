@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type PointerEvent as ReactPointerEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Background,
@@ -28,7 +28,7 @@ import {
   type NodeProps,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { Boxes, ChevronDown, Droplets, ChevronLeft, ChevronRight, Expand, Loader2, Maximize2, Minimize2, PanelLeftClose, PanelLeftOpen, Plus, Redo2, RotateCcw, Search, Spline, Trash2, Undo2, X } from 'lucide-react'
+import { Boxes, ChevronDown, Droplets, ChevronLeft, ChevronRight, Expand, Loader2, Maximize2, Minimize2, PanelLeftClose, PanelLeftOpen, Redo2, RotateCcw, Search, Spline, Trash2, Undo2, X } from 'lucide-react'
 import { Button, Sheet } from '@/components/piel'
 import { ToastAction } from '@/components/ui/toast'
 import { useHierarchyTree } from '@/hooks/useHierarchy'
@@ -85,10 +85,18 @@ const APOYO = 'rgb(var(--cat-6-ink))'
 type DatosMaquina = { nombre: string; peso: number | null; linea: string | null; contenedor: string | null; componentes: number; otraPlanta?: string; manual?: boolean; ciclo?: boolean; ramas: number }
 type DatosServicio = { nombre: string; abastece: string[]; recibe: string[] }
 type DatosEntrada = { linea: string }
-type DatosZona = { nombre: string; w: number; h: number; apoyo: boolean; resaltada: boolean; onMover?: (ev: ReactPointerEvent) => void }
+type DatosZona = { nombre: string; w: number; h: number; apoyo: boolean; resaltada: boolean; onMover?: (ev: ReactPointerEvent) => void; onMenu?: (ev: ReactMouseEvent) => void }
 type Instantanea = { nodes: Node[]; edges: Edge[]; lineas: LineaProceso[] }
 /** Pertenencia y nombre (manuales) que viajan en `data` de los nodos base. */
 type DatosBase = { zona?: string; nombre?: string }
+/** Un renglón del menú de clic derecho. */
+type ItemMenu =
+  | { tipo: 'accion'; texto: string; hacer: () => void; deshabilitado?: boolean; destructivo?: boolean }
+  | { tipo: 'titulo'; texto: string }
+  | { tipo: 'nota'; texto: string }
+  | { tipo: 'separador' }
+type MenuCtx = { x: number; y: number; items: ItemMenu[] }
+
 /** Una confirmación pendiente: entrar, salir o cambiar de contenedor (Orel, 19-09-2026). */
 type Pedido = {
   titulo: string
@@ -253,6 +261,7 @@ function NodoZona({ data }: NodeProps<Node<DatosZona>>) {
           Es la única parte que se agarra: el resto de la caja sigue desplazando el lienzo. */}
       <div
         onPointerDown={data.onMover}
+        onContextMenu={data.onMenu}
         // React Flow deja los nodos no seleccionables sin eventos de puntero: la franja los recupera.
         style={data.onMover ? { pointerEvents: 'all' } : undefined}
         title={data.onMover ? 'Arrastra el título para mover el contenedor con todo lo que tiene' : undefined}
@@ -437,6 +446,77 @@ function alGrafo(lineas: LineaProceso[], nodes: Node[], edges: Edge[], grupos: G
 
 const escribiendo = (t: EventTarget | null) => t instanceof HTMLElement && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)
 
+/**
+ * Menú de clic derecho: las herramientas viven donde se usan y no en la barra (Orel,
+ * 19-09-2026: «así no tenemos mil herramientas arriba»). HIG «Context menus»: aparece
+ * donde se tocó, se corre solo para no salirse de la pantalla, se cierra con Esc o
+ * tocando afuera, y ningún comando vive SOLO acá (la ayuda de la lista lo dice y los
+ * modos que duran —Unir— siguen arriba).
+ */
+function MenuContextual({ menu, onCerrar }: { menu: MenuCtx; onCerrar: () => void }) {
+  const caja = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState({ x: menu.x, y: menu.y })
+  useEffect(() => {
+    const el = caja.current
+    if (!el) return
+    const r = el.getBoundingClientRect()
+    setPos({ x: Math.max(8, Math.min(menu.x, window.innerWidth - r.width - 8)), y: Math.max(8, Math.min(menu.y, window.innerHeight - r.height - 8)) })
+    el.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus()
+  }, [menu])
+  useEffect(() => {
+    const fuera = (ev: PointerEvent) => {
+      if (!caja.current?.contains(ev.target as globalThis.Node | null)) onCerrar()
+    }
+    const tecla = (ev: KeyboardEvent) => {
+      if (ev.key !== 'Escape') return
+      // Antes que el modo Unir o Agrupar: Esc cierra primero lo de encima.
+      ev.stopPropagation()
+      onCerrar()
+    }
+    window.addEventListener('pointerdown', fuera, true)
+    window.addEventListener('keydown', tecla, true)
+    return () => {
+      window.removeEventListener('pointerdown', fuera, true)
+      window.removeEventListener('keydown', tecla, true)
+    }
+  }, [onCerrar])
+  return (
+    <div
+      ref={caja}
+      role="menu"
+      aria-label="Opciones"
+      style={{ left: pos.x, top: pos.y }}
+      className="fixed z-[80] min-w-[228px] max-w-[320px] rounded-ctl border border-border bg-card py-1 shadow-[0_8px_28px_rgba(0,0,0,0.28)]"
+    >
+      {menu.items.map((it, i) =>
+        it.tipo === 'separador' ? (
+          <div key={i} className="my-1 h-px bg-border" aria-hidden />
+        ) : it.tipo === 'titulo' ? (
+          <p key={i} className="px-3 pb-1 pt-2 text-caption font-semibold uppercase tracking-wide text-muted-foreground">{it.texto}</p>
+        ) : it.tipo === 'nota' ? (
+          <p key={i} className="px-3 py-1.5 text-caption leading-snug text-muted-foreground">{it.texto}</p>
+        ) : (
+          <button
+            key={i}
+            type="button"
+            role="menuitem"
+            disabled={it.deshabilitado}
+            onClick={() => {
+              it.hacer()
+              onCerrar()
+            }}
+            className={`flex min-h-[36px] w-full items-center px-3 text-left text-footnote hover:bg-muted-foreground/10 focus-visible:bg-muted-foreground/10 focus-visible:outline-none disabled:opacity-40 disabled:hover:bg-transparent ${
+              it.destructivo ? 'text-ink-crit' : ''
+            }`}
+          >
+            {it.texto}
+          </button>
+        ),
+      )}
+    </div>
+  )
+}
+
 function Editor() {
   const navigate = useNavigate()
   const { toast } = useToast()
@@ -445,6 +525,7 @@ function Editor() {
   const { screenToFlowPosition, fitView, getZoom } = useReactFlow()
   // Mover un contenedor entero por su título (se define más abajo, cuando ya existe la pertenencia).
   const moverZona = useRef<(zonaId: string, ev: ReactPointerEvent) => void>(() => undefined)
+  const menuZona = useRef<(lineaId: string, ev: ReactMouseEvent) => void>(() => undefined)
   const lienzo = useRef<HTMLDivElement>(null)
   // Espacio de trabajo (Orel, 19-09-2026): pantalla completa y lista de equipos plegable.
   const [amplio, setAmplio] = useState(false)
@@ -478,6 +559,7 @@ function Editor() {
   // Contenedor elegido (las zonas no son seleccionables de React Flow: se tocan por su título).
   const [zonaSel, setZonaSel] = useState<string | null>(null)
   const [nuevaLinea, setNuevaLinea] = useState<{ nombre: string; tipo: 'linea' | 'apoyo' } | null>(null)
+  const [menu, setMenu] = useState<MenuCtx | null>(null)
   // Renombrar: UNA entrada de deshacer por tanda de tecleo, no una por letra.
   const renombrando = useRef<string | null>(null)
   const [oscuro, setOscuro] = useState(() => typeof document !== 'undefined' && document.documentElement.classList.contains('dark'))
@@ -677,7 +759,7 @@ function Editor() {
           return {
             ...n,
             position: l ? { x: l.x, y: l.y } : n.position,
-            data: { ...n.data, ...(l ? { w: l.w, h: l.h } : {}), resaltada: n.id === zonaResaltada, ...(editable ? { onMover: (ev: ReactPointerEvent) => moverZona.current(n.id, ev) } : {}) },
+            data: { ...n.data, ...(l ? { w: l.w, h: l.h } : {}), resaltada: n.id === zonaResaltada, ...(editable ? { onMover: (ev: ReactPointerEvent) => moverZona.current(n.id, ev), onMenu: (ev: ReactMouseEvent) => menuZona.current(n.id.slice('zona:'.length), ev) } : {}) },
           }
         }
         if (n.type === 'entrada') return { ...n, className: marca, ariaLabel: nombreDe(n.id), data: { linea: nombreLinea.get(lineaDeEntrada(n.id)) ?? lineaDeEntrada(n.id) } }
@@ -1046,6 +1128,7 @@ function Editor() {
 
   // Mover la caja entera: el contenedor y TODO lo que le pertenece se desplazan juntos, a
   // pasos de la grilla. Deshacer lo devuelve de una vez (se registra al primer movimiento).
+  menuZona.current = (lineaId: string, ev: ReactMouseEvent) => abrirMenu(ev, itemsContenedor(lineaId))
   moverZona.current = (zonaId: string, ev: ReactPointerEvent) => {
     if (!editable || ev.button !== 0) return
     ev.stopPropagation()
@@ -1347,17 +1430,150 @@ function Editor() {
     ])
     toast({ title: hijos.length === 1 ? '1 componente agregado' : `${hijos.length} componentes agregados`, description: hijos.length === 1 ? 'Únelo con una flecha en el orden del flujo.' : 'Únelos con flechas en el orden del flujo.' })
   }
+  // Quitar por id, no «lo seleccionado»: el menú de clic derecho actúa sobre lo que se
+  // tocó, que no siempre es lo elegido.
+  const quitarDelLienzo = (ids: string[]) => {
+    const reales = ids.filter((id) => !esEntrada(id))
+    if (!reales.length) return
+    const fuera = new Set(reales)
+    registrar()
+    setNodes((ns) => ns.filter((x) => !fuera.has(x.id)))
+    setEdges((es) => es.filter((e) => !fuera.has(e.source) && !fuera.has(e.target)))
+    setGrupos((gs) => gs.map((g) => ({ ...g, miembros: g.miembros.filter((m) => !fuera.has(m)) })).filter((g) => g.miembros.length > 1))
+    avisoQuitado(reales.length === 1 ? `Se quitó ${nombreDe(reales[0]!)}` : `Se quitaron ${reales.length} equipos`)
+  }
+  const quitarFlecha = (e: Edge) => {
+    registrar()
+    setEdges((es) => es.filter((x) => x.id !== e.id))
+    setCurvas((cs) => cs.filter((c) => !(c.a === e.source && c.b === e.target)))
+    avisoQuitado(`Se quitó la flecha ${nombreDe(e.source)} → ${nombreDe(e.target)}`)
+  }
+  const enderezarFlecha = (e: Edge) => {
+    registrar()
+    setCurvas((cs) => cs.filter((c) => !(c.a === e.source && c.b === e.target)))
+  }
   const quitarSeleccion = () => {
-    if (seleccionado && !esEntrada(seleccionado.id)) {
-      registrar()
-      setNodes((ns) => ns.filter((x) => x.id !== seleccionado.id))
-      setEdges((es) => es.filter((e) => e.source !== seleccionado.id && e.target !== seleccionado.id))
-      avisoQuitado(`Se quitó ${nombreDe(seleccionado.id)}`)
-    } else if (flechaSeleccionada) {
-      registrar()
-      setEdges((es) => es.filter((e) => e.id !== flechaSeleccionada.id))
-      avisoQuitado(`Se quitó la flecha ${nombreDe(flechaSeleccionada.source)} → ${nombreDe(flechaSeleccionada.target)}`)
+    if (seleccionado && !esEntrada(seleccionado.id)) quitarDelLienzo([seleccionado.id])
+    else if (flechaSeleccionada) quitarFlecha(flechaSeleccionada)
+  }
+
+  // ——— Menú de clic derecho. Cada elemento ofrece lo suyo, así la barra de arriba se
+  // queda con lo que de verdad es global (Orel, 19-09-2026).
+  const abrirMenu = (ev: { clientX: number; clientY: number; preventDefault: () => void }, items: ItemMenu[]) => {
+    if (!editable || !items.length) return
+    ev.preventDefault()
+    setMenu({ x: ev.clientX, y: ev.clientY, items })
+  }
+  const contenedoresComoItems = (destinoActual: string | undefined, mover: (zona: string) => void): ItemMenu[] => [
+    { tipo: 'titulo', texto: 'Mover a' },
+    ...lineas.map((l): ItemMenu => ({ tipo: 'accion', texto: l.nombre, deshabilitado: l.id === destinoActual, hacer: () => mover(l.id) })),
+    { tipo: 'accion', texto: 'Ninguno · suelto en el lienzo', deshabilitado: !destinoActual, hacer: () => mover('') },
+  ]
+  const itemsLienzo = (ev: { clientX: number; clientY: number }): ItemMenu[] => {
+    const p = screenToFlowPosition({ x: ev.clientX, y: ev.clientY })
+    const z = zonaEn(p.x, p.y)
+    return [
+      { tipo: 'accion', texto: 'Nueva línea…', hacer: () => setNuevaLinea({ nombre: '', tipo: 'linea' }) },
+      { tipo: 'accion', texto: z ? `Elemento manual en ${z.nombre}…` : 'Elemento manual…', hacer: () => setManual({ nombre: '', zona: z?.id ?? '' }) },
+      { tipo: 'separador' },
+      {
+        tipo: 'accion',
+        texto: 'Agrupar tocando equipos',
+        hacer: () => {
+          setModoGrupo([])
+          setModoUnir(false)
+          setOrigenUnir(null)
+        },
+      },
+      { tipo: 'accion', texto: 'Ver la planta completa', hacer: () => void fitView({ padding: 0.06, duration: 250 }) },
+    ]
+  }
+  const itemsEquipo = (n: Node): ItemMenu[] => {
+    const hijos = (indice.get(n.id)?.hijos ?? []).filter((h) => !enLienzo.has(h.id))
+    return [
+      {
+        tipo: 'accion',
+        texto: 'Unir desde aquí',
+        hacer: () => {
+          setModoGrupo(null)
+          setModoUnir(true)
+          setOrigenUnir(n.id)
+        },
+      },
+      { tipo: 'accion', texto: hijos.length ? `Desplegar ${hijos.length} componentes` : 'Sin componentes por desplegar', deshabilitado: !hijos.length, hacer: () => desplegar(n) },
+      { tipo: 'separador' },
+      ...contenedoresComoItems(contenedorDeNodo(n), (z) => cambiarContenedor(n, z)),
+      { tipo: 'separador' },
+      { tipo: 'accion', texto: 'Quitar del lienzo', destructivo: true, hacer: () => quitarDelLienzo([n.id]) },
+    ]
+  }
+  const itemsEntrada = (n: Node): ItemMenu[] => [
+    { tipo: 'nota', texto: 'Por aquí entra el 100 % del flujo de la línea. No se puede quitar: para sacarla, pasa la línea a servicio de apoyo.' },
+    {
+      tipo: 'accion',
+      texto: 'Unir desde aquí',
+      hacer: () => {
+        setModoGrupo(null)
+        setModoUnir(true)
+        setOrigenUnir(n.id)
+      },
+    },
+  ]
+  /**
+   * Encuadre en paralelo. El que se dedujo de las flechas NO se puede borrar: no está
+   * guardado en ninguna parte, es el retrato de que de un equipo salen N flechas (Orel se
+   * topó con esto el 19-09-2026). Lo que sí se puede es quitar la flecha que lo causó.
+   */
+  const itemsParalelo = (n: Node): ItemMenu[] => {
+    if (n.id.startsWith('grupo:')) {
+      const id = n.id.slice('grupo:'.length)
+      return [
+        { tipo: 'nota', texto: 'Grupo marcado a mano.' },
+        { tipo: 'accion', texto: 'Editarlo en el inspector', hacer: () => setGrupoSel(id) },
+        { tipo: 'separador' },
+        { tipo: 'accion', texto: 'Deshacer el grupo', destructivo: true, hacer: () => deshacerGrupo(id) },
+      ]
     }
+    const origen = n.id.slice('paralelo:'.length)
+    const salidas = edges.filter((e) => e.source === origen)
+    return [
+      { tipo: 'nota', texto: `No es un grupo: sale de las ${salidas.length} flechas de ${nombreDe(origen)}, que se reparten el flujo en partes iguales. Se va solo al quitar una.` },
+      { tipo: 'titulo', texto: 'Quitar una flecha' },
+      ...salidas.map((e): ItemMenu => ({ tipo: 'accion', texto: `→ ${nombreDe(e.target)}`, destructivo: true, hacer: () => quitarFlecha(e) })),
+    ]
+  }
+  const itemsFlecha = (e: Edge): ItemMenu[] => [
+    { tipo: 'accion', texto: 'Enderezarla', deshabilitado: !curvas.some((c) => c.a === e.source && c.b === e.target && c.puntos.length), hacer: () => enderezarFlecha(e) },
+    { tipo: 'separador' },
+    { tipo: 'accion', texto: 'Quitar la flecha', destructivo: true, hacer: () => quitarFlecha(e) },
+  ]
+  const itemsVarios = (ns: Node[]): ItemMenu[] => {
+    const ids = ns.filter((x) => x.type !== 'zona' && x.type !== 'paralelo' && !esEntrada(x.id)).map((x) => x.id)
+    if (ids.length < 2) return []
+    return [
+      { tipo: 'accion', texto: `Agrupar en paralelo los ${ids.length}`, hacer: () => agruparEnParalelo(ids) },
+      { tipo: 'separador' },
+      ...contenedoresComoItems(undefined, (z) => {
+        registrar()
+        const dentro = new Set(ids)
+        setNodes((x) => x.map((y) => (dentro.has(y.id) ? { ...y, data: { ...(y.data as DatosBase), zona: z } } : y)))
+      }),
+      { tipo: 'separador' },
+      { tipo: 'accion', texto: `Quitar los ${ids.length} del lienzo`, destructivo: true, hacer: () => quitarDelLienzo(ids) },
+    ]
+  }
+  const itemsContenedor = (lineaId: string): ItemMenu[] => {
+    const l = lineas.find((x) => x.id === lineaId)
+    if (!l) return []
+    const apoyo = l.tipo === 'apoyo'
+    const dentro = equiposDeZona(l.id).length
+    return [
+      { tipo: 'accion', texto: 'Renombrar…', hacer: () => setZonaSel(l.id) },
+      { tipo: 'accion', texto: apoyo ? 'Pasar a línea de proceso' : 'Pasar a servicio de apoyo', hacer: () => cambiarTipoLinea(l, apoyo ? 'linea' : 'apoyo') },
+      { tipo: 'accion', texto: dentro ? `Sacar los ${dentro} equipos` : 'Sin equipos que sacar', deshabilitado: !dentro, hacer: () => sacarEquipos(l) },
+      { tipo: 'separador' },
+      { tipo: 'accion', texto: apoyo ? 'Eliminar la zona…' : 'Eliminar la línea…', destructivo: true, hacer: () => pedirBorrarLinea(l) },
+    ]
   }
 
   const guardar = async () => {
@@ -1429,22 +1645,6 @@ function Editor() {
             <button
               type="button"
               onClick={() => {
-                setModoGrupo((v) => (v ? null : []))
-                setModoUnir(false)
-                setOrigenUnir(null)
-              }}
-              aria-pressed={!!modoGrupo}
-              title="Marcar equipos que trabajan en paralelo"
-              className={`flex min-h-[44px] items-center gap-1.5 rounded-full px-3 text-footnote font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary [&>svg]:size-4 ${
-                modoGrupo ? 'bg-primary text-primary-foreground' : 'text-primary hover:bg-muted-foreground/10'
-              }`}
-            >
-              <Boxes aria-hidden />
-              {modoGrupo ? 'Salir de agrupar' : 'Agrupar'}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
                 setModoUnir((v) => !v)
                 setModoGrupo(null)
                 setOrigenUnir(null)
@@ -1457,15 +1657,6 @@ function Editor() {
             >
               <Spline aria-hidden />
               {modoUnir ? 'Salir de unir' : 'Unir'}
-            </button>
-            <button
-              type="button"
-              onClick={() => setNuevaLinea({ nombre: '', tipo: 'linea' })}
-              title="Crear una línea de proceso o una zona de servicios"
-              className="flex min-h-[44px] items-center gap-1.5 rounded-full px-3 text-footnote font-semibold text-primary hover:bg-muted-foreground/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary [&>svg]:size-4"
-            >
-              <Plus aria-hidden />
-              Nueva línea
             </button>
             <button
               type="button"
@@ -1523,11 +1714,8 @@ function Editor() {
                 className="h-[44px] w-full rounded-ctl bg-muted-foreground/10 pl-9 pr-3 text-campo outline-none focus-visible:ring-2 focus-visible:ring-primary"
               />
             </div>
-            <Button variant="tinted" onClick={() => setManual({ nombre: '', zona: '' })}>
-              <Plus /> Elemento manual
-            </Button>
             <p className="text-caption text-muted-foreground">
-              Toda la jerarquía, con o sin código. Arrastra al lienzo (o toca). Para unir dos equipos, usa «Unir equipos» arriba: tocas uno y después el que sigue. Mayús + arrastre selecciona varios. Supr quita · Ctrl+Z deshace.
+              Toda la jerarquía, con o sin código. Arrastra al lienzo (o toca). <b className="font-semibold text-foreground">Clic derecho</b> sobre el lienzo, un equipo, un contenedor o una flecha abre lo que se puede hacer ahí: nueva línea, elemento manual, mover, agrupar, quitar. Para unir dos equipos, «Unir» arriba: tocas uno y después el que sigue. Mayús + arrastre selecciona varios. Supr quita · Ctrl+Z deshace.
             </p>
             {consulta.trim() ? (
               <ul className="flex flex-col" aria-label="Resultados">
@@ -1615,6 +1803,18 @@ function Editor() {
                 setZonaSel(null)
                 if (modoUnir) setOrigenUnir(null)
               }}
+              onPaneContextMenu={editable ? (ev) => abrirMenu(ev, itemsLienzo(ev)) : undefined}
+              onNodeContextMenu={
+                editable
+                  ? (ev, n) => {
+                      if (n.type === 'paralelo') abrirMenu(ev, itemsParalelo(n))
+                      else if (esEntrada(n.id)) abrirMenu(ev, itemsEntrada(n))
+                      else if (n.type !== 'zona') abrirMenu(ev, itemsEquipo(n))
+                    }
+                  : undefined
+              }
+              onEdgeContextMenu={editable ? (ev, e) => abrirMenu(ev, itemsFlecha(e)) : undefined}
+              onSelectionContextMenu={editable ? (ev, ns) => abrirMenu(ev, itemsVarios(ns)) : undefined}
               onNodeDragStart={() => registrar()}
               onNodeDrag={(_, n) => {
                 const z = esEntrada(n.id) ? undefined : zonaEn(n.position.x + NODO.ancho / 2, n.position.y + NODO.alto / 2, contenedorDeNodo(n))
@@ -1864,6 +2064,8 @@ function Editor() {
           </aside>
         )}
       </div>
+
+      {menu && <MenuContextual menu={menu} onCerrar={() => setMenu(null)} />}
 
       {/* Entrar, salir o cambiar de contenedor: siempre se pregunta. Cancelar lo devuelve. */}
       <Sheet
