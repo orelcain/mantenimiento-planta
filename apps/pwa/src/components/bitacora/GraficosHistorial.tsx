@@ -3,6 +3,7 @@ import { formatoMinutos } from '@/services/bitacora/turnoMantencion'
 import { etiquetaCortaTurno } from '@/services/bitacora/entregaTurno'
 import { porcentaje, porcentajeFino } from '@/services/bitacora/historialBitacora'
 import type { BarraPareto, FallaRepetida, PuntoIntervenciones, PuntoParada } from '@/services/bitacora/preguntasHistorial'
+import type { PerdidaDeLinea } from '@/services/bitacora/pesoDeLinea'
 
 /**
  * Gráficos del Historial, uno por PREGUNTA (mockup aprobado 19-09-2026,
@@ -217,5 +218,51 @@ export function ListaRepetidas({ lista, dias }: { lista: readonly FallaRepetida[
         </li>
       ))}
     </ul>
+  )
+}
+
+// ── 6 · De máquina detenida a línea perdida ─────────────────────────────────
+/**
+ * Dos barras por equipo: lo que estuvo detenida la máquina y lo que eso le costó a la
+ * línea según su cuota. La diferencia es lo que absorbieron las máquinas en paralelo.
+ */
+export function GraficoPerdidaLinea({ perdida }: { perdida: PerdidaDeLinea }) {
+  const top = perdida.equipos.slice(0, 6)
+  const max = Math.max(...top.map((e) => e.minutos), 1)
+  return (
+    <div className="flex flex-col gap-2">
+      <ul className="flex flex-col gap-2">
+        {top.map((e) => (
+          <li key={e.equipo} className="flex min-w-0 flex-col gap-1">
+            <span className="flex items-baseline justify-between gap-2">
+              <span className="min-w-0 truncate text-footnote font-semibold">{e.equipo}</span>
+              <span className="shrink-0 text-footnote tabular-nums text-muted-foreground">
+                {formatoMinutos(Math.round(e.minutos))} → <b className="text-foreground">{formatoMinutos(Math.round(e.minutosLinea))}</b>
+              </span>
+            </span>
+            <span aria-hidden className="relative block h-2.5 rounded-full bg-muted-foreground/15">
+              <span className="absolute inset-y-0 left-0 rounded-full bg-muted-foreground/35" style={{ width: `${(e.minutos / max) * 100}%` }} />
+              <span className="absolute inset-y-0 left-0 rounded-full bg-[rgb(var(--brand))]" style={{ width: `${(e.minutosLinea / max) * 100}%` }} />
+            </span>
+            <span className="text-caption text-muted-foreground">
+              {e.cuota >= 0.999 ? 'en serie: toda la línea pasa por aquí' : `${porcentajeFino(e.cuota)} de ${e.linea}`}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {perdida.porLinea.length > 1 && (
+        <p className="text-caption text-muted-foreground">
+          Por línea: {perdida.porLinea.map((l) => `${l.linea} ${formatoMinutos(Math.round(l.minutos))}`).join(' · ')}
+        </p>
+      )}
+      {perdida.sinCuota.length > 0 && (
+        <p className="text-caption text-ink-warn">
+          {formatoMinutos(Math.round(perdida.minutosSinCuota))} sin convertir:{' '}
+          {perdida.sinCuota.length === 1 ? 'un equipo que todavía no está ubicado' : `${perdida.sinCuota.length} equipos que todavía no están ubicados`} en el editor de
+          líneas ({perdida.sinCuota.slice(0, 3).map((x) => x.equipo).join(', ')}
+          {perdida.sinCuota.length > 3 ? '…' : ''}).
+        </p>
+      )}
+    </div>
   )
 }

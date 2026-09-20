@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, ClipboardCopy, FileDown, Loader2 } from 'lucide-react'
 import { Button, Pill } from '@/components/piel'
@@ -34,11 +34,15 @@ import {
 import {
   GraficoIntervenciones,
   GraficoPareto,
+  GraficoPerdidaLinea,
   GraficoReparacion,
   GraficoTendencia,
   ListaRepetidas,
   PanelPregunta,
 } from '@/components/bitacora/GraficosHistorial'
+import { perdidaDeLinea, respuestaPerdida } from '@/services/bitacora/pesoDeLinea'
+import { leerLineas } from '@/services/lineasProceso/lineasProceso.service'
+import type { GrafoLineas } from '@/services/lineasProceso/modeloLineas'
 import { etiquetaCortaTurno } from '@/services/bitacora/entregaTurno'
 import { formatoMinutos } from '@/services/bitacora/turnoMantencion'
 
@@ -91,6 +95,22 @@ export function HistorialBitacoraVista({ fuente, alAbrirTurno }: { fuente: Fuent
   const duraciones = useMemo(() => duracionesFallas(eventos), [eventos])
   const reparacion = useMemo(() => respuestaReparacion(duraciones), [duraciones])
   const repetidas = useMemo(() => fallasRepetidas(eventos), [eventos])
+  /**
+   * Las líneas de proceso, para pasar de «máquina detenida» a «línea perdida». Se lee una
+   * vez: es un solo documento. Si todavía no existe, el bloque lo dice en vez de inventar.
+   */
+  const [lineas, setLineas] = useState<GrafoLineas | null>(null)
+  useEffect(() => {
+    let vivo = true
+    leerLineas(BITACORA_PLANTA.id)
+      .then((g) => vivo && setLineas(g))
+      .catch(() => undefined)
+    return () => {
+      vivo = false
+    }
+  }, [])
+  const perdida = useMemo(() => perdidaDeLinea(resumen.equiposTodos, lineas), [resumen, lineas])
+  const respPerdida = useMemo(() => respuestaPerdida(perdida, (m) => formatoMinutos(Math.round(m))), [perdida])
   const unidadSerie = agrupar === 'dia' ? 'día' : 'semana'
   const abrirTurno = alAbrirTurno ?? ((turnoId: string) => navigate(`/bitacora?turno=${turnoId}`))
 
@@ -267,6 +287,20 @@ export function HistorialBitacoraVista({ fuente, alAbrirTurno }: { fuente: Fuent
             >
               <GraficoPareto barras={pareto.barras} />
             </PanelPregunta>
+            {respPerdida && (
+              <PanelPregunta
+                pregunta="¿Cuánto de eso le costó a la línea?"
+                respuesta={respPerdida.titulo}
+                referencia={
+                  <>
+                    {respPerdida.detalle} La cuota de cada máquina sale del editor de líneas de proceso: una de tres máquinas en paralelo pesa un tercio; una en serie,
+                    toda la línea. <span className="text-muted-foreground/80">Barra gris: máquina detenida · barra azul: línea perdida.</span>
+                  </>
+                }
+              >
+                <GraficoPerdidaLinea perdida={perdida} />
+              </PanelPregunta>
+            )}
             <PanelPregunta
               pregunta="¿Mantención interviene sin detener la línea?"
               respuesta={intervenciones.titulo}

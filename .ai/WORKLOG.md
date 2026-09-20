@@ -21,6 +21,24 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-19 · Historial · de «máquina detenida» a «línea perdida»
+
+- Para esto se construyó el editor de líneas: una parada de 30 min en una de las tres BAADER no le
+  cuesta 30 min a Eviscerado, le cuesta su cuota (≈10 min). Bloque nuevo en el Historial de la
+  bitácora: «¿Cuánto de eso le costó a la línea?», con dos barras por equipo (gris = máquina
+  detenida, azul = línea perdida) y el reparto por línea.
+- `services/bitacora/pesoDeLinea.ts` (+5 tests): cruza `resumen.equiposTodos` con
+  `pesosPorLinea(leerLineas(planta))`. La llave es `EventoBitacora.equipoId` (id de `hierarchy`),
+  que es la misma que usa `NodoGrafo.id` en el editor.
+- NO INVENTA (regla de datos): lo que no se puede convertir se informa aparte con su motivo —
+  `sin-ubicar` (no está en el editor, o el evento se escribió a mano sin elegirlo del buscador),
+  `fuera-de-linea` (está puesto pero no le llega el flujo) y `en-circulo`. Si nunca se guardaron
+  las líneas, el bloque no aparece.
+- `EquipoDelPeriodo` gana `equipoId`, y `ResumenPeriodo` gana `equiposTodos` (sin el recorte a 5).
+- ⚠ Redondear ANTES de restar: «5 min = 3 min, absorbió 3 min» sumaba más que el total.
+- Verificado en el navegador con datos reales (DESPLAZADOR AUTOMATICO 1, 50 % de Empaque: 5 → 3 min;
+  PLANTA RILES avisada como no ubicada) y a 375 px sin desborde.
+
 ## 2026-09-19 · Jerarquía · el aviso «hay datos nuevos» nunca funcionó (y gastaba en todas las pantallas)
 
 - `useHierarchyTree` sondeaba cada 30 s en TODA pantalla que usa el árbol (editor de líneas, CTD,
