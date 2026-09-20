@@ -653,3 +653,70 @@ export function relacionesDeServicios(g: Pick<GrafoLineas, 'lineas' | 'nodos' | 
 export function lineaEnPunto(lineas: readonly LineaProceso[], x: number, y: number): LineaProceso | undefined {
   return lineas.find((l) => x >= l.zona.x && x < l.zona.x + l.zona.w && y >= l.zona.y && y < l.zona.y + l.zona.h)
 }
+
+/** Un equipo que el diagrama no va a poder cobrarle a ninguna línea. */
+export interface HallazgoRevision {
+  id: string
+  lineaId: string
+  /** Parte de la línea que pasa por él (0–1): ordena por lo que cuesta, no por nombre. */
+  peso: number
+}
+
+/**
+ * Qué le falta al diagrama, desde la única pregunta que importa: **¿qué falla de la bitácora
+ * no vamos a poder cobrarle a una línea?** (Orel, 20-09-2026).
+ *
+ * Son los tres motivos que `perdidaDeLinea` ya usa para dejar tiempo sin convertir, vistos
+ * desde el editor y ANTES de que ocurra la falla:
+ *
+ * - `fueraDeLinea` — está dibujado pero no le llega el flujo desde ninguna entrada: su parada
+ *   vale 0 minutos de línea.
+ * - `enCirculo` — un círculo de flechas deja sin cuota a todo lo de aguas abajo.
+ * - `sinSap` — elementos `manual:`, que existen solo acá. La bitácora liga por código de
+ *   equipo, así que una falla en ellos no se puede anotar contra nada.
+ *
+ * ⚠ Los servicios de apoyo NO son hallazgos: por diseño no reparten flujo (ver la cabecera de
+ * este archivo). Marcarlos «fuera de la línea» sería un falso positivo en cada revisión.
+ * ⚠ Tampoco se listan los equipos del árbol que no están en el lienzo: la enorme mayoría son
+ * componentes ya contados dentro de su padre («CHILLER · +5 comp.») y la lista sería ruido.
+ */
+export function revisionDeLineas(
+  g: Pick<GrafoLineas, 'lineas' | 'nodos'>,
+  pesos: ReadonlyMap<string, PesoEnLinea>,
+): {
+  fueraDeLinea: HallazgoRevision[]
+  enCirculo: HallazgoRevision[]
+  sinSap: HallazgoRevision[]
+  equipos: number
+  conFlujo: number
+} {
+  const apoyo = new Set(g.lineas.filter((l) => l.tipo === 'apoyo').map((l) => l.id))
+  const fueraDeLinea: HallazgoRevision[] = []
+  const enCirculo: HallazgoRevision[] = []
+  const sinSap: HallazgoRevision[] = []
+  let equipos = 0
+  let conFlujo = 0
+
+  for (const n of g.nodos) {
+    if (esEntrada(n.id)) continue
+    const zona = zonaDeNodo(g.lineas, n)
+    if (zona && apoyo.has(zona)) continue
+    equipos += 1
+    const p = pesos.get(n.id)
+    const h: HallazgoRevision = { id: n.id, lineaId: p?.lineaId ?? zona ?? '', peso: p?.peso ?? 0 }
+    if (p && !p.ciclo && p.peso > 0) conFlujo += 1
+    if (p?.ciclo) enCirculo.push(h)
+    else if (!p || p.peso <= 0) fueraDeLinea.push(h)
+    // Un elemento manual puede tener flujo perfecto y seguir siendo un pendiente con SAP.
+    if (esManual(n.id)) sinSap.push(h)
+  }
+
+  const porPeso = (a: HallazgoRevision, b: HallazgoRevision) => b.peso - a.peso || a.id.localeCompare(b.id)
+  return {
+    fueraDeLinea: fueraDeLinea.sort(porPeso),
+    enCirculo: enCirculo.sort(porPeso),
+    sinSap: sinSap.sort(porPeso),
+    equipos,
+    conFlujo,
+  }
+}
