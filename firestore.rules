@@ -2169,6 +2169,25 @@ service cloud.firestore {
     }
 
     // ============================================
+    // INSPECCIONES DE PLANTA — post-aseo / detención prolongada (20-09-2026)
+    // ============================================
+    // La pauta la edita un supervisor; la inspección la llena quien está de turno,
+    // igual que la bitácora (incluido el pase por QR del teléfono de planta).
+    match /pautasInspeccion/{pautaId} {
+      allow read: if isActiveUser() || paseBitacoraActivo();
+      allow create, update: if isSupervisor() && isValidDocSize();
+      allow delete: if isAdmin();
+    }
+    match /inspecciones/{inspeccionId} {
+      allow read: if isActiveUser() || paseBitacoraActivo();
+      // Se escribe con `merge`, así que create y update son el mismo gesto. No se
+      // exige que el id calce con la planta: `plantId` viaja en el documento y el
+      // tamaño lo acota `isValidDocSize`.
+      allow create, update: if (isActiveUser() || paseBitacoraActivo()) && isValidDocSize();
+      allow delete: if isSupervisor();
+    }
+
+    // ============================================
     // MANUALES — Documentación técnica (F4 2026-05-04)
     // ============================================
     match /manuales/{manualId} {

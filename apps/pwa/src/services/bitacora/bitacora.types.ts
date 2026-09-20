@@ -193,6 +193,12 @@ export interface EventoBitacora {
   cierre?: CierrePendiente | null
   /** En el evento que RESUELVE un pendiente de un turno anterior: de cuál. */
   resuelvePendiente?: OrigenPendiente | null
+  /**
+   * Desviación de una inspección de planta: de qué inspección y de qué punto de la pauta
+   * salió (Orel, 20-09-2026). No es un registro aparte — es un evento como cualquier otro,
+   * y por eso suma al MTTR y arrastra pendientes igual que los demás.
+   */
+  inspeccion?: EnlaceInspeccion | null
   actualizadoPorNombre?: string
   estado?: EstadoEvento
   /** Desde dónde se hizo el último cambio («desde el celular de Danilo»). */
@@ -218,6 +224,12 @@ export interface PresenciaBitacora {
 }
 
 /** Lo que el formulario entrega para crear o editar un evento. */
+/** De qué inspección y de qué punto de su pauta salió una desviación. */
+export interface EnlaceInspeccion {
+  id: string
+  criterioId: string
+}
+
 export type EventoBitacoraDatos = Pick<
   EventoBitacora,
   | 'tipo'
@@ -236,6 +248,7 @@ export type EventoBitacoraDatos = Pick<
   | 'contingencia'
   | 'pendiente'
   | 'fotos'
+  | 'inspeccion'
 > & {
   participantes: string[]
   equipoId: string | null
