@@ -43,6 +43,7 @@ import {
   PREFIJO_MANUAL,
   cajaNueva,
   acomodarEnCapas,
+  acomodarPlanta,
   caminoSuave,
   cierraCiclo,
   esEntrada,
@@ -51,6 +52,8 @@ import {
   PREFIJO_GRUPO,
   formatoPeso,
   idDeContenedor,
+  parteDe,
+  repartoDisparejo,
   limitesDeGrupo,
   limitesDeZonas,
   lineaDeEntrada,
@@ -60,6 +63,7 @@ import {
   serviciosDe,
   zonaDeNodo,
   type GrafoLineas,
+  type CuotaRama,
   type CurvaFlecha,
   type GrupoParalelo,
   type LineaProceso,
@@ -192,6 +196,12 @@ function PuntosUnion({ claro }: { claro?: boolean }) {
       >
         <span aria-hidden style={{ width: visible, height: visible }} className={`pointer-events-none rounded-full ${punto}`} />
       </Handle>
+      {/* Puntos de HABILITACIÓN, arriba y abajo. Convención IDEF0: lo que entra por abajo de
+          una caja es lo que la hace posible (las bombas de vacío bajo la succión), y lo que
+          sale por arriba es lo que uno habilita. No se ven ni se agarran: los usan solo las
+          flechas «habilita», para que la posición diga el significado sin leer la etiqueta. */}
+      <Handle type="source" id="arriba" position={Position.Top} isConnectableStart={false} className="!size-0 !min-h-0 !min-w-0 !border-0 !bg-transparent !opacity-0" />
+      <Handle type="target" id="abajo" position={Position.Bottom} isConnectableStart={false} className="!size-0 !min-h-0 !min-w-0 !border-0 !bg-transparent !opacity-0" />
     </>
   )
 }
@@ -244,7 +254,7 @@ function NodoMaquina({ id, data, selected }: NodeProps<Node<DatosMaquina>>) {
       <BarritaNodo id={id} data={data} selected={selected} />
     <div
       style={{ width: NODO.ancho, height: NODO.alto }}
-      className={`relative flex flex-col justify-center gap-1 overflow-hidden rounded-ctl border bg-card px-2.5 py-2 shadow-[0_1px_2px_rgb(0_0_0/0.07)] ${
+      className={`relative flex flex-col justify-center gap-1 overflow-hidden rounded-ctl border bg-card px-4 py-2 shadow-[0_1px_2px_rgb(0_0_0/0.07)] ${
         conFlujo ? 'border-border' : 'border-dashed border-muted-foreground/55'
       } ${selected ? SELECCION : ''}`}
     >
@@ -286,7 +296,7 @@ function NodoServicio({ id, data, selected }: NodeProps<Node<DatosServicio>>) {
       <BarritaNodo id={id} data={data} selected={selected} />
     <div
       style={{ width: NODO.ancho, borderColor: APOYO }}
-      className={`rounded-card border-2 border-dashed bg-card px-3 py-2 shadow-[0_1px_4px_rgba(0,0,0,0.12)] ${selected ? SELECCION : ''}`}
+      className={`rounded-card border-2 border-dashed bg-card px-4 py-2 shadow-[0_1px_4px_rgba(0,0,0,0.12)] ${selected ? SELECCION : ''}`}
     >
       <p className="break-words text-[12px] font-semibold leading-tight">{data.nombre}</p>
       <p className="text-[12px] font-bold leading-snug" style={{ color: APOYO }}>
@@ -380,7 +390,7 @@ function NodoParalelo({ data }: NodeProps<Node<DatosParalelo>>) {
         }}
         style={{ pointerEvents: 'all' }}
         title={data.manual ? 'Grupo marcado a mano: tócalo para editarlo o usa el clic derecho' : 'No es un grupo: se dedujo de las flechas'}
-        className={`nodrag nopan absolute -top-3 left-4 flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-semibold disabled:cursor-default ${
+        className={`nodrag nopan absolute -top-3 left-4 flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[10.5px] font-semibold disabled:cursor-default ${
           data.manual ? 'bg-[rgb(var(--brand)/0.2)] text-[rgb(var(--brand-ink))] ring-1 ring-[rgb(var(--brand)/0.5)]' : 'bg-card text-muted-foreground ring-1 ring-border'
         }`}
       >
@@ -394,12 +404,7 @@ function NodoParalelo({ data }: NodeProps<Node<DatosParalelo>>) {
   )
 }
 
-/** Barra donde el flujo se abre en ramas (convención de los P&ID: cabezal común). */
-function NodoReparto({ data }: NodeProps<Node<{ h: number }>>) {
-  return <div style={{ width: 6, height: data.h, background: 'rgb(var(--brand))' }} className="rounded-full" />
-}
-
-const TIPOS = { maquina: NodoMaquina, servicio: NodoServicio, entrada: NodoEntrada, zona: NodoZona, paralelo: NodoParalelo, reparto: NodoReparto }
+const TIPOS = { maquina: NodoMaquina, servicio: NodoServicio, entrada: NodoEntrada, zona: NodoZona, paralelo: NodoParalelo }
 
 /** Lo que la flecha necesita para dibujarse y para dejarse acomodar. */
 type DatosFlecha = { puntos: { x: number; y: number }[]; editable: boolean; onPuntos: (p: { x: number; y: number }[]) => void; acciones?: { quitar: () => void; enderezar: () => void } }
@@ -543,7 +548,7 @@ const aAristas = (g: GrafoLineas): Edge[] => [
   ...(g.habilitan ?? []).map(([a, b]) => ({ id: `hab:${a}->${b}`, source: a, target: b, data: { habilita: true } satisfies DatosArista })),
 ]
 
-function alGrafo(lineas: LineaProceso[], nodes: Node[], edges: Edge[], grupos: GrupoParalelo[] = [], curvas: CurvaFlecha[] = []): GrafoLineas {
+function alGrafo(lineas: LineaProceso[], nodes: Node[], edges: Edge[], grupos: GrupoParalelo[] = [], curvas: CurvaFlecha[] = [], cuotas: CuotaRama[] = []): GrafoLineas {
   // La esquina de cada contenedor vive en su nodo del lienzo: así mover la caja entra en deshacer.
   const esquina = new Map(nodes.filter((n) => n.type === 'zona').map((n) => [n.id.slice('zona:'.length), n.position]))
   return {
@@ -564,6 +569,8 @@ function alGrafo(lineas: LineaProceso[], nodes: Node[], edges: Edge[], grupos: G
     grupos: grupos.map((g) => ({ ...g, miembros: g.miembros.filter((m) => nodes.some((n) => n.id === m)) })).filter((g) => g.miembros.length > 1),
     // Una curva sin su flecha ya no sirve.
     curvas: curvas.filter((c) => c.puntos.length > 0 && edges.some((e) => e.source === c.a && e.target === c.b)),
+    // Idem la cuota: si la rama se fue, la cuota se va con ella.
+    cuotas: cuotas.filter((c) => edges.some((e) => e.source === c.a && e.target === c.b)),
   }
 }
 
@@ -764,6 +771,9 @@ function Editor() {
   const [lineas, setLineas] = useState<LineaProceso[]>([])
   const [grupos, setGrupos] = useState<GrupoParalelo[]>([])
   const [curvas, setCurvas] = useState<CurvaFlecha[]>([])
+  const [cuotas, setCuotas] = useState<CuotaRama[]>([])
+  // Escribir cuánto se lleva una rama (piezas por turno, o el número que se quiera).
+  const [cuotaEdit, setCuotaEdit] = useState<{ a: string; b: string; texto: string } | null>(null)
   const [grupoSel, setGrupoSel] = useState<string | null>(null)
   // Modo «Agrupar»: tocar los equipos que trabajan en paralelo, sin depender de teclas
   // (Ctrl/Mayús + clic no es descubrible, y Orel ya entendió el modo «Unir»).
@@ -831,6 +841,7 @@ function Editor() {
     setLineas(g.lineas)
     setGrupos(g.grupos ?? [])
     setCurvas(g.curvas ?? [])
+    setCuotas(g.cuotas ?? [])
     setNodes(aNodos(g))
     setEdges(aAristas(g))
   }, [])
@@ -851,7 +862,7 @@ function Editor() {
         if (!vivo) return
         const base = g ?? propuesta()
         cargarGrafo(base)
-        setGuardado(g ? JSON.stringify(alGrafo(base.lineas, aNodos(base), aAristas(base), base.grupos ?? [], base.curvas ?? [])) : '')
+        setGuardado(g ? JSON.stringify(alGrafo(base.lineas, aNodos(base), aAristas(base), base.grupos ?? [], base.curvas ?? [], base.cuotas ?? [])) : '')
         setMeta(g?.actualizadoPor ? `Guardado por ${g.actualizadoPor}${g.actualizadoEn ? ` · ${g.actualizadoEn.toDate().toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' })}` : ''}` : 'Propuesta sin guardar')
       })
       .catch(() => {
@@ -869,7 +880,7 @@ function Editor() {
   }, [cargandoArbol, indice, propuesta, cargarGrafo, toast])
 
   // Pesos calculados con las flechas, en cada cambio.
-  const grafo = useMemo(() => alGrafo(lineas, nodes, edges, grupos, curvas), [lineas, nodes, edges, grupos, curvas])
+  const grafo = useMemo(() => alGrafo(lineas, nodes, edges, grupos, curvas, cuotas), [lineas, nodes, edges, grupos, curvas, cuotas])
   const pesos = useMemo(() => pesosPorLinea(grafo), [grafo])
   const servicios = useMemo(() => serviciosDe(grafo), [grafo])
   const relaciones = useMemo(() => relacionesDeServicios(grafo, pesos), [grafo, pesos])
@@ -900,11 +911,24 @@ function Editor() {
   const yaUnidos = useMemo(() => new Set(origenUnir ? edges.filter((e) => e.source === origenUnir).map((e) => e.target) : []), [edges, origenUnir])
   // Ramas por equipo (de cuántas salidas del mismo padre es una) y flujo que lleva cada flecha:
   // el GROSOR de la flecha es el flujo, así se ve dónde reparte la línea sin leer un número.
+  /** Los destinos de flujo de cada equipo: hace falta para rotular cuánto se lleva cada rama. */
+  const hijosDe = useMemo(() => {
+    const m = new Map<string, string[]>()
+    for (const e of edges) {
+      if (esHabilita(e) || servicios.has(e.source) || servicios.has(e.target)) continue
+      m.set(e.source, [...(m.get(e.source) ?? []), e.target])
+    }
+    return m
+  }, [edges, servicios])
+
   const reparto = useMemo(() => {
+    // Solo las flechas de FLUJO abren ramas: una «habilita» no reparte nada, así que no
+    // debe contarse (con dos habilitaciones, un equipo decía «1 de 3» sin serlo).
+    const flujo = edges.filter((e) => !esHabilita(e) && !servicios.has(e.source) && !servicios.has(e.target))
     const salidas = new Map<string, number>()
-    for (const e of edges) if (!servicios.has(e.source) && !servicios.has(e.target)) salidas.set(e.source, (salidas.get(e.source) ?? 0) + 1)
+    for (const e of flujo) salidas.set(e.source, (salidas.get(e.source) ?? 0) + 1)
     const ramas = new Map<string, number>()
-    for (const e of edges) if (!servicios.has(e.source) && !servicios.has(e.target)) ramas.set(e.target, Math.max(ramas.get(e.target) ?? 1, salidas.get(e.source) ?? 1))
+    for (const e of flujo) ramas.set(e.target, Math.max(ramas.get(e.target) ?? 1, salidas.get(e.source) ?? 1))
     return { salidas, ramas }
   }, [edges, servicios])
   const flujoDeFlecha = useCallback(
@@ -945,10 +969,6 @@ function Editor() {
         focusable: false,
         zIndex: -1,
       })
-      const p = caja.get(origen)
-      const alto = Math.max(24, y2 - y1 - NODO.alto)
-      // A media distancia entre el equipo que reparte y el grupo: ahí se abre el flujo.
-      if (p) out.push({ id: `reparto:${origen}`, type: 'reparto', position: { x: Math.max(p.x + NODO.ancho + 12, (p.x + NODO.ancho + x1) / 2 - 3), y: y1 + NODO.alto / 2 - 3 }, data: { h: alto }, draggable: false, selectable: false, deletable: false, focusable: false, zIndex: -1 })
     }
     return out
   }, [edges, nodes, pesos, servicios])
@@ -1090,6 +1110,7 @@ function Editor() {
         return {
           ...e,
           type: 'curva',
+          ...(habilita ? { sourceHandle: 'arriba', targetHandle: 'abajo' } : {}),
           data: {
             puntos: curvas.find((c) => c.a === e.source && c.b === e.target)?.puntos ?? [],
             editable,
@@ -1099,6 +1120,19 @@ function Editor() {
           ariaLabel: `Flecha de ${nombreDe(e.source)} a ${nombreDe(e.target)}`,
           // Punta chica: a 20 px pesaba más que la línea y tapaba el borde de la tarjeta.
           markerEnd: { type: MarkerType.ArrowClosed, width: 7, height: 6, color },
+          ...(!habilita && !apoyo && !entre && repartoDisparejo(cuotas, e.source, hijosDe.get(e.source) ?? [])
+            ? (() => {
+                const hs = hijosDe.get(e.source) ?? []
+                const suma = hs.reduce((t, h) => t + parteDe(cuotas, e.source, h), 0) || hs.length
+                return {
+                  label: formatoPeso(parteDe(cuotas, e.source, e.target) / suma),
+                  labelStyle: { fill: 'rgb(var(--brand-ink))', fontSize: 11, fontWeight: 700 },
+                  labelBgStyle: { fill: 'rgb(var(--card))' },
+                  labelBgPadding: [4, 2] as [number, number],
+                  labelBgBorderRadius: 6,
+                }
+              })()
+            : {}),
           ...(habilita
             ? {
                 label: 'habilita',
@@ -1128,7 +1162,7 @@ function Editor() {
               : { stroke: color, strokeWidth: grosor, strokeOpacity: opacidad, vectorEffect: 'non-scaling-stroke' },
         }
       }),
-    [edges, servicios, nombreDe, flujoDeFlecha, curvas, editable, ponerPuntos],
+    [edges, servicios, nombreDe, flujoDeFlecha, curvas, editable, ponerPuntos, cuotas, hijosDe],
   )
 
   // La flecha propuesta se dibuja pero NO está en `edges`: si estuviera, el editor diría
@@ -1876,15 +1910,29 @@ function Editor() {
    * contenedores, y se deshace con Ctrl+Z como cualquier movida.
    */
   const acomodar = (lineaId?: string) => {
-    const objetivos = lineaId ? [lineaId] : lineas.map((l) => l.id)
-    const movidos = objetivos.flatMap((id) => acomodarEnCapas(grafo, id))
+    // Un contenedor solo: se ordena por dentro. Toda la planta: además se reubican los
+    // contenedores en fila y al tamaño justo, para que dejen de pisarse.
+    const plano = lineaId ? { nodos: acomodarEnCapas(grafo, lineaId), zonas: [] as { id: string; zona: LineaProceso['zona'] }[] } : acomodarPlanta(grafo)
+    const movidos = plano.nodos
     if (!movidos.length) return
     registrar()
     const pos = new Map(movidos.map((m) => [m.id, m]))
-    setNodes((ns) => ns.map((n) => (pos.has(n.id) ? { ...n, position: { x: pos.get(n.id)!.x, y: pos.get(n.id)!.y } } : n)))
+    const cajas = new Map(plano.zonas.map((z) => [z.id, z.zona]))
+    if (cajas.size) {
+      setLineas((ls) => ls.map((l) => (cajas.has(l.id) ? { ...l, zona: cajas.get(l.id)! } : l)))
+    }
+    setNodes((ns) =>
+      ns.map((n) => {
+        if (pos.has(n.id)) return { ...n, position: { x: pos.get(n.id)!.x, y: pos.get(n.id)!.y } }
+        const caja = n.type === 'zona' ? cajas.get(n.id.slice('zona:'.length)) : undefined
+        return caja ? { ...n, position: { x: caja.x, y: caja.y }, data: { ...(n.data as DatosZona), w: caja.w, h: caja.h } } : n
+      }),
+    )
     toast({
       title: lineaId ? `${nombreLinea.get(lineaId) ?? lineaId} acomodado` : 'Planta acomodada',
-      description: `${movidos.length} equipos ordenados por el flujo, de izquierda a derecha.`,
+      description: lineaId
+        ? `${movidos.length} equipos ordenados por el flujo, de izquierda a derecha.`
+        : `${movidos.length} equipos ordenados y ${plano.zonas.length} contenedores puestos en fila, sin pisarse.`,
       action: (
         <ToastAction altText="Deshacer" onClick={deshacer}>
           Deshacer
@@ -1993,6 +2041,22 @@ function Editor() {
     registrar()
     setGrupos((gs) => gs.map((g) => (g.id === id ? { ...g, modo } : g)))
   }
+  /**
+   * La cuota es un peso RELATIVO, no un porcentaje: se puede escribir las piezas por turno de
+   * cada rama (5500, 5500, 5500, 2750) y el reparto sale solo. Vacío o 1 = vuelve a lo parejo.
+   */
+  const guardarCuota = () => {
+    if (!cuotaEdit) return
+    const n = Number(cuotaEdit.texto.replace(',', '.'))
+    const { a, b } = cuotaEdit
+    registrar()
+    setCuotas((cs) => {
+      const resto = cs.filter((c) => !(c.a === a && c.b === b))
+      return Number.isFinite(n) && n > 0 && n !== 1 ? [...resto, { a, b, parte: n }] : resto
+    })
+    setCuotaEdit(null)
+  }
+
   const enderezarFlecha = (e: Edge) => {
     registrar()
     setCurvas((cs) => cs.filter((c) => !(c.a === e.source && c.b === e.target)))
@@ -2119,6 +2183,16 @@ function Editor() {
       ? { tipo: 'accion', texto: 'Volverla flujo de producto', hacer: () => cambiarTipoFlecha(e, false) }
       : { tipo: 'accion', texto: 'Marcarla como «habilita»', hacer: () => cambiarTipoFlecha(e, true) },
     { tipo: 'nota', texto: esHabilita(e) ? 'Hoy no pasa producto: se lleva la cuota de lo que hace posible.' : 'Hoy pasa producto y reparte cuota en cada bifurcación.' },
+    ...(esHabilita(e) || (hijosDe.get(e.source) ?? []).length < 2
+      ? []
+      : ([
+          { tipo: 'separador' },
+          {
+            tipo: 'accion',
+            texto: `Cuánto se lleva esta rama… (${parteDe(cuotas, e.source, e.target)})`,
+            hacer: () => setCuotaEdit({ a: e.source, b: e.target, texto: String(parteDe(cuotas, e.source, e.target)) }),
+          },
+        ] as ItemMenu[])),
     { tipo: 'separador' },
     { tipo: 'accion', texto: 'Enderezarla', deshabilitado: !curvas.some((c) => c.a === e.source && c.b === e.target && c.puntos.length), hacer: () => enderezarFlecha(e) },
     { tipo: 'separador' },
@@ -2730,6 +2804,51 @@ function Editor() {
           </>
         }
       />
+
+      {/* Cuánto se lleva una rama: el peso relativo con el que se reparte el flujo. */}
+      <Sheet
+        open={!!cuotaEdit}
+        onClose={() => setCuotaEdit(null)}
+        title={cuotaEdit ? `¿Cuánto se lleva ${nombreDe(cuotaEdit.b)}?` : undefined}
+        description="Es un peso relativo, no un porcentaje: escribe las piezas por turno de cada rama y el reparto sale solo. Deja 1 para que vuelva a repartirse parejo."
+        actions={
+          <>
+            <Button variant="tinted" onClick={() => setCuotaEdit(null)}>
+              Cancelar
+            </Button>
+            <Button onClick={guardarCuota}>Guardar</Button>
+          </>
+        }
+      >
+        {cuotaEdit && (
+          <div className="flex flex-col gap-3">
+            <label className="flex flex-col gap-1">
+              <span className="text-footnote text-muted-foreground">
+                De {nombreDe(cuotaEdit.a)} salen {(hijosDe.get(cuotaEdit.a) ?? []).length} ramas
+              </span>
+              <input
+                autoFocus
+                inputMode="decimal"
+                value={cuotaEdit.texto}
+                onChange={(e) => setCuotaEdit({ ...cuotaEdit, texto: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') guardarCuota()
+                }}
+                placeholder="Ej.: 5500"
+                className="h-[44px] w-full rounded-ctl bg-muted-foreground/10 px-3 text-campo tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              />
+            </label>
+            <ul className="flex flex-col gap-1">
+              {(hijosDe.get(cuotaEdit.a) ?? []).map((h) => (
+                <li key={h} className="flex items-center justify-between gap-2 text-footnote">
+                  <span className="truncate text-muted-foreground">{nombreDe(h)}</span>
+                  <b className="shrink-0 tabular-nums">{h === cuotaEdit.b ? (cuotaEdit.texto || '1') : parteDe(cuotas, cuotaEdit.a, h)}</b>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </Sheet>
 
       {/* Nueva línea de proceso o zona de servicios: nace vacía, a la derecha de todo. */}
       <Sheet
