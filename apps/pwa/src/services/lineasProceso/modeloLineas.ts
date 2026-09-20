@@ -100,6 +100,34 @@ export interface GrupoParalelo {
   nombre?: string
 }
 
+/**
+ * Id de un contenedor nuevo a partir de su nombre, sin chocar con los que ya existen
+ * (el id viaja en `NodoGrafo.zona` y en `in:<id>`: cambiarlo después rompería lo guardado).
+ */
+export function idDeContenedor(nombre: string, usados: readonly string[]): string {
+  const base =
+    nombre
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '') || 'linea'
+  let id = base
+  for (let i = 2; usados.includes(id); i++) id = `${base}-${i}`
+  return id
+}
+
+/** Caja de un contenedor nuevo: a la derecha de todo, que es como fluye la planta. */
+export function cajaNueva(cajas: Iterable<LineaProceso['zona']>, w = 560, h = 360): LineaProceso['zona'] {
+  const todas = [...cajas]
+  return {
+    x: todas.length ? Math.round(Math.max(...todas.map((z) => z.x + z.w)) + 80) : 0,
+    y: todas.length ? Math.round(Math.min(...todas.map((z) => z.y))) : 0,
+    w,
+    h,
+  }
+}
+
 /** Tamaño de la tarjeta de un equipo en el lienzo (px): para saber en qué zona cae su centro. */
 export const NODO = { ancho: 188, alto: 68 }
 /** Tamaño de la píldora «Entrada …». */
