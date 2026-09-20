@@ -18,7 +18,7 @@ export interface GrafoGuardado extends GrafoLineas {
 export async function leerLineas(plantId: string): Promise<GrafoGuardado | null> {
   const snap = await getDoc(doc(db, COLECCION_LINEAS, plantId))
   if (!snap.exists()) return null
-  const d = snap.data() as Omit<Partial<GrafoGuardado>, 'aristas'> & { aristas?: { a: string; b: string }[] }
+  const d = snap.data() as Omit<Partial<GrafoGuardado>, 'aristas' | 'habilitan'> & { aristas?: { a: string; b: string }[]; habilitan?: { a: string; b: string }[] }
   if (!Array.isArray(d.lineas) || !Array.isArray(d.nodos)) return null
   return {
     version: 1,
@@ -26,6 +26,8 @@ export async function leerLineas(plantId: string): Promise<GrafoGuardado | null>
     nodos: d.nodos,
     // Firestore no guarda arreglos de arreglos: las flechas van como {a, b}.
     aristas: (d.aristas ?? []).map((x) => [x.a, x.b] as [string, string]),
+    // «Gracias a X funciona Y»: van aparte de las flechas de flujo.
+    habilitan: (d.habilitan ?? []).map((x) => [x.a, x.b] as [string, string]),
     grupos: Array.isArray(d.grupos) ? d.grupos : [],
     curvas: Array.isArray(d.curvas) ? d.curvas : [],
     actualizadoPor: d.actualizadoPor,
@@ -46,7 +48,8 @@ export async function guardarLineas(plantId: string, g: GrafoLineas, quien: stri
       ...(n.nombre ? { nombre: n.nombre } : {}),
     })),
     aristas: g.aristas.map(([a, b]) => ({ a, b })),
-    grupos: (g.grupos ?? []).map((gr) => ({ id: gr.id, miembros: gr.miembros, ...(gr.nombre ? { nombre: gr.nombre } : {}) })),
+    habilitan: (g.habilitan ?? []).map(([a, b]) => ({ a, b })),
+    grupos: (g.grupos ?? []).map((gr) => ({ id: gr.id, miembros: gr.miembros, ...(gr.nombre ? { nombre: gr.nombre } : {}), ...(gr.modo ? { modo: gr.modo } : {}) })),
     curvas: (g.curvas ?? []).map((c) => ({ a: c.a, b: c.b, puntos: c.puntos.map((p) => ({ x: Math.round(p.x), y: Math.round(p.y) })) })),
     actualizadoPor: quien,
     actualizadoEn: serverTimestamp(),
