@@ -87,6 +87,29 @@ describe('grupo que habilita', () => {
     expect(p.get('compresor')).toBeUndefined()
   })
 
+  it('quien habilita a VARIOS se lleva la suma: si para, se detienen todos', () => {
+    // El compresor de aire habilita a los dos estanques (50 % cada uno). Si para, el acopio
+    // se detiene entero, asi que su parada cuesta 100 % y no 50 % (Orel, 20-09-2026).
+    const p = pesosPorLinea(acopio([], [['compresor', 'estanqueA'], ['compresor', 'estanqueB']]))
+    expect(p.get('compresor')?.peso).toBe(1)
+    expect(p.get('compresor')?.habilita).toBe(true)
+    // Y no le saca nada a los estanques.
+    expect(p.get('estanqueA')?.peso).toBe(0.5)
+  })
+
+  it('la suma se topa en 100 %: nadie puede costar mas que su linea', () => {
+    const p = pesosPorLinea(acopio([], [['compresor', 'ducto'], ['compresor', 'hidroforo']]))
+    expect(p.get('compresor')?.peso).toBe(1)
+  })
+
+  it('si por el habilitador SI pasa producto, manda su cuota de flujo', () => {
+    // El hidroforo esta en el camino (100 %) y ademas habilita al estanque A (50 %):
+    // su cuota sigue siendo la del flujo, no la del habilitado.
+    const p = pesosPorLinea(acopio([], [['hidroforo', 'estanqueA']]))
+    expect(p.get('hidroforo')?.peso).toBe(1)
+    expect(p.get('hidroforo')?.habilita).toBeUndefined()
+  })
+
   it('en cadena: quien habilita al habilitador hereda la misma cuota', () => {
     const p = pesosPorLinea(acopio([], [['compresor', 'hidroforo'], ['bombaN1', 'compresor']]))
     expect(p.get('compresor')?.peso).toBe(1)

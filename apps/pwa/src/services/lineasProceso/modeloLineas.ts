@@ -216,16 +216,21 @@ export interface Acomodo {
 export const ACOMODO = { entreCapas: 72, entreRamas: 28, sueltos: 56 }
 
 /**
- * Acomoda los equipos de un contenedor de izquierda a derecha siguiendo el flujo: cada uno
- * va una capa más a la derecha que el que lo alimenta (capa = el camino MÁS LARGO desde la
- * entrada, así nada queda a la izquierda de quien lo alimenta) y las ramas de una misma capa
- * se apilan en el orden en que ya estaban, para que el dibujo no dé un salto.
+ * Acomoda los equipos de un contenedor de izquierda a derecha siguiendo el flujo.
  *
- * Lo que no cuelga del flujo —y lo que quedó en un círculo— va en una fila aparte, abajo.
- * No toca contenedores ni flechas: solo devuelve posiciones.
+ * Tres reglas, en este orden:
+ *  1. El camino del producto va en capas: cada equipo una capa más a la derecha que el que
+ *     lo alimenta, con la capa medida por el camino MÁS LARGO, así nada queda a la izquierda
+ *     de quien lo alimenta. Las ramas de una capa se apilan respetando el orden que ya tenían.
+ *  2. Un GRUPO cuenta como un solo casillero: sus miembros se apilan en la misma capa.
+ *  3. Los HABILITADORES van DEBAJO de lo que habilitan, alineados con su columna (convención
+ *     IDEF0: lo que entra por abajo de una caja es lo que la hace posible). Si dos habilitan
+ *     lo mismo, se apilan uno bajo el otro.
+ *
+ * Lo que no cuelga de nada queda en filas al final. No toca contenedores ni flechas.
  */
 export function acomodarEnCapas(
-  g: Pick<GrafoLineas, 'lineas' | 'nodos' | 'aristas'>,
+  g: Pick<GrafoLineas, 'lineas' | 'nodos' | 'aristas'> & Partial<Pick<GrafoLineas, 'grupos' | 'habilitan'>>,
   lineaId: string,
   medidas: { nodo: typeof NODO; entrada: typeof ENTRADA; margen: typeof MARGEN_ZONA } = { nodo: NODO, entrada: ENTRADA, margen: MARGEN_ZONA },
 ): Acomodo[] {
@@ -233,22 +238,38 @@ export function acomodarEnCapas(
   if (!linea) return []
   const dentro = g.nodos.filter((n) => zonaDeNodo(g.lineas, n) === lineaId)
   if (!dentro.length) return []
-  const ids = new Set(dentro.map((n) => n.id))
+  const suyos = new Set(dentro.map((n) => n.id))
+
+  // Cada equipo pertenece a lo sumo a un grupo; el grupo es la UNIDAD que se acomoda.
+  const grupoDe = new Map<string, GrupoParalelo>()
+  for (const gr of g.grupos ?? []) for (const id of gr.miembros) if (suyos.has(id)) grupoDe.set(id, gr)
+  const unidadDe = (id: string) => {
+    const gr = grupoDe.get(id)
+    return gr ? PREFIJO_GRUPO + gr.id : id
+  }
+  const miembrosDe = (u: string): NodoGrafo[] =>
+    esGrupo(u) ? dentro.filter((n) => grupoDe.get(n.id) && PREFIJO_GRUPO + grupoDe.get(n.id)!.id === u) : dentro.filter((n) => n.id === u)
+
+  const unidades = [...new Set(dentro.map((n) => unidadDe(n.id)))]
+  const enUnidad = new Set(unidades)
   const salidas = new Map<string, string[]>()
   const entran = new Map<string, number>()
   for (const [a, b] of g.aristas) {
-    if (!ids.has(a) || !ids.has(b) || a === b) continue
-    const lista = salidas.get(a) ?? []
-    if (lista.includes(b)) continue
-    lista.push(b)
-    salidas.set(a, lista)
-    entran.set(b, (entran.get(b) ?? 0) + 1)
+    const ua = enUnidad.has(a) ? a : unidadDe(a)
+    const ub = enUnidad.has(b) ? b : unidadDe(b)
+    if (!enUnidad.has(ua) || !enUnidad.has(ub) || ua === ub) continue
+    const lista = salidas.get(ua) ?? []
+    if (lista.includes(ub)) continue
+    lista.push(ub)
+    salidas.set(ua, lista)
+    entran.set(ub, (entran.get(ub) ?? 0) + 1)
   }
-  // Capa por camino más largo (Kahn). Lo que queda atascado está en un círculo.
+
+  // Capa por camino más largo (Kahn). Lo atascado está en un círculo y queda fuera de la cadena.
   const capa = new Map<string, number>()
-  const pendientes = new Map(dentro.map((n) => [n.id, entran.get(n.id) ?? 0]))
-  const cola = dentro.filter((n) => !(entran.get(n.id) ?? 0)).map((n) => n.id)
-  for (const id of cola) capa.set(id, 0)
+  const pendientes = new Map(unidades.map((u) => [u, entran.get(u) ?? 0]))
+  const cola = unidades.filter((u) => !(entran.get(u) ?? 0))
+  for (const u of cola) capa.set(u, 0)
   while (cola.length) {
     const n = cola.shift()!
     for (const s of salidas.get(n) ?? []) {
@@ -258,42 +279,117 @@ export function acomodarEnCapas(
       if (p === 0) cola.push(s)
     }
   }
-  const conCapa = dentro.filter((n) => capa.has(n.id) && (salidas.has(n.id) || (entran.get(n.id) ?? 0) > 0))
-  const sueltos = dentro.filter((n) => !conCapa.includes(n))
-  const porCapa = new Map<number, NodoGrafo[]>()
-  for (const n of conCapa) {
-    const c = capa.get(n.id) ?? 0
-    porCapa.set(c, [...(porCapa.get(c) ?? []), n])
-  }
+  const enCadena = unidades.filter((u) => capa.has(u) && (salidas.has(u) || (entran.get(u) ?? 0) > 0))
+  const orden = new Map(unidades.map((u) => [u, Math.min(...miembrosDe(u).map((n) => n.y))]))
+
   const x0 = linea.zona.x + medidas.margen.lado
   const y0 = linea.zona.y + medidas.margen.arriba
+  const paso = medidas.nodo.ancho + ACOMODO.entreCapas
+  const alto = medidas.nodo.alto + ACOMODO.entreRamas
   const out: Acomodo[] = []
-  let abajo = y0
-  for (const [c, lista] of [...porCapa.entries()].sort((a, b) => a[0] - b[0])) {
-    // Se respeta el orden de arriba a abajo que ya tenían: acomodar no debe barajar.
-    const ordenada = [...lista].sort((a, b) => a.y - b.y)
-    ordenada.forEach((n, i) => {
-      const alto = esEntrada(n.id) ? medidas.entrada.alto : medidas.nodo.alto
-      const ancho = esEntrada(n.id) ? medidas.entrada.ancho : medidas.nodo.ancho
-      out.push({
-        id: n.id,
-        x: Math.round(x0 + c * (medidas.nodo.ancho + ACOMODO.entreCapas) + (medidas.nodo.ancho - ancho) / 2),
-        y: Math.round(y0 + i * (medidas.nodo.alto + ACOMODO.entreRamas) + (medidas.nodo.alto - alto) / 2),
+  const columna = new Map<string, number>()
+  let pieDeLaCadena = y0
+
+  const poner = (u: string, cx: number, cy: number) => {
+    columna.set(u, cx)
+    miembrosDe(u)
+      .sort((a, b) => a.y - b.y)
+      .forEach((n, i) => {
+        const t = esEntrada(n.id) ? medidas.entrada : medidas.nodo
+        out.push({
+          id: n.id,
+          x: Math.round(cx + (medidas.nodo.ancho - t.ancho) / 2),
+          y: Math.round(cy + i * alto + (medidas.nodo.alto - t.alto) / 2),
+        })
       })
-    })
-    abajo = Math.max(abajo, y0 + ordenada.length * (medidas.nodo.alto + ACOMODO.entreRamas))
+    return cy + miembrosDe(u).length * alto
   }
-  // Los que no cuelgan del flujo: en filas abajo, sin mezclarse con la cadena.
-  sueltos
-    .sort((a, b) => a.y - b.y || a.x - b.x)
-    .forEach((n, i) => {
-      out.push({
-        id: n.id,
-        x: Math.round(x0 + (i % 5) * (medidas.nodo.ancho + ACOMODO.entreRamas)),
-        y: Math.round(abajo + ACOMODO.sueltos + Math.floor(i / 5) * (medidas.nodo.alto + ACOMODO.entreRamas)),
-      })
-    })
+
+  const porCapa = new Map<number, string[]>()
+  for (const u of enCadena) {
+    const c = capa.get(u) ?? 0
+    porCapa.set(c, [...(porCapa.get(c) ?? []), u])
+  }
+  for (const [c, lista] of [...porCapa.entries()].sort((a, b) => a[0] - b[0])) {
+    let cy = y0
+    for (const u of [...lista].sort((a, b) => (orden.get(a) ?? 0) - (orden.get(b) ?? 0))) cy = poner(u, x0 + c * paso, cy)
+    pieDeLaCadena = Math.max(pieDeLaCadena, cy)
+  }
+
+  // Habilitadores: bajo la columna de lo que habilitan. Si uno habilita a varios, va bajo
+  // el primero; si varios habilitan lo mismo, se apilan.
+  const colocadas = new Set(enCadena)
+  const usadas = new Map<number, number>()
+  for (const [h, t] of g.habilitan ?? []) {
+    const uh = enUnidad.has(h) ? h : unidadDe(h)
+    const ut = enUnidad.has(t) ? t : unidadDe(t)
+    if (!enUnidad.has(uh) || colocadas.has(uh)) continue
+    const cx = columna.get(ut)
+    if (cx === undefined) continue
+    const nivel = usadas.get(cx) ?? 0
+    const cy = pieDeLaCadena + ACOMODO.sueltos + nivel * alto
+    poner(uh, cx, cy)
+    usadas.set(cx, nivel + miembrosDe(uh).length)
+    colocadas.add(uh)
+  }
+
+  // Lo que no cuelga de nada: filas al final, sin mezclarse con la cadena.
+  const piso = pieDeLaCadena + ACOMODO.sueltos + (usadas.size ? Math.max(...usadas.values()) * alto + ACOMODO.sueltos : 0)
+  let i = 0
+  for (const u of unidades) {
+    if (colocadas.has(u)) continue
+    poner(u, x0 + (i % 5) * (medidas.nodo.ancho + ACOMODO.entreRamas), piso + Math.floor(i / 5) * alto)
+    i++
+  }
   return out
+}
+
+/** Aire entre un contenedor y el siguiente al acomodar toda la planta. */
+export const ENTRE_CONTENEDORES = 140
+
+/**
+ * Acomoda TODA la planta: primero el contenido de cada contenedor y después los contenedores
+ * mismos, en fila de izquierda a derecha y del tamaño justo de lo que tienen adentro, para que
+ * dejen de pisarse (Orel, 20-09-2026: «reacomoda los contenedores para que no se solapen»).
+ *
+ * Se respeta el orden que ya tenían (por su x actual): acomodar no debe barajar la planta.
+ * Las zonas de apoyo van debajo de todo, que es donde se leen sin cruzar la línea.
+ */
+export function acomodarPlanta(
+  g: Pick<GrafoLineas, 'lineas' | 'nodos' | 'aristas'> & Partial<Pick<GrafoLineas, 'grupos' | 'habilitan'>>,
+  medidas: { nodo: typeof NODO; entrada: typeof ENTRADA; margen: typeof MARGEN_ZONA } = { nodo: NODO, entrada: ENTRADA, margen: MARGEN_ZONA },
+): { nodos: Acomodo[]; zonas: { id: string; zona: LineaProceso['zona'] }[] } {
+  const nodos: Acomodo[] = []
+  const zonas: { id: string; zona: LineaProceso['zona'] }[] = []
+  const porX = (a: LineaProceso, b: LineaProceso) => a.zona.x - b.zona.x || a.zona.y - b.zona.y
+
+  const medir = (l: LineaProceso) => {
+    // Se acomoda con el contenedor en el origen para medir cuánto ocupa de verdad.
+    const enOrigen = { ...g, lineas: g.lineas.map((x) => (x.id === l.id ? { ...x, zona: { ...x.zona, x: 0, y: 0 } } : x)) }
+    const piezas = acomodarEnCapas(enOrigen, l.id, medidas)
+    const w = piezas.length ? Math.max(...piezas.map((p) => p.x + medidas.nodo.ancho)) + medidas.margen.lado : l.zona.w
+    const h = piezas.length ? Math.max(...piezas.map((p) => p.y + medidas.nodo.alto)) + medidas.margen.abajo : l.zona.h
+    return { piezas, w: Math.max(w, 280), h: Math.max(h, 180) }
+  }
+
+  let x = 0
+  let alto = 0
+  for (const l of g.lineas.filter((z) => z.tipo !== 'apoyo').sort(porX)) {
+    const { piezas, w, h } = medir(l)
+    for (const p of piezas) nodos.push({ id: p.id, x: p.x + x, y: p.y })
+    zonas.push({ id: l.id, zona: { x, y: 0, w, h } })
+    alto = Math.max(alto, h)
+    x += w + ENTRE_CONTENEDORES
+  }
+
+  let y = alto + ENTRE_CONTENEDORES
+  for (const l of g.lineas.filter((z) => z.tipo === 'apoyo').sort(porX)) {
+    const { piezas, w, h } = medir(l)
+    for (const p of piezas) nodos.push({ id: p.id, x: p.x, y: p.y + y })
+    zonas.push({ id: l.id, zona: { x: 0, y, w, h } })
+    y += h + ENTRE_CONTENEDORES
+  }
+  return { nodos, zonas }
 }
 
 /** Tamaño de la tarjeta de un equipo en el lienzo (px): para saber en qué zona cae su centro. */
@@ -397,21 +493,31 @@ export function pesosPorLinea(
     const p = res.get(gid)
     if (p) repartirGrupo(gr, p)
   }
-  // Habilitadores: no reciben flujo, se llevan la cuota de lo que hacen posible. En cadena
-  // (X habilita a Y que habilita a Z) hacen falta varias vueltas; cuatro sobran de lejos.
-  const habilitan = g.habilitan ?? []
-  for (let vuelta = 0; vuelta < 4 && habilitan.length; vuelta++) {
+  // Habilitadores: no reciben flujo, se llevan la cuota de lo que hacen posible. Si uno
+  // habilita a VARIOS, se lleva la SUMA: si para, se detienen todos (el compresor de aire
+  // del Acopio habilita a los dos estanques, asi que su parada cuesta el 100 %, no el 50 %).
+  // En cadena (X habilita a Y que habilita a Z) hacen falta varias vueltas.
+  const porFlujo = new Set(res.keys())
+  const porHabilitador = new Map<string, string[]>()
+  for (const [h, t] of g.habilitan ?? []) porHabilitador.set(h, [...(porHabilitador.get(h) ?? []), t])
+  for (let vuelta = 0; vuelta < 4 && porHabilitador.size; vuelta++) {
     let cambio = false
-    for (const [h, t] of habilitan) {
-      const destino = res.get(t)
-      if (!destino || res.has(h)) continue
-      const suyo: PesoEnLinea = { lineaId: destino.lineaId, peso: destino.peso, habilita: true, ...(destino.ciclo ? { ciclo: true } : {}) }
-      res.set(h, suyo)
-      const gr = porId.get(h)
-      if (gr) repartirGrupo(gr, suyo, { habilita: true })
+    for (const [h, destinos] of porHabilitador) {
+      // Si por el habilitador SI pasa producto, manda su cuota de flujo.
+      if (porFlujo.has(h)) continue
+      const cuotas = destinos.map((t) => res.get(t)).filter((p): p is PesoEnLinea => !!p)
+      if (!cuotas.length) continue
+      const suma = Math.min(1, cuotas.reduce((a, p) => a + p.peso, 0))
+      if (res.get(h)?.peso === suma) continue
+      res.set(h, { lineaId: cuotas[0]!.lineaId, peso: suma, habilita: true, ...(cuotas.every((p) => p.ciclo) ? { ciclo: true } : {}) })
       cambio = true
     }
     if (!cambio) break
+  }
+  // Y recien ahi baja a los miembros del grupo que habilita.
+  for (const [gid, gr] of porId) {
+    const p = res.get(gid)
+    if (p?.habilita) repartirGrupo(gr, p, { habilita: true })
   }
   return res
 }

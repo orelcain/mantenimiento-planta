@@ -43,6 +43,7 @@ import {
   PREFIJO_MANUAL,
   cajaNueva,
   acomodarEnCapas,
+  acomodarPlanta,
   caminoSuave,
   cierraCiclo,
   esEntrada,
@@ -250,7 +251,7 @@ function NodoMaquina({ id, data, selected }: NodeProps<Node<DatosMaquina>>) {
       <BarritaNodo id={id} data={data} selected={selected} />
     <div
       style={{ width: NODO.ancho, height: NODO.alto }}
-      className={`relative flex flex-col justify-center gap-1 overflow-hidden rounded-ctl border bg-card px-2.5 py-2 shadow-[0_1px_2px_rgb(0_0_0/0.07)] ${
+      className={`relative flex flex-col justify-center gap-1 overflow-hidden rounded-ctl border bg-card px-4 py-2 shadow-[0_1px_2px_rgb(0_0_0/0.07)] ${
         conFlujo ? 'border-border' : 'border-dashed border-muted-foreground/55'
       } ${selected ? SELECCION : ''}`}
     >
@@ -292,7 +293,7 @@ function NodoServicio({ id, data, selected }: NodeProps<Node<DatosServicio>>) {
       <BarritaNodo id={id} data={data} selected={selected} />
     <div
       style={{ width: NODO.ancho, borderColor: APOYO }}
-      className={`rounded-card border-2 border-dashed bg-card px-3 py-2 shadow-[0_1px_4px_rgba(0,0,0,0.12)] ${selected ? SELECCION : ''}`}
+      className={`rounded-card border-2 border-dashed bg-card px-4 py-2 shadow-[0_1px_4px_rgba(0,0,0,0.12)] ${selected ? SELECCION : ''}`}
     >
       <p className="break-words text-[12px] font-semibold leading-tight">{data.nombre}</p>
       <p className="text-[12px] font-bold leading-snug" style={{ color: APOYO }}>
@@ -400,12 +401,7 @@ function NodoParalelo({ data }: NodeProps<Node<DatosParalelo>>) {
   )
 }
 
-/** Barra donde el flujo se abre en ramas (convención de los P&ID: cabezal común). */
-function NodoReparto({ data }: NodeProps<Node<{ h: number }>>) {
-  return <div style={{ width: 6, height: data.h, background: 'rgb(var(--brand))' }} className="rounded-full" />
-}
-
-const TIPOS = { maquina: NodoMaquina, servicio: NodoServicio, entrada: NodoEntrada, zona: NodoZona, paralelo: NodoParalelo, reparto: NodoReparto }
+const TIPOS = { maquina: NodoMaquina, servicio: NodoServicio, entrada: NodoEntrada, zona: NodoZona, paralelo: NodoParalelo }
 
 /** Lo que la flecha necesita para dibujarse y para dejarse acomodar. */
 type DatosFlecha = { puntos: { x: number; y: number }[]; editable: boolean; onPuntos: (p: { x: number; y: number }[]) => void; acciones?: { quitar: () => void; enderezar: () => void } }
@@ -907,10 +903,13 @@ function Editor() {
   // Ramas por equipo (de cuántas salidas del mismo padre es una) y flujo que lleva cada flecha:
   // el GROSOR de la flecha es el flujo, así se ve dónde reparte la línea sin leer un número.
   const reparto = useMemo(() => {
+    // Solo las flechas de FLUJO abren ramas: una «habilita» no reparte nada, así que no
+    // debe contarse (con dos habilitaciones, un equipo decía «1 de 3» sin serlo).
+    const flujo = edges.filter((e) => !esHabilita(e) && !servicios.has(e.source) && !servicios.has(e.target))
     const salidas = new Map<string, number>()
-    for (const e of edges) if (!servicios.has(e.source) && !servicios.has(e.target)) salidas.set(e.source, (salidas.get(e.source) ?? 0) + 1)
+    for (const e of flujo) salidas.set(e.source, (salidas.get(e.source) ?? 0) + 1)
     const ramas = new Map<string, number>()
-    for (const e of edges) if (!servicios.has(e.source) && !servicios.has(e.target)) ramas.set(e.target, Math.max(ramas.get(e.target) ?? 1, salidas.get(e.source) ?? 1))
+    for (const e of flujo) ramas.set(e.target, Math.max(ramas.get(e.target) ?? 1, salidas.get(e.source) ?? 1))
     return { salidas, ramas }
   }, [edges, servicios])
   const flujoDeFlecha = useCallback(
@@ -951,10 +950,6 @@ function Editor() {
         focusable: false,
         zIndex: -1,
       })
-      const p = caja.get(origen)
-      const alto = Math.max(24, y2 - y1 - NODO.alto)
-      // A media distancia entre el equipo que reparte y el grupo: ahí se abre el flujo.
-      if (p) out.push({ id: `reparto:${origen}`, type: 'reparto', position: { x: Math.max(p.x + NODO.ancho + 12, (p.x + NODO.ancho + x1) / 2 - 3), y: y1 + NODO.alto / 2 - 3 }, data: { h: alto }, draggable: false, selectable: false, deletable: false, focusable: false, zIndex: -1 })
     }
     return out
   }, [edges, nodes, pesos, servicios])
@@ -1883,15 +1878,29 @@ function Editor() {
    * contenedores, y se deshace con Ctrl+Z como cualquier movida.
    */
   const acomodar = (lineaId?: string) => {
-    const objetivos = lineaId ? [lineaId] : lineas.map((l) => l.id)
-    const movidos = objetivos.flatMap((id) => acomodarEnCapas(grafo, id))
+    // Un contenedor solo: se ordena por dentro. Toda la planta: además se reubican los
+    // contenedores en fila y al tamaño justo, para que dejen de pisarse.
+    const plano = lineaId ? { nodos: acomodarEnCapas(grafo, lineaId), zonas: [] as { id: string; zona: LineaProceso['zona'] }[] } : acomodarPlanta(grafo)
+    const movidos = plano.nodos
     if (!movidos.length) return
     registrar()
     const pos = new Map(movidos.map((m) => [m.id, m]))
-    setNodes((ns) => ns.map((n) => (pos.has(n.id) ? { ...n, position: { x: pos.get(n.id)!.x, y: pos.get(n.id)!.y } } : n)))
+    const cajas = new Map(plano.zonas.map((z) => [z.id, z.zona]))
+    if (cajas.size) {
+      setLineas((ls) => ls.map((l) => (cajas.has(l.id) ? { ...l, zona: cajas.get(l.id)! } : l)))
+    }
+    setNodes((ns) =>
+      ns.map((n) => {
+        if (pos.has(n.id)) return { ...n, position: { x: pos.get(n.id)!.x, y: pos.get(n.id)!.y } }
+        const caja = n.type === 'zona' ? cajas.get(n.id.slice('zona:'.length)) : undefined
+        return caja ? { ...n, position: { x: caja.x, y: caja.y }, data: { ...(n.data as DatosZona), w: caja.w, h: caja.h } } : n
+      }),
+    )
     toast({
       title: lineaId ? `${nombreLinea.get(lineaId) ?? lineaId} acomodado` : 'Planta acomodada',
-      description: `${movidos.length} equipos ordenados por el flujo, de izquierda a derecha.`,
+      description: lineaId
+        ? `${movidos.length} equipos ordenados por el flujo, de izquierda a derecha.`
+        : `${movidos.length} equipos ordenados y ${plano.zonas.length} contenedores puestos en fila, sin pisarse.`,
       action: (
         <ToastAction altText="Deshacer" onClick={deshacer}>
           Deshacer
