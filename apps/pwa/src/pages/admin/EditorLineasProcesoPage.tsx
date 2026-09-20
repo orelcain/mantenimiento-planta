@@ -46,7 +46,9 @@ import {
   caminoSuave,
   cierraCiclo,
   esEntrada,
+  esGrupo,
   esManual,
+  PREFIJO_GRUPO,
   formatoPeso,
   idDeContenedor,
   limitesDeGrupo,
@@ -348,7 +350,7 @@ function NodoZona({ data }: NodeProps<Node<DatosZona>>) {
 }
 
 /** Encuadre de un grupo en paralelo: se deriva del grafo, no se guarda. */
-type DatosParalelo = { w: number; h: number; etiqueta: string; manual?: boolean; activo?: boolean; onEditar?: () => void }
+type DatosParalelo = { w: number; h: number; etiqueta: string; manual?: boolean; activo?: boolean; conectable?: boolean; onEditar?: () => void }
 /**
  * Encuadre en paralelo. Los dos tipos tienen que distinguirse DE UN VISTAZO (Orel,
  * 19-09-2026: «no tengo cómo saber si es un paralelo y si están en grupo… eso debe ser
@@ -385,6 +387,9 @@ function NodoParalelo({ data }: NodeProps<Node<DatosParalelo>>) {
         {data.manual ? <Boxes className="size-3" aria-hidden /> : <Split className="size-3" aria-hidden />}
         {data.etiqueta}
       </button>
+      {/* Un grupo se une como un equipo más: una sola flecha llega al grupo y adentro se
+          reparte (Orel, 19-09-2026: «que a ese paralelo llegue una sola línea… al medio»). */}
+      {data.conectable && <PuntosUnion />}
     </div>
   )
 }
@@ -530,7 +535,13 @@ const aNodos = (g: GrafoLineas): Node[] => [
     deletable: !esEntrada(n.id),
   })),
 ]
-const aAristas = (g: GrafoLineas): Edge[] => g.aristas.map(([a, b]) => ({ id: `${a}->${b}`, source: a, target: b }))
+/** Marca que distingue una flecha «habilita» de una de flujo dentro de `edges`. */
+type DatosArista = { habilita?: boolean }
+const esHabilita = (e: Edge) => !!(e.data as DatosArista | undefined)?.habilita
+const aAristas = (g: GrafoLineas): Edge[] => [
+  ...g.aristas.map(([a, b]) => ({ id: `${a}->${b}`, source: a, target: b })),
+  ...(g.habilitan ?? []).map(([a, b]) => ({ id: `hab:${a}->${b}`, source: a, target: b, data: { habilita: true } satisfies DatosArista })),
+]
 
 function alGrafo(lineas: LineaProceso[], nodes: Node[], edges: Edge[], grupos: GrupoParalelo[] = [], curvas: CurvaFlecha[] = []): GrafoLineas {
   // La esquina de cada contenedor vive en su nodo del lienzo: así mover la caja entra en deshacer.
@@ -547,7 +558,8 @@ function alGrafo(lineas: LineaProceso[], nodes: Node[], edges: Edge[], grupos: G
         const d = n.data as DatosBase
         return { id: n.id, x: Math.round(n.position.x), y: Math.round(n.position.y), ...(d.zona !== undefined ? { zona: d.zona } : {}), ...(d.nombre ? { nombre: d.nombre } : {}) }
       }),
-    aristas: edges.map((e) => [e.source, e.target] as [string, string]),
+    aristas: edges.filter((e) => !esHabilita(e)).map((e) => [e.source, e.target] as [string, string]),
+    habilitan: edges.filter(esHabilita).map((e) => [e.source, e.target] as [string, string]),
     // Un grupo con menos de dos miembros en el lienzo ya no es un grupo.
     grupos: grupos.map((g) => ({ ...g, miembros: g.miembros.filter((m) => nodes.some((n) => n.id === m)) })).filter((g) => g.miembros.length > 1),
     // Una curva sin su flecha ya no sirve.
@@ -869,14 +881,17 @@ function Editor() {
     return m
   }, [grupos])
   const nombresManuales = useMemo(() => new Map(grafo.nodos.filter((n) => esManual(n.id)).map((n) => [n.id, n.nombre ?? 'Elemento manual'])), [grafo])
+  const nombreGrupo = useCallback((id: string) => grupos.find((g) => PREFIJO_GRUPO + g.id === id)?.nombre?.trim() || 'el grupo', [grupos])
   const nombreDe = useCallback(
     (id: string) =>
       esEntrada(id)
         ? `Entrada ${nombreLinea.get(lineaDeEntrada(id)) ?? ''}`
-        : esManual(id)
-          ? (nombresManuales.get(id) ?? 'Elemento manual')
-          : (indice.get(id)?.nombre ?? 'Equipo que ya no está en el árbol'),
-    [indice, nombreLinea, nombresManuales],
+        : esGrupo(id)
+          ? nombreGrupo(id)
+          : esManual(id)
+            ? (nombresManuales.get(id) ?? 'Elemento manual')
+            : (indice.get(id)?.nombre ?? 'Equipo que ya no está en el árbol'),
+    [indice, nombreLinea, nombresManuales, nombreGrupo],
   )
   // Contenedores: pertenencia explícita y límites que crecen con sus equipos.
   const limites = useMemo(() => limitesDeZonas(grafo), [grafo])
@@ -961,6 +976,7 @@ function Editor() {
           w: caja.w,
           h: caja.h,
           manual: true,
+          conectable: true,
           activo: grupoSel === gr.id,
           onEditar: () => setGrupoSel(gr.id),
           etiqueta: `Grupo · ${gr.nombre ? `${gr.nombre} · ` : ''}${gr.miembros.length} ramas${parejo ? ` · ${formatoPeso(cuotas[0] ?? 0)} c/u` : ''}`,
@@ -968,6 +984,7 @@ function Editor() {
         draggable: false,
         // Seleccionable para poder tocarlo y editarlo; sin `draggable` el lienzo se sigue desplazando.
         selectable: true,
+        connectable: true,
         deletable: false,
         focusable: false,
         zIndex: -1,
@@ -1063,12 +1080,13 @@ function Editor() {
   const vistaAristas = useMemo(
     () =>
       edges.map((e): Edge => {
-        const apoyo = servicios.has(e.source) || servicios.has(e.target)
-        const entre = !apoyo && esEntrada(e.target)
+        const habilita = esHabilita(e)
+        const apoyo = !habilita && (servicios.has(e.source) || servicios.has(e.target))
+        const entre = !apoyo && !habilita && esEntrada(e.target)
         const f = flujoDeFlecha(e)
         const grosor = f >= 0.99 ? 2.5 : f >= 0.45 ? 1.8 : f >= 0.2 ? 1.4 : 1.2
         const opacidad = f >= 0.99 ? 1 : f >= 0.45 ? 0.9 : 0.8
-        const color = apoyo ? APOYO : entre ? 'rgb(var(--muted-foreground))' : 'rgb(var(--brand))'
+        const color = apoyo ? APOYO : habilita ? 'rgb(var(--ink-warn))' : entre ? 'rgb(var(--muted-foreground))' : 'rgb(var(--brand))'
         return {
           ...e,
           type: 'curva',
@@ -1081,6 +1099,15 @@ function Editor() {
           ariaLabel: `Flecha de ${nombreDe(e.source)} a ${nombreDe(e.target)}`,
           // Punta chica: a 20 px pesaba más que la línea y tapaba el borde de la tarjeta.
           markerEnd: { type: MarkerType.ArrowClosed, width: 7, height: 6, color },
+          ...(habilita
+            ? {
+                label: 'habilita',
+                labelStyle: { fill: 'rgb(var(--ink-warn))', fontSize: 11, fontWeight: 600 },
+                labelBgStyle: { fill: 'rgb(var(--card))' },
+                labelBgPadding: [4, 2] as [number, number],
+                labelBgBorderRadius: 6,
+              }
+            : {}),
           ...(apoyo
             ? {
                 label: servicios.has(e.source) ? 'abastece' : 'recibe',
@@ -1092,7 +1119,9 @@ function Editor() {
             : {}),
           // `non-scaling-stroke`: el trazo mantiene su grosor en pantalla aunque el lienzo se
           // aleje (a 32 % una línea de 2,5 px se veía de 0,8 px).
-          style: apoyo
+          style: habilita
+            ? { stroke: color, strokeWidth: 2, strokeDasharray: '7 4', strokeLinecap: 'round', vectorEffect: 'non-scaling-stroke' }
+            : apoyo
             ? { stroke: color, strokeWidth: 2, strokeDasharray: '2 6', strokeLinecap: 'round', vectorEffect: 'non-scaling-stroke' }
             : entre
               ? { stroke: color, strokeWidth: 2, strokeDasharray: '6 5', vectorEffect: 'non-scaling-stroke' }
@@ -1241,7 +1270,7 @@ function Editor() {
   // Solo las flechas de flujo: las de los servicios de apoyo no reparten, así que ni
   // arman círculos ni se puentean al sacar un equipo del medio.
   const aristasFlujo = useMemo(
-    () => edges.filter((e) => !servicios.has(e.source) && !servicios.has(e.target)).map((e) => [e.source, e.target] as [string, string]),
+    () => edges.filter((e) => !esHabilita(e) && !servicios.has(e.source) && !servicios.has(e.target)).map((e) => [e.source, e.target] as [string, string]),
     [edges, servicios],
   )
   const avisoCiclo = useCallback(
@@ -1941,6 +1970,29 @@ function Editor() {
     setCurvas((cs) => cs.filter((c) => !(c.a === e.source && c.b === e.target)))
     avisoQuitado(`Se quitó la flecha ${nombreDe(e.source)} → ${nombreDe(e.target)}`)
   }
+  /**
+   * Una flecha de flujo pasa a «habilita» y al revés. Lo que cambia es de qué lista sale al
+   * guardar (`aristas` o `habilitan`) y, con eso, si reparte flujo o se lleva la cuota de lo
+   * que hace posible.
+   */
+  const cambiarTipoFlecha = (e: Edge, habilita: boolean) => {
+    registrar()
+    setEdges((es) =>
+      es.map((x) =>
+        x.id === e.id
+          ? { ...x, id: habilita ? `hab:${x.source}->${x.target}` : `${x.source}->${x.target}`, data: habilita ? ({ habilita: true } satisfies DatosArista) : undefined }
+          : x,
+      ),
+    )
+    toast({
+      title: habilita ? `${nombreDe(e.source)} habilita a ${nombreDe(e.target)}` : `${nombreDe(e.source)} → ${nombreDe(e.target)}`,
+      description: habilita ? 'No pasa producto, pero si para, el otro pierde capacidad.' : 'Vuelve a ser flujo de producto: reparte cuota.',
+    })
+  }
+  const cambiarModoGrupo = (id: string, modo: 'reparte' | 'todas') => {
+    registrar()
+    setGrupos((gs) => gs.map((g) => (g.id === id ? { ...g, modo } : g)))
+  }
   const enderezarFlecha = (e: Edge) => {
     registrar()
     setCurvas((cs) => cs.filter((c) => !(c.a === e.source && c.b === e.target)))
@@ -2036,6 +2088,18 @@ function Editor() {
       const id = n.id.slice('grupo:'.length)
       return [
         { tipo: 'nota', texto: 'Grupo marcado a mano: lo dijiste tú, no sale de las flechas.' },
+        { tipo: 'titulo', texto: 'Si para una de ellas' },
+        {
+          tipo: 'accion',
+          texto: (grupos.find((x) => x.id === id)?.modo ?? 'reparte') === 'reparte' ? '✓ Se pierde su parte (1/N)' : 'Se pierde su parte (1/N)',
+          hacer: () => cambiarModoGrupo(id, 'reparte'),
+        },
+        {
+          tipo: 'accion',
+          texto: grupos.find((x) => x.id === id)?.modo === 'todas' ? '✓ Se detiene todo: se necesitan todas' : 'Se detiene todo: se necesitan todas',
+          hacer: () => cambiarModoGrupo(id, 'todas'),
+        },
+        { tipo: 'separador' },
         { tipo: 'accion', texto: 'Renombrar el grupo…', hacer: () => setGrupoSel(id) },
         { tipo: 'separador' },
         { tipo: 'accion', texto: 'Deshacer el grupo', destructivo: true, hacer: () => deshacerGrupo(id) },
@@ -2051,6 +2115,11 @@ function Editor() {
     ]
   }
   const itemsFlecha = (e: Edge): ItemMenu[] => [
+    esHabilita(e)
+      ? { tipo: 'accion', texto: 'Volverla flujo de producto', hacer: () => cambiarTipoFlecha(e, false) }
+      : { tipo: 'accion', texto: 'Marcarla como «habilita»', hacer: () => cambiarTipoFlecha(e, true) },
+    { tipo: 'nota', texto: esHabilita(e) ? 'Hoy no pasa producto: se lleva la cuota de lo que hace posible.' : 'Hoy pasa producto y reparte cuota en cada bifurcación.' },
+    { tipo: 'separador' },
     { tipo: 'accion', texto: 'Enderezarla', deshabilitado: !curvas.some((c) => c.a === e.source && c.b === e.target && c.puntos.length), hacer: () => enderezarFlecha(e) },
     { tipo: 'separador' },
     { tipo: 'accion', texto: 'Quitar la flecha', destructivo: true, hacer: () => quitarFlecha(e) },
@@ -2304,7 +2373,13 @@ function Editor() {
                   return
                 }
                 if (n.type === 'paralelo') {
-                  setGrupoSel(n.id.startsWith('grupo:') ? n.id.slice('grupo:'.length) : null)
+                  // Un grupo a mano se une como un equipo más: es el camino de «que a ese
+                  // paralelo llegue una sola línea», sin tener que apuntarle a su punto.
+                  if (modoUnir && esGrupo(n.id)) {
+                    tocarParaUnir(n.id)
+                    return
+                  }
+                  setGrupoSel(esGrupo(n.id) ? n.id.slice(PREFIJO_GRUPO.length) : null)
                   return
                 }
                 if (modoUnir && n.type !== 'zona') tocarParaUnir(n.id)

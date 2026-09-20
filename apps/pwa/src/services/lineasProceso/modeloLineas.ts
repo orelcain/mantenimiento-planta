@@ -56,6 +56,13 @@ export interface GrafoLineas {
   grupos?: GrupoParalelo[]
   /** Puntos por los que se hace pasar una flecha, para acomodarla a mano. */
   curvas?: CurvaFlecha[]
+  /**
+   * «Gracias a X funciona Y» (Orel, 19-09-2026): [habilitador, habilitado]. No pasa
+   * producto —las bombas de vacío no reciben peces— pero si el habilitador para, el
+   * habilitado pierde capacidad. Es el punto medio que faltaba entre una flecha de flujo
+   * (el producto pasa) y un servicio de apoyo (influye, sin peso).
+   */
+  habilitan?: [string, string][]
 }
 
 /**
@@ -96,9 +103,21 @@ export function caminoSuave(puntos: readonly { x: number; y: number }[]): string
 export interface GrupoParalelo {
   id: string
   miembros: string[]
-  /** Nombre propio; si falta, se rotula «Paralelo · N ramas». */
+  /** Nombre propio; si falta, se rotula «Grupo · N ramas». */
   nombre?: string
+  /**
+   * Cómo se reparte lo que le llega al grupo:
+   * - `reparte` (el de siempre): cada miembro se lleva 1/N. Si para uno, se pierde esa parte.
+   * - `todas`: se necesitan TODAS para que funcione, así que cada una vale lo mismo que el
+   *   grupo entero. Orel, 19-09-2026, sobre las dos bombas de vacío de anillo: «succiona
+   *   pero con tan poco vacío que termina deteniendo la succión, así que en la práctica
+   *   deben estar las 2 operando». Estar al lado no es estar en paralelo.
+   */
+  modo?: 'reparte' | 'todas'
 }
+
+export const PREFIJO_GRUPO = 'grupo:'
+export const esGrupo = (id: string) => id.startsWith(PREFIJO_GRUPO)
 
 /**
  * Id de un contenedor nuevo a partir de su nombre, sin chocar con los que ya existen
@@ -298,14 +317,30 @@ export interface PesoEnLinea {
    * (Orel, 19-09-2026: Acopio entero marcaba 0 % por una flecha de vuelta).
    */
   ciclo?: boolean
+  /** No pasa producto por ella: su cuota viene de lo que HABILITA. */
+  habilita?: boolean
 }
 
 /**
  * Peso de cada máquina en su línea. Una máquina alcanzable desde dos entradas
  * queda en la primera línea que la alcanza (orden de `lineas`).
  */
-export function pesosPorLinea(g: Pick<GrafoLineas, 'lineas' | 'nodos' | 'aristas'>): Map<string, PesoEnLinea> {
-  const existe = new Set(g.nodos.map((n) => n.id))
+/**
+ * Peso de cada máquina en su línea. Una máquina alcanzable desde dos entradas
+ * queda en la primera línea que la alcanza (orden de `lineas`).
+ *
+ * Tres cosas reparten cuota, en este orden: las FLECHAS de flujo (1/N en cada bifurcación),
+ * los GRUPOS —lo que le llega al grupo se reparte entre sus miembros, o se copia entero si
+ * se necesitan todas— y los HABILITADORES, que no reciben flujo pero se llevan la cuota de
+ * lo que hacen posible.
+ */
+export function pesosPorLinea(
+  g: Pick<GrafoLineas, 'lineas' | 'nodos' | 'aristas'> & Partial<Pick<GrafoLineas, 'grupos' | 'habilitan'>>,
+): Map<string, PesoEnLinea> {
+  const grupos = g.grupos ?? []
+  const porId = new Map(grupos.map((x) => [PREFIJO_GRUPO + x.id, x]))
+  // Un grupo es un nodo más del grafo: se le puede llegar con una sola flecha.
+  const existe = new Set<string>([...g.nodos.map((n) => n.id), ...porId.keys()])
   const servicios = serviciosDe(g)
   const salidas = new Map<string, string[]>()
   for (const [a, b] of g.aristas) {
@@ -349,6 +384,34 @@ export function pesosPorLinea(g: Pick<GrafoLineas, 'lineas' | 'nodos' | 'aristas
       const atascado = !!pendientes.get(n)
       res.set(n, { lineaId: l.id, peso: atascado ? 0 : Math.min(1, flujo.get(n) ?? 0), ...(atascado ? { ciclo: true } : {}) })
     }
+  }
+  // Lo que le llegó a un grupo baja a sus miembros: 1/N, o entero si se necesitan todas.
+  const repartirGrupo = (gr: GrupoParalelo, p: PesoEnLinea, extra: Partial<PesoEnLinea> = {}) => {
+    const cuota = gr.modo === 'todas' ? p.peso : p.peso / Math.max(1, gr.miembros.length)
+    for (const miembro of gr.miembros) {
+      if (res.has(miembro)) continue
+      res.set(miembro, { lineaId: p.lineaId, peso: cuota, ...(p.ciclo ? { ciclo: true } : {}), ...extra })
+    }
+  }
+  for (const [gid, gr] of porId) {
+    const p = res.get(gid)
+    if (p) repartirGrupo(gr, p)
+  }
+  // Habilitadores: no reciben flujo, se llevan la cuota de lo que hacen posible. En cadena
+  // (X habilita a Y que habilita a Z) hacen falta varias vueltas; cuatro sobran de lejos.
+  const habilitan = g.habilitan ?? []
+  for (let vuelta = 0; vuelta < 4 && habilitan.length; vuelta++) {
+    let cambio = false
+    for (const [h, t] of habilitan) {
+      const destino = res.get(t)
+      if (!destino || res.has(h)) continue
+      const suyo: PesoEnLinea = { lineaId: destino.lineaId, peso: destino.peso, habilita: true, ...(destino.ciclo ? { ciclo: true } : {}) }
+      res.set(h, suyo)
+      const gr = porId.get(h)
+      if (gr) repartirGrupo(gr, suyo, { habilita: true })
+      cambio = true
+    }
+    if (!cambio) break
   }
   return res
 }
