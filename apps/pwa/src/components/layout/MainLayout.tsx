@@ -216,6 +216,10 @@ export function MainLayout() {
   // Repuestos: lente área-first con 3 paneles (sidebar/lista/detalle) que scrollean
   // independientes → necesita contenedor de altura acotada + overflow-hidden (como Clima/HMI).
   const isRepuestosRoute = location.pathname.startsWith('/repuestos')
+  // Líneas de proceso: es un lienzo, no una página que scrollea. Con el `pb-44` del grupo
+  // normal el lienzo quedaba 176 px más abajo de lo que se ve y el diagrama se hundía bajo
+  // la barra flotante (Orel, 20-09-2026: «la vista en celular no es adecuada»).
+  const isLineasRoute = location.pathname.endsWith('/lineas-proceso')
   const shouldHideDesktopSidebar =
     sidebarCollapsed || (isGanttRoute && ganttFocusMode && !sidebarPeekOpen)
 
@@ -1168,7 +1172,7 @@ export function MainLayout() {
         <main
           id="main-content"
           className={`${
-            isClimaRoute || isHmiKnuroRoute || isBaader200Route || isMapRoute || isPlanosAguasRoute || isRepuestosRoute
+            isClimaRoute || isHmiKnuroRoute || isBaader200Route || isMapRoute || isPlanosAguasRoute || isRepuestosRoute || isLineasRoute
               ? 'h-[calc(100vh-3.5rem-4rem)] lg:h-[calc(100vh-3.5rem)] p-0 overflow-hidden'
               : isAprendizajeRoute
               ? 'p-0 w-full max-w-[100vw] overflow-x-hidden pb-24 lg:pb-0'

@@ -354,9 +354,12 @@ export function App() {
                 <Route
                   path="/dev/lineas-proceso"
                   element={
-                    <Suspense fallback={<LoadingScreen />}>
-                      <EditorLineasProcesoPage />
-                    </Suspense>
+                    // Fuera de MainLayout nadie le da altura al lienzo: se la damos acá.
+                    <div className="h-dvh">
+                      <Suspense fallback={<LoadingScreen />}>
+                        <EditorLineasProcesoPage />
+                      </Suspense>
+                    </div>
                   }
                 />
               )}

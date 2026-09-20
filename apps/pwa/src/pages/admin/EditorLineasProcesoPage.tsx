@@ -30,7 +30,7 @@ import {
   type NodeProps,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { Boxes, ChevronDown, Droplets, ChevronLeft, ChevronRight, Expand, Loader2, Maximize2, Minimize2, PanelLeftClose, PanelLeftOpen, Redo2, RotateCcw, Search, Split, Spline, Trash2, Undo2, X } from 'lucide-react'
+import { Boxes, ChevronDown, Crosshair, Droplets, ChevronLeft, ChevronRight, Expand, HelpCircle, Loader2, Maximize2, Minimize2, Minus, PanelLeftClose, PanelLeftOpen, Plus, Redo2, RotateCcw, Search, Split, Spline, Trash2, Undo2, X } from 'lucide-react'
 import { Button, Sheet } from '@/components/piel'
 import { ToastAction } from '@/components/ui/toast'
 import { useHierarchyTree } from '@/hooks/useHierarchy'
@@ -90,6 +90,9 @@ import { RAIZ_SITIO_CHONCHI, guardarLineas, indiceArbol, leerLineas } from '@/se
 
 const PLANTA = 'chonchi'
 const MIME = 'application/x-equipo'
+/** Bajo esto el nombre del equipo deja de leerse en un teléfono. */
+const ZOOM_LEGIBLE = 0.5
+
 const GRILLA: [number, number] = [16, 16]
 const APOYO = 'rgb(var(--cat-6-ink))'
 
@@ -407,6 +410,38 @@ function NodoParalelo({ data }: NodeProps<Node<DatosParalelo>>) {
 const TIPOS = { maquina: NodoMaquina, servicio: NodoServicio, entrada: NodoEntrada, zona: NodoZona, paralelo: NodoParalelo }
 
 /** Lo que la flecha necesita para dibujarse y para dejarse acomodar. */
+/**
+ * Qué significa cada trazo. En PC vive en un panel fijo arriba a la izquierda; en celular
+ * ese panel se apilaba en seis filas y tapaba 130 px de lienzo, así que pasa a una hoja
+ * detrás del botón «?» (HIG «Layout»: el cromo no compite con el contenido).
+ */
+function ItemsLeyenda() {
+  return (
+    <>
+      <span className="flex items-center gap-1.5">
+        <svg width="26" height="8" aria-hidden className="shrink-0">
+          <line x1="0" y1="4" x2="26" y2="4" stroke="rgb(var(--brand))" strokeWidth="2.5" />
+        </svg>
+        <b>100 %</b> en serie: todo el flujo pasa
+      </span>
+      <span className="flex items-center gap-1.5">
+        <svg width="26" height="8" aria-hidden className="shrink-0">
+          <line x1="0" y1="4" x2="26" y2="4" stroke="rgb(var(--brand))" strokeWidth="1.4" strokeOpacity="0.8" />
+        </svg>
+        <b>1/N</b> en paralelo: más fina, menos flujo
+      </span>
+      <span>
+        <b className="text-muted-foreground">0 %</b> borde punteado: fuera de la línea
+      </span>
+      <span>
+        <b style={{ color: APOYO }}>indirecto</b> servicio de apoyo
+      </span>
+      <span className="text-muted-foreground">– – entre líneas</span>
+      <span className="rounded-full bg-[rgb(var(--brand)/0.14)] px-2 text-[rgb(var(--brand-ink))]">grupo en paralelo</span>
+    </>
+  )
+}
+
 type DatosFlecha = { puntos: { x: number; y: number }[]; editable: boolean; onPuntos: (p: { x: number; y: number }[]) => void; acciones?: { quitar: () => void; enderezar: () => void } }
 
 /**
@@ -756,7 +791,7 @@ function Editor() {
   const { toast } = useToast()
   const usuario = useAuthStore((s) => s.user)
   const { tree, loading: cargandoArbol } = useHierarchyTree()
-  const { screenToFlowPosition, fitView, getZoom } = useReactFlow()
+  const { screenToFlowPosition, fitView, getZoom, setViewport, zoomIn, zoomOut } = useReactFlow()
   // Mover un contenedor entero por su título (se define más abajo, cuando ya existe la pertenencia).
   const moverZona = useRef<(zonaId: string, ev: ReactPointerEvent) => void>(() => undefined)
   const menuZona = useRef<(lineaId: string, ev: ReactMouseEvent) => void>(() => undefined)
@@ -808,6 +843,15 @@ function Editor() {
   const renombrando = useRef<string | null>(null)
   const [oscuro, setOscuro] = useState(() => typeof document !== 'undefined' && document.documentElement.classList.contains('dark'))
   const [editable, setEditable] = useState(() => typeof window === 'undefined' || window.matchMedia('(min-width: 768px) and (pointer: fine)').matches)
+  /**
+   * En celular esto deja de ser un editor y pasa a ser un VISOR POR LÍNEA (Orel, 20-09-2026).
+   * Encuadrar la planta entera —8.500 px de flujo— en 390 px toca el `minZoom` y deja una
+   * tira de cajas de 26 px: ilegible. Se encuadra UNA línea y se cambia con los chips.
+   */
+  const [compacto, setCompacto] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches)
+  const [lineaVista, setLineaVista] = useState<string | null>(null)
+  const [verLeyenda, setVerLeyenda] = useState(false)
+  const eligioLinea = useRef(false)
   // Deshacer / rehacer: instantáneas antes de cada cambio que importa (HIG «Undo and redo»).
   const pilaDeshacer = useRef<Instantanea[]>([])
   const pilaRehacer = useRef<Instantanea[]>([])
@@ -822,9 +866,13 @@ function Editor() {
     const mq = window.matchMedia('(min-width: 768px) and (pointer: fine)')
     const cambio = () => setEditable(mq.matches)
     mq.addEventListener('change', cambio)
+    const mqCel = window.matchMedia('(max-width: 767px)')
+    const cambioCel = () => setCompacto(mqCel.matches)
+    mqCel.addEventListener('change', cambioCel)
     return () => {
       obs.disconnect()
       mq.removeEventListener('change', cambio)
+      mqCel.removeEventListener('change', cambioCel)
     }
   }, [])
 
@@ -1271,6 +1319,49 @@ function Editor() {
     const t = window.setTimeout(() => void fitView({ padding: 0.06, nodes: [{ id: 'zona:acopio' }, { id: 'zona:eviscerado' }], duration: 250 }), 120)
     return () => window.clearTimeout(t)
   }, [amplio, fitView])
+
+  /**
+   * Encuadra un contenedor (o toda la planta si va en null).
+   *
+   * Una línea NO cabe entera en un teléfono: Acopio mide ~1.400 px de ancho y Eviscerado más
+   * de 5.000, así que un `fitView` la dejaba al 27 % — texto de 3 px, el mismo problema que
+   * teníamos con la planta completa, solo que más chico. Se entra por la ENTRADA de la línea
+   * a un zoom legible y se recorre con el dedo: una línea de proceso se lee de izquierda a
+   * derecha, igual que en terreno.
+   *
+   * ⚠ La caja sale de `limites`, no de `getNode()`: los contenedores nunca reciben `measured`
+   * (por eso `useNodesInitialized` tampoco sirve acá) y la medición llegaba siempre vacía.
+   * ⚠ Y por eso en celular el `fitView` de React Flow va apagado: corre después y gana la
+   * carrera contra este encuadre.
+   */
+  const encuadrar = useCallback(
+    (id: string | null, duration = 260) => {
+      const z = id ? limites.get(id) : null
+      const caja = lienzo.current?.getBoundingClientRect()
+      if (!z || !caja?.height) {
+        void fitView({ padding: 0.06, duration })
+        return
+      }
+      // El alto manda (la línea es larga, no alta) y nunca se baja de lo legible.
+      const zoom = Math.min(1, Math.max(ZOOM_LEGIBLE, (caja.height - 48) / z.h))
+      void setViewport({ zoom, x: 20 - z.x * zoom, y: caja.height / 2 - (z.y + z.h / 2) * zoom }, { duration })
+    },
+    [fitView, limites, setViewport],
+  )
+
+  // La primera línea de proceso es la que se abre en celular.
+  useEffect(() => {
+    if (eligioLinea.current || !lineas.length) return
+    eligioLinea.current = true
+    setLineaVista(lineas.find((l) => l.tipo !== 'apoyo')?.id ?? null)
+  }, [lineas])
+
+  // Al cambiar de chip —o al pasar a celular— el lienzo va a esa línea.
+  useEffect(() => {
+    if (!compacto || cargando) return
+    const t = window.setTimeout(() => encuadrar(lineaVista), 120)
+    return () => window.clearTimeout(t)
+  }, [compacto, cargando, lineaVista, encuadrar])
 
   const volver = () => {
     if (sucio && !window.confirm('Hay cambios sin guardar en las líneas. ¿Salir igual y perderlos?')) return
@@ -2262,10 +2353,37 @@ function Editor() {
     [lineas, pesos],
   )
 
+  /**
+   * La respuesta corta de lo que se está mirando. En celular reemplaza al panel de resumen,
+   * que estaba `hidden lg:block`: se veía el dibujo y ningún número (HIG «Labels»).
+   */
+  const cifrasVista = useMemo(() => {
+    if (!lineaVista) {
+      const lineasProceso = lineas.filter((l) => l.tipo !== 'apoyo').length
+      return `${lineasProceso} ${lineasProceso === 1 ? 'línea' : 'líneas'} · ${pesos.size} con flujo · ${servicios.size} de apoyo`
+    }
+    const dentro = [...contenedorDe.entries()].filter(([id, z]) => z === lineaVista && !esEntrada(id))
+    if (!dentro.length) return 'Todavía no hay equipos en este contenedor.'
+    if (lineas.find((l) => l.id === lineaVista)?.tipo === 'apoyo') {
+      return `${dentro.length} ${dentro.length === 1 ? 'servicio' : 'servicios'} de apoyo · influyen sin repartir flujo`
+    }
+    let serie = 0
+    let paralelo = 0
+    let fuera = 0
+    for (const [id] of dentro) {
+      const p = pesos.get(id)
+      if (!p || p.ciclo || p.peso <= 0) fuera += 1
+      else if (Math.abs(p.peso - 1) < 1e-9) serie += 1
+      else paralelo += 1
+    }
+    // «Sin flujo» es el pendiente que importa: esos equipos no le cobran nada a la línea.
+    return `${dentro.length} ${dentro.length === 1 ? 'máquina' : 'máquinas'} · ${serie} en serie · ${paralelo} en paralelo${fuera ? ` · ${fuera} sin flujo` : ''}`
+  }, [lineaVista, lineas, pesos, servicios, contenedorDe])
+
   const inspector = editable && (seleccionado || flechaSeleccionada || seleccionados.length > 1 || grupoActivo || lineaSel)
 
   return (
-    <div className={amplio ? 'fixed inset-0 z-[60] flex h-dvh flex-col bg-background' : 'flex h-[calc(100dvh-4rem)] min-h-[520px] flex-col md:h-[calc(100dvh-1rem)]'}>
+    <div className={amplio ? 'fixed inset-0 z-[60] flex h-dvh flex-col bg-background' : 'flex h-full min-h-0 flex-col'}>
       <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border px-4 py-3">
         <button
           type="button"
@@ -2275,9 +2393,19 @@ function Editor() {
           <ChevronLeft className="size-5" aria-hidden /> Admin
         </button>
         <div className="min-w-0 flex-1">
-          <h1 className="text-title3">Líneas de proceso · Chonchi</h1>
+          <h1 className="text-body font-semibold md:text-title3 md:font-normal">Líneas de proceso · Chonchi</h1>
           <p className="text-footnote text-muted-foreground" role="status">
-            {cargando ? 'Cargando…' : sucio ? <span className="font-semibold text-ink-warn">Cambios sin guardar</span> : meta}
+            {cargando ? (
+              'Cargando…'
+            ) : !editable ? (
+              // Antes era una cápsula fija sobre el lienzo que chocaba con «Planta completa».
+              // El estado va integrado en la interfaz, no en un aviso permanente (HIG «Feedback»).
+              <>Solo lectura · para editar, abre esto en un PC</>
+            ) : sucio ? (
+              <span className="font-semibold text-ink-warn">Cambios sin guardar</span>
+            ) : (
+              meta
+            )}
           </p>
         </div>
         {editable && (
@@ -2352,6 +2480,39 @@ function Editor() {
           </div>
         )}
       </header>
+
+      {compacto && lineas.length > 0 && (
+        <>
+          <div
+            role="tablist"
+            aria-label="Línea que se está viendo"
+            className="flex shrink-0 gap-2 overflow-x-auto border-b border-border px-3 py-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
+            {[...lineas, null].map((l) => {
+              const id = l?.id ?? null
+              const activo = lineaVista === id
+              return (
+                <button
+                  key={id ?? 'todo'}
+                  type="button"
+                  role="tab"
+                  aria-selected={activo}
+                  onClick={() => (activo ? encuadrar(id) : setLineaVista(id))}
+                  className={`flex min-h-[44px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-footnote focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary [&>svg]:size-3.5 ${
+                    activo ? 'bg-primary font-semibold text-primary-foreground' : 'bg-muted-foreground/12 text-muted-foreground'
+                  }`}
+                >
+                  {l?.tipo === 'apoyo' ? <Droplets aria-hidden /> : null}
+                  {l ? l.nombre : 'Toda la planta'}
+                </button>
+              )
+            })}
+          </div>
+          <p className="shrink-0 border-b border-border px-4 py-1.5 text-caption tabular-nums text-muted-foreground" role="status">
+            {cifrasVista}
+          </p>
+        </>
+      )}
 
       <div className="flex min-h-0 flex-1">
         {editable && conLista && (
@@ -2506,7 +2667,7 @@ function Editor() {
               snapToGrid
               snapGrid={GRILLA}
               colorMode={oscuro ? 'dark' : 'light'}
-              fitView
+              fitView={!compacto}
               fitViewOptions={{ padding: 0.06, nodes: [{ id: 'zona:acopio' }, { id: 'zona:eviscerado' }] }}
               minZoom={0.15}
               maxZoom={1.6}
@@ -2545,17 +2706,54 @@ function Editor() {
                   </p>
                 </Panel>
               )}
-              <Controls showInteractive={false} showFitView={false} position="bottom-right" />
-              <Panel position="bottom-right" className="!mb-[118px] !mr-[15px]">
-                <button
-                  type="button"
-                  onClick={() => void fitView({ padding: 0.05, duration: 300 })}
-                  title="Ver la planta completa"
-                  className="flex min-h-[44px] items-center gap-1.5 rounded-full bg-card px-3 text-footnote font-semibold text-primary shadow-[0_1px_4px_rgba(0,0,0,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                >
-                  <Expand className="size-4" aria-hidden /> Planta completa
-                </button>
-              </Panel>
+              {!compacto && <Controls showInteractive={false} showFitView={false} position="bottom-right" />}
+              {compacto ? (
+                <>
+                  {/* Abajo a la izquierda: la derecha es del botón flotante del chat
+                      (DESIGN §7), el centro del lienzo es del diagrama, y a 26 px los
+                      controles de React Flow no llegan al piso de 44 px. */}
+                  <Panel position="bottom-left" className="!m-3 overflow-hidden rounded-ctl border border-border bg-card/95 shadow-[0_1px_4px_rgba(0,0,0,0.12)] backdrop-blur">
+                    <button type="button" onClick={() => void zoomIn({ duration: 160 })} aria-label="Acercar" className="flex size-11 items-center justify-center text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary">
+                      <Plus className="size-5" aria-hidden />
+                    </button>
+                    <button type="button" onClick={() => void zoomOut({ duration: 160 })} aria-label="Alejar" className="flex size-11 items-center justify-center border-t border-border text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary">
+                      <Minus className="size-5" aria-hidden />
+                    </button>
+                  </Panel>
+                  <Panel position="top-right" className="!m-3">
+                    <button
+                      type="button"
+                      onClick={() => setVerLeyenda(true)}
+                      aria-label="Qué significa cada trazo"
+                      className="flex size-11 items-center justify-center rounded-full border border-border bg-card/95 text-primary shadow-[0_1px_4px_rgba(0,0,0,0.12)] backdrop-blur focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    >
+                      <HelpCircle className="size-5" aria-hidden />
+                    </button>
+                  </Panel>
+                  {/* Centrado: la derecha la tapa el chat y los chips ya cambian de línea. */}
+                  <Panel position="bottom-center" className="!mb-3">
+                    <button
+                      type="button"
+                      onClick={() => encuadrar(lineaVista)}
+                      className="flex min-h-[44px] items-center gap-1.5 rounded-full border border-border bg-card/95 px-4 text-footnote font-semibold text-primary shadow-[0_1px_4px_rgba(0,0,0,0.12)] backdrop-blur focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    >
+                      <Crosshair className="size-4" aria-hidden /> Centrar
+                    </button>
+                  </Panel>
+                </>
+              ) : (
+                <Panel position="bottom-right" className="!mb-[118px] !mr-[15px]">
+                  <button
+                    type="button"
+                    onClick={() => void fitView({ padding: 0.05, duration: 300 })}
+                    title="Ver la planta completa"
+                    className="flex min-h-[44px] items-center gap-1.5 rounded-full bg-card px-3 text-footnote font-semibold text-primary shadow-[0_1px_4px_rgba(0,0,0,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  >
+                    <Expand className="size-4" aria-hidden /> Planta completa
+                  </button>
+                </Panel>
+              )}
+              {!compacto && (
               <MiniMap
                 pannable
                 zoomable
@@ -2571,28 +2769,12 @@ function Editor() {
                   return p ? `rgb(var(--brand) / ${0.45 + 0.55 * p})` : 'rgb(var(--muted-foreground) / 0.5)'
                 }}
               />
-              <Panel position="top-left" className="!m-3 flex flex-wrap gap-x-4 gap-y-1 rounded-ctl bg-card/90 px-3 py-2 text-caption shadow-[0_1px_4px_rgba(0,0,0,0.08)] backdrop-blur">
-                <span className="flex items-center gap-1.5">
-                  <svg width="26" height="8" aria-hidden className="shrink-0">
-                    <line x1="0" y1="4" x2="26" y2="4" stroke="rgb(var(--brand))" strokeWidth="2.5" />
-                  </svg>
-                  <b>100 %</b> en serie: todo el flujo pasa
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <svg width="26" height="8" aria-hidden className="shrink-0">
-                    <line x1="0" y1="4" x2="26" y2="4" stroke="rgb(var(--brand))" strokeWidth="1.4" strokeOpacity="0.8" />
-                  </svg>
-                  <b>1/N</b> en paralelo: más fina, menos flujo
-                </span>
-                <span>
-                  <b className="text-muted-foreground">0 %</b> borde punteado: fuera de la línea
-                </span>
-                <span>
-                  <b style={{ color: APOYO }}>indirecto</b> servicio de apoyo
-                </span>
-                <span className="text-muted-foreground">– – entre líneas</span>
-                <span className="rounded-full bg-[rgb(var(--brand)/0.14)] px-2 text-[rgb(var(--brand-ink))]">grupo en paralelo</span>
-              </Panel>
+              )}
+              {!compacto && (
+                <Panel position="top-left" className="!m-3 flex flex-wrap gap-x-4 gap-y-1 rounded-ctl bg-card/90 px-3 py-2 text-caption shadow-[0_1px_4px_rgba(0,0,0,0.08)] backdrop-blur">
+                  <ItemsLeyenda />
+                </Panel>
+              )}
               {!inspector && (
                 <Panel position="top-right" className="!m-3 hidden rounded-ctl bg-card/90 px-3 py-2 text-caption shadow-[0_1px_4px_rgba(0,0,0,0.08)] backdrop-blur lg:block">
                   {resumen.map(({ l, maquinas, serie }) => (
@@ -2603,11 +2785,6 @@ function Editor() {
                   <p className="tabular-nums">
                     <b style={{ color: APOYO }}>Servicios de apoyo</b> · {servicios.size}
                   </p>
-                </Panel>
-              )}
-              {!editable && (
-                <Panel position="bottom-center" className="!mb-16 rounded-full bg-card px-4 py-2 text-footnote shadow-[0_1px_4px_rgba(0,0,0,0.12)]">
-                  Solo lectura. Para editar, abre esta herramienta en un PC.
                 </Panel>
               )}
             </ReactFlow>
@@ -2848,6 +3025,13 @@ function Editor() {
             </ul>
           </div>
         )}
+      </Sheet>
+
+      {/* Qué significa cada trazo: en celular no cabe fijo sobre el lienzo. */}
+      <Sheet open={verLeyenda} onClose={() => setVerLeyenda(false)} title="Cómo leer el diagrama" description="El grosor de la flecha y el borde de la caja dicen cuánto del flujo de la línea pasa por ese equipo.">
+        <div className="flex flex-col items-start gap-2.5 text-footnote">
+          <ItemsLeyenda />
+        </div>
       </Sheet>
 
       {/* Nueva línea de proceso o zona de servicios: nace vacía, a la derecha de todo. */}
