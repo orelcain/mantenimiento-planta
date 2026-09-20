@@ -30,7 +30,7 @@ import {
   type NodeProps,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { Boxes, ChevronDown, Droplets, ChevronLeft, ChevronRight, Expand, Loader2, Maximize2, Minimize2, PanelLeftClose, PanelLeftOpen, Redo2, RotateCcw, Search, Spline, Trash2, Undo2, X } from 'lucide-react'
+import { Boxes, ChevronDown, Droplets, ChevronLeft, ChevronRight, Expand, Loader2, Maximize2, Minimize2, PanelLeftClose, PanelLeftOpen, Redo2, RotateCcw, Search, Split, Spline, Trash2, Undo2, X } from 'lucide-react'
 import { Button, Sheet } from '@/components/piel'
 import { ToastAction } from '@/components/ui/toast'
 import { useHierarchyTree } from '@/hooks/useHierarchy'
@@ -89,7 +89,7 @@ const APOYO = 'rgb(var(--cat-6-ink))'
 
 /** Lo que la barrita flotante puede hacer sobre lo que está elegido. */
 type AccionesRapidas = { unirDesde: (id: string) => void; quitar: (id: string) => void }
-type DatosMaquina = { acciones?: AccionesRapidas; soloUno?: boolean; nombre: string; peso: number | null; linea: string | null; contenedor: string | null; componentes: number; otraPlanta?: string; manual?: boolean; ciclo?: boolean; ramas: number }
+type DatosMaquina = { acciones?: AccionesRapidas; soloUno?: boolean; grupo?: string; nombre: string; peso: number | null; linea: string | null; contenedor: string | null; componentes: number; otraPlanta?: string; manual?: boolean; ciclo?: boolean; ramas: number }
 type DatosServicio = { acciones?: AccionesRapidas; soloUno?: boolean; nombre: string; abastece: string[]; recibe: string[] }
 type DatosEntrada = { linea: string }
 type DatosZona = {
@@ -103,7 +103,7 @@ type DatosZona = {
   onMenu?: (ev: ReactMouseEvent) => void
   onTamano?: (caja: { x: number; y: number; w: number; h: number }, empezando?: boolean) => void
 }
-type Instantanea = { nodes: Node[]; edges: Edge[]; lineas: LineaProceso[] }
+type Instantanea = { nodes: Node[]; edges: Edge[]; lineas: LineaProceso[]; grupos: GrupoParalelo[] }
 /** Pertenencia y nombre (manuales) que viajan en `data` de los nodos base. */
 type DatosBase = { zona?: string; nombre?: string }
 /** Un renglón del menú de clic derecho. */
@@ -256,8 +256,8 @@ function NodoMaquina({ id, data, selected }: NodeProps<Node<DatosMaquina>>) {
               ? 'flecha de vuelta'
               : data.linea
                 ? data.ramas > 1
-                  ? `1 de ${data.ramas} · ${data.linea}`
-                  : data.linea
+                  ? `1 de ${data.ramas} · ${data.grupo ?? data.linea}`
+                  : (data.grupo ?? data.linea)
                 : `fuera de la línea${data.contenedor ? ` · ${data.contenedor}` : ''}`}
           {data.componentes ? ` · +${data.componentes} comp.` : ''}
           {data.manual ? ' · manual' : ''}
@@ -349,11 +349,22 @@ function NodoZona({ data }: NodeProps<Node<DatosZona>>) {
 
 /** Encuadre de un grupo en paralelo: se deriva del grafo, no se guarda. */
 type DatosParalelo = { w: number; h: number; etiqueta: string; manual?: boolean; activo?: boolean; onEditar?: () => void }
+/**
+ * Encuadre en paralelo. Los dos tipos tienen que distinguirse DE UN VISTAZO (Orel,
+ * 19-09-2026: «no tengo cómo saber si es un paralelo y si están en grupo… eso debe ser
+ * visible en todo momento»): antes un grupo sin nombre decía exactamente lo mismo que uno
+ * deducido. Ahora el deducido va punteado y apagado y dice cómo se reparte; el marcado a
+ * mano va sólido, teñido y empieza con la palabra «Grupo».
+ */
 function NodoParalelo({ data }: NodeProps<Node<DatosParalelo>>) {
   return (
     <div
-      style={{ width: data.w, height: data.h, borderColor: 'rgb(var(--brand) / 0.55)', background: 'rgb(var(--brand) / 0.07)' }}
-      className={`rounded-[18px] border ${data.manual ? 'border-solid' : 'border-dashed'} ${data.activo ? 'ring-4 ring-primary/35' : ''}`}
+      style={
+        data.manual
+          ? { width: data.w, height: data.h, borderColor: 'rgb(var(--brand))', background: 'rgb(var(--brand) / 0.12)' }
+          : { width: data.w, height: data.h, borderColor: 'rgb(var(--muted-foreground) / 0.5)', background: 'transparent' }
+      }
+      className={`rounded-[18px] ${data.manual ? 'border-2 border-solid' : 'border border-dashed'} ${data.activo ? 'ring-4 ring-primary/35' : ''}`}
     >
       {/* La píldora es el asa del grupo: se toca para editarlo (el encuadre queda bajo las
           tarjetas, así que un clic en el medio no siempre le llega). */}
@@ -366,9 +377,12 @@ function NodoParalelo({ data }: NodeProps<Node<DatosParalelo>>) {
           data.onEditar()
         }}
         style={{ pointerEvents: 'all' }}
-        title={data.manual ? 'Grupo marcado a mano: tócalo para editarlo' : 'Se dedujo de las flechas'}
-        className="nodrag nopan absolute -top-3 left-4 rounded-full bg-[rgb(var(--brand)/0.14)] px-2 py-0.5 text-[10.5px] font-semibold text-[rgb(var(--brand-ink))] disabled:cursor-default"
+        title={data.manual ? 'Grupo marcado a mano: tócalo para editarlo o usa el clic derecho' : 'No es un grupo: se dedujo de las flechas'}
+        className={`nodrag nopan absolute -top-3 left-4 flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-semibold disabled:cursor-default ${
+          data.manual ? 'bg-[rgb(var(--brand)/0.2)] text-[rgb(var(--brand-ink))] ring-1 ring-[rgb(var(--brand)/0.5)]' : 'bg-card text-muted-foreground ring-1 ring-border'
+        }`}
       >
+        {data.manual ? <Boxes className="size-3" aria-hidden /> : <Split className="size-3" aria-hidden />}
         {data.etiqueta}
       </button>
     </div>
@@ -776,8 +790,8 @@ function Editor() {
   const pilaDeshacer = useRef<Instantanea[]>([])
   const pilaRehacer = useRef<Instantanea[]>([])
   const [, setVersionPilas] = useState(0)
-  const actual = useRef<Instantanea>({ nodes: [], edges: [], lineas: [] })
-  actual.current = { nodes, edges, lineas }
+  const actual = useRef<Instantanea>({ nodes: [], edges: [], lineas: [], grupos: [] })
+  actual.current = { nodes, edges, lineas, grupos }
 
   useEffect(() => {
     const raiz = document.documentElement
@@ -848,6 +862,12 @@ function Editor() {
   const servicios = useMemo(() => serviciosDe(grafo), [grafo])
   const relaciones = useMemo(() => relacionesDeServicios(grafo, pesos), [grafo, pesos])
   const nombreLinea = useMemo(() => new Map(lineas.map((l) => [l.id, l.nombre])), [lineas])
+  /** A qué grupo marcado a mano pertenece cada equipo: la tarjeta y el menú lo dicen. */
+  const grupoDe = useMemo(() => {
+    const m = new Map<string, GrupoParalelo>()
+    for (const g of grupos) for (const id of g.miembros) m.set(id, g)
+    return m
+  }, [grupos])
   const nombresManuales = useMemo(() => new Map(grafo.nodos.filter((n) => esManual(n.id)).map((n) => [n.id, n.nombre ?? 'Elemento manual'])), [grafo])
   const nombreDe = useCallback(
     (id: string) =>
@@ -903,7 +923,7 @@ function Editor() {
         id: `paralelo:${origen}`,
         type: 'paralelo',
         position: { x: x1 - 14, y: y1 - 14 },
-        data: { w: x2 - x1 + 28, h: y2 - y1 + 28, etiqueta: `Paralelo · ${destinos.length} ramas · ${formatoPeso(cuotas[0] ?? 0)} c/u` },
+        data: { w: x2 - x1 + 28, h: y2 - y1 + 28, etiqueta: `Se reparte en ${destinos.length} · ${formatoPeso(cuotas[0] ?? 0)} c/u` },
         draggable: false,
         selectable: false,
         deletable: false,
@@ -943,7 +963,7 @@ function Editor() {
           manual: true,
           activo: grupoSel === gr.id,
           onEditar: () => setGrupoSel(gr.id),
-          etiqueta: gr.nombre ? `${gr.nombre} · ${gr.miembros.length} ramas` : `Paralelo · ${gr.miembros.length} ramas${parejo ? ` · ${formatoPeso(cuotas[0] ?? 0)} c/u` : ''}`,
+          etiqueta: `Grupo · ${gr.nombre ? `${gr.nombre} · ` : ''}${gr.miembros.length} ramas${parejo ? ` · ${formatoPeso(cuotas[0] ?? 0)} c/u` : ''}`,
         },
         draggable: false,
         // Seleccionable para poder tocarlo y editarlo; sin `draggable` el lienzo se sigue desplazando.
@@ -998,8 +1018,10 @@ function Editor() {
         }
         const p = pesos.get(n.id)
         const cont = contenedorDe.get(n.id)
+        const gr = grupoDe.get(n.id)
         const data: DatosMaquina = {
           ...(editable ? { acciones: acciones.current, soloUno: unoSolo } : {}),
+          ...(gr ? { grupo: gr.nombre?.trim() || 'en grupo' } : {}),
           nombre: nombreDe(n.id),
           componentes: e ? e.hijos.length : 0,
           otraPlanta: deOtraPlanta.get(n.id),
@@ -1019,7 +1041,7 @@ function Editor() {
         }
       })
     )
-  }, [nodes, indice, pesos, servicios, relaciones, nombreLinea, zonaResaltada, deOtraPlanta, nombreDe, limites, contenedorDe, editable, origenUnir, yaUnidos, reparto, modoGrupo, zonaSel])
+  }, [nodes, indice, pesos, servicios, relaciones, nombreLinea, zonaResaltada, deOtraPlanta, nombreDe, limites, contenedorDe, editable, origenUnir, yaUnidos, reparto, modoGrupo, zonaSel, grupoDe])
 
   const conParalelos = useMemo(
     () =>
@@ -1121,6 +1143,7 @@ function Editor() {
     setNodes(previa.nodes)
     setEdges(previa.edges)
     setLineas(previa.lineas)
+    setGrupos(previa.grupos)
     setVersionPilas((v) => v + 1)
   }, [])
   const rehacer = useCallback(() => {
@@ -1130,6 +1153,7 @@ function Editor() {
     setNodes(siguiente.nodes)
     setEdges(siguiente.edges)
     setLineas(siguiente.lineas)
+    setGrupos(siguiente.grupos)
     setVersionPilas((v) => v + 1)
   }, [])
   useEffect(() => {
@@ -1326,21 +1350,30 @@ function Editor() {
     (miembros: string[]) => {
       if (miembros.length < 2) return
       const id = `g${Date.now().toString(36)}`
+      registrar()
       // Un equipo pertenece a un solo grupo: sale de los anteriores.
       setGrupos((gs) => [...gs.map((g) => ({ ...g, miembros: g.miembros.filter((m) => !miembros.includes(m)) })).filter((g) => g.miembros.length > 1), { id, miembros }])
       setNodes((ns) => ns.map((n) => ({ ...n, selected: false })))
       setGrupoSel(id)
       toast({ title: `Grupo en paralelo de ${miembros.length} equipos` })
     },
-    [toast],
+    [toast, registrar],
   )
-  const quitarDelGrupo = useCallback((id: string, miembro: string) => {
-    setGrupos((gs) => gs.map((g) => (g.id === id ? { ...g, miembros: g.miembros.filter((m) => m !== miembro) } : g)).filter((g) => g.miembros.length > 1))
-  }, [])
-  const deshacerGrupo = useCallback((id: string) => {
-    setGrupos((gs) => gs.filter((g) => g.id !== id))
-    setGrupoSel(null)
-  }, [])
+  const quitarDelGrupo = useCallback(
+    (id: string, miembro: string) => {
+      registrar()
+      setGrupos((gs) => gs.map((g) => (g.id === id ? { ...g, miembros: g.miembros.filter((m) => m !== miembro) } : g)).filter((g) => g.miembros.length > 1))
+    },
+    [registrar],
+  )
+  const deshacerGrupo = useCallback(
+    (id: string) => {
+      registrar()
+      setGrupos((gs) => gs.filter((g) => g.id !== id))
+      setGrupoSel(null)
+    },
+    [registrar],
+  )
 
   /**
    * No se deja cerrar un círculo (patrón «Preventing Cycles» de React Flow). En un círculo el
@@ -1964,6 +1997,17 @@ function Editor() {
         },
       },
       { tipo: 'accion', texto: hijos.length ? `Desplegar ${hijos.length} componentes` : 'Sin componentes por desplegar', deshabilitado: !hijos.length, hacer: () => desplegar(n) },
+      ...(grupoDe.has(n.id)
+        ? ([
+            { tipo: 'separador' },
+            {
+              tipo: 'accion',
+              texto: `Sacar de ${grupoDe.get(n.id)!.nombre?.trim() || 'su grupo'}`,
+              destructivo: true,
+              hacer: () => quitarDelGrupo(grupoDe.get(n.id)!.id, n.id),
+            },
+          ] as ItemMenu[])
+        : []),
       { tipo: 'separador' },
       ...contenedoresComoItems(contenedorDeNodo(n), (z) => cambiarContenedor(n, z)),
       { tipo: 'separador' },
@@ -1991,8 +2035,8 @@ function Editor() {
     if (n.id.startsWith('grupo:')) {
       const id = n.id.slice('grupo:'.length)
       return [
-        { tipo: 'nota', texto: 'Grupo marcado a mano.' },
-        { tipo: 'accion', texto: 'Editarlo en el inspector', hacer: () => setGrupoSel(id) },
+        { tipo: 'nota', texto: 'Grupo marcado a mano: lo dijiste tú, no sale de las flechas.' },
+        { tipo: 'accion', texto: 'Renombrar el grupo…', hacer: () => setGrupoSel(id) },
         { tipo: 'separador' },
         { tipo: 'accion', texto: 'Deshacer el grupo', destructivo: true, hacer: () => deshacerGrupo(id) },
       ]
@@ -2001,6 +2045,7 @@ function Editor() {
     const salidas = edges.filter((e) => e.source === origen)
     return [
       { tipo: 'nota', texto: `No es un grupo: sale de las ${salidas.length} flechas de ${nombreDe(origen)}, que se reparten el flujo en partes iguales. Se va solo al quitar una.` },
+      { tipo: 'accion', texto: `Agrupar estos ${salidas.length} a mano`, hacer: () => agruparEnParalelo(salidas.map((e) => e.target)) },
       { tipo: 'titulo', texto: 'Quitar una flecha' },
       ...salidas.map((e): ItemMenu => ({ tipo: 'accion', texto: `→ ${nombreDe(e.target)}`, destructivo: true, hacer: () => quitarFlecha(e) })),
     ]
