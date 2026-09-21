@@ -243,6 +243,17 @@ export function BitacoraTurnoVista({
   // ── Inspección de planta post-aseo ──
   const { pauta, cambioLaPauta, inspeccion, desviaciones, resumen: resumenInsp } = useInspeccion(BITACORA_PLANTA.id, turno.id, eventos)
   const avisoInsp = useMemo(() => avisoDeInspeccion(turno.fecha, inspeccion, resumenInsp), [turno.fecha, inspeccion, resumenInsp])
+  /**
+   * Lo que CIERRA una inspección es la entrega, no el borde del turno.
+   *
+   * Estaba atada a `esActual` y el recorrido empieza a las 04:00 con el turno cerrando a las
+   * 08:00: al día siguiente el aviso decía «quedó a medias» y no dejaba terminarla — invitaba
+   * a algo imposible (Orel, 21-09-2026). Los eventos del mismo turno tampoco se bloquean al
+   * cerrarse, así que la inspección era MÁS estricta que la bitácora donde vive.
+   *
+   * Una vez liberada queda fija: ahí el panel solo ofrece deshacer la entrega.
+   */
+  const puedeEditarInspeccion = true
   const [inspTrabajando, setInspTrabajando] = useState(false)
   /** El correo de la inspección se arma igual que el del turno: mismos bloques, mismo estilo. */
   const datosCorreoInsp = useMemo(
@@ -981,7 +992,7 @@ export function BitacoraTurnoVista({
             inspeccion={inspeccion}
             desviaciones={desviaciones}
             resumen={resumenInsp}
-            editable={esActual}
+            editable={puedeEditarInspeccion}
             cambioLaPauta={cambioLaPauta}
             tocaHoy={avisoInsp === 'toca'}
             trabajando={inspTrabajando}
