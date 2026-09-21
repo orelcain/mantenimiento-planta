@@ -68,6 +68,16 @@ export interface CriterioPauta {
   titulo: string
   /** El texto del procedimiento: guía del técnico, plegada bajo el criterio. */
   ayuda: string
+  /**
+   * Cinco o seis palabras con lo que cubre el punto, para ponerlas BAJO el título en la tabla
+   * del correo (Orel, 21-09-2026). «Sistema eléctrico» a secas no le dice nada a quien no
+   * recorrió la pauta, y el texto completo del procedimiento dentro de la celda multiplica por
+   * cuatro el alto de la tabla: se parte en nueve líneas de treinta caracteres y separa el
+   * primer estado del último por mil píxeles. El texto completo sigue al pie.
+   *
+   * Ausente en las pautas anteriores a este cambio: ahí no se muestra nada.
+   */
+  resumen?: string
 }
 
 export interface PautaInspeccion {
@@ -212,41 +222,48 @@ export const PAUTA_POST_ASEO: PautaInspeccion = {
   criterios: [
     {
       id: 'mecanico',
+      resumen: 'cintas, motorreductor, rodamientos',
       titulo: 'Equipos mecánicos',
       ayuda:
         'Alineación y centrado de las cintas. Motorreductor: fijaciones, lubricación y fugas. Estructura y soportes. Rodamientos, ejes, poleas y rodillos. Pernos y uniones. Sin objetos atrapados que interfieran con el movimiento.',
     },
     {
       id: 'electrico',
+      resumen: 'motores, tableros, botoneras, humedad',
       titulo: 'Sistema eléctrico',
       ayuda:
         'Motores, cajas, tableros, botoneras y conexiones accesibles. Sin agua ni humedad en componentes eléctricos. Tapas, protecciones y guardas instaladas. Sin alarmas ni indicaciones anormales en el control.',
     },
     {
       id: 'neumatico',
+      resumen: 'mangueras, racores, cilindros, fugas',
       titulo: 'Sistema neumático',
       ayuda:
         'Mangueras, conexiones, racores, cilindros y válvulas. Presión de trabajo. Sin fugas de aire. Cilindros y actuadores funcionando. Mangueras bien sujetas y sin daños.',
     },
     {
       id: 'seguridad',
+      resumen: 'pulsadores, sensores y guardas',
       titulo: 'Paradas de emergencia y protecciones',
       ayuda:
         'Funcionamiento de las paradas de emergencia. Sensores, interruptores de seguridad y dispositivos de protección del equipo. Guardas y protecciones en su lugar.',
     },
     {
       id: 'operacional',
+      resumen: 'marcha en vacío, giro, alarmas',
       titulo: 'Prueba operacional',
       ayuda:
         'Marcha en vacío de los equipos principales. Sentido de giro de los motores. Desplazamiento de las cintas. Sistemas neumáticos. Sin alarmas ni fallas en el control. Prohibido intervenir, limpiar o ajustar con el equipo en movimiento: toda intervención con riesgo va con bloqueo y etiquetado (LOTO).',
     },
     {
       id: 'anomalias',
+      resumen: 'fugas, ruidos, vibraciones, golpes',
       titulo: 'Sin fugas, ruidos ni vibraciones anormales',
       ayuda: 'Durante la prueba: fugas, ruidos, vibraciones, golpes, calentamientos o movimientos anormales.',
     },
     {
       id: 'despejado',
+      resumen: 'herramientas, residuos, accesos, tapas',
       titulo: 'Sin herramientas ni objetos extraños',
       ayuda:
         'Sin herramientas, materiales, repuestos, piezas sueltas ni elementos de limpieza sobre los equipos. Sin acumulaciones de agua, residuos o químicos. Pisos, pasillos y accesos despejados. Tapas y protecciones desmontadas durante el aseo, reinstaladas.',
@@ -301,7 +318,18 @@ export function criterioDe(pauta: PautaInspeccion, id: string): CriterioPauta | 
  */
 export function pautaDeLaInspeccion(viva: PautaInspeccion, inspeccion: Pick<Inspeccion, 'pautaId' | 'pautaVersion' | 'criterios'> | null): PautaInspeccion {
   if (!inspeccion?.criterios?.length) return viva
-  return { id: inspeccion.pautaId, nombre: viva.nombre, version: inspeccion.pautaVersion, criterios: inspeccion.criterios }
+  return {
+    id: inspeccion.pautaId,
+    nombre: viva.nombre,
+    version: inspeccion.pautaVersion,
+    // El `resumen` es presentación, no registro: si la inspección se abrió antes de que
+    // existiera, se toma de la pauta viva en vez de dejar el renglón en blanco. Lo que SÍ es
+    // registro —id, título y ayuda— sale de lo que se guardó al empezar.
+    criterios: inspeccion.criterios.map((c) => ({
+      ...c,
+      resumen: c.resumen ?? viva.criterios.find((v) => v.id === c.id)?.resumen,
+    })),
+  }
 }
 
 /** ¿La pauta se editó después de que esta inspección empezó? */

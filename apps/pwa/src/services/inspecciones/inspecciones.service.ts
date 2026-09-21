@@ -35,7 +35,7 @@ export function escucharPauta(pautaId: string, alCambiar: (p: PautaInspeccion) =
         id: pautaId,
         nombre: d.nombre ?? PAUTA_POST_ASEO.nombre,
         version: typeof d.version === 'number' ? d.version : 1,
-        criterios: d.criterios.map((c) => ({ id: c.id, titulo: c.titulo, ayuda: c.ayuda ?? '' })),
+        criterios: d.criterios.map((c) => ({ id: c.id, titulo: c.titulo, ayuda: c.ayuda ?? '', resumen: c.resumen })),
       })
     },
     // Sin permisos o sin red: la del código igual deja trabajar.

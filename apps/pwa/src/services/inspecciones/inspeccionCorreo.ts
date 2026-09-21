@@ -6,6 +6,7 @@ import {
   TEXTO_LIBERACION,
   frasePorLiberacion,
   titularLiberacion,
+  type CriterioPauta,
   type Inspeccion,
   type PautaInspeccion,
   type ResultadoCriterio,
@@ -157,10 +158,16 @@ function estadoDesviacion(e: EventoBitacora, inspeccion: Inspeccion): string {
   return `<span style="color:${color};">●</span> ${texto}`
 }
 
-function celda(texto: string, ancho?: string, gris?: boolean): string {
+/**
+ * El punto de la pauta con lo que cubre, en cinco palabras, debajo. «Sistema eléctrico» a
+ * secas no le dice nada a quien no recorrió la pauta; el texto completo del procedimiento
+ * dentro de la celda multiplica por cuatro el alto de la tabla. El completo va al pie.
+ */
+function celdaPunto(c: CriterioPauta, ancho: string): string {
   return (
-    `<td style="${CELDA}${gris ? `color:${C.sec};` : ''}${ancho ? `width:${ancho};` : ''}">` +
-    `${escaparHtml(texto)}</td>`
+    `<td style="${CELDA}width:${ancho};">${escaparHtml(c.titulo)}` +
+    (c.resumen ? `<div style="font-size:${SEC};line-height:1.4;color:${C.sec};padding-top:2px;">${escaparHtml(c.resumen)}</div>` : '') +
+    `</td>`
   )
 }
 
@@ -316,7 +323,7 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen: vivo, desvia
           .join('')
       return (
         // 4 + 2 (+1) + 5 o 6 tracks: la suma es 12 siempre.
-        `<tr>${celda(c.titulo, track(4))}${celdaEstado(inspeccion.resultados[c.id], track(2))}` +
+        `<tr>${celdaPunto(c, track(4))}${celdaEstado(inspeccion.resultados[c.id], track(2))}` +
         (hayHoras ? celdaHora(hora(inspeccion.marcas?.[c.id]), track(1)) : '') +
         celdaHtml(cuerpo, track(hayHoras ? 5 : 6)) +
         `</tr>`

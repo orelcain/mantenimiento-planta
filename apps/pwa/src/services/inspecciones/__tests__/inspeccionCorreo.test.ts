@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { inspeccionAHtmlCorreo, inspeccionATextoPlano, type DatosCorreoInspeccion } from '../inspeccionCorreo'
-import { PAUTA_POST_ASEO, resumenDeInspeccion, type Inspeccion } from '../modeloInspeccion'
+import { PAUTA_POST_ASEO, pautaDeLaInspeccion, resumenDeInspeccion, type Inspeccion } from '../modeloInspeccion'
 import { C } from '@/services/bitacora/bitacoraCorreo'
 import type { EventoBitacora, TurnoMantencion } from '@/services/bitacora/bitacora.types'
 
@@ -433,5 +433,27 @@ describe('la forma del documento: protocolo, no plantilla', () => {
     const semanticos = [C.ventana, C.parada, C.afectado, C.pendBorde].map((c) => c.toUpperCase())
     const neutros = [C.tinta, C.sec].map((c) => c.toUpperCase())
     expect(conColor.every((c) => semanticos.includes(c) || neutros.includes(c))).toBe(true)
+  })
+})
+
+/**
+ * «Sistema eléctrico» a secas no le dice nada a quien no recorrió la pauta. El texto completo
+ * del procedimiento dentro de la celda multiplicaba por cuatro el alto de la tabla —nueve
+ * líneas de treinta caracteres por punto—, así que va cinco palabras arriba y el completo al
+ * pie (Orel, 21-09-2026).
+ */
+describe('cada punto dice lo que cubre', () => {
+  it('el resumen corto va en la tabla y el texto completo al pie', () => {
+    const html = inspeccionAHtmlCorreo(datos(inspeccion(), []))
+    expect(html).toContain('motores, tableros, botoneras, humedad')
+    expect(html).toContain('Sin agua ni humedad en componentes eléctricos')
+    // El resumen corto entra en una línea de la columna: más largo la parte en dos.
+    for (const c of PAUTA_POST_ASEO.criterios) expect((c.resumen ?? '').length).toBeLessThanOrEqual(40)
+  })
+
+  it('una inspección abierta antes del cambio igual lo muestra: el resumen es presentación', () => {
+    const vieja = inspeccion({ criterios: PAUTA_POST_ASEO.criterios.map(({ id, titulo, ayuda }) => ({ id, titulo, ayuda })) })
+    const pauta = pautaDeLaInspeccion(PAUTA_POST_ASEO, vieja)
+    expect(pauta.criterios[1]?.resumen).toBe('motores, tableros, botoneras, humedad')
   })
 })
