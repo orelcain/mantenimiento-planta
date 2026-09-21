@@ -207,3 +207,27 @@ describe('las fotos de la desviación viajan en el correo', () => {
     expect(inspeccionAHtmlCorreo(datos(inspeccion(), [desviacion()]))).not.toContain('colspan="6"')
   })
 })
+
+describe('el correo ya no se contradice', () => {
+  it('«corregido» sale como tal, no como no conforme', () => {
+    const insp = inspeccion({
+      resultados: { ...inspeccion().resultados, mecanico: 'corregido' },
+      notas: { mecanico: 'Cinta azul rozaba con la estructura, se corrige' },
+    })
+    const html = inspeccionAHtmlCorreo(datos(insp, []))
+    expect(html).toContain('>Corregido<')
+    expect(html).toContain('Cinta azul rozaba con la estructura, se corrige')
+    expect(html).not.toContain('>No conforme<')
+  })
+
+  it('un «no conforme» SIN desviación lo dice, en vez de afirmar que no hubo ninguna', () => {
+    const insp = inspeccion({ resultados: { ...inspeccion().resultados, mecanico: 'no-conforme' } })
+    const html = inspeccionAHtmlCorreo(datos(insp, []))
+    expect(html).toContain('sin una desviación anotada')
+    expect(html).not.toContain('Sin desviaciones detectadas')
+  })
+
+  it('sin nada que reportar sigue diciendo que no hubo desviaciones', () => {
+    expect(inspeccionAHtmlCorreo(datos(inspeccion(), []))).toContain('Sin desviaciones detectadas')
+  })
+})

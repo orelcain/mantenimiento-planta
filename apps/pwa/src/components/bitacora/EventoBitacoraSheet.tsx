@@ -88,6 +88,11 @@ export interface EventoBitacoraSheetProps {
   sugerenciasTipo?: string[]
   /** Teléfono con pase de bitácora: registra siempre su técnico, sin elegir. */
   autorFijo?: string | null
+  /**
+   * Texto con el que nace la descripción de un evento NUEVO. Lo usa la inspección de planta
+   * al pasar una observación a la bitácora: lo ya escrito no se reescribe.
+   */
+  descripcionInicial?: string
   /** De dónde salen los repuestos (la vitrina usa uno de ejemplo). */
   fuenteRepuestos?: FuenteRepuestos
   /** Estrella de favoritos en el buscador de repuestos; `null` la oculta (el pase). */
@@ -227,6 +232,7 @@ export function EventoBitacoraSheet({
   sugerenciasEquipo,
   sugerenciasTipo = [],
   autorFijo = null,
+  descripcionInicial = '',
   fuenteRepuestos = fuenteRepuestosFirestore,
   favoritosRepuestos = null,
   puedeEditarMaestro = true,
@@ -400,7 +406,7 @@ export function EventoBitacoraSheet({
     setTipoOtro(evento?.tipoOtro ?? pendienteOrigen?.tipoOtro ?? '')
     setEquipo(evento?.equipo ?? pendienteOrigen?.equipo ?? '')
     setTitulo(evento?.titulo ?? '')
-    setDescripcion(evento?.descripcion ?? '')
+    setDescripcion(evento?.descripcion ?? (evento ? '' : descripcionInicial))
     setSinHora(evento ? evento.horaInicio === '' : false)
     setPosicion(evento && evento.horaInicio === '' && typeof evento.posicionMin === 'number' ? String(evento.posicionMin) : '')
     // Un evento sin hora deja lista la hora sugerida por si se apaga «Sin hora».
@@ -460,7 +466,7 @@ export function EventoBitacoraSheet({
     setPorGuardar(false)
     setConflictos([])
     setEliminadoAfuera(false)
-  }, [open, evento, turno, pendienteOrigen, autorFijo])
+  }, [open, evento, turno, pendienteOrigen, autorFijo, descripcionInicial])
 
   const duracion = sinHora ? null : minutosEntre(horaInicio, horaTermino || null)
   /** «Terminó ahora» solo mientras corre el turno del evento y sin pasar de 2 h (18-09-2026). */

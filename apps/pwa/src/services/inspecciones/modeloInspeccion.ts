@@ -18,8 +18,22 @@
  * registro paralelo que nadie cruza.
  */
 
-/** Lo que se marca en cada punto de la pauta. */
-export type ResultadoCriterio = 'conforme' | 'no-conforme'
+/**
+ * Lo que se marca en cada punto de la pauta.
+ *
+ * `corregido` es el escalón que faltaba (Orel, 21-09-2026). «No conforme» estaba haciendo dos
+ * trabajos: *encontré algo y queda como desviación* y *encontré algo y lo arreglé ahí mismo*.
+ * Con uno solo, el correo decía «No conforme» y abajo «Sin desviaciones»: se contradecía.
+ *
+ * Y no es hacer trampa: §8 pide que las desviaciones queden «corregidas **o controladas** antes
+ * de la puesta en marcha», y §10 es el criterio de LIBERACIÓN — describe el estado al entregar
+ * la planta, no lo que se vio mientras se caminaba. Lo encontrado y resuelto termina conforme,
+ * con el registro de lo que se hizo.
+ */
+export type ResultadoCriterio = 'conforme' | 'corregido' | 'no-conforme'
+
+/** Los tres estados permiten entregar; solo `no-conforme` deja algo pendiente. */
+export const LIBERA: Record<ResultadoCriterio, boolean> = { conforme: true, corregido: true, 'no-conforme': false }
 
 export interface CriterioPauta {
   id: string
@@ -101,6 +115,13 @@ export interface ResumenInspeccion {
   /** De los pendientes, los que paran una línea. §10 los pide en cero para liberar. */
   pendientesCriticos: number
   conObservacion: number
+  /** Puntos que se encontraron mal y se resolvieron antes de entregar. */
+  corregidos: number
+  /**
+   * Puntos en «no conforme» a los que NO se les anotó una desviación. El correo lo dice en vez
+   * de afirmar que no hubo ninguna: era la contradicción que encontró Orel.
+   */
+  noConformesSinDesviacion: number
   /** De la primera marca a la última: distingue un recorrido de una firma de un tirón. */
   minutosDeRecorrido: number | null
   /** Qué corresponde marcar según lo encontrado. `null` = todavía falta revisar puntos. */
@@ -190,13 +211,19 @@ export function resumenDeInspeccion(
   desviaciones: readonly DesviacionDeInspeccion[],
 ): ResumenInspeccion {
   let conformes = 0
+  let corregidos = 0
   let noConformes = 0
+  const sinDesviacion = new Set<string>()
   for (const c of pauta.criterios) {
     const r = inspeccion.resultados[c.id]
     if (r === 'conforme') conformes += 1
-    else if (r === 'no-conforme') noConformes += 1
+    else if (r === 'corregido') corregidos += 1
+    else if (r === 'no-conforme') {
+      noConformes += 1
+      if (!desviaciones.some((d) => d.criterioId === c.id)) sinDesviacion.add(c.id)
+    }
   }
-  const revisados = conformes + noConformes
+  const revisados = conformes + corregidos + noConformes
   const abiertas = desviaciones.filter((d) => d.pendiente)
   const pendientes = abiertas.length
   const pendientesCriticos = abiertas.filter((d) => d.critica).length
@@ -226,6 +253,8 @@ export function resumenDeInspeccion(
     pendientes,
     pendientesCriticos,
     conObservacion,
+    corregidos,
+    noConformesSinDesviacion: sinDesviacion.size,
     minutosDeRecorrido,
     sugerido,
     minutosDeCorrida,
@@ -248,7 +277,11 @@ export const TEXTO_LIBERACION: Record<EstadoLiberacion, { titulo: string; detall
 
 /** La frase de la liberación, con la corrida cuando la hubo. */
 export function frasePorLiberacion(estado: EstadoLiberacion, r: ResumenInspeccion): string {
-  if (estado === 'conforme') return `${r.total} de ${r.total} conformes.`
+  if (estado === 'conforme') {
+    return r.corregidos
+      ? `${r.total} de ${r.total} conformes, ${r.corregidos} ${r.corregidos === 1 ? 'corregido' : 'corregidos'} antes de entregar.`
+      : `${r.total} de ${r.total} conformes.`
+  }
   if (estado === 'corregida') {
     const cuanto = r.minutosDeCorrida != null ? ` en ${r.minutosDeCorrida} min` : ''
     return `${r.desviaciones} ${r.desviaciones === 1 ? 'desviación resuelta' : 'desviaciones resueltas'}${cuanto} antes del arranque.`
