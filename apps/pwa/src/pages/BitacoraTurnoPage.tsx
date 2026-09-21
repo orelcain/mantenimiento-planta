@@ -281,7 +281,9 @@ export function BitacoraTurnoVista({
       `${resumenInsp.revisados} de ${resumenInsp.total} puntos revisados${resumenInsp.minutosDeRecorrido != null ? ` en ${resumenInsp.minutosDeRecorrido} min` : ''}.`,
     ]
     if (resumenInsp.pendientesCriticos > 0) {
-      lineas.push(`⚠ ${resumenInsp.pendientesCriticos} desviación(es) abierta(s) que detienen una línea.`)
+      const n = resumenInsp.pendientesCriticos
+      // Sin emoji: la piel nueva usa Lucide, no signos (`audit-piel`).
+      lineas.push(`*Atención:* ${n} ${n === 1 ? 'desviación abierta detiene' : 'desviaciones abiertas detienen'} una línea.`)
     }
     const abiertas = desviaciones.filter((d) => d.pendiente && !d.cierre)
     if (abiertas.length) {
