@@ -148,11 +148,13 @@ function celdaEstado(estado: ResultadoCriterio | undefined, ancho?: string): str
  * El estado de una DESVIACIÓN (§8). Antes decía «No conforme» en todas, incluso en las ya
  * resueltas: la columna no estaba diciendo nada. Sale de lo que el evento y su punto guardan.
  */
-function celdaEstadoDesviacion(e: EventoBitacora, inspeccion: Inspeccion): string {
-  if (!abierta(e)) return celdaTono('Resuelta', C.ventana, track(1))
-  return inspeccion.resultados[e.inspeccion?.criterioId ?? ''] === 'controlado'
-    ? celdaTono('Controlada', C.pendBorde, track(1))
-    : celdaTono('Pendiente', C.parada, track(1))
+function estadoDesviacion(e: EventoBitacora, inspeccion: Inspeccion): string {
+  const [texto, color] = !abierta(e)
+    ? ['Resuelta', C.ventana]
+    : inspeccion.resultados[e.inspeccion?.criterioId ?? ''] === 'controlado'
+      ? ['Controlada', C.pendBorde]
+      : ['Pendiente', C.parada]
+  return `<span style="color:${color};">●</span> ${texto}`
 }
 
 function celda(texto: string, ancho?: string, gris?: boolean): string {
@@ -258,7 +260,6 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen: vivo, desvia
   const kpis = [
     kpi(`${resumen.revisados} de ${resumen.total}`, 'puntos revisados'),
     resumen.desviaciones > 0 ? kpi(String(resumen.desviaciones), resumen.desviaciones === 1 ? 'desviación' : 'desviaciones') : '',
-    resumen.pendientes > 0 ? kpi(String(resumen.pendientes), resumen.pendientes === 1 ? 'queda abierta' : 'quedan abiertas') : '',
     // La CORRIDA: lo que se alcanzó a arreglar antes de entregar. Es el trabajo que no se ve.
     resumen.minutosDeCorrida != null ? kpi(`${resumen.minutosDeCorrida} min`, 'corrigiendo antes de arrancar') : '',
     resumen.minutosDeRecorrido ? kpi(`${resumen.minutosDeRecorrido} min`, 'de recorrido') : '',
@@ -278,22 +279,37 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen: vivo, desvia
   /** Las que no calzan con ningún punto (la pauta cambió, o el evento llegó sin criterio). */
   const sueltas = desviaciones.filter((e) => !pauta.criterios.some((c) => c.id === e.inspeccion?.criterioId))
 
+  /**
+   * Las fichas numeradas en el orden en que se imprimen: por punto de la pauta, las sueltas al
+   * final. El número es lo que deja que el criterio de liberación apunte a su ficha sin
+   * repetir el nombre del equipo tres centímetros más arriba de la ficha misma.
+   */
+  const numeroDe = new Map<string, number>()
+  const numeroDeFicha = new Map<string, number[]>()
+  ;[
+    ...pauta.criterios.flatMap((c) => (porCriterio.get(c.id) ?? []).map((e) => ({ criterioId: c.id, e }))),
+    ...sueltas.map((e) => ({ criterioId: '', e })),
+  ].forEach(({ criterioId, e }, i) => {
+    numeroDe.set(e.id, i + 1)
+    numeroDeFicha.set(criterioId, [...(numeroDeFicha.get(criterioId) ?? []), i + 1])
+  })
+
   // §10 · Criterio de liberación. La columna Hora solo existe si ALGÚN punto tiene hora: una
   // columna entera de guiones no informa, estorba.
   const hayHoras = pauta.criterios.some((c) => hora(inspeccion.marcas?.[c.id]))
   const filasCriterios = pauta.criterios
     .map((c) => {
       const nota = (inspeccion.notas?.[c.id] ?? '').trim()
-      const suyas = porCriterio.get(c.id) ?? []
+      const nums = numeroDeFicha.get(c.id) ?? []
       // La observación del punto no puede quedar en blanco cuando SÍ hubo algo: si no se
-      // escribió una nota, lo dicen las desviaciones que cuelgan de él.
+      // escribió una nota, lo dice la referencia a la ficha del registro. Numerada, porque
+      // repetir el nombre del equipo tres centímetros más arriba de su propia ficha sobra.
       const cuerpo =
         [
           nota ? `<div>${escaparHtml(nota)}</div>` : '',
-          suyas.length
+          nums.length
             ? `<div style="font-size:${SEC};color:${C.sec};${nota ? 'padding-top:4px;' : ''}">` +
-              `${suyas.length} ${suyas.length === 1 ? 'desviación' : 'desviaciones'}: ` +
-              `${escaparHtml(suyas.map((e) => e.equipo || tituloDe(e) || 'sin equipo').join(' · '))}</div>`
+              `${nums.length === 1 ? 'Desviación' : 'Desviaciones'} ${nums.join(', ')} del registro</div>`
             : '',
         ]
           .filter(Boolean)
@@ -327,50 +343,73 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen: vivo, desvia
     filaCierre(hayHoras ? 4 : 3, `${resumen.total} ${resumen.total === 1 ? 'punto' : 'puntos'}`, desglose) +
     `</table>`
 
-  // §8 · Registro de desviaciones, AGRUPADO por punto de la pauta: un punto puede tener
-  // varias, y una fila suelta no deja saber de dónde salió.
-  const filaDesviacion = (e: EventoBitacora) => {
+  /**
+   * §8 · Registro de desviaciones. Deja de ser una tabla de SEIS columnas y pasa a ser una
+   * FICHA por desviación, con los seis campos rotulados (Orel, 21-09-2026).
+   *
+   * El procedimiento pide seis datos, no seis columnas. En 680 px, seis columnas dejaban la
+   * condición encontrada —que es la sustancia— en una caja de veinte caracteres de ancho: una
+   * fila de ocho líneas con cinco columnas casi vacías al lado. La hoja 3 del estándar pide
+   * entre 45 y 90 caracteres por línea; así la condición se lee en cuatro líneas anchas.
+   * Es la forma del protocolo de ensayo: cada hallazgo es un registro numerado con sus campos
+   * al lado, no una fila de planilla.
+   */
+  const ficha = (e: EventoBitacora, n: number) => {
     const equipo = [e.equipo || 'Sin equipo', codigoEquipoDe(e)].filter(Boolean).join(' · ')
-    const fila =
-      // 2 + 2 + 4 + 2 + 1 + 1 = 12 tracks. La condición encontrada se lleva el doble que las
-      // demás porque es la sustancia; responsable y estado no envuelven.
-      `<tr>${celda(equipo, track(2))}${celda(tituloDe(e) || e.descripcion, track(2))}${celda(e.descripcion, track(4))}` +
-      celda(accionDe(e, inspeccion), track(2)) +
-      celda(autorVisible(e), track(1)) +
-      celdaEstadoDesviacion(e, inspeccion) +
-      `</tr>`
-    // La «condición encontrada» de §8 se ve mejor que se cuenta: antes y después van juntos.
+    const campo = (rotulo: string, valor: string) =>
+      `<tr><td style="padding:3px 14px 3px 0;font-family:${FUENTE};font-size:${SEC};color:${C.sec};` +
+      `vertical-align:top;width:${track(2)};">${escaparHtml(rotulo)}</td>` +
+      `<td style="padding:3px 0;font-family:${FUENTE};font-size:${TEXTO};line-height:1.5;color:${C.tinta};` +
+      `vertical-align:top;">${escaparHtml(valor)}</td></tr>`
+    // El encabezado de la ficha: número y equipo a la izquierda, estado a la derecha, sobre
+    // el mismo eje que el resto del documento.
+    const cabecera =
+      `<tr><td colspan="2" style="padding:16px 0 6px;font-family:${FUENTE};">` +
+      `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;width:100%;">` +
+      `<tr><td style="font-family:${FUENTE};font-size:${TEXTO};font-weight:600;color:${C.tinta};vertical-align:top;">` +
+      `<span style="color:${C.sec};font-weight:400;font-variant-numeric:tabular-nums;">${n}</span>&nbsp;&nbsp;${escaparHtml(equipo)}</td>` +
+      `<td align="right" style="font-family:${FUENTE};font-size:${TEXTO};color:${C.tinta};white-space:nowrap;vertical-align:top;">` +
+      `${estadoDesviacion(e, inspeccion)}</td></tr></table></td></tr>`
     const fotos = (e.fotos ?? []).length
-      ? `<tr><td colspan="6" style="padding:0 0 12px;border-bottom:1px solid ${RAYA};">` +
-        htmlFotos(e.fotos ?? [], fuente) +
-        `</td></tr>`
+      ? // La «condición encontrada» se ve mejor que se cuenta: antes y después van juntos.
+        `<tr><td colspan="2" style="padding:8px 0 4px;">${htmlFotos(e.fotos ?? [], fuente)}</td></tr>`
       : ''
-    return fila + fotos
+    return (
+      cabecera +
+      campo('Anomalía', tituloDe(e) || e.descripcion) +
+      campo('Condición', e.descripcion) +
+      campo('Acción', accionDe(e, inspeccion)) +
+      campo('Responsable', autorVisible(e)) +
+      fotos +
+      `<tr><td colspan="2" style="padding:0;border-bottom:1px solid ${RAYA};font-size:0;line-height:0;">&nbsp;</td></tr>`
+    )
   }
 
   const grupo = (titulo: string, cuantas: number) =>
-    `<tr><td colspan="6" style="padding:22px 0 8px;border-bottom:1px solid ${C.linea};` +
+    // En formato oración, no en versalitas: el rótulo en versalitas ya lo usa la SECCIÓN, y dos
+    // niveles de versalitas apilados son el tic n.º 6. Este es un encabezado de contenido.
+    `<tr><td colspan="2" style="padding:22px 0 8px;border-bottom:1.5px solid ${C.tinta};` +
     `font-family:${FUENTE};font-size:${TEXTO};font-weight:600;color:${C.tinta};">${escaparHtml(titulo)}` +
     `<span style="font-weight:400;color:${C.sec};"> · ${cuantas} ${cuantas === 1 ? 'desviación' : 'desviaciones'}</span></td></tr>`
 
+  const numerada = (e: EventoBitacora) => ficha(e, numeroDe.get(e.id) ?? 0)
   const filasDesviaciones =
     pauta.criterios
       .map((c) => {
         const suyas = porCriterio.get(c.id) ?? []
-        return suyas.length ? grupo(c.titulo, suyas.length) + suyas.map(filaDesviacion).join('') : ''
+        return suyas.length ? grupo(c.titulo, suyas.length) + suyas.map(numerada).join('') : ''
       })
       .join('') +
-    (sueltas.length ? grupo('Sin punto de la pauta', sueltas.length) + sueltas.map(filaDesviacion).join('') : '') +
+    (sueltas.length ? grupo('Sin punto de la pauta', sueltas.length) + sueltas.map(numerada).join('') : '') +
     filaCierre(
-      6,
+      2,
       `${desviaciones.length} ${desviaciones.length === 1 ? 'desviación' : 'desviaciones'}`,
       cierreDesviaciones(resumen),
     )
 
   const tablaDesviaciones = desviaciones.length
     ? seccion('Registro de desviaciones', desviaciones.length) +
-      `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;width:100%;margin-top:8px;">` +
-      encabezadoTabla(['Equipo o área', 'Anomalía', 'Condición encontrada', 'Acción realizada o pendiente', 'Responsable', 'Estado']) +
+      `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;width:100%;margin-top:4px;">` +
       filasDesviaciones +
       `</table>`
     : seccion('Registro de desviaciones') +
@@ -535,20 +574,21 @@ export function inspeccionATextoPlano({ inspeccion, pauta, resumen: vivo, desvia
   else {
     // Agrupadas por punto de la pauta, igual que en el HTML: una desviación suelta no deja
     // saber de qué punto salió.
-    const linea = (e: EventoBitacora) => {
+    const linea = (e: EventoBitacora, n: number) => {
       const fotos = (e.fotos ?? []).length
       return (
-        `  - ${[e.equipo || 'Sin equipo', codigoEquipoDe(e)].filter(Boolean).join(' · ')}: ${e.descripcion}` +
+        `  ${n}. ${[e.equipo || 'Sin equipo', codigoEquipoDe(e)].filter(Boolean).join(' · ')}: ${e.descripcion}` +
         ` | ${accionDe(e, inspeccion)} | ${autorVisible(e)}` +
         (fotos ? ` | ${fotos} ${fotos === 1 ? 'foto' : 'fotos'}` : '')
       )
     }
+    let n = 0
     for (const c of pauta.criterios) {
       const suyas = desviaciones.filter((e) => e.inspeccion?.criterioId === c.id)
-      if (suyas.length) partes.push(`${c.titulo}:`, ...suyas.map(linea))
+      if (suyas.length) partes.push(`${c.titulo}:`, ...suyas.map((e) => linea(e, ++n)))
     }
     const sueltas = desviaciones.filter((e) => !pauta.criterios.some((c) => c.id === e.inspeccion?.criterioId))
-    if (sueltas.length) partes.push('Sin punto de la pauta:', ...sueltas.map(linea))
+    if (sueltas.length) partes.push('Sin punto de la pauta:', ...sueltas.map((e) => linea(e, ++n)))
   }
 
   if (resumen.sinEvaluar) {

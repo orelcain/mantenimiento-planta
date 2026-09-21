@@ -101,14 +101,20 @@ describe('§10 · el criterio de liberación va completo', () => {
   })
 })
 
-describe('§8 · el registro de desviaciones trae las seis columnas', () => {
+describe('§8 · el registro de desviaciones trae los seis datos', () => {
   const d = datos(inspeccion({ resultados: { ...inspeccion().resultados, neumatico: 'no-conforme' } }), [desviacion()])
 
-  it('los encabezados son los que pide el procedimiento', () => {
+  /**
+   * El procedimiento pide seis DATOS, no seis columnas. En 680 px, seis columnas dejaban la
+   * condición encontrada en una caja de veinte caracteres; cada desviación es ahora una ficha
+   * numerada con sus campos rotulados, y los seis siguen estando.
+   */
+  it('los seis datos de §8 están, cada uno con su rótulo', () => {
     const html = inspeccionAHtmlCorreo(d)
-    for (const col of ['Equipo o área', 'Anomalía', 'Condición encontrada', 'Acción realizada o pendiente', 'Responsable', 'Estado']) {
-      expect(html).toContain(col)
-    }
+    for (const campo of ['Anomalía', 'Condición', 'Acción', 'Responsable']) expect(html).toContain(campo)
+    // Equipo y estado van en el encabezado de la ficha, no como campo rotulado.
+    expect(html).toContain('CINTA LARGA GRADER')
+    expect(html).toContain('Resuelta')
   })
 
   it('el equipo va con su código SAP y el responsable es quien registró', () => {
@@ -344,8 +350,8 @@ describe('las desviaciones cuelgan de su punto de la pauta', () => {
 
   it('la observación del punto deja de salir vacía: nombra lo que cuelga de él', () => {
     const html = inspeccionAHtmlCorreo(datos(insp, dos))
-    expect(html).toContain('TABLERO TOLVA · BOTONERA CINTA 3')
-    expect(html).toContain('2 desviaciones:')
+    // Numeradas: repetir el nombre del equipo justo encima de su propia ficha sobra.
+    expect(html).toContain('Desviaciones 1, 2 del registro')
   })
 
   it('el texto plano también las agrupa', () => {
@@ -416,14 +422,14 @@ describe('la forma del documento: protocolo, no plantilla', () => {
   })
 
   it('cuatro cuerpos y nada intermedio', () => {
-    const cuerpos = new Set([...html().matchAll(/font-size:([\d.]+)px/g)].map((m) => m[1]))
+    const cuerpos = new Set([...html().matchAll(/font-size:([\d.]+)px/g)].map((m) => m[1] ?? ''))
     expect([...cuerpos].sort()).toEqual(['10.5', '11', '14', '21'])
   })
 
   it('el color solo aparece donde codifica un estado', () => {
     // Fuera de los puntos de estado, el documento es tinta sobre papel: en blanco y negro
     // tiene que conservar la jerarquía.
-    const conColor = [...html().matchAll(/color:(#[0-9A-Fa-f]{6})/g)].map((m) => m[1].toUpperCase())
+    const conColor = [...html().matchAll(/color:(#[0-9A-Fa-f]{6})/g)].map((m) => (m[1] ?? '').toUpperCase())
     const semanticos = [C.ventana, C.parada, C.afectado, C.pendBorde].map((c) => c.toUpperCase())
     const neutros = [C.tinta, C.sec].map((c) => c.toUpperCase())
     expect(conColor.every((c) => semanticos.includes(c) || neutros.includes(c))).toBe(true)
