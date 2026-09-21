@@ -87,7 +87,7 @@ export function BitacoraTurnoVista({
   const navigate = useNavigate()
   const turnoActual = useTurnoMantencionActual()
   const turnoParam = params.get('turno')
-  const [editor, setEditor] = useState<{ evento: EventoBitacora | null; idNuevo: string; turno: TurnoMantencion; pendienteOrigen?: EventoBitacora | null; desdeInspeccion?: EnlaceInspeccion } | null>(null)
+  const [editor, setEditor] = useState<{ evento: EventoBitacora | null; idNuevo: string; turno: TurnoMantencion; pendienteOrigen?: EventoBitacora | null; desdeInspeccion?: EnlaceInspeccion; descripcionInicial?: string } | null>(null)
   // Pestaña: el turno o la inspección de planta (Orel, 20-09-2026).
   const [vista, setVista] = useState<'turno' | 'inspeccion'>(() => (params.get('vista') === 'inspeccion' ? 'inspeccion' : 'turno'))
   // La jerarquía (702 nodos) se carga recién al abrir el editor, y queda en caché.
@@ -966,8 +966,15 @@ export function BitacoraTurnoVista({
               void conAviso(() => marcarCriterio(BITACORA_PLANTA.id, turno.id, criterioId, resultado))
             }
             onAnotar={(criterioId, nota) => void conAviso(() => anotarCriterio(BITACORA_PLANTA.id, turno.id, criterioId, nota))}
-            onNuevaDesviacion={(criterioId) =>
-              inspeccion && setEditor({ evento: null, idNuevo: nuevoId(), turno, desdeInspeccion: { id: inspeccion.id, criterioId } })
+            onNuevaDesviacion={(criterioId, nota) =>
+              inspeccion &&
+              setEditor({
+                evento: null,
+                idNuevo: nuevoId(),
+                turno,
+                desdeInspeccion: { id: inspeccion.id, criterioId },
+                descripcionInicial: nota,
+              })
             }
             onAbrirEvento={(e) => setEditor({ evento: e, idNuevo: '', turno })}
             onLiberar={(estado) =>
@@ -1501,6 +1508,7 @@ export function BitacoraTurnoVista({
         sugerenciasEquipo={sugerenciasEquipo}
         sugerenciasTipo={sugerenciasTipo}
         autorFijo={autorFijo}
+        descripcionInicial={editor?.descripcionInicial ?? ''}
         puedeEditarMaestro={!autorFijo}
         tecnicos={tecnicos}
         opcionesEquipo={opcionesEquipo}

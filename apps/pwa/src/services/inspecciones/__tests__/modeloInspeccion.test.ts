@@ -159,3 +159,45 @@ describe('el recorrido y las observaciones', () => {
     expect(r.conObservacion).toBe(1)
   })
 })
+
+describe('«corregido»: encontrado y resuelto antes de entregar', () => {
+  it('cuenta como revisado y libera igual que un conforme', () => {
+    const r = resumenDeInspeccion(PAUTA_POST_ASEO, { resultados: { ...TODOS, mecanico: 'corregido' } }, [])
+    expect(r.revisados).toBe(7)
+    expect(r.corregidos).toBe(1)
+    expect(r.conformes).toBe(6)
+    expect(r.sugerido).toBe('conforme')
+  })
+
+  it('no se cuenta como no conforme: el criterio de liberación mira el estado AL ENTREGAR', () => {
+    const r = resumenDeInspeccion(PAUTA_POST_ASEO, { resultados: { ...TODOS, mecanico: 'corregido' } }, [])
+    expect(r.noConformes).toBe(0)
+  })
+
+  it('la frase de la entrega dice cuántos se corrigieron al pasar', () => {
+    const r = resumenDeInspeccion(PAUTA_POST_ASEO, { resultados: { ...TODOS, mecanico: 'corregido' } }, [])
+    expect(frasePorLiberacion('conforme', r)).toBe('7 de 7 conformes, 1 corregido antes de entregar.')
+  })
+})
+
+describe('la contradicción que encontró Orel: «no conforme» sin desviación', () => {
+  it('se cuenta aparte para poder decirlo en el informe', () => {
+    const r = resumenDeInspeccion(PAUTA_POST_ASEO, { resultados: { ...TODOS, mecanico: 'no-conforme' } }, [])
+    expect(r.noConformes).toBe(1)
+    expect(r.noConformesSinDesviacion).toBe(1)
+  })
+
+  it('con su desviación anotada, deja de contarse', () => {
+    const r = resumenDeInspeccion(PAUTA_POST_ASEO, { resultados: { ...TODOS, mecanico: 'no-conforme' } }, [
+      desviacion({ criterioId: 'mecanico' }),
+    ])
+    expect(r.noConformesSinDesviacion).toBe(0)
+  })
+
+  it('una desviación de OTRO punto no tapa el hueco', () => {
+    const r = resumenDeInspeccion(PAUTA_POST_ASEO, { resultados: { ...TODOS, mecanico: 'no-conforme' } }, [
+      desviacion({ criterioId: 'neumatico' }),
+    ])
+    expect(r.noConformesSinDesviacion).toBe(1)
+  })
+})

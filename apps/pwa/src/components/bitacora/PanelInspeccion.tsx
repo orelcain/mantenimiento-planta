@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AlertTriangle, Check, ChevronDown, ChevronRight, ClipboardCheck, Loader2, MessageSquarePlus, Plus, X } from 'lucide-react'
+import { AlertTriangle, Check, ChevronDown, ChevronRight, ClipboardCheck, Loader2, MessageSquarePlus, NotebookPen, Plus, Wrench, X } from 'lucide-react'
 import { Button } from '@/components/piel'
 import {
   TEXTO_LIBERACION,
@@ -7,6 +7,7 @@ import {
   type EstadoLiberacion,
   type Inspeccion,
   type PautaInspeccion,
+  type ResultadoCriterio,
   type ResumenInspeccion,
 } from '@/services/inspecciones/modeloInspeccion'
 import type { EventoBitacora } from '@/services/bitacora/bitacora.types'
@@ -23,8 +24,9 @@ export interface PanelInspeccionProps {
   editable: boolean
   trabajando?: boolean
   onIniciar: () => void
-  onMarcar: (criterioId: string, resultado: 'conforme' | 'no-conforme' | null) => void
-  onNuevaDesviacion: (criterioId: string) => void
+  onMarcar: (criterioId: string, resultado: ResultadoCriterio | null) => void
+  /** `nota` prellena la descripción del evento: no se reescribe lo ya anotado. */
+  onNuevaDesviacion: (criterioId: string, nota?: string) => void
   onAnotar: (criterioId: string, nota: string) => void
   onAbrirEvento: (e: EventoBitacora) => void
   onLiberar: (estado: EstadoLiberacion) => void
@@ -54,6 +56,8 @@ export function PanelInspeccion({
   const [abierto, setAbierto] = useState<string | null>(null)
   /** Criterio cuya observación se está escribiendo, y el texto en curso. */
   const [anotando, setAnotando] = useState<{ id: string; texto: string } | null>(null)
+  /** Criterio al que se le toco «No» y todavia no se dice si quedo resuelto. */
+  const [preguntando, setPreguntando] = useState<string | null>(null)
   const [eligiendo, setEligiendo] = useState<EstadoLiberacion | null>(null)
 
   if (!inspeccion) {
@@ -93,6 +97,7 @@ export function PanelInspeccion({
             ` · ${resumen.desviaciones} ${resumen.desviaciones === 1 ? 'desviación' : 'desviaciones'}`}
           {resumen.pendientes > 0 && ` (${resumen.pendientes} abierta${resumen.pendientes === 1 ? '' : 's'})`}
           {resumen.minutosDeRecorrido != null && ` · recorrido de ${resumen.minutosDeRecorrido} min`}
+          {resumen.corregidos > 0 && ` · ${resumen.corregidos} ${resumen.corregidos === 1 ? 'corregido' : 'corregidos'}`}
           {resumen.conObservacion > 0 && ` · ${resumen.conObservacion} con observación`}
         </p>
         {resumen.pendientesCriticos > 0 && (
@@ -105,6 +110,7 @@ export function PanelInspeccion({
         )}
         <div className="flex h-1.5 overflow-hidden rounded-full bg-muted-foreground/12" aria-hidden>
           <span className="bg-ink-ok" style={{ width: `${(resumen.conformes / resumen.total) * 100}%` }} />
+          <span className="bg-ink-warn" style={{ width: `${(resumen.corregidos / resumen.total) * 100}%` }} />
           <span className="bg-ink-crit" style={{ width: `${(resumen.noConformes / resumen.total) * 100}%` }} />
         </div>
       </header>
@@ -141,23 +147,59 @@ export function PanelInspeccion({
                     <Check aria-hidden /> Conforme
                   </BotonResultado>
                   <BotonResultado
-                    activo={r === 'no-conforme'}
-                    tono="mal"
+                    activo={r === 'no-conforme' || r === 'corregido'}
+                    tono={r === 'corregido' ? 'medio' : 'mal'}
                     disabled={!editable || !!liberada}
                     onClick={() => {
-                      // Marcar «no conforme» y anotar qué se encontró es el mismo gesto.
-                      onMarcar(c.id, 'no-conforme')
-                      if (r !== 'no-conforme') onNuevaDesviacion(c.id)
-                      setAbierto(c.id)
+                      // Saltar derecho al evento obligaba a cancelarlo para poder anotar algo
+                      // menor ya resuelto (Orel, 21-09). Primero se pregunta.
+                      if (r === 'no-conforme' || r === 'corregido') onMarcar(c.id, null)
+                      else {
+                        setPreguntando(c.id)
+                        setAbierto(c.id)
+                      }
                     }}
                   >
-                    <X aria-hidden /> No
+                    <X aria-hidden /> {r === 'corregido' ? 'Corregido' : 'No'}
                   </BotonResultado>
                 </div>
               </div>
 
               {desplegado && c.ayuda && (
                 <p className="mt-1.5 pl-[22px] text-caption leading-snug text-muted-foreground">{c.ayuda}</p>
+              )}
+
+              {preguntando === c.id && (
+                <div className="ml-[22px] mt-2 flex flex-col gap-2 rounded-ctl bg-muted-foreground/10 p-3">
+                  <p className="text-footnote font-semibold">¿Quedó resuelto antes de entregar la planta?</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="tinted"
+                      onClick={() => {
+                        onMarcar(c.id, 'corregido')
+                        setPreguntando(null)
+                        setAnotando({ id: c.id, texto: inspeccion.notas?.[c.id] ?? '' })
+                      }}
+                    >
+                      <Wrench /> Sí, lo corregí
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        onMarcar(c.id, 'no-conforme')
+                        setPreguntando(null)
+                        onNuevaDesviacion(c.id)
+                      }}
+                    >
+                      <Plus /> No, queda pendiente
+                    </Button>
+                    <Button variant="plain" onClick={() => setPreguntando(null)}>
+                      Cancelar
+                    </Button>
+                  </div>
+                  <p className="text-caption leading-snug text-muted-foreground">
+                    Corregido queda conforme al entregar, con lo que hiciste anotado. Pendiente abre una desviación.
+                  </p>
+                </div>
               )}
 
               {/* El recordatorio del procedimiento, donde de verdad hace falta: es el momento en
@@ -179,9 +221,10 @@ export function PanelInspeccion({
                     placeholder="Qué viste, aunque no amerite abrir una desviación"
                     className="w-full rounded-ctl bg-muted-foreground/10 p-2.5 text-footnote outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   />
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <Button
-                      variant="plain"
+                      variant="tinted"
+                      disabled={r === 'corregido' && !anotando.texto.trim()}
                       onClick={() => {
                         onAnotar(c.id, anotando.texto)
                         setAnotando(null)
@@ -189,10 +232,27 @@ export function PanelInspeccion({
                     >
                       Guardar observación
                     </Button>
+                    {/* El piso es la observación; el evento queda a un toque, con el texto ya
+                        escrito, para que nadie tenga que redactarlo dos veces. */}
+                    {!!anotando.texto.trim() && (
+                      <Button
+                        variant="plain"
+                        onClick={() => {
+                          onAnotar(c.id, anotando.texto)
+                          onNuevaDesviacion(c.id, anotando.texto)
+                          setAnotando(null)
+                        }}
+                      >
+                        <NotebookPen /> Registrarlo en la bitácora
+                      </Button>
+                    )}
                     <Button variant="plain" onClick={() => setAnotando(null)}>
                       Cancelar
                     </Button>
                   </div>
+                  {r === 'corregido' && !anotando.texto.trim() && (
+                    <p className="text-caption text-muted-foreground">Escribe qué encontraste y qué hiciste.</p>
+                  )}
                 </div>
               ) : (
                 inspeccion.notas?.[c.id] && (
@@ -340,12 +400,13 @@ function BotonResultado({
   children,
 }: {
   activo: boolean
-  tono: 'ok' | 'mal'
+  tono: 'ok' | 'medio' | 'mal'
   disabled?: boolean
   onClick: () => void
   children: React.ReactNode
 }) {
-  const encendido = tono === 'ok' ? 'bg-ink-ok/15 text-ink-ok' : 'bg-ink-crit/15 text-ink-crit'
+  const encendido =
+    tono === 'ok' ? 'bg-ink-ok/15 text-ink-ok' : tono === 'medio' ? 'bg-ink-warn/15 text-ink-warn' : 'bg-ink-crit/15 text-ink-crit'
   return (
     <button
       type="button"

@@ -51,14 +51,18 @@ export function tituloCorreoInspeccion({ turno, planta }: Pick<DatosCorreoInspec
   return `Inspección de planta post-aseo · ${planta} · ${etiquetaTurno(turno)} ${turno.fecha.split('-').reverse().join('-')}`
 }
 
-/** «Conforme» / «No conforme» / «Sin revisar», con el color que le toca. */
+/** El estado del punto con el color que le toca. */
 function celdaEstado(estado: string | undefined): string {
   const [texto, fondo, color] =
     estado === 'conforme'
       ? ['Conforme', C.okFondo, C.ventana]
-      : estado === 'no-conforme'
-        ? ['No conforme', C.critFondo, C.parada]
-        : ['Sin revisar', C.neutroFondo, C.sec]
+      : // Se encontró algo y se resolvió antes de entregar: libera, pero no es lo mismo que
+        // un punto que estaba bien (§8, «corregidas o controladas antes de la puesta en marcha»).
+        estado === 'corregido'
+        ? ['Corregido', C.pendFondo, C.afectado]
+        : estado === 'no-conforme'
+          ? ['No conforme', C.critFondo, C.parada]
+          : ['Sin revisar', C.neutroFondo, C.sec]
   return (
     `<td style="padding:6px 10px;border:1px solid ${C.linea};background:${fondo};font-family:${FUENTE};` +
     `font-size:13px;font-weight:600;color:${color};white-space:nowrap;">${texto}</td>`
@@ -110,6 +114,9 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen, desviaciones
 
   const kpis = [
     htmlKpi(`${resumen.revisados} de ${resumen.total}`, 'puntos revisados'),
+    resumen.corregidos > 0
+      ? htmlKpi(String(resumen.corregidos), resumen.corregidos === 1 ? 'corregido al pasar' : 'corregidos al pasar', C.afectado)
+      : '',
     htmlKpi(String(resumen.noConformes), resumen.noConformes === 1 ? 'no conforme' : 'no conformes', resumen.noConformes ? C.parada : undefined),
     resumen.desviaciones > 0
       ? htmlKpi(String(resumen.desviaciones), resumen.desviaciones === 1 ? 'desviación' : 'desviaciones')
@@ -168,8 +175,13 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen, desviaciones
       encabezadoTabla(['Equipo o área', 'Anomalía', 'Condición encontrada', 'Acción realizada o pendiente', 'Responsable', 'Estado']) +
       filasDesviaciones +
       `</table>`
-    : htmlSeccion('Registro de desviaciones', null, C.linea) +
-      `<p style="font-family:${FUENTE};font-size:14px;color:${C.sec};margin:8px 0 0;">Sin desviaciones detectadas durante la inspección.</p>`
+    : htmlSeccion('Registro de desviaciones', null, resumen.noConformesSinDesviacion ? C.pendBorde : C.linea) +
+      `<p style="font-family:${FUENTE};font-size:14px;color:${C.sec};margin:8px 0 0;">` +
+      (resumen.noConformesSinDesviacion
+        ? // Decirlo es lo unico honesto: el punto quedo en no conforme y no se anoto nada.
+          `${resumen.noConformesSinDesviacion} ${resumen.noConformesSinDesviacion === 1 ? 'punto quedó' : 'puntos quedaron'} en «no conforme» sin una desviación anotada. Ver el criterio de liberación, arriba.`
+        : 'Sin desviaciones detectadas durante la inspección.') +
+      `</p>`
 
   const aviso = resumen.pendientesCriticos
     ? `<div style="font-family:${FUENTE};background:${C.critFondo};border-left:3px solid ${C.parada};padding:8px 12px;margin-top:10px;font-size:13px;color:${C.tinta};">` +
@@ -203,8 +215,10 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen, desviaciones
 /** La misma inspección en texto plano, para el cuerpo alterno del correo y para WhatsApp. */
 export function inspeccionATextoPlano({ inspeccion, pauta, resumen, desviaciones, turno, planta }: DatosCorreoInspeccion): string {
   const l = inspeccion.liberacion
-  const etiqueta = (id: string) =>
-    inspeccion.resultados[id] === 'conforme' ? 'Conforme' : inspeccion.resultados[id] === 'no-conforme' ? 'NO CONFORME' : 'Sin revisar'
+  const etiqueta = (id: string) => {
+    const r = inspeccion.resultados[id]
+    return r === 'conforme' ? 'Conforme' : r === 'corregido' ? 'Corregido' : r === 'no-conforme' ? 'NO CONFORME' : 'Sin revisar'
+  }
 
   const partes: string[] = [
     `${pauta.nombre.toUpperCase()} · ${planta}`,
@@ -220,7 +234,13 @@ export function inspeccionATextoPlano({ inspeccion, pauta, resumen, desviaciones
     'REGISTRO DE DESVIACIONES',
   ]
 
-  if (!desviaciones.length) partes.push('Sin desviaciones detectadas durante la inspección.')
+  if (!desviaciones.length) {
+    partes.push(
+      resumen.noConformesSinDesviacion
+        ? `${resumen.noConformesSinDesviacion} ${resumen.noConformesSinDesviacion === 1 ? 'punto quedó' : 'puntos quedaron'} en «no conforme» sin una desviación anotada.`
+        : 'Sin desviaciones detectadas durante la inspección.',
+    )
+  }
   else {
     for (const e of desviaciones) {
       const fotos = (e.fotos ?? []).length
