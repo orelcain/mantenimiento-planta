@@ -95,21 +95,45 @@ export async function iniciarInspeccion(base: Omit<Inspeccion, 'id' | 'resultado
  *
  * Guarda también CUÁNDO se marcó: siete marcas repartidas en media hora son un recorrido,
  * siete en el mismo minuto son una firma de un tirón. No se le pide nada al técnico.
+ *
+ * ⚠ `horaISO` la decide quien llama, y es `null` cuando el turno ya no está corriendo: una
+ * pauta del domingo completada el lunes a las 18:09 quedaba con siete marcas a las 18:09 y un
+ * recorrido de 833 min inventado (Orel, 21-09-2026). Sin hora se puede poner a mano después
+ * con `fijarHoraCriterio`; lo que no se puede es que el sistema se la invente.
+ *
+ * Al re-marcar sin hora NO se toca la que ya estaba: una hora escrita a mano sobrevive a que
+ * alguien cambie el resultado del punto.
  */
 export async function marcarCriterio(
   plantId: string,
   turnoId: string,
   criterioId: string,
   resultado: ResultadoCriterio | null,
+  horaISO?: string | null,
 ): Promise<void> {
+  const marcas = !resultado ? { [criterioId]: null } : horaISO ? { [criterioId]: horaISO } : undefined
   await setDoc(
     doc(db, COLECCION_INSPECCIONES, idDeInspeccion(plantId, turnoId)),
     // Campo anidado: el merge de Firestore no pisa los demás resultados.
     {
       resultados: { [criterioId]: resultado },
-      marcas: { [criterioId]: resultado ? new Date().toISOString() : null },
+      ...(marcas ? { marcas } : {}),
       actualizadoEn: serverTimestamp(),
     },
+    { merge: true },
+  )
+}
+
+/** Corrige a mano la hora de un punto. `null` lo deja sin hora, y el correo no inventa una. */
+export async function fijarHoraCriterio(
+  plantId: string,
+  turnoId: string,
+  criterioId: string,
+  horaISO: string | null,
+): Promise<void> {
+  await setDoc(
+    doc(db, COLECCION_INSPECCIONES, idDeInspeccion(plantId, turnoId)),
+    { marcas: { [criterioId]: horaISO }, actualizadoEn: serverTimestamp() },
     { merge: true },
   )
 }

@@ -30,7 +30,7 @@ import { FUENTE_FIRESTORE, useTurnoMantencionActual, type FuenteBitacora } from 
 import { BITACORA_PLANTA } from '@/config/bitacora'
 import { PanelInspeccion } from '@/components/bitacora/PanelInspeccion'
 import { useInspeccion } from '@/hooks/useInspeccion'
-import { anotarCriterio, iniciarInspeccion, liberarPlanta, marcarCriterio } from '@/services/inspecciones/inspecciones.service'
+import { anotarCriterio, fijarHoraCriterio, iniciarInspeccion, liberarPlanta, marcarCriterio } from '@/services/inspecciones/inspecciones.service'
 import { TEXTO_AVISO as TEXTO_AVISO_INSPECCION, TEXTO_LIBERACION, avisoDeInspeccion, frasePorLiberacion } from '@/services/inspecciones/modeloInspeccion'
 import { inspeccionAHtmlCorreo, inspeccionATextoPlano, tituloCorreoInspeccion } from '@/services/inspecciones/inspeccionCorreo'
 import { encabezadoEvento, etiquetaTipo, posicionAlMover, posicionEnIndice, tieneHora, tiposPropiosUsados, tituloDe } from '@/services/bitacora/presentacionEvento'
@@ -53,8 +53,10 @@ import {
   fechaTurnoLarga,
   formatoMinutos,
   horarioTurno,
+  minutosDesdeInicioTurno,
   turnoAdyacente,
   turnoDesdeId,
+  turnoEnCurso,
 } from '@/services/bitacora/turnoMantencion'
 
 /**
@@ -998,7 +1000,21 @@ export function BitacoraTurnoVista({
             trabajando={inspTrabajando}
             onIniciar={iniciarLaInspeccion}
             onMarcar={(criterioId, resultado) =>
-              void conAviso(() => marcarCriterio(BITACORA_PLANTA.id, turno.id, criterioId, resultado))
+              // La hora solo se sella si el turno está CORRIENDO. Completar el domingo el lunes
+              // a las 18:09 dejaba siete marcas a las 18:09 y un recorrido inventado; mismo
+              // criterio que ya rige en los eventos (Orel, 21-09-2026).
+              void conAviso(() =>
+                marcarCriterio(
+                  BITACORA_PLANTA.id,
+                  turno.id,
+                  criterioId,
+                  resultado,
+                  turnoEnCurso(turno) ? new Date().toISOString() : null,
+                ),
+              )
+            }
+            onFijarHora={(criterioId, hhmm) =>
+              void conAviso(() => fijarHoraCriterio(BITACORA_PLANTA.id, turno.id, criterioId, isoEnTurno(turno, hhmm)))
             }
             onAnotar={(criterioId, nota) => void conAviso(() => anotarCriterio(BITACORA_PLANTA.id, turno.id, criterioId, nota))}
             onNuevaDesviacion={(criterioId, nota) =>
@@ -1035,6 +1051,15 @@ export function BitacoraTurnoVista({
               <p className="text-caption text-muted-foreground">
                 Lleva el criterio de liberación, el registro de desviaciones y el resultado final, como pide el procedimiento.
               </p>
+              {/* El correo salía diciendo «La planta todavía no se ha liberado» cuando en
+                  terreno ya se había entregado: faltaba marcar la entrega y nadie lo veía
+                  hasta leer la vista previa (Orel, 21-09-2026). */}
+              {!inspeccion?.liberacion && (
+                <p className="flex items-start gap-2 rounded-ctl bg-ink-warn/10 p-2.5 text-caption leading-snug text-ink-warn [&>svg]:mt-px [&>svg]:size-4 [&>svg]:shrink-0">
+                  <AlertTriangle aria-hidden /> Todavía no marcaste la entrega de la planta: el correo va a decir que
+                  falta. Márcala arriba, en «Liberación de planta».
+                </p>
+              )}
               <div className="flex flex-wrap gap-2">
                 <Button onClick={() => void copiarInspeccionParaCorreo()}>
                   <Copy /> Copiar para correo
@@ -1929,4 +1954,17 @@ function VistaPreviaCorreo({ html, ancho = ANCHO_CORREO }: { html: string; ancho
       className="w-full rounded-card border-0 shadow-[0_1px_4px_rgba(0,0,0,0.08)]"
     />
   )
+}
+
+/**
+ * `HH:mm` → el instante ISO que le corresponde DENTRO del turno. No se puede armar con la
+ * fecha del turno a secas: el turno noche va de 00:00 a 08:00 pero el nocturno de otras bandas
+ * cruza la medianoche, y ahí la fecha del día siguiente es la correcta. `minutosDesdeInicioTurno`
+ * ya resuelve esa cuenta, así que se apoya en ella desde el inicio real del turno.
+ */
+function isoEnTurno(turno: TurnoMantencion, hhmm: string | null): string | null {
+  if (!hhmm) return null
+  const min = minutosDesdeInicioTurno(turno, hhmm)
+  if (!Number.isFinite(min) || min === Number.MAX_SAFE_INTEGER) return null
+  return new Date(turno.inicio.getTime() + min * 60_000).toISOString()
 }

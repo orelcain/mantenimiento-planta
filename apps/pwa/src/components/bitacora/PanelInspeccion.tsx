@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AlertTriangle, Check, ChevronDown, ChevronRight, ClipboardCheck, Loader2, MessageSquarePlus, NotebookPen, Plus, Wrench, X } from 'lucide-react'
+import { AlertTriangle, Check, ChevronDown, ChevronRight, ClipboardCheck, Clock, LifeBuoy, Loader2, MessageSquarePlus, NotebookPen, Plus, Wrench, X } from 'lucide-react'
 import { Button } from '@/components/piel'
 import {
   TEXTO_LIBERACION,
@@ -29,6 +29,11 @@ export interface PanelInspeccionProps {
   trabajando?: boolean
   onIniciar: () => void
   onMarcar: (criterioId: string, resultado: ResultadoCriterio | null) => void
+  /**
+   * Corrige a mano la hora de un punto; `null` lo deja sin hora. El panel no sabe armar el
+   * instante (los turnos cruzan la medianoche): manda `HH:mm` y la página lo ubica en el turno.
+   */
+  onFijarHora: (criterioId: string, hhmm: string | null) => void
   /** `nota` prellena la descripción del evento: no se reescribe lo ya anotado. */
   onNuevaDesviacion: (criterioId: string, nota?: string) => void
   onAnotar: (criterioId: string, nota: string) => void
@@ -53,6 +58,7 @@ export function PanelInspeccion({
   trabajando,
   onIniciar,
   onMarcar,
+  onFijarHora,
   onNuevaDesviacion,
   onAnotar,
   onAbrirEvento,
@@ -64,6 +70,8 @@ export function PanelInspeccion({
   const [anotando, setAnotando] = useState<{ id: string; texto: string } | null>(null)
   /** Criterio al que se le toco «No» y todavia no se dice si quedo resuelto. */
   const [preguntando, setPreguntando] = useState<string | null>(null)
+  /** Criterio cuya hora se está corrigiendo a mano, y el `HH:mm` en curso. */
+  const [editandoHora, setEditandoHora] = useState<{ id: string; hhmm: string } | null>(null)
   const [eligiendo, setEligiendo] = useState<EstadoLiberacion | null>(null)
 
   if (!inspeccion) {
@@ -109,6 +117,7 @@ export function PanelInspeccion({
           {resumen.pendientes > 0 && ` (${resumen.pendientes} abierta${resumen.pendientes === 1 ? '' : 's'})`}
           {resumen.minutosDeRecorrido != null && ` · recorrido de ${resumen.minutosDeRecorrido} min`}
           {resumen.corregidos > 0 && ` · ${resumen.corregidos} ${resumen.corregidos === 1 ? 'corregido' : 'corregidos'}`}
+          {resumen.controlados > 0 && ` · ${resumen.controlados} con contingencia`}
           {resumen.conObservacion > 0 && ` · ${resumen.conObservacion} con observación`}
         </p>
         {resumen.pendientesCriticos > 0 && (
@@ -126,7 +135,10 @@ export function PanelInspeccion({
         )}
         <div className="flex h-1.5 overflow-hidden rounded-full bg-muted-foreground/12" aria-hidden>
           <span className="bg-ink-ok" style={{ width: `${(resumen.conformes / resumen.total) * 100}%` }} />
-          <span className="bg-ink-warn" style={{ width: `${(resumen.corregidos / resumen.total) * 100}%` }} />
+          <span
+            className="bg-ink-warn"
+            style={{ width: `${((resumen.corregidos + resumen.controlados) / resumen.total) * 100}%` }}
+          />
           <span className="bg-ink-crit" style={{ width: `${(resumen.noConformes / resumen.total) * 100}%` }} />
         </div>
       </header>
@@ -163,20 +175,20 @@ export function PanelInspeccion({
                     <Check aria-hidden /> Conforme
                   </BotonResultado>
                   <BotonResultado
-                    activo={r === 'no-conforme' || r === 'corregido'}
-                    tono={r === 'corregido' ? 'medio' : 'mal'}
+                    activo={r === 'no-conforme' || r === 'corregido' || r === 'controlado'}
+                    tono={r === 'corregido' || r === 'controlado' ? 'medio' : 'mal'}
                     disabled={!editable || !!liberada}
                     onClick={() => {
                       // Saltar derecho al evento obligaba a cancelarlo para poder anotar algo
                       // menor ya resuelto (Orel, 21-09). Primero se pregunta.
-                      if (r === 'no-conforme' || r === 'corregido') onMarcar(c.id, null)
+                      if (r === 'no-conforme' || r === 'corregido' || r === 'controlado') onMarcar(c.id, null)
                       else {
                         setPreguntando(c.id)
                         setAbierto(c.id)
                       }
                     }}
                   >
-                    <X aria-hidden /> {r === 'corregido' ? 'Corregido' : 'No'}
+                    <X aria-hidden /> {r === 'corregido' ? 'Corregido' : r === 'controlado' ? 'Controlado' : 'No'}
                   </BotonResultado>
                 </div>
               </div>
@@ -199,6 +211,21 @@ export function PanelInspeccion({
                     >
                       <Wrench /> Sí, lo corregí
                     </Button>
+                    {/* §8 pide las desviaciones «corregidas O CONTROLADAS antes de la puesta en
+                        marcha». Sin este escalón, una falla que se sobrellevó toda la noche a
+                        mano para no detener el proceso quedaba como «No conforme» a secas: la
+                        mitad mala de la historia, sin el trabajo que hizo que la planta
+                        produjera igual (Orel, 21-09-2026). */}
+                    <Button
+                      variant="tinted"
+                      onClick={() => {
+                        onMarcar(c.id, 'controlado')
+                        setPreguntando(null)
+                        onNuevaDesviacion(c.id)
+                      }}
+                    >
+                      <LifeBuoy /> No, pero está controlado
+                    </Button>
                     <Button
                       onClick={() => {
                         onMarcar(c.id, 'no-conforme')
@@ -213,7 +240,9 @@ export function PanelInspeccion({
                     </Button>
                   </div>
                   <p className="text-caption leading-snug text-muted-foreground">
-                    Corregido queda conforme al entregar, con lo que hiciste anotado. Pendiente abre una desviación.
+                    Corregido queda conforme al entregar, con lo que hiciste anotado. Controlado es que el problema
+                    sigue ahí pero se opera con una medida transitoria: entrega con pendiente y en la desviación
+                    escribe qué medida tomaste. Pendiente abre una desviación sin contingencia.
                   </p>
                 </div>
               )}
@@ -224,6 +253,52 @@ export function PanelInspeccion({
                 <p className="ml-[22px] mt-2 rounded-ctl bg-ink-warn/10 p-2 text-caption leading-snug text-ink-warn">
                   No intervengas con el equipo en movimiento. Si hay riesgo, bloquea y etiquetea (LOTO) antes de tocar.
                 </p>
+              )}
+
+              {/* La hora es OPCIONAL y se puede corregir. Se sellaba sola con el reloj del
+                  momento, y una pauta del domingo completada el lunes a las 18:09 quedaba con
+                  siete marcas a las 18:09 y un «recorrido de 833 min» que nadie caminó
+                  (Orel, 21-09-2026). */}
+              {editandoHora?.id === c.id && (
+                <div className="ml-[22px] mt-2 flex flex-col gap-2 rounded-ctl bg-muted-foreground/10 p-3">
+                  <label className="text-footnote font-semibold" htmlFor={`hora-${c.id}`}>
+                    ¿A qué hora se revisó este punto?
+                  </label>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      id={`hora-${c.id}`}
+                      type="time"
+                      value={editandoHora.hhmm}
+                      onChange={(ev) => setEditandoHora({ id: c.id, hhmm: ev.target.value })}
+                      className="min-h-[44px] rounded-ctl bg-card px-3 text-footnote tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    />
+                    <Button
+                      variant="tinted"
+                      disabled={!editandoHora.hhmm}
+                      onClick={() => {
+                        onFijarHora(c.id, editandoHora.hhmm || null)
+                        setEditandoHora(null)
+                      }}
+                    >
+                      Guardar la hora
+                    </Button>
+                    <Button
+                      variant="plain"
+                      onClick={() => {
+                        onFijarHora(c.id, null)
+                        setEditandoHora(null)
+                      }}
+                    >
+                      Dejarlo sin hora
+                    </Button>
+                    <Button variant="plain" onClick={() => setEditandoHora(null)}>
+                      Cancelar
+                    </Button>
+                  </div>
+                  <p className="text-caption leading-snug text-muted-foreground">
+                    Si no la sabes, déjalo sin hora: el correo no va a inventar una.
+                  </p>
+                </div>
               )}
 
               {anotando?.id === c.id ? (
@@ -318,6 +393,15 @@ export function PanelInspeccion({
                       className="flex min-h-[44px] items-center gap-1 text-footnote font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary [&>svg]:size-4"
                     >
                       <Plus aria-hidden /> Otra desviación acá
+                    </button>
+                  )}
+                  {!!r && editandoHora?.id !== c.id && (
+                    <button
+                      type="button"
+                      onClick={() => setEditandoHora({ id: c.id, hhmm: hhmmDe(inspeccion.marcas?.[c.id]) })}
+                      className="flex min-h-[44px] items-center gap-1 text-footnote text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary [&>svg]:size-4"
+                    >
+                      <Clock aria-hidden /> {hhmmDe(inspeccion.marcas?.[c.id]) || 'Sin hora'}
                     </button>
                   )}
                   {/* El escalón que faltaba: ni perderlo ni abrir un evento entero por algo menor. */}
@@ -436,6 +520,13 @@ function BotonResultado({
       {children}
     </button>
   )
+}
+
+/** `HH:mm` de un ISO, o cadena vacía si no hay hora. Sin hora no se muestra ninguna. */
+function hhmmDe(iso: string | null | undefined): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false })
 }
 
 /** `HH:mm` de un ISO; vacío si no se puede. */

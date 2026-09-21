@@ -36,6 +36,7 @@ function pintar(insp: Inspeccion, editable = true) {
     editable,
     onIniciar: vi.fn(),
     onMarcar: vi.fn(),
+    onFijarHora: vi.fn(),
     onNuevaDesviacion: vi.fn(),
     onAnotar: vi.fn(),
     onAbrirEvento: vi.fn(),
@@ -82,5 +83,47 @@ describe('lo que SÍ cierra la inspección es la entrega', () => {
   it('pero deshacer la entrega sigue disponible', () => {
     pintar(liberada)
     expect(screen.getByRole('button', { name: /deshacer la entrega/i })).toBeTruthy()
+  })
+})
+
+/**
+ * §8 pide las desviaciones «corregidas **o controladas** antes de la puesta en marcha». Tocar
+ * «No» solo ofrecía corregido o pendiente: la falla que se sobrellevó a mano toda la noche
+ * para no detener el proceso no tenía dónde ir (Orel, 21-09-2026).
+ */
+describe('un punto se puede dejar controlado', () => {
+  it('la pregunta ofrece las tres salidas', () => {
+    pintar(inspeccion())
+    fireEvent.click(screen.getAllByRole('button', { name: /^no$/i })[0] as HTMLElement)
+    expect(screen.getByRole('button', { name: /lo corregí/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /pero está controlado/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /queda pendiente/i })).toBeTruthy()
+  })
+
+  it('controlado marca el punto y abre la desviación: el pendiente pasa al turno siguiente', () => {
+    const { onMarcar, onNuevaDesviacion } = pintar(inspeccion())
+    fireEvent.click(screen.getAllByRole('button', { name: /^no$/i })[0] as HTMLElement)
+    fireEvent.click(screen.getByRole('button', { name: /pero está controlado/i }))
+    expect(onMarcar).toHaveBeenCalledWith(expect.any(String), 'controlado')
+    expect(onNuevaDesviacion).toHaveBeenCalled()
+  })
+})
+
+/**
+ * Una pauta del domingo completada el lunes a las 18:09 quedaba con siete marcas a las 18:09 y
+ * un «recorrido de 833 min» que nadie caminó. La hora se puede corregir o dejar en blanco.
+ */
+describe('la hora del punto se puede corregir', () => {
+  it('un punto marcado sin hora lo dice, y deja ponerla', () => {
+    pintar(inspeccion())
+    fireEvent.click(screen.getByRole('button', { name: /sin hora/i }))
+    expect(screen.getByLabelText(/a qué hora se revisó/i)).toBeTruthy()
+  })
+
+  it('«Dejarlo sin hora» manda null: el correo no inventa ninguna', () => {
+    const { onFijarHora } = pintar(inspeccion({ marcas: { mecanico: '2026-09-21T07:16:00.000Z' } }))
+    fireEvent.click(screen.getAllByRole('button', { name: /^\d{2}:\d{2}$/ })[0] as HTMLElement)
+    fireEvent.click(screen.getByRole('button', { name: /dejarlo sin hora/i }))
+    expect(onFijarHora).toHaveBeenCalledWith('mecanico', null)
   })
 })

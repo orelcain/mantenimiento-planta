@@ -30,10 +30,38 @@
  * la planta, no lo que se vio mientras se caminaba. Lo encontrado y resuelto termina conforme,
  * con el registro de lo que se hizo.
  */
-export type ResultadoCriterio = 'conforme' | 'corregido' | 'no-conforme'
+export type ResultadoCriterio = 'conforme' | 'corregido' | 'controlado' | 'no-conforme'
 
-/** Los tres estados permiten entregar; solo `no-conforme` deja algo pendiente. */
-export const LIBERA: Record<ResultadoCriterio, boolean> = { conforme: true, corregido: true, 'no-conforme': false }
+/**
+ * `controlado` es la otra mitad de §8, la que faltaba (Orel, 21-09-2026). El procedimiento pide
+ * que las desviaciones queden «corregidas **o controladas** antes de la puesta en marcha», y
+ * hasta ahora la app solo sabía decir *corregidas*. El caso real: TABLERO CONTROL TOLVA RIÑONES
+ * con agua adentro y la fuente de 24 V quemada — la solución final queda pendiente, pero se
+ * operó a mano toda la noche para no detener el proceso.
+ *
+ * Marcarlo «No conforme» a secas cuenta la mitad de la historia: dice que algo estaba mal y
+ * calla el trabajo que hizo que la planta igual produjera. Y no puede ser `corregido`, porque
+ * no se corrigió: sigue abierto y pasa al turno siguiente.
+ *
+ * `controlado` = **sigue mal, opera con una medida transitoria**. Deja desviación abierta.
+ */
+export const LIBERA: Record<ResultadoCriterio, boolean> = {
+  conforme: true,
+  corregido: true,
+  controlado: false,
+  'no-conforme': false,
+}
+
+/** Cómo se llama cada resultado al presentarlo, y qué significa. Mismo texto en app y correo. */
+export const TEXTO_RESULTADO: Record<ResultadoCriterio, { titulo: string; detalle: string }> = {
+  conforme: { titulo: 'Conforme', detalle: 'Se revisó y estaba bien.' },
+  corregido: { titulo: 'Corregido', detalle: 'Se encontró algo y se resolvió antes de entregar.' },
+  controlado: {
+    titulo: 'Controlado',
+    detalle: 'No se resolvió: se opera con una medida transitoria para no detener el proceso. Queda pendiente.',
+  },
+  'no-conforme': { titulo: 'No conforme', detalle: 'Queda como desviación abierta, sin medida de contingencia.' },
+}
 
 export interface CriterioPauta {
   id: string
@@ -100,7 +128,15 @@ export interface Inspeccion {
    * «afectó sin detener» en el impacto.
    */
   notas?: Record<string, string>
-  /** Cuándo se marcó cada punto (ISO). Siete marcas en el mismo minuto no son un recorrido. */
+  /**
+   * Cuándo se marcó cada punto (ISO). Siete marcas en el mismo minuto no son un recorrido.
+   *
+   * ⚠ La hora es OPCIONAL (Orel, 21-09-2026). Se sellaba siempre con el reloj del momento, y
+   * una pauta del domingo que se completa el lunes a las 18:09 quedaba con siete marcas a las
+   * 18:09 y un «recorrido de 833 min» que nadie caminó. Mismo criterio que ya rige en los
+   * eventos (`horaInicioNuevoEvento`): con el turno cerrado, mejor vacío que un número con
+   * forma de hora real que nadie escribió. Sin hora, el correo no inventa ninguna.
+   */
   marcas?: Record<string, string>
   liberacion?: Liberacion | null
 }
@@ -136,9 +172,12 @@ export interface ResumenInspeccion {
   conObservacion: number
   /** Puntos que se encontraron mal y se resolvieron antes de entregar. */
   corregidos: number
+  /** Puntos que siguen mal y operan con una medida transitoria (§8, «o controladas»). */
+  controlados: number
   /**
-   * Puntos en «no conforme» a los que NO se les anotó una desviación. El correo lo dice en vez
-   * de afirmar que no hubo ninguna: era la contradicción que encontró Orel.
+   * Puntos que quedaron sin resolver (`no-conforme` o `controlado`) y a los que NO se les anotó
+   * una desviación. El correo lo dice en vez de afirmar que no hubo ninguna: era la
+   * contradicción que encontró Orel.
    */
   noConformesSinDesviacion: number
   /**
@@ -287,18 +326,22 @@ export function resumenDeInspeccion(
 ): ResumenInspeccion {
   let conformes = 0
   let corregidos = 0
+  let controlados = 0
   let noConformes = 0
   const sinDesviacion = new Set<string>()
   for (const c of pauta.criterios) {
     const r = inspeccion.resultados[c.id]
     if (r === 'conforme') conformes += 1
     else if (r === 'corregido') corregidos += 1
-    else if (r === 'no-conforme') {
-      noConformes += 1
+    else if (r === 'controlado' || r === 'no-conforme') {
+      if (r === 'controlado') controlados += 1
+      else noConformes += 1
+      // Los dos dejan algo abierto: los dos tienen que terminar en una desviación que pase al
+      // turno siguiente. Si no la tienen, se dice.
       if (!desviaciones.some((d) => d.criterioId === c.id)) sinDesviacion.add(c.id)
     }
   }
-  const revisados = conformes + corregidos + noConformes
+  const revisados = conformes + corregidos + controlados + noConformes
   const abiertas = desviaciones.filter((d) => d.pendiente)
   const pendientes = abiertas.length
   const pendientesCriticos = abiertas.filter((d) => d.critica === true).length
@@ -317,8 +360,16 @@ export function resumenDeInspeccion(
   const minutosDeCorrida =
     inicios.length && cierres.length ? Math.max(0, Math.max(...cierres) - Math.min(...inicios)) : null
 
+  // Un punto abierto SIN desviación anotada también deja pendientes: sugerir «conforme» ahí
+  // era el mismo lavado que ya se había corregido en el correo.
   const sugerido: EstadoLiberacion | null =
-    revisados < pauta.criterios.length ? null : !desviaciones.length ? 'conforme' : pendientes ? 'con-pendientes' : 'corregida'
+    revisados < pauta.criterios.length
+      ? null
+      : pendientes || sinDesviacion.size
+        ? 'con-pendientes'
+        : desviaciones.length
+          ? 'corregida'
+          : 'conforme'
 
   return {
     total: pauta.criterios.length,
@@ -330,6 +381,7 @@ export function resumenDeInspeccion(
     pendientesCriticos,
     conObservacion,
     corregidos,
+    controlados,
     noConformesSinDesviacion: sinDesviacion.size,
     sinEvaluar,
     minutosDeRecorrido,
@@ -338,18 +390,34 @@ export function resumenDeInspeccion(
   }
 }
 
-/** Cómo se llama cada estado al presentarlo, y qué significa. */
-export const TEXTO_LIBERACION: Record<EstadoLiberacion, { titulo: string; detalle: string }> = {
-  conforme: { titulo: 'Conforme', detalle: 'Sin desviaciones.' },
+/**
+ * Cómo se llama cada estado al presentarlo, qué significa y con qué TITULAR encabeza el correo.
+ *
+ * El titular decía «PLANTA LIBERADA PARA OPERACIÓN» para los tres estados que entregan, y con
+ * pendientes abiertos eso se leía como si no hubiera pasado nada (Orel, 21-09-2026). Ahora
+ * cada uno dice lo suyo: siempre se entregó a Producción, y en qué condición se entregó.
+ */
+export const TEXTO_LIBERACION: Record<EstadoLiberacion, { titulo: string; detalle: string; titular: string }> = {
+  conforme: {
+    titulo: 'Conforme',
+    detalle: 'Sin desviaciones.',
+    titular: 'PLANTA ENTREGADA A PRODUCCIÓN — CONFORME',
+  },
   corregida: {
     titulo: 'Corregida antes del arranque',
     detalle: 'Se encontró algo y se resolvió antes de entregar la planta.',
+    titular: 'PLANTA ENTREGADA A PRODUCCIÓN — CORREGIDA ANTES DEL ARRANQUE',
   },
   'con-pendientes': {
     titulo: 'Con pendientes controlados',
     detalle: 'Queda algo abierto, sin riesgo para operar. Pasa al turno siguiente.',
+    titular: 'PLANTA ENTREGADA A PRODUCCIÓN — CON PENDIENTES CONTROLADOS',
   },
-  'no-liberada': { titulo: 'No liberada', detalle: 'La planta no arranca. Excepción.' },
+  'no-liberada': {
+    titulo: 'No liberada',
+    detalle: 'La planta no arranca. Excepción.',
+    titular: 'PLANTA NO LIBERADA — REQUIERE ACCIÓN CORRECTIVA',
+  },
 }
 
 /** La frase de la liberación, con la corrida cuando la hubo. */
@@ -365,12 +433,15 @@ export function frasePorLiberacion(estado: EstadoLiberacion, r: ResumenInspeccio
   }
   if (estado === 'con-pendientes') {
     const base = `${r.pendientes} de ${r.desviaciones} ${r.pendientes === 1 ? 'desviación queda abierta' : 'desviaciones quedan abiertas'}`
+    // La contingencia ES el trabajo de Mantención: sin ella el proceso se detenía. Decirla en
+    // la misma frase que el pendiente evita que el correo cuente solo la mitad mala.
+    const conMedida = r.controlados ? ' con medida de contingencia en marcha' : ''
     // §10 pide las críticas en cero para liberar. No se bloquea, pero no se dice «controladas»
     // cuando algo que para una línea sigue abierto: eso sería lavarlo.
-    if (r.pendientesCriticos) return `${base}, ${r.pendientesCriticos} de ellas detiene una línea.`
+    if (r.pendientesCriticos) return `${base}${conMedida}, ${r.pendientesCriticos} de ellas detiene una línea.`
     // No se puede decir «controladas» de algo que no se pudo evaluar.
-    if (r.sinEvaluar) return `${base}, ${r.sinEvaluar} sin poder evaluar si detienen una línea.`
-    return `${base}, controladas.`
+    if (r.sinEvaluar) return `${base}${conMedida}, ${r.sinEvaluar} sin poder evaluar si ${r.sinEvaluar === 1 ? 'detiene' : 'detienen'} una línea.`
+    return `${base}${conMedida}, controladas.`
   }
   return `${r.pendientes} ${r.pendientes === 1 ? 'desviación impide' : 'desviaciones impiden'} entregar la planta.`
 }

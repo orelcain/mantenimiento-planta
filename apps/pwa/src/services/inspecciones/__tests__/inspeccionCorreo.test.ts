@@ -138,8 +138,18 @@ describe('el resultado final', () => {
   it('liberada sale con la frase del procedimiento', () => {
     const insp = inspeccion({ liberacion: { estado: 'conforme', en: '2026-09-20T10:30:00.000Z', porNombre: 'Danilo Cortes' } })
     const html = inspeccionAHtmlCorreo(datos(insp, []))
-    expect(html).toContain('PLANTA LIBERADA PARA OPERACIÓN')
+    expect(html).toContain('PLANTA ENTREGADA A PRODUCCIÓN — CONFORME')
     expect(html).toContain('Danilo Cortes')
+  })
+
+  /**
+   * «PLANTA LIBERADA PARA OPERACIÓN» encabezaba los tres estados que entregan, y con un
+   * pendiente abierto se leía como si no hubiera pasado nada (Orel, 21-09-2026).
+   */
+  it('con pendientes controlados el titular lo dice, no lo esconde', () => {
+    const insp = inspeccion({ liberacion: { estado: 'con-pendientes', en: '2026-09-20T10:30:00.000Z', porNombre: 'Danilo Cortes' } })
+    const html = inspeccionAHtmlCorreo(datos(insp, [desviacion({ pendiente: true, horaTermino: null })]))
+    expect(html).toContain('PLANTA ENTREGADA A PRODUCCIÓN — CON PENDIENTES CONTROLADOS')
   })
 
   it('no liberada sale con la suya', () => {
@@ -147,10 +157,10 @@ describe('el resultado final', () => {
     expect(inspeccionAHtmlCorreo(datos(insp, []))).toContain('PLANTA NO LIBERADA — REQUIERE ACCIÓN CORRECTIVA')
   })
 
-  it('sin liberar no finge que se entregó', () => {
+  it('sin liberar no finge que se entregó: pide marcar la entrega', () => {
     const html = inspeccionAHtmlCorreo(datos(inspeccion(), []))
-    expect(html).toContain('todavía no se ha liberado')
-    expect(html).not.toContain('PLANTA LIBERADA')
+    expect(html).toContain('Falta marcar la entrega de la planta')
+    expect(html).not.toContain('ENTREGADA A PRODUCCIÓN')
   })
 })
 
@@ -204,7 +214,9 @@ describe('las fotos de la desviación viajan en el correo', () => {
   })
 
   it('sin fotos no deja una fila vacía en la tabla', () => {
-    expect(inspeccionAHtmlCorreo(datos(inspeccion(), [desviacion()]))).not.toContain('colspan="6"')
+    // La única fila a todo el ancho que puede quedar es el encabezado del grupo (el punto de
+    // la pauta); la de fotos no existe si no hay fotos.
+    expect(inspeccionAHtmlCorreo(datos(inspeccion(), [desviacion()]))).not.toContain('<img')
   })
 })
 
@@ -263,7 +275,7 @@ describe('la entrega es una foto, no un calculo vivo', () => {
   it('una entrega vieja, sin foto guardada, cae al resumen en vivo', () => {
     const insp = inspeccion({ liberacion: { estado: 'conforme', en: '2026-09-20T10:30:00.000Z', porNombre: 'Danilo Cortes' } })
     const html = inspeccionAHtmlCorreo(datos(insp, []))
-    expect(html).toContain('PLANTA LIBERADA PARA OPERACIÓN')
+    expect(html).toContain('PLANTA ENTREGADA A PRODUCCIÓN')
     expect(html).not.toContain('Después de la entrega')
   })
 })
@@ -275,5 +287,99 @@ describe('las desviaciones sin equipo reconocible se declaran', () => {
     const html = inspeccionAHtmlCorreo(conNull)
     expect(html).toContain('Sin evaluar')
     expect(html).toContain('no se pudo determinar si detienen una línea')
+  })
+})
+
+/**
+ * El caso real del 21-09-2026: TABLERO CONTROL TOLVA RIÑONES con agua adentro y la fuente de
+ * 24 V quemada. La solución final quedó pendiente, pero se operó a mano toda la noche para no
+ * detener el proceso. «No conforme» a secas contaba la mitad mala y callaba el trabajo que
+ * hizo que la planta produjera igual.
+ */
+describe('un punto controlado con contingencia', () => {
+  const insp = inspeccion({
+    resultados: { ...inspeccion().resultados, electrico: 'controlado' },
+  })
+  const abierta = desviacion({
+    pendiente: true,
+    horaTermino: null,
+    equipo: 'TABLERO CONTROL TOLVA RIÑONES',
+    descripcion: 'Ingreso de agua, fuente 24 V quemada; se opera a mano durante la noche',
+    inspeccion: { id: 'chonchi_2026-09-20_dia', criterioId: 'electrico' },
+  })
+
+  it('el punto sale «Controlado», no «No conforme»', () => {
+    const html = inspeccionAHtmlCorreo(datos(insp, [abierta]))
+    expect(html).toContain('>Controlado<')
+    expect(html).not.toContain('>No conforme<')
+  })
+
+  it('la desviación sale «Controlada» y con la medida, no como un pendiente pelado', () => {
+    const html = inspeccionAHtmlCorreo(datos(insp, [abierta]))
+    expect(html).toContain('>Controlada<')
+    expect(html).toContain('Medida de contingencia en marcha')
+  })
+
+  it('el estado de la desviación deja de decir «No conforme» cuando ya está resuelta', () => {
+    const html = inspeccionAHtmlCorreo(datos(inspeccion(), [desviacion()]))
+    expect(html).toContain('>Resuelta<')
+  })
+})
+
+describe('las desviaciones cuelgan de su punto de la pauta', () => {
+  const insp = inspeccion({ resultados: { ...inspeccion().resultados, electrico: 'no-conforme' } })
+  const dos = [
+    desviacion({ id: 'e1', inspeccion: { id: 'chonchi_2026-09-20_dia', criterioId: 'electrico' }, equipo: 'TABLERO TOLVA' }),
+    desviacion({ id: 'e2', inspeccion: { id: 'chonchi_2026-09-20_dia', criterioId: 'electrico' }, equipo: 'BOTONERA CINTA 3' }),
+  ]
+
+  it('el registro las agrupa bajo el punto, con cuántas son', () => {
+    const html = inspeccionAHtmlCorreo(datos(insp, dos))
+    expect(html).toContain('Sistema eléctrico')
+    expect(html).toContain('2 desviaciones')
+  })
+
+  it('la observación del punto deja de salir vacía: nombra lo que cuelga de él', () => {
+    const html = inspeccionAHtmlCorreo(datos(insp, dos))
+    expect(html).toContain('TABLERO TOLVA · BOTONERA CINTA 3')
+    expect(html).toContain('ver el registro abajo')
+  })
+
+  it('el texto plano también las agrupa', () => {
+    expect(inspeccionATextoPlano(datos(insp, dos))).toContain('Sistema eléctrico:')
+  })
+})
+
+/**
+ * Una pauta del domingo completada el lunes a las 18:09 quedaba con siete marcas a las 18:09.
+ * Sin hora, el correo no inventa ninguna (Orel, 21-09-2026).
+ */
+describe('la hora del punto es opcional', () => {
+  it('sin ninguna marca, la columna Hora ni siquiera aparece', () => {
+    const html = inspeccionAHtmlCorreo(datos(inspeccion(), []))
+    expect(html).not.toContain('>Hora<')
+  })
+
+  it('con marcas, la columna vuelve', () => {
+    const insp = inspeccion({ marcas: { electrico: '2026-09-20T12:16:00.000Z' } })
+    expect(inspeccionAHtmlCorreo(datos(insp, []))).toContain('>Hora<')
+  })
+
+  it('el texto plano no pone un horario donde no lo hay', () => {
+    const texto = inspeccionATextoPlano(datos(inspeccion(), []))
+    expect(texto).toContain('- Sistema eléctrico: Conforme')
+    expect(texto).not.toContain('Sistema eléctrico: Conforme (')
+  })
+})
+
+describe('el correo explica qué se revisa en cada punto', () => {
+  it('trae la guía del procedimiento al final, para quien quiera verificar', () => {
+    const html = inspeccionAHtmlCorreo(datos(inspeccion(), []))
+    expect(html).toContain('Qué se revisa en cada punto')
+    expect(html).toContain('Sin agua ni humedad en componentes eléctricos')
+  })
+
+  it('y explica qué significa cada estado', () => {
+    expect(inspeccionAHtmlCorreo(datos(inspeccion(), []))).toContain('se opera con una medida transitoria')
   })
 })
