@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { BarChart3, Check, ChevronDown, ChevronLeft, ChevronRight, Clock, Copy, FileSpreadsheet, Loader2, MessageCircle, NotebookPen, Pencil, Plus, QrCode, Share, Trash2 } from 'lucide-react'
+import { BarChart3, Check, ChevronDown, ChevronLeft, ChevronRight, Clock, Copy, FileSpreadsheet, Images, Loader2, MessageCircle, NotebookPen, Pencil, Plus, QrCode, Share, Trash2 } from 'lucide-react'
 import { Button, ListCell, ListGroup, Pill, SegmentedControl, Sheet, Tag, type SwipeAction } from '@/components/piel'
 import { ToastAction } from '@/components/ui/toast'
 import { vibrar } from '@/services/bitacora/vibrar'
@@ -252,6 +252,7 @@ export function BitacoraTurnoVista({
     [inspeccion, pauta, resumenInsp, desviaciones, turno],
   )
   const htmlCorreoInsp = useMemo(() => (datosCorreoInsp ? inspeccionAHtmlCorreo(datosCorreoInsp) : ''), [datosCorreoInsp])
+  const fotosInsp = useMemo(() => desviaciones.reduce((n, e) => n + (e.fotos?.length ?? 0), 0), [desviaciones])
   /** El nombre con que se firma: el mismo que la bitácora usa para el autor. */
   const firmante = autorFijo || [usuario?.nombre, usuario?.apellido].filter(Boolean).join(' ').trim() || usuario?.email || 'Mantención'
 
@@ -316,6 +317,37 @@ export function BitacoraTurnoVista({
       toast({ title: 'No se pudo copiar', description: 'El navegador bloqueó el portapapeles. Prueba de nuevo.', variant: 'destructive' })
     }
   }, [datosCorreoInsp, htmlCorreoInsp, toast])
+
+  /**
+   * Igual que en el turno: para Outlook nuevo/web las fotos van DENTRO del HTML (JPEG a
+   * 600 px). Outlook clásico trunca las base64, por eso no es la opción por defecto.
+   */
+  const copiarInspeccionConFotos = useCallback(async () => {
+    if (!datosCorreoInsp) return
+    setInspTrabajando(true)
+    try {
+      const urls = [...new Set(desviaciones.flatMap((e) => (e.fotos ?? []).map((f) => f.url)))]
+      const mapa = new Map<string, string>()
+      await Promise.all(
+        urls.map(async (u) => {
+          try {
+            mapa.set(u, (await cargarFotoComoJpeg(u, 600, 0.78)).dataUrl)
+          } catch {
+            /* esa foto queda por URL */
+          }
+        }),
+      )
+      await copiarHtml(
+        inspeccionAHtmlCorreo({ ...datosCorreoInsp, fuenteFoto: (f) => mapa.get(f.url) ?? f.url }),
+        inspeccionATextoPlano(datosCorreoInsp),
+      )
+      toast({ title: 'Copiado con fotos incrustadas', description: 'Pensado para Outlook nuevo o web.', variant: 'success' })
+    } catch {
+      toast({ title: 'No se pudo copiar', variant: 'destructive' })
+    } finally {
+      setInspTrabajando(false)
+    }
+  }, [datosCorreoInsp, desviaciones, toast])
 
   const iniciarLaInspeccion = useCallback(
     () =>
@@ -964,15 +996,23 @@ export function BitacoraTurnoVista({
                 >
                   Copiar asunto
                 </Button>
+                {fotosInsp > 0 && (
+                  <Button variant="tinted" onClick={() => void copiarInspeccionConFotos()} disabled={inspTrabajando}>
+                    {inspTrabajando ? <Loader2 className="animate-spin" /> : <Images />} Copiar con fotos incrustadas
+                  </Button>
+                )}
                 {inspeccion?.liberacion && (
                   <Button variant="tinted" onClick={() => void avisarDeLaLiberacion()}>
                     <Share /> Por WhatsApp
                   </Button>
                 )}
               </div>
-              <div className="hidden md:block">
-                <VistaPreviaCorreo html={htmlCorreoInsp} />
-              </div>
+              <p className="text-caption text-muted-foreground">
+                Así se va a ver al pegarlo{fotosInsp > 0 ? ` · ${fotosInsp} ${fotosInsp === 1 ? 'foto' : 'fotos'}` : ''}.
+              </p>
+              {/* La vista previa va TAMBIÉN en el teléfono: la inspección se hace desde ahí y
+                  hay que poder mirar el correo antes de copiarlo. */}
+              <VistaPreviaCorreo html={htmlCorreoInsp} ancho={720} />
             </section>
           )}
         </div>
@@ -1791,10 +1831,15 @@ function AccionesCabecera({
  */
 const ANCHO_CORREO = 1000
 
-function VistaPreviaCorreo({ html }: { html: string }) {
+/**
+ * `ancho`: el lienzo sobre el que se dibuja el correo antes de escalarlo. El del turno usa
+ * los 1000 px de siempre; el de la inspección mide 680, y darle el lienzo ancho lo dejaba al
+ * 31 % en un teléfono — ilegible por 320 px de papel en blanco.
+ */
+function VistaPreviaCorreo({ html, ancho = ANCHO_CORREO }: { html: string; ancho?: number }) {
   const ref = useRef<HTMLIFrameElement>(null)
   const [alto, setAlto] = useState(480)
-  const doc = `<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:#fff;}body{padding:20px;width:${ANCHO_CORREO - 40}px;}</style></head><body>${html}</body></html>`
+  const doc = `<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:#fff;}body{padding:20px;width:${ancho - 40}px;}</style></head><body>${html}</body></html>`
 
   /**
    * El correo se dibuja a SU ancho real y se escala para caber en la columna.
@@ -1805,10 +1850,10 @@ function VistaPreviaCorreo({ html }: { html: string }) {
     const iframe = ref.current
     const d = iframe?.contentDocument
     if (!iframe || !d?.body) return
-    const escala = Math.min(1, iframe.clientWidth / ANCHO_CORREO)
+    const escala = Math.min(1, iframe.clientWidth / ancho)
     d.documentElement.style.zoom = String(escala)
     setAlto(Math.max(240, Math.ceil(d.body.scrollHeight * escala) + 4))
-  }, [])
+  }, [ancho])
 
   useEffect(() => {
     const iframe = ref.current

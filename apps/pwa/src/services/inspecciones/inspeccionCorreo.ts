@@ -1,7 +1,7 @@
-import { C, FUENTE, escaparHtml, htmlKpi, htmlSeccion } from '@/services/bitacora/bitacoraCorreo'
+import { C, FUENTE, escaparHtml, htmlFotos, htmlKpi, htmlSeccion } from '@/services/bitacora/bitacoraCorreo'
 import { etiquetaTurno, fechaTurnoLarga, horarioTurno } from '@/services/bitacora/turnoMantencion'
 import { codigoEquipoDe, horarioEvento, tituloDe } from '@/services/bitacora/presentacionEvento'
-import { autorVisible, type EventoBitacora, type TurnoMantencion } from '@/services/bitacora/bitacora.types'
+import { autorVisible, type EventoBitacora, type FotoEvento, type TurnoMantencion } from '@/services/bitacora/bitacora.types'
 import {
   TEXTO_LIBERACION,
   frasePorLiberacion,
@@ -31,6 +31,11 @@ export interface DatosCorreoInspeccion {
   desviaciones: readonly EventoBitacora[]
   turno: TurnoMantencion
   planta: string
+  /**
+   * Por defecto las fotos van por URL (Outlook clásico las descarga al pegar). La variante
+   * incrustada en base64 existe solo para Outlook nuevo/web, que sí las acepta.
+   */
+  fuenteFoto?: (foto: FotoEvento) => string
 }
 
 const abierta = (e: EventoBitacora) => e.pendiente && !e.cierre
@@ -90,8 +95,9 @@ function accionDe(e: EventoBitacora): string {
   return h ? `Resuelta (${h})` : 'Resuelta'
 }
 
-export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen, desviaciones, turno, planta }: DatosCorreoInspeccion): string {
+export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen, desviaciones, turno, planta, fuenteFoto }: DatosCorreoInspeccion): string {
   const l = inspeccion.liberacion
+  const fuente = fuenteFoto ?? ((f: FotoEvento) => f.url)
 
   const encabezado =
     `<div style="font-family:${FUENTE};font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:${C.marca};">` +
@@ -140,13 +146,19 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen, desviaciones
   const filasDesviaciones = desviaciones
     .map((e) => {
       const equipo = [e.equipo || 'Sin equipo', codigoEquipoDe(e)].filter(Boolean).join(' · ')
-      return (
+      const fila =
         `<tr>${celda(equipo, '20%')}${celda(tituloDe(e) || e.descripcion, '22%')}${celda(e.descripcion, '26%')}` +
         celda(accionDe(e), '16%') +
         celda(autorVisible(e), '16%') +
         celdaEstado('no-conforme') +
         `</tr>`
-      )
+      // La «condición encontrada» de §8 se ve mejor que se cuenta: antes y después van juntos.
+      const fotos = (e.fotos ?? []).length
+        ? `<tr><td colspan="6" style="padding:0 10px 10px;border:1px solid ${C.linea};border-top:0;">` +
+          htmlFotos(e.fotos ?? [], fuente) +
+          `</td></tr>`
+        : ''
+      return fila + fotos
     })
     .join('')
 
@@ -211,9 +223,11 @@ export function inspeccionATextoPlano({ inspeccion, pauta, resumen, desviaciones
   if (!desviaciones.length) partes.push('Sin desviaciones detectadas durante la inspección.')
   else {
     for (const e of desviaciones) {
+      const fotos = (e.fotos ?? []).length
       partes.push(
         `- ${[e.equipo || 'Sin equipo', codigoEquipoDe(e)].filter(Boolean).join(' · ')}: ${e.descripcion}` +
-          ` | ${accionDe(e)} | ${autorVisible(e)}`,
+          ` | ${accionDe(e)} | ${autorVisible(e)}` +
+          (fotos ? ` | ${fotos} ${fotos === 1 ? 'foto' : 'fotos'}` : ''),
       )
     }
   }

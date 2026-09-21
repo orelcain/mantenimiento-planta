@@ -140,7 +140,7 @@ function dimensionesFoto(f: FotoEvento): { w: number; h: number | null } {
   return { w: ANCHO_FOTO, h: null }
 }
 
-function htmlFotos(fotos: readonly FotoEvento[], fuente: (f: FotoEvento) => string): string {
+export function htmlFotos(fotos: readonly FotoEvento[], fuente: (f: FotoEvento) => string): string {
   if (!fotos.length) return ''
   // Antes y después juntos y en ese orden: es la comparación que se quiere ver.
   const orden = { antes: 0, despues: 1, foto: 2 } as const

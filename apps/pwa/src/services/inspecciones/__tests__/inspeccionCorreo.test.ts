@@ -168,3 +168,42 @@ describe('cómo pega en Outlook', () => {
     expect(html).not.toContain('<b>grande</b>')
   })
 })
+
+describe('las fotos de la desviación viajan en el correo', () => {
+  const conFotos = () =>
+    desviacion({
+      fotos: [
+        { url: 'https://x/despues.jpg', path: 'p/2', etiqueta: 'despues', ancho: 1200, alto: 900 },
+        { url: 'https://x/antes.jpg', path: 'p/1', etiqueta: 'antes', ancho: 1200, alto: 900 },
+      ],
+    })
+
+  it('van como <img> con width y height: sin ellos Outlook las pega a 1920 px', () => {
+    const html = inspeccionAHtmlCorreo(datos(inspeccion(), [conFotos()]))
+    expect(html).toContain('https://x/antes.jpg')
+    expect(html).toContain('https://x/despues.jpg')
+    expect(html).toMatch(/<img[^>]+width="\d+"[^>]+height="\d+"/)
+  })
+
+  it('«antes» va primero: es la comparación que se quiere ver', () => {
+    const html = inspeccionAHtmlCorreo(datos(inspeccion(), [conFotos()]))
+    expect(html.indexOf('antes.jpg')).toBeLessThan(html.indexOf('despues.jpg'))
+  })
+
+  it('la variante incrustada reemplaza la URL por el base64', () => {
+    const html = inspeccionAHtmlCorreo({
+      ...datos(inspeccion(), [conFotos()]),
+      fuenteFoto: (f) => (f.etiqueta === 'antes' ? 'data:image/jpeg;base64,AAA' : f.url),
+    })
+    expect(html).toContain('data:image/jpeg;base64,AAA')
+    expect(html).not.toContain('https://x/antes.jpg')
+  })
+
+  it('el texto plano dice cuántas fotos hay, ya que no puede mostrarlas', () => {
+    expect(inspeccionATextoPlano(datos(inspeccion(), [conFotos()]))).toContain('2 fotos')
+  })
+
+  it('sin fotos no deja una fila vacía en la tabla', () => {
+    expect(inspeccionAHtmlCorreo(datos(inspeccion(), [desviacion()]))).not.toContain('colspan="6"')
+  })
+})
