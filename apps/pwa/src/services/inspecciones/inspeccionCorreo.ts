@@ -66,10 +66,11 @@ export function tituloCorreoInspeccion({ turno, planta }: Pick<DatosCorreoInspec
  * el punto en el rótulo y la cifra en tinta
  * (HIG «Color»: https://developer.apple.com/design/human-interface-guidelines/color).
  */
-function celdaTono(texto: string, color: string): string {
+function celdaTono(texto: string, color: string, ancho?: string): string {
   return (
     `<td style="padding:6px 10px;border:1px solid ${C.linea};font-family:${FUENTE};font-size:13px;` +
-    `color:${C.tinta};white-space:nowrap;"><span style="color:${color};">●</span> ${texto}</td>`
+    `color:${C.tinta};white-space:nowrap;vertical-align:top;${ancho ? `width:${ancho};` : ''}">` +
+    `<span style="color:${color};">●</span> ${texto}</td>`
   )
 }
 
@@ -96,10 +97,10 @@ function celdaEstado(estado: ResultadoCriterio | undefined): string {
  * resueltas: la columna no estaba diciendo nada. Sale de lo que el evento y su punto guardan.
  */
 function celdaEstadoDesviacion(e: EventoBitacora, inspeccion: Inspeccion): string {
-  if (!abierta(e)) return celdaTono('Resuelta', C.ventana)
+  if (!abierta(e)) return celdaTono('Resuelta', C.ventana, '10%')
   return inspeccion.resultados[e.inspeccion?.criterioId ?? ''] === 'controlado'
-    ? celdaTono('Controlada', C.pendBorde)
-    : celdaTono('Pendiente', C.parada)
+    ? celdaTono('Controlada', C.pendBorde, '10%')
+    : celdaTono('Pendiente', C.parada, '10%')
 }
 
 function celda(texto: string, ancho?: string, gris?: boolean): string {
@@ -179,7 +180,10 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen: vivo, desvia
     resumen.controlados > 0
       ? htmlKpi(String(resumen.controlados), resumen.controlados === 1 ? 'con contingencia' : 'con contingencia', C.pendBorde)
       : '',
-    htmlKpi(String(resumen.noConformes), resumen.noConformes === 1 ? 'no conforme' : 'no conformes', resumen.noConformes ? C.parada : undefined),
+    // Un cero no es noticia: la fila de KPI es para lo que pasó, no para lo que no pasó.
+    resumen.noConformes > 0
+      ? htmlKpi(String(resumen.noConformes), resumen.noConformes === 1 ? 'no conforme' : 'no conformes', C.parada)
+      : '',
     resumen.desviaciones > 0
       ? htmlKpi(String(resumen.desviaciones), resumen.desviaciones === 1 ? 'desviación' : 'desviaciones')
       : '',
@@ -246,9 +250,11 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen: vivo, desvia
   const filaDesviacion = (e: EventoBitacora) => {
     const equipo = [e.equipo || 'Sin equipo', codigoEquipoDe(e)].filter(Boolean).join(' · ')
     const fila =
-      `<tr>${celda(equipo, '20%')}${celda(tituloDe(e) || e.descripcion, '22%')}${celda(e.descripcion, '26%')}` +
+      // Los anchos suman 100 con la columna de estado incluida: sin eso, la descripción
+      // quedaba en una columna de cuatro palabras de ancho y la fila crecía a lo alto.
+      `<tr>${celda(equipo, '16%')}${celda(tituloDe(e) || e.descripcion, '16%')}${celda(e.descripcion, '30%')}` +
       celda(accionDe(e, inspeccion), '16%') +
-      celda(autorVisible(e), '16%') +
+      celda(autorVisible(e), '12%') +
       celdaEstadoDesviacion(e, inspeccion) +
       `</tr>`
     // La «condición encontrada» de §8 se ve mejor que se cuenta: antes y después van juntos.
