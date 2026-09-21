@@ -979,7 +979,14 @@ export function BitacoraTurnoVista({
             onAbrirEvento={(e) => setEditor({ evento: e, idNuevo: '', turno })}
             onLiberar={(estado) =>
               void conAviso(() =>
-                liberarPlanta(BITACORA_PLANTA.id, turno.id, { estado, en: new Date().toISOString(), porNombre: firmante }),
+                liberarPlanta(BITACORA_PLANTA.id, turno.id, {
+                  estado,
+                  en: new Date().toISOString(),
+                  porNombre: firmante,
+                  // La foto del momento: el informe de entrega no puede decir otra cosa
+                  // mañana porque alguien cerró un pendiente.
+                  resumen: resumenInsp,
+                }),
               )
             }
             onDeshacerLiberacion={() => void conAviso(() => liberarPlanta(BITACORA_PLANTA.id, turno.id, null))}

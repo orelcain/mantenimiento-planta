@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { leerLineas } from '@/services/lineasProceso/lineasProceso.service'
 import { pesosPorLinea, type PesoEnLinea } from '@/services/lineasProceso/modeloLineas'
 import {
+  escucharDesviaciones,
   escucharInspeccion,
   escucharPauta,
   type InspeccionGuardada,
@@ -38,6 +39,13 @@ export function useInspeccion(
    * equipo lleva flujo, su falla para la línea. Se lee una vez.
    */
   const [pesos, setPesos] = useState<Map<string, PesoEnLinea>>(() => new Map())
+  /**
+   * El peso de los elementos MANUALES por su nombre. Un `manual:` no tiene código SAP, así que
+   * el evento no lo puede enlazar por `equipoId` — y son justo los que más pesan (la cinta
+   * larga del grader y las 12 buchacas son el 100 % de Emparrillado).
+   */
+  const [pesoPorNombre, setPesoPorNombre] = useState<Map<string, PesoEnLinea>>(() => new Map())
+  const [desviaciones, setDesviaciones] = useState<EventoBitacora[]>([])
 
   useEffect(() => escucharPauta(PAUTA_POST_ASEO.id, setPauta), [])
   useEffect(() => {
@@ -45,7 +53,17 @@ export function useInspeccion(
     // Sin diagrama guardado no se puede deducir: entonces ninguna se marca crítica, que es
     // mejor que marcarlas todas y que el aviso deje de significar algo.
     void leerLineas(plantId)
-      .then((g) => vivo && g && setPesos(pesosPorLinea(g)))
+      .then((g) => {
+        if (!vivo || !g) return
+        const ps = pesosPorLinea(g)
+        setPesos(ps)
+        const porNombre = new Map<string, PesoEnLinea>()
+        for (const n of g.nodos) {
+          const p = n.nombre && ps.get(n.id)
+          if (p) porNombre.set(clave(n.nombre ?? ''), p)
+        }
+        setPesoPorNombre(porNombre)
+      })
       .catch(() => undefined)
     return () => {
       vivo = false
@@ -57,18 +75,30 @@ export function useInspeccion(
     return escucharInspeccion(plantId, turnoId, setInspeccion)
   }, [plantId, turnoId])
 
-  const desviaciones = useMemo(
-    () => eventos.filter((e) => !!e.inspeccion?.id && e.inspeccion.id === inspeccion?.id),
-    [eventos, inspeccion?.id],
-  )
+  // Se leen por inspección; los eventos del turno solo sirven para verlas al instante
+  // mientras Firestore confirma (el mismo evento puede llegar por las dos vías).
+  useEffect(() => {
+    if (!inspeccion?.id) {
+      setDesviaciones([])
+      return
+    }
+    return escucharDesviaciones(inspeccion.id, setDesviaciones)
+  }, [inspeccion?.id])
+
+  const todas = useMemo(() => {
+    const m = new Map<string, EventoBitacora>()
+    for (const e of desviaciones) m.set(e.id, e)
+    for (const e of eventos) if (e.inspeccion?.id && e.inspeccion.id === inspeccion?.id) m.set(e.id, e)
+    return [...m.values()]
+  }, [desviaciones, eventos, inspeccion?.id])
 
   const resumen = useMemo(() => {
-    const ds: DesviacionDeInspeccion[] = desviaciones.map((e) => ({
+    const ds: DesviacionDeInspeccion[] = todas.map((e) => ({
       id: e.id,
       criterioId: e.inspeccion?.criterioId ?? '',
       // Un pendiente con cierre ya está resuelto: el cierre manda sobre la marca.
       pendiente: e.pendiente && !e.cierre,
-      critica: esCritica(e, pesos),
+      critica: esCritica(e, pesos, pesoPorNombre),
       desdeMin: e.posicionMin ?? null,
       hastaMin: minutosDeTermino(e),
     }))
@@ -77,9 +107,9 @@ export function useInspeccion(
       { resultados: inspeccion?.resultados ?? {}, notas: inspeccion?.notas, marcas: inspeccion?.marcas },
       ds,
     )
-  }, [pauta, inspeccion?.resultados, inspeccion?.notas, inspeccion?.marcas, desviaciones, pesos])
+  }, [pauta, inspeccion?.resultados, inspeccion?.notas, inspeccion?.marcas, todas, pesos, pesoPorNombre])
 
-  return { pauta, inspeccion, desviaciones, resumen }
+  return { pauta, inspeccion, desviaciones: todas, resumen }
 }
 
 /**
@@ -87,10 +117,29 @@ export function useInspeccion(
  * su línea al fallar. Un elemento suelto (0 %) o un servicio de apoyo, no.
  * ⚠ Un evento escrito a mano, sin equipo del árbol, no se puede juzgar: no se marca crítica.
  */
-function esCritica(e: EventoBitacora, pesos: ReadonlyMap<string, PesoEnLinea>): boolean {
-  if (!e.equipoId) return false
-  const p = pesos.get(e.equipoId)
-  return !!p && !p.ciclo && p.peso > 0
+function esCritica(
+  e: EventoBitacora,
+  pesos: ReadonlyMap<string, PesoEnLinea>,
+  porNombre: ReadonlyMap<string, PesoEnLinea>,
+): boolean | null {
+  // Del árbol: la vía normal.
+  const p = e.equipoId ? pesos.get(e.equipoId) : undefined
+  if (p) return !p.ciclo && p.peso > 0
+  // Sin código SAP: se intenta por nombre contra los elementos manuales del diagrama.
+  const m = porNombre.get(clave(e.equipo ?? ''))
+  if (m) return !m.ciclo && m.peso > 0
+  // No se pudo juzgar. NO es lo mismo que «no es crítica».
+  return null
+}
+
+/** Nombres comparables: sin tildes, sin dobles espacios y en minúscula. */
+function clave(nombre: string): string {
+  return nombre
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase()
 }
 
 /**

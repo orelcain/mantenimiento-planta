@@ -1,5 +1,7 @@
-import { doc, onSnapshot, serverTimestamp, setDoc, type Timestamp } from 'firebase/firestore'
+import { collection, doc, onSnapshot, query, serverTimestamp, setDoc, where, type Timestamp } from 'firebase/firestore'
 import { db } from '@/services/firebase'
+import { BITACORA_COLECCION } from '@/config/bitacora'
+import type { EventoBitacora } from '@/services/bitacora/bitacora.types'
 import { PAUTA_POST_ASEO, type Inspeccion, type Liberacion, type PautaInspeccion, type ResultadoCriterio } from './modeloInspeccion'
 
 /**
@@ -117,6 +119,21 @@ export async function anotarCriterio(plantId: string, turnoId: string, criterioI
     doc(db, COLECCION_INSPECCIONES, idDeInspeccion(plantId, turnoId)),
     { notas: { [criterioId]: nota.trim().slice(0, 300) || null }, actualizadoEn: serverTimestamp() },
     { merge: true },
+  )
+}
+
+/**
+ * Las desviaciones de una inspección, buscadas por la INSPECCIÓN y no por el turno.
+ *
+ * ⚠ Filtrarlas entre los eventos del turno parecía equivalente y no lo es: un evento se puede
+ * mover de turno (se anotó en el equivocado), y al moverlo desaparecía del registro §8 sin que
+ * nadie se enterara — el informe quedaba incompleto en silencio.
+ */
+export function escucharDesviaciones(inspeccionId: string, alCambiar: (e: EventoBitacora[]) => void): () => void {
+  return onSnapshot(
+    query(collection(db, BITACORA_COLECCION), where('inspeccion.id', '==', inspeccionId)),
+    (snap) => alCambiar(snap.docs.map((d) => ({ ...(d.data() as EventoBitacora), id: d.id }))),
+    () => alCambiar([]),
   )
 }
 

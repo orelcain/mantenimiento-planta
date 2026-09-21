@@ -231,3 +231,49 @@ describe('el correo ya no se contradice', () => {
     expect(inspeccionAHtmlCorreo(datos(inspeccion(), []))).toContain('Sin desviaciones detectadas')
   })
 })
+
+describe('la entrega es una foto, no un calculo vivo', () => {
+  const liberada = (resumenFoto: Parameters<typeof inspeccionAHtmlCorreo>[0]['resumen']) =>
+    inspeccion({
+      liberacion: { estado: 'con-pendientes', en: '2026-09-20T10:30:00.000Z', porNombre: 'Danilo Cortes', resumen: resumenFoto },
+    })
+
+  it('usa los numeros del momento de liberar, no los de hoy', () => {
+    // Al entregar quedaba 1 pendiente; ahora ya se cerro.
+    const foto = datos(inspeccion(), [desviacion({ pendiente: true, horaTermino: null })]).resumen
+    const ahora = datos(inspeccion(), [desviacion()])
+    const html = inspeccionAHtmlCorreo({ ...ahora, inspeccion: liberada(foto) })
+    expect(html).toContain('queda abierta')
+  })
+
+  it('pero dice aparte lo que cambio despues, sin reescribir la entrega', () => {
+    const foto = datos(inspeccion(), [desviacion({ pendiente: true, horaTermino: null })]).resumen
+    const ahora = datos(inspeccion(), [desviacion()])
+    const html = inspeccionAHtmlCorreo({ ...ahora, inspeccion: liberada(foto) })
+    expect(html).toContain('Después de la entrega')
+    expect(html).toContain('1 pendiente se resolvió')
+  })
+
+  it('sin cambios no agrega el bloque', () => {
+    const d = datos(inspeccion(), [desviacion()])
+    const html = inspeccionAHtmlCorreo({ ...d, inspeccion: liberada(d.resumen) })
+    expect(html).not.toContain('Después de la entrega')
+  })
+
+  it('una entrega vieja, sin foto guardada, cae al resumen en vivo', () => {
+    const insp = inspeccion({ liberacion: { estado: 'conforme', en: '2026-09-20T10:30:00.000Z', porNombre: 'Danilo Cortes' } })
+    const html = inspeccionAHtmlCorreo(datos(insp, []))
+    expect(html).toContain('PLANTA LIBERADA PARA OPERACIÓN')
+    expect(html).not.toContain('Después de la entrega')
+  })
+})
+
+describe('las desviaciones sin equipo reconocible se declaran', () => {
+  it('el correo lo dice en vez de darlas por inofensivas', () => {
+    const d = datos(inspeccion(), [desviacion({ pendiente: true, horaTermino: null, equipoId: null, equipo: 'CINTA LARGA GRADER' })])
+    const conNull = { ...d, resumen: { ...d.resumen, sinEvaluar: 1, pendientesCriticos: 0 } }
+    const html = inspeccionAHtmlCorreo(conNull)
+    expect(html).toContain('Sin evaluar')
+    expect(html).toContain('no se pudo determinar si detienen una línea')
+  })
+})

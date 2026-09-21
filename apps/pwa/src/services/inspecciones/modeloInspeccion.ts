@@ -61,6 +61,15 @@ export interface Liberacion {
   en: string
   porNombre: string
   nota?: string
+  /**
+   * FOTO del momento de la entrega. Un informe de liberación no es un cálculo vivo: si se
+   * entrega «con pendientes controlados» y al día siguiente alguien cierra ese pendiente, el
+   * mismo documento no puede decir otra cosa al volver a abrirlo. Lo que pase después es
+   * historia del turno, no de la entrega (Orel, 21-09-2026).
+   *
+   * Ausente en las liberaciones anteriores a este cambio: ahí se cae al resumen en vivo.
+   */
+  resumen?: ResumenInspeccion
 }
 
 export interface Inspeccion {
@@ -99,8 +108,9 @@ export interface DesviacionDeInspeccion {
   /**
    * «Compromete el funcionamiento del proceso» (§8 del procedimiento). No se pregunta: lo
    * responde el diagrama de líneas. Si el equipo lleva flujo, su falla para la línea.
+   * `null` = no se pudo evaluar (sin equipo reconocible). No es lo mismo que «no».
    */
-  critica: boolean
+  critica: boolean | null
   desdeMin: number | null
   hastaMin: number | null
 }
@@ -122,6 +132,12 @@ export interface ResumenInspeccion {
    * de afirmar que no hubo ninguna: era la contradicción que encontró Orel.
    */
   noConformesSinDesviacion: number
+  /**
+   * Desviaciones abiertas que no se pudieron juzgar: sin equipo del árbol ni nombre que calce
+   * con el diagrama, no hay cómo saber si detienen una línea. Decirlo es mejor que darlas por
+   * inofensivas — justo el caso de los elementos sin código SAP, que son los que más pesan.
+   */
+  sinEvaluar: number
   /** De la primera marca a la última: distingue un recorrido de una firma de un tirón. */
   minutosDeRecorrido: number | null
   /** Qué corresponde marcar según lo encontrado. `null` = todavía falta revisar puntos. */
@@ -226,7 +242,8 @@ export function resumenDeInspeccion(
   const revisados = conformes + corregidos + noConformes
   const abiertas = desviaciones.filter((d) => d.pendiente)
   const pendientes = abiertas.length
-  const pendientesCriticos = abiertas.filter((d) => d.critica).length
+  const pendientesCriticos = abiertas.filter((d) => d.critica === true).length
+  const sinEvaluar = abiertas.filter((d) => d.critica == null).length
   const conObservacion = pauta.criterios.filter((c) => (inspeccion.notas?.[c.id] ?? '').trim()).length
 
   const marcas = pauta.criterios
@@ -255,6 +272,7 @@ export function resumenDeInspeccion(
     conObservacion,
     corregidos,
     noConformesSinDesviacion: sinDesviacion.size,
+    sinEvaluar,
     minutosDeRecorrido,
     sugerido,
     minutosDeCorrida,
@@ -290,9 +308,10 @@ export function frasePorLiberacion(estado: EstadoLiberacion, r: ResumenInspeccio
     const base = `${r.pendientes} de ${r.desviaciones} ${r.pendientes === 1 ? 'desviación queda abierta' : 'desviaciones quedan abiertas'}`
     // §10 pide las críticas en cero para liberar. No se bloquea, pero no se dice «controladas»
     // cuando algo que para una línea sigue abierto: eso sería lavarlo.
-    return r.pendientesCriticos
-      ? `${base}, ${r.pendientesCriticos} de ellas detiene una línea.`
-      : `${base}, controladas.`
+    if (r.pendientesCriticos) return `${base}, ${r.pendientesCriticos} de ellas detiene una línea.`
+    // No se puede decir «controladas» de algo que no se pudo evaluar.
+    if (r.sinEvaluar) return `${base}, ${r.sinEvaluar} sin poder evaluar si detienen una línea.`
+    return `${base}, controladas.`
   }
   return `${r.pendientes} ${r.pendientes === 1 ? 'desviación impide' : 'desviaciones impiden'} entregar la planta.`
 }

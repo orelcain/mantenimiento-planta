@@ -99,9 +99,13 @@ function accionDe(e: EventoBitacora): string {
   return h ? `Resuelta (${h})` : 'Resuelta'
 }
 
-export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen, desviaciones, turno, planta, fuenteFoto }: DatosCorreoInspeccion): string {
+export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen: vivo, desviaciones, turno, planta, fuenteFoto }: DatosCorreoInspeccion): string {
   const l = inspeccion.liberacion
   const fuente = fuenteFoto ?? ((f: FotoEvento) => f.url)
+  // Entregada: manda la FOTO de ese momento. Sin foto (entregas anteriores a este cambio) o
+  // sin entregar todavía, el resumen en vivo.
+  const resumen = l?.resumen ?? vivo
+  const cambios = l?.resumen ? cambiosDesdeLaEntrega(l.resumen, vivo) : ''
 
   const encabezado =
     `<div style="font-family:${FUENTE};font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:${C.marca};">` +
@@ -183,6 +187,12 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen, desviaciones
         : 'Sin desviaciones detectadas durante la inspección.') +
       `</p>`
 
+  const sinJuzgar = resumen.sinEvaluar
+    ? `<div style="font-family:${FUENTE};background:${C.pendFondo};border-left:3px solid ${C.pendBorde};padding:8px 12px;margin-top:10px;font-size:13px;color:${C.tinta};">` +
+      `<b>Sin evaluar:</b> ${resumen.sinEvaluar} ${resumen.sinEvaluar === 1 ? 'desviación abierta no tiene' : 'desviaciones abiertas no tienen'} un equipo reconocible en el diagrama de líneas, ` +
+      `así que no se pudo determinar si detienen una línea de proceso.</div>`
+    : ''
+
   const aviso = resumen.pendientesCriticos
     ? `<div style="font-family:${FUENTE};background:${C.critFondo};border-left:3px solid ${C.parada};padding:8px 12px;margin-top:10px;font-size:13px;color:${C.tinta};">` +
       `<b>Atención:</b> ${resumen.pendientesCriticos} ${resumen.pendientesCriticos === 1 ? 'desviación abierta detiene' : 'desviaciones abiertas detienen'} una línea de proceso.</div>`
@@ -209,12 +219,30 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen, desviaciones
 
   return `<div style="max-width:680px;color:${C.tinta};">${encabezado}` +
     `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin:12px 0 4px;"><tr>${kpis}</tr></table>` +
-    `${tablaCriterios}${tablaDesviaciones}${aviso}${resultado}${pie}</div>`
+    `${tablaCriterios}${tablaDesviaciones}${aviso}${sinJuzgar}${resultado}${cambios}${pie}</div>`
+}
+
+/**
+ * Lo que cambió DESPUÉS de entregar la planta. No reescribe la entrega —esa es una foto— pero
+ * tampoco la deja incompleta: si un pendiente se cerró al día siguiente, se dice aparte.
+ */
+function cambiosDesdeLaEntrega(foto: ResumenInspeccion, ahora: ResumenInspeccion): string {
+  const partes: string[] = []
+  const cerradas = foto.pendientes - ahora.pendientes
+  if (cerradas > 0) partes.push(`${cerradas} ${cerradas === 1 ? 'pendiente se resolvió' : 'pendientes se resolvieron'}`)
+  const nuevas = ahora.desviaciones - foto.desviaciones
+  if (nuevas > 0) partes.push(`${nuevas} ${nuevas === 1 ? 'desviación nueva' : 'desviaciones nuevas'}`)
+  if (!partes.length) return ''
+  return (
+    `<div style="font-family:${FUENTE};font-size:12.5px;color:${C.sec};padding-top:10px;border-top:1px solid ${C.linea};margin-top:12px;">` +
+    `Después de la entrega: ${escaparHtml(partes.join(' · '))}. Los números de arriba son los del momento de liberar.</div>`
+  )
 }
 
 /** La misma inspección en texto plano, para el cuerpo alterno del correo y para WhatsApp. */
-export function inspeccionATextoPlano({ inspeccion, pauta, resumen, desviaciones, turno, planta }: DatosCorreoInspeccion): string {
+export function inspeccionATextoPlano({ inspeccion, pauta, resumen: vivo, desviaciones, turno, planta }: DatosCorreoInspeccion): string {
   const l = inspeccion.liberacion
+  const resumen = l?.resumen ?? vivo
   const etiqueta = (id: string) => {
     const r = inspeccion.resultados[id]
     return r === 'conforme' ? 'Conforme' : r === 'corregido' ? 'Corregido' : r === 'no-conforme' ? 'NO CONFORME' : 'Sin revisar'
@@ -252,6 +280,9 @@ export function inspeccionATextoPlano({ inspeccion, pauta, resumen, desviaciones
     }
   }
 
+  if (resumen.sinEvaluar) {
+    partes.push('', `SIN EVALUAR: ${resumen.sinEvaluar} desviación(es) abierta(s) sin equipo reconocible en el diagrama.`)
+  }
   if (resumen.pendientesCriticos) {
     partes.push('', `ATENCIÓN: ${resumen.pendientesCriticos} ${resumen.pendientesCriticos === 1 ? 'desviación abierta detiene' : 'desviaciones abiertas detienen'} una línea de proceso.`)
   }
