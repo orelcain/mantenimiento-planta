@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   PAUTA_POST_ASEO,
+  avisoDeInspeccion,
   frasePorLiberacion,
+  pautaCambio,
+  pautaDeLaInspeccion,
   resumenDeInspeccion,
   type DesviacionDeInspeccion,
 } from '../modeloInspeccion'
@@ -230,5 +233,59 @@ describe('lo que no se pudo evaluar no se da por inofensivo', () => {
   it('una cerrada sin evaluar no cuenta: solo importa lo que queda abierto', () => {
     const r = resumenDeInspeccion(PAUTA_POST_ASEO, { resultados: TODOS }, [desviacion({ critica: null })])
     expect(r.sinEvaluar).toBe(0)
+  })
+})
+
+describe('la inspeccion se recorre con la pauta con que empezo', () => {
+  const guardada = { pautaId: 'post-aseo', pautaVersion: 1, criterios: [{ id: 'mecanico', titulo: 'Equipos mecanicos', ayuda: '' }] }
+  const viva = { ...PAUTA_POST_ASEO, version: 4 }
+
+  it('usa los criterios guardados, no los de la pauta viva', () => {
+    const p = pautaDeLaInspeccion(viva, guardada)
+    expect(p.criterios).toHaveLength(1)
+    expect(p.version).toBe(1)
+  })
+
+  it('una inspeccion vieja, sin criterios guardados, cae a la pauta viva', () => {
+    expect(pautaDeLaInspeccion(viva, { pautaId: 'post-aseo', pautaVersion: 1 }).criterios).toHaveLength(7)
+  })
+
+  it('avisa cuando la pauta se edito despues de empezar', () => {
+    expect(pautaCambio(viva, guardada)).toBe(true)
+    expect(pautaCambio(PAUTA_POST_ASEO, guardada)).toBe(false)
+    // Sin criterios guardados no hay con que comparar: no se avisa.
+    expect(pautaCambio(viva, { pautaVersion: 1 })).toBe(false)
+  })
+})
+
+describe('el aviso: que toca y que quedo a medias', () => {
+  const r = (revisados: number) => ({ revisados, total: 7 })
+
+  it('un turno de domingo sin inspeccion dice que toca', () => {
+    // 20-09-2026 es domingo.
+    expect(avisoDeInspeccion('2026-09-20', null, r(0))).toBe('toca')
+  })
+
+  it('cualquier otro dia no molesta', () => {
+    expect(avisoDeInspeccion('2026-09-21', null, r(0))).toBeNull()
+  })
+
+  it('el dia se calcula a mediodia: la zona horaria no puede correrlo', () => {
+    // A medianoche UTC-3 esto caeria en sabado y el aviso no saldria el domingo.
+    expect(avisoDeInspeccion('2026-09-20', null, r(0))).toBe('toca')
+    expect(avisoDeInspeccion('2026-09-27', null, r(0))).toBe('toca')
+  })
+
+  it('empezada y sin terminar queda «a medias»', () => {
+    expect(avisoDeInspeccion('2026-09-21', { liberacion: null }, r(3))).toBe('a-medias')
+  })
+
+  it('completa pero sin entregar la planta se dice aparte', () => {
+    expect(avisoDeInspeccion('2026-09-21', { liberacion: null }, r(7))).toBe('sin-liberar')
+  })
+
+  it('entregada no avisa nada', () => {
+    const l = { estado: 'conforme' as const, en: '2026-09-21T10:00:00.000Z', porNombre: 'Danilo' }
+    expect(avisoDeInspeccion('2026-09-20', { liberacion: l }, r(7))).toBeNull()
   })
 })
