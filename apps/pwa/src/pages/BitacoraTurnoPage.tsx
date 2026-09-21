@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { BarChart3, Check, ChevronDown, ChevronLeft, ChevronRight, Clock, FileSpreadsheet, Loader2, MessageCircle, NotebookPen, Pencil, Plus, QrCode, Share, Trash2 } from 'lucide-react'
+import { BarChart3, Check, ChevronDown, ChevronLeft, ChevronRight, Clock, Copy, FileSpreadsheet, Loader2, MessageCircle, NotebookPen, Pencil, Plus, QrCode, Share, Trash2 } from 'lucide-react'
 import { Button, ListCell, ListGroup, Pill, SegmentedControl, Sheet, Tag, type SwipeAction } from '@/components/piel'
 import { ToastAction } from '@/components/ui/toast'
 import { vibrar } from '@/services/bitacora/vibrar'
@@ -32,6 +32,7 @@ import { PanelInspeccion } from '@/components/bitacora/PanelInspeccion'
 import { useInspeccion } from '@/hooks/useInspeccion'
 import { anotarCriterio, iniciarInspeccion, liberarPlanta, marcarCriterio } from '@/services/inspecciones/inspecciones.service'
 import { TEXTO_LIBERACION, frasePorLiberacion } from '@/services/inspecciones/modeloInspeccion'
+import { inspeccionAHtmlCorreo, inspeccionATextoPlano, tituloCorreoInspeccion } from '@/services/inspecciones/inspeccionCorreo'
 import { encabezadoEvento, etiquetaTipo, posicionAlMover, posicionEnIndice, tieneHora, tiposPropiosUsados, tituloDe } from '@/services/bitacora/presentacionEvento'
 import { copiarHtml, copiarTexto } from '@/lib/clipboard'
 import type { EnlaceInspeccion, EventoBitacora, FotoEvento, TurnoMantencion } from '@/services/bitacora/bitacora.types'
@@ -242,6 +243,15 @@ export function BitacoraTurnoVista({
   // ── Inspección de planta post-aseo ──
   const { pauta, inspeccion, desviaciones, resumen: resumenInsp } = useInspeccion(BITACORA_PLANTA.id, turno.id, eventos)
   const [inspTrabajando, setInspTrabajando] = useState(false)
+  /** El correo de la inspección se arma igual que el del turno: mismos bloques, mismo estilo. */
+  const datosCorreoInsp = useMemo(
+    () =>
+      inspeccion
+        ? { inspeccion, pauta, resumen: resumenInsp, desviaciones, turno, planta: BITACORA_PLANTA.nombre }
+        : null,
+    [inspeccion, pauta, resumenInsp, desviaciones, turno],
+  )
+  const htmlCorreoInsp = useMemo(() => (datosCorreoInsp ? inspeccionAHtmlCorreo(datosCorreoInsp) : ''), [datosCorreoInsp])
   /** El nombre con que se firma: el mismo que la bitácora usa para el autor. */
   const firmante = autorFijo || [usuario?.nombre, usuario?.apellido].filter(Boolean).join(' ').trim() || usuario?.email || 'Mantención'
 
@@ -289,13 +299,23 @@ export function BitacoraTurnoVista({
     if (abiertas.length) {
       lineas.push('', '*Queda abierto:*', ...abiertas.map((d) => `• ${d.equipo || 'Sin equipo'} — ${d.descripcion}`))
     }
-    lineas.push('', `Liberada ${new Date(l.en).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })} · ${l.porNombre}`)
+    lineas.push('', `Liberada ${new Date(l.en).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false })} · ${l.porNombre}`)
     try {
       await compartirMensaje(lineas.join('\n'))
     } catch {
       toast({ title: 'No se pudo compartir', description: 'Copia el texto a mano desde la pantalla.', variant: 'destructive' })
     }
   }, [inspeccion?.liberacion, pauta.nombre, turno, resumenInsp, desviaciones, toast])
+
+  const copiarInspeccionParaCorreo = useCallback(async () => {
+    if (!datosCorreoInsp) return
+    try {
+      await copiarHtml(htmlCorreoInsp, inspeccionATextoPlano(datosCorreoInsp))
+      toast({ title: 'Copiado', description: 'Pégalo en el correo con Ctrl+V.', variant: 'success' })
+    } catch {
+      toast({ title: 'No se pudo copiar', description: 'El navegador bloqueó el portapapeles. Prueba de nuevo.', variant: 'destructive' })
+    }
+  }, [datosCorreoInsp, htmlCorreoInsp, toast])
 
   const iniciarLaInspeccion = useCallback(
     () =>
@@ -914,7 +934,6 @@ export function BitacoraTurnoVista({
               void conAviso(() => marcarCriterio(BITACORA_PLANTA.id, turno.id, criterioId, resultado))
             }
             onAnotar={(criterioId, nota) => void conAviso(() => anotarCriterio(BITACORA_PLANTA.id, turno.id, criterioId, nota))}
-            onAvisarSupervisor={() => void avisarDeLaLiberacion()}
             onNuevaDesviacion={(criterioId) =>
               inspeccion && setEditor({ evento: null, idNuevo: nuevoId(), turno, desdeInspeccion: { id: inspeccion.id, criterioId } })
             }
@@ -926,6 +945,36 @@ export function BitacoraTurnoVista({
             }
             onDeshacerLiberacion={() => void conAviso(() => liberarPlanta(BITACORA_PLANTA.id, turno.id, null))}
           />
+
+          {/* Enviar: la misma mecánica del turno — copiar para pegar en Outlook, o WhatsApp.
+              §9 del procedimiento: «Informar al supervisor». */}
+          {datosCorreoInsp && (
+            <section className="mt-5 flex flex-col gap-3 rounded-card border border-border bg-card p-4">
+              <h3 className="text-subhead font-semibold">Enviar la inspección</h3>
+              <p className="text-caption text-muted-foreground">
+                Lleva el criterio de liberación, el registro de desviaciones y el resultado final, como pide el procedimiento.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={() => void copiarInspeccionParaCorreo()}>
+                  <Copy /> Copiar para correo
+                </Button>
+                <Button
+                  variant="tinted"
+                  onClick={() => void copiarTexto(tituloCorreoInspeccion({ turno, planta: BITACORA_PLANTA.nombre }))}
+                >
+                  Copiar asunto
+                </Button>
+                {inspeccion?.liberacion && (
+                  <Button variant="tinted" onClick={() => void avisarDeLaLiberacion()}>
+                    <Share /> Por WhatsApp
+                  </Button>
+                )}
+              </div>
+              <div className="hidden md:block">
+                <VistaPreviaCorreo html={htmlCorreoInsp} />
+              </div>
+            </section>
+          )}
         </div>
       ) : (
       <>
