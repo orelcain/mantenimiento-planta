@@ -1056,8 +1056,8 @@ export function BitacoraTurnoVista({
                   hasta leer la vista previa (Orel, 21-09-2026). */}
               {!inspeccion?.liberacion && (
                 <p className="flex items-start gap-2 rounded-ctl bg-ink-warn/10 p-2.5 text-caption leading-snug text-ink-warn [&>svg]:mt-px [&>svg]:size-4 [&>svg]:shrink-0">
-                  <AlertTriangle aria-hidden /> Todavía no marcaste la entrega de la planta: el correo va a decir que
-                  falta. Márcala arriba, en «Liberación de planta».
+                  <AlertTriangle aria-hidden /> Todavía no marcaste la entrega y el correo lo va a decir. Márcala
+                  arriba, en «Liberación de planta».
                 </p>
               )}
               <div className="flex flex-wrap gap-2">

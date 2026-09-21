@@ -390,34 +390,32 @@ export function resumenDeInspeccion(
   }
 }
 
-/**
- * Cómo se llama cada estado al presentarlo, qué significa y con qué TITULAR encabeza el correo.
- *
- * El titular decía «PLANTA LIBERADA PARA OPERACIÓN» para los tres estados que entregan, y con
- * pendientes abiertos eso se leía como si no hubiera pasado nada (Orel, 21-09-2026). Ahora
- * cada uno dice lo suyo: siempre se entregó a Producción, y en qué condición se entregó.
- */
-export const TEXTO_LIBERACION: Record<EstadoLiberacion, { titulo: string; detalle: string; titular: string }> = {
-  conforme: {
-    titulo: 'Conforme',
-    detalle: 'Sin desviaciones.',
-    titular: 'PLANTA ENTREGADA A PRODUCCIÓN — CONFORME',
-  },
+/** Cómo se llama cada estado al presentarlo, y qué significa. */
+export const TEXTO_LIBERACION: Record<EstadoLiberacion, { titulo: string; detalle: string }> = {
+  conforme: { titulo: 'Conforme', detalle: 'Sin desviaciones.' },
   corregida: {
     titulo: 'Corregida antes del arranque',
     detalle: 'Se encontró algo y se resolvió antes de entregar la planta.',
-    titular: 'PLANTA ENTREGADA A PRODUCCIÓN — CORREGIDA ANTES DEL ARRANQUE',
   },
   'con-pendientes': {
     titulo: 'Con pendientes controlados',
     detalle: 'Queda algo abierto, sin riesgo para operar. Pasa al turno siguiente.',
-    titular: 'PLANTA ENTREGADA A PRODUCCIÓN — CON PENDIENTES CONTROLADOS',
   },
-  'no-liberada': {
-    titulo: 'No liberada',
-    detalle: 'La planta no arranca. Excepción.',
-    titular: 'PLANTA NO LIBERADA — REQUIERE ACCIÓN CORRECTIVA',
-  },
+  'no-liberada': { titulo: 'No liberada', detalle: 'La planta no arranca. Excepción.' },
+}
+
+/**
+ * El titular del resultado final. Lo que hay que saber de un vistazo es UNA cosa: si la planta
+ * quedó en manos de Producción o no. La condición en que se entregó es el renglón siguiente
+ * —es un rótulo secundario, no un segundo titular— y por eso va aparte
+ * (HIG «Labels»: https://developer.apple.com/design/human-interface-guidelines/labels).
+ *
+ * Antes decía «PLANTA LIBERADA PARA OPERACIÓN» en mayúsculas para los tres estados que
+ * entregan: gritaba y, con un pendiente abierto, sonaba a que no había pasado nada
+ * (Orel, 21-09-2026).
+ */
+export function titularLiberacion(estado: EstadoLiberacion): string {
+  return estado === 'no-liberada' ? 'Planta no liberada' : 'Planta entregada a Producción'
 }
 
 /** La frase de la liberación, con la corrida cuando la hubo. */
@@ -435,13 +433,13 @@ export function frasePorLiberacion(estado: EstadoLiberacion, r: ResumenInspeccio
     const base = `${r.pendientes} de ${r.desviaciones} ${r.pendientes === 1 ? 'desviación queda abierta' : 'desviaciones quedan abiertas'}`
     // La contingencia ES el trabajo de Mantención: sin ella el proceso se detenía. Decirla en
     // la misma frase que el pendiente evita que el correo cuente solo la mitad mala.
-    const conMedida = r.controlados ? ' con medida de contingencia en marcha' : ''
+    const conMedida = r.controlados ? ', con contingencia aplicada' : ''
     // §10 pide las críticas en cero para liberar. No se bloquea, pero no se dice «controladas»
     // cuando algo que para una línea sigue abierto: eso sería lavarlo.
-    if (r.pendientesCriticos) return `${base}${conMedida}, ${r.pendientesCriticos} de ellas detiene una línea.`
+    if (r.pendientesCriticos) return `${base}${conMedida}. ${r.pendientesCriticos} de ellas detiene una línea.`
     // No se puede decir «controladas» de algo que no se pudo evaluar.
-    if (r.sinEvaluar) return `${base}${conMedida}, ${r.sinEvaluar} sin poder evaluar si ${r.sinEvaluar === 1 ? 'detiene' : 'detienen'} una línea.`
-    return `${base}${conMedida}, controladas.`
+    if (r.sinEvaluar) return `${base}${conMedida}. ${r.sinEvaluar} sin poder evaluar si ${r.sinEvaluar === 1 ? 'detiene' : 'detienen'} una línea.`
+    return `${base}${conMedida || ', controladas'}.`
   }
   return `${r.pendientes} ${r.pendientes === 1 ? 'desviación impide' : 'desviaciones impiden'} entregar la planta.`
 }

@@ -239,11 +239,13 @@ export function PanelInspeccion({
                       Cancelar
                     </Button>
                   </div>
-                  <p className="text-caption leading-snug text-muted-foreground">
-                    Corregido queda conforme al entregar, con lo que hiciste anotado. Controlado es que el problema
-                    sigue ahí pero se opera con una medida transitoria: entrega con pendiente y en la desviación
-                    escribe qué medida tomaste. Pendiente abre una desviación sin contingencia.
-                  </p>
+                  {/* Las mismas tres frases que la leyenda del correo: quien marca acá y quien
+                      lee allá tienen que entender lo mismo por la misma palabra. */}
+                  <ul className="flex flex-col gap-0.5 text-caption leading-snug text-muted-foreground">
+                    <li>Corregido: se resolvió y queda conforme al entregar.</li>
+                    <li>Controlado: sigue abierto y se opera con una medida transitoria.</li>
+                    <li>Pendiente: sigue abierto, sin contingencia.</li>
+                  </ul>
                 </div>
               )}
 

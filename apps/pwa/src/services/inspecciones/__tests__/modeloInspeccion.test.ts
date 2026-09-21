@@ -319,7 +319,7 @@ describe('un punto controlado con contingencia', () => {
     const r = resumenDeInspeccion(PAUTA_POST_ASEO, { resultados: conControlado }, [
       desviacion({ criterioId: 'electrico', pendiente: true, critica: false, hastaMin: null }),
     ])
-    expect(frasePorLiberacion('con-pendientes', r)).toContain('medida de contingencia')
+    expect(frasePorLiberacion('con-pendientes', r)).toContain('contingencia aplicada')
   })
 
   /** Un punto abierto sin desviación anotada NO puede sugerir «conforme»: es el mismo lavado. */
