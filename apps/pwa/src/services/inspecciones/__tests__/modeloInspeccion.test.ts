@@ -201,3 +201,34 @@ describe('la contradicción que encontró Orel: «no conforme» sin desviación'
     expect(r.noConformesSinDesviacion).toBe(1)
   })
 })
+
+describe('lo que no se pudo evaluar no se da por inofensivo', () => {
+  it('una desviacion abierta sin equipo reconocible se cuenta aparte', () => {
+    const r = resumenDeInspeccion(PAUTA_POST_ASEO, { resultados: TODOS }, [
+      desviacion({ pendiente: true, critica: null, hastaMin: null }),
+    ])
+    expect(r.sinEvaluar).toBe(1)
+    expect(r.pendientesCriticos).toBe(0)
+  })
+
+  it('la frase NO dice «controladas» cuando algo quedo sin evaluar', () => {
+    const r = resumenDeInspeccion(PAUTA_POST_ASEO, { resultados: TODOS }, [
+      desviacion({ pendiente: true, critica: null, hastaMin: null }),
+    ])
+    expect(frasePorLiberacion('con-pendientes', r)).toContain('sin poder evaluar')
+    expect(frasePorLiberacion('con-pendientes', r)).not.toContain('controladas')
+  })
+
+  it('una critica confirmada manda sobre una sin evaluar', () => {
+    const r = resumenDeInspeccion(PAUTA_POST_ASEO, { resultados: TODOS }, [
+      desviacion({ id: 'd1', pendiente: true, critica: true, hastaMin: null }),
+      desviacion({ id: 'd2', pendiente: true, critica: null, hastaMin: null }),
+    ])
+    expect(frasePorLiberacion('con-pendientes', r)).toContain('detiene una linea'.replace('linea', 'línea'))
+  })
+
+  it('una cerrada sin evaluar no cuenta: solo importa lo que queda abierto', () => {
+    const r = resumenDeInspeccion(PAUTA_POST_ASEO, { resultados: TODOS }, [desviacion({ critica: null })])
+    expect(r.sinEvaluar).toBe(0)
+  })
+})
