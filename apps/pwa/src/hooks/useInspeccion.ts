@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
+import { leerLineas } from '@/services/lineasProceso/lineasProceso.service'
+import { pesosPorLinea, type PesoEnLinea } from '@/services/lineasProceso/modeloLineas'
 import {
   escucharInspeccion,
   escucharPauta,
@@ -30,8 +32,25 @@ export function useInspeccion(
 } {
   const [pauta, setPauta] = useState<PautaInspeccion>(PAUTA_POST_ASEO)
   const [inspeccion, setInspeccion] = useState<InspeccionGuardada | null>(null)
+  /**
+   * Qué parte de su línea lleva cada equipo. Es lo que responde si una desviación abierta es
+   * CRÍTICA (§8: «compromete el funcionamiento del proceso») sin preguntárselo a nadie: si el
+   * equipo lleva flujo, su falla para la línea. Se lee una vez.
+   */
+  const [pesos, setPesos] = useState<Map<string, PesoEnLinea>>(() => new Map())
 
   useEffect(() => escucharPauta(PAUTA_POST_ASEO.id, setPauta), [])
+  useEffect(() => {
+    let vivo = true
+    // Sin diagrama guardado no se puede deducir: entonces ninguna se marca crítica, que es
+    // mejor que marcarlas todas y que el aviso deje de significar algo.
+    void leerLineas(plantId)
+      .then((g) => vivo && g && setPesos(pesosPorLinea(g)))
+      .catch(() => undefined)
+    return () => {
+      vivo = false
+    }
+  }, [plantId])
   useEffect(() => {
     if (!turnoId) return
     setInspeccion(null)
@@ -49,13 +68,29 @@ export function useInspeccion(
       criterioId: e.inspeccion?.criterioId ?? '',
       // Un pendiente con cierre ya está resuelto: el cierre manda sobre la marca.
       pendiente: e.pendiente && !e.cierre,
+      critica: esCritica(e, pesos),
       desdeMin: e.posicionMin ?? null,
       hastaMin: minutosDeTermino(e),
     }))
-    return resumenDeInspeccion(pauta, { resultados: inspeccion?.resultados ?? {} }, ds)
-  }, [pauta, inspeccion?.resultados, desviaciones])
+    return resumenDeInspeccion(
+      pauta,
+      { resultados: inspeccion?.resultados ?? {}, notas: inspeccion?.notas, marcas: inspeccion?.marcas },
+      ds,
+    )
+  }, [pauta, inspeccion?.resultados, inspeccion?.notas, inspeccion?.marcas, desviaciones, pesos])
 
   return { pauta, inspeccion, desviaciones, resumen }
+}
+
+/**
+ * ¿Esta desviación para una línea? Lo dice el diagrama: un equipo con peso de flujo detiene
+ * su línea al fallar. Un elemento suelto (0 %) o un servicio de apoyo, no.
+ * ⚠ Un evento escrito a mano, sin equipo del árbol, no se puede juzgar: no se marca crítica.
+ */
+function esCritica(e: EventoBitacora, pesos: ReadonlyMap<string, PesoEnLinea>): boolean {
+  if (!e.equipoId) return false
+  const p = pesos.get(e.equipoId)
+  return !!p && !p.ciclo && p.peso > 0
 }
 
 /**

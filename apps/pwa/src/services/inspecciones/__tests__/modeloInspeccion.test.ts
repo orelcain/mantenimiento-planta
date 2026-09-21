@@ -12,6 +12,7 @@ const desviacion = (p: Partial<DesviacionDeInspeccion> = {}): DesviacionDeInspec
   id: 'd1',
   criterioId: 'neumatico',
   pendiente: false,
+  critica: false,
   desdeMin: 40,
   hastaMin: 80,
   ...p,
@@ -99,5 +100,62 @@ describe('la frase de la entrega', () => {
       desviacion({ pendiente: true, hastaMin: null }),
     ])
     expect(frasePorLiberacion('con-pendientes', r)).toBe('1 de 1 desviación queda abierta, controladas.')
+  })
+})
+
+describe('las desviaciones críticas (§8) no se lavan', () => {
+  it('cuenta aparte las abiertas que detienen una línea', () => {
+    const r = resumenDeInspeccion(PAUTA_POST_ASEO, { resultados: TODOS }, [
+      desviacion({ id: 'd1', pendiente: true, critica: true, hastaMin: null }),
+      desviacion({ id: 'd2', pendiente: true, critica: false, hastaMin: null }),
+    ])
+    expect(r.pendientes).toBe(2)
+    expect(r.pendientesCriticos).toBe(1)
+  })
+
+  it('una crítica ya cerrada no cuenta: lo que importa es lo que queda abierto', () => {
+    const r = resumenDeInspeccion(PAUTA_POST_ASEO, { resultados: TODOS }, [desviacion({ critica: true })])
+    expect(r.pendientesCriticos).toBe(0)
+    expect(r.sugerido).toBe('corregida')
+  })
+
+  it('con una crítica abierta la frase NO dice «controladas»', () => {
+    const r = resumenDeInspeccion(PAUTA_POST_ASEO, { resultados: TODOS }, [
+      desviacion({ pendiente: true, critica: true, hastaMin: null }),
+    ])
+    expect(frasePorLiberacion('con-pendientes', r)).toContain('detiene una línea')
+    expect(frasePorLiberacion('con-pendientes', r)).not.toContain('controladas')
+  })
+
+  it('sin críticas abiertas sí dice «controladas»', () => {
+    const r = resumenDeInspeccion(PAUTA_POST_ASEO, { resultados: TODOS }, [
+      desviacion({ pendiente: true, critica: false, hastaMin: null }),
+    ])
+    expect(frasePorLiberacion('con-pendientes', r)).toContain('controladas')
+  })
+})
+
+describe('el recorrido y las observaciones', () => {
+  it('mide de la primera marca a la última', () => {
+    const r = resumenDeInspeccion(
+      PAUTA_POST_ASEO,
+      { resultados: TODOS, marcas: { mecanico: '2026-09-20T09:20:00Z', despejado: '2026-09-20T10:05:00Z' } },
+      [],
+    )
+    expect(r.minutosDeRecorrido).toBe(45)
+  })
+
+  it('con una sola marca no inventa un recorrido', () => {
+    const r = resumenDeInspeccion(PAUTA_POST_ASEO, { resultados: TODOS, marcas: { mecanico: '2026-09-20T09:20:00Z' } }, [])
+    expect(r.minutosDeRecorrido).toBeNull()
+  })
+
+  it('cuenta los «conforme con observación», y una nota en blanco no cuenta', () => {
+    const r = resumenDeInspeccion(
+      PAUTA_POST_ASEO,
+      { resultados: TODOS, notas: { mecanico: 'Rodillo 3 empieza a sonar', electrico: '   ' } },
+      [],
+    )
+    expect(r.conObservacion).toBe(1)
   })
 })

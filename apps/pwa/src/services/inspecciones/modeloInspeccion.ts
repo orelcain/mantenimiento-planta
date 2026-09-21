@@ -61,6 +61,15 @@ export interface Inspeccion {
   iniciadaEn: string
   iniciadaPorNombre: string
   resultados: Record<string, ResultadoCriterio>
+  /**
+   * «Conforme, pero…»: lo menor que no amerita abrir un evento pero que igual hay que dejar
+   * dicho (Orel, 20-09-2026). Sin este escalón el técnico elige entre perderlo o abrir una
+   * desviación completa, y en la práctica lo pierde. Mismo problema que resolvió
+   * «afectó sin detener» en el impacto.
+   */
+  notas?: Record<string, string>
+  /** Cuándo se marcó cada punto (ISO). Siete marcas en el mismo minuto no son un recorrido. */
+  marcas?: Record<string, string>
   liberacion?: Liberacion | null
 }
 
@@ -73,6 +82,11 @@ export interface DesviacionDeInspeccion {
   id: string
   criterioId: string
   pendiente: boolean
+  /**
+   * «Compromete el funcionamiento del proceso» (§8 del procedimiento). No se pregunta: lo
+   * responde el diagrama de líneas. Si el equipo lleva flujo, su falla para la línea.
+   */
+  critica: boolean
   desdeMin: number | null
   hastaMin: number | null
 }
@@ -84,6 +98,11 @@ export interface ResumenInspeccion {
   noConformes: number
   desviaciones: number
   pendientes: number
+  /** De los pendientes, los que paran una línea. §10 los pide en cero para liberar. */
+  pendientesCriticos: number
+  conObservacion: number
+  /** De la primera marca a la última: distingue un recorrido de una firma de un tirón. */
+  minutosDeRecorrido: number | null
   /** Qué corresponde marcar según lo encontrado. `null` = todavía falta revisar puntos. */
   sugerido: EstadoLiberacion | null
   /**
@@ -134,7 +153,7 @@ export const PAUTA_POST_ASEO: PautaInspeccion = {
       id: 'operacional',
       titulo: 'Prueba operacional',
       ayuda:
-        'Marcha en vacío de los equipos principales. Sentido de giro de los motores. Desplazamiento de las cintas. Sistemas neumáticos. Sin alarmas ni fallas en el control. ⚠ Prohibido intervenir, limpiar o ajustar con el equipo en movimiento: toda intervención con riesgo va con bloqueo y etiquetado (LOTO).',
+        'Marcha en vacío de los equipos principales. Sentido de giro de los motores. Desplazamiento de las cintas. Sistemas neumáticos. Sin alarmas ni fallas en el control. Prohibido intervenir, limpiar o ajustar con el equipo en movimiento: toda intervención con riesgo va con bloqueo y etiquetado (LOTO).',
     },
     {
       id: 'anomalias',
@@ -167,7 +186,7 @@ export function criterioDe(pauta: PautaInspeccion, id: string): CriterioPauta | 
  */
 export function resumenDeInspeccion(
   pauta: PautaInspeccion,
-  inspeccion: Pick<Inspeccion, 'resultados'>,
+  inspeccion: Pick<Inspeccion, 'resultados'> & Partial<Pick<Inspeccion, 'notas' | 'marcas'>>,
   desviaciones: readonly DesviacionDeInspeccion[],
 ): ResumenInspeccion {
   let conformes = 0
@@ -178,7 +197,17 @@ export function resumenDeInspeccion(
     else if (r === 'no-conforme') noConformes += 1
   }
   const revisados = conformes + noConformes
-  const pendientes = desviaciones.filter((d) => d.pendiente).length
+  const abiertas = desviaciones.filter((d) => d.pendiente)
+  const pendientes = abiertas.length
+  const pendientesCriticos = abiertas.filter((d) => d.critica).length
+  const conObservacion = pauta.criterios.filter((c) => (inspeccion.notas?.[c.id] ?? '').trim()).length
+
+  const marcas = pauta.criterios
+    .map((c) => inspeccion.marcas?.[c.id])
+    .filter((x): x is string => !!x)
+    .map((x) => new Date(x).getTime())
+    .filter((t) => Number.isFinite(t))
+  const minutosDeRecorrido = marcas.length > 1 ? Math.round((Math.max(...marcas) - Math.min(...marcas)) / 60000) : null
 
   const inicios = desviaciones.map((d) => d.desdeMin).filter((m): m is number => m != null)
   const cierres = desviaciones.filter((d) => !d.pendiente).map((d) => d.hastaMin).filter((m): m is number => m != null)
@@ -195,6 +224,9 @@ export function resumenDeInspeccion(
     noConformes,
     desviaciones: desviaciones.length,
     pendientes,
+    pendientesCriticos,
+    conObservacion,
+    minutosDeRecorrido,
     sugerido,
     minutosDeCorrida,
   }
@@ -222,7 +254,12 @@ export function frasePorLiberacion(estado: EstadoLiberacion, r: ResumenInspeccio
     return `${r.desviaciones} ${r.desviaciones === 1 ? 'desviación resuelta' : 'desviaciones resueltas'}${cuanto} antes del arranque.`
   }
   if (estado === 'con-pendientes') {
-    return `${r.pendientes} de ${r.desviaciones} ${r.pendientes === 1 ? 'desviación queda abierta' : 'desviaciones quedan abiertas'}, controladas.`
+    const base = `${r.pendientes} de ${r.desviaciones} ${r.pendientes === 1 ? 'desviación queda abierta' : 'desviaciones quedan abiertas'}`
+    // §10 pide las críticas en cero para liberar. No se bloquea, pero no se dice «controladas»
+    // cuando algo que para una línea sigue abierto: eso sería lavarlo.
+    return r.pendientesCriticos
+      ? `${base}, ${r.pendientesCriticos} de ellas detiene una línea.`
+      : `${base}, controladas.`
   }
   return `${r.pendientes} ${r.pendientes === 1 ? 'desviación impide' : 'desviaciones impiden'} entregar la planta.`
 }

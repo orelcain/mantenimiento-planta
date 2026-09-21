@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AlertTriangle, Check, ChevronDown, ChevronRight, ClipboardCheck, Loader2, Plus, X } from 'lucide-react'
+import { AlertTriangle, Check, ChevronDown, ChevronRight, ClipboardCheck, Loader2, MessageSquarePlus, Plus, Send, X } from 'lucide-react'
 import { Button } from '@/components/piel'
 import {
   TEXTO_LIBERACION,
@@ -25,6 +25,8 @@ export interface PanelInspeccionProps {
   onIniciar: () => void
   onMarcar: (criterioId: string, resultado: 'conforme' | 'no-conforme' | null) => void
   onNuevaDesviacion: (criterioId: string) => void
+  onAnotar: (criterioId: string, nota: string) => void
+  onAvisarSupervisor: () => void
   onAbrirEvento: (e: EventoBitacora) => void
   onLiberar: (estado: EstadoLiberacion) => void
   onDeshacerLiberacion: () => void
@@ -45,11 +47,15 @@ export function PanelInspeccion({
   onIniciar,
   onMarcar,
   onNuevaDesviacion,
+  onAnotar,
+  onAvisarSupervisor,
   onAbrirEvento,
   onLiberar,
   onDeshacerLiberacion,
 }: PanelInspeccionProps) {
   const [abierto, setAbierto] = useState<string | null>(null)
+  /** Criterio cuya observación se está escribiendo, y el texto en curso. */
+  const [anotando, setAnotando] = useState<{ id: string; texto: string } | null>(null)
   const [eligiendo, setEligiendo] = useState<EstadoLiberacion | null>(null)
 
   if (!inspeccion) {
@@ -88,7 +94,17 @@ export function PanelInspeccion({
           {resumen.desviaciones > 0 &&
             ` · ${resumen.desviaciones} ${resumen.desviaciones === 1 ? 'desviación' : 'desviaciones'}`}
           {resumen.pendientes > 0 && ` (${resumen.pendientes} abierta${resumen.pendientes === 1 ? '' : 's'})`}
+          {resumen.minutosDeRecorrido != null && ` · recorrido de ${resumen.minutosDeRecorrido} min`}
+          {resumen.conObservacion > 0 && ` · ${resumen.conObservacion} con observación`}
         </p>
+        {resumen.pendientesCriticos > 0 && (
+          <p className="flex items-start gap-2 rounded-ctl bg-ink-crit/10 p-2 text-caption leading-snug text-ink-crit [&>svg]:mt-px [&>svg]:size-4 [&>svg]:shrink-0">
+            <AlertTriangle aria-hidden />
+            {resumen.pendientesCriticos === 1
+              ? 'Queda 1 desviación abierta que detiene una línea.'
+              : `Quedan ${resumen.pendientesCriticos} desviaciones abiertas que detienen una línea.`}
+          </p>
+        )}
         <div className="flex h-1.5 overflow-hidden rounded-full bg-muted-foreground/12" aria-hidden>
           <span className="bg-ink-ok" style={{ width: `${(resumen.conformes / resumen.total) * 100}%` }} />
           <span className="bg-ink-crit" style={{ width: `${(resumen.noConformes / resumen.total) * 100}%` }} />
@@ -110,7 +126,12 @@ export function PanelInspeccion({
                   className="flex min-h-[44px] min-w-0 flex-1 items-center gap-1.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-muted-foreground"
                 >
                   {desplegado ? <ChevronDown aria-hidden /> : <ChevronRight aria-hidden />}
-                  <span className="text-subhead font-medium">{c.titulo}</span>
+                  <span className="min-w-0 flex-1 text-subhead font-medium">{c.titulo}</span>
+                  {inspeccion.marcas?.[c.id] && (
+                    <span className="shrink-0 pr-1 text-caption tabular-nums text-muted-foreground">
+                      {horaDe(inspeccion.marcas[c.id] ?? '')}
+                    </span>
+                  )}
                 </button>
                 <div className="flex shrink-0 gap-1.5 pt-1">
                   <BotonResultado
@@ -141,6 +162,53 @@ export function PanelInspeccion({
                 <p className="mt-1.5 pl-[22px] text-caption leading-snug text-muted-foreground">{c.ayuda}</p>
               )}
 
+              {/* El recordatorio del procedimiento, donde de verdad hace falta: es el momento en
+                  que hay una máquina andando y la tentación es meter la mano. */}
+              {c.id === 'operacional' && r === 'no-conforme' && (
+                <p className="ml-[22px] mt-2 rounded-ctl bg-ink-warn/10 p-2 text-caption leading-snug text-ink-warn">
+                  No intervengas con el equipo en movimiento. Si hay riesgo, bloquea y etiquetea (LOTO) antes de tocar.
+                </p>
+              )}
+
+              {anotando?.id === c.id ? (
+                <div className="ml-[22px] mt-2 flex flex-col gap-2">
+                  <textarea
+                    autoFocus
+                    rows={2}
+                    maxLength={300}
+                    value={anotando.texto}
+                    onChange={(ev) => setAnotando({ id: c.id, texto: ev.target.value })}
+                    placeholder="Qué viste, aunque no amerite abrir una desviación"
+                    className="w-full rounded-ctl bg-muted-foreground/10 p-2.5 text-footnote outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      variant="plain"
+                      onClick={() => {
+                        onAnotar(c.id, anotando.texto)
+                        setAnotando(null)
+                      }}
+                    >
+                      Guardar observación
+                    </Button>
+                    <Button variant="plain" onClick={() => setAnotando(null)}>
+                      Cancelar
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                inspeccion.notas?.[c.id] && (
+                  <button
+                    type="button"
+                    disabled={!editable || !!liberada}
+                    onClick={() => setAnotando({ id: c.id, texto: inspeccion.notas?.[c.id] ?? '' })}
+                    className="ml-[22px] mt-2 block w-[calc(100%-22px)] rounded-ctl bg-ink-warn/10 p-2 text-left text-caption leading-snug text-ink-warn disabled:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  >
+                    {inspeccion.notas[c.id]}
+                  </button>
+                )
+              )}
+
               {suyas.length > 0 && (
                 <ul className="mt-2 flex flex-col gap-1 pl-[22px]">
                   {suyas.map((d) => (
@@ -167,14 +235,28 @@ export function PanelInspeccion({
                 </ul>
               )}
 
-              {r === 'no-conforme' && editable && !liberada && (
-                <button
-                  type="button"
-                  onClick={() => onNuevaDesviacion(c.id)}
-                  className="ml-[22px] mt-1.5 flex min-h-[44px] items-center gap-1 text-footnote font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary [&>svg]:size-4"
-                >
-                  <Plus aria-hidden /> Otra desviación acá
-                </button>
+              {editable && !liberada && anotando?.id !== c.id && (
+                <div className="ml-[22px] flex flex-wrap items-center gap-x-4">
+                  {r === 'no-conforme' && (
+                    <button
+                      type="button"
+                      onClick={() => onNuevaDesviacion(c.id)}
+                      className="flex min-h-[44px] items-center gap-1 text-footnote font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary [&>svg]:size-4"
+                    >
+                      <Plus aria-hidden /> Otra desviación acá
+                    </button>
+                  )}
+                  {/* El escalón que faltaba: ni perderlo ni abrir un evento entero por algo menor. */}
+                  {!!r && !inspeccion.notas?.[c.id] && (
+                    <button
+                      type="button"
+                      onClick={() => setAnotando({ id: c.id, texto: '' })}
+                      className="flex min-h-[44px] items-center gap-1 text-footnote text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary [&>svg]:size-4"
+                    >
+                      <MessageSquarePlus aria-hidden /> Agregar observación
+                    </button>
+                  )}
+                </div>
               )}
             </li>
           )
@@ -192,6 +274,10 @@ export function PanelInspeccion({
             <p className="text-caption tabular-nums text-muted-foreground">
               {horaDe(liberada.en)} · {liberada.porNombre} · {resumen.revisados} de {resumen.total} revisados
             </p>
+            {/* §9 del procedimiento: «Informar al supervisor», por el mismo canal de la bitácora. */}
+            <Button variant="tinted" onClick={onAvisarSupervisor}>
+              <Send /> Avisar al supervisor
+            </Button>
             {editable && (
               <Button variant="plain" onClick={onDeshacerLiberacion} disabled={trabajando}>
                 Deshacer la entrega
