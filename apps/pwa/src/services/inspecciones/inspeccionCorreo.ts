@@ -1,4 +1,4 @@
-import { C, FUENTE, escaparHtml, htmlFotos, htmlKpi, htmlSeccion } from '@/services/bitacora/bitacoraCorreo'
+import { C, FUENTE, escaparHtml, htmlFotos } from '@/services/bitacora/bitacoraCorreo'
 import { etiquetaTurno, fechaTurnoLarga, horarioTurno } from '@/services/bitacora/turnoMantencion'
 import { codigoEquipoDe, horarioEvento, tituloDe } from '@/services/bitacora/presentacionEvento'
 import { autorVisible, type EventoBitacora, type FotoEvento, type TurnoMantencion } from '@/services/bitacora/bitacora.types'
@@ -43,6 +43,17 @@ export interface DatosCorreoInspeccion {
 const abierta = (e: EventoBitacora) => e.pendiente && !e.cierre
 
 /**
+ * Una tabla de documento, no una reja. Las celdas llevan SOLO una raya abajo: el borde en los
+ * cuatro lados es lo que hacía que el correo se leyera como una planilla volcada, y la lista
+ * de Apple separa las filas con una línea fina y nada más
+ * (HIG «Lists and tables»: https://developer.apple.com/design/human-interface-guidelines/lists-and-tables).
+ */
+const RAYA = '#ECECEC'
+const CELDA =
+  `padding:10px 14px 10px 0;border-bottom:1px solid ${RAYA};font-family:${FUENTE};font-size:13px;` +
+  `line-height:1.45;color:${C.tinta};vertical-align:top;`
+
+/**
  * `HH:mm` de un ISO, o cadena vacía si no hay hora.
  *
  * ⚠ Vacío, NO un guion ni la hora de ahora: si el punto se marcó sin hora, el correo no
@@ -68,8 +79,7 @@ export function tituloCorreoInspeccion({ turno, planta }: Pick<DatosCorreoInspec
  */
 function celdaTono(texto: string, color: string, ancho?: string): string {
   return (
-    `<td style="padding:6px 10px;border:1px solid ${C.linea};font-family:${FUENTE};font-size:13px;` +
-    `color:${C.tinta};white-space:nowrap;vertical-align:top;${ancho ? `width:${ancho};` : ''}">` +
+    `<td style="${CELDA}white-space:nowrap;${ancho ? `width:${ancho};` : ''}">` +
     `<span style="color:${color};">●</span> ${texto}</td>`
   )
 }
@@ -105,26 +115,22 @@ function celdaEstadoDesviacion(e: EventoBitacora, inspeccion: Inspeccion): strin
 
 function celda(texto: string, ancho?: string, gris?: boolean): string {
   return (
-    `<td style="padding:6px 10px;border:1px solid ${C.linea};font-family:${FUENTE};font-size:13px;` +
-    `color:${gris ? C.sec : C.tinta};vertical-align:top;${ancho ? `width:${ancho};` : ''}">${escaparHtml(texto) || '—'}</td>`
+    `<td style="${CELDA}${gris ? `color:${C.sec};` : ''}${ancho ? `width:${ancho};` : ''}">` +
+    `${escaparHtml(texto)}</td>`
   )
 }
 
 /** Una hora: cifras tabulares para que las columnas se lean en vertical (HIG «Typography»). */
 function celdaHora(hhmm: string, ancho: string): string {
   return (
-    `<td style="padding:6px 10px;border:1px solid ${C.linea};font-family:${FUENTE};font-size:13px;` +
-    `color:${C.sec};vertical-align:top;white-space:nowrap;font-variant-numeric:tabular-nums;width:${ancho};">` +
-    `${escaparHtml(hhmm) || '—'}</td>`
+    `<td style="${CELDA}color:${C.sec};white-space:nowrap;font-variant-numeric:tabular-nums;width:${ancho};">` +
+    `${escaparHtml(hhmm)}</td>`
   )
 }
 
 /** Una celda cuyo contenido ya viene armado (para meterle más de una línea). */
 function celdaHtml(html: string, ancho?: string): string {
-  return (
-    `<td style="padding:6px 10px;border:1px solid ${C.linea};font-family:${FUENTE};font-size:13px;` +
-    `color:${C.tinta};vertical-align:top;${ancho ? `width:${ancho};` : ''}">${html}</td>`
-  )
+  return `<td style="${CELDA}${ancho ? `width:${ancho};` : ''}">${html}</td>`
 }
 
 function encabezadoTabla(columnas: readonly string[]): string {
@@ -132,11 +138,39 @@ function encabezadoTabla(columnas: readonly string[]): string {
     `<tr>${columnas
       .map(
         (t) =>
-          `<th align="left" style="padding:6px 10px;border:1px solid ${C.linea};background:${C.neutroFondo};` +
-          `font-family:${FUENTE};font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;` +
+          `<th align="left" style="padding:0 14px 7px 0;border-bottom:1px solid ${C.linea};` +
+          `font-family:${FUENTE};font-size:10.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;` +
           `color:${C.sec};">${escaparHtml(t)}</th>`,
       )
       .join('')}</tr>`
+  )
+}
+
+/** El encabezado de una sección: un rótulo, no una banda de color. */
+function seccion(titulo: string, cantidad?: number): string {
+  return (
+    `<div style="font-family:${FUENTE};font-size:11px;font-weight:700;letter-spacing:.09em;` +
+    `text-transform:uppercase;color:${C.sec};margin-top:30px;">${escaparHtml(titulo)}` +
+    (cantidad != null ? ` <span style="color:${C.tinta};">${cantidad}</span>` : '') +
+    `</div>`
+  )
+}
+
+/** Una cifra con su rótulo. Sin caja: el número pesa por tamaño, no por borde. */
+function kpi(valor: string, etiqueta: string, punto?: string): string {
+  return (
+    `<td style="padding:0 30px 0 0;vertical-align:top;font-family:${FUENTE};">` +
+    `<div style="font-size:20px;font-weight:600;line-height:1.2;color:${C.tinta};white-space:nowrap;">${escaparHtml(valor)}</div>` +
+    `<div style="font-size:11.5px;color:${C.sec};padding-top:3px;white-space:nowrap;">` +
+    `${punto ? `<span style="color:${punto};">●</span> ` : ''}${escaparHtml(etiqueta)}</div></td>`
+  )
+}
+
+/** Un bloque de aviso: barra de color a la izquierda, fondo tenue. Un solo lenguaje para los tres. */
+function bloque(fondo: string, borde: string, html: string, margen = '12px'): string {
+  return (
+    `<div style="font-family:${FUENTE};background:${fondo};border-left:3px solid ${borde};` +
+    `padding:12px 16px;margin-top:${margen};font-size:13px;line-height:1.5;color:${C.tinta};">${html}</div>`
   )
 }
 
@@ -172,27 +206,19 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen: vivo, desvia
     `${hora(inspeccion.iniciadaEn) ? ` · Inicio ${hora(inspeccion.iniciadaEn)}` : ''} · Pauta v${inspeccion.pautaVersion}</div>`
 
   const kpis = [
-    htmlKpi(`${resumen.revisados} de ${resumen.total}`, 'puntos revisados'),
-    resumen.corregidos > 0
-      ? htmlKpi(String(resumen.corregidos), resumen.corregidos === 1 ? 'corregido' : 'corregidos', C.afectado)
-      : '',
+    kpi(`${resumen.revisados} de ${resumen.total}`, 'puntos revisados'),
+    resumen.corregidos > 0 ? kpi(String(resumen.corregidos), resumen.corregidos === 1 ? 'corregido' : 'corregidos', C.afectado) : '',
     // El trabajo que hizo que la planta produjera igual: sin esto el correo solo cuenta la falla.
-    resumen.controlados > 0
-      ? htmlKpi(String(resumen.controlados), resumen.controlados === 1 ? 'con contingencia' : 'con contingencia', C.pendBorde)
-      : '',
+    resumen.controlados > 0 ? kpi(String(resumen.controlados), 'con contingencia', C.pendBorde) : '',
     // Un cero no es noticia: la fila de KPI es para lo que pasó, no para lo que no pasó.
-    resumen.noConformes > 0
-      ? htmlKpi(String(resumen.noConformes), resumen.noConformes === 1 ? 'no conforme' : 'no conformes', C.parada)
-      : '',
-    resumen.desviaciones > 0
-      ? htmlKpi(String(resumen.desviaciones), resumen.desviaciones === 1 ? 'desviación' : 'desviaciones')
-      : '',
+    resumen.noConformes > 0 ? kpi(String(resumen.noConformes), resumen.noConformes === 1 ? 'no conforme' : 'no conformes', C.parada) : '',
+    resumen.desviaciones > 0 ? kpi(String(resumen.desviaciones), resumen.desviaciones === 1 ? 'desviación' : 'desviaciones') : '',
     // La CORRIDA: lo que se alcanzó a arreglar antes de entregar. Es el trabajo que no se ve.
-    resumen.minutosDeCorrida != null ? htmlKpi(`${resumen.minutosDeCorrida} min`, 'corrigiendo antes de arrancar', C.ventana) : '',
+    resumen.minutosDeCorrida != null ? kpi(`${resumen.minutosDeCorrida} min`, 'corrigiendo antes de arrancar', C.ventana) : '',
     resumen.pendientesCriticos > 0
-      ? htmlKpi(String(resumen.pendientesCriticos), resumen.pendientesCriticos === 1 ? 'crítica abierta' : 'críticas abiertas', C.parada)
+      ? kpi(String(resumen.pendientesCriticos), resumen.pendientesCriticos === 1 ? 'crítica abierta' : 'críticas abiertas', C.parada)
       : '',
-    resumen.minutosDeRecorrido ? htmlKpi(`${resumen.minutosDeRecorrido} min`, 'de recorrido') : '',
+    resumen.minutosDeRecorrido ? kpi(`${resumen.minutosDeRecorrido} min`, 'de recorrido') : '',
   ].join('')
 
   /**
@@ -228,7 +254,7 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen: vivo, desvia
             : '',
         ]
           .filter(Boolean)
-          .join('') || `<span style="color:${C.sec};">—</span>`
+          .join('')
       return (
         `<tr>${celda(c.titulo, '34%')}${celdaEstado(inspeccion.resultados[c.id])}` +
         (hayHoras ? celdaHora(hora(inspeccion.marcas?.[c.id]), '12%') : '') +
@@ -239,7 +265,7 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen: vivo, desvia
     .join('')
 
   const tablaCriterios =
-    htmlSeccion('Criterio de liberación', null, C.marca) +
+    seccion('Criterio de liberación') +
     `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;width:100%;margin-top:8px;">` +
     encabezadoTabla(['Punto de la pauta', 'Estado', ...(hayHoras ? ['Hora'] : []), 'Observación']) +
     filasCriterios +
@@ -252,14 +278,14 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen: vivo, desvia
     const fila =
       // Los anchos suman 100 con la columna de estado incluida: sin eso, la descripción
       // quedaba en una columna de cuatro palabras de ancho y la fila crecía a lo alto.
-      `<tr>${celda(equipo, '16%')}${celda(tituloDe(e) || e.descripcion, '16%')}${celda(e.descripcion, '30%')}` +
+      `<tr>${celda(equipo, '18%')}${celda(tituloDe(e) || e.descripcion, '14%')}${celda(e.descripcion, '30%')}` +
       celda(accionDe(e, inspeccion), '16%') +
       celda(autorVisible(e), '12%') +
       celdaEstadoDesviacion(e, inspeccion) +
       `</tr>`
     // La «condición encontrada» de §8 se ve mejor que se cuenta: antes y después van juntos.
     const fotos = (e.fotos ?? []).length
-      ? `<tr><td colspan="6" style="padding:0 10px 10px;border:1px solid ${C.linea};border-top:0;">` +
+      ? `<tr><td colspan="6" style="padding:0 0 12px;border-bottom:1px solid ${RAYA};">` +
         htmlFotos(e.fotos ?? [], fuente) +
         `</td></tr>`
       : ''
@@ -267,8 +293,8 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen: vivo, desvia
   }
 
   const grupo = (titulo: string, cuantas: number) =>
-    `<tr><td colspan="6" style="padding:7px 10px;border:1px solid ${C.linea};background:${C.neutroFondo};` +
-    `font-family:${FUENTE};font-size:12px;font-weight:700;color:${C.tinta};">${escaparHtml(titulo)}` +
+    `<tr><td colspan="6" style="padding:20px 0 7px;border-bottom:1px solid ${C.linea};` +
+    `font-family:${FUENTE};font-size:12.5px;font-weight:600;color:${C.tinta};">${escaparHtml(titulo)}` +
     `<span style="font-weight:400;color:${C.sec};"> · ${cuantas} ${cuantas === 1 ? 'desviación' : 'desviaciones'}</span></td></tr>`
 
   const filasDesviaciones =
@@ -280,13 +306,13 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen: vivo, desvia
       .join('') + (sueltas.length ? grupo('Sin punto de la pauta', sueltas.length) + sueltas.map(filaDesviacion).join('') : '')
 
   const tablaDesviaciones = desviaciones.length
-    ? htmlSeccion('Registro de desviaciones', desviaciones.length, C.pendBorde) +
+    ? seccion('Registro de desviaciones', desviaciones.length) +
       `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;width:100%;margin-top:8px;">` +
       encabezadoTabla(['Equipo o área', 'Anomalía', 'Condición encontrada', 'Acción realizada o pendiente', 'Responsable', 'Estado']) +
       filasDesviaciones +
       `</table>`
-    : htmlSeccion('Registro de desviaciones', null, resumen.noConformesSinDesviacion ? C.pendBorde : C.linea) +
-      `<p style="font-family:${FUENTE};font-size:14px;color:${C.sec};margin:8px 0 0;">` +
+    : seccion('Registro de desviaciones') +
+      `<p style="font-family:${FUENTE};font-size:13.5px;line-height:1.5;color:${C.sec};margin:10px 0 0;">` +
       (resumen.noConformesSinDesviacion
         ? // Decirlo es lo unico honesto: el punto quedo abierto y no se anoto nada.
           `${resumen.noConformesSinDesviacion} ${resumen.noConformesSinDesviacion === 1 ? 'punto quedó' : 'puntos quedaron'} sin resolver y sin una desviación anotada. Ver el criterio de liberación, arriba.`
@@ -294,35 +320,47 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen: vivo, desvia
       `</p>`
 
   const sinJuzgar = resumen.sinEvaluar
-    ? `<div style="font-family:${FUENTE};background:${C.pendFondo};border-left:3px solid ${C.pendBorde};padding:8px 12px;margin-top:10px;font-size:13px;color:${C.tinta};">` +
-      `<b>Sin evaluar.</b> ${resumen.sinEvaluar} ${resumen.sinEvaluar === 1 ? 'desviación abierta no calza' : 'desviaciones abiertas no calzan'} con ningún equipo del diagrama de líneas, ` +
-      `así que no se sabe si ${resumen.sinEvaluar === 1 ? 'detiene' : 'detienen'} una línea.</div>`
+    ? bloque(
+        C.pendFondo,
+        C.pendBorde,
+        `<b>Sin evaluar.</b> ${resumen.sinEvaluar} ${resumen.sinEvaluar === 1 ? 'desviación abierta no calza' : 'desviaciones abiertas no calzan'} con ningún equipo del diagrama de líneas, ` +
+          `así que no se sabe si ${resumen.sinEvaluar === 1 ? 'detiene' : 'detienen'} una línea.`,
+      )
     : ''
 
   const aviso = resumen.pendientesCriticos
-    ? `<div style="font-family:${FUENTE};background:${C.critFondo};border-left:3px solid ${C.parada};padding:8px 12px;margin-top:10px;font-size:13px;color:${C.tinta};">` +
-      `<b>Atención.</b> ${resumen.pendientesCriticos} ${resumen.pendientesCriticos === 1 ? 'desviación abierta detiene' : 'desviaciones abiertas detienen'} una línea de proceso.</div>`
+    ? bloque(
+        C.critFondo,
+        C.parada,
+        `<b>Atención.</b> ${resumen.pendientesCriticos} ${resumen.pendientesCriticos === 1 ? 'desviación abierta detiene' : 'desviaciones abiertas detienen'} una línea de proceso.`,
+      )
     : ''
 
   // §10 · Resultado final.
   const resultado = l
-    ? htmlSeccion('Resultado final', null, l.estado === 'no-liberada' ? C.parada : C.ventana) +
-      `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;width:100%;margin-top:8px;">` +
-      `<tr><td style="padding:12px 14px;border:1px solid ${C.linea};background:${l.estado === 'no-liberada' ? C.critFondo : C.okFondo};font-family:${FUENTE};">` +
-      `<div style="font-size:19px;font-weight:600;color:${l.estado === 'no-liberada' ? C.parada : C.ventana};">` +
-      `${escaparHtml(titularLiberacion(l.estado))}</div>` +
-      `<div style="font-size:13.5px;color:${C.tinta};padding-top:5px;">` +
-      `<b style="font-weight:600;">${escaparHtml(TEXTO_LIBERACION[l.estado].titulo)}.</b> ${escaparHtml(frasePorLiberacion(l.estado, resumen))}</div>` +
-      `<div style="font-size:12.5px;color:${C.sec};padding-top:7px;">Entregada${hora(l.en) ? ` a las ${hora(l.en)}` : ''} por ${escaparHtml(l.porNombre)}` +
-      `${l.nota ? ` · ${escaparHtml(l.nota)}` : ''}</div>` +
-      `</td></tr></table>`
+    ? seccion('Resultado final') +
+      bloque(
+        l.estado === 'no-liberada' ? C.critFondo : C.okFondo,
+        l.estado === 'no-liberada' ? C.parada : C.ventana,
+        `<div style="font-size:20px;font-weight:600;line-height:1.25;color:${l.estado === 'no-liberada' ? C.parada : C.ventana};">` +
+          `${escaparHtml(titularLiberacion(l.estado))}</div>` +
+          `<div style="padding-top:6px;">` +
+          `<b style="font-weight:600;">${escaparHtml(TEXTO_LIBERACION[l.estado].titulo)}.</b> ${escaparHtml(frasePorLiberacion(l.estado, resumen))}</div>` +
+          `<div style="font-size:12.5px;color:${C.sec};padding-top:8px;">Entregada${hora(l.en) ? ` a las ${hora(l.en)}` : ''} por ${escaparHtml(l.porNombre)}` +
+          `${l.nota ? ` · ${escaparHtml(l.nota)}` : ''}</div>`,
+        '14px',
+      )
     : // Sin entrega marcada el correo NO puede decir que la planta está entregada; pero tampoco
       // puede quedarse en una frase gris que se lee como «la planta está parada». Es un aviso
       // al que lo está por enviar: falta un paso en la app (Orel, 21-09-2026).
-      htmlSeccion('Resultado final', null, C.pendBorde) +
-      `<div style="font-family:${FUENTE};background:${C.pendFondo};border-left:3px solid ${C.pendBorde};padding:10px 12px;margin-top:8px;font-size:13px;color:${C.tinta};">` +
-      `<b>Falta marcar la entrega de la planta.</b> El recorrido está registrado; todavía no se dice en qué condición quedó la planta ` +
-      `al pasar a Producción. Se marca en la app, en «Liberación de planta».</div>`
+      seccion('Resultado final') +
+      bloque(
+        C.pendFondo,
+        C.pendBorde,
+        `<b>Falta marcar la entrega de la planta.</b> El recorrido está registrado; todavía no se dice en qué condición quedó la planta ` +
+          `al pasar a Producción. Se marca en la app, en «Liberación de planta».`,
+        '14px',
+      )
 
   /**
    * Qué hay DETRÁS de cada punto. «Sistema eléctrico: Conforme» no le dice nada a quien no
@@ -331,17 +369,17 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen: vivo, desvia
    * (Orel, 21-09-2026).
    */
   const queSeRevisa =
-    `<div style="font-family:${FUENTE};border-top:1px solid ${C.linea};margin-top:18px;padding-top:10px;">` +
-    `<div style="font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:${C.sec};">` +
+    `<div style="font-family:${FUENTE};border-top:1px solid ${C.linea};margin-top:34px;padding-top:16px;">` +
+    `<div style="font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:${C.sec};">` +
     `Qué se revisa en cada punto</div>` +
     pauta.criterios
       .map(
         (c) =>
-          `<div style="font-size:11.5px;line-height:1.45;color:${C.sec};padding-top:5px;">` +
-          `<b style="color:${C.tinta};">${escaparHtml(c.titulo)}.</b> ${escaparHtml(c.ayuda)}</div>`,
+          `<div style="font-size:11.5px;line-height:1.5;color:${C.sec};padding-top:7px;">` +
+          `<b style="color:${C.tinta};font-weight:600;">${escaparHtml(c.titulo)}.</b> ${escaparHtml(c.ayuda)}</div>`,
       )
       .join('') +
-    `<div style="font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:${C.sec};padding-top:12px;">` +
+    `<div style="font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:${C.sec};padding-top:18px;">` +
     `Qué dice cada estado</div>` +
     [
       ['Conforme', C.ventana, 'se revisó y estaba bien'],
@@ -358,12 +396,12 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen: vivo, desvia
     `</div>`
 
   const pie =
-    `<div style="font-family:${FUENTE};font-size:11px;color:${C.sec};padding-top:16px;">` +
+    `<div style="font-family:${FUENTE};font-size:11px;line-height:1.5;color:${C.sec};padding-top:18px;">` +
     `Generado con la app de Mantención · ${escaparHtml(etiquetaTurno(turno))} ${escaparHtml(turno.fecha.split('-').reverse().join('-'))}` +
     ` · Las desviaciones quedan también en la bitácora del turno.</div>`
 
   return `<div style="max-width:680px;color:${C.tinta};">${encabezado}` +
-    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin:12px 0 4px;"><tr>${kpis}</tr></table>` +
+    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin:22px 0 2px;"><tr>${kpis}</tr></table>` +
     `${tablaCriterios}${tablaDesviaciones}${aviso}${sinJuzgar}${resultado}${cambios}${queSeRevisa}${pie}</div>`
 }
 
