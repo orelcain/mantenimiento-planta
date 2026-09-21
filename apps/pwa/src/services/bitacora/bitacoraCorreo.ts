@@ -50,7 +50,7 @@ export interface DatosCorreoBitacora {
 
 // 2 fotos por fila en 540 px: caben en la columna de vista previa y en cualquier cuerpo de correo.
 const ANCHO_FOTO = 260
-const C = {
+export const C = {
   tinta: '#1F1F1F',
   sec: '#5F6368',
   linea: '#E3E3E3',
@@ -67,7 +67,7 @@ const C = {
   critFondo: '#FCE8E6',
   neutroFondo: '#F1F3F4',
 }
-const FUENTE = "'Segoe UI', Calibri, Arial, sans-serif"
+export const FUENTE = "'Segoe UI', Calibri, Arial, sans-serif"
 
 export function escaparHtml(texto: string | null | undefined): string {
   return String(texto ?? '')
@@ -140,7 +140,7 @@ function dimensionesFoto(f: FotoEvento): { w: number; h: number | null } {
   return { w: ANCHO_FOTO, h: null }
 }
 
-function htmlFotos(fotos: readonly FotoEvento[], fuente: (f: FotoEvento) => string): string {
+export function htmlFotos(fotos: readonly FotoEvento[], fuente: (f: FotoEvento) => string): string {
   if (!fotos.length) return ''
   // Antes y después juntos y en ese orden: es la comparación que se quiere ver.
   const orden = { antes: 0, despues: 1, foto: 2 } as const
@@ -251,7 +251,7 @@ function htmlEvento(e: EventoBitacora, numero: number, fuente: (f: FotoEvento) =
 }
 
 /** Título de sección: «EVENTOS DEL TURNO 6» con una raya debajo (ámbar en los pendientes). */
-function htmlSeccion(titulo: string, cantidad: number | null, color: string): string {
+export function htmlSeccion(titulo: string, cantidad: number | null, color: string): string {
   return (
     `<div style="font-family:${FUENTE};font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:${C.tinta};` +
     `margin-top:20px;padding-bottom:6px;border-bottom:2px solid ${color};">${escaparHtml(titulo)}` +
@@ -260,7 +260,7 @@ function htmlSeccion(titulo: string, cantidad: number | null, color: string): st
   )
 }
 
-function htmlKpi(valor: string, etiqueta: string, punto?: string): string {
+export function htmlKpi(valor: string, etiqueta: string, punto?: string): string {
   return (
     `<td style="padding:8px 12px;border:1px solid ${C.linea};vertical-align:top;font-family:${FUENTE};">` +
     `<div style="font-size:18px;font-weight:600;color:${C.tinta};white-space:nowrap;">${escaparHtml(valor)}</div>` +

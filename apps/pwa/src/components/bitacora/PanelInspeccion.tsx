@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AlertTriangle, Check, ChevronDown, ChevronRight, ClipboardCheck, Loader2, MessageSquarePlus, Plus, Send, X } from 'lucide-react'
+import { AlertTriangle, Check, ChevronDown, ChevronRight, ClipboardCheck, Loader2, MessageSquarePlus, Plus, X } from 'lucide-react'
 import { Button } from '@/components/piel'
 import {
   TEXTO_LIBERACION,
@@ -26,7 +26,6 @@ export interface PanelInspeccionProps {
   onMarcar: (criterioId: string, resultado: 'conforme' | 'no-conforme' | null) => void
   onNuevaDesviacion: (criterioId: string) => void
   onAnotar: (criterioId: string, nota: string) => void
-  onAvisarSupervisor: () => void
   onAbrirEvento: (e: EventoBitacora) => void
   onLiberar: (estado: EstadoLiberacion) => void
   onDeshacerLiberacion: () => void
@@ -48,7 +47,6 @@ export function PanelInspeccion({
   onMarcar,
   onNuevaDesviacion,
   onAnotar,
-  onAvisarSupervisor,
   onAbrirEvento,
   onLiberar,
   onDeshacerLiberacion,
@@ -274,10 +272,6 @@ export function PanelInspeccion({
             <p className="text-caption tabular-nums text-muted-foreground">
               {horaDe(liberada.en)} · {liberada.porNombre} · {resumen.revisados} de {resumen.total} revisados
             </p>
-            {/* §9 del procedimiento: «Informar al supervisor», por el mismo canal de la bitácora. */}
-            <Button variant="tinted" onClick={onAvisarSupervisor}>
-              <Send /> Avisar al supervisor
-            </Button>
             {editable && (
               <Button variant="plain" onClick={onDeshacerLiberacion} disabled={trabajando}>
                 Deshacer la entrega
@@ -370,5 +364,5 @@ function BotonResultado({
 /** `HH:mm` de un ISO; vacío si no se puede. */
 function horaDe(iso: string): string {
   const d = new Date(iso)
-  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })
+  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false })
 }
