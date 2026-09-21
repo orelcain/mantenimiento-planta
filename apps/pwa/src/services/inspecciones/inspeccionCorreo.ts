@@ -42,16 +42,49 @@ export interface DatosCorreoInspeccion {
 
 const abierta = (e: EventoBitacora) => e.pendiente && !e.cierre
 
+/** De qué se compone el registro §8, para su fila de cierre. Un cero no se nombra. */
+function cierreDesviaciones(r: ResumenInspeccion): string {
+  if (!r.pendientes) return 'todas resueltas antes de entregar'
+  const abiertas = `${r.pendientes} ${r.pendientes === 1 ? 'abierta' : 'abiertas'} al entregar`
+  const resueltas = r.desviaciones - r.pendientes
+  return resueltas ? `${resueltas} ${resueltas === 1 ? 'resuelta' : 'resueltas'} · ${abiertas}` : abiertas
+}
+
 /**
- * Una tabla de documento, no una reja. Las celdas llevan SOLO una raya abajo: el borde en los
- * cuatro lados es lo que hacía que el correo se leyera como una planilla volcada, y la lista
- * de Apple separa las filas con una línea fina y nada más
- * (HIG «Lists and tables»: https://developer.apple.com/design/human-interface-guidelines/lists-and-tables).
+ * La forma del documento, decidida contra el catálogo de tics de la IA y la tradición del
+ * PROTOCOLO DE ENSAYO (Orel, 21-09-2026: «primero establezcamos qué es un estilo hecho por IA
+ * y reemplacémoslo por estilos profesionales ya comprobados»). Las seis reglas:
+ *
+ * 1. **Retícula de 12.** Todo ancho de columna es un número entero de doceavos. Seis anchos
+ *    improvisados es lo que delata una tabla generada.
+ * 2. **Tres filetes por tabla**, nunca verticales: uno grueso bajo el encabezado, uno fino
+ *    entre filas y uno sobre la fila de cierre. La reja de cuatro bordes por celda es el tic;
+ *    quitarlos todos —lo que hice en la pasada anterior— es el tic opuesto y pierde la
+ *    estructura (Tufte: borrar la tinta que no es dato, no la que sí lo es).
+ * 3. **Cuatro cuerpos y nada intermedio.** Dos tamaños que hay que medir para distinguirlos
+ *    son uno de más (Bringhurst).
+ * 4. **Color solo donde codifica** un estado. Ni fondos de sección, ni cifras pintadas.
+ * 5. **Ninguna caja de color.** La conclusión se anuncia con filete y cuerpo mayor, como el
+ *    total de una factura; la advertencia, con un rótulo en negrita al principio del párrafo.
+ *    La tarjeta con barra de color a la izquierda es el bloque de nota de la documentación
+ *    técnica web, y es el tic más reconocible de un HTML escrito por un modelo.
+ * 6. **El espacio es la estructura**: 28 px sobre una sección dicen que empieza una sección
+ *    mejor que una banda de color.
+ *
+ * La prueba de humo: en blanco y negro tiene que seguir teniendo jerarquía. Si sin el color
+ * se vuelve una lista plana, el color estaba haciendo el trabajo de la tipografía.
  */
+const TITULO = '21px'
+const TEXTO = '14px'
+const SEC = '11px'
+const ROTULO = '10.5px'
+/** Filete fino entre filas; el grueso y el de cierre van en tinta. */
 const RAYA = '#ECECEC'
 const CELDA =
-  `padding:10px 14px 10px 0;border-bottom:1px solid ${RAYA};font-family:${FUENTE};font-size:13px;` +
-  `line-height:1.45;color:${C.tinta};vertical-align:top;`
+  `padding:10px 14px 10px 0;border-bottom:1px solid ${RAYA};font-family:${FUENTE};font-size:${TEXTO};` +
+  `line-height:1.5;color:${C.tinta};vertical-align:top;`
+/** Un doceavo del ancho útil. Las columnas ocupan tracks enteros, no porcentajes inventados. */
+const track = (n: number) => `${((n / 12) * 100).toFixed(4)}%`
 
 /**
  * `HH:mm` de un ISO, o cadena vacía si no hay hora.
@@ -84,8 +117,17 @@ function celdaTono(texto: string, color: string, ancho?: string): string {
   )
 }
 
+/** La fila de cierre: el «total» del protocolo. Dice de qué se compone el resultado. */
+function filaCierre(columnas: number, izquierda: string, derecha: string): string {
+  const td = `padding:11px 14px 0 0;border-top:1px solid ${C.tinta};font-family:${FUENTE};font-size:${SEC};color:${C.sec};vertical-align:top;`
+  return (
+    `<tr><td style="${td}">${escaparHtml(izquierda)}</td>` +
+    `<td colspan="${columnas - 1}" style="${td}">${escaparHtml(derecha)}</td></tr>`
+  )
+}
+
 /** El estado del punto con el color que le toca. */
-function celdaEstado(estado: ResultadoCriterio | undefined): string {
+function celdaEstado(estado: ResultadoCriterio | undefined, ancho?: string): string {
   const [texto, color] =
     estado === 'conforme'
       ? ['Conforme', C.ventana]
@@ -99,7 +141,7 @@ function celdaEstado(estado: ResultadoCriterio | undefined): string {
           : estado === 'no-conforme'
             ? ['No conforme', C.parada]
             : ['Sin revisar', C.sec]
-  return celdaTono(texto, color)
+  return celdaTono(texto, color, ancho)
 }
 
 /**
@@ -107,10 +149,10 @@ function celdaEstado(estado: ResultadoCriterio | undefined): string {
  * resueltas: la columna no estaba diciendo nada. Sale de lo que el evento y su punto guardan.
  */
 function celdaEstadoDesviacion(e: EventoBitacora, inspeccion: Inspeccion): string {
-  if (!abierta(e)) return celdaTono('Resuelta', C.ventana, '10%')
+  if (!abierta(e)) return celdaTono('Resuelta', C.ventana, track(1))
   return inspeccion.resultados[e.inspeccion?.criterioId ?? ''] === 'controlado'
-    ? celdaTono('Controlada', C.pendBorde, '10%')
-    : celdaTono('Pendiente', C.parada, '10%')
+    ? celdaTono('Controlada', C.pendBorde, track(1))
+    : celdaTono('Pendiente', C.parada, track(1))
 }
 
 function celda(texto: string, ancho?: string, gris?: boolean): string {
@@ -138,39 +180,42 @@ function encabezadoTabla(columnas: readonly string[]): string {
     `<tr>${columnas
       .map(
         (t) =>
-          `<th align="left" style="padding:0 14px 7px 0;border-bottom:1px solid ${C.linea};` +
-          `font-family:${FUENTE};font-size:10.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;` +
+          `<th align="left" style="padding:0 14px 8px 0;border-bottom:1.5px solid ${C.tinta};` +
+          `font-family:${FUENTE};font-size:${ROTULO};font-weight:600;letter-spacing:.07em;text-transform:uppercase;` +
           `color:${C.sec};">${escaparHtml(t)}</th>`,
       )
       .join('')}</tr>`
   )
 }
 
-/** El encabezado de una sección: un rótulo, no una banda de color. */
+/** El encabezado de una sección: un rótulo, y 28 px de aire encima. Nunca una banda de color. */
 function seccion(titulo: string, cantidad?: number): string {
   return (
-    `<div style="font-family:${FUENTE};font-size:11px;font-weight:700;letter-spacing:.09em;` +
-    `text-transform:uppercase;color:${C.sec};margin-top:30px;">${escaparHtml(titulo)}` +
+    `<div style="font-family:${FUENTE};font-size:${ROTULO};font-weight:600;letter-spacing:.09em;` +
+    `text-transform:uppercase;color:${C.sec};margin-top:28px;">${escaparHtml(titulo)}` +
     (cantidad != null ? ` <span style="color:${C.tinta};">${cantidad}</span>` : '') +
     `</div>`
   )
 }
 
 /** Una cifra con su rótulo. Sin caja: el número pesa por tamaño, no por borde. */
-function kpi(valor: string, etiqueta: string, punto?: string): string {
+function kpi(valor: string, etiqueta: string): string {
   return (
-    `<td style="padding:0 30px 0 0;vertical-align:top;font-family:${FUENTE};">` +
-    `<div style="font-size:20px;font-weight:600;line-height:1.2;color:${C.tinta};white-space:nowrap;">${escaparHtml(valor)}</div>` +
-    `<div style="font-size:11.5px;color:${C.sec};padding-top:3px;white-space:nowrap;">` +
-    `${punto ? `<span style="color:${punto};">●</span> ` : ''}${escaparHtml(etiqueta)}</div></td>`
+    `<td style="padding:0 34px 0 0;vertical-align:top;font-family:${FUENTE};">` +
+    `<div style="font-size:${TITULO};font-weight:600;line-height:1.2;color:${C.tinta};white-space:nowrap;` +
+    `font-variant-numeric:tabular-nums;">${escaparHtml(valor)}</div>` +
+    `<div style="font-size:${SEC};color:${C.sec};padding-top:4px;white-space:nowrap;">${escaparHtml(etiqueta)}</div></td>`
   )
 }
 
-/** Un bloque de aviso: barra de color a la izquierda, fondo tenue. Un solo lenguaje para los tres. */
-function bloque(fondo: string, borde: string, html: string, margen = '12px'): string {
+/**
+ * Una advertencia: rótulo en negrita al principio del párrafo, bajo un filete. Antes era una
+ * tarjeta con fondo tenue y barra de color a la izquierda — el tic n.º 1.
+ */
+function nota(html: string): string {
   return (
-    `<div style="font-family:${FUENTE};background:${fondo};border-left:3px solid ${borde};` +
-    `padding:12px 16px;margin-top:${margen};font-size:13px;line-height:1.5;color:${C.tinta};">${html}</div>`
+    `<div style="font-family:${FUENTE};border-top:1px solid ${C.linea};margin-top:16px;padding-top:12px;` +
+    `font-size:${TEXTO};line-height:1.5;color:${C.tinta};">${html}</div>`
   )
 }
 
@@ -197,27 +242,25 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen: vivo, desvia
   const cambios = l?.resumen ? cambiosDesdeLaEntrega(l.resumen, vivo) : ''
 
   const encabezado =
-    `<div style="font-family:${FUENTE};font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:${C.marca};">` +
+    `<div style="font-family:${FUENTE};font-size:${ROTULO};font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:${C.sec};">` +
     `${escaparHtml(pauta.nombre)} · ${escaparHtml(planta)}</div>` +
-    `<div style="font-family:${FUENTE};font-size:21px;font-weight:600;color:${C.tinta};padding-top:2px;">` +
+    `<div style="font-family:${FUENTE};font-size:${TITULO};font-weight:600;line-height:1.2;color:${C.tinta};padding-top:4px;">` +
     `${escaparHtml(etiquetaTurno(turno))} · ${escaparHtml(fechaTurnoLarga(turno))}</div>` +
-    `<div style="font-family:${FUENTE};font-size:13px;color:${C.sec};padding-top:2px;">` +
+    `<div style="font-family:${FUENTE};font-size:${SEC};line-height:1.5;color:${C.sec};padding-top:4px;">` +
     `${escaparHtml(horarioTurno(turno).replace('–', 'a'))} · Realizada por ${escaparHtml(inspeccion.iniciadaPorNombre)}` +
     `${hora(inspeccion.iniciadaEn) ? ` · Inicio ${hora(inspeccion.iniciadaEn)}` : ''} · Pauta v${inspeccion.pautaVersion}</div>`
 
+  /**
+   * La cabecera de cifras dice lo que la fila de cierre de la tabla NO dice. El desglose por
+   * estado (5 conformes, 1 corregido, 1 controlado) es el «total» de la tabla y vive ahí:
+   * repetirlo acá arriba era la duplicación que deja a los dos bloques diciendo lo mismo.
+   */
   const kpis = [
     kpi(`${resumen.revisados} de ${resumen.total}`, 'puntos revisados'),
-    resumen.corregidos > 0 ? kpi(String(resumen.corregidos), resumen.corregidos === 1 ? 'corregido' : 'corregidos', C.afectado) : '',
-    // El trabajo que hizo que la planta produjera igual: sin esto el correo solo cuenta la falla.
-    resumen.controlados > 0 ? kpi(String(resumen.controlados), 'con contingencia', C.pendBorde) : '',
-    // Un cero no es noticia: la fila de KPI es para lo que pasó, no para lo que no pasó.
-    resumen.noConformes > 0 ? kpi(String(resumen.noConformes), resumen.noConformes === 1 ? 'no conforme' : 'no conformes', C.parada) : '',
     resumen.desviaciones > 0 ? kpi(String(resumen.desviaciones), resumen.desviaciones === 1 ? 'desviación' : 'desviaciones') : '',
+    resumen.pendientes > 0 ? kpi(String(resumen.pendientes), resumen.pendientes === 1 ? 'queda abierta' : 'quedan abiertas') : '',
     // La CORRIDA: lo que se alcanzó a arreglar antes de entregar. Es el trabajo que no se ve.
-    resumen.minutosDeCorrida != null ? kpi(`${resumen.minutosDeCorrida} min`, 'corrigiendo antes de arrancar', C.ventana) : '',
-    resumen.pendientesCriticos > 0
-      ? kpi(String(resumen.pendientesCriticos), resumen.pendientesCriticos === 1 ? 'crítica abierta' : 'críticas abiertas', C.parada)
-      : '',
+    resumen.minutosDeCorrida != null ? kpi(`${resumen.minutosDeCorrida} min`, 'corrigiendo antes de arrancar') : '',
     resumen.minutosDeRecorrido ? kpi(`${resumen.minutosDeRecorrido} min`, 'de recorrido') : '',
   ].join('')
 
@@ -248,7 +291,7 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen: vivo, desvia
         [
           nota ? `<div>${escaparHtml(nota)}</div>` : '',
           suyas.length
-            ? `<div style="font-size:12px;color:${C.sec};${nota ? 'padding-top:3px;' : ''}">` +
+            ? `<div style="font-size:${SEC};color:${C.sec};${nota ? 'padding-top:4px;' : ''}">` +
               `${suyas.length} ${suyas.length === 1 ? 'desviación' : 'desviaciones'}: ` +
               `${escaparHtml(suyas.map((e) => e.equipo || tituloDe(e) || 'sin equipo').join(' · '))}</div>`
             : '',
@@ -256,19 +299,32 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen: vivo, desvia
           .filter(Boolean)
           .join('')
       return (
-        `<tr>${celda(c.titulo, '34%')}${celdaEstado(inspeccion.resultados[c.id])}` +
-        (hayHoras ? celdaHora(hora(inspeccion.marcas?.[c.id]), '12%') : '') +
-        celdaHtml(cuerpo) +
+        // 4 + 2 (+1) + 5 o 6 tracks: la suma es 12 siempre.
+        `<tr>${celda(c.titulo, track(4))}${celdaEstado(inspeccion.resultados[c.id], track(2))}` +
+        (hayHoras ? celdaHora(hora(inspeccion.marcas?.[c.id]), track(1)) : '') +
+        celdaHtml(cuerpo, track(hayHoras ? 5 : 6)) +
         `</tr>`
       )
     })
     .join('')
+
+  /** De qué se compone el «7 de 7»: el total de la tabla, no un adorno. */
+  const desglose = [
+    resumen.conformes ? `${resumen.conformes} ${resumen.conformes === 1 ? 'conforme' : 'conformes'}` : '',
+    resumen.corregidos ? `${resumen.corregidos} ${resumen.corregidos === 1 ? 'corregido' : 'corregidos'}` : '',
+    resumen.controlados ? `${resumen.controlados} ${resumen.controlados === 1 ? 'controlado' : 'controlados'}` : '',
+    resumen.noConformes ? `${resumen.noConformes} sin resolver` : '',
+    resumen.total - resumen.revisados ? `${resumen.total - resumen.revisados} sin revisar` : '',
+  ]
+    .filter(Boolean)
+    .join(' · ')
 
   const tablaCriterios =
     seccion('Criterio de liberación') +
     `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;width:100%;margin-top:8px;">` +
     encabezadoTabla(['Punto de la pauta', 'Estado', ...(hayHoras ? ['Hora'] : []), 'Observación']) +
     filasCriterios +
+    filaCierre(hayHoras ? 4 : 3, `${resumen.total} ${resumen.total === 1 ? 'punto' : 'puntos'}`, desglose) +
     `</table>`
 
   // §8 · Registro de desviaciones, AGRUPADO por punto de la pauta: un punto puede tener
@@ -276,11 +332,11 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen: vivo, desvia
   const filaDesviacion = (e: EventoBitacora) => {
     const equipo = [e.equipo || 'Sin equipo', codigoEquipoDe(e)].filter(Boolean).join(' · ')
     const fila =
-      // Los anchos suman 100 con la columna de estado incluida: sin eso, la descripción
-      // quedaba en una columna de cuatro palabras de ancho y la fila crecía a lo alto.
-      `<tr>${celda(equipo, '18%')}${celda(tituloDe(e) || e.descripcion, '14%')}${celda(e.descripcion, '30%')}` +
-      celda(accionDe(e, inspeccion), '16%') +
-      celda(autorVisible(e), '12%') +
+      // 2 + 2 + 4 + 2 + 1 + 1 = 12 tracks. La condición encontrada se lleva el doble que las
+      // demás porque es la sustancia; responsable y estado no envuelven.
+      `<tr>${celda(equipo, track(2))}${celda(tituloDe(e) || e.descripcion, track(2))}${celda(e.descripcion, track(4))}` +
+      celda(accionDe(e, inspeccion), track(2)) +
+      celda(autorVisible(e), track(1)) +
       celdaEstadoDesviacion(e, inspeccion) +
       `</tr>`
     // La «condición encontrada» de §8 se ve mejor que se cuenta: antes y después van juntos.
@@ -293,8 +349,8 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen: vivo, desvia
   }
 
   const grupo = (titulo: string, cuantas: number) =>
-    `<tr><td colspan="6" style="padding:20px 0 7px;border-bottom:1px solid ${C.linea};` +
-    `font-family:${FUENTE};font-size:12.5px;font-weight:600;color:${C.tinta};">${escaparHtml(titulo)}` +
+    `<tr><td colspan="6" style="padding:22px 0 8px;border-bottom:1px solid ${C.linea};` +
+    `font-family:${FUENTE};font-size:${TEXTO};font-weight:600;color:${C.tinta};">${escaparHtml(titulo)}` +
     `<span style="font-weight:400;color:${C.sec};"> · ${cuantas} ${cuantas === 1 ? 'desviación' : 'desviaciones'}</span></td></tr>`
 
   const filasDesviaciones =
@@ -303,7 +359,13 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen: vivo, desvia
         const suyas = porCriterio.get(c.id) ?? []
         return suyas.length ? grupo(c.titulo, suyas.length) + suyas.map(filaDesviacion).join('') : ''
       })
-      .join('') + (sueltas.length ? grupo('Sin punto de la pauta', sueltas.length) + sueltas.map(filaDesviacion).join('') : '')
+      .join('') +
+    (sueltas.length ? grupo('Sin punto de la pauta', sueltas.length) + sueltas.map(filaDesviacion).join('') : '') +
+    filaCierre(
+      6,
+      `${desviaciones.length} ${desviaciones.length === 1 ? 'desviación' : 'desviaciones'}`,
+      cierreDesviaciones(resumen),
+    )
 
   const tablaDesviaciones = desviaciones.length
     ? seccion('Registro de desviaciones', desviaciones.length) +
@@ -312,7 +374,7 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen: vivo, desvia
       filasDesviaciones +
       `</table>`
     : seccion('Registro de desviaciones') +
-      `<p style="font-family:${FUENTE};font-size:13.5px;line-height:1.5;color:${C.sec};margin:10px 0 0;">` +
+      `<p style="font-family:${FUENTE};font-size:${TEXTO};line-height:1.5;color:${C.sec};margin:10px 0 0;">` +
       (resumen.noConformesSinDesviacion
         ? // Decirlo es lo unico honesto: el punto quedo abierto y no se anoto nada.
           `${resumen.noConformesSinDesviacion} ${resumen.noConformesSinDesviacion === 1 ? 'punto quedó' : 'puntos quedaron'} sin resolver y sin una desviación anotada. Ver el criterio de liberación, arriba.`
@@ -320,46 +382,53 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen: vivo, desvia
       `</p>`
 
   const sinJuzgar = resumen.sinEvaluar
-    ? bloque(
-        C.pendFondo,
-        C.pendBorde,
-        `<b>Sin evaluar.</b> ${resumen.sinEvaluar} ${resumen.sinEvaluar === 1 ? 'desviación abierta no calza' : 'desviaciones abiertas no calzan'} con ningún equipo del diagrama de líneas, ` +
+    ? nota(
+        `<b style="font-weight:600;">Sin evaluar.</b> ${resumen.sinEvaluar} ${resumen.sinEvaluar === 1 ? 'desviación abierta no calza' : 'desviaciones abiertas no calzan'} con ningún equipo del diagrama de líneas, ` +
           `así que no se sabe si ${resumen.sinEvaluar === 1 ? 'detiene' : 'detienen'} una línea.`,
       )
     : ''
 
   const aviso = resumen.pendientesCriticos
-    ? bloque(
-        C.critFondo,
-        C.parada,
-        `<b>Atención.</b> ${resumen.pendientesCriticos} ${resumen.pendientesCriticos === 1 ? 'desviación abierta detiene' : 'desviaciones abiertas detienen'} una línea de proceso.`,
+    ? nota(
+        `<b style="font-weight:600;color:${C.parada};">Atención.</b> ${resumen.pendientesCriticos} ${resumen.pendientesCriticos === 1 ? 'desviación abierta detiene' : 'desviaciones abiertas detienen'} una línea de proceso.`,
       )
     : ''
 
   // §10 · Resultado final.
+  /**
+   * El cierre del documento. Filete grueso, titular en el cuerpo mayor y, bajo otro filete, la
+   * firma: quién entregó y a qué hora. Es la forma del «Resultado» de un protocolo de ensayo y
+   * del total de una factura. Antes era una caja verde con barra de color — el tic n.º 1.
+   * El único color que queda es el punto de estado, porque ahí sí codifica.
+   */
+  const cierre = (punto: string, titular: string, cuerpo: string, firma: string) =>
+    `<div style="font-family:${FUENTE};border-top:2px solid ${C.tinta};margin-top:10px;padding-top:14px;">` +
+    `<div style="font-size:${TITULO};font-weight:600;line-height:1.25;color:${C.tinta};">` +
+    `<span style="color:${punto};">●</span> ${escaparHtml(titular)}</div>` +
+    `<div style="font-size:${TEXTO};line-height:1.5;color:${C.tinta};padding-top:7px;">${cuerpo}</div>` +
+    (firma
+      ? `<div style="font-size:${SEC};color:${C.sec};border-top:1px solid ${C.linea};margin-top:13px;padding-top:11px;">${escaparHtml(firma)}</div>`
+      : '') +
+    `</div>`
+
   const resultado = l
     ? seccion('Resultado final') +
-      bloque(
-        l.estado === 'no-liberada' ? C.critFondo : C.okFondo,
+      cierre(
         l.estado === 'no-liberada' ? C.parada : C.ventana,
-        `<div style="font-size:20px;font-weight:600;line-height:1.25;color:${l.estado === 'no-liberada' ? C.parada : C.ventana};">` +
-          `${escaparHtml(titularLiberacion(l.estado))}</div>` +
-          `<div style="padding-top:6px;">` +
-          `<b style="font-weight:600;">${escaparHtml(TEXTO_LIBERACION[l.estado].titulo)}.</b> ${escaparHtml(frasePorLiberacion(l.estado, resumen))}</div>` +
-          `<div style="font-size:12.5px;color:${C.sec};padding-top:8px;">Entregada${hora(l.en) ? ` a las ${hora(l.en)}` : ''} por ${escaparHtml(l.porNombre)}` +
-          `${l.nota ? ` · ${escaparHtml(l.nota)}` : ''}</div>`,
-        '14px',
+        titularLiberacion(l.estado),
+        `<b style="font-weight:600;">${escaparHtml(TEXTO_LIBERACION[l.estado].titulo)}.</b> ${escaparHtml(frasePorLiberacion(l.estado, resumen))}`,
+        `Entregada${hora(l.en) ? ` a las ${hora(l.en)}` : ''} · ${l.porNombre}${l.nota ? ` · ${l.nota}` : ''} · Mantención`,
       )
     : // Sin entrega marcada el correo NO puede decir que la planta está entregada; pero tampoco
       // puede quedarse en una frase gris que se lee como «la planta está parada». Es un aviso
       // al que lo está por enviar: falta un paso en la app (Orel, 21-09-2026).
       seccion('Resultado final') +
-      bloque(
-        C.pendFondo,
+      cierre(
         C.pendBorde,
-        `<b>Falta marcar la entrega de la planta.</b> El recorrido está registrado; todavía no se dice en qué condición quedó la planta ` +
-          `al pasar a Producción. Se marca en la app, en «Liberación de planta».`,
-        '14px',
+        'Falta marcar la entrega de la planta',
+        'El recorrido está registrado; todavía no se dice en qué condición quedó la planta al pasar a Producción. ' +
+          'Se marca en la app, en «Liberación de planta».',
+        '',
       )
 
   /**
@@ -370,16 +439,16 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen: vivo, desvia
    */
   const queSeRevisa =
     `<div style="font-family:${FUENTE};border-top:1px solid ${C.linea};margin-top:34px;padding-top:16px;">` +
-    `<div style="font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:${C.sec};">` +
+    `<div style="font-size:${ROTULO};font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:${C.sec};">` +
     `Qué se revisa en cada punto</div>` +
     pauta.criterios
       .map(
         (c) =>
-          `<div style="font-size:11.5px;line-height:1.5;color:${C.sec};padding-top:7px;">` +
+          `<div style="font-size:${SEC};line-height:1.5;color:${C.sec};padding-top:7px;">` +
           `<b style="color:${C.tinta};font-weight:600;">${escaparHtml(c.titulo)}.</b> ${escaparHtml(c.ayuda)}</div>`,
       )
       .join('') +
-    `<div style="font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:${C.sec};padding-top:18px;">` +
+    `<div style="font-size:${ROTULO};font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:${C.sec};padding-top:18px;">` +
     `Qué dice cada estado</div>` +
     [
       ['Conforme', C.ventana, 'se revisó y estaba bien'],
@@ -389,14 +458,14 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen: vivo, desvia
     ]
       .map(
         ([nombre, color, que]) =>
-          `<div style="font-size:11.5px;line-height:1.45;color:${C.sec};padding-top:4px;">` +
+          `<div style="font-size:${SEC};line-height:1.5;color:${C.sec};padding-top:5px;">` +
           `<span style="color:${color};">●</span> <b style="color:${C.tinta};font-weight:600;">${nombre}</b> · ${que}</div>`,
       )
       .join('') +
     `</div>`
 
   const pie =
-    `<div style="font-family:${FUENTE};font-size:11px;line-height:1.5;color:${C.sec};padding-top:18px;">` +
+    `<div style="font-family:${FUENTE};font-size:${ROTULO};line-height:1.5;color:${C.sec};padding-top:18px;">` +
     `Generado con la app de Mantención · ${escaparHtml(etiquetaTurno(turno))} ${escaparHtml(turno.fecha.split('-').reverse().join('-'))}` +
     ` · Las desviaciones quedan también en la bitácora del turno.</div>`
 
@@ -417,7 +486,7 @@ function cambiosDesdeLaEntrega(foto: ResumenInspeccion, ahora: ResumenInspeccion
   if (nuevas > 0) partes.push(`${nuevas} ${nuevas === 1 ? 'desviación nueva' : 'desviaciones nuevas'}`)
   if (!partes.length) return ''
   return (
-    `<div style="font-family:${FUENTE};font-size:12.5px;color:${C.sec};padding-top:10px;border-top:1px solid ${C.linea};margin-top:12px;">` +
+    `<div style="font-family:${FUENTE};font-size:${SEC};line-height:1.5;color:${C.sec};padding-top:11px;border-top:1px solid ${C.linea};margin-top:16px;">` +
     `Después de la entrega: ${escaparHtml(partes.join(' · '))}. Los números de arriba son los del momento de liberar.</div>`
   )
 }

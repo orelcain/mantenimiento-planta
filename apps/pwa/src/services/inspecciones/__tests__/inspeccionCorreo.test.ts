@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { inspeccionAHtmlCorreo, inspeccionATextoPlano, type DatosCorreoInspeccion } from '../inspeccionCorreo'
 import { PAUTA_POST_ASEO, resumenDeInspeccion, type Inspeccion } from '../modeloInspeccion'
+import { C } from '@/services/bitacora/bitacoraCorreo'
 import type { EventoBitacora, TurnoMantencion } from '@/services/bitacora/bitacora.types'
 
 /**
@@ -383,5 +384,48 @@ describe('el correo explica qué se revisa en cada punto', () => {
 
   it('y explica qué significa cada estado', () => {
     expect(inspeccionAHtmlCorreo(datos(inspeccion(), []))).toContain('se opera con una medida transitoria')
+  })
+})
+
+/**
+ * La forma del documento, fijada el 21-09-2026 contra el catálogo de tics de la IA
+ * (artifact «Estilo IA vs. documento profesional», hoja 3). Estas pruebas son el estándar:
+ * si alguien vuelve a meter una caja de color o a pintar una celda, se cae acá.
+ */
+describe('la forma del documento: protocolo, no plantilla', () => {
+  const html = () => inspeccionAHtmlCorreo(datos(inspeccion(), [desviacion()]))
+
+  it('ninguna caja de color: ni fondos de sección ni barras a la izquierda', () => {
+    // El tic n.º 1: la tarjeta con `border-left` y fondo tenue del bloque de nota de la
+    // documentación técnica. La conclusión se anuncia con filete y cuerpo mayor.
+    expect(html()).not.toContain('border-left')
+    expect(html()).not.toContain(`background:${C.okFondo}`)
+    expect(html()).not.toContain(`background:${C.pendFondo}`)
+    expect(html()).not.toContain(`background:${C.critFondo}`)
+  })
+
+  it('ningún filete vertical: las tablas no son rejas', () => {
+    expect(html()).not.toMatch(/border:1px solid/)
+  })
+
+  it('cada tabla cierra con su total, como una factura', () => {
+    const h = inspeccionAHtmlCorreo(datos(inspeccion({ resultados: { ...inspeccion().resultados, neumatico: 'corregido' } }), [desviacion()]))
+    expect(h).toContain('7 puntos')
+    expect(h).toContain('6 conformes · 1 corregido')
+    expect(h).toContain('todas resueltas antes de entregar')
+  })
+
+  it('cuatro cuerpos y nada intermedio', () => {
+    const cuerpos = new Set([...html().matchAll(/font-size:([\d.]+)px/g)].map((m) => m[1]))
+    expect([...cuerpos].sort()).toEqual(['10.5', '11', '14', '21'])
+  })
+
+  it('el color solo aparece donde codifica un estado', () => {
+    // Fuera de los puntos de estado, el documento es tinta sobre papel: en blanco y negro
+    // tiene que conservar la jerarquía.
+    const conColor = [...html().matchAll(/color:(#[0-9A-Fa-f]{6})/g)].map((m) => m[1].toUpperCase())
+    const semanticos = [C.ventana, C.parada, C.afectado, C.pendBorde].map((c) => c.toUpperCase())
+    const neutros = [C.tinta, C.sec].map((c) => c.toUpperCase())
+    expect(conColor.every((c) => semanticos.includes(c) || neutros.includes(c))).toBe(true)
   })
 })
