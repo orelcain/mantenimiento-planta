@@ -80,6 +80,15 @@ export interface Inspeccion {
   banda: string
   pautaId: string
   pautaVersion: number
+  /**
+   * Los criterios CON QUE SE EMPEZÓ. Guardábamos la versión pero leíamos la pauta viva: si
+   * alguien la editaba a mitad del recorrido, un «7 de 7» se volvía «7 de 8» y quedaban
+   * resultados de puntos que ya no existían (Orel, 21-09-2026). Son 7 líneas: copiarlas sale
+   * más barato que versionar documentos.
+   *
+   * Ausente en las inspecciones anteriores a este cambio: ahí se cae a la pauta viva.
+   */
+  criterios?: CriterioPauta[]
   /** ISO. */
   iniciadaEn: string
   iniciadaPorNombre: string
@@ -206,9 +215,59 @@ export const PAUTA_POST_ASEO: PautaInspeccion = {
   ],
 }
 
+/**
+ * Qué hay que decir de la inspección de este turno, sin abrir la pestaña.
+ *
+ * - `toca` — es un turno de domingo y nadie la ha empezado. El aseo semanal es el domingo y
+ *   la planta se entrega ahí (Orel); el procedimiento cubre además cualquier detención
+ *   prolongada, así que esto PROPONE, no obliga: se puede iniciar cualquier día.
+ * - `a-medias` — empezada y sin liberar. Una inspección a medias es justo lo que no puede
+ *   pasar inadvertido.
+ * - `sin-liberar` — todos los puntos revisados pero la planta no se ha entregado.
+ */
+export type AvisoInspeccion = 'toca' | 'a-medias' | 'sin-liberar' | null
+
+export function avisoDeInspeccion(
+  fechaTurno: string,
+  inspeccion: Pick<Inspeccion, 'liberacion'> | null,
+  resumen: Pick<ResumenInspeccion, 'revisados' | 'total'>,
+): AvisoInspeccion {
+  if (!inspeccion) return esDomingo(fechaTurno) ? 'toca' : null
+  if (inspeccion.liberacion) return null
+  return resumen.revisados >= resumen.total ? 'sin-liberar' : 'a-medias'
+}
+
+/** Qué se muestra de cada aviso, en una línea. */
+export const TEXTO_AVISO: Record<Exclude<AvisoInspeccion, null>, string> = {
+  toca: 'Este turno entrega planta: hay inspección post-aseo pendiente',
+  'a-medias': 'La inspección post-aseo quedó a medias',
+  'sin-liberar': 'La inspección está completa pero la planta no se ha liberado',
+}
+
+/** `YYYY-MM-DD` → domingo. Se arma a mediodía para que la zona horaria no corra el día. */
+function esDomingo(fechaTurno: string): boolean {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(fechaTurno)
+  if (!m) return false
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12).getDay() === 0
+}
+
 /** El criterio de la pauta, o `undefined` si la pauta cambió y ese punto ya no existe. */
 export function criterioDe(pauta: PautaInspeccion, id: string): CriterioPauta | undefined {
   return pauta.criterios.find((c) => c.id === id)
+}
+
+/**
+ * La pauta con que se recorre ESTA inspección: la que quedó guardada al empezar, o la viva si
+ * es una inspección anterior a que se guardaran.
+ */
+export function pautaDeLaInspeccion(viva: PautaInspeccion, inspeccion: Pick<Inspeccion, 'pautaId' | 'pautaVersion' | 'criterios'> | null): PautaInspeccion {
+  if (!inspeccion?.criterios?.length) return viva
+  return { id: inspeccion.pautaId, nombre: viva.nombre, version: inspeccion.pautaVersion, criterios: inspeccion.criterios }
+}
+
+/** ¿La pauta se editó después de que esta inspección empezó? */
+export function pautaCambio(viva: PautaInspeccion, inspeccion: Pick<Inspeccion, 'pautaVersion' | 'criterios'> | null): boolean {
+  return !!inspeccion?.criterios?.length && viva.version !== inspeccion.pautaVersion
 }
 
 /**

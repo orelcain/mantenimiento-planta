@@ -9,6 +9,8 @@ import {
 } from '@/services/inspecciones/inspecciones.service'
 import {
   PAUTA_POST_ASEO,
+  pautaCambio,
+  pautaDeLaInspeccion,
   resumenDeInspeccion,
   type DesviacionDeInspeccion,
   type PautaInspeccion,
@@ -26,12 +28,17 @@ export function useInspeccion(
   turnoId: string,
   eventos: readonly EventoBitacora[],
 ): {
+  /** La pauta CON QUE SE RECORRE esta inspección (la guardada al empezar). */
   pauta: PautaInspeccion
+  /** La pauta vigente, para saber con cuál nacería una nueva. */
+  pautaViva: PautaInspeccion
+  /** La pauta se editó después de que esta inspección empezó. */
+  cambioLaPauta: boolean
   inspeccion: InspeccionGuardada | null
   desviaciones: EventoBitacora[]
   resumen: ResumenInspeccion
 } {
-  const [pauta, setPauta] = useState<PautaInspeccion>(PAUTA_POST_ASEO)
+  const [pautaViva, setPauta] = useState<PautaInspeccion>(PAUTA_POST_ASEO)
   const [inspeccion, setInspeccion] = useState<InspeccionGuardada | null>(null)
   /**
    * Qué parte de su línea lleva cada equipo. Es lo que responde si una desviación abierta es
@@ -92,6 +99,9 @@ export function useInspeccion(
     return [...m.values()]
   }, [desviaciones, eventos, inspeccion?.id])
 
+  // La inspección se recorre con lo que tenía al empezar, pase lo que pase con la pauta.
+  const pauta = useMemo(() => pautaDeLaInspeccion(pautaViva, inspeccion), [pautaViva, inspeccion])
+
   const resumen = useMemo(() => {
     const ds: DesviacionDeInspeccion[] = todas.map((e) => ({
       id: e.id,
@@ -109,7 +119,7 @@ export function useInspeccion(
     )
   }, [pauta, inspeccion?.resultados, inspeccion?.notas, inspeccion?.marcas, todas, pesos, pesoPorNombre])
 
-  return { pauta, inspeccion, desviaciones: todas, resumen }
+  return { pauta, pautaViva, cambioLaPauta: pautaCambio(pautaViva, inspeccion), inspeccion, desviaciones: todas, resumen }
 }
 
 /**

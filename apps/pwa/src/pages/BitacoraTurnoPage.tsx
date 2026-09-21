@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { BarChart3, Check, ChevronDown, ChevronLeft, ChevronRight, Clock, Copy, FileSpreadsheet, Images, Loader2, MessageCircle, NotebookPen, Pencil, Plus, QrCode, Share, Trash2 } from 'lucide-react'
+import { AlertTriangle, BarChart3, Check, ChevronDown, ChevronLeft, ChevronRight, Clock, Copy, FileSpreadsheet, Images, Loader2, MessageCircle, NotebookPen, Pencil, Plus, QrCode, Share, Trash2 } from 'lucide-react'
 import { Button, ListCell, ListGroup, Pill, SegmentedControl, Sheet, Tag, type SwipeAction } from '@/components/piel'
 import { ToastAction } from '@/components/ui/toast'
 import { vibrar } from '@/services/bitacora/vibrar'
@@ -31,7 +31,7 @@ import { BITACORA_PLANTA } from '@/config/bitacora'
 import { PanelInspeccion } from '@/components/bitacora/PanelInspeccion'
 import { useInspeccion } from '@/hooks/useInspeccion'
 import { anotarCriterio, iniciarInspeccion, liberarPlanta, marcarCriterio } from '@/services/inspecciones/inspecciones.service'
-import { TEXTO_LIBERACION, frasePorLiberacion } from '@/services/inspecciones/modeloInspeccion'
+import { TEXTO_AVISO as TEXTO_AVISO_INSPECCION, TEXTO_LIBERACION, avisoDeInspeccion, frasePorLiberacion } from '@/services/inspecciones/modeloInspeccion'
 import { inspeccionAHtmlCorreo, inspeccionATextoPlano, tituloCorreoInspeccion } from '@/services/inspecciones/inspeccionCorreo'
 import { encabezadoEvento, etiquetaTipo, posicionAlMover, posicionEnIndice, tieneHora, tiposPropiosUsados, tituloDe } from '@/services/bitacora/presentacionEvento'
 import { copiarHtml, copiarTexto } from '@/lib/clipboard'
@@ -241,7 +241,8 @@ export function BitacoraTurnoVista({
   const abrirNuevo = useCallback(() => setEditor({ evento: null, idNuevo: nuevoId(), turno }), [nuevoId, turno])
 
   // ── Inspección de planta post-aseo ──
-  const { pauta, inspeccion, desviaciones, resumen: resumenInsp } = useInspeccion(BITACORA_PLANTA.id, turno.id, eventos)
+  const { pauta, cambioLaPauta, inspeccion, desviaciones, resumen: resumenInsp } = useInspeccion(BITACORA_PLANTA.id, turno.id, eventos)
+  const avisoInsp = useMemo(() => avisoDeInspeccion(turno.fecha, inspeccion, resumenInsp), [turno.fecha, inspeccion, resumenInsp])
   const [inspTrabajando, setInspTrabajando] = useState(false)
   /** El correo de la inspección se arma igual que el del turno: mismos bloques, mismo estilo. */
   const datosCorreoInsp = useMemo(
@@ -948,9 +949,30 @@ export function BitacoraTurnoVista({
         }}
         segments={[
           { value: 'turno', label: 'Turno' },
-          { value: 'inspeccion', label: 'Inspección post-aseo' },
+          {
+            value: 'inspeccion',
+            label: (
+              <span className="flex items-center gap-1.5">
+                Inspección post-aseo
+                {/* Un punto, no un número: lo que hay que saber es que falta mirarla. */}
+                {avisoInsp && <span aria-label={TEXTO_AVISO_INSPECCION[avisoInsp]} className="size-1.5 rounded-full bg-ink-warn" />}
+              </span>
+            ),
+          },
         ]}
       />
+
+      {vista === 'turno' && avisoInsp && avisoInsp !== 'toca' && (
+        <button
+          type="button"
+          onClick={() => setVista('inspeccion')}
+          className="mx-1 flex min-h-[44px] items-center gap-2 rounded-ctl border border-ink-warn/30 bg-ink-warn/10 px-3 text-left text-footnote text-ink-warn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary [&>svg]:size-4 [&>svg]:shrink-0"
+        >
+          <AlertTriangle aria-hidden />
+          <span className="min-w-0 flex-1">{TEXTO_AVISO_INSPECCION[avisoInsp]}</span>
+          <ChevronRight aria-hidden />
+        </button>
+      )}
 
       {vista === 'inspeccion' ? (
         <div className="px-1">
@@ -960,6 +982,8 @@ export function BitacoraTurnoVista({
             desviaciones={desviaciones}
             resumen={resumenInsp}
             editable={esActual}
+            cambioLaPauta={cambioLaPauta}
+            tocaHoy={avisoInsp === 'toca'}
             trabajando={inspTrabajando}
             onIniciar={iniciarLaInspeccion}
             onMarcar={(criterioId, resultado) =>

@@ -22,6 +22,10 @@ export interface PanelInspeccionProps {
   resumen: ResumenInspeccion
   /** Solo se puede escribir en el turno vigente. */
   editable: boolean
+  /** La pauta se editó después de que esta inspección empezó. */
+  cambioLaPauta?: boolean
+  /** Es un turno de domingo: el aseo semanal termina ahí y la planta se entrega. */
+  tocaHoy?: boolean
   trabajando?: boolean
   onIniciar: () => void
   onMarcar: (criterioId: string, resultado: ResultadoCriterio | null) => void
@@ -44,6 +48,8 @@ export function PanelInspeccion({
   desviaciones,
   resumen,
   editable,
+  cambioLaPauta,
+  tocaHoy,
   trabajando,
   onIniciar,
   onMarcar,
@@ -68,6 +74,11 @@ export function PanelInspeccion({
           Se recorre después del aseo semanal, de un fin de semana largo o de una detención prolongada, antes de
           entregarle la planta a Producción. Lo que se encuentre se anota como un evento más de este turno.
         </p>
+        {tocaHoy && (
+          <p className="flex items-start gap-2 rounded-ctl bg-ink-warn/10 p-2.5 text-footnote leading-snug text-ink-warn [&>svg]:mt-px [&>svg]:size-4 [&>svg]:shrink-0">
+            <AlertTriangle aria-hidden /> Este turno entrega planta después del aseo semanal.
+          </p>
+        )}
         {editable ? (
           <Button onClick={onIniciar} disabled={trabajando}>
             {trabajando ? <Loader2 className="animate-spin" /> : <ClipboardCheck />} Empezar la inspección
@@ -106,6 +117,11 @@ export function PanelInspeccion({
             {resumen.pendientesCriticos === 1
               ? 'Queda 1 desviación abierta que detiene una línea.'
               : `Quedan ${resumen.pendientesCriticos} desviaciones abiertas que detienen una línea.`}
+          </p>
+        )}
+        {cambioLaPauta && (
+          <p className="text-caption leading-snug text-muted-foreground">
+            La pauta se editó después de que empezaste. Esta inspección sigue con la v{inspeccion.pautaVersion}, como corresponde.
           </p>
         )}
         <div className="flex h-1.5 overflow-hidden rounded-full bg-muted-foreground/12" aria-hidden>

@@ -65,6 +65,7 @@ export function escucharInspeccion(
         banda: d.banda ?? '',
         pautaId: d.pautaId ?? PAUTA_POST_ASEO.id,
         pautaVersion: d.pautaVersion ?? 1,
+        criterios: Array.isArray(d.criterios) && d.criterios.length ? d.criterios : undefined,
         iniciadaEn: d.iniciadaEn ?? '',
         iniciadaPorNombre: d.iniciadaPorNombre ?? '',
         resultados: d.resultados ?? {},
