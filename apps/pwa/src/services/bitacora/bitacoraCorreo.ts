@@ -261,10 +261,15 @@ export function bitacoraAHtmlCorreo(datos: DatosCorreoBitacora): string {
   // bitácora sigue debajo (pedido de Orel, 17-09-2026). Bajo la planilla, las dos siglas con
   // su definición y su cálculo (Orel, 18-09). La planilla NO sigue el estándar del correo a
   // propósito: es una copia del Excel, y parecer una planilla es su trabajo.
+  //
+  // ⚠ La planilla va DENTRO del mismo ancho de 680 px que el cuerpo. Iba suelta con
+  // `width:100%`, así que en Outlook se estiraba a todo el panel de lectura —mil píxeles de
+  // planilla con filas altas— mientras el cuerpo quedaba en 680: por eso se veía «como letra
+  // 30» (Orel, 21-09-2026). No era la letra, era el ancho.
   const recoleccion = eventos.length
-    ? `${htmlRecoleccionMttr(filasRecoleccion(datos.turno, eventos))}` +
+    ? `<div style="max-width:680px;">${htmlRecoleccionMttr(filasRecoleccion(datos.turno, eventos))}` +
       `<div style="font-family:${FUENTE};font-size:${SEC};line-height:1.5;color:${C.sec};padding-top:6px;">${escaparHtml(explicacionMtbfMttr(datos.turno, r))}</div>` +
-      `<div style="height:14px;line-height:14px;">&nbsp;</div>`
+      `<div style="height:14px;line-height:14px;">&nbsp;</div></div>`
     : ''
   return recoleccion + cuerpoBitacoraHtml(datos)
 }
