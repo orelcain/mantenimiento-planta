@@ -17,8 +17,13 @@ import {
   tituloDe,
 } from './presentacionEvento'
 
+import { C, FUENTE, escaparHtml } from './documentoCorreo'
+
 // Se reexporta: el PDF y las pruebas lo importan desde aquí.
 export { horarioEvento }
+// La paleta, la fuente y el escape viven en `documentoCorreo` (la forma compartida de los
+// correos); se reexportan para no mover a quien ya los importaba de aquí.
+export { C, FUENTE, escaparHtml }
 
 /**
  * Convierte la bitácora en el cuerpo de un correo.
@@ -50,34 +55,6 @@ export interface DatosCorreoBitacora {
 
 // 2 fotos por fila en 540 px: caben en la columna de vista previa y en cualquier cuerpo de correo.
 const ANCHO_FOTO = 260
-export const C = {
-  tinta: '#1F1F1F',
-  sec: '#5F6368',
-  linea: '#E3E3E3',
-  parada: '#B3261E',
-  ventana: '#1E7B34',
-  /** Afectó sin detener: ni el rojo de la parada ni el verde del «sin costo». */
-  afectado: '#8A5A00',
-  pendFondo: '#FFF4E5',
-  pendBorde: '#E8900C',
-  marca: '#2E75B6',
-  citaFondo: '#F4F5F7',
-  citaBarra: '#BDC1C6',
-  okFondo: '#E6F4EA',
-  critFondo: '#FCE8E6',
-  neutroFondo: '#F1F3F4',
-}
-export const FUENTE = "'Segoe UI', Calibri, Arial, sans-serif"
-
-export function escaparHtml(texto: string | null | undefined): string {
-  return String(texto ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-}
-
 const conSaltos = (t: string) => escaparHtml(t.trim()).replace(/\r?\n/g, '<br>')
 
 export function capitalizarPrimera(t: string): string {

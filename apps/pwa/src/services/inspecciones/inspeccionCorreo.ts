@@ -1,4 +1,26 @@
-import { C, FUENTE, escaparHtml, htmlFotos } from '@/services/bitacora/bitacoraCorreo'
+import { htmlFotos } from '@/services/bitacora/bitacoraCorreo'
+import {
+  C,
+  FUENTE,
+  ROTULO,
+  SEC,
+  TEXTO,
+  TITULO,
+  RAYA,
+  CELDA,
+  celdaHora,
+  celdaHtml,
+  celdaTono,
+  encabezadoTabla,
+  escaparHtml,
+  filaCierre,
+  filaCifras,
+  kpi,
+  nota,
+  recortar,
+  seccion,
+  track,
+} from '@/services/bitacora/documentoCorreo'
 import { etiquetaTurno, fechaTurnoLarga, horarioTurno } from '@/services/bitacora/turnoMantencion'
 import { codigoEquipoDe, horarioEvento, tituloDe } from '@/services/bitacora/presentacionEvento'
 import { autorVisible, type EventoBitacora, type FotoEvento, type TurnoMantencion } from '@/services/bitacora/bitacora.types'
@@ -43,12 +65,6 @@ export interface DatosCorreoInspeccion {
 
 const abierta = (e: EventoBitacora) => e.pendiente && !e.cierre
 
-/** Un texto en una línea de la columna; el completo está en la ficha del registro. */
-function recortar(texto: string, largo: number): string {
-  const t = texto.trim().replace(/\s+/g, ' ')
-  return t.length <= largo ? t : `${t.slice(0, largo - 1).trimEnd()}…`
-}
-
 /** De qué se compone el registro §8, para su fila de cierre. Un cero no se nombra. */
 function cierreDesviaciones(r: ResumenInspeccion): string {
   if (!r.pendientes) return 'todas resueltas antes de entregar'
@@ -57,41 +73,6 @@ function cierreDesviaciones(r: ResumenInspeccion): string {
   return resueltas ? `${resueltas} ${resueltas === 1 ? 'resuelta' : 'resueltas'} · ${abiertas}` : abiertas
 }
 
-/**
- * La forma del documento, decidida contra el catálogo de tics de la IA y la tradición del
- * PROTOCOLO DE ENSAYO (Orel, 21-09-2026: «primero establezcamos qué es un estilo hecho por IA
- * y reemplacémoslo por estilos profesionales ya comprobados»). Las seis reglas:
- *
- * 1. **Retícula de 12.** Todo ancho de columna es un número entero de doceavos. Seis anchos
- *    improvisados es lo que delata una tabla generada.
- * 2. **Tres filetes por tabla**, nunca verticales: uno grueso bajo el encabezado, uno fino
- *    entre filas y uno sobre la fila de cierre. La reja de cuatro bordes por celda es el tic;
- *    quitarlos todos —lo que hice en la pasada anterior— es el tic opuesto y pierde la
- *    estructura (Tufte: borrar la tinta que no es dato, no la que sí lo es).
- * 3. **Cuatro cuerpos y nada intermedio.** Dos tamaños que hay que medir para distinguirlos
- *    son uno de más (Bringhurst).
- * 4. **Color solo donde codifica** un estado. Ni fondos de sección, ni cifras pintadas.
- * 5. **Ninguna caja de color.** La conclusión se anuncia con filete y cuerpo mayor, como el
- *    total de una factura; la advertencia, con un rótulo en negrita al principio del párrafo.
- *    La tarjeta con barra de color a la izquierda es el bloque de nota de la documentación
- *    técnica web, y es el tic más reconocible de un HTML escrito por un modelo.
- * 6. **El espacio es la estructura**: 28 px sobre una sección dicen que empieza una sección
- *    mejor que una banda de color.
- *
- * La prueba de humo: en blanco y negro tiene que seguir teniendo jerarquía. Si sin el color
- * se vuelve una lista plana, el color estaba haciendo el trabajo de la tipografía.
- */
-const TITULO = '21px'
-const TEXTO = '14px'
-const SEC = '11px'
-const ROTULO = '10.5px'
-/** Filete fino entre filas; el grueso y el de cierre van en tinta. */
-const RAYA = '#ECECEC'
-const CELDA =
-  `padding:10px 14px 10px 0;border-bottom:1px solid ${RAYA};font-family:${FUENTE};font-size:${TEXTO};` +
-  `line-height:1.5;color:${C.tinta};vertical-align:top;`
-/** Un doceavo del ancho útil. Las columnas ocupan tracks enteros, no porcentajes inventados. */
-const track = (n: number) => `${((n / 12) * 100).toFixed(4)}%`
 
 /**
  * `HH:mm` de un ISO, o cadena vacía si no hay hora.
@@ -108,29 +89,6 @@ function hora(iso: string | undefined | null): string {
 
 export function tituloCorreoInspeccion({ turno, planta }: Pick<DatosCorreoInspeccion, 'turno' | 'planta'>): string {
   return `Inspección de planta post-aseo · ${planta} · ${etiquetaTurno(turno)} ${turno.fecha.split('-').reverse().join('-')}`
-}
-
-/**
- * El estado, como un punto de color y su palabra. Antes cada celda iba pintada entera: seis
- * bloques de color por tabla, que es lo que le da a un documento ese aire de tablero generado
- * en serie. El color marca, la palabra dice — igual que los KPI de la bitácora, que ya llevan
- * el punto en el rótulo y la cifra en tinta
- * (HIG «Color»: https://developer.apple.com/design/human-interface-guidelines/color).
- */
-function celdaTono(texto: string, color: string, ancho?: string): string {
-  return (
-    `<td style="${CELDA}white-space:nowrap;${ancho ? `width:${ancho};` : ''}">` +
-    `<span style="color:${color};">●</span> ${texto}</td>`
-  )
-}
-
-/** La fila de cierre: el «total» del protocolo. Dice de qué se compone el resultado. */
-function filaCierre(columnas: number, izquierda: string, derecha: string): string {
-  const td = `padding:11px 14px 0 0;border-top:1px solid ${C.tinta};font-family:${FUENTE};font-size:${SEC};color:${C.sec};vertical-align:top;`
-  return (
-    `<tr><td style="${td}">${escaparHtml(izquierda)}</td>` +
-    `<td colspan="${columnas - 1}" style="${td}">${escaparHtml(derecha)}</td></tr>`
-  )
 }
 
 /** El estado del punto con el color que le toca. */
@@ -178,62 +136,6 @@ function celdaPunto(c: CriterioPauta, ancho: string): string {
 }
 
 /** Una hora: cifras tabulares para que las columnas se lean en vertical (HIG «Typography»). */
-function celdaHora(hhmm: string, ancho: string): string {
-  return (
-    `<td style="${CELDA}color:${C.sec};white-space:nowrap;font-variant-numeric:tabular-nums;width:${ancho};">` +
-    `${escaparHtml(hhmm)}</td>`
-  )
-}
-
-/** Una celda cuyo contenido ya viene armado (para meterle más de una línea). */
-function celdaHtml(html: string, ancho?: string): string {
-  return `<td style="${CELDA}${ancho ? `width:${ancho};` : ''}">${html}</td>`
-}
-
-function encabezadoTabla(columnas: readonly string[]): string {
-  return (
-    `<tr>${columnas
-      .map(
-        (t) =>
-          `<th align="left" style="padding:0 14px 8px 0;border-bottom:1.5px solid ${C.tinta};` +
-          `font-family:${FUENTE};font-size:${ROTULO};font-weight:600;letter-spacing:.07em;text-transform:uppercase;` +
-          `color:${C.sec};">${escaparHtml(t)}</th>`,
-      )
-      .join('')}</tr>`
-  )
-}
-
-/** El encabezado de una sección: un rótulo, y 28 px de aire encima. Nunca una banda de color. */
-function seccion(titulo: string, cantidad?: number): string {
-  return (
-    `<div style="font-family:${FUENTE};font-size:${ROTULO};font-weight:600;letter-spacing:.09em;` +
-    `text-transform:uppercase;color:${C.sec};margin-top:28px;">${escaparHtml(titulo)}` +
-    (cantidad != null ? ` <span style="color:${C.tinta};">${cantidad}</span>` : '') +
-    `</div>`
-  )
-}
-
-/** Una cifra con su rótulo. Sin caja: el número pesa por tamaño, no por borde. */
-function kpi(valor: string, etiqueta: string): string {
-  return (
-    `<td style="padding:0 34px 0 0;vertical-align:top;font-family:${FUENTE};">` +
-    `<div style="font-size:${TITULO};font-weight:600;line-height:1.2;color:${C.tinta};white-space:nowrap;` +
-    `font-variant-numeric:tabular-nums;">${escaparHtml(valor)}</div>` +
-    `<div style="font-size:${SEC};color:${C.sec};padding-top:4px;white-space:nowrap;">${escaparHtml(etiqueta)}</div></td>`
-  )
-}
-
-/**
- * Una advertencia: rótulo en negrita al principio del párrafo, bajo un filete. Antes era una
- * tarjeta con fondo tenue y barra de color a la izquierda — el tic n.º 1.
- */
-function nota(html: string): string {
-  return (
-    `<div style="font-family:${FUENTE};border-top:1px solid ${C.linea};margin-top:16px;padding-top:12px;` +
-    `font-size:${TEXTO};line-height:1.5;color:${C.tinta};">${html}</div>`
-  )
-}
-
 /** La acción en dos palabras, para la fila del criterio de liberación. */
 function accionCorta(e: EventoBitacora, inspeccion: Inspeccion): string {
   if (!abierta(e)) return 'resuelta'
@@ -282,11 +184,8 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen: vivo, desvia
     // La CORRIDA: lo que se alcanzó a arreglar antes de entregar. Es el trabajo que no se ve.
     resumen.minutosDeCorrida != null ? kpi(`${resumen.minutosDeCorrida} min`, 'corrigiendo antes de arrancar') : '',
     resumen.minutosDeRecorrido ? kpi(`${resumen.minutosDeRecorrido} min`, 'de recorrido') : '',
-  ].filter(Boolean)
-  // Con una o dos cifras, la fila repite lo que la tabla ya cierra («7 puntos · 5 conformes…»)
-  // y queda como dos números sueltos. Se gana su lugar cuando trae lo que la tabla no dice:
-  // la corrida, el recorrido, las críticas.
-  const kpis = cifras.length >= 3 ? cifras.join('') : ''
+  ]
+  const kpis = filaCifras(cifras)
 
   /**
    * Las desviaciones ordenadas POR PUNTO DE LA PAUTA. Un punto puede tener varias, y hasta
@@ -513,9 +412,7 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen: vivo, desvia
   // para Producción.
 
   return `<div style="max-width:680px;color:${C.tinta};">${encabezado}` +
-    (kpis
-      ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin:22px 0 2px;"><tr>${kpis}</tr></table>`
-      : '') +
+    kpis +
     `${tablaCriterios}${tablaDesviaciones}${aviso}${resultado}${cambios}</div>`
 }
 
