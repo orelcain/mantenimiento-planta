@@ -92,12 +92,16 @@ export function kpi(valor: string, etiqueta: string): string {
 }
 
 /**
- * La fila de cifras, o nada. Con una o dos repite lo que la tabla ya cierra y queda como dos
- * números sueltos; se gana su lugar cuando trae lo que la tabla no dice.
+ * La fila de cifras, o nada. Se gana su lugar cuando trae lo que el resto del documento no
+ * dice. En la inspección, con una o dos cifras repetía la fila de cierre de la tabla («7
+ * puntos · 5 conformes…») como dos números sueltos: ahí el mínimo es 3. En el correo de
+ * turno no hay una tabla que cierre con eventos y pendientes, así que la fila es la única
+ * que los dice y va siempre que haya eventos: `minimo` 1. (Una prueba de la entrega de turno
+ * lo cazó: «1 pendiente (1 ya cerrado)» desaparecía con el mínimo de 3.)
  */
-export function filaCifras(cifras: readonly string[]): string {
+export function filaCifras(cifras: readonly string[], minimo = 3): string {
   const vivas = cifras.filter(Boolean)
-  return vivas.length >= 3
+  return vivas.length >= minimo
     ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin:22px 0 2px;"><tr>${vivas.join('')}</tr></table>`
     : ''
 }
