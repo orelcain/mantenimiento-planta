@@ -31,6 +31,7 @@ export async function leerLineas(plantId: string): Promise<GrafoGuardado | null>
     grupos: Array.isArray(d.grupos) ? d.grupos : [],
     cuotas: Array.isArray(d.cuotas) ? d.cuotas : [],
     curvas: Array.isArray(d.curvas) ? d.curvas : [],
+    descartados: Array.isArray(d.descartados) ? d.descartados.filter((x): x is string => typeof x === 'string') : [],
     actualizadoPor: d.actualizadoPor,
     actualizadoEn: d.actualizadoEn,
   }
@@ -53,6 +54,7 @@ export async function guardarLineas(plantId: string, g: GrafoLineas, quien: stri
     cuotas: (g.cuotas ?? []).map((c) => ({ a: c.a, b: c.b, parte: c.parte })),
     grupos: (g.grupos ?? []).map((gr) => ({ id: gr.id, miembros: gr.miembros, ...(gr.nombre ? { nombre: gr.nombre } : {}), ...(gr.modo ? { modo: gr.modo } : {}) })),
     curvas: (g.curvas ?? []).map((c) => ({ a: c.a, b: c.b, puntos: c.puntos.map((p) => ({ x: Math.round(p.x), y: Math.round(p.y) })) })),
+    descartados: (g.descartados ?? []).slice(0, 200),
     actualizadoPor: quien,
     actualizadoEn: serverTimestamp(),
   })
