@@ -445,15 +445,16 @@ describe('la forma del documento: protocolo, no plantilla', () => {
 describe('cada punto dice lo que cubre', () => {
   it('el resumen corto va en la tabla y el texto completo al pie', () => {
     const html = inspeccionAHtmlCorreo(datos(inspeccion(), []))
-    expect(html).toContain('motores, tableros, botoneras, humedad')
+    expect(html).toContain('motores, tableros, botoneras, conexiones, humedad y guardas')
     expect(html).toContain('Sin agua ni humedad en componentes eléctricos')
-    // El resumen corto entra en una línea de la columna: más largo la parte en dos.
-    for (const c of PAUTA_POST_ASEO.criterios) expect((c.resumen ?? '').length).toBeLessThanOrEqual(40)
+    // Dos líneas de la columna. Con una sola se caía media pauta; con tres, la tabla deja de
+    // escanearse y vale más mandar al anexo.
+    for (const c of PAUTA_POST_ASEO.criterios) expect((c.resumen ?? '').length).toBeLessThanOrEqual(80)
   })
 
   it('una inspección abierta antes del cambio igual lo muestra: el resumen es presentación', () => {
     const vieja = inspeccion({ criterios: PAUTA_POST_ASEO.criterios.map(({ id, titulo, ayuda }) => ({ id, titulo, ayuda })) })
     const pauta = pautaDeLaInspeccion(PAUTA_POST_ASEO, vieja)
-    expect(pauta.criterios[1]?.resumen).toBe('motores, tableros, botoneras, humedad')
+    expect(pauta.criterios[1]?.resumen).toBe('motores, tableros, botoneras, conexiones, humedad y guardas')
   })
 })

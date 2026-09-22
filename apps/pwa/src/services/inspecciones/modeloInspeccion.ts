@@ -69,11 +69,16 @@ export interface CriterioPauta {
   /** El texto del procedimiento: guía del técnico, plegada bajo el criterio. */
   ayuda: string
   /**
-   * Cinco o seis palabras con lo que cubre el punto, para ponerlas BAJO el título en la tabla
-   * del correo (Orel, 21-09-2026). «Sistema eléctrico» a secas no le dice nada a quien no
-   * recorrió la pauta, y el texto completo del procedimiento dentro de la celda multiplica por
-   * cuatro el alto de la tabla: se parte en nueve líneas de treinta caracteres y separa el
-   * primer estado del último por mil píxeles. El texto completo sigue al pie.
+   * Lo que cubre el punto, para ponerlo BAJO el título en la tabla del correo (Orel,
+   * 21-09-2026). «Sistema eléctrico» a secas no le dice nada a quien no recorrió la pauta, y
+   * el texto completo del procedimiento dentro de la celda multiplica por cuatro el alto de la
+   * tabla: se parte en nueve líneas de treinta caracteres y separa el primer estado del último
+   * por mil píxeles. El texto completo sigue al pie.
+   *
+   * ⚠ El presupuesto son DOS líneas de la columna, unos 80 caracteres. Con una sola —40
+   * caracteres— se caía media pauta: «Equipos mecánicos» perdía pernos y estructura, y
+   * «Paradas de emergencia» quedaba en tres palabras. Ajustar el resumen a la caja en vez de
+   * ajustar la caja al contenido es la manera rápida de dejar el correo diciendo menos.
    *
    * Ausente en las pautas anteriores a este cambio: ahí no se muestra nada.
    */
@@ -222,48 +227,48 @@ export const PAUTA_POST_ASEO: PautaInspeccion = {
   criterios: [
     {
       id: 'mecanico',
-      resumen: 'cintas, motorreductor, rodamientos',
+      resumen: 'cintas, motorreductor, rodamientos, poleas, pernos y estructura',
       titulo: 'Equipos mecánicos',
       ayuda:
         'Alineación y centrado de las cintas. Motorreductor: fijaciones, lubricación y fugas. Estructura y soportes. Rodamientos, ejes, poleas y rodillos. Pernos y uniones. Sin objetos atrapados que interfieran con el movimiento.',
     },
     {
       id: 'electrico',
-      resumen: 'motores, tableros, botoneras, humedad',
+      resumen: 'motores, tableros, botoneras, conexiones, humedad y guardas',
       titulo: 'Sistema eléctrico',
       ayuda:
         'Motores, cajas, tableros, botoneras y conexiones accesibles. Sin agua ni humedad en componentes eléctricos. Tapas, protecciones y guardas instaladas. Sin alarmas ni indicaciones anormales en el control.',
     },
     {
       id: 'neumatico',
-      resumen: 'mangueras, racores, cilindros, fugas',
+      resumen: 'mangueras, racores, cilindros, válvulas, presión y fugas de aire',
       titulo: 'Sistema neumático',
       ayuda:
         'Mangueras, conexiones, racores, cilindros y válvulas. Presión de trabajo. Sin fugas de aire. Cilindros y actuadores funcionando. Mangueras bien sujetas y sin daños.',
     },
     {
       id: 'seguridad',
-      resumen: 'pulsadores, sensores y guardas',
+      resumen: 'pulsadores de emergencia, sensores, enclavamientos y guardas',
       titulo: 'Paradas de emergencia y protecciones',
       ayuda:
         'Funcionamiento de las paradas de emergencia. Sensores, interruptores de seguridad y dispositivos de protección del equipo. Guardas y protecciones en su lugar.',
     },
     {
       id: 'operacional',
-      resumen: 'marcha en vacío, giro, alarmas',
+      resumen: 'marcha en vacío, sentido de giro, cintas, alarmas y LOTO',
       titulo: 'Prueba operacional',
       ayuda:
         'Marcha en vacío de los equipos principales. Sentido de giro de los motores. Desplazamiento de las cintas. Sistemas neumáticos. Sin alarmas ni fallas en el control. Prohibido intervenir, limpiar o ajustar con el equipo en movimiento: toda intervención con riesgo va con bloqueo y etiquetado (LOTO).',
     },
     {
       id: 'anomalias',
-      resumen: 'fugas, ruidos, vibraciones, golpes',
+      resumen: 'fugas, ruidos, vibraciones, golpes, calentamientos y movimientos',
       titulo: 'Sin fugas, ruidos ni vibraciones anormales',
       ayuda: 'Durante la prueba: fugas, ruidos, vibraciones, golpes, calentamientos o movimientos anormales.',
     },
     {
       id: 'despejado',
-      resumen: 'herramientas, residuos, accesos, tapas',
+      resumen: 'herramientas, materiales, agua, residuos, accesos y tapas repuestas',
       titulo: 'Sin herramientas ni objetos extraños',
       ayuda:
         'Sin herramientas, materiales, repuestos, piezas sueltas ni elementos de limpieza sobre los equipos. Sin acumulaciones de agua, residuos o químicos. Pisos, pasillos y accesos despejados. Tapas y protecciones desmontadas durante el aseo, reinstaladas.',

@@ -159,9 +159,9 @@ function estadoDesviacion(e: EventoBitacora, inspeccion: Inspeccion): string {
 }
 
 /**
- * El punto de la pauta con lo que cubre, en cinco palabras, debajo. «Sistema eléctrico» a
- * secas no le dice nada a quien no recorrió la pauta; el texto completo del procedimiento
- * dentro de la celda multiplica por cuatro el alto de la tabla. El completo va al pie.
+ * El punto de la pauta con lo que cubre debajo, en dos líneas. «Sistema eléctrico» a secas no
+ * le dice nada a quien no recorrió la pauta; el texto completo del procedimiento dentro de la
+ * celda multiplica por cuatro el alto de la tabla. El completo va al pie.
  */
 function celdaPunto(c: CriterioPauta, ancho: string): string {
   return (
