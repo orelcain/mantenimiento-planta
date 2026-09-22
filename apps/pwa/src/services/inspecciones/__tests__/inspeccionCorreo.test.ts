@@ -350,8 +350,10 @@ describe('las desviaciones cuelgan de su punto de la pauta', () => {
 
   it('la observación del punto deja de salir vacía: nombra lo que cuelga de él', () => {
     const html = inspeccionAHtmlCorreo(datos(insp, dos))
-    // Numeradas: repetir el nombre del equipo justo encima de su propia ficha sobra.
-    expect(html).toContain('Desviaciones 1, 2 del registro')
+    // Dice qué se encontró, con el número que enlaza a su ficha; no un puntero.
+    expect(html).toContain('1. TABLERO TOLVA')
+    expect(html).toContain('2. BOTONERA CINTA 3')
+    expect(html).not.toContain('del registro')
   })
 
   it('el texto plano también las agrupa', () => {
@@ -459,5 +461,28 @@ describe('cada punto dice lo que cubre', () => {
     const vieja = inspeccion({ criterios: PAUTA_POST_ASEO.criterios.map(({ id, titulo, ayuda }) => ({ id, titulo, ayuda })) })
     const pauta = pautaDeLaInspeccion(PAUTA_POST_ASEO, vieja)
     expect(pauta.criterios[1]?.resumen).toContain('sin agua ni humedad')
+  })
+})
+
+/**
+ * `tituloDe` viene vacío en casi todos los eventos —el título es opcional en la bitácora— y el
+ * respaldo `|| descripcion` hacía que la ficha imprimiera el mismo párrafo como Anomalía y como
+ * Condición (Orel, 21-09-2026).
+ */
+describe('la ficha no se repite a sí misma', () => {
+  it('sin título propio, el evento no sale con la condición dos veces', () => {
+    const sinTitulo = desviacion({ titulo: '', descripcion: 'Racor del cilindro suelto tras el aseo' })
+    const html = inspeccionAHtmlCorreo(datos(inspeccion(), [sinTitulo]))
+    expect(html.match(/Racor del cilindro suelto tras el aseo/g) ?? []).toHaveLength(1)
+    expect(html).not.toContain('Anomalía')
+    // La observación del punto se queda con el equipo: el detalle vive una sola vez, en la ficha.
+    expect(html).toContain('1. CINTA LARGA GRADER')
+  })
+
+  it('con título propio, los dos campos están y dicen cosas distintas', () => {
+    const html = inspeccionAHtmlCorreo(datos(inspeccion(), [desviacion()]))
+    expect(html).toContain('Anomalía')
+    expect(html).toContain('Fuga de aire en el racor')
+    expect(html).toContain('Racor del cilindro suelto tras el aseo, silbido audible')
   })
 })

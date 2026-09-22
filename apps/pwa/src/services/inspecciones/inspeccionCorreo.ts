@@ -43,6 +43,12 @@ export interface DatosCorreoInspeccion {
 
 const abierta = (e: EventoBitacora) => e.pendiente && !e.cierre
 
+/** Un texto en una línea de la columna; el completo está en la ficha del registro. */
+function recortar(texto: string, largo: number): string {
+  const t = texto.trim().replace(/\s+/g, ' ')
+  return t.length <= largo ? t : `${t.slice(0, largo - 1).trimEnd()}…`
+}
+
 /** De qué se compone el registro §8, para su fila de cierre. Un cero no se nombra. */
 function cierreDesviaciones(r: ResumenInspeccion): string {
   if (!r.pendientes) return 'todas resueltas antes de entregar'
@@ -307,17 +313,30 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen: vivo, desvia
   const filasCriterios = pauta.criterios
     .map((c) => {
       const nota = (inspeccion.notas?.[c.id] ?? '').trim()
-      const nums = numeroDeFicha.get(c.id) ?? []
-      // La observación del punto no puede quedar en blanco cuando SÍ hubo algo: si no se
-      // escribió una nota, lo dice la referencia a la ficha del registro. Numerada, porque
-      // repetir el nombre del equipo tres centímetros más arriba de su propia ficha sobra.
+      const suyas = porCriterio.get(c.id) ?? []
+      /**
+       * La observación del punto dice QUÉ se encontró, no dónde mirarlo. Decía «Desviación 1
+       * del registro»: un puntero a algo que está diez centímetros más abajo en el mismo
+       * correo (Orel, 21-09-2026). Peor todavía, dejaba la fila que más importa —la del punto
+       * con la falla— como la más pobre de la tabla, mientras un punto corregido menor se
+       * leía con una frase entera. El número queda como prefijo, que es lo único que servía
+       * del puntero: enlaza con la ficha sin gastar un renglón en decirlo.
+       */
       const cuerpo =
         [
           nota ? `<div>${escaparHtml(nota)}</div>` : '',
-          nums.length
-            ? `<div style="font-size:${SEC};color:${C.sec};${nota ? 'padding-top:4px;' : ''}">` +
-              `${nums.length === 1 ? 'Desviación' : 'Desviaciones'} ${nums.join(', ')} del registro</div>`
-            : '',
+          ...suyas.map((e) => {
+            const n = numeroDe.get(e.id)
+            // Solo el título, nunca la descripción: la descripción completa está en la ficha
+            // y repetirla acá deja el mismo párrafo dos veces en el correo. Sin título, el
+            // nombre del equipo ya es el dato útil de la fila.
+            const que = tituloDe(e)
+            return (
+              `<div style="font-size:${SEC};line-height:1.45;color:${C.sec};padding-top:4px;">` +
+              `${n != null ? `${n}. ` : ''}${escaparHtml(e.equipo || 'Sin equipo')}` +
+              `${que ? ` · ${escaparHtml(recortar(que, 70))}` : ''}</div>`
+            )
+          }),
         ]
           .filter(Boolean)
           .join('')
@@ -381,9 +400,13 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen: vivo, desvia
       ? // La «condición encontrada» se ve mejor que se cuenta: antes y después van juntos.
         `<tr><td colspan="2" style="padding:8px 0 4px;">${htmlFotos(e.fotos ?? [], fuente)}</td></tr>`
       : ''
+    // ⚠ `tituloDe` viene vacío en casi todos los eventos: el título es opcional en la bitácora
+    // y la mayoría se escribe solo con la descripción. Con el respaldo `|| e.descripcion`, la
+    // ficha imprimía el mismo párrafo dos veces, como Anomalía y como Condición.
+    const anomalia = tituloDe(e)
     return (
       cabecera +
-      campo('Anomalía', tituloDe(e) || e.descripcion) +
+      (anomalia && anomalia !== e.descripcion ? campo('Anomalía', anomalia) : '') +
       campo('Condición', e.descripcion) +
       campo('Acción', accionDe(e, inspeccion)) +
       campo('Responsable', autorVisible(e)) +
