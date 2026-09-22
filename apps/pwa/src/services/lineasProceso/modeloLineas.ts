@@ -57,6 +57,12 @@ export interface GrafoLineas {
   /** Puntos por los que se hace pasar una flecha, para acomodarla a mano. */
   curvas?: CurvaFlecha[]
   /**
+   * Nombres escritos a mano en la bitácora que el admin marcó «no es un equipo» (claves
+   * normalizadas, ver `pendientesDeUbicar`): un área, una sala, un error. Es lo único que se
+   * persiste de la bandeja de pendientes; la bandeja misma se deduce de los eventos.
+   */
+  descartados?: string[]
+  /**
    * «Gracias a X funciona Y» (Orel, 19-09-2026): [habilitador, habilitado]. No pasa
    * producto —las bombas de vacío no reciben peces— pero si el habilitador para, el
    * habilitado pierde capacidad. Es el punto medio que faltaba entre una flecha de flujo

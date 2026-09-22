@@ -73,6 +73,10 @@ import {
 } from '@/services/lineasProceso/modeloLineas'
 import { DE_OTRA_PLANTA, propuestaChonchi } from '@/services/lineasProceso/propuestaChonchi'
 import { RAIZ_SITIO_CHONCHI, guardarLineas, indiceArbol, leerLineas } from '@/services/lineasProceso/lineasProceso.service'
+import { pendientesDeUbicar, type EquipoElegido, type EquipoPendiente } from '@/services/lineasProceso/pendientesDeUbicar'
+import { reubicarEquipoDeEventos } from '@/services/bitacora/reubicarEquipo'
+import { useEventosSinEquipo } from '@/hooks/useEventosSinEquipo'
+import { PendientesDeUbicar, type OpcionUbicar } from '@/components/lineasProceso/PendientesDeUbicar'
 
 /**
  * Editor de líneas de proceso (panel admin, 19-09-2026; mockups aprobados
@@ -892,6 +896,12 @@ function Editor() {
   const [pedido, setPedido] = useState<Pedido | null>(null)
   const [abiertos, setAbiertos] = useState<Set<string>>(() => new Set())
   const [manual, setManual] = useState<{ nombre: string; zona: string; de?: string; flow?: { x: number; y: number } } | null>(null)
+  /** Nombres escritos a mano en la bitácora que el admin marcó «no es un equipo». Se guardan con el grafo. */
+  const [descartados, setDescartados] = useState<string[]>([])
+  /** Eventos ya corregidos en esta sesión: salen de la bandeja sin volver a leer Firestore. */
+  const [idsCorregidos, setIdsCorregidos] = useState<Set<string>>(() => new Set())
+  const [reubicando, setReubicando] = useState<string | null>(null)
+  const { eventos: eventosSinEquipo, cargando: cargandoEventos } = useEventosSinEquipo(60)
   // Contenedor elegido (las zonas no son seleccionables de React Flow: se tocan por su título).
   const [zonaSel, setZonaSel] = useState<string | null>(null)
   const [nuevaLinea, setNuevaLinea] = useState<{ nombre: string; tipo: 'linea' | 'apoyo' } | null>(null)
@@ -952,6 +962,7 @@ function Editor() {
     setGrupos(g.grupos ?? [])
     setCurvas(g.curvas ?? [])
     setCuotas(g.cuotas ?? [])
+    setDescartados(g.descartados ?? [])
     setNodes(aNodos(g))
     setEdges(aAristas(g))
   }, [])
@@ -972,7 +983,11 @@ function Editor() {
         if (!vivo) return
         const base = g ?? propuesta()
         cargarGrafo(base)
-        setGuardado(g ? JSON.stringify(alGrafo(base.lineas, aNodos(base), aAristas(base), base.grupos ?? [], base.curvas ?? [], base.cuotas ?? [])) : '')
+        setGuardado(
+          g
+            ? JSON.stringify({ ...alGrafo(base.lineas, aNodos(base), aAristas(base), base.grupos ?? [], base.curvas ?? [], base.cuotas ?? []), descartados: base.descartados ?? [] })
+            : '',
+        )
         setMeta(g?.actualizadoPor ? `Guardado por ${g.actualizadoPor}${g.actualizadoEn ? ` · ${g.actualizadoEn.toDate().toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' })}` : ''}` : 'Propuesta sin guardar')
       })
       .catch(() => {
@@ -990,7 +1005,8 @@ function Editor() {
   }, [cargandoArbol, indice, propuesta, cargarGrafo, toast])
 
   // Pesos calculados con las flechas, en cada cambio.
-  const grafo = useMemo(() => alGrafo(lineas, nodes, edges, grupos, curvas, cuotas), [lineas, nodes, edges, grupos, curvas, cuotas])
+  // `descartados` va dentro del grafo: así se guarda con él y cuenta para «hay cambios sin guardar».
+  const grafo = useMemo(() => ({ ...alGrafo(lineas, nodes, edges, grupos, curvas, cuotas), descartados }), [lineas, nodes, edges, grupos, curvas, cuotas, descartados])
   const pesos = useMemo(() => pesosPorLinea(grafo), [grafo])
   const servicios = useMemo(() => serviciosDe(grafo), [grafo])
   const relaciones = useMemo(() => relacionesDeServicios(grafo, pesos), [grafo, pesos])
@@ -1018,6 +1034,48 @@ function Editor() {
     return m
   }, [grupos])
   const nombresManuales = useMemo(() => new Map(grafo.nodos.filter((n) => esManual(n.id)).map((n) => [n.id, n.nombre ?? 'Elemento manual'])), [grafo])
+  /**
+   * Lo que alguien escribió a mano en la bitácora y no calza con nada (Orel, 21-09-2026: el
+   * técnico puso «baader 143» y era la BAADER 142 N1). Se deduce de los eventos, no se guarda.
+   */
+  const pendientesUbicar = useMemo(
+    () =>
+      pendientesDeUbicar(
+        eventosSinEquipo.filter((e) => !idsCorregidos.has(e.id)),
+        { nombresConocidos: [...[...indice.values()].map((e) => e.nombre), ...nombresManuales.values()], descartados },
+      ),
+    [eventosSinEquipo, idsCorregidos, indice, nombresManuales, descartados],
+  )
+  /** Entre qué elegir: el árbol entero, con la pista de si ya está en el diagrama y con cuánto. */
+  const opcionesUbicar = useMemo<OpcionUbicar[]>(
+    () =>
+      [...indice.entries()]
+        .filter(([, e]) => !e.area)
+        .map(([id, e]) => {
+          const p = pesos.get(id)
+          return { id, nombre: e.nombre, codigo: e.codigo, ruta: e.ruta.join(' › '), ...(p && !p.ciclo && p.peso > 0 ? { peso: p.peso } : {}) }
+        }),
+    [indice, pesos],
+  )
+  const elegirEquipo = async (g: EquipoPendiente, equipo: EquipoElegido) => {
+    setReubicando(g.clave)
+    try {
+      const { corregidos } = await reubicarEquipoDeEventos(
+        g.eventos.map((e) => e.id),
+        equipo,
+      )
+      setIdsCorregidos((s) => new Set([...s, ...g.eventos.map((e) => e.id)]))
+      toast({ title: `${corregidos} ${corregidos === 1 ? 'evento corregido' : 'eventos corregidos'}`, description: `«${g.nombre}» ahora es ${equipo.nombre}.` })
+    } catch {
+      toast({ title: 'No se pudieron corregir los eventos', description: 'Revisa la conexión y vuelve a intentarlo.', variant: 'destructive' })
+    } finally {
+      setReubicando(null)
+    }
+  }
+  const descartarNombre = (g: EquipoPendiente) => {
+    setDescartados((d) => (d.includes(g.clave) ? d : [...d, g.clave]))
+    toast({ title: `«${g.nombre}» no se volverá a mostrar`, description: 'Guarda las líneas para que quede.' })
+  }
   const nombreGrupo = useCallback((id: string) => grupos.find((g) => PREFIJO_GRUPO + g.id === id)?.nombre?.trim() || 'el grupo', [grupos])
   const nombreDe = useCallback(
     (id: string) =>
@@ -3204,6 +3262,15 @@ function Editor() {
             nombreDe={nombreDe}
             nombreLinea={nombreLinea}
             onIr={irAlEquipo}
+          />
+          <PendientesDeUbicar
+            grupos={pendientesUbicar}
+            opciones={opcionesUbicar}
+            cargando={cargandoEventos}
+            trabajando={reubicando}
+            onElegir={(g, eq) => void elegirEquipo(g, eq)}
+            onCrearManual={(nombre) => setManual({ nombre, zona: '' })}
+            onDescartar={descartarNombre}
           />
           <GrupoRevision
             titulo="En círculo"
