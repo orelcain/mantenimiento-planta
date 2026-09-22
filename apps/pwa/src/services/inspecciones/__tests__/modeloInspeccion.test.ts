@@ -218,8 +218,8 @@ describe('lo que no se pudo evaluar no se da por inofensivo', () => {
     const r = resumenDeInspeccion(PAUTA_POST_ASEO, { resultados: TODOS }, [
       desviacion({ pendiente: true, critica: null, hastaMin: null }),
     ])
-    expect(frasePorLiberacion('con-pendientes', r)).toContain('sin poder evaluar')
-    expect(frasePorLiberacion('con-pendientes', r)).not.toContain('controladas')
+    // Ni «controladas» (sería lavarlo) ni «sin poder evaluar» (jerga nuestra): la cifra y punto.
+    expect(frasePorLiberacion('con-pendientes', r)).toBe('1 de 1 desviación queda abierta.')
   })
 
   it('una critica confirmada manda sobre una sin evaluar', () => {
@@ -287,5 +287,60 @@ describe('el aviso: que toca y que quedo a medias', () => {
   it('entregada no avisa nada', () => {
     const l = { estado: 'conforme' as const, en: '2026-09-21T10:00:00.000Z', porNombre: 'Danilo' }
     expect(avisoDeInspeccion('2026-09-20', { liberacion: l }, r(7))).toBeNull()
+  })
+})
+
+/**
+ * §8 pide las desviaciones «corregidas **o controladas** antes de la puesta en marcha». La app
+ * solo sabía decir *corregidas*: una falla que se sobrellevó toda la noche a mano para no
+ * detener el proceso quedaba como «No conforme» a secas (Orel, 21-09-2026).
+ */
+describe('un punto controlado con contingencia', () => {
+  const conControlado = { ...TODOS, electrico: 'controlado' as const }
+
+  it('cuenta como revisado, pero no como conforme', () => {
+    const r = resumenDeInspeccion(PAUTA_POST_ASEO, { resultados: conControlado }, [
+      desviacion({ criterioId: 'electrico', pendiente: true, hastaMin: null }),
+    ])
+    expect(r.revisados).toBe(r.total)
+    expect(r.controlados).toBe(1)
+    expect(r.conformes).toBe(r.total - 1)
+    expect(r.noConformes).toBe(0)
+  })
+
+  it('deja la entrega en «con pendientes controlados», no en «conforme»', () => {
+    const r = resumenDeInspeccion(PAUTA_POST_ASEO, { resultados: conControlado }, [
+      desviacion({ criterioId: 'electrico', pendiente: true, hastaMin: null }),
+    ])
+    expect(r.sugerido).toBe('con-pendientes')
+  })
+
+  it('la frase de la entrega nombra la contingencia: es el trabajo que se hizo', () => {
+    const r = resumenDeInspeccion(PAUTA_POST_ASEO, { resultados: conControlado }, [
+      desviacion({ criterioId: 'electrico', pendiente: true, critica: false, hastaMin: null }),
+    ])
+    expect(frasePorLiberacion('con-pendientes', r)).toContain('contingencia aplicada')
+  })
+
+  /** Un punto abierto sin desviación anotada NO puede sugerir «conforme»: es el mismo lavado. */
+  it('sin desviación anotada igual deja pendientes', () => {
+    const r = resumenDeInspeccion(PAUTA_POST_ASEO, { resultados: conControlado }, [])
+    expect(r.noConformesSinDesviacion).toBe(1)
+    expect(r.sugerido).toBe('con-pendientes')
+  })
+})
+
+/**
+ * Siete marcas a las 18:09 en una pauta del domingo completada el lunes daban un «recorrido de
+ * 833 min» que nadie caminó. Sin marcas no hay recorrido que declarar.
+ */
+describe('la hora del punto es opcional', () => {
+  it('sin marcas no se inventa un recorrido', () => {
+    expect(resumenDeInspeccion(PAUTA_POST_ASEO, { resultados: TODOS }, []).minutosDeRecorrido).toBeNull()
+  })
+
+  it('con una sola marca tampoco: un punto no es un recorrido', () => {
+    const r = resumenDeInspeccion(PAUTA_POST_ASEO, { resultados: TODOS, marcas: { electrico: '2026-09-20T12:16:00.000Z' } }, [])
+    expect(r.minutosDeRecorrido).toBeNull()
   })
 })

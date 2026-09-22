@@ -36,6 +36,7 @@ const PurezaPuertaDevPage = lazyWithReload(() => import('@/pages/dev/PurezaPuert
 const BitacoraDevPage = lazyWithReload(() => import('@/pages/dev/BitacoraDevPage').then((mod) => ({ default: mod.BitacoraDevPage })))
 const BitacoraRealDevPage = lazyWithReload(() => import('@/pages/dev/BitacoraDevPage').then((mod) => ({ default: mod.BitacoraRealDevPage })))
 const PaseBitacoraDevPage = lazyWithReload(() => import('@/pages/dev/PaseBitacoraDevPage').then((mod) => ({ default: mod.PaseBitacoraDevPage })))
+const InspeccionDevPage = lazyWithReload(() => import('@/pages/dev/InspeccionDevPage').then((mod) => ({ default: mod.InspeccionDevPage })))
 const PaseBitacoraPage = lazyWithReload(() => import('@/pages/PaseBitacoraPage').then((mod) => ({ default: mod.PaseBitacoraPage })))
 /** Banco de pruebas del resumen ejecutivo — solo montado en dev (ver Routes). */
 const ResumenTurnoDevPage = lazyWithReload(() => import('@/pages/dev/ResumenTurnoDevPage'))
@@ -344,6 +345,18 @@ export function App() {
                   element={
                     <Suspense fallback={<LoadingScreen />}>
                       <BitacoraDevPage />
+                    </Suspense>
+                  }
+                />
+              )}
+              {/* Solo desarrollo: el panel de inspección post-aseo con datos de ejemplo, sin
+                  Firestore, para mirarlo contra el HIG sin sesión. */}
+              {import.meta.env.DEV && (
+                <Route
+                  path="/dev/inspeccion"
+                  element={
+                    <Suspense fallback={<LoadingScreen />}>
+                      <InspeccionDevPage />
                     </Suspense>
                   }
                 />
