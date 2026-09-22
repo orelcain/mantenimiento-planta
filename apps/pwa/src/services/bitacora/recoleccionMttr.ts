@@ -134,13 +134,16 @@ const ANCHOS = { fecha: 14, maquina: 16, falla: 21, duracion: 9 }
 
 export function htmlRecoleccionMttr(filas: readonly FilaRecoleccion[], opciones: { logo?: string } = {}): string {
   const logo = opciones.logo ?? LOGO_RECOLECCION_DATA_URI
+  // 9 pt y no 10: en Outlook la planilla se leía «como letra 30» al lado del cuerpo del correo
+  // (Orel, 21-09-2026). Sigue siendo la copia del Excel —banda azul, filas alternadas, logo—,
+  // pero al tamaño del documento que la sigue, no al de una hoja de cálculo a pantalla completa.
   const th = (t: string, ancho?: number) =>
-    `<th${ancho ? ` width="${ancho}%"` : ''} style="${ancho ? `width:${ancho}%;` : ''}background:${AZUL};color:#FFFFFF;font-family:${CAL};font-size:10pt;font-weight:bold;text-align:center;vertical-align:bottom;padding:3px 4px;">${t}</th>`
+    `<th${ancho ? ` width="${ancho}%"` : ''} style="${ancho ? `width:${ancho}%;` : ''}background:${AZUL};color:#FFFFFF;font-family:${CAL};font-size:9pt;line-height:1.25;font-weight:bold;text-align:center;vertical-align:bottom;padding:3px 5px;">${t}</th>`
   const td = (t: string, i: number, izq = false, nowrap = false) =>
     // TableStyleMedium2 pinta la PRIMERA fila de datos y luego alterna.
     // `overflow-wrap:anywhere`: en el celular una palabra larga («EMPACADORA») se
     // montaba sobre la columna vecina en vez de partirse.
-    `<td style="background:${i % 2 ? '#FFFFFF' : BANDA};color:#000000;font-family:${CAL};font-size:10pt;text-align:${izq ? 'left' : 'center'};vertical-align:bottom;padding:3px 4px;overflow-wrap:anywhere;word-break:break-word;${nowrap ? 'white-space:nowrap;' : ''}">${escaparHtml(t)}</td>`
+    `<td style="background:${i % 2 ? '#FFFFFF' : BANDA};color:#000000;font-family:${CAL};font-size:9pt;line-height:1.3;text-align:${izq ? 'left' : 'center'};vertical-align:bottom;padding:3px 5px;overflow-wrap:anywhere;word-break:break-word;${nowrap ? 'white-space:nowrap;' : ''}">${escaparHtml(t)}</td>`
   const cuerpo = filas.length
     ? filas
         .map((f, i) => `<tr>${td(f.fecha, i)}${td(f.maquina, i)}${td(f.falla, i)}${td(f.duracion, i, false, true)}${td(f.observaciones, i, true)}</tr>`)
@@ -150,9 +153,11 @@ export function htmlRecoleccionMttr(filas: readonly FilaRecoleccion[], opciones:
     // La banda va en su propia tabla: con `table-layout:fixed` la primera fila fija
     // los anchos, y la celda del logo (146 px) no debe mandar sobre la columna Fecha.
     `<table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;width:100%;font-family:${CAL};">` +
-    `<tr><td width="146" style="width:146px;height:56px;background:${GRIS};padding:0 0 0 13px;vertical-align:middle;">` +
+    // La banda baja de 56 a 40 px y el título de 16 a 12 pt. El logo NO se escala (se recortó
+    // el PNG a propósito): 120×28 entra en 40 px con 6 px de aire arriba y abajo.
+    `<tr><td width="134" style="width:134px;height:40px;background:${GRIS};padding:0 0 0 12px;vertical-align:middle;">` +
     `<img src="${logo}" width="120" height="28" alt="" style="display:block;width:120px;height:28px;"></td>` +
-    `<td style="background:${AZUL};color:#FFFFFF;font-family:${CAL};font-size:16pt;font-weight:bold;height:56px;padding:0 8px;vertical-align:middle;">MTBF - MTTR</td></tr></table>` +
+    `<td style="background:${AZUL};color:#FFFFFF;font-family:${CAL};font-size:12pt;font-weight:bold;height:40px;padding:0 8px;vertical-align:middle;">MTBF - MTTR</td></tr></table>` +
     `<table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;table-layout:fixed;width:100%;font-family:${CAL};">` +
     `<tr>${th('Fecha', ANCHOS.fecha)}${th('Máquina', ANCHOS.maquina)}${th('Falla', ANCHOS.falla)}${th('Duración Falla (Min)', ANCHOS.duracion)}${th('Observaciones')}</tr>` +
     cuerpo +

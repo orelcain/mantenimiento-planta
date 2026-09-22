@@ -1,12 +1,39 @@
-import { C, FUENTE, escaparHtml, htmlFotos, htmlKpi, htmlSeccion } from '@/services/bitacora/bitacoraCorreo'
+import { htmlFotos } from '@/services/bitacora/bitacoraCorreo'
+import {
+  C,
+  FUENTE,
+  ROTULO,
+  SEC,
+  TEXTO,
+  TITULO,
+  RAYA,
+  BANDA,
+  TABLA,
+  CELDA,
+  celdaHora,
+  celdaHtml,
+  celdaTono,
+  encabezadoTabla,
+  escaparHtml,
+  filaCierre,
+  filaCifras,
+  kpi,
+  nota,
+  recortar,
+  seccion,
+  track,
+} from '@/services/bitacora/documentoCorreo'
 import { etiquetaTurno, fechaTurnoLarga, horarioTurno } from '@/services/bitacora/turnoMantencion'
 import { codigoEquipoDe, horarioEvento, tituloDe } from '@/services/bitacora/presentacionEvento'
 import { autorVisible, type EventoBitacora, type FotoEvento, type TurnoMantencion } from '@/services/bitacora/bitacora.types'
 import {
   TEXTO_LIBERACION,
   frasePorLiberacion,
+  titularLiberacion,
+  type CriterioPauta,
   type Inspeccion,
   type PautaInspeccion,
+  type ResultadoCriterio,
   type ResumenInspeccion,
 } from './modeloInspeccion'
 
@@ -40,11 +67,26 @@ export interface DatosCorreoInspeccion {
 
 const abierta = (e: EventoBitacora) => e.pendiente && !e.cierre
 
-/** `HH:mm` de un ISO, o guion si no se puede. */
-function hora(iso: string | undefined): string {
-  if (!iso) return '—'
+/** De qué se compone el registro §8, para su fila de cierre. Un cero no se nombra. */
+function cierreDesviaciones(r: ResumenInspeccion): string {
+  if (!r.pendientes) return 'todas resueltas antes de entregar'
+  const abiertas = `${r.pendientes} ${r.pendientes === 1 ? 'abierta' : 'abiertas'} al entregar`
+  const resueltas = r.desviaciones - r.pendientes
+  return resueltas ? `${resueltas} ${resueltas === 1 ? 'resuelta' : 'resueltas'} · ${abiertas}` : abiertas
+}
+
+
+/**
+ * `HH:mm` de un ISO, o cadena vacía si no hay hora.
+ *
+ * ⚠ Vacío, NO un guion ni la hora de ahora: si el punto se marcó sin hora, el correo no
+ * inventa una (Orel, 21-09-2026). Quien lee tiene que poder distinguir «se revisó a las 04:16»
+ * de «se revisó, no sabemos a qué hora».
+ */
+function hora(iso: string | undefined | null): string {
+  if (!iso) return ''
   const d = new Date(iso)
-  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false })
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false })
 }
 
 export function tituloCorreoInspeccion({ turno, planta }: Pick<DatosCorreoInspeccion, 'turno' | 'planta'>): string {
@@ -52,49 +94,66 @@ export function tituloCorreoInspeccion({ turno, planta }: Pick<DatosCorreoInspec
 }
 
 /** El estado del punto con el color que le toca. */
-function celdaEstado(estado: string | undefined): string {
-  const [texto, fondo, color] =
+function celdaEstado(estado: ResultadoCriterio | undefined, ancho?: string): string {
+  const [texto, color] =
     estado === 'conforme'
-      ? ['Conforme', C.okFondo, C.ventana]
+      ? ['Conforme', C.ventana]
       : // Se encontró algo y se resolvió antes de entregar: libera, pero no es lo mismo que
         // un punto que estaba bien (§8, «corregidas o controladas antes de la puesta en marcha»).
         estado === 'corregido'
-        ? ['Corregido', C.pendFondo, C.afectado]
-        : estado === 'no-conforme'
-          ? ['No conforme', C.critFondo, C.parada]
-          : ['Sin revisar', C.neutroFondo, C.sec]
+        ? ['Corregido', C.afectado]
+        : // La otra mitad de §8: sigue mal, pero opera con una medida transitoria.
+          estado === 'controlado'
+          ? ['Controlado', C.pendBorde]
+          : estado === 'no-conforme'
+            ? ['No conforme', C.parada]
+            : ['Sin revisar', C.sec]
+  return celdaTono(texto, color, ancho)
+}
+
+/**
+ * El estado de una DESVIACIÓN (§8). Antes decía «No conforme» en todas, incluso en las ya
+ * resueltas: la columna no estaba diciendo nada. Sale de lo que el evento y su punto guardan.
+ */
+function estadoDesviacion(e: EventoBitacora, inspeccion: Inspeccion): string {
+  const [texto, color] = !abierta(e)
+    ? ['Resuelta', C.ventana]
+    : inspeccion.resultados[e.inspeccion?.criterioId ?? ''] === 'controlado'
+      ? ['Controlada', C.pendBorde]
+      : ['Pendiente', C.parada]
+  return `<span style="color:${color};">●</span> ${texto}`
+}
+
+/**
+ * El punto de la pauta con lo que cubre debajo, en dos líneas. «Sistema eléctrico» a secas no
+ * le dice nada a quien no recorrió la pauta; el texto completo del procedimiento dentro de la
+ * celda multiplica por cuatro el alto de la tabla. El completo va al pie.
+ */
+function celdaPunto(c: CriterioPauta, ancho: string): string {
   return (
-    `<td style="padding:6px 10px;border:1px solid ${C.linea};background:${fondo};font-family:${FUENTE};` +
-    `font-size:13px;font-weight:600;color:${color};white-space:nowrap;">${texto}</td>`
+    `<td style="${CELDA}width:${ancho};">${escaparHtml(c.titulo)}` +
+    (c.resumen ? `<div style="font-size:${SEC};line-height:1.4;color:${C.sec};padding-top:2px;">${escaparHtml(c.resumen)}</div>` : '') +
+    `</td>`
   )
 }
 
-function celda(texto: string, ancho?: string, gris?: boolean): string {
-  return (
-    `<td style="padding:6px 10px;border:1px solid ${C.linea};font-family:${FUENTE};font-size:13px;` +
-    `color:${gris ? C.sec : C.tinta};vertical-align:top;${ancho ? `width:${ancho};` : ''}">${escaparHtml(texto) || '—'}</td>`
-  )
-}
-
-function encabezadoTabla(columnas: readonly string[]): string {
-  return (
-    `<tr>${columnas
-      .map(
-        (t) =>
-          `<th align="left" style="padding:6px 10px;border:1px solid ${C.linea};background:${C.neutroFondo};` +
-          `font-family:${FUENTE};font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;` +
-          `color:${C.sec};">${escaparHtml(t)}</th>`,
-      )
-      .join('')}</tr>`
-  )
+/** Una hora: cifras tabulares para que las columnas se lean en vertical (HIG «Typography»). */
+/** La acción en dos palabras, para la fila del criterio de liberación. */
+function accionCorta(e: EventoBitacora, inspeccion: Inspeccion): string {
+  if (!abierta(e)) return 'resuelta'
+  return inspeccion.resultados[e.inspeccion?.criterioId ?? ''] === 'controlado' ? 'contingencia aplicada' : 'pendiente'
 }
 
 /**
  * «Acción realizada o pendiente» (§8). No se inventa: sale de lo que el evento ya guarda —
  * si está resuelto, con cuánto tardó; si no, que queda para el turno siguiente.
  */
-function accionDe(e: EventoBitacora): string {
-  if (abierta(e)) return 'Pendiente — queda para el turno siguiente'
+function accionDe(e: EventoBitacora, inspeccion: Inspeccion): string {
+  if (abierta(e)) {
+    return inspeccion.resultados[e.inspeccion?.criterioId ?? ''] === 'controlado'
+      ? 'Contingencia aplicada. Falta la solución final, queda para el turno siguiente'
+      : 'Pendiente, queda para el turno siguiente'
+  }
   const h = horarioEvento(e)
   return h ? `Resuelta (${h})` : 'Resuelta'
 }
@@ -108,118 +167,259 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen: vivo, desvia
   const cambios = l?.resumen ? cambiosDesdeLaEntrega(l.resumen, vivo) : ''
 
   const encabezado =
-    `<div style="font-family:${FUENTE};font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:${C.marca};">` +
+    `<div style="font-family:${FUENTE};font-size:${ROTULO};font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:${C.sec};">` +
     `${escaparHtml(pauta.nombre)} · ${escaparHtml(planta)}</div>` +
-    `<div style="font-family:${FUENTE};font-size:21px;font-weight:600;color:${C.tinta};padding-top:2px;">` +
+    `<div style="font-family:${FUENTE};font-size:${TITULO};font-weight:600;line-height:1.2;color:${C.tinta};padding-top:4px;">` +
     `${escaparHtml(etiquetaTurno(turno))} · ${escaparHtml(fechaTurnoLarga(turno))}</div>` +
-    `<div style="font-family:${FUENTE};font-size:13px;color:${C.sec};padding-top:2px;">` +
+    `<div style="font-family:${FUENTE};font-size:${SEC};line-height:1.5;color:${C.sec};padding-top:4px;">` +
     `${escaparHtml(horarioTurno(turno).replace('–', 'a'))} · Realizada por ${escaparHtml(inspeccion.iniciadaPorNombre)}` +
-    ` · Inicio ${hora(inspeccion.iniciadaEn)} · Pauta v${inspeccion.pautaVersion}</div>`
+    `${hora(inspeccion.iniciadaEn) ? ` · Inicio ${hora(inspeccion.iniciadaEn)}` : ''} · Pauta v${inspeccion.pautaVersion}</div>`
 
-  const kpis = [
-    htmlKpi(`${resumen.revisados} de ${resumen.total}`, 'puntos revisados'),
-    resumen.corregidos > 0
-      ? htmlKpi(String(resumen.corregidos), resumen.corregidos === 1 ? 'corregido al pasar' : 'corregidos al pasar', C.afectado)
-      : '',
-    htmlKpi(String(resumen.noConformes), resumen.noConformes === 1 ? 'no conforme' : 'no conformes', resumen.noConformes ? C.parada : undefined),
-    resumen.desviaciones > 0
-      ? htmlKpi(String(resumen.desviaciones), resumen.desviaciones === 1 ? 'desviación' : 'desviaciones')
-      : '',
+  /**
+   * La cabecera de cifras dice lo que la fila de cierre de la tabla NO dice. El desglose por
+   * estado (5 conformes, 1 corregido, 1 controlado) es el «total» de la tabla y vive ahí:
+   * repetirlo acá arriba era la duplicación que deja a los dos bloques diciendo lo mismo.
+   */
+  const cifras = [
+    kpi(`${resumen.revisados} de ${resumen.total}`, 'puntos revisados'),
+    resumen.desviaciones > 0 ? kpi(String(resumen.desviaciones), resumen.desviaciones === 1 ? 'desviación' : 'desviaciones') : '',
     // La CORRIDA: lo que se alcanzó a arreglar antes de entregar. Es el trabajo que no se ve.
-    resumen.minutosDeCorrida != null ? htmlKpi(`${resumen.minutosDeCorrida} min`, 'corrigiendo antes del arranque', C.ventana) : '',
-    resumen.pendientesCriticos > 0
-      ? htmlKpi(String(resumen.pendientesCriticos), resumen.pendientesCriticos === 1 ? 'crítica abierta' : 'críticas abiertas', C.parada)
-      : '',
-    resumen.minutosDeRecorrido ? htmlKpi(`${resumen.minutosDeRecorrido} min`, 'de recorrido') : '',
-  ].join('')
+    resumen.minutosDeCorrida != null ? kpi(`${resumen.minutosDeCorrida} min`, 'corrigiendo antes de arrancar') : '',
+    resumen.minutosDeRecorrido ? kpi(`${resumen.minutosDeRecorrido} min`, 'de recorrido') : '',
+  ]
+  const kpis = filaCifras(cifras)
 
-  // §10 · Criterio de liberación.
+  /**
+   * Las desviaciones ordenadas POR PUNTO DE LA PAUTA. Un punto puede tener varias, y hasta
+   * ahora el correo las tiraba todas en una lista suelta: «Sistema eléctrico: No conforme» con
+   * la observación vacía arriba, y abajo un evento que no se sabía de dónde salía
+   * (Orel, 21-09-2026). Van enlazadas en los dos sentidos.
+   */
+  const porCriterio = new Map<string, EventoBitacora[]>()
+  for (const e of desviaciones) {
+    const k = e.inspeccion?.criterioId ?? ''
+    porCriterio.set(k, [...(porCriterio.get(k) ?? []), e])
+  }
+  /** Las que no calzan con ningún punto (la pauta cambió, o el evento llegó sin criterio). */
+  const sueltas = desviaciones.filter((e) => !pauta.criterios.some((c) => c.id === e.inspeccion?.criterioId))
+
+  /**
+   * Las fichas numeradas en el orden en que se imprimen: por punto de la pauta, las sueltas al
+   * final. El número es lo que deja que el criterio de liberación apunte a su ficha sin
+   * repetir el nombre del equipo tres centímetros más arriba de la ficha misma.
+   */
+  const numeroDe = new Map<string, number>()
+  const numeroDeFicha = new Map<string, number[]>()
+  ;[
+    ...pauta.criterios.flatMap((c) => (porCriterio.get(c.id) ?? []).map((e) => ({ criterioId: c.id, e }))),
+    ...sueltas.map((e) => ({ criterioId: '', e })),
+  ].forEach(({ criterioId, e }, i) => {
+    numeroDe.set(e.id, i + 1)
+    numeroDeFicha.set(criterioId, [...(numeroDeFicha.get(criterioId) ?? []), i + 1])
+  })
+
+  // §10 · Criterio de liberación. La columna Hora existe con DOS o más horas: una sola marca
+  // no es un recorrido (el mismo criterio que `minutosDeRecorrido`), y una columna con seis
+  // celdas vacías no informa, estorba.
+  const hayHoras = pauta.criterios.filter((c) => hora(inspeccion.marcas?.[c.id])).length >= 2
   const filasCriterios = pauta.criterios
-    .map((c) => {
+    .map((c, i) => {
+      // Filas alternas: es lo que el HIG pide para una tabla de varias columnas, y ayuda a
+      // seguir cada punto hasta su estado y su observación.
+      const fondo = i % 2 ? `background:${BANDA};` : ''
       const nota = (inspeccion.notas?.[c.id] ?? '').trim()
+      const suyas = porCriterio.get(c.id) ?? []
+      /**
+       * La observación del punto dice QUÉ se encontró, no dónde mirarlo. Decía «Desviación 1
+       * del registro»: un puntero a algo que está diez centímetros más abajo en el mismo
+       * correo (Orel, 21-09-2026). Peor todavía, dejaba la fila que más importa —la del punto
+       * con la falla— como la más pobre de la tabla, mientras un punto corregido menor se
+       * leía con una frase entera. El número queda como prefijo, que es lo único que servía
+       * del puntero: enlaza con la ficha sin gastar un renglón en decirlo.
+       */
+      const cuerpo =
+        [
+          nota ? `<div>${escaparHtml(nota)}</div>` : '',
+          ...suyas.map((e) => {
+            const n = numeroDe.get(e.id)
+            // Solo el título, nunca la descripción: la descripción completa está en la ficha
+            // y repetirla acá deja el mismo párrafo dos veces en el correo. Sin título, el
+            // nombre del equipo ya es el dato útil de la fila. Y la acción en dos palabras:
+            // es lo que le faltaba a la fila del punto con falla para no leerse más pobre
+            // que la de un punto corregido menor.
+            const que = tituloDe(e)
+            return (
+              `<div style="font-size:${SEC};line-height:1.45;color:${C.sec};padding-top:4px;">` +
+              `${n != null ? `${n}. ` : ''}${escaparHtml(e.equipo || 'Sin equipo')}` +
+              `${que ? ` · ${escaparHtml(recortar(que, 70))}` : ''} · ${accionCorta(e, inspeccion)}</div>`
+            )
+          }),
+        ]
+          .filter(Boolean)
+          .join('')
       return (
-        `<tr>${celda(c.titulo, '34%')}${celdaEstado(inspeccion.resultados[c.id])}` +
-        celda(hora(inspeccion.marcas?.[c.id]), '12%', true) +
-        celda(nota, undefined, !nota) +
+        // 4 + 2 (+1) + 5 o 6 tracks: la suma es 12 siempre.
+        `<tr style="${fondo}">${celdaPunto(c, track(4))}${celdaEstado(inspeccion.resultados[c.id], track(2))}` +
+        (hayHoras ? celdaHora(hora(inspeccion.marcas?.[c.id]), track(1)) : '') +
+        celdaHtml(cuerpo, track(hayHoras ? 5 : 6)) +
         `</tr>`
       )
     })
     .join('')
 
+  /** De qué se compone el «7 de 7»: el total de la tabla, no un adorno. */
+  const desglose = [
+    resumen.conformes ? `${resumen.conformes} ${resumen.conformes === 1 ? 'conforme' : 'conformes'}` : '',
+    resumen.corregidos ? `${resumen.corregidos} ${resumen.corregidos === 1 ? 'corregido' : 'corregidos'}` : '',
+    resumen.controlados ? `${resumen.controlados} ${resumen.controlados === 1 ? 'controlado' : 'controlados'}` : '',
+    resumen.noConformes ? `${resumen.noConformes} sin resolver` : '',
+    resumen.total - resumen.revisados ? `${resumen.total - resumen.revisados} sin revisar` : '',
+  ]
+    .filter(Boolean)
+    .join(' · ')
+
   const tablaCriterios =
-    htmlSeccion('Criterio de liberación', null, C.marca) +
-    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;width:100%;margin-top:8px;">` +
-    encabezadoTabla(['Punto de la pauta', 'Estado', 'Hora', 'Observación']) +
+    seccion('Criterio de liberación') +
+    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="${TABLA}margin-top:8px;">` +
+    encabezadoTabla(['Punto de la pauta', 'Estado', ...(hayHoras ? ['Hora'] : []), 'Observación']) +
     filasCriterios +
+    filaCierre(hayHoras ? 4 : 3, `${resumen.total} ${resumen.total === 1 ? 'punto' : 'puntos'}`, desglose) +
     `</table>`
 
-  // §8 · Registro de desviaciones.
-  const filasDesviaciones = desviaciones
-    .map((e) => {
-      const equipo = [e.equipo || 'Sin equipo', codigoEquipoDe(e)].filter(Boolean).join(' · ')
-      const fila =
-        `<tr>${celda(equipo, '20%')}${celda(tituloDe(e) || e.descripcion, '22%')}${celda(e.descripcion, '26%')}` +
-        celda(accionDe(e), '16%') +
-        celda(autorVisible(e), '16%') +
-        celdaEstado('no-conforme') +
-        `</tr>`
-      // La «condición encontrada» de §8 se ve mejor que se cuenta: antes y después van juntos.
-      const fotos = (e.fotos ?? []).length
-        ? `<tr><td colspan="6" style="padding:0 10px 10px;border:1px solid ${C.linea};border-top:0;">` +
-          htmlFotos(e.fotos ?? [], fuente) +
-          `</td></tr>`
-        : ''
-      return fila + fotos
-    })
-    .join('')
+  /**
+   * §8 · Registro de desviaciones. Deja de ser una tabla de SEIS columnas y pasa a ser una
+   * FICHA por desviación, con los seis campos rotulados (Orel, 21-09-2026).
+   *
+   * El procedimiento pide seis datos, no seis columnas. En 680 px, seis columnas dejaban la
+   * condición encontrada —que es la sustancia— en una caja de veinte caracteres de ancho: una
+   * fila de ocho líneas con cinco columnas casi vacías al lado. La hoja 3 del estándar pide
+   * entre 45 y 90 caracteres por línea; así la condición se lee en cuatro líneas anchas.
+   * Es la forma del protocolo de ensayo: cada hallazgo es un registro numerado con sus campos
+   * al lado, no una fila de planilla.
+   */
+  const ficha = (e: EventoBitacora, n: number) => {
+    const equipo = [e.equipo || 'Sin equipo', codigoEquipoDe(e)].filter(Boolean).join(' · ')
+    const campo = (rotulo: string, valor: string) =>
+      `<tr><td style="padding:3px 12px;font-family:${FUENTE};font-size:${SEC};color:${C.sec};` +
+      `vertical-align:top;width:${track(2)};">${escaparHtml(rotulo)}</td>` +
+      `<td style="padding:3px 0;font-family:${FUENTE};font-size:${TEXTO};line-height:1.5;color:${C.tinta};` +
+      `vertical-align:top;">${escaparHtml(valor)}</td></tr>`
+    // El encabezado de la ficha: número y equipo a la izquierda, estado a la derecha, sobre
+    // el mismo eje que el resto del documento.
+    const cabecera =
+      `<tr><td colspan="2" style="padding:14px 12px 6px;font-family:${FUENTE};">` +
+      `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;width:100%;">` +
+      `<tr><td style="font-family:${FUENTE};font-size:${TEXTO};font-weight:600;color:${C.tinta};vertical-align:top;">` +
+      `<span style="color:${C.sec};font-weight:400;font-variant-numeric:tabular-nums;">${n}</span>&nbsp;&nbsp;${escaparHtml(equipo)}</td>` +
+      `<td align="right" style="font-family:${FUENTE};font-size:${TEXTO};color:${C.tinta};white-space:nowrap;vertical-align:top;">` +
+      `${estadoDesviacion(e, inspeccion)}</td></tr></table></td></tr>`
+    const fotos = (e.fotos ?? []).length
+      ? // La «condición encontrada» se ve mejor que se cuenta: antes y después van juntos.
+        `<tr><td colspan="2" style="padding:8px 12px 4px;">${htmlFotos(e.fotos ?? [], fuente)}</td></tr>`
+      : ''
+    // ⚠ `tituloDe` viene vacío en casi todos los eventos: el título es opcional en la bitácora
+    // y la mayoría se escribe solo con la descripción. Con el respaldo `|| e.descripcion`, la
+    // ficha imprimía el mismo párrafo dos veces, como Anomalía y como Condición.
+    const anomalia = tituloDe(e)
+    return (
+      cabecera +
+      (anomalia && anomalia !== e.descripcion ? campo('Anomalía', anomalia) : '') +
+      campo('Condición', e.descripcion) +
+      campo('Acción', accionDe(e, inspeccion)) +
+      campo('Responsable', autorVisible(e)) +
+      fotos +
+      `<tr><td colspan="2" style="padding:0 0 8px;border-bottom:1px solid ${RAYA};font-size:0;line-height:0;">&nbsp;</td></tr>`
+    )
+  }
+
+  const grupo = (titulo: string, cuantas: number) =>
+    // En formato oración, no en versalitas: el rótulo en versalitas ya lo usa la SECCIÓN, y dos
+    // niveles de versalitas apilados son el tic n.º 6. Este es un encabezado de contenido.
+    // El punto de la pauta como banda de grupo: el encabezado gris de una tabla, en formato oración.
+    `<tr><td colspan="2" style="padding:8px 12px;background:${BANDA};border-bottom:1px solid ${C.linea};` +
+    `font-family:${FUENTE};font-size:${TEXTO};font-weight:600;color:${C.tinta};">${escaparHtml(titulo)}` +
+    `<span style="font-weight:400;color:${C.sec};"> · ${cuantas} ${cuantas === 1 ? 'desviación' : 'desviaciones'}</span></td></tr>`
+
+  const numerada = (e: EventoBitacora) => ficha(e, numeroDe.get(e.id) ?? 0)
+  const filasDesviaciones =
+    pauta.criterios
+      .map((c) => {
+        const suyas = porCriterio.get(c.id) ?? []
+        return suyas.length ? grupo(c.titulo, suyas.length) + suyas.map(numerada).join('') : ''
+      })
+      .join('') +
+    (sueltas.length ? grupo('Sin punto de la pauta', sueltas.length) + sueltas.map(numerada).join('') : '') +
+    filaCierre(
+      2,
+      `${desviaciones.length} ${desviaciones.length === 1 ? 'desviación' : 'desviaciones'}`,
+      cierreDesviaciones(resumen),
+    )
 
   const tablaDesviaciones = desviaciones.length
-    ? htmlSeccion('Registro de desviaciones', desviaciones.length, C.pendBorde) +
-      `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;width:100%;margin-top:8px;">` +
-      encabezadoTabla(['Equipo o área', 'Anomalía', 'Condición encontrada', 'Acción realizada o pendiente', 'Responsable', 'Estado']) +
+    ? seccion('Registro de desviaciones', desviaciones.length) +
+      `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="${TABLA}margin-top:8px;">` +
       filasDesviaciones +
       `</table>`
-    : htmlSeccion('Registro de desviaciones', null, resumen.noConformesSinDesviacion ? C.pendBorde : C.linea) +
-      `<p style="font-family:${FUENTE};font-size:14px;color:${C.sec};margin:8px 0 0;">` +
+    : seccion('Registro de desviaciones') +
+      `<p style="font-family:${FUENTE};font-size:${TEXTO};line-height:1.5;color:${C.sec};margin:10px 0 0;">` +
       (resumen.noConformesSinDesviacion
-        ? // Decirlo es lo unico honesto: el punto quedo en no conforme y no se anoto nada.
-          `${resumen.noConformesSinDesviacion} ${resumen.noConformesSinDesviacion === 1 ? 'punto quedó' : 'puntos quedaron'} en «no conforme» sin una desviación anotada. Ver el criterio de liberación, arriba.`
+        ? // Decirlo es lo unico honesto: el punto quedo abierto y no se anoto nada.
+          `${resumen.noConformesSinDesviacion} ${resumen.noConformesSinDesviacion === 1 ? 'punto quedó' : 'puntos quedaron'} sin resolver y sin una desviación anotada. Ver el criterio de liberación, arriba.`
         : 'Sin desviaciones detectadas durante la inspección.') +
       `</p>`
 
-  const sinJuzgar = resumen.sinEvaluar
-    ? `<div style="font-family:${FUENTE};background:${C.pendFondo};border-left:3px solid ${C.pendBorde};padding:8px 12px;margin-top:10px;font-size:13px;color:${C.tinta};">` +
-      `<b>Sin evaluar:</b> ${resumen.sinEvaluar} ${resumen.sinEvaluar === 1 ? 'desviación abierta no tiene' : 'desviaciones abiertas no tienen'} un equipo reconocible en el diagrama de líneas, ` +
-      `así que no se pudo determinar si detienen una línea de proceso.</div>`
-    : ''
-
   const aviso = resumen.pendientesCriticos
-    ? `<div style="font-family:${FUENTE};background:${C.critFondo};border-left:3px solid ${C.parada};padding:8px 12px;margin-top:10px;font-size:13px;color:${C.tinta};">` +
-      `<b>Atención:</b> ${resumen.pendientesCriticos} ${resumen.pendientesCriticos === 1 ? 'desviación abierta detiene' : 'desviaciones abiertas detienen'} una línea de proceso.</div>`
+    ? nota(
+        `<b style="font-weight:600;color:${C.parada};">Atención.</b> ${resumen.pendientesCriticos} ${resumen.pendientesCriticos === 1 ? 'desviación abierta detiene' : 'desviaciones abiertas detienen'} una línea de proceso.`,
+      )
     : ''
 
   // §10 · Resultado final.
-  const resultado = l
-    ? htmlSeccion('Resultado final', null, l.estado === 'no-liberada' ? C.parada : C.ventana) +
-      `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;width:100%;margin-top:8px;">` +
-      `<tr><td style="padding:12px 14px;border:1px solid ${C.linea};background:${l.estado === 'no-liberada' ? C.critFondo : C.okFondo};font-family:${FUENTE};">` +
-      `<div style="font-size:17px;font-weight:700;color:${l.estado === 'no-liberada' ? C.parada : C.ventana};">` +
-      `${escaparHtml(l.estado === 'no-liberada' ? 'PLANTA NO LIBERADA — REQUIERE ACCIÓN CORRECTIVA' : 'PLANTA LIBERADA PARA OPERACIÓN')}</div>` +
-      `<div style="font-size:13px;color:${C.tinta};padding-top:4px;">${escaparHtml(TEXTO_LIBERACION[l.estado].titulo)} — ${escaparHtml(frasePorLiberacion(l.estado, resumen))}</div>` +
-      `<div style="font-size:12.5px;color:${C.sec};padding-top:6px;">Liberada ${hora(l.en)} · ${escaparHtml(l.porNombre)}` +
-      `${l.nota ? ` · ${escaparHtml(l.nota)}` : ''}</div>` +
-      `</td></tr></table>`
-    : htmlSeccion('Resultado final', null, C.pendBorde) +
-      `<p style="font-family:${FUENTE};font-size:14px;color:${C.sec};margin:8px 0 0;">La planta todavía no se ha liberado.</p>`
+  /**
+   * El cierre del documento. Filete grueso, titular en el cuerpo mayor y, bajo otro filete, la
+   * firma: quién entregó y a qué hora. Es la forma del «Resultado» de un protocolo de ensayo y
+   * del total de una factura. Antes era una caja verde con barra de color — el tic n.º 1.
+   * El único color que queda es el punto de estado, porque ahí sí codifica.
+   */
+  const cierre = (punto: string, titular: string, cuerpo: string, firma: string) =>
+    `<div style="font-family:${FUENTE};border-top:2px solid ${C.tinta};margin-top:10px;padding-top:14px;">` +
+    `<div style="font-size:${TITULO};font-weight:600;line-height:1.25;color:${C.tinta};">` +
+    `<span style="color:${punto};">●</span> ${escaparHtml(titular)}</div>` +
+    `<div style="font-size:${TEXTO};line-height:1.5;color:${C.tinta};padding-top:7px;">${cuerpo}</div>` +
+    (firma
+      ? `<div style="font-size:${SEC};color:${C.sec};border-top:1px solid ${C.linea};margin-top:13px;padding-top:11px;">${escaparHtml(firma)}</div>`
+      : '') +
+    `</div>`
 
-  const pie =
-    `<div style="font-family:${FUENTE};font-size:11px;color:${C.sec};padding-top:16px;">` +
-    `Generado con la app de Mantención · ${escaparHtml(etiquetaTurno(turno))} ${escaparHtml(turno.fecha.split('-').reverse().join('-'))}` +
-    ` · Las desviaciones quedan también en la bitácora del turno.</div>`
+  const resultado = l
+    ? seccion('Resultado final') +
+      cierre(
+        l.estado === 'no-liberada' ? C.parada : C.ventana,
+        titularLiberacion(l.estado),
+        `<b style="font-weight:600;">${escaparHtml(TEXTO_LIBERACION[l.estado].titulo)}.</b> ${escaparHtml(frasePorLiberacion(l.estado, resumen))}`,
+        `Entregada${hora(l.en) ? ` a las ${hora(l.en)}` : ''} · ${l.porNombre}${l.nota ? ` · ${l.nota}` : ''} · Mantención`,
+      )
+    : // Sin entrega marcada el correo NO puede decir que la planta está entregada; pero tampoco
+      // puede quedarse en una frase gris que se lee como «la planta está parada». Es un aviso
+      // al que lo está por enviar: falta un paso en la app (Orel, 21-09-2026).
+      seccion('Resultado final') +
+      cierre(
+        C.pendBorde,
+        'Falta marcar la entrega de la planta',
+        'El recorrido está registrado; todavía no se dice en qué condición quedó la planta al pasar a Producción. ' +
+          'Se marca en la app, en «Liberación de planta».',
+        '',
+      )
+
+  // Sin leyenda de estados ni pie de «generado con la app» (Orel, 21-09-2026): el documento
+  // termina donde termina la entrega. Los estados se explican solos por la palabra y el punto,
+  // y quien recibe el correo sabe de dónde viene. Tampoco se declara la desviación «sin
+  // evaluar»: es jerga nuestra (si el equipo calza con el diagrama de líneas), no un dato
+  // para Producción.
 
   return `<div style="max-width:680px;color:${C.tinta};">${encabezado}` +
-    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin:12px 0 4px;"><tr>${kpis}</tr></table>` +
-    `${tablaCriterios}${tablaDesviaciones}${aviso}${sinJuzgar}${resultado}${cambios}${pie}</div>`
+    kpis +
+    `${tablaCriterios}${tablaDesviaciones}${aviso}${resultado}${cambios}</div>`
 }
 
 /**
@@ -234,7 +434,7 @@ function cambiosDesdeLaEntrega(foto: ResumenInspeccion, ahora: ResumenInspeccion
   if (nuevas > 0) partes.push(`${nuevas} ${nuevas === 1 ? 'desviación nueva' : 'desviaciones nuevas'}`)
   if (!partes.length) return ''
   return (
-    `<div style="font-family:${FUENTE};font-size:12.5px;color:${C.sec};padding-top:10px;border-top:1px solid ${C.linea};margin-top:12px;">` +
+    `<div style="font-family:${FUENTE};font-size:${SEC};line-height:1.5;color:${C.sec};padding-top:11px;border-top:1px solid ${C.linea};margin-top:16px;">` +
     `Después de la entrega: ${escaparHtml(partes.join(' · '))}. Los números de arriba son los del momento de liberar.</div>`
   )
 }
@@ -245,18 +445,32 @@ export function inspeccionATextoPlano({ inspeccion, pauta, resumen: vivo, desvia
   const resumen = l?.resumen ?? vivo
   const etiqueta = (id: string) => {
     const r = inspeccion.resultados[id]
-    return r === 'conforme' ? 'Conforme' : r === 'corregido' ? 'Corregido' : r === 'no-conforme' ? 'NO CONFORME' : 'Sin revisar'
+    return r === 'conforme'
+      ? 'Conforme'
+      : r === 'corregido'
+        ? 'Corregido'
+        : r === 'controlado'
+          ? 'Controlado'
+          : r === 'no-conforme'
+            ? 'No conforme'
+            : 'Sin revisar'
   }
 
   const partes: string[] = [
     `${pauta.nombre.toUpperCase()} · ${planta}`,
     `${etiquetaTurno(turno)} · ${fechaTurnoLarga(turno)}`,
-    `Realizada por ${inspeccion.iniciadaPorNombre} · Inicio ${hora(inspeccion.iniciadaEn)} · Pauta v${inspeccion.pautaVersion}`,
+    `Realizada por ${inspeccion.iniciadaPorNombre}${hora(inspeccion.iniciadaEn) ? ` · Inicio ${hora(inspeccion.iniciadaEn)}` : ''} · Pauta v${inspeccion.pautaVersion}`,
     '',
     'CRITERIO DE LIBERACIÓN',
     ...pauta.criterios.map((c) => {
       const nota = (inspeccion.notas?.[c.id] ?? '').trim()
-      return `- ${c.titulo}: ${etiqueta(c.id)}${nota ? ` — ${nota}` : ''}`
+      const h = hora(inspeccion.marcas?.[c.id])
+      const suyas = desviaciones.filter((e) => e.inspeccion?.criterioId === c.id)
+      const cuelgan = suyas.length ? `. ${suyas.length} ${suyas.length === 1 ? 'desviación' : 'desviaciones'} en el registro` : ''
+      return (
+        `- ${c.titulo}: ${etiqueta(c.id)}${h ? ` (${h})` : ''}${nota ? `. ${nota}` : ''}${cuelgan}` +
+        (c.resumen ? `\n  ${c.resumen}` : '')
+      )
     }),
     '',
     'REGISTRO DE DESVIACIONES',
@@ -265,35 +479,41 @@ export function inspeccionATextoPlano({ inspeccion, pauta, resumen: vivo, desvia
   if (!desviaciones.length) {
     partes.push(
       resumen.noConformesSinDesviacion
-        ? `${resumen.noConformesSinDesviacion} ${resumen.noConformesSinDesviacion === 1 ? 'punto quedó' : 'puntos quedaron'} en «no conforme» sin una desviación anotada.`
+        ? `${resumen.noConformesSinDesviacion} ${resumen.noConformesSinDesviacion === 1 ? 'punto quedó' : 'puntos quedaron'} sin resolver y sin una desviación anotada.`
         : 'Sin desviaciones detectadas durante la inspección.',
     )
   }
   else {
-    for (const e of desviaciones) {
+    // Agrupadas por punto de la pauta, igual que en el HTML: una desviación suelta no deja
+    // saber de qué punto salió.
+    const linea = (e: EventoBitacora, n: number) => {
       const fotos = (e.fotos ?? []).length
-      partes.push(
-        `- ${[e.equipo || 'Sin equipo', codigoEquipoDe(e)].filter(Boolean).join(' · ')}: ${e.descripcion}` +
-          ` | ${accionDe(e)} | ${autorVisible(e)}` +
-          (fotos ? ` | ${fotos} ${fotos === 1 ? 'foto' : 'fotos'}` : ''),
+      return (
+        `  ${n}. ${[e.equipo || 'Sin equipo', codigoEquipoDe(e)].filter(Boolean).join(' · ')}: ${e.descripcion}` +
+        ` | ${accionDe(e, inspeccion)} | ${autorVisible(e)}` +
+        (fotos ? ` | ${fotos} ${fotos === 1 ? 'foto' : 'fotos'}` : '')
       )
     }
+    let n = 0
+    for (const c of pauta.criterios) {
+      const suyas = desviaciones.filter((e) => e.inspeccion?.criterioId === c.id)
+      if (suyas.length) partes.push(`${c.titulo}:`, ...suyas.map((e) => linea(e, ++n)))
+    }
+    const sueltas = desviaciones.filter((e) => !pauta.criterios.some((c) => c.id === e.inspeccion?.criterioId))
+    if (sueltas.length) partes.push('Sin punto de la pauta:', ...sueltas.map((e) => linea(e, ++n)))
   }
 
-  if (resumen.sinEvaluar) {
-    partes.push('', `SIN EVALUAR: ${resumen.sinEvaluar} desviación(es) abierta(s) sin equipo reconocible en el diagrama.`)
-  }
   if (resumen.pendientesCriticos) {
-    partes.push('', `ATENCIÓN: ${resumen.pendientesCriticos} ${resumen.pendientesCriticos === 1 ? 'desviación abierta detiene' : 'desviaciones abiertas detienen'} una línea de proceso.`)
+    partes.push('', `Atención: ${resumen.pendientesCriticos} ${resumen.pendientesCriticos === 1 ? 'desviación abierta detiene' : 'desviaciones abiertas detienen'} una línea de proceso.`)
   }
 
   partes.push('', 'RESULTADO FINAL')
   partes.push(
     l
-      ? `${l.estado === 'no-liberada' ? 'PLANTA NO LIBERADA — REQUIERE ACCIÓN CORRECTIVA' : 'PLANTA LIBERADA PARA OPERACIÓN'}\n` +
-        `${TEXTO_LIBERACION[l.estado].titulo} — ${frasePorLiberacion(l.estado, resumen)}\n` +
-        `Liberada ${hora(l.en)} · ${l.porNombre}`
-      : 'La planta todavía no se ha liberado.',
+      ? `${titularLiberacion(l.estado)}\n` +
+        `${TEXTO_LIBERACION[l.estado].titulo}. ${frasePorLiberacion(l.estado, resumen)}\n` +
+        `Entregada${hora(l.en) ? ` a las ${hora(l.en)}` : ''} por ${l.porNombre}`
+      : 'Falta marcar la entrega de la planta. El recorrido está registrado; todavía no se dice en qué condición quedó la planta al pasar a Producción.',
   )
   partes.push('', `${resumen.revisados} de ${resumen.total} puntos revisados${resumen.minutosDeRecorrido != null ? ` en ${resumen.minutosDeRecorrido} min` : ''}.`)
   return partes.join('\n')
