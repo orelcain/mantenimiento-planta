@@ -640,6 +640,16 @@ service cloud.firestore {
     // La foto NO va en el doc: se sube a Storage y acá queda su URL, para que
     // cargar todas las notas de la planta siga siendo barato.
     match /baader142Notas/{notaId} {
+      // fotoUrl: solo URL https (Storage) o data:image en base64, y SIN comillas, espacios
+      // ni < >: un prefijo valido seguido de `" onerror=...` ya no pasa. Vale al crear
+      // y al editar (antes el update no la revisaba y reabria el XSS almacenado).
+      function fotoUrlValida(d) {
+        return !('fotoUrl' in d)
+          || (d.fotoUrl is string
+              && d.fotoUrl.size() <= 800
+              && d.fotoUrl.matches('^(https://[A-Za-z0-9._~:/?#@!$&()*+,;=%-]+|data:image/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=]+)$'));
+      }
+
       allow read: if isActiveUser();
 
       allow create: if isActiveUser()
@@ -654,10 +664,7 @@ service cloud.firestore {
         && request.resource.data.y is number
         && request.resource.data.y >= 0 && request.resource.data.y <= 1
         && (!('texto' in request.resource.data) || request.resource.data.texto.size() <= 600)
-        && (!('fotoUrl' in request.resource.data)
-            || (request.resource.data.fotoUrl.size() <= 800
-                // Solo URL de Storage (https) o data:image local: cierra el XSS por fotoUrl.
-                && request.resource.data.fotoUrl.matches('^(https://|data:image/).*')))
+        && fotoUrlValida(request.resource.data)
         // Nota vacia no sirve: o dice algo o trae foto.
         && (('texto' in request.resource.data && request.resource.data.texto.size() > 0)
             || ('fotoUrl' in request.resource.data && request.resource.data.fotoUrl.size() > 0))
@@ -669,7 +676,8 @@ service cloud.firestore {
         && request.resource.data.creadoPor == resource.data.creadoPor
         && request.resource.data.figura == resource.data.figura
         && request.resource.data.tipo in ['nota', 'cota', 'foto']
-        && (!('texto' in request.resource.data) || request.resource.data.texto.size() <= 600);
+        && (!('texto' in request.resource.data) || request.resource.data.texto.size() <= 600)
+        && fotoUrlValida(request.resource.data);
 
       allow delete: if isActiveUser()
         && (resource.data.creadoPor == request.auth.uid || isAdmin());

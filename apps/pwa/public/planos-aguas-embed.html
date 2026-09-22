@@ -938,6 +938,9 @@ document.getElementById('pClose').onclick=()=>{document.getElementById('panel').
 document.getElementById('pNotas').addEventListener('input',e=>{if(sel){state.notas[sel]=e.target.value;save();}});
 /* ---- Fotos: 2 secciones (ent=entretecho / pla=en planta), varias por sección ---- */
 function downscale(src){return new Promise(res=>{const img=new Image();img.onload=()=>{const max=1600;let{width:w,height:h}=img;if(w>max||h>max){const r=Math.min(max/w,max/h);w*=r;h*=r;}const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);res(c.toDataURL('image/jpeg',0.85));};img.src=src;});}
+// Una foto solo puede ser una URL https (Storage) o un data:image local; cualquier otra cosa
+// (javascript:, un intento de romper el atributo) se descarta: barrera contra XSS almacenado.
+function safeImgSrc(u){u=String(u||'');return /^(https:\/\/|data:image\/(png|jpe?g|webp|gif|avif);)/i.test(u)?u:'';}
 function hasPhoto(id){const p=state.photos&&state.photos[id];return !!(p&&((p.ent&&p.ent.length)||(p.pla&&p.pla.length)));}
 async function renderGalleries(id){
   for(const cat of ['ent','pla']){
@@ -946,11 +949,11 @@ async function renderGalleries(id){
     if(!arr.length){el.innerHTML='<div class="empty">Sin fotos.</div>';continue;}
     el.innerHTML='';
     for(const it of arr){
-      const local=await getPhoto(it.k);const src=local||it.u;
+      const local=await getPhoto(it.k);const src=safeImgSrc(local)||safeImgSrc(it.u);
       if(!it.u&&local&&!READONLY)retryUpload(id,cat,it,local); // quedó sin URL pero hay copia local → re-subir
       const d=document.createElement('div');d.className='ph2';
       if(src){
-        d.innerHTML=`<img src="${src}" alt="">`+(READONLY?'':`<button class="galRm" title="Quitar foto">✕</button>`);
+        d.innerHTML=`<img src="${esc(src)}" alt="">`+(READONLY?'':`<button class="galRm" title="Quitar foto">✕</button>`);
         d.querySelector('img').onclick=()=>openImg(src);
       }else{ // sin imagen disponible en este dispositivo (subida falló, sin copia local)
         d.classList.add('ph2-pend');
@@ -974,7 +977,7 @@ function retryUpload(id,cat,it,data){
 }
 function openImg(src){
   const c=document.getElementById('modalCard');c.classList.add('wide');
-  c.innerHTML=`<div id="imgVp" style="position:relative;overflow:hidden;width:100%;height:72vh;background:#0a121c;border-radius:8px;touch-action:none;cursor:grab"><img id="imgZ" src="${src}" style="position:absolute;left:0;top:0;transform-origin:0 0;user-select:none;-webkit-user-drag:none;max-width:none" draggable="false"></div>
+  c.innerHTML=`<div id="imgVp" style="position:relative;overflow:hidden;width:100%;height:72vh;background:#0a121c;border-radius:8px;touch-action:none;cursor:grab"><img id="imgZ" src="${esc(safeImgSrc(src))}" style="position:absolute;left:0;top:0;transform-origin:0 0;user-select:none;-webkit-user-drag:none;max-width:none" draggable="false"></div>
     <div style="font-family:var(--mono);font-size:9.5px;color:var(--inkLo);letter-spacing:.4px;margin-top:8px;text-align:center">Rueda / pellizco para zoom · arrastrar para mover · doble-clic para acercar</div>
     <button class="btn primary" style="margin-top:11px;width:100%" onclick="document.getElementById('modal').classList.remove('open');this.closest('.card').classList.remove('wide')">Cerrar</button>`;
   document.getElementById('modal').classList.add('open');setupImgZoom();
