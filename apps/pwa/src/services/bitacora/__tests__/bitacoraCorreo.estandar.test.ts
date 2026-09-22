@@ -74,7 +74,7 @@ describe('el correo de turno sigue el estándar del correo', () => {
   })
 
   it('ningún filete vertical: las tablas no son rejas', () => {
-    expect(completo()).not.toMatch(/border:1px solid/)
+    expect(completo()).not.toMatch(/<t[dh][^>]*border:1px solid/)
   })
 
   it('cuatro cuerpos y nada intermedio', () => {

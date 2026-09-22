@@ -54,10 +54,21 @@ export const TITULO = '21px'
 export const TEXTO = '14px'
 export const SEC = '11px'
 export const ROTULO = '10.5px'
-/** Filete fino entre filas; el grueso y el de cierre van en tinta. */
+/** Filete fino entre filas; el de cierre va en tinta. */
 export const RAYA = '#ECECEC'
+/**
+ * La TABLA del documento: el estilo «bordered» de macOS, que es lo que Orel encontró agradable
+ * de la primera versión y que el HIG respalda («Lists and tables»: macOS define un estilo con
+ * marco y filas alternadas; «considera colores alternados en una tabla de varias columnas»).
+ * Un marco fino alrededor, un encabezado con fondo tenue, filetes horizontales entre filas y
+ * NINGÚN filete vertical: la reja de cuatro bordes por celda sigue siendo el tic; el marco
+ * es una sola caja, y el encabezado gris es el de cualquier tabla de Apple (21-09-2026).
+ */
+export const TABLA = `border-collapse:collapse;width:100%;border:1px solid ${C.linea};`
+/** Fondo tenue del encabezado y de las filas alternas. */
+export const BANDA = C.neutroFondo
 export const CELDA =
-  `padding:10px 14px 10px 0;border-bottom:1px solid ${RAYA};font-family:${FUENTE};font-size:${TEXTO};` +
+  `padding:9px 12px;border-bottom:1px solid ${RAYA};font-family:${FUENTE};font-size:${TEXTO};` +
   `line-height:1.5;color:${C.tinta};vertical-align:top;`
 /** Un doceavo del ancho útil. Las columnas ocupan tracks enteros, no porcentajes inventados. */
 export const track = (n: number) => `${((n / 12) * 100).toFixed(4)}%`
@@ -133,7 +144,7 @@ export function celdaTono(texto: string, color: string, ancho?: string): string 
 
 /** La fila de cierre: el «total» del protocolo. Dice de qué se compone el resultado. */
 export function filaCierre(columnas: number, izquierda: string, derecha: string): string {
-  const td = `padding:11px 14px 0 0;border-top:1px solid ${C.tinta};font-family:${FUENTE};font-size:${SEC};color:${C.sec};vertical-align:top;`
+  const td = `padding:9px 12px;border-top:1px solid ${C.tinta};background:${BANDA};font-family:${FUENTE};font-size:${SEC};color:${C.sec};vertical-align:top;`
   return (
     `<tr><td style="${td}">${escaparHtml(izquierda)}</td>` +
     `<td colspan="${columnas - 1}" style="${td}">${escaparHtml(derecha)}</td></tr>`
@@ -153,13 +164,13 @@ export function celdaHtml(html: string, ancho?: string): string {
   return `<td style="${CELDA}${ancho ? `width:${ancho};` : ''}">${html}</td>`
 }
 
-/** El encabezado de una tabla: rótulos sobre el filete grueso. Sin fondo. */
+/** El encabezado de una tabla: rótulos sobre una banda tenue, como el de una tabla de macOS. */
 export function encabezadoTabla(columnas: readonly string[]): string {
   return (
     `<tr>${columnas
       .map(
         (t) =>
-          `<th align="left" style="padding:0 14px 8px 0;border-bottom:1.5px solid ${C.tinta};` +
+          `<th align="left" style="padding:8px 12px;background:${BANDA};border-bottom:1px solid ${C.linea};` +
           `font-family:${FUENTE};font-size:${ROTULO};font-weight:600;letter-spacing:.07em;text-transform:uppercase;` +
           `color:${C.sec};">${escaparHtml(t)}</th>`,
       )

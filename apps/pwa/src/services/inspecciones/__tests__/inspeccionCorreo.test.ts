@@ -427,7 +427,8 @@ describe('la forma del documento: protocolo, no plantilla', () => {
   })
 
   it('ningún filete vertical: las tablas no son rejas', () => {
-    expect(html()).not.toMatch(/border:1px solid/)
+    // El marco va en la <table>; lo que no vuelve es el borde en los cuatro lados de cada celda.
+    expect(html()).not.toMatch(/<t[dh][^>]*border:1px solid/)
   })
 
   it('cada tabla cierra con su total, como una factura', () => {

@@ -7,6 +7,8 @@ import {
   TEXTO,
   TITULO,
   RAYA,
+  BANDA,
+  TABLA,
   CELDA,
   celdaHora,
   celdaHtml,
@@ -221,7 +223,10 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen: vivo, desvia
   // celdas vacías no informa, estorba.
   const hayHoras = pauta.criterios.filter((c) => hora(inspeccion.marcas?.[c.id])).length >= 2
   const filasCriterios = pauta.criterios
-    .map((c) => {
+    .map((c, i) => {
+      // Filas alternas: es lo que el HIG pide para una tabla de varias columnas, y ayuda a
+      // seguir cada punto hasta su estado y su observación.
+      const fondo = i % 2 ? `background:${BANDA};` : ''
       const nota = (inspeccion.notas?.[c.id] ?? '').trim()
       const suyas = porCriterio.get(c.id) ?? []
       /**
@@ -254,7 +259,7 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen: vivo, desvia
           .join('')
       return (
         // 4 + 2 (+1) + 5 o 6 tracks: la suma es 12 siempre.
-        `<tr>${celdaPunto(c, track(4))}${celdaEstado(inspeccion.resultados[c.id], track(2))}` +
+        `<tr style="${fondo}">${celdaPunto(c, track(4))}${celdaEstado(inspeccion.resultados[c.id], track(2))}` +
         (hayHoras ? celdaHora(hora(inspeccion.marcas?.[c.id]), track(1)) : '') +
         celdaHtml(cuerpo, track(hayHoras ? 5 : 6)) +
         `</tr>`
@@ -275,7 +280,7 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen: vivo, desvia
 
   const tablaCriterios =
     seccion('Criterio de liberación') +
-    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;width:100%;margin-top:8px;">` +
+    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="${TABLA}margin-top:8px;">` +
     encabezadoTabla(['Punto de la pauta', 'Estado', ...(hayHoras ? ['Hora'] : []), 'Observación']) +
     filasCriterios +
     filaCierre(hayHoras ? 4 : 3, `${resumen.total} ${resumen.total === 1 ? 'punto' : 'puntos'}`, desglose) +
@@ -295,14 +300,14 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen: vivo, desvia
   const ficha = (e: EventoBitacora, n: number) => {
     const equipo = [e.equipo || 'Sin equipo', codigoEquipoDe(e)].filter(Boolean).join(' · ')
     const campo = (rotulo: string, valor: string) =>
-      `<tr><td style="padding:3px 14px 3px 0;font-family:${FUENTE};font-size:${SEC};color:${C.sec};` +
+      `<tr><td style="padding:3px 12px;font-family:${FUENTE};font-size:${SEC};color:${C.sec};` +
       `vertical-align:top;width:${track(2)};">${escaparHtml(rotulo)}</td>` +
       `<td style="padding:3px 0;font-family:${FUENTE};font-size:${TEXTO};line-height:1.5;color:${C.tinta};` +
       `vertical-align:top;">${escaparHtml(valor)}</td></tr>`
     // El encabezado de la ficha: número y equipo a la izquierda, estado a la derecha, sobre
     // el mismo eje que el resto del documento.
     const cabecera =
-      `<tr><td colspan="2" style="padding:16px 0 6px;font-family:${FUENTE};">` +
+      `<tr><td colspan="2" style="padding:14px 12px 6px;font-family:${FUENTE};">` +
       `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;width:100%;">` +
       `<tr><td style="font-family:${FUENTE};font-size:${TEXTO};font-weight:600;color:${C.tinta};vertical-align:top;">` +
       `<span style="color:${C.sec};font-weight:400;font-variant-numeric:tabular-nums;">${n}</span>&nbsp;&nbsp;${escaparHtml(equipo)}</td>` +
@@ -310,7 +315,7 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen: vivo, desvia
       `${estadoDesviacion(e, inspeccion)}</td></tr></table></td></tr>`
     const fotos = (e.fotos ?? []).length
       ? // La «condición encontrada» se ve mejor que se cuenta: antes y después van juntos.
-        `<tr><td colspan="2" style="padding:8px 0 4px;">${htmlFotos(e.fotos ?? [], fuente)}</td></tr>`
+        `<tr><td colspan="2" style="padding:8px 12px 4px;">${htmlFotos(e.fotos ?? [], fuente)}</td></tr>`
       : ''
     // ⚠ `tituloDe` viene vacío en casi todos los eventos: el título es opcional en la bitácora
     // y la mayoría se escribe solo con la descripción. Con el respaldo `|| e.descripcion`, la
@@ -323,14 +328,15 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen: vivo, desvia
       campo('Acción', accionDe(e, inspeccion)) +
       campo('Responsable', autorVisible(e)) +
       fotos +
-      `<tr><td colspan="2" style="padding:0;border-bottom:1px solid ${RAYA};font-size:0;line-height:0;">&nbsp;</td></tr>`
+      `<tr><td colspan="2" style="padding:0 0 8px;border-bottom:1px solid ${RAYA};font-size:0;line-height:0;">&nbsp;</td></tr>`
     )
   }
 
   const grupo = (titulo: string, cuantas: number) =>
     // En formato oración, no en versalitas: el rótulo en versalitas ya lo usa la SECCIÓN, y dos
     // niveles de versalitas apilados son el tic n.º 6. Este es un encabezado de contenido.
-    `<tr><td colspan="2" style="padding:22px 0 8px;border-bottom:1.5px solid ${C.tinta};` +
+    // El punto de la pauta como banda de grupo: el encabezado gris de una tabla, en formato oración.
+    `<tr><td colspan="2" style="padding:8px 12px;background:${BANDA};border-bottom:1px solid ${C.linea};` +
     `font-family:${FUENTE};font-size:${TEXTO};font-weight:600;color:${C.tinta};">${escaparHtml(titulo)}` +
     `<span style="font-weight:400;color:${C.sec};"> · ${cuantas} ${cuantas === 1 ? 'desviación' : 'desviaciones'}</span></td></tr>`
 
@@ -351,7 +357,7 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen: vivo, desvia
 
   const tablaDesviaciones = desviaciones.length
     ? seccion('Registro de desviaciones', desviaciones.length) +
-      `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;width:100%;margin-top:4px;">` +
+      `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="${TABLA}margin-top:8px;">` +
       filasDesviaciones +
       `</table>`
     : seccion('Registro de desviaciones') +
