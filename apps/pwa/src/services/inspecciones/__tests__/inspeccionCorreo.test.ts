@@ -353,6 +353,8 @@ describe('las desviaciones cuelgan de su punto de la pauta', () => {
     // Dice qué se encontró, con el número que enlaza a su ficha; no un puntero.
     expect(html).toContain('1. TABLERO TOLVA')
     expect(html).toContain('2. BOTONERA CINTA 3')
+    // Y la acción en dos palabras: la fila del punto con falla no se lee más pobre que otra.
+    expect(html).toContain('· resuelta')
     expect(html).not.toContain('del registro')
   })
 
@@ -371,8 +373,13 @@ describe('la hora del punto es opcional', () => {
     expect(html).not.toContain('>Hora<')
   })
 
-  it('con marcas, la columna vuelve', () => {
+  it('con una sola marca tampoco: una hora no es un recorrido', () => {
     const insp = inspeccion({ marcas: { electrico: '2026-09-20T12:16:00.000Z' } })
+    expect(inspeccionAHtmlCorreo(datos(insp, []))).not.toContain('>Hora<')
+  })
+
+  it('con dos o más marcas, la columna vuelve', () => {
+    const insp = inspeccion({ marcas: { electrico: '2026-09-20T12:16:00.000Z', neumatico: '2026-09-20T12:24:00.000Z' } })
     expect(inspeccionAHtmlCorreo(datos(insp, []))).toContain('>Hora<')
   })
 
@@ -484,5 +491,24 @@ describe('la ficha no se repite a sí misma', () => {
     expect(html).toContain('Anomalía')
     expect(html).toContain('Fuga de aire en el racor')
     expect(html).toContain('Racor del cilindro suelto tras el aseo, silbido audible')
+  })
+})
+
+/**
+ * La fila de cifras se gana su lugar cuando trae lo que la tabla no dice (corrida, recorrido,
+ * críticas). Con una o dos, repetía el cierre de la tabla como dos números sueltos.
+ */
+describe('la cabecera de cifras', () => {
+  it('con menos de tres cifras no aparece: la tabla ya las cierra', () => {
+    const html = inspeccionAHtmlCorreo(datos(inspeccion(), []))
+    expect(html).not.toContain('puntos revisados</div>')
+    expect(html).toContain('7 puntos')
+  })
+
+  it('con corrida y recorrido, sí', () => {
+    const insp = inspeccion({ marcas: { electrico: '2026-09-20T12:16:00.000Z', neumatico: '2026-09-20T12:40:00.000Z' } })
+    const html = inspeccionAHtmlCorreo(datos(insp, [desviacion()]))
+    expect(html).toContain('puntos revisados')
+    expect(html).toContain('de recorrido')
   })
 })

@@ -234,6 +234,12 @@ function nota(html: string): string {
   )
 }
 
+/** La acción en dos palabras, para la fila del criterio de liberación. */
+function accionCorta(e: EventoBitacora, inspeccion: Inspeccion): string {
+  if (!abierta(e)) return 'resuelta'
+  return inspeccion.resultados[e.inspeccion?.criterioId ?? ''] === 'controlado' ? 'contingencia aplicada' : 'pendiente'
+}
+
 /**
  * «Acción realizada o pendiente» (§8). No se inventa: sale de lo que el evento ya guarda —
  * si está resuelto, con cuánto tardó; si no, que queda para el turno siguiente.
@@ -270,13 +276,17 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen: vivo, desvia
    * estado (5 conformes, 1 corregido, 1 controlado) es el «total» de la tabla y vive ahí:
    * repetirlo acá arriba era la duplicación que deja a los dos bloques diciendo lo mismo.
    */
-  const kpis = [
+  const cifras = [
     kpi(`${resumen.revisados} de ${resumen.total}`, 'puntos revisados'),
     resumen.desviaciones > 0 ? kpi(String(resumen.desviaciones), resumen.desviaciones === 1 ? 'desviación' : 'desviaciones') : '',
     // La CORRIDA: lo que se alcanzó a arreglar antes de entregar. Es el trabajo que no se ve.
     resumen.minutosDeCorrida != null ? kpi(`${resumen.minutosDeCorrida} min`, 'corrigiendo antes de arrancar') : '',
     resumen.minutosDeRecorrido ? kpi(`${resumen.minutosDeRecorrido} min`, 'de recorrido') : '',
-  ].join('')
+  ].filter(Boolean)
+  // Con una o dos cifras, la fila repite lo que la tabla ya cierra («7 puntos · 5 conformes…»)
+  // y queda como dos números sueltos. Se gana su lugar cuando trae lo que la tabla no dice:
+  // la corrida, el recorrido, las críticas.
+  const kpis = cifras.length >= 3 ? cifras.join('') : ''
 
   /**
    * Las desviaciones ordenadas POR PUNTO DE LA PAUTA. Un punto puede tener varias, y hasta
@@ -307,9 +317,10 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen: vivo, desvia
     numeroDeFicha.set(criterioId, [...(numeroDeFicha.get(criterioId) ?? []), i + 1])
   })
 
-  // §10 · Criterio de liberación. La columna Hora solo existe si ALGÚN punto tiene hora: una
-  // columna entera de guiones no informa, estorba.
-  const hayHoras = pauta.criterios.some((c) => hora(inspeccion.marcas?.[c.id]))
+  // §10 · Criterio de liberación. La columna Hora existe con DOS o más horas: una sola marca
+  // no es un recorrido (el mismo criterio que `minutosDeRecorrido`), y una columna con seis
+  // celdas vacías no informa, estorba.
+  const hayHoras = pauta.criterios.filter((c) => hora(inspeccion.marcas?.[c.id])).length >= 2
   const filasCriterios = pauta.criterios
     .map((c) => {
       const nota = (inspeccion.notas?.[c.id] ?? '').trim()
@@ -329,12 +340,14 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen: vivo, desvia
             const n = numeroDe.get(e.id)
             // Solo el título, nunca la descripción: la descripción completa está en la ficha
             // y repetirla acá deja el mismo párrafo dos veces en el correo. Sin título, el
-            // nombre del equipo ya es el dato útil de la fila.
+            // nombre del equipo ya es el dato útil de la fila. Y la acción en dos palabras:
+            // es lo que le faltaba a la fila del punto con falla para no leerse más pobre
+            // que la de un punto corregido menor.
             const que = tituloDe(e)
             return (
               `<div style="font-size:${SEC};line-height:1.45;color:${C.sec};padding-top:4px;">` +
               `${n != null ? `${n}. ` : ''}${escaparHtml(e.equipo || 'Sin equipo')}` +
-              `${que ? ` · ${escaparHtml(recortar(que, 70))}` : ''}</div>`
+              `${que ? ` · ${escaparHtml(recortar(que, 70))}` : ''} · ${accionCorta(e, inspeccion)}</div>`
             )
           }),
         ]
@@ -530,7 +543,9 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen: vivo, desvia
     ` · Las desviaciones quedan también en la bitácora del turno.</div>`
 
   return `<div style="max-width:680px;color:${C.tinta};">${encabezado}` +
-    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin:22px 0 2px;"><tr>${kpis}</tr></table>` +
+    (kpis
+      ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin:22px 0 2px;"><tr>${kpis}</tr></table>`
+      : '') +
     `${tablaCriterios}${tablaDesviaciones}${aviso}${sinJuzgar}${resultado}${cambios}${queSeRevisa}${pie}</div>`
 }
 
