@@ -159,7 +159,10 @@ export function PanelInspeccion({
                 >
                   {desplegado ? <ChevronDown aria-hidden /> : <ChevronRight aria-hidden />}
                   <span className="min-w-0 flex-1 text-subhead font-medium">{c.titulo}</span>
-                  {inspeccion.marcas?.[c.id] && (
+                  {/* La hora vive en UN lugar: mientras se puede editar, en el botón del reloj
+                      de la fila de acciones; ya entregada, acá junto al título. Las dos a la
+                      vez era la misma hora dos veces en la misma tarjeta (vitrina, 21-09). */}
+                  {inspeccion.marcas?.[c.id] && !(editable && !liberada) && (
                     <span className="shrink-0 pr-1 text-caption tabular-nums text-muted-foreground">
                       {horaDe(inspeccion.marcas[c.id] ?? '')}
                     </span>
