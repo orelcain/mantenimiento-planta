@@ -204,59 +204,34 @@ service firebase.storage {
     }
 
     // Modelos 3D — lectura pública para QR.
-    //
-    // La escritura se parte en dos para que Storage exija LO MISMO que Firestore.
-    // Antes esto era un solo `{allPaths=**}` que dejaba escribir a cualquier
-    // autenticado, mientras `firestore.rules` pide isAdmin() para crear el doc del
-    // modelo. Como `uploadModel3D` sube el archivo ANTES de escribir el doc, un
-    // no-admin dejaba el .glb en el bucket para siempre y el modelo no aparecía en
-    // ninguna parte — ni siquiera se podía borrar desde la app, porque la UI solo
-    // conoce los modelos que tienen doc. Así quedó `models3d/862bb7b2-.../test.glb`
-    // (4,7 MB, 22-05-2026), eliminado a mano el 05-08-2026.
-    //
-    // ⚠ 2026-08-05 — `isAdmin()` NO se puede usar acá. Está escrito, compila y el
-    // simulador de Rules lo da por bueno, pero en producción DENIEGA SIEMPRE: el
-    // `firestore.get()` cross-service falla porque al agente de Rules
-    // (`service-1019421112530@firebase-rules.iam.gserviceaccount.com`) le falta el
-    // rol `roles/firebaserules.firestoreServiceAgent`.
-    //
-    // Comprobado con tokens reales contra las reglas vivas:
-    //   models3d/{id}/{file}.glb con usuario ADMIN -> 403
-    //   maps/{loc}/{file}.jpg    con usuario ADMIN -> 403  (regla preexistente)
-    //   incidents/{id}/{file}    con cualquiera    -> 200  (no usa isAdmin)
-    //
-    // El simulador miente porque `functionMocks` reemplaza `firestore.get` por un
-    // valor fijo: prueba la LÓGICA de la regla, no que la llamada funcione.
-    //
-    // Mientras no esté ese rol IAM, la subida del .glb vuelve a pedir solo sesión
-    // iniciada. Los huérfanos los sigue evitando el rollback de `uploadModel3D`
-    // (services/models3d.ts): si el doc no se puede crear, el archivo se borra.
-    // Cuesta subir el archivo antes de saber que no hay permiso, pero no deja
-    // basura — y es preferible a que NADIE pueda subir.
+    // isAdmin() depende de roles/firebaserules.firestoreServiceAgent en el agente
+    // service-1019421112530@firebase-rules.iam.gserviceaccount.com (otorgar antes del merge).
+    // Ante un 403 para un admin con archivo válido, comprobar ese rol IAM:
+    // sin él falla firestore.get() cross-service; los mocks no verifican IAM.
 
-    // Fotos de anotaciones: las sube cualquier autenticado, igual que la
-    // subcolección `annotations`/`dimensions` en Firestore (wiki-like).
+    // Fotos de anotaciones: edición compartida por usuarios de la app, no solo admins
+    // (Visor3DViewerPage.tsx: handleSubmitAnnotation). Excluir sesiones anónimas.
     // Ruta real: models3d/{modelId}/annotations/{annotationId}/{photoId}.{ext}
     match /models3d/{modelId}/annotations/{allPaths=**} {
       allow read: if true;
-      allow write: if sesionApp()
+      allow create, update: if sesionApp()
+        && request.auth.token.firebase.sign_in_provider != 'anonymous'
         && request.resource.size < 10 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
-      allow delete: if sesionApp();
+      allow delete: if sesionApp()
+        && request.auth.token.firebase.sign_in_provider != 'anonymous';
     }
 
     // El archivo del modelo. Ruta real: models3d/{modelId}/{fileName}
-    // `sesionApp()` y NO `isAdmin()` — ver la nota de arriba.
     match /models3d/{modelId}/{fileName} {
       allow read: if true;
-      allow write: if sesionApp()
+      allow create, update: if isAdmin()
         && request.resource.size < 50 * 1024 * 1024
         && (request.resource.contentType.matches('model/.*')
             || request.resource.contentType.matches('application/octet-stream'));
-      // Lo usan deleteModel3D y el rollback de uploadModel3D cuando el doc no se
-      // pudo crear (services/models3d.ts). Si esto pidiera isAdmin(), el rollback
-      // fallaría y volvería a dejar el huérfano que este PR vino a evitar.
-      allow delete: if sesionApp();
+      // deleteModel3D y rollback de uploadModel3D: el admin puede borrar aunque
+      // no se haya creado el doc del modelo; no se consulta ese doc para autorizar.
+      allow delete: if isAdmin();
     }
 
     // Imágenes Baader 200 — Manual de Ajustes (lectura pública, subida autenticados, max 10MB)
