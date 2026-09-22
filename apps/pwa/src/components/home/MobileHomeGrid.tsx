@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   AlertTriangle, Package, Camera, CalendarClock, Wrench,
   BarChart3, Map, Route, Activity, Settings, FileText,
   GraduationCap, ChevronRight, ClipboardList, CloudSun,
   Box, Cpu, FolderTree, MapPin, TrendingUp, Monitor, Menu,
-  QrCode, Share2, ChevronDown, ChevronUp, Loader2,
+  QrCode, Share2, ChevronDown, ChevronUp,
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { cn } from '@/lib/utils'
@@ -16,10 +16,8 @@ import { useWipOverrides } from '@/hooks/useWipOverrides'
 import type { UserRole } from '@/types'
 import { LEARNING_MACHINES } from '@/data/learningMachines'
 import { PLANT_LINES, PLANTS, type PlantLineId } from '@/config/plantLines'
-import { toast } from '@/hooks/useToast'
-import {
-  lineaConMonitor, rutaMonitor, tokenMonitorDeLinea, turnoEnCursoDePlanta,
-} from '@/services/shoplogix/monitorDeLinea'
+import { lineaConMonitor } from '@/services/shoplogix/monitorDeLinea'
+import { MonitorCell } from './MonitorCell'
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
@@ -292,70 +290,6 @@ function CtaTile({ tile, showWip, onRelease }: { tile: Tile; showWip: boolean; o
       )}
       {!confirming && <ChevronRight className="size-4 shrink-0 text-muted-foreground" />}
     </Link>
-  )
-}
-
-// ─── Acceso directo al monitor de una línea ──────────────────────────────────
-
-/**
- * «Monitor Eviscerado» bajo su línea, con el estado del turno a la derecha.
- * Un poco más adentro que la línea y en el tinte de acción: es un destino
- * distinto del análisis, no otra línea. Título en subhead y sangría corta: a
- * 375 px, en body y con la sangría completa, «Monitor Eviscerado» se partía
- * en dos renglones junto a la píldora.
- */
-function MonitorCell({ lineId }: { lineId: PlantLineId }) {
-  const navigate = useNavigate()
-  const linea = lineaConMonitor(lineId)
-  const [enTurno, setEnTurno] = useState<boolean | null>(null)
-  const [abriendo, setAbriendo] = useState(false)
-
-  useEffect(() => {
-    if (!linea) return
-    let vivo = true
-    // Sin el estado la fila igual sirve: un error de lectura deja la píldora fuera.
-    turnoEnCursoDePlanta(linea.plantSlug)
-      .then((v) => { if (vivo) setEnTurno(v) })
-      .catch(() => { /* sin estado */ })
-    return () => { vivo = false }
-  }, [linea])
-
-  if (!linea) return null
-
-  const abrir = async () => {
-    if (abriendo) return
-    setAbriendo(true)
-    try {
-      navigate(rutaMonitor(await tokenMonitorDeLinea(linea)))
-    } catch (err) {
-      toast({
-        title: 'No se pudo abrir el monitor',
-        description: err instanceof Error ? err.message : 'Inténtalo de nuevo en un momento.',
-        variant: 'destructive',
-      })
-      setAbriendo(false)
-    }
-  }
-
-  return (
-    <ListCell
-      leading={
-        <span className="ml-5 flex size-7 items-center justify-center" aria-hidden>
-          <Monitor className="size-[18px] text-primary" />
-        </span>
-      }
-      className="before:left-[4.75rem]"
-      title={<span className="whitespace-nowrap text-subhead font-semibold text-primary">Monitor {linea.areaLabel}</span>}
-      trailing={
-        abriendo
-          ? <Loader2 className="size-4 animate-spin text-muted-foreground" aria-label="Abriendo" />
-          : enTurno == null
-            ? undefined
-            : <Pill tone={enTurno ? 'ok' : 'neutral'} dot>{enTurno ? 'En turno' : 'Sin turno'}</Pill>
-      }
-      chevron={false}
-      onClick={() => { void abrir() }}
-    />
   )
 }
 

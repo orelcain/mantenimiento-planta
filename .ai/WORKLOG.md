@@ -21,6 +21,14 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-22 · Monitor · los mismos accesos en el Inicio de PC
+
+- El Inicio de PC (`DashboardPage`, desde md) no tiene lista de líneas: va una tarjeta «Monitores de
+  línea» al lado de la bitácora (grilla de 2 columnas desde lg), solo para supervisor/admin.
+- `MonitorCell` salió de `MobileHomeGrid` a `components/home/MonitorCell.tsx` con `anidada`
+  (celular: bajo su línea, subhead y sangría; PC: lista propia, body sin sangría). Misma lógica de
+  token y estado que #1160.
+
 ## 2026-09-22 · Monitor · acceso directo desde Inicio y cambio de línea en un toque
 
 - Pedido de Orel: llegar al monitor costaba ~4 toques (Análisis de Turno → compartir → abrir).

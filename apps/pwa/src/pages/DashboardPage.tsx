@@ -32,6 +32,9 @@ import type { User, UserRole, Zone } from '@/types'
 import { getUserById } from '@/services/auth'
 import { MobileHomeGrid } from '@/components/home/MobileHomeGrid'
 import { BitacoraTurnoCard } from '@/components/bitacora/BitacoraTurnoCard'
+import { MonitorCell } from '@/components/home/MonitorCell'
+import { ListGroup } from '@/components/piel'
+import { LINEAS_CON_MONITOR } from '@/services/shoplogix/monitorDeLinea'
 import { dec1 } from '@/utils/formatoNumeros'
 
 export function DashboardPage() {
@@ -204,8 +207,15 @@ export function DashboardPage() {
 
       {/* Bitácora del turno: en el PC es donde se copia al correo de Mantención,
           así que el acceso tiene que estar en el Inicio y no solo en el menú. */}
-      <div className="max-w-xl">
+      {/* Al lado, los monitores de línea: en la sala de Mantención el monitor
+          vive en el PC y llegar a él costaba ~4 clics por Análisis de Turno. */}
+      <div className="grid max-w-5xl items-start gap-6 lg:grid-cols-2">
         <BitacoraTurnoCard />
+        {(user?.rol === 'admin' || user?.rol === 'supervisor') && (
+          <ListGroup title="Monitores de línea">
+            {LINEAS_CON_MONITOR.map((id) => <MonitorCell key={id} lineId={id} anidada={false} />)}
+          </ListGroup>
+        )}
       </div>
 
       {/* Alertas críticas */}
