@@ -483,8 +483,10 @@ export function frasePorLiberacion(estado: EstadoLiberacion, r: ResumenInspeccio
     // §10 pide las críticas en cero para liberar. No se bloquea, pero no se dice «controladas»
     // cuando algo que para una línea sigue abierto: eso sería lavarlo.
     if (r.pendientesCriticos) return `${base}${conMedida}. ${r.pendientesCriticos} de ellas detiene una línea.`
-    // No se puede decir «controladas» de algo que no se pudo evaluar.
-    if (r.sinEvaluar) return `${base}${conMedida}. ${r.sinEvaluar} sin poder evaluar si ${r.sinEvaluar === 1 ? 'detiene' : 'detienen'} una línea.`
+    // No se puede decir «controladas» de algo que no se pudo evaluar, pero tampoco se le cuenta
+    // a Producción que «no calza con el diagrama de líneas»: eso es jerga nuestra. Se calla la
+    // palabra y queda la cifra (Orel, 21-09-2026).
+    if (r.sinEvaluar) return `${base}${conMedida}.`
     return `${base}${conMedida || ', controladas'}.`
   }
   return `${r.pendientes} ${r.pendientes === 1 ? 'desviación impide' : 'desviaciones impiden'} entregar la planta.`

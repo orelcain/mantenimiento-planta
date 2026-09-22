@@ -289,13 +289,17 @@ describe('la entrega es una foto, no un calculo vivo', () => {
   })
 })
 
-describe('las desviaciones sin equipo reconocible se declaran', () => {
-  it('el correo lo dice en vez de darlas por inofensivas', () => {
+describe('las desviaciones sin equipo reconocible', () => {
+  it('no se las lava como «controladas», pero tampoco se le habla a Producción del diagrama', () => {
     const d = datos(inspeccion(), [desviacion({ pendiente: true, horaTermino: null, equipoId: null, equipo: 'CINTA LARGA GRADER' })])
     const conNull = { ...d, resumen: { ...d.resumen, sinEvaluar: 1, pendientesCriticos: 0 } }
-    const html = inspeccionAHtmlCorreo(conNull)
-    expect(html).toContain('Sin evaluar')
-    expect(html).toContain('no se sabe si detiene una línea')
+    const entregada = inspeccion({
+      liberacion: { estado: 'con-pendientes', en: '2026-09-20T10:30:00.000Z', porNombre: 'Danilo Cortes', resumen: conNull.resumen },
+    })
+    const html = inspeccionAHtmlCorreo({ ...conNull, inspeccion: entregada })
+    expect(html).not.toContain('Sin evaluar')
+    expect(html).not.toContain('diagrama de líneas')
+    expect(html).not.toContain('controladas')
   })
 })
 
@@ -398,8 +402,10 @@ describe('el correo explica qué se revisa en cada punto', () => {
     expect(html).not.toContain('Qué se revisa en cada punto')
   })
 
-  it('y explica qué significa cada estado', () => {
-    expect(inspeccionAHtmlCorreo(datos(inspeccion(), []))).toContain('se opera con una medida transitoria')
+  it('termina donde termina la entrega: sin leyenda de estados ni pie de «generado con»', () => {
+    const html = inspeccionAHtmlCorreo(datos(inspeccion(), []))
+    expect(html).not.toContain('Qué dice cada estado')
+    expect(html).not.toContain('Generado con la app')
   })
 })
 

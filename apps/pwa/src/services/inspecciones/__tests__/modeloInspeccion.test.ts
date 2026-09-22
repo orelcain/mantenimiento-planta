@@ -218,8 +218,8 @@ describe('lo que no se pudo evaluar no se da por inofensivo', () => {
     const r = resumenDeInspeccion(PAUTA_POST_ASEO, { resultados: TODOS }, [
       desviacion({ pendiente: true, critica: null, hastaMin: null }),
     ])
-    expect(frasePorLiberacion('con-pendientes', r)).toContain('sin poder evaluar')
-    expect(frasePorLiberacion('con-pendientes', r)).not.toContain('controladas')
+    // Ni «controladas» (sería lavarlo) ni «sin poder evaluar» (jerga nuestra): la cifra y punto.
+    expect(frasePorLiberacion('con-pendientes', r)).toBe('1 de 1 desviación queda abierta.')
   })
 
   it('una critica confirmada manda sobre una sin evaluar', () => {

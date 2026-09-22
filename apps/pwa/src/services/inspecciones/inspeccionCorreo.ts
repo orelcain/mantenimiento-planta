@@ -463,13 +463,6 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen: vivo, desvia
         : 'Sin desviaciones detectadas durante la inspección.') +
       `</p>`
 
-  const sinJuzgar = resumen.sinEvaluar
-    ? nota(
-        `<b style="font-weight:600;">Sin evaluar.</b> ${resumen.sinEvaluar} ${resumen.sinEvaluar === 1 ? 'desviación abierta no calza' : 'desviaciones abiertas no calzan'} con ningún equipo del diagrama de líneas, ` +
-          `así que no se sabe si ${resumen.sinEvaluar === 1 ? 'detiene' : 'detienen'} una línea.`,
-      )
-    : ''
-
   const aviso = resumen.pendientesCriticos
     ? nota(
         `<b style="font-weight:600;color:${C.parada};">Atención.</b> ${resumen.pendientesCriticos} ${resumen.pendientesCriticos === 1 ? 'desviación abierta detiene' : 'desviaciones abiertas detienen'} una línea de proceso.`,
@@ -513,40 +506,17 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen: vivo, desvia
         '',
       )
 
-  /**
-   * Qué significa cada estado. El anexo que repetía el procedimiento punto por punto se sacó:
-   * desde que cada punto lleva su criterio bajo el título, decía lo mismo dos veces en el
-   * mismo documento (Orel, 21-09-2026). El texto completo sigue en la app, plegado bajo el
-   * punto, que es donde se usa: mientras se recorre la pauta.
-   */
-  const queSeRevisa =
-    `<div style="font-family:${FUENTE};border-top:1px solid ${C.linea};margin-top:34px;padding-top:16px;">` +
-    `<div style="font-size:${ROTULO};font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:${C.sec};">` +
-    `Qué dice cada estado</div>` +
-    [
-      ['Conforme', C.ventana, 'se revisó y estaba bien'],
-      ['Corregido', C.afectado, 'se encontró algo y se resolvió antes de entregar'],
-      ['Controlado', C.pendBorde, 'sigue abierto; se opera con una medida transitoria'],
-      ['No conforme', C.parada, 'sigue abierto, sin contingencia'],
-    ]
-      .map(
-        ([nombre, color, que]) =>
-          `<div style="font-size:${SEC};line-height:1.5;color:${C.sec};padding-top:5px;">` +
-          `<span style="color:${color};">●</span> <b style="color:${C.tinta};font-weight:600;">${nombre}</b> · ${que}</div>`,
-      )
-      .join('') +
-    `</div>`
-
-  const pie =
-    `<div style="font-family:${FUENTE};font-size:${ROTULO};line-height:1.5;color:${C.sec};padding-top:18px;">` +
-    `Generado con la app de Mantención · ${escaparHtml(etiquetaTurno(turno))} ${escaparHtml(turno.fecha.split('-').reverse().join('-'))}` +
-    ` · Las desviaciones quedan también en la bitácora del turno.</div>`
+  // Sin leyenda de estados ni pie de «generado con la app» (Orel, 21-09-2026): el documento
+  // termina donde termina la entrega. Los estados se explican solos por la palabra y el punto,
+  // y quien recibe el correo sabe de dónde viene. Tampoco se declara la desviación «sin
+  // evaluar»: es jerga nuestra (si el equipo calza con el diagrama de líneas), no un dato
+  // para Producción.
 
   return `<div style="max-width:680px;color:${C.tinta};">${encabezado}` +
     (kpis
       ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin:22px 0 2px;"><tr>${kpis}</tr></table>`
       : '') +
-    `${tablaCriterios}${tablaDesviaciones}${aviso}${sinJuzgar}${resultado}${cambios}${queSeRevisa}${pie}</div>`
+    `${tablaCriterios}${tablaDesviaciones}${aviso}${resultado}${cambios}</div>`
 }
 
 /**
@@ -630,13 +600,6 @@ export function inspeccionATextoPlano({ inspeccion, pauta, resumen: vivo, desvia
     if (sueltas.length) partes.push('Sin punto de la pauta:', ...sueltas.map((e) => linea(e, ++n)))
   }
 
-  if (resumen.sinEvaluar) {
-    const n = resumen.sinEvaluar
-    partes.push(
-      '',
-      `Sin evaluar: ${n} ${n === 1 ? 'desviación abierta no calza' : 'desviaciones abiertas no calzan'} con ningún equipo del diagrama de líneas.`,
-    )
-  }
   if (resumen.pendientesCriticos) {
     partes.push('', `Atención: ${resumen.pendientesCriticos} ${resumen.pendientesCriticos === 1 ? 'desviación abierta detiene' : 'desviaciones abiertas detienen'} una línea de proceso.`)
   }
