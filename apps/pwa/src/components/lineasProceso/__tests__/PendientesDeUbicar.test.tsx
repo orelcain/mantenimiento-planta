@@ -75,6 +75,8 @@ describe('la bandeja de nombrados a mano', () => {
     pintar()
     const fila = screen.getByRole('button', { name: /baader 143/i })
     expect(fila.className).not.toMatch(/bg-|rounded-ctl/)
-    expect(fila.parentElement?.className).toMatch(/border-b/)
+    // El fondo tenue y los filetes los pone el GRUPO (inset grouped), no cada fila.
+    expect(fila.closest('ul')?.className).toMatch(/divide-y/)
+    expect(fila.closest('ul')?.className).toMatch(/bg-muted-foreground/)
   })
 })

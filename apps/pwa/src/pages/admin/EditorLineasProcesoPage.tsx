@@ -485,14 +485,19 @@ function GrupoRevision({
         </span>
       </div>
       <p className="text-caption leading-snug text-muted-foreground">{items.length ? porque : vacio}</p>
+      {/* Lista AGRUPADA, como la de Ajustes: UN contenedor con fondo tenue y las filas separadas
+          por filete. Antes cada fila era su propia pastilla gris redondeada — ese es el tic
+          «todo es una caja». El fondo gris que gusta a la vista se conserva, pero en el grupo,
+          que es donde Apple lo pone (HIG «Lists and tables», estilo inset grouped; «Boxes»: la
+          caja agrupa si es más angosta que su contenedor y no se anida). Orel, 21-09-2026. */}
       {items.length > 0 && (
-        <ul className="flex flex-col gap-1">
+        <ul className="mt-1 flex flex-col divide-y divide-border rounded-ctl bg-muted-foreground/8 px-3">
           {items.map((h) => (
             <li key={h.id}>
               <button
                 type="button"
                 onClick={() => onIr(h.id)}
-                className="flex min-h-[44px] w-full items-center justify-between gap-3 rounded-ctl bg-muted-foreground/10 px-3 text-left hover:bg-muted-foreground/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                className="flex min-h-[44px] w-full items-center justify-between gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               >
                 <span className="min-w-0 flex-1 truncate text-footnote">{nombreDe(h.id)}</span>
                 <span className="shrink-0 text-caption tabular-nums text-muted-foreground">

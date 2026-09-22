@@ -80,13 +80,15 @@ export function PendientesDeUbicar({
             : 'Ninguno: todo lo escrito en la bitácora en 60 días calza con un equipo.'}
       </p>
 
+      {/* Lista agrupada, igual que los otros grupos de la bandeja: un contenedor con fondo tenue
+          y filas separadas por filete (HIG «Lists and tables», inset grouped). */}
       {grupos.length > 0 && (
-        <ul className="mt-1 flex flex-col border-t border-border">
+        <ul className="mt-1 flex flex-col divide-y divide-border rounded-ctl bg-muted-foreground/8 px-3">
           {grupos.map((g) => {
             const desplegado = abierto === g.clave
             const ocupado = trabajando === g.clave
             return (
-              <li key={g.clave} className="border-b border-border">
+              <li key={g.clave}>
                 <button
                   type="button"
                   onClick={() => {
@@ -104,7 +106,7 @@ export function PendientesDeUbicar({
                 </button>
 
                 {desplegado && (
-                  <div className="flex flex-col gap-3 pb-3 pl-6">
+                  <div className="flex flex-col gap-3 pb-3 pl-6 pr-1">
                     {/* Sus eventos: quién, cuándo y qué, para reconocer de qué máquina hablaban. */}
                     <ul className="flex flex-col gap-0.5 text-caption leading-snug text-muted-foreground">
                       {g.eventos.slice(0, 4).map((e) => (
