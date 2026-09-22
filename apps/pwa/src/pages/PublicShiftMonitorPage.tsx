@@ -25,7 +25,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useParams, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Activity, AlertCircle, Check, ChevronLeft, ChevronRight, Clock, Gauge, Hourglass, Moon, PauseCircle, RefreshCw, Sun, Target, TrendingUp, Tv, Wrench } from 'lucide-react'
 import { useTheme } from '@/hooks/useTheme'
 import {
@@ -82,8 +82,12 @@ import {
 } from './monitor/aporteHistorico'
 import { useTablero, type TarjetaLayout } from './monitor/tableroLayout'
 import { duenoDe } from '@/services/shoplogix/monitorEventos'
-import { Pill } from '@/components/piel'
-import { useIsAdmin } from '@/store'
+import { Pill, SegmentedControl } from '@/components/piel'
+import { useIsAdmin, useIsSupervisor } from '@/store'
+import { toast } from '@/hooks/useToast'
+import {
+  LINEAS_CON_MONITOR, lineaConMonitor, lineaDelMonitor, rutaMonitor, tokenMonitorDeLinea,
+} from '@/services/shoplogix/monitorDeLinea'
 import { useAuthStore } from '@/store/authStore'
 import { Button } from '@/components/ui/button'
 import { ReAuthConfirmDialog } from '@/components/admin/ReAuthConfirmDialog'
@@ -4384,7 +4388,70 @@ function StatusPill({ live, sinDatosHaceMin }: {
 
 // ── Página ──────────────────────────────────────────────────────────────────
 
+/**
+ * Cambiar de línea navega a OTRO token por la misma ruta: la clave por token
+ * hace que el monitor nazca limpio (vista, zoom, peso y cuota locales) en vez
+ * de arrastrar el estado de la línea anterior.
+ */
 export function PublicShiftMonitorPage() {
+  const { token } = useParams<{ token: string }>()
+  return <MonitorDelToken key={token} />
+}
+
+/**
+ * Volver a Inicio y saltar al monitor de la otra línea de Principal, en un
+ * toque. Solo con sesión de supervisor/admin: el link público (TV, QR de
+ * Producción) sigue mostrando una sola línea, y generar el token de la otra
+ * exige ese rol en el backend.
+ */
+function CambioDeLinea({ plantLineId, plantSlug, className }: {
+  plantLineId: string | null | undefined
+  plantSlug: string | null | undefined
+  className?: string
+}) {
+  const navigate = useNavigate()
+  const esSupervisor = useIsSupervisor()
+  const [cambiando, setCambiando] = useState(false)
+  const actual = lineaDelMonitor(plantLineId, plantSlug)
+  if (!esSupervisor || !actual) return null
+
+  const cambiar = async (id: string) => {
+    const destino = lineaConMonitor(id)
+    if (!destino || destino.id === actual.id || cambiando) return
+    setCambiando(true)
+    try {
+      navigate(rutaMonitor(await tokenMonitorDeLinea(destino)))
+    } catch (err) {
+      toast({
+        title: 'No se pudo abrir el monitor',
+        description: err instanceof Error ? err.message : 'Inténtalo de nuevo en un momento.',
+        variant: 'destructive',
+      })
+      setCambiando(false)
+    }
+  }
+
+  return (
+    <nav aria-label="Cambiar de monitor" className={`flex items-center gap-2 ${className ?? ''}`}>
+      <Link
+        to="/"
+        className="flex min-h-[44px] shrink-0 items-center gap-0.5 rounded-full pl-1 pr-2 text-subhead font-medium text-primary transition-opacity hover:opacity-80"
+      >
+        <ChevronLeft className="size-5" aria-hidden />
+        Inicio
+      </Link>
+      <SegmentedControl
+        className={cambiando ? 'min-w-0 flex-1 opacity-60' : 'min-w-0 flex-1'}
+        ariaLabel="Línea del monitor"
+        value={actual.id}
+        segments={LINEAS_CON_MONITOR.map((id) => ({ value: id, label: lineaConMonitor(id)?.areaLabel ?? id }))}
+        onChange={(id) => { void cambiar(id) }}
+      />
+    </nav>
+  )
+}
+
+function MonitorDelToken() {
   const { token } = useParams<{ token: string }>()
   const { isDark, toggleTheme } = useTheme()
   const [data, setData] = useState<PublicShiftMonitorDoc | null>(null)
@@ -5764,6 +5831,7 @@ export function PublicShiftMonitorPage() {
   if (!live) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-background px-6 text-center">
+        <CambioDeLinea plantLineId={data.plantLineId} plantSlug={data.plantSlug} className="w-full max-w-sm pb-6" />
         <Hourglass className="h-11 w-11 text-primary" />
         <p className="text-lg font-semibold text-foreground">Esperando el próximo turno</p>
         <p className="max-w-xs text-sm text-muted-foreground">
@@ -5994,6 +6062,9 @@ export function PublicShiftMonitorPage() {
           </div>
 
           {/* El resto de la banda, solo en PC. */}
+          {!modoPantalla && (
+            <CambioDeLinea plantLineId={data.plantLineId} plantSlug={data.plantSlug} className="hidden w-80 shrink-0 lg:flex" />
+          )}
           {navegacionTurnos && <div className="hidden lg:block">{navegacionTurnos}</div>}
           {selectorPestana && <div className="hidden lg:block">{selectorPestana}</div>}
           {/* Los controles del modo TV, discretos: en la sala nadie los toca,
@@ -6036,6 +6107,9 @@ export function PublicShiftMonitorPage() {
           fuera de lo sticky: pegadas arriba se comerían media pantalla de
           scroll. El análisis dejó de compartir scroll con lo vivo — quien
           entra por el QR viene a ver cómo va el turno. */}
+      {!modoPantalla && (
+        <CambioDeLinea plantLineId={data.plantLineId} plantSlug={data.plantSlug} className="mx-auto max-w-3xl px-4 pt-3 lg:hidden" />
+      )}
       {navegacionTurnos && (
         <div className="mx-auto max-w-3xl px-4 pt-3 lg:hidden">{navegacionTurnos}</div>
       )}

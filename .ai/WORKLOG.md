@@ -21,6 +21,28 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
 
+## 2026-09-22 · Monitor · acceso directo desde Inicio y cambio de línea en un toque
+
+- Pedido de Orel: llegar al monitor costaba ~4 toques (Análisis de Turno → compartir → abrir).
+  Ahora en Inicio, bajo «Principal · Eviscerado» y «Principal · Filete», va «Monitor <área>» con
+  la píldora «En turno / Sin turno». Dentro del monitor, con sesión de supervisor/admin, arriba:
+  «‹ Inicio» + selector `Eviscerado | Filete`. Solo Principal (Yal no, decisión de Orel).
+  Mockup aprobado: artifact F9Km5XRrWmVencXoVCzSCk (opción A).
+- `services/shoplogix/monitorDeLinea.ts`: el token sale de `createPublicShiftMonitor` modo línea
+  (backend `ensureLineMonitor`: reusa el link fijo, NO crea otro — verificado: devolvió
+  27b0e71c… chonchi y 10e3596b… filete, los mismos de Telegram). Se recuerda en localStorage
+  (`monitor-linea:{slug}`) hasta 1 día antes de vencer → el 2º toque no llama a la función.
+- Estado «En turno»: `turnoEnCurso.ts` (+6 tests) sobre los docs padre de ayer y hoy
+  (~6 docs/planta, ~45 KB las dos): turno con nombre, arrancado, SIN `endBriefSentAt` y con
+  `lastSyncAt` < 20 min. ⚠ No sirve solo `lastSyncAt`: el re-sync horario toca los turnos de
+  ayer (medido: sync hace 7 min en turnos cerrados). No usa `scheduledEnd` (se deriva del último
+  intervalo). Cache en memoria 2 min.
+- El monitor se monta con `key={token}` (`PublicShiftMonitorPage` → `MonitorDelToken`): cambiar de
+  línea por la misma ruta arrastraba estado local (vista, peso, cuota) de la otra línea.
+- Sin sesión (TV, QR de Producción) no cambia nada: verificado que el selector no aparece.
+- ⚠ A 375 px con sangría completa y título en body, «Monitor Eviscerado» se partía en 2 renglones
+  → subhead + sangría corta. `h-11` mide 37 px en móvil: el link «Inicio» va con `min-h-[44px]`.
+
 ## 2026-09-19 · Historial · de «máquina detenida» a «línea perdida»
 
 - Para esto se construyó el editor de líneas: una parada de 30 min en una de las tres BAADER no le
