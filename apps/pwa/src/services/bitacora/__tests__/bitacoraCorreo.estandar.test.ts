@@ -96,6 +96,10 @@ describe('el correo de turno sigue el estándar del correo', () => {
     expect(html).not.toContain('display:inline-block')
   })
 
+  it('le dice al teléfono que no infle la letra (iOS Mail)', () => {
+    expect(completo()).toContain('-webkit-text-size-adjust:100%')
+  })
+
   it('termina donde termina la entrega: sin pie de «generado con»', () => {
     expect(completo()).not.toContain('Generado con la app')
   })
