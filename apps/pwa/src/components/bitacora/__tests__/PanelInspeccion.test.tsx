@@ -127,3 +127,38 @@ describe('la hora del punto se puede corregir', () => {
     expect(onFijarHora).toHaveBeenCalledWith('mecanico', null)
   })
 })
+
+/**
+ * HIG «Boxes» (21-09-2026): un contenedor agrupa solo si es pequeño respecto al suyo, y no se
+ * anida uno dentro de otro — los subgrupos se marcan con relleno y alineación. Cada punto de
+ * la pauta es una card, y dentro llevaba hasta cuatro rectángulos rellenos más: la
+ * observación, el bloque de la pregunta, el editor de hora y la fila de la desviación.
+ *
+ * Los botones y los campos NO entran en la regla: su relleno es la superficie del control.
+ */
+describe('sin cajas dentro de cajas', () => {
+  const conNota = inspeccion({ notas: { mecanico: 'Cinta azul rozaba con la estructura' } })
+
+  it('la observación es una línea con su punto, no un bloque ámbar a todo el ancho', () => {
+    pintar(conNota)
+    const nota = screen.getByRole('button', { name: /cinta azul rozaba/i })
+    expect(nota.className).not.toMatch(/bg-/)
+    expect(nota.className).not.toMatch(/rounded-ctl/)
+  })
+
+  it('la pregunta «¿quedó resuelto?» se separa con un filete, no con un panel relleno', () => {
+    pintar(inspeccion())
+    fireEvent.click(screen.getAllByRole('button', { name: /^no$/i })[0] as HTMLElement)
+    const bloque = screen.getByText(/quedó resuelto antes de entregar/i).parentElement
+    expect(bloque?.className).toMatch(/border-t/)
+    expect(bloque?.className).not.toMatch(/bg-muted-foreground\/10/)
+  })
+
+  it('la liberación es una lista agrupada, no cuatro tarjetas apiladas', () => {
+    const todos = Object.fromEntries(PAUTA_POST_ASEO.criterios.map((c) => [c.id, 'conforme' as const]))
+    pintar(inspeccion({ resultados: todos }))
+    const opcion = screen.getByRole('button', { name: /con pendientes controlados/i })
+    expect(opcion.className).toMatch(/border-t/)
+    expect(opcion.className).not.toMatch(/bg-primary\/8|bg-muted-foreground\/8/)
+  })
+})

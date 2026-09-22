@@ -83,7 +83,7 @@ export function PanelInspeccion({
           entregarle la planta a Producción. Lo que se encuentre se anota como un evento más de este turno.
         </p>
         {tocaHoy && (
-          <p className="flex items-start gap-2 rounded-ctl bg-ink-warn/10 p-2.5 text-footnote leading-snug text-ink-warn [&>svg]:mt-px [&>svg]:size-4 [&>svg]:shrink-0">
+          <p className="flex items-start gap-2 text-footnote leading-snug text-ink-warn [&>svg]:mt-px [&>svg]:size-4 [&>svg]:shrink-0">
             <AlertTriangle aria-hidden /> Este turno entrega planta después del aseo semanal.
           </p>
         )}
@@ -121,7 +121,7 @@ export function PanelInspeccion({
           {resumen.conObservacion > 0 && ` · ${resumen.conObservacion} con observación`}
         </p>
         {resumen.pendientesCriticos > 0 && (
-          <p className="flex items-start gap-2 rounded-ctl bg-ink-crit/10 p-2 text-caption leading-snug text-ink-crit [&>svg]:mt-px [&>svg]:size-4 [&>svg]:shrink-0">
+          <p className="flex items-start gap-2 text-caption leading-snug text-ink-crit [&>svg]:mt-px [&>svg]:size-4 [&>svg]:shrink-0">
             <AlertTriangle aria-hidden />
             {resumen.pendientesCriticos === 1
               ? 'Queda 1 desviación abierta que detiene una línea.'
@@ -197,8 +197,11 @@ export function PanelInspeccion({
                 <p className="mt-1.5 pl-[22px] text-caption leading-snug text-muted-foreground">{c.ayuda}</p>
               )}
 
+              {/* Filete y sangría, no un panel relleno: es un subgrupo DENTRO de la card del
+                  punto, y el HIG pide marcarlo con relleno y alineación en vez de meter otro
+                  rectángulo («Boxes»: evita anidar cajas dentro de cajas). */}
               {preguntando === c.id && (
-                <div className="ml-[22px] mt-2 flex flex-col gap-2 rounded-ctl bg-muted-foreground/10 p-3">
+                <div className="ml-[22px] mt-3 flex flex-col gap-2 border-t border-border pt-3">
                   <p className="text-footnote font-semibold">¿Quedó resuelto antes de entregar la planta?</p>
                   <div className="flex flex-wrap gap-2">
                     <Button
@@ -252,8 +255,9 @@ export function PanelInspeccion({
               {/* El recordatorio del procedimiento, donde de verdad hace falta: es el momento en
                   que hay una máquina andando y la tentación es meter la mano. */}
               {c.id === 'operacional' && r === 'no-conforme' && (
-                <p className="ml-[22px] mt-2 rounded-ctl bg-ink-warn/10 p-2 text-caption leading-snug text-ink-warn">
-                  No intervengas con el equipo en movimiento. Si hay riesgo, bloquea y etiquetea (LOTO) antes de tocar.
+                <p className="ml-[22px] mt-2 text-caption leading-snug text-muted-foreground">
+                  <b className="font-semibold text-ink-warn">Con el equipo en movimiento, no.</b> Si hay riesgo, bloquea y
+                  etiquetea (LOTO) antes de tocar.
                 </p>
               )}
 
@@ -262,7 +266,7 @@ export function PanelInspeccion({
                   siete marcas a las 18:09 y un «recorrido de 833 min» que nadie caminó
                   (Orel, 21-09-2026). */}
               {editandoHora?.id === c.id && (
-                <div className="ml-[22px] mt-2 flex flex-col gap-2 rounded-ctl bg-muted-foreground/10 p-3">
+                <div className="ml-[22px] mt-3 flex flex-col gap-2 border-t border-border pt-3">
                   <label className="text-footnote font-semibold" htmlFor={`hora-${c.id}`}>
                     ¿A qué hora se revisó este punto?
                   </label>
@@ -349,37 +353,43 @@ export function PanelInspeccion({
                 </div>
               ) : (
                 inspeccion.notas?.[c.id] && (
+                  // El color se retira al punto de estado; el bloque ámbar a todo el ancho de la
+                  // card no separaba de nada (HIG «Boxes»: la caja agrupa solo si es más angosta).
                   <button
                     type="button"
                     disabled={!editable || !!liberada}
                     onClick={() => setAnotando({ id: c.id, texto: inspeccion.notas?.[c.id] ?? '' })}
-                    className="ml-[22px] mt-2 block w-[calc(100%-22px)] rounded-ctl bg-ink-warn/10 p-2 text-left text-caption leading-snug text-ink-warn disabled:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    className="ml-[22px] mt-2 flex w-[calc(100%-22px)] items-start gap-2 py-1 text-left text-caption leading-snug text-muted-foreground disabled:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   >
-                    {inspeccion.notas[c.id]}
+                    <span aria-hidden className="mt-1 size-1.5 shrink-0 rounded-full bg-ink-warn" />
+                    <span className="min-w-0 flex-1">{inspeccion.notas[c.id]}</span>
                   </button>
                 )
               )}
 
               {suyas.length > 0 && (
-                <ul className="mt-2 flex flex-col gap-1 pl-[22px]">
+                // Fila de lista, no tarjeta: filete arriba, estado en palabra y chevron. Es el
+                // patrón de lista de iOS, y deja de competir con la card que la contiene.
+                <ul className="mt-2 flex flex-col pl-[22px]">
                   {suyas.map((d) => (
                     <li key={d.id}>
                       <button
                         type="button"
                         onClick={() => onAbrirEvento(d)}
-                        className="flex min-h-[44px] w-full items-center gap-2 rounded-ctl bg-muted-foreground/10 px-3 text-left hover:bg-muted-foreground/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        className="flex min-h-[44px] w-full items-center gap-2.5 border-t border-border text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                       >
                         <span className="min-w-0 flex-1 truncate text-footnote">
                           <b className="font-semibold">{d.equipo || 'Sin equipo'}</b>
                           {d.descripcion ? ` · ${d.descripcion}` : ''}
                         </span>
                         <span
-                          className={`shrink-0 rounded-full px-2 text-caption font-semibold ${
-                            d.pendiente && !d.cierre ? 'bg-ink-warn/15 text-ink-warn' : 'bg-ink-ok/15 text-ink-ok'
+                          className={`shrink-0 text-caption font-semibold ${
+                            d.pendiente && !d.cierre ? 'text-ink-warn' : 'text-ink-ok'
                           }`}
                         >
                           {d.pendiente && !d.cierre ? 'pendiente' : 'resuelta'}
                         </span>
+                        <ChevronRight aria-hidden className="size-4 shrink-0 text-muted-foreground" />
                       </button>
                     </li>
                   ))}
@@ -447,7 +457,9 @@ export function PanelInspeccion({
           </p>
         ) : (
           <>
-            <ul className="flex flex-col gap-1.5">
+            {/* Lista agrupada, como la pantalla de Ajustes: cuatro tarjetas apiladas dentro de
+                otra tarjeta eran cuatro cajas en una caja. El filete separa y el visto marca. */}
+            <ul className="flex flex-col">
               {ESTADOS.map((e) => {
                 const elegido = (eligiendo ?? resumen.sugerido) === e
                 const raro = e === 'no-liberada'
@@ -457,15 +469,13 @@ export function PanelInspeccion({
                       type="button"
                       onClick={() => setEligiendo(e)}
                       aria-pressed={elegido}
-                      className={`flex w-full items-start gap-2.5 rounded-ctl border p-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-                        elegido ? 'border-primary bg-primary/8' : 'border-transparent bg-muted-foreground/8'
-                      } ${raro && !elegido ? 'opacity-60' : ''}`}
+                      className={`flex w-full items-start gap-2.5 border-t border-border py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                        raro && !elegido ? 'opacity-60' : ''
+                      }`}
                     >
-                      <span
+                      <Check
                         aria-hidden
-                        className={`mt-0.5 size-4 shrink-0 rounded-full border-2 ${
-                          elegido ? 'border-primary bg-primary' : 'border-muted-foreground/50'
-                        }`}
+                        className={`mt-0.5 size-4 shrink-0 ${elegido ? 'text-primary' : 'text-transparent'}`}
                       />
                       <span className="min-w-0">
                         <b className="block text-footnote font-semibold">{TEXTO_LIBERACION[e].titulo}</b>
