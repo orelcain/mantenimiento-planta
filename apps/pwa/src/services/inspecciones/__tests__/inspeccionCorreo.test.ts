@@ -382,10 +382,11 @@ describe('la hora del punto es opcional', () => {
 })
 
 describe('el correo explica qué se revisa en cada punto', () => {
-  it('trae la guía del procedimiento al final, para quien quiera verificar', () => {
+  it('el criterio va con el punto, no en un anexo que lo repita', () => {
     const html = inspeccionAHtmlCorreo(datos(inspeccion(), []))
-    expect(html).toContain('Qué se revisa en cada punto')
-    expect(html).toContain('Sin agua ni humedad en componentes eléctricos')
+    expect(html).toContain('sin agua ni humedad')
+    // El anexo del pie decía lo mismo una segunda vez.
+    expect(html).not.toContain('Qué se revisa en cada punto')
   })
 
   it('y explica qué significa cada estado', () => {
@@ -443,18 +444,20 @@ describe('la forma del documento: protocolo, no plantilla', () => {
  * pie (Orel, 21-09-2026).
  */
 describe('cada punto dice lo que cubre', () => {
-  it('el resumen corto va en la tabla y el texto completo al pie', () => {
+  it('el criterio de cada punto va bajo su título, no en un anexo', () => {
     const html = inspeccionAHtmlCorreo(datos(inspeccion(), []))
-    expect(html).toContain('motores, tableros, botoneras, conexiones, humedad y guardas')
-    expect(html).toContain('Sin agua ni humedad en componentes eléctricos')
-    // Dos líneas de la columna. Con una sola se caía media pauta; con tres, la tabla deja de
-    // escanearse y vale más mandar al anexo.
-    for (const c of PAUTA_POST_ASEO.criterios) expect((c.resumen ?? '').length).toBeLessThanOrEqual(80)
+    expect(html).toContain('tapas y guardas instaladas')
+    // Tres o cuatro líneas de la columna. Y con un VERBO: un punto de pauta se aprueba contra
+    // un criterio, no contra una lista de piezas.
+    for (const c of PAUTA_POST_ASEO.criterios) {
+      expect((c.resumen ?? '').length).toBeLessThanOrEqual(190)
+      expect(c.resumen ?? '').toMatch(/\b(sin|con|ni|en)\b/i)
+    }
   })
 
   it('una inspección abierta antes del cambio igual lo muestra: el resumen es presentación', () => {
     const vieja = inspeccion({ criterios: PAUTA_POST_ASEO.criterios.map(({ id, titulo, ayuda }) => ({ id, titulo, ayuda })) })
     const pauta = pautaDeLaInspeccion(PAUTA_POST_ASEO, vieja)
-    expect(pauta.criterios[1]?.resumen).toBe('motores, tableros, botoneras, conexiones, humedad y guardas')
+    expect(pauta.criterios[1]?.resumen).toContain('sin agua ni humedad')
   })
 })

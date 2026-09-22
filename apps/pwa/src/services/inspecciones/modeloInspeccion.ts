@@ -75,10 +75,16 @@ export interface CriterioPauta {
    * tabla: se parte en nueve líneas de treinta caracteres y separa el primer estado del último
    * por mil píxeles. El texto completo sigue al pie.
    *
-   * ⚠ El presupuesto son DOS líneas de la columna, unos 80 caracteres. Con una sola —40
-   * caracteres— se caía media pauta: «Equipos mecánicos» perdía pernos y estructura, y
-   * «Paradas de emergencia» quedaba en tres palabras. Ajustar el resumen a la caja en vez de
-   * ajustar la caja al contenido es la manera rápida de dejar el correo diciendo menos.
+   * ⚠ Dice el CRITERIO, no el inventario. «cintas, motorreductor, rodamientos» nombra cosas y
+   * no dice qué hacer con ellas; «cintas alineadas y centradas, motorreductor lubricado y sin
+   * fugas, rodamientos sin juego» sí. Un punto de pauta se aprueba o se rechaza contra un
+   * criterio, así que el criterio es lo que tiene que estar escrito.
+   *
+   * El presupuesto es de unos 170 caracteres, tres o cuatro líneas de la columna. Llegó ahí en
+   * dos correcciones de Orel: con 40 se caía media pauta, y con 80 quedaban listas de
+   * sustantivos. Con el criterio adentro, el anexo del pie que repetía el procedimiento ya no
+   * hace falta: se sacó, y el texto completo (`ayuda`) sigue donde se usa de verdad, plegado
+   * bajo el punto mientras se recorre la pauta en el teléfono.
    *
    * Ausente en las pautas anteriores a este cambio: ahí no se muestra nada.
    */
@@ -227,48 +233,55 @@ export const PAUTA_POST_ASEO: PautaInspeccion = {
   criterios: [
     {
       id: 'mecanico',
-      resumen: 'cintas, motorreductor, rodamientos, poleas, pernos y estructura',
+      resumen:
+        'Cintas alineadas y centradas; motorreductor con sus fijaciones, lubricado y sin fugas; rodamientos, ejes y poleas sin juego; pernos apretados y nada atrapado.',
       titulo: 'Equipos mecánicos',
       ayuda:
         'Alineación y centrado de las cintas. Motorreductor: fijaciones, lubricación y fugas. Estructura y soportes. Rodamientos, ejes, poleas y rodillos. Pernos y uniones. Sin objetos atrapados que interfieran con el movimiento.',
     },
     {
       id: 'electrico',
-      resumen: 'motores, tableros, botoneras, conexiones, humedad y guardas',
+      resumen:
+        'Motores, tableros, botoneras y conexiones sin agua ni humedad; tapas y guardas instaladas; el control sin alarmas ni indicaciones anormales.',
       titulo: 'Sistema eléctrico',
       ayuda:
         'Motores, cajas, tableros, botoneras y conexiones accesibles. Sin agua ni humedad en componentes eléctricos. Tapas, protecciones y guardas instaladas. Sin alarmas ni indicaciones anormales en el control.',
     },
     {
       id: 'neumatico',
-      resumen: 'mangueras, racores, cilindros, válvulas, presión y fugas de aire',
+      resumen:
+        'Mangueras sujetas y sin daño; racores y válvulas sin fugas de aire; presión en el valor de trabajo; cilindros y actuadores completando su carrera.',
       titulo: 'Sistema neumático',
       ayuda:
         'Mangueras, conexiones, racores, cilindros y válvulas. Presión de trabajo. Sin fugas de aire. Cilindros y actuadores funcionando. Mangueras bien sujetas y sin daños.',
     },
     {
       id: 'seguridad',
-      resumen: 'pulsadores de emergencia, sensores, enclavamientos y guardas',
+      resumen:
+        'Cada parada de emergencia probada y repuesta; sensores e interruptores de seguridad respondiendo; guardas y protecciones en su lugar.',
       titulo: 'Paradas de emergencia y protecciones',
       ayuda:
         'Funcionamiento de las paradas de emergencia. Sensores, interruptores de seguridad y dispositivos de protección del equipo. Guardas y protecciones en su lugar.',
     },
     {
       id: 'operacional',
-      resumen: 'marcha en vacío, sentido de giro, cintas, alarmas y LOTO',
+      resumen:
+        'En marcha en vacío: sentido de giro correcto, cintas desplazando parejo, neumática respondiendo y sin alarmas. Nada se interviene en movimiento: con riesgo, bloqueo y etiquetado (LOTO).',
       titulo: 'Prueba operacional',
       ayuda:
         'Marcha en vacío de los equipos principales. Sentido de giro de los motores. Desplazamiento de las cintas. Sistemas neumáticos. Sin alarmas ni fallas en el control. Prohibido intervenir, limpiar o ajustar con el equipo en movimiento: toda intervención con riesgo va con bloqueo y etiquetado (LOTO).',
     },
     {
       id: 'anomalias',
-      resumen: 'fugas, ruidos, vibraciones, golpes, calentamientos y movimientos',
+      resumen:
+        'Durante la marcha, escuchar y tocar: ningún ruido, golpe, vibración, calentamiento ni movimiento fuera de lo normal.',
       titulo: 'Sin fugas, ruidos ni vibraciones anormales',
       ayuda: 'Durante la prueba: fugas, ruidos, vibraciones, golpes, calentamientos o movimientos anormales.',
     },
     {
       id: 'despejado',
-      resumen: 'herramientas, materiales, agua, residuos, accesos y tapas repuestas',
+      resumen:
+        'Nada suelto sobre los equipos —herramientas, repuestos ni útiles de aseo—; sin agua, residuos ni químicos acumulados; accesos despejados y las tapas del aseo repuestas.',
       titulo: 'Sin herramientas ni objetos extraños',
       ayuda:
         'Sin herramientas, materiales, repuestos, piezas sueltas ni elementos de limpieza sobre los equipos. Sin acumulaciones de agua, residuos o químicos. Pisos, pasillos y accesos despejados. Tapas y protecciones desmontadas durante el aseo, reinstaladas.',

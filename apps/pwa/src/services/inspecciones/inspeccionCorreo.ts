@@ -478,23 +478,14 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen: vivo, desvia
       )
 
   /**
-   * Qué hay DETRÁS de cada punto. «Sistema eléctrico: Conforme» no le dice nada a quien no
-   * recorrió la pauta; el procedimiento sí lo detalla (§§3-7). Va al final y en letra chica:
-   * es material de consulta para el que quiera verificar qué se revisó, no parte del resumen
-   * (Orel, 21-09-2026).
+   * Qué significa cada estado. El anexo que repetía el procedimiento punto por punto se sacó:
+   * desde que cada punto lleva su criterio bajo el título, decía lo mismo dos veces en el
+   * mismo documento (Orel, 21-09-2026). El texto completo sigue en la app, plegado bajo el
+   * punto, que es donde se usa: mientras se recorre la pauta.
    */
   const queSeRevisa =
     `<div style="font-family:${FUENTE};border-top:1px solid ${C.linea};margin-top:34px;padding-top:16px;">` +
     `<div style="font-size:${ROTULO};font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:${C.sec};">` +
-    `Qué se revisa en cada punto</div>` +
-    pauta.criterios
-      .map(
-        (c) =>
-          `<div style="font-size:${SEC};line-height:1.5;color:${C.sec};padding-top:7px;">` +
-          `<b style="color:${C.tinta};font-weight:600;">${escaparHtml(c.titulo)}.</b> ${escaparHtml(c.ayuda)}</div>`,
-      )
-      .join('') +
-    `<div style="font-size:${ROTULO};font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:${C.sec};padding-top:18px;">` +
     `Qué dice cada estado</div>` +
     [
       ['Conforme', C.ventana, 'se revisó y estaba bien'],
@@ -565,7 +556,10 @@ export function inspeccionATextoPlano({ inspeccion, pauta, resumen: vivo, desvia
       const h = hora(inspeccion.marcas?.[c.id])
       const suyas = desviaciones.filter((e) => e.inspeccion?.criterioId === c.id)
       const cuelgan = suyas.length ? `. ${suyas.length} ${suyas.length === 1 ? 'desviación' : 'desviaciones'} en el registro` : ''
-      return `- ${c.titulo}: ${etiqueta(c.id)}${h ? ` (${h})` : ''}${nota ? `. ${nota}` : ''}${cuelgan}`
+      return (
+        `- ${c.titulo}: ${etiqueta(c.id)}${h ? ` (${h})` : ''}${nota ? `. ${nota}` : ''}${cuelgan}` +
+        (c.resumen ? `\n  ${c.resumen}` : '')
+      )
     }),
     '',
     'REGISTRO DE DESVIACIONES',
@@ -618,6 +612,5 @@ export function inspeccionATextoPlano({ inspeccion, pauta, resumen: vivo, desvia
       : 'Falta marcar la entrega de la planta. El recorrido está registrado; todavía no se dice en qué condición quedó la planta al pasar a Producción.',
   )
   partes.push('', `${resumen.revisados} de ${resumen.total} puntos revisados${resumen.minutosDeRecorrido != null ? ` en ${resumen.minutosDeRecorrido} min` : ''}.`)
-  partes.push('', 'QUÉ SE REVISA EN CADA PUNTO', ...pauta.criterios.map((c) => `- ${c.titulo}: ${c.ayuda}`))
   return partes.join('\n')
 }
