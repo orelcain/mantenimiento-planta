@@ -426,6 +426,10 @@ describe('la forma del documento: protocolo, no plantilla', () => {
     expect(html()).not.toContain(`background:${C.critFondo}`)
   })
 
+  it('le dice al teléfono que no infle la letra (iOS Mail)', () => {
+    expect(html()).toContain('-webkit-text-size-adjust:100%')
+  })
+
   it('ningún filete vertical: las tablas no son rejas', () => {
     // El marco va en la <table>; lo que no vuelve es el borde en los cuatro lados de cada celda.
     expect(html()).not.toMatch(/<t[dh][^>]*border:1px solid/)

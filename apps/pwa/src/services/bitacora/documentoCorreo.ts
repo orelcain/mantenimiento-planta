@@ -70,6 +70,13 @@ export const BANDA = C.neutroFondo
 export const CELDA =
   `padding:9px 12px;border-bottom:1px solid ${RAYA};font-family:${FUENTE};font-size:${TEXTO};` +
   `line-height:1.5;color:${C.tinta};vertical-align:top;`
+/**
+ * Le dice al teléfono que NO infle la letra. iOS Mail (WebKit) agranda el texto de un correo por
+ * su cuenta —«font boosting»— cuando el contenedor no lo prohíbe: la letra de 14 px salía como
+ * de 26 en el iPhone de Orel, y como las tablas ya estaban calculadas para 680 px, el texto
+ * inflado se salía por la derecha (22-09-2026). Va en cada contenedor raíz del correo.
+ */
+export const TEXTO_FIJO = '-webkit-text-size-adjust:100%;text-size-adjust:100%;'
 /** Un doceavo del ancho útil. Las columnas ocupan tracks enteros, no porcentajes inventados. */
 export const track = (n: number) => `${((n / 12) * 100).toFixed(4)}%`
 

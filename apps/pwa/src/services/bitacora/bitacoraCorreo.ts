@@ -17,7 +17,7 @@ import {
   tituloDe,
 } from './presentacionEvento'
 
-import { C, FUENTE, ROTULO, SEC, TEXTO, TITULO, RAYA, escaparHtml, estado, filaCifras, kpi, seccion } from './documentoCorreo'
+import { C, FUENTE, ROTULO, SEC, TEXTO, TEXTO_FIJO, TITULO, RAYA, escaparHtml, estado, filaCifras, kpi, seccion } from './documentoCorreo'
 
 // Se reexporta: el PDF y las pruebas lo importan desde aquí.
 export { horarioEvento }
@@ -267,7 +267,7 @@ export function bitacoraAHtmlCorreo(datos: DatosCorreoBitacora): string {
   // planilla con filas altas— mientras el cuerpo quedaba en 680: por eso se veía «como letra
   // 30» (Orel, 21-09-2026). No era la letra, era el ancho.
   const recoleccion = eventos.length
-    ? `<div style="max-width:680px;">${htmlRecoleccionMttr(filasRecoleccion(datos.turno, eventos))}` +
+    ? `<div style="max-width:680px;${TEXTO_FIJO}">${htmlRecoleccionMttr(filasRecoleccion(datos.turno, eventos))}` +
       `<div style="font-family:${FUENTE};font-size:${SEC};line-height:1.5;color:${C.sec};padding-top:6px;">${escaparHtml(explicacionMtbfMttr(datos.turno, r))}</div>` +
       `<div style="height:14px;line-height:14px;">&nbsp;</div></div>`
     : ''
@@ -338,7 +338,7 @@ export function cuerpoBitacoraHtml({ turno, eventos: todos, tecnicos, planta, ob
 
   // Sin pie de «generado con la app»: quien recibe el correo sabe de dónde viene, y el
   // documento termina donde termina la entrega (Orel, 21-09-2026).
-  return `<div style="max-width:680px;color:${C.tinta};">${encabezado}${filaCifras(cifras, 1)}${bloqueObservacion}${cuerpo}${bloqueAnteriores}</div>`
+  return `<div style="max-width:680px;color:${C.tinta};${TEXTO_FIJO}">${encabezado}${filaCifras(cifras, 1)}${bloqueObservacion}${cuerpo}${bloqueAnteriores}</div>`
 }
 
 /** "3 eventos · 35 min de parada (1) · MTTR 35 min · 1 sin detener producción · 1 pendiente" (texto plano y WhatsApp). */

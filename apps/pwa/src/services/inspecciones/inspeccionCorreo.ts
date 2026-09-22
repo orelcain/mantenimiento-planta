@@ -5,6 +5,7 @@ import {
   ROTULO,
   SEC,
   TEXTO,
+  TEXTO_FIJO,
   TITULO,
   RAYA,
   BANDA,
@@ -417,7 +418,7 @@ export function inspeccionAHtmlCorreo({ inspeccion, pauta, resumen: vivo, desvia
   // evaluar»: es jerga nuestra (si el equipo calza con el diagrama de líneas), no un dato
   // para Producción.
 
-  return `<div style="max-width:680px;color:${C.tinta};">${encabezado}` +
+  return `<div style="max-width:680px;color:${C.tinta};${TEXTO_FIJO}">${encabezado}` +
     kpis +
     `${tablaCriterios}${tablaDesviaciones}${aviso}${resultado}${cambios}</div>`
 }
