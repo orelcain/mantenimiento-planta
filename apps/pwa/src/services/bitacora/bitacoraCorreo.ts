@@ -190,7 +190,9 @@ function htmlRepuestos(e: EventoBitacora): string {
     .join('')
   return (
     `<div style="font-size:${ROTULO};font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:${C.sec};padding:12px 0 6px;">Repuestos usados</div>` +
-    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;width:100%;font-family:${FUENTE};font-size:${SEC};color:${C.tinta};">` +
+    // Sin `width:100%`: el compositor de Outlook en el iPhone lo convierte en píxeles al pegar
+    // (652 px) y el teléfono encoge el correo entero para que quepa (prueba de Orel, 23-09-2026).
+    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-family:${FUENTE};font-size:${SEC};color:${C.tinta};">` +
     `<tr>${th('Código SAP', 'left', '96')}${th('Repuesto')}${th('Cant.', 'right', '48')}</tr>${filas}</table>`
   )
 }
@@ -326,7 +328,9 @@ export function cuerpoBitacoraHtml({ turno, eventos: todos, tecnicos, planta, ob
     : ''
 
   const tablaEventos = (lista: readonly EventoBitacora[], desde: number, pendiente: boolean) =>
-    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;width:100%;margin-top:4px;">${lista
+    // Sin `width:100%` (ver htmlRepuestos): la tabla toma el ancho del texto más largo, que en
+    // un evento real siempre llena la columna.
+    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin-top:4px;">${lista
       .map((e, i) => htmlEvento(e, desde + i, fuente, pendiente))
       .join('')}</table>`
 
