@@ -72,8 +72,16 @@ describe('planilla «Recoleccion MTTR» llenada desde la bitácora', () => {
     expect(html).toContain('background:#00557F;color:#FFFFFF')
     expect(html).toContain('<img src="data:image/png;base64,')
     expect(html).toContain('>Duración Falla (Min)</th>')
-    expect(html.match(/background:#D9E1F2/g)).toHaveLength(5)
-    expect(html.match(/background:#FFFFFF;color:#000000/g)).toHaveLength(5)
+    // Un solo día: cuatro columnas (la fecha va en la banda, no en una columna que en el
+    // teléfono se llevaba un cuarto del ancho para una sola celda con dato).
+    expect(html.match(/background:#D9E1F2/g)).toHaveLength(4)
+    expect(html.match(/background:#FFFFFF;color:#000000/g)).toHaveLength(4)
+    expect(html).not.toContain('>Fecha</th>')
+    expect(html).toMatch(/MTBF - MTTR<span[^>]*>&nbsp;&nbsp;·&nbsp;&nbsp;17-sept-2026 jue<\/span>/)
+    // Varios días (historial): la columna Fecha vuelve.
+    const dosDias = htmlRecoleccionMttr([...filasRecoleccion(turno, [ev({ id: 'a' })]), ...filasRecoleccion({ ...turno, id: '2026-09-18_dia', fecha: '2026-09-18' }, [ev({ id: 'c' })])])
+    expect(dosDias).toContain('>Fecha</th>')
+    expect(dosDias.match(/background:#D9E1F2/g)).toHaveLength(5)
     // Escapado: lo que escribe el técnico no se vuelve HTML.
     expect(htmlRecoleccionMttr(filasRecoleccion(turno, [ev({ descripcion: 'Presión <2 bar>' })]))).toContain('Presión &lt;2 bar&gt;')
   })

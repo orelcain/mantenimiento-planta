@@ -102,7 +102,7 @@ export function seccion(titulo: string, cantidad?: number): string {
 /** Una cifra con su rótulo. Sin caja: el número pesa por tamaño, no por borde. */
 export function kpi(valor: string, etiqueta: string): string {
   return (
-    `<td style="padding:0 34px 0 0;vertical-align:top;font-family:${FUENTE};">` +
+    `<td valign="top" style="padding:0 34px 10px 0;vertical-align:top;font-family:${FUENTE};">` +
     `<div style="font-size:${TITULO};font-weight:600;line-height:1.2;color:${C.tinta};white-space:nowrap;` +
     `font-variant-numeric:tabular-nums;">${escaparHtml(valor)}</div>` +
     `<div style="font-size:${SEC};color:${C.sec};padding-top:4px;white-space:nowrap;">${escaparHtml(etiqueta)}</div></td>`
@@ -119,9 +119,12 @@ export function kpi(valor: string, etiqueta: string): string {
  */
 export function filaCifras(cifras: readonly string[], minimo = 3): string {
   const vivas = cifras.filter(Boolean)
-  return vivas.length >= minimo
-    ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin:22px 0 2px;"><tr>${vivas.join('')}</tr></table>`
-    : ''
+  if (vivas.length < minimo) return ''
+  // De a tres por fila: las cifras van en `nowrap`, y cinco o seis en una sola fila se salían
+  // del ancho de un teléfono (el correo no puede llevar reglas «solo móvil»: Word las borra).
+  const filas: string[] = []
+  for (let i = 0; i < vivas.length; i += 3) filas.push(`<tr>${vivas.slice(i, i + 3).join('')}</tr>`)
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin:22px 0 2px;">${filas.join('')}</table>`
 }
 
 /**

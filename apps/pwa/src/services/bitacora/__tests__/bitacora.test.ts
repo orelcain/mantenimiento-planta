@@ -283,8 +283,9 @@ describe('correo de la bitácora', () => {
       ...base,
       eventos: [ev({ fotos: [{ url: 'https://x/a.jpg', path: 'p', etiqueta: 'despues', ancho: 1600, alto: 1200 }, { url: 'https://x/b.jpg', path: 'p', etiqueta: 'antes', ancho: 1200, alto: 1600 }] })],
     })
-    expect(html).toContain('width="260" height="195"')
-    expect(html).toContain('width="260" height="347"')
+    // 156 px: dos por fila caben en un teléfono (ver ANCHO_FOTO).
+    expect(html).toContain('width="156" height="117"')
+    expect(html).toContain('width="156" height="208"')
     // "Antes" sale primero aunque se haya cargado después.
     expect(html.indexOf('b.jpg')).toBeLessThan(html.indexOf('a.jpg'))
   })

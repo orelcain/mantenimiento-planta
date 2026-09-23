@@ -100,6 +100,26 @@ describe('el correo de turno sigue el estándar del correo', () => {
     expect(completo()).toContain('-webkit-text-size-adjust:100%')
   })
 
+  it('cabe en un teléfono: ningún ancho fijo pasa de 340 px y las cifras van de a tres', () => {
+    const html = cuerpoBitacoraHtml(
+      datos(
+        [evento({ fotos: [{ url: 'https://x/a.jpg', path: 'p', etiqueta: 'antes', ancho: 1600, alto: 1200 }, { url: 'https://x/b.jpg', path: 'p', etiqueta: 'despues', ancho: 1600, alto: 1200 }] }),
+         evento({ id: 'e2', impacto: 'en-ventana', ventana: 'colación' }),
+         evento({ id: 'e3', impacto: 'afecta-sin-detener', contingencia: 'a mano', pendiente: true, horaTermino: null })],
+      ),
+    )
+    // Word borra `vertical-align` del estilo al pegar: el atributo es lo que sobrevive.
+    for (const m of html.matchAll(/<td width="(\d+)"[^>]*>/g)) expect(m[0]).toContain('valign="top"')
+    const anchos = [...html.matchAll(/width="(\d+)"/g)].map((m) => Number(m[1]))
+    expect(Math.max(...anchos)).toBeLessThanOrEqual(340)
+    // 2 fotos × 156 + 8 + 28 del número = 348 < 351 (cuerpo del correo en un teléfono).
+    expect(html).toContain('width="156"')
+    // Seis cifras vivas (eventos, parada, MTTR, afectados, ventana, pendientes) → dos filas.
+    expect((html.match(/<tr><td valign="top" style="padding:0 34px/g) ?? []).length).toBe(2)
+    // La hora abre la línea de datos, sin columna propia.
+    expect(html).toContain('09:30 – 10:05 · Correctivo')
+  })
+
   it('termina donde termina la entrega: sin pie de «generado con»', () => {
     expect(completo()).not.toContain('Generado con la app')
   })
