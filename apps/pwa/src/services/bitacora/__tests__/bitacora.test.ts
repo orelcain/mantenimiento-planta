@@ -321,7 +321,7 @@ describe('correo de la bitácora', () => {
   it('incluye la observación general escapada y con saltos de línea', () => {
     const html = bitacoraAHtmlCorreo({ ...base, eventos: [ev({})], observacion: 'Planta sin agua caliente <2 h>\nSe avisó a jefatura' })
     // Título de sección y el texto en recuadro, escapado y con saltos (correo 17-09).
-    expect(html).toContain('Observaciones del turno</div>')
+    expect(html).toContain('Observaciones del turno</b></small></div>')
     expect(html).toContain('Planta sin agua caliente &lt;2 h&gt;<br>Se avisó a jefatura</div>')
     expect(bitacoraAHtmlCorreo({ ...base, eventos: [ev({})], observacion: '   ' })).not.toContain('Observaciones del turno')
     expect(bitacoraATextoPlano({ ...base, eventos: [ev({})], observacion: 'Sin novedad' })).toContain('Observaciones del turno: Sin novedad')

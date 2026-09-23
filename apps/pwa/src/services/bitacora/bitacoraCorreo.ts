@@ -17,7 +17,7 @@ import {
   tituloDe,
 } from './presentacionEvento'
 
-import { C, FUENTE, ROTULO, SEC, TEXTO, TEXTO_FIJO, TITULO, RAYA, escaparHtml, estado, filaCifras, kpi, seccion } from './documentoCorreo'
+import { C, FUENTE, ROTULO, SEC, TEXTO, TEXTO_FIJO, TITULO, RAYA, escaparHtml, estado, filaCifras, kpi, negrita, seccion, small } from './documentoCorreo'
 
 // Se reexporta: el PDF y las pruebas lo importan desde aquí.
 export { horarioEvento }
@@ -135,7 +135,7 @@ export function htmlFotos(fotos: readonly FotoEvento[], fuente: (f: FotoEvento) 
         `<td valign="top" style="padding:8px 8px 0 0;vertical-align:top;">` +
         `<img src="${escaparHtml(fuente(f))}" width="${w}"${h == null ? '' : ` height="${h}"`} alt="${escaparHtml(ETIQUETA_FOTO[f.etiqueta])}" ` +
         `style="display:block;width:${w}px;${h == null ? '' : `height:${h}px;`}border:0;border-radius:4px;">` +
-        `<div style="font-family:${FUENTE};font-size:12px;color:${C.sec};padding-top:2px;">${escaparHtml(ETIQUETA_FOTO[f.etiqueta])}</div>` +
+        `<div style="font-family:${FUENTE};font-size:12px;color:${C.sec};padding-top:2px;">${small(escaparHtml(ETIQUETA_FOTO[f.etiqueta]))}</div>` +
         `</td>`
       )
     })
@@ -161,7 +161,7 @@ function htmlImpacto(e: EventoBitacora): string {
   }
   return (
     `<div style="font-size:${SEC};line-height:1.6;color:${C.tinta};padding-top:4px;">` +
-    partes.map((t) => estado(t, color(t))).join(' &nbsp;·&nbsp; ') +
+    small(partes.map((t) => estado(t, color(t))).join(' &nbsp;·&nbsp; ')) +
     `</div>`
   )
 }
@@ -172,7 +172,7 @@ function htmlRepuestos(e: EventoBitacora): string {
   if (!lista.length) return ''
   // Anchos fijos en código y cantidad: sin ellos Outlook repartía la tabla por igual.
   const th = (t: string, alinear = 'left', ancho = '') =>
-    `<th${ancho ? ` width="${ancho}"` : ''} style="${ancho ? `width:${ancho}px;` : ''}text-align:${alinear};white-space:nowrap;font-weight:600;color:${C.sec};font-size:${ROTULO};letter-spacing:.07em;text-transform:uppercase;padding:0 6px 5px 0;border-bottom:1px solid ${C.tinta};">${t}</th>`
+    `<th${ancho ? ` width="${ancho}"` : ''} style="${ancho ? `width:${ancho}px;` : ''}text-align:${alinear};white-space:nowrap;font-weight:600;color:${C.sec};font-size:${ROTULO};letter-spacing:.07em;text-transform:uppercase;padding:0 6px 5px 0;border-bottom:1px solid ${C.tinta};">${small(negrita(t))}</th>`
   const filas = lista
     .map((r) => {
       const comun = (r.nombreComun ?? '').trim()
@@ -189,7 +189,7 @@ function htmlRepuestos(e: EventoBitacora): string {
     })
     .join('')
   return (
-    `<div style="font-size:${ROTULO};font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:${C.sec};padding:12px 0 6px;">Repuestos usados</div>` +
+    `<div style="font-size:${ROTULO};font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:${C.sec};padding:12px 0 6px;">${small(negrita('Repuestos usados'))}</div>` +
     // Sin `width:100%`: el compositor de Outlook en el iPhone lo convierte en píxeles al pegar
     // (652 px) y el teléfono encoge el correo entero para que quepa (prueba de Orel, 23-09-2026).
     `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-family:${FUENTE};font-size:${SEC};color:${C.tinta};">` +
@@ -222,15 +222,15 @@ function htmlEvento(e: EventoBitacora, numero: number, fuente: (f: FotoEvento) =
   // `valign` como ATRIBUTO además del estilo: es lo único que Word conserva al pegar.
   const celda = `vertical-align:top;padding:14px 0;border-bottom:1px solid ${RAYA};font-family:${FUENTE};color:${C.tinta};`
   return (
-    `<tr><td width="28" valign="top" style="width:28px;${celda}font-size:${TEXTO};line-height:1.5;color:${pendiente ? C.pendBorde : C.sec};font-variant-numeric:tabular-nums;">${numero}</td>` +
+    `<tr><td width="28" valign="top" style="width:28px;${celda}font-size:${TEXTO};line-height:1.5;color:${pendiente ? C.pendBorde : C.sec};font-variant-numeric:tabular-nums;">${negrita(String(numero))}</td>` +
     `<td valign="top" style="${celda}">` +
-    `<div style="font-size:${TEXTO};line-height:1.5;font-weight:600;">${escaparHtml(principal)}</div>` +
+    `<div style="font-size:${TEXTO};line-height:1.5;font-weight:600;">${negrita(escaparHtml(principal))}</div>` +
     (equipo && titulo ? `<div style="font-size:${TEXTO};line-height:1.5;">${escaparHtml(titulo)}</div>` : '') +
-    `<div style="font-size:${SEC};line-height:1.5;color:${C.sec};font-variant-numeric:tabular-nums;">${escaparHtml(meta)}</div>` +
+    `<div style="font-size:${SEC};line-height:1.5;color:${C.sec};font-variant-numeric:tabular-nums;">${small(escaparHtml(meta))}</div>` +
     htmlImpacto(e) +
     (e.descripcion?.trim() ? `<div style="font-size:${TEXTO};line-height:1.5;padding-top:6px;">${conSaltos(e.descripcion)}</div>` : '') +
     htmlRepuestos(e) +
-    (tecnicos.length ? `<div style="font-size:${SEC};line-height:1.5;color:${C.sec};padding-top:8px;">Técnicos: ${escaparHtml(tecnicos.join(', '))}</div>` : '') +
+    (tecnicos.length ? `<div style="font-size:${SEC};line-height:1.5;color:${C.sec};padding-top:8px;">${small(`Técnicos: ${escaparHtml(tecnicos.join(', '))}`)}</div>` : '') +
     htmlFotos(e.fotos ?? [], fuente) +
     `</td></tr>`
   )
@@ -276,7 +276,7 @@ export function bitacoraAHtmlCorreo(datos: DatosCorreoBitacora): string {
   // 30» (Orel, 21-09-2026). No era la letra, era el ancho.
   const recoleccion = eventos.length
     ? `<div style="max-width:680px;${TEXTO_FIJO}">${htmlRecoleccionMttr(filasRecoleccion(datos.turno, eventos))}` +
-      `<div style="font-family:${FUENTE};font-size:${SEC};line-height:1.5;color:${C.sec};padding-top:6px;">${escaparHtml(explicacionMtbfMttr(datos.turno, r))}</div>` +
+      `<div style="font-family:${FUENTE};font-size:${SEC};line-height:1.5;color:${C.sec};padding-top:6px;">${small(escaparHtml(explicacionMtbfMttr(datos.turno, r)))}</div>` +
       `<div style="height:14px;line-height:14px;">&nbsp;</div></div>`
     : ''
   return recoleccion + cuerpoBitacoraHtml(datos)
@@ -314,11 +314,11 @@ export function cuerpoBitacoraHtml({ turno, eventos: todos, tecnicos, planta, ob
 
   const encabezado =
     `<div style="font-family:${FUENTE};font-size:${ROTULO};font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:${C.sec};">` +
-    `Bitácora de Mantención · ${escaparHtml(planta)}</div>` +
+    `${small(negrita(`Bitácora de Mantención · ${escaparHtml(planta)}`))}</div>` +
     `<div style="font-family:${FUENTE};font-size:${TITULO};font-weight:600;line-height:1.2;color:${C.tinta};padding-top:4px;">` +
-    `${escaparHtml(etiquetaTurno(turno))} · ${escaparHtml(capitalizarPrimera(fechaTurnoLarga(turno)))}</div>` +
+    `${negrita(`${escaparHtml(etiquetaTurno(turno))} · ${escaparHtml(capitalizarPrimera(fechaTurnoLarga(turno)))}`)}</div>` +
     `<div style="font-family:${FUENTE};font-size:${SEC};line-height:1.5;color:${C.sec};padding-top:4px;">` +
-    `${escaparHtml(horarioTurno(turno).replace('–', 'a'))}${tecnicos.length ? ` · Técnicos de turno: ${escaparHtml(tecnicos.join(', '))}` : ''}</div>`
+    `${small(`${escaparHtml(horarioTurno(turno).replace('–', 'a'))}${tecnicos.length ? ` · Técnicos de turno: ${escaparHtml(tecnicos.join(', '))}` : ''}`)}</div>`
 
   // Lo que escribió quien entrega el turno va como texto bajo su rótulo, no en un recuadro
   // gris con barra a la izquierda (el tic n.º 1 del estándar).
