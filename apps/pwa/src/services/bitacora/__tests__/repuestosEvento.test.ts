@@ -107,11 +107,11 @@ describe('repuestos usados', () => {
 
   it('sale en el correo, el texto plano, WhatsApp y la clave de la lámina', () => {
     const html = bitacoraAHtmlCorreo(datos([ev()]))
-    // Correo 17-09: equipo arriba, N° de equipo en la línea de abajo y repuestos en tabla.
-    expect(html).toContain('>EVISCERADORA BAADER 142 N2</b></div>')
-    // La hora abre la línea de datos del evento (ya no es una tercera celda: en el teléfono
-    // se llevaba un cuarto del ancho).
-    expect(html).toContain('21:15 – 21:30 · Falla · N° de equipo 720004447')
+    // Correo 23-09: cada evento es una tabla con cabecera celeste (número · equipo · hora) y
+    // el N° de equipo en la línea de datos del desglose; repuestos en tabla.
+    expect(html).toContain('>EVISCERADORA BAADER 142 N2</b></td>')
+    expect(html).toMatch(/bgcolor="#BDD7EE"[^>]*><small>21:15 – 21:30<\/small><\/td>/)
+    expect(html).toContain('<small>Falla · N° de equipo 720004447</small>')
     expect(html).toContain('Repuestos usados</b></small></div><table')
     expect(html).toMatch(/>3300011612<\/td><td[^>]*>Soporte sección 519437<\/td><td[^>]*>1<\/td>/)
     expect(html).toMatch(/>3300011654<\/td><td[^>]*>Anillo 31000251<\/td><td[^>]*>2<\/td>/)

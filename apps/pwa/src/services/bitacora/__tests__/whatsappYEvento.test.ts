@@ -136,9 +136,10 @@ describe('título y «Sin hora»', () => {
 
   it('el correo y el texto plano no dejan un « · » suelto cuando no hay hora', () => {
     const e = ev({ horaInicio: '', horaTermino: null, titulo: 'Cambio de tubos' })
-    // Correo 17-09: el equipo arriba (sin hora, sin columna de hora) y el título debajo.
+    // Correo 23-09: el equipo en la cabecera celeste (sin hora: sin celda de hora, dos
+    // columnas) y el título abre el desglose.
     const html = bitacoraAHtmlCorreo(datos([e]))
-    expect(html).toMatch(/>CASINO<\/b><\/div><div style="[^"]*">Cambio de tubos<\/div>/)
+    expect(html).toMatch(/>CASINO<\/b><\/td><\/tr><tr><td colspan="2"[^>]*><div style="[^"]*">Cambio de tubos<\/div>/)
     expect(html).not.toContain('> · ')
     const plano = bitacoraATextoPlano(datos([e]))
     expect(plano).toContain('\nCASINO · Cambio de tubos\n')
