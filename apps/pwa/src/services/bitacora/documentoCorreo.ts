@@ -104,8 +104,10 @@ export const negrita = (html: string) => `<b>${html}</b>`
 /** El encabezado de una sección: un rótulo, y 28 px de aire encima. Nunca una banda de color. */
 export function seccion(titulo: string, cantidad?: number): string {
   return (
+    // Filete encima del rótulo: el aire (28 px) separa donde el pegado respeta el formato; la
+    // línea separa también donde lo aplana todo (Orel, 23-09-2026: «que no parezca un párrafo»).
     `<div style="font-family:${FUENTE};font-size:${ROTULO};font-weight:600;letter-spacing:.09em;` +
-    `text-transform:uppercase;color:${C.sec};margin-top:28px;">${small(negrita(escaparHtml(titulo)))}` +
+    `text-transform:uppercase;color:${C.sec};margin-top:28px;padding-top:10px;border-top:1px solid ${C.linea};">${small(negrita(escaparHtml(titulo)))}` +
     (cantidad != null ? ` ${small(`<span style="color:${C.tinta};">${cantidad}</span>`)}` : '') +
     `</div>`
   )

@@ -11,6 +11,13 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 - Sigue: ...
 ```
 
+## 2026-09-23 · Claude · Correo de bitácora: pulido de estructura (ronda 4)
+- Hecho: cinco ajustes para que cada elemento quede separado y legible en cualquier compositor. Planilla MTTR: «Falla» se corta en palabra completa y «Observaciones» dice solo qué se hizo y si quedó pendiente (los repuestos con SAP y el impacto se leen en el detalle). Rótulo de foto solo cuando es Antes/Después. Evento sin equipo ni título ya no repite el tipo («Mejora / Mejora»). Filete sobre el rótulo de cada sección (aguanta el pegado que aplana). Línea «MTTR x · MTBF y» en negrita antes de la explicación.
+- Archivos: services/bitacora/{documentoCorreo,bitacoraCorreo,recoleccionMttr}.ts + recoleccionMttr.test.ts.
+- Verificación: vitest 306/306, tsc, eslint; render normal y «aplanado» simulado lado a lado.
+- Estado: EN REVISIÓN (PR)
+- Sigue: test 5 de Orel desde el PC del trabajo. Descartado: 3 fotos por fila en PC (3×156 supera los 351 px del teléfono).
+
 ## 2026-09-23 · Claude · Correo de bitácora: jerarquía que sobrevive al pegado que aplana
 - Hecho: el Outlook nuevo con «Combinar formato» (predeterminado en cualquier PC ajeno) borra todo font-size/color al pegar; solo respeta <b>, <i>, <small> y fondos de celda (medido en Outlook web). Ahora cada nivel lleva doble señal: título en <b>, secundarios en <small>, cifras en <b> + <small>; cabecera de la planilla celeste con texto tinta (blanco sobre azul quedaba negro sobre azul). Texto de ayuda del panel Correo actualizado.
 - Archivos: services/bitacora/{documentoCorreo,bitacoraCorreo,recoleccionMttr}.ts, pages/BitacoraTurnoPage.tsx + 5 tests.

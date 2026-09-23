@@ -52,13 +52,14 @@ describe('planilla «Recoleccion MTTR» llenada desde la bitácora', () => {
       ev({ id: 'd', horaInicio: '14:00', horaTermino: null, impacto: 'no-aplica', minutosParada: null, pendiente: true, equipo: 'ENZUNCHADORA TP-6000', descripcion: 'Motor con ruido.' }),
     ])
     expect(conTitulo).toMatchObject({ maquina: 'DESPLAZADOR AUTOMATICO 1', falla: 'Cable de parada de emergencia', duracion: '35min', minutos: 35 })
-    expect(conTitulo!.observaciones).toContain('Repuestos: 3300011612 Soporte sección 519437 ×1.')
+    // Los repuestos ya no van en Observaciones (viven en el detalle del correo): la celda dice qué se hizo.
+    expect(conTitulo!.observaciones).not.toContain('Repuestos:')
     expect(sinTitulo!.falla).toBe('Se encontró cable de señal que va a parada de emergencia en mal estado')
     // Sin título, «Falla» ya lleva la primera frase: Observaciones sigue con el resto.
     expect(sinTitulo!.observaciones).toBe('Se realiza reconexión de equipo.')
     expect(sinTitulo!.duracion).toBe('20min')
     expect(sinParada).toMatchObject({ duracion: '0', minutos: 0, falla: 'Se recalibra la celda' })
-    expect(sinParada!.observaciones).toBe('Sin detener: Colación HG.')
+    expect(sinParada!.observaciones).toBe('')
     // El pendiente va al final, como en el correo, y lo dice.
     expect(pendiente).toMatchObject({ falla: 'Motor con ruido', observaciones: 'Queda pendiente para el turno siguiente.' })
     // Si la descripción repite el título, Observaciones no la repite (celular apretado).
