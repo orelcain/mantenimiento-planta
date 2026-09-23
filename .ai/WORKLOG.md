@@ -11,6 +11,13 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 - Sigue: ...
 ```
 
+## 2026-09-23 · Claude · Correo de bitácora: sobrevivir al pegado desde el iPhone
+- Hecho: el compositor de Outlook iOS reescribe el HTML al pegar (estilos calculados, sin atributos, sin imágenes remotas). Tablas sin `width:100%` (las fijaba a 680 px), colores de la planilla por tres vías (`background-color`, `bgcolor`, `<font color>`) porque borraba el blanco de los títulos y las bandas celestes.
+- Archivos: services/bitacora/{bitacoraCorreo,recoleccionMttr}.ts + test.
+- Verificación: vitest 306/306, tsc, eslint; render 390/900. Pendiente: pegar de nuevo desde iPhone (normal e «incrustadas») y desde PC.
+- Estado: EN REVISIÓN (PR)
+- Sigue: si el iPhone sigue botando las fotos, el camino es que la app MANDE el correo (Graph) o adjunte el PDF.
+
 ## 2026-09-23 · Claude · Correo de bitácora que quepa en el celular
 - Hecho: fotos de a dos de 156 px, evento en dos celdas con la hora en la línea de datos, cifras de a tres, planilla MTTR de un día sin columna Fecha (la fecha va en la banda). Causa: el teléfono encoge el correo al elemento más ancho (≈650 px fijos contra 351 útiles) y Word borra `vertical-align` (sobrevive `valign`).
 - Archivos: services/bitacora/{bitacoraCorreo,documentoCorreo,recoleccionMttr}.ts + 4 tests.
