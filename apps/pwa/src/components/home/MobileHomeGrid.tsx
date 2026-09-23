@@ -156,6 +156,17 @@ const GROUPS: Record<UserRole, TileGroup[]> = {
   ],
 
   admin: [
+    // Análisis y monitoreo arriba de Operaciones (Orel, 22-09): es lo que más
+    // se abre en el día y el monitor queda a un toque sin desplazar.
+    {
+      label: 'Análisis y monitoreo',
+      tiles: [
+        { id: 'grader',   label: 'Análisis de turno', sublabel: '',                icon: BarChart3, href: '/analisis-grader', color: 'blue', children: LINEAS_ANALISIS },
+        { id: 'sensores', label: 'Sensores',       sublabel: 'Tiempo real',        icon: Activity,  href: '/sensors/monitor', color: 'green',  wip: true },
+        { id: 'mapa',     label: 'Mapa de planta',   sublabel: 'Zonas',              icon: Map,       href: '/map',             color: 'emerald' },
+        { id: 'clima',    label: 'Clima del puerto',  sublabel: 'Condiciones',        icon: CloudSun,  href: '/clima-puerto',    color: 'slate'   },
+      ],
+    },
     {
       label: 'Operaciones',
       tiles: [
@@ -171,15 +182,6 @@ const GROUPS: Record<UserRole, TileGroup[]> = {
         { id: 'inspecc',   label: 'Inspecciones',  sublabel: 'Rondas',           icon: ClipboardList, href: '/inspections', color: 'amber',  wip: true },
         { id: 'prevntv',   label: 'Preventivo',    sublabel: 'Plan mantención',  icon: CalendarClock, href: '/preventive',  color: 'amber',  wip: true },
         { id: 'gantt',     label: 'Gantt',         sublabel: 'Planificador',     icon: TrendingUp,    href: '/gantt',       color: 'orange', wip: true },
-      ],
-    },
-    {
-      label: 'Análisis y monitoreo',
-      tiles: [
-        { id: 'grader',   label: 'Análisis de turno', sublabel: '',                icon: BarChart3, href: '/analisis-grader', color: 'blue', children: LINEAS_ANALISIS },
-        { id: 'sensores', label: 'Sensores',       sublabel: 'Tiempo real',        icon: Activity,  href: '/sensors/monitor', color: 'green',  wip: true },
-        { id: 'mapa',     label: 'Mapa de planta',   sublabel: 'Zonas',              icon: Map,       href: '/map',             color: 'emerald' },
-        { id: 'clima',    label: 'Clima del puerto',  sublabel: 'Condiciones',        icon: CloudSun,  href: '/clima-puerto',    color: 'slate'   },
       ],
     },
     {
