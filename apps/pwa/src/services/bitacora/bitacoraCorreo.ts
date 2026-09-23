@@ -2,7 +2,7 @@ import { ETIQUETA_FOTO } from '@/config/bitacora'
 import { autorVisible, tecnicosDelEvento, type EventoBitacora, type FotoEvento, type TurnoMantencion } from './bitacora.types'
 import { fuePendiente, gruposDelTurno, minutosParadaDe, ordenarEventos, resumirBitacora } from './resumenBitacora'
 import { filasRecoleccion, htmlRecoleccionMttr, textoRecoleccionMttr } from './recoleccionMttr'
-import { explicacionMtbfMttr } from './mtbf'
+import { explicacionMtbfMttr, mtbfDelTurno } from './mtbf'
 import { soloListos } from './borradores'
 import { etiquetaTurno, fechaTurnoLarga, formatoMinutos, horarioTurno } from './turnoMantencion'
 import { etiquetaCortaTurno } from './entregaTurno'
@@ -135,7 +135,8 @@ export function htmlFotos(fotos: readonly FotoEvento[], fuente: (f: FotoEvento) 
         `<td valign="top" style="padding:8px 8px 0 0;vertical-align:top;">` +
         `<img src="${escaparHtml(fuente(f))}" width="${w}"${h == null ? '' : ` height="${h}"`} alt="${escaparHtml(ETIQUETA_FOTO[f.etiqueta])}" ` +
         `style="display:block;width:${w}px;${h == null ? '' : `height:${h}px;`}border:0;border-radius:4px;">` +
-        `<div style="font-family:${FUENTE};font-size:12px;color:${C.sec};padding-top:2px;">${small(escaparHtml(ETIQUETA_FOTO[f.etiqueta]))}</div>` +
+        // «Foto» debajo de cada foto era ruido; solo «Antes» y «Después» dicen algo.
+        (f.etiqueta === 'foto' ? '' : `<div style="font-family:${FUENTE};font-size:12px;color:${C.sec};padding-top:2px;">${small(escaparHtml(ETIQUETA_FOTO[f.etiqueta]))}</div>`) +
         `</td>`
       )
     })
@@ -215,7 +216,9 @@ function htmlEvento(e: EventoBitacora, numero: number, fuente: (f: FotoEvento) =
   // en el teléfono esa columna se llevaba un cuarto del ancho para dos cifras, y como Word
   // borra `vertical-align` del estilo, la hora (y el número) flotaban a media altura del
   // evento (correo del 23-09-2026 en el celular de Orel).
-  const meta = [hora, etiquetaTipo(e), cod ? `${/^\d+$/.test(cod) ? 'N° de equipo' : 'Ubicación técnica'} ${cod}` : ''].filter(Boolean).join(' · ')
+  // Sin equipo ni título, el tipo ya es el título: no se repite en la línea de datos («Mejora /
+  // Mejora», correo del 23-09-2026).
+  const meta = [hora, equipo || titulo ? etiquetaTipo(e) : '', cod ? `${/^\d+$/.test(cod) ? 'N° de equipo' : 'Ubicación técnica'} ${cod}` : ''].filter(Boolean).join(' · ')
   const tecnicos = tecnicosDelEvento(e)
   // Una sola fila de DOS celdas (número · contenido), sin tablas anidadas: Word (el motor de
   // Outlook) no respeta el 100 % de una tabla dentro de una celda (foto de Orel, 17-09).
@@ -262,6 +265,14 @@ export function repuestosDistintos(eventos: readonly EventoBitacora[]): number {
   return new Set(eventos.flatMap((e) => normalizarRepuestos(e.repuestos).map((r) => r.codigoSAP))).size
 }
 
+/** «MTTR 40 min · MTBF 5 h 35 min» en una línea legible; la fórmula queda en pequeño debajo. */
+function lineaMtbfMttr(turno: TurnoMantencion, r: ReturnType<typeof resumirBitacora>): string {
+  if (!r.fallas) return ''
+  const valorMtbf = mtbfDelTurno(turno, r)
+  const partes = [`MTTR ${r.mttrMin == null ? '—' : formatoMinutos(r.mttrMin)}`, `MTBF ${valorMtbf == null ? '—' : formatoMinutos(valorMtbf)}`]
+  return `<div style="font-family:${FUENTE};font-size:${TEXTO};line-height:1.5;color:${C.tinta};padding-top:8px;">${negrita(escaparHtml(partes.join(' · ')))}</div>`
+}
+
 export function bitacoraAHtmlCorreo(datos: DatosCorreoBitacora): string {
   const eventos = soloListos(datos.eventos)
   const r = resumirBitacora(eventos)
@@ -276,7 +287,8 @@ export function bitacoraAHtmlCorreo(datos: DatosCorreoBitacora): string {
   // 30» (Orel, 21-09-2026). No era la letra, era el ancho.
   const recoleccion = eventos.length
     ? `<div style="max-width:680px;${TEXTO_FIJO}">${htmlRecoleccionMttr(filasRecoleccion(datos.turno, eventos))}` +
-      `<div style="font-family:${FUENTE};font-size:${SEC};line-height:1.5;color:${C.sec};padding-top:6px;">${small(escaparHtml(explicacionMtbfMttr(datos.turno, r)))}</div>` +
+      lineaMtbfMttr(datos.turno, r) +
+      `<div style="font-family:${FUENTE};font-size:${SEC};line-height:1.5;color:${C.sec};padding-top:2px;">${small(escaparHtml(explicacionMtbfMttr(datos.turno, r)))}</div>` +
       `<div style="height:14px;line-height:14px;">&nbsp;</div></div>`
     : ''
   return recoleccion + cuerpoBitacoraHtml(datos)

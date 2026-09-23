@@ -2,7 +2,7 @@ import type { EventoBitacora, TurnoMantencion } from './bitacora.types'
 import { soloListos } from './borradores'
 import { compartirOBajarArchivo } from './compartirArchivo'
 import { LOGO_RECOLECCION_DATA_URI } from './logoRecoleccion'
-import { etiquetaTipo, nombreConComun, normalizarRepuestos, tituloDe } from './presentacionEvento'
+import { etiquetaTipo, tituloDe } from './presentacionEvento'
 import { gruposDelTurno, minutosParadaDe } from './resumenBitacora'
 import { etiquetaTurno, turnoDesdeId } from './turnoMantencion'
 
@@ -52,7 +52,15 @@ function fallaDe(e: EventoBitacora): string {
   if (titulo) return titulo
   // La planilla lleva la falla en pocas palabras.
   const { frase } = primeraFrase(e.descripcion ?? '')
-  return frase ? (frase.length > 70 ? `${frase.slice(0, 67).trimEnd()}…` : frase) : etiquetaTipo(e)
+  return frase ? recortarEnPalabra(frase, 70) : etiquetaTipo(e)
+}
+
+/** Corta en la última palabra completa que cabe; «…que indica que se…» a mitad de palabra se veía descuidado. */
+export function recortarEnPalabra(texto: string, largo: number): string {
+  const t = texto.trim().replace(/\s+/g, ' ')
+  if (t.length <= largo) return t
+  const corte = t.lastIndexOf(' ', largo - 1)
+  return `${t.slice(0, corte > largo / 2 ? corte : largo - 1).trimEnd()}…`
 }
 
 function observacionesDe(e: EventoBitacora): string {
@@ -65,13 +73,10 @@ function observacionesDe(e: EventoBitacora): string {
       ? ''
       : descripcion
     : primeraFrase(e.descripcion ?? '').resto
-  const partes = [texto]
-  const repuestos = normalizarRepuestos(e.repuestos)
-  if (repuestos.length) partes.push(`Repuestos: ${repuestos.map((r) => `${r.codigoSAP} ${nombreConComun(r)} ×${r.cantidad}`.replace(/\s+×/, ' ×')).join('; ')}.`)
-  if (e.impacto === 'afecta-sin-detener') {
-    partes.push(e.contingencia?.trim() ? `Afectó sin detener: ${e.contingencia.trim()}.` : 'Afectó sin detener la producción.')
-  }
-  if (e.impacto === 'en-ventana') partes.push(e.ventana?.trim() ? `Sin detener: ${e.ventana.trim()}.` : 'Sin detener producción.')
+  // Observaciones dice QUÉ SE HIZO y si quedó pendiente. Los repuestos con código SAP y el
+  // impacto iban también aquí y la celda se volvía un párrafo (correo del 23-09-2026); viven
+  // en el detalle de abajo, que es donde se leen bien. Tope de 220 caracteres en palabra completa.
+  const partes = [texto ? recortarEnPalabra(texto, 220) : '']
   if (e.pendiente) partes.push('Queda pendiente para el turno siguiente.')
   return partes.filter(Boolean).join(' ')
 }
