@@ -11,6 +11,13 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 - Sigue: ...
 ```
 
+## 2026-09-23 · Claude · Correo de bitácora: dos bloques y eventos en tabla (ronda 5)
+- Hecho: la bitácora abre con su propia banda azul («Bitácora de Mantención · Planta»), la misma de la planilla, y entre los dos bloques va aire + raya de tinta. Cada evento es una tabla propia con cabecera celeste (número · equipo · hora a la derecha) y el desglose debajo (tipo y N° de equipo, impacto, texto, repuestos, técnicos, fotos). Opción A del mockup elegida por Orel.
+- Archivos: services/bitacora/bitacoraCorreo.ts + 3 tests (estandar, repuestosEvento, whatsappYEvento).
+- Verificación: vitest 306/306, tsc, eslint; render Playwright a 760 px normal, «aplanado» simulado y 375 px (el desglose mide 350 px con dos fotos: cabe en el teléfono).
+- Estado: EN REVISIÓN (PR)
+- Sigue: test 5 de Orel desde el PC del trabajo.
+
 ## 2026-09-23 · Claude · Correo de bitácora: pulido de estructura (ronda 4)
 - Hecho: cinco ajustes para que cada elemento quede separado y legible en cualquier compositor. Planilla MTTR: «Falla» se corta en palabra completa y «Observaciones» dice solo qué se hizo y si quedó pendiente (los repuestos con SAP y el impacto se leen en el detalle). Rótulo de foto solo cuando es Antes/Después. Evento sin equipo ni título ya no repite el tipo («Mejora / Mejora»). Filete sobre el rótulo de cada sección (aguanta el pegado que aplana). Línea «MTTR x · MTBF y» en negrita antes de la explicación.
 - Archivos: services/bitacora/{documentoCorreo,bitacoraCorreo,recoleccionMttr}.ts + recoleccionMttr.test.ts.

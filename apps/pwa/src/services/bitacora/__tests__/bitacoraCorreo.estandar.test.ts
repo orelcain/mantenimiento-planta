@@ -116,8 +116,13 @@ describe('el correo de turno sigue el estándar del correo', () => {
     expect(html).toContain('width="156"')
     // Seis cifras vivas (eventos, parada, MTTR, afectados, ventana, pendientes) → dos filas.
     expect((html.match(/<tr><td valign="top" style="padding:0 34px/g) ?? []).length).toBe(2)
-    // La hora abre la línea de datos, sin columna propia.
-    expect(html).toContain('09:30 – 10:05 · Correctivo')
+    // La hora va a la derecha de la cabecera celeste del evento; la tabla del evento lleva el
+    // marco, no las celdas (regla 3 del estándar: nada de rejas).
+    expect(html).toMatch(/bgcolor="#BDD7EE"[^>]*><small>09:30 – 10:05<\/small><\/td><\/tr>/)
+    expect(html).toContain('<small>Correctivo · N° de equipo 720004411</small>')
+    // Dos bloques: la bitácora abre con su banda azul, la misma de la planilla.
+    expect(html).toContain('bgcolor="#00557F"')
+    expect(html).toContain('<font color="#FFFFFF"><b>Bitácora de Mantención</b>')
   })
 
   it('termina donde termina la entrega: sin pie de «generado con»', () => {
