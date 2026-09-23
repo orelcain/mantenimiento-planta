@@ -53,8 +53,12 @@ export interface DatosCorreoBitacora {
   fuenteFoto?: (foto: FotoEvento) => string
 }
 
-// 2 fotos por fila en 540 px: caben en la columna de vista previa y en cualquier cuerpo de correo.
-const ANCHO_FOTO = 260
+// Dos fotos por fila que quepan en un TELÉFONO: 2 × 156 + 8 de aire + 28 del número = 348 px,
+// y el cuerpo de un correo en Outlook/Mail móvil mide ~351. Iban de 260 (2 × 260 = 536 px):
+// como el correo no puede llevar reglas «solo móvil» (Word las borra al pegar), el teléfono
+// ENCOGÍA todo el correo para que cupiera la fila de fotos y el texto se leía diminuto
+// (correo del 23-09-2026 en el celular de Orel). En PC se ven más chicas, pero se tocan.
+const ANCHO_FOTO = 156
 const conSaltos = (t: string) => escaparHtml(t.trim()).replace(/\r?\n/g, '<br>')
 
 export function capitalizarPrimera(t: string): string {
@@ -127,7 +131,8 @@ export function htmlFotos(fotos: readonly FotoEvento[], fuente: (f: FotoEvento) 
     const celdas = lista.slice(i, i + 2).map((f) => {
       const { w, h } = dimensionesFoto(f)
       return (
-        `<td style="padding:8px 8px 0 0;vertical-align:top;">` +
+        // `valign` como ATRIBUTO: Word borra `vertical-align` del estilo al pegar.
+        `<td valign="top" style="padding:8px 8px 0 0;vertical-align:top;">` +
         `<img src="${escaparHtml(fuente(f))}" width="${w}"${h == null ? '' : ` height="${h}"`} alt="${escaparHtml(ETIQUETA_FOTO[f.etiqueta])}" ` +
         `style="display:block;width:${w}px;${h == null ? '' : `height:${h}px;`}border:0;border-radius:4px;">` +
         `<div style="font-family:${FUENTE};font-size:12px;color:${C.sec};padding-top:2px;">${escaparHtml(ETIQUETA_FOTO[f.etiqueta])}</div>` +
@@ -204,27 +209,28 @@ function htmlEvento(e: EventoBitacora, numero: number, fuente: (f: FotoEvento) =
   const principal = equipo || titulo || etiquetaTipo(e)
   const hora = horarioEvento(e)
   const cod = codigoEquipoDe(e)
-  const meta = [etiquetaTipo(e), cod ? `${/^\d+$/.test(cod) ? 'N° de equipo' : 'Ubicación técnica'} ${cod}` : ''].filter(Boolean).join(' · ')
+  // La hora abre la línea de datos del evento. Iba en una tercera celda de 96 px a la derecha:
+  // en el teléfono esa columna se llevaba un cuarto del ancho para dos cifras, y como Word
+  // borra `vertical-align` del estilo, la hora (y el número) flotaban a media altura del
+  // evento (correo del 23-09-2026 en el celular de Orel).
+  const meta = [hora, etiquetaTipo(e), cod ? `${/^\d+$/.test(cod) ? 'N° de equipo' : 'Ubicación técnica'} ${cod}` : ''].filter(Boolean).join(' · ')
   const tecnicos = tecnicosDelEvento(e)
-  // Una sola fila de TRES celdas (número · contenido · hora), sin tablas anidadas:
-  // Word (el motor de Outlook) no respeta el 100 % de una tabla dentro de una
-  // celda, y al pegar la hora caía donde terminaba el texto y cada evento se
-  // corría más a la derecha que el anterior (foto de Orel, 17-09).
+  // Una sola fila de DOS celdas (número · contenido), sin tablas anidadas: Word (el motor de
+  // Outlook) no respeta el 100 % de una tabla dentro de una celda (foto de Orel, 17-09).
+  // `valign` como ATRIBUTO además del estilo: es lo único que Word conserva al pegar.
   const celda = `vertical-align:top;padding:14px 0;border-bottom:1px solid ${RAYA};font-family:${FUENTE};color:${C.tinta};`
   return (
-    `<tr><td width="36" style="width:36px;${celda}font-size:${TEXTO};line-height:1.5;color:${pendiente ? C.pendBorde : C.sec};font-variant-numeric:tabular-nums;">${numero}</td>` +
-    `<td style="${celda}">` +
+    `<tr><td width="28" valign="top" style="width:28px;${celda}font-size:${TEXTO};line-height:1.5;color:${pendiente ? C.pendBorde : C.sec};font-variant-numeric:tabular-nums;">${numero}</td>` +
+    `<td valign="top" style="${celda}">` +
     `<div style="font-size:${TEXTO};line-height:1.5;font-weight:600;">${escaparHtml(principal)}</div>` +
     (equipo && titulo ? `<div style="font-size:${TEXTO};line-height:1.5;">${escaparHtml(titulo)}</div>` : '') +
-    `<div style="font-size:${SEC};line-height:1.5;color:${C.sec};">${escaparHtml(meta)}</div>` +
+    `<div style="font-size:${SEC};line-height:1.5;color:${C.sec};font-variant-numeric:tabular-nums;">${escaparHtml(meta)}</div>` +
     htmlImpacto(e) +
     (e.descripcion?.trim() ? `<div style="font-size:${TEXTO};line-height:1.5;padding-top:6px;">${conSaltos(e.descripcion)}</div>` : '') +
     htmlRepuestos(e) +
     (tecnicos.length ? `<div style="font-size:${SEC};line-height:1.5;color:${C.sec};padding-top:8px;">Técnicos: ${escaparHtml(tecnicos.join(', '))}</div>` : '') +
     htmlFotos(e.fotos ?? [], fuente) +
-    `</td>` +
-    `<td width="96" style="width:96px;${celda}padding-left:12px;text-align:right;white-space:nowrap;font-size:${TEXTO};line-height:1.5;font-weight:600;font-variant-numeric:tabular-nums;">${escaparHtml(hora)}</td>` +
-    `</tr>`
+    `</td></tr>`
   )
 }
 

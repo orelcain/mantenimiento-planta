@@ -11,6 +11,13 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 - Sigue: ...
 ```
 
+## 2026-09-23 · Claude · Correo de bitácora que quepa en el celular
+- Hecho: fotos de a dos de 156 px, evento en dos celdas con la hora en la línea de datos, cifras de a tres, planilla MTTR de un día sin columna Fecha (la fecha va en la banda). Causa: el teléfono encoge el correo al elemento más ancho (≈650 px fijos contra 351 útiles) y Word borra `vertical-align` (sobrevive `valign`).
+- Archivos: services/bitacora/{bitacoraCorreo,documentoCorreo,recoleccionMttr}.ts + 4 tests.
+- Verificación: vitest 306/306, tsc, eslint; render a 390/680 px con Playwright. Falta la prueba real: correo del turno abierto en el teléfono.
+- Estado: EN REVISIÓN (PR)
+- Sigue: si en el teléfono sigue apretada la planilla, evaluar quitarla del cuerpo (va adjunta en .xlsx).
+
 > **Compactado el 2026-09-17** (tercera vez; las anteriores fueron el 2026-07-30 y el 2026-08-18).
 > - **Enteras, arriba y la más nueva primero:** las entradas del 2026-09-15 en adelante.
 > - **Resumidas por tema** (gotchas, causas raíz, decisiones con su porqué, cifras y pendientes):

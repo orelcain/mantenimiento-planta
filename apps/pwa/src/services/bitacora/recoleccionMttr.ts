@@ -131,6 +131,8 @@ const GRIS = '#F2F2F2'
 // pantalla y los anchos fijos dejaban a Observaciones sin espacio (revisión 17-09).
 // En PC (≈960 px) dan 115/154/211/96/384 px, cerca de la planilla.
 const ANCHOS = { fecha: 14, maquina: 16, falla: 21, duracion: 9 }
+// Sin la columna Fecha (planilla de un solo día), su ancho se reparte entre las otras.
+const ANCHOS_UN_DIA = { maquina: 20, falla: 26, duracion: 10 }
 
 export function htmlRecoleccionMttr(filas: readonly FilaRecoleccion[], opciones: { logo?: string } = {}): string {
   const logo = opciones.logo ?? LOGO_RECOLECCION_DATA_URI
@@ -141,14 +143,25 @@ export function htmlRecoleccionMttr(filas: readonly FilaRecoleccion[], opciones:
     `<th${ancho ? ` width="${ancho}%"` : ''} style="${ancho ? `width:${ancho}%;` : ''}background:${AZUL};color:#FFFFFF;font-family:${CAL};font-size:9pt;line-height:1.25;font-weight:bold;text-align:center;vertical-align:bottom;padding:3px 5px;">${t}</th>`
   const td = (t: string, i: number, izq = false, nowrap = false) =>
     // TableStyleMedium2 pinta la PRIMERA fila de datos y luego alterna.
-    // `overflow-wrap:anywhere`: en el celular una palabra larga («EMPACADORA») se
-    // montaba sobre la columna vecina en vez de partirse.
-    `<td style="background:${i % 2 ? '#FFFFFF' : BANDA};color:#000000;font-family:${CAL};font-size:9pt;line-height:1.3;text-align:${izq ? 'left' : 'center'};vertical-align:bottom;padding:3px 5px;overflow-wrap:anywhere;word-break:break-word;${nowrap ? 'white-space:nowrap;' : ''}">${escaparHtml(t)}</td>`
+    // `overflow-wrap:break-word`: una palabra larga («EMPACADORA») se parte solo si ella sola
+    // no cabe en la celda. Iba `anywhere` + `word-break`, y en el teléfono «SELLADORA» salía
+    // como «SELLADO / RA» aunque hubiera espacio (correo del 23-09-2026).
+    `<td style="background:${i % 2 ? '#FFFFFF' : BANDA};color:#000000;font-family:${CAL};font-size:9pt;line-height:1.3;text-align:${izq ? 'left' : 'center'};vertical-align:bottom;padding:3px 5px;overflow-wrap:break-word;${nowrap ? 'white-space:nowrap;' : ''}">${escaparHtml(t)}</td>`
+  // Un solo día (el correo del turno): la fecha va en la banda azul y la columna Fecha se
+  // omite. En el teléfono esa columna se llevaba un cuarto de los 351 px para una sola celda
+  // con dato, y «Máquina» quedaba partiendo palabras por letras (correo del 23-09-2026). El
+  // historial abarca varios días y conserva la columna. El Excel adjunto no cambia.
+  const fechas = filas.map((f) => f.fecha).filter(Boolean)
+  const unDia = fechas.length <= 1
+  const fila = (f: FilaRecoleccion, i: number) =>
+    `<tr>${unDia ? '' : td(f.fecha, i, false, true)}${td(f.maquina, i)}${td(f.falla, i)}${td(f.duracion, i, false, true)}${td(f.observaciones, i, true)}</tr>`
   const cuerpo = filas.length
-    ? filas
-        .map((f, i) => `<tr>${td(f.fecha, i)}${td(f.maquina, i)}${td(f.falla, i)}${td(f.duracion, i, false, true)}${td(f.observaciones, i, true)}</tr>`)
-        .join('')
-    : `<tr>${td('', 0, false, true)}${td('', 0)}${td('', 0)}${td('', 0)}${td('', 0, true)}</tr>`
+    ? filas.map(fila).join('')
+    : `<tr>${unDia ? '' : td('', 0, false, true)}${td('', 0)}${td('', 0)}${td('', 0, false, true)}${td('', 0, true)}</tr>`
+  const encabezado = unDia
+    ? `${th('Máquina', ANCHOS_UN_DIA.maquina)}${th('Falla', ANCHOS_UN_DIA.falla)}${th('Duración Falla (Min)', ANCHOS_UN_DIA.duracion)}${th('Observaciones')}`
+    : `${th('Fecha', ANCHOS.fecha)}${th('Máquina', ANCHOS.maquina)}${th('Falla', ANCHOS.falla)}${th('Duración Falla (Min)', ANCHOS.duracion)}${th('Observaciones')}`
+  const titulo = unDia && fechas[0] ? `MTBF - MTTR<span style="font-weight:normal;font-size:9pt;">&nbsp;&nbsp;·&nbsp;&nbsp;${escaparHtml(fechas[0])}</span>` : 'MTBF - MTTR'
   return (
     // La banda va en su propia tabla: con `table-layout:fixed` la primera fila fija
     // los anchos, y la celda del logo (146 px) no debe mandar sobre la columna Fecha.
@@ -157,9 +170,12 @@ export function htmlRecoleccionMttr(filas: readonly FilaRecoleccion[], opciones:
     // el PNG a propósito): 120×28 entra en 40 px con 6 px de aire arriba y abajo.
     `<tr><td width="134" style="width:134px;height:40px;background:${GRIS};padding:0 0 0 12px;vertical-align:middle;">` +
     `<img src="${logo}" width="120" height="28" alt="" style="display:block;width:120px;height:28px;"></td>` +
-    `<td style="background:${AZUL};color:#FFFFFF;font-family:${CAL};font-size:12pt;font-weight:bold;height:40px;padding:0 8px;vertical-align:middle;">MTBF - MTTR</td></tr></table>` +
-    `<table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;table-layout:fixed;width:100%;font-family:${CAL};">` +
-    `<tr>${th('Fecha', ANCHOS.fecha)}${th('Máquina', ANCHOS.maquina)}${th('Falla', ANCHOS.falla)}${th('Duración Falla (Min)', ANCHOS.duracion)}${th('Observaciones')}</tr>` +
+    `<td style="background:${AZUL};color:#FFFFFF;font-family:${CAL};font-size:12pt;font-weight:bold;height:40px;padding:0 8px;vertical-align:middle;white-space:nowrap;">${titulo}</td></tr></table>` +
+    // Sin `table-layout:fixed`: con él, la fecha en una línea se montaba sobre Máquina en el
+    // teléfono. En reparto automático los porcentajes siguen mandando cuando hay ancho (PC) y
+    // la columna cede lo justo cuando no lo hay.
+    `<table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;width:100%;font-family:${CAL};">` +
+    `<tr>${encabezado}</tr>` +
     cuerpo +
     `</table>`
   )
