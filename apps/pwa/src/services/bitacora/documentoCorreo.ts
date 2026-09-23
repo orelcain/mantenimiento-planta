@@ -89,12 +89,24 @@ export function escaparHtml(texto: string | null | undefined): string {
     .replace(/'/g, '&#39;')
 }
 
+/**
+ * Jerarquía que sobrevive al pegado que APLANA. El Outlook nuevo con «Combinar formato» (el
+ * predeterminado en cualquier PC ajeno) borra todo `font-size` y `color` al pegar —medido el
+ * 23-09-2026: h1, h2, `<font size>`, estilos en celdas, todo termina en 16 px negro— y solo
+ * respeta `<b>`, `<i>`, `<small>` y los fondos de celda. Por eso cada nivel del documento lleva
+ * DOS señales: la del estándar (cuerpo y color) y una que el aplanado no puede quitar: el
+ * título en `<b>`, lo secundario en `<small>`, los rótulos en MAYÚSCULA literal. En un pegado
+ * que respeta el formato no se nota; en el que lo borra, el correo sigue teniendo jerarquía.
+ */
+export const small = (html: string) => `<small>${html}</small>`
+export const negrita = (html: string) => `<b>${html}</b>`
+
 /** El encabezado de una sección: un rótulo, y 28 px de aire encima. Nunca una banda de color. */
 export function seccion(titulo: string, cantidad?: number): string {
   return (
     `<div style="font-family:${FUENTE};font-size:${ROTULO};font-weight:600;letter-spacing:.09em;` +
-    `text-transform:uppercase;color:${C.sec};margin-top:28px;">${escaparHtml(titulo)}` +
-    (cantidad != null ? ` <span style="color:${C.tinta};">${cantidad}</span>` : '') +
+    `text-transform:uppercase;color:${C.sec};margin-top:28px;">${small(negrita(escaparHtml(titulo)))}` +
+    (cantidad != null ? ` ${small(`<span style="color:${C.tinta};">${cantidad}</span>`)}` : '') +
     `</div>`
   )
 }
@@ -104,8 +116,8 @@ export function kpi(valor: string, etiqueta: string): string {
   return (
     `<td valign="top" style="padding:0 34px 10px 0;vertical-align:top;font-family:${FUENTE};">` +
     `<div style="font-size:${TITULO};font-weight:600;line-height:1.2;color:${C.tinta};white-space:nowrap;` +
-    `font-variant-numeric:tabular-nums;">${escaparHtml(valor)}</div>` +
-    `<div style="font-size:${SEC};color:${C.sec};padding-top:4px;white-space:nowrap;">${escaparHtml(etiqueta)}</div></td>`
+    `font-variant-numeric:tabular-nums;">${negrita(escaparHtml(valor))}</div>` +
+    `<div style="font-size:${SEC};color:${C.sec};padding-top:4px;white-space:nowrap;">${small(escaparHtml(etiqueta))}</div></td>`
   )
 }
 
@@ -180,9 +192,9 @@ export function encabezadoTabla(columnas: readonly string[]): string {
     `<tr>${columnas
       .map(
         (t) =>
-          `<th align="left" style="padding:8px 12px;background:${BANDA};border-bottom:1px solid ${C.linea};` +
+          `<th align="left" bgcolor="${BANDA}" style="padding:8px 12px;background:${BANDA};border-bottom:1px solid ${C.linea};` +
           `font-family:${FUENTE};font-size:${ROTULO};font-weight:600;letter-spacing:.07em;text-transform:uppercase;` +
-          `color:${C.sec};">${escaparHtml(t)}</th>`,
+          `color:${C.sec};">${small(negrita(escaparHtml(t)))}</th>`,
       )
       .join('')}</tr>`
   )

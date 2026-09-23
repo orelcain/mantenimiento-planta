@@ -11,6 +11,13 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 - Sigue: ...
 ```
 
+## 2026-09-23 · Claude · Correo de bitácora: jerarquía que sobrevive al pegado que aplana
+- Hecho: el Outlook nuevo con «Combinar formato» (predeterminado en cualquier PC ajeno) borra todo font-size/color al pegar; solo respeta <b>, <i>, <small> y fondos de celda (medido en Outlook web). Ahora cada nivel lleva doble señal: título en <b>, secundarios en <small>, cifras en <b> + <small>; cabecera de la planilla celeste con texto tinta (blanco sobre azul quedaba negro sobre azul). Texto de ayuda del panel Correo actualizado.
+- Archivos: services/bitacora/{documentoCorreo,bitacoraCorreo,recoleccionMttr}.ts, pages/BitacoraTurnoPage.tsx + 5 tests.
+- Verificación: vitest 306/306, tsc, eslint; render normal y «aplanado» simulado lado a lado.
+- Estado: EN REVISIÓN (PR)
+- Sigue: test 5 de Orel desde el PC del trabajo (Outlook nuevo con «Combinar formato»).
+
 ## 2026-09-23 · Claude · Correo de bitácora: sobrevivir al pegado desde el iPhone
 - Hecho: el compositor de Outlook iOS reescribe el HTML al pegar (estilos calculados, sin atributos, sin imágenes remotas). Tablas sin `width:100%` (las fijaba a 680 px), colores de la planilla por tres vías (`background-color`, `bgcolor`, `<font color>`) porque borraba el blanco de los títulos y las bandas celestes.
 - Archivos: services/bitacora/{bitacoraCorreo,recoleccionMttr}.ts + test.

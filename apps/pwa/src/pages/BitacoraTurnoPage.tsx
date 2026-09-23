@@ -1557,7 +1557,7 @@ export function BitacoraTurnoVista({
           </div>
           <VistaPreviaCorreo html={htmlCorreo} />
           <p className="px-4 pt-2 text-footnote text-muted-foreground">
-            Outlook clásico: usa «Copiar para correo». Si en Outlook nuevo o web las fotos no aparecen, usa «Copiar con fotos incrustadas».
+            Outlook clásico: usa «Copiar para correo». En Outlook nuevo, web o celular usa «Copiar con fotos incrustadas»; si la letra sale toda igual, pega con «Mantener formato de origen».
           </p>
           </>
           )}

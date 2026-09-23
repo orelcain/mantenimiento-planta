@@ -108,11 +108,11 @@ describe('repuestos usados', () => {
   it('sale en el correo, el texto plano, WhatsApp y la clave de la lámina', () => {
     const html = bitacoraAHtmlCorreo(datos([ev()]))
     // Correo 17-09: equipo arriba, N° de equipo en la línea de abajo y repuestos en tabla.
-    expect(html).toContain('>EVISCERADORA BAADER 142 N2</div>')
+    expect(html).toContain('>EVISCERADORA BAADER 142 N2</b></div>')
     // La hora abre la línea de datos del evento (ya no es una tercera celda: en el teléfono
     // se llevaba un cuarto del ancho).
     expect(html).toContain('21:15 – 21:30 · Falla · N° de equipo 720004447')
-    expect(html).toContain('Repuestos usados</div><table')
+    expect(html).toContain('Repuestos usados</b></small></div><table')
     expect(html).toMatch(/>3300011612<\/td><td[^>]*>Soporte sección 519437<\/td><td[^>]*>1<\/td>/)
     expect(html).toMatch(/>3300011654<\/td><td[^>]*>Anillo 31000251<\/td><td[^>]*>2<\/td>/)
     const conComun = bitacoraAHtmlCorreo(datos([ev({ repuestos: [{ codigoSAP: '3300135877', nombre: 'FILTRO 1/2 PURGA', nombreComun: 'Filtro FRL', cantidad: 1 }] })]))

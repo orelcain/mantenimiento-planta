@@ -126,6 +126,12 @@ export function filasRecoleccionPeriodo(eventos: readonly EventoBitacora[]): Fil
 const CAL = "Calibri,'Segoe UI',sans-serif"
 const AZUL = '#00557F'
 const BANDA = '#D9E1F2'
+// Cabecera de columnas: celeste con texto tinta, y no azul con texto blanco. El pegado que
+// aplana (Outlook nuevo con «Combinar formato», el predeterminado en cualquier PC ajeno)
+// vuelve NEGRO todo el texto y respeta el fondo: blanco sobre azul se leía negro sobre azul
+// (correos del 23-09-2026). Negro sobre celeste se lee en los dos casos.
+const CABECERA = '#BDD7EE'
+const TINTA = '#1F1F1F'
 const GRIS = '#F2F2F2'
 
 export function htmlRecoleccionMttr(filas: readonly FilaRecoleccion[], opciones: { logo?: string } = {}): string {
@@ -138,7 +144,7 @@ export function htmlRecoleccionMttr(filas: readonly FilaRecoleccion[], opciones:
   // texto y el celeste de las bandas (quedaba negro sobre azul; prueba de Orel, 23-09-2026).
   // Y sin anchos: los porcentajes los convertía en píxeles fijos.
   const th = (t: string) =>
-    `<th bgcolor="${AZUL}" style="background-color:${AZUL};color:#FFFFFF;font-family:${CAL};font-size:9pt;line-height:1.25;font-weight:bold;text-align:center;vertical-align:bottom;padding:3px 5px;"><font color="#FFFFFF">${t}</font></th>`
+    `<th bgcolor="${CABECERA}" style="background-color:${CABECERA};color:${TINTA};font-family:${CAL};font-size:9pt;line-height:1.25;font-weight:bold;text-align:center;vertical-align:bottom;padding:3px 5px;"><b>${t}</b></th>`
   const td = (t: string, i: number, izq = false, nowrap = false) =>
     // TableStyleMedium2 pinta la PRIMERA fila de datos y luego alterna.
     // `overflow-wrap:break-word`: una palabra larga («EMPACADORA») se parte solo si ella sola
@@ -168,7 +174,9 @@ export function htmlRecoleccionMttr(filas: readonly FilaRecoleccion[], opciones:
     // el PNG a propósito): 120×28 entra en 40 px con 6 px de aire arriba y abajo.
     `<tr><td width="134" bgcolor="${GRIS}" style="width:134px;height:40px;background-color:${GRIS};padding:0 0 0 12px;vertical-align:middle;">` +
     `<img src="${logo}" width="120" height="28" alt="" style="display:block;width:120px;height:28px;"></td>` +
-    `<td bgcolor="${AZUL}" style="background-color:${AZUL};color:#FFFFFF;font-family:${CAL};font-size:12pt;font-weight:bold;height:40px;padding:0 8px;vertical-align:middle;white-space:nowrap;"><font color="#FFFFFF">${titulo}</font></td></tr></table>` +
+    // La banda del título sigue azul con blanco (es la identidad del Excel); si el pegado la
+    // vuelve negra, el título se pierde pero la tabla de abajo sigue legible.
+    `<td bgcolor="${AZUL}" style="background-color:${AZUL};color:#FFFFFF;font-family:${CAL};font-size:12pt;font-weight:bold;height:40px;padding:0 8px;vertical-align:middle;white-space:nowrap;"><font color="#FFFFFF"><b>${titulo}</b></font></td></tr></table>` +
     // Sin `table-layout:fixed`: con él, la fecha en una línea se montaba sobre Máquina en el
     // teléfono. En reparto automático los porcentajes siguen mandando cuando hay ancho (PC) y
     // la columna cede lo justo cuando no lo hay.
