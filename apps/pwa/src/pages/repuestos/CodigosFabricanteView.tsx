@@ -20,7 +20,7 @@
  */
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { BookMarked, BookOpen, Check, CircleCheck, CirclePlus, Copy, Loader2, PackagePlus, ScanSearch, Search, Shapes } from 'lucide-react'
+import { BookMarked, BookOpen, Check, ChevronDown, CircleCheck, CirclePlus, Clock, Copy, Loader2, PackagePlus, ScanSearch, Search, Shapes } from 'lucide-react'
 import { collection, getDocs } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import { Input } from '@/components/ui'
@@ -28,6 +28,9 @@ import { ShareInteractiveButton } from '@/components/visor3d/ShareInteractiveBut
 import { CATALOGOS, cargarCatalogos, type PiezaCatalogo } from './catalogosFabricante'
 import { agruparPorCodigo, conRecuentoTotal, indexarGrupos } from './agruparPiezas'
 import { buscarPiezas, norm } from './buscarCatalogo'
+import { leerRecientes, sumarReciente, type BusquedaReciente } from '@/utils/recorridoPlano'
+
+const CLAVE_RECIENTES = 'codigos-fabricante-recientes'
 import { useRepuestosExistentes, normCodigo } from '@/hooks/repuestos/useRepuestosExistentes'
 import { logger } from '@/lib/logger'
 
@@ -118,6 +121,14 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
   const [error, setError] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [copiado, setCopiado] = useState<string | null>(null)
+  // Historial de búsquedas (en este dispositivo): volver a la pieza de ayer sin
+  // reescribir el código. Se guarda solo lo que dio resultados.
+  const [recientes, setRecientes] = useState<BusquedaReciente[]>(() => {
+    try { return leerRecientes(localStorage.getItem(CLAVE_RECIENTES)) } catch { return [] }
+  })
+  // Tarjetas con la lista de lugares desplegada (antes vivía en un tooltip,
+  // que en el teléfono no existe).
+  const [lugaresAbiertos, setLugaresAbiertos] = useState<Set<string>>(() => new Set())
   // Mapa manualId → URL del PDF (colección `manuales`), para el enlace "Ver manual".
   const [manualUrls, setManualUrls] = useState<Record<string, string>>({})
 
@@ -182,6 +193,25 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
   }, [piezas, query, indiceTodo])
   const { lista, total } = resultadosMemo
 
+  // Se guarda al quedar la búsqueda quieta 1,5 s con resultados: guardar en
+  // cada tecla llenaría el historial de prefijos ("51", "518", "5180"…).
+  useEffect(() => {
+    const q = query.trim()
+    if (q.length < 3 || total === 0) return
+    const primera = lista[0]?.rep
+    const n = total === 1 && primera?.descripcion?.trim()
+      ? `${primera.descripcion.trim()}${primera.maquina ? ` · ${primera.maquina}` : ''}`
+      : `${total} piezas`
+    const t = setTimeout(() => {
+      setRecientes((r) => {
+        const v = sumarReciente(r, { c: q, n })
+        try { localStorage.setItem(CLAVE_RECIENTES, JSON.stringify(v)) } catch { /* sin storage */ }
+        return v
+      })
+    }, 1500)
+    return () => clearTimeout(t)
+  }, [query, total, lista])
+
   // ¿cuáles de los códigos en pantalla ya existen como repuesto en el maestro?
   // (requiere sesión: en modo invitado no se consulta)
   const { existentes } = useRepuestosExistentes(publico ? [] : lista.map((g) => g.rep.codigo))
@@ -226,6 +256,29 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
           className="pl-9"
         />
       </div>
+
+      {query.trim().length < 3 && recientes.length > 0 && (
+        <div className="mb-4">
+          <div className="mb-1 flex items-center justify-between">
+            <span className="text-caption font-semibold text-muted-foreground">Búsquedas recientes</span>
+            <button type="button"
+                    onClick={() => { setRecientes([]); try { localStorage.removeItem(CLAVE_RECIENTES) } catch { /* sin storage */ } }}
+                    className="min-h-[44px] px-2 text-caption text-primary">
+              Borrar
+            </button>
+          </div>
+          <div className="flex flex-col">
+            {recientes.map((r) => (
+              <button key={r.c} type="button" onClick={() => setQuery(r.c)}
+                      className="flex min-h-[44px] items-center gap-2.5 rounded-ctl px-2 text-left hover:bg-muted">
+                <Clock className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                <span className="shrink-0 font-mono text-footnote font-semibold tabular-nums text-foreground">{r.c}</span>
+                {r.n && <span className="min-w-0 truncate text-footnote text-muted-foreground">{r.n}</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {error && (
         <p className="flex flex-wrap items-center gap-2 text-sm text-ink-crit">
@@ -339,15 +392,49 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
                 <>
                   <span className="inline-flex items-center gap-1"><BookMarked className="h-3 w-3" /> {p.conjunto || 'conjunto s/n'}</span>
                   <span>pág. {p.pagina}{p.posicion ? ` · pos. ${p.posicion}` : ''}</span>
-                  {g.apariciones.length > 1 && (
-                    <span title={g.apariciones.map((a) => `${a.conjunto || 's/n'} · pág. ${a.pagina}`).join(' | ')}>
-                      y en {g.apariciones.length - 1} lugar{g.apariciones.length > 2 ? 'es' : ''} más
-                    </span>
-                  )}
+                  {g.apariciones.length > 1 && (() => {
+                    const clave = `${p.codigo}|${p.maquina}`
+                    const abierto = lugaresAbiertos.has(clave)
+                    return (
+                      <button type="button" aria-expanded={abierto}
+                              onClick={() => setLugaresAbiertos((prev) => {
+                                const s = new Set(prev)
+                                if (s.has(clave)) s.delete(clave); else s.add(clave)
+                                return s
+                              })}
+                              className="inline-flex min-h-[32px] items-center gap-1 font-medium text-primary">
+                        {abierto ? 'Ocultar lugares' : `y en ${g.apariciones.length - 1} lugar${g.apariciones.length > 2 ? 'es' : ''} más`}
+                        <ChevronDown className={`h-3 w-3 transition-transform ${abierto ? 'rotate-180' : ''}`} />
+                      </button>
+                    )
+                  })()}
                 </>
               )}
               <span className="min-w-0 truncate" title={p.fuente}>{p.fuente}</span>
             </div>
+            {/* Los N lugares, a la vista y numerados. Con el manual cargado,
+                cada uno abre el PDF en SU página. */}
+            {!g.esComun && g.apariciones.length > 1 && lugaresAbiertos.has(`${p.codigo}|${p.maquina}`) && (
+              <ol className="mt-1.5 flex list-none flex-col p-0">
+                {g.apariciones.map((a, k) => {
+                  const url = !publico && a.manualId ? manualUrls[a.manualId] : undefined
+                  const texto = `${a.conjunto || 'conjunto s/n'} · pág. ${a.pagina}${a.posicion ? ` · pos. ${a.posicion}` : ''}`
+                  return (
+                    <li key={`${a.pagina}-${a.posicion}-${k}`} className="flex min-h-[36px] items-center gap-2 text-caption text-foreground">
+                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted font-semibold tabular-nums text-muted-foreground">{k + 1}</span>
+                      {url ? (
+                        <a href={`${url}#page=${a.pagina}`} target="_blank" rel="noopener noreferrer"
+                           className="min-w-0 truncate text-primary hover:underline" title={`Abrir el manual en la página ${a.pagina}`}>
+                          {texto}
+                        </a>
+                      ) : (
+                        <span className="min-w-0 truncate">{texto}</span>
+                      )}
+                    </li>
+                  )
+                })}
+              </ol>
+            )}
             {/* Acciones: abrir el PDF del manual en la página exacta + sembrar el maestro */}
             <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-border/50 pt-2">
               {/* Camino inverso del puente: si esta pieza tiene dibujo en el
@@ -366,7 +453,12 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
                     title={`Ver el dibujo explotado en la ${d.maquina} (figura ${d.fig})`}
                   >
                     <Shapes className="h-3.5 w-3.5" />
-                    {varias ? `${d.maquina} · fig. ${d.fig}` : `Ver dibujo · fig. ${d.fig}`}
+                    {/* Con varios lugares el visor abre el recorrido ‹ 1 de N ›. No
+                        se pone el número: el catálogo y el despiece navegable no
+                        siempre cuentan igual, y un contador que no cumple miente. */}
+                    {varias ? `${d.maquina} · fig. ${d.fig}`
+                      : g.apariciones.length > 1 && !g.esComun ? 'Recorrer en el dibujo'
+                      : `Ver dibujo · fig. ${d.fig}`}
                   </Link>
                 ))
               })()}

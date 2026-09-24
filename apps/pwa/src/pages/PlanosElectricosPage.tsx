@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
-import { AlertTriangle, Camera, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Component, Copy, Download, Link as LinkIcon, Loader2, LayoutPanelTop, Printer, QrCode, Search, Wind, X, Zap } from 'lucide-react'
+import { AlertTriangle, Camera, Check, CheckCircle2, ChevronDown, Clock, ChevronLeft, ChevronRight, ChevronUp, Component, Copy, Download, Link as LinkIcon, Loader2, LayoutPanelTop, Printer, QrCode, Search, Wind, X, Zap } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { EQUIPOS, PLANOS, assetPlano, planoPorSlug, planosPorEquipo, type PlanoCatalogo, type TipoPlano } from '@/data/planos'
 import {
   usePlano, guardarPlanoOffline,
-  type Caja, type FilaDespiece, type PlanoAparato, type PlanoBorneLibre,
+  type Caja, type FilaDespiece, type PlanoAparato, type PlanoAparicion, type PlanoBorneLibre,
   type PlanoHojaMeta, type PlanoIndice, type PlanoRotulo,
 } from '@/hooks/usePlano'
 import { usePlanoNotas } from '@/hooks/usePlanoNotas'
@@ -15,6 +15,10 @@ import { useCodigosParte, useCargaSiEsNumero, PARECE_NUMERO_PARTE, type ParteEnc
 import { usePlanoVinculos, type VinculoTerreno } from '@/hooks/usePlanoVinculos'
 import { PlanoLienzo, type Foco } from '@/components/planos/PlanoLienzo'
 import { NotasAparato } from '@/components/planos/NotasAparato'
+import { RecorridoUbicaciones } from '@/components/planos/RecorridoUbicaciones'
+import {
+  indiceInicial, leerRecientes, mismaCaja, ordenarPuntos, paso, sumarReciente, type BusquedaReciente,
+} from '@/utils/recorridoPlano'
 import { compactarTramos, compararTags } from '@/utils/designaciones'
 import { coincideTitulo, etiquetaHoja } from '@/utils/hojas'
 import { auth } from '@/services/firebase'
@@ -418,11 +422,21 @@ function Visor({ slug }: { slug: string }) {
   // en la hoja actual, para seguir un cable con la vista.
   const [resaltar, setResaltar] = useState(false)
   const [mostrarQR, setMostrarQR] = useState(false)
-  // Ultimos aparatos consultados en este equipo (la falla de ayer sin re-buscar)
-  const [recientes, setRecientes] = useState<string[]>(() => {
-    try { return JSON.parse(localStorage.getItem(`plano-recientes:${slug}`) ?? '[]') as string[] }
+  // Ultimos aparatos consultados en este equipo (la falla de ayer sin re-buscar).
+  // Guarda el código Y el nombre de la pieza: el historial que se despliega al
+  // tocar el buscador dice "518057 · Rodillo", no un número pelado.
+  const [recientes, setRecientes] = useState<BusquedaReciente[]>(() => {
+    try { return leerRecientes(localStorage.getItem(`plano-recientes:${slug}`)) }
     catch { return [] }
   })
+  const [verHistorial, setVerHistorial] = useState(false)
+  // Recorrido por TODAS las ubicaciones de un código (el 518057 va en 6
+  // lugares de la 200). Antes se saltaba solo a la primera y se borraba lo
+  // escrito: para ver la segunda había que teclear el código otra vez.
+  const [recorrido, setRecorrido] = useState<{ codigo: string; i: number; vistos: Set<number> } | null>(null)
+  // Lo escrito se CONSERVA al elegir un resultado; mientras no se edite, el
+  // panel muestra la ficha y no la lista de resultados.
+  const [buscaConfirmada, setBuscaConfirmada] = useState<string | null>(null)
   // La hoja inferior movil: altura ajustable arrastrando la agarradera, y
   // minimizable a una barrita (las esquinas curvas del telefono escondian el
   // contenido pegado al borde; ademas a veces solo quieres ver el plano).
@@ -483,20 +497,23 @@ function Visor({ slug }: { slug: string }) {
     [abrir, hoja],
   )
 
+  // Pasar de una ubicación a otra con ‹ › NO debe re-expandir la hoja
+  // inferior: minimizada es justo como se recorre viendo el plano completo.
+  const conservarHoja = useRef(false)
   const seleccionar = useCallback((nuevo: Seleccion) => {
-    setMinimizada(false)
+    if (!conservarHoja.current) setMinimizada(false)
+    conservarHoja.current = false
     setResaltar(false)
     if (nuevo?.tipo === 'aparato') {
       // En el despiece se guarda el CÓDIGO, no la posición: un chip que dice
       // "24" no significa nada (esa posición existe en decenas de figuras),
       // y el código además reabre la ficha correcta desde cualquier hoja.
-      const clave = esDespiece
-        ? (hoja?.datos.filas?.find((f) => normalizarPos(f.pos) === nuevo.tag)?.nr ?? null)
-        : nuevo.tag
+      const fila = esDespiece ? hoja?.datos.filas?.find((f) => normalizarPos(f.pos) === nuevo.tag) : undefined
+      const clave = esDespiece ? (fila?.nr ?? null) : nuevo.tag
       if (clave) {
         setRecientes((r) => {
-          const v = [clave, ...r.filter((x) => x !== clave)].slice(0, 6)
-          localStorage.setItem(`plano-recientes:${slug}`, JSON.stringify(v))
+          const v = sumarReciente(r, { c: clave, n: fila ? (fila.es || fila.de) : undefined })
+          try { localStorage.setItem(`plano-recientes:${slug}`, JSON.stringify(v)) } catch { /* sin storage: solo esta sesión */ }
           return v
         })
       }
@@ -521,7 +538,74 @@ function Visor({ slug }: { slug: string }) {
     })
   }, [abrir])
 
-// Deep-link ?ap=F24: abre la ficha del aparato y salta a su primera
+  // En el despiece las claves del índice son CÓDIGOS de repuesto, no
+  // posiciones: al abrir uno hay que seleccionar la FILA que lo lleva (su
+  // ficha con nombre, cantidad y SAP), y eso solo se puede una vez cargada la
+  // hoja destino — por eso queda pendiente hasta que llegue. Con la caja se
+  // distingue cuál de las posiciones de la figura (B10, B14 y B15 pueden
+  // llevar el mismo código).
+  const piezaPendiente = useRef<{ cod: string; b?: Caja } | null>(null)
+  const resolverPiezaPendiente = useCallback((h: typeof hoja) => {
+    const pend = piezaPendiente.current
+    if (!pend || !h || !esDespiece) return
+    const codN = normalizarPos(pend.cod)
+    const tagEnCaja = pend.b ? h.datos.tags.find((t) => mismaCaja(t.b, pend.b!)) : undefined
+    const fila = (tagEnCaja && h.datos.filas?.find((f) =>
+        normalizarPos(f.pos) === normalizarPos(tagEnCaja.t) && f.nr && normalizarPos(f.nr) === codN))
+      ?? h.datos.filas?.find((f) => f.nr && normalizarPos(f.nr) === codN)
+    if (!fila) return
+    piezaPendiente.current = null
+    seleccionar({ tipo: 'aparato', tag: normalizarPos(fila.pos) })
+  }, [esDespiece, seleccionar])
+  useEffect(() => { resolverPiezaPendiente(hoja) }, [hoja, resolverPiezaPendiente])
+
+  /** Lleva la vista a UNA aparición de un código y abre su ficha. */
+  const irAPunto = useCallback((codigo: string, p: PlanoAparicion) => {
+    if (esDespiece) {
+      piezaPendiente.current = { cod: codigo, b: p.b }
+      // Misma hoja: el efecto de arriba no vuelve a correr (la hoja no
+      // cambia), así que se resuelve acá mismo.
+      if (p.h === hoja?.blatt) resolverPiezaPendiente(hoja)
+    } else {
+      seleccionar({ tipo: 'aparato', tag: codigo })
+    }
+    void irA(p.h, undefined, p.b)
+  }, [esDespiece, hoja, resolverPiezaPendiente, seleccionar, irA])
+
+  /** Va a la ubicación i (en orden de lectura) de un código y la marca como vista. */
+  const irAUbicacion = useCallback((codigo: string, i: number) => {
+    const puntos = ordenarPuntos(indice?.indice[codigo] ?? [])
+    const p = puntos[i]
+    if (!p) return
+    conservarHoja.current = true
+    setRecorrido((r) => {
+      if (puntos.length < 2) return null
+      const vistos = new Set(r?.codigo === codigo ? r.vistos : [])
+      vistos.add(i)
+      return { codigo, i, vistos }
+    })
+    irAPunto(codigo, p)
+  }, [indice, irAPunto])
+
+  /**
+   * Abre un código: deja lo escrito en el buscador, arranca en la aparición de
+   * la hoja abierta (o en la caja pedida) y deja listo el recorrido ‹ ›.
+   */
+  const abrirCodigo = useCallback((codigo: string, caja?: Caja) => {
+    const puntos = ordenarPuntos(indice?.indice[codigo] ?? [])
+    if (!puntos.length) return
+    setBusca(codigo)
+    setBuscaConfirmada(codigo)
+    setVerHistorial(false)
+    // Teléfono: la hoja inferior baja a ~260 px (nombre, ‹ › y la fila de
+    // ubicaciones). A su alto normal (55dvh) tapaba justo la marca a la que
+    // el lienzo acababa de hacer zoom.
+    setMinimizada(false)
+    if (esMovil && puntos.length > 1) setAltoHoja(260)
+    irAUbicacion(codigo, indiceInicial(puntos, hoja?.blatt, caja))
+  }, [indice, hoja, irAUbicacion, esMovil])
+
+  // Deep-link ?ap=F24: abre la ficha del aparato y salta a su primera
   // aparicion. Para mandar por chat "mira ESTE aparato", no solo la hoja.
   const apAbierto = useRef(false)
   useEffect(() => {
@@ -538,20 +622,22 @@ function Visor({ slug }: { slug: string }) {
         (f) => f.nr && normalizarPos(f.nr) === apN,
       )
       if (filaCodigo) {
-        seleccionar({ tipo: 'aparato', tag: normalizarPos(filaCodigo.pos) })
         const tagCaja = hoja.datos.tags.find((t) => normalizarPos(t.t) === normalizarPos(filaCodigo.pos))
+        // Si el código va en más lugares, se abre como recorrido (desde
+        // Repuestos se llega así): ‹ 1 de 6 › listo y el código escrito arriba.
+        if (indice.indice[apN] && indice.indice[apN].length > 1) {
+          abrirCodigo(apN, tagCaja?.b)
+          return
+        }
+        seleccionar({ tipo: 'aparato', tag: normalizarPos(filaCodigo.pos) })
         if (tagCaja) setFoco({ tipo: 'caja', b: tagCaja.b })
         return
       }
     }
     if (indice.indice[apN]) {
-      // si la URL tambien trae ?hoja=, mandan la hoja pedida: se busca la
-      // aparicion del aparato AHI; si no hay, recien se va a la primera
-      const puntos = indice.indice[apN]
-      const enHojaPedida = puntos.find((pt) => pt.h === hoja.blatt)
-      const destino = enHojaPedida ?? puntos[0]
-      seleccionar({ tipo: 'aparato', tag: apN })
-      if (destino) void irA(destino.h, undefined, destino.b)
+      // si la URL tambien trae ?hoja=, mandan la hoja pedida: abrirCodigo
+      // arranca en la aparicion de ESA hoja; si no hay, en la primera
+      abrirCodigo(apN)
       return
     }
     // El indice global del despiece esta indexado por codigo de repuesto, no
@@ -562,7 +648,7 @@ function Visor({ slug }: { slug: string }) {
       seleccionar({ tipo: 'aparato', tag: apN })
       setFoco({ tipo: 'caja', b: tagEnHoja.b })
     }
-  }, [indice, hoja, irA, seleccionar, busquedaRuta, esDespiece])
+  }, [indice, hoja, abrirCodigo, seleccionar, busquedaRuta, esDespiece])
 
   const imprimirHoja = useCallback(() => {
     if (!hoja || !indice) return
@@ -611,30 +697,9 @@ function Visor({ slug }: { slug: string }) {
     setTimeout(() => w.print(), 400)
   }, [hoja, indice, esDespiece, meta])
 
-  // En el despiece las claves del índice son CÓDIGOS de repuesto, no
-  // posiciones: al abrir uno hay que seleccionar la FILA que lo lleva (su
-  // ficha con nombre, cantidad y SAP), y eso solo se puede una vez cargada la
-  // hoja destino — por eso queda pendiente hasta que llegue.
-  const piezaPendiente = useRef<string | null>(null)
-  useEffect(() => {
-    const cod = piezaPendiente.current
-    if (!cod || !hoja || !esDespiece) return
-    const fila = hoja.datos.filas?.find((f) => f.nr && normalizarPos(f.nr) === normalizarPos(cod))
-    if (!fila) return
-    piezaPendiente.current = null
-    seleccionar({ tipo: 'aparato', tag: normalizarPos(fila.pos) })
-  }, [hoja, esDespiece, seleccionar])
-
-  const abrirAparato = useCallback((tag: string) => {
-    const puntos = indice?.indice[tag]
-    if (!puntos?.length) return
-    const enEsta = puntos.find((pt) => pt.h === hoja?.blatt)
-    const destino = enEsta ?? puntos[0]!
-    if (esDespiece) piezaPendiente.current = tag
-    else seleccionar({ tipo: 'aparato', tag })
-    setBusca('')
-    void irA(destino.h, undefined, destino.b)
-  }, [indice, hoja, seleccionar, irA, esDespiece])
+  // Recientes y pendientes de terreno abren el código igual que el buscador:
+  // en la hoja abierta si está ahí, con el recorrido listo si va en varias.
+  const abrirAparato = abrirCodigo
 
   // Elegir una fila de la tabla del despiece (degradación cuando la posición
   // no tiene ancla OCR): si igual está dibujada en el lienzo se resalta su
@@ -759,6 +824,12 @@ function Visor({ slug }: { slug: string }) {
     return () => clearTimeout(t)
   }, [busca, sinNada, slug])
 
+  const codigoRecorrido = recorrido?.codigo
+  const puntosRecorrido = useMemo(
+    () => (codigoRecorrido && indice ? ordenarPuntos(indice.indice[codigoRecorrido] ?? []) : []),
+    [codigoRecorrido, indice],
+  )
+
   if (error) {
     return <Aviso texto={error} onReintentar={reintentar} />
   }
@@ -794,8 +865,25 @@ function Visor({ slug }: { slug: string }) {
       }
     })
   }
+  // Lo escrito queda en el buscador tras elegir; la lista de resultados solo
+  // vuelve cuando se EDITA.
+  const mostrarResultados = !!busca.trim() && busca !== buscaConfirmada
+  const recorridoActivo = recorrido && puntosRecorrido.length > 1 ? recorrido : null
+  const nombreRecorrido = recorridoActivo
+    ? (recientes.find((r) => r.c === recorridoActivo.codigo)?.n
+       ?? (() => { const f = hoja.datos.filas?.find((x) => x.nr === recorridoActivo.codigo); return f ? (f.es || f.de) : undefined })())
+    : undefined
+  const etiquetaUbicacion = (p: PlanoAparicion) => {
+    if (esDespiece) return figuraDetalle(indice, p.h)
+    const h = indice.hojas.find((x) => x.blatt === p.h)
+    return `Hoja ${p.h}${h?.tituloEs ? ` · ${h.tituloEs.slice(0, 40)}` : ''}`
+  }
+  const irAUbicacionActual = (i: number) => { if (recorridoActivo) irAUbicacion(recorridoActivo.codigo, i) }
+  // Historial al tocar el buscador: solo lo que este plano sabe abrir.
+  const historialBusquedas = recientes.filter((r) => indice.indice[r.c])
+  const terminarRecorrido = () => { setRecorrido(null); setBuscaConfirmada(null); setBusca('') }
   // En movil el panel es una hoja inferior: cerrada = plano completo.
-  const abiertoMovil = sel !== null || !!busca.trim() || ayuda
+  const abiertoMovil = sel !== null || !!busca.trim() || ayuda || !!recorridoActivo
 
   return (
     // Altura del viewport, NO h-full: esta ruta se monta directo bajo #root, sin
@@ -826,18 +914,82 @@ function Visor({ slug }: { slug: string }) {
         <div className="order-last basis-full md:order-none md:basis-auto relative min-w-[180px] flex-1 md:max-w-sm">
           <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--lc-ink-ghost)' }} />
           <input ref={buscaRef} value={busca}
-                 onChange={(e) => { setBusca(e.target.value); if (e.target.value.trim()) cargarBusqueda() }} type="search"
+                 onChange={(e) => {
+                   setBusca(e.target.value)
+                   setVerHistorial(!e.target.value.trim())
+                   if (e.target.value.trim()) cargarBusqueda()
+                 }}
+                 onFocus={() => setVerHistorial(true)}
+                 onBlur={() => setVerHistorial(false)}
+                 onKeyDown={(e) => {
+                   if (e.key === 'Escape') { setVerHistorial(false); return }
+                   if (e.key !== 'Enter') return
+                   setVerHistorial(false)
+                   const q = busca.trim()
+                   // Enter / Mayús+Enter recorre las ubicaciones, como el
+                   // buscar del navegador.
+                   if (recorridoActivo && q === recorridoActivo.codigo) {
+                     e.preventDefault()
+                     irAUbicacion(recorridoActivo.codigo, paso(recorridoActivo.i, puntosRecorrido.length, e.shiftKey ? -1 : 1))
+                     return
+                   }
+                   // Código completo escrito (o un único código posible): abrirlo sin tocar la lista.
+                   const codigos = resultados.filter((r) => r.aparato && indice.indice[r.aparato])
+                   const exacto = codigos.find((r) => norm(r.aparato!) === norm(q)) ?? (codigos.length === 1 ? codigos[0] : undefined)
+                   if (exacto?.aparato) { e.preventDefault(); abrirCodigo(exacto.aparato) }
+                 }}
+                 type="search" enterKeyHint="search"
                  placeholder={esVisor ? 'Buscar hoja por título: sellado, vacío, freno…'
                               : esDespiece ? 'Buscar pieza: cuchilla, resorte, código…'
                               : 'Buscar K7, Q1, B12, Messer, cuchillo…'}
                  className="min-h-[44px] w-full rounded-card border bg-transparent py-1.5 pl-8 pr-2 font-mono text-footnote outline-none"
                  style={{ color: 'var(--lc-ink)', borderColor: 'var(--lc-border)' }} />
+          {/* Historial de búsquedas: aparece al tocar el buscador. Cada fila
+              dice cuántos lugares tiene el código, y abrirla deja el
+              recorrido ‹ › listo. mousedown/pointerdown con preventDefault:
+              si no, el blur del input cierra la lista antes del clic. */}
+          {verHistorial && historialBusquedas.length > 0 && (!busca.trim() || busca === buscaConfirmada) && (
+            <div role="listbox" aria-label="Búsquedas recientes"
+                 onMouseDown={(e) => e.preventDefault()} onPointerDown={(e) => e.preventDefault()}
+                 className="absolute inset-x-0 top-full z-50 mt-1 overflow-hidden rounded-card border py-1 shadow-2xl"
+                 style={{ background: 'var(--lc-surface)', borderColor: 'var(--lc-border)' }}>
+              <div className="flex items-center justify-between px-3 pb-1 pt-1.5">
+                <span className="text-caption font-semibold" style={{ color: 'var(--lc-ink-mid)' }}>Recientes</span>
+                <button type="button"
+                        onClick={() => {
+                          setRecientes([])
+                          try { localStorage.removeItem(`plano-recientes:${slug}`) } catch { /* sin storage */ }
+                        }}
+                        className="min-h-[32px] text-caption" style={{ color: 'var(--lc-aqua-bright)' }}>
+                  Borrar
+                </button>
+              </div>
+              {historialBusquedas.map((r) => {
+                const n = indice.indice[r.c]?.length ?? 0
+                return (
+                  <button key={r.c} type="button" role="option" aria-selected={r.c === recorridoActivo?.codigo}
+                          onClick={() => { abrirCodigo(r.c); buscaRef.current?.blur() }}
+                          className="flex min-h-[44px] w-full items-center gap-2.5 px-3 text-left hover:opacity-80">
+                    <Clock size={14} className="shrink-0" style={{ color: 'var(--lc-ink-ghost)' }} />
+                    <b className="shrink-0 font-mono text-footnote tabular-nums" style={{ color: 'var(--lc-ink)' }}>{r.c}</b>
+                    <span className="min-w-0 flex-1 truncate text-footnote" style={{ color: 'var(--lc-ink-mid)' }}>{r.n ?? ''}</span>
+                    {n > 1 && (
+                      <span className="shrink-0 rounded-full px-2 py-0.5 text-caption font-semibold tabular-nums"
+                            style={{ background: 'var(--lc-aqua-soft)', color: 'var(--lc-aqua-bright)' }}>
+                        {n} lugares
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          )}
         </div>
 
         {/* Destacados: acceso rapido de uso diario (piezas de desgaste). En
             escritorio va arriba del indice lateral; en movil no hay indice,
             asi que se muestra acá, en el riel de busqueda. */}
-        {esDespiece && !!indice.destacados?.length && (
+        {esDespiece && !!indice.destacados?.length && !busca.trim() && (
           <div className="order-last flex basis-full gap-2 overflow-x-auto md:hidden">
             {indice.destacados.map((d, i) => (
               <button key={i} type="button" onClick={() => void irA(d.hoja)}
@@ -1050,7 +1202,7 @@ function Visor({ slug }: { slug: string }) {
           className={`${abiertoMovil ? 'fixed' : 'hidden'} inset-x-2 bottom-3 z-50 max-h-[55dvh] overflow-y-auto rounded-panel border p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-2xl md:static md:z-auto md:block md:max-h-none md:w-72 md:shrink-0 md:rounded-none md:border-0 md:border-l md:pb-3 md:shadow-none`}
           style={{
             background: 'var(--lc-surface)', borderColor: 'var(--lc-border)',
-            ...(esMovil && minimizada ? { height: 52, overflowY: 'hidden' as const } : {}),
+            ...(esMovil && minimizada ? { height: recorridoActivo && !mostrarResultados ? 76 : 52, overflowY: 'hidden' as const } : {}),
             ...(esMovil && !minimizada && altoHoja ? { height: altoHoja, maxHeight: '82dvh' } : {}),
           }}>
           {/* agarradera (arrastra para ajustar la altura) + minimizar + cerrar */}
@@ -1077,21 +1229,52 @@ function Visor({ slug }: { slug: string }) {
               {minimizada ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
             </button>
             <button type="button" aria-label="Cerrar panel"
-                    onClick={() => { setSel(null); setBusca(''); setAyuda(false); setMinimizada(false); setAltoHoja(null) }}
+                    onClick={() => { setSel(null); terminarRecorrido(); setAyuda(false); setMinimizada(false); setAltoHoja(null) }}
                     className="absolute -top-1 right-0 rounded-ctl p-1.5"
                     style={{ color: 'var(--lc-ink-mid)' }}>
               <X size={16} />
             </button>
           </div>
-          {esMovil && minimizada && (
+          {/* Minimizada con recorrido: quedan solo ‹ 3 de 6 ›, así se recorre
+              con el pulgar viendo el plano completo. */}
+          {esMovil && minimizada && recorridoActivo && !mostrarResultados && (
+            <div className="-mt-1 flex items-center gap-2 px-1">
+              <button type="button" onClick={() => setMinimizada(false)}
+                      className="min-w-0 flex-1 truncate text-left text-footnote font-semibold"
+                      style={{ color: 'var(--lc-ink)' }}>
+                {recorridoActivo.codigo}{nombreRecorrido ? ` · ${nombreRecorrido}` : ''}
+              </button>
+              <button type="button" aria-label="Ubicación anterior"
+                      onClick={() => irAUbicacionActual(paso(recorridoActivo.i, puntosRecorrido.length, -1))}
+                      className="flex h-[36px] w-[44px] items-center justify-center rounded-full"
+                      style={{ background: 'var(--lc-aqua-soft)', color: 'var(--lc-aqua-bright)' }}>
+                <ChevronLeft size={18} />
+              </button>
+              <span className="text-footnote font-semibold tabular-nums">{recorridoActivo.i + 1}/{puntosRecorrido.length}</span>
+              <button type="button" aria-label="Ubicación siguiente"
+                      onClick={() => irAUbicacionActual(paso(recorridoActivo.i, puntosRecorrido.length, 1))}
+                      className="flex h-[36px] w-[44px] items-center justify-center rounded-full"
+                      style={{ background: 'var(--lc-aqua-soft)', color: 'var(--lc-aqua-bright)' }}>
+                <ChevronRight size={18} />
+              </button>
+            </div>
+          )}
+          {esMovil && minimizada && !(recorridoActivo && !mostrarResultados) && (
             <button type="button" onClick={() => setMinimizada(false)}
                     className="flex w-full items-center gap-2 px-1 text-left text-footnote font-semibold"
                     style={{ color: 'var(--lc-ink)' }}>
-              {sel ? etiquetaSel(sel) : busca.trim() ? `Resultados de “${busca.trim()}”` : 'Panel'}
+              {sel ? etiquetaSel(sel) : mostrarResultados ? `Resultados de “${busca.trim()}”` : 'Panel'}
             </button>
           )}
           {!(esMovil && minimizada) && <>
-          {!busca.trim() && pilaSel.length > 0 && (
+          {recorridoActivo && !mostrarResultados && !esVisor && (
+            <RecorridoUbicaciones
+              codigo={recorridoActivo.codigo} nombre={nombreRecorrido}
+              puntos={puntosRecorrido} i={recorridoActivo.i} vistos={recorridoActivo.vistos}
+              etiquetaDe={etiquetaUbicacion} onIr={irAUbicacionActual}
+              onCerrar={terminarRecorrido} compacto={esMovil} />
+          )}
+          {!mostrarResultados && !recorridoActivo && pilaSel.length > 0 && (
             <button type="button" onClick={volverSel}
                     className="mb-2 flex w-full items-center gap-1.5 rounded-ctl border px-2 py-1.5 text-left text-footnote"
                     style={{ borderColor: 'var(--lc-border)', color: 'var(--lc-ink-mid)' }}>
@@ -1123,17 +1306,23 @@ function Visor({ slug }: { slug: string }) {
                   onEditar={notas.editar}
                 />
               </>
-            : busca.trim()
+            : mostrarResultados
             ? <Resultados items={resultados} total={totalResultados} partes={partesEncontradas} cargando={!buscadorListo}
                 onIr={(b, c, caja, aparato) => {
+                  // Un código del índice: se abre con TODAS sus ubicaciones y
+                  // lo escrito se queda en el buscador (antes se borraba y
+                  // para ver la 2ª ubicación había que teclearlo de nuevo).
+                  if (aparato && indice.indice[aparato]) { abrirCodigo(aparato, caja); return }
                   if (aparato) seleccionar({ tipo: 'aparato', tag: aparato })
-                  // Elegir un resultado cierra la busqueda: si no, el panel se
-                  // quedaba en la lista y la ficha del aparato no se veia.
+                  // Hoja, borne o nota: cierra la búsqueda para que se vea la ficha.
+                  setRecorrido(null)
+                  setBuscaConfirmada(null)
                   setBusca('')
                   void irA(b, c, caja)
                 }} />
             : <Panel sel={sel} indice={indice} hojaActual={hoja.blatt} notas={notas} onIr={irA}
-                     recientes={recientes} onAbrirAparato={abrirAparato}
+                     recientes={recientes.map((r) => r.c)} onAbrirAparato={abrirAparato}
+                     codigoEnRecorrido={recorridoActivo?.codigo}
                      resaltar={resaltar} onResaltar={() => setResaltar((v) => !v)}
                      enEstaHoja={sel?.tipo === 'aparato' ? hoja.datos.tags.filter((t) => t.t === sel.tag).length : 0}
                      esDespiece={esDespiece} meta={meta} filas={hoja.datos.filas ?? []}
@@ -1152,7 +1341,7 @@ function Visor({ slug }: { slug: string }) {
 /* ────────────────────────────── panel ────────────────────────────── */
 
 function Panel({
-  sel, indice, hojaActual, notas, onIr, recientes, onAbrirAparato, resaltar, onResaltar, enEstaHoja,
+  sel, indice, hojaActual, notas, onIr, recientes, onAbrirAparato, codigoEnRecorrido, resaltar, onResaltar, enEstaHoja,
   esDespiece, meta, filas, tagsHoja, onSeleccionarFila, onIrFigura, onVerEnDibujo, anclaDeAparato, partes, slug,
   sapPorCodigo, vinculosTerreno,
 }: {
@@ -1162,7 +1351,10 @@ function Panel({
   notas: ReturnType<typeof usePlanoNotas>
   onIr: (b: number, c?: number, caja?: Caja) => void
   recientes: string[]
-  onAbrirAparato: (tag: string) => void
+  /** abre un código con todas sus ubicaciones (caja = la marca de partida) */
+  onAbrirAparato: (tag: string, caja?: Caja) => void
+  /** código que ya se está recorriendo: su ficha no ofrece "recorrer" de nuevo */
+  codigoEnRecorrido?: string
   resaltar: boolean
   onResaltar: () => void
   enEstaHoja: number
@@ -1399,6 +1591,10 @@ function Panel({
           desgaste={indice.desgaste}
           hermanas={filaSel.nr ? indice.hermanasPorCodigo?.[filaSel.nr]?.[String(hojaActual)] : undefined}
           onVerEnDibujo={onVerEnDibujo}
+          ubicaciones={filaSel.nr ? (indice.indice[filaSel.nr]?.length ?? 0) : 0}
+          onRecorrer={filaSel.nr && filaSel.nr !== codigoEnRecorrido
+            ? () => onAbrirAparato(filaSel.nr!, tagsHoja.find((t) => normalizarPos(t.t) === normalizarPos(filaSel.pos))?.b)
+            : undefined}
         />
       )
     }
@@ -1612,7 +1808,7 @@ function Resultados({ items, total, onIr, partes = [], cargando = false }: {
  */
 function FichaPieza({
   fila, filas, meta, tagsHoja, selTag, notas, onSeleccionarFila, onIrFigura, anclaId, slug,
-  sapPorCodigo, usosPorCodigo, umbralComun, desgaste, hermanas, onVerEnDibujo,
+  sapPorCodigo, usosPorCodigo, umbralComun, desgaste, hermanas, onVerEnDibujo, ubicaciones = 0, onRecorrer,
 }: {
   fila: FilaDespiece
   filas: FilaDespiece[]
@@ -1636,6 +1832,10 @@ function FichaPieza({
   hermanas?: string[]
   /** centra el dibujo en la marca de una posición. */
   onVerEnDibujo: (caja: Caja) => void
+  /** en cuántos lugares del plano está el código (todas las figuras) */
+  ubicaciones?: number
+  /** arranca el recorrido ‹ › por esos lugares */
+  onRecorrer?: () => void
 }) {
   const [copiado, setCopiado] = useState(false)
   // la caja de ESTA posición sobre el dibujo, si el OCR la ancló
@@ -1705,6 +1905,14 @@ function FichaPieza({
             ? `Pieza común: se usa en toda la máquina (${usosPorCodigo[fila.nr]} figuras)`
             : `Esta misma pieza va en otras ${usosPorCodigo[fila.nr]! - 1} figuras`}
         </p>
+      )}
+      {/* Antes solo lo decía: ahora se recorren, una por una, sin volver a buscar. */}
+      {onRecorrer && ubicaciones > 1 && (
+        <button type="button" onClick={onRecorrer}
+                className="mt-2 flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-full px-3 text-footnote font-semibold"
+                style={{ background: 'var(--lc-aqua-soft)', color: 'var(--lc-aqua-bright)' }}>
+          Recorrer los {ubicaciones} lugares donde va <ChevronRight size={15} />
+        </button>
       )}
 
       {/* El MISMO código en varias posiciones de ESTA figura: el sensor
