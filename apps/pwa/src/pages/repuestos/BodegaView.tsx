@@ -44,7 +44,7 @@ import { useAuthStore } from '@/store/authStore'
 import { useToast } from '@/hooks/useToast'
 import { ImageLightbox } from '@/components/ui/ImageLightbox'
 import { dec1, dec2 } from '@/utils/formatoNumeros'
-import { InventarioMaquinaView } from './InventarioMaquinaView'
+import { InventarioMaquinaView, CLAVE_VOLVER_INVENTARIO } from './InventarioMaquinaView'
 
 type BodegaTab = 'stock' | 'inventarios' | 'movimientos' | 'estadisticas'
 type StockFilter = 'todos' | 'configurados' | 'bajo' | 'sin' | 'sinConfig' | 'favoritos'
@@ -92,7 +92,10 @@ interface BodegaViewProps {
 
 export function BodegaView({ onViewInEquipo, onSearchSimilar }: BodegaViewProps = {}) {
   const user = useAuthStore(s => s.user)
-  const [subTab, setSubTab] = useState<BodegaTab>('stock')
+  // Al volver del dibujo desde un inventario (teléfono), se reabre Inventarios.
+  const [subTab, setSubTab] = useState<BodegaTab>(() => {
+    try { return sessionStorage.getItem(CLAVE_VOLVER_INVENTARIO) ? 'inventarios' : 'stock' } catch { return 'stock' }
+  })
 
   // ── Cargar catálogo (mismo patrón que BuscadorGlobal) ──
   useGlobalEquipmentSearch('', 999)
@@ -473,6 +476,11 @@ function InventarioTab({ bodega, user }: { bodega: ReturnType<typeof useBodega>;
     const data = await loadInventarios()
     setSesiones(data)
     setLoading(false)
+    // Volviendo del dibujo: se cae de nuevo DENTRO del inventario que se miraba.
+    let volver: string | null = null
+    try { volver = sessionStorage.getItem(CLAVE_VOLVER_INVENTARIO); sessionStorage.removeItem(CLAVE_VOLVER_INVENTARIO) } catch { /* sin storage */ }
+    const s = volver ? data.find(x => x.id === volver) : undefined
+    if (s) setActiveSesion(s)
   }, [loadInventarios])
 
   useEffect(() => { reload() }, [reload])

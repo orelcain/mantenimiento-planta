@@ -14,7 +14,18 @@ vi.mock('xlsx', () => ({
   },
   writeFile: (_wb: unknown, nombre: string) => { if (xlsx.falla) throw new Error('disco lleno'); xlsx.archivo = nombre },
 }))
-import { InventarioMaquinaView } from '../InventarioMaquinaView'
+vi.mock('../enlacesPieza', () => ({
+  // El 92152025 tiene dibujo (hoja 28) y manual (pág. 85); el resto no.
+  useFigurasDespiece: () => ({ '92152025': [{ hoja: 28, fig: '6-3', slug: 'baader-200-despiece', maquina: 'BAADER 200' }] }),
+  rutaDibujo: (f: Record<string, { hoja: number; slug: string }[]> | null, c: string) =>
+    f?.[c]?.[0] ? `/aprendizaje/planos/${f[c][0].slug}?hoja=${f[c][0].hoja}&ap=${c}` : null,
+  useManualesPieza: () => ({
+    manualDe: (c: string) => (c === '92152025' ? { url: 'https://docs.example/manual-200.pdf#page=85', pagina: 85 } : null),
+    cargando: false,
+  }),
+}))
+import { MemoryRouter } from 'react-router-dom'
+import { InventarioMaquinaView, CLAVE_VOLVER_INVENTARIO } from '../InventarioMaquinaView'
 import type { InventarioLinea, InventarioSesion, BodegaMergedItem } from '@/hooks/repuestos/useBodega'
 
 // Líneas reales del cuaderno BAADER 200 (25-09-26).
@@ -40,12 +51,16 @@ const SESION = { id: 's1', nombre: 'Inventario BAADER 200 bodega 25-09-26', esta
 
 async function montar() {
   const validarLinea = vi.fn().mockResolvedValue(undefined)
-  const bodega = { items: ITEMS, loadLineas: vi.fn().mockResolvedValue(LINEAS), validarLinea } as never
-  const { container } = render(<InventarioMaquinaView sesion={SESION} bodega={bodega} user={{ id: 'u1', nombre: 'Tester' }} onVolver={() => {}} />)
+  const aplicarAjusteInventario = vi.fn().mockResolvedValue({ actualizados: 2, creados: 0, cuadran: 0 })
+  const bodega = { items: ITEMS, loadLineas: vi.fn().mockResolvedValue(LINEAS), validarLinea, aplicarAjusteInventario } as never
+  const { container } = render(
+    <MemoryRouter>
+      <InventarioMaquinaView sesion={SESION} bodega={bodega} user={{ id: 'u1', nombre: 'Tester' }} onVolver={() => {}} />
+    </MemoryRouter>)
   await screen.findAllByText('RODILLO 92152025')
   const pc = within(container.querySelector('[data-vista="pc"]') as HTMLElement)
   const cel = within(container.querySelector('[data-vista="celular"]') as HTMLElement)
-  return { validarLinea, pc, cel }
+  return { validarLinea, aplicarAjusteInventario, pc, cel, raiz: within(container) }
 }
 const filasTabla = (pc: ReturnType<typeof within>) =>
   pc.getAllByRole('row').slice(2).map((r: HTMLElement) => r.textContent ?? '')
@@ -140,5 +155,43 @@ describe('Descargar Excel', () => {
     const { cel } = await montar()
     fireEvent.click(cel.getByRole('button', { name: /Descargar Excel/ }))
     expect(await cel.findByText(/No se pudo generar el Excel: disco lleno/)).toBeTruthy()
+  })
+})
+
+describe('ir al dibujo y al manual', () => {
+  it('PC: íconos con la ruta al despiece y a la página del manual, en otra pestaña', async () => {
+    const { pc } = await montar()
+    const dib = pc.getByRole('link', { name: 'Ver 92152025 en el dibujo' })
+    expect(dib.getAttribute('href')).toContain('/aprendizaje/planos/baader-200-despiece?hoja=28&ap=92152025')
+    expect(dib.getAttribute('target')).toBe('_blank')
+    expect(pc.getByRole('link', { name: /Ver 92152025 en el manual, página 85/ }).getAttribute('href')).toBe('https://docs.example/manual-200.pdf#page=85')
+    // la que no tiene dibujo no ofrece enlace
+    expect(pc.queryByRole('link', { name: 'Ver 2001202002 en el dibujo' })).toBeNull()
+  })
+
+  it('celular: tocar la fila abre dibujo / manual / corregir, y el dibujo deja la marca para volver', async () => {
+    sessionStorage.clear()
+    const { cel } = await montar()
+    fireEvent.click(cel.getByText('RODILLO 92152025'))
+    expect(await screen.findByText('Ver en el manual · pág. 85')).toBeTruthy()
+    expect(screen.getByText('Corregir o recontar')).toBeTruthy()
+    fireEvent.click(screen.getByText('Ver en el dibujo'))
+    expect(sessionStorage.getItem(CLAVE_VOLVER_INVENTARIO)).toBe('s1')
+  })
+})
+
+describe('ajustar stock según el conteo', () => {
+  it('muestra el plan (qué baja, qué sube, precisión de antes) y lo aplica al confirmar', async () => {
+    const { raiz, aplicarAjusteInventario } = await montar()
+    fireEvent.click(raiz.getByRole('button', { name: /Ajustar stock según el conteo \(2\)/ }))
+    expect(raiz.getByText(/2 repuestos cambian de stock: 2 bajan y 0 suben/)).toBeTruthy()
+    expect(raiz.getByText(/No se tocan 2 dudosas/)).toBeTruthy()
+    expect(raiz.getByText(/0 de 2/)).toBeTruthy()
+    fireEvent.click(raiz.getByRole('button', { name: /^Ajustar stock$/ }))
+    await waitFor(() => expect(aplicarAjusteInventario).toHaveBeenCalled())
+    const plan = aplicarAjusteInventario.mock.calls[0]![2]
+    expect(plan.cambian.map((a: { codigoSAP: string; sistema: number; contado: number }) => [a.codigoSAP, a.sistema, a.contado]))
+      .toEqual([['3300051215', 6, 5], ['3300017418', 18, 1]])
+    expect(await raiz.findByText(/Stock ajustado: 2 actualizados/)).toBeTruthy()
   })
 })
