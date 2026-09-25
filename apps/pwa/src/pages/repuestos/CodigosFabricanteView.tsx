@@ -467,7 +467,13 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
                   href={`${manualUrls[p.manualId]}#page=${p.pagina}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 rounded-ctl border border-border px-2 py-1 text-caption font-medium text-foreground transition hover:bg-muted hover:text-primary"
+                  // Con dibujo navegable, el dibujo manda (encuentra la pieza, anda
+                  // sin señal) y el manual baja a enlace: es para VERIFICAR, y en el
+                  // teléfono es un PDF de cientos de páginas. Sin dibujo, sigue
+                  // siendo el botón.
+                  className={figurasDespiece?.[p.codigo]?.length
+                    ? 'inline-flex min-h-[32px] items-center gap-1 px-1 text-caption text-muted-foreground transition hover:text-primary'
+                    : 'inline-flex items-center gap-1 rounded-ctl border border-border px-2 py-1 text-caption font-medium text-foreground transition hover:bg-muted hover:text-primary'}
                   title={`Abrir ${p.fuente} en la página ${p.pagina}`}
                 >
                   <BookOpen className="h-3.5 w-3.5" /> Ver manual · pág. {p.pagina}

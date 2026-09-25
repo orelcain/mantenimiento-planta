@@ -14,6 +14,7 @@ import { usePartesPlano } from '@/hooks/usePartesPlano'
 import { useCodigosParte, useCargaSiEsNumero, PARECE_NUMERO_PARTE, type ParteEncontrada } from '@/hooks/useCodigosParte'
 import { usePlanoVinculos, type VinculoTerreno } from '@/hooks/usePlanoVinculos'
 import { PlanoLienzo, type Foco } from '@/components/planos/PlanoLienzo'
+import { siguienteGiro, type Giro } from '@/utils/giroPlano'
 import { NotasAparato } from '@/components/planos/NotasAparato'
 import { RecorridoUbicaciones } from '@/components/planos/RecorridoUbicaciones'
 import {
@@ -437,6 +438,15 @@ function Visor({ slug }: { slug: string }) {
   // Lo escrito se CONSERVA al elegir un resultado; mientras no se edite, el
   // panel muestra la ficha y no la lista de resultados.
   const [buscaConfirmada, setBuscaConfirmada] = useState<string | null>(null)
+  // Teléfono: durante el recorrido la ficha (SAP, bodega, tabla) va plegada.
+  // Lo que se necesita en terreno es ENCONTRAR la pieza: nombre, ‹ › y lugares.
+  const [fichaAbierta, setFichaAbierta] = useState(false)
+  // Giro de cada hoja (hay láminas escaneadas acostadas en página vertical).
+  // Se recuerda por plano y hoja en este dispositivo: se gira una vez.
+  const [giros, setGiros] = useState<Record<string, Giro>>(() => {
+    try { return JSON.parse(localStorage.getItem(`plano-giro:${slug}`) ?? '{}') as Record<string, Giro> }
+    catch { return {} }
+  })
   // La hoja inferior movil: altura ajustable arrastrando la agarradera, y
   // minimizable a una barrita (las esquinas curvas del telefono escondian el
   // contenido pegado al borde; ademas a veces solo quieres ver el plano).
@@ -601,7 +611,8 @@ function Visor({ slug }: { slug: string }) {
     // ubicaciones). A su alto normal (55dvh) tapaba justo la marca a la que
     // el lienzo acababa de hacer zoom.
     setMinimizada(false)
-    if (esMovil && puntos.length > 1) setAltoHoja(260)
+    setFichaAbierta(false)
+    if (esMovil && puntos.length > 1) setAltoHoja(262)
     irAUbicacion(codigo, indiceInicial(puntos, hoja?.blatt, caja))
   }, [indice, hoja, irAUbicacion, esMovil])
 
@@ -825,6 +836,37 @@ function Visor({ slug }: { slug: string }) {
   }, [busca, sinNada, slug])
 
   const codigoRecorrido = recorrido?.codigo
+  // Código COMPLETO escrito (existe tal cual en el índice): se salta directo
+  // al primer lugar, sin pasar por la lista. La pausa corta deja terminar de
+  // teclear un código más largo que empiece igual.
+  useEffect(() => {
+    if (!esDespiece || !indice) return
+    const q = busca.trim()
+    if (q.length < 5 || q === buscaConfirmada) return
+    const clave = indice.indice[q] ? q : indice.indice[q.toUpperCase()] ? q.toUpperCase() : null
+    if (!clave) return
+    const t = setTimeout(() => {
+      abrirCodigo(clave)
+      // en el teléfono se baja el teclado: tapaba el plano recién enfocado
+      if (esMovil) buscaRef.current?.blur()
+    }, 450)
+    return () => clearTimeout(t)
+  }, [busca, buscaConfirmada, esDespiece, indice, abrirCodigo, esMovil])
+
+  const giroHoja: Giro = (hoja && giros[String(hoja.blatt)]) || 0
+  const girarHoja = useCallback(() => {
+    if (!hoja) return
+    setGiros((g) => {
+      const k = String(hoja.blatt)
+      const n = siguienteGiro(g[k])
+      const v = { ...g }
+      if (n) v[k] = n
+      else delete v[k]
+      try { localStorage.setItem(`plano-giro:${slug}`, JSON.stringify(v)) } catch { /* sin storage: solo esta sesión */ }
+      return v
+    })
+  }, [hoja, slug])
+
   const puntosRecorrido = useMemo(
     () => (codigoRecorrido && indice ? ordenarPuntos(indice.indice[codigoRecorrido] ?? []) : []),
     [codigoRecorrido, indice],
@@ -1194,6 +1236,7 @@ function Visor({ slug }: { slug: string }) {
             onAparato={(tag) => { seleccionar({ tipo: 'aparato', tag }); setFoco(null) }}
             onRotulo={(r) => { seleccionar({ tipo: 'rotulo', r }); setFoco(null) }}
             onFondo={() => setSel(null)}
+            giro={giroHoja} onGirar={girarHoja}
           />
         </main>
 
@@ -1320,6 +1363,14 @@ function Visor({ slug }: { slug: string }) {
                   setBusca('')
                   void irA(b, c, caja)
                 }} />
+            : esMovil && recorridoActivo && !fichaAbierta
+            ? <button type="button"
+                      onClick={() => { setFichaAbierta(true); setAltoHoja(Math.round(window.innerHeight * 0.7)) }}
+                      className="flex min-h-[44px] w-full items-center justify-between border-t pt-1 text-left text-footnote font-semibold"
+                      style={{ borderColor: 'var(--lc-border)', color: 'var(--lc-aqua-bright)' }}>
+                Ficha: SAP, bodega, cantidad
+                <ChevronUp size={16} />
+              </button>
             : <Panel sel={sel} indice={indice} hojaActual={hoja.blatt} notas={notas} onIr={irA}
                      recientes={recientes.map((r) => r.c)} onAbrirAparato={abrirAparato}
                      codigoEnRecorrido={recorridoActivo?.codigo}
@@ -1697,15 +1748,36 @@ function buscar(
 
   // Aparatos: por designacion (K7, Q1, X5...) o codigo de fabricante en el
   // despiece. Aterrizan en su caja exacta.
+  const codigos = new Map<string, Resultado>()
   Object.entries(indice.indice).forEach(([tag, puntos]) => {
     const primero = puntos[0]
     if (primero && norm(tag).startsWith(v)) {
-      out.push({
+      const r: Resultado = {
         clave: tag, detalle: `${puntos.length} puntos`, aparato: tag,
         blatt: primero.h, caja: primero.b,
-      })
+      }
+      codigos.set(norm(tag), r)
+      out.push(r)
     }
   })
+  // Despiece: el texto alemán del catálogo trae el código adentro ("363
+  // Zugfeder 38010053"), así que buscar 38010053 listaba el código Y otras 8
+  // filas "Resorte tension" = los mismos 8 lugares repetidos. Ahora esas filas
+  // se descartan y su nombre pasa a la fila del código: una fila por pieza.
+  const codigoDeFila = (de: string): Resultado | undefined => {
+    if (!esDespiece || !codigos.size) return undefined
+    for (const t of de.split(/\s+/)) {
+      const r = codigos.get(t)
+      if (r) return r
+    }
+    return undefined
+  }
+  if (esDespiece) {
+    for (const r of codigos.values()) {
+      const n = indice.indice[r.aparato!]?.length ?? 0
+      r.detalle = `${n} lugar${n !== 1 ? 'es' : ''}`
+    }
+  }
 
   // Hojas por su titulo ("SELLADO" -> las hojas de la estacion de sellado).
   //
@@ -1738,9 +1810,15 @@ function buscar(
 
   // Rotulos / piezas: en el idioma que sea. Cada resultado lleva su hoja y
   // su caja. En el despiece "hoja N" no dice nada — se muestra la figura.
+  const conNombre = new Set<Resultado>()
   for (const r of indice.busqueda) {
     const es = norm(r.es)
     const de = norm(r.de)
+    const delCodigo = codigoDeFila(de)
+    if (delCodigo) {
+      if (!conNombre.has(delCodigo) && r.es) { delCodigo.detalle = `${r.es} · ${delCodigo.detalle}`; conNombre.add(delCodigo) }
+      continue
+    }
     const calza = de.includes(v) || es.includes(v)
       || (vAlias != null && (es.includes(vAlias) || de.includes(vAlias)))
     if (calza) {
