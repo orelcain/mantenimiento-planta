@@ -181,6 +181,44 @@ export interface InventarioSesion {
   conDiferencia: number
   createdAt: Date
   closedAt?: Date
+  /** 'maquina' = conteo físico de la bodega de UNA máquina, cargado desde el
+   *  cuaderno: cada línea lleva ubicación y código de fabricante, y puede no
+   *  tener SAP todavía. Sin tipo = inventario periódico clásico (por SAP). */
+  tipo?: 'periodico' | 'maquina'
+  maquina?: string
+  /** Líneas que aún esperan confirmación (código, cantidad o SAP). */
+  dudosos?: number
+  /** Unidades contadas en total. */
+  unidades?: number
+}
+
+/** Por qué una línea del inventario por máquina quedó en "Dudosos". */
+export type MotivoDuda = 'codigo' | 'cantidad' | 'sap' | 'sin_sap'
+
+/**
+ * Una línea del inventario por máquina (subcolección `conteos`, id propio:
+ * el mismo SAP puede aparecer en dos ubicaciones y una línea puede no tener SAP).
+ */
+export interface InventarioLinea {
+  id: string
+  ubicacion: string
+  /** Código de fabricante vigente (el corregido, si se validó otro). */
+  codigoFabricante: string
+  /** Lo que decía el cuaderno, tal cual: nunca se pisa. */
+  codigoCuaderno: string
+  codigoSAP: string
+  textoBreve: string
+  descripcion: string
+  nombreComun: string
+  cantidad: number | null
+  stockSistema: number | null
+  notaCuaderno: string
+  estado: 'validado' | 'dudoso'
+  motivo?: MotivoDuda
+  detalleDuda?: string
+  sugerencia?: string
+  validadoPorNombre?: string
+  validadoAt?: Date
 }
 
 export interface InventarioConteo {
@@ -682,6 +720,8 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
         totalItems: data.totalItems ?? 0, contados: data.contados ?? 0,
         conDiferencia: data.conDiferencia ?? 0,
         createdAt: tsToDate(data.createdAt), closedAt: data.closedAt ? tsToDate(data.closedAt) : undefined,
+        tipo: data.tipo === 'maquina' ? 'maquina' : 'periodico',
+        maquina: data.maquina, dudosos: data.dudosos, unidades: data.unidades,
       }
     })
   }, [])
@@ -731,6 +771,70 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
     const conDiferencia = allConteos.filter(c => c.stockFisico !== null && c.diferencia !== 0).length
     await updateDoc(doc(db, INVENTARIO_COL, inventarioId), { contados, conDiferencia })
   }, [loadConteos])
+
+  // ── Inventario por máquina ──
+
+  const loadLineas = useCallback(async (inventarioId: string): Promise<InventarioLinea[]> => {
+    const snap = await getDocs(collection(db, INVENTARIO_COL, inventarioId, 'conteos'))
+    return snap.docs.map(d => {
+      const x = d.data()
+      return {
+        id: d.id,
+        ubicacion: x.ubicacion || '',
+        codigoFabricante: x.codigoFabricante || '',
+        codigoCuaderno: x.codigoCuaderno || x.codigoFabricante || '',
+        codigoSAP: x.codigoSAP || '',
+        textoBreve: x.textoBreve || '',
+        descripcion: x.descripcion || '',
+        nombreComun: x.nombreComun || '',
+        cantidad: typeof x.cantidad === 'number' ? x.cantidad : null,
+        stockSistema: typeof x.stockSistema === 'number' ? x.stockSistema : null,
+        notaCuaderno: x.notaCuaderno || '',
+        estado: x.estado === 'dudoso' ? 'dudoso' : 'validado',
+        motivo: x.motivo,
+        detalleDuda: x.detalleDuda,
+        sugerencia: x.sugerencia,
+        validadoPorNombre: x.validadoPorNombre,
+        validadoAt: x.validadoAt ? tsToDate(x.validadoAt) : undefined,
+      }
+    })
+  }, [])
+
+  /**
+   * Confirma una línea (o corrige una ya validada): queda validada con el
+   * código, cantidad y SAP que se indiquen. El código del cuaderno no se toca:
+   * así siempre se ve qué decía el papel y qué se confirmó.
+   */
+  const validarLinea = useCallback(async (
+    inventarioId: string,
+    lineaId: string,
+    datos: { codigoFabricante: string; cantidad: number; codigoSAP: string; textoBreve: string; descripcion?: string; stockSistema: number | null },
+    userId: string,
+    userName: string,
+  ) => {
+    await updateDoc(doc(db, INVENTARIO_COL, inventarioId, 'conteos', lineaId), {
+      codigoFabricante: datos.codigoFabricante.trim(),
+      cantidad: datos.cantidad,
+      stockFisico: datos.cantidad,
+      codigoSAP: datos.codigoSAP.trim(),
+      textoBreve: datos.textoBreve,
+      ...(datos.descripcion !== undefined ? { descripcion: datos.descripcion } : {}),
+      stockSistema: datos.stockSistema,
+      diferencia: datos.stockSistema != null ? datos.cantidad - datos.stockSistema : 0,
+      estado: 'validado',
+      validadoPor: userId,
+      validadoPorNombre: userName,
+      validadoAt: serverTimestamp(),
+    })
+    // Los totales de la sesión se recalculan de las líneas (son ~150: barato).
+    const lineas = await loadLineas(inventarioId)
+    await updateDoc(doc(db, INVENTARIO_COL, inventarioId), {
+      dudosos: lineas.filter(l => l.estado === 'dudoso').length,
+      unidades: lineas.reduce((a, l) => a + (l.cantidad ?? 0), 0),
+      contados: lineas.filter(l => l.cantidad != null).length,
+      conDiferencia: lineas.filter(l => l.stockSistema != null && l.cantidad != null && l.cantidad !== l.stockSistema).length,
+    })
+  }, [loadLineas])
 
   // Finalizar inventario — ajustar stock según conteo físico
   const finalizarInventario = useCallback(async (
@@ -916,5 +1020,7 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
     loadConteos,
     registrarConteo,
     finalizarInventario,
+    loadLineas,
+    validarLinea,
   }
 }
