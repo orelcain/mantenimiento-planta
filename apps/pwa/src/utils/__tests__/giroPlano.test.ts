@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { geometriaGiro, siguienteGiro } from '../giroPlano'
+import { geometriaGiro, limpiarGiros, siguienteGiro } from '../giroPlano'
 
 /** Aplica la matriz de la transformación CSS a mano para comprobar que `punto` dice lo mismo. */
 function cssAplicado(giro: 0 | 90 | 180 | 270, W: number, H: number, x: number, y: number) {
@@ -33,5 +33,13 @@ describe('geometriaGiro', () => {
 describe('siguienteGiro', () => {
   it('da la vuelta completa', () => {
     expect([undefined, 90, 180, 270].map((g) => siguienteGiro(g as never))).toEqual([90, 180, 270, 0])
+  })
+})
+
+describe('limpiarGiros', () => {
+  it('solo deja hojas numéricas con giros válidos', () => {
+    expect(limpiarGiros({ 28: 90, 30: 45, x: 90, 31: '90', 32: 0, 33: 270 })).toEqual({ 28: 90, 32: 0, 33: 270 })
+    expect(limpiarGiros(null)).toEqual({})
+    expect(limpiarGiros('basura')).toEqual({})
   })
 })

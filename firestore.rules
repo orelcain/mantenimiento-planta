@@ -724,6 +724,20 @@ service cloud.firestore {
     // evidencia real, no con una suposicion de papel.
     // docId = "<planoSlug>__<designacion>" (uno por aparato: la ultima palabra
     // de terreno manda, y el historial de quien/cuando queda en el doc).
+    // Giro de cada hoja de un plano (láminas acostadas en página vertical):
+    // un doc por plano, id = slug, con el mapa hoja -> grados. Lo comparte
+    // toda la planta; el cliente descarta valores que no sean 0/90/180/270.
+    match /planoGiros/{slug} {
+      allow read: if isActiveUser();
+      allow create, update: if isActiveUser()
+        && isValidDocSize()
+        && request.resource.data.planoSlug == slug
+        && request.resource.data.giros is map
+        && request.resource.data.giros.size() <= 600
+        && request.resource.data.actualizadoPor == request.auth.uid;
+      allow delete: if isAdmin();
+    }
+
     match /planoVinculos/{vinculoId} {
       allow read: if isActiveUser();
 

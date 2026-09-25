@@ -14,7 +14,8 @@ import { usePartesPlano } from '@/hooks/usePartesPlano'
 import { useCodigosParte, useCargaSiEsNumero, PARECE_NUMERO_PARTE, type ParteEncontrada } from '@/hooks/useCodigosParte'
 import { usePlanoVinculos, type VinculoTerreno } from '@/hooks/usePlanoVinculos'
 import { PlanoLienzo, type Foco } from '@/components/planos/PlanoLienzo'
-import { siguienteGiro, type Giro } from '@/utils/giroPlano'
+import { type Giro } from '@/utils/giroPlano'
+import { usePlanoGiros } from '@/hooks/usePlanoGiros'
 import { NotasAparato } from '@/components/planos/NotasAparato'
 import { RecorridoUbicaciones } from '@/components/planos/RecorridoUbicaciones'
 import {
@@ -442,11 +443,8 @@ function Visor({ slug }: { slug: string }) {
   // Lo que se necesita en terreno es ENCONTRAR la pieza: nombre, ‹ › y lugares.
   const [fichaAbierta, setFichaAbierta] = useState(false)
   // Giro de cada hoja (hay láminas escaneadas acostadas en página vertical).
-  // Se recuerda por plano y hoja en este dispositivo: se gira una vez.
-  const [giros, setGiros] = useState<Record<string, Giro>>(() => {
-    try { return JSON.parse(localStorage.getItem(`plano-giro:${slug}`) ?? '{}') as Record<string, Giro> }
-    catch { return {} }
-  })
+  // Compartido por la planta: quien la gira la deja derecha para todos.
+  const { giros, girar } = usePlanoGiros(slug)
   // La hoja inferior movil: altura ajustable arrastrando la agarradera, y
   // minimizable a una barrita (las esquinas curvas del telefono escondian el
   // contenido pegado al borde; ademas a veces solo quieres ver el plano).
@@ -854,18 +852,7 @@ function Visor({ slug }: { slug: string }) {
   }, [busca, buscaConfirmada, esDespiece, indice, abrirCodigo, esMovil])
 
   const giroHoja: Giro = (hoja && giros[String(hoja.blatt)]) || 0
-  const girarHoja = useCallback(() => {
-    if (!hoja) return
-    setGiros((g) => {
-      const k = String(hoja.blatt)
-      const n = siguienteGiro(g[k])
-      const v = { ...g }
-      if (n) v[k] = n
-      else delete v[k]
-      try { localStorage.setItem(`plano-giro:${slug}`, JSON.stringify(v)) } catch { /* sin storage: solo esta sesión */ }
-      return v
-    })
-  }, [hoja, slug])
+  const girarHoja = useCallback(() => { if (hoja) girar(hoja.blatt) }, [hoja, girar])
 
   const puntosRecorrido = useMemo(
     () => (codigoRecorrido && indice ? ordenarPuntos(indice.indice[codigoRecorrido] ?? []) : []),
