@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { InventarioMaquinaView } from '../InventarioMaquinaView'
 import type { InventarioLinea, InventarioSesion, BodegaMergedItem } from '@/hooks/repuestos/useBodega'
 
@@ -9,6 +9,8 @@ const base = { codigoSAP: '', textoBreve: '', descripcion: '', nombreComun: '', 
 const LINEAS: InventarioLinea[] = [
   { ...base, id: 'u1-002', ubicacion: 'Ubicación 1', codigoFabricante: '92152025', codigoCuaderno: '92152025',
     codigoSAP: '3300051215', textoBreve: 'RODILLO 92152025', cantidad: 5, stockSistema: 6, estado: 'validado' },
+  { ...base, id: 'u5-004', ubicacion: 'Ubicación 5', codigoFabricante: '2001202002', codigoCuaderno: '2001202002',
+    codigoSAP: '3300017418', textoBreve: 'CHAPA GUIA 2001202002', cantidad: 1, stockSistema: 18, estado: 'validado' },
   { ...base, id: 'u3-008', ubicacion: 'Ubicación 3', codigoFabricante: '92481630', codigoCuaderno: '92481630',
     cantidad: 7, estado: 'dudoso', motivo: 'codigo', sugerencia: '92461630',
     detalleDuda: 'No existe. 92461630 = Bulón con gollete (SAP 3300011830).' },
@@ -20,34 +22,37 @@ const ITEMS = [
   { codigoSAP: '3300051215', codigoFabricante: '92152025', textoBreve: 'RODILLO 92152025', stockActual: 6, bodegaId: 'b2' },
 ] as unknown as BodegaMergedItem[]
 const SESION = { id: 's1', nombre: 'Inventario BAADER 200 bodega 25-09-26', estado: 'en_curso', tipo: 'maquina',
-  maquina: 'BAADER 200', creadoPor: 'u', creadoPorNombre: 'x', totalItems: 3, contados: 3, conDiferencia: 1,
+  maquina: 'BAADER 200', creadoPor: 'u', creadoPorNombre: 'x', totalItems: 4, contados: 4, conDiferencia: 2,
   createdAt: new Date() } as InventarioSesion
 
-function montar() {
+async function montar() {
   const validarLinea = vi.fn().mockResolvedValue(undefined)
   const bodega = { items: ITEMS, loadLineas: vi.fn().mockResolvedValue(LINEAS), validarLinea } as never
-  render(<InventarioMaquinaView sesion={SESION} bodega={bodega} user={{ id: 'u1', nombre: 'Tester' }} onVolver={() => {}} />)
-  return { validarLinea }
+  const { container } = render(<InventarioMaquinaView sesion={SESION} bodega={bodega} user={{ id: 'u1', nombre: 'Tester' }} onVolver={() => {}} />)
+  await screen.findAllByText('RODILLO 92152025')
+  const pc = within(container.querySelector('[data-vista="pc"]') as HTMLElement)
+  const cel = within(container.querySelector('[data-vista="celular"]') as HTMLElement)
+  return { validarLinea, pc, cel }
 }
+const filasTabla = (pc: ReturnType<typeof within>) =>
+  pc.getAllByRole('row').slice(2).map((r: HTMLElement) => r.textContent ?? '')
 
 afterEach(cleanup)
 
-describe('InventarioMaquinaView', () => {
-  it('muestra lo validado por ubicación, con contado vs sistema', async () => {
-    montar()
-    expect(await screen.findByText('RODILLO 92152025')).toBeTruthy()
-    expect(screen.getByText(/sist\. 6 \(-1\)/)).toBeTruthy()
-    // los dudosos NO aparecen en el inventario
-    expect(screen.queryByText(/92481630/)).toBeNull()
+describe('celular', () => {
+  it('Inventario muestra solo lo validado, con contado vs sistema', async () => {
+    const { cel } = await montar()
+    expect(cel.getByText('RODILLO 92152025')).toBeTruthy()
+    expect(cel.getByText(/sist\. 6 \(-1\)/)).toBeTruthy()
+    expect(cel.queryByText(/92481630/)).toBeNull()
   })
 
   it('valida un dudoso con la sugerencia y trae el SAP del maestro', async () => {
-    const { validarLinea } = montar()
-    fireEvent.click(await screen.findByRole('tab', { name: /Dudosos/ }))
-    // el código precargado es la sugerencia, y el maestro la reconoce
-    expect(await screen.findByDisplayValue('92461630')).toBeTruthy()
-    expect(screen.getByText('BULON 92461630')).toBeTruthy()
-    fireEvent.click(screen.getAllByRole('button', { name: /Validar/ })[0]!)
+    const { cel, validarLinea } = await montar()
+    fireEvent.click(cel.getByRole('tab', { name: /Dudosos/ }))
+    expect(await cel.findByDisplayValue('92461630')).toBeTruthy()
+    expect(cel.getByText('BULON 92461630')).toBeTruthy()
+    fireEvent.click(cel.getAllByRole('button', { name: /Validar/ })[0]!)
     await waitFor(() => expect(validarLinea).toHaveBeenCalled())
     const [, lineaId, datos] = validarLinea.mock.calls[0]!
     expect(lineaId).toBe('u3-008')
@@ -55,8 +60,42 @@ describe('InventarioMaquinaView', () => {
   })
 
   it('un SAP que no corresponde no se vuelve a ofrecer', async () => {
-    montar()
-    fireEvent.click(await screen.findByRole('tab', { name: /Dudosos/ }))
-    expect(await screen.findByPlaceholderText(/El actual \(3300011820\) es de otra pieza/)).toBeTruthy()
+    const { cel } = await montar()
+    fireEvent.click(cel.getByRole('tab', { name: /Dudosos/ }))
+    expect(await cel.findByPlaceholderText(/El actual \(3300011820\) es de otra pieza/)).toBeTruthy()
+  })
+})
+
+describe('PC: tabla', () => {
+  it('muestra TODAS las líneas (validadas y dudosas) en una sola tabla', async () => {
+    const { pc } = await montar()
+    expect(filasTabla(pc)).toHaveLength(4)
+    expect(pc.getByText(/4 de 4 líneas · 19 unidades/)).toBeTruthy()
+  })
+
+  it('filtra por ubicación y se combina con el estado; el pie sigue al filtro', async () => {
+    const { pc } = await montar()
+    fireEvent.change(pc.getByLabelText('Filtrar ubicación'), { target: { value: 'Ubicación 1' } })
+    expect(filasTabla(pc)).toHaveLength(2)
+    fireEvent.change(pc.getByLabelText('Filtrar estado'), { target: { value: 'dudoso' } })
+    expect(filasTabla(pc)).toHaveLength(1)
+    expect(pc.getByText(/1 de 4 líneas · 6 unidades · 2 filtros activos/)).toBeTruthy()
+    fireEvent.click(pc.getByRole('button', { name: /Quitar filtros/ }))
+    expect(filasTabla(pc)).toHaveLength(4)
+  })
+
+  it('ordenar por diferencia deja primero la que más falta', async () => {
+    const { pc } = await montar()
+    fireEvent.click(pc.getByRole('button', { name: /^Dif\./ }))
+    expect(filasTabla(pc)[0]).toContain('CHAPA GUIA 2001202002')
+    expect(filasTabla(pc)[0]).toContain('-17')
+  })
+
+  it('clic en una fila dudosa abre su formulario y valida', async () => {
+    const { pc, validarLinea } = await montar()
+    fireEvent.click(pc.getByText('92481630'))
+    fireEvent.click(await pc.findByRole('button', { name: /Validar/ }))
+    await waitFor(() => expect(validarLinea).toHaveBeenCalled())
+    expect(validarLinea.mock.calls[0]![2]).toMatchObject({ codigoFabricante: '92461630', codigoSAP: '3300011830' })
   })
 })

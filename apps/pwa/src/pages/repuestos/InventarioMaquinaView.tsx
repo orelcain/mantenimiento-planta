@@ -1,16 +1,22 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Check, ChevronLeft, Loader2, Pencil, Search, X } from 'lucide-react'
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
+import { AlertTriangle, Check, ChevronDown, ChevronLeft, ChevronUp, Download, Loader2, Pencil, Search, X } from 'lucide-react'
 import { Button, ListGroup, SegmentedControl, Tag, type TagTone } from '@/components/piel'
-import { haystackMatchesAll, normalizeForSearch } from '@/utils/repuestos'
+import {
+  FILTROS_VACIOS, diferencia, filtrosActivos, nombreDe, ordenarLineas, pasaFiltros,
+  type ColumnaOrden, type FiltroDif, type FiltroEstado, type FiltrosTabla,
+} from '@/utils/repuestos/inventarioTabla'
 import type { useBodega, InventarioLinea, InventarioSesion, MotivoDuda, BodegaMergedItem } from '@/hooks/repuestos/useBodega'
 
 /**
  * Inventario de la bodega de UNA máquina, contado a mano y cargado desde el
- * cuaderno. Dos listas:
- *  - Inventario: lo confirmado, por ubicación, con contado vs sistema.
- *  - Dudosos: lo que el papel no deja cerrar (código que no existe, cantidad
- *    sobrescrita, SAP que es de otra pieza, sin SAP). Al validar una línea
- *    pasa al inventario. El código del cuaderno nunca se pisa.
+ * cuaderno. Vista distinta por dispositivo:
+ *  - PC: una sola tabla con TODAS las líneas, orden por columna y un filtro
+ *    en cada columna (autofiltro de Excel). Clic en una fila la corrige o,
+ *    si es dudosa, la valida.
+ *  - Celular: Inventario (validado, en lista) y Dudosos (tarjetas).
+ * Dudosa = lo que el papel no deja cerrar (código que no existe, cantidad
+ * sobrescrita, SAP que es de otra pieza, sin SAP). El código del cuaderno
+ * nunca se pisa.
  */
 
 const MOTIVO: Record<MotivoDuda, { texto: string; tono: TagTone }> = {
@@ -29,6 +35,8 @@ function buscarEnMaestro(items: BodegaMergedItem[], codigo: string): BodegaMerge
   return items.find(i => i.codigoSAP && normCodigo(i.codigoFabricante || '') === k)
 }
 
+type Guardar = (l: InventarioLinea, d: Parameters<ReturnType<typeof useBodega>['validarLinea']>[2]) => Promise<void>
+
 export function InventarioMaquinaView({ sesion, bodega, user, onVolver }: {
   sesion: InventarioSesion
   bodega: ReturnType<typeof useBodega>
@@ -38,8 +46,6 @@ export function InventarioMaquinaView({ sesion, bodega, user, onVolver }: {
   const { items, loadLineas, validarLinea } = bodega
   const [lineas, setLineas] = useState<InventarioLinea[] | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [vista, setVista] = useState<'inventario' | 'dudosos'>('inventario')
-  const [busca, setBusca] = useState('')
 
   const recargar = useCallback(async () => {
     try {
@@ -51,29 +57,8 @@ export function InventarioMaquinaView({ sesion, bodega, user, onVolver }: {
   }, [loadLineas, sesion.id])
   useEffect(() => { void recargar() }, [recargar])
 
-  const validadas = useMemo(() => (lineas ?? []).filter(l => l.estado === 'validado'), [lineas])
-  const dudosas = useMemo(() => (lineas ?? []).filter(l => l.estado === 'dudoso'), [lineas])
-  // Los totales salen de las MISMAS listas que se muestran (contador = filtro).
   const unidades = (lineas ?? []).reduce((a, l) => a + (l.cantidad ?? 0), 0)
-  const conDif = validadas.filter(l => l.stockSistema != null && l.cantidad != null && l.cantidad !== l.stockSistema).length
-
-  const filtrar = useCallback((ls: InventarioLinea[]) => {
-    const t = normalizeForSearch(busca).split(/\s+/).filter(Boolean)
-    if (!t.length) return ls
-    return ls.filter(l => haystackMatchesAll(normalizeForSearch(
-      `${l.codigoFabricante} ${l.codigoCuaderno} ${l.codigoSAP} ${l.textoBreve} ${l.descripcion} ${l.nombreComun} ${l.ubicacion}`), t))
-  }, [busca])
-
-  const porUbicacion = useMemo(() => {
-    const m = new Map<string, InventarioLinea[]>()
-    for (const l of filtrar(validadas)) {
-      if (!m.has(l.ubicacion)) m.set(l.ubicacion, [])
-      m.get(l.ubicacion)!.push(l)
-    }
-    return [...m.entries()].sort(([a], [b]) => a.localeCompare(b, 'es', { numeric: true }))
-  }, [validadas, filtrar])
-
-  const guardar = async (l: InventarioLinea, datos: Parameters<typeof validarLinea>[2]) => {
+  const guardar: Guardar = async (l, datos) => {
     if (!user) throw new Error('Hay que iniciar sesión.')
     await validarLinea(sesion.id, l.id, datos, user.id, user.nombre)
     await recargar()
@@ -89,46 +74,329 @@ export function InventarioMaquinaView({ sesion, bodega, user, onVolver }: {
         <h3 className="text-title3 font-bold text-foreground">{sesion.nombre}</h3>
         <p className="text-footnote text-muted-foreground tabular-nums">
           {sesion.maquina ? `${sesion.maquina} · ` : ''}{lineas?.length ?? '…'} líneas · {unidades} unidades
-          {conDif > 0 && ` · ${conDif} con diferencia contra el sistema`}
         </p>
       </div>
 
+      {error && <p className="flex items-center gap-1.5 text-footnote text-ink-crit"><AlertTriangle className="h-4 w-4" />{error}</p>}
+      {!lineas && !error && <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>}
+
+      {lineas && (
+        <>
+          {/* PC: TODO el inventario en una sola tabla, con filtro por columna
+              (como el autofiltro de Excel). Celular: lista en dos renglones —
+              8 columnas no caben en 375 px sin volverse ilegibles. */}
+          <div className="hidden md:block" data-vista="pc">
+            <TablaInventario lineas={lineas} items={items} onGuardar={guardar} nombreArchivo={sesion.nombre} />
+          </div>
+          <div className="md:hidden" data-vista="celular">
+            <ListaCelular lineas={lineas} items={items} onGuardar={guardar} />
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+/* ══════════════════════ PC: tabla con autofiltro ══════════════════════ */
+
+const COLUMNAS: { col: ColumnaOrden; titulo: string; num?: boolean }[] = [
+  { col: 'ubicacion', titulo: 'Ubicación' },
+  { col: 'codigo', titulo: 'Código fabricante' },
+  { col: 'nombre', titulo: 'Nombre' },
+  { col: 'sap', titulo: 'SAP' },
+  { col: 'cantidad', titulo: 'Contado', num: true },
+  { col: 'sistema', titulo: 'Sistema', num: true },
+  { col: 'dif', titulo: 'Dif.', num: true },
+  { col: 'estado', titulo: 'Estado' },
+]
+
+function EstadoTag({ l }: { l: InventarioLinea }) {
+  if (l.estado === 'dudoso' && l.motivo) return <Tag tone={MOTIVO[l.motivo].tono}>{MOTIVO[l.motivo].texto}</Tag>
+  return <Tag tone={2}>Validado</Tag>
+}
+
+function DifTexto({ l }: { l: InventarioLinea }) {
+  const d = diferencia(l)
+  if (d == null) return <span className="text-muted-foreground/60">—</span>
+  if (d === 0) return <span className="text-muted-foreground">0</span>
+  return <span className={d > 0 ? 'text-ink-ok' : 'text-ink-crit'}>{d > 0 ? '+' : ''}{d}</span>
+}
+
+function TablaInventario({ lineas, items, onGuardar, nombreArchivo }: {
+  lineas: InventarioLinea[]
+  items: BodegaMergedItem[]
+  onGuardar: Guardar
+  nombreArchivo: string
+}) {
+  const [f, setF] = useState<FiltrosTabla>(FILTROS_VACIOS)
+  const [busca, setBusca] = useState('')
+  const [orden, setOrden] = useState<{ col: ColumnaOrden; dir: 1 | -1 }>({ col: 'ubicacion', dir: 1 })
+  const [abierta, setAbierta] = useState<string | null>(null)
+  const [bajando, setBajando] = useState(false)
+
+  const ubicaciones = useMemo(
+    () => [...new Set(lineas.map(l => l.ubicacion))].sort((a, b) => a.localeCompare(b, 'es', { numeric: true })),
+    [lineas])
+  // La tabla, el pie y la descarga salen de ESTA lista: lo anunciado es lo que se ve.
+  const visibles = useMemo(
+    () => ordenarLineas(lineas.filter(l => pasaFiltros(l, f, busca)), orden.col, orden.dir),
+    [lineas, f, busca, orden])
+  const nFiltros = filtrosActivos(f, busca)
+  const dudosas = lineas.filter(l => l.estado === 'dudoso').length
+  const set = <K extends keyof FiltrosTabla>(k: K, v: FiltrosTabla[K]) => setF(p => ({ ...p, [k]: v }))
+  const ordenarPor = (col: ColumnaOrden) =>
+    setOrden(o => ({ col, dir: o.col === col ? (o.dir === 1 ? -1 : 1) : 1 }))
+
+  const descargar = async () => {
+    setBajando(true)
+    try {
+      const XLSX = await import('xlsx')
+      const filas = visibles.map(l => ({
+        'Ubicación': l.ubicacion,
+        'Código fabricante': l.codigoFabricante,
+        'Código en el cuaderno': l.codigoCuaderno !== l.codigoFabricante ? l.codigoCuaderno : '',
+        'Nombre': nombreDe(l),
+        'Nombre común': l.nombreComun,
+        'SAP': l.codigoSAP,
+        'Contado': l.cantidad ?? '',
+        'Sistema': l.stockSistema ?? '',
+        'Diferencia': diferencia(l) ?? '',
+        'Estado': l.estado === 'dudoso' && l.motivo ? MOTIVO[l.motivo].texto : 'Validado',
+        'Nota del cuaderno': l.notaCuaderno,
+      }))
+      const ws = XLSX.utils.json_to_sheet(filas)
+      ws['!cols'] = [14, 16, 16, 32, 18, 13, 9, 9, 10, 18, 28].map(wch => ({ wch }))
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'Inventario')
+      XLSX.writeFile(wb, `${nombreArchivo}${nFiltros ? ' (filtrado)' : ''}.xlsx`)
+    } finally { setBajando(false) }
+  }
+
+  const control = 'h-[36px] w-full min-w-0 rounded-ctl bg-muted px-2 text-footnote text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40'
+  const activo = (v: string) => (v ? `${control} bg-primary/[0.12] font-semibold text-primary` : control)
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[240px] flex-1">
+          <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input type="search" value={busca} onChange={e => setBusca(e.target.value)}
+                 placeholder="Buscar en todo: código, SAP o nombre…"
+                 className="h-11 w-full rounded-full bg-muted pl-10 pr-4 text-body text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40" />
+        </div>
+        {dudosas > 0 && f.estado !== 'dudoso' && (
+          <Button variant="tinted" onClick={() => setF({ ...FILTROS_VACIOS, estado: 'dudoso' })}>
+            <AlertTriangle /> {dudosas} por confirmar
+          </Button>
+        )}
+        {nFiltros > 0 && (
+          <Button variant="plain" onClick={() => { setF(FILTROS_VACIOS); setBusca('') }}><X /> Quitar filtros</Button>
+        )}
+      </div>
+
+      <div className="overflow-hidden rounded-card bg-card shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
+        <div className="max-h-[70vh] overflow-auto">
+          <table className="w-full border-separate border-spacing-0 text-footnote tabular-nums">
+            <thead className="sticky top-0 z-10 bg-card">
+              <tr>
+                {COLUMNAS.map(c => (
+                  <th key={c.col} scope="col" aria-sort={orden.col === c.col ? (orden.dir === 1 ? 'ascending' : 'descending') : 'none'}
+                      className={`border-b border-border px-2 pt-2 font-semibold text-muted-foreground ${c.num ? 'text-right' : 'text-left'}`}>
+                    <button type="button" onClick={() => ordenarPor(c.col)}
+                            className={`inline-flex min-h-[32px] items-center gap-1 whitespace-nowrap ${orden.col === c.col ? 'text-primary' : ''}`}>
+                      {c.titulo}
+                      {orden.col === c.col && (orden.dir === 1 ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />)}
+                    </button>
+                  </th>
+                ))}
+              </tr>
+              <tr>
+                <th className="border-b border-border px-1.5 pb-2 font-normal">
+                  <select aria-label="Filtrar ubicación" value={f.ubicacion} onChange={e => set('ubicacion', e.target.value)} className={activo(f.ubicacion)}>
+                    <option value="">Todas</option>
+                    {ubicaciones.map(u => <option key={u} value={u}>{u}</option>)}
+                  </select>
+                </th>
+                <th className="border-b border-border px-1.5 pb-2 font-normal">
+                  <input aria-label="Filtrar código" value={f.codigo} onChange={e => set('codigo', e.target.value)} placeholder="Contiene…" className={`${activo(f.codigo)} font-mono`} />
+                </th>
+                <th className="border-b border-border px-1.5 pb-2 font-normal">
+                  <input aria-label="Filtrar nombre" value={f.nombre} onChange={e => set('nombre', e.target.value)} placeholder="Contiene…" className={activo(f.nombre)} />
+                </th>
+                <th className="border-b border-border px-1.5 pb-2 font-normal">
+                  <select aria-label="Filtrar SAP" value={f.sap} onChange={e => set('sap', e.target.value as FiltrosTabla['sap'])} className={activo(f.sap)}>
+                    <option value="">Todos</option><option value="con">Con SAP</option><option value="sin">Sin SAP</option>
+                  </select>
+                </th>
+                <th className="border-b border-border" /><th className="border-b border-border" />
+                <th className="border-b border-border px-1.5 pb-2 font-normal">
+                  <select aria-label="Filtrar diferencia" value={f.dif} onChange={e => set('dif', e.target.value as FiltroDif)} className={activo(f.dif)}>
+                    <option value="">Todas</option><option value="con">Con diferencia</option><option value="falta">Faltan (−)</option>
+                    <option value="sobra">Sobran (+)</option><option value="cero">Cuadra (0)</option><option value="nd">Sin dato</option>
+                  </select>
+                </th>
+                <th className="border-b border-border px-1.5 pb-2 font-normal">
+                  <select aria-label="Filtrar estado" value={f.estado} onChange={e => set('estado', e.target.value as FiltroEstado)} className={activo(f.estado)}>
+                    <option value="">Todos</option><option value="validado">Validados</option><option value="dudoso">Todos los dudosos</option>
+                    {(Object.keys(MOTIVO) as MotivoDuda[]).map(m => <option key={m} value={m}>{MOTIVO[m].texto}</option>)}
+                  </select>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {visibles.length === 0 && (
+                <tr><td colSpan={8} className="py-10 text-center text-muted-foreground">Ninguna línea cumple los filtros.</td></tr>
+              )}
+              {visibles.map(l => (
+                <Fragment key={l.id}>
+                  <tr onClick={() => setAbierta(a => (a === l.id ? null : l.id))}
+                      className={`cursor-pointer hover:bg-muted/60 ${abierta === l.id ? 'bg-muted/60' : ''}`}>
+                    <td className="border-b border-border/40 px-2 py-2 whitespace-nowrap">{l.ubicacion}</td>
+                    <td className="border-b border-border/40 px-2 py-2 font-mono">
+                      {l.codigoFabricante}
+                      {l.codigoCuaderno !== l.codigoFabricante && <span className="block text-caption text-muted-foreground">cuaderno: {l.codigoCuaderno}</span>}
+                    </td>
+                    <td className="border-b border-border/40 px-2 py-2">
+                      {nombreDe(l) || <span className="text-muted-foreground/60">—</span>}
+                      {l.nombreComun && <span className="text-muted-foreground"> · {l.nombreComun}</span>}
+                    </td>
+                    <td className="border-b border-border/40 px-2 py-2 font-mono">{l.codigoSAP || <span className="text-muted-foreground/60">sin SAP</span>}</td>
+                    <td className="border-b border-border/40 px-2 py-2 text-right font-semibold">{l.cantidad ?? '?'}</td>
+                    <td className="border-b border-border/40 px-2 py-2 text-right">{l.stockSistema ?? <span className="text-muted-foreground/60">—</span>}</td>
+                    <td className="border-b border-border/40 px-2 py-2 text-right"><DifTexto l={l} /></td>
+                    <td className="border-b border-border/40 px-2 py-2"><EstadoTag l={l} /></td>
+                  </tr>
+                  {abierta === l.id && (
+                    <tr>
+                      <td colSpan={8} className="border-b border-border/40 bg-muted/30 px-4 py-3">
+                        <div className="max-w-xl space-y-2">
+                          {l.estado === 'dudoso' && (
+                            <p className="text-footnote text-muted-foreground">
+                              Cuaderno: <b className="font-mono text-foreground">{l.codigoCuaderno}</b> × {l.cantidad ?? '?'}
+                              {l.notaCuaderno && <> · «{l.notaCuaderno}»</>}
+                              {l.detalleDuda && <><br />{l.detalleDuda}</>}
+                            </p>
+                          )}
+                          <FormularioLinea linea={l} items={items} textoBoton={l.estado === 'dudoso' ? 'Validar' : 'Guardar'}
+                                           onCancelar={() => setAbierta(null)}
+                                           onGuardar={async d => { await onGuardar(l, d); setAbierta(null) }} />
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-3 py-2.5 text-footnote text-muted-foreground tabular-nums">
+          <span>
+            {visibles.length} de {lineas.length} líneas · {visibles.reduce((a, l) => a + (l.cantidad ?? 0), 0)} unidades
+            {nFiltros > 0 && ` · ${nFiltros} filtro${nFiltros > 1 ? 's' : ''} activo${nFiltros > 1 ? 's' : ''}`}
+            {' · '}clic en una fila para corregirla
+          </span>
+          <Button variant="tinted" onClick={descargar} disabled={bajando || visibles.length === 0}>
+            {bajando ? <Loader2 className="animate-spin" /> : <Download />} Descargar Excel
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ══════════════════════ Celular: lista ══════════════════════ */
+
+type Chip = 'todos' | 'con' | 'falta' | 'sin'
+const CHIPS: { id: Chip; texto: string; filtro: Partial<FiltrosTabla> }[] = [
+  { id: 'todos', texto: 'Todos', filtro: {} },
+  { id: 'con', texto: 'Con diferencia', filtro: { dif: 'con' } },
+  { id: 'falta', texto: 'Faltan', filtro: { dif: 'falta' } },
+  { id: 'sin', texto: 'Sin SAP', filtro: { sap: 'sin' } },
+]
+
+function ListaCelular({ lineas, items, onGuardar }: { lineas: InventarioLinea[]; items: BodegaMergedItem[]; onGuardar: Guardar }) {
+  const [vista, setVista] = useState<'inventario' | 'dudosos'>('inventario')
+  const [busca, setBusca] = useState('')
+  const [agrupar, setAgrupar] = useState<'ubicacion' | ''>('ubicacion')
+  const [orden, setOrden] = useState<ColumnaOrden>('ubicacion')
+  const [chip, setChip] = useState<Chip>('todos')
+
+  const validadas = useMemo(() => lineas.filter(l => l.estado === 'validado'), [lineas])
+  const dudosas = useMemo(() => lineas.filter(l => l.estado === 'dudoso'), [lineas])
+  const filtroChip = (c: Chip): FiltrosTabla => ({ ...FILTROS_VACIOS, ...CHIPS.find(x => x.id === c)!.filtro })
+  const visibles = useMemo(
+    () => ordenarLineas(validadas.filter(l => pasaFiltros(l, filtroChip(chip), busca)), orden, 1),
+    [validadas, chip, busca, orden])
+  const grupos = useMemo(() => {
+    if (!agrupar) return [['', visibles] as const]
+    const m = new Map<string, InventarioLinea[]>()
+    for (const l of visibles) { if (!m.has(l.ubicacion)) m.set(l.ubicacion, []); m.get(l.ubicacion)!.push(l) }
+    return [...m.entries()].sort(([a], [b]) => a.localeCompare(b, 'es', { numeric: true }))
+  }, [visibles, agrupar])
+  const dudosasVisibles = dudosas.filter(l => pasaFiltros(l, FILTROS_VACIOS, busca))
+  const menu = 'h-11 min-w-0 flex-1 rounded-full bg-muted px-3 text-subhead text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40'
+
+  return (
+    <div className="space-y-3">
       <SegmentedControl
         value={vista} onChange={setVista} ariaLabel="Vista del inventario"
         segments={[
           { value: 'inventario', label: <>Inventario <span className="tabular-nums text-muted-foreground">{validadas.length}</span></> },
           { value: 'dudosos', label: <>Dudosos <span className="tabular-nums text-ink-warn">{dudosas.length}</span></> },
         ]} />
-
       <div className="relative">
         <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <input type="search" value={busca} onChange={e => setBusca(e.target.value)}
-               placeholder="Código de fabricante, SAP o nombre…"
+               placeholder="Código, SAP o nombre…"
                className="h-11 w-full rounded-full bg-muted pl-10 pr-4 text-body text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40" />
       </div>
 
-      {error && <p className="flex items-center gap-1.5 text-footnote text-ink-crit"><AlertTriangle className="h-4 w-4" />{error}</p>}
-      {!lineas && !error && <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>}
-
-      {lineas && vista === 'inventario' && (
-        porUbicacion.length === 0
-          ? <p className="py-8 text-center text-footnote text-muted-foreground">{busca ? 'Sin coincidencias' : 'Todavía no hay líneas validadas.'}</p>
-          : porUbicacion.map(([ubi, ls]) => (
-              <ListGroup key={ubi}
-                         title={<>{ubi} <span className="tabular-nums font-normal">· {ls.length} líneas · {ls.reduce((a, l) => a + (l.cantidad ?? 0), 0)} unidades</span></>}>
-                {ls.map(l => <FilaValidada key={l.id} linea={l} items={items} onGuardar={guardar} />)}
-              </ListGroup>
-            ))
+      {vista === 'inventario' && (
+        <>
+          <div className="flex gap-2">
+            <select aria-label="Agrupar" value={agrupar} onChange={e => setAgrupar(e.target.value as 'ubicacion' | '')} className={menu}>
+              <option value="ubicacion">Por ubicación</option>
+              <option value="">Sin agrupar</option>
+            </select>
+            <select aria-label="Ordenar" value={orden} onChange={e => setOrden(e.target.value as ColumnaOrden)} className={menu}>
+              <option value="ubicacion">Orden: ubicación</option>
+              <option value="codigo">Orden: código</option>
+              <option value="nombre">Orden: nombre</option>
+              <option value="cantidad">Orden: cantidad</option>
+              <option value="dif">Orden: diferencia</option>
+            </select>
+          </div>
+          <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1" style={{ scrollbarWidth: 'none' }}>
+            {CHIPS.map(c => {
+              const n = validadas.filter(l => pasaFiltros(l, filtroChip(c.id), busca)).length
+              const on = chip === c.id
+              return (
+                <button key={c.id} type="button" onClick={() => setChip(c.id)} aria-pressed={on}
+                        className={`flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-subhead font-medium ${on ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground'}`}>
+                  {c.texto} <span className="tabular-nums opacity-80">{n}</span>
+                </button>
+              )
+            })}
+          </div>
+          {visibles.length === 0
+            ? <p className="py-8 text-center text-footnote text-muted-foreground">Sin coincidencias</p>
+            : grupos.map(([ubi, ls]) => (
+                <ListGroup key={ubi || 'todo'}
+                           title={ubi ? <>{ubi} <span className="tabular-nums font-normal">· {ls.length} líneas · {ls.reduce((a, l) => a + (l.cantidad ?? 0), 0)} unidades</span></> : undefined}>
+                  {ls.map(l => <FilaValidada key={l.id} linea={l} items={items} onGuardar={onGuardar} />)}
+                </ListGroup>
+              ))}
+        </>
       )}
 
-      {lineas && vista === 'dudosos' && (
-        filtrar(dudosas).length === 0
+      {vista === 'dudosos' && (
+        dudosasVisibles.length === 0
           ? <p className="py-8 text-center text-footnote text-muted-foreground">{busca ? 'Sin coincidencias' : 'No quedan dudosos: todo está validado.'}</p>
           : <div className="space-y-3">
               <p className="text-footnote text-muted-foreground">
                 Confirma cada línea con la etiqueta de la pieza. Al validarla pasa al inventario; lo que decía el cuaderno queda guardado.
               </p>
-              {filtrar(dudosas).map(l => <TarjetaDudosa key={l.id} linea={l} items={items} onGuardar={guardar} />)}
+              {dudosasVisibles.map(l => <TarjetaDudosa key={l.id} linea={l} items={items} onGuardar={onGuardar} />)}
             </div>
       )}
     </div>
@@ -140,7 +408,7 @@ export function InventarioMaquinaView({ sesion, bodega, user, onVolver }: {
 function FilaValidada({ linea: l, items, onGuardar }: {
   linea: InventarioLinea
   items: BodegaMergedItem[]
-  onGuardar: (l: InventarioLinea, d: Parameters<ReturnType<typeof useBodega>['validarLinea']>[2]) => Promise<void>
+  onGuardar: Guardar
 }) {
   const [editando, setEditando] = useState(false)
   const dif = l.stockSistema != null && l.cantidad != null ? l.cantidad - l.stockSistema : null
@@ -186,7 +454,7 @@ function FilaValidada({ linea: l, items, onGuardar }: {
 function TarjetaDudosa({ linea: l, items, onGuardar }: {
   linea: InventarioLinea
   items: BodegaMergedItem[]
-  onGuardar: (l: InventarioLinea, d: Parameters<ReturnType<typeof useBodega>['validarLinea']>[2]) => Promise<void>
+  onGuardar: Guardar
 }) {
   const m = l.motivo ? MOTIVO[l.motivo] : undefined
   return (
