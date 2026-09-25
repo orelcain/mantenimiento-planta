@@ -18,3 +18,17 @@ export function geometriaGiro(giro: Giro, W: number, H: number) {
 
 /** El giro siguiente (+90°, vuelve a 0 tras 270). */
 export const siguienteGiro = (g: Giro | undefined): Giro => ((((g ?? 0) + 90) % 360) as Giro)
+
+/**
+ * Lo que llega de Firestore o del almacenamiento local, filtrado a giros
+ * válidos: un valor raro (o un doc editado a mano) no puede dejar una hoja
+ * en un ángulo que el lienzo no sabe dibujar.
+ */
+export function limpiarGiros(crudo: unknown): Record<string, Giro> {
+  const out: Record<string, Giro> = {}
+  if (!crudo || typeof crudo !== 'object') return out
+  for (const [k, v] of Object.entries(crudo as Record<string, unknown>)) {
+    if (/^\d{1,4}$/.test(k) && (v === 0 || v === 90 || v === 180 || v === 270)) out[k] = v
+  }
+  return out
+}
