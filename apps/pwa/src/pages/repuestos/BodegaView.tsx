@@ -45,6 +45,9 @@ import { useToast } from '@/hooks/useToast'
 import { ImageLightbox } from '@/components/ui/ImageLightbox'
 import { dec1, dec2 } from '@/utils/formatoNumeros'
 import { InventarioMaquinaView, CLAVE_VOLVER_INVENTARIO } from './InventarioMaquinaView'
+import { StockTablaPC } from './StockTablaPC'
+import { useEsPC } from '@/hooks/useEsPC'
+import { Pill, SegmentedControl } from '@/components/piel'
 
 type BodegaTab = 'stock' | 'inventarios' | 'movimientos' | 'estadisticas'
 type StockFilter = 'todos' | 'configurados' | 'bajo' | 'sin' | 'sinConfig' | 'favoritos'
@@ -140,6 +143,20 @@ export function BodegaView({ onViewInEquipo, onSearchSimilar }: BodegaViewProps 
   const bodega = useBodega(allRepuestos)
   const isLoading = catalogLoading || (bodega.loading && allRepuestos.length === 0)
 
+  // Inventarios en curso: se ven en la pestaña y como aviso arriba del stock
+  // (antes quedaban escondidos detrás del menú «Stock ⌄»).
+  const { loadInventarios } = bodega
+  const [enCurso, setEnCurso] = useState<InventarioSesion[]>([])
+  useEffect(() => {
+    let vivo = true
+    loadInventarios().then(s => { if (vivo) setEnCurso(s.filter(x => x.estado === 'en_curso')) }).catch(() => {})
+    return () => { vivo = false }
+  }, [loadInventarios, subTab])
+  const verInventario = useCallback((id: string) => {
+    try { sessionStorage.setItem(CLAVE_VOLVER_INVENTARIO, id) } catch { /* sin storage */ }
+    setSubTab('inventarios')
+  }, [])
+
   if (isLoading) {
     const pct = progress.total > 0 ? Math.round((progress.loaded / progress.total) * 100) : 0
     return (
@@ -170,10 +187,21 @@ export function BodegaView({ onViewInEquipo, onSearchSimilar }: BodegaViewProps 
   const subTabActual = SUB_TABS.find(t => t.id === subTab) ?? { id: 'stock' as BodegaTab, label: 'Stock', icon: Package }
 
   return (
-    <div className="flex flex-col gap-3 p-3 sm:p-6 max-w-6xl mx-auto">
-      {/* La sub-vista se elige desde el título (patrón Salud / Fitness): evita dos
-          controles segmentados apilados bajo el de Áreas · Bodega · Códigos. El
-          contador de alertas ya no vive aquí: está en la celda de alertas. */}
+    <div className="mx-auto flex max-w-6xl flex-col gap-3 p-3 sm:p-6 lg:max-w-[1680px]">
+      {/* PC: las cuatro vistas a la vista, con cuántos inventarios hay en curso. */}
+      <div className="hidden max-w-2xl lg:block">
+        <SegmentedControl<BodegaTab>
+          value={subTab} onChange={setSubTab} ariaLabel="Vista de Bodega"
+          segments={SUB_TABS.map(t => ({
+            value: t.id,
+            label: t.id === 'inventarios' && enCurso.length > 0
+              ? <>{t.label} <Pill tone="warning" className="px-1.5 py-0.5 tabular-nums">{enCurso.length} en curso</Pill></>
+              : t.label,
+          }))} />
+      </div>
+      {/* Teléfono: la sub-vista se elige desde el título (patrón Salud / Fitness):
+          evita dos controles segmentados apilados bajo el de Áreas · Bodega · Códigos. */}
+      <div className="lg:hidden">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
@@ -200,6 +228,25 @@ export function BodegaView({ onViewInEquipo, onSearchSimilar }: BodegaViewProps 
           })}
         </DropdownMenuContent>
       </DropdownMenu>
+      </div>
+
+      {subTab === 'stock' && enCurso.map(s => (
+        <div key={s.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-card bg-card px-4 py-3 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
+          <ClipboardList className="size-5 shrink-0 text-ink-warn" />
+          <div className="min-w-0 flex-1">
+            <p className="text-subhead font-semibold text-foreground">{s.nombre}</p>
+            <p className="text-footnote tabular-nums text-muted-foreground">
+              En curso{s.tipo === 'maquina'
+                ? ` · ${s.totalItems} líneas${s.unidades != null ? ` · ${s.unidades} unidades` : ''} · ${s.dudosos ?? 0} dudosos · ${s.ajustado ? 'stock ajustado' : 'ajuste de stock pendiente'}`
+                : ` · ${s.contados}/${s.totalItems} contados`}
+            </p>
+          </div>
+          <button type="button" onClick={() => verInventario(s.id)}
+                  className="inline-flex min-h-[44px] items-center gap-1 rounded-full bg-primary/[0.12] px-4 text-subhead font-medium text-primary">
+            Ver inventario <ChevronRight className="size-4" />
+          </button>
+        </div>
+      ))}
 
       {subTab === 'stock' && <StockTab bodega={bodega} user={user} onViewInEquipo={onViewInEquipo} onSearchSimilar={onSearchSimilar} />}
       {subTab === 'inventarios' && <InventarioTab bodega={bodega} user={user} />}
@@ -250,6 +297,8 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   const [alertasAbiertas, setAlertasAbiertas] = useState(false)
 
+  const esPC = useEsPC()
+
   const toggleSort = useCallback((field: SortField) => {
     setSortField(prev => { if (prev === field) { setSortDir(d => d === 'asc' ? 'desc' : 'asc'); return prev } setSortDir('asc'); return field })
   }, [])
@@ -291,27 +340,9 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
     return result
   }, [items, stockFilter, searchQuery, sortField, sortDir])
 
-  return (
-    <>
-      {/* ── Buscar + menú de acciones ──
-          Las cuatro acciones de la vista (lote, carga rápida, configurar, CSV) viven
-          en un menú «⋯», no como botones de color junto al buscador (DESIGN.md §10). */}
-      <div className="flex items-center gap-2">
-        <div className="relative flex-1">
-          <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <input
-            type="search"
-            placeholder="Nombre, SAP, tipo o ubicación"
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className="h-11 w-full rounded-full bg-muted pl-10 pr-9 text-body text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
-          />
-          {searchQuery && (
-            <button type="button" onClick={() => setSearchQuery('')} aria-label="Borrar búsqueda" className="absolute right-1 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-muted-foreground/[0.12]">
-              <X className="size-4" />
-            </button>
-          )}
-        </div>
+  // Las cuatro acciones de la vista (lote, carga rápida, configurar, CSV) viven
+  // en un menú «⋯», no como botones de color junto al buscador (DESIGN.md §10).
+  const menuAcciones = (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button type="button" aria-label="Más acciones" className="flex size-11 shrink-0 items-center justify-center rounded-full bg-muted text-foreground hover:bg-muted-foreground/[0.15] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
@@ -328,6 +359,52 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
             <DropdownMenuItem className="gap-2 py-2" onClick={() => exportCsv(filtered)}><Download className="size-4 text-muted-foreground" />Exportar CSV</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+  )
+
+  const modales = (
+    <>
+      {editingItem && <StockFormModal item={editingItem} onSave={async d => { await saveStock(editingItem.codigoSAP, d); setEditingItem(null) }} onClose={() => setEditingItem(null)} />}
+      {movimientoItem && <MovimientoModal item={movimientoItem} onSave={async (t, c, m) => { if (user) { await registrarMovimiento(movimientoItem, { tipo: t, cantidad: c, motivo: m }, user.id, user.nombre); setMovimientoItem(null) } }} onClose={() => setMovimientoItem(null)} />}
+      {historialItem && <HistorialModal item={historialItem} loadMovimientos={loadMovimientos} onClose={() => setHistorialItem(null)} />}
+      {showBulkConfig && <BulkConfigModal items={items.filter(i => !i.bodegaId)} saveStock={saveStock} onClose={() => setShowBulkConfig(false)} />}
+      {showCargaRapida && <CargaRapidaModal items={items} saveStock={saveStock} onClose={() => setShowCargaRapida(false)} />}
+      {showBatchMov && <BatchMovimientoModal items={items.filter(i => i.bodegaId)} registrarMovimientoBatch={registrarMovimientoBatch} user={user} onClose={() => setShowBatchMov(false)} />}
+      {drawerItem && <ItemDrawer item={drawerItem} loadMovimientos={loadMovimientos} onClose={() => setDrawerItem(null)} onEdit={() => { setEditingItem(drawerItem); setDrawerItem(null) }} onMovimiento={() => { setMovimientoItem(drawerItem); setDrawerItem(null) }} addPhoto={addPhoto} removePhoto={removePhoto} calcReorderData={calcReorderData} onViewInEquipo={onViewInEquipo} onSearchSimilar={onSearchSimilar} />}
+    </>
+  )
+
+  // PC (≥1024 px): filtros a la izquierda y tabla a todo el ancho.
+  if (esPC) {
+    return (
+      <>
+        <StockTablaPC items={items} acciones={menuAcciones}
+                      onAbrir={setDrawerItem} onMovimiento={setMovimientoItem}
+                      onFavorito={i => toggleWatch(i.rowKey)} />
+        {modales}
+      </>
+    )
+  }
+
+  return (
+    <>
+      {/* ── Buscar + menú de acciones ── */}
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="search"
+            placeholder="Nombre, SAP, tipo o ubicación"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="h-11 w-full rounded-full bg-muted pl-10 pr-9 text-body text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+          />
+          {searchQuery && (
+            <button type="button" onClick={() => setSearchQuery('')} aria-label="Borrar búsqueda" className="absolute right-1 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-muted-foreground/[0.12]">
+              <X className="size-4" />
+            </button>
+          )}
+        </div>
+        {menuAcciones}
       </div>
 
       {/* ── Filtros como chips (Fotos / App Store) ──
@@ -445,13 +522,7 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
         </ListGroup>
       )}
 
-      {editingItem && <StockFormModal item={editingItem} onSave={async d => { await saveStock(editingItem.codigoSAP, d); setEditingItem(null) }} onClose={() => setEditingItem(null)} />}
-      {movimientoItem && <MovimientoModal item={movimientoItem} onSave={async (t, c, m) => { if (user) { await registrarMovimiento(movimientoItem, { tipo: t, cantidad: c, motivo: m }, user.id, user.nombre); setMovimientoItem(null) } }} onClose={() => setMovimientoItem(null)} />}
-      {historialItem && <HistorialModal item={historialItem} loadMovimientos={loadMovimientos} onClose={() => setHistorialItem(null)} />}
-      {showBulkConfig && <BulkConfigModal items={items.filter(i => !i.bodegaId)} saveStock={saveStock} onClose={() => setShowBulkConfig(false)} />}
-      {showCargaRapida && <CargaRapidaModal items={items} saveStock={saveStock} onClose={() => setShowCargaRapida(false)} />}
-      {showBatchMov && <BatchMovimientoModal items={items.filter(i => i.bodegaId)} registrarMovimientoBatch={registrarMovimientoBatch} user={user} onClose={() => setShowBatchMov(false)} />}
-      {drawerItem && <ItemDrawer item={drawerItem} loadMovimientos={loadMovimientos} onClose={() => setDrawerItem(null)} onEdit={() => { setEditingItem(drawerItem); setDrawerItem(null) }} onMovimiento={() => { setMovimientoItem(drawerItem); setDrawerItem(null) }} addPhoto={addPhoto} removePhoto={removePhoto} calcReorderData={calcReorderData} onViewInEquipo={onViewInEquipo} onSearchSimilar={onSearchSimilar} />}
+      {modales}
     </>
   )
 }
