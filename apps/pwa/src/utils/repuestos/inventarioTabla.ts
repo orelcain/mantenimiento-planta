@@ -7,9 +7,30 @@ import type { InventarioLinea, MotivoDuda } from '@/hooks/repuestos/useBodega'
  * anuncia siempre es el que se ve.
  */
 
-/** Contado − sistema; null si falta alguno de los dos (no hay con qué comparar). */
+/**
+ * Contado − sistema; null si falta alguno de los dos (no hay con qué comparar).
+ * Si el SAP está repartido en varias líneas (p. ej. 92462030: 19 en la
+ * ubicación 3 y 2 en la 7), se compara el TOTAL contado contra el stock del
+ * SAP: línea por línea saldrían diferencias que no existen.
+ */
 export function diferencia(l: InventarioLinea): number | null {
-  return l.stockSistema == null || l.cantidad == null ? null : l.cantidad - l.stockSistema
+  const contado = l.contadoSap ?? l.cantidad
+  return l.stockSistema == null || contado == null ? null : contado - l.stockSistema
+}
+
+/** Marca en cada línea el total contado de su SAP cuando ese SAP aparece en más de una línea validada. */
+export function conTotalesPorSap(ls: readonly InventarioLinea[]): InventarioLinea[] {
+  const grupos = new Map<string, InventarioLinea[]>()
+  for (const l of ls) {
+    if (l.estado !== 'validado' || !l.codigoSAP || l.cantidad == null) continue
+    if (!grupos.has(l.codigoSAP)) grupos.set(l.codigoSAP, [])
+    grupos.get(l.codigoSAP)!.push(l)
+  }
+  return ls.map(l => {
+    const g = l.estado === 'validado' && l.codigoSAP ? grupos.get(l.codigoSAP) : undefined
+    if (!g || g.length < 2) return l
+    return { ...l, contadoSap: g.reduce((a, x) => a + (x.cantidad ?? 0), 0), lineasSap: g.length }
+  })
 }
 
 export type FiltroDif = '' | 'con' | 'falta' | 'sobra' | 'cero' | 'nd'

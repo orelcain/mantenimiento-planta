@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { InventarioLinea } from '@/hooks/repuestos/useBodega'
-import { FILTROS_VACIOS, diferencia, filtrosActivos, ordenarLineas, pasaFiltros, planDeAjuste } from '../inventarioTabla'
+import { FILTROS_VACIOS, conTotalesPorSap, diferencia, filtrosActivos, ordenarLineas, pasaFiltros, planDeAjuste } from '../inventarioTabla'
 
 const base: InventarioLinea = {
   id: '', ubicacion: '', codigoFabricante: '', codigoCuaderno: '', codigoSAP: '', textoBreve: '', descripcion: '',
@@ -73,5 +73,30 @@ describe('plan de ajuste de stock', () => {
       v('b', '3300011830', 5, 9, { ubicacion: 'Ubicación 3' }),
     ])
     expect(p.cambian).toEqual([expect.objectContaining({ contado: 7, sistema: 9, ubicaciones: ['Ubicación 1', 'Ubicación 3'] })])
+  })
+})
+
+describe('SAP repartido en varias líneas', () => {
+  const v = (id: string, ubic: string, cant: number, sis: number | null): InventarioLinea =>
+    ({ ...base, id, ubicacion: ubic, codigoFabricante: '92462030', codigoCuaderno: '92462030', codigoSAP: '3300017043', cantidad: cant, stockSistema: sis, estado: 'validado' })
+
+  it('la diferencia se mide con el TOTAL contado del SAP, no línea por línea', () => {
+    // Caso real: 92462030 → 19 en la ubicación 3 y 2 en la 7; el sistema dice 21.
+    const [a, b] = conTotalesPorSap([v('a', 'Ubicación 3', 19, 21), v('b', 'Ubicación 7', 2, 21)])
+    expect([a!.contadoSap, a!.lineasSap]).toEqual([21, 2])
+    expect(diferencia(a!)).toBe(0)
+    expect(diferencia(b!)).toBe(0)
+  })
+
+  it('una línea sola no cambia', () => {
+    const [a] = conTotalesPorSap([v('a', 'Ubicación 3', 19, 21)])
+    expect(a!.contadoSap).toBeUndefined()
+    expect(diferencia(a!)).toBe(-2)
+  })
+
+  it('las dudosas no suman al total', () => {
+    const d = { ...v('b', 'Ubicación 7', 2, 21), estado: 'dudoso' as const }
+    const [a] = conTotalesPorSap([v('a', 'Ubicación 3', 19, 21), d])
+    expect(a!.contadoSap).toBeUndefined()
   })
 })

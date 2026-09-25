@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, BookOpen, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Download, Loader2, Pencil, Scale, Search, Shapes, X } from 'lucide-react'
 import { Button, ListCell, ListGroup, SegmentedControl, Sheet, Tag, type TagTone } from '@/components/piel'
 import {
-  FILTROS_VACIOS, diferencia, filtrosActivos, nombreDe, ordenarLineas, pasaFiltros, planDeAjuste,
+  FILTROS_VACIOS, conTotalesPorSap, diferencia, filtrosActivos, nombreDe, ordenarLineas, pasaFiltros, planDeAjuste,
   type ColumnaOrden, type FiltroDif, type FiltroEstado, type FiltrosTabla,
 } from '@/utils/repuestos/inventarioTabla'
 import { rutaDibujo, useFigurasDespiece, useManualesPieza } from './enlacesPieza'
@@ -116,7 +116,9 @@ export function InventarioMaquinaView({ sesion, bodega, user, onVolver }: {
 
   const recargar = useCallback(async () => {
     try {
-      setLineas(await loadLineas(sesion.id))
+      // Con el total por SAP: la diferencia de un SAP repartido en dos
+      // ubicaciones se mide contra lo contado entre ambas.
+      setLineas(conTotalesPorSap(await loadLineas(sesion.id)))
       setError(null)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudieron cargar las líneas.')
@@ -425,7 +427,10 @@ function TablaInventario({ lineas, items, onGuardar, nombreArchivo }: {
                       {l.nombreComun && <span className="text-muted-foreground"> · {l.nombreComun}</span>}
                     </td>
                     <td className="border-b border-border/40 px-2 py-2 font-mono">{l.codigoSAP || <span className="text-muted-foreground/60">sin SAP</span>}</td>
-                    <td className="border-b border-border/40 px-2 py-2 text-right font-semibold">{l.cantidad ?? '?'}</td>
+                    <td className="border-b border-border/40 px-2 py-2 text-right font-semibold">
+                      {l.cantidad ?? '?'}
+                      {l.lineasSap && <span className="block text-caption font-normal text-muted-foreground">total SAP {l.contadoSap} ({l.lineasSap} líneas)</span>}
+                    </td>
                     <td className="border-b border-border/40 px-2 py-2 text-right">
                       {l.stockSistema ?? <span className="text-muted-foreground/60">—</span>}
                       {l.aplicadoCantidad != null && l.stockSistemaAntes !== l.stockSistema && (
@@ -589,7 +594,7 @@ function FilaValidada({ linea: l, items, onGuardar }: {
   const [acciones, setAcciones] = useState(false)
   const e = useEnlaces()
   const navigate = useNavigate()
-  const dif = l.stockSistema != null && l.cantidad != null ? l.cantidad - l.stockSistema : null
+  const dif = diferencia(l)
   if (editando) {
     return (
       <div className="border-b border-border/40 p-3 last:border-b-0">
@@ -620,6 +625,7 @@ function FilaValidada({ linea: l, items, onGuardar }: {
         </div>
         <div className="w-16 shrink-0 text-right">
           <p className="text-headline font-bold tabular-nums text-foreground">{l.cantidad ?? '—'}</p>
+          {l.lineasSap && <p className="text-caption tabular-nums text-muted-foreground">total {l.contadoSap}</p>}
           {l.stockSistema != null && (
             <p className={`text-caption tabular-nums ${dif ? (dif > 0 ? 'text-ink-ok' : 'text-ink-crit') : 'text-muted-foreground'}`}>
               sist. {l.stockSistema}{dif ? ` (${dif > 0 ? '+' : ''}${dif})` : ''}

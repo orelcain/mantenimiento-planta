@@ -40,7 +40,7 @@ import { useAuthStore } from '@/store'
 import { uploadBodegaPhoto, deleteBodegaPhoto } from '@/services/storage'
 import type { GlobalSearchResult } from '@/hooks/repuestos/useGlobalSearch'
 import type { MaterialClase } from '@/types/repuestos'
-import type { PlanAjuste } from '@/utils/repuestos/inventarioTabla'
+import { conTotalesPorSap, diferencia, type PlanAjuste } from '@/utils/repuestos/inventarioTabla'
 
 // ══════════════════════════════════════════════
 //  TIPOS
@@ -228,6 +228,12 @@ export interface InventarioLinea {
   /** Stock que decía el sistema ANTES del ajuste: la evidencia de cuánto no cuadraba. */
   stockSistemaAntes?: number | null
   aplicadoAt?: Date
+  /** Derivado (no se guarda): si el mismo SAP está en varias líneas, lo
+   *  contado entre TODAS. El stock del sistema es por SAP, así que la
+   *  diferencia se mide contra este total, no contra la línea sola. */
+  contadoSap?: number
+  /** Derivado: en cuántas líneas está ese SAP (solo si son más de una). */
+  lineasSap?: number
 }
 
 export interface InventarioConteo {
@@ -844,7 +850,8 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
       dudosos: lineas.filter(l => l.estado === 'dudoso').length,
       unidades: lineas.reduce((a, l) => a + (l.cantidad ?? 0), 0),
       contados: lineas.filter(l => l.cantidad != null).length,
-      conDiferencia: lineas.filter(l => l.stockSistema != null && l.cantidad != null && l.cantidad !== l.stockSistema).length,
+      // Mismo criterio que la tabla: un SAP en varias líneas se compara por su total.
+      conDiferencia: conTotalesPorSap(lineas).filter(l => { const d = diferencia(l); return d != null && d !== 0 }).length,
     })
   }, [loadLineas])
 
