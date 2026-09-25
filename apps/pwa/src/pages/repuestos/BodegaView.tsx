@@ -44,6 +44,7 @@ import { useAuthStore } from '@/store/authStore'
 import { useToast } from '@/hooks/useToast'
 import { ImageLightbox } from '@/components/ui/ImageLightbox'
 import { dec1, dec2 } from '@/utils/formatoNumeros'
+import { InventarioMaquinaView } from './InventarioMaquinaView'
 
 type BodegaTab = 'stock' | 'inventarios' | 'movimientos' | 'estadisticas'
 type StockFilter = 'todos' | 'configurados' | 'bajo' | 'sin' | 'sinConfig' | 'favoritos'
@@ -556,6 +557,15 @@ function InventarioTab({ bodega, user }: { bodega: ReturnType<typeof useBodega>;
     )
   }
 
+  // Inventario por máquina (conteo del cuaderno, con ubicación y dudosos):
+  // tiene su propia vista; el ajuste de stock de este tipo todavía no se aplica.
+  if (activeSesion?.tipo === 'maquina') {
+    return (
+      <InventarioMaquinaView sesion={activeSesion} bodega={bodega} user={user}
+                             onVolver={() => { setActiveSesion(null); void reload() }} />
+    )
+  }
+
   if (activeSesion) {
     const contados = conteos.filter(c => c.stockFisico !== null)
     const conDif = contados.filter(c => c.diferencia !== 0)
@@ -637,7 +647,10 @@ function InventarioTab({ bodega, user }: { bodega: ReturnType<typeof useBodega>;
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-foreground">{s.nombre}</p>
                 <div className="flex items-center gap-3 text-caption text-muted-foreground mt-0.5">
-                  <span>{s.contados}/{s.totalItems} contados</span>
+                  {s.tipo === 'maquina'
+                    ? <span>{s.maquina ? `${s.maquina} · ` : ''}{s.totalItems} líneas{s.unidades != null ? ` · ${s.unidades} unidades` : ''}</span>
+                    : <span>{s.contados}/{s.totalItems} contados</span>}
+                  {s.tipo === 'maquina' && (s.dudosos ?? 0) > 0 && <span className="text-ink-warn">{s.dudosos} dudosos</span>}
                   {s.conDiferencia > 0 && <span className="text-ink-warn">{s.conDiferencia} con diferencia</span>}
                   <span>{s.creadoPorNombre}</span>
                   <span>{s.createdAt.toLocaleDateString('es-CL')}</span>
