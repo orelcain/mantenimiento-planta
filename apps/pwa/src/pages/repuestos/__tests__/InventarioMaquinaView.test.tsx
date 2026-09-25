@@ -1,6 +1,19 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+const xlsx = vi.hoisted(() => ({
+  filas: [] as unknown[],
+  archivo: '',
+  falla: false,
+}))
+vi.mock('xlsx', () => ({
+  utils: {
+    json_to_sheet: (f: unknown[]) => { xlsx.filas = f; return {} },
+    book_new: () => ({}),
+    book_append_sheet: () => {},
+  },
+  writeFile: (_wb: unknown, nombre: string) => { if (xlsx.falla) throw new Error('disco lleno'); xlsx.archivo = nombre },
+}))
 import { InventarioMaquinaView } from '../InventarioMaquinaView'
 import type { InventarioLinea, InventarioSesion, BodegaMergedItem } from '@/hooks/repuestos/useBodega'
 
@@ -97,5 +110,35 @@ describe('PC: tabla', () => {
     fireEvent.click(await pc.findByRole('button', { name: /Validar/ }))
     await waitFor(() => expect(validarLinea).toHaveBeenCalled())
     expect(validarLinea.mock.calls[0]![2]).toMatchObject({ codigoFabricante: '92461630', codigoSAP: '3300011830' })
+  })
+})
+
+describe('Descargar Excel', () => {
+  it('en el celular baja TODO el inventario (validadas y dudosas), por ubicación', async () => {
+    xlsx.falla = false
+    const { cel } = await montar()
+    fireEvent.click(cel.getByRole('button', { name: /Descargar Excel/ }))
+    await waitFor(() => expect(xlsx.archivo).toBe('Inventario BAADER 200 bodega 25-09-26.xlsx'))
+    const filas = xlsx.filas as Record<string, unknown>[]
+    expect(filas).toHaveLength(4)
+    expect(filas.map(f => f['Ubicación'])).toEqual(['Ubicación 1', 'Ubicación 1', 'Ubicación 3', 'Ubicación 5'])
+    expect(filas.find(f => f['Código fabricante'] === '92481630')?.['Estado']).toBe('Revisar código')
+  })
+
+  it('en el PC baja lo filtrado y lo dice en el nombre', async () => {
+    xlsx.falla = false
+    const { pc } = await montar()
+    fireEvent.change(pc.getByLabelText('Filtrar ubicación'), { target: { value: 'Ubicación 5' } })
+    fireEvent.click(pc.getByRole('button', { name: /Descargar Excel/ }))
+    await waitFor(() => expect(xlsx.archivo).toBe('Inventario BAADER 200 bodega 25-09-26 (filtrado).xlsx'))
+    expect(xlsx.filas).toHaveLength(1)
+    expect((xlsx.filas[0] as Record<string, unknown>)['Diferencia']).toBe(-17)
+  })
+
+  it('si falla, lo avisa en pantalla', async () => {
+    xlsx.falla = true
+    const { cel } = await montar()
+    fireEvent.click(cel.getByRole('button', { name: /Descargar Excel/ }))
+    expect(await cel.findByText(/No se pudo generar el Excel: disco lleno/)).toBeTruthy()
   })
 })
