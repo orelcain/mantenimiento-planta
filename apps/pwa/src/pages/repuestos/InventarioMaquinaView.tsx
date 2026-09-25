@@ -1,10 +1,12 @@
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Check, ChevronDown, ChevronLeft, ChevronUp, Download, Loader2, Pencil, Search, X } from 'lucide-react'
-import { Button, ListGroup, SegmentedControl, Tag, type TagTone } from '@/components/piel'
+import { Fragment, createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { AlertTriangle, BookOpen, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Download, Loader2, Pencil, Scale, Search, Shapes, X } from 'lucide-react'
+import { Button, ListCell, ListGroup, SegmentedControl, Sheet, Tag, type TagTone } from '@/components/piel'
 import {
-  FILTROS_VACIOS, diferencia, filtrosActivos, nombreDe, ordenarLineas, pasaFiltros,
+  FILTROS_VACIOS, diferencia, filtrosActivos, nombreDe, ordenarLineas, pasaFiltros, planDeAjuste,
   type ColumnaOrden, type FiltroDif, type FiltroEstado, type FiltrosTabla,
 } from '@/utils/repuestos/inventarioTabla'
+import { rutaDibujo, useFigurasDespiece, useManualesPieza } from './enlacesPieza'
 import type { useBodega, InventarioLinea, InventarioSesion, MotivoDuda, BodegaMergedItem } from '@/hooks/repuestos/useBodega'
 
 /**
@@ -37,6 +39,27 @@ function buscarEnMaestro(items: BodegaMergedItem[], codigo: string): BodegaMerge
 
 type Guardar = (l: InventarioLinea, d: Parameters<ReturnType<typeof useBodega>['validarLinea']>[2]) => Promise<void>
 
+/**
+ * Al ir del inventario al dibujo en el teléfono (misma pestaña), al volver
+ * hay que caer DENTRO del mismo inventario, no en la lista de inventarios.
+ * BodegaView e InventarioTab leen esta marca al montar.
+ */
+export const CLAVE_VOLVER_INVENTARIO = 'bodega:volverAInventario'
+
+/** Lo que las filas necesitan para ir al dibujo o al manual de su pieza. */
+interface CtxEnlaces {
+  sesionId: string
+  maquina?: string
+  dibujoDe: (codigo: string) => string | null
+  manualDe: (codigo: string) => { url: string | null; pagina: number } | null
+  cargandoManual: boolean
+  /** En el teléfono los manuales se cargan recién al pedirlos (≈2 MB de catálogo). */
+  pedirManuales: () => void
+}
+const Enlaces = createContext<CtxEnlaces | null>(null)
+const useEnlaces = () => useContext(Enlaces)!
+const BASE = import.meta.env.BASE_URL.replace(/\/$/, '')
+
 /** Baja las líneas dadas como .xlsx. PC y celular usan esta misma función: mismo archivo, mismas columnas. */
 async function descargarExcel(ls: InventarioLinea[], nombreArchivo: string) {
   const XLSX = await import('xlsx')
@@ -50,11 +73,12 @@ async function descargarExcel(ls: InventarioLinea[], nombreArchivo: string) {
     'Contado': l.cantidad ?? '',
     'Sistema': l.stockSistema ?? '',
     'Diferencia': diferencia(l) ?? '',
+    'Sistema antes del ajuste': l.stockSistemaAntes ?? '',
     'Estado': l.estado === 'dudoso' && l.motivo ? MOTIVO[l.motivo].texto : 'Validado',
     'Nota del cuaderno': l.notaCuaderno,
   }))
   const ws = XLSX.utils.json_to_sheet(filas)
-  ws['!cols'] = [14, 16, 16, 32, 18, 13, 9, 9, 10, 18, 28].map(wch => ({ wch }))
+  ws['!cols'] = [14, 16, 16, 32, 18, 13, 9, 9, 10, 12, 18, 28].map(wch => ({ wch }))
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, 'Inventario')
   XLSX.writeFile(wb, `${nombreArchivo}.xlsx`)
@@ -86,7 +110,7 @@ export function InventarioMaquinaView({ sesion, bodega, user, onVolver }: {
   user: { id: string; nombre: string } | null
   onVolver: () => void
 }) {
-  const { items, loadLineas, validarLinea } = bodega
+  const { items, loadLineas, validarLinea, aplicarAjusteInventario } = bodega
   const [lineas, setLineas] = useState<InventarioLinea[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -101,6 +125,21 @@ export function InventarioMaquinaView({ sesion, bodega, user, onVolver }: {
   useEffect(() => { void recargar() }, [recargar])
 
   const unidades = (lineas ?? []).reduce((a, l) => a + (l.cantidad ?? 0), 0)
+  const figuras = useFigurasDespiece()
+  // En el PC los manuales se cargan de entrada (los íconos de la tabla ya
+  // apuntan a su página); en el teléfono, recién cuando alguien abre una fila.
+  const [quiereManuales, setQuiereManuales] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia?.('(min-width: 768px)').matches === true)
+  const manuales = useManualesPieza(quiereManuales)
+  const enlaces = useMemo<CtxEnlaces>(() => ({
+    sesionId: sesion.id,
+    maquina: sesion.maquina,
+    dibujoDe: codigo => rutaDibujo(figuras, codigo, sesion.maquina),
+    manualDe: codigo => manuales.manualDe(codigo, sesion.maquina),
+    cargandoManual: manuales.cargando,
+    pedirManuales: () => setQuiereManuales(true),
+  }), [sesion.id, sesion.maquina, figuras, manuales])
+
   const guardar: Guardar = async (l, datos) => {
     if (!user) throw new Error('Hay que iniciar sesión.')
     await validarLinea(sesion.id, l.id, datos, user.id, user.nombre)
@@ -123,8 +162,17 @@ export function InventarioMaquinaView({ sesion, bodega, user, onVolver }: {
       {error && <p className="flex items-center gap-1.5 text-footnote text-ink-crit"><AlertTriangle className="h-4 w-4" />{error}</p>}
       {!lineas && !error && <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>}
 
+      {lineas && user && (
+        <PanelAjuste lineas={lineas}
+                     onAplicar={async (plan, onProgreso) => {
+                       const r = await aplicarAjusteInventario(sesion, lineas, plan, user.id, user.nombre, onProgreso)
+                       await recargar()
+                       return r
+                     }} />
+      )}
+
       {lineas && (
-        <>
+        <Enlaces.Provider value={enlaces}>
           {/* PC: TODO el inventario en una sola tabla, con filtro por columna
               (como el autofiltro de Excel). Celular: lista en dos renglones —
               8 columnas no caben en 375 px sin volverse ilegibles. */}
@@ -134,8 +182,104 @@ export function InventarioMaquinaView({ sesion, bodega, user, onVolver }: {
           <div className="md:hidden" data-vista="celular">
             <ListaCelular lineas={lineas} items={items} onGuardar={guardar} nombreArchivo={sesion.nombre} />
           </div>
-        </>
+        </Enlaces.Provider>
       )}
+    </div>
+  )
+}
+
+/* ══════════════════════ Ajustar el stock de bodega al conteo ══════════════════════ */
+
+function PanelAjuste({ lineas, onAplicar }: {
+  lineas: InventarioLinea[]
+  onAplicar: (plan: ReturnType<typeof planDeAjuste>, onProgreso: (h: number, t: number) => void) =>
+    Promise<{ actualizados: number; creados: number; cuadran: number }>
+}) {
+  const plan = useMemo(() => planDeAjuste(lineas), [lineas])
+  const [abierto, setAbierto] = useState(false)
+  const [progreso, setProgreso] = useState<[number, number] | null>(null)
+  const [hecho, setHecho] = useState<string | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+  const pendientes = plan.cambian.length + plan.cuadran.length
+  const bajan = plan.cambian.filter(a => a.sistema != null && a.contado < a.sistema).length
+  const suben = plan.cambian.filter(a => a.sistema != null && a.contado > a.sistema).length
+  const crean = plan.cambian.filter(a => a.sistema == null).length
+  const pct = plan.conFicha ? Math.round((plan.cuadrabanConFicha / plan.conFicha) * 100) : null
+
+  const aviso = hecho && <p className="flex items-center gap-1.5 text-footnote text-ink-ok"><Check className="h-4 w-4 shrink-0" />{hecho}</p>
+  if (!pendientes) return aviso || null
+  if (!abierto) {
+    return (
+      <div className="space-y-2">
+        {aviso}
+        <Button variant="tinted" onClick={() => { setAbierto(true); setErr(null); setHecho(null) }}>
+          <Scale /> Ajustar stock según el conteo ({pendientes})
+        </Button>
+      </div>
+    )
+  }
+  return (
+    <div className="space-y-3 rounded-card bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
+      <p className="text-headline font-semibold text-foreground">Ajustar el stock de bodega a lo contado</p>
+      <ul className="m-0 list-disc space-y-1 pl-5 text-body text-foreground">
+        {plan.cambian.length - crean > 0 && (
+          <li className="tabular-nums">{plan.cambian.length - crean} repuestos cambian de stock: {bajan} bajan y {suben} suben.</li>
+        )}
+        {crean > 0 && <li className="tabular-nums">{crean} se crean en bodega (no tenían ficha), con la ubicación del inventario.</li>}
+        {plan.cuadran.length > 0 && <li className="tabular-nums">{plan.cuadran.length} ya cuadraban: solo se marcan como revisados.</li>}
+      </ul>
+      {(plan.dudosas > 0 || plan.sinSap > 0) && (
+        <p className="text-footnote text-muted-foreground tabular-nums">
+          No se tocan {plan.dudosas > 0 && <>{plan.dudosas} dudosas (hasta validarlas)</>}
+          {plan.dudosas > 0 && plan.sinSap > 0 && ' ni '}
+          {plan.sinSap > 0 && <>{plan.sinSap} sin SAP</>}. Cuando las valides, este botón vuelve a aparecer solo con esas.
+        </p>
+      )}
+      {pct != null && (
+        <p className="text-footnote text-muted-foreground tabular-nums">
+          Antes del ajuste, el sistema cuadraba con lo contado en <b className="text-foreground">{plan.cuadrabanConFicha} de {plan.conFicha}</b> repuestos con ficha ({pct} %).
+        </p>
+      )}
+      <p className="text-footnote text-muted-foreground">
+        Cada cambio queda como movimiento de ajuste («sistema X → contado Y») en el historial del repuesto.
+      </p>
+      {err && <p className="text-footnote text-ink-crit">{err}</p>}
+      <div className="flex flex-wrap gap-2">
+        <Button variant="filled" disabled={!!progreso}
+                onClick={async () => {
+                  setErr(null); setProgreso([0, plan.cambian.length])
+                  try {
+                    const r = await onAplicar(plan, (h, t) => setProgreso([h, t]))
+                    setHecho(`Stock ajustado: ${r.actualizados} actualizados, ${r.creados} creados en bodega, ${r.cuadran} ya cuadraban.`)
+                    setAbierto(false)
+                  } catch (e) {
+                    setErr(`No se pudo terminar el ajuste: ${e instanceof Error ? e.message : String(e)}. Lo que alcanzó a hacerse quedó guardado; vuelve a intentarlo y seguirá con lo pendiente.`)
+                  } finally { setProgreso(null) }
+                }}>
+          {progreso ? <><Loader2 className="animate-spin" /> {progreso[0]} de {progreso[1]}…</> : <><Check /> Ajustar stock</>}
+        </Button>
+        {!progreso && <Button variant="plain" onClick={() => setAbierto(false)}>Cancelar</Button>}
+      </div>
+    </div>
+  )
+}
+
+/* ══════════════════════ Ir al dibujo o al manual ══════════════════════ */
+
+/** Íconos de la tabla del PC: abren en OTRA pestaña para no perder los filtros. */
+function EnlacesPC({ codigo }: { codigo: string }) {
+  const e = useEnlaces()
+  const dib = e.dibujoDe(codigo)
+  const man = e.manualDe(codigo)
+  const icono = 'flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted'
+  return (
+    <div className="flex justify-end gap-0.5" onClick={ev => ev.stopPropagation()}>
+      {dib
+        ? <a href={`${BASE}${dib}`} target="_blank" rel="noopener noreferrer" title="Ver en el dibujo" aria-label={`Ver ${codigo} en el dibujo`} className={`${icono} text-primary`}><Shapes className="h-4 w-4" /></a>
+        : <span title="Sin dibujo en el despiece" className={`${icono} text-muted-foreground/30`}><Shapes className="h-4 w-4" /></span>}
+      {man?.url
+        ? <a href={man.url} target="_blank" rel="noopener noreferrer" title={`Manual, página ${man.pagina}`} aria-label={`Ver ${codigo} en el manual, página ${man.pagina}`} className={`${icono} text-primary`}><BookOpen className="h-4 w-4" /></a>
+        : <span title={man ? `Manual pág. ${man.pagina}: el PDF no está disponible ahora` : e.cargandoManual ? 'Buscando la página del manual…' : 'Sin página en el manual'} className={`${icono} text-muted-foreground/30`}><BookOpen className="h-4 w-4" /></span>}
     </div>
   )
 }
@@ -227,6 +371,7 @@ function TablaInventario({ lineas, items, onGuardar, nombreArchivo }: {
                     </button>
                   </th>
                 ))}
+                <th scope="col" className="border-b border-border px-2 pt-2 text-right font-semibold text-muted-foreground">Ver</th>
               </tr>
               <tr>
                 <th className="border-b border-border px-1.5 pb-2 font-normal">
@@ -259,11 +404,12 @@ function TablaInventario({ lineas, items, onGuardar, nombreArchivo }: {
                     {(Object.keys(MOTIVO) as MotivoDuda[]).map(m => <option key={m} value={m}>{MOTIVO[m].texto}</option>)}
                   </select>
                 </th>
+                <th className="border-b border-border" />
               </tr>
             </thead>
             <tbody>
               {visibles.length === 0 && (
-                <tr><td colSpan={8} className="py-10 text-center text-muted-foreground">Ninguna línea cumple los filtros.</td></tr>
+                <tr><td colSpan={9} className="py-10 text-center text-muted-foreground">Ninguna línea cumple los filtros.</td></tr>
               )}
               {visibles.map(l => (
                 <Fragment key={l.id}>
@@ -280,13 +426,19 @@ function TablaInventario({ lineas, items, onGuardar, nombreArchivo }: {
                     </td>
                     <td className="border-b border-border/40 px-2 py-2 font-mono">{l.codigoSAP || <span className="text-muted-foreground/60">sin SAP</span>}</td>
                     <td className="border-b border-border/40 px-2 py-2 text-right font-semibold">{l.cantidad ?? '?'}</td>
-                    <td className="border-b border-border/40 px-2 py-2 text-right">{l.stockSistema ?? <span className="text-muted-foreground/60">—</span>}</td>
+                    <td className="border-b border-border/40 px-2 py-2 text-right">
+                      {l.stockSistema ?? <span className="text-muted-foreground/60">—</span>}
+                      {l.aplicadoCantidad != null && l.stockSistemaAntes !== l.stockSistema && (
+                        <span className="block text-caption text-muted-foreground">antes {l.stockSistemaAntes ?? 'sin ficha'}</span>
+                      )}
+                    </td>
                     <td className="border-b border-border/40 px-2 py-2 text-right"><DifTexto l={l} /></td>
                     <td className="border-b border-border/40 px-2 py-2"><EstadoTag l={l} /></td>
+                    <td className="border-b border-border/40 px-1 py-1"><EnlacesPC codigo={l.codigoFabricante} /></td>
                   </tr>
                   {abierta === l.id && (
                     <tr>
-                      <td colSpan={8} className="border-b border-border/40 bg-muted/30 px-4 py-3">
+                      <td colSpan={9} className="border-b border-border/40 bg-muted/30 px-4 py-3">
                         <div className="max-w-xl space-y-2">
                           {l.estado === 'dudoso' && (
                             <p className="text-footnote text-muted-foreground">
@@ -434,6 +586,9 @@ function FilaValidada({ linea: l, items, onGuardar }: {
   onGuardar: Guardar
 }) {
   const [editando, setEditando] = useState(false)
+  const [acciones, setAcciones] = useState(false)
+  const e = useEnlaces()
+  const navigate = useNavigate()
   const dif = l.stockSistema != null && l.cantidad != null ? l.cantidad - l.stockSistema : null
   if (editando) {
     return (
@@ -444,31 +599,72 @@ function FilaValidada({ linea: l, items, onGuardar }: {
       </div>
     )
   }
+  const dib = e.dibujoDe(l.codigoFabricante)
+  const man = e.manualDe(l.codigoFabricante)
   return (
-    <div className="flex min-h-[56px] items-center gap-3 border-b border-border/40 px-4 py-2.5 last:border-b-0">
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-body font-medium text-foreground">{l.textoBreve || l.descripcion || 'Sin nombre'}</p>
-        <p className="text-footnote text-muted-foreground">
-          <span className="font-mono tabular-nums">{l.codigoFabricante}</span>
-          {' · '}
-          {l.codigoSAP ? <span className="font-mono tabular-nums">SAP {l.codigoSAP}</span> : <span className="text-ink-warn">sin SAP</span>}
-          {l.codigoCuaderno && l.codigoCuaderno !== l.codigoFabricante && <> · cuaderno: <span className="font-mono">{l.codigoCuaderno}</span></>}
-          {l.nombreComun && <> · {l.nombreComun}</>}
-        </p>
-      </div>
-      <div className="w-14 shrink-0 text-right">
-        <p className="text-headline font-bold tabular-nums text-foreground">{l.cantidad ?? '—'}</p>
-        {l.stockSistema != null && (
-          <p className={`text-caption tabular-nums ${dif ? (dif > 0 ? 'text-ink-ok' : 'text-ink-crit') : 'text-muted-foreground'}`}>
-            sist. {l.stockSistema}{dif ? ` (${dif > 0 ? '+' : ''}${dif})` : ''}
+    <>
+      {/* Toda la fila es el toque: abre las acciones (dibujo, manual, corregir).
+          Un solo blanco grande en vez de botoncitos apretados. */}
+      <button type="button"
+              onClick={() => { e.pedirManuales(); setAcciones(true) }}
+              className="flex min-h-[56px] w-full items-center gap-3 border-b border-border/40 px-4 py-2.5 text-left last:border-b-0 active:bg-muted/60">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-body font-medium text-foreground">{l.textoBreve || l.descripcion || 'Sin nombre'}</p>
+          <p className="text-footnote text-muted-foreground">
+            <span className="font-mono tabular-nums">{l.codigoFabricante}</span>
+            {' · '}
+            {l.codigoSAP ? <span className="font-mono tabular-nums">SAP {l.codigoSAP}</span> : <span className="text-ink-warn">sin SAP</span>}
+            {l.codigoCuaderno && l.codigoCuaderno !== l.codigoFabricante && <> · cuaderno: <span className="font-mono">{l.codigoCuaderno}</span></>}
+            {l.nombreComun && <> · {l.nombreComun}</>}
           </p>
-        )}
-      </div>
-      <button type="button" onClick={() => setEditando(true)} aria-label="Corregir línea"
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted">
-        <Pencil className="h-4 w-4" />
+        </div>
+        <div className="w-16 shrink-0 text-right">
+          <p className="text-headline font-bold tabular-nums text-foreground">{l.cantidad ?? '—'}</p>
+          {l.stockSistema != null && (
+            <p className={`text-caption tabular-nums ${dif ? (dif > 0 ? 'text-ink-ok' : 'text-ink-crit') : 'text-muted-foreground'}`}>
+              sist. {l.stockSistema}{dif ? ` (${dif > 0 ? '+' : ''}${dif})` : ''}
+            </p>
+          )}
+          {l.aplicadoCantidad != null && l.stockSistemaAntes !== l.stockSistema && (
+            <p className="text-caption tabular-nums text-muted-foreground">antes {l.stockSistemaAntes ?? 'sin ficha'}</p>
+          )}
+        </div>
+        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/60" />
       </button>
-    </div>
+
+      <Sheet open={acciones} onClose={() => setAcciones(false)}
+             title={l.textoBreve || l.descripcion || l.codigoFabricante}
+             description={<span className="font-mono tabular-nums">{l.codigoFabricante}{l.codigoSAP ? ` · SAP ${l.codigoSAP}` : ''} · {l.ubicacion}</span>}>
+        <ListGroup>
+          <ListCell
+            leading={<Shapes className="h-5 w-5 text-primary" />}
+            title="Ver en el dibujo"
+            subtitle={dib ? 'Zoom a su posición; si va en varios lugares, los recorre uno a uno' : 'Esta pieza no está en el despiece navegable'}
+            chevron={!!dib}
+            className={dib ? '' : 'opacity-50'}
+            onClick={dib ? () => {
+              // Al volver (atrás) se cae de nuevo en este inventario.
+              try { sessionStorage.setItem(CLAVE_VOLVER_INVENTARIO, e.sesionId) } catch { /* sin storage */ }
+              navigate(dib)
+            } : undefined} />
+          <ListCell
+            leading={<BookOpen className="h-5 w-5 text-primary" />}
+            title={man ? `Ver en el manual · pág. ${man.pagina}` : 'Ver en el manual'}
+            subtitle={man?.url ? 'PDF del fabricante: pesado, necesita señal'
+              : man ? 'El PDF no está disponible ahora (sin señal o sin sesión)'
+              : e.cargandoManual ? 'Buscando su página…' : 'Sin página en el manual'}
+            chevron={!!man?.url}
+            className={man?.url ? '' : 'opacity-50'}
+            onClick={man?.url ? () => { window.open(man.url!, '_blank', 'noopener') } : undefined} />
+          <ListCell
+            leading={<Pencil className="h-5 w-5 text-primary" />}
+            title="Corregir o recontar"
+            subtitle="Código, cantidad o SAP de esta línea"
+            chevron
+            onClick={() => { setAcciones(false); setEditando(true) }} />
+        </ListGroup>
+      </Sheet>
+    </>
   )
 }
 

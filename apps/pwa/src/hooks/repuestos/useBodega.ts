@@ -19,8 +19,10 @@ import {
   collection,
   collectionGroup,
   doc,
+  getDoc,
   getDocs,
   setDoc,
+  writeBatch,
   addDoc,
   updateDoc,
   query,
@@ -38,6 +40,7 @@ import { useAuthStore } from '@/store'
 import { uploadBodegaPhoto, deleteBodegaPhoto } from '@/services/storage'
 import type { GlobalSearchResult } from '@/hooks/repuestos/useGlobalSearch'
 import type { MaterialClase } from '@/types/repuestos'
+import type { PlanAjuste } from '@/utils/repuestos/inventarioTabla'
 
 // ══════════════════════════════════════════════
 //  TIPOS
@@ -219,6 +222,12 @@ export interface InventarioLinea {
   sugerencia?: string
   validadoPorNombre?: string
   validadoAt?: Date
+  /** Cantidad que ya se llevó al stock de bodega (null/undefined = pendiente).
+   *  Si se recuenta y cambia, la línea vuelve a quedar pendiente. */
+  aplicadoCantidad?: number | null
+  /** Stock que decía el sistema ANTES del ajuste: la evidencia de cuánto no cuadraba. */
+  stockSistemaAntes?: number | null
+  aplicadoAt?: Date
 }
 
 export interface InventarioConteo {
@@ -796,6 +805,9 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
         sugerencia: x.sugerencia,
         validadoPorNombre: x.validadoPorNombre,
         validadoAt: x.validadoAt ? tsToDate(x.validadoAt) : undefined,
+        aplicadoCantidad: typeof x.aplicadoCantidad === 'number' ? x.aplicadoCantidad : null,
+        stockSistemaAntes: typeof x.stockSistemaAntes === 'number' ? x.stockSistemaAntes : x.stockSistemaAntes === null ? null : undefined,
+        aplicadoAt: x.aplicadoAt ? tsToDate(x.aplicadoAt) : undefined,
       }
     })
   }, [])
@@ -835,6 +847,84 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
       conDiferencia: lineas.filter(l => l.stockSistema != null && l.cantidad != null && l.cantidad !== l.stockSistema).length,
     })
   }, [loadLineas])
+
+  /**
+   * Lleva el stock de bodega a lo contado en un inventario por máquina.
+   * Por cada SAP que cambia: actualiza `bodega/{sap}.stockActual` (o crea la
+   * ficha con la ubicación del inventario si no existía) y deja un movimiento
+   * de AJUSTE con "sistema X → contado Y" para poder auditarlo. Las líneas
+   * quedan marcadas como aplicadas y guardan cuánto decía el sistema ANTES:
+   * esa es la evidencia de cuánto no cuadraba. Se puede volver a correr: el
+   * plan (planDeAjuste) solo trae lo pendiente.
+   */
+  const aplicarAjusteInventario = useCallback(async (
+    sesion: InventarioSesion,
+    lineas: InventarioLinea[],
+    plan: PlanAjuste,
+    userId: string,
+    userName: string,
+    onProgreso?: (hechos: number, total: number) => void,
+  ): Promise<{ actualizados: number; creados: number; cuadran: number }> => {
+    let actualizados = 0, creados = 0, hechos = 0
+    const total = plan.cambian.length
+    for (const a of plan.cambian) {
+      const existing = bodegaOverlays.get(a.codigoSAP)
+      const donde = `${sesion.maquina ?? 'Bodega'} · ${a.ubicaciones.join(', ')}`
+      if (existing) {
+        await updateDoc(doc(db, BODEGA_COL, existing.id), {
+          stockActual: a.contado, updatedAt: serverTimestamp(), ultimoConteoAt: serverTimestamp(),
+        })
+        actualizados++
+      } else {
+        await setDoc(doc(db, BODEGA_COL, a.codigoSAP), {
+          codigoSAP: a.codigoSAP, stockActual: a.contado, stockMinimo: 0,
+          ubicacionBodega: donde, unidad: 'pzas', ...denormNombre(a.codigoSAP),
+          createdAt: serverTimestamp(), updatedAt: serverTimestamp(), ultimoConteoAt: serverTimestamp(),
+        })
+        creados++
+      }
+      const bid = existing?.id || a.codigoSAP
+      await addDoc(collection(db, BODEGA_COL, bid, 'movimientos'), {
+        bodegaItemId: bid, tipo: 'ajuste', cantidad: a.contado, stockResultante: a.contado,
+        motivo: `Inventario «${sesion.nombre}» (${donde}): sistema ${a.sistema ?? 'sin ficha'} → contado ${a.contado}`,
+        realizadoPor: userId, realizadoPorNombre: userName, createdAt: serverTimestamp(),
+      })
+      onProgreso?.(++hechos, total)
+    }
+
+    // Marcar las líneas: aplicadas, con el stock de ANTES (solo la primera vez:
+    // un reconteo no debe borrar la evidencia original).
+    const porId = new Map(lineas.map(l => [l.id, l]))
+    const batch = writeBatch(db)
+    for (const a of [...plan.cambian, ...plan.cuadran]) {
+      for (const id of a.lineaIds) {
+        const l = porId.get(id)
+        if (!l) continue
+        batch.update(doc(db, INVENTARIO_COL, sesion.id, 'conteos', id), {
+          aplicadoCantidad: l.cantidad,
+          ...(l.stockSistemaAntes === undefined ? { stockSistemaAntes: a.sistema } : {}),
+          stockSistema: a.contado,
+          diferencia: 0,
+          aplicadoAt: serverTimestamp(),
+          aplicadoPor: userId,
+          aplicadoPorNombre: userName,
+        })
+      }
+    }
+    // La precisión de ANTES se guarda una sola vez (el primer ajuste): es el
+    // número que dice cuánto cuadraba el sistema antes del inventario.
+    const sesionRef = doc(db, INVENTARIO_COL, sesion.id)
+    const previa = (await getDoc(sesionRef)).data()
+    batch.update(sesionRef, {
+      ultimoAjuste: { actualizados, creados, cuadran: plan.cuadran.length, por: userName, at: serverTimestamp() },
+      ...(previa?.precisionAntes ? {} : {
+        precisionAntes: { conFicha: plan.conFicha, cuadraban: plan.cuadrabanConFicha, sinFicha: creados },
+      }),
+    })
+    await batch.commit()
+    await reloadBodega(true)
+    return { actualizados, creados, cuadran: plan.cuadran.length }
+  }, [bodegaOverlays, denormNombre, reloadBodega])
 
   // Finalizar inventario — ajustar stock según conteo físico
   const finalizarInventario = useCallback(async (
@@ -1022,5 +1112,6 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
     finalizarInventario,
     loadLineas,
     validarLinea,
+    aplicarAjusteInventario,
   }
 }

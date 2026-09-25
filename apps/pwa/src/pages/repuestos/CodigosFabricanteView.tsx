@@ -28,60 +28,12 @@ import { ShareInteractiveButton } from '@/components/visor3d/ShareInteractiveBut
 import { CATALOGOS, cargarCatalogos, type PiezaCatalogo } from './catalogosFabricante'
 import { agruparPorCodigo, conRecuentoTotal, indexarGrupos } from './agruparPiezas'
 import { buscarPiezas, norm } from './buscarCatalogo'
+import { useFigurasDespiece } from './enlacesPieza'
 import { leerRecientes, sumarReciente, type BusquedaReciente } from '@/utils/recorridoPlano'
 
 const CLAVE_RECIENTES = 'codigos-fabricante-recientes'
 import { useRepuestosExistentes, normCodigo } from '@/hooks/repuestos/useRepuestosExistentes'
 import { logger } from '@/lib/logger'
-
-/**
- * Mapa código de fabricante → figura del despiece navegable.
- * Es el camino INVERSO del puente: el visor de planos ya lleva de una pieza a
- * `/repuestos?q=`, pero desde acá no se podía ver el DIBUJO. Se carga aparte
- * (~39 KB por máquina) en vez de leer los índices completos (~770 KB c/u).
- *
- * Son DOS máquinas: el archivo de la fileteadora ya se generaba (1.510
- * códigos) y nadie lo cargaba — el botón "Ver dibujo" solo aparecía para la
- * evisceradora aunque el dato de la otra estuviera ahí.
- */
-const DESPIECES = [
-  { slug: 'baader-142-despiece', archivo: 'despiece-142-figuras.json', maquina: 'BAADER 142' },
-  { slug: 'baader-200-despiece', archivo: 'despiece-200-figuras.json', maquina: 'BAADER 200' },
-]
-
-/** Dónde vive un código dentro de un despiece. */
-type EnDespiece = { hoja: number; fig: string; slug: string; maquina: string }
-
-function useFigurasDespiece() {
-  const [mapa, setMapa] = useState<Record<string, EnDespiece[]> | null>(null)
-  useEffect(() => {
-    let vivo = true
-    Promise.all(
-      DESPIECES.map(({ slug, archivo, maquina }) =>
-        fetch(`${import.meta.env.BASE_URL}data/${archivo}`)
-          .then((r) => (r.ok ? r.json() : null))
-          .then((d: { codigos?: Record<string, [number, string]> } | null) =>
-            Object.entries(d?.codigos ?? {}).map(
-              ([cod, [hoja, fig]]) => [cod, { hoja, fig, slug, maquina }] as const,
-            ))
-          .catch(() => []),
-      ),
-    ).then((partes) => {
-      if (!vivo) return
-      // Un código puede estar en LAS DOS máquinas (220 lo están: tornillos,
-      // arandelas). Se guardan todas sus ubicaciones y se muestra un botón por
-      // máquina — quedarse con una sola mandaría al de la fileteadora al
-      // dibujo de la evisceradora.
-      const acc: Record<string, EnDespiece[]> = {}
-      for (const [cod, donde] of partes.flat()) (acc[cod] ??= []).push(donde)
-      setMapa(acc)
-    })
-    return () => {
-      vivo = false
-    }
-  }, [])
-  return mapa
-}
 
 /** Datos para prellenar la creación de un repuesto desde una pieza de catálogo. */
 export interface CrearDesdeCatalogo {

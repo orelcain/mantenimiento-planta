@@ -167,7 +167,8 @@ describe('mapa código→figura (camino inverso desde Repuestos)', () => {
  * Este guard obliga a que cada archivo generado tenga quien lo consuma.
  */
 describe('mapas inversos codigo -> figura', () => {
-  const VISTA = join(__dirname, '..', '..', 'pages', 'repuestos', 'CodigosFabricanteView.tsx')
+  // La lista DESPIECES vive en enlacesPieza.ts (la comparten Códigos fabricante y el inventario).
+  const VISTA = join(__dirname, '..', '..', 'pages', 'repuestos', 'enlacesPieza.ts')
 
   it('todos los archivos despiece-*-figuras.json estan declarados en la vista', () => {
     const fuente = readFileSync(VISTA, 'utf8')
