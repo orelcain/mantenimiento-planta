@@ -360,7 +360,7 @@ function TablaInventario({ lineas, items, onGuardar, nombreArchivo }: {
 
       <div className="overflow-hidden rounded-card bg-card shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
         <div className="max-h-[70vh] overflow-auto">
-          <table className="w-full border-separate border-spacing-0 text-footnote tabular-nums">
+          <table className="w-full border-separate border-spacing-0 text-footnote">
             <thead className="sticky top-0 z-10 bg-card">
               <tr>
                 {COLUMNAS.map(c => (
@@ -427,17 +427,17 @@ function TablaInventario({ lineas, items, onGuardar, nombreArchivo }: {
                       {l.nombreComun && <span className="text-muted-foreground"> · {l.nombreComun}</span>}
                     </td>
                     <td className="border-b border-border/40 px-2 py-2 font-mono">{l.codigoSAP || <span className="text-muted-foreground/60">sin SAP</span>}</td>
-                    <td className="border-b border-border/40 px-2 py-2 text-right font-semibold">
+                    <td className="border-b border-border/40 px-2 py-2 text-right font-semibold tabular-nums">
                       {l.cantidad ?? '?'}
                       {l.lineasSap && <span className="block text-caption font-normal text-muted-foreground">total SAP {l.contadoSap} ({l.lineasSap} líneas)</span>}
                     </td>
-                    <td className="border-b border-border/40 px-2 py-2 text-right">
+                    <td className="border-b border-border/40 px-2 py-2 text-right tabular-nums">
                       {l.stockSistema ?? <span className="text-muted-foreground/60">—</span>}
                       {l.aplicadoCantidad != null && l.stockSistemaAntes !== l.stockSistema && (
                         <span className="block text-caption text-muted-foreground">antes {l.stockSistemaAntes ?? 'sin ficha'}</span>
                       )}
                     </td>
-                    <td className="border-b border-border/40 px-2 py-2 text-right"><DifTexto l={l} /></td>
+                    <td className="border-b border-border/40 px-2 py-2 text-right tabular-nums"><DifTexto l={l} /></td>
                     <td className="border-b border-border/40 px-2 py-2"><EstadoTag l={l} /></td>
                     <td className="border-b border-border/40 px-1 py-1"><EnlacesPC codigo={l.codigoFabricante} /></td>
                   </tr>

@@ -193,6 +193,8 @@ export interface InventarioSesion {
   dudosos?: number
   /** Unidades contadas en total. */
   unidades?: number
+  /** Ya se llevó (al menos una vez) el stock de bodega a lo contado. */
+  ajustado?: boolean
 }
 
 /** Por qué una línea del inventario por máquina quedó en "Dudosos". */
@@ -736,7 +738,7 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
         conDiferencia: data.conDiferencia ?? 0,
         createdAt: tsToDate(data.createdAt), closedAt: data.closedAt ? tsToDate(data.closedAt) : undefined,
         tipo: data.tipo === 'maquina' ? 'maquina' : 'periodico',
-        maquina: data.maquina, dudosos: data.dudosos, unidades: data.unidades,
+        maquina: data.maquina, dudosos: data.dudosos, unidades: data.unidades, ajustado: !!data.ultimoAjuste,
       }
     })
   }, [])
