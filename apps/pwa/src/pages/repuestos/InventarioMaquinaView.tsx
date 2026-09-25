@@ -37,6 +37,49 @@ function buscarEnMaestro(items: BodegaMergedItem[], codigo: string): BodegaMerge
 
 type Guardar = (l: InventarioLinea, d: Parameters<ReturnType<typeof useBodega>['validarLinea']>[2]) => Promise<void>
 
+/** Baja las líneas dadas como .xlsx. PC y celular usan esta misma función: mismo archivo, mismas columnas. */
+async function descargarExcel(ls: InventarioLinea[], nombreArchivo: string) {
+  const XLSX = await import('xlsx')
+  const filas = ls.map(l => ({
+    'Ubicación': l.ubicacion,
+    'Código fabricante': l.codigoFabricante,
+    'Código en el cuaderno': l.codigoCuaderno !== l.codigoFabricante ? l.codigoCuaderno : '',
+    'Nombre': nombreDe(l),
+    'Nombre común': l.nombreComun,
+    'SAP': l.codigoSAP,
+    'Contado': l.cantidad ?? '',
+    'Sistema': l.stockSistema ?? '',
+    'Diferencia': diferencia(l) ?? '',
+    'Estado': l.estado === 'dudoso' && l.motivo ? MOTIVO[l.motivo].texto : 'Validado',
+    'Nota del cuaderno': l.notaCuaderno,
+  }))
+  const ws = XLSX.utils.json_to_sheet(filas)
+  ws['!cols'] = [14, 16, 16, 32, 18, 13, 9, 9, 10, 18, 28].map(wch => ({ wch }))
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, 'Inventario')
+  XLSX.writeFile(wb, `${nombreArchivo}.xlsx`)
+}
+
+/** Botón de descarga con su propio estado de carga y error (un fallo se dice, no se traga). */
+function BotonExcel({ onDescargar, disabled, className }: { onDescargar: () => Promise<void>; disabled?: boolean; className?: string }) {
+  const [bajando, setBajando] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  return (
+    <div className={className}>
+      <Button variant="tinted" disabled={bajando || disabled}
+              onClick={async () => {
+                setBajando(true); setErr(null)
+                try { await onDescargar() }
+                catch (e) { setErr(e instanceof Error ? `No se pudo generar el Excel: ${e.message}` : 'No se pudo generar el Excel.') }
+                finally { setBajando(false) }
+              }}>
+        {bajando ? <Loader2 className="animate-spin" /> : <Download />} Descargar Excel
+      </Button>
+      {err && <p className="mt-1 text-footnote text-ink-crit">{err}</p>}
+    </div>
+  )
+}
+
 export function InventarioMaquinaView({ sesion, bodega, user, onVolver }: {
   sesion: InventarioSesion
   bodega: ReturnType<typeof useBodega>
@@ -89,7 +132,7 @@ export function InventarioMaquinaView({ sesion, bodega, user, onVolver }: {
             <TablaInventario lineas={lineas} items={items} onGuardar={guardar} nombreArchivo={sesion.nombre} />
           </div>
           <div className="md:hidden" data-vista="celular">
-            <ListaCelular lineas={lineas} items={items} onGuardar={guardar} />
+            <ListaCelular lineas={lineas} items={items} onGuardar={guardar} nombreArchivo={sesion.nombre} />
           </div>
         </>
       )}
@@ -132,7 +175,6 @@ function TablaInventario({ lineas, items, onGuardar, nombreArchivo }: {
   const [busca, setBusca] = useState('')
   const [orden, setOrden] = useState<{ col: ColumnaOrden; dir: 1 | -1 }>({ col: 'ubicacion', dir: 1 })
   const [abierta, setAbierta] = useState<string | null>(null)
-  const [bajando, setBajando] = useState(false)
 
   const ubicaciones = useMemo(
     () => [...new Set(lineas.map(l => l.ubicacion))].sort((a, b) => a.localeCompare(b, 'es', { numeric: true })),
@@ -147,30 +189,6 @@ function TablaInventario({ lineas, items, onGuardar, nombreArchivo }: {
   const ordenarPor = (col: ColumnaOrden) =>
     setOrden(o => ({ col, dir: o.col === col ? (o.dir === 1 ? -1 : 1) : 1 }))
 
-  const descargar = async () => {
-    setBajando(true)
-    try {
-      const XLSX = await import('xlsx')
-      const filas = visibles.map(l => ({
-        'Ubicación': l.ubicacion,
-        'Código fabricante': l.codigoFabricante,
-        'Código en el cuaderno': l.codigoCuaderno !== l.codigoFabricante ? l.codigoCuaderno : '',
-        'Nombre': nombreDe(l),
-        'Nombre común': l.nombreComun,
-        'SAP': l.codigoSAP,
-        'Contado': l.cantidad ?? '',
-        'Sistema': l.stockSistema ?? '',
-        'Diferencia': diferencia(l) ?? '',
-        'Estado': l.estado === 'dudoso' && l.motivo ? MOTIVO[l.motivo].texto : 'Validado',
-        'Nota del cuaderno': l.notaCuaderno,
-      }))
-      const ws = XLSX.utils.json_to_sheet(filas)
-      ws['!cols'] = [14, 16, 16, 32, 18, 13, 9, 9, 10, 18, 28].map(wch => ({ wch }))
-      const wb = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(wb, ws, 'Inventario')
-      XLSX.writeFile(wb, `${nombreArchivo}${nFiltros ? ' (filtrado)' : ''}.xlsx`)
-    } finally { setBajando(false) }
-  }
 
   const control = 'h-[36px] w-full min-w-0 rounded-ctl bg-muted px-2 text-footnote text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40'
   const activo = (v: string) => (v ? `${control} bg-primary/[0.12] font-semibold text-primary` : control)
@@ -295,9 +313,8 @@ function TablaInventario({ lineas, items, onGuardar, nombreArchivo }: {
             {nFiltros > 0 && ` · ${nFiltros} filtro${nFiltros > 1 ? 's' : ''} activo${nFiltros > 1 ? 's' : ''}`}
             {' · '}clic en una fila para corregirla
           </span>
-          <Button variant="tinted" onClick={descargar} disabled={bajando || visibles.length === 0}>
-            {bajando ? <Loader2 className="animate-spin" /> : <Download />} Descargar Excel
-          </Button>
+          <BotonExcel disabled={visibles.length === 0}
+                      onDescargar={() => descargarExcel(visibles, `${nombreArchivo}${nFiltros ? ' (filtrado)' : ''}`)} />
         </div>
       </div>
     </div>
@@ -314,7 +331,9 @@ const CHIPS: { id: Chip; texto: string; filtro: Partial<FiltrosTabla> }[] = [
   { id: 'sin', texto: 'Sin SAP', filtro: { sap: 'sin' } },
 ]
 
-function ListaCelular({ lineas, items, onGuardar }: { lineas: InventarioLinea[]; items: BodegaMergedItem[]; onGuardar: Guardar }) {
+function ListaCelular({ lineas, items, onGuardar, nombreArchivo }: {
+  lineas: InventarioLinea[]; items: BodegaMergedItem[]; onGuardar: Guardar; nombreArchivo: string
+}) {
   const [vista, setVista] = useState<'inventario' | 'dudosos'>('inventario')
   const [busca, setBusca] = useState('')
   const [agrupar, setAgrupar] = useState<'ubicacion' | ''>('ubicacion')
@@ -338,6 +357,10 @@ function ListaCelular({ lineas, items, onGuardar }: { lineas: InventarioLinea[];
 
   return (
     <div className="space-y-3">
+      {/* En el teléfono se baja TODO el inventario (validadas y dudosas, con
+          su estado), en el orden de las ubicaciones: los chips y la búsqueda
+          sirven para mirar, no para armar el reporte. */}
+      <BotonExcel onDescargar={() => descargarExcel(ordenarLineas(lineas, 'ubicacion', 1), nombreArchivo)} />
       <SegmentedControl
         value={vista} onChange={setVista} ariaLabel="Vista del inventario"
         segments={[
