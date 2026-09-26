@@ -43,7 +43,7 @@ const LINEAS: InventarioLinea[] = [
 ]
 const ITEMS = [
   { codigoSAP: '3300011830', codigoFabricante: '92461630', textoBreve: 'BULON 92461630', stockActual: 9, bodegaId: 'b1' },
-  { codigoSAP: '3300051215', codigoFabricante: '92152025', textoBreve: 'RODILLO 92152025', stockActual: 6, bodegaId: 'b2' },
+  { codigoSAP: '3300051215', codigoFabricante: '92152025', textoBreve: 'RODILLO 92152025', stockActual: 6, bodegaId: 'b2', rowKey: '3300051215', isWatched: false },
 ] as unknown as BodegaMergedItem[]
 const SESION = { id: 's1', nombre: 'Inventario BAADER 200 bodega 25-09-26', estado: 'en_curso', tipo: 'maquina',
   maquina: 'BAADER 200', creadoPor: 'u', creadoPorNombre: 'x', totalItems: 4, contados: 4, conDiferencia: 2,
@@ -52,15 +52,17 @@ const SESION = { id: 's1', nombre: 'Inventario BAADER 200 bodega 25-09-26', esta
 async function montar() {
   const validarLinea = vi.fn().mockResolvedValue(undefined)
   const aplicarAjusteInventario = vi.fn().mockResolvedValue({ actualizados: 2, creados: 0, cuadran: 0 })
-  const bodega = { items: ITEMS, loadLineas: vi.fn().mockResolvedValue(LINEAS), validarLinea, aplicarAjusteInventario } as never
+  const toggleWatch = vi.fn()
+  const onAbrirFicha = vi.fn()
+  const bodega = { items: ITEMS, loadLineas: vi.fn().mockResolvedValue(LINEAS), validarLinea, aplicarAjusteInventario, toggleWatch } as never
   const { container } = render(
     <MemoryRouter>
-      <InventarioMaquinaView sesion={SESION} bodega={bodega} user={{ id: 'u1', nombre: 'Tester' }} onVolver={() => {}} />
+      <InventarioMaquinaView sesion={SESION} bodega={bodega} user={{ id: 'u1', nombre: 'Tester' }} onVolver={() => {}} onAbrirFicha={onAbrirFicha} />
     </MemoryRouter>)
   await screen.findAllByText('RODILLO 92152025')
   const pc = within(container.querySelector('[data-vista="pc"]') as HTMLElement)
   const cel = within(container.querySelector('[data-vista="celular"]') as HTMLElement)
-  return { validarLinea, aplicarAjusteInventario, pc, cel, raiz: within(container) }
+  return { validarLinea, aplicarAjusteInventario, toggleWatch, onAbrirFicha, pc, cel, raiz: within(container) }
 }
 const filasTabla = (pc: ReturnType<typeof within>) =>
   pc.getAllByRole('row').slice(2).map((r: HTMLElement) => r.textContent ?? '')
@@ -193,5 +195,33 @@ describe('ajustar stock según el conteo', () => {
     expect(plan.cambian.map((a: { codigoSAP: string; sistema: number; contado: number }) => [a.codigoSAP, a.sistema, a.contado]))
       .toEqual([['3300051215', 6, 5], ['3300017418', 18, 1]])
     expect(await raiz.findByText(/Stock ajustado: 2 actualizados/)).toBeTruthy()
+  })
+})
+
+describe('ficha del repuesto y favoritos', () => {
+  it('PC: el ícono abre la ficha de ESE repuesto y la estrella lo marca como favorito', async () => {
+    const { pc, onAbrirFicha, toggleWatch } = await montar()
+    fireEvent.click(pc.getByRole('button', { name: 'Ficha del repuesto 92152025' }))
+    expect(onAbrirFicha).toHaveBeenCalledWith(expect.objectContaining({ codigoSAP: '3300051215' }))
+    fireEvent.click(pc.getByRole('button', { name: 'Agregar a favoritos' }))
+    expect(toggleWatch).toHaveBeenCalledWith('3300051215')
+    // un SAP sin ficha en el maestro no ofrece abrirla
+    expect(pc.queryByRole('button', { name: 'Ficha del repuesto 2001202002' })).toBeNull()
+  })
+
+  it('celular: el menú de la fila ofrece ver la ficha y agregar a favoritos', async () => {
+    const { cel, onAbrirFicha, toggleWatch } = await montar()
+    fireEvent.click(cel.getByText('RODILLO 92152025'))
+    fireEvent.click(await screen.findByText('Agregar a favoritos'))
+    expect(toggleWatch).toHaveBeenCalledWith('3300051215')
+    fireEvent.click(screen.getByText('Ver ficha del repuesto'))
+    expect(onAbrirFicha).toHaveBeenCalledWith(expect.objectContaining({ codigoSAP: '3300051215' }))
+  })
+
+  it('celular: si el SAP no tiene ficha en el maestro, lo dice', async () => {
+    const { cel } = await montar()
+    fireEvent.click(cel.getByText('CHAPA GUIA 2001202002'))
+    expect(await screen.findByText('Este SAP todavía no tiene ficha en el maestro')).toBeTruthy()
+    expect(screen.queryByText('Agregar a favoritos')).toBeNull()
   })
 })
