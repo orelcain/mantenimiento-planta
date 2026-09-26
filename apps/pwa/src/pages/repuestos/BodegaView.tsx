@@ -249,7 +249,7 @@ export function BodegaView({ onViewInEquipo, onSearchSimilar }: BodegaViewProps 
       ))}
 
       {subTab === 'stock' && <StockTab bodega={bodega} user={user} onViewInEquipo={onViewInEquipo} onSearchSimilar={onSearchSimilar} />}
-      {subTab === 'inventarios' && <InventarioTab bodega={bodega} user={user} />}
+      {subTab === 'inventarios' && <InventarioTab bodega={bodega} user={user} onViewInEquipo={onViewInEquipo} onSearchSimilar={onSearchSimilar} />}
       {subTab === 'movimientos' && <MovimientosTab bodega={bodega} />}
       {subTab === 'estadisticas' && <EstadisticasTab bodega={bodega} />}
     </div>
@@ -531,8 +531,16 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
 //  TAB: INVENTARIOS (mejorado con resumen + escaneo rápido)
 // ══════════════════════════════════════════════
 
-function InventarioTab({ bodega, user }: { bodega: ReturnType<typeof useBodega>; user: any }) {
+function InventarioTab({ bodega, user, onViewInEquipo, onSearchSimilar }: {
+  bodega: ReturnType<typeof useBodega>; user: any
+  onViewInEquipo?: (machineId: string) => void; onSearchSimilar?: (query: string) => void
+}) {
   const { items, crearInventario, loadInventarios, loadConteos, registrarConteo, finalizarInventario } = bodega
+  // La ficha del repuesto (la MISMA de Bodega → Stock) se abre encima del
+  // inventario: al cerrarla se vuelve justo donde se estaba, con los filtros.
+  const [fichaItem, setFichaItem] = useState<BodegaMergedItem | null>(null)
+  const [fichaEditar, setFichaEditar] = useState<BodegaMergedItem | null>(null)
+  const [fichaMovimiento, setFichaMovimiento] = useState<BodegaMergedItem | null>(null)
   const [sesiones, setSesiones] = useState<InventarioSesion[]>([])
   const [loading, setLoading] = useState(true)
   const [activeSesion, setActiveSesion] = useState<InventarioSesion | null>(null)
@@ -639,9 +647,29 @@ function InventarioTab({ bodega, user }: { bodega: ReturnType<typeof useBodega>;
   // Inventario por máquina (conteo del cuaderno, con ubicación y dudosos):
   // tiene su propia vista; el ajuste de stock de este tipo todavía no se aplica.
   if (activeSesion?.tipo === 'maquina') {
+    // Siempre la versión viva del ítem (stock y favorito recién cambiados).
+    const vivo = (i: BodegaMergedItem) => items.find(x => x.rowKey === i.rowKey) ?? i
     return (
-      <InventarioMaquinaView sesion={activeSesion} bodega={bodega} user={user}
-                             onVolver={() => { setActiveSesion(null); void reload() }} />
+      <>
+        <InventarioMaquinaView sesion={activeSesion} bodega={bodega} user={user}
+                               onVolver={() => { setActiveSesion(null); void reload() }}
+                               onAbrirFicha={setFichaItem} />
+        {fichaItem && (
+          <ItemDrawer item={vivo(fichaItem)} loadMovimientos={bodega.loadMovimientos} onClose={() => setFichaItem(null)}
+                      onEdit={() => { setFichaEditar(vivo(fichaItem)); setFichaItem(null) }}
+                      onMovimiento={() => { setFichaMovimiento(vivo(fichaItem)); setFichaItem(null) }}
+                      addPhoto={bodega.addPhoto} removePhoto={bodega.removePhoto} calcReorderData={bodega.calcReorderData}
+                      onViewInEquipo={onViewInEquipo} onSearchSimilar={onSearchSimilar} />
+        )}
+        {fichaEditar && (
+          <StockFormModal item={fichaEditar} onClose={() => setFichaEditar(null)}
+                          onSave={async d => { await bodega.saveStock(fichaEditar.codigoSAP, d); setFichaEditar(null) }} />
+        )}
+        {fichaMovimiento && (
+          <MovimientoModal item={fichaMovimiento} onClose={() => setFichaMovimiento(null)}
+                           onSave={async (t, c, m) => { if (user) { await bodega.registrarMovimiento(fichaMovimiento, { tipo: t, cantidad: c, motivo: m }, user.id, user.nombre); setFichaMovimiento(null) } }} />
+        )}
+      </>
     )
   }
 

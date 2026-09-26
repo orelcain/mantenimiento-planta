@@ -1,6 +1,6 @@
 import { Fragment, createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, BookOpen, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Download, Loader2, Pencil, Scale, Search, Shapes, X } from 'lucide-react'
+import { AlertTriangle, BookOpen, Check, Package, Star, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Download, Loader2, Pencil, Scale, Search, Shapes, X } from 'lucide-react'
 import { Button, ListCell, ListGroup, SegmentedControl, Sheet, Tag, type TagTone } from '@/components/piel'
 import {
   FILTROS_VACIOS, conTotalesPorSap, diferencia, filtrosActivos, nombreDe, ordenarLineas, pasaFiltros, planDeAjuste,
@@ -55,6 +55,10 @@ interface CtxEnlaces {
   cargandoManual: boolean
   /** En el teléfono los manuales se cargan recién al pedirlos (≈2 MB de catálogo). */
   pedirManuales: () => void
+  /** La ficha de Bodega de ese SAP (undefined = el SAP no tiene ficha en el maestro). */
+  itemDe: (codigoSAP: string) => BodegaMergedItem | undefined
+  abrirFicha?: (item: BodegaMergedItem) => void
+  alternarFavorito: (item: BodegaMergedItem) => void
 }
 const Enlaces = createContext<CtxEnlaces | null>(null)
 const useEnlaces = () => useContext(Enlaces)!
@@ -104,13 +108,16 @@ function BotonExcel({ onDescargar, disabled, className }: { onDescargar: () => P
   )
 }
 
-export function InventarioMaquinaView({ sesion, bodega, user, onVolver }: {
+export function InventarioMaquinaView({ sesion, bodega, user, onVolver, onAbrirFicha }: {
   sesion: InventarioSesion
   bodega: ReturnType<typeof useBodega>
   user: { id: string; nombre: string } | null
   onVolver: () => void
+  /** Abre la ficha del repuesto (la de Bodega → Stock) encima del inventario. */
+  onAbrirFicha?: (item: BodegaMergedItem) => void
 }) {
-  const { items, loadLineas, validarLinea, aplicarAjusteInventario } = bodega
+  const { items, loadLineas, validarLinea, aplicarAjusteInventario, toggleWatch } = bodega
+  const porSap = useMemo(() => new Map(items.filter(i => i.codigoSAP).map(i => [i.codigoSAP, i])), [items])
   const [lineas, setLineas] = useState<InventarioLinea[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -140,7 +147,10 @@ export function InventarioMaquinaView({ sesion, bodega, user, onVolver }: {
     manualDe: codigo => manuales.manualDe(codigo, sesion.maquina),
     cargandoManual: manuales.cargando,
     pedirManuales: () => setQuiereManuales(true),
-  }), [sesion.id, sesion.maquina, figuras, manuales])
+    itemDe: sap => (sap ? porSap.get(sap) : undefined),
+    abrirFicha: onAbrirFicha,
+    alternarFavorito: i => toggleWatch(i.rowKey),
+  }), [sesion.id, sesion.maquina, figuras, manuales, porSap, onAbrirFicha, toggleWatch])
 
   const guardar: Guardar = async (l, datos) => {
     if (!user) throw new Error('Hay que iniciar sesión.')
@@ -269,13 +279,18 @@ function PanelAjuste({ lineas, onAplicar }: {
 /* ══════════════════════ Ir al dibujo o al manual ══════════════════════ */
 
 /** Íconos de la tabla del PC: abren en OTRA pestaña para no perder los filtros. */
-function EnlacesPC({ codigo }: { codigo: string }) {
+function EnlacesPC({ codigo, sap }: { codigo: string; sap: string }) {
   const e = useEnlaces()
   const dib = e.dibujoDe(codigo)
   const man = e.manualDe(codigo)
+  const item = e.itemDe(sap)
   const icono = 'flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted'
   return (
     <div className="flex justify-end gap-0.5" onClick={ev => ev.stopPropagation()}>
+      {item && e.abrirFicha
+        ? <button type="button" onClick={() => e.abrirFicha!(item)} title="Ficha del repuesto (fotos, stock, movimientos)"
+                  aria-label={`Ficha del repuesto ${codigo}`} className={`${icono} text-primary`}><Package className="h-4 w-4" /></button>
+        : <span title={sap ? 'Este SAP todavía no tiene ficha en el maestro' : 'Sin SAP: no tiene ficha'} className={`${icono} text-muted-foreground/30`}><Package className="h-4 w-4" /></span>}
       {dib
         ? <a href={`${BASE}${dib}`} target="_blank" rel="noopener noreferrer" title="Ver en el dibujo" aria-label={`Ver ${codigo} en el dibujo`} className={`${icono} text-primary`}><Shapes className="h-4 w-4" /></a>
         : <span title="Sin dibujo en el despiece" className={`${icono} text-muted-foreground/30`}><Shapes className="h-4 w-4" /></span>}
@@ -283,6 +298,20 @@ function EnlacesPC({ codigo }: { codigo: string }) {
         ? <a href={man.url} target="_blank" rel="noopener noreferrer" title={`Manual, página ${man.pagina}`} aria-label={`Ver ${codigo} en el manual, página ${man.pagina}`} className={`${icono} text-primary`}><BookOpen className="h-4 w-4" /></a>
         : <span title={man ? `Manual pág. ${man.pagina}: el PDF no está disponible ahora` : e.cargandoManual ? 'Buscando la página del manual…' : 'Sin página en el manual'} className={`${icono} text-muted-foreground/30`}><BookOpen className="h-4 w-4" /></span>}
     </div>
+  )
+}
+
+/** Estrella de favorito de la tabla del PC (la misma lista de Bodega). */
+function EstrellaFavorito({ sap }: { sap: string }) {
+  const e = useEnlaces()
+  const item = e.itemDe(sap)
+  if (!item) return <span className="flex size-8" />
+  return (
+    <button type="button" aria-label={item.isWatched ? 'Quitar de favoritos' : 'Agregar a favoritos'}
+            onClick={ev => { ev.stopPropagation(); e.alternarFavorito(item) }}
+            className={`flex size-8 items-center justify-center rounded-full hover:bg-muted ${item.isWatched ? 'text-ink-warn' : 'text-muted-foreground/40'}`}>
+      <Star className={`size-4 ${item.isWatched ? 'fill-current' : ''}`} />
+    </button>
   )
 }
 
@@ -363,6 +392,7 @@ function TablaInventario({ lineas, items, onGuardar, nombreArchivo }: {
           <table className="w-full border-separate border-spacing-0 text-footnote">
             <thead className="sticky top-0 z-10 bg-card">
               <tr>
+                <th className="w-9 border-b border-border" aria-label="Favorito" />
                 {COLUMNAS.map(c => (
                   <th key={c.col} scope="col" aria-sort={orden.col === c.col ? (orden.dir === 1 ? 'ascending' : 'descending') : 'none'}
                       className={`border-b border-border px-2 pt-2 font-semibold text-muted-foreground ${c.num ? 'text-right' : 'text-left'}`}>
@@ -376,6 +406,7 @@ function TablaInventario({ lineas, items, onGuardar, nombreArchivo }: {
                 <th scope="col" className="border-b border-border px-2 pt-2 text-right font-semibold text-muted-foreground">Ver</th>
               </tr>
               <tr>
+                <th className="border-b border-border" />
                 <th className="border-b border-border px-1.5 pb-2 font-normal">
                   <select aria-label="Filtrar ubicación" value={f.ubicacion} onChange={e => set('ubicacion', e.target.value)} className={activo(f.ubicacion)}>
                     <option value="">Todas</option>
@@ -411,12 +442,13 @@ function TablaInventario({ lineas, items, onGuardar, nombreArchivo }: {
             </thead>
             <tbody>
               {visibles.length === 0 && (
-                <tr><td colSpan={9} className="py-10 text-center text-muted-foreground">Ninguna línea cumple los filtros.</td></tr>
+                <tr><td colSpan={10} className="py-10 text-center text-muted-foreground">Ninguna línea cumple los filtros.</td></tr>
               )}
               {visibles.map(l => (
                 <Fragment key={l.id}>
                   <tr onClick={() => setAbierta(a => (a === l.id ? null : l.id))}
                       className={`cursor-pointer hover:bg-muted/60 ${abierta === l.id ? 'bg-muted/60' : ''}`}>
+                    <td className="border-b border-border/40 pl-1"><EstrellaFavorito sap={l.codigoSAP} /></td>
                     <td className="border-b border-border/40 px-2 py-2 whitespace-nowrap">{l.ubicacion}</td>
                     <td className="border-b border-border/40 px-2 py-2 font-mono">
                       {l.codigoFabricante}
@@ -439,11 +471,11 @@ function TablaInventario({ lineas, items, onGuardar, nombreArchivo }: {
                     </td>
                     <td className="border-b border-border/40 px-2 py-2 text-right tabular-nums"><DifTexto l={l} /></td>
                     <td className="border-b border-border/40 px-2 py-2"><EstadoTag l={l} /></td>
-                    <td className="border-b border-border/40 px-1 py-1"><EnlacesPC codigo={l.codigoFabricante} /></td>
+                    <td className="border-b border-border/40 px-1 py-1"><EnlacesPC codigo={l.codigoFabricante} sap={l.codigoSAP} /></td>
                   </tr>
                   {abierta === l.id && (
                     <tr>
-                      <td colSpan={9} className="border-b border-border/40 bg-muted/30 px-4 py-3">
+                      <td colSpan={10} className="border-b border-border/40 bg-muted/30 px-4 py-3">
                         <div className="max-w-xl space-y-2">
                           {l.estado === 'dudoso' && (
                             <p className="text-footnote text-muted-foreground">
@@ -606,6 +638,7 @@ function FilaValidada({ linea: l, items, onGuardar }: {
   }
   const dib = e.dibujoDe(l.codigoFabricante)
   const man = e.manualDe(l.codigoFabricante)
+  const item = e.itemDe(l.codigoSAP)
   return (
     <>
       {/* Toda la fila es el toque: abre las acciones (dibujo, manual, corregir).
@@ -614,7 +647,10 @@ function FilaValidada({ linea: l, items, onGuardar }: {
               onClick={() => { e.pedirManuales(); setAcciones(true) }}
               className="flex min-h-[56px] w-full items-center gap-3 border-b border-border/40 px-4 py-2.5 text-left last:border-b-0 active:bg-muted/60">
         <div className="min-w-0 flex-1">
-          <p className="truncate text-body font-medium text-foreground">{l.textoBreve || l.descripcion || 'Sin nombre'}</p>
+          <p className="truncate text-body font-medium text-foreground">
+            {item?.isWatched && <Star className="mr-1 inline size-3.5 fill-current align-[-1px] text-ink-warn" aria-label="Favorito" />}
+            {l.textoBreve || l.descripcion || 'Sin nombre'}
+          </p>
           <p className="text-footnote text-muted-foreground">
             <span className="font-mono tabular-nums">{l.codigoFabricante}</span>
             {' · '}
@@ -642,6 +678,21 @@ function FilaValidada({ linea: l, items, onGuardar }: {
              title={l.textoBreve || l.descripcion || l.codigoFabricante}
              description={<span className="font-mono tabular-nums">{l.codigoFabricante}{l.codigoSAP ? ` · SAP ${l.codigoSAP}` : ''} · {l.ubicacion}</span>}>
         <ListGroup>
+          <ListCell
+            leading={<Package className="h-5 w-5 text-primary" />}
+            title="Ver ficha del repuesto"
+            subtitle={item ? 'Fotos, stock, ubicación, equipos y movimientos'
+              : l.codigoSAP ? 'Este SAP todavía no tiene ficha en el maestro' : 'Sin SAP: todavía no tiene ficha'}
+            chevron={!!item && !!e.abrirFicha}
+            className={item && e.abrirFicha ? '' : 'opacity-50'}
+            onClick={item && e.abrirFicha ? () => { setAcciones(false); e.abrirFicha!(item) } : undefined} />
+          {item && (
+            <ListCell
+              leading={<Star className={`h-5 w-5 text-ink-warn ${item.isWatched ? 'fill-current' : ''}`} />}
+              title={item.isWatched ? 'Quitar de favoritos' : 'Agregar a favoritos'}
+              subtitle="La misma lista de favoritos de Bodega"
+              onClick={() => e.alternarFavorito(item)} />
+          )}
           <ListCell
             leading={<Shapes className="h-5 w-5 text-primary" />}
             title="Ver en el dibujo"
