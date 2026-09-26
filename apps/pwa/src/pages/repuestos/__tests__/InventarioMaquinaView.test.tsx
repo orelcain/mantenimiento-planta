@@ -240,7 +240,7 @@ describe('falta confirmar nombre', () => {
     fireEvent.change(campo, { target: { value: 'chapa guía baader 2001202002' } })
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar nombre' }))
     await waitFor(() => expect(confirmarNombreRepuesto).toHaveBeenCalled())
-    const [ses, linea, , nombre, uid] = confirmarNombreRepuesto.mock.calls[0]
+    const [ses, linea, , nombre, uid] = confirmarNombreRepuesto.mock.calls[0] as unknown as [string, InventarioLinea, unknown, string, string]
     expect([ses, linea.id, nombre, uid]).toEqual(['s1', 'u5-004', 'CHAPA GUÍA BAADER 2001202002', 'u1'])
   })
 
@@ -249,7 +249,8 @@ describe('falta confirmar nombre', () => {
     expect(cel.getAllByText('Confirmar nombre').length).toBeGreaterThan(0)
     fireEvent.click(cel.getByText('CHAPA GUIA 2001202002'))
     await screen.findByText('Ver ficha del repuesto')
-    fireEvent.click(screen.getAllByText('Confirmar nombre').at(-1)!)
+    const opciones = screen.getAllByText('Confirmar nombre')
+    fireEvent.click(opciones[opciones.length - 1]!)
     expect(await screen.findByDisplayValue('CHAPA GUIA 2001202002')).toBeTruthy()
   })
 })
