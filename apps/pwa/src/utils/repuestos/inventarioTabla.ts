@@ -34,7 +34,7 @@ export function conTotalesPorSap(ls: readonly InventarioLinea[]): InventarioLine
 }
 
 export type FiltroDif = '' | 'con' | 'falta' | 'sobra' | 'cero' | 'nd'
-export type FiltroEstado = '' | 'validado' | 'dudoso' | MotivoDuda
+export type FiltroEstado = '' | 'validado' | 'dudoso' | 'nombre' | MotivoDuda
 
 export interface FiltrosTabla {
   ubicacion: string
@@ -72,7 +72,9 @@ export function pasaFiltros(l: InventarioLinea, f: FiltrosTabla, busca = ''): bo
   if (f.dif === 'nd' && d != null) return false
   if (f.estado === 'validado' && l.estado !== 'validado') return false
   if (f.estado === 'dudoso' && l.estado !== 'dudoso') return false
-  if (f.estado && f.estado !== 'validado' && f.estado !== 'dudoso' && !(l.estado === 'dudoso' && l.motivo === f.estado)) return false
+  if (f.estado === 'nombre' && !l.nombrePendiente) return false
+  if (f.estado && f.estado !== 'validado' && f.estado !== 'dudoso' && f.estado !== 'nombre'
+      && !(l.estado === 'dudoso' && l.motivo === f.estado)) return false
   return true
 }
 
