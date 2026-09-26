@@ -933,7 +933,12 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
     // número que dice cuánto cuadraba el sistema antes del inventario.
     const sesionRef = doc(db, INVENTARIO_COL, sesion.id)
     const previa = (await getDoc(sesionRef)).data()
+    // Lo aplicado queda cuadrado (sistema = total contado del SAP): la diferencia
+    // que queda en la sesión es solo la de lo no aplicado.
+    const nuevoSistema = new Map([...plan.cambian, ...plan.cuadran].flatMap(a => a.lineaIds.map(id => [id, a.contado] as const)))
+    const tras = lineas.map(l => (nuevoSistema.has(l.id) ? { ...l, stockSistema: nuevoSistema.get(l.id)! } : l))
     batch.update(sesionRef, {
+      conDiferencia: conTotalesPorSap(tras).filter(l => { const d = diferencia(l); return d != null && d !== 0 }).length,
       ultimoAjuste: { actualizados, creados, cuadran: plan.cuadran.length, por: userName, at: serverTimestamp() },
       ...(previa?.precisionAntes ? {} : {
         precisionAntes: { conFicha: plan.conFicha, cuadraban: plan.cuadrabanConFicha, sinFicha: creados },
