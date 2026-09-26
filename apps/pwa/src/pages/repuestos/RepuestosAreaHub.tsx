@@ -12,7 +12,7 @@
  *  - Fase 7: búsqueda global del topbar + promover hub a vista por defecto.
  */
 import { useState, useMemo, useEffect, useCallback, useRef, Fragment } from 'react'
-import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ClipboardList, Menu, History, Trash2, Star, Download, X, MoreVertical, Copy, Check, Package, PackageCheck, PackageMinus, PackageX, GripVertical, Boxes, Wrench, Settings2, MapPin } from 'lucide-react'
+import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ClipboardList, Menu, History, Trash2, Star, Download, X, MoreVertical, Copy, Check, Package, PackageCheck, PackageMinus, PackageX, GripVertical, Boxes, Wrench, Settings2, MapPin, Shapes } from 'lucide-react'
 import { isCommonPartSap, machinesForCommonSap } from '@/data/commonPartsByMachine'
 import { esComun, esDespiece, esFavoritoDe, contarCon } from '@/hooks/repuestos/filtrosDeRepuestos'
 import { esCodigoSapValido } from '@/utils/repuestos/exportBomSAP'
@@ -38,6 +38,7 @@ import { useHierarchyAreaTree, type AreaTreeNode } from '@/hooks/useHierarchyAre
 import { useGlobalSearch, invalidateGlobalRepuestosCache, type GlobalSearchResult } from '@/hooks/repuestos/useGlobalSearch'
 import { useGlobalEquipmentSearch, getGlobalEquipmentCache } from '@/hooks/useGlobalEquipmentSearch'
 import { Link } from 'react-router-dom'
+import { dibujoDe, maquinaDeDespiece, useFigurasDespiece } from './enlacesPieza'
 import { rutaExpedienteEquipo } from '@/services/equipos/enlaceExpediente'
 import { useBodega } from '@/hooks/repuestos/useBodega'
 import { useAreaRepuestos, type StockStatus, type AreaRepuestoRow } from '@/hooks/repuestos/useAreaRepuestos'
@@ -1054,6 +1055,8 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     } catch { /* noop */ }
   }, [prefsKey, repPageSize, repStockFilter, repFavOnly, repSortColumn, repSortDir])
 
+  // Código de fabricante → figura del despiece (BAADER 142 y 200), para el acceso al dibujo.
+  const figurasDespiece = useFigurasDespiece()
   const selectedRep = useMemo(
     () => areaRepuestos.find((r) => r.rowKey === selectedRowKey) ?? null,
     [areaRepuestos, selectedRowKey],
@@ -2026,6 +2029,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                         {renderSortTh('equipo', 'Equipo', 'hidden md:table-cell')}
                         {renderSortTh('stock', 'Stock', 'hidden md:table-cell')}
                         {renderSortTh('tipo', 'Tipo', 'hidden md:table-cell')}
+                        <th className="hidden w-16 px-2 py-2 text-center font-semibold md:table-cell">Dibujo</th>
                         <th className="w-8 px-3 py-2" />
                       </tr>
                     </thead>
@@ -2035,6 +2039,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                         // El equipo del filtro/foco primero; el marcador «Sin equipo» de un doc duplicado no cuenta.
                         const { nombre: equipo, mas } = equipoParaMostrar(r.equipos, preferirEquipo)
                         const extra = mas > 0 ? ` +${mas}` : ''
+                        const dibujo = dibujoDe(figurasDespiece, r.codigoFabricante, maquinaDeDespiece(equipo))
                         const isSel = selectedRowKey === r.rowKey
                         // Fotos: las de bodega (reales del físico) primero, luego las del catálogo
                         const fotos = [...(r.fotos ?? []), ...(r.fotosCatalogo ?? [])]
@@ -2044,7 +2049,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                           <Fragment key={r.rowKey}>
                           {showDespieceDivider && (
                             <tr className="bg-muted">
-                              <td colSpan={9} className="px-3 py-1.5 text-caption font-semibold tracking-wider text-muted-foreground">
+                              <td colSpan={10} className="px-3 py-1.5 text-caption font-semibold tracking-wider text-muted-foreground">
                                 Piezas de despiece · sin código SAP
                               </td>
                             </tr>
@@ -2195,6 +2200,15 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                             <td className="hidden px-3 py-2 md:table-cell">
                               <span className="inline-block rounded-ctl bg-muted px-1.5 py-0.5 text-caption text-muted-foreground">{tipoLabelOf(r.tipo)}</span>
                             </td>
+                            <td className="hidden px-2 py-2 text-center md:table-cell">
+                              {dibujo ? (
+                                <Link to={dibujo.ruta} onClick={(e) => e.stopPropagation()}
+                                      className={[AREA_TACTIL_COMPACTA, 'inline-flex items-center justify-center rounded-ctl text-primary hover:bg-primary/10'].join(' ')}
+                                      title={`Ver en el dibujo · fig. ${dibujo.fig}`} aria-label={`Ver ${r.codigoFabricante} en el dibujo`}>
+                                  <Shapes className="h-4 w-4" />
+                                </Link>
+                              ) : <span className="text-muted-foreground/40">—</span>}
+                            </td>
                             <td className="px-3 py-2">
                               <button
                                 onClick={(e) => { e.stopPropagation(); toggleFav(r.rowKey) }}
@@ -2287,6 +2301,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
           onSpecs={() => startAction('specs')}
           onPhotos={() => startAction('photos')}
           onManual={() => startAction('manual')}
+          dibujo={dibujoDe(figurasDespiece, selectedRep.codigoFabricante, maquinaDeDespiece(equipoParaMostrar(selectedRep.equipos, preferirEquipo).nombre))}
           isFavorite={favKeys.has(selectedRep.rowKey)}
           onToggleFavorite={() => toggleFav(selectedRep.rowKey)}
           onAddToList={() => setAddToListRowKey(selectedRep.rowKey)}
