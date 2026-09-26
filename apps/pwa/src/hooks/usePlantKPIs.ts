@@ -17,7 +17,10 @@ import {
   parseShiftDocId,
   loadShoplogixShift,
 } from '@/services/shoplogix/shoplogixShift.service'
-import { avg, computeMachineKPI, aggregateShifts, cadenceCpm, lineCadenceCpm } from '@/services/grader/plantKpiCompute'
+import {
+  computeMachineKPI, aggregateShifts, cadenceCpm, lineCadenceCpm,
+  aggregatePlantRatios, aggregateQuality,
+} from '@/services/grader/plantKpiCompute'
 import { isUnscheduledShift } from '@/services/grader/graderShiftDisplay'
 import type { MachineKPI, PlantKPIs } from '@/services/grader/plantKpiCompute'
 import type { PlantSlug } from '@/services/shoplogix/shoplogixMachines'
@@ -194,12 +197,19 @@ export function usePlantKPIs(
         // `map` pasa el índice como 2º arg — envolver para no colarlo como lineCpm.
         const lineCpm      = lineCadenceCpm(snapshot.machines.map(m => cadenceCpm(m.totalCycles ?? 0, m.shiftRuntimeBreakdown.uptimeSec)))
         const machineKPIs  = snapshot.machines.map(m => computeMachineKPI(m, lineCpm))
-        const availability = avg(machineKPIs.map(m => m.availability))
-        const performance  = avg(machineKPIs.map(m => m.performance))
+        // Razones de la línea: sumar numeradores y denominadores, no promediar
+        // las razones de cada máquina (ver `aggregatePlantRatios`).
+        const plant = aggregatePlantRatios(snapshot.machines.map((m, i) => ({
+          breakdown:  m.shiftRuntimeBreakdown,
+          intervals:  m.intervals,
+          // `computeMachineKPI` ya resolvió macro/micro; macroSec se recupera
+          // exacto desde el MTTR y el conteo de esa misma máquina.
+          macroSec:   machineKPIs[i]!.mttrMin * 60 * machineKPIs[i]!.failureCount,
+          macroCount: machineKPIs[i]!.failureCount,
+        })))
+        const { availability, performance } = plant
         const graderSummary = graderSummaries.find(s => s.dateKey === dateKey && s.shiftId === shiftId)
-        const quality: number | null = graderSummary && typeof graderSummary.pointZeroPct === 'number'
-          ? Math.max(0, Math.min(1, 1 - graderSummary.pointZeroPct / 100))
-          : null
+        const quality: number | null = graderSummary ? aggregateQuality([graderSummary]) : null
         const oee = quality !== null ? availability * performance * quality : null
 
         const kpis: PlantKPIs = {
@@ -207,8 +217,8 @@ export function usePlantKPIs(
           periodLabel: getPeriodLabel('day', dateKey!, new Date()),
           shiftsCount: 1,
           availability, performance, quality, oee,
-          mttrMin:      avg(machineKPIs.map(m => m.mttrMin)),
-          mtbfHours:    avg(machineKPIs.map(m => m.mtbfHours)),
+          mttrMin:      plant.mttrMin,
+          mtbfHours:    plant.mtbfHours,
           failureCount: machineKPIs.reduce((a, m) => a + m.failureCount, 0),
           microCount:   machineKPIs.reduce((a, m) => a + m.microCount, 0),
           microMin:     machineKPIs.reduce((a, m) => a + m.microMin, 0),
@@ -333,10 +343,7 @@ export function usePlantKPIsForPeriod(
     if (shifts.length === 0) {
       const graderForPeriod = graderSummaries.filter(g => dateKeys.includes(g.dateKey))
       if (graderForPeriod.length === 0) return { loading: false, error: null, kpis: null }
-      const qualityVals = graderForPeriod
-        .filter(g => typeof g.pointZeroPct === 'number')
-        .map(g => Math.max(0, Math.min(1, 1 - g.pointZeroPct / 100)))
-      const quality = qualityVals.length > 0 ? avg(qualityVals) : null
+      const quality = aggregateQuality(graderForPeriod)
       return {
         loading: false, error: null,
         kpis: {
