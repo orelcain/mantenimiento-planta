@@ -29,6 +29,11 @@ describe('filtros de la tabla', () => {
     expect(ids(L.filter(l => pasaFiltros(l, f({ estado: 'codigo' }))))).toBe('c')
     expect(ids(L.filter(l => pasaFiltros(l, f({ estado: 'sap' }))))).toBe('')
   })
+  it('falta confirmar nombre: validada pero con nombre provisional', () => {
+    const conNombre = L.map(l => (l.id === 'd' ? { ...l, nombrePendiente: true } : l))
+    expect(ids(conNombre.filter(l => pasaFiltros(l, f({ estado: 'nombre' }))))).toBe('d')
+    expect(ids(conNombre.filter(l => pasaFiltros(l, f({ estado: 'validado' }))))).toBe('abd')
+  })
   it('nombre busca también el nombre común, sin acentos', () => expect(ids(L.filter(l => pasaFiltros(l, f({ nombre: 'bocína' }))))).toBe('b'))
   it('búsqueda global por palabras', () => expect(ids(L.filter(l => pasaFiltros(l, FILTROS_VACIOS, 'chapa 3300017418')))).toBe('a'))
   it('cuenta filtros activos', () => expect(filtrosActivos(f({ ubicacion: 'x', dif: 'con' }), 'q')).toBe(3))

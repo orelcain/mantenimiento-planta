@@ -1,6 +1,6 @@
 import { Fragment, createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, BookOpen, Check, Package, Star, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Download, Loader2, Pencil, Scale, Search, Shapes, X } from 'lucide-react'
+import { AlertTriangle, BookOpen, BadgeCheck, Check, Package, Star, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Download, Loader2, Pencil, Scale, Search, Shapes, X } from 'lucide-react'
 import { Button, ListCell, ListGroup, SegmentedControl, Sheet, Tag, type TagTone } from '@/components/piel'
 import {
   FILTROS_VACIOS, conTotalesPorSap, diferencia, filtrosActivos, nombreDe, ordenarLineas, pasaFiltros, planDeAjuste,
@@ -59,6 +59,8 @@ interface CtxEnlaces {
   itemDe: (codigoSAP: string) => BodegaMergedItem | undefined
   abrirFicha?: (item: BodegaMergedItem) => void
   alternarFavorito: (item: BodegaMergedItem) => void
+  /** Confirma el nombre de SAP del repuesto de esa línea (maestro + bodega + líneas). */
+  confirmarNombre: (l: InventarioLinea, nombre: string) => Promise<void>
 }
 const Enlaces = createContext<CtxEnlaces | null>(null)
 const useEnlaces = () => useContext(Enlaces)!
@@ -116,7 +118,7 @@ export function InventarioMaquinaView({ sesion, bodega, user, onVolver, onAbrirF
   /** Abre la ficha del repuesto (la de Bodega → Stock) encima del inventario. */
   onAbrirFicha?: (item: BodegaMergedItem) => void
 }) {
-  const { items, loadLineas, validarLinea, aplicarAjusteInventario, toggleWatch } = bodega
+  const { items, loadLineas, validarLinea, aplicarAjusteInventario, toggleWatch, confirmarNombreRepuesto } = bodega
   const porSap = useMemo(() => new Map(items.filter(i => i.codigoSAP).map(i => [i.codigoSAP, i])), [items])
   const [lineas, setLineas] = useState<InventarioLinea[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -150,7 +152,12 @@ export function InventarioMaquinaView({ sesion, bodega, user, onVolver, onAbrirF
     itemDe: sap => (sap ? porSap.get(sap) : undefined),
     abrirFicha: onAbrirFicha,
     alternarFavorito: i => toggleWatch(i.rowKey),
-  }), [sesion.id, sesion.maquina, figuras, manuales, porSap, onAbrirFicha, toggleWatch])
+    confirmarNombre: async (l, nombre) => {
+      if (!user) throw new Error('Hay que iniciar sesión.')
+      await confirmarNombreRepuesto(sesion.id, l, lineas ?? [], nombre, user.id, user.nombre)
+      await recargar()
+    },
+  }), [sesion.id, sesion.maquina, figuras, manuales, porSap, onAbrirFicha, toggleWatch, confirmarNombreRepuesto, user, lineas, recargar])
 
   const guardar: Guardar = async (l, datos) => {
     if (!user) throw new Error('Hay que iniciar sesión.')
@@ -330,6 +337,7 @@ const COLUMNAS: { col: ColumnaOrden; titulo: string; num?: boolean }[] = [
 
 function EstadoTag({ l }: { l: InventarioLinea }) {
   if (l.estado === 'dudoso' && l.motivo) return <Tag tone={MOTIVO[l.motivo].tono}>{MOTIVO[l.motivo].texto}</Tag>
+  if (l.nombrePendiente) return <Tag tone={5}>Confirmar nombre</Tag>
   return <Tag tone={2}>Validado</Tag>
 }
 
@@ -360,6 +368,7 @@ function TablaInventario({ lineas, items, onGuardar, nombreArchivo }: {
     [lineas, f, busca, orden])
   const nFiltros = filtrosActivos(f, busca)
   const dudosas = lineas.filter(l => l.estado === 'dudoso').length
+  const sinNombre = lineas.filter(l => pasaFiltros(l, { ...FILTROS_VACIOS, estado: 'nombre' })).length
   const set = <K extends keyof FiltrosTabla>(k: K, v: FiltrosTabla[K]) => setF(p => ({ ...p, [k]: v }))
   const ordenarPor = (col: ColumnaOrden) =>
     setOrden(o => ({ col, dir: o.col === col ? (o.dir === 1 ? -1 : 1) : 1 }))
@@ -380,6 +389,11 @@ function TablaInventario({ lineas, items, onGuardar, nombreArchivo }: {
         {dudosas > 0 && f.estado !== 'dudoso' && (
           <Button variant="tinted" onClick={() => setF({ ...FILTROS_VACIOS, estado: 'dudoso' })}>
             <AlertTriangle /> {dudosas} por confirmar
+          </Button>
+        )}
+        {sinNombre > 0 && f.estado !== 'nombre' && (
+          <Button variant="tinted" onClick={() => setF({ ...FILTROS_VACIOS, estado: 'nombre' })}>
+            <BadgeCheck /> {sinNombre} por confirmar nombre
           </Button>
         )}
         {nFiltros > 0 && (
@@ -433,7 +447,7 @@ function TablaInventario({ lineas, items, onGuardar, nombreArchivo }: {
                 </th>
                 <th className="border-b border-border px-1.5 pb-2 font-normal">
                   <select aria-label="Filtrar estado" value={f.estado} onChange={e => set('estado', e.target.value as FiltroEstado)} className={activo(f.estado)}>
-                    <option value="">Todos</option><option value="validado">Validados</option><option value="dudoso">Todos los dudosos</option>
+                    <option value="">Todos</option><option value="validado">Validados</option><option value="nombre">Confirmar nombre</option><option value="dudoso">Todos los dudosos</option>
                     {(Object.keys(MOTIVO) as MotivoDuda[]).map(m => <option key={m} value={m}>{MOTIVO[m].texto}</option>)}
                   </select>
                 </th>
@@ -512,9 +526,10 @@ function TablaInventario({ lineas, items, onGuardar, nombreArchivo }: {
 
 /* ══════════════════════ Celular: lista ══════════════════════ */
 
-type Chip = 'todos' | 'con' | 'falta' | 'sin'
+type Chip = 'todos' | 'nombre' | 'con' | 'falta' | 'sin'
 const CHIPS: { id: Chip; texto: string; filtro: Partial<FiltrosTabla> }[] = [
   { id: 'todos', texto: 'Todos', filtro: {} },
+  { id: 'nombre', texto: 'Confirmar nombre', filtro: { estado: 'nombre' } },
   { id: 'con', texto: 'Con diferencia', filtro: { dif: 'con' } },
   { id: 'falta', texto: 'Faltan', filtro: { dif: 'falta' } },
   { id: 'sin', texto: 'Sin SAP', filtro: { sap: 'sin' } },
@@ -658,6 +673,7 @@ function FilaValidada({ linea: l, items, onGuardar }: {
             {l.codigoCuaderno && l.codigoCuaderno !== l.codigoFabricante && <> · cuaderno: <span className="font-mono">{l.codigoCuaderno}</span></>}
             {l.nombreComun && <> · {l.nombreComun}</>}
           </p>
+          {l.nombrePendiente && <Tag tone={5} className="mt-1">Confirmar nombre</Tag>}
         </div>
         <div className="w-16 shrink-0 text-right">
           <p className="text-headline font-bold tabular-nums text-foreground">{l.cantidad ?? '—'}</p>
@@ -678,6 +694,14 @@ function FilaValidada({ linea: l, items, onGuardar }: {
              title={l.textoBreve || l.descripcion || l.codigoFabricante}
              description={<span className="font-mono tabular-nums">{l.codigoFabricante}{l.codigoSAP ? ` · SAP ${l.codigoSAP}` : ''} · {l.ubicacion}</span>}>
         <ListGroup>
+          {l.nombrePendiente && (
+            <ListCell
+              leading={<BadgeCheck className="h-5 w-5 text-primary" />}
+              title="Confirmar nombre"
+              subtitle="Provisional del despiece: confírmalo o corrígelo con el de SAP"
+              chevron
+              onClick={() => { setAcciones(false); setEditando(true) }} />
+          )}
           <ListCell
             leading={<Package className="h-5 w-5 text-primary" />}
             title="Ver ficha del repuesto"
@@ -750,6 +774,39 @@ function TarjetaDudosa({ linea: l, items, onGuardar }: {
   )
 }
 
+/* ── Confirmar el nombre de SAP (el provisional viene del despiece) ── */
+
+function ConfirmarNombre({ linea: l }: { linea: InventarioLinea }) {
+  const e = useEnlaces()
+  const [nombre, setNombre] = useState(l.textoBreve)
+  const [guardando, setGuardando] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  return (
+    <div className="space-y-2 rounded-ctl bg-primary/[0.06] p-3">
+      <label className="flex flex-col gap-1">
+        <span className="text-caption text-muted-foreground">
+          Nombre en SAP del <span className="font-mono">{l.codigoSAP}</span> · el actual es provisional (del despiece)
+        </span>
+        <input value={nombre} onChange={ev => setNombre(ev.target.value.toUpperCase())} maxLength={40} autoComplete="off"
+               className="h-11 w-full rounded-ctl bg-card px-3 text-body text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40" />
+      </label>
+      {l.sapEnFicha === false && (
+        <p className="text-footnote text-muted-foreground">Al confirmar, también se escribe el SAP {l.codigoSAP} en la ficha del maestro.</p>
+      )}
+      {err && <p className="text-footnote text-ink-crit">{err}</p>}
+      <Button variant="filled" disabled={guardando || !nombre.trim()}
+              onClick={async () => {
+                setGuardando(true); setErr(null)
+                try { await e.confirmarNombre(l, nombre) }
+                catch (x) { setErr(x instanceof Error ? x.message : 'No se pudo guardar el nombre.') }
+                finally { setGuardando(false) }
+              }}>
+        {guardando ? <Loader2 className="animate-spin" /> : <BadgeCheck />} Confirmar nombre
+      </Button>
+    </div>
+  )
+}
+
 /* ── Formulario común: código, cantidad y SAP, con el maestro buscando solo ── */
 
 function FormularioLinea({ linea: l, items, textoBoton, onGuardar, onCancelar }: {
@@ -799,6 +856,7 @@ function FormularioLinea({ linea: l, items, textoBoton, onGuardar, onCancelar }:
   const campo = 'h-11 w-full rounded-ctl bg-muted px-3 text-body text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40'
   return (
     <div className="space-y-2">
+      {l.nombrePendiente && l.codigoSAP && <ConfirmarNombre linea={l} />}
       <div className="grid grid-cols-[1fr_5.5rem] gap-2">
         <label className="flex flex-col gap-1">
           <span className="text-caption text-muted-foreground">Código de fabricante</span>

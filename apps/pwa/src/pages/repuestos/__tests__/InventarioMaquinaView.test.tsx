@@ -34,7 +34,8 @@ const LINEAS: InventarioLinea[] = [
   { ...base, id: 'u1-002', ubicacion: 'Ubicación 1', codigoFabricante: '92152025', codigoCuaderno: '92152025',
     codigoSAP: '3300051215', textoBreve: 'RODILLO 92152025', cantidad: 5, stockSistema: 6, estado: 'validado' },
   { ...base, id: 'u5-004', ubicacion: 'Ubicación 5', codigoFabricante: '2001202002', codigoCuaderno: '2001202002',
-    codigoSAP: '3300017418', textoBreve: 'CHAPA GUIA 2001202002', cantidad: 1, stockSistema: 18, estado: 'validado' },
+    codigoSAP: '3300017418', textoBreve: 'CHAPA GUIA 2001202002', cantidad: 1, stockSistema: 18, estado: 'validado',
+    nombrePendiente: true, sapEnFicha: false, fichaId: 'f-2001202002' },
   { ...base, id: 'u3-008', ubicacion: 'Ubicación 3', codigoFabricante: '92481630', codigoCuaderno: '92481630',
     cantidad: 7, estado: 'dudoso', motivo: 'codigo', sugerencia: '92461630',
     detalleDuda: 'No existe. 92461630 = Bulón con gollete (SAP 3300011830).' },
@@ -54,7 +55,8 @@ async function montar() {
   const aplicarAjusteInventario = vi.fn().mockResolvedValue({ actualizados: 2, creados: 0, cuadran: 0 })
   const toggleWatch = vi.fn()
   const onAbrirFicha = vi.fn()
-  const bodega = { items: ITEMS, loadLineas: vi.fn().mockResolvedValue(LINEAS), validarLinea, aplicarAjusteInventario, toggleWatch } as never
+  const confirmarNombreRepuesto = vi.fn().mockResolvedValue(undefined)
+  const bodega = { items: ITEMS, loadLineas: vi.fn().mockResolvedValue(LINEAS), validarLinea, aplicarAjusteInventario, toggleWatch, confirmarNombreRepuesto } as never
   const { container } = render(
     <MemoryRouter>
       <InventarioMaquinaView sesion={SESION} bodega={bodega} user={{ id: 'u1', nombre: 'Tester' }} onVolver={() => {}} onAbrirFicha={onAbrirFicha} />
@@ -62,7 +64,7 @@ async function montar() {
   await screen.findAllByText('RODILLO 92152025')
   const pc = within(container.querySelector('[data-vista="pc"]') as HTMLElement)
   const cel = within(container.querySelector('[data-vista="celular"]') as HTMLElement)
-  return { validarLinea, aplicarAjusteInventario, toggleWatch, onAbrirFicha, pc, cel, raiz: within(container) }
+  return { validarLinea, aplicarAjusteInventario, toggleWatch, onAbrirFicha, confirmarNombreRepuesto, pc, cel, raiz: within(container) }
 }
 const filasTabla = (pc: ReturnType<typeof within>) =>
   pc.getAllByRole('row').slice(2).map((r: HTMLElement) => r.textContent ?? '')
@@ -223,5 +225,32 @@ describe('ficha del repuesto y favoritos', () => {
     fireEvent.click(cel.getByText('CHAPA GUIA 2001202002'))
     expect(await screen.findByText('Este SAP todavía no tiene ficha en el maestro')).toBeTruthy()
     expect(screen.queryByText('Agregar a favoritos')).toBeNull()
+  })
+})
+
+describe('falta confirmar nombre', () => {
+  it('PC: la línea lo marca, el filtro rápido la deja sola y el formulario guarda el nombre de SAP', async () => {
+    const { pc, confirmarNombreRepuesto } = await montar()
+    expect(pc.getAllByText('Confirmar nombre').length).toBeGreaterThan(0)
+    fireEvent.click(pc.getByRole('button', { name: /1 por confirmar nombre/ }))
+    expect(filasTabla(pc)).toHaveLength(1)
+    fireEvent.click(pc.getByText('CHAPA GUIA 2001202002'))
+    const campo = await screen.findByDisplayValue('CHAPA GUIA 2001202002')
+    expect(screen.getByText(/también se escribe el SAP 3300017418/)).toBeTruthy()
+    fireEvent.change(campo, { target: { value: 'chapa guía baader 2001202002' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar nombre' }))
+    await waitFor(() => expect(confirmarNombreRepuesto).toHaveBeenCalled())
+    const [ses, linea, , nombre, uid] = confirmarNombreRepuesto.mock.calls[0] as unknown as [string, InventarioLinea, unknown, string, string]
+    expect([ses, linea.id, nombre, uid]).toEqual(['s1', 'u5-004', 'CHAPA GUÍA BAADER 2001202002', 'u1'])
+  })
+
+  it('celular: el menú de la fila ofrece confirmar el nombre', async () => {
+    const { cel } = await montar()
+    expect(cel.getAllByText('Confirmar nombre').length).toBeGreaterThan(0)
+    fireEvent.click(cel.getByText('CHAPA GUIA 2001202002'))
+    await screen.findByText('Ver ficha del repuesto')
+    const opciones = screen.getAllByText('Confirmar nombre')
+    fireEvent.click(opciones[opciones.length - 1]!)
+    expect(await screen.findByDisplayValue('CHAPA GUIA 2001202002')).toBeTruthy()
   })
 })
