@@ -4621,7 +4621,11 @@ function MonitorDelToken() {
   const vistas = useMemo(() => {
     if (!data?.live) return []
     return [
-      { shiftDocId: data.shiftDocId, dateKey: data.dateKey, shiftId: data.shiftId, live: data.live },
+      {
+        shiftDocId: data.shiftDocId, dateKey: data.dateKey, shiftId: data.shiftId, live: data.live,
+        // El actual también puede ser el turno que marcó el sensor.
+        ...(data.extraordinario ? { extraordinario: data.extraordinario } : {}),
+      },
       ...(data.history ?? []),
     ]
   }, [data])

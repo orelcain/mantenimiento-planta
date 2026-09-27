@@ -2441,6 +2441,31 @@ function archivarSerieMinuto(monitor) {
  *
  * @returns {Promise<object|null>} patch a mergear en el doc, o null si no hay nada que publicar.
  */
+/**
+ * Decide qué se publica como ACTUAL: el turno con nombre vigente, o el turno
+ * del sensor si es posterior a él y el turno con nombre ya cerró. El que baja
+ * pasa al historial en la primera posición; el orden cronológico se conserva.
+ *
+ * @returns {{shiftDocId: string, live: object, history: Array, extraordinario: object|null}}
+ */
+function ordenarSensorComoActual(shiftDocId, live, history) {
+  const normal = { shiftDocId, live, history, extraordinario: null }
+  const sensor = history[0]
+  if (!sensor?.extraordinario || !live?.shiftClosed) return normal
+  const cierre = Date.parse(live.scheduledEnd ?? live.effectiveEnd ?? '')
+  const arranque = Date.parse(sensor.extraordinario.desde)
+  if (!Number.isFinite(cierre) || !Number.isFinite(arranque) || arranque < cierre) return normal
+  return {
+    shiftDocId: sensor.shiftDocId,
+    live: sensor.live,
+    extraordinario: sensor.extraordinario,
+    history: [
+      { shiftDocId, dateKey: shiftDocId.slice(0, 10), shiftId: shiftDocId.slice(11), live },
+      ...history.slice(1),
+    ].slice(0, HISTORY_MAX),
+  }
+}
+
 async function buildMonitorPatch(db, monitor, currentShiftDocIdByPlant = new Map(), shiftIndexByPlant = new Map()) {
   const plantSlug = monitor.plantSlug
   if (!plantSlug) return null
@@ -2505,18 +2530,40 @@ async function buildMonitorPatch(db, monitor, currentShiftDocIdByPlant = new Map
   if (!live) return null
 
   const sinTurno = { prev: monitor.sinTurnoRevisados || {}, next: {} }
-  const history = await buildMonitorHistory(db, plantSlug, shiftDocId, monitor.history, index, sinTurno)
+  /*
+   * Si el refresco anterior puso al turno del sensor como ACTUAL (ver abajo),
+   * su entrada vive en `live`, no en `history`: se le devuelve al historial
+   * previo para que el sello de su `Unscheduled` lo pueda reusar sin releer.
+   */
+  const historialPrevio = monitor.extraordinario && monitor.live
+    ? [{ shiftDocId: monitor.shiftDocId, dateKey: String(monitor.shiftDocId).slice(0, 10), shiftId: String(monitor.shiftDocId).slice(11), live: monitor.live, extraordinario: monitor.extraordinario }, ...(monitor.history || [])]
+    : monitor.history
+  const history = await buildMonitorHistory(db, plantSlug, shiftDocId, historialPrevio, index, sinTurno)
   const fhLinea = await buildForecastHistory(
     db, plantSlug, shiftDocId, shiftDocId.slice(11), monitor.forecastHistory, history, index, forecastSkip,
   )
+
+  /*
+   * El turno que marcó el sensor es el ACTUAL cuando vino DESPUÉS del turno
+   * con nombre y este ya cerró. Chonchi 26-sep-2026: el extraordinario
+   * 16:15→22:55 quedaba «1 turno atrás» del Turno 2 que cerró a las 15:00 —
+   * el último turno de la semana, atrasado en el tiempo (lo vio Orel). El
+   * vigente sigue resolviéndose entre turnos con nombre (`resolveCurrentShiftDocId`);
+   * acá solo se corrige el orden de lo que se publica. En cuanto arranque un
+   * turno con nombre nuevo, ese es el vigente y el sensor vuelve al historial.
+   */
+  const publicado = ordenarSensorComoActual(shiftDocId, live, history)
   /* El archivo de barras del turno que se venía midiendo (ver
      `archivarSerieMinuto`). Solo modo línea: en un link de turno fijo el pulso
      mide al turno VIGENTE de la planta, no al fijo, y archivarle esa serie le
      colgaría barras de otro turno. */
   const seriesMinuto = archivarSerieMinuto(monitor)
   return {
-    live,
-    history,
+    live: publicado.live,
+    history: publicado.history,
+    /* null cuando el actual es un turno con nombre: con `merge` un campo que no
+       se manda se queda, y el monitor seguiría diciendo «extraordinario». */
+    extraordinario: publicado.extraordinario,
     sinTurnoRevisados: sinTurno.next,
     ...(seriesMinuto ? { seriesMinuto } : {}),
     /* Turnos del mismo nombre: es lo que hace posible pronosticar en las
@@ -2527,9 +2574,9 @@ async function buildMonitorPatch(db, monitor, currentShiftDocIdByPlant = new Map
     shiftStats: await buildShiftStats(db, plantSlug, shiftDocId, monitor.shiftStats, history, fhLinea, index, statsSkip),
     statsDescartados: podado(statsSkip, SHIFT_INDEX_LOOKBACK_DAYS),
     forecastDescartados: podado(forecastSkip, 30),
-    shiftDocId,
-    dateKey: shiftDocId.slice(0, 10),
-    shiftId: shiftDocId.slice(11),
+    shiftDocId: publicado.shiftDocId,
+    dateKey: publicado.shiftDocId.slice(0, 10),
+    shiftId: publicado.shiftDocId.slice(11),
   }
 }
 
@@ -2733,6 +2780,7 @@ module.exports = {
   parentSinCambioReal,
   // exportados para tests
   bloquesDelSensor,
+  ordenarSensorComoActual,
   currentStateOf,
   statusOf,
   modelLabel,

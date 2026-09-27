@@ -345,6 +345,12 @@ export interface PublicShiftMonitorDoc {
    * deslizar hacia atrás sin sesión. Los compone el backend con el mismo
    * formato que `live`. Ausente en docs creados antes de esta función.
    */
+  /**
+   * Presente cuando el turno ACTUAL publicado es uno que marcó el sensor (vino
+   * después del último turno con nombre, ya cerrado). Mismo formato que en
+   * `history`. `null` cuando el actual es un turno con nombre.
+   */
+  extraordinario?: { desde: string; hasta: string; fuenteDocId?: string } | null
   history?: Array<{
     shiftDocId: string
     dateKey: string

@@ -1264,3 +1264,33 @@ test('bloquesDelSensor: una cola, ruido o un rato corto NO son un turno', () => 
   assert.equal(b.length, 1)
   assert.equal(b[0].pieces, 71 * 70)
 })
+
+const { ordenarSensorComoActual } = require('../publicMonitor')
+
+test('el turno del sensor posterior a un turno cerrado pasa a ser el ACTUAL; el de nombre baja a «1 atrás»', () => {
+  const t2 = { shiftClosed: true, scheduledStart: '2026-09-26T07:15:00.000Z', scheduledEnd: '2026-09-26T15:00:00.000Z', totalPieces: 13215 }
+  const sensor = {
+    shiftDocId: '2026-09-26_Unscheduled@16:15', dateKey: '2026-09-26', shiftId: 'Unscheduled@16:15',
+    live: { shiftClosed: true, totalPieces: 9553 },
+    extraordinario: { desde: '2026-09-26T16:15:00.000Z', hasta: '2026-09-26T22:55:00.000Z', fuenteDocId: '2026-09-26_Unscheduled' },
+  }
+  const t1Ayer = { shiftDocId: '2026-09-25_Turno 1', dateKey: '2026-09-25', shiftId: 'Turno 1', live: { totalPieces: 16346 } }
+
+  const out = ordenarSensorComoActual('2026-09-26_Turno 2', t2, [sensor, t1Ayer])
+  assert.equal(out.shiftDocId, sensor.shiftDocId, 'el último de la semana es el actual')
+  assert.equal(out.live.totalPieces, 9553)
+  assert.deepEqual(out.extraordinario, sensor.extraordinario)
+  assert.equal(out.history[0].shiftDocId, '2026-09-26_Turno 2', 'el Turno 2 queda un paso atrás')
+  assert.equal(out.history[0].live.totalPieces, 13215)
+  assert.equal(out.history[1].shiftDocId, '2026-09-25_Turno 1', 'y el resto conserva su orden')
+
+  // Con el turno con nombre EN CURSO, manda él: el sensor es historia.
+  const enCurso = { ...t2, shiftClosed: false }
+  const sigue = ordenarSensorComoActual('2026-09-26_Turno 2', enCurso, [sensor, t1Ayer])
+  assert.equal(sigue.shiftDocId, '2026-09-26_Turno 2')
+  assert.equal(sigue.extraordinario, null, 'se manda null para limpiar el campo con merge')
+
+  // Un sensor ANTERIOR al turno con nombre (arranque anticipado largo) tampoco lo desplaza.
+  const antes = { ...sensor, extraordinario: { ...sensor.extraordinario, desde: '2026-09-26T03:00:00.000Z' } }
+  assert.equal(ordenarSensorComoActual('2026-09-26_Turno 2', t2, [antes]).shiftDocId, '2026-09-26_Turno 2')
+})
