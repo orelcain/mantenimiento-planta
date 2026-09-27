@@ -88,6 +88,8 @@ export interface BodegaMergedItem {
   nombresComunes?: string[]
   /** Slugs de máquina para las que este repuesto es "común" (marca compartida). */
   comunEn?: string[]
+  /** Cuántas lleva la máquina (BOM de SAP PM). Informa al solicitar; no manda la cantidad. */
+  cantidadPorMaquina?: number
   tipo?: string
   /** Clase del material (maestro unificado): repuesto·insumo·herramienta·… */
   clase?: MaterialClase
@@ -439,6 +441,7 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
         alias: rep.alias,
         nombresComunes: Array.isArray(rep.nombresComunes) ? rep.nombresComunes : undefined,
         comunEn: Array.isArray(rep.comunEn) ? rep.comunEn : undefined,
+        cantidadPorMaquina: typeof rep.cantidadPorMaquina === 'number' && rep.cantidadPorMaquina > 0 ? rep.cantidadPorMaquina : undefined,
         tipo: rep.tipo,
         clase: rep.clase,
         tieneSap: rep.tieneSap ?? !!sap,

@@ -29,6 +29,7 @@ import {
   X,
   Zap,
   Search,
+  ClipboardList,
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import ReactECharts from 'echarts-for-react'
@@ -64,6 +65,12 @@ import { TableroExpediente } from '@/components/equipment/TableroExpediente'
 import { PhotoAnnotationEditor } from '@/components/PhotoAnnotationEditor'
 import { useManualesDeEquipos } from '@/hooks/repuestos/useManualesDeEquipos'
 import { useRepuestosDeEquipo, leerRepuestosDeEquipo } from '@/hooks/repuestos/useRepuestosDeEquipo'
+import { SolicitarVariosSheet } from '@/components/repuestos/SolicitarVariosSheet'
+import { useSolicitudes, type NuevaSolicitud } from '@/hooks/repuestos/useSolicitudes'
+import { leerStockDeBodega } from '@/services/repuestos/stockDeBodega'
+import { esComun } from '@/hooks/repuestos/filtrosDeRepuestos'
+import type { PiezaSolicitable } from '@/utils/repuestos/solicitudMultiple'
+import { useToast } from '@/hooks/useToast'
 import { particionarRepuestosDeEquipo, filtrarRepuestosDeEquipo, opcionesBomDesdeEquipo } from '@/services/repuestos/bomDeEquipo'
 import { cantidadDePosicion, contarSinCantidad } from '@/services/repuestos/cantidadDePosicion'
 import { buildBomIB01, exportBomIB01ToExcel, toUnidadSAP } from '@/utils/repuestos/exportBomSAP'
@@ -1514,6 +1521,26 @@ function RecursosRepuestos({ equipment, canEdit, buscarInicial }: { equipment: E
   const nodeId = equipment.hierarchyNodeId
   const [reloadKey, setReloadKey] = useState(0)
   const { repuestos, loading } = useRepuestosDeEquipo(nodeId, reloadKey)
+  // «Solicitar repuestos»: uno o varios de este equipo de una vez. El stock se lee al abrir.
+  const [solicitarOpen, setSolicitarOpen] = useState(false)
+  const { crearSolicitud } = useSolicitudes()
+  const usuario = useAuthStore((s) => s.user)
+  const { toast } = useToast()
+  const piezasSolicitables = useMemo<PiezaSolicitable[]>(() => repuestos.map((r) => ({
+    clave: r.id, codigoSAP: r.codigoSAP, textoBreve: r.nombre, codigoFabricante: r.codigoFabricante,
+    comun: esComun({ rowKey: r.id, codigoSAP: r.codigoSAP, comunEn: (r.doc as { comunEn?: unknown[] }).comunEn }),
+    cantidadPorMaquina: r.cantidadPorMaquina,
+  })), [repuestos])
+  const nombreEquipo = formatNombreSAP(equipment.nombre).nombre || equipment.nombre
+  const crearVarias = async (lineas: NuevaSolicitud[]) => {
+    for (const l of lineas) await crearSolicitud(l, usuario?.id ?? 'anon', usuario?.nombre ?? 'Anónimo')
+    setSolicitarOpen(false)
+    toast({
+      title: `${lineas.length} ${lineas.length === 1 ? 'solicitud creada' : 'solicitudes creadas'}`,
+      description: `${lineas.reduce((a, l) => a + l.cantidad, 0)} unidades para ${nombreEquipo}. Quedan en Repuestos → «Solicitudes».`,
+      variant: 'success',
+    })
+  }
   const [despieceAbierto, setDespieceAbierto] = useState(false)
   // Grupos del despiece desplegados, por nombre. Un grupo junta piezas DISTINTAS que se
   // llaman igual (los 58 «Soporte» tienen 58 códigos de fabricante): hay que poder abrirlo.
@@ -1637,12 +1664,21 @@ function RecursosRepuestos({ equipment, canEdit, buscarInicial }: { equipment: E
             Repuestos del equipo{' '}
             {repuestos.length > 0 && <span className="text-xs font-normal text-muted-foreground">({repuestos.length})</span>}
           </div>
-          {canEdit && nodeId && !adding && (
-            <Button variant="outline" size="sm" onClick={openAdd}>
-              <Plus className="h-3.5 w-3.5 mr-1.5" /> Vincular
-            </Button>
-          )}
+          <div className="flex items-center gap-1.5">
+            {repuestos.some((r) => r.codigoSAP.trim()) && (
+              <Button variant="outline" size="sm" onClick={() => setSolicitarOpen(true)}>
+                <ClipboardList className="h-3.5 w-3.5 mr-1.5" /> Solicitar repuestos
+              </Button>
+            )}
+            {canEdit && nodeId && !adding && (
+              <Button variant="outline" size="sm" onClick={openAdd}>
+                <Plus className="h-3.5 w-3.5 mr-1.5" /> Vincular
+              </Button>
+            )}
+          </div>
         </div>
+        <SolicitarVariosSheet open={solicitarOpen} onClose={() => setSolicitarOpen(false)} maquina={nombreEquipo}
+                              piezas={piezasSolicitables} cargarStock={leerStockDeBodega} onSubmit={crearVarias} />
 
         {adding && (
           <div className="space-y-2 rounded-card border bg-muted p-2">
