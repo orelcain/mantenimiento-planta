@@ -18,7 +18,7 @@ import { CLASE_LABEL } from '@/types/repuestos'
 import type { AreaRepuestoRow } from '@/hooks/repuestos/useAreaRepuestos'
 import type { MovimientoBodega } from '@/hooks/repuestos/useBodega'
 import { AREA_TACTIL, AREA_TACTIL_COMPACTA } from '@/lib/areaTactil'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { agruparDondeSeUsa, totalDondeSeUsa, plantaCorta } from '@/hooks/repuestos/dondeSeUsa'
 import { rutaExpedienteEquipo } from '@/services/equipos/enlaceExpediente'
 
@@ -57,7 +57,7 @@ interface RepuestoDetailPanelProps {
   /** Ver vínculos al manual. */
   onManual?: () => void
   /** Figura del despiece donde va la pieza (por código de fabricante); null = no está en un despiece. */
-  dibujo?: { ruta: string; fig: string } | null
+  dibujo?: { fig: string; abrir: () => void } | null
   /** ¿el repuesto está en favoritos? */
   isFavorite?: boolean
   /** Alternar favorito. */
@@ -255,7 +255,6 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, onClose, loadMov
   const familiasEquipos = agruparDondeSeUsa(equiposReales, plantaDe)
   const totalEquiposUnicos = totalDondeSeUsa(familiasEquipos)
   // Con qué se llega filtrada la lista del expediente: el código de ESTA pieza.
-  const navigate = useNavigate()
   const buscarEnExpediente = (item?.codigoSAP || item?.codigoFabricante || '').trim()
   const { manuales: manualesHeredados, loading: manualesLoading } = useManualesDeEquipos(equiposReales.map((e) => e.machineId))
 
@@ -422,7 +421,7 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, onClose, loadMov
               afirma nada (`undefined` = sin señal), para no decir «vacío» antes de saberlo.
             */}
             {dibujo && (
-              <ActionBtn icon={Shapes} label={`Dibujo · fig. ${dibujo.fig}`} onClick={() => navigate(dibujo.ruta)} />
+              <ActionBtn icon={Shapes} label={`Dibujo · fig. ${dibujo.fig}`} onClick={dibujo.abrir} />
             )}
             {onManual && (
               <ActionBtn

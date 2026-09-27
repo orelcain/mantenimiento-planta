@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dibujoDe, maquinaDeDespiece, rutaDibujo, type EnDespiece } from '../enlacesPieza'
+import { dibujoDe, leerVueltaDelDibujo, maquinaDeDespiece, recordarVueltaDelDibujo, rutaDibujo, type EnDespiece } from '../enlacesPieza'
 
 // 512247 = Riel de guía de la BAADER 200 (fig. 3-3); el código ficticio 999 va en las dos.
 const FIG: Record<string, EnDespiece[]> = {
@@ -30,5 +30,17 @@ describe('dibujo de una pieza', () => {
     expect(maquinaDeDespiece('EVISCERADORA BAADER 142 N2')).toBe('BAADER 142')
     expect(maquinaDeDespiece('CINTA PIMPONEO')).toBeUndefined()
     expect(maquinaDeDespiece(undefined)).toBeUndefined()
+  })
+})
+
+describe('volver del dibujo a Áreas', () => {
+  it('repone búsqueda y repuesto una sola vez', () => {
+    recordarVueltaDelDibujo({ q: 'guia', rowKey: '3300012252' })
+    expect(leerVueltaDelDibujo()).toEqual({ q: 'guia', rowKey: '3300012252' })
+    expect(leerVueltaDelDibujo()).toBeNull()
+  })
+  it('un valor roto no revienta', () => {
+    sessionStorage.setItem('repuestos:volverDelDibujo', '{no es json')
+    expect(leerVueltaDelDibujo()).toBeNull()
   })
 })
