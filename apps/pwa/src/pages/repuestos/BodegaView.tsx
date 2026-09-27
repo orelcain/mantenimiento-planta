@@ -18,8 +18,10 @@ import {
   BarChart3, Plus, ChevronRight, CheckCircle2, CircleDot,
   AlertCircle, Clock, Download, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown,
   Layers, Truck, ShieldCheck, ShieldAlert, ShieldX,
-  Star, Activity, Zap, Archive, Camera, QrCode, ShoppingCart, Image, Tag, MoreHorizontal,
+  Star, Activity, Zap, Archive, Camera, QrCode, ShoppingCart, Image, Tag, MoreHorizontal, Shapes,
 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { dibujoDe, maquinaDeDespiece, useFigurasDespiece } from './enlacesPieza'
 import { QRCodeSVG } from 'qrcode.react'
 import { escapeHtml } from '@/lib/escapeHtml'
 import { collection, getDocs, query as fsQuery, where } from 'firebase/firestore'
@@ -282,6 +284,10 @@ function exportCsv(items: BodegaMergedItem[]) {
 function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: ReturnType<typeof useBodega>; user: any; onViewInEquipo?: (machineId: string) => void; onSearchSimilar?: (query: string) => void }) {
   const { items, stats, saveStock, registrarMovimiento, registrarMovimientoBatch, loadMovimientos, toggleWatch, addPhoto, removePhoto, calcReorderData } = bodega
   const [searchQuery, setSearchQuery] = useState('')
+  // Código de fabricante → figura del despiece (BAADER 142/200): acceso al dibujo desde la tabla y el drawer.
+  const figurasDespiece = useFigurasDespiece()
+  const dibujoDeItem = useCallback((i: BodegaMergedItem) =>
+    dibujoDe(figurasDespiece, i.codigoFabricante, maquinaDeDespiece(i.equipos[0]?.machineName)), [figurasDespiece])
   // Default 'configurados': tras unificar el maestro (Fase 6) "Con SAP" pasó de
   // 759 a 3.778 ítems (mayoría sin stock). El gestor de bodega quiere ver primero
   // su inventario real (los que tienen registro de bodega); el resto, a un clic.
@@ -369,7 +375,7 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
       {showBulkConfig && <BulkConfigModal items={items.filter(i => !i.bodegaId)} saveStock={saveStock} onClose={() => setShowBulkConfig(false)} />}
       {showCargaRapida && <CargaRapidaModal items={items} saveStock={saveStock} onClose={() => setShowCargaRapida(false)} />}
       {showBatchMov && <BatchMovimientoModal items={items.filter(i => i.bodegaId)} registrarMovimientoBatch={registrarMovimientoBatch} user={user} onClose={() => setShowBatchMov(false)} />}
-      {drawerItem && <ItemDrawer item={drawerItem} loadMovimientos={loadMovimientos} onClose={() => setDrawerItem(null)} onEdit={() => { setEditingItem(drawerItem); setDrawerItem(null) }} onMovimiento={() => { setMovimientoItem(drawerItem); setDrawerItem(null) }} addPhoto={addPhoto} removePhoto={removePhoto} calcReorderData={calcReorderData} onViewInEquipo={onViewInEquipo} onSearchSimilar={onSearchSimilar} />}
+      {drawerItem && <ItemDrawer item={drawerItem} loadMovimientos={loadMovimientos} onClose={() => setDrawerItem(null)} onEdit={() => { setEditingItem(drawerItem); setDrawerItem(null) }} onMovimiento={() => { setMovimientoItem(drawerItem); setDrawerItem(null) }} addPhoto={addPhoto} removePhoto={removePhoto} calcReorderData={calcReorderData} onViewInEquipo={onViewInEquipo} onSearchSimilar={onSearchSimilar} dibujo={dibujoDeItem(drawerItem)} />}
     </>
   )
 
@@ -379,7 +385,7 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
       <>
         <StockTablaPC items={items} acciones={menuAcciones}
                       onAbrir={setDrawerItem} onMovimiento={setMovimientoItem}
-                      onFavorito={i => toggleWatch(i.rowKey)} />
+                      onFavorito={i => toggleWatch(i.rowKey)} dibujoDe={dibujoDeItem} />
         {modales}
       </>
     )
@@ -1693,7 +1699,7 @@ function BodegaRow({ item, onEdit, onMovimiento, onToggleWatch, onOpenDrawer }: 
 //  DRAWER LATERAL (vista rápida por ítem)
 // ══════════════════════════════════════════════
 
-function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addPhoto, removePhoto, calcReorderData, onViewInEquipo, onSearchSimilar }: {
+function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addPhoto, removePhoto, calcReorderData, onViewInEquipo, onSearchSimilar, dibujo }: {
   item: BodegaMergedItem; loadMovimientos: (id: string, max?: number) => Promise<MovimientoBodega[]>
   onClose: () => void; onEdit: () => void; onMovimiento: () => void
   addPhoto?: (sap: string, file: File) => Promise<string>
@@ -1701,7 +1707,10 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
   calcReorderData?: (item: BodegaMergedItem, movs: MovimientoBodega[]) => { consumoDiario: number; puntoReorden: number; diasRestantes: number; necesitaPedir: boolean } | null
   onViewInEquipo?: (machineId: string) => void
   onSearchSimilar?: (query: string) => void
+  /** Figura del despiece donde va la pieza; null = no está en un despiece. */
+  dibujo?: { ruta: string; fig: string } | null
 }) {
+  const navigate = useNavigate()
   const [movs, setMovs] = useState<MovimientoBodega[]>([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
@@ -1795,6 +1804,12 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
               </button>
             )}
           </div>
+          {dibujo && (
+            <button onClick={() => { onClose(); navigate(dibujo.ruta) }}
+                    className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-card border border-transparent bg-primary/[0.15] px-3 py-2 text-xs font-medium text-brand-ink hover:bg-primary/[0.15]">
+              <Shapes className="h-3.5 w-3.5" /> Ver en el dibujo · fig. {dibujo.fig}
+            </button>
+          )}
         </div>
 
         <div className="px-5 py-4 space-y-4">
