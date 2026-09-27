@@ -35,8 +35,8 @@ export const seccion: SeccionTerreno = {
     { texto: 'En la planta el 2.º levantador se baja más de lo normal porque trabaja sin chapas guía de aleta; está anotado como tema de mejora.', pos: ['3'], tipo: 'atencion', fuente: PLANTA(5) },
   ],
   dibujos: [
-    { id: 'v4-dib10', url: FUENTES.v4.urlPagina(8), titulo: 'Dibujo 10 · levantadores (pos. 1·3), tornillos de ajuste (pos. 2·4) y tornillo pos. 5; cotas 49 y 50 mm', recorte: { x: 17, y: 34, w: 68, h: 56 }, hotspots: [], fuente: V4(8) },
-    { id: 'planta-p5', url: FUENTES.planta.urlPagina(5), titulo: 'Esquema de planta · levantadores con cotas 49 y 50 mm y biela pos. 6', recorte: { x: 5, y: 22, w: 44, h: 68 }, hotspots: [], fuente: PLANTA(5) },
+    { id: 'v4-dib10', url: FUENTES.v4.urlPagina(8), titulo: 'Dibujo 10 · levantadores (pos. 1·3), tornillos de ajuste (pos. 2·4) y tornillo pos. 5; cotas 49 y 50 mm', recorte: { x: 17, y: 34, w: 68, h: 56 }, hotspots: [{ pos: '3', x: 31.8, y: 5.2 }, { pos: '1', x: 47.8, y: 7.3 }, { pos: '4', x: 78.0, y: 20.0 }, { pos: '2', x: 92.5, y: 19.0 }, { pos: '5', x: 21.7, y: 80.4 }], fuente: V4(8) },
+    { id: 'planta-p5', url: FUENTES.planta.urlPagina(5), titulo: 'Esquema de planta · levantadores con cotas 49 y 50 mm y biela pos. 6', recorte: { x: 5, y: 22, w: 44, h: 68 }, hotspots: [{ pos: '3', x: 50.2, y: 6.8 }, { pos: '1', x: 59.3, y: 6.1 }, { pos: '4', x: 73.8, y: 8.1 }, { pos: '2', x: 78.6, y: 8.9 }, { pos: '6', x: 49.0, y: 45.1 }, { pos: '8', x: 8.0, y: 66.6 }, { pos: '7', x: 31.0, y: 75.1 }, { pos: '9', x: 6.8, y: 95.0 }], fuente: PLANTA(5) },
   ],
   leyenda: [
     { pos: ['1'], nombre: '1.er levantador de aletas (herramienta derecha e izquierda)', codigoBaader: ['518377', '518397'], confianza: 'media', revisar: 'Conjunto 634327 «1. Flossenrichter».' },

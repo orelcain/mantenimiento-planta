@@ -36,9 +36,9 @@ export const seccion: SeccionTerreno = {
     { texto: 'Con cuchillos nuevos, revisar que no rocen las chapaletas de la 2.ª alimentación.', tipo: 'atencion', fuente: PLANTA(10) },
   ],
   dibujos: [
-    { id: 'v4-dib20', url: FUENTES.v4.urlPagina(15), titulo: 'Dibujo 20 · dorsal (pos. 1) sobre ventral (pos. 2) y medida «c»', recorte: { x: 38, y: 9, w: 56, h: 55 }, hotspots: [], fuente: V4(15) },
+    { id: 'v4-dib20', url: FUENTES.v4.urlPagina(15), titulo: 'Dibujo 20 · dorsal (pos. 1) sobre ventral (pos. 2) y medida «c»', recorte: { x: 38, y: 9, w: 56, h: 55 }, hotspots: [{ pos: '1', x: 21.3, y: 35.3 }, { pos: '2', x: 19.8, y: 57.0 }], fuente: V4(15) },
     { id: 'planta-p10', url: FUENTES.planta.urlPagina(10), titulo: 'Esquema y tabla «c» del manual de planta', recorte: { x: 24, y: 18, w: 51, h: 30 }, hotspots: [], fuente: PLANTA(10) },
-    { id: 'v4-dib17', url: FUENTES.v4.urlPagina(13), titulo: 'Dibujo 17 · tornillos de tope (pos. 4·5) y cuerpos de cojinete (pos. 6·7)', recorte: { x: 12, y: 24, w: 80, h: 37 }, hotspots: [], fuente: V4(13) },
+    { id: 'v4-dib17', url: FUENTES.v4.urlPagina(13), titulo: 'Dibujo 17 · tornillos de tope (pos. 4·5) y cuerpos de cojinete (pos. 6·7)', recorte: { x: 12, y: 24, w: 80, h: 37 }, hotspots: [{ pos: '2', x: 3.3, y: 52.5 }, { pos: '3', x: 6.6, y: 57.4 }, { pos: '4', x: 33.2, y: 55.5 }, { pos: '6', x: 37.3, y: 53.2 }, { pos: '1', x: 46.8, y: 59.0 }, { pos: '7', x: 56.0, y: 53.5 }, { pos: '5', x: 62.7, y: 56.0 }, { pos: '3', x: 87.3, y: 55.2 }, { pos: '2', x: 91.2, y: 51.0 }], fuente: V4(13) },
   ],
   leyenda: [
     { pos: ['4', '5'], nombre: 'Tornillo hexagonal de tope (apoyo de los cojinetes)', codigoBaader: ['30811040'], confianza: 'media', tornilleria: true },

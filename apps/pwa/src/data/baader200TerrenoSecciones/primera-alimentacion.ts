@@ -33,8 +33,8 @@ export const seccion: SeccionTerreno = {
     { texto: 'Las chapaletas no deben rozar la silleta.', pos: ['1', '2', '4'], tipo: 'atencion', fuente: PLANTA(3) },
   ],
   dibujos: [
-    { id: 'v4-dib1', url: FUENTES.v4.urlPagina(2), titulo: 'Dibujo 1 · chapaletas (pos. 1·2), tope (pos. 3), silleta (pos. 4), segmentos (pos. 5) y tuerca (pos. 6)', recorte: { x: 19, y: 31, w: 62, h: 59 }, hotspots: [], fuente: V4(2) },
-    { id: 'planta-p3', url: FUENTES.planta.urlPagina(3), titulo: 'Esquema de planta · cotas 32 y 28 mm', recorte: { x: 4, y: 17, w: 48, h: 71 }, hotspots: [], fuente: PLANTA(3) },
+    { id: 'v4-dib1', url: FUENTES.v4.urlPagina(2), titulo: 'Dibujo 1 · chapaletas (pos. 1·2), tope (pos. 3), silleta (pos. 4), segmentos (pos. 5) y tuerca (pos. 6)', recorte: { x: 19, y: 31, w: 62, h: 59 }, hotspots: [{ pos: '5', x: 36.2, y: 3.7 }, { pos: '6', x: 73.0, y: 6.1 }, { pos: '3', x: 95.3, y: 5.8 }, { pos: '4', x: 33.8, y: 51.0 }, { pos: '1', x: 56.3, y: 64.6 }, { pos: '2', x: 8.0, y: 71.1 }], fuente: V4(2) },
+    { id: 'planta-p3', url: FUENTES.planta.urlPagina(3), titulo: 'Esquema de planta · cotas 32 y 28 mm', recorte: { x: 4, y: 17, w: 48, h: 71 }, hotspots: [{ pos: '5', x: 35.7, y: 6.4 }, { pos: '6', x: 82.3, y: 12.2 }, { pos: '3', x: 89.9, y: 23.6 }, { pos: '4', x: 61.7, y: 73.6 }, { pos: '2', x: 8.8, y: 77.1 }, { pos: '1', x: 57.2, y: 80.8 }], fuente: PLANTA(3) },
   ],
   leyenda: [
     { pos: ['1'], nombre: 'Chapaleta alimentadora derecha (guía)', codigoBaader: ['633247'], confianza: 'media', revisar: 'En la variante de la fig. 101-3 el código cambia a 2005102005.' },

@@ -43,8 +43,11 @@ export const seccion: SeccionTerreno = {
     { texto: 'Esta sección es para el raspador oblicuo de 30° (salmón, trucha asalmonada, salmón japonés, bacalao japonés, perca, yellowtail). Si la máquina tiene otra versión del dispositivo, las cuchillas y las levas de la leyenda cambian.', tipo: 'atencion', fuente: V4(32) },
   ],
   dibujos: [
-    { id: 'v4-dib46', url: FUENTES.v4.urlPagina(32), titulo: 'Dibujo 46 · biela de mando (pos. 1), alojamientos (pos. 2) y pernos sujetadores (pos. 6·7)', recorte: { x: 14, y: 32, w: 72, h: 43 }, hotspots: [], fuente: V4(32) },
-    { id: 'v4-dib50', url: FUENTES.v4.urlPagina(36), titulo: 'Dibujo 50 · alojamiento a 35 mm (pos. 2), rascador (pos. 8), soporte (pos. 9) y tornillos (pos. 13)', recorte: { x: 10, y: 9, w: 80, h: 51 }, hotspots: [], fuente: V4(36) },
+    { id: 'v4-dib46', url: FUENTES.v4.urlPagina(32), titulo: 'Dibujo 46 · biela de mando (pos. 1), alojamientos (pos. 2) y pernos sujetadores (pos. 6·7)', recorte: { x: 14, y: 32, w: 72, h: 43 }, hotspots: [{ pos: '46.1', x: 2.9, y: 68.6 }, { pos: '46.6', x: 23.6, y: 32.6 }, { pos: '46.2', x: 38.2, y: 37.8 }, { pos: '46.7', x: 61.1, y: 27.9 }], fuente: V4(32) },
+    { id: 'v4-dib47', url: FUENTES.v4.urlPagina(33), titulo: 'Dibujo 47 · leva (pos. 3) y rodillo (pos. 4)', recorte: { x: 13.5, y: 20.8, w: 73, h: 42.5 }, hotspots: [{ pos: '47.4', x: 61.9, y: 10.8 }, { pos: '47.3', x: 68.9, y: 81.9 }], fuente: V4(33) },
+    { id: 'v4-dib48', url: FUENTES.v4.urlPagina(34), titulo: 'Dibujo 48 · filo del rascador (pos. 1) 1,5 mm bajo el contradiente de la silleta', recorte: { x: 15, y: 25.8, w: 73.5, h: 32 }, hotspots: [{ pos: '48.1', x: 43.8, y: 16.9 }], fuente: V4(34) },
+    { id: 'v4-dib49', url: FUENTES.v4.urlPagina(35), titulo: 'Dibujo 49 · biela de mando de los rascadores (pos. 5)', recorte: { x: 9.8, y: 26.5, w: 82.5, h: 52.5 }, hotspots: [{ pos: '49.5', x: 11.2, y: 25.0 }], fuente: V4(35) },
+    { id: 'v4-dib50', url: FUENTES.v4.urlPagina(36), titulo: 'Dibujo 50 · alojamiento a 35 mm (pos. 2), rascador (pos. 8), soporte (pos. 9) y tornillos (pos. 13)', recorte: { x: 10, y: 9, w: 80, h: 51 }, hotspots: [{ pos: '50.8', x: 30.5, y: 18.9 }, { pos: '50.13', x: 71.8, y: 16.0 }, { pos: '50.9', x: 69.9, y: 28.8 }, { pos: '50.2', x: 94.2, y: 61.9 }], fuente: V4(36) },
     { id: 'v4-dib51', url: FUENTES.v4.urlPagina(37), titulo: 'Dibujo 51 · distancia «g» y tabla por especie', recorte: { x: 14, y: 15, w: 72, h: 53 }, hotspots: [], fuente: V4(37) },
   ],
   leyenda: [

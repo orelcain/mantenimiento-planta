@@ -34,9 +34,9 @@ export const seccion: SeccionTerreno = {
     { texto: 'Al montar dorsales nuevos, rehacer el ajuste con las guías frontales y, si hace falta, con la guía superior.', tipo: 'atencion', fuente: PLANTA(36) },
   ],
   dibujos: [
-    { id: 'v4-dib17', url: FUENTES.v4.urlPagina(13), titulo: 'Dibujo 17 · dorsales (pos. 1), contrasoportes (pos. 2), bujes (pos. 3), tornillos (pos. 4·5) y cojinetes (pos. 6·7)', recorte: { x: 12, y: 24, w: 80, h: 37 }, hotspots: [], fuente: V4(13) },
-    { id: 'v4-dib18-19', url: FUENTES.v4.urlPagina(14), titulo: 'Dibujos 18 y 19 · medida «b» y cotas 22, 2 y 0,5 mm', recorte: { x: 21, y: 8, w: 58, h: 82 }, hotspots: [], fuente: V4(14) },
-    { id: 'planta-p9', url: FUENTES.planta.urlPagina(9), titulo: 'Esquema de planta · medida «b» y posiciones 1 a 7', recorte: { x: 22, y: 20, w: 56, h: 25 }, hotspots: [], fuente: PLANTA(9) },
+    { id: 'v4-dib17', url: FUENTES.v4.urlPagina(13), titulo: 'Dibujo 17 · dorsales (pos. 1), contrasoportes (pos. 2), bujes (pos. 3), tornillos (pos. 4·5) y cojinetes (pos. 6·7)', recorte: { x: 12, y: 24, w: 80, h: 37 }, hotspots: [{ pos: '2', x: 3.3, y: 52.5 }, { pos: '3', x: 6.6, y: 57.4 }, { pos: '4', x: 33.2, y: 55.5 }, { pos: '6', x: 37.3, y: 53.2 }, { pos: '1', x: 46.8, y: 59.0 }, { pos: '7', x: 56.0, y: 53.5 }, { pos: '5', x: 62.7, y: 56.0 }, { pos: '3', x: 87.3, y: 55.2 }, { pos: '2', x: 91.2, y: 51.0 }], fuente: V4(13) },
+    { id: 'v4-dib18-19', url: FUENTES.v4.urlPagina(14), titulo: 'Dibujos 18 y 19 · medida «b» y cotas 22, 2 y 0,5 mm', recorte: { x: 21, y: 8, w: 58, h: 82 }, hotspots: [{ pos: '1', x: 57.3, y: 28.6 }], fuente: V4(14) },
+    { id: 'planta-p9', url: FUENTES.planta.urlPagina(9), titulo: 'Esquema de planta · medida «b» y posiciones 1 a 7', recorte: { x: 22, y: 20, w: 56, h: 25 }, hotspots: [{ pos: '1', x: 43.5, y: 28.0 }, { pos: '6', x: 27.8, y: 41.0 }, { pos: '7', x: 57.0, y: 42.8 }, { pos: '2', x: 88.8, y: 44.8 }, { pos: '3', x: 76.0, y: 86.4 }, { pos: '4', x: 20.0, y: 92.9 }, { pos: '5', x: 61.8, y: 90.0 }], fuente: PLANTA(9) },
   ],
   leyenda: [
     { pos: ['1'], nombre: 'Cuchilla circular 200 mm (ventral y dorsal)', codigoBaader: ['94011760'], sap: ['3300106403'], confianza: 'alta' },

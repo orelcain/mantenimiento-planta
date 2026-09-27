@@ -48,8 +48,15 @@ export const seccion: SeccionTerreno = {
     { texto: 'Si quedan más bajas, cortan la espina del flanco completa y los cuchillos rascadores dejan de cumplir su función.', tipo: 'atencion', fuente: PLANTA(13) },
   ],
   dibujos: [
-    { id: 'v4-dib35', url: FUENTES.v4.urlPagina(26), titulo: 'Dibujo 35 · cuchillas de punta (pos. 1), biela de mando (pos. 2) y guía superior (pos. 7)', recorte: { x: 5, y: 11, w: 79, h: 36 }, hotspots: [], fuente: V4(26) },
-    { id: 'v4-dib38', url: FUENTES.v4.urlPagina(27), titulo: 'Dibujo 38 · topes superiores (pos. 5·6) y tornillo de los 8 mm (pos. 8)', recorte: { x: 17, y: 61, w: 67, h: 28 }, hotspots: [], fuente: V4(27) },
+    { id: 'v4-dib34', url: FUENTES.v4.urlPagina(25), titulo: 'Dibujo 34 · rodillo (pos. 1) sobre la parte trasera de la leva (pos. 2)', recorte: { x: 13, y: 19.5, w: 74, h: 43.5 }, hotspots: [{ pos: '34.2', x: 40.3, y: 10.3 }, { pos: '34.1', x: 60.1, y: 90.8 }], fuente: V4(25) },
+    { id: 'v4-dib35', url: FUENTES.v4.urlPagina(26), titulo: 'Dibujo 35 · cuchillas de punta (pos. 1), biela de mando (pos. 2) y guía superior (pos. 7)', recorte: { x: 5, y: 17.5, w: 79, h: 29.5 }, hotspots: [{ pos: '35.1', x: 40.7, y: 67.7 }, { pos: '35.7', x: 56.8, y: 65.1 }, { pos: '35.2', x: 69.0, y: 67.7 }], fuente: V4(26) },
+    { id: 'v4-dib36', url: FUENTES.v4.urlPagina(26), titulo: 'Dibujo 36 · cuchillas 6-7 mm dentro de la guía de espinas inferior (pos. 3) y 1 mm al fondo', recorte: { x: 15.5, y: 60, w: 69, h: 28.6 }, hotspots: [{ pos: '36.3', x: 80.9, y: 92.7 }], fuente: V4(26) },
+    { id: 'v4-dib37', url: FUENTES.v4.urlPagina(27), titulo: 'Dibujo 37 · tornillo de tope inferior (pos. 4)', recorte: { x: 21, y: 8.5, w: 56, h: 42 }, hotspots: [{ pos: '37.4', x: 69.3, y: 58.8 }], fuente: V4(27) },
+    { id: 'v4-dib38', url: FUENTES.v4.urlPagina(27), titulo: 'Dibujo 38 · topes superiores (pos. 5·6) y tornillo de los 8 mm (pos. 8)', recorte: { x: 17, y: 61, w: 67, h: 28 }, hotspots: [{ pos: '38.6', x: 33.4, y: 31.2 }, { pos: '38.8', x: 59.8, y: 44.5 }, { pos: '38.5', x: 33.0, y: 72.4 }], fuente: V4(27) },
+    { id: 'v4-dib39', url: FUENTES.v4.urlPagina(28), titulo: 'Dibujo 39 · silleta (pos. 1) y cuchillas de punta (pos. 2): 1-1,5 mm y 0,5-1 mm', recorte: { x: 13, y: 18.8, w: 74, h: 31.4 }, hotspots: [{ pos: '39.1', x: 10.3, y: 52.5 }, { pos: '39.2', x: 57.6, y: 35.7 }], fuente: V4(28) },
+    { id: 'v4-dib42', url: FUENTES.v4.urlPagina(30), titulo: 'Dibujo 42 · leva (pos. 1), rodillo (pos. 2) y pernos del segmento (pos. 3)', recorte: { x: 7, y: 28, w: 45.5, h: 51 }, hotspots: [{ pos: '42.1', x: 18.2, y: 48.0 }, { pos: '42.2', x: 33.4, y: 81.4 }, { pos: '42.3', x: 64.2, y: 60.0 }], fuente: V4(30) },
+    { id: 'v4-dib44', url: FUENTES.v4.urlPagina(31), titulo: 'Dibujo 44 · cuchillas de punta (pos. 1) sobre el contradiente de la silleta (pos. 2)', recorte: { x: 17, y: 17.5, w: 66, h: 31.5 }, hotspots: [{ pos: '44.1', x: 52.6, y: 42.2 }, { pos: '44.2', x: 32.6, y: 59.4 }], fuente: V4(31) },
+    { id: 'v4-dib45', url: FUENTES.v4.urlPagina(31), titulo: 'Dibujo 45 · rodillo (pos. 3) en lo más alto de la vía de leva (pos. 4)', recorte: { x: 17, y: 51.8, w: 65.5, h: 35.8 }, hotspots: [{ pos: '45.4', x: 53.0, y: 51.7 }, { pos: '45.3', x: 45.3, y: 80.7 }], fuente: V4(31) },
     { id: 'planta-p13', url: FUENTES.planta.urlPagina(13), titulo: 'Esquema de planta · figuras A a D del cuchillo punzón', recorte: { x: 6, y: 20, w: 41, h: 68 }, hotspots: [], fuente: PLANTA(13) },
   ],
   leyenda: [
